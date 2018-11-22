@@ -20,6 +20,22 @@
 #include <utils/Log.h>
 #include <math.h>
 
+namespace android {
+/**
+ * VolumeSource is the discriminent for volume management on an output.
+ * It used to be the stream type by legacy, it may be host volume group or a volume curves if
+ * we allow to have more than one curve per volume group.
+ */
+enum VolumeSource : std::underlying_type<audio_stream_type_t>::type;
+static const VolumeSource VOLUME_SOURCE_NONE = static_cast<VolumeSource>(AUDIO_STREAM_DEFAULT);
+
+static inline VolumeSource streamToVolumeSource(audio_stream_type_t stream) {
+    return static_cast<VolumeSource>(stream);
+}
+
+
+} // namespace android
+
 // Absolute min volume in dB (can be represented in single precision normal float value)
 #define VOLUME_MIN_DB (-758)
 

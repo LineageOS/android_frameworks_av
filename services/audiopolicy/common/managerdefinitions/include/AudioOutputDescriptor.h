@@ -73,13 +73,44 @@ public:
 
     virtual void dump(String8 *dst, int spaces) const
     {
-        dst->appendFormat("%*s- ActivityCount: %d, StopTime: %" PRId64 " \n", spaces, "",
+        dst->appendFormat("%*s- ActivityCount: %d, StopTime: %" PRId64 ", ", spaces, "",
                           getActivityCount(), getStopTime());
     }
 private:
     uint32_t mActivityCount = 0;
     nsecs_t mStopTime = 0;
 };
+
+/**
+ * @brief VolumeActivity: it tracks the activity for volume policy (volume index, mute,
+ * memorize previous stop, and store mute if incompatible device with another strategy.
+ */
+class VolumeActivity : public ActivityTracking
+{
+public:
+    bool isMuted() const { return mMuteCount > 0; }
+    int getMuteCount() const { return mMuteCount; }
+    int incMuteCount() { return ++mMuteCount; }
+    int decMuteCount() { return mMuteCount > 0 ? --mMuteCount : -1; }
+
+    void dump(String8 *dst, int spaces) const override
+    {
+        ActivityTracking::dump(dst, spaces);
+        dst->appendFormat(", Volume: %.03f, MuteCount: %02d\n", mCurVolumeDb, mMuteCount);
+    }
+    void setVolume(float volume) { mCurVolumeDb = volume; }
+    float getVolume() const { return mCurVolumeDb; }
+
+private:
+    int mMuteCount = 0; /**< mute request counter */
+    float mCurVolumeDb = NAN; /**< current volume in dB. */
+};
+/**
+ * Note: volume activities shall be indexed by CurvesId if we want to allow multiple
+ * curves per volume group, inferring a mute management or volume balancing between HW and SW is
+ * done
+ */
+using VolumeActivities = std::map<VolumeSource, VolumeActivity>;
 
 /**
  * @brief The Activity class: it tracks the activity for volume policy (volume index, mute,
@@ -92,6 +123,10 @@ public:
     void setMutedByDevice( bool isMuted) { mIsMutedByDevice = isMuted; }
     bool isMutedByDevice() const { return mIsMutedByDevice; }
 
+    void dump(String8 *dst, int spaces) const override {
+        ActivityTracking::dump(dst, spaces);
+        dst->appendFormat("\n");
+    }
 private:
     /**
      * strategies muted because of incompatible device selection.
@@ -128,15 +163,6 @@ public:
                            bool force);
 
     /**
-     * Changes the stream active count and mActiveClients only.
-     * This does not change the client->active() state or the output descriptor's
-     * global active count.
-     */
-    virtual void changeStreamActiveCount(const sp<TrackClientDescriptor>& client, int delta);
-            uint32_t streamActiveCount(audio_stream_type_t stream) const
-                            { return mActiveCount[stream]; }
-
-    /**
      * @brief setStopTime set the stop time due to the client stoppage or a re routing of this
      * client
      * @param client to be considered
@@ -148,13 +174,61 @@ public:
      * Changes the client->active() state and the output descriptor's global active count,
      * along with the stream active count and mActiveClients.
      * The client must be previously added by the base class addClient().
+     * In case of duplicating thread, client shall be added on the duplicated thread, not on the
+     * involved outputs but setClientActive will be called on all output to track strategy and
+     * active client for a given output.
+     * Active ref count of the client will be incremented/decremented through setActive API
      */
-            void setClientActive(const sp<TrackClientDescriptor>& client, bool active);
+    virtual void setClientActive(const sp<TrackClientDescriptor>& client, bool active);
 
-    bool isActive(uint32_t inPastMs = 0) const;
-    bool isStreamActive(audio_stream_type_t stream,
-                        uint32_t inPastMs = 0,
-                        nsecs_t sysTime = 0) const;
+    bool isActive(uint32_t inPastMs) const;
+    bool isActive(VolumeSource volumeSource = VOLUME_SOURCE_NONE,
+                  uint32_t inPastMs = 0,
+                  nsecs_t sysTime = 0) const;
+    bool isAnyActive(VolumeSource volumeSourceToIgnore) const;
+
+    std::vector<VolumeSource> getActiveVolumeSources() const {
+        std::vector<VolumeSource> activeList;
+        for (const auto &iter : mVolumeActivities) {
+            if (iter.second.isActive()) {
+                activeList.push_back(iter.first);
+            }
+        }
+        return activeList;
+    }
+    uint32_t getActivityCount(VolumeSource vs) const
+    {
+        return mVolumeActivities.find(vs) != std::end(mVolumeActivities)?
+                    mVolumeActivities.at(vs).getActivityCount() : 0;
+    }
+    bool isMuted(VolumeSource vs) const
+    {
+        return mVolumeActivities.find(vs) != std::end(mVolumeActivities)?
+                    mVolumeActivities.at(vs).isMuted() : false;
+    }
+    int getMuteCount(VolumeSource vs) const
+    {
+        return mVolumeActivities.find(vs) != std::end(mVolumeActivities)?
+                    mVolumeActivities.at(vs).getMuteCount() : 0;
+    }
+    int incMuteCount(VolumeSource vs)
+    {
+        return mVolumeActivities[vs].incMuteCount();
+    }
+    int decMuteCount(VolumeSource vs)
+    {
+        return mVolumeActivities[vs].decMuteCount();
+    }
+    void setCurVolume(VolumeSource vs, float volume)
+    {
+        // Even if not activity for this group registered, need to create anyway
+        mVolumeActivities[vs].setVolume(volume);
+    }
+    float getCurVolume(VolumeSource vs) const
+    {
+        return mVolumeActivities.find(vs) != std::end(mVolumeActivities) ?
+                    mVolumeActivities.at(vs).getVolume() : NAN;
+    }
 
     bool isStrategyActive(product_strategy_t ps, uint32_t inPastMs = 0, nsecs_t sysTime = 0) const
     {
@@ -195,40 +269,36 @@ public:
         // it is possible that when a client is removed, we could remove its
         // associated active count by calling changeStreamActiveCount(),
         // but that would be hiding a problem, so we log fatal instead.
-        auto it2 = mActiveClients.find(client);
-        LOG_ALWAYS_FATAL_IF(it2 != mActiveClients.end(),
-                "%s(%d) removing client portId %d which is active (count %zu)",
-                __func__, mId, portId, it2->second);
+        auto clientIter = std::find(begin(mActiveClients), end(mActiveClients), client);
+        LOG_ALWAYS_FATAL_IF(clientIter != mActiveClients.end(),
+                            "%s(%d) removing client portId %d which is active (count %d)",
+                            __func__, mId, portId, client->getActivityCount());
         ClientMapHandler<TrackClientDescriptor>::removeClient(portId);
     }
 
-    using ActiveClientMap = std::map<sp<TrackClientDescriptor>, size_t /* count */>;
-    // required for duplicating thread
-    const ActiveClientMap& getActiveClients() const {
+    const TrackClientVector& getActiveClients() const {
         return mActiveClients;
     }
 
     DeviceVector mDevices; /**< current devices this output is routed to */
-    nsecs_t mStopTime[AUDIO_STREAM_CNT];
-    int mMuteCount[AUDIO_STREAM_CNT];            // mute request counter
     AudioMix *mPolicyMix = nullptr;              // non NULL when used by a dynamic policy
 
 protected:
     const sp<AudioPort> mPort;
     AudioPolicyClientInterface * const mClientInterface;
-    float mCurVolume[AUDIO_STREAM_CNT];   // current stream volume in dB
-    uint32_t mActiveCount[AUDIO_STREAM_CNT]; // number of streams of each type active on this output
     uint32_t mGlobalActiveCount = 0;  // non-client-specific active count
     audio_patch_handle_t mPatchHandle = AUDIO_PATCH_HANDLE_NONE;
     audio_port_handle_t mId = AUDIO_PORT_HANDLE_NONE;
 
-    // The ActiveClientMap shows the clients that contribute to the streams counts
+    // The ActiveClients shows the clients that contribute to the @VolumeSource counts
     // and may include upstream clients from a duplicating thread.
     // Compare with the ClientMap (mClients) which are external AudioTrack clients of the
     // output descriptor (and do not count internal PatchTracks).
-    ActiveClientMap mActiveClients;
+    TrackClientVector mActiveClients;
 
     RoutingActivities mRoutingActivities; /**< track routing activity on this ouput.*/
+
+    VolumeActivities mVolumeActivities; /**< track volume activity on this ouput.*/
 };
 
 // Audio output driven by a software mixer in audio flinger.
@@ -250,8 +320,13 @@ public:
     virtual bool isFixedVolume(audio_devices_t device);
     sp<SwAudioOutputDescriptor> subOutput1() { return mOutput1; }
     sp<SwAudioOutputDescriptor> subOutput2() { return mOutput2; }
-            void changeStreamActiveCount(
-                    const sp<TrackClientDescriptor>& client, int delta) override;
+    void setClientActive(const sp<TrackClientDescriptor>& client, bool active) override;
+    void setAllClientsInactive()
+    {
+        for (const auto &client : clientsList(true)) {
+            setClientActive(client, false);
+        }
+    }
     virtual bool setVolume(float volume,
                            audio_stream_type_t stream,
                            audio_devices_t device,
@@ -344,25 +419,27 @@ class SwAudioOutputCollection :
         public DefaultKeyedVector< audio_io_handle_t, sp<SwAudioOutputDescriptor> >
 {
 public:
-    bool isStreamActive(audio_stream_type_t stream, uint32_t inPastMs = 0) const;
+    bool isActive(VolumeSource volumeSource, uint32_t inPastMs = 0) const;
 
     /**
-     * return whether a stream is playing remotely, override to change the definition of
+     * return whether any source contributing to VolumeSource is playing remotely, override 
+     * to change the definition of
      * local/remote playback, used for instance by notification manager to not make
      * media players lose audio focus when not playing locally
      * For the base implementation, "remotely" means playing during screen mirroring which
      * uses an output for playback with a non-empty, non "0" address.
      */
-    bool isStreamActiveRemotely(audio_stream_type_t stream, uint32_t inPastMs = 0) const;
+    bool isActiveRemotely(VolumeSource volumeSource, uint32_t inPastMs = 0) const;
 
     /**
-     * return whether a stream is playing, but not on a "remote" device.
+     * return whether any source contributing to VolumeSource is playing, but not on a "remote"
+     * device.
      * Override to change the definition of a local/remote playback.
      * Used for instance by policy manager to alter the speaker playback ("speaker safe" behavior)
      * when media plays or not locally.
      * For the base implementation, "remotely" means playing during screen mirroring.
      */
-    bool isStreamActiveLocally(audio_stream_type_t stream, uint32_t inPastMs = 0) const;
+    bool isActiveLocally(VolumeSource volumeSource, uint32_t inPastMs = 0) const;
 
     /**
      * @brief isStrategyActiveOnSameModule checks if the given strategy is active (or was active
@@ -409,9 +486,21 @@ public:
     sp<SwAudioOutputDescriptor> getPrimaryOutput() const;
 
     /**
-     * return true if any output is playing anything besides the stream to ignore
+     * @brief isAnyOutputActive checks if any output is active (aka playing) except the one(s) that
+     * hold the volume source to be ignored
+     * @param volumeSourceToIgnore source not considered in the activity detection
+     * @return true if any output is active for any source except the one to be ignored
      */
-    bool isAnyOutputActive(audio_stream_type_t streamToIgnore) const;
+    bool isAnyOutputActive(VolumeSource volumeSourceToIgnore) const
+    {
+        for (size_t i = 0; i < size(); i++) {
+            const sp<AudioOutputDescriptor> &outputDesc = valueAt(i);
+            if (outputDesc->isAnyActive(volumeSourceToIgnore)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     audio_devices_t getSupportedDevices(audio_io_handle_t handle) const;
 
@@ -424,12 +513,24 @@ class HwAudioOutputCollection :
         public DefaultKeyedVector< audio_io_handle_t, sp<HwAudioOutputDescriptor> >
 {
 public:
-    bool isStreamActive(audio_stream_type_t stream, uint32_t inPastMs = 0) const;
+    bool isActive(VolumeSource volumeSource, uint32_t inPastMs = 0) const;
 
     /**
-     * return true if any output is playing anything besides the stream to ignore
+     * @brief isAnyOutputActive checks if any output is active (aka playing) except the one(s) that
+     * hold the volume source to be ignored
+     * @param volumeSourceToIgnore source not considered in the activity detection
+     * @return true if any output is active for any source except the one to be ignored
      */
-    bool isAnyOutputActive(audio_stream_type_t streamToIgnore) const;
+    bool isAnyOutputActive(VolumeSource volumeSourceToIgnore) const
+    {
+        for (size_t i = 0; i < size(); i++) {
+            const sp<AudioOutputDescriptor> &outputDesc = valueAt(i);
+            if (outputDesc->isAnyActive(volumeSourceToIgnore)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     void dump(String8 *dst) const;
 };
