@@ -152,6 +152,8 @@ public:
 
     volume_group_t getVolumeGroupForStreamType(audio_stream_type_t stream) const;
 
+    volume_group_t getDefaultVolumeGroup() const;
+
     product_strategy_t getDefault() const;
 
     void dump(String8 *dst, int spaces = 0) const;

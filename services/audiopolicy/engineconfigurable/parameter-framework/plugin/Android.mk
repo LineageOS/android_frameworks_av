@@ -36,7 +36,9 @@ LOCAL_HEADER_LIBRARIES := \
 
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
 
-LOCAL_STATIC_LIBRARIES := libpfw_utility
+LOCAL_STATIC_LIBRARIES := \
+    libpfw_utility \
+    libaudiopolicycomponents
 
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE := libpolicy-subsystem

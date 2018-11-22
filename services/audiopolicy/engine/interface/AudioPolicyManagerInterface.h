@@ -283,10 +283,6 @@ public:
      */
     virtual volume_group_t getVolumeGroupForStreamType(audio_stream_type_t stream) const = 0;
 
-    virtual StreamTypeVector getStreamTypesForVolumeGroup(volume_group_t volumeGroup) const = 0;
-
-    virtual AttributesVector getAllAttributesForVolumeGroup(volume_group_t volumeGroup) const = 0;
-
     /**
      * @brief listAudioVolumeGroups introspection API to get the Audio Volume Groups, aka
      * former stream aliases in Audio Service, defining volume curves attached to one or more

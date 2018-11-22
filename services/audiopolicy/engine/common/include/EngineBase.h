@@ -84,10 +84,6 @@ public:
 
     volume_group_t getVolumeGroupForStreamType(audio_stream_type_t stream) const override;
 
-    StreamTypeVector getStreamTypesForVolumeGroup(volume_group_t volumeGroup) const override;
-
-    AttributesVector getAllAttributesForVolumeGroup(volume_group_t volumeGroup) const override;
-
     status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups) const override;
 
     void dump(String8 *dst) const override;
@@ -112,7 +108,7 @@ public:
 
     VolumeSource toVolumeSource(audio_stream_type_t stream) const
     {
-        return static_cast<VolumeSource>(stream);
+        return static_cast<VolumeSource>(getVolumeGroupForStreamType(stream));
     }
 
     status_t switchVolumeCurve(audio_stream_type_t streamSrc, audio_stream_type_t streamDst);

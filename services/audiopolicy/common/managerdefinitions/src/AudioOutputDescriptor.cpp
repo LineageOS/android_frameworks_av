@@ -23,6 +23,7 @@
 #include "AudioGain.h"
 #include "Volume.h"
 #include "HwModule.h"
+#include "TypeConverter.h"
 #include <media/AudioParameter.h>
 #include <media/AudioPolicy.h>
 
@@ -150,17 +151,18 @@ bool AudioOutputDescriptor::isFixedVolume(audio_devices_t device __unused)
 }
 
 bool AudioOutputDescriptor::setVolume(float volumeDb,
-                                      audio_stream_type_t stream,
-                                      audio_devices_t device __unused,
+                                      VolumeSource volumeSource,
+                                      const StreamTypeVector &/*streams*/,
+                                      audio_devices_t /*device*/,
                                       uint32_t delayMs,
                                       bool force)
 {
     // We actually change the volume if:
     // - the float value returned by computeVolume() changed
     // - the force flag is set
-    if (volumeDb != getCurVolume(static_cast<VolumeSource>(stream)) || force) {
-        ALOGV("setVolume() for stream %d, volume %f, delay %d", stream, volumeDb, delayMs);
-        setCurVolume(static_cast<VolumeSource>(stream), volumeDb);
+    if (volumeDb != getCurVolume(volumeSource) || force) {
+        ALOGV("%s for volumeSrc %d, volume %f, delay %d", __func__, volumeSource, volumeDb, delayMs);
+        setCurVolume(volumeSource, volumeDb);
         return true;
     }
     return false;
@@ -389,23 +391,33 @@ void SwAudioOutputDescriptor::toAudioPort(
 }
 
 bool SwAudioOutputDescriptor::setVolume(float volumeDb,
-                                        audio_stream_type_t stream,
+                                        VolumeSource vs, const StreamTypeVector &streamTypes,
                                         audio_devices_t device,
                                         uint32_t delayMs,
                                         bool force)
 {
-    if (!AudioOutputDescriptor::setVolume(volumeDb, stream, device, delayMs, force)) {
+    StreamTypeVector streams = streamTypes;
+    if (!AudioOutputDescriptor::setVolume(volumeDb, vs, streamTypes, device, delayMs, force)) {
         return false;
+    }
+    if (streams.empty()) {
+        streams.push_back(AUDIO_STREAM_MUSIC);
     }
     if (!devices().isEmpty()) {
         // Assume first device to check upon Gain Crontroller availability
+        // APM loops on all group, so filter on active group to set the port gain,
+        // let the other groups set the stream volume as per legacy
         const auto &devicePort = devices().itemAt(0);
-        ALOGV("%s: device %s hasGC %d", __FUNCTION__,
-            devicePort->toString().c_str(), devices().itemAt(0)->hasGainController(true));
-        if (devicePort->hasGainController(true)) {
+        if (devicePort->hasGainController(true) && isActive(vs)) {
+            ALOGV("%s: device %s has gain controller", __func__, devicePort->toString().c_str());
+            // @todo: here we might be in trouble if the SwOutput has several active clients with
+            // different Volume Source (or if we allow several curves within same volume group)
+            //
             // @todo: default stream volume to max (0) when using HW Port gain?
             float volumeAmpl = Volume::DbToAmpl(0);
-            mClientInterface->setStreamVolume(stream, volumeAmpl, mIoHandle, delayMs);
+            for (const auto &stream : streams) {
+                mClientInterface->setStreamVolume(stream, volumeAmpl, mIoHandle, delayMs);
+            }
 
             AudioGains gains = devicePort->getGains();
             int gainMinValueInMb = gains[0]->getMinValueInMb();
@@ -422,11 +434,15 @@ bool SwAudioOutputDescriptor::setVolume(float volumeDb,
         }
     }
     // Force VOICE_CALL to track BLUETOOTH_SCO stream volume when bluetooth audio is enabled
-    float volumeAmpl = Volume::DbToAmpl(getCurVolume(static_cast<VolumeSource>(stream)));
-    if (stream == AUDIO_STREAM_BLUETOOTH_SCO) {
+    float volumeAmpl = Volume::DbToAmpl(getCurVolume(vs));
+    if (hasStream(streams, AUDIO_STREAM_BLUETOOTH_SCO)) {
         mClientInterface->setStreamVolume(AUDIO_STREAM_VOICE_CALL, volumeAmpl, mIoHandle, delayMs);
     }
-    mClientInterface->setStreamVolume(stream, volumeAmpl, mIoHandle, delayMs);
+    for (const auto &stream : streams) {
+        ALOGV("%s output %d for volumeSource %d, volume %f, delay %d stream=%s", __func__,
+              mIoHandle, vs, volumeDb, delayMs, toString(stream).c_str());
+        mClientInterface->setStreamVolume(stream, volumeAmpl, mIoHandle, delayMs);
+    }
     return true;
 }
 
@@ -616,12 +632,13 @@ void HwAudioOutputDescriptor::toAudioPort(
 
 
 bool HwAudioOutputDescriptor::setVolume(float volumeDb,
-                                        audio_stream_type_t stream,
+                                        VolumeSource volumeSource, const StreamTypeVector &streams,
                                         audio_devices_t device,
                                         uint32_t delayMs,
                                         bool force)
 {
-    bool changed = AudioOutputDescriptor::setVolume(volumeDb, stream, device, delayMs, force);
+    bool changed =
+        AudioOutputDescriptor::setVolume(volumeDb, volumeSource, streams, device, delayMs, force);
 
     if (changed) {
       // TODO: use gain controller on source device if any to adjust volume

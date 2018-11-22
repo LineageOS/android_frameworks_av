@@ -218,6 +218,9 @@ VolumeCurves *EngineBase::getVolumeCurvesForAttributes(const audio_attributes_t 
 VolumeCurves *EngineBase::getVolumeCurvesForStreamType(audio_stream_type_t stream) const
 {
     volume_group_t volGr = mProductStrategies.getVolumeGroupForStreamType(stream);
+    if (volGr == VOLUME_GROUP_NONE) {
+        volGr = mProductStrategies.getDefaultVolumeGroup();
+    }
     const auto &iter = mVolumeGroups.find(volGr);
     LOG_ALWAYS_FATAL_IF(iter == std::end(mVolumeGroups), "No volume groups for %s",
                 toString(stream).c_str());
@@ -258,20 +261,6 @@ volume_group_t EngineBase::getVolumeGroupForAttributes(const audio_attributes_t 
 volume_group_t EngineBase::getVolumeGroupForStreamType(audio_stream_type_t stream) const
 {
     return mProductStrategies.getVolumeGroupForStreamType(stream);
-}
-
-StreamTypeVector EngineBase::getStreamTypesForVolumeGroup(volume_group_t volumeGroup) const
-{
-    // @TODO default music stream to control volume if no group?
-    return (mVolumeGroups.find(volumeGroup) != end(mVolumeGroups)) ?
-                mVolumeGroups.at(volumeGroup)->getStreamTypes() :
-                StreamTypeVector(AUDIO_STREAM_MUSIC);
-}
-
-AttributesVector EngineBase::getAllAttributesForVolumeGroup(volume_group_t volumeGroup) const
-{
-    return (mVolumeGroups.find(volumeGroup) != end(mVolumeGroups)) ?
-                mVolumeGroups.at(volumeGroup)->getSupportedAttributes() : AttributesVector();
 }
 
 status_t EngineBase::listAudioVolumeGroups(AudioVolumeGroupVector &groups) const

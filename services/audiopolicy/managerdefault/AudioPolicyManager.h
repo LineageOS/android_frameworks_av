@@ -174,8 +174,7 @@ public:
         status_t setVolumeGroupIndex(IVolumeCurves &volumeCurves, volume_group_t group, int index,
                                      audio_devices_t device, const audio_attributes_t attributes);
 
-        status_t setVolumeCurveIndex(volume_group_t volumeGroup,
-                                     int index,
+        status_t setVolumeCurveIndex(int index,
                                      audio_devices_t device,
                                      IVolumeCurves &volumeCurves);
 
@@ -358,6 +357,30 @@ protected:
             return mDefaultOutputDevice;
         }
 
+        std::vector<volume_group_t> getVolumeGroups() const
+        {
+            return mEngine->getVolumeGroups();
+        }
+
+        VolumeSource toVolumeSource(volume_group_t volumeGroup) const
+        {
+            return static_cast<VolumeSource>(volumeGroup);
+        }
+        VolumeSource toVolumeSource(const audio_attributes_t &attributes) const
+        {
+            return toVolumeSource(mEngine->getVolumeGroupForAttributes(attributes));
+        }
+        VolumeSource toVolumeSource(audio_stream_type_t stream) const
+        {
+            return toVolumeSource(mEngine->getVolumeGroupForStreamType(stream));
+        }
+        IVolumeCurves &getVolumeCurves(VolumeSource volumeSource)
+        {
+          auto *curves = mEngine->getVolumeCurvesForVolumeGroup(
+              static_cast<volume_group_t>(volumeSource));
+          ALOG_ASSERT(curves != nullptr, "No curves for volume source %d", volumeSource);
+          return *curves;
+        }
         IVolumeCurves &getVolumeCurves(const audio_attributes_t &attr)
         {
             auto *curves = mEngine->getVolumeCurvesForAttributes(attr);
@@ -395,7 +418,8 @@ protected:
 
         // compute the actual volume for a given stream according to the requested index and a particular
         // device
-        virtual float computeVolume(audio_stream_type_t stream,
+        virtual float computeVolume(IVolumeCurves &curves,
+                                    VolumeSource volumeSource,
                                     int index,
                                     audio_devices_t device);
 
@@ -404,7 +428,8 @@ protected:
                                audio_stream_type_t srcStream,
                                audio_stream_type_t dstStream);
         // check that volume change is permitted, compute and send new volume to audio hardware
-        virtual status_t checkAndSetVolume(audio_stream_type_t stream, int index,
+        virtual status_t checkAndSetVolume(IVolumeCurves &curves,
+                                           VolumeSource volumeSource, int index,
                                            const sp<AudioOutputDescriptor>& outputDesc,
                                            audio_devices_t device,
                                            int delayMs = 0, bool force = false);
@@ -428,12 +453,22 @@ protected:
                              int delayMs = 0,
                              audio_devices_t device = AUDIO_DEVICE_NONE);
 
-        // Mute or unmute the stream on the specified output
-        void setStreamMute(audio_stream_type_t stream,
-                           bool on,
-                           const sp<AudioOutputDescriptor>& outputDesc,
-                           int delayMs = 0,
-                           audio_devices_t device = (audio_devices_t)0);
+        /**
+         * @brief setVolumeSourceMute Mute or unmute the volume source on the specified output
+         * @param volumeSource to be muted/unmute (may host legacy streams or by extension set of
+         * audio attributes)
+         * @param on true to mute, false to umute
+         * @param outputDesc on which the client following the volume group shall be muted/umuted
+         * @param delayMs
+         * @param device
+         * @param activeOnly if true, mute only if the volume group is active on the output.
+         */
+        void setVolumeSourceMute(VolumeSource volumeSource,
+                                 bool on,
+                                 const sp<AudioOutputDescriptor>& outputDesc,
+                                 int delayMs = 0,
+                                 audio_devices_t device = AUDIO_DEVICE_NONE,
+                                 bool activeOnly = false);
 
         audio_mode_t getPhoneState();
 
