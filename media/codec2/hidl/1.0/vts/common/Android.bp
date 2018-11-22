@@ -1,0 +1,33 @@
+cc_library_static {
+    name: "VtsMediaC2V1_0CommonUtil",
+    defaults: [
+        "VtsHalTargetTestDefaults",
+        "libcodec2-hidl-defaults",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/codec2/hidl/client/include",
+    ],
+
+    srcs: [
+        "media_c2_hidl_test_common.cpp",
+    ],
+
+    export_include_dirs: ["."],
+}
+
+cc_defaults {
+    name: "VtsMediaC2V1_0Defaults",
+    defaults: [
+        "VtsHalTargetTestDefaults",
+        "libcodec2-hidl-defaults",
+    ],
+
+    static_libs: [
+        "VtsMediaC2V1_0CommonUtil",
+    ],
+
+    shared_libs: [
+        "libcodec2_client",
+    ],
+}
