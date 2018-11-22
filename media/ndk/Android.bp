@@ -161,6 +161,7 @@ cc_test {
     shared_libs: [
         "libbinder",
         "libmediandk",
+        "libmediautils",
         "libnativewindow",
         "libgui",
         "libutils",

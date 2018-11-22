@@ -34,7 +34,7 @@ JAudioTrack::JAudioTrack(                             // < Usages of the argumen
         callback_t cbf,                               // Offload
         void* user,                                   // Offload
         size_t frameCount,                            // bufferSizeInBytes
-        int32_t sessionId,                    // AudioTrack
+        int32_t sessionId,                            // AudioTrack
         const jobject attributes,                     // AudioAttributes
         float maxRequiredSpeed) {                     // bufferSizeInBytes
 
@@ -65,17 +65,19 @@ JAudioTrack::JAudioTrack(                             // < Usages of the argumen
     jmethodID jBuilderCtor = env->GetMethodID(jBuilderCls, "<init>", "()V");
     jobject jBuilderObj = env->NewObject(jBuilderCls, jBuilderCtor);
 
-    if (attributes != NULL) {
-        mAudioAttributesObj = new JObjectHolder(attributes);
-    } else {
-        mAudioAttributesObj = new JObjectHolder(
-                JAudioAttributes::createAudioAttributesObj(env, NULL));
+    {
+        sp<JObjectHolder> audioAttributesObj;
+        if (attributes != NULL) {
+            audioAttributesObj = new JObjectHolder(attributes);
+        } else {
+            audioAttributesObj = new JObjectHolder(
+                    JAudioAttributes::createAudioAttributesObj(env, NULL));
+        }
+        jmethodID jSetAudioAttributes = env->GetMethodID(jBuilderCls, "setAudioAttributes",
+                "(Landroid/media/AudioAttributes;)Landroid/media/AudioTrack$Builder;");
+        jBuilderObj = env->CallObjectMethod(jBuilderObj,
+                jSetAudioAttributes, audioAttributesObj->getJObject());
     }
-
-    jmethodID jSetAudioAttributes = env->GetMethodID(jBuilderCls, "setAudioAttributes",
-            "(Landroid/media/AudioAttributes;)Landroid/media/AudioTrack$Builder;");
-    jBuilderObj = env->CallObjectMethod(jBuilderObj,
-            jSetAudioAttributes, mAudioAttributesObj->getJObject());
 
     jmethodID jSetAudioFormat = env->GetMethodID(jBuilderCls, "setAudioFormat",
             "(Landroid/media/AudioFormat;)Landroid/media/AudioTrack$Builder;");
@@ -513,15 +515,14 @@ status_t JAudioTrack::setPreferredDevice(jobject device) {
 }
 
 audio_stream_type_t JAudioTrack::getAudioStreamType() {
-    if (mAudioAttributesObj == NULL) {
-        return AUDIO_STREAM_DEFAULT;
-    }
     JNIEnv *env = JavaVMHelper::getJNIEnv();
+    jmethodID jGetAudioAttributes = env->GetMethodID(mAudioTrackCls, "getAudioAttributes",
+            "()Landroid/media/AudioAttributes;");
+    jobject jAudioAttributes = env->CallObjectMethod(mAudioTrackObj, jGetAudioAttributes);
     jclass jAudioAttributesCls = env->FindClass("android/media/AudioAttributes");
     jmethodID jGetVolumeControlStream = env->GetMethodID(jAudioAttributesCls,
             "getVolumeControlStream", "()I");
-    int javaAudioStreamType = env->CallIntMethod(
-            mAudioAttributesObj->getJObject(), jGetVolumeControlStream);
+    int javaAudioStreamType = env->CallIntMethod(jAudioAttributes, jGetVolumeControlStream);
     return (audio_stream_type_t)javaAudioStreamType;
 }
 
@@ -755,7 +756,7 @@ jobject JAudioTrack::createVolumeShaperOperationObj(
 
 jobject JAudioTrack::createStreamEventCallback(callback_t cbf, void* user) {
     JNIEnv *env = JavaVMHelper::getJNIEnv();
-    jclass jCallbackCls = env->FindClass("android/media/MediaPlayer2Impl$StreamEventCallback");
+    jclass jCallbackCls = env->FindClass("android/media/MediaPlayer2$StreamEventCallback");
     jmethodID jCallbackCtor = env->GetMethodID(jCallbackCls, "<init>", "(JJJ)V");
     jobject jCallbackObj = env->NewObject(jCallbackCls, jCallbackCtor, this, cbf, user);
     return jCallbackObj;

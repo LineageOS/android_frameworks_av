@@ -209,7 +209,18 @@ class CameraHelper {
 
     int takePicture() {
         int seqId;
-        return ACameraCaptureSession_capture(mSession, nullptr, 1, &mStillRequest, &seqId);
+        return ACameraCaptureSession_capture(mSession, &mCaptureCallbacks, 1, &mStillRequest,
+                                             &seqId);
+    }
+
+    bool checkCallbacks(int pictureCount) {
+        std::lock_guard<std::mutex> lock(mMutex);
+        if (mCompletedCaptureCallbackCount != pictureCount) {
+            ALOGE("Completed capture callaback count not as expected. expected %d actual %d",
+                  pictureCount, mCompletedCaptureCallbackCount);
+            return false;
+        }
+        return true;
     }
 
     static void onDeviceDisconnected(void* /*obj*/, ACameraDevice* /*device*/) {}
@@ -246,6 +257,26 @@ class CameraHelper {
 
     bool mIsCameraReady = false;
     const char* mCameraId;
+    int mCompletedCaptureCallbackCount = 0;
+    std::mutex mMutex;
+    ACameraCaptureSession_captureCallbacks mCaptureCallbacks = {
+        // TODO: Add tests for other callbacks
+        this, // context
+        nullptr, // onCaptureStarted
+        nullptr, // onCaptureProgressed
+        // onCaptureCompleted, called serially, so no lock needed.
+        [](void* ctx , ACameraCaptureSession *, ACaptureRequest *,
+                                          const ACameraMetadata *) {
+            CameraHelper *ch = static_cast<CameraHelper *>(ctx);
+            std::lock_guard<std::mutex> lock(ch->mMutex);
+            ch->mCompletedCaptureCallbackCount++;
+        },
+        nullptr, // onCaptureFailed
+        nullptr, // onCaptureSequenceCompleted
+        nullptr, // onCaptureSequenceAborted
+        nullptr, // onCaptureBufferLost
+  };
+
 };
 
 class ImageReaderTestCase {
@@ -445,34 +476,36 @@ class ImageReaderTestCase {
     AImageReader_BufferRemovedListener mReaderDetachedCb{this, onBufferRemoved};
 };
 
-int takePictures(uint64_t readerUsage, int readerMaxImages, bool readerAsync, int pictureCount) {
+bool takePictures(uint64_t readerUsage, int readerMaxImages, bool readerAsync, int pictureCount) {
     int ret = 0;
-
     ImageReaderTestCase testCase(
             kTestImageWidth, kTestImageHeight, kTestImageFormat, readerUsage, readerMaxImages,
             readerAsync);
     ret = testCase.initImageReader();
     if (ret < 0) {
-        return ret;
+        ALOGE("Unable to initialize ImageReader");
+        return false;
     }
 
     CameraHelper cameraHelper(testCase.getNativeWindow());
     ret = cameraHelper.initCamera();
     if (ret < 0) {
-        return ret;
+        ALOGE("Unable to initialize camera helper");
+        return false;
     }
 
     if (!cameraHelper.isCameraReady()) {
         ALOGW("Camera is not ready after successful initialization. It's either due to camera on "
               "board lacks BACKWARDS_COMPATIBLE capability or the device does not have camera on "
               "board.");
-        return 0;
+        return true;
     }
 
     for (int i = 0; i < pictureCount; i++) {
         ret = cameraHelper.takePicture();
         if (ret < 0) {
-            return ret;
+            ALOGE("Unable to take picture");
+            return false;
         }
     }
 
@@ -485,7 +518,8 @@ int takePictures(uint64_t readerUsage, int readerMaxImages, bool readerAsync, in
             break;
         }
     }
-    return testCase.getAcquiredImageCount() == pictureCount ? 0 : -1;
+    return testCase.getAcquiredImageCount() == pictureCount &&
+            cameraHelper.checkCallbacks(pictureCount);
 }
 
 class AImageReaderWindowHandleTest : public ::testing::Test {
@@ -504,7 +538,7 @@ bool testTakePicturesNative() {
         for (auto& readerMaxImages : {1, 4, 8}) {
             for (auto& readerAsync : {true, false}) {
                 for (auto& pictureCount : {1, 4, 8}) {
-                    if (takePictures(readerUsage, readerMaxImages, readerAsync, pictureCount)) {
+                    if (!takePictures(readerUsage, readerMaxImages, readerAsync, pictureCount)) {
                         ALOGE("Test takePictures failed for test case usage=%" PRIu64 ", maxImages=%d, "
                               "async=%d, pictureCount=%d",
                               readerUsage, readerMaxImages, readerAsync, pictureCount);

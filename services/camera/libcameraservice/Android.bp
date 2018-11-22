@@ -72,7 +72,6 @@ cc_library_shared {
         "libbinder",
         "libcutils",
         "libmedia",
-        "libmediandk",
         "libmediautils",
         "libcamera_client",
         "libcamera_metadata",
