@@ -150,9 +150,7 @@ public final class MediaSession {
      * @param tag A short name for debugging purposes.
      */
     public MediaSession(@NonNull Context context, @NonNull String tag) {
-        //TODO(b/119749861): Resolve hidden API usage, UserHandle.myUserId
-        //this(context, tag, UserHandle.myUserId());
-        this(context, tag, 0);  //TODO: remove this.
+        this(context, tag, UserHandle.myUserId());
     }
 
     /**
