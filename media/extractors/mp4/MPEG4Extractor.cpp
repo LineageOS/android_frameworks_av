@@ -2733,8 +2733,7 @@ status_t MPEG4Extractor::parseAC4SpecificBox(off64_t offset) {
 
     // + 4-byte type
     offset += 4;
-    // at least for AC4 DSI v1 this is big enough
-    const uint32_t kAC4SpecificBoxPayloadSize = 256;
+    const uint32_t kAC4SpecificBoxPayloadSize = 1176;
     uint8_t chunk[kAC4SpecificBoxPayloadSize];
     ssize_t dsiSize = size - 8; // size of box - size and type fields
     if (dsiSize >= (ssize_t)kAC4SpecificBoxPayloadSize ||

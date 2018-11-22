@@ -310,13 +310,13 @@ bool AC4DSIParser::parse() {
                 pres_bytes += mBitReader.getBits(16);
             }
             ALOGV("%u: pres_bytes = %u\n", presentation, pres_bytes);
-            if (presentation_version > 1) {
+            if (presentation_version > 2) {
                 CHECK_BITS_LEFT(pres_bytes * 8);
                 mBitReader.skipBits(pres_bytes * 8);
                 continue;
             }
-            // ac4_presentation_v0_dsi() and ac4_presentation_v1_dsi() both
-            // start with a presentation_config of 5 bits
+            // ac4_presentation_v0_dsi(), ac4_presentation_v1_dsi() and ac4_presentation_v2_dsi()
+            // all start with a presentation_config of 5 bits
             CHECK_BITS_LEFT(5);
             presentation_config = mBitReader.getBits(5);
             b_single_substream_group = (presentation_config == 0x1f);
@@ -363,7 +363,7 @@ bool AC4DSIParser::parse() {
             uint32_t dsi_frame_rate_multiply_info = mBitReader.getBits(2);
             ALOGV("%u: dsi_frame_rate_multiply_info = %d\n", presentation,
                 dsi_frame_rate_multiply_info);
-            if (ac4_dsi_version == 1 && presentation_version == 1) {
+            if (ac4_dsi_version == 1 && (presentation_version == 1 || presentation_version == 2)) {
                 CHECK_BITS_LEFT(2);
                 uint32_t dsi_frame_rate_fraction_info = mBitReader.getBits(2);
                 ALOGV("%u: dsi_frame_rate_fraction_info = %d\n", presentation,
@@ -386,7 +386,7 @@ bool AC4DSIParser::parse() {
                 ALOGV("%u: b_presentation_channel_coded = %s\n", presentation,
                     BOOLSTR(b_presentation_channel_coded));
                 if (b_presentation_channel_coded) {
-                    if (presentation_version == 1) {
+                    if (presentation_version == 1 || presentation_version == 2) {
                         CHECK_BITS_LEFT(5);
                         uint32_t dsi_presentation_ch_mode = mBitReader.getBits(5);
                         mPresentations[presentation].mChannelMode = dsi_presentation_ch_mode;
@@ -411,7 +411,7 @@ bool AC4DSIParser::parse() {
                     ALOGV("%u: presentation_channel_mask_v1 = 0x%06x\n", presentation,
                         presentation_channel_mask_v1);
                 }
-                if (presentation_version == 1) {
+                if (presentation_version == 1 || presentation_version == 2) {
                     CHECK_BITS_LEFT(1);
                     bool b_presentation_core_differs = (mBitReader.getBits(1) == 1);
                     ALOGV("%u: b_presentation_core_differs = %s\n", presentation,
