@@ -171,10 +171,8 @@ public final class MediaSession {
         if (TextUtils.isEmpty(tag)) {
             throw new IllegalArgumentException("tag cannot be null or empty");
         }
-        //TODO(b/119749798): Resolve hidden API usage. com.android.internal.R
-        //mMaxBitmapSize = context.getResources().getDimensionPixelSize(
-                //com.android.internal.R.dimen.config_mediaMetadataBitmapMaxSize);
-        mMaxBitmapSize = 1024;  //TODO: remove this.
+        mMaxBitmapSize = context.getResources().getDimensionPixelSize(
+                android.R.dimen.config_mediaMetadataBitmapMaxSize);
         mCbStub = new CallbackStub(this);
         MediaSessionManager manager = (MediaSessionManager) context
                 .getSystemService(Context.MEDIA_SESSION_SERVICE);
