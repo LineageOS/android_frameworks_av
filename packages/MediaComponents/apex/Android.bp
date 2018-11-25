@@ -20,7 +20,7 @@ filegroup {
 java_library {
     name: "media",
     installable: true,
-    sdk_version: "current",
+    sdk_version: "system_current",
     srcs: [
         "java/android/media/**/*.java",
         "java/android/service/**/*.java",
