@@ -534,3 +534,20 @@ domainGroup: DeviceForStrategy
 					usb_device = 0
 					hdmi = 0
 
+			conf: None
+				component: /Policy/policy/strategies/sonification_respectful/selected_output_devices/mask
+					earpiece = 0
+					bluetooth_sco = 0
+					bluetooth_sco_headset = 0
+					bluetooth_sco_carkit = 0
+					bluetooth_a2dp_headphones = 0
+					bluetooth_a2dp_speaker = 0
+					bluetooth_a2dp = 0
+					wired_headset = 0
+					wired_headphone = 0
+					line = 0
+					angl_dock_headset = 0
+					dgtl_dock_headset = 0
+					usb_accessory = 0
+					usb_device = 0
+					hdmi = 0
