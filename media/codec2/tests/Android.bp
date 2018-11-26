@@ -6,8 +6,11 @@ cc_test {
     ],
 
     include_dirs: [
-        "frameworks/av/media/codec2/include",
         "frameworks/av/media/codec2/vndk/include",
+    ],
+
+    header_libs: [
+        "libcodec2_headers",
     ],
 
     // param tests must not depend on any codec2 libraries as all params should be templated
@@ -57,8 +60,8 @@ cc_test {
         "C2ComponentInterface_test.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/native/include/media/openmax",
+    header_libs: [
+        "media_plugin_headers",
     ],
 
     shared_libs: [
