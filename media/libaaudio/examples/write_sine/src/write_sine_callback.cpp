@@ -30,6 +30,8 @@
 #include "AAudioSimplePlayer.h"
 #include "AAudioArgsParser.h"
 
+#define APP_VERSION  "0.1.5"
+
 /**
  * Open stream, play some sine waves, then close the stream.
  *
@@ -109,13 +111,13 @@ static aaudio_result_t testOpenPlayClose(AAudioArgsParser &argParser,
         startedAtNanos = getNanoseconds(CLOCK_MONOTONIC);
         for (int second = 0; second < durationSeconds; second++) {
             // Sleep a while. Wake up early if there is an error, for example a DISCONNECT.
-            long ret = myData.waker.wait(AAUDIO_OK, NANOS_PER_SECOND);
+            myData.waker.wait(AAUDIO_OK, NANOS_PER_SECOND);
             int64_t millis =
                     (getNanoseconds(CLOCK_MONOTONIC) - startedAtNanos) / NANOS_PER_MILLISECOND;
             result = myData.waker.get();
-            printf("wait() returns %ld, aaudio_result = %d, at %6d millis"
+            printf(" waker result = %d, at %6d millis"
                            ", second = %3d, framesWritten = %8d, underruns = %d\n",
-                   ret, result, (int) millis,
+                   result, (int) millis,
                    second,
                    (int) AAudioStream_getFramesWritten(player.getStream()),
                    (int) AAudioStream_getXRunCount(player.getStream()));
@@ -135,6 +137,10 @@ static aaudio_result_t testOpenPlayClose(AAudioArgsParser &argParser,
         } else {
             printf("PAUSE/FLUSH, callback # = %d\n", myData.callbackCount);
             result = player.pause();
+            if (result != AAUDIO_OK) {
+                goto error;
+            }
+            result = player.waitUntilPaused();
             if (result != AAUDIO_OK) {
                 goto error;
             }
@@ -219,7 +225,7 @@ int main(int argc, const char **argv)
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
 
-    printf("%s - Play a sine sweep using an AAudio callback V0.1.4\n", argv[0]);
+    printf("%s - Play a sine sweep using an AAudio callback V%s\n", argv[0], APP_VERSION);
 
     for (int i = 1; i < argc; i++) {
         const char *arg = argv[i];

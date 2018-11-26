@@ -193,7 +193,7 @@ public:
      aaudio_result_t start() {
         aaudio_result_t result = AAudioStream_requestStart(mStream);
         if (result != AAUDIO_OK) {
-            printf("ERROR - AAudioStream_requestStart() returned %d %s\n",
+            printf("ERROR - AAudioStream_requestStart(output) returned %d %s\n",
                     result, AAudio_convertResultToText(result));
         }
         return result;
@@ -203,7 +203,7 @@ public:
     aaudio_result_t stop() {
         aaudio_result_t result = AAudioStream_requestStop(mStream);
         if (result != AAUDIO_OK) {
-            printf("ERROR - AAudioStream_requestStop() returned %d %s\n",
+            printf("ERROR - AAudioStream_requestStop(output) returned %d %s\n",
                    result, AAudio_convertResultToText(result));
         }
         int32_t xRunCount = AAudioStream_getXRunCount(mStream);
@@ -215,7 +215,7 @@ public:
     aaudio_result_t pause() {
         aaudio_result_t result = AAudioStream_requestPause(mStream);
         if (result != AAUDIO_OK) {
-            printf("ERROR - AAudioStream_requestPause() returned %d %s\n",
+            printf("ERROR - AAudioStream_requestPause(output) returned %d %s\n",
                    result, AAudio_convertResultToText(result));
         }
         int32_t xRunCount = AAudioStream_getXRunCount(mStream);
@@ -223,11 +223,27 @@ public:
         return result;
     }
 
+    aaudio_result_t waitUntilPaused() {
+        aaudio_result_t result = AAUDIO_OK;
+        aaudio_stream_state_t currentState = AAudioStream_getState(mStream);
+        aaudio_stream_state_t inputState = AAUDIO_STREAM_STATE_PAUSING;
+        while (result == AAUDIO_OK && currentState == AAUDIO_STREAM_STATE_PAUSING) {
+            result = AAudioStream_waitForStateChange(mStream, inputState,
+                                                     &currentState, NANOS_PER_SECOND);
+            inputState = currentState;
+        }
+        if (result != AAUDIO_OK) {
+            return result;
+        }
+        return (currentState == AAUDIO_STREAM_STATE_PAUSED)
+               ? AAUDIO_OK : AAUDIO_ERROR_INVALID_STATE;
+    }
+
     // Flush the stream. AAudio will stop calling your callback function.
     aaudio_result_t flush() {
         aaudio_result_t result = AAudioStream_requestFlush(mStream);
         if (result != AAUDIO_OK) {
-            printf("ERROR - AAudioStream_requestFlush() returned %d %s\n",
+            printf("ERROR - AAudioStream_requestFlush(output) returned %d %s\n",
                    result, AAudio_convertResultToText(result));
         }
         return result;
