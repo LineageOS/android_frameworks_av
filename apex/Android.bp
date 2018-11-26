@@ -35,6 +35,6 @@ apex {
 
 apex_key {
     name: "com.android.media.key",
-    public_key: "media.avbpubkey",
-    private_key: "media.pem",
+    public_key: "com.android.media.avbpubkey",
+    private_key: "com.android.media.pem",
 }
