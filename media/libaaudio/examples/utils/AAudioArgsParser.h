@@ -130,10 +130,12 @@ public:
     }
 
     int32_t getBufferCapacity() const {
+        printf("%s() returns %d\n", __func__, mBufferCapacity);
         return mBufferCapacity;
     }
 
     void setBufferCapacity(int32_t frames) {
+        printf("%s(%d)\n", __func__, frames);
         mBufferCapacity = frames;
     }
 
@@ -185,18 +187,26 @@ public:
         mNumberOfBursts = numBursts;
     }
 
+    int32_t getFramesPerCallback() const {
+        return mFramesPerCallback;
+    }
+    void setFramesPerCallback(int32_t size) {
+        mFramesPerCallback = size;
+    }
+
     /**
      * Apply these parameters to a stream builder.
      * @param builder
      */
     void applyParameters(AAudioStreamBuilder *builder) const {
+        AAudioStreamBuilder_setBufferCapacityInFrames(builder, getBufferCapacity());
         AAudioStreamBuilder_setChannelCount(builder, mChannelCount);
-        AAudioStreamBuilder_setFormat(builder, mFormat);
-        AAudioStreamBuilder_setSampleRate(builder, mSampleRate);
-        AAudioStreamBuilder_setBufferCapacityInFrames(builder, mBufferCapacity);
         AAudioStreamBuilder_setDeviceId(builder, mDeviceId);
-        AAudioStreamBuilder_setSharingMode(builder, mSharingMode);
+        AAudioStreamBuilder_setFormat(builder, mFormat);
+        AAudioStreamBuilder_setFramesPerDataCallback(builder, mFramesPerCallback);
         AAudioStreamBuilder_setPerformanceMode(builder, mPerformanceMode);
+        AAudioStreamBuilder_setSampleRate(builder, mSampleRate);
+        AAudioStreamBuilder_setSharingMode(builder, mSharingMode);
 
         // Call P functions if supported.
         loadFutureFunctions();
@@ -232,6 +242,7 @@ private:
     aaudio_input_preset_t      mInputPreset     = AAUDIO_UNSPECIFIED;
 
     int32_t                    mNumberOfBursts  = AAUDIO_UNSPECIFIED;
+    int32_t                    mFramesPerCallback = AAUDIO_UNSPECIFIED;
 };
 
 class AAudioArgsParser : public AAudioParameters {
@@ -297,6 +308,9 @@ public:
                 case 'y':
                     setContentType(atoi(&arg[2]));
                     break;
+                case 'z':
+                    setFramesPerCallback(atoi(&arg[2]));
+                    break;
                 default:
                     unrecognized = true;
                     break;
@@ -350,6 +364,7 @@ public:
         printf("      -u{usage} eg. 14 for AAUDIO_USAGE_GAME\n");
         printf("      -x to use EXCLUSIVE mode\n");
         printf("      -y{contentType} eg. 1 for AAUDIO_CONTENT_TYPE_SPEECH\n");
+        printf("      -z{callbackSize} or block size, in frames, default = 0\n");
     }
 
     static aaudio_performance_mode_t parsePerformanceMode(char c) {
@@ -405,6 +420,9 @@ public:
         }
         printf("  Capacity:     requested = %d, actual = %d\n", getBufferCapacity(),
                AAudioStream_getBufferCapacityInFrames(stream));
+
+        printf("  CallbackSize: requested = %d, actual = %d\n", getFramesPerCallback(),
+               AAudioStream_getFramesPerDataCallback(stream));
 
         printf("  SharingMode:  requested = %s, actual = %s\n",
                getSharingModeText(getSharingMode()),
