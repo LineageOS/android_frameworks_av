@@ -181,7 +181,9 @@ status_t CameraService::enumerateProviders() {
 
     for (auto& cameraId : deviceIds) {
         String8 id8 = String8(cameraId.c_str());
-        onDeviceStatusChanged(id8, CameraDeviceStatus::PRESENT);
+        if (getCameraState(id8) == nullptr) {
+            onDeviceStatusChanged(id8, CameraDeviceStatus::PRESENT);
+        }
     }
 
     return OK;
