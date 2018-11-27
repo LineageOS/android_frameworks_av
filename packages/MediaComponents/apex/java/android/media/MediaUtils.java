@@ -7,12 +7,6 @@ import android.view.KeyEvent;
  */
 public class MediaUtils {
 
-    /**
-     * Adjusting the volume due to a hardware key press.
-     * (Copied version of hidden AudioManager.FLAG_FROM_KEY)
-     */
-    public static final int AUDIO_MANAGER_FLAG_FROM_KEY = 1 << 12;
-
     // Keep sync with KeyEvent#isMediaKey().
     public static boolean isMediaKey(int keyCode) {
         switch (keyCode) {
