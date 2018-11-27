@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "334f9f7e_ff237efc",
+        "filename": "services/camera/libcameraservice/Android.mk",
+        "patchSetId": 3
+      },
+      "lineNbr": 107,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2018-11-27T13:47:00Z",
+      "side": 1,
+      "message": "Should it be ifneq?",
+      "range": {
+        "startLine": 107,
+        "startChar": 0,
+        "endLine": 107,
+        "endChar": 5
+      },
+      "revId": "554a4f21f5abb946e1a4b538b9cc8e1a88b4fcdf",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
