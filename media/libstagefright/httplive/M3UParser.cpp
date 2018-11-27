@@ -1391,6 +1391,7 @@ bool M3UParser::codecIsType(const AString &codec, const char *type) {
         case 'QDMC':
         case 'ulaw':
         case 'vdva':
+        case 'ac-4':
             return !strcmp("audio", type);
 
         case 'avc1':

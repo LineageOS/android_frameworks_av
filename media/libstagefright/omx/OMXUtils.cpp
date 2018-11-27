@@ -164,6 +164,8 @@ const char *GetComponentRole(bool isEncoder, const char *mime) {
             "audio_decoder.ac3", "audio_encoder.ac3" },
         { MEDIA_MIMETYPE_AUDIO_EAC3,
             "audio_decoder.eac3", "audio_encoder.eac3" },
+        { MEDIA_MIMETYPE_AUDIO_AC4,
+            "audio_decoder.ac4", "audio_encoder.ac4" },
         { MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC,
             "image_decoder.heic", "image_encoder.heic" },
     };
