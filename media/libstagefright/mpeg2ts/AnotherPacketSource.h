@@ -85,6 +85,8 @@ struct AnotherPacketSource : public MediaSource {
     void trimBuffersAfterMeta(const sp<AMessage> &meta);
     sp<AMessage> trimBuffersBeforeMeta(const sp<AMessage> &meta);
 
+    void convertAudioPresentationInfoToMetadata(const AudioPresentationCollection &presentations);
+
 protected:
     virtual ~AnotherPacketSource();
 

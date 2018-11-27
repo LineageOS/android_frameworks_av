@@ -96,7 +96,6 @@ cc_library_shared {
         "AHierarchicalStateMachine.cpp",
         "AMRWriter.cpp",
         "AudioPlayer.cpp",
-        "AudioPresentationInfo.cpp",
         "AudioSource.cpp",
         "BufferImpl.cpp",
         "CallbackDataSource.cpp",

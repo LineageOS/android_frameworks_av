@@ -225,6 +225,9 @@ enum {
 
     // Key for ALAC Magic Cookie
     kKeyAlacMagicCookie  = 'almc', // raw data
+
+    // AC-4 AudioPresentationInfo
+    kKeyAudioPresentationInfo = 'audP',  // raw data
 };
 
 enum {
