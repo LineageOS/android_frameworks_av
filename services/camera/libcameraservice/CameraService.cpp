@@ -1205,6 +1205,14 @@ Status CameraService::connect(
     Status ret = Status::ok();
 
     String8 id = cameraIdIntToStr(api1CameraId);
+
+#ifdef FACE_UNLOCK_CAMERA_ID
+    if (strcmp16(clientPackageName, String16("com.android.facelock")) == 0 &&
+           api1CameraId == 1) {
+        id = cameraIdIntToStr(FACE_UNLOCK_CAMERA_ID);
+    }
+#endif
+
     sp<Client> client = nullptr;
     ret = connectHelper<ICameraClient,Client>(cameraClient, id, api1CameraId,
             CAMERA_HAL_API_VERSION_UNSPECIFIED, clientPackageName, clientUid, clientPid, API_1,
