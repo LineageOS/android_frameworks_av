@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "d3c96c7a_c6c3d639",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 1211,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-11-27T17:05:12Z",
+      "side": 1,
+      "message": "What kind of value would this otherwise be?",
+      "range": {
+        "startLine": 1211,
+        "startChar": 11,
+        "endLine": 1211,
+        "endChar": 23
+      },
+      "revId": "ab6f0ece6ab0e79bbeb350bae68f40506ee36b94",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
