@@ -36,11 +36,7 @@
 #include <system/sound_trigger.h>
 #include "SoundTriggerHwService.h"
 
-#ifdef SOUND_TRIGGER_USE_STUB_MODULE
-#define HW_MODULE_PREFIX "stub"
-#else
 #define HW_MODULE_PREFIX "primary"
-#endif
 namespace android {
 
 SoundTriggerHwService::SoundTriggerHwService()

@@ -42,9 +42,9 @@ cc_library_shared {
         "internal",
     ],
 
-    include_dirs: [
-        "frameworks/native/include/media/hardware",
-        "frameworks/av/media/codec2/include",
+    header_libs: [
+        "media_plugin_headers",
+        "libcodec2_headers",
     ],
 
     shared_libs: [

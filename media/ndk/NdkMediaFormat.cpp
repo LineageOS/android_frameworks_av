@@ -272,6 +272,7 @@ EXPORT const char* AMEDIAFORMAT_KEY_ALBUM = "album";
 EXPORT const char* AMEDIAFORMAT_KEY_ALBUMART = "albumart";
 EXPORT const char* AMEDIAFORMAT_KEY_ALBUMARTIST = "albumartist";
 EXPORT const char* AMEDIAFORMAT_KEY_ARTIST = "artist";
+EXPORT const char* AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_INFO = "audio-presentation-info";
 EXPORT const char* AMEDIAFORMAT_KEY_AUDIO_SESSION_ID = "audio-session-id";
 EXPORT const char* AMEDIAFORMAT_KEY_AUTHOR = "author";
 EXPORT const char* AMEDIAFORMAT_KEY_BITRATE_MODE = "bitrate-mode";

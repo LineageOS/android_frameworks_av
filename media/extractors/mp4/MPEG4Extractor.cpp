@@ -38,6 +38,7 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/AudioPresentationInfo.h>
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/foundation/ColorUtils.h>
@@ -2753,6 +2754,75 @@ status_t MPEG4Extractor::parseAC4SpecificBox(off64_t offset) {
     AMediaFormat_setString(mLastTrack->meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_AC4);
     AMediaFormat_setInt32(mLastTrack->meta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, channelCount);
     AMediaFormat_setInt32(mLastTrack->meta, AMEDIAFORMAT_KEY_SAMPLE_RATE, sampleRate);
+
+    AudioPresentationCollection presentations;
+    // translate the AC4 presentation information to audio presentations for this track
+    AC4DSIParser::AC4Presentations ac4Presentations = parser.getPresentations();
+    if (!ac4Presentations.empty()) {
+        for (const auto& ac4Presentation : ac4Presentations) {
+            auto& presentation = ac4Presentation.second;
+            if (!presentation.mEnabled) {
+                continue;
+            }
+            AudioPresentationV1 ap;
+            ap.mPresentationId = presentation.mGroupIndex;
+            ap.mProgramId = presentation.mProgramID;
+            ap.mLanguage = presentation.mLanguage;
+            if (presentation.mPreVirtualized) {
+                ap.mMasteringIndication = MASTERED_FOR_HEADPHONE;
+            } else {
+                switch (presentation.mChannelMode) {
+                    case AC4Parser::AC4Presentation::kChannelMode_Mono:
+                    case AC4Parser::AC4Presentation::kChannelMode_Stereo:
+                        ap.mMasteringIndication = MASTERED_FOR_STEREO;
+                        break;
+                    case AC4Parser::AC4Presentation::kChannelMode_3_0:
+                    case AC4Parser::AC4Presentation::kChannelMode_5_0:
+                    case AC4Parser::AC4Presentation::kChannelMode_5_1:
+                    case AC4Parser::AC4Presentation::kChannelMode_7_0_34:
+                    case AC4Parser::AC4Presentation::kChannelMode_7_1_34:
+                    case AC4Parser::AC4Presentation::kChannelMode_7_0_52:
+                    case AC4Parser::AC4Presentation::kChannelMode_7_1_52:
+                        ap.mMasteringIndication = MASTERED_FOR_SURROUND;
+                        break;
+                    case AC4Parser::AC4Presentation::kChannelMode_7_0_322:
+                    case AC4Parser::AC4Presentation::kChannelMode_7_1_322:
+                    case AC4Parser::AC4Presentation::kChannelMode_7_0_4:
+                    case AC4Parser::AC4Presentation::kChannelMode_7_1_4:
+                    case AC4Parser::AC4Presentation::kChannelMode_9_0_4:
+                    case AC4Parser::AC4Presentation::kChannelMode_9_1_4:
+                    case AC4Parser::AC4Presentation::kChannelMode_22_2:
+                        ap.mMasteringIndication = MASTERED_FOR_3D;
+                        break;
+                    default:
+                        ALOGE("Invalid channel mode in AC4 presentation");
+                        return ERROR_MALFORMED;
+                }
+            }
+
+            ap.mAudioDescriptionAvailable = (presentation.mContentClassifier ==
+                    AC4Parser::AC4Presentation::kVisuallyImpaired);
+            ap.mSpokenSubtitlesAvailable = (presentation.mContentClassifier ==
+                    AC4Parser::AC4Presentation::kVoiceOver);
+            ap.mDialogueEnhancementAvailable = presentation.mHasDialogEnhancements;
+            if (!ap.mLanguage.empty()) {
+                ap.mLabels.emplace(ap.mLanguage, presentation.mDescription);
+            }
+            presentations.push_back(std::move(ap));
+        }
+    }
+
+    if (presentations.empty()) {
+        // Clear audio presentation info in metadata.
+        AMediaFormat_setBuffer(
+                mLastTrack->meta, AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_INFO, nullptr, 0);
+    } else {
+        std::ostringstream outStream(std::ios::out);
+        serializeAudioPresentations(presentations, &outStream);
+        AMediaFormat_setBuffer(
+                mLastTrack->meta, AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_INFO,
+                outStream.str().data(), outStream.str().size());
+    }
     return OK;
 }
 

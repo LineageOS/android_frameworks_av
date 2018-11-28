@@ -25,7 +25,6 @@ import android.content.Context;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.MediaMetadata;
-import android.media.MediaUtils;
 import android.media.Rating;
 import android.media.VolumeProvider;
 import android.net.Uri;
@@ -150,9 +149,12 @@ public final class MediaController {
         if (keyEvent == null) {
             throw new IllegalArgumentException("KeyEvent may not be null");
         }
-        if (!MediaUtils.isMediaKey(keyEvent.getKeyCode())) {
+        //TODO(b/119789707): Resolve hidden API usage: KeyEvent#isMediaKey
+        /*
+        if (!KeyEvent.isMediaKey(keyEvent.getKeyCode())) {
             return false;
         }
+        */
         try {
             //TODO(b/119748678): Resolve mContext.getOpPackageName() through this file.
             // Temporarilly it's replaced with "mContext.getOpPackageName()" for compiling.
@@ -197,8 +199,9 @@ public final class MediaController {
             }
 
             case KeyEvent.ACTION_UP: {
-                final int flags = AudioManager.FLAG_PLAY_SOUND | AudioManager.FLAG_VIBRATE
-                        | MediaUtils.AUDIO_MANAGER_FLAG_FROM_KEY;
+                //TODO(b/119790339): Resolve hidden API usage. AudioManager.FLAG_FROM_KEY
+                final int flags = AudioManager.FLAG_PLAY_SOUND | AudioManager.FLAG_VIBRATE;
+                        //| AudioManager.FLAG_FROM_KEY;
                 try {
                     mSessionBinder.adjustVolume("mContext.getOpPackageName()", mCbStub, true, 0,
                             flags);

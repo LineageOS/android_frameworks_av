@@ -697,4 +697,23 @@ sp<AMessage> AnotherPacketSource::trimBuffersBeforeMeta(
     return firstMeta;
 }
 
+void AnotherPacketSource::convertAudioPresentationInfoToMetadata(
+        const AudioPresentationCollection& presentations) {
+    sp<MetaData> meta = getFormat();
+    if (meta == NULL) {
+        return;
+    }
+    if (presentations.empty()) {
+        // Clear audio presentation info in metadata.
+        Mutex::Autolock autoLock(mLock);
+        meta->remove(kKeyAudioPresentationInfo);
+    } else {
+        std::ostringstream outStream(std::ios::out);
+        serializeAudioPresentations(presentations, &outStream);
+        Mutex::Autolock autoLock(mLock);
+        meta->setData(kKeyAudioPresentationInfo, MetaData::TYPE_NONE,
+                outStream.str().data(), outStream.str().size());
+    }
+}
+
 }  // namespace android

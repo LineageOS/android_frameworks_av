@@ -210,6 +210,7 @@ private:
     sp<ABuffer> mDescrambledBuffer;
     List<SubSampleInfo> mSubSamples;
     sp<IDescrambler> mDescrambler;
+    AudioPresentationCollection mAudioPresentations;
 
     // Flush accumulated payload if necessary --- i.e. at EOS or at the start of
     // another payload. event is set if the flushed payload is PES with a sync
@@ -525,6 +526,8 @@ status_t ATSParser::Program::parseProgramMap(ABitReader *br) {
 
         CADescriptor streamCA;
         info.mTypeExt = EXT_DESCRIPTOR_DVB_RESERVED_MAX;
+
+        info.mAudioPresentations.clear();
         bool hasStreamCA = false;
         while (ES_info_length > 2 && infoBytesRemaining >= 0) {
             unsigned descriptor_tag = br->getBits(8);
@@ -549,12 +552,94 @@ status_t ATSParser::Program::parseProgramMap(ABitReader *br) {
                        descriptor_tag == DESCRIPTOR_DVB_EXTENSION && descriptor_length >= 1) {
                 unsigned descTagExt = br->getBits(8);
                 ALOGV("      tag_ext = 0x%02x", descTagExt);
-                if (descTagExt == EXT_DESCRIPTOR_DVB_AC4) {
-                    info.mTypeExt = EXT_DESCRIPTOR_DVB_AC4;
-                }
                 ES_info_length -= descriptor_length;
                 descriptor_length--;
-                br->skipBits(descriptor_length * 8);
+                // The AC4 descriptor is used in the PSI PMT to identify streams which carry AC4
+                // audio.
+                if (descTagExt == EXT_DESCRIPTOR_DVB_AC4) {
+                    info.mTypeExt = EXT_DESCRIPTOR_DVB_AC4;
+                    br->skipBits(descriptor_length * 8);
+                } else if (descTagExt == EXT_DESCRIPTOR_DVB_AUDIO_PRESELECTION &&
+                           descriptor_length >= 1) {
+                    // DVB BlueBook A038 Table 110
+                    unsigned num_preselections = br->getBits(5);
+                    br->skipBits(3);  // reserved
+                    for (unsigned i = 0; i < num_preselections; ++i) {
+                        if (br->numBitsLeft() < 16) {
+                            ALOGE("Not enough data left in bitreader!");
+                            return ERROR_MALFORMED;
+                        }
+                        AudioPresentationV1 ap;
+                        ap.mPresentationId = br->getBits(5);  // preselection_id
+
+                        // audio_rendering_indication
+                        ap.mMasteringIndication = static_cast<MasteringIndication>(br->getBits(3));
+                        ap.mAudioDescriptionAvailable = (br->getBits(1) == 1);
+                        ap.mSpokenSubtitlesAvailable = (br->getBits(1) == 1);
+                        ap.mDialogueEnhancementAvailable = (br->getBits(1) == 1);
+
+                        bool interactivity_enabled = (br->getBits(1) == 1);
+                        MY_LOGV("      interactivity_enabled = %d", interactivity_enabled);
+
+                        bool language_code_present = (br->getBits(1) == 1);
+                        bool text_label_present = (br->getBits(1) == 1);
+
+                        bool multi_stream_info_present = (br->getBits(1) == 1);
+                        bool future_extension = (br->getBits(1) == 1);
+                        if (language_code_present) {
+                            if (br->numBitsLeft() < 24) {
+                                ALOGE("Not enough data left in bitreader!");
+                                return ERROR_MALFORMED;
+                            }
+                            char language[4];
+                            language[0] = br->getBits(8);
+                            language[1] = br->getBits(8);
+                            language[2] = br->getBits(8);
+                            language[3] = 0;
+                            ap.mLanguage = String8(language);
+                        }
+
+                        // This maps the presentation id to the message id in the
+                        // EXT_DESCRIPTOR_DVB_MESSAGE so that we can get the presentation label.
+                        if (text_label_present) {
+                            if (br->numBitsLeft() < 8) {
+                                ALOGE("Not enough data left in bitreader!");
+                                return ERROR_MALFORMED;
+                            }
+                            unsigned message_id = br->getBits(8);
+                            MY_LOGV("      message_id = %u", message_id);
+                        }
+
+                        if (multi_stream_info_present) {
+                            if (br->numBitsLeft() < 8) {
+                                ALOGE("Not enough data left in bitreader!");
+                                return ERROR_MALFORMED;
+                            }
+                            unsigned num_aux_components = br->getBits(3);
+                            br->skipBits(5);  // reserved
+                            if (br->numBitsLeft() < (num_aux_components * 8)) {
+                                ALOGE("Not enough data left in bitreader!");
+                                return ERROR_MALFORMED;
+                            }
+                            br->skipBits(num_aux_components * 8);  // component_tag
+                        }
+                        if (future_extension) {
+                            if (br->numBitsLeft() < 8) {
+                                return ERROR_MALFORMED;
+                            }
+                            br->skipBits(3);  // reserved
+                            unsigned future_extension_length = br->getBits(5);
+                            if (br->numBitsLeft() < (future_extension_length * 8)) {
+                                ALOGE("Not enough data left in bitreader!");
+                                return ERROR_MALFORMED;
+                            }
+                            br->skipBits(future_extension_length * 8);  // future_extension_byte
+                        }
+                        info.mAudioPresentations.push_back(std::move(ap));
+                    }
+                } else {
+                    br->skipBits(descriptor_length * 8);
+                }
             } else {
                 ES_info_length -= descriptor_length;
                 br->skipBits(descriptor_length * 8);
@@ -754,7 +839,8 @@ ATSParser::Stream::Stream(
       mEOSReached(false),
       mPrevPTS(0),
       mQueue(NULL),
-      mScrambled(info.mCADescriptor.mSystemID >= 0) {
+      mScrambled(info.mCADescriptor.mSystemID >= 0),
+      mAudioPresentations(info.mAudioPresentations) {
     mSampleEncrypted =
             mStreamType == STREAMTYPE_H264_ENCRYPTED ||
             mStreamType == STREAMTYPE_AAC_ENCRYPTED  ||
@@ -1633,6 +1719,7 @@ void ATSParser::Stream::onPayloadData(
                 }
                 mSource = new AnotherPacketSource(meta);
                 mSource->queueAccessUnit(accessUnit);
+                mSource->convertAudioPresentationInfoToMetadata(mAudioPresentations);
                 ALOGV("onPayloadData: created AnotherPacketSource PID 0x%08x of type 0x%02x",
                         mElementaryPID, mStreamType);
             }

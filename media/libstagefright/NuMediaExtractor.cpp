@@ -794,4 +794,32 @@ bool NuMediaExtractor::getCachedDuration(
     return false;
 }
 
+// Return OK if we have received an audio presentation info.
+// Return ERROR_UNSUPPORTED if the track has no audio presentation.
+// Return INVALID_OPERATION if audio presentation metadata version does not match.
+status_t NuMediaExtractor::getAudioPresentations(
+        size_t trackIndex, AudioPresentationCollection *presentations) const {
+    Mutex::Autolock autoLock(mLock);
+
+    if (mImpl == NULL) {
+        return -EINVAL;
+    }
+
+    if (trackIndex >= mImpl->countTracks()) {
+        return -ERANGE;
+    }
+
+    sp<MetaData> meta = mImpl->getTrackMetaData(trackIndex);
+
+    uint32_t type;
+    const void *data;
+    size_t size;
+    if (meta != NULL && meta->findData(kKeyAudioPresentationInfo, &type, &data, &size)) {
+        std::istringstream inStream(std::string(static_cast<const char*>(data), size));
+        return deserializeAudioPresentations(&inStream, presentations);
+    }
+    ALOGE("Source does not contain any audio presentation");
+    return ERROR_UNSUPPORTED;
+}
+
 }  // namespace android

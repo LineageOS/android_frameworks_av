@@ -1,3 +1,9 @@
+cc_library_headers {
+    name: "libcodec2_headers",
+    vendor_available: true,
+    export_include_dirs: ["include"],
+}
+
 cc_library_shared {
     name: "libcodec2",
     vendor_available: true,
@@ -9,22 +15,18 @@ cc_library_shared {
         "-Werror",
     ],
 
-    include_dirs: [
-        "frameworks/native/include/media/hardware",
-    ],
-
-    export_include_dirs: [
-        "include",
-    ],
-
     header_libs: [
+        "libcodec2_headers",
         "libhardware_headers",
         "libutils_headers",
+        "media_plugin_headers",
     ],
 
     export_header_lib_headers: [
+        "libcodec2_headers",
         "libhardware_headers",
         "libutils_headers",
+        "media_plugin_headers",
     ],
 
     sanitize: {
@@ -40,3 +42,4 @@ cc_library_shared {
 
     ldflags: ["-Wl,-Bsymbolic"],
 }
+
