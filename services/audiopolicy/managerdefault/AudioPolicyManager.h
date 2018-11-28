@@ -164,14 +164,8 @@ public:
                                         uint32_t strategy,
                                         int session,
                                         int id);
-        virtual status_t unregisterEffect(int id)
-        {
-            return mEffects.unregisterEffect(id);
-        }
-        virtual status_t setEffectEnabled(int id, bool enabled)
-        {
-            return mEffects.setEffectEnabled(id, enabled);
-        }
+        virtual status_t unregisterEffect(int id);
+        virtual status_t setEffectEnabled(int id, bool enabled);
 
         virtual bool isStreamActive(audio_stream_type_t stream, uint32_t inPastMs = 0) const;
         // return whether a stream is playing remotely, override to change the definition of

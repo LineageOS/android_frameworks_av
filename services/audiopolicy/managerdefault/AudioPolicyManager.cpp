@@ -2423,6 +2423,33 @@ status_t AudioPolicyManager::registerEffect(const effect_descriptor_t *desc,
     return mEffects.registerEffect(desc, io, strategy, session, id);
 }
 
+status_t AudioPolicyManager::unregisterEffect(int id)
+{
+    if (mEffects.getEffect(id) == nullptr) {
+        return INVALID_OPERATION;
+    }
+
+    if (mEffects.isEffectEnabled(id)) {
+        ALOGW("%s effect %d enabled", __FUNCTION__, id);
+        setEffectEnabled(id, false);
+    }
+    return mEffects.unregisterEffect(id);
+}
+
+status_t AudioPolicyManager::setEffectEnabled(int id, bool enabled)
+{
+    sp<EffectDescriptor> effect = mEffects.getEffect(id);
+    if (effect == nullptr) {
+        return INVALID_OPERATION;
+    }
+
+    status_t status = mEffects.setEffectEnabled(id, enabled);
+    if (status == NO_ERROR) {
+        mInputs.trackEffectEnabled(effect, enabled);
+    }
+    return status;
+}
+
 bool AudioPolicyManager::isStreamActive(audio_stream_type_t stream, uint32_t inPastMs) const
 {
     bool active = false;
