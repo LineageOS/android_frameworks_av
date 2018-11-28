@@ -35,6 +35,7 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MPEG4Writer.h>
+#include <media/stagefright/OggWriter.h>
 #include <media/stagefright/Utils.h>
 
 namespace android {
@@ -52,6 +53,8 @@ MediaMuxer::MediaMuxer(int fd, OutputFormat format)
         mWriter = new MPEG4Writer(fd);
     } else if (format == OUTPUT_FORMAT_WEBM) {
         mWriter = new WebmWriter(fd);
+    } else if (format == OUTPUT_FORMAT_OGG) {
+        mWriter = new OggWriter(fd);
     }
 
     if (mWriter != NULL) {
@@ -59,6 +62,8 @@ MediaMuxer::MediaMuxer(int fd, OutputFormat format)
         if (format == OUTPUT_FORMAT_HEIF) {
             // Note that the key uses recorder file types.
             mFileMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_HEIF);
+        } else if (format == OUTPUT_FORMAT_OGG) {
+            mFileMeta->setInt32(kKeyFileType, output_format::OUTPUT_FORMAT_OGG);
         }
         mState = INITIALIZED;
     }

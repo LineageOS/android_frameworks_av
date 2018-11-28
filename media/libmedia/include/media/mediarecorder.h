@@ -67,7 +67,7 @@ enum output_format {
     OUTPUT_FORMAT_AAC_ADTS = 6,
 
     OUTPUT_FORMAT_AUDIO_ONLY_END = 7, // Used in validating the output format.  Should be the
-                                      //  at the end of the audio only output formats.
+                                      // at the end of the audio only output formats.
 
     /* Stream over a socket, limited to a single stream */
     OUTPUT_FORMAT_RTP_AVP = 7,
@@ -81,6 +81,9 @@ enum output_format {
     /* HEIC data in a HEIF container */
     OUTPUT_FORMAT_HEIF = 10,
 
+    /* Opus data in a OGG container */
+    OUTPUT_FORMAT_OGG = 11,
+
     OUTPUT_FORMAT_LIST_END // must be last - used to validate format type
 };
 
@@ -92,6 +95,7 @@ enum audio_encoder {
     AUDIO_ENCODER_HE_AAC = 4,
     AUDIO_ENCODER_AAC_ELD = 5,
     AUDIO_ENCODER_VORBIS = 6,
+    AUDIO_ENCODER_OPUS = 7,
 
     AUDIO_ENCODER_LIST_END // must be the last - used to validate the audio encoder type
 };

@@ -166,6 +166,7 @@ private:
     void setupMPEG4orWEBMMetaData(sp<MetaData> *meta);
     status_t setupAMRRecording();
     status_t setupAACRecording();
+    status_t setupOggRecording();
     status_t setupRawAudioRecording();
     status_t setupRTPRecording();
     status_t setupMPEG2TSRecording();
