@@ -214,6 +214,9 @@ public:
                                         bool reported);
     virtual status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled);
 
+    virtual status_t setAssistantUid(uid_t uid);
+    virtual status_t setA11yServicesUids(const std::vector<uid_t>& uids);
+
             status_t doStopOutput(audio_port_handle_t portId);
             void doReleaseOutput(audio_port_handle_t portId);
 
@@ -277,7 +280,7 @@ private:
     class UidPolicy : public BnUidObserver, public virtual IBinder::DeathRecipient {
     public:
         explicit UidPolicy(wp<AudioPolicyService> service)
-                : mService(service), mObserverRegistered(false) {}
+                : mService(service), mObserverRegistered(false), mAssistantUid(0) {}
 
         void registerSelf();
         void unregisterSelf();
@@ -286,6 +289,10 @@ private:
         void binderDied(const wp<IBinder> &who) override;
 
         bool isUidActive(uid_t uid);
+        void setAssistantUid(uid_t uid) { mAssistantUid = uid; }
+        bool isAssistantUid(uid_t uid) { return uid == mAssistantUid; }
+        void setA11yUids(const std::vector<uid_t>& uids) { mA11yUids.clear(); mA11yUids = uids; }
+        bool isA11yUid(uid_t uid);
 
         // BnUidObserver implementation
         void onUidActive(uid_t uid) override;
@@ -307,6 +314,8 @@ private:
         bool mObserverRegistered;
         std::unordered_map<uid_t, bool> mOverrideUids;
         std::unordered_map<uid_t, bool> mCachedUids;
+        uid_t mAssistantUid;
+        std::vector<uid_t> mA11yUids;
     };
 
     // Thread used to send audio config commands to audio flinger

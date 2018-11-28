@@ -85,7 +85,9 @@ enum {
     ADD_STREAM_DEFAULT_EFFECT,
     REMOVE_STREAM_DEFAULT_EFFECT,
     ADD_SOURCE_DEFAULT_EFFECT,
-    REMOVE_SOURCE_DEFAULT_EFFECT
+    REMOVE_SOURCE_DEFAULT_EFFECT,
+    SET_ASSISTANT_UID,
+    SET_A11Y_SERVICES_UIDS,
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -941,6 +943,33 @@ public:
         return static_cast <status_t> (reply.readInt32());
     }
 
+    virtual status_t setAssistantUid(uid_t uid)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeInt32(uid);
+        status_t status = remote()->transact(SET_ASSISTANT_UID, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        return static_cast <status_t> (reply.readInt32());
+    }
+
+    virtual status_t setA11yServicesUids(const std::vector<uid_t>& uids)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeInt32(uids.size());
+        for (auto uid : uids) {
+            data.writeInt32(uid);
+        }
+        status_t status = remote()->transact(SET_A11Y_SERVICES_UIDS, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        return static_cast <status_t> (reply.readInt32());
+    }
+
 };
 
 IMPLEMENT_META_INTERFACE(AudioPolicyService, "android.media.IAudioPolicyService");
@@ -997,7 +1026,9 @@ status_t BnAudioPolicyService::onTransact(
         case START_AUDIO_SOURCE:
         case STOP_AUDIO_SOURCE:
         case GET_SURROUND_FORMATS:
-        case SET_SURROUND_FORMAT_ENABLED: {
+        case SET_SURROUND_FORMAT_ENABLED:
+        case SET_ASSISTANT_UID:
+        case SET_A11Y_SERVICES_UIDS: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
@@ -1707,6 +1738,42 @@ status_t BnAudioPolicyService::onTransact(
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             audio_unique_id_t id = static_cast<audio_unique_id_t>(data.readInt32());
             reply->writeInt32(static_cast <int32_t>(removeSourceDefaultEffect(id)));
+            return NO_ERROR;
+        }
+
+        case SET_ASSISTANT_UID: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            int32_t uid;
+            status_t status = data.readInt32(&uid);
+            if (status != NO_ERROR) {
+                return status;
+            }
+            status = setAssistantUid(uid);
+            reply->writeInt32(static_cast <int32_t>(status));
+            return NO_ERROR;
+        }
+
+        case SET_A11Y_SERVICES_UIDS: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            std::vector<uid_t> uids;
+            int32_t size;
+            status_t status = data.readInt32(&size);
+            if (status != NO_ERROR) {
+                return status;
+            }
+            if (size > MAX_ITEMS_PER_LIST) {
+                size = MAX_ITEMS_PER_LIST;
+            }
+            for (int32_t i = 0; i < size; i++) {
+                int32_t uid;
+                status =  data.readInt32(&uid);
+                if (status != NO_ERROR) {
+                    return status;
+                }
+                uids.push_back(uid);
+            }
+            status = setA11yServicesUids(uids);
+            reply->writeInt32(static_cast <int32_t>(status));
             return NO_ERROR;
         }
 

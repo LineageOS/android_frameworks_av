@@ -20,15 +20,14 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <unistd.h>
-
 #include <utils/RefBase.h>
 #include <utils/Errors.h>
 #include <binder/IInterface.h>
 #include <media/AudioSystem.h>
 #include <media/AudioPolicy.h>
 #include <media/IAudioPolicyServiceClient.h>
-
 #include <system/audio_policy.h>
+#include <vector>
 
 namespace android {
 
@@ -180,6 +179,9 @@ public:
                                         bool *surroundFormatsEnabled,
                                         bool reported) = 0;
     virtual status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled) = 0;
+
+    virtual status_t setAssistantUid(uid_t uid) = 0;
+    virtual status_t setA11yServicesUids(const std::vector<uid_t>& uids) = 0;
 };
 
 

@@ -1135,4 +1135,18 @@ status_t AudioPolicyService::setSurroundFormatEnabled(audio_format_t audioFormat
     return mAudioPolicyManager->setSurroundFormatEnabled(audioFormat, enabled);
 }
 
+status_t AudioPolicyService::setAssistantUid(uid_t uid)
+{
+    Mutex::Autolock _l(mLock);
+    mUidPolicy->setAssistantUid(uid);
+    return NO_ERROR;
+}
+
+status_t AudioPolicyService::setA11yServicesUids(const std::vector<uid_t>& uids)
+{
+    Mutex::Autolock _l(mLock);
+    mUidPolicy->setA11yUids(uids);
+    return NO_ERROR;
+}
+
 } // namespace android
