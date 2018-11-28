@@ -340,17 +340,18 @@ status_t AudioPolicyService::dumpInternals(int fd)
     return NO_ERROR;
 }
 
-void AudioPolicyService::setRecordSilenced(uid_t uid, bool silenced)
+void AudioPolicyService::setAppState(uid_t uid, app_state_t state)
 {
     {
         Mutex::Autolock _l(mLock);
         if (mAudioPolicyManager) {
             AutoCallerClear acc;
-            mAudioPolicyManager->setRecordSilenced(uid, silenced);
+            mAudioPolicyManager->setAppState(uid, state);
         }
     }
     sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
     if (af) {
+        bool silenced = state == APP_STATE_IDLE;
         af->setRecordSilenced(uid, silenced);
     }
 }
@@ -585,7 +586,9 @@ void AudioPolicyService::UidPolicy::onUidIdle(uid_t uid, __unused bool disabled)
 void AudioPolicyService::UidPolicy::notifyService(uid_t uid, bool active) {
     sp<AudioPolicyService> service = mService.promote();
     if (service != nullptr) {
-        service->setRecordSilenced(uid, !active);
+        service->setAppState(uid, active ?
+                              APP_STATE_FOREGROUND :
+                              APP_STATE_IDLE);
     }
 }
 

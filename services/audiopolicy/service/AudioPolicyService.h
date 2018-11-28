@@ -250,7 +250,7 @@ private:
     virtual status_t shellCommand(int in, int out, int err, Vector<String16>& args);
 
     // Sets whether the given UID records only silence
-    virtual void setRecordSilenced(uid_t uid, bool silenced);
+    virtual void setAppState(uid_t uid, app_state_t state);
 
     // Overrides the UID state as if it is idle
     status_t handleSetUidState(Vector<String16>& args, int err);
