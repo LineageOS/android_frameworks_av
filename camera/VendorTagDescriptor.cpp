@@ -411,6 +411,11 @@ status_t VendorTagDescriptorCache::readFromParcel(const Parcel* parcel) {
     return res;
 }
 
+const std::unordered_map<metadata_vendor_id_t, sp<android::VendorTagDescriptor>> &
+            VendorTagDescriptorCache::getVendorIdsAndTagDescriptors() {
+    return mVendorMap;
+}
+
 int VendorTagDescriptorCache::getTagCount(metadata_vendor_id_t id) const {
     int ret = 0;
     auto desc = mVendorMap.find(id);

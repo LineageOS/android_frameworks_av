@@ -40,9 +40,11 @@ using hardware::Void;
 using device::V2_0::implementation::H2BCameraDeviceCallbacks;
 using device::V2_0::implementation::HidlCameraDeviceUser;
 using service::V2_0::implementation::H2BCameraServiceListener;
-using HCameraMetadataType = android::frameworks::cameraservice::common::V2_0::CameraMetadataType;
-using HVendorTag = android::frameworks::cameraservice::common::V2_0::VendorTag;
-using HVendorTagSection = android::frameworks::cameraservice::common::V2_0::VendorTagSection;
+using HCameraMetadataType = frameworks::cameraservice::common::V2_0::CameraMetadataType;
+using HVendorTag = frameworks::cameraservice::common::V2_0::VendorTag;
+using HVendorTagSection = frameworks::cameraservice::common::V2_0::VendorTagSection;
+using HProviderIdAndVendorTagSections =
+        frameworks::cameraservice::common::V2_0::ProviderIdAndVendorTagSections;
 
 sp<HidlCameraService> gHidlCameraService;
 
@@ -215,39 +217,50 @@ Return<HStatus> HidlCameraService::removeListener(const sp<HCameraServiceListene
 }
 
 Return<void> HidlCameraService::getCameraVendorTagSections(getCameraVendorTagSections_cb _hidl_cb) {
-    hidl_vec<HVendorTagSection> hVendorTagSections;
-    // TODO: Could this be just created on the stack since we don't set it to
-    //       global cache or anything ?
-    HStatus hStatus = HStatus::NO_ERROR;
-    sp<VendorTagDescriptor> desc = new VendorTagDescriptor();
-    binder::Status serviceRet = mAidlICameraService->getCameraVendorTagDescriptor(desc.get());
-
-    if (!serviceRet.isOk()) {
-        ALOGE("%s: Failed to get VendorTagDescriptor", __FUNCTION__);
-        _hidl_cb(B2HStatus(serviceRet), hVendorTagSections);
+    sp<VendorTagDescriptorCache> gCache = VendorTagDescriptorCache::getGlobalVendorTagCache();
+    if (gCache == nullptr) {
+        _hidl_cb(HStatus::UNKNOWN_ERROR, {});
+        return Void();
+    }
+    const std::unordered_map<metadata_vendor_id_t, sp<android::VendorTagDescriptor>>
+            &vendorIdsAndTagDescs = gCache->getVendorIdsAndTagDescriptors();
+    if (vendorIdsAndTagDescs.size() == 0) {
+        _hidl_cb(HStatus::UNKNOWN_ERROR, {});
         return Void();
     }
 
-    const SortedVector<String8>* sectionNames = desc->getAllSectionNames();
-    size_t numSections = sectionNames->size();
-    std::vector<std::vector<HVendorTag>> tagsBySection(numSections);
-    int tagCount = desc->getTagCount();
-    std::vector<uint32_t> tags(tagCount);
-    desc->getTagArray(tags.data());
-    for (int i = 0; i < tagCount; i++) {
-        HVendorTag vt;
-        vt.tagId = tags[i];
-        vt.tagName = desc->getTagName(tags[i]);
-        vt.tagType = (HCameraMetadataType) desc->getTagType(tags[i]);
-        ssize_t sectionIdx = desc->getSectionIndex(tags[i]);
-        tagsBySection[sectionIdx].push_back(vt);
+    hidl_vec<HProviderIdAndVendorTagSections> hTagIdsAndVendorTagSections;
+    hTagIdsAndVendorTagSections.resize(vendorIdsAndTagDescs.size());
+    size_t j = 0;
+    for (auto &vendorIdAndTagDescs : vendorIdsAndTagDescs) {
+        hidl_vec<HVendorTagSection> hVendorTagSections;
+        sp<VendorTagDescriptor> desc = vendorIdAndTagDescs.second;
+        const SortedVector<String8>* sectionNames = desc->getAllSectionNames();
+        size_t numSections = sectionNames->size();
+        std::vector<std::vector<HVendorTag>> tagsBySection(numSections);
+        int tagCount = desc->getTagCount();
+        std::vector<uint32_t> tags(tagCount);
+        desc->getTagArray(tags.data());
+        for (int i = 0; i < tagCount; i++) {
+            HVendorTag vt;
+            vt.tagId = tags[i];
+            vt.tagName = desc->getTagName(tags[i]);
+            vt.tagType = (HCameraMetadataType) desc->getTagType(tags[i]);
+            ssize_t sectionIdx = desc->getSectionIndex(tags[i]);
+            tagsBySection[sectionIdx].push_back(vt);
+        }
+        hVendorTagSections.resize(numSections);
+        for (size_t s = 0; s < numSections; s++) {
+            hVendorTagSections[s].sectionName = (*sectionNames)[s].string();
+            hVendorTagSections[s].tags = tagsBySection[s];
+        }
+        HProviderIdAndVendorTagSections &hProviderIdAndVendorTagSections =
+                hTagIdsAndVendorTagSections[j];
+        hProviderIdAndVendorTagSections.providerId = vendorIdAndTagDescs.first;
+        hProviderIdAndVendorTagSections.vendorTagSections = std::move(hVendorTagSections);
+        j++;
     }
-    hVendorTagSections.resize(numSections);
-    for (size_t s = 0; s < numSections; s++) {
-        hVendorTagSections[s].sectionName = (*sectionNames)[s].string();
-        hVendorTagSections[s].tags = tagsBySection[s];
-    }
-    _hidl_cb(hStatus, hVendorTagSections);
+    _hidl_cb(HStatus::NO_ERROR, hTagIdsAndVendorTagSections);
     return Void();
 }
 
