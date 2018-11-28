@@ -103,7 +103,7 @@ status_t NuPlayer2::HTTPLiveSource2::setBufferingSettings(const BufferingSetting
 void NuPlayer2::HTTPLiveSource2::prepareAsync(int64_t /* startTimeUs */) {
     if (mLiveLooper == NULL) {
         mLiveLooper = new ALooper;
-        mLiveLooper->setName("http live");
+        mLiveLooper->setName("http live2");
         mLiveLooper->start(false, /* runOnCallingThread */
                            true /* canCallJava */);
 
