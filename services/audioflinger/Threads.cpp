@@ -2413,6 +2413,14 @@ String8 AudioFlinger::PlaybackThread::getParameters(const String8& keys)
     return String8();
 }
 
+status_t AudioFlinger::DirectOutputThread::selectPresentation(int presentationId, int programId) {
+    Mutex::Autolock _l(mLock);
+    if (mOutput == nullptr || mOutput->stream == nullptr) {
+        return NO_INIT;
+    }
+    return mOutput->stream->selectPresentation(presentationId, programId);
+}
+
 void AudioFlinger::PlaybackThread::ioConfigChanged(audio_io_config_event event, pid_t pid) {
     sp<AudioIoDescriptor> desc = new AudioIoDescriptor();
     ALOGV("PlaybackThread::ioConfigChanged, thread %p, event %d", this, event);

@@ -18,6 +18,7 @@
 //#define LOG_NDEBUG 0
 
 #include <hardware/audio.h>
+#include <media/AudioParameter.h>
 #include <utils/Log.h>
 
 #include "DeviceHalLocal.h"
@@ -136,6 +137,13 @@ status_t StreamOutHalLocal::getLatency(uint32_t *latency) {
 status_t StreamOutHalLocal::setVolume(float left, float right) {
     if (mStream->set_volume == NULL) return INVALID_OPERATION;
     return mStream->set_volume(mStream, left, right);
+}
+
+status_t StreamOutHalLocal::selectPresentation(int presentationId, int programId) {
+    AudioParameter param;
+    param.addInt(String8(AudioParameter::keyPresentationId), presentationId);
+    param.addInt(String8(AudioParameter::keyProgramId), programId);
+    return setParameters(param.toString());
 }
 
 status_t StreamOutHalLocal::write(const void *buffer, size_t bytes, size_t *written) {

@@ -20,6 +20,7 @@
 #include <android/hardware/audio/2.0/IStreamOutCallback.h>
 #include <android/hardware/audio/4.0/IStreamOutCallback.h>
 #include <hwbinder/IPCThreadState.h>
+#include <media/AudioParameter.h>
 #include <mediautils/SchedulingPolicyService.h>
 #include <utils/Log.h>
 
@@ -346,6 +347,24 @@ status_t StreamOutHalHidl::setVolume(float left, float right) {
     if (mStream == 0) return NO_INIT;
     return processReturn("setVolume", mStream->setVolume(left, right));
 }
+
+#if MAJOR_VERSION == 2
+status_t StreamOutHalHidl::selectPresentation(int presentationId, int programId) {
+    if (mStream == 0) return NO_INIT;
+    std::vector<ParameterValue> parameters;
+    String8 halParameters;
+    parameters.push_back({AudioParameter::keyPresentationId, std::to_string(presentationId)});
+    parameters.push_back({AudioParameter::keyProgramId, std::to_string(programId)});
+    parametersToHal(hidl_vec<ParameterValue>(parameters), &halParameters);
+    return setParameters(halParameters);
+}
+#elif MAJOR_VERSION == 4
+status_t StreamOutHalHidl::selectPresentation(int presentationId, int programId) {
+    if (mStream == 0) return NO_INIT;
+    return processReturn("selectPresentation",
+            mStream->selectPresentation(presentationId, programId));
+}
+#endif
 
 status_t StreamOutHalHidl::write(const void *buffer, size_t bytes, size_t *written) {
     if (mStream == 0) return NO_INIT;

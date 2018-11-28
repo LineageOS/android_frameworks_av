@@ -1199,6 +1199,8 @@ public:
                        audio_io_handle_t id, audio_devices_t device, bool systemReady);
     virtual                 ~DirectOutputThread();
 
+                status_t    selectPresentation(int presentationId, int programId);
+
     // Thread virtuals
 
     virtual     bool        checkForNewParameter_l(const String8& keyValuePair,

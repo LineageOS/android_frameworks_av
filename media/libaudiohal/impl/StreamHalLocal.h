@@ -103,6 +103,9 @@ class StreamOutHalLocal : public StreamOutHalInterface, public StreamHalLocal {
     // Use this method in situations where audio mixing is done in the hardware.
     virtual status_t setVolume(float left, float right);
 
+    // Selects the audio presentation (if available).
+    virtual status_t selectPresentation(int presentationId, int programId);
+
     // Write audio buffer to driver.
     virtual status_t write(const void *buffer, size_t bytes, size_t *written);
 
