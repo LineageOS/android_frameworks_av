@@ -269,6 +269,53 @@ FO_FLOAT_LShx_Coefs_t    LVM_TrebleBoostCoefs[] = {
                      -HPF_Fs48000_Gain15_B1}
 #ifdef HIGHER_FS
                     ,
+                    /* 88kHz Sampling rate */
+                    {HPF_Fs88200_Gain1_A1,             /* Gain Setting  1 */
+                    HPF_Fs88200_Gain1_A0,
+                    -HPF_Fs88200_Gain1_B1},
+                    {HPF_Fs88200_Gain2_A1,             /* Gain Setting  2 */
+                    HPF_Fs88200_Gain2_A0,
+                    -HPF_Fs88200_Gain2_B1},
+                    {HPF_Fs88200_Gain3_A1,             /* Gain Setting  3 */
+                    HPF_Fs88200_Gain3_A0,
+                    -HPF_Fs88200_Gain3_B1},
+                    {HPF_Fs88200_Gain4_A1,             /* Gain Setting  4 */
+                    HPF_Fs88200_Gain4_A0,
+                    -HPF_Fs88200_Gain4_B1},
+                    {HPF_Fs88200_Gain5_A1,             /* Gain Setting  5 */
+                    HPF_Fs88200_Gain5_A0,
+                    -HPF_Fs88200_Gain5_B1},
+                    {HPF_Fs88200_Gain6_A1,             /* Gain Setting  6 */
+                    HPF_Fs88200_Gain6_A0,
+                    -HPF_Fs88200_Gain6_B1},
+                    {HPF_Fs88200_Gain7_A1,             /* Gain Setting  7 */
+                    HPF_Fs88200_Gain7_A0,
+                    -HPF_Fs88200_Gain7_B1},
+                    {HPF_Fs88200_Gain8_A1,             /* Gain Setting  8 */
+                    HPF_Fs88200_Gain8_A0,
+                    -HPF_Fs88200_Gain8_B1},
+                    {HPF_Fs88200_Gain9_A1,             /* Gain Setting  9 */
+                    HPF_Fs88200_Gain9_A0,
+                    -HPF_Fs88200_Gain9_B1},
+                    {HPF_Fs88200_Gain10_A1,             /* Gain Setting  10 */
+                    HPF_Fs88200_Gain10_A0,
+                    -HPF_Fs88200_Gain10_B1},
+                    {HPF_Fs88200_Gain11_A1,             /* Gain Setting  11 */
+                    HPF_Fs88200_Gain11_A0,
+                    -HPF_Fs88200_Gain11_B1},
+                    {HPF_Fs88200_Gain12_A1,             /* Gain Setting  12 */
+                    HPF_Fs88200_Gain12_A0,
+                    -HPF_Fs88200_Gain12_B1},
+                    {HPF_Fs88200_Gain13_A1,             /* Gain Setting  13 */
+                    HPF_Fs88200_Gain13_A0,
+                    -HPF_Fs88200_Gain13_B1},
+                    {HPF_Fs88200_Gain14_A1,             /* Gain Setting  14 */
+                    HPF_Fs88200_Gain14_A0,
+                    -HPF_Fs88200_Gain14_B1},
+                    {HPF_Fs88200_Gain15_A1,             /* Gain Setting  15 */
+                    HPF_Fs88200_Gain15_A0,
+                    -HPF_Fs88200_Gain15_B1},
+
                     /* 96kHz sampling rate */
                     {HPF_Fs96000_Gain1_A1,             /* Gain setting 1 */
                     HPF_Fs96000_Gain1_A0,
@@ -315,6 +362,53 @@ FO_FLOAT_LShx_Coefs_t    LVM_TrebleBoostCoefs[] = {
                     {HPF_Fs96000_Gain15_A1,             /* Gain setting 15 */
                     HPF_Fs96000_Gain15_A0,
                     -HPF_Fs96000_Gain15_B1},
+
+                    /* 176kHz Sampling rate */
+                    {HPF_Fs176400_Gain1_A1,             /* Gain Setting  1 */
+                    HPF_Fs176400_Gain1_A0,
+                    -HPF_Fs176400_Gain1_B1},
+                    {HPF_Fs176400_Gain2_A1,             /* Gain Setting  2 */
+                    HPF_Fs176400_Gain2_A0,
+                    -HPF_Fs176400_Gain2_B1},
+                    {HPF_Fs176400_Gain3_A1,             /* Gain Setting  3 */
+                    HPF_Fs176400_Gain3_A0,
+                    -HPF_Fs176400_Gain3_B1},
+                    {HPF_Fs176400_Gain4_A1,             /* Gain Setting  4 */
+                    HPF_Fs176400_Gain4_A0,
+                    -HPF_Fs176400_Gain4_B1},
+                    {HPF_Fs176400_Gain5_A1,             /* Gain Setting  5 */
+                    HPF_Fs176400_Gain5_A0,
+                    -HPF_Fs176400_Gain5_B1},
+                    {HPF_Fs176400_Gain6_A1,             /* Gain Setting  6 */
+                    HPF_Fs176400_Gain6_A0,
+                    -HPF_Fs176400_Gain6_B1},
+                    {HPF_Fs176400_Gain7_A1,             /* Gain Setting  7 */
+                    HPF_Fs176400_Gain7_A0,
+                    -HPF_Fs176400_Gain7_B1},
+                    {HPF_Fs176400_Gain8_A1,             /* Gain Setting  8 */
+                    HPF_Fs176400_Gain8_A0,
+                    -HPF_Fs176400_Gain8_B1},
+                    {HPF_Fs176400_Gain9_A1,             /* Gain Setting  9 */
+                    HPF_Fs176400_Gain9_A0,
+                    -HPF_Fs176400_Gain9_B1},
+                    {HPF_Fs176400_Gain10_A1,             /* Gain Setting  10 */
+                    HPF_Fs176400_Gain10_A0,
+                    -HPF_Fs176400_Gain10_B1},
+                    {HPF_Fs176400_Gain11_A1,             /* Gain Setting  11 */
+                    HPF_Fs176400_Gain11_A0,
+                    -HPF_Fs176400_Gain11_B1},
+                    {HPF_Fs176400_Gain12_A1,             /* Gain Setting  12 */
+                    HPF_Fs176400_Gain12_A0,
+                    -HPF_Fs176400_Gain12_B1},
+                    {HPF_Fs176400_Gain13_A1,             /* Gain Setting  13 */
+                    HPF_Fs176400_Gain13_A0,
+                    -HPF_Fs176400_Gain13_B1},
+                    {HPF_Fs176400_Gain14_A1,             /* Gain Setting  14 */
+                    HPF_Fs176400_Gain14_A0,
+                    -HPF_Fs176400_Gain14_B1},
+                    {HPF_Fs176400_Gain15_A1,             /* Gain Setting  15 */
+                    HPF_Fs176400_Gain15_A0,
+                    -HPF_Fs176400_Gain15_B1},
 
                     /* 192kHz sampling rate */
                     {HPF_Fs192000_Gain1_A1,             /* Gain setting 1 */

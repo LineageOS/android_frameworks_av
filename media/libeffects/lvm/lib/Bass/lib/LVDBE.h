@@ -199,8 +199,10 @@ typedef enum
 #define LVDBE_CAP_FS_44100               128
 #define LVDBE_CAP_FS_48000               256
 #if defined(BUILD_FLOAT) && defined(HIGHER_FS)
-#define LVDBE_CAP_FS_96000               512
-#define LVDBE_CAP_FS_192000              1024
+#define LVDBE_CAP_FS_88200               512
+#define LVDBE_CAP_FS_96000               1024
+#define LVDBE_CAP_FS_176400              2048
+#define LVDBE_CAP_FS_192000              4096
 #endif
 
 typedef enum
@@ -215,8 +217,10 @@ typedef enum
     LVDBE_FS_44100 = 7,
     LVDBE_FS_48000 = 8,
 #if defined(BUILD_FLOAT) && defined(HIGHER_FS)
-    LVDBE_FS_96000 = 9,
-    LVDBE_FS_192000 = 10,
+    LVDBE_FS_88200 = 9,
+    LVDBE_FS_96000 = 10,
+    LVDBE_FS_176400 = 11,
+    LVDBE_FS_192000 = 12,
 #endif
     LVDBE_FS_MAX   = LVM_MAXINT_32
 } LVDBE_Fs_en;

@@ -123,7 +123,7 @@ extern "C" {
 #ifndef HIGHER_FS
 #define LVREV_NUM_FS                        9           /* Number of supported sample rates */
 #else
-#define LVREV_NUM_FS                       11           /* Number of supported sample rates */
+#define LVREV_NUM_FS                       13           /* Number of supported sample rates */
 #endif
 
 #define LVREV_MAXBLKSIZE_LIMIT             64           /* Maximum block size low limit */

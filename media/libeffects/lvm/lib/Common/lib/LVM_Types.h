@@ -169,8 +169,10 @@ typedef enum
     LVM_FS_44100 = 7,
     LVM_FS_48000 = 8,
 #ifdef HIGHER_FS
-    LVM_FS_96000 = 9,
-    LVM_FS_192000 = 10,
+    LVM_FS_88200 = 9,
+    LVM_FS_96000 = 10,
+    LVM_FS_176400 = 11,
+    LVM_FS_192000 = 12,
 #endif
     LVM_FS_INVALID = LVM_MAXENUM-1,
     LVM_FS_DUMMY = LVM_MAXENUM

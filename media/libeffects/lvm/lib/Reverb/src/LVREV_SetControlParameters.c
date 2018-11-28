@@ -68,7 +68,8 @@ LVREV_ReturnStatus_en LVREV_SetControlParameters(LVREV_Handle_t           hInsta
         (pNewParams->SampleRate != LVM_FS_44100) &&
         (pNewParams->SampleRate != LVM_FS_48000)
 #ifdef HIGHER_FS
-        && (pNewParams->SampleRate != LVM_FS_96000) && (pNewParams->SampleRate != LVM_FS_192000)
+        && (pNewParams->SampleRate != LVM_FS_88200) && (pNewParams->SampleRate != LVM_FS_96000)
+        && (pNewParams->SampleRate != LVM_FS_176400) && (pNewParams->SampleRate != LVM_FS_192000)
 #endif
         )
 #ifdef SUPPORT_MC

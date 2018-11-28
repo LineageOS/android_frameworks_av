@@ -54,7 +54,9 @@ const LVM_UINT32    LVPSA_SampleRateTab[] = {   8000,                    /* 8kS/
                                                 32000,
                                                 44100,
                                                 48000,
+                                                88200,
                                                 96000,
+                                               176400,
                                                192000};                  /* 192kS/s */
 #endif
 
@@ -78,7 +80,9 @@ const LVM_UINT32    LVPSA_SampleRateInvTab[] = {    268435,                    /
                                                     48696,
                                                     44739
 #ifdef HIGHER_FS
+                                                    ,24348
                                                     ,22369
+                                                    ,12174
                                                     ,11185                  /* 192kS/s */
 #endif
                                                };
@@ -105,7 +109,9 @@ const LVM_UINT16    LVPSA_nSamplesBufferUpdate[]  = {   160,                   /
                                                         882,
                                                         960
 #ifdef HIGHER_FS
+                                                        ,1764
                                                         ,1920
+                                                        ,3528
                                                         ,3840                  /* 192kS/s */
 #endif
                                                     };
@@ -128,7 +134,9 @@ const LVM_UINT16    LVPSA_DownSamplingFactor[]  = {     5,                    /*
                                                         30,                   /* 44100 S/s  */
                                                         32                    /* 48000 S/s  */
 #ifdef HIGHER_FS
+                                                       ,60                   /* 88200 S/s  */
                                                        ,64                   /* 96000 S/s  */
+                                                       ,120                  /* 176400 S/s  */
                                                        ,128                  /*192000 S/s  */
 #endif
                                                   };
@@ -153,7 +161,9 @@ const LVM_INT16     LVPSA_TwoPiOnFsTable[] = {  26354,      /* 8kS/s */
                                                  4781,
                                                  4392
 #ifdef HIGHER_FS
+                                                ,2390
                                                 ,2196
+                                                ,1195
                                                 ,1098    /* 192kS/s */
 #endif
                                              };
@@ -169,7 +179,9 @@ const LVM_FLOAT     LVPSA_Float_TwoPiOnFsTable[] = {  0.8042847f,      /* 8kS/s 
                                                       0.1459089f,
                                                       0.1340372f
 #ifdef HIGHER_FS
+                                                     ,0.0729476f
                                                      ,0.0670186f
+                                                     ,0.0364738f
                                                      ,0.0335093f    /* 192kS/s */
 #endif
                                                    };
@@ -352,7 +364,9 @@ const QPD_FLOAT_Coefs     LVPSA_QPD_Float_Coefs[] = {
                                           /* 48kS/s */
                                          {-0.9932638457976282f,0.0066249934025109f},
 #ifdef HIGHER_FS
+                                         {-0.9931269618682563f,0.0067592649720609f},
                                          {-0.9932638457976282f,0.0066249934025109f},
+                                         {-0.9931269618682563f,0.0067592649720609f},
                                          {-0.9932638457976282f,0.0066249934025109f},
 #endif
                                          /* 8kS/s  */    /* LVPSA_SPEED_MEDIUM      */
@@ -368,7 +382,9 @@ const QPD_FLOAT_Coefs     LVPSA_QPD_Float_Coefs[] = {
                                           /* 48kS/s */
                                          {-0.9540119562298059f,0.0445343819446862f},
 #ifdef HIGHER_FS
+                                         {-0.9531011912040412f,0.0453995238058269f},
                                          {-0.9540119562298059f,0.0445343819446862f},
+                                         {-0.9531011912040412f,0.0453995238058269f},
                                          {-0.9540119562298059f,0.0445343819446862f},
 #endif
                                           /* 8kS/s  */   /* LVPSA_SPEED_HIGH      */
@@ -383,7 +399,9 @@ const QPD_FLOAT_Coefs     LVPSA_QPD_Float_Coefs[] = {
                                            /* 48kS/s */
                                          {-0.7274807319045067f,0.2356666540727019f}
 #ifdef HIGHER_FS
+                                        ,{-0.7229706319049001f,0.2388987224549055f}
                                         ,{-0.7274807319045067f,0.2356666540727019f}
+                                        ,{-0.7229706319049001f,0.2388987224549055f}
                                         ,{-0.7274807319045067f,0.2356666540727019f}
 #endif
                                         };

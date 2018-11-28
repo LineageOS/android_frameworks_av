@@ -447,19 +447,69 @@ int lvmControl(struct EffectContext *pContext,
                lvmConfigParams_t    *plvmConfigParams,
                LVM_ControlParams_t  *params) {
   LVM_ReturnStatus_en LvmStatus = LVM_SUCCESS; /* Function call status */
-  LVM_EQNB_BandDef_t BandDefs[MAX_NUM_BANDS];  /* Equaliser band definitions */
-  int eqPresetLevel = plvmConfigParams->eqPresetLevel;
-  int nrChannels = plvmConfigParams->nrChannels;
-  params->NrChannels = nrChannels;
 
   /* Set the initial process parameters */
   /* General parameters */
   params->OperatingMode = LVM_MODE_ON;
-  params->SampleRate = LVM_FS_44100;
-  params->SourceFormat = LVM_STEREO;
   params->SpeakerType = LVM_HEADPHONES;
 
-  pContext->pBundledContext->SampleRate = LVM_FS_44100;
+  const int nrChannels = plvmConfigParams->nrChannels;
+  params->NrChannels = nrChannels;
+  if (nrChannels == 1) {
+    params->SourceFormat = LVM_MONO;
+  } else if (nrChannels == 2) {
+    params->SourceFormat = LVM_STEREO;
+  } else if (nrChannels > 2 && nrChannels <= 8) { // FCC_2 FCC_8
+    params->SourceFormat = LVM_MULTICHANNEL;
+  } else {
+      return -EINVAL;
+  }
+
+  LVM_Fs_en sampleRate;
+  switch (plvmConfigParams->samplingFreq) {
+    case 8000:
+      sampleRate = LVM_FS_8000;
+      break;
+    case 11025:
+      sampleRate = LVM_FS_11025;
+      break;
+    case 12000:
+      sampleRate = LVM_FS_12000;
+      break;
+    case 16000:
+      sampleRate = LVM_FS_16000;
+      break;
+    case 22050:
+      sampleRate = LVM_FS_22050;
+      break;
+    case 24000:
+      sampleRate = LVM_FS_24000;
+      break;
+    case 32000:
+      sampleRate = LVM_FS_32000;
+      break;
+    case 44100:
+      sampleRate = LVM_FS_44100;
+      break;
+    case 48000:
+      sampleRate = LVM_FS_48000;
+      break;
+    case 88200:
+      sampleRate = LVM_FS_88200;
+      break;
+    case 96000:
+      sampleRate = LVM_FS_96000;
+      break;
+    case 176400:
+      sampleRate = LVM_FS_176400;
+      break;
+    case 192000:
+      sampleRate = LVM_FS_192000;
+      break;
+    default:
+      return -EINVAL;
+  }
+  params->SampleRate = sampleRate;
 
   /* Concert Sound parameters */
   params->VirtualizerOperatingMode = plvmConfigParams->csEnable;
@@ -468,14 +518,17 @@ int lvmControl(struct EffectContext *pContext,
   params->CS_EffectLevel = LVM_CS_EFFECT_NONE;
 
   /* N-Band Equaliser parameters */
-  params->EQNB_OperatingMode = plvmConfigParams->eqEnable;
-  params->pEQNB_BandDefinition = &BandDefs[0];
+  const int eqPresetLevel = plvmConfigParams->eqPresetLevel;
+  LVM_EQNB_BandDef_t BandDefs[MAX_NUM_BANDS];  /* Equaliser band definitions */
   for (int i = 0; i < FIVEBAND_NUMBANDS; i++) {
     BandDefs[i].Frequency = EQNB_5BandPresetsFrequencies[i];
     BandDefs[i].QFactor = EQNB_5BandPresetsQFactors[i];
     BandDefs[i].Gain =
         EQNB_5BandSoftPresets[(FIVEBAND_NUMBANDS * eqPresetLevel) + i];
   }
+  params->EQNB_OperatingMode = plvmConfigParams->eqEnable;
+ // Caution: raw pointer to stack data, stored in instance by LVM_SetControlParameters.
+  params->pEQNB_BandDefinition = &BandDefs[0];
 
   /* Volume Control parameters */
   params->VC_EffectLevel = 0;
@@ -489,16 +542,6 @@ int lvmControl(struct EffectContext *pContext,
 
   /* Bass Enhancement parameters */
   params->BE_OperatingMode = plvmConfigParams->bassEnable;
-
-  if (nrChannels == 1) {
-    params->SourceFormat = LVM_MONO;
-  }
-  if (nrChannels == 2) {
-    params->SourceFormat = LVM_STEREO;
-  }
-  if ((nrChannels > 2) && (nrChannels <= 8)) {
-    params->SourceFormat = LVM_MULTICHANNEL;
-  }
 
   /* Activate the initial settings */
   LvmStatus =
@@ -613,7 +656,9 @@ int main(int argc, const char *argv[]) {
           samplingFreq != 12000 && samplingFreq != 16000 &&
           samplingFreq != 22050 && samplingFreq != 24000 &&
           samplingFreq != 32000 && samplingFreq != 44100 &&
-          samplingFreq != 48000 && samplingFreq != 96000) {
+          samplingFreq != 48000 && samplingFreq != 88200 &&
+          samplingFreq != 96000 && samplingFreq != 176400 &&
+          samplingFreq != 192000) {
         ALOGE("\nError: Unsupported Sampling Frequency : %d\n", samplingFreq);
         return -1;
       }
