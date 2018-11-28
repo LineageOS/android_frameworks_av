@@ -15,26 +15,30 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "C2SoftwareCodecServiceRegistrant"
+#define LOG_TAG "CodecServiceRegistrant"
+
+#include <android-base/logging.h>
 
 #include <C2PlatformSupport.h>
 #include <codec2/hidl/1.0/ComponentStore.h>
 #include <media/CodecServiceRegistrant.h>
-#include <log/log.h>
 
 extern "C" void RegisterCodecServices() {
     using namespace ::android::hardware::media::c2::V1_0;
+    LOG(INFO) << "Creating software Codec2 service...";
     android::sp<IComponentStore> store =
         new utils::ComponentStore(
                 android::GetCodec2PlatformComponentStore());
     if (store == nullptr) {
-        ALOGE("Cannot create Codec2's IComponentStore software service.");
+        LOG(ERROR) <<
+                "Cannot create software Codec2 service.";
     } else {
         if (store->registerAsService("software") != android::OK) {
-            ALOGE("Cannot register Codec2's "
-                    "IComponentStore software service.");
+            LOG(ERROR) <<
+                    "Cannot register software Codec2 service.";
         } else {
-            ALOGI("Codec2's IComponentStore software service created.");
+            LOG(INFO) <<
+                    "Software Codec2 service created.";
         }
     }
 }

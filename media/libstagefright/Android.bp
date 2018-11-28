@@ -146,6 +146,7 @@ cc_library_shared {
 
     shared_libs: [
         "libaudioutils",
+        "libbase",
         "libbinder",
         "libcamera_client",
         "libcutils",
@@ -204,12 +205,6 @@ cc_library_shared {
 
     export_include_dirs: [
         "include",
-    ],
-
-    // This is needed to make sure libcodec2 exists in all devices.
-    // TODO: Remove this once the public CCodec is enabled.
-    required: [
-        "libcodec2",
     ],
 
     cflags: [
