@@ -322,11 +322,26 @@ void AudioInputDescriptor::updateClientRecordingConfiguration(
     int event, const sp<RecordClientDescriptor>& client)
 {
     const audio_config_base_t sessionConfig = client->config();
-    const record_client_info_t recordClientInfo{client->uid(), client->session(), client->source()};
+    const record_client_info_t recordClientInfo{client->uid(), client->session(),
+                                                client->source(), client->portId(),
+                                                client->isSilenced()};
     const audio_config_base_t config = getConfig();
-    mClientInterface->onRecordingConfigurationUpdate(event,
-                                                     &recordClientInfo, &sessionConfig,
-                                                     &config, mPatchHandle);
+
+    std::vector<effect_descriptor_t> clientEffects;
+    EffectDescriptorCollection effectsList = client->getEnabledEffects();
+    for (size_t i = 0; i < effectsList.size(); i++) {
+        clientEffects.push_back(effectsList.valueAt(i)->mDesc);
+    }
+
+    std::vector<effect_descriptor_t> effects;
+    effectsList = getEnabledEffects();
+    for (size_t i = 0; i < effectsList.size(); i++) {
+        effects.push_back(effectsList.valueAt(i)->mDesc);
+    }
+
+    mClientInterface->onRecordingConfigurationUpdate(event, &recordClientInfo, &sessionConfig,
+                                                     clientEffects, &config, effects,
+                                                     mPatchHandle, source());
 }
 
 RecordClientVector AudioInputDescriptor::getClientsForSession(
@@ -358,15 +373,21 @@ RecordClientVector AudioInputDescriptor::clientsList(bool activeOnly, audio_sour
 void AudioInputDescriptor::trackEffectEnabled(const sp<EffectDescriptor> &effect,
                                               bool enabled)
 {
-    RecordClientVector clients = getClientsForSession((audio_session_t)effect->mSession);
-    for (const auto& client : clients) {
-        client->trackEffectEnabled(effect, enabled);
-    }
-
     if (enabled) {
         mEnabledEffects.replaceValueFor(effect->mId, effect);
     } else {
         mEnabledEffects.removeItem(effect->mId);
+    }
+
+    RecordClientVector clients = getClientsForSession((audio_session_t)effect->mSession);
+    for (const auto& client : clients) {
+        sp<EffectDescriptor> clientEffect = client->getEnabledEffects().getEffect(effect->mId);
+        bool changed = (enabled && clientEffect == nullptr)
+                || (!enabled && clientEffect != nullptr);
+        client->trackEffectEnabled(effect, enabled);
+        if (changed && client->active()) {
+            updateClientRecordingConfiguration(RECORD_CONFIG_EVENT_START, client);
+        }
     }
 }
 
@@ -380,6 +401,20 @@ EffectDescriptorCollection AudioInputDescriptor::getEnabledEffects() const
         enabledEffects = clients[0]->getEnabledEffects();
     }
     return enabledEffects;
+}
+
+void AudioInputDescriptor::setAppState(uid_t uid, app_state_t state) {
+    RecordClientVector clients = clientsList(false /*activeOnly*/);
+
+    for (const auto& client : clients) {
+        if (uid == client->uid()) {
+            bool wasSilenced = client->isSilenced();
+            client->setAppState(state);
+            if (client->active() && wasSilenced != client->isSilenced()) {
+                updateClientRecordingConfiguration(RECORD_CONFIG_EVENT_START, client);
+            }
+        }
+    }
 }
 
 void AudioInputDescriptor::dump(String8 *dst) const

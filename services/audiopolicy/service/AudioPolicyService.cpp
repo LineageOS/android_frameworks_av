@@ -215,22 +215,34 @@ void AudioPolicyService::doOnDynamicPolicyMixStateUpdate(const String8& regId, i
     }
 }
 
-void AudioPolicyService::onRecordingConfigurationUpdate(int event,
-        const record_client_info_t *clientInfo, const audio_config_base_t *clientConfig,
-        const audio_config_base_t *deviceConfig, audio_patch_handle_t patchHandle)
+void AudioPolicyService::onRecordingConfigurationUpdate(
+                                                    int event,
+                                                    const record_client_info_t *clientInfo,
+                                                    const audio_config_base_t *clientConfig,
+                                                    std::vector<effect_descriptor_t> clientEffects,
+                                                    const audio_config_base_t *deviceConfig,
+                                                    std::vector<effect_descriptor_t> effects,
+                                                    audio_patch_handle_t patchHandle,
+                                                    audio_source_t source)
 {
     mOutputCommandThread->recordingConfigurationUpdateCommand(event, clientInfo,
-            clientConfig, deviceConfig, patchHandle);
+            clientConfig, clientEffects, deviceConfig, effects, patchHandle, source);
 }
 
-void AudioPolicyService::doOnRecordingConfigurationUpdate(int event,
-        const record_client_info_t *clientInfo, const audio_config_base_t *clientConfig,
-        const audio_config_base_t *deviceConfig, audio_patch_handle_t patchHandle)
+void AudioPolicyService::doOnRecordingConfigurationUpdate(
+                                                  int event,
+                                                  const record_client_info_t *clientInfo,
+                                                  const audio_config_base_t *clientConfig,
+                                                  std::vector<effect_descriptor_t> clientEffects,
+                                                  const audio_config_base_t *deviceConfig,
+                                                  std::vector<effect_descriptor_t> effects,
+                                                  audio_patch_handle_t patchHandle,
+                                                  audio_source_t source)
 {
     Mutex::Autolock _l(mNotificationClientsLock);
     for (size_t i = 0; i < mNotificationClients.size(); i++) {
         mNotificationClients.valueAt(i)->onRecordingConfigurationUpdate(event, clientInfo,
-                clientConfig, deviceConfig, patchHandle);
+                clientConfig, clientEffects, deviceConfig, effects, patchHandle, source);
     }
 }
 
@@ -298,13 +310,18 @@ void AudioPolicyService::NotificationClient::onDynamicPolicyMixStateUpdate(
 }
 
 void AudioPolicyService::NotificationClient::onRecordingConfigurationUpdate(
-        int event, const record_client_info_t *clientInfo,
-        const audio_config_base_t *clientConfig, const audio_config_base_t *deviceConfig,
-        audio_patch_handle_t patchHandle)
+                                            int event,
+                                            const record_client_info_t *clientInfo,
+                                            const audio_config_base_t *clientConfig,
+                                            std::vector<effect_descriptor_t> clientEffects,
+                                            const audio_config_base_t *deviceConfig,
+                                            std::vector<effect_descriptor_t> effects,
+                                            audio_patch_handle_t patchHandle,
+                                            audio_source_t source)
 {
     if (mAudioPolicyServiceClient != 0 && isServiceUid(mUid)) {
         mAudioPolicyServiceClient->onRecordingConfigurationUpdate(event, clientInfo,
-                clientConfig, deviceConfig, patchHandle);
+                clientConfig, clientEffects, deviceConfig, effects, patchHandle, source);
     }
 }
 
@@ -1071,8 +1088,9 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
                     }
                     mLock.unlock();
                     svc->doOnRecordingConfigurationUpdate(data->mEvent, &data->mClientInfo,
-                            &data->mClientConfig, &data->mDeviceConfig,
-                            data->mPatchHandle);
+                            &data->mClientConfig, data->mClientEffects,
+                            &data->mDeviceConfig, data->mEffects,
+                            data->mPatchHandle, data->mSource);
                     mLock.lock();
                     } break;
                 default:
@@ -1307,9 +1325,14 @@ void AudioPolicyService::AudioCommandThread::dynamicPolicyMixStateUpdateCommand(
 }
 
 void AudioPolicyService::AudioCommandThread::recordingConfigurationUpdateCommand(
-        int event, const record_client_info_t *clientInfo,
-        const audio_config_base_t *clientConfig, const audio_config_base_t *deviceConfig,
-        audio_patch_handle_t patchHandle)
+                                                int event,
+                                                const record_client_info_t *clientInfo,
+                                                const audio_config_base_t *clientConfig,
+                                                std::vector<effect_descriptor_t> clientEffects,
+                                                const audio_config_base_t *deviceConfig,
+                                                std::vector<effect_descriptor_t> effects,
+                                                audio_patch_handle_t patchHandle,
+                                                audio_source_t source)
 {
     sp<AudioCommand>command = new AudioCommand();
     command->mCommand = RECORDING_CONFIGURATION_UPDATE;
@@ -1317,8 +1340,11 @@ void AudioPolicyService::AudioCommandThread::recordingConfigurationUpdateCommand
     data->mEvent = event;
     data->mClientInfo = *clientInfo;
     data->mClientConfig = *clientConfig;
+    data->mClientEffects = clientEffects;
     data->mDeviceConfig = *deviceConfig;
+    data->mEffects = effects;
     data->mPatchHandle = patchHandle;
+    data->mSource = source;
     command->mParam = data;
     ALOGV("AudioCommandThread() adding recording configuration update event %d, source %d uid %u",
             event, clientInfo->source, clientInfo->uid);

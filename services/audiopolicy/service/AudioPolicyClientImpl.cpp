@@ -209,12 +209,17 @@ void AudioPolicyService::AudioPolicyClient::onDynamicPolicyMixStateUpdate(
 }
 
 void AudioPolicyService::AudioPolicyClient::onRecordingConfigurationUpdate(
-        int event, const record_client_info_t *clientInfo,
-        const audio_config_base_t *clientConfig, const audio_config_base_t *deviceConfig,
-        audio_patch_handle_t patchHandle)
+                                                    int event,
+                                                    const record_client_info_t *clientInfo,
+                                                    const audio_config_base_t *clientConfig,
+                                                    std::vector<effect_descriptor_t> clientEffects,
+                                                    const audio_config_base_t *deviceConfig,
+                                                    std::vector<effect_descriptor_t> effects,
+                                                    audio_patch_handle_t patchHandle,
+                                                    audio_source_t source)
 {
     mAudioPolicyService->onRecordingConfigurationUpdate(event, clientInfo,
-            clientConfig, deviceConfig, patchHandle);
+            clientConfig, clientEffects, deviceConfig, effects, patchHandle, source);
 }
 
 audio_unique_id_t AudioPolicyService::AudioPolicyClient::newAudioUniqueId(audio_unique_id_use_t use)

@@ -3733,13 +3733,11 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
 
 void AudioPolicyManager::setAppState(uid_t uid, app_state_t state)
 {
-    Vector<sp<AudioInputDescriptor> > activeInputs = mInputs.getActiveInputs();
-
     ALOGV("%s(uid:%d, state:%d)", __func__, uid, state);
 
-    for (size_t i = 0; i < activeInputs.size(); i++) {
-        sp<AudioInputDescriptor> activeDesc = activeInputs[i];
-        RecordClientVector clients = activeDesc->clientsList(true /*activeOnly*/);
+    for (size_t i = 0; i < mInputs.size(); i++) {
+        sp<AudioInputDescriptor> inputDesc = mInputs.valueAt(i);
+        RecordClientVector clients = inputDesc->clientsList(false /*activeOnly*/);
         for (const auto& client : clients) {
             if (uid == client->uid()) {
                 client->setAppState(state);
