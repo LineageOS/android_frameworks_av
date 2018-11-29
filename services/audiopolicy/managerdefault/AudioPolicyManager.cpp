@@ -5899,18 +5899,8 @@ void AudioPolicyManager::filterSurroundFormats(FormatVector *formatsPtr) {
             // Add reported surround sound formats to enabled surround formats.
             for (size_t formatIndex = 0; formatIndex < formats.size(); formatIndex++) {
                 audio_format_t format = formats[formatIndex];
-                switch(format) {
-                    case AUDIO_FORMAT_AC3:
-                    case AUDIO_FORMAT_E_AC3:
-                    case AUDIO_FORMAT_DTS:
-                    case AUDIO_FORMAT_DTS_HD:
-                    case AUDIO_FORMAT_AAC_LC:
-                    case AUDIO_FORMAT_DOLBY_TRUEHD:
-                    case AUDIO_FORMAT_E_AC3_JOC:
-                        mSurroundFormats.insert(format);
-                        break;
-                    default:
-                        break;
+                if (mConfig.getSurroundFormats().count(format) != 0) {
+                    mSurroundFormats.insert(format);
                 }
             }
         }
