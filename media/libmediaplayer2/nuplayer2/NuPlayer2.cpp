@@ -1719,7 +1719,7 @@ void NuPlayer2::onStart(bool play) {
     notify->setInt32("generation", mRendererGeneration);
     mRenderer = new Renderer(mAudioSink, mMediaClock, notify, flags);
     mRendererLooper = new ALooper;
-    mRendererLooper->setName("NuPlayerRenderer");
+    mRendererLooper->setName("NuPlayer2Renderer");
     mRendererLooper->start(false, true, ANDROID_PRIORITY_AUDIO);
     mRendererLooper->registerHandler(mRenderer);
 
