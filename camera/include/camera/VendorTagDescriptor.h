@@ -211,6 +211,9 @@ class VendorTagDescriptorCache : public Parcelable {
      */
     void dump(int fd, int verbosity, int indentation) const;
 
+    const std::unordered_map<metadata_vendor_id_t, sp<android::VendorTagDescriptor>> &
+            getVendorIdsAndTagDescriptors();
+
   protected:
     std::unordered_map<metadata_vendor_id_t, sp<android::VendorTagDescriptor>> mVendorMap;
     struct vendor_tag_cache_ops mVendorCacheOps;

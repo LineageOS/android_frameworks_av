@@ -1298,6 +1298,24 @@ status_t AudioSystem::setSurroundFormatEnabled(audio_format_t audioFormat, bool 
     return aps->setSurroundFormatEnabled(audioFormat, enabled);
 }
 
+
+status_t AudioSystem::setAssistantUid(uid_t uid)
+{
+    const sp <IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+
+    return aps->setAssistantUid(uid);
+}
+
+status_t AudioSystem::setA11yServicesUids(const std::vector<uid_t>& uids)
+{
+    const sp <IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+
+    return aps->setA11yServicesUids(uids);
+}
+
+
 // ---------------------------------------------------------------------------
 
 int AudioSystem::AudioPolicyServiceClient::addAudioPortCallback(

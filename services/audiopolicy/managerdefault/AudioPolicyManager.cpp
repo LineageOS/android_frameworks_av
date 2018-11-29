@@ -3720,11 +3720,13 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
     return profileUpdated ? NO_ERROR : INVALID_OPERATION;
 }
 
-void AudioPolicyManager::setRecordSilenced(uid_t uid, bool silenced)
+void AudioPolicyManager::setAppState(uid_t uid, app_state_t state)
 {
+    Vector<sp<AudioInputDescriptor> > activeInputs = mInputs.getActiveInputs();
+    bool silenced = state == APP_STATE_IDLE;
+
     ALOGV("AudioPolicyManager:setRecordSilenced(uid:%d, silenced:%d)", uid, silenced);
 
-    Vector<sp<AudioInputDescriptor> > activeInputs = mInputs.getActiveInputs();
     for (size_t i = 0; i < activeInputs.size(); i++) {
         sp<AudioInputDescriptor> activeDesc = activeInputs[i];
         RecordClientVector clients = activeDesc->clientsList(true /*activeOnly*/);
