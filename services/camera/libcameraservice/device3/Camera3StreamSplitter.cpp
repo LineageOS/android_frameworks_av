@@ -493,6 +493,10 @@ void Camera3StreamSplitter::onFrameAvailable(const BufferItem& /*item*/) {
     SP_LOGV("acquired buffer %" PRId64 " from input at slot %d",
             bufferItem.mGraphicBuffer->getId(), bufferItem.mSlot);
 
+    if (bufferItem.mTransformToDisplayInverse) {
+        bufferItem.mTransform |= NATIVE_WINDOW_TRANSFORM_INVERSE_DISPLAY;
+    }
+
     // Attach and queue the buffer to each of the outputs
     BufferTracker& tracker = *(mBuffers[bufferId]);
 

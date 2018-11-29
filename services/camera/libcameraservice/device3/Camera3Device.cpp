@@ -2143,8 +2143,14 @@ status_t Camera3Device::setConsumerSurfaces(int streamId,
 
         res = stream->finishConfiguration();
         if (res != OK) {
-            SET_ERR_L("Can't finish configuring output stream %d: %s (%d)",
-                   stream->getId(), strerror(-res), res);
+            // If finishConfiguration fails due to abandoned surface, do not set
+            // device to error state.
+            bool isSurfaceAbandoned =
+                    (res == NO_INIT || res == DEAD_OBJECT) && stream->isAbandoned();
+            if (!isSurfaceAbandoned) {
+                SET_ERR_L("Can't finish configuring output stream %d: %s (%d)",
+                        stream->getId(), strerror(-res), res);
+            }
             return res;
         }
     }
@@ -2361,9 +2367,16 @@ bool Camera3Device::reconfigureCamera(const CameraMetadata& sessionParams) {
             //present streams end up with outstanding buffers that will
             //not get drained.
             internalUpdateStatusLocked(STATUS_ACTIVE);
+        } else if (rc == DEAD_OBJECT) {
+            // DEAD_OBJECT can be returned if either the consumer surface is
+            // abandoned, or the HAL has died.
+            // - If the HAL has died, configureStreamsLocked call will set
+            // device to error state,
+            // - If surface is abandoned, we should not set device to error
+            // state.
+            ALOGE("Failed to re-configure camera due to abandoned surface");
         } else {
-            setErrorStateLocked("%s: Failed to re-configure camera: %d",
-                    __FUNCTION__, rc);
+            SET_ERR_L("Failed to re-configure camera: %d", rc);
         }
     } else {
         ALOGE("%s: Failed to pause streaming: %d", __FUNCTION__, rc);
@@ -2497,6 +2510,9 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
             CLOGE("Can't finish configuring input stream %d: %s (%d)",
                     mInputStream->getId(), strerror(-res), res);
             cancelStreamsConfigurationLocked();
+            if ((res == NO_INIT || res == DEAD_OBJECT) && mInputStream->isAbandoned()) {
+                return DEAD_OBJECT;
+            }
             return BAD_VALUE;
         }
     }
@@ -2510,6 +2526,9 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
                 CLOGE("Can't finish configuring output stream %d: %s (%d)",
                         outputStream->getId(), strerror(-res), res);
                 cancelStreamsConfigurationLocked();
+                if ((res == NO_INIT || res == DEAD_OBJECT) && outputStream->isAbandoned()) {
+                    return DEAD_OBJECT;
+                }
                 return BAD_VALUE;
             }
         }
