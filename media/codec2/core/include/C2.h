@@ -289,7 +289,7 @@ public:
      * Convert to a smaller counter type. This is always safe.
      */
     template<typename U, typename E=typename std::enable_if<(sizeof(U) < sizeof(T))>::type>
-    inline operator c2_cntr_t<U>() {
+    inline constexpr operator c2_cntr_t<U>() {
         return c2_cntr_t<U>(mValue);
     }
 
