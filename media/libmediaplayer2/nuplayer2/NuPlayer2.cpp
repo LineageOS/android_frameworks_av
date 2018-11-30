@@ -825,19 +825,30 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
 
         case kWhatGetSelectedTrack:
         {
+            int32_t type32;
+            CHECK(msg->findInt32("type", (int32_t*)&type32));
+            media_track_type type = (media_track_type)type32;
+
+            size_t inbandTracks = 0;
             status_t err = INVALID_OPERATION;
+            ssize_t selectedTrack = -1;
             if (mCurrentSourceInfo.mSource != NULL) {
                 err = OK;
-
-                int32_t type32;
-                CHECK(msg->findInt32("type", (int32_t*)&type32));
-                media_track_type type = (media_track_type)type32;
-                ssize_t selectedTrack = mCurrentSourceInfo.mSource->getSelectedTrack(type);
-
-                PlayerMessage* reply;
-                CHECK(msg->findPointer("reply", (void**)&reply));
-                reply->add_values()->set_int32_value(selectedTrack);
+                inbandTracks = mCurrentSourceInfo.mSource->getTrackCount();
+                selectedTrack = mCurrentSourceInfo.mSource->getSelectedTrack(type);
             }
+
+            if (selectedTrack == -1 && mCCDecoder != NULL) {
+                err = OK;
+                selectedTrack = mCCDecoder->getSelectedTrack(type);
+                if (selectedTrack != -1) {
+                    selectedTrack += inbandTracks;
+                }
+            }
+
+            PlayerMessage* reply;
+            CHECK(msg->findPointer("reply", (void**)&reply));
+            reply->add_values()->set_int32_value(selectedTrack);
 
             sp<AMessage> response = new AMessage;
             response->setInt32("err", err);
