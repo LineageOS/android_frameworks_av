@@ -26,13 +26,24 @@
 namespace android {
 
 DeviceDescriptor::DeviceDescriptor(audio_devices_t type, const String8 &tagName) :
+        DeviceDescriptor(type, FormatVector{}, tagName)
+{
+}
+
+DeviceDescriptor::DeviceDescriptor(audio_devices_t type, const FormatVector &encodedFormats,
+        const String8 &tagName) :
     AudioPort(String8(""), AUDIO_PORT_TYPE_DEVICE,
               audio_is_output_device(type) ? AUDIO_PORT_ROLE_SINK :
                                              AUDIO_PORT_ROLE_SOURCE),
-    mAddress(""), mTagName(tagName), mDeviceType(type), mId(0)
+    mAddress(""), mTagName(tagName), mDeviceType(type), mEncodedFormats(encodedFormats), mId(0)
 {
     if (type == AUDIO_DEVICE_IN_REMOTE_SUBMIX || type == AUDIO_DEVICE_OUT_REMOTE_SUBMIX ) {
         mAddress = String8("0");
+    }
+    /* FIXME: read from APM config file */
+    if (type == AUDIO_DEVICE_OUT_HDMI) {
+        mEncodedFormats.add(AUDIO_FORMAT_AC3);
+        mEncodedFormats.add(AUDIO_FORMAT_IEC61937);
     }
 }
 

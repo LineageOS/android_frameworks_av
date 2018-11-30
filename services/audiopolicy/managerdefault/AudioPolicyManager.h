@@ -608,8 +608,8 @@ protected:
         std::unordered_set<audio_format_t> mSurroundFormats;
 private:
         // Add or remove AC3 DTS encodings based on user preferences.
-        void filterSurroundFormats(FormatVector *formatsPtr);
-        void filterSurroundChannelMasks(ChannelsVector *channelMasksPtr);
+        void modifySurroundFormats(const sp<DeviceDescriptor>& devDesc, FormatVector *formatsPtr);
+        void modifySurroundChannelMasks(ChannelsVector *channelMasksPtr);
 
         // Support for Multi-Stream Decoder (MSD) module
         sp<DeviceDescriptor> getMsdAudioInDevice() const;
@@ -623,7 +623,7 @@ private:
         status_t setMsdPatch(audio_devices_t outputDevice = AUDIO_DEVICE_NONE);
 
         // If any, resolve any "dynamic" fields of an Audio Profiles collection
-        void updateAudioProfiles(audio_devices_t device, audio_io_handle_t ioHandle,
+        void updateAudioProfiles(const sp<DeviceDescriptor>& devDesc, audio_io_handle_t ioHandle,
                 AudioProfileVector &profiles);
 
         // Notify the policy client of any change of device state with AUDIO_IO_HANDLE_NONE,

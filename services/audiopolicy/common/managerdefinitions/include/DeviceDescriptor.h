@@ -31,12 +31,16 @@ class DeviceDescriptor : public AudioPort, public AudioPortConfig
 public:
      // Note that empty name refers by convention to a generic device.
     explicit DeviceDescriptor(audio_devices_t type, const String8 &tagName = String8(""));
+    DeviceDescriptor(audio_devices_t type, const FormatVector &encodedFormats,
+            const String8 &tagName = String8(""));
 
     virtual ~DeviceDescriptor() {}
 
     virtual const String8 getTagName() const { return mTagName; }
 
     audio_devices_t type() const { return mDeviceType; }
+
+    const FormatVector& encodedFormats() const { return mEncodedFormats; }
 
     bool equals(const sp<DeviceDescriptor>& other) const;
 
@@ -59,6 +63,7 @@ public:
 private:
     String8 mTagName; // Unique human readable identifier for a device port found in conf file.
     audio_devices_t     mDeviceType;
+    FormatVector        mEncodedFormats;
     audio_port_handle_t mId;
 
 friend class DeviceVector;
