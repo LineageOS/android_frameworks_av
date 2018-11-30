@@ -17,8 +17,7 @@
 #ifndef ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HIDL_H
 #define ANDROID_HARDWARE_DEVICES_FACTORY_HAL_HIDL_H
 
-#include <android/hardware/audio/2.0/IDevicesFactory.h>
-#include <android/hardware/audio/4.0/IDevicesFactory.h>
+#include PATH(android/hardware/audio/FILE_VERSION/IDevicesFactory.h)
 #include <media/audiohal/DevicesFactoryHalInterface.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>

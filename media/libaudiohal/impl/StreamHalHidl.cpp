@@ -17,8 +17,7 @@
 #define LOG_TAG "StreamHalHidl"
 //#define LOG_NDEBUG 0
 
-#include <android/hardware/audio/2.0/IStreamOutCallback.h>
-#include <android/hardware/audio/4.0/IStreamOutCallback.h>
+#include PATH(android/hardware/audio/FILE_VERSION/IStreamOutCallback.h)
 #include <hwbinder/IPCThreadState.h>
 #include <media/AudioParameter.h>
 #include <mediautils/SchedulingPolicyService.h>

@@ -20,8 +20,7 @@
 #define LOG_TAG "DevicesFactoryHalHidl"
 //#define LOG_NDEBUG 0
 
-#include <android/hardware/audio/2.0/IDevice.h>
-#include <android/hardware/audio/4.0/IDevice.h>
+#include PATH(android/hardware/audio/FILE_VERSION/IDevice.h)
 #include <media/audiohal/hidl/HalDeathHandler.h>
 #include <utils/Log.h>
 

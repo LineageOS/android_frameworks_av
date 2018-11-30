@@ -68,7 +68,7 @@ cc_library_shared {
     cflags: [
         "-DMAJOR_VERSION=2",
         "-DMINOR_VERSION=0",
-        "-include VersionMacro.h",
+        "-include common/all-versions/VersionMacro.h",
     ]
 }
 
@@ -81,6 +81,6 @@ cc_library_shared {
     cflags: [
         "-DMAJOR_VERSION=4",
         "-DMINOR_VERSION=0",
-        "-include VersionMacro.h",
+        "-include common/all-versions/VersionMacro.h",
     ]
 }

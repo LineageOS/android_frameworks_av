@@ -17,8 +17,7 @@
 #ifndef ANDROID_HARDWARE_VERSION_UTILS_H
 #define ANDROID_HARDWARE_VERSION_UTILS_H
 
-#include <android/hardware/audio/2.0/types.h>
-#include <android/hardware/audio/4.0/types.h>
+#include PATH(android/hardware/audio/FILE_VERSION/types.h)
 #include <hidl/HidlSupport.h>
 
 using ::android::hardware::audio::CPP_VERSION::ParameterValue;

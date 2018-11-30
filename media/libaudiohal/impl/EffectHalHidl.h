@@ -17,8 +17,7 @@
 #ifndef ANDROID_HARDWARE_EFFECT_HAL_HIDL_H
 #define ANDROID_HARDWARE_EFFECT_HAL_HIDL_H
 
-#include <android/hardware/audio/effect/2.0/IEffect.h>
-#include <android/hardware/audio/effect/4.0/IEffect.h>
+#include PATH(android/hardware/audio/effect/FILE_VERSION/IEffect.h)
 #include <media/audiohal/EffectHalInterface.h>
 #include <fmq/EventFlag.h>
 #include <fmq/MessageQueue.h>
