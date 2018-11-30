@@ -4882,11 +4882,15 @@ audio_devices_t AudioPolicyManager::getNewOutputDevice(const sp<AudioOutputDescr
     //      use device for strategy DTMF
     // 9: the strategy for beacon, a.k.a. "transmitted through speaker" is active on the output:
     //      use device for strategy t-t-s
+
+    // FIXME: extend use of isStrategyActiveOnSameModule() to all strategies
+    // with a refined rule considering mutually exclusive devices (using same backend)
+    // as opposed to all streams on the same audio HAL module.
     if (isStrategyActive(outputDesc, STRATEGY_ENFORCED_AUDIBLE) &&
         mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_SYSTEM) == AUDIO_POLICY_FORCE_SYSTEM_ENFORCED) {
         device = getDeviceForStrategy(STRATEGY_ENFORCED_AUDIBLE, fromCache);
     } else if (isInCall() ||
-                    isStrategyActive(outputDesc, STRATEGY_PHONE)) {
+               isStrategyActiveOnSameModule(outputDesc, STRATEGY_PHONE)) {
         device = getDeviceForStrategy(STRATEGY_PHONE, fromCache);
     } else if (isStrategyActive(outputDesc, STRATEGY_SONIFICATION)) {
         device = getDeviceForStrategy(STRATEGY_SONIFICATION, fromCache);
@@ -5888,6 +5892,20 @@ bool AudioPolicyManager::isStrategyActive(const sp<AudioOutputDescriptor>& outpu
         if (((getStrategy((audio_stream_type_t)i) == strategy) ||
                 (NUM_STRATEGIES == strategy)) &&
                 outputDesc->isStreamActive((audio_stream_type_t)i, inPastMs, sysTime)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AudioPolicyManager::isStrategyActiveOnSameModule(const sp<AudioOutputDescriptor>& outputDesc,
+                                          routing_strategy strategy, uint32_t inPastMs,
+                                          nsecs_t sysTime) const
+{
+    for (size_t i = 0; i < mOutputs.size(); i++) {
+        sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
+        if (outputDesc->sharesHwModuleWith(desc)
+            && isStrategyActive(desc, strategy, inPastMs, sysTime)) {
             return true;
         }
     }
