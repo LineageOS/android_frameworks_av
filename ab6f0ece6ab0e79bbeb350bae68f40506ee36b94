@@ -22,6 +22,30 @@
       "revId": "ab6f0ece6ab0e79bbeb350bae68f40506ee36b94",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9d27bbbc_d6f77f11",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 5
+      },
+      "lineNbr": 1211,
+      "author": {
+        "id": 13559
+      },
+      "writtenOn": "2018-11-30T15:16:45Z",
+      "side": 1,
+      "message": "its usually 1 but added that just in case",
+      "parentUuid": "d3c96c7a_c6c3d639",
+      "range": {
+        "startLine": 1211,
+        "startChar": 11,
+        "endLine": 1211,
+        "endChar": 23
+      },
+      "revId": "ab6f0ece6ab0e79bbeb350bae68f40506ee36b94",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
     }
   ]
 }
