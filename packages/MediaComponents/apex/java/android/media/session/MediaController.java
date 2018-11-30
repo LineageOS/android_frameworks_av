@@ -149,12 +149,9 @@ public final class MediaController {
         if (keyEvent == null) {
             throw new IllegalArgumentException("KeyEvent may not be null");
         }
-        //TODO(b/119789707): Resolve hidden API usage: KeyEvent#isMediaKey
-        /*
-        if (!KeyEvent.isMediaKey(keyEvent.getKeyCode())) {
+        if (!KeyEvent.isMediaSessionKey(keyEvent.getKeyCode())) {
             return false;
         }
-        */
         try {
             //TODO(b/119748678): Resolve mContext.getOpPackageName() through this file.
             // Temporarilly it's replaced with "mContext.getOpPackageName()" for compiling.
