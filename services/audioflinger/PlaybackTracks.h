@@ -67,6 +67,7 @@ public:
             bool        isStatic() const { return  mSharedBuffer.get() != nullptr; }
 
             status_t    setParameters(const String8& keyValuePairs);
+            status_t    selectPresentation(int presentationId, int programId);
             status_t    attachAuxEffect(int EffectId);
             void        setAuxBuffer(int EffectId, int32_t *buffer);
             int32_t     *auxBuffer() const { return mAuxBuffer; }

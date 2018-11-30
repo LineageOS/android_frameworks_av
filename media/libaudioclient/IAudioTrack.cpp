@@ -39,6 +39,7 @@ enum {
     PAUSE,
     ATTACH_AUX_EFFECT,
     SET_PARAMETERS,
+    SELECT_PRESENTATION,
     GET_TIMESTAMP,
     SIGNAL,
     APPLY_VOLUME_SHAPER,
@@ -121,6 +122,19 @@ public:
         data.writeInterfaceToken(IAudioTrack::getInterfaceDescriptor());
         data.writeString8(keyValuePairs);
         status_t status = remote()->transact(SET_PARAMETERS, data, &reply);
+        if (status == NO_ERROR) {
+            status = reply.readInt32();
+        }
+        return status;
+    }
+
+    /* Selects the presentation (if available) */
+    virtual status_t selectPresentation(int presentationId, int programId) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioTrack::getInterfaceDescriptor());
+        data.writeInt32(presentationId);
+        data.writeInt32(programId);
+        status_t status = remote()->transact(SELECT_PRESENTATION, data, &reply);
         if (status == NO_ERROR) {
             status = reply.readInt32();
         }
@@ -237,6 +251,11 @@ status_t BnAudioTrack::onTransact(
             CHECK_INTERFACE(IAudioTrack, data, reply);
             String8 keyValuePairs(data.readString8());
             reply->writeInt32(setParameters(keyValuePairs));
+            return NO_ERROR;
+        } break;
+        case SELECT_PRESENTATION: {
+            CHECK_INTERFACE(IAudioTrack, data, reply);
+            reply->writeInt32(selectPresentation(data.readInt32(), data.readInt32()));
             return NO_ERROR;
         } break;
         case GET_TIMESTAMP: {
