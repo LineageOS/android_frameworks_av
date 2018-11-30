@@ -38,6 +38,7 @@ struct NuPlayer2::CCDecoder : public RefBase {
     size_t getTrackCount() const;
     sp<AMessage> getTrackInfo(size_t index) const;
     status_t selectTrack(size_t index, bool select);
+    ssize_t getSelectedTrack(media_track_type type) const;
     bool isSelected() const;
     void decode(const sp<ABuffer> &accessUnit);
     void display(int64_t timeUs);
