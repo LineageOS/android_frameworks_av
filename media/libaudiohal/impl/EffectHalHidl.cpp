@@ -34,7 +34,7 @@ using ::android::hardware::audio::effect::CPP_VERSION::Result;
 using ::android::hardware::audio::common::CPP_VERSION::HidlUtils;
 using ::android::hardware::audio::common::CPP_VERSION::AudioChannelMask;
 using ::android::hardware::audio::common::CPP_VERSION::AudioFormat;
-using ::android::hardware::audio::common::utils::mkEnumConverter;
+using ::android::hardware::audio::common::utils::EnumBitfield;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::MQDescriptorSync;
 using ::android::hardware::Return;
@@ -77,10 +77,10 @@ void EffectHalHidl::effectDescriptorToHal(
 void EffectHalHidl::effectBufferConfigFromHal(
         const buffer_config_t& halConfig, EffectBufferConfig* config) {
     config->samplingRateHz = halConfig.samplingRate;
-    config->channels = mkEnumConverter<AudioChannelMask>(halConfig.channels);
+    config->channels = EnumBitfield<AudioChannelMask>(halConfig.channels);
     config->format = AudioFormat(halConfig.format);
     config->accessMode = EffectBufferAccess(halConfig.accessMode);
-    config->mask = mkEnumConverter<EffectConfigParameters>(halConfig.mask);
+    config->mask = EnumBitfield<EffectConfigParameters>(halConfig.mask);
 }
 
 // static

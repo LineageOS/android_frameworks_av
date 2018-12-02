@@ -19,8 +19,7 @@
 #define LOG_TAG "DeviceHalHidl"
 //#define LOG_NDEBUG 0
 
-#include <android/hardware/audio/2.0/IPrimaryDevice.h>
-#include <android/hardware/audio/4.0/IPrimaryDevice.h>
+#include PATH(android/hardware/audio/FILE_VERSION/IPrimaryDevice.h)
 #include <cutils/native_handle.h>
 #include <hwbinder/IPCThreadState.h>
 #include <utils/Log.h>
@@ -42,7 +41,7 @@ using ::android::hardware::audio::common::CPP_VERSION::AudioPortConfig;
 using ::android::hardware::audio::common::CPP_VERSION::AudioMode;
 using ::android::hardware::audio::common::CPP_VERSION::AudioSource;
 using ::android::hardware::audio::common::CPP_VERSION::HidlUtils;
-using ::android::hardware::audio::common::utils::mkEnumConverter;
+using ::android::hardware::audio::common::utils::EnumBitfield;
 using ::android::hardware::audio::CPP_VERSION::DeviceAddress;
 using ::android::hardware::audio::CPP_VERSION::IPrimaryDevice;
 using ::android::hardware::audio::CPP_VERSION::ParameterValue;
@@ -262,7 +261,7 @@ status_t DeviceHalHidl::openOutputStream(
             handle,
             hidlDevice,
             hidlConfig,
-            mkEnumConverter<AudioOutputFlag>(flags),
+            EnumBitfield<AudioOutputFlag>(flags),
 #if MAJOR_VERSION == 4
             {} /* metadata */,
 #endif
@@ -302,7 +301,7 @@ status_t DeviceHalHidl::openInputStream(
             handle,
             hidlDevice,
             hidlConfig,
-            mkEnumConverter<AudioInputFlag>(flags),
+            EnumBitfield<AudioInputFlag>(flags),
             sourceMetadata,
             [&](Result r, const sp<IStreamIn>& result, const AudioConfig& suggestedConfig) {
                 retval = r;

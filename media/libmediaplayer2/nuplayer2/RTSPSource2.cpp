@@ -105,7 +105,7 @@ void NuPlayer2::RTSPSource2::prepareAsync(int64_t /* startTimeUs */) {
 
     if (mLooper == NULL) {
         mLooper = new ALooper;
-        mLooper->setName("rtsp");
+        mLooper->setName("rtsp2");
         mLooper->start();
 
         mLooper->registerHandler(this);

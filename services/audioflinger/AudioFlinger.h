@@ -553,6 +553,7 @@ using effect_buffer_t = int16_t;
         virtual void        pause();
         virtual status_t    attachAuxEffect(int effectId);
         virtual status_t    setParameters(const String8& keyValuePairs);
+        virtual status_t    selectPresentation(int presentationId, int programId);
         virtual media::VolumeShaper::Status applyVolumeShaper(
                 const sp<media::VolumeShaper::Configuration>& configuration,
                 const sp<media::VolumeShaper::Operation>& operation) override;

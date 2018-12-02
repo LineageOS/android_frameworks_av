@@ -19,12 +19,9 @@
 
 #include <atomic>
 
-#include <android/hardware/audio/2.0/IStream.h>
-#include <android/hardware/audio/4.0/IStream.h>
-#include <android/hardware/audio/2.0/IStreamIn.h>
-#include <android/hardware/audio/4.0/IStreamIn.h>
-#include <android/hardware/audio/2.0/IStreamOut.h>
-#include <android/hardware/audio/4.0/IStreamOut.h>
+#include PATH(android/hardware/audio/FILE_VERSION/IStream.h)
+#include PATH(android/hardware/audio/FILE_VERSION/IStreamIn.h)
+#include PATH(android/hardware/audio/FILE_VERSION/IStreamOut.h)
 #include <fmq/EventFlag.h>
 #include <fmq/MessageQueue.h>
 #include <media/audiohal/StreamHalInterface.h>
@@ -130,6 +127,9 @@ class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
 
     // Use this method in situations where audio mixing is done in the hardware.
     virtual status_t setVolume(float left, float right);
+
+    // Selects the audio presentation (if available).
+    virtual status_t selectPresentation(int presentationId, int programId);
 
     // Write audio buffer to driver.
     virtual status_t write(const void *buffer, size_t bytes, size_t *written);

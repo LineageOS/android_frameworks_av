@@ -49,10 +49,6 @@
 #include <system/audio.h>
 #include <audio_policy_conf.h>
 #include "AudioPolicyManager.h"
-#ifndef USE_XML_AUDIO_POLICY_CONF
-#include <ConfigParsingUtils.h>
-#include <StreamDescriptor.h>
-#endif
 #include <Serializer.h>
 #include "TypeConverter.h"
 #include <policy.h>
@@ -845,8 +841,9 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
     // chosen by the engine if not.
     // FIXME: provide a more generic approach which is not device specific and move this back
     // to getOutputForDevice.
+    // TODO: Remove check of AUDIO_STREAM_MUSIC once migration is completed on the app side.
     if (device == AUDIO_DEVICE_OUT_TELEPHONY_TX &&
-        *stream == AUDIO_STREAM_MUSIC &&
+        (*stream == AUDIO_STREAM_MUSIC || attributes.usage == AUDIO_USAGE_VOICE_COMMUNICATION) &&
         audio_is_linear_pcm(config->format) &&
         isInCall()) {
         if (requestedDeviceId != AUDIO_PORT_HANDLE_NONE) {
@@ -935,7 +932,8 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
     if (stream == AUDIO_STREAM_TTS) {
         *flags = AUDIO_OUTPUT_FLAG_TTS;
     } else if (stream == AUDIO_STREAM_VOICE_CALL &&
-               audio_is_linear_pcm(config->format)) {
+               audio_is_linear_pcm(config->format) &&
+               (*flags & AUDIO_OUTPUT_FLAG_INCALL_MUSIC) == 0) {
         *flags = (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_VOIP_RX |
                                        AUDIO_OUTPUT_FLAG_DIRECT);
         ALOGV("Set VoIP and Direct output flags for PCM format");
@@ -3794,7 +3792,6 @@ uint32_t AudioPolicyManager::nextAudioPortGeneration()
     return mAudioPortGeneration++;
 }
 
-#ifdef USE_XML_AUDIO_POLICY_CONF
 // Treblized audio policy xml config will be located in /odm/etc or /vendor/etc.
 static const char *kConfigLocationList[] =
         {"/odm/etc", "/vendor/etc", "/system/etc"};
@@ -3826,7 +3823,6 @@ static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
     }
     return ret;
 }
-#endif
 
 AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterface,
                                        bool /*forTesting*/)
@@ -3835,15 +3831,9 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
     mpClientInterface(clientInterface),
     mLimitRingtoneVolume(false), mLastVoiceVolume(-1.0f),
     mA2dpSuspended(false),
-#ifdef USE_XML_AUDIO_POLICY_CONF
     mVolumeCurves(new VolumeCurvesCollection()),
     mConfig(mHwModulesAll, mAvailableOutputDevices, mAvailableInputDevices,
             mDefaultOutputDevice, static_cast<VolumeCurvesCollection*>(mVolumeCurves.get())),
-#else
-    mVolumeCurves(new StreamDescriptorCollection()),
-    mConfig(mHwModulesAll, mAvailableOutputDevices, mAvailableInputDevices,
-            mDefaultOutputDevice),
-#endif
     mAudioPortGeneration(1),
     mBeaconMuteRefCount(0),
     mBeaconPlayingRefCount(0),
@@ -3862,13 +3852,16 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
     initialize();
 }
 
-void AudioPolicyManager::loadConfig() {
-#ifdef USE_XML_AUDIO_POLICY_CONF
-    if (deserializeAudioPolicyXmlConfig(getConfig()) != NO_ERROR) {
-#else
-    if ((ConfigParsingUtils::loadConfig(AUDIO_POLICY_VENDOR_CONFIG_FILE, getConfig()) != NO_ERROR)
-           && (ConfigParsingUtils::loadConfig(AUDIO_POLICY_CONFIG_FILE, getConfig()) != NO_ERROR)) {
+//  This check is to catch any legacy platform updating to Q without having
+//  switched to XML since its deprecation on O.
+// TODO: after Q release, remove this check and flag as XML is now the only
+//        option and all legacy platform should have transitioned to XML.
+#ifndef USE_XML_AUDIO_POLICY_CONF
+#error Audio policy no longer supports legacy .conf configuration format
 #endif
+
+void AudioPolicyManager::loadConfig() {
+    if (deserializeAudioPolicyXmlConfig(getConfig()) != NO_ERROR) {
         ALOGE("could not load audio policy configuration file, setting defaults");
         getConfig().setDefault();
     }
@@ -5897,18 +5890,8 @@ void AudioPolicyManager::filterSurroundFormats(FormatVector *formatsPtr) {
             // Add reported surround sound formats to enabled surround formats.
             for (size_t formatIndex = 0; formatIndex < formats.size(); formatIndex++) {
                 audio_format_t format = formats[formatIndex];
-                switch(format) {
-                    case AUDIO_FORMAT_AC3:
-                    case AUDIO_FORMAT_E_AC3:
-                    case AUDIO_FORMAT_DTS:
-                    case AUDIO_FORMAT_DTS_HD:
-                    case AUDIO_FORMAT_AAC_LC:
-                    case AUDIO_FORMAT_DOLBY_TRUEHD:
-                    case AUDIO_FORMAT_E_AC3_JOC:
-                        mSurroundFormats.insert(format);
-                        break;
-                    default:
-                        break;
+                if (mConfig.getSurroundFormats().count(format) != 0) {
+                    mSurroundFormats.insert(format);
                 }
             }
         }

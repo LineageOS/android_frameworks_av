@@ -326,6 +326,10 @@ status_t AudioFlinger::TrackHandle::setParameters(const String8& keyValuePairs) 
     return mTrack->setParameters(keyValuePairs);
 }
 
+status_t AudioFlinger::TrackHandle::selectPresentation(int presentationId, int programId) {
+    return mTrack->selectPresentation(presentationId, programId);
+}
+
 VolumeShaper::Status AudioFlinger::TrackHandle::applyVolumeShaper(
         const sp<VolumeShaper::Configuration>& configuration,
         const sp<VolumeShaper::Operation>& operation) {
@@ -974,6 +978,19 @@ status_t AudioFlinger::PlaybackThread::Track::setParameters(const String8& keyVa
     } else {
         return PERMISSION_DENIED;
     }
+}
+
+status_t AudioFlinger::PlaybackThread::Track::selectPresentation(int presentationId,
+        int programId) {
+    sp<ThreadBase> thread = mThread.promote();
+    if (thread == 0) {
+        ALOGE("thread is dead");
+        return FAILED_TRANSACTION;
+    } else if ((thread->type() == ThreadBase::DIRECT) || (thread->type() == ThreadBase::OFFLOAD)) {
+        DirectOutputThread *directOutputThread = static_cast<DirectOutputThread*>(thread.get());
+        return directOutputThread->selectPresentation(presentationId, programId);
+    }
+    return INVALID_OPERATION;
 }
 
 VolumeShaper::Status AudioFlinger::PlaybackThread::Track::applyVolumeShaper(

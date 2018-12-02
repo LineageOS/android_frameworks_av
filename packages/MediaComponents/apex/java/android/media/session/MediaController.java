@@ -199,9 +199,8 @@ public final class MediaController {
             }
 
             case KeyEvent.ACTION_UP: {
-                //TODO(b/119790339): Resolve hidden API usage. AudioManager.FLAG_FROM_KEY
-                final int flags = AudioManager.FLAG_PLAY_SOUND | AudioManager.FLAG_VIBRATE;
-                        //| AudioManager.FLAG_FROM_KEY;
+                final int flags = AudioManager.FLAG_PLAY_SOUND | AudioManager.FLAG_VIBRATE
+                        | AudioManager.FLAG_FROM_KEY;
                 try {
                     mSessionBinder.adjustVolume("mContext.getOpPackageName()", mCbStub, true, 0,
                             flags);
