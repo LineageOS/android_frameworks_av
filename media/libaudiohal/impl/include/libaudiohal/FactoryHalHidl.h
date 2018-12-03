@@ -35,6 +35,11 @@ sp<EffectsFactoryHalInterface> createEffectsFactoryHal();
 sp<DevicesFactoryHalInterface> createDevicesFactoryHal();
 } // namespace V4_0
 
+namespace V5_0 {
+sp<EffectsFactoryHalInterface> createEffectsFactoryHal();
+sp<DevicesFactoryHalInterface> createDevicesFactoryHal();
+} // namespace V5_0
+
 } // namespace android
 
 #endif // ANDROID_HARDWARE_FACTORY_HAL_HIDL_H
