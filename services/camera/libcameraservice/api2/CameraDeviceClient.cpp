@@ -661,7 +661,8 @@ binder::Status CameraDeviceClient::createStream(
         }
 
         sp<Surface> surface;
-        res = createSurfaceFromGbp(streamInfo, isStreamInfoValid, surface, bufferProducer);
+        res = createSurfaceFromGbp(streamInfo, isStreamInfoValid, surface, bufferProducer,
+                physicalCameraId);
 
         if (!res.isOk())
             return res;
@@ -889,6 +890,8 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
 
     const std::vector<sp<IGraphicBufferProducer> >& bufferProducers =
             outputConfiguration.getGraphicBufferProducers();
+    String8 physicalCameraId(outputConfiguration.getPhysicalCameraId());
+
     auto producerCount = bufferProducers.size();
     if (producerCount == 0) {
         ALOGE("%s: bufferProducers must not be empty", __FUNCTION__);
@@ -942,7 +945,7 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
         OutputStreamInfo outInfo;
         sp<Surface> surface;
         res = createSurfaceFromGbp(outInfo, /*isStreamInfoValid*/ false, surface,
-                newOutputsMap.valueAt(i));
+                newOutputsMap.valueAt(i), physicalCameraId);
         if (!res.isOk())
             return res;
 
@@ -1021,7 +1024,8 @@ bool CameraDeviceClient::isPublicFormat(int32_t format)
 
 binder::Status CameraDeviceClient::createSurfaceFromGbp(
         OutputStreamInfo& streamInfo, bool isStreamInfoValid,
-        sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp) {
+        sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
+        const String8& physicalId) {
 
     // bufferProducer must be non-null
     if (gbp == nullptr) {
@@ -1098,7 +1102,7 @@ binder::Status CameraDeviceClient::createSurfaceFromGbp(
     // Round dimensions to the nearest dimensions available for this format
     if (flexibleConsumer && isPublicFormat(format) &&
             !CameraDeviceClient::roundBufferDimensionNearest(width, height,
-            format, dataSpace, mDevice->info(), /*out*/&width, /*out*/&height)) {
+            format, dataSpace, mDevice->info(physicalId), /*out*/&width, /*out*/&height)) {
         String8 msg = String8::format("Camera %s: No supported stream configurations with "
                 "format %#x defined, failed to create output stream",
                 mCameraIdStr.string(), format);
@@ -1468,6 +1472,7 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
 
     const std::vector<sp<IGraphicBufferProducer> >& bufferProducers =
             outputConfiguration.getGraphicBufferProducers();
+    String8 physicalId(outputConfiguration.getPhysicalCameraId());
 
     if (bufferProducers.size() == 0) {
         ALOGE("%s: bufferProducers must not be empty", __FUNCTION__);
@@ -1521,7 +1526,7 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
 
         sp<Surface> surface;
         res = createSurfaceFromGbp(mStreamInfoMap[streamId], true /*isStreamInfoValid*/,
-                surface, bufferProducer);
+                surface, bufferProducer, physicalId);
 
         if (!res.isOk())
             return res;

@@ -258,7 +258,8 @@ private:
     // Create a Surface from an IGraphicBufferProducer. Returns error if
     // IGraphicBufferProducer's property doesn't match with streamInfo
     binder::Status createSurfaceFromGbp(OutputStreamInfo& streamInfo, bool isStreamInfoValid,
-            sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp);
+            sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
+            const String8& physicalCameraId);
 
 
     // Utility method to insert the surface into SurfaceMap
