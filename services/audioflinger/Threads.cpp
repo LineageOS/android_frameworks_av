@@ -7562,7 +7562,7 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
         (void)input->stream->dump(fd);
     }
 
-    const double latencyMs = RecordTrack::checkServerLatencySupported(mFormat, input->flags)
+    const double latencyMs = RecordTrack::checkServerLatencySupported(mFormat, flags)
             ? - mTimestamp.getOutputServerLatencyMs(mSampleRate) : 0.;
     if (latencyMs != 0.) {
         dprintf(fd, "  NormalRecord latency ms: %.2lf\n", latencyMs);
