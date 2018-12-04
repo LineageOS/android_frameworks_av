@@ -2237,6 +2237,15 @@ status_t ACodec::configureCodec(
         } else {
             err = setupEAC3Codec(encoder, numChannels, sampleRate);
         }
+     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AC4)) {
+        int32_t numChannels;
+        int32_t sampleRate;
+        if (!msg->findInt32("channel-count", &numChannels)
+                || !msg->findInt32("sample-rate", &sampleRate)) {
+            err = INVALID_OPERATION;
+        } else {
+            err = setupAC4Codec(encoder, numChannels, sampleRate);
+        }
     }
 
     if (err != OK) {
@@ -2891,6 +2900,38 @@ status_t ACodec::setupEAC3Codec(
 
     return mOMXNode->setParameter(
             (OMX_INDEXTYPE)OMX_IndexParamAudioAndroidEac3, &def, sizeof(def));
+}
+
+status_t ACodec::setupAC4Codec(
+        bool encoder, int32_t numChannels, int32_t sampleRate) {
+    status_t err = setupRawAudioFormat(
+            encoder ? kPortIndexInput : kPortIndexOutput, sampleRate, numChannels);
+
+    if (err != OK) {
+        return err;
+    }
+
+    if (encoder) {
+        ALOGW("AC4 encoding is not supported.");
+        return INVALID_OPERATION;
+    }
+
+    OMX_AUDIO_PARAM_ANDROID_AC4TYPE def;
+    InitOMXParams(&def);
+    def.nPortIndex = kPortIndexInput;
+
+    err = mOMXNode->getParameter(
+            (OMX_INDEXTYPE)OMX_IndexParamAudioAndroidAc4, &def, sizeof(def));
+
+    if (err != OK) {
+        return err;
+    }
+
+    def.nChannels = numChannels;
+    def.nSampleRate = sampleRate;
+
+    return mOMXNode->setParameter(
+            (OMX_INDEXTYPE)OMX_IndexParamAudioAndroidAc4, &def, sizeof(def));
 }
 
 static OMX_AUDIO_AMRBANDMODETYPE pickModeFromBitRate(
@@ -5241,6 +5282,25 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
                     }
 
                     notify->setString("mime", MEDIA_MIMETYPE_AUDIO_EAC3);
+                    notify->setInt32("channel-count", params.nChannels);
+                    notify->setInt32("sample-rate", params.nSampleRate);
+                    break;
+                }
+
+                case OMX_AUDIO_CodingAndroidAC4:
+                {
+                    OMX_AUDIO_PARAM_ANDROID_AC4TYPE params;
+                    InitOMXParams(&params);
+                    params.nPortIndex = portIndex;
+
+                    err = mOMXNode->getParameter(
+                            (OMX_INDEXTYPE)OMX_IndexParamAudioAndroidAc4,
+                            &params, sizeof(params));
+                    if (err != OK) {
+                        return err;
+                    }
+
+                    notify->setString("mime", MEDIA_MIMETYPE_AUDIO_AC4);
                     notify->setInt32("channel-count", params.nChannels);
                     notify->setInt32("sample-rate", params.nSampleRate);
                     break;
