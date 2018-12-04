@@ -1772,7 +1772,7 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
         thread->mFastTrackAvail = false;
     } else {
         // TODO: only Normal Record has timestamps (Fast Record does not).
-        mServerLatencySupported = audio_is_linear_pcm(mFormat);
+        mServerLatencySupported = checkServerLatencySupported(mFormat, flags);
     }
 #ifdef TEE_SINK
     mTee.setId(std::string("_") + std::to_string(mThreadIoHandle)

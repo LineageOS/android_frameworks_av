@@ -354,7 +354,7 @@ status_t StreamInHalLocal::getActiveMicrophones(
         std::vector<media::MicrophoneInfo> *microphones __unused) {
     return INVALID_OPERATION;
 }
-#elif MAJOR_VERSION == 4
+#elif MAJOR_VERSION >= 4
 status_t StreamInHalLocal::getActiveMicrophones(std::vector<media::MicrophoneInfo> *microphones) {
     if (mStream->get_active_microphones == NULL) return INVALID_OPERATION;
     size_t actual_mics = AUDIO_MICROPHONE_MAX_COUNT;
