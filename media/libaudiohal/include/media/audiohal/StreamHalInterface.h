@@ -179,6 +179,12 @@ class StreamInHalInterface : public virtual StreamHalInterface {
     // Get active microphones
     virtual status_t getActiveMicrophones(std::vector<media::MicrophoneInfo> *microphones) = 0;
 
+    // Set direction for capture processing
+    virtual status_t setMicrophoneDirection(audio_microphone_direction_t) = 0;
+
+    // Set zoom factor for capture stream
+    virtual status_t setMicrophoneFieldDimension(float zoom) = 0;
+
     struct SinkMetadata {
         std::vector<record_track_metadata_t> tracks;
     };

@@ -1398,6 +1398,17 @@ status_t AudioRecord::getActiveMicrophones(std::vector<media::MicrophoneInfo>* a
     return mAudioRecord->getActiveMicrophones(activeMicrophones).transactionError();
 }
 
+status_t AudioRecord::setMicrophoneDirection(audio_microphone_direction_t direction)
+{
+    AutoMutex lock(mLock);
+    return mAudioRecord->setMicrophoneDirection(direction).transactionError();
+}
+
+status_t AudioRecord::setMicrophoneFieldDimension(float zoom) {
+    AutoMutex lock(mLock);
+    return mAudioRecord->setMicrophoneFieldDimension(zoom).transactionError();
+}
+
 // =========================================================================
 
 void AudioRecord::DeathNotifier::binderDied(const wp<IBinder>& who __unused)

@@ -71,6 +71,9 @@ public:
 
             status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
 
+            status_t    setMicrophoneDirection(audio_microphone_direction_t direction);
+            status_t    setMicrophoneFieldDimension(float zoom);
+
     static  bool        checkServerLatencySupported(
                                 audio_format_t format, audio_input_flags_t flags) {
                             return audio_is_linear_pcm(format)

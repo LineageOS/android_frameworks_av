@@ -1541,6 +1541,9 @@ public:
 
             status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
 
+            status_t    setMicrophoneDirection(audio_microphone_direction_t direction);
+            status_t    setMicrophoneFieldDimension(float zoom);
+
             void        updateMetadata_l() override;
 
             bool        fastTrackAvailable() const { return mFastTrackAvail; }

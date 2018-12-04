@@ -368,5 +368,26 @@ status_t StreamInHalLocal::getActiveMicrophones(std::vector<media::MicrophoneInf
 }
 #endif
 
+#if MAJOR_VERSION < 5
+status_t StreamInHalLocal::setMicrophoneDirection(audio_microphone_direction_t direction __unused) {
+    return INVALID_OPERATION;
+}
+
+status_t StreamInHalLocal::setMicrophoneFieldDimension(float zoom __unused) {
+    return INVALID_OPERATION;
+}
+#else
+status_t StreamInHalLocal::setMicrophoneDirection(audio_microphone_direction_t direction) {
+    if (mStream->set_microphone_direction == NULL) return INVALID_OPERATION;
+    return mStream->set_microphone_direction(mStream, direction);
+}
+
+status_t StreamInHalLocal::setMicrophoneFieldDimension(float zoom) {
+    if (mStream->set_microphone_field_dimension == NULL) return INVALID_OPERATION;
+    return mStream->set_microphone_field_dimension(mStream, zoom);
+
+}
+#endif
+
 } // namespace CPP_VERSION
 } // namespace android
