@@ -588,6 +588,12 @@ static std::vector<std::pair<const char *, uint32_t>> stringMappings {
     }
 };
 
+static std::vector<std::pair<const char *, uint32_t>> floatMappings {
+    {
+        { "capture-rate", kKeyCaptureFramerate },
+    }
+};
+
 static std::vector<std::pair<const char *, uint32_t>> int64Mappings {
     {
         { "exif-offset", kKeyExifOffset },
@@ -632,6 +638,13 @@ void convertMessageToMetaDataFromMappings(const sp<AMessage> &msg, sp<MetaData> 
         }
     }
 
+    for (auto elem : floatMappings) {
+        float value;
+        if (msg->findFloat(elem.first, &value)) {
+            meta->setFloat(elem.second, value);
+        }
+    }
+
     for (auto elem : int64Mappings) {
         int64_t value;
         if (msg->findInt64(elem.first, &value)) {
@@ -660,6 +673,13 @@ void convertMetaDataToMessageFromMappings(const MetaDataBase *meta, sp<AMessage>
         const char *value;
         if (meta->findCString(elem.second, &value)) {
             format->setString(elem.first, value, strlen(value));
+        }
+    }
+
+    for (auto elem : floatMappings) {
+        float value;
+        if (meta->findFloat(elem.second, &value)) {
+            format->setFloat(elem.first, value);
         }
     }
 
