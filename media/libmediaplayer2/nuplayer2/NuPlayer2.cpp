@@ -240,8 +240,7 @@ NuPlayer2::NuPlayer2(pid_t pid, uid_t uid, const sp<MediaClock> &mediaClock)
       mVideoDecoderError(false),
       mPaused(false),
       mPausedByClient(true),
-      mPausedForBuffering(false),
-      mIsDrmProtected(false) {
+      mPausedForBuffering(false) {
     CHECK(mediaClock != NULL);
     clearFlushComplete();
 }
@@ -1630,7 +1629,7 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
 
         case kWhatReleaseDrm:
         {
-            status_t status = onReleaseDrm();
+            status_t status = onReleaseDrm(msg);
 
             sp<AMessage> response = new AMessage;
             response->setInt32("status", status);
@@ -1672,7 +1671,7 @@ void NuPlayer2::onResume() {
 }
 
 void NuPlayer2::onStart(bool play) {
-    ALOGV("onStart: mCrypto: %p", mCrypto.get());
+    ALOGV("onStart: mCrypto: %p", mCurrentSourceInfo.mCrypto.get());
 
     if (!mSourceStarted) {
         mSourceStarted = true;
@@ -1716,7 +1715,7 @@ void NuPlayer2::onStart(bool play) {
                 && (mPlaybackSettings.mSpeed == 1.f && mPlaybackSettings.mPitch == 1.f);
 
     // Modular DRM: Disabling audio offload if the source is protected
-    if (mOffloadAudio && mIsDrmProtected) {
+    if (mOffloadAudio && mCurrentSourceInfo.mIsDrmProtected) {
         mOffloadAudio = false;
         ALOGV("onStart: Disabling mOffloadAudio now that the source is protected.");
     }
@@ -2010,7 +2009,7 @@ void NuPlayer2::determineAudioModeChange(const sp<AMessage> &audioFormat) {
                     && (mPlaybackSettings.mSpeed == 1.f && mPlaybackSettings.mPitch == 1.f);
 
     // Modular DRM: Disabling audio offload if the source is protected
-    if (canOffload && mIsDrmProtected) {
+    if (canOffload && mCurrentSourceInfo.mIsDrmProtected) {
         canOffload = false;
         ALOGV("determineAudioModeChange: Disabling mOffloadAudio b/c the source is protected.");
     }
@@ -2117,10 +2116,11 @@ status_t NuPlayer2::instantiateDecoder(
     (*decoder)->init();
 
     // Modular DRM
-    if (mIsDrmProtected) {
-        format->setObject("crypto", mCrypto);
+    if (mCurrentSourceInfo.mIsDrmProtected) {
+        format->setObject("crypto", mCurrentSourceInfo.mCrypto);
         ALOGV("instantiateDecoder: mCrypto: %p isSecure: %d",
-                mCrypto.get(), (mCurrentSourceInfo.mSourceFlags & Source::FLAG_SECURE) != 0);
+                mCurrentSourceInfo.mCrypto.get(),
+                (mCurrentSourceInfo.mSourceFlags & Source::FLAG_SECURE) != 0);
     }
 
     (*decoder)->configure(format);
@@ -2506,12 +2506,8 @@ void NuPlayer2::performReset() {
     mRenderer.clear();
     ++mRendererGeneration;
 
-    if (mCurrentSourceInfo.mSource != NULL) {
-        mCurrentSourceInfo.mSource->stop();
-
-        Mutex::Autolock autoLock(mSourceLock);
-        mCurrentSourceInfo.mSource.clear();
-    }
+    resetSourceInfo(mCurrentSourceInfo);
+    resetSourceInfo(mNextSourceInfo);
 
     if (mDriver != NULL) {
         sp<NuPlayer2Driver> driver = mDriver.promote();
@@ -2525,14 +2521,6 @@ void NuPlayer2::performReset() {
     mResetting = false;
     mSourceStarted = false;
 
-    // Modular DRM
-    if (mCrypto != NULL) {
-        // decoders will be flushed before this so their mCrypto would go away on their own
-        // TODO change to ALOGV
-        ALOGD("performReset mCrypto: %p", mCrypto.get());
-        mCrypto.clear();
-    }
-    mIsDrmProtected = false;
 }
 
 void NuPlayer2::performPlayNextDataSource() {
@@ -2585,15 +2573,6 @@ void NuPlayer2::performPlayNextDataSource() {
     mSourceStarted = false;
 
     addEndTimeMonitor();
-
-    // Modular DRM
-    if (mCrypto != NULL) {
-        // decoders will be flushed before this so their mCrypto would go away on their own
-        // TODO change to ALOGV
-        ALOGD("performReset mCrypto: %p", mCrypto.get());
-        mCrypto.clear();
-    }
-    mIsDrmProtected = false;
 
     if (mRenderer != NULL) {
         mRenderer->resume();
@@ -3045,6 +3024,31 @@ const char *NuPlayer2::getDataSourceType() {
     }
  }
 
+NuPlayer2::SourceInfo* NuPlayer2::getSourceInfoByIdInMsg(const sp<AMessage> &msg) {
+    int64_t srcId;
+    CHECK(msg->findInt64("srcId", &srcId));
+    if (mCurrentSourceInfo.mSrcId == srcId) {
+        return &mCurrentSourceInfo;
+    } else if (mNextSourceInfo.mSrcId == srcId) {
+        return &mNextSourceInfo;
+    } else {
+        return NULL;
+    }
+}
+
+void NuPlayer2::resetSourceInfo(NuPlayer2::SourceInfo &srcInfo) {
+    if (srcInfo.mSource != NULL) {
+        srcInfo.mSource->stop();
+
+        Mutex::Autolock autoLock(mSourceLock);
+        srcInfo.mSource.clear();
+    }
+    // Modular DRM
+    ALOGD("performReset mCrypto: %p", srcInfo.mCrypto.get());
+    srcInfo.mCrypto.clear();
+    srcInfo.mIsDrmProtected = false;
+}
+
 // Modular DRM begin
 status_t NuPlayer2::prepareDrm(
         int64_t srcId, const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId)
@@ -3100,8 +3104,15 @@ status_t NuPlayer2::onPrepareDrm(const sp<AMessage> &msg)
     ALOGD("onPrepareDrm ");
 
     status_t status = INVALID_OPERATION;
-    if (mCurrentSourceInfo.mSource == NULL) {
-        ALOGE("onPrepareDrm: No source. onPrepareDrm failed with %d.", status);
+    SourceInfo *srcInfo = getSourceInfoByIdInMsg(msg);
+    if (srcInfo == NULL) {
+        return status;
+    }
+
+    int64_t srcId = srcInfo->mSrcId;
+    if (srcInfo->mSource == NULL) {
+        ALOGE("onPrepareDrm: srcInfo(%lld) No source. onPrepareDrm failed with %d.",
+                (long long)srcId, status);
         return status;
     }
 
@@ -3113,42 +3124,50 @@ status_t NuPlayer2::onPrepareDrm(const sp<AMessage> &msg)
     status = OK;
     sp<AMediaCryptoWrapper> crypto = NULL;
 
-    status = mCurrentSourceInfo.mSource->prepareDrm(uuid, *drmSessionId, &crypto);
+    status = srcInfo->mSource->prepareDrm(uuid, *drmSessionId, &crypto);
     if (crypto == NULL) {
-        ALOGE("onPrepareDrm: mCurrentSourceInfo.mSource->prepareDrm failed. status: %d", status);
+        ALOGE("onPrepareDrm: srcInfo(%lld).mSource->prepareDrm failed. status: %d",
+                (long long)srcId, status);
         return status;
     }
-    ALOGV("onPrepareDrm: mCurrentSourceInfo.mSource->prepareDrm succeeded");
+    ALOGV("onPrepareDrm: srcInfo(%lld).mSource->prepareDrm succeeded", (long long)srcId);
 
-    if (mCrypto != NULL) {
-        ALOGE("onPrepareDrm: Unexpected. Already having mCrypto: %p", mCrypto.get());
-        mCrypto.clear();
+    if (srcInfo->mCrypto != NULL) {
+        ALOGE("onPrepareDrm: srcInfo(%lld) Unexpected. Already having mCrypto: %p",
+                (long long)srcId, srcInfo->mCrypto.get());
+        srcInfo->mCrypto.clear();
     }
 
-    mCrypto = crypto;
-    mIsDrmProtected = true;
+    srcInfo->mCrypto = crypto;
+    srcInfo->mIsDrmProtected = true;
     // TODO change to ALOGV
-    ALOGD("onPrepareDrm: mCrypto: %p", mCrypto.get());
+    ALOGD("onPrepareDrm: mCrypto: %p", srcInfo->mCrypto.get());
 
     return status;
 }
 
-status_t NuPlayer2::onReleaseDrm()
+status_t NuPlayer2::onReleaseDrm(const sp<AMessage> &msg)
 {
     // TODO change to ALOGV
     ALOGD("onReleaseDrm ");
-
-    if (!mIsDrmProtected) {
-        ALOGW("onReleaseDrm: Unexpected. mIsDrmProtected is already false.");
+    SourceInfo *srcInfo = getSourceInfoByIdInMsg(msg);;
+    if (srcInfo == NULL) {
+        return INVALID_OPERATION;
     }
 
-    mIsDrmProtected = false;
+    int64_t srcId = srcInfo->mSrcId;
+    if (!srcInfo->mIsDrmProtected) {
+        ALOGW("onReleaseDrm: srcInfo(%lld) Unexpected. mIsDrmProtected is already false.",
+                (long long)srcId);
+    }
+
+    srcInfo->mIsDrmProtected = false;
 
     status_t status;
-    if (mCrypto != NULL) {
+    if (srcInfo->mCrypto != NULL) {
         // notifying the source first before removing crypto from codec
-        if (mCurrentSourceInfo.mSource != NULL) {
-            mCurrentSourceInfo.mSource->releaseDrm();
+        if (srcInfo->mSource != NULL) {
+            srcInfo->mSource->releaseDrm();
         }
 
         status=OK;
@@ -3169,9 +3188,9 @@ status_t NuPlayer2::onReleaseDrm()
         }
 
         // TODO change to ALOGV
-        ALOGD("onReleaseDrm: mCrypto: %p", mCrypto.get());
-        mCrypto.clear();
-    } else {   // mCrypto == NULL
+        ALOGD("onReleaseDrm: mCrypto: %p", srcInfo->mCrypto.get());
+        srcInfo->mCrypto.clear();
+    } else {   // srcInfo->mCrypto == NULL
         ALOGE("onReleaseDrm: Unexpected. There is no crypto.");
         status = INVALID_OPERATION;
     }
@@ -3243,11 +3262,13 @@ NuPlayer2::SourceInfo::SourceInfo()
 
 NuPlayer2::SourceInfo & NuPlayer2::SourceInfo::operator=(const NuPlayer2::SourceInfo &other) {
     mSource = other.mSource;
+    mCrypto = other.mCrypto;
     mDataSourceType = (DATA_SOURCE_TYPE)other.mDataSourceType;
     mSrcId = other.mSrcId;
     mSourceFlags = other.mSourceFlags;
     mStartTimeUs = other.mStartTimeUs;
     mEndTimeUs = other.mEndTimeUs;
+    mIsDrmProtected = other.mIsDrmProtected;
     return *this;
 }
 

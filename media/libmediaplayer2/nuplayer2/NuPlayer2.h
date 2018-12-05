@@ -178,6 +178,9 @@ private:
         uint32_t mSourceFlags;
         int64_t mStartTimeUs;
         int64_t mEndTimeUs;
+        // Modular DRM
+        sp<AMediaCryptoWrapper> mCrypto;
+        bool mIsDrmProtected = false;
     };
 
     wp<NuPlayer2Driver> mDriver;
@@ -269,10 +272,6 @@ private:
     // Pause state as requested by source (internally) due to buffering
     bool mPausedForBuffering;
 
-    // Modular DRM
-    sp<AMediaCryptoWrapper> mCrypto;
-    bool mIsDrmProtected;
-
     inline const sp<DecoderBase> &getDecoder(bool audio) {
         return audio ? mAudioDecoder : mVideoDecoder;
     }
@@ -351,7 +350,10 @@ private:
     void writeTrackInfo(PlayerMessage* reply, const sp<AMessage>& format) const;
 
     status_t onPrepareDrm(const sp<AMessage> &msg);
-    status_t onReleaseDrm();
+    status_t onReleaseDrm(const sp<AMessage> &msg);
+
+    SourceInfo* getSourceInfoByIdInMsg(const sp<AMessage> &msg);
+    void resetSourceInfo(SourceInfo &srcInfo);
 
     DISALLOW_EVIL_CONSTRUCTORS(NuPlayer2);
 };
