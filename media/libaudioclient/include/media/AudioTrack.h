@@ -912,7 +912,14 @@ public:
                 AutoMutex lock(mLock);
                 return mState == STATE_ACTIVE || mState == STATE_STOPPING;
             }
-protected:
+
+    /* Get the unique port ID assigned to this AudioTrack instance by audio policy manager.
+     * The ID is unique across all audioserver clients and can change during the life cycle
+     * of a given AudioTrack instance if the connection to audioserver is restored.
+     */
+            audio_port_handle_t getPortId() const { return mPortId; };
+
+ protected:
     /* copying audio tracks is not allowed */
                         AudioTrack(const AudioTrack& other);
             AudioTrack& operator = (const AudioTrack& other);
@@ -1166,7 +1173,7 @@ protected:
 
     audio_session_t         mSessionId;
     int                     mAuxEffectId;
-    int                     mId;                    // Id from AudioFlinger.
+    audio_port_handle_t     mPortId;                    // Id from Audio Policy Manager
 
     mutable Mutex           mLock;
 
