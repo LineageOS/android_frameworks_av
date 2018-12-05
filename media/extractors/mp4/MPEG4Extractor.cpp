@@ -1556,9 +1556,40 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 return ERROR_IO;
             }
 
-            String8 mimeFormat((const char *)(buffer.get()), chunk_data_size);
-            AMediaFormat_setString(mLastTrack->meta, AMEDIAFORMAT_KEY_MIME, mimeFormat.string());
+            // Prior to API 29, the metadata track was not compliant with ISO/IEC
+            // 14496-12-2015. This led to some ISO-compliant parsers failing to read the
+            // metatrack. As of API 29 and onwards, a change was made to metadata track to
+            // make it compliant with the standard. The workaround is to write the
+            // null-terminated mime_format string twice. This allows compliant parsers to
+            // read the missing reserved, data_reference_index, and content_encoding fields
+            // from the first mime_type string. The actual mime_format field would then be
+            // read correctly from the second string. The non-compliant Android frameworks
+            // from API 28 and earlier would still be able to read the mime_format correctly
+            // as it would only read the first null-terminated mime_format string. To enable
+            // reading metadata tracks generated from both the non-compliant and compliant
+            // formats, a check needs to be done to see which format is used.
+            int null_pos = 0;
+            const unsigned char *str = buffer.get();
+            while (null_pos < chunk_data_size) {
+              if (*(str + null_pos) == '\0') {
+                break;
+              }
+              ++null_pos;
+            }
 
+            if (null_pos == chunk_data_size - 1) {
+              // This is not a standard ompliant metadata track.
+              String8 mimeFormat((const char *)(buffer.get()), chunk_data_size);
+              AMediaFormat_setString(mLastTrack->meta,
+                  AMEDIAFORMAT_KEY_MIME, mimeFormat.string());
+            } else {
+              // This is a standard compliant metadata track.
+              String8 contentEncoding((const char *)(buffer.get() + 8));
+              String8 mimeFormat((const char *)(buffer.get() + 8 + contentEncoding.size() + 1),
+                  chunk_data_size - 8 - contentEncoding.size() - 1);
+              AMediaFormat_setString(mLastTrack->meta,
+                  AMEDIAFORMAT_KEY_MIME, mimeFormat.string());
+            }
             break;
         }
 
