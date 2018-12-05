@@ -92,8 +92,8 @@ struct NuPlayer2 : public AHandler {
     float getFrameRate();
 
     // Modular DRM
-    status_t prepareDrm(const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId);
-    status_t releaseDrm();
+    status_t prepareDrm(int64_t srcId, const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId);
+    status_t releaseDrm(int64_t srcId);
 
     const char *getDataSourceType();
 

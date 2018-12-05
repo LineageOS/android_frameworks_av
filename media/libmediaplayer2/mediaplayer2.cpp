@@ -1094,7 +1094,8 @@ void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const Play
 }
 
 // Modular DRM
-status_t MediaPlayer2::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>& drmSessionId) {
+status_t MediaPlayer2::prepareDrm(
+        int64_t srcId, const uint8_t uuid[16], const Vector<uint8_t>& drmSessionId) {
     // TODO change to ALOGV
     ALOGD("prepareDrm: uuid: %p  drmSessionId: %p(%zu)", uuid,
             drmSessionId.array(), drmSessionId.size());
@@ -1118,7 +1119,7 @@ status_t MediaPlayer2::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>&
     }
 
     // Passing down to mediaserver mainly for creating the crypto
-    status_t status = mPlayer->prepareDrm(uuid, drmSessionId);
+    status_t status = mPlayer->prepareDrm(srcId, uuid, drmSessionId);
     ALOGE_IF(status != OK, "prepareDrm: Failed at mediaserver with ret: %d", status);
 
     // TODO change to ALOGV
@@ -1127,7 +1128,7 @@ status_t MediaPlayer2::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>&
     return status;
 }
 
-status_t MediaPlayer2::releaseDrm() {
+status_t MediaPlayer2::releaseDrm(int64_t srcId) {
     Mutex::Autolock _l(mLock);
     if (mPlayer == NULL) {
         return NO_INIT;
@@ -1142,7 +1143,7 @@ status_t MediaPlayer2::releaseDrm() {
         return INVALID_OPERATION;
     }
 
-    status_t status = mPlayer->releaseDrm();
+    status_t status = mPlayer->releaseDrm(srcId);
     // TODO change to ALOGV
     ALOGD("releaseDrm: mediaserver::releaseDrm ret: %d", status);
     if (status != OK) {
