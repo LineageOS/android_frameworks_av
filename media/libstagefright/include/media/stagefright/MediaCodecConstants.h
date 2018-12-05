@@ -135,6 +135,8 @@ constexpr int32_t VP9Profile2 = 0x04;
 constexpr int32_t VP9Profile3 = 0x08;
 constexpr int32_t VP9Profile2HDR = 0x1000;
 constexpr int32_t VP9Profile3HDR = 0x2000;
+constexpr int32_t VP9Profile2HDR10Plus = 0x4000;
+constexpr int32_t VP9Profile3HDR10Plus = 0x8000;
 
 constexpr int32_t VP9Level1  = 0x1;
 constexpr int32_t VP9Level11 = 0x2;
@@ -155,6 +157,7 @@ constexpr int32_t HEVCProfileMain        = 0x01;
 constexpr int32_t HEVCProfileMain10      = 0x02;
 constexpr int32_t HEVCProfileMainStill   = 0x04;
 constexpr int32_t HEVCProfileMain10HDR10 = 0x1000;
+constexpr int32_t HEVCProfileMain10HDR10Plus = 0x2000;
 
 constexpr int32_t HEVCMainTierLevel1  = 0x1;
 constexpr int32_t HEVCHighTierLevel1  = 0x2;
@@ -343,6 +346,7 @@ constexpr char KEY_FRAME_RATE[] = "frame-rate";
 constexpr char KEY_GRID_COLUMNS[] = "grid-cols";
 constexpr char KEY_GRID_ROWS[] = "grid-rows";
 constexpr char KEY_HDR_STATIC_INFO[] = "hdr-static-info";
+constexpr char KEY_HDR10_PLUS_INFO[] = "hdr10-plus-info";
 constexpr char KEY_HEIGHT[] = "height";
 constexpr char KEY_I_FRAME_INTERVAL[] = "i-frame-interval";
 constexpr char KEY_INTRA_REFRESH_PERIOD[] = "intra-refresh-period";
