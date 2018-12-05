@@ -199,6 +199,7 @@ enum {
 
     // HDR related
     kKeyHdrStaticInfo    = 'hdrS', // HDRStaticInfo
+    kKeyHdr10PlusInfo    = 'hdrD', // raw data
 
     // color aspects
     kKeyColorRange       = 'cRng', // int32_t, color range, value defined by ColorAspects.Range

@@ -119,7 +119,8 @@ static bool isHdr(const sp<AMessage> &format) {
     }
 
     // if user/container supplied HDR static info without transfer set, assume true
-    if (format->contains("hdr-static-info") && !format->contains("color-transfer")) {
+    if ((format->contains("hdr-static-info") || format->contains("hdr10-plus-info"))
+            && !format->contains("color-transfer")) {
         return true;
     }
     // otherwise, verify that an HDR transfer function is set
@@ -876,6 +877,16 @@ status_t convertMetaDataToMessage(
             ColorUtils::setHDRStaticInfoIntoFormat(*(HDRStaticInfo*)data, msg);
         }
 
+        if (meta->findData(kKeyHdr10PlusInfo, &type, &data, &size)
+                && size > 0) {
+            sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
+            if (buffer.get() == NULL || buffer->base() == NULL) {
+                return NO_MEMORY;
+            }
+            memcpy(buffer->data(), data, size);
+            msg->setBuffer("hdr10-plus-info", buffer);
+        }
+
         convertMetaDataToMessageColorAspects(meta, msg);
     } else if (!strncasecmp("audio/", mime, 6)) {
         int32_t numChannels, sampleRate;
@@ -1622,6 +1633,12 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             if (ColorUtils::getHDRStaticInfoFromFormat(msg, &info)) {
                 meta->setData(kKeyHdrStaticInfo, 'hdrS', &info, sizeof(info));
             }
+        }
+
+        sp<ABuffer> hdr10PlusInfo;
+        if (msg->findBuffer("hdr10-plus-info", &hdr10PlusInfo)) {
+            meta->setData(kKeyHdr10PlusInfo, 0,
+                    hdr10PlusInfo->data(), hdr10PlusInfo->size());
         }
 
         convertMessageToMetaDataColorAspects(msg, meta);

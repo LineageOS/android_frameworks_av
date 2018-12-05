@@ -84,8 +84,8 @@ protected:
     virtual OMX_ERRORTYPE internalSetParameter(
             OMX_INDEXTYPE index, const OMX_PTR param);
 
-    virtual OMX_ERRORTYPE setConfig(
-            OMX_INDEXTYPE index, const OMX_PTR params);
+    virtual OMX_ERRORTYPE internalSetConfig(
+            OMX_INDEXTYPE index, const OMX_PTR params, bool *frameConfig);
 
     // OMX callback when buffers available
     // Note that both an input and output buffer

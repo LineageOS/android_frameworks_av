@@ -34,7 +34,8 @@ SimpleSoftOMXComponent::SimpleSoftOMXComponent(
       mLooper(new ALooper),
       mHandler(new AHandlerReflector<SimpleSoftOMXComponent>(this)),
       mState(OMX_StateLoaded),
-      mTargetState(OMX_StateLoaded) {
+      mTargetState(OMX_StateLoaded),
+      mFrameConfig(false) {
     mLooper->setName(name);
     mLooper->registerHandler(mHandler);
 
@@ -204,6 +205,21 @@ OMX_ERRORTYPE SimpleSoftOMXComponent::internalSetParameter(
     }
 }
 
+OMX_ERRORTYPE SimpleSoftOMXComponent::internalSetConfig(
+        OMX_INDEXTYPE index, const OMX_PTR params, bool *frameConfig) {
+    return OMX_ErrorUndefined;
+}
+
+OMX_ERRORTYPE SimpleSoftOMXComponent::setConfig(
+        OMX_INDEXTYPE index, const OMX_PTR params) {
+    bool frameConfig = mFrameConfig;
+    OMX_ERRORTYPE err = internalSetConfig(index, params, &frameConfig);
+    if (err == OMX_ErrorNone) {
+        mFrameConfig = frameConfig;
+    }
+    return err;
+}
+
 OMX_ERRORTYPE SimpleSoftOMXComponent::useBuffer(
         OMX_BUFFERHEADERTYPE **header,
         OMX_U32 portIndex,
@@ -336,6 +352,10 @@ OMX_ERRORTYPE SimpleSoftOMXComponent::emptyThisBuffer(
         OMX_BUFFERHEADERTYPE *buffer) {
     sp<AMessage> msg = new AMessage(kWhatEmptyThisBuffer, mHandler);
     msg->setPointer("header", buffer);
+    if (mFrameConfig) {
+        msg->setInt32("frame-config", mFrameConfig);
+        mFrameConfig = false;
+    }
     msg->post();
 
     return OMX_ErrorNone;
@@ -378,6 +398,10 @@ void SimpleSoftOMXComponent::onMessageReceived(const sp<AMessage> &msg) {
         {
             OMX_BUFFERHEADERTYPE *header;
             CHECK(msg->findPointer("header", (void **)&header));
+            int32_t frameConfig;
+            if (!msg->findInt32("frame-config", &frameConfig)) {
+                frameConfig = 0;
+            }
 
             CHECK(mState == OMX_StateExecuting && mTargetState == mState);
 
@@ -393,6 +417,7 @@ void SimpleSoftOMXComponent::onMessageReceived(const sp<AMessage> &msg) {
                     CHECK(!buffer->mOwnedByUs);
 
                     buffer->mOwnedByUs = true;
+                    buffer->mFrameConfig = (bool)frameConfig;
 
                     CHECK((msgType == kWhatEmptyThisBuffer
                             && port->mDef.eDir == OMX_DirInput)
