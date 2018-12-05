@@ -392,6 +392,7 @@ enum : uint32_t {
     _C2_PL_HEVC_BASE = 0x6000,
     _C2_PL_VP9_BASE  = 0x7000,
     _C2_PL_DV_BASE   = 0x8000,
+    _C2_PL_AV1_BASE  = 0x9000,
 
     C2_PROFILE_LEVEL_VENDOR_START = 0x70000000,
 };
@@ -539,6 +540,11 @@ enum C2Config::profile_t : uint32_t {
     PROFILE_DV_HE_07 = _C2_PL_DV_BASE + 7,      ///< Dolby Vision dvhe.07 profile
     PROFILE_DV_HE_08 = _C2_PL_DV_BASE + 8,      ///< Dolby Vision dvhe.08 profile
     PROFILE_DV_AV_09 = _C2_PL_DV_BASE + 9,      ///< Dolby Vision dvav.09 profile
+
+    // AV1 profiles
+    PROFILE_AV1_0 = _C2_PL_AV1_BASE,            ///< AV1 Profile 0 (4:2:0, 8 to 10 bit)
+    PROFILE_AV1_1,                              ///< AV1 Profile 1 (8 to 10 bit)
+    PROFILE_AV1_2,                              ///< AV1 Profile 2 (8 to 12 bit)
 };
 
 enum C2Config::level_t : uint32_t {
@@ -652,6 +658,31 @@ enum C2Config::level_t : uint32_t {
     LEVEL_DV_HIGH_UHD_30,                       ///< Dolby Vision high tier uhd30
     LEVEL_DV_HIGH_UHD_48,                       ///< Dolby Vision high tier uhd48
     LEVEL_DV_HIGH_UHD_60,                       ///< Dolby Vision high tier uhd60
+
+    LEVEL_AV1_2    = _C2_PL_AV1_BASE ,          ///< AV1 Level 2
+    LEVEL_AV1_2_1,                              ///< AV1 Level 2.1
+    LEVEL_AV1_2_2,                              ///< AV1 Level 2.2
+    LEVEL_AV1_2_3,                              ///< AV1 Level 2.3
+    LEVEL_AV1_3,                                ///< AV1 Level 3
+    LEVEL_AV1_3_1,                              ///< AV1 Level 3.1
+    LEVEL_AV1_3_2,                              ///< AV1 Level 3.2
+    LEVEL_AV1_3_3,                              ///< AV1 Level 3.3
+    LEVEL_AV1_4,                                ///< AV1 Level 4
+    LEVEL_AV1_4_1,                              ///< AV1 Level 4.1
+    LEVEL_AV1_4_2,                              ///< AV1 Level 4.2
+    LEVEL_AV1_4_3,                              ///< AV1 Level 4.3
+    LEVEL_AV1_5,                                ///< AV1 Level 5
+    LEVEL_AV1_5_1,                              ///< AV1 Level 5.1
+    LEVEL_AV1_5_2,                              ///< AV1 Level 5.2
+    LEVEL_AV1_5_3,                              ///< AV1 Level 5.3
+    LEVEL_AV1_6,                                ///< AV1 Level 6
+    LEVEL_AV1_6_1,                              ///< AV1 Level 6.1
+    LEVEL_AV1_6_2,                              ///< AV1 Level 6.2
+    LEVEL_AV1_6_3,                              ///< AV1 Level 6.3
+    LEVEL_AV1_7,                                ///< AV1 Level 7
+    LEVEL_AV1_7_1,                              ///< AV1 Level 7.1
+    LEVEL_AV1_7_2,                              ///< AV1 Level 7.2
+    LEVEL_AV1_7_3,                              ///< AV1 Level 7.3
 };
 
 struct C2ProfileLevelStruct {

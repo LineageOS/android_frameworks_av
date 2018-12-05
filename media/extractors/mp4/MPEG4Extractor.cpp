@@ -341,6 +341,8 @@ static const char *FourCC2MIME(uint32_t fourcc) {
         case FOURCC('a', 'l', 'a', 'c'):
             return MEDIA_MIMETYPE_AUDIO_ALAC;
 
+        case FOURCC('a', 'v', '0', '1'):
+            return MEDIA_MIMETYPE_VIDEO_AV1;
         default:
             ALOGW("Unknown fourcc: %c%c%c%c",
                    (fourcc >> 24) & 0xff,
@@ -1712,6 +1714,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC('a', 'v', 'c', '1'):
         case FOURCC('h', 'v', 'c', '1'):
         case FOURCC('h', 'e', 'v', '1'):
+        case FOURCC('a', 'v', '0', '1'):
         {
             uint8_t buffer[78];
             if (chunk_data_size < (ssize_t)sizeof(buffer)) {
@@ -5933,6 +5936,7 @@ static bool isCompatibleBrand(uint32_t fourcc) {
         FOURCC('a', 'v', 'c', '1'),
         FOURCC('h', 'v', 'c', '1'),
         FOURCC('h', 'e', 'v', '1'),
+        FOURCC('a', 'v', '0', '1'),
         FOURCC('3', 'g', 'p', '4'),
         FOURCC('m', 'p', '4', '1'),
         FOURCC('m', 'p', '4', '2'),

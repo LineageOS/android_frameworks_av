@@ -821,6 +821,7 @@ C2PlatformComponentStore::C2PlatformComponentStore()
     emplace("c2.android.vp9.decoder", "libcodec2_soft_vp9dec.so");
     emplace("c2.android.vp8.encoder", "libcodec2_soft_vp8enc.so");
     emplace("c2.android.vp9.encoder", "libcodec2_soft_vp9enc.so");
+    emplace("c2.android.av1.decoder", "libcodec2_soft_av1dec.so");
     emplace("c2.android.raw.decoder", "libcodec2_soft_rawdec.so");
     emplace("c2.android.flac.decoder", "libcodec2_soft_flacdec.so");
     emplace("c2.android.flac.encoder", "libcodec2_soft_flacenc.so");
