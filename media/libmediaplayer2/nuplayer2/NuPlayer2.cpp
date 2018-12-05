@@ -3046,7 +3046,8 @@ const char *NuPlayer2::getDataSourceType() {
  }
 
 // Modular DRM begin
-status_t NuPlayer2::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId)
+status_t NuPlayer2::prepareDrm(
+        int64_t srcId, const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId)
 {
     ALOGV("prepareDrm ");
 
@@ -3056,6 +3057,7 @@ status_t NuPlayer2::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t> &dr
     uint8_t UUID[16];
     memcpy(UUID, uuid, sizeof(UUID));
     Vector<uint8_t> sessionId = drmSessionId;
+    msg->setInt64("srcId", srcId);
     msg->setPointer("uuid", (void*)UUID);
     msg->setPointer("drmSessionId", (void*)&sessionId);
 
@@ -3072,11 +3074,12 @@ status_t NuPlayer2::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t> &dr
     return status;
 }
 
-status_t NuPlayer2::releaseDrm()
+status_t NuPlayer2::releaseDrm(int64_t srcId)
 {
     ALOGV("releaseDrm ");
 
     sp<AMessage> msg = new AMessage(kWhatReleaseDrm, this);
+    msg->setInt64("srcId", srcId);
 
     sp<AMessage> response;
     status_t status = msg->postAndAwaitResponse(&response);

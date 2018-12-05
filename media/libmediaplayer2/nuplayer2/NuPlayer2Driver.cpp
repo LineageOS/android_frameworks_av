@@ -976,24 +976,25 @@ void NuPlayer2Driver::notifyFlagsChanged(int64_t /* srcId */, uint32_t flags) {
 }
 
 // Modular DRM
-status_t NuPlayer2Driver::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId)
+status_t NuPlayer2Driver::prepareDrm(
+        int64_t srcId, const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId)
 {
     ALOGV("prepareDrm(%p) state: %d", this, mState);
 
     // leaving the state verification for mediaplayer.cpp
-    status_t ret = mPlayer->prepareDrm(uuid, drmSessionId);
+    status_t ret = mPlayer->prepareDrm(srcId, uuid, drmSessionId);
 
     ALOGV("prepareDrm ret: %d", ret);
 
     return ret;
 }
 
-status_t NuPlayer2Driver::releaseDrm()
+status_t NuPlayer2Driver::releaseDrm(int64_t srcId)
 {
     ALOGV("releaseDrm(%p) state: %d", this, mState);
 
     // leaving the state verification for mediaplayer.cpp
-    status_t ret = mPlayer->releaseDrm();
+    status_t ret = mPlayer->releaseDrm(srcId);
 
     ALOGV("releaseDrm ret: %d", ret);
 

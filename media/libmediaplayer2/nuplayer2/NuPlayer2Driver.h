@@ -82,8 +82,9 @@ struct NuPlayer2Driver : public MediaPlayer2Interface {
     void notifyFlagsChanged(int64_t srcId, uint32_t flags);
 
     // Modular DRM
-    virtual status_t prepareDrm(const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId);
-    virtual status_t releaseDrm();
+    virtual status_t prepareDrm(
+            int64_t srcId, const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId);
+    virtual status_t releaseDrm(int64_t srcId);
 
 protected:
     virtual ~NuPlayer2Driver();
