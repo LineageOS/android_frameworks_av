@@ -41,6 +41,9 @@ LOCAL_SHARED_LIBRARIES := \
   libmedia_helper \
   libutils
 
+LOCAL_HEADER_LIBRARIES := \
+  libmedia_headers
+
 LOCAL_SRC_FILES := \
   systemaudio_tests.cpp \
 
