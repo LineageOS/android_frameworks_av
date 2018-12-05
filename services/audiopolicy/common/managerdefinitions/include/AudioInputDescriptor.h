@@ -58,9 +58,8 @@ public:
     void clearPreemptedSessions();
     bool isActive() const { return mGlobalActiveCount > 0; }
     bool isSourceActive(audio_source_t source) const;
-    audio_source_t inputSource(bool activeOnly = false) const;
+    audio_source_t source() const;
     bool isSoundTrigger() const;
-    audio_source_t getHighestPrioritySource(bool activeOnly) const;
     void setClientActive(const sp<RecordClientDescriptor>& client, bool active);
     int32_t activeCount() { return mGlobalActiveCount; }
 
@@ -121,7 +120,7 @@ public:
      * Only considers inputs from physical devices (e.g. main mic, headset mic) when
      * ignoreVirtualInputs is true.
      */
-    Vector<sp <AudioInputDescriptor> > getActiveInputs(bool ignoreVirtualInputs = true);
+    Vector<sp <AudioInputDescriptor> > getActiveInputs();
 
     audio_devices_t getSupportedDevices(audio_io_handle_t handle) const;
 

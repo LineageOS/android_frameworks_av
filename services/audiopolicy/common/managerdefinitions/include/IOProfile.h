@@ -35,7 +35,7 @@ class IOProfile : public AudioPort
 public:
     IOProfile(const String8 &name, audio_port_role_t role)
         : AudioPort(name, AUDIO_PORT_TYPE_MIX, role),
-          maxOpenCount((role == AUDIO_PORT_ROLE_SOURCE) ? 1 : 0),
+          maxOpenCount(1),
           curOpenCount(0),
           maxActiveCount(1),
           curActiveCount(0) {}
