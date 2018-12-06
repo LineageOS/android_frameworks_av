@@ -47,10 +47,6 @@ AAudioServiceEndpointPlay::AAudioServiceEndpointPlay(AAudioService &audioService
     mStreamInternal = &mStreamInternalPlay;
 }
 
-AAudioServiceEndpointPlay::~AAudioServiceEndpointPlay() {
-    ALOGD("%s(%p) destroyed", __func__, this);
-}
-
 aaudio_result_t AAudioServiceEndpointPlay::open(const aaudio::AAudioStreamRequest &request) {
     aaudio_result_t result = AAudioServiceEndpointShared::open(request);
     if (result == AAUDIO_OK) {

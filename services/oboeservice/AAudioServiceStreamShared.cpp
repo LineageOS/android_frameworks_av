@@ -128,7 +128,6 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
 
     aaudio_result_t result = AAudioServiceStreamBase::open(request);
     if (result != AAUDIO_OK) {
-        ALOGE("%s() returned %d", __func__, result);
         return result;
     }
 
