@@ -561,7 +561,7 @@ int MtpDataPacket::write(struct usb_request *request, UrbPacketDivisionMode divi
     return processedBytes == mPacketSize ? processedBytes : -1;
 }
 
-int MtpDataPacket::write(struct usb_request *request,
+int64_t MtpDataPacket::write(struct usb_request *request,
                          UrbPacketDivisionMode divisionMode,
                          int fd,
                          size_t payloadSize) {
