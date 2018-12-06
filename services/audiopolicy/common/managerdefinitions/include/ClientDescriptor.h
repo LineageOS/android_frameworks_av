@@ -22,7 +22,6 @@
 #include <sys/types.h>
 
 #include <system/audio.h>
-#include <system/audio_policy.h>
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>
 #include <utils/RefBase.h>
@@ -107,7 +106,7 @@ public:
                         audio_port_handle_t preferredDeviceId,
                         audio_source_t source, audio_input_flags_t flags, bool isSoundTrigger) :
         ClientDescriptor(portId, uid, sessionId, attributes, config, preferredDeviceId),
-        mSource(source), mFlags(flags), mIsSoundTrigger(isSoundTrigger), mAppState(APP_STATE_IDLE) {}
+        mSource(source), mFlags(flags), mIsSoundTrigger(isSoundTrigger), mSilenced(false) {}
     ~RecordClientDescriptor() override = default;
 
     using ClientDescriptor::dump;
@@ -116,16 +115,14 @@ public:
     audio_source_t source() const { return mSource; }
     audio_input_flags_t flags() const { return mFlags; }
     bool isSoundTrigger() const { return mIsSoundTrigger; }
-    void setAppState(app_state_t appState) { mAppState = appState; }
-    app_state_t appState() { return mAppState; }
-    bool isSilenced() const { return mAppState == APP_STATE_IDLE; }
+    void setSilenced(bool silenced) { mSilenced = silenced; }
+    bool isSilenced() const { return mSilenced; }
 
 private:
     const audio_source_t mSource;
     const audio_input_flags_t mFlags;
     const bool mIsSoundTrigger;
-          app_state_t mAppState;
-
+          bool mSilenced;
 };
 
 class SourceClientDescriptor: public TrackClientDescriptor
