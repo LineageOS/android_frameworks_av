@@ -178,13 +178,15 @@
 #define CS_MIDDLE_96000_B1                    (-0.993334)
 #define CS_MIDDLE_96000_B2                     0.000000
 #define CS_MIDDLE_96000_SCALE                        15
-/* bandpass filter with fc1 270 and fc2 3703, designed using 2nd order butterworth */
-#define CS_SIDE_96000_A0                     0.016727
-#define CS_SIDE_96000_A1                     0.000000
-#define CS_SIDE_96000_A2                    (-0.016727)
-#define CS_SIDE_96000_B1                    (-1.793372)
-#define CS_SIDE_96000_B2                     0.797236
-#define CS_SIDE_96000_SCALE                        14
+/* Coefficients calculated using tf2ss and ss2tf functions based on
+ * coefficients available for 48000Hz sampling frequency
+ */
+#define CS_SIDE_96000_A0                     0.224326f
+#define CS_SIDE_96000_A1                     (-0.294937f)
+#define CS_SIDE_96000_A2                     0.070611f
+#define CS_SIDE_96000_B1                     (-1.792166f)
+#define CS_SIDE_96000_B2                     0.795830f
+#define CS_SIDE_96000_SCALE                  14
 
 /* Stereo Enhancer coefficients for 176400Hz sample rate.
  * The filter coefficients are obtained by carrying out
@@ -211,13 +213,15 @@
 #define CS_MIDDLE_192000_B1                    (-0.996661)
 #define CS_MIDDLE_192000_B2                     0.000000
 #define CS_MIDDLE_192000_SCALE                        15
-/* bandpass filter with fc1 270 and fc2 3703, designed using 2nd order butterworth */
-#define CS_SIDE_192000_A0                     0.008991
-#define CS_SIDE_192000_A1                    (-0.000000)
-#define CS_SIDE_192000_A2                    (-0.008991)
-#define CS_SIDE_192000_B1                    (-1.892509)
-#define CS_SIDE_192000_B2                     0.893524
-#define CS_SIDE_192000_SCALE                       14
+/* Coefficients calculated using tf2ss and ss2tf functions based on
+ * coefficients available for 48000Hz sampling frequency
+ */
+#define CS_SIDE_192000_A0                    0.196039f
+#define CS_SIDE_192000_A1                    (-0.311027f)
+#define CS_SIDE_192000_A2                    0.114988f
+#define CS_SIDE_192000_B1                    (-1.891380f)
+#define CS_SIDE_192000_B2                    0.8923460f
+#define CS_SIDE_192000_SCALE                 14
 #endif
 
 /************************************************************************************/
