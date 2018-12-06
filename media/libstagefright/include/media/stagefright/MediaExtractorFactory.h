@@ -35,16 +35,20 @@ public:
             const sp<DataSource> &source, const char *mime = NULL);
     static void LoadPlugins(const ::std::string& apkPath);
     static status_t dump(int fd, const Vector<String16>& args);
+    static void SetLinkedLibraries(const std::string& linkedLibraries);
 
 private:
     static Mutex gPluginMutex;
     static std::shared_ptr<std::list<sp<ExtractorPlugin>>> gPlugins;
     static bool gPluginsRegistered;
     static bool gIgnoreVersion;
+    static std::string gLinkedLibraries;
 
     static void RegisterExtractorsInApk(
             const char *apkPath, std::list<sp<ExtractorPlugin>> &pluginList);
     static void RegisterExtractorsInSystem(
+            const char *libDirPath, std::list<sp<ExtractorPlugin>> &pluginList);
+    static void RegisterExtractorsInApex(
             const char *libDirPath, std::list<sp<ExtractorPlugin>> &pluginList);
     static void RegisterExtractor(
             const sp<ExtractorPlugin> &plugin, std::list<sp<ExtractorPlugin>> &pluginList);

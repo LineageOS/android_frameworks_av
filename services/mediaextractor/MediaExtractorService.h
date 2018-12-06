@@ -27,7 +27,7 @@ class MediaExtractorService : public BinderService<MediaExtractorService>, publi
 {
     friend class BinderService<MediaExtractorService>;    // for MediaExtractorService()
 public:
-    MediaExtractorService() : BnMediaExtractorService() { }
+    MediaExtractorService();
     virtual ~MediaExtractorService() { }
     virtual void onFirstRef() { }
 
