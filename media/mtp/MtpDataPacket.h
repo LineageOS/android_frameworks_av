@@ -117,7 +117,8 @@ public:
     int                 write(struct usb_request *request, UrbPacketDivisionMode divisionMode);
     // Similar to previous write method but it reads the payload from |fd|. If |size| is larger than
     // MTP_BUFFER_SIZE, the data will be sent by multiple bulk transfer requests.
-    int                 write(struct usb_request *request, UrbPacketDivisionMode divisionMode,
+    // Return type (int64_t) is used to handle the case that the size can be larger than 2GB.
+    int64_t             write(struct usb_request *request, UrbPacketDivisionMode divisionMode,
                               int fd, size_t size);
 #endif
 
