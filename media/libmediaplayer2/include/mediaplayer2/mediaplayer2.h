@@ -105,8 +105,10 @@ public:
             status_t        getParameter(int key, Parcel* reply);
 
             // Modular DRM
-            status_t        prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>& drmSessionId);
-            status_t        releaseDrm();
+            status_t        prepareDrm(int64_t srcId,
+                                       const uint8_t uuid[16],
+                                       const Vector<uint8_t>& drmSessionId);
+            status_t        releaseDrm(int64_t srcId);
             // AudioRouting
             status_t        setPreferredDevice(jobject device);
             jobject         getRoutedDevice();

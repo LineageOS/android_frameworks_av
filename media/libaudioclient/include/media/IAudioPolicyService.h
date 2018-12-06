@@ -78,8 +78,7 @@ public:
                               audio_input_flags_t flags,
                               audio_port_handle_t *selectedDeviceId,
                               audio_port_handle_t *portId) = 0;
-    virtual status_t startInput(audio_port_handle_t portId,
-                                bool *silenced) = 0;
+    virtual status_t startInput(audio_port_handle_t portId) = 0;
     virtual status_t stopInput(audio_port_handle_t portId) = 0;
     virtual void releaseInput(audio_port_handle_t portId) = 0;
     virtual status_t initStreamVolume(audio_stream_type_t stream,

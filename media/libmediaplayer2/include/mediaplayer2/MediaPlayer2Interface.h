@@ -260,11 +260,11 @@ public:
     virtual void onMessageReceived(const sp<AMessage> & /* msg */) override { }
 
     // Modular DRM
-    virtual status_t prepareDrm(const uint8_t /* uuid */[16],
+    virtual status_t prepareDrm(int64_t /*srcId*/, const uint8_t /* uuid */[16],
                                 const Vector<uint8_t>& /* drmSessionId */) {
         return INVALID_OPERATION;
     }
-    virtual status_t releaseDrm() {
+    virtual status_t releaseDrm(int64_t /*srcId*/) {
         return INVALID_OPERATION;
     }
 
