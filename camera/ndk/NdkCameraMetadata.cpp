@@ -69,3 +69,20 @@ void ACameraMetadata_free(ACameraMetadata* metadata) {
         metadata->decStrong((void*) ACameraMetadata_free);
     }
 }
+
+EXPORT
+bool ACameraMetadata_isLogicalMultiCamera(const ACameraMetadata* staticMetadata,
+        /*out*/size_t* numPhysicalCameras, /*out*/const char*const** physicalCameraIds) {
+    ATRACE_CALL();
+    if (numPhysicalCameras == nullptr || physicalCameraIds == nullptr) {
+        ALOGE("%s: Invalid input: numPhysicalCameras %p, physicalCameraIds %p",
+                 __FUNCTION__, numPhysicalCameras, physicalCameraIds);
+        return false;
+    }
+    if (staticMetadata == nullptr) {
+        ALOGE("%s: Invalid input: staticMetadata is null.", __FUNCTION__);
+        return false;
+    }
+
+    return staticMetadata->isLogicalMultiCamera(numPhysicalCameras, physicalCameraIds);
+}

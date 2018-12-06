@@ -50,6 +50,7 @@ ACameraMetadata::isNdkSupportedCapability(int32_t capability) {
         case ANDROID_REQUEST_AVAILABLE_CAPABILITIES_READ_SENSOR_SETTINGS:
         case ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BURST_CAPTURE:
         case ANDROID_REQUEST_AVAILABLE_CAPABILITIES_DEPTH_OUTPUT:
+        case ANDROID_REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA:
             return true;
         case ANDROID_REQUEST_AVAILABLE_CAPABILITIES_YUV_REPROCESSING:
         case ANDROID_REQUEST_AVAILABLE_CAPABILITIES_PRIVATE_REPROCESSING:
@@ -79,11 +80,41 @@ ACameraMetadata::filterUnsupportedFeatures() {
         uint8_t capability = entry.data.u8[i];
         if (isNdkSupportedCapability(capability)) {
             capabilities.push(capability);
+
+            if (capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA) {
+                derivePhysicalCameraIds();
+            }
         }
     }
     mData.update(ANDROID_REQUEST_AVAILABLE_CAPABILITIES, capabilities);
 }
 
+void
+ACameraMetadata::derivePhysicalCameraIds() {
+    ACameraMetadata_const_entry entry;
+    auto ret = getConstEntry(ACAMERA_LOGICAL_MULTI_CAMERA_PHYSICAL_IDS, &entry);
+    if (ret != ACAMERA_OK) {
+        ALOGE("%s: Get ACAMERA_LOGICAL_MULTI_CAMERA_PHYSICAL_IDS key failed. ret %d",
+                __FUNCTION__, ret);
+        return;
+    }
+
+    const uint8_t* ids = entry.data.u8;
+    size_t start = 0;
+    for (size_t i = 0; i < entry.count; ++i) {
+        if (ids[i] == '\0') {
+            if (start != i) {
+                mStaticPhysicalCameraIds.push_back((const char*)ids+start);
+            }
+            start = i+1;
+        }
+    }
+
+    if (mStaticPhysicalCameraIds.size() < 2) {
+        ALOGW("%s: Logical multi-camera device only has %zu physical cameras",
+                __FUNCTION__, mStaticPhysicalCameraIds.size());
+    }
+}
 
 void
 ACameraMetadata::filterDurations(uint32_t tag) {
@@ -307,6 +338,27 @@ ACameraMetadata::getTags(/*out*/int32_t* numTags,
 const CameraMetadata&
 ACameraMetadata::getInternalData() const {
     return mData;
+}
+
+bool
+ACameraMetadata::isLogicalMultiCamera(size_t* count, const char*const** physicalCameraIds) const {
+    if (mType != ACM_CHARACTERISTICS) {
+        ALOGE("%s must be called for a static metadata!", __FUNCTION__);
+        return false;
+    }
+    if (count == nullptr || physicalCameraIds == nullptr) {
+        ALOGE("%s: Invalid input count: %p, physicalCameraIds: %p", __FUNCTION__,
+                count, physicalCameraIds);
+        return false;
+    }
+
+    if (mStaticPhysicalCameraIds.size() >= 2) {
+        *count = mStaticPhysicalCameraIds.size();
+        *physicalCameraIds = mStaticPhysicalCameraIds.data();
+        return true;
+    }
+
+    return false;
 }
 
 // TODO: some of key below should be hidden from user

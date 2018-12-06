@@ -2,9 +2,11 @@ LIBCAMERA2NDK {
   global:
     ACameraCaptureSession_abortCaptures;
     ACameraCaptureSession_capture;
+    ACameraCaptureSession_logicalCamera_capture; # introduced=29
     ACameraCaptureSession_close;
     ACameraCaptureSession_getDevice;
     ACameraCaptureSession_setRepeatingRequest;
+    ACameraCaptureSession_logicalCamera_setRepeatingRequest; # introduced=29
     ACameraCaptureSession_stopRepeating;
     ACameraCaptureSession_updateSharedOutput; # introduced=28
     ACameraDevice_close;
@@ -24,6 +26,7 @@ LIBCAMERA2NDK {
     ACameraMetadata_free;
     ACameraMetadata_getAllTags;
     ACameraMetadata_getConstEntry;
+    ACameraMetadata_isLogicalMultiCamera; # introduced=29
     ACameraOutputTarget_create;
     ACameraOutputTarget_free;
     ACaptureRequest_addTarget;
@@ -48,6 +51,7 @@ LIBCAMERA2NDK {
     ACaptureSessionSharedOutput_create; # introduced=28
     ACaptureSessionSharedOutput_add; # introduced=28
     ACaptureSessionSharedOutput_remove; # introduced=28
+    ACaptureSessionPhysicalOutput_create; # introduced=29
     ACaptureSessionOutput_free;
   local:
     *;

@@ -233,6 +233,28 @@ void ACameraMetadata_free(ACameraMetadata* metadata) __INTRODUCED_IN(24);
 
 #endif /* __ANDROID_API__ >= 24 */
 
+#if __ANDROID_API__ >= 29
+
+/**
+ * Helper function to check if a camera is logical multi-camera.
+ *
+ * <p> Check whether a camera device is a logical multi-camera based on its
+ * static metadata. If it is, also returns its physical sub camera Ids.</p>
+ *
+ * @param staticMetadata the static metadata of the camera being checked.
+ * @param numPhysicalCameras returns the number of physical cameras.
+ * @param physicalCameraIds returns the array of physical camera Ids backing this logical
+ *                          camera device. Note that this pointer is only valid
+ *                          during the lifetime of the staticMetadata object.
+ *
+ * @return true if this is a logical multi-camera, false otherwise.
+ */
+bool ACameraMetadata_isLogicalMultiCamera(const ACameraMetadata* staticMetadata,
+        /*out*/size_t* numPhysicalCameras, /*out*/const char* const** physicalCameraIds)
+        __INTRODUCED_IN(29);
+
+#endif /* __ANDROID_API__ >= 29 */
+
 __END_DECLS
 
 #endif /* _NDK_CAMERA_METADATA_H */

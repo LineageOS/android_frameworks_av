@@ -17,6 +17,7 @@
 #define _ACAMERA_CAPTURE_SESSION_H
 
 #include <set>
+#include <string>
 #include <hardware/camera3.h>
 #include <camera/NdkCameraDevice.h>
 
@@ -29,8 +30,9 @@
 using namespace android;
 
 struct ACaptureSessionOutput {
-    explicit ACaptureSessionOutput(ACameraWindowType* window, bool isShared = false) :
-            mWindow(window), mIsShared(isShared) {};
+    explicit ACaptureSessionOutput(ACameraWindowType* window, bool isShared = false,
+            const char* physicalCameraId = "") :
+            mWindow(window), mIsShared(isShared), mPhysicalCameraId(physicalCameraId) {};
 
     bool operator == (const ACaptureSessionOutput& other) const {
         return mWindow == other.mWindow;
@@ -49,6 +51,7 @@ struct ACaptureSessionOutput {
     std::set<ACameraWindowType *> mSharedWindows;
     bool           mIsShared;
     int            mRotation = CAMERA3_STREAM_ROTATION_0;
+    std::string mPhysicalCameraId;
 };
 #endif
 
@@ -88,13 +91,15 @@ struct ACameraCaptureSession : public RefBase {
 
     camera_status_t abortCaptures();
 
+    template<class T>
     camera_status_t setRepeatingRequest(
-            /*optional*/ACameraCaptureSession_captureCallbacks* cbs,
+            /*optional*/T* cbs,
             int numRequests, ACaptureRequest** requests,
             /*optional*/int* captureSequenceId);
 
+    template<class T>
     camera_status_t capture(
-            /*optional*/ACameraCaptureSession_captureCallbacks* cbs,
+            /*optional*/T* cbs,
             int numRequests, ACaptureRequest** requests,
             /*optional*/int* captureSequenceId);
 

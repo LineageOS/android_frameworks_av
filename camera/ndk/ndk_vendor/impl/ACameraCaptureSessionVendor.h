@@ -14,11 +14,13 @@
  * limitations under the License.
  */
 
+#include <string>
 #include "utils.h"
 
 struct ACaptureSessionOutput {
-    explicit ACaptureSessionOutput(native_handle_t* window, bool isShared = false) :
-            mWindow(window), mIsShared(isShared) {};
+    explicit ACaptureSessionOutput(native_handle_t* window, bool isShared = false,
+            const char* physicalCameraId = "") :
+            mWindow(window), mIsShared(isShared), mPhysicalCameraId(physicalCameraId) {};
 
     bool operator == (const ACaptureSessionOutput& other) const {
         return (mWindow == other.mWindow);
@@ -40,6 +42,7 @@ struct ACaptureSessionOutput {
     std::set<android::acam::utils::native_handle_ptr_wrapper> mSharedWindows;
     bool           mIsShared;
     int            mRotation = CAMERA3_STREAM_ROTATION_0;
+    std::string mPhysicalCameraId;
 };
 
 

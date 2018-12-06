@@ -643,6 +643,103 @@ camera_status_t ACameraCaptureSession_updateSharedOutput(ACameraCaptureSession* 
         ACaptureSessionOutput* output) __INTRODUCED_IN(28);
 #endif /* __ANDROID_API__ >= 28 */
 
+#if __ANDROID_API__ >= 29
+/**
+ * The definition of final capture result callback with logical multi-camera support.
+ *
+ * This has the same functionality as final ACameraCaptureSession_captureCallback_result, with
+ * added ability to return physical camera result metadata within a logical multi-camera.
+ *
+ * For a logical multi-camera, this function will be called with the Id and result metadata
+ * of the underlying physical cameras, which the corresponding capture request contains targets for.
+ * If the capture request doesn't contain targets specific to any physical camera, or the current
+ * camera device isn't a logical multi-camera, physicalResultCount will be 0.
+ *
+ * @param context The optional application context provided by user in
+ *                {@link ACameraCaptureSession_captureCallbacks}.
+ * @param session The camera capture session of interest.
+ * @param request The capture request of interest. Note that this pointer points to a copy of
+ *                capture request sent by application, so the address is different to what
+ *                application sent but the content will match. This request will be freed by
+ *                framework immediately after this callback returns.
+ * @param result The capture result metadata reported by camera device. The memory is managed by
+ *                camera framework. Do not access this pointer after this callback returns.
+ * @param physicalResultCount The number of physical camera result metadata
+ * @param physicalCameraIds The array of physical camera IDs on which the
+ *                physical result metadata are reported.
+ * @param physicalResults The array of capture result metadata reported by the
+ *                physical camera devices.
+ */
+typedef void (*ACameraCaptureSession_logicalCamera_captureCallback_result)(
+        void* context, ACameraCaptureSession* session,
+        ACaptureRequest* request, const ACameraMetadata* result,
+        size_t physicalResultCount, const char** physicalCameraIds,
+        const ACameraMetadata** physicalResults);
+
+/**
+ * This has the same functionality as ACameraCaptureSession_captureCallbacks,
+ * with the exception that an onLogicalCameraCaptureCompleted callback is
+ * used, instead of onCaptureCompleted, to support logical multi-camera.
+ */
+typedef struct ACameraCaptureSession_logicalCamera_captureCallbacks {
+    /**
+     * Same as ACameraCaptureSession_captureCallbacks
+     */
+    void*                                               context;
+    ACameraCaptureSession_captureCallback_start         onCaptureStarted;
+    ACameraCaptureSession_captureCallback_result        onCaptureProgressed;
+
+    /**
+     * This callback is called when an image capture has fully completed and all the
+     * result metadata is available. For a logical multi-camera, this callback
+     * also returns the result metadata for all physical cameras being
+     * explicitly requested on.
+     *
+     * <p>This callback will always fire after the last {@link onCaptureProgressed};
+     * in other words, no more partial results will be delivered once the completed result
+     * is available.</p>
+     *
+     * <p>For performance-intensive use-cases where latency is a factor, consider
+     * using {@link onCaptureProgressed} instead.</p>
+     *
+     * <p>Note that the ACaptureRequest pointer in the callback will not match what application has
+     * submitted, but the contents the ACaptureRequest will match what application submitted.</p>
+     */
+    ACameraCaptureSession_logicalCamera_captureCallback_result onLogicalCameraCaptureCompleted;
+
+    /**
+     * Same as ACameraCaptureSession_captureCallbacks
+     */
+    ACameraCaptureSession_captureCallback_failed        onCaptureFailed;
+    ACameraCaptureSession_captureCallback_sequenceEnd   onCaptureSequenceCompleted;
+    ACameraCaptureSession_captureCallback_sequenceAbort onCaptureSequenceAborted;
+    ACameraCaptureSession_captureCallback_bufferLost    onCaptureBufferLost;
+} ACameraCaptureSession_logicalCamera_captureCallbacks;
+
+/**
+ * This has the same functionality as ACameraCaptureSession_capture, with added
+ * support for logical multi-camera where the capture callbacks supports result metadata for
+ * physical cameras.
+ */
+camera_status_t ACameraCaptureSession_logicalCamera_capture(
+        ACameraCaptureSession* session,
+        /*optional*/ACameraCaptureSession_logicalCamera_captureCallbacks* callbacks,
+        int numRequests, ACaptureRequest** requests,
+        /*optional*/int* captureSequenceId) __INTRODUCED_IN(29);
+
+/**
+ * This has the same functionality as ACameraCaptureSession_setRepeatingRequest, with added
+ * support for logical multi-camera where the capture callbacks supports result metadata for
+ * physical cameras.
+ */
+camera_status_t ACameraCaptureSession_logicalCamera_setRepeatingRequest(
+        ACameraCaptureSession* session,
+        /*optional*/ACameraCaptureSession_logicalCamera_captureCallbacks* callbacks,
+        int numRequests, ACaptureRequest** requests,
+        /*optional*/int* captureSequenceId) __INTRODUCED_IN(29);
+
+#endif /* __ANDROID_API__ >= 29 */
+
 __END_DECLS
 
 #endif /* _NDK_CAMERA_CAPTURE_SESSION_H */
