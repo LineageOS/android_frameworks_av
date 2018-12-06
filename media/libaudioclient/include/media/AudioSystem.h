@@ -241,7 +241,8 @@ public:
                                     audio_port_handle_t *selectedDeviceId,
                                     audio_port_handle_t *portId);
 
-    static status_t startInput(audio_port_handle_t portId);
+    static status_t startInput(audio_port_handle_t portId,
+                               bool *silenced);
     static status_t stopInput(audio_port_handle_t portId);
     static void releaseInput(audio_port_handle_t portId);
     static status_t initStreamVolume(audio_stream_type_t stream,

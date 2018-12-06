@@ -53,32 +53,9 @@ audio_port_handle_t AudioInputDescriptor::getId() const
     return mId;
 }
 
-audio_source_t AudioInputDescriptor::source() const
+audio_source_t AudioInputDescriptor::inputSource(bool activeOnly) const
 {
-    audio_source_t source = AUDIO_SOURCE_DEFAULT;
-
-    for (bool activeOnly : { true, false }) {
-        int32_t topPriority = -1;
-        app_state_t topState = APP_STATE_IDLE;
-        for (const auto &client : getClientIterable()) {
-            if (activeOnly && !client->active()) {
-                continue;
-            }
-            app_state_t curState = client->appState();
-            if (curState >= topState) {
-                int32_t curPriority = source_priority(client->source());
-                if (curPriority > topPriority) {
-                    source = client->source();
-                    topPriority = curPriority;
-                }
-                topState = curState;
-            }
-        }
-        if (source != AUDIO_SOURCE_DEFAULT) {
-            break;
-        }
-    }
-    return source;
+    return getHighestPrioritySource(activeOnly);
 }
 
 void AudioInputDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
@@ -99,7 +76,7 @@ void AudioInputDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig
     dstConfig->type = AUDIO_PORT_TYPE_MIX;
     dstConfig->ext.mix.hw_module = getModuleHandle();
     dstConfig->ext.mix.handle = mIoHandle;
-    dstConfig->ext.mix.usecase.source = source();
+    dstConfig->ext.mix.usecase.source = inputSource();
 }
 
 void AudioInputDescriptor::toAudioPort(struct audio_port *port) const
@@ -146,6 +123,24 @@ bool AudioInputDescriptor::isSourceActive(audio_source_t source) const
         }
     }
     return false;
+}
+
+audio_source_t AudioInputDescriptor::getHighestPrioritySource(bool activeOnly) const
+{
+    audio_source_t source = AUDIO_SOURCE_DEFAULT;
+    int32_t priority = -1;
+
+    for (const auto &client : getClientIterable()) {
+        if (activeOnly && !client->active() ) {
+            continue;
+        }
+        int32_t curPriority = source_priority(client->source());
+        if (curPriority > priority) {
+            priority = curPriority;
+            source = client->source();
+        }
+    }
+    return source;
 }
 
 bool AudioInputDescriptor::isSoundTrigger() const {
@@ -229,7 +224,7 @@ status_t AudioInputDescriptor::open(const audio_config_t *config,
 
 status_t AudioInputDescriptor::start()
 {
-    if (!isActive()) {
+    if (mGlobalActiveCount == 1) {
         if (!mProfile->canStartNewIo()) {
             ALOGI("%s mProfile->curActiveCount %d", __func__, mProfile->curActiveCount);
             return INVALID_OPERATION;
@@ -393,13 +388,15 @@ uint32_t AudioInputCollection::activeInputsCountOnDevices(audio_devices_t device
     return count;
 }
 
-Vector<sp <AudioInputDescriptor> > AudioInputCollection::getActiveInputs()
+Vector<sp <AudioInputDescriptor> > AudioInputCollection::getActiveInputs(bool ignoreVirtualInputs)
 {
     Vector<sp <AudioInputDescriptor> > activeInputs;
 
     for (size_t i = 0; i < size(); i++) {
         const sp<AudioInputDescriptor>  inputDescriptor = valueAt(i);
-        if (inputDescriptor->isActive()) {
+        if ((inputDescriptor->isActive())
+                && (!ignoreVirtualInputs ||
+                    !is_virtual_input_device(inputDescriptor->mDevice))) {
             activeInputs.add(inputDescriptor);
         }
     }

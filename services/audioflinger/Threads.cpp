@@ -7367,7 +7367,8 @@ status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrac
         status_t status = NO_ERROR;
         if (recordTrack->isExternalTrack()) {
             mLock.unlock();
-            status = AudioSystem::startInput(recordTrack->portId());
+            bool silenced;
+            status = AudioSystem::startInput(recordTrack->portId(), &silenced);
             mLock.lock();
             if (recordTrack->isInvalid()) {
                 recordTrack->clearSyncStartEvent();
@@ -7395,6 +7396,7 @@ status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrac
                 recordTrack->clearSyncStartEvent();
                 return status;
             }
+            recordTrack->setSilenced(silenced);
         }
         // Catch up with current buffer indices if thread is already running.
         // This is what makes a new client discard all buffered data.  If the track's mRsmpInFront
@@ -8344,10 +8346,11 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         return BAD_VALUE;
     }
 
+    bool silenced = false;
     if (isOutput()) {
         ret = AudioSystem::startOutput(portId);
     } else {
-        ret = AudioSystem::startInput(portId);
+        ret = AudioSystem::startInput(portId, &silenced);
     }
 
     Mutex::Autolock _l(mLock);
@@ -8368,21 +8371,21 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         return PERMISSION_DENIED;
     }
 
+    if (isOutput()) {
+        // force volume update when a new track is added
+        mHalVolFloat = -1.0f;
+    } else if (!silenced) {
+        for (const sp<MmapTrack> &track : mActiveTracks) {
+            if (track->isSilenced_l() && track->uid() != client.clientUid)
+                track->invalidate();
+        }
+    }
+
     // Given that MmapThread::mAttr is mutable, should a MmapTrack have attributes ?
     sp<MmapTrack> track = new MmapTrack(this, mAttr, mSampleRate, mFormat, mChannelMask, mSessionId,
                                         isOutput(), client.clientUid, client.clientPid, portId);
 
-    if (isOutput()) {
-        // force volume update when a new track is added
-        mHalVolFloat = -1.0f;
-    } else if (!track->isSilenced_l()) {
-        for (const sp<MmapTrack> &t : mActiveTracks) {
-            if (t->isSilenced_l() && t->uid() != client.clientUid)
-                t->invalidate();
-        }
-    }
-
-
+    track->setSilenced_l(silenced);
     mActiveTracks.add(track);
     sp<EffectChain> chain = getEffectChain_l(mSessionId);
     if (chain != 0) {
