@@ -54,8 +54,5 @@ cc_library_shared {
             "unsigned-integer-overflow",
             "signed-integer-overflow",
         ],
-        diag: {
-            cfi: true,
-        },
     },
 }
