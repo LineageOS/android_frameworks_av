@@ -177,6 +177,19 @@ status_t CameraProviderManager::getCameraInfo(const std::string &id,
     return deviceInfo->getCameraInfo(info);
 }
 
+status_t CameraProviderManager::isSessionConfigurationSupported(const std::string& id,
+        const hardware::camera::device::V3_4::StreamConfiguration &configuration,
+        bool *status /*out*/) const {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+
+    auto deviceInfo = findDeviceInfoLocked(id);
+    if (deviceInfo == nullptr) {
+        return NAME_NOT_FOUND;
+    }
+
+    return deviceInfo->isSessionConfigurationSupported(configuration, status);
+}
+
 status_t CameraProviderManager::getCameraCharacteristics(const std::string &id,
         CameraMetadata* characteristics) const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
@@ -1379,6 +1392,43 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::getPhysicalCameraChar
 
     *characteristics = mPhysicalCameraCharacteristics.at(physicalCameraId);
     return OK;
+}
+
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::isSessionConfigurationSupported(
+        const hardware::camera::device::V3_4::StreamConfiguration &configuration,
+        bool *status /*out*/) const {
+    auto castResult = device::V3_5::ICameraDevice::castFrom(mInterface);
+    sp<hardware::camera::device::V3_5::ICameraDevice> interface_3_5 = castResult;
+    if (interface_3_5 == nullptr) {
+        return INVALID_OPERATION;
+    }
+
+    status_t res;
+    Status callStatus;
+    auto ret =  interface_3_5->isStreamCombinationSupported(configuration,
+            [&callStatus, &status] (Status s, bool combStatus) {
+                callStatus = s;
+                *status = combStatus;
+            });
+    if (ret.isOk()) {
+        switch (callStatus) {
+            case Status::OK:
+                // Expected case, do nothing.
+                res = OK;
+                break;
+            case Status::METHOD_NOT_SUPPORTED:
+                res = INVALID_OPERATION;
+                break;
+            default:
+                ALOGE("%s: Session configuration query failed: %d", __FUNCTION__, callStatus);
+                res = UNKNOWN_ERROR;
+        }
+    } else {
+        ALOGE("%s: Unexpected binder error: %s", __FUNCTION__, ret.description().c_str());
+        res = UNKNOWN_ERROR;
+    }
+
+    return res;
 }
 
 status_t CameraProviderManager::ProviderInfo::parseProviderName(const std::string& name,

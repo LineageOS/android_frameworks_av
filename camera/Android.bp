@@ -43,6 +43,7 @@ cc_library_shared {
         "ICameraRecordingProxyListener.cpp",
         "camera2/CaptureRequest.cpp",
         "camera2/OutputConfiguration.cpp",
+        "camera2/SessionConfiguration.cpp",
         "camera2/SubmitInfo.cpp",
         "CameraBase.cpp",
         "CameraUtils.cpp",
