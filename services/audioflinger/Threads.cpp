@@ -9146,7 +9146,13 @@ AudioFlinger::MmapCaptureThread::MmapCaptureThread(
 
 status_t AudioFlinger::MmapCaptureThread::exitStandby()
 {
-    mInput->stream->setGain(1.0f);
+    {
+        // mInput might have been cleared by clearInput()
+        Mutex::Autolock _l(mLock);
+        if (mInput != nullptr && mInput->stream != nullptr) {
+            mInput->stream->setGain(1.0f);
+        }
+    }
     return MmapThread::exitStandby();
 }
 
