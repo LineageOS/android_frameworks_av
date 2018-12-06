@@ -134,9 +134,6 @@ cc_library_static {
     cflags: ["-Werror"],
     sanitize: {
         cfi: true,
-        diag: {
-            cfi: true,
-        },
     },
 
 }
@@ -166,9 +163,6 @@ cc_library_shared {
             "signed-integer-overflow",
         ],
         cfi: true,
-        diag: {
-            cfi: true,
-        },
     },
 
     static_libs: ["libstagefright_amrwbenc"],

@@ -56,9 +56,6 @@ cc_library_static {
 
     sanitize: {
         cfi: true,
-        diag: {
-            cfi: true,
-        },
     },
 
 }

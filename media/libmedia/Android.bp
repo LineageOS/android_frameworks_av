@@ -110,9 +110,6 @@ cc_library_shared {
             "signed-integer-overflow",
         ],
         cfi: true,
-        diag: {
-            cfi: true,
-        },
     },
 }
 
@@ -137,9 +134,6 @@ cc_library_static {
             "signed-integer-overflow",
         ],
         cfi: true,
-        diag: {
-            cfi: true,
-        },
     },
 }
 
@@ -256,9 +250,6 @@ cc_library {
             "signed-integer-overflow",
         ],
         cfi: true,
-        diag: {
-            cfi: true,
-        },
     },
 }
 
@@ -320,8 +311,5 @@ cc_library {
             "signed-integer-overflow",
         ],
         cfi: true,
-        diag: {
-            cfi: true,
-        },
     },
 }

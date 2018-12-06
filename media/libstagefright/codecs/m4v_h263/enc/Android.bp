@@ -44,9 +44,6 @@ cc_library_static {
             "signed-integer-overflow",
         ],
         cfi: true,
-        diag: {
-            cfi: true,
-        },
     },
 }
 
@@ -92,9 +89,6 @@ cc_library_shared {
             "signed-integer-overflow",
         ],
         cfi: true,
-        diag: {
-            cfi: true,
-        },
     },
     compile_multilib: "32",
 }
@@ -122,9 +116,6 @@ cc_test {
             "signed-integer-overflow",
         ],
         cfi: true,
-        diag: {
-            cfi: true,
-        },
     },
 
     static_libs: ["libstagefright_m4vh263enc"],
