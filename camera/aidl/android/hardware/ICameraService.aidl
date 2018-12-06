@@ -162,6 +162,28 @@ interface ICameraService
      * Callers require the android.permission.CAMERA_SEND_SYSTEM_EVENTS permission.
      */
     const int EVENT_NONE = 0;
-    const int EVENT_USER_SWITCHED = 1;
+    const int EVENT_USER_SWITCHED = 1; // The argument is the set of new foreground user IDs.
     oneway void notifySystemEvent(int eventId, in int[] args);
+
+    /**
+     * Notify the camera service of a device physical status change. May only be called from
+     * a privileged process.
+     *
+     * newState is a bitfield consisting of DEVICE_STATE_* values combined together. Valid state
+     * combinations are device-specific. At device startup, the camera service will assume the device
+     * state is NORMAL until otherwise notified.
+     *
+     * Callers require the android.permission.CAMERA_SEND_SYSTEM_EVENTS permission.
+     */
+    oneway void notifyDeviceStateChange(long newState);
+
+    // Bitfield constants for notifyDeviceStateChange
+    // All bits >= 32 are for custom vendor states
+    // Written as ints since AIDL does not support long constants.
+    const int DEVICE_STATE_NORMAL = 0;
+    const int DEVICE_STATE_BACK_COVERED = 1;
+    const int DEVICE_STATE_FRONT_COVERED = 2;
+    const int DEVICE_STATE_FOLDED = 4;
+    const int DEVICE_STATE_LAST_FRAMEWORK_BIT = 0x80000000; // 1 << 31;
+
 }

@@ -154,6 +154,8 @@ public:
     virtual binder::Status    notifySystemEvent(int32_t eventId,
             const std::vector<int32_t>& args);
 
+    virtual binder::Status    notifyDeviceStateChange(int64_t newState);
+
     // OK = supports api of that version, -EOPNOTSUPP = does not support
     virtual binder::Status    supportsCameraApi(
             const String16& cameraId, int32_t apiVersion,
