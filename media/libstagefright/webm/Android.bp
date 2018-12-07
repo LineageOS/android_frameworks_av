@@ -14,9 +14,6 @@ cc_library_static {
             "unsigned-integer-overflow",
         ],
         cfi: true,
-        diag: {
-            cfi: true,
-        },
     },
 
     srcs: [
