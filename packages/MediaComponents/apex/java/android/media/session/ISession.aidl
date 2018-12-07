@@ -39,7 +39,7 @@ interface ISession {
     void destroy();
 
     // These commands are for the TransportPerformer
-    void setMetadata(in MediaMetadata metadata);
+    void setMetadata(in MediaMetadata metadata, long duration, String metadataDescription);
     void setPlaybackState(in PlaybackState state);
     //TODO(b/119750807): Resolve hidden API usage ParceledListSlice.
     //void setQueue(in ParceledListSlice queue);
