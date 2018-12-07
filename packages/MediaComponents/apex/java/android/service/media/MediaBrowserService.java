@@ -544,12 +544,8 @@ public abstract class MediaBrowserService extends Service {
             throw new IllegalStateException("This should be called inside of onGetRoot or"
                     + " onLoadChildren or onLoadItem methods");
         }
-        //TODO(b/119752205): Resolve hidden API usage. 4-param constructor of RemoteUserInfo
-        /*
         return new RemoteUserInfo(mCurConnection.pkg, mCurConnection.pid, mCurConnection.uid,
                 mCurConnection.callbacks.asBinder());
-        */
-        return new RemoteUserInfo(mCurConnection.pkg, mCurConnection.pid, mCurConnection.uid);
     }
 
     /**

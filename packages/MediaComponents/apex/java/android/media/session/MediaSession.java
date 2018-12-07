@@ -1070,12 +1070,8 @@ public final class MediaSession {
 
         private static RemoteUserInfo createRemoteUserInfo(String packageName, int pid, int uid,
                 ISessionControllerCallback caller) {
-            //TODO(b/119752205): Resolve hidden API usage. 4-param constructor of RemoteUserInfo
-            /*
             return new RemoteUserInfo(packageName, pid, uid,
                     caller != null ? caller.asBinder() : null);
-            */
-            return new RemoteUserInfo(packageName, pid, uid);
         }
 
         @Override
