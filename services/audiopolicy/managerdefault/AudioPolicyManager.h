@@ -134,7 +134,9 @@ public:
                                          audio_port_handle_t *portId);
 
         // indicates to the audio policy manager that the input starts being used.
-        virtual status_t startInput(audio_port_handle_t portId);
+        virtual status_t startInput(audio_port_handle_t portId,
+                                    bool silenced,
+                                    concurrency_type__mask_t *concurrency);
 
         // indicates to the audio policy manager that the input stops being used.
         virtual status_t stopInput(audio_port_handle_t portId);
@@ -537,6 +539,8 @@ protected:
 
         void clearAudioSources(uid_t uid);
 
+        static bool isConcurrentSource(audio_source_t source);
+
         static bool streamsMatchForvolume(audio_stream_type_t stream1,
                                           audio_stream_type_t stream2);
 
@@ -700,6 +704,10 @@ private:
                 int delayMs,
                 uid_t uid,
                 sp<AudioPatch> *patchDescPtr);
+
+        bool soundTriggerSupportsConcurrentCapture();
+        bool mSoundTriggerSupportsConcurrentCapture;
+        bool mHasComputedSoundTriggerSupportsConcurrentCapture;
 };
 
 };
