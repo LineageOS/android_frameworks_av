@@ -212,9 +212,13 @@ status_t MediaTrackCUnwrapperV3::read(MediaBufferBase **buffer, const ReadOption
         // only convert the keys we're actually expecting, as doing
         // the full convertMessageToMetadata() for every buffer is
         // too expensive
-        int64_t val;
-        if (format->mFormat->findInt64("timeUs", &val)) {
-            meta.setInt64(kKeyTime, val);
+        int64_t val64;
+        if (format->mFormat->findInt64("timeUs", &val64)) {
+            meta.setInt64(kKeyTime, val64);
+        }
+        int32_t val32;
+        if (format->mFormat->findInt32("is-sync-frame", &val32)) {
+            meta.setInt32(kKeyIsSyncFrame, val32);
         }
     } else {
         *buffer = nullptr;
