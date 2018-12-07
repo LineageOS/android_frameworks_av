@@ -20,10 +20,8 @@
 #include <media/NdkMediaError.h>
 #include <utils/Errors.h>
 
-using namespace android;
+media_status_t translate_error(android::status_t);
 
-media_status_t translate_error(status_t);
-
-status_t reverse_translate_error(media_status_t);
+android::status_t reverse_translate_error(media_status_t);
 
 #endif // _NDK_MEDIA_ERROR_PRIV_H

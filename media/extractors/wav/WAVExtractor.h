@@ -29,12 +29,12 @@ struct AMessage;
 struct CDataSource;
 class String8;
 
-class WAVExtractor : public MediaExtractorPluginHelperV2 {
+class WAVExtractor : public MediaExtractorPluginHelperV3 {
 public:
     explicit WAVExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
-    virtual MediaTrackHelperV2 *getTrack(size_t index);
+    virtual MediaTrackHelperV3 *getTrack(size_t index);
     virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
     virtual media_status_t getMetaData(AMediaFormat *meta);

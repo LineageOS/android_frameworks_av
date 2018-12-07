@@ -134,4 +134,57 @@ status_t MediaExtractorCUnwrapperV2::setMediaCas(const uint8_t* casToken, size_t
     return plugin->setMediaCas(plugin->data, casToken, size);
 }
 
+// --------------------------------------------------------------------------------
+MediaExtractorCUnwrapperV3::MediaExtractorCUnwrapperV3(CMediaExtractorV3 *plugin) {
+    this->plugin = plugin;
+}
+
+MediaExtractorCUnwrapperV3::~MediaExtractorCUnwrapperV3() {
+    plugin->free(plugin->data);
+    free(plugin);
+}
+
+size_t MediaExtractorCUnwrapperV3::countTracks() {
+    return plugin->countTracks(plugin->data);
+}
+
+MediaTrack *MediaExtractorCUnwrapperV3::getTrack(size_t index) {
+    return new MediaTrackCUnwrapperV3(plugin->getTrack(plugin->data, index));
+}
+
+status_t MediaExtractorCUnwrapperV3::getTrackMetaData(
+        MetaDataBase& meta, size_t index, uint32_t flags) {
+    sp<AMessage> msg = new AMessage();
+    AMediaFormat *format =  AMediaFormat_fromMsg(&msg);
+    media_status_t ret = plugin->getTrackMetaData(plugin->data, format, index, flags);
+    sp<MetaData> newMeta = new MetaData();
+    convertMessageToMetaData(msg, newMeta);
+    delete format;
+    meta = *newMeta;
+    return reverse_translate_error(ret);
+}
+
+status_t MediaExtractorCUnwrapperV3::getMetaData(MetaDataBase& meta) {
+    sp<AMessage> msg = new AMessage();
+    AMediaFormat *format =  AMediaFormat_fromMsg(&msg);
+    media_status_t ret = plugin->getMetaData(plugin->data, format);
+    sp<MetaData> newMeta = new MetaData();
+    convertMessageToMetaData(msg, newMeta);
+    delete format;
+    meta = *newMeta;
+    return reverse_translate_error(ret);
+}
+
+const char * MediaExtractorCUnwrapperV3::name() {
+    return plugin->name(plugin->data);
+}
+
+uint32_t MediaExtractorCUnwrapperV3::flags() const {
+    return plugin->flags(plugin->data);
+}
+
+status_t MediaExtractorCUnwrapperV3::setMediaCas(const uint8_t* casToken, size_t size) {
+    return plugin->setMediaCas(plugin->data, casToken, size);
+}
+
 }  // namespace android

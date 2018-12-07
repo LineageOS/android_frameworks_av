@@ -135,6 +135,22 @@ private:
     CMediaExtractorV2 *plugin;
 };
 
+class MediaExtractorCUnwrapperV3 : public MediaExtractorCUnwrapper {
+public:
+    explicit MediaExtractorCUnwrapperV3(CMediaExtractorV3 *plugin);
+    virtual size_t countTracks();
+    virtual MediaTrack *getTrack(size_t index);
+    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags = 0);
+    virtual status_t getMetaData(MetaDataBase& meta);
+    virtual const char * name();
+    virtual uint32_t flags() const;
+    virtual status_t setMediaCas(const uint8_t* casToken, size_t size);
+protected:
+    virtual ~MediaExtractorCUnwrapperV3();
+private:
+    CMediaExtractorV3 *plugin;
+};
+
 }  // namespace android
 
 #endif  // MEDIA_EXTRACTOR_H_

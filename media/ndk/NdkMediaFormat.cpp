@@ -327,6 +327,7 @@ EXPORT const char* AMEDIAFORMAT_KEY_IS_ADTS = "is-adts";
 EXPORT const char* AMEDIAFORMAT_KEY_IS_AUTOSELECT = "is-autoselect";
 EXPORT const char* AMEDIAFORMAT_KEY_IS_DEFAULT = "is-default";
 EXPORT const char* AMEDIAFORMAT_KEY_IS_FORCED_SUBTITLE = "is-forced-subtitle";
+EXPORT const char* AMEDIAFORMAT_KEY_IS_SYNC_FRAME = "is-sync-frame";
 EXPORT const char* AMEDIAFORMAT_KEY_I_FRAME_INTERVAL = "i-frame-interval";
 EXPORT const char* AMEDIAFORMAT_KEY_LANGUAGE = "language";
 EXPORT const char* AMEDIAFORMAT_KEY_LATENCY = "latency";
