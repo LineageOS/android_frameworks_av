@@ -179,7 +179,9 @@ public final class MediaSession {
         MediaSessionManager manager = (MediaSessionManager) context
                 .getSystemService(Context.MEDIA_SESSION_SERVICE);
         try {
-            mBinder = manager.createSession(mCbStub, tag, userId);
+            //TODO(b/119749862): Resolve hidden API usage. MediaSessioManager#createSession
+            //mBinder = manager.createSession(mCbStub, tag, userId);
+            mBinder = null;  //TODO: remove this.
             mSessionToken = new Token(mBinder.getController());
             mController = new MediaController(context, mSessionToken);
         } catch (RemoteException e) {
