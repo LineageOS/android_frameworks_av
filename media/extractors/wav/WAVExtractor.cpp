@@ -383,7 +383,6 @@ WAVSource::WAVSource(
 }
 
 WAVSource::~WAVSource() {
-    ALOGI("~WAVSource");
     if (mStarted) {
         stop();
     }
