@@ -26,6 +26,12 @@
 /* static */ android::Mutex C2PlatformStorePluginLoader::sMutex;
 /* static */ std::unique_ptr<C2PlatformStorePluginLoader> C2PlatformStorePluginLoader::sInstance;
 
+namespace /* unnamed */ {
+
+constexpr const char kStorePluginPath[] = "libc2plugin_store.so";
+
+}  // unnamed
+
 C2PlatformStorePluginLoader::C2PlatformStorePluginLoader(const char *libPath)
     : mCreateBlockPool(nullptr) {
     mLibHandle = dlopen(libPath, RTLD_NOW | RTLD_NODELETE);
@@ -89,7 +95,7 @@ const std::unique_ptr<C2PlatformStorePluginLoader>& C2PlatformStorePluginLoader:
     android::Mutex::Autolock _l(sMutex);
     if (!sInstance) {
         ALOGV("Loading library");
-        sInstance.reset(new C2PlatformStorePluginLoader("libstagefright_ccodec_ext.so"));
+        sInstance.reset(new C2PlatformStorePluginLoader(kStorePluginPath));
     }
     return sInstance;
 }

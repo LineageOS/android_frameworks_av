@@ -76,7 +76,11 @@ typedef std::array<std::shared_ptr<Codec2Client>, kNumClients> ClientList;
 
 // Convenience methods to obtain known clients.
 std::shared_ptr<Codec2Client> getClient(size_t index) {
-    return Codec2Client::CreateFromService(kClientNames[index]);
+    uint32_t serviceMask = ::android::base::GetUintProperty(
+            "debug.media.codec2", uint32_t(0));
+    return Codec2Client::CreateFromService(
+            kClientNames[index],
+            (serviceMask & (1 << index)) != 0);
 }
 
 ClientList getClientList() {
@@ -633,9 +637,13 @@ std::shared_ptr<Codec2Client> Codec2Client::CreateFromService(
             Base::tryGetService(instanceName);
     if (!baseStore) {
         if (waitForService) {
-            ALOGE("Codec2.0 service inaccessible. Check the device manifest.");
+            ALOGW("Codec2.0 service \"%s\" inaccessible. "
+                  "Check the device manifest.",
+                  instanceName);
         } else {
-            ALOGW("Codec2.0 service not available right now. Try again later.");
+            ALOGD("Codec2.0 service \"%s\" unavailable right now. "
+                  "Try again later.",
+                  instanceName);
         }
         return nullptr;
     }
