@@ -104,6 +104,7 @@ cc_library_shared {
             enabled: false,
         },
     },
+    version_script: "libmediandk.map.txt",
 }
 
 llndk_library {
