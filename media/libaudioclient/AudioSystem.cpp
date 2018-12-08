@@ -917,11 +917,11 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t *attr,
             config, flags, selectedDeviceId, portId);
 }
 
-status_t AudioSystem::startInput(audio_port_handle_t portId, bool *silenced)
+status_t AudioSystem::startInput(audio_port_handle_t portId)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
-    return aps->startInput(portId, silenced);
+    return aps->startInput(portId);
 }
 
 status_t AudioSystem::stopInput(audio_port_handle_t portId)
