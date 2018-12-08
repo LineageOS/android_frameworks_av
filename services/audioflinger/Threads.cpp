@@ -38,6 +38,7 @@
 
 #include <private/media/AudioTrackShared.h>
 #include <private/android_filesystem_config.h>
+#include <audio_utils/channels.h>
 #include <audio_utils/mono_blend.h>
 #include <audio_utils/primitives.h>
 #include <audio_utils/format.h>
@@ -751,6 +752,7 @@ String8 channelMaskToString(audio_channel_mask_t mask, bool output) {
             audio_channel_mask_get_representation(mask);
 
     switch (representation) {
+    // Travel all single bit channel mask to convert channel mask to string.
     case AUDIO_CHANNEL_REPRESENTATION_POSITION: {
         if (output) {
             if (mask & AUDIO_CHANNEL_OUT_FRONT_LEFT) s.append("front-left, ");
@@ -773,6 +775,8 @@ String8 channelMaskToString(audio_channel_mask_t mask, bool output) {
             if (mask & AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT) s.append("top-back-right, " );
             if (mask & AUDIO_CHANNEL_OUT_TOP_SIDE_LEFT) s.append("top-side-left, " );
             if (mask & AUDIO_CHANNEL_OUT_TOP_SIDE_RIGHT) s.append("top-side-right, " );
+            if (mask & AUDIO_CHANNEL_OUT_HAPTIC_B) s.append("haptic-B, " );
+            if (mask & AUDIO_CHANNEL_OUT_HAPTIC_A) s.append("haptic-A, " );
             if (mask & ~AUDIO_CHANNEL_OUT_ALL) s.append("unknown,  ");
         } else {
             if (mask & AUDIO_CHANNEL_IN_LEFT) s.append("left, ");
@@ -1845,6 +1849,10 @@ void AudioFlinger::PlaybackThread::dumpInternals(int fd, const Vector<String16>&
     dumpBase(fd, args);
 
     dprintf(fd, "  Master mute: %s\n", mMasterMute ? "on" : "off");
+    if (mHapticChannelMask != AUDIO_CHANNEL_NONE) {
+        dprintf(fd, "  Haptic channel mask: %#x (%s)\n", mHapticChannelMask,
+                channelMaskToString(mHapticChannelMask, true /* output */).c_str());
+    }
     dprintf(fd, "  Normal frame count: %zu\n", mNormalFrameCount);
     dprintf(fd, "  Last write occurred (msecs): %llu\n",
             (unsigned long long) ns2ms(systemTime() - mLastWriteTime));
@@ -1946,7 +1954,7 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
             audio_is_linear_pcm(format) &&
             // TODO: extract as a data library function that checks that a computationally
             // expensive downmixer is not required: isFastOutputChannelConversion()
-            (channelMask == mChannelMask ||
+            (channelMask == (mChannelMask | mHapticChannelMask) ||
                     mChannelMask != AUDIO_CHANNEL_OUT_STEREO ||
                     (channelMask == AUDIO_CHANNEL_OUT_MONO
                             /* && mChannelMask == AUDIO_CHANNEL_OUT_STEREO */)) &&
@@ -2348,6 +2356,17 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
                     track->sharedBuffer() != 0 ? Track::FS_FILLED : Track::FS_FILLING;
         }
 
+        // Disable all haptic playback for all other active tracks when haptic playback is supported
+        // and the track contains haptic channels. Enable haptic playback for current track.
+        // TODO: Request actual haptic playback status from vibrator service
+        if ((track->channelMask() & AUDIO_CHANNEL_HAPTIC_ALL) != AUDIO_CHANNEL_NONE
+                && mHapticChannelMask != AUDIO_CHANNEL_NONE) {
+            for (auto &t : mActiveTracks) {
+                t->setHapticPlaybackEnabled(false);
+            }
+            track->setHapticPlaybackEnabled(true);
+        }
+
         track->mResetDone = false;
         track->mPresentationCompleteFrames = 0;
         mActiveTracks.add(track);
@@ -2634,6 +2653,11 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
                 * audio_bytes_per_sample(mEffectBufferFormat);
         (void)posix_memalign(&mEffectBuffer, 32, mEffectBufferSize);
     }
+
+    mHapticChannelMask = mChannelMask & AUDIO_CHANNEL_HAPTIC_ALL;
+    mChannelMask &= ~mHapticChannelMask;
+    mHapticChannelCount = audio_channel_count_from_out_mask(mHapticChannelMask);
+    mChannelCount -= mHapticChannelCount;
 
     // force reconfiguration of effect chains and engines to take new buffer size and audio
     // parameters into account
@@ -3007,7 +3031,7 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
         // Only one effect chain can be present in direct output thread and it uses
         // the sink buffer as input
         if (mType != DIRECT) {
-            size_t numSamples = mNormalFrameCount * mChannelCount;
+            size_t numSamples = mNormalFrameCount * (mChannelCount + mHapticChannelCount);
             status_t result = mAudioFlinger->mEffectsFactoryHal->allocateBuffer(
                     numSamples * sizeof(effect_buffer_t),
                     &halInBuffer);
@@ -3506,7 +3530,17 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                 }
 
                 memcpy_by_audio_format(buffer, format, mMixerBuffer, mMixerBufferFormat,
-                        mNormalFrameCount * mChannelCount);
+                        mNormalFrameCount * (mChannelCount + mHapticChannelCount));
+
+                // If we're going directly to the sink and there are haptic channels,
+                // we should adjust channels as the sample data is partially interleaved
+                // in this case.
+                if (!mEffectBufferValid && mHapticChannelCount > 0) {
+                    adjust_channels_non_destructive(buffer, mChannelCount, buffer,
+                            mChannelCount + mHapticChannelCount,
+                            audio_bytes_per_sample(format),
+                            audio_bytes_per_frame(mChannelCount, format) * mNormalFrameCount);
+                }
             }
 
             mBytesRemaining = mCurrentWriteLength;
@@ -3550,7 +3584,15 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             }
 
             memcpy_by_audio_format(mSinkBuffer, mFormat, mEffectBuffer, mEffectBufferFormat,
-                    mNormalFrameCount * mChannelCount);
+                    mNormalFrameCount * (mChannelCount + mHapticChannelCount));
+            // The sample data is partially interleaved when haptic channels exist,
+            // we need to adjust channels here.
+            if (mHapticChannelCount > 0) {
+                adjust_channels_non_destructive(mSinkBuffer, mChannelCount, mSinkBuffer,
+                        mChannelCount + mHapticChannelCount,
+                        audio_bytes_per_sample(mFormat),
+                        audio_bytes_per_frame(mChannelCount, mFormat) * mNormalFrameCount);
+            }
         }
 
         // enable changes in effect chain
@@ -3716,6 +3758,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 // removeTracks_l() must be called with ThreadBase::mLock held
 void AudioFlinger::PlaybackThread::removeTracks_l(const Vector< sp<Track> >& tracksToRemove)
 {
+    bool enabledHapticTracksRemoved = false;
     for (const auto& track : tracksToRemove) {
         mActiveTracks.remove(track);
         ALOGV("%s(%d): removing track on session %d", __func__, track->id(), track->sessionId());
@@ -3736,6 +3779,18 @@ void AudioFlinger::PlaybackThread::removeTracks_l(const Vector< sp<Track> >& tra
         if (track->isTerminated()) {
             // remove from our tracks vector
             removeTrack_l(track);
+        }
+        enabledHapticTracksRemoved |= track->getHapticPlaybackEnabled();
+    }
+    // If the thread supports haptic playback and the track playing haptic data was removed,
+    // enable haptic playback on the first active track that contains haptic channels.
+    // TODO: Query vibrator service to know which track should enable haptic playback.
+    if (enabledHapticTracksRemoved && mHapticChannelMask != AUDIO_CHANNEL_NONE) {
+        for (auto &t : mActiveTracks) {
+            if (t->channelMask() & AUDIO_CHANNEL_HAPTIC_ALL) {
+                t->setHapticPlaybackEnabled(true);
+                break;
+            }
         }
     }
 }
@@ -3942,7 +3997,8 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
     // create an NBAIO sink for the HAL output stream, and negotiate
     mOutputSink = new AudioStreamOutSink(output->stream);
     size_t numCounterOffers = 0;
-    const NBAIO_Format offers[1] = {Format_from_SR_C(mSampleRate, mChannelCount, mFormat)};
+    const NBAIO_Format offers[1] = {Format_from_SR_C(
+            mSampleRate, mChannelCount + mHapticChannelCount, mFormat)};
 #if !LOG_NDEBUG
     ssize_t index =
 #else
@@ -3984,7 +4040,7 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
             // change our Sink format to accept our intermediate precision
             mFormat = fastMixerFormat;
             free(mSinkBuffer);
-            mFrameSize = mChannelCount * audio_bytes_per_sample(mFormat);
+            mFrameSize = audio_bytes_per_frame(mChannelCount + mHapticChannelCount, mFormat);
             const size_t sinkBufferSize = mNormalFrameCount * mFrameSize;
             (void)posix_memalign(&mSinkBuffer, 32, sinkBufferSize);
         }
@@ -4026,8 +4082,10 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
         // wrap the source side of the MonoPipe to make it an AudioBufferProvider
         fastTrack->mBufferProvider = new SourceAudioBufferProvider(new MonoPipeReader(monoPipe));
         fastTrack->mVolumeProvider = NULL;
-        fastTrack->mChannelMask = mChannelMask; // mPipeSink channel mask for audio to FastMixer
+        fastTrack->mChannelMask = mChannelMask | mHapticChannelMask; // mPipeSink channel mask for
+                                                                     // audio to FastMixer
         fastTrack->mFormat = mFormat; // mPipeSink format for audio to FastMixer
+        fastTrack->mHapticPlaybackEnabled = mHapticChannelMask != AUDIO_CHANNEL_NONE;
         fastTrack->mGeneration++;
         state->mFastTracksGen++;
         state->mTrackMask = 1;
@@ -4035,6 +4093,10 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
         state->mOutputSink = mOutputSink.get();
         state->mOutputSinkGen++;
         state->mFrameCount = mFrameCount;
+        // specify sink channel mask when haptic channel mask present as it can not
+        // be calculated directly from channel count
+        state->mSinkChannelMask = mHapticChannelMask == AUDIO_CHANNEL_NONE
+                ? AUDIO_CHANNEL_NONE : mChannelMask | mHapticChannelMask;
         state->mCommand = FastMixerState::COLD_IDLE;
         // already done in constructor initialization list
         //mFastMixerFutex = 0;
@@ -4411,6 +4473,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
         std::vector<std::pair<sp<Track>, size_t>> mUnderrunFrames;
     } deferredOperations(&mixerStatus); // implicit nested scope for variable capture
 
+    bool noFastHapticTrack = true;
     for (size_t i=0 ; i<count ; i++) {
         const sp<Track> t = mActiveTracks[i];
 
@@ -4419,6 +4482,9 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
 
         // process fast tracks
         if (track->isFastTrack()) {
+            if (track->getHapticPlaybackEnabled()) {
+                noFastHapticTrack = false;
+            }
 
             // It's theoretically possible (though unlikely) for a fast track to be created
             // and then removed within the same normal mix cycle.  This is not a problem, as
@@ -4544,6 +4610,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     fastTrack->mVolumeProvider = vp;
                     fastTrack->mChannelMask = track->mChannelMask;
                     fastTrack->mFormat = track->mFormat;
+                    fastTrack->mHapticPlaybackEnabled = track->getHapticPlaybackEnabled();
                     fastTrack->mGeneration++;
                     state->mTrackMask |= 1 << j;
                     didModify = true;
@@ -4588,6 +4655,10 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 tracksToRemove->add(track);
                 // Avoids a misleading display in dumpsys
                 track->mObservedUnderruns.mBitFields.mMostRecent = UNDERRUN_FULL;
+            }
+            if (fastTrack->mHapticPlaybackEnabled != track->getHapticPlaybackEnabled()) {
+                fastTrack->mHapticPlaybackEnabled = track->getHapticPlaybackEnabled();
+                didModify = true;
             }
             continue;
         }
@@ -4796,7 +4867,8 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
             mAudioMixer->setParameter(
                 trackId,
                 AudioMixer::TRACK,
-                AudioMixer::MIXER_CHANNEL_MASK, (void *)(uintptr_t)mChannelMask);
+                AudioMixer::MIXER_CHANNEL_MASK,
+                (void *)(uintptr_t)(mChannelMask | mHapticChannelMask));
             // limit track sample rate to 2 x output sample rate, which changes at re-configuration
             uint32_t maxSampleRate = mSampleRate * AUDIO_RESAMPLER_DOWN_RATIO_MAX;
             uint32_t reqSampleRate = track->mAudioTrackServerProxy->getSampleRate();
@@ -4857,6 +4929,10 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 trackId,
                 AudioMixer::TRACK,
                 AudioMixer::AUX_BUFFER, (void *)track->auxBuffer());
+            mAudioMixer->setParameter(
+                trackId,
+                AudioMixer::TRACK,
+                AudioMixer::HAPTIC_ENABLED, (void *)(uintptr_t)track->getHapticPlaybackEnabled());
 
             // reset retry count
             track->mRetryCount = kMaxTrackRetries;
@@ -4922,6 +4998,17 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
 
         }   // local variable scope to avoid goto warning
 
+    }
+
+    if (mHapticChannelMask != AUDIO_CHANNEL_NONE && sq != NULL) {
+        // When there is no fast track playing haptic and FastMixer exists,
+        // enabling the first FastTrack, which provides mixed data from normal
+        // tracks, to play haptic data.
+        FastTrack *fastTrack = &state->mFastTracks[0];
+        if (fastTrack->mHapticPlaybackEnabled != noFastHapticTrack) {
+            fastTrack->mHapticPlaybackEnabled = noFastHapticTrack;
+            didModify = true;
+        }
     }
 
     // Push the new FastMixer state if necessary

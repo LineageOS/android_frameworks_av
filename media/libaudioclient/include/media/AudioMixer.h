@@ -78,6 +78,8 @@ public:
         DOWNMIX_TYPE    = 0X4004,
         MIXER_FORMAT    = 0x4005, // AUDIO_FORMAT_PCM_(FLOAT|16_BIT)
         MIXER_CHANNEL_MASK = 0x4006, // Channel mask for mixer output
+        // for haptic
+        HAPTIC_ENABLED  = 0x4007, // Set haptic data from this track should be played or not.
         // for target RESAMPLE
         SAMPLE_RATE     = 0x4100, // Configure sample rate conversion on this track name;
                                   // parameter 'value' is the new sample rate in Hz.
@@ -329,6 +331,7 @@ private:
          * 7) mTimestretchBufferProvider: Adds timestretching for playback rate
          */
         AudioBufferProvider*     mInputBufferProvider;    // externally provided buffer provider.
+        // TODO: combine AdjustChannelsBufferProvider and AdjustChannelsNonDestructiveBufferProvider
         std::unique_ptr<PassthruBufferProvider> mAdjustChannelsBufferProvider;
         std::unique_ptr<PassthruBufferProvider> mAdjustChannelsNonDestructiveBufferProvider;
         std::unique_ptr<PassthruBufferProvider> mReformatBufferProvider;
@@ -360,6 +363,11 @@ private:
         AudioPlaybackRate    mPlaybackRate;
 
         // Haptic
+        bool                 mHapticPlaybackEnabled;
+        audio_channel_mask_t mHapticChannelMask;
+        uint32_t             mHapticChannelCount;
+        audio_channel_mask_t mMixerHapticChannelMask;
+        uint32_t             mMixerHapticChannelCount;
         uint32_t             mAdjustInChannelCount;
         uint32_t             mAdjustOutChannelCount;
         uint32_t             mAdjustNonDestructiveInChannelCount;
