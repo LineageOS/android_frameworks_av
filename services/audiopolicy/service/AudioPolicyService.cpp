@@ -350,23 +350,26 @@ void AudioPolicyService::updateUidStates_l()
 {
 //    Go over all active clients and allow capture (does not force silence) in the
 //    following cases:
-//    - The client is the assistant AND
-//           an accessibility service is on TOP AND the source is VOICE_RECOGNITION or HOTWORD
-//           OR
-//           is on TOP AND uses VOICE_RECOGNITION
-//               OR uses HOTWORD AND there is no privacy sensitive active capture
-//    - The client is an accessibility service AND
-//           is on TOP AND the source is VOICE_RECOGNITION or HOTWORD
-//    - Any other client AND
-//           The assistant is not on TOP AND
-//           is on TOP OR latest started AND
-//              there is no privacy sensitive active capture
+//    The client is the assistant
+//        AND an accessibility service is on TOP
+//               AND the source is VOICE_RECOGNITION or HOTWORD
+//        OR uses VOICE_RECOGNITION AND is on TOP OR latest started
+//               OR uses HOTWORD
+//            AND there is no privacy sensitive active capture
+//    OR The client is an accessibility service
+//        AND is on TOP OR latest started
+//        AND the source is VOICE_RECOGNITION or HOTWORD
+//    OR Any other client
+//        AND The assistant is not on TOP
+//        AND is on TOP OR latest started
+//        AND there is no privacy sensitive active capture
 //TODO: mamanage pre processing effects according to use case priority
 
     sp<AudioRecordClient> topActive;
     sp<AudioRecordClient> latestActive;
-    nsecs_t latestStartNs = 0;
     sp<AudioRecordClient> latestSensitiveActive;
+    nsecs_t topStartNs = 0;
+    nsecs_t latestStartNs = 0;
     nsecs_t latestSensitiveStartNs = 0;
     bool isA11yOnTop = mUidPolicy->isA11yOnTop();
     bool isAssistantOnTop = false;
@@ -383,8 +386,10 @@ void AudioPolicyService::updateUidStates_l()
             isSensitiveActive = true;
         }
         if (mUidPolicy->getUidState(current->uid) == ActivityManager::PROCESS_STATE_TOP) {
-            topActive = current;
-            latestActive = nullptr;
+            if (current->startTimeNs > topStartNs) {
+                topActive = current;
+                topStartNs = current->startTimeNs;
+            }
             if (mUidPolicy->isAssistantUid(current->uid)) {
                 isAssistantOnTop = true;
             }
@@ -399,12 +404,16 @@ void AudioPolicyService::updateUidStates_l()
         return;
     }
 
+    if (topActive != nullptr) {
+        latestActive = nullptr;
+    }
+
     for (size_t i =0; i < mAudioRecordClients.size(); i++) {
         sp<AudioRecordClient> current = mAudioRecordClients[i];
         if (!current->active) continue;
 
         audio_source_t source = current->attributes.source;
-        bool isOnTop = mUidPolicy->getUidState(current->uid) == ActivityManager::PROCESS_STATE_TOP;
+        bool isOnTop = current == topActive;
         bool isLatest = current == latestActive;
         bool isLatestSensitive = current == latestSensitiveActive;
         bool forceIdle = true;
@@ -414,18 +423,18 @@ void AudioPolicyService::updateUidStates_l()
                     forceIdle = false;
                 }
             } else {
-                if (((isOnTop && source == AUDIO_SOURCE_VOICE_RECOGNITION) ||
+                if ((((isOnTop || isLatest) && source == AUDIO_SOURCE_VOICE_RECOGNITION) ||
                      source == AUDIO_SOURCE_HOTWORD) && !isSensitiveActive) {
                     forceIdle = false;
                 }
             }
         } else if (mUidPolicy->isA11yUid(current->uid)) {
-            if (isOnTop &&
+            if ((isOnTop || isLatest) &&
                 (source == AUDIO_SOURCE_VOICE_RECOGNITION || source == AUDIO_SOURCE_HOTWORD)) {
                 forceIdle = false;
             }
         } else {
-            if (!isAssistantOnTop && (isOnTop || (topActive == nullptr && isLatest)) &&
+            if (!isAssistantOnTop && (isOnTop || isLatest) &&
                 (!isSensitiveActive || isLatestSensitive)) {
                 forceIdle = false;
             }
