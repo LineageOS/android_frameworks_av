@@ -401,6 +401,7 @@ void FLACParser::errorCallback(FLAC__StreamDecoderErrorStatus status)
 
 // Copy samples from FLAC native 32-bit non-interleaved to 16-bit signed
 // or 32-bit float interleaved.
+// TODO: Consider moving to audio_utils.
 // These are candidates for optimization if needed.
 static void copyTo16Signed(
         short *dst,
@@ -408,10 +409,19 @@ static void copyTo16Signed(
         unsigned nSamples,
         unsigned nChannels,
         unsigned bitsPerSample) {
-    const unsigned leftShift = 16 - bitsPerSample;
-    for (unsigned i = 0; i < nSamples; ++i) {
-        for (unsigned c = 0; c < nChannels; ++c) {
-            *dst++ = src[c][i] << leftShift;
+    const int leftShift = 16 - (int)bitsPerSample; // cast to int to prevent unsigned overflow.
+    if (leftShift >= 0) {
+        for (unsigned i = 0; i < nSamples; ++i) {
+            for (unsigned c = 0; c < nChannels; ++c) {
+                *dst++ = src[c][i] << leftShift;
+            }
+        }
+    } else {
+        const int rightShift = -leftShift;
+        for (unsigned i = 0; i < nSamples; ++i) {
+            for (unsigned c = 0; c < nChannels; ++c) {
+                *dst++ = src[c][i] >> rightShift;
+            }
         }
     }
 }
@@ -514,8 +524,10 @@ status_t FLACParser::init()
         case 8:
         case 16:
         case 24:
+        case 32: // generally not expected for FLAC
             break;
         default:
+            // Note: internally the FLAC extractor supports 2-32 bits.
             ALOGE("unsupported bits per sample %u", getBitsPerSample());
             return NO_INIT;
         }
@@ -532,8 +544,11 @@ status_t FLACParser::init()
         case 48000:
         case 88200:
         case 96000:
+        case 176400:
+        case 192000:
             break;
         default:
+            // Note: internally we support arbitrary sample rates from 8kHz to 192kHz.
             ALOGE("unsupported sample rate %u", getSampleRate());
             return NO_INIT;
         }

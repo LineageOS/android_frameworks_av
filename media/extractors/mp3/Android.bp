@@ -12,14 +12,13 @@ cc_library_shared {
 
     shared_libs: [
         "liblog",
-        "libmediaextractor",
         "libmediandk",
-        "libstagefright_foundation",
     ],
 
     static_libs: [
         "libutils",
         "libstagefright_id3",
+        "libstagefright_foundation",
     ],
 
     name: "libmp3extractor",
@@ -40,9 +39,6 @@ cc_library_shared {
             "unsigned-integer-overflow",
             "signed-integer-overflow",
         ],
-        diag: {
-            cfi: true,
-        },
     },
 
 }

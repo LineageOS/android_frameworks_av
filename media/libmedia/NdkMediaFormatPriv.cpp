@@ -19,27 +19,22 @@
 
 #include <inttypes.h>
 
-//#include <ndk/include/media/NdkMediaFormat.h>
-
 #include <utils/Log.h>
 #include <utils/StrongPointer.h>
 #include <media/NdkMediaFormatPriv.h>
-#include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
-//#include <android_runtime/AndroidRuntime.h>
-//#include <android_util_Binder.h>
 
 #include <jni.h>
 
 using namespace android;
 
-extern "C" {
+namespace android {
 
 // private functions for conversion to/from AMessage
-AMediaFormat* AMediaFormat_fromMsg(const void* data) {
+AMediaFormat* AMediaFormat_fromMsg(sp<AMessage> *data) {
     ALOGV("private ctor");
     AMediaFormat* mData = new AMediaFormat();
-    mData->mFormat = *((sp<AMessage>*)data);
+    mData->mFormat = *data;
     if (mData->mFormat == NULL) {
         ALOGW("got NULL format");
         mData->mFormat = new AMessage;
@@ -47,10 +42,10 @@ AMediaFormat* AMediaFormat_fromMsg(const void* data) {
     return mData;
 }
 
-void AMediaFormat_getFormat(const AMediaFormat* mData, void* dest) {
-    *((sp<AMessage>*)dest) = mData->mFormat;
+void AMediaFormat_getFormat(const AMediaFormat* mData, sp<AMessage> *dest) {
+    *dest = mData->mFormat;
 }
 
-} // extern "C"
+} // namespace android
 
 

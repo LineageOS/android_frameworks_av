@@ -663,12 +663,11 @@ status_t Camera3OutputStream::getEndpointUsage(uint64_t *usage) const {
     return res;
 }
 
-status_t Camera3OutputStream::getEndpointUsageForSurface(uint64_t *usage,
-        const sp<Surface>& surface) const {
-    status_t res;
-    uint64_t u = 0;
+void Camera3OutputStream::applyZSLUsageQuirk(int format, uint64_t *consumerUsage /*inout*/) {
+    if (consumerUsage == nullptr) {
+        return;
+    }
 
-    res = native_window_get_consumer_usage(static_cast<ANativeWindow*>(surface.get()), &u);
     // If an opaque output stream's endpoint is ImageReader, add
     // GRALLOC_USAGE_HW_CAMERA_ZSL to the usage so HAL knows it will be used
     // for the ZSL use case.
@@ -677,12 +676,20 @@ status_t Camera3OutputStream::getEndpointUsageForSurface(uint64_t *usage,
     //     2. GRALLOC_USAGE_HW_RENDER
     //     3. GRALLOC_USAGE_HW_COMPOSER
     //     4. GRALLOC_USAGE_HW_VIDEO_ENCODER
-    if (camera3_stream::format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED &&
-            (u & (GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_RENDER |
+    if (format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED &&
+            (*consumerUsage & (GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_RENDER |
             GRALLOC_USAGE_HW_COMPOSER | GRALLOC_USAGE_HW_VIDEO_ENCODER)) == 0) {
-        u |= GRALLOC_USAGE_HW_CAMERA_ZSL;
+        *consumerUsage |= GRALLOC_USAGE_HW_CAMERA_ZSL;
     }
+}
 
+status_t Camera3OutputStream::getEndpointUsageForSurface(uint64_t *usage,
+        const sp<Surface>& surface) const {
+    status_t res;
+    uint64_t u = 0;
+
+    res = native_window_get_consumer_usage(static_cast<ANativeWindow*>(surface.get()), &u);
+    applyZSLUsageQuirk(camera3_stream::format, &u);
     *usage = u;
     return res;
 }

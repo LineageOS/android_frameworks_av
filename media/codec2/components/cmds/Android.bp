@@ -33,8 +33,5 @@ cc_binary {
             "unsigned-integer-overflow",
             "signed-integer-overflow",
         ],
-        diag: {
-            cfi: true,
-        },
     },
 }

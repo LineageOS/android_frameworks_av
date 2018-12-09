@@ -754,8 +754,8 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
         const camera_metadata_t *params_metadata = params.getAndLock();
         utils::convertToHidl(params_metadata, &hidlParams);
         params.unlock(params_metadata);
-        remoteRet = mRemote->endConfigure(StreamConfigurationMode::NORMAL_MODE, hidlParams);
     }
+    remoteRet = mRemote->endConfigure(StreamConfigurationMode::NORMAL_MODE, hidlParams);
     if (!remoteRet.isOk()) {
         ALOGE("Transaction error: endConfigure failed %s", remoteRet.description().c_str());
     }

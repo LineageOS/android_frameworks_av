@@ -18,6 +18,10 @@
 
 #define MEDIA_BUFFER_BASE_H_
 
+#include <media/MediaExtractorPluginApi.h>
+#include <media/stagefright/foundation/AMessage.h>
+#include <media/NdkMediaFormatPriv.h>
+
 namespace android {
 
 class MediaBufferBase;
@@ -77,6 +81,48 @@ public:
     virtual int remoteRefcount() const = 0;
 
     virtual ~MediaBufferBase() {};
+
+    CMediaBufferV3 *wrap() {
+        if (mWrapper) {
+            return mWrapper;
+        }
+        mWrapper = new CMediaBufferV3;
+        mWrapper->handle = this;
+
+        mWrapper->release = [](void *handle) -> void {
+            ((MediaBufferBase*)handle)->release();
+        };
+
+        mWrapper->data = [](void *handle) -> void * {
+            return ((MediaBufferBase*)handle)->data();
+        };
+
+        mWrapper->size = [](void *handle) -> size_t {
+            return ((MediaBufferBase*)handle)->size();
+        };
+
+        mWrapper->set_range = [](void *handle, size_t offset, size_t length) -> void {
+            return ((MediaBufferBase*)handle)->set_range(offset, length);
+        };
+
+        mWrapper->meta_data = [](void *handle) -> AMediaFormat* {
+            if (((MediaBufferBase*)handle)->mFormat == nullptr) {
+                sp<AMessage> msg = new AMessage();
+                ((MediaBufferBase*)handle)->mFormat = AMediaFormat_fromMsg(&msg);
+            }
+            return ((MediaBufferBase*)handle)->mFormat;
+        };
+
+        return mWrapper;
+    }
+protected:
+    MediaBufferBase() {
+        mWrapper = nullptr;
+        mFormat = nullptr;
+    }
+private:
+    CMediaBufferV3 *mWrapper;
+    AMediaFormat *mFormat;
 };
 
 }  // namespace android

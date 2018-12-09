@@ -22,7 +22,7 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/DataSourceBase.h>
 #include <media/IDataSource.h>
-#include <media/MediaExtractorPluginHelper.h>
+#include <media/MediaExtractorPluginApi.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 #include <utils/threads.h>

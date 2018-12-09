@@ -27,6 +27,7 @@
 #ifndef _NDK_MEDIA_FORMAT_PRIV_H
 #define _NDK_MEDIA_FORMAT_PRIV_H
 
+#include <utils/KeyedVector.h>
 #include <utils/String8.h>
 #include <utils/StrongPointer.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -35,20 +36,22 @@
 extern "C" {
 #endif
 
-using namespace android;
-
 struct AMediaFormat {
-    sp<AMessage> mFormat;
-    String8 mDebug;
-    KeyedVector<String8, String8> mStringCache;
+    android::sp<android::AMessage> mFormat;
+    android::String8 mDebug;
+    android::KeyedVector<android::String8, android::String8> mStringCache;
 };
-
-AMediaFormat* AMediaFormat_fromMsg(const void*);
-void AMediaFormat_getFormat(const AMediaFormat* mData, void* dest);
 
 #ifdef __cplusplus
 } // extern "C"
 #endif
+
+namespace android {
+
+AMediaFormat* AMediaFormat_fromMsg(sp<AMessage> *);
+void AMediaFormat_getFormat(const AMediaFormat* mData, sp<AMessage> *dest);
+
+} // namespace android
 
 #endif // _NDK_MEDIA_FORMAT_PRIV_H
 

@@ -18,6 +18,7 @@
 #define LOG_TAG "StagefrightPluginLoader"
 #include <utils/Log.h>
 
+#include <android-base/properties.h>
 #include <dlfcn.h>
 
 #include "StagefrightPluginLoader.h"
@@ -27,9 +28,19 @@ namespace android {
 /* static */ Mutex StagefrightPluginLoader::sMutex;
 /* static */ std::unique_ptr<StagefrightPluginLoader> StagefrightPluginLoader::sInstance;
 
+namespace /* unnamed */ {
+
+constexpr const char kCCodecPluginPath[] = "libsfplugin_ccodec.so";
+
+}  // unnamed namespace
+
 StagefrightPluginLoader::StagefrightPluginLoader(const char *libPath)
     : mCreateCodec(nullptr),
       mCreateBuilder(nullptr) {
+    if (android::base::GetIntProperty("debug.media.codec2", 0) == 0) {
+        ALOGD("CCodec is disabled.");
+        return;
+    }
     mLibHandle = dlopen(libPath, RTLD_NOW | RTLD_NODELETE);
     if (mLibHandle == nullptr) {
         ALOGD("Failed to load library: %s (%s)", libPath, dlerror());
@@ -87,7 +98,7 @@ const std::unique_ptr<StagefrightPluginLoader> &StagefrightPluginLoader::GetCCod
     Mutex::Autolock _l(sMutex);
     if (!sInstance) {
         ALOGV("Loading library");
-        sInstance.reset(new StagefrightPluginLoader("libstagefright_ccodec.so"));
+        sInstance.reset(new StagefrightPluginLoader(kCCodecPluginPath));
     }
     return sInstance;
 }

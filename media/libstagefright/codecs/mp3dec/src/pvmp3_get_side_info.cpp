@@ -127,13 +127,13 @@ ERROR_CODE pvmp3_get_side_info(tmp3Bits    *inputStream,
         {
             tmp = getbits_crc(inputStream, 14, crc, info->error_protection);
             si->main_data_begin = (tmp << 18) >> 23;    /* 9 */
-            si->private_bits    = (tmp << 23) >> 27;    /* 5 */
+            si->private_bits    = (tmp << 27) >> 27;    /* 5 */
         }
         else
         {
             tmp = getbits_crc(inputStream, 12, crc, info->error_protection);
             si->main_data_begin = (tmp << 20) >> 23;    /* 9 */
-            si->private_bits    = (tmp << 23) >> 29;    /* 3 */
+            si->private_bits    = (tmp << 29) >> 29;    /* 3 */
 
         }
 

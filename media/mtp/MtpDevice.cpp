@@ -516,7 +516,7 @@ MtpObjectHandle MtpDevice::sendObjectInfo(MtpObjectInfo* info) {
     return (MtpObjectHandle)-1;
 }
 
-bool MtpDevice::sendObject(MtpObjectHandle handle, int size, int srcFD) {
+bool MtpDevice::sendObject(MtpObjectHandle handle, uint32_t size, int srcFD) {
     std::lock_guard<std::mutex> lg(mMutex);
 
     if (mLastSendObjectInfoTransactionID + 1 != mTransactionID ||
@@ -529,7 +529,7 @@ bool MtpDevice::sendObject(MtpObjectHandle handle, int size, int srcFD) {
     if (sendRequest(MTP_OPERATION_SEND_OBJECT)) {
         mData.setOperationCode(mRequest.getOperationCode());
         mData.setTransactionID(mRequest.getTransactionID());
-        const int writeResult = mData.write(mRequestOut, mPacketDivisionMode, srcFD, size);
+        const int64_t writeResult = mData.write(mRequestOut, mPacketDivisionMode, srcFD, size);
         const MtpResponseCode ret = readResponse();
         return ret == MTP_RESPONSE_OK && writeResult > 0;
     }

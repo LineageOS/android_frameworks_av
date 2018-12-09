@@ -36,6 +36,7 @@
 
 #include <inttypes.h>
 #include <math.h>
+#include <unordered_set>
 #include <vector>
 
 #include <AudioPolicyManagerInterface.h>
@@ -4228,7 +4229,7 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                     mpClientInterface->setParameters(output, String8(param));
                     free(param);
                 }
-                updateAudioProfiles(device, output, profile->getAudioProfiles());
+                updateAudioProfiles(devDesc, output, profile->getAudioProfiles());
                 if (!profile->hasValidAudioProfile()) {
                     ALOGW("checkOutputsForDevice() missing param");
                     desc->close();
@@ -4436,7 +4437,7 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
                     mpClientInterface->setParameters(input, String8(param));
                     free(param);
                 }
-                updateAudioProfiles(device, input, profile->getAudioProfiles());
+                updateAudioProfiles(devDesc, input, profile->getAudioProfiles());
                 if (!profile->hasValidAudioProfile()) {
                     ALOGW("checkInputsForDevice() direct input missing param");
                     desc->close();
@@ -5789,117 +5790,65 @@ void AudioPolicyManager::cleanUpForDevice(const sp<DeviceDescriptor>& deviceDesc
     }
 }
 
-// Modify the list of surround sound formats supported.
-void AudioPolicyManager::filterSurroundFormats(FormatVector *formatsPtr) {
-    FormatVector &formats = *formatsPtr;
-    // TODO Set this based on Config properties.
-    const bool alwaysForceAC3 = true;
+void AudioPolicyManager::modifySurroundFormats(
+        const sp<DeviceDescriptor>& devDesc, FormatVector *formatsPtr) {
+    // Use a set because FormatVector is unsorted.
+    std::unordered_set<audio_format_t> enforcedSurround(
+            devDesc->encodedFormats().begin(), devDesc->encodedFormats().end());
 
     audio_policy_forced_cfg_t forceUse = mEngine->getForceUse(
             AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND);
     ALOGD("%s: forced use = %d", __FUNCTION__, forceUse);
 
+    std::unordered_set<audio_format_t> formatSet;
+    if (forceUse == AUDIO_POLICY_FORCE_ENCODED_SURROUND_MANUAL
+            || forceUse == AUDIO_POLICY_FORCE_ENCODED_SURROUND_NEVER) {
+        // Only copy non-surround formats to formatSet.
+        for (auto formatIter = formatsPtr->begin(); formatIter != formatsPtr->end(); ++formatIter) {
+            if (mConfig.getSurroundFormats().count(*formatIter) == 0 &&
+                    enforcedSurround.count(*formatIter) == 0) {
+                formatSet.insert(*formatIter);
+            }
+        }
+    } else {
+        formatSet.insert(formatsPtr->begin(), formatsPtr->end());
+    }
+    formatsPtr->clear();  // Re-filled from the formatSet in the end.
+
     // If MANUAL, keep the supported surround sound formats as current enabled ones.
     if (forceUse == AUDIO_POLICY_FORCE_ENCODED_SURROUND_MANUAL) {
-        formats.clear();
-        for (auto it = mSurroundFormats.begin(); it != mSurroundFormats.end(); it++) {
-            formats.add(*it);
+        formatSet.insert(mSurroundFormats.begin(), mSurroundFormats.end());
+        // Enable IEC61937 when in MANUAL mode if it's enforced for this device.
+        if (enforcedSurround.count(AUDIO_FORMAT_IEC61937) != 0) {
+            formatSet.insert(AUDIO_FORMAT_IEC61937);
         }
-        // Always enable IEC61937 when in MANUAL mode.
-        formats.add(AUDIO_FORMAT_IEC61937);
     } else { // NEVER, AUTO or ALWAYS
-        // Analyze original support for various formats.
-        bool supportsAC3 = false;
-        bool supportsOtherSurround = false;
-        bool supportsIEC61937 = false;
         mSurroundFormats.clear();
-        for (ssize_t formatIndex = 0; formatIndex < (ssize_t)formats.size(); formatIndex++) {
-            audio_format_t format = formats[formatIndex];
-            switch (format) {
-                case AUDIO_FORMAT_AC3:
-                    supportsAC3 = true;
-                    break;
-                case AUDIO_FORMAT_E_AC3:
-                case AUDIO_FORMAT_DTS:
-                case AUDIO_FORMAT_DTS_HD:
-                    // If ALWAYS, remove all other surround formats here
-                    // since we will add them later.
-                    if (forceUse == AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS) {
-                        formats.removeAt(formatIndex);
-                        formatIndex--;
-                    }
-                    supportsOtherSurround = true;
-                    break;
-                case AUDIO_FORMAT_IEC61937:
-                    supportsIEC61937 = true;
-                    break;
-                default:
-                    break;
-            }
-        }
-
         // Modify formats based on surround preferences.
-        // If NEVER, remove support for surround formats.
-        if (forceUse == AUDIO_POLICY_FORCE_ENCODED_SURROUND_NEVER) {
-            if (supportsAC3 || supportsOtherSurround || supportsIEC61937) {
-                // Remove surround sound related formats.
-                for (size_t formatIndex = 0; formatIndex < formats.size(); ) {
-                    audio_format_t format = formats[formatIndex];
-                    switch(format) {
-                        case AUDIO_FORMAT_AC3:
-                        case AUDIO_FORMAT_E_AC3:
-                        case AUDIO_FORMAT_DTS:
-                        case AUDIO_FORMAT_DTS_HD:
-                        case AUDIO_FORMAT_IEC61937:
-                            formats.removeAt(formatIndex);
-                            break;
-                        default:
-                            formatIndex++; // keep it
-                            break;
-                    }
-                }
-                supportsAC3 = false;
-                supportsOtherSurround = false;
-                supportsIEC61937 = false;
-            }
-        } else { // AUTO or ALWAYS
-            // Most TVs support AC3 even if they do not report it in the EDID.
-            if ((alwaysForceAC3 || (forceUse == AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS))
-                    && !supportsAC3) {
-                formats.add(AUDIO_FORMAT_AC3);
-                supportsAC3 = true;
-            }
-
+        if (forceUse != AUDIO_POLICY_FORCE_ENCODED_SURROUND_NEVER) { // AUTO or ALWAYS
             // If ALWAYS, add support for raw surround formats if all are missing.
             // This assumes that if any of these formats are reported by the HAL
             // then the report is valid and should not be modified.
             if (forceUse == AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS) {
-                formats.add(AUDIO_FORMAT_E_AC3);
-                formats.add(AUDIO_FORMAT_DTS);
-                formats.add(AUDIO_FORMAT_DTS_HD);
-                supportsOtherSurround = true;
+                for (const auto& format : mConfig.getSurroundFormats()) {
+                    formatSet.insert(format.first);
+                }
             }
+            formatSet.insert(enforcedSurround.begin(), enforcedSurround.end());
 
-            // Add support for IEC61937 if any raw surround supported.
-            // The HAL could do this but add it here, just in case.
-            if ((supportsAC3 || supportsOtherSurround) && !supportsIEC61937) {
-                formats.add(AUDIO_FORMAT_IEC61937);
-                supportsIEC61937 = true;
-            }
-
-            // Add reported surround sound formats to enabled surround formats.
-            for (size_t formatIndex = 0; formatIndex < formats.size(); formatIndex++) {
-                audio_format_t format = formats[formatIndex];
+            for (const auto& format : formatSet) {
                 if (mConfig.getSurroundFormats().count(format) != 0) {
                     mSurroundFormats.insert(format);
                 }
             }
         }
     }
+    for (const auto& format : formatSet) {
+        formatsPtr->push(format);
+    }
 }
 
-// Modify the list of channel masks supported.
-void AudioPolicyManager::filterSurroundChannelMasks(ChannelsVector *channelMasksPtr) {
+void AudioPolicyManager::modifySurroundChannelMasks(ChannelsVector *channelMasksPtr) {
     ChannelsVector &channelMasks = *channelMasksPtr;
     audio_policy_forced_cfg_t forceUse = mEngine->getForceUse(
             AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND);
@@ -5934,11 +5883,12 @@ void AudioPolicyManager::filterSurroundChannelMasks(ChannelsVector *channelMasks
     }
 }
 
-void AudioPolicyManager::updateAudioProfiles(audio_devices_t device,
+void AudioPolicyManager::updateAudioProfiles(const sp<DeviceDescriptor>& devDesc,
                                              audio_io_handle_t ioHandle,
                                              AudioProfileVector &profiles)
 {
     String8 reply;
+    audio_devices_t device = devDesc->type();
 
     // Format MUST be checked first to update the list of AudioProfile
     if (profiles.hasDynamicFormat()) {
@@ -5953,7 +5903,7 @@ void AudioPolicyManager::updateAudioProfiles(audio_devices_t device,
         }
         FormatVector formats = formatsFromString(reply.string());
         if (device == AUDIO_DEVICE_OUT_HDMI) {
-            filterSurroundFormats(&formats);
+            modifySurroundFormats(devDesc, &formats);
         }
         profiles.setFormats(formats);
     }
@@ -5986,7 +5936,7 @@ void AudioPolicyManager::updateAudioProfiles(audio_devices_t device,
                     String8(AudioParameter::keyStreamSupportedChannels), reply) == NO_ERROR) {
                 channelMasks = channelMasksFromString(reply.string());
                 if (device == AUDIO_DEVICE_OUT_HDMI) {
-                    filterSurroundChannelMasks(&channelMasks);
+                    modifySurroundChannelMasks(&channelMasks);
                 }
             }
         }

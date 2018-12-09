@@ -104,6 +104,7 @@ cc_library_shared {
             enabled: false,
         },
     },
+    version_script: "libmediandk.map.txt",
 }
 
 llndk_library {
@@ -149,9 +150,6 @@ cc_library {
             "signed-integer-overflow",
         ],
         cfi: true,
-        diag: {
-            cfi: true,
-        },
     },
 }
 

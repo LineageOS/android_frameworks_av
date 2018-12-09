@@ -20,6 +20,7 @@
 #include <android/hardware/camera2/BnCameraDeviceUser.h>
 #include <android/hardware/camera2/ICameraDeviceCallbacks.h>
 #include <camera/camera2/OutputConfiguration.h>
+#include <camera/camera2/SessionConfiguration.h>
 #include <camera/camera2/SubmitInfo.h>
 
 #include "CameraService.h"
@@ -88,6 +89,12 @@ public:
 
     virtual binder::Status endConfigure(int operatingMode,
             const hardware::camera2::impl::CameraMetadataNative& sessionParams) override;
+
+    // Verify specific session configuration.
+    virtual binder::Status isSessionConfigurationSupported(
+            const SessionConfiguration& sessionConfiguration,
+            /*out*/
+            bool* streamStatus) override;
 
     // Returns -EBUSY if device is not idle or in error state
     virtual binder::Status deleteStream(int streamId) override;
@@ -230,6 +237,13 @@ private:
 
     /** Utility members */
     binder::Status checkPidStatus(const char* checkLocation);
+    binder::Status checkOperatingModeLocked(int operatingMode) const;
+    binder::Status checkPhysicalCameraIdLocked(String8 physicalCameraId);
+    binder::Status checkSurfaceTypeLocked(size_t numBufferProducers, bool deferredConsumer,
+            int surfaceType) const;
+    static void mapStreamInfo(const OutputStreamInfo &streamInfo,
+            camera3_stream_rotation_t rotation, String8 physicalId,
+            hardware::camera::device::V3_4::Stream *stream /*out*/);
     bool enforceRequestPermissions(CameraMetadata& metadata);
 
     // Find the square of the euclidean distance between two points
@@ -300,7 +314,7 @@ private:
     // stream ID -> outputStreamInfo mapping
     std::unordered_map<int32_t, OutputStreamInfo> mStreamInfoMap;
 
-    static const int32_t MAX_SURFACES_PER_STREAM = 2;
+    static const int32_t MAX_SURFACES_PER_STREAM = 4;
     sp<CameraProviderManager> mProviderManager;
 };
 

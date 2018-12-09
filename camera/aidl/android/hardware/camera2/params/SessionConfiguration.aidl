@@ -14,14 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef _NDK_MEDIA_ERROR_PRIV_H
-#define _NDK_MEDIA_ERROR_PRIV_H
+package android.hardware.camera2.params;
 
-#include <media/NdkMediaError.h>
-#include <utils/Errors.h>
-
-media_status_t translate_error(android::status_t);
-
-android::status_t reverse_translate_error(media_status_t);
-
-#endif // _NDK_MEDIA_ERROR_PRIV_H
+/** @hide */
+parcelable SessionConfiguration cpp_header "camera/camera2/SessionConfiguration.h";

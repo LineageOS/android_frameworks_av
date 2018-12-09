@@ -104,7 +104,7 @@ public:
     MtpObjectInfo*          getObjectInfo(MtpObjectHandle handle);
     void*                   getThumbnail(MtpObjectHandle handle, int& outLength);
     MtpObjectHandle         sendObjectInfo(MtpObjectInfo* info);
-    bool                    sendObject(MtpObjectHandle handle, int size, int srcFD);
+    bool                    sendObject(MtpObjectHandle handle, uint32_t size, int srcFD);
     bool                    deleteObject(MtpObjectHandle handle);
     MtpObjectHandle         getParent(MtpObjectHandle handle);
     MtpStorageID            getStorageID(MtpObjectHandle handle);

@@ -72,7 +72,6 @@ public:
             ALOGE("BpAAudioService::client transact(OPEN_STREAM) readInt %d", err);
             return AAudioConvert_androidToAAudioResult(err);
         } else if (stream < 0) {
-            ALOGE("BpAAudioService::client OPEN_STREAM passed stream %d", stream);
             return stream;
         }
         err = configurationOutput.readFromParcel(&reply);

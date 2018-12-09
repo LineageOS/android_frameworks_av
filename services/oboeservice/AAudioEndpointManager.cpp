@@ -172,7 +172,7 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openExclusiveEndpoint(
 
         aaudio_result_t result = endpoint->open(request);
         if (result != AAUDIO_OK) {
-            ALOGE("openExclusiveEndpoint(), open failed");
+            ALOGV("openExclusiveEndpoint(), open failed");
             endpoint.clear();
         } else {
             mExclusiveStreams.push_back(endpointMMap);
