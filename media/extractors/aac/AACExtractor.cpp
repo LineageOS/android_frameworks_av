@@ -31,7 +31,7 @@
 
 namespace android {
 
-class AACSource : public MediaTrackHelperV2 {
+class AACSource : public MediaTrackHelperV3 {
 public:
     AACSource(
             DataSourceHelper *source,
@@ -45,7 +45,7 @@ public:
     virtual media_status_t getFormat(AMediaFormat*);
 
     virtual media_status_t read(
-            MediaBufferBase **buffer, const ReadOptions *options = NULL);
+            MediaBufferHelperV3 **buffer, const ReadOptions *options = NULL);
 
 protected:
     virtual ~AACSource();
@@ -58,7 +58,6 @@ private:
     off64_t mOffset;
     int64_t mCurrentTimeUs;
     bool mStarted;
-    MediaBufferGroup *mGroup;
 
     Vector<uint64_t> mOffsetVector;
     int64_t mFrameDurationUs;
@@ -196,7 +195,7 @@ size_t AACExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrackHelperV2 *AACExtractor::getTrack(size_t index) {
+MediaTrackHelperV3 *AACExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index != 0) {
         return NULL;
     }
@@ -227,7 +226,6 @@ AACSource::AACSource(
       mOffset(0),
       mCurrentTimeUs(0),
       mStarted(false),
-      mGroup(NULL),
       mOffsetVector(offset_vector),
       mFrameDurationUs(frame_duration_us) {
 }
@@ -248,8 +246,7 @@ media_status_t AACSource::start() {
     }
 
     mCurrentTimeUs = 0;
-    mGroup = new MediaBufferGroup;
-    mGroup->add_buffer(MediaBufferBase::Create(kMaxFrameSize));
+    mBufferGroup->add_buffer(kMaxFrameSize);
     mStarted = true;
 
     return AMEDIA_OK;
@@ -257,9 +254,6 @@ media_status_t AACSource::start() {
 
 media_status_t AACSource::stop() {
     CHECK(mStarted);
-
-    delete mGroup;
-    mGroup = NULL;
 
     mStarted = false;
     return AMEDIA_OK;
@@ -270,7 +264,7 @@ media_status_t AACSource::getFormat(AMediaFormat *meta) {
 }
 
 media_status_t AACSource::read(
-        MediaBufferBase **out, const ReadOptions *options) {
+        MediaBufferHelperV3 **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t seekTimeUs;
@@ -293,8 +287,8 @@ media_status_t AACSource::read(
         return AMEDIA_ERROR_END_OF_STREAM;
     }
 
-    MediaBufferBase *buffer;
-    status_t err = mGroup->acquire_buffer(&buffer);
+    MediaBufferHelperV3 *buffer;
+    status_t err = mBufferGroup->acquire_buffer(&buffer);
     if (err != OK) {
         return AMEDIA_ERROR_UNKNOWN;
     }
@@ -309,8 +303,9 @@ media_status_t AACSource::read(
     }
 
     buffer->set_range(0, frameSizeWithoutHeader);
-    buffer->meta_data().setInt64(kKeyTime, mCurrentTimeUs);
-    buffer->meta_data().setInt32(kKeyIsSyncFrame, 1);
+    AMediaFormat *meta = buffer->meta_data();
+    AMediaFormat_setInt64(meta, AMEDIAFORMAT_KEY_TIME_US, mCurrentTimeUs);
+    AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, 1);
 
     mOffset += frameSize;
     mCurrentTimeUs += mFrameDurationUs;
@@ -321,14 +316,14 @@ media_status_t AACSource::read(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static CMediaExtractorV2* CreateExtractor(
+static CMediaExtractorV3* CreateExtractor(
         CDataSource *source,
         void *meta) {
     off64_t offset = *static_cast<off64_t*>(meta);
-    return wrapV2(new AACExtractor(new DataSourceHelper(source), offset));
+    return wrapV3(new AACExtractor(new DataSourceHelper(source), offset));
 }
 
-static CreatorFuncV2 Sniff(
+static CreatorFuncV3 Sniff(
         CDataSource *source, float *confidence, void **meta,
         FreeMetaFunc *freeMeta) {
     off64_t pos = 0;
@@ -388,11 +383,11 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION_CURRENT,
+        EXTRACTORDEF_VERSION_CURRENT + 1,
         UUID("4fd80eae-03d2-4d72-9eb9-48fa6bb54613"),
         1, // version
         "AAC Extractor",
-        { .v2 = Sniff }
+        { .v3 = Sniff }
     };
 }
 
