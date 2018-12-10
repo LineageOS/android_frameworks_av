@@ -36,7 +36,6 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MetaDataUtils.h>
-#include <media/stagefright/MediaBufferBase.h>
 #include <private/android_filesystem_config.h> // for AID_MEDIA
 #include <system/audio.h>
 
@@ -53,7 +52,7 @@ static inline bool shouldExtractorOutputFloat(int bitsPerSample)
 
 class FLACParser;
 
-class FLACSource : public MediaTrackHelperV2 {
+class FLACSource : public MediaTrackHelperV3 {
 
 public:
     FLACSource(
@@ -66,7 +65,7 @@ public:
     virtual media_status_t getFormat(AMediaFormat *meta);
 
     virtual media_status_t read(
-            MediaBufferBase **buffer, const ReadOptions *options = NULL);
+            MediaBufferHelperV3 **buffer, const ReadOptions *options = NULL);
 
 protected:
     virtual ~FLACSource();
@@ -125,12 +124,12 @@ public:
     }
 
     // media buffers
-    void allocateBuffers();
+    void allocateBuffers(MediaBufferGroupHelperV3 *group);
     void releaseBuffers();
-    MediaBufferBase *readBuffer() {
+    MediaBufferHelperV3 *readBuffer() {
         return readBuffer(false, 0LL);
     }
-    MediaBufferBase *readBuffer(FLAC__uint64 sample) {
+    MediaBufferHelperV3 *readBuffer(FLAC__uint64 sample) {
         return readBuffer(true, sample);
     }
 
@@ -143,7 +142,7 @@ private:
 
     // media buffers
     size_t mMaxBufferSize;
-    MediaBufferGroup *mGroup;
+    MediaBufferGroupHelperV3 *mGroup;
     void (*mCopy)(int16_t *dst, const int * src[kMaxChannels], unsigned nSamples, unsigned nChannels);
 
     // handle to underlying libFLAC parser
@@ -167,7 +166,7 @@ private:
     FLAC__StreamDecoderErrorStatus mErrorStatus;
 
     status_t init();
-    MediaBufferBase *readBuffer(bool doSeek, FLAC__uint64 sample);
+    MediaBufferHelperV3 *readBuffer(bool doSeek, FLAC__uint64 sample);
 
     // no copy constructor or assignment
     FLACParser(const FLACParser &);
@@ -577,12 +576,12 @@ status_t FLACParser::init()
     return OK;
 }
 
-void FLACParser::allocateBuffers()
+void FLACParser::allocateBuffers(MediaBufferGroupHelperV3 *group)
 {
     CHECK(mGroup == NULL);
-    mGroup = new MediaBufferGroup;
+    mGroup = group;
     mMaxBufferSize = getMaxBlockSize() * getChannels() * getOutputSampleSize();
-    mGroup->add_buffer(MediaBufferBase::Create(mMaxBufferSize));
+    mGroup->add_buffer(mMaxBufferSize);
 }
 
 void FLACParser::releaseBuffers()
@@ -592,7 +591,7 @@ void FLACParser::releaseBuffers()
     mGroup = NULL;
 }
 
-MediaBufferBase *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
+MediaBufferHelperV3 *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
 {
     mWriteRequested = true;
     mWriteCompleted = false;
@@ -629,7 +628,7 @@ MediaBufferBase *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
     }
     // acquire a media buffer
     CHECK(mGroup != NULL);
-    MediaBufferBase *buffer;
+    MediaBufferHelperV3 *buffer;
     status_t err = mGroup->acquire_buffer(&buffer);
     if (err != OK) {
         return NULL;
@@ -656,8 +655,9 @@ MediaBufferBase *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
     CHECK(mWriteHeader.number_type == FLAC__FRAME_NUMBER_TYPE_SAMPLE_NUMBER);
     FLAC__uint64 sampleNumber = mWriteHeader.number.sample_number;
     int64_t timeUs = (1000000LL * sampleNumber) / getSampleRate();
-    buffer->meta_data().setInt64(kKeyTime, timeUs);
-    buffer->meta_data().setInt32(kKeyIsSyncFrame, 1);
+    AMediaFormat *meta = buffer->meta_data();
+    AMediaFormat_setInt64(meta, AMEDIAFORMAT_KEY_TIME_US, timeUs);
+    AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, 1);
     return buffer;
 }
 
@@ -691,7 +691,7 @@ media_status_t FLACSource::start()
     ALOGV("FLACSource::start");
 
     CHECK(!mStarted);
-    mParser->allocateBuffers();
+    mParser->allocateBuffers(mBufferGroup);
     mStarted = true;
 
     return AMEDIA_OK;
@@ -719,9 +719,9 @@ media_status_t FLACSource::getFormat(AMediaFormat *meta)
 }
 
 media_status_t FLACSource::read(
-        MediaBufferBase **outBuffer, const ReadOptions *options)
+        MediaBufferHelperV3 **outBuffer, const ReadOptions *options)
 {
-    MediaBufferBase *buffer;
+    MediaBufferHelperV3 *buffer;
     // process an optional seek request
     int64_t seekTimeUs;
     ReadOptions::SeekMode mode;
@@ -775,7 +775,7 @@ size_t FLACExtractor::countTracks()
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrackHelperV2 *FLACExtractor::getTrack(size_t index)
+MediaTrackHelperV3 *FLACExtractor::getTrack(size_t index)
 {
     if (mInitCheck != OK || index > 0) {
         return NULL;
@@ -831,22 +831,22 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-            EXTRACTORDEF_VERSION_CURRENT,
+            EXTRACTORDEF_VERSION_CURRENT + 1,
             UUID("1364b048-cc45-4fda-9934-327d0ebf9829"),
             1,
             "FLAC Extractor",
             {
-                .v2 = [](
+                .v3 = [](
                         CDataSource *source,
                         float *confidence,
                         void **,
-                        FreeMetaFunc *) -> CreatorFuncV2 {
+                        FreeMetaFunc *) -> CreatorFuncV3 {
                     DataSourceHelper helper(source);
                     if (SniffFLAC(&helper, confidence)) {
                         return [](
                                 CDataSource *source,
-                                void *) -> CMediaExtractorV2* {
-                            return wrapV2(new FLACExtractor(new DataSourceHelper(source)));};
+                                void *) -> CMediaExtractorV3* {
+                            return wrapV3(new FLACExtractor(new DataSourceHelper(source)));};
                     }
                     return NULL;
                 }
