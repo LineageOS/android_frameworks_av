@@ -18,6 +18,7 @@
 #define ANDROID_SERVERS_CAMERA_CAMERAPROVIDER_H
 
 #include <vector>
+#include <unordered_map>
 #include <unordered_set>
 #include <string>
 #include <mutex>
@@ -111,6 +112,14 @@ public:
     };
 
     /**
+     * Represents the mode a camera device is currently in
+     */
+    enum class DeviceMode {
+        TORCH,
+        CAMERA
+    };
+
+    /**
      * Initialize the manager and give it a status listener; optionally accepts a service
      * interaction proxy.
      *
@@ -182,7 +191,7 @@ public:
     /**
      * Check if a given camera device support setTorchMode API.
      */
-    bool supportSetTorchMode(const std::string &id);
+    bool supportSetTorchMode(const std::string &id) const;
 
     /**
      * Turn on or off the flashlight on a given camera device.
@@ -211,6 +220,17 @@ public:
             const sp<hardware::camera::device::V1_0::ICameraDeviceCallback>& callback,
             /*out*/
             sp<hardware::camera::device::V1_0::ICameraDevice> *session);
+
+    /**
+     * Save the ICameraProvider while it is being used by a camera or torch client
+     */
+    void saveRef(DeviceMode usageType, const std::string &cameraId,
+            sp<hardware::camera::provider::V2_4::ICameraProvider> provider);
+
+    /**
+     * Notify that the camera or torch is no longer being used by a camera client
+     */
+    void removeRef(DeviceMode usageType, const std::string &cameraId);
 
     /**
      * IServiceNotification::onRegistration
@@ -259,20 +279,43 @@ private:
 
     static HardwareServiceInteractionProxy sHardwareServiceInteractionProxy;
 
+    // Mapping from CameraDevice IDs to CameraProviders. This map is used to keep the
+    // ICameraProvider alive while it is in use by the camera with the given ID for camera
+    // capabilities
+    std::unordered_map<std::string, sp<hardware::camera::provider::V2_4::ICameraProvider>>
+            mCameraProviderByCameraId;
+
+    // Mapping from CameraDevice IDs to CameraProviders. This map is used to keep the
+    // ICameraProvider alive while it is in use by the camera with the given ID for torch
+    // capabilities
+    std::unordered_map<std::string, sp<hardware::camera::provider::V2_4::ICameraProvider>>
+            mTorchProviderByCameraId;
+
+    // Lock for accessing mCameraProviderByCameraId and mTorchProviderByCameraId
+    std::mutex mProviderInterfaceMapLock;
+
     struct ProviderInfo :
             virtual public hardware::camera::provider::V2_4::ICameraProviderCallback,
             virtual public hardware::hidl_death_recipient
     {
         const std::string mProviderName;
-        const sp<hardware::camera::provider::V2_4::ICameraProvider> mInterface;
         const metadata_vendor_id_t mProviderTagid;
+        sp<VendorTagDescriptor> mVendorTagDescriptor;
+        bool mSetTorchModeSupported;
+        bool mIsRemote;
+
+        // This pointer is used to keep a reference to the ICameraProvider that was last accessed.
+        wp<hardware::camera::provider::V2_4::ICameraProvider> mActiveInterface;
+
+        sp<hardware::camera::provider::V2_4::ICameraProvider> mSavedInterface;
 
         ProviderInfo(const std::string &providerName,
-                sp<hardware::camera::provider::V2_4::ICameraProvider>& interface,
                 CameraProviderManager *manager);
         ~ProviderInfo();
 
-        status_t initialize();
+        status_t initialize(sp<hardware::camera::provider::V2_4::ICameraProvider>& interface);
+
+        const sp<hardware::camera::provider::V2_4::ICameraProvider> startProviderInterface();
 
         const std::string& getType() const;
 
@@ -294,6 +337,11 @@ private:
         // hidl_death_recipient interface - this locks the parent mInterfaceMutex
         virtual void serviceDied(uint64_t cookie, const wp<hidl::base::V1_0::IBase>& who) override;
 
+        /**
+         * Setup vendor tags for this provider
+         */
+        status_t setUpVendorTags();
+
         // Basic device information, common to all camera devices
         struct DeviceInfo {
             const std::string mName;  // Full instance name
@@ -302,16 +350,20 @@ private:
             const metadata_vendor_id_t mProviderTagid;
             bool mIsLogicalCamera;
             std::vector<std::string> mPhysicalIds;
+            hardware::CameraInfo mInfo;
+            sp<IBase> mSavedInterface;
 
             const hardware::camera::common::V1_0::CameraResourceCost mResourceCost;
 
             hardware::camera::common::V1_0::CameraDeviceStatus mStatus;
 
+            sp<ProviderInfo> mParentProvider;
+
             bool hasFlashUnit() const { return mHasFlashUnit; }
             virtual status_t setTorchMode(bool enabled) = 0;
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const = 0;
             virtual bool isAPI1Compatible() const = 0;
-            virtual status_t dumpState(int fd) const = 0;
+            virtual status_t dumpState(int fd) = 0;
             virtual status_t getCameraCharacteristics(CameraMetadata *characteristics) const {
                 (void) characteristics;
                 return INVALID_OPERATION;
@@ -325,19 +377,23 @@ private:
 
             virtual status_t isSessionConfigurationSupported(
                     const hardware::camera::device::V3_4::StreamConfiguration &/*configuration*/,
-                    bool * /*status*/)
-                    const {
+                    bool * /*status*/) {
                 return INVALID_OPERATION;
             }
+
+            template<class InterfaceT>
+            sp<InterfaceT> startDeviceInterface();
 
             DeviceInfo(const std::string& name, const metadata_vendor_id_t tagId,
                     const std::string &id, const hardware::hidl_version& version,
                     const std::vector<std::string>& publicCameraIds,
-                    const hardware::camera::common::V1_0::CameraResourceCost& resourceCost) :
+                    const hardware::camera::common::V1_0::CameraResourceCost& resourceCost,
+                    sp<ProviderInfo> parentProvider) :
                     mName(name), mId(id), mVersion(version), mProviderTagid(tagId),
                     mIsLogicalCamera(false), mResourceCost(resourceCost),
                     mStatus(hardware::camera::common::V1_0::CameraDeviceStatus::PRESENT),
-                    mHasFlashUnit(false), mPublicCameraIds(publicCameraIds) {}
+                    mParentProvider(parentProvider), mHasFlashUnit(false),
+                    mPublicCameraIds(publicCameraIds) {}
             virtual ~DeviceInfo();
         protected:
             bool mHasFlashUnit;
@@ -345,6 +401,14 @@ private:
 
             template<class InterfaceT>
             static status_t setTorchMode(InterfaceT& interface, bool enabled);
+
+            template<class InterfaceT>
+            status_t setTorchModeForDevice(bool enabled) {
+                // Don't save the ICameraProvider interface here because we assume that this was
+                // called from CameraProviderManager::setTorchMode(), which does save it.
+                const sp<InterfaceT> interface = startDeviceInterface<InterfaceT>();
+                return DeviceInfo::setTorchMode(interface, enabled);
+            }
         };
         std::vector<std::unique_ptr<DeviceInfo>> mDevices;
         std::unordered_set<std::string> mUniqueCameraIds;
@@ -360,32 +424,32 @@ private:
         // HALv1-specific camera fields, including the actual device interface
         struct DeviceInfo1 : public DeviceInfo {
             typedef hardware::camera::device::V1_0::ICameraDevice InterfaceT;
-            const sp<InterfaceT> mInterface;
 
             virtual status_t setTorchMode(bool enabled) override;
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const override;
             //In case of Device1Info assume that we are always API1 compatible
             virtual bool isAPI1Compatible() const override { return true; }
-            virtual status_t dumpState(int fd) const override;
+            virtual status_t dumpState(int fd) override;
             DeviceInfo1(const std::string& name, const metadata_vendor_id_t tagId,
                     const std::string &id, uint16_t minorVersion,
                     const hardware::camera::common::V1_0::CameraResourceCost& resourceCost,
+                    sp<ProviderInfo> parentProvider,
                     const std::vector<std::string>& publicCameraIds,
                     sp<InterfaceT> interface);
             virtual ~DeviceInfo1();
         private:
             CameraParameters2 mDefaultParameters;
+            status_t cacheCameraInfo(sp<InterfaceT> interface);
         };
 
         // HALv3-specific camera fields, including the actual device interface
         struct DeviceInfo3 : public DeviceInfo {
             typedef hardware::camera::device::V3_2::ICameraDevice InterfaceT;
-            const sp<InterfaceT> mInterface;
 
             virtual status_t setTorchMode(bool enabled) override;
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const override;
             virtual bool isAPI1Compatible() const override;
-            virtual status_t dumpState(int fd) const override;
+            virtual status_t dumpState(int fd) override;
             virtual status_t getCameraCharacteristics(
                     CameraMetadata *characteristics) const override;
             virtual status_t getPhysicalCameraCharacteristics(const std::string& physicalCameraId,
@@ -393,11 +457,12 @@ private:
             virtual status_t isSessionConfigurationSupported(
                     const hardware::camera::device::V3_4::StreamConfiguration &configuration,
                     bool *status /*out*/)
-                    const override;
+                    override;
 
             DeviceInfo3(const std::string& name, const metadata_vendor_id_t tagId,
                     const std::string &id, uint16_t minorVersion,
                     const hardware::camera::common::V1_0::CameraResourceCost& resourceCost,
+                    sp<ProviderInfo> parentProvider,
                     const std::vector<std::string>& publicCameraIds, sp<InterfaceT> interface);
             virtual ~DeviceInfo3();
         private:
@@ -424,11 +489,11 @@ private:
         template<class DeviceInfoT>
         std::unique_ptr<DeviceInfo> initializeDeviceInfo(const std::string &name,
                 const metadata_vendor_id_t tagId, const std::string &id,
-                uint16_t minorVersion) const;
+                uint16_t minorVersion);
 
         // Helper for initializeDeviceInfo to use the right CameraProvider get method.
         template<class InterfaceT>
-        sp<InterfaceT> getDeviceInterface(const std::string &name) const;
+        sp<InterfaceT> startDeviceInterface(const std::string &name);
 
         // Parse provider instance name for type and id
         static status_t parseProviderName(const std::string& name,
@@ -461,6 +526,14 @@ private:
     bool isValidDeviceLocked(const std::string &id, uint16_t majorVersion) const;
 
     std::vector<sp<ProviderInfo>> mProviders;
+
+    void addProviderToMap(
+            const std::string &cameraId,
+            sp<hardware::camera::provider::V2_4::ICameraProvider> provider,
+            bool isTorchUsage);
+    void removeCameraIdFromMap(
+        std::unordered_map<std::string, sp<hardware::camera::provider::V2_4::ICameraProvider>> &map,
+        const std::string &cameraId);
 
     static const char* deviceStatusToString(
         const hardware::camera::common::V1_0::CameraDeviceStatus&);

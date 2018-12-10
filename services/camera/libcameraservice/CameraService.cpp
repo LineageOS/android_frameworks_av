@@ -2215,6 +2215,8 @@ binder::Status CameraService::BasicClient::disconnect() {
     sCameraService->removeByClient(this);
     sCameraService->logDisconnected(mCameraIdStr, mClientPid,
             String8(mClientPackageName));
+    sCameraService->mCameraProviderManager->removeRef(CameraProviderManager::DeviceMode::CAMERA,
+            mCameraIdStr.c_str());
 
     sp<IBinder> remote = getRemote();
     if (remote != nullptr) {
