@@ -121,6 +121,8 @@ private:
     ATSParser *mParser;
     unsigned mProgramNumber;
     unsigned mProgramMapPID;
+    uint32_t mPMTVersion;
+    uint32_t mPMT_CRC;
     KeyedVector<unsigned, sp<Stream> > mStreams;
     bool mFirstPTSValid;
     uint64_t mFirstPTS;
@@ -143,6 +145,9 @@ struct ATSParser::Stream : public RefBase {
     unsigned typeExt() const { return mStreamTypeExt; }
     unsigned pid() const { return mElementaryPID; }
     void setPID(unsigned pid) { mElementaryPID = pid; }
+    void setAudioPresentations(AudioPresentationCollection audioPresentations) {
+        mAudioPresentations = audioPresentations;
+    }
 
     void setCasInfo(
             int32_t systemId,
@@ -293,6 +298,8 @@ ATSParser::Program::Program(
     : mParser(parser),
       mProgramNumber(programNumber),
       mProgramMapPID(programMapPID),
+      mPMTVersion(0xffffffff),
+      mPMT_CRC(0xffffffff),
       mFirstPTSValid(false),
       mFirstPTS(0),
       mLastRecoveredPTS(lastRecoveredPTS) {
@@ -480,7 +487,13 @@ status_t ATSParser::Program::parseProgramMap(ABitReader *br) {
 
     MY_LOGV("  program_number = %u", br->getBits(16));
     MY_LOGV("  reserved = %u", br->getBits(2));
-    MY_LOGV("  version_number = %u", br->getBits(5));
+    bool audioPresentationsChanged = false;
+    unsigned pmtVersion = br->getBits(5);
+    if (pmtVersion != mPMTVersion) {
+        audioPresentationsChanged = true;
+        mPMTVersion = pmtVersion;
+    }
+    MY_LOGV("  version_number = %u", pmtVersion);
     MY_LOGV("  current_next_indicator = %u", br->getBits(1));
     MY_LOGV("  section_number = %u", br->getBits(8));
     MY_LOGV("  last_section_number = %u", br->getBits(8));
@@ -661,7 +674,12 @@ status_t ATSParser::Program::parseProgramMap(ABitReader *br) {
     if (infoBytesRemaining != 0) {
         ALOGW("Section data remains unconsumed");
     }
-    MY_LOGV("  CRC = 0x%08x", br->getBits(32));
+    unsigned crc = br->getBits(32);
+    if (crc != mPMT_CRC) {
+        audioPresentationsChanged = true;
+        mPMT_CRC = crc;
+    }
+    MY_LOGV("  CRC = 0x%08x", crc);
 
     bool PIDsChanged = false;
     for (size_t i = 0; i < infos.size(); ++i) {
@@ -721,6 +739,10 @@ status_t ATSParser::Program::parseProgramMap(ABitReader *br) {
 
             isAddingScrambledStream |= info.mCADescriptor.mSystemID >= 0;
             mStreams.add(info.mPID, stream);
+        }
+        else if (index >= 0 && mStreams.editValueAt(index)->isAudio()
+                 && audioPresentationsChanged) {
+            mStreams.editValueAt(index)->setAudioPresentations(info.mAudioPresentations);
         }
     }
 
@@ -1732,6 +1754,7 @@ void ATSParser::Stream::onPayloadData(
                 mSource->setFormat(mQueue->getFormat());
             }
             mSource->queueAccessUnit(accessUnit);
+            mSource->convertAudioPresentationInfoToMetadata(mAudioPresentations);
         }
 
         // Every access unit has a pesStartOffset queued in |mPesStartOffsets|.
