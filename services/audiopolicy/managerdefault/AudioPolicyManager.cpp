@@ -2327,7 +2327,7 @@ status_t AudioPolicyManager::setStreamVolumeIndex(audio_stream_type_t stream,
     status_t status = NO_ERROR;
     for (size_t i = 0; i < mOutputs.size(); i++) {
         sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
-        audio_devices_t curDevice = Volume::getDeviceForVolume(desc->device());
+        audio_devices_t curDevice = desc->device();
         for (int curStream = 0; curStream < AUDIO_STREAM_FOR_POLICY_CNT; curStream++) {
             if (!(streamsMatchForvolume(stream, (audio_stream_type_t)curStream))) {
                 continue;
@@ -2345,7 +2345,7 @@ status_t AudioPolicyManager::setStreamVolumeIndex(audio_stream_type_t stream,
             bool applyVolume;
             if (device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) {
                 curStreamDevice |= device;
-                applyVolume = (curDevice & curStreamDevice) != 0;
+                applyVolume = (Volume::getDeviceForVolume(curDevice) & curStreamDevice) != 0;
             } else {
                 applyVolume = !mVolumeCurves->hasVolumeIndexForDevice(
                         stream, curStreamDevice);
