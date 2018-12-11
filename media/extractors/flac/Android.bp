@@ -10,7 +10,6 @@ cc_library_shared {
     shared_libs: [
         "libbinder_ndk",
         "liblog",
-        "libmediaextractor",
         "libmediandk",
     ],
 
