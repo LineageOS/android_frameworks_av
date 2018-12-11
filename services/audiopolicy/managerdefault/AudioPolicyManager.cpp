@@ -1889,7 +1889,38 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
     }
 
     if (!profile->canOpenNewIo()) {
-        return AUDIO_IO_HANDLE_NONE;
+        for (size_t i = 0; i < mInputs.size(); ) {
+            sp <AudioInputDescriptor> desc = mInputs.valueAt(i);
+            if (desc->mProfile != profile) {
+                continue;
+            }
+            // if sound trigger, reuse input if used by other sound trigger on same session
+            // else
+            //    reuse input if active client app is not in IDLE state
+            //
+            RecordClientVector clients = desc->clientsList();
+            bool doClose = false;
+            for (const auto& client : clients) {
+                if (isSoundTrigger != client->isSoundTrigger()) {
+                    continue;
+                }
+                if (client->isSoundTrigger()) {
+                    if (session == client->session()) {
+                        return desc->mIoHandle;
+                    }
+                    continue;
+                }
+                if (client->active() && client->appState() != APP_STATE_IDLE) {
+                    return desc->mIoHandle;
+                }
+                doClose = true;
+            }
+            if (doClose) {
+                closeInput(desc->mIoHandle);
+            } else {
+                i++;
+            }
+        }
     }
 
     sp<AudioInputDescriptor> inputDesc = new AudioInputDescriptor(profile, mpClientInterface);
@@ -1930,55 +1961,8 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
     return input;
 }
 
-//static
-bool AudioPolicyManager::isConcurrentSource(audio_source_t source)
+status_t AudioPolicyManager::startInput(audio_port_handle_t portId)
 {
-    return (source == AUDIO_SOURCE_HOTWORD) ||
-            (source == AUDIO_SOURCE_VOICE_RECOGNITION) ||
-            (source == AUDIO_SOURCE_FM_TUNER);
-}
-
-// FIXME: remove when concurrent capture is ready. This is a hack to work around bug b/63083537.
-bool AudioPolicyManager::soundTriggerSupportsConcurrentCapture() {
-    if (!mHasComputedSoundTriggerSupportsConcurrentCapture) {
-        bool soundTriggerSupportsConcurrentCapture = false;
-        unsigned int numModules = 0;
-        struct sound_trigger_module_descriptor* nModules = NULL;
-
-        status_t status = SoundTrigger::listModules(nModules, &numModules);
-        if (status == NO_ERROR && numModules != 0) {
-            nModules = (struct sound_trigger_module_descriptor*) calloc(
-                    numModules, sizeof(struct sound_trigger_module_descriptor));
-            if (nModules == NULL) {
-              // We failed to malloc the buffer, so just say no for now, and hope that we have more
-              // ram the next time this function is called.
-              ALOGE("Failed to allocate buffer for module descriptors");
-              return false;
-            }
-
-            status = SoundTrigger::listModules(nModules, &numModules);
-            if (status == NO_ERROR) {
-                soundTriggerSupportsConcurrentCapture = true;
-                for (size_t i = 0; i < numModules; ++i) {
-                    soundTriggerSupportsConcurrentCapture &=
-                            nModules[i].properties.concurrent_capture;
-                }
-            }
-            free(nModules);
-        }
-        mSoundTriggerSupportsConcurrentCapture = soundTriggerSupportsConcurrentCapture;
-        mHasComputedSoundTriggerSupportsConcurrentCapture = true;
-    }
-    return mSoundTriggerSupportsConcurrentCapture;
-}
-
-
-status_t AudioPolicyManager::startInput(audio_port_handle_t portId,
-                                        bool silenced,
-                                        concurrency_type__mask_t *concurrency)
-{
-    *concurrency = API_INPUT_CONCURRENCY_NONE;
-
     ALOGV("%s portId %d", __FUNCTION__, portId);
 
     sp<AudioInputDescriptor> inputDesc = mInputs.getInputForClient(portId);
@@ -1995,106 +1979,16 @@ status_t AudioPolicyManager::startInput(audio_port_handle_t portId,
 
     audio_session_t session = client->session();
 
-    ALOGV("%s input:%d, session:%d, silenced:%d, concurrency:%d)",
-        __FUNCTION__, input, session, silenced, *concurrency);
+    ALOGV("%s input:%d, session:%d)", __FUNCTION__, input, session);
 
-    if (!is_virtual_input_device(inputDesc->mDevice)) {
-        if (mCallTxPatch != 0 &&
-            inputDesc->getModuleHandle() == mCallTxPatch->mPatch.sources[0].ext.device.hw_module) {
-            ALOGW("startInput(%d) failed: call in progress", input);
-            *concurrency |= API_INPUT_CONCURRENCY_CALL;
-            return INVALID_OPERATION;
-        }
+    Vector<sp<AudioInputDescriptor>> activeInputs = mInputs.getActiveInputs();
 
-        Vector<sp<AudioInputDescriptor>> activeInputs = mInputs.getActiveInputs();
-
-        // If a UID is idle and records silence and another not silenced recording starts
-        // from another UID (idle or active) we stop the current idle UID recording in
-        // favor of the new one - "There can be only one" TM
-        if (!silenced) {
-            for (const auto& activeDesc : activeInputs) {
-                if ((activeDesc->getAudioPort()->getFlags() & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0 &&
-                        activeDesc->getId() == inputDesc->getId()) {
-                     continue;
-                }
-
-                RecordClientVector activeClients = activeDesc->clientsList(true /*activeOnly*/);
-                for (const auto& activeClient : activeClients) {
-                    if (activeClient->isSilenced()) {
-                        closeClient(activeClient->portId());
-                        ALOGV("%s client %d stopping silenced client %d", __FUNCTION__,
-                              portId, activeClient->portId());
-                        activeInputs = mInputs.getActiveInputs();
-                    }
-                }
-            }
-        }
-
-        for (const auto& activeDesc : activeInputs) {
-            if ((client->flags() & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0 &&
-                    activeDesc->getId() == inputDesc->getId()) {
-                continue;
-            }
-
-            audio_source_t activeSource = activeDesc->inputSource(true);
-            if (client->source() == AUDIO_SOURCE_HOTWORD) {
-                if (activeSource == AUDIO_SOURCE_HOTWORD) {
-                    if (activeDesc->hasPreemptedSession(session)) {
-                        ALOGW("%s input %d failed for HOTWORD: "
-                                "other input %d already started for HOTWORD", __FUNCTION__,
-                              input, activeDesc->mIoHandle);
-                        *concurrency |= API_INPUT_CONCURRENCY_HOTWORD;
-                        return INVALID_OPERATION;
-                    }
-                } else {
-                    ALOGV("%s input %d failed for HOTWORD: other input %d already started",
-                        __FUNCTION__, input, activeDesc->mIoHandle);
-                    *concurrency |= API_INPUT_CONCURRENCY_CAPTURE;
-                    return INVALID_OPERATION;
-                }
-            } else {
-                if (activeSource != AUDIO_SOURCE_HOTWORD) {
-                    ALOGW("%s input %d failed: other input %d already started", __FUNCTION__,
-                          input, activeDesc->mIoHandle);
-                    *concurrency |= API_INPUT_CONCURRENCY_CAPTURE;
-                    return INVALID_OPERATION;
-                }
-            }
-        }
-
-        // We only need to check if the sound trigger session supports concurrent capture if the
-        // input is also a sound trigger input. Otherwise, we should preempt any hotword stream
-        // that's running.
-        const bool allowConcurrentWithSoundTrigger =
-            inputDesc->isSoundTrigger() ? soundTriggerSupportsConcurrentCapture() : false;
-
-        // if capture is allowed, preempt currently active HOTWORD captures
-        for (const auto& activeDesc : activeInputs) {
-            if (allowConcurrentWithSoundTrigger && activeDesc->isSoundTrigger()) {
-                continue;
-            }
-            RecordClientVector activeHotwordClients =
-                activeDesc->clientsList(true, AUDIO_SOURCE_HOTWORD);
-            if (activeHotwordClients.size() > 0) {
-                SortedVector<audio_session_t> sessions = activeDesc->getPreemptedSessions();
-
-                for (const auto& activeClient : activeHotwordClients) {
-                    *concurrency |= API_INPUT_CONCURRENCY_PREEMPT;
-                    sessions.add(activeClient->session());
-                    closeClient(activeClient->portId());
-                    ALOGV("%s input %d for HOTWORD preempting HOTWORD input %d", __FUNCTION__,
-                          input, activeDesc->mIoHandle);
-                }
-
-                inputDesc->setPreemptedSessions(sessions);
-            }
-        }
+    status_t status = inputDesc->start();
+    if (status != NO_ERROR) {
+        return status;
     }
 
-    // Make sure we start with the correct silence state
-    client->setSilenced(silenced);
-
-    // increment activity count before calling getNewInputDevice() below as only active sessions
+  // increment activity count before calling getNewInputDevice() below as only active sessions
     // are considered for device selection
     inputDesc->setClientActive(client, true);
 
@@ -2102,12 +1996,6 @@ status_t AudioPolicyManager::startInput(audio_port_handle_t portId,
     // primary HW module
     audio_devices_t device = getNewInputDevice(inputDesc);
     setInputDevice(input, device, true /* force */);
-
-    status_t status = inputDesc->start();
-    if (status != NO_ERROR) {
-        inputDesc->setClientActive(client, false);
-        return status;
-    }
 
     if (inputDesc->activeCount()  == 1) {
         // if input maps to a dynamic policy with an activity listener, notify of state change
@@ -3366,7 +3254,7 @@ void AudioPolicyManager::clearSessionRoutes(uid_t uid)
     SortedVector<audio_io_handle_t> inputsToClose;
     for (size_t i = 0; i < mInputs.size(); i++) {
         sp<AudioInputDescriptor> inputDesc = mInputs.valueAt(i);
-        if (affectedSources.indexOf(inputDesc->inputSource()) >= 0) {
+        if (affectedSources.indexOf(inputDesc->source()) >= 0) {
             inputsToClose.add(inputDesc->mIoHandle);
         }
     }
@@ -3728,16 +3616,15 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
 void AudioPolicyManager::setAppState(uid_t uid, app_state_t state)
 {
     Vector<sp<AudioInputDescriptor> > activeInputs = mInputs.getActiveInputs();
-    bool silenced = state == APP_STATE_IDLE;
 
-    ALOGV("AudioPolicyManager:setRecordSilenced(uid:%d, silenced:%d)", uid, silenced);
+    ALOGV("%s(uid:%d, state:%d)", __func__, uid, state);
 
     for (size_t i = 0; i < activeInputs.size(); i++) {
         sp<AudioInputDescriptor> activeDesc = activeInputs[i];
         RecordClientVector clients = activeDesc->clientsList(true /*activeOnly*/);
         for (const auto& client : clients) {
             if (uid == client->uid()) {
-                client->setSilenced(silenced);
+                client->setAppState(state);
             }
         }
     }
@@ -3847,8 +3734,7 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
     mBeaconMuted(false),
     mTtsOutputAvailable(false),
     mMasterMono(false),
-    mMusicEffectOutput(AUDIO_IO_HANDLE_NONE),
-    mHasComputedSoundTriggerSupportsConcurrentCapture(false)
+    mMusicEffectOutput(AUDIO_IO_HANDLE_NONE)
 {
 }
 
@@ -4901,7 +4787,7 @@ audio_devices_t AudioPolicyManager::getNewInputDevice(const sp<AudioInputDescrip
 
     // If we are not in call and no client is active on this input, this methods returns
     // AUDIO_DEVICE_NONE, causing the patch on the input stream to be released.
-    audio_source_t source = inputDesc->getHighestPrioritySource(true /*activeOnly*/);
+    audio_source_t source = inputDesc->source();
     if (source == AUDIO_SOURCE_DEFAULT && isInCall()) {
         source = AUDIO_SOURCE_VOICE_COMMUNICATION;
     }
@@ -5239,20 +5125,6 @@ uint32_t AudioPolicyManager::setOutputDevice(const sp<AudioOutputDescriptor>& ou
                 patchBuilder.addSink(deviceList.itemAt(i));
             }
             installPatch(__func__, patchHandle, outputDesc.get(), patchBuilder.patch(), delayMs);
-        }
-
-        // inform all input as well
-        for (size_t i = 0; i < mInputs.size(); i++) {
-            const sp<AudioInputDescriptor>  inputDescriptor = mInputs.valueAt(i);
-            if (!is_virtual_input_device(inputDescriptor->mDevice)) {
-                AudioParameter inputCmd = AudioParameter();
-                ALOGV("%s: inform input %d of device:%d", __func__,
-                      inputDescriptor->mIoHandle, device);
-                inputCmd.addInt(String8(AudioParameter::keyRouting),device);
-                mpClientInterface->setParameters(inputDescriptor->mIoHandle,
-                                                 inputCmd.toString(),
-                                                 delayMs);
-            }
         }
     }
 

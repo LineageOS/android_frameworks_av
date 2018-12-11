@@ -32,14 +32,6 @@ static const audio_format_t gDynamicFormat = AUDIO_FORMAT_DEFAULT;
 #define MAX_MIXER_CHANNEL_COUNT FCC_8
 
 /**
- * A device mask for all audio input devices that are considered "virtual" when evaluating
- * active inputs in getActiveInputs()
- */
-#define APM_AUDIO_IN_DEVICE_VIRTUAL_ALL (AUDIO_DEVICE_IN_REMOTE_SUBMIX|\
-        AUDIO_DEVICE_IN_BUS|AUDIO_DEVICE_IN_FM_TUNER)
-
-
-/**
  * A device mask for all audio input and output devices where matching inputs/outputs on device
  * type alone is not enough: the address must match too
  */
@@ -65,23 +57,6 @@ static const audio_format_t gDynamicFormat = AUDIO_FORMAT_DEFAULT;
 static inline bool is_state_in_call(int state)
 {
     return (state == AUDIO_MODE_IN_CALL) || (state == AUDIO_MODE_IN_COMMUNICATION);
-}
-
-/**
- * Check if the input device given is considered as a virtual device.
- *
- * @param[in] device to consider
- *
- * @return true if the device is a virtual one, false otherwise.
- */
-static inline bool is_virtual_input_device(audio_devices_t device)
-{
-    if ((device & AUDIO_DEVICE_BIT_IN) != 0) {
-        device &= ~AUDIO_DEVICE_BIT_IN;
-        if ((popcount(device) == 1) && ((device & ~APM_AUDIO_IN_DEVICE_VIRTUAL_ALL) == 0))
-            return true;
-    }
-    return false;
 }
 
 /**

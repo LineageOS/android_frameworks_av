@@ -329,16 +329,13 @@ public:
         return NO_ERROR;
     }
 
-    virtual status_t startInput(audio_port_handle_t portId,
-                                bool *silenced)
+    virtual status_t startInput(audio_port_handle_t portId)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
         data.writeInt32(portId);
-        data.writeInt32(*silenced ? 1 : 0);
         remote()->transact(START_INPUT, data, &reply);
         status_t status = static_cast <status_t> (reply.readInt32());
-        *silenced = reply.readInt32() == 1;
         return status;
     }
 
@@ -1219,10 +1216,8 @@ status_t BnAudioPolicyService::onTransact(
         case START_INPUT: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             audio_port_handle_t portId = static_cast <audio_port_handle_t>(data.readInt32());
-            bool silenced = data.readInt32() == 1;
-            status_t status = startInput(portId, &silenced);
+            status_t status = startInput(portId);
             reply->writeInt32(static_cast <uint32_t>(status));
-            reply->writeInt32(silenced ? 1 : 0);
             return NO_ERROR;
         } break;
 
