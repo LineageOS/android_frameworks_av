@@ -162,6 +162,12 @@ status_t AudioMixer::create(
                 AUDIO_CHANNEL_REPRESENTATION_POSITION, AUDIO_CHANNEL_OUT_STEREO);
         t->mMixerChannelCount = audio_channel_count_from_out_mask(t->mMixerChannelMask);
         t->mPlaybackRate = AUDIO_PLAYBACK_RATE_DEFAULT;
+        // haptic
+        t->mAdjustInChannelCount = 0;
+        t->mAdjustOutChannelCount = 0;
+        t->mAdjustNonDestructiveInChannelCount = 0;
+        t->mAdjustNonDestructiveOutChannelCount = 0;
+        t->mKeepContractedChannels = false;
         // Check the downmixing (or upmixing) requirements.
         status_t status = t->prepareForDownmix();
         if (status != OK) {
@@ -171,6 +177,8 @@ status_t AudioMixer::create(
         // prepareForDownmix() may change mDownmixRequiresFormat
         ALOGVV("mMixerFormat:%#x  mMixerInFormat:%#x\n", t->mMixerFormat, t->mMixerInFormat);
         t->prepareForReformat();
+        t->prepareForAdjustChannelsNonDestructive(mFrameCount);
+        t->prepareForAdjustChannels();
 
         mTracks[name] = t;
         return OK;
@@ -211,6 +219,9 @@ bool AudioMixer::setChannelMasks(int name,
     // always do reformat since channel mask changed,
     // do it after downmix since track format may change!
     track->prepareForReformat();
+
+    track->prepareForAdjustChannelsNonDestructive(mFrameCount);
+    track->prepareForAdjustChannels();
 
     if (track->mResampler.get() != nullptr) {
         // resampler channels may have changed.
@@ -335,10 +346,82 @@ status_t AudioMixer::Track::prepareForReformat()
     return NO_ERROR;
 }
 
+void AudioMixer::Track::unprepareForAdjustChannels()
+{
+    ALOGV("AUDIOMIXER::unprepareForAdjustChannels");
+    if (mAdjustChannelsBufferProvider.get() != nullptr) {
+        mAdjustChannelsBufferProvider.reset(nullptr);
+        reconfigureBufferProviders();
+    }
+}
+
+status_t AudioMixer::Track::prepareForAdjustChannels()
+{
+    ALOGV("AudioMixer::prepareForAdjustChannels(%p) with inChannelCount: %u, outChannelCount: %u",
+            this, mAdjustInChannelCount, mAdjustOutChannelCount);
+    unprepareForAdjustChannels();
+    if (mAdjustInChannelCount != mAdjustOutChannelCount) {
+        mAdjustChannelsBufferProvider.reset(new AdjustChannelsBufferProvider(
+                mFormat, mAdjustInChannelCount, mAdjustOutChannelCount, kCopyBufferFrameCount));
+        reconfigureBufferProviders();
+    }
+    return NO_ERROR;
+}
+
+void AudioMixer::Track::unprepareForAdjustChannelsNonDestructive()
+{
+    ALOGV("AUDIOMIXER::unprepareForAdjustChannelsNonDestructive");
+    if (mAdjustChannelsNonDestructiveBufferProvider.get() != nullptr) {
+        mAdjustChannelsNonDestructiveBufferProvider.reset(nullptr);
+        reconfigureBufferProviders();
+    }
+}
+
+status_t AudioMixer::Track::prepareForAdjustChannelsNonDestructive(size_t frames)
+{
+    ALOGV("AudioMixer::prepareForAdjustChannelsNonDestructive(%p) with inChannelCount: %u, "
+          "outChannelCount: %u, keepContractedChannels: %d",
+            this, mAdjustNonDestructiveInChannelCount, mAdjustNonDestructiveOutChannelCount,
+            mKeepContractedChannels);
+    unprepareForAdjustChannelsNonDestructive();
+    if (mAdjustNonDestructiveInChannelCount != mAdjustNonDestructiveOutChannelCount) {
+        uint8_t* buffer = mKeepContractedChannels
+                ? (uint8_t*)mainBuffer + frames * audio_bytes_per_frame(
+                        mMixerChannelCount, mMixerFormat)
+                : NULL;
+        mAdjustChannelsNonDestructiveBufferProvider.reset(
+                new AdjustChannelsNonDestructiveBufferProvider(
+                        mFormat,
+                        mAdjustNonDestructiveInChannelCount,
+                        mAdjustNonDestructiveOutChannelCount,
+                        mKeepContractedChannels ? mMixerFormat : AUDIO_FORMAT_INVALID,
+                        frames,
+                        buffer));
+        reconfigureBufferProviders();
+    }
+    return NO_ERROR;
+}
+
+void AudioMixer::Track::clearContractedBuffer()
+{
+    if (mAdjustChannelsNonDestructiveBufferProvider.get() != nullptr) {
+        static_cast<AdjustChannelsNonDestructiveBufferProvider*>(
+                mAdjustChannelsNonDestructiveBufferProvider.get())->clearContractedFrames();
+    }
+}
+
 void AudioMixer::Track::reconfigureBufferProviders()
 {
     // configure from upstream to downstream buffer providers.
     bufferProvider = mInputBufferProvider;
+    if (mAdjustChannelsBufferProvider.get() != nullptr) {
+        mAdjustChannelsBufferProvider->setBufferProvider(bufferProvider);
+        bufferProvider = mAdjustChannelsBufferProvider.get();
+    }
+    if (mAdjustChannelsNonDestructiveBufferProvider.get() != nullptr) {
+        mAdjustChannelsNonDestructiveBufferProvider->setBufferProvider(bufferProvider);
+        bufferProvider = mAdjustChannelsNonDestructiveBufferProvider.get();
+    }
     if (mReformatBufferProvider.get() != nullptr) {
         mReformatBufferProvider->setBufferProvider(bufferProvider);
         bufferProvider = mReformatBufferProvider.get();
@@ -542,6 +625,9 @@ void AudioMixer::setParameter(int name, int target, int param, void *value)
             if (track->mainBuffer != valueBuf) {
                 track->mainBuffer = valueBuf;
                 ALOGV("setParameter(TRACK, MAIN_BUFFER, %p)", valueBuf);
+                if (track->mKeepContractedChannels) {
+                    track->prepareForAdjustChannelsNonDestructive(mFrameCount);
+                }
                 invalidate();
             }
             break;
@@ -571,6 +657,9 @@ void AudioMixer::setParameter(int name, int target, int param, void *value)
             if (track->mMixerFormat != format) {
                 track->mMixerFormat = format;
                 ALOGV("setParameter(TRACK, MIXER_FORMAT, %#x)", format);
+                if (track->mKeepContractedChannels) {
+                    track->prepareForAdjustChannelsNonDestructive(mFrameCount);
+                }
             }
             } break;
         case MIXER_CHANNEL_MASK: {
@@ -823,6 +912,10 @@ void AudioMixer::setBufferProvider(int name, AudioBufferProvider* bufferProvider
         track->mDownmixerBufferProvider->reset();
     } else if (track->mReformatBufferProvider.get() != nullptr) {
         track->mReformatBufferProvider->reset();
+    } else if (track->mAdjustChannelsNonDestructiveBufferProvider.get() != nullptr) {
+        track->mAdjustChannelsNonDestructiveBufferProvider->reset();
+    } else if (track->mAdjustChannelsBufferProvider.get() != nullptr) {
+        track->mAdjustChannelsBufferProvider->reset();
     }
 
     track->mInputBufferProvider = bufferProvider;
