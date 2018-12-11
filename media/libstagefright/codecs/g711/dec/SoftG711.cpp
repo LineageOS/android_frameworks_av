@@ -372,7 +372,7 @@ void SoftG711::DecodeMLaw(
 
         int32_t step = 4 << segment;
 
-        int32_t abs = (0x80l << exponent) + step * mantissa + step / 2 - 4 * 33;
+        int32_t abs = (0x80L << exponent) + step * mantissa + step / 2 - 4 * 33;
 
         *out++ = (x < 0x80) ? -abs : abs;
     }

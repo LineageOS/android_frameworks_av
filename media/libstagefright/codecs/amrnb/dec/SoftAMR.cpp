@@ -505,7 +505,7 @@ void SoftAMR::onQueueFilled(OMX_U32 /* portIndex */) {
 
             outHeader->nTimeStamp =
                 mAnchorTimeUs
-                    + (mNumSamplesOutput * 1000000ll) / kSampleRateNB;
+                    + (mNumSamplesOutput * 1000000LL) / kSampleRateNB;
 
             mNumSamplesOutput += kNumSamplesPerFrameNB;
         } else {
@@ -513,7 +513,7 @@ void SoftAMR::onQueueFilled(OMX_U32 /* portIndex */) {
 
             outHeader->nTimeStamp =
                 mAnchorTimeUs
-                    + (mNumSamplesOutput * 1000000ll) / kSampleRateWB;
+                    + (mNumSamplesOutput * 1000000LL) / kSampleRateWB;
 
             mNumSamplesOutput += kNumSamplesPerFrameWB;
         }

@@ -35,7 +35,7 @@ FrameDropper::~FrameDropper() {
 
 status_t FrameDropper::setMaxFrameRate(float maxFrameRate) {
     if (maxFrameRate < 0) {
-        mMinIntervalUs = -1ll;
+        mMinIntervalUs = -1LL;
         return OK;
     }
 

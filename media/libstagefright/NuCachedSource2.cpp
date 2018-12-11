@@ -436,12 +436,12 @@ void NuCachedSource2::onFetch() {
     if (mFetching) {
         if (mFinalStatus != OK && mNumRetriesLeft > 0) {
             // We failed this time and will try again in 3 seconds.
-            delayUs = 3000000ll;
+            delayUs = 3000000LL;
         } else {
             delayUs = 0;
         }
     } else {
-        delayUs = 100000ll;
+        delayUs = 100000LL;
     }
 
     (new AMessage(kWhatFetchMore, mReflector))->post(delayUs);
@@ -728,7 +728,7 @@ void NuCachedSource2::updateCacheParamsFromString(const char *s) {
     }
 
     if (keepAliveSecs >= 0) {
-        mKeepAliveIntervalUs = keepAliveSecs * 1000000ll;
+        mKeepAliveIntervalUs = keepAliveSecs * 1000000LL;
     } else {
         mKeepAliveIntervalUs = kDefaultKeepAliveIntervalUs;
     }

@@ -665,7 +665,7 @@ void SoftXAAC::onQueueFilled(OMX_U32 /* portIndex */) {
                     mCurrentTimestamp = inHeader->nTimeStamp;
                     mLastInHeader = inHeader;
                 } else {
-                    mCurrentTimestamp = mPrevTimestamp + mOutputFrameLength * 1000000ll / mSampFreq;
+                    mCurrentTimestamp = mPrevTimestamp + mOutputFrameLength * 1000000LL / mSampFreq;
                 }
             } else {
                 inBuffer = inHeader->pBuffer + inHeader->nOffset;

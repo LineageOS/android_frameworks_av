@@ -420,10 +420,10 @@ void ARTPWriter::addSDES(const sp<ABuffer> &buffer) {
 uint64_t ARTPWriter::GetNowNTP() {
     uint64_t nowUs = ALooper::GetNowUs();
 
-    nowUs += ((70ll * 365 + 17) * 24) * 60 * 60 * 1000000ll;
+    nowUs += ((70LL * 365 + 17) * 24) * 60 * 60 * 1000000LL;
 
-    uint64_t hi = nowUs / 1000000ll;
-    uint64_t lo = ((1ll << 32) * (nowUs % 1000000ll)) / 1000000ll;
+    uint64_t hi = nowUs / 1000000LL;
+    uint64_t lo = ((1LL << 32) * (nowUs % 1000000LL)) / 1000000LL;
 
     return (hi << 32) | lo;
 }
@@ -576,7 +576,7 @@ void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
     int64_t timeUs;
     CHECK(mediaBuf->meta_data().findInt64(kKeyTime, &timeUs));
 
-    uint32_t rtpTime = mRTPTimeBase + (timeUs * 9 / 100ll);
+    uint32_t rtpTime = mRTPTimeBase + (timeUs * 9 / 100LL);
 
     const uint8_t *mediaData =
         (const uint8_t *)mediaBuf->data() + mediaBuf->range_offset();
@@ -671,7 +671,7 @@ void ARTPWriter::sendH263Data(MediaBufferBase *mediaBuf) {
     int64_t timeUs;
     CHECK(mediaBuf->meta_data().findInt64(kKeyTime, &timeUs));
 
-    uint32_t rtpTime = mRTPTimeBase + (timeUs * 9 / 100ll);
+    uint32_t rtpTime = mRTPTimeBase + (timeUs * 9 / 100LL);
 
     const uint8_t *mediaData =
         (const uint8_t *)mediaBuf->data() + mediaBuf->range_offset();

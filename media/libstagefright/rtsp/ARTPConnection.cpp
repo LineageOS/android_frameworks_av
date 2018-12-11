@@ -50,7 +50,7 @@ static uint64_t u64at(const uint8_t *data) {
 }
 
 // static
-const int64_t ARTPConnection::kSelectTimeoutUs = 1000ll;
+const int64_t ARTPConnection::kSelectTimeoutUs = 1000LL;
 
 struct ARTPConnection::StreamInfo {
     int mRTPSocket;
@@ -118,7 +118,7 @@ void ARTPConnection::MakePortPair(
     bumpSocketBufferSize(*rtcpSocket);
 
     /* rand() * 1000 may overflow int type, use long long */
-    unsigned start = (unsigned)((rand()* 1000ll)/RAND_MAX) + 15550;
+    unsigned start = (unsigned)((rand()* 1000LL)/RAND_MAX) + 15550;
     start &= ~1;
 
     for (unsigned port = start; port < 65536; port += 2) {
@@ -307,7 +307,7 @@ void ARTPConnection::onPollStreams() {
 
     int64_t nowUs = ALooper::GetNowUs();
     if (mLastReceiverReportTimeUs <= 0
-            || mLastReceiverReportTimeUs + 5000000ll <= nowUs) {
+            || mLastReceiverReportTimeUs + 5000000LL <= nowUs) {
         sp<ABuffer> buffer = new ABuffer(kMaxUDPSize);
         List<StreamInfo>::iterator it = mStreams.begin();
         while (it != mStreams.end()) {
