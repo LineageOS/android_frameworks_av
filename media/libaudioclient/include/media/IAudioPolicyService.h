@@ -125,6 +125,10 @@ public:
     // bit rate, duration, video and streaming or offload property is enabled
     virtual bool isOffloadSupported(const audio_offload_info_t& info) = 0;
 
+    // Check if direct playback is possible for given format, sample rate, channel mask and flags.
+    virtual bool isDirectOutputSupported(const audio_config_base_t& config,
+                                         const audio_attributes_t& attributes) = 0;
+
     /* List available audio ports and their attributes */
     virtual status_t listAudioPorts(audio_port_role_t role,
                                     audio_port_type_t type,

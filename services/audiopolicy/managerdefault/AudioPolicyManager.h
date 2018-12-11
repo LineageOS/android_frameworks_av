@@ -192,6 +192,9 @@ public:
 
         virtual bool isOffloadSupported(const audio_offload_info_t& offloadInfo);
 
+        virtual bool isDirectOutputSupported(const audio_config_base_t& config,
+                                             const audio_attributes_t& attributes);
+
         virtual status_t listAudioPorts(audio_port_role_t role,
                                         audio_port_type_t type,
                                         unsigned int *num_ports,
@@ -479,11 +482,12 @@ protected:
                                       audio_format_t& format,
                                       audio_channel_mask_t& channelMask,
                                       audio_input_flags_t flags);
-        sp<IOProfile> getProfileForDirectOutput(audio_devices_t device,
-                                                       uint32_t samplingRate,
-                                                       audio_format_t format,
-                                                       audio_channel_mask_t channelMask,
-                                                       audio_output_flags_t flags);
+        sp<IOProfile> getProfileForOutput(audio_devices_t device,
+                                          uint32_t samplingRate,
+                                          audio_format_t format,
+                                          audio_channel_mask_t channelMask,
+                                          audio_output_flags_t flags,
+                                          bool directOnly);
 
         audio_io_handle_t selectOutputForMusicEffects();
 
