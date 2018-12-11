@@ -18,6 +18,7 @@
 #define LOG_TAG "MediaExtractorFactory"
 #include <utils/Log.h>
 
+#include <android/dlext.h>
 #include <binder/IPCThreadState.h>
 #include <binder/PermissionCache.h>
 #include <binder/IServiceManager.h>
@@ -35,6 +36,23 @@
 
 #include <dirent.h>
 #include <dlfcn.h>
+
+// Copied from GraphicsEnv.cpp
+// TODO(b/37049319) Get this from a header once one exists
+extern "C" {
+  android_namespace_t* android_create_namespace(const char* name,
+                                                const char* ld_library_path,
+                                                const char* default_library_path,
+                                                uint64_t type,
+                                                const char* permitted_when_isolated_path,
+                                                android_namespace_t* parent);
+  bool android_link_namespaces(android_namespace_t* from,
+                               android_namespace_t* to,
+                               const char* shared_libs_sonames);
+  enum {
+     ANDROID_NAMESPACE_TYPE_ISOLATED = 1,
+  };
+}
 
 namespace android {
 
@@ -145,6 +163,13 @@ Mutex MediaExtractorFactory::gPluginMutex;
 std::shared_ptr<std::list<sp<ExtractorPlugin>>> MediaExtractorFactory::gPlugins;
 bool MediaExtractorFactory::gPluginsRegistered = false;
 bool MediaExtractorFactory::gIgnoreVersion = false;
+std::string MediaExtractorFactory::gLinkedLibraries;
+
+// static
+void MediaExtractorFactory::SetLinkedLibraries(const std::string& linkedLibraries) {
+    Mutex::Autolock autoLock(gPluginMutex);
+    gLinkedLibraries = linkedLibraries;
+}
 
 // static
 void *MediaExtractorFactory::sniff(
@@ -328,6 +353,62 @@ void MediaExtractorFactory::RegisterExtractorsInSystem(
     }
 }
 
+//static
+void MediaExtractorFactory::RegisterExtractorsInApex(
+        const char *libDirPath, std::list<sp<ExtractorPlugin>> &pluginList) {
+    ALOGV("search for plugins at %s", libDirPath);
+    ALOGV("linked libs %s", gLinkedLibraries.c_str());
+
+    android_namespace_t *extractorNs = android_create_namespace("extractor",
+            nullptr,  // ld_library_path
+            libDirPath,
+            ANDROID_NAMESPACE_TYPE_ISOLATED,
+            nullptr,  // permitted_when_isolated_path
+            nullptr); // parent
+    if (!android_link_namespaces(extractorNs, nullptr, gLinkedLibraries.c_str())) {
+        ALOGE("Failed to link namespace. Failed to load extractor plug-ins in apex.");
+        return;
+    }
+    const android_dlextinfo dlextinfo = {
+        .flags = ANDROID_DLEXT_USE_NAMESPACE,
+        .library_namespace = extractorNs,
+    };
+
+    DIR *libDir = opendir(libDirPath);
+    if (libDir) {
+        struct dirent* libEntry;
+        while ((libEntry = readdir(libDir))) {
+            if (libEntry->d_name[0] == '.') {
+                continue;
+            }
+            String8 libPath = String8(libDirPath) + "/" + libEntry->d_name;
+            if (!libPath.contains("extractor.so")) {
+                continue;
+            }
+            void *libHandle = android_dlopen_ext(
+                    libPath.string(),
+                    RTLD_NOW | RTLD_LOCAL, &dlextinfo);
+            if (libHandle) {
+                GetExtractorDef getDef =
+                    (GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
+                if (getDef) {
+                    ALOGV("registering sniffer for %s", libPath.string());
+                    RegisterExtractor(
+                            new ExtractorPlugin(getDef(), libHandle, libPath), pluginList);
+                } else {
+                    ALOGW("%s does not contain sniffer", libPath.string());
+                    dlclose(libHandle);
+                }
+            } else {
+                ALOGW("couldn't dlopen(%s) %s", libPath.string(), strerror(errno));
+            }
+        }
+        closedir(libDir);
+    } else {
+        ALOGE("couldn't opendir(%s)", libDirPath);
+    }
+}
+
 static bool compareFunc(const sp<ExtractorPlugin>& first, const sp<ExtractorPlugin>& second) {
     return strcmp(first->def.extractor_name, second->def.extractor_name) < 0;
 }
@@ -345,6 +426,12 @@ void MediaExtractorFactory::UpdateExtractors(const char *newUpdateApkPath) {
     gIgnoreVersion = property_get_bool("debug.extractor.ignore_version", false);
 
     std::shared_ptr<std::list<sp<ExtractorPlugin>>> newList(new std::list<sp<ExtractorPlugin>>());
+
+    RegisterExtractorsInApex("/apex/com.android.media/lib"
+#ifdef __LP64__
+            "64"
+#endif
+            , *newList);
 
     RegisterExtractorsInSystem("/system/lib"
 #ifdef __LP64__
