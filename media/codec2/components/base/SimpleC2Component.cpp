@@ -489,6 +489,13 @@ bool SimpleC2Component::processQueue() {
     }
 
     ALOGV("start processing frame #%" PRIu64, work->input.ordinal.frameIndex.peeku());
+    // If input buffer list is not empty, it means we have some input to process on.
+    // However, input could be a null buffer. In such case, clear the buffer list
+    // before making call to process().
+    if (!work->input.buffers.empty() && !work->input.buffers[0]) {
+        ALOGD("Encountered null input buffer. Clearing the input buffer");
+        work->input.buffers.clear();
+    }
     process(work, mOutputBlockPool);
     ALOGV("processed frame #%" PRIu64, work->input.ordinal.frameIndex.peeku());
     {

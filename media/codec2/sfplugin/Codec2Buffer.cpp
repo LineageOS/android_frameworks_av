@@ -109,9 +109,11 @@ bool LocalLinearBuffer::copy(const std::shared_ptr<C2Buffer> &buffer) {
 
 // DummyContainerBuffer
 
+static uint8_t sDummyByte[1] = { 0 };
+
 DummyContainerBuffer::DummyContainerBuffer(
         const sp<AMessage> &format, const std::shared_ptr<C2Buffer> &buffer)
-    : Codec2Buffer(format, new ABuffer(nullptr, 1)),
+    : Codec2Buffer(format, new ABuffer(sDummyByte, 1)),
       mBufferRef(buffer) {
     setRange(0, buffer ? 1 : 0);
 }
