@@ -252,7 +252,7 @@ binder::Status CameraDeviceClient::submitRequestList(
         Vector<int32_t> outputStreamIds;
         std::vector<std::string> requestedPhysicalIds;
         if (request.mSurfaceList.size() > 0) {
-            for (sp<Surface> surface : request.mSurfaceList) {
+            for (const sp<Surface>& surface : request.mSurfaceList) {
                 if (surface == 0) continue;
 
                 int32_t streamId;
