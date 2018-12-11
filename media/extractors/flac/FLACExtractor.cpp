@@ -586,9 +586,6 @@ void FLACParser::allocateBuffers(MediaBufferGroupHelperV3 *group)
 
 void FLACParser::releaseBuffers()
 {
-    CHECK(mGroup != NULL);
-    delete mGroup;
-    mGroup = NULL;
 }
 
 MediaBufferHelperV3 *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
