@@ -84,6 +84,10 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
                 int64_t clientFramesRead = 0;
                 bool allowUnderflow = true;
 
+                if (clientStream->isSuspended()) {
+                    continue; // dead stream
+                }
+
                 aaudio_stream_state_t state = clientStream->getState();
                 if (state == AAUDIO_STREAM_STATE_STOPPING) {
                     allowUnderflow = false; // just read what is already in the FIFO

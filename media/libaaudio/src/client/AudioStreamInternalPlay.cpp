@@ -293,7 +293,7 @@ void *AudioStreamInternalPlay::callbackLoop() {
                 break;
             }
         } else if (callbackResult == AAUDIO_CALLBACK_RESULT_STOP) {
-            ALOGV("%s(): callback returned AAUDIO_CALLBACK_RESULT_STOP", __func__);
+            ALOGD("%s(): callback returned AAUDIO_CALLBACK_RESULT_STOP", __func__);
             break;
         }
     }

@@ -82,8 +82,9 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
 
             std::lock_guard <std::mutex> lock(mLockStreams);
             for (const auto& clientStream : mRegisteredStreams) {
-                if (clientStream->isRunning()) {
+                if (clientStream->isRunning() && !clientStream->isSuspended()) {
                     int64_t clientFramesWritten = 0;
+
                     sp<AAudioServiceStreamShared> streamShared =
                             static_cast<AAudioServiceStreamShared *>(clientStream.get());
 
