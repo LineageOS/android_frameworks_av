@@ -272,10 +272,10 @@ void NuPlayer2::HTTPLiveSource2::pollForRawData(
 
         if (fetchType == LiveSession::STREAMTYPE_SUBTITLES) {
             notify->post();
-            msg->post(delayUs > 0ll ? delayUs : 0ll);
+            msg->post(delayUs > 0LL ? delayUs : 0LL);
             return;
         } else if (fetchType == LiveSession::STREAMTYPE_METADATA) {
-            if (delayUs < -1000000ll) { // 1 second
+            if (delayUs < -1000000LL) { // 1 second
                 continue;
             }
             notify->post();
@@ -287,7 +287,7 @@ void NuPlayer2::HTTPLiveSource2::pollForRawData(
     }
 
     // try again in 1 second
-    msg->post(1000000ll);
+    msg->post(1000000LL);
 }
 
 void NuPlayer2::HTTPLiveSource2::onMessageReceived(const sp<AMessage> &msg) {
