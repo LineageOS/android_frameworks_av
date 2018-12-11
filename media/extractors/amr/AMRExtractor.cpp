@@ -29,7 +29,7 @@
 
 namespace android {
 
-class AMRSource : public MediaTrackHelperV2 {
+class AMRSource : public MediaTrackHelperV3 {
 public:
     AMRSource(
             DataSourceHelper *source,
@@ -44,7 +44,7 @@ public:
     virtual media_status_t getFormat(AMediaFormat *);
 
     virtual media_status_t read(
-            MediaBufferBase **buffer, const ReadOptions *options = NULL);
+            MediaBufferHelperV3 **buffer, const ReadOptions *options = NULL);
 
 protected:
     virtual ~AMRSource();
@@ -209,7 +209,7 @@ size_t AMRExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrackHelperV2 *AMRExtractor::getTrack(size_t index) {
+MediaTrackHelperV3 *AMRExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index != 0) {
         return NULL;
     }
@@ -255,8 +255,7 @@ media_status_t AMRSource::start() {
 
     mOffset = mIsWide ? 9 : 6;
     mCurrentTimeUs = 0;
-    mGroup = new MediaBufferGroup;
-    mGroup->add_buffer(MediaBufferBase::Create(128));
+    mBufferGroup->add_buffer(128);
     mStarted = true;
 
     return AMEDIA_OK;
@@ -264,9 +263,6 @@ media_status_t AMRSource::start() {
 
 media_status_t AMRSource::stop() {
     CHECK(mStarted);
-
-    delete mGroup;
-    mGroup = NULL;
 
     mStarted = false;
     return AMEDIA_OK;
@@ -277,7 +273,7 @@ media_status_t AMRSource::getFormat(AMediaFormat *meta) {
 }
 
 media_status_t AMRSource::read(
-        MediaBufferBase **out, const ReadOptions *options) {
+        MediaBufferHelperV3 **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t seekTimeUs;
@@ -326,8 +322,8 @@ media_status_t AMRSource::read(
         return AMEDIA_ERROR_MALFORMED;
     }
 
-    MediaBufferBase *buffer;
-    status_t err = mGroup->acquire_buffer(&buffer);
+    MediaBufferHelperV3 *buffer;
+    status_t err = mBufferGroup->acquire_buffer(&buffer);
     if (err != OK) {
         return AMEDIA_ERROR_UNKNOWN;
     }
@@ -348,8 +344,9 @@ media_status_t AMRSource::read(
     }
 
     buffer->set_range(0, frameSize);
-    buffer->meta_data().setInt64(kKeyTime, mCurrentTimeUs);
-    buffer->meta_data().setInt32(kKeyIsSyncFrame, 1);
+    AMediaFormat *meta = buffer->meta_data();
+    AMediaFormat_setInt64(meta, AMEDIAFORMAT_KEY_TIME_US, mCurrentTimeUs);
+    AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, 1);
 
     mOffset += frameSize;
     mCurrentTimeUs += 20000;  // Each frame is 20ms
@@ -366,22 +363,22 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION_CURRENT,
+        EXTRACTORDEF_VERSION_CURRENT + 1,
         UUID("c86639c9-2f31-40ac-a715-fa01b4493aaf"),
         1,
         "AMR Extractor",
         {
-           .v2 = [](
+           .v3 = [](
                     CDataSource *source,
                     float *confidence,
                     void **,
-                    FreeMetaFunc *) -> CreatorFuncV2 {
+                    FreeMetaFunc *) -> CreatorFuncV3 {
                 DataSourceHelper helper(source);
                 if (SniffAMR(&helper, nullptr, confidence)) {
                     return [](
                             CDataSource *source,
-                            void *) -> CMediaExtractorV2* {
-                        return wrapV2(new AMRExtractor(new DataSourceHelper(source)));};
+                            void *) -> CMediaExtractorV3* {
+                        return wrapV3(new AMRExtractor(new DataSourceHelper(source)));};
                 }
                 return NULL;
             }

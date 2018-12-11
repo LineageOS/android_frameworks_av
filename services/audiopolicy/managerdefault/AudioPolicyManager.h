@@ -186,7 +186,9 @@ public:
 
         virtual bool isSourceActive(audio_source_t source) const;
 
-        void dump(String8 *dst) const; // helper for dump(int fd)
+        // helpers for dump(int fd)
+        void dumpManualSurroundFormats(String8 *dst) const;
+        void dump(String8 *dst) const;
 
         status_t dump(int fd) override;
 
@@ -516,6 +518,9 @@ protected:
         sp<AudioPatch> createTelephonyPatch(bool isRx, audio_devices_t device, uint32_t delayMs);
         sp<DeviceDescriptor> findDevice(
                 const DeviceVector& devices, audio_devices_t device) const;
+        audio_devices_t getModuleDeviceTypes(
+                const DeviceVector& devices, const char *moduleId) const;
+        bool isDeviceOfModule(const sp<DeviceDescriptor>& devDesc, const char *moduleId) const;
 
         status_t startSource(const sp<SwAudioOutputDescriptor>& outputDesc,
                              const sp<TrackClientDescriptor>& client,
@@ -608,8 +613,9 @@ protected:
         // Audio Policy Engine Interface.
         AudioPolicyManagerInterface *mEngine;
 
-        // Surround formats that are enabled.
-        std::unordered_set<audio_format_t> mSurroundFormats;
+        // Surround formats that are enabled manually. Taken into account when
+        // "encoded surround" is forced into "manual" mode.
+        std::unordered_set<audio_format_t> mManualSurroundFormats;
 private:
         // Add or remove AC3 DTS encodings based on user preferences.
         void modifySurroundFormats(const sp<DeviceDescriptor>& devDesc, FormatVector *formatsPtr);
@@ -617,7 +623,6 @@ private:
 
         // Support for Multi-Stream Decoder (MSD) module
         sp<DeviceDescriptor> getMsdAudioInDevice() const;
-        audio_devices_t getMsdAudioOutDeviceTypes() const;
         const AudioPatchCollection getMsdPatches() const;
         status_t getBestMsdAudioProfileFor(audio_devices_t outputDevice,
                                            bool hwAvSync,

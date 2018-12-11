@@ -8,7 +8,6 @@ cc_library_shared {
 
     shared_libs: [
         "liblog",
-        "libmediaextractor",
         "libmediandk",
     ],
 

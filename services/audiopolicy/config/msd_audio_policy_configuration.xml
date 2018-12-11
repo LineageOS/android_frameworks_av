@@ -32,6 +32,9 @@
             <profile name="" format="AUDIO_FORMAT_E_AC3"
                      samplingRates="32000,44100,48000"
                      channelMasks="AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
+            <profile name="" format="AUDIO_FORMAT_E_AC3_JOC"
+                     samplingRates="32000,44100,48000"
+                     channelMasks="AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
             <profile name="" format="AUDIO_FORMAT_AC4"
                      samplingRates="32000,44100,48000"
                      channelMasks="AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
@@ -50,6 +53,18 @@
        <devicePort tagName="MS12 Input" type="AUDIO_DEVICE_OUT_BUS"  role="sink">
            <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
                     samplingRates="48000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
+           <profile name="" format="AUDIO_FORMAT_AC3"
+                    samplingRates="32000,44100,48000"
+                    channelMasks="AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_5POINT1"/>
+           <profile name="" format="AUDIO_FORMAT_E_AC3"
+                    samplingRates="32000,44100,48000"
+                    channelMasks="AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
+            <profile name="" format="AUDIO_FORMAT_E_AC3_JOC"
+                     samplingRates="32000,44100,48000"
+                     channelMasks="AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
+           <profile name="" format="AUDIO_FORMAT_AC4"
+                    samplingRates="32000,44100,48000"
+                    channelMasks="AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
        </devicePort>
        <devicePort tagName="MS12 Output" type="AUDIO_DEVICE_IN_BUS"  role="source">
            <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"

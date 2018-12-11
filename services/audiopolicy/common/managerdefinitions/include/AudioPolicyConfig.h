@@ -176,7 +176,8 @@ public:
                     AUDIO_FORMAT_AAC_HE_V1, AUDIO_FORMAT_AAC_HE_V2, AUDIO_FORMAT_AAC_ELD,
                     AUDIO_FORMAT_AAC_XHE}},
             {AUDIO_FORMAT_DOLBY_TRUEHD, {}},
-            {AUDIO_FORMAT_E_AC3_JOC, {}}};
+            {AUDIO_FORMAT_E_AC3_JOC, {}},
+            {AUDIO_FORMAT_AC4, {}}};
     }
 
 private:
