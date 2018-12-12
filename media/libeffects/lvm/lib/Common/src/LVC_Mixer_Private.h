@@ -62,6 +62,13 @@ void LVC_Core_MixInSoft_D16C31_SAT( LVMixer3_FLOAT_st *ptrInstance,
                                     const LVM_FLOAT     *src,
                                     LVM_FLOAT     *dst,
                                     LVM_INT16     n);
+#ifdef SUPPORT_MC
+void LVC_Core_MixInSoft_Mc_D16C31_SAT(LVMixer3_FLOAT_st *ptrInstance,
+                                    const LVM_FLOAT     *src,
+                                          LVM_FLOAT     *dst,
+                                          LVM_INT16     NrFrames,
+                                          LVM_INT16     NrChannels);
+#endif
 #else
 void LVC_Core_MixInSoft_D16C31_SAT( LVMixer3_st *pInstance,
                                     const LVM_INT16     *src,
@@ -73,6 +80,13 @@ void LVC_Core_MixSoft_1St_D16C31_WRA( LVMixer3_FLOAT_st *ptrInstance,
                                       const LVM_FLOAT     *src,
                                       LVM_FLOAT     *dst,
                                       LVM_INT16     n);
+#ifdef SUPPORT_MC
+void LVC_Core_MixSoft_Mc_D16C31_WRA(LVMixer3_FLOAT_st *ptrInstance,
+                                    const LVM_FLOAT     *src,
+                                          LVM_FLOAT     *dst,
+                                          LVM_INT16     NrFrames,
+                                          LVM_INT16     NrChannels);
+#endif
 #else
 void LVC_Core_MixSoft_1St_D16C31_WRA( LVMixer3_st *pInstance,
                                     const LVM_INT16     *src,

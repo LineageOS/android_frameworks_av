@@ -95,7 +95,7 @@ LVDBE_ReturnStatus_en LVDBE_Memory(LVDBE_Handle_t            hInstance,
 #ifdef BUILD_FLOAT
         pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].Size   = sizeof(LVDBE_Coef_FLOAT_t);
 #else
-        pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].Size         = sizeof(LVDBE_Coef_t);   
+        pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].Size         = sizeof(LVDBE_Coef_t);
 #endif
         pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].Alignment    = LVDBE_PERSISTENT_COEF_ALIGN;
         pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].Type         = LVDBE_PERSISTENT_COEF;

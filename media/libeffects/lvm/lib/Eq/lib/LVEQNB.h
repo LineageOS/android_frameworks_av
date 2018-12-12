@@ -267,7 +267,9 @@ typedef struct
     /* Equaliser parameters */
     LVM_UINT16                  NBands;                 /* Number of bands */
     LVEQNB_BandDef_t            *pBandDefinition;       /* Pointer to equaliser definitions */
-
+#ifdef SUPPORT_MC
+    LVM_INT16                   NrChannels;
+#endif
 } LVEQNB_Params_t;
 
 

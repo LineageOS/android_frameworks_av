@@ -515,16 +515,16 @@ const LVCS_VolCorrect_t LVCS_VolCorrectTable[] = {
 
 #if defined(BUILD_FLOAT) && defined(HIGHER_FS)
 const LVM_INT16 LVCS_VolumeTCTable[11] = {LVCS_VOL_TC_Fs8000,
-		                                  LVCS_VOL_TC_Fs11025,
-										  LVCS_VOL_TC_Fs12000,
-										  LVCS_VOL_TC_Fs16000,
-										  LVCS_VOL_TC_Fs22050,
-										  LVCS_VOL_TC_Fs24000,
-										  LVCS_VOL_TC_Fs32000,
-										  LVCS_VOL_TC_Fs44100,
-										  LVCS_VOL_TC_Fs48000,
-										  LVCS_VOL_TC_Fs96000,
-										  LVCS_VOL_TC_Fs192000
+                                          LVCS_VOL_TC_Fs11025,
+                                          LVCS_VOL_TC_Fs12000,
+                                          LVCS_VOL_TC_Fs16000,
+                                          LVCS_VOL_TC_Fs22050,
+                                          LVCS_VOL_TC_Fs24000,
+                                          LVCS_VOL_TC_Fs32000,
+                                          LVCS_VOL_TC_Fs44100,
+                                          LVCS_VOL_TC_Fs48000,
+                                          LVCS_VOL_TC_Fs96000,
+                                          LVCS_VOL_TC_Fs192000
 };
 #else
 const LVM_INT16 LVCS_VolumeTCTable[9] = {LVCS_VOL_TC_Fs8000,
@@ -546,16 +546,16 @@ const LVM_INT16 LVCS_VolumeTCTable[9] = {LVCS_VOL_TC_Fs8000,
 /************************************************************************************/
 #if defined(BUILD_FLOAT) && defined(HIGHER_FS)
 const LVM_INT32   LVCS_SampleRateTable[11] = {8000,
-		                                      11025,
-											  12000,
-											  16000,
-											  22050,
-											  24000,
-											  32000,
-											  44100,
-											  48000,
-											  96000,
-											  192000
+                                              11025,
+                                              12000,
+                                              16000,
+                                              22050,
+                                              24000,
+                                              32000,
+                                              44100,
+                                              48000,
+                                              96000,
+                                              192000
 };
 #else
 const LVM_INT16   LVCS_SampleRateTable[9] = {8000,
