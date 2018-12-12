@@ -80,11 +80,6 @@ public:
 
     virtual void setObserver(MediaBufferObserver *group);
 
-    // Returns a clone of this MediaBuffer increasing its reference count.
-    // The clone references the same data but has its own range and
-    // MetaData.
-    virtual MediaBufferBase *clone();
-
     // sum of localRefcount() and remoteRefcount()
     // Result should be treated as approximate unless the result precludes concurrent accesses.
     virtual int refcount() const {
@@ -157,8 +152,6 @@ private:
     bool mOwnsData;
 
     MetaDataBase* mMetaData;
-
-    MediaBuffer *mOriginal;
 
     static std::atomic_int_least32_t mUseSharedMemory;
 
