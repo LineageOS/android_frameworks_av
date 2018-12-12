@@ -193,6 +193,8 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
             // remove device from available output devices
             mAvailableOutputDevices.remove(device);
 
+            mOutputs.clearSessionRoutesForDevice(device);
+
             checkOutputsForDevice(device, state, outputs);
 
             // Reset active device codec
@@ -929,8 +931,6 @@ status_t AudioPolicyManager::getOutputForAttrInt(
     const sp<DeviceDescriptor> requestedDevice =
         mAvailableOutputDevices.getDeviceFromId(requestedPortId);
 
-
-
     status_t status = getAudioAttributes(resultAttr, attr, *stream);
     if (status != NO_ERROR) {
         return status;
@@ -1045,6 +1045,14 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
     audio_attributes_t resultAttr;
     bool isRequestedDeviceForExclusiveUse = false;
     std::vector<sp<SwAudioOutputDescriptor>> secondaryOutputDescs;
+    const sp<DeviceDescriptor> requestedDevice =
+      mAvailableOutputDevices.getDeviceFromId(requestedPortId);
+
+    // Prevent from storing invalid requested device id in clients
+    const audio_port_handle_t sanitizedRequestedPortId =
+      requestedDevice != nullptr ? requestedPortId : AUDIO_PORT_HANDLE_NONE;
+    *selectedDeviceId = sanitizedRequestedPortId;
+
     status_t status = getOutputForAttrInt(&resultAttr, output, session, attr, stream, uid,
             config, flags, selectedDeviceId, &isRequestedDeviceForExclusiveUse,
             &secondaryOutputDescs);
@@ -1064,15 +1072,15 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
 
     sp<TrackClientDescriptor> clientDesc =
         new TrackClientDescriptor(*portId, uid, session, resultAttr, clientConfig,
-                                  requestedPortId, *stream,
+                                  sanitizedRequestedPortId, *stream,
                                   mEngine->getProductStrategyForAttributes(resultAttr),
                                   *flags, isRequestedDeviceForExclusiveUse,
                                   std::move(weakSecondaryOutputDescs));
     sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueFor(*output);
     outputDesc->addClient(clientDesc);
 
-    ALOGV("%s() returns output %d selectedDeviceId %d for port ID %d", __func__,
-          *output, *selectedDeviceId, *portId);
+    ALOGV("%s() returns output %d requestedPortId %d selectedDeviceId %d for port ID %d", __func__,
+          *output, requestedPortId, *selectedDeviceId, *portId);
 
     return NO_ERROR;
 }
@@ -1953,6 +1961,8 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
         if (explicitRoutingDevice != nullptr) {
             device = explicitRoutingDevice;
         } else {
+            // Prevent from storing invalid requested device id in clients
+            requestedDeviceId = AUDIO_PORT_HANDLE_NONE;
             device = mEngine->getInputDeviceForAttributes(attributes, &policyMix);
         }
         if (device == nullptr) {
@@ -5295,15 +5305,16 @@ uint32_t AudioPolicyManager::setOutputDevices(const sp<SwAudioOutputDescriptor>&
 
     // filter devices according to output selected
     DeviceVector filteredDevices = outputDesc->filterSupportedDevices(devices);
+    DeviceVector prevDevices = outputDesc->devices();
 
     // no need to proceed if new device is not AUDIO_DEVICE_NONE and not supported by current
-    // output profile
-    if (!devices.isEmpty() && filteredDevices.isEmpty()) {
+    // output profile or if new device is not supported AND previous device(s) is(are) still
+    // available (otherwise reset device must be done on the output)
+    if (!devices.isEmpty() && filteredDevices.isEmpty() &&
+            !mAvailableOutputDevices.filter(prevDevices).empty()) {
         ALOGV("%s: unsupported device %s for output", __func__, devices.toString().c_str());
         return 0;
     }
-
-    DeviceVector prevDevices = outputDesc->devices();
 
     ALOGV("setOutputDevices() prevDevice %s", prevDevices.toString().c_str());
 
@@ -5818,6 +5829,8 @@ void AudioPolicyManager::cleanUpForDevice(const sp<DeviceDescriptor>& deviceDesc
             releaseAudioPatch(patchDesc->mHandle, patchDesc->mUid);
         }
     }
+
+    mInputs.clearSessionRoutesForDevice(deviceDesc);
 
     mHwModules.cleanUpForDevice(deviceDesc);
 }
