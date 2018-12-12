@@ -53,11 +53,11 @@ void DelayAllPass_Sat_32x16To32(  LVM_INT32  *delay,                    /* Delay
         {
             if(a < 0)
             {
-                c = 0x80000000l;
+                c = 0x80000000L;
             }
             else
             {
-                c = 0x7FFFFFFFl;
+                c = 0x7FFFFFFFL;
             }
         }
         *dst = c;
@@ -72,11 +72,11 @@ void DelayAllPass_Sat_32x16To32(  LVM_INT32  *delay,                    /* Delay
         {
             if(a < 0)
             {
-                c = 0x80000000l;
+                c = 0x80000000L;
             }
             else
             {
-                c = 0x7FFFFFFFl;
+                c = 0x7FFFFFFFL;
             }
         }
         delay[AllPassOffset] = c;
