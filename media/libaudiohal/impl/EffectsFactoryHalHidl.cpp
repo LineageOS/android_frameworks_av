@@ -25,14 +25,15 @@
 #include "EffectHalHidl.h"
 #include "HidlUtils.h"
 
-using ::android::hardware::audio::common::CPP_VERSION::HidlUtils;
-using ::android::hardware::audio::common::CPP_VERSION::Uuid;
+using ::android::hardware::audio::common::CPP_VERSION::implementation::HidlUtils;
 using ::android::hardware::audio::effect::CPP_VERSION::IEffect;
 using ::android::hardware::audio::effect::CPP_VERSION::Result;
 using ::android::hardware::Return;
 
 namespace android {
 namespace CPP_VERSION {
+
+using namespace ::android::hardware::audio::common::CPP_VERSION;
 
 EffectsFactoryHalHidl::EffectsFactoryHalHidl() : ConversionHelperHidl("EffectsFactory") {
     mEffectsFactory = IEffectsFactory::getService();

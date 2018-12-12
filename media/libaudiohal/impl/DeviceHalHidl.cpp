@@ -31,32 +31,16 @@
 #include "StreamHalHidl.h"
 #include "VersionUtils.h"
 
-using ::android::hardware::audio::common::CPP_VERSION::AudioConfig;
-using ::android::hardware::audio::common::CPP_VERSION::AudioDevice;
-using ::android::hardware::audio::common::CPP_VERSION::AudioInputFlag;
-using ::android::hardware::audio::common::CPP_VERSION::AudioOutputFlag;
-using ::android::hardware::audio::common::CPP_VERSION::AudioPatchHandle;
-using ::android::hardware::audio::common::CPP_VERSION::AudioPort;
-using ::android::hardware::audio::common::CPP_VERSION::AudioPortConfig;
-using ::android::hardware::audio::common::CPP_VERSION::AudioMode;
-using ::android::hardware::audio::common::CPP_VERSION::AudioSource;
-using ::android::hardware::audio::common::CPP_VERSION::HidlUtils;
+using ::android::hardware::audio::common::CPP_VERSION::implementation::HidlUtils;
 using ::android::hardware::audio::common::utils::EnumBitfield;
-using ::android::hardware::audio::CPP_VERSION::DeviceAddress;
-using ::android::hardware::audio::CPP_VERSION::IPrimaryDevice;
-using ::android::hardware::audio::CPP_VERSION::ParameterValue;
-using ::android::hardware::audio::CPP_VERSION::Result;
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 
-#if MAJOR_VERSION == 4
-using ::android::hardware::audio::CPP_VERSION::SinkMetadata;
-#elif MAJOR_VERSION == 5
-using ::android::hardware::audio::common::CPP_VERSION::SinkMetadata;
-#endif
-
 namespace android {
 namespace CPP_VERSION {
+
+using namespace ::android::hardware::audio::common::CPP_VERSION;
+using namespace ::android::hardware::audio::CPP_VERSION;
 
 namespace {
 
