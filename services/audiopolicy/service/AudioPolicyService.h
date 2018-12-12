@@ -33,6 +33,7 @@
 #include <media/AudioPolicy.h>
 #include "AudioPolicyEffects.h"
 #include "managerdefault/AudioPolicyManager.h"
+#include <android/hardware/BnSensorPrivacyListener.h>
 
 #include <unordered_map>
 
@@ -279,6 +280,8 @@ private:
     void updateUidStates();
     void updateUidStates_l();
 
+    void silenceAllRecordings_l();
+
     static bool isPrivacySensitive(audio_source_t source);
 
     // If recording we need to make sure the UID is allowed to do that. If the UID is idle
@@ -332,6 +335,27 @@ private:
         std::unordered_map<uid_t, std::pair<bool, int>> mCachedUids;
         uid_t mAssistantUid;
         std::vector<uid_t> mA11yUids;
+    };
+
+    // If sensor privacy is enabled then all apps, including those that are active, should be
+    // prevented from recording. This is handled similar to idle UIDs, any app that attempts
+    // to record while sensor privacy is enabled will receive buffers with zeros. As soon as
+    // sensor privacy is disabled active apps will receive the expected data when recording.
+    class SensorPrivacyPolicy : public hardware::BnSensorPrivacyListener {
+        public:
+            explicit SensorPrivacyPolicy(wp<AudioPolicyService> service)
+                    : mService(service) {}
+
+            void registerSelf();
+            void unregisterSelf();
+
+            bool isSensorPrivacyEnabled();
+
+            binder::Status onSensorPrivacyChanged(bool enabled);
+
+        private:
+            wp<AudioPolicyService> mService;
+            std::atomic_bool mSensorPrivacyEnabled;
     };
 
     // Thread used to send audio config commands to audio flinger
@@ -718,6 +742,8 @@ private:
     audio_mode_t mPhoneState;
 
     sp<UidPolicy> mUidPolicy;
+    sp<SensorPrivacyPolicy> mSensorPrivacyPolicy;
+
     DefaultKeyedVector< audio_port_handle_t, sp<AudioRecordClient> >   mAudioRecordClients;
     DefaultKeyedVector< audio_port_handle_t, sp<AudioPlaybackClient> >   mAudioPlaybackClients;
 };
