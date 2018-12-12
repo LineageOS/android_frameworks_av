@@ -598,7 +598,10 @@ static std::vector<std::pair<const char *, uint32_t>> int64Mappings {
     {
         { "exif-offset", kKeyExifOffset },
         { "exif-size", kKeyExifSize },
+        { "target-time", kKeyTargetTime },
         { "thumbnail-time", kKeyThumbnailTime },
+        { "timeUs", kKeyTime },
+        { "durationUs", kKeyDuration },
     }
 };
 
@@ -613,6 +616,7 @@ static std::vector<std::pair<const char *, uint32_t>> int32Mappings {
         { "max-bitrate", kKeyMaxBitRate },
         { "pcm-big-endian", kKeyPcmBigEndian },
         { "temporal-layer-count", kKeyTemporalLayerCount },
+        { "temporal-layer-id", kKeyTemporalLayerId },
         { "thumbnail-width", kKeyThumbnailWidth },
         { "thumbnail-height", kKeyThumbnailHeight },
         { "frame-count", kKeyFrameCount },
@@ -626,6 +630,8 @@ static std::vector<std::pair<const char *, uint32_t>> bufferMappings {
         { "pssh", kKeyPssh },
         { "crypto-iv", kKeyCryptoIV },
         { "crypto-key", kKeyCryptoKey },
+        { "crypto-encrypted-sizes", kKeyEncryptedSizes },
+        { "crypto-plain-sizes", kKeyPlainSizes },
         { "icc-profile", kKeyIccProfile },
         { "text-format-data", kKeyTextFormatData },
     }

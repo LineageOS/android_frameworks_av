@@ -16,6 +16,7 @@
 
 #include <mutex>
 
+#include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/Utils.h>
 
@@ -216,9 +217,50 @@ status_t MediaTrackCUnwrapperV3::read(MediaBufferBase **buffer, const ReadOption
         if (format->mFormat->findInt64("timeUs", &val64)) {
             meta.setInt64(kKeyTime, val64);
         }
+        if (format->mFormat->findInt64("duration", &val64)) {
+            meta.setInt64(kKeyDuration, val64);
+        }
+        if (format->mFormat->findInt64("target-time", &val64)) {
+            meta.setInt64(kKeyTargetTime, val64);
+        }
         int32_t val32;
         if (format->mFormat->findInt32("is-sync-frame", &val32)) {
             meta.setInt32(kKeyIsSyncFrame, val32);
+        }
+        if (format->mFormat->findInt32("temporal-layer-id", &val32)) {
+            meta.setInt32(kKeyTemporalLayerId, val32);
+        }
+        if (format->mFormat->findInt32("temporal-layer-count", &val32)) {
+            meta.setInt32(kKeyTemporalLayerCount, val32);
+        }
+        if (format->mFormat->findInt32("crypto-default-iv-size", &val32)) {
+            meta.setInt32(kKeyCryptoDefaultIVSize, val32);
+        }
+        if (format->mFormat->findInt32("crypto-mode", &val32)) {
+            meta.setInt32(kKeyCryptoMode, val32);
+        }
+        if (format->mFormat->findInt32("crypto-encrypted-byte-block", &val32)) {
+            meta.setInt32(kKeyEncryptedByteBlock, val32);
+        }
+        if (format->mFormat->findInt32("crypto-skip-byte-block", &val32)) {
+            meta.setInt32(kKeySkipByteBlock, val32);
+        }
+        sp<ABuffer> valbuf;
+        if (format->mFormat->findBuffer("crypto-plain-sizes", &valbuf)) {
+            meta.setData(kKeyPlainSizes,
+                    MetaDataBase::Type::TYPE_NONE, valbuf->data(), valbuf->size());
+        }
+        if (format->mFormat->findBuffer("crypto-encrypted-sizes", &valbuf)) {
+            meta.setData(kKeyEncryptedSizes,
+                    MetaDataBase::Type::TYPE_NONE, valbuf->data(), valbuf->size());
+        }
+        if (format->mFormat->findBuffer("crypto-key", &valbuf)) {
+            meta.setData(kKeyCryptoKey,
+                    MetaDataBase::Type::TYPE_NONE, valbuf->data(), valbuf->size());
+        }
+        if (format->mFormat->findBuffer("crypto-iv", &valbuf)) {
+            meta.setData(kKeyCryptoIV,
+                    MetaDataBase::Type::TYPE_NONE, valbuf->data(), valbuf->size());
         }
     } else {
         *buffer = nullptr;

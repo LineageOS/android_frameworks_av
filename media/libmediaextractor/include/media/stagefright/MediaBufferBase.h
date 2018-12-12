@@ -96,6 +96,14 @@ public:
             return ((MediaBufferBase*)handle)->size();
         };
 
+        mWrapper->range_offset = [](void *handle) -> size_t {
+            return ((MediaBufferBase*)handle)->range_offset();
+        };
+
+        mWrapper->range_length = [](void *handle) -> size_t {
+            return ((MediaBufferBase*)handle)->range_length();
+        };
+
         mWrapper->set_range = [](void *handle, size_t offset, size_t length) -> void {
             return ((MediaBufferBase*)handle)->set_range(offset, length);
         };
