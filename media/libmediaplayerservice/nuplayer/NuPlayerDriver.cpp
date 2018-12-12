@@ -473,7 +473,7 @@ status_t NuPlayerDriver::seekTo(int msec, MediaPlayerSeekMode mode) {
     ALOGD("seekTo(%p) (%d ms, %d) at state %d", this, msec, mode, mState);
     Mutex::Autolock autoLock(mLock);
 
-    int64_t seekTimeUs = msec * 1000ll;
+    int64_t seekTimeUs = msec * 1000LL;
 
     switch (mState) {
         case STATE_PREPARED:
@@ -530,7 +530,7 @@ status_t NuPlayerDriver::getDuration(int *msec) {
         return UNKNOWN_ERROR;
     }
 
-    *msec = (mDurationUs + 500ll) / 1000;
+    *msec = (mDurationUs + 500LL) / 1000;
 
     return OK;
 }
@@ -738,7 +738,7 @@ status_t NuPlayerDriver::invoke(const Parcel &request, Parcel *reply) {
             int msec = 0;
             // getCurrentPosition should always return OK
             getCurrentPosition(&msec);
-            return mPlayer->selectTrack(trackIndex, true /* select */, msec * 1000ll);
+            return mPlayer->selectTrack(trackIndex, true /* select */, msec * 1000LL);
         }
 
         case INVOKE_ID_UNSELECT_TRACK:
