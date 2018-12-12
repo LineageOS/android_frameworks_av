@@ -43,11 +43,11 @@ void Add2_Sat_32x32( const LVM_INT32  *src,
         {
             if(a<0)
             {
-                c=0x80000000l;
+                c=0x80000000L;
             }
             else
             {
-                c=0x7FFFFFFFl;
+                c=0x7FFFFFFFL;
             }
         }
 
