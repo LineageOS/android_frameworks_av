@@ -186,7 +186,7 @@ bool NuPlayer::StreamingSource::haveSufficientDataOnAllTracks() {
     // We're going to buffer at least 2 secs worth data on all tracks before
     // starting playback (both at startup and after a seek).
 
-    static const int64_t kMinDurationUs = 2000000ll;
+    static const int64_t kMinDurationUs = 2000000LL;
 
     sp<AnotherPacketSource> audioTrack = getSource(true /*audio*/);
     sp<AnotherPacketSource> videoTrack = getSource(false /*audio*/);
