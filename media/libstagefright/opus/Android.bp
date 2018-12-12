@@ -1,0 +1,21 @@
+cc_library_shared {
+    name: "libstagefright_opus_common",
+    vendor_available: true,
+
+    export_include_dirs: ["include"],
+
+    srcs: ["OpusHeader.cpp"],
+
+    shared_libs: ["liblog"],
+
+    cflags: ["-Werror"],
+
+    sanitize: {
+        integer_overflow: true,
+        cfi: true,
+        diag: {
+            integer_overflow: true,
+            cfi: true,
+        },
+    },
+}

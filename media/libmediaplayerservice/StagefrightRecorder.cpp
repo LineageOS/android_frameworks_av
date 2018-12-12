@@ -46,6 +46,7 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MediaCodecSource.h>
+#include <media/stagefright/OggWriter.h>
 #include <media/stagefright/PersistentSurface.h>
 #include <media/MediaProfiles.h>
 #include <camera/CameraParameters.h>
@@ -948,6 +949,10 @@ status_t StagefrightRecorder::prepareInternal() {
             status = setupMPEG2TSRecording();
             break;
 
+        case OUTPUT_FORMAT_OGG:
+            status = setupOggRecording();
+            break;
+
         default:
             ALOGE("Unsupported output file format: %d", mOutputFormat);
             status = UNKNOWN_ERROR;
@@ -1013,6 +1018,7 @@ status_t StagefrightRecorder::start() {
         case OUTPUT_FORMAT_AAC_ADTS:
         case OUTPUT_FORMAT_RTP_AVP:
         case OUTPUT_FORMAT_MPEG2TS:
+        case OUTPUT_FORMAT_OGG:
         {
             sp<MetaData> meta = new MetaData;
             int64_t startTimeUs = systemTime() / 1000;
@@ -1113,6 +1119,9 @@ sp<MediaCodecSource> StagefrightRecorder::createAudioSource() {
             format->setString("mime", MEDIA_MIMETYPE_AUDIO_AAC);
             format->setInt32("aac-profile", OMX_AUDIO_AACObjectELD);
             break;
+        case AUDIO_ENCODER_OPUS:
+            format->setString("mime", MEDIA_MIMETYPE_AUDIO_OPUS);
+            break;
 
         default:
             ALOGE("Unknown audio encoder: %d", mAudioEncoder);
@@ -1166,6 +1175,13 @@ status_t StagefrightRecorder::setupAACRecording() {
     CHECK(mAudioSource != AUDIO_SOURCE_CNT);
 
     mWriter = new AACWriter(mOutputFd);
+    return setupRawAudioRecording();
+}
+
+status_t StagefrightRecorder::setupOggRecording() {
+    CHECK_EQ(mOutputFormat, OUTPUT_FORMAT_OGG);
+
+    mWriter = new OggWriter(mOutputFd);
     return setupRawAudioRecording();
 }
 
@@ -1813,6 +1829,7 @@ status_t StagefrightRecorder::setupAudioEncoder(const sp<MediaWriter>& writer) {
         case AUDIO_ENCODER_AAC:
         case AUDIO_ENCODER_HE_AAC:
         case AUDIO_ENCODER_AAC_ELD:
+        case AUDIO_ENCODER_OPUS:
             break;
 
         default:
@@ -1863,19 +1880,18 @@ status_t StagefrightRecorder::setupMPEG4orWEBMRecording() {
         mTotalBitRate += mVideoBitRate;
     }
 
-    if (mOutputFormat != OUTPUT_FORMAT_WEBM) {
-        // Audio source is added at the end if it exists.
-        // This help make sure that the "recoding" sound is suppressed for
-        // camcorder applications in the recorded files.
-        // TODO Audio source is currently unsupported for webm output; vorbis encoder needed.
-        // disable audio for time lapse recording
-        bool disableAudio = mCaptureFpsEnable && mCaptureFps < mFrameRate;
-        if (!disableAudio && mAudioSource != AUDIO_SOURCE_CNT) {
-            err = setupAudioEncoder(writer);
-            if (err != OK) return err;
-            mTotalBitRate += mAudioBitRate;
-        }
+    // Audio source is added at the end if it exists.
+    // This help make sure that the "recoding" sound is suppressed for
+    // camcorder applications in the recorded files.
+    // disable audio for time lapse recording
+    const bool disableAudio = mCaptureFpsEnable && mCaptureFps < mFrameRate;
+    if (!disableAudio && mAudioSource != AUDIO_SOURCE_CNT) {
+        err = setupAudioEncoder(writer);
+        if (err != OK) return err;
+        mTotalBitRate += mAudioBitRate;
+    }
 
+    if (mOutputFormat != OUTPUT_FORMAT_WEBM) {
         if (mCaptureFpsEnable) {
             mp4writer->setCaptureRate(mCaptureFps);
         }
