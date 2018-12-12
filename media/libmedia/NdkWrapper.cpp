@@ -27,21 +27,23 @@
 #include <media/NdkMediaFormat.h>
 #include <media/NdkMediaExtractor.h>
 #include <media/stagefright/MetaData.h>
+#include <media/stagefright/NuMediaExtractor.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <utils/Errors.h>
+#include <utils/StrongPointer.h>
 
-// TODO: remove forward declaration when AMediaExtractor_disconnect is offcially added to NDK
+// Temporarily keeping AMediaExtractor_disconnect() where it is used.
+// Will be removed soon in favor of official public APIs.
+struct AMediaExtractor {
+    android::sp<android::NuMediaExtractor> mImpl;
+    android::sp<android::ABuffer> mPsshBuf;
+};
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-media_status_t AMediaExtractor_disconnect(AMediaExtractor *);
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
+media_status_t AMediaExtractor_disconnect(AMediaExtractor * ex) {
+    ex->mImpl->disconnect();
+    return AMEDIA_OK;
+}
 
 namespace android {
 
