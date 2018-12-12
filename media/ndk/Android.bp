@@ -61,6 +61,7 @@ cc_library_shared {
     ],
 
     cflags: [
+        "-fvisibility=hidden",
         "-DEXPORT=__attribute__((visibility(\"default\")))",
         "-Werror",
         "-Wall",
@@ -104,10 +105,6 @@ cc_library_shared {
         },
     },
     version_script: "libmediandk.map.txt",
-    stubs: {
-        symbol_file: "libmediandk.map.txt",
-        versions: ["29"],
-    },
 }
 
 llndk_library {
