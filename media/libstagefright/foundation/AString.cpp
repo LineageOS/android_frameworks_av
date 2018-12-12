@@ -365,6 +365,8 @@ bool AString::endsWithIgnoreCase(const char *suffix) const {
 // static
 AString AString::FromParcel(const Parcel &parcel) {
     size_t size = static_cast<size_t>(parcel.readInt32());
+    // The static analyzer incorrectly reports a false-positive here in c++17.
+    // https://bugs.llvm.org/show_bug.cgi?id=38176 . NOLINTNEXTLINE
     return AString(static_cast<const char *>(parcel.readInplace(size)), size);
 }
 
