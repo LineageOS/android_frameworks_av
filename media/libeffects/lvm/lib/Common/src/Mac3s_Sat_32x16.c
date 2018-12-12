@@ -50,11 +50,11 @@ void Mac3s_Sat_32x16(  const LVM_INT32 *src,
         {
             if(temp<0)
             {
-                dOutVal=0x80000000l;
+                dOutVal=0x80000000L;
             }
             else
             {
-                dOutVal=0x7FFFFFFFl;
+                dOutVal=0x7FFFFFFFL;
             }
         }
 
