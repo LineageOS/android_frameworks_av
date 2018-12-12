@@ -158,7 +158,7 @@ LIBMEDIANDK {
     AMediaCodec_dequeueInputBuffer;
     AMediaCodec_dequeueOutputBuffer;
     AMediaCodec_flush;
-    AMediaCodec_getBufferFormat; # introduced=21
+    AMediaCodec_getBufferFormat; # introduced=28
     AMediaCodec_getInputBuffer;
     AMediaCodec_getInputFormat; # introduced=28
     AMediaCodec_getName; # introduced=28
