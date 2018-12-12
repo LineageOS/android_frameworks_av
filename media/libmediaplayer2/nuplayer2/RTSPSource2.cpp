@@ -30,7 +30,7 @@
 
 namespace android {
 
-const int64_t kNearEOSTimeoutUs = 2000000ll; // 2 secs
+const int64_t kNearEOSTimeoutUs = 2000000LL; // 2 secs
 
 // Default Buffer Underflow/Prepare/StartServer/Overflow Marks
 static const int kUnderflowMarkMs   =  1000;  // 1 second
@@ -168,7 +168,7 @@ bool NuPlayer2::RTSPSource2::haveSufficientDataOnAllTracks() {
     // We're going to buffer at least 2 secs worth data on all tracks before
     // starting playback (both at startup and after a seek).
 
-    static const int64_t kMinDurationUs = 2000000ll;
+    static const int64_t kMinDurationUs = 2000000LL;
 
     int64_t mediaDurationUs = 0;
     getDuration(&mediaDurationUs);
@@ -272,7 +272,7 @@ void NuPlayer2::RTSPSource2::setEOSTimeout(bool audio, int64_t timeout) {
 }
 
 status_t NuPlayer2::RTSPSource2::getDuration(int64_t *durationUs) {
-    *durationUs = -1ll;
+    *durationUs = -1LL;
 
     int64_t audioDurationUs;
     if (mAudioTrack != NULL
@@ -321,7 +321,7 @@ void NuPlayer2::RTSPSource2::performSeek(int64_t seekTimeUs) {
 
 void NuPlayer2::RTSPSource2::schedulePollBuffering() {
     sp<AMessage> msg = new AMessage(kWhatPollBuffering, this);
-    msg->post(1000000ll); // 1 second intervals
+    msg->post(1000000LL); // 1 second intervals
 }
 
 void NuPlayer2::RTSPSource2::checkBuffering(
@@ -345,10 +345,10 @@ void NuPlayer2::RTSPSource2::checkBuffering(
         int64_t maxRebufferingMarkUs;
         {
             Mutex::Autolock _l(mBufferingSettingsLock);
-            initialMarkUs = mBufferingSettings.mInitialMarkMs * 1000ll;
+            initialMarkUs = mBufferingSettings.mInitialMarkMs * 1000LL;
             // TODO: maxRebufferingMarkUs could be larger than
             // mBufferingSettings.mResumePlaybackMarkMs * 1000ll.
-            maxRebufferingMarkUs = mBufferingSettings.mResumePlaybackMarkMs * 1000ll;
+            maxRebufferingMarkUs = mBufferingSettings.mResumePlaybackMarkMs * 1000LL;
         }
         // isFinished when duration is 0 checks for EOS result only
         if (bufferedDurationUs > initialMarkUs
@@ -368,7 +368,7 @@ void NuPlayer2::RTSPSource2::checkBuffering(
                 ++overflowCount;
             }
             int64_t startServerMarkUs =
-                    (kUnderflowMarkMs * 1000ll + maxRebufferingMarkUs) / 2;
+                    (kUnderflowMarkMs * 1000LL + maxRebufferingMarkUs) / 2;
             if (bufferedDurationUs < startServerMarkUs) {
                 ++startCount;
             }
@@ -639,7 +639,7 @@ void NuPlayer2::RTSPSource2::onMessageReceived(const sp<AMessage> &msg) {
                 int64_t nptUs =
                     ((double)rtpTime - (double)info->mRTPTime)
                         / info->mTimeScale
-                        * 1000000ll
+                        * 1000000LL
                         + info->mNormalPlaytimeUs;
 
                 accessUnit->meta()->setInt64("timeUs", nptUs);
@@ -747,7 +747,7 @@ void NuPlayer2::RTSPSource2::onConnected() {
         TrackInfo info;
         info.mTimeScale = timeScale;
         info.mRTPTime = 0;
-        info.mNormalPlaytimeUs = 0ll;
+        info.mNormalPlaytimeUs = 0LL;
         info.mNPTMappingValid = false;
 
         if ((isAudio && mAudioTrack == NULL)
