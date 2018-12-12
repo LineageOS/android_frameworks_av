@@ -811,7 +811,7 @@ ResultStatus BufferPoolClient::getAccessor(sp<IAccessor> *accessor) {
 }
 
 void BufferPoolClient::receiveInvalidation(uint32_t msgId) {
-    ALOGV("bufferpool client recv inv %u", msgId);
+    ALOGV("bufferpool2 client recv inv %u", msgId);
     if (isValid()) {
         mImpl->receiveInvalidation(msgId);
     }

@@ -33,12 +33,12 @@ namespace {
 using android::C2AllocatorGralloc;
 using android::C2AllocatorIon;
 using android::hardware::media::bufferpool::BufferPoolData;
-using android::hardware::media::bufferpool::V1_0::ResultStatus;
-using android::hardware::media::bufferpool::V1_0::implementation::BufferPoolAllocation;
-using android::hardware::media::bufferpool::V1_0::implementation::BufferPoolAllocator;
-using android::hardware::media::bufferpool::V1_0::implementation::ClientManager;
-using android::hardware::media::bufferpool::V1_0::implementation::ConnectionId;
-using android::hardware::media::bufferpool::V1_0::implementation::INVALID_CONNECTIONID;
+using android::hardware::media::bufferpool::V2_0::ResultStatus;
+using android::hardware::media::bufferpool::V2_0::implementation::BufferPoolAllocation;
+using android::hardware::media::bufferpool::V2_0::implementation::BufferPoolAllocator;
+using android::hardware::media::bufferpool::V2_0::implementation::ClientManager;
+using android::hardware::media::bufferpool::V2_0::implementation::ConnectionId;
+using android::hardware::media::bufferpool::V2_0::implementation::INVALID_CONNECTIONID;
 
 // This anonymous namespace contains the helper classes that allow our implementation to create
 // block/buffer objects.

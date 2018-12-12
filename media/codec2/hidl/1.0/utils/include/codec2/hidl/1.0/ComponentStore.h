@@ -20,7 +20,7 @@
 #include <codec2/hidl/1.0/Component.h>
 #include <codec2/hidl/1.0/Configurable.h>
 #include <android/hardware/media/c2/1.0/IComponentStore.h>
-#include <android/hardware/media/bufferpool/1.0/IClientManager.h>
+#include <android/hardware/media/bufferpool/2.0/IClientManager.h>
 #include <hidl/Status.h>
 
 #include <C2Component.h>
@@ -40,7 +40,7 @@ namespace c2 {
 namespace V1_0 {
 namespace utils {
 
-using ::android::hardware::media::bufferpool::V1_0::IClientManager;
+using ::android::hardware::media::bufferpool::V2_0::IClientManager;
 
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_handle;

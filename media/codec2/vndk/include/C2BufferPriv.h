@@ -20,7 +20,7 @@
 #include <functional>
 
 #include <C2Buffer.h>
-#include <android/hardware/media/bufferpool/1.0/IAccessor.h>
+#include <android/hardware/media/bufferpool/2.0/IAccessor.h>
 
 class C2BasicLinearBlockPool : public C2BlockPool {
 public:
@@ -112,7 +112,7 @@ public:
      * \return true             IAcessor is writen successfully.
      * \return false            IAccessor is not written.
      */
-    bool getAccessor(android::sp<android::hardware::media::bufferpool::V1_0::IAccessor> *accessor);
+    bool getAccessor(android::sp<android::hardware::media::bufferpool::V2_0::IAccessor> *accessor);
 
 private:
     const std::shared_ptr<C2Allocator> mAllocator;

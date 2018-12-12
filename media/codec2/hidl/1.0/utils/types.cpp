@@ -49,11 +49,11 @@ namespace utils {
 using namespace ::android;
 using ::android::hardware::Return;
 using ::android::hardware::media::bufferpool::BufferPoolData;
-using ::android::hardware::media::bufferpool::V1_0::BufferStatusMessage;
-using ::android::hardware::media::bufferpool::V1_0::ResultStatus;
-using ::android::hardware::media::bufferpool::V1_0::implementation::
+using ::android::hardware::media::bufferpool::V2_0::BufferStatusMessage;
+using ::android::hardware::media::bufferpool::V2_0::ResultStatus;
+using ::android::hardware::media::bufferpool::V2_0::implementation::
         ClientManager;
-using ::android::hardware::media::bufferpool::V1_0::implementation::
+using ::android::hardware::media::bufferpool::V2_0::implementation::
         TransactionId;
 using ::android::TWGraphicBufferProducer;
 

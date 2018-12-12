@@ -20,8 +20,8 @@
 #include <chrono>
 
 #include <bufferpool/ClientManager.h>
-#include <android/hardware/media/bufferpool/1.0/IClientManager.h>
-#include <android/hardware/media/bufferpool/1.0/types.h>
+#include <android/hardware/media/bufferpool/2.0/IClientManager.h>
+#include <android/hardware/media/bufferpool/2.0/types.h>
 #include <android/hardware/media/c2/1.0/IComponentStore.h>
 #include <android/hardware/media/c2/1.0/types.h>
 #include <gui/IGraphicBufferProducer.h>
@@ -46,7 +46,7 @@ using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 using ::android::status_t;
 using ::android::sp;
-using ::android::hardware::media::bufferpool::V1_0::implementation::
+using ::android::hardware::media::bufferpool::V2_0::implementation::
         ConnectionId;
 using ::android::IGraphicBufferProducer;
 
@@ -131,9 +131,9 @@ c2_status_t objcpy(
 // Abstract class to be used in
 // objcpy(std::list<std::unique_ptr<C2Work>> -> WorkBundle).
 struct BufferPoolSender {
-    typedef ::android::hardware::media::bufferpool::V1_0::
+    typedef ::android::hardware::media::bufferpool::V2_0::
             ResultStatus ResultStatus;
-    typedef ::android::hardware::media::bufferpool::V1_0::
+    typedef ::android::hardware::media::bufferpool::V2_0::
             BufferStatusMessage BufferStatusMessage;
     typedef ::android::hardware::media::bufferpool::
             BufferPoolData BufferPoolData;
@@ -151,7 +151,7 @@ struct BufferPoolSender {
      *    other means so it can call receive() properly.
      * \return ResultStatus value that determines the success of the operation.
      *    (See the possible values of ResultStatus in
-     *    hardware/interfaces/media/bufferpool/1.0/types.hal.)
+     *    hardware/interfaces/media/bufferpool/2.0/types.hal.)
      */
     virtual ResultStatus send(
             const std::shared_ptr<BufferPoolData>& bpData,
@@ -168,9 +168,9 @@ struct BufferPoolSender {
 // IClientManager::registerSender() to establish the bufferpool connection when
 // send() is called.
 struct DefaultBufferPoolSender : BufferPoolSender {
-    typedef ::android::hardware::media::bufferpool::V1_0::implementation::
+    typedef ::android::hardware::media::bufferpool::V2_0::implementation::
             ClientManager ClientManager;
-    typedef ::android::hardware::media::bufferpool::V1_0::
+    typedef ::android::hardware::media::bufferpool::V2_0::
             IClientManager IClientManager;
 
     // Set the IClientManager instance of the receiving process and the refresh
@@ -278,7 +278,7 @@ c2_status_t updateParamsFromBlob(
  * \param BufferPool status
  * \return Corresponding c2_status_t
  */
-c2_status_t toC2Status(::android::hardware::media::bufferpool::V1_0::
+c2_status_t toC2Status(::android::hardware::media::bufferpool::V2_0::
         ResultStatus rs);
 
 // BufferQueue-Based Block Operations

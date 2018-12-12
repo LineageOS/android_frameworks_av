@@ -20,7 +20,7 @@
 #include <codec2/hidl/1.0/Configurable.h>
 #include <codec2/hidl/1.0/types.h>
 
-#include <android/hardware/media/bufferpool/1.0/IClientManager.h>
+#include <android/hardware/media/bufferpool/2.0/IClientManager.h>
 #include <android/hardware/media/c2/1.0/IComponentListener.h>
 #include <android/hardware/media/c2/1.0/IComponentStore.h>
 #include <android/hardware/media/c2/1.0/IComponent.h>
@@ -71,7 +71,7 @@ struct Component : public Configurable<IComponent> {
             const std::shared_ptr<C2Component>&,
             const sp<IComponentListener>& listener,
             const sp<ComponentStore>& store,
-            const sp<::android::hardware::media::bufferpool::V1_0::
+            const sp<::android::hardware::media::bufferpool::V2_0::
                 IClientManager>& clientPoolManager);
     c2_status_t status() const;
 

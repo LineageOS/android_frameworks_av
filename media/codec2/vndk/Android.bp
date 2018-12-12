@@ -35,7 +35,7 @@ cc_library_shared {
 
     export_shared_lib_headers: [
         "libbase",
-        "android.hardware.media.bufferpool@1.0",
+        "android.hardware.media.bufferpool@2.0",
     ],
 
     local_include_dirs: [
@@ -51,7 +51,7 @@ cc_library_shared {
         "android.hardware.graphics.allocator@2.0",
         "android.hardware.graphics.bufferqueue@1.0",
         "android.hardware.graphics.mapper@2.0",
-        "android.hardware.media.bufferpool@1.0",
+        "android.hardware.media.bufferpool@2.0",
         "libbase",
         "libbinder",
         "libcutils",
@@ -63,7 +63,7 @@ cc_library_shared {
         "liblog",
         "libstagefright_bufferqueue_helper",
         "libstagefright_foundation",
-        "libstagefright_bufferpool@1.0",
+        "libstagefright_bufferpool@2.0",
         "libui",
         "libutils",
     ],
