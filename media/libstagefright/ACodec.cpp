@@ -2357,6 +2357,17 @@ status_t ACodec::getLatency(uint32_t *latency) {
     return err;
 }
 
+status_t ACodec::setAudioPresentation(int32_t presentationId, int32_t programId) {
+    OMX_AUDIO_CONFIG_ANDROID_AUDIOPRESENTATION config;
+    InitOMXParams(&config);
+    config.nPresentationId = (OMX_S32)presentationId;
+    config.nProgramId = (OMX_S32)programId;
+    status_t err = mOMXNode->setConfig(
+            (OMX_INDEXTYPE)OMX_IndexConfigAudioPresentation,
+            &config, sizeof(config));
+    return err;
+}
+
 status_t ACodec::setPriority(int32_t priority) {
     if (priority < 0) {
         return BAD_VALUE;
@@ -7447,6 +7458,18 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
         status_t err = setLatency(latency);
         if (err != OK) {
             ALOGI("[%s] failed setLatency. Failure is fine since this key is optional",
+                    mComponentName.c_str());
+            err = OK;
+        }
+    }
+
+    int32_t presentationId = -1;
+    if (params->findInt32("audio-presentation-presentation-id", &presentationId)) {
+        int32_t programId = -1;
+        params->findInt32("audio-presentation-program-id", &programId);
+        status_t err = setAudioPresentation(presentationId, programId);
+        if (err != OK) {
+            ALOGI("[%s] failed setAudioPresentation. Failure is fine since this key is optional",
                     mComponentName.c_str());
             err = OK;
         }
