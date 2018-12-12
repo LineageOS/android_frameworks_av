@@ -41,6 +41,7 @@
 
 using drm::V1_0::KeyedVector;
 using drm::V1_0::KeyStatusType;
+using drm::V1_0::KeyRequestType;
 using drm::V1_0::KeyType;
 using drm::V1_0::KeyValue;
 using drm::V1_0::SecureStop;
@@ -59,6 +60,9 @@ using ::android::hardware::Void;
 using ::android::hidl::manager::V1_0::IServiceManager;
 using ::android::os::PersistableBundle;
 using ::android::sp;
+
+typedef drm::V1_1::KeyRequestType KeyRequestType_V1_1;
+typedef drm::V1_2::Status Status_V1_2;
 
 namespace {
 
@@ -239,7 +243,7 @@ static status_t toStatusT(Status status) {
         return ERROR_DRM_CANNOT_HANDLE;
         break;
     case Status::ERROR_DRM_INVALID_STATE:
-        return ERROR_DRM_TAMPER_DETECTED;
+        return ERROR_DRM_INVALID_STATE;
         break;
     case Status::BAD_VALUE:
         return BAD_VALUE;
@@ -257,6 +261,19 @@ static status_t toStatusT(Status status) {
     default:
         return ERROR_DRM_UNKNOWN;
         break;
+    }
+}
+
+static status_t toStatusT_1_2(Status_V1_2 status) {
+    switch (status) {
+    case Status_V1_2::ERROR_DRM_RESOURCE_CONTENTION:
+        return ERROR_DRM_RESOURCE_CONTENTION;
+    case Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE:
+        return ERROR_DRM_FRAME_TOO_LARGE;
+    case Status_V1_2::ERROR_DRM_INSUFFICIENT_SECURITY:
+        return ERROR_DRM_INSUFFICIENT_SECURITY;
+    default:
+        return toStatusT(static_cast<Status>(status));
     }
 }
 
@@ -319,8 +336,11 @@ void DrmHal::cleanup() {
 
     setListener(NULL);
     mInitCheck = NO_INIT;
-
-    if (mPlugin != NULL) {
+    if (mPluginV1_2 != NULL) {
+        if (!mPluginV1_2->setListener(NULL).isOk()) {
+            mInitCheck = DEAD_OBJECT;
+        }
+    } else if (mPlugin != NULL) {
         if (!mPlugin->setListener(NULL).isOk()) {
             mInitCheck = DEAD_OBJECT;
         }
@@ -532,6 +552,22 @@ Return<void> DrmHal::sendKeysChange(const hidl_vec<uint8_t>& sessionId,
     return Void();
 }
 
+Return<void> DrmHal::sendSessionLostState(
+        const hidl_vec<uint8_t>& sessionId) {
+
+    mEventLock.lock();
+    sp<IDrmClient> listener = mListener;
+    mEventLock.unlock();
+
+    if (listener != NULL) {
+        Parcel obj;
+        writeByteArray(obj, sessionId);
+        Mutex::Autolock lock(mNotifyLock);
+        listener->notify(DrmPlugin::kDrmPluginEventSessionLostState, 0, &obj);
+    }
+    return Void();
+}
+
 bool DrmHal::isCryptoSchemeSupported(const uint8_t uuid[16], const String8 &mimeType) {
     Mutex::Autolock autoLock(mLock);
 
@@ -568,15 +604,21 @@ status_t DrmHal::createPlugin(const uint8_t uuid[16],
     if (mPlugin == NULL) {
         mInitCheck = ERROR_UNSUPPORTED;
     } else {
-        if (!mPlugin->setListener(this).isOk()) {
-            mPlugin = NULL;
-            mPluginV1_1 = NULL;
-            mPluginV1_2 = NULL;
+        mInitCheck = OK;
+        if (mPluginV1_2 != NULL) {
+            if (!mPluginV1_2->setListener(this).isOk()) {
+                mInitCheck = DEAD_OBJECT;
+            }
+        } else if (!mPlugin->setListener(this).isOk()) {
             mInitCheck = DEAD_OBJECT;
-        } else {
-            mInitCheck = OK;
+        }
+        if (mInitCheck != OK) {
+            mPlugin.clear();
+            mPluginV1_1.clear();
+            mPluginV1_2.clear();
         }
     }
+
 
     return mInitCheck;
 }
@@ -694,6 +736,39 @@ status_t DrmHal::closeSession(Vector<uint8_t> const &sessionId) {
     return DEAD_OBJECT;
 }
 
+static DrmPlugin::KeyRequestType toKeyRequestType(
+        KeyRequestType keyRequestType) {
+    switch (keyRequestType) {
+        case KeyRequestType::INITIAL:
+            return DrmPlugin::kKeyRequestType_Initial;
+            break;
+        case KeyRequestType::RENEWAL:
+            return DrmPlugin::kKeyRequestType_Renewal;
+            break;
+        case KeyRequestType::RELEASE:
+            return DrmPlugin::kKeyRequestType_Release;
+            break;
+        default:
+            return DrmPlugin::kKeyRequestType_Unknown;
+            break;
+    }
+}
+
+static DrmPlugin::KeyRequestType toKeyRequestType_1_1(
+        KeyRequestType_V1_1 keyRequestType) {
+    switch (keyRequestType) {
+        case KeyRequestType_V1_1::NONE:
+            return DrmPlugin::kKeyRequestType_None;
+            break;
+        case KeyRequestType_V1_1::UPDATE:
+            return DrmPlugin::kKeyRequestType_Update;
+            break;
+        default:
+            return toKeyRequestType(static_cast<KeyRequestType>(keyRequestType));
+            break;
+    }
+}
+
 status_t DrmHal::getKeyRequest(Vector<uint8_t> const &sessionId,
         Vector<uint8_t> const &initData, String8 const &mimeType,
         DrmPlugin::KeyType keyType, KeyedVector<String8,
@@ -720,73 +795,51 @@ status_t DrmHal::getKeyRequest(Vector<uint8_t> const &sessionId,
     ::KeyedVector hOptionalParameters = toHidlKeyedVector(optionalParameters);
 
     status_t err = UNKNOWN_ERROR;
+    Return<void> hResult;
 
-    if (mPluginV1_1 != NULL) {
-        Return<void> hResult =
-            mPluginV1_1->getKeyRequest_1_1(
+    if (mPluginV1_2 != NULL) {
+        hResult = mPluginV1_2->getKeyRequest_1_2(
+                toHidlVec(sessionId), toHidlVec(initData),
+                toHidlString(mimeType), hKeyType, hOptionalParameters,
+                [&](Status_V1_2 status, const hidl_vec<uint8_t>& hRequest,
+                        KeyRequestType_V1_1 hKeyRequestType,
+                        const hidl_string& hDefaultUrl) {
+                    if (status == Status_V1_2::OK) {
+                        request = toVector(hRequest);
+                        defaultUrl = toString8(hDefaultUrl);
+                        *keyRequestType = toKeyRequestType_1_1(hKeyRequestType);
+                    }
+                    err = toStatusT_1_2(status);
+                });
+    } else if (mPluginV1_1 != NULL) {
+        hResult = mPluginV1_1->getKeyRequest_1_1(
                 toHidlVec(sessionId), toHidlVec(initData),
                 toHidlString(mimeType), hKeyType, hOptionalParameters,
                 [&](Status status, const hidl_vec<uint8_t>& hRequest,
-                    drm::V1_1::KeyRequestType hKeyRequestType,
-                    const hidl_string& hDefaultUrl) {
-
-            if (status == Status::OK) {
-                request = toVector(hRequest);
-                defaultUrl = toString8(hDefaultUrl);
-
-                switch (hKeyRequestType) {
-                    case drm::V1_1::KeyRequestType::INITIAL:
-                        *keyRequestType = DrmPlugin::kKeyRequestType_Initial;
-                        break;
-                    case drm::V1_1::KeyRequestType::RENEWAL:
-                        *keyRequestType = DrmPlugin::kKeyRequestType_Renewal;
-                        break;
-                    case drm::V1_1::KeyRequestType::RELEASE:
-                        *keyRequestType = DrmPlugin::kKeyRequestType_Release;
-                        break;
-                    case drm::V1_1::KeyRequestType::NONE:
-                        *keyRequestType = DrmPlugin::kKeyRequestType_None;
-                        break;
-                    case drm::V1_1::KeyRequestType::UPDATE:
-                        *keyRequestType = DrmPlugin::kKeyRequestType_Update;
-                        break;
-                    default:
-                        *keyRequestType = DrmPlugin::kKeyRequestType_Unknown;
-                        break;
-                }
-                err = toStatusT(status);
-            }
-        });
-        return hResult.isOk() ? err : DEAD_OBJECT;
-    }
-
-    Return<void> hResult = mPlugin->getKeyRequest(toHidlVec(sessionId),
-            toHidlVec(initData), toHidlString(mimeType), hKeyType, hOptionalParameters,
-            [&](Status status, const hidl_vec<uint8_t>& hRequest,
-                    drm::V1_0::KeyRequestType hKeyRequestType,
-                    const hidl_string& hDefaultUrl) {
-
-                if (status == Status::OK) {
-                    request = toVector(hRequest);
-                    defaultUrl = toString8(hDefaultUrl);
-
-                    switch (hKeyRequestType) {
-                    case drm::V1_0::KeyRequestType::INITIAL:
-                        *keyRequestType = DrmPlugin::kKeyRequestType_Initial;
-                        break;
-                    case drm::V1_0::KeyRequestType::RENEWAL:
-                        *keyRequestType = DrmPlugin::kKeyRequestType_Renewal;
-                        break;
-                    case drm::V1_0::KeyRequestType::RELEASE:
-                        *keyRequestType = DrmPlugin::kKeyRequestType_Release;
-                        break;
-                    default:
-                        *keyRequestType = DrmPlugin::kKeyRequestType_Unknown;
-                        break;
+                        KeyRequestType_V1_1 hKeyRequestType,
+                        const hidl_string& hDefaultUrl) {
+                    if (status == Status::OK) {
+                        request = toVector(hRequest);
+                        defaultUrl = toString8(hDefaultUrl);
+                        *keyRequestType = toKeyRequestType_1_1(hKeyRequestType);
                     }
                     err = toStatusT(status);
-                }
-            });
+                });
+    } else {
+        hResult = mPlugin->getKeyRequest(
+                toHidlVec(sessionId), toHidlVec(initData),
+                toHidlString(mimeType), hKeyType, hOptionalParameters,
+                [&](Status status, const hidl_vec<uint8_t>& hRequest,
+                        KeyRequestType hKeyRequestType,
+                        const hidl_string& hDefaultUrl) {
+                    if (status == Status::OK) {
+                        request = toVector(hRequest);
+                        defaultUrl = toString8(hDefaultUrl);
+                        *keyRequestType = toKeyRequestType(hKeyRequestType);
+                    }
+                    err = toStatusT(status);
+                });
+    }
 
     err = hResult.isOk() ? err : DEAD_OBJECT;
     keyRequestTimer.SetAttribute(err);
@@ -868,18 +921,33 @@ status_t DrmHal::getProvisionRequest(String8 const &certType,
     INIT_CHECK();
 
     status_t err = UNKNOWN_ERROR;
+    Return<void> hResult;
 
-    Return<void> hResult = mPlugin->getProvisionRequest(
-            toHidlString(certType), toHidlString(certAuthority),
-            [&](Status status, const hidl_vec<uint8_t>& hRequest,
-                    const hidl_string& hDefaultUrl) {
-                if (status == Status::OK) {
-                    request = toVector(hRequest);
-                    defaultUrl = toString8(hDefaultUrl);
+    if (mPluginV1_2 != NULL) {
+        Return<void> hResult = mPluginV1_2->getProvisionRequest_1_2(
+                toHidlString(certType), toHidlString(certAuthority),
+                [&](Status_V1_2 status, const hidl_vec<uint8_t>& hRequest,
+                        const hidl_string& hDefaultUrl) {
+                    if (status == Status_V1_2::OK) {
+                        request = toVector(hRequest);
+                        defaultUrl = toString8(hDefaultUrl);
+                    }
+                    err = toStatusT_1_2(status);
                 }
-                err = toStatusT(status);
-            }
-        );
+            );
+    } else {
+        Return<void> hResult = mPlugin->getProvisionRequest(
+                toHidlString(certType), toHidlString(certAuthority),
+                [&](Status status, const hidl_vec<uint8_t>& hRequest,
+                        const hidl_string& hDefaultUrl) {
+                    if (status == Status::OK) {
+                        request = toVector(hRequest);
+                        defaultUrl = toString8(hDefaultUrl);
+                    }
+                    err = toStatusT(status);
+                }
+            );
+    }
 
     err = hResult.isOk() ? err : DEAD_OBJECT;
     mMetrics.mGetProvisionRequestCounter.Increment(err);

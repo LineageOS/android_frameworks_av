@@ -30,16 +30,16 @@
 #include <media/stagefright/MediaErrors.h>
 #include <mediadrm/CryptoHal.h>
 
+using drm::V1_0::BufferType;
+using drm::V1_0::DestinationBuffer;
+using drm::V1_0::ICryptoFactory;
+using drm::V1_0::ICryptoPlugin;
+using drm::V1_0::Mode;
+using drm::V1_0::Pattern;
+using drm::V1_0::SharedBuffer;
+using drm::V1_0::Status;
+using drm::V1_0::SubSample;
 
-using ::android::hardware::drm::V1_0::BufferType;
-using ::android::hardware::drm::V1_0::DestinationBuffer;
-using ::android::hardware::drm::V1_0::ICryptoFactory;
-using ::android::hardware::drm::V1_0::ICryptoPlugin;
-using ::android::hardware::drm::V1_0::Mode;
-using ::android::hardware::drm::V1_0::Pattern;
-using ::android::hardware::drm::V1_0::SharedBuffer;
-using ::android::hardware::drm::V1_0::Status;
-using ::android::hardware::drm::V1_0::SubSample;
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_handle;
 using ::android::hardware::hidl_memory;
@@ -50,6 +50,7 @@ using ::android::hardware::Void;
 using ::android::hidl::manager::V1_0::IServiceManager;
 using ::android::sp;
 
+typedef drm::V1_2::Status Status_V1_2;
 
 namespace android {
 
@@ -76,6 +77,18 @@ static status_t toStatusT(Status status) {
     }
 }
 
+static status_t toStatusT_1_2(Status_V1_2 status) {
+    switch (status) {
+    case Status_V1_2::ERROR_DRM_SESSION_LOST_STATE:
+        return ERROR_DRM_SESSION_LOST_STATE;;
+    case Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE:
+        return ERROR_DRM_FRAME_TOO_LARGE;
+    case Status_V1_2::ERROR_DRM_INSUFFICIENT_SECURITY:
+        return ERROR_DRM_INSUFFICIENT_SECURITY;
+    default:
+        return toStatusT(static_cast<Status>(status));
+    }
+}
 
 static hidl_vec<uint8_t> toHidlVec(const Vector<uint8_t> &vector) {
     hidl_vec<uint8_t> vec;
@@ -196,6 +209,9 @@ status_t CryptoHal::createPlugin(const uint8_t uuid[16], const void *data,
     for (size_t i = 0; i < mFactories.size(); i++) {
         if (mFactories[i]->isCryptoSchemeSupported(uuid)) {
             mPlugin = makeCryptoPlugin(mFactories[i], uuid, data, size);
+            if (mPlugin != NULL) {
+                mPluginV1_2 = drm::V1_2::ICryptoPlugin::castFrom(mPlugin);
+            }
         }
     }
 
@@ -216,6 +232,7 @@ status_t CryptoHal::destroyPlugin() {
     }
 
     mPlugin.clear();
+    mPluginV1_2.clear();
     return OK;
 }
 
@@ -389,21 +406,33 @@ ssize_t CryptoHal::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
     status_t err = UNKNOWN_ERROR;
     uint32_t bytesWritten = 0;
 
-    Return<void> hResult = mPlugin->decrypt(secure, toHidlArray16(keyId), toHidlArray16(iv), hMode,
-            hPattern, hSubSamples, hSource, offset, hDestination,
-            [&](Status status, uint32_t hBytesWritten, hidl_string hDetailedError) {
-                if (status == Status::OK) {
-                    bytesWritten = hBytesWritten;
-                    *errorDetailMsg = toString8(hDetailedError);
-                }
-                err = toStatusT(status);
-            }
-        );
+    Return<void> hResult;
 
-    if (!hResult.isOk()) {
-        err = DEAD_OBJECT;
+    if (mPluginV1_2 != NULL) {
+        hResult = mPluginV1_2->decrypt_1_2(secure, toHidlArray16(keyId), toHidlArray16(iv),
+                hMode, hPattern, hSubSamples, hSource, offset, hDestination,
+                [&](Status_V1_2 status, uint32_t hBytesWritten, hidl_string hDetailedError) {
+                    if (status == Status_V1_2::OK) {
+                        bytesWritten = hBytesWritten;
+                        *errorDetailMsg = toString8(hDetailedError);
+                    }
+                    err = toStatusT_1_2(status);
+                }
+            );
+    } else {
+        hResult = mPlugin->decrypt(secure, toHidlArray16(keyId), toHidlArray16(iv),
+                hMode, hPattern, hSubSamples, hSource, offset, hDestination,
+                [&](Status status, uint32_t hBytesWritten, hidl_string hDetailedError) {
+                    if (status == Status::OK) {
+                        bytesWritten = hBytesWritten;
+                        *errorDetailMsg = toString8(hDetailedError);
+                    }
+                    err = toStatusT(status);
+                }
+            );
     }
 
+    err = hResult.isOk() ? err : DEAD_OBJECT;
     if (err == OK) {
         return bytesWritten;
     }

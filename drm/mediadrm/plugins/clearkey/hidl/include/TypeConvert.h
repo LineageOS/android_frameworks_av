@@ -68,6 +68,17 @@ template<typename T, size_t SIZE> std::vector<T> toVector(
     return vec;
 }
 
+inline Status toStatus_1_0(Status_V1_2 status) {
+  switch (status) {
+    case Status_V1_2::ERROR_DRM_INSUFFICIENT_SECURITY:
+    case Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE:
+    case Status_V1_2::ERROR_DRM_SESSION_LOST_STATE:
+      return Status::ERROR_DRM_UNKNOWN;
+    default:
+      return static_cast<Status>(status);
+  }
+}
+
 }  // namespace clearkey
 }  // namespace V1_2
 }  // namespace drm

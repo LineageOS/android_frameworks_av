@@ -30,13 +30,16 @@ namespace drm {
 namespace V1_2 {
 namespace clearkey {
 
-using ::android::hardware::drm::V1_0::Status;
-using ::android::hardware::drm::V1_0::SubSample;
+namespace drm = ::android::hardware::drm;
+using drm::V1_0::Status;
+using drm::V1_0::SubSample;
+
+typedef drm::V1_2::Status Status_V1_2;
 
 class Session : public RefBase {
 public:
     explicit Session(const std::vector<uint8_t>& sessionId)
-            : mSessionId(sessionId) {}
+        : mSessionId(sessionId), mMockError(Status_V1_2::OK) {}
     virtual ~Session() {}
 
     const std::vector<uint8_t>& sessionId() const { return mSessionId; }
@@ -50,10 +53,13 @@ public:
     Status provideKeyResponse(
             const std::vector<uint8_t>& response);
 
-    Status decrypt(
+    Status_V1_2 decrypt(
             const KeyId keyId, const Iv iv, const uint8_t* srcPtr,
             uint8_t* dstPtr, const std::vector<SubSample> subSamples,
             size_t* bytesDecryptedOut);
+
+    void setMockError(Status_V1_2 error) {mMockError = error;}
+    Status_V1_2 getMockError() const {return mMockError;}
 
 private:
     CLEARKEY_DISALLOW_COPY_AND_ASSIGN(Session);
@@ -61,6 +67,9 @@ private:
     const std::vector<uint8_t> mSessionId;
     KeyMap mKeyMap;
     Mutex mMapLock;
+
+    // For mocking error return scenarios
+    Status_V1_2 mMockError;
 };
 
 } // namespace clearkey

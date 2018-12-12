@@ -20,11 +20,11 @@
 
 #include <android/hardware/drm/1.0/IDrmFactory.h>
 #include <android/hardware/drm/1.0/IDrmPlugin.h>
-#include <android/hardware/drm/1.0/IDrmPluginListener.h>
 #include <android/hardware/drm/1.1/IDrmFactory.h>
 #include <android/hardware/drm/1.1/IDrmPlugin.h>
 #include <android/hardware/drm/1.2/IDrmFactory.h>
 #include <android/hardware/drm/1.2/IDrmPlugin.h>
+#include <android/hardware/drm/1.2/IDrmPluginListener.h>
 
 #include <media/MediaAnalyticsItem.h>
 #include <mediadrm/DrmMetrics.h>
@@ -43,6 +43,8 @@ using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 
+typedef drm::V1_2::IDrmPluginListener IDrmPluginListener_V1_2;
+
 namespace android {
 
 struct DrmSessionClientInterface;
@@ -54,7 +56,7 @@ inline bool operator==(const Vector<uint8_t> &l, const Vector<uint8_t> &r) {
 
 struct DrmHal : public BnDrm,
              public IBinder::DeathRecipient,
-             public IDrmPluginListener {
+                public IDrmPluginListener_V1_2 {
     DrmHal();
     virtual ~DrmHal();
 
@@ -175,6 +177,8 @@ struct DrmHal : public BnDrm,
 
     Return<void> sendKeysChange(const hidl_vec<uint8_t>& sessionId,
             const hidl_vec<KeyStatus>& keyStatusList, bool hasNewUsableKey);
+
+    Return<void> sendSessionLostState(const hidl_vec<uint8_t>& sessionId);
 
     virtual void binderDied(const wp<IBinder> &the_late_who);
 
