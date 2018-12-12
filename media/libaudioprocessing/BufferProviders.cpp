@@ -19,6 +19,7 @@
 
 #include <audio_utils/primitives.h>
 #include <audio_utils/format.h>
+#include <audio_utils/channels.h>
 #include <external/sonic/sonic.h>
 #include <media/audiohal/EffectBufferHalInterface.h>
 #include <media/audiohal/EffectHalInterface.h>
@@ -629,6 +630,84 @@ void TimestretchBufferProvider::processFrames(void *dstBuffer, size_t *dstFrames
             LOG_ALWAYS_FATAL("invalid format %#x for TimestretchBufferProvider", mFormat);
         }
     }
+}
+
+AdjustChannelsBufferProvider::AdjustChannelsBufferProvider(audio_format_t format,
+        size_t inChannelCount, size_t outChannelCount, size_t frameCount) :
+        CopyBufferProvider(
+                audio_bytes_per_frame(inChannelCount, format),
+                audio_bytes_per_frame(outChannelCount, format),
+                frameCount),
+        mFormat(format),
+        mInChannelCount(inChannelCount),
+        mOutChannelCount(outChannelCount),
+        mSampleSizeInBytes(audio_bytes_per_sample(format))
+{
+    ALOGV("AdjustBufferProvider(%p)(%#x, %zu, %zu, %zu)",
+            this, format, inChannelCount, outChannelCount, frameCount);
+}
+
+void AdjustChannelsBufferProvider::copyFrames(void *dst, const void *src, size_t frames)
+{
+    adjust_channels(src, mInChannelCount, dst, mOutChannelCount, mSampleSizeInBytes,
+            frames * mInChannelCount * mSampleSizeInBytes);
+}
+
+AdjustChannelsNonDestructiveBufferProvider::AdjustChannelsNonDestructiveBufferProvider(
+        audio_format_t format, size_t inChannelCount, size_t outChannelCount,
+        audio_format_t contractedFormat, size_t contractedFrameCount, void* contractedBuffer) :
+        CopyBufferProvider(
+                audio_bytes_per_frame(inChannelCount, format),
+                audio_bytes_per_frame(outChannelCount, format),
+                0 /*bufferFrameCount*/),
+        mFormat(format),
+        mInChannelCount(inChannelCount),
+        mOutChannelCount(outChannelCount),
+        mSampleSizeInBytes(audio_bytes_per_sample(format)),
+        mContractedChannelCount(inChannelCount - outChannelCount),
+        mContractedFormat(contractedFormat),
+        mContractedFrameCount(contractedFrameCount),
+        mContractedBuffer(contractedBuffer),
+        mContractedWrittenFrames(0)
+{
+    ALOGV("AdjustChannelsNonDestructiveBufferProvider(%p)(%#x, %zu, %zu, %#x, %p)",
+            this, format, inChannelCount, outChannelCount, contractedFormat, contractedBuffer);
+    if (mContractedFormat != AUDIO_FORMAT_INVALID && mInChannelCount > mOutChannelCount) {
+        mContractedFrameSize = audio_bytes_per_frame(mContractedChannelCount, mContractedFormat);
+    }
+}
+
+status_t AdjustChannelsNonDestructiveBufferProvider::getNextBuffer(
+        AudioBufferProvider::Buffer* pBuffer)
+{
+    const size_t outFramesLeft = mContractedFrameCount - mContractedWrittenFrames;
+    if (outFramesLeft < pBuffer->frameCount) {
+        // Restrict the frame count so that we don't write over the size of the output buffer.
+        pBuffer->frameCount = outFramesLeft;
+    }
+    return CopyBufferProvider::getNextBuffer(pBuffer);
+}
+
+void AdjustChannelsNonDestructiveBufferProvider::copyFrames(
+        void *dst, const void *src, size_t frames)
+{
+    adjust_channels_non_destructive(src, mInChannelCount, dst, mOutChannelCount, mSampleSizeInBytes,
+            frames * mInChannelCount * mSampleSizeInBytes);
+    if (mContractedFormat != AUDIO_FORMAT_INVALID && mContractedBuffer != NULL
+            && mInChannelCount > mOutChannelCount) {
+        const size_t contractedIdx = frames * mOutChannelCount * mSampleSizeInBytes;
+        memcpy_by_audio_format(
+                (uint8_t*)mContractedBuffer + mContractedWrittenFrames * mContractedFrameSize,
+                mContractedFormat, (uint8_t*)dst + contractedIdx, mFormat,
+                mContractedChannelCount * frames);
+        mContractedWrittenFrames += frames;
+    }
+}
+
+void AdjustChannelsNonDestructiveBufferProvider::reset()
+{
+    mContractedWrittenFrames = 0;
+    CopyBufferProvider::reset();
 }
 // ----------------------------------------------------------------------------
 } // namespace android

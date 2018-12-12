@@ -76,6 +76,8 @@ private:
     size_t          mMixerBufferSize;
     audio_format_t  mMixerBufferFormat; // mixer output format: AUDIO_FORMAT_PCM_(16_BIT|FLOAT).
 
+    uint32_t        mAudioChannelCount; // audio channel count, excludes haptic channels.
+
     enum {UNDEFINED, MIXED, ZEROED} mMixerBufferState;
     NBAIO_Format    mFormat;
     unsigned        mSampleRate;

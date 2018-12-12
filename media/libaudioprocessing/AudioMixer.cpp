@@ -136,6 +136,9 @@ status_t AudioMixer::create(
 
         // no initialization needed
         // t->frameCount
+        t->mHapticChannelMask = channelMask & AUDIO_CHANNEL_HAPTIC_ALL;
+        t->mHapticChannelCount = audio_channel_count_from_out_mask(t->mHapticChannelMask);
+        channelMask &= ~AUDIO_CHANNEL_HAPTIC_ALL;
         t->channelCount = audio_channel_count_from_out_mask(channelMask);
         t->enabled = false;
         ALOGV_IF(audio_channel_mask_get_bits(channelMask) != AUDIO_CHANNEL_OUT_STEREO,
@@ -162,6 +165,15 @@ status_t AudioMixer::create(
                 AUDIO_CHANNEL_REPRESENTATION_POSITION, AUDIO_CHANNEL_OUT_STEREO);
         t->mMixerChannelCount = audio_channel_count_from_out_mask(t->mMixerChannelMask);
         t->mPlaybackRate = AUDIO_PLAYBACK_RATE_DEFAULT;
+        // haptic
+        t->mHapticPlaybackEnabled = false;
+        t->mMixerHapticChannelMask = AUDIO_CHANNEL_NONE;
+        t->mMixerHapticChannelCount = 0;
+        t->mAdjustInChannelCount = t->channelCount + t->mHapticChannelCount;
+        t->mAdjustOutChannelCount = t->channelCount + t->mMixerHapticChannelCount;
+        t->mAdjustNonDestructiveInChannelCount = t->mAdjustOutChannelCount;
+        t->mAdjustNonDestructiveOutChannelCount = t->channelCount;
+        t->mKeepContractedChannels = false;
         // Check the downmixing (or upmixing) requirements.
         status_t status = t->prepareForDownmix();
         if (status != OK) {
@@ -171,6 +183,8 @@ status_t AudioMixer::create(
         // prepareForDownmix() may change mDownmixRequiresFormat
         ALOGVV("mMixerFormat:%#x  mMixerInFormat:%#x\n", t->mMixerFormat, t->mMixerInFormat);
         t->prepareForReformat();
+        t->prepareForAdjustChannelsNonDestructive(mFrameCount);
+        t->prepareForAdjustChannels();
 
         mTracks[name] = t;
         return OK;
@@ -185,13 +199,20 @@ bool AudioMixer::setChannelMasks(int name,
     LOG_ALWAYS_FATAL_IF(!exists(name), "invalid name: %d", name);
     const std::shared_ptr<Track> &track = mTracks[name];
 
-    if (trackChannelMask == track->channelMask
-            && mixerChannelMask == track->mMixerChannelMask) {
+    if (trackChannelMask == (track->channelMask | track->mHapticChannelMask)
+            && mixerChannelMask == (track->mMixerChannelMask | track->mMixerHapticChannelMask)) {
         return false;  // no need to change
     }
+    const audio_channel_mask_t hapticChannelMask = trackChannelMask & AUDIO_CHANNEL_HAPTIC_ALL;
+    trackChannelMask &= ~AUDIO_CHANNEL_HAPTIC_ALL;
+    const audio_channel_mask_t mixerHapticChannelMask = mixerChannelMask & AUDIO_CHANNEL_HAPTIC_ALL;
+    mixerChannelMask &= ~AUDIO_CHANNEL_HAPTIC_ALL;
     // always recompute for both channel masks even if only one has changed.
     const uint32_t trackChannelCount = audio_channel_count_from_out_mask(trackChannelMask);
     const uint32_t mixerChannelCount = audio_channel_count_from_out_mask(mixerChannelMask);
+    const uint32_t hapticChannelCount = audio_channel_count_from_out_mask(hapticChannelMask);
+    const uint32_t mixerHapticChannelCount =
+            audio_channel_count_from_out_mask(mixerHapticChannelMask);
 
     ALOG_ASSERT((trackChannelCount <= MAX_NUM_CHANNELS_TO_DOWNMIX)
             && trackChannelCount
@@ -200,6 +221,24 @@ bool AudioMixer::setChannelMasks(int name,
     track->channelCount = trackChannelCount;
     track->mMixerChannelMask = mixerChannelMask;
     track->mMixerChannelCount = mixerChannelCount;
+    track->mHapticChannelMask = hapticChannelMask;
+    track->mHapticChannelCount = hapticChannelCount;
+    track->mMixerHapticChannelMask = mixerHapticChannelMask;
+    track->mMixerHapticChannelCount = mixerHapticChannelCount;
+
+    if (track->mHapticChannelCount > 0) {
+        track->mAdjustInChannelCount = track->channelCount + track->mHapticChannelCount;
+        track->mAdjustOutChannelCount = track->channelCount + track->mMixerHapticChannelCount;
+        track->mAdjustNonDestructiveInChannelCount = track->mAdjustOutChannelCount;
+        track->mAdjustNonDestructiveOutChannelCount = track->channelCount;
+        track->mKeepContractedChannels = track->mHapticPlaybackEnabled;
+    } else {
+        track->mAdjustInChannelCount = 0;
+        track->mAdjustOutChannelCount = 0;
+        track->mAdjustNonDestructiveInChannelCount = 0;
+        track->mAdjustNonDestructiveOutChannelCount = 0;
+        track->mKeepContractedChannels = false;
+    }
 
     // channel masks have changed, does this track need a downmixer?
     // update to try using our desired format (if we aren't already using it)
@@ -211,6 +250,9 @@ bool AudioMixer::setChannelMasks(int name,
     // always do reformat since channel mask changed,
     // do it after downmix since track format may change!
     track->prepareForReformat();
+
+    track->prepareForAdjustChannelsNonDestructive(mFrameCount);
+    track->prepareForAdjustChannels();
 
     if (track->mResampler.get() != nullptr) {
         // resampler channels may have changed.
@@ -335,10 +377,82 @@ status_t AudioMixer::Track::prepareForReformat()
     return NO_ERROR;
 }
 
+void AudioMixer::Track::unprepareForAdjustChannels()
+{
+    ALOGV("AUDIOMIXER::unprepareForAdjustChannels");
+    if (mAdjustChannelsBufferProvider.get() != nullptr) {
+        mAdjustChannelsBufferProvider.reset(nullptr);
+        reconfigureBufferProviders();
+    }
+}
+
+status_t AudioMixer::Track::prepareForAdjustChannels()
+{
+    ALOGV("AudioMixer::prepareForAdjustChannels(%p) with inChannelCount: %u, outChannelCount: %u",
+            this, mAdjustInChannelCount, mAdjustOutChannelCount);
+    unprepareForAdjustChannels();
+    if (mAdjustInChannelCount != mAdjustOutChannelCount) {
+        mAdjustChannelsBufferProvider.reset(new AdjustChannelsBufferProvider(
+                mFormat, mAdjustInChannelCount, mAdjustOutChannelCount, kCopyBufferFrameCount));
+        reconfigureBufferProviders();
+    }
+    return NO_ERROR;
+}
+
+void AudioMixer::Track::unprepareForAdjustChannelsNonDestructive()
+{
+    ALOGV("AUDIOMIXER::unprepareForAdjustChannelsNonDestructive");
+    if (mAdjustChannelsNonDestructiveBufferProvider.get() != nullptr) {
+        mAdjustChannelsNonDestructiveBufferProvider.reset(nullptr);
+        reconfigureBufferProviders();
+    }
+}
+
+status_t AudioMixer::Track::prepareForAdjustChannelsNonDestructive(size_t frames)
+{
+    ALOGV("AudioMixer::prepareForAdjustChannelsNonDestructive(%p) with inChannelCount: %u, "
+          "outChannelCount: %u, keepContractedChannels: %d",
+            this, mAdjustNonDestructiveInChannelCount, mAdjustNonDestructiveOutChannelCount,
+            mKeepContractedChannels);
+    unprepareForAdjustChannelsNonDestructive();
+    if (mAdjustNonDestructiveInChannelCount != mAdjustNonDestructiveOutChannelCount) {
+        uint8_t* buffer = mKeepContractedChannels
+                ? (uint8_t*)mainBuffer + frames * audio_bytes_per_frame(
+                        mMixerChannelCount, mMixerFormat)
+                : NULL;
+        mAdjustChannelsNonDestructiveBufferProvider.reset(
+                new AdjustChannelsNonDestructiveBufferProvider(
+                        mFormat,
+                        mAdjustNonDestructiveInChannelCount,
+                        mAdjustNonDestructiveOutChannelCount,
+                        mKeepContractedChannels ? mMixerFormat : AUDIO_FORMAT_INVALID,
+                        frames,
+                        buffer));
+        reconfigureBufferProviders();
+    }
+    return NO_ERROR;
+}
+
+void AudioMixer::Track::clearContractedBuffer()
+{
+    if (mAdjustChannelsNonDestructiveBufferProvider.get() != nullptr) {
+        static_cast<AdjustChannelsNonDestructiveBufferProvider*>(
+                mAdjustChannelsNonDestructiveBufferProvider.get())->clearContractedFrames();
+    }
+}
+
 void AudioMixer::Track::reconfigureBufferProviders()
 {
     // configure from upstream to downstream buffer providers.
     bufferProvider = mInputBufferProvider;
+    if (mAdjustChannelsBufferProvider.get() != nullptr) {
+        mAdjustChannelsBufferProvider->setBufferProvider(bufferProvider);
+        bufferProvider = mAdjustChannelsBufferProvider.get();
+    }
+    if (mAdjustChannelsNonDestructiveBufferProvider.get() != nullptr) {
+        mAdjustChannelsNonDestructiveBufferProvider->setBufferProvider(bufferProvider);
+        bufferProvider = mAdjustChannelsNonDestructiveBufferProvider.get();
+    }
     if (mReformatBufferProvider.get() != nullptr) {
         mReformatBufferProvider->setBufferProvider(bufferProvider);
         bufferProvider = mReformatBufferProvider.get();
@@ -533,7 +647,8 @@ void AudioMixer::setParameter(int name, int target, int param, void *value)
         case CHANNEL_MASK: {
             const audio_channel_mask_t trackChannelMask =
                 static_cast<audio_channel_mask_t>(valueInt);
-            if (setChannelMasks(name, trackChannelMask, track->mMixerChannelMask)) {
+            if (setChannelMasks(name, trackChannelMask,
+                    (track->mMixerChannelMask | track->mMixerHapticChannelMask))) {
                 ALOGV("setParameter(TRACK, CHANNEL_MASK, %x)", trackChannelMask);
                 invalidate();
             }
@@ -542,6 +657,9 @@ void AudioMixer::setParameter(int name, int target, int param, void *value)
             if (track->mainBuffer != valueBuf) {
                 track->mainBuffer = valueBuf;
                 ALOGV("setParameter(TRACK, MAIN_BUFFER, %p)", valueBuf);
+                if (track->mKeepContractedChannels) {
+                    track->prepareForAdjustChannelsNonDestructive(mFrameCount);
+                }
                 invalidate();
             }
             break;
@@ -571,14 +689,27 @@ void AudioMixer::setParameter(int name, int target, int param, void *value)
             if (track->mMixerFormat != format) {
                 track->mMixerFormat = format;
                 ALOGV("setParameter(TRACK, MIXER_FORMAT, %#x)", format);
+                if (track->mKeepContractedChannels) {
+                    track->prepareForAdjustChannelsNonDestructive(mFrameCount);
+                }
             }
             } break;
         case MIXER_CHANNEL_MASK: {
             const audio_channel_mask_t mixerChannelMask =
                     static_cast<audio_channel_mask_t>(valueInt);
-            if (setChannelMasks(name, track->channelMask, mixerChannelMask)) {
+            if (setChannelMasks(name, track->channelMask | track->mHapticChannelMask,
+                    mixerChannelMask)) {
                 ALOGV("setParameter(TRACK, MIXER_CHANNEL_MASK, %#x)", mixerChannelMask);
                 invalidate();
+            }
+            } break;
+        case HAPTIC_ENABLED: {
+            const bool hapticPlaybackEnabled = static_cast<bool>(valueInt);
+            if (track->mHapticPlaybackEnabled != hapticPlaybackEnabled) {
+                track->mHapticPlaybackEnabled = hapticPlaybackEnabled;
+                track->mKeepContractedChannels = hapticPlaybackEnabled;
+                track->prepareForAdjustChannelsNonDestructive(mFrameCount);
+                track->prepareForAdjustChannels();
             }
             } break;
         default:
@@ -823,6 +954,10 @@ void AudioMixer::setBufferProvider(int name, AudioBufferProvider* bufferProvider
         track->mDownmixerBufferProvider->reset();
     } else if (track->mReformatBufferProvider.get() != nullptr) {
         track->mReformatBufferProvider->reset();
+    } else if (track->mAdjustChannelsNonDestructiveBufferProvider.get() != nullptr) {
+        track->mAdjustChannelsNonDestructiveBufferProvider->reset();
+    } else if (track->mAdjustChannelsBufferProvider.get() != nullptr) {
+        track->mAdjustChannelsBufferProvider->reset();
     }
 
     track->mInputBufferProvider = bufferProvider;
@@ -1266,8 +1401,8 @@ void AudioMixer::process__nop()
 
         const std::shared_ptr<Track> &t = mTracks[group[0]];
         memset(t->mainBuffer, 0,
-                mFrameCount * t->mMixerChannelCount
-                * audio_bytes_per_sample(t->mMixerFormat));
+                mFrameCount * audio_bytes_per_frame(
+                        t->mMixerChannelCount + t->mMixerHapticChannelCount, t->mMixerFormat));
 
         // now consume data
         for (const int name : group) {
