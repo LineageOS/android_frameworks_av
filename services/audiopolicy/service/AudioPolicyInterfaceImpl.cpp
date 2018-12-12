@@ -1133,4 +1133,15 @@ status_t AudioPolicyService::setA11yServicesUids(const std::vector<uid_t>& uids)
     return NO_ERROR;
 }
 
+bool AudioPolicyService::isHapticPlaybackSupported()
+{
+    if (mAudioPolicyManager == NULL) {
+        ALOGW("%s, mAudioPolicyManager == NULL", __func__);
+        return false;
+    }
+    Mutex::Autolock _l(mLock);
+    AutoCallerClear acc;
+    return mAudioPolicyManager->isHapticPlaybackSupported();
+}
+
 } // namespace android

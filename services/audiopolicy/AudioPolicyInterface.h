@@ -228,6 +228,8 @@ public:
                                         bool reported) = 0;
     virtual status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled) = 0;
 
+    virtual bool     isHapticPlaybackSupported() = 0;
+
     virtual void     setAppState(uid_t uid, app_state_t state);
 };
 
