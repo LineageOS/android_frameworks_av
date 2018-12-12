@@ -750,7 +750,7 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
                 }
             }
 
-            msg->post(1000000ll);  // poll again in a second.
+            msg->post(1000000LL);  // poll again in a second.
             break;
         }
 
@@ -1038,7 +1038,7 @@ void NuPlayer::onMessageReceived(const sp<AMessage> &msg) {
             }
 
             if (rescan) {
-                msg->post(100000ll);
+                msg->post(100000LL);
                 mScanSourcesPending = true;
             }
             break;
@@ -2659,7 +2659,7 @@ void NuPlayer::onSourceNotify(const sp<AMessage> &msg) {
             int posMs;
             int64_t timeUs, posUs;
             driver->getCurrentPosition(&posMs);
-            posUs = (int64_t) posMs * 1000ll;
+            posUs = (int64_t) posMs * 1000LL;
             CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
 
             if (posUs < timeUs) {
