@@ -134,9 +134,7 @@ public:
                                          audio_port_handle_t *portId);
 
         // indicates to the audio policy manager that the input starts being used.
-        virtual status_t startInput(audio_port_handle_t portId,
-                                    bool silenced,
-                                    concurrency_type__mask_t *concurrency);
+        virtual status_t startInput(audio_port_handle_t portId);
 
         // indicates to the audio policy manager that the input stops being used.
         virtual status_t stopInput(audio_port_handle_t portId);
@@ -193,6 +191,9 @@ public:
         status_t dump(int fd) override;
 
         virtual bool isOffloadSupported(const audio_offload_info_t& offloadInfo);
+
+        virtual bool isDirectOutputSupported(const audio_config_base_t& config,
+                                             const audio_attributes_t& attributes);
 
         virtual status_t listAudioPorts(audio_port_role_t role,
                                         audio_port_type_t type,
@@ -481,11 +482,12 @@ protected:
                                       audio_format_t& format,
                                       audio_channel_mask_t& channelMask,
                                       audio_input_flags_t flags);
-        sp<IOProfile> getProfileForDirectOutput(audio_devices_t device,
-                                                       uint32_t samplingRate,
-                                                       audio_format_t format,
-                                                       audio_channel_mask_t channelMask,
-                                                       audio_output_flags_t flags);
+        sp<IOProfile> getProfileForOutput(audio_devices_t device,
+                                          uint32_t samplingRate,
+                                          audio_format_t format,
+                                          audio_channel_mask_t channelMask,
+                                          audio_output_flags_t flags,
+                                          bool directOnly);
 
         audio_io_handle_t selectOutputForMusicEffects();
 
@@ -543,8 +545,6 @@ protected:
         void cleanUpForDevice(const sp<DeviceDescriptor>& deviceDesc);
 
         void clearAudioSources(uid_t uid);
-
-        static bool isConcurrentSource(audio_source_t source);
 
         static bool streamsMatchForvolume(audio_stream_type_t stream1,
                                           audio_stream_type_t stream2);
@@ -709,10 +709,6 @@ private:
                 int delayMs,
                 uid_t uid,
                 sp<AudioPatch> *patchDescPtr);
-
-        bool soundTriggerSupportsConcurrentCapture();
-        bool mSoundTriggerSupportsConcurrentCapture;
-        bool mHasComputedSoundTriggerSupportsConcurrentCapture;
 };
 
 };

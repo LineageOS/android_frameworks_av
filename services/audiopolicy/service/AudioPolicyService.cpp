@@ -348,11 +348,100 @@ void AudioPolicyService::updateUidStates()
 
 void AudioPolicyService::updateUidStates_l()
 {
-    //TODO: implement real concurrent capture policy: for now just apply each app state directly
+//    Go over all active clients and allow capture (does not force silence) in the
+//    following cases:
+//    The client is the assistant
+//        AND an accessibility service is on TOP
+//               AND the source is VOICE_RECOGNITION or HOTWORD
+//        OR uses VOICE_RECOGNITION AND is on TOP OR latest started
+//               OR uses HOTWORD
+//            AND there is no privacy sensitive active capture
+//    OR The client is an accessibility service
+//        AND is on TOP OR latest started
+//        AND the source is VOICE_RECOGNITION or HOTWORD
+//    OR Any other client
+//        AND The assistant is not on TOP
+//        AND is on TOP OR latest started
+//        AND there is no privacy sensitive active capture
+//TODO: mamanage pre processing effects according to use case priority
+
+    sp<AudioRecordClient> topActive;
+    sp<AudioRecordClient> latestActive;
+    sp<AudioRecordClient> latestSensitiveActive;
+    nsecs_t topStartNs = 0;
+    nsecs_t latestStartNs = 0;
+    nsecs_t latestSensitiveStartNs = 0;
+    bool isA11yOnTop = mUidPolicy->isA11yOnTop();
+    bool isAssistantOnTop = false;
+    bool isSensitiveActive = false;
+
     for (size_t i =0; i < mAudioRecordClients.size(); i++) {
         sp<AudioRecordClient> current = mAudioRecordClients[i];
         if (!current->active) continue;
-        setAppState_l(current->uid, apmStatFromAmState(mUidPolicy->getUidState(current->uid)));
+        if (isPrivacySensitive(current->attributes.source)) {
+            if (current->startTimeNs > latestSensitiveStartNs) {
+                latestSensitiveActive = current;
+                latestSensitiveStartNs = current->startTimeNs;
+            }
+            isSensitiveActive = true;
+        }
+        if (mUidPolicy->getUidState(current->uid) == ActivityManager::PROCESS_STATE_TOP) {
+            if (current->startTimeNs > topStartNs) {
+                topActive = current;
+                topStartNs = current->startTimeNs;
+            }
+            if (mUidPolicy->isAssistantUid(current->uid)) {
+                isAssistantOnTop = true;
+            }
+        }
+        if (current->startTimeNs > latestStartNs) {
+            latestActive = current;
+            latestStartNs = current->startTimeNs;
+        }
+    }
+
+    if (topActive == nullptr && latestActive == nullptr) {
+        return;
+    }
+
+    if (topActive != nullptr) {
+        latestActive = nullptr;
+    }
+
+    for (size_t i =0; i < mAudioRecordClients.size(); i++) {
+        sp<AudioRecordClient> current = mAudioRecordClients[i];
+        if (!current->active) continue;
+
+        audio_source_t source = current->attributes.source;
+        bool isOnTop = current == topActive;
+        bool isLatest = current == latestActive;
+        bool isLatestSensitive = current == latestSensitiveActive;
+        bool forceIdle = true;
+        if (mUidPolicy->isAssistantUid(current->uid)) {
+            if (isA11yOnTop) {
+                if (source == AUDIO_SOURCE_HOTWORD || source == AUDIO_SOURCE_VOICE_RECOGNITION) {
+                    forceIdle = false;
+                }
+            } else {
+                if ((((isOnTop || isLatest) && source == AUDIO_SOURCE_VOICE_RECOGNITION) ||
+                     source == AUDIO_SOURCE_HOTWORD) && !isSensitiveActive) {
+                    forceIdle = false;
+                }
+            }
+        } else if (mUidPolicy->isA11yUid(current->uid)) {
+            if ((isOnTop || isLatest) &&
+                (source == AUDIO_SOURCE_VOICE_RECOGNITION || source == AUDIO_SOURCE_HOTWORD)) {
+                forceIdle = false;
+            }
+        } else {
+            if (!isAssistantOnTop && (isOnTop || isLatest) &&
+                (!isSensitiveActive || isLatestSensitive)) {
+                forceIdle = false;
+            }
+        }
+        setAppState_l(current->uid,
+                      forceIdle ? APP_STATE_IDLE :
+                                  apmStatFromAmState(mUidPolicy->getUidState(current->uid)));
     }
 }
 
@@ -367,6 +456,22 @@ app_state_t AudioPolicyService::apmStatFromAmState(int amState) {
         break;
     }
     return APP_STATE_FOREGROUND;
+}
+
+/* static */
+bool AudioPolicyService::isPrivacySensitive(audio_source_t source)
+{
+    switch (source) {
+        case AUDIO_SOURCE_VOICE_UPLINK:
+        case AUDIO_SOURCE_VOICE_DOWNLINK:
+        case AUDIO_SOURCE_VOICE_CALL:
+        case AUDIO_SOURCE_CAMCORDER:
+        case AUDIO_SOURCE_VOICE_COMMUNICATION:
+            return true;
+        default:
+            break;
+    }
+    return false;
 }
 
 void AudioPolicyService::setAppState_l(uid_t uid, app_state_t state)
@@ -548,6 +653,7 @@ void AudioPolicyService::UidPolicy::registerSelf() {
         mObserverRegistered = true;
     } else {
         ALOGE("UidPolicy::registerSelf linkToDeath failed: %d", res);
+
         am.unregisterUidObserver(this);
     }
 }
@@ -650,6 +756,7 @@ int AudioPolicyService::UidPolicy::getUidState(uid_t uid) {
         mCachedUids.insert(std::pair<uid_t,
                            std::pair<bool, int>>(uid, std::pair<bool, int>(active, state)));
     }
+
     return state;
 }
 
@@ -728,6 +835,21 @@ void AudioPolicyService::UidPolicy::updateUidLocked(std::unordered_map<uid_t,
         uids->insert(std::pair<uid_t, std::pair<bool, int>>(uid,
                                       std::pair<bool, int>(active, state)));
     }
+}
+
+bool AudioPolicyService::UidPolicy::isA11yOnTop() {
+    for (const auto &uid : mCachedUids) {
+        std::vector<uid_t>::iterator it = find(mA11yUids.begin(), mA11yUids.end(), uid.first);
+        if (it == mA11yUids.end()) {
+            continue;
+        }
+        if (uid.second.second == ActivityManager::PROCESS_STATE_TOP ||
+            uid.second.second == ActivityManager::PROCESS_STATE_FOREGROUND_SERVICE ||
+            uid.second.second == ActivityManager::PROCESS_STATE_BOUND_FOREGROUND_SERVICE) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool AudioPolicyService::UidPolicy::isA11yUid(uid_t uid)

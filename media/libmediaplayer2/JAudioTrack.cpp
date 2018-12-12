@@ -439,31 +439,16 @@ audio_format_t JAudioTrack::format() {
 
 size_t JAudioTrack::frameSize() {
     JNIEnv *env = JavaVMHelper::getJNIEnv();
-
-    // TODO: Calculated here implementing the logic in AudioTrack.java
-    // wait for AudioTrack.java exposing this parameter (i.e. getFrameSizeInBtytes())
-    jmethodID jGetAudioFormat = env->GetMethodID(mAudioTrackCls, "getAudioFormat", "()I");
-    int javaFormat = env->CallIntMethod(mAudioTrackObj, jGetAudioFormat);
+    jmethodID jGetFormat = env->GetMethodID(mAudioTrackCls,
+            "getFormat", "()Landroid/media/AudioFormat;");
+    jobject jAudioFormatObj = env->CallObjectMethod(mAudioTrackObj, jGetFormat);
 
     jclass jAudioFormatCls = env->FindClass("android/media/AudioFormat");
-    jmethodID jIsEncodingLinearFrames = env->GetStaticMethodID(
-            jAudioFormatCls, "isEncodingLinearFrames", "(I)Z");
-    jboolean javaIsEncodingLinearFrames = env->CallStaticBooleanMethod(
-            jAudioFormatCls, jIsEncodingLinearFrames, javaFormat);
+    jmethodID jGetFrameSizeInBytes = env->GetMethodID(
+            jAudioFormatCls, "getFrameSizeInBytes", "()I");
+    jint javaFrameSizeInBytes = env->CallIntMethod(jAudioFormatObj, jGetFrameSizeInBytes);
 
-    if (javaIsEncodingLinearFrames == false) {
-        return 1;
-    }
-
-    jmethodID jGetBytesPerSample = env->GetStaticMethodID(jAudioFormatCls,
-            "getBytesPerSample", "(I)I");
-    int javaBytesPerSample = env->CallStaticIntMethod(jAudioFormatCls,
-            jGetBytesPerSample, javaFormat);
-
-    jmethodID jGetChannelCount = env->GetMethodID(mAudioTrackCls, "getChannelCount", "()I");
-    int javaChannelCount = env->CallIntMethod(mAudioTrackObj, jGetChannelCount);
-
-    return javaChannelCount * javaBytesPerSample;
+    return (size_t)javaFrameSizeInBytes;
 }
 
 status_t JAudioTrack::dump(int fd, const Vector<String16>& args __unused) const

@@ -94,8 +94,7 @@ public:
                                      audio_input_flags_t flags,
                                      audio_port_handle_t *selectedDeviceId = NULL,
                                      audio_port_handle_t *portId = NULL);
-    virtual status_t startInput(audio_port_handle_t portId,
-                                bool *silenced);
+    virtual status_t startInput(audio_port_handle_t portId);
     virtual status_t stopInput(audio_port_handle_t portId);
     virtual void releaseInput(audio_port_handle_t portId);
     virtual status_t initStreamVolume(audio_stream_type_t stream,
@@ -168,6 +167,8 @@ public:
                                      int delayMs = 0);
     virtual status_t setVoiceVolume(float volume, int delayMs = 0);
     virtual bool isOffloadSupported(const audio_offload_info_t &config);
+    virtual bool isDirectOutputSupported(const audio_config_base_t& config,
+                                         const audio_attributes_t& attributes);
 
     virtual status_t listAudioPorts(audio_port_role_t role,
                                     audio_port_type_t type,
@@ -276,6 +277,8 @@ private:
     void updateUidStates();
     void updateUidStates_l();
 
+    static bool isPrivacySensitive(audio_source_t source);
+
     // If recording we need to make sure the UID is allowed to do that. If the UID is idle
     // then it cannot record and gets buffers with zeros - silence. As soon as the UID
     // transitions to an active state we will start reporting buffers with data. This approach
@@ -299,6 +302,7 @@ private:
         bool isAssistantUid(uid_t uid) { return uid == mAssistantUid; }
         void setA11yUids(const std::vector<uid_t>& uids) { mA11yUids.clear(); mA11yUids = uids; }
         bool isA11yUid(uid_t uid);
+        bool isA11yOnTop();
 
         // BnUidObserver implementation
         void onUidActive(uid_t uid) override;
@@ -650,12 +654,11 @@ private:
                           const audio_session_t session, const audio_port_handle_t deviceId,
                           const String16& opPackageName) :
                     AudioClient(attributes, io, uid, pid, session, deviceId),
-                    opPackageName(opPackageName), isConcurrent(false), isVirtualDevice(false) {}
+                    opPackageName(opPackageName), startTimeNs(0) {}
                 ~AudioRecordClient() override = default;
 
         const String16 opPackageName;        // client package name
-        bool isConcurrent;             // is allowed to concurrent capture
-        bool isVirtualDevice;          // uses virtual device: updated by APM::getInputForAttr()
+        nsecs_t startTimeNs;
     };
 
     // --- AudioPlaybackClient ---

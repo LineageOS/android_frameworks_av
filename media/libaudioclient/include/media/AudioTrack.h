@@ -147,6 +147,12 @@ public:
                                      audio_stream_type_t streamType,
                                      uint32_t sampleRate);
 
+    /* Check if direct playback is possible for the given audio configuration and attributes.
+     * Return true if output is possible for the given parameters. Otherwise returns false.
+     */
+    static bool isDirectOutputSupported(const audio_config_base_t& config,
+                                        const audio_attributes_t& attributes);
+
     /* How data is transferred to AudioTrack
      */
     enum transfer_type {

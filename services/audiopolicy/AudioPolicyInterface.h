@@ -65,20 +65,6 @@ public:
         API_INPUT_TELEPHONY_RX, // used for capture from telephony RX path
     } input_type_t;
 
-    enum {
-        API_INPUT_CONCURRENCY_NONE = 0,
-        API_INPUT_CONCURRENCY_CALL = (1 << 0),      // Concurrency with a call
-        API_INPUT_CONCURRENCY_CAPTURE = (1 << 1),   // Concurrency with another capture
-        API_INPUT_CONCURRENCY_HOTWORD = (1 << 2),   // Concurrency with a hotword
-        API_INPUT_CONCURRENCY_PREEMPT = (1 << 3),   // pre-empted someone
-                // NB: preempt is marked on a successful return, others are on failing calls
-        API_INPUT_CONCURRENCY_LAST = (1 << 4),
-
-        API_INPUT_CONCURRENCY_ALL = (API_INPUT_CONCURRENCY_LAST - 1),
-    };
-
-    typedef uint32_t concurrency_type__mask_t;
-
 public:
     virtual ~AudioPolicyInterface() {}
     //
@@ -141,9 +127,7 @@ public:
                                      input_type_t *inputType,
                                      audio_port_handle_t *portId) = 0;
     // indicates to the audio policy manager that the input starts being used.
-    virtual status_t startInput(audio_port_handle_t portId,
-                                bool silenced,
-                                concurrency_type__mask_t *concurrency) = 0;
+    virtual status_t startInput(audio_port_handle_t portId) = 0;
     // indicates to the audio policy manager that the input stops being used.
     virtual status_t stopInput(audio_port_handle_t portId) = 0;
     // releases the input.
@@ -197,6 +181,8 @@ public:
     virtual status_t    dump(int fd) = 0;
 
     virtual bool isOffloadSupported(const audio_offload_info_t& offloadInfo) = 0;
+    virtual bool isDirectOutputSupported(const audio_config_base_t& config,
+                                         const audio_attributes_t& attributes) = 0;
 
     virtual status_t listAudioPorts(audio_port_role_t role,
                                     audio_port_type_t type,
