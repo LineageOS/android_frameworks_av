@@ -5352,7 +5352,7 @@ media_status_t MPEG4Source::read(
         }
     }
 
-    if ((!mIsAVC && !mIsHEVC && !mIsAC4)) {
+    if (!mIsAVC && !mIsHEVC && !mIsAC4) {
         if (newBuffer) {
             if (mIsPcm) {
                 // The twos' PCM block reader assumes that all samples has the same size.
@@ -5429,58 +5429,11 @@ media_status_t MPEG4Source::read(
             }
         }
 
-        if (!mIsAVC && !mIsHEVC && !mIsAC4) {
-            *out = mBuffer;
-            mBuffer = NULL;
-
-            return AMEDIA_OK;
-        }
-
-        if (mIsAC4) {
-            mBuffer->release();
-            mBuffer = NULL;
-
-            return AMEDIA_ERROR_IO;
-        }
-
-        // Each NAL unit is split up into its constituent fragments and
-        // each one of them returned in its own buffer.
-
-        CHECK(mBuffer->range_length() >= mNALLengthSize);
-
-        const uint8_t *src =
-            (const uint8_t *)mBuffer->data() + mBuffer->range_offset();
-
-        size_t nal_size = parseNALSize(src);
-        if (mNALLengthSize > SIZE_MAX - nal_size) {
-            ALOGE("b/24441553, b/24445122");
-        }
-        if (mBuffer->range_length() - mNALLengthSize < nal_size) {
-            ALOGE("incomplete NAL unit.");
-
-            mBuffer->release();
-            mBuffer = NULL;
-
-            return AMEDIA_ERROR_MALFORMED;
-        }
-
-        MediaBufferBase *clone = mBuffer->clone();
-        CHECK(clone != NULL);
-        clone->set_range(mBuffer->range_offset() + mNALLengthSize, nal_size);
-
-        CHECK(mBuffer != NULL);
-        mBuffer->set_range(
-                mBuffer->range_offset() + mNALLengthSize + nal_size,
-                mBuffer->range_length() - mNALLengthSize - nal_size);
-
-        if (mBuffer->range_length() == 0) {
-            mBuffer->release();
-            mBuffer = NULL;
-        }
-
-        *out = clone;
+        *out = mBuffer;
+        mBuffer = NULL;
 
         return AMEDIA_OK;
+
     } else if (mIsAC4) {
         CHECK(mBuffer != NULL);
         // Make sure there is enough space to write the sync header and the raw frame
@@ -5773,7 +5726,7 @@ media_status_t MPEG4Source::fragmentedRead(
 
     }
 
-    if ((!mIsAVC && !mIsHEVC)) {
+    if (!mIsAVC && !mIsHEVC) {
         if (newBuffer) {
             if (!isInRange((size_t)0u, mBuffer->size(), size)) {
                 mBuffer->release();
@@ -5825,52 +5778,11 @@ media_status_t MPEG4Source::fragmentedRead(
             ++mCurrentSampleIndex;
         }
 
-        if (!mIsAVC && !mIsHEVC) {
-            *out = mBuffer;
-            mBuffer = NULL;
-
-            return AMEDIA_OK;
-        }
-
-        // Each NAL unit is split up into its constituent fragments and
-        // each one of them returned in its own buffer.
-
-        CHECK(mBuffer->range_length() >= mNALLengthSize);
-
-        const uint8_t *src =
-            (const uint8_t *)mBuffer->data() + mBuffer->range_offset();
-
-        size_t nal_size = parseNALSize(src);
-        if (mNALLengthSize > SIZE_MAX - nal_size) {
-            ALOGE("b/24441553, b/24445122");
-        }
-
-        if (mBuffer->range_length() - mNALLengthSize < nal_size) {
-            ALOGE("incomplete NAL unit.");
-
-            mBuffer->release();
-            mBuffer = NULL;
-
-            return AMEDIA_ERROR_MALFORMED;
-        }
-
-        MediaBufferBase *clone = mBuffer->clone();
-        CHECK(clone != NULL);
-        clone->set_range(mBuffer->range_offset() + mNALLengthSize, nal_size);
-
-        CHECK(mBuffer != NULL);
-        mBuffer->set_range(
-                mBuffer->range_offset() + mNALLengthSize + nal_size,
-                mBuffer->range_length() - mNALLengthSize - nal_size);
-
-        if (mBuffer->range_length() == 0) {
-            mBuffer->release();
-            mBuffer = NULL;
-        }
-
-        *out = clone;
+        *out = mBuffer;
+        mBuffer = NULL;
 
         return AMEDIA_OK;
+
     } else {
         ALOGV("whole NAL");
         // Whole NAL units are returned but each fragment is prefixed by

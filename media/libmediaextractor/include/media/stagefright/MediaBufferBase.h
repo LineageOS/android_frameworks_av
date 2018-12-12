@@ -70,11 +70,6 @@ public:
 
     virtual void setObserver(MediaBufferObserver *group) = 0;
 
-    // Returns a clone of this MediaBufferBase increasing its reference
-    // count. The clone references the same data but has its own range and
-    // MetaData.
-    virtual MediaBufferBase *clone() = 0;
-
     virtual int refcount() const = 0;
 
     virtual int localRefcount() const = 0;
