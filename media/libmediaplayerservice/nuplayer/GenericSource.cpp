@@ -68,7 +68,7 @@ NuPlayer::GenericSource::GenericSource(
       mVideoDataGeneration(0),
       mFetchSubtitleDataGeneration(0),
       mFetchTimedTextDataGeneration(0),
-      mDurationUs(-1ll),
+      mDurationUs(-1LL),
       mAudioIsVorbis(false),
       mIsSecure(false),
       mIsStreaming(false),
@@ -76,7 +76,7 @@ NuPlayer::GenericSource::GenericSource(
       mUID(uid),
       mMediaClock(mediaClock),
       mFd(-1),
-      mBitrate(-1ll),
+      mBitrate(-1LL),
       mPendingReadBufferTypes(0) {
     ALOGV("GenericSource");
     CHECK(mediaClock != NULL);
@@ -727,7 +727,7 @@ void NuPlayer::GenericSource::fetchTextData(
     }
 
     if (msg->what() == kWhatFetchSubtitleData) {
-        subTimeUs -= 1000000ll;  // send subtile data one second earlier
+        subTimeUs -= 1000000LL;  // send subtile data one second earlier
     }
     sp<AMessage> msg2 = new AMessage(sendWhat, this);
     msg2->setInt32("generation", msgGeneration);
@@ -764,7 +764,7 @@ void NuPlayer::GenericSource::sendTextData(
         notify->post();
 
         if (msg->what() == kWhatSendSubtitleData) {
-            nextSubTimeUs -= 1000000ll;  // send subtile data one second earlier
+            nextSubTimeUs -= 1000000LL;  // send subtile data one second earlier
         }
         mMediaClock->addTimer(msg, nextSubTimeUs);
     }
@@ -855,7 +855,7 @@ status_t NuPlayer::GenericSource::dequeueAccessUnit(
         // TODO: maxRebufferingMarkMs could be larger than
         // mBufferingSettings.mResumePlaybackMarkMs
         int64_t restartBufferingMarkUs =
-             mBufferingSettings.mResumePlaybackMarkMs * 1000ll / 2;
+             mBufferingSettings.mResumePlaybackMarkMs * 1000LL / 2;
         if (finalResult == OK) {
             if (durationUs < restartBufferingMarkUs) {
                 postReadBuffer(audio? MEDIA_TRACK_TYPE_AUDIO : MEDIA_TRACK_TYPE_VIDEO);
@@ -1446,7 +1446,7 @@ void NuPlayer::GenericSource::readBuffer(
         // TODO: maxRebufferingMarkMs could be larger than
         // mBufferingSettings.mResumePlaybackMarkMs
         int64_t markUs = (mPreparing ? mBufferingSettings.mInitialMarkMs
-            : mBufferingSettings.mResumePlaybackMarkMs) * 1000ll;
+            : mBufferingSettings.mResumePlaybackMarkMs) * 1000LL;
         if (finalResult == ERROR_END_OF_STREAM || durationUs >= markUs) {
             if (mPreparing || mSentPauseOnBuffering) {
                 Track *counterTrack =
@@ -1514,12 +1514,12 @@ void NuPlayer::GenericSource::schedulePollBuffering() {
     sp<AMessage> msg = new AMessage(kWhatPollBuffering, this);
     msg->setInt32("generation", mPollBufferingGeneration);
     // Enquires buffering status every second.
-    msg->post(1000000ll);
+    msg->post(1000000LL);
 }
 
 void NuPlayer::GenericSource::onPollBuffering() {
     status_t finalStatus = UNKNOWN_ERROR;
-    int64_t cachedDurationUs = -1ll;
+    int64_t cachedDurationUs = -1LL;
     ssize_t cachedDataRemaining = -1;
 
     if (mCachedSource != NULL) {
@@ -1527,15 +1527,15 @@ void NuPlayer::GenericSource::onPollBuffering() {
 
         if (finalStatus == OK) {
             off64_t size;
-            int64_t bitrate = 0ll;
+            int64_t bitrate = 0LL;
             if (mDurationUs > 0 && mCachedSource->getSize(&size) == OK) {
                 // |bitrate| uses bits/second unit, while size is number of bytes.
-                bitrate = size * 8000000ll / mDurationUs;
+                bitrate = size * 8000000LL / mDurationUs;
             } else if (mBitrate > 0) {
                 bitrate = mBitrate;
             }
             if (bitrate > 0) {
-                cachedDurationUs = cachedDataRemaining * 8000000ll / bitrate;
+                cachedDurationUs = cachedDataRemaining * 8000000LL / bitrate;
             }
         }
     }
@@ -1550,8 +1550,8 @@ void NuPlayer::GenericSource::onPollBuffering() {
         return;
     }
 
-    if (cachedDurationUs >= 0ll) {
-        if (mDurationUs > 0ll) {
+    if (cachedDurationUs >= 0LL) {
+        if (mDurationUs > 0LL) {
             int64_t cachedPosUs = getLastReadPosition() + cachedDurationUs;
             int percentage = 100.0 * cachedPosUs / mDurationUs;
             if (percentage > 100) {
