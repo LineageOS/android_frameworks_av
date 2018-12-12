@@ -555,7 +555,7 @@ void NuPlayer2::CCDecoder::display(int64_t timeUs) {
 
         ccBuf->meta()->setInt32(AMEDIAFORMAT_KEY_TRACK_INDEX, mSelectedTrack);
         ccBuf->meta()->setInt64("timeUs", timeUs);
-        ccBuf->meta()->setInt64("durationUs", 0ll);
+        ccBuf->meta()->setInt64("durationUs", 0LL);
 
         sp<AMessage> msg = mNotify->dup();
         msg->setInt32("what", kWhatClosedCaptionData);
