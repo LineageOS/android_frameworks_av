@@ -131,6 +131,7 @@ public:
     // getCaptureSize() but the length of the FFT is half of the size (both parts of the spectrum
     // are returned
     status_t getFft(uint8_t *fft);
+    void release();
 
 protected:
     // from IEffectClient
@@ -146,12 +147,12 @@ private:
     class CaptureThread : public Thread
     {
     public:
-        CaptureThread(Visualizer& receiver, uint32_t captureRate, bool bCanCallJava = false);
+        CaptureThread(Visualizer* visualizer, uint32_t captureRate, bool bCanCallJava = false);
 
     private:
         friend class Visualizer;
         virtual bool        threadLoop();
-        Visualizer& mReceiver;
+        wp<Visualizer> mReceiver;
         Mutex       mLock;
         uint32_t mSleepTimeUs;
     };
