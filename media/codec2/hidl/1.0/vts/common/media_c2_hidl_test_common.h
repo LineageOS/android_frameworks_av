@@ -22,6 +22,7 @@
 #include <android/hardware/media/c2/1.0/types.h>
 
 #include <C2Component.h>
+#include <C2Config.h>
 #include <getopt.h>
 #include <hidl/HidlSupport.h>
 #include <media/stagefright/foundation/ALooper.h>
@@ -37,6 +38,10 @@ using ::android::hardware::hidl_vec;
 using ::android::hardware::hidl_string;
 
 #include <VtsHalHidlTargetTestEnvBase.h>
+
+#define MAX_RETRY 20
+#define TIME_OUT 400ms
+#define MAX_INPUT_BUFFERS 8
 
 /*
  * Handle Callback functions onWorkDone(), onTripped(),
@@ -176,5 +181,21 @@ class ComponentTestEnvironment : public ::testing::VtsHalHidlTargetTestEnvBase {
 /*
  * common functions declarations
  */
-void dumpFSV(const FieldSupportedValues& sv);
+void testInputBuffer(
+    const std::shared_ptr<android::Codec2Client::Component>& component,
+    std::mutex& queueLock, std::list<std::unique_ptr<C2Work>>& workQueue,
+    uint32_t flags, bool isNullBuffer);
+
+void waitOnInputConsumption(std::mutex& queueLock,
+                            std::condition_variable& queueCondition,
+                            std::list<std::unique_ptr<C2Work>>& workQueue,
+                            size_t bufferCount = MAX_INPUT_BUFFERS);
+
+void workDone(
+    const std::shared_ptr<android::Codec2Client::Component>& component,
+    std::unique_ptr<C2Work>& work, std::list<uint64_t>& flushedIndices,
+    std::mutex& queueLock, std::condition_variable& queueCondition,
+    std::list<std::unique_ptr<C2Work>>& workQueue, bool& eos, bool& csd,
+    uint32_t& framesReceived);
+
 #endif  // MEDIA_C2_HIDL_TEST_COMMON_H
