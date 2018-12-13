@@ -26,11 +26,6 @@
 #include "EffectHalHidl.h"
 #include "HidlUtils.h"
 
-using ::android::hardware::audio::effect::CPP_VERSION::AudioBuffer;
-using ::android::hardware::audio::effect::CPP_VERSION::EffectBufferAccess;
-using ::android::hardware::audio::effect::CPP_VERSION::EffectConfigParameters;
-using ::android::hardware::audio::effect::CPP_VERSION::MessageQueueFlagBits;
-using ::android::hardware::audio::effect::CPP_VERSION::Result;
 using ::android::hardware::audio::common::CPP_VERSION::implementation::HidlUtils;
 using ::android::hardware::audio::common::utils::EnumBitfield;
 using ::android::hardware::hidl_vec;
@@ -38,9 +33,11 @@ using ::android::hardware::MQDescriptorSync;
 using ::android::hardware::Return;
 
 namespace android {
+namespace effect {
 namespace CPP_VERSION {
 
 using namespace ::android::hardware::audio::common::CPP_VERSION;
+using namespace ::android::hardware::audio::effect::CPP_VERSION;
 
 EffectHalHidl::EffectHalHidl(const sp<IEffect>& effect, uint64_t effectId)
         : mEffect(effect), mEffectId(effectId), mBuffersChanged(true), mEfGroup(nullptr) {
@@ -338,4 +335,5 @@ status_t EffectHalHidl::setConfigImpl(
 }
 
 } // namespace CPP_VERSION
+} // namespace effect
 } // namespace android
