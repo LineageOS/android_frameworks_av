@@ -25,18 +25,29 @@
 
 namespace android {
 
+namespace effect {
 namespace V2_0 {
 sp<EffectsFactoryHalInterface> createEffectsFactoryHal();
-sp<DevicesFactoryHalInterface> createDevicesFactoryHal();
 } // namespace V2_0
 
 namespace V4_0 {
 sp<EffectsFactoryHalInterface> createEffectsFactoryHal();
-sp<DevicesFactoryHalInterface> createDevicesFactoryHal();
 } // namespace V4_0
 
 namespace V5_0 {
 sp<EffectsFactoryHalInterface> createEffectsFactoryHal();
+} // namespace V5_0
+} // namespace effect
+
+namespace V2_0 {
+sp<DevicesFactoryHalInterface> createDevicesFactoryHal();
+} // namespace V2_0
+
+namespace V4_0 {
+sp<DevicesFactoryHalInterface> createDevicesFactoryHal();
+} // namespace V4_0
+
+namespace V5_0 {
 sp<DevicesFactoryHalInterface> createDevicesFactoryHal();
 } // namespace V5_0
 
