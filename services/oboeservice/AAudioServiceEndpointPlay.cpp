@@ -84,7 +84,7 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
             int64_t mmapFramesWritten = getStreamInternal()->getFramesWritten();
 
             std::lock_guard <std::mutex> lock(mLockStreams);
-            for (const auto clientStream : mRegisteredStreams) {
+            for (const auto& clientStream : mRegisteredStreams) {
                 int64_t clientFramesRead = 0;
                 bool allowUnderflow = true;
 
