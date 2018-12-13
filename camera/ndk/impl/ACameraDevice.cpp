@@ -633,7 +633,7 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
     }
 
     std::set<std::pair<ANativeWindow*, OutputConfiguration>> outputSet;
-    for (auto outConfig : outputs->mOutputs) {
+    for (const auto& outConfig : outputs->mOutputs) {
         ANativeWindow* anw = outConfig.mWindow;
         sp<IGraphicBufferProducer> iGBP(nullptr);
         ret = getIGBPfromAnw(anw, iGBP);
@@ -706,7 +706,7 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
     }
 
     // add new streams
-    for (auto outputPair : addSet) {
+    for (const auto& outputPair : addSet) {
         int streamId;
         remoteRet = mRemote->createStream(outputPair.second, &streamId);
         if (!remoteRet.isOk()) {
@@ -839,7 +839,7 @@ CameraDevice::onCaptureErrorLocked(
 
         const auto& gbps = outputPairIt->second.second.getGraphicBufferProducers();
         for (const auto& outGbp : gbps) {
-            for (auto surface : request->mSurfaceList) {
+            for (const auto& surface : request->mSurfaceList) {
                 if (surface->getIGraphicBufferProducer() == outGbp) {
                     ANativeWindow* anw = static_cast<ANativeWindow*>(surface.get());
                     ALOGV("Camera %s Lost output buffer for ANW %p frame %" PRId64,

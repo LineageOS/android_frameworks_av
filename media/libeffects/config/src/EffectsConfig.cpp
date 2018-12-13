@@ -305,7 +305,7 @@ ParsingResult parse(const char* path) {
         return parseWithPath(path);
     }
 
-    for (std::string location : DEFAULT_LOCATIONS) {
+    for (const std::string& location : DEFAULT_LOCATIONS) {
         std::string defaultPath = location + '/' + DEFAULT_NAME;
         if (access(defaultPath.c_str(), R_OK) != 0) {
             continue;
