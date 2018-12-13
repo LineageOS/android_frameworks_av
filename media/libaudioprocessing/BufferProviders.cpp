@@ -19,7 +19,7 @@
 
 #include <audio_utils/primitives.h>
 #include <audio_utils/format.h>
-#include <external/sonic/sonic.h>
+#include <sonic.h>
 #include <media/audiohal/EffectBufferHalInterface.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
