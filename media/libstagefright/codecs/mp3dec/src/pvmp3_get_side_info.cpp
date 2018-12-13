@@ -154,7 +154,7 @@ ERROR_CODE pvmp3_get_side_info(tmp3Bits    *inputStream,
                 tmp = getbits_crc(inputStream, 22, crc, info->error_protection);
 
                 si->ch[ch].gran[gr].big_values            = (tmp << 10) >> 23;   /* 9 */
-                si->ch[ch].gran[gr].global_gain           = ((tmp << 19) >> 24) - 210;   /* 8 */
+                si->ch[ch].gran[gr].global_gain        = (int32)((tmp << 19) >> 24) - 210; /* 8 */
                 si->ch[ch].gran[gr].scalefac_compress     = (tmp << 27) >> 28;   /* 4 */
                 si->ch[ch].gran[gr].window_switching_flag = tmp & 1;         /* 1 */
 
