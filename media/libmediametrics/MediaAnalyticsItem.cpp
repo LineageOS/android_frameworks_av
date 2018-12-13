@@ -487,6 +487,18 @@ bool MediaAnalyticsItem::getCString(MediaAnalyticsItem::Attr name, char **value)
     return true;
 }
 
+bool MediaAnalyticsItem::getString(MediaAnalyticsItem::Attr name, std::string *value) {
+    Prop *prop = findProp(name);
+    if (prop == NULL || prop->mType != kTypeCString) {
+        return false;
+    }
+    if (value != NULL) {
+        // std::string makes a copy for us
+        *value = prop->u.CStringValue;
+    }
+    return true;
+}
+
 // remove indicated keys and their values
 // return value is # keys removed
 int32_t MediaAnalyticsItem::filter(int n, MediaAnalyticsItem::Attr attrs[]) {
@@ -725,6 +737,15 @@ int32_t MediaAnalyticsItem::writeToParcel(Parcel *data) {
     return 0;
 }
 
+
+const char *MediaAnalyticsItem::toCString() {
+   return toCString(PROTO_LAST);
+}
+
+const char * MediaAnalyticsItem::toCString(int version) {
+    std::string val = toString(version);
+    return strdup(val.c_str());
+}
 
 std::string MediaAnalyticsItem::toString() {
    return toString(PROTO_LAST);

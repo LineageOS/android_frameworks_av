@@ -134,6 +134,7 @@ class MediaAnalyticsItem {
         bool getRate(Attr, int64_t *count, int64_t *duration, double *rate);
         // Caller owns the returned string
         bool getCString(Attr, char **value);
+        bool getString(Attr, std::string *value);
 
         // parameter indicates whether to close any existing open
         // record with same key before establishing a new record
@@ -176,6 +177,8 @@ class MediaAnalyticsItem {
 
         std::string toString();
         std::string toString(int version);
+        const char *toCString();
+        const char *toCString(int version);
 
         // are we collecting analytics data
         static bool isEnabled();

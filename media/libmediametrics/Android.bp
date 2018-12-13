@@ -6,15 +6,16 @@ cc_library {
     srcs: [
         "IMediaAnalyticsService.cpp",
         "MediaAnalyticsItem.cpp",
+        "MediaMetrics.cpp",
     ],
 
     shared_libs: [
-        "liblog",
-        "libcutils",
-        "libutils",
-        "libbinder",
-        "libstagefright_foundation",
         "libbase",
+        "libbinder",
+        "libcutils",
+        "liblog",
+        "libstagefright_foundation",
+        "libutils",
     ],
 
     export_include_dirs: ["include"],
@@ -32,4 +33,13 @@ cc_library {
         ],
         cfi: true,
     },
+
+    // enumerate the stable interface
+// this would mean nobody can use the C++ interface. have to rework some things.
+//  stubs: {
+//      symbol_file: "libmediametrics.map.txt",
+//      versions: [
+//          "1" ,
+//      ]
+//  },
 }
