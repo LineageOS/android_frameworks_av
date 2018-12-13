@@ -613,13 +613,14 @@ static std::vector<std::pair<const char *, uint32_t>> int32Mappings {
         { "crypto-default-iv-size", kKeyCryptoDefaultIVSize },
         { "crypto-encrypted-byte-block", kKeyEncryptedByteBlock },
         { "crypto-skip-byte-block", kKeySkipByteBlock },
+        { "frame-count", kKeyFrameCount },
         { "max-bitrate", kKeyMaxBitRate },
         { "pcm-big-endian", kKeyPcmBigEndian },
         { "temporal-layer-count", kKeyTemporalLayerCount },
         { "temporal-layer-id", kKeyTemporalLayerId },
         { "thumbnail-width", kKeyThumbnailWidth },
         { "thumbnail-height", kKeyThumbnailHeight },
-        { "frame-count", kKeyFrameCount },
+        { "valid-samples", kKeyValidSamples },
     }
 };
 

@@ -140,6 +140,7 @@ LIBMEDIANDK {
     AMEDIAFORMAT_KEY_TIME_US; # var introduced=28
     AMEDIAFORMAT_KEY_TRACK_INDEX; # var introduced=28
     AMEDIAFORMAT_KEY_TRACK_ID; # var introduced=28
+    AMEDIAFORMAT_KEY_VALID_SAMPLES; # var introduced=29
     AMEDIAFORMAT_KEY_WIDTH; # var introduced=21
     AMEDIAFORMAT_KEY_YEAR; # var introduced=29
     AMediaCodecActionCode_isRecoverable; # introduced=28
