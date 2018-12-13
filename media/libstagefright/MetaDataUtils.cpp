@@ -308,6 +308,8 @@ static void extractAlbumArt(
 
 void parseVorbisComment(
         AMediaFormat *fileMeta, const char *comment, size_t commentLength) {
+    // Haptic tag is only kept here as it will only be used in extractor to generate channel mask.
+    const char* const haptic = "haptic";
     struct {
         const char *const mTag;
         const char *mKey;
@@ -328,6 +330,7 @@ void parseVorbisComment(
         { "LYRICIST", AMEDIAFORMAT_KEY_LYRICIST },
         { "METADATA_BLOCK_PICTURE", AMEDIAFORMAT_KEY_ALBUMART },
         { "ANDROID_LOOP", AMEDIAFORMAT_KEY_LOOP },
+        { "ANDROID_HAPTIC", haptic },
     };
 
         for (size_t j = 0; j < sizeof(kMap) / sizeof(kMap[0]); ++j) {
@@ -342,6 +345,15 @@ void parseVorbisComment(
                 } else if (kMap[j].mKey == AMEDIAFORMAT_KEY_LOOP) {
                     if (!strcasecmp(&comment[tagLen + 1], "true")) {
                         AMediaFormat_setInt32(fileMeta, AMEDIAFORMAT_KEY_LOOP, 1);
+                    }
+                } else if (kMap[j].mKey == haptic) {
+                    char *end;
+                    errno = 0;
+                    const int hapticChannelCount = strtol(&comment[tagLen + 1], &end, 10);
+                    if (errno == 0) {
+                        AMediaFormat_setInt32(fileMeta, haptic, hapticChannelCount);
+                    } else {
+                        ALOGE("Error(%d) when parsing haptic channel count", errno);
                     }
                 } else {
                     AMediaFormat_setString(fileMeta, kMap[j].mKey, &comment[tagLen + 1]);

@@ -21,14 +21,8 @@ apex {
         "libamrextractor",
         "libflacextractor",
         "libmidiextractor",
-        "libmkvextractor",
         "libmp3extractor",
-        "libmp4extractor",
-        "libmpeg2extractor",
-        "liboggextractor",
         "libwavextractor",
-        // MediaPlayer2
-        "libmedia2_jni",
     ],
     key: "com.android.media.key",
 }

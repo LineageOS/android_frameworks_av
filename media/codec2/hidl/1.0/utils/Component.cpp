@@ -410,7 +410,7 @@ Component::Component(
         const std::shared_ptr<C2Component>& component,
         const sp<IComponentListener>& listener,
         const sp<ComponentStore>& store,
-        const sp<::android::hardware::media::bufferpool::V1_0::
+        const sp<::android::hardware::media::bufferpool::V2_0::
         IClientManager>& clientPoolManager) :
     Configurable(new CachedConfigurable(
             std::make_unique<CompIntf>(component->intf()))),

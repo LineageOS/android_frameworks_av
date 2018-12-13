@@ -7,7 +7,7 @@ cc_library {
 
     shared_libs: [
         "android.hardware.graphics.bufferqueue@1.0",
-        "android.hardware.media.bufferpool@1.0",
+        "android.hardware.media.bufferpool@2.0",
         "android.hardware.media.c2@1.0",
         "libbase",
         "libbinder",
@@ -19,7 +19,7 @@ cc_library {
         "libhidlbase",
         "libhidltransport",
         "liblog",
-        "libstagefright_bufferpool@1.0",
+        "libstagefright_bufferpool@2.0",
         "libstagefright_bufferqueue_helper",
         "libui",
         "libutils",

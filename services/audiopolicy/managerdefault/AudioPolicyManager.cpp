@@ -484,7 +484,7 @@ sp<AudioPatch> AudioPolicyManager::createTelephonyPatch(
 
     audio_devices_t outputDevice = isRx ? device : AUDIO_DEVICE_OUT_TELEPHONY_TX;
     SortedVector<audio_io_handle_t> outputs = getOutputsForDevice(outputDevice, mOutputs);
-    audio_io_handle_t output = selectOutput(outputs, AUDIO_OUTPUT_FLAG_NONE, AUDIO_FORMAT_INVALID);
+    audio_io_handle_t output = selectOutput(outputs);
     // request to reuse existing output stream if one is already opened to reach the target device
     if (output != AUDIO_IO_HANDLE_NONE) {
         sp<AudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
@@ -774,7 +774,7 @@ audio_io_handle_t AudioPolicyManager::getOutput(audio_stream_type_t stream)
     // and AudioSystem::getOutputSamplingRate().
 
     SortedVector<audio_io_handle_t> outputs = getOutputsForDevice(device, mOutputs);
-    audio_io_handle_t output = selectOutput(outputs, AUDIO_OUTPUT_FLAG_NONE, AUDIO_FORMAT_INVALID);
+    audio_io_handle_t output = selectOutput(outputs);
 
     ALOGV("getOutput() stream %d selected device %08x, output %d", stream, device, output);
     return output;
@@ -1091,7 +1091,8 @@ non_direct_output:
 
         // at this stage we should ignore the DIRECT flag as no direct output could be found earlier
         *flags = (audio_output_flags_t)(*flags & ~AUDIO_OUTPUT_FLAG_DIRECT);
-        output = selectOutput(outputs, *flags, config->format);
+        output = selectOutput(outputs, *flags, config->format,
+                config->channel_mask, config->sample_rate);
     }
     ALOGW_IF((output == 0), "getOutputForDevice() could not find output for stream %d, "
             "sampling rate %d, format %#x, channels %#x, flags %#x",
@@ -1252,15 +1253,18 @@ status_t AudioPolicyManager::setMsdPatch(audio_devices_t outputDevice) {
 
 audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_handle_t>& outputs,
                                                        audio_output_flags_t flags,
-                                                       audio_format_t format)
+                                                       audio_format_t format,
+                                                       audio_channel_mask_t channelMask,
+                                                       uint32_t samplingRate)
 {
     // select one output among several that provide a path to a particular device or set of
     // devices (the list was previously build by getOutputsForDevice()).
     // The priority is as follows:
-    // 1: the output with the highest number of requested policy flags
-    // 2: the output with the bit depth the closest to the requested one
-    // 3: the primary output
-    // 4: the first output in the list
+    // 1: the output supporting haptic playback when requesting haptic playback
+    // 2: the output with the highest number of requested policy flags
+    // 3: the output with the bit depth the closest to the requested one
+    // 4: the primary output
+    // 5: the first output in the list
 
     if (outputs.size() == 0) {
         return AUDIO_IO_HANDLE_NONE;
@@ -1270,6 +1274,8 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
     }
 
     int maxCommonFlags = 0;
+    const size_t hapticChannelCount = audio_channel_count_from_out_mask(
+            channelMask & AUDIO_CHANNEL_HAPTIC_ALL);
     audio_io_handle_t outputForFlags = AUDIO_IO_HANDLE_NONE;
     audio_io_handle_t outputForPrimary = AUDIO_IO_HANDLE_NONE;
     audio_io_handle_t outputForFormat = AUDIO_IO_HANDLE_NONE;
@@ -1282,6 +1288,24 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
             if (outputDesc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) {
                 continue;
             }
+            // If haptic channel is specified, use the haptic output if present.
+            // When using haptic output, same audio format and sample rate are required.
+            if (hapticChannelCount > 0) {
+                // If haptic channel is specified, use the first output that
+                // support haptic playback.
+                if (audio_channel_count_from_out_mask(
+                        outputDesc->mChannelMask & AUDIO_CHANNEL_HAPTIC_ALL) >= hapticChannelCount
+                        && format == outputDesc->mFormat
+                        && samplingRate == outputDesc->mSamplingRate) {
+                    return output;
+                }
+            } else {
+                // When haptic channel is not specified, skip haptic output.
+                if (outputDesc->mChannelMask & AUDIO_CHANNEL_HAPTIC_ALL) {
+                    continue;
+                }
+            }
+
             // if a valid format is specified, skip output if not compatible
             if (format != AUDIO_FORMAT_INVALID) {
                 if (!audio_is_linear_pcm(format)) {
@@ -3036,9 +3060,7 @@ status_t AudioPolicyManager::createAudioPatch(const struct audio_patch *patch,
                                             getOutputsForDevice(sinkDeviceDesc->type(), mOutputs);
                     // if the sink device is reachable via an opened output stream, request to go via
                     // this output stream by adding a second source to the patch description
-                    audio_io_handle_t output = selectOutput(outputs,
-                                                            AUDIO_OUTPUT_FLAG_NONE,
-                                                            AUDIO_FORMAT_INVALID);
+                    audio_io_handle_t output = selectOutput(outputs);
                     if (output != AUDIO_IO_HANDLE_NONE) {
                         sp<AudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
                         if (outputDesc->isDuplicated()) {
@@ -3382,8 +3404,7 @@ status_t AudioPolicyManager::connectAudioSource(const sp<SourceClientDescriptor>
         //   create Hwoutput and add to mHwOutputs
     } else {
         SortedVector<audio_io_handle_t> outputs = getOutputsForDevice(sinkDevice, mOutputs);
-        audio_io_handle_t output =
-                selectOutput(outputs, AUDIO_OUTPUT_FLAG_NONE, AUDIO_FORMAT_INVALID);
+        audio_io_handle_t output = selectOutput(outputs);
         if (output == AUDIO_IO_HANDLE_NONE) {
             ALOGV("%s no output for device %08x", __FUNCTION__, sinkDevice);
             return INVALID_OPERATION;
@@ -3653,6 +3674,23 @@ void AudioPolicyManager::setAppState(uid_t uid, app_state_t state)
             }
         }
     }
+}
+
+bool AudioPolicyManager::isHapticPlaybackSupported()
+{
+    for (const auto& hwModule : mHwModules) {
+        const OutputProfileCollection &outputProfiles = hwModule->getOutputProfiles();
+        for (const auto &outProfile : outputProfiles) {
+            struct audio_port audioPort;
+            outProfile->toAudioPort(&audioPort);
+            for (size_t i = 0; i < audioPort.num_channel_masks; i++) {
+                if (audioPort.channel_masks[i] & AUDIO_CHANNEL_HAPTIC_ALL) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
 }
 
 status_t AudioPolicyManager::disconnectAudioSource(const sp<SourceClientDescriptor>& sourceDesc)

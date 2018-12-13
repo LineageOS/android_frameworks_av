@@ -70,10 +70,10 @@ static inline int32_t getAudioSinkPcmMsSetting() {
 
 // Maximum time in paused state when offloading audio decompression. When elapsed, the AudioSink
 // is closed to allow the audio DSP to power down.
-static const int64_t kOffloadPauseMaxUs = 10000000ll;
+static const int64_t kOffloadPauseMaxUs = 10000000LL;
 
 // Maximum allowed delay from AudioSink, 1.5 seconds.
-static const int64_t kMaxAllowedAudioSinkDelayUs = 1500000ll;
+static const int64_t kMaxAllowedAudioSinkDelayUs = 1500000LL;
 
 static const int64_t kMinimumAudioClockUpdatePeriodUs = 20 /* msec */ * 1000;
 
@@ -125,7 +125,7 @@ NuPlayer::Renderer::Renderer(
       mAudioFirstAnchorTimeMediaUs(-1),
       mAnchorTimeMediaUs(-1),
       mAnchorNumFramesWritten(-1),
-      mVideoLateByUs(0ll),
+      mVideoLateByUs(0LL),
       mNextVideoTimeMediaUs(-1),
       mHasAudio(false),
       mHasVideo(false),
@@ -580,7 +580,7 @@ void NuPlayer::Renderer::onMessageReceived(const sp<AMessage> &msg) {
                 // play back.
                 int64_t delayUs =
                     mAudioSink->msecsPerFrame()
-                        * numFramesPendingPlayout * 1000ll;
+                        * numFramesPendingPlayout * 1000LL;
                 if (mPlaybackRate > 1.0f) {
                     delayUs /= mPlaybackRate;
                 }
@@ -1172,7 +1172,7 @@ int64_t NuPlayer::Renderer::getPendingAudioPlayoutDurationUs(int64_t nowUs) {
         int64_t nowUs = ALooper::GetNowUs();
         int64_t mediaUs;
         if (mMediaClock->getMediaTime(nowUs, &mediaUs) != OK) {
-            return 0ll;
+            return 0LL;
         } else {
             return writtenAudioDurationUs - (mediaUs - mAudioFirstAnchorTimeMediaUs);
         }
@@ -1387,7 +1387,7 @@ void NuPlayer::Renderer::onDrainVideoQueue() {
         tooLate = false;
     }
 
-    entry->mNotifyConsumed->setInt64("timestampNs", realTimeUs * 1000ll);
+    entry->mNotifyConsumed->setInt64("timestampNs", realTimeUs * 1000LL);
     entry->mNotifyConsumed->setInt32("render", !tooLate);
     entry->mNotifyConsumed->post();
     mVideoQueue.erase(mVideoQueue.begin());
@@ -1519,7 +1519,7 @@ void NuPlayer::Renderer::onQueueBuffer(const sp<AMessage> &msg) {
 
     ALOGV("queueDiff = %.2f secs", diff / 1E6);
 
-    if (diff > 100000ll) {
+    if (diff > 100000LL) {
         // Audio data starts More than 0.1 secs before video.
         // Drop some audio.
 

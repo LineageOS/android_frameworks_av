@@ -23,6 +23,8 @@
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/foundation/hexdump.h>
+#include <OpusHeader.h>
 
 #include <utils/Errors.h>
 
@@ -112,46 +114,102 @@ sp<WebmElement> WebmWriter::videoTrack(const sp<MetaData>& md) {
 // static
 sp<WebmElement> WebmWriter::audioTrack(const sp<MetaData>& md) {
     int32_t nChannels, samplerate;
-    uint32_t type;
-    const void *headerData1;
-    const char headerData2[] = { 3, 'v', 'o', 'r', 'b', 'i', 's', 7, 0, 0, 0,
-            'a', 'n', 'd', 'r', 'o', 'i', 'd', 0, 0, 0, 0, 1 };
-    const void *headerData3;
-    size_t headerSize1, headerSize2 = sizeof(headerData2), headerSize3;
+    const char* mimeType;
 
     if (!md->findInt32(kKeyChannelCount, &nChannels)
-            || !md->findInt32(kKeySampleRate, &samplerate)
-            || !md->findData(kKeyVorbisInfo, &type, &headerData1, &headerSize1)
-            || !md->findData(kKeyVorbisBooks, &type, &headerData3, &headerSize3)) {
+        || !md->findInt32(kKeySampleRate, &samplerate)
+        || !md->findCString(kKeyMIMEType, &mimeType)) {
         ALOGE("Missing format keys for audio track");
         md->dumpToLog();
         return NULL;
     }
 
-    size_t codecPrivateSize = 1;
-    codecPrivateSize += XiphLaceCodeLen(headerSize1);
-    codecPrivateSize += XiphLaceCodeLen(headerSize2);
-    codecPrivateSize += headerSize1 + headerSize2 + headerSize3;
+    if (!strncasecmp(mimeType, MEDIA_MIMETYPE_AUDIO_OPUS, strlen(MEDIA_MIMETYPE_AUDIO_OPUS))) {
+        // Opus in WebM is a well-known, yet under-documented, format. The codec private data
+        // of the track is an Opus Ogg header (https://tools.ietf.org/html/rfc7845#section-5.1)
+        // The name of the track isn't standardized, its value should be "A_OPUS".
+        OpusHeader header;
+        header.channels = nChannels;
+        header.num_streams = nChannels;
+        header.num_coupled = 0;
+        // - Channel mapping family (8 bits unsigned)
+        //  --  0 = one stream: mono or L,R stereo
+        //  --  1 = channels in vorbis spec order: mono or L,R stereo or ... or FL,C,FR,RL,RR,LFE, ...
+        //  --  2..254 = reserved (treat as 255)
+        //  --  255 = no defined channel meaning
+        //
+        //  our implementation encodes:  0, 1, or 255
+        header.channel_mapping = ((nChannels > 8) ? 255 : (nChannels > 2));
+        header.gain_db = 0;
+        header.skip_samples = 0;
 
-    off_t off = 0;
-    sp<ABuffer> codecPrivateBuf = new ABuffer(codecPrivateSize);
-    uint8_t *codecPrivateData = codecPrivateBuf->data();
-    codecPrivateData[off++] = 2;
+        // headers are 21-bytes + something driven by channel count
+        // expect numbers in the low 30's here. WriteOpusHeader() will tell us
+        // if things are bad.
+        unsigned char header_data[100];
+        int headerSize = WriteOpusHeader(header, samplerate, (uint8_t*)header_data,
+                                            sizeof(header_data));
 
-    off += XiphLaceEnc(codecPrivateData + off, headerSize1);
-    off += XiphLaceEnc(codecPrivateData + off, headerSize2);
+        if (headerSize < 0) {
+            // didn't fill out that header for some reason
+            ALOGE("failed to generate OPUS header");
+            return NULL;
+        }
 
-    memcpy(codecPrivateData + off, headerData1, headerSize1);
-    off += headerSize1;
-    memcpy(codecPrivateData + off, headerData2, headerSize2);
-    off += headerSize2;
-    memcpy(codecPrivateData + off, headerData3, headerSize3);
+        size_t codecPrivateSize = 0;
+        codecPrivateSize += headerSize;
 
-    sp<WebmElement> entry = WebmElement::AudioTrackEntry(
-            nChannels,
-            samplerate,
-            codecPrivateBuf);
-    return entry;
+        off_t off = 0;
+        sp<ABuffer> codecPrivateBuf = new ABuffer(codecPrivateSize);
+        uint8_t* codecPrivateData = codecPrivateBuf->data();
+
+        memcpy(codecPrivateData + off, (uint8_t*)header_data, headerSize);
+        sp<WebmElement> entry =
+                WebmElement::AudioTrackEntry("A_OPUS", nChannels, samplerate, codecPrivateBuf);
+        return entry;
+    } else if (!strncasecmp(mimeType,
+                            MEDIA_MIMETYPE_AUDIO_VORBIS,
+                            strlen(MEDIA_MIMETYPE_AUDIO_VORBIS))) {
+        uint32_t type;
+        const void *headerData1;
+        const char headerData2[] = { 3, 'v', 'o', 'r', 'b', 'i', 's', 7, 0, 0, 0,
+                'a', 'n', 'd', 'r', 'o', 'i', 'd', 0, 0, 0, 0, 1 };
+        const void *headerData3;
+        size_t headerSize1, headerSize2 = sizeof(headerData2), headerSize3;
+
+        if (!md->findData(kKeyVorbisInfo, &type, &headerData1, &headerSize1)
+            || !md->findData(kKeyVorbisBooks, &type, &headerData3, &headerSize3)) {
+            ALOGE("Missing header format keys for vorbis track");
+            md->dumpToLog();
+            return NULL;
+        }
+
+        size_t codecPrivateSize = 1;
+        codecPrivateSize += XiphLaceCodeLen(headerSize1);
+        codecPrivateSize += XiphLaceCodeLen(headerSize2);
+        codecPrivateSize += headerSize1 + headerSize2 + headerSize3;
+
+        off_t off = 0;
+        sp<ABuffer> codecPrivateBuf = new ABuffer(codecPrivateSize);
+        uint8_t *codecPrivateData = codecPrivateBuf->data();
+        codecPrivateData[off++] = 2;
+
+        off += XiphLaceEnc(codecPrivateData + off, headerSize1);
+        off += XiphLaceEnc(codecPrivateData + off, headerSize2);
+
+        memcpy(codecPrivateData + off, headerData1, headerSize1);
+        off += headerSize1;
+        memcpy(codecPrivateData + off, headerData2, headerSize2);
+        off += headerSize2;
+        memcpy(codecPrivateData + off, headerData3, headerSize3);
+
+        sp<WebmElement> entry =
+                WebmElement::AudioTrackEntry("A_VORBIS", nChannels, samplerate, codecPrivateBuf);
+        return entry;
+    } else {
+        ALOGE("Track (%s) is not a supported audio format", mimeType);
+        return NULL;
+    }
 }
 
 size_t WebmWriter::numTracks() {
@@ -382,16 +440,18 @@ status_t WebmWriter::addSource(const sp<MediaSource> &source) {
     const char *vp8 = MEDIA_MIMETYPE_VIDEO_VP8;
     const char *vp9 = MEDIA_MIMETYPE_VIDEO_VP9;
     const char *vorbis = MEDIA_MIMETYPE_AUDIO_VORBIS;
+    const char* opus = MEDIA_MIMETYPE_AUDIO_OPUS;
 
     size_t streamIndex;
     if (!strncasecmp(mime, vp8, strlen(vp8)) ||
         !strncasecmp(mime, vp9, strlen(vp9))) {
         streamIndex = kVideoIndex;
-    } else if (!strncasecmp(mime, vorbis, strlen(vorbis))) {
+    } else if (!strncasecmp(mime, vorbis, strlen(vorbis)) ||
+               !strncasecmp(mime, opus, strlen(opus))) {
         streamIndex = kAudioIndex;
     } else {
-        ALOGE("Track (%s) other than %s, %s or %s is not supported",
-              mime, vp8, vp9, vorbis);
+        ALOGE("Track (%s) other than %s, %s, %s, or %s is not supported",
+              mime, vp8, vp9, vorbis, opus);
         return ERROR_UNSUPPORTED;
     }
 

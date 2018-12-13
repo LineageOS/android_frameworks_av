@@ -30,8 +30,17 @@ extern "C" {
 #ifdef BUILD_FLOAT
 typedef struct
 {
+#ifdef SUPPORT_MC
+    /* The memory region created by this structure instance is typecast
+     * into another structure containing a pointer and an array of filter
+     * coefficients. In one case this memory region is used for storing
+     * DC component of channels
+     */
+    LVM_FLOAT *pStorage;
+    LVM_FLOAT Storage[LVM_MAX_CHANNELS];
+#else
     LVM_FLOAT Storage[6];
-
+#endif
 } Biquad_FLOAT_Instance_t;
 #else
 typedef struct
@@ -179,7 +188,12 @@ typedef struct
 
 typedef struct
 {
-    LVM_FLOAT Storage[ (2 * 2) ];  /* Two channels, two taps of size LVM_INT32 */
+#ifdef SUPPORT_MC
+    /* LVM_MAX_CHANNELS channels, two taps of size LVM_FLOAT */
+    LVM_FLOAT Storage[ (LVM_MAX_CHANNELS * 2) ];
+#else
+    LVM_FLOAT Storage[ (2 * 2) ];  /* Two channels, two taps of size LVM_FLOAT */
+#endif
 } Biquad_2I_Order1_FLOAT_Taps_t;
 #else
 typedef struct
@@ -197,12 +211,17 @@ typedef struct
 #ifdef BUILD_FLOAT
 typedef struct
 {
-    LVM_FLOAT Storage[ (1 * 4) ];  /* One channel, four taps of size LVM_INT32 */
+    LVM_FLOAT Storage[ (1 * 4) ];  /* One channel, four taps of size LVM_FLOAT */
 } Biquad_1I_Order2_FLOAT_Taps_t;
 
 typedef struct
 {
-    LVM_FLOAT Storage[ (2 * 4) ];  /* Two channels, four taps of size LVM_INT32 */
+#ifdef SUPPORT_MC
+    /* LVM_MAX_CHANNELS, four taps of size LVM_FLOAT */
+    LVM_FLOAT Storage[ (LVM_MAX_CHANNELS * 4) ];
+#else
+    LVM_FLOAT Storage[ (2 * 4) ];  /* Two channels, four taps of size LVM_FLOAT */
+#endif
 } Biquad_2I_Order2_FLOAT_Taps_t;
 #else
 typedef struct
@@ -366,6 +385,13 @@ void BQ_2I_D32F32C30_TRC_WRA_01 (           Biquad_FLOAT_Instance_t  *pInstance,
                                             LVM_FLOAT                    *pDataIn,
                                             LVM_FLOAT                    *pDataOut,
                                             LVM_INT16                 NrSamples);
+#ifdef SUPPORT_MC
+void BQ_MC_D32F32C30_TRC_WRA_01 (           Biquad_FLOAT_Instance_t      *pInstance,
+                                            LVM_FLOAT                    *pDataIn,
+                                            LVM_FLOAT                    *pDataOut,
+                                            LVM_INT16                    NrFrames,
+                                            LVM_INT16                    NrChannels);
+#endif
 #else
 void BQ_2I_D32F32Cll_TRC_WRA_01_Init (      Biquad_Instance_t       *pInstance,
                                             Biquad_2I_Order2_Taps_t *pTaps,
@@ -434,6 +460,13 @@ void FO_1I_D32F32C31_TRC_WRA_01( Biquad_FLOAT_Instance_t       *pInstance,
                                  LVM_FLOAT                     *pDataIn,
                                  LVM_FLOAT                     *pDataOut,
                                  LVM_INT16                     NrSamples);
+#ifdef SUPPORT_MC
+void FO_Mc_D16F32C15_LShx_TRC_WRA_01(Biquad_FLOAT_Instance_t  *pInstance,
+                                     LVM_FLOAT                *pDataIn,
+                                     LVM_FLOAT                *pDataOut,
+                                     LVM_INT16                NrFrames,
+                                     LVM_INT16                NrChannels);
+#endif
 #else
 void FO_1I_D32F32Cll_TRC_WRA_01_Init(       Biquad_Instance_t       *pInstance,
                                             Biquad_1I_Order1_Taps_t *pTaps,
@@ -527,6 +560,13 @@ void PK_2I_D32F32C14G11_TRC_WRA_01( Biquad_FLOAT_Instance_t       *pInstance,
                                     LVM_FLOAT               *pDataIn,
                                     LVM_FLOAT               *pDataOut,
                                     LVM_INT16               NrSamples);
+#ifdef SUPPORT_MC
+void PK_Mc_D32F32C14G11_TRC_WRA_01(Biquad_FLOAT_Instance_t       *pInstance,
+                                   LVM_FLOAT               *pDataIn,
+                                   LVM_FLOAT               *pDataOut,
+                                   LVM_INT16               NrFrames,
+                                   LVM_INT16               NrChannels);
+#endif
 #else
 void PK_2I_D32F32C14G11_TRC_WRA_01 (        Biquad_Instance_t       *pInstance,
                                             LVM_INT32                    *pDataIn,
@@ -540,12 +580,22 @@ void PK_2I_D32F32C14G11_TRC_WRA_01 (        Biquad_Instance_t       *pInstance,
 
 /*** 16 bit data path STEREO ******************************************************/
 #ifdef BUILD_FLOAT
+#ifdef SUPPORT_MC
+void DC_Mc_D16_TRC_WRA_01_Init     (        Biquad_FLOAT_Instance_t       *pInstance);
+
+void DC_Mc_D16_TRC_WRA_01          (        Biquad_FLOAT_Instance_t       *pInstance,
+                                            LVM_FLOAT               *pDataIn,
+                                            LVM_FLOAT               *pDataOut,
+                                            LVM_INT16               NrFrames,
+                                            LVM_INT16               NrChannels);
+#else
 void DC_2I_D16_TRC_WRA_01_Init     (        Biquad_FLOAT_Instance_t       *pInstance);
 
 void DC_2I_D16_TRC_WRA_01          (        Biquad_FLOAT_Instance_t       *pInstance,
                                             LVM_FLOAT               *pDataIn,
                                             LVM_FLOAT               *pDataOut,
                                             LVM_INT16               NrSamples);
+#endif
 #else
 void DC_2I_D16_TRC_WRA_01_Init     (        Biquad_Instance_t       *pInstance);
 

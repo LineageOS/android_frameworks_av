@@ -118,7 +118,7 @@ void    LVDBE_SetFilters(LVDBE_Instance_t     *pInstance,
      * Calculate the table offsets
      */
     LVM_UINT16 Offset = (LVM_UINT16)((LVM_UINT16)pParams->SampleRate + \
-                                    (LVM_UINT16)(pParams->CentreFrequency * (1+LVDBE_FS_48000)));    
+                                    (LVM_UINT16)(pParams->CentreFrequency * (1+LVDBE_FS_48000)));
 #endif
 
     /*

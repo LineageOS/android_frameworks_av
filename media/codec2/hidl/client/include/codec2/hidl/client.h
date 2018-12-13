@@ -85,9 +85,9 @@ namespace android {
 namespace hardware {
 namespace media {
 namespace bufferpool {
-namespace V1_0 {
+namespace V2_0 {
 struct IClientManager;
-} // namespace V1_0
+} // namespace V2_0
 } // namespace bufferpool
 } // namespace media
 } // namespace hardware
@@ -237,7 +237,7 @@ protected:
     mutable std::vector<std::unique_ptr<std::vector<std::string>>>
             mAliasesBuffer;
 
-    sp<::android::hardware::media::bufferpool::V1_0::IClientManager>
+    sp<::android::hardware::media::bufferpool::V2_0::IClientManager>
             mHostPoolManager;
 };
 

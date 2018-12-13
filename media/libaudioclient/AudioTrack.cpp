@@ -66,7 +66,7 @@ static inline nsecs_t framesToNanoseconds(ssize_t frames, uint32_t sampleRate, f
 
 static int64_t convertTimespecToUs(const struct timespec &tv)
 {
-    return tv.tv_sec * 1000000ll + tv.tv_nsec / 1000;
+    return tv.tv_sec * 1000000LL + tv.tv_nsec / 1000;
 }
 
 // TODO move to audio_utils.

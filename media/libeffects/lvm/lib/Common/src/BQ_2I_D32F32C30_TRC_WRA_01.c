@@ -123,6 +123,87 @@ void BQ_2I_D32F32C30_TRC_WRA_01 (           Biquad_FLOAT_Instance_t       *pInst
         }
 
     }
+
+#ifdef SUPPORT_MC
+/**************************************************************************
+ ASSUMPTIONS:
+ COEFS-
+ pBiquadState->coefs[0] is A2, pBiquadState->coefs[1] is A1
+ pBiquadState->coefs[2] is A0, pBiquadState->coefs[3] is -B2
+ pBiquadState->coefs[4] is -B1
+
+ DELAYS-
+ pBiquadState->pDelays[0] to
+ pBiquadState->pDelays[NrChannels - 1] is x(n-1) for all NrChannels
+
+ pBiquadState->pDelays[NrChannels] to
+ pBiquadState->pDelays[2*NrChannels - 1] is x(n-2) for all NrChannels
+
+ pBiquadState->pDelays[2*NrChannels] to
+ pBiquadState->pDelays[3*NrChannels - 1] is y(n-1) for all NrChannels
+
+ pBiquadState->pDelays[3*NrChannels] to
+ pBiquadState->pDelays[4*NrChannels - 1] is y(n-2) for all NrChannels
+***************************************************************************/
+void BQ_MC_D32F32C30_TRC_WRA_01 (           Biquad_FLOAT_Instance_t      *pInstance,
+                                            LVM_FLOAT                    *pDataIn,
+                                            LVM_FLOAT                    *pDataOut,
+                                            LVM_INT16                    NrFrames,
+                                            LVM_INT16                    NrChannels)
+
+
+    {
+        LVM_FLOAT yn, temp;
+        LVM_INT16 ii, jj;
+        PFilter_State_FLOAT pBiquadState = (PFilter_State_FLOAT) pInstance;
+
+         for (ii = NrFrames; ii != 0; ii--)
+         {
+            /**************************************************************************
+                            PROCESSING CHANNEL-WISE
+            ***************************************************************************/
+            for (jj = 0; jj < NrChannels; jj++)
+            {
+                /* yn= (A2  * x(n-2)) */
+                yn = pBiquadState->coefs[0] * pBiquadState->pDelays[NrChannels + jj];
+
+                /* yn+= (A1  * x(n-1)) */
+                temp = pBiquadState->coefs[1] * pBiquadState->pDelays[jj];
+                yn += temp;
+
+                /* yn+= (A0  * x(n)) */
+                temp = pBiquadState->coefs[2] * (*pDataIn);
+                yn += temp;
+
+                 /* yn+= (-B2  * y(n-2)) */
+                temp = pBiquadState->coefs[3] * pBiquadState->pDelays[NrChannels*3 + jj];
+                yn += temp;
+
+                /* yn+= (-B1  * y(n-1)) */
+                temp = pBiquadState->coefs[4] * pBiquadState->pDelays[NrChannels*2 + jj];
+                yn += temp;
+
+                /**************************************************************************
+                                UPDATING THE DELAYS
+                ***************************************************************************/
+                pBiquadState->pDelays[NrChannels * 3 + jj] =
+                    pBiquadState->pDelays[NrChannels * 2 + jj]; /* y(n-2)=y(n-1)*/
+                pBiquadState->pDelays[NrChannels * 1 + jj] =
+                    pBiquadState->pDelays[jj]; /* x(n-2)=x(n-1)*/
+                pBiquadState->pDelays[NrChannels * 2 + jj] = (LVM_FLOAT)yn; /* Update y(n-1)*/
+                pBiquadState->pDelays[jj] = (*pDataIn); /* Update x(n-1)*/
+                pDataIn++;
+                /**************************************************************************
+                                WRITING THE OUTPUT
+                ***************************************************************************/
+                *pDataOut = (LVM_FLOAT)yn; /* Write jj Channel output */
+                pDataOut++;
+            }
+        }
+
+    }
+#endif /*SUPPORT_MC*/
+
 #else
 void BQ_2I_D32F32C30_TRC_WRA_01 (           Biquad_Instance_t       *pInstance,
                                             LVM_INT32                    *pDataIn,

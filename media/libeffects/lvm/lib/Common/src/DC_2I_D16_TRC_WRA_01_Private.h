@@ -34,6 +34,13 @@ typedef struct _Filter_FLOAT_State_
     LVM_FLOAT  RightDC;    /* RightDC  */
 }Filter_FLOAT_State;
 typedef Filter_FLOAT_State * PFilter_FLOAT_State ;
+#ifdef SUPPORT_MC
+typedef struct _Filter_FLOAT_State_Mc_
+{
+    LVM_FLOAT  ChDC[LVM_MAX_CHANNELS];     /* ChannelDC  */
+} Filter_FLOAT_State_Mc;
+typedef Filter_FLOAT_State_Mc * PFilter_FLOAT_State_Mc ;
+#endif
 #else
 typedef struct _Filter_State_
 {

@@ -115,7 +115,7 @@ BufLogStream::BufLogStream(unsigned int id,
         unsigned int samplingRate,
         size_t maxBytes = 0) : mId(id), mFormat(format), mChannels(channels),
                 mSamplingRate(samplingRate), mMaxBytes(maxBytes) {
-    mByteCount = 0l;
+    mByteCount = 0;
     mPaused = false;
     if (tag != NULL) {
         (void)audio_utils_strlcpy(mTag, tag);

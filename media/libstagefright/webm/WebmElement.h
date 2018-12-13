@@ -50,6 +50,7 @@ struct WebmElement : public LightRefBase<WebmElement> {
     static sp<WebmElement> SegmentInfo(uint64_t scale = 1000000, double dur = 0);
 
     static sp<WebmElement> AudioTrackEntry(
+            const char *codec,
             int chans,
             double rate,
             const sp<ABuffer> &buf,

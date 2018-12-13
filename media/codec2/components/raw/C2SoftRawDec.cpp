@@ -83,6 +83,18 @@ public:
                 DefineParam(mInputMaxBufSize, C2_PARAMKEY_INPUT_MAX_BUFFER_SIZE)
                 .withConstValue(new C2StreamMaxBufferSizeInfo::input(0u, 64 * 1024))
                 .build());
+
+        addParameter(
+                DefineParam(mPcmEncodingInfo, C2_PARAMKEY_PCM_ENCODING)
+                .withDefault(new C2StreamPcmEncodingInfo::output(0u, C2Config::PCM_16))
+                .withFields({C2F(mPcmEncodingInfo, value).oneOf({
+                     C2Config::PCM_16,
+                     C2Config::PCM_8,
+                     C2Config::PCM_FLOAT})
+                })
+                .withSetter((Setter<decltype(*mPcmEncodingInfo)>::StrictValueWithNoDeps))
+                .build());
+
     }
 
 private:
@@ -94,6 +106,7 @@ private:
     std::shared_ptr<C2StreamChannelCountInfo::output> mChannelCount;
     std::shared_ptr<C2BitrateTuning::input> mBitrate;
     std::shared_ptr<C2StreamMaxBufferSizeInfo::input> mInputMaxBufSize;
+    std::shared_ptr<C2StreamPcmEncodingInfo::output> mPcmEncodingInfo;
 };
 
 C2SoftRawDec::C2SoftRawDec(

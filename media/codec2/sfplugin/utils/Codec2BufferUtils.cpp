@@ -88,16 +88,30 @@ static status_t _ImageCopy(View &view, const MediaImage2 *img, ImagePixel *imgBa
 
         uint32_t planeW = img->mWidth / plane.colSampling;
         uint32_t planeH = img->mHeight / plane.rowSampling;
-        for (uint32_t row = 0; row < planeH; ++row) {
-            decltype(imgRow) imgPtr = imgRow;
-            decltype(viewRow) viewPtr = viewRow;
-            for (uint32_t col = 0; col < planeW; ++col) {
-                MemCopier<ToMediaImage, 0>::copy(imgPtr, viewPtr, bpp);
-                imgPtr += img->mPlane[i].mColInc;
-                viewPtr += plane.colInc;
+
+        bool canCopyByRow = (plane.colInc == 1) && (img->mPlane[i].mColInc == 1);
+        bool canCopyByPlane = canCopyByRow && (plane.rowInc == img->mPlane[i].mRowInc);
+        if (canCopyByPlane) {
+            MemCopier<ToMediaImage, 0>::copy(imgRow, viewRow, plane.rowInc * planeH);
+        } else if (canCopyByRow) {
+            for (uint32_t row = 0; row < planeH; ++row) {
+                MemCopier<ToMediaImage, 0>::copy(
+                        imgRow, viewRow, std::min(plane.rowInc, img->mPlane[i].mRowInc));
+                imgRow += img->mPlane[i].mRowInc;
+                viewRow += plane.rowInc;
             }
-            imgRow += img->mPlane[i].mRowInc;
-            viewRow += plane.rowInc;
+        } else {
+            for (uint32_t row = 0; row < planeH; ++row) {
+                decltype(imgRow) imgPtr = imgRow;
+                decltype(viewRow) viewPtr = viewRow;
+                for (uint32_t col = 0; col < planeW; ++col) {
+                    MemCopier<ToMediaImage, 0>::copy(imgPtr, viewPtr, bpp);
+                    imgPtr += img->mPlane[i].mColInc;
+                    viewPtr += plane.colInc;
+                }
+                imgRow += img->mPlane[i].mRowInc;
+                viewRow += plane.rowInc;
+            }
         }
     }
     return OK;

@@ -78,6 +78,8 @@ public:
         DOWNMIX_TYPE    = 0X4004,
         MIXER_FORMAT    = 0x4005, // AUDIO_FORMAT_PCM_(FLOAT|16_BIT)
         MIXER_CHANNEL_MASK = 0x4006, // Channel mask for mixer output
+        // for haptic
+        HAPTIC_ENABLED  = 0x4007, // Set haptic data from this track should be played or not.
         // for target RESAMPLE
         SAMPLE_RATE     = 0x4100, // Configure sample rate conversion on this track name;
                                   // parameter 'value' is the new sample rate in Hz.
@@ -137,6 +139,13 @@ public:
     void        setBufferProvider(int name, AudioBufferProvider* bufferProvider);
 
     void        process() {
+        for (const auto &pair : mTracks) {
+            // Clear contracted buffer before processing if contracted channels are saved
+            const std::shared_ptr<Track> &t = pair.second;
+            if (t->mKeepContractedChannels) {
+                t->clearContractedBuffer();
+            }
+        }
         (this->*mHook)();
     }
 
@@ -235,6 +244,8 @@ private:
             mPostDownmixReformatBufferProvider.reset(nullptr);
             mDownmixerBufferProvider.reset(nullptr);
             mReformatBufferProvider.reset(nullptr);
+            mAdjustChannelsNonDestructiveBufferProvider.reset(nullptr);
+            mAdjustChannelsBufferProvider.reset(nullptr);
         }
 
         bool        needsRamp() { return (volumeInc[0] | volumeInc[1] | auxInc) != 0; }
@@ -249,6 +260,11 @@ private:
         void        unprepareForDownmix();
         status_t    prepareForReformat();
         void        unprepareForReformat();
+        status_t    prepareForAdjustChannels();
+        void        unprepareForAdjustChannels();
+        status_t    prepareForAdjustChannelsNonDestructive(size_t frames);
+        void        unprepareForAdjustChannelsNonDestructive();
+        void        clearContractedBuffer();
         bool        setPlaybackRate(const AudioPlaybackRate &playbackRate);
         void        reconfigureBufferProviders();
 
@@ -302,17 +318,22 @@ private:
          * all pre-mixer track buffer conversions outside the AudioMixer class.
          *
          * 1) mInputBufferProvider: The AudioTrack buffer provider.
-         * 2) mReformatBufferProvider: If not NULL, performs the audio reformat to
+         * 2) mAdjustChannelsBufferProvider: Expend or contracts data
+         * 3) mAdjustChannelsNonDestructiveBufferProvider: Non-destructively adjust sample data
+         * 4) mReformatBufferProvider: If not NULL, performs the audio reformat to
          *    match either mMixerInFormat or mDownmixRequiresFormat, if the downmixer
          *    requires reformat. For example, it may convert floating point input to
          *    PCM_16_bit if that's required by the downmixer.
-         * 3) mDownmixerBufferProvider: If not NULL, performs the channel remixing to match
+         * 5) mDownmixerBufferProvider: If not NULL, performs the channel remixing to match
          *    the number of channels required by the mixer sink.
-         * 4) mPostDownmixReformatBufferProvider: If not NULL, performs reformatting from
+         * 6) mPostDownmixReformatBufferProvider: If not NULL, performs reformatting from
          *    the downmixer requirements to the mixer engine input requirements.
-         * 5) mTimestretchBufferProvider: Adds timestretching for playback rate
+         * 7) mTimestretchBufferProvider: Adds timestretching for playback rate
          */
         AudioBufferProvider*     mInputBufferProvider;    // externally provided buffer provider.
+        // TODO: combine AdjustChannelsBufferProvider and AdjustChannelsNonDestructiveBufferProvider
+        std::unique_ptr<PassthruBufferProvider> mAdjustChannelsBufferProvider;
+        std::unique_ptr<PassthruBufferProvider> mAdjustChannelsNonDestructiveBufferProvider;
         std::unique_ptr<PassthruBufferProvider> mReformatBufferProvider;
         std::unique_ptr<PassthruBufferProvider> mDownmixerBufferProvider;
         std::unique_ptr<PassthruBufferProvider> mPostDownmixReformatBufferProvider;
@@ -340,6 +361,18 @@ private:
         uint32_t             mMixerChannelCount;
 
         AudioPlaybackRate    mPlaybackRate;
+
+        // Haptic
+        bool                 mHapticPlaybackEnabled;
+        audio_channel_mask_t mHapticChannelMask;
+        uint32_t             mHapticChannelCount;
+        audio_channel_mask_t mMixerHapticChannelMask;
+        uint32_t             mMixerHapticChannelCount;
+        uint32_t             mAdjustInChannelCount;
+        uint32_t             mAdjustOutChannelCount;
+        uint32_t             mAdjustNonDestructiveInChannelCount;
+        uint32_t             mAdjustNonDestructiveOutChannelCount;
+        bool                 mKeepContractedChannels;
 
     private:
         // hooks

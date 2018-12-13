@@ -157,10 +157,18 @@ void LVC_Mixer_VarSlope_SetTimeConstant( LVMixer3_st *pStream,
 /*** 16 bit functions *************************************************************/
 
 #ifdef BUILD_FLOAT
-void LVC_MixSoft_1St_D16C31_SAT( LVMixer3_1St_FLOAT_st *pInstance,
-                                 const LVM_FLOAT           *src,
-                                 LVM_FLOAT           *dst,
-                                 LVM_INT16           n);
+void LVC_MixSoft_1St_D16C31_SAT(LVMixer3_1St_FLOAT_st *pInstance,
+                                const LVM_FLOAT       *src,
+                                      LVM_FLOAT       *dst,
+                                      LVM_INT16       n);
+#ifdef SUPPORT_MC
+void LVC_MixSoft_Mc_D16C31_SAT(LVMixer3_1St_FLOAT_st *pInstance,
+                               const LVM_FLOAT       *src,
+                                     LVM_FLOAT       *dst,
+                                     LVM_INT16       NrFrames,
+                                     LVM_INT16       NrChannels);
+#endif
+
 #else
 void LVC_MixSoft_1St_D16C31_SAT( LVMixer3_1St_st *pInstance,
                                   const LVM_INT16           *src,
@@ -169,10 +177,18 @@ void LVC_MixSoft_1St_D16C31_SAT( LVMixer3_1St_st *pInstance,
 #endif
 
 #ifdef BUILD_FLOAT
-void LVC_MixInSoft_D16C31_SAT( LVMixer3_1St_FLOAT_st *pInstance,
-                               LVM_FLOAT           *src,
-                               LVM_FLOAT           *dst,
-                               LVM_INT16           n);
+void LVC_MixInSoft_D16C31_SAT(LVMixer3_1St_FLOAT_st *pInstance,
+                              const LVM_FLOAT       *src,
+                                    LVM_FLOAT       *dst,
+                                    LVM_INT16       n);
+#ifdef SUPPORT_MC
+void LVC_MixInSoft_Mc_D16C31_SAT(LVMixer3_1St_FLOAT_st *pInstance,
+                                 const LVM_FLOAT       *src,
+                                       LVM_FLOAT       *dst,
+                                       LVM_INT16       NrFrames,
+                                       LVM_INT16       NrChannels);
+#endif
+
 #else
 void LVC_MixInSoft_D16C31_SAT( LVMixer3_1St_st *pInstance,
                                         LVM_INT16           *src,
@@ -181,11 +197,19 @@ void LVC_MixInSoft_D16C31_SAT( LVMixer3_1St_st *pInstance,
 #endif
 
 #ifdef BUILD_FLOAT
-void LVC_MixSoft_2St_D16C31_SAT( LVMixer3_2St_FLOAT_st *pInstance,
-                                 const LVM_FLOAT             *src1,
-                                 LVM_FLOAT             *src2,
-                                 LVM_FLOAT             *dst,  /* dst cannot be equal to src2 */
-                                 LVM_INT16             n);
+void LVC_MixSoft_2St_D16C31_SAT(LVMixer3_2St_FLOAT_st *pInstance,
+                                const LVM_FLOAT       *src1,
+                                const LVM_FLOAT       *src2,
+                                LVM_FLOAT             *dst,  /* dst cannot be equal to src2 */
+                                LVM_INT16             n);
+#ifdef SUPPORT_MC
+void LVC_MixSoft_2Mc_D16C31_SAT(LVMixer3_2St_FLOAT_st *pInstance,
+                                const LVM_FLOAT       *src1,
+                                const LVM_FLOAT       *src2,
+                                LVM_FLOAT             *dst,  /* dst cannot be equal to src2 */
+                                LVM_INT16             NrFrames,
+                                LVM_INT16             NrChannels);
+#endif
 #else
 void LVC_MixSoft_2St_D16C31_SAT( LVMixer3_2St_st *pInstance,
                                 const LVM_INT16             *src1,
@@ -200,10 +224,10 @@ void LVC_MixSoft_2St_D16C31_SAT( LVMixer3_2St_st *pInstance,
 /* Gain values should not be more that 1.0                                        */
 /**********************************************************************************/
 #ifdef BUILD_FLOAT
-void LVC_MixSoft_1St_2i_D16C31_SAT( LVMixer3_2St_FLOAT_st         *pInstance,
-                                    const   LVM_FLOAT           *src,
-                                    LVM_FLOAT           *dst,   /* dst can be equal to src */
-                                    LVM_INT16           n);     /* Number of stereo samples */
+void LVC_MixSoft_1St_2i_D16C31_SAT(LVMixer3_2St_FLOAT_st *pInstance,
+                                   const   LVM_FLOAT     *src,
+                                   LVM_FLOAT             *dst,   /* dst can be equal to src */
+                                   LVM_INT16             n);     /* Number of stereo samples */
 #else
 void LVC_MixSoft_1St_2i_D16C31_SAT( LVMixer3_2St_st         *pInstance,
                                 const   LVM_INT16           *src,

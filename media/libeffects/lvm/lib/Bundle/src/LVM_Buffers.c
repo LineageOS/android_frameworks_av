@@ -25,6 +25,8 @@
 #include "LVM_Private.h"
 #include "VectorArithmetic.h"
 
+#include <log/log.h>
+
 /****************************************************************************************/
 /*                                                                                      */
 /* FUNCTION:                 LVM_BufferManagedIn                                        */
@@ -62,8 +64,11 @@ void LVM_BufferManagedIn(LVM_Handle_t       hInstance,
     LVM_Instance_t   *pInstance = (LVM_Instance_t  *)hInstance;
     LVM_Buffer_t     *pBuffer;
     LVM_FLOAT        *pDest;
+#ifdef SUPPORT_MC
+    LVM_INT16        NumChannels = pInstance->NrChannels;
+#else
     LVM_INT16        NumChannels = 2;
-
+#endif
 
     /*
      * Set the processing address pointers
@@ -207,8 +212,7 @@ void LVM_BufferManagedIn(LVM_Handle_t       hInstance,
     LVM_Instance_t   *pInstance = (LVM_Instance_t  *)hInstance;
     LVM_Buffer_t     *pBuffer;
     LVM_INT16        *pDest;
-    LVM_INT16        NumChannels =2;
-
+    LVM_INT16        NumChannels = 2;
 
     /*
      * Set the processing address pointers
@@ -499,7 +503,7 @@ void LVM_BufferOptimisedIn(LVM_Handle_t         hInstance,
         if (pBuffer->OutDelaySamples != 0)
         {
             Copy_16(&pBuffer->OutDelayBuffer[0],                    /* Source */
-                    pDest,                                          /* Detsination */
+                    pDest,                                          /* Destination */
                     (LVM_INT16)(2*pBuffer->OutDelaySamples));       /* Number of delay samples */
             pDest += 2 * pBuffer->OutDelaySamples;                  /* Update the output pointer */
             pBuffer->SamplesToOutput = (LVM_INT16)(pBuffer->SamplesToOutput - pBuffer->OutDelaySamples); /* Update the numbr of samples to output */
@@ -750,14 +754,17 @@ void LVM_BufferManagedOut(LVM_Handle_t        hInstance,
     LVM_INT16       NumSamples;
     LVM_FLOAT       *pStart;
     LVM_FLOAT       *pDest;
-
+#ifdef SUPPORT_MC
+    LVM_INT32       NrChannels = pInstance->NrChannels;
+#define NrFrames NumSamples  // alias for clarity
+#define FrameCount SampleCount
+#endif
 
     /*
      * Set the pointers
      */
     NumSamples = pBuffer->SamplesToOutput;
     pStart     = pBuffer->pScratch;
-
 
     /*
      * check if it is the first call of a block
@@ -786,14 +793,25 @@ void LVM_BufferManagedOut(LVM_Handle_t        hInstance,
             /*
              * Copy all output delay samples to the output
              */
+#ifdef SUPPORT_MC
             Copy_Float(&pBuffer->OutDelayBuffer[0],                /* Source */
-                       pDest,                                      /* Detsination */
+                       pDest,                                      /* Destination */
+                       /* Number of delay samples */
+                       (LVM_INT16)(NrChannels * pBuffer->OutDelaySamples));
+#else
+            Copy_Float(&pBuffer->OutDelayBuffer[0],                /* Source */
+                       pDest,                                      /* Destination */
                        (LVM_INT16)(2 * pBuffer->OutDelaySamples)); /* Number of delay samples */
+#endif
 
             /*
              * Update the pointer and sample counts
              */
+#ifdef SUPPORT_MC
+            pDest += NrChannels * pBuffer->OutDelaySamples; /* Output sample pointer */
+#else
             pDest += 2 * pBuffer->OutDelaySamples; /* Output sample pointer */
+#endif
             NumSamples = (LVM_INT16)(NumSamples - pBuffer->OutDelaySamples); /* Samples left \
                                                                                 to send */
             pBuffer->OutDelaySamples = 0; /* No samples left in the buffer */
@@ -803,23 +821,40 @@ void LVM_BufferManagedOut(LVM_Handle_t        hInstance,
             /*
              * Copy only some of the ouput delay samples to the output
              */
+#ifdef SUPPORT_MC
             Copy_Float(&pBuffer->OutDelayBuffer[0],                    /* Source */
-                       pDest,                                          /* Detsination */
+                       pDest,                                          /* Destination */
+                       (LVM_INT16)(NrChannels * NrFrames));       /* Number of delay samples */
+#else
+            Copy_Float(&pBuffer->OutDelayBuffer[0],                    /* Source */
+                       pDest,                                          /* Destination */
                        (LVM_INT16)(2 * NumSamples));       /* Number of delay samples */
+#endif
 
             /*
              * Update the pointer and sample counts
              */
+#ifdef SUPPORT_MC
+            pDest += NrChannels * NrFrames; /* Output sample pointer */
+#else
             pDest += 2 * NumSamples; /* Output sample pointer */
+#endif
             /* No samples left in the buffer */
             pBuffer->OutDelaySamples = (LVM_INT16)(pBuffer->OutDelaySamples - NumSamples);
 
             /*
              * Realign the delay buffer data to avoid using circular buffer management
              */
+#ifdef SUPPORT_MC
+            Copy_Float(&pBuffer->OutDelayBuffer[NrChannels * NrFrames],         /* Source */
+                       &pBuffer->OutDelayBuffer[0],                    /* Destination */
+                       /* Number of samples to move */
+                       (LVM_INT16)(NrChannels * pBuffer->OutDelaySamples));
+#else
             Copy_Float(&pBuffer->OutDelayBuffer[2 * NumSamples],         /* Source */
                        &pBuffer->OutDelayBuffer[0],                    /* Destination */
                        (LVM_INT16)(2 * pBuffer->OutDelaySamples)); /* Number of samples to move */
+#endif
             NumSamples = 0;                                /* Samples left to send */
         }
     }
@@ -836,13 +871,23 @@ void LVM_BufferManagedOut(LVM_Handle_t        hInstance,
             /*
              * Copy all processed samples to the output
              */
+#ifdef SUPPORT_MC
             Copy_Float(pStart,                                      /* Source */
-                       pDest,                                       /* Detsination */
+                       pDest,                                       /* Destination */
+                       (LVM_INT16)(NrChannels * FrameCount)); /* Number of processed samples */
+#else
+            Copy_Float(pStart,                                      /* Source */
+                       pDest,                                       /* Destination */
                        (LVM_INT16)(2 * SampleCount)); /* Number of processed samples */
+#endif
             /*
              * Update the pointer and sample counts
              */
+#ifdef SUPPORT_MC
+            pDest      += NrChannels * FrameCount;                 /* Output sample pointer */
+#else
             pDest      += 2 * SampleCount;                          /* Output sample pointer */
+#endif
             NumSamples  = (LVM_INT16)(NumSamples - SampleCount);    /* Samples left to send */
             SampleCount = 0; /* No samples left in the buffer */
         }
@@ -851,14 +896,25 @@ void LVM_BufferManagedOut(LVM_Handle_t        hInstance,
             /*
              * Copy only some processed samples to the output
              */
+#ifdef SUPPORT_MC
+            Copy_Float(pStart,                                         /* Source */
+                       pDest,                                          /* Destination */
+                       (LVM_INT16)(NrChannels * NrFrames));  /* Number of processed samples */
+#else
             Copy_Float(pStart,                                         /* Source */
                        pDest,                                          /* Destination */
                        (LVM_INT16)(2 * NumSamples));     /* Number of processed samples */
+#endif
             /*
              * Update the pointers and sample counts
                */
+#ifdef SUPPORT_MC
+            pStart      += NrChannels * NrFrames;               /* Processed sample pointer */
+            pDest       += NrChannels * NrFrames;               /* Output sample pointer */
+#else
             pStart      += 2 * NumSamples;                        /* Processed sample pointer */
             pDest       += 2 * NumSamples;                        /* Output sample pointer */
+#endif
             SampleCount  = (LVM_INT16)(SampleCount - NumSamples); /* Processed samples left */
             NumSamples   = 0;                                     /* Clear the sample count */
         }
@@ -870,9 +926,16 @@ void LVM_BufferManagedOut(LVM_Handle_t        hInstance,
      */
     if (SampleCount != 0)
     {
+#ifdef SUPPORT_MC
+        Copy_Float(pStart,                                                 /* Source */
+                   /* Destination */
+                   &pBuffer->OutDelayBuffer[NrChannels * pBuffer->OutDelaySamples],
+                   (LVM_INT16)(NrChannels * FrameCount));      /* Number of processed samples */
+#else
         Copy_Float(pStart,                                                 /* Source */
                    &pBuffer->OutDelayBuffer[2 * pBuffer->OutDelaySamples], /* Destination */
                    (LVM_INT16)(2 * SampleCount));               /* Number of processed samples */
+#endif
         /* Update the buffer count */
         pBuffer->OutDelaySamples = (LVM_INT16)(pBuffer->OutDelaySamples + SampleCount);
     }
@@ -1063,14 +1126,24 @@ void LVM_BufferUnmanagedOut(LVM_Handle_t        hInstance,
 {
 
     LVM_Instance_t      *pInstance  = (LVM_Instance_t  *)hInstance;
-    LVM_INT16           NumChannels =2;
+#ifdef SUPPORT_MC
+    LVM_INT16           NumChannels = pInstance->NrChannels;
+#undef NrFrames
+#define NrFrames (*pNumSamples) // alias for clarity
+#else
+    LVM_INT16           NumChannels = 2;
+#endif
 
 
     /*
      * Update sample counts
      */
     pInstance->pInputSamples    += (LVM_INT16)(*pNumSamples * NumChannels); /* Update the I/O pointers */
+#ifdef SUPPORT_MC
+    pInstance->pOutputSamples   += (LVM_INT16)(NrFrames * NumChannels);
+#else
     pInstance->pOutputSamples   += (LVM_INT16)(*pNumSamples * 2);
+#endif
     pInstance->SamplesToProcess  = (LVM_INT16)(pInstance->SamplesToProcess - *pNumSamples); /* Update the sample count */
 
     /*
