@@ -791,9 +791,13 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
             sp<AReplyToken> replyID;
             CHECK(msg->senderAwaitsResponse(&replyID));
 
+            int64_t srcId;
+            CHECK(msg->findInt64("srcId", (int64_t*)&srcId));
+
             PlayerMessage* reply;
             CHECK(msg->findPointer("reply", (void**)&reply));
 
+            // TODO: use correct source info based on srcId.
             size_t inbandTracks = 0;
             if (mCurrentSourceInfo.mSource != NULL) {
                 inbandTracks = mCurrentSourceInfo.mSource->getTrackCount();
@@ -824,10 +828,14 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
 
         case kWhatGetSelectedTrack:
         {
+            int64_t srcId;
+            CHECK(msg->findInt64("srcId", (int64_t*)&srcId));
+
             int32_t type32;
             CHECK(msg->findInt32("type", (int32_t*)&type32));
             media_track_type type = (media_track_type)type32;
 
+            // TODO: use correct source info based on srcId.
             size_t inbandTracks = 0;
             status_t err = INVALID_OPERATION;
             ssize_t selectedTrack = -1;
@@ -863,15 +871,18 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
             sp<AReplyToken> replyID;
             CHECK(msg->senderAwaitsResponse(&replyID));
 
+            int64_t srcId;
             size_t trackIndex;
             int32_t select;
             int64_t timeUs;
+            CHECK(msg->findInt64("srcId", (int64_t*)&srcId));
             CHECK(msg->findSize("trackIndex", &trackIndex));
             CHECK(msg->findInt32("select", &select));
             CHECK(msg->findInt64("timeUs", &timeUs));
 
             status_t err = INVALID_OPERATION;
 
+            // TODO: use correct source info based on srcId.
             size_t inbandTracks = 0;
             if (mCurrentSourceInfo.mSource != NULL) {
                 inbandTracks = mCurrentSourceInfo.mSource->getTrackCount();
@@ -2324,8 +2335,9 @@ status_t NuPlayer2::setVideoScalingMode(int32_t mode) {
     return OK;
 }
 
-status_t NuPlayer2::getTrackInfo(PlayerMessage* reply) const {
+status_t NuPlayer2::getTrackInfo(int64_t srcId, PlayerMessage* reply) const {
     sp<AMessage> msg = new AMessage(kWhatGetTrackInfo, this);
+    msg->setInt64("srcId", srcId);
     msg->setPointer("reply", reply);
 
     sp<AMessage> response;
@@ -2333,9 +2345,10 @@ status_t NuPlayer2::getTrackInfo(PlayerMessage* reply) const {
     return err;
 }
 
-status_t NuPlayer2::getSelectedTrack(int32_t type, PlayerMessage* reply) const {
+status_t NuPlayer2::getSelectedTrack(int64_t srcId, int32_t type, PlayerMessage* reply) const {
     sp<AMessage> msg = new AMessage(kWhatGetSelectedTrack, this);
     msg->setPointer("reply", reply);
+    msg->setInt64("srcId", srcId);
     msg->setInt32("type", type);
 
     sp<AMessage> response;
@@ -2346,8 +2359,9 @@ status_t NuPlayer2::getSelectedTrack(int32_t type, PlayerMessage* reply) const {
     return err;
 }
 
-status_t NuPlayer2::selectTrack(size_t trackIndex, bool select, int64_t timeUs) {
+status_t NuPlayer2::selectTrack(int64_t srcId, size_t trackIndex, bool select, int64_t timeUs) {
     sp<AMessage> msg = new AMessage(kWhatSelectTrack, this);
+    msg->setInt64("srcId", srcId);
     msg->setSize("trackIndex", trackIndex);
     msg->setInt32("select", select);
     msg->setInt64("timeUs", timeUs);
