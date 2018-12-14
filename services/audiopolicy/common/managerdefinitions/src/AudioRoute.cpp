@@ -37,4 +37,19 @@ void AudioRoute::dump(String8 *dst, int spaces) const
     dst->append("\n");
 }
 
+bool AudioRoute::supportsPatch(const sp<AudioPort> &srcPort, const sp<AudioPort> &dstPort) const
+{
+    if (mSink == 0 || dstPort == 0 || dstPort != mSink) {
+        return false;
+    }
+    ALOGV("%s: sinks %s matching", __FUNCTION__, mSink->getTagName().string());
+    for (const auto &sourcePort : mSources) {
+        if (sourcePort == srcPort) {
+            ALOGV("%s: sources %s matching", __FUNCTION__, sourcePort->getTagName().string());
+            return true;
+        }
+    }
+    return false;
+}
+
 }

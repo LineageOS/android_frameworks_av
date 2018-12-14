@@ -149,13 +149,13 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t device,
 
             // Before checking outputs, broadcast connect event to allow HAL to retrieve dynamic
             // parameters on newly connected devices (instead of opening the outputs...)
-            broadcastDeviceConnectionState(device, state, devDesc->mAddress);
+            broadcastDeviceConnectionState(device, state, devDesc->address());
 
-            if (checkOutputsForDevice(devDesc, state, outputs, devDesc->mAddress) != NO_ERROR) {
+            if (checkOutputsForDevice(devDesc, state, outputs, devDesc->address()) != NO_ERROR) {
                 mAvailableOutputDevices.remove(devDesc);
 
                 broadcastDeviceConnectionState(device, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
-                                               devDesc->mAddress);
+                                               devDesc->address());
                 return INVALID_OPERATION;
             }
             // Propagate device availability to Engine
@@ -178,12 +178,12 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t device,
             ALOGV("setDeviceConnectionState() disconnecting output device %x", device);
 
             // Send Disconnect to HALs
-            broadcastDeviceConnectionState(device, state, devDesc->mAddress);
+            broadcastDeviceConnectionState(device, state, devDesc->address());
 
             // remove device from available output devices
             mAvailableOutputDevices.remove(devDesc);
 
-            checkOutputsForDevice(devDesc, state, outputs, devDesc->mAddress);
+            checkOutputsForDevice(devDesc, state, outputs, devDesc->address());
 
             // Propagate device availability to Engine
             mEngine->setDeviceConnectionState(devDesc, state);
@@ -265,11 +265,11 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t device,
 
             // Before checking intputs, broadcast connect event to allow HAL to retrieve dynamic
             // parameters on newly connected devices (instead of opening the inputs...)
-            broadcastDeviceConnectionState(device, state, devDesc->mAddress);
+            broadcastDeviceConnectionState(device, state, devDesc->address());
 
-            if (checkInputsForDevice(devDesc, state, inputs, devDesc->mAddress) != NO_ERROR) {
+            if (checkInputsForDevice(devDesc, state, inputs, devDesc->address()) != NO_ERROR) {
                 broadcastDeviceConnectionState(device, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
-                                               devDesc->mAddress);
+                                               devDesc->address());
                 return INVALID_OPERATION;
             }
 
@@ -294,9 +294,9 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t device,
             ALOGV("setDeviceConnectionState() disconnecting input device %x", device);
 
             // Set Disconnect to HALs
-            broadcastDeviceConnectionState(device, state, devDesc->mAddress);
+            broadcastDeviceConnectionState(device, state, devDesc->address());
 
-            checkInputsForDevice(devDesc, state, inputs, devDesc->mAddress);
+            checkInputsForDevice(devDesc, state, inputs, devDesc->address());
             mAvailableInputDevices.remove(devDesc);
 
             // Propagate device availability to Engine
@@ -910,8 +910,7 @@ status_t AudioPolicyManager::getOutputForAttrInt(audio_attributes_t *resultAttr,
     }
 
     outputDevices = mAvailableOutputDevices.getDevicesFromTypeMask(device);
-    *selectedDeviceId = outputDevices.size() > 0 ? outputDevices.itemAt(0)->getId()
-            : AUDIO_PORT_HANDLE_NONE;
+    *selectedDeviceId = getFirstDeviceId(outputDevices);
 
     ALOGV("%s returns output %d selectedDeviceId %d", __func__, *output, *selectedDeviceId);
 
@@ -1053,8 +1052,7 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevice(
                 new SwAudioOutputDescriptor(profile, mpClientInterface);
 
         DeviceVector outputDevices = mAvailableOutputDevices.getDevicesFromTypeMask(device);
-        String8 address = outputDevices.size() > 0 ? outputDevices.itemAt(0)->mAddress
-                : String8("");
+        String8 address = getFirstDeviceAddress(outputDevices);
 
         // MSD patch may be using the only output stream that can service this request. Release
         // MSD patch to prioritize this request over any active output on MSD.
@@ -1755,10 +1753,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
     }
 
     // Explicit routing?
-    sp<DeviceDescriptor> deviceDesc;
-    if (*selectedDeviceId != AUDIO_PORT_HANDLE_NONE) {
-        deviceDesc = mAvailableInputDevices.getDeviceFromId(*selectedDeviceId);
-    }
+    sp<DeviceDescriptor> deviceDesc = mAvailableInputDevices.getDeviceFromId(*selectedDeviceId);
 
     // special case for mmap capture: if an input IO handle is specified, we reuse this input if
     // possible
@@ -1864,8 +1859,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
 exit:
 
     inputDevices = mAvailableInputDevices.getDevicesFromTypeMask(device);
-    *selectedDeviceId = inputDevices.size() > 0 ? inputDevices.itemAt(0)->getId()
-                                                : AUDIO_PORT_HANDLE_NONE;
+    *selectedDeviceId = getFirstDeviceId(inputDevices);
 
     isSoundTrigger = inputSource == AUDIO_SOURCE_HOTWORD &&
         mSoundTriggerSessions.indexOfKey(session) > 0;
@@ -1996,7 +1990,7 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(audio_devices_t device,
     if (address == "") {
         DeviceVector inputDevices = mAvailableInputDevices.getDevicesFromTypeMask(device);
         // the inputs vector must be of size >= 1, but we don't want to crash here
-        address = inputDevices.size() > 0 ? inputDevices.itemAt(0)->mAddress : String8("");
+        address = getFirstDeviceAddress(inputDevices);
     }
 
     status_t status = inputDesc->open(&lConfig, device, address,
@@ -2963,7 +2957,7 @@ status_t AudioPolicyManager::createAudioPatch(const struct audio_patch *patch,
             }
 
             if (!outputDesc->mProfile->isCompatibleProfile(devDesc->type(),
-                                                           devDesc->mAddress,
+                                                           devDesc->address(),
                                                            patch->sources[0].sample_rate,
                                                            NULL,  // updatedSamplingRate
                                                            patch->sources[0].format,
@@ -3020,7 +3014,7 @@ status_t AudioPolicyManager::createAudioPatch(const struct audio_patch *patch,
             }
 
             if (!inputDesc->mProfile->isCompatibleProfile(devDesc->type(),
-                                                          devDesc->mAddress,
+                                                          devDesc->address(),
                                                           patch->sinks[0].sample_rate,
                                                           NULL, /*updatedSampleRate*/
                                                           patch->sinks[0].format,
@@ -3083,8 +3077,10 @@ status_t AudioPolicyManager::createAudioPatch(const struct audio_patch *patch,
                 // create a software bridge in PatchPanel if:
                 // - source and sink devices are on different HW modules OR
                 // - audio HAL version is < 3.0
+                // - audio HAL version is >= 3.0 but no route has been declared between devices
                 if (!srcDeviceDesc->hasSameHwModuleAs(sinkDeviceDesc) ||
-                        (srcDeviceDesc->mModule->getHalVersionMajor() < 3)) {
+                        (srcDeviceDesc->getModuleVersionMajor() < 3) ||
+                        !srcDeviceDesc->getModule()->supportsPatch(srcDeviceDesc, sinkDeviceDesc)) {
                     // support only one sink device for now to simplify output selection logic
                     if (patch->num_sinks > 1) {
                         return INVALID_OPERATION;
@@ -3428,14 +3424,14 @@ status_t AudioPolicyManager::connectAudioSource(const sp<SourceClientDescriptor>
 
     audio_patch_handle_t afPatchHandle = AUDIO_PATCH_HANDLE_NONE;
 
-    if (srcDeviceDesc->getAudioPort()->mModule->getHandle() ==
-            sinkDeviceDesc->getAudioPort()->mModule->getHandle() &&
-            srcDeviceDesc->getAudioPort()->mModule->getHalVersionMajor() >= 3 &&
+    if (srcDeviceDesc->hasSameHwModuleAs(sinkDeviceDesc) &&
+            srcDeviceDesc->getModuleVersionMajor() >= 3 &&
+            sinkDeviceDesc->getModule()->supportsPatch(srcDeviceDesc, sinkDeviceDesc) &&
             srcDeviceDesc->getAudioPort()->mGains.size() > 0) {
-        ALOGV("%s AUDIO_DEVICE_API_VERSION_3_0", __FUNCTION__);
+        ALOGV("%s Device to Device route supported by >=3.0 HAL", __FUNCTION__);
         // TODO: may explicitly specify whether we should use HW or SW patch
-        // create patch between src device and output device
-        // create Hwoutput and add to mHwOutputs
+        //   create patch between src device and output device
+        //   create Hwoutput and add to mHwOutputs
     } else {
         audio_attributes_t resultAttr;
         audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
@@ -3664,7 +3660,7 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
             AUDIO_DEVICE_OUT_HDMI);
     for (size_t i = 0; i < hdmiOutputDevices.size(); i++) {
         // Simulate reconnection to update enabled surround sound formats.
-        String8 address = hdmiOutputDevices[i]->mAddress;
+        String8 address = hdmiOutputDevices[i]->address();
         String8 name = hdmiOutputDevices[i]->getName();
         status_t status = setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_HDMI,
                                                       AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
@@ -3684,7 +3680,7 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
                 AUDIO_DEVICE_IN_HDMI);
     for (size_t i = 0; i < hdmiInputDevices.size(); i++) {
         // Simulate reconnection to update enabled surround sound formats.
-        String8 address = hdmiInputDevices[i]->mAddress;
+        String8 address = hdmiInputDevices[i]->address();
         String8 name = hdmiInputDevices[i]->getName();
         status_t status = setDeviceConnectionStateInt(AUDIO_DEVICE_IN_HDMI,
                                                       AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
@@ -3942,8 +3938,7 @@ status_t AudioPolicyManager::initialize() {
             const DeviceVector &supportedDevices = outProfile->getSupportedDevices();
             const DeviceVector &devicesForType = supportedDevices.getDevicesFromTypeMask(
                     profileType);
-            String8 address = devicesForType.size() > 0 ? devicesForType.itemAt(0)->mAddress
-                    : String8("");
+            String8 address = getFirstDeviceAddress(devicesForType);
             audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
             status_t status = outputDesc->open(nullptr, profileType, address,
                                            AUDIO_STREAM_DEFAULT, AUDIO_OUTPUT_FLAG_NONE, &output);
@@ -3997,8 +3992,7 @@ status_t AudioPolicyManager::initialize() {
 
             DeviceVector inputDevices = mAvailableInputDevices.getDevicesFromTypeMask(profileType);
             //   the inputs vector must be of size >= 1, but we don't want to crash here
-            String8 address = inputDevices.size() > 0 ? inputDevices.itemAt(0)->mAddress
-                    : String8("");
+            String8 address = getFirstDeviceAddress(inputDevices);
             ALOGV("  for input device 0x%x using address %s", profileType, address.string());
             ALOGE_IF(inputDevices.size() == 0, "Input device list is empty!");
 
@@ -4060,11 +4054,11 @@ status_t AudioPolicyManager::initialize() {
     }
     // If microphones address is empty, set it according to device type
     for (size_t i = 0; i  < mAvailableInputDevices.size(); i++) {
-        if (mAvailableInputDevices[i]->mAddress.isEmpty()) {
+        if (mAvailableInputDevices[i]->address().isEmpty()) {
             if (mAvailableInputDevices[i]->type() == AUDIO_DEVICE_IN_BUILTIN_MIC) {
-                mAvailableInputDevices[i]->mAddress = String8(AUDIO_BOTTOM_MICROPHONE_ADDRESS);
+                mAvailableInputDevices[i]->address() = String8(AUDIO_BOTTOM_MICROPHONE_ADDRESS);
             } else if (mAvailableInputDevices[i]->type() == AUDIO_DEVICE_IN_BACK_MIC) {
-                mAvailableInputDevices[i]->mAddress = String8(AUDIO_BACK_MICROPHONE_ADDRESS);
+                mAvailableInputDevices[i]->address() = String8(AUDIO_BACK_MICROPHONE_ADDRESS);
             }
         }
     }
@@ -5233,8 +5227,9 @@ uint32_t AudioPolicyManager::setOutputDevice(const sp<AudioOutputDescriptor>& ou
         if (!deviceList.isEmpty()) {
             PatchBuilder patchBuilder;
             patchBuilder.addSource(outputDesc);
-            for (size_t i = 0; i < deviceList.size() && i < AUDIO_PATCH_PORTS_MAX; i++) {
-                patchBuilder.addSink(deviceList.itemAt(i));
+            ALOG_ASSERT(deviceList.size() <= AUDIO_PATCH_PORTS_MAX, "Too many sink ports");
+            for (const auto &device : deviceList) {
+                patchBuilder.addSink(device);
             }
             installPatch(__func__, patchHandle, outputDesc.get(), patchBuilder.patch(), delayMs);
         }

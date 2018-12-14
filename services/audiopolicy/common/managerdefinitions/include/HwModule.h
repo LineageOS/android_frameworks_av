@@ -81,6 +81,17 @@ public:
         return mPorts.findByTagName(tagName);
     }
 
+    /**
+     * @brief supportsPatch checks if an audio patch between 2 ports beloging to this HwModule
+     * is supported by a HwModule. The ports and the route shall be declared in the
+     * audio_policy_configuration.xml file.
+     * @param srcPort (aka the source) to be considered
+     * @param dstPort (aka the sink) to be considered
+     * @return true if the HwModule supports the connection between the sink and the source,
+     * false otherwise
+     */
+    bool supportsPatch(const sp<AudioPort> &srcPort, const sp<AudioPort> &dstPort) const;
+
     // TODO remove from here (split serialization)
     void dump(String8 *dst) const;
 
