@@ -17,12 +17,9 @@ cc_library_shared {
         "android.hidl.token@1.0-utils",
         "android.hidl.allocator@1.0",
         "libhidlmemory",
-        "libcrypto",
-        "libcutils",
         "libhidlbase",
         "liblog",
-        "libmediaextractor",
-        "libstagefright_foundation",
+        "libmediandk",
     ],
 
     header_libs: [
@@ -30,8 +27,13 @@ cc_library_shared {
     ],
 
     static_libs: [
+        "libcrypto",
+        "libstagefright_foundation",
         "libstagefright_mpeg2support",
+        "libmediaextractor",
         "libutils",
+        "libstagefright",
+        "libstagefright_esds",
     ],
 
     name: "libmpeg2extractor",

@@ -31,27 +31,27 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION_CURRENT + 1,
         UUID("3d1dcfeb-e40a-436d-a574-c2438a555e5f"),
         1,
         "MPEG2-PS/TS Extractor",
         {
-            [](
+            .v3 = [](
                     CDataSource *source,
                     float *confidence,
                     void **,
-                    FreeMetaFunc *) -> CreatorFunc {
+                    FreeMetaFunc *) -> CreatorFuncV3 {
                 DataSourceHelper helper(source);
                 if (SniffMPEG2TS(&helper, confidence)) {
                     return [](
                             CDataSource *source,
-                            void *) -> CMediaExtractor* {
-                        return wrap(new MPEG2TSExtractor(new DataSourceHelper(source)));};
+                            void *) -> CMediaExtractorV3* {
+                        return wrapV3(new MPEG2TSExtractor(new DataSourceHelper(source)));};
                 } else if (SniffMPEG2PS(&helper, confidence)) {
                             return [](
                                     CDataSource *source,
-                                    void *) -> CMediaExtractor* {
-                                return wrap(new MPEG2PSExtractor(new DataSourceHelper(source)));};
+                                    void *) -> CMediaExtractorV3* {
+                                return wrapV3(new MPEG2PSExtractor(new DataSourceHelper(source)));};
                 }
                 return NULL;
             }
