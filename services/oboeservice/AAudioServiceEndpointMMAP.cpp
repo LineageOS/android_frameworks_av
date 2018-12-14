@@ -371,7 +371,7 @@ void AAudioServiceEndpointMMAP::onVolumeChanged(audio_channel_mask_t channels,
     float volume = values[0];
     ALOGD("%s(%p) volume[0] = %f", __func__, this, volume);
     std::lock_guard<std::mutex> lock(mLockStreams);
-    for(const auto stream : mRegisteredStreams) {
+    for(const auto& stream : mRegisteredStreams) {
         stream->onVolumeChanged(volume);
     }
 };
