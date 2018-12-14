@@ -41,7 +41,6 @@ LOCAL_REQUIRED_MODULES_x86_64 := crash_dump.policy mediaextractor.policy
 # extractor libraries
 LOCAL_REQUIRED_MODULES += \
     libmpeg2extractor \
-    liboggextractor \
 
 LOCAL_SRC_FILES := main_extractorservice.cpp
 LOCAL_SHARED_LIBRARIES := libmedia libmediaextractorservice libbinder libutils \

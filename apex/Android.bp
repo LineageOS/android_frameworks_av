@@ -24,6 +24,7 @@ apex {
         "libmkvextractor",
         "libmp3extractor",
         "libmp4extractor",
+        "liboggextractor",
         "libwavextractor",
     ],
     key: "com.android.media.key",

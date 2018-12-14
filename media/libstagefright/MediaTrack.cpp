@@ -245,6 +245,9 @@ status_t MediaTrackCUnwrapperV3::read(MediaBufferBase **buffer, const ReadOption
         if (format->mFormat->findInt32("crypto-skip-byte-block", &val32)) {
             meta.setInt32(kKeySkipByteBlock, val32);
         }
+        if (format->mFormat->findInt32("valid-samples", &val32)) {
+            meta.setInt32(kKeyValidSamples, val32);
+        }
         sp<ABuffer> valbuf;
         if (format->mFormat->findBuffer("crypto-plain-sizes", &valbuf)) {
             meta.setData(kKeyPlainSizes,
