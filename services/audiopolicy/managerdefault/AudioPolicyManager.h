@@ -519,6 +519,19 @@ protected:
             return mAvailableInputDevices.getDeviceTypesFromHwModule(
                     mPrimaryOutput->getModuleHandle());
         }
+        /**
+         * @brief getFirstDeviceId of the Device Vector
+         * @return if the collection is not empty, it returns the first device Id,
+         *         otherwise AUDIO_PORT_HANDLE_NONE
+         */
+        audio_port_handle_t getFirstDeviceId(const DeviceVector &devices) const
+        {
+            return (devices.size() > 0) ? devices.itemAt(0)->getId() : AUDIO_PORT_HANDLE_NONE;
+        }
+        String8 getFirstDeviceAddress(const DeviceVector &devices) const
+        {
+            return (devices.size() > 0) ? devices.itemAt(0)->address() : String8("");
+        }
 
         uint32_t updateCallRouting(audio_devices_t rxDevice, uint32_t delayMs = 0);
         sp<AudioPatch> createTelephonyPatch(bool isRx, audio_devices_t device, uint32_t delayMs);
@@ -661,6 +674,21 @@ private:
                 const String8& address /*in*/,
                 SortedVector<audio_io_handle_t>& outputs /*out*/);
         uint32_t curAudioPortGeneration() const { return mAudioPortGeneration; }
+        // internal method, get audio_attributes_t from either a source audio_attributes_t
+        // or audio_stream_type_t, respectively.
+        status_t getAudioAttributes(audio_attributes_t *dstAttr,
+                const audio_attributes_t *srcAttr,
+                audio_stream_type_t srcStream);
+        // internal method, called by getOutputForAttr() and connectAudioSource.
+        status_t getOutputForAttrInt(audio_attributes_t *resultAttr,
+                audio_io_handle_t *output,
+                audio_session_t session,
+                const audio_attributes_t *attr,
+                audio_stream_type_t *stream,
+                uid_t uid,
+                const audio_config_t *config,
+                audio_output_flags_t *flags,
+                audio_port_handle_t *selectedDeviceId);
         // internal method to return the output handle for the given device and format
         audio_io_handle_t getOutputForDevice(
                 audio_devices_t device,

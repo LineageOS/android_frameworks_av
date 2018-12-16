@@ -152,6 +152,24 @@
 #define CS_SIDE_48000_SCALE                          14
 
 #ifdef HIGHER_FS
+/* Coefficients for 88200Hz sample rate.
+ * The filter coefficients are obtained by carrying out
+ * state-space analysis using the coefficients available
+ * for 44100Hz.
+ */
+#define CS_MIDDLE_88200_A0                     0.233846f
+#define CS_MIDDLE_88200_A1                     (-0.232657f)
+#define CS_MIDDLE_88200_A2                     0.000000f
+#define CS_MIDDLE_88200_B1                     (-0.992747f)
+#define CS_MIDDLE_88200_B2                     0.000000f
+#define CS_MIDDLE_88200_SCALE                  15
+#define CS_SIDE_88200_A0                       0.231541f
+#define CS_SIDE_88200_A1                       (-0.289586f)
+#define CS_SIDE_88200_A2                       0.058045f
+#define CS_SIDE_88200_B1                       (-1.765300f)
+#define CS_SIDE_88200_B2                       0.769816f
+#define CS_SIDE_88200_SCALE                    14
+
 /* Stereo Enhancer coefficients for 96000Hz sample rate, scaled with  0.165*/
 /* high pass filter with cutoff frequency 102.18 Hz*/
 #define CS_MIDDLE_96000_A0                     0.235532
@@ -167,6 +185,24 @@
 #define CS_SIDE_96000_B1                    (-1.793372)
 #define CS_SIDE_96000_B2                     0.797236
 #define CS_SIDE_96000_SCALE                        14
+
+/* Stereo Enhancer coefficients for 176400Hz sample rate.
+ * The filter coefficients are obtained by carrying out
+ * state-space analysis using the coefficients available
+ * for 44100Hz.
+ */
+#define CS_MIDDLE_176400_A0                     0.233973f
+#define CS_MIDDLE_176400_A1                     (-0.233378f)
+#define CS_MIDDLE_176400_A2                     0.000000f
+#define CS_MIDDLE_176400_B1                     (-0.996367f)
+#define CS_MIDDLE_176400_B2                     0.000000f
+#define CS_MIDDLE_176400_SCALE                  15
+#define CS_SIDE_176400_A0                       0.199836f
+#define CS_SIDE_176400_A1                       (-0.307544f)
+#define CS_SIDE_176400_A2                       0.107708f
+#define CS_SIDE_176400_B1                       (-1.876572f)
+#define CS_SIDE_176400_B2                       0.877771f
+#define CS_SIDE_176400_SCALE                    14
 
 /* Stereo Enhancer coefficients for 192000Hz sample rate, scaled with  0.1689*/
 #define CS_MIDDLE_192000_A0                     0.241219
@@ -199,7 +235,13 @@
 #define LVCS_STEREODELAY_CS_24KHZ                   279         /* Sample rate 24kS/s */
 #define LVCS_STEREODELAY_CS_32KHZ                   372         /* Sample rate 32kS/s */
 #define LVCS_STEREODELAY_CS_44KHZ                   512         /* Sample rate 44kS/s */
+// TODO: this should linearly scale by frequency but is limited to 512 frames until
+// we ensure enough buffer size has been allocated.
 #define LVCS_STEREODELAY_CS_48KHZ                   512         /* Sample rate 48kS/s */
+#define LVCS_STEREODELAY_CS_88KHZ                   512         /* Sample rate 88.2kS/s */
+#define LVCS_STEREODELAY_CS_96KHZ                   512         /* Sample rate 96kS/s */
+#define LVCS_STEREODELAY_CS_176KHZ                  512         /* Sample rate 176.4kS/s */
+#define LVCS_STEREODELAY_CS_192KHZ                  512         /* Sample rate 196kS/s */
 
 /* Reverb coefficients for 8000 Hz sample rate, scaled with 1.038030 */
 #define CS_REVERB_8000_A0                          0.667271
@@ -275,6 +317,14 @@
 #define CS_REVERB_48000_SCALE                        14
 
 #ifdef HIGHER_FS
+/* Reverb coefficients for 88200Hz sample rate, scaled with 0.8 */
+/* Band pass filter with fc1=500 and fc2=8000 */
+#define CS_REVERB_88200_A0                       0.171901f
+#define CS_REVERB_88200_A1                       0.000000f
+#define CS_REVERB_88200_A2                      (-0.171901f)
+#define CS_REVERB_88200_B1                      (-1.553948f)
+#define CS_REVERB_88200_B2                      (0.570248f)
+#define CS_REVERB_88200_SCALE                      14
 /* Reverb coefficients for 96000Hz sample rate, scaled with 0.8 */
 /* Band pass filter with fc1=500 and fc2=8000*/
 #define CS_REVERB_96000_A0                       0.1602488
@@ -284,6 +334,14 @@
 #define CS_REVERB_96000_B2                       0.599377
 #define CS_REVERB_96000_SCALE                        14
 
+/* Reverb coefficients for 176400Hz sample rate, scaled with 0.8 */
+/* Band pass filter with fc1=500 and fc2=8000 */
+#define CS_REVERB_176400_A0                       0.094763f
+#define CS_REVERB_176400_A1                       0.000000f
+#define CS_REVERB_176400_A2                      (-0.094763f)
+#define CS_REVERB_176400_B1                      (-1.758593f)
+#define CS_REVERB_176400_B2                      (0.763091f)
+#define CS_REVERB_176400_SCALE                      14
 /* Reverb coefficients for 192000Hz sample rate, scaled with 0.8 */
 /* Band pass filter with fc1=500 and fc2=8000*/
 #define CS_REVERB_192000_A0                       0.0878369
@@ -446,6 +504,24 @@
 
 
 #ifdef HIGHER_FS
+/* Equaliser coefficients for 88200Hz sample rate.
+ * The filter coefficients are obtained by carrying out
+ * state-space analysis using the coefficients available
+ * for 44100Hz.
+ */
+#define CS_EQUALISER_88200_A0                   1.771899f
+#define CS_EQUALISER_88200_A1                   (-2.930762f)
+#define CS_EQUALISER_88200_A2                   1.172175f
+#define CS_EQUALISER_88200_B1                   (-1.438349f)
+#define CS_EQUALISER_88200_B2                   0.442520f
+#define CS_EQUALISER_88200_SCALE                13
+#define CSEX_EQUALISER_88200_A0                 2.675241f
+#define CSEX_EQUALISER_88200_A1                 (-4.466154f)
+#define CSEX_EQUALISER_88200_A2                 1.810305f
+#define CSEX_EQUALISER_88200_B1                 (-0.925350f)
+#define CSEX_EQUALISER_88200_B2                 (-0.066616f)
+#define CSEX_EQUALISER_88200_SCALE              13
+
 #define CS_EQUALISER_96000_A0                    1.784497
 #define CS_EQUALISER_96000_A1                   (-3.001435)
 #define CS_EQUALISER_96000_A2                    1.228422
@@ -458,6 +534,23 @@
 #define CSEX_EQUALISER_96000_B1                 (-0.971718)
 #define CSEX_EQUALISER_96000_B2                 (-0.021216)
 #define CSEX_EQUALISER_96000_SCALE                   13
+/* Equaliser coefficients for 176400Hz sample rate.
+ * The filter coefficients are obtained by carrying out
+ * state-space analysis using the coefficients available
+ * for 44100Hz.
+ */
+#define CS_EQUALISER_176400_A0                  1.883440f
+#define CS_EQUALISER_176400_A1                  (-3.414272f)
+#define CS_EQUALISER_176400_A2                  1.534702f
+#define CS_EQUALISER_176400_B1                  (-1.674614f)
+#define CS_EQUALISER_176400_B2                  0.675827f
+#define CS_EQUALISER_176400_SCALE               13
+#define CSEX_EQUALISER_176400_A0                3.355068f
+#define CSEX_EQUALISER_176400_A1                (-6.112578f)
+#define CSEX_EQUALISER_176400_A2                2.764135f
+#define CSEX_EQUALISER_176400_B1                (-1.268533f)
+#define CSEX_EQUALISER_176400_B2                0.271277f
+#define CSEX_EQUALISER_176400_SCALE             13
 
 #define CS_EQUALISER_192000_A0                    1.889582
 #define CS_EQUALISER_192000_A1                   (-3.456140)

@@ -39,6 +39,8 @@ public:
     virtual const String8 getTagName() const { return mTagName; }
 
     audio_devices_t type() const { return mDeviceType; }
+    String8 address() const { return mAddress; }
+    void setAddress(const String8 &address) { mAddress = address; }
 
     const FormatVector& encodedFormats() const { return mEncodedFormats; }
 
@@ -57,38 +59,112 @@ public:
     audio_port_handle_t getId() const;
     void dump(String8 *dst, int spaces, int index, bool verbose = true) const;
     void log() const;
-
-    String8 mAddress;
+    std::string toString() const;
 
 private:
+    String8 mAddress{""};
     String8 mTagName; // Unique human readable identifier for a device port found in conf file.
     audio_devices_t     mDeviceType;
     FormatVector        mEncodedFormats;
-    audio_port_handle_t mId;
-
-friend class DeviceVector;
+    audio_port_handle_t mId = AUDIO_PORT_HANDLE_NONE;
 };
 
 class DeviceVector : public SortedVector<sp<DeviceDescriptor> >
 {
 public:
     DeviceVector() : SortedVector(), mDeviceTypes(AUDIO_DEVICE_NONE) {}
+    explicit DeviceVector(const sp<DeviceDescriptor>& item) : DeviceVector()
+    {
+        add(item);
+    }
 
     ssize_t add(const sp<DeviceDescriptor>& item);
     void add(const DeviceVector &devices);
     ssize_t remove(const sp<DeviceDescriptor>& item);
+    void remove(const DeviceVector &devices);
     ssize_t indexOf(const sp<DeviceDescriptor>& item) const;
 
     audio_devices_t types() const { return mDeviceTypes; }
 
     // If 'address' is empty, a device with a non-empty address may be returned
     // if there is no device with the specified 'type' and empty address.
-    sp<DeviceDescriptor> getDevice(audio_devices_t type, const String8 &address) const;
+    sp<DeviceDescriptor> getDevice(audio_devices_t type, const String8 &address = {}) const;
     DeviceVector getDevicesFromTypeMask(audio_devices_t types) const;
+
+    /**
+     * @brief getDeviceFromId
+     * @param id of the DeviceDescriptor to seach (aka Port handle).
+     * @return DeviceDescriptor associated to port id if found, nullptr otherwise. If the id is
+     * equal to AUDIO_PORT_HANDLE_NONE, it also returns a nullptr.
+     */
     sp<DeviceDescriptor> getDeviceFromId(audio_port_handle_t id) const;
     sp<DeviceDescriptor> getDeviceFromTagName(const String8 &tagName) const;
     DeviceVector getDevicesFromHwModule(audio_module_handle_t moduleHandle) const;
     audio_devices_t getDeviceTypesFromHwModule(audio_module_handle_t moduleHandle) const;
+
+    bool contains(const sp<DeviceDescriptor>& item) const { return indexOf(item) >= 0; }
+
+    /**
+     * @brief containsAtLeastOne
+     * @param devices vector of devices to check against.
+     * @return true if the DeviceVector contains at list one of the devices from the given vector.
+     */
+    bool containsAtLeastOne(const DeviceVector &devices) const;
+
+    /**
+     * @brief containsAllDevices
+     * @param devices vector of devices to check against.
+     * @return true if the DeviceVector contains all the devices from the given vector
+     */
+    bool containsAllDevices(const DeviceVector &devices) const;
+
+    /**
+     * @brief filter the devices supported by this collection against another collection
+     * @param devices to filter against
+     * @return
+     */
+    DeviceVector filter(const DeviceVector &devices) const;
+
+    /**
+     * @brief merge two vectors. As SortedVector Implementation is buggy (it does not check the size
+     * of the destination vector, only of the source, it provides a safe implementation
+     * @param devices source device vector to merge with
+     * @return size of the merged vector.
+     */
+    ssize_t merge(const DeviceVector &devices)
+    {
+        if (isEmpty()) {
+            add(devices);
+            return size();
+        }
+        return SortedVector::merge(devices);
+    }
+
+    /**
+     * @brief operator == DeviceVector are equals if all the DeviceDescriptor can be found (aka
+     * DeviceDescriptor with same type and address) and the vector has same size.
+     * @param right DeviceVector to compare to.
+     * @return true if right contains the same device and has the same size.
+     */
+    bool operator==(const DeviceVector &right) const
+    {
+        if (size() != right.size()) {
+            return false;
+        }
+        for (const auto &device : *this) {
+            if (right.indexOf(device) < 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool operator!=(const DeviceVector &right) const
+    {
+        return !operator==(right);
+    }
+
+    std::string toString() const;
 
     void dump(String8 *dst, const String8 &tag, int spaces = 0, bool verbose = true) const;
 

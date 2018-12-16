@@ -23,12 +23,14 @@
 #include <media/audiohal/EffectBufferHalInterface.h>
 #include <system/audio_effect.h>
 
-using android::hardware::audio::effect::CPP_VERSION::AudioBuffer;
 using android::hardware::hidl_memory;
 using android::hidl::memory::V1_0::IMemory;
 
 namespace android {
+namespace effect {
 namespace CPP_VERSION {
+
+using namespace ::android::hardware::audio::effect::CPP_VERSION;
 
 class EffectBufferHalHidl : public EffectBufferHalInterface
 {
@@ -73,6 +75,7 @@ class EffectBufferHalHidl : public EffectBufferHalInterface
 };
 
 } // namespace CPP_VERSION
+} // namespace effect
 } // namespace android
 
 #endif // ANDROID_HARDWARE_EFFECT_BUFFER_HAL_HIDL_H

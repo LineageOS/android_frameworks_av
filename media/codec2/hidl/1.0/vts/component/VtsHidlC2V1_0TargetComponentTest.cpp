@@ -38,14 +38,21 @@ class Codec2ComponentHidlTest : public ::testing::VtsHalHidlTargetTestBase {
    public:
     virtual void SetUp() override {
         Super::SetUp();
+        mEos = false;
         mClient = android::Codec2Client::CreateFromService(
             gEnv->getInstance().c_str());
         ASSERT_NE(mClient, nullptr);
-        mListener.reset(new CodecListener());
+        mListener.reset(new CodecListener(
+            [this](std::list<std::unique_ptr<C2Work>>& workItems) {
+                handleWorkDone(workItems);
+            }));
         ASSERT_NE(mListener, nullptr);
         mClient->createComponent(gEnv->getComponent().c_str(), mListener,
                                  &mComponent);
         ASSERT_NE(mComponent, nullptr);
+        for (int i = 0; i < MAX_INPUT_BUFFERS; ++i) {
+            mWorkQueue.emplace_back(new C2Work);
+        }
     }
 
     virtual void TearDown() override {
@@ -59,6 +66,23 @@ class Codec2ComponentHidlTest : public ::testing::VtsHalHidlTargetTestBase {
         }
         Super::TearDown();
     }
+    // callback function to process onWorkDone received by Listener
+    void handleWorkDone(std::list<std::unique_ptr<C2Work>>& workItems) {
+        for (std::unique_ptr<C2Work>& work : workItems) {
+            if (!work->worklets.empty()) {
+                bool mCsd = false;
+                uint32_t mFramesReceived = 0;
+                std::list<uint64_t> mFlushedIndices;
+                workDone(mComponent, work, mFlushedIndices, mQueueLock, mQueueCondition,
+                         mWorkQueue, mEos, mCsd, mFramesReceived);
+            }
+        }
+    }
+
+    bool mEos;
+    std::mutex mQueueLock;
+    std::condition_variable mQueueCondition;
+    std::list<std::unique_ptr<C2Work>> mWorkQueue;
 
     std::shared_ptr<android::Codec2Client> mClient;
     std::shared_ptr<android::Codec2Client::Listener> mListener;
@@ -135,8 +159,6 @@ TEST_F(Codec2ComponentHidlTest, MultipleStartStopReset) {
     ALOGV("Multiple Start Stop and Reset Test");
     c2_status_t err = C2_OK;
 
-#define MAX_RETRY 16
-
     for (size_t i = 0; i < MAX_RETRY; i++) {
         err = mComponent->start();
         ASSERT_EQ(err, C2_OK);
@@ -184,12 +206,43 @@ TEST_F(Codec2ComponentHidlTest, MultipleRelease) {
     ASSERT_EQ(err, C2_OK);
     ASSERT_EQ(failures.size(), 0u);
 
-#define MAX_RETRY 16
     for (size_t i = 0; i < MAX_RETRY; i++) {
         err = mComponent->release();
         ASSERT_EQ(err, C2_OK);
     }
 }
+
+class Codec2ComponentInputTests : public Codec2ComponentHidlTest,
+        public ::testing::WithParamInterface<std::pair<uint32_t, bool> > {
+};
+
+TEST_P(Codec2ComponentInputTests, InputBufferTest) {
+    description("Tests for different inputs");
+
+    uint32_t flags = GetParam().first;
+    bool isNullBuffer = GetParam().second;
+    if (isNullBuffer) ALOGD("Testing for null input buffer with flag : %u", flags);
+    else ALOGD("Testing for empty input buffer with flag : %u", flags);
+    mEos = false;
+    ASSERT_EQ(mComponent->start(), C2_OK);
+    ASSERT_NO_FATAL_FAILURE(testInputBuffer(
+        mComponent, mQueueLock, mWorkQueue, flags, isNullBuffer));
+
+    ALOGD("Waiting for input consumption");
+    ASSERT_NO_FATAL_FAILURE(
+        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
+
+    if (flags == C2FrameData::FLAG_END_OF_STREAM) ASSERT_EQ(mEos, true);
+    ASSERT_EQ(mComponent->stop(), C2_OK);
+    ASSERT_EQ(mComponent->reset(), C2_OK);
+}
+
+INSTANTIATE_TEST_CASE_P(NonStdInputs, Codec2ComponentInputTests, ::testing::Values(
+    std::make_pair(0, true),
+    std::make_pair(C2FrameData::FLAG_END_OF_STREAM, true),
+    std::make_pair(0, false),
+    std::make_pair(C2FrameData::FLAG_CODEC_CONFIG, false),
+    std::make_pair(C2FrameData::FLAG_END_OF_STREAM, false)));
 
 }  // anonymous namespace
 

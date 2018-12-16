@@ -22,18 +22,11 @@
 
 #include "ConversionHelperHidl.h"
 
-using ::android::hardware::audio::CPP_VERSION::Result;
-
-#if MAJOR_VERSION >= 4
-using ::android::hardware::audio::CPP_VERSION::AudioMicrophoneChannelMapping;
-using ::android::hardware::audio::CPP_VERSION::AudioMicrophoneDirectionality;
-using ::android::hardware::audio::CPP_VERSION::AudioMicrophoneLocation;
-using ::android::hardware::audio::CPP_VERSION::DeviceAddress;
-using ::android::hardware::audio::CPP_VERSION::MicrophoneInfo;
-#endif
-
 namespace android {
 namespace CPP_VERSION {
+
+using namespace ::android::hardware::audio::common::CPP_VERSION;
+using namespace ::android::hardware::audio::CPP_VERSION;
 
 // static
 status_t ConversionHelperHidl::keysFromHal(const String8& keys, hidl_vec<hidl_string> *hidlKeys) {

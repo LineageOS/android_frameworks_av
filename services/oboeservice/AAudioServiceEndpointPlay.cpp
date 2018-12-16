@@ -80,9 +80,13 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
             int64_t mmapFramesWritten = getStreamInternal()->getFramesWritten();
 
             std::lock_guard <std::mutex> lock(mLockStreams);
-            for (const auto clientStream : mRegisteredStreams) {
+            for (const auto& clientStream : mRegisteredStreams) {
                 int64_t clientFramesRead = 0;
                 bool allowUnderflow = true;
+
+                if (clientStream->isSuspended()) {
+                    continue; // dead stream
+                }
 
                 aaudio_stream_state_t state = clientStream->getState();
                 if (state == AAUDIO_STREAM_STATE_STOPPING) {

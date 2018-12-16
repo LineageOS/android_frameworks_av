@@ -23,16 +23,14 @@
 #include <fmq/MessageQueue.h>
 #include <system/audio_effect.h>
 
-using ::android::hardware::audio::effect::CPP_VERSION::EffectBufferConfig;
-using ::android::hardware::audio::effect::CPP_VERSION::EffectConfig;
-using ::android::hardware::audio::effect::CPP_VERSION::EffectDescriptor;
-using ::android::hardware::audio::effect::CPP_VERSION::IEffect;
-using EffectResult = ::android::hardware::audio::effect::CPP_VERSION::Result;
 using ::android::hardware::EventFlag;
 using ::android::hardware::MessageQueue;
 
 namespace android {
+namespace effect {
 namespace CPP_VERSION {
+
+using namespace ::android::hardware::audio::effect::CPP_VERSION;
 
 class EffectHalHidl : public EffectHalInterface
 {
@@ -70,7 +68,7 @@ class EffectHalHidl : public EffectHalInterface
 
   private:
     friend class EffectsFactoryHalHidl;
-    typedef MessageQueue<EffectResult, hardware::kSynchronizedReadWrite> StatusMQ;
+    typedef MessageQueue<Result, hardware::kSynchronizedReadWrite> StatusMQ;
 
     sp<IEffect> mEffect;
     const uint64_t mEffectId;
@@ -80,7 +78,7 @@ class EffectHalHidl : public EffectHalInterface
     std::unique_ptr<StatusMQ> mStatusMQ;
     EventFlag* mEfGroup;
 
-    static status_t analyzeResult(const EffectResult& result);
+    static status_t analyzeResult(const Result& result);
     static void effectBufferConfigFromHal(
             const buffer_config_t& halConfig, EffectBufferConfig* config);
     static void effectBufferConfigToHal(
@@ -105,6 +103,7 @@ class EffectHalHidl : public EffectHalInterface
 };
 
 } // namespace CPP_VERSION
+} // namespace effect
 } // namespace android
 
 #endif // ANDROID_HARDWARE_EFFECT_HAL_HIDL_H

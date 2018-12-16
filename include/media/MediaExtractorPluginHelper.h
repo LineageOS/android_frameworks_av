@@ -183,32 +183,32 @@ public:
         mBuffer = buf;
     }
 
-    ~MediaBufferHelperV3() {}
+    virtual ~MediaBufferHelperV3() {}
 
-    void release() {
+    virtual void release() {
         mBuffer->release(mBuffer->handle);
     }
 
-    void* data() {
+    virtual void* data() {
         return mBuffer->data(mBuffer->handle);
     }
 
-    size_t size() {
+    virtual size_t size() {
         return mBuffer->size(mBuffer->handle);
     }
 
-    size_t range_offset() {
+    virtual size_t range_offset() {
         return mBuffer->range_offset(mBuffer->handle);
     }
 
-    size_t range_length() {
+    virtual size_t range_length() {
         return mBuffer->range_length(mBuffer->handle);
     }
 
-    void set_range(size_t offset, size_t length) {
+    virtual void set_range(size_t offset, size_t length) {
         mBuffer->set_range(mBuffer->handle, offset, length);
     }
-    AMediaFormat *meta_data() {
+    virtual AMediaFormat *meta_data() {
         return mBuffer->meta_data(mBuffer->handle);
     }
 };

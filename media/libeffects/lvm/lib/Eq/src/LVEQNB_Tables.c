@@ -46,7 +46,9 @@ const LVM_UINT32    LVEQNB_SampleRateTab[] = {8000,                    /* 8kS/s 
                                               32000,
                                               44100,
                                               48000,
+                                              88200,
                                               96000,
+                                              176400,
                                               192000
 };
 #else
@@ -82,7 +84,9 @@ const LVM_FLOAT     LVEQNB_TwoPiOnFsTable[] = {LVEQNB_2PiOn_8000,      /* 8kS/s 
                                                LVEQNB_2PiOn_44100,
                                                LVEQNB_2PiOn_48000
 #ifdef HIGHER_FS
+                                              ,LVEQNB_2PiOn_88200
                                               ,LVEQNB_2PiOn_96000
+                                              ,LVEQNB_2PiOn_176400
                                               ,LVEQNB_2PiOn_192000
 #endif
                                                };
@@ -249,30 +253,4 @@ const LVM_INT16     LVEQNB_DPCosCoef[] = {1,                           /* Shifts
                                           16586,                       /* a2 */
                                           -44};                        /* a3 */
 
-/************************************************************************************/
-/*                                                                                  */
-/*  Bypass mixer time constants (100ms)                                             */
-/*                                                                                  */
-/************************************************************************************/
 
-#define LVEQNB_MIX_TC_Fs8000    32580         /* Floating point value 0.994262695 */
-#define LVEQNB_MIX_TC_Fs11025   32632         /* Floating point value 0.995849609 */
-#define LVEQNB_MIX_TC_Fs12000   32643         /* Floating point value 0.996185303 */
-#define LVEQNB_MIX_TC_Fs16000   32674         /* Floating point value 0.997131348 */
-#define LVEQNB_MIX_TC_Fs22050   32700         /* Floating point value 0.997924805 */
-#define LVEQNB_MIX_TC_Fs24000   32705         /* Floating point value 0.998077393 */
-#define LVEQNB_MIX_TC_Fs32000   32721         /* Floating point value 0.998565674 */
-#define LVEQNB_MIX_TC_Fs44100   32734         /* Floating point value 0.998962402 */
-#define LVEQNB_MIX_TC_Fs48000   32737         /* Floating point value 0.999053955 */
-
-
-const LVM_INT16 LVEQNB_MixerTCTable[] = {
-    LVEQNB_MIX_TC_Fs8000,
-    LVEQNB_MIX_TC_Fs11025,
-    LVEQNB_MIX_TC_Fs12000,
-    LVEQNB_MIX_TC_Fs16000,
-    LVEQNB_MIX_TC_Fs22050,
-    LVEQNB_MIX_TC_Fs24000,
-    LVEQNB_MIX_TC_Fs32000,
-    LVEQNB_MIX_TC_Fs44100,
-    LVEQNB_MIX_TC_Fs48000};

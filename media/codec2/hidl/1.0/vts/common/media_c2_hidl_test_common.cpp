@@ -14,39 +14,115 @@
  * limitations under the License.
  */
 
+// #define LOG_NDEBUG 0
 #define LOG_TAG "media_c2_hidl_test_common"
 #include <stdio.h>
 
 #include "media_c2_hidl_test_common.h"
-using ::android::hardware::media::c2::V1_0::FieldSupportedValues;
 
-void dumpFSV(const FieldSupportedValues& sv) {
-    ALOGD("Dumping FSV data");
-    using namespace std;
-    if (sv.type == FieldSupportedValues::Type::EMPTY) {
-        ALOGD("FSV Value is Empty");
-    }
-    if (sv.type == FieldSupportedValues::Type::RANGE) {
-        ALOGD("Dumping FSV range");
-        cout << ".range(" << sv.range.min;
-        if (sv.range.step != 0) {
-            cout << ":" << sv.range.step;
+// Test the codecs for NullBuffer, Empty Input Buffer with(out) flags set
+void testInputBuffer(
+    const std::shared_ptr<android::Codec2Client::Component>& component,
+    std::mutex& queueLock, std::list<std::unique_ptr<C2Work>>& workQueue,
+    uint32_t flags, bool isNullBuffer) {
+    std::unique_ptr<C2Work> work;
+    {
+        typedef std::unique_lock<std::mutex> ULock;
+        ULock l(queueLock);
+        if (!workQueue.empty()) {
+            work.swap(workQueue.front());
+            workQueue.pop_front();
+        } else {
+            ASSERT_TRUE(false) << "workQueue Empty at the start of test";
         }
-        if (sv.range.num != 1 || sv.range.denom != 1) {
-            cout << ":" << sv.range.num << "/" << sv.range.denom;
-        }
-        cout << " " << sv.range.max << ")";
     }
-    if (sv.values.size()) {
-        ALOGD("Dumping FSV value");
-        cout << (sv.type == FieldSupportedValues::Type::FLAGS ? ".flags("
-                                                              : ".list(");
-        const char* sep = "";
-        for (const auto& p : sv.values) {
-            cout << sep << p;
-            sep = ",";
-        }
-        cout << ")";
+    ASSERT_NE(work, nullptr);
+
+    work->input.flags = (C2FrameData::flags_t)flags;
+    work->input.ordinal.timestamp = 0;
+    work->input.ordinal.frameIndex = 0;
+    work->input.buffers.clear();
+    if (isNullBuffer) {
+        work->input.buffers.emplace_back(nullptr);
     }
-    cout << endl;
+    work->worklets.clear();
+    work->worklets.emplace_back(new C2Worklet);
+
+    std::list<std::unique_ptr<C2Work>> items;
+    items.push_back(std::move(work));
+    ASSERT_EQ(component->queue(&items), C2_OK);
+}
+
+// Wait for all the inputs to be consumed by the plugin.
+void waitOnInputConsumption(std::mutex& queueLock,
+                            std::condition_variable& queueCondition,
+                            std::list<std::unique_ptr<C2Work>>& workQueue,
+                            size_t bufferCount) {
+    typedef std::unique_lock<std::mutex> ULock;
+    uint32_t queueSize;
+    uint32_t maxRetry = 0;
+    {
+        ULock l(queueLock);
+        queueSize = workQueue.size();
+    }
+    while ((maxRetry < MAX_RETRY) && (queueSize < bufferCount)) {
+        ULock l(queueLock);
+        if (queueSize != workQueue.size()) {
+            queueSize = workQueue.size();
+            maxRetry = 0;
+        } else {
+            queueCondition.wait_for(l, TIME_OUT);
+            maxRetry++;
+        }
+    }
+}
+
+// process onWorkDone received by Listener
+void workDone(
+    const std::shared_ptr<android::Codec2Client::Component>& component,
+    std::unique_ptr<C2Work>& work, std::list<uint64_t>& flushedIndices,
+    std::mutex& queueLock, std::condition_variable& queueCondition,
+    std::list<std::unique_ptr<C2Work>>& workQueue, bool& eos, bool& csd,
+    uint32_t& framesReceived) {
+    // handle configuration changes in work done
+    if (work->worklets.front()->output.configUpdate.size() != 0) {
+        ALOGV("Config Update");
+        std::vector<std::unique_ptr<C2Param>> updates =
+            std::move(work->worklets.front()->output.configUpdate);
+        std::vector<C2Param*> configParam;
+        std::vector<std::unique_ptr<C2SettingResult>> failures;
+        for (size_t i = 0; i < updates.size(); ++i) {
+            C2Param* param = updates[i].get();
+            if (param->index() == C2StreamCsdInfo::output::PARAM_TYPE) {
+                csd = true;
+            } else if ((param->index() ==
+                        C2StreamSampleRateInfo::output::PARAM_TYPE) ||
+                       (param->index() ==
+                        C2StreamChannelCountInfo::output::PARAM_TYPE) ||
+                       (param->index() ==
+                        C2VideoSizeStreamInfo::output::PARAM_TYPE)) {
+                configParam.push_back(param);
+            }
+        }
+        component->config(configParam, C2_DONT_BLOCK, &failures);
+        ASSERT_EQ(failures.size(), 0u);
+    }
+    framesReceived++;
+    eos = (work->worklets.front()->output.flags &
+           C2FrameData::FLAG_END_OF_STREAM) != 0;
+    auto frameIndexIt = std::find(flushedIndices.begin(), flushedIndices.end(),
+                                  work->input.ordinal.frameIndex.peeku());
+    ALOGV("WorkDone: frameID received %d",
+          (int)work->worklets.front()->output.ordinal.frameIndex.peeku());
+    work->input.buffers.clear();
+    work->worklets.clear();
+    {
+        typedef std::unique_lock<std::mutex> ULock;
+        ULock l(queueLock);
+        workQueue.push_back(std::move(work));
+        if (!flushedIndices.empty()) {
+            flushedIndices.erase(frameIndexIt);
+        }
+        queueCondition.notify_all();
+    }
 }

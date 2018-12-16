@@ -184,3 +184,15 @@ cc_test {
         "libutils",
     ],
 }
+
+cc_test {
+    name: "test_return_stop",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_return_stop.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}

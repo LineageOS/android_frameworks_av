@@ -29,10 +29,8 @@
 #include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/foundation/ColorUtils.h>
 #include <media/stagefright/foundation/hexdump.h>
-#include <media/stagefright/MediaBufferBase.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MetaData.h>
 #include <media/stagefright/MetaDataUtils.h>
 #include <utils/String8.h>
 
@@ -127,7 +125,7 @@ private:
     BlockIterator &operator=(const BlockIterator &);
 };
 
-struct MatroskaSource : public MediaTrackHelperV2 {
+struct MatroskaSource : public MediaTrackHelperV3 {
     MatroskaSource(MatroskaExtractor *extractor, size_t index);
 
     virtual media_status_t start();
@@ -136,7 +134,7 @@ struct MatroskaSource : public MediaTrackHelperV2 {
     virtual media_status_t getFormat(AMediaFormat *);
 
     virtual media_status_t read(
-            MediaBufferBase **buffer, const ReadOptions *options);
+            MediaBufferHelperV3 **buffer, const ReadOptions *options);
 
 protected:
     virtual ~MatroskaSource();
@@ -156,11 +154,11 @@ private:
     BlockIterator mBlockIter;
     ssize_t mNALSizeLen;  // for type AVC or HEVC
 
-    List<MediaBufferBase *> mPendingFrames;
+    List<MediaBufferHelperV3 *> mPendingFrames;
 
     status_t advance();
 
-    status_t setWebmBlockCryptoInfo(MediaBufferBase *mbuf);
+    status_t setWebmBlockCryptoInfo(MediaBufferHelperV3 *mbuf);
     media_status_t readBlock();
     void clearPendingFrames();
 
@@ -265,6 +263,8 @@ media_status_t MatroskaSource::start() {
         return AMEDIA_ERROR_MALFORMED;
     }
 
+    // allocate one small initial buffer, but leave plenty of room to grow
+    mBufferGroup->init(1 /* number of buffers */, 1024 /* buffer size */, 64 /* growth limit */);
     mBlockIter.reset();
 
     return AMEDIA_OK;
@@ -569,7 +569,7 @@ static AString uriDebugString(const char *uri) {
 
 void MatroskaSource::clearPendingFrames() {
     while (!mPendingFrames.empty()) {
-        MediaBufferBase *frame = *mPendingFrames.begin();
+        MediaBufferHelperV3 *frame = *mPendingFrames.begin();
         mPendingFrames.erase(mPendingFrames.begin());
 
         frame->release();
@@ -577,7 +577,7 @@ void MatroskaSource::clearPendingFrames() {
     }
 }
 
-status_t MatroskaSource::setWebmBlockCryptoInfo(MediaBufferBase *mbuf) {
+status_t MatroskaSource::setWebmBlockCryptoInfo(MediaBufferHelperV3 *mbuf) {
     if (mbuf->range_length() < 1 || mbuf->range_length() - 1 > INT32_MAX) {
         // 1-byte signal
         return ERROR_MALFORMED;
@@ -591,7 +591,7 @@ status_t MatroskaSource::setWebmBlockCryptoInfo(MediaBufferBase *mbuf) {
         return ERROR_MALFORMED;
     }
 
-    MetaDataBase &meta = mbuf->meta_data();
+    AMediaFormat *meta = mbuf->meta_data();
     if (encrypted) {
         uint8_t ctrCounter[16] = { 0 };
         const uint8_t *keyId;
@@ -599,9 +599,9 @@ status_t MatroskaSource::setWebmBlockCryptoInfo(MediaBufferBase *mbuf) {
         AMediaFormat *trackMeta = mExtractor->mTracks.itemAt(mTrackIndex).mMeta;
         AMediaFormat_getBuffer(trackMeta, AMEDIAFORMAT_KEY_CRYPTO_KEY,
                 (void**)&keyId, &keyIdSize);
-        meta.setData(kKeyCryptoKey, 0, keyId, keyIdSize);
+        AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_CRYPTO_KEY, keyId, keyIdSize);
         memcpy(ctrCounter, data + 1, 8);
-        meta.setData(kKeyCryptoIV, 0, ctrCounter, 16);
+        AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_CRYPTO_IV, ctrCounter, 16);
         if (partitioned) {
             /*  0                   1                   2                   3
              *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -654,8 +654,10 @@ status_t MatroskaSource::setWebmBlockCryptoInfo(MediaBufferBase *mbuf) {
             }
             uint32_t sizeofPlainSizes = sizeof(uint32_t) * plainSizes.size();
             uint32_t sizeofEncryptedSizes = sizeof(uint32_t) * encryptedSizes.size();
-            meta.setData(kKeyPlainSizes, 0, plainSizes.data(), sizeofPlainSizes);
-            meta.setData(kKeyEncryptedSizes, 0, encryptedSizes.data(), sizeofEncryptedSizes);
+            AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_CRYPTO_PLAIN_SIZES,
+                    plainSizes.data(), sizeofPlainSizes);
+            AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_CRYPTO_ENCRYPTED_SIZES,
+                    encryptedSizes.data(), sizeofEncryptedSizes);
             mbuf->set_range(frameOffset, mbuf->range_length() - frameOffset);
         } else {
             /*
@@ -675,8 +677,10 @@ status_t MatroskaSource::setWebmBlockCryptoInfo(MediaBufferBase *mbuf) {
              */
             int32_t plainSizes[] = { 0 };
             int32_t encryptedSizes[] = { static_cast<int32_t>(mbuf->range_length() - 9) };
-            meta.setData(kKeyPlainSizes, 0, plainSizes, sizeof(plainSizes));
-            meta.setData(kKeyEncryptedSizes, 0, encryptedSizes, sizeof(encryptedSizes));
+            AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_CRYPTO_PLAIN_SIZES,
+                    plainSizes, sizeof(plainSizes));
+            AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_CRYPTO_ENCRYPTED_SIZES,
+                    encryptedSizes, sizeof(encryptedSizes));
             mbuf->set_range(9, mbuf->range_length() - 9);
         }
     } else {
@@ -693,8 +697,10 @@ status_t MatroskaSource::setWebmBlockCryptoInfo(MediaBufferBase *mbuf) {
          */
         int32_t plainSizes[] = { static_cast<int32_t>(mbuf->range_length() - 1) };
         int32_t encryptedSizes[] = { 0 };
-        meta.setData(kKeyPlainSizes, 0, plainSizes, sizeof(plainSizes));
-        meta.setData(kKeyEncryptedSizes, 0, encryptedSizes, sizeof(encryptedSizes));
+        AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_CRYPTO_PLAIN_SIZES,
+                plainSizes, sizeof(plainSizes));
+        AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_CRYPTO_ENCRYPTED_SIZES,
+                encryptedSizes, sizeof(encryptedSizes));
         mbuf->set_range(1, mbuf->range_length() - 1);
     }
 
@@ -721,14 +727,17 @@ media_status_t MatroskaSource::readBlock() {
         }
 
         len += trackInfo->mHeaderLen;
-        MediaBufferBase *mbuf = MediaBufferBase::Create(len);
+        MediaBufferHelperV3 *mbuf;
+        mBufferGroup->acquire_buffer(&mbuf, false /* nonblocking */, len /* requested size */);
+        mbuf->set_range(0, len);
         uint8_t *data = static_cast<uint8_t *>(mbuf->data());
         if (trackInfo->mHeader) {
             memcpy(data, trackInfo->mHeader, trackInfo->mHeaderLen);
         }
 
-        mbuf->meta_data().setInt64(kKeyTime, timeUs);
-        mbuf->meta_data().setInt32(kKeyIsSyncFrame, block->IsKey());
+        AMediaFormat *meta = mbuf->meta_data();
+        AMediaFormat_setInt64(meta, AMEDIAFORMAT_KEY_TIME_US, timeUs);
+        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, block->IsKey());
 
         status_t err = frame.Read(mExtractor->mReader, data + trackInfo->mHeaderLen);
         if (err == OK
@@ -754,7 +763,7 @@ media_status_t MatroskaSource::readBlock() {
 }
 
 media_status_t MatroskaSource::read(
-        MediaBufferBase **out, const ReadOptions *options) {
+        MediaBufferHelperV3 **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t targetSampleTimeUs = -1ll;
@@ -790,13 +799,13 @@ media_status_t MatroskaSource::read(
         }
     }
 
-    MediaBufferBase *frame = *mPendingFrames.begin();
+    MediaBufferHelperV3 *frame = *mPendingFrames.begin();
     mPendingFrames.erase(mPendingFrames.begin());
 
     if ((mType != AVC && mType != HEVC) || mNALSizeLen == 0) {
         if (targetSampleTimeUs >= 0ll) {
-            frame->meta_data().setInt64(
-                    kKeyTargetTime, targetSampleTimeUs);
+            AMediaFormat_setInt64(frame->meta_data(),
+                    AMEDIAFORMAT_KEY_TARGET_TIME, targetSampleTimeUs);
         }
 
         *out = frame;
@@ -819,7 +828,7 @@ media_status_t MatroskaSource::read(
     size_t srcSize = frame->range_length();
 
     size_t dstSize = 0;
-    MediaBufferBase *buffer = NULL;
+    MediaBufferHelperV3 *buffer = NULL;
     uint8_t *dstPtr = NULL;
 
     for (int32_t pass = 0; pass < 2; ++pass) {
@@ -879,16 +888,20 @@ media_status_t MatroskaSource::read(
                 // each 4-byte nal size with a 4-byte start code
                 buffer = frame;
             } else {
-                buffer = MediaBufferBase::Create(dstSize);
+                mBufferGroup->acquire_buffer(
+                        &buffer, false /* nonblocking */, dstSize /* requested size */);
+                buffer->set_range(0, dstSize);
             }
 
+            AMediaFormat *frameMeta = frame->meta_data();
             int64_t timeUs;
-            CHECK(frame->meta_data().findInt64(kKeyTime, &timeUs));
+            CHECK(AMediaFormat_getInt64(frameMeta, AMEDIAFORMAT_KEY_TIME_US, &timeUs));
             int32_t isSync;
-            CHECK(frame->meta_data().findInt32(kKeyIsSyncFrame, &isSync));
+            CHECK(AMediaFormat_getInt32(frameMeta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, &isSync));
 
-            buffer->meta_data().setInt64(kKeyTime, timeUs);
-            buffer->meta_data().setInt32(kKeyIsSyncFrame, isSync);
+            AMediaFormat *bufMeta = buffer->meta_data();
+            AMediaFormat_setInt64(bufMeta, AMEDIAFORMAT_KEY_TIME_US, timeUs);
+            AMediaFormat_setInt32(bufMeta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, isSync);
 
             dstPtr = (uint8_t *)buffer->data();
         }
@@ -900,8 +913,8 @@ media_status_t MatroskaSource::read(
     }
 
     if (targetSampleTimeUs >= 0ll) {
-        buffer->meta_data().setInt64(
-                kKeyTargetTime, targetSampleTimeUs);
+        AMediaFormat_setInt64(buffer->meta_data(),
+                AMEDIAFORMAT_KEY_TARGET_TIME, targetSampleTimeUs);
     }
 
     *out = buffer;
@@ -992,7 +1005,7 @@ size_t MatroskaExtractor::countTracks() {
     return mTracks.size();
 }
 
-MediaTrackHelperV2 *MatroskaExtractor::getTrack(size_t index) {
+MediaTrackHelperV3 *MatroskaExtractor::getTrack(size_t index) {
     if (index >= mTracks.size()) {
         return NULL;
     }
@@ -1660,22 +1673,22 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION_CURRENT,
+        EXTRACTORDEF_VERSION_CURRENT + 1,
         UUID("abbedd92-38c4-4904-a4c1-b3f45f899980"),
         1,
         "Matroska Extractor",
         {
-            .v2 = [](
+            .v3 = [](
                     CDataSource *source,
                     float *confidence,
                     void **,
-                    FreeMetaFunc *) -> CreatorFuncV2 {
+                    FreeMetaFunc *) -> CreatorFuncV3 {
                 DataSourceHelper helper(source);
                 if (SniffMatroska(&helper, confidence)) {
                     return [](
                             CDataSource *source,
-                            void *) -> CMediaExtractorV2* {
-                        return wrapV2(new MatroskaExtractor(new DataSourceHelper(source)));};
+                            void *) -> CMediaExtractorV3* {
+                        return wrapV3(new MatroskaExtractor(new DataSourceHelper(source)));};
                 }
                 return NULL;
             }

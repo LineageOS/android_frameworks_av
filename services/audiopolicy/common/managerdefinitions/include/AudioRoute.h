@@ -46,6 +46,19 @@ public:
 
     audio_route_type_t getType() const { return mType; }
 
+    /**
+     * @brief supportsPatch checks if an audio patch is supported by a Route declared in
+     * the audio_policy_configuration.xml file.
+     * If the patch is supported natively by an AudioHAL (which supports of course Routing API 3.0),
+     * audiopolicy will not request AudioFlinger to use a software bridge to realize a patch
+     * between 2 ports.
+     * @param srcPort (aka the source) to be considered
+     * @param dstPort (aka the sink) to be considered
+     * @return true if the audio route supports the connection between the sink and the source,
+     * false otherwise
+     */
+    bool supportsPatch(const sp<AudioPort> &srcPort, const sp<AudioPort> &dstPort) const;
+
     void dump(String8 *dst, int spaces) const;
 
 private:

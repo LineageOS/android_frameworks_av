@@ -28,11 +28,8 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/base64.h>
 #include <media/stagefright/foundation/ByteUtils.h>
-#include <media/stagefright/MediaBufferBase.h>
-#include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MetaDataBase.h>
 #include <media/stagefright/MetaDataUtils.h>
 #include <system/audio.h>
 #include <utils/String8.h>
@@ -48,7 +45,7 @@ extern "C" {
 
 namespace android {
 
-struct OggSource : public MediaTrackHelperV2 {
+struct OggSource : public MediaTrackHelperV3 {
     explicit OggSource(OggExtractor *extractor);
 
     virtual media_status_t getFormat(AMediaFormat *);
@@ -57,7 +54,7 @@ struct OggSource : public MediaTrackHelperV2 {
     virtual media_status_t stop();
 
     virtual media_status_t read(
-            MediaBufferBase **buffer, const ReadOptions *options = NULL);
+            MediaBufferHelperV3 **buffer, const ReadOptions *options = NULL);
 
 protected:
     virtual ~OggSource();
@@ -85,7 +82,7 @@ struct MyOggExtractor {
 
     status_t seekToTime(int64_t timeUs);
     status_t seekToOffset(off64_t offset);
-    virtual media_status_t readNextPacket(MediaBufferBase **buffer) = 0;
+    virtual media_status_t readNextPacket(MediaBufferHelperV3 **buffer) = 0;
 
     status_t init();
 
@@ -93,6 +90,9 @@ struct MyOggExtractor {
         return AMediaFormat_copy(meta, mFileMeta);
     }
 
+    void setBufferGroup(MediaBufferGroupHelperV3 *group) {
+        mBufferGroup = group;
+    }
 protected:
     struct Page {
         uint64_t mGranulePosition;
@@ -110,6 +110,7 @@ protected:
         int64_t mTimeUs;
     };
 
+    MediaBufferGroupHelperV3 *mBufferGroup;
     DataSourceHelper *mSource;
     off64_t mOffset;
     Page mCurrentPage;
@@ -148,7 +149,7 @@ protected:
     // 1 - bitstream identification header
     // 3 - comment header
     // 5 - codec setup header (Vorbis only)
-    virtual media_status_t verifyHeader(MediaBufferBase *buffer, uint8_t type) = 0;
+    virtual media_status_t verifyHeader(MediaBufferHelperV3 *buffer, uint8_t type) = 0;
 
     // Read the next ogg packet from the underlying data source; optionally
     // calculate the timestamp for the output packet whilst pretending
@@ -156,9 +157,9 @@ protected:
     //
     // *buffer is NULL'ed out immediately upon entry, and if successful a new buffer is allocated;
     // clients are responsible for releasing the original buffer.
-    media_status_t _readNextPacket(MediaBufferBase **buffer, bool calcVorbisTimestamp);
+    media_status_t _readNextPacket(MediaBufferHelperV3 **buffer, bool calcVorbisTimestamp);
 
-    int32_t getPacketBlockSize(MediaBufferBase *buffer);
+    int32_t getPacketBlockSize(MediaBufferHelperV3 *buffer);
 
     void parseFileMetaData();
 
@@ -182,7 +183,7 @@ struct MyVorbisExtractor : public MyOggExtractor {
 
     virtual uint64_t approxBitrate() const;
 
-    virtual media_status_t readNextPacket(MediaBufferBase **buffer) {
+    virtual media_status_t readNextPacket(MediaBufferHelperV3 **buffer) {
         return _readNextPacket(buffer, /* calcVorbisTimestamp = */ true);
     }
 
@@ -194,7 +195,7 @@ protected:
         return granulePos * 1000000ll / mVi.rate;
     }
 
-    virtual media_status_t verifyHeader(MediaBufferBase *buffer, uint8_t type);
+    virtual media_status_t verifyHeader(MediaBufferHelperV3 *buffer, uint8_t type);
 };
 
 struct MyOpusExtractor : public MyOggExtractor {
@@ -212,16 +213,16 @@ struct MyOpusExtractor : public MyOggExtractor {
         return 0;
     }
 
-    virtual media_status_t readNextPacket(MediaBufferBase **buffer);
+    virtual media_status_t readNextPacket(MediaBufferHelperV3 **buffer);
 
 protected:
     virtual int64_t getTimeUsOfGranule(uint64_t granulePos) const;
-    virtual media_status_t verifyHeader(MediaBufferBase *buffer, uint8_t type);
+    virtual media_status_t verifyHeader(MediaBufferHelperV3 *buffer, uint8_t type);
 
 private:
-    media_status_t verifyOpusHeader(MediaBufferBase *buffer);
-    media_status_t verifyOpusComments(MediaBufferBase *buffer);
-    uint32_t getNumSamplesInPacket(MediaBufferBase *buffer) const;
+    media_status_t verifyOpusHeader(MediaBufferHelperV3 *buffer);
+    media_status_t verifyOpusComments(MediaBufferHelperV3 *buffer);
+    uint32_t getNumSamplesInPacket(MediaBufferHelperV3 *buffer) const;
 
     uint8_t mChannelCount;
     uint16_t mCodecDelay;
@@ -249,7 +250,9 @@ media_status_t OggSource::start() {
     if (mStarted) {
         return AMEDIA_ERROR_INVALID_OPERATION;
     }
-
+    // initialize buffer group with a single small buffer, but a generous upper limit
+    mBufferGroup->init(1 /* number of buffers */, 128 /* size */, 64 /* max number of buffers */);
+    mExtractor->mImpl->setBufferGroup(mBufferGroup);
     mStarted = true;
 
     return AMEDIA_OK;
@@ -262,7 +265,7 @@ media_status_t OggSource::stop() {
 }
 
 media_status_t OggSource::read(
-        MediaBufferBase **out, const ReadOptions *options) {
+        MediaBufferHelperV3 **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t seekTimeUs;
@@ -274,26 +277,27 @@ media_status_t OggSource::read(
         }
     }
 
-    MediaBufferBase *packet;
+    MediaBufferHelperV3 *packet;
     media_status_t err = mExtractor->mImpl->readNextPacket(&packet);
 
     if (err != AMEDIA_OK) {
         return err;
     }
 
+    AMediaFormat *meta = packet->meta_data();
 #if 0
     int64_t timeUs;
-    if (packet->meta_data().findInt64(kKeyTime, &timeUs)) {
+    if (AMediaFormat_findInt64(meta, AMEDIAFORMAT_KEY_TIME_US, timeStampUs)) {
         ALOGI("found time = %lld us", timeUs);
     } else {
         ALOGI("NO time");
     }
 #endif
 
-    packet->meta_data().setInt32(kKeyIsSyncFrame, 1);
+    AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, 1);
 
     *out = packet;
-
+    ALOGV("returning buffer %p", packet);
     return AMEDIA_OK;
 }
 
@@ -304,7 +308,8 @@ MyOggExtractor::MyOggExtractor(
         const char *mimeType,
         size_t numHeaders,
         int64_t seekPreRollUs)
-    : mSource(source),
+    : mBufferGroup(NULL),
+      mSource(source),
       mOffset(0),
       mCurGranulePosition(0),
       mPrevGranulePosition(0),
@@ -573,13 +578,13 @@ ssize_t MyOggExtractor::readPage(off64_t offset, Page *page) {
     return sizeof(header) + page->mNumSegments + totalSize;
 }
 
-media_status_t MyOpusExtractor::readNextPacket(MediaBufferBase **out) {
+media_status_t MyOpusExtractor::readNextPacket(MediaBufferHelperV3 **out) {
     if (mOffset <= mFirstDataOffset && mStartGranulePosition < 0) {
         // The first sample might not start at time 0; find out where by subtracting
         // the number of samples on the first page from the granule position
         // (position of last complete sample) of the first page. This happens
         // the first time before we attempt to read a packet from the first page.
-        MediaBufferBase *mBuf;
+        MediaBufferHelperV3 *mBuf;
         uint32_t numSamples = 0;
         uint64_t curGranulePosition = 0;
         while (true) {
@@ -617,24 +622,25 @@ media_status_t MyOpusExtractor::readNextPacket(MediaBufferBase **out) {
     int32_t currentPageSamples;
     // Calculate timestamps by accumulating durations starting from the first sample of a page;
     // We assume that we only seek to page boundaries.
-    if ((*out)->meta_data().findInt32(kKeyValidSamples, &currentPageSamples)) {
+    AMediaFormat *meta = (*out)->meta_data();
+    if (AMediaFormat_getInt32(meta, AMEDIAFORMAT_KEY_VALID_SAMPLES, &currentPageSamples)) {
         // first packet in page
         if (mOffset == mFirstDataOffset) {
             currentPageSamples -= mStartGranulePosition;
-            (*out)->meta_data().setInt32(kKeyValidSamples, currentPageSamples);
+            AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_VALID_SAMPLES, currentPageSamples);
         }
         mCurGranulePosition = mCurrentPage.mGranulePosition - currentPageSamples;
     }
 
     int64_t timeUs = getTimeUsOfGranule(mCurGranulePosition);
-    (*out)->meta_data().setInt64(kKeyTime, timeUs);
+    AMediaFormat_setInt64(meta, AMEDIAFORMAT_KEY_TIME_US, timeUs);
 
     uint32_t frames = getNumSamplesInPacket(*out);
     mCurGranulePosition += frames;
     return AMEDIA_OK;
 }
 
-uint32_t MyOpusExtractor::getNumSamplesInPacket(MediaBufferBase *buffer) const {
+uint32_t MyOpusExtractor::getNumSamplesInPacket(MediaBufferHelperV3 *buffer) const {
     if (buffer == NULL || buffer->range_length() < 1) {
         return 0;
     }
@@ -680,10 +686,66 @@ uint32_t MyOpusExtractor::getNumSamplesInPacket(MediaBufferBase *buffer) const {
     return numSamples;
 }
 
-media_status_t MyOggExtractor::_readNextPacket(MediaBufferBase **out, bool calcVorbisTimestamp) {
+/*
+ * basic mediabuffer implementation used during initial parsing of the
+ * header packets, which happens before we have a buffer group
+ */
+class StandAloneMediaBuffer : public MediaBufferHelperV3 {
+private:
+    void *mData;
+    size_t mSize;
+    size_t mOffset;
+    size_t mLength;
+    AMediaFormat *mFormat;
+public:
+    StandAloneMediaBuffer(size_t size) : MediaBufferHelperV3(NULL) {
+        mSize = size;
+        mData = malloc(mSize);
+        mOffset = 0;
+        mLength = mSize;
+        mFormat = AMediaFormat_new();
+        ALOGV("created standalone media buffer %p of size %zu", this, mSize);
+    }
+
+    ~StandAloneMediaBuffer() override {
+        free(mData);
+        AMediaFormat_delete(mFormat);
+        ALOGV("deleted standalone media buffer %p of size %zu", this, mSize);
+    }
+
+    void release() override {
+        delete this;
+    }
+
+    void* data() override {
+        return mData;
+    }
+
+    size_t size() override {
+        return mSize;
+    }
+
+    size_t range_offset() override {
+        return mOffset;
+    }
+
+    size_t range_length() override {
+        return mLength;
+    }
+
+    void set_range(size_t offset, size_t length) override {
+        mOffset = offset;
+        mLength = length;
+    }
+    AMediaFormat *meta_data() override {
+        return mFormat;
+    }
+};
+
+media_status_t MyOggExtractor::_readNextPacket(MediaBufferHelperV3 **out, bool calcVorbisTimestamp) {
     *out = NULL;
 
-    MediaBufferBase *buffer = NULL;
+    MediaBufferHelperV3 *buffer = NULL;
     int64_t timeUs = -1;
 
     for (;;) {
@@ -719,7 +781,13 @@ media_status_t MyOggExtractor::_readNextPacket(MediaBufferBase **out, bool calcV
                 ALOGE("b/36592202");
                 return AMEDIA_ERROR_MALFORMED;
             }
-            MediaBufferBase *tmp = MediaBufferBase::Create(fullSize);
+            MediaBufferHelperV3 *tmp;
+            if (mBufferGroup) {
+                mBufferGroup->acquire_buffer(&tmp, false, fullSize);
+                ALOGV("acquired buffer %p from group", tmp);
+            } else {
+                tmp = new StandAloneMediaBuffer(fullSize);
+            }
             if (tmp == NULL) {
                 if (buffer != NULL) {
                     buffer->release();
@@ -727,6 +795,7 @@ media_status_t MyOggExtractor::_readNextPacket(MediaBufferBase **out, bool calcV
                 ALOGE("b/36592202");
                 return AMEDIA_ERROR_MALFORMED;
             }
+            AMediaFormat_clear(tmp->meta_data());
             if (buffer != NULL) {
                 memcpy(tmp->data(), buffer->data(), buffer->range_length());
                 tmp->set_range(0, buffer->range_length());
@@ -756,8 +825,9 @@ media_status_t MyOggExtractor::_readNextPacket(MediaBufferBase **out, bool calcV
                 // We've just read the entire packet.
 
                 if (mFirstPacketInPage) {
-                    buffer->meta_data().setInt32(
-                            kKeyValidSamples, mCurrentPageSamples);
+                    AMediaFormat *meta = buffer->meta_data();
+                    AMediaFormat_setInt32(
+                            meta, AMEDIAFORMAT_KEY_VALID_SAMPLES, mCurrentPageSamples);
                     mFirstPacketInPage = false;
                 }
 
@@ -778,7 +848,8 @@ media_status_t MyOggExtractor::_readNextPacket(MediaBufferBase **out, bool calcV
                         mCurrentPage.mPrevPacketPos += actualBlockSize / 2;
                         mCurrentPage.mPrevPacketSize = curBlockSize;
                     }
-                    buffer->meta_data().setInt64(kKeyTime, timeUs);
+                    AMediaFormat *meta = buffer->meta_data();
+                    AMediaFormat_setInt64(meta, AMEDIAFORMAT_KEY_TIME_US, timeUs);
                 }
                 *out = buffer;
 
@@ -824,11 +895,13 @@ media_status_t MyOggExtractor::_readNextPacket(MediaBufferBase **out, bool calcV
                 // is already complete.
 
                 if (timeUs >= 0) {
-                    buffer->meta_data().setInt64(kKeyTime, timeUs);
+                    AMediaFormat *meta = buffer->meta_data();
+                    AMediaFormat_setInt64(meta, AMEDIAFORMAT_KEY_TIME_US, timeUs);
                 }
 
-                buffer->meta_data().setInt32(
-                        kKeyValidSamples, mCurrentPageSamples);
+                AMediaFormat *meta = buffer->meta_data();
+                AMediaFormat_setInt32(
+                        meta, AMEDIAFORMAT_KEY_VALID_SAMPLES, mCurrentPageSamples);
                 mFirstPacketInPage = false;
 
                 *out = buffer;
@@ -843,7 +916,7 @@ status_t MyOggExtractor::init() {
     AMediaFormat_setString(mMeta, AMEDIAFORMAT_KEY_MIME, mMimeType);
 
     media_status_t err;
-    MediaBufferBase *packet;
+    MediaBufferHelperV3 *packet;
     for (size_t i = 0; i < mNumHeaders; ++i) {
         // ignore timestamp for configuration packets
         if ((err = _readNextPacket(&packet, /* calcVorbisTimestamp = */ false)) != AMEDIA_OK) {
@@ -920,7 +993,7 @@ void MyOggExtractor::buildTableOfContents() {
     }
 }
 
-int32_t MyOggExtractor::getPacketBlockSize(MediaBufferBase *buffer) {
+int32_t MyOggExtractor::getPacketBlockSize(MediaBufferHelperV3 *buffer) {
     const uint8_t *data =
         (const uint8_t *)buffer->data() + buffer->range_offset();
 
@@ -960,7 +1033,7 @@ int64_t MyOpusExtractor::getTimeUsOfGranule(uint64_t granulePos) const {
     return pcmSamplePosition * 1000000ll / kOpusSampleRate;
 }
 
-media_status_t MyOpusExtractor::verifyHeader(MediaBufferBase *buffer, uint8_t type) {
+media_status_t MyOpusExtractor::verifyHeader(MediaBufferHelperV3 *buffer, uint8_t type) {
     switch (type) {
         // there are actually no header types defined in the Opus spec; we choose 1 and 3 to mean
         // header and comments such that we can share code with MyVorbisExtractor.
@@ -973,7 +1046,7 @@ media_status_t MyOpusExtractor::verifyHeader(MediaBufferBase *buffer, uint8_t ty
     }
 }
 
-media_status_t MyOpusExtractor::verifyOpusHeader(MediaBufferBase *buffer) {
+media_status_t MyOpusExtractor::verifyOpusHeader(MediaBufferHelperV3 *buffer) {
     const size_t kOpusHeaderSize = 19;
     const uint8_t *data =
         (const uint8_t *)buffer->data() + buffer->range_offset();
@@ -1001,7 +1074,7 @@ media_status_t MyOpusExtractor::verifyOpusHeader(MediaBufferBase *buffer) {
     return AMEDIA_OK;
 }
 
-media_status_t MyOpusExtractor::verifyOpusComments(MediaBufferBase *buffer) {
+media_status_t MyOpusExtractor::verifyOpusComments(MediaBufferHelperV3 *buffer) {
     // add artificial framing bit so we can reuse _vorbis_unpack_comment
     int32_t commentSize = buffer->range_length() + 1;
     auto tmp = heapbuffer<uint8_t>(commentSize);
@@ -1094,7 +1167,7 @@ media_status_t MyOpusExtractor::verifyOpusComments(MediaBufferBase *buffer) {
 }
 
 media_status_t MyVorbisExtractor::verifyHeader(
-        MediaBufferBase *buffer, uint8_t type) {
+        MediaBufferHelperV3 *buffer, uint8_t type) {
     const uint8_t *data =
         (const uint8_t *)buffer->data() + buffer->range_offset();
 
@@ -1262,7 +1335,7 @@ size_t OggExtractor::countTracks() {
     return mInitCheck != OK ? 0 : 1;
 }
 
-MediaTrackHelperV2 *OggExtractor::getTrack(size_t index) {
+MediaTrackHelperV3 *OggExtractor::getTrack(size_t index) {
     if (index >= 1) {
         return NULL;
     }
@@ -1284,13 +1357,13 @@ media_status_t OggExtractor::getMetaData(AMediaFormat *meta) {
     return mImpl->getFileMetaData(meta);
 }
 
-static CMediaExtractorV2* CreateExtractor(
+static CMediaExtractorV3* CreateExtractor(
         CDataSource *source,
         void *) {
-    return wrapV2(new OggExtractor(new DataSourceHelper(source)));
+    return wrapV3(new OggExtractor(new DataSourceHelper(source)));
 }
 
-static CreatorFuncV2 Sniff(
+static CreatorFuncV3 Sniff(
         CDataSource *source,
         float *confidence,
         void **,
@@ -1311,11 +1384,11 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION_CURRENT,
+        EXTRACTORDEF_VERSION_CURRENT + 1,
         UUID("8cc5cd06-f772-495e-8a62-cba9649374e9"),
         1, // version
         "Ogg Extractor",
-        { .v2 = Sniff }
+        { .v3 = Sniff }
     };
 }
 

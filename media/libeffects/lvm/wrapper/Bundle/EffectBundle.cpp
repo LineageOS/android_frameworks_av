@@ -1275,9 +1275,17 @@ int Effect_setConfig(EffectContext *pContext, effect_config_t *pConfig){
         pContext->pBundledContext->SamplesPerSecond = 48000 * NrChannels;
         break;
 #if defined(BUILD_FLOAT) && defined(HIGHER_FS)
+    case 88200:
+        SampleRate = LVM_FS_88200;
+        pContext->pBundledContext->SamplesPerSecond = 88200 * NrChannels;
+        break;
     case 96000:
         SampleRate = LVM_FS_96000;
         pContext->pBundledContext->SamplesPerSecond = 96000 * NrChannels;
+        break;
+    case 176400:
+        SampleRate = LVM_FS_176400;
+        pContext->pBundledContext->SamplesPerSecond = 176400 * NrChannels;
         break;
     case 192000:
         SampleRate = LVM_FS_192000;

@@ -179,6 +179,7 @@ aaudio_result_t AAudioServiceStreamBase::start() {
     }
 
     setFlowing(false);
+    setSuspended(false);
 
     // Start with fresh presentation timestamps.
     mAtomicTimestamp.clear();
@@ -345,7 +346,9 @@ aaudio_result_t AAudioServiceStreamBase::writeUpMessageQueue(AAudioServiceMessag
     }
     int32_t count = mUpMessageQueue->getFifoBuffer()->write(command, 1);
     if (count != 1) {
-        ALOGE("%s(): Queue full. Did client die? %s", __func__, getTypeText());
+        ALOGW("%s(): Queue full. Did client stop? Suspending stream. what = %u, %s",
+              __func__, command->what, getTypeText());
+        setSuspended(true);
         return AAUDIO_ERROR_WOULD_BLOCK;
     } else {
         return AAUDIO_OK;

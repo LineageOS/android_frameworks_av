@@ -204,6 +204,20 @@ public:
     }
 
     /**
+     * Set false when the stream should not longer be processed.
+     * This may be caused by a message queue overflow.
+     * Set true when stream is started.
+     * @param suspended
+     */
+    void setSuspended(bool suspended) {
+        mSuspended = suspended;
+    }
+
+    bool isSuspended() const {
+        return mSuspended;
+    }
+
+    /**
      * Atomically increment the number of active references to the stream by AAudioService.
      *
      * This is called under a global lock in AAudioStreamTracker.
@@ -304,7 +318,12 @@ private:
     // This is modified under a global lock in AAudioStreamTracker.
     int32_t                 mCallingCount = 0;
 
+    // This indicates that a stream that is being referenced by a binder call needs to closed.
     std::atomic<bool>       mCloseNeeded{false};
+
+    // This indicate that a running stream should not be processed because of an error,
+    // for example a full message queue. Note that this atomic is unrelated to mCloseNeeded.
+    std::atomic<bool>       mSuspended{false};
 };
 
 } /* namespace aaudio */

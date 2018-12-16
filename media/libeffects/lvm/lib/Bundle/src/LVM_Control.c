@@ -71,7 +71,8 @@ LVM_ReturnStatus_en LVM_SetControlParameters(LVM_Handle_t           hInstance,
     ((pParams->SampleRate != LVM_FS_8000) && (pParams->SampleRate != LVM_FS_11025) && (pParams->SampleRate != LVM_FS_12000)       &&
      (pParams->SampleRate != LVM_FS_16000) && (pParams->SampleRate != LVM_FS_22050) && (pParams->SampleRate != LVM_FS_24000)      &&
      (pParams->SampleRate != LVM_FS_32000) && (pParams->SampleRate != LVM_FS_44100) && (pParams->SampleRate != LVM_FS_48000)      &&
-     (pParams->SampleRate != LVM_FS_96000) && (pParams->SampleRate != LVM_FS_192000))      ||
+     (pParams->SampleRate != LVM_FS_88200) && (pParams->SampleRate != LVM_FS_96000) &&
+     (pParams->SampleRate != LVM_FS_176400) && (pParams->SampleRate != LVM_FS_192000))      ||
 #else
         ((pParams->SampleRate != LVM_FS_8000) && (pParams->SampleRate != LVM_FS_11025) && (pParams->SampleRate != LVM_FS_12000)       &&
         (pParams->SampleRate != LVM_FS_16000) && (pParams->SampleRate != LVM_FS_22050) && (pParams->SampleRate != LVM_FS_24000)       &&

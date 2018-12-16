@@ -580,11 +580,23 @@
 #define HPF_Fs48000_Fc55_B2                       0.989882f
 
 #ifdef HIGHER_FS
+#define HPF_Fs88200_Fc55_A0                       0.985818f
+#define HPF_Fs88200_Fc55_A1                       (-1.971636f)
+#define HPF_Fs88200_Fc55_A2                       0.985818f
+#define HPF_Fs88200_Fc55_B1                       (-1.994466f)
+#define HPF_Fs88200_Fc55_B2                       0.994481f
+
 #define HPF_Fs96000_Fc55_A0                       0.986040f
 #define HPF_Fs96000_Fc55_A1                       (-1.972080f)
 #define HPF_Fs96000_Fc55_A2                       0.986040f
 #define HPF_Fs96000_Fc55_B1                       (-1.994915f)
 #define HPF_Fs96000_Fc55_B2                       0.994928f
+
+#define HPF_Fs176400_Fc55_A0                      0.987183f
+#define HPF_Fs176400_Fc55_A1                      (-1.974366f)
+#define HPF_Fs176400_Fc55_A2                      0.987183f
+#define HPF_Fs176400_Fc55_B1                      (-1.997233f)
+#define HPF_Fs176400_Fc55_B2                      0.997237f
 
 #define HPF_Fs192000_Fc55_A0                      0.987294f
 #define HPF_Fs192000_Fc55_A1                      (-1.974588f)
@@ -642,11 +654,23 @@
 #define HPF_Fs48000_Fc66_B2                       0.987871f
 
 #ifdef HIGHER_FS
+#define HPF_Fs88200_Fc66_A0                       0.985273f
+#define HPF_Fs88200_Fc66_A1                       (-1.970546f)
+#define HPF_Fs88200_Fc66_A2                       0.985273f
+#define HPF_Fs88200_Fc66_B1                       (-1.993359f)
+#define HPF_Fs88200_Fc66_B2                       0.993381f
+
 #define HPF_Fs96000_Fc66_A0                       0.985539f
 #define HPF_Fs96000_Fc66_A1                       (-1.971077f)
 #define HPF_Fs96000_Fc66_A2                       0.985539f
 #define HPF_Fs96000_Fc66_B1                       (-1.993898f)
 #define HPF_Fs96000_Fc66_B2                       0.993917f
+
+#define HPF_Fs176400_Fc66_A0                      0.986910f
+#define HPF_Fs176400_Fc66_A1                      (-1.973820f)
+#define HPF_Fs176400_Fc66_A2                      0.986910f
+#define HPF_Fs176400_Fc66_B1                      (-1.996679f)
+#define HPF_Fs176400_Fc66_B2                      0.996685f
 
 #define HPF_Fs192000_Fc66_A0                      0.987043f
 #define HPF_Fs192000_Fc66_A1                      (-1.974086f)
@@ -703,11 +727,23 @@
 #define HPF_Fs48000_Fc78_B2                       0.985681f
 
 #ifdef HIGHER_FS
+#define HPF_Fs88200_Fc78_A0                       0.984678f
+#define HPF_Fs88200_Fc78_A1                       (-1.969356f)
+#define HPF_Fs88200_Fc78_A2                       0.984678f
+#define HPF_Fs88200_Fc78_B1                       (-1.992151f)
+#define HPF_Fs88200_Fc78_B2                       0.992182f
+
 #define HPF_Fs96000_Fc78_A0                       0.984992f
 #define HPF_Fs96000_Fc78_A1                       (-1.969984f)
 #define HPF_Fs96000_Fc78_A2                       0.984992f
 #define HPF_Fs96000_Fc78_B1                       (-1.992789f)
 #define HPF_Fs96000_Fc78_B2                       0.992815f
+
+#define HPF_Fs176400_Fc78_A0                      0.986612f
+#define HPF_Fs176400_Fc78_A1                      (-1.973224f)
+#define HPF_Fs176400_Fc78_A2                      0.986612f
+#define HPF_Fs176400_Fc78_B1                      (-1.996076f)
+#define HPF_Fs176400_Fc78_B2                      0.996083f
 
 #define HPF_Fs192000_Fc78_A0                      0.986769f
 #define HPF_Fs192000_Fc78_A1                      (-1.973539f)
@@ -764,11 +800,23 @@
 #define HPF_Fs48000_Fc90_B2                      0.983497f
 
 #ifdef HIGHER_FS
+#define HPF_Fs88200_Fc90_A0                       0.984084f
+#define HPF_Fs88200_Fc90_A1                       (-1.968168f)
+#define HPF_Fs88200_Fc90_A2                       0.984084f
+#define HPF_Fs88200_Fc90_B1                       (-1.990944f)
+#define HPF_Fs88200_Fc90_B2                       0.990985f
+
 #define HPF_Fs96000_Fc90_A0                       0.984446f
 #define HPF_Fs96000_Fc90_A1                       (-1.968892f)
 #define HPF_Fs96000_Fc90_A2                       0.984446f
 #define HPF_Fs96000_Fc90_B1                       (-1.991680f)
 #define HPF_Fs96000_Fc90_B2                       0.991714f
+
+#define HPF_Fs176400_Fc90_A0                      0.986314f
+#define HPF_Fs176400_Fc90_A1                      (-1.972629f)
+#define HPF_Fs176400_Fc90_A2                      0.986314f
+#define HPF_Fs176400_Fc90_B1                      (-1.995472f)
+#define HPF_Fs176400_Fc90_B2                      0.995482f
 
 #define HPF_Fs192000_Fc90_A0                      0.986496f
 #define HPF_Fs192000_Fc90_A1                      (-1.972992f)
@@ -831,11 +879,23 @@
 #define BPF_Fs48000_Fc55_B2                      0.996875f
 
 #ifdef HIGHER_FS
+#define BPF_Fs88200_Fc55_A0                      0.000831f
+#define BPF_Fs88200_Fc55_A1                      0.000000f
+#define BPF_Fs88200_Fc55_A2                      (-0.000831f)
+#define BPF_Fs88200_Fc55_B1                      (-1.998321f)
+#define BPF_Fs88200_Fc55_B2                      0.998338f
+
 #define BPF_Fs96000_Fc55_A0                      0.000762f
 #define BPF_Fs96000_Fc55_A1                      0.000000f
 #define BPF_Fs96000_Fc55_A2                      (-0.000762f)
 #define BPF_Fs96000_Fc55_B1                      (-1.998461f)
 #define BPF_Fs96000_Fc55_B2                      0.998477f
+
+#define BPF_Fs176400_Fc55_A0                     0.000416f
+#define BPF_Fs176400_Fc55_A1                     0.000000f
+#define BPF_Fs176400_Fc55_A2                     (-0.000416f)
+#define BPF_Fs176400_Fc55_B1                     (-1.999164f)
+#define BPF_Fs176400_Fc55_B2                     0.999169f
 
 #define BPF_Fs192000_Fc55_A0                     0.000381f
 #define BPF_Fs192000_Fc55_A1                     0.000000f
@@ -892,11 +952,23 @@
 #define BPF_Fs48000_Fc66_B2                     0.995690f
 
 #ifdef HIGHER_FS
+#define BPF_Fs88200_Fc66_A0                     0.001146f
+#define BPF_Fs88200_Fc66_A1                     0.000000f
+#define BPF_Fs88200_Fc66_A2                     (-0.001146f)
+#define BPF_Fs88200_Fc66_B1                     (-1.997684f)
+#define BPF_Fs88200_Fc66_B2                     0.997708f
+
 #define BPF_Fs96000_Fc66_A0                     0.001055f
 #define BPF_Fs96000_Fc66_A1                     0.000000f
 #define BPF_Fs96000_Fc66_A2                     (-0.001055f)
 #define BPF_Fs96000_Fc66_B1                     (-1.997868f)
 #define BPF_Fs96000_Fc66_B2                     0.997891f
+
+#define BPF_Fs176400_Fc66_A0                    0.000573f
+#define BPF_Fs176400_Fc66_A1                    0.000000f
+#define BPF_Fs176400_Fc66_A2                    (-0.000573f)
+#define BPF_Fs176400_Fc66_B1                    (-1.998847f)
+#define BPF_Fs176400_Fc66_B2                    0.998853f
 
 #define BPF_Fs192000_Fc66_A0                    0.000528f
 #define BPF_Fs192000_Fc66_A1                    0.000000f
@@ -953,11 +1025,23 @@
 #define BPF_Fs48000_Fc78_B2                     0.993639f
 
 #ifdef HIGHER_FS
+#define BPF_Fs88200_Fc78_A0                    0.001693f
+#define BPF_Fs88200_Fc78_A1                    0.000000f
+#define BPF_Fs88200_Fc78_A2                    (-0.001693f)
+#define BPF_Fs88200_Fc78_B1                    (-1.996582f)
+#define BPF_Fs88200_Fc78_B2                    0.996615f
+
 #define BPF_Fs96000_Fc78_A0                     0.001555f
 #define BPF_Fs96000_Fc78_A1                     0.000000f
 #define BPF_Fs96000_Fc78_A2                    (-0.0015555f)
 #define BPF_Fs96000_Fc78_B1                    (-1.996860f)
 #define BPF_Fs96000_Fc78_B2                     0.996891f
+
+#define BPF_Fs176400_Fc78_A0                    0.000847f
+#define BPF_Fs176400_Fc78_A1                    0.000000f
+#define BPF_Fs176400_Fc78_A2                    (-0.000847f)
+#define BPF_Fs176400_Fc78_B1                    (-1.998298f)
+#define BPF_Fs176400_Fc78_B2                    0.998306f
 
 #define BPF_Fs192000_Fc78_A0                    0.000778f
 #define BPF_Fs192000_Fc78_A1                    0.000000f
@@ -1014,11 +1098,23 @@
 #define BPF_Fs48000_Fc90_B2                      0.992177f
 
 #ifdef HIGHER_FS
+#define BPF_Fs88200_Fc90_A0                      0.002083f
+#define BPF_Fs88200_Fc90_A1                      0.000000f
+#define BPF_Fs88200_Fc90_A2                      (-0.002083f)
+#define BPF_Fs88200_Fc90_B1                      (-1.995791f)
+#define BPF_Fs88200_Fc90_B2                      0.995835f
+
 #define BPF_Fs96000_Fc90_A0                      0.001913f
 #define BPF_Fs96000_Fc90_A1                      0.000000f
 #define BPF_Fs96000_Fc90_A2                     (-0.001913f)
 #define BPF_Fs96000_Fc90_B1                     (-1.996134f)
 #define BPF_Fs96000_Fc90_B2                      0.996174f
+
+#define BPF_Fs176400_Fc90_A0                     0.001042f
+#define BPF_Fs176400_Fc90_A1                     0.000000f
+#define BPF_Fs176400_Fc90_A2                     (-0.001042f)
+#define BPF_Fs176400_Fc90_B1                     (-1.997904f)
+#define BPF_Fs176400_Fc90_B2                     0.997915f
 
 #define BPF_Fs192000_Fc90_A0                     0.000958f
 #define BPF_Fs192000_Fc90_A1                     0.000000f
@@ -1045,7 +1141,9 @@
 #define AGC_ATTACK_Fs48000                            0.971628f
 
 #ifdef HIGHER_FS
+#define AGC_ATTACK_Fs88200                             0.984458f
 #define AGC_ATTACK_Fs96000                             0.985712f
+#define AGC_ATTACK_Fs176400                            0.992199f
 #define AGC_ATTACK_Fs192000                            0.992830f
 #endif
 
@@ -1062,7 +1160,9 @@
 #define AGC_DECAY_Fs48000                             0.000007f
 
 #ifdef HIGHER_FS
+#define AGC_DECAY_Fs88200                            0.0000038f
 #define AGC_DECAY_FS96000                            0.0000035f
+#define AGC_DECAY_Fs176400                          0.00000188f
 #define AGC_DECAY_FS192000                          0.00000175f
 #endif
 
@@ -1125,7 +1225,9 @@
 #define VOL_TC_Fs44100                                  0.004525f
 #define VOL_TC_Fs48000                                  0.004158f
 #ifdef HIGHER_FS
+#define VOL_TC_Fs88200                                  0.002263f
 #define VOL_TC_Fs96000                                  0.002079f
+#define VOL_TC_Fs176400                                 0.001131f
 #define VOL_TC_Fs192000                                 0.001039f
 #endif
 #define MIX_TC_Fs8000                                   29365         /* Floating point value 0.896151 */
@@ -1138,7 +1240,11 @@
 #define MIX_TC_Fs44100                                  32097         /* Floating point value 0.979515 */
 #define MIX_TC_Fs48000                                  32150         /* Floating point value 0.981150 */
 #ifdef HIGHER_FS
+/* Floating point value 0.989704 */
+#define MIX_TC_Fs88200                                  32430
 #define MIX_TC_Fs96000                                  32456         /* Floating point value 0.990530 */
+/* Floating point value 0.994838 */
+#define MIX_TC_Fs176400                                 32598
 #define MIX_TC_Fs192000                                 32611         /* Floating point value 0.992524 */
 #endif
 

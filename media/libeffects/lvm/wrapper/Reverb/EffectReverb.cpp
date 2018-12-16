@@ -675,8 +675,14 @@ int Reverb_setConfig(ReverbContext *pContext, effect_config_t *pConfig){
         SampleRate = LVM_FS_48000;
         break;
 #if defined(BUILD_FLOAT) && defined(HIGHER_FS)
+    case 88200:
+        SampleRate = LVM_FS_88200;
+        break;
     case 96000:
         SampleRate = LVM_FS_96000;
+        break;
+    case 176400:
+        SampleRate = LVM_FS_176400;
         break;
     case 192000:
         SampleRate = LVM_FS_192000;

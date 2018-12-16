@@ -35,6 +35,7 @@ using ::android::hardware::Void;
 namespace android {
 namespace CPP_VERSION {
 
+using EffectHalHidl = ::android::effect::CPP_VERSION::EffectHalHidl;
 using ReadCommand = ::android::hardware::audio::CPP_VERSION::IStreamIn::ReadCommand;
 
 using namespace ::android::hardware::audio::common::CPP_VERSION;

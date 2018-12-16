@@ -698,8 +698,8 @@ bool SwAudioOutputCollection::isA2dpOffloadedOnPrimary() const
     sp<SwAudioOutputDescriptor> primaryOutput = getPrimaryOutput();
 
     if ((primaryOutput != NULL) && (primaryOutput->mProfile != NULL)
-        && (primaryOutput->mProfile->mModule != NULL)) {
-        sp<HwModule> primaryHwModule = primaryOutput->mProfile->mModule;
+        && (primaryOutput->mProfile->getModule() != NULL)) {
+        sp<HwModule> primaryHwModule = primaryOutput->mProfile->getModule();
         Vector <sp<IOProfile>> primaryHwModuleOutputProfiles =
                                    primaryHwModule->getOutputProfiles();
         for (size_t i = 0; i < primaryHwModuleOutputProfiles.size(); i++) {
