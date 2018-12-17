@@ -228,8 +228,6 @@ int main(int argc, char **argv) {
         result = AAudioStream_requestStart(engine.stream);
         printf("AAudioStream_requestStart() returned %d >>>>>>>>>>>>>>>>>>>>>>\n", result);
         if (result != AAUDIO_OK) {
-            printf("ERROR - AAudioStream_requestStart returned %s",
-                   AAudio_convertResultToText(result));
             errorCount++;
             break;
         }
