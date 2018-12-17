@@ -23,10 +23,10 @@
 #include "ESQueue.h"
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
-#include <binder/IMemory.h>
-#include <binder/MemoryDealer.h>
+#include <android/hidl/allocator/1.0/IAllocator.h>
+#include <android/hidl/memory/1.0/IMemory.h>
 #include <cutils/native_handle.h>
-#include <hidlmemory/FrameworkUtils.h>
+#include <hidlmemory/mapping.h>
 #include <media/cas/DescramblerAPI.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -46,12 +46,13 @@
 #include <inttypes.h>
 
 namespace android {
-using hardware::fromHeap;
 using hardware::hidl_string;
 using hardware::hidl_vec;
-using hardware::HidlMemory;
+using hardware::hidl_memory;
 using namespace hardware::cas::V1_0;
 using namespace hardware::cas::native::V1_0;
+typedef hidl::allocator::V1_0::IAllocator TAllocator;
+typedef hidl::memory::V1_0::IMemory TMemory;
 
 // I want the expression "y" evaluated even if verbose logging is off.
 #define MY_LOGV(x, y) \
@@ -208,9 +209,8 @@ private:
     bool mScrambled;
     bool mSampleEncrypted;
     sp<AMessage> mSampleAesKeyItem;
-    sp<IMemory> mMem;
-    sp<MemoryDealer> mDealer;
-    sp<HidlMemory> mHidlMemory;
+    sp<TMemory> mHidlMemory;
+    sp<TAllocator> mHidlAllocator;
     hardware::cas::native::V1_0::SharedBuffer mDescramblerSrcBuffer;
     sp<ABuffer> mDescrambledBuffer;
     List<SubSampleInfo> mSubSamples;
@@ -975,16 +975,43 @@ bool ATSParser::Stream::ensureBufferCapacity(size_t neededSize) {
             mBuffer == NULL ? 0 : mBuffer->capacity(), neededSize, mScrambled);
 
     sp<ABuffer> newBuffer, newScrambledBuffer;
-    sp<IMemory> newMem;
-    sp<MemoryDealer> newDealer;
+    sp<TMemory> newMem;
     if (mScrambled) {
-        size_t alignment = MemoryDealer::getAllocationAlignment();
-        neededSize = (neededSize + (alignment - 1)) & ~(alignment - 1);
-        // Align to multiples of 64K.
-        neededSize = (neededSize + 65535) & ~65535;
-        newDealer = new MemoryDealer(neededSize, "ATSParser");
-        newMem = newDealer->allocate(neededSize);
-        newScrambledBuffer = new ABuffer(newMem->pointer(), newMem->size());
+        if (mHidlAllocator == nullptr) {
+            mHidlAllocator = TAllocator::getService("ashmem");
+            if (mHidlAllocator == nullptr) {
+                ALOGE("[stream %d] can't get hidl allocator", mElementaryPID);
+                return false;
+            }
+        }
+
+        hidl_memory hidlMemToken;
+        bool success;
+        auto transStatus = mHidlAllocator->allocate(
+                neededSize,
+                [&success, &hidlMemToken](
+                        bool s,
+                        hidl_memory const& m) {
+                    success = s;
+                    hidlMemToken = m;
+                });
+
+        if (!transStatus.isOk()) {
+            ALOGE("[stream %d] hidl allocator failed at the transport: %s",
+                    mElementaryPID, transStatus.description().c_str());
+            return false;
+        }
+        if (!success) {
+            ALOGE("[stream %d] hidl allocator failed", mElementaryPID);
+            return false;
+        }
+        newMem = mapMemory(hidlMemToken);
+        if (newMem == nullptr || newMem->getPointer() == nullptr) {
+            ALOGE("[stream %d] hidl failed to map memory", mElementaryPID);
+            return false;
+        }
+
+        newScrambledBuffer = new ABuffer(newMem->getPointer(), newMem->getSize());
 
         if (mDescrambledBuffer != NULL) {
             memcpy(newScrambledBuffer->data(),
@@ -993,24 +1020,15 @@ bool ATSParser::Stream::ensureBufferCapacity(size_t neededSize) {
         } else {
             newScrambledBuffer->setRange(0, 0);
         }
-        mMem = newMem;
-        mDealer = newDealer;
+        mHidlMemory = newMem;
         mDescrambledBuffer = newScrambledBuffer;
 
-        ssize_t offset;
-        size_t size;
-        sp<IMemoryHeap> heap = newMem->getMemory(&offset, &size);
-        if (heap == NULL) {
-            return false;
-        }
+        mDescramblerSrcBuffer.heapBase = hidlMemToken;
+        mDescramblerSrcBuffer.offset = 0ULL;
+        mDescramblerSrcBuffer.size =  (uint64_t)neededSize;
 
-        mHidlMemory = fromHeap(heap);
-        mDescramblerSrcBuffer.heapBase = *mHidlMemory;
-        mDescramblerSrcBuffer.offset = (uint64_t) offset;
-        mDescramblerSrcBuffer.size = (uint64_t) size;
-
-        ALOGD("[stream %d] created shared buffer for descrambling, offset %zd, size %zu",
-                mElementaryPID, offset, size);
+        ALOGD("[stream %d] created shared buffer for descrambling, size %zu",
+                mElementaryPID, neededSize);
     } else {
         // Align to multiples of 64K.
         neededSize = (neededSize + 65535) & ~65535;
@@ -1498,7 +1516,7 @@ status_t ATSParser::Stream::flushScrambled(SyncEvent *event) {
         return UNKNOWN_ERROR;
     }
 
-    if (mDescrambledBuffer == NULL || mMem == NULL) {
+    if (mDescrambledBuffer == NULL || mHidlMemory == NULL) {
         ALOGE("received scrambled packets without shared memory!");
 
         return UNKNOWN_ERROR;
