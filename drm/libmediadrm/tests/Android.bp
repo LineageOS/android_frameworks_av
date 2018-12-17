@@ -34,7 +34,6 @@ cc_test {
         // Suppress unused parameter and no error options. These cause problems
         // when using the map type in a proto definition.
         "-Wno-unused-parameter",
-        "-Wno-error",
     ]
 }
 
