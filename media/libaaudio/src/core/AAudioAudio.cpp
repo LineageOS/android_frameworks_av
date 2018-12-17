@@ -316,7 +316,7 @@ AAUDIO_API aaudio_result_t  AAudioStream_requestStop(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     ALOGD("%s(%p) called", __func__, stream);
-    return audioStream->systemStop();
+    return audioStream->systemStopFromApp();
 }
 
 AAUDIO_API aaudio_result_t AAudioStream_waitForStateChange(AAudioStream* stream,

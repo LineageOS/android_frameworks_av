@@ -51,21 +51,6 @@ public:
 
     virtual ~AudioStream();
 
-    /**
-     * Lock a mutex and make sure we are not calling from a callback function.
-     * @return result of requestStart();
-     */
-    aaudio_result_t safeStart();
-
-    aaudio_result_t safePause();
-
-    aaudio_result_t safeFlush();
-
-    aaudio_result_t safeStop();
-
-    aaudio_result_t safeClose();
-
-    // =========== Begin ABSTRACT methods ===========================
 protected:
 
     /* Asynchronous requests.
@@ -74,7 +59,7 @@ protected:
     virtual aaudio_result_t requestStart() = 0;
 
     /**
-     * Check the state to see if Pause if currently legal.
+     * Check the state to see if Pause is currently legal.
      *
      * @param result pointer to return code
      * @return true if OK to continue, if false then return result
@@ -356,33 +341,28 @@ public:
         mPlayerBase->unregisterWithAudioManager();
     }
 
-    // Pass start request through PlayerBase for tracking.
-    aaudio_result_t systemStart() {
-        mPlayerBase->start();
-        // Pass aaudio_result_t around the PlayerBase interface, which uses status__t.
-        return mPlayerBase->getResult();
-    }
+    aaudio_result_t systemStart();
 
-    // Pass pause request through PlayerBase for tracking.
-    aaudio_result_t systemPause() {
-        mPlayerBase->pause();
-        return mPlayerBase->getResult();
-    }
+    aaudio_result_t systemPause();
 
-    // Pass stop request through PlayerBase for tracking.
-    aaudio_result_t systemStop() {
-        mPlayerBase->stop();
-        return mPlayerBase->getResult();
-    }
+    aaudio_result_t safeFlush();
+
+    /**
+     * This is called when an app calls AAudioStream_requestStop();
+     * It prevents calls from a callback.
+     */
+    aaudio_result_t systemStopFromApp();
+
+    /**
+     * This is called internally when an app callback returns AAUDIO_CALLBACK_RESULT_STOP.
+     */
+    aaudio_result_t systemStopFromCallback();
+
+    aaudio_result_t safeClose();
 
 protected:
 
-    // PlayerBase allows the system to control the stream.
-    // Calling through PlayerBase->start() notifies the AudioManager of the player state.
-    // The AudioManager also can start/stop a stream by calling mPlayerBase->playerStart().
-    // systemStart() ==> mPlayerBase->start()   mPlayerBase->playerStart() ==> requestStart()
-    //                        \                           /
-    //                         ------ AudioManager -------
+    // PlayerBase allows the system to control the stream volume.
     class MyPlayerBase : public android::PlayerBase {
     public:
         explicit MyPlayerBase(AudioStream *parent);
@@ -406,20 +386,19 @@ protected:
 
         void clearParentReference() { mParent = nullptr; }
 
+        // Just a stub. The ability to start audio through PlayerBase is being deprecated.
         android::status_t playerStart() override {
-            // mParent should NOT be null. So go ahead and crash if it is.
-            mResult = mParent->safeStart();
-            return AAudioConvert_aaudioToAndroidStatus(mResult);
+            return android::NO_ERROR;
         }
 
+        // Just a stub. The ability to pause audio through PlayerBase is being deprecated.
         android::status_t playerPause() override {
-            mResult = mParent->safePause();
-            return AAudioConvert_aaudioToAndroidStatus(mResult);
+            return android::NO_ERROR;
         }
 
+        // Just a stub. The ability to stop audio through PlayerBase is being deprecated.
         android::status_t playerStop() override {
-            mResult = mParent->safeStop();
-            return AAudioConvert_aaudioToAndroidStatus(mResult);
+            return android::NO_ERROR;
         }
 
         android::status_t playerSetVolume() override {
@@ -547,6 +526,8 @@ protected:
     }
 
 private:
+
+    aaudio_result_t safeStop();
 
     std::mutex                 mStreamLock;
 
