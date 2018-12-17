@@ -33,6 +33,8 @@
 
 #include <camera_metadata_hidden.h>
 
+#include "DepthCompositeStream.h"
+
 // Convenience methods for constructing binder::Status objects for error returns
 
 #define STATUS_ERROR(errorCode, errorString) \
@@ -143,6 +145,7 @@ binder::Status CameraDeviceClient::submitRequest(
 
 binder::Status CameraDeviceClient::insertGbpLocked(const sp<IGraphicBufferProducer>& gbp,
         SurfaceMap* outSurfaceMap, Vector<int32_t>* outputStreamIds, int32_t *currentStreamId) {
+    int compositeIdx;
     int idx = mStreamMap.indexOfKey(IInterface::asBinder(gbp));
 
     // Trying to submit request with surface that wasn't created
@@ -152,6 +155,11 @@ binder::Status CameraDeviceClient::insertGbpLocked(const sp<IGraphicBufferProduc
                 __FUNCTION__, mCameraIdStr.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
                 "Request targets Surface that is not part of current capture session");
+    } else if ((compositeIdx = mCompositeStreamMap.indexOfKey(IInterface::asBinder(gbp)))
+            != NAME_NOT_FOUND) {
+        mCompositeStreamMap.valueAt(compositeIdx)->insertGbp(outSurfaceMap, outputStreamIds,
+                currentStreamId);
+        return binder::Status::ok();
     }
 
     const StreamSurfaceId& streamSurfaceId = mStreamMap.valueAt(idx);
@@ -489,6 +497,17 @@ binder::Status CameraDeviceClient::endConfigure(int operatingMode,
                 mCameraIdStr.string(), strerror(-err), err);
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         res = STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.string());
+    } else {
+        for (size_t i = 0; i < mCompositeStreamMap.size(); ++i) {
+            err = mCompositeStreamMap.valueAt(i)->configureStream();
+            if (err != OK ) {
+                String8 msg = String8::format("Camera %s: Error configuring composite "
+                        "streams: %s (%d)", mCameraIdStr.string(), strerror(-err), err);
+                ALOGE("%s: %s", __FUNCTION__, msg.string());
+                res = STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.string());
+                break;
+            }
+        }
     }
 
     return res;
@@ -692,8 +711,35 @@ binder::Status CameraDeviceClient::isSessionConfigurationSupported(
                 return res;
 
             if (!isStreamInfoValid) {
-                mapStreamInfo(streamInfo, static_cast<camera3_stream_rotation_t> (it.getRotation()),
-                        physicalCameraId, &streamConfiguration.streams[streamIdx++]);
+                if (camera3::DepthCompositeStream::isDepthCompositeStream(surface)) {
+                    // We need to take in to account that composite streams can have
+                    // additional internal camera streams.
+                    std::vector<OutputStreamInfo> compositeStreams;
+                    ret = camera3::DepthCompositeStream::getCompositeStreamInfo(streamInfo,
+                            mDevice->info(), &compositeStreams);
+                    if (ret != OK) {
+                        String8 msg = String8::format(
+                                "Camera %s: Failed adding depth composite streams: %s (%d)",
+                                mCameraIdStr.string(), strerror(-ret), ret);
+                        ALOGE("%s: %s", __FUNCTION__, msg.string());
+                        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+                    }
+
+                    if (compositeStreams.size() > 1) {
+                        streamCount += compositeStreams.size() - 1;
+                        streamConfiguration.streams.resize(streamCount);
+                    }
+
+                    for (const auto& compositeStream : compositeStreams) {
+                        mapStreamInfo(compositeStream,
+                                static_cast<camera3_stream_rotation_t> (it.getRotation()),
+                                physicalCameraId, &streamConfiguration.streams[streamIdx++]);
+                    }
+                } else {
+                    mapStreamInfo(streamInfo,
+                            static_cast<camera3_stream_rotation_t> (it.getRotation()),
+                            physicalCameraId, &streamConfiguration.streams[streamIdx++]);
+                }
                 isStreamInfoValid = true;
             }
         }
@@ -743,6 +789,7 @@ binder::Status CameraDeviceClient::deleteStream(int streamId) {
     bool isInput = false;
     std::vector<sp<IBinder>> surfaces;
     ssize_t dIndex = NAME_NOT_FOUND;
+    ssize_t compositeIndex  = NAME_NOT_FOUND;
 
     if (mInputStream.configured && mInputStream.id == streamId) {
         isInput = true;
@@ -758,6 +805,13 @@ binder::Status CameraDeviceClient::deleteStream(int streamId) {
         for (size_t i = 0; i < mDeferredStreams.size(); ++i) {
             if (streamId == mDeferredStreams[i]) {
                 dIndex = i;
+                break;
+            }
+        }
+
+        for (size_t i = 0; i < mCompositeStreamMap.size(); ++i) {
+            if (streamId == mCompositeStreamMap.valueAt(i)->getStreamId()) {
+                compositeIndex = i;
                 break;
             }
         }
@@ -790,6 +844,19 @@ binder::Status CameraDeviceClient::deleteStream(int streamId) {
 
             if (dIndex != NAME_NOT_FOUND) {
                 mDeferredStreams.removeItemsAt(dIndex);
+            }
+
+            if (compositeIndex != NAME_NOT_FOUND) {
+                status_t ret;
+                if ((ret = mCompositeStreamMap.valueAt(compositeIndex)->deleteStream())
+                        != OK) {
+                    String8 msg = String8::format("Camera %s: Unexpected error %s (%d) when "
+                            "deleting composite stream %d", mCameraIdStr.string(), strerror(-err), err,
+                            streamId);
+                    ALOGE("%s: %s", __FUNCTION__, msg.string());
+                    res = STATUS_ERROR(CameraService::ERROR_INVALID_OPERATION, msg.string());
+                }
+                mCompositeStreamMap.removeItemsAt(compositeIndex);
             }
         }
     }
@@ -870,11 +937,25 @@ binder::Status CameraDeviceClient::createStream(
 
     int streamId = camera3::CAMERA3_STREAM_ID_INVALID;
     std::vector<int> surfaceIds;
-    err = mDevice->createStream(surfaces, deferredConsumer, streamInfo.width,
-            streamInfo.height, streamInfo.format, streamInfo.dataSpace,
-            static_cast<camera3_stream_rotation_t>(outputConfiguration.getRotation()),
-            &streamId, physicalCameraId, &surfaceIds, outputConfiguration.getSurfaceSetID(),
-            isShared);
+    if (!camera3::DepthCompositeStream::isDepthCompositeStream(surfaces[0])) {
+        err = mDevice->createStream(surfaces, deferredConsumer, streamInfo.width,
+                streamInfo.height, streamInfo.format, streamInfo.dataSpace,
+                static_cast<camera3_stream_rotation_t>(outputConfiguration.getRotation()),
+                &streamId, physicalCameraId, &surfaceIds, outputConfiguration.getSurfaceSetID(),
+                isShared);
+    } else {
+        sp<CompositeStream> compositeStream = new camera3::DepthCompositeStream(mDevice,
+                getRemoteCallback());
+        err = compositeStream->createStream(surfaces, deferredConsumer, streamInfo.width,
+                streamInfo.height, streamInfo.format,
+                static_cast<camera3_stream_rotation_t>(outputConfiguration.getRotation()),
+                &streamId, physicalCameraId, &surfaceIds, outputConfiguration.getSurfaceSetID(),
+                isShared);
+        if (err == OK) {
+            mCompositeStreamMap.add(IInterface::asBinder(surfaces[0]->getIGraphicBufferProducer()),
+                    compositeStream);
+        }
+    }
 
     if (err != OK) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
@@ -1808,7 +1889,14 @@ void CameraDeviceClient::notifyError(int32_t errorCode,
     // Thread safe. Don't bother locking.
     sp<hardware::camera2::ICameraDeviceCallbacks> remoteCb = getRemoteCallback();
 
-    if (remoteCb != 0) {
+    // Composites can have multiple internal streams. Error notifications coming from such internal
+    // streams may need to remain within camera service.
+    bool skipClientNotification = false;
+    for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
+        skipClientNotification |= mCompositeStreamMap.valueAt(i)->onError(errorCode, resultExtras);
+    }
+
+    if ((remoteCb != 0) && (!skipClientNotification)) {
         remoteCb->onDeviceError(errorCode, resultExtras);
     }
 }
@@ -1900,6 +1988,10 @@ void CameraDeviceClient::onResultAvailable(const CaptureResult& result) {
     if (remoteCb != NULL) {
         remoteCb->onResultReceived(result.mMetadata, result.mResultExtras,
                 result.mPhysicalMetadatas);
+    }
+
+    for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
+        mCompositeStreamMap.valueAt(i)->onResultAvailable(result);
     }
 }
 

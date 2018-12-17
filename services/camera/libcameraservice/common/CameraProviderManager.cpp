@@ -58,6 +58,8 @@ const std::chrono::system_clock::duration kCameraKeepAliveDelay = 3s;
 
 } // anonymous namespace
 
+const float CameraProviderManager::kDepthARTolerance = .1f;
+
 CameraProviderManager::HardwareServiceInteractionProxy
 CameraProviderManager::sHardwareServiceInteractionProxy{};
 
@@ -576,10 +578,7 @@ void CameraProviderManager::ProviderInfo::DeviceInfo3::getSupportedDynamicDepthS
 
     // The dynamic depth spec. does not mention how close the AR ratio should be.
     // Try using something appropriate.
-    float ARTolerance = .01f;
-
-    //TODO: Remove this before merging! This is for testing purposes only
-    ARTolerance = 10.f;
+    float ARTolerance = kDepthARTolerance;
 
     for (const auto& blobSize : blobSizes) {
         float jpegAR = static_cast<float> (std::get<0>(blobSize)) /

@@ -656,7 +656,7 @@ void Camera3Stream::removeOutstandingBuffer(const camera3_stream_buffer &buffer)
 
 status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
         nsecs_t timestamp, bool timestampIncreasing,
-         const std::vector<size_t>& surface_ids) {
+         const std::vector<size_t>& surface_ids, uint64_t frameNumber) {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
 
@@ -687,7 +687,7 @@ status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
      */
     status_t res = returnBufferLocked(b, timestamp, surface_ids);
     if (res == OK) {
-        fireBufferListenersLocked(b, /*acquired*/false, /*output*/true);
+        fireBufferListenersLocked(b, /*acquired*/false, /*output*/true, timestamp, frameNumber);
     }
 
     // Even if returning the buffer failed, we still want to signal whoever is waiting for the
@@ -763,8 +763,21 @@ status_t Camera3Stream::getInputBufferProducer(sp<IGraphicBufferProducer> *produ
     return getInputBufferProducerLocked(producer);
 }
 
+void Camera3Stream::fireBufferRequestForFrameNumber(uint64_t frameNumber) {
+    ATRACE_CALL();
+    Mutex::Autolock l(mLock);
+
+    for (auto &it : mBufferListenerList) {
+        sp<Camera3StreamBufferListener> listener = it.promote();
+        if (listener.get() != nullptr) {
+            listener->onBufferRequestForFrameNumber(frameNumber, getId());
+        }
+    }
+}
+
 void Camera3Stream::fireBufferListenersLocked(
-        const camera3_stream_buffer& buffer, bool acquired, bool output) {
+        const camera3_stream_buffer& buffer, bool acquired, bool output, nsecs_t timestamp,
+        uint64_t frameNumber) {
     List<wp<Camera3StreamBufferListener> >::iterator it, end;
 
     // TODO: finish implementing
@@ -773,6 +786,8 @@ void Camera3Stream::fireBufferListenersLocked(
         Camera3StreamBufferListener::BufferInfo();
     info.mOutput = output;
     info.mError = (buffer.status == CAMERA3_BUFFER_STATUS_ERROR);
+    info.mFrameNumber = frameNumber;
+    info.mTimestamp = timestamp;
     // TODO: rest of fields
 
     for (it = mBufferListenerList.begin(), end = mBufferListenerList.end();

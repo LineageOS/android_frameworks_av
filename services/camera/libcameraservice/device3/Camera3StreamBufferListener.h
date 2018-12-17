@@ -41,6 +41,8 @@ public:
     virtual void onBufferAcquired(const BufferInfo& bufferInfo) = 0;
     // Buffer was released by the HAL
     virtual void onBufferReleased(const BufferInfo& bufferInfo) = 0;
+    // Notify about incoming buffer request frame number
+    virtual void onBufferRequestForFrameNumber(uint64_t frameNumber, int streamId) = 0;
 };
 
 }; //namespace camera3

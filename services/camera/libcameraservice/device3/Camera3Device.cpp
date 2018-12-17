@@ -3119,10 +3119,12 @@ void Camera3Device::returnOutputBuffers(
         status_t res = OK;
         if (it != outputSurfaces.end()) {
             res = stream->returnBuffer(
-                    outputBuffers[i], timestamp, timestampIncreasing, it->second);
+                    outputBuffers[i], timestamp, timestampIncreasing, it->second,
+                    inResultExtras.frameNumber);
         } else {
             res = stream->returnBuffer(
-                    outputBuffers[i], timestamp, timestampIncreasing);
+                    outputBuffers[i], timestamp, timestampIncreasing, std::vector<size_t> (),
+                    inResultExtras.frameNumber);
         }
 
         // Note: stream may be deallocated at this point, if this buffer was
@@ -3139,7 +3141,8 @@ void Camera3Device::returnOutputBuffers(
             // cancel the buffer
             camera3_stream_buffer_t sb = outputBuffers[i];
             sb.status = CAMERA3_BUFFER_STATUS_ERROR;
-            stream->returnBuffer(sb, /*timestamp*/0, timestampIncreasing);
+            stream->returnBuffer(sb, /*timestamp*/0, timestampIncreasing, std::vector<size_t> (),
+                    inResultExtras.frameNumber);
 
             // notify client buffer error
             sp<NotificationListener> listener;
@@ -3279,7 +3282,8 @@ void Camera3Device::flushInflightRequests() {
                 streamBuffer.stream = halStream;
                 switch (halStream->stream_type) {
                     case CAMERA3_STREAM_OUTPUT:
-                        res = stream->returnBuffer(streamBuffer, /*timestamp*/ 0);
+                        res = stream->returnBuffer(streamBuffer, /*timestamp*/ 0,
+                                /*timestampIncreasing*/true, std::vector<size_t> (), frameNumber);
                         if (res != OK) {
                             ALOGE("%s: Can't return output buffer for frame %d to"
                                   " stream %d: %s (%d)",  __FUNCTION__,
@@ -5469,6 +5473,8 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                     return TIMED_OUT;
                 }
             }
+            outputStream->fireBufferRequestForFrameNumber(
+                    captureRequest->mResultExtras.frameNumber);
 
             String8 physicalCameraId = outputStream->getPhysicalCameraId();
 
@@ -5692,7 +5698,9 @@ void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) 
                 outputBuffers->editItemAt(i).acquire_fence = -1;
             }
             outputBuffers->editItemAt(i).status = CAMERA3_BUFFER_STATUS_ERROR;
-            captureRequest->mOutputStreams.editItemAt(i)->returnBuffer((*outputBuffers)[i], 0);
+            captureRequest->mOutputStreams.editItemAt(i)->returnBuffer((*outputBuffers)[i], 0,
+                    /*timestampIncreasing*/true, std::vector<size_t> (),
+                    captureRequest->mResultExtras.frameNumber);
         }
 
         if (sendRequestError) {

@@ -265,6 +265,8 @@ public:
     bool isLogicalCamera(const std::string& id, std::vector<std::string>* physicalCameraIds);
 
     bool isHiddenPhysicalCamera(const std::string& cameraId);
+
+    static const float kDepthARTolerance;
 private:
     // All private members, unless otherwise noted, expect mInterfaceMutex to be locked before use
     mutable std::mutex mInterfaceMutex;
