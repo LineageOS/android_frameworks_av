@@ -25,6 +25,8 @@
 #include <media/stagefright/MediaErrors.h>
 
 #include "libyuv/convert_from.h"
+#include "libyuv/convert_argb.h"
+#include "libyuv/planar_functions.h"
 #include "libyuv/video_common.h"
 #include <functional>
 #include <sys/time.h>
@@ -71,9 +73,16 @@ bool ColorConverter::isValid() const {
 
         case OMX_COLOR_FormatCbYCrY:
         case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
-        case OMX_COLOR_FormatYUV420SemiPlanar:
         case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
             return mDstFormat == OMX_COLOR_Format16bitRGB565;
+
+        case OMX_COLOR_FormatYUV420SemiPlanar:
+#ifdef USE_LIBYUV
+            return mDstFormat == OMX_COLOR_Format16bitRGB565
+                    || mDstFormat == OMX_COLOR_Format32BitRGBA8888;
+#else
+            return mDstFormat == OMX_COLOR_Format16bitRGB565;
+#endif
 
         default:
             return false;
@@ -201,7 +210,11 @@ status_t ColorConverter::convert(
             break;
 
         case OMX_COLOR_FormatYUV420SemiPlanar:
+#ifdef USE_LIBYUV
+            err = convertYUV420SemiPlanarUseLibYUV(src, dst);
+#else
             err = convertYUV420SemiPlanar(src, dst);
+#endif
             break;
 
         case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
@@ -312,6 +325,36 @@ status_t ColorConverter::convertYUV420PlanarUseLibYUV(
     }
 
     return OK;
+}
+
+status_t ColorConverter::convertYUV420SemiPlanarUseLibYUV(
+        const BitmapParams &src, const BitmapParams &dst) {
+    uint8_t *dst_ptr = (uint8_t *)dst.mBits
+        + dst.mCropTop * dst.mStride + dst.mCropLeft * dst.mBpp;
+
+    const uint8_t *src_y =
+        (const uint8_t *)src.mBits + src.mCropTop * src.mStride + src.mCropLeft;
+
+    const uint8_t *src_u =
+        (const uint8_t *)src.mBits + src.mStride * src.mHeight
+        + src.mCropTop * src.mStride + src.mCropLeft;
+
+    switch (mDstFormat) {
+    case OMX_COLOR_Format16bitRGB565:
+        libyuv::NV12ToRGB565(src_y, src.mStride, src_u, src.mStride, (uint8 *)dst_ptr,
+                dst.mStride, src.cropWidth(), src.cropHeight());
+        break;
+
+    case OMX_COLOR_Format32BitRGBA8888:
+        libyuv::NV12ToARGB(src_y, src.mStride, src_u, src.mStride, (uint8 *)dst_ptr,
+                dst.mStride, src.cropWidth(), src.cropHeight());
+        break;
+
+    default:
+        return ERROR_UNSUPPORTED;
+   }
+
+   return OK;
 }
 
 std::function<void (void *, void *, void *, size_t,
