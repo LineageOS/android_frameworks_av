@@ -46,7 +46,7 @@ void CameraLatencyHistogram::add(nsecs_t start, nsecs_t end) {
 }
 
 void CameraLatencyHistogram::reset() {
-    mBins.clear();
+    memset(mBins.data(), 0, mBins.size() * sizeof(int64_t));
     mTotalCount = 0;
 }
 
