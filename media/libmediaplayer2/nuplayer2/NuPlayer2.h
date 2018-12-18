@@ -82,9 +82,9 @@ struct NuPlayer2 : public AHandler {
     void rewind();
 
     status_t setVideoScalingMode(int32_t mode);
-    status_t getTrackInfo(PlayerMessage* reply) const;
-    status_t getSelectedTrack(int32_t type, PlayerMessage* reply) const;
-    status_t selectTrack(size_t trackIndex, bool select, int64_t timeUs);
+    status_t getTrackInfo(int64_t srcId, PlayerMessage* reply) const;
+    status_t getSelectedTrack(int64_t srcId, int32_t type, PlayerMessage* reply) const;
+    status_t selectTrack(int64_t srcId, size_t trackIndex, bool select, int64_t timeUs);
     status_t getCurrentPosition(int64_t *mediaUs);
     void getStats(Vector<sp<AMessage> > *mTrackStats);
 

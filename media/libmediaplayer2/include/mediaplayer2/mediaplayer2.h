@@ -86,7 +86,7 @@ public:
                     MediaPlayer2SeekMode mode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC);
             status_t        notifyAt(int64_t mediaTimeUs);
             status_t        getCurrentPosition(int64_t *msec);
-            status_t        getDuration(int64_t *msec);
+            status_t        getDuration(int64_t srcId, int64_t *msec);
             status_t        reset();
             status_t        setAudioStreamType(audio_stream_type_t type);
             status_t        getAudioStreamType(audio_stream_type_t *type);
