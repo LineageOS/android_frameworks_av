@@ -253,9 +253,21 @@ void Accessor::Impl::flush() {
 }
 
 void Accessor::Impl::handleInvalidateAck() {
-    std::lock_guard<std::mutex> lock(mBufferPool.mMutex);
-    mBufferPool.processStatusMessages();
-    mBufferPool.mInvalidation.onHandleAck();
+    std::map<ConnectionId, const sp<IObserver>> observers;
+    uint32_t invalidationId;
+    {
+        std::lock_guard<std::mutex> lock(mBufferPool.mMutex);
+        mBufferPool.processStatusMessages();
+        mBufferPool.mInvalidation.onHandleAck(&observers, &invalidationId);
+    }
+    // Do not hold lock for send invalidations
+    for (auto it = observers.begin(); it != observers.end(); ++it) {
+        const sp<IObserver> observer = it->second;
+        if (observer) {
+            Return<void> transResult = observer->onMessage(it->first, invalidationId);
+            (void) transResult;
+        }
+    }
 }
 
 bool Accessor::Impl::isValid() {
@@ -365,19 +377,21 @@ void Accessor::Impl::BufferPool::Invalidation::onInvalidationRequest(
     sInvalidator->addAccessor(mId, impl);
 }
 
-void Accessor::Impl::BufferPool::Invalidation::onHandleAck() {
+void Accessor::Impl::BufferPool::Invalidation::onHandleAck(
+        std::map<ConnectionId, const sp<IObserver>> *observers,
+        uint32_t *invalidationId) {
     if (mInvalidationId != 0) {
+        *invalidationId = mInvalidationId;
         std::set<int> deads;
         for (auto it = mAcks.begin(); it != mAcks.end(); ++it) {
             if (it->second != mInvalidationId) {
                 const sp<IObserver> observer = mObservers[it->first];
                 if (observer) {
-                    ALOGV("connection %lld call observer (%u: %u)",
+                    observers->emplace(it->first, observer);
+                    ALOGV("connection %lld will call observer (%u: %u)",
                           (long long)it->first, it->second, mInvalidationId);
-                    Return<void> transResult = observer->onMessage(it->first, mInvalidationId);
-                    (void) transResult;
-                    // N.B: ignore possibility of onMessage oneway call being
-                    // lost.
+                    // N.B: onMessage will be called later. ignore possibility of
+                    // onMessage# oneway call being lost.
                     it->second = mInvalidationId;
                 } else {
                     ALOGV("bufferpool2 observer died %lld", (long long)it->first);
