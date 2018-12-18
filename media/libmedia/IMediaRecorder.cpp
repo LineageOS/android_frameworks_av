@@ -65,7 +65,7 @@ enum {
     GET_ROUTED_DEVICE_ID,
     ENABLE_AUDIO_DEVICE_CALLBACK,
     GET_ACTIVE_MICROPHONES,
-
+    GET_PORT_ID,
 };
 
 class BpMediaRecorder: public BpInterface<IMediaRecorder>
@@ -407,6 +407,23 @@ public:
         return status;
     }
 
+    status_t getPortId(audio_port_handle_t *portId)
+    {
+        ALOGV("getPortId");
+        if (portId == nullptr) {
+            return BAD_VALUE;
+        }
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
+        status_t status = remote()->transact(GET_PORT_ID, data, &reply);
+        if (status != OK
+                || (status = (status_t)reply.readInt32()) != NO_ERROR) {
+            *portId = AUDIO_PORT_HANDLE_NONE;
+            return status;
+        }
+        *portId = (audio_port_handle_t)reply.readInt32();
+        return NO_ERROR;
+    }
 };
 
 IMPLEMENT_META_INTERFACE(MediaRecorder, "android.media.IMediaRecorder");
@@ -660,6 +677,17 @@ status_t BnMediaRecorder::onTransact(
             reply->writeParcelableVector(activeMicrophones);
             return NO_ERROR;
 
+        }
+        case GET_PORT_ID: {
+            ALOGV("GET_PORT_ID");
+            CHECK_INTERFACE(IMediaRecorder, data, reply);
+            audio_port_handle_t portId;
+            status_t status = getPortId(&portId);
+            reply->writeInt32(status);
+            if (status == NO_ERROR) {
+                reply->writeInt32(portId);
+            }
+            return NO_ERROR;
         }
         default:
             return BBinder::onTransact(code, data, reply, flags);

@@ -506,4 +506,11 @@ status_t AudioSource::getActiveMicrophones(
     return NO_INIT;
 }
 
+status_t AudioSource::getPortId(audio_port_handle_t *portId) const {
+    if (mRecord != 0) {
+        *portId = mRecord->getPortId();
+        return NO_ERROR;
+    }
+    return NO_INIT;
+}
 }  // namespace android

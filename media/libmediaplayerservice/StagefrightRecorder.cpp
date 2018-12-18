@@ -2255,6 +2255,12 @@ status_t StagefrightRecorder::getActiveMicrophones(
     return NO_INIT;
 }
 
+status_t StagefrightRecorder::getPortId(audio_port_handle_t *portId) const {
+    if (mAudioSourceNode != 0) {
+        return mAudioSourceNode->getPortId(portId);
+    }
+    return NO_INIT;
+}
 
 status_t StagefrightRecorder::dump(
         int fd, const Vector<String16>& args) const {

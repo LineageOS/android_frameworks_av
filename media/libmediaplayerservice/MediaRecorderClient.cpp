@@ -537,4 +537,13 @@ status_t MediaRecorderClient::getActiveMicrophones(
     }
     return NO_INIT;
 }
+
+status_t MediaRecorderClient::getPortId(audio_port_handle_t *portId) {
+    ALOGV("getPortId");
+    Mutex::Autolock lock(mLock);
+    if (mRecorder != NULL) {
+        return mRecorder->getPortId(portId);
+    }
+    return NO_INIT;
+}
 }; // namespace android

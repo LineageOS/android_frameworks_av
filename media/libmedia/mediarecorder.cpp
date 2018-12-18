@@ -842,4 +842,15 @@ status_t MediaRecorder::getActiveMicrophones(std::vector<media::MicrophoneInfo>*
     return mMediaRecorder->getActiveMicrophones(activeMicrophones);
 }
 
+status_t MediaRecorder::getPortId(audio_port_handle_t *portId) const
+{
+    ALOGV("getPortId");
+
+    if (mMediaRecorder == NULL) {
+        ALOGE("media recorder is not initialized yet");
+        return INVALID_OPERATION;
+    }
+    return mMediaRecorder->getPortId(portId);
+}
+
 } // namespace android
