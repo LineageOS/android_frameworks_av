@@ -29,7 +29,6 @@ cc_library {
 
     shared_libs: [
         "liblog",
-        "libbinder",
         "libcrypto",
         "libcutils",
         "libmedia",
@@ -38,10 +37,11 @@ cc_library {
         "libstagefright",
         "libstagefright_foundation",
         "libutils",
-        "libhidlallocatorutils",
         "libhidlbase",
+        "libhidlmemory",
         "android.hardware.cas@1.0",
         "android.hardware.cas.native@1.0",
+        "android.hidl.allocator@1.0",
     ],
 
     header_libs: [

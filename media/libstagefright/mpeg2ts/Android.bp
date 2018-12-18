@@ -30,9 +30,10 @@ cc_library_static {
     shared_libs: [
         "libcrypto",
         "libmedia",
-        "libhidlallocatorutils",
+        "libhidlmemory",
         "android.hardware.cas.native@1.0",
         "android.hidl.memory@1.0",
+        "android.hidl.allocator@1.0",
     ],
 
     header_libs: [
