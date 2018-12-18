@@ -90,6 +90,9 @@ private:
     status_t convertYUV420PlanarUseLibYUV(
             const BitmapParams &src, const BitmapParams &dst);
 
+    status_t convertYUV420SemiPlanarUseLibYUV(
+            const BitmapParams &src, const BitmapParams &dst);
+
     status_t convertYUV420Planar16(
             const BitmapParams &src, const BitmapParams &dst);
 
