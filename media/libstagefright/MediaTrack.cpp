@@ -172,6 +172,10 @@ status_t MediaTrackCUnwrapper::read(MediaBufferBase **buffer, const ReadOptions 
             meta.setData(kKeySEI,
                     MetaDataBase::Type::TYPE_NONE, valbuf->data(), valbuf->size());
         }
+        if (format->mFormat->findBuffer("audio-presentation-info", &valbuf)) {
+            meta.setData(kKeyAudioPresentationInfo,
+                    MetaDataBase::Type::TYPE_NONE, valbuf->data(), valbuf->size());
+        }
     } else {
         *buffer = nullptr;
     }

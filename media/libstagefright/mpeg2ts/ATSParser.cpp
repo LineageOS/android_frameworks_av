@@ -217,6 +217,9 @@ private:
     sp<IDescrambler> mDescrambler;
     AudioPresentationCollection mAudioPresentations;
 
+    // Send audio presentations along with access units.
+    void addAudioPresentations(const sp<ABuffer> &buffer);
+
     // Flush accumulated payload if necessary --- i.e. at EOS or at the start of
     // another payload. event is set if the flushed payload is PES with a sync
     // frame.
@@ -1708,6 +1711,13 @@ status_t ATSParser::Stream::flush(SyncEvent *event) {
     return err;
 }
 
+void ATSParser::Stream::addAudioPresentations(const sp<ABuffer> &buffer) {
+    std::ostringstream outStream(std::ios::out);
+    serializeAudioPresentations(mAudioPresentations, &outStream);
+    sp<ABuffer> ap = ABuffer::CreateAsCopy(outStream.str().data(), outStream.str().size());
+    buffer->meta()->setBuffer("audio-presentation-info", ap);
+}
+
 void ATSParser::Stream::onPayloadData(
         unsigned PTS_DTS_flags, uint64_t PTS, uint64_t /* DTS */,
         unsigned PES_scrambling_control,
@@ -1758,8 +1768,10 @@ void ATSParser::Stream::onPayloadData(
                     }
                 }
                 mSource = new AnotherPacketSource(meta);
+                if (mAudioPresentations.size() > 0) {
+                    addAudioPresentations(accessUnit);
+                }
                 mSource->queueAccessUnit(accessUnit);
-                mSource->convertAudioPresentationInfoToMetadata(mAudioPresentations);
                 ALOGV("onPayloadData: created AnotherPacketSource PID 0x%08x of type 0x%02x",
                         mElementaryPID, mStreamType);
             }
@@ -1771,8 +1783,10 @@ void ATSParser::Stream::onPayloadData(
             if (mSource->getFormat() == NULL) {
                 mSource->setFormat(mQueue->getFormat());
             }
+            if (mAudioPresentations.size() > 0) {
+                addAudioPresentations(accessUnit);
+            }
             mSource->queueAccessUnit(accessUnit);
-            mSource->convertAudioPresentationInfoToMetadata(mAudioPresentations);
         }
 
         // Every access unit has a pesStartOffset queued in |mPesStartOffsets|.

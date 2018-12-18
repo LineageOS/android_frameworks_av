@@ -795,30 +795,34 @@ bool NuMediaExtractor::getCachedDuration(
 }
 
 // Return OK if we have received an audio presentation info.
+// Return ERROR_END_OF_STREAM if no tracks are available.
 // Return ERROR_UNSUPPORTED if the track has no audio presentation.
 // Return INVALID_OPERATION if audio presentation metadata version does not match.
 status_t NuMediaExtractor::getAudioPresentations(
-        size_t trackIndex, AudioPresentationCollection *presentations) const {
+        size_t trackIndex, AudioPresentationCollection *presentations) {
     Mutex::Autolock autoLock(mLock);
-
-    if (mImpl == NULL) {
-        return -EINVAL;
+    ssize_t minIndex = fetchAllTrackSamples();
+    if (minIndex < 0) {
+        return ERROR_END_OF_STREAM;
     }
+    for (size_t i = 0; i < mSelectedTracks.size(); ++i) {
+        TrackInfo *info = &mSelectedTracks.editItemAt(i);
 
-    if (trackIndex >= mImpl->countTracks()) {
-        return -ERANGE;
+        if (info->mTrackIndex == trackIndex) {
+            sp<MetaData> meta = new MetaData(info->mSamples.begin()->mBuffer->meta_data());
+
+            uint32_t type;
+            const void *data;
+            size_t size;
+            if (meta != NULL && meta->findData(kKeyAudioPresentationInfo, &type, &data, &size)) {
+                std::istringstream inStream(std::string(static_cast<const char*>(data), size));
+                return deserializeAudioPresentations(&inStream, presentations);
+            }
+            ALOGV("Track %zu does not contain any audio presentation", trackIndex);
+            return ERROR_UNSUPPORTED;
+        }
     }
-
-    sp<MetaData> meta = mImpl->getTrackMetaData(trackIndex);
-
-    uint32_t type;
-    const void *data;
-    size_t size;
-    if (meta != NULL && meta->findData(kKeyAudioPresentationInfo, &type, &data, &size)) {
-        std::istringstream inStream(std::string(static_cast<const char*>(data), size));
-        return deserializeAudioPresentations(&inStream, presentations);
-    }
-    ALOGE("Source does not contain any audio presentation");
+    ALOGV("Source does not contain any audio presentation");
     return ERROR_UNSUPPORTED;
 }
 
