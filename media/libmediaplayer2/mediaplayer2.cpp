@@ -718,8 +718,15 @@ status_t MediaPlayer2::getCurrentPosition(int64_t *msec) {
     return ret;
 }
 
-status_t MediaPlayer2::getDuration(int64_t *msec) {
+status_t MediaPlayer2::getDuration(int64_t srcId, int64_t *msec) {
     Mutex::Autolock _l(mLock);
+    // TODO: cache duration for currentSrcId and nextSrcId, and return correct
+    // value for nextSrcId.
+    if (srcId != mSrcId) {
+        *msec = -1;
+        return OK;
+    }
+
     ALOGV("getDuration_l");
     bool isValidState = (mCurrentState & (MEDIA_PLAYER2_PREPARED | MEDIA_PLAYER2_STARTED |
             MEDIA_PLAYER2_PAUSED | MEDIA_PLAYER2_PLAYBACK_COMPLETE));

@@ -17,6 +17,8 @@
 #define LOG_TAG "BufferProvider"
 //#define LOG_NDEBUG 0
 
+#include <algorithm>
+
 #include <audio_utils/primitives.h>
 #include <audio_utils/format.h>
 #include <audio_utils/channels.h>
@@ -36,13 +38,6 @@
 namespace android {
 
 // ----------------------------------------------------------------------------
-
-template <typename T>
-static inline T min(const T& a, const T& b)
-{
-    return a < b ? a : b;
-}
-
 CopyBufferProvider::CopyBufferProvider(size_t inputFrameSize,
         size_t outputFrameSize, size_t bufferFrameCount) :
         mInputFrameSize(inputFrameSize),
@@ -100,8 +95,8 @@ status_t CopyBufferProvider::getNextBuffer(AudioBufferProvider::Buffer *pBuffer)
         mConsumed = 0;
     }
     ALOG_ASSERT(mConsumed < mBuffer.frameCount);
-    size_t count = min(mLocalBufferFrameCount, mBuffer.frameCount - mConsumed);
-    count = min(count, pBuffer->frameCount);
+    size_t count = std::min(mLocalBufferFrameCount, mBuffer.frameCount - mConsumed);
+    count = std::min(count, pBuffer->frameCount);
     pBuffer->raw = mLocalBufferData;
     pBuffer->frameCount = count;
     copyFrames(pBuffer->raw, (uint8_t*)mBuffer.raw + mConsumed * mInputFrameSize,
@@ -491,7 +486,7 @@ status_t TimestretchBufferProvider::getNextBuffer(
         }
 
         // time-stretch the data
-        dstAvailable = min(mLocalBufferFrameCount - mRemaining, outputDesired);
+        dstAvailable = std::min(mLocalBufferFrameCount - mRemaining, outputDesired);
         size_t srcAvailable = mBuffer.frameCount;
         processFrames((uint8_t*)mLocalBufferData + mRemaining * mFrameSize, &dstAvailable,
                 mBuffer.raw, &srcAvailable);
@@ -589,7 +584,7 @@ void TimestretchBufferProvider::processFrames(void *dstBuffer, size_t *dstFrames
                   } else {
                       // cyclically repeat the source.
                       for (size_t count = 0; count < *dstFrames; count += *srcFrames) {
-                          size_t remaining = min(*srcFrames, *dstFrames - count);
+                          size_t remaining = std::min(*srcFrames, *dstFrames - count);
                           memcpy((uint8_t*)dstBuffer + mFrameSize * count,
                                   srcBuffer, mFrameSize * remaining);
                       }
@@ -657,9 +652,9 @@ AdjustChannelsNonDestructiveBufferProvider::AdjustChannelsNonDestructiveBufferPr
         audio_format_t format, size_t inChannelCount, size_t outChannelCount,
         audio_format_t contractedFormat, size_t contractedFrameCount, void* contractedBuffer) :
         CopyBufferProvider(
-                audio_bytes_per_frame(inChannelCount, format),
-                audio_bytes_per_frame(outChannelCount, format),
-                0 /*bufferFrameCount*/),
+                audio_bytes_per_frame(std::max(inChannelCount, outChannelCount), format),
+                audio_bytes_per_frame(std::max(inChannelCount, outChannelCount), format),
+                contractedFrameCount),
         mFormat(format),
         mInChannelCount(inChannelCount),
         mOutChannelCount(outChannelCount),

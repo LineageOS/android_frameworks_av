@@ -108,6 +108,7 @@ LOCAL_SHARED_LIBRARIES := \
 LOCAL_MODULE := mediaswcodec
 LOCAL_INIT_RC := mediaswcodec.rc
 LOCAL_32_BIT_ONLY := true
+LOCAL_SANITIZE := scudo
 
 sanitizer_runtime_libraries :=
 llndk_libraries :=

@@ -603,28 +603,33 @@ status_t NuPlayer2Driver::invoke(const PlayerMessage &request, PlayerMessage *re
 
         case MEDIA_PLAYER2_INVOKE_ID_GET_TRACK_INFO:
         {
-            return mPlayer->getTrackInfo(response);
+            int64_t srcId = (it++)->int64_value();
+            return mPlayer->getTrackInfo(srcId, response);
         }
 
         case MEDIA_PLAYER2_INVOKE_ID_SELECT_TRACK:
         {
+            int64_t srcId = (it++)->int64_value();
             int trackIndex = (it++)->int32_value();
             int64_t msec = 0;
             // getCurrentPosition should always return OK
             getCurrentPosition(&msec);
-            return mPlayer->selectTrack(trackIndex, true /* select */, msec * 1000LL);
+            return mPlayer->selectTrack(srcId, trackIndex, true /* select */, msec * 1000LL);
         }
 
         case MEDIA_PLAYER2_INVOKE_ID_UNSELECT_TRACK:
         {
+            int64_t srcId = (it++)->int64_value();
             int trackIndex = (it++)->int32_value();
-            return mPlayer->selectTrack(trackIndex, false /* select */, 0xdeadbeef /* not used */);
+            return mPlayer->selectTrack(
+                    srcId, trackIndex, false /* select */, 0xdeadbeef /* not used */);
         }
 
         case MEDIA_PLAYER2_INVOKE_ID_GET_SELECTED_TRACK:
         {
+            int64_t srcId = (it++)->int64_value();
             int32_t type = (it++)->int32_value();
-            return mPlayer->getSelectedTrack(type, response);
+            return mPlayer->getSelectedTrack(srcId, type, response);
         }
 
         default:

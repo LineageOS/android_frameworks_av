@@ -3674,6 +3674,29 @@ void MPEG4Writer::Track::writeMetadataFourCCBox() {
         TRESPASS();
     }
     mOwner->beginBox(fourcc);    // TextMetaDataSampleEntry
+
+    //  HACK to make the metadata track compliant with the ISO standard.
+    //
+    //  Metadata track is added from API 26 and the original implementation does not
+    //  fully followed the TextMetaDataSampleEntry specified in ISO/IEC 14496-12-2015
+    //  in that only the mime_format is written out. content_encoding and
+    //  data_reference_index have not been written out. This leads to the failure
+    //  when some MP4 parser tries to parse the metadata track according to the
+    //  standard. The hack here will make the metadata track compliant with the
+    //  standard while still maintaining backwards compatibility. This would enable
+    //  Android versions before API 29 to be able to read out the standard compliant
+    //  Metadata track generated with Android API 29 and upward. The trick is based
+    //  on the fact that the Metadata track must start with prefix “application/” and
+    //  those missing fields are not used in Android's Metadata track. By writting
+    //  out the mime_format twice, the first mime_format will be used to fill out the
+    //  missing reserved, data_reference_index and content encoding fields. On the
+    //  parser side, the extracter before API 29  will read out the first mime_format
+    //  correctly and drop the second mime_format. The extractor from API 29 will
+    //  check if the reserved, data_reference_index and content encoding are filled
+    //  with “application” to detect if this is a standard compliant metadata track
+    //  and read out the data accordingly.
+    mOwner->writeCString(mime);
+
     mOwner->writeCString(mime);  // metadata mime_format
     mOwner->endBox(); // mett
 }
