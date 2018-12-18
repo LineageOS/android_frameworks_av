@@ -9,6 +9,8 @@ filegroup {
         // "Refusing to generate code with unstructured parcelables."
         "java/android/media/MediaDescription.aidl",
         "java/android/media/MediaMetadata.aidl",
+        // TODO(insun): check why MediaParceledListSlice.aidl should be added here
+        "java/android/media/MediaParceledListSlice.aidl",
         "java/android/media/Rating.aidl",
         "java/android/media/browse/MediaBrowser.aidl",
         "java/android/media/session/MediaSession.aidl",
