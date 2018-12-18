@@ -38,7 +38,8 @@ LOCAL_SHARED_LIBRARIES := \
     libpowermanager \
     libmediautils \
     libmemunreachable \
-    libmedia_helper
+    libmedia_helper \
+    libvibrator
 
 LOCAL_STATIC_LIBRARIES := \
     libcpustats \

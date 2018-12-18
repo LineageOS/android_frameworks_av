@@ -451,6 +451,12 @@ AudioFlinger::PlaybackThread::Track::Track(
     mTee.setId(std::string("_") + std::to_string(mThreadIoHandle)
             + "_" + std::to_string(mId));
 #endif
+
+    if (channelMask & AUDIO_CHANNEL_HAPTIC_ALL) {
+        mAudioVibrationController = new AudioVibrationController(this);
+        mExternalVibration = new os::ExternalVibration(
+                mUid, "" /* pkg */, mAttr, mAudioVibrationController);
+    }
 }
 
 AudioFlinger::PlaybackThread::Track::~Track()
@@ -1334,6 +1340,40 @@ void AudioFlinger::PlaybackThread::Track::updateTrackFrameInfo(
 
     mServerLatencyFromTrack.store(useTrackTimestamp);
     mServerLatencyMs.store(latencyMs);
+}
+
+binder::Status AudioFlinger::PlaybackThread::Track::AudioVibrationController::mute(
+        /*out*/ bool *ret) {
+    *ret = false;
+    sp<ThreadBase> thread = mTrack->mThread.promote();
+    if (thread != 0) {
+        // Lock for updating mHapticPlaybackEnabled.
+        Mutex::Autolock _l(thread->mLock);
+        PlaybackThread *playbackThread = (PlaybackThread *)thread.get();
+        if ((mTrack->channelMask() & AUDIO_CHANNEL_HAPTIC_ALL) != AUDIO_CHANNEL_NONE
+                && playbackThread->mHapticChannelCount > 0) {
+            mTrack->setHapticPlaybackEnabled(false);
+            *ret = true;
+        }
+    }
+    return binder::Status::ok();
+}
+
+binder::Status AudioFlinger::PlaybackThread::Track::AudioVibrationController::unmute(
+        /*out*/ bool *ret) {
+    *ret = false;
+    sp<ThreadBase> thread = mTrack->mThread.promote();
+    if (thread != 0) {
+        // Lock for updating mHapticPlaybackEnabled.
+        Mutex::Autolock _l(thread->mLock);
+        PlaybackThread *playbackThread = (PlaybackThread *)thread.get();
+        if ((mTrack->channelMask() & AUDIO_CHANNEL_HAPTIC_ALL) != AUDIO_CHANNEL_NONE
+                && playbackThread->mHapticChannelCount > 0) {
+            mTrack->setHapticPlaybackEnabled(true);
+            *ret = true;
+        }
+    }
+    return binder::Status::ok();
 }
 
 // ----------------------------------------------------------------------------

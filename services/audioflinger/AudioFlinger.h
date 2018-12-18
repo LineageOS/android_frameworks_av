@@ -30,6 +30,7 @@
 #include <sys/types.h>
 #include <limits.h>
 
+#include <android/os/BnExternalVibrationController.h>
 #include <android-base/macros.h>
 
 #include <cutils/atomic.h>
@@ -83,6 +84,8 @@
 #include <media/nblog/NBLog.h>
 #include <private/media/AudioEffectShared.h>
 #include <private/media/AudioTrackShared.h>
+
+#include <vibrator/ExternalVibration.h>
 
 #include "android/media/BnAudioRecord.h"
 
@@ -284,6 +287,9 @@ public:
                             const sp<MmapStreamCallback>& callback,
                             sp<MmapStreamInterface>& interface,
                             audio_port_handle_t *handle);
+
+    static int onExternalVibrationStart(const sp<os::ExternalVibration>& externalVibration);
+    static void onExternalVibrationStop(const sp<os::ExternalVibration>& externalVibration);
 private:
     // FIXME The 400 is temporarily too high until a leak of writers in media.log is fixed.
     static const size_t kLogMemorySize = 400 * 1024;
