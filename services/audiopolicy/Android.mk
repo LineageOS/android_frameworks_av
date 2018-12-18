@@ -25,7 +25,11 @@ LOCAL_SHARED_LIBRARIES := \
     libmedia_helper \
     libmediametrics \
     libmediautils \
-    libeffectsconfig
+    libeffectsconfig \
+    libsensorprivacy
+
+LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := \
+    libsensorprivacy
 
 LOCAL_STATIC_LIBRARIES := \
     libaudiopolicycomponents

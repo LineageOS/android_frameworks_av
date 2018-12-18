@@ -38,6 +38,7 @@
 #include <media/AudioEffect.h>
 #include <media/AudioParameter.h>
 #include <mediautils/ServiceUtilities.h>
+#include <sensorprivacy/SensorPrivacyManager.h>
 
 #include <system/audio.h>
 #include <system/audio_policy.h>
@@ -84,6 +85,9 @@ void AudioPolicyService::onFirstRef()
 
     mUidPolicy = new UidPolicy(this);
     mUidPolicy->registerSelf();
+
+    mSensorPrivacyPolicy = new SensorPrivacyPolicy(this);
+    mSensorPrivacyPolicy->registerSelf();
 }
 
 AudioPolicyService::~AudioPolicyService()
@@ -99,6 +103,9 @@ AudioPolicyService::~AudioPolicyService()
 
     mUidPolicy->unregisterSelf();
     mUidPolicy.clear();
+
+    mSensorPrivacyPolicy->unregisterSelf();
+    mSensorPrivacyPolicy.clear();
 }
 
 // A notification client is always registered by AudioSystem when the client process
@@ -375,6 +382,12 @@ void AudioPolicyService::updateUidStates_l()
     bool isAssistantOnTop = false;
     bool isSensitiveActive = false;
 
+    // if Sensor Privacy is enabled then all recordings should be silenced.
+    if (mSensorPrivacyPolicy->isSensorPrivacyEnabled()) {
+        silenceAllRecordings_l();
+        return;
+    }
+
     for (size_t i =0; i < mAudioRecordClients.size(); i++) {
         sp<AudioRecordClient> current = mAudioRecordClients[i];
         if (!current->active) continue;
@@ -442,6 +455,13 @@ void AudioPolicyService::updateUidStates_l()
         setAppState_l(current->uid,
                       forceIdle ? APP_STATE_IDLE :
                                   apmStatFromAmState(mUidPolicy->getUidState(current->uid)));
+    }
+}
+
+void AudioPolicyService::silenceAllRecordings_l() {
+    for (size_t i = 0; i < mAudioRecordClients.size(); i++) {
+        sp<AudioRecordClient> current = mAudioRecordClients[i];
+        setAppState_l(current->uid, APP_STATE_IDLE);
     }
 }
 
@@ -856,6 +876,31 @@ bool AudioPolicyService::UidPolicy::isA11yUid(uid_t uid)
 {
     std::vector<uid_t>::iterator it = find(mA11yUids.begin(), mA11yUids.end(), uid);
     return it != mA11yUids.end();
+}
+
+// -----------  AudioPolicyService::SensorPrivacyService implementation ----------
+void AudioPolicyService::SensorPrivacyPolicy::registerSelf() {
+    SensorPrivacyManager spm;
+    mSensorPrivacyEnabled = spm.isSensorPrivacyEnabled();
+    spm.addSensorPrivacyListener(this);
+}
+
+void AudioPolicyService::SensorPrivacyPolicy::unregisterSelf() {
+    SensorPrivacyManager spm;
+    spm.removeSensorPrivacyListener(this);
+}
+
+bool AudioPolicyService::SensorPrivacyPolicy::isSensorPrivacyEnabled() {
+    return mSensorPrivacyEnabled;
+}
+
+binder::Status AudioPolicyService::SensorPrivacyPolicy::onSensorPrivacyChanged(bool enabled) {
+    mSensorPrivacyEnabled = enabled;
+    sp<AudioPolicyService> service = mService.promote();
+    if (service != nullptr) {
+        service->updateUidStates();
+    }
+    return binder::Status::ok();
 }
 
 // -----------  AudioPolicyService::AudioCommandThread implementation ----------
