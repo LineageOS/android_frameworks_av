@@ -158,7 +158,9 @@ private:
                     BufferInvalidationChannel &channel,
                     const std::shared_ptr<Accessor::Impl> &impl);
 
-            void onHandleAck();
+            void onHandleAck(
+                    std::map<ConnectionId, const sp<IObserver>> *observers,
+                    uint32_t *invalidationId);
         } mInvalidation;
         /// Buffer pool statistics which tracks allocation and transfer statistics.
         struct Stats {
