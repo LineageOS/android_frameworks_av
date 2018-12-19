@@ -188,6 +188,24 @@ public:
                 .withConstValue(defaultColorInfo)
                 .build());
 
+        addParameter(
+                DefineParam(mDefaultColorAspects, C2_PARAMKEY_DEFAULT_COLOR_ASPECTS)
+                .withDefault(new C2StreamColorAspectsTuning::output(
+                        0u, C2Color::RANGE_UNSPECIFIED, C2Color::PRIMARIES_UNSPECIFIED,
+                        C2Color::TRANSFER_UNSPECIFIED, C2Color::MATRIX_UNSPECIFIED))
+                .withFields({
+                    C2F(mDefaultColorAspects, range).inRange(
+                                C2Color::RANGE_UNSPECIFIED,     C2Color::RANGE_OTHER),
+                    C2F(mDefaultColorAspects, primaries).inRange(
+                                C2Color::PRIMARIES_UNSPECIFIED, C2Color::PRIMARIES_OTHER),
+                    C2F(mDefaultColorAspects, transfer).inRange(
+                                C2Color::TRANSFER_UNSPECIFIED,  C2Color::TRANSFER_OTHER),
+                    C2F(mDefaultColorAspects, matrix).inRange(
+                                C2Color::MATRIX_UNSPECIFIED,    C2Color::MATRIX_OTHER)
+                })
+                .withSetter(DefaultColorAspectsSetter)
+                .build());
+
         // TODO: support more formats?
         addParameter(
                 DefineParam(mPixelFormat, C2_PARAMKEY_PIXEL_FORMAT)
@@ -228,6 +246,22 @@ public:
         return C2R::Ok();
     }
 
+    static C2R DefaultColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsTuning::output> &me) {
+        (void)mayBlock;
+        if (me.v.range > C2Color::RANGE_OTHER) {
+            me.set().range = C2Color::RANGE_OTHER;
+        }
+        if (me.v.primaries > C2Color::PRIMARIES_OTHER) {
+            me.set().primaries = C2Color::PRIMARIES_OTHER;
+        }
+        if (me.v.transfer > C2Color::TRANSFER_OTHER) {
+            me.set().transfer = C2Color::TRANSFER_OTHER;
+        }
+        if (me.v.matrix > C2Color::MATRIX_OTHER) {
+            me.set().matrix = C2Color::MATRIX_OTHER;
+        }
+        return C2R::Ok();
+    }
 
     static C2R ProfileLevelSetter(bool mayBlock, C2P<C2StreamProfileLevelInfo::input> &me,
                                   const C2P<C2StreamPictureSizeInfo::output> &size) {
@@ -235,6 +269,9 @@ public:
         (void)size;
         (void)me;  // TODO: validate
         return C2R::Ok();
+    }
+    std::shared_ptr<C2StreamColorAspectsTuning::output> getDefaultColorAspects_l() {
+        return mDefaultColorAspects;
     }
 
     static C2R Hdr10PlusInfoInputSetter(bool mayBlock, C2P<C2StreamHdr10PlusInfo::input> &me) {
@@ -256,6 +293,7 @@ private:
     std::shared_ptr<C2StreamMaxBufferSizeInfo::input> mMaxInputSize;
     std::shared_ptr<C2StreamColorInfo::output> mColorInfo;
     std::shared_ptr<C2StreamPixelFormatInfo::output> mPixelFormat;
+    std::shared_ptr<C2StreamColorAspectsTuning::output> mDefaultColorAspects;
 #ifdef VP9
 #if 0
     std::shared_ptr<C2StreamHdrStaticInfo::output> mHdrStaticInfo;
@@ -524,32 +562,129 @@ void C2SoftVpxDec::process(
 static void copyOutputBufferToYV12Frame(uint8_t *dst,
         const uint8_t *srcY, const uint8_t *srcU, const uint8_t *srcV,
         size_t srcYStride, size_t srcUStride, size_t srcVStride,
-        uint32_t width, uint32_t height, int32_t bpp) {
-    size_t dstYStride = align(width, 16) * bpp ;
+        uint32_t width, uint32_t height) {
+    size_t dstYStride = align(width, 16);
     size_t dstUVStride = align(dstYStride / 2, 16);
     uint8_t *dstStart = dst;
 
     for (size_t i = 0; i < height; ++i) {
-         memcpy(dst, srcY, width * bpp);
+         memcpy(dst, srcY, width);
          srcY += srcYStride;
          dst += dstYStride;
     }
 
     dst = dstStart + dstYStride * height;
     for (size_t i = 0; i < height / 2; ++i) {
-         memcpy(dst, srcV, width / 2 * bpp);
+         memcpy(dst, srcV, width / 2);
          srcV += srcVStride;
          dst += dstUVStride;
     }
 
     dst = dstStart + (dstYStride * height) + (dstUVStride * height / 2);
     for (size_t i = 0; i < height / 2; ++i) {
-         memcpy(dst, srcU, width / 2 * bpp);
+         memcpy(dst, srcU, width / 2);
          srcU += srcUStride;
          dst += dstUVStride;
     }
 }
 
+static void convertYUV420Planar16ToY410(uint32_t *dst,
+        const uint16_t *srcY, const uint16_t *srcU, const uint16_t *srcV,
+        size_t srcYStride, size_t srcUStride, size_t srcVStride,
+        size_t dstStride, size_t width, size_t height) {
+
+    // Converting two lines at a time, slightly faster
+    for (size_t y = 0; y < height; y += 2) {
+        uint32_t *dstTop = (uint32_t *) dst;
+        uint32_t *dstBot = (uint32_t *) (dst + dstStride);
+        uint16_t *ySrcTop = (uint16_t*) srcY;
+        uint16_t *ySrcBot = (uint16_t*) (srcY + srcYStride);
+        uint16_t *uSrc = (uint16_t*) srcU;
+        uint16_t *vSrc = (uint16_t*) srcV;
+
+        uint32_t u01, v01, y01, y23, y45, y67, uv0, uv1;
+        size_t x = 0;
+        for (; x < width - 3; x += 4) {
+
+            u01 = *((uint32_t*)uSrc); uSrc += 2;
+            v01 = *((uint32_t*)vSrc); vSrc += 2;
+
+            y01 = *((uint32_t*)ySrcTop); ySrcTop += 2;
+            y23 = *((uint32_t*)ySrcTop); ySrcTop += 2;
+            y45 = *((uint32_t*)ySrcBot); ySrcBot += 2;
+            y67 = *((uint32_t*)ySrcBot); ySrcBot += 2;
+
+            uv0 = (u01 & 0x3FF) | ((v01 & 0x3FF) << 20);
+            uv1 = (u01 >> 16) | ((v01 >> 16) << 20);
+
+            *dstTop++ = 3 << 30 | ((y01 & 0x3FF) << 10) | uv0;
+            *dstTop++ = 3 << 30 | ((y01 >> 16) << 10) | uv0;
+            *dstTop++ = 3 << 30 | ((y23 & 0x3FF) << 10) | uv1;
+            *dstTop++ = 3 << 30 | ((y23 >> 16) << 10) | uv1;
+
+            *dstBot++ = 3 << 30 | ((y45 & 0x3FF) << 10) | uv0;
+            *dstBot++ = 3 << 30 | ((y45 >> 16) << 10) | uv0;
+            *dstBot++ = 3 << 30 | ((y67 & 0x3FF) << 10) | uv1;
+            *dstBot++ = 3 << 30 | ((y67 >> 16) << 10) | uv1;
+        }
+
+        // There should be at most 2 more pixels to process. Note that we don't
+        // need to consider odd case as the buffer is always aligned to even.
+        if (x < width) {
+            u01 = *uSrc;
+            v01 = *vSrc;
+            y01 = *((uint32_t*)ySrcTop);
+            y45 = *((uint32_t*)ySrcBot);
+            uv0 = (u01 & 0x3FF) | ((v01 & 0x3FF) << 20);
+            *dstTop++ = ((y01 & 0x3FF) << 10) | uv0;
+            *dstTop++ = ((y01 >> 16) << 10) | uv0;
+            *dstBot++ = ((y45 & 0x3FF) << 10) | uv0;
+            *dstBot++ = ((y45 >> 16) << 10) | uv0;
+        }
+
+        srcY += srcYStride * 2;
+        srcU += srcUStride;
+        srcV += srcVStride;
+        dst += dstStride * 2;
+    }
+
+    return;
+}
+
+static void convertYUV420Planar16ToYUV420Planar(uint8_t *dst,
+        const uint16_t *srcY, const uint16_t *srcU, const uint16_t *srcV,
+        size_t srcYStride, size_t srcUStride, size_t srcVStride,
+        size_t dstStride, size_t width, size_t height) {
+
+    uint8_t *dstY = (uint8_t *)dst;
+    size_t dstYSize = dstStride * height;
+    size_t dstUVStride = align(dstStride / 2, 16);
+    size_t dstUVSize = dstUVStride * height / 2;
+    uint8_t *dstV = dstY + dstYSize;
+    uint8_t *dstU = dstV + dstUVSize;
+
+    for (size_t y = 0; y < height; ++y) {
+        for (size_t x = 0; x < width; ++x) {
+            dstY[x] = (uint8_t)(srcY[x] >> 2);
+        }
+
+        srcY += srcYStride;
+        dstY += dstStride;
+    }
+
+    for (size_t y = 0; y < (height + 1) / 2; ++y) {
+        for (size_t x = 0; x < (width + 1) / 2; ++x) {
+            dstU[x] = (uint8_t)(srcU[x] >> 2);
+            dstV[x] = (uint8_t)(srcV[x] >> 2);
+        }
+
+        srcU += srcUStride;
+        srcV += srcVStride;
+        dstU += dstUVStride;
+        dstV += dstUVStride;
+    }
+    return;
+}
 bool C2SoftVpxDec::outputBuffer(
         const std::shared_ptr<C2BlockPool> &pool,
         const std::unique_ptr<C2Work> &work)
@@ -581,15 +716,21 @@ bool C2SoftVpxDec::outputBuffer(
 
     }
     CHECK(img->fmt == VPX_IMG_FMT_I420 || img->fmt == VPX_IMG_FMT_I42016);
-    int32_t bpp = 1;
-    if (img->fmt == VPX_IMG_FMT_I42016) {
-        bpp = 2;
-    }
 
     std::shared_ptr<C2GraphicBlock> block;
     uint32_t format = HAL_PIXEL_FORMAT_YV12;
+    if (img->fmt == VPX_IMG_FMT_I42016) {
+        IntfImpl::Lock lock = mIntf->lock();
+        std::shared_ptr<C2StreamColorAspectsTuning::output> defaultColorAspects = mIntf->getDefaultColorAspects_l();
+
+        if (defaultColorAspects->primaries == C2Color::PRIMARIES_BT2020 &&
+            defaultColorAspects->matrix == C2Color::MATRIX_BT2020 &&
+            defaultColorAspects->transfer == C2Color::TRANSFER_ST2084) {
+            format = HAL_PIXEL_FORMAT_RGBA_1010102;
+        }
+    }
     C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
-    c2_status_t err = pool->fetchGraphicBlock(align(mWidth, 16) * bpp, mHeight, format, usage, &block);
+    c2_status_t err = pool->fetchGraphicBlock(align(mWidth, 16), mHeight, format, usage, &block);
     if (err != C2_OK) {
         ALOGE("fetchGraphicBlock for Output failed with status %d", err);
         work->result = err;
@@ -610,12 +751,30 @@ bool C2SoftVpxDec::outputBuffer(
     size_t srcYStride = img->stride[VPX_PLANE_Y];
     size_t srcUStride = img->stride[VPX_PLANE_U];
     size_t srcVStride = img->stride[VPX_PLANE_V];
-    const uint8_t *srcY = (const uint8_t *)img->planes[VPX_PLANE_Y];
-    const uint8_t *srcU = (const uint8_t *)img->planes[VPX_PLANE_U];
-    const uint8_t *srcV = (const uint8_t *)img->planes[VPX_PLANE_V];
-    copyOutputBufferToYV12Frame(dst, srcY, srcU, srcV,
-                                srcYStride, srcUStride, srcVStride, mWidth, mHeight, bpp);
 
+    if (img->fmt == VPX_IMG_FMT_I42016) {
+        const uint16_t *srcY = (const uint16_t *)img->planes[VPX_PLANE_Y];
+        const uint16_t *srcU = (const uint16_t *)img->planes[VPX_PLANE_U];
+        const uint16_t *srcV = (const uint16_t *)img->planes[VPX_PLANE_V];
+
+        if (format == HAL_PIXEL_FORMAT_RGBA_1010102) {
+            convertYUV420Planar16ToY410((uint32_t *)dst, srcY, srcU, srcV, srcYStride / 2,
+                                    srcUStride / 2, srcVStride / 2,
+                                    align(mWidth, 16),
+                                    mWidth, mHeight);
+        } else {
+            convertYUV420Planar16ToYUV420Planar(dst, srcY, srcU, srcV, srcYStride / 2,
+                                    srcUStride / 2, srcVStride / 2,
+                                    align(mWidth, 16),
+                                    mWidth, mHeight);
+        }
+    } else {
+        const uint8_t *srcY = (const uint8_t *)img->planes[VPX_PLANE_Y];
+        const uint8_t *srcU = (const uint8_t *)img->planes[VPX_PLANE_U];
+        const uint8_t *srcV = (const uint8_t *)img->planes[VPX_PLANE_V];
+        copyOutputBufferToYV12Frame(dst, srcY, srcU, srcV,
+                                srcYStride, srcUStride, srcVStride, mWidth, mHeight);
+    }
     finishWork(*(int64_t *)img->user_priv, work, std::move(block));
     return true;
 }
