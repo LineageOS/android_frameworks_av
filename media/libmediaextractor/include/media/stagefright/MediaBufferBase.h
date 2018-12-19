@@ -75,7 +75,10 @@ public:
     virtual int localRefcount() const = 0;
     virtual int remoteRefcount() const = 0;
 
-    virtual ~MediaBufferBase() {};
+    virtual ~MediaBufferBase() {
+        delete mWrapper;
+        delete mFormat;
+    };
 
     CMediaBufferV3 *wrap() {
         if (mWrapper) {

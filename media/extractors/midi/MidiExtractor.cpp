@@ -279,6 +279,7 @@ MidiExtractor::~MidiExtractor()
     ALOGV("MidiExtractor dtor");
     AMediaFormat_delete(mFileMetadata);
     AMediaFormat_delete(mTrackMetadata);
+    delete mEngine;
 }
 
 size_t MidiExtractor::countTracks()

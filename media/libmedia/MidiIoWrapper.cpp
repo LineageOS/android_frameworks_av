@@ -50,24 +50,15 @@ MidiIoWrapper::MidiIoWrapper(int fd, off64_t offset, int64_t size) {
     mDataSource = nullptr;
 }
 
-MidiIoWrapper::MidiIoWrapper(DataSourceBase *source) {
-    ALOGV("MidiIoWrapper(DataSource)");
-    mFd = -1;
-    mDataSource = source;
-    off64_t l;
-    if (mDataSource->getSize(&l) == OK) {
-        mLength = l;
-    } else {
-        mLength = 0;
-    }
-}
-
 class DataSourceUnwrapper : public DataSourceBase {
 
 public:
     explicit DataSourceUnwrapper(CDataSource *csource) {
         mSource = csource;
     }
+
+    virtual ~DataSourceUnwrapper() {}
+
     virtual status_t initCheck() const { return OK; }
 
     // Returns the number of bytes read, or -1 on failure. It's not an error if
@@ -98,6 +89,7 @@ private:
 MidiIoWrapper::MidiIoWrapper(CDataSource *csource) {
     ALOGV("MidiIoWrapper(CDataSource)");
     mFd = -1;
+    mBase = 0;
     mDataSource = new DataSourceUnwrapper(csource);
     off64_t l;
     if (mDataSource->getSize(&l) == OK) {
@@ -112,6 +104,7 @@ MidiIoWrapper::~MidiIoWrapper() {
     if (mFd >= 0) {
         close(mFd);
     }
+    delete mDataSource;
 }
 
 int MidiIoWrapper::readAt(void *buffer, int offset, int size) {

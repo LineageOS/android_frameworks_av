@@ -125,6 +125,7 @@ MediaBufferGroup::~MediaBufferGroup() {
         buffer->release();
     }
     delete mInternal;
+    delete mWrapper;
 }
 
 void MediaBufferGroup::add_buffer(MediaBufferBase *buffer) {

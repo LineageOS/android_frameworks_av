@@ -734,6 +734,7 @@ media_status_t MPEG2PSExtractor::Track::read(
     if (inMeta.findData(kKeySEI, &bufType, &bufData, &bufSize)) {
         AMediaFormat_setBuffer(outMeta, AMEDIAFORMAT_KEY_SEI, bufData, bufSize);
     }
+    mbuf->release();
     return AMEDIA_OK;
 }
 
