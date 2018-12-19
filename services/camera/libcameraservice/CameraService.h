@@ -18,6 +18,7 @@
 #define ANDROID_SERVERS_CAMERA_CAMERASERVICE_H
 
 #include <android/hardware/BnCameraService.h>
+#include <android/hardware/BnSensorPrivacyListener.h>
 #include <android/hardware/ICameraServiceListener.h>
 #include <android/hardware/ICameraServiceProxy.h>
 
@@ -554,7 +555,34 @@ private:
         std::unordered_map<uid_t, bool> mOverrideUids;
     }; // class UidPolicy
 
+    // If sensor privacy is enabled then all apps, including those that are active, should be
+    // prevented from accessing the camera.
+    class SensorPrivacyPolicy : public hardware::BnSensorPrivacyListener,
+            public virtual IBinder::DeathRecipient {
+        public:
+            explicit SensorPrivacyPolicy(wp<CameraService> service)
+                    : mService(service), mSensorPrivacyEnabled(false), mRegistered(false) {}
+
+            void registerSelf();
+            void unregisterSelf();
+
+            bool isSensorPrivacyEnabled();
+
+            binder::Status onSensorPrivacyChanged(bool enabled);
+
+            // IBinder::DeathRecipient implementation
+            virtual void binderDied(const wp<IBinder> &who);
+
+        private:
+            wp<CameraService> mService;
+            Mutex mSensorPrivacyLock;
+            bool mSensorPrivacyEnabled;
+            bool mRegistered;
+    };
+
     sp<UidPolicy> mUidPolicy;
+
+    sp<SensorPrivacyPolicy> mSensorPrivacyPolicy;
 
     // Delay-load the Camera HAL module
     virtual void onFirstRef();
@@ -824,6 +852,9 @@ private:
 
     // Blocks all clients from the UID
     void blockClientsForUid(uid_t uid);
+
+    // Blocks all active clients.
+    void blockAllClients();
 
     // Overrides the UID state as if it is idle
     status_t handleSetUidState(const Vector<String16>& args, int err);
