@@ -21,8 +21,10 @@
 #include "Configuration.h"
 #include <atomic>
 #include <mutex>
+#include <chrono>
 #include <deque>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>

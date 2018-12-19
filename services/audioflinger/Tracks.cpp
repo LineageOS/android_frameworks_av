@@ -277,6 +277,27 @@ status_t AudioFlinger::ThreadBase::TrackBase::setSyncEvent(const sp<SyncEvent>& 
     return NO_ERROR;
 }
 
+AudioFlinger::ThreadBase::PatchTrackBase::PatchTrackBase(sp<ClientProxy> proxy,
+                                                         const ThreadBase& thread,
+                                                         const Timeout& timeout)
+    : mProxy(proxy)
+{
+    if (timeout) {
+        setPeerTimeout(*timeout);
+    } else {
+        // Double buffer mixer
+        uint64_t mixBufferNs = ((uint64_t)2 * thread.frameCount() * 1000000000) /
+                                              thread.sampleRate();
+        setPeerTimeout(std::chrono::nanoseconds{mixBufferNs});
+    }
+}
+
+void AudioFlinger::ThreadBase::PatchTrackBase::setPeerTimeout(std::chrono::nanoseconds timeout) {
+    mPeerTimeout.tv_sec = timeout.count() / std::nano::den;
+    mPeerTimeout.tv_nsec = timeout.count() % std::nano::den;
+}
+
+
 // ----------------------------------------------------------------------------
 //      Playback
 // ----------------------------------------------------------------------------
@@ -1615,19 +1636,16 @@ AudioFlinger::PlaybackThread::PatchTrack::PatchTrack(PlaybackThread *playbackThr
                                                      size_t frameCount,
                                                      void *buffer,
                                                      size_t bufferSize,
-                                                     audio_output_flags_t flags)
+                                                     audio_output_flags_t flags,
+                                                     const Timeout& timeout)
     :   Track(playbackThread, NULL, streamType,
               audio_attributes_t{} /* currently unused for patch track */,
               sampleRate, format, channelMask, frameCount,
               buffer, bufferSize, nullptr /* sharedBuffer */,
               AUDIO_SESSION_NONE, AID_AUDIOSERVER, flags, TYPE_PATCH),
-              mProxy(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, true, true))
+        PatchTrackBase(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, true, true),
+                       *playbackThread, timeout)
 {
-    uint64_t mixBufferNs = ((uint64_t)2 * playbackThread->frameCount() * 1000000000) /
-                                                                    playbackThread->sampleRate();
-    mPeerTimeout.tv_sec = mixBufferNs / 1000000000;
-    mPeerTimeout.tv_nsec = (int) (mixBufferNs % 1000000000);
-
     ALOGV("%s(%d): sampleRate %d mPeerTimeout %d.%03d sec",
                                       __func__, mId, sampleRate,
                                       (int)mPeerTimeout.tv_sec,
@@ -2088,19 +2106,16 @@ AudioFlinger::RecordThread::PatchRecord::PatchRecord(RecordThread *recordThread,
                                                      size_t frameCount,
                                                      void *buffer,
                                                      size_t bufferSize,
-                                                     audio_input_flags_t flags)
+                                                     audio_input_flags_t flags,
+                                                     const Timeout& timeout)
     :   RecordTrack(recordThread, NULL,
                 audio_attributes_t{} /* currently unused for patch track */,
                 sampleRate, format, channelMask, frameCount,
                 buffer, bufferSize, AUDIO_SESSION_NONE, AID_AUDIOSERVER,
                 flags, TYPE_PATCH),
-                mProxy(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, false, true))
+        PatchTrackBase(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, false, true),
+                       *recordThread, timeout)
 {
-    uint64_t mixBufferNs = ((uint64_t)2 * recordThread->frameCount() * 1000000000) /
-                                                                recordThread->sampleRate();
-    mPeerTimeout.tv_sec = mixBufferNs / 1000000000;
-    mPeerTimeout.tv_nsec = (int) (mixBufferNs % 1000000000);
-
     ALOGV("%s(%d): sampleRate %d mPeerTimeout %d.%03d sec",
                                       __func__, mId, sampleRate,
                                       (int)mPeerTimeout.tv_sec,

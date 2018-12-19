@@ -318,7 +318,7 @@ private:
 };  // end of OutputTrack
 
 // playback track, used by PatchPanel
-class PatchTrack : public Track, public PatchProxyBufferProvider {
+class PatchTrack : public Track, public PatchTrackBase {
 public:
 
                         PatchTrack(PlaybackThread *playbackThread,
@@ -329,7 +329,8 @@ public:
                                    size_t frameCount,
                                    void *buffer,
                                    size_t bufferSize,
-                                   audio_output_flags_t flags);
+                                   audio_output_flags_t flags,
+                                   const Timeout& timeout = {});
     virtual             ~PatchTrack();
 
     virtual status_t    start(AudioSystem::sync_event_t event =
@@ -345,12 +346,7 @@ public:
                                      const struct timespec *timeOut = NULL);
     virtual void        releaseBuffer(Proxy::Buffer* buffer);
 
-            void setPeerProxy(PatchProxyBufferProvider *proxy) { mPeerProxy = proxy; }
-
 private:
             void restartIfDisabled();
 
-    sp<ClientProxy>             mProxy;
-    PatchProxyBufferProvider*   mPeerProxy;
-    struct timespec             mPeerTimeout;
 };  // end of PatchTrack
