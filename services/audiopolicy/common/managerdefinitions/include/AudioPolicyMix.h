@@ -99,6 +99,11 @@ public:
     status_t getDevicesForUid(uid_t uid, Vector<AudioDeviceTypeAddr>& devices) const;
 
     void dump(String8 *dst) const;
+
+private:
+    enum class MixMatchStatus { MATCH, NO_MATCH, INVALID_MIX };
+    MixMatchStatus mixMatch(const AudioMix* mix, size_t mixIndex,
+                            audio_attributes_t attributes, uid_t uid);
 };
 
 } // namespace android
