@@ -34,6 +34,7 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
+#include <media/stagefright/Utils.h>
 #include <utils/String8.h>
 
 #include "mpeg2ts/AnotherPacketSource.h"
@@ -50,19 +51,19 @@ static const size_t kTSPacketSize = 188;
 static const int kMaxDurationReadSize = 250000LL;
 static const int kMaxDurationRetry = 6;
 
-struct MPEG2TSSource : public MediaTrackHelper {
+struct MPEG2TSSource : public MediaTrackHelperV3 {
     MPEG2TSSource(
             MPEG2TSExtractor *extractor,
             const sp<AnotherPacketSource> &impl,
             bool doesSeek);
     virtual ~MPEG2TSSource();
 
-    virtual status_t start();
-    virtual status_t stop();
-    virtual status_t getFormat(MetaDataBase &);
+    virtual media_status_t start();
+    virtual media_status_t stop();
+    virtual media_status_t getFormat(AMediaFormat *);
 
-    virtual status_t read(
-            MediaBufferBase **buffer, const ReadOptions *options = NULL);
+    virtual media_status_t read(
+            MediaBufferHelperV3 **buffer, const ReadOptions *options = NULL);
 
 private:
     MPEG2TSExtractor *mExtractor;
@@ -87,22 +88,84 @@ MPEG2TSSource::MPEG2TSSource(
 MPEG2TSSource::~MPEG2TSSource() {
 }
 
-status_t MPEG2TSSource::start() {
-    return mImpl->start(NULL); // AnotherPacketSource::start() doesn't use its argument
+media_status_t MPEG2TSSource::start() {
+    // initialize with one small buffer, but allow growth
+    mBufferGroup->init(1 /* one buffer */, 256 /* buffer size */, 64 /* max number of buffers */);
+
+    if (!mImpl->start(NULL)) { // AnotherPacketSource::start() doesn't use its argument
+        return AMEDIA_OK;
+    }
+    return AMEDIA_ERROR_UNKNOWN;
 }
 
-status_t MPEG2TSSource::stop() {
-    return mImpl->stop();
+media_status_t MPEG2TSSource::stop() {
+    if (!mImpl->stop()) {
+        return AMEDIA_OK;
+    }
+    return AMEDIA_ERROR_UNKNOWN;
 }
 
-status_t MPEG2TSSource::getFormat(MetaDataBase &meta) {
+void copyAMessageToAMediaFormat(AMediaFormat *format, sp<AMessage> msg) {
+    size_t numEntries = msg->countEntries();
+    for (size_t i = 0; i < numEntries; i++) {
+        AMessage::Type type;
+        const char *name = msg->getEntryNameAt(i, &type);
+        AMessage::ItemData id = msg->getEntryAt(i);
+
+        switch (type) {
+            case AMessage::kTypeInt32:
+                int32_t val32;
+                if (id.find(&val32)) {
+                    AMediaFormat_setInt32(format, name, val32);
+                }
+                break;
+            case AMessage::kTypeInt64:
+                int64_t val64;
+                if (id.find(&val64)) {
+                    AMediaFormat_setInt64(format, name, val64);
+                }
+                break;
+            case AMessage::kTypeFloat:
+                float valfloat;
+                if (id.find(&valfloat)) {
+                    AMediaFormat_setFloat(format, name, valfloat);
+                }
+                break;
+            case AMessage::kTypeDouble:
+                double valdouble;
+                if (id.find(&valdouble)) {
+                    AMediaFormat_setDouble(format, name, valdouble);
+                }
+                break;
+            case AMessage::kTypeString:
+                if (AString s; id.find(&s)) {
+                    AMediaFormat_setString(format, name, s.c_str());
+                }
+                break;
+            case AMessage::kTypeBuffer:
+            {
+                sp<ABuffer> buffer;
+                if (id.find(&buffer)) {
+                    AMediaFormat_setBuffer(format, name, buffer->data(), buffer->size());
+                }
+                break;
+            }
+            default:
+                ALOGW("ignoring unsupported type %d '%s'", type, name);
+        }
+    }
+}
+
+media_status_t MPEG2TSSource::getFormat(AMediaFormat *meta) {
     sp<MetaData> implMeta = mImpl->getFormat();
-    meta = *implMeta;
-    return OK;
+    sp<AMessage> msg;
+    convertMetaDataToMessage(implMeta, &msg);
+    copyAMessageToAMediaFormat(meta, msg);
+    return AMEDIA_OK;
 }
 
-status_t MPEG2TSSource::read(
-        MediaBufferBase **out, const ReadOptions *options) {
+media_status_t MPEG2TSSource::read(
+        MediaBufferHelperV3 **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t seekTimeUs;
@@ -110,16 +173,59 @@ status_t MPEG2TSSource::read(
     if (mDoesSeek && options && options->getSeekTo(&seekTimeUs, &seekMode)) {
         // seek is needed
         status_t err = mExtractor->seek(seekTimeUs, (ReadOptions::SeekMode)seekMode);
-        if (err != OK) {
-            return err;
+        if (err == ERROR_END_OF_STREAM) {
+            return AMEDIA_ERROR_END_OF_STREAM;
+        } else if (err != OK) {
+            return AMEDIA_ERROR_UNKNOWN;
         }
     }
 
     if (mExtractor->feedUntilBufferAvailable(mImpl) != OK) {
-        return ERROR_END_OF_STREAM;
+        return AMEDIA_ERROR_END_OF_STREAM;
     }
 
-    return mImpl->read(out, (MediaSource::ReadOptions*) options);
+    MediaBufferBase *mbuf;
+    mImpl->read(&mbuf, (MediaTrack::ReadOptions*) options);
+    size_t length = mbuf->range_length();
+    MediaBufferHelperV3 *outbuf;
+    mBufferGroup->acquire_buffer(&outbuf, false, length);
+    memcpy(outbuf->data(), mbuf->data(), length);
+    outbuf->set_range(0, length);
+    *out = outbuf;
+    MetaDataBase &inMeta = mbuf->meta_data();
+    AMediaFormat *outMeta = outbuf->meta_data();
+    AMediaFormat_clear(outMeta);
+    int64_t val64;
+    if (inMeta.findInt64(kKeyTime, &val64)) {
+        AMediaFormat_setInt64(outMeta, AMEDIAFORMAT_KEY_TIME_US, val64);
+    }
+    int32_t val32;
+    if (inMeta.findInt32(kKeyIsSyncFrame, &val32)) {
+        AMediaFormat_setInt32(outMeta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, val32);
+    }
+    if (inMeta.findInt32(kKeyCryptoMode, &val32)) {
+        AMediaFormat_setInt32(outMeta, AMEDIAFORMAT_KEY_CRYPTO_MODE, val32);
+    }
+    uint32_t bufType;
+    const void *bufData;
+    size_t bufSize;
+    if (inMeta.findData(kKeyCryptoIV, &bufType, &bufData, &bufSize)) {
+        AMediaFormat_setBuffer(outMeta, AMEDIAFORMAT_KEY_CRYPTO_IV, bufData, bufSize);
+    }
+    if (inMeta.findData(kKeyCryptoKey, &bufType, &bufData, &bufSize)) {
+        AMediaFormat_setBuffer(outMeta, AMEDIAFORMAT_KEY_CRYPTO_KEY, bufData, bufSize);
+    }
+    if (inMeta.findData(kKeyPlainSizes, &bufType, &bufData, &bufSize)) {
+        AMediaFormat_setBuffer(outMeta, AMEDIAFORMAT_KEY_CRYPTO_PLAIN_SIZES, bufData, bufSize);
+    }
+    if (inMeta.findData(kKeyEncryptedSizes, &bufType, &bufData, &bufSize)) {
+        AMediaFormat_setBuffer(outMeta, AMEDIAFORMAT_KEY_CRYPTO_ENCRYPTED_SIZES, bufData, bufSize);
+    }
+    if (inMeta.findData(kKeySEI, &bufType, &bufData, &bufSize)) {
+        AMediaFormat_setBuffer(outMeta, AMEDIAFORMAT_KEY_SEI, bufData, bufSize);
+    }
+
+    return AMEDIA_OK;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -140,7 +246,7 @@ size_t MPEG2TSExtractor::countTracks() {
     return mSourceImpls.size();
 }
 
-MediaTrackHelper *MPEG2TSExtractor::getTrack(size_t index) {
+MediaTrackHelperV3 *MPEG2TSExtractor::getTrack(size_t index) {
     if (index >= mSourceImpls.size()) {
         return NULL;
     }
@@ -151,22 +257,23 @@ MediaTrackHelper *MPEG2TSExtractor::getTrack(size_t index) {
             (mSeekSyncPoints == &mSyncPoints.editItemAt(index)));
 }
 
-status_t MPEG2TSExtractor::getTrackMetaData(
-        MetaDataBase &meta,
+media_status_t MPEG2TSExtractor::getTrackMetaData(
+        AMediaFormat *meta,
         size_t index, uint32_t /* flags */) {
     sp<MetaData> implMeta = index < mSourceImpls.size()
         ? mSourceImpls.editItemAt(index)->getFormat() : NULL;
     if (implMeta == NULL) {
-        return UNKNOWN_ERROR;
+        return AMEDIA_ERROR_UNKNOWN;
     }
-    meta = *implMeta;
-    return OK;
+    sp<AMessage> msg = new AMessage;
+    convertMetaDataToMessage(implMeta, &msg);
+    copyAMessageToAMediaFormat(meta, msg);
+    return AMEDIA_OK;
 }
 
-status_t MPEG2TSExtractor::getMetaData(MetaDataBase &meta) {
-    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_CONTAINER_MPEG2TS);
-
-    return OK;
+media_status_t MPEG2TSExtractor::getMetaData(AMediaFormat *meta) {
+    AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_CONTAINER_MPEG2TS);
+    return AMEDIA_OK;
 }
 
 //static
@@ -177,7 +284,7 @@ bool MPEG2TSExtractor::isScrambledFormat(MetaDataBase &format) {
                     || !strcasecmp(MEDIA_MIMETYPE_AUDIO_SCRAMBLED, mime));
 }
 
-status_t MPEG2TSExtractor::setMediaCas(const uint8_t* casToken, size_t size) {
+media_status_t MPEG2TSExtractor::setMediaCas(const uint8_t* casToken, size_t size) {
     HalToken halToken;
     halToken.setToExternal((uint8_t*)casToken, size);
     sp<ICas> cas = ICas::castFrom(retrieveHalInterface(halToken));
@@ -187,8 +294,9 @@ status_t MPEG2TSExtractor::setMediaCas(const uint8_t* casToken, size_t size) {
     if (err == OK) {
         ALOGI("All tracks now have descramblers");
         init();
+        return AMEDIA_OK;
     }
-    return err;
+    return AMEDIA_ERROR_UNKNOWN;
 }
 
 void MPEG2TSExtractor::addSource(const sp<AnotherPacketSource> &impl) {
@@ -494,7 +602,7 @@ uint32_t MPEG2TSExtractor::flags() const {
 }
 
 status_t MPEG2TSExtractor::seek(int64_t seekTimeUs,
-        const MediaTrackHelper::ReadOptions::SeekMode &seekMode) {
+        const MediaTrackHelperV3::ReadOptions::SeekMode &seekMode) {
     if (mSeekSyncPoints == NULL || mSeekSyncPoints->isEmpty()) {
         ALOGW("No sync point to seek to.");
         // ... and therefore we have nothing useful to do here.
@@ -515,18 +623,18 @@ status_t MPEG2TSExtractor::seek(int64_t seekTimeUs,
     }
 
     switch (seekMode) {
-        case MediaTrackHelper::ReadOptions::SEEK_NEXT_SYNC:
+        case MediaTrackHelperV3::ReadOptions::SEEK_NEXT_SYNC:
             if (index == mSeekSyncPoints->size()) {
                 ALOGW("Next sync not found; starting from the latest sync.");
                 --index;
             }
             break;
-        case MediaTrackHelper::ReadOptions::SEEK_CLOSEST_SYNC:
-        case MediaTrackHelper::ReadOptions::SEEK_CLOSEST:
+        case MediaTrackHelperV3::ReadOptions::SEEK_CLOSEST_SYNC:
+        case MediaTrackHelperV3::ReadOptions::SEEK_CLOSEST:
             ALOGW("seekMode not supported: %d; falling back to PREVIOUS_SYNC",
                     seekMode);
             FALLTHROUGH_INTENDED;
-        case MediaTrackHelper::ReadOptions::SEEK_PREVIOUS_SYNC:
+        case MediaTrackHelperV3::ReadOptions::SEEK_PREVIOUS_SYNC:
             if (index == 0) {
                 ALOGW("Previous sync not found; starting from the earliest "
                         "sync.");

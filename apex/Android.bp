@@ -24,6 +24,7 @@ apex {
         "libmkvextractor",
         "libmp3extractor",
         "libmp4extractor",
+        "libmpeg2extractor",
         "liboggextractor",
         "libwavextractor",
     ],

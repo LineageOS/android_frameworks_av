@@ -265,6 +265,10 @@ status_t MediaTrackCUnwrapperV3::read(MediaBufferBase **buffer, const ReadOption
             meta.setData(kKeyCryptoIV,
                     MetaDataBase::Type::TYPE_NONE, valbuf->data(), valbuf->size());
         }
+        if (format->mFormat->findBuffer("sei", &valbuf)) {
+            meta.setData(kKeySEI,
+                    MetaDataBase::Type::TYPE_NONE, valbuf->data(), valbuf->size());
+        }
     } else {
         *buffer = nullptr;
     }

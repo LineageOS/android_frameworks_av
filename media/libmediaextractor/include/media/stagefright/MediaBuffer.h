@@ -46,12 +46,13 @@ public:
     explicit MediaBuffer(size_t size);
 
     explicit MediaBuffer(const sp<ABuffer> &buffer);
-
+#ifndef NO_IMEMORY
     MediaBuffer(const sp<IMemory> &mem) :
         MediaBuffer((uint8_t *)mem->pointer() + sizeof(SharedControl), mem->size()) {
         // delegate and override mMemory
         mMemory = mem;
     }
+#endif
 
     // If MediaBufferGroup is set, decrement the local reference count;
     // if the local reference count drops to 0, return the buffer to the
@@ -92,17 +93,26 @@ public:
     }
 
     virtual int remoteRefcount() const {
+#ifndef NO_IMEMORY
         if (mMemory.get() == nullptr || mMemory->pointer() == nullptr) return 0;
         int32_t remoteRefcount =
                 reinterpret_cast<SharedControl *>(mMemory->pointer())->getRemoteRefcount();
         // Sanity check so that remoteRefCount() is non-negative.
         return remoteRefcount >= 0 ? remoteRefcount : 0; // do not allow corrupted data.
+#else
+        return 0;
+#endif
     }
 
     // returns old value
     int addRemoteRefcount(int32_t value) {
+#ifndef NO_IMEMORY
         if (mMemory.get() == nullptr || mMemory->pointer() == nullptr) return 0;
         return reinterpret_cast<SharedControl *>(mMemory->pointer())->addRemoteRefcount(value);
+#else
+        (void) value;
+        return 0;
+#endif
     }
 
     bool isDeadObject() const {
@@ -110,8 +120,13 @@ public:
     }
 
     static bool isDeadObject(const sp<IMemory> &memory) {
+#ifndef NO_IMEMORY
         if (memory.get() == nullptr || memory->pointer() == nullptr) return false;
         return reinterpret_cast<SharedControl *>(memory->pointer())->isDeadObject();
+#else
+        (void) memory;
+        return false;
+#endif
     }
 
     // Sticky on enabling of shared memory MediaBuffers. By default we don't use
@@ -204,7 +219,11 @@ private:
     };
 
     inline SharedControl *getSharedControl() const {
+#ifndef NO_IMEMORY
          return reinterpret_cast<SharedControl *>(mMemory->pointer());
+#else
+         return nullptr;
+#endif
      }
 };
 
