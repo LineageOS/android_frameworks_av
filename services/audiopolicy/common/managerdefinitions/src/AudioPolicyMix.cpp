@@ -340,6 +340,87 @@ status_t AudioPolicyMixCollection::getInputMixForAttr(audio_attributes_t attr, A
     return NO_ERROR;
 }
 
+status_t AudioPolicyMixCollection::setUidDeviceAffinities(uid_t uid,
+        const Vector<AudioDeviceTypeAddr>& devices) {
+    // remove existing rules for this uid
+    removeUidDeviceAffinities(uid);
+
+    // for each player mix: add a rule to match or exclude the uid based on the device
+    for (size_t i = 0; i < size(); i++) {
+        const AudioMix *mix = valueAt(i)->getMix();
+        if (mix->mMixType != MIX_TYPE_PLAYERS) {
+            continue;
+        }
+        // check if this mix goes to a device in the list of devices
+        bool deviceMatch = false;
+        for (size_t j = 0; j < devices.size(); j++) {
+            if (devices[j].mType == mix->mDeviceType
+                    && devices[j].mAddress == mix->mDeviceAddress) {
+                deviceMatch = true;
+                break;
+            }
+        }
+        if (!deviceMatch) {
+            // this mix doesn't go to one of the listed devices for the given uid,
+            // modify its rules to exclude the uid
+            mix->excludeUid(uid);
+        }
+    }
+
+    return NO_ERROR;
+}
+
+status_t AudioPolicyMixCollection::removeUidDeviceAffinities(uid_t uid) {
+    // for each player mix: remove existing rules that match or exclude this uid
+    for (size_t i = 0; i < size(); i++) {
+        bool foundUidRule = false;
+        AudioMix *mix = valueAt(i)->getMix();
+        if (mix->mMixType != MIX_TYPE_PLAYERS) {
+            continue;
+        }
+        std::vector<size_t> criteriaToRemove;
+        for (size_t j = 0; j < mix->mCriteria.size(); j++) {
+            const uint32_t rule = mix->mCriteria[j].mRule;
+            // is this rule affecting the uid?
+            if (rule == RULE_EXCLUDE_UID
+                    && uid == mix->mCriteria[j].mValue.mUid) {
+                foundUidRule = true;
+                criteriaToRemove.push_back(j);
+            }
+        }
+        if (foundUidRule) {
+            for (size_t j = criteriaToRemove.size() - 1; j >= 0; j--) {
+                mix->mCriteria.removeAt(criteriaToRemove[j]);
+            }
+        }
+    }
+    return NO_ERROR;
+}
+
+status_t AudioPolicyMixCollection::getDevicesForUid(uid_t uid,
+        Vector<AudioDeviceTypeAddr>& devices) const {
+    // for each player mix: find rules that don't exclude this uid, and add the device to the list
+    for (size_t i = 0; i < size(); i++) {
+        bool ruleAllowsUid = true;
+        AudioMix *mix = valueAt(i)->getMix();
+        if (mix->mMixType != MIX_TYPE_PLAYERS) {
+            continue;
+        }
+        for (size_t j = 0; j < mix->mCriteria.size(); j++) {
+            const uint32_t rule = mix->mCriteria[j].mRule;
+            if (rule == RULE_EXCLUDE_UID
+                    && uid == mix->mCriteria[j].mValue.mUid) {
+                ruleAllowsUid = false;
+                break;
+            }
+        }
+        if (ruleAllowsUid) {
+            devices.add(AudioDeviceTypeAddr(mix->mDeviceType, mix->mDeviceAddress));
+        }
+    }
+    return NO_ERROR;
+}
+
 void AudioPolicyMixCollection::dump(String8 *dst) const
 {
     dst->append("\nAudio Policy Mix:\n");

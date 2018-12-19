@@ -1037,6 +1037,31 @@ status_t AudioPolicyService::registerPolicyMixes(const Vector<AudioMix>& mixes, 
     }
 }
 
+status_t AudioPolicyService::setUidDeviceAffinities(uid_t uid,
+        const Vector<AudioDeviceTypeAddr>& devices) {
+    Mutex::Autolock _l(mLock);
+    if(!modifyAudioRoutingAllowed()) {
+        return PERMISSION_DENIED;
+    }
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    AutoCallerClear acc;
+    return mAudioPolicyManager->setUidDeviceAffinities(uid, devices);
+}
+
+status_t AudioPolicyService::removeUidDeviceAffinities(uid_t uid) {
+    Mutex::Autolock _l(mLock);
+    if(!modifyAudioRoutingAllowed()) {
+        return PERMISSION_DENIED;
+    }
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    AutoCallerClear acc;
+    return mAudioPolicyManager->removeUidDeviceAffinities(uid);
+}
+
 status_t AudioPolicyService::startAudioSource(const struct audio_port_config *source,
                                               const audio_attributes_t *attributes,
                                               audio_port_handle_t *portId)
