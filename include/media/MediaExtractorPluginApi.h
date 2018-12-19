@@ -47,33 +47,11 @@ enum CMediaTrackReadOptions : uint32_t {
     NONBLOCKING = 16
 };
 
-struct CMediaTrack {
-    void *data;
-    void (*free)(void *data);
-
-    status_t (*start)(void *data);
-    status_t (*stop)(void *data);
-    status_t (*getFormat)(void *data, MetaDataBase &format);
-    status_t (*read)(void *data, MediaBufferBase **buffer, uint32_t options, int64_t seekPosUs);
-    bool     (*supportsNonBlockingRead)(void *data);
-};
-
-struct CMediaTrackV2 {
-    void *data;
-    void (*free)(void *data);
-
-    media_status_t (*start)(void *data);
-    media_status_t (*stop)(void *data);
-    media_status_t (*getFormat)(void *data, AMediaFormat *format);
-    media_status_t (*read)(void *data, MediaBufferBase **buffer, uint32_t options, int64_t seekPosUs);
-    bool     (*supportsNonBlockingRead)(void *data);
-};
-
 /**
- * only use CMediaBufferV3 allocated from the CMediaBufferGroupV3 that is
+ * only use CMediaBuffer allocated from the CMediaBufferGroup that is
  * provided to CMediaTrack::start()
  */
-struct CMediaBufferV3 {
+struct CMediaBuffer {
     void *handle;
     void (*release)(void *handle);
     void* (*data)(void *handle);
@@ -84,49 +62,32 @@ struct CMediaBufferV3 {
     AMediaFormat* (*meta_data)(void *handle);
 };
 
-struct CMediaBufferGroupV3 {
+struct CMediaBufferGroup {
     void *handle;
     bool (*init)(void *handle, size_t buffers, size_t buffer_size, size_t growthLimit);
     void (*add_buffer)(void *handle, size_t size);
     media_status_t (*acquire_buffer)(void *handle,
-            CMediaBufferV3 **buffer, bool nonBlocking, size_t requestedSize);
+            CMediaBuffer **buffer, bool nonBlocking, size_t requestedSize);
     bool (*has_buffers)(void *handle);
 };
 
-struct CMediaTrackV3 {
+struct CMediaTrack {
     void *data;
     void (*free)(void *data);
 
-    media_status_t (*start)(void *data, CMediaBufferGroupV3 *bufferGroup);
+    media_status_t (*start)(void *data, CMediaBufferGroup *bufferGroup);
     media_status_t (*stop)(void *data);
     media_status_t (*getFormat)(void *data, AMediaFormat *format);
-    media_status_t (*read)(void *data, CMediaBufferV3 **buffer, uint32_t options, int64_t seekPosUs);
+    media_status_t (*read)(void *data, CMediaBuffer **buffer, uint32_t options, int64_t seekPosUs);
     bool     (*supportsNonBlockingRead)(void *data);
 };
 
-struct CMediaExtractorV1 {
+struct CMediaExtractor {
     void *data;
 
     void (*free)(void *data);
     size_t (*countTracks)(void *data);
     CMediaTrack* (*getTrack)(void *data, size_t index);
-    status_t (*getTrackMetaData)(
-            void *data,
-            MetaDataBase& meta,
-            size_t index, uint32_t flags);
-
-    status_t (*getMetaData)(void *data, MetaDataBase& meta);
-    uint32_t (*flags)(void *data);
-    status_t (*setMediaCas)(void *data, const uint8_t* casToken, size_t size);
-    const char * (*name)(void *data);
-};
-
-struct CMediaExtractorV2 {
-    void *data;
-
-    void (*free)(void *data);
-    size_t (*countTracks)(void *data);
-    CMediaTrackV2* (*getTrack)(void *data, size_t index);
     media_status_t (*getTrackMetaData)(
             void *data,
             AMediaFormat *meta,
@@ -138,48 +99,19 @@ struct CMediaExtractorV2 {
     const char * (*name)(void *data);
 };
 
-struct CMediaExtractorV3 {
-    void *data;
-
-    void (*free)(void *data);
-    size_t (*countTracks)(void *data);
-    CMediaTrackV3* (*getTrack)(void *data, size_t index);
-    media_status_t (*getTrackMetaData)(
-            void *data,
-            AMediaFormat *meta,
-            size_t index, uint32_t flags);
-
-    media_status_t (*getMetaData)(void *data, AMediaFormat *meta);
-    uint32_t (*flags)(void *data);
-    media_status_t (*setMediaCas)(void *data, const uint8_t* casToken, size_t size);
-    const char * (*name)(void *data);
-};
-
-typedef CMediaExtractorV1* (*CreatorFuncV1)(CDataSource *source, void *meta);
+typedef CMediaExtractor* (*CreatorFunc)(CDataSource *source, void *meta);
 typedef void (*FreeMetaFunc)(void *meta);
 
 // The sniffer can optionally fill in an opaque object, "meta", that helps
 // the corresponding extractor initialize its state without duplicating
 // effort already exerted by the sniffer. If "freeMeta" is given, it will be
 // called against the opaque object when it is no longer used.
-typedef CreatorFuncV1 (*SnifferFuncV1)(
+typedef CreatorFunc (*SnifferFunc)(
         CDataSource *source, float *confidence,
         void **meta, FreeMetaFunc *freeMeta);
 
-typedef CMediaExtractorV2* (*CreatorFuncV2)(CDataSource *source, void *meta);
-
-typedef CreatorFuncV2 (*SnifferFuncV2)(
-        CDataSource *source, float *confidence,
-        void **meta, FreeMetaFunc *freeMeta);
-
-typedef CMediaExtractorV3* (*CreatorFuncV3)(CDataSource *source, void *meta);
-
-typedef CreatorFuncV3 (*SnifferFuncV3)(
-        CDataSource *source, float *confidence,
-        void **meta, FreeMetaFunc *freeMeta);
-
-typedef CMediaExtractorV1 CMediaExtractor;
-typedef CreatorFuncV1 CreatorFunc;
+typedef CMediaExtractor CMediaExtractor;
+typedef CreatorFunc CreatorFunc;
 
 
 typedef struct {
@@ -203,16 +135,17 @@ struct ExtractorDef {
     const char *extractor_name;
 
     union {
-        SnifferFuncV1 v1;
-        SnifferFuncV2 v2;
-        SnifferFuncV3 v3;
+        SnifferFunc v2;
     } sniff;
 };
 
+// the C++ based API which first shipped in P and is no longer supported
 const uint32_t EXTRACTORDEF_VERSION_LEGACY = 1;
-const uint32_t EXTRACTORDEF_VERSION_CURRENT = 2;
 
-const uint32_t EXTRACTORDEF_VERSION = EXTRACTORDEF_VERSION_LEGACY;
+// the first C/NDK based API
+const uint32_t EXTRACTORDEF_VERSION_NDK_V1 = 2;
+
+const uint32_t EXTRACTORDEF_VERSION = EXTRACTORDEF_VERSION_NDK_V1;
 
 // each plugin library exports one function of this type
 typedef ExtractorDef (*GetExtractorDef)();

@@ -38,11 +38,11 @@ struct CDataSource;
 struct MPEG2TSSource;
 class String8;
 
-struct MPEG2TSExtractor : public MediaExtractorPluginHelperV3 {
+struct MPEG2TSExtractor : public MediaExtractorPluginHelper {
     explicit MPEG2TSExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
-    virtual MediaTrackHelperV3 *getTrack(size_t index);
+    virtual MediaTrackHelper *getTrack(size_t index);
     virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
     virtual media_status_t getMetaData(AMediaFormat *meta);
@@ -90,7 +90,7 @@ private:
     // the data has syntax error during parsing, etc.
     status_t feedMore(bool isInit = false);
     status_t seek(int64_t seekTimeUs,
-            const MediaTrackHelperV3::ReadOptions::SeekMode& seekMode);
+            const MediaTrackHelper::ReadOptions::SeekMode& seekMode);
     status_t queueDiscontinuityForSeek(int64_t actualSeekTimeUs);
     status_t seekBeyond(int64_t seekTimeUs);
 

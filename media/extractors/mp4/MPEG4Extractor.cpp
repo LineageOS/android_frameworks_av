@@ -69,7 +69,7 @@ enum {
     kMaxAtomSize = 64 * 1024 * 1024,
 };
 
-class MPEG4Source : public MediaTrackHelperV3 {
+class MPEG4Source : public MediaTrackHelper {
 static const size_t  kMaxPcmFrameSize = 8192;
 public:
     // Caller retains ownership of both "dataSource" and "sampleTable".
@@ -88,10 +88,10 @@ public:
 
     virtual media_status_t getFormat(AMediaFormat *);
 
-    virtual media_status_t read(MediaBufferHelperV3 **buffer, const ReadOptions *options = NULL);
+    virtual media_status_t read(MediaBufferHelper **buffer, const ReadOptions *options = NULL);
     virtual bool supportNonblockingRead() { return true; }
     virtual media_status_t fragmentedRead(
-            MediaBufferHelperV3 **buffer, const ReadOptions *options = NULL);
+            MediaBufferHelper **buffer, const ReadOptions *options = NULL);
 
     virtual ~MPEG4Source();
 
@@ -136,7 +136,7 @@ private:
 
     bool mStarted;
 
-    MediaBufferHelperV3 *mBuffer;
+    MediaBufferHelper *mBuffer;
 
     uint8_t *mSrcBuffer;
 
@@ -3855,7 +3855,7 @@ void MPEG4Extractor::parseID3v2MetaData(off64_t offset) {
     }
 }
 
-MediaTrackHelperV3 *MPEG4Extractor::getTrack(size_t index) {
+MediaTrackHelper *MPEG4Extractor::getTrack(size_t index) {
     status_t err;
     if ((err = readMetaData()) != OK) {
         return NULL;
@@ -5206,7 +5206,7 @@ int32_t MPEG4Source::parseHEVCLayerId(const uint8_t *data, size_t size) {
 }
 
 media_status_t MPEG4Source::read(
-        MediaBufferHelperV3 **out, const ReadOptions *options) {
+        MediaBufferHelper **out, const ReadOptions *options) {
     Mutex::Autolock autoLock(mLock);
 
     CHECK(mStarted);
@@ -5609,7 +5609,7 @@ media_status_t MPEG4Source::read(
 }
 
 media_status_t MPEG4Source::fragmentedRead(
-        MediaBufferHelperV3 **out, const ReadOptions *options) {
+        MediaBufferHelper **out, const ReadOptions *options) {
 
     ALOGV("MPEG4Source::fragmentedRead");
 
@@ -6102,11 +6102,11 @@ static bool BetterSniffMPEG4(DataSourceHelper *source, float *confidence) {
     return true;
 }
 
-static CMediaExtractorV3* CreateExtractor(CDataSource *source, void *) {
-    return wrapV3(new MPEG4Extractor(new DataSourceHelper(source)));
+static CMediaExtractor* CreateExtractor(CDataSource *source, void *) {
+    return wrap(new MPEG4Extractor(new DataSourceHelper(source)));
 }
 
-static CreatorFuncV3 Sniff(
+static CreatorFunc Sniff(
         CDataSource *source, float *confidence, void **,
         FreeMetaFunc *) {
     DataSourceHelper helper(source);
@@ -6127,11 +6127,11 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION_CURRENT + 1,
+        EXTRACTORDEF_VERSION,
         UUID("27575c67-4417-4c54-8d3d-8e626985a164"),
         2, // version
         "MP4 Extractor",
-        { .v3 = Sniff }
+        { .v2 = Sniff }
     };
 }
 

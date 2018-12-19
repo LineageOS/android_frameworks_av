@@ -59,12 +59,12 @@ public:
     // If buffer is nullptr, have acquire_buffer() check for remote release.
     virtual void signalBufferReturned(MediaBufferBase *buffer);
 
-    CMediaBufferGroupV3 *wrap() {
+    CMediaBufferGroup *wrap() {
         if (mWrapper) {
             return mWrapper;
         }
 
-        mWrapper = new CMediaBufferGroupV3;
+        mWrapper = new CMediaBufferGroup;
         mWrapper->handle = this;
 
         mWrapper->add_buffer = [](void *handle, size_t size) -> void {
@@ -80,7 +80,7 @@ public:
         };
 
         mWrapper->acquire_buffer = [](void *handle,
-                CMediaBufferV3 **buf, bool nonBlocking, size_t requestedSize) -> media_status_t {
+                CMediaBuffer **buf, bool nonBlocking, size_t requestedSize) -> media_status_t {
             MediaBufferBase *acquiredBuf = nullptr;
             status_t err = ((MediaBufferGroup*)handle)->acquire_buffer(
                     &acquiredBuf, nonBlocking, requestedSize);
@@ -100,7 +100,7 @@ public:
     }
 
 private:
-    CMediaBufferGroupV3 *mWrapper;
+    CMediaBufferGroup *mWrapper;
     struct InternalData;
     InternalData *mInternal;
 

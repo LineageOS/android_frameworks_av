@@ -40,7 +40,7 @@
 
 namespace android {
 
-struct MPEG2PSExtractor::Track : public MediaTrackHelperV3 {
+struct MPEG2PSExtractor::Track : public MediaTrackHelper {
     Track(MPEG2PSExtractor *extractor,
           unsigned stream_id, unsigned stream_type);
 
@@ -49,7 +49,7 @@ struct MPEG2PSExtractor::Track : public MediaTrackHelperV3 {
     virtual media_status_t getFormat(AMediaFormat *);
 
     virtual media_status_t read(
-            MediaBufferHelperV3 **buffer, const ReadOptions *options);
+            MediaBufferHelper **buffer, const ReadOptions *options);
 
 protected:
     virtual ~Track();
@@ -72,7 +72,7 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(Track);
 };
 
-struct MPEG2PSExtractor::WrappedTrack : public MediaTrackHelperV3 {
+struct MPEG2PSExtractor::WrappedTrack : public MediaTrackHelper {
     WrappedTrack(MPEG2PSExtractor *extractor, Track *track);
 
     virtual media_status_t start();
@@ -80,7 +80,7 @@ struct MPEG2PSExtractor::WrappedTrack : public MediaTrackHelperV3 {
     virtual media_status_t getFormat(AMediaFormat *);
 
     virtual media_status_t read(
-            MediaBufferHelperV3 **buffer, const ReadOptions *options);
+            MediaBufferHelper **buffer, const ReadOptions *options);
 
 protected:
     virtual ~WrappedTrack();
@@ -128,7 +128,7 @@ size_t MPEG2PSExtractor::countTracks() {
     return mTracks.size();
 }
 
-MediaTrackHelperV3 *MPEG2PSExtractor::getTrack(size_t index) {
+MediaTrackHelper *MPEG2PSExtractor::getTrack(size_t index) {
     if (index >= mTracks.size()) {
         return NULL;
     }
@@ -677,7 +677,7 @@ media_status_t MPEG2PSExtractor::Track::getFormat(AMediaFormat *meta) {
 }
 
 media_status_t MPEG2PSExtractor::Track::read(
-        MediaBufferHelperV3 **buffer, const ReadOptions *options) {
+        MediaBufferHelper **buffer, const ReadOptions *options) {
     if (mSource == NULL) {
         return AMEDIA_ERROR_UNKNOWN;
     }
@@ -698,7 +698,7 @@ media_status_t MPEG2PSExtractor::Track::read(
     MediaBufferBase *mbuf;
     mSource->read(&mbuf, (MediaTrack::ReadOptions*) options);
     size_t length = mbuf->range_length();
-    MediaBufferHelperV3 *outbuf;
+    MediaBufferHelper *outbuf;
     mBufferGroup->acquire_buffer(&outbuf, false, length);
     memcpy(outbuf->data(), mbuf->data(), length);
     outbuf->set_range(0, length);
@@ -802,7 +802,7 @@ media_status_t MPEG2PSExtractor::WrappedTrack::getFormat(AMediaFormat *meta) {
 }
 
 media_status_t MPEG2PSExtractor::WrappedTrack::read(
-        MediaBufferHelperV3 **buffer, const ReadOptions *options) {
+        MediaBufferHelper **buffer, const ReadOptions *options) {
     return mTrack->read(buffer, options);
 }
 

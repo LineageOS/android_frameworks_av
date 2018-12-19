@@ -29,7 +29,7 @@
 
 namespace android {
 
-class AMRSource : public MediaTrackHelperV3 {
+class AMRSource : public MediaTrackHelper {
 public:
     AMRSource(
             DataSourceHelper *source,
@@ -44,7 +44,7 @@ public:
     virtual media_status_t getFormat(AMediaFormat *);
 
     virtual media_status_t read(
-            MediaBufferHelperV3 **buffer, const ReadOptions *options = NULL);
+            MediaBufferHelper **buffer, const ReadOptions *options = NULL);
 
 protected:
     virtual ~AMRSource();
@@ -209,7 +209,7 @@ size_t AMRExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrackHelperV3 *AMRExtractor::getTrack(size_t index) {
+MediaTrackHelper *AMRExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index != 0) {
         return NULL;
     }
@@ -273,7 +273,7 @@ media_status_t AMRSource::getFormat(AMediaFormat *meta) {
 }
 
 media_status_t AMRSource::read(
-        MediaBufferHelperV3 **out, const ReadOptions *options) {
+        MediaBufferHelper **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t seekTimeUs;
@@ -322,7 +322,7 @@ media_status_t AMRSource::read(
         return AMEDIA_ERROR_MALFORMED;
     }
 
-    MediaBufferHelperV3 *buffer;
+    MediaBufferHelper *buffer;
     status_t err = mBufferGroup->acquire_buffer(&buffer);
     if (err != OK) {
         return AMEDIA_ERROR_UNKNOWN;
@@ -363,22 +363,22 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION_CURRENT + 1,
+        EXTRACTORDEF_VERSION,
         UUID("c86639c9-2f31-40ac-a715-fa01b4493aaf"),
         1,
         "AMR Extractor",
         {
-           .v3 = [](
+           .v2 = [](
                     CDataSource *source,
                     float *confidence,
                     void **,
-                    FreeMetaFunc *) -> CreatorFuncV3 {
+                    FreeMetaFunc *) -> CreatorFunc {
                 DataSourceHelper helper(source);
                 if (SniffAMR(&helper, nullptr, confidence)) {
                     return [](
                             CDataSource *source,
-                            void *) -> CMediaExtractorV3* {
-                        return wrapV3(new AMRExtractor(new DataSourceHelper(source)));};
+                            void *) -> CMediaExtractor* {
+                        return wrap(new AMRExtractor(new DataSourceHelper(source)));};
                 }
                 return NULL;
             }

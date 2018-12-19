@@ -58,27 +58,39 @@ bool MediaTrack::ReadOptions::getSeekTo(
     return (mOptions & kSeekTo_Option) != 0;
 }
 
-/* -------------- unwrapper v1 --------------- */
+/* -------------- unwrapper --------------- */
 
 MediaTrackCUnwrapper::MediaTrackCUnwrapper(CMediaTrack *cmediatrack) {
     wrapper = cmediatrack;
+    bufferGroup = nullptr;
 }
 
 MediaTrackCUnwrapper::~MediaTrackCUnwrapper() {
     wrapper->free(wrapper->data);
     free(wrapper);
+    delete bufferGroup;
 }
 
 status_t MediaTrackCUnwrapper::start() {
-    return wrapper->start(wrapper->data);
+    if (bufferGroup == nullptr) {
+        bufferGroup = new MediaBufferGroup();
+    }
+    return reverse_translate_error(wrapper->start(wrapper->data, bufferGroup->wrap()));
 }
 
 status_t MediaTrackCUnwrapper::stop() {
-    return wrapper->stop(wrapper->data);
+    return reverse_translate_error(wrapper->stop(wrapper->data));
 }
 
 status_t MediaTrackCUnwrapper::getFormat(MetaDataBase& format) {
-    return wrapper->getFormat(wrapper->data, format);
+    sp<AMessage> msg = new AMessage();
+    AMediaFormat *tmpFormat =  AMediaFormat_fromMsg(&msg);
+    media_status_t ret = wrapper->getFormat(wrapper->data, tmpFormat);
+    sp<MetaData> newMeta = new MetaData();
+    convertMessageToMetaData(msg, newMeta);
+    delete tmpFormat;
+    format = *newMeta;
+    return reverse_translate_error(ret);
 }
 
 status_t MediaTrackCUnwrapper::read(MediaBufferBase **buffer, const ReadOptions *options) {
@@ -95,117 +107,7 @@ status_t MediaTrackCUnwrapper::read(MediaBufferBase **buffer, const ReadOptions 
         opts |= SEEK;
         opts |= (uint32_t) seekMode;
     }
-
-
-    return wrapper->read(wrapper->data, buffer, opts, seekPosition);
-}
-
-bool MediaTrackCUnwrapper::supportNonblockingRead() {
-    return wrapper->supportsNonBlockingRead(wrapper->data);
-}
-
-/* -------------- unwrapper v2 --------------- */
-
-MediaTrackCUnwrapperV2::MediaTrackCUnwrapperV2(CMediaTrackV2 *cmediatrack2) {
-    wrapper = cmediatrack2;
-}
-
-MediaTrackCUnwrapperV2::~MediaTrackCUnwrapperV2() {
-    wrapper->free(wrapper->data);
-    free(wrapper);
-}
-
-status_t MediaTrackCUnwrapperV2::start() {
-    return reverse_translate_error(wrapper->start(wrapper->data));
-}
-
-status_t MediaTrackCUnwrapperV2::stop() {
-    return reverse_translate_error(wrapper->stop(wrapper->data));
-}
-
-status_t MediaTrackCUnwrapperV2::getFormat(MetaDataBase& format) {
-    sp<AMessage> msg = new AMessage();
-    AMediaFormat *tmpFormat =  AMediaFormat_fromMsg(&msg);
-    media_status_t ret = wrapper->getFormat(wrapper->data, tmpFormat);
-    sp<MetaData> newMeta = new MetaData();
-    convertMessageToMetaData(msg, newMeta);
-    delete tmpFormat;
-    format = *newMeta;
-    return reverse_translate_error(ret);
-}
-
-status_t MediaTrackCUnwrapperV2::read(MediaBufferBase **buffer, const ReadOptions *options) {
-
-    uint32_t opts = 0;
-
-    if (options && options->getNonBlocking()) {
-        opts |= CMediaTrackReadOptions::NONBLOCKING;
-    }
-
-    int64_t seekPosition = 0;
-    MediaTrack::ReadOptions::SeekMode seekMode;
-    if (options && options->getSeekTo(&seekPosition, &seekMode)) {
-        opts |= SEEK;
-        opts |= (uint32_t) seekMode;
-    }
-
-    return reverse_translate_error(wrapper->read(wrapper->data, buffer, opts, seekPosition));
-}
-
-bool MediaTrackCUnwrapperV2::supportNonblockingRead() {
-    return wrapper->supportsNonBlockingRead(wrapper->data);
-}
-
-/* -------------- unwrapper v3 --------------- */
-
-MediaTrackCUnwrapperV3::MediaTrackCUnwrapperV3(CMediaTrackV3 *cmediatrack3) {
-    wrapper = cmediatrack3;
-    bufferGroup = nullptr;
-}
-
-MediaTrackCUnwrapperV3::~MediaTrackCUnwrapperV3() {
-    wrapper->free(wrapper->data);
-    free(wrapper);
-    delete bufferGroup;
-}
-
-status_t MediaTrackCUnwrapperV3::start() {
-    if (bufferGroup == nullptr) {
-        bufferGroup = new MediaBufferGroup();
-    }
-    return reverse_translate_error(wrapper->start(wrapper->data, bufferGroup->wrap()));
-}
-
-status_t MediaTrackCUnwrapperV3::stop() {
-    return reverse_translate_error(wrapper->stop(wrapper->data));
-}
-
-status_t MediaTrackCUnwrapperV3::getFormat(MetaDataBase& format) {
-    sp<AMessage> msg = new AMessage();
-    AMediaFormat *tmpFormat =  AMediaFormat_fromMsg(&msg);
-    media_status_t ret = wrapper->getFormat(wrapper->data, tmpFormat);
-    sp<MetaData> newMeta = new MetaData();
-    convertMessageToMetaData(msg, newMeta);
-    delete tmpFormat;
-    format = *newMeta;
-    return reverse_translate_error(ret);
-}
-
-status_t MediaTrackCUnwrapperV3::read(MediaBufferBase **buffer, const ReadOptions *options) {
-
-    uint32_t opts = 0;
-
-    if (options && options->getNonBlocking()) {
-        opts |= CMediaTrackReadOptions::NONBLOCKING;
-    }
-
-    int64_t seekPosition = 0;
-    MediaTrack::ReadOptions::SeekMode seekMode;
-    if (options && options->getSeekTo(&seekPosition, &seekMode)) {
-        opts |= SEEK;
-        opts |= (uint32_t) seekMode;
-    }
-    CMediaBufferV3 *buf = nullptr;
+    CMediaBuffer *buf = nullptr;
     media_status_t ret = wrapper->read(wrapper->data, &buf, opts, seekPosition);
     if (ret == AMEDIA_OK && buf != nullptr) {
         *buffer = (MediaBufferBase*)buf->handle;
@@ -277,7 +179,7 @@ status_t MediaTrackCUnwrapperV3::read(MediaBufferBase **buffer, const ReadOption
     return reverse_translate_error(ret);
 }
 
-bool MediaTrackCUnwrapperV3::supportNonblockingRead() {
+bool MediaTrackCUnwrapper::supportNonblockingRead() {
     return wrapper->supportsNonBlockingRead(wrapper->data);
 }
 

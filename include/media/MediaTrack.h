@@ -156,42 +156,6 @@ protected:
 
 private:
     CMediaTrack *wrapper;
-};
-
-class MediaTrackCUnwrapperV2 : public MediaTrack {
-public:
-    explicit MediaTrackCUnwrapperV2(CMediaTrackV2 *wrapper);
-
-    virtual status_t start();
-    virtual status_t stop();
-    virtual status_t getFormat(MetaDataBase& format);
-    virtual status_t read(MediaBufferBase **buffer, const ReadOptions *options = NULL);
-
-    virtual bool supportNonblockingRead();
-
-protected:
-    virtual ~MediaTrackCUnwrapperV2();
-
-private:
-    CMediaTrackV2 *wrapper;
-};
-
-class MediaTrackCUnwrapperV3 : public MediaTrack {
-public:
-    explicit MediaTrackCUnwrapperV3(CMediaTrackV3 *wrapper);
-
-    virtual status_t start();
-    virtual status_t stop();
-    virtual status_t getFormat(MetaDataBase& format);
-    virtual status_t read(MediaBufferBase **buffer, const ReadOptions *options = NULL);
-
-    virtual bool supportNonblockingRead();
-
-protected:
-    virtual ~MediaTrackCUnwrapperV3();
-
-private:
-    CMediaTrackV3 *wrapper;
     MediaBufferGroup *bufferGroup;
 };
 

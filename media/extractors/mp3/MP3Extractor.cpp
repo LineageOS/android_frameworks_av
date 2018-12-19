@@ -207,7 +207,7 @@ static bool Resync(
     return valid;
 }
 
-class MP3Source : public MediaTrackHelperV3 {
+class MP3Source : public MediaTrackHelper {
 public:
     MP3Source(
             AMediaFormat *meta, DataSourceHelper *source,
@@ -220,7 +220,7 @@ public:
     virtual media_status_t getFormat(AMediaFormat *meta);
 
     virtual media_status_t read(
-            MediaBufferHelperV3 **buffer, const ReadOptions *options = NULL);
+            MediaBufferHelper **buffer, const ReadOptions *options = NULL);
 
 protected:
     virtual ~MP3Source();
@@ -413,7 +413,7 @@ size_t MP3Extractor::countTracks() {
     return mInitCheck != OK ? 0 : 1;
 }
 
-MediaTrackHelperV3 *MP3Extractor::getTrack(size_t index) {
+MediaTrackHelper *MP3Extractor::getTrack(size_t index) {
     if (mInitCheck != OK || index != 0) {
         return NULL;
     }
@@ -493,7 +493,7 @@ media_status_t MP3Source::getFormat(AMediaFormat *meta) {
 }
 
 media_status_t MP3Source::read(
-        MediaBufferHelperV3 **out, const ReadOptions *options) {
+        MediaBufferHelper **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t seekTimeUs;
@@ -523,7 +523,7 @@ media_status_t MP3Source::read(
         mSamplesRead = 0;
     }
 
-    MediaBufferHelperV3 *buffer;
+    MediaBufferHelper *buffer;
     status_t err = mBufferGroup->acquire_buffer(&buffer);
     if (err != OK) {
         return AMEDIA_ERROR_UNKNOWN;
@@ -668,14 +668,14 @@ media_status_t MP3Extractor::getMetaData(AMediaFormat *meta) {
     return AMEDIA_OK;
 }
 
-static CMediaExtractorV3* CreateExtractor(
+static CMediaExtractor* CreateExtractor(
         CDataSource *source,
         void *meta) {
     Mp3Meta *metaData = static_cast<Mp3Meta *>(meta);
-    return wrapV3(new MP3Extractor(new DataSourceHelper(source), metaData));
+    return wrap(new MP3Extractor(new DataSourceHelper(source), metaData));
 }
 
-static CreatorFuncV3 Sniff(
+static CreatorFunc Sniff(
         CDataSource *source, float *confidence, void **meta,
         FreeMetaFunc *freeMeta) {
     off64_t pos = 0;
@@ -712,11 +712,11 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION_CURRENT + 1,
+        EXTRACTORDEF_VERSION,
         UUID("812a3f6c-c8cf-46de-b529-3774b14103d4"),
         1, // version
         "MP3 Extractor",
-        { .v3 = Sniff }
+        { .v2 = Sniff }
     };
 }
 
