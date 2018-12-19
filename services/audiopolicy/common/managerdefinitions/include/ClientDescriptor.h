@@ -86,10 +86,12 @@ public:
                           audio_attributes_t attributes, audio_config_base_t config,
                           audio_port_handle_t preferredDeviceId, audio_stream_type_t stream,
                           product_strategy_t strategy, audio_output_flags_t flags,
-                          bool isPreferredDeviceForExclusiveUse) :
+                          bool isPreferredDeviceForExclusiveUse,
+                          std::vector<wp<SwAudioOutputDescriptor>> secondaryOutputs) :
         ClientDescriptor(portId, uid, sessionId, attributes, config, preferredDeviceId,
                          isPreferredDeviceForExclusiveUse),
-        mStream(stream), mStrategy(strategy), mFlags(flags) {}
+        mStream(stream), mStrategy(strategy), mFlags(flags),
+        mSecondaryOutputs(std::move(secondaryOutputs)) {}
     ~TrackClientDescriptor() override = default;
 
     using ClientDescriptor::dump;
@@ -99,11 +101,15 @@ public:
     audio_output_flags_t flags() const { return mFlags; }
     audio_stream_type_t stream() const { return mStream; }
     product_strategy_t strategy() const { return mStrategy; }
+    const std::vector<wp<SwAudioOutputDescriptor>>& getSecondaryOutputs() const {
+        return mSecondaryOutputs;
+    };
 
 private:
     const audio_stream_type_t mStream;
     const product_strategy_t mStrategy;
     const audio_output_flags_t mFlags;
+    const std::vector<wp<SwAudioOutputDescriptor>> mSecondaryOutputs;
 };
 
 class RecordClientDescriptor: public ClientDescriptor

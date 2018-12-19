@@ -157,30 +157,49 @@ void AudioPolicyMixCollection::closeOutput(sp<SwAudioOutputDescriptor> &desc)
 }
 
 status_t AudioPolicyMixCollection::getOutputForAttr(
-        audio_attributes_t attributes, uid_t uid, sp<SwAudioOutputDescriptor> &desc)
+        audio_attributes_t attributes, uid_t uid, sp<SwAudioOutputDescriptor> &primaryDesc,
+        std::vector<sp<SwAudioOutputDescriptor>> *secondaryDescs)
 {
     ALOGV("getOutputForAttr() querying %zu mixes:", size());
-    desc = 0;
+    primaryDesc = 0;
     for (size_t i = 0; i < size(); i++) {
         sp<AudioPolicyMix> policyMix = valueAt(i);
         sp<SwAudioOutputDescriptor> policyDesc = policyMix->getOutput();
         if (!policyDesc) {
-            ALOGV("Skiping %zu: Mix has no output", i);
+            ALOGV("%s: Skiping %zu: Mix has no output", __func__, i);
             continue;
         }
 
         AudioMix *mix = policyMix->getMix();
+        const bool primaryOutputMix = !is_mix_loopback_render(mix->mRouteFlags);
+
+        if (primaryOutputMix && primaryDesc != 0) {
+            ALOGV("%s: Skiping %zu: Primary output already found", __func__, i);
+            continue; // Primary output already found
+        }
+
         switch (mixMatch(mix, i, attributes, uid)) {
-            case MixMatchStatus::INVALID_MIX: return BAD_VALUE; // TODO: Do we really want to abort ?
-            case MixMatchStatus::NO_MATCH: continue; // skip the mix
+            case MixMatchStatus::INVALID_MIX: return BAD_VALUE; // TODO: Do we really want to abort?
+            case MixMatchStatus::NO_MATCH:
+                ALOGV("%s: Mix %zu: does not match", __func__, i);
+                continue; // skip the mix
             case MixMatchStatus::MATCH:;
         }
 
-        desc = policyMix->getOutput();
-        desc->mPolicyMix = mix;
-        return NO_ERROR;
+        policyDesc->mPolicyMix = mix;
+        if (primaryOutputMix) {
+            primaryDesc = policyDesc;
+            ALOGV("%s: Mix %zu: set primary desc", __func__, i);
+        } else {
+            if (policyDesc->mIoHandle == AUDIO_IO_HANDLE_NONE) {
+                ALOGV("%s: Mix %zu ignored as secondaryOutput because not opened yet", __func__, i);
+            } else {
+                ALOGV("%s: Add a secondary desc %zu", __func__, i);
+                secondaryDescs->push_back(policyDesc);
+            }
+        }
     }
-    return BAD_VALUE;
+    return (primaryDesc == nullptr && secondaryDescs->empty()) ? BAD_VALUE : NO_ERROR;
 }
 
 AudioPolicyMixCollection::MixMatchStatus AudioPolicyMixCollection::mixMatch(

@@ -99,7 +99,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
         mId(android_atomic_inc(&nextTrackId)),
         mTerminated(false),
         mType(type),
-        mThreadIoHandle(thread->id()),
+        mThreadIoHandle(thread ? thread->id() : AUDIO_IO_HANDLE_NONE),
         mPortId(portId),
         mIsInvalid(false)
 {
@@ -670,8 +670,7 @@ uint32_t AudioFlinger::PlaybackThread::Track::sampleRate() const {
 }
 
 // AudioBufferProvider interface
-status_t AudioFlinger::PlaybackThread::Track::getNextBuffer(
-        AudioBufferProvider::Buffer* buffer)
+status_t AudioFlinger::PlaybackThread::Track::getNextBuffer(AudioBufferProvider::Buffer* buffer)
 {
     ServerProxy::Buffer buf;
     size_t desiredFrames = buffer->frameCount;
@@ -686,8 +685,37 @@ status_t AudioFlinger::PlaybackThread::Track::getNextBuffer(
     } else {
         mAudioTrackServerProxy->tallyUnderrunFrames(0);
     }
-
     return status;
+}
+
+void AudioFlinger::PlaybackThread::Track::releaseBuffer(AudioBufferProvider::Buffer* buffer)
+{
+    interceptBuffer(*buffer);
+    TrackBase::releaseBuffer(buffer);
+}
+
+// TODO: compensate for time shift between HW modules.
+void AudioFlinger::PlaybackThread::Track::interceptBuffer(
+        const AudioBufferProvider::Buffer& buffer) {
+    for (auto& sink : mTeePatches) {
+        RecordThread::PatchRecord& patchRecord = *sink.patchRecord;
+        AudioBufferProvider::Buffer patchBuffer;
+        patchBuffer.frameCount = buffer.frameCount;
+        auto status = patchRecord.getNextBuffer(&patchBuffer);
+        if (status != NO_ERROR) {
+           ALOGW("%s PathRecord getNextBuffer failed with error %d: %s",
+                 __func__, status, strerror(-status));
+           continue;
+        }
+        // FIXME: On buffer wrap, the frame count will be less then requested,
+        //        retry to write the rest. (unlikely due to lcm buffer sizing)
+        ALOGW_IF(patchBuffer.frameCount != buffer.frameCount,
+                 "%s PatchRecord can not provide big enough buffer %zu/%zu, dropping %zu frames",
+                 __func__, patchBuffer.frameCount, buffer.frameCount,
+                 buffer.frameCount - patchBuffer.frameCount);
+        memcpy(patchBuffer.raw, buffer.raw, patchBuffer.frameCount * mFrameSize);
+        patchRecord.releaseBuffer(&patchBuffer);
+    }
 }
 
 // releaseBuffer() is not overridden
@@ -1079,6 +1107,10 @@ void AudioFlinger::PlaybackThread::Track::copyMetadataTo(MetadataInserter& backI
             .content_type = mAttr.content_type,
             .gain = mFinalVolume,
     };
+}
+
+void AudioFlinger::PlaybackThread::Track::setTeePatches(TeePatches teePatches) {
+    mTeePatches = std::move(teePatches);
 }
 
 status_t AudioFlinger::PlaybackThread::Track::getTimestamp(AudioTimestamp& timestamp)

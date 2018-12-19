@@ -231,7 +231,8 @@ public:
                                      const audio_config_t *config,
                                      audio_output_flags_t flags,
                                      audio_port_handle_t *selectedDeviceId,
-                                     audio_port_handle_t *portId);
+                                     audio_port_handle_t *portId,
+                                     std::vector<audio_io_handle_t> *secondaryOutputs);
     static status_t startOutput(audio_port_handle_t portId);
     static status_t stopOutput(audio_port_handle_t portId);
     static void releaseOutput(audio_port_handle_t portId);
