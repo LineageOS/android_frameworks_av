@@ -952,7 +952,8 @@ status_t AudioTrack::setSampleRate(uint32_t rate)
     if (rate == mSampleRate) {
         return NO_ERROR;
     }
-    if (isOffloadedOrDirect_l() || (mFlags & AUDIO_OUTPUT_FLAG_FAST)) {
+    if (isOffloadedOrDirect_l() || (mFlags & AUDIO_OUTPUT_FLAG_FAST)
+            || (mChannelMask & AUDIO_CHANNEL_HAPTIC_ALL)) {
         return INVALID_OPERATION;
     }
     if (mOutput == AUDIO_IO_HANDLE_NONE) {
