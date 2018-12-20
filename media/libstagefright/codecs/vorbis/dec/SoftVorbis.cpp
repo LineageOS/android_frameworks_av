@@ -357,7 +357,10 @@ void SoftVorbis::onQueueFilled(OMX_U32 /* portIndex */) {
         int32_t numPageSamples = 0;
 
         if (inHeader) {
-            if (mInputBufferCount < 2) {
+            // Assume the very first 2 buffers are always codec config (in this case mState is NULL)
+            // After flush, handle CSD
+            if (mInputBufferCount < 2 &&
+                    (mState == NULL || (inHeader->nFlags & OMX_BUFFERFLAG_CODECCONFIG))) {
                 const uint8_t *data = inHeader->pBuffer + inHeader->nOffset;
                 size_t size = inHeader->nFilledLen;
 
@@ -380,7 +383,24 @@ void SoftVorbis::onQueueFilled(OMX_U32 /* portIndex */) {
 
                 makeBitReader((const uint8_t *)data + 7, size - 7, &buf, &ref, &bits);
 
-                if (mInputBufferCount == 0) {
+                // Assume very first frame is identification header - or reset identification
+                // header after flush, but allow only specifying setup header after flush if
+                // identification header was already set up.
+                if (mInputBufferCount == 0 &&
+                        (mVi == NULL || data[0] == 1 /* identification header */)) {
+                    // remove any prior state
+                    if (mVi != NULL) {
+                        // also clear mState as it may refer to the old mVi
+                        if (mState != NULL) {
+                            vorbis_dsp_clear(mState);
+                            delete mState;
+                            mState = NULL;
+                        }
+                        vorbis_info_clear(mVi);
+                        delete mVi;
+                        mVi = NULL;
+                    }
+
                     CHECK(mVi == NULL);
                     mVi = new vorbis_info;
                     vorbis_info_init(mVi);
@@ -392,8 +412,15 @@ void SoftVorbis::onQueueFilled(OMX_U32 /* portIndex */) {
                         return;
                     }
                 } else {
+                    // remove any prior state
+                    if (mState != NULL) {
+                        vorbis_dsp_clear(mState);
+                        delete mState;
+                        mState = NULL;
+                    }
+
                     int ret = _vorbis_unpack_books(mVi, &bits);
-                    if (ret != 0) {
+                    if (ret != 0 || mState != NULL) {
                         notify(OMX_EventError, OMX_ErrorUndefined, ret, NULL);
                         mSignalledError = true;
                         return;
@@ -409,6 +436,7 @@ void SoftVorbis::onQueueFilled(OMX_U32 /* portIndex */) {
                         notify(OMX_EventPortSettingsChanged, 1, 0, NULL);
                         mOutputPortSettingsChange = AWAITING_DISABLED;
                     }
+                    mInputBufferCount = 1;
                 }
 
                 if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
@@ -550,19 +578,10 @@ void SoftVorbis::onPortFlushCompleted(OMX_U32 portIndex) {
 
         mInputBufferCount = 0;
         mNumFramesOutput = 0;
-        if (mState != NULL) {
-            vorbis_dsp_clear(mState);
-            delete mState;
-            mState = NULL;
-        }
-        if (mVi != NULL) {
-            vorbis_info_clear(mVi);
-            delete mVi;
-            mVi = NULL;
-        }
         mSawInputEos = false;
         mSignalledOutputEos = false;
         mNumFramesLeftOnPage = -1;
+        vorbis_dsp_restart(mState);
     }
 }
 
