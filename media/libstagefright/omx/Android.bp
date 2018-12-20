@@ -53,7 +53,6 @@ cc_library_shared {
         "libhidlbase",
         "libhidlmemory",
         "libhidltransport",
-        "libnativewindow", // TODO(b/62923479): use header library
         "libvndksupport",
         "android.hardware.media.omx@1.0",
         "android.hardware.graphics.bufferqueue@1.0",

@@ -36,8 +36,6 @@ cc_library {
 
     shared_libs: [
         "liblog",
-        "libstagefright_foundation",
-        "libutils",
     ],
     header_libs: ["libmedia_headers"],
 }

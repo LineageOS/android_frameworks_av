@@ -10,11 +10,9 @@ cc_library {
     ],
 
     shared_libs: [
-        "libbase",
         "libbinder",
         "libcutils",
         "liblog",
-        "libstagefright_foundation",
         "libutils",
     ],
 
