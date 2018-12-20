@@ -63,10 +63,20 @@ std::string TrackClientDescriptor::toShortString() const
     return ss.str();
 }
 
+void RecordClientDescriptor::trackEffectEnabled(const sp<EffectDescriptor> &effect, bool enabled)
+{
+    if (enabled) {
+        mEnabledEffects.replaceValueFor(effect->mId, effect);
+    } else {
+        mEnabledEffects.removeItem(effect->mId);
+    }
+}
+
 void RecordClientDescriptor::dump(String8 *dst, int spaces, int index) const
 {
     ClientDescriptor::dump(dst, spaces, index);
     dst->appendFormat("%*s- Source: %d flags: %08x\n", spaces, "", mSource, mFlags);
+    mEnabledEffects.dump(dst, spaces + 2 /*spaces*/, false /*verbose*/);
 }
 
 SourceClientDescriptor::SourceClientDescriptor(audio_port_handle_t portId, uid_t uid,

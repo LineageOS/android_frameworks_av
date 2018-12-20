@@ -240,12 +240,22 @@ public:
 
             void onDynamicPolicyMixStateUpdate(const String8& regId, int32_t state);
             void doOnDynamicPolicyMixStateUpdate(const String8& regId, int32_t state);
-            void onRecordingConfigurationUpdate(int event, const record_client_info_t *clientInfo,
-                    const audio_config_base_t *clientConfig,
-                    const audio_config_base_t *deviceConfig, audio_patch_handle_t patchHandle);
-            void doOnRecordingConfigurationUpdate(int event, const record_client_info_t *clientInfo,
-                    const audio_config_base_t *clientConfig,
-                    const audio_config_base_t *deviceConfig, audio_patch_handle_t patchHandle);
+            void onRecordingConfigurationUpdate(int event,
+                                                const record_client_info_t *clientInfo,
+                                                const audio_config_base_t *clientConfig,
+                                                std::vector<effect_descriptor_t> clientEffects,
+                                                const audio_config_base_t *deviceConfig,
+                                                std::vector<effect_descriptor_t> effects,
+                                                audio_patch_handle_t patchHandle,
+                                                audio_source_t source);
+            void doOnRecordingConfigurationUpdate(int event,
+                                                  const record_client_info_t *clientInfo,
+                                                  const audio_config_base_t *clientConfig,
+                                                  std::vector<effect_descriptor_t> clientEffects,
+                                                  const audio_config_base_t *deviceConfig,
+                                                  std::vector<effect_descriptor_t> effects,
+                                                  audio_patch_handle_t patchHandle,
+                                                  audio_source_t source);
 
 private:
                         AudioPolicyService() ANDROID_API;
@@ -409,13 +419,17 @@ private:
                     void        updateAudioPatchListCommand();
                     status_t    setAudioPortConfigCommand(const struct audio_port_config *config,
                                                           int delayMs);
-                    void        dynamicPolicyMixStateUpdateCommand(const String8& regId, int32_t state);
+                    void        dynamicPolicyMixStateUpdateCommand(const String8& regId,
+                                                                   int32_t state);
                     void        recordingConfigurationUpdateCommand(
-                                                        int event,
-                                                        const record_client_info_t *clientInfo,
-                                                        const audio_config_base_t *clientConfig,
-                                                        const audio_config_base_t *deviceConfig,
-                                                        audio_patch_handle_t patchHandle);
+                                                    int event,
+                                                    const record_client_info_t *clientInfo,
+                                                    const audio_config_base_t *clientConfig,
+                                                    std::vector<effect_descriptor_t> clientEffects,
+                                                    const audio_config_base_t *deviceConfig,
+                                                    std::vector<effect_descriptor_t> effects,
+                                                    audio_patch_handle_t patchHandle,
+                                                    audio_source_t source);
                     void        insertCommand_l(AudioCommand *command, int delayMs = 0);
     private:
         class AudioCommandData;
@@ -500,8 +514,11 @@ private:
             int mEvent;
             record_client_info_t mClientInfo;
             struct audio_config_base mClientConfig;
+            std::vector<effect_descriptor_t> mClientEffects;
             struct audio_config_base mDeviceConfig;
+            std::vector<effect_descriptor_t> mEffects;
             audio_patch_handle_t mPatchHandle;
+            audio_source_t mSource;
         };
 
         Mutex   mLock;
@@ -605,9 +622,13 @@ private:
         virtual void onAudioPatchListUpdate();
         virtual void onDynamicPolicyMixStateUpdate(String8 regId, int32_t state);
         virtual void onRecordingConfigurationUpdate(int event,
-                        const record_client_info_t *clientInfo,
-                        const audio_config_base_t *clientConfig,
-                        const audio_config_base_t *deviceConfig, audio_patch_handle_t patchHandle);
+                                                    const record_client_info_t *clientInfo,
+                                                    const audio_config_base_t *clientConfig,
+                                                    std::vector<effect_descriptor_t> clientEffects,
+                                                    const audio_config_base_t *deviceConfig,
+                                                    std::vector<effect_descriptor_t> effects,
+                                                    audio_patch_handle_t patchHandle,
+                                                    audio_source_t source);
 
         virtual audio_unique_id_t newAudioUniqueId(audio_unique_id_use_t use);
 
@@ -625,12 +646,17 @@ private:
 
                             void      onAudioPortListUpdate();
                             void      onAudioPatchListUpdate();
-                            void      onDynamicPolicyMixStateUpdate(const String8& regId, int32_t state);
+                            void      onDynamicPolicyMixStateUpdate(const String8& regId,
+                                                                    int32_t state);
                             void      onRecordingConfigurationUpdate(
-                                        int event, const record_client_info_t *clientInfo,
-                                        const audio_config_base_t *clientConfig,
-                                        const audio_config_base_t *deviceConfig,
-                                        audio_patch_handle_t patchHandle);
+                                                    int event,
+                                                    const record_client_info_t *clientInfo,
+                                                    const audio_config_base_t *clientConfig,
+                                                    std::vector<effect_descriptor_t> clientEffects,
+                                                    const audio_config_base_t *deviceConfig,
+                                                    std::vector<effect_descriptor_t> effects,
+                                                    audio_patch_handle_t patchHandle,
+                                                    audio_source_t source);
                             void      setAudioPortCallbacksEnabled(bool enabled);
 
                             uid_t uid() {

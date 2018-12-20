@@ -28,6 +28,7 @@
 #include <utils/RefBase.h>
 #include <utils/String8.h>
 #include "AudioPatch.h"
+#include "EffectDescriptor.h"
 #include "RoutingStrategy.h"
 
 namespace android {
@@ -119,13 +120,15 @@ public:
     void setAppState(app_state_t appState) { mAppState = appState; }
     app_state_t appState() { return mAppState; }
     bool isSilenced() const { return mAppState == APP_STATE_IDLE; }
+    void trackEffectEnabled(const sp<EffectDescriptor> &effect, bool enabled);
+    EffectDescriptorCollection getEnabledEffects() const { return mEnabledEffects; }
 
 private:
     const audio_source_t mSource;
     const audio_input_flags_t mFlags;
     const bool mIsSoundTrigger;
           app_state_t mAppState;
-
+    EffectDescriptorCollection mEnabledEffects;
 };
 
 class SourceClientDescriptor: public TrackClientDescriptor
@@ -172,7 +175,7 @@ public:
     virtual ~ClientMapHandler() = default;
 
     // Track client management
-    void addClient(const sp<T> &client) {
+    virtual void addClient(const sp<T> &client) {
         const audio_port_handle_t portId = client->portId();
         LOG_ALWAYS_FATAL_IF(!mClients.emplace(portId, client).second,
                 "%s(%d): attempting to add client that already exists", __func__, portId);

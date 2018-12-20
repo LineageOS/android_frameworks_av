@@ -332,10 +332,13 @@ public:
     virtual void onDynamicPolicyMixStateUpdate(String8 regId, int32_t state) = 0;
 
     virtual void onRecordingConfigurationUpdate(int event,
-                    const record_client_info_t *clientInfo,
-                    const struct audio_config_base *clientConfig,
-                    const struct audio_config_base *deviceConfig,
-                    audio_patch_handle_t patchHandle) = 0;
+                                                const record_client_info_t *clientInfo,
+                                                const audio_config_base_t *clientConfig,
+                                                std::vector<effect_descriptor_t> clientEffects,
+                                                const audio_config_base_t *deviceConfig,
+                                                std::vector<effect_descriptor_t> effects,
+                                                audio_patch_handle_t patchHandle,
+                                                audio_source_t source) = 0;
 };
 
 extern "C" AudioPolicyInterface* createAudioPolicyManager(AudioPolicyClientInterface *clientInterface);

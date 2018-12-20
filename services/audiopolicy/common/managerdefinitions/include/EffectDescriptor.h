@@ -25,12 +25,12 @@
 
 namespace android {
 
-
 class EffectDescriptor : public RefBase
 {
 public:
-    void dump(String8 *dst) const;
+    void dump(String8 *dst, int spaces = 0) const;
 
+    int mId;                // effect unique ID
     int mIo;                // io the effect is attached to
     routing_strategy mStrategy; // routing strategy the effect is associated to
     int mSession;               // audio session the effect is on
@@ -46,12 +46,14 @@ public:
     status_t registerEffect(const effect_descriptor_t *desc, audio_io_handle_t io,
                             uint32_t strategy, int session, int id);
     status_t unregisterEffect(int id);
+    sp<EffectDescriptor> getEffect(int id) const;
     status_t setEffectEnabled(int id, bool enabled);
+    bool     isEffectEnabled(int id) const;
     uint32_t getMaxEffectsCpuLoad() const;
     uint32_t getMaxEffectsMemory() const;
-    bool isNonOffloadableEffectEnabled();
+    bool isNonOffloadableEffectEnabled() const;
 
-    void dump(String8 *dst) const;
+    void dump(String8 *dst, int spaces = 0, bool verbose = true) const;
 
 private:
     status_t setEffectEnabled(const sp<EffectDescriptor> &effectDesc, bool enabled);

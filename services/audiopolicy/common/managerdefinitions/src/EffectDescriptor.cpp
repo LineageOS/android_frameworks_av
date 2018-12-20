@@ -22,13 +22,13 @@
 
 namespace android {
 
-void EffectDescriptor::dump(String8 *dst) const
+void EffectDescriptor::dump(String8 *dst, int spaces) const
 {
-    dst->appendFormat(" I/O: %d\n", mIo);
-    dst->appendFormat(" Strategy: %d\n", mStrategy);
-    dst->appendFormat(" Session: %d\n", mSession);
-    dst->appendFormat(" Name: %s\n",  mDesc.name);
-    dst->appendFormat(" %s\n",  mEnabled ? "Enabled" : "Disabled");
+    dst->appendFormat("%*sI/O: %d\n", spaces, "", mIo);
+    dst->appendFormat("%*sStrategy: %d\n", spaces, "", mStrategy);
+    dst->appendFormat("%*sSession: %d\n", spaces, "", mSession);
+    dst->appendFormat("%*sName: %s\n", spaces, "",  mDesc.name);
+    dst->appendFormat("%*s%s\n", spaces, "",  mEnabled ? "Enabled" : "Disabled");
 }
 
 EffectDescriptorCollection::EffectDescriptorCollection() :
@@ -45,6 +45,11 @@ status_t EffectDescriptorCollection::registerEffect(const effect_descriptor_t *d
                                                     int session,
                                                     int id)
 {
+    if (getEffect(id) != nullptr) {
+        ALOGW("%s effect %s already registered", __FUNCTION__, desc->name);
+        return INVALID_OPERATION;
+    }
+
     if (mTotalEffectsMemory + desc->memoryUsage > getMaxEffectsMemory()) {
         ALOGW("registerEffect() memory limit exceeded for Fx %s, Memory %d KB",
                 desc->name, desc->memoryUsage);
@@ -60,6 +65,7 @@ status_t EffectDescriptorCollection::registerEffect(const effect_descriptor_t *d
 
     sp<EffectDescriptor> effectDesc = new EffectDescriptor();
     memcpy (&effectDesc->mDesc, desc, sizeof(effect_descriptor_t));
+    effectDesc->mId = id;
     effectDesc->mIo = io;
     effectDesc->mStrategy = static_cast<routing_strategy>(strategy);
     effectDesc->mSession = session;
@@ -70,17 +76,22 @@ status_t EffectDescriptorCollection::registerEffect(const effect_descriptor_t *d
     return NO_ERROR;
 }
 
-status_t EffectDescriptorCollection::unregisterEffect(int id)
+sp<EffectDescriptor> EffectDescriptorCollection::getEffect(int id) const
 {
     ssize_t index = indexOfKey(id);
     if (index < 0) {
-        ALOGW("unregisterEffect() unknown effect ID %d", id);
+        return nullptr;
+    }
+    return valueAt(index);
+}
+
+status_t EffectDescriptorCollection::unregisterEffect(int id)
+{
+    sp<EffectDescriptor> effectDesc = getEffect(id);
+    if (effectDesc == nullptr) {
+        ALOGW("%s unknown effect ID %d", __FUNCTION__, id);
         return INVALID_OPERATION;
     }
-
-    sp<EffectDescriptor> effectDesc = valueAt(index);
-
-    setEffectEnabled(effectDesc, false);
 
     if (mTotalEffectsMemory < effectDesc->mDesc.memoryUsage) {
         ALOGW("unregisterEffect() memory %d too big for total %d",
@@ -107,6 +118,14 @@ status_t EffectDescriptorCollection::setEffectEnabled(int id, bool enabled)
     return setEffectEnabled(valueAt(index), enabled);
 }
 
+bool EffectDescriptorCollection::isEffectEnabled(int id) const
+{
+    ssize_t index = indexOfKey(id);
+    if (index < 0) {
+        return false;
+    }
+    return valueAt(index)->mEnabled;
+}
 
 status_t EffectDescriptorCollection::setEffectEnabled(const sp<EffectDescriptor> &effectDesc,
                                                       bool enabled)
@@ -138,7 +157,7 @@ status_t EffectDescriptorCollection::setEffectEnabled(const sp<EffectDescriptor>
     return NO_ERROR;
 }
 
-bool EffectDescriptorCollection::isNonOffloadableEffectEnabled()
+bool EffectDescriptorCollection::isNonOffloadableEffectEnabled() const
 {
     for (size_t i = 0; i < size(); i++) {
         sp<EffectDescriptor> effectDesc = valueAt(i);
@@ -162,15 +181,21 @@ uint32_t EffectDescriptorCollection::getMaxEffectsMemory() const
     return MAX_EFFECTS_MEMORY;
 }
 
-void EffectDescriptorCollection::dump(String8 *dst) const
+void EffectDescriptorCollection::dump(String8 *dst, int spaces, bool verbose) const
 {
-    dst->appendFormat(
-            "\nTotal Effects CPU: %f MIPS, Total Effects memory: %d KB, Max memory used: %d KB\n",
-             (float)mTotalEffectsCpuLoad/10, mTotalEffectsMemory, mTotalEffectsMemoryMaxUsed);
-    dst->append("Registered effects:\n");
+    if (verbose) {
+        dst->appendFormat(
+            "\n%*sTotal Effects CPU: %f MIPS, "
+            "Total Effects memory: %d KB, Max memory used: %d KB\n",
+            spaces, "",
+            (float) mTotalEffectsCpuLoad / 10,
+            mTotalEffectsMemory,
+            mTotalEffectsMemoryMaxUsed);
+    }
+    dst->appendFormat("%*sEffects:\n", spaces, "");
     for (size_t i = 0; i < size(); i++) {
-        dst->appendFormat("- Effect %d dump:\n", keyAt(i));
-        valueAt(i)->dump(dst);
+        dst->appendFormat("%*s- Effect %d:\n", spaces, "", keyAt(i));
+        valueAt(i)->dump(dst, spaces + 2);
     }
 }
 
