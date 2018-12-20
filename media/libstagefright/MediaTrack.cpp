@@ -166,6 +166,7 @@ MediaTrackCUnwrapperV3::MediaTrackCUnwrapperV3(CMediaTrackV3 *cmediatrack3) {
 MediaTrackCUnwrapperV3::~MediaTrackCUnwrapperV3() {
     wrapper->free(wrapper->data);
     free(wrapper);
+    delete bufferGroup;
 }
 
 status_t MediaTrackCUnwrapperV3::start() {
