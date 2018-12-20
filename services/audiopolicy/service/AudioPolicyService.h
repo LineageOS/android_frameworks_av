@@ -220,6 +220,8 @@ public:
                                         audio_format_t *surroundFormats,
                                         bool *surroundFormatsEnabled,
                                         bool reported);
+    virtual status_t getHwOffloadEncodingFormatsSupportedForA2DP(
+                                        std::vector<audio_format_t> *formats);
     virtual status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled);
 
     virtual status_t setAssistantUid(uid_t uid);

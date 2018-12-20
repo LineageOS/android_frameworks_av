@@ -1337,6 +1337,13 @@ bool AudioSystem::isHapticPlaybackSupported()
     return aps->isHapticPlaybackSupported();
 }
 
+status_t AudioSystem::getHwOffloadEncodingFormatsSupportedForA2DP(
+                                std::vector<audio_format_t> *formats)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->getHwOffloadEncodingFormatsSupportedForA2DP(formats);
+}
 
 // ---------------------------------------------------------------------------
 

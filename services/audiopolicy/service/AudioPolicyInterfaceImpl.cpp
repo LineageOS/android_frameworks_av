@@ -1140,6 +1140,17 @@ status_t AudioPolicyService::getSurroundFormats(unsigned int *numSurroundFormats
                                                    surroundFormatsEnabled, reported);
 }
 
+status_t AudioPolicyService::getHwOffloadEncodingFormatsSupportedForA2DP(
+                                        std::vector<audio_format_t> *formats)
+{
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    AutoCallerClear acc;
+    return mAudioPolicyManager->getHwOffloadEncodingFormatsSupportedForA2DP(formats);
+}
+
 status_t AudioPolicyService::setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled)
 {
     if (mAudioPolicyManager == NULL) {

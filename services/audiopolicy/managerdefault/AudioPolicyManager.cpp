@@ -446,6 +446,43 @@ status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
     return NO_ERROR;
 }
 
+status_t AudioPolicyManager::getHwOffloadEncodingFormatsSupportedForA2DP(
+                                    std::vector<audio_format_t> *formats)
+{
+    ALOGV("getHwOffloadEncodingFormatsSupportedForA2DP()");
+    char *tok = NULL, *saveptr;
+    status_t status = NO_ERROR;
+    char encoding_formats_list[PROPERTY_VALUE_MAX];
+    audio_format_t format = AUDIO_FORMAT_DEFAULT;
+    // FIXME This list should not come from a property but the supported encoded
+    // formats of declared A2DP devices in primary module
+    property_get("persist.bluetooth.a2dp_offload.cap", encoding_formats_list, "");
+    tok = strtok_r(encoding_formats_list, "-", &saveptr);
+    for (;tok != NULL; tok = strtok_r(NULL, "-", &saveptr)) {
+        if (strcmp(tok, "sbc") == 0) {
+            ALOGV("%s: SBC offload supported\n",__func__);
+            format = AUDIO_FORMAT_SBC;
+        } else if (strcmp(tok, "aptx") == 0) {
+            ALOGV("%s: APTX offload supported\n",__func__);
+            format = AUDIO_FORMAT_APTX;
+        } else if (strcmp(tok, "aptxhd") == 0) {
+            ALOGV("%s: APTX HD offload supported\n",__func__);
+            format = AUDIO_FORMAT_APTX_HD;
+        } else if (strcmp(tok, "ldac") == 0) {
+            ALOGV("%s: LDAC offload supported\n",__func__);
+            format = AUDIO_FORMAT_LDAC;
+        } else if (strcmp(tok, "aac") == 0) {
+            ALOGV("%s: AAC offload supported\n",__func__);
+            format = AUDIO_FORMAT_AAC;
+        } else {
+            ALOGE("%s: undefined token - %s\n",__func__, tok);
+            continue;
+        }
+        formats->push_back(format);
+    }
+    return status;
+}
+
 uint32_t AudioPolicyManager::updateCallRouting(const DeviceVector &rxDevices, uint32_t delayMs)
 {
     bool createTxPatch = false;
