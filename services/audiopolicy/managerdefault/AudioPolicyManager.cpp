@@ -1313,6 +1313,10 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
     audio_format_t bestFormat = AUDIO_FORMAT_INVALID;
     audio_format_t bestFormatForFlags = AUDIO_FORMAT_INVALID;
 
+    // Flags which must be present on both the request and the selected output
+    static const audio_output_flags_t kMandatedFlags = (audio_output_flags_t)
+        (AUDIO_OUTPUT_FLAG_HW_AV_SYNC | AUDIO_OUTPUT_FLAG_MMAP_NOIRQ);
+
     for (audio_io_handle_t output : outputs) {
         sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
         if (!outputDesc->isDuplicated()) {
@@ -1335,6 +1339,10 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
                 if (outputDesc->mChannelMask & AUDIO_CHANNEL_HAPTIC_ALL) {
                     continue;
                 }
+            }
+            if ((kMandatedFlags & flags) !=
+                (kMandatedFlags & outputDesc->mProfile->getFlags())) {
+                continue;
             }
 
             // if a valid format is specified, skip output if not compatible
