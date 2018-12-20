@@ -33,6 +33,7 @@ static const CodecProfileLevel kVP9ProfileLevels[] = {
     { OMX_VIDEO_VP9Profile0, OMX_VIDEO_VP9Level5 },
     { OMX_VIDEO_VP9Profile2, OMX_VIDEO_VP9Level5 },
     { OMX_VIDEO_VP9Profile2HDR, OMX_VIDEO_VP9Level5 },
+    { OMX_VIDEO_VP9Profile2HDR10Plus, OMX_VIDEO_VP9Level5 },
 };
 
 SoftVPX::SoftVPX(
@@ -81,6 +82,10 @@ static int GetCPUCoreCount() {
 }
 
 bool SoftVPX::supportDescribeHdrStaticInfo() {
+    return true;
+}
+
+bool SoftVPX::supportDescribeHdr10PlusInfo() {
     return true;
 }
 
@@ -167,7 +172,12 @@ bool SoftVPX::outputBuffers(bool flushDecoder, bool display, bool eos, bool *por
         outHeader->nOffset = 0;
         outHeader->nFlags = 0;
         outHeader->nFilledLen = (outputBufferWidth() * outputBufferHeight() * bpp * 3) / 2;
-        outHeader->nTimeStamp = *(OMX_TICKS *)mImg->user_priv;
+        PrivInfo *privInfo = (PrivInfo *)mImg->user_priv;
+        outHeader->nTimeStamp = privInfo->mTimeStamp;
+        if (privInfo->mHdr10PlusInfo != nullptr) {
+            queueOutputFrameConfig(privInfo->mHdr10PlusInfo);
+        }
+
         if (outputBufferSafe(outHeader)) {
             uint8_t *dst = outHeader->pBuffer;
             const uint8_t *srcY = (const uint8_t *)mImg->planes[VPX_PLANE_Y];
@@ -275,7 +285,13 @@ void SoftVPX::onQueueFilled(OMX_U32 /* portIndex */) {
             }
         }
 
-        mTimeStamps[mTimeStampIdx] = inHeader->nTimeStamp;
+        mPrivInfo[mTimeStampIdx].mTimeStamp = inHeader->nTimeStamp;
+
+        if (inInfo->mFrameConfig) {
+            mPrivInfo[mTimeStampIdx].mHdr10PlusInfo = dequeueInputFrameConfig();
+        } else {
+            mPrivInfo[mTimeStampIdx].mHdr10PlusInfo.clear();
+        }
 
         if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
             mEOSStatus = INPUT_EOS_SEEN;
@@ -285,7 +301,7 @@ void SoftVPX::onQueueFilled(OMX_U32 /* portIndex */) {
         if (inHeader->nFilledLen > 0) {
             vpx_codec_err_t err = vpx_codec_decode(
                     (vpx_codec_ctx_t *)mCtx, inHeader->pBuffer + inHeader->nOffset,
-                    inHeader->nFilledLen, &mTimeStamps[mTimeStampIdx], 0);
+                    inHeader->nFilledLen, &mPrivInfo[mTimeStampIdx], 0);
             if (err == VPX_CODEC_OK) {
                 inInfo->mOwnedByUs = false;
                 inQueue.erase(inQueue.begin());

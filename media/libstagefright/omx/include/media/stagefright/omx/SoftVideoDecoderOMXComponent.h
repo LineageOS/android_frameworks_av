@@ -20,6 +20,7 @@
 
 #include "SimpleSoftOMXComponent.h"
 
+#include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AHandlerReflector.h>
 #include <media/stagefright/foundation/ColorUtils.h>
 #include <media/IOMX.h>
@@ -28,6 +29,7 @@
 #include <utils/RefBase.h>
 #include <utils/threads.h>
 #include <utils/Vector.h>
+#include <utils/List.h>
 
 namespace android {
 
@@ -48,6 +50,7 @@ protected:
     enum {
         kDescribeColorAspectsIndex = kPrepareForAdaptivePlaybackIndex + 1,
         kDescribeHdrStaticInfoIndex = kPrepareForAdaptivePlaybackIndex + 2,
+        kDescribeHdr10PlusInfoIndex = kPrepareForAdaptivePlaybackIndex + 3,
     };
 
     enum {
@@ -68,8 +71,8 @@ protected:
     virtual OMX_ERRORTYPE getConfig(
             OMX_INDEXTYPE index, OMX_PTR params);
 
-    virtual OMX_ERRORTYPE setConfig(
-            OMX_INDEXTYPE index, const OMX_PTR params);
+    virtual OMX_ERRORTYPE internalSetConfig(
+            OMX_INDEXTYPE index, const OMX_PTR params, bool *frameConfig);
 
     virtual OMX_ERRORTYPE getExtensionIndex(
             const char *name, OMX_INDEXTYPE *index);
@@ -79,6 +82,8 @@ protected:
     virtual int getColorAspectPreference();
 
     virtual bool supportDescribeHdrStaticInfo();
+
+    virtual bool supportDescribeHdr10PlusInfo();
 
     // This function sets both minimum buffer count and actual buffer count of
     // input port to be |numInputBuffers|. It will also set both minimum buffer
@@ -166,6 +171,9 @@ protected:
     // Helper function to dump the ColorAspects.
     void dumpColorAspects(const ColorAspects &colorAspects);
 
+    sp<ABuffer> dequeueInputFrameConfig();
+    void queueOutputFrameConfig(const sp<ABuffer> &info);
+
 private:
     uint32_t mMinInputBufferSize;
     uint32_t mMinCompressionRatio;
@@ -174,6 +182,9 @@ private:
     OMX_VIDEO_CODINGTYPE mCodingType;
     const CodecProfileLevel *mProfileLevels;
     size_t mNumProfileLevels;
+    typedef List<sp<ABuffer> > Hdr10PlusInfoList;
+    Hdr10PlusInfoList mHdr10PlusInputs;
+    Hdr10PlusInfoList mHdr10PlusOutputs;
 
     DISALLOW_EVIL_CONSTRUCTORS(SoftVideoDecoderOMXComponent);
 };

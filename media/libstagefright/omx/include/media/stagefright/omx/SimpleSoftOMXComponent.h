@@ -20,6 +20,7 @@
 
 #include "SoftOMXComponent.h"
 
+#include <atomic>
 #include <media/stagefright/foundation/AHandlerReflector.h>
 #include <utils/RefBase.h>
 #include <utils/threads.h>
@@ -28,6 +29,7 @@
 namespace android {
 
 struct ALooper;
+struct ABuffer;
 
 struct CodecProfileLevel {
     OMX_U32 mProfile;
@@ -49,6 +51,7 @@ protected:
     struct BufferInfo {
         OMX_BUFFERHEADERTYPE *mHeader;
         bool mOwnedByUs;
+        bool mFrameConfig;
     };
 
     struct PortInfo {
@@ -76,6 +79,9 @@ protected:
     virtual OMX_ERRORTYPE internalSetParameter(
             OMX_INDEXTYPE index, const OMX_PTR params);
 
+    virtual OMX_ERRORTYPE internalSetConfig(
+            OMX_INDEXTYPE index, const OMX_PTR params, bool *frameConfig);
+
     virtual void onQueueFilled(OMX_U32 portIndex);
     List<BufferInfo *> &getPortQueue(OMX_U32 portIndex);
 
@@ -101,6 +107,7 @@ private:
     OMX_STATETYPE mTargetState;
 
     Vector<PortInfo> mPorts;
+    std::atomic_bool mFrameConfig;
 
     bool isSetParameterAllowed(
             OMX_INDEXTYPE index, const OMX_PTR params) const;
@@ -112,6 +119,9 @@ private:
             OMX_INDEXTYPE index, OMX_PTR params);
 
     virtual OMX_ERRORTYPE setParameter(
+            OMX_INDEXTYPE index, const OMX_PTR params);
+
+    virtual OMX_ERRORTYPE setConfig(
             OMX_INDEXTYPE index, const OMX_PTR params);
 
     virtual OMX_ERRORTYPE useBuffer(
