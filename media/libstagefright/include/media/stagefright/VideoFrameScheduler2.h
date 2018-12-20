@@ -14,27 +14,33 @@
  * limitations under the License.
  */
 
-#ifndef VIDEO_FRAME_SCHEDULER_H_
-#define VIDEO_FRAME_SCHEDULER_H_
+#ifndef VIDEO_FRAME_SCHEDULER_2_H_
+#define VIDEO_FRAME_SCHEDULER_2_H_
 
 #include <media/stagefright/VideoFrameSchedulerBase.h>
 
 namespace android {
 
-class ISurfaceComposer;
+class VsyncTracker;
+struct ChoreographerThread;
 
-struct VideoFrameScheduler : public VideoFrameSchedulerBase {
-    VideoFrameScheduler();
+struct VideoFrameScheduler2 : public VideoFrameSchedulerBase {
+    VideoFrameScheduler2();
     void release() override;
 
 protected:
-    virtual ~VideoFrameScheduler();
+    virtual ~VideoFrameScheduler2();
 
 private:
     void updateVsync() override;
-    sp<ISurfaceComposer> mComposer;
+
+    long mAppVsyncOffset;
+    long mSfVsyncOffset;
+    sp<VsyncTracker> mVsyncTracker;
+    sp<ChoreographerThread> mChoreographerThread;
+    Mutex mLock;
 };
 
 }  // namespace android
 
-#endif  // VIDEO_FRAME_SCHEDULER_H_
+#endif  // VIDEO_FRAME_SCHEDULER_2_H_
