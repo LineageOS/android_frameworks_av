@@ -38,26 +38,26 @@ public:
 
     status_t initCheck();
 
-    status_t allocateBuffers(MediaBufferGroupHelperV3 *group);
+    status_t allocateBuffers(MediaBufferGroupHelper *group);
     status_t releaseBuffers();
     status_t seekTo(int64_t positionUs);
-    MediaBufferHelperV3* readBuffer();
+    MediaBufferHelper* readBuffer();
 private:
     MidiIoWrapper *mIoWrapper;
-    MediaBufferGroupHelperV3 *mGroup;
+    MediaBufferGroupHelper *mGroup;
     EAS_DATA_HANDLE mEasData;
     EAS_HANDLE mEasHandle;
     const S_EAS_LIB_CONFIG* mEasConfig;
     bool mIsInitialized;
 };
 
-class MidiExtractor : public MediaExtractorPluginHelperV3 {
+class MidiExtractor : public MediaExtractorPluginHelper {
 
 public:
     explicit MidiExtractor(CDataSource *source);
 
     virtual size_t countTracks();
-    virtual MediaTrackHelperV3 *getTrack(size_t index);
+    virtual MediaTrackHelper *getTrack(size_t index);
     virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
     virtual media_status_t getMetaData(AMediaFormat *meta);

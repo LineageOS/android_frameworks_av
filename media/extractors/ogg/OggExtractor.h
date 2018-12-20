@@ -31,11 +31,11 @@ class String8;
 struct MyOggExtractor;
 struct OggSource;
 
-struct OggExtractor : public MediaExtractorPluginHelperV3 {
+struct OggExtractor : public MediaExtractorPluginHelper {
     explicit OggExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
-    virtual MediaTrackHelperV3 *getTrack(size_t index);
+    virtual MediaTrackHelper *getTrack(size_t index);
     virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
     virtual media_status_t getMetaData(AMediaFormat *meta);

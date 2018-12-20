@@ -66,7 +66,7 @@ static uint16_t U16_LE_AT(const uint8_t *ptr) {
     return ptr[1] << 8 | ptr[0];
 }
 
-struct WAVSource : public MediaTrackHelperV3 {
+struct WAVSource : public MediaTrackHelper {
     WAVSource(
             DataSourceHelper *dataSource,
             AMediaFormat *meta,
@@ -79,7 +79,7 @@ struct WAVSource : public MediaTrackHelperV3 {
     virtual media_status_t getFormat(AMediaFormat *meta);
 
     virtual media_status_t read(
-            MediaBufferHelperV3 **buffer, const ReadOptions *options = NULL);
+            MediaBufferHelper **buffer, const ReadOptions *options = NULL);
 
     virtual bool supportNonblockingRead() { return true; }
 
@@ -131,7 +131,7 @@ size_t WAVExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrackHelperV3 *WAVExtractor::getTrack(size_t index) {
+MediaTrackHelper *WAVExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index > 0) {
         return NULL;
     }
@@ -428,7 +428,7 @@ media_status_t WAVSource::getFormat(AMediaFormat *meta) {
 }
 
 media_status_t WAVSource::read(
-        MediaBufferHelperV3 **out, const ReadOptions *options) {
+        MediaBufferHelper **out, const ReadOptions *options) {
     *out = NULL;
 
     if (options != nullptr && options->getNonBlocking() && !mBufferGroup->has_buffers()) {
@@ -454,7 +454,7 @@ media_status_t WAVSource::read(
         mCurrentPos = pos + mOffset;
     }
 
-    MediaBufferHelperV3 *buffer;
+    MediaBufferHelper *buffer;
     media_status_t err = mBufferGroup->acquire_buffer(&buffer);
     if (err != OK) {
         return err;
@@ -581,13 +581,13 @@ media_status_t WAVSource::read(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static CMediaExtractorV3* CreateExtractor(
+static CMediaExtractor* CreateExtractor(
         CDataSource *source,
         void *) {
-    return wrapV3(new WAVExtractor(new DataSourceHelper(source)));
+    return wrap(new WAVExtractor(new DataSourceHelper(source)));
 }
 
-static CreatorFuncV3 Sniff(
+static CreatorFunc Sniff(
         CDataSource *source,
         float *confidence,
         void **,
@@ -621,11 +621,11 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION_CURRENT + 1,
+        EXTRACTORDEF_VERSION,
         UUID("7d613858-5837-4a38-84c5-332d1cddee27"),
         1, // version
         "WAV Extractor",
-        { .v3 = Sniff }
+        { .v2 = Sniff }
     };
 }
 

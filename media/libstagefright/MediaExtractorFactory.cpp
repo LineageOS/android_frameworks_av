@@ -106,24 +106,12 @@ sp<IMediaExtractor> MediaExtractorFactory::CreateFromService(
     }
 
     MediaExtractor *ex = nullptr;
-    if (creatorVersion == 1) {
-        CMediaExtractor *ret = ((CreatorFuncV1)creator)(source->wrap(), meta);
+    if (creatorVersion == EXTRACTORDEF_VERSION_NDK_V1) {
+        CMediaExtractor *ret = ((CreatorFunc)creator)(source->wrap(), meta);
         if (meta != nullptr && freeMeta != nullptr) {
             freeMeta(meta);
         }
-        ex = ret != nullptr ? new MediaExtractorCUnwrapperV1(ret) : nullptr;
-    } else if (creatorVersion == 2) {
-        CMediaExtractorV2 *ret = ((CreatorFuncV2)creator)(source->wrap(), meta);
-        if (meta != nullptr && freeMeta != nullptr) {
-            freeMeta(meta);
-        }
-        ex = ret != nullptr ? new MediaExtractorCUnwrapperV2(ret) : nullptr;
-    } else if (creatorVersion == 3) {
-        CMediaExtractorV3 *ret = ((CreatorFuncV3)creator)(source->wrap(), meta);
-        if (meta != nullptr && freeMeta != nullptr) {
-            freeMeta(meta);
-        }
-        ex = ret != nullptr ? new MediaExtractorCUnwrapperV3(ret) : nullptr;
+        ex = ret != nullptr ? new MediaExtractorCUnwrapper(ret) : nullptr;
     }
 
     ALOGV("Created an extractor '%s' with confidence %.2f",
@@ -195,14 +183,8 @@ void *MediaExtractorFactory::sniff(
         FreeMetaFunc newFreeMeta = nullptr;
 
         void *curCreator = NULL;
-        if ((*it)->def.def_version == 1) {
-            curCreator = (void*) (*it)->def.sniff.v1(
-                    source->wrap(), &newConfidence, &newMeta, &newFreeMeta);
-        } else if ((*it)->def.def_version == 2) {
+        if ((*it)->def.def_version == EXTRACTORDEF_VERSION_NDK_V1) {
             curCreator = (void*) (*it)->def.sniff.v2(
-                    source->wrap(), &newConfidence, &newMeta, &newFreeMeta);
-        } else if ((*it)->def.def_version == 3) {
-            curCreator = (void*) (*it)->def.sniff.v3(
                     source->wrap(), &newConfidence, &newMeta, &newFreeMeta);
         }
 
@@ -232,8 +214,7 @@ void *MediaExtractorFactory::sniff(
 void MediaExtractorFactory::RegisterExtractor(const sp<ExtractorPlugin> &plugin,
         std::list<sp<ExtractorPlugin>> &pluginList) {
     // sanity check check struct version, uuid, name
-    if (plugin->def.def_version == 0
-            || plugin->def.def_version > EXTRACTORDEF_VERSION_CURRENT + 1) {
+    if (plugin->def.def_version != EXTRACTORDEF_VERSION_NDK_V1) {
         ALOGE("don't understand extractor format %u, ignoring.", plugin->def.def_version);
         return;
     }

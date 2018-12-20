@@ -32,13 +32,13 @@ struct MP3Seeker;
 class String8;
 struct Mp3Meta;
 
-class MP3Extractor : public MediaExtractorPluginHelperV3 {
+class MP3Extractor : public MediaExtractorPluginHelper {
 public:
     MP3Extractor(DataSourceHelper *source, Mp3Meta *meta);
     ~MP3Extractor();
 
     virtual size_t countTracks();
-    virtual MediaTrackHelperV3 *getTrack(size_t index);
+    virtual MediaTrackHelper *getTrack(size_t index);
     virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
     virtual media_status_t getMetaData(AMediaFormat *meta);

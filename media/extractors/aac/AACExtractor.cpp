@@ -31,7 +31,7 @@
 
 namespace android {
 
-class AACSource : public MediaTrackHelperV3 {
+class AACSource : public MediaTrackHelper {
 public:
     AACSource(
             DataSourceHelper *source,
@@ -45,7 +45,7 @@ public:
     virtual media_status_t getFormat(AMediaFormat*);
 
     virtual media_status_t read(
-            MediaBufferHelperV3 **buffer, const ReadOptions *options = NULL);
+            MediaBufferHelper **buffer, const ReadOptions *options = NULL);
 
 protected:
     virtual ~AACSource();
@@ -195,7 +195,7 @@ size_t AACExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrackHelperV3 *AACExtractor::getTrack(size_t index) {
+MediaTrackHelper *AACExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index != 0) {
         return NULL;
     }
@@ -264,7 +264,7 @@ media_status_t AACSource::getFormat(AMediaFormat *meta) {
 }
 
 media_status_t AACSource::read(
-        MediaBufferHelperV3 **out, const ReadOptions *options) {
+        MediaBufferHelper **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t seekTimeUs;
@@ -287,7 +287,7 @@ media_status_t AACSource::read(
         return AMEDIA_ERROR_END_OF_STREAM;
     }
 
-    MediaBufferHelperV3 *buffer;
+    MediaBufferHelper *buffer;
     status_t err = mBufferGroup->acquire_buffer(&buffer);
     if (err != OK) {
         return AMEDIA_ERROR_UNKNOWN;
@@ -316,14 +316,14 @@ media_status_t AACSource::read(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static CMediaExtractorV3* CreateExtractor(
+static CMediaExtractor* CreateExtractor(
         CDataSource *source,
         void *meta) {
     off64_t offset = *static_cast<off64_t*>(meta);
-    return wrapV3(new AACExtractor(new DataSourceHelper(source), offset));
+    return wrap(new AACExtractor(new DataSourceHelper(source), offset));
 }
 
-static CreatorFuncV3 Sniff(
+static CreatorFunc Sniff(
         CDataSource *source, float *confidence, void **meta,
         FreeMetaFunc *freeMeta) {
     off64_t pos = 0;
@@ -383,11 +383,11 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION_CURRENT + 1,
+        EXTRACTORDEF_VERSION,
         UUID("4fd80eae-03d2-4d72-9eb9-48fa6bb54613"),
         1, // version
         "AAC Extractor",
-        { .v3 = Sniff }
+        { .v2 = Sniff }
     };
 }
 
