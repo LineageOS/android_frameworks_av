@@ -146,7 +146,6 @@ cc_library {
         "libdl",
         "libdrmframework",
         "libgui",
-        "libion",
         "liblog",
         "libmedia",
         "libmedia_omx",
@@ -154,7 +153,6 @@ cc_library {
         "libmediaextractor",
         "libmediametrics",
         "libmediautils",
-        "libnetd_client",
         "libui",
         "libutils",
         "libmedia_helper",
@@ -162,7 +160,6 @@ cc_library {
         "libstagefright_foundation",
         "libstagefright_omx_utils",
         "libstagefright_opus_common",
-        "libstagefright_xmlparser",
         "libRScpp",
         "libhidlallocatorutils",
         "libhidlbase",
@@ -171,8 +168,6 @@ cc_library {
         "android.hidl.allocator@1.0",
         "android.hardware.cas.native@1.0",
         "android.hardware.media.omx@1.0",
-        "android.hardware.graphics.allocator@2.0",
-        "android.hardware.graphics.mapper@2.0",
     ],
 
     static_libs: [
@@ -190,6 +185,7 @@ cc_library {
     ],
 
     header_libs:[
+        "libstagefright_xmlparser_headers",
         "media_ndk_headers",
     ],
 

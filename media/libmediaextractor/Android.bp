@@ -27,7 +27,6 @@ cc_library {
         "libbinder",
         "libstagefright_foundation",
         "libutils",
-        "libcutils",
         "liblog",
     ],
 
