@@ -92,18 +92,18 @@ bool parseBoolean(const char* s) {
 status_t limitFoundMissingAttr(const char* name, const char *attr, bool found = true) {
     ALOGE("limit '%s' with %s'%s' attribute", name,
             (found ? "" : "no "), attr);
-    return -EINVAL;
+    return BAD_VALUE;
 }
 
 status_t limitError(const char* name, const char *msg) {
     ALOGE("limit '%s' %s", name, msg);
-    return -EINVAL;
+    return BAD_VALUE;
 }
 
 status_t limitInvalidAttr(const char* name, const char* attr, const char* value) {
     ALOGE("limit '%s' with invalid '%s' attribute (%s)", name,
             attr, value);
-    return -EINVAL;
+    return BAD_VALUE;
 }
 
 }; // unnamed namespace
@@ -232,12 +232,12 @@ status_t MediaCodecsXmlParser::includeXMLFile(const char **attrs) {
     while (attrs[i] != nullptr) {
         if (strEq(attrs[i], "href")) {
             if (attrs[++i] == nullptr) {
-                return -EINVAL;
+                return BAD_VALUE;
             }
             href = attrs[i];
         } else {
             ALOGE("includeXMLFile: unrecognized attribute: %s", attrs[i]);
-            return -EINVAL;
+            return BAD_VALUE;
         }
         ++i;
     }
@@ -252,32 +252,32 @@ status_t MediaCodecsXmlParser::includeXMLFile(const char **attrs) {
             continue;
         }
         ALOGE("invalid include file name: %s", href);
-        return -EINVAL;
+        return BAD_VALUE;
     }
 
     std::string filename = href;
     if (filename.compare(0, 13, "media_codecs_") != 0 ||
             filename.compare(filename.size() - 4, 4, ".xml") != 0) {
         ALOGE("invalid include file name: %s", href);
-        return -EINVAL;
+        return BAD_VALUE;
     }
     filename.insert(0, mHrefBase);
 
+    status_t oldParsingStatus = mParsingStatus;
+
     parseXMLFile(filename.c_str());
-    return mParsingStatus;
+
+    status_t newParsingStatus = mParsingStatus;
+    mParsingStatus = oldParsingStatus;
+    return newParsingStatus;
 }
 
 void MediaCodecsXmlParser::startElementHandler(
         const char *name, const char **attrs) {
-    if (mParsingStatus != OK) {
-        return;
-    }
-
     bool inType = true;
 
     if (strEq(name, "Include")) {
-        mParsingStatus = includeXMLFile(attrs);
-        if (mParsingStatus == OK) {
+        if (includeXMLFile(attrs) == OK) {
             mSectionStack.push_back(mCurrentSection);
             mCurrentSection = SECTION_INCLUDE;
         }
@@ -300,7 +300,7 @@ void MediaCodecsXmlParser::startElementHandler(
         case SECTION_SETTINGS:
         {
             if (strEq(name, "Setting")) {
-                mParsingStatus = addSettingFromAttributes(attrs);
+                (void)addSettingFromAttributes(attrs);
             }
             break;
         }
@@ -308,9 +308,7 @@ void MediaCodecsXmlParser::startElementHandler(
         case SECTION_DECODERS:
         {
             if (strEq(name, "MediaCodec")) {
-                mParsingStatus =
-                    addMediaCodecFromAttributes(false /* encoder */, attrs);
-
+                (void)addMediaCodecFromAttributes(false /* encoder */, attrs);
                 mCurrentSection = SECTION_DECODER;
             }
             break;
@@ -319,9 +317,7 @@ void MediaCodecsXmlParser::startElementHandler(
         case SECTION_ENCODERS:
         {
             if (strEq(name, "MediaCodec")) {
-                mParsingStatus =
-                    addMediaCodecFromAttributes(true /* encoder */, attrs);
-
+                (void)addMediaCodecFromAttributes(true /* encoder */, attrs);
                 mCurrentSection = SECTION_ENCODER;
             }
             break;
@@ -331,9 +327,9 @@ void MediaCodecsXmlParser::startElementHandler(
         case SECTION_ENCODER:
         {
             if (strEq(name, "Quirk")) {
-                mParsingStatus = addQuirk(attrs);
+                (void)addQuirk(attrs);
             } else if (strEq(name, "Type")) {
-                mParsingStatus = addTypeFromAttributes(attrs,
+                (void)addTypeFromAttributes(attrs,
                         (mCurrentSection == SECTION_ENCODER));
                 mCurrentSection =
                         (mCurrentSection == SECTION_DECODER ?
@@ -353,9 +349,9 @@ void MediaCodecsXmlParser::startElementHandler(
                     (strEq(name, "Limit") || strEq(name, "Feature"))) {
                 ALOGW("ignoring %s specified outside of a Type", name);
             } else if (strEq(name, "Limit")) {
-                mParsingStatus = addLimit(attrs);
+                (void)addLimit(attrs);
             } else if (strEq(name, "Feature")) {
-                mParsingStatus = addFeature(attrs);
+                (void)addFeature(attrs);
             }
             break;
         }
@@ -367,10 +363,6 @@ void MediaCodecsXmlParser::startElementHandler(
 }
 
 void MediaCodecsXmlParser::endElementHandler(const char *name) {
-    if (mParsingStatus != OK) {
-        return;
-    }
-
     switch (mCurrentSection) {
         case SECTION_SETTINGS:
         {
@@ -452,31 +444,31 @@ status_t MediaCodecsXmlParser::addSettingFromAttributes(const char **attrs) {
         if (strEq(attrs[i], "name")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addSettingFromAttributes: name is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             name = attrs[i];
         } else if (strEq(attrs[i], "value")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addSettingFromAttributes: value is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             value = attrs[i];
         } else if (strEq(attrs[i], "update")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addSettingFromAttributes: update is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             update = attrs[i];
         } else {
             ALOGE("addSettingFromAttributes: unrecognized attribute: %s", attrs[i]);
-            return -EINVAL;
+            return BAD_VALUE;
         }
         ++i;
     }
 
     if (name == nullptr || value == nullptr) {
         ALOGE("addSettingFromAttributes: name or value unspecified");
-        return -EINVAL;
+        return BAD_VALUE;
     }
 
     // Boolean values are converted to "0" or "1".
@@ -489,7 +481,7 @@ status_t MediaCodecsXmlParser::addSettingFromAttributes(const char **attrs) {
     if (attribute == mServiceAttributeMap.end()) { // New attribute name
         if (mUpdate) {
             ALOGE("addSettingFromAttributes: updating non-existing setting");
-            return -EINVAL;
+            return BAD_VALUE;
         }
         mServiceAttributeMap.insert(Attribute(name, value));
     } else { // Existing attribute name
@@ -513,39 +505,40 @@ status_t MediaCodecsXmlParser::addMediaCodecFromAttributes(
         if (strEq(attrs[i], "name")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addMediaCodecFromAttributes: name is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             name = attrs[i];
         } else if (strEq(attrs[i], "type")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addMediaCodecFromAttributes: type is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             type = attrs[i];
         } else if (strEq(attrs[i], "update")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addMediaCodecFromAttributes: update is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             update = attrs[i];
         } else {
             ALOGE("addMediaCodecFromAttributes: unrecognized attribute: %s", attrs[i]);
-            return -EINVAL;
+            return BAD_VALUE;
         }
         ++i;
     }
 
     if (name == nullptr) {
         ALOGE("addMediaCodecFromAttributes: name not found");
-        return -EINVAL;
+        return BAD_VALUE;
     }
 
     mUpdate = (update != nullptr) && parseBoolean(update);
     mCurrentCodec = mCodecMap.find(name);
     if (mCurrentCodec == mCodecMap.end()) { // New codec name
         if (mUpdate) {
-            ALOGE("addMediaCodecFromAttributes: updating non-existing codec");
-            return -EINVAL;
+            ALOGW("addMediaCodecFromAttributes: cannot update "
+                  "non-existing codec \"%s\".", name);
+            return BAD_VALUE;
         }
         // Create a new codec in mCodecMap
         mCurrentCodec = mCodecMap.insert(
@@ -560,18 +553,26 @@ status_t MediaCodecsXmlParser::addMediaCodecFromAttributes(
         mCurrentCodec->second.order = mCodecCounter++;
     } else { // Existing codec name
         if (!mUpdate) {
-            ALOGE("addMediaCodecFromAttributes: adding existing codec");
-            return -EINVAL;
+            ALOGW("addMediaCodecFromAttributes: trying to add "
+                  "existing codec \"%s\"", name);
+            return ALREADY_EXISTS;
         }
         if (type != nullptr) {
             mCurrentType = mCurrentCodec->second.typeMap.find(type);
             if (mCurrentType == mCurrentCodec->second.typeMap.end()) {
-                ALOGE("addMediaCodecFromAttributes: updating non-existing type");
-                return -EINVAL;
+                ALOGE("addMediaCodecFromAttributes: cannot update "
+                      "non-existing type \"%s\" for codec \"%s\"",
+                        type, name);
+                return BAD_VALUE;
             }
         } else {
             // This should happen only when the codec has at most one type.
             mCurrentType = mCurrentCodec->second.typeMap.begin();
+            if (mCurrentType == mCurrentCodec->second.typeMap.end()) {
+                ALOGE("addMediaCodecFromAttributes: cannot update "
+                      "codec \"%s\" without type specified", name);
+                return BAD_VALUE;
+            }
         }
     }
 
@@ -579,6 +580,10 @@ status_t MediaCodecsXmlParser::addMediaCodecFromAttributes(
 }
 
 status_t MediaCodecsXmlParser::addQuirk(const char **attrs) {
+    if (mCurrentCodec == mCodecMap.end()) {
+        return BAD_VALUE;
+    }
+
     const char *name = nullptr;
 
     size_t i = 0;
@@ -586,19 +591,19 @@ status_t MediaCodecsXmlParser::addQuirk(const char **attrs) {
         if (strEq(attrs[i], "name")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addQuirk: name is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             name = attrs[i];
         } else {
             ALOGE("addQuirk: unrecognized attribute: %s", attrs[i]);
-            return -EINVAL;
+            return BAD_VALUE;
         }
         ++i;
     }
 
     if (name == nullptr) {
         ALOGE("addQuirk: name not found");
-        return -EINVAL;
+        return BAD_VALUE;
     }
 
     mCurrentCodec->second.quirkSet.emplace(name);
@@ -606,6 +611,10 @@ status_t MediaCodecsXmlParser::addQuirk(const char **attrs) {
 }
 
 status_t MediaCodecsXmlParser::addTypeFromAttributes(const char **attrs, bool encoder) {
+    if (mCurrentCodec == mCodecMap.end()) {
+        return BAD_VALUE;
+    }
+
     const char *name = nullptr;
     const char *update = nullptr;
 
@@ -614,42 +623,51 @@ status_t MediaCodecsXmlParser::addTypeFromAttributes(const char **attrs, bool en
         if (strEq(attrs[i], "name")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addTypeFromAttributes: name is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             name = attrs[i];
         } else if (strEq(attrs[i], "update")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addTypeFromAttributes: update is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             update = attrs[i];
         } else {
             ALOGE("addTypeFromAttributes: unrecognized attribute: %s", attrs[i]);
-            return -EINVAL;
+            return BAD_VALUE;
         }
         ++i;
     }
 
     if (name == nullptr) {
-        return -EINVAL;
+        return BAD_VALUE;
     }
 
     mCurrentCodec->second.isEncoder = encoder;
     mCurrentType = mCurrentCodec->second.typeMap.find(name);
     if (!mUpdate) {
         if (mCurrentType != mCurrentCodec->second.typeMap.end()) {
-            ALOGE("addTypeFromAttributes: re-defining existing type without update");
-            return -EINVAL;
+            ALOGW("addTypeFromAttributes: trying to update "
+                  "existing type \"%s\"", name);
+            return ALREADY_EXISTS;
         }
         mCurrentType = mCurrentCodec->second.typeMap.insert(
                 Type(name, AttributeMap())).first;
     } else if (mCurrentType == mCurrentCodec->second.typeMap.end()) {
         ALOGE("addTypeFromAttributes: updating non-existing type");
+        return BAD_VALUE;
     }
     return OK;
 }
 
 status_t MediaCodecsXmlParser::addLimit(const char **attrs) {
+    if (mCurrentCodec == mCodecMap.end()) {
+        return BAD_VALUE;
+    }
+    if (mCurrentType == mCurrentCodec->second.typeMap.end()) {
+        return BAD_VALUE;
+    }
+
     const char* a_name = nullptr;
     const char* a_default = nullptr;
     const char* a_in = nullptr;
@@ -665,78 +683,73 @@ status_t MediaCodecsXmlParser::addLimit(const char **attrs) {
         if (strEq(attrs[i], "name")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addLimit: name is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             a_name = attrs[i];
         } else if (strEq(attrs[i], "default")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addLimit: default is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             a_default = attrs[i];
         } else if (strEq(attrs[i], "in")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addLimit: in is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             a_in = attrs[i];
         } else if (strEq(attrs[i], "max")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addLimit: max is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             a_max = attrs[i];
         } else if (strEq(attrs[i], "min")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addLimit: min is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             a_min = attrs[i];
         } else if (strEq(attrs[i], "range")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addLimit: range is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             a_range = attrs[i];
         } else if (strEq(attrs[i], "ranges")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addLimit: ranges is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             a_ranges = attrs[i];
         } else if (strEq(attrs[i], "scale")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addLimit: scale is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             a_scale = attrs[i];
         } else if (strEq(attrs[i], "value")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addLimit: value is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             a_value = attrs[i];
         } else {
             ALOGE("addLimit: unrecognized limit: %s", attrs[i]);
-            return -EINVAL;
+            return BAD_VALUE;
         }
         ++i;
     }
 
     if (a_name == nullptr) {
         ALOGE("limit with no 'name' attribute");
-        return -EINVAL;
+        return BAD_VALUE;
     }
 
     // size, blocks, bitrate, frame-rate, blocks-per-second, aspect-ratio,
     // measured-frame-rate, measured-blocks-per-second: range
     // quality: range + default + [scale]
     // complexity: range + default
-    if (mCurrentType == mCurrentCodec->second.typeMap.end()) {
-        ALOGW("ignoring null type");
-        return OK;
-    }
-
     std::string range;
     if (strEq(a_name, "aspect-ratio") ||
             strEq(a_name, "bitrate") ||
@@ -880,6 +893,13 @@ status_t MediaCodecsXmlParser::addLimit(const char **attrs) {
 }
 
 status_t MediaCodecsXmlParser::addFeature(const char **attrs) {
+    if (mCurrentCodec == mCodecMap.end()) {
+        return BAD_VALUE;
+    }
+    if (mCurrentType == mCurrentCodec->second.typeMap.end()) {
+        return BAD_VALUE;
+    }
+
     size_t i = 0;
     const char *name = nullptr;
     int32_t optional = -1;
@@ -890,30 +910,30 @@ status_t MediaCodecsXmlParser::addFeature(const char **attrs) {
         if (strEq(attrs[i], "name")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addFeature: name is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             name = attrs[i];
         } else if (strEq(attrs[i], "optional")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addFeature: optional is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             optional = parseBoolean(attrs[i]) ? 1 : 0;
         } else if (strEq(attrs[i], "required")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addFeature: required is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             required = parseBoolean(attrs[i]) ? 1 : 0;
         } else if (strEq(attrs[i], "value")) {
             if (attrs[++i] == nullptr) {
                 ALOGE("addFeature: value is null");
-                return -EINVAL;
+                return BAD_VALUE;
             }
             value = attrs[i];
         } else {
             ALOGE("addFeature: unrecognized attribute: %s", attrs[i]);
-            return -EINVAL;
+            return BAD_VALUE;
         }
         ++i;
     }
@@ -921,23 +941,18 @@ status_t MediaCodecsXmlParser::addFeature(const char **attrs) {
     // Every feature must have a name.
     if (name == nullptr) {
         ALOGE("feature with no 'name' attribute");
-        return -EINVAL;
-    }
-
-    if (mCurrentType == mCurrentCodec->second.typeMap.end()) {
-        ALOGW("ignoring null type");
-        return OK;
+        return BAD_VALUE;
     }
 
     if ((optional != -1) || (required != -1)) {
         if (optional == required) {
             ALOGE("feature '%s' is both/neither optional and required", name);
-            return -EINVAL;
+            return BAD_VALUE;
         }
         if ((optional == 1) || (required == 1)) {
             if (value != nullptr) {
                 ALOGE("feature '%s' cannot have extra 'value'", name);
-                return -EINVAL;
+                return BAD_VALUE;
             }
             mCurrentType->second[std::string("feature-") + name] =
                     optional == 1 ? "0" : "1";
