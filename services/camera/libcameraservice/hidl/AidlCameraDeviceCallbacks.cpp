@@ -139,18 +139,18 @@ void H2BCameraDeviceCallbacks::CallbackHandler::processResultMessage(
     }
     CameraMetadataNative &result = resultWrapper->mResult;
     auto resultExtras = resultWrapper->mResultExtras;
-    auto &physicalCaptureResultInfos = resultWrapper->mPhysicalCaptureResultInfos;
     HCaptureResultExtras hResultExtras =
             hardware::cameraservice::utils::conversion::convertToHidl(resultExtras);
-    hidl_vec<HPhysicalCaptureResultInfo> hPhysicalCaptureResultInfos =
-            hardware::cameraservice::utils::conversion::convertToHidl(
-                    physicalCaptureResultInfos, converter->mCaptureResultMetadataQueue);
 
     // Convert Metadata into HCameraMetadata;
     FmqSizeOrMetadata hResult;
     const camera_metadata_t *rawMetadata = result.getAndLock();
     converter->convertResultMetadataToHidl(rawMetadata, &hResult);
     result.unlock(rawMetadata);
+    auto &physicalCaptureResultInfos = resultWrapper->mPhysicalCaptureResultInfos;
+    hidl_vec<HPhysicalCaptureResultInfo> hPhysicalCaptureResultInfos =
+            hardware::cameraservice::utils::conversion::convertToHidl(
+                    physicalCaptureResultInfos, converter->mCaptureResultMetadataQueue);
     auto ret = converter->mBase->onResultReceived(hResult, hResultExtras,
                                                   hPhysicalCaptureResultInfos);
     if (!ret.isOk()) {

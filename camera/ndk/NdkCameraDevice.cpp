@@ -129,6 +129,20 @@ camera_status_t ACaptureSessionSharedOutput_create(
 }
 
 EXPORT
+camera_status_t ACaptureSessionPhysicalOutput_create(
+        ACameraWindowType* window, const char* physicalId,
+        /*out*/ACaptureSessionOutput** out) {
+    ATRACE_CALL();
+    if (window == nullptr || physicalId == nullptr || out == nullptr) {
+        ALOGE("%s: Error: bad argument. window %p, physicalId %p, out %p",
+                __FUNCTION__, window, physicalId, out);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    *out = new ACaptureSessionOutput(window, false, physicalId);
+    return ACAMERA_OK;
+}
+
+EXPORT
 camera_status_t ACaptureSessionSharedOutput_add(ACaptureSessionOutput *out,
         ACameraWindowType* window) {
     ATRACE_CALL();

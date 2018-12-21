@@ -107,47 +107,6 @@ ACameraCaptureSession::abortCaptures() {
     return ret;
 }
 
-camera_status_t
-ACameraCaptureSession::setRepeatingRequest(
-        /*optional*/ACameraCaptureSession_captureCallbacks* cbs,
-        int numRequests, ACaptureRequest** requests,
-        /*optional*/int* captureSequenceId) {
-    sp<acam::CameraDevice> dev = getDeviceSp();
-    if (dev == nullptr) {
-        ALOGE("Error: Device associated with session %p has been closed!", this);
-        return ACAMERA_ERROR_SESSION_CLOSED;
-    }
-
-    camera_status_t ret;
-    dev->lockDeviceForSessionOps();
-    {
-        Mutex::Autolock _l(mSessionLock);
-        ret = dev->setRepeatingRequestsLocked(
-                this, cbs, numRequests, requests, captureSequenceId);
-    }
-    dev->unlockDevice();
-    return ret;
-}
-
-camera_status_t ACameraCaptureSession::capture(
-        /*optional*/ACameraCaptureSession_captureCallbacks* cbs,
-        int numRequests, ACaptureRequest** requests,
-        /*optional*/int* captureSequenceId) {
-    sp<acam::CameraDevice> dev = getDeviceSp();
-    if (dev == nullptr) {
-        ALOGE("Error: Device associated with session %p has been closed!", this);
-        return ACAMERA_ERROR_SESSION_CLOSED;
-    }
-    camera_status_t ret;
-    dev->lockDeviceForSessionOps();
-    {
-        Mutex::Autolock _l(mSessionLock);
-        ret = dev->captureLocked(this, cbs, numRequests, requests, captureSequenceId);
-    }
-    dev->unlockDevice();
-    return ret;
-}
-
 camera_status_t ACameraCaptureSession::updateOutputConfiguration(ACaptureSessionOutput *output) {
     sp<acam::CameraDevice> dev = getDeviceSp();
     if (dev == nullptr) {

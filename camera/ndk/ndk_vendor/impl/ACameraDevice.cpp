@@ -29,6 +29,8 @@
 #include "ACaptureRequest.h"
 #include "utils.h"
 
+#include "ACameraCaptureSession.inc"
+
 using namespace android;
 
 namespace android {
@@ -47,6 +49,7 @@ const char* CameraDevice::kSessionSpKey      = "SessionSp";
 const char* CameraDevice::kCaptureRequestKey = "CaptureRequest";
 const char* CameraDevice::kTimeStampKey      = "TimeStamp";
 const char* CameraDevice::kCaptureResultKey  = "CaptureResult";
+const char* CameraDevice::kPhysicalCaptureResultKey = "PhysicalCaptureResult";
 const char* CameraDevice::kCaptureFailureKey = "CaptureFailure";
 const char* CameraDevice::kSequenceIdKey     = "SequenceId";
 const char* CameraDevice::kFrameNumberKey    = "FrameNumber";
@@ -206,28 +209,8 @@ CameraDevice::createCaptureSession(
     return ACAMERA_OK;
 }
 
-camera_status_t
-CameraDevice::captureLocked(
-        sp<ACameraCaptureSession> session,
-        /*optional*/ACameraCaptureSession_captureCallbacks* cbs,
-        int numRequests, ACaptureRequest** requests,
-        /*optional*/int* captureSequenceId) {
-    return submitRequestsLocked(
-            session, cbs, numRequests, requests, captureSequenceId, /*isRepeating*/false);
-}
-
-camera_status_t
-CameraDevice::setRepeatingRequestsLocked(
-        sp<ACameraCaptureSession> session,
-        /*optional*/ACameraCaptureSession_captureCallbacks* cbs,
-        int numRequests, ACaptureRequest** requests,
-        /*optional*/int* captureSequenceId) {
-    return submitRequestsLocked(
-            session, cbs, numRequests, requests, captureSequenceId, /*isRepeating*/true);
-}
-
-void addRequestSettingsMetadata(ACaptureRequest *aCaptureRequest,
-                                sp<CaptureRequest> &req) {
+void CameraDevice::addRequestSettingsMetadata(ACaptureRequest *aCaptureRequest,
+        sp<CaptureRequest> &req) {
     CameraMetadata metadataCopy = aCaptureRequest->settings->getInternalData();
     const camera_metadata_t *camera_metadata = metadataCopy.getAndLock();
     HCameraMetadata hCameraMetadata;
@@ -235,101 +218,6 @@ void addRequestSettingsMetadata(ACaptureRequest *aCaptureRequest,
     metadataCopy.unlock(camera_metadata);
     req->mPhysicalCameraSettings.resize(1);
     req->mPhysicalCameraSettings[0].settings.metadata(std::move(hCameraMetadata));
-}
-
-camera_status_t
-CameraDevice::submitRequestsLocked(
-        sp<ACameraCaptureSession> session,
-        /*optional*/ACameraCaptureSession_captureCallbacks* cbs,
-        int numRequests, ACaptureRequest** requests,
-        /*optional*/int* captureSequenceId,
-        bool isRepeating) {
-    camera_status_t ret = checkCameraClosedOrErrorLocked();
-    if (ret != ACAMERA_OK) {
-        ALOGE("Camera %s submit capture request failed! ret %d", getId(), ret);
-        return ret;
-    }
-
-    // Form two vectors of capture request, one for internal tracking
-    std::vector<frameworks::cameraservice::device::V2_0::CaptureRequest> requestList;
-    Vector<sp<CaptureRequest>> requestsV;
-    requestsV.setCapacity(numRequests);
-    for (int i = 0; i < numRequests; i++) {
-        sp<CaptureRequest> req;
-        ret = allocateCaptureRequest(requests[i], req);
-        // We need to call this method since after submitRequestList is called,
-        // the request metadata queue might have removed the capture request
-        // metadata. Therefore we simply add the metadata to its wrapper class,
-        // so that it can be retrived later.
-        addRequestSettingsMetadata(requests[i], req);
-        if (ret != ACAMERA_OK) {
-            ALOGE("Convert capture request to internal format failure! ret %d", ret);
-            return ret;
-        }
-        if (req->mCaptureRequest.streamAndWindowIds.size() == 0) {
-            ALOGE("Capture request without output target cannot be submitted!");
-            return ACAMERA_ERROR_INVALID_PARAMETER;
-        }
-        requestList.push_back(utils::convertToHidl(req.get()));
-        requestsV.push_back(req);
-    }
-    if (isRepeating) {
-        ret = stopRepeatingLocked();
-        if (ret != ACAMERA_OK) {
-            ALOGE("Camera %s stop repeating failed! ret %d", getId(), ret);
-            return ret;
-        }
-    }
-
-    SubmitInfo info;
-    Status status;
-    auto remoteRet = mRemote->submitRequestList(requestList, isRepeating,
-                                                [&status, &info](auto s, auto &submitInfo) {
-                                                    status = s;
-                                                    info = submitInfo;
-                                                });
-    if (!remoteRet.isOk()) {
-        ALOGE("%s: Transaction error for submitRequestList call: %s", __FUNCTION__,
-              remoteRet.description().c_str());
-    }
-    if (status != Status::NO_ERROR) {
-        return utils::convertFromHidl(status);
-    }
-    int32_t sequenceId = info.requestId;
-    int64_t lastFrameNumber = info.lastFrameNumber;
-    if (sequenceId < 0) {
-        ALOGE("Camera %s submit request remote failure: ret %d", getId(), sequenceId);
-        return ACAMERA_ERROR_UNKNOWN;
-    }
-
-    CallbackHolder cbHolder(session, requestsV, isRepeating, cbs);
-    mSequenceCallbackMap.insert(std::make_pair(sequenceId, cbHolder));
-
-    if (isRepeating) {
-        // stopRepeating above should have cleanup repeating sequence id
-        if (mRepeatingSequenceId != REQUEST_ID_NONE) {
-            setCameraDeviceErrorLocked(ACAMERA_ERROR_CAMERA_DEVICE);
-            return ACAMERA_ERROR_CAMERA_DEVICE;
-        }
-        mRepeatingSequenceId = sequenceId;
-    } else {
-        mSequenceLastFrameNumberMap.insert(std::make_pair(sequenceId, lastFrameNumber));
-    }
-
-    if (mIdle) {
-        sp<AMessage> msg = new AMessage(kWhatSessionStateCb, mHandler);
-        msg->setPointer(kContextKey, session->mUserSessionCallback.context);
-        msg->setObject(kSessionSpKey, session);
-        msg->setPointer(kCallbackFpKey, (void*) session->mUserSessionCallback.onActive);
-        postSessionMsgAndCleanup(msg);
-    }
-    mIdle = false;
-    mBusySession = session;
-
-    if (captureSequenceId) {
-        *captureSequenceId = sequenceId;
-    }
-    return ACAMERA_OK;
 }
 
 camera_status_t CameraDevice::updateOutputConfigurationLocked(ACaptureSessionOutput *output) {
@@ -365,6 +253,7 @@ camera_status_t CameraDevice::updateOutputConfigurationLocked(ACaptureSessionOut
     outConfig.windowGroupId = -1; // ndk doesn't support inter OutputConfiguration buffer sharing.
     outConfig.windowHandles.resize(output->mSharedWindows.size() + 1);
     outConfig.windowHandles[0] = output->mWindow;
+    outConfig.physicalCameraId = output->mPhysicalCameraId;
     int i = 1;
     for (auto& anw : output->mSharedWindows) {
         outConfig.windowHandles[i++] = anw;
@@ -668,6 +557,7 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
         outConfigInsert.windowGroupId = -1;
         outConfigInsert.windowHandles.resize(outConfig.mSharedWindows.size() + 1);
         outConfigInsert.windowHandles[0] = anw;
+        outConfigInsert.physicalCameraId = outConfig.mPhysicalCameraId;
         native_handle_ptr_wrapper wrap(anw);
         outputSet.insert(std::make_pair(anw, outConfigInsertW));
     }
@@ -894,7 +784,7 @@ CameraDevice::onCaptureErrorLocked(
     if (errorCode == ErrorCode::CAMERA_BUFFER) {
         int32_t streamId = resultExtras.errorStreamId;
         ACameraCaptureSession_captureCallback_bufferLost onBufferLost =
-                cbh.mCallbacks.onCaptureBufferLost;
+                cbh.mOnCaptureBufferLost;
         auto outputPairIt = mConfiguredOutputs.find(streamId);
         if (outputPairIt == mConfiguredOutputs.end()) {
             ALOGE("%s: Error: stream id %d does not exist", __FUNCTION__, streamId);
@@ -913,7 +803,7 @@ CameraDevice::onCaptureErrorLocked(
                             getId(), anw, frameNumber);
 
                     sp<AMessage> msg = new AMessage(kWhatCaptureBufferLost, mHandler);
-                    msg->setPointer(kContextKey, cbh.mCallbacks.context);
+                    msg->setPointer(kContextKey, cbh.mContext);
                     msg->setObject(kSessionSpKey, session);
                     msg->setPointer(kCallbackFpKey, (void*) onBufferLost);
                     msg->setObject(kCaptureRequestKey, request);
@@ -925,7 +815,7 @@ CameraDevice::onCaptureErrorLocked(
         }
     } else { // Handle other capture failures
         // Fire capture failure callback if there is one registered
-        ACameraCaptureSession_captureCallback_failed onError = cbh.mCallbacks.onCaptureFailed;
+        ACameraCaptureSession_captureCallback_failed onError = cbh.mOnCaptureFailed;
         sp<CameraCaptureFailure> failure(new CameraCaptureFailure());
         failure->frameNumber = frameNumber;
         // TODO: refine this when implementing flush
@@ -934,7 +824,7 @@ CameraDevice::onCaptureErrorLocked(
         failure->wasImageCaptured = (errorCode == ErrorCode::CAMERA_RESULT);
 
         sp<AMessage> msg = new AMessage(kWhatCaptureFail, mHandler);
-        msg->setPointer(kContextKey, cbh.mCallbacks.context);
+        msg->setPointer(kContextKey, cbh.mContext);
         msg->setObject(kSessionSpKey, session);
         msg->setPointer(kCallbackFpKey, (void*) onError);
         msg->setObject(kCaptureRequestKey, request);
@@ -956,6 +846,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
         case kWhatSessionStateCb:
         case kWhatCaptureStart:
         case kWhatCaptureResult:
+        case kWhatLogicalCaptureResult:
         case kWhatCaptureFail:
         case kWhatCaptureSeqEnd:
         case kWhatCaptureSeqAbort:
@@ -1026,6 +917,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
         case kWhatSessionStateCb:
         case kWhatCaptureStart:
         case kWhatCaptureResult:
+        case kWhatLogicalCaptureResult:
         case kWhatCaptureFail:
         case kWhatCaptureSeqEnd:
         case kWhatCaptureSeqAbort:
@@ -1043,6 +935,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
             switch (msg->what()) {
                 case kWhatCaptureStart:
                 case kWhatCaptureResult:
+                case kWhatLogicalCaptureResult:
                 case kWhatCaptureFail:
                 case kWhatCaptureBufferLost:
                     found = msg->findObject(kCaptureRequestKey, &obj);
@@ -1114,6 +1007,62 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                     freeACaptureRequest(request);
                     break;
                 }
+                case kWhatLogicalCaptureResult:
+                {
+                    ACameraCaptureSession_logicalCamera_captureCallback_result onResult;
+                    found = msg->findPointer(kCallbackFpKey, (void**) &onResult);
+                    if (!found) {
+                        ALOGE("%s: Cannot find capture result callback!", __FUNCTION__);
+                        return;
+                    }
+                    if (onResult == nullptr) {
+                        return;
+                    }
+
+                    found = msg->findObject(kCaptureResultKey, &obj);
+                    if (!found) {
+                        ALOGE("%s: Cannot find capture result!", __FUNCTION__);
+                        return;
+                    }
+                    sp<ACameraMetadata> result(static_cast<ACameraMetadata*>(obj.get()));
+
+                    found = msg->findObject(kPhysicalCaptureResultKey, &obj);
+                    if (!found) {
+                        ALOGE("%s: Cannot find physical capture result!", __FUNCTION__);
+                        return;
+                    }
+                    sp<ACameraPhysicalCaptureResultInfo> physicalResult(
+                            static_cast<ACameraPhysicalCaptureResultInfo*>(obj.get()));
+                    std::vector<PhysicalCaptureResultInfoLocal>& physicalResultInfo =
+                            physicalResult->mPhysicalResultInfo;
+
+                    std::vector<std::string> physicalCameraIds;
+                    std::vector<sp<ACameraMetadata>> physicalMetadataCopy;
+                    for (size_t i = 0; i < physicalResultInfo.size(); i++) {
+                        physicalCameraIds.push_back(physicalResultInfo[i].physicalCameraId);
+
+                        CameraMetadata clone = physicalResultInfo[i].physicalMetadata;
+                        clone.update(ANDROID_SYNC_FRAME_NUMBER,
+                                &physicalResult->mFrameNumber, /*data_count*/1);
+                        sp<ACameraMetadata> metadata =
+                                new ACameraMetadata(clone.release(), ACameraMetadata::ACM_RESULT);
+                        physicalMetadataCopy.push_back(metadata);
+                    }
+                    std::vector<const char*> physicalCameraIdPtrs;
+                    std::vector<const ACameraMetadata*> physicalMetadataCopyPtrs;
+                    for (size_t i = 0; i < physicalResultInfo.size(); i++) {
+                        physicalCameraIdPtrs.push_back(physicalCameraIds[i].c_str());
+                        physicalMetadataCopyPtrs.push_back(physicalMetadataCopy[i].get());
+                    }
+
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp);
+                    (*onResult)(context, session.get(), request, result.get(),
+                            physicalResultInfo.size(), physicalCameraIdPtrs.data(),
+                            physicalMetadataCopyPtrs.data());
+                    freeACaptureRequest(request);
+                    break;
+                }
+
                 case kWhatCaptureFail:
                 {
                     ACameraCaptureSession_captureCallback_failed onFail;
@@ -1224,12 +1173,34 @@ void CameraDevice::CallbackHandler::onMessageReceived(
 }
 
 CameraDevice::CallbackHolder::CallbackHolder(
-    sp<ACameraCaptureSession>          session,
-    const Vector<sp<CaptureRequest> >& requests,
-    bool                               isRepeating,
-    ACameraCaptureSession_captureCallbacks* cbs) :
-    mSession(session), mRequests(requests),
-    mIsRepeating(isRepeating), mCallbacks(fillCb(cbs)) {}
+        sp<ACameraCaptureSession>          session,
+        const Vector<sp<CaptureRequest> >& requests,
+        bool                               isRepeating,
+        ACameraCaptureSession_captureCallbacks* cbs) :
+        mSession(session), mRequests(requests),
+        mIsRepeating(isRepeating),
+        mIsLogicalCameraCallback(false) {
+    initCaptureCallbacks(cbs);
+
+    if (cbs != nullptr) {
+        mOnCaptureCompleted = cbs->onCaptureCompleted;
+    }
+}
+
+CameraDevice::CallbackHolder::CallbackHolder(
+        sp<ACameraCaptureSession>          session,
+        const Vector<sp<CaptureRequest> >& requests,
+        bool                               isRepeating,
+        ACameraCaptureSession_logicalCamera_captureCallbacks* lcbs) :
+        mSession(session), mRequests(requests),
+        mIsRepeating(isRepeating),
+        mIsLogicalCameraCallback(true) {
+    initCaptureCallbacks(lcbs);
+
+    if (lcbs != nullptr) {
+        mOnLogicalCameraCaptureCompleted = lcbs->onLogicalCameraCaptureCompleted;
+    }
+}
 
 void
 CameraDevice::checkRepeatingSequenceCompleteLocked(
@@ -1246,9 +1217,9 @@ CameraDevice::checkRepeatingSequenceCompleteLocked(
         mSequenceCallbackMap.erase(cbIt);
         // send seq aborted callback
         sp<AMessage> msg = new AMessage(kWhatCaptureSeqAbort, mHandler);
-        msg->setPointer(kContextKey, cbh.mCallbacks.context);
+        msg->setPointer(kContextKey, cbh.mContext);
         msg->setObject(kSessionSpKey, cbh.mSession);
-        msg->setPointer(kCallbackFpKey, (void*) cbh.mCallbacks.onCaptureSequenceAborted);
+        msg->setPointer(kCallbackFpKey, (void*) cbh.mOnCaptureSequenceAborted);
         msg->setInt32(kSequenceIdKey, sequenceId);
         postSessionMsgAndCleanup(msg);
     } else {
@@ -1295,9 +1266,9 @@ CameraDevice::checkAndFireSequenceCompleteLocked() {
             mSequenceCallbackMap.erase(cbIt);
             // send seq complete callback
             sp<AMessage> msg = new AMessage(kWhatCaptureSeqEnd, mHandler);
-            msg->setPointer(kContextKey, cbh.mCallbacks.context);
+            msg->setPointer(kContextKey, cbh.mContext);
             msg->setObject(kSessionSpKey, cbh.mSession);
-            msg->setPointer(kCallbackFpKey, (void*) cbh.mCallbacks.onCaptureSequenceCompleted);
+            msg->setPointer(kCallbackFpKey, (void*) cbh.mOnCaptureSequenceCompleted);
             msg->setInt32(kSequenceIdKey, sequenceId);
             msg->setInt64(kFrameNumberKey, lastFrameNumber);
 
@@ -1454,7 +1425,7 @@ CameraDevice::ServiceCallback::onCaptureStarted(
     auto it = dev->mSequenceCallbackMap.find(sequenceId);
     if (it != dev->mSequenceCallbackMap.end()) {
         CallbackHolder cbh = (*it).second;
-        ACameraCaptureSession_captureCallback_start onStart = cbh.mCallbacks.onCaptureStarted;
+        ACameraCaptureSession_captureCallback_start onStart = cbh.mOnCaptureStarted;
         sp<ACameraCaptureSession> session = cbh.mSession;
         if ((size_t) burstId >= cbh.mRequests.size()) {
             ALOGE("%s: Error: request index %d out of bound (size %zu)",
@@ -1463,7 +1434,7 @@ CameraDevice::ServiceCallback::onCaptureStarted(
         }
         sp<CaptureRequest> request = cbh.mRequests[burstId];
         sp<AMessage> msg = new AMessage(kWhatCaptureStart, dev->mHandler);
-        msg->setPointer(kContextKey, cbh.mCallbacks.context);
+        msg->setPointer(kContextKey, cbh.mContext);
         msg->setObject(kSessionSpKey, session);
         msg->setPointer(kCallbackFpKey, (void*) onStart);
         msg->setObject(kCaptureRequestKey, request);
@@ -1478,7 +1449,6 @@ CameraDevice::ServiceCallback::onResultReceived(
         const FmqSizeOrMetadata& resultMetadata,
         const CaptureResultExtras& resultExtras,
         const hidl_vec<PhysicalCaptureResultInfo>& physicalResultInfos) {
-    (void) physicalResultInfos;
     auto ret = Void();
 
     sp<CameraDevice> dev = mDevice.promote();
@@ -1508,27 +1478,10 @@ CameraDevice::ServiceCallback::onResultReceived(
     }
 
     CameraMetadata metadataCopy;
-    HCameraMetadata hCameraMetadata;
-    bool converted = false;
-    if (resultMetadata.getDiscriminator() ==
-        FmqSizeOrMetadata::hidl_discriminator::fmqMetadataSize) {
-        hCameraMetadata.resize(resultMetadata.fmqMetadataSize());
-        bool read = dev->mCaptureResultMetadataQueue->read(hCameraMetadata.data(),
-                                                           resultMetadata.fmqMetadataSize());
-            if (!read) {
-                ALOGE("%s capture request settings could't be read from fmq",
-                      __FUNCTION__);
-                return ret;
-            }
-            // TODO: Do we actually need to clone here ?
-            converted = utils::convertFromHidlCloned(hCameraMetadata, &metadataCopy);
-
-    } else {
-          converted = utils::convertFromHidlCloned(resultMetadata.metadata(), &metadataCopy);
-    }
-
-    if (!converted) {
-        ALOGE("%s result metadata couldn't be converted", __FUNCTION__);
+    camera_status_t status = readOneResultMetadata(resultMetadata,
+            dev->mCaptureResultMetadataQueue.get(), &metadataCopy);
+    if (status != ACAMERA_OK) {
+        ALOGE("%s: result metadata couldn't be converted", __FUNCTION__);
         return ret;
     }
 
@@ -1538,9 +1491,6 @@ CameraDevice::ServiceCallback::onResultReceived(
     auto it = dev->mSequenceCallbackMap.find(sequenceId);
     if (it != dev->mSequenceCallbackMap.end()) {
         CallbackHolder cbh = (*it).second;
-        ACameraCaptureSession_captureCallback_result onResult = isPartialResult ?
-                cbh.mCallbacks.onCaptureProgressed :
-                cbh.mCallbacks.onCaptureCompleted;
         sp<ACameraCaptureSession> session = cbh.mSession;
         if ((size_t) burstId >= cbh.mRequests.size()) {
             ALOGE("%s: Error: request index %d out of bound (size %zu)",
@@ -1551,12 +1501,39 @@ CameraDevice::ServiceCallback::onResultReceived(
         sp<ACameraMetadata> result(new ACameraMetadata(
                 metadataCopy.release(), ACameraMetadata::ACM_RESULT));
 
-        sp<AMessage> msg = new AMessage(kWhatCaptureResult, dev->mHandler);
-        msg->setPointer(kContextKey, cbh.mCallbacks.context);
+        std::vector<PhysicalCaptureResultInfoLocal> localPhysicalResult;
+        localPhysicalResult.resize(physicalResultInfos.size());
+        for (size_t i = 0; i < physicalResultInfos.size(); i++) {
+            localPhysicalResult[i].physicalCameraId = physicalResultInfos[i].physicalCameraId;
+            status = readOneResultMetadata(physicalResultInfos[i].physicalCameraMetadata,
+                    dev->mCaptureResultMetadataQueue.get(),
+                    &localPhysicalResult[i].physicalMetadata);
+            if (status != ACAMERA_OK) {
+                ALOGE("%s: physical camera result metadata couldn't be converted", __FUNCTION__);
+                return ret;
+            }
+        }
+        sp<ACameraPhysicalCaptureResultInfo> physicalResult(
+                new ACameraPhysicalCaptureResultInfo(localPhysicalResult, frameNumber));
+
+        sp<AMessage> msg = new AMessage(
+                cbh.mIsLogicalCameraCallback ? kWhatLogicalCaptureResult : kWhatCaptureResult,
+                dev->mHandler);
+        msg->setPointer(kContextKey, cbh.mContext);
         msg->setObject(kSessionSpKey, session);
-        msg->setPointer(kCallbackFpKey, (void*) onResult);
         msg->setObject(kCaptureRequestKey, request);
         msg->setObject(kCaptureResultKey, result);
+        if (isPartialResult) {
+            msg->setPointer(kCallbackFpKey,
+                    (void *)cbh.mOnCaptureProgressed);
+        } else if (cbh.mIsLogicalCameraCallback) {
+            msg->setPointer(kCallbackFpKey,
+                    (void *)cbh.mOnLogicalCameraCaptureCompleted);
+            msg->setObject(kPhysicalCaptureResultKey, physicalResult);
+        } else {
+            msg->setPointer(kCallbackFpKey,
+                    (void *)cbh.mOnCaptureCompleted);
+        }
         dev->postSessionMsgAndCleanup(msg);
     }
 
@@ -1588,6 +1565,32 @@ CameraDevice::ServiceCallback::onRepeatingRequestError(
     dev->checkRepeatingSequenceCompleteLocked(repeatingSequenceId, lastFrameNumber);
 
     return ret;
+}
+
+camera_status_t CameraDevice::ServiceCallback::readOneResultMetadata(
+        const FmqSizeOrMetadata& fmqSizeOrMetadata, ResultMetadataQueue* metadataQueue,
+        CameraMetadata* metadata) {
+    if (metadataQueue == nullptr || metadata == nullptr) {
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    bool converted;
+    HCameraMetadata hCameraMetadata;
+    if (fmqSizeOrMetadata.getDiscriminator() ==
+            FmqSizeOrMetadata::hidl_discriminator::fmqMetadataSize) {
+        hCameraMetadata.resize(fmqSizeOrMetadata.fmqMetadataSize());
+        bool read = metadataQueue->read(
+                hCameraMetadata.data(), fmqSizeOrMetadata.fmqMetadataSize());
+        if (!read) {
+            ALOGE("%s capture request settings could't be read from fmq", __FUNCTION__);
+            return ACAMERA_ERROR_UNKNOWN;
+        }
+        // TODO: Do we actually need to clone here ?
+        converted = utils::convertFromHidlCloned(hCameraMetadata, metadata);
+    } else {
+        converted = utils::convertFromHidlCloned(fmqSizeOrMetadata.metadata(), metadata);
+    }
+
+    return converted ? ACAMERA_OK : ACAMERA_ERROR_UNKNOWN;
 }
 
 } // namespace acam

@@ -167,19 +167,23 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
 }
 
 OutputConfiguration::OutputConfiguration(sp<IGraphicBufferProducer>& gbp, int rotation,
+        const String16& physicalId,
         int surfaceSetID, bool isShared) {
     mGbps.push_back(gbp);
     mRotation = rotation;
     mSurfaceSetID = surfaceSetID;
     mIsDeferred = false;
     mIsShared = isShared;
+    mPhysicalCameraId = physicalId;
 }
 
 OutputConfiguration::OutputConfiguration(
         const std::vector<sp<IGraphicBufferProducer>>& gbps,
-    int rotation, int surfaceSetID,  int surfaceType, int width, int height, bool isShared)
+    int rotation, const String16& physicalCameraId, int surfaceSetID,  int surfaceType,
+    int width, int height, bool isShared)
   : mGbps(gbps), mRotation(rotation), mSurfaceSetID(surfaceSetID), mSurfaceType(surfaceType),
-    mWidth(width), mHeight(height), mIsDeferred(false), mIsShared(isShared) { }
+    mWidth(width), mHeight(height), mIsDeferred(false), mIsShared(isShared),
+    mPhysicalCameraId(physicalCameraId) { }
 
 status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
 
