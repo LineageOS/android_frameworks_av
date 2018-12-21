@@ -264,6 +264,7 @@ public:
     status_t    getRoutedDeviceId(audio_port_handle_t *deviceId);
     status_t    enableAudioDeviceCallback(bool enabled);
     status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
+    status_t    getPortId(audio_port_handle_t *portId) const;
 
 private:
     void                    doCleanUp();
