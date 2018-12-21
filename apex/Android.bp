@@ -31,8 +31,25 @@ apex {
     key: "com.android.media.key",
 }
 
+apex {
+    name: "com.android.media.swcodec",
+    compile_multilib: "32",
+    manifest: "manifest_codec.json",
+    native_shared_libs: [
+        "libmedia_codecserviceregistrant",
+    ],
+    use_vendor: true,
+    key: "com.android.media.swcodec.key",
+}
+
 apex_key {
     name: "com.android.media.key",
     public_key: "com.android.media.avbpubkey",
     private_key: "com.android.media.pem",
+}
+
+apex_key {
+    name: "com.android.media.swcodec.key",
+    public_key: "com.android.media.swcodec.avbpubkey",
+    private_key: "com.android.media.swcodec.pem",
 }

@@ -1,5 +1,6 @@
 cc_library_shared {
     name: "libmedia_codecserviceregistrant",
+    vendor_available: true,
     srcs: [
         "CodecServiceRegistrant.cpp",
     ],
