@@ -277,18 +277,18 @@ status_t DeviceHalHidl::openInputStream(
     HidlUtils::audioConfigFromHal(*config, &hidlConfig);
     Result retval = Result::NOT_INITIALIZED;
 #if MAJOR_VERSION == 2
-    auto sourceMetadata = AudioSource(source);
+    auto sinkMetadata = AudioSource(source);
 #elif MAJOR_VERSION >= 4
     // TODO: correctly propagate the tracks sources and volume
     //       for now, only send the main source at 1dbfs
-    SinkMetadata sourceMetadata = {{{AudioSource(source), 1}}};
+    SinkMetadata sinkMetadata = {{{ .source = AudioSource(source), .gain = 1 }}};
 #endif
     Return<void> ret = mDevice->openInputStream(
             handle,
             hidlDevice,
             hidlConfig,
             EnumBitfield<AudioInputFlag>(flags),
-            sourceMetadata,
+            sinkMetadata,
             [&](Result r, const sp<IStreamIn>& result, const AudioConfig& suggestedConfig) {
                 retval = r;
                 if (retval == Result::OK) {
