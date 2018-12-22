@@ -31,10 +31,12 @@
 // Do not submit with DOWNMIX_ALWAYS_USE_GENERIC_DOWNMIXER defined, strictly for testing
 //#define DOWNMIX_ALWAYS_USE_GENERIC_DOWNMIXER 0
 
-#define MINUS_3_DB_IN_Q19_12 2896 // -3dB = 0.707 * 2^12 = 2896
-
 #ifdef BUILD_FLOAT
 #define MINUS_3_DB_IN_FLOAT 0.70710678f // -3dB = 0.70710678f
+const audio_format_t gTargetFormat = AUDIO_FORMAT_PCM_FLOAT;
+#else
+#define MINUS_3_DB_IN_Q19_12 2896 // -3dB = 0.707 * 2^12 = 2896
+const audio_format_t gTargetFormat = AUDIO_FORMAT_PCM_16_BIT;
 #endif
 
 // subset of possible audio_channel_mask_t values, and AUDIO_CHANNEL_OUT_* renamed to CHANNEL_MASK_*
@@ -703,7 +705,7 @@ int Downmix_Init(downmix_module_t *pDwmModule) {
     memset(&pDwmModule->context, 0, sizeof(downmix_object_t));
 
     pDwmModule->config.inputCfg.accessMode = EFFECT_BUFFER_ACCESS_READ;
-    pDwmModule->config.inputCfg.format = AUDIO_FORMAT_PCM_16_BIT;
+    pDwmModule->config.inputCfg.format = gTargetFormat;
     pDwmModule->config.inputCfg.channels = AUDIO_CHANNEL_OUT_7POINT1;
     pDwmModule->config.inputCfg.bufferProvider.getBuffer = NULL;
     pDwmModule->config.inputCfg.bufferProvider.releaseBuffer = NULL;
@@ -715,7 +717,7 @@ int Downmix_Init(downmix_module_t *pDwmModule) {
 
     // set a default value for the access mode, but should be overwritten by caller
     pDwmModule->config.outputCfg.accessMode = EFFECT_BUFFER_ACCESS_ACCUMULATE;
-    pDwmModule->config.outputCfg.format = AUDIO_FORMAT_PCM_16_BIT;
+    pDwmModule->config.outputCfg.format = gTargetFormat;
     pDwmModule->config.outputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
     pDwmModule->config.outputCfg.bufferProvider.getBuffer = NULL;
     pDwmModule->config.outputCfg.bufferProvider.releaseBuffer = NULL;
@@ -762,8 +764,8 @@ int Downmix_Configure(downmix_module_t *pDwmModule, effect_config_t *pConfig, bo
     // Check configuration compatibility with build options, and effect capabilities
     if (pConfig->inputCfg.samplingRate != pConfig->outputCfg.samplingRate
         || pConfig->outputCfg.channels != DOWNMIX_OUTPUT_CHANNELS
-        || pConfig->inputCfg.format != AUDIO_FORMAT_PCM_16_BIT
-        || pConfig->outputCfg.format != AUDIO_FORMAT_PCM_16_BIT) {
+        || pConfig->inputCfg.format != gTargetFormat
+        || pConfig->outputCfg.format != gTargetFormat) {
         ALOGE("Downmix_Configure error: invalid config");
         return -EINVAL;
     }
@@ -1185,8 +1187,8 @@ void Downmix_foldFrom7Point1(LVM_FLOAT *pSrc, LVM_FLOAT *pDst, size_t numFrames,
     if (accumulate) {
         while (numFrames) {
             // centerPlusLfeContrib = FC(-3dB) + LFE(-3dB)
-            centerPlusLfeContrib = (pSrc[2] * MINUS_3_DB_IN_Q19_12)
-                    + (pSrc[3] * MINUS_3_DB_IN_Q19_12);
+            centerPlusLfeContrib = (pSrc[2] * MINUS_3_DB_IN_FLOAT)
+                    + (pSrc[3] * MINUS_3_DB_IN_FLOAT);
             // FL + centerPlusLfeContrib + SL + RL
             lt = pSrc[0] + centerPlusLfeContrib + pSrc[6] + pSrc[4];
             // FR + centerPlusLfeContrib + SR + RR
