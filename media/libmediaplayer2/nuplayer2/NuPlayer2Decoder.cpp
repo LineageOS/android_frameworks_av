@@ -1108,6 +1108,11 @@ bool NuPlayer2::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
             } // buffer->data()
         } // needsCopy
 
+        sp<RefBase> cryptInfoObj;
+        if (buffer->meta()->findObject("cryptInfo", &cryptInfoObj)) {
+            cryptInfo = static_cast<AMediaCodecCryptoInfoWrapper *>(cryptInfoObj.get());
+        }
+
         status_t err;
         if (cryptInfo != NULL) {
             err = mCodec->queueSecureInputBuffer(
