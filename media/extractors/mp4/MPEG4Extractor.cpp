@@ -69,7 +69,7 @@ enum {
     kMaxAtomSize = 64 * 1024 * 1024,
 };
 
-class MPEG4Source : public MediaTrackHelperV3 {
+class MPEG4Source : public MediaTrackHelper {
 static const size_t  kMaxPcmFrameSize = 8192;
 public:
     // Caller retains ownership of both "dataSource" and "sampleTable".
@@ -80,7 +80,8 @@ public:
                 Vector<SidxEntry> &sidx,
                 const Trex *trex,
                 off64_t firstMoofOffset,
-                const sp<ItemTable> &itemTable);
+                const sp<ItemTable> &itemTable,
+                int32_t elstShiftStartTicks);
     virtual status_t init();
 
     virtual media_status_t start();
@@ -88,10 +89,10 @@ public:
 
     virtual media_status_t getFormat(AMediaFormat *);
 
-    virtual media_status_t read(MediaBufferHelperV3 **buffer, const ReadOptions *options = NULL);
+    virtual media_status_t read(MediaBufferHelper **buffer, const ReadOptions *options = NULL);
     virtual bool supportNonblockingRead() { return true; }
     virtual media_status_t fragmentedRead(
-            MediaBufferHelperV3 **buffer, const ReadOptions *options = NULL);
+            MediaBufferHelper **buffer, const ReadOptions *options = NULL);
 
     virtual ~MPEG4Source();
 
@@ -109,7 +110,7 @@ private:
     off64_t mFirstMoofOffset;
     off64_t mCurrentMoofOffset;
     off64_t mNextMoofOffset;
-    uint32_t mCurrentTime;
+    uint32_t mCurrentTime; // in media timescale ticks
     int32_t mLastParsedTrackId;
     int32_t mTrackId;
 
@@ -136,12 +137,16 @@ private:
 
     bool mStarted;
 
-    MediaBufferHelperV3 *mBuffer;
+    MediaBufferHelper *mBuffer;
 
     uint8_t *mSrcBuffer;
 
     bool mIsHeif;
     sp<ItemTable> mItemTable;
+
+    // Start offset from composition time to presentation time.
+    // Support shift only for video tracks through mElstShiftStartTicks for now.
+    int32_t mElstShiftStartTicks;
 
     size_t parseNALSize(const uint8_t *data) const;
     status_t parseChunk(off64_t *offset);
@@ -459,11 +464,12 @@ media_status_t MPEG4Extractor::getTrackMetaData(
     [=] {
         int64_t duration;
         int32_t samplerate;
+        // Only for audio track.
         if (track->has_elst && mHeaderTimescale != 0 &&
                 AMediaFormat_getInt64(track->meta, AMEDIAFORMAT_KEY_DURATION, &duration) &&
                 AMediaFormat_getInt32(track->meta, AMEDIAFORMAT_KEY_SAMPLE_RATE, &samplerate)) {
 
-            // elst has to be processed only the first time this function is called
+            // Elst has to be processed only the first time this function is called.
             track->has_elst = false;
 
             if (track->elst_segment_duration > INT64_MAX) {
@@ -479,67 +485,72 @@ media_status_t MPEG4Extractor::getTrackMetaData(
                   halfscale, mHeaderTimescale, track->timescale);
 
             if ((uint32_t)samplerate != track->timescale){
-                ALOGV("samplerate:%" PRId32 ", track->timescale and samplerate are different!", samplerate);
+                ALOGV("samplerate:%" PRId32 ", track->timescale and samplerate are different!",
+                    samplerate);
             }
-
-            int64_t delay;
-            // delay = ((media_time * samplerate) + halfscale) / track->timescale;
-            if (__builtin_mul_overflow(media_time, samplerate, &delay) ||
-                    __builtin_add_overflow(delay, halfscale, &delay) ||
-                    (delay /= track->timescale, false) ||
-                    delay > INT32_MAX ||
-                    delay < INT32_MIN) {
-                ALOGW("ignoring edit list with bogus values");
-                return;
+            // Both delay and paddingsamples have to be set inorder for either to be
+            // effective in the lower layers.
+            int64_t delay = 0;
+            if (media_time > 0) { // Gapless playback
+                // delay = ((media_time * samplerate) + halfscale) / track->timescale;
+                if (__builtin_mul_overflow(media_time, samplerate, &delay) ||
+                        __builtin_add_overflow(delay, halfscale, &delay) ||
+                        (delay /= track->timescale, false) ||
+                        delay > INT32_MAX ||
+                        delay < INT32_MIN) {
+                    ALOGW("ignoring edit list with bogus values");
+                    return;
+                }
             }
             ALOGV("delay = %" PRId64, delay);
             AMediaFormat_setInt32(track->meta, AMEDIAFORMAT_KEY_ENCODER_DELAY, delay);
 
-            int64_t scaled_duration;
-            // scaled_duration = duration * mHeaderTimescale;
-            if (__builtin_mul_overflow(duration, mHeaderTimescale, &scaled_duration)) {
-                return;
-            }
-            ALOGV("scaled_duration = %" PRId64, scaled_duration);
-
-            int64_t segment_end;
-            int64_t padding;
-            int64_t segment_duration_e6;
-            int64_t media_time_scaled_e6;
-            int64_t media_time_scaled;
-            // padding = scaled_duration - ((segment_duration * 1000000) +
-            //                  ((media_time * mHeaderTimeScale * 1000000)/track->timescale) )
-            // segment_duration is based on timescale in movie header box(mdhd)
-            // media_time is based on timescale track header/media timescale
-            if (__builtin_mul_overflow(segment_duration, 1000000, &segment_duration_e6) ||
-                __builtin_mul_overflow(media_time, mHeaderTimescale, &media_time_scaled) ||
-                __builtin_mul_overflow(media_time_scaled, 1000000, &media_time_scaled_e6)) {
-                return;
-            }
-            media_time_scaled_e6 /= track->timescale;
-            if(__builtin_add_overflow(segment_duration_e6, media_time_scaled_e6, &segment_end) ||
-                __builtin_sub_overflow(scaled_duration, segment_end, &padding)) {
-                return;
-            }
-            ALOGV("segment_end = %" PRId64 ", padding = %" PRId64, segment_end, padding);
             int64_t paddingsamples = 0;
-            if (padding < 0) {
+            if (segment_duration > 0) {
+                int64_t scaled_duration;
+                // scaled_duration = duration * mHeaderTimescale;
+                if (__builtin_mul_overflow(duration, mHeaderTimescale, &scaled_duration)) {
+                    return;
+                }
+                ALOGV("scaled_duration = %" PRId64, scaled_duration);
+
+                int64_t segment_end;
+                int64_t padding;
+                int64_t segment_duration_e6;
+                int64_t media_time_scaled_e6;
+                int64_t media_time_scaled;
+                // padding = scaled_duration - ((segment_duration * 1000000) +
+                //                  ((media_time * mHeaderTimescale * 1000000)/track->timescale) )
+                // segment_duration is based on timescale in movie header box(mdhd)
+                // media_time is based on timescale track header/media timescale
+                if (__builtin_mul_overflow(segment_duration, 1000000, &segment_duration_e6) ||
+                    __builtin_mul_overflow(media_time, mHeaderTimescale, &media_time_scaled) ||
+                    __builtin_mul_overflow(media_time_scaled, 1000000, &media_time_scaled_e6)) {
+                    return;
+                }
+                media_time_scaled_e6 /= track->timescale;
+                if (__builtin_add_overflow(segment_duration_e6, media_time_scaled_e6, &segment_end)
+                    || __builtin_sub_overflow(scaled_duration, segment_end, &padding)) {
+                    return;
+                }
+                ALOGV("segment_end = %" PRId64 ", padding = %" PRId64, segment_end, padding);
                 // track duration from media header (which is what AMEDIAFORMAT_KEY_DURATION is)
                 // might be slightly shorter than the segment duration, which would make the
                 // padding negative. Clamp to zero.
-                padding = 0;
-            } else {
-                int64_t halfscale_e6;
-                int64_t timescale_e6;
-                // paddingsamples = ((padding * samplerate) + (halfscale * 1000000))
-                //                / (mHeaderTimescale * 1000000);
-                if (__builtin_mul_overflow(padding, samplerate, &paddingsamples) ||
-                        __builtin_mul_overflow(halfscale, 1000000, &halfscale_e6) ||
-                        __builtin_mul_overflow(mHeaderTimescale, 1000000, &timescale_e6) ||
-                        __builtin_add_overflow(paddingsamples, halfscale_e6, &paddingsamples) ||
-                        (paddingsamples /= timescale_e6, false) ||
-                        paddingsamples > INT32_MAX) {
-                    return;
+                if (padding > 0) {
+                    int64_t halfscale_mht = mHeaderTimescale / 2;
+                    int64_t halfscale_e6;
+                    int64_t timescale_e6;
+                    // paddingsamples = ((padding * samplerate) + (halfscale_mht * 1000000))
+                    //                / (mHeaderTimescale * 1000000);
+                    if (__builtin_mul_overflow(padding, samplerate, &paddingsamples) ||
+                            __builtin_mul_overflow(halfscale_mht, 1000000, &halfscale_e6) ||
+                            __builtin_mul_overflow(mHeaderTimescale, 1000000, &timescale_e6) ||
+                            __builtin_add_overflow(paddingsamples, halfscale_e6, &paddingsamples) ||
+                            (paddingsamples /= timescale_e6, false) ||
+                            paddingsamples > INT32_MAX) {
+                        return;
+                    }
                 }
             }
             ALOGV("paddingsamples = %" PRId64, paddingsamples);
@@ -668,6 +679,7 @@ status_t MPEG4Extractor::readMetaData() {
             track->includes_expensive_metadata = false;
             track->skipTrack = false;
             track->timescale = 1000000;
+            track->elstShiftStartTicks = 0;
         }
     }
 
@@ -965,6 +977,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                         AMEDIAFORMAT_KEY_MIME, "application/octet-stream");
                 track->has_elst = false;
                 track->subsample_encryption = false;
+                track->elstShiftStartTicks = 0;
             }
 
             off64_t stop_offset = *offset + chunk_size;
@@ -1092,6 +1105,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
             if (entry_count != 1) {
                 // we only support a single entry at the moment, for gapless playback
+                // or start offset
                 ALOGW("ignoring edit list with %d entries", entry_count);
             } else {
                 off64_t entriesoffset = data_offset + 8;
@@ -3855,7 +3869,7 @@ void MPEG4Extractor::parseID3v2MetaData(off64_t offset) {
     }
 }
 
-MediaTrackHelperV3 *MPEG4Extractor::getTrack(size_t index) {
+MediaTrackHelper *MPEG4Extractor::getTrack(size_t index) {
     status_t err;
     if ((err = readMetaData()) != OK) {
         return NULL;
@@ -3929,9 +3943,15 @@ MediaTrackHelperV3 *MPEG4Extractor::getTrack(size_t index) {
         }
     }
 
+    if (track->has_elst and !strncasecmp("video/", mime, 6) and track->elst_media_time > 0) {
+        track->elstShiftStartTicks = track->elst_media_time;
+        ALOGV("video track->elstShiftStartTicks :%" PRId64, track->elst_media_time);
+    }
+
     MPEG4Source *source =  new MPEG4Source(
             track->meta, mDataSource, track->timescale, track->sampleTable,
-            mSidxEntries, trex, mMoofOffset, itemTable);
+            mSidxEntries, trex, mMoofOffset, itemTable,
+            track->elstShiftStartTicks);
     if (source->init() != OK) {
         delete source;
         return NULL;
@@ -4332,7 +4352,8 @@ MPEG4Source::MPEG4Source(
         Vector<SidxEntry> &sidx,
         const Trex *trex,
         off64_t firstMoofOffset,
-        const sp<ItemTable> &itemTable)
+        const sp<ItemTable> &itemTable,
+        int32_t elstShiftStartTicks)
     : mFormat(format),
       mDataSource(dataSource),
       mTimescale(timeScale),
@@ -4360,7 +4381,8 @@ MPEG4Source::MPEG4Source(
       mBuffer(NULL),
       mSrcBuffer(NULL),
       mIsHeif(itemTable != NULL),
-      mItemTable(itemTable) {
+      mItemTable(itemTable),
+      mElstShiftStartTicks(elstShiftStartTicks) {
 
     memset(&mTrackFragmentHeaderInfo, 0, sizeof(mTrackFragmentHeaderInfo));
 
@@ -4445,11 +4467,31 @@ MPEG4Source::MPEG4Source(
 }
 
 status_t MPEG4Source::init() {
+    status_t err = OK;
+    const char *mime;
+    CHECK(AMediaFormat_getString(mFormat, AMEDIAFORMAT_KEY_MIME, &mime));
     if (mFirstMoofOffset != 0) {
         off64_t offset = mFirstMoofOffset;
-        return parseChunk(&offset);
+        err = parseChunk(&offset);
+        if(err == OK && !strncasecmp("video/", mime, 6)
+            && !mCurrentSamples.isEmpty()) {
+            // Start offset should be less or equal to composition time of first sample.
+            // ISO : sample_composition_time_offset, version 0 (unsigned) for major brands.
+            mElstShiftStartTicks = std::min(mElstShiftStartTicks,
+                (*mCurrentSamples.begin()).compositionOffset);
+        }
+        return err;
     }
-    return OK;
+
+    if (!strncasecmp("video/", mime, 6)) {
+        uint32_t firstSampleCTS = 0;
+        err = mSampleTable->getMetaDataForSample(0, NULL, NULL, &firstSampleCTS);
+        // Start offset should be less or equal to composition time of first sample.
+        // Composition time stamp of first sample cannot be negative.
+        mElstShiftStartTicks = std::min(mElstShiftStartTicks, (int32_t)firstSampleCTS);
+    }
+
+    return err;
 }
 
 MPEG4Source::~MPEG4Source() {
@@ -4990,7 +5032,7 @@ status_t MPEG4Source::parseTrackFragmentHeader(off64_t offset, off64_t size) {
 
 status_t MPEG4Source::parseTrackFragmentRun(off64_t offset, off64_t size) {
 
-    ALOGV("MPEG4Extractor::parseTrackFragmentRun");
+    ALOGV("MPEG4Source::parseTrackFragmentRun");
     if (size < 8) {
         return -EINVAL;
     }
@@ -5132,10 +5174,10 @@ status_t MPEG4Source::parseTrackFragmentRun(off64_t offset, off64_t size) {
         }
 
         ALOGV("adding sample %d at offset 0x%08" PRIx64 ", size %u, duration %u, "
-              " flags 0x%08x", i + 1,
+              " flags 0x%08x ctsOffset %" PRIu32, i + 1,
                 dataOffset, sampleSize, sampleDuration,
                 (flags & kFirstSampleFlagsPresent) && i == 0
-                    ? firstSampleFlags : sampleFlags);
+                    ? firstSampleFlags : sampleFlags, sampleCtsOffset);
         tmp.offset = dataOffset;
         tmp.size = sampleSize;
         tmp.duration = sampleDuration;
@@ -5206,7 +5248,7 @@ int32_t MPEG4Source::parseHEVCLayerId(const uint8_t *data, size_t size) {
 }
 
 media_status_t MPEG4Source::read(
-        MediaBufferHelperV3 **out, const ReadOptions *options) {
+        MediaBufferHelper **out, const ReadOptions *options) {
     Mutex::Autolock autoLock(mLock);
 
     CHECK(mStarted);
@@ -5227,6 +5269,7 @@ media_status_t MPEG4Source::read(
     int64_t seekTimeUs;
     ReadOptions::SeekMode mode;
     if (options && options->getSeekTo(&seekTimeUs, &mode)) {
+
         if (mIsHeif) {
             CHECK(mSampleTable == NULL);
             CHECK(mItemTable != NULL);
@@ -5263,6 +5306,9 @@ media_status_t MPEG4Source::read(
                 default:
                     CHECK(!"Should not be here.");
                     break;
+            }
+            if( mode != ReadOptions::SEEK_FRAME_INDEX) {
+                seekTimeUs += ((int64_t)mElstShiftStartTicks * 1000000) / mTimescale;
             }
 
             uint32_t sampleIndex;
@@ -5305,6 +5351,7 @@ media_status_t MPEG4Source::read(
 
             if (mode == ReadOptions::SEEK_CLOSEST
                 || mode == ReadOptions::SEEK_FRAME_INDEX) {
+                sampleTime -= mElstShiftStartTicks;
                 targetSampleTimeUs = (sampleTime * 1000000ll) / mTimescale;
             }
 
@@ -5343,6 +5390,10 @@ media_status_t MPEG4Source::read(
         if (!mIsHeif) {
             err = mSampleTable->getMetaDataForSample(
                     mCurrentSampleIndex, &offset, &size, &cts, &isSyncSample, &stts);
+            if(err == OK) {
+                cts -= mElstShiftStartTicks;
+            }
+
         } else {
             err = mItemTable->getImageOffsetAndSize(
                     options && options->getSeekTo(&seekTimeUs, &mode) ?
@@ -5609,7 +5660,7 @@ media_status_t MPEG4Source::read(
 }
 
 media_status_t MPEG4Source::fragmentedRead(
-        MediaBufferHelperV3 **out, const ReadOptions *options) {
+        MediaBufferHelper **out, const ReadOptions *options) {
 
     ALOGV("MPEG4Source::fragmentedRead");
 
@@ -5622,6 +5673,10 @@ media_status_t MPEG4Source::fragmentedRead(
     int64_t seekTimeUs;
     ReadOptions::SeekMode mode;
     if (options && options->getSeekTo(&seekTimeUs, &mode)) {
+
+        seekTimeUs += ((int64_t)mElstShiftStartTicks * 1000000) / mTimescale;
+        ALOGV("shifted seekTimeUs :%" PRId64 ", mElstShiftStartTicks:%" PRId32, seekTimeUs,
+                mElstShiftStartTicks);
 
         int numSidxEntries = mSegments.size();
         if (numSidxEntries != 0) {
@@ -5709,6 +5764,8 @@ media_status_t MPEG4Source::fragmentedRead(
         offset = smpl->offset;
         size = smpl->size;
         cts = mCurrentTime + smpl->compositionOffset;
+        cts -= mElstShiftStartTicks;
+
         mCurrentTime += smpl->duration;
         isSyncSample = (mCurrentSampleIndex == 0);
 
@@ -6102,11 +6159,11 @@ static bool BetterSniffMPEG4(DataSourceHelper *source, float *confidence) {
     return true;
 }
 
-static CMediaExtractorV3* CreateExtractor(CDataSource *source, void *) {
-    return wrapV3(new MPEG4Extractor(new DataSourceHelper(source)));
+static CMediaExtractor* CreateExtractor(CDataSource *source, void *) {
+    return wrap(new MPEG4Extractor(new DataSourceHelper(source)));
 }
 
-static CreatorFuncV3 Sniff(
+static CreatorFunc Sniff(
         CDataSource *source, float *confidence, void **,
         FreeMetaFunc *) {
     DataSourceHelper helper(source);
@@ -6127,11 +6184,11 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION_CURRENT + 1,
+        EXTRACTORDEF_VERSION,
         UUID("27575c67-4417-4c54-8d3d-8e626985a164"),
         2, // version
         "MP4 Extractor",
-        { .v3 = Sniff }
+        { .v2 = Sniff }
     };
 }
 

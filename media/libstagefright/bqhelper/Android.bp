@@ -25,7 +25,6 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "libbase",
         "libbinder",
         "libcutils",
         "libgui",
@@ -38,8 +37,6 @@ cc_library_shared {
         "libutils",
 
         "android.hardware.graphics.bufferqueue@1.0",
-
-        "libnativewindow", // TODO(b/62923479): use header library
     ],
 
     export_shared_lib_headers: [

@@ -35,12 +35,12 @@ class MetaData;
 struct DataSourceBaseReader;
 struct MatroskaSource;
 
-struct MatroskaExtractor : public MediaExtractorPluginHelperV3 {
+struct MatroskaExtractor : public MediaExtractorPluginHelper {
     explicit MatroskaExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
 
-    virtual MediaTrackHelperV3 *getTrack(size_t index);
+    virtual MediaTrackHelper *getTrack(size_t index);
 
     virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 

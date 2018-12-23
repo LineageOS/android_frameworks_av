@@ -17,6 +17,7 @@
 #define _ACAMERA_METADATA_H
 
 #include <unordered_set>
+#include <vector>
 
 #include <sys/types.h>
 #include <utils/Mutex.h>
@@ -65,6 +66,7 @@ struct ACameraMetadata : public RefBase {
                             /*out*/const uint32_t** tags) const;
 
     const CameraMetadata& getInternalData() const;
+    bool isLogicalMultiCamera(size_t* count, const char* const** physicalCameraIds) const;
 
   private:
 
@@ -74,6 +76,7 @@ struct ACameraMetadata : public RefBase {
     void filterUnsupportedFeatures(); // Hide features not yet supported by NDK
     void filterStreamConfigurations(); // Hide input streams, translate hal format to NDK formats
     void filterDurations(uint32_t tag); // translate hal format to NDK formats
+    void derivePhysicalCameraIds(); // Derive array of physical ids.
 
     template<typename INTERNAL_T, typename NDK_T>
     camera_status_t updateImpl(uint32_t tag, uint32_t count, const NDK_T* data) {
@@ -112,6 +115,8 @@ struct ACameraMetadata : public RefBase {
     const ACAMERA_METADATA_TYPE mType;
 
     static std::unordered_set<uint32_t> sSystemTags;
+
+    std::vector<const char*> mStaticPhysicalCameraIds;
 };
 
 #endif // _ACAMERA_METADATA_H

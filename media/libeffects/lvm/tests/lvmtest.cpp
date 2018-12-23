@@ -76,6 +76,7 @@ struct lvmConfigParams_t {
   int              samplingFreq    = 44100;
   int              nrChannels      = 2;
   int              fChannels       = 2;
+  bool             monoMode        = false;
   int              bassEffectLevel = 0;
   int              eqPresetLevel   = 0;
   int              frameLength     = 256;
@@ -98,6 +99,8 @@ void printUsage() {
   printf("\n");
   printf("\n     -ch:<process_channels> (1 through 8)\n\n");
   printf("\n     -fch:<file_channels> (1 through 8)\n\n");
+  printf("\n     -M");
+  printf("\n           Mono mode (force all input audio channels to be identical)");
   printf("\n     -basslvl:<effect_level>");
   printf("\n           A value that ranges between 0 - 15 default 0");
   printf("\n");
@@ -612,6 +615,15 @@ int lvmMainProcess(lvmConfigParams_t *plvmConfigParams, FILE *finp, FILE *fout) 
     }
     memcpy_to_float_from_i16(floatIn.data(), in.data(), frameLength * channelCount);
 
+    // Mono mode will replicate the first channel to all other channels.
+    // This ensures all audio channels are identical. This is useful for testing
+    // Bass Boost, which extracts a mono signal for processing.
+    if (plvmConfigParams->monoMode && channelCount > 1) {
+        for (int i = 0; i < frameLength; ++i) {
+            auto *fp = &floatIn[i * channelCount];
+            std::fill(fp + 1, fp + channelCount, *fp); // replicate ch 0
+        }
+    }
 #if 1
     errCode = lvmExecute(floatIn.data(), floatOut.data(), &context, plvmConfigParams);
     if (errCode) {
@@ -677,6 +689,8 @@ int main(int argc, const char *argv[]) {
              return -1;
            }
            lvmConfigParams.fChannels = fChannels;
+    } else if (!strcmp(argv[i],"-M")) {
+          lvmConfigParams.monoMode = true;
     } else if (!strncmp(argv[i], "-basslvl:", 9)) {
       const int bassEffectLevel = atoi(argv[i] + 9);
       if (bassEffectLevel > 15 || bassEffectLevel < 0) {

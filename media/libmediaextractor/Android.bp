@@ -14,11 +14,19 @@ cc_library {
         "-Wall",
     ],
 
+    static: {
+        cflags: [
+            "-Wno-multichar",
+            "-Werror",
+            "-Wall",
+            "-DNO_IMEMORY",
+        ],
+    },
+
     shared_libs: [
         "libbinder",
         "libstagefright_foundation",
         "libutils",
-        "libcutils",
         "liblog",
     ],
 

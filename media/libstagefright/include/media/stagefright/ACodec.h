@@ -237,6 +237,8 @@ private:
     android_native_rect_t mLastNativeWindowCrop;
     int32_t mLastNativeWindowDataSpace;
     HDRStaticInfo mLastHDRStaticInfo;
+    sp<ABuffer> mHdr10PlusScratchBuffer;
+    sp<ABuffer> mLastHdr10PlusBuffer;
     sp<AMessage> mConfigFormat;
     sp<AMessage> mInputFormat;
     sp<AMessage> mOutputFormat;
@@ -290,6 +292,7 @@ private:
 
     OMX_INDEXTYPE mDescribeColorAspectsIndex;
     OMX_INDEXTYPE mDescribeHDRStaticInfoIndex;
+    OMX_INDEXTYPE mDescribeHDR10PlusInfoIndex;
 
     std::shared_ptr<ACodecBufferChannel> mBufferChannel;
 
@@ -424,6 +427,11 @@ private:
     // unspecified values.
     void onDataSpaceChanged(android_dataspace dataSpace, const ColorAspects &aspects);
 
+    // notifies the codec that the config with |configIndex| has changed, the value
+    // can be queried by OMX getConfig, and the config should be applied to the next
+    // output buffer notified after this callback.
+    void onConfigUpdate(OMX_INDEXTYPE configIndex);
+
     // gets index or sets it to 0 on error. Returns error from codec.
     status_t initDescribeHDRStaticInfoIndex();
 
@@ -435,11 +443,21 @@ private:
     // sets |params|. Returns the codec error.
     status_t setHDRStaticInfo(const DescribeHDRStaticInfoParams &params);
 
+    // sets |hdr10PlusInfo|. Returns the codec error.
+    status_t setHdr10PlusInfo(const sp<ABuffer> &hdr10PlusInfo);
+
     // gets |params|. Returns the codec error.
     status_t getHDRStaticInfo(DescribeHDRStaticInfoParams &params);
 
     // gets HDR static information for the video encoder/decoder port and sets them into |format|.
     status_t getHDRStaticInfoForVideoCodec(OMX_U32 portIndex, sp<AMessage> &format);
+
+    // gets DescribeHDR10PlusInfoParams params. If |paramSizeUsed| is zero, it's
+    // possible that the returned DescribeHDR10PlusInfoParams only has the
+    // nParamSizeUsed field updated, because the size of the storage is insufficient.
+    // In this case, getHDR10PlusInfo() should be called again with |paramSizeUsed|
+    // specified to the previous returned value.
+    DescribeHDR10PlusInfoParams* getHDR10PlusInfo(size_t paramSizeUsed = 0);
 
     typedef struct drcParams {
         int32_t drcCut;

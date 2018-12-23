@@ -26,8 +26,6 @@
 #include <cutils/properties.h>
 #include <cutils/qtaguid.h>
 
-#include <NetdClient.h>
-
 namespace android {
 
 HTTPBase::HTTPBase()

@@ -1313,6 +1313,10 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
     audio_format_t bestFormat = AUDIO_FORMAT_INVALID;
     audio_format_t bestFormatForFlags = AUDIO_FORMAT_INVALID;
 
+    // Flags which must be present on both the request and the selected output
+    static const audio_output_flags_t kMandatedFlags = (audio_output_flags_t)
+        (AUDIO_OUTPUT_FLAG_HW_AV_SYNC | AUDIO_OUTPUT_FLAG_MMAP_NOIRQ);
+
     for (audio_io_handle_t output : outputs) {
         sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
         if (!outputDesc->isDuplicated()) {
@@ -1335,6 +1339,10 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
                 if (outputDesc->mChannelMask & AUDIO_CHANNEL_HAPTIC_ALL) {
                     continue;
                 }
+            }
+            if ((kMandatedFlags & flags) !=
+                (kMandatedFlags & outputDesc->mProfile->getFlags())) {
+                continue;
             }
 
             // if a valid format is specified, skip output if not compatible
@@ -2421,6 +2429,33 @@ status_t AudioPolicyManager::registerEffect(const effect_descriptor_t *desc,
         }
     }
     return mEffects.registerEffect(desc, io, strategy, session, id);
+}
+
+status_t AudioPolicyManager::unregisterEffect(int id)
+{
+    if (mEffects.getEffect(id) == nullptr) {
+        return INVALID_OPERATION;
+    }
+
+    if (mEffects.isEffectEnabled(id)) {
+        ALOGW("%s effect %d enabled", __FUNCTION__, id);
+        setEffectEnabled(id, false);
+    }
+    return mEffects.unregisterEffect(id);
+}
+
+status_t AudioPolicyManager::setEffectEnabled(int id, bool enabled)
+{
+    sp<EffectDescriptor> effect = mEffects.getEffect(id);
+    if (effect == nullptr) {
+        return INVALID_OPERATION;
+    }
+
+    status_t status = mEffects.setEffectEnabled(id, enabled);
+    if (status == NO_ERROR) {
+        mInputs.trackEffectEnabled(effect, enabled);
+    }
+    return status;
 }
 
 bool AudioPolicyManager::isStreamActive(audio_stream_type_t stream, uint32_t inPastMs) const
@@ -3706,13 +3741,11 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
 
 void AudioPolicyManager::setAppState(uid_t uid, app_state_t state)
 {
-    Vector<sp<AudioInputDescriptor> > activeInputs = mInputs.getActiveInputs();
-
     ALOGV("%s(uid:%d, state:%d)", __func__, uid, state);
 
-    for (size_t i = 0; i < activeInputs.size(); i++) {
-        sp<AudioInputDescriptor> activeDesc = activeInputs[i];
-        RecordClientVector clients = activeDesc->clientsList(true /*activeOnly*/);
+    for (size_t i = 0; i < mInputs.size(); i++) {
+        sp<AudioInputDescriptor> inputDesc = mInputs.valueAt(i);
+        RecordClientVector clients = inputDesc->clientsList(false /*activeOnly*/);
         for (const auto& client : clients) {
             if (uid == client->uid()) {
                 client->setAppState(state);

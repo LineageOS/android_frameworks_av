@@ -91,18 +91,15 @@ cc_library {
         "JMedia2HTTPConnection.cpp",
     ],
 
+    header_libs: [
+        "libbinder_headers",
+        "libnativehelper_header_only",
+    ],
+
     shared_libs: [
-        "android.hidl.token@1.0-utils",
         "liblog",
-        "libcutils",
         "libutils",
-        "libbinder",
-        "libstagefright_foundation",
-        "libmediaextractor",
         "libdl",
-        "libaudioutils",
-        "libaudioclient",
-        "libnativehelper",
     ],
 
     include_dirs: [

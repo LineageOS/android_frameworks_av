@@ -53,12 +53,12 @@ struct Trex {
     uint32_t default_sample_flags;
 };
 
-class MPEG4Extractor : public MediaExtractorPluginHelperV3 {
+class MPEG4Extractor : public MediaExtractorPluginHelper {
 public:
     explicit MPEG4Extractor(DataSourceHelper *source, const char *mime = NULL);
 
     virtual size_t countTracks();
-    virtual MediaTrackHelperV3 *getTrack(size_t index);
+    virtual MediaTrackHelper *getTrack(size_t index);
     virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
     virtual media_status_t getMetaData(AMediaFormat *meta);
@@ -85,6 +85,7 @@ private:
         bool has_elst;
         int64_t elst_media_time;
         uint64_t elst_segment_duration;
+        int32_t elstShiftStartTicks;
         bool subsample_encryption;
     };
 

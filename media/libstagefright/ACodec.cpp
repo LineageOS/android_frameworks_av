@@ -576,6 +576,7 @@ ACodec::ACodec()
       mTunneled(false),
       mDescribeColorAspectsIndex((OMX_INDEXTYPE)0),
       mDescribeHDRStaticInfoIndex((OMX_INDEXTYPE)0),
+      mDescribeHDR10PlusInfoIndex((OMX_INDEXTYPE)0),
       mStateGeneration(0),
       mVendorExtensionsStatus(kExtensionsUnchecked) {
     memset(&mLastHDRStaticInfo, 0, sizeof(mLastHDRStaticInfo));
@@ -3765,8 +3766,17 @@ status_t ACodec::initDescribeHDRStaticInfoIndex() {
             "OMX.google.android.index.describeHDRStaticInfo", &mDescribeHDRStaticInfoIndex);
     if (err != OK) {
         mDescribeHDRStaticInfoIndex = (OMX_INDEXTYPE)0;
+        return err;
     }
-    return err;
+
+    err = mOMXNode->getExtensionIndex(
+                "OMX.google.android.index.describeHDR10PlusInfo", &mDescribeHDR10PlusInfoIndex);
+    if (err != OK) {
+        mDescribeHDR10PlusInfoIndex = (OMX_INDEXTYPE)0;
+        return err;
+    }
+
+    return OK;
 }
 
 status_t ACodec::setHDRStaticInfo(const DescribeHDRStaticInfoParams &params) {
@@ -4411,8 +4421,8 @@ status_t ACodec::setupAVCEncoderParameters(const sp<AMessage> &msg) {
         h264type.nBFrames = mLatency == 0 ? 1 : std::min(1U, mLatency - 1);
 
         // disable B-frames until MPEG4Writer can guarantee finalizing files with B-frames
-        h264type.nRefFrames = 1;
-        h264type.nBFrames = 0;
+        // h264type.nRefFrames = 1;
+        // h264type.nBFrames = 0;
 
         h264type.nPFrames = setPFramesSpacing(iFrameInterval, frameRate, h264type.nBFrames);
         h264type.nAllowedPictureTypes =
@@ -5397,6 +5407,70 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
     return getVendorParameters(portIndex, notify);
 }
 
+DescribeHDR10PlusInfoParams* ACodec::getHDR10PlusInfo(size_t paramSizeUsed) {
+    if (mDescribeHDR10PlusInfoIndex == 0) {
+        ALOGE("getHDR10PlusInfo: does not support DescribeHDR10PlusInfoParams");
+        return nullptr;
+    }
+
+    size_t newSize = sizeof(DescribeHDR10PlusInfoParams) - 1 +
+            ((paramSizeUsed > 0) ? paramSizeUsed : 512);
+    if (mHdr10PlusScratchBuffer == nullptr
+            || newSize > mHdr10PlusScratchBuffer->size()) {
+        mHdr10PlusScratchBuffer = new ABuffer(newSize);
+    }
+    DescribeHDR10PlusInfoParams *config =
+            (DescribeHDR10PlusInfoParams *)mHdr10PlusScratchBuffer->data();
+    InitOMXParams(config);
+    config->nSize = mHdr10PlusScratchBuffer->size();
+    config->nPortIndex = 1;
+    size_t paramSize = config->nSize - sizeof(DescribeHDR10PlusInfoParams) + 1;
+    config->nParamSize = paramSize;
+    config->nParamSizeUsed = 0;
+    status_t err = mOMXNode->getConfig(
+            (OMX_INDEXTYPE)mDescribeHDR10PlusInfoIndex,
+            config, config->nSize);
+    if (err != OK) {
+        ALOGE("failed to get DescribeHDR10PlusInfoParams (err %d)", err);
+        return nullptr;
+    }
+    if (config->nParamSize != paramSize) {
+        ALOGE("DescribeHDR10PlusInfoParams alters nParamSize: %u vs %zu",
+                config->nParamSize, paramSize);
+        return nullptr;
+    }
+    if (paramSizeUsed > 0 && config->nParamSizeUsed != paramSizeUsed) {
+        ALOGE("DescribeHDR10PlusInfoParams returns wrong nParamSizeUsed: %u vs %zu",
+                config->nParamSizeUsed, paramSizeUsed);
+        return nullptr;
+    }
+    return config;
+}
+
+void ACodec::onConfigUpdate(OMX_INDEXTYPE configIndex) {
+    if (mDescribeHDR10PlusInfoIndex == 0
+            || configIndex != mDescribeHDR10PlusInfoIndex) {
+        // mDescribeHDR10PlusInfoIndex is the only update we recognize now
+        return;
+    }
+
+    DescribeHDR10PlusInfoParams *config = getHDR10PlusInfo();
+    if (config == nullptr) {
+        return;
+    }
+    if (config->nParamSizeUsed > config->nParamSize) {
+        // try again with the size specified
+        config = getHDR10PlusInfo(config->nParamSizeUsed);
+        if (config == nullptr) {
+            return;
+        }
+    }
+
+    mOutputFormat = mOutputFormat->dup(); // trigger an output format changed event
+    mOutputFormat->setBuffer("hdr10-plus-info",
+            ABuffer::CreateAsCopy(config->nValue, config->nParamSizeUsed));
+}
+
 void ACodec::onDataSpaceChanged(android_dataspace dataSpace, const ColorAspects &aspects) {
     // aspects are normally communicated in ColorAspects
     int32_t range, standard, transfer;
@@ -6335,6 +6409,15 @@ void ACodec::BaseState::onOutputBufferDrained(const sp<AMessage> &msg) {
                 setNativeWindowHdrMetadata(mCodec->mNativeWindow.get(), &info);
                 mCodec->mLastHDRStaticInfo = info;
             }
+        }
+
+        sp<ABuffer> hdr10PlusInfo;
+        if (buffer->format()->findBuffer("hdr10-plus-info", &hdr10PlusInfo)
+                && hdr10PlusInfo != nullptr && hdr10PlusInfo->size() > 0
+                && hdr10PlusInfo != mCodec->mLastHdr10PlusBuffer) {
+            native_window_set_buffers_hdr10_plus_metadata(mCodec->mNativeWindow.get(),
+                    hdr10PlusInfo->size(), hdr10PlusInfo->data());
+            mCodec->mLastHdr10PlusBuffer = hdr10PlusInfo;
         }
 
         // save buffers sent to the surface so we can get render time when they return
@@ -7475,10 +7558,43 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
         }
     }
 
+    sp<ABuffer> hdr10PlusInfo;
+    if (params->findBuffer("hdr10-plus-info", &hdr10PlusInfo)
+            && hdr10PlusInfo != nullptr && hdr10PlusInfo->size() > 0) {
+        (void)setHdr10PlusInfo(hdr10PlusInfo);
+    }
+
     // Ignore errors as failure is expected for codecs that aren't video encoders.
     (void)configureTemporalLayers(params, false /* inConfigure */, mOutputFormat);
 
     return setVendorParameters(params);
+}
+
+status_t ACodec::setHdr10PlusInfo(const sp<ABuffer> &hdr10PlusInfo) {
+    if (mDescribeHDR10PlusInfoIndex == 0) {
+        ALOGE("setHdr10PlusInfo: does not support DescribeHDR10PlusInfoParams");
+        return ERROR_UNSUPPORTED;
+    }
+    size_t newSize = sizeof(DescribeHDR10PlusInfoParams) + hdr10PlusInfo->size() - 1;
+    if (mHdr10PlusScratchBuffer == nullptr ||
+            newSize > mHdr10PlusScratchBuffer->size()) {
+        mHdr10PlusScratchBuffer = new ABuffer(newSize);
+    }
+    DescribeHDR10PlusInfoParams *config =
+            (DescribeHDR10PlusInfoParams *)mHdr10PlusScratchBuffer->data();
+    InitOMXParams(config);
+    config->nPortIndex = 0;
+    config->nSize = newSize;
+    config->nParamSize = hdr10PlusInfo->size();
+    config->nParamSizeUsed = hdr10PlusInfo->size();
+    memcpy(config->nValue, hdr10PlusInfo->data(), hdr10PlusInfo->size());
+    status_t err = mOMXNode->setConfig(
+            (OMX_INDEXTYPE)mDescribeHDR10PlusInfoIndex,
+            config, config->nSize);
+    if (err != OK) {
+        ALOGE("failed to set DescribeHDR10PlusInfoParams (err %d)", err);
+    }
+    return OK;
 }
 
 // Removes trailing tags matching |tag| from |key| (e.g. a settings name). |minLength| specifies
@@ -7898,6 +8014,15 @@ bool ACodec::ExecutingState::onOMXEvent(
                 ALOGV("[%s] OMX_EventPortSettingsChanged 0x%08x",
                      mCodec->mComponentName.c_str(), data2);
             }
+
+            return true;
+        }
+
+        case OMX_EventConfigUpdate:
+        {
+            CHECK_EQ(data1, (OMX_U32)kPortIndexOutput);
+
+            mCodec->onConfigUpdate((OMX_INDEXTYPE)data2);
 
             return true;
         }

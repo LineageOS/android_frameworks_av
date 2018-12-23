@@ -77,7 +77,7 @@ cc_library_shared {
     },
 }
 
-cc_library_shared {
+cc_library {
     name: "libstagefright",
 
     srcs: [
@@ -133,6 +133,7 @@ cc_library_shared {
         "SurfaceUtils.cpp",
         "Utils.cpp",
         "ThrottledSource.cpp",
+        "VideoFrameSchedulerBase.cpp",
         "VideoFrameScheduler.cpp",
     ],
 
@@ -145,7 +146,6 @@ cc_library_shared {
         "libdl",
         "libdrmframework",
         "libgui",
-        "libion",
         "liblog",
         "libmedia",
         "libmedia_omx",
@@ -153,7 +153,6 @@ cc_library_shared {
         "libmediaextractor",
         "libmediametrics",
         "libmediautils",
-        "libnetd_client",
         "libui",
         "libutils",
         "libmedia_helper",
@@ -161,7 +160,6 @@ cc_library_shared {
         "libstagefright_foundation",
         "libstagefright_omx_utils",
         "libstagefright_opus_common",
-        "libstagefright_xmlparser",
         "libRScpp",
         "libhidlallocatorutils",
         "libhidlbase",
@@ -170,8 +168,6 @@ cc_library_shared {
         "android.hidl.allocator@1.0",
         "android.hardware.cas.native@1.0",
         "android.hardware.media.omx@1.0",
-        "android.hardware.graphics.allocator@2.0",
-        "android.hardware.graphics.mapper@2.0",
     ],
 
     static_libs: [
@@ -189,6 +185,7 @@ cc_library_shared {
     ],
 
     header_libs:[
+        "libstagefright_xmlparser_headers",
         "media_ndk_headers",
     ],
 
@@ -237,7 +234,8 @@ cc_library_static {
         "MediaClock.cpp",
         "NdkUtils.cpp",
         "Utils.cpp",
-        "VideoFrameScheduler.cpp",
+        "VideoFrameSchedulerBase.cpp",
+        "VideoFrameScheduler2.cpp",
         "http/ClearMediaHTTP.cpp",
     ],
 
@@ -247,10 +245,12 @@ cc_library_static {
         "libnetd_client",
         "libutils",
         "libstagefright_foundation",
+        "libandroid",
     ],
 
     static_libs: [
         "libmedia_player2_util",
+        "libmedia2_jni_core",
     ],
 
     export_include_dirs: [

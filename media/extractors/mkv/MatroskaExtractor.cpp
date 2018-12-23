@@ -125,7 +125,7 @@ private:
     BlockIterator &operator=(const BlockIterator &);
 };
 
-struct MatroskaSource : public MediaTrackHelperV3 {
+struct MatroskaSource : public MediaTrackHelper {
     MatroskaSource(MatroskaExtractor *extractor, size_t index);
 
     virtual media_status_t start();
@@ -134,7 +134,7 @@ struct MatroskaSource : public MediaTrackHelperV3 {
     virtual media_status_t getFormat(AMediaFormat *);
 
     virtual media_status_t read(
-            MediaBufferHelperV3 **buffer, const ReadOptions *options);
+            MediaBufferHelper **buffer, const ReadOptions *options);
 
 protected:
     virtual ~MatroskaSource();
@@ -154,11 +154,11 @@ private:
     BlockIterator mBlockIter;
     ssize_t mNALSizeLen;  // for type AVC or HEVC
 
-    List<MediaBufferHelperV3 *> mPendingFrames;
+    List<MediaBufferHelper *> mPendingFrames;
 
     status_t advance();
 
-    status_t setWebmBlockCryptoInfo(MediaBufferHelperV3 *mbuf);
+    status_t setWebmBlockCryptoInfo(MediaBufferHelper *mbuf);
     media_status_t readBlock();
     void clearPendingFrames();
 
@@ -569,7 +569,7 @@ static AString uriDebugString(const char *uri) {
 
 void MatroskaSource::clearPendingFrames() {
     while (!mPendingFrames.empty()) {
-        MediaBufferHelperV3 *frame = *mPendingFrames.begin();
+        MediaBufferHelper *frame = *mPendingFrames.begin();
         mPendingFrames.erase(mPendingFrames.begin());
 
         frame->release();
@@ -577,7 +577,7 @@ void MatroskaSource::clearPendingFrames() {
     }
 }
 
-status_t MatroskaSource::setWebmBlockCryptoInfo(MediaBufferHelperV3 *mbuf) {
+status_t MatroskaSource::setWebmBlockCryptoInfo(MediaBufferHelper *mbuf) {
     if (mbuf->range_length() < 1 || mbuf->range_length() - 1 > INT32_MAX) {
         // 1-byte signal
         return ERROR_MALFORMED;
@@ -727,7 +727,7 @@ media_status_t MatroskaSource::readBlock() {
         }
 
         len += trackInfo->mHeaderLen;
-        MediaBufferHelperV3 *mbuf;
+        MediaBufferHelper *mbuf;
         mBufferGroup->acquire_buffer(&mbuf, false /* nonblocking */, len /* requested size */);
         mbuf->set_range(0, len);
         uint8_t *data = static_cast<uint8_t *>(mbuf->data());
@@ -763,7 +763,7 @@ media_status_t MatroskaSource::readBlock() {
 }
 
 media_status_t MatroskaSource::read(
-        MediaBufferHelperV3 **out, const ReadOptions *options) {
+        MediaBufferHelper **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t targetSampleTimeUs = -1ll;
@@ -799,7 +799,7 @@ media_status_t MatroskaSource::read(
         }
     }
 
-    MediaBufferHelperV3 *frame = *mPendingFrames.begin();
+    MediaBufferHelper *frame = *mPendingFrames.begin();
     mPendingFrames.erase(mPendingFrames.begin());
 
     if ((mType != AVC && mType != HEVC) || mNALSizeLen == 0) {
@@ -828,7 +828,7 @@ media_status_t MatroskaSource::read(
     size_t srcSize = frame->range_length();
 
     size_t dstSize = 0;
-    MediaBufferHelperV3 *buffer = NULL;
+    MediaBufferHelper *buffer = NULL;
     uint8_t *dstPtr = NULL;
 
     for (int32_t pass = 0; pass < 2; ++pass) {
@@ -1005,7 +1005,7 @@ size_t MatroskaExtractor::countTracks() {
     return mTracks.size();
 }
 
-MediaTrackHelperV3 *MatroskaExtractor::getTrack(size_t index) {
+MediaTrackHelper *MatroskaExtractor::getTrack(size_t index) {
     if (index >= mTracks.size()) {
         return NULL;
     }
@@ -1673,22 +1673,22 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION_CURRENT + 1,
+        EXTRACTORDEF_VERSION,
         UUID("abbedd92-38c4-4904-a4c1-b3f45f899980"),
         1,
         "Matroska Extractor",
         {
-            .v3 = [](
+            .v2 = [](
                     CDataSource *source,
                     float *confidence,
                     void **,
-                    FreeMetaFunc *) -> CreatorFuncV3 {
+                    FreeMetaFunc *) -> CreatorFunc {
                 DataSourceHelper helper(source);
                 if (SniffMatroska(&helper, confidence)) {
                     return [](
                             CDataSource *source,
-                            void *) -> CMediaExtractorV3* {
-                        return wrapV3(new MatroskaExtractor(new DataSourceHelper(source)));};
+                            void *) -> CMediaExtractor* {
+                        return wrap(new MatroskaExtractor(new DataSourceHelper(source)));};
                 }
                 return NULL;
             }

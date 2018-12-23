@@ -29,12 +29,12 @@ namespace android {
 struct AMessage;
 class String8;
 
-class AACExtractor : public MediaExtractorPluginHelperV3 {
+class AACExtractor : public MediaExtractorPluginHelper {
 public:
     AACExtractor(DataSourceHelper *source, off64_t offset);
 
     virtual size_t countTracks();
-    virtual MediaTrackHelperV3 *getTrack(size_t index);
+    virtual MediaTrackHelper *getTrack(size_t index);
     virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
     virtual media_status_t getMetaData(AMediaFormat *meta);

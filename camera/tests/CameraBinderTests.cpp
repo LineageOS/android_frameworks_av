@@ -480,7 +480,8 @@ TEST_F(CameraClientBinderTest, CheckBinderCameraDeviceUser) {
 
         sp<Surface> surface(new Surface(gbProducer, /*controlledByApp*/false));
 
-        OutputConfiguration output(gbProducer, /*rotation*/0);
+        String16 noPhysicalId;
+        OutputConfiguration output(gbProducer, /*rotation*/0, noPhysicalId);
 
         // Can we configure?
         res = device->beginConfigure();

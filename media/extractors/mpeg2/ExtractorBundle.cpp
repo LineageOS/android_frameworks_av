@@ -36,7 +36,7 @@ ExtractorDef GETEXTRACTORDEF() {
         1,
         "MPEG2-PS/TS Extractor",
         {
-            [](
+            .v2 = [](
                     CDataSource *source,
                     float *confidence,
                     void **,

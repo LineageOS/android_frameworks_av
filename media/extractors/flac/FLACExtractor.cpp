@@ -52,7 +52,7 @@ static inline bool shouldExtractorOutputFloat(int bitsPerSample)
 
 class FLACParser;
 
-class FLACSource : public MediaTrackHelperV3 {
+class FLACSource : public MediaTrackHelper {
 
 public:
     FLACSource(
@@ -65,7 +65,7 @@ public:
     virtual media_status_t getFormat(AMediaFormat *meta);
 
     virtual media_status_t read(
-            MediaBufferHelperV3 **buffer, const ReadOptions *options = NULL);
+            MediaBufferHelper **buffer, const ReadOptions *options = NULL);
 
 protected:
     virtual ~FLACSource();
@@ -124,12 +124,12 @@ public:
     }
 
     // media buffers
-    void allocateBuffers(MediaBufferGroupHelperV3 *group);
+    void allocateBuffers(MediaBufferGroupHelper *group);
     void releaseBuffers();
-    MediaBufferHelperV3 *readBuffer() {
+    MediaBufferHelper *readBuffer() {
         return readBuffer(false, 0LL);
     }
-    MediaBufferHelperV3 *readBuffer(FLAC__uint64 sample) {
+    MediaBufferHelper *readBuffer(FLAC__uint64 sample) {
         return readBuffer(true, sample);
     }
 
@@ -142,7 +142,7 @@ private:
 
     // media buffers
     size_t mMaxBufferSize;
-    MediaBufferGroupHelperV3 *mGroup;
+    MediaBufferGroupHelper *mGroup;
     void (*mCopy)(int16_t *dst, const int * src[kMaxChannels], unsigned nSamples, unsigned nChannels);
 
     // handle to underlying libFLAC parser
@@ -166,7 +166,7 @@ private:
     FLAC__StreamDecoderErrorStatus mErrorStatus;
 
     status_t init();
-    MediaBufferHelperV3 *readBuffer(bool doSeek, FLAC__uint64 sample);
+    MediaBufferHelper *readBuffer(bool doSeek, FLAC__uint64 sample);
 
     // no copy constructor or assignment
     FLACParser(const FLACParser &);
@@ -576,7 +576,7 @@ status_t FLACParser::init()
     return OK;
 }
 
-void FLACParser::allocateBuffers(MediaBufferGroupHelperV3 *group)
+void FLACParser::allocateBuffers(MediaBufferGroupHelper *group)
 {
     CHECK(mGroup == NULL);
     mGroup = group;
@@ -588,7 +588,7 @@ void FLACParser::releaseBuffers()
 {
 }
 
-MediaBufferHelperV3 *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
+MediaBufferHelper *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
 {
     mWriteRequested = true;
     mWriteCompleted = false;
@@ -625,7 +625,7 @@ MediaBufferHelperV3 *FLACParser::readBuffer(bool doSeek, FLAC__uint64 sample)
     }
     // acquire a media buffer
     CHECK(mGroup != NULL);
-    MediaBufferHelperV3 *buffer;
+    MediaBufferHelper *buffer;
     status_t err = mGroup->acquire_buffer(&buffer);
     if (err != OK) {
         return NULL;
@@ -716,9 +716,9 @@ media_status_t FLACSource::getFormat(AMediaFormat *meta)
 }
 
 media_status_t FLACSource::read(
-        MediaBufferHelperV3 **outBuffer, const ReadOptions *options)
+        MediaBufferHelper **outBuffer, const ReadOptions *options)
 {
-    MediaBufferHelperV3 *buffer;
+    MediaBufferHelper *buffer;
     // process an optional seek request
     int64_t seekTimeUs;
     ReadOptions::SeekMode mode;
@@ -772,7 +772,7 @@ size_t FLACExtractor::countTracks()
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrackHelperV3 *FLACExtractor::getTrack(size_t index)
+MediaTrackHelper *FLACExtractor::getTrack(size_t index)
 {
     if (mInitCheck != OK || index > 0) {
         return NULL;
@@ -828,22 +828,22 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-            EXTRACTORDEF_VERSION_CURRENT + 1,
+            EXTRACTORDEF_VERSION,
             UUID("1364b048-cc45-4fda-9934-327d0ebf9829"),
             1,
             "FLAC Extractor",
             {
-                .v3 = [](
+                .v2 = [](
                         CDataSource *source,
                         float *confidence,
                         void **,
-                        FreeMetaFunc *) -> CreatorFuncV3 {
+                        FreeMetaFunc *) -> CreatorFunc {
                     DataSourceHelper helper(source);
                     if (SniffFLAC(&helper, confidence)) {
                         return [](
                                 CDataSource *source,
-                                void *) -> CMediaExtractorV3* {
-                            return wrapV3(new FLACExtractor(new DataSourceHelper(source)));};
+                                void *) -> CMediaExtractor* {
+                            return wrap(new FLACExtractor(new DataSourceHelper(source)));};
                     }
                     return NULL;
                 }

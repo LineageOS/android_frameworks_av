@@ -89,8 +89,9 @@ hardware::camera2::params::OutputConfiguration convertFromHidl(
     for (auto &handle : windowHandles) {
         iGBPs.push_back(new H2BGraphicBufferProducer(AImageReader_getHGBPFromHandle(handle)));
     }
+    String16 physicalCameraId16(hOutputConfiguration.physicalCameraId.c_str());
     hardware::camera2::params::OutputConfiguration outputConfiguration(
-        iGBPs, convertFromHidl(hOutputConfiguration.rotation),
+        iGBPs, convertFromHidl(hOutputConfiguration.rotation), physicalCameraId16,
         hOutputConfiguration.windowGroupId, OutputConfiguration::SURFACE_TYPE_UNKNOWN, 0, 0,
         (windowHandles.size() > 1));
     return outputConfiguration;

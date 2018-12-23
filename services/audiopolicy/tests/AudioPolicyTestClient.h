@@ -75,11 +75,14 @@ public:
     void onAudioPatchListUpdate() override { }
     audio_unique_id_t newAudioUniqueId(audio_unique_id_use_t /*use*/) override { return 0; }
     void onDynamicPolicyMixStateUpdate(String8 /*regId*/, int32_t /*state*/) override { }
-    void onRecordingConfigurationUpdate(int /*event*/,
-                                        const record_client_info_t* /*clientInfo*/,
-                                        const struct audio_config_base* /*clientConfig*/,
-                                        const struct audio_config_base* /*deviceConfig*/,
-                                        audio_patch_handle_t /*patchHandle*/) override { }
+    void onRecordingConfigurationUpdate(int event __unused,
+                                        const record_client_info_t *clientInfo __unused,
+                                        const audio_config_base_t *clientConfig __unused,
+                                        std::vector<effect_descriptor_t> clientEffects __unused,
+                                        const audio_config_base_t *deviceConfig __unused,
+                                        std::vector<effect_descriptor_t> effects __unused,
+                                        audio_patch_handle_t patchHandle __unused,
+                                        audio_source_t source __unused) override { }
 };
 
 } // namespace android

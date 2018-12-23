@@ -2197,6 +2197,13 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                 }
                             }
 
+                            sp<ABuffer> hdr10PlusInfo;
+                            if (mOutputFormat->findBuffer("hdr10-plus-info", &hdr10PlusInfo)
+                                    && hdr10PlusInfo != nullptr && hdr10PlusInfo->size() > 0) {
+                                native_window_set_buffers_hdr10_plus_metadata(mSurface.get(),
+                                        hdr10PlusInfo->size(), hdr10PlusInfo->data());
+                            }
+
                             if (mime.startsWithIgnoreCase("video/")) {
                                 mSoftRenderer = new SoftwareRenderer(mSurface, mRotationDegrees);
                             }

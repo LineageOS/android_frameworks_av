@@ -405,10 +405,7 @@ void C2SoftVorbisDec::process(
     int numFrames = 0;
     int ret = vorbis_dsp_synthesis(mState, &pack, 1);
     if (0 != ret) {
-        ALOGE("vorbis_dsp_synthesis returned %d", ret);
-        mSignalledError = true;
-        work->result = C2_CORRUPTED;
-        return;
+        ALOGD("vorbis_dsp_synthesis returned %d; ignored", ret);
     } else {
         numFrames = vorbis_dsp_pcmout(
                 mState,  reinterpret_cast<int16_t *> (wView.data()),

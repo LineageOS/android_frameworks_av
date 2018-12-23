@@ -69,6 +69,7 @@ struct AudioSource : public MediaSource, public MediaBufferObserver {
 
     status_t getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
 
+    status_t getPortId(audio_port_handle_t *portId) const;
 
 protected:
     virtual ~AudioSource();

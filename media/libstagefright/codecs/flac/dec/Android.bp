@@ -29,7 +29,6 @@ cc_library_shared {
     },
 
     shared_libs: [
-        "libcutils",
         "liblog",
         "libstagefright_flacdec",
         "libstagefright_omx",

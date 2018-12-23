@@ -17,8 +17,8 @@ package android.media.session;
 
 import android.app.PendingIntent;
 import android.content.Intent;
-//import android.content.pm.ParceledListSlice;
 import android.media.MediaMetadata;
+import android.media.MediaParceledListSlice;
 import android.media.Rating;
 import android.media.session.ISessionControllerCallback;
 import android.media.session.MediaSession;
@@ -81,8 +81,7 @@ interface ISessionController {
             String action, in Bundle args);
     MediaMetadata getMetadata();
     PlaybackState getPlaybackState();
-    //TODO:(b/119750807) Resolve hidden API usage ParceledListSlice.
-    //ParceledListSlice getQueue();
+    MediaParceledListSlice getQueue();
     CharSequence getQueueTitle();
     Bundle getExtras();
     int getRatingType();

@@ -219,8 +219,8 @@ private:
     OMX_ERRORTYPE internalSetBitrateParams(
         const OMX_VIDEO_PARAM_BITRATETYPE *bitrate);
 
-    OMX_ERRORTYPE setConfig(
-        OMX_INDEXTYPE index, const OMX_PTR _params);
+    OMX_ERRORTYPE internalSetConfig(
+        OMX_INDEXTYPE index, const OMX_PTR _params, bool *frameConfig);
 
     OMX_ERRORTYPE getConfig(
         OMX_INDEXTYPE index, const OMX_PTR _params);

@@ -602,13 +602,40 @@ OMX_ERRORTYPE SoftVideoDecoderOMXComponent::getConfig(
             return OMX_ErrorNone;
         }
 
+        case kDescribeHdr10PlusInfoIndex:
+        {
+            if (!supportDescribeHdr10PlusInfo()) {
+                return OMX_ErrorUnsupportedIndex;
+            }
+
+            if (mHdr10PlusOutputs.size() > 0) {
+                auto it = mHdr10PlusOutputs.begin();
+
+                auto info = (*it).get();
+
+                DescribeHDR10PlusInfoParams* outParams =
+                        (DescribeHDR10PlusInfoParams *)params;
+
+                outParams->nParamSizeUsed = info->size();
+
+                // If the buffer provided by the client does not have enough
+                // storage, return the size only and do not remove the param yet.
+                if (outParams->nParamSize >= info->size()) {
+                    memcpy(outParams->nValue, info->data(), info->size());
+                    mHdr10PlusOutputs.erase(it);
+                }
+                return OMX_ErrorNone;
+            }
+            return OMX_ErrorUnderflow;
+        }
+
         default:
             return OMX_ErrorUnsupportedIndex;
     }
 }
 
-OMX_ERRORTYPE SoftVideoDecoderOMXComponent::setConfig(
-        OMX_INDEXTYPE index, const OMX_PTR params){
+OMX_ERRORTYPE SoftVideoDecoderOMXComponent::internalSetConfig(
+        OMX_INDEXTYPE index, const OMX_PTR params, bool *frameConfig){
     switch ((int)index) {
         case kDescribeColorAspectsIndex:
         {
@@ -658,11 +685,55 @@ OMX_ERRORTYPE SoftVideoDecoderOMXComponent::setConfig(
             return OMX_ErrorNone;
         }
 
+        case kDescribeHdr10PlusInfoIndex:
+        {
+            if (!supportDescribeHdr10PlusInfo()) {
+                return OMX_ErrorUnsupportedIndex;
+            }
+
+            const DescribeHDR10PlusInfoParams* inParams =
+                    (DescribeHDR10PlusInfoParams *)params;
+
+            if (*frameConfig) {
+                // This is a request to append to the current frame config set.
+                // For now, we only support kDescribeHdr10PlusInfoIndex, which
+                // we simply replace with the last set value.
+                if (mHdr10PlusInputs.size() > 0) {
+                    *(--mHdr10PlusInputs.end()) = ABuffer::CreateAsCopy(
+                            inParams->nValue, inParams->nParamSizeUsed);
+                } else {
+                    ALOGW("Ignoring kDescribeHdr10PlusInfoIndex: append to "
+                            "frame config while no frame config is present");
+                }
+            } else {
+                // This is a frame config, setting *frameConfig to true so that
+                // the client marks the next queued input frame to apply it.
+                *frameConfig = true;
+                mHdr10PlusInputs.push_back(ABuffer::CreateAsCopy(
+                        inParams->nValue, inParams->nParamSizeUsed));
+            }
+            return OMX_ErrorNone;
+        }
+
         default:
             return OMX_ErrorUnsupportedIndex;
     }
 }
 
+sp<ABuffer> SoftVideoDecoderOMXComponent::dequeueInputFrameConfig() {
+    auto it = mHdr10PlusInputs.begin();
+    sp<ABuffer> info = *it;
+    mHdr10PlusInputs.erase(it);
+    return info;
+}
+
+void SoftVideoDecoderOMXComponent::queueOutputFrameConfig(const sp<ABuffer> &info) {
+    mHdr10PlusOutputs.push_back(info);
+    notify(OMX_EventConfigUpdate,
+           kOutputPortIndex,
+           kDescribeHdr10PlusInfoIndex,
+           NULL);
+}
 
 OMX_ERRORTYPE SoftVideoDecoderOMXComponent::getExtensionIndex(
         const char *name, OMX_INDEXTYPE *index) {
@@ -676,6 +747,10 @@ OMX_ERRORTYPE SoftVideoDecoderOMXComponent::getExtensionIndex(
     } else if (!strcmp(name, "OMX.google.android.index.describeHDRStaticInfo")
             && supportDescribeHdrStaticInfo()) {
         *(int32_t*)index = kDescribeHdrStaticInfoIndex;
+        return OMX_ErrorNone;
+    } else if (!strcmp(name, "OMX.google.android.index.describeHDR10PlusInfo")
+            && supportDescribeHdr10PlusInfo()) {
+        *(int32_t*)index = kDescribeHdr10PlusInfoIndex;
         return OMX_ErrorNone;
     }
 
@@ -691,6 +766,10 @@ int SoftVideoDecoderOMXComponent::getColorAspectPreference() {
 }
 
 bool SoftVideoDecoderOMXComponent::supportDescribeHdrStaticInfo() {
+    return false;
+}
+
+bool SoftVideoDecoderOMXComponent::supportDescribeHdr10PlusInfo() {
     return false;
 }
 

@@ -21,10 +21,10 @@ import android.annotation.Nullable;
 import android.annotation.UnsupportedAppUsage;
 import android.app.PendingIntent;
 import android.content.Context;
-//import android.content.pm.ParceledListSlice;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.MediaMetadata;
+import android.media.MediaParceledListSlice;
 import android.media.Rating;
 import android.media.VolumeProvider;
 import android.net.Uri;
@@ -243,17 +243,14 @@ public final class MediaController {
      * @return The current play queue or null.
      */
     public @Nullable List<MediaSession.QueueItem> getQueue() {
-        //TODO:(b/119750807) Resolve hidden API usage ParceledListSlice.
-        /*
         try {
-            ParceledListSlice queue = mSessionBinder.getQueue();
+            MediaParceledListSlice queue = mSessionBinder.getQueue();
             if (queue != null) {
                 return queue.getList();
             }
         } catch (RemoteException e) {
             Log.wtf(TAG, "Error calling getQueue.", e);
         }
-        */
         return null;
     }
 
@@ -1102,10 +1099,8 @@ public final class MediaController {
             }
         }
 
-        //TODO:(b/119750807) Resolve hidden API usage ParceledListSlice.
-        /*
         @Override
-        public void onQueueChanged(ParceledListSlice parceledQueue) {
+        public void onQueueChanged(MediaParceledListSlice parceledQueue) {
             List<MediaSession.QueueItem> queue = parceledQueue == null ? null : parceledQueue
                     .getList();
             MediaController controller = mController.get();
@@ -1113,7 +1108,6 @@ public final class MediaController {
                 controller.postMessage(MSG_UPDATE_QUEUE, queue, null);
             }
         }
-        */
 
         @Override
         public void onQueueTitleChanged(CharSequence title) {

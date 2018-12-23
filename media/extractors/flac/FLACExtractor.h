@@ -27,13 +27,13 @@ namespace android {
 
 class FLACParser;
 
-class FLACExtractor : public MediaExtractorPluginHelperV3 {
+class FLACExtractor : public MediaExtractorPluginHelper {
 
 public:
     explicit FLACExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
-    virtual MediaTrackHelperV3 *getTrack(size_t index);
+    virtual MediaTrackHelper *getTrack(size_t index);
     virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
     virtual media_status_t getMetaData(AMediaFormat *meta);

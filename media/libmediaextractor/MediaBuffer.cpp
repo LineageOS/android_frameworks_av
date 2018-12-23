@@ -51,9 +51,12 @@ MediaBuffer::MediaBuffer(size_t size)
       mRangeLength(size),
       mOwnsData(true),
       mMetaData(new MetaDataBase) {
+#ifndef NO_IMEMORY
     if (size < kSharedMemThreshold
             || std::atomic_load_explicit(&mUseSharedMemory, std::memory_order_seq_cst) == 0) {
+#endif
         mData = malloc(size);
+#ifndef NO_IMEMORY
     } else {
         ALOGV("creating memoryDealer");
         sp<MemoryDealer> memoryDealer =
@@ -71,6 +74,7 @@ MediaBuffer::MediaBuffer(size_t size)
             ALOGV("Allocated shared mem buffer of size %zu @ %p", size, mData);
         }
     }
+#endif
 }
 
 MediaBuffer::MediaBuffer(const sp<ABuffer> &buffer)

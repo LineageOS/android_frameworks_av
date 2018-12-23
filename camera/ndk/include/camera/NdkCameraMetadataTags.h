@@ -5552,6 +5552,25 @@ typedef enum acamera_metadata_tag {
     ACAMERA_DEPTH_END,
 
     /**
+     * <p>String containing the ids of the underlying physical cameras.</p>
+     *
+     * <p>Type: byte[n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>For a logical camera, this is concatenation of all underlying physical camera ids.
+     * The null terminator for physical camera id must be preserved so that the whole string
+     * can be tokenized using '\0' to generate list of physical camera ids.</p>
+     * <p>For example, if the physical camera ids of the logical camera are "2" and "3", the
+     * value of this tag will be ['2', '\0', '3', '\0'].</p>
+     * <p>The number of physical camera ids must be no less than 2.</p>
+     */
+    ACAMERA_LOGICAL_MULTI_CAMERA_PHYSICAL_IDS =                 // byte[n]
+            ACAMERA_LOGICAL_MULTI_CAMERA_START,
+    /**
      * <p>The accuracy of frame timestamp synchronization between physical cameras</p>
      *
      * <p>Type: byte (acamera_metadata_enum_android_logical_multi_camera_sensor_sync_type_t)</p>

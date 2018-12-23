@@ -28,7 +28,7 @@
 #include <media/stagefright/MediaClock.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/Utils.h>
-#include <media/stagefright/VideoFrameScheduler.h>
+#include <media/stagefright/VideoFrameScheduler2.h>
 #include <media/MediaCodecBuffer.h>
 
 #include <inttypes.h>
@@ -1436,7 +1436,7 @@ void NuPlayer2::Renderer::onQueueBuffer(const sp<AMessage> &msg) {
 
     if (mHasVideo) {
         if (mVideoScheduler == NULL) {
-            mVideoScheduler = new VideoFrameScheduler();
+            mVideoScheduler = new VideoFrameScheduler2();
             mVideoScheduler->init();
         }
     }
@@ -1779,7 +1779,7 @@ void NuPlayer2::Renderer::onResume() {
 
 void NuPlayer2::Renderer::onSetVideoFrameRate(float fps) {
     if (mVideoScheduler == NULL) {
-        mVideoScheduler = new VideoFrameScheduler();
+        mVideoScheduler = new VideoFrameScheduler2();
     }
     mVideoScheduler->init(fps);
 }

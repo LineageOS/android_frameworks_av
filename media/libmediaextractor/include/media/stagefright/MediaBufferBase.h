@@ -75,13 +75,16 @@ public:
     virtual int localRefcount() const = 0;
     virtual int remoteRefcount() const = 0;
 
-    virtual ~MediaBufferBase() {};
+    virtual ~MediaBufferBase() {
+        delete mWrapper;
+        delete mFormat;
+    };
 
-    CMediaBufferV3 *wrap() {
+    CMediaBuffer *wrap() {
         if (mWrapper) {
             return mWrapper;
         }
-        mWrapper = new CMediaBufferV3;
+        mWrapper = new CMediaBuffer;
         mWrapper->handle = this;
 
         mWrapper->release = [](void *handle) -> void {
@@ -124,7 +127,7 @@ protected:
         mFormat = nullptr;
     }
 private:
-    CMediaBufferV3 *mWrapper;
+    CMediaBuffer *mWrapper;
     AMediaFormat *mFormat;
 };
 

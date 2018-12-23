@@ -32,7 +32,7 @@ namespace android {
 // how many Sonivox output buffers to aggregate into one MediaBuffer
 static const int NUM_COMBINE_BUFFERS = 4;
 
-class MidiSource : public MediaTrackHelperV3 {
+class MidiSource : public MediaTrackHelper {
 
 public:
     MidiSource(
@@ -44,7 +44,7 @@ public:
     virtual media_status_t getFormat(AMediaFormat *);
 
     virtual media_status_t read(
-            MediaBufferHelperV3 **buffer, const ReadOptions *options = NULL);
+            MediaBufferHelper **buffer, const ReadOptions *options = NULL);
 
 protected:
     virtual ~MidiSource();
@@ -113,10 +113,10 @@ media_status_t MidiSource::getFormat(AMediaFormat *meta)
 }
 
 media_status_t MidiSource::read(
-        MediaBufferHelperV3 **outBuffer, const ReadOptions *options)
+        MediaBufferHelper **outBuffer, const ReadOptions *options)
 {
     ALOGV("MidiSource::read");
-    MediaBufferHelperV3 *buffer;
+    MediaBufferHelper *buffer;
     // process an optional seek request
     int64_t seekTimeUs;
     ReadOptions::SeekMode mode;
@@ -199,7 +199,7 @@ status_t MidiEngine::initCheck() {
     return mIsInitialized ? OK : UNKNOWN_ERROR;
 }
 
-status_t MidiEngine::allocateBuffers(MediaBufferGroupHelperV3 *group) {
+status_t MidiEngine::allocateBuffers(MediaBufferGroupHelper *group) {
     // select reverb preset and enable
     EAS_SetParameter(mEasData, EAS_MODULE_REVERB, EAS_PARAM_REVERB_PRESET, EAS_PARAM_REVERB_CHAMBER);
     EAS_SetParameter(mEasData, EAS_MODULE_REVERB, EAS_PARAM_REVERB_BYPASS, EAS_FALSE);
@@ -222,13 +222,13 @@ status_t MidiEngine::seekTo(int64_t positionUs) {
     return result == EAS_SUCCESS ? OK : UNKNOWN_ERROR;
 }
 
-MediaBufferHelperV3* MidiEngine::readBuffer() {
+MediaBufferHelper* MidiEngine::readBuffer() {
     EAS_STATE state;
     EAS_State(mEasData, mEasHandle, &state);
     if ((state == EAS_STATE_STOPPED) || (state == EAS_STATE_ERROR)) {
         return NULL;
     }
-    MediaBufferHelperV3 *buffer;
+    MediaBufferHelper *buffer;
     status_t err = mGroup->acquire_buffer(&buffer);
     if (err != OK) {
         ALOGE("readBuffer: no buffer");
@@ -279,6 +279,7 @@ MidiExtractor::~MidiExtractor()
     ALOGV("MidiExtractor dtor");
     AMediaFormat_delete(mFileMetadata);
     AMediaFormat_delete(mTrackMetadata);
+    delete mEngine;
 }
 
 size_t MidiExtractor::countTracks()
@@ -286,7 +287,7 @@ size_t MidiExtractor::countTracks()
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrackHelperV3 *MidiExtractor::getTrack(size_t index)
+MediaTrackHelper *MidiExtractor::getTrack(size_t index)
 {
     if (mInitCheck != OK || index > 0) {
         return NULL;
@@ -331,21 +332,21 @@ extern "C" {
 __attribute__ ((visibility ("default")))
 ExtractorDef GETEXTRACTORDEF() {
     return {
-        EXTRACTORDEF_VERSION_CURRENT + 1,
+        EXTRACTORDEF_VERSION,
         UUID("ef6cca0a-f8a2-43e6-ba5f-dfcd7c9a7ef2"),
         1,
         "MIDI Extractor",
         {
-            .v3 = [](
+            .v2 = [](
                 CDataSource *source,
                 float *confidence,
                 void **,
-                FreeMetaFunc *) -> CreatorFuncV3 {
+                FreeMetaFunc *) -> CreatorFunc {
                 if (SniffMidi(source, confidence)) {
                     return [](
                             CDataSource *source,
-                            void *) -> CMediaExtractorV3* {
-                        return wrapV3(new MidiExtractor(source));};
+                            void *) -> CMediaExtractor* {
+                        return wrap(new MidiExtractor(source));};
                 }
                 return NULL;
             }
