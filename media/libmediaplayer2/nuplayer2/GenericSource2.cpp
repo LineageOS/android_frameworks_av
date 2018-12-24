@@ -1286,6 +1286,11 @@ void NuPlayer2::GenericSource2::readBuffer(
             mVideoTimeUs = timeUs;
         }
 
+        sp<AMediaCodecCryptoInfoWrapper> cryptInfo = extractor->getSampleCryptoInfo();
+        if (cryptInfo != NULL) {
+            meta->setObject("cryptInfo", cryptInfo);
+        }
+
         queueDiscontinuityIfNeeded(seeking, formatChange, trackType, track);
 
         if (numBuffers == 0 && actualTimeUs != nullptr) {
