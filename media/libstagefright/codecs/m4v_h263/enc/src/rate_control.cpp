@@ -377,15 +377,15 @@ void RC_ResetSkipNextFrame(VideoEncData *video, Int currLayer)
 /*  In/out   : Nr, B, Rr                                                    */
 /*  Return   : Void                                                         */
 /*  Modified :                                                              */
+/* Input argument "video" is guaranteed non-null by caller                  */
 /* ======================================================================== */
-
 
 PV_STATUS RC_UpdateBuffer(VideoEncData *video, Int currLayer, Int num_skip)
 {
     rateControl *rc  = video->rc[currLayer];
     MultiPass   *pMP = video->pMP[currLayer];
 
-    if (video == NULL || rc == NULL || pMP == NULL)
+    if (rc == NULL || pMP == NULL)
         return PV_FAIL;
 
     rc->VBV_fullness   -= (Int)(rc->bitrate / rc->framerate * num_skip); //rc[currLayer]->Rp;
@@ -524,6 +524,7 @@ PV_STATUS RC_UpdateBXRCParams(void *input)
 /*  In/out   : rc->T                                                                */
 /*  Return   : Void                                                                 */
 /*  Modified :                                                                      */
+/* Input argument "input" is guaranteed non-null by caller                          */
 /* ================================================================================ */
 
 void targetBitCalculation(void *input)
@@ -537,7 +538,7 @@ void targetBitCalculation(void *input)
     Int diff_counter_BTsrc, diff_counter_BTdst, prev_counter_diff, curr_counter_diff, bound;
     /* BT = Bit Transfer, for pMP->counter_BTsrc, pMP->counter_BTdst */
 
-    if (video == NULL || currVol == NULL || pMP == NULL || rc == NULL)
+    if (currVol == NULL || pMP == NULL || rc == NULL)
         return;
 
     /* some stuff about frame dropping remained here to be done because pMP cannot be inserted into updateRateControl()*/
@@ -693,6 +694,7 @@ void targetBitCalculation(void *input)
 /*  In/out   : rc->T and rc->Qc                                                     */
 /*  Return   : Void                                                                 */
 /*  Modified :                                                                      */
+/*  Input argument "input" is guaranteed non-null by caller                         */
 /* ================================================================================ */
 
 /* Mad based variable bit allocation + QP calculation with a new quadratic method */
@@ -708,7 +710,7 @@ void calculateQuantizer_Multipass(void *input)
     float curr_mad, prev_mad, curr_RD, prev_RD, average_mad, aver_QP;
 
 
-    if (video == NULL || currVol == NULL || pMP == NULL || rc == NULL)
+    if (currVol == NULL || pMP == NULL || rc == NULL)
         return;
 
     /* Mad based variable bit allocation */
