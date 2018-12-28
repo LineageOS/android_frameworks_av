@@ -83,7 +83,20 @@ public:
                 DefineParam(mInputMaxBufSize, C2_PARAMKEY_INPUT_MAX_BUFFER_SIZE)
                 .withConstValue(new C2StreamMaxBufferSizeInfo::input(0u, 32768))
                 .build());
+
+        addParameter(
+                DefineParam(mPcmEncodingInfo, C2_PARAMKEY_PCM_ENCODING)
+                .withDefault(new C2StreamPcmEncodingInfo::output(0u, C2Config::PCM_16))
+                .withFields({C2F(mPcmEncodingInfo, value).oneOf({
+                     C2Config::PCM_16,
+                     // C2Config::PCM_8,
+                     C2Config::PCM_FLOAT})
+                })
+                .withSetter((Setter<decltype(*mPcmEncodingInfo)>::StrictValueWithNoDeps))
+                .build());
     }
+
+    int32_t getPcmEncodingInfo() const { return mPcmEncodingInfo->value; }
 
 private:
     std::shared_ptr<C2StreamFormatConfig::input> mInputFormat;
@@ -94,6 +107,7 @@ private:
     std::shared_ptr<C2StreamChannelCountInfo::output> mChannelCount;
     std::shared_ptr<C2BitrateTuning::input> mBitrate;
     std::shared_ptr<C2StreamMaxBufferSizeInfo::input> mInputMaxBufSize;
+    std::shared_ptr<C2StreamPcmEncodingInfo::output> mPcmEncodingInfo;
 };
 
 C2SoftFlacDec::C2SoftFlacDec(
@@ -263,11 +277,11 @@ void C2SoftFlacDec::process(
         return;
     }
 
-    size_t outSize;
-    if (mHasStreamInfo)
-        outSize = mStreamInfo.max_blocksize * mStreamInfo.channels * sizeof(short);
-    else
-        outSize = kMaxBlockSize * FLACDecoder::kMaxChannels * sizeof(short);
+    const bool outputFloat = mIntf->getPcmEncodingInfo() == C2Config::PCM_FLOAT;
+    const size_t sampleSize = outputFloat ? sizeof(float) : sizeof(short);
+    size_t outSize = mHasStreamInfo ?
+            mStreamInfo.max_blocksize * mStreamInfo.channels * sampleSize
+          : kMaxBlockSize * FLACDecoder::kMaxChannels * sampleSize;
 
     std::shared_ptr<C2LinearBlock> block;
     C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
@@ -284,9 +298,8 @@ void C2SoftFlacDec::process(
         return;
     }
 
-    short *output = reinterpret_cast<short *>(wView.data());
     status_t decoderErr = mFLACDecoder->decodeOneFrame(
-                            input, inSize, output, &outSize);
+                            input, inSize, wView.data(), &outSize, outputFloat);
     if (decoderErr != OK) {
         ALOGE("process: FLACDecoder decodeOneFrame returns error %d", decoderErr);
         mSignalledError = true;

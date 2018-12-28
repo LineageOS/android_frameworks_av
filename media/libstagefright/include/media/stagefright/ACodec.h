@@ -488,7 +488,8 @@ private:
     status_t setupG711Codec(bool encoder, int32_t sampleRate, int32_t numChannels);
 
     status_t setupFlacCodec(
-            bool encoder, int32_t numChannels, int32_t sampleRate, int32_t compressionLevel);
+            bool encoder, int32_t numChannels, int32_t sampleRate, int32_t compressionLevel,
+            AudioEncoding encoding);
 
     status_t setupRawAudioFormat(
             OMX_U32 portIndex, int32_t sampleRate, int32_t numChannels,
