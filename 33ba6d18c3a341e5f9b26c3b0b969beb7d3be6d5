@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9e052e0e_2ee8898c",
+        "filename": "services/audiopolicy/enginedefault/src/Engine.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 529,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2018-12-29T21:25:10Z",
+      "side": 1,
+      "message": "I guess the main part I don\u0027t quite get is why these changes are needed.",
+      "range": {
+        "startLine": 525,
+        "startChar": 8,
+        "endLine": 529,
+        "endChar": 9
+      },
+      "revId": "33ba6d18c3a341e5f9b26c3b0b969beb7d3be6d5",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
