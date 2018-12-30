@@ -302,14 +302,19 @@ status_t AudioMixer::Track::prepareForDownmix()
     if (audio_channel_mask_get_representation(channelMask)
                 == AUDIO_CHANNEL_REPRESENTATION_POSITION
             && DownmixerBufferProvider::isMultichannelCapable()) {
-        mDownmixerBufferProvider.reset(new DownmixerBufferProvider(channelMask,
-                mMixerChannelMask,
-                AUDIO_FORMAT_PCM_16_BIT /* TODO: use mMixerInFormat, now only PCM 16 */,
-                sampleRate, sessionId, kCopyBufferFrameCount));
-        if (static_cast<DownmixerBufferProvider *>(mDownmixerBufferProvider.get())->isValid()) {
-            mDownmixRequiresFormat = AUDIO_FORMAT_PCM_16_BIT; // PCM 16 bit required for downmix
-            reconfigureBufferProviders();
-            return NO_ERROR;
+
+        // Check if we have a float or int16 downmixer, in that order.
+        for (const audio_format_t format : { AUDIO_FORMAT_PCM_FLOAT, AUDIO_FORMAT_PCM_16_BIT }) {
+            mDownmixerBufferProvider.reset(new DownmixerBufferProvider(
+                    channelMask, mMixerChannelMask,
+                    format,
+                    sampleRate, sessionId, kCopyBufferFrameCount));
+            if (static_cast<DownmixerBufferProvider *>(mDownmixerBufferProvider.get())
+                    ->isValid()) {
+                mDownmixRequiresFormat = format;
+                reconfigureBufferProviders();
+                return NO_ERROR;
+            }
         }
         // mDownmixerBufferProvider reset below.
     }
