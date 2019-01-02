@@ -28,7 +28,10 @@ cc_library_shared {
     ],
 
     header_libs: ["libbase_headers"],
-    static_libs: ["libFLAC"],
+    static_libs: [
+        "libaudioutils",
+        "libFLAC",
+    ],
 
     name: "libstagefright_soft_flacenc",
     vendor_available: true,
