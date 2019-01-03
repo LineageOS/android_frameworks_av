@@ -17,7 +17,6 @@ package android.media.session;
 
 import android.content.ComponentName;
 import android.media.IRemoteVolumeController;
-import android.media.ISessionTokensListener;
 import android.media.session.IActiveSessionsListener;
 import android.media.session.ICallback;
 import android.media.session.IOnMediaKeyListener;
@@ -36,9 +35,10 @@ interface ISessionManager {
     List<IBinder> getSessions(in ComponentName compName, int userId);
     void dispatchMediaKeyEvent(String packageName, boolean asSystemService, in KeyEvent keyEvent,
             boolean needWakeLock);
-    void dispatchVolumeKeyEvent(String packageName, boolean asSystemService, in KeyEvent keyEvent,
-            int stream, boolean musicOnly);
-    void dispatchAdjustVolume(String packageName, int suggestedStream, int delta, int flags);
+    void dispatchVolumeKeyEvent(String packageName, String opPackageName, boolean asSystemService,
+            in KeyEvent keyEvent, int stream, boolean musicOnly);
+    void dispatchAdjustVolume(String packageName, String opPackageName, int suggestedStream,
+            int delta, int flags);
     void addSessionsListener(in IActiveSessionsListener listener, in ComponentName compName,
             int userId);
     void removeSessionsListener(in IActiveSessionsListener listener);
@@ -55,12 +55,4 @@ interface ISessionManager {
 
     // MediaSession2
     boolean isTrusted(String controllerPackageName, int controllerPid, int controllerUid);
-    boolean createSession2(in Bundle sessionToken);
-    void destroySession2(in Bundle sessionToken);
-    List<Bundle> getSessionTokens(boolean activeSessionOnly, boolean sessionServiceOnly,
-            String packageName);
-
-    void addSessionTokensListener(in ISessionTokensListener listener, int userId,
-            String packageName);
-    void removeSessionTokensListener(in ISessionTokensListener listener, String packageName);
 }
