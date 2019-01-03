@@ -115,9 +115,6 @@ enum video_encoder {
  * The state machine of the media_recorder.
  */
 enum media_recorder_states {
-    // Error state.
-    MEDIA_RECORDER_ERROR                 =      0,
-
     // Recorder was just created.
     MEDIA_RECORDER_IDLE                  = 1 << 0,
 
@@ -132,6 +129,9 @@ enum media_recorder_states {
 
     // Recording is in progress.
     MEDIA_RECORDER_RECORDING             = 1 << 4,
+
+    // Error state.
+    MEDIA_RECORDER_ERROR                 = 1 << 5,
 };
 
 // The "msg" code passed to the listener in notify.
