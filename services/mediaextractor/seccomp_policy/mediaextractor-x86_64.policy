@@ -21,6 +21,7 @@ clone: 1
 getuid: 1
 setpriority: 1
 sigaltstack: 1
+fstat: 1
 fstatfs: 1
 newfstatat: 1
 restart_syscall: 1
