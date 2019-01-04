@@ -132,6 +132,56 @@ void SimpleC2Component::WorkHandler::onMessageReceived(const sp<AMessage> &msg) 
     }
 }
 
+class SimpleC2Component::BlockingBlockPool : public C2BlockPool {
+public:
+    BlockingBlockPool(const std::shared_ptr<C2BlockPool>& base): mBase{base} {}
+
+    virtual local_id_t getLocalId() const override {
+        return mBase->getLocalId();
+    }
+
+    virtual C2Allocator::id_t getAllocatorId() const override {
+        return mBase->getAllocatorId();
+    }
+
+    virtual c2_status_t fetchLinearBlock(
+            uint32_t capacity,
+            C2MemoryUsage usage,
+            std::shared_ptr<C2LinearBlock>* block) {
+        c2_status_t status;
+        do {
+            status = mBase->fetchLinearBlock(capacity, usage, block);
+        } while (status == C2_TIMED_OUT);
+        return status;
+    }
+
+    virtual c2_status_t fetchCircularBlock(
+            uint32_t capacity,
+            C2MemoryUsage usage,
+            std::shared_ptr<C2CircularBlock>* block) {
+        c2_status_t status;
+        do {
+            status = mBase->fetchCircularBlock(capacity, usage, block);
+        } while (status == C2_TIMED_OUT);
+        return status;
+    }
+
+    virtual c2_status_t fetchGraphicBlock(
+            uint32_t width, uint32_t height, uint32_t format,
+            C2MemoryUsage usage,
+            std::shared_ptr<C2GraphicBlock>* block) {
+        c2_status_t status;
+        do {
+            status = mBase->fetchGraphicBlock(width, height, format, usage,
+                                              block);
+        } while (status == C2_TIMED_OUT);
+        return status;
+    }
+
+private:
+    std::shared_ptr<C2BlockPool> mBase;
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 
 namespace {
@@ -446,12 +496,16 @@ bool SimpleC2Component::processQueue() {
                 }
             }
 
-            err = GetCodec2BlockPool(poolId, shared_from_this(), &mOutputBlockPool);
+            std::shared_ptr<C2BlockPool> blockPool;
+            err = GetCodec2BlockPool(poolId, shared_from_this(), &blockPool);
             ALOGD("Using output block pool with poolID %llu => got %llu - %d",
                     (unsigned long long)poolId,
                     (unsigned long long)(
-                            mOutputBlockPool ? mOutputBlockPool->getLocalId() : 111000111),
+                            blockPool ? blockPool->getLocalId() : 111000111),
                     err);
+            if (err == C2_OK) {
+                mOutputBlockPool = std::make_shared<BlockingBlockPool>(blockPool);
+            }
             return err;
         }();
         if (err != C2_OK) {
