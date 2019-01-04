@@ -16,7 +16,12 @@
 <criterion_types>
     <criterion_type name="OutputDevicesMaskType" type="inclusive"/>
     <criterion_type name="InputDevicesMaskType" type="inclusive"/>
-    <criterion_type name="OutputDevicesAddressesType" type="inclusive"/>
+    <criterion_type name="OutputDevicesAddressesType" type="inclusive">
+        <values>
+            <!-- legacy remote submix -->
+            <value literal="0" numerical="1"/>
+        </values>
+    </criterion_type>
     <criterion_type name="InputDevicesAddressesType" type="inclusive"/>
     <criterion_type name="AndroidModeType" type="exclusive"/>
     <criterion_type name="BooleanType" type="exclusive">
