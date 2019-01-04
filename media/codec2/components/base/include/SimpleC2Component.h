@@ -234,7 +234,8 @@ private:
     typedef std::unordered_map<uint64_t, std::unique_ptr<C2Work>> PendingWork;
     Mutexed<PendingWork> mPendingWork;
 
-    std::shared_ptr<C2BlockPool> mOutputBlockPool;
+    class BlockingBlockPool;
+    std::shared_ptr<BlockingBlockPool> mOutputBlockPool;
 
     SimpleC2Component() = delete;
 };
