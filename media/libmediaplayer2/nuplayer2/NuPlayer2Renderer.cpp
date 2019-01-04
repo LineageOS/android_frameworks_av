@@ -1278,10 +1278,10 @@ void NuPlayer2::Renderer::postDrainVideoQueue() {
             mAnchorTimeMediaUs = mediaTimeUs;
         }
     }
-    mNextVideoTimeMediaUs = mediaTimeUs + 100000;
+    mNextVideoTimeMediaUs = mediaTimeUs;
     if (!mHasAudio) {
         // smooth out videos >= 10fps
-        mMediaClock->updateMaxTimeMedia(mNextVideoTimeMediaUs);
+        mMediaClock->updateMaxTimeMedia(mediaTimeUs + 100000);
     }
 
     if (!mVideoSampleReceived || mediaTimeUs < mAudioFirstAnchorTimeMediaUs) {
@@ -1415,9 +1415,15 @@ void NuPlayer2::Renderer::notifyEOS_l(bool audio, status_t finalResult, int64_t 
         mHasAudio = false;
         if (mNextVideoTimeMediaUs >= 0) {
             int64_t mediaUs = 0;
-            mMediaClock->getMediaTime(ALooper::GetNowUs(), &mediaUs);
-            if (mNextVideoTimeMediaUs > mediaUs) {
-                mMediaClock->updateMaxTimeMedia(mNextVideoTimeMediaUs);
+            int64_t nowUs = ALooper::GetNowUs();
+            status_t result = mMediaClock->getMediaTime(nowUs, &mediaUs);
+            if (result == OK) {
+                if (mNextVideoTimeMediaUs > mediaUs) {
+                    mMediaClock->updateMaxTimeMedia(mNextVideoTimeMediaUs);
+                }
+            } else {
+                mMediaClock->updateAnchor(
+                        mNextVideoTimeMediaUs, nowUs, mNextVideoTimeMediaUs + 100000);
             }
         }
     }
