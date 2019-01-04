@@ -224,11 +224,15 @@ static void playSource(sp<MediaSource> &source) {
         player->setSource(rawSource);
         rawSource.clear();
 
-        player->start(true /* sourceAlreadyStarted */);
+        err = player->start(true /* sourceAlreadyStarted */);
 
-        status_t finalStatus;
-        while (!player->reachedEOS(&finalStatus)) {
-            usleep(100000ll);
+        if (err == OK) {
+            status_t finalStatus;
+            while (!player->reachedEOS(&finalStatus)) {
+                usleep(100000ll);
+            }
+        } else {
+            fprintf(stderr, "unable to start playback err=%d (0x%08x)\n", err, err);
         }
 
         delete player;

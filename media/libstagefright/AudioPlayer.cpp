@@ -118,6 +118,13 @@ status_t AudioPlayer::start(bool sourceAlreadyStarted) {
     }
 
     sp<MetaData> format = mSource->getFormat();
+
+    if (format == NULL) {
+        ALOGE("No metadata b/118620871");
+        android_errorWriteLog(0x534e4554, "118620871");
+        return BAD_VALUE;
+    }
+
     const char *mime;
     bool success = format->findCString(kKeyMIMEType, &mime);
     CHECK(success);
