@@ -201,4 +201,6 @@ void workDone(
     std::list<std::unique_ptr<C2Work>>& workQueue, bool& eos, bool& csd,
     uint32_t& framesReceived);
 
+int64_t getNowUs();
+
 #endif  // MEDIA_C2_HIDL_TEST_COMMON_H
