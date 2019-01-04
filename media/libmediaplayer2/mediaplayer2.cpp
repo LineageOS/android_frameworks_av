@@ -211,8 +211,8 @@ status_t dumpPlayers(int fd, const Vector<String16>& args) {
 }  // anonymous namespace
 
 //static
-sp<MediaPlayer2> MediaPlayer2::Create(int32_t sessionId) {
-    sp<MediaPlayer2> player = new MediaPlayer2(sessionId);
+sp<MediaPlayer2> MediaPlayer2::Create(int32_t sessionId, jobject context) {
+    sp<MediaPlayer2> player = new MediaPlayer2(sessionId, context);
 
     if (!player->init()) {
         return NULL;
@@ -229,13 +229,14 @@ status_t MediaPlayer2::DumpAll(int fd, const Vector<String16>& args) {
     return dumpPlayers(fd, args);
 }
 
-MediaPlayer2::MediaPlayer2(int32_t sessionId) {
+MediaPlayer2::MediaPlayer2(int32_t sessionId, jobject context) {
     ALOGV("constructor");
     mSrcId = 0;
     mLockThreadId = 0;
     mListener = NULL;
     mStreamType = AUDIO_STREAM_MUSIC;
     mAudioAttributes = NULL;
+    mContext = new JObjectHolder(context);
     mCurrentPosition = -1;
     mCurrentSeekMode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC;
     mSeekPosition = -1;
@@ -326,15 +327,15 @@ status_t MediaPlayer2::setDataSource(const sp<DataSourceDesc> &dsd) {
 
     sp<MediaPlayer2Interface> oldPlayer;
 
-    Mutex::Autolock _l(mLock);
     {
+        Mutex::Autolock _l(mLock);
         if (!((mCurrentState & MEDIA_PLAYER2_IDLE)
               || mCurrentState == MEDIA_PLAYER2_STATE_ERROR)) {
             ALOGE("setDataSource called in wrong state %d", mCurrentState);
             return INVALID_OPERATION;
         }
 
-        sp<MediaPlayer2Interface> player = new NuPlayer2Driver(mPid, mUid);
+        sp<MediaPlayer2Interface> player = new NuPlayer2Driver(mPid, mUid, mContext);
         status_t err = player->initCheck();
         if (err != NO_ERROR) {
             ALOGE("Failed to create player object, initCheck failed(%d)", err);

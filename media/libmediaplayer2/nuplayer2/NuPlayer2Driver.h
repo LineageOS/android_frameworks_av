@@ -18,6 +18,7 @@
 
 #include <media/MediaAnalyticsItem.h>
 #include <media/stagefright/foundation/ABase.h>
+#include <mediaplayer2/JObjectHolder.h>
 
 namespace android {
 
@@ -26,7 +27,7 @@ struct MediaClock;
 struct NuPlayer2;
 
 struct NuPlayer2Driver : public MediaPlayer2Interface {
-    explicit NuPlayer2Driver(pid_t pid, uid_t uid);
+    explicit NuPlayer2Driver(pid_t pid, uid_t uid, const sp<JObjectHolder> &context);
 
     virtual status_t initCheck() override;
 

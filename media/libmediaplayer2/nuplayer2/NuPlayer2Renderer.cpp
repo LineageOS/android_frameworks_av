@@ -106,6 +106,7 @@ NuPlayer2::Renderer::Renderer(
         const sp<MediaPlayer2Interface::AudioSink> &sink,
         const sp<MediaClock> &mediaClock,
         const sp<AMessage> &notify,
+        const sp<JObjectHolder> &context,
         uint32_t flags)
     : mAudioSink(sink),
       mUseVirtualAudioSink(false),
@@ -147,7 +148,7 @@ NuPlayer2::Renderer::Renderer(
       mTotalBuffersQueued(0),
       mLastAudioBufferDrained(0),
       mUseAudioCallback(false),
-      mWakeLock(new JWakeLock()) {
+      mWakeLock(new JWakeLock(context)) {
     CHECK(mediaClock != NULL);
     mMediaClock->setPlaybackRate(mPlaybackSettings.mSpeed);
 }

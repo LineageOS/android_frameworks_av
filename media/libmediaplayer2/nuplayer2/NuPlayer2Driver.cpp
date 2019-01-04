@@ -108,7 +108,7 @@ static const char *kPlayerRebufferingCount = "android.media.mediaplayer.rebuffer
 static const char *kPlayerRebufferingAtExit = "android.media.mediaplayer.rebufferExit";
 
 
-NuPlayer2Driver::NuPlayer2Driver(pid_t pid, uid_t uid)
+NuPlayer2Driver::NuPlayer2Driver(pid_t pid, uid_t uid, const sp<JObjectHolder> &context)
     : mState(STATE_IDLE),
       mAsyncResult(UNKNOWN_ERROR),
       mSrcId(0),
@@ -123,7 +123,7 @@ NuPlayer2Driver::NuPlayer2Driver(pid_t pid, uid_t uid)
       mLooper(new ALooper),
       mNuPlayer2Looper(new ALooper),
       mMediaClock(new MediaClock),
-      mPlayer(new NuPlayer2(pid, uid, mMediaClock)),
+      mPlayer(new NuPlayer2(pid, uid, mMediaClock, context)),
       mPlayerFlags(0),
       mAnalyticsItem(NULL),
       mClientUid(uid),

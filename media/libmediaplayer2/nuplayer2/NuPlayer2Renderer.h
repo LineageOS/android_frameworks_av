@@ -20,6 +20,7 @@
 
 #include <media/AudioResamplerPublic.h>
 #include <media/AVSyncSettings.h>
+#include <mediaplayer2/JObjectHolder.h>
 
 #include "NuPlayer2.h"
 
@@ -38,6 +39,7 @@ struct NuPlayer2::Renderer : public AHandler {
     Renderer(const sp<MediaPlayer2Interface::AudioSink> &sink,
              const sp<MediaClock> &mediaClock,
              const sp<AMessage> &notify,
+             const sp<JObjectHolder> &context,
              uint32_t flags = 0);
 
     static size_t AudioSinkCallback(
