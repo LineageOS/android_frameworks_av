@@ -120,7 +120,7 @@ status_t MediaTrackCUnwrapper::read(MediaBufferBase **buffer, const ReadOptions 
         if (format->mFormat->findInt64("timeUs", &val64)) {
             meta.setInt64(kKeyTime, val64);
         }
-        if (format->mFormat->findInt64("duration", &val64)) {
+        if (format->mFormat->findInt64("durationUs", &val64)) {
             meta.setInt64(kKeyDuration, val64);
         }
         if (format->mFormat->findInt64("target-time", &val64)) {
