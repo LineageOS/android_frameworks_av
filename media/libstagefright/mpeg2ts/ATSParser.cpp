@@ -1610,9 +1610,9 @@ status_t ATSParser::Stream::flushScrambled(SyncEvent *event) {
                     detailedError = _detailedError;
                 });
 
-        if (!returnVoid.isOk()) {
-            ALOGE("[stream %d] descramble failed, trans=%s",
-                    mElementaryPID, returnVoid.description().c_str());
+        if (!returnVoid.isOk() || status != Status::OK) {
+            ALOGE("[stream %d] descramble failed, trans=%s, status=%d",
+                    mElementaryPID, returnVoid.description().c_str(), status);
             return UNKNOWN_ERROR;
         }
 
