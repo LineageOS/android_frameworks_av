@@ -326,6 +326,41 @@ ALookup<C2Config::profile_t, int32_t> sVp9Profiles = {
     { C2Config::PROFILE_VP9_3, VP9Profile3 },
 };
 
+ALookup<C2Config::level_t, int32_t> sAv1Levels = {
+    { C2Config::LEVEL_AV1_2,    AV1Level2  },
+    { C2Config::LEVEL_AV1_2_1,  AV1Level21 },
+    { C2Config::LEVEL_AV1_2_2,  AV1Level22 },
+    { C2Config::LEVEL_AV1_2_3,  AV1Level23 },
+    { C2Config::LEVEL_AV1_3,    AV1Level3  },
+    { C2Config::LEVEL_AV1_3_1,  AV1Level31 },
+    { C2Config::LEVEL_AV1_3_2,  AV1Level32 },
+    { C2Config::LEVEL_AV1_3_3,  AV1Level33 },
+    { C2Config::LEVEL_AV1_4,    AV1Level4  },
+    { C2Config::LEVEL_AV1_4_1,  AV1Level41 },
+    { C2Config::LEVEL_AV1_4_2,  AV1Level42 },
+    { C2Config::LEVEL_AV1_4_3,  AV1Level43 },
+    { C2Config::LEVEL_AV1_5,    AV1Level5  },
+    { C2Config::LEVEL_AV1_5_1,  AV1Level51 },
+    { C2Config::LEVEL_AV1_5_2,  AV1Level52 },
+    { C2Config::LEVEL_AV1_5_3,  AV1Level53 },
+    { C2Config::LEVEL_AV1_6,    AV1Level6  },
+    { C2Config::LEVEL_AV1_6_1,  AV1Level61 },
+    { C2Config::LEVEL_AV1_6_2,  AV1Level62 },
+    { C2Config::LEVEL_AV1_6_3,  AV1Level63 },
+    { C2Config::LEVEL_AV1_7,    AV1Level7  },
+    { C2Config::LEVEL_AV1_7_1,  AV1Level71 },
+    { C2Config::LEVEL_AV1_7_2,  AV1Level72 },
+    { C2Config::LEVEL_AV1_7_3,  AV1Level73 },
+};
+
+
+ALookup<C2Config::profile_t, int32_t> sAv1Profiles = {
+    { C2Config::PROFILE_AV1_0, AV1Profile0 },
+    { C2Config::PROFILE_AV1_1, AV1Profile1 },
+    { C2Config::PROFILE_AV1_2, AV1Profile2 },
+};
+
+
 /**
  * A helper that passes through vendor extension profile and level values.
  */

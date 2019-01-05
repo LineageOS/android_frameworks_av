@@ -39,6 +39,7 @@ cc_library_shared {
         "libcodec2_soft_opusdec",
         "libcodec2_soft_vp8dec",
         "libcodec2_soft_vp9dec",
+        "libcodec2_soft_av1dec",
         "libcodec2_soft_vp8enc",
         "libcodec2_soft_vp9enc",
         "libcodec2_soft_rawdec",

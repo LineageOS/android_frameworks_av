@@ -1463,6 +1463,8 @@ void MatroskaExtractor::addTracks() {
                       AMediaFormat_setBuffer(meta,
                              AMEDIAFORMAT_KEY_CSD_0, codecPrivate, codecPrivateSize);
                     }
+                } else if (!strcmp("V_AV1", codecID)) {
+                    AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_AV1);
                 } else {
                     ALOGW("%s is not supported.", codecID);
                     continue;
