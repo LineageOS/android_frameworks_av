@@ -4142,9 +4142,9 @@ status_t AudioPolicyManager::initialize() {
     for (size_t i = 0; i  < mAvailableInputDevices.size(); i++) {
         if (mAvailableInputDevices[i]->address().isEmpty()) {
             if (mAvailableInputDevices[i]->type() == AUDIO_DEVICE_IN_BUILTIN_MIC) {
-                mAvailableInputDevices[i]->address() = String8(AUDIO_BOTTOM_MICROPHONE_ADDRESS);
+                mAvailableInputDevices[i]->setAddress(String8(AUDIO_BOTTOM_MICROPHONE_ADDRESS));
             } else if (mAvailableInputDevices[i]->type() == AUDIO_DEVICE_IN_BACK_MIC) {
-                mAvailableInputDevices[i]->address() = String8(AUDIO_BACK_MICROPHONE_ADDRESS);
+                mAvailableInputDevices[i]->setAddress(String8(AUDIO_BACK_MICROPHONE_ADDRESS));
             }
         }
     }
