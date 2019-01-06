@@ -2320,12 +2320,16 @@ status_t ACodec::configureCodec(
             (void)mInputFormat->findInt32("pcm-encoding", (int32_t*)&codecPcmEncoding);
             mConverter[kPortIndexInput] = AudioConverter::Create(pcmEncoding, codecPcmEncoding);
             if (mConverter[kPortIndexInput] != NULL) {
+                ALOGD("%s: encoder %s input format pcm encoding converter from %d to %d",
+                        __func__, mComponentName.c_str(), pcmEncoding, codecPcmEncoding);
                 mInputFormat->setInt32("pcm-encoding", pcmEncoding);
             }
         } else {
             (void)mOutputFormat->findInt32("pcm-encoding", (int32_t*)&codecPcmEncoding);
             mConverter[kPortIndexOutput] = AudioConverter::Create(codecPcmEncoding, pcmEncoding);
             if (mConverter[kPortIndexOutput] != NULL) {
+                ALOGD("%s: decoder %s output format pcm encoding converter from %d to %d",
+                        __func__, mComponentName.c_str(), codecPcmEncoding, pcmEncoding);
                 mOutputFormat->setInt32("pcm-encoding", pcmEncoding);
             }
         }

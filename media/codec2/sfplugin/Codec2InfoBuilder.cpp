@@ -517,6 +517,13 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                         caps->addProfileLevel(VP9Profile2,    VP9Level5);
                         caps->addProfileLevel(VP9Profile2HDR, VP9Level5);
                     }
+                } else if (mediaType == MIMETYPE_VIDEO_AV1 && !encoder) {
+                    caps->addProfileLevel(AV1Profile0,      AV1Level2);
+                    caps->addProfileLevel(AV1Profile0,      AV1Level21);
+                    caps->addProfileLevel(AV1Profile1,      AV1Level22);
+                    caps->addProfileLevel(AV1Profile1,      AV1Level3);
+                    caps->addProfileLevel(AV1Profile2,      AV1Level31);
+                    caps->addProfileLevel(AV1Profile2,      AV1Level32);
                 } else if (mediaType == MIMETYPE_VIDEO_HEVC && !encoder) {
                     caps->addProfileLevel(HEVCProfileMain,      HEVCMainTierLevel51);
                     caps->addProfileLevel(HEVCProfileMainStill, HEVCMainTierLevel51);

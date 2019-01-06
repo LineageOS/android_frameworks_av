@@ -90,6 +90,8 @@ enum {
     SET_ASSISTANT_UID,
     SET_A11Y_SERVICES_UIDS,
     IS_HAPTIC_PLAYBACK_SUPPORTED,
+    SET_UID_DEVICE_AFFINITY,
+    REMOVE_UID_DEVICE_AFFINITY,
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -990,6 +992,50 @@ public:
         return reply.readBool();
     }
 
+    virtual status_t setUidDeviceAffinities(uid_t uid, const Vector<AudioDeviceTypeAddr>& devices)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+
+        data.writeInt32((int32_t) uid);
+        size_t size = devices.size();
+        size_t sizePosition = data.dataPosition();
+        data.writeInt32((int32_t) size);
+        size_t finalSize = size;
+        for (size_t i = 0; i < size; i++) {
+            size_t position = data.dataPosition();
+            if (devices[i].writeToParcel(&data) != NO_ERROR) {
+                data.setDataPosition(position);
+                finalSize--;
+            }
+        }
+        if (size != finalSize) {
+            size_t position = data.dataPosition();
+            data.setDataPosition(sizePosition);
+            data.writeInt32(finalSize);
+            data.setDataPosition(position);
+        }
+
+        status_t status = remote()->transact(SET_UID_DEVICE_AFFINITY, data, &reply);
+        if (status == NO_ERROR) {
+            status = (status_t)reply.readInt32();
+        }
+        return status;
+    }
+
+    virtual status_t removeUidDeviceAffinities(uid_t uid)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+
+        data.writeInt32((int32_t) uid);
+
+        status_t status = remote()->transact(REMOVE_UID_DEVICE_AFFINITY, data, &reply);
+        if (status == NO_ERROR) {
+            status = (status_t)reply.readInt32();
+        }
+        return status;
+    }
 };
 
 IMPLEMENT_META_INTERFACE(AudioPolicyService, "android.media.IAudioPolicyService");
@@ -1048,7 +1094,9 @@ status_t BnAudioPolicyService::onTransact(
         case GET_SURROUND_FORMATS:
         case SET_SURROUND_FORMAT_ENABLED:
         case SET_ASSISTANT_UID:
-        case SET_A11Y_SERVICES_UIDS: {
+        case SET_A11Y_SERVICES_UIDS:
+        case SET_UID_DEVICE_AFFINITY:
+        case REMOVE_UID_DEVICE_AFFINITY: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
@@ -1811,6 +1859,30 @@ status_t BnAudioPolicyService::onTransact(
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             bool isSupported = isHapticPlaybackSupported();
             reply->writeBool(isSupported);
+            return NO_ERROR;    
+        }
+
+        case SET_UID_DEVICE_AFFINITY: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            const uid_t uid = (uid_t) data.readInt32();
+            Vector<AudioDeviceTypeAddr> devices;
+            size_t size = (size_t)data.readInt32();
+            for (size_t i = 0; i < size; i++) {
+                AudioDeviceTypeAddr device;
+                if (device.readFromParcel((Parcel*)&data) == NO_ERROR) {
+                    devices.add(device);
+                }
+            }
+            status_t status = setUidDeviceAffinities(uid, devices);
+            reply->writeInt32(status);
+            return NO_ERROR;
+        }
+
+        case REMOVE_UID_DEVICE_AFFINITY: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            const uid_t uid = (uid_t) data.readInt32();
+            status_t status = removeUidDeviceAffinities(uid);
+            reply->writeInt32(status);
             return NO_ERROR;
         }
 

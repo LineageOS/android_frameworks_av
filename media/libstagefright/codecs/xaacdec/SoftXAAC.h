@@ -33,8 +33,6 @@
 #include "impd_apicmd_standards.h"
 #include "impd_drc_config_params.h"
 
-#define MAX_MEM_ALLOCS 100
-
 extern "C" IA_ERRORCODE ixheaacd_dec_api(pVOID p_ia_module_obj, WORD32 i_cmd, WORD32 i_idx,
                                          pVOID pv_value);
 extern "C" IA_ERRORCODE ia_drc_dec_api(pVOID p_ia_module_obj, WORD32 i_cmd, WORD32 i_idx,
@@ -80,18 +78,19 @@ struct SoftXAAC : public SimpleSoftOMXComponent {
     enum { NONE, AWAITING_DISABLED, AWAITING_ENABLED } mOutputPortSettingsChange;
 
     void initPorts();
-    status_t initDecoder();
+    IA_ERRORCODE initDecoder();
     bool isConfigured() const;
-    int drainDecoder();
-    int initXAACDecoder();
-    int deInitXAACDecoder();
+    IA_ERRORCODE drainDecoder();
+    IA_ERRORCODE initXAACDecoder();
+    IA_ERRORCODE deInitXAACDecoder();
+    IA_ERRORCODE initMPEGDDDrc();
+    IA_ERRORCODE deInitMPEGDDDrc();
+    IA_ERRORCODE configXAACDecoder(uint8_t* inBuffer, uint32_t inBufferLength);
+    IA_ERRORCODE configMPEGDDrc();
+    IA_ERRORCODE decodeXAACStream(uint8_t* inBuffer, uint32_t inBufferLength,
+                                  int32_t* bytesConsumed, int32_t* outBytes);
 
-    int configXAACDecoder(uint8_t* inBuffer, uint32_t inBufferLength);
-    int configMPEGDDrc();
-    int decodeXAACStream(uint8_t* inBuffer, uint32_t inBufferLength, int32_t* bytesConsumed,
-                         int32_t* outBytes);
-
-    int configflushDecode();
+    IA_ERRORCODE configflushDecode();
     IA_ERRORCODE getXAACStreamInfo();
     IA_ERRORCODE setXAACDRCInfo(int32_t drcCut, int32_t drcBoost, int32_t drcRefLevel,
                                 int32_t drcHeavyCompression
@@ -120,9 +119,8 @@ struct SoftXAAC : public SimpleSoftOMXComponent {
     int8_t* mDrcOutBuf;
     int32_t mMpegDDRCPresent;
     int32_t mDRCFlag;
-
-    void* mMemoryArray[MAX_MEM_ALLOCS];
-    int32_t mMallocCount;
+    Vector<void*> mMemoryVec;
+    Vector<void*> mDrcMemoryVec;
 
     DISALLOW_EVIL_CONSTRUCTORS(SoftXAAC);
 };

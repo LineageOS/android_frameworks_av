@@ -80,6 +80,10 @@ public:
 
     status_t getInputMixForAttr(audio_attributes_t attr, AudioMix **policyMix);
 
+    status_t setUidDeviceAffinities(uid_t uid, const Vector<AudioDeviceTypeAddr>& devices);
+    status_t removeUidDeviceAffinities(uid_t uid);
+    status_t getDevicesForUid(uid_t uid, Vector<AudioDeviceTypeAddr>& devices) const;
+
     void dump(String8 *dst) const;
 };
 

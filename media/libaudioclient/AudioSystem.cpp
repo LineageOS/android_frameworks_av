@@ -1236,6 +1236,19 @@ status_t AudioSystem::registerPolicyMixes(const Vector<AudioMix>& mixes, bool re
     return aps->registerPolicyMixes(mixes, registration);
 }
 
+status_t AudioSystem::setUidDeviceAffinities(uid_t uid, const Vector<AudioDeviceTypeAddr>& devices)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->setUidDeviceAffinities(uid, devices);
+}
+
+status_t AudioSystem::removeUidDeviceAffinities(uid_t uid) {
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->removeUidDeviceAffinities(uid);
+}
+
 status_t AudioSystem::startAudioSource(const struct audio_port_config *source,
                                        const audio_attributes_t *attributes,
                                        audio_port_handle_t *portId)

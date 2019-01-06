@@ -224,11 +224,15 @@ static void playSource(sp<MediaSource> &source) {
         player->setSource(rawSource);
         rawSource.clear();
 
-        player->start(true /* sourceAlreadyStarted */);
+        err = player->start(true /* sourceAlreadyStarted */);
 
-        status_t finalStatus;
-        while (!player->reachedEOS(&finalStatus)) {
-            usleep(100000ll);
+        if (err == OK) {
+            status_t finalStatus;
+            while (!player->reachedEOS(&finalStatus)) {
+                usleep(100000ll);
+            }
+        } else {
+            fprintf(stderr, "unable to start playback err=%d (0x%08x)\n", err, err);
         }
 
         delete player;
@@ -651,7 +655,8 @@ static void dumpCodecProfiles(bool queryDecoders) {
         MEDIA_MIMETYPE_AUDIO_G711_ALAW, MEDIA_MIMETYPE_AUDIO_VORBIS,
         MEDIA_MIMETYPE_VIDEO_VP8, MEDIA_MIMETYPE_VIDEO_VP9,
         MEDIA_MIMETYPE_VIDEO_DOLBY_VISION, MEDIA_MIMETYPE_VIDEO_HEVC,
-        MEDIA_MIMETYPE_AUDIO_EAC3, MEDIA_MIMETYPE_AUDIO_AC4
+        MEDIA_MIMETYPE_AUDIO_EAC3, MEDIA_MIMETYPE_AUDIO_AC4,
+        MEDIA_MIMETYPE_VIDEO_AV1
     };
 
     const char *codecType = queryDecoders? "decoder" : "encoder";

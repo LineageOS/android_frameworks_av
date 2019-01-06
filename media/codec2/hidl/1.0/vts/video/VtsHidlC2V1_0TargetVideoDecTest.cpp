@@ -421,17 +421,21 @@ TEST_F(Codec2VideoDecHidlTest, validateCompName) {
     ASSERT_EQ(mDisableTest, false);
 }
 
+class Codec2VideoDecDecodeTest : public Codec2VideoDecHidlTest,
+                                 public ::testing::WithParamInterface<int32_t> {
+};
+
 // Bitstream Test
-TEST_F(Codec2VideoDecHidlTest, DecodeTest) {
+TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
     description("Decodes input file");
     if (mDisableTest) return;
 
+    uint32_t streamIndex = GetParam();
     char mURL[512], info[512];
     std::ifstream eleStream, eleInfo;
-
     strcpy(mURL, gEnv->getRes().c_str());
     strcpy(info, gEnv->getRes().c_str());
-    GetURLForComponent(mCompName, mURL, info);
+    GetURLForComponent(mCompName, mURL, info, streamIndex);
 
     eleInfo.open(info);
     ASSERT_EQ(eleInfo.is_open(), true) << mURL << " - file not found";
@@ -452,6 +456,9 @@ TEST_F(Codec2VideoDecHidlTest, DecodeTest) {
     eleInfo.close();
 
     ASSERT_EQ(mComponent->start(), C2_OK);
+    // Reset total no of frames received
+    mFramesReceived = 0;
+    mTimestampUs = 0;
     ALOGV("mURL : %s", mURL);
     eleStream.open(mURL, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
@@ -476,8 +483,11 @@ TEST_F(Codec2VideoDecHidlTest, DecodeTest) {
     }
 
     if (mTimestampDevTest) EXPECT_EQ(mTimestampUslist.empty(), true);
+    ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
+INSTANTIATE_TEST_CASE_P(StreamIndexes, Codec2VideoDecDecodeTest,
+                        ::testing::Values(0, 1));
 
 // Adaptive Test
 TEST_F(Codec2VideoDecHidlTest, AdaptiveDecodeTest) {

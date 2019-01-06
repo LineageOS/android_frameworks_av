@@ -468,7 +468,8 @@ void C2SoftAacEnc::process(
 
             if (outargs.numOutBytes > 0) {
                 mInputSize = 0;
-                int consumed = ((capacity / sizeof(int16_t)) - inargs.numInSamples);
+                int consumed = (capacity / sizeof(int16_t)) - inargs.numInSamples
+                        + outargs.numInSamples;
                 mInputTimeUs = work->input.ordinal.timestamp
                         + (consumed * 1000000ll / channelCount / sampleRate);
                 buffer = createLinearBuffer(block, 0, outargs.numOutBytes);

@@ -56,6 +56,19 @@ namespace android {
 #define MAX_MIXES_PER_POLICY 10
 #define MAX_CRITERIA_PER_MIX 20
 
+class AudioDeviceTypeAddr {
+public:
+    AudioDeviceTypeAddr() {}
+    AudioDeviceTypeAddr(audio_devices_t type, String8 address) :
+        mType(type), mAddress(address) {}
+
+    status_t readFromParcel(Parcel *parcel);
+    status_t writeToParcel(Parcel *parcel) const;
+
+    audio_devices_t mType;
+    String8 mAddress;
+};
+
 class AudioMixMatchCriterion {
 public:
     AudioMixMatchCriterion() {}
@@ -87,7 +100,9 @@ public:
     status_t readFromParcel(Parcel *parcel);
     status_t writeToParcel(Parcel *parcel) const;
 
-    Vector<AudioMixMatchCriterion> mCriteria;
+    void excludeUid(uid_t uid) const;
+
+    mutable Vector<AudioMixMatchCriterion> mCriteria;
     uint32_t        mMixType;
     audio_config_t  mFormat;
     uint32_t        mRouteFlags;

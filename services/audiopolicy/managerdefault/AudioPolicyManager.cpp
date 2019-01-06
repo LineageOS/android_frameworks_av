@@ -2674,6 +2674,59 @@ void AudioPolicyManager::dumpManualSurroundFormats(String8 *dst) const
     }
 }
 
+status_t AudioPolicyManager::setUidDeviceAffinities(uid_t uid,
+        const Vector<AudioDeviceTypeAddr>& devices) {
+    ALOGV("%s() uid=%d num devices %zu", __FUNCTION__, uid, devices.size());
+    // uid/device affinity is only for output devices
+    for (size_t i = 0; i < devices.size(); i++) {
+        if (!audio_is_output_device(devices[i].mType)) {
+            ALOGE("setUidDeviceAffinities() device=%08x is NOT an output device",
+                    devices[i].mType);
+            return BAD_VALUE;
+        }
+    }
+    status_t res =  mPolicyMixes.setUidDeviceAffinities(uid, devices);
+    if (res == NO_ERROR) {
+        // reevaluate outputs for all given devices
+        for (size_t i = 0; i < devices.size(); i++) {
+            sp<DeviceDescriptor> devDesc = mHwModules.getDeviceDescriptor(
+                            devices[i].mType, devices[i].mAddress, String8());
+            SortedVector<audio_io_handle_t> outputs;
+            if (checkOutputsForDevice(devDesc, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                    outputs,
+                    devDesc->address()) != NO_ERROR) {
+                ALOGE("setUidDeviceAffinities() error in checkOutputsForDevice for device=%08x"
+                        " addr=%s", devices[i].mType, devices[i].mAddress.string());
+                return INVALID_OPERATION;
+            }
+        }
+    }
+    return res;
+}
+
+status_t AudioPolicyManager::removeUidDeviceAffinities(uid_t uid) {
+    ALOGV("%s() uid=%d", __FUNCTION__, uid);
+    Vector<AudioDeviceTypeAddr> devices;
+    status_t res =  mPolicyMixes.getDevicesForUid(uid, devices);
+    if (res == NO_ERROR) {
+        // reevaluate outputs for all found devices
+        for (size_t i = 0; i < devices.size(); i++) {
+            sp<DeviceDescriptor> devDesc = mHwModules.getDeviceDescriptor(
+                    devices[i].mType, devices[i].mAddress, String8());
+            SortedVector<audio_io_handle_t> outputs;
+            if (checkOutputsForDevice(devDesc, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                    outputs,
+                    devDesc->address()) != NO_ERROR) {
+                ALOGE("%s() error in checkOutputsForDevice for device=%08x addr=%s",
+                        __FUNCTION__, devices[i].mType, devices[i].mAddress.string());
+                return INVALID_OPERATION;
+            }
+        }
+    }
+
+    return res;
+}
+
 void AudioPolicyManager::dump(String8 *dst) const
 {
     dst->appendFormat("\nAudioPolicyManager Dump: %p\n", this);
@@ -4089,9 +4142,9 @@ status_t AudioPolicyManager::initialize() {
     for (size_t i = 0; i  < mAvailableInputDevices.size(); i++) {
         if (mAvailableInputDevices[i]->address().isEmpty()) {
             if (mAvailableInputDevices[i]->type() == AUDIO_DEVICE_IN_BUILTIN_MIC) {
-                mAvailableInputDevices[i]->address() = String8(AUDIO_BOTTOM_MICROPHONE_ADDRESS);
+                mAvailableInputDevices[i]->setAddress(String8(AUDIO_BOTTOM_MICROPHONE_ADDRESS));
             } else if (mAvailableInputDevices[i]->type() == AUDIO_DEVICE_IN_BACK_MIC) {
-                mAvailableInputDevices[i]->address() = String8(AUDIO_BACK_MICROPHONE_ADDRESS);
+                mAvailableInputDevices[i]->setAddress(String8(AUDIO_BACK_MICROPHONE_ADDRESS));
             }
         }
     }

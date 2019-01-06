@@ -199,6 +199,10 @@ public:
 
     virtual status_t registerPolicyMixes(const Vector<AudioMix>& mixes, bool registration);
 
+    virtual status_t setUidDeviceAffinities(uid_t uid, const Vector<AudioDeviceTypeAddr>& devices);
+
+    virtual status_t removeUidDeviceAffinities(uid_t uid);
+
     virtual status_t startAudioSource(const struct audio_port_config *source,
                                       const audio_attributes_t *attributes,
                                       audio_port_handle_t *portId);
