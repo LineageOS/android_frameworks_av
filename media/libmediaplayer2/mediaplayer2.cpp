@@ -25,7 +25,6 @@
 #include <media/DataSourceDesc.h>
 #include <media/MediaAnalyticsItem.h>
 #include <media/MemoryLeakTrackUtil.h>
-#include <media/Metadata.h>
 #include <media/NdkWrapper.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooperRoster.h>
