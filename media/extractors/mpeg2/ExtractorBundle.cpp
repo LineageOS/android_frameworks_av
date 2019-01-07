@@ -19,12 +19,19 @@
 #include <utils/Log.h>
 
 #include <media/MediaExtractorPluginHelper.h>
+#include <media/stagefright/MediaDefs.h>
 #include "MPEG2PSExtractor.h"
 #include "MPEG2TSExtractor.h"
 
 namespace android {
 
 struct CDataSource;
+
+static const char *extensions[] = {
+   "m2p",
+   "ts",
+   NULL
+};
 
 extern "C" {
 // This is the only symbol that needs to be exported
@@ -36,26 +43,29 @@ ExtractorDef GETEXTRACTORDEF() {
         1,
         "MPEG2-PS/TS Extractor",
         {
-            .v2 = [](
+            .v3 = {
+                [](
                     CDataSource *source,
                     float *confidence,
                     void **,
                     FreeMetaFunc *) -> CreatorFunc {
-                DataSourceHelper helper(source);
-                if (SniffMPEG2TS(&helper, confidence)) {
-                    return [](
-                            CDataSource *source,
-                            void *) -> CMediaExtractor* {
-                        return wrap(new MPEG2TSExtractor(new DataSourceHelper(source)));};
-                } else if (SniffMPEG2PS(&helper, confidence)) {
-                            return [](
-                                    CDataSource *source,
-                                    void *) -> CMediaExtractor* {
-                                return wrap(new MPEG2PSExtractor(new DataSourceHelper(source)));};
-                }
-                return NULL;
+                    DataSourceHelper helper(source);
+                    if (SniffMPEG2TS(&helper, confidence)) {
+                        return [](
+                                CDataSource *source,
+                                void *) -> CMediaExtractor* {
+                            return wrap(new MPEG2TSExtractor(new DataSourceHelper(source)));};
+                    } else if (SniffMPEG2PS(&helper, confidence)) {
+                        return [](
+                                CDataSource *source,
+                                void *) -> CMediaExtractor* {
+                            return wrap(new MPEG2PSExtractor(new DataSourceHelper(source)));};
+                    }
+                    return NULL;
+                },
+                extensions
             }
-        }
+        },
     };
 }
 

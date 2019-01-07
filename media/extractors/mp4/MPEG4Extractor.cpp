@@ -6183,6 +6183,19 @@ static CreatorFunc Sniff(
     return NULL;
 }
 
+static const char *extensions[] = {
+    "3g2",
+    "3gp",
+    "3gpp",
+    "3gpp2",
+    "m4a",
+    "m4r",
+    "m4v",
+    "mov",
+    "mp4",
+    NULL
+};
+
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
@@ -6192,7 +6205,7 @@ ExtractorDef GETEXTRACTORDEF() {
         UUID("27575c67-4417-4c54-8d3d-8e626985a164"),
         2, // version
         "MP4 Extractor",
-        { .v2 = Sniff }
+        { .v3 = {Sniff, extensions} },
     };
 }
 

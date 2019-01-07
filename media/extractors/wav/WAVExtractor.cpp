@@ -616,6 +616,11 @@ static CreatorFunc Sniff(
     return CreateExtractor;
 }
 
+static const char *extensions[] = {
+    "wav",
+    NULL
+};
+
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
@@ -625,7 +630,7 @@ ExtractorDef GETEXTRACTORDEF() {
         UUID("7d613858-5837-4a38-84c5-332d1cddee27"),
         1, // version
         "WAV Extractor",
-        { .v2 = Sniff }
+        { .v3 = {Sniff, extensions} },
     };
 }
 
