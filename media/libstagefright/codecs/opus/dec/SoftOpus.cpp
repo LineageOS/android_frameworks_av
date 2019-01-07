@@ -430,6 +430,15 @@ void SoftOpus::onQueueFilled(OMX_U32 /* portIndex */) {
                 return;
             }
 
+            if (size < sizeof(int64_t)) {
+                // The 2nd and 3rd input buffer are expected to contain
+                //  an int64_t (see below), so make sure we get at least
+                //  that much. The first input buffer must contain 19 bytes,
+                //  but that is checked already.
+                notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
+                return;
+            }
+
             if (mInputBufferCount == 0) {
                 delete mHeader;
                 mHeader = new OpusHeader();
