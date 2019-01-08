@@ -217,7 +217,7 @@ status_t SurfaceMediaSource::stop()
 
 #if DEBUG_PENDING_BUFFERS
         for (size_t i = 0; i < mPendingBuffers.size(); ++i) {
-            ALOGI("%d: %p", i, mPendingBuffers.itemAt(i));
+            ALOGI("%zu: %p", i, mPendingBuffers.itemAt(i));
         }
 #endif
 
@@ -355,7 +355,7 @@ status_t SurfaceMediaSource::read(
 
     (*buffer)->setObserver(this);
     (*buffer)->add_ref();
-    (*buffer)->meta_data()->setInt64(kKeyTime, mCurrentTimestamp / 1000);
+    (*buffer)->meta_data().setInt64(kKeyTime, mCurrentTimestamp / 1000);
     ALOGV("Frames encoded = %d, timestamp = %" PRId64 ", time diff = %" PRId64,
             mNumFramesEncoded, mCurrentTimestamp / 1000,
             mCurrentTimestamp / 1000 - prevTimeStamp / 1000);
