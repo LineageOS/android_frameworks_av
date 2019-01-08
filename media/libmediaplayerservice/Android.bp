@@ -2,10 +2,12 @@ cc_library_shared {
 
     srcs: [
         "ActivityManager.cpp",
+        "HDCP.cpp",
         "MediaPlayerFactory.cpp",
         "MediaPlayerService.cpp",
         "MediaRecorderClient.cpp",
         "MetadataRetrieverClient.cpp",
+        "RemoteDisplay.cpp",
         "StagefrightRecorder.cpp",
         "TestPlayerStub.cpp",
     ],
@@ -31,6 +33,7 @@ cc_library_shared {
         "libmemunreachable",
         "libpowermanager",
         "libstagefright",
+        "libstagefright_wfd",
         "libstagefright_foundation",
         "libstagefright_httplive",
         "libutils",
@@ -51,6 +54,7 @@ cc_library_shared {
     include_dirs: [
         "frameworks/av/media/libstagefright/rtsp",
         "frameworks/av/media/libstagefright/webm",
+        "frameworks/av/media/libstagefright/wifi-display",
     ],
 
     local_include_dirs: ["include"],

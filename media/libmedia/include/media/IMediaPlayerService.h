@@ -31,6 +31,7 @@
 
 namespace android {
 
+struct IHDCP;
 class IMediaCodecList;
 struct IMediaHTTPService;
 class IMediaRecorder;
@@ -48,6 +49,7 @@ public:
     virtual sp<IMediaMetadataRetriever> createMetadataRetriever() = 0;
     virtual sp<IMediaPlayer> create(const sp<IMediaPlayerClient>& client,
             audio_session_t audioSessionId = AUDIO_SESSION_ALLOCATE) = 0;
+    virtual sp<IHDCP>           makeHDCP(bool createEncryptionModule) = 0;
     virtual sp<IMediaCodecList> getCodecList() const = 0;
 
     // Connects to a remote display.
