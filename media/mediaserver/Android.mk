@@ -20,7 +20,7 @@ LOCAL_SHARED_LIBRARIES := \
         libmediaplayerservice \
         libutils \
         libbinder \
-        libicuuc \
+        libandroidicu \
         android.hardware.media.omx@1.0 \
 
 LOCAL_STATIC_LIBRARIES := \
