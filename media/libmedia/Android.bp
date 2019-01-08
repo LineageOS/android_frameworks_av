@@ -359,6 +359,7 @@ cc_library {
         "BufferingSettings.cpp",
         "CharacterEncodingDetector.cpp",
         "IDataSource.cpp",
+        "IHDCP.cpp",
         "IMediaDeathNotifier.cpp",
         "IMediaExtractor.cpp",
         "IMediaHTTPConnection.cpp",
