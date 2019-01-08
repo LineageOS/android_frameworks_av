@@ -34,7 +34,10 @@ using namespace android::acam;
 namespace android {
 namespace acam {
 
-using CameraStatusAndId = frameworks::cameraservice::service::V2_0::CameraStatusAndId;
+using frameworks::cameraservice::service::V2_0::CameraStatusAndId;
+using frameworks::cameraservice::common::V2_0::ProviderIdAndVendorTagSections;
+using android::hardware::camera::common::V1_0::helper::VendorTagDescriptor;
+using android::hardware::camera::common::V1_0::helper::VendorTagDescriptorCache;
 
 // Static member definitions
 const char* CameraManagerGlobal::kCameraIdKey   = "CameraId";
@@ -42,6 +45,104 @@ const char* CameraManagerGlobal::kCallbackFpKey = "CallbackFp";
 const char* CameraManagerGlobal::kContextKey    = "CallbackContext";
 Mutex                CameraManagerGlobal::sLock;
 CameraManagerGlobal* CameraManagerGlobal::sInstance = nullptr;
+
+/**
+ * The vendor tag descriptor class that takes HIDL vendor tag information as
+ * input. Not part of vendor available VendorTagDescriptor class because that class is used by
+ * default HAL implementation code as well.
+ */
+class HidlVendorTagDescriptor : public VendorTagDescriptor {
+public:
+    /**
+     * Create a VendorTagDescriptor object from the HIDL VendorTagSection
+     * vector.
+     *
+     * Returns OK on success, or a negative error code.
+     */
+    static status_t createDescriptorFromHidl(const hidl_vec<VendorTagSection>& vts,
+                                             /*out*/ sp<VendorTagDescriptor> *descriptor);
+};
+
+status_t HidlVendorTagDescriptor::createDescriptorFromHidl(const hidl_vec<VendorTagSection> &vts,
+                                                           sp<VendorTagDescriptor> *descriptor) {
+    int tagCount = 0;
+
+    for (size_t s = 0; s < vts.size(); s++) {
+        tagCount += vts[s].tags.size();
+    }
+
+    if (tagCount < 0 || tagCount > INT32_MAX) {
+        ALOGE("%s: tag count %d from vendor tag sections is invalid.", __FUNCTION__, tagCount);
+        return BAD_VALUE;
+    }
+
+    Vector<uint32_t> tagArray;
+    LOG_ALWAYS_FATAL_IF(tagArray.resize(tagCount) != tagCount,
+            "%s: too many (%u) vendor tags defined.", __FUNCTION__, tagCount);
+
+    sp<HidlVendorTagDescriptor> desc = new HidlVendorTagDescriptor();
+    desc->mTagCount = tagCount;
+
+    KeyedVector<uint32_t, String8> tagToSectionMap;
+
+    int idx = 0;
+    for (size_t s = 0; s < vts.size(); s++) {
+        const VendorTagSection& section = vts[s];
+        const char *sectionName = section.sectionName.c_str();
+        if (sectionName == NULL) {
+            ALOGE("%s: no section name defined for vendor tag section %zu.", __FUNCTION__, s);
+            return BAD_VALUE;
+        }
+        String8 sectionString(sectionName);
+        desc->mSections.add(sectionString);
+
+        for (size_t j = 0; j < section.tags.size(); j++) {
+            uint32_t tag = section.tags[j].tagId;
+            if (tag < CAMERA_METADATA_VENDOR_TAG_BOUNDARY) {
+                ALOGE("%s: vendor tag %d not in vendor tag section.", __FUNCTION__, tag);
+                return BAD_VALUE;
+            }
+
+            tagArray.editItemAt(idx++) = section.tags[j].tagId;
+
+            const char *tagName = section.tags[j].tagName.c_str();
+            if (tagName == NULL) {
+                ALOGE("%s: no tag name defined for vendor tag %d.", __FUNCTION__, tag);
+                return BAD_VALUE;
+            }
+            desc->mTagToNameMap.add(tag, String8(tagName));
+            tagToSectionMap.add(tag, sectionString);
+
+            int tagType = (int) section.tags[j].tagType;
+            if (tagType < 0 || tagType >= NUM_TYPES) {
+                ALOGE("%s: tag type %d from vendor ops does not exist.", __FUNCTION__, tagType);
+                return BAD_VALUE;
+            }
+            desc->mTagToTypeMap.emplace(tag, tagType);
+        }
+    }
+
+    for (size_t i = 0; i < tagArray.size(); ++i) {
+        uint32_t tag = tagArray[i];
+        String8 sectionString = tagToSectionMap.valueFor(tag);
+
+        // Set up tag to section index map
+        ssize_t index = desc->mSections.indexOf(sectionString);
+        LOG_ALWAYS_FATAL_IF(index < 0, "index %zd must be non-negative", index);
+        desc->mTagToSectionMap.add(tag, static_cast<uint32_t>(index));
+
+        // Set up reverse mapping
+        ssize_t reverseIndex = -1;
+        if ((reverseIndex = desc->mReverseMapping.indexOfKey(sectionString)) < 0) {
+            KeyedVector<String8, uint32_t>* nameMapper = new KeyedVector<String8, uint32_t>();
+            reverseIndex = desc->mReverseMapping.add(sectionString, nameMapper);
+        }
+        desc->mReverseMapping[reverseIndex]->add(desc->mTagToNameMap.valueFor(tag), tag);
+    }
+
+    *descriptor = std::move(desc);
+    return OK;
+}
 
 CameraManagerGlobal&
 CameraManagerGlobal::getInstance() {
@@ -80,8 +181,34 @@ static bool isCameraServiceDisabled() {
     return (strncmp(value, "0", 2) != 0 && strncasecmp(value, "false", 6) != 0);
 }
 
-// TODO: Add back when vendor tags are supported for libcamera2ndk_vendor when
-//       the HIDL interface supports querying by vendor id.
+bool CameraManagerGlobal::setupVendorTags() {
+    sp<VendorTagDescriptorCache> tagCache = new VendorTagDescriptorCache();
+    Status status = Status::NO_ERROR;
+    std::vector<ProviderIdAndVendorTagSections> providerIdsAndVts;
+    auto remoteRet = mCameraService->getCameraVendorTagSections([&status, &providerIdsAndVts]
+                                                                 (Status s,
+                                                                  auto &IdsAndVts) {
+                                                         status = s;
+                                                         providerIdsAndVts = IdsAndVts; });
+
+    if (!remoteRet.isOk() || status != Status::NO_ERROR) {
+        ALOGE("Failed to retrieve VendorTagSections %s", remoteRet.description().c_str());
+        return false;
+    }
+    // Convert each providers VendorTagSections into a VendorTagDescriptor and
+    // add it to the cache
+    for (auto &providerIdAndVts : providerIdsAndVts) {
+        sp<VendorTagDescriptor> vendorTagDescriptor;
+        if (HidlVendorTagDescriptor::createDescriptorFromHidl(providerIdAndVts.vendorTagSections,
+                                                              &vendorTagDescriptor) != OK) {
+            ALOGE("Failed to convert from Hidl: VendorTagDescriptor");
+            return false;
+        }
+        tagCache->addVendorDescriptor(providerIdAndVts.providerId, vendorTagDescriptor);
+    }
+    VendorTagDescriptorCache::setAsGlobalVendorTagCache(tagCache);
+    return true;
+}
 
 sp<ICameraService> CameraManagerGlobal::getCameraService() {
     Mutex::Autolock _l(mLock);
@@ -140,6 +267,13 @@ sp<ICameraService> CameraManagerGlobal::getCameraService() {
         if (!remoteRet.isOk() || status != Status::NO_ERROR) {
             ALOGE("Failed to add listener to camera service %s", remoteRet.description().c_str());
         }
+
+        // Setup vendor tags
+        if (!setupVendorTags()) {
+            ALOGE("Unable to set up vendor tags");
+            return nullptr;
+        }
+
         for (auto& c : cameraStatuses) {
             onStatusChangedLocked(c);
         }

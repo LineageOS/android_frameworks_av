@@ -142,6 +142,8 @@ class CameraManagerGlobal final : public RefBase {
 
     void onStatusChanged(const CameraStatusAndId &statusAndId);
     void onStatusChangedLocked(const CameraStatusAndId &statusAndId);
+    bool setupVendorTags();
+
     // Utils for status
     static bool validStatus(CameraDeviceStatus status);
     static bool isStatusAvailable(CameraDeviceStatus status);
