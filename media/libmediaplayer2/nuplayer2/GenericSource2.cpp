@@ -1152,7 +1152,6 @@ sp<ABuffer> NuPlayer2::GenericSource2::mediaBufferToABuffer(
         // If ref>0, there must be an observer, or it'll crash at release().
         // TODO: MediaBuffer might need to be revised to ease such need.
         mb->setObserver(this);
-        // setMediaBufferBase() interestingly doesn't increment the ref count on its own.
         // Extra increment (since we want to keep mb alive and attached to ab beyond this function
         // call. This is to counter the effect of mb->release() towards the end.
         mb->add_ref();

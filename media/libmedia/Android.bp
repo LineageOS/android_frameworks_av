@@ -217,6 +217,7 @@ cc_library {
         "libstagefright_foundation",
         "libmediaextractor",
         "libgui",
+        "libui",
         "libdl",
         "libaudioutils",
         "libaudioclient",
