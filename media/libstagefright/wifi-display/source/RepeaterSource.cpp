@@ -7,7 +7,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/MediaBuffer.h>
+#include <media/stagefright/MediaBufferBase.h>
 #include <media/stagefright/MetaData.h>
 
 namespace android {
@@ -107,7 +107,7 @@ sp<MetaData> RepeaterSource::getFormat() {
 }
 
 status_t RepeaterSource::read(
-        MediaBuffer **buffer, const ReadOptions *options) {
+        MediaBufferBase **buffer, const ReadOptions *options) {
     int64_t seekTimeUs;
     ReadOptions::SeekMode seekMode;
     CHECK(options == NULL || !options->getSeekTo(&seekTimeUs, &seekMode));
@@ -155,7 +155,7 @@ status_t RepeaterSource::read(
             {
                 mBuffer->add_ref();
                 *buffer = mBuffer;
-                (*buffer)->meta_data()->setInt64(kKeyTime, bufferTimeUs);
+                (*buffer)->meta_data().setInt64(kKeyTime, bufferTimeUs);
                 ++mFrameCount;
             }
         }
@@ -180,7 +180,7 @@ void RepeaterSource::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatRead:
         {
-            MediaBuffer *buffer;
+            MediaBufferBase *buffer;
             status_t err = mSource->read(&buffer);
 
             ALOGV("read mbuf %p", buffer);
