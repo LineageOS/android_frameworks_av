@@ -20,7 +20,6 @@
 #include <media/AVSyncSettings.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/BufferingSettings.h>
-#include <media/Metadata.h>
 #include <media/mediaplayer_common.h>
 #include <mediaplayer2/MediaPlayer2Interface.h>
 #include <mediaplayer2/MediaPlayer2Types.h>
