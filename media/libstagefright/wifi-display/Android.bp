@@ -26,11 +26,17 @@ cc_library_shared {
         "libcutils",
         "liblog",
         "libmedia",
+        "libmedia_omx",
         "libstagefright",
         "libstagefright_foundation",
         "libui",
         "libgui",
         "libutils",
+    ],
+
+    header_libs: [
+        "libmediadrm_headers",
+        "libmediametrics_headers",
     ],
 
     cflags: [
