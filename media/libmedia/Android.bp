@@ -424,6 +424,7 @@ cc_library {
         "libmedia_codeclist",
         "libmedia_omx",
         "libstagefright_foundation",
+        "libui",
         "libutils",
         "server_configurable_flags",
     ],

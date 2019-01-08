@@ -217,7 +217,7 @@ status_t SurfaceMediaSource::stop()
 
 #if DEBUG_PENDING_BUFFERS
         for (size_t i = 0; i < mPendingBuffers.size(); ++i) {
-            ALOGI("%d: %p", i, mPendingBuffers.itemAt(i));
+            ALOGI("%zu: %p", i, mPendingBuffers.itemAt(i));
         }
 #endif
 
@@ -309,9 +309,7 @@ status_t SurfaceMediaSource::read(
                 if (mStartTimeNs > 0) {
                     if (item.mTimestamp < mStartTimeNs) {
                         // This frame predates start of record, discard
-                        mConsumer->releaseBuffer(
-                                item.mSlot, item.mFrameNumber, EGL_NO_DISPLAY,
-                                EGL_NO_SYNC_KHR, Fence::NO_FENCE);
+                        mConsumer->releaseBuffer(item.mSlot, item.mFrameNumber, Fence::NO_FENCE);
                         continue;
                     }
                     mStartTimeNs = item.mTimestamp - mStartTimeNs;
@@ -355,7 +353,7 @@ status_t SurfaceMediaSource::read(
 
     (*buffer)->setObserver(this);
     (*buffer)->add_ref();
-    (*buffer)->meta_data()->setInt64(kKeyTime, mCurrentTimestamp / 1000);
+    (*buffer)->meta_data().setInt64(kKeyTime, mCurrentTimestamp / 1000);
     ALOGV("Frames encoded = %d, timestamp = %" PRId64 ", time diff = %" PRId64,
             mNumFramesEncoded, mCurrentTimestamp / 1000,
             mCurrentTimestamp / 1000 - prevTimeStamp / 1000);
@@ -409,9 +407,7 @@ void SurfaceMediaSource::signalBufferReturned(MediaBufferBase *buffer) {
             ALOGV("Slot %d returned, matches handle = %p", id,
                     mSlots[id].mGraphicBuffer->handle);
 
-            mConsumer->releaseBuffer(id, mSlots[id].mFrameNumber,
-                                        EGL_NO_DISPLAY, EGL_NO_SYNC_KHR,
-                    Fence::NO_FENCE);
+            mConsumer->releaseBuffer(id, mSlots[id].mFrameNumber, Fence::NO_FENCE);
 
             buffer->setObserver(0);
             buffer->release();
