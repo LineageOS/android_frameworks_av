@@ -19,8 +19,8 @@
 #include <utils/Log.h>
 
 #include "TSPacketizer.h"
-#include "include/avc_utils.h"
 
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -471,7 +471,7 @@ status_t TSPacketizer::packetize(
     const sp<Track> &track = mTracks.itemAt(trackIndex);
 
     if (track->isH264() && (flags & PREPEND_SPS_PPS_TO_IDR_FRAMES)
-            && IsIDR(accessUnit)) {
+            && IsIDR(accessUnit->data(), accessUnit->size())) {
         // prepend codec specific data, i.e. SPS and PPS.
         accessUnit = track->prependCSD(accessUnit);
     } else if (track->isAAC() && track->lacksADTSHeader()) {
@@ -1039,7 +1039,7 @@ sp<ABuffer> TSPacketizer::prependCSD(
     CHECK_LT(trackIndex, mTracks.size());
 
     const sp<Track> &track = mTracks.itemAt(trackIndex);
-    CHECK(track->isH264() && IsIDR(accessUnit));
+    CHECK(track->isH264() && IsIDR(accessUnit->data(), accessUnit->size()));
 
     int64_t timeUs;
     CHECK(accessUnit->meta()->findInt64("timeUs", &timeUs));
