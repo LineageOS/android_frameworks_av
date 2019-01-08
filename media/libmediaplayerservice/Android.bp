@@ -22,11 +22,13 @@ cc_library {
     srcs: [
         "ActivityManager.cpp",
         "DeathNotifier.cpp",
+        "HDCP.cpp",
         "MediaPlayerFactory.cpp",
         "MediaPlayerService.cpp",
         "MediaRecorderClient.cpp",
         "MetadataRetrieverClient.cpp",
         "StagefrightMetadataRetriever.cpp",
+        "RemoteDisplay.cpp",
         "StagefrightRecorder.cpp",
         "TestPlayerStub.cpp",
     ],
@@ -62,6 +64,7 @@ cc_library {
         "libnetd_client",
         "libpowermanager",
         "libstagefright",
+        "libstagefright_wfd",
         "libstagefright_foundation",
         "libstagefright_httplive",
         "libutils",
@@ -90,6 +93,10 @@ cc_library {
 
     export_header_lib_headers: [
         "libmediautils_headers",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/libstagefright/wifi-display",
     ],
 
     local_include_dirs: ["include"],
