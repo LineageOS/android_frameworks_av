@@ -154,6 +154,7 @@ cc_library {
     srcs: [
         ":mediaupdateservice_aidl",
         "IDataSource.cpp",
+        "IHDCP.cpp",
         "BufferingSettings.cpp",
         "mediaplayer.cpp",
         "IMediaHTTPConnection.cpp",
