@@ -34,6 +34,7 @@
 namespace android {
 
 class IMediaPlayer;
+struct IHDCP;
 class IMediaCodecList;
 struct IMediaHTTPService;
 class IMediaRecorder;
@@ -54,6 +55,7 @@ public:
             audio_session_t audioSessionId = AUDIO_SESSION_ALLOCATE,
             const android::content::AttributionSourceState &attributionSource =
                 android::content::AttributionSourceState()) = 0;
+    virtual sp<IHDCP>           makeHDCP(bool createEncryptionModule) = 0;
     virtual sp<IMediaCodecList> getCodecList() const = 0;
 
     // Connects to a remote display.
