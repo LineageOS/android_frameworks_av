@@ -20,7 +20,7 @@ struct RepeaterSource : public MediaSource {
     virtual sp<MetaData> getFormat();
 
     virtual status_t read(
-            MediaBuffer **buffer, const ReadOptions *options);
+            MediaBufferBase **buffer, const ReadOptions *options);
 
     void onMessageReceived(const sp<AMessage> &msg);
 
@@ -50,7 +50,7 @@ private:
     sp<ALooper> mLooper;
     sp<AHandlerReflector<RepeaterSource> > mReflector;
 
-    MediaBuffer *mBuffer;
+    MediaBufferBase *mBuffer;
     status_t mResult;
     int64_t mLastBufferUpdateUs;
 

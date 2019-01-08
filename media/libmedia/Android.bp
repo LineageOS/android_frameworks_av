@@ -362,6 +362,7 @@ cc_library {
         "libcamera_client",
         "libstagefright_foundation",
         "libgui",
+        "libui",
         "libdl",
         "libaudioclient",
         "libmedia_codeclist",

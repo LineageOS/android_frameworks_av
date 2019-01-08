@@ -22,6 +22,7 @@
 #include "PlaybackSession.h"
 #include "Parameters.h"
 #include "rtp/RTPSender.h"
+#include <media/stagefright/FoundationUtils.h>
 
 #include <binder/IServiceManager.h>
 #include <gui/IGraphicBufferProducer.h>
