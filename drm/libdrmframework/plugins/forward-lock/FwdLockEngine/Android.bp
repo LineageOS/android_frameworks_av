@@ -29,8 +29,7 @@ cc_library_shared {
     srcs: ["src/FwdLockEngine.cpp"],
 
     shared_libs: [
-        "libicui18n",
-        "libicuuc",
+        "libandroidicu",
         "libutils",
         "liblog",
         "libdl",
