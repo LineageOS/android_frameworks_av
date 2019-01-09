@@ -553,12 +553,14 @@ status_t DrmHal::createPlugin(const uint8_t uuid[16],
         const String8& appPackageName) {
     Mutex::Autolock autoLock(mLock);
 
-    for (size_t i = 0; i < mFactories.size(); i++) {
+    for (size_t i = mFactories.size() - 1; i >= 0; i--) {
         if (mFactories[i]->isCryptoSchemeSupported(uuid)) {
-            mPlugin = makeDrmPlugin(mFactories[i], uuid, appPackageName);
-            if (mPlugin != NULL) {
+            auto plugin = makeDrmPlugin(mFactories[i], uuid, appPackageName);
+            if (plugin != NULL) {
+                mPlugin = plugin;
                 mPluginV1_1 = drm::V1_1::IDrmPlugin::castFrom(mPlugin);
                 mPluginV1_2 = drm::V1_2::IDrmPlugin::castFrom(mPlugin);
+                break;
             }
         }
     }
@@ -567,6 +569,9 @@ status_t DrmHal::createPlugin(const uint8_t uuid[16],
         mInitCheck = ERROR_UNSUPPORTED;
     } else {
         if (!mPlugin->setListener(this).isOk()) {
+            mPlugin = NULL;
+            mPluginV1_1 = NULL;
+            mPluginV1_2 = NULL;
             mInitCheck = DEAD_OBJECT;
         } else {
             mInitCheck = OK;
