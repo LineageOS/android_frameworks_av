@@ -18,6 +18,7 @@
 #define LOG_TAG "C2SoftFlacEnc"
 #include <log/log.h>
 
+#include <audio_utils/primitives.h>
 #include <media/stagefright/foundation/MediaDefs.h>
 
 #include <C2PlatformSupport.h>
@@ -72,11 +73,23 @@ public:
                 DefineParam(mInputMaxBufSize, C2_PARAMKEY_INPUT_MAX_BUFFER_SIZE)
                 .withConstValue(new C2StreamMaxBufferSizeInfo::input(0u, 4608))
                 .build());
+
+        addParameter(
+                DefineParam(mPcmEncodingInfo, C2_PARAMKEY_PCM_ENCODING)
+                .withDefault(new C2StreamPcmEncodingInfo::input(0u, C2Config::PCM_16))
+                .withFields({C2F(mPcmEncodingInfo, value).oneOf({
+                     C2Config::PCM_16,
+                     // C2Config::PCM_8,
+                     C2Config::PCM_FLOAT})
+                })
+                .withSetter((Setter<decltype(*mPcmEncodingInfo)>::StrictValueWithNoDeps))
+                .build());
     }
 
     uint32_t getSampleRate() const { return mSampleRate->value; }
     uint32_t getChannelCount() const { return mChannelCount->value; }
     uint32_t getBitrate() const { return mBitrate->value; }
+    int32_t getPcmEncodingInfo() const { return mPcmEncodingInfo->value; }
 
 private:
     std::shared_ptr<C2StreamFormatConfig::input> mInputFormat;
@@ -87,6 +100,7 @@ private:
     std::shared_ptr<C2StreamChannelCountInfo::input> mChannelCount;
     std::shared_ptr<C2BitrateTuning::output> mBitrate;
     std::shared_ptr<C2StreamMaxBufferSizeInfo::input> mInputMaxBufSize;
+    std::shared_ptr<C2StreamPcmEncodingInfo::input> mPcmEncodingInfo;
 };
 constexpr char COMPONENT_NAME[] = "c2.android.flac.encoder";
 
@@ -224,12 +238,15 @@ void C2SoftFlacEnc::process(
         mWroteHeader = true;
     }
 
-    uint32_t sampleRate = mIntf->getSampleRate();
-    uint32_t channelCount = mIntf->getChannelCount();
-    uint64_t outTimeStamp = mProcessedSamples * 1000000ll / sampleRate;
+    const uint32_t sampleRate = mIntf->getSampleRate();
+    const uint32_t channelCount = mIntf->getChannelCount();
+    const bool inputFloat = mIntf->getPcmEncodingInfo() == C2Config::PCM_FLOAT;
+    const unsigned sampleSize = inputFloat ? sizeof(float) : sizeof(int16_t);
+    const unsigned frameSize = channelCount * sampleSize;
+    const uint64_t outTimeStamp = mProcessedSamples * 1000000ll / sampleRate;
 
     size_t outCapacity = inSize;
-    outCapacity += mBlockSize * channelCount * sizeof(int16_t);
+    outCapacity += mBlockSize * frameSize;
 
     C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
     c2_status_t err = pool->fetchLinearBlock(outCapacity, usage, &mOutputBlock);
@@ -250,14 +267,19 @@ void C2SoftFlacEnc::process(
     size_t inPos = 0;
     while (inPos < inSize) {
         const uint8_t *inPtr = rView.data() + inOffset;
-        size_t processSize = MIN(kInBlockSize * channelCount * sizeof(int16_t), (inSize - inPos));
-        const unsigned nbInputFrames = processSize / (channelCount * sizeof(int16_t));
-        const unsigned nbInputSamples = processSize / sizeof(int16_t);
-        const int16_t *pcm16 = reinterpret_cast<const int16_t *>(inPtr + inPos);
-        ALOGV("about to encode %zu bytes", processSize);
+        const size_t processSize = MIN(kInBlockSize * frameSize, (inSize - inPos));
+        const unsigned nbInputFrames = processSize / frameSize;
+        const unsigned nbInputSamples = processSize / sampleSize;
 
-        for (unsigned i = 0; i < nbInputSamples; i++) {
-            mInputBufferPcm32[i] = (FLAC__int32) pcm16[i];
+        ALOGV("about to encode %zu bytes", processSize);
+        if (inputFloat) {
+            const float * const pcmFloat = reinterpret_cast<const float *>(inPtr + inPos);
+            memcpy_to_q8_23_from_float_with_clamp(mInputBufferPcm32, pcmFloat, nbInputSamples);
+        } else {
+            const int16_t * const pcm16 = reinterpret_cast<const int16_t *>(inPtr + inPos);
+            for (unsigned i = 0; i < nbInputSamples; i++) {
+                mInputBufferPcm32[i] = (FLAC__int32) pcm16[i];
+            }
         }
 
         FLAC__bool ok = FLAC__stream_encoder_process_interleaved(
@@ -342,10 +364,12 @@ status_t C2SoftFlacEnc::configureEncoder() {
         return UNKNOWN_ERROR;
     }
 
+    const bool inputFloat = mIntf->getPcmEncodingInfo() == C2Config::PCM_FLOAT;
+    const int bitsPerSample = inputFloat ? 24 : 16;
     FLAC__bool ok = true;
     ok = ok && FLAC__stream_encoder_set_channels(mFlacStreamEncoder, mIntf->getChannelCount());
     ok = ok && FLAC__stream_encoder_set_sample_rate(mFlacStreamEncoder, mIntf->getSampleRate());
-    ok = ok && FLAC__stream_encoder_set_bits_per_sample(mFlacStreamEncoder, 16);
+    ok = ok && FLAC__stream_encoder_set_bits_per_sample(mFlacStreamEncoder, bitsPerSample);
     ok = ok && FLAC__stream_encoder_set_compression_level(mFlacStreamEncoder, mCompressionLevel);
     ok = ok && FLAC__stream_encoder_set_verify(mFlacStreamEncoder, false);
     if (!ok) {

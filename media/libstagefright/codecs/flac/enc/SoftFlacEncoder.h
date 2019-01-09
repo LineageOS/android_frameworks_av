@@ -45,8 +45,10 @@ protected:
 
 private:
     const unsigned int kNumBuffers = 2;
-    const unsigned int kMaxNumSamplesPerFrame = 1152;
-    const unsigned int kMaxInputBufferSize = kMaxNumSamplesPerFrame * sizeof(int16_t) * 2;
+    static constexpr unsigned int kMaxChannels = 2;
+    static constexpr unsigned int kNumSamplesPerFrame = 1152;
+    static constexpr unsigned int kMaxInputBufferSize =
+            kNumSamplesPerFrame * kMaxChannels * sizeof(float);
     const unsigned int kMaxOutputBufferSize = 65536;    //TODO check if this can be reduced
 
     bool mSignalledError;
@@ -54,6 +56,8 @@ private:
     OMX_U32 mNumChannels;
     OMX_U32 mSampleRate;
     OMX_U32 mCompressionLevel;
+    OMX_NUMERICALDATATYPE mNumericalData = OMX_NumericalDataSigned;
+    OMX_U32 mBitsPerSample = 16;
 
     // should the data received by the callback be written to the output port
     bool        mEncoderWriteData;
