@@ -271,12 +271,8 @@ private:
 
 namespace {
 
-// TODO: get this info from component
-const static size_t kMinInputBufferArraySize = 4;
-const static size_t kMaxPipelineCapacity = 18;
-const static size_t kChannelOutputDelay = 0;
-const static size_t kMinOutputBufferArraySize = kMaxPipelineCapacity +
-                                                kChannelOutputDelay;
+const static size_t kSmoothnessFactor = 4;
+const static size_t kRenderingDepth = 3;
 const static size_t kLinearBufferSize = 1048576;
 // This can fit 4K RGBA frame, and most likely client won't need more than this.
 const static size_t kMaxLinearBufferSize = 3840 * 2160 * 4;
@@ -829,6 +825,7 @@ public:
             const sp<ICrypto> &crypto,
             int32_t heapSeqNum,
             size_t capacity,
+            size_t numInputSlots,
             const char *componentName, const char *name = "EncryptedInput")
         : LinearInputBuffers(componentName, name),
           mUsage({0, 0}),
@@ -840,7 +837,7 @@ public:
         } else {
             mUsage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
         }
-        for (size_t i = 0; i < kMinInputBufferArraySize; ++i) {
+        for (size_t i = 0; i < numInputSlots; ++i) {
             sp<IMemory> memory = mDealer->allocate(capacity);
             if (memory == nullptr) {
                 ALOGD("[%s] Failed to allocate memory from dealer: only %zu slots allocated", mName, i);
@@ -951,11 +948,12 @@ private:
 
 class GraphicInputBuffers : public CCodecBufferChannel::InputBuffers {
 public:
-    GraphicInputBuffers(const char *componentName, const char *name = "2D-BB-Input")
+    GraphicInputBuffers(
+            size_t numInputSlots, const char *componentName, const char *name = "2D-BB-Input")
         : InputBuffers(componentName, name),
           mImpl(mName),
           mLocalBufferPool(LocalBufferPool::Create(
-                  kMaxLinearBufferSize * kMinInputBufferArraySize)) { }
+                  kMaxLinearBufferSize * numInputSlots)) { }
     ~GraphicInputBuffers() override = default;
 
     bool requestNewBuffer(size_t *index, sp<MediaCodecBuffer> *buffer) override {
@@ -1291,10 +1289,11 @@ public:
 
 class RawGraphicOutputBuffers : public FlexOutputBuffers {
 public:
-    RawGraphicOutputBuffers(const char *componentName, const char *name = "2D-BB-Output")
+    RawGraphicOutputBuffers(
+            size_t numOutputSlots, const char *componentName, const char *name = "2D-BB-Output")
         : FlexOutputBuffers(componentName, name),
           mLocalBufferPool(LocalBufferPool::Create(
-                  kMaxLinearBufferSize * kMinOutputBufferArraySize)) { }
+                  kMaxLinearBufferSize * numOutputSlots)) { }
     ~RawGraphicOutputBuffers() override = default;
 
     sp<Codec2Buffer> wrap(const std::shared_ptr<C2Buffer> &buffer) override {
@@ -1545,6 +1544,8 @@ CCodecBufferChannel::CCodecBufferChannel(
         const std::shared_ptr<CCodecCallback> &callback)
     : mHeapSeqNum(-1),
       mCCodecCallback(callback),
+      mNumInputSlots(kSmoothnessFactor),
+      mNumOutputSlots(kSmoothnessFactor),
       mFrameIndex(0u),
       mFirstValidFrameIndex(0u),
       mMetaMode(MODE_NONE),
@@ -2006,7 +2007,7 @@ void CCodecBufferChannel::getInputBufferArray(Vector<sp<MediaCodecBuffer>> *arra
     Mutexed<std::unique_ptr<InputBuffers>>::Locked buffers(mInputBuffers);
 
     if (!(*buffers)->isArrayMode()) {
-        *buffers = (*buffers)->toArrayMode(kMinInputBufferArraySize);
+        *buffers = (*buffers)->toArrayMode(mNumInputSlots);
     }
 
     (*buffers)->getArray(array);
@@ -2017,7 +2018,7 @@ void CCodecBufferChannel::getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *arr
     Mutexed<std::unique_ptr<OutputBuffers>>::Locked buffers(mOutputBuffers);
 
     if (!(*buffers)->isArrayMode()) {
-        *buffers = (*buffers)->toArrayMode(kMinOutputBufferArraySize);
+        *buffers = (*buffers)->toArrayMode(mNumOutputSlots);
     }
 
     (*buffers)->getArray(array);
@@ -2029,12 +2030,19 @@ status_t CCodecBufferChannel::start(
     C2StreamBufferTypeSetting::output oStreamFormat(0u);
     C2PortReorderBufferDepthTuning::output reorderDepth;
     C2PortReorderKeySetting::output reorderKey;
+    C2PortActualDelayTuning::input inputDelay(0);
+    C2PortActualDelayTuning::output outputDelay(0);
+    C2ActualPipelineDelayTuning pipelineDelay(0);
+
     c2_status_t err = mComponent->query(
             {
                 &iStreamFormat,
                 &oStreamFormat,
                 &reorderDepth,
                 &reorderKey,
+                &inputDelay,
+                &pipelineDelay,
+                &outputDelay,
             },
             {},
             C2_DONT_BLOCK,
@@ -2057,6 +2065,13 @@ status_t CCodecBufferChannel::start(
             reorder->setKey(reorderKey.value);
         }
     }
+
+    mNumInputSlots =
+        (inputDelay ? inputDelay.value : 0) +
+        (pipelineDelay ? pipelineDelay.value : 0) +
+        kSmoothnessFactor;
+    mNumOutputSlots = (outputDelay ? outputDelay.value : 0) + kSmoothnessFactor;
+
     // TODO: get this from input format
     bool secure = mComponent->getName().find(".secure") != std::string::npos;
 
@@ -2135,7 +2150,7 @@ status_t CCodecBufferChannel::start(
             } else if (mMetaMode == MODE_ANW) {
                 buffers->reset(new GraphicMetadataInputBuffers(mName));
             } else {
-                buffers->reset(new GraphicInputBuffers(mName));
+                buffers->reset(new GraphicInputBuffers(mNumInputSlots, mName));
             }
         } else {
             if (hasCryptoOrDescrambler()) {
@@ -2148,7 +2163,7 @@ status_t CCodecBufferChannel::start(
                 if (mDealer == nullptr) {
                     mDealer = new MemoryDealer(
                             align(capacity, MemoryDealer::getAllocationAlignment())
-                                * (kMinInputBufferArraySize + 1),
+                                * (mNumInputSlots + 1),
                             "EncryptedLinearInputBuffers");
                     mDecryptDestination = mDealer->allocate((size_t)capacity);
                 }
@@ -2158,7 +2173,8 @@ status_t CCodecBufferChannel::start(
                     mHeapSeqNum = -1;
                 }
                 buffers->reset(new EncryptedLinearInputBuffers(
-                        secure, mDealer, mCrypto, mHeapSeqNum, (size_t)capacity, mName));
+                        secure, mDealer, mCrypto, mHeapSeqNum, (size_t)capacity,
+                        mNumInputSlots, mName));
                 forceArrayMode = true;
             } else {
                 buffers->reset(new LinearInputBuffers(mName));
@@ -2173,7 +2189,7 @@ status_t CCodecBufferChannel::start(
         }
 
         if (forceArrayMode) {
-            *buffers = (*buffers)->toArrayMode(kMinInputBufferArraySize);
+            *buffers = (*buffers)->toArrayMode(mNumInputSlots);
         }
     }
 
@@ -2292,7 +2308,7 @@ status_t CCodecBufferChannel::start(
             if (outputSurface) {
                 buffers->reset(new GraphicOutputBuffers(mName));
             } else {
-                buffers->reset(new RawGraphicOutputBuffers(mName));
+                buffers->reset(new RawGraphicOutputBuffers(mNumOutputSlots, mName));
             }
         } else {
             buffers->reset(new LinearOutputBuffers(mName));
@@ -2313,7 +2329,7 @@ status_t CCodecBufferChannel::start(
             // WORKAROUND: if we're using early CSD workaround we convert to
             //             array mode, to appease apps assuming the output
             //             buffers to be of the same size.
-            (*buffers) = (*buffers)->toArrayMode(kMinOutputBufferArraySize);
+            (*buffers) = (*buffers)->toArrayMode(mNumOutputSlots);
 
             int32_t channelCount;
             int32_t sampleRate;
@@ -2341,27 +2357,10 @@ status_t CCodecBufferChannel::start(
     // about buffers from the previous generation do not interfere with the
     // newly initialized pipeline capacity.
 
-    // Query delays
-    C2PortRequestedDelayTuning::input inputDelay;
-    C2PortRequestedDelayTuning::output outputDelay;
-    C2RequestedPipelineDelayTuning pipelineDelay;
-#if 0
-    err = mComponent->query(
-            { &inputDelay, &pipelineDelay, &outputDelay },
-            {},
-            C2_DONT_BLOCK,
-            nullptr);
     mAvailablePipelineCapacity.initialize(
-            inputDelay,
-            inputDelay + pipelineDelay,
-            inputDelay + pipelineDelay + outputDelay,
+            mNumInputSlots,
+            mNumInputSlots + mNumOutputSlots,
             mName);
-#else
-    mAvailablePipelineCapacity.initialize(
-            kMinInputBufferArraySize,
-            kMaxPipelineCapacity,
-            mName);
-#endif
 
     mInputMetEos = false;
     mSync.start();
@@ -2380,7 +2379,7 @@ status_t CCodecBufferChannel::requestInitialInputBuffers() {
     }
     std::vector<sp<MediaCodecBuffer>> toBeQueued;
     // TODO: use proper buffer depth instead of this random value
-    for (size_t i = 0; i < kMinInputBufferArraySize; ++i) {
+    for (size_t i = 0; i < mNumInputSlots; ++i) {
         size_t index;
         sp<MediaCodecBuffer> buffer;
         {
@@ -2737,7 +2736,7 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
     sp<IGraphicBufferProducer> producer;
     if (newSurface) {
         newSurface->setScalingMode(NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
-        newSurface->setMaxDequeuedBufferCount(kMinOutputBufferArraySize);
+        newSurface->setMaxDequeuedBufferCount(mNumOutputSlots + kRenderingDepth);
         producer = newSurface->getIGraphicBufferProducer();
         producer->setGenerationNumber(generation);
     } else {
