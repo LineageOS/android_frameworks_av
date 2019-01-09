@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,12 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "Codec2-Configurable"
-#include <log/log.h>
+#include <android-base/logging.h>
 
 #include <codec2/hidl/1.0/Configurable.h>
 #include <codec2/hidl/1.0/ComponentStore.h>
 #include <codec2/hidl/1.0/types.h>
+
 #include <C2ParamInternal.h>
 
 namespace android {
@@ -33,8 +34,8 @@ namespace utils {
 using namespace ::android;
 
 CachedConfigurable::CachedConfigurable(
-        std::unique_ptr<ConfigurableC2Intf>&& intf) :
-    mIntf(std::move(intf)) {
+        std::unique_ptr<ConfigurableC2Intf>&& intf)
+      : mIntf{std::move(intf)} {
 }
 
 c2_status_t CachedConfigurable::init(ComponentStore* store) {
@@ -45,6 +46,10 @@ c2_status_t CachedConfigurable::init(ComponentStore* store) {
 }
 
 // Methods from ::android::hardware::media::c2::V1_0::IConfigurable follow.
+Return<uint32_t> CachedConfigurable::getId() {
+    return mIntf->getId();
+}
+
 Return<void> CachedConfigurable::getName(getName_cb _hidl_cb) {
     _hidl_cb(mIntf->getName());
     return Void();
@@ -65,9 +70,10 @@ Return<void> CachedConfigurable::query(
             &c2heapParams);
 
     hidl_vec<uint8_t> params;
-    createParamsBlob(&params, c2heapParams);
+    if (!createParamsBlob(&params, c2heapParams)) {
+        LOG(WARNING) << "query -- invalid output params.";
+    }
     _hidl_cb(static_cast<Status>(c2res), params);
-
     return Void();
 }
 
@@ -78,7 +84,8 @@ Return<void> CachedConfigurable::config(
     // inParams is not writable, so create a copy as config modifies the parameters
     hidl_vec<uint8_t> inParamsCopy = inParams;
     std::vector<C2Param*> c2params;
-    if (parseParamsBlob(&c2params, inParamsCopy) != C2_OK) {
+    if (!parseParamsBlob(&c2params, inParamsCopy)) {
+        LOG(WARNING) << "config -- invalid input params.";
         _hidl_cb(Status::CORRUPTED,
                 hidl_vec<SettingResult>(),
                 hidl_vec<uint8_t>());
@@ -95,13 +102,20 @@ Return<void> CachedConfigurable::config(
         size_t ix = 0;
         for (const std::unique_ptr<C2SettingResult>& c2result : c2failures) {
             if (c2result) {
-                objcpy(&failures[ix++], *c2result);
+                if (objcpy(&failures[ix], *c2result)) {
+                    ++ix;
+                } else {
+                    LOG(DEBUG) << "config -- invalid setting results.";
+                    break;
+                }
             }
         }
         failures.resize(ix);
     }
     hidl_vec<uint8_t> outParams;
-    createParamsBlob(&outParams, c2params);
+    if (!createParamsBlob(&outParams, c2params)) {
+        LOG(DEBUG) << "config -- invalid output params.";
+    }
     _hidl_cb((Status)c2res, failures, outParams);
     return Void();
 }
@@ -117,7 +131,13 @@ Return<void> CachedConfigurable::querySupportedParams(
     size_t dstIx = 0;
     for (size_t srcIx = request.offset(); srcIx < request.endOffset(); ++srcIx) {
         if (mSupportedParams[srcIx]) {
-            objcpy(&params[dstIx++], *mSupportedParams[srcIx]);
+            if (objcpy(&params[dstIx], *mSupportedParams[srcIx])) {
+                ++dstIx;
+            } else {
+                res = Status::CORRUPTED;
+                LOG(WARNING) << "querySupportedParams -- invalid output params.";
+                break;
+            }
         } else {
             res = Status::BAD_INDEX;
         }
@@ -154,7 +174,14 @@ Return<void> CachedConfigurable::querySupportedValues(
     {
         size_t ix = 0;
         for (const C2FieldSupportedValuesQuery &result : c2fields) {
-            objcpy(&outFields[ix++], result);
+            if (!objcpy(&outFields[ix], result)) {
+                ++ix;
+            } else {
+                outFields.resize(ix);
+                c2res = C2_CORRUPTED;
+                LOG(WARNING) << "querySupportedValues -- invalid output params.";
+                break;
+            }
         }
     }
     _hidl_cb((Status)c2res, outFields);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,14 +17,12 @@
 #ifndef CODEC2_HIDL_V1_0_UTILS_CONFIGURABLE_H
 #define CODEC2_HIDL_V1_0_UTILS_CONFIGURABLE_H
 
-#include <codec2/hidl/1.0/ConfigurableC2Intf.h>
+#include <android/hardware/media/c2/1.0/IConfigurable.h>
+#include <hidl/Status.h>
 
 #include <C2Component.h>
 #include <C2Param.h>
 #include <C2.h>
-
-#include <android/hardware/media/c2/1.0/IConfigurable.h>
-#include <hidl/Status.h>
 
 #include <memory>
 
@@ -35,9 +33,6 @@ namespace c2 {
 namespace V1_0 {
 namespace utils {
 
-using ::android::hardware::hidl_array;
-using ::android::hardware::hidl_memory;
-using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
@@ -46,12 +41,52 @@ using ::android::sp;
 struct ComponentStore;
 
 /**
+ * Codec2 objects of different types may have different querying and configuring
+ * functions, but across the Treble boundary, they share the same HIDL
+ * interface, IConfigurable.
+ *
+ * ConfigurableC2Intf is an abstract class that a Codec2 object can implement to
+ * easily expose an IConfigurable instance. See CachedConfigurable below.
+ */
+struct ConfigurableC2Intf {
+    C2String getName() const { return mName; }
+    uint32_t getId() const { return mId; }
+    /** C2ComponentInterface::query_vb sans stack params */
+    virtual c2_status_t query(
+            const std::vector<C2Param::Index> &indices,
+            c2_blocking_t mayBlock,
+            std::vector<std::unique_ptr<C2Param>>* const params) const = 0;
+    /** C2ComponentInterface::config_vb */
+    virtual c2_status_t config(
+            const std::vector<C2Param*> &params,
+            c2_blocking_t mayBlock,
+            std::vector<std::unique_ptr<C2SettingResult>>* const failures) = 0;
+    /** C2ComponentInterface::querySupportedParams_nb */
+    virtual c2_status_t querySupportedParams(
+            std::vector<std::shared_ptr<C2ParamDescriptor>>* const params) const = 0;
+    /** C2ComponentInterface::querySupportedParams_nb */
+    virtual c2_status_t querySupportedValues(
+            std::vector<C2FieldSupportedValuesQuery>& fields, c2_blocking_t mayBlock) const = 0;
+
+    virtual ~ConfigurableC2Intf() = default;
+
+    ConfigurableC2Intf(const C2String& name, uint32_t id)
+          : mName{name}, mId{id} {}
+
+protected:
+    C2String mName; /* cached component name */
+    uint32_t mId;
+};
+
+/**
  * Implementation of the IConfigurable interface that supports caching of
  * supported parameters from a supplied ComponentStore.
  *
- * This is mainly the same for all of the configurable C2 interfaces though
- * there are slight differences in the blocking behavior. This is handled in the
- * ConfigurableC2Intf implementations.
+ * CachedConfigurable essentially converts a ConfigurableC2Intf into HIDL's
+ * IConfigurable. A Codec2 object generally implements ConfigurableC2Intf and
+ * passes the implementation to the constructor of CachedConfigurable.
+ *
+ * Note that caching happens
  */
 struct CachedConfigurable : public IConfigurable {
     CachedConfigurable(std::unique_ptr<ConfigurableC2Intf>&& intf);
@@ -59,6 +94,8 @@ struct CachedConfigurable : public IConfigurable {
     c2_status_t init(ComponentStore* store);
 
     // Methods from ::android::hardware::media::c2::V1_0::IConfigurable
+
+    virtual Return<uint32_t> getId() override;
 
     virtual Return<void> getName(getName_cb _hidl_cb) override;
 
@@ -90,63 +127,6 @@ protected:
     std::vector<std::shared_ptr<C2ParamDescriptor>> mSupportedParams;
 };
 
-/**
- * Template that implements the `IConfigurable` interface for an inherited
- * interface. Classes that implement a child interface `I` of `IConfigurable`
- * can derive from `Configurable<I>`.
- */
-template <typename I>
-struct Configurable : public I {
-    Configurable(const sp<CachedConfigurable>& intf): mIntf(intf) {
-    }
-
-    c2_status_t init(ComponentStore* store) {
-        return mIntf->init(store);
-    }
-
-    // Methods from ::android::hardware::media::c2::V1_0::IConfigurable
-
-    using getName_cb = typename I::getName_cb;
-    virtual Return<void> getName(getName_cb _hidl_cb) override {
-        return mIntf->getName(_hidl_cb);
-    }
-
-    using query_cb = typename I::query_cb;
-    virtual Return<void> query(
-            const hidl_vec<uint32_t>& indices,
-            bool mayBlock,
-            query_cb _hidl_cb) override {
-        return mIntf->query(indices, mayBlock, _hidl_cb);
-    }
-
-    using config_cb = typename I::config_cb;
-    virtual Return<void> config(
-            const hidl_vec<uint8_t>& inParams,
-            bool mayBlock,
-            config_cb _hidl_cb) override {
-        return mIntf->config(inParams, mayBlock, _hidl_cb);
-    }
-
-    using querySupportedParams_cb = typename I::querySupportedParams_cb;
-    virtual Return<void> querySupportedParams(
-            uint32_t start,
-            uint32_t count,
-            querySupportedParams_cb _hidl_cb) override {
-        return mIntf->querySupportedParams(start, count, _hidl_cb);
-    }
-
-    using querySupportedValues_cb = typename I::querySupportedValues_cb;
-    virtual Return<void> querySupportedValues(
-            const hidl_vec<FieldSupportedValuesQuery>& inFields,
-            bool mayBlock,
-            querySupportedValues_cb _hidl_cb) override {
-        return mIntf->querySupportedValues(inFields, mayBlock, _hidl_cb);
-    }
-
-protected:
-    sp<CachedConfigurable> mIntf;
-};
-
 }  // namespace utils
 }  // namespace V1_0
 }  // namespace c2
@@ -155,3 +135,4 @@ protected:
 }  // namespace android
 
 #endif  // CODEC2_HIDL_V1_0_UTILS_CONFIGURABLE_H
+

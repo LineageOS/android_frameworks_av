@@ -8,8 +8,10 @@ cc_library {
 
     srcs: [
         "Component.cpp",
+        "ComponentInterface.cpp",
         "ComponentStore.cpp",
         "Configurable.cpp",
+        "InputBufferManager.cpp",
         "InputSurface.cpp",
         "InputSurfaceConnection.cpp",
         "types.cpp",

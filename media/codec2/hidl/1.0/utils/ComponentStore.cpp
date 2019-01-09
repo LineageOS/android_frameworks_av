@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,37 +16,25 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "Codec2-ComponentStore"
-#include <log/log.h>
+#include <android-base/logging.h>
 
 #include <codec2/hidl/1.0/ComponentStore.h>
 #include <codec2/hidl/1.0/InputSurface.h>
-#include <codec2/hidl/1.0/Component.h>
-#include <codec2/hidl/1.0/ConfigurableC2Intf.h>
 #include <codec2/hidl/1.0/types.h>
 
+#include <android-base/file.h>
 #include <media/stagefright/bqhelper/WGraphicBufferProducer.h>
 #include <media/stagefright/bqhelper/GraphicBufferSource.h>
+#include <utils/Errors.h>
 
 #include <C2PlatformSupport.h>
 #include <util/C2InterfaceHelper.h>
 
-#include <utils/Errors.h>
-
-#include <android-base/file.h>
-
-#ifdef LOG
-#undef LOG
-#endif
-
-#ifdef PLOG
-#undef PLOG
-#endif
-
-#include <android-base/logging.h>
-
+#include <chrono>
+#include <ctime>
+#include <iomanip>
 #include <ostream>
 #include <sstream>
-#include <iomanip>
 
 namespace android {
 namespace hardware {
@@ -62,12 +50,12 @@ using namespace ::android::hardware::media::bufferpool::V2_0::implementation;
 namespace /* unnamed */ {
 
 struct StoreIntf : public ConfigurableC2Intf {
-    StoreIntf(const std::shared_ptr<C2ComponentStore>& store) :
-        ConfigurableC2Intf(store ? store->getName() : ""),
-        mStore(store) {
+    StoreIntf(const std::shared_ptr<C2ComponentStore>& store)
+          : ConfigurableC2Intf{store ? store->getName() : "", 0},
+            mStore{store} {
     }
 
-    c2_status_t config(
+    virtual c2_status_t config(
             const std::vector<C2Param*> &params,
             c2_blocking_t mayBlock,
             std::vector<std::unique_ptr<C2SettingResult>> *const failures
@@ -80,7 +68,7 @@ struct StoreIntf : public ConfigurableC2Intf {
         return mStore->config_sm(params, failures);
     }
 
-    c2_status_t query(
+    virtual c2_status_t query(
             const std::vector<C2Param::Index> &indices,
             c2_blocking_t mayBlock,
             std::vector<std::unique_ptr<C2Param>> *const params) const override {
@@ -92,13 +80,13 @@ struct StoreIntf : public ConfigurableC2Intf {
         return mStore->query_sm({}, indices, params);
     }
 
-    c2_status_t querySupportedParams(
+    virtual c2_status_t querySupportedParams(
             std::vector<std::shared_ptr<C2ParamDescriptor>> *const params
             ) const override {
         return mStore->querySupportedParams_nb(params);
     }
 
-    c2_status_t querySupportedValues(
+    virtual c2_status_t querySupportedValues(
             std::vector<C2FieldSupportedValuesQuery> &fields,
             c2_blocking_t mayBlock) const override {
         // Assume all params are blocking
@@ -115,9 +103,9 @@ protected:
 
 } // unnamed namespace
 
-ComponentStore::ComponentStore(const std::shared_ptr<C2ComponentStore>& store) :
-    Configurable(new CachedConfigurable(std::make_unique<StoreIntf>(store))),
-    mStore(store) {
+ComponentStore::ComponentStore(const std::shared_ptr<C2ComponentStore>& store)
+      : mConfigurable{new CachedConfigurable(std::make_unique<StoreIntf>(store))},
+        mStore{store} {
 
     std::shared_ptr<C2ComponentStore> platformStore = android::GetCodec2PlatformComponentStore();
     SetPreferredCodec2ComponentStore(store);
@@ -126,7 +114,11 @@ ComponentStore::ComponentStore(const std::shared_ptr<C2ComponentStore>& store) :
     mParamReflector = mStore->getParamReflector();
 
     // Retrieve supported parameters from store
-    mInit = init(this);
+    mInit = mConfigurable->init(this);
+}
+
+c2_status_t ComponentStore::status() const {
+    return mInit;
 }
 
 c2_status_t ComponentStore::validateSupportedParams(
@@ -172,19 +164,15 @@ Return<void> ComponentStore::createComponent(
         component = new Component(c2component, listener, this, pool);
         if (!component) {
             status = Status::CORRUPTED;
-        } else if (component->status() != C2_OK) {
-            status = static_cast<Status>(component->status());
         } else {
-            component->initListener(component);
+            reportComponentBirth(component.get());
             if (component->status() != C2_OK) {
                 status = static_cast<Status>(component->status());
             } else {
-                std::lock_guard<std::mutex> lock(mComponentRosterMutex);
-                component->setLocalId(
-                        mComponentRoster.emplace(
-                            Component::InterfaceKey(component),
-                            c2component)
-                        .first);
+                component->initListener(component);
+                if (component->status() != C2_OK) {
+                    status = static_cast<Status>(component->status());
+                }
             }
         }
     }
@@ -202,7 +190,7 @@ Return<void> ComponentStore::createInterface(
         onInterfaceLoaded(c2interface);
         interface = new ComponentInterface(c2interface, this);
     }
-    _hidl_cb((Status)res, interface);
+    _hidl_cb(static_cast<Status>(res), interface);
     return Void();
 }
 
@@ -213,27 +201,35 @@ Return<void> ComponentStore::listComponents(listComponents_cb _hidl_cb) {
     size_t ix = 0;
     for (const std::shared_ptr<const C2Component::Traits> &c2trait : c2traits) {
         if (c2trait) {
-            objcpy(&traits[ix++], *c2trait);
+            if (objcpy(&traits[ix], *c2trait)) {
+                ++ix;
+            } else {
+                break;
+            }
         }
     }
     traits.resize(ix);
-    _hidl_cb(traits);
+    _hidl_cb(Status::OK, traits);
     return Void();
 }
 
-Return<sp<IInputSurface>> ComponentStore::createInputSurface() {
+Return<void> ComponentStore::createInputSurface(createInputSurface_cb _hidl_cb) {
     sp<GraphicBufferSource> source = new GraphicBufferSource();
     if (source->initCheck() != OK) {
-        return nullptr;
+        _hidl_cb(Status::CORRUPTED, nullptr);
+        return Void();
     }
     typedef ::android::hardware::graphics::bufferqueue::V1_0::
             IGraphicBufferProducer HGbp;
     typedef ::android::TWGraphicBufferProducer<HGbp> B2HGbp;
-    return new InputSurface(
+    sp<InputSurface> inputSurface = new InputSurface(
             this,
             std::make_shared<C2ReflectorHelper>(),
             new B2HGbp(source->getIGraphicBufferProducer()),
             source);
+    _hidl_cb(inputSurface ? Status::OK : Status::NO_MEMORY,
+             inputSurface);
+    return Void();
 }
 
 void ComponentStore::onInterfaceLoaded(const std::shared_ptr<C2ComponentInterface> &intf) {
@@ -265,15 +261,25 @@ Return<void> ComponentStore::getStructDescriptors(
                     mUnsupportedStructDescriptors.emplace(coreIndex);
                 } else {
                     mStructDescriptors.insert({ coreIndex, structDesc });
-                    objcpy(&descriptors[dstIx++], *structDesc);
-                    continue;
+                    if (objcpy(&descriptors[dstIx], *structDesc)) {
+                        ++dstIx;
+                        continue;
+                    }
+                    res = Status::CORRUPTED;
+                    break;
                 }
             }
             res = Status::NOT_FOUND;
         } else if (item->second) {
-            objcpy(&descriptors[dstIx++], *item->second);
+            if (objcpy(&descriptors[dstIx], *item->second)) {
+                ++dstIx;
+                continue;
+            }
+            res = Status::CORRUPTED;
+            break;
         } else {
             res = Status::NO_MEMORY;
+            break;
         }
     }
     descriptors.resize(dstIx);
@@ -292,29 +298,29 @@ Return<Status> ComponentStore::copyBuffer(const Buffer& src, const Buffer& dst) 
     return Status::OMITTED;
 }
 
-void ComponentStore::reportComponentDeath(
-        const Component::LocalId& componentLocalId) {
-    std::lock_guard<std::mutex> lock(mComponentRosterMutex);
-    mComponentRoster.erase(componentLocalId);
+Return<sp<IConfigurable>> ComponentStore::getConfigurable() {
+    return mConfigurable;
 }
 
-std::shared_ptr<C2Component> ComponentStore::findC2Component(
-        const sp<IComponent>& component) const {
+// Called from createComponent() after a successful creation of `component`.
+void ComponentStore::reportComponentBirth(Component* component) {
+    ComponentStatus componentStatus;
+    componentStatus.c2Component = component->mComponent;
+    componentStatus.birthTime = std::chrono::system_clock::now();
+
     std::lock_guard<std::mutex> lock(mComponentRosterMutex);
-    Component::LocalId it = mComponentRoster.find(
-            Component::InterfaceKey(component));
-    if (it == mComponentRoster.end()) {
-        return std::shared_ptr<C2Component>();
-    }
-    return it->second.lock();
+    mComponentRoster.emplace(component, componentStatus);
 }
 
-// Debug dump
+// Called from within the destructor of `component`. No virtual function calls
+// are made on `component` here.
+void ComponentStore::reportComponentDeath(Component* component) {
+    std::lock_guard<std::mutex> lock(mComponentRosterMutex);
+    mComponentRoster.erase(component);
+}
 
-namespace /* unnamed */ {
-
-// Dump component traits
-std::ostream& dump(
+// Dumps component traits.
+std::ostream& ComponentStore::dump(
         std::ostream& out,
         const std::shared_ptr<const C2Component::Traits>& comp) {
 
@@ -334,25 +340,38 @@ std::ostream& dump(
     return out;
 }
 
-// Dump component
-std::ostream& dump(
+// Dumps component status.
+std::ostream& ComponentStore::dump(
         std::ostream& out,
-        const std::shared_ptr<C2Component>& comp) {
+        ComponentStatus& compStatus) {
 
     constexpr const char indent[] = "    ";
 
-    std::shared_ptr<C2ComponentInterface> intf = comp->intf();
+    // Print birth time.
+    std::chrono::milliseconds ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                compStatus.birthTime.time_since_epoch());
+    std::time_t birthTime = std::chrono::system_clock::to_time_t(
+            compStatus.birthTime);
+    std::tm tm = *std::localtime(&birthTime);
+    out << indent << "Creation time: "
+        << std::put_time(&tm, "%Y-%m-%d %H:%M:%S")
+        << '.' << std::setfill('0') << std::setw(3) << ms.count() % 1000
+        << std::endl;
+
+    // Print name and id.
+    std::shared_ptr<C2ComponentInterface> intf = compStatus.c2Component->intf();
     if (!intf) {
-        out << indent << "Unknown -- null interface" << std::endl;
+        out << indent << "Unknown component -- null interface" << std::endl;
         return out;
     }
-    out << indent << "name: " << intf->getName() << std::endl;
-    out << indent << "id: " << intf->getId() << std::endl;
+    out << indent << "Name: " << intf->getName() << std::endl;
+    out << indent << "Id: " << intf->getId() << std::endl;
+
     return out;
 }
 
-} // unnamed namespace
-
+// Dumps information when lshal is called.
 Return<void> ComponentStore::debug(
         const hidl_handle& handle,
         const hidl_vec<hidl_string>& /* args */) {
@@ -387,31 +406,16 @@ Return<void> ComponentStore::debug(
             }
         }
 
-        // Retrieve the list of active components.
-        std::list<std::shared_ptr<C2Component>> activeComps;
-        {
-            std::lock_guard<std::mutex> lock(mComponentRosterMutex);
-            auto i = mComponentRoster.begin();
-            while (i != mComponentRoster.end()) {
-                std::shared_ptr<C2Component> c2comp = i->second.lock();
-                if (!c2comp) {
-                    auto j = i;
-                    ++i;
-                    mComponentRoster.erase(j);
-                } else {
-                    ++i;
-                    activeComps.emplace_back(c2comp);
-                }
-            }
-        }
-
         // Dump active components.
-        out << indent << "Active components:" << std::endl << std::endl;
-        if (activeComps.size() == 0) {
-            out << indent << indent << "NONE" << std::endl << std::endl;
-        } else {
-            for (const std::shared_ptr<C2Component>& c2comp : activeComps) {
-                dump(out, c2comp) << std::endl;
+        {
+            out << indent << "Active components:" << std::endl << std::endl;
+            std::lock_guard<std::mutex> lock(mComponentRosterMutex);
+            if (mComponentRoster.size() == 0) {
+                out << indent << indent << "NONE" << std::endl << std::endl;
+            } else {
+                for (auto& pair : mComponentRoster) {
+                    dump(out, pair.second) << std::endl;
+                }
             }
         }
 
