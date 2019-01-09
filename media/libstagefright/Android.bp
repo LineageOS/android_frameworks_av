@@ -267,6 +267,7 @@ cc_library {
         "RemoteMediaSource.cpp",
         "SimpleDecodingSource.cpp",
         "StagefrightMediaScanner.cpp",
+        "SurfaceMediaSource.cpp",
         "SurfaceUtils.cpp",
         "ThrottledSource.cpp",
         "Utils.cpp",
