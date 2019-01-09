@@ -19,6 +19,7 @@
 #include <inttypes.h>
 
 #include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/SurfaceMediaSource.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
@@ -387,6 +388,12 @@ void SurfaceMediaSource::signalBufferReturned(MediaBufferBase *buffer) {
     Mutex::Autolock lock(mMutex);
 
     buffer_handle_t bufferHandle = getMediaBufferHandle(buffer);
+
+        ALOGI("Buffer handle %p", bufferHandle);
+        ALOGI("Buffer handle hexdump:");
+        hexdump(bufferHandle, sizeof(ANativeWindowBuffer*));
+        ALOGI("Buffer hexdump:");
+        hexdump(buffer->data(), buffer->size());
 
     for (size_t i = 0; i < mCurrentBuffers.size(); i++) {
         if (mCurrentBuffers[i]->handle == bufferHandle) {

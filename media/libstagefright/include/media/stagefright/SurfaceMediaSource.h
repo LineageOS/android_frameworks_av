@@ -55,7 +55,7 @@ class GraphicBuffer;
 // may be dropped.  It is possible to wait for the buffers to be
 // returned (but not implemented)
 
-#define DEBUG_PENDING_BUFFERS   0
+#define DEBUG_PENDING_BUFFERS   1
 
 class SurfaceMediaSource : public MediaSource,
                                 public MediaBufferObserver,

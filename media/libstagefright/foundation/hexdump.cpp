@@ -18,10 +18,9 @@
 #define LOG_TAG "hexdump"
 #include <utils/Log.h>
 
-#include "hexdump.h"
-
-#include "ADebug.h"
-#include "AString.h"
+#include <media/stagefright/foundation/hexdump.h>
+#include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/foundation/AString.h>
 
 #include <ctype.h>
 #include <stdint.h>

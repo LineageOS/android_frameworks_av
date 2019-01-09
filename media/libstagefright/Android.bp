@@ -108,6 +108,7 @@ cc_library_shared {
         "FileSource.cpp",
         "FrameDecoder.cpp",
         "HTTPBase.cpp",
+        "foundation/hexdump.cpp",
         "HevcUtils.cpp",
         "InterfaceUtils.cpp",
         "JPEGSource.cpp",
