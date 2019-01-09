@@ -167,6 +167,7 @@ cc_library {
         "StagefrightMediaScanner.cpp",
         "StagefrightMetadataRetriever.cpp",
         "StagefrightPluginLoader.cpp",
+        "SurfaceMediaSource.cpp",
         "SurfaceUtils.cpp",
         "Utils.cpp",
         "ThrottledSource.cpp",
