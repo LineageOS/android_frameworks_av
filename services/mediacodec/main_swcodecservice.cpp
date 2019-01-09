@@ -20,11 +20,7 @@
 // from LOCAL_C_INCLUDES
 #include "minijail.h"
 
-#include <android-base/properties.h>
-#include <binder/ProcessState.h>
-#include <dlfcn.h>
 #include <hidl/HidlTransportSupport.h>
-#include <media/CodecServiceRegistrant.h>
 
 #include "MediaCodecUpdateService.h"
 
@@ -49,32 +45,10 @@ int main(int argc __unused, char** /*argv*/)
     signal(SIGPIPE, SIG_IGN);
     SetUpMinijail(kSystemSeccompPolicyPath, kVendorSeccompPolicyPath);
 
-    std::string value = base::GetProperty("ro.build.type", "unknown");
-    if (value == "userdebug" || value == "eng") {
-        media::MediaCodecUpdateService::instantiate();
-    }
-
-    android::ProcessState::self()->startThreadPool();
-
     ::android::hardware::configureRpcThreadpool(64, false);
 
-    // Registration of customized codec services
-    void *registrantLib = dlopen(
-            "libmedia_codecserviceregistrant.so",
-            RTLD_NOW | RTLD_LOCAL);
-    if (registrantLib) {
-        RegisterCodecServicesFunc registerCodecServices =
-                reinterpret_cast<RegisterCodecServicesFunc>(
-                dlsym(registrantLib, "RegisterCodecServices"));
-        if (registerCodecServices) {
-            registerCodecServices();
-        } else {
-            LOG(WARNING) << "Cannot register codec services "
-                    "-- corrupted library.";
-        }
-    } else {
-        LOG(ERROR) << "Cannot find codec service registrant.";
-    }
+    // codec libs are currently 32-bit only
+    loadFromApex("/apex/com.android.media.swcodec/lib");
 
     ::android::hardware::joinRpcThreadpool();
 }

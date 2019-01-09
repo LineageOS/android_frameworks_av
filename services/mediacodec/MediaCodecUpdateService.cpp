@@ -18,14 +18,10 @@
 //#define LOG_NDEBUG 0
 
 #include <android/dlext.h>
-#include <android-base/logging.h>
-#include <android-base/strings.h>
-#include <dirent.h>
 #include <dlfcn.h>
 #include <media/CodecServiceRegistrant.h>
 #include <utils/Log.h>
-#include <ziparchive/zip_archive.h>
-#include <cutils/properties.h>
+#include <utils/String8.h>
 
 #include "MediaCodecUpdateService.h"
 
@@ -47,90 +43,53 @@ extern "C" {
 }
 
 namespace android {
-namespace media {
 
-binder::Status MediaCodecUpdateService::loadPlugins(const ::std::string& apkPath) {
-    ALOGV("loadPlugins %s", apkPath.c_str());
+void loadFromApex(const char *libDirPath) {
+    ALOGV("loadFromApex: path=%s", libDirPath);
 
-    ZipArchiveHandle zipHandle;
-    void *registrantLib = NULL;
-    int32_t ret = OpenArchive(apkPath.c_str(), &zipHandle);
+    String8 libPath = String8(libDirPath) + "/libmedia_codecserviceregistrant.so";
 
-    if (ret == 0) {
-        char abilist32[PROPERTY_VALUE_MAX];
-        property_get("ro.product.cpu.abilist32", abilist32, "armeabi-v7a");
+    android_namespace_t *codecNs = android_create_namespace("codecs",
+            nullptr,  // ld_library_path
+            libDirPath,
+            ANDROID_NAMESPACE_TYPE_ISOLATED,
+            nullptr,  // permitted_when_isolated_path
+            nullptr); // parent
 
-        auto abis = base::Split(abilist32, ",");
-        if (abis.empty()) {
-            ALOGW("abilist is empty, trying armeabi-v7a ...");
-            abis.push_back("armeabi-v7a");
-        }
-
-        // TODO: Only try the first entry in abilist32 for now.
-        // We probably should try the next if it fails.
-        String8 libPathInApk = String8("lib/") + String8(abis[0].c_str());
-        String8 defaultLibPath = String8(apkPath.c_str()) + "!/" + libPathInApk;
-        String8 libPath = defaultLibPath + "/libmedia_codecserviceregistrant.so";
-        String8 zipEntryPath = libPathInApk + "/libmedia_codecserviceregistrant.so";
-
-        ZipEntry entry;
-        ret = FindEntry(zipHandle, ZipString(zipEntryPath), &entry);
-
-        if (ret == 0) {
-            android_namespace_t *codecNs = android_create_namespace("codecs",
-                    nullptr,  // ld_library_path
-                    defaultLibPath.c_str(),
-                    ANDROID_NAMESPACE_TYPE_ISOLATED,
-                    nullptr,  // permitted_when_isolated_path
-                    nullptr); // parent
-
-            if (codecNs != nullptr) {
-                String8 linked_libraries(LINKED_LIBRARIES);
-                if (android_link_namespaces(
-                        codecNs, nullptr, linked_libraries.c_str())) {
-                    const android_dlextinfo dlextinfo = {
-                            .flags = ANDROID_DLEXT_USE_NAMESPACE,
-                            .library_namespace = codecNs,
-                    };
-
-                    registrantLib = android_dlopen_ext(
-                            libPath.string(),
-                            RTLD_NOW | RTLD_LOCAL, &dlextinfo);
-
-                    if (registrantLib == NULL) {
-                        ALOGE("Failed to load lib from archive: %s", dlerror());
-                    }
-                } else {
-                    ALOGE("Failed to link namespace");
-                }
-            } else {
-                ALOGE("Failed to create codec namespace");
-            }
-        } else {
-            ALOGE("Failed to find entry (ret=%d)", ret);
-        }
-
-        CloseArchive(zipHandle);
-    } else {
-        ALOGE("Failed to open archive (ret=%d)", ret);
+    if (codecNs == nullptr) {
+        ALOGE("Failed to create codec namespace");
+        return;
     }
 
-    if (registrantLib) {
-        RegisterCodecServicesFunc registerCodecServices =
-                reinterpret_cast<RegisterCodecServicesFunc>(
-                dlsym(registrantLib, "RegisterCodecServices"));
-        if (registerCodecServices) {
-            registerCodecServices();
-        } else {
-            LOG(WARNING) << "Cannot register codec services "
-                    "-- corrupted library.";
-        }
-    } else {
-        LOG(ERROR) << "Cannot find codec service registrant.";
+    String8 linked_libraries(LINKED_LIBRARIES);
+    if (!android_link_namespaces(codecNs, nullptr, linked_libraries.c_str())) {
+        ALOGE("Failed to link namespace");
+        return;
     }
 
-    return binder::Status::ok();
+    const android_dlextinfo dlextinfo = {
+            .flags = ANDROID_DLEXT_USE_NAMESPACE,
+            .library_namespace = codecNs,
+    };
+
+    void *registrantLib = android_dlopen_ext(
+            libPath.string(),
+            RTLD_NOW | RTLD_LOCAL, &dlextinfo);
+
+    if (registrantLib == nullptr) {
+        ALOGE("Failed to load lib from archive: %s", dlerror());
+    }
+
+    RegisterCodecServicesFunc registerCodecServices =
+            reinterpret_cast<RegisterCodecServicesFunc>(
+            dlsym(registrantLib, "RegisterCodecServices"));
+
+    if (registerCodecServices == nullptr) {
+        ALOGE("Cannot register codec services -- corrupted library.");
+        return;
+    }
+
+    registerCodecServices();
 }
 
-}   // namespace media
 }   // namespace android
