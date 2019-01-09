@@ -662,33 +662,6 @@ status_t NuPlayer2Driver::getParameter(int key, Parcel *reply) {
     return INVALID_OPERATION;
 }
 
-status_t NuPlayer2Driver::getMetadata(
-        const media::Metadata::Filter& /* ids */, Parcel *records) {
-    Mutex::Autolock autoLock(mLock);
-
-    using media::Metadata;
-
-    Metadata meta(records);
-
-    meta.appendBool(
-            Metadata::kPauseAvailable,
-            mPlayerFlags & NuPlayer2::Source::FLAG_CAN_PAUSE);
-
-    meta.appendBool(
-            Metadata::kSeekBackwardAvailable,
-            mPlayerFlags & NuPlayer2::Source::FLAG_CAN_SEEK_BACKWARD);
-
-    meta.appendBool(
-            Metadata::kSeekForwardAvailable,
-            mPlayerFlags & NuPlayer2::Source::FLAG_CAN_SEEK_FORWARD);
-
-    meta.appendBool(
-            Metadata::kSeekAvailable,
-            mPlayerFlags & NuPlayer2::Source::FLAG_CAN_SEEK);
-
-    return OK;
-}
-
 void NuPlayer2Driver::notifyResetComplete(int64_t /* srcId */) {
     ALOGD("notifyResetComplete(%p)", this);
     Mutex::Autolock autoLock(mLock);

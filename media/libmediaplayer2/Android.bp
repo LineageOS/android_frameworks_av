@@ -16,6 +16,7 @@ cc_library_static {
         "libandroid_runtime",
         "libaudioclient",
         "libbinder",
+        "libbinder_ndk",
         "libcutils",
         "libgui",
         "liblog",
