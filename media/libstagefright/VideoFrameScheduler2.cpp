@@ -36,7 +36,7 @@
 
 namespace android {
 
-static void getVsyncOffset(long* appVsyncOffsetPtr, long* sfVsyncOffsetPtr);
+static void getVsyncOffset(nsecs_t* appVsyncOffsetPtr, nsecs_t* sfVsyncOffsetPtr);
 
 /* ======================================================================= */
 /*                               VsyncTracker                              */
@@ -46,19 +46,19 @@ class VsyncTracker : public RefBase{
 public:
     VsyncTracker();
     ~VsyncTracker() {}
-    long getVsyncPeriod();
-    long getVsyncTime(long periodOffset);
-    void addSample(long timestamp);
+    nsecs_t getVsyncPeriod();
+    nsecs_t getVsyncTime(nsecs_t periodOffset);
+    void addSample(nsecs_t timestamp);
 
 private:
     static const int kMaxSamples = 32;
     static const int kMinSamplesForUpdate = 6;
     int mNumSamples;
     int mFirstSample;
-    long mReferenceTime;
-    long mPhase;
-    long mPeriod;
-    long mTimestampSamples[kMaxSamples];
+    nsecs_t mReferenceTime;
+    nsecs_t mPhase;
+    nsecs_t mPeriod;
+    nsecs_t mTimestampSamples[kMaxSamples];
     Mutex mLock;
 
     void updateModelLocked();
@@ -75,19 +75,39 @@ VsyncTracker::VsyncTracker()
     }
 }
 
-long VsyncTracker::getVsyncPeriod() {
+nsecs_t VsyncTracker::getVsyncPeriod() {
     Mutex::Autolock dataLock(mLock);
     return mPeriod;
 }
 
-long VsyncTracker::getVsyncTime(long periodOffset) {
+nsecs_t VsyncTracker::getVsyncTime(nsecs_t periodOffset) {
     Mutex::Autolock dataLock(mLock);
-    const long now = systemTime();
-    long phase = mReferenceTime + mPhase;
-    return (((now - phase) / mPeriod) + periodOffset + 1) * mPeriod + phase;
+    const nsecs_t now = systemTime();
+    nsecs_t phase = mReferenceTime + mPhase;
+
+    // result = (((now - phase) / mPeriod) + periodOffset + 1) * mPeriod + phase
+    // prevent overflow
+    nsecs_t result = (now - phase) / mPeriod;
+    if (result > LONG_LONG_MAX - periodOffset - 1) {
+        return LONG_LONG_MAX;
+    } else {
+        result += periodOffset + 1;
+    }
+    if (result > LONG_LONG_MAX / mPeriod) {
+        return LONG_LONG_MAX;
+    } else {
+        result *= mPeriod;
+    }
+    if (result > LONG_LONG_MAX - phase) {
+        return LONG_LONG_MAX;
+    } else {
+        result += phase;
+    }
+
+    return result;
 }
 
-void VsyncTracker::addSample(long timestamp) {
+void VsyncTracker::addSample(nsecs_t timestamp) {
     Mutex::Autolock dataLock(mLock);
     if (mNumSamples == 0) {
         mPhase = 0;
@@ -107,17 +127,17 @@ void VsyncTracker::updateModelLocked() {
     if (mNumSamples < kMinSamplesForUpdate) {
         return;
     }
-    long durationSum = 0;
-    long minDuration = LONG_MAX;
-    long maxDuration = 0;
+    nsecs_t durationSum = 0;
+    nsecs_t minDuration = LONG_MAX;
+    nsecs_t maxDuration = 0;
 
     for (int i = 1; i < mNumSamples; i++) {
         int idx = (mFirstSample + i) % kMaxSamples;
         int prev = (idx + kMaxSamples - 1) % kMaxSamples;
         long duration = mTimestampSamples[idx] - mTimestampSamples[prev];
         durationSum += duration;
-        minDuration = min(minDuration, duration);
-        maxDuration = max(maxDuration, duration);
+        if (minDuration > duration) { minDuration = duration; }
+        if (maxDuration < duration) { maxDuration = duration; }
     }
 
     durationSum -= (minDuration + maxDuration);
@@ -154,9 +174,9 @@ static void frameCallback(long frameTimeNanos, void* data) {
 /*                                   JNI                                   */
 /* ======================================================================= */
 
-static void getVsyncOffset(long* appVsyncOffsetPtr, long* sfVsyncOffsetPtr) {
-    static const long kOneMillisecInNanosec = 1000000;
-    static const long kOneSecInNanosec = kOneMillisecInNanosec * 1000;
+static void getVsyncOffset(nsecs_t* appVsyncOffsetPtr, nsecs_t* sfVsyncOffsetPtr) {
+    static const nsecs_t kOneMillisecInNanosec = 1000000;
+    static const nsecs_t kOneSecInNanosec = kOneMillisecInNanosec * 1000;
 
     JNIEnv *env = JavaVMHelper::getJNIEnv();
     jclass jDisplayManagerGlobalCls = env->FindClass(
@@ -178,19 +198,19 @@ static void getVsyncOffset(long* appVsyncOffsetPtr, long* sfVsyncOffsetPtr) {
 
     jmethodID jGetRefreshRate = env->GetMethodID(jDisplayCls, "getRefreshRate", "()F");
     jfloat javaRefreshRate = env->CallFloatMethod(javaDisplayObj, jGetRefreshRate);
-    long vsyncPeriod = (long) (kOneSecInNanosec / (float) javaRefreshRate);
+    nsecs_t vsyncPeriod = (nsecs_t) (kOneSecInNanosec / (float) javaRefreshRate);
 
     jmethodID jGetAppVsyncOffsetNanos = env->GetMethodID(
             jDisplayCls, "getAppVsyncOffsetNanos", "()J");
     jlong javaAppVsyncOffset = env->CallLongMethod(javaDisplayObj, jGetAppVsyncOffsetNanos);
-    *appVsyncOffsetPtr = (long) javaAppVsyncOffset;
+    *appVsyncOffsetPtr = (nsecs_t) javaAppVsyncOffset;
 
     jmethodID jGetPresentationDeadlineNanos = env->GetMethodID(
             jDisplayCls, "getPresentationDeadlineNanos", "()J");
     jlong javaPresentationDeadline = env->CallLongMethod(
             javaDisplayObj, jGetPresentationDeadlineNanos);
 
-    *sfVsyncOffsetPtr = vsyncPeriod - ((long) javaPresentationDeadline - kOneMillisecInNanosec);
+    *sfVsyncOffsetPtr = vsyncPeriod - ((nsecs_t) javaPresentationDeadline - kOneMillisecInNanosec);
 }
 
 /* ======================================================================= */
