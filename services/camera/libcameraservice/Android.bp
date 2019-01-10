@@ -83,6 +83,7 @@ cc_library_shared {
         "libhidltransport",
         "libjpeg",
         "libmemunreachable",
+        "libsensorprivacy",
         "libstagefright_foundation",
         "android.frameworks.cameraservice.common@2.0",
         "android.frameworks.cameraservice.service@2.0",
@@ -100,6 +101,7 @@ cc_library_shared {
         "libbinder",
         "libcamera_client",
         "libfmq",
+        "libsensorprivacy",
     ],
 
     include_dirs: [
