@@ -59,6 +59,10 @@ sp<IDataSource> MediaExtractorService::makeIDataSource(int fd, int64_t offset, i
     return CreateIDataSourceFromDataSource(source);
 }
 
+std::unordered_set<std::string> MediaExtractorService::getSupportedTypes() {
+    return MediaExtractorFactory::getSupportedTypes();
+}
+
 status_t MediaExtractorService::dump(int fd, const Vector<String16>& args) {
     return MediaExtractorFactory::dump(fd, args) || dumpExtractors(fd, args);
 }

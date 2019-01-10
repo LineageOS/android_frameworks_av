@@ -1379,6 +1379,12 @@ static CreatorFunc Sniff(
     return CreateExtractor;
 }
 
+static const char *extensions[] = {
+    "oga",
+    "ogg",
+    NULL
+};
+
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
@@ -1388,7 +1394,7 @@ ExtractorDef GETEXTRACTORDEF() {
         UUID("8cc5cd06-f772-495e-8a62-cba9649374e9"),
         1, // version
         "Ogg Extractor",
-        { .v2 = Sniff }
+        { .v3 = {Sniff, extensions} },
     };
 }
 

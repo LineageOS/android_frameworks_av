@@ -135,8 +135,16 @@ struct ExtractorDef {
     const char *extractor_name;
 
     union {
-        SnifferFunc v2;
-    } sniff;
+        struct {
+            SnifferFunc sniff;
+        } v2;
+        struct {
+            SnifferFunc sniff;
+            // a NULL terminated list of container mime types and/or file extensions
+            // that this extractor supports
+            const char **supported_types;
+        } v3;
+    } u;
 };
 
 // the C++ based API which first shipped in P and is no longer supported
@@ -145,7 +153,10 @@ const uint32_t EXTRACTORDEF_VERSION_LEGACY = 1;
 // the first C/NDK based API
 const uint32_t EXTRACTORDEF_VERSION_NDK_V1 = 2;
 
-const uint32_t EXTRACTORDEF_VERSION = EXTRACTORDEF_VERSION_NDK_V1;
+// the second C/NDK based API
+const uint32_t EXTRACTORDEF_VERSION_NDK_V2 = 3;
+
+const uint32_t EXTRACTORDEF_VERSION = EXTRACTORDEF_VERSION_NDK_V2;
 
 // each plugin library exports one function of this type
 typedef ExtractorDef (*GetExtractorDef)();

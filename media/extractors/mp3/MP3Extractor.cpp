@@ -609,7 +609,7 @@ media_status_t MP3Extractor::getMetaData(AMediaFormat *meta) {
     if (mInitCheck != OK) {
         return AMEDIA_ERROR_UNKNOWN;
     }
-    AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, "audio/mpeg");
+    AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_MPEG);
 
     DataSourceHelper helper(mDataSource);
     ID3 id3(&helper);
@@ -707,6 +707,14 @@ static CreatorFunc Sniff(
     return CreateExtractor;
 }
 
+static const char *extensions[] = {
+    "mp3",
+    "mpeg",
+    "mpg",
+    "mpga",
+    NULL
+};
+
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
@@ -716,7 +724,7 @@ ExtractorDef GETEXTRACTORDEF() {
         UUID("812a3f6c-c8cf-46de-b529-3774b14103d4"),
         1, // version
         "MP3 Extractor",
-        { .v2 = Sniff }
+        { .v3 = {Sniff, extensions} }
     };
 }
 

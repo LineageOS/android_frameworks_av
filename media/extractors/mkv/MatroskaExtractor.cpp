@@ -1669,6 +1669,12 @@ bool SniffMatroska(
     return true;
 }
 
+static const char *extensions[] = {
+    "mka",
+    "mkv",
+    "webm",
+    NULL
+};
 
 extern "C" {
 // This is the only symbol that needs to be exported
@@ -1680,19 +1686,22 @@ ExtractorDef GETEXTRACTORDEF() {
         1,
         "Matroska Extractor",
         {
-            .v2 = [](
+            .v3 = {
+                [](
                     CDataSource *source,
                     float *confidence,
                     void **,
                     FreeMetaFunc *) -> CreatorFunc {
-                DataSourceHelper helper(source);
-                if (SniffMatroska(&helper, confidence)) {
-                    return [](
-                            CDataSource *source,
-                            void *) -> CMediaExtractor* {
-                        return wrap(new MatroskaExtractor(new DataSourceHelper(source)));};
-                }
-                return NULL;
+                    DataSourceHelper helper(source);
+                    if (SniffMatroska(&helper, confidence)) {
+                        return [](
+                                CDataSource *source,
+                                void *) -> CMediaExtractor* {
+                            return wrap(new MatroskaExtractor(new DataSourceHelper(source)));};
+                    }
+                    return NULL;
+                },
+                extensions
             }
         }
     };

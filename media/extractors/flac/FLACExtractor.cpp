@@ -822,6 +822,11 @@ bool SniffFLAC(DataSourceHelper *source, float *confidence)
     return true;
 }
 
+static const char *extensions[] = {
+    "flac",
+    "fl",
+    NULL
+};
 
 extern "C" {
 // This is the only symbol that needs to be exported
@@ -833,21 +838,24 @@ ExtractorDef GETEXTRACTORDEF() {
             1,
             "FLAC Extractor",
             {
-                .v2 = [](
+                .v3 = {
+                    [](
                         CDataSource *source,
                         float *confidence,
                         void **,
                         FreeMetaFunc *) -> CreatorFunc {
-                    DataSourceHelper helper(source);
-                    if (SniffFLAC(&helper, confidence)) {
-                        return [](
-                                CDataSource *source,
-                                void *) -> CMediaExtractor* {
-                            return wrap(new FLACExtractor(new DataSourceHelper(source)));};
-                    }
-                    return NULL;
+                        DataSourceHelper helper(source);
+                        if (SniffFLAC(&helper, confidence)) {
+                            return [](
+                                    CDataSource *source,
+                                    void *) -> CMediaExtractor* {
+                                return wrap(new FLACExtractor(new DataSourceHelper(source)));};
+                        }
+                        return NULL;
+                    },
+                    extensions
                 }
-            }
+            },
      };
 }
 

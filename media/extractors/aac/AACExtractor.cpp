@@ -377,6 +377,10 @@ static CreatorFunc Sniff(
     return NULL;
 }
 
+static const char *extensions[] = {
+    "aac",
+    NULL
+};
 
 extern "C" {
 // This is the only symbol that needs to be exported
@@ -387,7 +391,7 @@ ExtractorDef GETEXTRACTORDEF() {
         UUID("4fd80eae-03d2-4d72-9eb9-48fa6bb54613"),
         1, // version
         "AAC Extractor",
-        { .v2 = Sniff }
+        { .v3 = {Sniff, extensions} },
     };
 }
 
