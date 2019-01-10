@@ -24,7 +24,6 @@ cc_library_static {
     shared_libs: [
         "libcutils",
         "libhidlbase",
-        "libicuuc",
         "liblog",
         "libmedia",
         "libutils",
