@@ -5659,10 +5659,10 @@ media_status_t MPEG4Source::read(
             }
 
             if (isMalFormed) {
-                ALOGE("Video is malformed");
-                mBuffer->release();
-                mBuffer = NULL;
-                return AMEDIA_ERROR_MALFORMED;
+                //if nallength abnormal,ignore it.
+                ALOGW("abnormal nallength, ignore this NAL");
+                srcOffset = size;
+                break;
             }
 
             if (nalLength == 0) {
