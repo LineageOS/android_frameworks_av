@@ -26,12 +26,10 @@
 
 using namespace android;
 
-// TODO: replace policy with software codec-only policies
-// Must match location in Android.mk.
 static const char kSystemSeccompPolicyPath[] =
-        "/system/etc/seccomp_policy/mediacodec.policy";
+        "/system/etc/seccomp_policy/mediaswcodec.policy";
 static const char kVendorSeccompPolicyPath[] =
-        "/vendor/etc/seccomp_policy/mediacodec.policy";
+        "/vendor/etc/seccomp_policy/mediaswcodec.policy";
 
 // Disable Scudo's mismatch allocation check, as it is being triggered
 // by some third party code.
