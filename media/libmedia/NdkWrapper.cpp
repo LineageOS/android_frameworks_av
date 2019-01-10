@@ -1249,7 +1249,11 @@ sp<AMediaCodecCryptoInfoWrapper> AMediaExtractorWrapper::getSampleCryptoInfo() {
     if (mAMediaExtractor == NULL) {
         return NULL;
     }
-    return new AMediaCodecCryptoInfoWrapper(AMediaExtractor_getSampleCryptoInfo(mAMediaExtractor));
+    AMediaCodecCryptoInfo *cryptoInfo = AMediaExtractor_getSampleCryptoInfo(mAMediaExtractor);
+    if (cryptoInfo == NULL) {
+        return NULL;
+    }
+    return new AMediaCodecCryptoInfoWrapper(cryptoInfo);
 }
 
 AMediaDataSourceWrapper::AMediaDataSourceWrapper(const sp<DataSource> &dataSource)
