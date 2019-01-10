@@ -27,11 +27,17 @@ cc_library {
     },
 
     static: {
-        whole_static_libs: ["libFLAC"],
+        whole_static_libs: [
+            "libFLAC",
+            "libaudioutils",
+        ],
     },
 
     shared: {
-        static_libs: ["libFLAC"],
+        static_libs: [
+            "libFLAC",
+            "libaudioutils",
+        ],
     },
 
     shared_libs: [

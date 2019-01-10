@@ -1544,7 +1544,7 @@ int VirtualizerIsDeviceSupported(audio_devices_t deviceType) {
 int VirtualizerIsConfigurationSupported(audio_channel_mask_t channelMask,
         audio_devices_t deviceType) {
     uint32_t channelCount = audio_channel_count_from_out_mask(channelMask);
-    if (channelCount < 1 || channelCount > LVM_MAX_CHANNELS) {
+    if (channelCount < 1 || channelCount > FCC_2) { // TODO: update to 8 channels when supported.
         return -EINVAL;
     }
     return VirtualizerIsDeviceSupported(deviceType);

@@ -89,12 +89,12 @@ void SoftFlacDecoder::initPorts() {
     def.eDir = OMX_DirOutput;
     def.nBufferCountMin = kNumOutputBuffers;
     def.nBufferCountActual = def.nBufferCountMin;
-    def.nBufferSize = 4096 * FLACDecoder::kMaxChannels;
+    def.nBufferSize = kNumSamplesPerFrame * FLACDecoder::kMaxChannels * sizeof(float);
     def.bEnabled = OMX_TRUE;
     def.bPopulated = OMX_FALSE;
     def.eDomain = OMX_PortDomainAudio;
     def.bBuffersContiguous = OMX_FALSE;
-    def.nBufferAlignment = 2;
+    def.nBufferAlignment = sizeof(float);
 
     def.format.audio.cMIMEType = const_cast<char *>("audio/raw");
     def.format.audio.pNativeRender = NULL;
@@ -173,7 +173,7 @@ OMX_ERRORTYPE SoftFlacDecoder::internalGetParameter(
                 flacParams->nChannels = mStreamInfo.channels;
                 flacParams->nSampleRate = mStreamInfo.sample_rate;
             } else {
-                flacParams->nChannels = 1;
+                flacParams->nChannels = 2;
                 flacParams->nSampleRate = 44100;
             }
 
@@ -195,10 +195,10 @@ OMX_ERRORTYPE SoftFlacDecoder::internalGetParameter(
                 return OMX_ErrorBadPortIndex;
             }
 
-            pcmParams->eNumData = OMX_NumericalDataSigned;
+            pcmParams->eNumData = mNumericalData;
             pcmParams->eEndian = OMX_EndianBig;
             pcmParams->bInterleaved = OMX_TRUE;
-            pcmParams->nBitPerSample = 16;
+            pcmParams->nBitPerSample = mBitsPerSample;
             pcmParams->ePCMMode = OMX_AUDIO_PCMModeLinear;
             pcmParams->eChannelMapping[0] = OMX_AUDIO_ChannelLF;
             pcmParams->eChannelMapping[1] = OMX_AUDIO_ChannelRF;
@@ -211,7 +211,7 @@ OMX_ERRORTYPE SoftFlacDecoder::internalGetParameter(
                 pcmParams->nChannels = mStreamInfo.channels;
                 pcmParams->nSamplingRate = mStreamInfo.sample_rate;
             } else {
-                pcmParams->nChannels = 1;
+                pcmParams->nChannels = 2;
                 pcmParams->nSamplingRate = 44100;
             }
 
@@ -281,6 +281,19 @@ OMX_ERRORTYPE SoftFlacDecoder::internalSetParameter(
                 return OMX_ErrorBadPortIndex;
             }
 
+            if (pcmParams->eNumData == OMX_NumericalDataFloat && pcmParams->nBitPerSample == 32) {
+                mNumericalData = OMX_NumericalDataFloat;
+                mBitsPerSample = 32;
+            } else if (pcmParams->eNumData == OMX_NumericalDataSigned
+                     && pcmParams->nBitPerSample == 16) {
+                mNumericalData = OMX_NumericalDataSigned;
+                mBitsPerSample = 16;
+            } else {
+                ALOGE("Invalid eNumData %d, nBitsPerSample %d",
+                        pcmParams->eNumData, pcmParams->nBitPerSample);
+                return OMX_ErrorUndefined;
+            }
+
             return OMX_ErrorNone;
         }
 
@@ -301,11 +314,13 @@ void SoftFlacDecoder::onQueueFilled(OMX_U32 /* portIndex */) {
     List<BufferInfo *> &inQueue = getPortQueue(0);
     List<BufferInfo *> &outQueue = getPortQueue(1);
 
+    const bool outputFloat = mNumericalData == OMX_NumericalDataFloat;
+
     ALOGV("onQueueFilled %d/%d:", inQueue.empty(), outQueue.empty());
     while ((!inQueue.empty() || mSawInputEOS) && !outQueue.empty() && !mFinishedDecoder) {
         BufferInfo *outInfo = *outQueue.begin();
         OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
-        int16_t *outBuffer = reinterpret_cast<int16_t *>(outHeader->pBuffer + outHeader->nOffset);
+        void *outBuffer = reinterpret_cast<void *>(outHeader->pBuffer + outHeader->nOffset);
         size_t outBufferSize = outHeader->nAllocLen - outHeader->nOffset;
         int64_t timeStamp = 0;
 
@@ -374,7 +389,7 @@ void SoftFlacDecoder::onQueueFilled(OMX_U32 /* portIndex */) {
             }
 
             status_t decoderErr = mFLACDecoder->decodeOneFrame(
-                    inBuffer, inBufferLength, outBuffer, &outBufferSize);
+                    inBuffer, inBufferLength, outBuffer, &outBufferSize, outputFloat);
             if (decoderErr != OK) {
                 ALOGE("onQueueFilled: FLACDecoder decodeOneFrame returns error %d", decoderErr);
                 mSignalledError = true;
@@ -393,7 +408,9 @@ void SoftFlacDecoder::onQueueFilled(OMX_U32 /* portIndex */) {
                 continue;
             }
         } else if (mSawInputEOS) {
-            status_t decoderErr = mFLACDecoder->decodeOneFrame(NULL, 0, outBuffer, &outBufferSize);
+            status_t decoderErr = mFLACDecoder->decodeOneFrame(
+                    nullptr /* inBuffer */, 0 /* inBufferLen */,
+                    outBuffer, &outBufferSize, outputFloat);
             mFinishedDecoder = true;
             if (decoderErr != OK) {
                 ALOGE("onQueueFilled: FLACDecoder finish returns error %d", decoderErr);
@@ -456,7 +473,8 @@ void SoftFlacDecoder::onPortEnableCompleted(OMX_U32 portIndex, bool enabled) {
             mOutputPortSettingsChange = AWAITING_ENABLED;
             PortInfo *info = editPortInfo(1 /* portIndex */);
             if (!info->mDef.bEnabled) {
-                info->mDef.nBufferSize = mStreamInfo.max_blocksize * mStreamInfo.channels * 2;
+                info->mDef.nBufferSize =
+                        mStreamInfo.max_blocksize * mStreamInfo.channels * sizeof(float);
             }
             break;
         }

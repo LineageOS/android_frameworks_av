@@ -2183,7 +2183,8 @@ status_t ACodec::configureCodec(
             err = setupG711Codec(encoder, sampleRate, numChannels);
         }
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_FLAC)) {
-        int32_t numChannels = 0, sampleRate = 0, compressionLevel = -1;
+        // numChannels needs to be set to properly communicate PCM values.
+        int32_t numChannels = 2, sampleRate = 44100, compressionLevel = -1;
         if (encoder &&
                 (!msg->findInt32("channel-count", &numChannels)
                         || !msg->findInt32("sample-rate", &sampleRate))) {
@@ -2209,7 +2210,7 @@ status_t ACodec::configureCodec(
                 }
             }
             err = setupFlacCodec(
-                    encoder, numChannels, sampleRate, compressionLevel);
+                    encoder, numChannels, sampleRate, compressionLevel, pcmEncoding);
         }
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_RAW)) {
         int32_t numChannels, sampleRate;
@@ -3033,8 +3034,8 @@ status_t ACodec::setupG711Codec(bool encoder, int32_t sampleRate, int32_t numCha
 }
 
 status_t ACodec::setupFlacCodec(
-        bool encoder, int32_t numChannels, int32_t sampleRate, int32_t compressionLevel) {
-
+        bool encoder, int32_t numChannels, int32_t sampleRate, int32_t compressionLevel,
+        AudioEncoding encoding) {
     if (encoder) {
         OMX_AUDIO_PARAM_FLACTYPE def;
         InitOMXParams(&def);
@@ -3057,7 +3058,8 @@ status_t ACodec::setupFlacCodec(
     return setupRawAudioFormat(
             encoder ? kPortIndexInput : kPortIndexOutput,
             sampleRate,
-            numChannels);
+            numChannels,
+            encoding);
 }
 
 status_t ACodec::setupRawAudioFormat(
@@ -3115,6 +3117,7 @@ status_t ACodec::setupRawAudioFormat(
     pcmParams.ePCMMode = OMX_AUDIO_PCMModeLinear;
 
     if (getOMXChannelMapping(numChannels, pcmParams.eChannelMapping) != OK) {
+        ALOGE("%s: incorrect numChannels: %d", __func__, numChannels);
         return OMX_ErrorNone;
     }
 
