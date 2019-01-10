@@ -2714,6 +2714,8 @@ sp<IEffect> AudioFlinger::createEffect(
     }
 
     {
+        Mutex::Autolock _l(mLock);
+
         if (!EffectIsNullUuid(&pDesc->uuid)) {
             // if uuid is specified, request effect descriptor
             lStatus = EffectGetDescriptor(&pDesc->uuid, &desc);
@@ -2769,6 +2771,8 @@ sp<IEffect> AudioFlinger::createEffect(
                 desc = d;
             }
         }
+    }
+    {
 
         // Do not allow auxiliary effects on a session different from 0 (output mix)
         if (sessionId != AUDIO_SESSION_OUTPUT_MIX &&
