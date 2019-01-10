@@ -765,10 +765,7 @@ void SoundTriggerHwService::Module::onCallbackEvent(const sp<CallbackEvent>& eve
             }
 
             recognitionEvent->capture_session = model->mCaptureSession;
-            // Don't reset the model state if this recognition event is a get-state response
-            if (recognitionEvent->status != RECOGNITION_STATUS_GET_STATE_RESPONSE) {
-                model->mState = Model::STATE_IDLE;
-            }
+            model->mState = Model::STATE_IDLE;
             clients.add(model->mModuleClient);
         }
     } break;
