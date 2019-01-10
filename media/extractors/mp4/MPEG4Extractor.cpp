@@ -2101,9 +2101,10 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 return ERROR_MALFORMED;
             }
 
-            uint8_t buffer[256];
-            if (chunk_data_size > (off64_t)sizeof(buffer)) {
-                return ERROR_BUFFER_TOO_SMALL;
+            auto tmp = heapbuffer<uint8_t>(chunk_data_size);
+            uint8_t *buffer = tmp.get();
+            if (buffer == NULL) {
+                return -ENOMEM;
             }
 
             if (mDataSource->readAt(
