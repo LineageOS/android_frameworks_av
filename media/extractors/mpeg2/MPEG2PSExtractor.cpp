@@ -790,6 +790,7 @@ MPEG2PSExtractor::WrappedTrack::~WrappedTrack() {
 }
 
 media_status_t MPEG2PSExtractor::WrappedTrack::start() {
+    mTrack->mBufferGroup = mBufferGroup;
     return mTrack->start();
 }
 
