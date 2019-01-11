@@ -625,21 +625,21 @@ int64_t ATSParser::Program::recoverPTS(uint64_t PTS_33bit) {
     // reasonable amount of time. To handle the wrap-around, use fancy math
     // to get an extended PTS that is within [-0xffffffff, 0xffffffff]
     // of the latest recovered PTS.
-    if (mLastRecoveredPTS < 0ll) {
+    if (mLastRecoveredPTS < 0LL) {
         // Use the original 33bit number for 1st frame, the reason is that
         // if 1st frame wraps to negative that's far away from 0, we could
         // never start. Only start wrapping around from 2nd frame.
         mLastRecoveredPTS = static_cast<int64_t>(PTS_33bit);
     } else {
         mLastRecoveredPTS = static_cast<int64_t>(
-                ((mLastRecoveredPTS - static_cast<int64_t>(PTS_33bit) + 0x100000000ll)
+                ((mLastRecoveredPTS - static_cast<int64_t>(PTS_33bit) + 0x100000000LL)
                 & 0xfffffffe00000000ull) | PTS_33bit);
         // We start from 0, but recovered PTS could be slightly below 0.
         // Clamp it to 0 as rest of the pipeline doesn't take negative pts.
         // (eg. video is read first and starts at 0, but audio starts at 0xfffffff0)
-        if (mLastRecoveredPTS < 0ll) {
+        if (mLastRecoveredPTS < 0LL) {
             ALOGI("Clamping negative recovered PTS (%" PRId64 ") to 0", mLastRecoveredPTS);
-            mLastRecoveredPTS = 0ll;
+            mLastRecoveredPTS = 0LL;
         }
     }
 
@@ -689,7 +689,7 @@ int64_t ATSParser::Program::convertPTSToTimestamp(uint64_t PTS) {
 
     int64_t timeUs = (PTS * 100) / 9;
 
-    if (mParser->mAbsoluteTimeAnchorUs >= 0ll) {
+    if (mParser->mAbsoluteTimeAnchorUs >= 0LL) {
         timeUs += mParser->mAbsoluteTimeAnchorUs;
     }
 
@@ -1529,7 +1529,7 @@ void ATSParser::Stream::onPayloadData(
 
     ALOGV("onPayloadData mStreamType=0x%02x size: %zu", mStreamType, size);
 
-    int64_t timeUs = 0ll;  // no presentation timestamp available.
+    int64_t timeUs = 0LL;  // no presentation timestamp available.
     if (PTS_DTS_flags == 2 || PTS_DTS_flags == 3) {
         timeUs = mProgram->convertPTSToTimestamp(PTS);
     }
@@ -1659,10 +1659,10 @@ void ATSParser::Stream::setCasInfo(
 
 ATSParser::ATSParser(uint32_t flags)
     : mFlags(flags),
-      mAbsoluteTimeAnchorUs(-1ll),
+      mAbsoluteTimeAnchorUs(-1LL),
       mTimeOffsetValid(false),
-      mTimeOffsetUs(0ll),
-      mLastRecoveredPTS(-1ll),
+      mTimeOffsetUs(0LL),
+      mLastRecoveredPTS(-1LL),
       mNumTSPacketsParsed(0),
       mNumPCRs(0) {
     mPSISections.add(0 /* PID */, new PSISection);
@@ -1704,7 +1704,7 @@ void ATSParser::signalDiscontinuity(
         if ((mFlags & TS_TIMESTAMPS_ARE_ABSOLUTE)
                 && extra->findInt64(
                     kATSParserKeyRecentMediaTimeUs, &mediaTimeUs)) {
-            if (mAbsoluteTimeAnchorUs >= 0ll) {
+            if (mAbsoluteTimeAnchorUs >= 0LL) {
                 mediaTimeUs -= mAbsoluteTimeAnchorUs;
             }
             if (mTimeOffsetValid) {

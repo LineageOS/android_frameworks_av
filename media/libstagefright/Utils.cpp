@@ -1802,7 +1802,7 @@ AString uriDebugString(const AString &uri, bool incognito) {
 
 HLSTime::HLSTime(const sp<AMessage>& meta) :
     mSeq(-1),
-    mTimeUs(-1ll),
+    mTimeUs(-1LL),
     mMeta(meta) {
     if (meta != NULL) {
         CHECK(meta->findInt32("discontinuitySeq", &mSeq));
@@ -1811,7 +1811,7 @@ HLSTime::HLSTime(const sp<AMessage>& meta) :
 }
 
 int64_t HLSTime::getSegmentTimeUs() const {
-    int64_t segmentStartTimeUs = -1ll;
+    int64_t segmentStartTimeUs = -1LL;
     if (mMeta != NULL) {
         CHECK(mMeta->findInt64("segmentStartTimeUs", &segmentStartTimeUs));
 

@@ -180,7 +180,7 @@ void ARTPSource::addFIR(const sp<ABuffer> &buffer) {
     }
 
     int64_t nowUs = ALooper::GetNowUs();
-    if (mLastFIRRequestUs >= 0 && mLastFIRRequestUs + 5000000ll > nowUs) {
+    if (mLastFIRRequestUs >= 0 && mLastFIRRequestUs + 5000000LL > nowUs) {
         // Send FIR requests at most every 5 secs.
         return;
     }
