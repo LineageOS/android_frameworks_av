@@ -49,7 +49,7 @@ SoftAMRNBEncoder::SoftAMRNBEncoder(
       mBitRate(0),
       mMode(MR475),
       mInputSize(0),
-      mInputTimeUs(-1ll),
+      mInputTimeUs(-1LL),
       mSawInputEOS(false),
       mSignalledError(false) {
     initPorts();
@@ -340,7 +340,7 @@ void SoftAMRNBEncoder::onQueueFilled(OMX_U32 /* portIndex */) {
             // "Time" on the input buffer has in effect advanced by the
             // number of audio frames we just advanced nOffset by.
             inHeader->nTimeStamp +=
-                (copy * 1000000ll / kSampleRate) / sizeof(int16_t);
+                (copy * 1000000LL / kSampleRate) / sizeof(int16_t);
 
             if (inHeader->nFilledLen == 0) {
                 if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {

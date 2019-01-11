@@ -2699,7 +2699,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             int64_t timeoutUs;
             CHECK(msg->findInt64("timeoutUs", &timeoutUs));
 
-            if (timeoutUs == 0ll) {
+            if (timeoutUs == 0LL) {
                 PostReplyWithError(replyID, -EAGAIN);
                 break;
             }
@@ -2707,7 +2707,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             mFlags |= kFlagDequeueInputPending;
             mDequeueInputReplyID = replyID;
 
-            if (timeoutUs > 0ll) {
+            if (timeoutUs > 0LL) {
                 sp<AMessage> timeoutMsg =
                     new AMessage(kWhatDequeueInputTimedOut, this);
                 timeoutMsg->setInt32(
@@ -2773,7 +2773,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             int64_t timeoutUs;
             CHECK(msg->findInt64("timeoutUs", &timeoutUs));
 
-            if (timeoutUs == 0ll) {
+            if (timeoutUs == 0LL) {
                 PostReplyWithError(replyID, -EAGAIN);
                 break;
             }
@@ -2781,7 +2781,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             mFlags |= kFlagDequeueOutputPending;
             mDequeueOutputReplyID = replyID;
 
-            if (timeoutUs > 0ll) {
+            if (timeoutUs > 0LL) {
                 sp<AMessage> timeoutMsg =
                     new AMessage(kWhatDequeueOutputTimedOut, this);
                 timeoutMsg->setInt32(
@@ -3042,7 +3042,7 @@ status_t MediaCodec::queueCSDInputBuffer(size_t bufferIndex) {
     msg->setSize("index", bufferIndex);
     msg->setSize("offset", 0);
     msg->setSize("size", csd->size());
-    msg->setInt64("timeUs", 0ll);
+    msg->setInt64("timeUs", 0LL);
     msg->setInt32("flags", BUFFER_FLAG_CODECCONFIG);
     msg->setPointer("errorDetailMsg", &errorDetailMsg);
 

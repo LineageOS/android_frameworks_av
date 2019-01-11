@@ -41,7 +41,7 @@ namespace android {
 
 NuMediaExtractor::Sample::Sample()
     : mBuffer(NULL),
-      mSampleTimeUs(-1ll) {
+      mSampleTimeUs(-1LL) {
 }
 
 NuMediaExtractor::Sample::Sample(MediaBufferBase *buffer, int64_t timeUs)
@@ -50,8 +50,8 @@ NuMediaExtractor::Sample::Sample(MediaBufferBase *buffer, int64_t timeUs)
 }
 
 NuMediaExtractor::NuMediaExtractor()
-    : mTotalBitrate(-1ll),
-      mDurationUs(-1ll) {
+    : mTotalBitrate(-1LL),
+      mDurationUs(-1LL) {
 }
 
 NuMediaExtractor::~NuMediaExtractor() {
@@ -209,8 +209,8 @@ status_t NuMediaExtractor::updateDurationAndBitrate() {
         return ERROR_UNSUPPORTED;
     }
 
-    mTotalBitrate = 0ll;
-    mDurationUs = -1ll;
+    mTotalBitrate = 0LL;
+    mDurationUs = -1LL;
 
     for (size_t i = 0; i < mImpl->countTracks(); ++i) {
         sp<MetaData> meta = mImpl->getTrackMetaData(i);
@@ -225,8 +225,8 @@ status_t NuMediaExtractor::updateDurationAndBitrate() {
             CHECK(meta->findCString(kKeyMIMEType, &mime));
             ALOGV("track of type '%s' does not publish bitrate", mime);
 
-            mTotalBitrate = -1ll;
-        } else if (mTotalBitrate >= 0ll) {
+            mTotalBitrate = -1LL;
+        } else if (mTotalBitrate >= 0LL) {
             mTotalBitrate += bitrate;
         }
 
@@ -503,7 +503,7 @@ void NuMediaExtractor::fetchTrackSamples(TrackInfo *info,
     }
 
     MediaSource::ReadOptions options;
-    if (seekTimeUs >= 0ll) {
+    if (seekTimeUs >= 0LL) {
         options.setSeekTo(seekTimeUs, mode);
         info->mFinalResult = OK;
         releaseTrackSamples(info);
@@ -768,7 +768,7 @@ bool NuMediaExtractor::getTotalBitrate(int64_t *bitrate) const {
 
     off64_t size;
     if (mDurationUs > 0 && mDataSource->getSize(&size) == OK) {
-        *bitrate = size * 8000000ll / mDurationUs;  // in bits/sec
+        *bitrate = size * 8000000LL / mDurationUs;  // in bits/sec
         return true;
     }
 

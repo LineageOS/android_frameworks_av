@@ -35,7 +35,7 @@
 
 namespace android {
 
-const int64_t kNearEOSMarkUs = 2000000ll; // 2 secs
+const int64_t kNearEOSMarkUs = 2000000LL; // 2 secs
 
 AnotherPacketSource::AnotherPacketSource(const sp<MetaData> &meta)
     : mIsAudio(false),
@@ -299,7 +299,7 @@ void AnotherPacketSource::queueAccessUnit(const sp<ABuffer> &buffer) {
     if (buffer->meta()->findInt32("discontinuity", &discontinuity)){
         ALOGV("queueing a discontinuity with queueAccessUnit");
 
-        mLastQueuedTimeUs = 0ll;
+        mLastQueuedTimeUs = 0LL;
         mEOSResult = OK;
         mLatestEnqueuedMeta = NULL;
 

@@ -36,7 +36,7 @@
 
 // Maximum late time allowed for a video frame to be rendered. When a video
 // frame arrives later than this number, it will be discarded without rendering.
-static const int64_t kMaxAllowedVideoLateTimeUs = 40000ll;
+static const int64_t kMaxAllowedVideoLateTimeUs = 40000LL;
 
 namespace android {
 

@@ -582,7 +582,7 @@ void SoftOpus::onQueueFilled(OMX_U32 /* portIndex */) {
         outHeader->nFilledLen = numFrames * sizeof(int16_t) * mHeader->channels;
 
         outHeader->nTimeStamp = mAnchorTimeUs +
-                                (mNumFramesOutput * 1000000ll) /
+                                (mNumFramesOutput * 1000000LL) /
                                 kRate;
 
         mNumFramesOutput += numFrames;
