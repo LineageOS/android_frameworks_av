@@ -5142,7 +5142,7 @@ status_t MPEG4Source::parseTrackFragmentRun(off64_t offset, off64_t size) {
         sampleCtsOffset = 0;
     }
 
-    if (size < (off64_t)(sampleCount * bytesPerSample)) {
+    if (size < (off64_t)sampleCount * bytesPerSample) {
         return -EINVAL;
     }
 
