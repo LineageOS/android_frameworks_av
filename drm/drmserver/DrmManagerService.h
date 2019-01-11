@@ -60,7 +60,7 @@ private:
 
     static const char *get_perm_label(drm_perm_t perm);
 
-    static bool selinuxIsProtectedCallAllowed(pid_t spid, drm_perm_t perm);
+    static bool selinuxIsProtectedCallAllowed(pid_t spid, const char* ssid, drm_perm_t perm);
 
     static bool isProtectedCallAllowed(drm_perm_t perm);
 
