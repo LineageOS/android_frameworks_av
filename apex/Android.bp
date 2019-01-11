@@ -27,6 +27,8 @@ apex {
         "libmpeg2extractor",
         "liboggextractor",
         "libwavextractor",
+        // MediaPlayer2
+        "libmediaplayer2_jni",
     ],
     key: "com.android.media.key",
 }
