@@ -61,13 +61,15 @@ public:
     virtual status_t setDeviceConnectionState(audio_devices_t device,
                                               audio_policy_dev_state_t state,
                                               const char *device_address,
-                                              const char *device_name);
+                                              const char *device_name,
+                                              audio_format_t encodedFormat);
     virtual audio_policy_dev_state_t getDeviceConnectionState(
                                                                 audio_devices_t device,
                                                                 const char *device_address);
     virtual status_t handleDeviceConfigChange(audio_devices_t device,
                                               const char *device_address,
-                                              const char *device_name);
+                                              const char *device_name,
+                                              audio_format_t encodedFormat);
     virtual status_t setPhoneState(audio_mode_t state);
     virtual status_t setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config);
     virtual audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage);

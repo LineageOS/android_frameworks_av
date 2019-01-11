@@ -130,9 +130,11 @@ class HwModuleCollection : public Vector<sp<HwModule> >
 public:
     sp<HwModule> getModuleFromName(const char *name) const;
 
-    sp<HwModule> getModuleForDeviceTypes(audio_devices_t device) const;
+    sp<HwModule> getModuleForDeviceTypes(audio_devices_t device,
+                                         audio_format_t encodedFormat) const;
 
-    sp<HwModule> getModuleForDevice(const sp<DeviceDescriptor> &device) const;
+    sp<HwModule> getModuleForDevice(const sp<DeviceDescriptor> &device,
+                                    audio_format_t encodedFormat) const;
 
     DeviceVector getAvailableDevicesFromModuleName(const char *name,
                                                    const DeviceVector &availableDevices) const;
@@ -149,6 +151,7 @@ public:
      * @param type of the device requested
      * @param address of the device requested
      * @param name of the device that requested
+     * @param encodedFormat if not AUDIO_FORMAT_DEFAULT, must match one supported format
      * @param matchAddress true if a strong match is required
      * @param allowToCreate true if allowed to create dynamic device (e.g. hdmi, usb...)
      * @return device descriptor associated to the type (and address if matchAddress is true)
@@ -156,6 +159,7 @@ public:
     sp<DeviceDescriptor> getDeviceDescriptor(const audio_devices_t type,
                                              const char *address,
                                              const char *name,
+                                             audio_format_t encodedFormat,
                                              bool allowToCreate = false,
                                              bool matchAddress = true) const;
 
@@ -171,7 +175,8 @@ public:
      */
     sp<DeviceDescriptor> createDevice(const audio_devices_t type,
                                       const char *address,
-                                      const char *name) const;
+                                      const char *name,
+                                      const audio_format_t encodedFormat) const;
 
     /**
      * @brief cleanUpForDevice: loop on all profiles of all modules to remove device from

@@ -364,6 +364,16 @@ DeviceVector SwAudioOutputDescriptor::filterSupportedDevices(const DeviceVector 
     return filteredDevices.filter(devices);
 }
 
+bool SwAudioOutputDescriptor::deviceSupportsEncodedFormats(audio_devices_t device)
+{
+    if (isDuplicated()) {
+        return (mOutput1->deviceSupportsEncodedFormats(device)
+                    || mOutput2->deviceSupportsEncodedFormats(device));
+    } else {
+       return mProfile->deviceSupportsEncodedFormats(device);
+    }
+}
+
 uint32_t SwAudioOutputDescriptor::latency()
 {
     if (isDuplicated()) {
@@ -687,7 +697,9 @@ audio_io_handle_t SwAudioOutputCollection::getA2dpOutput() const
     for (size_t i = 0; i < size(); i++) {
         sp<SwAudioOutputDescriptor> outputDesc = valueAt(i);
         if (!outputDesc->isDuplicated() &&
-                outputDesc->devices().types() & AUDIO_DEVICE_OUT_ALL_A2DP) {
+             outputDesc->devices().types()  & AUDIO_DEVICE_OUT_ALL_A2DP &&
+             outputDesc->deviceSupportsEncodedFormats(
+                     AUDIO_DEVICE_OUT_BLUETOOTH_A2DP)) {
             return this->keyAt(i);
         }
     }

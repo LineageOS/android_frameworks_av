@@ -94,7 +94,10 @@ public:
     bool supportsDeviceTypes(audio_devices_t device) const
     {
         if (audio_is_output_devices(device)) {
-            return mSupportedDevices.types() & device;
+            if (deviceSupportsEncodedFormats(device)) {
+                return mSupportedDevices.types() & device;
+            }
+            return false;
         }
         return mSupportedDevices.types() & (device & ~AUDIO_DEVICE_BIT_IN);
     }
@@ -114,6 +117,16 @@ public:
             return supportsDeviceTypes(device->type());
         }
         return mSupportedDevices.contains(device);
+    }
+
+    bool deviceSupportsEncodedFormats(audio_devices_t device) const
+    {
+        DeviceVector deviceList =
+            mSupportedDevices.getDevicesFromTypeMask(device);
+        if (!deviceList.empty()) {
+            return deviceList.itemAt(0)->hasCurrentEncodedFormat();
+        }
+        return false;
     }
 
     void clearSupportedDevices() { mSupportedDevices.clear(); }

@@ -209,12 +209,14 @@ public:
     // IAudioPolicyService interface (see AudioPolicyInterface for method descriptions)
     //
     static status_t setDeviceConnectionState(audio_devices_t device, audio_policy_dev_state_t state,
-                                             const char *device_address, const char *device_name);
+                                             const char *device_address, const char *device_name,
+                                             audio_format_t encodedFormat);
     static audio_policy_dev_state_t getDeviceConnectionState(audio_devices_t device,
                                                                 const char *device_address);
     static status_t handleDeviceConfigChange(audio_devices_t device,
                                              const char *device_address,
-                                             const char *device_name);
+                                             const char *device_name,
+                                             audio_format_t encodedFormat);
     static status_t setPhoneState(audio_mode_t state);
     static status_t setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config);
     static audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage);

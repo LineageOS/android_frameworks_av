@@ -273,32 +273,34 @@ sp <HwModule> HwModuleCollection::getModuleFromName(const char *name) const
     return nullptr;
 }
 
-sp <HwModule> HwModuleCollection::getModuleForDeviceTypes(audio_devices_t device) const
+sp <HwModule> HwModuleCollection::getModuleForDeviceTypes(audio_devices_t type,
+                                                          audio_format_t encodedFormat) const
 {
     for (const auto& module : *this) {
-        const auto& profiles = audio_is_output_device(device) ?
+        const auto& profiles = audio_is_output_device(type) ?
                 module->getOutputProfiles() : module->getInputProfiles();
         for (const auto& profile : profiles) {
-            if (profile->supportsDeviceTypes(device)) {
-                return module;
+            if (profile->supportsDeviceTypes(type)) {
+                if (encodedFormat != AUDIO_FORMAT_DEFAULT) {
+                    DeviceVector declaredDevices = module->getDeclaredDevices();
+                    sp <DeviceDescriptor> deviceDesc =
+                            declaredDevices.getDevice(type, String8(), encodedFormat);
+                    if (deviceDesc) {
+                        return module;
+                    }
+                } else {
+                    return module;
+                }
             }
         }
     }
     return nullptr;
 }
 
-sp <HwModule> HwModuleCollection::getModuleForDevice(const sp<DeviceDescriptor> &device) const
+sp<HwModule> HwModuleCollection::getModuleForDevice(const sp<DeviceDescriptor> &device,
+                                                     audio_format_t encodedFormat) const
 {
-    for (const auto& module : *this) {
-        const auto& profiles = audio_is_output_device(device->type()) ?
-                module->getOutputProfiles() : module->getInputProfiles();
-        for (const auto& profile : profiles) {
-            if (profile->supportsDevice(device)) {
-                return module;
-            }
-        }
-    }
-    return nullptr;
+    return getModuleForDeviceTypes(device->type(), encodedFormat);
 }
 
 DeviceVector HwModuleCollection::getAvailableDevicesFromModuleName(
@@ -314,6 +316,7 @@ DeviceVector HwModuleCollection::getAvailableDevicesFromModuleName(
 sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices_t deviceType,
                                                              const char *address,
                                                              const char *name,
+                                                             const audio_format_t encodedFormat,
                                                              bool allowToCreate,
                                                              bool matchAddress) const
 {
@@ -325,8 +328,14 @@ sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices
 
     for (const auto& hwModule : *this) {
         DeviceVector moduleDevices = hwModule->getAllDevices();
-        auto moduleDevice = moduleDevices.getDevice(deviceType, devAddress);
+        auto moduleDevice = moduleDevices.getDevice(deviceType, devAddress, encodedFormat);
         if (moduleDevice) {
+            if (encodedFormat != AUDIO_FORMAT_DEFAULT) {
+                moduleDevice->setEncodedFormat(encodedFormat);
+                if (moduleDevice->address() != devAddress) {
+                    moduleDevice->setAddress(devAddress);
+                }
+            }
             if (allowToCreate) {
                 moduleDevice->attach(hwModule);
             }
@@ -338,14 +347,15 @@ sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices
               name, deviceType, address);
         return nullptr;
     }
-    return createDevice(deviceType, address, name);
+    return createDevice(deviceType, address, name, encodedFormat);
 }
 
 sp<DeviceDescriptor> HwModuleCollection::createDevice(const audio_devices_t type,
                                                       const char *address,
-                                                      const char *name) const
+                                                      const char *name,
+                                                      const audio_format_t encodedFormat) const
 {
-    sp<HwModule> hwModule = getModuleForDeviceTypes(type);
+    sp<HwModule> hwModule = getModuleForDeviceTypes(type, encodedFormat);
     if (hwModule == 0) {
         ALOGE("%s: could not find HW module for device %04x address %s", __FUNCTION__, type,
               address);
@@ -354,8 +364,9 @@ sp<DeviceDescriptor> HwModuleCollection::createDevice(const audio_devices_t type
     sp<DeviceDescriptor> device = new DeviceDescriptor(type, String8(name));
     device->setName(String8(name));
     device->setAddress(String8(address));
+    device->setEncodedFormat(encodedFormat);
 
-    // Add the device to the list of dynamic devices
+  // Add the device to the list of dynamic devices
     hwModule->addDynamicDevice(device);
     // Reciprocally attach the device to the module
     device->attach(hwModule);
@@ -370,7 +381,8 @@ sp<DeviceDescriptor> HwModuleCollection::createDevice(const audio_devices_t type
         if (profile->supportsDevice(device, false /*matchAdress*/)) {
 
             // @todo quid of audio profile? import the profile from device of the same type?
-            const auto &isoTypeDeviceForProfile = profile->getSupportedDevices().getDevice(type);
+            const auto &isoTypeDeviceForProfile =
+                profile->getSupportedDevices().getDevice(type, String8(), AUDIO_FORMAT_DEFAULT);
             device->importAudioPort(isoTypeDeviceForProfile, true /* force */);
 
             ALOGV("%s: adding device %s to profile %s", __FUNCTION__,

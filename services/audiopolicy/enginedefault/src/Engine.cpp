@@ -506,7 +506,7 @@ audio_devices_t Engine::getDeviceForStrategyInt(routing_strategy strategy,
         if (strategy != STRATEGY_SONIFICATION) {
             // no sonification on remote submix (e.g. WFD)
             if (availableOutputDevices.getDevice(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
-                                                 String8("0")) != 0) {
+                                                 String8("0"), AUDIO_FORMAT_DEFAULT) != 0) {
                 device2 = availableOutputDevices.types() & AUDIO_DEVICE_OUT_REMOTE_SUBMIX;
             }
         }
