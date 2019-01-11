@@ -258,7 +258,7 @@ M3UParser::M3UParser(
       mIsEvent(false),
       mFirstSeqNumber(-1),
       mLastSeqNumber(-1),
-      mTargetDurationUs(-1ll),
+      mTargetDurationUs(-1LL),
       mDiscontinuitySeq(0),
       mDiscontinuityCount(0),
       mSelectedIndex(-1) {
@@ -716,7 +716,7 @@ status_t M3UParser::parse(const void *_data, size_t size) {
             ALOGE("Media playlist missing #EXT-X-TARGETDURATION");
             return ERROR_MALFORMED;
         }
-        mTargetDurationUs = targetDurationSecs * 1000000ll;
+        mTargetDurationUs = targetDurationSecs * 1000000LL;
 
         mFirstSeqNumber = 0;
         if (mMeta != NULL) {

@@ -566,8 +566,8 @@ ACodec::ACodec()
       mDequeueCounter(0),
       mMetadataBuffersToSubmit(0),
       mNumUndequeuedBuffers(0),
-      mRepeatFrameDelayUs(-1ll),
-      mMaxPtsGapUs(0ll),
+      mRepeatFrameDelayUs(-1LL),
+      mMaxPtsGapUs(0LL),
       mMaxFps(-1),
       mFps(-1.0),
       mCaptureFps(-1.0),
@@ -1818,15 +1818,15 @@ status_t ACodec::configureCodec(
         if (!msg->findInt64(
                     "repeat-previous-frame-after",
                     &mRepeatFrameDelayUs)) {
-            mRepeatFrameDelayUs = -1ll;
+            mRepeatFrameDelayUs = -1LL;
         }
 
         // only allow 32-bit value, since we pass it as U32 to OMX.
         if (!msg->findInt64("max-pts-gap-to-encoder", &mMaxPtsGapUs)) {
-            mMaxPtsGapUs = 0ll;
+            mMaxPtsGapUs = 0LL;
         } else if (mMaxPtsGapUs > INT32_MAX || mMaxPtsGapUs < INT32_MIN) {
             ALOGW("Unsupported value for max pts gap %lld", (long long) mMaxPtsGapUs);
-            mMaxPtsGapUs = 0ll;
+            mMaxPtsGapUs = 0LL;
         }
 
         if (!msg->findFloat("max-fps-to-encoder", &mMaxFps)) {
@@ -1834,7 +1834,7 @@ status_t ACodec::configureCodec(
         }
 
         // notify GraphicBufferSource to allow backward frames
-        if (mMaxPtsGapUs < 0ll) {
+        if (mMaxPtsGapUs < 0LL) {
             mMaxFps = -1;
         }
 
@@ -6538,7 +6538,7 @@ void ACodec::LoadedState::stateEntered() {
 
     mCodec->mDequeueCounter = 0;
     mCodec->mMetadataBuffersToSubmit = 0;
-    mCodec->mRepeatFrameDelayUs = -1ll;
+    mCodec->mRepeatFrameDelayUs = -1LL;
     mCodec->mInputFormat.clear();
     mCodec->mOutputFormat.clear();
     mCodec->mBaseOutputFormat.clear();
@@ -6680,7 +6680,7 @@ status_t ACodec::LoadedState::setupInputSurface() {
         return err;
     }
 
-    if (mCodec->mRepeatFrameDelayUs > 0ll) {
+    if (mCodec->mRepeatFrameDelayUs > 0LL) {
         err = statusFromBinderStatus(
                 mCodec->mGraphicBufferSource->setRepeatPreviousFrameDelayUs(
                         mCodec->mRepeatFrameDelayUs));
@@ -6693,7 +6693,7 @@ status_t ACodec::LoadedState::setupInputSurface() {
         }
     }
 
-    if (mCodec->mMaxPtsGapUs != 0ll) {
+    if (mCodec->mMaxPtsGapUs != 0LL) {
         OMX_PARAM_U32TYPE maxPtsGapParams;
         InitOMXParams(&maxPtsGapParams);
         maxPtsGapParams.nPortIndex = kPortIndexInput;

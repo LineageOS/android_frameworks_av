@@ -240,7 +240,7 @@ void MPEG2TSWriter::SourceInfo::extractCodecSpecificData() {
         size -= length;
     }
 
-    out->meta()->setInt64("timeUs", 0ll);
+    out->meta()->setInt64("timeUs", 0LL);
 
     sp<AMessage> notify = mNotify->dup();
     notify->setInt32("what", kNotifyBuffer);
@@ -842,7 +842,7 @@ void MPEG2TSWriter::writeAccessUnit(
     int64_t timeUs;
     CHECK(accessUnit->meta()->findInt64("timeUs", &timeUs));
 
-    uint32_t PTS = (timeUs * 9ll) / 100ll;
+    uint32_t PTS = (timeUs * 9LL) / 100LL;
 
     size_t PES_packet_length = accessUnit->size() + 8;
     bool padding = (accessUnit->size() < (188 - 18));

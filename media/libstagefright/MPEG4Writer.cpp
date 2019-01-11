@@ -481,7 +481,7 @@ void MPEG4Writer::initInternal(int fd, bool isFirstSession) {
 
     mInterleaveDurationUs = 1000000;
 
-    mStartTimestampUs = -1ll;
+    mStartTimestampUs = -1LL;
     mStartTimeOffsetMs = -1;
     mPaused = false;
     mStarted = false;
@@ -1734,7 +1734,7 @@ bool MPEG4Writer::reachedEOS() {
 
 void MPEG4Writer::setStartTimestampUs(int64_t timeUs) {
     ALOGI("setStartTimestampUs: %" PRId64, timeUs);
-    CHECK_GE(timeUs, 0ll);
+    CHECK_GE(timeUs, 0LL);
     Mutex::Autolock autoLock(mLock);
     if (mStartTimestampUs < 0 || mStartTimestampUs > timeUs) {
         mStartTimestampUs = timeUs;
@@ -3067,7 +3067,7 @@ status_t MPEG4Writer::Track::threadEntry() {
 
             if (mResumed) {
                 int64_t durExcludingEarlierPausesUs = timestampUs - previousPausedDurationUs;
-                if (WARN_UNLESS(durExcludingEarlierPausesUs >= 0ll, "for %s track", trackName)) {
+                if (WARN_UNLESS(durExcludingEarlierPausesUs >= 0LL, "for %s track", trackName)) {
                     copy->release();
                     mSource->stop();
                     mIsMalformed = true;
@@ -3088,7 +3088,7 @@ status_t MPEG4Writer::Track::threadEntry() {
             TimestampDebugHelperEntry timestampDebugEntry;
             timestampUs -= previousPausedDurationUs;
             timestampDebugEntry.pts = timestampUs;
-            if (WARN_UNLESS(timestampUs >= 0ll, "for %s track", trackName)) {
+            if (WARN_UNLESS(timestampUs >= 0LL, "for %s track", trackName)) {
                 copy->release();
                 mSource->stop();
                 mIsMalformed = true;
@@ -3127,7 +3127,7 @@ status_t MPEG4Writer::Track::threadEntry() {
 
                 cttsOffsetTimeUs =
                         timestampUs + kMaxCttsOffsetTimeUs - decodingTimeUs;
-                if (WARN_UNLESS(cttsOffsetTimeUs >= 0ll, "for %s track", trackName)) {
+                if (WARN_UNLESS(cttsOffsetTimeUs >= 0LL, "for %s track", trackName)) {
                     copy->release();
                     mSource->stop();
                     mIsMalformed = true;
@@ -3185,7 +3185,7 @@ status_t MPEG4Writer::Track::threadEntry() {
                 }
             }
 
-            if (WARN_UNLESS(timestampUs >= 0ll, "for %s track", trackName)) {
+            if (WARN_UNLESS(timestampUs >= 0LL, "for %s track", trackName)) {
                 copy->release();
                 mSource->stop();
                 mIsMalformed = true;
@@ -3206,7 +3206,7 @@ status_t MPEG4Writer::Track::threadEntry() {
             currDurationTicks =
                 ((timestampUs * mTimeScale + 500000LL) / 1000000LL -
                     (lastTimestampUs * mTimeScale + 500000LL) / 1000000LL);
-            if (currDurationTicks < 0ll) {
+            if (currDurationTicks < 0LL) {
                 ALOGE("do not support out of order frames (timestamp: %lld < last: %lld for %s track",
                         (long long)timestampUs, (long long)lastTimestampUs, trackName);
                 copy->release();
