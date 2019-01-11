@@ -1,1 +1,1 @@
-../../media/libmediaextractor/include/media/MediaSource.h
+../../media/libstagefright/include/media/stagefright/MediaSource.h

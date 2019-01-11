@@ -32,7 +32,6 @@ cc_library {
         "libcrypto",
         "libcutils",
         "libmedia",
-        "libmediaextractor",
         "libmediandk",
         "libstagefright",
         "libstagefright_foundation",

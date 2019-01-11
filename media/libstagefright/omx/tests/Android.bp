@@ -9,7 +9,6 @@ cc_test {
         "libbinder",
         "libmedia",
         "libmedia_omx",
-        "libmediaextractor",
         "libutils",
         "liblog",
         "libstagefright_foundation",
