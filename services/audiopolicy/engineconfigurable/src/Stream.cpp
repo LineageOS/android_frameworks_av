@@ -21,10 +21,8 @@
 
 using std::string;
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
 
 status_t Element<audio_stream_type_t>::setIdentifier(audio_stream_type_t identifier)
 {

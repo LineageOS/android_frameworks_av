@@ -22,10 +22,8 @@
 #include <system/audio.h>
 #include <utils/Log.h>
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
 
 template <typename Key>
 class Element

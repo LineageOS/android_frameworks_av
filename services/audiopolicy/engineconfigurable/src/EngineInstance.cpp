@@ -21,10 +21,8 @@
 
 using std::string;
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
 
 EngineInstance::EngineInstance()
 {

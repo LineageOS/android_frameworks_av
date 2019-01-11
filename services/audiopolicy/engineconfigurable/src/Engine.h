@@ -21,12 +21,10 @@
 #include <AudioPolicyPluginInterface.h>
 #include "Collection.h"
 
-namespace android
-{
+namespace android {
 class AudioPolicyManagerObserver;
 
-namespace audio_policy
-{
+namespace audio_policy {
 
 class ParameterManagerWrapper;
 class VolumeProfile;

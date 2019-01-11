@@ -21,10 +21,9 @@
 #include <RoutingStrategy.h>
 #include <map>
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
+
 /**
  * @tparam routing_strategy: Applicable strategy for this stream.
  */

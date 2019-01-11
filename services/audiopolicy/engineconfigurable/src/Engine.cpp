@@ -35,10 +35,9 @@
 using std::string;
 using std::map;
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
+
 template <>
 StrategyCollection &Engine::getCollection<routing_strategy>()
 {
@@ -220,8 +219,10 @@ audio_policy_forced_cfg_t Engine::getForceUse(audio_policy_force_use_t usage) co
 }
 
 status_t Engine::setDeviceConnectionState(const sp<DeviceDescriptor> devDesc,
-                                          audio_policy_dev_state_t /*state*/)
+                                          audio_policy_dev_state_t state)
 {
+    mPolicyParameterMgr->setDeviceConnectionState(devDesc, state);
+
     if (audio_is_output_device(devDesc->type())) {
         return mPolicyParameterMgr->setAvailableOutputDevices(
                     mApmObserver->getAvailableOutputDevices().types());

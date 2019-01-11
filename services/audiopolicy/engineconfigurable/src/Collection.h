@@ -28,10 +28,8 @@
 #include <stdint.h>
 #include <string>
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
 
 /**
  * Collection of policy element as a map indexed with a their UID type.
