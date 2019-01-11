@@ -376,7 +376,7 @@ void MPEG2TSExtractor::init() {
         }
 
         // Wait only for 2 seconds to detect audio/video streams.
-        if (ALooper::GetNowUs() - startTime > 2000000ll) {
+        if (ALooper::GetNowUs() - startTime > 2000000LL) {
             break;
         }
     }
@@ -388,7 +388,7 @@ void MPEG2TSExtractor::init() {
         List<int64_t> durations;
         // Estimate duration --- stabilize until you get <500ms deviation.
         while (feedMore() == OK
-                && ALooper::GetNowUs() - startTime <= 2000000ll) {
+                && ALooper::GetNowUs() - startTime <= 2000000LL) {
             if (mSeekSyncPoints->size() > prevSyncSize) {
                 prevSyncSize = mSeekSyncPoints->size();
                 int64_t diffUs = mSeekSyncPoints->keyAt(prevSyncSize - 1)

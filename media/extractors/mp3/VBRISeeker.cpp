@@ -71,7 +71,7 @@ VBRISeeker *VBRISeeker::CreateFromSource(
     size_t numFrames = U32_AT(&vbriHeader[14]);
 
     int64_t durationUs =
-        numFrames * 1000000ll * (sampleRate >= 32000 ? 1152 : 576) / sampleRate;
+        numFrames * 1000000LL * (sampleRate >= 32000 ? 1152 : 576) / sampleRate;
 
     ALOGV("duration = %.2f secs", durationUs / 1E6);
 
