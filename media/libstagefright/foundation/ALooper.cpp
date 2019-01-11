@@ -66,7 +66,7 @@ private:
 
 // static
 int64_t ALooper::GetNowUs() {
-    return systemTime(SYSTEM_TIME_MONOTONIC) / 1000ll;
+    return systemTime(SYSTEM_TIME_MONOTONIC) / 1000LL;
 }
 
 ALooper::ALooper()

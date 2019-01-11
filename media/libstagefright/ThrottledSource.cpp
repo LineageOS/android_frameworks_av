@@ -51,7 +51,7 @@ ssize_t ThrottledSource::readAt(off64_t offset, void *data, size_t size) {
     // How long would it have taken to transfer everything we ever
     // transferred given the limited bandwidth.
     int64_t durationUs =
-        mTotalTransferred * 1000000ll / mBandwidthLimitBytesPerSecond;
+        mTotalTransferred * 1000000LL / mBandwidthLimitBytesPerSecond;
 
     int64_t whenUs = mStartTimeUs + durationUs;
 

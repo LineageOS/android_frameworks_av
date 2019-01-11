@@ -355,9 +355,9 @@ OMXNodeInstance::OMXNodeInstance(
       mQuirks(0),
       mBufferIDCount(0),
       mRestorePtsFailed(false),
-      mMaxTimestampGapUs(0ll),
-      mPrevOriginalTimeUs(-1ll),
-      mPrevModifiedTimeUs(-1ll)
+      mMaxTimestampGapUs(0LL),
+      mPrevOriginalTimeUs(-1LL),
+      mPrevModifiedTimeUs(-1LL)
 {
     mName = ADebug::GetDebugName(name);
     DEBUG = ADebug::GetDebugLevelFromProperty(name, "debug.stagefright.omx-debug");
@@ -1948,7 +1948,7 @@ status_t OMXNodeInstance::setMaxPtsGapUs(const void *params, size_t size) {
 int64_t OMXNodeInstance::getCodecTimestamp(OMX_TICKS timestamp) {
     int64_t originalTimeUs = timestamp;
 
-    if (mMaxTimestampGapUs > 0ll) {
+    if (mMaxTimestampGapUs > 0LL) {
         /* Cap timestamp gap between adjacent frames to specified max
          *
          * In the scenario of cast mirroring, encoding could be suspended for
@@ -1956,7 +1956,7 @@ int64_t OMXNodeInstance::getCodecTimestamp(OMX_TICKS timestamp) {
          * where encoder's rate control logic produces huge frames after a
          * long period of suspension.
          */
-        if (mPrevOriginalTimeUs >= 0ll) {
+        if (mPrevOriginalTimeUs >= 0LL) {
             int64_t timestampGapUs = originalTimeUs - mPrevOriginalTimeUs;
             timestamp = (timestampGapUs < mMaxTimestampGapUs ?
                 timestampGapUs : mMaxTimestampGapUs) + mPrevModifiedTimeUs;
@@ -1964,7 +1964,7 @@ int64_t OMXNodeInstance::getCodecTimestamp(OMX_TICKS timestamp) {
         ALOGV("IN  timestamp: %lld -> %lld",
             static_cast<long long>(originalTimeUs),
             static_cast<long long>(timestamp));
-    } else if (mMaxTimestampGapUs < 0ll) {
+    } else if (mMaxTimestampGapUs < 0LL) {
         /*
          * Apply a fixed timestamp gap between adjacent frames.
          *
@@ -1972,7 +1972,7 @@ int64_t OMXNodeInstance::getCodecTimestamp(OMX_TICKS timestamp) {
          * on frames could go forward or backward. Some encoders may silently
          * drop frames when it goes backward (or even stay unchanged).
          */
-        if (mPrevOriginalTimeUs >= 0ll) {
+        if (mPrevOriginalTimeUs >= 0LL) {
             timestamp = mPrevModifiedTimeUs - mMaxTimestampGapUs;
         }
         ALOGV("IN  timestamp: %lld -> %lld",
@@ -1983,7 +1983,7 @@ int64_t OMXNodeInstance::getCodecTimestamp(OMX_TICKS timestamp) {
     mPrevOriginalTimeUs = originalTimeUs;
     mPrevModifiedTimeUs = timestamp;
 
-    if (mMaxTimestampGapUs != 0ll && !mRestorePtsFailed) {
+    if (mMaxTimestampGapUs != 0LL && !mRestorePtsFailed) {
         mOriginalTimeUs.add(timestamp, originalTimeUs);
     }
 
@@ -2016,7 +2016,7 @@ status_t OMXNodeInstance::emptyNativeHandleBuffer_l(
 void OMXNodeInstance::codecBufferFilled(omx_message &msg) {
     Mutex::Autolock autoLock(mLock);
 
-    if (mMaxTimestampGapUs == 0ll || mRestorePtsFailed) {
+    if (mMaxTimestampGapUs == 0LL || mRestorePtsFailed) {
         return;
     }
 

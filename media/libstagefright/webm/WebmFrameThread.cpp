@@ -364,14 +364,14 @@ void WebmFrameMediaSourceThread::run() {
         // adjust time-stamps after pause/resume
         if (mResumed) {
             int64_t durExcludingEarlierPausesUs = timestampUs - previousPausedDurationUs;
-            CHECK_GE(durExcludingEarlierPausesUs, 0ll);
+            CHECK_GE(durExcludingEarlierPausesUs, 0LL);
             int64_t pausedDurationUs = durExcludingEarlierPausesUs - mTrackDurationUs;
             CHECK_GE(pausedDurationUs, lastDurationUs);
             previousPausedDurationUs += pausedDurationUs - lastDurationUs;
             mResumed = false;
         }
         timestampUs -= previousPausedDurationUs;
-        CHECK_GE(timestampUs, 0ll);
+        CHECK_GE(timestampUs, 0LL);
 
         int32_t isSync = false;
         md.findInt32(kKeyIsSyncFrame, &isSync);

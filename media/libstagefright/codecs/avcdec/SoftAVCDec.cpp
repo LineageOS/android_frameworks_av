@@ -607,7 +607,7 @@ void SoftAVC::onQueueFilled(OMX_U32 portIndex) {
             timeTaken = mTimeEnd - mTimeStart;
 
             ALOGV("timeTaken=%6lldus delay=%6lldus numBytes=%6d",
-                    (long long) (timeTaken / 1000ll), (long long) (timeDelay / 1000ll),
+                    (long long) (timeTaken / 1000LL), (long long) (timeDelay / 1000LL),
                    s_dec_op.u4_num_bytes_consumed);
             if (s_dec_op.u4_frame_decoded_flag && !mFlushNeeded) {
                 mFlushNeeded = true;

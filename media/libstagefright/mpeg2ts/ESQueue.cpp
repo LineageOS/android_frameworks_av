@@ -776,7 +776,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitPCMAudio() {
     memcpy(accessUnit->data(), mBuffer->data() + 4, payloadSize);
 
     int64_t timeUs = fetchTimestamp(payloadSize + 4);
-    if (timeUs < 0ll) {
+    if (timeUs < 0LL) {
         ALOGE("Negative timeUs");
         return NULL;
     }
@@ -812,7 +812,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAAC() {
         return NULL;
     }
 
-    if (info.mTimestampUs < 0ll) {
+    if (info.mTimestampUs < 0LL) {
         ALOGE("Negative info.mTimestampUs");
         return NULL;
     }
@@ -996,7 +996,7 @@ int64_t ElementaryStreamQueue::fetchTimestamp(
 
     }
 
-    if (timeUs == 0ll) {
+    if (timeUs == 0LL) {
         ALOGV("Returning 0 timestamp");
     }
 
@@ -1160,7 +1160,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitH264() {
             mBuffer->setRange(0, mBuffer->size() - nextScan);
 
             int64_t timeUs = fetchTimestamp(nextScan);
-            if (timeUs < 0ll) {
+            if (timeUs < 0LL) {
                 ALOGE("Negative timeUs");
                 return NULL;
             }
@@ -1245,7 +1245,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitMPEGAudio() {
     mBuffer->setRange(0, mBuffer->size() - frameSize);
 
     int64_t timeUs = fetchTimestamp(frameSize);
-    if (timeUs < 0ll) {
+    if (timeUs < 0LL) {
         ALOGE("Negative timeUs");
         return NULL;
     }
@@ -1451,7 +1451,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitMPEGVideo() {
                 mBuffer->setRange(0, mBuffer->size() - offset);
 
                 int64_t timeUs = fetchTimestamp(offset);
-                if (timeUs < 0ll) {
+                if (timeUs < 0LL) {
                     ALOGE("Negative timeUs");
                     return NULL;
                 }
@@ -1648,7 +1648,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitMPEG4Video() {
                     mBuffer->setRange(0, size);
 
                     int64_t timeUs = fetchTimestamp(offset);
-                    if (timeUs < 0ll) {
+                    if (timeUs < 0LL) {
                         ALOGE("Negative timeus");
                         return NULL;
                     }

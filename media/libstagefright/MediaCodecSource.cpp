@@ -372,7 +372,7 @@ int64_t MediaCodecSource::getFirstSampleSystemTimeUs() {
     msg->postAndAwaitResponse(&response);
     int64_t timeUs;
     if (!response->findInt64("time-us", &timeUs)) {
-        timeUs = -1ll;
+        timeUs = -1LL;
     }
     return timeUs;
 }
@@ -452,9 +452,9 @@ MediaCodecSource::MediaCodecSource(
       mEncoderDataSpace(0),
       mPersistentSurface(persistentSurface),
       mInputBufferTimeOffsetUs(0),
-      mFirstSampleSystemTimeUs(-1ll),
+      mFirstSampleSystemTimeUs(-1LL),
       mPausePending(false),
-      mFirstSampleTimeUs(-1ll),
+      mFirstSampleTimeUs(-1LL),
       mGeneration(0) {
     CHECK(mLooper != NULL);
 
@@ -687,13 +687,13 @@ status_t MediaCodecSource::feedEncoderInputBuffers() {
         size_t bufferIndex = *mAvailEncoderInputIndices.begin();
         mAvailEncoderInputIndices.erase(mAvailEncoderInputIndices.begin());
 
-        int64_t timeUs = 0ll;
+        int64_t timeUs = 0LL;
         uint32_t flags = 0;
         size_t size = 0;
 
         if (mbuf != NULL) {
             CHECK(mbuf->meta_data().findInt64(kKeyTime, &timeUs));
-            if (mFirstSampleSystemTimeUs < 0ll) {
+            if (mFirstSampleSystemTimeUs < 0LL) {
                 mFirstSampleSystemTimeUs = systemTime() / 1000;
                 if (mPausePending) {
                     mPausePending = false;
@@ -767,7 +767,7 @@ status_t MediaCodecSource::onStart(MetaData *params) {
     }
     int64_t startTimeUs;
     if (params == NULL || !params->findInt64(kKeyTime, &startTimeUs)) {
-        startTimeUs = -1ll;
+        startTimeUs = -1LL;
     }
 
     if (mStarted) {
@@ -914,7 +914,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
                 if (mIsVideo) {
                     int64_t decodingTimeUs;
                     if (mFlags & FLAG_USE_SURFACE_INPUT) {
-                        if (mFirstSampleSystemTimeUs < 0ll) {
+                        if (mFirstSampleSystemTimeUs < 0LL) {
                             mFirstSampleSystemTimeUs = systemTime() / 1000;
                             if (mPausePending) {
                                 mPausePending = false;
@@ -926,7 +926,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
                         // Timestamp offset is already adjusted in GraphicBufferSource.
                         // GraphicBufferSource is supposed to discard samples
                         // queued before start, and offset timeUs by start time
-                        CHECK_GE(timeUs, 0ll);
+                        CHECK_GE(timeUs, 0LL);
                         // TODO:
                         // Decoding time for surface source is unavailable,
                         // use presentation time for now. May need to move
@@ -954,7 +954,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
                 }
                 mbuf->meta_data().setInt64(kKeyTime, timeUs);
             } else {
-                mbuf->meta_data().setInt64(kKeyTime, 0ll);
+                mbuf->meta_data().setInt64(kKeyTime, 0LL);
                 mbuf->meta_data().setInt32(kKeyIsCodecConfig, true);
             }
             if (flags & MediaCodec::BUFFER_FLAG_SYNCFRAME) {
@@ -1081,7 +1081,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
             MetaData *params = static_cast<MetaData *>(obj.get());
             int64_t pauseStartTimeUs = -1;
             if (params == NULL || !params->findInt64(kKeyTime, &pauseStartTimeUs)) {
-                pauseStartTimeUs = -1ll;
+                pauseStartTimeUs = -1LL;
             }
             onPause(pauseStartTimeUs);
         }

@@ -292,20 +292,20 @@ GraphicBufferSource::GraphicBufferSource() :
     mSuspended(false),
     mLastFrameTimestampUs(-1),
     mStopTimeUs(-1),
-    mLastActionTimeUs(-1ll),
-    mSkipFramesBeforeNs(-1ll),
-    mFrameRepeatIntervalUs(-1ll),
+    mLastActionTimeUs(-1LL),
+    mSkipFramesBeforeNs(-1LL),
+    mFrameRepeatIntervalUs(-1LL),
     mRepeatLastFrameGeneration(0),
     mOutstandingFrameRepeatCount(0),
     mFrameRepeatBlockedOnCodecBuffer(false),
     mFps(-1.0),
     mCaptureFps(-1.0),
-    mBaseCaptureUs(-1ll),
-    mBaseFrameUs(-1ll),
+    mBaseCaptureUs(-1LL),
+    mBaseFrameUs(-1LL),
     mFrameCount(0),
-    mPrevCaptureUs(-1ll),
-    mPrevFrameUs(-1ll),
-    mInputBufferTimeOffsetUs(0ll) {
+    mPrevCaptureUs(-1LL),
+    mPrevFrameUs(-1LL),
+    mInputBufferTimeOffsetUs(0LL) {
     ALOGV("GraphicBufferSource");
 
     String8 name("GraphicBufferSource");
@@ -392,7 +392,7 @@ Status GraphicBufferSource::start() {
         submitEndOfInputStream_l();
     }
 
-    if (mFrameRepeatIntervalUs > 0ll && mLooper == NULL) {
+    if (mFrameRepeatIntervalUs > 0LL && mLooper == NULL) {
         mReflector = new AHandlerReflector<GraphicBufferSource>(this);
 
         mLooper = new ALooper;
@@ -655,7 +655,7 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
 
     // only submit sample if start time is unspecified, or sample
     // is queued after the specified start time
-    if (mSkipFramesBeforeNs < 0ll || item.mTimestampNs >= mSkipFramesBeforeNs) {
+    if (mSkipFramesBeforeNs < 0LL || item.mTimestampNs >= mSkipFramesBeforeNs) {
         // if start time is set, offset time stamp by start time
         if (mSkipFramesBeforeNs > 0) {
             item.mTimestampNs -= mSkipFramesBeforeNs;
@@ -677,7 +677,7 @@ bool GraphicBufferSource::fillCodecBuffer_l() {
     } else {
         // Don't set the last buffer id if we're not repeating,
         // we'll be holding on to the last buffer for nothing.
-        if (mFrameRepeatIntervalUs > 0ll) {
+        if (mFrameRepeatIntervalUs > 0LL) {
             setLatestBuffer_l(item);
         }
         ALOGV("buffer submitted [slot=%d, useCount=%ld] acquired=%d",
@@ -755,7 +755,7 @@ bool GraphicBufferSource::calculateCodecTimestamp_l(
             && (mFps > 2 * mCaptureFps
             || mCaptureFps > 2 * mFps)) {
         // Time lapse or slow motion mode
-        if (mPrevCaptureUs < 0ll) {
+        if (mPrevCaptureUs < 0LL) {
             // first capture
             mPrevCaptureUs = mBaseCaptureUs = timeUs;
             // adjust the first sample timestamp.
@@ -1115,19 +1115,19 @@ status_t GraphicBufferSource::configure(
         mSuspended = false;
         mEndOfStream = false;
         mEndOfStreamSent = false;
-        mSkipFramesBeforeNs = -1ll;
+        mSkipFramesBeforeNs = -1LL;
         mFrameDropper.clear();
-        mFrameRepeatIntervalUs = -1ll;
+        mFrameRepeatIntervalUs = -1LL;
         mRepeatLastFrameGeneration = 0;
         mOutstandingFrameRepeatCount = 0;
         mLatestBuffer.mBuffer.reset();
         mFrameRepeatBlockedOnCodecBuffer = false;
         mFps = -1.0;
         mCaptureFps = -1.0;
-        mBaseCaptureUs = -1ll;
-        mBaseFrameUs = -1ll;
-        mPrevCaptureUs = -1ll;
-        mPrevFrameUs = -1ll;
+        mBaseCaptureUs = -1LL;
+        mBaseFrameUs = -1LL;
+        mPrevCaptureUs = -1LL;
+        mPrevFrameUs = -1LL;
         mFrameCount = 0;
         mInputBufferTimeOffsetUs = 0;
         mStopTimeUs = -1;
@@ -1193,7 +1193,7 @@ status_t GraphicBufferSource::setRepeatPreviousFrameDelayUs(int64_t repeatAfterU
 
     Mutex::Autolock autoLock(mMutex);
 
-    if (mExecuting || repeatAfterUs <= 0ll) {
+    if (mExecuting || repeatAfterUs <= 0LL) {
         return INVALID_OPERATION;
     }
 
@@ -1205,7 +1205,7 @@ status_t GraphicBufferSource::setTimeOffsetUs(int64_t timeOffsetUs) {
     Mutex::Autolock autoLock(mMutex);
 
     // timeOffsetUs must be negative for adjustment.
-    if (timeOffsetUs >= 0ll) {
+    if (timeOffsetUs >= 0LL) {
         return INVALID_OPERATION;
     }
 
@@ -1239,7 +1239,7 @@ status_t GraphicBufferSource::setStartTimeUs(int64_t skipFramesBeforeUs) {
 
     mSkipFramesBeforeNs =
             (skipFramesBeforeUs > 0 && skipFramesBeforeUs <= INT64_MAX / 1000) ?
-            (skipFramesBeforeUs * 1000) : -1ll;
+            (skipFramesBeforeUs * 1000) : -1LL;
 
     return OK;
 }
