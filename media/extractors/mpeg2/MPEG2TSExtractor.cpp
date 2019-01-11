@@ -224,6 +224,9 @@ media_status_t MPEG2TSSource::read(
     if (inMeta.findData(kKeySEI, &bufType, &bufData, &bufSize)) {
         AMediaFormat_setBuffer(outMeta, AMEDIAFORMAT_KEY_SEI, bufData, bufSize);
     }
+    if (inMeta.findData(kKeyAudioPresentationInfo, &bufType, &bufData, &bufSize)) {
+        AMediaFormat_setBuffer(outMeta, AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_INFO, bufData, bufSize);
+    }
     mbuf->release();
     return AMEDIA_OK;
 }

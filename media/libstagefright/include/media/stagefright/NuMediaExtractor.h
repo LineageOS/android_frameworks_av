@@ -96,8 +96,7 @@ struct NuMediaExtractor : public RefBase {
 
     bool getCachedDuration(int64_t *durationUs, bool *eos) const;
 
-    status_t getAudioPresentations(size_t trackIdx,
-            AudioPresentationCollection *presentations) const;
+    status_t getAudioPresentations(size_t trackIdx, AudioPresentationCollection *presentations);
 
 protected:
     virtual ~NuMediaExtractor();

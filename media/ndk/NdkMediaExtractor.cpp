@@ -448,6 +448,16 @@ media_status_t AMediaExtractor_getSampleFormat(AMediaExtractor *ex, AMediaFormat
         meta->setBuffer(AMEDIAFORMAT_KEY_MPEG_USER_DATA, mpegUserData);
     }
 
+    const void *audioPresentationsPointer;
+    size_t audioPresentationsLength;
+    if (sampleMeta->findData(
+            kKeyAudioPresentationInfo, &dataType,
+            &audioPresentationsPointer, &audioPresentationsLength)) {
+        sp<ABuffer> audioPresentationsData = ABuffer::CreateAsCopy(
+                audioPresentationsPointer, audioPresentationsLength);
+        meta->setBuffer(AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_INFO, audioPresentationsData);
+    }
+
     return AMEDIA_OK;
 }
 
