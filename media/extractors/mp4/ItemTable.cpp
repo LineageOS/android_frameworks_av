@@ -1687,8 +1687,31 @@ status_t ItemTable::getExifOffsetAndSize(off64_t *offset, size_t *size) {
     }
 
     // skip the first 4-byte of the offset to TIFF header
-    *offset = mItemIdToExifMap[exifIndex].offset + 4;
-    *size = mItemIdToExifMap[exifIndex].size - 4;
+    uint32_t tiffOffset;
+    if (!mDataSource->readAt(
+            mItemIdToExifMap[exifIndex].offset, &tiffOffset, 4)) {
+        return ERROR_IO;
+    }
+
+    // We need 'Exif\0\0' before the tiff header
+    tiffOffset = ntohl(tiffOffset);
+    if (tiffOffset < 6) {
+        return ERROR_MALFORMED;
+    }
+    // The first 4-byte of the item is the offset of the tiff header within the
+    // exif data. The size of the item should be > 4 for a non-empty exif (this
+    // was already checked when the item was added). Also check that the tiff
+    // header offset is valid.
+    if (mItemIdToExifMap[exifIndex].size <= 4 ||
+            tiffOffset > mItemIdToExifMap[exifIndex].size - 4) {
+        return ERROR_MALFORMED;
+    }
+
+    // Offset of 'Exif\0\0' relative to the beginning of 'Exif' item
+    // (first 4-byte is the tiff header offset)
+    uint32_t exifOffset = 4 + tiffOffset - 6;
+    *offset = mItemIdToExifMap[exifIndex].offset + exifOffset;
+    *size = mItemIdToExifMap[exifIndex].size - exifOffset;
     return OK;
 }
 

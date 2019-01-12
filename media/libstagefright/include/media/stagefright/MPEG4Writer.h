@@ -257,7 +257,9 @@ private:
     void initInternal(int fd, bool isFirstSession);
 
     // Acquire lock before calling these methods
-    off64_t addSample_l(MediaBuffer *buffer, bool usePrefix, bool isExif, size_t *bytesWritten);
+    off64_t addSample_l(
+            MediaBuffer *buffer, bool usePrefix,
+            uint32_t tiffHdrOffset, size_t *bytesWritten);
     void addLengthPrefixedSample_l(MediaBuffer *buffer);
     void addMultipleLengthPrefixedSamples_l(MediaBuffer *buffer);
     uint16_t addProperty_l(const ItemProperty &);
