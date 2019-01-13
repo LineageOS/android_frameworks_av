@@ -28,6 +28,7 @@ LOCAL_C_INCLUDES := \
 LOCAL_SHARED_LIBRARIES := \
     libaudiopolicyengineconfigurable  \
     libparameter \
+    libmedia_helper \
     liblog \
 
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)

@@ -30,6 +30,7 @@
 #include <media/stagefright/MediaExtractorFactory.h>
 #include <media/IMediaExtractor.h>
 #include <media/IMediaExtractorService.h>
+#include <private/android_filesystem_config.h>
 #include <cutils/properties.h>
 #include <utils/String8.h>
 #include <ziparchive/zip_archive.h>
@@ -106,7 +107,8 @@ sp<IMediaExtractor> MediaExtractorFactory::CreateFromService(
     }
 
     MediaExtractor *ex = nullptr;
-    if (creatorVersion == EXTRACTORDEF_VERSION_NDK_V1) {
+    if (creatorVersion == EXTRACTORDEF_VERSION_NDK_V1 ||
+            creatorVersion == EXTRACTORDEF_VERSION_NDK_V2) {
         CMediaExtractor *ret = ((CreatorFunc)creator)(source->wrap(), meta);
         if (meta != nullptr && freeMeta != nullptr) {
             freeMeta(meta);
@@ -184,7 +186,10 @@ void *MediaExtractorFactory::sniff(
 
         void *curCreator = NULL;
         if ((*it)->def.def_version == EXTRACTORDEF_VERSION_NDK_V1) {
-            curCreator = (void*) (*it)->def.sniff.v2(
+            curCreator = (void*) (*it)->def.u.v2.sniff(
+                    source->wrap(), &newConfidence, &newMeta, &newFreeMeta);
+        } else if ((*it)->def.def_version == EXTRACTORDEF_VERSION_NDK_V2) {
+            curCreator = (void*) (*it)->def.u.v3.sniff(
                     source->wrap(), &newConfidence, &newMeta, &newFreeMeta);
         }
 
@@ -214,7 +219,8 @@ void *MediaExtractorFactory::sniff(
 void MediaExtractorFactory::RegisterExtractor(const sp<ExtractorPlugin> &plugin,
         std::list<sp<ExtractorPlugin>> &pluginList) {
     // sanity check check struct version, uuid, name
-    if (plugin->def.def_version != EXTRACTORDEF_VERSION_NDK_V1) {
+    if (plugin->def.def_version != EXTRACTORDEF_VERSION_NDK_V1 &&
+            plugin->def.def_version != EXTRACTORDEF_VERSION_NDK_V2) {
         ALOGE("don't understand extractor format %u, ignoring.", plugin->def.def_version);
         return;
     }
@@ -394,6 +400,8 @@ static bool compareFunc(const sp<ExtractorPlugin>& first, const sp<ExtractorPlug
     return strcmp(first->def.extractor_name, second->def.extractor_name) < 0;
 }
 
+static std::unordered_set<std::string> gSupportedExtensions;
+
 // static
 void MediaExtractorFactory::UpdateExtractors(const char *newUpdateApkPath) {
     Mutex::Autolock autoLock(gPluginMutex);
@@ -426,7 +434,35 @@ void MediaExtractorFactory::UpdateExtractors(const char *newUpdateApkPath) {
 
     newList->sort(compareFunc);
     gPlugins = newList;
+
+    for (auto it = gPlugins->begin(); it != gPlugins->end(); ++it) {
+        if ((*it)->def.def_version == EXTRACTORDEF_VERSION_NDK_V2) {
+            for (size_t i = 0;; i++) {
+                const char* ext = (*it)->def.u.v3.supported_types[i];
+                if (ext == nullptr) {
+                    break;
+                }
+                gSupportedExtensions.insert(std::string(ext));
+            }
+        }
+    }
+
     gPluginsRegistered = true;
+}
+
+// static
+std::unordered_set<std::string> MediaExtractorFactory::getSupportedTypes() {
+    if (getuid() == AID_MEDIA_EX) {
+        return gSupportedExtensions;
+    }
+    ALOGV("get service manager");
+    sp<IBinder> binder = defaultServiceManager()->getService(String16("media.extractor"));
+
+    if (binder != 0) {
+        sp<IMediaExtractorService> mediaExService(interface_cast<IMediaExtractorService>(binder));
+        return mediaExService->getSupportedTypes();
+    }
+    return std::unordered_set<std::string>();
 }
 
 status_t MediaExtractorFactory::dump(int fd, const Vector<String16>&) {
@@ -445,13 +481,25 @@ status_t MediaExtractorFactory::dump(int fd, const Vector<String16>&) {
         out.append("Available extractors:\n");
         if (gPluginsRegistered) {
             for (auto it = gPlugins->begin(); it != gPlugins->end(); ++it) {
-                out.appendFormat("  %25s: plugin_version(%d), uuid(%s), version(%u), path(%s)\n",
+                out.appendFormat("  %25s: plugin_version(%d), uuid(%s), version(%u), path(%s)",
                         (*it)->def.extractor_name,
                     (*it)->def.def_version,
                         (*it)->uuidString.c_str(),
                         (*it)->def.extractor_version,
                         (*it)->libPath.c_str());
+                if ((*it)->def.def_version == EXTRACTORDEF_VERSION_NDK_V2) {
+                    out.append(", supports: ");
+                    for (size_t i = 0;; i++) {
+                        const char* mime = (*it)->def.u.v3.supported_types[i];
+                        if (mime == nullptr) {
+                            break;
+                        }
+                        out.appendFormat("%s ", mime);
+                    }
+                }
+                out.append("\n");
             }
+            out.append("\n");
         } else {
             out.append("  (no plugins registered)\n");
         }

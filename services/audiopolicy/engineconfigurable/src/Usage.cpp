@@ -18,10 +18,8 @@
 
 #include "Usage.h"
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
 
 status_t Element<audio_usage_t>::setIdentifier(audio_usage_t identifier)
 {

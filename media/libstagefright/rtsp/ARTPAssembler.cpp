@@ -36,7 +36,7 @@ void ARTPAssembler::onPacketReceived(const sp<ARTPSource> &source) {
 
         if (status == WRONG_SEQUENCE_NUMBER) {
             if (mFirstFailureTimeUs >= 0) {
-                if (ALooper::GetNowUs() - mFirstFailureTimeUs > 10000ll) {
+                if (ALooper::GetNowUs() - mFirstFailureTimeUs > 10000LL) {
                     mFirstFailureTimeUs = -1;
 
                     // LOG(VERBOSE) << "waited too long for packet.";

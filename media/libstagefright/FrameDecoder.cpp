@@ -39,7 +39,7 @@
 
 namespace android {
 
-static const int64_t kBufferTimeOutUs = 10000ll; // 10 msec
+static const int64_t kBufferTimeOutUs = 10000LL; // 10 msec
 static const size_t kRetryCount = 50; // must be >0
 
 sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
@@ -274,7 +274,7 @@ status_t FrameDecoder::extractInternal() {
     size_t retriesLeft = kRetryCount;
     do {
         size_t index;
-        int64_t ptsUs = 0ll;
+        int64_t ptsUs = 0LL;
         uint32_t flags = 0;
 
         // Queue as many inputs as we possibly can, then block on dequeuing
@@ -406,7 +406,7 @@ VideoFrameDecoder::VideoFrameDecoder(
     : FrameDecoder(componentName, trackMeta, source),
       mIsAvcOrHevc(false),
       mSeekMode(MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC),
-      mTargetTimeUs(-1ll),
+      mTargetTimeUs(-1LL),
       mNumFrames(0),
       mNumFramesDecoded(0) {
 }
@@ -487,7 +487,7 @@ status_t VideoFrameDecoder::onOutputReceived(
         const sp<MediaCodecBuffer> &videoFrameBuffer,
         const sp<AMessage> &outputFormat,
         int64_t timeUs, bool *done) {
-    bool shouldOutput = (mTargetTimeUs < 0ll) || (timeUs >= mTargetTimeUs);
+    bool shouldOutput = (mTargetTimeUs < 0LL) || (timeUs >= mTargetTimeUs);
 
     // If this is not the target frame, skip color convert.
     if (!shouldOutput) {

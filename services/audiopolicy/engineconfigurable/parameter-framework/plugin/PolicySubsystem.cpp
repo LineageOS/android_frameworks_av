@@ -65,22 +65,22 @@ PolicySubsystem::PolicySubsystem(const std::string &name, core::log::Logger &log
     addSubsystemObjectFactory(
         new TSubsystemObjectFactory<Stream>(
             mStreamComponentName,
-            (1 << MappingKeyIdentifier))
+            (1 << MappingKeyName))
         );
     addSubsystemObjectFactory(
         new TSubsystemObjectFactory<Strategy>(
             mStrategyComponentName,
-            (1 << MappingKeyAmend1) | (1 << MappingKeyIdentifier))
+            0)
         );
     addSubsystemObjectFactory(
         new TSubsystemObjectFactory<Usage>(
             mUsageComponentName,
-            (1 << MappingKeyAmend1) | (1 << MappingKeyIdentifier))
+            (1 << MappingKeyName))
         );
     addSubsystemObjectFactory(
         new TSubsystemObjectFactory<InputSource>(
             mInputSourceComponentName,
-            (1 << MappingKeyAmend1) | (1 << MappingKeyIdentifier))
+            (1 << MappingKeyName))
         );
 }
 

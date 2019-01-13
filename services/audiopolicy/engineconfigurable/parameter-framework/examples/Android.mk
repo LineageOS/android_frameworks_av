@@ -7,14 +7,18 @@
 #
 ################################################################################################
 
-ifeq (1, 0)
-
 LOCAL_PATH := $(call my-dir)
 
+ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), 1)
+
 PFW_CORE := external/parameter-framework
-BUILD_PFW_SETTINGS := $(PFW_CORE)/support/android/build_pfw_settings.mk
+#@TODO: upstream new domain generator
+#BUILD_PFW_SETTINGS := $(PFW_CORE)/support/android/build_pfw_settings.mk
 PFW_DEFAULT_SCHEMAS_DIR := $(PFW_CORE)/upstream/schemas
 PFW_SCHEMAS_DIR := $(PFW_DEFAULT_SCHEMAS_DIR)
+
+TOOLS := frameworks/av/services/audiopolicy/engineconfigurable/tools
+BUILD_PFW_SETTINGS := $(TOOLS)/build_audio_pfw_settings.mk
 
 ##################################################################
 # CONFIGURATION FILES
@@ -25,7 +29,8 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := ParameterFrameworkConfigurationPolicy.xml
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
-LOCAL_MODULE_PATH := $(TARGET_OUT_ETC)/parameter-framework
+LOCAL_VENDOR_MODULE := true
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR_ETC)/parameter-framework
 LOCAL_SRC_FILES := $(LOCAL_MODULE).in
 
 AUDIO_PATTERN = @TUNING_ALLOWED@
@@ -46,7 +51,8 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := PolicyClass.xml
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
-LOCAL_MODULE_PATH := $(TARGET_OUT_ETC)/parameter-framework/Structure/Policy
+LOCAL_VENDOR_MODULE := true
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR_ETC)/parameter-framework/Structure/Policy
 LOCAL_SRC_FILES := Structure/$(LOCAL_MODULE)
 include $(BUILD_PREBUILT)
 
@@ -54,12 +60,12 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := PolicySubsystem.xml
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
+LOCAL_VENDOR_MODULE := true
 LOCAL_REQUIRED_MODULES := \
     PolicySubsystem-CommonTypes.xml \
-    PolicySubsystem-Volume.xml \
-    libpolicy-subsystem \
+    libpolicy-subsystem
 
-LOCAL_MODULE_PATH := $(TARGET_OUT_ETC)/parameter-framework/Structure/Policy
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR_ETC)/parameter-framework/Structure/Policy
 LOCAL_SRC_FILES := Structure/$(LOCAL_MODULE)
 include $(BUILD_PREBUILT)
 
@@ -67,7 +73,8 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := PolicySubsystem-CommonTypes.xml
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
-LOCAL_MODULE_PATH := $(TARGET_OUT_ETC)/parameter-framework/Structure/Policy
+LOCAL_VENDOR_MODULE := true
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR_ETC)/parameter-framework/Structure/Policy
 LOCAL_SRC_FILES := Structure/$(LOCAL_MODULE)
 include $(BUILD_PREBUILT)
 
@@ -76,15 +83,16 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := parameter-framework.policy
 LOCAL_MODULE_STEM := PolicyConfigurableDomains.xml
 LOCAL_MODULE_CLASS := ETC
+LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Settings/Policy
-LOCAL_ADDITIONAL_DEPENDENCIES := \
-        PolicyClass.xml \
-        PolicySubsystem.xml \
-        ParameterFrameworkConfigurationPolicy.xml
+LOCAL_REQUIRED_MODULES := \
+    policy_criteria.xml \
+    policy_criterion_types.xml \
+    PolicySubsystem.xml \
+    PolicyClass.xml \
+    ParameterFrameworkConfigurationPolicy.xml
 
 ifeq ($(pfw_rebuild_settings),true)
-PFW_TOPLEVEL_FILE := $(TARGET_OUT_ETC)/parameter-framework/ParameterFrameworkConfigurationPolicy.xml
-PFW_CRITERIA_FILE := $(LOCAL_PATH)/policy_criteria.txt
 PFW_EDD_FILES := \
         $(LOCAL_PATH)/Settings/device_for_strategy_media.pfw \
         $(LOCAL_PATH)/Settings/device_for_strategy_phone.pfw \
@@ -100,6 +108,17 @@ PFW_EDD_FILES := \
         $(LOCAL_PATH)/Settings/device_for_input_source.pfw \
         $(LOCAL_PATH)/Settings/volumes.pfw
 
+LOCAL_ADDITIONAL_DEPENDENCIES := \
+    $(PFW_EDD_FILES)
+
+
+PFW_CRITERION_TYPES_FILE := $(TARGET_OUT_VENDOR_ETC)/policy_criterion_types.xml
+PFW_CRITERIA_FILE := $(TARGET_OUT_VENDOR_ETC)/policy_criteria.xml
+
+PFW_TOPLEVEL_FILE := $(TARGET_OUT_VENDOR_ETC)/parameter-framework/ParameterFrameworkConfigurationPolicy.xml
+
+PFW_SCHEMAS_DIR := $(PFW_DEFAULT_SCHEMAS_DIR)
+
 include $(BUILD_PFW_SETTINGS)
 else
 # Use the existing file
@@ -107,19 +126,27 @@ LOCAL_SRC_FILES := Settings/$(LOCAL_MODULE_STEM)
 include $(BUILD_PREBUILT)
 endif # pfw_rebuild_settings
 
+endif # ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), 0)
+
 ######### Policy PFW Settings - No Output #########
+ifeq (0, 1)
+
 include $(CLEAR_VARS)
 LOCAL_MODULE := parameter-framework.policy.no-output
 LOCAL_MODULE_STEM := PolicyConfigurableDomains-NoOutputDevice.xml
 LOCAL_MODULE_CLASS := ETC
+LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Settings/Policy
-LOCAL_ADDITIONAL_DEPENDENCIES := \
-        PolicyClass.xml \
-        PolicySubsystem.xml \
-        ParameterFrameworkConfigurationPolicy.xml
+LOCAL_REQUIRED_MODULES := \
+    policy_criteria.xml \
+    policy_criterion_types.xml \
+    PolicySubsystem.xml \
+    PolicyClass.xml \
+    ParameterFrameworkConfigurationPolicy.xml
 
-PFW_TOPLEVEL_FILE := $(TARGET_OUT_ETC)/parameter-framework/ParameterFrameworkConfigurationPolicy.xml
-PFW_CRITERIA_FILE := $(LOCAL_PATH)/policy_criteria.txt
+PFW_TOPLEVEL_FILE := $(TARGET_OUT_VENDOR_ETC)/parameter-framework/ParameterFrameworkConfigurationPolicy.xml
+PFW_CRITERION_TYPES_FILE := $(TARGET_OUT_VENDOR_ETC)/policy_criterion_types.xml
+PFW_CRITERIA_FILE := $(TARGET_OUT_VENDOR_ETC)/policy_criteria.xml
 PFW_EDD_FILES := \
         $(LOCAL_PATH)/SettingsNoOutput/device_for_strategies.pfw \
         $(LOCAL_PATH)/Settings/strategy_for_stream.pfw \
@@ -128,20 +155,26 @@ PFW_EDD_FILES := \
         $(LOCAL_PATH)/Settings/volumes.pfw
 
 include $(BUILD_PFW_SETTINGS)
-
+endif # ifeq (0, 1)
 ######### Policy PFW Settings - No Input #########
+ifeq (0, 1)
+
 include $(CLEAR_VARS)
 LOCAL_MODULE := parameter-framework.policy.no-input
 LOCAL_MODULE_STEM := PolicyConfigurableDomains-NoInputDevice.xml
 LOCAL_MODULE_CLASS := ETC
+LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Settings/Policy
-LOCAL_ADDITIONAL_DEPENDENCIES := \
-        PolicyClass.xml \
-        PolicySubsystem.xml \
-        ParameterFrameworkConfigurationPolicy.xml
+LOCAL_REQUIRED_MODULES := \
+    policy_criteria.xml \
+    policy_criterion_types.xml \
+    PolicySubsystem.xml \
+    PolicyClass.xml \
+    ParameterFrameworkConfigurationPolicy.xml
 
-PFW_TOPLEVEL_FILE := $(TARGET_OUT_ETC)/parameter-framework/ParameterFrameworkConfigurationPolicy.xml
-PFW_CRITERIA_FILE := $(LOCAL_PATH)/policy_criteria.txt
+PFW_TOPLEVEL_FILE := $(TARGET_OUT_VENDOR_ETC)/parameter-framework/ParameterFrameworkConfigurationPolicy.xml
+PFW_CRITERION_TYPES_FILE := $(TARGET_OUT_VENDOR_ETC)/policy_criterion_types.xml
+PFW_CRITERIA_FILE := $(TARGET_OUT_VENDOR_ETC)/policy_criteria.xml
 PFW_EDD_FILES := \
         $(LOCAL_PATH)/Settings/device_for_strategy_media.pfw \
         $(LOCAL_PATH)/Settings/device_for_strategy_phone.pfw \
@@ -160,3 +193,9 @@ PFW_EDD_FILES := \
 include $(BUILD_PFW_SETTINGS)
 
 endif # ifeq (1, 0)
+
+#######################################################################
+# Recursive call sub-folder Android.mk
+#######################################################################
+
+include $(call all-makefiles-under,$(LOCAL_PATH))

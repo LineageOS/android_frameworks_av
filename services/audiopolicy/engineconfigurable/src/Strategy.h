@@ -19,10 +19,8 @@
 #include "Element.h"
 #include <RoutingStrategy.h>
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
 
 /**
  * @tparam audio_devices_t: Applicable output device(s) for this strategy.

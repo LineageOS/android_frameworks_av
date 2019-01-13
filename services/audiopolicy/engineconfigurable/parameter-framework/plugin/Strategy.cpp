@@ -17,9 +17,37 @@
 #include "Strategy.h"
 #include "PolicyMappingKeys.h"
 #include "PolicySubsystem.h"
+#include <RoutingStrategy.h>
 
 using std::string;
 using android::routing_strategy;
+
+namespace detail {
+
+constexpr std::pair<routing_strategy, const char*> routingStrategyMap[] = {
+    {android::STRATEGY_MEDIA, "STRATEGY_MEDIA"},
+    {android::STRATEGY_PHONE, "STRATEGY_PHONE"},
+    {android::STRATEGY_SONIFICATION, "STRATEGY_SONIFICATION"},
+    {android::STRATEGY_SONIFICATION_RESPECTFUL, "STRATEGY_SONIFICATION_RESPECTFUL"},
+    {android::STRATEGY_DTMF, "STRATEGY_DTMF"},
+    {android::STRATEGY_ENFORCED_AUDIBLE, "STRATEGY_ENFORCED_AUDIBLE"},
+    {android::STRATEGY_TRANSMITTED_THROUGH_SPEAKER, "STRATEGY_TRANSMITTED_THROUGH_SPEAKER"},
+    {android::STRATEGY_ACCESSIBILITY, "STRATEGY_ACCESSIBILITY"},
+    {android::STRATEGY_REROUTING, "STRATEGY_REROUTING"},
+};
+
+bool fromString(const char *literalName, routing_strategy &type)
+{
+    for (auto& pair : routingStrategyMap) {
+        if (strcmp(pair.second, literalName) == 0) {
+            type = pair.first;
+            return true;
+        }
+    }
+    return false;
+}
+
+}
 
 Strategy::Strategy(const string &mappingValue,
                    CInstanceConfigurableElement *instanceConfigurableElement,
@@ -35,10 +63,12 @@ Strategy::Strategy(const string &mappingValue,
                            instanceConfigurableElement->getBelongingSubsystem())),
       mPolicyPluginInterface(mPolicySubsystem->getPolicyPluginInterface())
 {
-    mId = static_cast<routing_strategy>(context.getItemAsInteger(MappingKeyIdentifier));
-
+    std::string name(context.getItem(MappingKeyName));
+    if (not detail::fromString(name.c_str(), mId)) {
+        LOG_ALWAYS_FATAL("Invalid Strategy %s, invalid XML structure file", name.c_str());
+    }
     // Declares the strategy to audio policy engine
-    mPolicyPluginInterface->addStrategy(getFormattedMappingValue(), mId);
+    mPolicyPluginInterface->addStrategy(instanceConfigurableElement->getName(), mId);
 }
 
 bool Strategy::sendToHW(string & /*error*/)

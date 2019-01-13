@@ -44,10 +44,10 @@ namespace android {
 
 // static
 // Bandwidth Switch Mark Defaults
-const int64_t LiveSession::kUpSwitchMarkUs = 15000000ll;
-const int64_t LiveSession::kDownSwitchMarkUs = 20000000ll;
-const int64_t LiveSession::kUpSwitchMarginUs = 5000000ll;
-const int64_t LiveSession::kResumeThresholdUs = 100000ll;
+const int64_t LiveSession::kUpSwitchMarkUs = 15000000LL;
+const int64_t LiveSession::kDownSwitchMarkUs = 20000000LL;
+const int64_t LiveSession::kUpSwitchMarginUs = 5000000LL;
+const int64_t LiveSession::kResumeThresholdUs = 100000LL;
 
 //TODO: redefine this mark to a fair value
 // default buffer underflow mark
@@ -66,9 +66,9 @@ private:
     // Bandwidth estimation parameters
     static const int32_t kShortTermBandwidthItems = 3;
     static const int32_t kMinBandwidthHistoryItems = 20;
-    static const int64_t kMinBandwidthHistoryWindowUs = 5000000ll; // 5 sec
-    static const int64_t kMaxBandwidthHistoryWindowUs = 30000000ll; // 30 sec
-    static const int64_t kMaxBandwidthHistoryAgeUs = 60000000ll; // 60 sec
+    static const int64_t kMinBandwidthHistoryWindowUs = 5000000LL; // 5 sec
+    static const int64_t kMaxBandwidthHistoryWindowUs = 30000000LL; // 30 sec
+    static const int64_t kMaxBandwidthHistoryAgeUs = 60000000LL; // 60 sec
 
     struct BandwidthEntry {
         int64_t mTimestampUs;
@@ -284,7 +284,7 @@ LiveSession::LiveSession(
       mPrevBufferPercentage(-1),
       mCurBandwidthIndex(-1),
       mOrigBandwidthIndex(-1),
-      mLastBandwidthBps(-1ll),
+      mLastBandwidthBps(-1LL),
       mLastBandwidthStable(false),
       mBandwidthEstimator(new BandwidthEstimator()),
       mMaxWidth(720),
@@ -294,8 +294,8 @@ LiveSession::LiveSession(
       mSwapMask(0),
       mSwitchGeneration(0),
       mSubtitleGeneration(0),
-      mLastDequeuedTimeUs(0ll),
-      mRealTimeBaseUs(0ll),
+      mLastDequeuedTimeUs(0LL),
+      mRealTimeBaseUs(0LL),
       mReconfigurationInProgress(false),
       mSwitchInProgress(false),
       mUpSwitchMark(kUpSwitchMarkUs),
@@ -844,7 +844,7 @@ void LiveSession::onMessageReceived(const sp<AMessage> &msg) {
                     // (If we don't have that cushion we'd rather cancel and try again.)
                     int64_t delayUs =
                         switchUp ?
-                            (kUnderflowMarkMs * 1000ll + 1000000ll)
+                            (kUnderflowMarkMs * 1000LL + 1000000LL)
                             : 0;
                     bool needResumeUntil = false;
                     sp<AMessage> stopParams = msg;
@@ -954,7 +954,7 @@ void LiveSession::onMessageReceived(const sp<AMessage> &msg) {
 
 // static
 bool LiveSession::isBandwidthValid(const BandwidthItem &item) {
-    static const int64_t kBlacklistWindowUs = 300 * 1000000ll;
+    static const int64_t kBlacklistWindowUs = 300 * 1000000LL;
     return item.mLastFailureUs < 0
             || ALooper::GetNowUs() - item.mLastFailureUs > kBlacklistWindowUs;
 }
@@ -1060,7 +1060,7 @@ void LiveSession::onMasterPlaylistFetched(const sp<AMessage> &msg) {
             BandwidthItem item;
 
             item.mPlaylistIndex = i;
-            item.mLastFailureUs = -1ll;
+            item.mLastFailureUs = -1LL;
 
             sp<AMessage> meta;
             AString uri;
@@ -1114,7 +1114,7 @@ void LiveSession::onMasterPlaylistFetched(const sp<AMessage> &msg) {
 
     mPlaylist->pickRandomMediaItems();
     changeConfiguration(
-            0ll /* timeUs */, initialBandwidthIndex, false /* pickTrack */);
+            0LL /* timeUs */, initialBandwidthIndex, false /* pickTrack */);
 }
 
 void LiveSession::finishDisconnect() {
@@ -1175,7 +1175,7 @@ sp<PlaylistFetcher> LiveSession::addFetcher(const char *uri) {
     FetcherInfo info;
     info.mFetcher = new PlaylistFetcher(
             notify, this, uri, mCurBandwidthIndex, mSubtitleGeneration);
-    info.mDurationUs = -1ll;
+    info.mDurationUs = -1LL;
     info.mToBeRemoved = false;
     info.mToBeResumed = false;
     mFetcherLooper->registerHandler(info.mFetcher);
@@ -1466,7 +1466,7 @@ void LiveSession::onSeek(const sp<AMessage> &msg) {
 }
 
 status_t LiveSession::getDuration(int64_t *durationUs) const {
-    int64_t maxDurationUs = -1ll;
+    int64_t maxDurationUs = -1LL;
     for (size_t i = 0; i < mFetcherInfos.size(); ++i) {
         int64_t fetcherDurationUs = mFetcherInfos.valueAt(i).mDurationUs;
 
@@ -1592,7 +1592,7 @@ void LiveSession::changeConfiguration(
         // Delay fetcher removal if not picking tracks, AND old fetcher
         // has stream mask that overlaps new variant. (Okay to discard
         // old fetcher now, if completely no overlap.)
-        if (discardFetcher && timeUs < 0ll && !pickTrack
+        if (discardFetcher && timeUs < 0LL && !pickTrack
                 && (fetcher->getStreamTypeMask() & streamMask)) {
             discardFetcher = false;
             delayRemoval = true;
@@ -1604,7 +1604,7 @@ void LiveSession::changeConfiguration(
         } else {
             float threshold = 0.0f; // default to pause after current block (47Kbytes)
             bool disconnect = false;
-            if (timeUs >= 0ll) {
+            if (timeUs >= 0LL) {
                 // seeking, no need to finish fetching
                 disconnect = true;
             } else if (delayRemoval) {
@@ -1620,7 +1620,7 @@ void LiveSession::changeConfiguration(
     }
 
     sp<AMessage> msg;
-    if (timeUs < 0ll) {
+    if (timeUs < 0LL) {
         // skip onChangeConfiguration2 (decoder destruction) if not seeking.
         msg = new AMessage(kWhatChangeConfiguration3, this);
     } else {
@@ -1654,9 +1654,9 @@ void LiveSession::onChangeConfiguration(const sp<AMessage> &msg) {
     if (!mReconfigurationInProgress) {
         int32_t pickTrack = 0;
         msg->findInt32("pickTrack", &pickTrack);
-        changeConfiguration(-1ll /* timeUs */, -1, pickTrack);
+        changeConfiguration(-1LL /* timeUs */, -1, pickTrack);
     } else {
-        msg->post(1000000ll); // retry in 1 sec
+        msg->post(1000000LL); // retry in 1 sec
     }
 }
 
@@ -1788,7 +1788,7 @@ void LiveSession::onChangeConfiguration3(const sp<AMessage> &msg) {
     CHECK(msg->findInt64("timeUs", &timeUs));
     CHECK(msg->findInt32("pickTrack", &pickTrack));
 
-    if (timeUs < 0ll) {
+    if (timeUs < 0LL) {
         if (!pickTrack) {
             // mSwapMask contains streams that are in both old and new variant,
             // (in mNewStreamMask & mStreamMask) but with different URIs
@@ -2062,7 +2062,7 @@ void LiveSession::tryToFinishBandwidthSwitch(const AString &oldUri) {
 void LiveSession::schedulePollBuffering() {
     sp<AMessage> msg = new AMessage(kWhatPollBuffering, this);
     msg->setInt32("generation", mPollBufferingGeneration);
-    msg->post(1000000ll);
+    msg->post(1000000LL);
 }
 
 void LiveSession::cancelPollBuffering() {
@@ -2208,13 +2208,13 @@ bool LiveSession::checkBuffering(
         int64_t readyMarkUs =
             (mInPreparationPhase ?
                 mBufferingSettings.mInitialMarkMs :
-                mBufferingSettings.mResumePlaybackMarkMs) * 1000ll;
+                mBufferingSettings.mResumePlaybackMarkMs) * 1000LL;
         if (bufferedDurationUs > readyMarkUs
                 || mPacketSources[i]->isFinished(0)) {
             ++readyCount;
         }
         if (!mPacketSources[i]->isFinished(0)) {
-            if (bufferedDurationUs < kUnderflowMarkMs * 1000ll) {
+            if (bufferedDurationUs < kUnderflowMarkMs * 1000LL) {
                 ++underflowCount;
             }
             if (bufferedDurationUs > mUpSwitchMark) {
@@ -2300,7 +2300,7 @@ bool LiveSession::tryBandwidthFallback() {
         ssize_t lowestValid = getLowestValidBandwidthIndex();
         if (mCurBandwidthIndex > lowestValid) {
             cancelBandwidthSwitch();
-            changeConfiguration(-1ll, lowestValid);
+            changeConfiguration(-1LL, lowestValid);
             return true;
         }
     }
@@ -2370,7 +2370,7 @@ bool LiveSession::switchBandwidthIfNeeded(bool bufferHigh, bool bufferLow) {
             // if not yet prepared, just restart again with new bw index.
             // this is faster and playback experience is cleaner.
             changeConfiguration(
-                    mInPreparationPhase ? 0 : -1ll, bandwidthIndex);
+                    mInPreparationPhase ? 0 : -1LL, bandwidthIndex);
             return true;
         }
     }

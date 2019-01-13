@@ -199,7 +199,7 @@ media_status_t AMRExtractor::getMetaData(AMediaFormat *meta) {
 
     if (mInitCheck == OK) {
         AMediaFormat_setString(meta,
-                AMEDIAFORMAT_KEY_MIME, mIsWide ? "audio/amr-wb" : "audio/amr");
+                AMEDIAFORMAT_KEY_MIME, mIsWide ? MEDIA_MIMETYPE_AUDIO_AMR_WB : "audio/amr");
     }
 
     return AMEDIA_OK;
@@ -280,8 +280,8 @@ media_status_t AMRSource::read(
     ReadOptions::SeekMode mode;
     if (mOffsetTableLength > 0 && options && options->getSeekTo(&seekTimeUs, &mode)) {
         size_t size;
-        int64_t seekFrame = seekTimeUs / 20000ll;  // 20ms per frame.
-        mCurrentTimeUs = seekFrame * 20000ll;
+        int64_t seekFrame = seekTimeUs / 20000LL;  // 20ms per frame.
+        mCurrentTimeUs = seekFrame * 20000LL;
 
         size_t index = seekFrame < 0 ? 0 : seekFrame / 50;
         if (index >= mOffsetTableLength) {
@@ -358,6 +358,12 @@ media_status_t AMRSource::read(
 
 ////////////////////////////////////////////////////////////////////////////////
 
+static const char *extensions[] = {
+    "amr",
+    "awb",
+    NULL
+};
+
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
@@ -368,21 +374,24 @@ ExtractorDef GETEXTRACTORDEF() {
         1,
         "AMR Extractor",
         {
-           .v2 = [](
-                    CDataSource *source,
-                    float *confidence,
-                    void **,
-                    FreeMetaFunc *) -> CreatorFunc {
-                DataSourceHelper helper(source);
-                if (SniffAMR(&helper, nullptr, confidence)) {
-                    return [](
-                            CDataSource *source,
-                            void *) -> CMediaExtractor* {
-                        return wrap(new AMRExtractor(new DataSourceHelper(source)));};
-                }
-                return NULL;
-            }
-        }
+           .v3 = {
+               [](
+                   CDataSource *source,
+                   float *confidence,
+                   void **,
+                   FreeMetaFunc *) -> CreatorFunc {
+                   DataSourceHelper helper(source);
+                   if (SniffAMR(&helper, nullptr, confidence)) {
+                       return [](
+                               CDataSource *source,
+                               void *) -> CMediaExtractor* {
+                           return wrap(new AMRExtractor(new DataSourceHelper(source)));};
+                   }
+                   return NULL;
+               },
+               extensions
+           },
+        },
     };
 }
 

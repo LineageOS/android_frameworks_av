@@ -54,7 +54,7 @@ class MediaPlayer2 : public MediaPlayer2InterfaceListener
 public:
     ~MediaPlayer2();
 
-    static sp<MediaPlayer2> Create(int32_t sessionId);
+    static sp<MediaPlayer2> Create(int32_t sessionId, jobject context);
     static status_t DumpAll(int fd, const Vector<String16>& args);
 
             void            disconnect();
@@ -117,7 +117,7 @@ public:
             status_t        dump(int fd, const Vector<String16>& args);
 
 private:
-    MediaPlayer2(int32_t sessionId);
+    MediaPlayer2(int32_t sessionId, jobject context);
     bool init();
 
     // Disconnect from the currently connected ANativeWindow.
@@ -153,6 +153,7 @@ private:
     int                         mVideoHeight;
     int32_t                     mAudioSessionId;
     sp<JObjectHolder>           mAudioAttributes;
+    sp<JObjectHolder>           mContext;
     float                       mSendLevel;
     sp<ANativeWindowWrapper>    mConnectedWindow;
 };

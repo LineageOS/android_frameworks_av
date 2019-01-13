@@ -872,7 +872,7 @@ media_status_t MyOggExtractor::_readNextPacket(MediaBufferHelper **out, bool cal
 
             ALOGV("readPage returned %zd", n);
 
-            return n < 0 ? (media_status_t) n : AMEDIA_ERROR_END_OF_STREAM;
+            return n == ERROR_END_OF_STREAM ? AMEDIA_ERROR_END_OF_STREAM : AMEDIA_ERROR_UNKNOWN;
         }
 
         // Prevent a harmless unsigned integer overflow by clamping to 0
@@ -1379,6 +1379,12 @@ static CreatorFunc Sniff(
     return CreateExtractor;
 }
 
+static const char *extensions[] = {
+    "oga",
+    "ogg",
+    NULL
+};
+
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
@@ -1388,7 +1394,7 @@ ExtractorDef GETEXTRACTORDEF() {
         UUID("8cc5cd06-f772-495e-8a62-cba9649374e9"),
         1, // version
         "Ogg Extractor",
-        { .v2 = Sniff }
+        { .v3 = {Sniff, extensions} },
     };
 }
 

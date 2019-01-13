@@ -35,7 +35,7 @@
 
 namespace android {
 
-const int64_t kNearEOSMarkUs = 2000000ll; // 2 secs
+const int64_t kNearEOSMarkUs = 2000000LL; // 2 secs
 
 AnotherPacketSource::AnotherPacketSource(const sp<MetaData> &meta)
     : mIsAudio(false),
@@ -223,6 +223,12 @@ status_t AnotherPacketSource::read(
                     kKeyMpegUserData, 0, mpegUserData->data(), mpegUserData->size());
         }
 
+        sp<ABuffer> ap;
+        if (buffer->meta()->findBuffer("audio-presentation-info", &ap) && ap != NULL) {
+            bufmeta.setData(
+                    kKeyAudioPresentationInfo, 0, ap->data(), ap->size());
+        }
+
         int32_t cryptoMode;
         if (buffer->meta()->findInt32("cryptoMode", &cryptoMode)) {
             int32_t cryptoKey;
@@ -293,7 +299,7 @@ void AnotherPacketSource::queueAccessUnit(const sp<ABuffer> &buffer) {
     if (buffer->meta()->findInt32("discontinuity", &discontinuity)){
         ALOGV("queueing a discontinuity with queueAccessUnit");
 
-        mLastQueuedTimeUs = 0ll;
+        mLastQueuedTimeUs = 0LL;
         mEOSResult = OK;
         mLatestEnqueuedMeta = NULL;
 
@@ -695,25 +701,6 @@ sp<AMessage> AnotherPacketSource::trimBuffersBeforeMeta(
     }
 
     return firstMeta;
-}
-
-void AnotherPacketSource::convertAudioPresentationInfoToMetadata(
-        const AudioPresentationCollection& presentations) {
-    sp<MetaData> meta = getFormat();
-    if (meta == NULL) {
-        return;
-    }
-    if (presentations.empty()) {
-        // Clear audio presentation info in metadata.
-        Mutex::Autolock autoLock(mLock);
-        meta->remove(kKeyAudioPresentationInfo);
-    } else {
-        std::ostringstream outStream(std::ios::out);
-        serializeAudioPresentations(presentations, &outStream);
-        Mutex::Autolock autoLock(mLock);
-        meta->setData(kKeyAudioPresentationInfo, MetaData::TYPE_NONE,
-                outStream.str().data(), outStream.str().size());
-    }
 }
 
 }  // namespace android

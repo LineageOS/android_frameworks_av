@@ -22,6 +22,7 @@
 #include <media/stagefright/foundation/AHandler.h>
 
 #include <mediaplayer2/MediaPlayer2Interface.h>
+#include <mediaplayer2/JObjectHolder.h>
 
 #include "mediaplayer2.pb.h"
 
@@ -42,7 +43,8 @@ class MetaData;
 struct NuPlayer2Driver;
 
 struct NuPlayer2 : public AHandler {
-    explicit NuPlayer2(pid_t pid, uid_t uid, const sp<MediaClock> &mediaClock);
+    explicit NuPlayer2(pid_t pid, uid_t uid,
+            const sp<MediaClock> &mediaClock, const sp<JObjectHolder> &context);
 
     void setDriver(const wp<NuPlayer2Driver> &driver);
 
@@ -271,6 +273,9 @@ private:
 
     // Pause state as requested by source (internally) due to buffering
     bool mPausedForBuffering;
+
+    // Passed from JAVA
+    const sp<JObjectHolder> mContext;
 
     inline const sp<DecoderBase> &getDecoder(bool audio) {
         return audio ? mAudioDecoder : mVideoDecoder;

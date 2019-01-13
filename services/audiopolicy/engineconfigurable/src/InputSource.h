@@ -18,10 +18,8 @@
 
 #include "Element.h"
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
 
 /**
  * Specialization of policy base class element for audio_source_t

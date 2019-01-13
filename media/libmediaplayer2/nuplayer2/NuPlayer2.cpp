@@ -209,7 +209,8 @@ private:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-NuPlayer2::NuPlayer2(pid_t pid, uid_t uid, const sp<MediaClock> &mediaClock)
+NuPlayer2::NuPlayer2(
+        pid_t pid, uid_t uid, const sp<MediaClock> &mediaClock, const sp<JObjectHolder> &context)
     : mPID(pid),
       mUID(uid),
       mMediaClock(mediaClock),
@@ -240,7 +241,8 @@ NuPlayer2::NuPlayer2(pid_t pid, uid_t uid, const sp<MediaClock> &mediaClock)
       mVideoDecoderError(false),
       mPaused(false),
       mPausedByClient(true),
-      mPausedForBuffering(false) {
+      mPausedForBuffering(false),
+      mContext(context) {
     CHECK(mediaClock != NULL);
     clearFlushComplete();
 }
@@ -1738,7 +1740,7 @@ void NuPlayer2::onStart(bool play) {
     sp<AMessage> notify = new AMessage(kWhatRendererNotify, this);
     ++mRendererGeneration;
     notify->setInt32("generation", mRendererGeneration);
-    mRenderer = new Renderer(mAudioSink, mMediaClock, notify, flags);
+    mRenderer = new Renderer(mAudioSink, mMediaClock, notify, mContext, flags);
     mRendererLooper = new ALooper;
     mRendererLooper->setName("NuPlayer2Renderer");
     mRendererLooper->start(false, true, ANDROID_PRIORITY_AUDIO);

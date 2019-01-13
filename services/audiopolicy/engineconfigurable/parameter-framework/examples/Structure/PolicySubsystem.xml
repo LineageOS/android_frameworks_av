@@ -13,54 +13,40 @@
 
         <!--#################### STRATEGY BEGIN ####################-->
 
-        <ComponentType Name="Strategies" Description="Identifier must match the enum value to make
-                             the link between the PolicyManager and PFW">
-            <Component Name="media" Type="StrategyConfig" Mapping="Amend1:Media,Identifier:0"/>
-            <Component Name="phone" Type="StrategyConfig" Mapping="Amend1:Phone,Identifier:1"/>
-            <Component Name="sonification" Type="StrategyConfig"
-                                           Mapping="Amend1:Sonification,Identifier:2"/>
-            <Component Name="sonification_respectful" Type="StrategyConfig"
-                       Mapping="Amend1:SonificationRespectful,Identifier:3"/>
-            <Component Name="dtmf" Type="StrategyConfig" Mapping="Amend1:Dtmf,Identifier:4"/>
-            <Component Name="enforced_audible" Type="StrategyConfig"
-                                               Mapping="Amend1:EnforcedAudible,Identifier:5"/>
-            <Component Name="transmitted_through_speaker" Type="StrategyConfig"
-                       Mapping="Amend1:TransmittedThroughSpeaker,Identifier:6"/>
-            <Component Name="accessibility" Type="StrategyConfig"
-                                            Mapping="Amend1:Accessibility,Identifier:7"/>
-            <Component Name="rerouting" Type="StrategyConfig"
-                                        Mapping="Amend1:Rerouting,Identifier:8"/>
+        <ComponentType Name="Strategies">
+            <Component Name="media" Type="StrategyConfig" Mapping="Name:STRATEGY_MEDIA"/>
+            <Component Name="phone" Type="StrategyConfig" Mapping="Name:STRATEGY_PHONE"/>
+            <Component Name="sonification" Type="StrategyConfig" Mapping="Name:STRATEGY_SONIFICATION"/>
+            <Component Name="sonification_respectful" Type="StrategyConfig" Mapping="Name:STRATEGY_SONIFICATION_RESPECTFUL"/>
+            <Component Name="dtmf" Type="StrategyConfig" Mapping="Name:STRATEGY_DTMF"/>
+            <Component Name="enforced_audible" Type="StrategyConfig" Mapping="Name:STRATEGY_ENFORCED_AUDIBLE"/>
+            <Component Name="transmitted_through_speaker" Type="StrategyConfig" Mapping="Name:STRATEGY_TRANSMITTED_THROUGH_SPEAKER"/>
+            <Component Name="accessibility" Type="StrategyConfig" Mapping="Name:STRATEGY_ACCESSIBILITY"/>
+            <Component Name="rerouting" Type="StrategyConfig" Mapping=",Name:STRATEGY_REROUTING"/>
         </ComponentType>
 
         <!--#################### STRATEGY END ####################-->
 
         <!--#################### STREAM BEGIN ####################-->
 
-        <ComponentType Name="Streams" Description="associated to audio_stream_type_t definition,
-                             identifier mapping must match the value of the enum">
-            <Component Name="voice_call" Type="Stream" Mapping="Stream:VoiceCall,Identifier:0"/>
-            <Component Name="system" Type="Stream" Mapping="Stream:System,Identifier:1"/>
-            <Component Name="ring" Type="Stream" Mapping="Stream:Ring,Identifier:2"/>
-            <Component Name="music" Type="Stream" Mapping="Stream:Music,Identifier:3"/>
-            <Component Name="alarm" Type="Stream" Mapping="Stream:Alarm,Identifier:4"/>
-            <Component Name="notification" Type="Stream"
-                                           Mapping="Stream:Notification,Identifier:5"/>
-            <Component Name="bluetooth_sco" Type="Stream"
-                                            Mapping="Stream:BluetoothSco,Identifier:6"/>
-            <Component Name="enforced_audible" Type="Stream"
-                                               Mapping="Stream:EnforceAudible,Identifier:7"
-                       Description="Sounds that cannot be muted by user and must
-                                    be routed to speaker"/>
-            <Component Name="dtmf" Type="Stream" Mapping="Stream:Dtmf,Identifier:8"/>
-            <Component Name="tts" Type="Stream" Mapping="Stream:Tts,Identifier:9"
-                             Description="Transmitted Through Speaker.
-                                          Plays over speaker only, silent on other devices"/>
-            <Component Name="accessibility" Type="Stream"
-                                            Mapping="Stream:Accessibility,Identifier:10"
+        <ComponentType Name="Streams" Description="associated to audio_stream_type_t definition">
+            <Component Name="voice_call" Type="Stream" Mapping="Name:AUDIO_STREAM_VOICE_CALL"/>
+            <Component Name="system" Type="Stream" Mapping="Name:AUDIO_STREAM_SYSTEM"/>
+            <Component Name="ring" Type="Stream" Mapping="Name:AUDIO_STREAM_RING"/>
+            <Component Name="music" Type="Stream" Mapping="Name:AUDIO_STREAM_MUSIC"/>
+            <Component Name="alarm" Type="Stream" Mapping="Name:AUDIO_STREAM_ALARM"/>
+            <Component Name="notification" Type="Stream" Mapping="Name:AUDIO_STREAM_NOTIFICATION"/>
+            <Component Name="bluetooth_sco" Type="Stream" Mapping="Name:AUDIO_STREAM_BLUETOOTH_SCO"/>
+            <Component Name="enforced_audible" Type="Stream" Mapping="Name:AUDIO_STREAM_ENFORCED_AUDIBLE"
+                       Description="Sounds that cannot be muted by user and must be routed to speaker"/>
+            <Component Name="dtmf" Type="Stream" Mapping="Name:AUDIO_STREAM_DTMF"/>
+            <Component Name="tts" Type="Stream" Mapping="Name:AUDIO_STREAM_TTS"
+                             Description="Transmitted Through Speaker. Plays over speaker only, silent on other devices"/>
+            <Component Name="accessibility" Type="Stream" Mapping="Name:AUDIO_STREAM_ACCESSIBILITY"
                              Description="For accessibility talk back prompts"/>
-            <Component Name="rerouting" Type="Stream" Mapping="Stream:Rerouting,Identifier:11"
+            <Component Name="rerouting" Type="Stream" Mapping="Name:AUDIO_STREAM_REROUTING"
                              Description="For dynamic policy output mixes"/>
-            <Component Name="patch" Type="Stream" Mapping="Stream:Patch,Identifier:12"
+            <Component Name="patch" Type="Stream" Mapping="Name:AUDIO_STREAM_PATCH"
                              Description="For internal audio flinger tracks. Fixed volume"/>
         </ComponentType>
 
@@ -68,36 +54,34 @@
 
         <!--#################### USAGE BEGIN ####################-->
 
-        <ComponentType Name="Usages" Description="associated to audio_usage_t definition,
-                             identifier mapping must match the value of the enum">
-            <Component Name="unknown" Type="Usage" Mapping="Amend1:Unknown,Identifier:0"/>
-            <Component Name="media" Type="Usage" Mapping="Amend1:Media,Identifier:1"/>
+        <ComponentType Name="Usages" Description="associated to audio_usage_t definition">
+            <Component Name="unknown" Type="Usage" Mapping="Name:AUDIO_USAGE_UNKNOWN"/>
+            <Component Name="media" Type="Usage" Mapping="Name:AUDIO_USAGE_MEDIA"/>
             <Component Name="voice_communication" Type="Usage"
-                                                  Mapping="Amend1:VoiceCommunication,Identifier:2"/>
+                       Mapping="Name:AUDIO_USAGE_VOICE_COMMUNICATION"/>
             <Component Name="voice_communication_signalling" Type="Usage"
-                       Mapping="Amend1:VoiceCommunicationSignalling,Identifier:3"/>
-            <Component Name="alarm" Type="Usage" Mapping="Amend1:Alarm,Identifier:4"/>
-            <Component Name="notification" Type="Usage" Mapping="Amend1:Notification,Identifier:5"/>
+                       Mapping="Name:AUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING"/>
+            <Component Name="alarm" Type="Usage" Mapping="Name:AUDIO_USAGE_ALARM"/>
+            <Component Name="notification" Type="Usage" Mapping="Name:AUDIO_USAGE_NOTIFICATION"/>
             <Component Name="notification_telephony_ringtone" Type="Usage"
-                       Mapping="Amend1:NotificationTelephonyRingtone,Identifier:6"/>
+                       Mapping="Name:AUDIO_USAGE_NOTIFICATION_TELEPHONY_RINGTONE"/>
             <Component Name="notification_communication_request" Type="Usage"
-                       Mapping="Amend1:NotificationCommunicationRequest,Identifier:7"/>
+                       Mapping="Name:AUDIO_USAGE_NOTIFICATION_COMMUNICATION_REQUEST"/>
             <Component Name="notification_communication_instant" Type="Usage"
-                       Mapping="Amend1:NotificationCommunicationInstant,Identifier:8"/>
+                       Mapping="Name:AUDIO_USAGE_NOTIFICATION_COMMUNICATION_INSTANT"/>
             <Component Name="notification_communication_delayed" Type="Usage"
-                       Mapping="Amend1:NotificationCommunicationDelated,Identifier:9"/>
+                       Mapping="Name:AUDIO_USAGE_NOTIFICATION_COMMUNICATION_DELAYED"/>
             <Component Name="notification_event" Type="Usage"
-                                                 Mapping="Amend1:NotificationEvent,Identifier:10"/>
+                       Mapping="Name:AUDIO_USAGE_NOTIFICATION_EVENT"/>
             <Component Name="assistance_accessibility" Type="Usage"
-                       Mapping="Amend1:AssistanceAccessibility,Identifier:11"/>
+                       Mapping="Name:AUDIO_USAGE_ASSISTANCE_ACCESSIBILITY"/>
             <Component Name="assistance_navigation_guidance" Type="Usage"
-                       Mapping="Amend1:AssistanceNavigationGuidance,Identifier:12"/>
+                       Mapping="Name:AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE"/>
             <Component Name="assistance_sonification" Type="Usage"
-                       Mapping="Amend1:AssistanceSonification,Identifier:13"/>
-            <Component Name="game" Type="Usage" Mapping="Amend1:BluetoothSco,Identifier:14"/>
-            <Component Name="virtual_source" Type="Usage"
-                                             Mapping="Amend1:VirtualSource,Identifier:15"/>
-            <Component Name="assistant" Type="Usage" Mapping="Amend1:Assistant,Identifier:16"/>
+                       Mapping="Name:AUDIO_USAGE_ASSISTANCE_SONIFICATION"/>
+            <Component Name="game" Type="Usage" Mapping="Name:AUDIO_USAGE_GAME"/>
+            <Component Name="virtual_source" Type="Usage" Mapping="Name:AUDIO_USAGE_VIRTUAL_SOURCE"/>
+            <Component Name="assistant" Type="Usage" Mapping="Name:AUDIO_USAGE_ASSISTANT"/>
         </ComponentType>
 
         <!--#################### USAGE END ####################-->
@@ -106,25 +90,25 @@
 
         <ComponentType Name="InputSources" Description="associated to audio_source_t definition,
                              identifier mapping must match the value of the enum">
-            <Component Name="default" Type="InputSource" Mapping="Amend1:Default,Identifier:0"/>
-            <Component Name="mic" Type="InputSource" Mapping="Amend1:Mic,Identifier:1"/>
+            <Component Name="default" Type="InputSource" Mapping="Name:AUDIO_SOURCE_DEFAULT"/>
+            <Component Name="mic" Type="InputSource" Mapping="Name:AUDIO_SOURCE_MIC"/>
             <Component Name="voice_uplink" Type="InputSource"
-                                           Mapping="Amend1:VoiceUplink,Identifier:2"/>
+                                           Mapping="Name:AUDIO_SOURCE_VOICE_UPLINK"/>
             <Component Name="voice_downlink" Type="InputSource"
-                                             Mapping="Amend1:VoiceDownlink,Identifier:3"/>
+                                             Mapping="Name:AUDIO_SOURCE_VOICE_DOWNLINK"/>
             <Component Name="voice_call" Type="InputSource"
-                                         Mapping="Amend1:VoiceCall,Identifier:4"/>
-            <Component Name="camcorder" Type="InputSource" Mapping="Amend1:Camcorder,Identifier:5"/>
+                                         Mapping="Name:AUDIO_SOURCE_VOICE_CALL"/>
+            <Component Name="camcorder" Type="InputSource" Mapping="Name:AUDIO_SOURCE_CAMCORDER"/>
             <Component Name="voice_recognition" Type="InputSource"
-                                                Mapping="Amend1:VoiceRecognition,Identifier:6"/>
+                                                Mapping="Name:AUDIO_SOURCE_VOICE_RECOGNITION"/>
             <Component Name="voice_communication" Type="InputSource"
-                                                  Mapping="Amend1:VoiceCommunication,Identifier:7"/>
+                                                  Mapping="Name:AUDIO_SOURCE_VOICE_COMMUNICATION"/>
             <Component Name="remote_submix" Type="InputSource"
-                                            Mapping="Amend1:RemoteSubmix,Identifier:8"/>
+                                            Mapping="Name:AUDIO_SOURCE_REMOTE_SUBMIX"/>
             <Component Name="unprocessed" Type="InputSource"
-                                            Mapping="Amend1:Unprocessed,Identifier:9"/>
-            <Component Name="fm_tuner" Type="InputSource" Mapping="Amend1:FmTuner,Identifier:1998"/>
-            <Component Name="hotword" Type="InputSource" Mapping="Amend1:Hotword,Identifier:1999"/>
+                                            Mapping="Name:AUDIO_SOURCE_UNPROCESSED"/>
+            <Component Name="fm_tuner" Type="InputSource" Mapping="Name:AUDIO_SOURCE_FM_TUNER"/>
+            <Component Name="hotword" Type="InputSource" Mapping="Name:AUDIO_SOURCE_HOTWORD"/>
         </ComponentType>
 
         <!--#################### INPUT SOURCE END ####################-->

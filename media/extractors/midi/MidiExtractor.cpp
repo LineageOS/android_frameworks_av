@@ -326,6 +326,18 @@ bool SniffMidi(CDataSource *source, float *confidence)
 
 }
 
+static const char *extensions[] = {
+    "imy",
+    "mid",
+    "midi",
+    "mxmf",
+    "ota",
+    "rtttl",
+    "rtx",
+    "smf",
+    "xmf",
+    NULL
+};
 
 extern "C" {
 // This is the only symbol that needs to be exported
@@ -337,20 +349,23 @@ ExtractorDef GETEXTRACTORDEF() {
         1,
         "MIDI Extractor",
         {
-            .v2 = [](
+            .v3 = {
+                [](
                 CDataSource *source,
                 float *confidence,
                 void **,
                 FreeMetaFunc *) -> CreatorFunc {
-                if (SniffMidi(source, confidence)) {
-                    return [](
-                            CDataSource *source,
-                            void *) -> CMediaExtractor* {
-                        return wrap(new MidiExtractor(source));};
-                }
-                return NULL;
+                    if (SniffMidi(source, confidence)) {
+                        return [](
+                                CDataSource *source,
+                                void *) -> CMediaExtractor* {
+                            return wrap(new MidiExtractor(source));};
+                    }
+                    return NULL;
+                },
+                extensions
             }
-        }
+        },
     };
 }
 

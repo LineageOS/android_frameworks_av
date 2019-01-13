@@ -19,10 +19,8 @@
 class AudioPolicyManagerInterface;
 class AudioPolicyPluginInterface;
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
 
 class Engine;
 

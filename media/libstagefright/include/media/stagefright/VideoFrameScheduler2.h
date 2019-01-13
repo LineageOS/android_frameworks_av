@@ -34,8 +34,8 @@ protected:
 private:
     void updateVsync() override;
 
-    long mAppVsyncOffset;
-    long mSfVsyncOffset;
+    nsecs_t mAppVsyncOffset;
+    nsecs_t mSfVsyncOffset;
     sp<VsyncTracker> mVsyncTracker;
     sp<ChoreographerThread> mChoreographerThread;
     Mutex mLock;

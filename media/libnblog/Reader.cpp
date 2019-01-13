@@ -284,6 +284,15 @@ void DumpReader::dump(int fd, size_t indent)
 EntryIterator DumpReader::handleFormat(const FormatEntry &fmtEntry,
         String8 *timestamp, String8 *body)
 {
+    String8 timestampLocal;
+    String8 bodyLocal;
+    if (timestamp == nullptr) {
+        timestamp = &timestampLocal;
+    }
+    if (body == nullptr) {
+        body = &bodyLocal;
+    }
+
     // log timestamp
     const int64_t ts = fmtEntry.timestamp();
     timestamp->clear();

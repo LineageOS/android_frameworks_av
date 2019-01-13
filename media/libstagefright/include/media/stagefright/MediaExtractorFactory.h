@@ -19,6 +19,7 @@
 #define MEDIA_EXTRACTOR_FACTORY_H_
 
 #include <stdio.h>
+#include <unordered_set>
 
 #include <media/IMediaExtractor.h>
 
@@ -35,6 +36,7 @@ public:
             const sp<DataSource> &source, const char *mime = NULL);
     static void LoadPlugins(const ::std::string& apkPath);
     static status_t dump(int fd, const Vector<String16>& args);
+    static std::unordered_set<std::string> getSupportedTypes();
     static void SetLinkedLibraries(const std::string& linkedLibraries);
 
 private:

@@ -37,6 +37,8 @@ public:
 
     virtual sp<IDataSource> makeIDataSource(int fd, int64_t offset, int64_t length);
 
+    virtual std::unordered_set<std::string> getSupportedTypes();
+
     virtual status_t    dump(int fd, const Vector<String16>& args);
 
     virtual status_t    onTransact(uint32_t code, const Parcel& data, Parcel* reply,

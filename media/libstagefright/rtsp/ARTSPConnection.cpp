@@ -39,7 +39,7 @@
 namespace android {
 
 // static
-const int64_t ARTSPConnection::kSelectTimeoutUs = 1000ll;
+const int64_t ARTSPConnection::kSelectTimeoutUs = 1000LL;
 
 // static
 const AString ARTSPConnection::sUserAgent =
