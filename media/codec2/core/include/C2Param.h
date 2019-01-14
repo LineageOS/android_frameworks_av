@@ -1605,11 +1605,13 @@ struct C2FieldSupportedValues {
     /// \internal
     /// \todo: create separate values vs. flags initializer as for flags we want
     /// to list both allowed and required flags
-    template<typename T, typename E=decltype(C2FieldDescriptor::namedValuesFor(*(T*)0))>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnull-dereference"
+    template<typename T, typename E=decltype(C2FieldDescriptor::namedValuesFor(*(T*)nullptr))>
     C2FieldSupportedValues(bool flags, const T*)
         : type(flags ? FLAGS : VALUES),
           range{(T)0, (T)0, (T)0, (T)0, (T)0} {
-              C2FieldDescriptor::NamedValuesType named = C2FieldDescriptor::namedValuesFor(*(T*)0);
+              C2FieldDescriptor::NamedValuesType named = C2FieldDescriptor::namedValuesFor(*(T*)nullptr);
         if (flags) {
             values.emplace_back(0); // min-mask defaults to 0
         }
@@ -1618,6 +1620,7 @@ struct C2FieldSupportedValues {
         }
     }
 };
+#pragma GCC diagnostic pop
 
 /**
  * Supported values for a specific field.
