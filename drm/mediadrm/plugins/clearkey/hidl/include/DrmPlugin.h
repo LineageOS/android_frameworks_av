@@ -63,6 +63,7 @@ using ::android::sp;
 typedef drm::V1_1::KeyRequestType KeyRequestType_V1_1;
 typedef drm::V1_2::IDrmPluginListener IDrmPluginListener_V1_2;
 typedef drm::V1_2::Status Status_V1_2;
+typedef drm::V1_2::HdcpLevel HdcpLevel_V1_2;
 
 struct DrmPlugin : public IDrmPlugin {
     explicit DrmPlugin(SessionLibrary* sessionLibrary);
@@ -159,6 +160,13 @@ struct DrmPlugin : public IDrmPlugin {
         HdcpLevel connectedLevel = HdcpLevel::HDCP_NONE;
         HdcpLevel maxLevel = HdcpLevel::HDCP_NO_OUTPUT;
         _hidl_cb(Status::OK, connectedLevel, maxLevel);
+        return Void();
+    }
+
+    Return<void> getHdcpLevels_1_2(getHdcpLevels_1_2_cb _hidl_cb) {
+        HdcpLevel_V1_2 connectedLevel = HdcpLevel_V1_2::HDCP_NONE;
+        HdcpLevel_V1_2 maxLevel = HdcpLevel_V1_2::HDCP_NO_OUTPUT;
+        _hidl_cb(Status_V1_2::OK, connectedLevel, maxLevel);
         return Void();
     }
 

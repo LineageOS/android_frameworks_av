@@ -63,6 +63,7 @@ using ::android::sp;
 
 typedef drm::V1_1::KeyRequestType KeyRequestType_V1_1;
 typedef drm::V1_2::Status Status_V1_2;
+typedef drm::V1_2::HdcpLevel HdcpLevel_V1_2;
 
 namespace {
 
@@ -156,26 +157,26 @@ static DrmPlugin::OfflineLicenseState toOfflineLicenseState(
     }
 }
 
-static DrmPlugin::HdcpLevel toHdcpLevel(HdcpLevel level) {
+static DrmPlugin::HdcpLevel toHdcpLevel(HdcpLevel_V1_2 level) {
     switch(level) {
-    case HdcpLevel::HDCP_NONE:
+    case HdcpLevel_V1_2::HDCP_NONE:
         return DrmPlugin::kHdcpNone;
-    case HdcpLevel::HDCP_V1:
+    case HdcpLevel_V1_2::HDCP_V1:
         return DrmPlugin::kHdcpV1;
-    case HdcpLevel::HDCP_V2:
+    case HdcpLevel_V1_2::HDCP_V2:
         return DrmPlugin::kHdcpV2;
-    case HdcpLevel::HDCP_V2_1:
+    case HdcpLevel_V1_2::HDCP_V2_1:
         return DrmPlugin::kHdcpV2_1;
-    case HdcpLevel::HDCP_V2_2:
+    case HdcpLevel_V1_2::HDCP_V2_2:
         return DrmPlugin::kHdcpV2_2;
-    case HdcpLevel::HDCP_NO_OUTPUT:
+    case HdcpLevel_V1_2::HDCP_V2_3:
+        return DrmPlugin::kHdcpV2_3;
+    case HdcpLevel_V1_2::HDCP_NO_OUTPUT:
         return DrmPlugin::kHdcpNoOutput;
     default:
         return DrmPlugin::kHdcpLevelUnknown;
     }
 }
-
-
 static ::KeyedVector toHidlKeyedVector(const KeyedVector<String8, String8>&
         keyedVector) {
     std::vector<KeyValue> stdKeyedVector;
@@ -1093,22 +1094,31 @@ status_t DrmHal::getHdcpLevels(DrmPlugin::HdcpLevel *connected,
     }
     status_t err = UNKNOWN_ERROR;
 
-    if (mPluginV1_1 == NULL) {
-        return ERROR_DRM_CANNOT_HANDLE;
-    }
-
     *connected = DrmPlugin::kHdcpLevelUnknown;
     *max = DrmPlugin::kHdcpLevelUnknown;
 
-    Return<void> hResult = mPluginV1_1->getHdcpLevels(
-            [&](Status status, const HdcpLevel& hConnected, const HdcpLevel& hMax) {
-                if (status == Status::OK) {
-                    *connected = toHdcpLevel(hConnected);
-                    *max = toHdcpLevel(hMax);
-                }
-                err = toStatusT(status);
-            }
-    );
+    Return<void> hResult;
+    if (mPluginV1_2 != NULL) {
+        hResult = mPluginV1_2->getHdcpLevels_1_2(
+                [&](Status_V1_2 status, const HdcpLevel_V1_2& hConnected, const HdcpLevel_V1_2& hMax) {
+                    if (status == Status_V1_2::OK) {
+                        *connected = toHdcpLevel(hConnected);
+                        *max = toHdcpLevel(hMax);
+                    }
+                    err = toStatusT_1_2(status);
+                });
+    } else if (mPluginV1_1 != NULL) {
+        hResult = mPluginV1_1->getHdcpLevels(
+                [&](Status status, const HdcpLevel& hConnected, const HdcpLevel& hMax) {
+                    if (status == Status::OK) {
+                        *connected = toHdcpLevel(static_cast<HdcpLevel_V1_2>(hConnected));
+                        *max = toHdcpLevel(static_cast<HdcpLevel_V1_2>(hMax));
+                    }
+                    err = toStatusT(status);
+                });
+    } else {
+        return ERROR_DRM_CANNOT_HANDLE;
+    }
 
     return hResult.isOk() ? err : DEAD_OBJECT;
 }
