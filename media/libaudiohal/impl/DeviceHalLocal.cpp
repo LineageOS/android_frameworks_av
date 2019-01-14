@@ -131,6 +131,8 @@ status_t DeviceHalLocal::openInputStream(
         audio_input_flags_t flags,
         const char *address,
         audio_source_t source,
+        audio_devices_t /*outputDevice*/,
+        const char */*outputDeviceAddress*/,
         sp<StreamInHalInterface> *inStream) {
     audio_stream_in_t *halStream;
     ALOGV("open_input_stream handle: %d devices: %x flags: %#x "

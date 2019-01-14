@@ -2379,7 +2379,8 @@ status_t AudioFlinger::openInput(audio_module_handle_t module,
         return BAD_VALUE;
     }
 
-    sp<ThreadBase> thread = openInput_l(module, input, config, *devices, address, source, flags);
+    sp<ThreadBase> thread = openInput_l(
+            module, input, config, *devices, address, source, flags, AUDIO_DEVICE_NONE, String8{});
 
     if (thread != 0) {
         // notify client processes of the new input creation
@@ -2395,7 +2396,9 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
                                                          audio_devices_t devices,
                                                          const String8& address,
                                                          audio_source_t source,
-                                                         audio_input_flags_t flags)
+                                                         audio_input_flags_t flags,
+                                                         audio_devices_t outputDevice,
+                                                         const String8& outputDeviceAddress)
 {
     AudioHwDevice *inHwDev = findSuitableHwDev_l(module, devices);
     if (inHwDev == NULL) {
@@ -2424,7 +2427,8 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
     sp<DeviceHalInterface> inHwHal = inHwDev->hwDevice();
     sp<StreamInHalInterface> inStream;
     status_t status = inHwHal->openInputStream(
-            *input, devices, &halconfig, flags, address.string(), source, &inStream);
+            *input, devices, &halconfig, flags, address.string(), source,
+            outputDevice, outputDeviceAddress, &inStream);
     ALOGV("openInput_l() openInputStream returned input %p, devices %#x, SamplingRate %d"
            ", Format %#x, Channels %#x, flags %#x, status %d addr %s",
             inStream.get(),
@@ -2447,7 +2451,8 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
         ALOGV("openInput_l() reopening with proposed sampling rate and channel mask");
         inStream.clear();
         status = inHwHal->openInputStream(
-                *input, devices, &halconfig, flags, address.string(), source, &inStream);
+                *input, devices, &halconfig, flags, address.string(), source,
+                outputDevice, outputDeviceAddress, &inStream);
         // FIXME log this new status; HAL should not propose any further changes
     }
 
