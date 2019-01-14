@@ -346,7 +346,7 @@ protected:
                                   audio_patch_handle_t *patchHandle = NULL);
 
         // select input device corresponding to requested audio source
-        sp<DeviceDescriptor> getDeviceForInputSource(audio_source_t inputSource);
+        sp<DeviceDescriptor> getDeviceForAttributes(const audio_attributes_t &attributes);
 
         // compute the actual volume for a given stream according to the requested index and a particular
         // device
@@ -517,7 +517,7 @@ protected:
             if (!hasPrimaryOutput()) {
                 return DeviceVector();
             }
-            return mAvailableOutputDevices.filter(mPrimaryOutput->supportedDevices().types());
+            return mAvailableOutputDevices.filter(mPrimaryOutput->supportedDevices());
         }
         DeviceVector availablePrimaryModuleInputDevices() const
         {
@@ -724,8 +724,8 @@ private:
 
         // select input device corresponding to requested audio source and return associated policy
         // mix if any. Calls getDeviceForInputSource().
-        sp<DeviceDescriptor> getDeviceAndMixForInputSource(audio_source_t inputSource,
-                                                           AudioMix **policyMix = NULL);
+        sp<DeviceDescriptor> getDeviceAndMixForAttributes(const audio_attributes_t &attributes,
+                                                          AudioMix **policyMix = NULL);
 
         // Called by setDeviceConnectionState().
         status_t setDeviceConnectionStateInt(audio_devices_t deviceType,

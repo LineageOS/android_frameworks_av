@@ -68,6 +68,7 @@ public:
     bool isSourceActive(audio_source_t source) const;
     audio_source_t source() const;
     bool isSoundTrigger() const;
+    audio_attributes_t getHighestPriorityAttributes() const;
     void setClientActive(const sp<RecordClientDescriptor>& client, bool active);
     int32_t activeCount() { return mGlobalActiveCount; }
     void trackEffectEnabled(const sp<EffectDescriptor> &effect, bool enabled);

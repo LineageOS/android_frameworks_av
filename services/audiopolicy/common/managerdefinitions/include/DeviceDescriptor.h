@@ -53,6 +53,8 @@ public:
 
     // AudioPort
     virtual void attach(const sp<HwModule>& module);
+    virtual void detach();
+
     virtual void toAudioPort(struct audio_port *port) const;
     virtual void importAudioPort(const sp<AudioPort>& port, bool force = false);
 
@@ -124,8 +126,6 @@ public:
      * @return
      */
     DeviceVector filter(const DeviceVector &devices) const;
-
-    DeviceVector filter(audio_devices_t deviceTypes) const;
 
     /**
      * @brief merge two vectors. As SortedVector Implementation is buggy (it does not check the size

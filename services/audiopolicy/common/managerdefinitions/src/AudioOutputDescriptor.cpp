@@ -350,10 +350,6 @@ DeviceVector SwAudioOutputDescriptor::supportedDevices() const
 
 bool SwAudioOutputDescriptor::supportsDevice(const sp<DeviceDescriptor> &device) const
 {
-    // Performs weak check until dynamic support of supportedDevice on Modules/Profiles
-    if (!device_distinguishes_on_address(device->type())) {
-        return supportedDevices().types() & (device->type());
-    }
     return supportedDevices().contains(device);
 }
 
@@ -756,13 +752,6 @@ bool SwAudioOutputCollection::isAnyOutputActive(audio_stream_type_t streamToIgno
         }
     }
     return false;
-}
-
-audio_devices_t SwAudioOutputCollection::getSupportedDevices(audio_io_handle_t handle) const
-{
-    sp<SwAudioOutputDescriptor> outputDesc = valueFor(handle);
-    audio_devices_t devices = outputDesc->mProfile->getSupportedDevicesType();
-    return devices;
 }
 
 sp<SwAudioOutputDescriptor> SwAudioOutputCollection::getOutputForClient(audio_port_handle_t portId)

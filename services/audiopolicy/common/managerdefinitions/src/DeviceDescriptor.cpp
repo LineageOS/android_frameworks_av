@@ -58,6 +58,12 @@ void DeviceDescriptor::attach(const sp<HwModule>& module)
     mId = getNextUniqueId();
 }
 
+void DeviceDescriptor::detach()
+{
+    mId = AUDIO_PORT_HANDLE_NONE;
+    AudioPort::detach();
+}
+
 bool DeviceDescriptor::equals(const sp<DeviceDescriptor>& other) const
 {
     // Devices are considered equal if they:
@@ -329,17 +335,6 @@ DeviceVector DeviceVector::filter(const DeviceVector &devices) const
     DeviceVector filteredDevices;
     for (const auto &device : *this) {
         if (devices.contains(device)) {
-            filteredDevices.add(device);
-        }
-    }
-    return filteredDevices;
-}
-
-DeviceVector DeviceVector::filter(audio_devices_t deviceTypes) const
-{
-    DeviceVector filteredDevices;
-    for (const auto &device : *this) {
-        if ((device->type() & deviceTypes) == device->type()) {
             filteredDevices.add(device);
         }
     }

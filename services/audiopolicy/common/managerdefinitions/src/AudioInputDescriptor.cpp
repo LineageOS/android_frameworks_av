@@ -54,30 +54,7 @@ audio_port_handle_t AudioInputDescriptor::getId() const
 
 audio_source_t AudioInputDescriptor::source() const
 {
-    audio_source_t source = AUDIO_SOURCE_DEFAULT;
-
-    for (bool activeOnly : { true, false }) {
-        int32_t topPriority = -1;
-        app_state_t topState = APP_STATE_IDLE;
-        for (const auto &client : getClientIterable()) {
-            if (activeOnly && !client->active()) {
-                continue;
-            }
-            app_state_t curState = client->appState();
-            if (curState >= topState) {
-                int32_t curPriority = source_priority(client->source());
-                if (curPriority > topPriority) {
-                    source = client->source();
-                    topPriority = curPriority;
-                }
-                topState = curState;
-            }
-        }
-        if (source != AUDIO_SOURCE_DEFAULT) {
-            break;
-        }
-    }
-    return source;
+    return getHighestPriorityAttributes().source;
 }
 
 void AudioInputDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
@@ -145,6 +122,34 @@ bool AudioInputDescriptor::isSourceActive(audio_source_t source) const
         }
     }
     return false;
+}
+
+audio_attributes_t AudioInputDescriptor::getHighestPriorityAttributes() const
+{
+    audio_attributes_t attributes = { .source = AUDIO_SOURCE_DEFAULT };
+
+    for (bool activeOnly : { true, false }) {
+        int32_t topPriority = -1;
+        app_state_t topState = APP_STATE_IDLE;
+        for (const auto &client : getClientIterable()) {
+            if (activeOnly && !client->active()) {
+              continue;
+            }
+            app_state_t curState = client->appState();
+            if (curState >= topState) {
+                int32_t curPriority = source_priority(client->source());
+                if (curPriority > topPriority) {
+                    attributes = client->attributes();
+                    topPriority = curPriority;
+                }
+                topState = curState;
+            }
+        }
+        if (attributes.source != AUDIO_SOURCE_DEFAULT) {
+            break;
+        }
+    }
+    return attributes;
 }
 
 bool AudioInputDescriptor::isSoundTrigger() const {

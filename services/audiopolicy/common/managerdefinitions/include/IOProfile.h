@@ -99,11 +99,6 @@ public:
         return mSupportedDevices.types() & (device & ~AUDIO_DEVICE_BIT_IN);
     }
 
-    bool supportDeviceAddress(const String8 &address) const
-    {
-        return mSupportedDevices[0]->address() == address;
-    }
-
     /**
      * @brief supportsDevice
      * @param device to be checked against
@@ -121,26 +116,15 @@ public:
         return mSupportedDevices.contains(device);
     }
 
-    // chose first device present in mSupportedDevices also part of deviceType
-    audio_devices_t getSupportedDeviceForType(audio_devices_t deviceType) const
-    {
-        for (size_t k = 0; k  < mSupportedDevices.size(); k++) {
-            audio_devices_t profileType = mSupportedDevices[k]->type();
-            if (profileType & deviceType) {
-                return profileType;
-            }
-        }
-        return AUDIO_DEVICE_NONE;
-    }
-
-    audio_devices_t getSupportedDevicesType() const { return mSupportedDevices.types(); }
-
     void clearSupportedDevices() { mSupportedDevices.clear(); }
     void addSupportedDevice(const sp<DeviceDescriptor> &device)
     {
         mSupportedDevices.add(device);
     }
-
+    void removeSupportedDevice(const sp<DeviceDescriptor> &device)
+    {
+        mSupportedDevices.remove(device);
+    }
     void setSupportedDevices(const DeviceVector &devices)
     {
         mSupportedDevices = devices;

@@ -52,6 +52,9 @@ status_t HwModule::addOutputProfile(const String8& name, const audio_config_t *c
 
     sp<DeviceDescriptor> devDesc = new DeviceDescriptor(device);
     devDesc->setAddress(address);
+    addDynamicDevice(devDesc);
+    // Reciprocally attach the device to the module
+    devDesc->attach(this);
     profile->addSupportedDevice(devDesc);
 
     return addOutputProfile(profile);
@@ -97,6 +100,9 @@ status_t HwModule::removeOutputProfile(const String8& name)
 {
     for (size_t i = 0; i < mOutputProfiles.size(); i++) {
         if (mOutputProfiles[i]->getName() == name) {
+            for (const auto &device : mOutputProfiles[i]->getSupportedDevices()) {
+                removeDynamicDevice(device);
+            }
             mOutputProfiles.removeAt(i);
             break;
         }
@@ -114,6 +120,9 @@ status_t HwModule::addInputProfile(const String8& name, const audio_config_t *co
 
     sp<DeviceDescriptor> devDesc = new DeviceDescriptor(device);
     devDesc->setAddress(address);
+    addDynamicDevice(devDesc);
+    // Reciprocally attach the device to the module
+    devDesc->attach(this);
     profile->addSupportedDevice(devDesc);
 
     ALOGV("addInputProfile() name %s rate %d mask 0x%08x",
@@ -126,6 +135,9 @@ status_t HwModule::removeInputProfile(const String8& name)
 {
     for (size_t i = 0; i < mInputProfiles.size(); i++) {
         if (mInputProfiles[i]->getName() == name) {
+            for (const auto &device : mInputProfiles[i]->getSupportedDevices()) {
+                removeDynamicDevice(device);
+            }
             mInputProfiles.removeAt(i);
             break;
         }
@@ -247,6 +259,7 @@ void HwModule::dump(String8 *dst) const
         }
     }
     mDeclaredDevices.dump(dst, String8("Declared"), 2, true);
+    mDynamicDevices.dump(dst, String8("Dynamic"),  2, true);
     mRoutes.dump(dst, 2);
 }
 
@@ -298,30 +311,103 @@ DeviceVector HwModuleCollection::getAvailableDevicesFromModuleName(
     return availableDevices.getDevicesFromHwModule(module->getHandle());
 }
 
-sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices_t device,
-                                                             const char *device_address,
-                                                             const char *device_name,
+sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices_t deviceType,
+                                                             const char *address,
+                                                             const char *name,
+                                                             bool allowToCreate,
                                                              bool matchAddress) const
 {
-    String8 address = (device_address == nullptr || !matchAddress) ?
-            String8("") : String8(device_address);
+    String8 devAddress = (address == nullptr || !matchAddress) ? String8("") : String8(address);
     // handle legacy remote submix case where the address was not always specified
-    if (device_distinguishes_on_address(device) && (address.length() == 0)) {
-        address = String8("0");
+    if (device_distinguishes_on_address(deviceType) && (devAddress.length() == 0)) {
+        devAddress = String8("0");
     }
 
     for (const auto& hwModule : *this) {
-        DeviceVector declaredDevices = hwModule->getDeclaredDevices();
-        sp<DeviceDescriptor> deviceDesc = declaredDevices.getDevice(device, address);
-        if (deviceDesc) {
-            return deviceDesc;
+        DeviceVector moduleDevices = hwModule->getAllDevices();
+        auto moduleDevice = moduleDevices.getDevice(deviceType, devAddress);
+        if (moduleDevice) {
+            if (allowToCreate) {
+                moduleDevice->attach(hwModule);
+            }
+            return moduleDevice;
         }
     }
+    if (!allowToCreate) {
+        ALOGE("%s: could not find HW module for device %s %04x address %s", __FUNCTION__,
+              name, deviceType, address);
+        return nullptr;
+    }
+    return createDevice(deviceType, address, name);
+}
 
-    sp<DeviceDescriptor> devDesc = new DeviceDescriptor(device);
-    devDesc->setName(String8(device_name));
-    devDesc->setAddress(address);
-    return devDesc;
+sp<DeviceDescriptor> HwModuleCollection::createDevice(const audio_devices_t type,
+                                                      const char *address,
+                                                      const char *name) const
+{
+    sp<HwModule> hwModule = getModuleForDeviceTypes(type);
+    if (hwModule == 0) {
+        ALOGE("%s: could not find HW module for device %04x address %s", __FUNCTION__, type,
+              address);
+        return nullptr;
+    }
+    sp<DeviceDescriptor> device = new DeviceDescriptor(type, String8(name));
+    device->setName(String8(name));
+    device->setAddress(String8(address));
+
+    // Add the device to the list of dynamic devices
+    hwModule->addDynamicDevice(device);
+    // Reciprocally attach the device to the module
+    device->attach(hwModule);
+    ALOGD("%s: adding dynamic device %s to module %s", __FUNCTION__,
+          device->toString().c_str(), hwModule->getName());
+
+    const auto &profiles = (audio_is_output_device(type) ? hwModule->getOutputProfiles() :
+                                                             hwModule->getInputProfiles());
+    for (const auto &profile : profiles) {
+        // Add the device as supported to all profile supporting "weakly" or not the device
+        // according to its type
+        if (profile->supportsDevice(device, false /*matchAdress*/)) {
+
+            // @todo quid of audio profile? import the profile from device of the same type?
+            const auto &isoTypeDeviceForProfile = profile->getSupportedDevices().getDevice(type);
+            device->importAudioPort(isoTypeDeviceForProfile, true /* force */);
+
+            ALOGV("%s: adding device %s to profile %s", __FUNCTION__,
+                  device->toString().c_str(), profile->getTagName().c_str());
+            profile->addSupportedDevice(device);
+        }
+    }
+    return device;
+}
+
+void HwModuleCollection::cleanUpForDevice(const sp<DeviceDescriptor> &device)
+{
+    for (const auto& hwModule : *this) {
+        DeviceVector moduleDevices = hwModule->getAllDevices();
+        if (!moduleDevices.contains(device)) {
+            continue;
+        }
+        device->detach();
+        // Only remove from dynamic list, not from declared list!!!
+        if (!hwModule->getDynamicDevices().contains(device)) {
+            return;
+        }
+        hwModule->removeDynamicDevice(device);
+        ALOGV("%s: removed dynamic device %s from module %s", __FUNCTION__,
+              device->toString().c_str(), hwModule->getName());
+
+        const IOProfileCollection &profiles = audio_is_output_device(device->type()) ?
+                    hwModule->getOutputProfiles() : hwModule->getInputProfiles();
+        for (const auto &profile : profiles) {
+            // For cleanup, strong match is required
+            if (profile->supportsDevice(device, true /*matchAdress*/)) {
+                ALOGV("%s: removing device %s from profile %s", __FUNCTION__,
+                      device->toString().c_str(), profile->getTagName().c_str());
+                profile->removeSupportedDevice(device);
+            }
+        }
+    }
 }
 
 void HwModuleCollection::dump(String8 *dst) const
