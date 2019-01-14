@@ -135,6 +135,8 @@ MediaScanResult StagefrightMediaScanner::processFileInternal(
         { "colorstandard", METADATA_KEY_COLOR_STANDARD },
         { "colortransfer", METADATA_KEY_COLOR_TRANSFER },
         { "colorrange", METADATA_KEY_COLOR_RANGE },
+        { "samplerate", METADATA_KEY_SAMPLERATE },
+        { "bitspersample", METADATA_KEY_BITS_PER_SAMPLE },
     };
     static const size_t kNumEntries = sizeof(kKeyMap) / sizeof(kKeyMap[0]);
 
