@@ -872,7 +872,7 @@ media_status_t MyOggExtractor::_readNextPacket(MediaBufferHelper **out, bool cal
 
             ALOGV("readPage returned %zd", n);
 
-            return n < 0 ? (media_status_t) n : AMEDIA_ERROR_END_OF_STREAM;
+            return n == ERROR_END_OF_STREAM ? AMEDIA_ERROR_END_OF_STREAM : AMEDIA_ERROR_UNKNOWN;
         }
 
         // Prevent a harmless unsigned integer overflow by clamping to 0
