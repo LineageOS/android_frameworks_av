@@ -506,15 +506,17 @@ TEST_F(Codec2AudioDecHidlTest, configComp) {
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
-class Codec2AudioDecDecodeTest : public Codec2AudioDecHidlTest,
-                                 public ::testing::WithParamInterface<int32_t> {
+class Codec2AudioDecDecodeTest
+    : public Codec2AudioDecHidlTest,
+      public ::testing::WithParamInterface<std::pair<int32_t, bool>> {
 };
 
 TEST_P(Codec2AudioDecDecodeTest, DecodeTest) {
     description("Decodes input file");
     if (mDisableTest) return;
 
-    uint32_t streamIndex = GetParam();
+    uint32_t streamIndex = GetParam().first;
+    bool signalEOS = GetParam().second;
     mTimestampDevTest = true;
     char mURL[512], info[512];
     std::ifstream eleStream, eleInfo;
@@ -566,16 +568,27 @@ TEST_P(Codec2AudioDecDecodeTest, DecodeTest) {
     ASSERT_EQ(eleStream.is_open(), true);
     ASSERT_NO_FATAL_FAILURE(decodeNFrames(
         mComponent, mQueueLock, mQueueCondition, mWorkQueue, mFlushedIndices,
-        mLinearPool, eleStream, &Info, 0, (int)Info.size()));
+        mLinearPool, eleStream, &Info, 0, (int)Info.size(), signalEOS));
+
+    // If EOS is not sent, sending empty input with EOS flag
+    size_t infoSize = Info.size();
+    if (!signalEOS) {
+        ASSERT_NO_FATAL_FAILURE(
+            waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue, 1));
+        ASSERT_NO_FATAL_FAILURE(
+            testInputBuffer(mComponent, mQueueLock, mWorkQueue,
+                            C2FrameData::FLAG_END_OF_STREAM, false));
+        infoSize += 1;
+    }
     // blocking call to ensures application to Wait till all the inputs are
     // consumed
     ASSERT_NO_FATAL_FAILURE(
         waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
     eleStream.close();
-    if (mFramesReceived != Info.size()) {
+    if (mFramesReceived != infoSize) {
         ALOGE("Input buffer count and Output buffer count mismatch");
         ALOGE("framesReceived : %d inputFrames : %zu", mFramesReceived,
-              Info.size());
+              infoSize);
         ASSERT_TRUE(false);
     }
     ASSERT_EQ(mEos, true);
@@ -607,9 +620,12 @@ TEST_P(Codec2AudioDecDecodeTest, DecodeTest) {
     }
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
-
-INSTANTIATE_TEST_CASE_P(StreamIndexes, Codec2AudioDecDecodeTest,
-                        ::testing::Values(0, 1));
+// DecodeTest with StreamIndex and EOS / No EOS
+INSTANTIATE_TEST_CASE_P(StreamIndexAndEOS, Codec2AudioDecDecodeTest,
+                        ::testing::Values(std::make_pair(0, false),
+                                          std::make_pair(0, true),
+                                          std::make_pair(1, false),
+                                          std::make_pair(1, true)));
 
 // thumbnail test
 TEST_F(Codec2AudioDecHidlTest, ThumbnailTest) {
