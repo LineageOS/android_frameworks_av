@@ -143,9 +143,16 @@ status_t AudioMix::writeToParcel(Parcel *parcel) const
     return NO_ERROR;
 }
 
-void AudioMix::excludeUid(uid_t uid) const {
+void AudioMix::setExcludeUid(uid_t uid) const {
     AudioMixMatchCriterion crit;
     crit.mRule = RULE_EXCLUDE_UID;
+    crit.mValue.mUid = uid;
+    mCriteria.add(crit);
+}
+
+void AudioMix::setMatchUid(uid_t uid) const {
+    AudioMixMatchCriterion crit;
+    crit.mRule = RULE_MATCH_UID;
     crit.mValue.mUid = uid;
     mCriteria.add(crit);
 }

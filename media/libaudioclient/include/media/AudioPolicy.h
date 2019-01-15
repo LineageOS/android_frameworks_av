@@ -100,7 +100,8 @@ public:
     status_t readFromParcel(Parcel *parcel);
     status_t writeToParcel(Parcel *parcel) const;
 
-    void excludeUid(uid_t uid) const;
+    void setExcludeUid(uid_t uid) const;
+    void setMatchUid(uid_t uid) const;
 
     mutable Vector<AudioMixMatchCriterion> mCriteria;
     uint32_t        mMixType;
