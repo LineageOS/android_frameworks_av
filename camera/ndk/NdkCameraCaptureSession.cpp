@@ -80,7 +80,9 @@ camera_status_t ACameraCaptureSession_capture(
 
     if (session->isClosed()) {
         ALOGE("%s: session %p is already closed", __FUNCTION__, session);
-        *captureSequenceId = CAPTURE_SEQUENCE_ID_NONE;
+        if (captureSequenceId != nullptr) {
+            *captureSequenceId = CAPTURE_SEQUENCE_ID_NONE;
+        }
         return ACAMERA_ERROR_SESSION_CLOSED;
     }
 
