@@ -46,6 +46,7 @@ LOCAL_MODULE:= mediaextractor
 LOCAL_INIT_RC := mediaextractor.rc
 LOCAL_C_INCLUDES := frameworks/av/media/libmedia
 LOCAL_CFLAGS := -Wall -Werror
+LOCAL_SANITIZE := scudo
 include $(BUILD_EXECUTABLE)
 
 # service seccomp filter
