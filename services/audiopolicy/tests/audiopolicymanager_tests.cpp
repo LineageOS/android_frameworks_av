@@ -112,10 +112,34 @@ class AudioPolicyManagerTestClient : public AudioPolicyTestClient {
     std::set<audio_patch_handle_t> mActivePatches;
 };
 
+class PatchCountCheck {
+  public:
+    explicit PatchCountCheck(AudioPolicyManagerTestClient *client)
+            : mClient{client},
+              mInitialCount{mClient->getActivePatchesCount()} {}
+    void assertDelta(int delta) const {
+        ASSERT_EQ(mInitialCount + delta, mClient->getActivePatchesCount()); }
+    void assertNoChange() const { assertDelta(0); }
+  private:
+    const AudioPolicyManagerTestClient *mClient;
+    const size_t mInitialCount;
+};
+
 class AudioPolicyManagerTest : public testing::Test {
   protected:
-    virtual void SetUp();
-    virtual void TearDown();
+    void SetUp() override;
+    void TearDown() override;
+    virtual void SetUpConfig(AudioPolicyConfig *config) { (void)config; }
+
+    void dumpToLog();
+    void getOutputForAttr(
+            audio_port_handle_t *selectedDeviceId,
+            audio_format_t format,
+            int channelMask,
+            int sampleRate,
+            audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE,
+            audio_port_handle_t *portId = nullptr);
+    PatchCountCheck snapPatchCount() { return PatchCountCheck(mClient.get()); }
 
     std::unique_ptr<AudioPolicyManagerTestClient> mClient;
     std::unique_ptr<AudioPolicyTestManager> mManager;
@@ -125,6 +149,7 @@ void AudioPolicyManagerTest::SetUp() {
     mClient.reset(new AudioPolicyManagerTestClient);
     mManager.reset(new AudioPolicyTestManager(mClient.get()));
     mManager->getConfig().setDefault();
+    SetUpConfig(&mManager->getConfig());  // Subclasses may want to customize the config.
     ASSERT_EQ(NO_ERROR, mManager->initialize());
     ASSERT_EQ(NO_ERROR, mManager->initCheck());
 }
@@ -134,11 +159,7 @@ void AudioPolicyManagerTest::TearDown() {
     mClient.reset();
 }
 
-TEST_F(AudioPolicyManagerTest, InitSuccess) {
-    // SetUp must finish with no assertions.
-}
-
-TEST_F(AudioPolicyManagerTest, Dump) {
+void AudioPolicyManagerTest::dumpToLog() {
     int pipefd[2];
     ASSERT_NE(-1, pipe(pipefd));
     pid_t cpid = fork();
@@ -168,10 +189,43 @@ TEST_F(AudioPolicyManagerTest, Dump) {
     }
 }
 
+void AudioPolicyManagerTest::getOutputForAttr(
+        audio_port_handle_t *selectedDeviceId,
+        audio_format_t format,
+        int channelMask,
+        int sampleRate,
+        audio_output_flags_t flags,
+        audio_port_handle_t *portId) {
+    audio_attributes_t attr = {};
+    audio_io_handle_t output = AUDIO_PORT_HANDLE_NONE;
+    audio_stream_type_t stream = AUDIO_STREAM_DEFAULT;
+    audio_config_t config = AUDIO_CONFIG_INITIALIZER;
+    config.sample_rate = sampleRate;
+    config.channel_mask = channelMask;
+    config.format = format;
+    *selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    audio_port_handle_t localPortId;
+    if (!portId) portId = &localPortId;
+    *portId = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_EQ(OK, mManager->getOutputForAttr(
+                    &attr, &output, AUDIO_SESSION_NONE, &stream, 0 /*uid*/, &config, &flags,
+                    selectedDeviceId, portId));
+    ASSERT_NE(AUDIO_PORT_HANDLE_NONE, *portId);
+}
+
+
+TEST_F(AudioPolicyManagerTest, InitSuccess) {
+    // SetUp must finish with no assertions.
+}
+
+TEST_F(AudioPolicyManagerTest, Dump) {
+    dumpToLog();
+}
+
 TEST_F(AudioPolicyManagerTest, CreateAudioPatchFailure) {
     audio_patch patch{};
     audio_patch_handle_t handle = AUDIO_PATCH_HANDLE_NONE;
-    const size_t patchCountBefore = mClient->getActivePatchesCount();
+    const PatchCountCheck patchCount = snapPatchCount();
     ASSERT_EQ(BAD_VALUE, mManager->createAudioPatch(nullptr, &handle, 0));
     ASSERT_EQ(BAD_VALUE, mManager->createAudioPatch(&patch, nullptr, 0));
     ASSERT_EQ(BAD_VALUE, mManager->createAudioPatch(&patch, &handle, 0));
@@ -198,20 +252,182 @@ TEST_F(AudioPolicyManagerTest, CreateAudioPatchFailure) {
     ASSERT_EQ(INVALID_OPERATION, mManager->createAudioPatch(&patch, &handle, 0));
     // Verify that the handle is left unchanged.
     ASSERT_EQ(AUDIO_PATCH_HANDLE_NONE, handle);
-    ASSERT_EQ(patchCountBefore, mClient->getActivePatchesCount());
+    patchCount.assertNoChange();
 }
 
 TEST_F(AudioPolicyManagerTest, CreateAudioPatchFromMix) {
     audio_patch_handle_t handle = AUDIO_PATCH_HANDLE_NONE;
     uid_t uid = 42;
-    const size_t patchCountBefore = mClient->getActivePatchesCount();
+    const PatchCountCheck patchCount = snapPatchCount();
     ASSERT_FALSE(mManager->getConfig().getAvailableInputDevices().isEmpty());
     PatchBuilder patchBuilder;
     patchBuilder.addSource(mManager->getConfig().getAvailableInputDevices()[0]).
             addSink(mManager->getConfig().getDefaultOutputDevice());
     ASSERT_EQ(NO_ERROR, mManager->createAudioPatch(patchBuilder.patch(), &handle, uid));
     ASSERT_NE(AUDIO_PATCH_HANDLE_NONE, handle);
-    ASSERT_EQ(patchCountBefore + 1, mClient->getActivePatchesCount());
+    patchCount.assertDelta(1);
 }
 
 // TODO: Add patch creation tests that involve already existing patch
+
+class AudioPolicyManagerTestMsd : public AudioPolicyManagerTest {
+  protected:
+    void SetUpConfig(AudioPolicyConfig *config) override;
+    void TearDown() override;
+
+    sp<DeviceDescriptor> mMsdOutputDevice;
+    sp<DeviceDescriptor> mMsdInputDevice;
+};
+
+void AudioPolicyManagerTestMsd::SetUpConfig(AudioPolicyConfig *config) {
+    // TODO: Consider using Serializer to load part of the config from a string.
+    mMsdOutputDevice = new DeviceDescriptor(AUDIO_DEVICE_OUT_BUS);
+    sp<AudioProfile> pcmOutputProfile = new AudioProfile(
+            AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, 48000);
+    sp<AudioProfile> ac3OutputProfile = new AudioProfile(
+            AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_5POINT1, 48000);
+    mMsdOutputDevice->addAudioProfile(pcmOutputProfile);
+    mMsdOutputDevice->addAudioProfile(ac3OutputProfile);
+    mMsdInputDevice = new DeviceDescriptor(AUDIO_DEVICE_IN_BUS);
+    // Match output profile from AudioPolicyConfig::setDefault.
+    sp<AudioProfile> pcmInputProfile = new AudioProfile(
+            AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO, 44100);
+    mMsdInputDevice->addAudioProfile(pcmInputProfile);
+    config->addAvailableDevice(mMsdOutputDevice);
+    config->addAvailableDevice(mMsdInputDevice);
+
+    sp<HwModule> msdModule = new HwModule(AUDIO_HARDWARE_MODULE_ID_MSD, 2 /*halVersionMajor*/);
+    HwModuleCollection modules = config->getHwModules();
+    modules.add(msdModule);
+    config->setHwModules(modules);
+    mMsdOutputDevice->attach(msdModule);
+    mMsdInputDevice->attach(msdModule);
+
+    sp<OutputProfile> msdOutputProfile = new OutputProfile(String8("msd input"));
+    msdOutputProfile->addAudioProfile(pcmOutputProfile);
+    msdOutputProfile->addSupportedDevice(mMsdOutputDevice);
+    msdModule->addOutputProfile(msdOutputProfile);
+    sp<OutputProfile> msdCompressedOutputProfile =
+            new OutputProfile(String8("msd compressed input"));
+    msdCompressedOutputProfile->addAudioProfile(ac3OutputProfile);
+    msdCompressedOutputProfile->setFlags(
+            AUDIO_OUTPUT_FLAG_DIRECT | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD |
+            AUDIO_OUTPUT_FLAG_NON_BLOCKING);
+    msdCompressedOutputProfile->addSupportedDevice(mMsdOutputDevice);
+    msdModule->addOutputProfile(msdCompressedOutputProfile);
+
+    sp<InputProfile> msdInputProfile = new InputProfile(String8("msd output"));
+    msdInputProfile->addAudioProfile(pcmInputProfile);
+    msdInputProfile->addSupportedDevice(mMsdInputDevice);
+    msdModule->addInputProfile(msdInputProfile);
+
+    // Add a profile with another encoding to the default device to test routing
+    // of streams that are not supported by MSD.
+    sp<AudioProfile> dtsOutputProfile = new AudioProfile(
+            AUDIO_FORMAT_DTS, AUDIO_CHANNEL_OUT_5POINT1, 48000);
+    config->getDefaultOutputDevice()->addAudioProfile(dtsOutputProfile);
+    sp<OutputProfile> primaryEncodedOutputProfile = new OutputProfile(String8("encoded"));
+    primaryEncodedOutputProfile->addAudioProfile(dtsOutputProfile);
+    primaryEncodedOutputProfile->setFlags(AUDIO_OUTPUT_FLAG_DIRECT);
+    primaryEncodedOutputProfile->addSupportedDevice(config->getDefaultOutputDevice());
+    config->getHwModules().getModuleFromName(AUDIO_HARDWARE_MODULE_ID_PRIMARY)->
+            addOutputProfile(primaryEncodedOutputProfile);
+}
+
+void AudioPolicyManagerTestMsd::TearDown() {
+    mMsdOutputDevice.clear();
+    mMsdInputDevice.clear();
+    AudioPolicyManagerTest::TearDown();
+}
+
+TEST_F(AudioPolicyManagerTestMsd, InitSuccess) {
+    ASSERT_TRUE(mMsdOutputDevice);
+    ASSERT_TRUE(mMsdInputDevice);
+}
+
+TEST_F(AudioPolicyManagerTestMsd, Dump) {
+    dumpToLog();
+}
+
+TEST_F(AudioPolicyManagerTestMsd, PatchCreationOnSetForceUse) {
+    const PatchCountCheck patchCount = snapPatchCount();
+    mManager->setForceUse(AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND,
+            AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS);
+    patchCount.assertDelta(1);
+}
+
+TEST_F(AudioPolicyManagerTestMsd, GetOutputForAttrEncodedRoutesToMsd) {
+    const PatchCountCheck patchCount = snapPatchCount();
+    audio_port_handle_t selectedDeviceId;
+    getOutputForAttr(&selectedDeviceId,
+            AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT);
+    ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
+    patchCount.assertDelta(1);
+}
+
+TEST_F(AudioPolicyManagerTestMsd, GetOutputForAttrPcmRoutesToMsd) {
+    const PatchCountCheck patchCount = snapPatchCount();
+    audio_port_handle_t selectedDeviceId;
+    getOutputForAttr(&selectedDeviceId,
+            AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, 48000);
+    ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
+    patchCount.assertDelta(1);
+}
+
+TEST_F(AudioPolicyManagerTestMsd, GetOutputForAttrEncodedPlusPcmRoutesToMsd) {
+    const PatchCountCheck patchCount = snapPatchCount();
+    audio_port_handle_t selectedDeviceId;
+    getOutputForAttr(&selectedDeviceId,
+            AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT);
+    ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
+    patchCount.assertDelta(1);
+    getOutputForAttr(&selectedDeviceId,
+            AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, 48000);
+    ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
+    patchCount.assertDelta(1);
+}
+
+TEST_F(AudioPolicyManagerTestMsd, GetOutputForAttrUnsupportedFormatBypassesMsd) {
+    const PatchCountCheck patchCount = snapPatchCount();
+    audio_port_handle_t selectedDeviceId;
+    getOutputForAttr(&selectedDeviceId,
+            AUDIO_FORMAT_DTS, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT);
+    ASSERT_NE(selectedDeviceId, mMsdOutputDevice->getId());
+    patchCount.assertNoChange();
+}
+
+TEST_F(AudioPolicyManagerTestMsd, GetOutputForAttrFormatSwitching) {
+    // Switch between formats that are supported and not supported by MSD.
+    {
+        const PatchCountCheck patchCount = snapPatchCount();
+        audio_port_handle_t selectedDeviceId, portId;
+        getOutputForAttr(&selectedDeviceId,
+                AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT,
+                &portId);
+        ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
+        patchCount.assertDelta(1);
+        mManager->releaseOutput(portId);
+        patchCount.assertDelta(1);  // compared to the state at the block entry
+        // TODO: make PatchCountCheck asserts more obvious. It's easy to
+        // miss the fact that it is immutable.
+    }
+    {
+        const PatchCountCheck patchCount = snapPatchCount();
+        audio_port_handle_t selectedDeviceId, portId;
+        getOutputForAttr(&selectedDeviceId,
+                AUDIO_FORMAT_DTS, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT,
+                &portId);
+        ASSERT_NE(selectedDeviceId, mMsdOutputDevice->getId());
+        patchCount.assertDelta(-1);
+        mManager->releaseOutput(portId);
+        patchCount.assertNoChange();
+    }
+    {
+        const PatchCountCheck patchCount = snapPatchCount();
+        audio_port_handle_t selectedDeviceId;
+        getOutputForAttr(&selectedDeviceId,
+                AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT);
+        ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
+        patchCount.assertNoChange();
+    }
+}
