@@ -137,12 +137,16 @@ cc_test {
     shared_libs: [
         "libhwbinder",
         "libcamera2ndk_vendor",
+        "libcamera_metadata",
         "libmediandk",
         "libnativewindow",
         "libutils",
         "libui",
         "libcutils",
         "liblog",
+    ],
+    static_libs: [
+        "android.hardware.camera.common@1.0-helper",
     ],
     cflags: [
         "-D__ANDROID_VNDK__",
