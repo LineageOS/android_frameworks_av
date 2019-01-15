@@ -78,7 +78,6 @@ cc_library_shared {
         "libmedia_omx",
         "libmedia_jni",
         "libmediadrm",
-        "libmediaextractor",
         "libstagefright",
         "libstagefright_foundation",
         "libstagefright_bufferqueue_helper",
