@@ -17,7 +17,7 @@
 #ifndef CLEARKEY_MACROS_H_
 #define CLEARKEY_MACROS_H_
 
-#include <android/hardware/drm/1.0/types.h>
+#include <android/hardware/drm/1.2/types.h>
 
 #include <map>
 
