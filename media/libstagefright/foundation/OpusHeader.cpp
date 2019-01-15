@@ -16,7 +16,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "SoftOpus"
-
+#include <algorithm>
 #include <cstring>
 #include <stdint.h>
 
@@ -173,6 +173,90 @@ int WriteOpusHeader(const OpusHeader &header, int input_sample_rate,
     } else {
         output[kOpusHeaderChannelMappingOffset] = 0;
         return kOpusHeaderChannelMappingOffset + 1;
+    }
+}
+
+int WriteOpusHeaders(const OpusHeader &header, int inputSampleRate,
+                     uint8_t* output, size_t outputSize, uint64_t codecDelay,
+                     uint64_t seekPreRoll) {
+    if (outputSize < AOPUS_UNIFIED_CSD_MINSIZE) {
+        ALOGD("Buffer not large enough to hold unified OPUS CSD");
+        return -1;
+    }
+
+    int headerLen = WriteOpusHeader(header, inputSampleRate, output,
+        outputSize);
+    if (headerLen < 0) {
+        ALOGD("WriteOpusHeader failed");
+        return -1;
+    }
+    if (headerLen >= (outputSize - 2 * AOPUS_TOTAL_CSD_SIZE)) {
+        ALOGD("Buffer not large enough to hold codec delay and seek pre roll");
+        return -1;
+    }
+
+    uint64_t length = AOPUS_LENGTH;
+
+    /*
+      Following is the CSD syntax for signalling codec delay and
+      seek pre-roll which is to be appended after OpusHeader
+
+      Marker (8 bytes) | Length (8 bytes) | Samples (8 bytes)
+
+      Markers supported:
+      AOPUSDLY - Signals Codec Delay
+      AOPUSPRL - Signals seek pre roll
+
+      Length should be 8.
+    */
+
+    // Add codec delay
+    memcpy(output + headerLen, AOPUS_CSD_CODEC_DELAY_MARKER, AOPUS_MARKER_SIZE);
+    headerLen += AOPUS_MARKER_SIZE;
+    memcpy(output + headerLen, &length, AOPUS_LENGTH_SIZE);
+    headerLen += AOPUS_LENGTH_SIZE;
+    memcpy(output + headerLen, &codecDelay, AOPUS_CSD_SIZE);
+    headerLen += AOPUS_CSD_SIZE;
+
+    // Add skip pre roll
+    memcpy(output + headerLen, AOPUS_CSD_SEEK_PREROLL_MARKER, AOPUS_MARKER_SIZE);
+    headerLen += AOPUS_MARKER_SIZE;
+    memcpy(output + headerLen, &length, AOPUS_LENGTH_SIZE);
+    headerLen += AOPUS_LENGTH_SIZE;
+    memcpy(output + headerLen, &seekPreRoll, AOPUS_CSD_SIZE);
+    headerLen += AOPUS_CSD_SIZE;
+
+    return headerLen;
+}
+
+void GetOpusHeaderBuffers(const uint8_t *data, size_t data_size,
+                          void **opusHeadBuf, size_t *opusHeadSize,
+                          void **codecDelayBuf, size_t *codecDelaySize,
+                          void **seekPreRollBuf, size_t *seekPreRollSize) {
+    *codecDelayBuf = NULL;
+    *codecDelaySize = 0;
+    *seekPreRollBuf = NULL;
+    *seekPreRollSize = 0;
+    *opusHeadBuf = (void *)data;
+    *opusHeadSize = data_size;
+    if (data_size >= AOPUS_UNIFIED_CSD_MINSIZE) {
+        size_t i = 0;
+        while (i < data_size - AOPUS_TOTAL_CSD_SIZE) {
+            uint8_t *csdBuf = (uint8_t *)data + i;
+            if (!memcmp(csdBuf, AOPUS_CSD_CODEC_DELAY_MARKER, AOPUS_MARKER_SIZE)) {
+                *opusHeadSize = std::min(*opusHeadSize, i);
+                *codecDelayBuf = csdBuf + AOPUS_MARKER_SIZE + AOPUS_LENGTH_SIZE;
+                *codecDelaySize = AOPUS_CSD_SIZE;
+                i += AOPUS_TOTAL_CSD_SIZE;
+            } else if (!memcmp(csdBuf, AOPUS_CSD_SEEK_PREROLL_MARKER, AOPUS_MARKER_SIZE)) {
+                *opusHeadSize = std::min(*opusHeadSize, i);
+                *seekPreRollBuf = csdBuf + AOPUS_MARKER_SIZE + AOPUS_LENGTH_SIZE;
+                *seekPreRollSize = AOPUS_CSD_SIZE;
+                i += AOPUS_TOTAL_CSD_SIZE;
+            } else {
+                i++;
+            }
+        }
     }
 }
 
