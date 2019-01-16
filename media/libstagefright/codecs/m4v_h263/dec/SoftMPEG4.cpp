@@ -382,6 +382,7 @@ void SoftMPEG4::onPortFlushCompleted(OMX_U32 portIndex) {
     if (portIndex == 0 && mInitialized) {
         CHECK_EQ((int)PVResetVideoDecoder(mHandle), (int)PV_TRUE);
     }
+    mFramesConfigured = false;
 }
 
 void SoftMPEG4::onReset() {

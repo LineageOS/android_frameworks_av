@@ -21,6 +21,7 @@
 #include <android/hardware/drm/1.0/ICryptoFactory.h>
 #include <android/hardware/drm/1.0/ICryptoPlugin.h>
 #include <android/hardware/drm/1.1/ICryptoFactory.h>
+#include <android/hardware/drm/1.2/ICryptoPlugin.h>
 
 #include <mediadrm/ICrypto.h>
 #include <utils/KeyedVector.h>
@@ -72,6 +73,7 @@ private:
 
     const Vector<sp<ICryptoFactory>> mFactories;
     sp<ICryptoPlugin> mPlugin;
+    sp<drm::V1_2::ICryptoPlugin> mPluginV1_2;
 
     /**
      * mInitCheck is:

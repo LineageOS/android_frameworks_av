@@ -17,7 +17,7 @@
 #ifndef CLEARKEY_CRYPTO_PLUGIN_H_
 #define CLEARKEY_CRYPTO_PLUGIN_H_
 
-#include <android/hardware/drm/1.0/ICryptoPlugin.h>
+#include <android/hardware/drm/1.2/ICryptoPlugin.h>
 #include <android/hidl/memory/1.0/IMemory.h>
 
 #include "ClearKeyTypes.h"
@@ -35,13 +35,14 @@ namespace drm {
 namespace V1_2 {
 namespace clearkey {
 
-using ::android::hardware::drm::V1_0::DestinationBuffer;
-using ::android::hardware::drm::V1_0::ICryptoPlugin;
-using ::android::hardware::drm::V1_0::Mode;
-using ::android::hardware::drm::V1_0::Pattern;
-using ::android::hardware::drm::V1_0::SharedBuffer;
-using ::android::hardware::drm::V1_0::Status;
-using ::android::hardware::drm::V1_0::SubSample;
+namespace drm = ::android::hardware::drm;
+using drm::V1_0::DestinationBuffer;
+using drm::V1_0::Mode;
+using drm::V1_0::Pattern;
+using drm::V1_0::SharedBuffer;
+using drm::V1_0::Status;
+using drm::V1_0::SubSample;
+
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_memory;
 using ::android::hardware::hidl_string;
@@ -51,7 +52,9 @@ using ::android::hardware::Void;
 using ::android::hidl::memory::V1_0::IMemory;
 using ::android::sp;
 
-struct CryptoPlugin : public ICryptoPlugin {
+typedef drm::V1_2::Status Status_V1_2;
+
+struct CryptoPlugin : public drm::V1_2::ICryptoPlugin {
     explicit CryptoPlugin(const hidl_vec<uint8_t>& sessionId) {
         mInitStatus = setMediaDrmSession(sessionId);
     }
@@ -79,6 +82,18 @@ struct CryptoPlugin : public ICryptoPlugin {
             uint64_t offset,
             const DestinationBuffer& destination,
             decrypt_cb _hidl_cb);
+
+    Return<void> decrypt_1_2(
+            bool secure,
+            const hidl_array<uint8_t, KEY_ID_SIZE>& keyId,
+            const hidl_array<uint8_t, KEY_IV_SIZE>& iv,
+            Mode mode,
+            const Pattern& pattern,
+            const hidl_vec<SubSample>& subSamples,
+            const SharedBuffer& source,
+            uint64_t offset,
+            const DestinationBuffer& destination,
+            decrypt_1_2_cb _hidl_cb);
 
     Return<void> setSharedBufferBase(const hidl_memory& base,
             uint32_t bufferId);

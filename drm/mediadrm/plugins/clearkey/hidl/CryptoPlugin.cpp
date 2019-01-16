@@ -42,10 +42,42 @@ Return<void> CryptoPlugin::setSharedBufferBase(
     return Void();
 }
 
+Return<void> CryptoPlugin::decrypt(
+    bool secure,
+    const hidl_array<uint8_t, 16>& keyId,
+    const hidl_array<uint8_t, 16>& iv,
+    Mode mode,
+    const Pattern& pattern,
+    const hidl_vec<SubSample>& subSamples,
+    const SharedBuffer& source,
+    uint64_t offset,
+    const DestinationBuffer& destination,
+    decrypt_cb _hidl_cb) {
+
+  Status status = Status::ERROR_DRM_UNKNOWN;
+  hidl_string detailedError;
+  uint32_t bytesWritten = 0;
+
+  Return<void> hResult = decrypt_1_2(
+      secure, keyId, iv, mode, pattern, subSamples, source, offset, destination,
+      [&](Status_V1_2 hStatus, uint32_t hBytesWritten, hidl_string hDetailedError) {
+        status = toStatus_1_0(hStatus);
+        if (status == Status::OK) {
+          bytesWritten = hBytesWritten;
+          detailedError = hDetailedError;
+        }
+      }
+    );
+
+  status = hResult.isOk() ? status : Status::ERROR_DRM_CANNOT_HANDLE;
+  _hidl_cb(status, bytesWritten, detailedError);
+  return Void();
+}
+
 // Returns negative values for error code and positive values for the size of
 // decrypted data.  In theory, the output size can be larger than the input
 // size, but in practice this will never happen for AES-CTR.
-Return<void> CryptoPlugin::decrypt(
+Return<void> CryptoPlugin::decrypt_1_2(
         bool secure,
         const hidl_array<uint8_t, KEY_ID_SIZE>& keyId,
         const hidl_array<uint8_t, KEY_IV_SIZE>& iv,
@@ -55,17 +87,17 @@ Return<void> CryptoPlugin::decrypt(
         const SharedBuffer& source,
         uint64_t offset,
         const DestinationBuffer& destination,
-        decrypt_cb _hidl_cb) {
+        decrypt_1_2_cb _hidl_cb) {
     UNUSED(pattern);
 
     if (secure) {
-        _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, 0,
+        _hidl_cb(Status_V1_2::ERROR_DRM_CANNOT_HANDLE, 0,
             "Secure decryption is not supported with ClearKey.");
         return Void();
     }
 
     if (mSharedBufferMap.find(source.bufferId) == mSharedBufferMap.end()) {
-      _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, 0,
+      _hidl_cb(Status_V1_2::ERROR_DRM_CANNOT_HANDLE, 0,
                "source decrypt buffer base not set");
       return Void();
     }
@@ -73,7 +105,7 @@ Return<void> CryptoPlugin::decrypt(
     if (destination.type == BufferType::SHARED_MEMORY) {
       const SharedBuffer& dest = destination.nonsecureMemory;
       if (mSharedBufferMap.find(dest.bufferId) == mSharedBufferMap.end()) {
-        _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, 0,
+        _hidl_cb(Status_V1_2::ERROR_DRM_CANNOT_HANDLE, 0,
                  "destination decrypt buffer base not set");
         return Void();
       }
@@ -81,12 +113,12 @@ Return<void> CryptoPlugin::decrypt(
 
     sp<IMemory> sourceBase = mSharedBufferMap[source.bufferId];
     if (sourceBase == nullptr) {
-        _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, 0, "source is a nullptr");
+        _hidl_cb(Status_V1_2::ERROR_DRM_CANNOT_HANDLE, 0, "source is a nullptr");
         return Void();
     }
 
     if (source.offset + offset + source.size > sourceBase->getSize()) {
-        _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, 0, "invalid buffer size");
+        _hidl_cb(Status_V1_2::ERROR_DRM_CANNOT_HANDLE, 0, "invalid buffer size");
         return Void();
     }
 
@@ -98,12 +130,12 @@ Return<void> CryptoPlugin::decrypt(
         const SharedBuffer& destBuffer = destination.nonsecureMemory;
         sp<IMemory> destBase = mSharedBufferMap[destBuffer.bufferId];
         if (destBase == nullptr) {
-            _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, 0, "destination is a nullptr");
+            _hidl_cb(Status_V1_2::ERROR_DRM_CANNOT_HANDLE, 0, "destination is a nullptr");
             return Void();
         }
 
         if (destBuffer.offset + destBuffer.size > destBase->getSize()) {
-            _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, 0, "invalid buffer size");
+            _hidl_cb(Status_V1_2::ERROR_DRM_CANNOT_HANDLE, 0, "invalid buffer size");
             return Void();
         }
         destPtr = static_cast<void *>(base + destination.nonsecureMemory.offset);
@@ -128,7 +160,7 @@ Return<void> CryptoPlugin::decrypt(
 
     if (mode == Mode::UNENCRYPTED) {
         if (haveEncryptedSubsamples) {
-            _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, 0,
+            _hidl_cb(Status_V1_2::ERROR_DRM_CANNOT_HANDLE, 0,
                     "Encrypted subsamples found in allegedly unencrypted data.");
             return Void();
         }
@@ -144,22 +176,21 @@ Return<void> CryptoPlugin::decrypt(
             }
         }
 
-        _hidl_cb(Status::OK, static_cast<ssize_t>(offset), "");
+        _hidl_cb(Status_V1_2::OK, static_cast<ssize_t>(offset), "");
         return Void();
     } else if (mode == Mode::AES_CTR) {
         size_t bytesDecrypted;
-        Status res = mSession->decrypt(keyId.data(), iv.data(), srcPtr,
+        Status_V1_2 res = mSession->decrypt(keyId.data(), iv.data(), srcPtr,
                 static_cast<uint8_t*>(destPtr), toVector(subSamples), &bytesDecrypted);
-        if (res == Status::OK) {
-            _hidl_cb(Status::OK, static_cast<ssize_t>(bytesDecrypted), "");
+        if (res == Status_V1_2::OK) {
+            _hidl_cb(Status_V1_2::OK, static_cast<ssize_t>(bytesDecrypted), "");
             return Void();
         } else {
-            _hidl_cb(Status::ERROR_DRM_DECRYPT, static_cast<ssize_t>(res),
-                    "Decryption Error");
+            _hidl_cb(res, 0, "Decryption Error");
             return Void();
         }
     } else {
-        _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, 0,
+        _hidl_cb(Status_V1_2::ERROR_DRM_CANNOT_HANDLE, 0,
                 "Selected encryption mode is not supported by the ClearKey DRM Plugin.");
         return Void();
     }

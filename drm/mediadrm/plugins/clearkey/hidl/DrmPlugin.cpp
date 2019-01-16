@@ -61,15 +61,23 @@ namespace drm {
 namespace V1_2 {
 namespace clearkey {
 
-using ::android::hardware::drm::V1_2::KeySetId;
-using ::android::hardware::drm::V1_2::OfflineLicenseState;
+KeyRequestType toKeyRequestType_V1_0(KeyRequestType_V1_1 keyRequestType) {
+  switch (keyRequestType) {
+    case KeyRequestType_V1_1::NONE:
+    case KeyRequestType_V1_1::UPDATE:
+      return KeyRequestType::UNKNOWN;
+    default:
+      return static_cast<KeyRequestType>(keyRequestType);
+  }
+}
 
 DrmPlugin::DrmPlugin(SessionLibrary* sessionLibrary)
         : mSessionLibrary(sessionLibrary),
           mOpenSessionOkCount(0),
           mCloseSessionOkCount(0),
           mCloseSessionNotOpenedCount(0),
-          mNextSecureStopId(kSecureStopIdStart) {
+          mNextSecureStopId(kSecureStopIdStart),
+          mMockError(Status_V1_2::OK) {
     mPlayPolicy.clear();
     initProperties();
     mSecureStops.clear();
@@ -84,6 +92,7 @@ void DrmPlugin::initProperties() {
     mStringProperties[kPluginDescriptionKey] = kPluginDescriptionValue;
     mStringProperties[kAlgorithmsKey] = kAlgorithmsValue;
     mStringProperties[kListenerTestSupportKey] = kListenerTestSupportValue;
+    mStringProperties[kDrmErrorTestKey] = kDrmErrorTestValue;
 
     std::vector<uint8_t> valueVector;
     valueVector.clear();
@@ -112,6 +121,7 @@ void DrmPlugin::installSecureStop(const hidl_vec<uint8_t>& sessionId) {
 
 Return<void> DrmPlugin::openSession(openSession_cb _hidl_cb) {
     sp<Session> session = mSessionLibrary->createSession();
+    processMockError(session);
     std::vector<uint8_t> sessionId = session->sessionId();
 
     Status status = setSecurityLevel(sessionId, SecurityLevel::SW_SECURE_CRYPTO);
@@ -123,6 +133,7 @@ Return<void> DrmPlugin::openSession(openSession_cb _hidl_cb) {
 Return<void> DrmPlugin::openSession_1_1(SecurityLevel securityLevel,
         openSession_1_1_cb _hidl_cb) {
     sp<Session> session = mSessionLibrary->createSession();
+    processMockError(session);
     std::vector<uint8_t> sessionId = session->sessionId();
 
     Status status = setSecurityLevel(sessionId, securityLevel);
@@ -138,6 +149,10 @@ Return<Status> DrmPlugin::closeSession(const hidl_vec<uint8_t>& sessionId) {
 
     sp<Session> session = mSessionLibrary->findSession(toVector(sessionId));
     if (session.get()) {
+        if (session->getMockError() != Status_V1_2::OK) {
+            sendSessionLostState(sessionId);
+            return Status::ERROR_DRM_INVALID_STATE;
+        }
         mCloseSessionOkCount++;
         mSessionLibrary->destroySession(session);
         return Status::OK;
@@ -146,13 +161,13 @@ Return<Status> DrmPlugin::closeSession(const hidl_vec<uint8_t>& sessionId) {
     return Status::ERROR_DRM_SESSION_NOT_OPENED;
 }
 
-Status DrmPlugin::getKeyRequestCommon(const hidl_vec<uint8_t>& scope,
+Status_V1_2 DrmPlugin::getKeyRequestCommon(const hidl_vec<uint8_t>& scope,
         const hidl_vec<uint8_t>& initData,
         const hidl_string& mimeType,
         KeyType keyType,
         const hidl_vec<KeyValue>& optionalParameters,
         std::vector<uint8_t> *request,
-        KeyRequestType *keyRequestType,
+        KeyRequestType_V1_1 *keyRequestType,
         std::string *defaultUrl) {
         UNUSED(optionalParameters);
 
@@ -161,18 +176,18 @@ Status DrmPlugin::getKeyRequestCommon(const hidl_vec<uint8_t>& scope,
     // Those tests pass in an empty initData, we use the empty initData to
     // signal such specific use case.
     if (keyType == KeyType::OFFLINE && 0 == initData.size()) {
-        return Status::ERROR_DRM_CANNOT_HANDLE;
+        return Status_V1_2::ERROR_DRM_CANNOT_HANDLE;
     }
 
     *defaultUrl = "";
-    *keyRequestType = KeyRequestType::UNKNOWN;
+    *keyRequestType = KeyRequestType_V1_1::UNKNOWN;
     *request = std::vector<uint8_t>();
 
     if (scope.size() == 0 ||
             (keyType != KeyType::STREAMING &&
             keyType != KeyType::OFFLINE &&
             keyType != KeyType::RELEASE)) {
-        return Status::BAD_VALUE;
+        return Status_V1_2::BAD_VALUE;
     }
 
     const std::vector<uint8_t> scopeId = toVector(scope);
@@ -181,12 +196,16 @@ Status DrmPlugin::getKeyRequestCommon(const hidl_vec<uint8_t>& scope,
         std::vector<uint8_t> sessionId(scopeId.begin(), scopeId.end());
         session = mSessionLibrary->findSession(sessionId);
         if (!session.get()) {
-            return Status::ERROR_DRM_SESSION_NOT_OPENED;
+            return Status_V1_2::ERROR_DRM_SESSION_NOT_OPENED;
+        } else if (session->getMockError() != Status_V1_2::OK) {
+            return session->getMockError();
         }
-        *keyRequestType = KeyRequestType::INITIAL;
+
+        *keyRequestType = KeyRequestType_V1_1::INITIAL;
     }
 
-    Status status = session->getKeyRequest(initData, mimeType, keyType, request);
+    Status_V1_2 status = static_cast<Status_V1_2>(
+            session->getKeyRequest(initData, mimeType, keyType, request));
 
     if (keyType == KeyType::RELEASE) {
         std::vector<uint8_t> keySetId(scopeId.begin(), scopeId.end());
@@ -198,7 +217,7 @@ Status DrmPlugin::getKeyRequestCommon(const hidl_vec<uint8_t>& scope,
                     DeviceFiles::kLicenseStateReleasing,
                     emptyResponse)) {
                 ALOGE("Problem releasing offline license");
-                return Status::ERROR_DRM_UNKNOWN;
+                return Status_V1_2::ERROR_DRM_UNKNOWN;
             }
             if (mReleaseKeysMap.find(keySetIdString) == mReleaseKeysMap.end()) {
                 sp<Session> session = mSessionLibrary->createSession();
@@ -209,7 +228,7 @@ Status DrmPlugin::getKeyRequestCommon(const hidl_vec<uint8_t>& scope,
         } else {
             ALOGE("Offline license not found, nothing to release");
         }
-        *keyRequestType = KeyRequestType::RELEASE;
+        *keyRequestType = KeyRequestType_V1_1::RELEASE;
     }
     return status;
 }
@@ -223,15 +242,15 @@ Return<void> DrmPlugin::getKeyRequest(
         getKeyRequest_cb _hidl_cb) {
     UNUSED(optionalParameters);
 
-    KeyRequestType keyRequestType = KeyRequestType::UNKNOWN;
+    KeyRequestType_V1_1 keyRequestType = KeyRequestType_V1_1::UNKNOWN;
     std::string defaultUrl("");
     std::vector<uint8_t> request;
-    Status status = getKeyRequestCommon(
+    Status_V1_2 status = getKeyRequestCommon(
             scope, initData, mimeType, keyType, optionalParameters,
             &request, &keyRequestType, &defaultUrl);
 
-    _hidl_cb(status, toHidlVec(request),
-            static_cast<drm::V1_0::KeyRequestType>(keyRequestType),
+    _hidl_cb(toStatus_1_0(status), toHidlVec(request),
+            toKeyRequestType_V1_0(keyRequestType),
             hidl_string(defaultUrl));
     return Void();
 }
@@ -245,10 +264,31 @@ Return<void> DrmPlugin::getKeyRequest_1_1(
         getKeyRequest_1_1_cb _hidl_cb) {
     UNUSED(optionalParameters);
 
-    KeyRequestType keyRequestType = KeyRequestType::UNKNOWN;
+    KeyRequestType_V1_1 keyRequestType = KeyRequestType_V1_1::UNKNOWN;
     std::string defaultUrl("");
     std::vector<uint8_t> request;
-    Status status = getKeyRequestCommon(
+    Status_V1_2 status = getKeyRequestCommon(
+            scope, initData, mimeType, keyType, optionalParameters,
+            &request, &keyRequestType, &defaultUrl);
+
+    _hidl_cb(toStatus_1_0(status), toHidlVec(request),
+            keyRequestType, hidl_string(defaultUrl));
+    return Void();
+}
+
+Return<void> DrmPlugin::getKeyRequest_1_2(
+        const hidl_vec<uint8_t>& scope,
+        const hidl_vec<uint8_t>& initData,
+        const hidl_string& mimeType,
+        KeyType keyType,
+        const hidl_vec<KeyValue>& optionalParameters,
+        getKeyRequest_1_2_cb _hidl_cb) {
+    UNUSED(optionalParameters);
+
+    KeyRequestType_V1_1 keyRequestType = KeyRequestType_V1_1::UNKNOWN;
+    std::string defaultUrl("");
+    std::vector<uint8_t> request;
+    Status_V1_2 status = getKeyRequestCommon(
             scope, initData, mimeType, keyType, optionalParameters,
             &request, &keyRequestType, &defaultUrl);
 
@@ -434,6 +474,8 @@ Return<void> DrmPlugin::getPropertyString(
         value = mStringProperties[kAlgorithmsKey];
     } else if (name == kListenerTestSupportKey) {
         value = mStringProperties[kListenerTestSupportKey];
+    } else if (name == kDrmErrorTestKey) {
+        value = mStringProperties[kDrmErrorTestKey];
     } else {
         ALOGE("App requested unknown string property %s", name.c_str());
         _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, "");
@@ -476,6 +518,16 @@ Return<Status> DrmPlugin::setPropertyString(
     if (itr == mStringProperties.end()) {
         ALOGE("Cannot set undefined property string, key=%s", key.c_str());
         return Status::BAD_VALUE;
+    }
+
+    if (name == kDrmErrorTestKey) {
+        if (value == kResourceContentionValue) {
+            mMockError = Status_V1_2::ERROR_DRM_RESOURCE_CONTENTION;
+        } else if (value == kLostStateValue) {
+            mMockError = Status_V1_2::ERROR_DRM_SESSION_LOST_STATE;
+        } else if (value == kFrameTooLargeValue) {
+            mMockError = Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE;
+        }
     }
 
     mStringProperties[key] = std::string(value.c_str());

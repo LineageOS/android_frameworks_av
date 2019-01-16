@@ -360,10 +360,12 @@ status_t AudioPolicyMixCollection::setUidDeviceAffinities(uid_t uid,
                 break;
             }
         }
-        if (!deviceMatch) {
+        if (deviceMatch) {
+            mix->setMatchUid(uid);
+        } else {
             // this mix doesn't go to one of the listed devices for the given uid,
             // modify its rules to exclude the uid
-            mix->excludeUid(uid);
+            mix->setExcludeUid(uid);
         }
     }
 
@@ -382,7 +384,7 @@ status_t AudioPolicyMixCollection::removeUidDeviceAffinities(uid_t uid) {
         for (size_t j = 0; j < mix->mCriteria.size(); j++) {
             const uint32_t rule = mix->mCriteria[j].mRule;
             // is this rule affecting the uid?
-            if (rule == RULE_EXCLUDE_UID
+            if ((rule == RULE_EXCLUDE_UID || rule == RULE_MATCH_UID)
                     && uid == mix->mCriteria[j].mValue.mUid) {
                 foundUidRule = true;
                 criteriaToRemove.push_back(j);

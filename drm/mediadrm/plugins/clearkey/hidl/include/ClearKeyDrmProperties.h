@@ -35,6 +35,11 @@ static const std::string kAlgorithmsKey("algorithms");
 static const std::string kAlgorithmsValue("");
 static const std::string kListenerTestSupportKey("listenerTestSupport");
 static const std::string kListenerTestSupportValue("true");
+static const std::string kDrmErrorTestKey("drmErrorTest");
+static const std::string kDrmErrorTestValue("");
+static const std::string kResourceContentionValue("resourceContention");
+static const std::string kLostStateValue("lostState");
+static const std::string kFrameTooLargeValue("frameTooLarge");
 
 static const std::string kDeviceIdKey("deviceId");
 static const uint8_t kTestDeviceIdData[] =

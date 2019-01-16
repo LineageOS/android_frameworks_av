@@ -37,12 +37,7 @@
 #include <media/NdkImage.h>
 #include <media/NdkImageReader.h>
 #include <cutils/native_handle.h>
-
-//#define ALOGV(...) __android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__)
-//#define ALOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
-#define ALOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-#define ALOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
-#define ALOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#include <VendorTagDescriptor.h>
 
 namespace {
 
@@ -52,6 +47,8 @@ static constexpr int kCaptureWaitRetry = 10;
 static constexpr int kTestImageWidth = 640;
 static constexpr int kTestImageHeight = 480;
 static constexpr int kTestImageFormat = AIMAGE_FORMAT_YUV_420_888;
+
+using android::hardware::camera::common::V1_0::helper::VendorTagDescriptorCache;
 
 class CameraHelper {
    public:
@@ -527,6 +524,8 @@ class AImageReaderVendorTest : public ::testing::Test {
             ALOGE("Failed to get cameraIdList: ret=%d", ret);
             return;
         }
+        // TODO: Add more rigorous tests for vendor tags
+        ASSERT_NE(VendorTagDescriptorCache::getGlobalVendorTagCache(), nullptr);
         if (mCameraIdList->numCameras < 1) {
             ALOGW("Device has no camera on board.");
             return;

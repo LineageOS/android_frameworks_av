@@ -15,7 +15,6 @@ cc_binary {
         "libcutils",
         "libgui",
         "liblog",
-        "libmediaextractor",
         "libstagefright",
         "libstagefright_foundation",
         "libui",

@@ -21,7 +21,6 @@ cc_library_static {
         "libgui",
         "liblog",
         "libmedia_omx",
-        "libmediaextractor",
         "libstagefright_foundation",
         "libui",
         "libutils",

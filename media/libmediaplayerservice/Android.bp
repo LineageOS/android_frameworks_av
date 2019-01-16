@@ -24,7 +24,6 @@ cc_library_shared {
         "liblog",
         "libmedia",
         "libmedia_omx",
-        "libmediaextractor",
         "libmediadrm",
         "libmediametrics",
         "libmediautils",
