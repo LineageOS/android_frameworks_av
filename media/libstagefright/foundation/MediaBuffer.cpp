@@ -59,9 +59,11 @@ MediaBuffer::MediaBuffer(size_t size)
 #ifndef NO_IMEMORY
     } else {
         ALOGV("creating memoryDealer");
-        sp<MemoryDealer> memoryDealer =
-                new MemoryDealer(size + sizeof(SharedControl), "MediaBuffer");
-        mMemory = memoryDealer->allocate(size + sizeof(SharedControl));
+        size_t newSize = 0;
+        if (!__builtin_add_overflow(size, sizeof(SharedControl), &newSize)) {
+            sp<MemoryDealer> memoryDealer = new MemoryDealer(newSize, "MediaBuffer");
+            mMemory = memoryDealer->allocate(newSize);
+        }
         if (mMemory == NULL) {
             ALOGW("Failed to allocate shared memory, trying regular allocation!");
             mData = malloc(size);
