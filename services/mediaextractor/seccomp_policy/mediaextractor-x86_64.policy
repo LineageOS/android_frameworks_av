@@ -11,6 +11,7 @@ munmap: 1
 mmap: 1
 madvise: 1
 openat: 1
+open: 1
 clock_gettime: 1
 writev: 1
 brk: 1
