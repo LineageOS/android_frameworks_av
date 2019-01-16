@@ -322,6 +322,13 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                         }
                     }
                     status = thread->sendCreateAudioPatchConfigEvent(patch, &halHandle);
+                    // remove stale audio patch with same input as sink if any
+                    for (auto& iter : mPatches) {
+                        if (iter.second.mAudioPatch.sinks[0].ext.mix.handle == thread->id()) {
+                            mPatches.erase(iter.first);
+                            break;
+                        }
+                    }
                 } else {
                     sp<DeviceHalInterface> hwDevice = audioHwDevice->hwDevice();
                     status = hwDevice->createAudioPatch(patch->num_sources,
@@ -376,6 +383,14 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
             }
 
             status = thread->sendCreateAudioPatchConfigEvent(patch, &halHandle);
+
+            // remove stale audio patch with same output as source if any
+            for (auto& iter : mPatches) {
+                if (iter.second.mAudioPatch.sources[0].ext.mix.handle == thread->id()) {
+                    mPatches.erase(iter.first);
+                    break;
+                }
+            }
         } break;
         default:
             status = BAD_VALUE;
