@@ -631,6 +631,7 @@ audio_devices_t Engine::getDeviceForInputSource(audio_source_t inputSource) cons
         case AUDIO_SOURCE_UNPROCESSED:
         case AUDIO_SOURCE_HOTWORD:
         case AUDIO_SOURCE_CAMCORDER:
+        case AUDIO_SOURCE_VOICE_PERFORMANCE:
             inputSource = AUDIO_SOURCE_VOICE_COMMUNICATION;
             break;
         default:
@@ -737,14 +738,30 @@ audio_devices_t Engine::getDeviceForInputSource(audio_source_t inputSource) cons
             device = AUDIO_DEVICE_IN_VOICE_CALL;
         }
         break;
+    case AUDIO_SOURCE_VOICE_PERFORMANCE:
+        if (availableDeviceTypes & AUDIO_DEVICE_IN_WIRED_HEADSET) {
+            device = AUDIO_DEVICE_IN_WIRED_HEADSET;
+        } else if (availableDeviceTypes & AUDIO_DEVICE_IN_USB_HEADSET) {
+            device = AUDIO_DEVICE_IN_USB_HEADSET;
+        } else if (availableDeviceTypes & AUDIO_DEVICE_IN_USB_DEVICE) {
+            device = AUDIO_DEVICE_IN_USB_DEVICE;
+        } else if (availableDeviceTypes & AUDIO_DEVICE_IN_BUILTIN_MIC) {
+            device = AUDIO_DEVICE_IN_BUILTIN_MIC;
+        }
+        break;
     case AUDIO_SOURCE_REMOTE_SUBMIX:
         if (availableDeviceTypes & AUDIO_DEVICE_IN_REMOTE_SUBMIX) {
             device = AUDIO_DEVICE_IN_REMOTE_SUBMIX;
         }
         break;
-     case AUDIO_SOURCE_FM_TUNER:
+    case AUDIO_SOURCE_FM_TUNER:
         if (availableDeviceTypes & AUDIO_DEVICE_IN_FM_TUNER) {
             device = AUDIO_DEVICE_IN_FM_TUNER;
+        }
+        break;
+    case AUDIO_SOURCE_ECHO_REFERENCE:
+        if (availableDeviceTypes & AUDIO_DEVICE_IN_ECHO_REFERENCE) {
+            device = AUDIO_DEVICE_IN_ECHO_REFERENCE;
         }
         break;
     default:
