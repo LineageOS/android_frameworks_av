@@ -30,7 +30,7 @@
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/OggWriter.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include "OpusHeader.h"
+#include <media/stagefright/foundation/OpusHeader.h>
 
 extern "C" {
 #include <ogg/ogg.h>

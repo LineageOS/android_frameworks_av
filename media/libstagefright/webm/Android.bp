@@ -28,7 +28,6 @@ cc_library_static {
 
     shared_libs: [
         "libstagefright_foundation",
-        "libstagefright_opus_common",
         "libutils",
         "liblog",
     ],
