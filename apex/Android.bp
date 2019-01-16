@@ -15,6 +15,7 @@
 apex {
     name: "com.android.media",
     manifest: "manifest.json",
+    java_libs: ["updatable-media"],
     native_shared_libs: [
         // Extractor plugins
         "libaacextractor",
