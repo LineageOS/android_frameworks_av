@@ -36,4 +36,12 @@ interface IAudioRecord {
   /* Get a list of current active microphones.
    */
   void getActiveMicrophones(out MicrophoneInfo[] activeMicrophones);
+
+  /* Set the microphone direction (for processing).
+   */
+  void setMicrophoneDirection(int /*audio_microphone_direction_t*/ direction);
+
+  /* Set the microphone zoom (for processing).
+   */
+  void setMicrophoneFieldDimension(float zoom);
 }

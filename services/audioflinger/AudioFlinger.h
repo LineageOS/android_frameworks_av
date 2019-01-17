@@ -579,6 +579,10 @@ using effect_buffer_t = int16_t;
         virtual binder::Status   stop();
         virtual binder::Status   getActiveMicrophones(
                 std::vector<media::MicrophoneInfo>* activeMicrophones);
+        virtual binder::Status   setMicrophoneDirection(
+                int /*audio_microphone_direction_t*/ direction);
+        virtual binder::Status   setMicrophoneFieldDimension(float zoom);
+
     private:
         const sp<RecordThread::RecordTrack> mRecordTrack;
 

@@ -534,6 +534,14 @@ public:
      */
             status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
 
+    /* Set the Microphone direction (for processing purposes).
+     */
+            status_t    setMicrophoneDirection(audio_microphone_direction_t direction);
+
+    /* Set the Microphone zoom factor (for processing purposes).
+     */
+            status_t    setMicrophoneFieldDimension(float zoom);
+
      /* Get the unique port ID assigned to this AudioRecord instance by audio policy manager.
       * The ID is unique across all audioserver clients and can change during the life cycle
       * of a given AudioRecord instance if the connection to audioserver is restored.
