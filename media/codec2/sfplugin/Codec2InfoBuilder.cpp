@@ -496,6 +496,23 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                         asString(err), asString(profileQuery[0].status));
                 if (err == C2_OK && profileQuery[0].status == C2_OK) {
                     if (profileQuery[0].values.type == C2FieldSupportedValues::VALUES) {
+                        std::vector<std::shared_ptr<C2ParamDescriptor>> paramDescs;
+                        c2_status_t err1 = intf->querySupportedParams(&paramDescs);
+                        bool isHdr = false, isHdr10Plus = false;
+                        if (err1 == C2_OK) {
+                            for (const std::shared_ptr<C2ParamDescriptor> &desc : paramDescs) {
+                                if ((uint32_t)desc->index() ==
+                                        C2StreamHdr10PlusInfo::output::PARAM_TYPE) {
+                                    isHdr10Plus = true;
+                                } else if ((uint32_t)desc->index() ==
+                                        C2StreamHdrStaticInfo::output::PARAM_TYPE) {
+                                    isHdr = true;
+                                }
+                            }
+                        }
+                        // For VP9, the static info is always propagated by framework.
+                        isHdr |= (mediaType == MIMETYPE_VIDEO_VP9);
+
                         for (C2Value::Primitive profile : profileQuery[0].values.values) {
                             pl.profile = (C2Config::profile_t)profile.ref<uint32_t>();
                             std::vector<std::unique_ptr<C2SettingResult>> failures;
@@ -519,6 +536,26 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                                         caps->addProfileLevel(
                                                 (uint32_t)sdkProfile, (uint32_t)sdkLevel);
                                         gotProfileLevels = true;
+                                        if (isHdr) {
+                                            auto hdrMapper = C2Mapper::GetHdrProfileLevelMapper(
+                                                    trait.mediaType);
+                                            if (hdrMapper && hdrMapper->mapProfile(
+                                                    pl.profile, &sdkProfile)) {
+                                                caps->addProfileLevel(
+                                                        (uint32_t)sdkProfile,
+                                                        (uint32_t)sdkLevel);
+                                            }
+                                            if (isHdr10Plus) {
+                                                hdrMapper = C2Mapper::GetHdrProfileLevelMapper(
+                                                        trait.mediaType, true /*isHdr10Plus*/);
+                                                if (hdrMapper && hdrMapper->mapProfile(
+                                                        pl.profile, &sdkProfile)) {
+                                                    caps->addProfileLevel(
+                                                            (uint32_t)sdkProfile,
+                                                            (uint32_t)sdkLevel);
+                                                }
+                                            }
+                                        }
                                     } else if (!mapper) {
                                         caps->addProfileLevel(pl.profile, pl.level);
                                         gotProfileLevels = true;
