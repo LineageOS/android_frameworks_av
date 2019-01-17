@@ -82,25 +82,10 @@ audio_port_handle_t AudioOutputDescriptor::getId() const
     return mId;
 }
 
-audio_devices_t AudioOutputDescriptor::device() const
-{
-    return mDevice;
-}
-
-audio_devices_t AudioOutputDescriptor::supportedDevices()
-{
-    return mDevice;
-}
-
 bool AudioOutputDescriptor::sharesHwModuleWith(
         const sp<AudioOutputDescriptor>& outputDesc)
 {
-    if (outputDesc->isDuplicated()) {
-        return sharesHwModuleWith(outputDesc->subOutput1()) ||
-                    sharesHwModuleWith(outputDesc->subOutput2());
-    } else {
-        return hasSameHwModuleAs(outputDesc);
-    }
+    return hasSameHwModuleAs(outputDesc);
 }
 
 void AudioOutputDescriptor::changeStreamActiveCount(const sp<TrackClientDescriptor>& client,
@@ -282,7 +267,7 @@ void AudioOutputDescriptor::dump(String8 *dst) const
     dst->appendFormat(" Sampling rate: %d\n", mSamplingRate);
     dst->appendFormat(" Format: %08x\n", mFormat);
     dst->appendFormat(" Channels: %08x\n", mChannelMask);
-    dst->appendFormat(" Devices: %08x\n", device());
+    dst->appendFormat(" Devices: %s\n", devices().toString().c_str());
     dst->appendFormat(" Global active count: %u\n", mGlobalActiveCount);
     dst->append(" Stream volume activeCount muteCount\n");
     for (int i = 0; i < (int)AUDIO_STREAM_CNT; i++) {
@@ -330,17 +315,18 @@ void SwAudioOutputDescriptor::dump(String8 *dst) const
     AudioOutputDescriptor::dump(dst);
 }
 
-audio_devices_t SwAudioOutputDescriptor::device() const
+DeviceVector SwAudioOutputDescriptor::devices() const
 {
     if (isDuplicated()) {
-        return (audio_devices_t)(mOutput1->mDevice | mOutput2->mDevice);
-    } else {
-        return mDevice;
+        DeviceVector devices = mOutput1->devices();
+        devices.merge(mOutput2->devices());
+        return devices;
     }
+    return mDevices;
 }
 
 bool SwAudioOutputDescriptor::sharesHwModuleWith(
-        const sp<AudioOutputDescriptor>& outputDesc)
+        const sp<SwAudioOutputDescriptor>& outputDesc)
 {
     if (isDuplicated()) {
         return mOutput1->sharesHwModuleWith(outputDesc) || mOutput2->sharesHwModuleWith(outputDesc);
@@ -352,13 +338,30 @@ bool SwAudioOutputDescriptor::sharesHwModuleWith(
     }
 }
 
-audio_devices_t SwAudioOutputDescriptor::supportedDevices()
+DeviceVector SwAudioOutputDescriptor::supportedDevices() const
 {
     if (isDuplicated()) {
-        return (audio_devices_t)(mOutput1->supportedDevices() | mOutput2->supportedDevices());
-    } else {
-        return mProfile->getSupportedDevicesType();
+        DeviceVector supportedDevices = mOutput1->supportedDevices();
+        supportedDevices.merge(mOutput2->supportedDevices());
+        return supportedDevices;
     }
+    return mProfile->getSupportedDevices();
+}
+
+bool SwAudioOutputDescriptor::supportsDevice(const sp<DeviceDescriptor> &device) const
+{
+    return supportedDevices().contains(device);
+}
+
+bool SwAudioOutputDescriptor::supportsAllDevices(const DeviceVector &devices) const
+{
+    return supportedDevices().containsAllDevices(devices);
+}
+
+DeviceVector SwAudioOutputDescriptor::filterSupportedDevices(const DeviceVector &devices) const
+{
+    DeviceVector filteredDevices = supportedDevices();
+    return filteredDevices.filter(devices);
 }
 
 uint32_t SwAudioOutputDescriptor::latency()
@@ -443,12 +446,15 @@ bool SwAudioOutputDescriptor::setVolume(float volume,
 }
 
 status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
-                                       audio_devices_t device,
-                                       const String8& address,
+                                       const DeviceVector &devices,
                                        audio_stream_type_t stream,
                                        audio_output_flags_t flags,
                                        audio_io_handle_t *output)
 {
+    mDevices = devices;
+    const String8& address = devices.getFirstValidAddress();
+    audio_devices_t device = devices.types();
+
     audio_config_t lConfig;
     if (config == nullptr) {
         lConfig = AUDIO_CONFIG_INITIALIZER;
@@ -459,7 +465,6 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
         lConfig = *config;
     }
 
-    mDevice = device;
     // if the selected profile is offloaded and no offload info was specified,
     // create a default one
     if ((mProfile->getFlags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) &&
@@ -477,19 +482,19 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
 
     mFlags = (audio_output_flags_t)(mFlags | flags);
 
-    ALOGV("opening output for device %08x address %s profile %p name %s",
-          mDevice, address.string(), mProfile.get(), mProfile->getName().string());
+    ALOGV("opening output for device %s profile %p name %s",
+          mDevices.toString().c_str(), mProfile.get(), mProfile->getName().string());
 
     status_t status = mClientInterface->openOutput(mProfile->getModuleHandle(),
                                                    output,
                                                    &lConfig,
-                                                   &mDevice,
+                                                   &device,
                                                    address,
                                                    &mLatency,
                                                    mFlags);
-    LOG_ALWAYS_FATAL_IF(mDevice != device,
+    LOG_ALWAYS_FATAL_IF(mDevices.types() != device,
                         "%s openOutput returned device %08x when given device %08x",
-                        __FUNCTION__, mDevice, device);
+                        __FUNCTION__, mDevices.types(), device);
 
     if (status == NO_ERROR) {
         LOG_ALWAYS_FATAL_IF(*output == AUDIO_IO_HANDLE_NONE,
@@ -605,11 +610,6 @@ void HwAudioOutputDescriptor::dump(String8 *dst) const
     mSource->dump(dst, 0, 0);
 }
 
-audio_devices_t HwAudioOutputDescriptor::supportedDevices()
-{
-    return mDevice;
-}
-
 void HwAudioOutputDescriptor::toAudioPortConfig(
                                                  struct audio_port_config *dstConfig,
                                                  const struct audio_port_config *srcConfig) const
@@ -657,7 +657,7 @@ bool SwAudioOutputCollection::isStreamActiveLocally(audio_stream_type_t stream, 
     for (size_t i = 0; i < this->size(); i++) {
         const sp<SwAudioOutputDescriptor> outputDesc = this->valueAt(i);
         if (outputDesc->isStreamActive(stream, inPastMs, sysTime)
-                && ((outputDesc->device() & APM_AUDIO_OUT_DEVICE_REMOTE_ALL) == 0)) {
+                && ((outputDesc->devices().types() & APM_AUDIO_OUT_DEVICE_REMOTE_ALL) == 0)) {
             return true;
         }
     }
@@ -670,7 +670,7 @@ bool SwAudioOutputCollection::isStreamActiveRemotely(audio_stream_type_t stream,
     nsecs_t sysTime = systemTime();
     for (size_t i = 0; i < size(); i++) {
         const sp<SwAudioOutputDescriptor> outputDesc = valueAt(i);
-        if (((outputDesc->device() & APM_AUDIO_OUT_DEVICE_REMOTE_ALL) != 0) &&
+        if (((outputDesc->devices().types() & APM_AUDIO_OUT_DEVICE_REMOTE_ALL) != 0) &&
                 outputDesc->isStreamActive(stream, inPastMs, sysTime)) {
             // do not consider re routing (when the output is going to a dynamic policy)
             // as "remote playback"
@@ -686,7 +686,8 @@ audio_io_handle_t SwAudioOutputCollection::getA2dpOutput() const
 {
     for (size_t i = 0; i < size(); i++) {
         sp<SwAudioOutputDescriptor> outputDesc = valueAt(i);
-        if (!outputDesc->isDuplicated() && outputDesc->device() & AUDIO_DEVICE_OUT_ALL_A2DP) {
+        if (!outputDesc->isDuplicated() &&
+                outputDesc->devices().types() & AUDIO_DEVICE_OUT_ALL_A2DP) {
             return this->keyAt(i);
         }
     }
@@ -700,10 +701,9 @@ bool SwAudioOutputCollection::isA2dpOffloadedOnPrimary() const
     if ((primaryOutput != NULL) && (primaryOutput->mProfile != NULL)
         && (primaryOutput->mProfile->getModule() != NULL)) {
         sp<HwModule> primaryHwModule = primaryOutput->mProfile->getModule();
-        Vector <sp<IOProfile>> primaryHwModuleOutputProfiles =
-                                   primaryHwModule->getOutputProfiles();
-        for (size_t i = 0; i < primaryHwModuleOutputProfiles.size(); i++) {
-            if (primaryHwModuleOutputProfiles[i]->supportDevice(AUDIO_DEVICE_OUT_ALL_A2DP)) {
+
+        for (const auto &outputProfile : primaryHwModule->getOutputProfiles()) {
+            if (outputProfile->supportsDeviceTypes(AUDIO_DEVICE_OUT_ALL_A2DP)) {
                 return true;
             }
         }
@@ -752,13 +752,6 @@ bool SwAudioOutputCollection::isAnyOutputActive(audio_stream_type_t streamToIgno
         }
     }
     return false;
-}
-
-audio_devices_t SwAudioOutputCollection::getSupportedDevices(audio_io_handle_t handle) const
-{
-    sp<SwAudioOutputDescriptor> outputDesc = valueFor(handle);
-    audio_devices_t devices = outputDesc->mProfile->getSupportedDevicesType();
-    return devices;
 }
 
 sp<SwAudioOutputDescriptor> SwAudioOutputCollection::getOutputForClient(audio_port_handle_t portId)

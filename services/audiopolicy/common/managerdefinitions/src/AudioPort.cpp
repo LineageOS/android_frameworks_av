@@ -31,7 +31,13 @@ namespace android {
 // --- AudioPort class implementation
 void AudioPort::attach(const sp<HwModule>& module)
 {
+    ALOGV("%s: attaching module %s to port %s", __FUNCTION__, getModuleName(), mName.string());
     mModule = module;
+}
+
+void AudioPort::detach()
+{
+    mModule = nullptr;
 }
 
 // Note that is a different namespace than AudioFlinger unique IDs

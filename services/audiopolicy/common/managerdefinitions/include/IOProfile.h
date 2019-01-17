@@ -57,12 +57,25 @@ public:
         }
     }
 
-    // This method is used for input and direct output, and is not used for other output.
-    // If parameter updatedSamplingRate is non-NULL, it is assigned the actual sample rate.
-    // For input, flags is interpreted as audio_input_flags_t.
-    // TODO: merge audio_output_flags_t and audio_input_flags_t.
-    bool isCompatibleProfile(audio_devices_t device,
-                             const String8& address,
+    /**
+     * @brief isCompatibleProfile: This method is used for input and direct output,
+     * and is not used for other output.
+     * Checks if the IO profile is compatible with specified parameters.
+     * For input, flags is interpreted as audio_input_flags_t.
+     * TODO: merge audio_output_flags_t and audio_input_flags_t.
+     *
+     * @param devices vector of devices to be checked for compatibility
+     * @param samplingRate to be checked for compatibility. Must be specified
+     * @param updatedSamplingRate if non-NULL, it is assigned the actual sample rate.
+     * @param format to be checked for compatibility. Must be specified
+     * @param updatedFormat if non-NULL, it is assigned the actual format
+     * @param channelMask to be checked for compatibility. Must be specified
+     * @param updatedChannelMask if non-NULL, it is assigned the actual channel mask
+     * @param flags to be checked for compatibility
+     * @param exactMatchRequiredForInputFlags true if exact match is required on flags
+     * @return true if the profile is compatible, false otherwise.
+     */
+    bool isCompatibleProfile(const DeviceVector &devices,
                              uint32_t samplingRate,
                              uint32_t *updatedSamplingRate,
                              audio_format_t format,
@@ -78,7 +91,7 @@ public:
 
     bool hasSupportedDevices() const { return !mSupportedDevices.isEmpty(); }
 
-    bool supportDevice(audio_devices_t device) const
+    bool supportsDeviceTypes(audio_devices_t device) const
     {
         if (audio_is_output_devices(device)) {
             return mSupportedDevices.types() & device;
@@ -86,39 +99,35 @@ public:
         return mSupportedDevices.types() & (device & ~AUDIO_DEVICE_BIT_IN);
     }
 
-    bool supportDeviceAddress(const String8 &address) const
+    /**
+     * @brief supportsDevice
+     * @param device to be checked against
+     *        forceCheckOnAddress if true, check on type and address whatever the type, otherwise
+     *        the address enforcement is limited to "offical devices" that distinguishe on address
+     * @return true if the device is supported by type (for non bus / remote submix devices),
+     *         true if the device is supported (both type and address) for bus / remote submix
+     *         false otherwise
+     */
+    bool supportsDevice(const sp<DeviceDescriptor> &device, bool forceCheckOnAddress = false) const
     {
-        return mSupportedDevices[0]->address() == address;
-    }
-
-    // chose first device present in mSupportedDevices also part of deviceType
-    audio_devices_t getSupportedDeviceForType(audio_devices_t deviceType) const
-    {
-        for (size_t k = 0; k  < mSupportedDevices.size(); k++) {
-            audio_devices_t profileType = mSupportedDevices[k]->type();
-            if (profileType & deviceType) {
-                return profileType;
-            }
+        if (!device_distinguishes_on_address(device->type()) && !forceCheckOnAddress) {
+            return supportsDeviceTypes(device->type());
         }
-        return AUDIO_DEVICE_NONE;
+        return mSupportedDevices.contains(device);
     }
-
-    audio_devices_t getSupportedDevicesType() const { return mSupportedDevices.types(); }
 
     void clearSupportedDevices() { mSupportedDevices.clear(); }
     void addSupportedDevice(const sp<DeviceDescriptor> &device)
     {
         mSupportedDevices.add(device);
     }
-
+    void removeSupportedDevice(const sp<DeviceDescriptor> &device)
+    {
+        mSupportedDevices.remove(device);
+    }
     void setSupportedDevices(const DeviceVector &devices)
     {
         mSupportedDevices = devices;
-    }
-
-    sp<DeviceDescriptor> getSupportedDeviceByAddress(audio_devices_t type, String8 address) const
-    {
-        return mSupportedDevices.getDevice(type, address);
     }
 
     const DeviceVector &getSupportedDevices() const { return mSupportedDevices; }

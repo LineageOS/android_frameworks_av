@@ -58,6 +58,12 @@ void DeviceDescriptor::attach(const sp<HwModule>& module)
     mId = getNextUniqueId();
 }
 
+void DeviceDescriptor::detach()
+{
+    mId = AUDIO_PORT_HANDLE_NONE;
+    AudioPort::detach();
+}
+
 bool DeviceDescriptor::equals(const sp<DeviceDescriptor>& other) const
 {
     // Devices are considered equal if they:

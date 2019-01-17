@@ -53,6 +53,8 @@ public:
 
     // AudioPort
     virtual void attach(const sp<HwModule>& module);
+    virtual void detach();
+
     virtual void toAudioPort(struct audio_port *port) const;
     virtual void importAudioPort(const sp<AudioPort>& port, bool force = false);
 
@@ -162,6 +164,23 @@ public:
     bool operator!=(const DeviceVector &right) const
     {
         return !operator==(right);
+    }
+
+    /**
+     * @brief getFirstValidAddress
+     * @return the first valid address of a list of device, "" if no device with valid address
+     * found.
+     * This helper function helps maintaining compatibility with legacy where we used to have a
+     * devices mask and an address.
+     */
+    String8 getFirstValidAddress() const
+    {
+        for (const auto &device : *this) {
+            if (device->address() != "") {
+                return device->address();
+            }
+        }
+        return String8("");
     }
 
     std::string toString() const;

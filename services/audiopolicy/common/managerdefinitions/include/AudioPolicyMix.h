@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "DeviceDescriptor.h"
 #include <utils/RefBase.h>
 #include <media/AudioPolicy.h>
 #include <utils/KeyedVector.h>
@@ -74,9 +75,9 @@ public:
     status_t getOutputForAttr(audio_attributes_t attributes, uid_t uid,
             sp<SwAudioOutputDescriptor> &desc);
 
-    audio_devices_t getDeviceAndMixForInputSource(audio_source_t inputSource,
-                                                  audio_devices_t availableDeviceTypes,
-                                                  AudioMix **policyMix);
+    sp<DeviceDescriptor> getDeviceAndMixForInputSource(audio_source_t inputSource,
+                                                       const DeviceVector &availableDeviceTypes,
+                                                       AudioMix **policyMix);
 
     status_t getInputMixForAttr(audio_attributes_t attr, AudioMix **policyMix);
 

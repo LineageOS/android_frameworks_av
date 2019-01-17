@@ -46,6 +46,22 @@ public:
 
     const DeviceVector &getDeclaredDevices() const { return mDeclaredDevices; }
     void setDeclaredDevices(const DeviceVector &devices);
+    DeviceVector getAllDevices() const
+    {
+        DeviceVector devices = mDeclaredDevices;
+        devices.merge(mDynamicDevices);
+        return devices;
+    }
+    void addDynamicDevice(const sp<DeviceDescriptor> &device)
+    {
+        mDynamicDevices.add(device);
+    }
+
+    bool removeDynamicDevice(const sp<DeviceDescriptor> &device)
+    {
+        return mDynamicDevices.remove(device) >= 0;
+    }
+    DeviceVector getDynamicDevices() const { return mDynamicDevices; }
 
     const InputProfileCollection &getInputProfiles() const { return mInputProfiles; }
     const OutputProfileCollection &getOutputProfiles() const { return mOutputProfiles; }
@@ -104,6 +120,7 @@ private:
     InputProfileCollection mInputProfiles;  // input profiles exposed by this module
     uint32_t mHalVersion; // audio HAL API version
     DeviceVector mDeclaredDevices; // devices declared in audio_policy configuration file.
+    DeviceVector mDynamicDevices; /**< devices that can be added/removed at runtime (e.g. rsbumix)*/
     AudioRouteVector mRoutes;
     AudioPortVector mPorts;
 };
@@ -113,12 +130,57 @@ class HwModuleCollection : public Vector<sp<HwModule> >
 public:
     sp<HwModule> getModuleFromName(const char *name) const;
 
-    sp<HwModule> getModuleForDevice(audio_devices_t device) const;
+    sp<HwModule> getModuleForDeviceTypes(audio_devices_t device) const;
 
-    sp<DeviceDescriptor> getDeviceDescriptor(const audio_devices_t device,
-                                             const char *device_address,
-                                             const char *device_name,
+    sp<HwModule> getModuleForDevice(const sp<DeviceDescriptor> &device) const;
+
+    DeviceVector getAvailableDevicesFromModuleName(const char *name,
+                                                   const DeviceVector &availableDevices) const;
+
+    /**
+     * @brief getDeviceDescriptor returns a device descriptor associated to the device type and
+     * device address (if matchAddress is true).
+     * It may loop twice on all modules to check if allowToCreate is true
+     *      -first loop will check if the device is found on a module since declared in the list
+     * of device port in configuration file
+     *      -(allowToCreate is true)second loop will check if the device is weakly supported by one
+     * or more profiles on a given module and will add as a supported device for this module.
+     *       The device will also be added to the dynamic list of device of this module
+     * @param type of the device requested
+     * @param address of the device requested
+     * @param name of the device that requested
+     * @param matchAddress true if a strong match is required
+     * @param allowToCreate true if allowed to create dynamic device (e.g. hdmi, usb...)
+     * @return device descriptor associated to the type (and address if matchAddress is true)
+     */
+    sp<DeviceDescriptor> getDeviceDescriptor(const audio_devices_t type,
+                                             const char *address,
+                                             const char *name,
+                                             bool allowToCreate = false,
                                              bool matchAddress = true) const;
+
+    /**
+     * @brief createDevice creates a new device from the type and address given. It checks that
+     * according to the device type, a module is supporting this device (weak check).
+     * This concerns only dynamic device, aka device with a specific address and not
+     * already supported by module/underlying profiles.
+     * @param type of the device to be created
+     * @param address of the device to be created
+     * @param name of the device to be created
+     * @return device descriptor if a module is supporting this type, nullptr otherwise.
+     */
+    sp<DeviceDescriptor> createDevice(const audio_devices_t type,
+                                      const char *address,
+                                      const char *name) const;
+
+    /**
+     * @brief cleanUpForDevice: loop on all profiles of all modules to remove device from
+     * the list of supported device. If this device is a dynamic device (aka a device not in the
+     * xml file with a runtime address), it is also removed from the module collection of dynamic
+     * devices.
+     * @param device that has been disconnected
+     */
+    void cleanUpForDevice(const sp<DeviceDescriptor> &device);
 
     void dump(String8 *dst) const;
 };
