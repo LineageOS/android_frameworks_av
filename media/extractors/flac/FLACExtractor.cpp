@@ -806,7 +806,32 @@ media_status_t FLACExtractor::getMetaData(AMediaFormat *meta)
 
 bool SniffFLAC(DataSourceHelper *source, float *confidence)
 {
-    // FLAC header.
+    // Skip ID3 tags
+    off64_t pos = 0;
+    uint8_t header[10];
+    for (;;) {
+        if (source->readAt(pos, header, sizeof(header)) != sizeof(header)) {
+            return false; // no more file to read.
+        }
+
+        // check for ID3 tag
+        if (memcmp("ID3", header, 3) != 0) {
+            break; // not an ID3 tag.
+        }
+
+        // skip the ID3v2 data and check again
+        const unsigned id3Len = 10 +
+                (((header[6] & 0x7f) << 21)
+                 | ((header[7] & 0x7f) << 14)
+                 | ((header[8] & 0x7f) << 7)
+                 | (header[9] & 0x7f));
+        pos += id3Len;
+
+        ALOGV("skipped ID3 tag of len %u new starting offset is %#016llx",
+                id3Len, (long long)pos);
+    }
+
+    // Check FLAC header.
     // https://xiph.org/flac/format.html#stream
     //
     // Note: content stored big endian.
@@ -815,12 +840,8 @@ bool SniffFLAC(DataSourceHelper *source, float *confidence)
     // 4            8         metadata type STREAMINFO (0) (note: OR with 0x80 if last metadata)
     // 5            24        size of metadata, for STREAMINFO (0x22).
 
-    // Android is LE, so express header as little endian int64 constant.
-    constexpr int64_t flacHeader = (0x22LL << 56) | 'CaLf';
-    constexpr int64_t flacHeader2 = flacHeader | (0x80LL << 32); // alternate form (last metadata)
-    int64_t header;
-    if (source->readAt(0, &header, sizeof(header)) != sizeof(header)
-            || (header != flacHeader && header != flacHeader2)) {
+    if (memcmp("fLaC\x00\x00\x00\x22", header, 8) != 0 &&
+        memcmp("fLaC\x80\x00\x00\x22", header, 8) != 0) {
         return false;
     }
 
