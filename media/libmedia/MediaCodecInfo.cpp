@@ -28,6 +28,15 @@
 
 namespace android {
 
+/** This redundant redeclaration is needed for C++ pre 14 */
+constexpr char MediaCodecInfo::Capabilities::FEATURE_ADAPTIVE_PLAYBACK[];
+constexpr char MediaCodecInfo::Capabilities::FEATURE_DYNAMIC_TIMESTAMP[];
+constexpr char MediaCodecInfo::Capabilities::FEATURE_FRAME_PARSING[];
+constexpr char MediaCodecInfo::Capabilities::FEATURE_INTRA_REFRESH[];
+constexpr char MediaCodecInfo::Capabilities::FEATURE_MULTIPLE_FRAMES[];
+constexpr char MediaCodecInfo::Capabilities::FEATURE_SECURE_PLAYBACK[];
+constexpr char MediaCodecInfo::Capabilities::FEATURE_TUNNELED_PLAYBACK[];
+
 void MediaCodecInfo::Capabilities::getSupportedProfileLevels(
         Vector<ProfileLevel> *profileLevels) const {
     profileLevels->clear();
@@ -40,16 +49,11 @@ void MediaCodecInfo::Capabilities::getSupportedColorFormats(
     colorFormats->appendVector(mColorFormats);
 }
 
-uint32_t MediaCodecInfo::Capabilities::getFlags() const {
-    return mFlags;
-}
-
 const sp<AMessage> MediaCodecInfo::Capabilities::getDetails() const {
     return mDetails;
 }
 
-MediaCodecInfo::Capabilities::Capabilities()
-  : mFlags(0) {
+MediaCodecInfo::Capabilities::Capabilities() {
     mDetails = new AMessage;
 }
 
@@ -73,12 +77,10 @@ sp<MediaCodecInfo::Capabilities> MediaCodecInfo::Capabilities::FromParcel(
             caps->mColorFormats.push_back(color);
         }
     }
-    uint32_t flags = static_cast<uint32_t>(parcel.readInt32());
     sp<AMessage> details = AMessage::FromParcel(parcel);
     if (details == NULL)
         return NULL;
     if (caps != NULL) {
-        caps->mFlags = flags;
         caps->mDetails = details;
     }
     return caps;
@@ -96,7 +98,6 @@ status_t MediaCodecInfo::Capabilities::writeToParcel(Parcel *parcel) const {
     for (size_t i = 0; i < mColorFormats.size(); i++) {
         parcel->writeInt32(mColorFormats.itemAt(i));
     }
-    parcel->writeInt32(mFlags);
     mDetails->writeToParcel(parcel);
     return OK;
 }
@@ -109,6 +110,14 @@ void MediaCodecInfo::CapabilitiesWriter::addDetail(
 void MediaCodecInfo::CapabilitiesWriter::addDetail(
         const char* key, int32_t value) {
     mCap->mDetails->setInt32(key, value);
+}
+
+void MediaCodecInfo::CapabilitiesWriter::removeDetail(const char* key) {
+    if (mCap->mDetails->removeEntryAt(mCap->mDetails->findEntryByName(key)) == OK) {
+        ALOGD("successfully removed detail %s", key);
+    } else {
+        ALOGD("detail %s wasn't present to remove", key);
+    }
 }
 
 void MediaCodecInfo::CapabilitiesWriter::addProfileLevel(
@@ -129,32 +138,32 @@ void MediaCodecInfo::CapabilitiesWriter::addColorFormat(uint32_t format) {
     }
 }
 
-void MediaCodecInfo::CapabilitiesWriter::addFlags(uint32_t flags) {
-    mCap->mFlags |= flags;
-}
-
 MediaCodecInfo::CapabilitiesWriter::CapabilitiesWriter(
         MediaCodecInfo::Capabilities* cap) : mCap(cap) {
 }
 
-bool MediaCodecInfo::isEncoder() const {
-    return mIsEncoder;
+MediaCodecInfo::Attributes MediaCodecInfo::getAttributes() const {
+    return mAttributes;
 }
 
-uint32_t MediaCodecInfo::rank() const {
+uint32_t MediaCodecInfo::getRank() const {
     return mRank;
 }
 
-void MediaCodecInfo::getSupportedMimes(Vector<AString> *mimes) const {
-    mimes->clear();
+void MediaCodecInfo::getAliases(Vector<AString> *aliases) const {
+    *aliases = mAliases;
+}
+
+void MediaCodecInfo::getSupportedMediaTypes(Vector<AString> *mediaTypes) const {
+    mediaTypes->clear();
     for (size_t ix = 0; ix < mCaps.size(); ix++) {
-        mimes->push_back(mCaps.keyAt(ix));
+        mediaTypes->push_back(mCaps.keyAt(ix));
     }
 }
 
 const sp<MediaCodecInfo::Capabilities>
-MediaCodecInfo::getCapabilitiesFor(const char *mime) const {
-    ssize_t ix = getCapabilityIndex(mime);
+MediaCodecInfo::getCapabilitiesFor(const char *mediaType) const {
+    ssize_t ix = getCapabilityIndex(mediaType);
     if (ix >= 0) {
         return mCaps.valueAt(ix);
     }
@@ -173,21 +182,26 @@ const char *MediaCodecInfo::getOwnerName() const {
 sp<MediaCodecInfo> MediaCodecInfo::FromParcel(const Parcel &parcel) {
     AString name = AString::FromParcel(parcel);
     AString owner = AString::FromParcel(parcel);
-    bool isEncoder = static_cast<bool>(parcel.readInt32());
+    Attributes attributes = static_cast<Attributes>(parcel.readInt32());
     uint32_t rank = parcel.readUint32();
     sp<MediaCodecInfo> info = new MediaCodecInfo;
     info->mName = name;
     info->mOwner = owner;
-    info->mIsEncoder = isEncoder;
+    info->mAttributes = attributes;
     info->mRank = rank;
+    size_t numAliases = static_cast<size_t>(parcel.readInt32());
+    for (size_t i = 0; i < numAliases; i++) {
+        AString alias = AString::FromParcel(parcel);
+        info->mAliases.add(alias);
+    }
     size_t size = static_cast<size_t>(parcel.readInt32());
     for (size_t i = 0; i < size; i++) {
-        AString mime = AString::FromParcel(parcel);
+        AString mediaType = AString::FromParcel(parcel);
         sp<Capabilities> caps = Capabilities::FromParcel(parcel);
         if (caps == NULL)
             return NULL;
         if (info != NULL) {
-            info->mCaps.add(mime, caps);
+            info->mCaps.add(mediaType, caps);
         }
     }
     return info;
@@ -196,8 +210,12 @@ sp<MediaCodecInfo> MediaCodecInfo::FromParcel(const Parcel &parcel) {
 status_t MediaCodecInfo::writeToParcel(Parcel *parcel) const {
     mName.writeToParcel(parcel);
     mOwner.writeToParcel(parcel);
-    parcel->writeInt32(mIsEncoder);
+    parcel->writeInt32(mAttributes);
     parcel->writeUint32(mRank);
+    parcel->writeInt32(mAliases.size());
+    for (const AString &alias : mAliases) {
+        alias.writeToParcel(parcel);
+    }
     parcel->writeInt32(mCaps.size());
     for (size_t i = 0; i < mCaps.size(); i++) {
         mCaps.keyAt(i).writeToParcel(parcel);
@@ -206,10 +224,10 @@ status_t MediaCodecInfo::writeToParcel(Parcel *parcel) const {
     return OK;
 }
 
-ssize_t MediaCodecInfo::getCapabilityIndex(const char *mime) const {
-    if (mime) {
+ssize_t MediaCodecInfo::getCapabilityIndex(const char *mediaType) const {
+    if (mediaType) {
         for (size_t ix = 0; ix < mCaps.size(); ix++) {
-            if (mCaps.keyAt(ix).equalsIgnoreCase(mime)) {
+            if (mCaps.keyAt(ix).equalsIgnoreCase(mediaType)) {
                 return ix;
             }
         }
@@ -217,19 +235,26 @@ ssize_t MediaCodecInfo::getCapabilityIndex(const char *mime) const {
     return -1;
 }
 
-MediaCodecInfo::MediaCodecInfo() : mRank(0x100) {
+MediaCodecInfo::MediaCodecInfo()
+    : mAttributes((MediaCodecInfo::Attributes)0),
+      mRank(0x100) {
 }
 
 void MediaCodecInfoWriter::setName(const char* name) {
     mInfo->mName = name;
 }
 
+void MediaCodecInfoWriter::addAlias(const char* name) {
+    mInfo->mAliases.add(name);
+}
+
 void MediaCodecInfoWriter::setOwner(const char* owner) {
     mInfo->mOwner = owner;
 }
 
-void MediaCodecInfoWriter::setEncoder(bool isEncoder) {
-    mInfo->mIsEncoder = isEncoder;
+void MediaCodecInfoWriter::setAttributes(
+        typename std::underlying_type<MediaCodecInfo::Attributes>::type attributes) {
+    mInfo->mAttributes = (MediaCodecInfo::Attributes)attributes;
 }
 
 void MediaCodecInfoWriter::setRank(uint32_t rank) {
@@ -237,21 +262,21 @@ void MediaCodecInfoWriter::setRank(uint32_t rank) {
 }
 
 std::unique_ptr<MediaCodecInfo::CapabilitiesWriter>
-        MediaCodecInfoWriter::addMime(const char *mime) {
-    ssize_t ix = mInfo->getCapabilityIndex(mime);
+        MediaCodecInfoWriter::addMediaType(const char *mediaType) {
+    ssize_t ix = mInfo->getCapabilityIndex(mediaType);
     if (ix >= 0) {
         return std::unique_ptr<MediaCodecInfo::CapabilitiesWriter>(
                 new MediaCodecInfo::CapabilitiesWriter(
                 mInfo->mCaps.valueAt(ix).get()));
     }
     sp<MediaCodecInfo::Capabilities> caps = new MediaCodecInfo::Capabilities();
-    mInfo->mCaps.add(AString(mime), caps);
+    mInfo->mCaps.add(AString(mediaType), caps);
     return std::unique_ptr<MediaCodecInfo::CapabilitiesWriter>(
             new MediaCodecInfo::CapabilitiesWriter(caps.get()));
 }
 
-bool MediaCodecInfoWriter::removeMime(const char *mime) {
-    ssize_t ix = mInfo->getCapabilityIndex(mime);
+bool MediaCodecInfoWriter::removeMediaType(const char *mediaType) {
+    ssize_t ix = mInfo->getCapabilityIndex(mediaType);
     if (ix >= 0) {
         mInfo->mCaps.removeItemsAt(ix);
         return true;
