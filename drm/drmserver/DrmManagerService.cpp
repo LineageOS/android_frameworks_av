@@ -58,22 +58,26 @@ const char *DrmManagerService::get_perm_label(drm_perm_t perm) {
     return drm_perm_labels[index];
 }
 
-bool DrmManagerService::selinuxIsProtectedCallAllowed(pid_t spid, drm_perm_t perm) {
+bool DrmManagerService::selinuxIsProtectedCallAllowed(pid_t spid, const char* ssid, drm_perm_t perm) {
     if (selinux_enabled <= 0) {
         return true;
     }
 
-    char *sctx;
+    char *sctx = NULL;
     const char *selinux_class = "drmservice";
     const char *str_perm = get_perm_label(perm);
 
-    if (getpidcon(spid, &sctx) != 0) {
-        ALOGE("SELinux: getpidcon(pid=%d) failed.\n", spid);
-        return false;
+    if (ssid == NULL) {
+        android_errorWriteLog(0x534e4554, "121035042");
+
+        if (getpidcon(spid, &sctx) != 0) {
+            ALOGE("SELinux: getpidcon(pid=%d) failed.\n", spid);
+            return false;
+        }
     }
 
-    bool allowed = (selinux_check_access(sctx, drmserver_context, selinux_class,
-            str_perm, NULL) == 0);
+    bool allowed = (selinux_check_access(ssid ? ssid : sctx, drmserver_context,
+            selinux_class, str_perm, NULL) == 0);
     freecon(sctx);
 
     return allowed;
@@ -86,10 +90,11 @@ bool DrmManagerService::isProtectedCallAllowed(drm_perm_t perm) {
     IPCThreadState* ipcState = IPCThreadState::self();
     uid_t uid = ipcState->getCallingUid();
     pid_t spid = ipcState->getCallingPid();
+    const char* ssid = ipcState->getCallingSid();
 
     for (unsigned int i = 0; i < trustedUids.size(); ++i) {
         if (trustedUids[i] == uid) {
-            return selinuxIsProtectedCallAllowed(spid, perm);
+            return selinuxIsProtectedCallAllowed(spid, ssid, perm);
         }
     }
     return false;
@@ -97,7 +102,9 @@ bool DrmManagerService::isProtectedCallAllowed(drm_perm_t perm) {
 
 void DrmManagerService::instantiate() {
     ALOGV("instantiate");
-    defaultServiceManager()->addService(String16("drm.drmManager"), new DrmManagerService());
+    sp<DrmManagerService> service = new DrmManagerService();
+    service->setRequestingSid(true);
+    defaultServiceManager()->addService(String16("drm.drmManager"), service);
 
     if (0 >= trustedUids.size()) {
         // TODO
