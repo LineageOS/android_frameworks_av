@@ -486,6 +486,9 @@ aaudio_result_t AudioStreamRecord::getTimestamp(clockid_t clockId,
                                                int64_t *framePosition,
                                                int64_t *timeNanoseconds) {
     ExtendedTimestamp extendedTimestamp;
+    if (getState() != AAUDIO_STREAM_STATE_STARTED) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
     status_t status = mAudioRecord->getTimestamp(&extendedTimestamp);
     if (status == WOULD_BLOCK) {
         return AAUDIO_ERROR_INVALID_STATE;
