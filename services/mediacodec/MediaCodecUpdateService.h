@@ -17,24 +17,10 @@
 #ifndef ANDROID_MEDIA_CODEC_UPDATE_SERVICE_H
 #define ANDROID_MEDIA_CODEC_UPDATE_SERVICE_H
 
-#include <binder/BinderService.h>
-#include <android/media/BnMediaUpdateService.h>
-
 namespace android {
-namespace media {
 
-class MediaCodecUpdateService
-    : public BinderService<MediaCodecUpdateService>, public BnMediaUpdateService
-{
-    friend class BinderService<MediaCodecUpdateService>;
-public:
-    MediaCodecUpdateService() : BnMediaUpdateService() { }
-    virtual ~MediaCodecUpdateService() { }
-    static const char* getServiceName() { return "media.codec.update"; }
-    binder::Status loadPlugins(const ::std::string& apkPath);
-};
+void loadFromApex(const char *libDirPath);
 
-}   // namespace media
 }   // namespace android
 
 #endif  // ANDROID_MEDIA_CODEC_UPDATE_SERVICE_H

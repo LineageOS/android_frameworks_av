@@ -130,6 +130,7 @@ static const aaudio_input_preset_t sInputPresets[] = {
     AAUDIO_INPUT_PRESET_VOICE_RECOGNITION,
     AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION,
     AAUDIO_INPUT_PRESET_UNPROCESSED,
+    AAUDIO_INPUT_PRESET_VOICE_PERFORMANCE,
 };
 
 static void checkAttributesUsage(aaudio_performance_mode_t perfMode) {

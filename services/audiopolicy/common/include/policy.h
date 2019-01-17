@@ -83,7 +83,10 @@ static inline bool device_distinguishes_on_address(audio_devices_t device)
  * @param[in] inputSource to consider. Valid sources are:
  * - AUDIO_SOURCE_VOICE_COMMUNICATION
  * - AUDIO_SOURCE_CAMCORDER
+ * - AUDIO_SOURCE_VOICE_PERFORMANCE
+ * - AUDIO_SOURCE_UNPROCESSED
  * - AUDIO_SOURCE_MIC
+ * - AUDIO_SOURCE_ECHO_REFERENCE
  * - AUDIO_SOURCE_FM_TUNER
  * - AUDIO_SOURCE_VOICE_RECOGNITION
  * - AUDIO_SOURCE_HOTWORD
@@ -96,10 +99,16 @@ static inline int32_t source_priority(audio_source_t inputSource)
 {
     switch (inputSource) {
     case AUDIO_SOURCE_VOICE_COMMUNICATION:
-        return 6;
+        return 9;
     case AUDIO_SOURCE_CAMCORDER:
-        return 5;
+        return 8;
+    case AUDIO_SOURCE_VOICE_PERFORMANCE:
+        return 7;
+    case AUDIO_SOURCE_UNPROCESSED:
+        return 6;
     case AUDIO_SOURCE_MIC:
+        return 5;
+    case AUDIO_SOURCE_ECHO_REFERENCE:
         return 4;
     case AUDIO_SOURCE_FM_TUNER:
         return 3;

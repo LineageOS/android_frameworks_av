@@ -336,8 +336,11 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
     }
 
     // already checked by client, but double-check in case the client wrapper is bypassed
-    if (attr->source < AUDIO_SOURCE_DEFAULT && attr->source >= AUDIO_SOURCE_CNT &&
-            attr->source != AUDIO_SOURCE_HOTWORD && attr->source != AUDIO_SOURCE_FM_TUNER) {
+    if ((attr->source < AUDIO_SOURCE_DEFAULT)
+            || (attr->source >= AUDIO_SOURCE_CNT
+                && attr->source != AUDIO_SOURCE_HOTWORD
+                && attr->source != AUDIO_SOURCE_FM_TUNER
+                && attr->source != AUDIO_SOURCE_ECHO_REFERENCE)) {
         return BAD_VALUE;
     }
 
@@ -367,7 +370,8 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
 
     if ((attr->source == AUDIO_SOURCE_VOICE_UPLINK ||
         attr->source == AUDIO_SOURCE_VOICE_DOWNLINK ||
-        attr->source == AUDIO_SOURCE_VOICE_CALL) &&
+        attr->source == AUDIO_SOURCE_VOICE_CALL ||
+        attr->source == AUDIO_SOURCE_ECHO_REFERENCE) &&
         !captureAudioOutputAllowed(pid, uid)) {
         return PERMISSION_DENIED;
     }

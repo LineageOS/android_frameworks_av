@@ -158,6 +158,7 @@ aaudio_result_t AAudioStreamParameters::validate() const {
         case AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION:
         case AAUDIO_INPUT_PRESET_VOICE_RECOGNITION:
         case AAUDIO_INPUT_PRESET_UNPROCESSED:
+        case AAUDIO_INPUT_PRESET_VOICE_PERFORMANCE:
             break; // valid
         default:
             ALOGE("input preset not valid = %d", mInputPreset);

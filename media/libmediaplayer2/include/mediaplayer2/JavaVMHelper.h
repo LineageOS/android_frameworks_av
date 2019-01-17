@@ -26,6 +26,7 @@ namespace android {
 
 struct JavaVMHelper {
     static JNIEnv *getJNIEnv();
+    static JavaVM *getJavaVM();
     static void setJavaVM(JavaVM *vm);
 
 private:

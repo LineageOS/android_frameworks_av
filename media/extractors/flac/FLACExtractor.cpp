@@ -806,14 +806,21 @@ media_status_t FLACExtractor::getMetaData(AMediaFormat *meta)
 
 bool SniffFLAC(DataSourceHelper *source, float *confidence)
 {
-    // first 4 is the signature word
-    // second 4 is the sizeof STREAMINFO
-    // 042 is the mandatory STREAMINFO
-    // no need to read rest of the header, as a premature EOF will be caught later
-    uint8_t header[4+4];
-    if (source->readAt(0, header, sizeof(header)) != sizeof(header)
-            || memcmp("fLaC\0\0\0\042", header, 4+4))
-    {
+    // FLAC header.
+    // https://xiph.org/flac/format.html#stream
+    //
+    // Note: content stored big endian.
+    // byte offset  bit size  content
+    // 0            32        fLaC
+    // 4            8         metadata type STREAMINFO (0) (note: OR with 0x80 if last metadata)
+    // 5            24        size of metadata, for STREAMINFO (0x22).
+
+    // Android is LE, so express header as little endian int64 constant.
+    constexpr int64_t flacHeader = (0x22LL << 56) | 'CaLf';
+    constexpr int64_t flacHeader2 = flacHeader | (0x80LL << 32); // alternate form (last metadata)
+    int64_t header;
+    if (source->readAt(0, &header, sizeof(header)) != sizeof(header)
+            || (header != flacHeader && header != flacHeader2)) {
         return false;
     }
 
