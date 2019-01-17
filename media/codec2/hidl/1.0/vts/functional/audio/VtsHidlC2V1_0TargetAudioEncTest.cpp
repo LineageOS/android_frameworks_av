@@ -355,12 +355,17 @@ TEST_F(Codec2AudioEncHidlTest, validateCompName) {
     ASSERT_EQ(mDisableTest, false);
 }
 
-TEST_F(Codec2AudioEncHidlTest, EncodeTest) {
+class Codec2AudioEncEncodeTest : public Codec2AudioEncHidlTest,
+                                 public ::testing::WithParamInterface<bool> {
+};
+
+TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
     ALOGV("EncodeTest");
     if (mDisableTest) return;
     char mURL[512];
     strcpy(mURL, gEnv->getRes().c_str());
     GetURLForComponent(mCompName, mURL);
+    bool signalEOS = GetParam();
 
     // Setting default configuration
     int32_t nChannels = 2;
@@ -408,7 +413,19 @@ TEST_F(Codec2AudioEncHidlTest, EncodeTest) {
     ASSERT_NO_FATAL_FAILURE(
         encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
                       mFlushedIndices, mLinearPool, eleStream, numFrames,
-                      samplesPerFrame, nChannels, nSampleRate));
+                      samplesPerFrame, nChannels, nSampleRate, false,
+                      signalEOS));
+
+    // If EOS is not sent, sending empty input with EOS flag
+    if (!signalEOS) {
+        ASSERT_NO_FATAL_FAILURE(
+            waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue, 1));
+        ASSERT_NO_FATAL_FAILURE(
+            testInputBuffer(mComponent, mQueueLock, mWorkQueue,
+                            C2FrameData::FLAG_END_OF_STREAM, false));
+        numFrames += 1;
+    }
+
     // blocking call to ensures application to Wait till all the inputs are
     // consumed
     ASSERT_NO_FATAL_FAILURE(
@@ -428,6 +445,10 @@ TEST_F(Codec2AudioEncHidlTest, EncodeTest) {
     ASSERT_EQ(mEos, true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
+
+// EncodeTest with EOS / No EOS
+INSTANTIATE_TEST_CASE_P(EncodeTestwithEOS, Codec2AudioEncEncodeTest,
+                        ::testing::Values(true, false));
 
 TEST_F(Codec2AudioEncHidlTest, EOSTest) {
     description("Test empty input buffer with EOS flag");
