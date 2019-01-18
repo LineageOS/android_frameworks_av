@@ -398,6 +398,15 @@ public:
 
         virtual void onAudioDeviceUpdate(audio_io_handle_t audioIo,
                                          audio_port_handle_t deviceId) = 0;
+                bool notifiedOnce() const { return mNotifiedOnce; }
+                void setNotifiedOnce() { mNotifiedOnce = true; }
+    private:
+                /**
+                 * @brief mNotifiedOnce it forces the callback to be called at least once when
+                 * registered with a VALID AudioDevice, and allows not to flood other listeners
+                 * on this iohandle that already know the valid device.
+                 */
+                bool mNotifiedOnce = false;
     };
 
     static status_t addAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
@@ -443,8 +452,27 @@ private:
     private:
         Mutex                               mLock;
         DefaultKeyedVector<audio_io_handle_t, sp<AudioIoDescriptor> >   mIoDescriptors;
-        DefaultKeyedVector<audio_io_handle_t, Vector < wp<AudioDeviceCallback> > >
-                                                                        mAudioDeviceCallbacks;
+
+        class AudioDeviceCallbacks : public Vector<wp<AudioDeviceCallback>>
+        {
+        public:
+            /**
+             * @brief notifiedOnce ensures that if a client adds a callback, it must at least be
+             * called once with the device on which it will be routed to.
+             * @return true if already notified or nobody waits for a callback, false otherwise.
+             */
+            bool notifiedOnce() const { return (size() == 0) || mNotifiedOnce; }
+            void setNotifiedOnce() { mNotifiedOnce = true; }
+            void resetNotifiedOnce() { mNotifiedOnce = false; }
+        private:
+            /**
+             * @brief mNotifiedOnce it forces each callback to be called at least once when
+             * registered with a VALID AudioDevice
+             */
+            bool mNotifiedOnce = false;
+        };
+        Mutex                               mCallbacksLock; // prevents race on Callbacks
+        DefaultKeyedVector<audio_io_handle_t, AudioDeviceCallbacks> mAudioDeviceCallbacks;
         // cached values for recording getInputBufferSize() queries
         size_t                              mInBuffSize;    // zero indicates cache is invalid
         uint32_t                            mInSamplingRate;
