@@ -57,7 +57,7 @@ size_t MediaExtractorCUnwrapper::countTracks() {
 }
 
 MediaTrack *MediaExtractorCUnwrapper::getTrack(size_t index) {
-    return new MediaTrackCUnwrapper(plugin->getTrack(plugin->data, index));
+    return MediaTrackCUnwrapper::create(plugin->getTrack(plugin->data, index));
 }
 
 status_t MediaExtractorCUnwrapper::getTrackMetaData(
