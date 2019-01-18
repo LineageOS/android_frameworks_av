@@ -19,6 +19,7 @@
 #include <utils/Log.h>
 
 #include <stdint.h>
+#include <time.h>
 #include <sys/types.h>
 
 #include <binder/IPCThreadState.h>
@@ -219,10 +220,16 @@ typedef struct {
     Vector<wp<IMediaSource>> tracks;
     Vector<String8> trackDescriptions;
     String8 toString() const;
+    time_t when;
 } ExtractorInstance;
 
 String8 ExtractorInstance::toString() const {
-    String8 str = name;
+    String8 str;
+    char timeString[32];
+    strftime(timeString, sizeof(timeString), "%m-%d %T", localtime(&when));
+    str.append(timeString);
+    str.append(": ");
+    str.append(name);
     str.append(" for mime ");
     str.append(mime);
     str.append(", source ");
@@ -287,6 +294,7 @@ void registerMediaExtractor(
     ex.sourceDescription = source->toString();
     ex.owner = IPCThreadState::self()->getCallingPid();
     ex.extractor = extractor;
+    ex.when = time(NULL);
 
     {
         Mutex::Autolock lock(sExtractorsLock);
