@@ -1635,9 +1635,8 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC(".mp3"):
         case 0x6D730055: // "ms U" mp3 audio
         {
-            if (mIsQT && chunk_type == FOURCC("mp4a")
-                    && depth >= 1 && mPath[depth - 1] == FOURCC("wave")) {
-                // Ignore mp4a embedded in QT wave atom
+            if (mIsQT && depth >= 1 && mPath[depth - 1] == FOURCC("wave")) {
+                // Ignore all atoms embedded in QT wave atom
                 *offset += chunk_size;
                 break;
             }
@@ -1666,7 +1665,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             off64_t stop_offset = *offset + chunk_size;
             *offset = data_offset + sizeof(buffer);
 
-            if (mIsQT && chunk_type == FOURCC("mp4a")) {
+            if (mIsQT) {
                 if (version == 1) {
                     if (mDataSource->readAt(*offset, buffer, 16) < 16) {
                         return ERROR_IO;
