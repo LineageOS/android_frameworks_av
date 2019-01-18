@@ -34,11 +34,19 @@ namespace V1_2 {
 namespace clearkey {
 
 using ::android::hardware::drm::V1_0::Status;
+using ::android::hardware::drm::V1_1::SecurityLevel;
 using ::android::hardware::Void;
 
 Return<bool> DrmFactory::isCryptoSchemeSupported(
         const hidl_array<uint8_t, 16>& uuid) {
     return clearkeydrm::isClearKeyUUID(uuid.data());
+}
+
+Return<bool> DrmFactory::isCryptoSchemeSupported_1_2(const hidl_array<uint8_t, 16>& uuid,
+                                                     const hidl_string &mimeType,
+                                                     SecurityLevel level) {
+    return isCryptoSchemeSupported(uuid) && isContentTypeSupported(mimeType) &&
+            level == SecurityLevel::SW_SECURE_CRYPTO;
 }
 
 Return<bool> DrmFactory::isContentTypeSupported(const hidl_string &mimeType) {
