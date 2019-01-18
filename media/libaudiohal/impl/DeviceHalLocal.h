@@ -79,6 +79,8 @@ class DeviceHalLocal : public DeviceHalInterface
             audio_input_flags_t flags,
             const char *address,
             audio_source_t source,
+            audio_devices_t outputDevice,
+            const char *outputDeviceAddress,
             sp<StreamInHalInterface> *inStream);
 
     // Returns whether createAudioPatch and releaseAudioPatch operations are supported.

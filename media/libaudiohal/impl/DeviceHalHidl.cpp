@@ -268,6 +268,8 @@ status_t DeviceHalHidl::openInputStream(
         audio_input_flags_t flags,
         const char *address,
         audio_source_t source,
+        audio_devices_t outputDevice,
+        const char *outputDeviceAddress,
         sp<StreamInHalInterface> *inStream) {
     if (mDevice == 0) return NO_INIT;
     DeviceAddress hidlDevice;
@@ -282,6 +284,17 @@ status_t DeviceHalHidl::openInputStream(
     // TODO: correctly propagate the tracks sources and volume
     //       for now, only send the main source at 1dbfs
     SinkMetadata sinkMetadata = {{{ .source = AudioSource(source), .gain = 1 }}};
+#endif
+#if MAJOR_VERSION < 5
+    (void)outputDevice;
+    (void)outputDeviceAddress;
+#else
+    if (outputDevice != AUDIO_DEVICE_NONE) {
+        DeviceAddress hidlOutputDevice;
+        status = deviceAddressFromHal(outputDevice, outputDeviceAddress, &hidlOutputDevice);
+        if (status != OK) return status;
+        sinkMetadata.tracks[0].destination.device(std::move(hidlOutputDevice));
+    }
 #endif
     Return<void> ret = mDevice->openInputStream(
             handle,

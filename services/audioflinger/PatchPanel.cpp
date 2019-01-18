@@ -211,6 +211,8 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                 ((patch->sinks[0].type == AUDIO_PORT_TYPE_DEVICE) &&
                  ((patch->sinks[0].ext.device.hw_module != srcModule) ||
                   !audioHwDevice->supportsAudioPatches()))) {
+                audio_devices_t outputDevice = AUDIO_DEVICE_NONE;
+                String8 outputDeviceAddress;
                 if (patch->num_sources == 2) {
                     if (patch->sources[1].type != AUDIO_PORT_TYPE_MIX ||
                             (patch->num_sinks != 0 && patch->sinks[0].ext.device.hw_module !=
@@ -261,6 +263,8 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                         goto exit;
                     }
                     newPatch.mPlayback.setThread(reinterpret_cast<PlaybackThread*>(thread.get()));
+                    outputDevice = device;
+                    outputDeviceAddress = address;
                 }
                 audio_devices_t device = patch->sources[0].ext.device.type;
                 String8 address = String8(patch->sources[0].ext.device.address);
@@ -293,7 +297,9 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                                                                     device,
                                                                     address,
                                                                     AUDIO_SOURCE_MIC,
-                                                                    flags);
+                                                                    flags,
+                                                                    outputDevice,
+                                                                    outputDeviceAddress);
                 ALOGV("mAudioFlinger.openInput_l() returned %p inChannelMask %08x",
                       thread.get(), config.channel_mask);
                 if (thread == 0) {
