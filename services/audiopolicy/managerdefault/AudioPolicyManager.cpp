@@ -4070,7 +4070,8 @@ status_t AudioPolicyManager::initialize() {
     }
     // make sure all attached devices have been allocated a unique ID
     auto checkAndSetAvailable = [this](auto& devices) {
-        for (const auto &device : devices) {
+        for (size_t i = 0; i < devices.size();) {
+            const auto &device = devices[i];
             if (!device->isAttached()) {
                 ALOGW("device %s is unreachable", device->toString().c_str());
                 devices.remove(device);
@@ -4078,6 +4079,7 @@ status_t AudioPolicyManager::initialize() {
             }
             // Device is now validated and can be appended to the available devices of the engine
             mEngine->setDeviceConnectionState(device, AUDIO_POLICY_DEVICE_STATE_AVAILABLE);
+            i++;
         }
     };
     checkAndSetAvailable(mAvailableOutputDevices);
