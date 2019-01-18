@@ -5689,18 +5689,21 @@ void Camera3Device::RequestThread::cleanUpFailedRequests(bool sendRequestError) 
             captureRequest->mInputStream->returnInputBuffer(captureRequest->mInputBuffer);
         }
 
-        for (size_t i = 0; i < halRequest->num_output_buffers; i++) {
-            //Buffers that failed processing could still have
-            //valid acquire fence.
-            int acquireFence = (*outputBuffers)[i].acquire_fence;
-            if (0 <= acquireFence) {
-                close(acquireFence);
-                outputBuffers->editItemAt(i).acquire_fence = -1;
+        // No output buffer can be returned when using HAL buffer manager
+        if (!mUseHalBufManager) {
+            for (size_t i = 0; i < halRequest->num_output_buffers; i++) {
+                //Buffers that failed processing could still have
+                //valid acquire fence.
+                int acquireFence = (*outputBuffers)[i].acquire_fence;
+                if (0 <= acquireFence) {
+                    close(acquireFence);
+                    outputBuffers->editItemAt(i).acquire_fence = -1;
+                }
+                outputBuffers->editItemAt(i).status = CAMERA3_BUFFER_STATUS_ERROR;
+                captureRequest->mOutputStreams.editItemAt(i)->returnBuffer((*outputBuffers)[i], 0,
+                        /*timestampIncreasing*/true, std::vector<size_t> (),
+                        captureRequest->mResultExtras.frameNumber);
             }
-            outputBuffers->editItemAt(i).status = CAMERA3_BUFFER_STATUS_ERROR;
-            captureRequest->mOutputStreams.editItemAt(i)->returnBuffer((*outputBuffers)[i], 0,
-                    /*timestampIncreasing*/true, std::vector<size_t> (),
-                    captureRequest->mResultExtras.frameNumber);
         }
 
         if (sendRequestError) {
