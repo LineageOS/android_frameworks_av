@@ -1995,6 +1995,13 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
             *offset += chunk_size;
 
+            if (depth >= 1 && mPath[depth - 1] != FOURCC("stbl")) {
+                char chunk[5];
+                MakeFourCCString(mPath[depth - 1], chunk);
+                ALOGW("stts's parent box (%s) is not stbl, skip it.", chunk);
+                break;
+            }
+
             status_t err =
                 mLastTrack->sampleTable->setTimeToSampleParams(
                         data_offset, chunk_data_size);
