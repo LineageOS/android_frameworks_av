@@ -52,6 +52,17 @@ const char * const MediaAnalyticsItem::EnabledProperty  = "media.metrics.enabled
 const char * const MediaAnalyticsItem::EnabledPropertyPersist  = "persist.media.metrics.enabled";
 const int MediaAnalyticsItem::EnabledProperty_default  = 1;
 
+// So caller doesn't need to know size of allocated space
+MediaAnalyticsItem *MediaAnalyticsItem::create()
+{
+    return MediaAnalyticsItem::create(kKeyNone);
+}
+
+MediaAnalyticsItem *MediaAnalyticsItem::create(MediaAnalyticsItem::Key key)
+{
+    MediaAnalyticsItem *item = new MediaAnalyticsItem(key);
+    return item;
+}
 
 // access functions for the class
 MediaAnalyticsItem::MediaAnalyticsItem()
@@ -642,6 +653,19 @@ bool MediaAnalyticsItem::growProps(int increment)
 //
 
 int32_t MediaAnalyticsItem::readFromParcel(const Parcel& data) {
+    int32_t version = data.readInt32();
+
+    switch(version) {
+        case 0:
+          return readFromParcel0(data);
+          break;
+        default:
+          ALOGE("Unsupported MediaAnalyticsItem Parcel version: %d", version);
+          return -1;
+    }
+}
+
+int32_t MediaAnalyticsItem::readFromParcel0(const Parcel& data) {
     // into 'this' object
     // .. we make a copy of the string to put away.
     mKey = data.readCString();
@@ -691,8 +715,23 @@ int32_t MediaAnalyticsItem::readFromParcel(const Parcel& data) {
 }
 
 int32_t MediaAnalyticsItem::writeToParcel(Parcel *data) {
+
     if (data == NULL) return -1;
 
+    int32_t version = 0;
+    data->writeInt32(version);
+
+    switch(version) {
+        case 0:
+          return writeToParcel0(data);
+          break;
+        default:
+          ALOGE("Unsupported MediaAnalyticsItem Parcel version: %d", version);
+          return -1;
+    }
+}
+
+int32_t MediaAnalyticsItem::writeToParcel0(Parcel *data) {
 
     data->writeCString(mKey.c_str());
     data->writeInt32(mPid);
@@ -736,7 +775,6 @@ int32_t MediaAnalyticsItem::writeToParcel(Parcel *data) {
 
     return 0;
 }
-
 
 const char *MediaAnalyticsItem::toCString() {
    return toCString(PROTO_LAST);
@@ -876,8 +914,6 @@ bool MediaAnalyticsItem::selfrecord(bool forcenew) {
         }
         return true;
     } else {
-        std::string p = this->toString();
-        ALOGW("Unable to record: %s [forcenew=%d]", p.c_str(), forcenew);
         return false;
     }
 }
@@ -1033,6 +1069,171 @@ bool MediaAnalyticsItem::merge(MediaAnalyticsItem *incoming) {
 
     // not sure when we'd return false...
     return true;
+}
+
+// a byte array; contents are
+// overall length (uint32) including the length field itself
+// encoding version (uint32)
+// count of properties (uint32)
+// N copies of:
+//     property name as length(int16), bytes
+//         the bytes WILL include the null terminator of the name
+//     type (uint8 -- 1 byte)
+//     size of value field (int16 -- 2 bytes)
+//     value (size based on type)
+//       int32, int64, double -- little endian 4/8/8 bytes respectively
+//       cstring -- N bytes of value [WITH terminator]
+
+enum { kInt32 = 0, kInt64, kDouble, kRate, kCString};
+
+bool MediaAnalyticsItem::dumpAttributes(char **pbuffer, size_t *plength) {
+
+    char *build = NULL;
+
+    if (pbuffer == NULL || plength == NULL)
+        return false;
+
+    // consistency for the caller, who owns whatever comes back in this pointer.
+    *pbuffer = NULL;
+
+    // first, let's calculate sizes
+    int32_t goal = 0;
+    int32_t version = 0;
+
+    goal += sizeof(uint32_t);   // overall length, including the length field
+    goal += sizeof(uint32_t);   // encoding version
+    goal += sizeof(uint32_t);   // # properties
+
+    int32_t count = mPropCount;
+    for (int i = 0 ; i < count; i++ ) {
+        Prop *prop = &mProps[i];
+        goal += sizeof(uint16_t);           // name length
+        goal += strlen(prop->mName) + 1;    // string + null
+        goal += sizeof(uint8_t);            // type
+        goal += sizeof(uint16_t);           // size of value
+        switch (prop->mType) {
+            case MediaAnalyticsItem::kTypeInt32:
+                    goal += sizeof(uint32_t);
+                    break;
+            case MediaAnalyticsItem::kTypeInt64:
+                    goal += sizeof(uint64_t);
+                    break;
+            case MediaAnalyticsItem::kTypeDouble:
+                    goal += sizeof(double);
+                    break;
+            case MediaAnalyticsItem::kTypeRate:
+                    goal += 2 * sizeof(uint64_t);
+                    break;
+            case MediaAnalyticsItem::kTypeCString:
+                    // length + actual string + null
+                    goal += strlen(prop->u.CStringValue) + 1;
+                    break;
+            default:
+                    ALOGE("found bad Prop type: %d, idx %d, name %s",
+                          prop->mType, i, prop->mName);
+                    return false;
+        }
+    }
+
+    // now that we have a size... let's allocate and fill
+    build = (char *)malloc(goal);
+    if (build == NULL)
+        return false;
+
+    memset(build, 0, goal);
+
+    char *filling = build;
+
+#define _INSERT(val, size) \
+    { memcpy(filling, &(val), (size)); filling += (size);}
+#define _INSERTSTRING(val, size) \
+    { memcpy(filling, (val), (size)); filling += (size);}
+
+    _INSERT(goal, sizeof(int32_t));
+    _INSERT(version, sizeof(int32_t));
+    _INSERT(count, sizeof(int32_t));
+
+    for (int i = 0 ; i < count; i++ ) {
+        Prop *prop = &mProps[i];
+        int16_t attrNameLen = strlen(prop->mName) + 1;
+        _INSERT(attrNameLen, sizeof(int16_t));
+        _INSERTSTRING(prop->mName, attrNameLen);    // termination included
+        int8_t elemtype;
+        int16_t elemsize;
+        switch (prop->mType) {
+            case MediaAnalyticsItem::kTypeInt32:
+                {
+                    elemtype = kInt32;
+                    _INSERT(elemtype, sizeof(int8_t));
+                    elemsize = sizeof(int32_t);
+                    _INSERT(elemsize, sizeof(int16_t));
+
+                    _INSERT(prop->u.int32Value, sizeof(int32_t));
+                    break;
+                }
+            case MediaAnalyticsItem::kTypeInt64:
+                {
+                    elemtype = kInt64;
+                    _INSERT(elemtype, sizeof(int8_t));
+                    elemsize = sizeof(int64_t);
+                    _INSERT(elemsize, sizeof(int16_t));
+
+                    _INSERT(prop->u.int64Value, sizeof(int64_t));
+                    break;
+                }
+            case MediaAnalyticsItem::kTypeDouble:
+                {
+                    elemtype = kDouble;
+                    _INSERT(elemtype, sizeof(int8_t));
+                    elemsize = sizeof(double);
+                    _INSERT(elemsize, sizeof(int16_t));
+
+                    _INSERT(prop->u.doubleValue, sizeof(double));
+                    break;
+                }
+            case MediaAnalyticsItem::kTypeRate:
+                {
+                    elemtype = kRate;
+                    _INSERT(elemtype, sizeof(int8_t));
+                    elemsize = 2 * sizeof(uint64_t);
+                    _INSERT(elemsize, sizeof(int16_t));
+
+                    _INSERT(prop->u.rate.count, sizeof(uint64_t));
+                    _INSERT(prop->u.rate.duration, sizeof(uint64_t));
+                    break;
+                }
+            case MediaAnalyticsItem::kTypeCString:
+                {
+                    elemtype = kCString;
+                    _INSERT(elemtype, sizeof(int8_t));
+                    elemsize = strlen(prop->u.CStringValue) + 1;
+                    _INSERT(elemsize, sizeof(int16_t));
+
+                    _INSERTSTRING(prop->u.CStringValue, elemsize);
+                    break;
+                }
+            default:
+                    // error if can't encode; warning if can't decode
+                    ALOGE("found bad Prop type: %d, idx %d, name %s",
+                          prop->mType, i, prop->mName);
+                    goto badness;
+        }
+    }
+
+    if (build + goal != filling) {
+        ALOGE("problems populating; wrote=%d planned=%d",
+              (int)(filling-build), goal);
+        goto badness;
+    }
+
+    *pbuffer = build;
+    *plength = goal;
+
+    return true;
+
+  badness:
+    free(build);
+    return false;
 }
 
 } // namespace android
