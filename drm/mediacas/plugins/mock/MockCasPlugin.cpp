@@ -60,6 +60,19 @@ status_t MockCasFactory::createPlugin(
     return OK;
 }
 
+status_t MockCasFactory::createPlugin(
+        int32_t CA_system_id,
+        void* /*appData*/,
+        CasPluginCallbackExt /*callback*/,
+        CasPlugin **plugin) {
+    if (!isSystemIdSupported(CA_system_id)) {
+        return BAD_VALUE;
+    }
+
+    *plugin = new MockCasPlugin();
+    return OK;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 bool MockDescramblerFactory::isSystemIdSupported(int32_t CA_system_id) const {
@@ -165,6 +178,16 @@ status_t MockCasPlugin::processEmm(const CasEmm& emm) {
 status_t MockCasPlugin::sendEvent(
         int32_t event, int /*arg*/, const CasData& /*eventData*/) {
     ALOGV("sendEvent: event=%d", event);
+    Mutex::Autolock lock(mLock);
+
+    return OK;
+}
+
+status_t MockCasPlugin::sendSessionEvent(
+        const CasSessionId &sessionId, int32_t event,
+        int /*arg*/, const CasData& /*eventData*/) {
+    ALOGV("sendSessionEvent: sessionId=%s, event=%d",
+          arrayToString(sessionId).string(), event);
     Mutex::Autolock lock(mLock);
 
     return OK;

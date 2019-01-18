@@ -42,6 +42,11 @@ public:
             void *appData,
             CasPluginCallback callback,
             CasPlugin **plugin) override;
+    virtual status_t createPlugin(
+            int32_t CA_system_id,
+            void *appData,
+            CasPluginCallbackExt callback,
+            CasPlugin **plugin) override;
 };
 
 class MockDescramblerFactory : public DescramblerFactory {
@@ -80,7 +85,11 @@ public:
     virtual status_t sendEvent(
             int32_t event, int32_t arg, const CasData &eventData) override;
 
-    virtual status_t provision(const String8 &str) override;
+    virtual status_t sendSessionEvent(
+            const CasSessionId &sessionId,
+            int32_t event, int32_t arg, const CasData &eventData) override;
+
+     virtual status_t provision(const String8 &str) override;
 
     virtual status_t refreshEntitlements(
             int32_t refreshType, const CasData &refreshData) override;
