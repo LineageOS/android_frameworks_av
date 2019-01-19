@@ -65,6 +65,13 @@ MediaTrackCUnwrapper::MediaTrackCUnwrapper(CMediaTrack *cmediatrack) {
     bufferGroup = nullptr;
 }
 
+MediaTrackCUnwrapper *MediaTrackCUnwrapper::create(CMediaTrack *cmediatrack) {
+    if (cmediatrack == nullptr) {
+        return nullptr;
+    }
+    return new MediaTrackCUnwrapper(cmediatrack);
+}
+
 MediaTrackCUnwrapper::~MediaTrackCUnwrapper() {
     wrapper->free(wrapper->data);
     free(wrapper);

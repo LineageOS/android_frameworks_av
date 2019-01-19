@@ -142,7 +142,7 @@ private:
 
 class MediaTrackCUnwrapper : public MediaTrack {
 public:
-    explicit MediaTrackCUnwrapper(CMediaTrack *wrapper);
+    static MediaTrackCUnwrapper *create(CMediaTrack *wrapper);
 
     virtual status_t start();
     virtual status_t stop();
@@ -155,6 +155,7 @@ protected:
     virtual ~MediaTrackCUnwrapper();
 
 private:
+    explicit MediaTrackCUnwrapper(CMediaTrack *wrapper);
     CMediaTrack *wrapper;
     MediaBufferGroup *bufferGroup;
 };
