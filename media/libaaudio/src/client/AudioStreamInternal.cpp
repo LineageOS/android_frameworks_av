@@ -349,8 +349,7 @@ aaudio_result_t AudioStreamInternal::stopCallback()
     }
 }
 
-aaudio_result_t AudioStreamInternal::requestStop()
-{
+aaudio_result_t AudioStreamInternal::requestStop() {
     aaudio_result_t result = stopCallback();
     if (result != AAUDIO_OK) {
         return result;
