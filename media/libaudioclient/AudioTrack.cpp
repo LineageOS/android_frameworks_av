@@ -29,6 +29,7 @@
 #include <media/AudioTrack.h>
 #include <utils/Log.h>
 #include <private/media/AudioTrackShared.h>
+#include <processgroup/sched_policy.h>
 #include <media/IAudioFlinger.h>
 #include <media/IAudioPolicyService.h>
 #include <media/AudioParameter.h>

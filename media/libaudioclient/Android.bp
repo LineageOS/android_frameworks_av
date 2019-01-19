@@ -50,6 +50,7 @@ cc_library_shared {
         "libmediametrics",
         "libmediautils",
         "libnblog",
+        "libprocessgroup",
         "libutils",
     ],
     export_shared_lib_headers: ["libbinder"],
