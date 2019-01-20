@@ -21,7 +21,6 @@
 #include <android/binder_ibinder.h>
 #include <media/AudioSystem.h>
 #include <media/DataSourceDesc.h>
-#include <media/MediaAnalyticsItem.h>
 #include <media/MemoryLeakTrackUtil.h>
 #include <media/NdkWrapper.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -975,6 +974,22 @@ status_t MediaPlayer2::getParameter(int key, Parcel *reply) {
     status_t status =  mPlayer->getParameter(key, reply);
     if (status != OK) {
         ALOGD("getParameter returns %d", status);
+    }
+    return status;
+}
+
+// for mediametrics
+status_t MediaPlayer2::getMetrics(char **buffer, size_t *length) {
+    ALOGD("MediaPlayer2::getMetrics()");
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == NULL) {
+        ALOGV("getMetrics: no active player");
+        return INVALID_OPERATION;
+    }
+
+    status_t status =  mPlayer->getMetrics(buffer, length);
+    if (status != OK) {
+        ALOGD("getMetrics returns %d", status);
     }
     return status;
 }
