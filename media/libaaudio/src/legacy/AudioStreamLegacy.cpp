@@ -78,8 +78,9 @@ int32_t AudioStreamLegacy::onProcessFixedBlock(uint8_t *buffer, int32_t numBytes
 
 void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode, void *info) {
     aaudio_data_callback_result_t callbackResult;
-    // This illegal size can be used to tell AudioFlinger to stop calling us.
-    // This takes advantage of AudioFlinger killing the stream.
+    // This illegal size can be used to tell AudioRecord or AudioTrack to stop calling us.
+    // This takes advantage of them killing the stream when they see a size out of range.
+    // That is an undocumented behavior.
     // TODO add to API in AudioRecord and AudioTrack
     const size_t SIZE_STOP_CALLBACKS = SIZE_MAX;
 
@@ -95,7 +96,7 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
                 ALOGW("processCallbackCommon() data, stream disconnected");
                 audioBuffer->size = SIZE_STOP_CALLBACKS;
             } else if (!mCallbackEnabled.load()) {
-                ALOGW("processCallbackCommon() stopping because callback disabled");
+                ALOGW("processCallbackCommon() no data because callback disabled");
                 audioBuffer->size = SIZE_STOP_CALLBACKS;
             } else {
                 if (audioBuffer->frameCount == 0) {
@@ -115,10 +116,16 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
                 }
                 if (callbackResult == AAUDIO_CALLBACK_RESULT_CONTINUE) {
                     audioBuffer->size = audioBuffer->frameCount * getBytesPerDeviceFrame();
-                } else { // STOP or invalid result
-                    ALOGW("%s() callback requested stop, fake an error", __func__);
-                    audioBuffer->size = SIZE_STOP_CALLBACKS;
-                    // Disable the callback just in case AudioFlinger keeps trying to call us.
+                } else {
+                    if (callbackResult == AAUDIO_CALLBACK_RESULT_STOP) {
+                        ALOGD("%s() callback returned AAUDIO_CALLBACK_RESULT_STOP", __func__);
+                    } else {
+                        ALOGW("%s() callback returned invalid result = %d",
+                              __func__, callbackResult);
+                    }
+                    audioBuffer->size = 0;
+                    systemStopFromCallback();
+                    // Disable the callback just in case the system keeps trying to call us.
                     mCallbackEnabled.store(false);
                 }
 

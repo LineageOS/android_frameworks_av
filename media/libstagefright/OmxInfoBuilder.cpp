@@ -57,14 +57,9 @@ bool hasPrefix(const hidl_string& s, const char* prefix) {
 }
 
 status_t queryCapabilities(
-        const IOmxStore::NodeInfo& node, const char* mime, bool isEncoder,
+        const IOmxStore::NodeInfo& node, const char* mediaType, bool isEncoder,
         MediaCodecInfo::CapabilitiesWriter* caps) {
     sp<ACodec> codec = new ACodec();
-    status_t err = codec->queryCapabilities(
-            node.owner.c_str(), node.name.c_str(), mime, isEncoder, caps);
-    if (err != OK) {
-        return err;
-    }
     for (const auto& attribute : node.attributes) {
         // All features have an int32 value except
         // "feature-bitrate-modes", which has a string value.
@@ -80,6 +75,12 @@ status_t queryCapabilities(
             caps->addDetail(
                     attribute.key.c_str(), attribute.value.c_str());
         }
+    }
+    // query capabilities may remove capabilities that are not actually supported by the codec
+    status_t err = codec->queryCapabilities(
+            node.owner.c_str(), node.name.c_str(), mediaType, isEncoder, caps);
+    if (err != OK) {
+        return err;
     }
     return OK;
 }
@@ -163,7 +164,10 @@ status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                     info = c2i->second.get();
                     info->setName(nodeName.c_str());
                     info->setOwner(node.owner.c_str());
-                    info->setEncoder(isEncoder);
+                    info->setAttributes(
+                            // all OMX codecs are vendor codecs (in the vendor partition), but
+                            // treat OMX.google codecs as non-hardware-accelerated and  non-vendor
+                            (isEncoder ? MediaCodecInfo::kFlagIsEncoder : 0));
                     info->setRank(defaultRank);
                 } else {
                     // The node has been seen before. Simply retrieve the
@@ -180,7 +184,19 @@ status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                         info = c2i->second.get();
                         info->setName(nodeName.c_str());
                         info->setOwner(node.owner.c_str());
-                        info->setEncoder(isEncoder);
+                        typename std::underlying_type<MediaCodecInfo::Attributes>::type attrs =
+                            MediaCodecInfo::kFlagIsVendor;
+                        if (isEncoder) {
+                            attrs |= MediaCodecInfo::kFlagIsEncoder;
+                        }
+                        if (std::count_if(
+                                node.attributes.begin(), node.attributes.end(),
+                                [](const IOmxStore::Attribute &i) -> bool {
+                                    return i.key == "attribute::software-codec";
+                                                                          })) {
+                            attrs |= MediaCodecInfo::kFlagIsHardwareAccelerated;
+                        }
+                        info->setAttributes(attrs);
                         info->setRank(defaultRank);
                     } else {
                         // If preferPlatformNodes is true, this node must be
@@ -195,12 +211,12 @@ status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                 }
             }
             std::unique_ptr<MediaCodecInfo::CapabilitiesWriter> caps =
-                    info->addMime(typeName.c_str());
+                    info->addMediaType(typeName.c_str());
             if (queryCapabilities(
                     node, typeName.c_str(), isEncoder, caps.get()) != OK) {
-                ALOGW("Fail to add mime %s to codec %s",
+                ALOGW("Fail to add media type %s to codec %s",
                         typeName.c_str(), nodeName.c_str());
-                info->removeMime(typeName.c_str());
+                info->removeMediaType(typeName.c_str());
             }
         }
 
@@ -219,7 +235,18 @@ status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                     info = c2i->second.get();
                     info->setName(nodeName.c_str());
                     info->setOwner(node->owner.c_str());
-                    info->setEncoder(isEncoder);
+                    typename std::underlying_type<MediaCodecInfo::Attributes>::type attrs =
+                        MediaCodecInfo::kFlagIsVendor;
+                    if (isEncoder) {
+                        attrs |= MediaCodecInfo::kFlagIsEncoder;
+                    }
+                    if (std::count_if(
+                            node->attributes.begin(), node->attributes.end(),
+                            [](const IOmxStore::Attribute &i) -> bool {
+                                return i.key == "attribute::software-codec";
+                                                                      })) {
+                        attrs |= MediaCodecInfo::kFlagIsHardwareAccelerated;
+                    }
                     info->setRank(defaultRank);
                 } else {
                     // The node has been seen before. Simply retrieve the
@@ -227,13 +254,13 @@ status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                     info = c2i->second.get();
                 }
                 std::unique_ptr<MediaCodecInfo::CapabilitiesWriter> caps =
-                        info->addMime(typeName.c_str());
+                        info->addMediaType(typeName.c_str());
                 if (queryCapabilities(
                         *node, typeName.c_str(), isEncoder, caps.get()) != OK) {
-                    ALOGW("Fail to add mime %s to codec %s "
+                    ALOGW("Fail to add media type %s to codec %s "
                           "after software codecs",
                           typeName.c_str(), nodeName.c_str());
-                    info->removeMime(typeName.c_str());
+                    info->removeMediaType(typeName.c_str());
                 }
             }
         }

@@ -288,7 +288,7 @@ aaudio_result_t AudioStreamTrack::requestStart() {
 
 aaudio_result_t AudioStreamTrack::requestPause() {
     if (mAudioTrack.get() == nullptr) {
-        ALOGE("requestPause() no AudioTrack");
+        ALOGE("%s() no AudioTrack", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -304,7 +304,7 @@ aaudio_result_t AudioStreamTrack::requestPause() {
 
 aaudio_result_t AudioStreamTrack::requestFlush() {
     if (mAudioTrack.get() == nullptr) {
-        ALOGE("requestFlush() no AudioTrack");
+        ALOGE("%s() no AudioTrack", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -318,7 +318,7 @@ aaudio_result_t AudioStreamTrack::requestFlush() {
 
 aaudio_result_t AudioStreamTrack::requestStop() {
     if (mAudioTrack.get() == nullptr) {
-        ALOGE("requestStop() no AudioTrack");
+        ALOGE("%s() no AudioTrack", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
 

@@ -25,11 +25,7 @@
 
 namespace android {
 
-// checks if the IO profile is compatible with specified parameters.
-// Sampling rate, format and channel mask must be specified in order to
-// get a valid a match
-bool IOProfile::isCompatibleProfile(audio_devices_t device,
-                                    const String8& address,
+bool IOProfile::isCompatibleProfile(const DeviceVector &devices,
                                     uint32_t samplingRate,
                                     uint32_t *updatedSamplingRate,
                                     audio_format_t format,
@@ -46,14 +42,8 @@ bool IOProfile::isCompatibleProfile(audio_devices_t device,
             getType() == AUDIO_PORT_TYPE_MIX && getRole() == AUDIO_PORT_ROLE_SINK;
     ALOG_ASSERT(isPlaybackThread != isRecordThread);
 
-
-    if (device != AUDIO_DEVICE_NONE) {
-        // just check types if multiple devices are selected
-        if (popcount(device & ~AUDIO_DEVICE_BIT_IN) > 1) {
-            if ((mSupportedDevices.types() & device) != device) {
-                return false;
-            }
-        } else if (mSupportedDevices.getDevice(device, address) == 0) {
+    if (!devices.isEmpty()) {
+        if (!mSupportedDevices.containsAllDevices(devices)) {
             return false;
         }
     }

@@ -862,9 +862,9 @@ static CodecBase *CreateCCodec() {
 //static
 sp<CodecBase> MediaCodec::GetCodecBase(const AString &name, const char *owner) {
     if (owner) {
-        if (strncmp(owner, "default", 8) == 0) {
+        if (strcmp(owner, "default") == 0) {
             return new ACodec;
-        } else if (strncmp(owner, "codec2", 7) == 0) {
+        } else if (strncmp(owner, "codec2", 6) == 0) {
             return CreateCCodec();
         }
     }
@@ -911,10 +911,10 @@ status_t MediaCodec::init(const AString &name) {
             continue;
         }
         mCodecInfo = mcl->getCodecInfo(codecIdx);
-        Vector<AString> mimes;
-        mCodecInfo->getSupportedMimes(&mimes);
-        for (size_t i = 0; i < mimes.size(); i++) {
-            if (mimes[i].startsWith("video/")) {
+        Vector<AString> mediaTypes;
+        mCodecInfo->getSupportedMediaTypes(&mediaTypes);
+        for (size_t i = 0; i < mediaTypes.size(); i++) {
+            if (mediaTypes[i].startsWith("video/")) {
                 mIsVideo = true;
                 break;
             }

@@ -171,6 +171,9 @@ protected:
 };
 
 inline CMediaTrack *wrap(MediaTrackHelper *track) {
+    if (track == nullptr) {
+        return nullptr;
+    }
     CMediaTrack *wrapper = (CMediaTrack*) malloc(sizeof(CMediaTrack));
     wrapper->data = track;
     wrapper->free = [](void *data) -> void {

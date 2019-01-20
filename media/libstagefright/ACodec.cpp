@@ -8682,14 +8682,17 @@ status_t ACodec::queryCapabilities(
         if (omxNode->configureVideoTunnelMode(
                 kPortIndexOutput, OMX_TRUE, 0, &sidebandHandle) == OK) {
             // tunneled playback includes adaptive playback
-            caps->addFlags(MediaCodecInfo::Capabilities::kFlagSupportsAdaptivePlayback
-                    | MediaCodecInfo::Capabilities::kFlagSupportsTunneledPlayback);
-        } else if (omxNode->setPortMode(
-                kPortIndexOutput, IOMX::kPortModeDynamicANWBuffer) == OK ||
-                omxNode->prepareForAdaptivePlayback(
-                kPortIndexOutput, OMX_TRUE,
-                1280 /* width */, 720 /* height */) == OK) {
-            caps->addFlags(MediaCodecInfo::Capabilities::kFlagSupportsAdaptivePlayback);
+        } else {
+            // tunneled playback is not supported
+            caps->removeDetail(MediaCodecInfo::Capabilities::FEATURE_TUNNELED_PLAYBACK);
+            if (omxNode->setPortMode(
+                    kPortIndexOutput, IOMX::kPortModeDynamicANWBuffer) != OK &&
+                    omxNode->prepareForAdaptivePlayback(
+                        kPortIndexOutput, OMX_TRUE,
+                        1280 /* width */, 720 /* height */) != OK) {
+                // adaptive playback is not supported
+                caps->removeDetail(MediaCodecInfo::Capabilities::FEATURE_ADAPTIVE_PLAYBACK);
+            }
         }
     }
 
@@ -8697,11 +8700,20 @@ status_t ACodec::queryCapabilities(
         OMX_VIDEO_CONFIG_ANDROID_INTRAREFRESHTYPE params;
         InitOMXParams(&params);
         params.nPortIndex = kPortIndexOutput;
-        // TODO: should we verify if fallback is supported?
+
+        OMX_VIDEO_PARAM_INTRAREFRESHTYPE fallbackParams;
+        InitOMXParams(&fallbackParams);
+        fallbackParams.nPortIndex = kPortIndexOutput;
+        fallbackParams.eRefreshMode = OMX_VIDEO_IntraRefreshCyclic;
+
         if (omxNode->getConfig(
                 (OMX_INDEXTYPE)OMX_IndexConfigAndroidIntraRefresh,
-                &params, sizeof(params)) == OK) {
-            caps->addFlags(MediaCodecInfo::Capabilities::kFlagSupportsIntraRefresh);
+                &params, sizeof(params)) != OK &&
+                omxNode->getParameter(
+                    OMX_IndexParamVideoIntraRefresh, &fallbackParams,
+                    sizeof(fallbackParams)) != OK) {
+            // intra refresh is not supported
+            caps->removeDetail(MediaCodecInfo::Capabilities::FEATURE_INTRA_REFRESH);
         }
     }
 

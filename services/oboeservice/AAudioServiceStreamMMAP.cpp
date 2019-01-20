@@ -162,7 +162,7 @@ aaudio_result_t AAudioServiceStreamMMAP::getFreeRunningPosition(int64_t *positio
     aaudio_result_t result = serviceEndpointMMAP->getFreeRunningPosition(positionFrames, timeNanos);
     if (result == AAUDIO_OK) {
         Timestamp timestamp(*positionFrames, *timeNanos);
-        mAtomicTimestamp.write(timestamp);
+        mAtomicStreamTimestamp.write(timestamp);
         *positionFrames = timestamp.getPosition();
         *timeNanos = timestamp.getNanoseconds();
     } else if (result != AAUDIO_ERROR_UNAVAILABLE) {
@@ -184,8 +184,8 @@ aaudio_result_t AAudioServiceStreamMMAP::getHardwareTimestamp(int64_t *positionF
             static_cast<AAudioServiceEndpointMMAP *>(endpoint.get());
 
     // TODO Get presentation timestamp from the HAL
-    if (mAtomicTimestamp.isValid()) {
-        Timestamp timestamp = mAtomicTimestamp.read();
+    if (mAtomicStreamTimestamp.isValid()) {
+        Timestamp timestamp = mAtomicStreamTimestamp.read();
         *positionFrames = timestamp.getPosition();
         *timeNanos = timestamp.getNanoseconds() + serviceEndpointMMAP->getHardwareTimeOffsetNanos();
         return AAUDIO_OK;

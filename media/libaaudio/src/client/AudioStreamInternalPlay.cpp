@@ -71,7 +71,7 @@ aaudio_result_t AudioStreamInternalPlay::requestPause()
 
     mClockModel.stop(AudioClock::getNanoseconds());
     setState(AAUDIO_STREAM_STATE_PAUSING);
-    mAtomicTimestamp.clear();
+    mAtomicInternalTimestamp.clear();
     return mServiceInterface.pauseStream(mServiceStreamHandle);
 }
 
@@ -294,6 +294,7 @@ void *AudioStreamInternalPlay::callbackLoop() {
             }
         } else if (callbackResult == AAUDIO_CALLBACK_RESULT_STOP) {
             ALOGD("%s(): callback returned AAUDIO_CALLBACK_RESULT_STOP", __func__);
+            result = systemStopFromCallback();
             break;
         }
     }

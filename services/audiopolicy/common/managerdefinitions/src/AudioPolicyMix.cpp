@@ -280,13 +280,11 @@ status_t AudioPolicyMixCollection::getOutputForAttr(audio_attributes_t attribute
     return BAD_VALUE;
 }
 
-audio_devices_t AudioPolicyMixCollection::getDeviceAndMixForInputSource(audio_source_t inputSource,
-                                                                        audio_devices_t availDevices,
-                                                                        AudioMix **policyMix)
+sp<DeviceDescriptor> AudioPolicyMixCollection::getDeviceAndMixForInputSource(
+        audio_source_t inputSource, const DeviceVector &availDevices, AudioMix **policyMix)
 {
     for (size_t i = 0; i < size(); i++) {
         AudioMix *mix = valueAt(i)->getMix();
-
         if (mix->mMixType != MIX_TYPE_RECORDERS) {
             continue;
         }
@@ -295,17 +293,21 @@ audio_devices_t AudioPolicyMixCollection::getDeviceAndMixForInputSource(audio_so
                     mix->mCriteria[j].mValue.mSource == inputSource) ||
                (RULE_EXCLUDE_ATTRIBUTE_CAPTURE_PRESET == mix->mCriteria[j].mRule &&
                     mix->mCriteria[j].mValue.mSource != inputSource)) {
-                if (availDevices & AUDIO_DEVICE_IN_REMOTE_SUBMIX) {
+                // assuming PolicyMix only for remote submix for input
+                // so mix->mDeviceType can only be AUDIO_DEVICE_OUT_REMOTE_SUBMIX
+                audio_devices_t device = AUDIO_DEVICE_IN_REMOTE_SUBMIX;
+                auto mixDevice = availDevices.getDevice(device, mix->mDeviceAddress);
+                if (mixDevice != nullptr) {
                     if (policyMix != NULL) {
                         *policyMix = mix;
                     }
-                    return AUDIO_DEVICE_IN_REMOTE_SUBMIX;
+                    return mixDevice;
                 }
                 break;
             }
         }
     }
-    return AUDIO_DEVICE_NONE;
+    return nullptr;
 }
 
 status_t AudioPolicyMixCollection::getInputMixForAttr(audio_attributes_t attr, AudioMix **policyMix)

@@ -26,6 +26,7 @@
 #include <media/AudioRecord.h>
 #include <utils/Log.h>
 #include <private/media/AudioTrackShared.h>
+#include <processgroup/sched_policy.h>
 #include <media/IAudioFlinger.h>
 #include <media/MediaAnalyticsItem.h>
 #include <media/TypeConverter.h>
@@ -1396,6 +1397,17 @@ status_t AudioRecord::getActiveMicrophones(std::vector<media::MicrophoneInfo>* a
 {
     AutoMutex lock(mLock);
     return mAudioRecord->getActiveMicrophones(activeMicrophones).transactionError();
+}
+
+status_t AudioRecord::setMicrophoneDirection(audio_microphone_direction_t direction)
+{
+    AutoMutex lock(mLock);
+    return mAudioRecord->setMicrophoneDirection(direction).transactionError();
+}
+
+status_t AudioRecord::setMicrophoneFieldDimension(float zoom) {
+    AutoMutex lock(mLock);
+    return mAudioRecord->setMicrophoneFieldDimension(zoom).transactionError();
 }
 
 // =========================================================================

@@ -253,6 +253,14 @@ ALookup<C2Config::profile_t, int32_t> sHevcProfiles = {
     { C2Config::PROFILE_HEVC_MAIN_10_INTRA, HEVCProfileMain10 },
 };
 
+ALookup<C2Config::profile_t, int32_t> sHevcHdrProfiles = {
+    { C2Config::PROFILE_HEVC_MAIN_10, HEVCProfileMain10HDR10 },
+};
+
+ALookup<C2Config::profile_t, int32_t> sHevcHdr10PlusProfiles = {
+    { C2Config::PROFILE_HEVC_MAIN_10, HEVCProfileMain10HDR10Plus },
+};
+
 ALookup<C2Config::level_t, int32_t> sMpeg2Levels = {
     { C2Config::LEVEL_MP2V_LOW,         MPEG2LevelLL },
     { C2Config::LEVEL_MP2V_MAIN,        MPEG2LevelML },
@@ -324,6 +332,20 @@ ALookup<C2Config::profile_t, int32_t> sVp9Profiles = {
     { C2Config::PROFILE_VP9_1, VP9Profile1 },
     { C2Config::PROFILE_VP9_2, VP9Profile2 },
     { C2Config::PROFILE_VP9_3, VP9Profile3 },
+    { C2Config::PROFILE_VP9_2, VP9Profile2HDR },
+    { C2Config::PROFILE_VP9_3, VP9Profile3HDR },
+    { C2Config::PROFILE_VP9_2, VP9Profile2HDR10Plus },
+    { C2Config::PROFILE_VP9_3, VP9Profile3HDR10Plus },
+};
+
+ALookup<C2Config::profile_t, int32_t> sVp9HdrProfiles = {
+    { C2Config::PROFILE_VP9_2, VP9Profile2HDR },
+    { C2Config::PROFILE_VP9_3, VP9Profile3HDR },
+};
+
+ALookup<C2Config::profile_t, int32_t> sVp9Hdr10PlusProfiles = {
+    { C2Config::PROFILE_VP9_2, VP9Profile2HDR10Plus },
+    { C2Config::PROFILE_VP9_3, VP9Profile3HDR10Plus },
 };
 
 ALookup<C2Config::level_t, int32_t> sAv1Levels = {
@@ -461,6 +483,10 @@ struct H263ProfileLevelMapper : ProfileLevelMapperHelper {
 };
 
 struct HevcProfileLevelMapper : ProfileLevelMapperHelper {
+    HevcProfileLevelMapper(bool isHdr = false, bool isHdr10Plus = false) :
+        ProfileLevelMapperHelper(),
+        mIsHdr(isHdr), mIsHdr10Plus(isHdr10Plus) {}
+
     virtual bool simpleMap(C2Config::level_t from, int32_t *to) {
         return sHevcLevels.map(from, to);
     }
@@ -468,11 +494,19 @@ struct HevcProfileLevelMapper : ProfileLevelMapperHelper {
         return sHevcLevels.map(from, to);
     }
     virtual bool simpleMap(C2Config::profile_t from, int32_t *to) {
-        return sHevcProfiles.map(from, to);
+        return mIsHdr10Plus ? sHevcHdr10PlusProfiles.map(from, to) :
+                     mIsHdr ? sHevcHdrProfiles.map(from, to) :
+                              sHevcProfiles.map(from, to);
     }
     virtual bool simpleMap(int32_t from, C2Config::profile_t *to) {
-        return sHevcProfiles.map(from, to);
+        return mIsHdr10Plus ? sHevcHdr10PlusProfiles.map(from, to) :
+                     mIsHdr ? sHevcHdrProfiles.map(from, to) :
+                              sHevcProfiles.map(from, to);
     }
+
+private:
+    bool mIsHdr;
+    bool mIsHdr10Plus;
 };
 
 struct Mpeg2ProfileLevelMapper : ProfileLevelMapperHelper {
@@ -527,6 +561,10 @@ struct Vp8ProfileLevelMapper : ProfileLevelMapperHelper {
 };
 
 struct Vp9ProfileLevelMapper : ProfileLevelMapperHelper {
+    Vp9ProfileLevelMapper(bool isHdr = false, bool isHdr10Plus = false) :
+        ProfileLevelMapperHelper(),
+        mIsHdr(isHdr), mIsHdr10Plus(isHdr10Plus) {}
+
     virtual bool simpleMap(C2Config::level_t from, int32_t *to) {
         return sVp9Levels.map(from, to);
     }
@@ -534,11 +572,19 @@ struct Vp9ProfileLevelMapper : ProfileLevelMapperHelper {
         return sVp9Levels.map(from, to);
     }
     virtual bool simpleMap(C2Config::profile_t from, int32_t *to) {
-        return sVp9Profiles.map(from, to);
+        return mIsHdr10Plus ? sVp9Hdr10PlusProfiles.map(from, to) :
+                     mIsHdr ? sVp9HdrProfiles.map(from, to) :
+                              sVp9Profiles.map(from, to);
     }
     virtual bool simpleMap(int32_t from, C2Config::profile_t *to) {
-        return sVp9Profiles.map(from, to);
+        return mIsHdr10Plus ? sVp9Hdr10PlusProfiles.map(from, to) :
+                     mIsHdr ? sVp9HdrProfiles.map(from, to) :
+                              sVp9Profiles.map(from, to);
     }
+
+private:
+    bool mIsHdr;
+    bool mIsHdr10Plus;
 };
 
 } // namespace
@@ -565,6 +611,18 @@ C2Mapper::GetProfileLevelMapper(std::string mediaType) {
         return std::make_shared<Vp8ProfileLevelMapper>();
     } else if (mediaType == MIMETYPE_VIDEO_VP9) {
         return std::make_shared<Vp9ProfileLevelMapper>();
+    }
+    return nullptr;
+}
+
+// static
+std::shared_ptr<C2Mapper::ProfileLevelMapper>
+C2Mapper::GetHdrProfileLevelMapper(std::string mediaType, bool isHdr10Plus) {
+    std::transform(mediaType.begin(), mediaType.begin(), mediaType.end(), ::tolower);
+    if (mediaType == MIMETYPE_VIDEO_HEVC) {
+        return std::make_shared<HevcProfileLevelMapper>(true, isHdr10Plus);
+    } else if (mediaType == MIMETYPE_VIDEO_VP9) {
+        return std::make_shared<Vp9ProfileLevelMapper>(true, isHdr10Plus);
     }
     return nullptr;
 }

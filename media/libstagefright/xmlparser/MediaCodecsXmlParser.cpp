@@ -26,8 +26,9 @@
 #include <sys/stat.h>
 #include <expat.h>
 
-#include <cctype>
 #include <algorithm>
+#include <cctype>
+#include <string>
 
 namespace android {
 
@@ -326,8 +327,8 @@ void MediaCodecsXmlParser::startElementHandler(
         case SECTION_DECODER:
         case SECTION_ENCODER:
         {
-            if (strEq(name, "Quirk")) {
-                (void)addQuirk(attrs);
+            if (strEq(name, "Quirk") || strEq(name, "Attribute")) {
+                (void)addQuirk(attrs, name);
             } else if (strEq(name, "Type")) {
                 (void)addTypeFromAttributes(attrs,
                         (mCurrentSection == SECTION_ENCODER));
@@ -348,6 +349,8 @@ void MediaCodecsXmlParser::startElementHandler(
             if (outside &&
                     (strEq(name, "Limit") || strEq(name, "Feature"))) {
                 ALOGW("ignoring %s specified outside of a Type", name);
+            } else if (strEq(name, "Alias")) {
+                (void)addAlias(attrs);
             } else if (strEq(name, "Limit")) {
                 (void)addLimit(attrs);
             } else if (strEq(name, "Feature")) {
@@ -579,7 +582,7 @@ status_t MediaCodecsXmlParser::addMediaCodecFromAttributes(
     return OK;
 }
 
-status_t MediaCodecsXmlParser::addQuirk(const char **attrs) {
+status_t MediaCodecsXmlParser::addQuirk(const char **attrs, const char *tag) {
     if (mCurrentCodec == mCodecMap.end()) {
         return BAD_VALUE;
     }
@@ -606,7 +609,12 @@ status_t MediaCodecsXmlParser::addQuirk(const char **attrs) {
         return BAD_VALUE;
     }
 
-    mCurrentCodec->second.quirkSet.emplace(name);
+    std::string tagString = tag;
+    std::transform(tagString.begin(), tagString.end(), tagString.begin(), ::tolower);
+    tagString.append("::");
+    tagString.append(name);
+    mCurrentCodec->second.quirkSet.emplace(tagString.c_str());
+    ALOGI("adding %s to %s", tagString.c_str(), mCurrentCodec->first.c_str());
     return OK;
 }
 
@@ -760,6 +768,7 @@ status_t MediaCodecsXmlParser::addLimit(const char **attrs) {
             strEq(a_name, "quality") ||
             strEq(a_name, "size") ||
             strEq(a_name, "measured-blocks-per-second") ||
+            strHasPrefix(a_name, "performance-point-") ||
             strHasPrefix(a_name, "measured-frame-rate-")) {
         // "range" is specified in exactly one of the following forms:
         // 1) min-max
@@ -964,6 +973,34 @@ status_t MediaCodecsXmlParser::addFeature(const char **attrs) {
     return OK;
 }
 
+status_t MediaCodecsXmlParser::addAlias(const char **attrs) {
+    size_t i = 0;
+    const char *name = nullptr;
+
+    while (attrs[i] != nullptr) {
+        if (strEq(attrs[i], "name")) {
+            if (attrs[++i] == nullptr) {
+                ALOGE("addAlias: name is null");
+                return BAD_VALUE;
+            }
+            name = attrs[i];
+        } else {
+            ALOGE("addAlias: unrecognized attribute: %s", attrs[i]);
+            return BAD_VALUE;
+        }
+        ++i;
+    }
+
+    // Every feature must have a name.
+    if (name == nullptr) {
+        ALOGE("alias with no 'name' attribute");
+        return BAD_VALUE;
+    }
+
+    mCurrentCodec->second.aliases.emplace_back(name);
+    return OK;
+}
+
 const MediaCodecsXmlParser::AttributeMap&
         MediaCodecsXmlParser::getServiceAttributeMap() const {
     return mServiceAttributeMap;
@@ -1041,10 +1078,17 @@ void MediaCodecsXmlParser::generateRoleMap() const {
 
             NodeInfo nodeInfo;
             nodeInfo.name = codecName;
+            // NOTE: no aliases are exposed in role info
+            // attribute quirks are exposed as node attributes
             nodeInfo.attributeList.reserve(typeAttributeMap.size());
             for (const auto& attribute : typeAttributeMap) {
                 nodeInfo.attributeList.push_back(
                         Attribute{attribute.first, attribute.second});
+            }
+            for (const std::string &quirk : codec.second.quirkSet) {
+                if (strHasPrefix(quirk.c_str(), "attribute::")) {
+                    nodeInfo.attributeList.push_back(Attribute{quirk, "present"});
+                }
             }
             nodeList->insert(std::make_pair(
                     std::move(order), std::move(nodeInfo)));

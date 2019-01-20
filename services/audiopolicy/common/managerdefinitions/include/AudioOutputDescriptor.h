@@ -26,13 +26,14 @@
 #include "AudioIODescriptorInterface.h"
 #include "AudioPort.h"
 #include "ClientDescriptor.h"
+#include "DeviceDescriptor.h"
+#include <map>
 
 namespace android {
 
 class IOProfile;
 class AudioMix;
 class AudioPolicyClientInterface;
-class DeviceDescriptor;
 
 // descriptor for audio outputs. Used to maintain current configuration of each opened audio output
 // and keep track of the usage of this output by each audio stream type.
@@ -48,14 +49,12 @@ public:
     void        log(const char* indent);
 
     audio_port_handle_t getId() const;
-    virtual audio_devices_t device() const;
-    virtual bool sharesHwModuleWith(const sp<AudioOutputDescriptor>& outputDesc);
-    virtual audio_devices_t supportedDevices();
+    virtual DeviceVector devices() const { return mDevices; }
+    bool sharesHwModuleWith(const sp<AudioOutputDescriptor>& outputDesc);
+    virtual DeviceVector supportedDevices() const  { return mDevices; }
     virtual bool isDuplicated() const { return false; }
     virtual uint32_t latency() { return 0; }
     virtual bool isFixedVolume(audio_devices_t device);
-    virtual sp<AudioOutputDescriptor> subOutput1() { return 0; }
-    virtual sp<AudioOutputDescriptor> subOutput2() { return 0; }
     virtual bool setVolume(float volume,
                            audio_stream_type_t stream,
                            audio_devices_t device,
@@ -119,7 +118,7 @@ public:
         return mActiveClients;
     }
 
-    audio_devices_t mDevice = AUDIO_DEVICE_NONE; // current device this output is routed to
+    DeviceVector mDevices; /**< current devices this output is routed to */
     nsecs_t mStopTime[AUDIO_STREAM_CNT];
     int mMuteCount[AUDIO_STREAM_CNT];            // mute request counter
     bool mStrategyMutedByDevice[NUM_STRATEGIES]; // strategies muted because of incompatible
@@ -151,14 +150,15 @@ public:
     virtual ~SwAudioOutputDescriptor() {}
 
             void dump(String8 *dst) const override;
-    virtual audio_devices_t device() const;
-    virtual bool sharesHwModuleWith(const sp<AudioOutputDescriptor>& outputDesc);
-    virtual audio_devices_t supportedDevices();
+    virtual DeviceVector devices() const;
+    void setDevices(const DeviceVector &devices) { mDevices = devices; }
+    bool sharesHwModuleWith(const sp<SwAudioOutputDescriptor>& outputDesc);
+    virtual DeviceVector supportedDevices() const;
     virtual uint32_t latency();
     virtual bool isDuplicated() const { return (mOutput1 != NULL && mOutput2 != NULL); }
     virtual bool isFixedVolume(audio_devices_t device);
-    virtual sp<AudioOutputDescriptor> subOutput1() { return mOutput1; }
-    virtual sp<AudioOutputDescriptor> subOutput2() { return mOutput2; }
+    sp<SwAudioOutputDescriptor> subOutput1() { return mOutput1; }
+    sp<SwAudioOutputDescriptor> subOutput2() { return mOutput2; }
             void changeStreamActiveCount(
                     const sp<TrackClientDescriptor>& client, int delta) override;
     virtual bool setVolume(float volume,
@@ -171,22 +171,49 @@ public:
                            const struct audio_port_config *srcConfig = NULL) const;
     virtual void toAudioPort(struct audio_port *port) const;
 
-            status_t open(const audio_config_t *config,
-                          audio_devices_t device,
-                          const String8& address,
-                          audio_stream_type_t stream,
-                          audio_output_flags_t flags,
-                          audio_io_handle_t *output);
-            // Called when a stream is about to be started
-            // Note: called before setClientActive(true);
-            status_t start();
-            // Called after a stream is stopped.
-            // Note: called after setClientActive(false);
-            void stop();
-            void close();
-            status_t openDuplicating(const sp<SwAudioOutputDescriptor>& output1,
-                                     const sp<SwAudioOutputDescriptor>& output2,
-                                     audio_io_handle_t *ioHandle);
+        status_t open(const audio_config_t *config,
+                      const DeviceVector &devices,
+                      audio_stream_type_t stream,
+                      audio_output_flags_t flags,
+                      audio_io_handle_t *output);
+
+        // Called when a stream is about to be started
+        // Note: called before setClientActive(true);
+        status_t start();
+        // Called after a stream is stopped.
+        // Note: called after setClientActive(false);
+        void stop();
+        void close();
+        status_t openDuplicating(const sp<SwAudioOutputDescriptor>& output1,
+                                 const sp<SwAudioOutputDescriptor>& output2,
+                                 audio_io_handle_t *ioHandle);
+
+    /**
+     * @brief supportsDevice
+     * @param device to be checked against
+     * @return true if the device is supported by type (for non bus / remote submix devices),
+     *         true if the device is supported (both type and address) for bus / remote submix
+     *         false otherwise
+     */
+    bool supportsDevice(const sp<DeviceDescriptor> &device) const;
+
+    /**
+     * @brief supportsAllDevices
+     * @param devices to be checked against
+     * @return true if the device is weakly supported by type (e.g. for non bus / rsubmix devices),
+     *         true if the device is supported (both type and address) for bus / remote submix
+     *         false otherwise
+     */
+    bool supportsAllDevices(const DeviceVector &devices) const;
+
+    /**
+     * @brief filterSupportedDevices takes a vector of devices and filters them according to the
+     * device supported by this output (the profile from which this output derives from)
+     * @param devices reference device vector to be filtered
+     * @return vector of devices filtered from the supported devices of this output (weakly or not
+     * depending on the device type)
+     */
+    DeviceVector filterSupportedDevices(const DeviceVector &devices) const;
 
     const sp<IOProfile> mProfile;          // I/O profile this output derives from
     audio_io_handle_t mIoHandle;           // output handle
@@ -208,7 +235,6 @@ public:
 
             void dump(String8 *dst) const override;
 
-    virtual audio_devices_t supportedDevices();
     virtual bool setVolume(float volume,
                            audio_stream_type_t stream,
                            audio_devices_t device,

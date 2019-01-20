@@ -579,6 +579,10 @@ using effect_buffer_t = int16_t;
         virtual binder::Status   stop();
         virtual binder::Status   getActiveMicrophones(
                 std::vector<media::MicrophoneInfo>* activeMicrophones);
+        virtual binder::Status   setMicrophoneDirection(
+                int /*audio_microphone_direction_t*/ direction);
+        virtual binder::Status   setMicrophoneFieldDimension(float zoom);
+
     private:
         const sp<RecordThread::RecordTrack> mRecordTrack;
 
@@ -620,7 +624,9 @@ using effect_buffer_t = int16_t;
                                            audio_devices_t device,
                                            const String8& address,
                                            audio_source_t source,
-                                           audio_input_flags_t flags);
+                                           audio_input_flags_t flags,
+                                           audio_devices_t outputDevice,
+                                           const String8& outputDeviceAddress);
               sp<ThreadBase> openOutput_l(audio_module_handle_t module,
                                               audio_io_handle_t *output,
                                               audio_config_t *config,
