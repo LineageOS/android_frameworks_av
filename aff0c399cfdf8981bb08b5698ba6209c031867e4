@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "764d81de_a880ac5f",
+        "filename": "media/libstagefright/wifi-display/source/Converter.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 629,
+      "author": {
+        "id": 18924
+      },
+      "writtenOn": "2019-01-20T21:13:15Z",
+      "side": 1,
+      "message": "I might have functionally broken the buffer refcounting here.",
+      "revId": "aff0c399cfdf8981bb08b5698ba6209c031867e4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "a4a28080_7274d7fa",
+        "filename": "media/libstagefright/wifi-display/source/MediaPuller.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 183,
+      "author": {
+        "id": 18924
+      },
+      "writtenOn": "2019-01-20T21:13:15Z",
+      "side": 1,
+      "message": "I might have broken refcounting here.",
+      "revId": "aff0c399cfdf8981bb08b5698ba6209c031867e4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
