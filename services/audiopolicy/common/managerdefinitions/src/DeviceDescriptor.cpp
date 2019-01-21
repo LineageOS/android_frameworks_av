@@ -18,6 +18,7 @@
 //#define LOG_NDEBUG 0
 
 #include <audio_utils/string.h>
+#include <set>
 #include "DeviceDescriptor.h"
 #include "TypeConverter.h"
 #include "AudioGain.h"
@@ -37,6 +38,7 @@ DeviceDescriptor::DeviceDescriptor(audio_devices_t type, const FormatVector &enc
                                              AUDIO_PORT_ROLE_SOURCE),
     mTagName(tagName), mDeviceType(type), mEncodedFormats(encodedFormats)
 {
+    mCurrentEncodedFormat = AUDIO_FORMAT_DEFAULT;
     if (type == AUDIO_DEVICE_IN_REMOTE_SUBMIX || type == AUDIO_DEVICE_OUT_REMOTE_SUBMIX ) {
         mAddress = String8("0");
     }
@@ -44,6 +46,12 @@ DeviceDescriptor::DeviceDescriptor(audio_devices_t type, const FormatVector &enc
     if (type == AUDIO_DEVICE_OUT_HDMI) {
         mEncodedFormats.add(AUDIO_FORMAT_AC3);
         mEncodedFormats.add(AUDIO_FORMAT_IEC61937);
+    }
+    // For backward compatibility always indicate support for SBC and AAC if no
+    // supported format is listed in the configuration file
+    if ((type & AUDIO_DEVICE_OUT_ALL_A2DP) != 0 && mEncodedFormats.isEmpty()) {
+        mEncodedFormats.add(AUDIO_FORMAT_SBC);
+        mEncodedFormats.add(AUDIO_FORMAT_AAC);
     }
 }
 
@@ -58,10 +66,17 @@ void DeviceDescriptor::attach(const sp<HwModule>& module)
     mId = getNextUniqueId();
 }
 
-void DeviceDescriptor::detach()
-{
+void DeviceDescriptor::detach() {
     mId = AUDIO_PORT_HANDLE_NONE;
     AudioPort::detach();
+}
+
+template<typename T>
+bool checkEqual(const T& f1, const T& f2)
+{
+    std::set<typename T::value_type> s1(f1.begin(), f1.end());
+    std::set<typename T::value_type> s2(f2.begin(), f2.end());
+    return s1 == s2;
 }
 
 bool DeviceDescriptor::equals(const sp<DeviceDescriptor>& other) const
@@ -69,10 +84,31 @@ bool DeviceDescriptor::equals(const sp<DeviceDescriptor>& other) const
     // Devices are considered equal if they:
     // - are of the same type (a device type cannot be AUDIO_DEVICE_NONE)
     // - have the same address
+    // - have the same encodingFormats (if device supports encoding)
     if (other == 0) {
         return false;
     }
-    return (mDeviceType == other->mDeviceType) && (mAddress == other->mAddress);
+
+    return (mDeviceType == other->mDeviceType) && (mAddress == other->mAddress) &&
+           checkEqual(mEncodedFormats, other->mEncodedFormats);
+}
+
+bool DeviceDescriptor::hasCurrentEncodedFormat() const
+{
+    if (!device_has_encoding_capability(type())) {
+        return true;
+    }
+    return (mCurrentEncodedFormat != AUDIO_FORMAT_DEFAULT);
+}
+
+bool DeviceDescriptor::supportsFormat(audio_format_t format)
+{
+    for (const auto& devFormat : mEncodedFormats) {
+        if (devFormat == format) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void DeviceVector::refreshTypes()
@@ -167,12 +203,17 @@ audio_devices_t DeviceVector::getDeviceTypesFromHwModule(audio_module_handle_t m
     return deviceTypes;
 }
 
-sp<DeviceDescriptor> DeviceVector::getDevice(audio_devices_t type, const String8& address) const
+sp<DeviceDescriptor> DeviceVector::getDevice(audio_devices_t type, const String8& address,
+                                             audio_format_t format) const
 {
     sp<DeviceDescriptor> device;
     for (size_t i = 0; i < size(); i++) {
         if (itemAt(i)->type() == type) {
-            if (address == "" || itemAt(i)->address() == address) {
+            // Assign device if address is empty or matches and
+            // format is default or matches
+            if (((address == "" || itemAt(i)->address() == address) &&
+                 format == AUDIO_FORMAT_DEFAULT) ||
+                itemAt(i)->supportsFormat(format)) {
                 device = itemAt(i);
                 if (itemAt(i)->address() == address) {
                     break;
@@ -180,8 +221,8 @@ sp<DeviceDescriptor> DeviceVector::getDevice(audio_devices_t type, const String8
             }
         }
     }
-    ALOGV("DeviceVector::%s() for type %08x address \"%s\" found %p",
-            __func__, type, address.string(), device.get());
+    ALOGV("DeviceVector::%s() for type %08x address \"%s\" found %p format %08x",
+            __func__, type, address.string(), device.get(), format);
     return device;
 }
 

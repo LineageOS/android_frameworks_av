@@ -154,6 +154,7 @@ public:
     void setDevices(const DeviceVector &devices) { mDevices = devices; }
     bool sharesHwModuleWith(const sp<SwAudioOutputDescriptor>& outputDesc);
     virtual DeviceVector supportedDevices() const;
+    virtual bool deviceSupportsEncodedFormats(audio_devices_t device);
     virtual uint32_t latency();
     virtual bool isDuplicated() const { return (mOutput1 != NULL && mOutput2 != NULL); }
     virtual bool isFixedVolume(audio_devices_t device);

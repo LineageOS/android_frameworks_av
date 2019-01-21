@@ -44,7 +44,17 @@ public:
 
     const FormatVector& encodedFormats() const { return mEncodedFormats; }
 
+    audio_format_t getEncodedFormat() { return mCurrentEncodedFormat; }
+
+    void setEncodedFormat(audio_format_t format) {
+        mCurrentEncodedFormat = format;
+    }
+
     bool equals(const sp<DeviceDescriptor>& other) const;
+
+    bool hasCurrentEncodedFormat() const;
+
+    bool supportsFormat(audio_format_t format);
 
     // AudioPortConfig
     virtual sp<AudioPort> getAudioPort() const { return (AudioPort*) this; }
@@ -69,6 +79,7 @@ private:
     audio_devices_t     mDeviceType;
     FormatVector        mEncodedFormats;
     audio_port_handle_t mId = AUDIO_PORT_HANDLE_NONE;
+    audio_format_t      mCurrentEncodedFormat;
 };
 
 class DeviceVector : public SortedVector<sp<DeviceDescriptor> >
@@ -88,9 +99,10 @@ public:
 
     audio_devices_t types() const { return mDeviceTypes; }
 
-    // If 'address' is empty, a device with a non-empty address may be returned
-    // if there is no device with the specified 'type' and empty address.
-    sp<DeviceDescriptor> getDevice(audio_devices_t type, const String8 &address = {}) const;
+    // If 'address' is empty and 'codec' is AUDIO_FORMAT_DEFAULT, a device with a non-empty
+    // address may be returned if there is no device with the specified 'type' and empty address.
+    sp<DeviceDescriptor> getDevice(audio_devices_t type, const String8 &address,
+                                   audio_format_t codec) const;
     DeviceVector getDevicesFromTypeMask(audio_devices_t types) const;
 
     /**

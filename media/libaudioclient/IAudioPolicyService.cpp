@@ -108,7 +108,8 @@ public:
                                     audio_devices_t device,
                                     audio_policy_dev_state_t state,
                                     const char *device_address,
-                                    const char *device_name)
+                                    const char *device_name,
+                                    audio_format_t encodedFormat)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
@@ -116,6 +117,7 @@ public:
         data.writeInt32(static_cast <uint32_t>(state));
         data.writeCString(device_address);
         data.writeCString(device_name);
+        data.writeInt32(static_cast <uint32_t>(encodedFormat));
         remote()->transact(SET_DEVICE_CONNECTION_STATE, data, &reply);
         return static_cast <status_t> (reply.readInt32());
     }
@@ -134,13 +136,15 @@ public:
 
     virtual status_t handleDeviceConfigChange(audio_devices_t device,
                                               const char *device_address,
-                                              const char *device_name)
+                                              const char *device_name,
+                                              audio_format_t encodedFormat)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
         data.writeInt32(static_cast <uint32_t>(device));
         data.writeCString(device_address);
         data.writeCString(device_name);
+        data.writeInt32(static_cast <uint32_t>(encodedFormat));
         remote()->transact(HANDLE_DEVICE_CONFIG_CHANGE, data, &reply);
         return static_cast <status_t> (reply.readInt32());
     }
@@ -1121,6 +1125,7 @@ status_t BnAudioPolicyService::onTransact(
                     static_cast <audio_policy_dev_state_t>(data.readInt32());
             const char *device_address = data.readCString();
             const char *device_name = data.readCString();
+            audio_format_t codecFormat = static_cast <audio_format_t>(data.readInt32());
             if (device_address == nullptr || device_name == nullptr) {
                 ALOGE("Bad Binder transaction: SET_DEVICE_CONNECTION_STATE for device %u", device);
                 reply->writeInt32(static_cast<int32_t> (BAD_VALUE));
@@ -1128,7 +1133,8 @@ status_t BnAudioPolicyService::onTransact(
                 reply->writeInt32(static_cast<uint32_t> (setDeviceConnectionState(device,
                                                                                   state,
                                                                                   device_address,
-                                                                                  device_name)));
+                                                                                  device_name,
+                                                                                  codecFormat)));
             }
             return NO_ERROR;
         } break;
@@ -1154,13 +1160,16 @@ status_t BnAudioPolicyService::onTransact(
                     static_cast <audio_devices_t>(data.readInt32());
             const char *device_address = data.readCString();
             const char *device_name = data.readCString();
+            audio_format_t codecFormat =
+                    static_cast <audio_format_t>(data.readInt32());
             if (device_address == nullptr || device_name == nullptr) {
                 ALOGE("Bad Binder transaction: HANDLE_DEVICE_CONFIG_CHANGE for device %u", device);
                 reply->writeInt32(static_cast<int32_t> (BAD_VALUE));
             } else {
                 reply->writeInt32(static_cast<uint32_t> (handleDeviceConfigChange(device,
                                                                                   device_address,
-                                                                                  device_name)));
+                                                                                  device_name,
+                                                                                  codecFormat)));
             }
             return NO_ERROR;
         } break;

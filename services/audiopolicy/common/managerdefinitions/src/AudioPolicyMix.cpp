@@ -296,7 +296,8 @@ sp<DeviceDescriptor> AudioPolicyMixCollection::getDeviceAndMixForInputSource(
                 // assuming PolicyMix only for remote submix for input
                 // so mix->mDeviceType can only be AUDIO_DEVICE_OUT_REMOTE_SUBMIX
                 audio_devices_t device = AUDIO_DEVICE_IN_REMOTE_SUBMIX;
-                auto mixDevice = availDevices.getDevice(device, mix->mDeviceAddress);
+                auto mixDevice =
+                        availDevices.getDevice(device, mix->mDeviceAddress, AUDIO_FORMAT_DEFAULT);
                 if (mixDevice != nullptr) {
                     if (policyMix != NULL) {
                         *policyMix = mix;
