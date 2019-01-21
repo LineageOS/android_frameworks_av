@@ -241,6 +241,9 @@ public:
                                             bool reported);
         virtual status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled);
 
+        virtual status_t getHwOffloadEncodingFormatsSupportedForA2DP(
+                    std::vector<audio_format_t> *formats);
+
         // return the strategy corresponding to a given stream type
         routing_strategy getStrategy(audio_stream_type_t stream) const;
 

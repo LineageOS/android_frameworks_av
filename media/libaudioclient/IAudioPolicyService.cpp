@@ -92,6 +92,7 @@ enum {
     IS_HAPTIC_PLAYBACK_SUPPORTED,
     SET_UID_DEVICE_AFFINITY,
     REMOVE_UID_DEVICE_AFFINITY,
+    GET_OFFLOAD_FORMATS_A2DP
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -888,7 +889,30 @@ public:
         return reply.readInt32();
     }
 
-    virtual status_t addStreamDefaultEffect(const effect_uuid_t *type,
+    virtual status_t getHwOffloadEncodingFormatsSupportedForA2DP(
+                std::vector<audio_format_t> *formats)
+    {
+        if (formats == NULL) {
+            return BAD_VALUE;
+        }
+
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        status_t status = remote()->transact(GET_OFFLOAD_FORMATS_A2DP, data, &reply);
+        if (status != NO_ERROR || (status = (status_t)reply.readInt32()) != NO_ERROR) {
+            return status;
+        }
+
+        size_t list_size = reply.readUint32();
+
+        for (size_t i = 0; i < list_size; i++) {
+            formats->push_back(static_cast<audio_format_t>(reply.readInt32()));
+        }
+        return NO_ERROR;
+    }
+
+
+     virtual status_t addStreamDefaultEffect(const effect_uuid_t *type,
                                             const String16& opPackageName,
                                             const effect_uuid_t *uuid,
                                             int32_t priority,
@@ -1100,7 +1124,8 @@ status_t BnAudioPolicyService::onTransact(
         case SET_ASSISTANT_UID:
         case SET_A11Y_SERVICES_UIDS:
         case SET_UID_DEVICE_AFFINITY:
-        case REMOVE_UID_DEVICE_AFFINITY: {
+        case REMOVE_UID_DEVICE_AFFINITY:
+        case GET_OFFLOAD_FORMATS_A2DP: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
@@ -1753,6 +1778,21 @@ status_t BnAudioPolicyService::onTransact(
             reply->writeInt32(status);
             return NO_ERROR;
         }
+
+        case GET_OFFLOAD_FORMATS_A2DP: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            std::vector<audio_format_t> encodingFormats;
+            status_t status = getHwOffloadEncodingFormatsSupportedForA2DP(&encodingFormats);
+            reply->writeInt32(status);
+            if (status != NO_ERROR) {
+                return NO_ERROR;
+            }
+            reply->writeUint32(static_cast<uint32_t>(encodingFormats.size()));
+            for (size_t i = 0; i < encodingFormats.size(); i++)
+                reply->writeInt32(static_cast<int32_t>(encodingFormats[i]));
+            return NO_ERROR;
+        }
+
 
         case ADD_STREAM_DEFAULT_EFFECT: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
