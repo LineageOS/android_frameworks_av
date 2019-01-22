@@ -75,14 +75,16 @@ public:
     virtual status_t setDeviceConnectionState(audio_devices_t device,
                                               audio_policy_dev_state_t state,
                                               const char *device_address,
-                                              const char *device_name) = 0;
+                                              const char *device_name,
+                                              audio_format_t encodedFormat) = 0;
     // retrieve a device connection status
     virtual audio_policy_dev_state_t getDeviceConnectionState(audio_devices_t device,
                                                                           const char *device_address) = 0;
     // indicate a change in device configuration
     virtual status_t handleDeviceConfigChange(audio_devices_t device,
                                               const char *device_address,
-                                              const char *device_name) = 0;
+                                              const char *device_name,
+                                              audio_format_t encodedFormat) = 0;
     // indicate a change in phone state. Valid phones states are defined by audio_mode_t
     virtual void setPhoneState(audio_mode_t state) = 0;
     // force using a specific device category for the specified usage
@@ -233,6 +235,9 @@ public:
     virtual status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled) = 0;
 
     virtual bool     isHapticPlaybackSupported() = 0;
+
+    virtual status_t getHwOffloadEncodingFormatsSupportedForA2DP(
+                std::vector<audio_format_t> *formats) = 0;
 
     virtual void     setAppState(uid_t uid, app_state_t state);
 };

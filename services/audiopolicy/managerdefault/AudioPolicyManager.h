@@ -97,12 +97,14 @@ public:
         virtual status_t setDeviceConnectionState(audio_devices_t device,
                                                           audio_policy_dev_state_t state,
                                                           const char *device_address,
-                                                          const char *device_name);
+                                                          const char *device_name,
+                                                          audio_format_t encodedFormat);
         virtual audio_policy_dev_state_t getDeviceConnectionState(audio_devices_t device,
                                                                               const char *device_address);
         virtual status_t handleDeviceConfigChange(audio_devices_t device,
                                                   const char *device_address,
-                                                  const char *device_name);
+                                                  const char *device_name,
+                                                  audio_format_t encodedFormat);
         virtual void setPhoneState(audio_mode_t state);
         virtual void setForceUse(audio_policy_force_use_t usage,
                                  audio_policy_forced_cfg_t config);
@@ -238,6 +240,9 @@ public:
                                             bool *surroundFormatsEnabled,
                                             bool reported);
         virtual status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled);
+
+        virtual status_t getHwOffloadEncodingFormatsSupportedForA2DP(
+                    std::vector<audio_format_t> *formats);
 
         // return the strategy corresponding to a given stream type
         routing_strategy getStrategy(audio_stream_type_t stream) const;
@@ -731,7 +736,8 @@ private:
         status_t setDeviceConnectionStateInt(audio_devices_t deviceType,
                                              audio_policy_dev_state_t state,
                                              const char *device_address,
-                                             const char *device_name);
+                                             const char *device_name,
+                                             audio_format_t encodedFormat);
         void updateMono(audio_io_handle_t output) {
             AudioParameter param;
             param.addInt(String8(AudioParameter::keyMonoOutput), (int)mMasterMono);

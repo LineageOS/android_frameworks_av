@@ -784,7 +784,8 @@ const sp<IAudioPolicyService> AudioSystem::get_audio_policy_service()
 status_t AudioSystem::setDeviceConnectionState(audio_devices_t device,
                                                audio_policy_dev_state_t state,
                                                const char *device_address,
-                                               const char *device_name)
+                                               const char *device_name,
+                                               audio_format_t encodedFormat)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     const char *address = "";
@@ -798,7 +799,7 @@ status_t AudioSystem::setDeviceConnectionState(audio_devices_t device,
     if (device_name != NULL) {
         name = device_name;
     }
-    return aps->setDeviceConnectionState(device, state, address, name);
+    return aps->setDeviceConnectionState(device, state, address, name, encodedFormat);
 }
 
 audio_policy_dev_state_t AudioSystem::getDeviceConnectionState(audio_devices_t device,
@@ -812,7 +813,8 @@ audio_policy_dev_state_t AudioSystem::getDeviceConnectionState(audio_devices_t d
 
 status_t AudioSystem::handleDeviceConfigChange(audio_devices_t device,
                                                const char *device_address,
-                                               const char *device_name)
+                                               const char *device_name,
+                                               audio_format_t encodedFormat)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     const char *address = "";
@@ -826,7 +828,7 @@ status_t AudioSystem::handleDeviceConfigChange(audio_devices_t device,
     if (device_name != NULL) {
         name = device_name;
     }
-    return aps->handleDeviceConfigChange(device, address, name);
+    return aps->handleDeviceConfigChange(device, address, name, encodedFormat);
 }
 
 status_t AudioSystem::setPhoneState(audio_mode_t state)
@@ -1335,6 +1337,13 @@ bool AudioSystem::isHapticPlaybackSupported()
     return aps->isHapticPlaybackSupported();
 }
 
+status_t AudioSystem::getHwOffloadEncodingFormatsSupportedForA2DP(
+                                std::vector<audio_format_t> *formats)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->getHwOffloadEncodingFormatsSupportedForA2DP(formats);
+}
 
 // ---------------------------------------------------------------------------
 

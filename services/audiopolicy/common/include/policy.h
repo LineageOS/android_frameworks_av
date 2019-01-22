@@ -76,6 +76,21 @@ static inline bool device_distinguishes_on_address(audio_devices_t device)
 }
 
 /**
+ * Check whether audio device has encoding capability.
+ *
+ * @param[in] device to consider
+ *
+ * @return true if device has encoding capability, false otherwise..
+ */
+static inline bool device_has_encoding_capability(audio_devices_t device)
+{
+    if (device & AUDIO_DEVICE_OUT_ALL_A2DP) {
+        return true;
+    }
+    return false;
+}
+
+/**
  * Returns the priority of a given audio source for capture. The priority is used when more than one
  * capture session is active on a given input stream to determine which session drives routing and
  * effect configuration.

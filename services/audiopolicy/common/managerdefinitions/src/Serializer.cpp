@@ -140,6 +140,8 @@ struct DevicePortTraits : public AndroidCollectionTraits<DeviceDescriptor, Devic
         static constexpr const char *roleSource = "source"; /**< <attribute role source value>. */
         /** optional: device address, char string less than 64. */
         static constexpr const char *address = "address";
+        /** optional: the list of encoded audio formats that are known to be supported. */
+        static constexpr const char *encodedFormats = "encodedFormats";
     };
 
     static Return<Element> deserialize(const xmlNode *cur, PtrSerializingCtx serializingContext);
@@ -511,7 +513,13 @@ Return<DevicePortTraits::Element> DevicePortTraits::deserialize(const xmlNode *c
         ALOGW("%s: bad type %08x", __func__, type);
         return Status::fromStatusT(BAD_VALUE);
     }
-    Element deviceDesc = new DeviceDescriptor(type, String8(name.c_str()));
+    std::string encodedFormatsLiteral = getXmlAttribute(cur, Attributes::encodedFormats);
+    ALOGV("%s: %s %s=%s", __func__, tag, Attributes::encodedFormats, encodedFormatsLiteral.c_str());
+    FormatVector encodedFormats;
+    if (!encodedFormatsLiteral.empty()) {
+        encodedFormats = formatsFromString(encodedFormatsLiteral, " ");
+    }
+    Element deviceDesc = new DeviceDescriptor(type, encodedFormats, String8(name.c_str()));
 
     std::string address = getXmlAttribute(cur, Attributes::address);
     if (!address.empty()) {
