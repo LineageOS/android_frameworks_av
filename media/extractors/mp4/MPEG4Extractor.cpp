@@ -306,34 +306,34 @@ static const bool kUseHexDump = false;
 
 static const char *FourCC2MIME(uint32_t fourcc) {
     switch (fourcc) {
-        case FOURCC('m', 'p', '4', 'a'):
+        case FOURCC("mp4a"):
             return MEDIA_MIMETYPE_AUDIO_AAC;
 
-        case FOURCC('s', 'a', 'm', 'r'):
+        case FOURCC("samr"):
             return MEDIA_MIMETYPE_AUDIO_AMR_NB;
 
-        case FOURCC('s', 'a', 'w', 'b'):
+        case FOURCC("sawb"):
             return MEDIA_MIMETYPE_AUDIO_AMR_WB;
 
-        case FOURCC('m', 'p', '4', 'v'):
+        case FOURCC("mp4v"):
             return MEDIA_MIMETYPE_VIDEO_MPEG4;
 
-        case FOURCC('s', '2', '6', '3'):
-        case FOURCC('h', '2', '6', '3'):
-        case FOURCC('H', '2', '6', '3'):
+        case FOURCC("s263"):
+        case FOURCC("h263"):
+        case FOURCC("H263"):
             return MEDIA_MIMETYPE_VIDEO_H263;
 
-        case FOURCC('a', 'v', 'c', '1'):
+        case FOURCC("avc1"):
             return MEDIA_MIMETYPE_VIDEO_AVC;
 
-        case FOURCC('h', 'v', 'c', '1'):
-        case FOURCC('h', 'e', 'v', '1'):
+        case FOURCC("hvc1"):
+        case FOURCC("hev1"):
             return MEDIA_MIMETYPE_VIDEO_HEVC;
 
-        case FOURCC('t', 'w', 'o', 's'):
-        case FOURCC('s', 'o', 'w', 't'):
+        case FOURCC("twos"):
+        case FOURCC("sowt"):
             return MEDIA_MIMETYPE_AUDIO_RAW;
-        case FOURCC('a', 'l', 'a', 'c'):
+        case FOURCC("alac"):
             return MEDIA_MIMETYPE_AUDIO_ALAC;
 
         default:
@@ -731,21 +731,21 @@ private:
 
 static bool underMetaDataPath(const Vector<uint32_t> &path) {
     return path.size() >= 5
-        && path[0] == FOURCC('m', 'o', 'o', 'v')
-        && path[1] == FOURCC('u', 'd', 't', 'a')
-        && path[2] == FOURCC('m', 'e', 't', 'a')
-        && path[3] == FOURCC('i', 'l', 's', 't');
+        && path[0] == FOURCC("moov")
+        && path[1] == FOURCC("udta")
+        && path[2] == FOURCC("meta")
+        && path[3] == FOURCC("ilst");
 }
 
 static bool underQTMetaPath(const Vector<uint32_t> &path, int32_t depth) {
     return path.size() >= 2
-            && path[0] == FOURCC('m', 'o', 'o', 'v')
-            && path[1] == FOURCC('m', 'e', 't', 'a')
+            && path[0] == FOURCC("moov")
+            && path[1] == FOURCC("meta")
             && (depth == 2
             || (depth == 3
-                    && (path[2] == FOURCC('h', 'd', 'l', 'r')
-                    ||  path[2] == FOURCC('i', 'l', 's', 't')
-                    ||  path[2] == FOURCC('k', 'e', 'y', 's'))));
+                    && (path[2] == FOURCC("hdlr")
+                    ||  path[2] == FOURCC("ilst")
+                    ||  path[2] == FOURCC("keys"))));
 }
 
 // Given a time in seconds since Jan 1 1904, produce a human-readable string.
@@ -849,7 +849,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         ALOGE("b/23540914");
         return ERROR_MALFORMED;
     }
-    if (chunk_type != FOURCC('m', 'd', 'a', 't') && chunk_data_size > kMaxAtomSize) {
+    if (chunk_type != FOURCC("mdat") && chunk_data_size > kMaxAtomSize) {
         char errMsg[100];
         sprintf(errMsg, "%s atom has size %" PRId64, chunk, chunk_data_size);
         ALOGE("%s (b/28615448)", errMsg);
@@ -857,8 +857,8 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         return ERROR_MALFORMED;
     }
 
-    if (chunk_type != FOURCC('c', 'p', 'r', 't')
-            && chunk_type != FOURCC('c', 'o', 'v', 'r')
+    if (chunk_type != FOURCC("cprt")
+            && chunk_type != FOURCC("covr")
             && mPath.size() == 5 && underMetaDataPath(mPath)) {
         off64_t stop_offset = *offset + chunk_size;
         *offset = data_offset;
@@ -877,40 +877,40 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
     }
 
     switch(chunk_type) {
-        case FOURCC('m', 'o', 'o', 'v'):
-        case FOURCC('t', 'r', 'a', 'k'):
-        case FOURCC('m', 'd', 'i', 'a'):
-        case FOURCC('m', 'i', 'n', 'f'):
-        case FOURCC('d', 'i', 'n', 'f'):
-        case FOURCC('s', 't', 'b', 'l'):
-        case FOURCC('m', 'v', 'e', 'x'):
-        case FOURCC('m', 'o', 'o', 'f'):
-        case FOURCC('t', 'r', 'a', 'f'):
-        case FOURCC('m', 'f', 'r', 'a'):
-        case FOURCC('u', 'd', 't', 'a'):
-        case FOURCC('i', 'l', 's', 't'):
-        case FOURCC('s', 'i', 'n', 'f'):
-        case FOURCC('s', 'c', 'h', 'i'):
-        case FOURCC('e', 'd', 't', 's'):
-        case FOURCC('w', 'a', 'v', 'e'):
+        case FOURCC("moov"):
+        case FOURCC("trak"):
+        case FOURCC("mdia"):
+        case FOURCC("minf"):
+        case FOURCC("dinf"):
+        case FOURCC("stbl"):
+        case FOURCC("mvex"):
+        case FOURCC("moof"):
+        case FOURCC("traf"):
+        case FOURCC("mfra"):
+        case FOURCC("udta"):
+        case FOURCC("ilst"):
+        case FOURCC("sinf"):
+        case FOURCC("schi"):
+        case FOURCC("edts"):
+        case FOURCC("wave"):
         {
-            if (chunk_type == FOURCC('m', 'o', 'o', 'v') && depth != 0) {
+            if (chunk_type == FOURCC("moov") && depth != 0) {
                 ALOGE("moov: depth %d", depth);
                 return ERROR_MALFORMED;
             }
 
-            if (chunk_type == FOURCC('m', 'o', 'o', 'v') && mInitCheck == OK) {
+            if (chunk_type == FOURCC("moov") && mInitCheck == OK) {
                 ALOGE("duplicate moov");
                 return ERROR_MALFORMED;
             }
 
-            if (chunk_type == FOURCC('m', 'o', 'o', 'f') && !mMoofFound) {
+            if (chunk_type == FOURCC("moof") && !mMoofFound) {
                 // store the offset of the first segment
                 mMoofFound = true;
                 mMoofOffset = *offset;
             }
 
-            if (chunk_type == FOURCC('s', 't', 'b', 'l')) {
+            if (chunk_type == FOURCC("stbl")) {
                 ALOGV("sampleTable chunk is %" PRIu64 " bytes long.", chunk_size);
 
                 if (mDataSource->flags()
@@ -936,7 +936,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             }
 
             bool isTrack = false;
-            if (chunk_type == FOURCC('t', 'r', 'a', 'k')) {
+            if (chunk_type == FOURCC("trak")) {
                 if (depth != 1) {
                     ALOGE("trak: depth %d", depth);
                     return ERROR_MALFORMED;
@@ -1010,7 +1010,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
                     return OK;
                 }
-            } else if (chunk_type == FOURCC('m', 'o', 'o', 'v')) {
+            } else if (chunk_type == FOURCC("moov")) {
                 mInitCheck = OK;
 
                 return UNKNOWN_ERROR;  // Return a dummy error.
@@ -1018,7 +1018,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('s', 'c', 'h', 'm'):
+        case FOURCC("schm"):
         {
 
             *offset += chunk_size;
@@ -1033,23 +1033,23 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             scheme_type = ntohl(scheme_type);
             int32_t mode = kCryptoModeUnencrypted;
             switch(scheme_type) {
-                case FOURCC('c', 'b', 'c', '1'):
+                case FOURCC("cbc1"):
                 {
                     mode = kCryptoModeAesCbc;
                     break;
                 }
-                case FOURCC('c', 'b', 'c', 's'):
+                case FOURCC("cbcs"):
                 {
                     mode = kCryptoModeAesCbc;
                     mLastTrack->subsample_encryption = true;
                     break;
                 }
-                case FOURCC('c', 'e', 'n', 'c'):
+                case FOURCC("cenc"):
                 {
                     mode = kCryptoModeAesCtr;
                     break;
                 }
-                case FOURCC('c', 'e', 'n', 's'):
+                case FOURCC("cens"):
                 {
                     mode = kCryptoModeAesCtr;
                     mLastTrack->subsample_encryption = true;
@@ -1063,7 +1063,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         }
 
 
-        case FOURCC('e', 'l', 's', 't'):
+        case FOURCC("elst"):
         {
             *offset += chunk_size;
 
@@ -1118,7 +1118,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('f', 'r', 'm', 'a'):
+        case FOURCC("frma"):
         {
             *offset += chunk_size;
 
@@ -1144,7 +1144,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             // If format type is 'alac', it is necessary to get the parameters
             // from a alac atom spreading behind the frma atom.
             // See 'external/alac/ALACMagicCookieDescription.txt'.
-            if (original_fourcc == FOURCC('a', 'l', 'a', 'c')) {
+            if (original_fourcc == FOURCC("alac")) {
                 // Store ALAC magic cookie (decoder needs it).
                 uint8_t alacInfo[12];
                 data_offset = *offset;
@@ -1154,7 +1154,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 }
                 uint32_t size = U32_AT(&alacInfo[0]);
                 if ((size != ALAC_SPECIFIC_INFO_SIZE) ||
-                        (U32_AT(&alacInfo[4]) != FOURCC('a', 'l', 'a', 'c')) ||
+                        (U32_AT(&alacInfo[4]) != FOURCC("alac")) ||
                         (U32_AT(&alacInfo[8]) != 0)) {
                     return ERROR_MALFORMED;
                 }
@@ -1180,7 +1180,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('t', 'e', 'n', 'c'):
+        case FOURCC("tenc"):
         {
             *offset += chunk_size;
 
@@ -1286,7 +1286,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('t', 'k', 'h', 'd'):
+        case FOURCC("tkhd"):
         {
             *offset += chunk_size;
 
@@ -1298,7 +1298,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('t', 'r', 'e', 'f'):
+        case FOURCC("tref"):
         {
             off64_t stop_offset = *offset + chunk_size;
             *offset = data_offset;
@@ -1314,7 +1314,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('t', 'h', 'm', 'b'):
+        case FOURCC("thmb"):
         {
             *offset += chunk_size;
 
@@ -1331,7 +1331,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('p', 's', 's', 'h'):
+        case FOURCC("pssh"):
         {
             *offset += chunk_size;
 
@@ -1367,7 +1367,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('m', 'd', 'h', 'd'):
+        case FOURCC("mdhd"):
         {
             *offset += chunk_size;
 
@@ -1464,7 +1464,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('s', 't', 's', 'd'):
+        case FOURCC("stsd"):
         {
             uint8_t buffer[8];
             if (chunk_data_size < (off64_t)sizeof(buffer)) {
@@ -1516,7 +1516,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             }
             break;
         }
-        case FOURCC('m', 'e', 't', 't'):
+        case FOURCC("mett"):
         {
             *offset += chunk_size;
 
@@ -1539,16 +1539,16 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('m', 'p', '4', 'a'):
-        case FOURCC('e', 'n', 'c', 'a'):
-        case FOURCC('s', 'a', 'm', 'r'):
-        case FOURCC('s', 'a', 'w', 'b'):
-        case FOURCC('t', 'w', 'o', 's'):
-        case FOURCC('s', 'o', 'w', 't'):
-        case FOURCC('a', 'l', 'a', 'c'):
+        case FOURCC("mp4a"):
+        case FOURCC("enca"):
+        case FOURCC("samr"):
+        case FOURCC("sawb"):
+        case FOURCC("twos"):
+        case FOURCC("sowt"):
+        case FOURCC("alac"):
         {
-            if (mIsQT && chunk_type == FOURCC('m', 'p', '4', 'a')
-                    && depth >= 1 && mPath[depth - 1] == FOURCC('w', 'a', 'v', 'e')) {
+            if (mIsQT && chunk_type == FOURCC("mp4a")
+                    && depth >= 1 && mPath[depth - 1] == FOURCC("wave")) {
                 // Ignore mp4a embedded in QT wave atom
                 *offset += chunk_size;
                 break;
@@ -1578,7 +1578,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             off64_t stop_offset = *offset + chunk_size;
             *offset = data_offset + sizeof(buffer);
 
-            if (mIsQT && chunk_type == FOURCC('m', 'p', '4', 'a')) {
+            if (mIsQT && chunk_type == FOURCC("mp4a")) {
                 if (version == 1) {
                     if (mDataSource->readAt(*offset, buffer, 16) < 16) {
                         return ERROR_IO;
@@ -1611,14 +1611,14 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 }
             }
 
-            if (chunk_type != FOURCC('e', 'n', 'c', 'a')) {
+            if (chunk_type != FOURCC("enca")) {
                 // if the chunk type is enca, we'll get the type from the frma box later
                 mLastTrack->meta.setCString(kKeyMIMEType, FourCC2MIME(chunk_type));
                 AdjustChannelsAndRate(chunk_type, &num_channels, &sample_rate);
 
                 if (!strcasecmp(MEDIA_MIMETYPE_AUDIO_RAW, FourCC2MIME(chunk_type))) {
                     mLastTrack->meta.setInt32(kKeyBitsPerSample, sample_size);
-                    if (chunk_type == FOURCC('t', 'w', 'o', 's')) {
+                    if (chunk_type == FOURCC("twos")) {
                         mLastTrack->meta.setInt32(kKeyPcmBigEndian, 1);
                     }
                 }
@@ -1628,7 +1628,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             mLastTrack->meta.setInt32(kKeyChannelCount, num_channels);
             mLastTrack->meta.setInt32(kKeySampleRate, sample_rate);
 
-            if (chunk_type == FOURCC('a', 'l', 'a', 'c')) {
+            if (chunk_type == FOURCC("alac")) {
 
                 // See 'external/alac/ALACMagicCookieDescription.txt for the detail'.
                 // Store ALAC magic cookie (decoder needs it).
@@ -1640,7 +1640,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 }
                 uint32_t size = U32_AT(&alacInfo[0]);
                 if ((size != ALAC_SPECIFIC_INFO_SIZE) ||
-                        (U32_AT(&alacInfo[4]) != FOURCC('a', 'l', 'a', 'c')) ||
+                        (U32_AT(&alacInfo[4]) != FOURCC("alac")) ||
                         (U32_AT(&alacInfo[8]) != 0)) {
                     return ERROR_MALFORMED;
                 }
@@ -1675,14 +1675,14 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('m', 'p', '4', 'v'):
-        case FOURCC('e', 'n', 'c', 'v'):
-        case FOURCC('s', '2', '6', '3'):
-        case FOURCC('H', '2', '6', '3'):
-        case FOURCC('h', '2', '6', '3'):
-        case FOURCC('a', 'v', 'c', '1'):
-        case FOURCC('h', 'v', 'c', '1'):
-        case FOURCC('h', 'e', 'v', '1'):
+        case FOURCC("mp4v"):
+        case FOURCC("encv"):
+        case FOURCC("s263"):
+        case FOURCC("H263"):
+        case FOURCC("h263"):
+        case FOURCC("avc1"):
+        case FOURCC("hvc1"):
+        case FOURCC("hev1"):
         {
             uint8_t buffer[78];
             if (chunk_data_size < (ssize_t)sizeof(buffer)) {
@@ -1712,7 +1712,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             if (mLastTrack == NULL)
                 return ERROR_MALFORMED;
 
-            if (chunk_type != FOURCC('e', 'n', 'c', 'v')) {
+            if (chunk_type != FOURCC("encv")) {
                 // if the chunk type is encv, we'll get the type from the frma box later
                 mLastTrack->meta.setCString(kKeyMIMEType, FourCC2MIME(chunk_type));
             }
@@ -1734,8 +1734,8 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('s', 't', 'c', 'o'):
-        case FOURCC('c', 'o', '6', '4'):
+        case FOURCC("stco"):
+        case FOURCC("co64"):
         {
             if ((mLastTrack == NULL) || (mLastTrack->sampleTable == NULL)) {
                 return ERROR_MALFORMED;
@@ -1754,7 +1754,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('s', 't', 's', 'c'):
+        case FOURCC("stsc"):
         {
             if ((mLastTrack == NULL) || (mLastTrack->sampleTable == NULL))
                 return ERROR_MALFORMED;
@@ -1772,8 +1772,8 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('s', 't', 's', 'z'):
-        case FOURCC('s', 't', 'z', '2'):
+        case FOURCC("stsz"):
+        case FOURCC("stz2"):
         {
             if ((mLastTrack == NULL) || (mLastTrack->sampleTable == NULL)) {
                 return ERROR_MALFORMED;
@@ -1884,7 +1884,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('s', 't', 't', 's'):
+        case FOURCC("stts"):
         {
             if ((mLastTrack == NULL) || (mLastTrack->sampleTable == NULL))
                 return ERROR_MALFORMED;
@@ -1902,7 +1902,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('c', 't', 't', 's'):
+        case FOURCC("ctts"):
         {
             if ((mLastTrack == NULL) || (mLastTrack->sampleTable == NULL))
                 return ERROR_MALFORMED;
@@ -1920,7 +1920,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('s', 't', 's', 's'):
+        case FOURCC("stss"):
         {
             if ((mLastTrack == NULL) || (mLastTrack->sampleTable == NULL))
                 return ERROR_MALFORMED;
@@ -1939,7 +1939,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         }
 
         // \xA9xyz
-        case FOURCC(0xA9, 'x', 'y', 'z'):
+        case FOURCC("\251xyz"):
         {
             *offset += chunk_size;
 
@@ -1989,7 +1989,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('e', 's', 'd', 's'):
+        case FOURCC("esds"):
         {
             *offset += chunk_size;
 
@@ -2019,7 +2019,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     kKeyESDS, kTypeESDS, &buffer[4], chunk_data_size - 4);
 
             if (mPath.size() >= 2
-                    && mPath[mPath.size() - 2] == FOURCC('m', 'p', '4', 'a')) {
+                    && mPath[mPath.size() - 2] == FOURCC("mp4a")) {
                 // Information from the ESDS must be relied on for proper
                 // setup of sample rate and channel count for MPEG4 Audio.
                 // The generic header appears to only contain generic
@@ -2033,7 +2033,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 }
             }
             if (mPath.size() >= 2
-                    && mPath[mPath.size() - 2] == FOURCC('m', 'p', '4', 'v')) {
+                    && mPath[mPath.size() - 2] == FOURCC("mp4v")) {
                 // Check if the video is MPEG2
                 ESDS esds(&buffer[4], chunk_data_size - 4);
 
@@ -2047,7 +2047,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('b', 't', 'r', 't'):
+        case FOURCC("btrt"):
         {
             *offset += chunk_size;
             if (mLastTrack == NULL) {
@@ -2075,7 +2075,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('a', 'v', 'c', 'C'):
+        case FOURCC("avcC"):
         {
             *offset += chunk_size;
 
@@ -2099,7 +2099,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
             break;
         }
-        case FOURCC('h', 'v', 'c', 'C'):
+        case FOURCC("hvcC"):
         {
             auto buffer = heapbuffer<uint8_t>(chunk_data_size);
 
@@ -2123,7 +2123,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('d', '2', '6', '3'):
+        case FOURCC("d263"):
         {
             *offset += chunk_size;
             /*
@@ -2157,7 +2157,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('m', 'e', 't', 'a'):
+        case FOURCC("meta"):
         {
             off64_t stop_offset = *offset + chunk_size;
             *offset = data_offset;
@@ -2201,13 +2201,13 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('i', 'l', 'o', 'c'):
-        case FOURCC('i', 'i', 'n', 'f'):
-        case FOURCC('i', 'p', 'r', 'p'):
-        case FOURCC('p', 'i', 't', 'm'):
-        case FOURCC('i', 'd', 'a', 't'):
-        case FOURCC('i', 'r', 'e', 'f'):
-        case FOURCC('i', 'p', 'r', 'o'):
+        case FOURCC("iloc"):
+        case FOURCC("iinf"):
+        case FOURCC("iprp"):
+        case FOURCC("pitm"):
+        case FOURCC("idat"):
+        case FOURCC("iref"):
+        case FOURCC("ipro"):
         {
             if (mIsHeif) {
                 if (mItemTable == NULL) {
@@ -2223,9 +2223,9 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('m', 'e', 'a', 'n'):
-        case FOURCC('n', 'a', 'm', 'e'):
-        case FOURCC('d', 'a', 't', 'a'):
+        case FOURCC("mean"):
+        case FOURCC("name"):
+        case FOURCC("data"):
         {
             *offset += chunk_size;
 
@@ -2240,7 +2240,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('m', 'v', 'h', 'd'):
+        case FOURCC("mvhd"):
         {
             *offset += chunk_size;
 
@@ -2292,7 +2292,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('m', 'e', 'h', 'd'):
+        case FOURCC("mehd"):
         {
             *offset += chunk_size;
 
@@ -2336,7 +2336,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('m', 'd', 'a', 't'):
+        case FOURCC("mdat"):
         {
             mMdatFound = true;
 
@@ -2344,7 +2344,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('h', 'd', 'l', 'r'):
+        case FOURCC("hdlr"):
         {
             *offset += chunk_size;
 
@@ -2362,7 +2362,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             // For the 3GPP file format, the handler-type within the 'hdlr' box
             // shall be 'text'. We also want to support 'sbtl' handler type
             // for a practical reason as various MPEG4 containers use it.
-            if (type == FOURCC('t', 'e', 'x', 't') || type == FOURCC('s', 'b', 't', 'l')) {
+            if (type == FOURCC("text") || type == FOURCC("sbtl")) {
                 if (mLastTrack != NULL) {
                     mLastTrack->meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_TEXT_3GPP);
                 }
@@ -2371,7 +2371,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('k', 'e', 'y', 's'):
+        case FOURCC("keys"):
         {
             *offset += chunk_size;
 
@@ -2384,7 +2384,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('t', 'r', 'e', 'x'):
+        case FOURCC("trex"):
         {
             *offset += chunk_size;
 
@@ -2403,7 +2403,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('t', 'x', '3', 'g'):
+        case FOURCC("tx3g"):
         {
             if (mLastTrack == NULL)
                 return ERROR_MALFORMED;
@@ -2448,7 +2448,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('c', 'o', 'v', 'r'):
+        case FOURCC("covr"):
         {
             *offset += chunk_size;
 
@@ -2479,12 +2479,12 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('c', 'o', 'l', 'r'):
+        case FOURCC("colr"):
         {
             *offset += chunk_size;
             // this must be in a VisualSampleEntry box under the Sample Description Box ('stsd')
             // ignore otherwise
-            if (depth >= 2 && mPath[depth - 2] == FOURCC('s', 't', 's', 'd')) {
+            if (depth >= 2 && mPath[depth - 2] == FOURCC("stsd")) {
                 status_t err = parseColorInfo(data_offset, chunk_data_size);
                 if (err != OK) {
                     return err;
@@ -2494,12 +2494,12 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('t', 'i', 't', 'l'):
-        case FOURCC('p', 'e', 'r', 'f'):
-        case FOURCC('a', 'u', 't', 'h'):
-        case FOURCC('g', 'n', 'r', 'e'):
-        case FOURCC('a', 'l', 'b', 'm'):
-        case FOURCC('y', 'r', 'r', 'c'):
+        case FOURCC("titl"):
+        case FOURCC("perf"):
+        case FOURCC("auth"):
+        case FOURCC("gnre"):
+        case FOURCC("albm"):
+        case FOURCC("yrrc"):
         {
             *offset += chunk_size;
 
@@ -2512,7 +2512,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('I', 'D', '3', '2'):
+        case FOURCC("ID32"):
         {
             *offset += chunk_size;
 
@@ -2525,7 +2525,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('-', '-', '-', '-'):
+        case FOURCC("----"):
         {
             mLastCommentMean.clear();
             mLastCommentName.clear();
@@ -2534,7 +2534,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
-        case FOURCC('s', 'i', 'd', 'x'):
+        case FOURCC("sidx"):
         {
             status_t err = parseSegmentIndex(data_offset, chunk_data_size);
             if (err != OK) {
@@ -2544,13 +2544,13 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             return UNKNOWN_ERROR; // stop parsing after sidx
         }
 
-        case FOURCC('a', 'c', '-', '3'):
+        case FOURCC("ac-3"):
         {
             *offset += chunk_size;
             return parseAC3SampleEntry(data_offset);
         }
 
-        case FOURCC('f', 't', 'y', 'p'):
+        case FOURCC("ftyp"):
         {
             if (chunk_data_size < 8 || depth != 0) {
                 return ERROR_MALFORMED;
@@ -2575,16 +2575,16 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 brandSet.insert(brand);
             }
 
-            if (brandSet.count(FOURCC('q', 't', ' ', ' ')) > 0) {
+            if (brandSet.count(FOURCC("qt  ")) > 0) {
                 mIsQT = true;
             } else {
-                if (brandSet.count(FOURCC('m', 'i', 'f', '1')) > 0
-                 && brandSet.count(FOURCC('h', 'e', 'i', 'c')) > 0) {
+                if (brandSet.count(FOURCC("mif1")) > 0
+                 && brandSet.count(FOURCC("heic")) > 0) {
                     ALOGV("identified HEIF image");
 
                     mIsHeif = true;
-                    brandSet.erase(FOURCC('m', 'i', 'f', '1'));
-                    brandSet.erase(FOURCC('h', 'e', 'i', 'c'));
+                    brandSet.erase(FOURCC("mif1"));
+                    brandSet.erase(FOURCC("heic"));
                 }
 
                 if (!brandSet.empty()) {
@@ -2663,7 +2663,7 @@ status_t MPEG4Extractor::parseAC3SpecificBox(
 
     offset += 4;
     uint32_t type;
-    if (!mDataSource->getUInt32(offset, &type) || type != FOURCC('d', 'a', 'c', '3')) {
+    if (!mDataSource->getUInt32(offset, &type) || type != FOURCC("dac3")) {
         ALOGE("MPEG4Extractor: error while reading ac-3 specific block: header not dac3");
         return ERROR_MALFORMED;
     }
@@ -2867,7 +2867,7 @@ status_t MPEG4Extractor::parseQTMetaKey(off64_t offset, size_t size) {
 
         uint32_t type;
         if (!mDataSource->getUInt32(keyOffset + 4, &type)
-                || type != FOURCC('m', 'd', 't', 'a')) {
+                || type != FOURCC("mdta")) {
             return ERROR_MALFORMED;
         }
 
@@ -2909,7 +2909,7 @@ status_t MPEG4Extractor::parseQTMetaVal(
     }
     uint32_t atomFourCC;
     if (!mDataSource->getUInt32(offset + 4, &atomFourCC)
-            || atomFourCC != FOURCC('d', 'a', 't', 'a')) {
+            || atomFourCC != FOURCC("data")) {
         return ERROR_MALFORMED;
     }
     uint32_t dataType;
@@ -3069,52 +3069,48 @@ status_t MPEG4Extractor::parseITunesMetaData(off64_t offset, size_t size) {
     MakeFourCCString(mPath[4], chunk);
     ALOGV("meta: %s @ %lld", chunk, (long long)offset);
     switch ((int32_t)mPath[4]) {
-        case FOURCC(0xa9, 'a', 'l', 'b'):
+        case FOURCC("\251alb"):
         {
             metadataKey = kKeyAlbum;
             break;
         }
-        case FOURCC(0xa9, 'A', 'R', 'T'):
+        case FOURCC("\251ART"):
         {
             metadataKey = kKeyArtist;
             break;
         }
-        case FOURCC('a', 'A', 'R', 'T'):
+        case FOURCC("aART"):
         {
             metadataKey = kKeyAlbumArtist;
             break;
         }
-        case FOURCC(0xa9, 'd', 'a', 'y'):
+        case FOURCC("\251day"):
         {
             metadataKey = kKeyYear;
             break;
         }
-        case FOURCC(0xa9, 'n', 'a', 'm'):
+        case FOURCC("\251nam"):
         {
             metadataKey = kKeyTitle;
             break;
         }
-        case FOURCC(0xa9, 'w', 'r', 't'):
+        case FOURCC("\251wrt"):
         {
             metadataKey = kKeyWriter;
             break;
         }
-        case FOURCC('c', 'o', 'v', 'r'):
+        case FOURCC("covr"):
         {
             metadataKey = kKeyAlbumArt;
             break;
         }
-        case FOURCC('g', 'n', 'r', 'e'):
+        case FOURCC("gnre"):
+        case FOURCC("\251gen"):
         {
             metadataKey = kKeyGenre;
             break;
         }
-        case FOURCC(0xa9, 'g', 'e', 'n'):
-        {
-            metadataKey = kKeyGenre;
-            break;
-        }
-        case FOURCC('c', 'p', 'i', 'l'):
+        case FOURCC("cpil"):
         {
             if (size == 9 && flags == 21) {
                 char tmp[16];
@@ -3125,7 +3121,7 @@ status_t MPEG4Extractor::parseITunesMetaData(off64_t offset, size_t size) {
             }
             break;
         }
-        case FOURCC('t', 'r', 'k', 'n'):
+        case FOURCC("trkn"):
         {
             if (size == 16 && flags == 0) {
                 char tmp[16];
@@ -3137,7 +3133,7 @@ status_t MPEG4Extractor::parseITunesMetaData(off64_t offset, size_t size) {
             }
             break;
         }
-        case FOURCC('d', 'i', 's', 'k'):
+        case FOURCC("disk"):
         {
             if ((size == 14 || size == 16) && flags == 0) {
                 char tmp[16];
@@ -3149,17 +3145,17 @@ status_t MPEG4Extractor::parseITunesMetaData(off64_t offset, size_t size) {
             }
             break;
         }
-        case FOURCC('-', '-', '-', '-'):
+        case FOURCC("----"):
         {
             buffer[size] = '\0';
             switch (mPath[5]) {
-                case FOURCC('m', 'e', 'a', 'n'):
+                case FOURCC("mean"):
                     mLastCommentMean.setTo((const char *)buffer + 4);
                     break;
-                case FOURCC('n', 'a', 'm', 'e'):
+                case FOURCC("name"):
                     mLastCommentName.setTo((const char *)buffer + 4);
                     break;
-                case FOURCC('d', 'a', 't', 'a'):
+                case FOURCC("data"):
                     if (size < 8) {
                         delete[] buffer;
                         buffer = NULL;
@@ -3263,12 +3259,12 @@ status_t MPEG4Extractor::parseColorInfo(off64_t offset, size_t size) {
     }
 
     int32_t type = U32_AT(&buffer[0]);
-    if ((type == FOURCC('n', 'c', 'l', 'x') && size >= 11)
-            || (type == FOURCC('n', 'c', 'l', 'c') && size >= 10)) {
+    if ((type == FOURCC("nclx") && size >= 11)
+            || (type == FOURCC("nclc") && size >= 10)) {
         int32_t primaries = U16_AT(&buffer[4]);
         int32_t transfer = U16_AT(&buffer[6]);
         int32_t coeffs = U16_AT(&buffer[8]);
-        bool fullRange = (type == FOURCC('n', 'c', 'l', 'x')) && (buffer[10] & 128);
+        bool fullRange = (type == FOURCC("nclx")) && (buffer[10] & 128);
 
         ColorAspects aspects;
         ColorUtils::convertIsoColorAspectsToCodecAspects(
@@ -3308,27 +3304,27 @@ status_t MPEG4Extractor::parse3GPPMetaData(off64_t offset, size_t size, int dept
 
     uint32_t metadataKey = 0;
     switch (mPath[depth]) {
-        case FOURCC('t', 'i', 't', 'l'):
+        case FOURCC("titl"):
         {
             metadataKey = kKeyTitle;
             break;
         }
-        case FOURCC('p', 'e', 'r', 'f'):
+        case FOURCC("perf"):
         {
             metadataKey = kKeyArtist;
             break;
         }
-        case FOURCC('a', 'u', 't', 'h'):
+        case FOURCC("auth"):
         {
             metadataKey = kKeyWriter;
             break;
         }
-        case FOURCC('g', 'n', 'r', 'e'):
+        case FOURCC("gnre"):
         {
             metadataKey = kKeyGenre;
             break;
         }
-        case FOURCC('a', 'l', 'b', 'm'):
+        case FOURCC("albm"):
         {
             if (buffer[size - 1] != '\0') {
               char tmp[4];
@@ -3340,7 +3336,7 @@ status_t MPEG4Extractor::parse3GPPMetaData(off64_t offset, size_t size, int dept
             metadataKey = kKeyAlbum;
             break;
         }
-        case FOURCC('y', 'r', 'r', 'c'):
+        case FOURCC("yrrc"):
         {
             if (size < 6) {
                 delete[] buffer;
@@ -4176,8 +4172,8 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
 
     switch(chunk_type) {
 
-        case FOURCC('t', 'r', 'a', 'f'):
-        case FOURCC('m', 'o', 'o', 'f'): {
+        case FOURCC("traf"):
+        case FOURCC("moof"): {
             off64_t stop_offset = *offset + chunk_size;
             *offset = data_offset;
             while (*offset < stop_offset) {
@@ -4186,7 +4182,7 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
                     return err;
                 }
             }
-            if (chunk_type == FOURCC('m', 'o', 'o', 'f')) {
+            if (chunk_type == FOURCC("moof")) {
                 // *offset points to the box following this moof. Find the next moof from there.
 
                 while (true) {
@@ -4215,7 +4211,7 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
                         return ERROR_MALFORMED;
                     }
 
-                    if (chunk_type == FOURCC('m', 'o', 'o', 'f')) {
+                    if (chunk_type == FOURCC("moof")) {
                         mNextMoofOffset = *offset;
                         break;
                     } else if (chunk_size == 0) {
@@ -4227,7 +4223,7 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
             break;
         }
 
-        case FOURCC('t', 'f', 'h', 'd'): {
+        case FOURCC("tfhd"): {
                 status_t err;
                 if ((err = parseTrackFragmentHeader(data_offset, chunk_data_size)) != OK) {
                     return err;
@@ -4236,7 +4232,7 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
                 break;
         }
 
-        case FOURCC('t', 'r', 'u', 'n'): {
+        case FOURCC("trun"): {
                 status_t err;
                 if (mLastParsedTrackId == mTrackId) {
                     if ((err = parseTrackFragmentRun(data_offset, chunk_data_size)) != OK) {
@@ -4248,7 +4244,7 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
                 break;
         }
 
-        case FOURCC('s', 'a', 'i', 'z'): {
+        case FOURCC("saiz"): {
             status_t err;
             if ((err = parseSampleAuxiliaryInformationSizes(data_offset, chunk_data_size)) != OK) {
                 return err;
@@ -4256,7 +4252,7 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
             *offset += chunk_size;
             break;
         }
-        case FOURCC('s', 'a', 'i', 'o'): {
+        case FOURCC("saio"): {
             status_t err;
             if ((err = parseSampleAuxiliaryInformationOffsets(data_offset, chunk_data_size)) != OK) {
                 return err;
@@ -4265,7 +4261,7 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
             break;
         }
 
-        case FOURCC('s', 'e', 'n', 'c'): {
+        case FOURCC("senc"): {
             status_t err;
             if ((err = parseSampleEncryption(data_offset)) != OK) {
                 return err;
@@ -4274,7 +4270,7 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
             break;
         }
 
-        case FOURCC('m', 'd', 'a', 't'): {
+        case FOURCC("mdat"): {
             // parse DRM info if present
             ALOGV("MPEG4Source::parseChunk mdat");
             // if saiz/saoi was previously observed, do something with the sampleinfos
@@ -5582,27 +5578,27 @@ static bool LegacySniffMPEG4(DataSourceBase *source, float *confidence) {
 
 static bool isCompatibleBrand(uint32_t fourcc) {
     static const uint32_t kCompatibleBrands[] = {
-        FOURCC('i', 's', 'o', 'm'),
-        FOURCC('i', 's', 'o', '2'),
-        FOURCC('a', 'v', 'c', '1'),
-        FOURCC('h', 'v', 'c', '1'),
-        FOURCC('h', 'e', 'v', '1'),
-        FOURCC('3', 'g', 'p', '4'),
-        FOURCC('m', 'p', '4', '1'),
-        FOURCC('m', 'p', '4', '2'),
-        FOURCC('d', 'a', 's', 'h'),
+        FOURCC("isom"),
+        FOURCC("iso2"),
+        FOURCC("avc1"),
+        FOURCC("hvc1"),
+        FOURCC("hev1"),
+        FOURCC("3gp4"),
+        FOURCC("mp41"),
+        FOURCC("mp42"),
+        FOURCC("dash"),
 
         // Won't promise that the following file types can be played.
         // Just give these file types a chance.
-        FOURCC('q', 't', ' ', ' '),  // Apple's QuickTime
-        FOURCC('M', 'S', 'N', 'V'),  // Sony's PSP
+        FOURCC("qt  "),  // Apple's QuickTime
+        FOURCC("MSNV"),  // Sony's PSP
 
-        FOURCC('3', 'g', '2', 'a'),  // 3GPP2
-        FOURCC('3', 'g', '2', 'b'),
-        FOURCC('m', 'i', 'f', '1'),  // HEIF image
-        FOURCC('h', 'e', 'i', 'c'),  // HEIF image
-        FOURCC('m', 's', 'f', '1'),  // HEIF image sequence
-        FOURCC('h', 'e', 'v', 'c'),  // HEIF image sequence
+        FOURCC("3g2a"),  // 3GPP2
+        FOURCC("3g2b"),
+        FOURCC("mif1"),  // HEIF image
+        FOURCC("heic"),  // HEIF image
+        FOURCC("msf1"),  // HEIF image sequence
+        FOURCC("hevc"),  // HEIF image sequence
     };
 
     for (size_t i = 0;
@@ -5669,7 +5665,7 @@ static bool BetterSniffMPEG4(DataSourceBase *source, float *confidence) {
         MakeFourCCString(chunkType, chunkstring);
         ALOGV("saw chunk type %s, size %" PRIu64 " @ %lld", chunkstring, chunkSize, (long long)offset);
         switch (chunkType) {
-            case FOURCC('f', 't', 'y', 'p'):
+            case FOURCC("ftyp"):
             {
                 if (chunkDataSize < 8) {
                     return false;
@@ -5704,7 +5700,7 @@ static bool BetterSniffMPEG4(DataSourceBase *source, float *confidence) {
                 break;
             }
 
-            case FOURCC('m', 'o', 'o', 'v'):
+            case FOURCC("moov"):
             {
                 moovAtomEndOffset = offset + chunkSize;
 
