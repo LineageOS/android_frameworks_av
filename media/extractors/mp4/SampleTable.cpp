@@ -37,13 +37,13 @@
 namespace android {
 
 // static
-const uint32_t SampleTable::kChunkOffsetType32 = FOURCC('s', 't', 'c', 'o');
+const uint32_t SampleTable::kChunkOffsetType32 = FOURCC("stco");
 // static
-const uint32_t SampleTable::kChunkOffsetType64 = FOURCC('c', 'o', '6', '4');
+const uint32_t SampleTable::kChunkOffsetType64 = FOURCC("co64");
 // static
-const uint32_t SampleTable::kSampleSizeType32 = FOURCC('s', 't', 's', 'z');
+const uint32_t SampleTable::kSampleSizeType32 = FOURCC("stsz");
 // static
-const uint32_t SampleTable::kSampleSizeTypeCompact = FOURCC('s', 't', 'z', '2');
+const uint32_t SampleTable::kSampleSizeTypeCompact = FOURCC("stz2");
 
 ////////////////////////////////////////////////////////////////////////////////
 
