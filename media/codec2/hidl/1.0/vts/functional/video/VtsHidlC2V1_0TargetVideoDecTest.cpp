@@ -445,6 +445,9 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
     int bytesCount = 0;
     uint32_t flags = 0;
     uint32_t timestamp = 0;
+    mTimestampDevTest = true;
+    mFlushedIndices.clear();
+    mTimestampUslist.clear();
     while (1) {
         if (!(eleInfo >> bytesCount)) break;
         eleInfo >> flags;

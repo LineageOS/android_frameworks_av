@@ -120,6 +120,8 @@ class Codec2VideoEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
         mCsd = false;
         mFramesReceived = 0;
         mFailedWorkReceived = 0;
+        mTimestampUs = 0u;
+        mTimestampDevTest = false;
         if (mCompName == unknown_comp) mDisableTest = true;
         if (mDisableTest) std::cout << "[   WARN   ] Test Disabled \n";
     }
@@ -139,6 +141,45 @@ class Codec2VideoEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
     void handleWorkDone(std::list<std::unique_ptr<C2Work>>& workItems) {
         for (std::unique_ptr<C2Work>& work : workItems) {
             if (!work->worklets.empty()) {
+                // For encoder components current timestamp always exceeds
+                // previous timestamp
+                typedef std::unique_lock<std::mutex> ULock;
+                if (!mTimestampUslist.empty()) {
+                    EXPECT_GE((work->worklets.front()
+                                   ->output.ordinal.timestamp.peeku()),
+                              mTimestampUs);
+                    mTimestampUs = work->worklets.front()
+                                       ->output.ordinal.timestamp.peeku();
+                    // Currently this lock is redundant as no mTimestampUslist is only initialized
+                    // before queuing any work to component. Once AdaptiveTest is added similar to
+                    // the one in video decoders, this is needed.
+                    ULock l(mQueueLock);
+
+                    if (mTimestampDevTest) {
+                        bool tsHit = false;
+                        std::list<uint64_t>::iterator it =
+                            mTimestampUslist.begin();
+                        while (it != mTimestampUslist.end()) {
+                            if (*it == mTimestampUs) {
+                                mTimestampUslist.erase(it);
+                                tsHit = true;
+                                break;
+                            }
+                            it++;
+                        }
+                        if (tsHit == false) {
+                            if (mTimestampUslist.empty() == false) {
+                                EXPECT_EQ(tsHit, true)
+                                    << "TimeStamp not recognized";
+                            } else {
+                                std::cout
+                                    << "[   INFO   ] Received non-zero "
+                                       "output / TimeStamp not recognized \n";
+                            }
+                        }
+                    }
+                }
+
                 if (work->result != C2_OK) mFailedWorkReceived++;
                 workDone(mComponent, work, mFlushedIndices, mQueueLock,
                          mQueueCondition, mWorkQueue, mEos, mCsd,
@@ -161,10 +202,13 @@ class Codec2VideoEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
     bool mCsd;
     bool mDisableTest;
     bool mConfig;
+    bool mTimestampDevTest;
     standardComp mCompName;
     uint32_t mFramesReceived;
     uint32_t mFailedWorkReceived;
+    uint64_t mTimestampUs;
 
+    std::list<uint64_t> mTimestampUslist;
     std::list<uint64_t> mFlushedIndices;
 
     C2BlockPool::local_id_t mBlockPoolId;
@@ -364,6 +408,18 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
     ASSERT_EQ(eleStream.is_open(), true) << mURL << " file not found";
     ALOGV("mURL : %s", mURL);
 
+    mTimestampUs = 0;
+    mTimestampDevTest = true;
+    mFlushedIndices.clear();
+    mTimestampUslist.clear();
+    uint32_t inputFrames = ENC_NUM_FRAMES;
+    uint32_t timestamp = 0;
+    // Add input timestamp to timestampUslist
+    while (inputFrames) {
+        if (mTimestampDevTest) mTimestampUslist.push_back(timestamp);
+        timestamp += ENCODER_TIMESTAMP_INCREMENT;
+        inputFrames--;
+    }
     if (!setupConfigParam(nWidth, nHeight)) {
         std::cout << "[   WARN   ] Test Skipped \n";
         return;
@@ -375,7 +431,7 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
                       0, ENC_NUM_FRAMES, nWidth, nHeight, false, signalEOS));
 
     // If EOS is not sent, sending empty input with EOS flag
-    uint32_t inputFrames = ENC_NUM_FRAMES;
+    inputFrames = ENC_NUM_FRAMES;
     if (!signalEOS) {
         ASSERT_NO_FATAL_FAILURE(
             waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue, 1));
@@ -407,6 +463,7 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
         ASSERT_TRUE(false) << "CSD Buffer not expected";
     }
 
+    if (mTimestampDevTest) EXPECT_EQ(mTimestampUslist.empty(), true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
