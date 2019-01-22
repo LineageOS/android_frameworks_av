@@ -302,16 +302,21 @@ media_status_t MPEG2TSExtractor::setMediaCas(const uint8_t* casToken, size_t siz
     return AMEDIA_ERROR_UNKNOWN;
 }
 
-void MPEG2TSExtractor::addSource(const sp<AnotherPacketSource> &impl) {
-    bool found = false;
+status_t MPEG2TSExtractor::findIndexOfSource(const sp<AnotherPacketSource> &impl, size_t *index) {
     for (size_t i = 0; i < mSourceImpls.size(); i++) {
         if (mSourceImpls[i] == impl) {
-            found = true;
-            break;
+            *index = i;
+            return OK;
         }
     }
-    if (!found) {
+    return NAME_NOT_FOUND;
+}
+
+void MPEG2TSExtractor::addSource(const sp<AnotherPacketSource> &impl) {
+    size_t index;
+    if (findIndexOfSource(impl, &index) != OK) {
         mSourceImpls.push(impl);
+        mSyncPoints.push();
     }
 }
 
@@ -319,6 +324,7 @@ void MPEG2TSExtractor::init() {
     bool haveAudio = false;
     bool haveVideo = false;
     int64_t startTime = ALooper::GetNowUs();
+    size_t index;
 
     status_t err;
     while ((err = feedMore(true /* isInit */)) == OK
@@ -337,8 +343,9 @@ void MPEG2TSExtractor::init() {
                     haveVideo = true;
                     addSource(impl);
                     if (!isScrambledFormat(*(format.get()))) {
-                        mSyncPoints.push();
-                        mSeekSyncPoints = &mSyncPoints.editTop();
+                        if (findIndexOfSource(impl, &index) == OK) {
+                            mSeekSyncPoints = &mSyncPoints.editItemAt(index);
+                        }
                     }
                 }
             }
@@ -352,10 +359,9 @@ void MPEG2TSExtractor::init() {
                 if (format != NULL) {
                     haveAudio = true;
                     addSource(impl);
-                    if (!isScrambledFormat(*(format.get()))) {
-                        mSyncPoints.push();
-                        if (!haveVideo) {
-                            mSeekSyncPoints = &mSyncPoints.editTop();
+                    if (!isScrambledFormat(*(format.get())) && !haveVideo) {
+                        if (findIndexOfSource(impl, &index) == OK) {
+                            mSeekSyncPoints = &mSyncPoints.editItemAt(index);
                         }
                     }
                 }
