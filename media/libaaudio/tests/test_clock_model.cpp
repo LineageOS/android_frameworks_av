@@ -43,11 +43,45 @@ public:
     }
 
     void TearDown() {
-
     }
 
     ~ClockModelTestFixture()  {
         // cleanup any pending stuff, but no exceptions allowed
+    }
+
+    // Test processing of timestamps when the hardware may be slightly off from
+    // the expected sample rate.
+    void checkDriftingClock(double hardwareFramesPerSecond, int numLoops) {
+        const int64_t startTimeNanos = 500000000; // arbitrary
+        model.start(startTimeNanos);
+
+        const int64_t startPositionFrames = HW_FRAMES_PER_BURST; // hardware
+        // arbitrary time for first burst
+        const int64_t markerTime = startTimeNanos + NANOS_PER_MILLISECOND
+                + (200 * NANOS_PER_MICROSECOND);
+
+        // Should set initial marker.
+        model.processTimestamp(startPositionFrames, markerTime);
+        ASSERT_EQ(startPositionFrames, model.convertTimeToPosition(markerTime));
+
+        double elapsedTimeSeconds = startTimeNanos / (double) NANOS_PER_SECOND;
+        for (int i = 0; i < numLoops; i++) {
+            // Calculate random delay over several bursts.
+            const double timeDelaySeconds = 10.0 * drand48() * NANOS_PER_BURST / NANOS_PER_SECOND;
+            elapsedTimeSeconds += timeDelaySeconds;
+            const int64_t elapsedTimeNanos = (int64_t)(elapsedTimeSeconds * NANOS_PER_SECOND);
+            const int64_t currentTimeNanos = startTimeNanos + elapsedTimeNanos;
+            // Simulate DSP running at the specified rate.
+            const int64_t currentTimeFrames = startPositionFrames +
+                                        (int64_t)(hardwareFramesPerSecond * elapsedTimeSeconds);
+            const int64_t numBursts = currentTimeFrames / HW_FRAMES_PER_BURST;
+            const int64_t alignedPosition = startPositionFrames + (numBursts * HW_FRAMES_PER_BURST);
+
+            // Apply drifting timestamp.
+            model.processTimestamp(alignedPosition, currentTimeNanos);
+
+            ASSERT_EQ(alignedPosition, model.convertTimeToPosition(currentTimeNanos));
+        }
     }
 
     IsochronousClockModel model;
@@ -95,7 +129,6 @@ TEST_F(ClockModelTestFixture, clock_start) {
 }
 
 // timestamps moves the window if outside the bounds
-// TODO test nudging the window
 TEST_F(ClockModelTestFixture, clock_timestamp) {
     const int64_t startTime = 100000000;
     model.start(startTime);
@@ -112,4 +145,22 @@ TEST_F(ClockModelTestFixture, clock_timestamp) {
 
     // convertPositionToTime rounds up
     EXPECT_EQ(markerTime + NANOS_PER_BURST, model.convertPositionToTime(position + 17));
+}
+
+#define NUM_LOOPS_DRIFT   10000
+
+// test nudging the window by using a drifting HW clock
+TEST_F(ClockModelTestFixture, clock_no_drift) {
+    checkDriftingClock(SAMPLE_RATE, NUM_LOOPS_DRIFT);
+}
+
+// These slow drift rates caused errors when I disabled the code that handles
+// drifting in the clock model. So I think the test is valid.
+// It is unlikely that real hardware would be off by more than this amount.
+TEST_F(ClockModelTestFixture, clock_slow_drift) {
+    checkDriftingClock(0.998 * SAMPLE_RATE, NUM_LOOPS_DRIFT);
+}
+
+TEST_F(ClockModelTestFixture, clock_fast_drift) {
+    checkDriftingClock(1.002 * SAMPLE_RATE, NUM_LOOPS_DRIFT);
 }
