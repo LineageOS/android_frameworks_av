@@ -4868,7 +4868,9 @@ status_t MPEG4Source::parseClearEncryptedSizes(
         off64_t offset, bool isSubsampleEncryption, uint32_t flags) {
 
     int32_t ivlength;
-    CHECK(AMediaFormat_getInt32(mFormat, AMEDIAFORMAT_KEY_CRYPTO_DEFAULT_IV_SIZE, &ivlength));
+    if (!AMediaFormat_getInt32(mFormat, AMEDIAFORMAT_KEY_CRYPTO_DEFAULT_IV_SIZE, &ivlength)) {
+        return ERROR_MALFORMED;
+    }
 
     // only 0, 8 and 16 byte initialization vectors are supported
     if (ivlength != 0 && ivlength != 8 && ivlength != 16) {
