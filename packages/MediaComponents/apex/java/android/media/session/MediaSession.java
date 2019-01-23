@@ -1077,8 +1077,7 @@ public final class MediaSession {
 
         private static RemoteUserInfo createRemoteUserInfo(String packageName, int pid, int uid,
                 ISessionControllerCallback caller) {
-            return new RemoteUserInfo(packageName, pid, uid,
-                    caller != null ? caller.asBinder() : null);
+            return new RemoteUserInfo(packageName, pid, uid);
         }
 
         @Override
