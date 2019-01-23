@@ -37,6 +37,8 @@
 
 namespace android {
 
+class MemoryDealer;
+
 class CCodecCallback {
 public:
     virtual ~CCodecCallback() = default;
@@ -232,6 +234,9 @@ private:
     std::shared_ptr<C2BlockPool> mInputAllocator;
     QueueSync mQueueSync;
     std::vector<std::unique_ptr<C2Param>> mParamsToBeSet;
+
+    size_t mNumInputSlots;
+    size_t mNumOutputSlots;
 
     Mutexed<std::unique_ptr<InputBuffers>> mInputBuffers;
     Mutexed<std::list<sp<ABuffer>>> mFlushedConfigs;

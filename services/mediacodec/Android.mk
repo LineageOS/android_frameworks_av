@@ -69,8 +69,8 @@ include $(BUILD_EXECUTABLE)
 include $(CLEAR_VARS)
 # seccomp is not required for coverage build.
 ifneq ($(NATIVE_COVERAGE),true)
-LOCAL_REQUIRED_MODULES_arm := crash_dump.policy mediacodec.policy
-LOCAL_REQUIRED_MODULES_x86 := crash_dump.policy mediacodec.policy
+LOCAL_REQUIRED_MODULES_arm := crash_dump.policy mediaswcodec.policy
+LOCAL_REQUIRED_MODULES_x86 := crash_dump.policy mediaswcodec.policy
 endif
 LOCAL_SRC_FILES := \
     main_swcodecservice.cpp \
@@ -133,6 +133,28 @@ ifdef TARGET_2ND_ARCH
   endif
 else
     LOCAL_SRC_FILES := seccomp_policy/mediacodec-$(TARGET_ARCH).policy
+endif
+include $(BUILD_PREBUILT)
+endif
+
+####################################################################
+
+# sw service seccomp policy
+ifeq ($(TARGET_ARCH), $(filter $(TARGET_ARCH), x86 x86_64 arm arm64))
+include $(CLEAR_VARS)
+LOCAL_MODULE := mediaswcodec.policy
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT)/etc/seccomp_policy
+# mediaswcodec runs in 32-bit combatibility mode. For 64 bit architectures,
+# use the 32 bit policy
+ifdef TARGET_2ND_ARCH
+  ifneq ($(TARGET_TRANSLATE_2ND_ARCH),true)
+    LOCAL_SRC_FILES := seccomp_policy/mediaswcodec-$(TARGET_2ND_ARCH).policy
+  else
+    LOCAL_SRC_FILES := seccomp_policy/mediaswcodec-$(TARGET_ARCH).policy
+  endif
+else
+    LOCAL_SRC_FILES := seccomp_policy/mediaswcodec-$(TARGET_ARCH).policy
 endif
 include $(BUILD_PREBUILT)
 endif

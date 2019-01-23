@@ -95,6 +95,7 @@ private:
     status_t seekBeyond(int64_t seekTimeUs);
 
     status_t feedUntilBufferAvailable(const sp<AnotherPacketSource> &impl);
+    status_t findIndexOfSource(const sp<AnotherPacketSource> &impl, size_t *index);
 
     // Add a SynPoint derived from |event|.
     void addSyncPoint_l(const ATSParser::SyncEvent &event);
