@@ -105,9 +105,14 @@ static int32_t readFormattedData(LoopbackData *myData, int32_t numFrames) {
         assert(false);
     }
     if (framesRead < 0) {
-        myData->inputError = framesRead;
-        printf("ERROR in read = %d = %s\n", framesRead,
-               AAudio_convertResultToText(framesRead));
+        // Expect INVALID_STATE if STATE_STARTING
+        if (myData->framesReadTotal > 0) {
+            myData->inputError = framesRead;
+            printf("ERROR in read = %d = %s\n", framesRead,
+                   AAudio_convertResultToText(framesRead));
+        } else {
+            framesRead = 0;
+        }
     } else {
         myData->framesReadTotal += framesRead;
     }
@@ -149,8 +154,10 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
         int32_t totalFramesRead = 0;
         do {
             actualFramesRead = readFormattedData(myData, numFrames);
-            if (actualFramesRead) {
+            if (actualFramesRead > 0) {
                 totalFramesRead += actualFramesRead;
+            } else if (actualFramesRead < 0) {
+                result = AAUDIO_CALLBACK_RESULT_STOP;
             }
             // Ignore errors because input stream may not be started yet.
         } while (actualFramesRead > 0);
