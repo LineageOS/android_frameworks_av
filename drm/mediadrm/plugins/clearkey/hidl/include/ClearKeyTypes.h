@@ -28,6 +28,7 @@ namespace V1_2 {
 namespace clearkey {
 
 using ::android::hardware::drm::V1_0::KeyValue;
+using ::android::hardware::drm::V1_1::SecurityLevel;
 using ::android::hardware::hidl_vec;
 
 const uint8_t kBlockSize = 16; //AES_BLOCK_SIZE;

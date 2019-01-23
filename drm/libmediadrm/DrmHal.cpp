@@ -145,6 +145,23 @@ static DrmPlugin::SecurityLevel toSecurityLevel(SecurityLevel level) {
     }
 }
 
+static SecurityLevel toHidlSecurityLevel(DrmPlugin::SecurityLevel level) {
+    switch(level) {
+    case DrmPlugin::kSecurityLevelSwSecureCrypto:
+        return SecurityLevel::SW_SECURE_CRYPTO;
+    case DrmPlugin::kSecurityLevelSwSecureDecode:
+        return SecurityLevel::SW_SECURE_DECODE;
+    case DrmPlugin::kSecurityLevelHwSecureCrypto:
+        return SecurityLevel::HW_SECURE_CRYPTO;
+    case DrmPlugin::kSecurityLevelHwSecureDecode:
+        return SecurityLevel::HW_SECURE_DECODE;
+    case DrmPlugin::kSecurityLevelHwSecureAll:
+        return SecurityLevel::HW_SECURE_ALL;
+    default:
+        return SecurityLevel::UNKNOWN;
+    }
+}
+
 static DrmPlugin::OfflineLicenseState toOfflineLicenseState(
         OfflineLicenseState licenseState) {
     switch(licenseState) {
@@ -569,16 +586,39 @@ Return<void> DrmHal::sendSessionLostState(
     return Void();
 }
 
-bool DrmHal::isCryptoSchemeSupported(const uint8_t uuid[16], const String8 &mimeType) {
+bool DrmHal::matchMimeTypeAndSecurityLevel(sp<IDrmFactory> &factory,
+                                           const uint8_t uuid[16],
+                                           const String8 &mimeType,
+                                           DrmPlugin::SecurityLevel level) {
+    if (mimeType == "") {
+        return true;
+    } else if (!factory->isContentTypeSupported(mimeType.string())) {
+        return false;
+    }
+
+    if (level == DrmPlugin::kSecurityLevelUnknown) {
+        return true;
+    } else {
+        sp<drm::V1_2::IDrmFactory> factoryV1_2 = drm::V1_2::IDrmFactory::castFrom(factory);
+        if (factoryV1_2 == NULL) {
+            return true;
+        } else if (factoryV1_2->isCryptoSchemeSupported_1_2(uuid,
+                        mimeType.string(), toHidlSecurityLevel(level))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool DrmHal::isCryptoSchemeSupported(const uint8_t uuid[16],
+                                     const String8 &mimeType,
+                                     DrmPlugin::SecurityLevel level) {
     Mutex::Autolock autoLock(mLock);
 
     for (size_t i = 0; i < mFactories.size(); i++) {
-        if (mFactories[i]->isCryptoSchemeSupported(uuid)) {
-            if (mimeType != "") {
-                if (mFactories[i]->isContentTypeSupported(mimeType.string())) {
-                    return true;
-                }
-            } else {
+        sp<IDrmFactory> factory = mFactories[i];
+        if (factory->isCryptoSchemeSupported(uuid)) {
+            if (matchMimeTypeAndSecurityLevel(factory, uuid, mimeType, level)) {
                 return true;
             }
         }
@@ -634,30 +674,15 @@ status_t DrmHal::openSession(DrmPlugin::SecurityLevel level,
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
-    SecurityLevel hSecurityLevel;
+    SecurityLevel hSecurityLevel = toHidlSecurityLevel(level);
     bool setSecurityLevel = true;
 
-    switch(level) {
-    case DrmPlugin::kSecurityLevelSwSecureCrypto:
-        hSecurityLevel = SecurityLevel::SW_SECURE_CRYPTO;
-        break;
-    case DrmPlugin::kSecurityLevelSwSecureDecode:
-        hSecurityLevel = SecurityLevel::SW_SECURE_DECODE;
-        break;
-    case DrmPlugin::kSecurityLevelHwSecureCrypto:
-        hSecurityLevel = SecurityLevel::HW_SECURE_CRYPTO;
-        break;
-    case DrmPlugin::kSecurityLevelHwSecureDecode:
-        hSecurityLevel = SecurityLevel::HW_SECURE_DECODE;
-        break;
-    case DrmPlugin::kSecurityLevelHwSecureAll:
-        hSecurityLevel = SecurityLevel::HW_SECURE_ALL;
-        break;
-    case DrmPlugin::kSecurityLevelMax:
+    if (level == DrmPlugin::kSecurityLevelMax) {
         setSecurityLevel = false;
-        break;
-    default:
-        return ERROR_DRM_CANNOT_HANDLE;
+    } else {
+        if (hSecurityLevel == SecurityLevel::UNKNOWN) {
+            return ERROR_DRM_CANNOT_HANDLE;
+        }
     }
 
     status_t  err = UNKNOWN_ERROR;
