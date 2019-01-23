@@ -159,7 +159,7 @@ public:
         return xd != nullptr && xd->magic == MAGIC;
     }
 
-    static C2HandleGralloc* WrapNativeHandle(
+    static C2HandleGralloc* WrapAndMoveNativeHandle(
             const native_handle_t *const handle,
             uint32_t width, uint32_t height, uint32_t format, uint64_t usage,
             uint32_t stride, uint32_t generation, uint64_t igbp_id = 0, uint32_t igbp_slot = 0) {
@@ -179,6 +179,26 @@ public:
             *getExtraData(res) = xd;
         }
         return reinterpret_cast<C2HandleGralloc *>(res);
+    }
+
+    static C2HandleGralloc* WrapNativeHandle(
+            const native_handle_t *const handle,
+            uint32_t width, uint32_t height, uint32_t format, uint64_t usage,
+            uint32_t stride, uint32_t generation, uint64_t igbp_id = 0, uint32_t igbp_slot = 0) {
+        if (handle == nullptr) {
+            return nullptr;
+        }
+        native_handle_t *clone = native_handle_clone(handle);
+        if (clone == nullptr) {
+            return nullptr;
+        }
+        C2HandleGralloc *res = WrapAndMoveNativeHandle(
+                clone, width, height, format, usage, stride, generation, igbp_id, igbp_slot);
+        if (res == nullptr) {
+            native_handle_close(clone);
+        }
+        native_handle_delete(clone);
+        return res;
     }
 
     static native_handle_t* UnwrapNativeHandle(
@@ -366,7 +386,7 @@ c2_status_t C2AllocationGralloc::map(
         if (mHandle) {
             mHandle->getIgbpData(&generation, &igbp_id, &igbp_slot);
         }
-        mLockedHandle = C2HandleGralloc::WrapNativeHandle(
+        mLockedHandle = C2HandleGralloc::WrapAndMoveNativeHandle(
                 mBuffer, mInfo.mapperInfo.width, mInfo.mapperInfo.height,
                 (uint32_t)mInfo.mapperInfo.format, mInfo.mapperInfo.usage, mInfo.stride,
                 generation, igbp_id, igbp_slot);
@@ -743,7 +763,7 @@ c2_status_t C2AllocatorGralloc::Impl::newGraphicAllocation(
                     return;
                 }
                 info.stride = stride;
-                buffer = std::move(buffers[0]);
+                buffer = buffers[0];
             });
     if (err != C2_OK) {
         return err;
@@ -752,7 +772,7 @@ c2_status_t C2AllocatorGralloc::Impl::newGraphicAllocation(
 
     allocation->reset(new C2AllocationGralloc(
             info, mMapper, buffer,
-            C2HandleGralloc::WrapNativeHandle(
+            C2HandleGralloc::WrapAndMoveNativeHandle(
                     buffer.getNativeHandle(),
                     info.mapperInfo.width, info.mapperInfo.height,
                     (uint32_t)info.mapperInfo.format, info.mapperInfo.usage, info.stride,
