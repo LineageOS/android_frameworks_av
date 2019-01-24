@@ -40,6 +40,7 @@ enum {
     SET_DATA_SOURCE_FD,
     SET_DATA_SOURCE_STREAM,
     SET_DATA_SOURCE_CALLBACK,
+    SET_DATA_SOURCE_RTP,
     SET_BUFFERING_SETTINGS,
     GET_BUFFERING_SETTINGS,
     PREPARE_ASYNC,
@@ -158,6 +159,15 @@ public:
         data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
         data.writeStrongBinder(IInterface::asBinder(source));
         remote()->transact(SET_DATA_SOURCE_CALLBACK, data, &reply);
+        return reply.readInt32();
+    }
+
+    status_t setDataSource(const String8& rtpParams) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
+        data.writeString8(rtpParams);
+        remote()->transact(SET_DATA_SOURCE_RTP, data, &reply);
+
         return reply.readInt32();
     }
 
@@ -683,6 +693,12 @@ status_t BnMediaPlayer::onTransact(
             } else {
                 reply->writeInt32(setDataSource(source));
             }
+            return NO_ERROR;
+        }
+        case SET_DATA_SOURCE_RTP: {
+            CHECK_INTERFACE(IMediaPlayer, data, reply);
+            const String8& rtpParams = data.readString8();
+            reply->writeInt32(setDataSource(rtpParams));
             return NO_ERROR;
         }
         case SET_VIDEO_SURFACETEXTURE: {

@@ -31,6 +31,7 @@
 #include "NuPlayerDriver.h"
 #include "NuPlayerRenderer.h"
 #include "NuPlayerSource.h"
+#include "RTPSource.h"
 #include "RTSPSource.h"
 #include "StreamingSource.h"
 #include "GenericSource.h"
@@ -366,6 +367,17 @@ status_t NuPlayer::setBufferingSettings(const BufferingSettings& buffering) {
         CHECK(response->findInt32("err", &err));
     }
     return err;
+}
+
+void NuPlayer::setDataSourceAsync(const String8& rtpParams) {
+    ALOGD("setDataSourceAsync for RTP = %s", rtpParams.string());
+    sp<AMessage> msg = new AMessage(kWhatSetDataSource, this);
+
+    sp<AMessage> notify = new AMessage(kWhatSourceNotify, this);
+    sp<Source> source = new RTPSource(notify, rtpParams);
+
+    msg->setObject("source", source);
+    msg->post();
 }
 
 void NuPlayer::prepareAsync() {
