@@ -49,6 +49,13 @@ struct ARTPConnection : public AHandler {
     // next higher port).
     static void MakePortPair(
             int *rtpSocket, int *rtcpSocket, unsigned *rtpPort);
+    // Creates a pair of UDP datagram sockets bound to assigned ip and
+    // ports (the rtpSocket is bound to an even port, the rtcpSocket
+    // to the next higher port).
+    static void MakeRTPSocketPair(
+            int *rtpSocket, int *rtcpSocket,
+            const char *localIp, const char *remoteIp,
+            unsigned localPort, unsigned remotePort);
 
 protected:
     virtual ~ARTPConnection();

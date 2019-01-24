@@ -145,6 +145,77 @@ void ARTPConnection::MakePortPair(
     TRESPASS();
 }
 
+// static
+void ARTPConnection::MakeRTPSocketPair(
+        int *rtpSocket, int *rtcpSocket, const char *localIp, const char *remoteIp,
+        unsigned localPort, unsigned remotePort) {
+    *rtpSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    CHECK_GE(*rtpSocket, 0);
+
+    bumpSocketBufferSize(*rtpSocket);
+
+    *rtcpSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    CHECK_GE(*rtcpSocket, 0);
+
+    bumpSocketBufferSize(*rtcpSocket);
+
+    struct sockaddr_in addr;
+    memset(addr.sin_zero, 0, sizeof(addr.sin_zero));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = inet_addr(localIp);
+    addr.sin_port = htons(localPort);
+
+    int sockopt = 1;
+    setsockopt(*rtpSocket, SOL_SOCKET, SO_REUSEADDR, (int *)&sockopt, sizeof(sockopt));
+    setsockopt(*rtpSocket, SOL_SOCKET, SO_REUSEPORT, (int *)&sockopt, sizeof(sockopt));
+    setsockopt(*rtcpSocket, SOL_SOCKET, SO_REUSEADDR, (int *)&sockopt, sizeof(sockopt));
+    setsockopt(*rtcpSocket, SOL_SOCKET, SO_REUSEPORT, (int *)&sockopt, sizeof(sockopt));
+
+    if (bind(*rtpSocket,
+             (const struct sockaddr *)&addr, sizeof(addr)) == 0) {
+        ALOGI("rtp socket successfully binded. addr=%s:%d", inet_ntoa(addr.sin_addr), localPort);
+    } else {
+        ALOGE("failed to bind rtp socket addr=%s:%d err=%s", inet_ntoa(addr.sin_addr),
+            localPort, strerror(errno));
+        return;
+    }
+
+    addr.sin_port = htons(localPort + 1);
+
+    if (bind(*rtcpSocket,
+             (const struct sockaddr *)&addr, sizeof(addr)) == 0) {
+        ALOGI("rtcp socket successfully binded. addr=%s:%d", inet_ntoa(addr.sin_addr),
+                localPort + 1);
+    } else {
+        ALOGE("failed to bind rtcp socket addr=%s:%d err=%s", inet_ntoa(addr.sin_addr),
+                localPort + 1, strerror(errno));
+    }
+
+    // Re uses addr variable as remote addr.
+    memset(addr.sin_zero, 0, sizeof(addr.sin_zero));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = inet_addr(remoteIp);
+    addr.sin_port = htons(remotePort);
+    if (connect(*rtpSocket, (const struct sockaddr *)&addr, sizeof(addr)) == 0) {
+        ALOGI("rtp socket successfully connected to remote=%s:%d", inet_ntoa(addr.sin_addr),
+                remotePort);
+    } else {
+        ALOGE("failed to connect rtp socket to remote addr=%s:%d err=%s", inet_ntoa(addr.sin_addr),
+                remotePort, strerror(errno));
+        return;
+    }
+
+    addr.sin_port = htons(remotePort + 1);
+    if (connect(*rtcpSocket, (const struct sockaddr *)&addr, sizeof(addr)) == 0) {
+        ALOGI("rtcp socket successfully connected to remote=%s:%d", inet_ntoa(addr.sin_addr),
+                remotePort);
+    } else {
+        ALOGE("failed to connect rtcp socket addr=%s:%d err=%s", inet_ntoa(addr.sin_addr),
+                remotePort + 1, strerror(errno));
+        return;
+    }
+}
+
 void ARTPConnection::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatAddStream:
