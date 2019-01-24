@@ -216,7 +216,7 @@ public:
         };
 
         uint64_t mbs = uint64_t((size.v.width + 15) / 16) * ((size.v.height + 15) / 16);
-        float mbsPerSec = float(mbs) / frameRate.v.value;
+        float mbsPerSec = float(mbs) * frameRate.v.value;
 
         // Check if the supplied level meets the MB / bitrate requirements. If
         // not, update the level with the lowest level meeting the requirements.

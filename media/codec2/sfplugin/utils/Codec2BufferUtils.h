@@ -91,6 +91,31 @@ status_t ImageCopy(C2GraphicView &view, const uint8_t *imgBase, const MediaImage
 bool IsYUV420(const C2GraphicView &view);
 
 /**
+ * Returns true iff a view has a NV12 layout.
+ */
+bool IsNV12(const C2GraphicView &view);
+
+/**
+ * Returns true iff a view has a I420 layout.
+ */
+bool IsI420(const C2GraphicView &view);
+
+/**
+ * Returns true iff a MediaImage2 has a YUV 420 888 layout.
+ */
+bool IsYUV420(const MediaImage2 *img);
+
+/**
+ * Returns true iff a MediaImage2 has a NV12 layout.
+ */
+bool IsNV12(const MediaImage2 *img);
+
+/**
+ * Returns true iff a MediaImage2 has a I420 layout.
+ */
+bool IsI420(const MediaImage2 *img);
+
+/**
  * A raw memory block to use for internal buffers.
  *
  * TODO: replace this with C2LinearBlocks from a private C2BlockPool

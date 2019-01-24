@@ -44,6 +44,7 @@
 #include <cutils/native_handle.h>
 #include <media/omx/1.0/WOmxNode.h>
 #include <media/stagefright/MediaCodecConstants.h>
+#include <media/stagefright/foundation/ALookup.h>
 #include <media/stagefright/foundation/MediaDefs.h>
 #include <media/stagefright/omx/OMXUtils.h>
 #include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
@@ -299,7 +300,6 @@ void buildOmxInfo(const MediaCodecsXmlParser& parser,
         // OMX components don't have aliases
         for (const MediaCodecsXmlParser::Type &type : properties.typeMap) {
             const std::string &mediaType = type.first;
-
             std::unique_ptr<MediaCodecInfo::CapabilitiesWriter> caps =
                     info->addMediaType(mediaType.c_str());
             const MediaCodecsXmlParser::AttributeMap &attrMap = type.second;
@@ -376,7 +376,7 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
     }
 
     bool surfaceTest(Codec2Client::CreateInputSurface());
-    if (option == 0 || !surfaceTest) {
+    if (option == 0 || (option != 4 && !surfaceTest)) {
         buildOmxInfo(parser, writer);
     }
 
