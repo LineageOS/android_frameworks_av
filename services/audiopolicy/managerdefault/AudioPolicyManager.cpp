@@ -2674,19 +2674,23 @@ status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
             }
         } else if ((mix.mRouteFlags & MIX_ROUTE_FLAG_RENDER) == MIX_ROUTE_FLAG_RENDER) {
             String8 address = mix.mDeviceAddress;
-            audio_devices_t device = mix.mDeviceType;
+            audio_devices_t type = mix.mDeviceType;
             ALOGV(" registerPolicyMixes() mix %zu of %zu is RENDER, dev=0x%X addr=%s",
-                    i, mixes.size(), device, address.string());
+                    i, mixes.size(), type, address.string());
+
+            sp<DeviceDescriptor> device = mHwModules.getDeviceDescriptor(
+                    mix.mDeviceType, mix.mDeviceAddress,
+                    String8(), AUDIO_FORMAT_DEFAULT);
+            if (device == nullptr) {
+                res = INVALID_OPERATION;
+                break;
+            }
 
             bool foundOutput = false;
             for (size_t j = 0 ; j < mOutputs.size() ; j++) {
                 sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(j);
-                sp<AudioPatch> patch = mAudioPatches.valueFor(desc->getPatchHandle());
-                if ((patch != 0) && (patch->mPatch.num_sinks != 0)
-                        && (patch->mPatch.sinks[0].type == AUDIO_PORT_TYPE_DEVICE)
-                        && (patch->mPatch.sinks[0].ext.device.type == device)
-                        && (strncmp(patch->mPatch.sinks[0].ext.device.address, address.string(),
-                                AUDIO_DEVICE_MAX_ADDRESS_LEN) == 0)) {
+
+                if (desc->supportedDevices().contains(device)) {
                     if (mPolicyMixes.registerMix(address, mix, desc) != NO_ERROR) {
                         res = INVALID_OPERATION;
                     } else {
@@ -2698,12 +2702,12 @@ status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
 
             if (res != NO_ERROR) {
                 ALOGE(" Error registering mix %zu for device 0x%X addr %s",
-                        i, device, address.string());
+                        i, type, address.string());
                 res = INVALID_OPERATION;
                 break;
             } else if (!foundOutput) {
                 ALOGE(" Output not found for mix %zu for device 0x%X addr %s",
-                        i, device, address.string());
+                        i, type, address.string());
                 res = INVALID_OPERATION;
                 break;
             }
