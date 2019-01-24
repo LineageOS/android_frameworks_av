@@ -20,6 +20,7 @@ supDomain: DeviceForStrategy
 				TelephonyMode IsNot InCall
 				TelephonyMode IsNot InCommunication
 				AvailableOutputDevices Includes RemoteSubmix
+				AvailableOutputDevicesAddresses Includes 0
 
 				component: /Policy/policy/strategies/dtmf/selected_output_devices/mask
 					remote_submix = 1
