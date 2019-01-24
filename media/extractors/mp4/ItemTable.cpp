@@ -48,7 +48,7 @@ struct ImageItem {
             offset(0), size(0), nextTileIndex(0) {}
 
     bool isGrid() const {
-        return type == FOURCC('g', 'r', 'i', 'd');
+        return type == FOURCC("grid");
     }
 
     status_t getNextTileItemId(uint32_t *nextTileItemId, bool reset) {
@@ -223,7 +223,7 @@ status_t FullBox::parseFullBoxHeader(off64_t *offset, size_t *size) {
 
 struct PitmBox : public FullBox {
     PitmBox(DataSourceHelper *source) :
-        FullBox(source, FOURCC('p', 'i', 't', 'm')) {}
+        FullBox(source, FOURCC("pitm")) {}
 
     status_t parse(off64_t offset, size_t size, uint32_t *primaryItemId);
 };
@@ -303,7 +303,7 @@ struct ItemLoc {
 
 struct IlocBox : public FullBox {
     IlocBox(DataSourceHelper *source, KeyedVector<uint32_t, ItemLoc> *itemLocs) :
-        FullBox(source, FOURCC('i', 'l', 'o', 'c')),
+        FullBox(source, FOURCC("iloc")),
         mItemLocs(itemLocs), mHasConstructMethod1(false) {}
 
     status_t parse(off64_t offset, size_t size);
@@ -497,7 +497,7 @@ void ItemReference::apply(
     ALOGV("attach reference type 0x%x to item id %d)", type(), mItemId);
 
     switch(type()) {
-    case FOURCC('d', 'i', 'm', 'g'): {
+    case FOURCC("dimg"): {
         ssize_t itemIndex = itemIdToItemMap.indexOfKey(mItemId);
 
         // ignore non-image items
@@ -525,7 +525,7 @@ void ItemReference::apply(
         }
         break;
     }
-    case FOURCC('t', 'h', 'm', 'b'): {
+    case FOURCC("thmb"): {
         ssize_t itemIndex = itemIdToItemMap.indexOfKey(mItemId);
 
         // ignore non-image items
@@ -554,7 +554,7 @@ void ItemReference::apply(
         }
         break;
     }
-    case FOURCC('c', 'd', 's', 'c'): {
+    case FOURCC("cdsc"): {
         ssize_t itemIndex = itemIdToExifMap.indexOfKey(mItemId);
 
         // ignore non-exif block items
@@ -575,7 +575,7 @@ void ItemReference::apply(
         }
         break;
     }
-    case FOURCC('a', 'u', 'x', 'l'): {
+    case FOURCC("auxl"): {
         ssize_t itemIndex = itemIdToItemMap.indexOfKey(mItemId);
 
         // ignore non-image items
@@ -628,7 +628,7 @@ status_t ItemReference::parse(off64_t offset, size_t size) {
 
 struct IrefBox : public FullBox {
     IrefBox(DataSourceHelper *source, Vector<sp<ItemReference> > *itemRefs) :
-        FullBox(source, FOURCC('i', 'r', 'e', 'f')), mRefIdSize(0), mItemRefs(itemRefs) {}
+        FullBox(source, FOURCC("iref")), mRefIdSize(0), mItemRefs(itemRefs) {}
 
     status_t parse(off64_t offset, size_t size);
 
@@ -690,7 +690,7 @@ private:
 
 struct IspeBox : public FullBox, public ItemProperty {
     IspeBox(DataSourceHelper *source) :
-        FullBox(source, FOURCC('i', 's', 'p', 'e')), mWidth(0), mHeight(0) {}
+        FullBox(source, FOURCC("ispe")), mWidth(0), mHeight(0) {}
 
     status_t parse(off64_t offset, size_t size) override;
 
@@ -726,7 +726,7 @@ status_t IspeBox::parse(off64_t offset, size_t size) {
 
 struct HvccBox : public Box, public ItemProperty {
     HvccBox(DataSourceHelper *source) :
-        Box(source, FOURCC('h', 'v', 'c', 'C')) {}
+        Box(source, FOURCC("hvcC")) {}
 
     status_t parse(off64_t offset, size_t size) override;
 
@@ -759,7 +759,7 @@ status_t HvccBox::parse(off64_t offset, size_t size) {
 
 struct IrotBox : public Box, public ItemProperty {
     IrotBox(DataSourceHelper *source) :
-        Box(source, FOURCC('i', 'r', 'o', 't')), mAngle(0) {}
+        Box(source, FOURCC("irot")), mAngle(0) {}
 
     status_t parse(off64_t offset, size_t size) override;
 
@@ -788,7 +788,7 @@ status_t IrotBox::parse(off64_t offset, size_t size) {
 
 struct ColrBox : public Box, public ItemProperty {
     ColrBox(DataSourceHelper *source) :
-        Box(source, FOURCC('c', 'o', 'l', 'r')) {}
+        Box(source, FOURCC("colr")) {}
 
     status_t parse(off64_t offset, size_t size) override;
 
@@ -812,11 +812,11 @@ status_t ColrBox::parse(off64_t offset, size_t size) {
     }
     offset += 4;
     size -= 4;
-    if (colour_type == FOURCC('n', 'c', 'l', 'x')) {
+    if (colour_type == FOURCC("nclx")) {
         return OK;
     }
-    if ((colour_type != FOURCC('r', 'I', 'C', 'C')) &&
-        (colour_type != FOURCC('p', 'r', 'o', 'f'))) {
+    if ((colour_type != FOURCC("rICC")) &&
+        (colour_type != FOURCC("prof"))) {
         return ERROR_MALFORMED;
     }
 
@@ -836,7 +836,7 @@ status_t ColrBox::parse(off64_t offset, size_t size) {
 
 struct IpmaBox : public FullBox {
     IpmaBox(DataSourceHelper *source, Vector<AssociationEntry> *associations) :
-        FullBox(source, FOURCC('i', 'p', 'm', 'a')), mAssociations(associations) {}
+        FullBox(source, FOURCC("ipma")), mAssociations(associations) {}
 
     status_t parse(off64_t offset, size_t size);
 private:
@@ -910,7 +910,7 @@ status_t IpmaBox::parse(off64_t offset, size_t size) {
 
 struct IpcoBox : public Box {
     IpcoBox(DataSourceHelper *source, Vector<sp<ItemProperty> > *properties) :
-        Box(source, FOURCC('i', 'p', 'c', 'o')), mItemProperties(properties) {}
+        Box(source, FOURCC("ipco")), mItemProperties(properties) {}
 
     status_t parse(off64_t offset, size_t size);
 protected:
@@ -930,22 +930,22 @@ status_t IpcoBox::parse(off64_t offset, size_t size) {
 status_t IpcoBox::onChunkData(uint32_t type, off64_t offset, size_t size) {
     sp<ItemProperty> itemProperty;
     switch(type) {
-        case FOURCC('h', 'v', 'c', 'C'):
+        case FOURCC("hvcC"):
         {
             itemProperty = new HvccBox(source());
             break;
         }
-        case FOURCC('i', 's', 'p', 'e'):
+        case FOURCC("ispe"):
         {
             itemProperty = new IspeBox(source());
             break;
         }
-        case FOURCC('i', 'r', 'o', 't'):
+        case FOURCC("irot"):
         {
             itemProperty = new IrotBox(source());
             break;
         }
-        case FOURCC('c', 'o', 'l', 'r'):
+        case FOURCC("colr"):
         {
             itemProperty = new ColrBox(source());
             break;
@@ -969,7 +969,7 @@ struct IprpBox : public Box {
     IprpBox(DataSourceHelper *source,
             Vector<sp<ItemProperty> > *properties,
             Vector<AssociationEntry> *associations) :
-        Box(source, FOURCC('i', 'p', 'r', 'p')),
+        Box(source, FOURCC("iprp")),
         mProperties(properties), mAssociations(associations) {}
 
     status_t parse(off64_t offset, size_t size);
@@ -993,12 +993,12 @@ status_t IprpBox::parse(off64_t offset, size_t size) {
 
 status_t IprpBox::onChunkData(uint32_t type, off64_t offset, size_t size) {
     switch(type) {
-        case FOURCC('i', 'p', 'c', 'o'):
+        case FOURCC("ipco"):
         {
             IpcoBox ipcoBox(source(), mProperties);
             return ipcoBox.parse(offset, size);
         }
-        case FOURCC('i', 'p', 'm', 'a'):
+        case FOURCC("ipma"):
         {
             IpmaBox ipmaBox(source(), mAssociations);
             return ipmaBox.parse(offset, size);
@@ -1024,7 +1024,7 @@ struct ItemInfo {
 
 struct InfeBox : public FullBox {
     InfeBox(DataSourceHelper *source) :
-        FullBox(source, FOURCC('i', 'n', 'f', 'e')) {}
+        FullBox(source, FOURCC("infe")) {}
 
     status_t parse(off64_t offset, size_t size, ItemInfo *itemInfo);
 
@@ -1104,7 +1104,7 @@ status_t InfeBox::parse(off64_t offset, size_t size, ItemInfo *itemInfo) {
         }
         ALOGV("item_name %s", item_name.c_str());
 
-        if (item_type == FOURCC('m', 'i', 'm', 'e')) {
+        if (item_type == FOURCC("mime")) {
             String8 content_type;
             if (!parseNullTerminatedString(&offset, &size, &content_type)) {
                 return ERROR_MALFORMED;
@@ -1117,7 +1117,7 @@ status_t InfeBox::parse(off64_t offset, size_t size, ItemInfo *itemInfo) {
                     return ERROR_MALFORMED;
                 }
             }
-        } else if (item_type == FOURCC('u', 'r', 'i', ' ')) {
+        } else if (item_type == FOURCC("uri ")) {
             String8 item_uri_type;
             if (!parseNullTerminatedString(&offset, &size, &item_uri_type)) {
                 return ERROR_MALFORMED;
@@ -1129,7 +1129,7 @@ status_t InfeBox::parse(off64_t offset, size_t size, ItemInfo *itemInfo) {
 
 struct IinfBox : public FullBox {
     IinfBox(DataSourceHelper *source, Vector<ItemInfo> *itemInfos) :
-        FullBox(source, FOURCC('i', 'i', 'n', 'f')),
+        FullBox(source, FOURCC("iinf")),
         mItemInfos(itemInfos), mHasGrids(false) {}
 
     status_t parse(off64_t offset, size_t size);
@@ -1179,7 +1179,7 @@ status_t IinfBox::parse(off64_t offset, size_t size) {
 }
 
 status_t IinfBox::onChunkData(uint32_t type, off64_t offset, size_t size) {
-    if (type != FOURCC('i', 'n', 'f', 'e')) {
+    if (type != FOURCC("infe")) {
         return OK;
     }
 
@@ -1188,7 +1188,7 @@ status_t IinfBox::onChunkData(uint32_t type, off64_t offset, size_t size) {
     status_t err = infeBox.parse(offset, size, &itemInfo);
     if (err == OK) {
         mItemInfos->push_back(itemInfo);
-        mHasGrids |= (itemInfo.itemType == FOURCC('g', 'r', 'i', 'd'));
+        mHasGrids |= (itemInfo.itemType == FOURCC("grid"));
     }
     // InfeBox parse returns ERROR_UNSUPPORTED if the box if an unsupported
     // version. Ignore this error as it's not fatal.
@@ -1214,31 +1214,31 @@ ItemTable::~ItemTable() {}
 
 status_t ItemTable::parse(uint32_t type, off64_t data_offset, size_t chunk_data_size) {
     switch(type) {
-        case FOURCC('i', 'l', 'o', 'c'):
+        case FOURCC("iloc"):
         {
             return parseIlocBox(data_offset, chunk_data_size);
         }
-        case FOURCC('i', 'i', 'n', 'f'):
+        case FOURCC("iinf"):
         {
             return parseIinfBox(data_offset, chunk_data_size);
         }
-        case FOURCC('i', 'p', 'r', 'p'):
+        case FOURCC("iprp"):
         {
             return parseIprpBox(data_offset, chunk_data_size);
         }
-        case FOURCC('p', 'i', 't', 'm'):
+        case FOURCC("pitm"):
         {
             return parsePitmBox(data_offset, chunk_data_size);
         }
-        case FOURCC('i', 'd', 'a', 't'):
+        case FOURCC("idat"):
         {
             return parseIdatBox(data_offset, chunk_data_size);
         }
-        case FOURCC('i', 'r', 'e', 'f'):
+        case FOURCC("iref"):
         {
             return parseIrefBox(data_offset, chunk_data_size);
         }
-        case FOURCC('i', 'p', 'r', 'o'):
+        case FOURCC("ipro"):
         {
             ALOGW("ipro box not supported!");
             break;
@@ -1355,9 +1355,9 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
         //   'grid': derived image from tiles
         //   'hvc1': coded image (or tile)
         //   'Exif': EXIF metadata
-        if (info.itemType != FOURCC('g', 'r', 'i', 'd') &&
-            info.itemType != FOURCC('h', 'v', 'c', '1') &&
-            info.itemType != FOURCC('E', 'x', 'i', 'f')) {
+        if (info.itemType != FOURCC("grid") &&
+            info.itemType != FOURCC("hvc1") &&
+            info.itemType != FOURCC("Exif")) {
             continue;
         }
 
@@ -1380,7 +1380,7 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
             return ERROR_MALFORMED;
         }
 
-        if (info.itemType == FOURCC('E', 'x', 'i', 'f')) {
+        if (info.itemType == FOURCC("Exif")) {
             // Only add if the Exif data is non-empty. The first 4 bytes contain
             // the offset to TIFF header, which the Exif parser doesn't use.
             if (size > 4) {
