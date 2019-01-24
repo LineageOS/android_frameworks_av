@@ -45,8 +45,11 @@ int main(int argc __unused, char** /*argv*/)
 
     ::android::hardware::configureRpcThreadpool(64, false);
 
-    // codec libs are currently 32-bit only
+#ifdef __LP64__
+    loadFromApex("/apex/com.android.media.swcodec/lib64");
+#else
     loadFromApex("/apex/com.android.media.swcodec/lib");
+#endif
 
     ::android::hardware::joinRpcThreadpool();
 }
