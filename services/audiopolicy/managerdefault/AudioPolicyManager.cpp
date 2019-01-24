@@ -2255,10 +2255,11 @@ status_t AudioPolicyManager::setStreamVolumeIndex(audio_stream_type_t stream,
                                                   audio_devices_t device)
 {
 
-    // VOICE_CALL stream has minVolumeIndex > 0  but can be muted directly by an
-    // app that has MODIFY_PHONE_STATE permission.
+    // VOICE_CALL and BLUETOOTH_SCO stream have minVolumeIndex > 0 but
+    // can be muted directly by an app that has MODIFY_PHONE_STATE permission.
     if (((index < mVolumeCurves->getVolumeIndexMin(stream)) &&
-            !(stream == AUDIO_STREAM_VOICE_CALL && index == 0)) ||
+            !((stream == AUDIO_STREAM_VOICE_CALL || stream == AUDIO_STREAM_BLUETOOTH_SCO) &&
+            index == 0)) ||
             (index > mVolumeCurves->getVolumeIndexMax(stream))) {
         return BAD_VALUE;
     }
