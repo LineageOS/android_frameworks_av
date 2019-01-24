@@ -26,16 +26,22 @@ float VolumeCurve::volIndexToDb(int indexInUi, int volIndexMin, int volIndexMax)
 {
     ALOG_ASSERT(!mCurvePoints.isEmpty(), "Invalid volume curve");
 
-    size_t nbCurvePoints = mCurvePoints.size();
-    // the volume index in the UI is relative to the min and max volume indices for this stream
-    int nbSteps = 1 + mCurvePoints[nbCurvePoints - 1].mIndex - mCurvePoints[0].mIndex;
     if (indexInUi < volIndexMin) {
+        // an index of 0 means mute request when volIndexMin > 0
+        if (indexInUi == 0) {
+            ALOGV("VOLUME forcing mute for index 0 with min index %d", volIndexMin);
+            return VOLUME_MIN_DB;
+        }
         ALOGV("VOLUME remapping index from %d to min index %d", indexInUi, volIndexMin);
         indexInUi = volIndexMin;
     } else if (indexInUi > volIndexMax) {
         ALOGV("VOLUME remapping index from %d to max index %d", indexInUi, volIndexMax);
         indexInUi = volIndexMax;
     }
+
+    size_t nbCurvePoints = mCurvePoints.size();
+    // the volume index in the UI is relative to the min and max volume indices for this stream
+    int nbSteps = 1 + mCurvePoints[nbCurvePoints - 1].mIndex - mCurvePoints[0].mIndex;
     int volIdx = (nbSteps * (indexInUi - volIndexMin)) / (volIndexMax - volIndexMin);
 
     // Where would this volume index been inserted in the curve point

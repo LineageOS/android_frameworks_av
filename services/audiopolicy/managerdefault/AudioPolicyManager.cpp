@@ -2290,6 +2290,10 @@ void AudioPolicyManager::initStreamVolume(audio_stream_type_t stream,
                                             int indexMax)
 {
     ALOGV("initStreamVolume() stream %d, min %d, max %d", stream , indexMin, indexMax);
+    if (indexMin < 0 || indexMax < 0) {
+        ALOGE("%s for stream %d: invalid min %d or max %d", __func__, stream , indexMin, indexMax);
+        return;
+    }
     mVolumeCurves->initStreamVolume(stream, indexMin, indexMax);
 
     // initialize other private stream volumes which follow this one
@@ -5624,6 +5628,15 @@ int AudioPolicyManager::rescaleVolumeIndex(int srcIndex,
     float minDst = (float)mVolumeCurves->getVolumeIndexMin(dstStream);
     float maxDst = (float)mVolumeCurves->getVolumeIndexMax(dstStream);
 
+    // preserve mute request or correct range
+    if (srcIndex < minSrc) {
+        if (srcIndex == 0) {
+            return 0;
+        }
+        srcIndex = minSrc;
+    } else if (srcIndex > maxSrc) {
+        srcIndex = maxSrc;
+    }
     return (int)(minDst + ((srcIndex - minSrc) * (maxDst - minDst)) / (maxSrc - minSrc));
 }
 
