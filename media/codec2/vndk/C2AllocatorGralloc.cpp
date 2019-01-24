@@ -316,6 +316,11 @@ C2AllocationGralloc::~C2AllocationGralloc() {
         native_handle_delete(
                 const_cast<native_handle_t *>(reinterpret_cast<const native_handle_t *>(mHandle)));
     }
+    if (mLockedHandle) {
+        native_handle_delete(
+                const_cast<native_handle_t *>(
+                        reinterpret_cast<const native_handle_t *>(mLockedHandle)));
+    }
 }
 
 c2_status_t C2AllocationGralloc::map(
