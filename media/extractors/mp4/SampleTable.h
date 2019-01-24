@@ -66,9 +66,9 @@ public:
             uint32_t sampleIndex,
             off64_t *offset,
             size_t *size,
-            uint32_t *compositionTime,
+            uint64_t *compositionTime,
             bool *isSyncSample = NULL,
-            uint32_t *sampleDuration = NULL);
+            uint64_t *sampleDuration = NULL);
 
     // call only after getMetaDataForSample has been called successfully.
     uint32_t getLastSampleIndexInChunk();
@@ -124,7 +124,7 @@ private:
 
     struct SampleTimeEntry {
         uint32_t mSampleIndex;
-        uint32_t mCompositionTime;
+        uint64_t mCompositionTime;
     };
     SampleTimeEntry *mSampleTimeEntries;
 

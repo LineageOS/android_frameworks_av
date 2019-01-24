@@ -594,7 +594,7 @@ media_status_t MPEG4Extractor::getTrackMetaData(
                 }
             } else {
                 uint32_t sampleIndex;
-                uint32_t sampleTime;
+                uint64_t sampleTime;
                 if (track->timescale != 0 &&
                         track->sampleTable->findThumbnailSample(&sampleIndex) == OK
                         && track->sampleTable->getMetaDataForSample(
@@ -4503,7 +4503,7 @@ status_t MPEG4Source::init() {
     }
 
     if (!strncasecmp("video/", mime, 6)) {
-        uint32_t firstSampleCTS = 0;
+        uint64_t firstSampleCTS = 0;
         err = mSampleTable->getMetaDataForSample(0, NULL, NULL, &firstSampleCTS);
         // Start offset should be less or equal to composition time of first sample.
         // Composition time stamp of first sample cannot be negative.
@@ -5351,7 +5351,7 @@ media_status_t MPEG4Source::read(
                         sampleIndex, &syncSampleIndex, findFlags);
             }
 
-            uint32_t sampleTime;
+            uint64_t sampleTime;
             if (err == OK) {
                 err = mSampleTable->getMetaDataForSample(
                         sampleIndex, NULL, NULL, &sampleTime);
@@ -5401,7 +5401,7 @@ media_status_t MPEG4Source::read(
 
     off64_t offset = 0;
     size_t size = 0;
-    uint32_t cts, stts;
+    uint64_t cts, stts;
     bool isSyncSample;
     bool newBuffer = false;
     if (mBuffer == NULL) {
