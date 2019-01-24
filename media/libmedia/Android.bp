@@ -202,7 +202,6 @@ cc_library {
         "android.hidl.token@1.0-utils",
         "liblog",
         "libcutils",
-        "libprocessgroup",
         "libutils",
         "libbinder",
         "libsonivox",

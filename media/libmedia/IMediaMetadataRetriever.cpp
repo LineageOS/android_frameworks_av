@@ -23,7 +23,6 @@
 #include <media/IDataSource.h>
 #include <media/IMediaHTTPService.h>
 #include <media/IMediaMetadataRetriever.h>
-#include <processgroup/sched_policy.h>
 #include <utils/String8.h>
 #include <utils/KeyedVector.h>
 
