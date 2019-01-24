@@ -330,7 +330,7 @@ status_t SampleIterator::findSampleTimeAndDuration(
 
     // below is equivalent to:
     // *time = mTTSSampleTime + mTTSDuration * (sampleIndex - mTTSSampleIndex);
-    uint32_t tmp;
+    uint64_t tmp;
     if (__builtin_sub_overflow(sampleIndex, mTTSSampleIndex, &tmp) ||
             __builtin_mul_overflow(mTTSDuration, tmp, &tmp) ||
             __builtin_add_overflow(mTTSSampleTime, tmp, &tmp)) {
@@ -340,7 +340,7 @@ status_t SampleIterator::findSampleTimeAndDuration(
 
     int32_t offset = mTable->getCompositionTimeOffset(sampleIndex);
     if ((offset < 0 && *time < (offset == INT32_MIN ?
-            INT32_MAX : uint32_t(-offset))) ||
+            INT64_MAX : uint64_t(-offset))) ||
             (offset > 0 && *time > UINT64_MAX - offset)) {
         ALOGE("%llu + %d would overflow", (unsigned long long) *time, offset);
         return ERROR_OUT_OF_RANGE;
@@ -348,7 +348,7 @@ status_t SampleIterator::findSampleTimeAndDuration(
     if (offset > 0) {
         *time += offset;
     } else {
-        *time -= (offset == INT32_MIN ? INT32_MAX : (-offset));
+        *time -= (offset == INT64_MIN ? INT64_MAX : (-offset));
     }
 
     *duration = mTTSDuration;
