@@ -38,6 +38,7 @@ using drm::V1_0::IDrmFactory;
 using drm::V1_0::IDrmPlugin;
 using drm::V1_0::IDrmPluginListener;
 using drm::V1_0::KeyStatus;
+using drm::V1_1::SecurityLevel;
 using drm::V1_2::OfflineLicenseState;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
@@ -62,7 +63,9 @@ struct DrmHal : public BnDrm,
 
     virtual status_t initCheck() const;
 
-    virtual bool isCryptoSchemeSupported(const uint8_t uuid[16], const String8 &mimeType);
+    virtual bool isCryptoSchemeSupported(const uint8_t uuid[16],
+                                         const String8& mimeType,
+                                         DrmPlugin::SecurityLevel level);
 
     virtual status_t createPlugin(const uint8_t uuid[16],
                                   const String8 &appPackageName);
@@ -223,6 +226,10 @@ private:
     status_t getPropertyStringInternal(String8 const &name, String8 &value) const;
     status_t getPropertyByteArrayInternal(String8 const &name,
                                           Vector<uint8_t> &value) const;
+    bool matchMimeTypeAndSecurityLevel(sp<IDrmFactory> &factory,
+                                       const uint8_t uuid[16],
+                                       const String8 &mimeType,
+                                       DrmPlugin::SecurityLevel level);
 
     DISALLOW_EVIL_CONSTRUCTORS(DrmHal);
 };

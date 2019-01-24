@@ -52,7 +52,7 @@ void LVC_Mixer_VarSlope_SetTimeConstant( LVMixer3_FLOAT_st *pStream,
                                          LVM_INT16           NumChannels)
 {
 #ifdef HIGHER_FS
-     LVM_FLOAT   DeltaTable[11] = {0.500000f,/*8000*/
+     LVM_FLOAT   DeltaTable[13] = {0.500000f,/*8000*/
                                    0.362812f,/*11025*/
                                    0.333333f,/*12000*/
                                    0.250000f,/*16000*/
@@ -61,7 +61,9 @@ void LVC_Mixer_VarSlope_SetTimeConstant( LVMixer3_FLOAT_st *pStream,
                                    0.125000f,/*32000*/
                                    0.090703f,/*44100*/
                                    0.083333f,/*48000*/
+                                   0.045352f,/*88200*/
                                    0.041666f,/*96000*/
+                                   0.022676f,/*176400*/
                                    0.020833f};/*192000*/
 #else
     LVM_FLOAT   DeltaTable[9] = {0.500000f,/*8000*/

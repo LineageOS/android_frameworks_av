@@ -239,13 +239,12 @@
 #define LVCS_STEREODELAY_CS_24KHZ                   279         /* Sample rate 24kS/s */
 #define LVCS_STEREODELAY_CS_32KHZ                   372         /* Sample rate 32kS/s */
 #define LVCS_STEREODELAY_CS_44KHZ                   512         /* Sample rate 44kS/s */
-// TODO: this should linearly scale by frequency but is limited to 512 frames until
-// we ensure enough buffer size has been allocated.
-#define LVCS_STEREODELAY_CS_48KHZ                   512         /* Sample rate 48kS/s */
-#define LVCS_STEREODELAY_CS_88KHZ                   512         /* Sample rate 88.2kS/s */
-#define LVCS_STEREODELAY_CS_96KHZ                   512         /* Sample rate 96kS/s */
-#define LVCS_STEREODELAY_CS_176KHZ                  512         /* Sample rate 176.4kS/s */
-#define LVCS_STEREODELAY_CS_192KHZ                  512         /* Sample rate 196kS/s */
+#define LVCS_STEREODELAY_CS_48KHZ                   557         /* Sample rate 48kS/s */
+#define LVCS_STEREODELAY_CS_88KHZ                   1024        /* Sample rate 88.2kS/s */
+#define LVCS_STEREODELAY_CS_96KHZ                   1115        /* Sample rate 96kS/s */
+#define LVCS_STEREODELAY_CS_176KHZ                  2048        /* Sample rate 176.4kS/s */
+#define LVCS_STEREODELAY_CS_192KHZ                  2229        /* Sample rate 196kS/s */
+#define LVCS_STEREODELAY_CS_MAX_VAL                 LVCS_STEREODELAY_CS_192KHZ
 
 /* Reverb coefficients for 8000 Hz sample rate, scaled with 1.038030 */
 #define CS_REVERB_8000_A0                          0.667271

@@ -274,7 +274,7 @@ bool AMediaDrm_isCryptoSchemeSupported(const AMediaUUID uuid, const char *mimeTy
     }
 
     String8 mimeStr = mimeType ? String8(mimeType) : String8("");
-    return drm->isCryptoSchemeSupported(uuid, mimeStr);
+    return drm->isCryptoSchemeSupported(uuid, mimeStr, DrmPlugin::kSecurityLevelUnknown);
 }
 
 EXPORT

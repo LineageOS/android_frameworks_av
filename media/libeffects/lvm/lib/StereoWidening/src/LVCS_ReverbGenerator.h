@@ -65,7 +65,7 @@ typedef struct
     /* Filter */
     void                        (*pBiquadCallBack) (Biquad_Instance_t*, LVM_INT16*, LVM_INT16*, LVM_INT16);
 #else
-    LVM_FLOAT                   StereoSamples[2 * LVCS_STEREODELAY_CS_48KHZ];
+    LVM_FLOAT                   StereoSamples[2 * LVCS_STEREODELAY_CS_MAX_VAL];
     /* Reverb Level */
     LVM_FLOAT                   ReverbLevel;
     /* Filter */
