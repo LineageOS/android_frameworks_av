@@ -5319,7 +5319,7 @@ uint32_t AudioPolicyManager::setOutputDevices(const sp<SwAudioOutputDescriptor>&
     //  AND force is not specified
     //  AND the output is connected by a valid audio patch.
     // Doing this check here allows the caller to call setOutputDevices() without conditions
-    if ((!filteredDevices.isEmpty() || filteredDevices == prevDevices) &&
+    if ((filteredDevices.isEmpty() || filteredDevices == prevDevices) &&
             !force && outputDesc->getPatchHandle() != 0) {
         ALOGV("%s setting same device %s or null device, force=%d, patch handle=%d", __func__,
               filteredDevices.toString().c_str(), force, outputDesc->getPatchHandle());
