@@ -183,6 +183,10 @@ public:
         return INVALID_OPERATION;
     }
 
+    virtual status_t    setDataSource(const String8& /* rtpParams */) {
+        return INVALID_OPERATION;
+    }
+
     // pass the buffered IGraphicBufferProducer to the media player service
     virtual status_t    setVideoSurfaceTexture(
                                 const sp<IGraphicBufferProducer>& bufferProducer) = 0;
