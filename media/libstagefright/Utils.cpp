@@ -37,6 +37,7 @@
 #include <media/stagefright/foundation/ALookup.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/ByteUtils.h>
+#include <media/stagefright/foundation/OpusHeader.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/AudioSystem.h>
@@ -1745,12 +1746,34 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
         } else if (mime == MEDIA_MIMETYPE_VIDEO_VP9) {
             meta->setData(kKeyVp9CodecPrivate, 0, csd0->data(), csd0->size());
         } else if (mime == MEDIA_MIMETYPE_AUDIO_OPUS) {
-            meta->setData(kKeyOpusHeader, 0, csd0->data(), csd0->size());
+            size_t opusHeadSize = csd0->size();
+            size_t codecDelayBufSize = 0;
+            size_t seekPreRollBufSize = 0;
+            void *opusHeadBuf = csd0->data();
+            void *codecDelayBuf = NULL;
+            void *seekPreRollBuf = NULL;
             if (msg->findBuffer("csd-1", &csd1)) {
-                meta->setData(kKeyOpusCodecDelay, 0, csd1->data(), csd1->size());
+                codecDelayBufSize = csd1->size();
+                codecDelayBuf = csd1->data();
             }
             if (msg->findBuffer("csd-2", &csd2)) {
-                meta->setData(kKeyOpusSeekPreRoll, 0, csd2->data(), csd2->size());
+                seekPreRollBufSize = csd2->size();
+                seekPreRollBuf = csd2->data();
+            }
+            /* Extract codec delay and seek pre roll from csd-0,
+             * if csd-1 and csd-2 are not present */
+            if (!codecDelayBuf && !seekPreRollBuf) {
+                GetOpusHeaderBuffers(csd0->data(), csd0->size(), &opusHeadBuf,
+                                    &opusHeadSize, &codecDelayBuf,
+                                    &codecDelayBufSize, &seekPreRollBuf,
+                                    &seekPreRollBufSize);
+            }
+            meta->setData(kKeyOpusHeader, 0, opusHeadBuf, opusHeadSize);
+            if (codecDelayBuf) {
+                meta->setData(kKeyOpusCodecDelay, 0, codecDelayBuf, codecDelayBufSize);
+            }
+            if (seekPreRollBuf) {
+                meta->setData(kKeyOpusSeekPreRoll, 0, seekPreRollBuf, seekPreRollBufSize);
             }
         } else if (mime == MEDIA_MIMETYPE_AUDIO_VORBIS) {
             meta->setData(kKeyVorbisInfo, 0, csd0->data(), csd0->size());
