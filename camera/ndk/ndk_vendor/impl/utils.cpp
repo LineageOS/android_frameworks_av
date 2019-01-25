@@ -70,7 +70,6 @@ void convertToHidl(const camera_metadata_t *src, HCameraMetadata* dst) {
         return;
     }
     size_t size = get_camera_metadata_size(src);
-    ALOGE("Converting metadata size: %d", (int)size);
     dst->setToExternal((uint8_t *) src, size);
     return;
 }
