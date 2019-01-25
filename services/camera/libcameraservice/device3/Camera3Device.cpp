@@ -3878,7 +3878,8 @@ Camera3Device::HalInterface::HalInterface(
             bool useHalBufManager) :
         mHidlSession(session),
         mRequestMetadataQueue(queue),
-        mUseHalBufManager(useHalBufManager) {
+        mUseHalBufManager(useHalBufManager),
+        mIsReconfigurationQuerySupported(true) {
     // Check with hardware service manager if we can downcast these interfaces
     // Somewhat expensive, so cache the results at startup
     auto castResult_3_5 = device::V3_5::ICameraDeviceSession::castFrom(mHidlSession);
@@ -3982,6 +3983,52 @@ status_t Camera3Device::HalInterface::constructDefaultRequestSettings(
     }
 
     return res;
+}
+
+bool Camera3Device::HalInterface::isReconfigurationRequired(CameraMetadata& oldSessionParams,
+        CameraMetadata& newSessionParams) {
+    // We do reconfiguration by default;
+    bool ret = true;
+    if ((mHidlSession_3_5 != nullptr) && mIsReconfigurationQuerySupported) {
+        android::hardware::hidl_vec<uint8_t> oldParams, newParams;
+        camera_metadata_t* oldSessioMeta = const_cast<camera_metadata_t*>(
+                oldSessionParams.getAndLock());
+        camera_metadata_t* newSessioMeta = const_cast<camera_metadata_t*>(
+                newSessionParams.getAndLock());
+        oldParams.setToExternal(reinterpret_cast<uint8_t*>(oldSessioMeta),
+                get_camera_metadata_size(oldSessioMeta));
+        newParams.setToExternal(reinterpret_cast<uint8_t*>(newSessioMeta),
+                get_camera_metadata_size(newSessioMeta));
+        hardware::camera::common::V1_0::Status callStatus;
+        bool required;
+        auto hidlCb = [&callStatus, &required] (hardware::camera::common::V1_0::Status s,
+                bool requiredFlag) {
+            callStatus = s;
+            required = requiredFlag;
+        };
+        auto err = mHidlSession_3_5->isReconfigurationRequired(oldParams, newParams, hidlCb);
+        oldSessionParams.unlock(oldSessioMeta);
+        newSessionParams.unlock(newSessioMeta);
+        if (err.isOk()) {
+            switch (callStatus) {
+                case hardware::camera::common::V1_0::Status::OK:
+                    ret = required;
+                    break;
+                case hardware::camera::common::V1_0::Status::METHOD_NOT_SUPPORTED:
+                    mIsReconfigurationQuerySupported = false;
+                    ret = true;
+                    break;
+                default:
+                    ALOGV("%s: Reconfiguration query failed: %d", __FUNCTION__, callStatus);
+                    ret = true;
+            }
+        } else {
+            ALOGE("%s: Unexpected binder error: %s", __FUNCTION__, err.description().c_str());
+            ret = true;
+        }
+    }
+
+    return ret;
 }
 
 status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *sessionParams,
@@ -5095,9 +5142,10 @@ bool Camera3Device::RequestThread::updateSessionParameters(const CameraMetadata&
     ATRACE_CALL();
     bool updatesDetected = false;
 
+    CameraMetadata updatedParams(mLatestSessionParams);
     for (auto tag : mSessionParamKeys) {
         camera_metadata_ro_entry entry = settings.find(tag);
-        camera_metadata_entry lastEntry = mLatestSessionParams.find(tag);
+        camera_metadata_entry lastEntry = updatedParams.find(tag);
 
         if (entry.count > 0) {
             bool isDifferent = false;
@@ -5126,17 +5174,26 @@ bool Camera3Device::RequestThread::updateSessionParameters(const CameraMetadata&
                 if (!skipHFRTargetFPSUpdate(tag, entry, lastEntry)) {
                     updatesDetected = true;
                 }
-                mLatestSessionParams.update(entry);
+                updatedParams.update(entry);
             }
         } else if (lastEntry.count > 0) {
             // Value has been removed
             ALOGV("%s: Session parameter tag id %d removed", __FUNCTION__, tag);
-            mLatestSessionParams.erase(tag);
+            updatedParams.erase(tag);
             updatesDetected = true;
         }
     }
 
-    return updatesDetected;
+    bool reconfigureRequired;
+    if (updatesDetected) {
+        reconfigureRequired = mInterface->isReconfigurationRequired(mLatestSessionParams,
+                updatedParams);
+        mLatestSessionParams = updatedParams;
+    } else {
+        reconfigureRequired = false;
+    }
+
+    return reconfigureRequired;
 }
 
 bool Camera3Device::RequestThread::threadLoop() {

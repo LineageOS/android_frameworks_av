@@ -309,6 +309,8 @@ class Camera3Device :
         status_t close();
 
         void signalPipelineDrain(const std::vector<int>& streamIds);
+        bool isReconfigurationRequired(CameraMetadata& oldSessionParams,
+                CameraMetadata& newSessionParams);
 
         // method to extract buffer's unique ID
         // return pair of (newlySeenBuffer?, bufferId)
@@ -401,6 +403,7 @@ class Camera3Device :
         uint32_t mNextStreamConfigCounter = 1;
 
         const bool mUseHalBufManager;
+        bool mIsReconfigurationQuerySupported;
     };
 
     sp<HalInterface> mInterface;
