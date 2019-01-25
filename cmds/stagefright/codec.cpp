@@ -411,10 +411,12 @@ int main(int argc, char **argv) {
         composerClient = new SurfaceComposerClient;
         CHECK_EQ(composerClient->initCheck(), (status_t)OK);
 
-        sp<IBinder> display(SurfaceComposerClient::getBuiltInDisplay(
-                ISurfaceComposer::eDisplayIdMain));
+        const sp<IBinder> display = SurfaceComposerClient::getInternalDisplayToken();
+        CHECK(display != nullptr);
+
         DisplayInfo info;
-        SurfaceComposerClient::getDisplayInfo(display, &info);
+        CHECK_EQ(SurfaceComposerClient::getDisplayInfo(display, &info), NO_ERROR);
+
         ssize_t displayWidth = info.w;
         ssize_t displayHeight = info.h;
 
