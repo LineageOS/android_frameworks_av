@@ -17,6 +17,7 @@
 #ifndef ANDROID_SERVERS_CAMERA_CAMERA3_DEPTH_COMPOSITE_STREAM_H
 #define ANDROID_SERVERS_CAMERA_CAMERA3_DEPTH_COMPOSITE_STREAM_H
 
+#include "common/DepthPhotoProcessor.h"
 #include <dynamic_depth/imaging_model.h>
 #include <dynamic_depth/depth_map.h>
 
@@ -131,6 +132,8 @@ private:
     std::vector<std::tuple<size_t, size_t>> mSupportedDepthSizes;
     std::vector<float>   mInstrinsicCalibration, mLensDistortion;
     bool                 mIsLogicalCamera;
+    void*                mDepthPhotoLibHandle;
+    process_depth_photo_frame mDepthPhotoProcess;
 
     // Keep all incoming Depth buffer timestamps pending further processing.
     std::vector<int64_t> mInputDepthBuffers;

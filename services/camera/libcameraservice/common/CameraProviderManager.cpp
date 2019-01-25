@@ -24,6 +24,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include "common/DepthPhotoProcessor.h"
+#include <dlfcn.h>
 #include <future>
 #include <inttypes.h>
 #include <hardware/camera_common.h>
@@ -606,6 +608,31 @@ void CameraProviderManager::ProviderInfo::DeviceInfo3::getSupportedDynamicDepthS
     }
 }
 
+bool CameraProviderManager::ProviderInfo::DeviceInfo3::isDepthPhotoLibraryPresent() {
+    static bool libraryPresent = false;
+    static bool initialized = false;
+    if (initialized) {
+        return libraryPresent;
+    } else {
+        initialized = true;
+    }
+
+    void* depthLibHandle = dlopen(camera3::kDepthPhotoLibrary, RTLD_NOW | RTLD_LOCAL);
+    if (depthLibHandle == nullptr) {
+        return false;
+    }
+
+    auto processFunc = dlsym(depthLibHandle, camera3::kDepthPhotoProcessFunction);
+    if (processFunc != nullptr) {
+        libraryPresent = true;
+    } else {
+        libraryPresent = false;
+    }
+    dlclose(depthLibHandle);
+
+    return libraryPresent;
+}
+
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDynamicDepthTags() {
     uint32_t depthExclTag = ANDROID_DEPTH_DEPTH_IS_EXCLUSIVE;
     uint32_t depthSizesTag = ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS;
@@ -651,6 +678,11 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDynamicDepthTags()
     if (supportedDynamicDepthSizes.empty()) {
         ALOGE("%s: No dynamic depth size matched!", __func__);
         // Nothing more to do.
+        return OK;
+    }
+
+    if(!isDepthPhotoLibraryPresent()) {
+        // Depth photo processing library is not present, nothing more to do.
         return OK;
     }
 

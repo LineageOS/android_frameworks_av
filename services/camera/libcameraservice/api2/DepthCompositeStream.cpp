@@ -20,44 +20,12 @@
 
 #include "api1/client2/JpegProcessor.h"
 #include "common/CameraProviderManager.h"
-
-#include <dynamic_depth/camera.h>
-#include <dynamic_depth/cameras.h>
-#include <dynamic_depth/container.h>
-#include <dynamic_depth/device.h>
-#include <dynamic_depth/dimension.h>
-#include <dynamic_depth/dynamic_depth.h>
-#include <dynamic_depth/point.h>
-#include <dynamic_depth/pose.h>
-#include <dynamic_depth/profile.h>
-#include <dynamic_depth/profiles.h>
-#include <xmpmeta/xmp_data.h>
-#include <xmpmeta/xmp_writer.h>
-
-#include <jpeglib.h>
-#include <math.h>
-
+#include "dlfcn.h"
 #include <gui/Surface.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
 
 #include "DepthCompositeStream.h"
-
-using dynamic_depth::Camera;
-using dynamic_depth::Cameras;
-using dynamic_depth::CameraParams;
-using dynamic_depth::Container;
-using dynamic_depth::DepthFormat;
-using dynamic_depth::DepthMapParams;
-using dynamic_depth::DepthUnits;
-using dynamic_depth::Device;
-using dynamic_depth::DeviceParams;
-using dynamic_depth::Dimension;
-using dynamic_depth::Image;
-using dynamic_depth::ImagingModelParams;
-using dynamic_depth::Pose;
-using dynamic_depth::Profile;
-using dynamic_depth::Profiles;
 
 namespace android {
 namespace camera3 {
@@ -75,7 +43,9 @@ DepthCompositeStream::DepthCompositeStream(wp<CameraDeviceBase> device,
         mBlobBufferAcquired(false),
         mProducerListener(new ProducerListener()),
         mMaxJpegSize(-1),
-        mIsLogicalCamera(false) {
+        mIsLogicalCamera(false),
+        mDepthPhotoLibHandle(nullptr),
+        mDepthPhotoProcess(nullptr) {
     sp<CameraDeviceBase> cameraDevice = device.promote();
     if (cameraDevice.get() != nullptr) {
         CameraMetadata staticInfo = cameraDevice->info();
@@ -113,6 +83,19 @@ DepthCompositeStream::DepthCompositeStream(wp<CameraDeviceBase> device,
         }
 
         getSupportedDepthSizes(staticInfo, &mSupportedDepthSizes);
+
+        mDepthPhotoLibHandle = dlopen(camera3::kDepthPhotoLibrary, RTLD_NOW | RTLD_LOCAL);
+        if (mDepthPhotoLibHandle != nullptr) {
+            mDepthPhotoProcess = reinterpret_cast<camera3::process_depth_photo_frame> (
+                    dlsym(mDepthPhotoLibHandle, camera3::kDepthPhotoProcessFunction));
+            if (mDepthPhotoProcess == nullptr) {
+                ALOGE("%s: Failed to link to depth photo process function: %s", __FUNCTION__,
+                        dlerror());
+            }
+        } else {
+            ALOGE("%s: Failed to link to depth photo library: %s", __FUNCTION__, dlerror());
+        }
+
     }
 }
 
@@ -125,6 +108,11 @@ DepthCompositeStream::~DepthCompositeStream() {
     mDepthSurface.clear();
     mDepthConsumer = nullptr;
     mDepthSurface = nullptr;
+    if (mDepthPhotoLibHandle != nullptr) {
+        dlclose(mDepthPhotoLibHandle);
+        mDepthPhotoLibHandle = nullptr;
+    }
+    mDepthPhotoProcess = nullptr;
 }
 
 void DepthCompositeStream::compilePendingInputLocked() {
@@ -259,215 +247,18 @@ int64_t DepthCompositeStream::getNextFailingInputLocked(int64_t *currentTs /*ino
     return ret;
 }
 
-status_t DepthCompositeStream::encodeGrayscaleJpeg(size_t width, size_t height, uint8_t *in,
-        void *out, const size_t maxOutSize, uint8_t jpegQuality, size_t &actualSize) {
-    status_t ret;
-    // libjpeg is a C library so we use C-style "inheritance" by
-    // putting libjpeg's jpeg_destination_mgr first in our custom
-    // struct. This allows us to cast jpeg_destination_mgr* to
-    // CustomJpegDestMgr* when we get it passed to us in a callback.
-    struct CustomJpegDestMgr : public jpeg_destination_mgr {
-        JOCTET *mBuffer;
-        size_t mBufferSize;
-        size_t mEncodedSize;
-        bool mSuccess;
-    } dmgr;
-
-    jpeg_compress_struct cinfo = {};
-    jpeg_error_mgr jerr;
-
-    // Initialize error handling with standard callbacks, but
-    // then override output_message (to print to ALOG) and
-    // error_exit to set a flag and print a message instead
-    // of killing the whole process.
-    cinfo.err = jpeg_std_error(&jerr);
-
-    cinfo.err->output_message = [](j_common_ptr cinfo) {
-        char buffer[JMSG_LENGTH_MAX];
-
-        /* Create the message */
-        (*cinfo->err->format_message)(cinfo, buffer);
-        ALOGE("libjpeg error: %s", buffer);
-    };
-
-    cinfo.err->error_exit = [](j_common_ptr cinfo) {
-        (*cinfo->err->output_message)(cinfo);
-        if(cinfo->client_data) {
-            auto & dmgr = *static_cast<CustomJpegDestMgr*>(cinfo->client_data);
-            dmgr.mSuccess = false;
-        }
-    };
-
-    // Now that we initialized some callbacks, let's create our compressor
-    jpeg_create_compress(&cinfo);
-    dmgr.mBuffer = static_cast<JOCTET*>(out);
-    dmgr.mBufferSize = maxOutSize;
-    dmgr.mEncodedSize = 0;
-    dmgr.mSuccess = true;
-    cinfo.client_data = static_cast<void*>(&dmgr);
-
-    // These lambdas become C-style function pointers and as per C++11 spec
-    // may not capture anything.
-    dmgr.init_destination = [](j_compress_ptr cinfo) {
-        auto & dmgr = static_cast<CustomJpegDestMgr&>(*cinfo->dest);
-        dmgr.next_output_byte = dmgr.mBuffer;
-        dmgr.free_in_buffer = dmgr.mBufferSize;
-        ALOGV("%s:%d jpeg start: %p [%zu]",
-              __FUNCTION__, __LINE__, dmgr.mBuffer, dmgr.mBufferSize);
-    };
-
-    dmgr.empty_output_buffer = [](j_compress_ptr cinfo __unused) {
-        ALOGV("%s:%d Out of buffer", __FUNCTION__, __LINE__);
-        return 0;
-    };
-
-    dmgr.term_destination = [](j_compress_ptr cinfo) {
-        auto & dmgr = static_cast<CustomJpegDestMgr&>(*cinfo->dest);
-        dmgr.mEncodedSize = dmgr.mBufferSize - dmgr.free_in_buffer;
-        ALOGV("%s:%d Done with jpeg: %zu", __FUNCTION__, __LINE__, dmgr.mEncodedSize);
-    };
-    cinfo.dest = reinterpret_cast<struct jpeg_destination_mgr*>(&dmgr);
-    cinfo.image_width = width;
-    cinfo.image_height = height;
-    cinfo.input_components = 1;
-    cinfo.in_color_space = JCS_GRAYSCALE;
-
-    // Initialize defaults and then override what we want
-    jpeg_set_defaults(&cinfo);
-
-    jpeg_set_quality(&cinfo, jpegQuality, 1);
-    jpeg_set_colorspace(&cinfo, JCS_GRAYSCALE);
-    cinfo.raw_data_in = 0;
-    cinfo.dct_method = JDCT_IFAST;
-
-    cinfo.comp_info[0].h_samp_factor = 1;
-    cinfo.comp_info[1].h_samp_factor = 1;
-    cinfo.comp_info[2].h_samp_factor = 1;
-    cinfo.comp_info[0].v_samp_factor = 1;
-    cinfo.comp_info[1].v_samp_factor = 1;
-    cinfo.comp_info[2].v_samp_factor = 1;
-
-    jpeg_start_compress(&cinfo, TRUE);
-
-    for (size_t i = 0; i < cinfo.image_height; i++) {
-        auto currentRow  = static_cast<JSAMPROW>(in + i*width);
-        jpeg_write_scanlines(&cinfo, &currentRow, /*num_lines*/1);
-    }
-
-    jpeg_finish_compress(&cinfo);
-
-    actualSize = dmgr.mEncodedSize;
-    if (dmgr.mSuccess) {
-        ret = NO_ERROR;
-    } else {
-        ret = UNKNOWN_ERROR;
-    }
-
-    return ret;
-}
-
-std::unique_ptr<DepthMap> DepthCompositeStream::processDepthMapFrame(
-        const CpuConsumer::LockedBuffer &depthMapBuffer, size_t maxJpegSize, uint8_t jpegQuality,
-        std::vector<std::unique_ptr<Item>> *items /*out*/) {
-    std::vector<float> points, confidence;
-
-    size_t pointCount = depthMapBuffer.width * depthMapBuffer.height;
-    points.reserve(pointCount);
-    confidence.reserve(pointCount);
-    float near = UINT16_MAX;
-    float far = .0f;
-    uint16_t *data = reinterpret_cast<uint16_t *> (depthMapBuffer.data);
-    for (size_t i = 0; i < depthMapBuffer.height; i++) {
-        for (size_t j = 0; j < depthMapBuffer.width; j++) {
-            // Android densely packed depth map. The units for the range are in
-            // millimeters and need to be scaled to meters.
-            // The confidence value is encoded in the 3 most significant bits.
-            // The confidence data needs to be additionally normalized with
-            // values 1.0f, 0.0f representing maximum and minimum confidence
-            // respectively.
-            auto value = data[i*depthMapBuffer.stride + j];
-            auto point = static_cast<float>(value & 0x1FFF) / 1000.f;
-            points.push_back(point);
-
-            auto conf = (value >> 13) & 0x7;
-            float normConfidence = (conf == 0) ? 1.f : (static_cast<float>(conf) - 1) / 7.f;
-            confidence.push_back(normConfidence);
-
-            if (near > point) {
-                near = point;
-            }
-            if (far < point) {
-                far = point;
-            }
-        }
-    }
-
-    if (near == far) {
-        ALOGE("%s: Near and far range values must not match!", __FUNCTION__);
-        return nullptr;
-    }
-
-    std::vector<uint8_t> pointsQuantized, confidenceQuantized;
-    pointsQuantized.reserve(pointCount); confidenceQuantized.reserve(pointCount);
-    auto pointIt = points.begin();
-    auto confidenceIt = confidence.begin();
-    while ((pointIt != points.end()) && (confidenceIt != confidence.end())) {
-        pointsQuantized.push_back(floorf(((far * (*pointIt - near)) /
-                (*pointIt * (far - near))) * 255.0f));
-        confidenceQuantized.push_back(floorf(*confidenceIt * 255.0f));
-        confidenceIt++; pointIt++;
-    }
-
-    DepthMapParams depthParams(DepthFormat::kRangeInverse, near, far, DepthUnits::kMeters,
-            "android/depthmap");
-    depthParams.confidence_uri = "android/confidencemap";
-    depthParams.mime = "image/jpeg";
-    depthParams.depth_image_data.resize(maxJpegSize);
-    depthParams.confidence_data.resize(maxJpegSize);
-    size_t actualJpegSize;
-    auto ret = encodeGrayscaleJpeg(depthMapBuffer.width, depthMapBuffer.height,
-            pointsQuantized.data(), depthParams.depth_image_data.data(), maxJpegSize, jpegQuality,
-            actualJpegSize);
-    if (ret != NO_ERROR) {
-        ALOGE("%s: Depth map compression failed!", __FUNCTION__);
-        return nullptr;
-    }
-    depthParams.depth_image_data.resize(actualJpegSize);
-
-    ret = encodeGrayscaleJpeg(depthMapBuffer.width, depthMapBuffer.height,
-            confidenceQuantized.data(), depthParams.confidence_data.data(), maxJpegSize,
-            jpegQuality, actualJpegSize);
-    if (ret != NO_ERROR) {
-        ALOGE("%s: Confidence map compression failed!", __FUNCTION__);
-        return nullptr;
-    }
-    depthParams.confidence_data.resize(actualJpegSize);
-
-    return DepthMap::FromData(depthParams, items);
-}
-
 status_t DepthCompositeStream::processInputFrame(const InputFrame &inputFrame) {
     status_t res;
     sp<ANativeWindow> outputANW = mOutputSurface;
     ANativeWindowBuffer *anb;
     int fenceFd;
     void *dstBuffer;
-    auto imgBuffer = inputFrame.jpegBuffer;
 
     auto jpegSize = android::camera2::JpegProcessor::findJpegSize(inputFrame.jpegBuffer.data,
             inputFrame.jpegBuffer.width);
     if (jpegSize == 0) {
         ALOGW("%s: Failed to find input jpeg size, default to using entire buffer!", __FUNCTION__);
         jpegSize = inputFrame.jpegBuffer.width;
-    }
-
-    std::vector<std::unique_ptr<Item>> items;
-    std::vector<std::unique_ptr<Camera>> cameraList;
-    auto image = Image::FromDataForPrimaryImage("android/mainimage", &items);
-    std::unique_ptr<CameraParams> cameraParams(new CameraParams(std::move(image)));
-    if (cameraParams == nullptr) {
-        ALOGE("%s: Failed to initialize camera parameters", __FUNCTION__);
-        return BAD_VALUE;
     }
 
     size_t maxDepthJpegSize;
@@ -482,49 +273,16 @@ status_t DepthCompositeStream::processInputFrame(const InputFrame &inputFrame) {
     if (entry.count > 0) {
         jpegQuality = entry.data.u8[0];
     }
-    cameraParams->depth_map = processDepthMapFrame(inputFrame.depthBuffer, maxDepthJpegSize,
-            jpegQuality, &items);
-    if (cameraParams->depth_map == nullptr) {
-        ALOGE("%s: Depth map processing failed!", __FUNCTION__);
-        return BAD_VALUE;
-    }
-    cameraParams->imaging_model = getImagingModel();
 
-    if (mIsLogicalCamera) {
-        cameraParams->trait = dynamic_depth::CameraTrait::LOGICAL;
-    } else {
-        cameraParams->trait = dynamic_depth::CameraTrait::PHYSICAL;
-    }
+    // The final depth photo will consist of the main jpeg buffer, the depth map buffer (also in
+    // jpeg format) and confidence map (jpeg as well). Assume worst case that all 3 jpeg need
+    // max jpeg size.
+    size_t finalJpegBufferSize = maxDepthJpegSize * 3;
 
-    cameraList.emplace_back(Camera::FromData(std::move(cameraParams)));
-
-    auto deviceParams = std::make_unique<DeviceParams> (Cameras::FromCameraArray(&cameraList));
-    deviceParams->container = Container::FromItems(&items);
-    std::vector<std::unique_ptr<Profile>> profileList;
-    profileList.emplace_back(Profile::FromData("DepthPhoto", {0}));
-    deviceParams->profiles = Profiles::FromProfileArray(&profileList);
-    std::unique_ptr<Device> device = Device::FromData(std::move(deviceParams));
-    if (device == nullptr) {
-        ALOGE("%s: Failed to initialize camera device", __FUNCTION__);
-        return BAD_VALUE;
-    }
-
-    std::istringstream inputJpegStream(std::string(reinterpret_cast<const char *> (imgBuffer.data),
-            jpegSize));
-    std::ostringstream outputJpegStream;
-    if (!WriteImageAndMetadataAndContainer(&inputJpegStream, device.get(), &outputJpegStream)) {
-        ALOGE("%s: Failed writing depth output", __FUNCTION__);
-        return BAD_VALUE;
-    }
-
-    size_t finalJpegSize = static_cast<size_t> (outputJpegStream.tellp()) +
-            sizeof(struct camera3_jpeg_blob);
-
-    ALOGV("%s: Final jpeg size: %zu", __func__, finalJpegSize);
-    if ((res = native_window_set_buffers_dimensions(mOutputSurface.get(), finalJpegSize, 1))
+    if ((res = native_window_set_buffers_dimensions(mOutputSurface.get(), finalJpegBufferSize, 1))
             != OK) {
         ALOGE("%s: Unable to configure stream buffer dimensions"
-                " %zux%u for stream %d", __FUNCTION__, finalJpegSize, 1U, mBlobStreamId);
+                " %zux%u for stream %d", __FUNCTION__, finalJpegBufferSize, 1U, mBlobStreamId);
         return res;
     }
 
@@ -544,20 +302,65 @@ status_t DepthCompositeStream::processInputFrame(const InputFrame &inputFrame) {
         return res;
     }
 
-    if ((gb->getWidth() < finalJpegSize) || (gb->getHeight() != 1)) {
+    if ((gb->getWidth() < finalJpegBufferSize) || (gb->getHeight() != 1)) {
         ALOGE("%s: Blob buffer size mismatch, expected %dx%d received %zux%u", __FUNCTION__,
-                gb->getWidth(), gb->getHeight(), finalJpegSize, 1U);
+                gb->getWidth(), gb->getHeight(), finalJpegBufferSize, 1U);
         outputANW->cancelBuffer(mOutputSurface.get(), anb, /*fence*/ -1);
         return BAD_VALUE;
     }
 
-    // Copy final jpeg with embedded depth data in the composite stream output buffer
+    DepthPhotoInputFrame depthPhoto;
+    depthPhoto.mMainJpegBuffer = reinterpret_cast<const char*> (inputFrame.jpegBuffer.data);
+    depthPhoto.mMainJpegWidth = mBlobWidth;
+    depthPhoto.mMainJpegHeight = mBlobHeight;
+    depthPhoto.mMainJpegSize = jpegSize;
+    depthPhoto.mDepthMapBuffer = reinterpret_cast<uint16_t*> (inputFrame.depthBuffer.data);
+    depthPhoto.mDepthMapWidth = inputFrame.depthBuffer.width;
+    depthPhoto.mDepthMapHeight = inputFrame.depthBuffer.height;
+    depthPhoto.mDepthMapStride = inputFrame.depthBuffer.stride;
+    depthPhoto.mJpegQuality = jpegQuality;
+    depthPhoto.mIsLogical = mIsLogicalCamera;
+    depthPhoto.mMaxJpegSize = maxDepthJpegSize;
+    // The camera intrinsic calibration layout is as follows:
+    // [focalLengthX, focalLengthY, opticalCenterX, opticalCenterY, skew]
+    if (mInstrinsicCalibration.size() == 5) {
+        memcpy(depthPhoto.mInstrinsicCalibration, mInstrinsicCalibration.data(),
+                sizeof(depthPhoto.mInstrinsicCalibration));
+        depthPhoto.mIsInstrinsicCalibrationValid = 1;
+    } else {
+        depthPhoto.mIsInstrinsicCalibrationValid = 0;
+    }
+    // The camera lens distortion contains the following lens correction coefficients.
+    // [kappa_1, kappa_2, kappa_3 kappa_4, kappa_5]
+    if (mLensDistortion.size() == 5) {
+        memcpy(depthPhoto.mLensDistortion, mLensDistortion.data(),
+                sizeof(depthPhoto.mLensDistortion));
+        depthPhoto.mIsLensDistortionValid = 1;
+    } else {
+        depthPhoto.mIsLensDistortionValid = 0;
+    }
+
+    size_t actualJpegSize = 0;
+    res = mDepthPhotoProcess(depthPhoto, finalJpegBufferSize, dstBuffer, &actualJpegSize);
+    if (res != 0) {
+        ALOGE("%s: Depth photo processing failed: %s (%d)", __FUNCTION__, strerror(-res), res);
+        outputANW->cancelBuffer(mOutputSurface.get(), anb, /*fence*/ -1);
+        return res;
+    }
+
+    size_t finalJpegSize = actualJpegSize + sizeof(struct camera3_jpeg_blob);
+    if (finalJpegSize > finalJpegBufferSize) {
+        ALOGE("%s: Final jpeg buffer not large enough for the jpeg blob header", __FUNCTION__);
+        outputANW->cancelBuffer(mOutputSurface.get(), anb, /*fence*/ -1);
+        return NO_MEMORY;
+    }
+
+    ALOGV("%s: Final jpeg size: %zu", __func__, finalJpegSize);
     uint8_t* header = static_cast<uint8_t *> (dstBuffer) +
         (gb->getWidth() - sizeof(struct camera3_jpeg_blob));
     struct camera3_jpeg_blob *blob = reinterpret_cast<struct camera3_jpeg_blob*> (header);
     blob->jpeg_blob_id = CAMERA3_JPEG_BLOB_ID;
-    blob->jpeg_size = static_cast<uint32_t> (outputJpegStream.tellp());
-    memcpy(dstBuffer, outputJpegStream.str().c_str(), blob->jpeg_size);
+    blob->jpeg_size = actualJpegSize;
     outputANW->queueBuffer(mOutputSurface.get(), anb, /*fence*/ -1);
 
     return res;
@@ -756,6 +559,11 @@ status_t DepthCompositeStream::configureStream() {
     if (isRunning()) {
         // Processing thread is already running, nothing more to do.
         return NO_ERROR;
+    }
+
+    if ((mDepthPhotoLibHandle == nullptr) || (mDepthPhotoProcess == nullptr)) {
+        ALOGE("%s: Depth photo library is not present!", __FUNCTION__);
+        return NO_INIT;
     }
 
     if (mOutputSurface.get() == nullptr) {
@@ -988,38 +796,6 @@ status_t DepthCompositeStream::getCompositeStreamInfo(const OutputStreamInfo &st
     (*compositeOutput)[1].consumerUsage = GRALLOC_USAGE_SW_READ_OFTEN;
 
     return NO_ERROR;
-}
-
-std::unique_ptr<ImagingModel> DepthCompositeStream::getImagingModel() {
-    // It is not possible to generate an imaging model without instrinsic calibration.
-    if (mInstrinsicCalibration.empty() || mInstrinsicCalibration.size() != 5) {
-        return nullptr;
-    }
-
-    // The camera intrinsic calibration layout is as follows:
-    // [focalLengthX, focalLengthY, opticalCenterX, opticalCenterY, skew]
-    const dynamic_depth::Point<double> focalLength(mInstrinsicCalibration[0],
-            mInstrinsicCalibration[1]);
-    const Dimension imageSize(mBlobWidth, mBlobHeight);
-    ImagingModelParams params(focalLength, imageSize);
-    params.principal_point.x = mInstrinsicCalibration[2];
-    params.principal_point.y = mInstrinsicCalibration[3];
-    params.skew = mInstrinsicCalibration[4];
-
-    // The camera lens distortion contains the following lens correction coefficients.
-    // [kappa_1, kappa_2, kappa_3 kappa_4, kappa_5]
-    if (mLensDistortion.size() == 5) {
-        // According to specification the lens distortion coefficients should be ordered
-        // as [1, kappa_4, kappa_1, kappa_5, kappa_2, 0, kappa_3, 0]
-        float distortionData[] = {1.f, mLensDistortion[3], mLensDistortion[0], mLensDistortion[4],
-            mLensDistortion[1], 0.f, mLensDistortion[2], 0.f};
-        auto distortionDataLength = sizeof(distortionData) / sizeof(distortionData[0]);
-        params.distortion.reserve(distortionDataLength);
-        params.distortion.insert(params.distortion.end(), distortionData,
-                distortionData + distortionDataLength);
-    }
-
-    return ImagingModel::FromData(params);
 }
 
 }; // namespace camera3

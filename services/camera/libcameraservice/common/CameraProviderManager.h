@@ -483,6 +483,7 @@ private:
             void getSupportedDynamicDepthDurations(const std::vector<int64_t>& depthDurations,
                     const std::vector<int64_t>& blobDurations,
                     std::vector<int64_t> *dynamicDepthDurations /*out*/);
+            static bool isDepthPhotoLibraryPresent();
             static void getSupportedDynamicDepthSizes(
                     const std::vector<std::tuple<size_t, size_t>>& blobSizes,
                     const std::vector<std::tuple<size_t, size_t>>& depthSizes,

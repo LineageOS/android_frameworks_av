@@ -67,9 +67,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "libimage_io",
-        "libdynamic_depth",
-        "libxml2",
+        "libdl",
         "libui",
         "liblog",
         "libutilscallstack",
@@ -113,6 +111,41 @@ cc_library_shared {
         "system/media/private/camera/include",
         "frameworks/native/include/media/openmax",
         "frameworks/av/media/ndk",
+        "external/dynamic_depth/includes",
+        "external/dynamic_depth/internal",
+    ],
+
+    export_include_dirs: ["."],
+
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wno-ignored-qualifiers",
+    ],
+
+}
+
+cc_library_shared {
+    name: "libdepthphoto",
+
+    srcs: [
+        "common/DepthPhotoProcessor.cpp",
+    ],
+
+    shared_libs: [
+        "libimage_io",
+        "libdynamic_depth",
+        "libxml2",
+        "liblog",
+        "libutilscallstack",
+        "libutils",
+        "libcutils",
+        "libjpeg",
+        "libmemunreachable",
+    ],
+
+    include_dirs: [
         "external/dynamic_depth/includes",
         "external/dynamic_depth/internal",
     ],
