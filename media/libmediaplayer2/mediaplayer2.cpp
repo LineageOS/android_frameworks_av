@@ -1124,8 +1124,10 @@ status_t MediaPlayer2::prepareDrm(
     // completed) so the state change to "prepared" might not have happened yet (e.g., buffering).
     // Still, we can allow prepareDrm for the use case of being called in OnDrmInfoListener.
     if (!(mCurrentState & (MEDIA_PLAYER2_PREPARING | MEDIA_PLAYER2_PREPARED))) {
-        ALOGE("prepareDrm is called in the wrong state (%d).", mCurrentState);
-        return INVALID_OPERATION;
+        ALOGW("prepareDrm(%lld) called in non-prepare state(%d)", (long long)srcId, mCurrentState);
+        if (srcId == mSrcId) {
+            return INVALID_OPERATION;
+        }
     }
 
     if (drmSessionId.isEmpty()) {
