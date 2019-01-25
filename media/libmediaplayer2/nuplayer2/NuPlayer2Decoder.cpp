@@ -107,6 +107,8 @@ sp<AMessage> NuPlayer2::Decoder::getStats() const {
     mStats->setInt64("frames-total", mNumFramesTotal);
     mStats->setInt64("frames-dropped-input", mNumInputFramesDropped);
     mStats->setInt64("frames-dropped-output", mNumOutputFramesDropped);
+    mStats->setFloat("frame-rate-total", mFrameRateTotal);
+
     return mStats;
 }
 

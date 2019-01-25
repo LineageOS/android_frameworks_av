@@ -85,13 +85,9 @@ const char *mediametrics_readable(mediametrics_handle_t handle);
 void mediametrics_setUid(mediametrics_handle_t handle, uid_t uid);
 bool mediametrics_isEnabled();
 
-#if 0
-// do not expose this as is.
-// need to revisit (or redefine) how the android::Parcel parameter is handled
-// so that it meets the stable-API criteria for updateable components.
-//
-int32_t mediametrics_writeToParcel(mediametrics_handle_t handle, android::Parcel *parcel);
-#endif
+// serialized copy of the attributes/values, mostly for upstream getMetrics() calls
+// caller owns the buffer allocated as part of this call.
+bool mediametrics_getAttributes(mediametrics_handle_t handle, char **buffer, size_t *length);
 
 __END_DECLS
 

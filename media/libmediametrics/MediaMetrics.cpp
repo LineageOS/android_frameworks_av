@@ -34,7 +34,7 @@
 
 // manage the overall record
 mediametrics_handle_t mediametrics_create(mediametricskey_t key) {
-    android::MediaAnalyticsItem *item = new android::MediaAnalyticsItem(key);
+    android::MediaAnalyticsItem *item = android::MediaAnalyticsItem::create(key);
     return (mediametrics_handle_t) item;
 }
 
@@ -187,18 +187,9 @@ bool mediametrics_isEnabled() {
     return android::MediaAnalyticsItem::isEnabled();
 }
 
-#if 0
-// do not expose this as is.
-// need to revisit (or redefine) how the android::Parcel parameter is handled
-// so that it meets the stable-API criteria for updateable components.
-//
-int32_t mediametrics_writeToParcel(mediametrics_handle_t handle, android::Parcel *parcel) {
+bool mediametrics_getAttributes(mediametrics_handle_t handle, char **buffer, size_t *length) {
     android::MediaAnalyticsItem *item = (android::MediaAnalyticsItem *) handle;
-    if (item == NULL) {
-        return -1;
-    }
-    return item->writeToParcel(parcel);
+    if (item == NULL) return false;
+    return item->dumpAttributes(buffer, length);
+
 }
-#endif
-
-

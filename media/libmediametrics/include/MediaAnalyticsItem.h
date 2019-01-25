@@ -17,9 +17,10 @@
 #ifndef ANDROID_MEDIA_MEDIAANALYTICSITEM_H
 #define ANDROID_MEDIA_MEDIAANALYTICSITEM_H
 
-#include <cutils/properties.h>
 #include <string>
 #include <sys/types.h>
+
+#include <cutils/properties.h>
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>
 #include <utils/RefBase.h>
@@ -83,6 +84,10 @@ class MediaAnalyticsItem {
 
 
     public:
+
+        // so clients do not need to know size details
+        static MediaAnalyticsItem* create(Key key);
+        static MediaAnalyticsItem* create();
 
         // access functions for the class
         MediaAnalyticsItem();
@@ -175,6 +180,9 @@ class MediaAnalyticsItem {
         int32_t writeToParcel(Parcel *);
         int32_t readFromParcel(const Parcel&);
 
+        // supports the stable interface
+        bool dumpAttributes(char **pbuffer, size_t *plength);
+
         std::string toString();
         std::string toString(int version);
         const char *toCString();
@@ -182,6 +190,11 @@ class MediaAnalyticsItem {
 
         // are we collecting analytics data
         static bool isEnabled();
+
+    private:
+        // handle Parcel version 0
+        int32_t writeToParcel0(Parcel *);
+        int32_t readFromParcel0(const Parcel&);
 
     protected:
 
