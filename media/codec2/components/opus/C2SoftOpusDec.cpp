@@ -252,20 +252,25 @@ void C2SoftOpusDec::process(
     const uint8_t *data = rView.data() + inOffset;
     if (mInputBufferCount < 3) {
         if (mInputBufferCount == 0) {
-            size_t opusHeadSize = inSize;
+            size_t opusHeadSize = 0;
             size_t codecDelayBufSize = 0;
             size_t seekPreRollBufSize = 0;
-            void *opusHeadBuf = (void *)data;
+            void *opusHeadBuf = NULL;
             void *codecDelayBuf = NULL;
             void *seekPreRollBuf = NULL;
 
-            GetOpusHeaderBuffers(data, inSize, &opusHeadBuf,
-                                &opusHeadSize, &codecDelayBuf,
-                                &codecDelayBufSize, &seekPreRollBuf,
-                                &seekPreRollBufSize);
+            if (!GetOpusHeaderBuffers(data, inSize, &opusHeadBuf,
+                                     &opusHeadSize, &codecDelayBuf,
+                                     &codecDelayBufSize, &seekPreRollBuf,
+                                     &seekPreRollBufSize)) {
+                ALOGE("%s encountered error in GetOpusHeaderBuffers", __func__);
+                mSignalledError = true;
+                work->result = C2_CORRUPTED;
+                return;
+            }
 
             if (!ParseOpusHeader((uint8_t *)opusHeadBuf, opusHeadSize, &mHeader)) {
-                ALOGE("Encountered error while Parsing Opus Header.");
+                ALOGE("%s Encountered error while Parsing Opus Header.", __func__);
                 mSignalledError = true;
                 work->result = C2_CORRUPTED;
                 return;
@@ -304,14 +309,14 @@ void C2SoftOpusDec::process(
                 return;
             }
 
-            if (codecDelayBuf && codecDelayBufSize == 8) {
+            if (codecDelayBuf && codecDelayBufSize == sizeof(uint64_t)) {
                 uint64_t value;
                 memcpy(&value, codecDelayBuf, sizeof(uint64_t));
                 mCodecDelay = ns_to_samples(value, kRate);
                 mSamplesToDiscard = mCodecDelay;
                 ++mInputBufferCount;
             }
-            if (seekPreRollBuf && seekPreRollBufSize == 8) {
+            if (seekPreRollBuf && seekPreRollBufSize == sizeof(uint64_t)) {
                 uint64_t value;
                 memcpy(&value, codecDelayBuf, sizeof(uint64_t));
                 mSeekPreRoll = ns_to_samples(value, kRate);

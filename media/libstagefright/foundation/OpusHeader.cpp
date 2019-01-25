@@ -15,9 +15,9 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "SoftOpus"
-#include <algorithm>
+#define LOG_TAG "OpusHeader"
 #include <cstring>
+#include <inttypes.h>
 #include <stdint.h>
 
 #include <log/log.h>
@@ -91,6 +91,9 @@ static uint16_t ReadLE16(const uint8_t* data, size_t data_size, uint32_t read_of
 
 // Parses Opus Header. Header spec: http://wiki.xiph.org/OggOpus#ID_Header
 bool ParseOpusHeader(const uint8_t* data, size_t data_size, OpusHeader* header) {
+    if (data == NULL) {
+        return false;
+    }
     if (data_size < kOpusHeaderSize) {
         ALOGV("Header size is too small.");
         return false;
@@ -183,53 +186,88 @@ int WriteOpusHeaders(const OpusHeader &header, int inputSampleRate,
         ALOGD("Buffer not large enough to hold unified OPUS CSD");
         return -1;
     }
+    int headerLen = 0;
 
-    int headerLen = WriteOpusHeader(header, inputSampleRate, output,
+    // Add opus header
+    /*
+      Following is the CSD syntax for signalling OpusHeader
+      (http://wiki.xiph.org/OggOpus#ID_Header)
+
+      Marker (8 bytes) | Length (8 bytes) | OpusHeader
+
+      Markers supported:
+      AOPUS_CSD_OPUS_HEADER_MARKER - Signals Opus Header
+
+      Length should be a value within AOPUS_OPUSHEAD_MINSIZE and AOPUS_OPUSHEAD_MAXSIZE.
+    */
+
+    memcpy(output + headerLen, AOPUS_CSD_OPUS_HEADER_MARKER, AOPUS_MARKER_SIZE);
+    headerLen += AOPUS_MARKER_SIZE;
+
+    // Place holder for opusHeader Size
+    headerLen += AOPUS_LENGTH_SIZE;
+
+    int headerSize = WriteOpusHeader(header, inputSampleRate, output + headerLen,
         outputSize);
-    if (headerLen < 0) {
-        ALOGD("WriteOpusHeader failed");
+    if (headerSize < 0) {
+        ALOGD("%s: WriteOpusHeader failed", __func__);
         return -1;
     }
-    if (headerLen >= (outputSize - 2 * AOPUS_TOTAL_CSD_SIZE)) {
-        ALOGD("Buffer not large enough to hold codec delay and seek pre roll");
-        return -1;
-    }
+    headerLen += headerSize;
 
-    uint64_t length = AOPUS_LENGTH;
+    // Update opus headerSize after AOPUS_CSD_OPUS_HEADER_MARKER
+    uint64_t length = headerSize;
+    memcpy(output + AOPUS_MARKER_SIZE, &length, AOPUS_LENGTH_SIZE);
 
     /*
       Following is the CSD syntax for signalling codec delay and
       seek pre-roll which is to be appended after OpusHeader
 
-      Marker (8 bytes) | Length (8 bytes) | Samples (8 bytes)
+      Marker (8 bytes) | Length (8 bytes) | Samples in ns (8 bytes)
 
       Markers supported:
-      AOPUSDLY - Signals Codec Delay
-      AOPUSPRL - Signals seek pre roll
+      AOPUS_CSD_CODEC_DELAY_MARKER - codec delay as samples in ns, represented in 8 bytes
+      AOPUS_CSD_SEEK_PREROLL_MARKER - preroll adjustment as samples in ns, represented in 8 bytes
 
-      Length should be 8.
     */
-
+    length = sizeof(codecDelay);
+    if (headerLen > (outputSize - AOPUS_MARKER_SIZE - AOPUS_LENGTH_SIZE - length)) {
+        ALOGD("Buffer not large enough to hold codec delay");
+        return -1;
+    }
     // Add codec delay
     memcpy(output + headerLen, AOPUS_CSD_CODEC_DELAY_MARKER, AOPUS_MARKER_SIZE);
     headerLen += AOPUS_MARKER_SIZE;
     memcpy(output + headerLen, &length, AOPUS_LENGTH_SIZE);
     headerLen += AOPUS_LENGTH_SIZE;
-    memcpy(output + headerLen, &codecDelay, AOPUS_CSD_SIZE);
-    headerLen += AOPUS_CSD_SIZE;
+    memcpy(output + headerLen, &codecDelay, length);
+    headerLen += length;
 
+    length = sizeof(seekPreRoll);
+    if (headerLen > (outputSize - AOPUS_MARKER_SIZE - AOPUS_LENGTH_SIZE - length)) {
+        ALOGD("Buffer not large enough to hold seek pre roll");
+        return -1;
+    }
     // Add skip pre roll
     memcpy(output + headerLen, AOPUS_CSD_SEEK_PREROLL_MARKER, AOPUS_MARKER_SIZE);
     headerLen += AOPUS_MARKER_SIZE;
     memcpy(output + headerLen, &length, AOPUS_LENGTH_SIZE);
     headerLen += AOPUS_LENGTH_SIZE;
-    memcpy(output + headerLen, &seekPreRoll, AOPUS_CSD_SIZE);
-    headerLen += AOPUS_CSD_SIZE;
+    memcpy(output + headerLen, &seekPreRoll, length);
+    headerLen += length;
 
     return headerLen;
 }
 
-void GetOpusHeaderBuffers(const uint8_t *data, size_t data_size,
+bool IsOpusHeader(const uint8_t *data, size_t data_size) {
+    if (data_size < AOPUS_MARKER_SIZE) {
+        return false;
+    }
+
+    return !memcmp(data, AOPUS_CSD_OPUS_HEADER_MARKER, AOPUS_MARKER_SIZE);
+}
+
+bool GetOpusHeaderBuffers(const uint8_t *data, size_t data_size,
                           void **opusHeadBuf, size_t *opusHeadSize,
                           void **codecDelayBuf, size_t *codecDelaySize,
                           void **seekPreRollBuf, size_t *seekPreRollSize) {
@@ -237,26 +275,77 @@ void GetOpusHeaderBuffers(const uint8_t *data, size_t data_size,
     *codecDelaySize = 0;
     *seekPreRollBuf = NULL;
     *seekPreRollSize = 0;
-    *opusHeadBuf = (void *)data;
-    *opusHeadSize = data_size;
-    if (data_size >= AOPUS_UNIFIED_CSD_MINSIZE) {
+    *opusHeadBuf = NULL;
+    *opusHeadSize = 0;
+
+    // AOPUS_MARKER_SIZE is 8 "OpusHead" is of size 8
+    if (data_size < 8)
+        return false;
+
+    // Check if the CSD is in legacy format
+    if (!memcmp("OpusHead", data, 8)) {
+        if (data_size < AOPUS_OPUSHEAD_MINSIZE || data_size > AOPUS_OPUSHEAD_MAXSIZE) {
+            ALOGD("Unexpected size for opusHeadSize %zu", data_size);
+            return false;
+        }
+        *opusHeadBuf = (void *)data;
+        *opusHeadSize = data_size;
+        return true;
+    } else if (memcmp(AOPUS_CSD_MARKER_PREFIX, data, AOPUS_CSD_MARKER_PREFIX_SIZE) == 0) {
         size_t i = 0;
-        while (i < data_size - AOPUS_TOTAL_CSD_SIZE) {
+        bool found = false;
+        while (i <= data_size - AOPUS_MARKER_SIZE - AOPUS_LENGTH_SIZE) {
             uint8_t *csdBuf = (uint8_t *)data + i;
-            if (!memcmp(csdBuf, AOPUS_CSD_CODEC_DELAY_MARKER, AOPUS_MARKER_SIZE)) {
-                *opusHeadSize = std::min(*opusHeadSize, i);
+            if (!memcmp(csdBuf, AOPUS_CSD_OPUS_HEADER_MARKER, AOPUS_MARKER_SIZE)) {
+                uint64_t value;
+                memcpy(&value, csdBuf + AOPUS_MARKER_SIZE, sizeof(value));
+                if (value < AOPUS_OPUSHEAD_MINSIZE || value > AOPUS_OPUSHEAD_MAXSIZE) {
+                    ALOGD("Unexpected size for opusHeadSize %" PRIu64, value);
+                    return false;
+                }
+                i += AOPUS_MARKER_SIZE + AOPUS_LENGTH_SIZE + value;
+                if (i > data_size) {
+                    ALOGD("Marker signals a header that is larger than input");
+                    return false;
+                }
+                *opusHeadBuf = csdBuf + AOPUS_MARKER_SIZE + AOPUS_LENGTH_SIZE;
+                *opusHeadSize = value;
+                found = true;
+            } else if (!memcmp(csdBuf, AOPUS_CSD_CODEC_DELAY_MARKER, AOPUS_MARKER_SIZE)) {
+                uint64_t value;
+                memcpy(&value, csdBuf + AOPUS_MARKER_SIZE, sizeof(value));
+                if (value != sizeof(uint64_t)) {
+                    ALOGD("Unexpected size for codecDelay %" PRIu64, value);
+                    return false;
+                }
+                i += AOPUS_MARKER_SIZE + AOPUS_LENGTH_SIZE + value;
+                if (i > data_size) {
+                    ALOGD("Marker signals a header that is larger than input");
+                    return false;
+                }
                 *codecDelayBuf = csdBuf + AOPUS_MARKER_SIZE + AOPUS_LENGTH_SIZE;
-                *codecDelaySize = AOPUS_CSD_SIZE;
-                i += AOPUS_TOTAL_CSD_SIZE;
+                *codecDelaySize = value;
             } else if (!memcmp(csdBuf, AOPUS_CSD_SEEK_PREROLL_MARKER, AOPUS_MARKER_SIZE)) {
-                *opusHeadSize = std::min(*opusHeadSize, i);
+                uint64_t value;
+                memcpy(&value, csdBuf + AOPUS_MARKER_SIZE, sizeof(value));
+                if (value != sizeof(uint64_t)) {
+                    ALOGD("Unexpected size for seekPreRollSize %" PRIu64, value);
+                    return false;
+                }
+                i += AOPUS_MARKER_SIZE + AOPUS_LENGTH_SIZE + value;
+                if (i > data_size) {
+                    ALOGD("Marker signals a header that is larger than input");
+                    return false;
+                }
                 *seekPreRollBuf = csdBuf + AOPUS_MARKER_SIZE + AOPUS_LENGTH_SIZE;
-                *seekPreRollSize = AOPUS_CSD_SIZE;
-                i += AOPUS_TOTAL_CSD_SIZE;
+                *seekPreRollSize = value;
             } else {
                 i++;
             }
         }
+        return found;
+    } else {
+        return false;  // it isn't in either format
     }
 }
 
