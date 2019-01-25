@@ -318,7 +318,7 @@ void C2SoftOpusDec::process(
             }
             if (seekPreRollBuf && seekPreRollBufSize == sizeof(uint64_t)) {
                 uint64_t value;
-                memcpy(&value, codecDelayBuf, sizeof(uint64_t));
+                memcpy(&value, seekPreRollBuf, sizeof(uint64_t));
                 mSeekPreRoll = ns_to_samples(value, kRate);
                 ++mInputBufferCount;
             }
