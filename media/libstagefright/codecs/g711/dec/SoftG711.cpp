@@ -23,6 +23,8 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaDefs.h>
 
+#define MAX_CHANNEL_COUNT            6  /* maximum number of audio channels that can be decoded */
+
 namespace android {
 
 template<class T>
@@ -184,7 +186,7 @@ OMX_ERRORTYPE SoftG711::internalSetParameter(
                 return OMX_ErrorUndefined;
             }
 
-            if (pcmParams->nChannels < 1 || pcmParams->nChannels > 2) {
+            if (pcmParams->nChannels < 1 || pcmParams->nChannels > MAX_CHANNEL_COUNT) {
                 return OMX_ErrorUndefined;
             }
 
