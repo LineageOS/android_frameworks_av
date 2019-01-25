@@ -50,14 +50,6 @@ namespace {
 const std::string kLegacyProviderName("legacy/0");
 const std::string kExternalProviderName("external/0");
 const bool kEnableLazyHal(property_get_bool("ro.camera.enableLazyHal", false));
-
-// The extra amount of time to hold a reference to an ICameraProvider after it is no longer needed.
-// Hold the reference for this extra time so that if the camera is unreferenced and then referenced
-// again quickly, we do not let the HAL exit and then need to immediately restart it. An example
-// when this could happen is switching from a front-facing to a rear-facing camera. If the HAL were
-// to exit during the camera switch, the camera could appear janky to the user.
-const std::chrono::system_clock::duration kCameraKeepAliveDelay = 3s;
-
 } // anonymous namespace
 
 const float CameraProviderManager::kDepthARTolerance = .1f;
@@ -399,12 +391,15 @@ void CameraProviderManager::removeRef(DeviceMode usageType, const std::string &c
     std::lock_guard<std::mutex> lock(mProviderInterfaceMapLock);
     auto search = providerMap->find(cameraId.c_str());
     if (search != providerMap->end()) {
-        auto ptr = search->second;
-        auto future = std::async(std::launch::async, [ptr] {
-            std::this_thread::sleep_for(kCameraKeepAliveDelay);
-            IPCThreadState::self()->flushCommands();
-        });
+        // Drop the reference to this ICameraProvider. This is safe to do immediately (without an
+        // added delay) because hwservicemanager guarantees to hold the reference for at least five
+        // more seconds.  We depend on this behavior so that if the provider is unreferenced and
+        // then referenced again quickly, we do not let the HAL exit and then need to immediately
+        // restart it. An example when this could happen is switching from a front-facing to a
+        // rear-facing camera. If the HAL were to exit during the camera switch, the camera could
+        // appear janky to the user.
         providerMap->erase(cameraId.c_str());
+        IPCThreadState::self()->flushCommands();
     } else {
         ALOGE("%s: Asked to remove reference for camera %s, but no reference to it was found. This "
                 "could mean removeRef was called twice for the same camera ID.", __FUNCTION__,
