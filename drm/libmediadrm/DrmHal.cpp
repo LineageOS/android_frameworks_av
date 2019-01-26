@@ -586,51 +586,57 @@ Return<void> DrmHal::sendSessionLostState(
     return Void();
 }
 
-bool DrmHal::matchMimeTypeAndSecurityLevel(sp<IDrmFactory> &factory,
-                                           const uint8_t uuid[16],
-                                           const String8 &mimeType,
-                                           DrmPlugin::SecurityLevel level) {
-    if (mimeType == "") {
-        return true;
-    } else if (!factory->isContentTypeSupported(mimeType.string())) {
-        return false;
+status_t DrmHal::matchMimeTypeAndSecurityLevel(const sp<IDrmFactory> &factory,
+                                               const uint8_t uuid[16],
+                                               const String8 &mimeType,
+                                               DrmPlugin::SecurityLevel level,
+                                               bool *isSupported) {
+    *isSupported = false;
+
+    // handle default value cases
+    if (level == DrmPlugin::kSecurityLevelUnknown) {
+        if (mimeType == "") {
+            // isCryptoSchemeSupported(uuid)
+            *isSupported = true;
+        } else {
+            // isCryptoSchemeSupported(uuid, mimeType)
+            *isSupported = factory->isContentTypeSupported(mimeType.string());
+        }
+        return OK;
+    } else if (mimeType == "") {
+        return BAD_VALUE;
     }
 
-    if (level == DrmPlugin::kSecurityLevelUnknown) {
-        return true;
+    sp<drm::V1_2::IDrmFactory> factoryV1_2 = drm::V1_2::IDrmFactory::castFrom(factory);
+    if (factoryV1_2 == NULL) {
+        return ERROR_UNSUPPORTED;
     } else {
-        sp<drm::V1_2::IDrmFactory> factoryV1_2 = drm::V1_2::IDrmFactory::castFrom(factory);
-        if (factoryV1_2 == NULL) {
-            return true;
-        } else if (factoryV1_2->isCryptoSchemeSupported_1_2(uuid,
-                        mimeType.string(), toHidlSecurityLevel(level))) {
-            return true;
-        }
+        *isSupported = factoryV1_2->isCryptoSchemeSupported_1_2(uuid,
+                mimeType.string(), toHidlSecurityLevel(level));
+        return OK;
     }
-    return false;
 }
 
-bool DrmHal::isCryptoSchemeSupported(const uint8_t uuid[16],
-                                     const String8 &mimeType,
-                                     DrmPlugin::SecurityLevel level) {
+status_t DrmHal::isCryptoSchemeSupported(const uint8_t uuid[16],
+                                         const String8 &mimeType,
+                                         DrmPlugin::SecurityLevel level,
+                                         bool *isSupported) {
     Mutex::Autolock autoLock(mLock);
-
-    for (size_t i = 0; i < mFactories.size(); i++) {
-        sp<IDrmFactory> factory = mFactories[i];
-        if (factory->isCryptoSchemeSupported(uuid)) {
-            if (matchMimeTypeAndSecurityLevel(factory, uuid, mimeType, level)) {
-                return true;
-            }
+    *isSupported = false;
+    for (ssize_t i = mFactories.size() - 1; i >= 0; i--) {
+        if (mFactories[i]->isCryptoSchemeSupported(uuid)) {
+            return matchMimeTypeAndSecurityLevel(mFactories[i],
+                    uuid, mimeType, level, isSupported);
         }
     }
-    return false;
+    return OK;
 }
 
 status_t DrmHal::createPlugin(const uint8_t uuid[16],
         const String8& appPackageName) {
     Mutex::Autolock autoLock(mLock);
 
-    for (size_t i = mFactories.size() - 1; i >= 0; i--) {
+    for (ssize_t i = mFactories.size() - 1; i >= 0; i--) {
         if (mFactories[i]->isCryptoSchemeSupported(uuid)) {
             auto plugin = makeDrmPlugin(mFactories[i], uuid, appPackageName);
             if (plugin != NULL) {
@@ -1213,7 +1219,7 @@ status_t DrmHal::getOfflineLicenseKeySetIds(List<Vector<uint8_t>> &keySetIds) co
     }
 
     if (mPluginV1_2 == NULL) {
-        return ERROR_DRM_CANNOT_HANDLE;
+        return ERROR_UNSUPPORTED;
     }
 
     status_t err = UNKNOWN_ERROR;
@@ -1238,7 +1244,7 @@ status_t DrmHal::removeOfflineLicense(Vector<uint8_t> const &keySetId) {
     }
 
     if (mPluginV1_2 == NULL) {
-        return ERROR_DRM_CANNOT_HANDLE;
+        return ERROR_UNSUPPORTED;
     }
 
     Return<Status> status = mPluginV1_2->removeOfflineLicense(toHidlVec(keySetId));
@@ -1254,7 +1260,7 @@ status_t DrmHal::getOfflineLicenseState(Vector<uint8_t> const &keySetId,
     }
 
     if (mPluginV1_2 == NULL) {
-        return ERROR_DRM_CANNOT_HANDLE;
+        return ERROR_UNSUPPORTED;
     }
     *licenseState = DrmPlugin::kOfflineLicenseStateUnknown;
 

@@ -63,9 +63,10 @@ struct DrmHal : public BnDrm,
 
     virtual status_t initCheck() const;
 
-    virtual bool isCryptoSchemeSupported(const uint8_t uuid[16],
-                                         const String8& mimeType,
-                                         DrmPlugin::SecurityLevel level);
+    virtual status_t isCryptoSchemeSupported(const uint8_t uuid[16],
+                                             const String8& mimeType,
+                                             DrmPlugin::SecurityLevel level,
+                                             bool *isSupported);
 
     virtual status_t createPlugin(const uint8_t uuid[16],
                                   const String8 &appPackageName);
@@ -226,10 +227,11 @@ private:
     status_t getPropertyStringInternal(String8 const &name, String8 &value) const;
     status_t getPropertyByteArrayInternal(String8 const &name,
                                           Vector<uint8_t> &value) const;
-    bool matchMimeTypeAndSecurityLevel(sp<IDrmFactory> &factory,
-                                       const uint8_t uuid[16],
-                                       const String8 &mimeType,
-                                       DrmPlugin::SecurityLevel level);
+    status_t matchMimeTypeAndSecurityLevel(const sp<IDrmFactory> &factory,
+                                           const uint8_t uuid[16],
+                                           const String8 &mimeType,
+                                           DrmPlugin::SecurityLevel level,
+                                           bool *isSupported);
 
     DISALLOW_EVIL_CONSTRUCTORS(DrmHal);
 };

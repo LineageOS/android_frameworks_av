@@ -159,9 +159,12 @@ Vector<DrmUUID> NuPlayerDrm::getSupportedDrmSchemes(const void *pssh, size_t pss
     if (drm != NULL) {
         for (size_t i = 0; i < psshDRMs.size(); i++) {
             DrmUUID uuid = psshDRMs[i];
-            if (drm->isCryptoSchemeSupported(uuid.ptr(), String8(),
-                            DrmPlugin::kSecurityLevelUnknown))
+            bool isSupported = false;
+            status = drm->isCryptoSchemeSupported(uuid.ptr(), String8(),
+                    DrmPlugin::kSecurityLevelUnknown, &isSupported);
+            if (status == OK && isSupported) {
                 supportedDRMs.add(uuid);
+            }
         }
 
         drm.clear();

@@ -83,8 +83,8 @@ struct BpDrm : public BpInterface<IDrm> {
         return reply.readInt32();
     }
 
-    virtual bool isCryptoSchemeSupported(const uint8_t uuid[16], const String8 &mimeType,
-            DrmPlugin::SecurityLevel level) {
+    virtual status_t isCryptoSchemeSupported(const uint8_t uuid[16], const String8 &mimeType,
+            DrmPlugin::SecurityLevel level, bool *isSupported) {
         Parcel data, reply;
         data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
         data.write(uuid, 16);
@@ -94,10 +94,11 @@ struct BpDrm : public BpInterface<IDrm> {
         status_t status = remote()->transact(IS_CRYPTO_SUPPORTED, data, &reply);
         if (status != OK) {
             ALOGE("isCryptoSchemeSupported: binder call failed: %d", status);
-            return false;
+            return status;
         }
+        *isSupported = static_cast<bool>(reply.readInt32());
 
-        return reply.readInt32() != 0;
+        return reply.readInt32();
     }
 
     virtual status_t createPlugin(const uint8_t uuid[16],
@@ -773,7 +774,10 @@ status_t BnDrm::onTransact(
             String8 mimeType = data.readString8();
             DrmPlugin::SecurityLevel level =
                     static_cast<DrmPlugin::SecurityLevel>(data.readInt32());
-            reply->writeInt32(isCryptoSchemeSupported(uuid, mimeType, level));
+            bool isSupported = false;
+            status_t result = isCryptoSchemeSupported(uuid, mimeType, level, &isSupported);
+            reply->writeInt32(isSupported);
+            reply->writeInt32(result);
             return OK;
         }
 
