@@ -22,7 +22,6 @@
 
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/Utils.h>
-#include <nativehelper/JNIHelp.h>
 #include <utils/Log.h>
 
 #include "log/log.h"
