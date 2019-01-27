@@ -46,6 +46,18 @@ struct AMediaExtractor {
     sp<ABuffer> mPsshBuf;
 };
 
+sp<ABuffer> U32ArrayToSizeBuf(size_t numSubSamples, uint32_t *data) {
+    if (numSubSamples >  SIZE_MAX / sizeof(size_t)) {
+        return NULL;
+    }
+    sp<ABuffer> sizebuf = new ABuffer(numSubSamples * sizeof(size_t));
+    size_t *sizes = (size_t *)sizebuf->data();
+    for (size_t i = 0; sizes != NULL && i < numSubSamples; i++) {
+        sizes[i] = data[i];
+    }
+    return sizebuf;
+}
+
 extern "C" {
 
 EXPORT
@@ -339,7 +351,7 @@ AMediaCodecCryptoInfo *AMediaExtractor_getSampleCryptoInfo(AMediaExtractor *ex) 
     if (!meta->findData(kKeyEncryptedSizes, &type, &crypteddata, &cryptedsize)) {
         return NULL;
     }
-    size_t numSubSamples = cryptedsize / sizeof(size_t);
+    size_t numSubSamples = cryptedsize / sizeof(uint32_t);
 
     const void *cleardata;
     size_t clearsize;
@@ -371,6 +383,16 @@ AMediaCodecCryptoInfo *AMediaExtractor_getSampleCryptoInfo(AMediaExtractor *ex) 
     int32_t mode;
     if (!meta->findInt32(kKeyCryptoMode, &mode)) {
         mode = CryptoPlugin::kMode_AES_CTR;
+    }
+
+    if (sizeof(uint32_t) != sizeof(size_t)) {
+        sp<ABuffer> clearbuf   = U32ArrayToSizeBuf(numSubSamples, (uint32_t *)cleardata);
+        sp<ABuffer> cryptedbuf = U32ArrayToSizeBuf(numSubSamples, (uint32_t *)crypteddata);
+        cleardata   = clearbuf    == NULL ? NULL : clearbuf->data();
+        crypteddata = crypteddata == NULL ? NULL : cryptedbuf->data();
+        if(crypteddata == NULL || cleardata == NULL) {
+            return NULL;
+        }
     }
 
     return AMediaCodecCryptoInfo_new(

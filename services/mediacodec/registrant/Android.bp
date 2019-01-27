@@ -38,6 +38,7 @@ cc_library_shared {
         "libcodec2_soft_mp3dec",
         "libcodec2_soft_vorbisdec",
         "libcodec2_soft_opusdec",
+        "libcodec2_soft_opusenc",
         "libcodec2_soft_vp8dec",
         "libcodec2_soft_vp9dec",
         "libcodec2_soft_av1dec",
@@ -49,7 +50,5 @@ cc_library_shared {
         "libcodec2_soft_gsmdec",
         "libcodec2_soft_xaacdec",
     ],
-
-    compile_multilib: "32",
 }
 

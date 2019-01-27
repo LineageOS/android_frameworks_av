@@ -30,7 +30,7 @@
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/OggWriter.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include "OpusHeader.h"
+#include <media/stagefright/foundation/OpusHeader.h>
 
 extern "C" {
 #include <ogg/ogg.h>
@@ -114,30 +114,17 @@ status_t OggWriter::addSource(const sp<MediaSource>& source) {
     }
 
     mSampleRate = sampleRate;
-
-    OpusHeader header;
-    header.channels = nChannels;
-    header.num_streams = nChannels;
-    header.num_coupled = 0;
-    header.channel_mapping = ((nChannels > 8) ? 255 : (nChannels > 2));
-    header.gain_db = 0;
-    header.skip_samples = 0;
-
-    // headers are 21-bytes + something driven by channel count
-    // expect numbers in the low 30's here. WriteOpusHeader() will tell us
-    // if things are bad.
-    unsigned char header_data[100];
-    ogg_packet op;
-    ogg_page og;
-
-    const int packet_size = WriteOpusHeader(header, mSampleRate, (uint8_t*)header_data,
-                                            sizeof(header_data));
-
-    if (packet_size < 0) {
-        ALOGE("opus header writing failed");
+    uint32_t type;
+    const void *header_data;
+    size_t packet_size;
+    if (!source->getFormat()->findData(kKeyOpusHeader, &type, &header_data, &packet_size)) {
+        ALOGE("opus header not found");
         return UNKNOWN_ERROR;
     }
-    op.packet = header_data;
+
+    ogg_packet op;
+    ogg_page og;
+    op.packet = (unsigned char *)header_data;
     op.bytes = packet_size;
     op.b_o_s = 1;
     op.e_o_s = 0;

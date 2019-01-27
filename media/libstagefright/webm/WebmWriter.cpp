@@ -24,7 +24,7 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/hexdump.h>
-#include <OpusHeader.h>
+#include <media/stagefright/foundation/OpusHeader.h>
 
 #include <utils/Errors.h>
 

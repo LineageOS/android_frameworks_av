@@ -85,7 +85,7 @@ static const char kMetaKey_TemporalLayerCount[] = "com.android.video.temporal_la
 static const int kTimestampDebugCount = 10;
 static const int kItemIdBase = 10000;
 static const char kExifHeader[] = {'E', 'x', 'i', 'f', '\0', '\0'};
-static const int32_t kTiffHeaderOffset = htonl(sizeof(kExifHeader));
+static const uint8_t kExifApp1Marker[] = {'E', 'x', 'i', 'f', 0xff, 0xe1};
 
 static const uint8_t kMandatoryHevcNalUnitTypes[3] = {
     kHevcNalUnitTypeVps,
@@ -125,7 +125,7 @@ public:
     bool isAudio() const { return mIsAudio; }
     bool isMPEG4() const { return mIsMPEG4; }
     bool usePrefix() const { return mIsAvc || mIsHevc || mIsHeic; }
-    bool isExifData(const MediaBufferBase *buffer) const;
+    bool isExifData(MediaBufferBase *buffer, uint32_t *tiffHdrOffset) const;
     void addChunkOffset(off64_t offset);
     void addItemOffsetAndSize(off64_t offset, size_t size, bool isExif);
     void flushItemRefs();
@@ -364,7 +364,7 @@ private:
 
     Vector<uint16_t> mProperties;
     ItemRefs mDimgRefs;
-    ItemRefs mCdscRefs;
+    Vector<uint16_t> mExifList;
     uint16_t mImageItemId;
     int32_t mIsPrimary;
     int32_t mWidth, mHeight;
@@ -1368,14 +1368,16 @@ void MPEG4Writer::unlock() {
 }
 
 off64_t MPEG4Writer::addSample_l(
-        MediaBuffer *buffer, bool usePrefix, bool isExif, size_t *bytesWritten) {
+        MediaBuffer *buffer, bool usePrefix,
+        uint32_t tiffHdrOffset, size_t *bytesWritten) {
     off64_t old_offset = mOffset;
 
     if (usePrefix) {
         addMultipleLengthPrefixedSamples_l(buffer);
     } else {
-        if (isExif) {
-            ::write(mFd, &kTiffHeaderOffset, 4); // exif_tiff_header_offset field
+        if (tiffHdrOffset > 0) {
+            tiffHdrOffset = htonl(tiffHdrOffset);
+            ::write(mFd, &tiffHdrOffset, 4); // exif_tiff_header_offset field
             mOffset += 4;
         }
 
@@ -1803,7 +1805,6 @@ MPEG4Writer::Track::Track(
       mStartTimestampUs(-1),
       mRotation(0),
       mDimgRefs("dimg"),
-      mCdscRefs("cdsc"),
       mImageItemId(0),
       mIsPrimary(0),
       mWidth(0),
@@ -1984,11 +1985,34 @@ status_t MPEG4Writer::setNextFd(int fd) {
     return OK;
 }
 
-bool MPEG4Writer::Track::isExifData(const MediaBufferBase *buffer) const {
-    return mIsHeic
-            && (buffer->range_length() > sizeof(kExifHeader))
-            && !memcmp((uint8_t *)buffer->data() + buffer->range_offset(),
-                    kExifHeader, sizeof(kExifHeader));
+bool MPEG4Writer::Track::isExifData(
+        MediaBufferBase *buffer, uint32_t *tiffHdrOffset) const {
+    if (!mIsHeic) {
+        return false;
+    }
+
+    // Exif block starting with 'Exif\0\0'
+    size_t length = buffer->range_length();
+    uint8_t *data = (uint8_t *)buffer->data() + buffer->range_offset();
+    if ((length > sizeof(kExifHeader))
+        && !memcmp(data, kExifHeader, sizeof(kExifHeader))) {
+        *tiffHdrOffset = sizeof(kExifHeader);
+        return true;
+    }
+
+    // Exif block starting with fourcc 'Exif' followed by APP1 marker
+    if ((length > sizeof(kExifApp1Marker) + 2 + sizeof(kExifHeader))
+            && !memcmp(data, kExifApp1Marker, sizeof(kExifApp1Marker))
+            && !memcmp(data + sizeof(kExifApp1Marker) + 2, kExifHeader, sizeof(kExifHeader))) {
+        // skip 'Exif' fourcc
+        buffer->set_range(4, buffer->range_length() - 4);
+
+        // 2-byte APP1 + 2-byte size followed by kExifHeader
+        *tiffHdrOffset = 2 + 2 + sizeof(kExifHeader);
+        return true;
+    }
+
+    return false;
 }
 
 void MPEG4Writer::Track::addChunkOffset(off64_t offset) {
@@ -2014,7 +2038,7 @@ void MPEG4Writer::Track::addItemOffsetAndSize(off64_t offset, size_t size, bool 
     }
 
     if (isExif) {
-         mCdscRefs.value.push_back(mOwner->addItem_l({
+         mExifList.push_back(mOwner->addItem_l({
             .itemType = "Exif",
             .isPrimary = false,
             .isHidden = false,
@@ -2117,7 +2141,16 @@ void MPEG4Writer::Track::flushItemRefs() {
 
     if (mImageItemId > 0) {
         mOwner->addRefs_l(mImageItemId, mDimgRefs);
-        mOwner->addRefs_l(mImageItemId, mCdscRefs);
+
+        if (!mExifList.empty()) {
+            // The "cdsc" ref is from the metadata/exif item to the image item.
+            // So the refs all contain the image item.
+            ItemRefs cdscRefs("cdsc");
+            cdscRefs.value.push_back(mImageItemId);
+            for (uint16_t exifItem : mExifList) {
+                mOwner->addRefs_l(exifItem, cdscRefs);
+            }
+        }
     }
 }
 
@@ -2269,14 +2302,16 @@ void MPEG4Writer::writeChunkToFile(Chunk* chunk) {
     while (!chunk->mSamples.empty()) {
         List<MediaBuffer *>::iterator it = chunk->mSamples.begin();
 
-        int32_t isExif;
-        if (!(*it)->meta_data().findInt32(kKeyIsExif, &isExif)) {
-            isExif = 0;
+        uint32_t tiffHdrOffset;
+        if (!(*it)->meta_data().findInt32(
+                kKeyExifTiffOffset, (int32_t*)&tiffHdrOffset)) {
+            tiffHdrOffset = 0;
         }
+        bool isExif = (tiffHdrOffset > 0);
         bool usePrefix = chunk->mTrack->usePrefix() && !isExif;
 
         size_t bytesWritten;
-        off64_t offset = addSample_l(*it, usePrefix, isExif, &bytesWritten);
+        off64_t offset = addSample_l(*it, usePrefix, tiffHdrOffset, &bytesWritten);
 
         if (chunk->mTrack->isHeic()) {
             chunk->mTrack->addItemOffsetAndSize(offset, bytesWritten, isExif);
@@ -3002,10 +3037,11 @@ status_t MPEG4Writer::Track::threadEntry() {
         }
 
         bool isExif = false;
+        uint32_t tiffHdrOffset = 0;
         int32_t isMuxerData;
         if (buffer->meta_data().findInt32(kKeyIsMuxerData, &isMuxerData) && isMuxerData) {
             // We only support one type of muxer data, which is Exif data block.
-            isExif = isExifData(buffer);
+            isExif = isExifData(buffer, &tiffHdrOffset);
             if (!isExif) {
                 ALOGW("Ignoring bad Exif data block");
                 buffer->release();
@@ -3027,7 +3063,7 @@ status_t MPEG4Writer::Track::threadEntry() {
         buffer = NULL;
 
         if (isExif) {
-            copy->meta_data().setInt32(kKeyIsExif, 1);
+            copy->meta_data().setInt32(kKeyExifTiffOffset, tiffHdrOffset);
         }
         bool usePrefix = this->usePrefix() && !isExif;
 
@@ -3300,7 +3336,8 @@ status_t MPEG4Writer::Track::threadEntry() {
         }
         if (!hasMultipleTracks) {
             size_t bytesWritten;
-            off64_t offset = mOwner->addSample_l(copy, usePrefix, isExif, &bytesWritten);
+            off64_t offset = mOwner->addSample_l(
+                    copy, usePrefix, tiffHdrOffset, &bytesWritten);
 
             if (mIsHeic) {
                 addItemOffsetAndSize(offset, bytesWritten, isExif);

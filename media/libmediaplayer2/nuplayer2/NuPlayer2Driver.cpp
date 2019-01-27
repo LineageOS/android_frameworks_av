@@ -92,6 +92,7 @@ static const char *kPlayerWidth = "android.media.mediaplayer.width";
 static const char *kPlayerHeight = "android.media.mediaplayer.height";
 static const char *kPlayerFrames = "android.media.mediaplayer.frames";
 static const char *kPlayerFramesDropped = "android.media.mediaplayer.dropped";
+static const char *kPlayerFrameRate = "android.media.mediaplayer.fps";
 static const char *kPlayerAMime = "android.media.mediaplayer.audio.mime";
 static const char *kPlayerACodec = "android.media.mediaplayer.audio.codec";
 static const char *kPlayerDuration = "android.media.mediaplayer.durationMs";
@@ -125,7 +126,7 @@ NuPlayer2Driver::NuPlayer2Driver(pid_t pid, uid_t uid, const sp<JObjectHolder> &
       mMediaClock(new MediaClock),
       mPlayer(new NuPlayer2(pid, uid, mMediaClock, context)),
       mPlayerFlags(0),
-      mAnalyticsItem(NULL),
+      mMetricsHandle(0),
       mClientUid(uid),
       mAtEOS(false),
       mLooping(false),
@@ -136,9 +137,9 @@ NuPlayer2Driver::NuPlayer2Driver(pid_t pid, uid_t uid, const sp<JObjectHolder> &
 
     mMediaClock->init();
 
-    // set up an analytics record
-    mAnalyticsItem = new MediaAnalyticsItem(kKeyPlayer);
-    mAnalyticsItem->setUid(mClientUid);
+    // set up media metrics record
+    mMetricsHandle = mediametrics_create(kKeyPlayer);
+    mediametrics_setUid(mMetricsHandle, mClientUid);
 
     mNuPlayer2Looper->start(
             false, /* runOnCallingThread */
@@ -159,10 +160,7 @@ NuPlayer2Driver::~NuPlayer2Driver() {
     updateMetrics("destructor");
     logMetrics("destructor");
 
-    if (mAnalyticsItem != NULL) {
-        delete mAnalyticsItem;
-        mAnalyticsItem = NULL;
-    }
+    mediametrics_delete(mMetricsHandle);
 }
 
 status_t NuPlayer2Driver::initCheck() {
@@ -453,15 +451,15 @@ void NuPlayer2Driver::updateMetrics(const char *where) {
 
             if (mime.startsWith("video/")) {
                 int32_t width, height;
-                mAnalyticsItem->setCString(kPlayerVMime, mime.c_str());
+                mediametrics_setCString(mMetricsHandle, kPlayerVMime, mime.c_str());
                 if (!name.empty()) {
-                    mAnalyticsItem->setCString(kPlayerVCodec, name.c_str());
+                    mediametrics_setCString(mMetricsHandle, kPlayerVCodec, name.c_str());
                 }
 
                 if (stats->findInt32("width", &width)
                         && stats->findInt32("height", &height)) {
-                    mAnalyticsItem->setInt32(kPlayerWidth, width);
-                    mAnalyticsItem->setInt32(kPlayerHeight, height);
+                    mediametrics_setInt32(mMetricsHandle, kPlayerWidth, width);
+                    mediametrics_setInt32(mMetricsHandle, kPlayerHeight, height);
                 }
 
                 int64_t numFramesTotal = 0;
@@ -469,14 +467,18 @@ void NuPlayer2Driver::updateMetrics(const char *where) {
                 stats->findInt64("frames-total", &numFramesTotal);
                 stats->findInt64("frames-dropped-output", &numFramesDropped);
 
-                mAnalyticsItem->setInt64(kPlayerFrames, numFramesTotal);
-                mAnalyticsItem->setInt64(kPlayerFramesDropped, numFramesDropped);
+                mediametrics_setInt64(mMetricsHandle, kPlayerFrames, numFramesTotal);
+                mediametrics_setInt64(mMetricsHandle, kPlayerFramesDropped, numFramesDropped);
 
+                float frameRate = 0;
+                if (stats->findFloat("frame-rate-output", &frameRate)) {
+                    mediametrics_setInt64(mMetricsHandle, kPlayerFrameRate, frameRate);
+		}
 
             } else if (mime.startsWith("audio/")) {
-                mAnalyticsItem->setCString(kPlayerAMime, mime.c_str());
+                mediametrics_setCString(mMetricsHandle, kPlayerAMime, mime.c_str());
                 if (!name.empty()) {
-                    mAnalyticsItem->setCString(kPlayerACodec, name.c_str());
+                    mediametrics_setCString(mMetricsHandle, kPlayerACodec, name.c_str());
                 }
             }
         }
@@ -487,17 +489,17 @@ void NuPlayer2Driver::updateMetrics(const char *where) {
     // getDuration() uses mLock for mutex -- careful where we use it.
     int64_t duration_ms = -1;
     getDuration(&duration_ms);
-    mAnalyticsItem->setInt64(kPlayerDuration, duration_ms);
+    mediametrics_setInt64(mMetricsHandle, kPlayerDuration, duration_ms);
 
-    mAnalyticsItem->setInt64(kPlayerPlaying, (mPlayingTimeUs+500)/1000 );
+    mediametrics_setInt64(mMetricsHandle, kPlayerPlaying, (mPlayingTimeUs+500)/1000 );
 
     if (mRebufferingEvents != 0) {
-        mAnalyticsItem->setInt64(kPlayerRebuffering, (mRebufferingTimeUs+500)/1000 );
-        mAnalyticsItem->setInt32(kPlayerRebufferingCount, mRebufferingEvents);
-        mAnalyticsItem->setInt32(kPlayerRebufferingAtExit, mRebufferingAtExit);
+        mediametrics_setInt64(mMetricsHandle, kPlayerRebuffering, (mRebufferingTimeUs+500)/1000 );
+        mediametrics_setInt32(mMetricsHandle, kPlayerRebufferingCount, mRebufferingEvents);
+        mediametrics_setInt32(mMetricsHandle, kPlayerRebufferingAtExit, mRebufferingAtExit);
     }
 
-    mAnalyticsItem->setCString(kPlayerDataSourceType, mPlayer->getDataSourceType());
+    mediametrics_setCString(mMetricsHandle, kPlayerDataSourceType, mPlayer->getDataSourceType());
 }
 
 
@@ -507,7 +509,7 @@ void NuPlayer2Driver::logMetrics(const char *where) {
     }
     ALOGV("logMetrics(%p) from %s at state %d", this, where, mState);
 
-    if (mAnalyticsItem == NULL || mAnalyticsItem->isEnabled() == false) {
+    if (mMetricsHandle == 0 || mediametrics_isEnabled() == false) {
         return;
     }
 
@@ -516,16 +518,12 @@ void NuPlayer2Driver::logMetrics(const char *where) {
     // and that always injects 3 fields (duration, playing time, and
     // datasource) into the record.
     // So the canonical "empty" record has 3 elements in it.
-    if (mAnalyticsItem->count() > 3) {
-
-        mAnalyticsItem->selfrecord();
-
+    if (mediametrics_count(mMetricsHandle) > 3) {
+        mediametrics_selfRecord(mMetricsHandle);
         // re-init in case we prepare() and start() again.
-        delete mAnalyticsItem ;
-        mAnalyticsItem = new MediaAnalyticsItem(kKeyPlayer);
-        if (mAnalyticsItem) {
-            mAnalyticsItem->setUid(mClientUid);
-        }
+        mediametrics_delete(mMetricsHandle);
+        mMetricsHandle = mediametrics_create(kKeyPlayer);
+        mediametrics_setUid(mMetricsHandle, mClientUid);
     } else {
         ALOGV("did not have anything to record");
     }
@@ -649,17 +647,16 @@ status_t NuPlayer2Driver::setParameter(
     return INVALID_OPERATION;
 }
 
-status_t NuPlayer2Driver::getParameter(int key, Parcel *reply) {
-
-    if (key == FOURCC('m','t','r','X')) {
-        // mtrX -- a play on 'metrics' (not matrix)
-        // gather current info all together, parcel it, and send it back
-        updateMetrics("api");
-        mAnalyticsItem->writeToParcel(reply);
-        return OK;
-    }
-
+status_t NuPlayer2Driver::getParameter(int key __unused, Parcel *reply __unused) {
     return INVALID_OPERATION;
+}
+
+status_t NuPlayer2Driver::getMetrics(char **buffer, size_t *length) {
+    updateMetrics("api");
+    if (mediametrics_getAttributes(mMetricsHandle, buffer, length))
+        return OK;
+    else
+        return FAILED_TRANSACTION;
 }
 
 void NuPlayer2Driver::notifyResetComplete(int64_t /* srcId */) {
@@ -867,11 +864,11 @@ void NuPlayer2Driver::notifyListener_l(
                 // ext1 is our primary 'error type' value. Only add ext2 when non-zero.
                 // [test against msg is due to fall through from previous switch value]
                 if (msg == MEDIA2_ERROR) {
-                    mAnalyticsItem->setInt32(kPlayerError, ext1);
+                    mediametrics_setInt32(mMetricsHandle, kPlayerError, ext1);
                     if (ext2 != 0) {
-                        mAnalyticsItem->setInt32(kPlayerErrorCode, ext2);
+                        mediametrics_setInt32(mMetricsHandle, kPlayerErrorCode, ext2);
                     }
-                    mAnalyticsItem->setCString(kPlayerErrorState, stateString(mState).c_str());
+                    mediametrics_setCString(mMetricsHandle, kPlayerErrorState, stateString(mState).c_str());
                 }
                 mAtEOS = true;
                 break;

@@ -225,14 +225,18 @@ status_t C2OMXNode::emptyBuffer(
     if (omxBuf.mBufferType == OMXBuffer::kBufferTypeANWBuffer
             && omxBuf.mGraphicBuffer != nullptr) {
         std::shared_ptr<C2GraphicAllocation> alloc;
+        native_handle_t *clonedHandle = native_handle_clone(omxBuf.mGraphicBuffer->handle);
         handle = WrapNativeCodec2GrallocHandle(
-                native_handle_clone(omxBuf.mGraphicBuffer->handle),
+                clonedHandle,
                 omxBuf.mGraphicBuffer->width,
                 omxBuf.mGraphicBuffer->height,
                 omxBuf.mGraphicBuffer->format,
                 omxBuf.mGraphicBuffer->usage,
                 omxBuf.mGraphicBuffer->stride);
         c2_status_t err = mAllocator->priorGraphicAllocation(handle, &alloc);
+        if (clonedHandle) {
+            native_handle_delete(clonedHandle);
+        }
         if (err != OK) {
             return UNKNOWN_ERROR;
         }

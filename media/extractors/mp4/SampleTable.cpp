@@ -37,13 +37,13 @@
 namespace android {
 
 // static
-const uint32_t SampleTable::kChunkOffsetType32 = FOURCC('s', 't', 'c', 'o');
+const uint32_t SampleTable::kChunkOffsetType32 = FOURCC("stco");
 // static
-const uint32_t SampleTable::kChunkOffsetType64 = FOURCC('c', 'o', '6', '4');
+const uint32_t SampleTable::kChunkOffsetType64 = FOURCC("co64");
 // static
-const uint32_t SampleTable::kSampleSizeType32 = FOURCC('s', 't', 's', 'z');
+const uint32_t SampleTable::kSampleSizeType32 = FOURCC("stsz");
 // static
-const uint32_t SampleTable::kSampleSizeTypeCompact = FOURCC('s', 't', 'z', '2');
+const uint32_t SampleTable::kSampleSizeTypeCompact = FOURCC("stz2");
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -614,7 +614,7 @@ status_t SampleTable::getMaxSampleSize(size_t *max_size) {
     return OK;
 }
 
-uint32_t abs_difference(uint32_t time1, uint32_t time2) {
+uint32_t abs_difference(uint64_t time1, uint64_t time2) {
     return time1 > time2 ? time1 - time2 : time2 - time1;
 }
 
@@ -662,7 +662,7 @@ void SampleTable::buildSampleEntriesTable() {
     }
 
     uint32_t sampleIndex = 0;
-    uint32_t sampleTime = 0;
+    uint64_t sampleTime = 0;
 
     for (uint32_t i = 0; i < mTimeToSampleCount; ++i) {
         uint32_t n = mTimeToSample[2 * i];
@@ -684,13 +684,13 @@ void SampleTable::buildSampleEntriesTable() {
                         (compTimeDelta == INT32_MIN ?
                                 INT32_MAX : uint32_t(-compTimeDelta)))
                         || (compTimeDelta > 0 &&
-                                sampleTime > UINT32_MAX - compTimeDelta)) {
-                    ALOGE("%u + %d would overflow, clamping",
-                            sampleTime, compTimeDelta);
+                                sampleTime > UINT64_MAX - compTimeDelta)) {
+                    ALOGE("%llu + %d would overflow, clamping",
+                            (unsigned long long) sampleTime, compTimeDelta);
                     if (compTimeDelta < 0) {
                         sampleTime = 0;
                     } else {
-                        sampleTime = UINT32_MAX;
+                        sampleTime = UINT64_MAX;
                     }
                     compTimeDelta = 0;
                 }
@@ -701,10 +701,10 @@ void SampleTable::buildSampleEntriesTable() {
             }
 
             ++sampleIndex;
-            if (sampleTime > UINT32_MAX - delta) {
-                ALOGE("%u + %u would overflow, clamping",
-                    sampleTime, delta);
-                sampleTime = UINT32_MAX;
+            if (sampleTime > UINT64_MAX - delta) {
+                ALOGE("%llu + %u would overflow, clamping",
+                    (unsigned long long) sampleTime, delta);
+                sampleTime = UINT64_MAX;
             } else {
                 sampleTime += delta;
             }
@@ -870,19 +870,19 @@ status_t SampleTable::findSyncSampleNear(
             if (err != OK) {
                 return err;
             }
-            uint32_t sample_time = mSampleIterator->getSampleTime();
+            uint64_t sample_time = mSampleIterator->getSampleTime();
 
             err = mSampleIterator->seekTo(mSyncSamples[left]);
             if (err != OK) {
                 return err;
             }
-            uint32_t upper_time = mSampleIterator->getSampleTime();
+            uint64_t upper_time = mSampleIterator->getSampleTime();
 
             err = mSampleIterator->seekTo(mSyncSamples[left - 1]);
             if (err != OK) {
                 return err;
             }
-            uint32_t lower_time = mSampleIterator->getSampleTime();
+            uint64_t lower_time = mSampleIterator->getSampleTime();
 
             // use abs_difference for safety
             if (abs_difference(upper_time, sample_time) >
@@ -955,9 +955,9 @@ status_t SampleTable::getMetaDataForSample(
         uint32_t sampleIndex,
         off64_t *offset,
         size_t *size,
-        uint32_t *compositionTime,
+        uint64_t *compositionTime,
         bool *isSyncSample,
-        uint32_t *sampleDuration) {
+        uint64_t *sampleDuration) {
     Mutex::Autolock autoLock(mLock);
 
     status_t err;

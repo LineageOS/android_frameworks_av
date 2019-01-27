@@ -16,7 +16,7 @@
 
 #include <mediaplayer2/MediaPlayer2Interface.h>
 
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetrics.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <mediaplayer2/JObjectHolder.h>
 
@@ -61,6 +61,7 @@ struct NuPlayer2Driver : public MediaPlayer2Interface {
     virtual void setAudioSink(const sp<AudioSink> &audioSink) override;
     virtual status_t setParameter(int key, const Parcel &request) override;
     virtual status_t getParameter(int key, Parcel *reply) override;
+    virtual status_t getMetrics(char **buf, size_t *length) override;
 
     virtual status_t dump(int fd, const Vector<String16> &args) const override;
 
@@ -132,7 +133,7 @@ private:
     sp<AudioSink> mAudioSink;
     uint32_t mPlayerFlags;
 
-    MediaAnalyticsItem *mAnalyticsItem;
+    mediametrics_handle_t mMetricsHandle;
     uid_t mClientUid;
 
     bool mAtEOS;

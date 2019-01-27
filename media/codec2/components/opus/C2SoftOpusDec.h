@@ -24,16 +24,6 @@ struct OpusMSDecoder;
 
 namespace android {
 
-struct OpusHeader {
-  int channels;
-  int skip_samples;
-  int channel_mapping;
-  int num_streams;
-  int num_coupled;
-  int16_t gain_db;
-  uint8_t stream_map[8];
-};
-
 struct C2SoftOpusDec : public SimpleC2Component {
     class IntfImpl;
 

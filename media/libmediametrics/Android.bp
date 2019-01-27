@@ -1,6 +1,4 @@
-// TODO: change it back to cc_library_shared when there is a way to
-// expose media metrics as stable API.
-cc_library {
+cc_library_shared {
     name: "libmediametrics",
 
     srcs: [
@@ -32,12 +30,13 @@ cc_library {
         cfi: true,
     },
 
-    // enumerate the stable interface
-// this would mean nobody can use the C++ interface. have to rework some things.
-//  stubs: {
-//      symbol_file: "libmediametrics.map.txt",
-//      versions: [
-//          "1" ,
-//      ]
-//  },
+    // enumerate stable entry points, for apex use
+    stubs: {
+        symbol_file: "libmediametrics.map.txt",
+        versions: [
+            "1" ,
+        ]
+    },
 }
+
+

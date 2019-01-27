@@ -44,3 +44,16 @@ cc_test {
         "-Wextra",
     ],
 }
+
+cc_test {
+    name: "snr",
+    host_supported: false,
+
+    srcs: ["snr.cpp"],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+}

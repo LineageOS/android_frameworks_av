@@ -308,6 +308,9 @@ AImageReader::init() {
         ALOGE("Failed to set BufferItemConsumer buffer dataSpace");
         return AMEDIA_ERROR_UNKNOWN;
     }
+    if (mUsage & AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT) {
+        gbConsumer->setConsumerIsProtected(true);
+    }
 
     mSurface = new Surface(mProducer, /*controlledByApp*/true);
     if (mSurface == nullptr) {

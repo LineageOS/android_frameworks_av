@@ -102,6 +102,7 @@ public:
             status_t        setAudioAttributes(const jobject attributes);
             jobject         getAudioAttributes();
             status_t        getParameter(int key, Parcel* reply);
+            status_t        getMetrics(char **buffer, size_t *length);
 
             // Modular DRM
             status_t        prepareDrm(int64_t srcId,

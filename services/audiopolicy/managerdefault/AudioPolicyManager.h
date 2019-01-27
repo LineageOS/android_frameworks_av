@@ -517,6 +517,13 @@ protected:
             return mAudioPatches.removeAudioPatch(handle);
         }
 
+        bool isPrimaryModule(const sp<HwModule> &module) const
+        {
+            if (module == 0 || !hasPrimaryOutput()) {
+                return false;
+            }
+            return module->getHandle() == mPrimaryOutput->getModuleHandle();
+        }
         DeviceVector availablePrimaryOutputDevices() const
         {
             if (!hasPrimaryOutput()) {

@@ -563,6 +563,17 @@ void SwAudioOutputDescriptor::stop()
 void SwAudioOutputDescriptor::close()
 {
     if (mIoHandle != AUDIO_IO_HANDLE_NONE) {
+        // clean up active clients if any (can happen if close() is called to force
+        // clients to reconnect
+        for (const auto &client : getClientIterable()) {
+            if (client->active()) {
+                ALOGW("%s client with port ID %d still active on output %d",
+                      __func__, client->portId(), mId);
+                setClientActive(client, false);
+                stop();
+            }
+        }
+
         AudioParameter param;
         param.add(String8("closing"), String8("true"));
         mClientInterface->setParameters(mIoHandle, param.toString());
@@ -571,11 +582,6 @@ void SwAudioOutputDescriptor::close()
 
         LOG_ALWAYS_FATAL_IF(mProfile->curOpenCount < 1, "%s profile open count %u",
                             __FUNCTION__, mProfile->curOpenCount);
-        // do not call stop() here as stop() is supposed to be called after setClientActive(false)
-        // and we don't know how many streams are still active at this time
-        if (isActive()) {
-            mProfile->curActiveCount--;
-        }
         mProfile->curOpenCount--;
         mIoHandle = AUDIO_IO_HANDLE_NONE;
     }

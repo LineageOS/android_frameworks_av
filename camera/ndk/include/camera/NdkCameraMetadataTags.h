@@ -5561,12 +5561,12 @@ typedef enum acamera_metadata_tag {
      *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
      * </ul></p>
      *
-     * <p>For a logical camera, this is concatenation of all underlying physical camera ids.
-     * The null terminator for physical camera id must be preserved so that the whole string
-     * can be tokenized using '\0' to generate list of physical camera ids.</p>
-     * <p>For example, if the physical camera ids of the logical camera are "2" and "3", the
+     * <p>For a logical camera, this is concatenation of all underlying physical camera IDs.
+     * The null terminator for physical camera ID must be preserved so that the whole string
+     * can be tokenized using '\0' to generate list of physical camera IDs.</p>
+     * <p>For example, if the physical camera IDs of the logical camera are "2" and "3", the
      * value of this tag will be ['2', '\0', '3', '\0'].</p>
-     * <p>The number of physical camera ids must be no less than 2.</p>
+     * <p>The number of physical camera IDs must be no less than 2.</p>
      */
     ACAMERA_LOGICAL_MULTI_CAMERA_PHYSICAL_IDS =                 // byte[n]
             ACAMERA_LOGICAL_MULTI_CAMERA_START,
@@ -5591,6 +5591,28 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE =             // byte (acamera_metadata_enum_android_logical_multi_camera_sensor_sync_type_t)
             ACAMERA_LOGICAL_MULTI_CAMERA_START + 1,
+    /**
+     * <p>String containing the ID of the underlying active physical camera.</p>
+     *
+     * <p>Type: byte</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     * </ul></p>
+     *
+     * <p>The ID of the active physical camera that's backing the logical camera. All camera
+     * streams and metadata that are not physical camera specific will be originating from this
+     * physical camera. This must be one of valid physical IDs advertised in the physicalIds
+     * static tag.</p>
+     * <p>For a logical camera made up of physical cameras where each camera's lenses have
+     * different characteristics, the camera device may choose to switch between the physical
+     * cameras when application changes FOCAL_LENGTH or SCALER_CROP_REGION.
+     * At the time of lens switch, this result metadata reflects the new active physical camera
+     * ID.</p>
+     */
+    ACAMERA_LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID =           // byte
+            ACAMERA_LOGICAL_MULTI_CAMERA_START + 2,
     ACAMERA_LOGICAL_MULTI_CAMERA_END,
 
     /**
@@ -7162,6 +7184,10 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * <p>If this is supported, android.scaler.streamConfigurationMap will
      * additionally return a min frame duration that is greater than
      * zero for each supported size-format combination.</p>
+     * <p>For camera devices with LOGICAL_MULTI_CAMERA capability, when the underlying active
+     * physical camera switches, exposureTime, sensitivity, and lens properties may change
+     * even if AE/AF is locked. However, the overall auto exposure and auto focus experience
+     * for users will be consistent. Refer to LOGICAL_MULTI_CAMERA capability for details.</p>
      *
      * @see ACAMERA_BLACK_LEVEL_LOCK
      * @see ACAMERA_CONTROL_AE_LOCK
@@ -7217,6 +7243,10 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * will accurately report the values applied by AWB in the result.</p>
      * <p>A given camera device may also support additional post-processing
      * controls, but this capability only covers the above list of controls.</p>
+     * <p>For camera devices with LOGICAL_MULTI_CAMERA capability, when underlying active
+     * physical camera switches, tonemap, white balance, and shading map may change even if
+     * awb is locked. However, the overall post-processing experience for users will be
+     * consistent. Refer to LOGICAL_MULTI_CAMERA capability for details.</p>
      *
      * @see ACAMERA_COLOR_CORRECTION_ABERRATION_MODE
      * @see ACAMERA_COLOR_CORRECTION_AVAILABLE_ABERRATION_MODES
@@ -7396,7 +7426,7 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * </li>
      * <li>The SENSOR_INFO_TIMESTAMP_SOURCE of the logical device and physical devices must be
      *   the same.</li>
-     * <li>The logical camera device must be LIMITED or higher device.</li>
+     * <li>The logical camera must be LIMITED or higher device.</li>
      * </ul>
      * <p>Both the logical camera device and its underlying physical devices support the
      * mandatory stream combinations required for their device levels.</p>
@@ -7416,13 +7446,84 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * <p>Using physical streams in place of a logical stream of the same size and format will
      * not slow down the frame rate of the capture, as long as the minimum frame duration
      * of the physical and logical streams are the same.</p>
+     * <p>A logical camera device's dynamic metadata may contain
+     * ACAMERA_LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID to notify the application of the current
+     * active physical camera Id. An active physical camera is the physical camera from which
+     * the logical camera's main image data outputs (YUV or RAW) and metadata come from.
+     * In addition, this serves as an indication which physical camera is used to output to
+     * a RAW stream, or in case only physical cameras support RAW, which physical RAW stream
+     * the application should request.</p>
+     * <p>Logical camera's static metadata tags below describe the default active physical
+     * camera. An active physical camera is default if it's used when application directly
+     * uses requests built from a template. All templates will default to the same active
+     * physical camera.</p>
+     * <ul>
+     * <li>ACAMERA_SENSOR_INFO_SENSITIVITY_RANGE</li>
+     * <li>ACAMERA_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT</li>
+     * <li>ACAMERA_SENSOR_INFO_EXPOSURE_TIME_RANGE</li>
+     * <li>ACAMERA_SENSOR_INFO_MAX_FRAME_DURATION</li>
+     * <li>ACAMERA_SENSOR_INFO_PHYSICAL_SIZE</li>
+     * <li>ACAMERA_SENSOR_INFO_WHITE_LEVEL</li>
+     * <li>ACAMERA_SENSOR_INFO_LENS_SHADING_APPLIED</li>
+     * <li>ACAMERA_SENSOR_REFERENCE_ILLUMINANT1</li>
+     * <li>ACAMERA_SENSOR_REFERENCE_ILLUMINANT2</li>
+     * <li>ACAMERA_SENSOR_CALIBRATION_TRANSFORM1</li>
+     * <li>ACAMERA_SENSOR_CALIBRATION_TRANSFORM2</li>
+     * <li>ACAMERA_SENSOR_COLOR_TRANSFORM1</li>
+     * <li>ACAMERA_SENSOR_COLOR_TRANSFORM2</li>
+     * <li>ACAMERA_SENSOR_FORWARD_MATRIX1</li>
+     * <li>ACAMERA_SENSOR_FORWARD_MATRIX2</li>
+     * <li>ACAMERA_SENSOR_BLACK_LEVEL_PATTERN</li>
+     * <li>ACAMERA_SENSOR_MAX_ANALOG_SENSITIVITY</li>
+     * <li>ACAMERA_SENSOR_OPTICAL_BLACK_REGIONS</li>
+     * <li>ACAMERA_SENSOR_AVAILABLE_TEST_PATTERN_MODES</li>
+     * <li>ACAMERA_LENS_INFO_HYPERFOCAL_DISTANCE</li>
+     * <li>ACAMERA_LENS_INFO_MINIMUM_FOCUS_DISTANCE</li>
+     * <li>ACAMERA_LENS_INFO_FOCUS_DISTANCE_CALIBRATION</li>
+     * <li>ACAMERA_LENS_POSE_ROTATION</li>
+     * <li>ACAMERA_LENS_POSE_TRANSLATION</li>
+     * <li>ACAMERA_LENS_INTRINSIC_CALIBRATION</li>
+     * <li>ACAMERA_LENS_POSE_REFERENCE</li>
+     * <li>ACAMERA_LENS_DISTORTION</li>
+     * </ul>
+     * <p>To maintain backward compatibility, the capture request and result metadata tags
+     * required for basic camera functionalities will be solely based on the
+     * logical camera capabiltity. Other request and result metadata tags, on the other
+     * hand, will be based on current active physical camera. For example, the physical
+     * cameras' sensor sensitivity and lens capability could be different from each other.
+     * So when the application manually controls sensor exposure time/gain, or does manual
+     * focus control, it must checks the current active physical camera's exposure, gain,
+     * and focus distance range.</p>
      *
      * @see ACAMERA_LENS_DISTORTION
+     * @see ACAMERA_LENS_INFO_FOCUS_DISTANCE_CALIBRATION
+     * @see ACAMERA_LENS_INFO_HYPERFOCAL_DISTANCE
+     * @see ACAMERA_LENS_INFO_MINIMUM_FOCUS_DISTANCE
      * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
      * @see ACAMERA_LENS_POSE_REFERENCE
      * @see ACAMERA_LENS_POSE_ROTATION
      * @see ACAMERA_LENS_POSE_TRANSLATION
+     * @see ACAMERA_LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID
      * @see ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE
+     * @see ACAMERA_SENSOR_AVAILABLE_TEST_PATTERN_MODES
+     * @see ACAMERA_SENSOR_BLACK_LEVEL_PATTERN
+     * @see ACAMERA_SENSOR_CALIBRATION_TRANSFORM1
+     * @see ACAMERA_SENSOR_CALIBRATION_TRANSFORM2
+     * @see ACAMERA_SENSOR_COLOR_TRANSFORM1
+     * @see ACAMERA_SENSOR_COLOR_TRANSFORM2
+     * @see ACAMERA_SENSOR_FORWARD_MATRIX1
+     * @see ACAMERA_SENSOR_FORWARD_MATRIX2
+     * @see ACAMERA_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT
+     * @see ACAMERA_SENSOR_INFO_EXPOSURE_TIME_RANGE
+     * @see ACAMERA_SENSOR_INFO_LENS_SHADING_APPLIED
+     * @see ACAMERA_SENSOR_INFO_MAX_FRAME_DURATION
+     * @see ACAMERA_SENSOR_INFO_PHYSICAL_SIZE
+     * @see ACAMERA_SENSOR_INFO_SENSITIVITY_RANGE
+     * @see ACAMERA_SENSOR_INFO_WHITE_LEVEL
+     * @see ACAMERA_SENSOR_MAX_ANALOG_SENSITIVITY
+     * @see ACAMERA_SENSOR_OPTICAL_BLACK_REGIONS
+     * @see ACAMERA_SENSOR_REFERENCE_ILLUMINANT1
+     * @see ACAMERA_SENSOR_REFERENCE_ILLUMINANT2
      */
     ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA      = 11,
 

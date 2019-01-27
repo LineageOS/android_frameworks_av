@@ -61,6 +61,7 @@ supDomain: DeviceForStrategy
 		domain: Device2
 			conf: RemoteSubmix
 				AvailableOutputDevices Includes RemoteSubmix
+				AvailableOutputDevicesAddresses Includes 0
 
 				component: /Policy/policy/strategies/enforced_audible/selected_output_devices/mask
 					remote_submix = 1

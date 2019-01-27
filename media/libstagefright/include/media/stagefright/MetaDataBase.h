@@ -221,7 +221,8 @@ enum {
     kKeyFrameCount       = 'nfrm', // int32_t, total number of frame in video track
     kKeyExifOffset       = 'exof', // int64_t, Exif data offset
     kKeyExifSize         = 'exsz', // int64_t, Exif data size
-    kKeyIsExif           = 'exif', // bool (int32_t) buffer contains exif data block
+    kKeyExifTiffOffset   = 'thdr', // int32_t, if > 0, buffer contains exif data block with
+                                   // tiff hdr at specified offset
     kKeyPcmBigEndian     = 'pcmb', // bool (int32_t)
 
     // Key for ALAC Magic Cookie

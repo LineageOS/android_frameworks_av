@@ -117,9 +117,14 @@ class PatchCountCheck {
     explicit PatchCountCheck(AudioPolicyManagerTestClient *client)
             : mClient{client},
               mInitialCount{mClient->getActivePatchesCount()} {}
-    void assertDelta(int delta) const {
-        ASSERT_EQ(mInitialCount + delta, mClient->getActivePatchesCount()); }
-    void assertNoChange() const { assertDelta(0); }
+    int deltaFromSnapshot() const {
+        size_t currentCount = mClient->getActivePatchesCount();
+        if (mInitialCount <= currentCount) {
+            return currentCount - mInitialCount;
+        } else {
+            return -(static_cast<int>(mInitialCount - currentCount));
+        }
+    }
   private:
     const AudioPolicyManagerTestClient *mClient;
     const size_t mInitialCount;
@@ -139,7 +144,7 @@ class AudioPolicyManagerTest : public testing::Test {
             int sampleRate,
             audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE,
             audio_port_handle_t *portId = nullptr);
-    PatchCountCheck snapPatchCount() { return PatchCountCheck(mClient.get()); }
+    PatchCountCheck snapshotPatchCount() { return PatchCountCheck(mClient.get()); }
 
     std::unique_ptr<AudioPolicyManagerTestClient> mClient;
     std::unique_ptr<AudioPolicyTestManager> mManager;
@@ -225,7 +230,7 @@ TEST_F(AudioPolicyManagerTest, Dump) {
 TEST_F(AudioPolicyManagerTest, CreateAudioPatchFailure) {
     audio_patch patch{};
     audio_patch_handle_t handle = AUDIO_PATCH_HANDLE_NONE;
-    const PatchCountCheck patchCount = snapPatchCount();
+    const PatchCountCheck patchCount = snapshotPatchCount();
     ASSERT_EQ(BAD_VALUE, mManager->createAudioPatch(nullptr, &handle, 0));
     ASSERT_EQ(BAD_VALUE, mManager->createAudioPatch(&patch, nullptr, 0));
     ASSERT_EQ(BAD_VALUE, mManager->createAudioPatch(&patch, &handle, 0));
@@ -252,20 +257,20 @@ TEST_F(AudioPolicyManagerTest, CreateAudioPatchFailure) {
     ASSERT_EQ(INVALID_OPERATION, mManager->createAudioPatch(&patch, &handle, 0));
     // Verify that the handle is left unchanged.
     ASSERT_EQ(AUDIO_PATCH_HANDLE_NONE, handle);
-    patchCount.assertNoChange();
+    ASSERT_EQ(0, patchCount.deltaFromSnapshot());
 }
 
 TEST_F(AudioPolicyManagerTest, CreateAudioPatchFromMix) {
     audio_patch_handle_t handle = AUDIO_PATCH_HANDLE_NONE;
     uid_t uid = 42;
-    const PatchCountCheck patchCount = snapPatchCount();
+    const PatchCountCheck patchCount = snapshotPatchCount();
     ASSERT_FALSE(mManager->getConfig().getAvailableInputDevices().isEmpty());
     PatchBuilder patchBuilder;
     patchBuilder.addSource(mManager->getConfig().getAvailableInputDevices()[0]).
             addSink(mManager->getConfig().getDefaultOutputDevice());
     ASSERT_EQ(NO_ERROR, mManager->createAudioPatch(patchBuilder.patch(), &handle, uid));
     ASSERT_NE(AUDIO_PATCH_HANDLE_NONE, handle);
-    patchCount.assertDelta(1);
+    ASSERT_EQ(1, patchCount.deltaFromSnapshot());
 }
 
 // TODO: Add patch creation tests that involve already existing patch
@@ -350,84 +355,82 @@ TEST_F(AudioPolicyManagerTestMsd, Dump) {
 }
 
 TEST_F(AudioPolicyManagerTestMsd, PatchCreationOnSetForceUse) {
-    const PatchCountCheck patchCount = snapPatchCount();
+    const PatchCountCheck patchCount = snapshotPatchCount();
     mManager->setForceUse(AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND,
             AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS);
-    patchCount.assertDelta(1);
+    ASSERT_EQ(1, patchCount.deltaFromSnapshot());
 }
 
 TEST_F(AudioPolicyManagerTestMsd, GetOutputForAttrEncodedRoutesToMsd) {
-    const PatchCountCheck patchCount = snapPatchCount();
+    const PatchCountCheck patchCount = snapshotPatchCount();
     audio_port_handle_t selectedDeviceId;
     getOutputForAttr(&selectedDeviceId,
             AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT);
     ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
-    patchCount.assertDelta(1);
+    ASSERT_EQ(1, patchCount.deltaFromSnapshot());
 }
 
 TEST_F(AudioPolicyManagerTestMsd, GetOutputForAttrPcmRoutesToMsd) {
-    const PatchCountCheck patchCount = snapPatchCount();
+    const PatchCountCheck patchCount = snapshotPatchCount();
     audio_port_handle_t selectedDeviceId;
     getOutputForAttr(&selectedDeviceId,
             AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, 48000);
     ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
-    patchCount.assertDelta(1);
+    ASSERT_EQ(1, patchCount.deltaFromSnapshot());
 }
 
 TEST_F(AudioPolicyManagerTestMsd, GetOutputForAttrEncodedPlusPcmRoutesToMsd) {
-    const PatchCountCheck patchCount = snapPatchCount();
+    const PatchCountCheck patchCount = snapshotPatchCount();
     audio_port_handle_t selectedDeviceId;
     getOutputForAttr(&selectedDeviceId,
             AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT);
     ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
-    patchCount.assertDelta(1);
+    ASSERT_EQ(1, patchCount.deltaFromSnapshot());
     getOutputForAttr(&selectedDeviceId,
             AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, 48000);
     ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
-    patchCount.assertDelta(1);
+    ASSERT_EQ(1, patchCount.deltaFromSnapshot());
 }
 
 TEST_F(AudioPolicyManagerTestMsd, GetOutputForAttrUnsupportedFormatBypassesMsd) {
-    const PatchCountCheck patchCount = snapPatchCount();
+    const PatchCountCheck patchCount = snapshotPatchCount();
     audio_port_handle_t selectedDeviceId;
     getOutputForAttr(&selectedDeviceId,
             AUDIO_FORMAT_DTS, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT);
     ASSERT_NE(selectedDeviceId, mMsdOutputDevice->getId());
-    patchCount.assertNoChange();
+    ASSERT_EQ(0, patchCount.deltaFromSnapshot());
 }
 
 TEST_F(AudioPolicyManagerTestMsd, GetOutputForAttrFormatSwitching) {
     // Switch between formats that are supported and not supported by MSD.
     {
-        const PatchCountCheck patchCount = snapPatchCount();
+        const PatchCountCheck patchCount = snapshotPatchCount();
         audio_port_handle_t selectedDeviceId, portId;
         getOutputForAttr(&selectedDeviceId,
                 AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT,
                 &portId);
         ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
-        patchCount.assertDelta(1);
+        ASSERT_EQ(1, patchCount.deltaFromSnapshot());
         mManager->releaseOutput(portId);
-        patchCount.assertDelta(1);  // compared to the state at the block entry
-        // TODO: make PatchCountCheck asserts more obvious. It's easy to
-        // miss the fact that it is immutable.
+        ASSERT_EQ(1, patchCount.deltaFromSnapshot());
     }
     {
-        const PatchCountCheck patchCount = snapPatchCount();
+        const PatchCountCheck patchCount = snapshotPatchCount();
         audio_port_handle_t selectedDeviceId, portId;
         getOutputForAttr(&selectedDeviceId,
                 AUDIO_FORMAT_DTS, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT,
                 &portId);
         ASSERT_NE(selectedDeviceId, mMsdOutputDevice->getId());
-        patchCount.assertDelta(-1);
+        ASSERT_EQ(-1, patchCount.deltaFromSnapshot());
         mManager->releaseOutput(portId);
-        patchCount.assertNoChange();
+        ASSERT_EQ(0, patchCount.deltaFromSnapshot());
     }
     {
-        const PatchCountCheck patchCount = snapPatchCount();
+        const PatchCountCheck patchCount = snapshotPatchCount();
         audio_port_handle_t selectedDeviceId;
         getOutputForAttr(&selectedDeviceId,
                 AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT);
         ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
-        patchCount.assertNoChange();
+        ASSERT_EQ(0, patchCount.deltaFromSnapshot());
     }
 }

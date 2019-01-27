@@ -29,6 +29,8 @@ LOCAL_CFLAGS := -Werror -Wall
 
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
 
+LOCAL_COMPATIBILITY_SUITE := device-tests
+
 include $(BUILD_NATIVE_TEST)
 
 # system/audio.h utilities test
@@ -54,5 +56,7 @@ LOCAL_MODULE_TAGS := tests
 LOCAL_CFLAGS := -Werror -Wall
 
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
+
+LOCAL_COMPATIBILITY_SUITE := device-tests
 
 include $(BUILD_NATIVE_TEST)

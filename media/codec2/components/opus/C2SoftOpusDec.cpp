@@ -19,10 +19,9 @@
 #include <log/log.h>
 
 #include <media/stagefright/foundation/MediaDefs.h>
-
+#include <media/stagefright/foundation/OpusHeader.h>
 #include <C2PlatformSupport.h>
 #include <SimpleC2Interface.h>
-
 #include "C2SoftOpusDec.h"
 
 extern "C" {
@@ -188,16 +187,6 @@ static void fillEmptyWork(const std::unique_ptr<C2Work> &work) {
     work->workletsProcessed = 1u;
 }
 
-static uint16_t ReadLE16(const uint8_t *data, size_t data_size,
-                         uint32_t read_offset) {
-    if (read_offset + 1 > data_size)
-        return 0;
-    uint16_t val;
-    val = data[read_offset];
-    val |= data[read_offset + 1] << 8;
-    return val;
-}
-
 static const int kRate = 48000;
 
 // Opus uses Vorbis channel mapping, and Vorbis channel mapping specifies
@@ -216,81 +205,6 @@ static const int kMaxOpusOutputPacketSizeSamples = 960 * 6;
 static const int kMaxChannelsWithDefaultLayout = 2;
 static const uint8_t kDefaultOpusChannelLayout[kMaxChannelsWithDefaultLayout] = { 0, 1 };
 
-// Parses Opus Header. Header spec: http://wiki.xiph.org/OggOpus#ID_Header
-static bool ParseOpusHeader(const uint8_t *data, size_t data_size,
-                            OpusHeader* header) {
-    // Size of the Opus header excluding optional mapping information.
-    const size_t kOpusHeaderSize = 19;
-
-    // Offset to the channel count byte in the Opus header.
-    const size_t kOpusHeaderChannelsOffset = 9;
-
-    // Offset to the pre-skip value in the Opus header.
-    const size_t kOpusHeaderSkipSamplesOffset = 10;
-
-    // Offset to the gain value in the Opus header.
-    const size_t kOpusHeaderGainOffset = 16;
-
-    // Offset to the channel mapping byte in the Opus header.
-    const size_t kOpusHeaderChannelMappingOffset = 18;
-
-    // Opus Header contains a stream map. The mapping values are in the header
-    // beyond the always present |kOpusHeaderSize| bytes of data. The mapping
-    // data contains stream count, coupling information, and per channel mapping
-    // values:
-    //   - Byte 0: Number of streams.
-    //   - Byte 1: Number coupled.
-    //   - Byte 2: Starting at byte 2 are |header->channels| uint8 mapping
-    //             values.
-    const size_t kOpusHeaderNumStreamsOffset = kOpusHeaderSize;
-    const size_t kOpusHeaderNumCoupledOffset = kOpusHeaderNumStreamsOffset + 1;
-    const size_t kOpusHeaderStreamMapOffset = kOpusHeaderNumStreamsOffset + 2;
-
-    if (data_size < kOpusHeaderSize) {
-        ALOGE("Header size is too small.");
-        return false;
-    }
-    header->channels = *(data + kOpusHeaderChannelsOffset);
-    if (header->channels <= 0 || header->channels > kMaxChannels) {
-        ALOGE("Invalid Header, wrong channel count: %d", header->channels);
-        return false;
-    }
-
-    header->skip_samples = ReadLE16(data,
-                                    data_size,
-                                    kOpusHeaderSkipSamplesOffset);
-
-    header->gain_db = static_cast<int16_t>(ReadLE16(data,
-                                                    data_size,
-                                                    kOpusHeaderGainOffset));
-
-    header->channel_mapping = *(data + kOpusHeaderChannelMappingOffset);
-    if (!header->channel_mapping) {
-        if (header->channels > kMaxChannelsWithDefaultLayout) {
-            ALOGE("Invalid Header, missing stream map.");
-            return false;
-        }
-        header->num_streams = 1;
-        header->num_coupled = header->channels > 1;
-        header->stream_map[0] = 0;
-        header->stream_map[1] = 1;
-        return true;
-    }
-    if (data_size < kOpusHeaderStreamMapOffset + header->channels) {
-        ALOGE("Invalid stream map; insufficient data for current channel "
-              "count: %d", header->channels);
-        return false;
-    }
-    header->num_streams = *(data + kOpusHeaderNumStreamsOffset);
-    header->num_coupled = *(data + kOpusHeaderNumCoupledOffset);
-    if (header->num_streams + header->num_coupled != header->channels) {
-        ALOGE("Inconsistent channel mapping.");
-        return false;
-    }
-    for (int i = 0; i < header->channels; ++i)
-        header->stream_map[i] = *(data + kOpusHeaderStreamMapOffset + i);
-    return true;
-}
 
 // Convert nanoseconds to number of samples.
 static uint64_t ns_to_samples(uint64_t ns, int rate) {
@@ -338,7 +252,19 @@ void C2SoftOpusDec::process(
     const uint8_t *data = rView.data() + inOffset;
     if (mInputBufferCount < 3) {
         if (mInputBufferCount == 0) {
-            if (!ParseOpusHeader(data, inSize, &mHeader)) {
+            size_t opusHeadSize = inSize;
+            size_t codecDelayBufSize = 0;
+            size_t seekPreRollBufSize = 0;
+            void *opusHeadBuf = (void *)data;
+            void *codecDelayBuf = NULL;
+            void *seekPreRollBuf = NULL;
+
+            GetOpusHeaderBuffers(data, inSize, &opusHeadBuf,
+                                &opusHeadSize, &codecDelayBuf,
+                                &codecDelayBufSize, &seekPreRollBuf,
+                                &seekPreRollBufSize);
+
+            if (!ParseOpusHeader((uint8_t *)opusHeadBuf, opusHeadSize, &mHeader)) {
                 ALOGE("Encountered error while Parsing Opus Header.");
                 mSignalledError = true;
                 work->result = C2_CORRUPTED;
@@ -377,6 +303,20 @@ void C2SoftOpusDec::process(
                 work->result = C2_CORRUPTED;
                 return;
             }
+
+            if (codecDelayBuf && codecDelayBufSize == 8) {
+                uint64_t value;
+                memcpy(&value, codecDelayBuf, sizeof(uint64_t));
+                mCodecDelay = ns_to_samples(value, kRate);
+                mSamplesToDiscard = mCodecDelay;
+                ++mInputBufferCount;
+            }
+            if (seekPreRollBuf && seekPreRollBufSize == 8) {
+                uint64_t value;
+                memcpy(&value, codecDelayBuf, sizeof(uint64_t));
+                mSeekPreRoll = ns_to_samples(value, kRate);
+                ++mInputBufferCount;
+            }
         } else {
             if (inSize < 8) {
                 ALOGE("Input sample size is too small.");
@@ -392,29 +332,30 @@ void C2SoftOpusDec::process(
             }
             else {
                 mSeekPreRoll = samples;
-
-                ALOGI("Configuring decoder: %d Hz, %d channels",
-                       kRate, mHeader.channels);
-                C2StreamSampleRateInfo::output sampleRateInfo(0u, kRate);
-                C2StreamChannelCountInfo::output channelCountInfo(0u, mHeader.channels);
-                std::vector<std::unique_ptr<C2SettingResult>> failures;
-                c2_status_t err = mIntf->config(
-                        { &sampleRateInfo, &channelCountInfo },
-                        C2_MAY_BLOCK,
-                        &failures);
-                if (err == OK) {
-                    work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(sampleRateInfo));
-                    work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(channelCountInfo));
-                } else {
-                    ALOGE("Config Update failed");
-                    mSignalledError = true;
-                    work->result = C2_CORRUPTED;
-                    return;
-                }
             }
         }
 
         ++mInputBufferCount;
+        if (mInputBufferCount == 3) {
+            ALOGI("Configuring decoder: %d Hz, %d channels",
+                   kRate, mHeader.channels);
+            C2StreamSampleRateInfo::output sampleRateInfo(0u, kRate);
+            C2StreamChannelCountInfo::output channelCountInfo(0u, mHeader.channels);
+            std::vector<std::unique_ptr<C2SettingResult>> failures;
+            c2_status_t err = mIntf->config(
+                    { &sampleRateInfo, &channelCountInfo },
+                    C2_MAY_BLOCK,
+                    &failures);
+            if (err == OK) {
+                work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(sampleRateInfo));
+                work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(channelCountInfo));
+            } else {
+                ALOGE("Config Update failed");
+                mSignalledError = true;
+                work->result = C2_CORRUPTED;
+                return;
+            }
+        }
         fillEmptyWork(work);
         if (eos) {
             mSignalledOutputEos = true;

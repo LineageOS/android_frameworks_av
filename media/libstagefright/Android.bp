@@ -160,7 +160,6 @@ cc_library {
         "libstagefright_codecbase",
         "libstagefright_foundation",
         "libstagefright_omx_utils",
-        "libstagefright_opus_common",
         "libRScpp",
         "libhidlallocatorutils",
         "libhidlbase",

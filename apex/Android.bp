@@ -36,7 +36,6 @@ apex {
 
 apex {
     name: "com.android.media.swcodec",
-    compile_multilib: "32",
     manifest: "manifest_codec.json",
     native_shared_libs: [
         "libmedia_codecserviceregistrant",

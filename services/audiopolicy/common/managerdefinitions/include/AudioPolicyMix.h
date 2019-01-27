@@ -23,9 +23,10 @@
 #include <system/audio.h>
 #include <utils/String8.h>
 
-namespace android {
+#include <DeviceDescriptor.h>
+#include <AudioOutputDescriptor.h>
 
-class SwAudioOutputDescriptor;
+namespace android {
 
 /**
  * custom mix entry in mPolicyMixes
@@ -78,6 +79,18 @@ public:
     sp<DeviceDescriptor> getDeviceAndMixForInputSource(audio_source_t inputSource,
                                                        const DeviceVector &availableDeviceTypes,
                                                        AudioMix **policyMix);
+
+    /**
+     * @brief try to find a matching mix for a given output descriptor and returns the associated
+     * output device.
+     * @param output to be considered
+     * @param availableOutputDevices list of output devices currently reachable
+     * @param policyMix to be returned if any mix matching ouput descriptor
+     * @return device selected from the mix attached to the output, null pointer otherwise
+     */
+    sp<DeviceDescriptor> getDeviceAndMixForOutput(const sp<SwAudioOutputDescriptor> &output,
+                                                  const DeviceVector &availableOutputDevices,
+                                                  AudioMix **policyMix = nullptr);
 
     status_t getInputMixForAttr(audio_attributes_t attr, AudioMix **policyMix);
 
