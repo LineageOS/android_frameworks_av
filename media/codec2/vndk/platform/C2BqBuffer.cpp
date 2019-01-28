@@ -269,36 +269,28 @@ private:
             }
         }
         if (slotBuffer) {
-            native_handle_t *grallocHandle = native_handle_clone(slotBuffer->handle);
-
-            if (grallocHandle) {
-                ALOGV("buffer wraps %llu %d", (unsigned long long)mProducerId, slot);
-                C2Handle *c2Handle = android::WrapNativeCodec2GrallocHandle(
-                        grallocHandle,
-                        slotBuffer->width,
-                        slotBuffer->height,
-                        slotBuffer->format,
-                        slotBuffer->usage,
-                        slotBuffer->stride,
-                        slotBuffer->getGenerationNumber(),
-                        mProducerId, slot);
-                if (c2Handle) {
-                    // Moved everything to c2Handle.
-                    native_handle_delete(grallocHandle);
-                    std::shared_ptr<C2GraphicAllocation> alloc;
-                    c2_status_t err = mAllocator->priorGraphicAllocation(c2Handle, &alloc);
-                    if (err != C2_OK) {
-                        return err;
-                    }
-                    std::shared_ptr<C2BufferQueueBlockPoolData> poolData =
-                            std::make_shared<C2BufferQueueBlockPoolData>(
-                                    slotBuffer->getGenerationNumber(),
-                                    mProducerId, slot, shared_from_this());
-                    *block = _C2BlockFactory::CreateGraphicBlock(alloc, poolData);
-                    return C2_OK;
+            ALOGV("buffer wraps %llu %d", (unsigned long long)mProducerId, slot);
+            C2Handle *c2Handle = android::WrapNativeCodec2GrallocHandle(
+                    slotBuffer->handle,
+                    slotBuffer->width,
+                    slotBuffer->height,
+                    slotBuffer->format,
+                    slotBuffer->usage,
+                    slotBuffer->stride,
+                    slotBuffer->getGenerationNumber(),
+                    mProducerId, slot);
+            if (c2Handle) {
+                std::shared_ptr<C2GraphicAllocation> alloc;
+                c2_status_t err = mAllocator->priorGraphicAllocation(c2Handle, &alloc);
+                if (err != C2_OK) {
+                    return err;
                 }
-                native_handle_close(grallocHandle);
-                native_handle_delete(grallocHandle);
+                std::shared_ptr<C2BufferQueueBlockPoolData> poolData =
+                        std::make_shared<C2BufferQueueBlockPoolData>(
+                                slotBuffer->getGenerationNumber(),
+                                mProducerId, slot, shared_from_this());
+                *block = _C2BlockFactory::CreateGraphicBlock(alloc, poolData);
+                return C2_OK;
             }
             // Block was not created. call requestBuffer# again next time.
             slotBuffer.clear();
