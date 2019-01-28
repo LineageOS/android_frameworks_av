@@ -27,26 +27,6 @@ BufferingSettings::BufferingSettings()
         : mInitialMarkMs(kNoMark),
           mResumePlaybackMarkMs(kNoMark) { }
 
-status_t BufferingSettings::readFromParcel(const Parcel* parcel) {
-    if (parcel == nullptr) {
-        return BAD_VALUE;
-    }
-    mInitialMarkMs = parcel->readInt32();
-    mResumePlaybackMarkMs = parcel->readInt32();
-
-    return OK;
-}
-
-status_t BufferingSettings::writeToParcel(Parcel* parcel) const {
-    if (parcel == nullptr) {
-        return BAD_VALUE;
-    }
-    parcel->writeInt32(mInitialMarkMs);
-    parcel->writeInt32(mResumePlaybackMarkMs);
-
-    return OK;
-}
-
 String8 BufferingSettings::toString() const {
     String8 s;
     s.appendFormat(

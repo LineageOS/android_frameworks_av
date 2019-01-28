@@ -21,7 +21,6 @@ cc_library_static {
         "libgui",
         "liblog",
         "libmedia_omx",
-        "libstagefright_foundation",
         "libui",
         "libutils",
 
@@ -55,6 +54,7 @@ cc_library_static {
         "libmediaplayer2-protos",
         "libmedia_player2_util",
         "libprotobuf-cpp-lite",
+        "libstagefright_foundation_without_imemory",
         "libstagefright_nuplayer2",
         "libstagefright_player2",
         "libstagefright_rtsp",
