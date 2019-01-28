@@ -62,6 +62,10 @@ void JpegProcessor::onFrameAvailable(const BufferItem& /*item*/) {
     }
 }
 
+void JpegProcessor::onBufferRequestForFrameNumber(uint64_t /*frameNumber*/, int /*streamId*/) {
+    // Intentionally left empty
+}
+
 void JpegProcessor::onBufferAcquired(const BufferInfo& /*bufferInfo*/) {
     // Intentionally left empty
 }

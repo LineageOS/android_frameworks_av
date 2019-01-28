@@ -26,8 +26,10 @@
 #include "CameraService.h"
 #include "common/FrameProcessorBase.h"
 #include "common/Camera2ClientBase.h"
+#include "CompositeStream.h"
 
 using android::camera3::OutputStreamInfo;
+using android::camera3::CompositeStream;
 
 namespace android {
 
@@ -313,6 +315,8 @@ private:
 
     // stream ID -> outputStreamInfo mapping
     std::unordered_map<int32_t, OutputStreamInfo> mStreamInfoMap;
+
+    KeyedVector<sp<IBinder>, sp<CompositeStream>> mCompositeStreamMap;
 
     static const int32_t MAX_SURFACES_PER_STREAM = 4;
     sp<CameraProviderManager> mProviderManager;

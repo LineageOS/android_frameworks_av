@@ -24,6 +24,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include "common/DepthPhotoProcessor.h"
+#include <dlfcn.h>
 #include <future>
 #include <inttypes.h>
 #include <hardware/camera_common.h>
@@ -57,6 +59,8 @@ const bool kEnableLazyHal(property_get_bool("ro.camera.enableLazyHal", false));
 const std::chrono::system_clock::duration kCameraKeepAliveDelay = 3s;
 
 } // anonymous namespace
+
+const float CameraProviderManager::kDepthARTolerance = .1f;
 
 CameraProviderManager::HardwareServiceInteractionProxy
 CameraProviderManager::sHardwareServiceInteractionProxy{};
@@ -498,6 +502,275 @@ void CameraProviderManager::ProviderInfo::DeviceInfo3::queryPhysicalCameraIds() 
             start = i+1;
         }
     }
+}
+
+void CameraProviderManager::ProviderInfo::DeviceInfo3::getSupportedSizes(
+        const CameraMetadata& ch, uint32_t tag, android_pixel_format_t format,
+        std::vector<std::tuple<size_t, size_t>> *sizes/*out*/) {
+    if (sizes == nullptr) {
+        return;
+    }
+
+    auto scalerDims = ch.find(tag);
+    if (scalerDims.count > 0) {
+        // Scaler entry contains 4 elements (format, width, height, type)
+        for (size_t i = 0; i < scalerDims.count; i += 4) {
+            if ((scalerDims.data.i32[i] == format) &&
+                    (scalerDims.data.i32[i+3] ==
+                     ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT)) {
+                sizes->push_back(std::make_tuple(scalerDims.data.i32[i+1],
+                            scalerDims.data.i32[i+2]));
+            }
+        }
+    }
+}
+
+void CameraProviderManager::ProviderInfo::DeviceInfo3::getSupportedDurations(
+        const CameraMetadata& ch, uint32_t tag, android_pixel_format_t format,
+        const std::vector<std::tuple<size_t, size_t>>& sizes,
+        std::vector<int64_t> *durations/*out*/) {
+    if (durations == nullptr) {
+        return;
+    }
+
+    auto availableDurations = ch.find(tag);
+    if (availableDurations.count > 0) {
+        // Duration entry contains 4 elements (format, width, height, duration)
+        for (size_t i = 0; i < availableDurations.count; i += 4) {
+            for (const auto& size : sizes) {
+                int64_t width = std::get<0>(size);
+                int64_t height = std::get<1>(size);
+                if ((availableDurations.data.i64[i] == format) &&
+                        (availableDurations.data.i64[i+1] == width) &&
+                        (availableDurations.data.i64[i+2] == height)) {
+                    durations->push_back(availableDurations.data.i64[i+3]);
+                }
+            }
+        }
+    }
+}
+void CameraProviderManager::ProviderInfo::DeviceInfo3::getSupportedDynamicDepthDurations(
+        const std::vector<int64_t>& depthDurations, const std::vector<int64_t>& blobDurations,
+        std::vector<int64_t> *dynamicDepthDurations /*out*/) {
+    if ((dynamicDepthDurations == nullptr) || (depthDurations.size() != blobDurations.size())) {
+        return;
+    }
+
+    // Unfortunately there is no direct way to calculate the dynamic depth stream duration.
+    // Processing time on camera service side can vary greatly depending on multiple
+    // variables which are not under our control. Make a guesstimate by taking the maximum
+    // corresponding duration value from depth and blob.
+    auto depthDuration = depthDurations.begin();
+    auto blobDuration = blobDurations.begin();
+    dynamicDepthDurations->reserve(depthDurations.size());
+    while ((depthDuration != depthDurations.end()) && (blobDuration != blobDurations.end())) {
+        dynamicDepthDurations->push_back(std::max(*depthDuration, *blobDuration));
+        depthDuration++; blobDuration++;
+    }
+}
+
+void CameraProviderManager::ProviderInfo::DeviceInfo3::getSupportedDynamicDepthSizes(
+        const std::vector<std::tuple<size_t, size_t>>& blobSizes,
+        const std::vector<std::tuple<size_t, size_t>>& depthSizes,
+        std::vector<std::tuple<size_t, size_t>> *dynamicDepthSizes /*out*/,
+        std::vector<std::tuple<size_t, size_t>> *internalDepthSizes /*out*/) {
+    if (dynamicDepthSizes == nullptr || internalDepthSizes == nullptr) {
+        return;
+    }
+
+    // The dynamic depth spec. does not mention how close the AR ratio should be.
+    // Try using something appropriate.
+    float ARTolerance = kDepthARTolerance;
+
+    for (const auto& blobSize : blobSizes) {
+        float jpegAR = static_cast<float> (std::get<0>(blobSize)) /
+                static_cast<float>(std::get<1>(blobSize));
+        bool found = false;
+        for (const auto& depthSize : depthSizes) {
+            if (depthSize == blobSize) {
+                internalDepthSizes->push_back(depthSize);
+                found = true;
+                break;
+            } else {
+                float depthAR = static_cast<float> (std::get<0>(depthSize)) /
+                    static_cast<float>(std::get<1>(depthSize));
+                if (std::fabs(jpegAR - depthAR) <= ARTolerance) {
+                    internalDepthSizes->push_back(depthSize);
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        if (found) {
+            dynamicDepthSizes->push_back(blobSize);
+        }
+    }
+}
+
+bool CameraProviderManager::ProviderInfo::DeviceInfo3::isDepthPhotoLibraryPresent() {
+    static bool libraryPresent = false;
+    static bool initialized = false;
+    if (initialized) {
+        return libraryPresent;
+    } else {
+        initialized = true;
+    }
+
+    void* depthLibHandle = dlopen(camera3::kDepthPhotoLibrary, RTLD_NOW | RTLD_LOCAL);
+    if (depthLibHandle == nullptr) {
+        return false;
+    }
+
+    auto processFunc = dlsym(depthLibHandle, camera3::kDepthPhotoProcessFunction);
+    if (processFunc != nullptr) {
+        libraryPresent = true;
+    } else {
+        libraryPresent = false;
+    }
+    dlclose(depthLibHandle);
+
+    return libraryPresent;
+}
+
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDynamicDepthTags() {
+    uint32_t depthExclTag = ANDROID_DEPTH_DEPTH_IS_EXCLUSIVE;
+    uint32_t depthSizesTag = ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS;
+    auto& c = mCameraCharacteristics;
+    std::vector<std::tuple<size_t, size_t>> supportedBlobSizes, supportedDepthSizes,
+            supportedDynamicDepthSizes, internalDepthSizes;
+    auto chTags = c.find(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS);
+    if (chTags.count == 0) {
+        ALOGE("%s: Supported camera characteristics is empty!", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    bool isDepthExclusivePresent = std::find(chTags.data.i32, chTags.data.i32 + chTags.count,
+            depthExclTag) != (chTags.data.i32 + chTags.count);
+    bool isDepthSizePresent = std::find(chTags.data.i32, chTags.data.i32 + chTags.count,
+            depthExclTag) != (chTags.data.i32 + chTags.count);
+    if (!(isDepthExclusivePresent && isDepthSizePresent)) {
+        // No depth support, nothing more to do.
+        return OK;
+    }
+
+    auto depthExclusiveEntry = c.find(depthExclTag);
+    if (depthExclusiveEntry.count > 0) {
+        if (depthExclusiveEntry.data.u8[0] != ANDROID_DEPTH_DEPTH_IS_EXCLUSIVE_FALSE) {
+            // Depth support is exclusive, nothing more to do.
+            return OK;
+        }
+    } else {
+        ALOGE("%s: Advertised depth exclusive tag but value is not present!", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    getSupportedSizes(c, ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS, HAL_PIXEL_FORMAT_BLOB,
+            &supportedBlobSizes);
+    getSupportedSizes(c, depthSizesTag, HAL_PIXEL_FORMAT_Y16, &supportedDepthSizes);
+    if (supportedBlobSizes.empty() || supportedDepthSizes.empty()) {
+        // Nothing to do in this case.
+        return OK;
+    }
+
+    getSupportedDynamicDepthSizes(supportedBlobSizes, supportedDepthSizes,
+            &supportedDynamicDepthSizes, &internalDepthSizes);
+    if (supportedDynamicDepthSizes.empty()) {
+        ALOGE("%s: No dynamic depth size matched!", __func__);
+        // Nothing more to do.
+        return OK;
+    }
+
+    if(!isDepthPhotoLibraryPresent()) {
+        // Depth photo processing library is not present, nothing more to do.
+        return OK;
+    }
+
+    std::vector<int32_t> dynamicDepthEntries;
+    for (const auto& it : supportedDynamicDepthSizes) {
+        int32_t entry[4] = {HAL_PIXEL_FORMAT_BLOB, static_cast<int32_t> (std::get<0>(it)),
+                static_cast<int32_t> (std::get<1>(it)),
+                ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT };
+        dynamicDepthEntries.insert(dynamicDepthEntries.end(), entry, entry + 4);
+    }
+
+    std::vector<int64_t> depthMinDurations, depthStallDurations;
+    std::vector<int64_t> blobMinDurations, blobStallDurations;
+    std::vector<int64_t> dynamicDepthMinDurations, dynamicDepthStallDurations;
+
+    getSupportedDurations(c, ANDROID_DEPTH_AVAILABLE_DEPTH_MIN_FRAME_DURATIONS,
+            HAL_PIXEL_FORMAT_Y16, internalDepthSizes, &depthMinDurations);
+    getSupportedDurations(c, ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS,
+            HAL_PIXEL_FORMAT_BLOB, supportedDynamicDepthSizes, &blobMinDurations);
+    if (blobMinDurations.empty() || depthMinDurations.empty() ||
+            (depthMinDurations.size() != blobMinDurations.size())) {
+        ALOGE("%s: Unexpected number of available depth min durations! %zu vs. %zu",
+                __FUNCTION__, depthMinDurations.size(), blobMinDurations.size());
+        return BAD_VALUE;
+    }
+
+    getSupportedDurations(c, ANDROID_DEPTH_AVAILABLE_DEPTH_STALL_DURATIONS,
+            HAL_PIXEL_FORMAT_Y16, internalDepthSizes, &depthStallDurations);
+    getSupportedDurations(c, ANDROID_SCALER_AVAILABLE_STALL_DURATIONS,
+            HAL_PIXEL_FORMAT_BLOB, supportedDynamicDepthSizes, &blobStallDurations);
+    if (blobStallDurations.empty() || depthStallDurations.empty() ||
+            (depthStallDurations.size() != blobStallDurations.size())) {
+        ALOGE("%s: Unexpected number of available depth stall durations! %zu vs. %zu",
+                __FUNCTION__, depthStallDurations.size(), blobStallDurations.size());
+        return BAD_VALUE;
+    }
+
+    getSupportedDynamicDepthDurations(depthMinDurations, blobMinDurations,
+            &dynamicDepthMinDurations);
+    getSupportedDynamicDepthDurations(depthStallDurations, blobStallDurations,
+            &dynamicDepthStallDurations);
+    if (dynamicDepthMinDurations.empty() || dynamicDepthStallDurations.empty() ||
+            (dynamicDepthMinDurations.size() != dynamicDepthStallDurations.size())) {
+        ALOGE("%s: Unexpected number of dynamic depth stall/min durations! %zu vs. %zu",
+                __FUNCTION__, dynamicDepthMinDurations.size(), dynamicDepthStallDurations.size());
+        return BAD_VALUE;
+    }
+
+    std::vector<int64_t> dynamicDepthMinDurationEntries;
+    auto itDuration = dynamicDepthMinDurations.begin();
+    auto itSize = supportedDynamicDepthSizes.begin();
+    while (itDuration != dynamicDepthMinDurations.end()) {
+        int64_t entry[4] = {HAL_PIXEL_FORMAT_BLOB, static_cast<int32_t> (std::get<0>(*itSize)),
+                static_cast<int32_t> (std::get<1>(*itSize)), *itDuration};
+        dynamicDepthMinDurationEntries.insert(dynamicDepthMinDurationEntries.end(), entry,
+                entry + 4);
+        itDuration++; itSize++;
+    }
+
+    std::vector<int64_t> dynamicDepthStallDurationEntries;
+    itDuration = dynamicDepthStallDurations.begin();
+    itSize = supportedDynamicDepthSizes.begin();
+    while (itDuration != dynamicDepthStallDurations.end()) {
+        int64_t entry[4] = {HAL_PIXEL_FORMAT_BLOB, static_cast<int32_t> (std::get<0>(*itSize)),
+                static_cast<int32_t> (std::get<1>(*itSize)), *itDuration};
+        dynamicDepthStallDurationEntries.insert(dynamicDepthStallDurationEntries.end(), entry,
+                entry + 4);
+        itDuration++; itSize++;
+    }
+
+    c.update(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS,
+            dynamicDepthEntries.data(), dynamicDepthEntries.size());
+    c.update(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_MIN_FRAME_DURATIONS,
+            dynamicDepthMinDurationEntries.data(), dynamicDepthMinDurationEntries.size());
+    c.update(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STALL_DURATIONS,
+            dynamicDepthStallDurationEntries.data(), dynamicDepthStallDurationEntries.size());
+
+    std::vector<int32_t> supportedChTags;
+    supportedChTags.reserve(chTags.count + 3);
+    supportedChTags.insert(supportedChTags.end(), chTags.data.i32,
+            chTags.data.i32 + chTags.count);
+    supportedChTags.push_back(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS);
+    supportedChTags.push_back(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_MIN_FRAME_DURATIONS);
+    supportedChTags.push_back(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STALL_DURATIONS);
+    c.update(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS, supportedChTags.data(),
+            supportedChTags.size());
+
+    return OK;
 }
 
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::fixupMonochromeTags() {
@@ -1440,6 +1713,12 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
     if (OK != res) {
         ALOGE("%s: Unable to fix up monochrome tags based for older HAL version: %s (%d)",
                 __FUNCTION__, strerror(-res), res);
+        return;
+    }
+    res = addDynamicDepthTags();
+    if (OK != res) {
+        ALOGE("%s: Failed appending dynamic depth tags: %s (%d)", __FUNCTION__, strerror(-res),
+                res);
         return;
     }
     camera_metadata_entry flashAvailable =

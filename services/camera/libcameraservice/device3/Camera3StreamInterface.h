@@ -259,7 +259,8 @@ class Camera3StreamInterface : public virtual RefBase {
      */
     virtual status_t returnBuffer(const camera3_stream_buffer &buffer,
             nsecs_t timestamp, bool timestampIncreasing = true,
-            const std::vector<size_t>& surface_ids = std::vector<size_t>()) = 0;
+            const std::vector<size_t>& surface_ids = std::vector<size_t>(),
+            uint64_t frameNumber = 0) = 0;
 
     /**
      * Fill in the camera3_stream_buffer with the next valid buffer for this
@@ -341,6 +342,11 @@ class Camera3StreamInterface : public virtual RefBase {
      * Camera3Stream.
      */
     virtual void setBufferFreedListener(wp<Camera3StreamBufferFreedListener> listener) = 0;
+
+    /**
+     * Notify buffer stream listeners about incoming request with particular frame number.
+     */
+    virtual void fireBufferRequestForFrameNumber(uint64_t frameNumber) = 0;
 };
 
 } // namespace camera3

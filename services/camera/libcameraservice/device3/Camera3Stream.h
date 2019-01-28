@@ -332,7 +332,8 @@ class Camera3Stream :
      */
     status_t         returnBuffer(const camera3_stream_buffer &buffer,
             nsecs_t timestamp, bool timestampIncreasing,
-            const std::vector<size_t>& surface_ids = std::vector<size_t>());
+            const std::vector<size_t>& surface_ids = std::vector<size_t>(),
+            uint64_t frameNumber = 0);
 
     /**
      * Fill in the camera3_stream_buffer with the next valid buffer for this
@@ -429,6 +430,11 @@ class Camera3Stream :
      * in case it contains outstanding buffers.
      */
     status_t         restoreConfiguredState();
+
+    /**
+     * Notify buffer stream listeners about incoming request with particular frame number.
+     */
+    void fireBufferRequestForFrameNumber(uint64_t frameNumber) override;
 
   protected:
     const int mId;
@@ -538,7 +544,7 @@ class Camera3Stream :
     static const nsecs_t kWaitForBufferDuration = 3000000000LL; // 3000 ms
 
     void fireBufferListenersLocked(const camera3_stream_buffer& buffer,
-                                  bool acquired, bool output);
+            bool acquired, bool output, nsecs_t timestamp = 0, uint64_t frameNumber = 0);
     List<wp<Camera3StreamBufferListener> > mBufferListenerList;
 
     status_t        cancelPrepareLocked();
