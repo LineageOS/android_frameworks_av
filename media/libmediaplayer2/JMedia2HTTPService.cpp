@@ -25,8 +25,7 @@
 #include <mediaplayer2/JMedia2HTTPConnection.h>
 #include <media/stagefright/foundation/ADebug.h>
 
-#include <nativehelper/JNIHelp.h>
-#include <nativehelper/ScopedLocalRef.h>
+#include <nativehelper/scoped_local_ref.h>
 
 namespace android {
 

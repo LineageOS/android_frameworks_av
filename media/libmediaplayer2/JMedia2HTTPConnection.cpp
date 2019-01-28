@@ -21,11 +21,10 @@
 #include <mediaplayer2/JavaVMHelper.h>
 #include <mediaplayer2/JMedia2HTTPConnection.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include <nativehelper/ScopedLocalRef.h>
+#include <nativehelper/scoped_local_ref.h>
 
 #include "log/log.h"
 #include "jni.h"
-#include <nativehelper/JNIHelp.h>
 
 namespace android {
 
