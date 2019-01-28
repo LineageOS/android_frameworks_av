@@ -329,7 +329,7 @@ status_t NuPlayerDriver::prepareAsync() {
 }
 
 status_t NuPlayerDriver::start() {
-    ALOGD("start(%p), state is %d, eos is %d", this, mState, mAtEOS);
+    ALOGV("start(%p), state is %d, eos is %d", this, mState, mAtEOS);
     Mutex::Autolock autoLock(mLock);
     return start_l();
 }
@@ -471,7 +471,7 @@ status_t NuPlayerDriver::getSyncSettings(AVSyncSettings *sync, float *videoFps) 
 }
 
 status_t NuPlayerDriver::seekTo(int msec, MediaPlayerSeekMode mode) {
-    ALOGD("seekTo(%p) (%d ms, %d) at state %d", this, msec, mode, mState);
+    ALOGV("seekTo(%p) (%d ms, %d) at state %d", this, msec, mode, mState);
     Mutex::Autolock autoLock(mLock);
 
     int64_t seekTimeUs = msec * 1000LL;
@@ -965,7 +965,7 @@ void NuPlayerDriver::notifyListener(
 
 void NuPlayerDriver::notifyListener_l(
         int msg, int ext1, int ext2, const Parcel *in) {
-    ALOGD("notifyListener_l(%p), (%d, %d, %d, %d), loop setting(%d, %d)",
+    ALOGV("notifyListener_l(%p), (%d, %d, %d, %d), loop setting(%d, %d)",
             this, msg, ext1, ext2, (in == NULL ? -1 : (int)in->dataSize()), mAutoLoop, mLooping);
     switch (msg) {
         case MEDIA_PLAYBACK_COMPLETE:
