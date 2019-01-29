@@ -350,7 +350,7 @@ void C2SoftOpusEnc::process(const std::unique_ptr<C2Work>& work,
             return;
         }
     }
-    if (mIsFirstFrame) {
+    if (mIsFirstFrame && inSize > 0) {
         mAnchorTimeStamp = work->input.ordinal.timestamp.peekull();
         mIsFirstFrame = false;
     }
