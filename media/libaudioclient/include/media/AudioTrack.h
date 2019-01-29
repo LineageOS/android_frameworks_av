@@ -1227,7 +1227,7 @@ private:
 private:
     class MediaMetrics {
       public:
-        MediaMetrics() : mAnalyticsItem(new MediaAnalyticsItem("audiotrack")) {
+        MediaMetrics() : mAnalyticsItem(MediaAnalyticsItem::create("audiotrack")) {
         }
         ~MediaMetrics() {
             // mAnalyticsItem alloc failure will be flagged in the constructor
