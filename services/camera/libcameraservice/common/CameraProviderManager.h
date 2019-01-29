@@ -265,6 +265,8 @@ public:
     bool isLogicalCamera(const std::string& id, std::vector<std::string>* physicalCameraIds);
 
     bool isHiddenPhysicalCamera(const std::string& cameraId);
+
+    static const float kDepthARTolerance;
 private:
     // All private members, unless otherwise noted, expect mInterfaceMutex to be locked before use
     mutable std::mutex mInterfaceMutex;
@@ -470,6 +472,23 @@ private:
             std::unordered_map<std::string, CameraMetadata> mPhysicalCameraCharacteristics;
             void queryPhysicalCameraIds();
             status_t fixupMonochromeTags();
+            status_t addDynamicDepthTags();
+            static void getSupportedSizes(const CameraMetadata& ch, uint32_t tag,
+                    android_pixel_format_t format,
+                    std::vector<std::tuple<size_t, size_t>> *sizes /*out*/);
+            void getSupportedDurations( const CameraMetadata& ch, uint32_t tag,
+                    android_pixel_format_t format,
+                    const std::vector<std::tuple<size_t, size_t>>& sizes,
+                    std::vector<int64_t> *durations/*out*/);
+            void getSupportedDynamicDepthDurations(const std::vector<int64_t>& depthDurations,
+                    const std::vector<int64_t>& blobDurations,
+                    std::vector<int64_t> *dynamicDepthDurations /*out*/);
+            static bool isDepthPhotoLibraryPresent();
+            static void getSupportedDynamicDepthSizes(
+                    const std::vector<std::tuple<size_t, size_t>>& blobSizes,
+                    const std::vector<std::tuple<size_t, size_t>>& depthSizes,
+                    std::vector<std::tuple<size_t, size_t>> *dynamicDepthSizes /*out*/,
+                    std::vector<std::tuple<size_t, size_t>> *internalDepthSizes /*out*/);
             status_t removeAvailableKeys(CameraMetadata& c, const std::vector<uint32_t>& keys,
                     uint32_t keyTag);
         };

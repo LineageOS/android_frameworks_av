@@ -25,6 +25,7 @@
 #include <gui/CpuConsumer.h>
 
 #include "camera/CameraMetadata.h"
+#include "device3/Camera3StreamBufferListener.h"
 
 namespace android {
 
@@ -53,12 +54,16 @@ class JpegProcessor:
     // Camera3StreamBufferListener implementation
     void onBufferAcquired(const BufferInfo& bufferInfo) override;
     void onBufferReleased(const BufferInfo& bufferInfo) override;
+    void onBufferRequestForFrameNumber(uint64_t frameNumber, int streamId) override;
 
     status_t updateStream(const Parameters &params);
     status_t deleteStream();
     int getStreamId() const;
 
     void dump(int fd, const Vector<String16>& args) const;
+
+    static size_t findJpegSize(uint8_t* jpegBuffer, size_t maxSize);
+
   private:
     static const nsecs_t kWaitDuration = 10000000; // 10 ms
     wp<CameraDeviceBase> mDevice;
@@ -82,7 +87,6 @@ class JpegProcessor:
     virtual bool threadLoop();
 
     status_t processNewCapture(bool captureSuccess);
-    size_t findJpegSize(uint8_t* jpegBuffer, size_t maxSize);
 
 };
 
