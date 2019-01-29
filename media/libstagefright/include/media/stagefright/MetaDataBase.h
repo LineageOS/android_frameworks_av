@@ -241,6 +241,9 @@ enum {
 
     // Treat empty track as malformed for MediaRecorder.
     kKeyEmptyTrackMalFormed = 'nemt', // bool (int32_t)
+
+    kKeySps              = 'sSps', // int32_t, indicates that a buffer is sps.
+    kKeyPps              = 'sPps', // int32_t, indicates that a buffer is pps.
 };
 
 enum {
