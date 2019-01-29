@@ -5329,16 +5329,9 @@ void AudioFlinger::MixerThread::cacheParameters_l()
 // ----------------------------------------------------------------------------
 
 AudioFlinger::DirectOutputThread::DirectOutputThread(const sp<AudioFlinger>& audioFlinger,
-        AudioStreamOut* output, audio_io_handle_t id, audio_devices_t device, bool systemReady)
-    :   PlaybackThread(audioFlinger, output, id, device, DIRECT, systemReady)
-{
-}
-
-AudioFlinger::DirectOutputThread::DirectOutputThread(const sp<AudioFlinger>& audioFlinger,
-        AudioStreamOut* output, audio_io_handle_t id, uint32_t device,
+        AudioStreamOut* output, audio_io_handle_t id, audio_devices_t device,
         ThreadBase::type_t type, bool systemReady)
     :   PlaybackThread(audioFlinger, output, id, device, type, systemReady)
-        , mVolumeShaperActive(false)
 {
 }
 
