@@ -182,7 +182,8 @@ Return<void> HidlCameraService::addListener(const sp<HCameraServiceListener>& hC
         }
     }
     std::vector<hardware::CameraStatus> cameraStatusAndIds{};
-    binder::Status serviceRet = mAidlICameraService->addListener(csListener, &cameraStatusAndIds);
+    binder::Status serviceRet =
+        mAidlICameraService->addListenerHelper(csListener, &cameraStatusAndIds, true);
     HStatus status = HStatus::NO_ERROR;
     if (!serviceRet.isOk()) {
       ALOGE("%s: Unable to add camera device status listener", __FUNCTION__);
