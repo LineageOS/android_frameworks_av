@@ -134,6 +134,9 @@ public:
     bool             isVolumeControl() const
                         { return (mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK)
                             == EFFECT_FLAG_VOLUME_CTRL; }
+    bool             isVolumeMonitor() const
+                        { return (mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK)
+                            == EFFECT_FLAG_VOLUME_MONITOR; }
     status_t         setOffloaded(bool offloaded, audio_io_handle_t io);
     bool             isOffloaded() const;
     void             addEffectToHal_l();

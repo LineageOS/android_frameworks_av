@@ -1136,7 +1136,8 @@ status_t AudioFlinger::EffectModule::setVolume(uint32_t *left, uint32_t *right, 
     // if controller flag is set (Note that controller == TRUE => EFFECT_FLAG_VOLUME_CTRL set)
     if (isProcessEnabled() &&
             ((mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK) == EFFECT_FLAG_VOLUME_CTRL ||
-            (mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK) == EFFECT_FLAG_VOLUME_IND)) {
+             (mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK) == EFFECT_FLAG_VOLUME_IND ||
+             (mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK) == EFFECT_FLAG_VOLUME_MONITOR)) {
         uint32_t volume[2];
         uint32_t *pVolume = NULL;
         uint32_t size = sizeof(volume);
@@ -1331,6 +1332,7 @@ String8 effectFlagsToString(uint32_t flags) {
     case EFFECT_FLAG_VOLUME_NONE: s.append("none"); break;
     case EFFECT_FLAG_VOLUME_CTRL: s.append("implements control"); break;
     case EFFECT_FLAG_VOLUME_IND: s.append("requires indication"); break;
+    case EFFECT_FLAG_VOLUME_MONITOR: s.append("monitors volume"); break;
     default: s.append("unknown/reserved"); break;
     }
     s.append(", ");
@@ -2277,7 +2279,7 @@ bool AudioFlinger::EffectChain::setVolume_l(uint32_t *left, uint32_t *right, boo
     }
     // then indicate volume to all other effects in chain.
     // Pass altered volume to effects before volume controller
-    // and requested volume to effects after controller
+    // and requested volume to effects after controller or with volume monitor flag
     uint32_t lVol = newLeft;
     uint32_t rVol = newRight;
 
@@ -2290,7 +2292,12 @@ bool AudioFlinger::EffectChain::setVolume_l(uint32_t *left, uint32_t *right, boo
             lVol = *left;
             rVol = *right;
         }
-        mEffects[i]->setVolume(&lVol, &rVol, false);
+        // Pass requested volume directly if this is volume monitor module
+        if (mEffects[i]->isVolumeMonitor()) {
+            mEffects[i]->setVolume(left, right, false);
+        } else {
+            mEffects[i]->setVolume(&lVol, &rVol, false);
+        }
     }
     *left = newLeft;
     *right = newRight;
