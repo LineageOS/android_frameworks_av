@@ -138,6 +138,10 @@ private:
     int32_t mLongitudex10000;
     int32_t mStartTimeOffsetMs;
     int32_t mTotalBitRate;
+    String8 mLocalIp;
+    String8 mRemoteIp;
+    int32_t mLocalPort;
+    int32_t mRemotePort;
 
     int64_t mDurationRecordedUs;
     int64_t mStartedRecordingUs;
@@ -219,6 +223,10 @@ private:
     status_t setParamMovieTimeScale(int32_t timeScale);
     status_t setParamGeoDataLongitude(int64_t longitudex10000);
     status_t setParamGeoDataLatitude(int64_t latitudex10000);
+    status_t setParamRtpLocalIp(const String8 &localIp);
+    status_t setParamRtpLocalPort(int32_t localPort);
+    status_t setParamRtpRemoteIp(const String8 &remoteIp);
+    status_t setParamRtpRemotePort(int32_t remotePort);
     void clipVideoBitRate();
     void clipVideoFrameRate();
     void clipVideoFrameWidth();
