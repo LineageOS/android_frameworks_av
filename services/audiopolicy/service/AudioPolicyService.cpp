@@ -880,9 +880,8 @@ bool AudioPolicyService::UidPolicy::isA11yOnTop() {
         if (it == mA11yUids.end()) {
             continue;
         }
-        if (uid.second.second == ActivityManager::PROCESS_STATE_TOP ||
-            uid.second.second == ActivityManager::PROCESS_STATE_FOREGROUND_SERVICE ||
-            uid.second.second == ActivityManager::PROCESS_STATE_BOUND_FOREGROUND_SERVICE) {
+        if (uid.second.second >= ActivityManager::PROCESS_STATE_TOP
+                && uid.second.second <= ActivityManager::PROCESS_STATE_BOUND_FOREGROUND_SERVICE) {
             return true;
         }
     }
