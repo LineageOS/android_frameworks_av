@@ -776,6 +776,34 @@ status_t StagefrightRecorder::setParamGeoDataLatitude(
     return OK;
 }
 
+status_t StagefrightRecorder::setParamRtpLocalIp(const String8 &localIp) {
+    ALOGV("setParamVideoLocalIp: %s", localIp.string());
+
+    mLocalIp.setTo(localIp.string());
+    return OK;
+}
+
+status_t StagefrightRecorder::setParamRtpLocalPort(int32_t localPort) {
+    ALOGV("setParamVideoLocalPort: %d", localPort);
+
+    mLocalPort = localPort;
+    return OK;
+}
+
+status_t StagefrightRecorder::setParamRtpRemoteIp(const String8 &remoteIp) {
+    ALOGV("setParamVideoRemoteIp: %s", remoteIp.string());
+
+    mRemoteIp.setTo(remoteIp.string());
+    return OK;
+}
+
+status_t StagefrightRecorder::setParamRtpRemotePort(int32_t remotePort) {
+    ALOGV("setParamVideoRemotePort: %d", remotePort);
+
+    mRemotePort = remotePort;
+    return OK;
+}
+
 status_t StagefrightRecorder::setParameter(
         const String8 &key, const String8 &value) {
     ALOGV("setParameter: key (%s) => value (%s)", key.string(), value.string());
@@ -883,6 +911,20 @@ status_t StagefrightRecorder::setParameter(
         double fps;
         if (safe_strtod(value.string(), &fps)) {
             return setParamCaptureFps(fps);
+        }
+    } else if (key == "rtp-param-local-ip") {
+        return setParamRtpLocalIp(value);
+    } else if (key == "rtp-param-local-port") {
+        int32_t localPort;
+        if (safe_strtoi32(value.string(), &localPort)) {
+            return setParamRtpLocalPort(localPort);
+        }
+    } else if (key == "rtp-param-remote-ip") {
+        return setParamRtpRemoteIp(value);
+    } else if (key == "rtp-param-remote-port") {
+        int32_t remotePort;
+        if (safe_strtoi32(value.string(), &remotePort)) {
+            return setParamRtpRemotePort(remotePort);
         }
     } else {
         ALOGE("setParameter: failed to find key %s", key.string());
@@ -1330,7 +1372,7 @@ status_t StagefrightRecorder::setupRTPRecording() {
         mVideoEncoderSource = source;
     }
 
-    mWriter = new ARTPWriter(mOutputFd);
+    mWriter = new ARTPWriter(mOutputFd, mLocalIp, mLocalPort, mRemoteIp, mRemotePort);
     mWriter->addSource(source);
     mWriter->setListener(mListener);
 
