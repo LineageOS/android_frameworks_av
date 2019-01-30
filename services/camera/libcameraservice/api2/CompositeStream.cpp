@@ -82,7 +82,8 @@ status_t CompositeStream::deleteStream() {
     return deleteInternalStreams();
 }
 
-void CompositeStream::onBufferRequestForFrameNumber(uint64_t frameNumber, int streamId) {
+void CompositeStream::onBufferRequestForFrameNumber(uint64_t frameNumber, int streamId,
+        const CameraMetadata& /*settings*/) {
     Mutex::Autolock l(mMutex);
     if (!mErrorState && (streamId == getStreamId())) {
         mPendingCaptureResults.emplace(frameNumber, CameraMetadata());

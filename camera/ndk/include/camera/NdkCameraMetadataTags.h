@@ -71,6 +71,8 @@ typedef enum acamera_metadata_section {
     ACAMERA_DEPTH,
     ACAMERA_LOGICAL_MULTI_CAMERA,
     ACAMERA_DISTORTION_CORRECTION,
+    ACAMERA_HEIC,
+    ACAMERA_HEIC_INFO,
     ACAMERA_SECTION_COUNT,
 
     ACAMERA_VENDOR = 0x8000
@@ -112,6 +114,8 @@ typedef enum acamera_metadata_section_start {
     ACAMERA_DISTORTION_CORRECTION_START
                                    = ACAMERA_DISTORTION_CORRECTION
                                                                 << 16,
+    ACAMERA_HEIC_START             = ACAMERA_HEIC              << 16,
+    ACAMERA_HEIC_INFO_START        = ACAMERA_HEIC_INFO         << 16,
     ACAMERA_VENDOR_START           = ACAMERA_VENDOR            << 16
 } acamera_metadata_section_start_t;
 
@@ -1912,6 +1916,7 @@ typedef enum acamera_metadata_tag {
      *   <li>ACaptureRequest</li>
      * </ul></p>
      *
+     * <p>This tag is also used for HEIC image capture.</p>
      */
     ACAMERA_JPEG_GPS_COORDINATES =                              // double[3]
             ACAMERA_JPEG_START,
@@ -1927,6 +1932,7 @@ typedef enum acamera_metadata_tag {
      *   <li>ACaptureRequest</li>
      * </ul></p>
      *
+     * <p>This tag is also used for HEIC image capture.</p>
      */
     ACAMERA_JPEG_GPS_PROCESSING_METHOD =                        // byte
             ACAMERA_JPEG_START + 1,
@@ -1942,6 +1948,7 @@ typedef enum acamera_metadata_tag {
      *   <li>ACaptureRequest</li>
      * </ul></p>
      *
+     * <p>This tag is also used for HEIC image capture.</p>
      */
     ACAMERA_JPEG_GPS_TIMESTAMP =                                // int64
             ACAMERA_JPEG_START + 2,
@@ -1986,6 +1993,10 @@ typedef enum acamera_metadata_tag {
      * </code></pre>
      * <p>For EXTERNAL cameras the sensor orientation will always be set to 0 and the facing will
      * also be set to EXTERNAL. The above code is not relevant in such case.</p>
+     * <p>This tag is also used to describe the orientation of the HEIC image capture, in which
+     * case the rotation is reflected by
+     * <a href="https://developer.android.com/reference/android/media/ExifInterface.html#TAG_ORIENTATION">EXIF orientation flag</a>, and not by
+     * rotating the image data itself.</p>
      *
      * @see ACAMERA_SENSOR_ORIENTATION
      */
@@ -2003,7 +2014,8 @@ typedef enum acamera_metadata_tag {
      *   <li>ACaptureRequest</li>
      * </ul></p>
      *
-     * <p>85-95 is typical usage range.</p>
+     * <p>85-95 is typical usage range. This tag is also used to describe the quality
+     * of the HEIC image capture.</p>
      */
     ACAMERA_JPEG_QUALITY =                                      // byte
             ACAMERA_JPEG_START + 4,
@@ -2019,6 +2031,7 @@ typedef enum acamera_metadata_tag {
      *   <li>ACaptureRequest</li>
      * </ul></p>
      *
+     * <p>This tag is also used to describe the quality of the HEIC image capture.</p>
      */
     ACAMERA_JPEG_THUMBNAIL_QUALITY =                            // byte
             ACAMERA_JPEG_START + 5,
@@ -2055,6 +2068,10 @@ typedef enum acamera_metadata_tag {
      *   orientation is requested. LEGACY device will always report unrotated thumbnail
      *   size.</li>
      * </ul>
+     * <p>The tag is also used as thumbnail size for HEIC image format capture, in which case the
+     * the thumbnail rotation is reflected by
+     * <a href="https://developer.android.com/reference/android/media/ExifInterface.html#TAG_ORIENTATION">EXIF orientation flag</a>, and not by
+     * rotating the thumbnail data itself.</p>
      *
      * @see ACAMERA_JPEG_ORIENTATION
      */
@@ -2088,6 +2105,7 @@ typedef enum acamera_metadata_tag {
      * and vice versa.</li>
      * <li>All non-<code>(0, 0)</code> sizes will have non-zero widths and heights.</li>
      * </ul>
+     * <p>This list is also used as supported thumbnail sizes for HEIC image format capture.</p>
      *
      * @see ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS
      */
@@ -5757,6 +5775,80 @@ typedef enum acamera_metadata_tag {
             ACAMERA_DISTORTION_CORRECTION_START + 1,
     ACAMERA_DISTORTION_CORRECTION_END,
 
+    /**
+     * <p>The available HEIC (ISO/IEC 23008-12) stream
+     * configurations that this camera device supports
+     * (i.e. format, width, height, output/input stream).</p>
+     *
+     * <p>Type: int32[n*4] (acamera_metadata_enum_android_heic_available_heic_stream_configurations_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>The configurations are listed as <code>(format, width, height, input?)</code> tuples.</p>
+     * <p>If the camera device supports HEIC image format, it will support identical set of stream
+     * combinations involving HEIC image format, compared to the combinations involving JPEG
+     * image format as required by the device's hardware level and capabilities.</p>
+     * <p>All the static, control, and dynamic metadata tags related to JPEG apply to HEIC formats.
+     * Configuring JPEG and HEIC streams at the same time is not supported.</p>
+     * <p>All the configuration tuples <code>(format, width, height, input?)</code> will contain
+     * AIMAGE_FORMAT_HEIC format as OUTPUT only.</p>
+     */
+    ACAMERA_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS =         // int32[n*4] (acamera_metadata_enum_android_heic_available_heic_stream_configurations_t)
+            ACAMERA_HEIC_START,
+    /**
+     * <p>This lists the minimum frame duration for each
+     * format/size combination for HEIC output formats.</p>
+     *
+     * <p>Type: int64[4*n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>This should correspond to the frame duration when only that
+     * stream is active, with all processing (typically in android.*.mode)
+     * set to either OFF or FAST.</p>
+     * <p>When multiple streams are used in a request, the minimum frame
+     * duration will be max(individual stream min durations).</p>
+     * <p>See ACAMERA_SENSOR_FRAME_DURATION and
+     * ACAMERA_SCALER_AVAILABLE_STALL_DURATIONS for more details about
+     * calculating the max frame rate.</p>
+     *
+     * @see ACAMERA_SCALER_AVAILABLE_STALL_DURATIONS
+     * @see ACAMERA_SENSOR_FRAME_DURATION
+     */
+    ACAMERA_HEIC_AVAILABLE_HEIC_MIN_FRAME_DURATIONS =           // int64[4*n]
+            ACAMERA_HEIC_START + 1,
+    /**
+     * <p>This lists the maximum stall duration for each
+     * output format/size combination for HEIC streams.</p>
+     *
+     * <p>Type: int64[4*n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>A stall duration is how much extra time would get added
+     * to the normal minimum frame duration for a repeating request
+     * that has streams with non-zero stall.</p>
+     * <p>This functions similarly to
+     * ACAMERA_SCALER_AVAILABLE_STALL_DURATIONS for HEIC
+     * streams.</p>
+     * <p>All HEIC output stream formats may have a nonzero stall
+     * duration.</p>
+     *
+     * @see ACAMERA_SCALER_AVAILABLE_STALL_DURATIONS
+     */
+    ACAMERA_HEIC_AVAILABLE_HEIC_STALL_DURATIONS =               // int64[4*n]
+            ACAMERA_HEIC_START + 2,
+    ACAMERA_HEIC_END,
+
 } acamera_metadata_tag_t;
 
 /**
@@ -8371,6 +8463,16 @@ typedef enum acamera_metadata_enum_acamera_distortion_correction_mode {
     ACAMERA_DISTORTION_CORRECTION_MODE_HIGH_QUALITY                  = 2,
 
 } acamera_metadata_enum_android_distortion_correction_mode_t;
+
+
+// ACAMERA_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS
+typedef enum acamera_metadata_enum_acamera_heic_available_heic_stream_configurations {
+    ACAMERA_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS_OUTPUT         = 0,
+
+    ACAMERA_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS_INPUT          = 1,
+
+} acamera_metadata_enum_android_heic_available_heic_stream_configurations_t;
+
 
 
 #endif /* __ANDROID_API__ >= 24 */

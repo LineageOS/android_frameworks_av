@@ -21,7 +21,6 @@
 #include <dynamic_depth/imaging_model.h>
 #include <dynamic_depth/depth_map.h>
 
-#include <gui/IProducerListener.h>
 #include <gui/CpuConsumer.h>
 
 #include "CompositeStream.h"
@@ -115,11 +114,6 @@ private:
     static const auto kDepthMapPixelFormat = HAL_PIXEL_FORMAT_Y16;
     static const auto kDepthMapDataSpace = HAL_DATASPACE_DEPTH;
     static const auto kJpegDataSpace = HAL_DATASPACE_V0_JFIF;
-
-    struct ProducerListener : public BnProducerListener {
-        // ProducerListener implementation
-        void onBufferReleased() override { /*No impl. for now*/ };
-    };
 
     int                  mBlobStreamId, mBlobSurfaceId, mDepthStreamId, mDepthSurfaceId;
     size_t               mBlobWidth, mBlobHeight;

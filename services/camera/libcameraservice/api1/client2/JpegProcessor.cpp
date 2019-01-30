@@ -62,7 +62,8 @@ void JpegProcessor::onFrameAvailable(const BufferItem& /*item*/) {
     }
 }
 
-void JpegProcessor::onBufferRequestForFrameNumber(uint64_t /*frameNumber*/, int /*streamId*/) {
+void JpegProcessor::onBufferRequestForFrameNumber(uint64_t /*frameNumber*/,
+        int /*streamId*/, const CameraMetadata& /*settings*/) {
     // Intentionally left empty
 }
 

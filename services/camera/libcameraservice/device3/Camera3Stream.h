@@ -434,7 +434,8 @@ class Camera3Stream :
     /**
      * Notify buffer stream listeners about incoming request with particular frame number.
      */
-    void fireBufferRequestForFrameNumber(uint64_t frameNumber) override;
+    void fireBufferRequestForFrameNumber(uint64_t frameNumber,
+            const CameraMetadata& settings) override;
 
   protected:
     const int mId;

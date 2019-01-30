@@ -18,6 +18,8 @@
 #define ANDROID_SERVERS_CAMERA3_STREAM_INTERFACE_H
 
 #include <utils/RefBase.h>
+
+#include <camera/CameraMetadata.h>
 #include "Camera3StreamBufferListener.h"
 #include "Camera3StreamBufferFreedListener.h"
 
@@ -346,7 +348,8 @@ class Camera3StreamInterface : public virtual RefBase {
     /**
      * Notify buffer stream listeners about incoming request with particular frame number.
      */
-    virtual void fireBufferRequestForFrameNumber(uint64_t frameNumber) = 0;
+    virtual void fireBufferRequestForFrameNumber(uint64_t frameNumber,
+            const CameraMetadata& settings) = 0;
 };
 
 } // namespace camera3
