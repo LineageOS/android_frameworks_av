@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,15 +18,18 @@
 #define CODEC2_HIDL_V1_0_UTILS_COMPONENTSTORE_H
 
 #include <codec2/hidl/1.0/Component.h>
+#include <codec2/hidl/1.0/ComponentInterface.h>
 #include <codec2/hidl/1.0/Configurable.h>
-#include <android/hardware/media/c2/1.0/IComponentStore.h>
+
 #include <android/hardware/media/bufferpool/2.0/IClientManager.h>
+#include <android/hardware/media/c2/1.0/IComponentStore.h>
 #include <hidl/Status.h>
 
 #include <C2Component.h>
 #include <C2Param.h>
 #include <C2.h>
 
+#include <chrono>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -42,53 +45,61 @@ namespace utils {
 
 using ::android::hardware::media::bufferpool::V2_0::IClientManager;
 
-using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_handle;
-using ::android::hardware::hidl_memory;
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::sp;
-using ::android::wp;
 
-struct ComponentStore : public Configurable<IComponentStore> {
+struct ComponentStore : public IComponentStore {
     ComponentStore(const std::shared_ptr<C2ComponentStore>& store);
     virtual ~ComponentStore() = default;
 
-    c2_status_t status() const {
-        return mInit;
-    }
+    /**
+     * Returns the status of the construction of this object.
+     */
+    c2_status_t status() const;
 
+    /**
+     * This function is called by CachedConfigurable::init() to validate
+     * supported parameters.
+     */
     c2_status_t validateSupportedParams(
             const std::vector<std::shared_ptr<C2ParamDescriptor>>& params);
 
-    // Methods from ::android::hardware::media::c2::V1_0::IComponentStore
-    Return<void> createComponent(
+    // Methods from ::android::hardware::media::c2::V1_0::IComponentStore.
+    virtual Return<void> createComponent(
             const hidl_string& name,
             const sp<IComponentListener>& listener,
             const sp<IClientManager>& pool,
             createComponent_cb _hidl_cb) override;
-    Return<void> createInterface(
+    virtual Return<void> createInterface(
             const hidl_string& name,
             createInterface_cb _hidl_cb) override;
-    Return<void> listComponents(listComponents_cb _hidl_cb) override;
-    Return<sp<IInputSurface>> createInputSurface() override;
-    Return<void> getStructDescriptors(
+    virtual Return<void> listComponents(listComponents_cb _hidl_cb) override;
+    virtual Return<void> createInputSurface(
+            createInputSurface_cb _hidl_cb) override;
+    virtual Return<void> getStructDescriptors(
             const hidl_vec<uint32_t>& indices,
             getStructDescriptors_cb _hidl_cb) override;
-    Return<sp<IClientManager>> getPoolClientManager() override;
-    Return<Status> copyBuffer(
+    virtual Return<sp<IClientManager>> getPoolClientManager() override;
+    virtual Return<Status> copyBuffer(
             const Buffer& src,
             const Buffer& dst) override;
+    virtual Return<sp<IConfigurable>> getConfigurable() override;
 
-    // Debug dump
-    Return<void> debug(
+    /**
+     * Dumps information when lshal is called.
+     */
+    virtual Return<void> debug(
             const hidl_handle& handle,
             const hidl_vec<hidl_string>& args) override;
 
 protected:
-    // does bookkeeping for an interface that has been loaded
+    sp<CachedConfigurable> mConfigurable;
+
+    // Does bookkeeping for an interface that has been loaded.
     void onInterfaceLoaded(const std::shared_ptr<C2ComponentInterface> &intf);
 
     c2_status_t mInit;
@@ -100,18 +111,33 @@ protected:
     std::set<C2String> mLoadedInterfaces;
     mutable std::mutex mStructDescriptorsMutex;
 
-    // Component lifetime management
-    Component::Roster mComponentRoster;
+    // ComponentStore keeps track of live Components.
+
+    struct ComponentStatus {
+        std::shared_ptr<C2Component> c2Component;
+        std::chrono::system_clock::time_point birthTime;
+    };
+
     mutable std::mutex mComponentRosterMutex;
-    void reportComponentDeath(const Component::LocalId& componentLocalId);
+    std::map<Component*, ComponentStatus> mComponentRoster;
+
+    // Called whenever Component is created.
+    void reportComponentBirth(Component* component);
+    // Called only from the destructor of Component.
+    void reportComponentDeath(Component* component);
 
     friend Component;
 
-    // C2Component lookup
-    std::shared_ptr<C2Component> findC2Component(
-            const sp<IComponent>& component) const;
+    // Helper functions for dumping.
 
-    friend struct InputSurface;
+    std::ostream& dump(
+            std::ostream& out,
+            const std::shared_ptr<const C2Component::Traits>& comp);
+
+    std::ostream& dump(
+            std::ostream& out,
+            ComponentStatus& compStatus);
+
 };
 
 }  // namespace utils

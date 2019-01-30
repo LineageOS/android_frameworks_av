@@ -1656,6 +1656,7 @@ status_t CCodecBufferChannel::queueInputBufferInternal(const sp<MediaCodecBuffer
         work->input.ordinal.customOrdinal = timeUs;
         work->input.buffers.clear();
         work->input.flags = C2FrameData::FLAG_END_OF_STREAM;
+        work->worklets.emplace_back(new C2Worklet);
 
         items.clear();
         items.push_back(std::move(work));

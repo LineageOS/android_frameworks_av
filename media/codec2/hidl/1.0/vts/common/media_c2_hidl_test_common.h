@@ -94,10 +94,14 @@ struct CodecListener : public android::Codec2Client::Listener {
         (void)buffer;
     }
 
-    virtual void onFramesRendered(
-        const std::vector<RenderedFrame>& renderedFrames) override {
+    virtual void onFrameRendered(
+        uint64_t bufferQueueId,
+        int32_t slotId,
+        int64_t timestampNs) override {
         /* TODO */
-        (void)renderedFrames;
+        (void)bufferQueueId;
+        (void)slotId;
+        (void)timestampNs;
     }
     // std::mutex mQueueLock;
     // std::condition_variable mQueueCondition;

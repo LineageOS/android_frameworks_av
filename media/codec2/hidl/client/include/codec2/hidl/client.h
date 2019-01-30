@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef CODEC2_HIDL_CLIENT_H_
-#define CODEC2_HIDL_CLIENT_H_
+#ifndef CODEC2_HIDL_CLIENT_H
+#define CODEC2_HIDL_CLIENT_H
 
 #include <gui/IGraphicBufferProducer.h>
 #include <codec2/hidl/1.0/types.h>
@@ -70,8 +70,8 @@ namespace media {
 namespace c2 {
 namespace V1_0 {
 struct IConfigurable;
-struct IComponentInterface;
 struct IComponent;
+struct IComponentInterface;
 struct IComponentStore;
 struct IInputSurface;
 struct IInputSurfaceConnection;
@@ -146,10 +146,8 @@ struct Codec2ConfigurableClient {
     Codec2ConfigurableClient(const sp<Base>& base);
 
 protected:
-    C2String mName;
     sp<Base> mBase;
-
-    Base* base() const;
+    C2String mName;
 
     friend struct Codec2Client;
 };
@@ -162,9 +160,9 @@ struct Codec2Client : public Codec2ConfigurableClient {
 
     typedef Codec2ConfigurableClient Configurable;
 
-    typedef Configurable Interface; // These two types may diverge in the future.
-
     struct Component;
+
+    struct Interface;
 
     struct InputSurface;
 
@@ -172,7 +170,7 @@ struct Codec2Client : public Codec2ConfigurableClient {
 
     typedef Codec2Client Store;
 
-    std::string getInstanceName() const { return mInstanceName; }
+    std::string getServiceName() const { return mServiceName; }
 
     c2_status_t createComponent(
             const C2String& name,
@@ -195,7 +193,7 @@ struct Codec2Client : public Codec2ConfigurableClient {
     std::shared_ptr<C2ParamReflector> getParamReflector();
 
     static std::shared_ptr<Codec2Client> CreateFromService(
-            const char* instanceName,
+            const char* serviceName,
             bool waitForService = true);
 
     // Try to create a component with a given name from all known
@@ -218,10 +216,10 @@ struct Codec2Client : public Codec2ConfigurableClient {
     static std::shared_ptr<InputSurface> CreateInputSurface();
 
     // base cannot be null.
-    Codec2Client(const sp<Base>& base, std::string instanceName);
+    Codec2Client(const sp<Base>& base, std::string serviceName);
 
 protected:
-    Base* base() const;
+    sp<Base> mBase;
 
     // Finds the first store where the predicate returns OK, and returns the last
     // predicate result. Uses key to remember the last store found, and if cached,
@@ -232,13 +230,23 @@ protected:
 
     mutable std::mutex mMutex;
     mutable bool mListed;
-    std::string mInstanceName;
+    std::string mServiceName;
     mutable std::vector<C2Component::Traits> mTraitsList;
     mutable std::vector<std::unique_ptr<std::vector<std::string>>>
             mAliasesBuffer;
 
     sp<::android::hardware::media::bufferpool::V2_0::IClientManager>
             mHostPoolManager;
+};
+
+struct Codec2Client::Interface : public Codec2Client::Configurable {
+
+    typedef ::android::hardware::media::c2::V1_0::IComponentInterface Base;
+
+    Interface(const sp<Base>& base);
+
+protected:
+    sp<Base> mBase;
 };
 
 struct Codec2Client::Listener {
@@ -277,28 +285,12 @@ struct Codec2Client::Listener {
     virtual void onInputBufferDone(
             const std::shared_ptr<C2Buffer>& buffer) = 0;
 
-    // This structure is used for transporting onFramesRendered() event to the
-    // client in the case where the output buffers are obtained from a
-    // bufferqueue.
-    struct RenderedFrame {
-        // The id of the bufferqueue.
-        uint64_t bufferQueueId;
-        // The slot of the buffer inside the bufferqueue.
-        int32_t slotId;
-        // The timestamp.
-        int64_t timestampNs;
-
-        RenderedFrame(uint64_t bufferQueueId, int32_t slotId,
-                      int64_t timestampNs)
-              : bufferQueueId(bufferQueueId),
-                slotId(slotId),
-                timestampNs(timestampNs) {}
-        RenderedFrame(const RenderedFrame&) = default;
-    };
-
-    // This is called when the component becomes aware of frames being rendered.
-    virtual void onFramesRendered(
-            const std::vector<RenderedFrame>& renderedFrames) = 0;
+    // This is called when the component becomes aware of a frame being
+    // rendered.
+    virtual void onFrameRendered(
+            uint64_t bufferQueueId,
+            int32_t slotId,
+            int64_t timestampNs) = 0;
 
     virtual ~Listener();
 
@@ -373,9 +365,15 @@ struct Codec2Client::Component : public Codec2Client::Configurable {
             const QueueBufferInput& input,
             QueueBufferOutput* output);
 
+    // Connect to a given InputSurface.
+    c2_status_t connectToInputSurface(
+            const std::shared_ptr<InputSurface>& inputSurface,
+            std::shared_ptr<InputSurfaceConnection>* connection);
+
     c2_status_t connectToOmxInputSurface(
             const sp<HGraphicBufferProducer>& producer,
-            const sp<HGraphicBufferSource>& source);
+            const sp<HGraphicBufferSource>& source,
+            std::shared_ptr<InputSurfaceConnection>* connection);
 
     c2_status_t disconnectFromInputSurface();
 
@@ -385,7 +383,7 @@ struct Codec2Client::Component : public Codec2Client::Configurable {
     ~Component();
 
 protected:
-    Base* base() const;
+    sp<Base> mBase;
 
     // Mutex for mInputBuffers and mInputBufferCount.
     mutable std::mutex mInputBuffersMutex;
@@ -428,7 +426,7 @@ protected:
 
 };
 
-struct Codec2Client::InputSurface {
+struct Codec2Client::InputSurface : public Codec2Client::Configurable {
 public:
     typedef ::android::hardware::media::c2::V1_0::IInputSurface Base;
 
@@ -439,22 +437,15 @@ public:
 
     typedef ::android::IGraphicBufferProducer IGraphicBufferProducer;
 
-    c2_status_t connectToComponent(
-            const std::shared_ptr<Component>& component,
-            std::shared_ptr<Connection>* connection);
-
-    std::shared_ptr<Configurable> getConfigurable() const;
-
-    const sp<IGraphicBufferProducer>& getGraphicBufferProducer() const;
+    sp<IGraphicBufferProducer> getGraphicBufferProducer() const;
 
     // Return the underlying IInputSurface.
-    const sp<Base>& getHalInterface() const;
+    sp<Base> getHalInterface() const;
 
     // base cannot be null.
     InputSurface(const sp<Base>& base);
 
 protected:
-    Base* base() const;
     sp<Base> mBase;
 
     sp<IGraphicBufferProducer> mGraphicBufferProducer;
@@ -463,7 +454,7 @@ protected:
     friend struct Component;
 };
 
-struct Codec2Client::InputSurfaceConnection {
+struct Codec2Client::InputSurfaceConnection : public Codec2Client::Configurable {
 
     typedef ::android::hardware::media::c2::V1_0::IInputSurfaceConnection Base;
 
@@ -473,7 +464,6 @@ struct Codec2Client::InputSurfaceConnection {
     InputSurfaceConnection(const sp<Base>& base);
 
 protected:
-    Base* base() const;
     sp<Base> mBase;
 
     friend struct Codec2Client::InputSurface;
@@ -481,5 +471,5 @@ protected:
 
 }  // namespace android
 
-#endif  // CODEC2_HIDL_CLIENT_H_
+#endif  // CODEC2_HIDL_CLIENT_H
 

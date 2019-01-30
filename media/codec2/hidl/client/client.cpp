@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "Codec2Client"
-#include <log/log.h>
+#include <android-base/logging.h>
 
 #include <codec2/hidl/client.h>
 
@@ -32,7 +32,6 @@
 #include <gui/bufferqueue/1.0/H2BGraphicBufferProducer.h>
 #include <hidl/HidlSupport.h>
 #include <media/stagefright/bqhelper/WGraphicBufferProducer.h>
-#undef LOG
 
 #include <android/hardware/media/bufferpool/2.0/IClientManager.h>
 #include <android/hardware/media/c2/1.0/IComponent.h>
@@ -99,19 +98,17 @@ const C2String& Codec2ConfigurableClient::getName() const {
     return mName;
 }
 
-Codec2ConfigurableClient::Base* Codec2ConfigurableClient::base() const {
-    return static_cast<Base*>(mBase.get());
-}
-
 Codec2ConfigurableClient::Codec2ConfigurableClient(
-        const sp<Codec2ConfigurableClient::Base>& base) : mBase(base) {
-    Return<void> transStatus = base->getName(
-            [this](const hidl_string& name) {
-                mName = name.c_str();
-            });
-    if (!transStatus.isOk()) {
-        ALOGE("Cannot obtain name from IConfigurable.");
-    }
+        const sp<IConfigurable>& base)
+      : mBase{base},
+        mName{[base]() -> C2String {
+                C2String outName;
+                Return<void> transStatus = base->getName(
+                        [&outName](const hidl_string& name) {
+                            outName = name.c_str();
+                        });
+                return transStatus.isOk() ? outName : "";
+            }()} {
 }
 
 c2_status_t Codec2ConfigurableClient::query(
@@ -124,7 +121,7 @@ c2_status_t Codec2ConfigurableClient::query(
     size_t numIndices = 0;
     for (C2Param* const& stackParam : stackParams) {
         if (!stackParam) {
-            ALOGW("query -- null stack param encountered.");
+            LOG(WARNING) << "query -- null stack param encountered.";
             continue;
         }
         indices[numIndices++] = static_cast<ParamIndex>(stackParam->index());
@@ -139,32 +136,31 @@ c2_status_t Codec2ConfigurableClient::query(
         heapParams->reserve(heapParams->size() + numIndices);
     }
     c2_status_t status;
-    Return<void> transStatus = base()->query(
+    Return<void> transStatus = mBase->query(
             indices,
             mayBlock == C2_MAY_BLOCK,
             [&status, &numStackIndices, &stackParams, heapParams](
                     Status s, const Params& p) {
                 status = static_cast<c2_status_t>(s);
                 if (status != C2_OK && status != C2_BAD_INDEX) {
-                    ALOGE("query -- call failed. "
-                            "Error code = %d", static_cast<int>(status));
+                    LOG(DEBUG) << "query -- call failed: "
+                               << status << ".";
                     return;
                 }
                 std::vector<C2Param*> paramPointers;
-                c2_status_t parseStatus = parseParamsBlob(&paramPointers, p);
-                if (parseStatus != C2_OK) {
-                    ALOGE("query -- error while parsing params. "
-                            "Error code = %d", static_cast<int>(status));
-                    status = parseStatus;
+                if (!parseParamsBlob(&paramPointers, p)) {
+                    LOG(ERROR) << "query -- error while parsing params.";
+                    status = C2_CORRUPTED;
                     return;
                 }
                 size_t i = 0;
-                for (auto it = paramPointers.begin(); it != paramPointers.end(); ) {
+                for (auto it = paramPointers.begin();
+                        it != paramPointers.end(); ) {
                     C2Param* paramPointer = *it;
                     if (numStackIndices > 0) {
                         --numStackIndices;
                         if (!paramPointer) {
-                            ALOGW("query -- null stack param.");
+                            LOG(WARNING) << "query -- null stack param.";
                             ++it;
                             continue;
                         }
@@ -172,37 +168,41 @@ c2_status_t Codec2ConfigurableClient::query(
                             ++i;
                         }
                         if (i >= stackParams.size()) {
-                            ALOGE("query -- unexpected error.");
+                            LOG(ERROR) << "query -- unexpected error.";
                             status = C2_CORRUPTED;
                             return;
                         }
                         if (stackParams[i]->index() != paramPointer->index()) {
-                            ALOGW("query -- param skipped. index = %d",
-                                    static_cast<int>(stackParams[i]->index()));
+                            LOG(WARNING) << "query -- param skipped: "
+                                            "index = "
+                                         << stackParams[i]->index() << ".";
                             stackParams[i++]->invalidate();
                             continue;
                         }
                         if (!stackParams[i++]->updateFrom(*paramPointer)) {
-                            ALOGW("query -- param update failed. index = %d",
-                                    static_cast<int>(paramPointer->index()));
+                            LOG(WARNING) << "query -- param update failed: "
+                                            "index = "
+                                         << paramPointer->index() << ".";
                         }
                     } else {
                         if (!paramPointer) {
-                            ALOGW("query -- null heap param.");
+                            LOG(WARNING) << "query -- null heap param.";
                             ++it;
                             continue;
                         }
                         if (!heapParams) {
-                            ALOGW("query -- unexpected extra stack param.");
+                            LOG(WARNING) << "query -- "
+                                            "unexpected extra stack param.";
                         } else {
-                            heapParams->emplace_back(C2Param::Copy(*paramPointer));
+                            heapParams->emplace_back(
+                                    C2Param::Copy(*paramPointer));
                         }
                     }
                     ++it;
                 }
             });
     if (!transStatus.isOk()) {
-        ALOGE("query -- transaction failed.");
+        LOG(ERROR) << "query -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     }
     return status;
@@ -213,13 +213,12 @@ c2_status_t Codec2ConfigurableClient::config(
         c2_blocking_t mayBlock,
         std::vector<std::unique_ptr<C2SettingResult>>* const failures) {
     Params hidlParams;
-    Status hidlStatus = createParamsBlob(&hidlParams, params);
-    if (hidlStatus != Status::OK) {
-        ALOGE("config -- bad input.");
+    if (!createParamsBlob(&hidlParams, params)) {
+        LOG(ERROR) << "config -- bad input.";
         return C2_TRANSACTION_FAILED;
     }
     c2_status_t status;
-    Return<void> transStatus = base()->config(
+    Return<void> transStatus = mBase->config(
             hidlParams,
             mayBlock == C2_MAY_BLOCK,
             [&status, &params, failures](
@@ -227,24 +226,27 @@ c2_status_t Codec2ConfigurableClient::config(
                     const hidl_vec<SettingResult> f,
                     const Params& o) {
                 status = static_cast<c2_status_t>(s);
-                if (status != C2_OK) {
-                    ALOGD("config -- call failed. "
-                            "Error code = %d", static_cast<int>(status));
+                if (status != C2_OK && status != C2_BAD_INDEX) {
+                    LOG(DEBUG) << "config -- call failed: "
+                               << status << ".";
                 }
                 size_t i = failures->size();
                 failures->resize(i + f.size());
                 for (const SettingResult& sf : f) {
-                    status = objcpy(&(*failures)[i++], sf);
-                    if (status != C2_OK) {
-                        ALOGE("config -- invalid returned SettingResult. "
-                                "Error code = %d", static_cast<int>(status));
+                    if (!objcpy(&(*failures)[i++], sf)) {
+                        LOG(ERROR) << "config -- "
+                                   << "invalid SettingResult returned.";
                         return;
                     }
                 }
-                status = updateParamsFromBlob(params, o);
+                if (!updateParamsFromBlob(params, o)) {
+                    LOG(ERROR) << "config -- "
+                               << "failed to parse returned params.";
+                    status = C2_CORRUPTED;
+                }
             });
     if (!transStatus.isOk()) {
-        ALOGE("config -- transaction failed.");
+        LOG(ERROR) << "config -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     }
     return status;
@@ -254,7 +256,7 @@ c2_status_t Codec2ConfigurableClient::querySupportedParams(
         std::vector<std::shared_ptr<C2ParamDescriptor>>* const params) const {
     // TODO: Cache and query properly!
     c2_status_t status;
-    Return<void> transStatus = base()->querySupportedParams(
+    Return<void> transStatus = mBase->querySupportedParams(
             std::numeric_limits<uint32_t>::min(),
             std::numeric_limits<uint32_t>::max(),
             [&status, params](
@@ -262,24 +264,22 @@ c2_status_t Codec2ConfigurableClient::querySupportedParams(
                     const hidl_vec<ParamDescriptor>& p) {
                 status = static_cast<c2_status_t>(s);
                 if (status != C2_OK) {
-                    ALOGE("querySupportedParams -- call failed. "
-                            "Error code = %d", static_cast<int>(status));
+                    LOG(DEBUG) << "querySupportedParams -- call failed: "
+                               << status << ".";
                     return;
                 }
                 size_t i = params->size();
                 params->resize(i + p.size());
                 for (const ParamDescriptor& sp : p) {
-                    status = objcpy(&(*params)[i++], sp);
-                    if (status != C2_OK) {
-                        ALOGE("querySupportedParams -- "
-                                "invalid returned ParamDescriptor. "
-                                "Error code = %d", static_cast<int>(status));
+                    if (!objcpy(&(*params)[i++], sp)) {
+                        LOG(ERROR) << "querySupportedParams -- "
+                                   << "invalid returned ParamDescriptor.";
                         return;
                     }
                 }
             });
     if (!transStatus.isOk()) {
-        ALOGE("querySupportedParams -- transaction failed.");
+        LOG(ERROR) << "querySupportedParams -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     }
     return status;
@@ -290,15 +290,14 @@ c2_status_t Codec2ConfigurableClient::querySupportedValues(
         c2_blocking_t mayBlock) const {
     hidl_vec<FieldSupportedValuesQuery> inFields(fields.size());
     for (size_t i = 0; i < fields.size(); ++i) {
-        Status hidlStatus = objcpy(&inFields[i], fields[i]);
-        if (hidlStatus != Status::OK) {
-            ALOGE("querySupportedValues -- bad input");
+        if (!objcpy(&inFields[i], fields[i])) {
+            LOG(ERROR) << "querySupportedValues -- bad input";
             return C2_TRANSACTION_FAILED;
         }
     }
 
     c2_status_t status;
-    Return<void> transStatus = base()->querySupportedValues(
+    Return<void> transStatus = mBase->querySupportedValues(
             inFields,
             mayBlock == C2_MAY_BLOCK,
             [&status, &inFields, &fields](
@@ -306,27 +305,28 @@ c2_status_t Codec2ConfigurableClient::querySupportedValues(
                     const hidl_vec<FieldSupportedValuesQueryResult>& r) {
                 status = static_cast<c2_status_t>(s);
                 if (status != C2_OK) {
-                    ALOGE("querySupportedValues -- call failed. "
-                            "Error code = %d", static_cast<int>(status));
+                    LOG(DEBUG) << "querySupportedValues -- call failed: "
+                               << status << ".";
                     return;
                 }
                 if (r.size() != fields.size()) {
-                    ALOGE("querySupportedValues -- input and output lists "
-                            "have different sizes.");
+                    LOG(ERROR) << "querySupportedValues -- "
+                                  "input and output lists "
+                                  "have different sizes.";
                     status = C2_CORRUPTED;
                     return;
                 }
                 for (size_t i = 0; i < fields.size(); ++i) {
-                    status = objcpy(&fields[i], inFields[i], r[i]);
-                    if (status != C2_OK) {
-                        ALOGE("querySupportedValues -- invalid returned value. "
-                                "Error code = %d", static_cast<int>(status));
+                    if (!objcpy(&fields[i], inFields[i], r[i])) {
+                        LOG(ERROR) << "querySupportedValues -- "
+                                      "invalid returned value.";
+                        status = C2_CORRUPTED;
                         return;
                     }
                 }
             });
     if (!transStatus.isOk()) {
-        ALOGE("querySupportedValues -- transaction failed.");
+        LOG(ERROR) << "querySupportedValues -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     }
     return status;
@@ -339,22 +339,24 @@ struct Codec2Client::Component::HidlListener : public IComponentListener {
 
     virtual Return<void> onWorkDone(const WorkBundle& workBundle) override {
         std::list<std::unique_ptr<C2Work>> workItems;
-        c2_status_t status = objcpy(&workItems, workBundle);
-        if (status != C2_OK) {
-            ALOGI("onWorkDone -- received corrupted WorkBundle. "
-                    "status = %d.", static_cast<int>(status));
+        if (!objcpy(&workItems, workBundle)) {
+            LOG(DEBUG) << "onWorkDone -- received corrupted WorkBundle.";
             return Void();
         }
         // release input buffers potentially held by the component from queue
         size_t numDiscardedInputBuffers = 0;
-        std::shared_ptr<Codec2Client::Component> strongComponent = component.lock();
+        std::shared_ptr<Codec2Client::Component> strongComponent =
+                component.lock();
         if (strongComponent) {
-            numDiscardedInputBuffers = strongComponent->handleOnWorkDone(workItems);
+            numDiscardedInputBuffers =
+                    strongComponent->handleOnWorkDone(workItems);
         }
         if (std::shared_ptr<Codec2Client::Listener> listener = base.lock()) {
-            listener->onWorkDone(component, workItems, numDiscardedInputBuffers);
+            listener->onWorkDone(component,
+                                 workItems,
+                                 numDiscardedInputBuffers);
         } else {
-            ALOGD("onWorkDone -- listener died.");
+            LOG(DEBUG) << "onWorkDone -- listener died.";
         }
         return Void();
     }
@@ -363,13 +365,10 @@ struct Codec2Client::Component::HidlListener : public IComponentListener {
             const hidl_vec<SettingResult>& settingResults) override {
         std::vector<std::shared_ptr<C2SettingResult>> c2SettingResults(
                 settingResults.size());
-        c2_status_t status;
         for (size_t i = 0; i < settingResults.size(); ++i) {
             std::unique_ptr<C2SettingResult> c2SettingResult;
-            status = objcpy(&c2SettingResult, settingResults[i]);
-            if (status != C2_OK) {
-                ALOGI("onTripped -- received corrupted SettingResult. "
-                        "status = %d.", static_cast<int>(status));
+            if (!objcpy(&c2SettingResult, settingResults[i])) {
+                LOG(DEBUG) << "onTripped -- received corrupted SettingResult.";
                 return Void();
             }
             c2SettingResults[i] = std::move(c2SettingResult);
@@ -377,20 +376,21 @@ struct Codec2Client::Component::HidlListener : public IComponentListener {
         if (std::shared_ptr<Codec2Client::Listener> listener = base.lock()) {
             listener->onTripped(component, c2SettingResults);
         } else {
-            ALOGD("onTripped -- listener died.");
+            LOG(DEBUG) << "onTripped -- listener died.";
         }
         return Void();
     }
 
     virtual Return<void> onError(Status s, uint32_t errorCode) override {
-        ALOGD("onError -- status = %d, errorCode = %u.",
-                static_cast<int>(s),
-                static_cast<unsigned>(errorCode));
+        LOG(DEBUG) << "onError --"
+                   << " status = " << s
+                   << ", errorCode = " << errorCode
+                   << ".";
         if (std::shared_ptr<Listener> listener = base.lock()) {
             listener->onError(component, s == Status::OK ?
                     errorCode : static_cast<c2_status_t>(s));
         } else {
-            ALOGD("onError -- listener died.");
+            LOG(DEBUG) << "onError -- listener died.";
         }
         return Void();
     }
@@ -398,55 +398,70 @@ struct Codec2Client::Component::HidlListener : public IComponentListener {
     virtual Return<void> onFramesRendered(
             const hidl_vec<RenderedFrame>& renderedFrames) override {
         std::shared_ptr<Listener> listener = base.lock();
-        std::vector<Codec2Client::Listener::RenderedFrame> rfs;
-        rfs.reserve(renderedFrames.size());
-        for (const RenderedFrame& rf : renderedFrames) {
-            if (rf.slotId >= 0) {
-                if (listener) {
-                    rfs.emplace_back(rf.bufferQueueId,
-                                     rf.slotId,
-                                     rf.timestampNs);
-                }
-            } else {
-                std::shared_ptr<Codec2Client::Component> strongComponent =
-                        component.lock();
-                if (strongComponent) {
-                    uint64_t frameIndex = rf.bufferQueueId;
-                    size_t bufferIndex = static_cast<size_t>(~rf.slotId);
-                    ALOGV("Received death notification of input buffer: "
-                          "frameIndex = %llu, bufferIndex = %zu.",
-                          static_cast<long long unsigned>(frameIndex),
-                          bufferIndex);
-                    std::shared_ptr<C2Buffer> buffer =
-                            strongComponent->freeInputBuffer(
-                                frameIndex, bufferIndex);
-                    if (buffer) {
-                        listener->onInputBufferDone(buffer);
-                    }
-                }
-            }
+        if (!listener) {
+            LOG(DEBUG) << "onFramesRendered -- listener died.";
+            return Void();
         }
-        if (!rfs.empty()) {
-            if (listener) {
-                listener->onFramesRendered(rfs);
-            } else {
-                ALOGD("onFramesRendered -- listener died.");
+        for (const RenderedFrame& renderedFrame : renderedFrames) {
+            listener->onFrameRendered(
+                    renderedFrame.bufferQueueId,
+                    renderedFrame.slotId,
+                    renderedFrame.timestampNs);
+        }
+        return Void();
+    }
+
+    virtual Return<void> onInputBuffersReleased(
+            const hidl_vec<InputBuffer>& inputBuffers) override {
+        std::shared_ptr<Listener> listener = base.lock();
+        if (!listener) {
+            LOG(DEBUG) << "onInputBuffersReleased -- listener died.";
+            return Void();
+        }
+        std::shared_ptr<Codec2Client::Component> strongComponent =
+                component.lock();
+        if (!strongComponent) {
+            LOG(DEBUG) << "onInputBuffersReleased -- component died.";
+            return Void();
+        }
+        for (const InputBuffer& inputBuffer : inputBuffers) {
+            std::shared_ptr<C2Buffer> buffer =
+                    strongComponent->freeInputBuffer(
+                        inputBuffer.frameIndex,
+                        inputBuffer.arrayIndex);
+            LOG(VERBOSE) << "onInputBuffersReleased --"
+                            " received death notification of"
+                            " input buffer:"
+                            " frameIndex = " << inputBuffer.frameIndex
+                         << ", bufferIndex = " << inputBuffer.arrayIndex
+                         << ".";
+            if (buffer) {
+                listener->onInputBufferDone(buffer);
             }
         }
         return Void();
     }
+
 };
 
 // Codec2Client
-Codec2Client::Base* Codec2Client::base() const {
-    return static_cast<Base*>(mBase.get());
-}
-
-Codec2Client::Codec2Client(const sp<Codec2Client::Base>& base, std::string instanceName) :
-    Codec2ConfigurableClient(base), mListed(false), mInstanceName(instanceName) {
+Codec2Client::Codec2Client(const sp<IComponentStore>& base,
+                           std::string serviceName)
+      : Configurable{
+            [base]() -> sp<IConfigurable> {
+                Return<sp<IConfigurable>> transResult =
+                        base->getConfigurable();
+                return transResult.isOk() ?
+                        static_cast<sp<IConfigurable>>(transResult) :
+                        nullptr;
+            }()
+        },
+        mBase{base},
+        mListed{false},
+        mServiceName{serviceName} {
     Return<sp<IClientManager>> transResult = base->getPoolClientManager();
     if (!transResult.isOk()) {
-        ALOGE("getPoolClientManager -- failed transaction.");
+        LOG(ERROR) << "getPoolClientManager -- transaction failed.";
     } else {
         mHostPoolManager = static_cast<sp<IClientManager>>(transResult);
     }
@@ -457,13 +472,10 @@ c2_status_t Codec2Client::createComponent(
         const std::shared_ptr<Codec2Client::Listener>& listener,
         std::shared_ptr<Codec2Client::Component>* const component) {
 
-    // TODO: Add support for Bufferpool
-
-
     c2_status_t status;
-    sp<Component::HidlListener> hidlListener = new Component::HidlListener();
+    sp<Component::HidlListener> hidlListener = new Component::HidlListener{};
     hidlListener->base = listener;
-    Return<void> transStatus = base()->createComponent(
+    Return<void> transStatus = mBase->createComponent(
             name,
             hidlListener,
             ClientManager::getInstance(),
@@ -478,23 +490,24 @@ c2_status_t Codec2Client::createComponent(
                 hidlListener->component = *component;
             });
     if (!transStatus.isOk()) {
-        ALOGE("createComponent -- failed transaction.");
+        LOG(ERROR) << "createComponent(" << name.c_str()
+                   << ") -- transaction failed.";
         return C2_TRANSACTION_FAILED;
-    }
-
-    if (status != C2_OK) {
+    } else if (status != C2_OK) {
+        LOG(ERROR) << "createComponent(" << name.c_str()
+                   << ") -- call failed: " << status << ".";
         return status;
-    }
-
-    if (!*component) {
-        ALOGE("createComponent -- null component.");
+    } else if (!*component) {
+        LOG(ERROR) << "createComponent(" << name.c_str()
+                   << ") -- null component.";
         return C2_CORRUPTED;
     }
 
     status = (*component)->setDeathListener(*component, listener);
     if (status != C2_OK) {
-        ALOGE("createComponent -- setDeathListener returned error: %d.",
-                static_cast<int>(status));
+        LOG(ERROR) << "createComponent(" << name.c_str()
+                   << ") -- failed to set up death listener: "
+                   << status << ".";
     }
 
     (*component)->mBufferPoolSender.setReceiver(mHostPoolManager);
@@ -505,44 +518,51 @@ c2_status_t Codec2Client::createInterface(
         const C2String& name,
         std::shared_ptr<Codec2Client::Interface>* const interface) {
     c2_status_t status;
-    Return<void> transStatus = base()->createInterface(
+    Return<void> transStatus = mBase->createInterface(
             name,
             [&status, interface](
                     Status s,
                     const sp<IComponentInterface>& i) {
                 status = static_cast<c2_status_t>(s);
                 if (status != C2_OK) {
-                    ALOGE("createInterface -- call failed. "
-                            "Error code = %d", static_cast<int>(status));
                     return;
                 }
-                *interface = std::make_shared<Codec2Client::Interface>(i);
+                *interface = std::make_shared<Interface>(i);
             });
     if (!transStatus.isOk()) {
-        ALOGE("createInterface -- failed transaction.");
+        LOG(ERROR) << "createInterface(" << name.c_str()
+                   << ") -- transaction failed.";
         return C2_TRANSACTION_FAILED;
+    } else if (status != C2_OK) {
+        LOG(ERROR) << "createComponent(" << name.c_str()
+                   << ") -- call failed: " << status << ".";
+        return status;
     }
+
     return status;
 }
 
 c2_status_t Codec2Client::createInputSurface(
-        std::shared_ptr<Codec2Client::InputSurface>* const inputSurface) {
-    Return<sp<IInputSurface>> transResult = base()->createInputSurface();
-    if (!transResult.isOk()) {
-        ALOGE("createInputSurface -- failed transaction.");
+        std::shared_ptr<InputSurface>* const inputSurface) {
+    c2_status_t status;
+    Return<void> transStatus = mBase->createInputSurface(
+            [&status, inputSurface](
+                    Status s,
+                    const sp<IInputSurface>& i) {
+                status = static_cast<c2_status_t>(s);
+                if (status != C2_OK) {
+                    return;
+                }
+                *inputSurface = std::make_shared<InputSurface>(i);
+            });
+    if (!transStatus.isOk()) {
+        LOG(ERROR) << "createInputSurface -- transaction failed.";
         return C2_TRANSACTION_FAILED;
+    } else if (status != C2_OK) {
+        LOG(DEBUG) << "createInputSurface -- call failed: "
+                   << status << ".";
     }
-    sp<IInputSurface> result = static_cast<sp<IInputSurface>>(transResult);
-    if (!result) {
-        *inputSurface = nullptr;
-        return C2_OK;
-    }
-    *inputSurface = std::make_shared<InputSurface>(result);
-    if (!*inputSurface) {
-        ALOGE("createInputSurface -- unknown error.");
-        return C2_CORRUPTED;
-    }
-    return C2_OK;
+    return status;
 }
 
 const std::vector<C2Component::Traits>& Codec2Client::listComponents() const {
@@ -550,22 +570,26 @@ const std::vector<C2Component::Traits>& Codec2Client::listComponents() const {
     if (mListed) {
         return mTraitsList;
     }
-    Return<void> transStatus = base()->listComponents(
-            [this](const hidl_vec<IComponentStore::ComponentTraits>& t) {
+    Return<void> transStatus = mBase->listComponents(
+            [this](Status s,
+                   const hidl_vec<IComponentStore::ComponentTraits>& t) {
+                if (s != Status::OK) {
+                    LOG(DEBUG) << "listComponents -- call failed: "
+                               << static_cast<c2_status_t>(s) << ".";
+                    return;
+                }
                 mTraitsList.resize(t.size());
                 mAliasesBuffer.resize(t.size());
                 for (size_t i = 0; i < t.size(); ++i) {
-                    c2_status_t status = objcpy(
-                            &mTraitsList[i], &mAliasesBuffer[i], t[i]);
-                    mTraitsList[i].owner = mInstanceName;
-                    if (status != C2_OK) {
-                        ALOGE("listComponents -- corrupted output.");
+                    if (!objcpy(&mTraitsList[i], &mAliasesBuffer[i], t[i])) {
+                        LOG(ERROR) << "listComponents -- corrupted output.";
                         return;
                     }
+                    mTraitsList[i].owner = mServiceName;
                 }
             });
     if (!transStatus.isOk()) {
-        ALOGE("listComponents -- failed transaction.");
+        LOG(ERROR) << "listComponents -- transaction failed.";
     }
     mListed = true;
     return mTraitsList;
@@ -577,7 +601,7 @@ c2_status_t Codec2Client::copyBuffer(
     // TODO: Implement?
     (void)src;
     (void)dst;
-    ALOGE("copyBuffer not implemented");
+    LOG(ERROR) << "copyBuffer not implemented";
     return C2_OMITTED;
 }
 
@@ -597,21 +621,25 @@ std::shared_ptr<C2ParamReflector>
                             const hidl_vec<StructDescriptor>& sd) {
                         c2_status_t status = static_cast<c2_status_t>(s);
                         if (status != C2_OK) {
-                            ALOGE("getStructDescriptors -- call failed. "
-                                    "Error code = %d", static_cast<int>(status));
+                            LOG(DEBUG) << "SimpleParamReflector -- "
+                                          "getStructDescriptors() failed: "
+                                       << status << ".";
                             descriptor.reset();
                             return;
                         }
                         if (sd.size() != 1) {
-                            ALOGD("getStructDescriptors -- returned vector of size %zu.",
-                                    sd.size());
+                            LOG(DEBUG) << "SimpleParamReflector -- "
+                                          "getStructDescriptors() "
+                                          "returned vector of size "
+                                       << sd.size() << ". "
+                                          "It should be 1.";
                             descriptor.reset();
                             return;
                         }
-                        status = objcpy(&descriptor, sd[0]);
-                        if (status != C2_OK) {
-                            ALOGD("getStructDescriptors -- failed to convert. "
-                                    "Error code = %d", static_cast<int>(status));
+                        if (!objcpy(&descriptor, sd[0])) {
+                            LOG(DEBUG) << "SimpleParamReflector -- "
+                                          "getStructDescriptors() returned "
+                                          "corrupted data.";
                             descriptor.reset();
                             return;
                         }
@@ -625,44 +653,44 @@ std::shared_ptr<C2ParamReflector>
         sp<Base> mBase;
     };
 
-    return std::make_shared<SimpleParamReflector>(base());
+    return std::make_shared<SimpleParamReflector>(mBase);
 };
 
 std::shared_ptr<Codec2Client> Codec2Client::CreateFromService(
-        const char* instanceName, bool waitForService) {
-    if (!instanceName) {
+        const char* serviceName, bool waitForService) {
+    if (!serviceName) {
         return nullptr;
     }
     sp<Base> baseStore = waitForService ?
-            Base::getService(instanceName) :
-            Base::tryGetService(instanceName);
+            Base::getService(serviceName) :
+            Base::tryGetService(serviceName);
     if (!baseStore) {
         if (waitForService) {
-            ALOGW("Codec2.0 service \"%s\" inaccessible. "
-                  "Check the device manifest.",
-                  instanceName);
+            LOG(WARNING) << "Codec2.0 service \"" << serviceName << "\""
+                            " inaccessible. Check the device manifest.";
         } else {
-            ALOGD("Codec2.0 service \"%s\" unavailable right now. "
-                  "Try again later.",
-                  instanceName);
+            LOG(DEBUG) << "Codec2.0 service \"" << serviceName << "\""
+                          " unavailable at the moment. "
+                          " Wait or check the device manifest.";
         }
         return nullptr;
     }
-    return std::make_shared<Codec2Client>(baseStore, instanceName);
+    return std::make_shared<Codec2Client>(baseStore, serviceName);
 }
 
 c2_status_t Codec2Client::ForAllStores(
         const std::string &key,
-        std::function<c2_status_t(const std::shared_ptr<Codec2Client>&)> predicate) {
+        std::function<c2_status_t(const std::shared_ptr<Codec2Client>&)>
+            predicate) {
     c2_status_t status = C2_NO_INIT;  // no IComponentStores present
 
     // Cache the mapping key -> index of Codec2Client in getClient().
     static std::mutex key2IndexMutex;
     static std::map<std::string, size_t> key2Index;
 
-    // By default try all stores. However, try the last known client first. If the last known
-    // client fails, retry once. We do this by pushing the last known client in front of the
-    // list of all clients.
+    // By default try all stores. However, try the last known client first. If
+    // the last known client fails, retry once. We do this by pushing the last
+    // known client in front of the list of all clients.
     std::deque<size_t> indices;
     for (size_t index = kNumClients; index > 0; ) {
         indices.push_front(--index);
@@ -688,7 +716,8 @@ c2_status_t Codec2Client::ForAllStores(
             }
         }
         if (wasMapped) {
-            ALOGI("Could not find '%s' in last instance. Retrying...", key.c_str());
+            LOG(INFO) << "Could not find \"" << key << "\""
+                         " in the last instance. Retrying...";
             wasMapped = false;
         }
     }
@@ -704,20 +733,27 @@ std::shared_ptr<Codec2Client::Component>
     c2_status_t status = ForAllStores(
             componentName,
             [owner, &component, componentName, &listener](
-                    const std::shared_ptr<Codec2Client> &client) -> c2_status_t {
-                c2_status_t status = client->createComponent(componentName, listener, &component);
+                    const std::shared_ptr<Codec2Client> &client)
+                        -> c2_status_t {
+                c2_status_t status = client->createComponent(componentName,
+                                                             listener,
+                                                             &component);
                 if (status == C2_OK) {
                     if (owner) {
                         *owner = client;
                     }
                 } else if (status != C2_NOT_FOUND) {
-                    ALOGD("IComponentStore(%s)::createComponent('%s') returned %s",
-                            client->getInstanceName().c_str(), componentName, asString(status));
+                    LOG(DEBUG) << "IComponentStore("
+                                   << client->getServiceName()
+                               << ")::createComponent(\"" << componentName
+                               << "\") returned status = "
+                               << status << ".";
                 }
                 return status;
             });
     if (status != C2_OK) {
-        ALOGI("Could not create component '%s' (%s)", componentName, asString(status));
+        LOG(DEBUG) << "Could not create component \"" << componentName << "\". "
+                      "Status = " << status << ".";
     }
     return component;
 }
@@ -730,20 +766,26 @@ std::shared_ptr<Codec2Client::Interface>
     c2_status_t status = ForAllStores(
             interfaceName,
             [owner, &interface, interfaceName](
-                    const std::shared_ptr<Codec2Client> &client) -> c2_status_t {
-                c2_status_t status = client->createInterface(interfaceName, &interface);
+                    const std::shared_ptr<Codec2Client> &client)
+                        -> c2_status_t {
+                c2_status_t status = client->createInterface(interfaceName,
+                                                             &interface);
                 if (status == C2_OK) {
                     if (owner) {
                         *owner = client;
                     }
                 } else if (status != C2_NOT_FOUND) {
-                    ALOGD("IComponentStore(%s)::createInterface('%s') returned %s",
-                            client->getInstanceName().c_str(), interfaceName, asString(status));
+                    LOG(DEBUG) << "IComponentStore("
+                                   << client->getServiceName()
+                               << ")::createInterface(\"" << interfaceName
+                               << "\") returned status = "
+                               << status << ".";
                 }
                 return status;
             });
     if (status != C2_OK) {
-        ALOGI("Could not create interface '%s' (%s)", interfaceName, asString(status));
+        LOG(DEBUG) << "Could not create interface \"" << interfaceName << "\". "
+                      "Status = " << status << ".";
     }
     return interface;
 }
@@ -762,7 +804,8 @@ std::shared_ptr<Codec2Client::InputSurface> Codec2Client::CreateInputSurface() {
             }
         }
     }
-    ALOGW("Could not create an input surface from any Codec2.0 services.");
+    LOG(INFO) << "Could not create an input surface "
+                 "from any Codec2.0 services.";
     return nullptr;
 }
 
@@ -798,15 +841,39 @@ const std::vector<C2Component::Traits>& Codec2Client::ListComponents() {
 Codec2Client::Listener::~Listener() {
 }
 
-// Codec2Client::Component
-
-Codec2Client::Component::Base* Codec2Client::Component::base() const {
-    return static_cast<Base*>(mBase.get());
+// Codec2Client::Interface
+Codec2Client::Interface::Interface(const sp<Base>& base)
+      : Configurable{
+            [base]() -> sp<IConfigurable> {
+                Return<sp<IConfigurable>> transResult =
+                        base->getConfigurable();
+                return transResult.isOk() ?
+                        static_cast<sp<IConfigurable>>(transResult) :
+                        nullptr;
+            }()
+        },
+        mBase{base} {
 }
 
-Codec2Client::Component::Component(const sp<Codec2Client::Component::Base>& base) :
-    Codec2Client::Configurable(base),
-    mBufferPoolSender(nullptr) {
+// Codec2Client::Component
+Codec2Client::Component::Component(const sp<Base>& base)
+      : Configurable{
+            [base]() -> sp<IConfigurable> {
+                Return<sp<IComponentInterface>> transResult1 =
+                        base->getInterface();
+                if (!transResult1.isOk()) {
+                    return nullptr;
+                }
+                Return<sp<IConfigurable>> transResult2 =
+                        static_cast<sp<IComponentInterface>>(transResult1)->
+                        getConfigurable();
+                return transResult2.isOk() ?
+                        static_cast<sp<IConfigurable>>(transResult2) :
+                        nullptr;
+            }()
+        },
+        mBase{base},
+        mBufferPoolSender{nullptr} {
 }
 
 Codec2Client::Component::~Component() {
@@ -817,7 +884,7 @@ c2_status_t Codec2Client::Component::createBlockPool(
         C2BlockPool::local_id_t* blockPoolId,
         std::shared_ptr<Codec2Client::Configurable>* configurable) {
     c2_status_t status;
-    Return<void> transStatus = base()->createBlockPool(
+    Return<void> transStatus = mBase->createBlockPool(
             static_cast<uint32_t>(id),
             [&status, blockPoolId, configurable](
                     Status s,
@@ -826,15 +893,15 @@ c2_status_t Codec2Client::Component::createBlockPool(
                 status = static_cast<c2_status_t>(s);
                 configurable->reset();
                 if (status != C2_OK) {
-                    ALOGE("createBlockPool -- call failed. "
-                            "Error code = %d", static_cast<int>(status));
+                    LOG(DEBUG) << "createBlockPool -- call failed: "
+                               << status << ".";
                     return;
                 }
                 *blockPoolId = static_cast<C2BlockPool::local_id_t>(pId);
-                *configurable = std::make_shared<Codec2Client::Configurable>(c);
+                *configurable = std::make_shared<Configurable>(c);
             });
     if (!transStatus.isOk()) {
-        ALOGE("createBlockPool -- transaction failed.");
+        LOG(ERROR) << "createBlockPool -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     }
     return status;
@@ -842,10 +909,10 @@ c2_status_t Codec2Client::Component::createBlockPool(
 
 c2_status_t Codec2Client::Component::destroyBlockPool(
         C2BlockPool::local_id_t localId) {
-    Return<Status> transResult = base()->destroyBlockPool(
+    Return<Status> transResult = mBase->destroyBlockPool(
             static_cast<uint64_t>(localId));
     if (!transResult.isOk()) {
-        ALOGE("destroyBlockPool -- transaction failed.");
+        LOG(ERROR) << "destroyBlockPool -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     }
     return static_cast<c2_status_t>(static_cast<Status>(transResult));
@@ -859,7 +926,8 @@ size_t Codec2Client::Component::handleOnWorkDone(
         if (work) {
             if (work->worklets.empty()
                     || !work->worklets.back()
-                    || (work->worklets.back()->output.flags & C2FrameData::FLAG_INCOMPLETE) == 0) {
+                    || (work->worklets.back()->output.flags &
+                        C2FrameData::FLAG_INCOMPLETE) == 0) {
                 // input is complete
                 inputDone.emplace_back(work->input.ordinal.frameIndex.peeku());
             }
@@ -872,13 +940,14 @@ size_t Codec2Client::Component::handleOnWorkDone(
         for (uint64_t inputIndex : inputDone) {
             auto it = mInputBuffers.find(inputIndex);
             if (it == mInputBuffers.end()) {
-                ALOGV("onWorkDone -- returned consumed/unknown "
-                      "input frame: index %llu",
-                        (long long)inputIndex);
+                LOG(VERBOSE) << "onWorkDone -- returned consumed/unknown "
+                                "input frame: index = "
+                             << inputIndex << ".";
             } else {
-                ALOGV("onWorkDone -- processed input frame: "
-                      "index %llu (containing %zu buffers)",
-                        (long long)inputIndex, it->second.size());
+                LOG(VERBOSE) << "onWorkDone -- processed input frame: "
+                             << inputIndex
+                             << " (containing " << it->second.size()
+                                 << " buffers).";
                 mInputBuffers.erase(it);
                 mInputBufferCount.erase(inputIndex);
                 ++numDiscardedInputBuffers;
@@ -906,21 +975,21 @@ std::shared_ptr<C2Buffer> Codec2Client::Component::freeInputBuffer(
     std::lock_guard<std::mutex> lock(mInputBuffersMutex);
     auto it = mInputBuffers.find(frameIndex);
     if (it == mInputBuffers.end()) {
-        ALOGI("freeInputBuffer -- Unrecognized input frame index %llu.",
-              static_cast<long long unsigned>(frameIndex));
+        LOG(INFO) << "freeInputBuffer -- Unrecognized input frame index "
+                  << frameIndex << ".";
         return nullptr;
     }
     if (bufferIndex >= it->second.size()) {
-        ALOGI("freeInputBuffer -- Input buffer no. %zu is invalid in "
-              "input frame index %llu.",
-              bufferIndex, static_cast<long long unsigned>(frameIndex));
+        LOG(INFO) << "freeInputBuffer -- Input buffer number " << bufferIndex
+                  << " is not valid in input with frame index " << frameIndex
+                  << ".";
         return nullptr;
     }
     buffer = it->second[bufferIndex];
     if (!buffer) {
-        ALOGI("freeInputBuffer -- Input buffer no. %zu in "
-              "input frame index %llu has already been freed.",
-              bufferIndex, static_cast<long long unsigned>(frameIndex));
+        LOG(INFO) << "freeInputBuffer -- Input buffer number " << bufferIndex
+                  << " in input with frame index " << frameIndex
+                  << " has already been freed.";
         return nullptr;
     }
     it->second[bufferIndex] = nullptr;
@@ -949,33 +1018,33 @@ c2_status_t Codec2Client::Component::queue(
             if (!res.second) {
                 // TODO: append? - for now we are replacing
                 res.first->second = work->input.buffers;
-                ALOGI("queue -- duplicate input frame: index %llu. "
-                      "Discarding the old input frame...",
-                        (long long)inputIndex);
+                LOG(INFO) << "queue -- duplicate input frame index: "
+                          << inputIndex
+                          << ". Discarding the old input frame...";
             }
             mInputBufferCount[inputIndex] = work->input.buffers.size();
-            ALOGV("queue -- queueing input frame: "
-                  "index %llu (containing %zu buffers)",
-                    (long long)inputIndex, work->input.buffers.size());
+            LOG(VERBOSE) << "queue -- queuing input frame: "
+                         << "index = " << inputIndex
+                         << ", number of buffers = "
+                             << work->input.buffers.size()
+                         << ".";
         }
     }
 
     WorkBundle workBundle;
-    Status hidlStatus = objcpy(&workBundle, *items, &mBufferPoolSender);
-    if (hidlStatus != Status::OK) {
-        ALOGE("queue -- bad input.");
+    if (!objcpy(&workBundle, *items, &mBufferPoolSender)) {
+        LOG(ERROR) << "queue -- bad input.";
         return C2_TRANSACTION_FAILED;
     }
-    Return<Status> transStatus = base()->queue(workBundle);
+    Return<Status> transStatus = mBase->queue(workBundle);
     if (!transStatus.isOk()) {
-        ALOGE("queue -- transaction failed.");
+        LOG(ERROR) << "queue -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     }
     c2_status_t status =
             static_cast<c2_status_t>(static_cast<Status>(transStatus));
     if (status != C2_OK) {
-        ALOGE("queue -- call failed. "
-                "Error code = %d", static_cast<int>(status));
+        LOG(DEBUG) << "queue -- call failed: " << status << ".";
     }
     return status;
 }
@@ -985,19 +1054,22 @@ c2_status_t Codec2Client::Component::flush(
         std::list<std::unique_ptr<C2Work>>* const flushedWork) {
     (void)mode; // Flush mode isn't supported in HIDL yet.
     c2_status_t status;
-    Return<void> transStatus = base()->flush(
+    Return<void> transStatus = mBase->flush(
             [&status, flushedWork](
                     Status s, const WorkBundle& wb) {
                 status = static_cast<c2_status_t>(s);
                 if (status != C2_OK) {
-                    ALOGE("flush -- call failed. "
-                            "Error code = %d", static_cast<int>(status));
+                    LOG(DEBUG) << "flush -- call failed: " << status << ".";
                     return;
                 }
-                status = objcpy(flushedWork, wb);
+                if (!objcpy(flushedWork, wb)) {
+                    status = C2_CORRUPTED;
+                } else {
+                    status = C2_OK;
+                }
             });
     if (!transStatus.isOk()) {
-        ALOGE("flush -- transaction failed.");
+        LOG(ERROR) << "flush -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     }
 
@@ -1021,13 +1093,14 @@ c2_status_t Codec2Client::Component::flush(
         std::lock_guard<std::mutex> lock(mInputBuffersMutex);
         auto it = mInputBuffers.find(flushedIndex);
         if (it == mInputBuffers.end()) {
-            ALOGV("flush -- returned consumed/unknown input frame: "
-                  "index %llu",
-                    (long long)flushedIndex);
+            LOG(VERBOSE) << "flush -- returned consumed/unknown input frame: "
+                            "index = " << flushedIndex << ".";
         } else {
-            ALOGV("flush -- returned unprocessed input frame: "
-                  "index %llu (containing %zu buffers)",
-                    (long long)flushedIndex, mInputBufferCount[flushedIndex]);
+            LOG(VERBOSE) << "flush -- returned unprocessed input frame: "
+                            "index = " << flushedIndex
+                         << ", number of buffers = "
+                             << mInputBufferCount[flushedIndex]
+                         << ".";
             mInputBuffers.erase(it);
             mInputBufferCount.erase(flushedIndex);
         }
@@ -1048,47 +1121,44 @@ c2_status_t Codec2Client::Component::flush(
 }
 
 c2_status_t Codec2Client::Component::drain(C2Component::drain_mode_t mode) {
-    Return<Status> transStatus = base()->drain(
+    Return<Status> transStatus = mBase->drain(
             mode == C2Component::DRAIN_COMPONENT_WITH_EOS);
     if (!transStatus.isOk()) {
-        ALOGE("drain -- transaction failed.");
+        LOG(ERROR) << "drain -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     }
     c2_status_t status =
             static_cast<c2_status_t>(static_cast<Status>(transStatus));
     if (status != C2_OK) {
-        ALOGE("drain -- call failed. "
-                "Error code = %d", static_cast<int>(status));
+        LOG(DEBUG) << "drain -- call failed: " << status << ".";
     }
     return status;
 }
 
 c2_status_t Codec2Client::Component::start() {
-    Return<Status> transStatus = base()->start();
+    Return<Status> transStatus = mBase->start();
     if (!transStatus.isOk()) {
-        ALOGE("start -- transaction failed.");
+        LOG(ERROR) << "start -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     }
     c2_status_t status =
             static_cast<c2_status_t>(static_cast<Status>(transStatus));
     if (status != C2_OK) {
-        ALOGE("start -- call failed. "
-                "Error code = %d", static_cast<int>(status));
+        LOG(DEBUG) << "start -- call failed: " << status << ".";
     }
     return status;
 }
 
 c2_status_t Codec2Client::Component::stop() {
-    Return<Status> transStatus = base()->stop();
+    Return<Status> transStatus = mBase->stop();
     if (!transStatus.isOk()) {
-        ALOGE("stop -- transaction failed.");
+        LOG(ERROR) << "stop -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     }
     c2_status_t status =
             static_cast<c2_status_t>(static_cast<Status>(transStatus));
     if (status != C2_OK) {
-        ALOGE("stop -- call failed. "
-                "Error code = %d", static_cast<int>(status));
+        LOG(DEBUG) << "stop -- call failed: " << status << ".";
     }
     mInputBuffersMutex.lock();
     mInputBuffers.clear();
@@ -1098,16 +1168,15 @@ c2_status_t Codec2Client::Component::stop() {
 }
 
 c2_status_t Codec2Client::Component::reset() {
-    Return<Status> transStatus = base()->reset();
+    Return<Status> transStatus = mBase->reset();
     if (!transStatus.isOk()) {
-        ALOGE("reset -- transaction failed.");
+        LOG(ERROR) << "reset -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     }
     c2_status_t status =
             static_cast<c2_status_t>(static_cast<Status>(transStatus));
     if (status != C2_OK) {
-        ALOGE("reset -- call failed. "
-                "Error code = %d", static_cast<int>(status));
+        LOG(DEBUG) << "reset -- call failed: " << status << ".";
     }
     mInputBuffersMutex.lock();
     mInputBuffers.clear();
@@ -1117,16 +1186,15 @@ c2_status_t Codec2Client::Component::reset() {
 }
 
 c2_status_t Codec2Client::Component::release() {
-    Return<Status> transStatus = base()->release();
+    Return<Status> transStatus = mBase->release();
     if (!transStatus.isOk()) {
-        ALOGE("release -- transaction failed.");
+        LOG(ERROR) << "release -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     }
     c2_status_t status =
             static_cast<c2_status_t>(static_cast<Status>(transStatus));
     if (status != C2_OK) {
-        ALOGE("release -- call failed. "
-                "Error code = %d", static_cast<int>(status));
+        LOG(DEBUG) << "release -- call failed: " << status << ".";
     }
     mInputBuffersMutex.lock();
     mInputBuffers.clear();
@@ -1144,17 +1212,16 @@ c2_status_t Codec2Client::Component::setOutputSurface(
         igbp = new TWGraphicBufferProducer<HGraphicBufferProducer>(surface);
     }
 
-    Return<Status> transStatus = base()->setOutputSurface(
+    Return<Status> transStatus = mBase->setOutputSurface(
             static_cast<uint64_t>(blockPoolId), igbp);
     if (!transStatus.isOk()) {
-        ALOGE("setOutputSurface -- transaction failed.");
+        LOG(ERROR) << "setOutputSurface -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     }
     c2_status_t status =
             static_cast<c2_status_t>(static_cast<Status>(transStatus));
     if (status != C2_OK) {
-        ALOGE("setOutputSurface -- call failed. "
-                "Error code = %d", static_cast<int>(status));
+        LOG(DEBUG) << "setOutputSurface -- call failed: " << status << ".";
     } else {
         std::lock_guard<std::mutex> lock(mOutputBufferQueueMutex);
         if (mOutputIgbp != surface) {
@@ -1162,7 +1229,8 @@ c2_status_t Codec2Client::Component::setOutputSurface(
             if (!surface) {
                 mOutputBqId = 0;
             } else if (surface->getUniqueId(&mOutputBqId) != OK) {
-                ALOGE("setOutputSurface -- cannot obtain bufferqueue id.");
+                LOG(ERROR) << "setOutputSurface -- "
+                              "cannot obtain bufferqueue id.";
             }
         }
         mOutputGeneration = generation;
@@ -1191,17 +1259,16 @@ status_t Codec2Client::Component::queueToOutputSurface(
                                                outputGeneration,
                                                &bqSlot);
         if (status != OK) {
-            ALOGW("queueToOutputSurface -- attaching failed.");
+            LOG(WARNING) << "queueToOutputSurface -- attaching failed.";
             return INVALID_OPERATION;
         }
 
         status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
                                          input, output);
         if (status != OK) {
-            ALOGE("queueToOutputSurface -- queueBuffer() failed "
-                    "on non-bufferqueue-based block. "
-                    "Error code = %d.",
-                    static_cast<int>(status));
+            LOG(ERROR) << "queueToOutputSurface -- queueBuffer() failed "
+                          "on non-bufferqueue-based block. "
+                          "Error = " << status << ".";
             return status;
         }
         return OK;
@@ -1214,17 +1281,17 @@ status_t Codec2Client::Component::queueToOutputSurface(
     mOutputBufferQueueMutex.unlock();
 
     if (!outputIgbp) {
-        ALOGV("queueToOutputSurface -- output surface is null.");
+        LOG(VERBOSE) << "queueToOutputSurface -- output surface is null.";
         return NO_INIT;
     }
 
     if (bqId != outputBqId || generation != outputGeneration) {
         if (!holdBufferQueueBlock(block, mOutputIgbp, mOutputBqId, mOutputGeneration)) {
-            ALOGE("queueToOutputSurface -- migration fialed");
+            LOG(ERROR) << "queueToOutputSurface -- migration failed.";
             return DEAD_OBJECT;
         }
         if (!getBufferQueueAssignment(block, &generation, &bqId, &bqSlot)) {
-            ALOGE("queueToOutputSurface -- corrupted bq assignment");
+            LOG(ERROR) << "queueToOutputSurface -- corrupted bufferqueue assignment.";
             return UNKNOWN_ERROR;
         }
     }
@@ -1232,49 +1299,77 @@ status_t Codec2Client::Component::queueToOutputSurface(
     status_t status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
                                               input, output);
     if (status != OK) {
-        ALOGD("queueToOutputSurface -- queueBuffer() failed "
-                "on bufferqueue-based block. "
-                "Error code = %d.",
-                static_cast<int>(status));
+        LOG(DEBUG) << "queueToOutputSurface -- queueBuffer() failed "
+                      "on bufferqueue-based block. "
+                      "Error = " << status << ".";
         return status;
     }
     if (!yieldBufferQueueBlock(block)) {
-        ALOGD("queueToOutputSurface -- cannot yield bufferqueue-based block "
-                "to the bufferqueue.");
+        LOG(DEBUG) << "queueToOutputSurface -- cannot yield "
+                      "bufferqueue-based block to the bufferqueue.";
         return UNKNOWN_ERROR;
     }
     return OK;
 }
 
-c2_status_t Codec2Client::Component::connectToOmxInputSurface(
-        const sp<HGraphicBufferProducer>& producer,
-        const sp<HGraphicBufferSource>& source) {
-    Return<Status> transStatus = base()->connectToOmxInputSurface(
-            producer, source);
+c2_status_t Codec2Client::Component::connectToInputSurface(
+        const std::shared_ptr<InputSurface>& inputSurface,
+        std::shared_ptr<InputSurfaceConnection>* connection) {
+    c2_status_t status;
+    Return<void> transStatus = mBase->connectToInputSurface(
+            inputSurface->mBase,
+            [&status, connection](
+                    Status s, const sp<IInputSurfaceConnection>& c) {
+                status = static_cast<c2_status_t>(s);
+                if (status != C2_OK) {
+                    LOG(DEBUG) << "connectToInputSurface -- call failed: "
+                               << status << ".";
+                    return;
+                }
+                *connection = std::make_shared<InputSurfaceConnection>(c);
+            });
     if (!transStatus.isOk()) {
-        ALOGE("connectToOmxInputSurface -- transaction failed.");
+        LOG(ERROR) << "connectToInputSurface -- transaction failed";
         return C2_TRANSACTION_FAILED;
     }
-    c2_status_t status =
-            static_cast<c2_status_t>(static_cast<Status>(transStatus));
-    if (status != C2_OK) {
-        ALOGE("connectToOmxInputSurface -- call failed. "
-                "Error code = %d", static_cast<int>(status));
+    return status;
+}
+
+c2_status_t Codec2Client::Component::connectToOmxInputSurface(
+        const sp<HGraphicBufferProducer>& producer,
+        const sp<HGraphicBufferSource>& source,
+        std::shared_ptr<InputSurfaceConnection>* connection) {
+    c2_status_t status;
+    Return<void> transStatus = mBase->connectToOmxInputSurface(
+            producer, source,
+            [&status, connection](
+                    Status s, const sp<IInputSurfaceConnection>& c) {
+                status = static_cast<c2_status_t>(s);
+                if (status != C2_OK) {
+                    LOG(DEBUG) << "connectToOmxInputSurface -- call failed: "
+                               << status << ".";
+                    return;
+                }
+                *connection = std::make_shared<InputSurfaceConnection>(c);
+            });
+    if (!transStatus.isOk()) {
+        LOG(ERROR) << "connectToOmxInputSurface -- transaction failed.";
+        return C2_TRANSACTION_FAILED;
     }
     return status;
 }
 
 c2_status_t Codec2Client::Component::disconnectFromInputSurface() {
-    Return<Status> transStatus = base()->disconnectFromInputSurface();
+    Return<Status> transStatus = mBase->disconnectFromInputSurface();
     if (!transStatus.isOk()) {
-        ALOGE("disconnectToInputSurface -- transaction failed.");
+        LOG(ERROR) << "disconnectToInputSurface -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     }
     c2_status_t status =
             static_cast<c2_status_t>(static_cast<Status>(transStatus));
     if (status != C2_OK) {
-        ALOGE("disconnectFromInputSurface -- call failed. "
-                "Error code = %d", static_cast<int>(status));
+        LOG(DEBUG) << "disconnectFromInputSurface -- call failed: "
+                   << status << ".";
     }
     return status;
 }
@@ -1294,7 +1389,7 @@ c2_status_t Codec2Client::Component::setDeathListener(
             if (std::shared_ptr<Codec2Client::Listener> listener = base.lock()) {
                 listener->onDeath(component);
             } else {
-                ALOGW("onDeath -- listener died.");
+                LOG(DEBUG) << "onDeath -- listener died.";
             }
         }
     };
@@ -1304,93 +1399,68 @@ c2_status_t Codec2Client::Component::setDeathListener(
     deathRecipient->component = component;
 
     component->mDeathRecipient = deathRecipient;
-    Return<bool> transResult = component->base()->linkToDeath(
+    Return<bool> transResult = component->mBase->linkToDeath(
             component->mDeathRecipient, 0);
     if (!transResult.isOk()) {
-        ALOGE("setDeathListener -- failed transaction: linkToDeath.");
+        LOG(ERROR) << "setDeathListener -- linkToDeath() transaction failed.";
         return C2_TRANSACTION_FAILED;
     }
     if (!static_cast<bool>(transResult)) {
-        ALOGE("setDeathListener -- linkToDeath call failed.");
+        LOG(DEBUG) << "setDeathListener -- linkToDeath() call failed.";
         return C2_CORRUPTED;
     }
     return C2_OK;
 }
 
 // Codec2Client::InputSurface
-
-Codec2Client::InputSurface::Base* Codec2Client::InputSurface::base() const {
-    return static_cast<Base*>(mBase.get());
-}
-
-Codec2Client::InputSurface::InputSurface(const sp<IInputSurface>& base) :
-    mBase(base),
-    mGraphicBufferProducer(new
+Codec2Client::InputSurface::InputSurface(const sp<IInputSurface>& base)
+      : Configurable{
+            [base]() -> sp<IConfigurable> {
+                Return<sp<IConfigurable>> transResult =
+                        base->getConfigurable();
+                return transResult.isOk() ?
+                        static_cast<sp<IConfigurable>>(transResult) :
+                        nullptr;
+            }()
+        },
+        mBase{base},
+        mGraphicBufferProducer{new
             ::android::hardware::graphics::bufferqueue::V1_0::utils::
-            H2BGraphicBufferProducer(base)) {
+            H2BGraphicBufferProducer([base]() -> sp<HGraphicBufferProducer> {
+                Return<sp<HGraphicBufferProducer>> transResult =
+                        base->getGraphicBufferProducer();
+                return transResult.isOk() ?
+                        static_cast<sp<HGraphicBufferProducer>>(transResult) :
+                        nullptr;
+            }())} {
 }
 
-c2_status_t Codec2Client::InputSurface::connectToComponent(
-        const std::shared_ptr<Codec2Client::Component>& component,
-        std::shared_ptr<Connection>* connection) {
-    c2_status_t status;
-    Return<void> transStatus = base()->connectToComponent(
-        component->base(),
-        [&status, connection](
-                Status s,
-                const sp<IInputSurfaceConnection>& c) {
-            status = static_cast<c2_status_t>(s);
-            if (status != C2_OK) {
-                ALOGE("connectToComponent -- call failed. "
-                        "Error code = %d", static_cast<int>(status));
-                return;
-            }
-            *connection = std::make_shared<Connection>(c);
-        });
-    if (!transStatus.isOk()) {
-        ALOGE("connect -- transaction failed.");
-        return C2_TRANSACTION_FAILED;
-    }
-    return status;
-}
-
-std::shared_ptr<Codec2Client::Configurable>
-        Codec2Client::InputSurface::getConfigurable() const {
-    Return<sp<IConfigurable>> transResult = base()->getConfigurable();
-    if (!transResult.isOk()) {
-        ALOGW("getConfigurable -- transaction failed.");
-        return nullptr;
-    }
-    if (!static_cast<sp<IConfigurable>>(transResult)) {
-        ALOGW("getConfigurable -- null pointer.");
-        return nullptr;
-    }
-    return std::make_shared<Configurable>(transResult);
-}
-
-const sp<IGraphicBufferProducer>&
+sp<IGraphicBufferProducer>
         Codec2Client::InputSurface::getGraphicBufferProducer() const {
     return mGraphicBufferProducer;
 }
 
-const sp<IInputSurface>& Codec2Client::InputSurface::getHalInterface() const {
+sp<IInputSurface> Codec2Client::InputSurface::getHalInterface() const {
     return mBase;
 }
 
 // Codec2Client::InputSurfaceConnection
-
-Codec2Client::InputSurfaceConnection::Base*
-        Codec2Client::InputSurfaceConnection::base() const {
-    return static_cast<Base*>(mBase.get());
-}
-
 Codec2Client::InputSurfaceConnection::InputSurfaceConnection(
-        const sp<Codec2Client::InputSurfaceConnection::Base>& base) :
-    mBase(base) {
+        const sp<IInputSurfaceConnection>& base)
+      : Configurable{
+            [base]() -> sp<IConfigurable> {
+                Return<sp<IConfigurable>> transResult =
+                        base->getConfigurable();
+                return transResult.isOk() ?
+                        static_cast<sp<IConfigurable>>(transResult) :
+                        nullptr;
+            }()
+        },
+        mBase{base} {
 }
 
 c2_status_t Codec2Client::InputSurfaceConnection::disconnect() {
-    Return<Status> transResult = base()->disconnect();
+    Return<Status> transResult = mBase->disconnect();
     return static_cast<c2_status_t>(static_cast<Status>(transResult));
 }
 
