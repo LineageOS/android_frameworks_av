@@ -555,7 +555,6 @@ uint32_t AudioPolicyManager::updateCallRouting(const DeviceVector &rxDevices, ui
         muteWaitMs = setOutputDevices(mPrimaryOutput, rxDevices, true, delayMs);
     } else { // create RX path audio patch
         mCallRxPatch = createTelephonyPatch(true /*isRx*/, rxDevices.itemAt(0), delayMs);
-        ALOG_ASSERT(createTxPatch, "No Tx Patch will be created, nor legacy routing done");
     }
     if (createTxPatch) { // create TX path audio patch
         mCallTxPatch = createTelephonyPatch(false /*isRx*/, txSourceDevice, delayMs);
