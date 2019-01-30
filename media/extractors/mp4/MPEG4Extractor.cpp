@@ -6214,6 +6214,7 @@ static CreatorFunc Sniff(
 
 static const char *extensions[] = {
     "3g2",
+    "3ga",
     "3gp",
     "3gpp",
     "3gpp2",
@@ -6222,6 +6223,7 @@ static const char *extensions[] = {
     "m4v",
     "mov",
     "mp4",
+    "qt",
     NULL
 };
 
