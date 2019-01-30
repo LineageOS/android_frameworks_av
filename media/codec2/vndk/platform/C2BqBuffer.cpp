@@ -192,7 +192,7 @@ private:
         int slot;
         ALOGV("tries to dequeue buffer");
         Return<void> transStatus = mProducer->dequeueBuffer(
-                width, height, pixelFormat, androidUsage.asGrallocUsage(), true,
+                width, height, pixelFormat, androidUsage.asGrallocUsage(), false,
                 [&status, &slot, &fence](
                         int32_t tStatus, int32_t tSlot, hidl_handle const& tFence,
                         HGraphicBufferProducer::FrameEventHistoryDelta const& tTs) {
