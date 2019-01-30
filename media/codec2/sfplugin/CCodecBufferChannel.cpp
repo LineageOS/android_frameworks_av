@@ -1171,6 +1171,9 @@ public:
             size_t *index,
             sp<MediaCodecBuffer> *clientBuffer) override {
         sp<Codec2Buffer> newBuffer = wrap(buffer);
+        if (newBuffer == nullptr) {
+            return NO_MEMORY;
+        }
         newBuffer->setFormat(mFormat);
         *index = mImpl.assignSlot(newBuffer);
         *clientBuffer = newBuffer;
@@ -1263,6 +1266,10 @@ public:
             return nullptr;
         }
         sp<Codec2Buffer> clientBuffer = ConstLinearBlockBuffer::Allocate(mFormat, buffer);
+        if (clientBuffer == nullptr) {
+            ALOGD("[%s] ConstLinearBlockBuffer::Allocate failed", mName);
+            return nullptr;
+        }
         submit(clientBuffer);
         return clientBuffer;
     }
@@ -1303,6 +1310,10 @@ public:
                     [lbp = mLocalBufferPool](size_t capacity) {
                         return lbp->newBuffer(capacity);
                     });
+            if (c2buffer == nullptr) {
+                ALOGD("[%s] ConstGraphicBlockBuffer::AllocateEmpty failed", mName);
+                return nullptr;
+            }
             c2buffer->setRange(0, 0);
             return c2buffer;
         } else {
@@ -2708,6 +2719,9 @@ void CCodecBufferChannel::sendOutputBuffers() {
         status_t err = (*buffers)->registerBuffer(entry.buffer, &index, &outBuffer);
         if (err != OK) {
             if (err != WOULD_BLOCK) {
+                if (!(*buffers)->isArrayMode()) {
+                    *buffers = (*buffers)->toArrayMode(mNumOutputSlots);
+                }
                 OutputBuffersArray *array = (OutputBuffersArray *)buffers->get();
                 array->realloc(entry.buffer);
                 mCCodecCallback->onOutputBuffersChanged();
