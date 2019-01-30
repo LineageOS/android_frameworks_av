@@ -85,7 +85,7 @@ status_t AACWriter::addSource(const sp<MediaSource> &source) {
     CHECK(!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC));
     CHECK(meta->findInt32(kKeyChannelCount, &mChannelCount));
     CHECK(meta->findInt32(kKeySampleRate, &mSampleRate));
-    CHECK(mChannelCount >= 1 && mChannelCount <= 2);
+    CHECK(mChannelCount >= 1 && mChannelCount <= 7);
 
     // Optionally, we want to check whether AACProfile is also set.
     if (meta->findInt32(kKeyAACProfile, &mAACProfile)) {
