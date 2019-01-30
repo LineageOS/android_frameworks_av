@@ -171,11 +171,7 @@ static sp<DataConverter> getCopyConverter() {
 }
 
 struct CodecObserver : public BnOMXObserver {
-    CodecObserver() {}
-
-    void setNotificationMessage(const sp<AMessage> &msg) {
-        mNotify = msg;
-    }
+    explicit CodecObserver(const sp<AMessage> &msg) : mNotify(msg) {}
 
     // from IOMXObserver
     virtual void onMessages(const std::list<omx_message> &messages) {
@@ -251,7 +247,7 @@ protected:
     virtual ~CodecObserver() {}
 
 private:
-    sp<AMessage> mNotify;
+    const sp<AMessage> mNotify;
 
     DISALLOW_EVIL_CONSTRUCTORS(CodecObserver);
 };
@@ -6629,7 +6625,8 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
 
     CHECK(mCodec->mOMXNode == NULL);
 
-    sp<AMessage> notify = new AMessage(kWhatOMXDied, mCodec);
+    sp<AMessage> notify = new AMessage(kWhatOMXMessageList, mCodec);
+    notify->setInt32("generation", mCodec->mNodeGeneration + 1);
 
     sp<RefBase> obj;
     CHECK(msg->findObject("codecInfo", &obj));
@@ -6644,7 +6641,7 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
     AString componentName;
     CHECK(msg->findString("componentName", &componentName));
 
-    sp<CodecObserver> observer = new CodecObserver;
+    sp<CodecObserver> observer = new CodecObserver(notify);
     sp<IOMX> omx;
     sp<IOMXNode> omxNode;
 
@@ -6675,9 +6672,7 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
         mDeathNotifier.clear();
     }
 
-    notify = new AMessage(kWhatOMXMessageList, mCodec);
-    notify->setInt32("generation", ++mCodec->mNodeGeneration);
-    observer->setNotificationMessage(notify);
+    ++mCodec->mNodeGeneration;
 
     mCodec->mComponentName = componentName;
     mCodec->mRenderTracker.setComponentName(componentName);
@@ -8572,7 +8567,7 @@ status_t ACodec::queryCapabilities(
     }
 
     sp<IOMX> omx = client.interface();
-    sp<CodecObserver> observer = new CodecObserver;
+    sp<CodecObserver> observer = new CodecObserver(new AMessage);
     sp<IOMXNode> omxNode;
 
     err = omx->allocateNode(name, observer, &omxNode);
