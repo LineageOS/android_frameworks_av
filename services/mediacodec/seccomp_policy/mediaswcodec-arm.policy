@@ -21,6 +21,8 @@ dup: 1
 ppoll: 1
 mprotect: arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE
 mmap2: arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE
+memfd_create: 1
+ftruncate64: 1
 
 # mremap: Ensure |flags| are (MREMAP_MAYMOVE | MREMAP_FIXED) TODO: Once minijail
 # parser support for '<' is in this needs to be modified to also prevent
