@@ -261,7 +261,7 @@ bool ASessionDescription::getDurationUs(int64_t *durationUs) const {
         return false;
     }
 
-    if (strncmp(value.c_str(), "npt=", 4)) {
+    if (strncmp(value.c_str(), "npt=", 4) && strncmp(value.c_str(), "npt:", 4)) {
         return false;
     }
 
