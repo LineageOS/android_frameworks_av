@@ -105,6 +105,10 @@ bool DeviceDescriptor::hasCurrentEncodedFormat() const
 
 bool DeviceDescriptor::supportsFormat(audio_format_t format)
 {
+    if (mEncodedFormats.isEmpty()) {
+        return true;
+    }
+
     for (const auto& devFormat : mEncodedFormats) {
         if (devFormat == format) {
             return true;

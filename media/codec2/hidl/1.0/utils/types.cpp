@@ -1693,11 +1693,11 @@ status_t attachToBufferQueue(const C2ConstGraphicBlock& block,
     if (result != OK) {
         ALOGW("attachToBufferQueue -- attachBuffer failed. Error code = %d",
                 static_cast<int>(result));
-        return false;
+        return result;
     }
     ALOGV("attachToBufferQueue -- attachBuffer returned slot %d",
             static_cast<int>(*bqSlot));
-    return true;
+    return OK;
 }
 
 bool getBufferQueueAssignment(const C2ConstGraphicBlock& block,
@@ -1779,7 +1779,7 @@ bool holdBufferQueueBlock(const C2ConstGraphicBlock& block,
             static_cast<int>(bqSlot),
             static_cast<unsigned>(generation));
     _C2BlockFactory::AssignBlockToBufferQueue(
-            data, getHgbp(igbp), bqId, bqSlot, true);
+            data, getHgbp(igbp), generation, bqId, bqSlot, true);
     return true;
 }
 

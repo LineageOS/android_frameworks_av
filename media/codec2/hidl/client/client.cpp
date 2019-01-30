@@ -1186,7 +1186,7 @@ status_t Codec2Client::Component::queueToOutputSurface(
         uint32_t outputGeneration = mOutputGeneration;
         mOutputBufferQueueMutex.unlock();
 
-        status_t status = !attachToBufferQueue(block,
+        status_t status = attachToBufferQueue(block,
                                                outputIgbp,
                                                outputGeneration,
                                                &bqSlot);
@@ -1218,14 +1218,15 @@ status_t Codec2Client::Component::queueToOutputSurface(
         return NO_INIT;
     }
 
-    if (bqId != outputBqId) {
-        ALOGV("queueToOutputSurface -- bufferqueue ids mismatch.");
-        return DEAD_OBJECT;
-    }
-
-    if (generation != outputGeneration) {
-        ALOGV("queueToOutputSurface -- generation numbers mismatch.");
-        return DEAD_OBJECT;
+    if (bqId != outputBqId || generation != outputGeneration) {
+        if (!holdBufferQueueBlock(block, mOutputIgbp, mOutputBqId, mOutputGeneration)) {
+            ALOGE("queueToOutputSurface -- migration fialed");
+            return DEAD_OBJECT;
+        }
+        if (!getBufferQueueAssignment(block, &generation, &bqId, &bqSlot)) {
+            ALOGE("queueToOutputSurface -- corrupted bq assignment");
+            return UNKNOWN_ERROR;
+        }
     }
 
     status_t status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),

@@ -128,7 +128,7 @@ void DepthCompositeStream::compilePendingInputLocked() {
             ALOGE("%s: Error locking blob image buffer: %s (%d)", __FUNCTION__,
                     strerror(-res), res);
             mPendingInputFrames[*it].error = true;
-            mInputDepthBuffers.erase(it);
+            mInputJpegBuffers.erase(it);
             continue;
         }
 

@@ -199,6 +199,7 @@ private:
     struct parameterManagerElementSupported;
 
     static const char *const mPolicyPfwDefaultConfFileName; /**< Default Policy PFW top file name.*/
+    static const char *const mPolicyPfwVendorConfFileName; /**< Vendor Policy PFW top file name.*/
 };
 
 } // namespace audio_policy

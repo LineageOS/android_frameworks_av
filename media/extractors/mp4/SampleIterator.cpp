@@ -111,8 +111,15 @@ status_t SampleIterator::seekTo(uint32_t sampleIndex) {
             if ((err = getSampleSizeDirect(
                             firstChunkSampleIndex + i, &sampleSize)) != OK) {
                 ALOGE("getSampleSizeDirect return error");
-                mCurrentChunkSampleSizes.clear();
-                return err;
+                // stsc sample count is not sync with stsz sample count
+                if (err == ERROR_OUT_OF_RANGE) {
+                    ALOGW("stsc samples(%d) not sync with stsz samples(%d)", mSamplesPerChunk, i);
+                    mSamplesPerChunk = i;
+                    break;
+                } else{
+                    mCurrentChunkSampleSizes.clear();
+                    return err;
+                }
             }
 
             mCurrentChunkSampleSizes.push(sampleSize);

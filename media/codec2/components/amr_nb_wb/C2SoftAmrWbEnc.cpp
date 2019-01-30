@@ -347,7 +347,7 @@ void C2SoftAmrWbEnc::process(
         mFilledLen = 0;
     }
     ALOGV("causal sample size %d", mFilledLen);
-    if (mIsFirst) {
+    if (mIsFirst && outPos != 0) {
         mIsFirst = false;
         mAnchorTimeStamp = work->input.ordinal.timestamp.peekull();
     }

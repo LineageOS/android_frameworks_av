@@ -1205,7 +1205,9 @@ class DirectOutputThread : public PlaybackThread {
 public:
 
     DirectOutputThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
-                       audio_io_handle_t id, audio_devices_t device, bool systemReady);
+                       audio_io_handle_t id, audio_devices_t device, bool systemReady)
+        : DirectOutputThread(audioFlinger, output, id, device, DIRECT, systemReady) { }
+
     virtual                 ~DirectOutputThread();
 
                 status_t    selectPresentation(int presentationId, int programId);
@@ -1231,10 +1233,10 @@ protected:
 
     virtual     void        onAddNewTrack_l();
 
-    bool mVolumeShaperActive;
+    bool mVolumeShaperActive = false;
 
     DirectOutputThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
-                        audio_io_handle_t id, uint32_t device, ThreadBase::type_t type,
+                        audio_io_handle_t id, audio_devices_t device, ThreadBase::type_t type,
                         bool systemReady);
     void processVolume_l(Track *track, bool lastTrack);
 
