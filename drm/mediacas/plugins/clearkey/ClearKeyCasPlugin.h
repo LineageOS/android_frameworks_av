@@ -47,11 +47,6 @@ public:
             void *appData,
             CasPluginCallback callback,
             CasPlugin **plugin) override;
-    virtual status_t createPlugin(
-            int32_t CA_system_id,
-            void *appData,
-            CasPluginCallbackExt callback,
-            CasPlugin **plugin) override;
 };
 
 class ClearKeyDescramblerFactory : public DescramblerFactory {
@@ -68,7 +63,6 @@ public:
 class ClearKeyCasPlugin : public CasPlugin {
 public:
     ClearKeyCasPlugin(void *appData, CasPluginCallback callback);
-    ClearKeyCasPlugin(void *appData, CasPluginCallbackExt callback);
     virtual ~ClearKeyCasPlugin();
 
     virtual status_t setPrivateData(
@@ -91,10 +85,6 @@ public:
     virtual status_t sendEvent(
             int32_t event, int32_t arg, const CasData &eventData) override;
 
-    virtual status_t sendSessionEvent(
-            const CasSessionId &sessionId,
-            int32_t event, int32_t arg, const CasData &eventData) override;
-
     virtual status_t provision(const String8 &str) override;
 
     virtual status_t refreshEntitlements(
@@ -104,7 +94,6 @@ private:
     Mutex mKeyFetcherLock;
     std::unique_ptr<KeyFetcher> mKeyFetcher;
     CasPluginCallback mCallback;
-    CasPluginCallbackExt mCallbackExt;
     void* mAppData;
 };
 
