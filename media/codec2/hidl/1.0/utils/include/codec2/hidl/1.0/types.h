@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@
 #ifndef CODEC2_HIDL_V1_0_UTILS_TYPES_H
 #define CODEC2_HIDL_V1_0_UTILS_TYPES_H
 
-#include <chrono>
-
 #include <bufferpool/ClientManager.h>
 #include <android/hardware/media/bufferpool/2.0/IClientManager.h>
 #include <android/hardware/media/bufferpool/2.0/types.h>
@@ -30,6 +28,9 @@
 #include <C2Param.h>
 #include <C2ParamDef.h>
 #include <C2Work.h>
+#include <util/C2Debug-base.h>
+
+#include <chrono>
 
 using namespace std::chrono_literals;
 
@@ -65,66 +66,74 @@ struct C2Hidl_Rect {
 };
 typedef C2GlobalParam<C2Info, C2Hidl_Rect, 1> C2Hidl_RectInfo;
 
+// Make asString() and operator<< work with Status as well as c2_status_t.
+C2_DECLARE_AS_STRING_AND_DEFINE_STREAM_OUT(Status);
+
+/**
+ * All objcpy() functions will return a boolean value indicating whether the
+ * conversion succeeds or not.
+ */
+
 // C2SettingResult -> SettingResult
-Status objcpy(
+bool objcpy(
         SettingResult* d,
         const C2SettingResult& s);
 
 // SettingResult -> std::unique_ptr<C2SettingResult>
-c2_status_t objcpy(
+bool objcpy(
         std::unique_ptr<C2SettingResult>* d,
         const SettingResult& s);
 
 // C2ParamDescriptor -> ParamDescriptor
-Status objcpy(
+bool objcpy(
         ParamDescriptor* d,
         const C2ParamDescriptor& s);
 
 // ParamDescriptor -> std::shared_ptr<C2ParamDescriptor>
-c2_status_t objcpy(
+bool objcpy(
         std::shared_ptr<C2ParamDescriptor>* d,
         const ParamDescriptor& s);
 
 // C2FieldSupportedValuesQuery -> FieldSupportedValuesQuery
-Status objcpy(
+bool objcpy(
         FieldSupportedValuesQuery* d,
         const C2FieldSupportedValuesQuery& s);
 
 // FieldSupportedValuesQuery -> C2FieldSupportedValuesQuery
-c2_status_t objcpy(
+bool objcpy(
         C2FieldSupportedValuesQuery* d,
         const FieldSupportedValuesQuery& s);
 
 // C2FieldSupportedValuesQuery -> FieldSupportedValuesQueryResult
-Status objcpy(
+bool objcpy(
         FieldSupportedValuesQueryResult* d,
         const C2FieldSupportedValuesQuery& s);
 
 // FieldSupportedValuesQuery, FieldSupportedValuesQueryResult -> C2FieldSupportedValuesQuery
-c2_status_t objcpy(
+bool objcpy(
         C2FieldSupportedValuesQuery* d,
         const FieldSupportedValuesQuery& sq,
         const FieldSupportedValuesQueryResult& sr);
 
 // C2Component::Traits -> ComponentTraits
-Status objcpy(
+bool objcpy(
         IComponentStore::ComponentTraits* d,
         const C2Component::Traits& s);
 
 // ComponentTraits -> C2Component::Traits, std::unique_ptr<std::vector<std::string>>
 // Note: The output d is only valid as long as aliasesBuffer remains alive.
-c2_status_t objcpy(
+bool objcpy(
         C2Component::Traits* d,
         std::unique_ptr<std::vector<std::string>>* aliasesBuffer,
         const IComponentStore::ComponentTraits& s);
 
 // C2StructDescriptor -> StructDescriptor
-Status objcpy(
+bool objcpy(
         StructDescriptor* d,
         const C2StructDescriptor& s);
 
 // StructDescriptor -> C2StructDescriptor
-c2_status_t objcpy(
+bool objcpy(
         std::unique_ptr<C2StructDescriptor>* d,
         const StructDescriptor& s);
 
@@ -208,68 +217,77 @@ private:
 
 // std::list<std::unique_ptr<C2Work>> -> WorkBundle
 // Note: If bufferpool will be used, bpSender must not be null.
-Status objcpy(
+bool objcpy(
         WorkBundle* d,
         const std::list<std::unique_ptr<C2Work>>& s,
         BufferPoolSender* bpSender = nullptr);
 
 // WorkBundle -> std::list<std::unique_ptr<C2Work>>
-c2_status_t objcpy(
+bool objcpy(
         std::list<std::unique_ptr<C2Work>>* d,
         const WorkBundle& s);
 
 /**
- * Parses a params blob and returns C2Param pointers to its params.
+ * Parses a params blob and returns C2Param pointers to its params. The pointers
+ * point to locations inside the underlying buffer of \p blob. If \p blob is
+ * destroyed, the pointers become invalid.
+ *
  * \param[out] params target vector of C2Param pointers
  * \param[in] blob parameter blob to parse
- * \retval C2_OK if the full blob was parsed
- * \retval C2_BAD_VALUE otherwise
+ * \retval true if the full blob was parsed
+ * \retval false otherwise
  */
-c2_status_t parseParamsBlob(
+bool parseParamsBlob(
         std::vector<C2Param*> *params,
         const hidl_vec<uint8_t> &blob);
 
 /**
  * Concatenates a list of C2Params into a params blob.
+ *
  * \param[out] blob target blob
  * \param[in] params parameters to concatenate
- * \retval C2_OK if the blob was successfully created
- * \retval C2_BAD_VALUE if the blob was not successful (this only happens if the parameters were
- *         not const)
+ * \retval true if the blob was successfully created
+ * \retval false if the blob was not successful (this only happens if the
+ *         parameters were not const)
  */
-Status createParamsBlob(
+bool createParamsBlob(
         hidl_vec<uint8_t> *blob,
         const std::vector<C2Param*> &params);
-Status createParamsBlob(
+bool createParamsBlob(
         hidl_vec<uint8_t> *blob,
         const std::vector<std::unique_ptr<C2Param>> &params);
-Status createParamsBlob(
+bool createParamsBlob(
         hidl_vec<uint8_t> *blob,
         const std::vector<std::shared_ptr<const C2Info>> &params);
-Status createParamsBlob(
+bool createParamsBlob(
         hidl_vec<uint8_t> *blob,
         const std::vector<std::unique_ptr<C2Tuning>> &params);
 
 /**
  * Parses a params blob and create a vector of C2Params whose members are copies
  * of the params in the blob.
+ *
  * \param[out] params the resulting vector
  * \param[in] blob parameter blob to parse
- * \retval C2_OK if the full blob was parsed and params was constructed
- * \retval C2_BAD_VALUE otherwise
+ * \retval true if the full blob was parsed and params was constructed
+ * \retval false otherwise
  */
-c2_status_t copyParamsFromBlob(
+bool copyParamsFromBlob(
         std::vector<std::unique_ptr<C2Param>>* params,
+        Params blob);
+bool copyParamsFromBlob(
+        std::vector<std::unique_ptr<C2Tuning>>* params,
         Params blob);
 
 /**
- * Parses a params blob and applies updates to params
+ * Parses a params blob and applies updates to params.
+ *
  * \param[in,out] params params to be updated
  * \param[in] blob parameter blob containing updates
- * \retval C2_OK if the full blob was parsed and params was updated
- * \retval C2_BAD_VALUE otherwise
+ * \retval true if the full blob was parsed and params was updated
+ * \retval false otherwise
  */
-c2_status_t updateParamsFromBlob(
+bool updateParamsFromBlob(
         const std::vector<C2Param*>& params,
         const Params& blob);
 

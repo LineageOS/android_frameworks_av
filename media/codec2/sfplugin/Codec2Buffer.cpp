@@ -451,6 +451,9 @@ public:
     }
 
     bool setBackBuffer(const sp<ABuffer> &backBuffer) {
+        if (backBuffer == nullptr) {
+            return false;
+        }
         if (backBuffer->capacity() < mBackBufferSize) {
             return false;
         }

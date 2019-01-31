@@ -143,8 +143,7 @@ public:
         if (mConnection != nullptr) {
             return ALREADY_EXISTS;
         }
-        return toStatusT(mSurface->connectToComponent(comp, &mConnection),
-                         C2_OPERATION_InputSurface_connectToComponent);
+        return toStatusT(comp->connectToInputSurface(mSurface, &mConnection));
     }
 
     void disconnect() override {
@@ -162,7 +161,7 @@ public:
     status_t signalEndOfInputStream() override {
         C2InputSurfaceEosTuning eos(true);
         std::vector<std::unique_ptr<C2SettingResult>> failures;
-        c2_status_t err = mSurface->getConfigurable()->config({&eos}, C2_MAY_BLOCK, &failures);
+        c2_status_t err = mSurface->config({&eos}, C2_MAY_BLOCK, &failures);
         if (err != C2_OK) {
             return UNKNOWN_ERROR;
         }
@@ -495,10 +494,13 @@ struct CCodec::ClientListener : public Codec2Client::Listener {
         codec->mCallback->onError(DEAD_OBJECT, ACTION_CODE_FATAL);
     }
 
-    virtual void onFramesRendered(
-            const std::vector<RenderedFrame>& renderedFrames) override {
-        // TODO
-        (void)renderedFrames;
+    virtual void onFrameRendered(uint64_t bufferQueueId,
+                                 int32_t slotId,
+                                 int64_t timestampNs) override {
+        // TODO: implement
+        (void)bufferQueueId;
+        (void)slotId;
+        (void)timestampNs;
     }
 
     virtual void onInputBufferDone(
@@ -599,7 +601,7 @@ void CCodec::allocate(const sp<MediaCodecInfo> &codecInfo) {
     // set up preferred component store to access vendor store parameters
     client = Codec2Client::CreateFromService("default", false);
     if (client) {
-        ALOGI("setting up '%s' as default (vendor) store", client->getInstanceName().c_str());
+        ALOGI("setting up '%s' as default (vendor) store", client->getServiceName().c_str());
         SetPreferredCodec2ComponentStore(
                 std::make_shared<Codec2ClientInterfaceWrapper>(client));
     }
@@ -956,16 +958,18 @@ void CCodec::createInputSurface() {
     std::shared_ptr<PersistentSurface> persistentSurface(CreateInputSurface());
 
     if (persistentSurface->getHidlTarget()) {
-        sp<IInputSurface> inputSurface = IInputSurface::castFrom(
+        sp<IInputSurface> hidlInputSurface = IInputSurface::castFrom(
                 persistentSurface->getHidlTarget());
-        if (!inputSurface) {
+        if (!hidlInputSurface) {
             ALOGE("Corrupted input surface");
             mCallback->onInputSurfaceCreationFailed(UNKNOWN_ERROR);
             return;
         }
+        std::shared_ptr<Codec2Client::InputSurface> inputSurface =
+                std::make_shared<Codec2Client::InputSurface>(hidlInputSurface);
         err = setupInputSurface(std::make_shared<C2InputSurfaceWrapper>(
-                std::make_shared<Codec2Client::InputSurface>(inputSurface)));
-        bufferProducer = new H2BGraphicBufferProducer(inputSurface);
+                inputSurface));
+        bufferProducer = inputSurface->getGraphicBufferProducer();
     } else {
         int32_t width = 0;
         (void)outputFormat->findInt32("width", &width);
@@ -1020,7 +1024,7 @@ status_t CCodec::setupInputSurface(const std::shared_ptr<InputSurfaceWrapper> &s
         ALOGD("ISConfig: no configuration");
     }
 
-    return surface->start();
+    return OK;
 }
 
 void CCodec::initiateSetInputSurface(const sp<PersistentSurface> &surface) {
@@ -1107,12 +1111,20 @@ void CCodec::start() {
     }
     sp<AMessage> inputFormat;
     sp<AMessage> outputFormat;
+    status_t err2 = OK;
     {
         Mutexed<Config>::Locked config(mConfig);
         inputFormat = config->mInputFormat;
         outputFormat = config->mOutputFormat;
+        if (config->mInputSurface) {
+            err2 = config->mInputSurface->start();
+        }
     }
-    status_t err2 = mChannel->start(inputFormat, outputFormat);
+    if (err2 != OK) {
+        mCallback->onError(err2, ACTION_CODE_FATAL);
+        return;
+    }
+    err2 = mChannel->start(inputFormat, outputFormat);
     if (err2 != OK) {
         mCallback->onError(err2, ACTION_CODE_FATAL);
         return;
@@ -1187,6 +1199,13 @@ void CCodec::stop() {
     }
 
     {
+        Mutexed<Config>::Locked config(mConfig);
+        if (config->mInputSurface) {
+            config->mInputSurface->disconnect();
+            config->mInputSurface = nullptr;
+        }
+    }
+    {
         Mutexed<State>::Locked state(mState);
         if (state->get() == STOPPING) {
             state->set(ALLOCATED);
@@ -1196,6 +1215,7 @@ void CCodec::stop() {
 }
 
 void CCodec::initiateRelease(bool sendCallback /* = true */) {
+    bool clearInputSurfaceIfNeeded = false;
     {
         Mutexed<State>::Locked state(mState);
         if (state->get() == RELEASED || state->get() == RELEASING) {
@@ -1217,7 +1237,21 @@ void CCodec::initiateRelease(bool sendCallback /* = true */) {
             }
             return;
         }
+        if (state->get() == STARTING
+                || state->get() == RUNNING
+                || state->get() == STOPPING) {
+            // Input surface may have been started, so clean up is needed.
+            clearInputSurfaceIfNeeded = true;
+        }
         state->set(RELEASING);
+    }
+
+    if (clearInputSurfaceIfNeeded) {
+        Mutexed<Config>::Locked config(mConfig);
+        if (config->mInputSurface) {
+            config->mInputSurface->disconnect();
+            config->mInputSurface = nullptr;
+        }
     }
 
     mChannel->stop();

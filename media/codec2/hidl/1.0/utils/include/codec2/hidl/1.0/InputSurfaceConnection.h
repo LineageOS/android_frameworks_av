@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +18,10 @@
 #define CODEC2_HIDL_V1_0_UTILS_INPUTSURFACECONNECTION_H
 
 #include <codec2/hidl/1.0/Component.h>
+#include <codec2/hidl/1.0/Configurable.h>
 
 #include <android/hardware/media/c2/1.0/IComponent.h>
+#include <android/hardware/media/c2/1.0/IConfigurable.h>
 #include <android/hardware/media/c2/1.0/IInputSurfaceConnection.h>
 
 #include <media/stagefright/bqhelper/GraphicBufferSource.h>
@@ -44,19 +46,28 @@ using ::android::hardware::Void;
 using ::android::sp;
 using ::android::GraphicBufferSource;
 
+// An InputSurfaceConnection connects an InputSurface to a sink, which may be an
+// IInputSink or a local C2Component. This can be specified by choosing the
+// corresponding constructor. The reason for distinguishing these two cases is
+// that when an InputSurfaceConnection lives in the same process as the
+// component that processes the buffers, data parceling is not needed.
 struct InputSurfaceConnection : public IInputSurfaceConnection {
 
     virtual Return<Status> disconnect() override;
+
+    virtual Return<sp<IConfigurable>> getConfigurable() override;
 
 protected:
 
     InputSurfaceConnection(
             const sp<GraphicBufferSource>& source,
-            const std::shared_ptr<C2Component>& component);
+            const std::shared_ptr<C2Component>& comp,
+            const sp<ComponentStore>& store);
 
     InputSurfaceConnection(
             const sp<GraphicBufferSource>& source,
-            const sp<IComponent>& component);
+            const sp<IInputSink>& sink,
+            const sp<ComponentStore>& store);
 
     bool init();
 
@@ -68,9 +79,9 @@ protected:
 
     struct Impl;
 
-    std::mutex mMutex;
-    sp<GraphicBufferSource> mSource;
+    std::mutex mImplMutex;
     sp<Impl> mImpl;
+    sp<CachedConfigurable> mConfigurable;
 
     virtual ~InputSurfaceConnection() override;
 };

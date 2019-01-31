@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,21 +19,14 @@
 
 #include <codec2/hidl/1.0/ComponentStore.h>
 
-#include <android/hardware/media/c2/1.0/IInputSurface.h>
-#include <android/hardware/media/c2/1.0/IComponent.h>
-
 #include <android/hardware/graphics/bufferqueue/1.0/IGraphicBufferProducer.h>
-#include <android/hardware/graphics/bufferqueue/1.0/IProducerListener.h>
-#include <android/hardware/graphics/common/1.0/types.h>
-#include <android/hardware/media/1.0/types.h>
-
+#include <android/hardware/media/c2/1.0/IInputSink.h>
+#include <android/hardware/media/c2/1.0/IInputSurface.h>
 #include <gui/IGraphicBufferProducer.h>
+#include <hidl/Status.h>
 #include <media/stagefright/bqhelper/GraphicBufferSource.h>
 
-#include <hidl/HidlSupport.h>
-#include <hidl/Status.h>
-
-class C2ReflectorHelper;
+#include <util/C2InterfaceHelper.h>
 
 namespace android {
 namespace hardware {
@@ -49,18 +42,7 @@ using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::sp;
 
-using ::android::hardware::graphics::common::V1_0::PixelFormat;
-using ::android::hardware::media::V1_0::AnwBuffer;
-
 struct InputSurface : public IInputSurface {
-
-    typedef ::android::hidl::base::V1_0::IBase IBase;
-
-    typedef ::android::hardware::graphics::bufferqueue::V1_0::
-            IProducerListener HProducerListener;
-
-    typedef ::android::
-            IGraphicBufferProducer BGraphicBufferProducer;
 
     typedef ::android::hardware::graphics::bufferqueue::V1_0::
             IGraphicBufferProducer HGraphicBufferProducer;
@@ -68,114 +50,23 @@ struct InputSurface : public IInputSurface {
     typedef ::android::
             GraphicBufferSource GraphicBufferSource;
 
-// Type disambiguation
-
-    typedef ::android::hardware::media::c2::V1_0::Status Status;
-
-// New methods from IInputSurface
-
-    virtual Return<void> connectToComponent(
-            const sp<IComponent>& component,
-            connectToComponent_cb _hidl_cb) override;
+    virtual Return<sp<HGraphicBufferProducer>> getGraphicBufferProducer() override;
 
     virtual Return<sp<IConfigurable>> getConfigurable() override;
 
-// Methods derived from IGraphicBufferProducer
-
-    virtual Return<void> requestBuffer(
-            int32_t slot,
-            requestBuffer_cb _hidl_cb) override;
-
-    virtual Return<int32_t> setMaxDequeuedBufferCount(
-            int32_t maxDequeuedBuffers) override;
-
-    virtual Return<int32_t> setAsyncMode(
-            bool async) override;
-
-    virtual Return<void> dequeueBuffer(
-            uint32_t width,
-            uint32_t height,
-            PixelFormat format,
-            uint32_t usage,
-            bool getFrameTimestamps,
-            dequeueBuffer_cb _hidl_cb) override;
-
-    virtual Return<int32_t> detachBuffer(
-            int32_t slot) override;
-
-    virtual Return<void> detachNextBuffer(
-            detachNextBuffer_cb _hidl_cb) override;
-
-    virtual Return<void> attachBuffer(
-            const AnwBuffer& buffer,
-            attachBuffer_cb _hidl_cb) override;
-
-    virtual Return<void> queueBuffer(
-            int32_t slot,
-            const QueueBufferInput& input,
-            queueBuffer_cb _hidl_cb) override;
-
-    virtual Return<int32_t> cancelBuffer(
-            int32_t slot,
-            const hidl_handle& fence) override;
-
-    virtual Return<void> query(
-            int32_t what,
-            query_cb _hidl_cb) override;
-
     virtual Return<void> connect(
-            const sp<HProducerListener>& listener,
-            int32_t api,
-            bool producerControlledByApp,
+            const sp<IInputSink>& sink,
             connect_cb _hidl_cb) override;
 
-    virtual Return<int32_t> disconnect(
-            int32_t api,
-            DisconnectMode mode) override;
-
-    virtual Return<int32_t> setSidebandStream(
-            const hidl_handle& stream) override;
-
-    virtual Return<void> allocateBuffers(
-            uint32_t width,
-            uint32_t height,
-            PixelFormat format,
-            uint32_t usage) override;
-
-    virtual Return<int32_t> allowAllocation(
-            bool allow) override;
-
-    virtual Return<int32_t> setGenerationNumber(
-            uint32_t generationNumber) override;
-
-    virtual Return<void> getConsumerName(
-            getConsumerName_cb _hidl_cb) override;
-
-    virtual Return<int32_t> setSharedBufferMode(
-            bool sharedBufferMode) override;
-
-    virtual Return<int32_t> setAutoRefresh(
-            bool autoRefresh) override;
-
-    virtual Return<int32_t> setDequeueTimeout(
-            int64_t timeoutNs) override;
-
-    virtual Return<void> getLastQueuedBuffer(
-            getLastQueuedBuffer_cb _hidl_cb) override;
-
-    virtual Return<void> getFrameTimestamps(
-            getFrameTimestamps_cb _hidl_cb) override;
-
-    virtual Return<void> getUniqueId(
-            getUniqueId_cb _hidl_cb) override;
-
-    class ConfigurableImpl;
-
 protected:
+
+    class Interface;
+    class ConfigurableIntf;
+
     sp<ComponentStore> mStore;
-    sp<HGraphicBufferProducer> mBase;
+    sp<HGraphicBufferProducer> mProducer;
     sp<GraphicBufferSource> mSource;
-    std::shared_ptr<ConfigurableImpl> mHelper;
+    std::shared_ptr<Interface> mIntf;
     sp<CachedConfigurable> mConfigurable;
 
     InputSurface(
@@ -187,6 +78,7 @@ protected:
     virtual ~InputSurface() override = default;
 
     friend struct ComponentStore;
+
 };
 
 

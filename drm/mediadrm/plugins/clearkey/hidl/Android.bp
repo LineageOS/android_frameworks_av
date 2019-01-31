@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-cc_binary {
-    name: "android.hardware.drm@1.2-service.clearkey",
+cc_defaults {
+    name: "clearkey_service_defaults",
     vendor: true,
 
     srcs: [
@@ -33,13 +33,11 @@ cc_binary {
         "MemoryFileSystem.cpp",
         "Session.cpp",
         "SessionLibrary.cpp",
-        "service.cpp",
     ],
 
     relative_install_path: "hw",
 
     cflags: ["-Wall", "-Werror"],
-    init_rc: ["android.hardware.drm@1.2-service.clearkey.rc"],
 
     shared_libs: [
         "android.hardware.drm@1.0",
@@ -79,4 +77,17 @@ cc_library_static {
         type: "lite",
     },
     srcs: ["protos/DeviceFiles.proto"],
+}
+cc_binary {
+    name: "android.hardware.drm@1.2-service.clearkey",
+    defaults: ["clearkey_service_defaults"],
+    srcs: ["service.cpp"],
+    init_rc: ["android.hardware.drm@1.2-service.clearkey.rc"],
+}
+cc_binary {
+    name: "android.hardware.drm@1.2-service-lazy.clearkey",
+    overrides: ["android.hardware.drm@1.2-service.clearkey"],
+    defaults: ["clearkey_service_defaults"],
+    srcs: ["serviceLazy.cpp"],
+    init_rc: ["android.hardware.drm@1.2-service-lazy.clearkey.rc"],
 }

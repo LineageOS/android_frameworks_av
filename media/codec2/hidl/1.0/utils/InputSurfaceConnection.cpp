@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,9 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "Codec2-InputSurfaceConnection"
-#include <log/log.h>
+#include <android-base/logging.h>
 
+#include <codec2/hidl/1.0/InputSurfaceConnection.h>
 #include <codec2/hidl/1.0/InputSurfaceConnection.h>
 
 #include <memory>
@@ -65,51 +66,74 @@ public:
 
 } // unnamed namespace
 
+// Derived class of ComponentWrapper for use with
+// GraphicBufferSource::configure().
+//
 struct InputSurfaceConnection::Impl : public ComponentWrapper {
+
     Impl(const sp<GraphicBufferSource>& source,
-         const std::shared_ptr<C2Component>& comp) :
-            mSource(source), mComp(comp), mRemoteComp(),
-            mFrameIndex(0) {
-        std::shared_ptr<C2ComponentInterface> intf = comp->intf();
-        mCompName = intf ? intf->getName() : "";
+         const std::shared_ptr<C2Component>& localComp)
+          : mSource{source}, mLocalComp{localComp}, mSink{}, mFrameIndex{0} {
+        std::shared_ptr<C2ComponentInterface> intf = localComp->intf();
+        mSinkName = intf ? intf->getName() : "";
     }
 
     Impl(const sp<GraphicBufferSource>& source,
-         const sp<IComponent>& comp) :
-            mSource(source), mComp(), mRemoteComp(comp),
-            mFrameIndex(0) {
-        Return<void> transStatus = comp->getName(
-                [this](const hidl_string& name) {
-                    mCompName = name.c_str();
+         const sp<IInputSink>& sink)
+          : mSource{source}, mLocalComp{}, mSink{sink}, mFrameIndex{0} {
+        Return<sp<IConfigurable>> transResult = sink->getConfigurable();
+        if (!transResult.isOk()) {
+            LOG(ERROR) << "Remote sink is dead.";
+            return;
+        }
+        mSinkConfigurable =
+                static_cast<sp<IConfigurable>>(transResult);
+        if (!mSinkConfigurable) {
+            LOG(ERROR) << "Remote sink is not configurable.";
+            mSinkName = "";
+            return;
+        }
+
+        hidl_string name;
+        Return<void> transStatus = mSinkConfigurable->getName(
+                [&name](const hidl_string& n) {
+                    name = n;
                 });
         if (!transStatus.isOk()) {
-            ALOGD("getName -- Cannot obtain remote component name.");
+            LOG(ERROR) << "Remote sink's configurable is dead.";
+            mSinkName = "";
+            return;
         }
+        mSinkName = name.c_str();
     }
 
-    virtual ~Impl() = default;
+    virtual ~Impl() {
+        mSource->stop();
+        mSource->release();
+    }
 
     bool init() {
-        sp<GraphicBufferSource> source = mSource.promote();
-        if (source == nullptr) {
+        if (mSource == nullptr) {
             return false;
         }
-        status_t err = source->initCheck();
+        status_t err = mSource->initCheck();
         if (err != OK) {
-            ALOGD("Impl::init -- GBS init failed: %d", err);
+            LOG(WARNING) << "Impl::init -- GraphicBufferSource init failed: "
+                         << "status = " << err << ".";
             return false;
         }
 
         // TODO: read settings properly from the interface
         C2VideoSizeStreamTuning::input inputSize;
         C2StreamUsageTuning::input usage;
-        c2_status_t c2Status = compQuery({ &inputSize, &usage },
+        c2_status_t c2Status = queryFromSink({ &inputSize, &usage },
                                          {},
                                          C2_MAY_BLOCK,
                                          nullptr);
         if (c2Status != C2_OK) {
-            ALOGD("Impl::init -- cannot query information from "
-                    "the component interface: %s.", asString(c2Status));
+            LOG(WARNING) << "Impl::init -- cannot query information from "
+                            "the component interface: "
+                         << "status = " << asString(c2Status) << ".";
             return false;
         }
 
@@ -122,26 +146,27 @@ struct InputSurfaceConnection::Impl : public ComponentWrapper {
         //         asGrallocUsage();
 
         uint32_t grallocUsage =
-                mCompName.compare(0, 11, "c2.android.") == 0 ?
+                mSinkName.compare(0, 11, "c2.android.") == 0 ?
                 GRALLOC_USAGE_SW_READ_OFTEN :
                 GRALLOC_USAGE_HW_VIDEO_ENCODER;
 
-        err = source->configure(
+        err = mSource->configure(
                 this, dataSpace, kBufferCount,
                 inputSize.width, inputSize.height,
                 grallocUsage);
         if (err != OK) {
-            ALOGD("Impl::init -- GBS configure failed: %d", err);
+            LOG(WARNING) << "Impl::init -- GBS configure failed: "
+                         << "status = " << err << ".";
             return false;
         }
         for (int32_t i = 0; i < kBufferCount; ++i) {
-            if (!source->onInputBufferAdded(i).isOk()) {
-                ALOGD("Impl::init: populating GBS slots failed");
+            if (!mSource->onInputBufferAdded(i).isOk()) {
+                LOG(WARNING) << "Impl::init: failed to populate GBS slots.";
                 return false;
             }
         }
-        if (!source->start().isOk()) {
-            ALOGD("Impl::init -- GBS start failed");
+        if (!mSource->start().isOk()) {
+            LOG(WARNING) << "Impl::init -- GBS failed to start.";
             return false;
         }
         mAllocatorMutex.lock();
@@ -150,7 +175,8 @@ struct InputSurfaceConnection::Impl : public ComponentWrapper {
                 &mAllocator);
         mAllocatorMutex.unlock();
         if (c2err != OK) {
-            ALOGD("Impl::init -- failed to fetch gralloc allocator: %d", c2err);
+            LOG(WARNING) << "Impl::init -- failed to fetch gralloc allocator: "
+                         << "status = " << asString(c2err) << ".";
             return false;
         }
         return true;
@@ -162,7 +188,7 @@ struct InputSurfaceConnection::Impl : public ComponentWrapper {
             const sp<GraphicBuffer>& buffer,
             int64_t timestamp,
             int fenceFd) override {
-        ALOGV("Impl::submitBuffer -- bufferId = %d", bufferId);
+        LOG(VERBOSE) << "Impl::submitBuffer -- bufferId = " << bufferId << ".";
         // TODO: Use fd to construct fence
         (void)fenceFd;
 
@@ -190,9 +216,8 @@ struct InputSurfaceConnection::Impl : public ComponentWrapper {
                 // TODO: fence
                 new Buffer2D(block->share(
                         C2Rect(block->width(), block->height()), ::C2Fence())),
-                [bufferId, src = mSource](C2Buffer* ptr) {
+                [bufferId, source = mSource](C2Buffer* ptr) {
                     delete ptr;
-                    sp<GraphicBufferSource> source = src.promote();
                     if (source != nullptr) {
                         // TODO: fence
                         (void)source->onInputBufferEmptied(bufferId, -1);
@@ -204,12 +229,13 @@ struct InputSurfaceConnection::Impl : public ComponentWrapper {
         std::list<std::unique_ptr<C2Work>> items;
         items.push_back(std::move(work));
 
-        err = compQueue(&items);
+        err = queueToSink(&items);
         return (err == C2_OK) ? OK : UNKNOWN_ERROR;
     }
 
-    virtual status_t submitEos(int32_t /* bufferId */) override {
-        ALOGV("Impl::submitEos");
+    virtual status_t submitEos(int32_t bufferId) override {
+        LOG(VERBOSE) << "Impl::submitEos -- bufferId = " << bufferId << ".";
+        (void)bufferId;
 
         std::unique_ptr<C2Work> work(new C2Work);
         work->input.flags = (C2FrameData::flags_t)0;
@@ -221,11 +247,11 @@ struct InputSurfaceConnection::Impl : public ComponentWrapper {
         std::list<std::unique_ptr<C2Work>> items;
         items.push_back(std::move(work));
 
-        c2_status_t err = compQueue(&items);
+        c2_status_t err = queueToSink(&items);
         return (err == C2_OK) ? OK : UNKNOWN_ERROR;
     }
 
-    void dispatchDataSpaceChanged(
+    virtual void dispatchDataSpaceChanged(
             int32_t dataSpace, int32_t aspects, int32_t pixelFormat) override {
         // TODO
         (void)dataSpace;
@@ -233,36 +259,63 @@ struct InputSurfaceConnection::Impl : public ComponentWrapper {
         (void)pixelFormat;
     }
 
+    // Configurable interface for InputSurfaceConnection::Impl.
+    //
+    // This class is declared as an inner class so that it will have access to
+    // all Impl's members.
+    struct ConfigurableIntf : public ConfigurableC2Intf {
+        sp<Impl> mConnection;
+        ConfigurableIntf(const sp<Impl>& connection)
+              : ConfigurableC2Intf{"input-surface-connection", 0},
+                mConnection{connection} {}
+        virtual c2_status_t config(
+                const std::vector<C2Param*> &params,
+                c2_blocking_t mayBlock,
+                std::vector<std::unique_ptr<C2SettingResult>> *const failures
+                ) override;
+        virtual c2_status_t query(
+                const std::vector<C2Param::Index> &indices,
+                c2_blocking_t mayBlock,
+                std::vector<std::unique_ptr<C2Param>> *const params) const override;
+        virtual c2_status_t querySupportedParams(
+                std::vector<std::shared_ptr<C2ParamDescriptor>> *const params
+                ) const override;
+        virtual c2_status_t querySupportedValues(
+                std::vector<C2FieldSupportedValuesQuery> &fields,
+                c2_blocking_t mayBlock) const override;
+    };
+
 private:
-    c2_status_t compQuery(
+    c2_status_t queryFromSink(
             const std::vector<C2Param*> &stackParams,
             const std::vector<C2Param::Index> &heapParamIndices,
             c2_blocking_t mayBlock,
             std::vector<std::unique_ptr<C2Param>>* const heapParams) {
-        std::shared_ptr<C2Component> comp = mComp.lock();
-        if (comp) {
-            std::shared_ptr<C2ComponentInterface> intf = comp->intf();
+        if (mLocalComp) {
+            std::shared_ptr<C2ComponentInterface> intf = mLocalComp->intf();
             if (intf) {
                 return intf->query_vb(stackParams,
                                       heapParamIndices,
                                       mayBlock,
                                       heapParams);
             } else {
-                ALOGD("compQuery -- component does not have an interface.");
+                LOG(ERROR) << "queryFromSink -- "
+                           << "component does not have an interface.";
                 return C2_BAD_STATE;
             }
         }
-        if (!mRemoteComp) {
-            ALOGD("compQuery -- component no longer exists.");
-            return C2_BAD_STATE;
-        }
+
+        CHECK(mSink) << "-- queryFromSink "
+                     << "-- connection has no sink.";
+        CHECK(mSinkConfigurable) << "-- queryFromSink "
+                                 << "-- sink has no configurable.";
 
         hidl_vec<ParamIndex> indices(
                 stackParams.size() + heapParamIndices.size());
         size_t numIndices = 0;
         for (C2Param* const& stackParam : stackParams) {
             if (!stackParam) {
-                ALOGD("compQuery -- null stack param encountered.");
+                LOG(DEBUG) << "queryFromSink -- null stack param encountered.";
                 continue;
             }
             indices[numIndices++] = static_cast<ParamIndex>(stackParam->index());
@@ -277,22 +330,22 @@ private:
             heapParams->reserve(heapParams->size() + numIndices);
         }
         c2_status_t status;
-        Return<void> transStatus = mRemoteComp->query(
+        Return<void> transStatus = mSinkConfigurable->query(
                 indices,
                 mayBlock == C2_MAY_BLOCK,
                 [&status, &numStackIndices, &stackParams, heapParams](
                         Status s, const Params& p) {
                     status = static_cast<c2_status_t>(s);
                     if (status != C2_OK && status != C2_BAD_INDEX) {
-                        ALOGD("compQuery -- call failed: %s.", asString(status));
+                        LOG(DEBUG) << "queryFromSink -- call failed: "
+                                   << "status = " << asString(status) << ".";
                         return;
                     }
                     std::vector<C2Param*> paramPointers;
-                    c2_status_t parseStatus = parseParamsBlob(&paramPointers, p);
-                    if (parseStatus != C2_OK) {
-                        ALOGD("compQuery -- error while parsing params: %s.",
-                              asString(parseStatus));
-                        status = parseStatus;
+                    if (!parseParamsBlob(&paramPointers, p)) {
+                        LOG(DEBUG) << "queryFromSink -- error while "
+                                   << "parsing params.";
+                        status = C2_CORRUPTED;
                         return;
                     }
                     size_t i = 0;
@@ -302,7 +355,8 @@ private:
                         if (numStackIndices > 0) {
                             --numStackIndices;
                             if (!paramPointer) {
-                                ALOGD("compQuery -- null stack param.");
+                                LOG(DEBUG) << "queryFromSink -- "
+                                              "null stack param.";
                                 ++it;
                                 continue;
                             }
@@ -313,25 +367,27 @@ private:
                             CHECK(i < stackParams.size());
                             if (stackParams[i]->index() !=
                                     paramPointer->index()) {
-                                ALOGD("compQuery -- param skipped. index = %d",
-                                      static_cast<int>(
-                                      stackParams[i]->index()));
+                                LOG(DEBUG) << "queryFromSink -- "
+                                              "param skipped (index = "
+                                           << stackParams[i]->index() << ").";
                                 stackParams[i++]->invalidate();
                                 continue;
                             }
                             if (!stackParams[i++]->updateFrom(*paramPointer)) {
-                                ALOGD("compQuery -- param update failed: "
-                                      "index = %d.",
-                                      static_cast<int>(paramPointer->index()));
+                                LOG(DEBUG) << "queryFromSink -- "
+                                              "param update failed (index = "
+                                           << paramPointer->index() << ").";
                             }
                         } else {
                             if (!paramPointer) {
-                                ALOGD("compQuery -- null heap param.");
+                                LOG(DEBUG) << "queryFromSink -- "
+                                              "null heap param.";
                                 ++it;
                                 continue;
                             }
                             if (!heapParams) {
-                                ALOGD("compQuery -- too many stack params.");
+                                LOG(WARNING) << "queryFromSink -- "
+                                                "too many stack params.";
                                 break;
                             }
                             heapParams->emplace_back(C2Param::Copy(*paramPointer));
@@ -340,94 +396,128 @@ private:
                     }
                 });
         if (!transStatus.isOk()) {
-            ALOGD("compQuery -- transaction failed.");
+            LOG(ERROR) << "queryFromSink -- transaction failed.";
             return C2_CORRUPTED;
         }
         return status;
     }
 
-    c2_status_t compQueue(std::list<std::unique_ptr<C2Work>>* const items) {
-        std::shared_ptr<C2Component> comp = mComp.lock();
-        if (comp) {
-            return comp->queue_nb(items);
+    c2_status_t queueToSink(std::list<std::unique_ptr<C2Work>>* const items) {
+        if (mLocalComp) {
+            return mLocalComp->queue_nb(items);
         }
 
+        CHECK(mSink) << "-- queueToSink "
+                     << "-- connection has no sink.";
+
         WorkBundle workBundle;
-        Status hidlStatus = objcpy(&workBundle, *items, nullptr);
-        if (hidlStatus != Status::OK) {
-            ALOGD("compQueue -- bad input.");
+        if (!objcpy(&workBundle, *items, nullptr)) {
+            LOG(ERROR) << "queueToSink -- bad input.";
             return C2_CORRUPTED;
         }
-        Return<Status> transStatus = mRemoteComp->queue(workBundle);
+        Return<Status> transStatus = mSink->queue(workBundle);
         if (!transStatus.isOk()) {
-            ALOGD("compQueue -- transaction failed.");
+            LOG(ERROR) << "queueToSink -- transaction failed.";
             return C2_CORRUPTED;
         }
         c2_status_t status =
                 static_cast<c2_status_t>(static_cast<Status>(transStatus));
         if (status != C2_OK) {
-            ALOGV("compQueue -- call failed: %s.", asString(status));
+            LOG(DEBUG) << "queueToSink -- call failed: "
+                         << asString(status);
         }
         return status;
     }
 
-    wp<GraphicBufferSource> mSource;
-    std::weak_ptr<C2Component> mComp;
-    sp<IComponent> mRemoteComp;
-    std::string mCompName;
+    sp<GraphicBufferSource> mSource;
+    std::shared_ptr<C2Component> mLocalComp;
+    sp<IInputSink> mSink;
+    sp<IConfigurable> mSinkConfigurable;
+    std::string mSinkName;
 
     // Needed for ComponentWrapper implementation
     std::mutex mAllocatorMutex;
     std::shared_ptr<C2Allocator> mAllocator;
     std::atomic_uint64_t mFrameIndex;
+
 };
 
 InputSurfaceConnection::InputSurfaceConnection(
         const sp<GraphicBufferSource>& source,
-        const std::shared_ptr<C2Component>& comp) :
-    mSource(source),
-    mImpl(new Impl(source, comp)) {
+        const std::shared_ptr<C2Component>& comp,
+        const sp<ComponentStore>& store)
+      : mImpl{new Impl(source, comp)},
+        mConfigurable{new CachedConfigurable(
+            std::make_unique<Impl::ConfigurableIntf>(mImpl))} {
+    mConfigurable->init(store.get());
 }
 
 InputSurfaceConnection::InputSurfaceConnection(
         const sp<GraphicBufferSource>& source,
-        const sp<IComponent>& comp) :
-    mSource(source),
-    mImpl(new Impl(source, comp)) {
-}
-
-InputSurfaceConnection::~InputSurfaceConnection() {
-    if (mSource) {
-        (void)mSource->stop();
-        (void)mSource->release();
-        mSource.clear();
-    }
-    mImpl.clear();
-}
-
-bool InputSurfaceConnection::init() {
-    mMutex.lock();
-    sp<Impl> impl = mImpl;
-    mMutex.unlock();
-
-    if (!impl) {
-        return false;
-    }
-    return impl->init();
+        const sp<IInputSink>& sink,
+        const sp<ComponentStore>& store)
+      : mImpl{new Impl(source, sink)},
+        mConfigurable{new CachedConfigurable(
+            std::make_unique<Impl::ConfigurableIntf>(mImpl))} {
+    mConfigurable->init(store.get());
 }
 
 Return<Status> InputSurfaceConnection::disconnect() {
-    ALOGV("disconnect");
-    mMutex.lock();
-    if (mSource) {
-        (void)mSource->stop();
-        (void)mSource->release();
-        mSource.clear();
-    }
-    mImpl.clear();
-    mMutex.unlock();
-    ALOGV("disconnected");
+    std::lock_guard<std::mutex> lock(mImplMutex);
+    mImpl = nullptr;
     return Status::OK;
+}
+
+InputSurfaceConnection::~InputSurfaceConnection() {
+    mImpl = nullptr;
+}
+
+bool InputSurfaceConnection::init() {
+    std::lock_guard<std::mutex> lock(mImplMutex);
+    return mImpl->init();
+}
+
+Return<sp<IConfigurable>> InputSurfaceConnection::getConfigurable() {
+    return mConfigurable;
+}
+
+// Configurable interface for InputSurfaceConnection::Impl
+c2_status_t InputSurfaceConnection::Impl::ConfigurableIntf::config(
+        const std::vector<C2Param*> &params,
+        c2_blocking_t mayBlock,
+        std::vector<std::unique_ptr<C2SettingResult>> *const failures) {
+    // TODO: implement
+    (void)params;
+    (void)mayBlock;
+    (void)failures;
+    return C2_OK;
+}
+
+c2_status_t InputSurfaceConnection::Impl::ConfigurableIntf::query(
+        const std::vector<C2Param::Index> &indices,
+        c2_blocking_t mayBlock,
+        std::vector<std::unique_ptr<C2Param>> *const params) const {
+    // TODO: implement
+    (void)indices;
+    (void)mayBlock;
+    (void)params;
+    return C2_OK;
+}
+
+c2_status_t InputSurfaceConnection::Impl::ConfigurableIntf::querySupportedParams(
+        std::vector<std::shared_ptr<C2ParamDescriptor>> *const params) const {
+    // TODO: implement
+    (void)params;
+    return C2_OK;
+}
+
+c2_status_t InputSurfaceConnection::Impl::ConfigurableIntf::querySupportedValues(
+        std::vector<C2FieldSupportedValuesQuery> &fields,
+        c2_blocking_t mayBlock) const {
+    // TODO: implement
+    (void)fields;
+    (void)mayBlock;
+    return C2_OK;
 }
 
 }  // namespace utils

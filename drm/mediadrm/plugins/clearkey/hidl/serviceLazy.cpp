@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Android Open Source Project
+ * Copyright 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ using android::hardware::drm::V1_2::ICryptoFactory;
 using android::hardware::drm::V1_2::IDrmFactory;
 using android::hardware::drm::V1_2::clearkey::CryptoFactory;
 using android::hardware::drm::V1_2::clearkey::DrmFactory;
+using android::hardware::LazyServiceRegistrar;
 
 int main(int /* argc */, char** /* argv */) {
     sp<IDrmFactory> drmFactory = new DrmFactory;
@@ -37,9 +38,12 @@ int main(int /* argc */, char** /* argv */) {
     configureRpcThreadpool(8, true /* callerWillJoin */);
 
     // Setup hwbinder service
-    CHECK_EQ(drmFactory->registerAsService("clearkey"), android::NO_ERROR)
+    LazyServiceRegistrar serviceRegistrar;
+
+    // Setup hwbinder service
+    CHECK_EQ(serviceRegistrar.registerService(drmFactory, "clearkey"), android::NO_ERROR)
         << "Failed to register Clearkey Factory HAL";
-    CHECK_EQ(cryptoFactory->registerAsService("clearkey"), android::NO_ERROR)
+    CHECK_EQ(serviceRegistrar.registerService(cryptoFactory, "clearkey"), android::NO_ERROR)
         << "Failed to register Clearkey Crypto  HAL";
 
     joinRpcThreadpool();

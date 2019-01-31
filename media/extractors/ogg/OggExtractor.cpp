@@ -983,7 +983,7 @@ void MyOggExtractor::buildTableOfContents() {
         size_t denom = numerator - kMaxNumTOCEntries;
 
         size_t accum = 0;
-        for (ssize_t i = mTableOfContents.size() - 1; i >= 0; --i) {
+        for (ssize_t i = mTableOfContents.size(); i > 0; --i) {
             accum += denom;
             if (accum >= numerator) {
                 mTableOfContents.removeAt(i);
