@@ -552,7 +552,7 @@ public:
 };
 
 IMPLEMENT_META_INTERFACE(OMX, "android.hardware.IOMX");
-IMPLEMENT_HYBRID_META_INTERFACE(OMXNode, IOmxNode, "android.hardware.IOMXNode");
+IMPLEMENT_HYBRID_META_INTERFACE(OMXNode, "android.hardware.IOMXNode");
 
 ////////////////////////////////////////////////////////////////////////////////
 

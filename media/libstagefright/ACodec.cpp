@@ -6539,8 +6539,10 @@ void ACodec::UninitializedState::stateEntered() {
 
     if (mDeathNotifier != NULL) {
         if (mCodec->mOMXNode != NULL) {
-            auto tOmxNode = mCodec->mOMXNode->getHalInterface();
-            tOmxNode->unlinkToDeath(mDeathNotifier);
+            auto tOmxNode = mCodec->mOMXNode->getHalInterface<IOmxNode>();
+            if (tOmxNode) {
+                tOmxNode->unlinkToDeath(mDeathNotifier);
+            }
         }
         mDeathNotifier.clear();
     }
@@ -6668,8 +6670,8 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
     }
 
     mDeathNotifier = new DeathNotifier(notify);
-    auto tOmxNode = omxNode->getHalInterface();
-    if (!tOmxNode->linkToDeath(mDeathNotifier, 0)) {
+    auto tOmxNode = omxNode->getHalInterface<IOmxNode>();
+    if (tOmxNode && !tOmxNode->linkToDeath(mDeathNotifier, 0)) {
         mDeathNotifier.clear();
     }
 

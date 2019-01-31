@@ -1803,7 +1803,8 @@ void forEachBlock(const std::list<std::unique_ptr<C2Work>>& workList,
 }
 
 sp<HGraphicBufferProducer> getHgbp(const sp<IGraphicBufferProducer>& igbp) {
-    sp<HGraphicBufferProducer> hgbp = igbp->getHalInterface();
+    sp<HGraphicBufferProducer> hgbp =
+            igbp->getHalInterface<HGraphicBufferProducer>();
     return hgbp ? hgbp :
             new TWGraphicBufferProducer<HGraphicBufferProducer>(igbp);
 }
