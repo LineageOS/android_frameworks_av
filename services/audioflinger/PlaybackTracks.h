@@ -119,6 +119,15 @@ public:
             void    setHapticPlaybackEnabled(bool hapticPlaybackEnabled) {
                 mHapticPlaybackEnabled = hapticPlaybackEnabled;
             }
+            /** Return at what intensity to play haptics, used in mixer. */
+            AudioMixer::haptic_intensity_t getHapticIntensity() const { return mHapticIntensity; }
+            /** Set intensity of haptic playback, should be set after querying vibrator service. */
+            void    setHapticIntensity(AudioMixer::haptic_intensity_t hapticIntensity) {
+                if (AudioMixer::isValidHapticIntensity(hapticIntensity)) {
+                    mHapticIntensity = hapticIntensity;
+                }
+            }
+            sp<os::ExternalVibration> getExternalVibration() const { return mExternalVibration; }
 
 protected:
     // for numerous
@@ -197,6 +206,18 @@ protected:
     sp<media::VolumeHandler>  mVolumeHandler; // handles multiple VolumeShaper configs and operations
 
     bool                mHapticPlaybackEnabled = false; // indicates haptic playback enabled or not
+    // intensity to play haptic data
+    AudioMixer::haptic_intensity_t mHapticIntensity = AudioMixer::HAPTIC_SCALE_NONE;
+    class AudioVibrationController : public os::BnExternalVibrationController {
+    public:
+        explicit AudioVibrationController(Track* track) : mTrack(track) {}
+        binder::Status mute(/*out*/ bool *ret) override;
+        binder::Status unmute(/*out*/ bool *ret) override;
+    private:
+        Track* const mTrack;
+    };
+    sp<AudioVibrationController> mAudioVibrationController;
+    sp<os::ExternalVibration>    mExternalVibration;
 
 private:
     // The following fields are only for fast tracks, and should be in a subclass

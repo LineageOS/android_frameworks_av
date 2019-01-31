@@ -27,6 +27,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
+#include <android/os/IExternalVibratorService.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <utils/Log.h>
@@ -120,6 +121,21 @@ static void sMediaLogInit()
     if (sMediaLogServiceAsBinder != 0) {
         sMediaLogService = interface_cast<IMediaLogService>(sMediaLogServiceAsBinder);
     }
+}
+
+// Keep a strong reference to external vibrator service
+static sp<os::IExternalVibratorService> sExternalVibratorService;
+
+static sp<os::IExternalVibratorService> getExternalVibratorService() {
+    if (sExternalVibratorService == 0) {
+        sp <IBinder> binder = defaultServiceManager()->getService(
+            String16("external_vibrator_service"));
+        if (binder != 0) {
+            sExternalVibratorService =
+                interface_cast<os::IExternalVibratorService>(binder);
+        }
+    }
+    return sExternalVibratorService;
 }
 
 // ----------------------------------------------------------------------------
@@ -316,6 +332,27 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
     ALOGV("%s done status %d portId %d", __FUNCTION__, ret, portId);
 
     return ret;
+}
+
+/* static */
+int AudioFlinger::onExternalVibrationStart(const sp<os::ExternalVibration>& externalVibration) {
+    sp<os::IExternalVibratorService> evs = getExternalVibratorService();
+    if (evs != 0) {
+        int32_t ret;
+        binder::Status status = evs->onExternalVibrationStart(*externalVibration, &ret);
+        if (status.isOk()) {
+            return ret;
+        }
+    }
+    return AudioMixer::HAPTIC_SCALE_NONE;
+}
+
+/* static */
+void AudioFlinger::onExternalVibrationStop(const sp<os::ExternalVibration>& externalVibration) {
+    sp<os::IExternalVibratorService> evs = getExternalVibratorService();
+    if (evs != 0) {
+        evs->onExternalVibrationStop(*externalVibration);
+    }
 }
 
 static const char * const audio_interfaces[] = {

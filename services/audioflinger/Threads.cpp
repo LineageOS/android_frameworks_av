@@ -2358,15 +2358,23 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
                     track->sharedBuffer() != 0 ? Track::FS_FILLED : Track::FS_FILLING;
         }
 
-        // Disable all haptic playback for all other active tracks when haptic playback is supported
-        // and the track contains haptic channels. Enable haptic playback for current track.
-        // TODO: Request actual haptic playback status from vibrator service
         if ((track->channelMask() & AUDIO_CHANNEL_HAPTIC_ALL) != AUDIO_CHANNEL_NONE
                 && mHapticChannelMask != AUDIO_CHANNEL_NONE) {
-            for (auto &t : mActiveTracks) {
-                t->setHapticPlaybackEnabled(false);
+            // Unlock due to VibratorService will lock for this call and will
+            // call Tracks.mute/unmute which also require thread's lock.
+            mLock.unlock();
+            const int intensity = AudioFlinger::onExternalVibrationStart(
+                    track->getExternalVibration());
+            mLock.lock();
+            // Haptic playback should be enabled by vibrator service.
+            if (track->getHapticPlaybackEnabled()) {
+                // Disable haptic playback of all active track to ensure only
+                // one track playing haptic if current track should play haptic.
+                for (const auto &t : mActiveTracks) {
+                    t->setHapticPlaybackEnabled(false);
+                }
             }
-            track->setHapticPlaybackEnabled(true);
+            track->setHapticIntensity(intensity);
         }
 
         track->mResetDone = false;
@@ -3760,7 +3768,6 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 // removeTracks_l() must be called with ThreadBase::mLock held
 void AudioFlinger::PlaybackThread::removeTracks_l(const Vector< sp<Track> >& tracksToRemove)
 {
-    bool enabledHapticTracksRemoved = false;
     for (const auto& track : tracksToRemove) {
         mActiveTracks.remove(track);
         ALOGV("%s(%d): removing track on session %d", __func__, track->id(), track->sessionId());
@@ -3782,17 +3789,13 @@ void AudioFlinger::PlaybackThread::removeTracks_l(const Vector< sp<Track> >& tra
             // remove from our tracks vector
             removeTrack_l(track);
         }
-        enabledHapticTracksRemoved |= track->getHapticPlaybackEnabled();
-    }
-    // If the thread supports haptic playback and the track playing haptic data was removed,
-    // enable haptic playback on the first active track that contains haptic channels.
-    // TODO: Query vibrator service to know which track should enable haptic playback.
-    if (enabledHapticTracksRemoved && mHapticChannelMask != AUDIO_CHANNEL_NONE) {
-        for (auto &t : mActiveTracks) {
-            if (t->channelMask() & AUDIO_CHANNEL_HAPTIC_ALL) {
-                t->setHapticPlaybackEnabled(true);
-                break;
-            }
+        if ((track->channelMask() & AUDIO_CHANNEL_HAPTIC_ALL) != AUDIO_CHANNEL_NONE
+                && mHapticChannelCount > 0) {
+            mLock.unlock();
+            // Unlock due to VibratorService will lock for this call and will
+            // call Tracks.mute/unmute which also require thread's lock.
+            AudioFlinger::onExternalVibrationStop(track->getExternalVibration());
+            mLock.lock();
         }
     }
 }
@@ -4615,6 +4618,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     fastTrack->mChannelMask = track->mChannelMask;
                     fastTrack->mFormat = track->mFormat;
                     fastTrack->mHapticPlaybackEnabled = track->getHapticPlaybackEnabled();
+                    fastTrack->mHapticIntensity = track->getHapticIntensity();
                     fastTrack->mGeneration++;
                     state->mTrackMask |= 1 << j;
                     didModify = true;
@@ -4937,6 +4941,10 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 trackId,
                 AudioMixer::TRACK,
                 AudioMixer::HAPTIC_ENABLED, (void *)(uintptr_t)track->getHapticPlaybackEnabled());
+            mAudioMixer->setParameter(
+                trackId,
+                AudioMixer::TRACK,
+                AudioMixer::HAPTIC_INTENSITY, (void *)(uintptr_t)track->getHapticIntensity());
 
             // reset retry count
             track->mRetryCount = kMaxTrackRetries;

@@ -295,6 +295,8 @@ void FastMixer::onStateChange()
                         (void *)(uintptr_t)mSinkChannelMask);
                 mMixer->setParameter(name, AudioMixer::TRACK, AudioMixer::HAPTIC_ENABLED,
                         (void *)(uintptr_t)fastTrack->mHapticPlaybackEnabled);
+                mMixer->setParameter(name, AudioMixer::TRACK, AudioMixer::HAPTIC_INTENSITY,
+                        (void *)(uintptr_t)fastTrack->mHapticIntensity);
                 mMixer->enable(name);
             }
             mGenerations[i] = fastTrack->mGeneration;
@@ -333,6 +335,8 @@ void FastMixer::onStateChange()
                             (void *)(uintptr_t)mSinkChannelMask);
                     mMixer->setParameter(name, AudioMixer::TRACK, AudioMixer::HAPTIC_ENABLED,
                             (void *)(uintptr_t)fastTrack->mHapticPlaybackEnabled);
+                    mMixer->setParameter(name, AudioMixer::TRACK, AudioMixer::HAPTIC_INTENSITY,
+                            (void *)(uintptr_t)fastTrack->mHapticIntensity);
                     // already enabled
                 }
                 mGenerations[i] = fastTrack->mGeneration;
