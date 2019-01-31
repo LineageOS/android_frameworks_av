@@ -129,7 +129,7 @@ void DeviceVector::refreshTypes()
 ssize_t DeviceVector::indexOf(const sp<DeviceDescriptor>& item) const
 {
     for (size_t i = 0; i < size(); i++) {
-        if (item->equals(itemAt(i))) {
+        if (itemAt(i)->equals(item)) { // item may be null sp<>, i.e. AUDIO_DEVICE_NONE
             return i;
         }
     }

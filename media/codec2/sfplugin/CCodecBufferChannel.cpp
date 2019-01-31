@@ -1519,6 +1519,11 @@ void CCodecBufferChannel::ReorderStash::clear() {
     mKey = C2Config::ORDINAL;
 }
 
+void CCodecBufferChannel::ReorderStash::flush() {
+    mPending.clear();
+    mStash.clear();
+}
+
 void CCodecBufferChannel::ReorderStash::setDepth(uint32_t depth) {
     mPending.splice(mPending.end(), mStash);
     mDepth = depth;
@@ -2526,6 +2531,7 @@ void CCodecBufferChannel::flush(const std::list<std::unique_ptr<C2Work>> &flushe
         Mutexed<std::unique_ptr<OutputBuffers>>::Locked buffers(mOutputBuffers);
         (*buffers)->flush(flushedWork);
     }
+    mReorderStash.lock()->flush();
 }
 
 void CCodecBufferChannel::onWorkDone(
