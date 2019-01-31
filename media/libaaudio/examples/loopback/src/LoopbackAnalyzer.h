@@ -310,7 +310,7 @@ public:
     }
 
     // Write SHORT data from the first channel.
-    int write(int16_t *inputData, int inputChannelCount, int numFrames) {
+    int32_t write(int16_t *inputData, int32_t inputChannelCount, int32_t numFrames) {
         // stop at end of buffer
         if ((mFrameCounter + numFrames) > mMaxFrames) {
             numFrames = mMaxFrames - mFrameCounter;
@@ -322,7 +322,7 @@ public:
     }
 
     // Write FLOAT data from the first channel.
-    int write(float *inputData, int inputChannelCount, int numFrames) {
+    int32_t write(float *inputData, int32_t inputChannelCount, int32_t numFrames) {
         // stop at end of buffer
         if ((mFrameCounter + numFrames) > mMaxFrames) {
             numFrames = mMaxFrames - mFrameCounter;
@@ -333,7 +333,7 @@ public:
         return numFrames;
     }
 
-    int size() {
+    int32_t size() {
         return mFrameCounter;
     }
 
@@ -443,9 +443,14 @@ public:
     virtual ~LoopbackProcessor() = default;
 
 
+    enum process_result {
+        PROCESS_RESULT_OK,
+        PROCESS_RESULT_GLITCH
+    };
+
     virtual void reset() {}
 
-    virtual void process(float *inputData, int inputChannelCount,
+    virtual process_result process(float *inputData, int inputChannelCount,
                  float *outputData, int outputChannelCount,
                  int numFrames) = 0;
 
@@ -639,7 +644,7 @@ public:
         return getSampleRate() / 8;
     }
 
-    void process(float *inputData, int inputChannelCount,
+    process_result process(float *inputData, int inputChannelCount,
                  float *outputData, int outputChannelCount,
                  int numFrames) override {
         int channelsValid = std::min(inputChannelCount, outputChannelCount);
@@ -750,6 +755,7 @@ public:
 
         mState = nextState;
         mLoopCounter++;
+        return PROCESS_RESULT_OK;
     }
 
     int save(const char *fileName) override {
@@ -896,9 +902,10 @@ public:
      * @param inputData contains microphone data with sine signal feedback
      * @param outputData contains the reference sine wave
      */
-    void process(float *inputData, int inputChannelCount,
+    process_result process(float *inputData, int inputChannelCount,
                  float *outputData, int outputChannelCount,
                  int numFrames) override {
+        process_result result = PROCESS_RESULT_OK;
         mProcessCount++;
 
         float peak = measurePeakAmplitude(inputData, inputChannelCount, numFrames);
@@ -978,6 +985,7 @@ public:
                     mMaxGlitchDelta = std::max(mMaxGlitchDelta, absDiff);
                     if (absDiff > mTolerance) {
                         mGlitchCount++;
+                        result = PROCESS_RESULT_GLITCH;
                         //printf("%5d: Got a glitch # %d, predicted = %f, actual = %f\n",
                         //       mFrameCounter, mGlitchCount, predicted, sample);
                         mState = STATE_IMMUNE;
@@ -1018,6 +1026,7 @@ public:
 
             mFrameCounter++;
         }
+        return result;
     }
 
     void resetAccumulator() {
