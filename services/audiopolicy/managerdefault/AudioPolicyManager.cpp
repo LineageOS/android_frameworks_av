@@ -5062,7 +5062,7 @@ sp<DeviceDescriptor> AudioPolicyManager::getNewInputDevice(
     }
 
     // If we are not in call and no client is active on this input, this methods returns
-    // AUDIO_DEVICE_NONE, causing the patch on the input stream to be released.
+    // a null sp<>, causing the patch on the input stream to be released.
     audio_attributes_t attributes = inputDesc->getHighestPriorityAttributes();
     if (attributes.source == AUDIO_SOURCE_DEFAULT && isInCall()) {
         attributes.source = AUDIO_SOURCE_VOICE_COMMUNICATION;
