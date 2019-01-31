@@ -168,7 +168,7 @@ static DrmPlugin::OfflineLicenseState toOfflineLicenseState(
     case OfflineLicenseState::USABLE:
         return DrmPlugin::kOfflineLicenseStateUsable;
     case OfflineLicenseState::INACTIVE:
-        return DrmPlugin::kOfflineLicenseStateInactive;
+        return DrmPlugin::kOfflineLicenseStateReleased;
     default:
         return DrmPlugin::kOfflineLicenseStateUnknown;
     }
