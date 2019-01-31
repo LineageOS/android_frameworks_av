@@ -54,6 +54,7 @@ class CharacterEncodingDetector {
         StringArray     mValues;
 
         UConverter*     mUtf8Conv;
+        const char*     mLocaleEnc;
 };
 
 
