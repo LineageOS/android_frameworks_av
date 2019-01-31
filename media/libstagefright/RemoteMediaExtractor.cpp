@@ -49,7 +49,7 @@ RemoteMediaExtractor::RemoteMediaExtractor(
 
     mAnalyticsItem = nullptr;
     if (MEDIA_LOG) {
-        mAnalyticsItem = new MediaAnalyticsItem(kKeyExtractor);
+        mAnalyticsItem = MediaAnalyticsItem::create(kKeyExtractor);
 
         // track the container format (mpeg, aac, wvm, etc)
         size_t ntracks = extractor->countTracks();

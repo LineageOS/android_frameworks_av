@@ -82,16 +82,19 @@ class MediaAnalyticsItem {
             PROTO_LAST = PROTO_V1,
         };
 
+    private:
+        // use the ::create() method instead
+        MediaAnalyticsItem();
+        MediaAnalyticsItem(Key);
+        MediaAnalyticsItem(const MediaAnalyticsItem&);
+        MediaAnalyticsItem &operator=(const MediaAnalyticsItem&);
 
     public:
 
-        // so clients do not need to know size details
         static MediaAnalyticsItem* create(Key key);
         static MediaAnalyticsItem* create();
 
         // access functions for the class
-        MediaAnalyticsItem();
-        MediaAnalyticsItem(Key);
         ~MediaAnalyticsItem();
 
         // SessionID ties multiple submissions for same key together

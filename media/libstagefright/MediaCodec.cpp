@@ -550,7 +550,7 @@ MediaCodec::~MediaCodec() {
 
 void MediaCodec::initAnalyticsItem() {
     if (mAnalyticsItem == NULL) {
-        mAnalyticsItem = new MediaAnalyticsItem(kCodecKeyName);
+        mAnalyticsItem = MediaAnalyticsItem::create(kCodecKeyName);
     }
 
     mLatencyHist.setup(kLatencyHistBuckets, kLatencyHistWidth, kLatencyHistFloor);
