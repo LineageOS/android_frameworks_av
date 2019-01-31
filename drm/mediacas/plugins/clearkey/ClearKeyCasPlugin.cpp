@@ -65,20 +65,7 @@ status_t ClearKeyCasFactory::createPlugin(
     *plugin = new ClearKeyCasPlugin(appData, callback);
     return OK;
 }
-
-status_t ClearKeyCasFactory::createPlugin(
-        int32_t CA_system_id,
-        void *appData,
-        CasPluginCallbackExt callback,
-        CasPlugin **plugin) {
-    if (!isSystemIdSupported(CA_system_id)) {
-        return BAD_VALUE;
-    }
-
-    *plugin = new ClearKeyCasPlugin(appData, callback);
-    return OK;
-}
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 bool ClearKeyDescramblerFactory::isSystemIdSupported(
         int32_t CA_system_id) const {
     return CA_system_id == sClearKeySystemId;
@@ -98,12 +85,6 @@ status_t ClearKeyDescramblerFactory::createPlugin(
 ClearKeyCasPlugin::ClearKeyCasPlugin(
         void *appData, CasPluginCallback callback)
     : mCallback(callback), mAppData(appData) {
-    ALOGV("CTOR");
-}
-
-ClearKeyCasPlugin::ClearKeyCasPlugin(
-        void *appData, CasPluginCallbackExt callback)
-    : mCallbackExt(callback), mAppData(appData) {
     ALOGV("CTOR");
 }
 
@@ -186,27 +167,8 @@ status_t ClearKeyCasPlugin::sendEvent(
     // Echo the received event to the callback.
     // Clear key plugin doesn't use any event, echo'ing for testing only.
     if (mCallback != NULL) {
-        mCallback((void*)mAppData, event, arg, (uint8_t*)eventData.data(),
-                    eventData.size());
-    } else if (mCallbackExt != NULL) {
-        mCallbackExt((void*)mAppData, event, arg, (uint8_t*)eventData.data(),
-                    eventData.size(), NULL);
+        mCallback((void*)mAppData, event, arg, (uint8_t*)eventData.data(), eventData.size());
     }
-    return OK;
-}
-
-status_t ClearKeyCasPlugin::sendSessionEvent(
-        const CasSessionId &sessionId, int32_t event,
-        int arg, const CasData &eventData) {
-    ALOGV("sendSessionEvent: sessionId=%s, event=%d, arg=%d",
-          sessionIdToString(sessionId).string(), event, arg);
-    // Echo the received event to the callback.
-    // Clear key plugin doesn't use any event, echo'ing for testing only.
-    if (mCallbackExt != NULL) {
-        mCallbackExt((void*)mAppData, event, arg, (uint8_t*)eventData.data(),
-                    eventData.size(), &sessionId);
-    }
-
     return OK;
 }
 
