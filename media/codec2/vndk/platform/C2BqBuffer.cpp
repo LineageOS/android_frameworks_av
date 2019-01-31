@@ -207,12 +207,16 @@ private:
         // dequeueBuffer returns flag.
         if (!transStatus.isOk() || status < android::OK) {
             ALOGD("cannot dequeue buffer %d", status);
-            if (transStatus.isOk() && status == android::INVALID_OPERATION) {
-              // Too many buffer dequeued. retrying after some time is required.
-              return C2_TIMED_OUT;
-            } else {
-              return C2_BAD_VALUE;
+            if (transStatus.isOk()) {
+                if (status == android::INVALID_OPERATION ||
+                    status == android::TIMED_OUT ||
+                    status == android::WOULD_BLOCK) {
+                    // Dequeue buffer is blocked temporarily. Retrying is
+                    // required.
+                    return C2_BLOCKING;
+                }
             }
+            return C2_BAD_VALUE;
         }
         ALOGV("dequeued a buffer successfully");
         native_handle_t* nh = nullptr;
@@ -227,7 +231,7 @@ private:
             if (status == -ETIME) {
                 // fence is not signalled yet.
                 (void)mProducer->cancelBuffer(slot, fenceHandle).isOk();
-                return C2_TIMED_OUT;
+                return C2_BLOCKING;
             }
             if (status != android::NO_ERROR) {
                 ALOGD("buffer fence wait error %d", status);
@@ -353,14 +357,14 @@ public:
                 return C2_OK;
             }
             c2_status_t status = fetchFromIgbp_l(width, height, format, usage, block);
-            if (status == C2_TIMED_OUT) {
+            if (status == C2_BLOCKING) {
                 lock.unlock();
                 ::usleep(kMaxIgbpRetryDelayUs);
                 continue;
             }
             return status;
         }
-        return C2_TIMED_OUT;
+        return C2_BLOCKING;
     }
 
     void setRenderCallback(const OnRenderCallback &renderCallback) {

@@ -151,7 +151,7 @@ public:
         c2_status_t status;
         do {
             status = mBase->fetchLinearBlock(capacity, usage, block);
-        } while (status == C2_TIMED_OUT);
+        } while (status == C2_BLOCKING);
         return status;
     }
 
@@ -162,7 +162,7 @@ public:
         c2_status_t status;
         do {
             status = mBase->fetchCircularBlock(capacity, usage, block);
-        } while (status == C2_TIMED_OUT);
+        } while (status == C2_BLOCKING);
         return status;
     }
 
@@ -174,7 +174,7 @@ public:
         do {
             status = mBase->fetchGraphicBlock(width, height, format, usage,
                                               block);
-        } while (status == C2_TIMED_OUT);
+        } while (status == C2_BLOCKING);
         return status;
     }
 
