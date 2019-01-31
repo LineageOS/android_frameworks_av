@@ -252,16 +252,9 @@ protected:
 struct Codec2Client::Listener {
 
     // This is called when the component produces some output.
-    //
-    // numDiscardedInputBuffers is the number of input buffers contained in
-    // workItems that have just become unused. Note that workItems may contain
-    // more input buffers than numDiscardedInputBuffers because buffers that
-    // have been previously reported by onInputBufferDone() are not counted
-    // towards numDiscardedInputBuffers, but may still show up in workItems.
     virtual void onWorkDone(
             const std::weak_ptr<Component>& comp,
-            std::list<std::unique_ptr<C2Work>>& workItems,
-            size_t numDiscardedInputBuffers) = 0;
+            std::list<std::unique_ptr<C2Work>>& workItems) = 0;
 
     // This is called when the component goes into a tripped state.
     virtual void onTripped(
@@ -283,7 +276,7 @@ struct Codec2Client::Listener {
     // Input buffers that have been returned by onWorkDone() or flush() will not
     // trigger a call to this function.
     virtual void onInputBufferDone(
-            const std::shared_ptr<C2Buffer>& buffer) = 0;
+            uint64_t frameIndex, size_t arrayIndex) = 0;
 
     // This is called when the component becomes aware of a frame being
     // rendered.
@@ -385,24 +378,6 @@ struct Codec2Client::Component : public Codec2Client::Configurable {
 protected:
     sp<Base> mBase;
 
-    // Mutex for mInputBuffers and mInputBufferCount.
-    mutable std::mutex mInputBuffersMutex;
-
-    // Map: frameIndex -> vector of bufferIndices
-    //
-    // mInputBuffers[frameIndex][bufferIndex] may be null if the buffer in that
-    // slot has been freed.
-    mutable std::map<uint64_t, std::vector<std::shared_ptr<C2Buffer>>>
-            mInputBuffers;
-
-    // Map: frameIndex -> number of bufferIndices that have not been freed
-    //
-    // mInputBufferCount[frameIndex] keeps track of the number of non-null
-    // elements in mInputBuffers[frameIndex]. When mInputBufferCount[frameIndex]
-    // decreases to 0, frameIndex can be removed from both mInputBuffers and
-    // mInputBufferCount.
-    mutable std::map<uint64_t, size_t> mInputBufferCount;
-
     ::android::hardware::media::c2::V1_0::utils::DefaultBufferPoolSender
             mBufferPoolSender;
 
@@ -419,10 +394,7 @@ protected:
     friend struct Codec2Client;
 
     struct HidlListener;
-    // Return the number of input buffers that should be discarded.
-    size_t handleOnWorkDone(const std::list<std::unique_ptr<C2Work>> &workItems);
-    // Remove an input buffer from mInputBuffers and return it.
-    std::shared_ptr<C2Buffer> freeInputBuffer(uint64_t frameIndex, size_t bufferIndex);
+    void handleOnWorkDone(const std::list<std::unique_ptr<C2Work>> &workItems);
 
 };
 

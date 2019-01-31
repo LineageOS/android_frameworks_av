@@ -52,33 +52,26 @@
 
 namespace android {
 
-class C2SoftAacDec::IntfImpl : public C2InterfaceHelper {
+constexpr char COMPONENT_NAME[] = "c2.android.aac.decoder";
+
+class C2SoftAacDec::IntfImpl : public SimpleInterface<void>::BaseParams {
 public:
     explicit IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helper)
-        : C2InterfaceHelper(helper) {
-
-        setDerivedInstance(this);
-
-        addParameter(
-                DefineParam(mInputFormat, C2_NAME_INPUT_STREAM_FORMAT_SETTING)
-                .withConstValue(new C2StreamFormatConfig::input(0u, C2FormatCompressed))
-                .build());
-
-        addParameter(
-                DefineParam(mOutputFormat, C2_NAME_OUTPUT_STREAM_FORMAT_SETTING)
-                .withConstValue(new C2StreamFormatConfig::output(0u, C2FormatAudio))
-                .build());
+        : SimpleInterface<void>::BaseParams(
+                helper,
+                COMPONENT_NAME,
+                C2Component::KIND_DECODER,
+                C2Component::DOMAIN_AUDIO,
+                MEDIA_MIMETYPE_AUDIO_AAC) {
+        noPrivateBuffers();
+        noInputReferences();
+        noOutputReferences();
+        noInputLatency();
+        noTimeStretch();
 
         addParameter(
-                DefineParam(mInputMediaType, C2_NAME_INPUT_PORT_MIME_SETTING)
-                .withConstValue(AllocSharedString<C2PortMimeConfig::input>(
-                        MEDIA_MIMETYPE_AUDIO_AAC))
-                .build());
-
-        addParameter(
-                DefineParam(mOutputMediaType, C2_NAME_OUTPUT_PORT_MIME_SETTING)
-                .withConstValue(AllocSharedString<C2PortMimeConfig::output>(
-                        MEDIA_MIMETYPE_AUDIO_RAW))
+                DefineParam(mActualOutputDelay, C2_PARAMKEY_OUTPUT_DELAY)
+                .withConstValue(new C2PortActualDelayTuning::output(2u))
                 .build());
 
         addParameter(
@@ -230,8 +223,6 @@ private:
     std::shared_ptr<C2StreamDrcEffectTypeTuning::input> mDrcEffectType;
     // TODO Add : C2StreamAacSbrModeTuning
 };
-
-constexpr char COMPONENT_NAME[] = "c2.android.aac.decoder";
 
 C2SoftAacDec::C2SoftAacDec(
         const char *name,
