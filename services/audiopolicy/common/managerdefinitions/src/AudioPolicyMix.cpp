@@ -411,11 +411,11 @@ status_t AudioPolicyMixCollection::removeUidDeviceAffinities(uid_t uid) {
             if ((rule == RULE_EXCLUDE_UID || rule == RULE_MATCH_UID)
                     && uid == mix->mCriteria[j].mValue.mUid) {
                 foundUidRule = true;
-                criteriaToRemove.push_back(j);
+                criteriaToRemove.insert(criteriaToRemove.begin(), j);
             }
         }
         if (foundUidRule) {
-            for (size_t j = criteriaToRemove.size() - 1; j >= 0; j--) {
+            for (size_t j = 0; j < criteriaToRemove.size(); j++) {
                 mix->mCriteria.removeAt(criteriaToRemove[j]);
             }
         }
