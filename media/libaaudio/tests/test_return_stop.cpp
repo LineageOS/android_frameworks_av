@@ -140,12 +140,34 @@ static void s_myErrorCallbackProc(
     printf("%s() - error = %d\n", __func__, error);
 }
 
-void usage() {
+static void s_usage() {
     printf("test_return_stop [-i] [-x] [-n] [-c]\n");
     printf("     -i direction INPUT, otherwise OUTPUT\n");
     printf("     -x sharing mode EXCLUSIVE, otherwise SHARED\n");
     printf("     -n performance mode NONE, otherwise LOW_LATENCY\n");
     printf("     -c always return CONTINUE from callback, not STOP\n");
+}
+
+/**
+ * @return 0 is OK, -1 for error
+ */
+static int s_checkEnginePositions(AudioEngine *engine) {
+    const int64_t framesRead = AAudioStream_getFramesRead(engine->stream);
+    const int64_t framesWritten = AAudioStream_getFramesWritten(engine->stream);
+    const int32_t delta = (int32_t)(framesWritten - framesRead);
+    printf("playing framesRead = %7d, framesWritten = %7d"
+           ", delta = %4d, framesCalled = %6d, callbackCount = %4d\n",
+           (int32_t) framesRead,
+           (int32_t) framesWritten,
+           delta,
+           engine->framesCalled.load(),
+           engine->callbackCount.load()
+    );
+    if (delta > AAudioStream_getBufferCapacityInFrames(engine->stream)) {
+        printf("ERROR - delta > capacity\n");
+        return -1;
+    }
+    return 0;
 }
 
 int main(int argc, char **argv) {
@@ -188,12 +210,12 @@ int main(int argc, char **argv) {
                     sharingMode = AAUDIO_SHARING_MODE_EXCLUSIVE;
                     break;
                 default:
-                    usage();
+                    s_usage();
                     exit(EXIT_FAILURE);
                     break;
             }
         } else {
-            usage();
+            s_usage();
             exit(EXIT_FAILURE);
             break;
         }
@@ -201,12 +223,20 @@ int main(int argc, char **argv) {
 
     result = s_OpenAudioStream(&engine, direction, sharingMode, perfMode);
     if (result != AAUDIO_OK) {
-        printf("s_OpenAudioStream returned %s",
+        printf("s_OpenAudioStream returned %s\n",
                AAudio_convertResultToText(result));
         errorCount++;
     }
 
     int32_t framesPerBurst = AAudioStream_getFramesPerBurst(engine.stream);
+    // Use double buffered stream.
+    const int32_t bufferSize = AAudioStream_setBufferSizeInFrames(engine.stream, 2 * framesPerBurst);
+    if (bufferSize < 0) {
+        printf("AAudioStream_setBufferSizeInFrames returned %s\n",
+               AAudio_convertResultToText(bufferSize));
+        errorCount++;
+    }
+
     // Check to see what kind of stream we actually got.
     int32_t deviceId = AAudioStream_getDeviceId(engine.stream);
     aaudio_performance_mode_t actualPerfMode = AAudioStream_getPerformanceMode(engine.stream);
@@ -235,21 +265,14 @@ int main(int argc, char **argv) {
         if (result == AAUDIO_OK) {
             const int watchLoops = LOOP_DURATION_MSEC / SLEEP_DURATION_MSEC;
             for (int i = watchLoops; i > 0; i--) {
-                printf("playing silence #%02d, framesRead = %7d, framesWritten = %7d,"
-                       " framesCalled = %6d, callbackCount = %4d\n",
-                       i,
-                       (int32_t) AAudioStream_getFramesRead(engine.stream),
-                       (int32_t) AAudioStream_getFramesWritten(engine.stream),
-                       engine.framesCalled.load(),
-                       engine.callbackCount.load()
-                );
+                errorCount += s_checkEnginePositions(&engine) ? 1 : 0;
                 usleep(SLEEP_DURATION_MSEC * 1000);
             }
         }
 
         if (engine.stopAtFrame != INT32_MAX) {
             callbackResult = (engine.callbackCountAfterStop == 0) ? EXIT_SUCCESS
-                                                                             : EXIT_FAILURE;
+                                                                  : EXIT_FAILURE;
             if (callbackResult) {
                 printf("ERROR - Callback count after STOP = %d\n",
                        engine.callbackCountAfterStop.load());
@@ -268,9 +291,7 @@ int main(int argc, char **argv) {
             errorCount++;
         }
         usleep(SLEEP_DURATION_MSEC * 1000);
-        printf("getFramesRead() = %d, getFramesWritten() = %d\n",
-               (int32_t) AAudioStream_getFramesRead(engine.stream),
-               (int32_t) AAudioStream_getFramesWritten(engine.stream));
+        errorCount += s_checkEnginePositions(&engine) ? 1 : 0;
     }
 
     s_CloseAudioStream(&engine);

@@ -326,16 +326,13 @@ aaudio_result_t AudioStreamRecord::requestStart()
     if (mAudioRecord.get() == nullptr) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
-    // Get current position so we can detect when the track is recording.
-    status_t err = mAudioRecord->getPosition(&mPositionWhenStarting);
-    if (err != OK) {
-        return AAudioConvert_androidToAAudioResult(err);
-    }
 
-    // Enable callback before starting AudioTrack to avoid shutting
+    // Enable callback before starting AudioRecord to avoid shutting
     // down because of a race condition.
     mCallbackEnabled.store(true);
-    err = mAudioRecord->start();
+    mFramesWritten.reset32(); // service writes frames
+    mTimestampPosition.reset32();
+    status_t err = mAudioRecord->start(); // resets position to zero
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
     } else {
@@ -349,12 +346,10 @@ aaudio_result_t AudioStreamRecord::requestStop() {
         return AAUDIO_ERROR_INVALID_STATE;
     }
     setState(AAUDIO_STREAM_STATE_STOPPING);
-    incrementFramesWritten(getFramesRead() - getFramesWritten()); // TODO review
-    mTimestampPosition.set(getFramesRead());
+    mFramesWritten.catchUpTo(getFramesRead());
+    mTimestampPosition.catchUpTo(getFramesRead());
     mAudioRecord->stop();
     mCallbackEnabled.store(false);
-    mFramesWritten.reset32(); // service writes frames, service position reset on flush
-    mTimestampPosition.reset32();
     // Pass false to prevent errorCallback from being called after disconnect
     // when app has already requested a stop().
     return checkForDisconnectRequest(false);
@@ -368,10 +363,12 @@ aaudio_result_t AudioStreamRecord::updateStateMachine()
     switch (getState()) {
     // TODO add better state visibility to AudioRecord
     case AAUDIO_STREAM_STATE_STARTING:
+        // When starting, the position will begin at zero and then go positive.
+        // The position can wrap but by that time the state will not be STARTING.
         err = mAudioRecord->getPosition(&position);
         if (err != OK) {
             result = AAudioConvert_androidToAAudioResult(err);
-        } else if (position != mPositionWhenStarting) {
+        } else if (position > 0) {
             setState(AAUDIO_STREAM_STATE_STARTED);
         }
         break;
@@ -504,12 +501,12 @@ int64_t AudioStreamRecord::getFramesWritten() {
     switch (getState()) {
         case AAUDIO_STREAM_STATE_STARTING:
         case AAUDIO_STREAM_STATE_STARTED:
-        case AAUDIO_STREAM_STATE_STOPPING:
             result = mAudioRecord->getPosition(&position);
             if (result == OK) {
                 mFramesWritten.update32(position);
             }
             break;
+        case AAUDIO_STREAM_STATE_STOPPING:
         default:
             break;
     }
