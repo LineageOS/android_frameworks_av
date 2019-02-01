@@ -21,8 +21,8 @@
 #define OMX_ANDROID_COMPILE_AS_32BIT_ON_64BIT_PLATFORMS
 #endif
 
+#include <android-base/properties.h>
 #include <utils/Log.h>
-#include <cutils/properties.h>
 
 #include <media/stagefright/foundation/MediaDefs.h>
 #include <media/stagefright/OmxInfoBuilder.h>
@@ -53,7 +53,7 @@ using namespace ::android::hardware::media::omx::V1_0;
 namespace /* unnamed */ {
 
 bool hasPrefix(const hidl_string& s, const char* prefix) {
-    return strncmp(s.c_str(), prefix, strlen(prefix)) == 0;
+    return strncasecmp(s.c_str(), prefix, strlen(prefix)) == 0;
 }
 
 status_t queryCapabilities(
@@ -87,7 +87,8 @@ status_t queryCapabilities(
 
 }  // unnamed namespace
 
-OmxInfoBuilder::OmxInfoBuilder() {
+OmxInfoBuilder::OmxInfoBuilder(bool allowSurfaceEncoders)
+    : mAllowSurfaceEncoders(allowSurfaceEncoders) {
 }
 
 status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
@@ -135,80 +136,79 @@ status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
     // Convert roles to lists of codecs
 
     // codec name -> index into swCodecs/hwCodecs
-    std::map<hidl_string, std::unique_ptr<MediaCodecInfoWriter>>
-            swCodecName2Info, hwCodecName2Info;
+    std::map<hidl_string, std::unique_ptr<MediaCodecInfoWriter>> codecName2Info;
 
-    char rank[PROPERTY_VALUE_MAX];
-    uint32_t defaultRank = 0x100;
-    if (property_get("debug.stagefright.omx_default_rank", rank, nullptr)) {
-        defaultRank = std::strtoul(rank, nullptr, 10);
-    }
+    uint32_t defaultRank =
+        ::android::base::GetUintProperty("debug.stagefright.omx_default_rank", 0x100u);
+    uint32_t defaultSwAudioRank =
+        ::android::base::GetUintProperty("debug.stagefright.omx_default_rank.sw-audio", 0x10u);
+    uint32_t defaultSwOtherRank =
+        ::android::base::GetUintProperty("debug.stagefright.omx_default_rank.sw-other", 0x210u);
+
     for (const IOmxStore::RoleInfo& role : roles) {
         const hidl_string& typeName = role.type;
         bool isEncoder = role.isEncoder;
-        bool preferPlatformNodes = role.preferPlatformNodes;
-        // If preferPlatformNodes is true, hardware nodes must be added after
-        // platform (software) nodes. hwCodecs is used to hold hardware nodes
-        // that need to be added after software nodes for the same role.
-        std::vector<const IOmxStore::NodeInfo*> hwCodecs;
-        for (const IOmxStore::NodeInfo& node : role.nodes) {
+        bool isAudio = hasPrefix(role.type, "audio/");
+        bool isVideoOrImage = hasPrefix(role.type, "video/") || hasPrefix(role.type, "image/");
+
+        for (const IOmxStore::NodeInfo &node : role.nodes) {
             const hidl_string& nodeName = node.name;
+
+            // currently image and video encoders use surface input
+            if (!mAllowSurfaceEncoders && isVideoOrImage && isEncoder) {
+                ALOGD("disabling %s for media type %s because we are not using OMX input surface",
+                        nodeName.c_str(), role.type.c_str());
+                continue;
+            }
+
             bool isSoftware = hasPrefix(nodeName, "OMX.google");
-            MediaCodecInfoWriter* info;
-            if (isSoftware) {
-                auto c2i = swCodecName2Info.find(nodeName);
-                if (c2i == swCodecName2Info.end()) {
-                    // Create a new MediaCodecInfo for a new node.
-                    c2i = swCodecName2Info.insert(std::make_pair(
-                            nodeName, writer->addMediaCodecInfo())).first;
-                    info = c2i->second.get();
-                    info->setName(nodeName.c_str());
-                    info->setOwner(node.owner.c_str());
-                    info->setAttributes(
-                            // all OMX codecs are vendor codecs (in the vendor partition), but
-                            // treat OMX.google codecs as non-hardware-accelerated and  non-vendor
-                            (isEncoder ? MediaCodecInfo::kFlagIsEncoder : 0));
-                    info->setRank(defaultRank);
-                } else {
-                    // The node has been seen before. Simply retrieve the
-                    // existing MediaCodecInfoWriter.
-                    info = c2i->second.get();
-                }
-            } else {
-                auto c2i = hwCodecName2Info.find(nodeName);
-                if (c2i == hwCodecName2Info.end()) {
-                    // Create a new MediaCodecInfo for a new node.
-                    if (!preferPlatformNodes) {
-                        c2i = hwCodecName2Info.insert(std::make_pair(
-                                nodeName, writer->addMediaCodecInfo())).first;
-                        info = c2i->second.get();
-                        info->setName(nodeName.c_str());
-                        info->setOwner(node.owner.c_str());
-                        typename std::underlying_type<MediaCodecInfo::Attributes>::type attrs =
-                            MediaCodecInfo::kFlagIsVendor;
-                        if (isEncoder) {
-                            attrs |= MediaCodecInfo::kFlagIsEncoder;
-                        }
-                        if (std::count_if(
-                                node.attributes.begin(), node.attributes.end(),
-                                [](const IOmxStore::Attribute &i) -> bool {
-                                    return i.key == "attribute::software-codec";
-                                                                          })) {
-                            attrs |= MediaCodecInfo::kFlagIsHardwareAccelerated;
-                        }
-                        info->setAttributes(attrs);
-                        info->setRank(defaultRank);
-                    } else {
-                        // If preferPlatformNodes is true, this node must be
-                        // added after all software nodes.
-                        hwCodecs.push_back(&node);
-                        continue;
+            uint32_t rank = isSoftware
+                    ? (isAudio ? defaultSwAudioRank : defaultSwOtherRank)
+                    : defaultRank;
+            // get rank from IOmxStore via attribute
+            for (const IOmxStore::Attribute& attribute : node.attributes) {
+                if (attribute.key == "rank") {
+                    uint32_t oldRank = rank;
+                    char dummy;
+                    if (sscanf(attribute.value.c_str(), "%u%c", &rank, &dummy) != 1) {
+                        rank = oldRank;
                     }
-                } else {
-                    // The node has been seen before. Simply retrieve the
-                    // existing MediaCodecInfoWriter.
-                    info = c2i->second.get();
+                    break;
                 }
+            }
+
+            MediaCodecInfoWriter* info;
+            auto c2i = codecName2Info.find(nodeName);
+            if (c2i == codecName2Info.end()) {
+                // Create a new MediaCodecInfo for a new node.
+                c2i = codecName2Info.insert(std::make_pair(
+                        nodeName, writer->addMediaCodecInfo())).first;
+                info = c2i->second.get();
+                info->setName(nodeName.c_str());
+                info->setOwner(node.owner.c_str());
+                info->setRank(rank);
+
+                typename std::underlying_type<MediaCodecInfo::Attributes>::type attrs = 0;
+                // all OMX codecs are vendor codecs (in the vendor partition), but
+                // treat OMX.google codecs as non-hardware-accelerated and non-vendor
+                if (!isSoftware) {
+                    attrs |= MediaCodecInfo::kFlagIsVendor;
+                    if (std::count_if(
+                            node.attributes.begin(), node.attributes.end(),
+                            [](const IOmxStore::Attribute &i) -> bool {
+                                return i.key == "attribute::software-codec";
+                                                                      })) {
+                        attrs |= MediaCodecInfo::kFlagIsHardwareAccelerated;
+                    }
+                }
+                if (isEncoder) {
+                    attrs |= MediaCodecInfo::kFlagIsEncoder;
+                }
+                info->setAttributes(attrs);
+            } else {
+                // The node has been seen before. Simply retrieve the
+                // existing MediaCodecInfoWriter.
+                info = c2i->second.get();
             }
             std::unique_ptr<MediaCodecInfo::CapabilitiesWriter> caps =
                     info->addMediaType(typeName.c_str());
@@ -219,54 +219,8 @@ status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                 info->removeMediaType(typeName.c_str());
             }
         }
-
-        // If preferPlatformNodes is true, hardware nodes will not have been
-        // added in the loop above, but rather saved in hwCodecs. They are
-        // going to be added here.
-        if (preferPlatformNodes) {
-            for (const IOmxStore::NodeInfo *node : hwCodecs) {
-                MediaCodecInfoWriter* info;
-                const hidl_string& nodeName = node->name;
-                auto c2i = hwCodecName2Info.find(nodeName);
-                if (c2i == hwCodecName2Info.end()) {
-                    // Create a new MediaCodecInfo for a new node.
-                    c2i = hwCodecName2Info.insert(std::make_pair(
-                            nodeName, writer->addMediaCodecInfo())).first;
-                    info = c2i->second.get();
-                    info->setName(nodeName.c_str());
-                    info->setOwner(node->owner.c_str());
-                    typename std::underlying_type<MediaCodecInfo::Attributes>::type attrs =
-                        MediaCodecInfo::kFlagIsVendor;
-                    if (isEncoder) {
-                        attrs |= MediaCodecInfo::kFlagIsEncoder;
-                    }
-                    if (std::count_if(
-                            node->attributes.begin(), node->attributes.end(),
-                            [](const IOmxStore::Attribute &i) -> bool {
-                                return i.key == "attribute::software-codec";
-                                                                      })) {
-                        attrs |= MediaCodecInfo::kFlagIsHardwareAccelerated;
-                    }
-                    info->setRank(defaultRank);
-                } else {
-                    // The node has been seen before. Simply retrieve the
-                    // existing MediaCodecInfoWriter.
-                    info = c2i->second.get();
-                }
-                std::unique_ptr<MediaCodecInfo::CapabilitiesWriter> caps =
-                        info->addMediaType(typeName.c_str());
-                if (queryCapabilities(
-                        *node, typeName.c_str(), isEncoder, caps.get()) != OK) {
-                    ALOGW("Fail to add media type %s to codec %s "
-                          "after software codecs",
-                          typeName.c_str(), nodeName.c_str());
-                    info->removeMediaType(typeName.c_str());
-                }
-            }
-        }
     }
     return OK;
 }
 
 }  // namespace android
-

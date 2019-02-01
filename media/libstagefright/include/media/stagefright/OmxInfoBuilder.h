@@ -23,8 +23,11 @@
 namespace android {
 
 class OmxInfoBuilder : public MediaCodecListBuilderBase {
+private:
+    bool mAllowSurfaceEncoders; // allow surface encoders
+
 public:
-    OmxInfoBuilder();
+    explicit OmxInfoBuilder(bool allowSurfaceEncoders);
     ~OmxInfoBuilder() override = default;
     status_t buildMediaCodecList(MediaCodecListWriter* writer) override;
 };

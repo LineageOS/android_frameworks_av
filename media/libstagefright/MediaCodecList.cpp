@@ -77,7 +77,8 @@ bool isProfilingNeeded() {
     return profilingNeeded;
 }
 
-OmxInfoBuilder sOmxInfoBuilder;
+OmxInfoBuilder sOmxInfoBuilder{true /* allowSurfaceEncoders */};
+OmxInfoBuilder sOmxNoSurfaceEncoderInfoBuilder{false /* allowSurfaceEncoders */};
 
 Mutex sCodec2InfoBuilderMutex;
 std::unique_ptr<MediaCodecListBuilderBase> sCodec2InfoBuilder;
@@ -98,7 +99,11 @@ std::vector<MediaCodecListBuilderBase *> GetBuilders() {
     sp<PersistentSurface> surfaceTest =
         StagefrightPluginLoader::GetCCodecInstance()->createInputSurface();
     if (surfaceTest == nullptr) {
+        ALOGD("Allowing all OMX codecs");
         builders.push_back(&sOmxInfoBuilder);
+    } else {
+        ALOGD("Allowing only non-surface-encoder OMX codecs");
+        builders.push_back(&sOmxNoSurfaceEncoderInfoBuilder);
     }
     builders.push_back(GetCodec2InfoBuilder());
     return builders;
