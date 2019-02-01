@@ -1281,6 +1281,20 @@ status_t AudioSystem::getMasterMono(bool *mono)
     return aps->getMasterMono(mono);
 }
 
+status_t AudioSystem::setMasterBalance(float balance)
+{
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == 0) return PERMISSION_DENIED;
+    return af->setMasterBalance(balance);
+}
+
+status_t AudioSystem::getMasterBalance(float *balance)
+{
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == 0) return PERMISSION_DENIED;
+    return af->getMasterBalance(balance);
+}
+
 float AudioSystem::getStreamVolumeDB(audio_stream_type_t stream, int index, audio_devices_t device)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();

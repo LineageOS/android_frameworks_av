@@ -359,6 +359,9 @@ public:
     virtual     float       masterVolume() const = 0;
     virtual     bool        masterMute() const = 0;
 
+    virtual     status_t    setMasterBalance(float balance) = 0;
+    virtual     status_t    getMasterBalance(float *balance) const = 0;
+
     /* set/get stream type state. This will probably be used by
      * the preference panel, mostly.
      */

@@ -733,6 +733,7 @@ public:
 
                 // VolumeInterface
     virtual     void        setMasterVolume(float value);
+    virtual     void        setMasterBalance(float balance);
     virtual     void        setMasterMute(bool muted);
     virtual     void        setStreamVolume(audio_stream_type_t stream, float value);
     virtual     void        setStreamMute(audio_stream_type_t stream, bool muted);
@@ -1027,6 +1028,8 @@ private:
     AudioStreamOut                  *mOutput;
 
     float                           mMasterVolume;
+    std::atomic<float>              mMasterBalance{};
+    audio_utils::Balance            mBalance;
     nsecs_t                         mLastWriteTime;
     int                             mNumWrites;
     int                             mNumDelayedWrites;
@@ -1199,6 +1202,13 @@ protected:
                 // Blending with limiter is not idempotent,
                 // and blending without limiter is idempotent but inefficient to do twice.
     virtual     bool       requireMonoBlend() { return mMasterMono.load() && !hasFastMixer(); }
+
+                void       setMasterBalance(float balance) override {
+                               mMasterBalance.store(balance);
+                               if (hasFastMixer()) {
+                                   mFastMixer->setMasterBalance(balance);
+                               }
+                           }
 };
 
 class DirectOutputThread : public PlaybackThread {
@@ -1216,7 +1226,12 @@ public:
 
     virtual     bool        checkForNewParameter_l(const String8& keyValuePair,
                                                    status_t& status);
+
+                void        dumpInternals(int fd, const Vector<String16>& args) override;
+
     virtual     void        flushHw_l();
+
+                void        setMasterBalance(float balance) override;
 
 protected:
     virtual     uint32_t    activeSleepTimeUs() const;
@@ -1244,6 +1259,10 @@ protected:
     sp<Track>               mActiveTrack;
 
     wp<Track>               mPreviousTrack;         // used to detect track switch
+
+    // This must be initialized for initial condition of mMasterBalance = 0 (disabled).
+    float                   mMasterBalanceLeft = 1.f;
+    float                   mMasterBalanceRight = 1.f;
 
 public:
     virtual     bool        hasFastMixer() const { return false; }
