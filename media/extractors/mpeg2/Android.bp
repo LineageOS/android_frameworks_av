@@ -24,6 +24,8 @@ cc_library_shared {
 
     header_libs: [
         "libbase_headers",
+        "libstagefright_headers",
+        "libmedia_headers",
     ],
 
     static_libs: [
@@ -31,7 +33,7 @@ cc_library_shared {
         "libstagefright_foundation_without_imemory",
         "libstagefright_mpeg2support",
         "libutils",
-        "libstagefright",
+        "libstagefright_mpeg2extractor",
         "libstagefright_esds",
     ],
 
