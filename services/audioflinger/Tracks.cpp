@@ -525,6 +525,7 @@ void AudioFlinger::PlaybackThread::Track::destroy()
             AudioSystem::releaseOutput(mPortId);
         }
     }
+    forEachTeePatchTrack([](auto patchTrack) { patchTrack->destroy(); });
 }
 
 void AudioFlinger::PlaybackThread::Track::appendDumpHeader(String8& result)
@@ -865,6 +866,9 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
     } else {
         status = BAD_VALUE;
     }
+    if (status == NO_ERROR) {
+        forEachTeePatchTrack([](auto patchTrack) { patchTrack->start(); });
+    }
     return status;
 }
 
@@ -898,6 +902,7 @@ void AudioFlinger::PlaybackThread::Track::stop()
                     __func__, mId, (int)mThreadIoHandle);
         }
     }
+    forEachTeePatchTrack([](auto patchTrack) { patchTrack->stop(); });
 }
 
 void AudioFlinger::PlaybackThread::Track::pause()
@@ -930,6 +935,8 @@ void AudioFlinger::PlaybackThread::Track::pause()
             break;
         }
     }
+    // Pausing the TeePatch to avoid a glitch on underrun, at the cost of buffered audio loss.
+    forEachTeePatchTrack([](auto patchTrack) { patchTrack->pause(); });
 }
 
 void AudioFlinger::PlaybackThread::Track::flush()
@@ -991,6 +998,8 @@ void AudioFlinger::PlaybackThread::Track::flush()
         // because the hardware buffer could hold a large amount of audio
         playbackThread->broadcast_l();
     }
+    // Flush the Tee to avoid on resume playing old data and glitching on the transition to new data
+    forEachTeePatchTrack([](auto patchTrack) { patchTrack->flush(); });
 }
 
 // must be called with thread lock held
@@ -1110,6 +1119,7 @@ void AudioFlinger::PlaybackThread::Track::copyMetadataTo(MetadataInserter& backI
 }
 
 void AudioFlinger::PlaybackThread::Track::setTeePatches(TeePatches teePatches) {
+    forEachTeePatchTrack([](auto patchTrack) { patchTrack->destroy(); });
     mTeePatches = std::move(teePatches);
 }
 

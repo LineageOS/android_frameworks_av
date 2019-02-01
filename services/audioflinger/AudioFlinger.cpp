@@ -838,8 +838,6 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
                 secondaryThread->addPatchTrack(patchTrack);
                 patchTrack->setPeerProxy(patchRecord.get());
                 patchRecord->setPeerProxy(patchTrack.get());
-
-                patchTrack->start(); // patchRecord is NOT started as it has no thread
             }
             track->setTeePatches(std::move(teePatches));
         }

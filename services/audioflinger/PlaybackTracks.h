@@ -222,6 +222,10 @@ protected:
 
 private:
     void                interceptBuffer(const AudioBufferProvider::Buffer& buffer);
+    template <class F>
+    void                forEachTeePatchTrack(F f) {
+        for (auto& tp : mTeePatches) { f(tp.patchTrack); }
+    };
 
     // The following fields are only for fast tracks, and should be in a subclass
     int                 mFastIndex; // index within FastMixerState::mFastTracks[];
