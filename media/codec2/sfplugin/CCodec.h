@@ -90,6 +90,16 @@ private:
     void flush();
     void release(bool sendCallback);
 
+    /**
+     * Creates an input surface for the current device configuration compatible with CCodec.
+     * This could be backed by the C2 HAL or the OMX HAL.
+     */
+    static sp<PersistentSurface> CreateCompatibleInputSurface();
+
+    /// Creates an input surface to the OMX HAL
+    static sp<PersistentSurface> CreateOmxInputSurface();
+
+    /// handle a create input surface call
     void createInputSurface();
     void setInputSurface(const sp<PersistentSurface> &surface);
     status_t setupInputSurface(const std::shared_ptr<InputSurfaceWrapper> &surface);
