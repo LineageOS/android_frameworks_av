@@ -579,9 +579,8 @@ const std::vector<C2Component::Traits>& Codec2Client::listComponents() const {
                     return;
                 }
                 mTraitsList.resize(t.size());
-                mAliasesBuffer.resize(t.size());
                 for (size_t i = 0; i < t.size(); ++i) {
-                    if (!objcpy(&mTraitsList[i], &mAliasesBuffer[i], t[i])) {
+                    if (!objcpy(&mTraitsList[i], t[i])) {
                         LOG(ERROR) << "listComponents -- corrupted output.";
                         return;
                     }

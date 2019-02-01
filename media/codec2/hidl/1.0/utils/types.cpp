@@ -351,7 +351,6 @@ bool objcpy(
 // ComponentTraits -> C2Component::Traits, std::unique_ptr<std::vector<std::string>>
 bool objcpy(
         C2Component::Traits* d,
-        std::unique_ptr<std::vector<std::string>>* aliasesBuffer,
         const IComponentStore::ComponentTraits& s) {
     d->name = s.name.c_str();
 
@@ -394,15 +393,9 @@ bool objcpy(
 
     d->rank = static_cast<C2Component::rank_t>(s.rank);
     d->mediaType = s.mediaType.c_str();
-
-    // aliasesBuffer must not be resized after this.
-    *aliasesBuffer = std::make_unique<std::vector<std::string>>(
-            s.aliases.size());
-    (*aliasesBuffer)->resize(s.aliases.size());
-    std::vector<C2StringLiteral> dAliases(s.aliases.size());
+    d->aliases.resize(s.aliases.size());
     for (size_t i = 0; i < s.aliases.size(); ++i) {
-        (**aliasesBuffer)[i] = s.aliases[i].c_str();
-        d->aliases[i] = (**aliasesBuffer)[i].c_str();
+        d->aliases[i] = s.aliases[i];
     }
     return true;
 }
