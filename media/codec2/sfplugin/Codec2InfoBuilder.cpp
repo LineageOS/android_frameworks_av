@@ -68,262 +68,146 @@ bool hasSuffix(const std::string& s, const char* suffix) {
             s.compare(s.size() - suffixLen, suffixLen, suffix) == 0;
 }
 
-// Constants from ACodec
-constexpr OMX_U32 kPortIndexInput = 0;
-constexpr OMX_U32 kPortIndexOutput = 1;
-constexpr OMX_U32 kMaxIndicesToCheck = 32;
+void addSupportedProfileLevels(
+        std::shared_ptr<Codec2Client::Interface> intf,
+        MediaCodecInfo::CapabilitiesWriter *caps,
+        const Traits& trait, const std::string &mediaType) {
+    std::shared_ptr<C2Mapper::ProfileLevelMapper> mapper =
+        C2Mapper::GetProfileLevelMapper(trait.mediaType);
+    // if we don't know the media type, pass through all values unmapped
 
-status_t queryOmxCapabilities(
-        const char* name, const char* mediaType, bool isEncoder,
-        MediaCodecInfo::CapabilitiesWriter* caps) {
-
-    const char *role = GetComponentRole(isEncoder, mediaType);
-    if (role == nullptr) {
-        return BAD_VALUE;
-    }
-
-    using namespace ::android::hardware::media::omx::V1_0;
-    using ::android::hardware::Return;
-    using ::android::hardware::Void;
-    using ::android::hardware::hidl_vec;
-    using ::android::hardware::media::omx::V1_0::utils::LWOmxNode;
-
-    sp<IOmx> omx = IOmx::getService();
-    if (!omx) {
-        ALOGW("Could not obtain IOmx service.");
-        return NO_INIT;
-    }
-
-    struct Observer : IOmxObserver {
-        virtual Return<void> onMessages(const hidl_vec<Message>&) override {
-            return Void();
-        }
+    // TODO: we cannot find levels that are local 'maxima' without knowing the coding
+    // e.g. H.263 level 45 and level 30 could be two values for highest level as
+    // they don't include one another. For now we use the last supported value.
+    bool encoder = trait.kind == C2Component::KIND_ENCODER;
+    C2StreamProfileLevelInfo pl(encoder /* output */, 0u);
+    std::vector<C2FieldSupportedValuesQuery> profileQuery = {
+        C2FieldSupportedValuesQuery::Possible(C2ParamField(&pl, &pl.profile))
     };
 
-    sp<Observer> observer = new Observer();
-    Status status;
-    sp<IOmxNode> tOmxNode;
-    Return<void> transStatus = omx->allocateNode(
-            name, observer,
-            [&status, &tOmxNode](Status s, const sp<IOmxNode>& n) {
-                status = s;
-                tOmxNode = n;
-            });
-    if (!transStatus.isOk()) {
-        ALOGW("IOmx::allocateNode -- transaction failed.");
-        return NO_INIT;
-    }
-    if (status != Status::OK) {
-        ALOGW("IOmx::allocateNode -- error returned: %d.",
-                static_cast<int>(status));
-        return NO_INIT;
+    c2_status_t err = intf->querySupportedValues(profileQuery, C2_DONT_BLOCK);
+    ALOGV("query supported profiles -> %s | %s", asString(err), asString(profileQuery[0].status));
+    if (err != C2_OK || profileQuery[0].status != C2_OK) {
+        return;
     }
 
-    sp<LWOmxNode> omxNode = new LWOmxNode(tOmxNode);
-
-    status_t err = SetComponentRole(omxNode, role);
-    if (err != OK) {
-        omxNode->freeNode();
-        ALOGW("Failed to SetComponentRole: component = %s, role = %s.",
-                name, role);
-        return err;
+    // we only handle enumerated values
+    if (profileQuery[0].values.type != C2FieldSupportedValues::VALUES) {
+        return;
     }
 
-    bool isVideo = hasPrefix(mediaType, "video/") == 0;
-    bool isImage = hasPrefix(mediaType, "image/") == 0;
+    // determine if codec supports HDR
+    bool supportsHdr = false;
+    bool supportsHdr10Plus = false;
 
-    if (isVideo || isImage) {
-        OMX_VIDEO_PARAM_PROFILELEVELTYPE param;
-        InitOMXParams(&param);
-        param.nPortIndex = isEncoder ? kPortIndexOutput : kPortIndexInput;
-
-        for (OMX_U32 index = 0; index <= kMaxIndicesToCheck; ++index) {
-            param.nProfileIndex = index;
-            status_t err = omxNode->getParameter(
-                    OMX_IndexParamVideoProfileLevelQuerySupported,
-                    &param, sizeof(param));
-            if (err != OK) {
+    std::vector<std::shared_ptr<C2ParamDescriptor>> paramDescs;
+    c2_status_t err1 = intf->querySupportedParams(&paramDescs);
+    if (err1 == C2_OK) {
+        for (const std::shared_ptr<C2ParamDescriptor> &desc : paramDescs) {
+            switch ((uint32_t)desc->index()) {
+            case C2StreamHdr10PlusInfo::output::PARAM_TYPE:
+                supportsHdr10Plus = true;
+                break;
+            case C2StreamHdrStaticInfo::output::PARAM_TYPE:
+                supportsHdr = true;
+                break;
+            default:
                 break;
             }
-            caps->addProfileLevel(param.eProfile, param.eLevel);
-
-            // AVC components may not list the constrained profiles explicitly, but
-            // decoders that support a profile also support its constrained version.
-            // Encoders must explicitly support constrained profiles.
-            if (!isEncoder && strcasecmp(mediaType, MEDIA_MIMETYPE_VIDEO_AVC) == 0) {
-                if (param.eProfile == OMX_VIDEO_AVCProfileHigh) {
-                    caps->addProfileLevel(OMX_VIDEO_AVCProfileConstrainedHigh, param.eLevel);
-                } else if (param.eProfile == OMX_VIDEO_AVCProfileBaseline) {
-                    caps->addProfileLevel(OMX_VIDEO_AVCProfileConstrainedBaseline, param.eLevel);
-                }
-            }
-
-            if (index == kMaxIndicesToCheck) {
-                ALOGW("[%s] stopping checking profiles after %u: %x/%x",
-                        name, index,
-                        param.eProfile, param.eLevel);
-            }
-        }
-
-        // Color format query
-        // return colors in the order reported by the OMX component
-        // prefix "flexible" standard ones with the flexible equivalent
-        OMX_VIDEO_PARAM_PORTFORMATTYPE portFormat;
-        InitOMXParams(&portFormat);
-        portFormat.nPortIndex = isEncoder ? kPortIndexInput : kPortIndexOutput;
-        for (OMX_U32 index = 0; index <= kMaxIndicesToCheck; ++index) {
-            portFormat.nIndex = index;
-            status_t err = omxNode->getParameter(
-                    OMX_IndexParamVideoPortFormat,
-                    &portFormat, sizeof(portFormat));
-            if (err != OK) {
-                break;
-            }
-
-            OMX_U32 flexibleEquivalent;
-            if (IsFlexibleColorFormat(
-                    omxNode, portFormat.eColorFormat, false /* usingNativeWindow */,
-                    &flexibleEquivalent)) {
-                caps->addColorFormat(flexibleEquivalent);
-            }
-            caps->addColorFormat(portFormat.eColorFormat);
-
-            if (index == kMaxIndicesToCheck) {
-                ALOGW("[%s] stopping checking formats after %u: %s(%x)",
-                        name, index,
-                        asString(portFormat.eColorFormat), portFormat.eColorFormat);
-            }
-        }
-    } else if (strcasecmp(mediaType, MEDIA_MIMETYPE_AUDIO_AAC) == 0) {
-        // More audio codecs if they have profiles.
-        OMX_AUDIO_PARAM_ANDROID_PROFILETYPE param;
-        InitOMXParams(&param);
-        param.nPortIndex = isEncoder ? kPortIndexOutput : kPortIndexInput;
-        for (OMX_U32 index = 0; index <= kMaxIndicesToCheck; ++index) {
-            param.nProfileIndex = index;
-            status_t err = omxNode->getParameter(
-                    (OMX_INDEXTYPE)OMX_IndexParamAudioProfileQuerySupported,
-                    &param, sizeof(param));
-            if (err != OK) {
-                break;
-            }
-            // For audio, level is ignored.
-            caps->addProfileLevel(param.eProfile, 0 /* level */);
-
-            if (index == kMaxIndicesToCheck) {
-                ALOGW("[%s] stopping checking profiles after %u: %x",
-                        name, index,
-                        param.eProfile);
-            }
-        }
-
-        // NOTE: Without Android extensions, OMX does not provide a way to query
-        // AAC profile support
-        if (param.nProfileIndex == 0) {
-            ALOGW("component %s doesn't support profile query.", name);
         }
     }
 
-    if (isVideo && !isEncoder) {
-        native_handle_t *sidebandHandle = nullptr;
-        if (omxNode->configureVideoTunnelMode(
-                kPortIndexOutput, OMX_TRUE, 0, &sidebandHandle) == OK) {
-            // tunneled playback includes adaptive playback
-        } else {
-            // tunneled playback is not supported
-            caps->removeDetail(MediaCodecInfo::Capabilities::FEATURE_TUNNELED_PLAYBACK);
-            if (omxNode->setPortMode(
-                    kPortIndexOutput, IOMX::kPortModeDynamicANWBuffer) == OK ||
-                    omxNode->prepareForAdaptivePlayback(
-                            kPortIndexOutput, OMX_TRUE,
-                            1280 /* width */, 720 /* height */) != OK) {
-                // adaptive playback is not supported
-                caps->removeDetail(MediaCodecInfo::Capabilities::FEATURE_ADAPTIVE_PLAYBACK);
-            }
-        }
-    }
+    // For VP9, the static info is always propagated by framework.
+    supportsHdr |= (mediaType == MIMETYPE_VIDEO_VP9);
 
-    if (isVideo && isEncoder) {
-        OMX_VIDEO_CONFIG_ANDROID_INTRAREFRESHTYPE params;
-        InitOMXParams(&params);
-        params.nPortIndex = kPortIndexOutput;
-
-        OMX_VIDEO_PARAM_INTRAREFRESHTYPE fallbackParams;
-        InitOMXParams(&fallbackParams);
-        fallbackParams.nPortIndex = kPortIndexOutput;
-        fallbackParams.eRefreshMode = OMX_VIDEO_IntraRefreshCyclic;
-
-        if (omxNode->getConfig(
-                (OMX_INDEXTYPE)OMX_IndexConfigAndroidIntraRefresh,
-                &params, sizeof(params)) != OK &&
-                omxNode->getParameter(
-                    OMX_IndexParamVideoIntraRefresh, &fallbackParams,
-                    sizeof(fallbackParams)) != OK) {
-            // intra refresh is not supported
-            caps->removeDetail(MediaCodecInfo::Capabilities::FEATURE_INTRA_REFRESH);
-        }
-    }
-
-    omxNode->freeNode();
-    return OK;
-}
-
-void buildOmxInfo(const MediaCodecsXmlParser& parser,
-                  MediaCodecListWriter* writer) {
-    uint32_t omxRank = ::android::base::GetUintProperty(
-            "debug.stagefright.omx_default_rank", uint32_t(0x100));
-    for (const MediaCodecsXmlParser::Codec& codec : parser.getCodecMap()) {
-        const std::string &name = codec.first;
-        if (!hasPrefix(codec.first, "OMX.")) {
+    for (C2Value::Primitive profile : profileQuery[0].values.values) {
+        pl.profile = (C2Config::profile_t)profile.ref<uint32_t>();
+        std::vector<std::unique_ptr<C2SettingResult>> failures;
+        err = intf->config({&pl}, C2_DONT_BLOCK, &failures);
+        ALOGV("set profile to %u -> %s", pl.profile, asString(err));
+        std::vector<C2FieldSupportedValuesQuery> levelQuery = {
+            C2FieldSupportedValuesQuery::Current(C2ParamField(&pl, &pl.level))
+        };
+        err = intf->querySupportedValues(levelQuery, C2_DONT_BLOCK);
+        ALOGV("query supported levels -> %s | %s", asString(err), asString(levelQuery[0].status));
+        if (err != C2_OK || levelQuery[0].status != C2_OK
+                || levelQuery[0].values.type != C2FieldSupportedValues::VALUES
+                || levelQuery[0].values.values.size() == 0) {
             continue;
         }
-        const MediaCodecsXmlParser::CodecProperties &properties = codec.second;
-        bool encoder = properties.isEncoder;
-        std::unique_ptr<MediaCodecInfoWriter> info =
-                writer->addMediaCodecInfo();
-        info->setName(name.c_str());
-        info->setOwner("default");
-        typename std::underlying_type<MediaCodecInfo::Attributes>::type attrs = 0;
-        if (encoder) {
-            attrs |= MediaCodecInfo::kFlagIsEncoder;
-        }
-        // NOTE: we don't support software-only codecs in OMX
-        if (!hasPrefix(name, "OMX.google.")) {
-            attrs |= MediaCodecInfo::kFlagIsVendor;
-            if (properties.quirkSet.find("attribute::software-codec")
-                    == properties.quirkSet.end()) {
-                attrs |= MediaCodecInfo::kFlagIsHardwareAccelerated;
-            }
-        }
-        info->setAttributes(attrs);
-        info->setRank(omxRank);
-        // OMX components don't have aliases
-        for (const MediaCodecsXmlParser::Type &type : properties.typeMap) {
-            const std::string &mediaType = type.first;
-            std::unique_ptr<MediaCodecInfo::CapabilitiesWriter> caps =
-                    info->addMediaType(mediaType.c_str());
-            const MediaCodecsXmlParser::AttributeMap &attrMap = type.second;
-            for (const MediaCodecsXmlParser::Attribute& attr : attrMap) {
-                const std::string &key = attr.first;
-                const std::string &value = attr.second;
-                if (hasPrefix(key, "feature-") &&
-                        !hasPrefix(key, "feature-bitrate-modes")) {
-                    caps->addDetail(key.c_str(), hasPrefix(value, "1") ? 1 : 0);
-                } else {
-                    caps->addDetail(key.c_str(), value.c_str());
+
+        C2Value::Primitive level = levelQuery[0].values.values.back();
+        pl.level = (C2Config::level_t)level.ref<uint32_t>();
+        ALOGV("supporting level: %u", pl.level);
+        int32_t sdkProfile, sdkLevel;
+        if (mapper && mapper->mapProfile(pl.profile, &sdkProfile)
+                && mapper->mapLevel(pl.level, &sdkLevel)) {
+            caps->addProfileLevel((uint32_t)sdkProfile, (uint32_t)sdkLevel);
+            // also list HDR profiles if component supports HDR
+            if (supportsHdr) {
+                auto hdrMapper = C2Mapper::GetHdrProfileLevelMapper(trait.mediaType);
+                if (hdrMapper && hdrMapper->mapProfile(pl.profile, &sdkProfile)) {
+                    caps->addProfileLevel((uint32_t)sdkProfile, (uint32_t)sdkLevel);
+                }
+                if (supportsHdr10Plus) {
+                    hdrMapper = C2Mapper::GetHdrProfileLevelMapper(
+                            trait.mediaType, true /*isHdr10Plus*/);
+                    if (hdrMapper && hdrMapper->mapProfile(pl.profile, &sdkProfile)) {
+                        caps->addProfileLevel((uint32_t)sdkProfile, (uint32_t)sdkLevel);
+                    }
                 }
             }
-            status_t err = queryOmxCapabilities(
-                    name.c_str(),
-                    mediaType.c_str(),
-                    encoder,
-                    caps.get());
-            if (err != OK) {
-                ALOGI("Failed to query capabilities for %s (media type: %s). Error: %d",
-                        name.c_str(),
-                        mediaType.c_str(),
-                        static_cast<int>(err));
+        } else if (!mapper) {
+            caps->addProfileLevel(pl.profile, pl.level);
+        }
+
+        // for H.263 also advertise the second highest level if the
+        // codec supports level 45, as level 45 only covers level 10
+        // TODO: move this to some form of a setting so it does not
+        // have to be here
+        if (mediaType == MIMETYPE_VIDEO_H263) {
+            C2Config::level_t nextLevel = C2Config::LEVEL_UNUSED;
+            for (C2Value::Primitive v : levelQuery[0].values.values) {
+                C2Config::level_t level = (C2Config::level_t)v.ref<uint32_t>();
+                if (level < C2Config::LEVEL_H263_45 && level > nextLevel) {
+                    nextLevel = level;
+                }
             }
+            if (nextLevel != C2Config::LEVEL_UNUSED
+                    && nextLevel != pl.level
+                    && mapper
+                    && mapper->mapProfile(pl.profile, &sdkProfile)
+                    && mapper->mapLevel(nextLevel, &sdkLevel)) {
+                caps->addProfileLevel(
+                        (uint32_t)sdkProfile, (uint32_t)sdkLevel);
+            }
+        }
+    }
+}
+
+void addSupportedColorFormats(
+        std::shared_ptr<Codec2Client::Interface> intf,
+        MediaCodecInfo::CapabilitiesWriter *caps,
+        const Traits& trait, const std::string &mediaType) {
+    (void)intf;
+
+    // TODO: get this from intf() as well, but how do we map them to
+    // MediaCodec color formats?
+    bool encoder = trait.kind == C2Component::KIND_ENCODER;
+    if (mediaType.find("video") != std::string::npos) {
+        // vendor video codecs prefer opaque format
+        if (trait.name.find("android") == std::string::npos) {
+            caps->addColorFormat(COLOR_FormatSurface);
+        }
+        caps->addColorFormat(COLOR_FormatYUV420Flexible);
+        caps->addColorFormat(COLOR_FormatYUV420Planar);
+        caps->addColorFormat(COLOR_FormatYUV420SemiPlanar);
+        caps->addColorFormat(COLOR_FormatYUV420PackedPlanar);
+        caps->addColorFormat(COLOR_FormatYUV420PackedSemiPlanar);
+        // framework video encoders must support surface format, though it is unclear
+        // that they will be able to map it if it is opaque
+        if (encoder && trait.name.find("android") != std::string::npos) {
+            caps->addColorFormat(COLOR_FormatSurface);
         }
     }
 }
@@ -335,7 +219,7 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
     // properly. (Assume "full" behavior eventually.)
     //
     // debug.stagefright.ccodec supports 5 values.
-    //   0 - Only OMX components are available.
+    //   0 - No Codec 2.0 components are available.
     //   1 - Audio decoders and encoders with prefix "c2.android." are available
     //       and ranked first.
     //       All other components with prefix "c2.android." are available with
@@ -366,306 +250,156 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
 
     MediaCodecsXmlParser parser(
             MediaCodecsXmlParser::defaultSearchDirs,
-            option == 0 ? "media_codecs.xml" :
-                          "media_codecs_c2.xml",
-            option == 0 ? "media_codecs_performance.xml" :
-                          "media_codecs_performance_c2.xml");
+            "media_codecs_c2.xml",
+            "media_codecs_performance_c2.xml");
     if (parser.getParsingStatus() != OK) {
         ALOGD("XML parser no good");
         return OK;
     }
 
-    bool surfaceTest(Codec2Client::CreateInputSurface());
-    if (option == 0 || (option != 4 && !surfaceTest)) {
-        buildOmxInfo(parser, writer);
-    }
-
     for (const Traits& trait : traits) {
         C2Component::rank_t rank = trait.rank;
 
-        std::shared_ptr<Codec2Client::Interface> intf =
-            Codec2Client::CreateInterfaceByName(trait.name.c_str());
-        if (!intf || parser.getCodecMap().count(intf->getName()) == 0) {
-            ALOGD("%s not found in xml", trait.name.c_str());
-            continue;
-        }
-        std::string canonName = intf->getName();
-
-        // TODO: Remove this block once all codecs are enabled by default.
-        switch (option) {
-        case 0:
-            continue;
-        case 1:
-            if (hasPrefix(canonName, "c2.vda.")) {
-                break;
+        // Interface must be accessible for us to list the component, and there also
+        // must be an XML entry for the codec. Codec aliases listed in the traits
+        // allow additional XML entries to be specified for each alias. These will
+        // be listed as separate codecs. If no XML entry is specified for an alias,
+        // those will be treated as an additional alias specified in the XML entry
+        // for the interface name.
+        std::vector<std::string> nameAndAliases = trait.aliases;
+        nameAndAliases.insert(nameAndAliases.begin(), trait.name);
+        for (const std::string &nameOrAlias : nameAndAliases) {
+            bool isAlias = trait.name != nameOrAlias;
+            std::shared_ptr<Codec2Client::Interface> intf =
+                Codec2Client::CreateInterfaceByName(nameOrAlias.c_str());
+            if (!intf) {
+                ALOGD("could not create interface for %s'%s'",
+                        isAlias ? "alias " : "",
+                        nameOrAlias.c_str());
+                continue;
             }
-            if (hasPrefix(canonName, "c2.android.")) {
-                if (trait.domain == C2Component::DOMAIN_AUDIO) {
+            if (parser.getCodecMap().count(nameOrAlias) == 0) {
+                if (isAlias) {
+                    std::unique_ptr<MediaCodecInfoWriter> baseCodecInfo =
+                        writer->findMediaCodecInfo(trait.name.c_str());
+                    if (!baseCodecInfo) {
+                        ALOGD("alias '%s' not found in xml but canonical codec info '%s' missing",
+                                nameOrAlias.c_str(),
+                                trait.name.c_str());
+                    } else {
+                        ALOGD("alias '%s' not found in xml; use an XML <Alias> tag for this",
+                                nameOrAlias.c_str());
+                        // merge alias into existing codec
+                        baseCodecInfo->addAlias(nameOrAlias.c_str());
+                    }
+                } else {
+                    ALOGD("component '%s' not found in xml", trait.name.c_str());
+                }
+                continue;
+            }
+            std::string canonName = trait.name;
+
+            // TODO: Remove this block once all codecs are enabled by default.
+            switch (option) {
+            case 0:
+                continue;
+            case 1:
+                if (hasPrefix(canonName, "c2.vda.")) {
+                    break;
+                }
+                if (hasPrefix(canonName, "c2.android.")) {
+                    if (trait.domain == C2Component::DOMAIN_AUDIO) {
+                        rank = 1;
+                        break;
+                    }
+                    break;
+                }
+                if (hasSuffix(canonName, ".avc.decoder") ||
+                        hasSuffix(canonName, ".avc.encoder")) {
+                    rank = std::numeric_limits<decltype(rank)>::max();
+                    break;
+                }
+                continue;
+            case 2:
+                if (hasPrefix(canonName, "c2.vda.")) {
+                    break;
+                }
+                if (hasPrefix(canonName, "c2.android.")) {
                     rank = 1;
                     break;
                 }
+                if (hasSuffix(canonName, ".avc.decoder") ||
+                        hasSuffix(canonName, ".avc.encoder")) {
+                    rank = std::numeric_limits<decltype(rank)>::max();
+                    break;
+                }
+                continue;
+            case 3:
+                if (hasPrefix(canonName, "c2.android.")) {
+                    rank = 1;
+                }
                 break;
             }
-            if (hasSuffix(canonName, ".avc.decoder") ||
-                    hasSuffix(canonName, ".avc.encoder")) {
-                rank = std::numeric_limits<decltype(rank)>::max();
-                break;
-            }
-            continue;
-        case 2:
-            if (hasPrefix(canonName, "c2.vda.")) {
-                break;
-            }
-            if (hasPrefix(canonName, "c2.android.")) {
-                rank = 1;
-                break;
-            }
-            if (hasSuffix(canonName, ".avc.decoder") ||
-                    hasSuffix(canonName, ".avc.encoder")) {
-                rank = std::numeric_limits<decltype(rank)>::max();
-                break;
-            }
-            continue;
-        case 3:
-            if (hasPrefix(canonName, "c2.android.")) {
-                rank = 1;
-            }
-            break;
-        }
 
-        ALOGV("canonName = %s", canonName.c_str());
-        std::unique_ptr<MediaCodecInfoWriter> codecInfo = writer->addMediaCodecInfo();
-        codecInfo->setName(trait.name.c_str());
-        codecInfo->setOwner(("codec2::" + trait.owner).c_str());
-        const MediaCodecsXmlParser::CodecProperties &codec = parser.getCodecMap().at(canonName);
+            ALOGV("adding codec entry for '%s'", nameOrAlias.c_str());
+            std::unique_ptr<MediaCodecInfoWriter> codecInfo = writer->addMediaCodecInfo();
+            codecInfo->setName(nameOrAlias.c_str());
+            codecInfo->setOwner(("codec2::" + trait.owner).c_str());
+            const MediaCodecsXmlParser::CodecProperties &codec =
+                parser.getCodecMap().at(nameOrAlias);
 
-        bool encoder = trait.kind == C2Component::KIND_ENCODER;
-        typename std::underlying_type<MediaCodecInfo::Attributes>::type attrs = 0;
+            bool encoder = trait.kind == C2Component::KIND_ENCODER;
+            typename std::underlying_type<MediaCodecInfo::Attributes>::type attrs = 0;
 
-        if (encoder) {
-            attrs |= MediaCodecInfo::kFlagIsEncoder;
-        }
-        if (trait.owner == "software") {
-            attrs |= MediaCodecInfo::kFlagIsSoftwareOnly;
-        } else {
-            attrs |= MediaCodecInfo::kFlagIsVendor;
-            if (trait.owner == "vendor-software") {
+            if (encoder) {
+                attrs |= MediaCodecInfo::kFlagIsEncoder;
+            }
+            if (trait.owner == "software") {
                 attrs |= MediaCodecInfo::kFlagIsSoftwareOnly;
-            } else if (codec.quirkSet.find("attribute::software-codec") == codec.quirkSet.end()) {
-                attrs |= MediaCodecInfo::kFlagIsHardwareAccelerated;
-            }
-        }
-        codecInfo->setAttributes(attrs);
-        codecInfo->setRank(rank);
-
-        for (const std::string &alias : codec.aliases) {
-            codecInfo->addAlias(alias.c_str());
-        }
-
-        for (auto typeIt = codec.typeMap.begin(); typeIt != codec.typeMap.end(); ++typeIt) {
-            const std::string &mediaType = typeIt->first;
-            const MediaCodecsXmlParser::AttributeMap &attrMap = typeIt->second;
-            std::unique_ptr<MediaCodecInfo::CapabilitiesWriter> caps =
-                codecInfo->addMediaType(mediaType.c_str());
-            for (auto attrIt = attrMap.begin(); attrIt != attrMap.end(); ++attrIt) {
-                std::string key, value;
-                std::tie(key, value) = *attrIt;
-                if (key.find("feature-") == 0 && key.find("feature-bitrate-modes") != 0) {
-                    caps->addDetail(key.c_str(), std::stoi(value));
-                } else {
-                    caps->addDetail(key.c_str(), value.c_str());
+            } else {
+                attrs |= MediaCodecInfo::kFlagIsVendor;
+                if (trait.owner == "vendor-software") {
+                    attrs |= MediaCodecInfo::kFlagIsSoftwareOnly;
+                } else if (codec.quirkSet.find("attribute::software-codec")
+                        == codec.quirkSet.end()) {
+                    attrs |= MediaCodecInfo::kFlagIsHardwareAccelerated;
                 }
             }
-
-            bool gotProfileLevels = false;
-            if (intf) {
-                std::shared_ptr<C2Mapper::ProfileLevelMapper> mapper =
-                    C2Mapper::GetProfileLevelMapper(trait.mediaType);
-                // if we don't know the media type, pass through all values unmapped
-
-                // TODO: we cannot find levels that are local 'maxima' without knowing the coding
-                // e.g. H.263 level 45 and level 30 could be two values for highest level as
-                // they don't include one another. For now we use the last supported value.
-                C2StreamProfileLevelInfo pl(encoder /* output */, 0u);
-                std::vector<C2FieldSupportedValuesQuery> profileQuery = {
-                    C2FieldSupportedValuesQuery::Possible(C2ParamField(&pl, &pl.profile))
-                };
-
-                c2_status_t err = intf->querySupportedValues(profileQuery, C2_DONT_BLOCK);
-                ALOGV("query supported profiles -> %s | %s",
-                        asString(err), asString(profileQuery[0].status));
-                if (err == C2_OK && profileQuery[0].status == C2_OK) {
-                    if (profileQuery[0].values.type == C2FieldSupportedValues::VALUES) {
-                        std::vector<std::shared_ptr<C2ParamDescriptor>> paramDescs;
-                        c2_status_t err1 = intf->querySupportedParams(&paramDescs);
-                        bool isHdr = false, isHdr10Plus = false;
-                        if (err1 == C2_OK) {
-                            for (const std::shared_ptr<C2ParamDescriptor> &desc : paramDescs) {
-                                if ((uint32_t)desc->index() ==
-                                        C2StreamHdr10PlusInfo::output::PARAM_TYPE) {
-                                    isHdr10Plus = true;
-                                } else if ((uint32_t)desc->index() ==
-                                        C2StreamHdrStaticInfo::output::PARAM_TYPE) {
-                                    isHdr = true;
-                                }
-                            }
-                        }
-                        // For VP9, the static info is always propagated by framework.
-                        isHdr |= (mediaType == MIMETYPE_VIDEO_VP9);
-
-                        for (C2Value::Primitive profile : profileQuery[0].values.values) {
-                            pl.profile = (C2Config::profile_t)profile.ref<uint32_t>();
-                            std::vector<std::unique_ptr<C2SettingResult>> failures;
-                            err = intf->config({&pl}, C2_DONT_BLOCK, &failures);
-                            ALOGV("set profile to %u -> %s", pl.profile, asString(err));
-                            std::vector<C2FieldSupportedValuesQuery> levelQuery = {
-                                C2FieldSupportedValuesQuery::Current(C2ParamField(&pl, &pl.level))
-                            };
-                            err = intf->querySupportedValues(levelQuery, C2_DONT_BLOCK);
-                            ALOGV("query supported levels -> %s | %s",
-                                    asString(err), asString(levelQuery[0].status));
-                            if (err == C2_OK && levelQuery[0].status == C2_OK) {
-                                if (levelQuery[0].values.type == C2FieldSupportedValues::VALUES
-                                        && levelQuery[0].values.values.size() > 0) {
-                                    C2Value::Primitive level = levelQuery[0].values.values.back();
-                                    pl.level = (C2Config::level_t)level.ref<uint32_t>();
-                                    ALOGV("supporting level: %u", pl.level);
-                                    int32_t sdkProfile, sdkLevel;
-                                    if (mapper && mapper->mapProfile(pl.profile, &sdkProfile)
-                                            && mapper->mapLevel(pl.level, &sdkLevel)) {
-                                        caps->addProfileLevel(
-                                                (uint32_t)sdkProfile, (uint32_t)sdkLevel);
-                                        gotProfileLevels = true;
-                                        if (isHdr) {
-                                            auto hdrMapper = C2Mapper::GetHdrProfileLevelMapper(
-                                                    trait.mediaType);
-                                            if (hdrMapper && hdrMapper->mapProfile(
-                                                    pl.profile, &sdkProfile)) {
-                                                caps->addProfileLevel(
-                                                        (uint32_t)sdkProfile,
-                                                        (uint32_t)sdkLevel);
-                                            }
-                                            if (isHdr10Plus) {
-                                                hdrMapper = C2Mapper::GetHdrProfileLevelMapper(
-                                                        trait.mediaType, true /*isHdr10Plus*/);
-                                                if (hdrMapper && hdrMapper->mapProfile(
-                                                        pl.profile, &sdkProfile)) {
-                                                    caps->addProfileLevel(
-                                                            (uint32_t)sdkProfile,
-                                                            (uint32_t)sdkLevel);
-                                                }
-                                            }
-                                        }
-                                    } else if (!mapper) {
-                                        caps->addProfileLevel(pl.profile, pl.level);
-                                        gotProfileLevels = true;
-                                    }
-
-                                    // for H.263 also advertise the second highest level if the
-                                    // codec supports level 45, as level 45 only covers level 10
-                                    // TODO: move this to some form of a setting so it does not
-                                    // have to be here
-                                    if (mediaType == MIMETYPE_VIDEO_H263) {
-                                        C2Config::level_t nextLevel = C2Config::LEVEL_UNUSED;
-                                        for (C2Value::Primitive v : levelQuery[0].values.values) {
-                                            C2Config::level_t level =
-                                                (C2Config::level_t)v.ref<uint32_t>();
-                                            if (level < C2Config::LEVEL_H263_45
-                                                    && level > nextLevel) {
-                                                nextLevel = level;
-                                            }
-                                        }
-                                        if (nextLevel != C2Config::LEVEL_UNUSED
-                                                && nextLevel != pl.level
-                                                && mapper
-                                                && mapper->mapProfile(pl.profile, &sdkProfile)
-                                                && mapper->mapLevel(nextLevel, &sdkLevel)) {
-                                            caps->addProfileLevel(
-                                                    (uint32_t)sdkProfile, (uint32_t)sdkLevel);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+            codecInfo->setAttributes(attrs);
+            if (!codec.rank.empty()) {
+                uint32_t xmlRank;
+                char dummy;
+                if (sscanf(codec.rank.c_str(), "%u%c", &xmlRank, &dummy) == 1) {
+                    rank = xmlRank;
                 }
             }
+            codecInfo->setRank(rank);
 
-            if (!gotProfileLevels) {
-                if (mediaType == MIMETYPE_VIDEO_VP9) {
-                    if (encoder) {
-                        caps->addProfileLevel(VP9Profile0,    VP9Level41);
-                    } else {
-                        caps->addProfileLevel(VP9Profile0,    VP9Level5);
-                        caps->addProfileLevel(VP9Profile2,    VP9Level5);
-                        caps->addProfileLevel(VP9Profile2HDR, VP9Level5);
-                    }
-                } else if (mediaType == MIMETYPE_VIDEO_AV1 && !encoder) {
-                    caps->addProfileLevel(AV1Profile0,      AV1Level2);
-                    caps->addProfileLevel(AV1Profile0,      AV1Level21);
-                    caps->addProfileLevel(AV1Profile1,      AV1Level22);
-                    caps->addProfileLevel(AV1Profile1,      AV1Level3);
-                    caps->addProfileLevel(AV1Profile2,      AV1Level31);
-                    caps->addProfileLevel(AV1Profile2,      AV1Level32);
-                } else if (mediaType == MIMETYPE_VIDEO_HEVC && !encoder) {
-                    caps->addProfileLevel(HEVCProfileMain,      HEVCMainTierLevel51);
-                    caps->addProfileLevel(HEVCProfileMainStill, HEVCMainTierLevel51);
-                } else if (mediaType == MIMETYPE_VIDEO_VP8) {
-                    if (encoder) {
-                        caps->addProfileLevel(VP8ProfileMain, VP8Level_Version0);
-                    } else {
-                        caps->addProfileLevel(VP8ProfileMain, VP8Level_Version0);
-                    }
-                } else if (mediaType == MIMETYPE_VIDEO_AVC) {
-                    if (encoder) {
-                        caps->addProfileLevel(AVCProfileBaseline,            AVCLevel41);
-//                      caps->addProfileLevel(AVCProfileConstrainedBaseline, AVCLevel41);
-                        caps->addProfileLevel(AVCProfileMain,                AVCLevel41);
-                    } else {
-                        caps->addProfileLevel(AVCProfileBaseline,            AVCLevel52);
-                        caps->addProfileLevel(AVCProfileConstrainedBaseline, AVCLevel52);
-                        caps->addProfileLevel(AVCProfileMain,                AVCLevel52);
-                        caps->addProfileLevel(AVCProfileConstrainedHigh,     AVCLevel52);
-                        caps->addProfileLevel(AVCProfileHigh,                AVCLevel52);
-                    }
-                } else if (mediaType == MIMETYPE_VIDEO_MPEG4) {
-                    if (encoder) {
-                        caps->addProfileLevel(MPEG4ProfileSimple,  MPEG4Level2);
-                    } else {
-                        caps->addProfileLevel(MPEG4ProfileSimple,  MPEG4Level3);
-                    }
-                } else if (mediaType == MIMETYPE_VIDEO_H263) {
-                    if (encoder) {
-                        caps->addProfileLevel(H263ProfileBaseline, H263Level45);
-                    } else {
-                        caps->addProfileLevel(H263ProfileBaseline, H263Level30);
-                        caps->addProfileLevel(H263ProfileBaseline, H263Level45);
-                        caps->addProfileLevel(H263ProfileISWV2,    H263Level30);
-                        caps->addProfileLevel(H263ProfileISWV2,    H263Level45);
-                    }
-                } else if (mediaType == MIMETYPE_VIDEO_MPEG2 && !encoder) {
-                    caps->addProfileLevel(MPEG2ProfileSimple, MPEG2LevelHL);
-                    caps->addProfileLevel(MPEG2ProfileMain,   MPEG2LevelHL);
-                }
+            for (const std::string &alias : codec.aliases) {
+                ALOGV("adding alias '%s'", alias.c_str());
+                codecInfo->addAlias(alias.c_str());
             }
 
-            // TODO: get this from intf() as well, but how do we map them to
-            // MediaCodec color formats?
-            if (mediaType.find("video") != std::string::npos) {
-                // vendor video codecs prefer opaque format
-                if (trait.name.find("android") == std::string::npos) {
-                    caps->addColorFormat(COLOR_FormatSurface);
+            for (auto typeIt = codec.typeMap.begin(); typeIt != codec.typeMap.end(); ++typeIt) {
+                const std::string &mediaType = typeIt->first;
+                const MediaCodecsXmlParser::AttributeMap &attrMap = typeIt->second;
+                std::unique_ptr<MediaCodecInfo::CapabilitiesWriter> caps =
+                    codecInfo->addMediaType(mediaType.c_str());
+                for (auto attrIt = attrMap.begin(); attrIt != attrMap.end(); ++attrIt) {
+                    std::string key, value;
+                    std::tie(key, value) = *attrIt;
+                    if (key.find("feature-") == 0 && key.find("feature-bitrate-modes") != 0) {
+                        int32_t intValue = 0;
+                        // Ignore trailing bad characters and default to 0.
+                        (void)sscanf(value.c_str(), "%d", &intValue);
+                        caps->addDetail(key.c_str(), intValue);
+                    } else {
+                        caps->addDetail(key.c_str(), value.c_str());
+                    }
                 }
-                caps->addColorFormat(COLOR_FormatYUV420Flexible);
-                caps->addColorFormat(COLOR_FormatYUV420Planar);
-                caps->addColorFormat(COLOR_FormatYUV420SemiPlanar);
-                caps->addColorFormat(COLOR_FormatYUV420PackedPlanar);
-                caps->addColorFormat(COLOR_FormatYUV420PackedSemiPlanar);
-                // framework video encoders must support surface format, though it is unclear
-                // that they will be able to map it if it is opaque
-                if (encoder && trait.name.find("android") != std::string::npos) {
-                    caps->addColorFormat(COLOR_FormatSurface);
-                }
+
+                addSupportedProfileLevels(intf, caps.get(), trait, mediaType);
+                addSupportedColorFormats(intf, caps.get(), trait, mediaType);
             }
         }
     }
@@ -677,4 +411,3 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
 extern "C" android::MediaCodecListBuilderBase *CreateBuilder() {
     return new android::Codec2InfoBuilder;
 }
-
