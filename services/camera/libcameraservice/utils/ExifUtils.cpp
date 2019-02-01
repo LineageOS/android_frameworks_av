@@ -55,6 +55,7 @@ public:
     // Initialize() can be called multiple times. The setting of Exif tags will be
     // cleared.
     virtual bool initialize(const unsigned char *app1Segment, size_t app1SegmentSize);
+    virtual bool initializeEmpty();
 
     // set all known fields from a metadata structure
     virtual bool setFromMetadata(const CameraMetadata& metadata,
@@ -150,7 +151,11 @@ public:
 
     // sets image orientation.
     // Returns false if memory allocation fails.
-    virtual bool setOrientation(uint16_t orientation);
+    virtual bool setOrientation(uint16_t degrees);
+
+    // sets image orientation.
+    // Returns false if memory allocation fails.
+    virtual bool setOrientationValue(ExifOrientation orientationValue);
 
     // sets the shutter speed.
     // Returns false if memory allocation fails.
@@ -297,6 +302,26 @@ ExifUtilsImpl::~ExifUtilsImpl() {
 bool ExifUtilsImpl::initialize(const unsigned char *app1Segment, size_t app1SegmentSize) {
     reset();
     exif_data_ = exif_data_new_from_data(app1Segment, app1SegmentSize);
+    if (exif_data_ == nullptr) {
+        ALOGE("%s: allocate memory for exif_data_ failed", __FUNCTION__);
+        return false;
+    }
+    // set the image options.
+    exif_data_set_option(exif_data_, EXIF_DATA_OPTION_FOLLOW_SPECIFICATION);
+    exif_data_set_data_type(exif_data_, EXIF_DATA_TYPE_COMPRESSED);
+    exif_data_set_byte_order(exif_data_, EXIF_BYTE_ORDER_INTEL);
+
+    // set exif version to 2.2.
+    if (!setExifVersion("0220")) {
+        return false;
+    }
+
+    return true;
+}
+
+bool ExifUtilsImpl::initializeEmpty() {
+    reset();
+    exif_data_ = exif_data_new();
     if (exif_data_ == nullptr) {
         ALOGE("%s: allocate memory for exif_data_ failed", __FUNCTION__);
         return false;
@@ -609,32 +634,26 @@ bool ExifUtilsImpl::setExposureBias(int32_t ev,
     return true;
 }
 
-bool ExifUtilsImpl::setOrientation(uint16_t orientation) {
-    /*
-     * Orientation value:
-     *  1      2      3      4      5          6          7          8
-     *
-     *  888888 888888     88 88     8888888888 88                 88 8888888888
-     *  88         88     88 88     88  88     88  88         88  88     88  88
-     *  8888     8888   8888 8888   88         8888888888 8888888888         88
-     *  88         88     88 88
-     *  88         88 888888 888888
-     */
-    int value = 1;
-    switch (orientation) {
+bool ExifUtilsImpl::setOrientation(uint16_t degrees) {
+    ExifOrientation value = ExifOrientation::ORIENTATION_0_DEGREES;
+    switch (degrees) {
         case 90:
-            value = 6;
+            value = ExifOrientation::ORIENTATION_90_DEGREES;
             break;
         case 180:
-            value = 3;
+            value = ExifOrientation::ORIENTATION_180_DEGREES;
             break;
         case 270:
-            value = 8;
+            value = ExifOrientation::ORIENTATION_270_DEGREES;
             break;
         default:
             break;
     }
-    SET_SHORT(EXIF_IFD_0, EXIF_TAG_ORIENTATION, value);
+    return setOrientationValue(value);
+}
+
+bool ExifUtilsImpl::setOrientationValue(ExifOrientation orientationValue) {
+    SET_SHORT(EXIF_IFD_0, EXIF_TAG_ORIENTATION, orientationValue);
     return true;
 }
 

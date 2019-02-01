@@ -137,6 +137,7 @@ cc_library_shared {
     name: "libdepthphoto",
 
     srcs: [
+        "utils/ExifUtils.cpp",
         "common/DepthPhotoProcessor.cpp",
     ],
 
@@ -150,6 +151,8 @@ cc_library_shared {
         "libcutils",
         "libjpeg",
         "libmemunreachable",
+        "libexif",
+        "libcamera_client",
     ],
 
     include_dirs: [

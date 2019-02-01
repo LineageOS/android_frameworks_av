@@ -32,9 +32,12 @@
 #include <dynamic_depth/profile.h>
 #include <dynamic_depth/profiles.h>
 #include <jpeglib.h>
+#include <libexif/exif-data.h>
+#include <libexif/exif-system.h>
 #include <math.h>
 #include <sstream>
 #include <utils/Errors.h>
+#include <utils/ExifUtils.h>
 #include <utils/Log.h>
 #include <xmpmeta/xmp_data.h>
 #include <xmpmeta/xmp_writer.h>
@@ -61,8 +64,44 @@ using dynamic_depth::Profiles;
 namespace android {
 namespace camera3 {
 
+ExifOrientation getExifOrientation(const unsigned char *jpegBuffer, size_t jpegBufferSize) {
+    if ((jpegBuffer == nullptr) || (jpegBufferSize == 0)) {
+        return ExifOrientation::ORIENTATION_UNDEFINED;
+    }
+
+    auto exifData = exif_data_new();
+    exif_data_load_data(exifData, jpegBuffer, jpegBufferSize);
+    ExifEntry *orientation = exif_content_get_entry(exifData->ifd[EXIF_IFD_0],
+            EXIF_TAG_ORIENTATION);
+    if ((orientation == nullptr) || (orientation->size != sizeof(ExifShort))) {
+        ALOGV("%s: Orientation EXIF entry invalid!", __FUNCTION__);
+        exif_data_unref(exifData);
+        return ExifOrientation::ORIENTATION_0_DEGREES;
+    }
+
+    auto orientationValue = exif_get_short(orientation->data, exif_data_get_byte_order(exifData));
+    ExifOrientation ret;
+    switch (orientationValue) {
+        case ExifOrientation::ORIENTATION_0_DEGREES:
+        case ExifOrientation::ORIENTATION_90_DEGREES:
+        case ExifOrientation::ORIENTATION_180_DEGREES:
+        case ExifOrientation::ORIENTATION_270_DEGREES:
+            ret = static_cast<ExifOrientation> (orientationValue);
+            break;
+        default:
+            ALOGE("%s: Unexpected EXIF orientation value: %d, defaulting to 0 degrees",
+                    __FUNCTION__, orientationValue);
+            ret = ExifOrientation::ORIENTATION_0_DEGREES;
+    }
+
+    exif_data_unref(exifData);
+
+    return ret;
+}
+
 status_t encodeGrayscaleJpeg(size_t width, size_t height, uint8_t *in, void *out,
-        const size_t maxOutSize, uint8_t jpegQuality, size_t &actualSize) {
+        const size_t maxOutSize, uint8_t jpegQuality, ExifOrientation exifOrientation,
+        size_t &actualSize) {
     status_t ret;
     // libjpeg is a C library so we use C-style "inheritance" by
     // putting libjpeg's jpeg_destination_mgr first in our custom
@@ -151,6 +190,23 @@ status_t encodeGrayscaleJpeg(size_t width, size_t height, uint8_t *in, void *out
 
     jpeg_start_compress(&cinfo, TRUE);
 
+    if (exifOrientation != ExifOrientation::ORIENTATION_UNDEFINED) {
+        std::unique_ptr<ExifUtils> utils(ExifUtils::create());
+        utils->initializeEmpty();
+        utils->setImageWidth(width);
+        utils->setImageHeight(height);
+        utils->setOrientationValue(exifOrientation);
+
+        if (utils->generateApp1()) {
+            const uint8_t* exifBuffer = utils->getApp1Buffer();
+            size_t exifBufferSize = utils->getApp1Length();
+            jpeg_write_marker(&cinfo, JPEG_APP0 + 1, static_cast<const JOCTET*>(exifBuffer),
+                    exifBufferSize);
+        } else {
+            ALOGE("%s: Unable to generate App1 buffer", __FUNCTION__);
+        }
+    }
+
     for (size_t i = 0; i < cinfo.image_height; i++) {
         auto currentRow  = static_cast<JSAMPROW>(in + i*width);
         jpeg_write_scanlines(&cinfo, &currentRow, /*num_lines*/1);
@@ -169,7 +225,7 @@ status_t encodeGrayscaleJpeg(size_t width, size_t height, uint8_t *in, void *out
 }
 
 std::unique_ptr<dynamic_depth::DepthMap> processDepthMapFrame(DepthPhotoInputFrame inputFrame,
-                std::vector<std::unique_ptr<Item>> *items /*out*/) {
+        ExifOrientation exifOrientation, std::vector<std::unique_ptr<Item>> *items /*out*/) {
     std::vector<float> points, confidence;
 
     size_t pointCount = inputFrame.mDepthMapWidth * inputFrame.mDepthMapHeight;
@@ -227,7 +283,7 @@ std::unique_ptr<dynamic_depth::DepthMap> processDepthMapFrame(DepthPhotoInputFra
     size_t actualJpegSize;
     auto ret = encodeGrayscaleJpeg(inputFrame.mDepthMapWidth, inputFrame.mDepthMapHeight,
             pointsQuantized.data(), depthParams.depth_image_data.data(), inputFrame.mMaxJpegSize,
-            inputFrame.mJpegQuality, actualJpegSize);
+            inputFrame.mJpegQuality, exifOrientation, actualJpegSize);
     if (ret != NO_ERROR) {
         ALOGE("%s: Depth map compression failed!", __FUNCTION__);
         return nullptr;
@@ -236,7 +292,7 @@ std::unique_ptr<dynamic_depth::DepthMap> processDepthMapFrame(DepthPhotoInputFra
 
     ret = encodeGrayscaleJpeg(inputFrame.mDepthMapWidth, inputFrame.mDepthMapHeight,
             confidenceQuantized.data(), depthParams.confidence_data.data(), inputFrame.mMaxJpegSize,
-            inputFrame.mJpegQuality, actualJpegSize);
+            inputFrame.mJpegQuality, exifOrientation, actualJpegSize);
     if (ret != NO_ERROR) {
         ALOGE("%s: Confidence map compression failed!", __FUNCTION__);
         return nullptr;
@@ -262,7 +318,10 @@ extern "C" int processDepthPhotoFrame(DepthPhotoInputFrame inputFrame, size_t de
         return BAD_VALUE;
     }
 
-    cameraParams->depth_map = processDepthMapFrame(inputFrame, &items);
+    ExifOrientation exifOrientation = getExifOrientation(
+            reinterpret_cast<const unsigned char*> (inputFrame.mMainJpegBuffer),
+            inputFrame.mMainJpegSize);
+    cameraParams->depth_map = processDepthMapFrame(inputFrame, exifOrientation, &items);
     if (cameraParams->depth_map == nullptr) {
         ALOGE("%s: Depth map processing failed!", __FUNCTION__);
         return BAD_VALUE;
