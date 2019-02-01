@@ -951,8 +951,8 @@ status_t AudioPolicyManager::getOutputForAttrInt(
 
     // FIXME: in case of RENDER policy, the output capabilities should be checked
     if ((usePrimaryOutputFromPolicyMixes || !secondaryDescs->empty())
-        && !audio_has_proportional_frames(config->format)) {
-        ALOGW("%s: audio loopback only supports proportional frames", __func__);
+        && !audio_is_linear_pcm(config->format)) {
+        ALOGD("%s: rejecting request as dynamic audio policy only support pcm", __func__);
         return BAD_VALUE;
     }
     if (usePrimaryOutputFromPolicyMixes) {
