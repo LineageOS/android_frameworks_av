@@ -107,22 +107,24 @@ void workDone(
         component->config(configParam, C2_DONT_BLOCK, &failures);
         ASSERT_EQ(failures.size(), 0u);
     }
-    framesReceived++;
-    eos = (work->worklets.front()->output.flags &
-           C2FrameData::FLAG_END_OF_STREAM) != 0;
-    auto frameIndexIt = std::find(flushedIndices.begin(), flushedIndices.end(),
-                                  work->input.ordinal.frameIndex.peeku());
-    ALOGV("WorkDone: frameID received %d",
-          (int)work->worklets.front()->output.ordinal.frameIndex.peeku());
-    work->input.buffers.clear();
-    work->worklets.clear();
-    {
-        typedef std::unique_lock<std::mutex> ULock;
-        ULock l(queueLock);
-        workQueue.push_back(std::move(work));
-        if (!flushedIndices.empty()) {
-            flushedIndices.erase(frameIndexIt);
+    if (work->worklets.front()->output.flags != C2FrameData::FLAG_INCOMPLETE) {
+        framesReceived++;
+        eos = (work->worklets.front()->output.flags &
+               C2FrameData::FLAG_END_OF_STREAM) != 0;
+        auto frameIndexIt = std::find(flushedIndices.begin(), flushedIndices.end(),
+                                      work->input.ordinal.frameIndex.peeku());
+        ALOGV("WorkDone: frameID received %d",
+              (int)work->worklets.front()->output.ordinal.frameIndex.peeku());
+        work->input.buffers.clear();
+        work->worklets.clear();
+        {
+            typedef std::unique_lock<std::mutex> ULock;
+            ULock l(queueLock);
+            workQueue.push_back(std::move(work));
+            if (!flushedIndices.empty()) {
+                flushedIndices.erase(frameIndexIt);
+            }
+            queueCondition.notify_all();
         }
-        queueCondition.notify_all();
     }
 }
