@@ -1,0 +1,28 @@
+
+
+cc_library_shared {
+    name: "libresourcemanagerservice",
+
+    srcs: [
+        "ResourceManagerService.cpp",
+        "ServiceLog.cpp",
+    ],
+
+    shared_libs: [
+        "libmedia",
+        "libmediautils",
+        "libbinder",
+        "libutils",
+        "liblog",
+    ],
+
+    compile_multilib: "32",
+
+    include_dirs: ["frameworks/av/include"],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+}
