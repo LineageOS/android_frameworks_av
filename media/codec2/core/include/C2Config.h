@@ -180,6 +180,7 @@ enum C2ParamIndexKind : C2Param::type_index_t {
 
     kParamIndexPictureTypeMask,
     kParamIndexPictureType,
+    kParamIndexHdr10PlusMetadata,
 
     /* ------------------------------------ video components ------------------------------------ */
 
@@ -194,7 +195,6 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexLayerIndex,
     kParamIndexLayerCount,
     kParamIndexIntraRefresh,
-    kParamIndexHdr10PlusMetadata,
 
     /* ------------------------------------ image components ------------------------------------ */
 
