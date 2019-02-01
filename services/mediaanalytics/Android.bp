@@ -1,0 +1,49 @@
+// Media Statistics service
+//
+
+cc_binary {
+    name: "mediametrics",
+
+    srcs: [
+        "main_mediametrics.cpp",
+        "MediaAnalyticsService.cpp",
+    ],
+
+    shared_libs: [
+        "libcutils",
+        "liblog",
+        "libmedia",
+        "libutils",
+        "libbinder",
+        "libdl",
+        "libgui",
+        "libmedia",
+        "libmediautils",
+        "libmediametrics",
+        "libstagefright_foundation",
+        "libutils",
+    ],
+
+    static_libs: ["libregistermsext"],
+
+    include_dirs: [
+        "frameworks/av/media/libstagefright/include",
+        "frameworks/av/media/libstagefright/rtsp",
+        "frameworks/av/media/libstagefright/webm",
+        "frameworks/av/include/media",
+        "frameworks/av/include/camera",
+        "frameworks/native/include/media/openmax",
+        "frameworks/native/include/media/hardware",
+        "external/tremolo/Tremolo",
+    ],
+
+    init_rc: ["mediametrics.rc"],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+        "-Wno-error=deprecated-declarations",
+    ],
+    clang: true,
+
+}
