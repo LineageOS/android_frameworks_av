@@ -60,8 +60,12 @@ void IsochronousClockModel::stop(int64_t nanoTime) {
     mState = STATE_STOPPED;
 }
 
-bool IsochronousClockModel::isStarting() {
+bool IsochronousClockModel::isStarting() const {
     return mState == STATE_STARTING;
+}
+
+bool IsochronousClockModel::isRunning() const {
+    return mState == STATE_RUNNING;
 }
 
 void IsochronousClockModel::processTimestamp(int64_t framePosition, int64_t nanoTime) {
