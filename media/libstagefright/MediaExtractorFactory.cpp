@@ -346,11 +346,13 @@ void MediaExtractorFactory::RegisterExtractorsInApex(
     ALOGV("search for plugins at %s", libDirPath);
     ALOGV("linked libs %s", gLinkedLibraries.c_str());
 
+    std::string libDirPathEx = libDirPath;
+    libDirPathEx += "/extractors";
     android_namespace_t *extractorNs = android_create_namespace("extractor",
             nullptr,  // ld_library_path
-            libDirPath,
+            libDirPath,  // default_library_path
             ANDROID_NAMESPACE_TYPE_ISOLATED,
-            nullptr,  // permitted_when_isolated_path
+            libDirPathEx.c_str(),  // permitted_when_isolated_path
             nullptr); // parent
     if (!android_link_namespaces(extractorNs, nullptr, gLinkedLibraries.c_str())) {
         ALOGE("Failed to link namespace. Failed to load extractor plug-ins in apex.");
@@ -361,7 +363,14 @@ void MediaExtractorFactory::RegisterExtractorsInApex(
         .library_namespace = extractorNs,
     };
 
-    DIR *libDir = opendir(libDirPath);
+    // try extractors subfolder first
+    DIR *libDir = opendir(libDirPathEx.c_str());
+
+    if (libDir) {
+        libDirPath = libDirPathEx.c_str();
+    } else {
+        libDir = opendir(libDirPath);
+    }
     if (libDir) {
         struct dirent* libEntry;
         while ((libEntry = readdir(libDir))) {
