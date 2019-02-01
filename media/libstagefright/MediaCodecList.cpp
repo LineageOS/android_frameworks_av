@@ -224,6 +224,21 @@ MediaCodecList::MediaCodecList(std::vector<MediaCodecListBuilderBase*> builders)
                 return info1 == nullptr
                         || (info2 != nullptr && info1->getRank() < info2->getRank());
             });
+
+    // remove duplicate entries
+    bool dedupe = property_get_bool("debug.stagefright.dedupe-codecs", true);
+    if (dedupe) {
+        std::set<std::string> codecsSeen;
+        for (auto it = mCodecInfos.begin(); it != mCodecInfos.end(); ) {
+            std::string codecName = (*it)->getCodecName();
+            if (codecsSeen.count(codecName) == 0) {
+                codecsSeen.emplace(codecName);
+                it++;
+            } else {
+                it = mCodecInfos.erase(it);
+            }
+        }
+    }
 }
 
 MediaCodecList::~MediaCodecList() {
