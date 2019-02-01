@@ -687,10 +687,27 @@ c2_status_t C2PlatformComponentStore::ComponentModule::init(
         if (alias != intf->getName()) {
             ALOGV("%s is alias to %s", alias.c_str(), intf->getName().c_str());
         }
-        traits->name = alias;
-        // TODO: get this from interface properly.
-        bool encoder = (traits->name.find("encoder") != std::string::npos);
-        uint32_t mediaTypeIndex = encoder ? C2PortMimeConfig::output::PARAM_TYPE
+        traits->name = alias; // TODO: this needs to be intf->getName() once aliases are supported
+
+        C2ComponentKindSetting kind;
+        C2ComponentDomainSetting domain;
+        res = intf->query_vb({ &kind, &domain }, {}, C2_MAY_BLOCK, nullptr);
+        bool fixDomain = res != C2_OK;
+        if (res == C2_OK) {
+            traits->kind = kind.value;
+            traits->domain = domain.value;
+        } else {
+            // TODO: remove this fall-back
+            ALOGD("failed to query interface for kind and domain: %d", res);
+
+            traits->kind =
+                (traits->name.find("encoder") != std::string::npos) ? C2Component::KIND_ENCODER :
+                (traits->name.find("decoder") != std::string::npos) ? C2Component::KIND_DECODER :
+                C2Component::KIND_OTHER;
+        }
+
+        uint32_t mediaTypeIndex =
+                traits->kind == C2Component::KIND_ENCODER ? C2PortMimeConfig::output::PARAM_TYPE
                 : C2PortMimeConfig::input::PARAM_TYPE;
         std::vector<std::unique_ptr<C2Param>> params;
         res = intf->query_vb({}, { mediaTypeIndex }, C2_MAY_BLOCK, &params);
@@ -702,29 +719,54 @@ c2_status_t C2PlatformComponentStore::ComponentModule::init(
             ALOGD("failed to query interface: unexpected vector size: %zu", params.size());
             return mInit;
         }
-        C2PortMimeConfig *mediaTypeConfig = (C2PortMimeConfig *)(params[0].get());
+        C2PortMimeConfig *mediaTypeConfig = C2PortMimeConfig::From(params[0].get());
         if (mediaTypeConfig == nullptr) {
             ALOGD("failed to query media type");
             return mInit;
         }
-        traits->mediaType = mediaTypeConfig->m.value;
-        // TODO: get this properly.
-        traits->rank = 0x200;
+        traits->mediaType =
+            std::string(mediaTypeConfig->m.value,
+                        strnlen(mediaTypeConfig->m.value, mediaTypeConfig->flexCount()));
 
-        // TODO: define these values properly
-        bool decoder = (traits->name.find("decoder") != std::string::npos);
-        traits->kind =
-                decoder ? C2Component::KIND_DECODER :
-                encoder ? C2Component::KIND_ENCODER :
-                C2Component::KIND_OTHER;
-        if (strncmp(traits->mediaType.c_str(), "audio/", 6) == 0) {
-            traits->domain = C2Component::DOMAIN_AUDIO;
-        } else if (strncmp(traits->mediaType.c_str(), "video/", 6) == 0) {
-            traits->domain = C2Component::DOMAIN_VIDEO;
-        } else if (strncmp(traits->mediaType.c_str(), "image/", 6) == 0) {
-            traits->domain = C2Component::DOMAIN_IMAGE;
-        } else {
-            traits->domain = C2Component::DOMAIN_OTHER;
+        if (fixDomain) {
+            if (strncmp(traits->mediaType.c_str(), "audio/", 6) == 0) {
+                traits->domain = C2Component::DOMAIN_AUDIO;
+            } else if (strncmp(traits->mediaType.c_str(), "video/", 6) == 0) {
+                traits->domain = C2Component::DOMAIN_VIDEO;
+            } else if (strncmp(traits->mediaType.c_str(), "image/", 6) == 0) {
+                traits->domain = C2Component::DOMAIN_IMAGE;
+            } else {
+                traits->domain = C2Component::DOMAIN_OTHER;
+            }
+        }
+
+        // TODO: get this properly from the store during emplace
+        switch (traits->domain) {
+        case C2Component::DOMAIN_AUDIO:
+            traits->rank = 8;
+            break;
+        default:
+            traits->rank = 512;
+        }
+
+        params.clear();
+        res = intf->query_vb({}, { C2ComponentAliasesSetting::PARAM_TYPE }, C2_MAY_BLOCK, &params);
+        if (res == C2_OK && params.size() == 1u) {
+            C2ComponentAliasesSetting *aliasesSetting =
+                C2ComponentAliasesSetting::From(params[0].get());
+            if (aliasesSetting) {
+                // Split aliases on ','
+                // This looks simpler in plain C and even std::string would still make a copy.
+                char *aliases = ::strndup(aliasesSetting->m.value, aliasesSetting->flexCount());
+                ALOGD("'%s' has aliases: '%s'", intf->getName().c_str(), aliases);
+
+                for (char *tok, *ptr, *str = aliases; (tok = ::strtok_r(str, ",", &ptr));
+                        str = nullptr) {
+                    traits->aliases.push_back(tok);
+                    ALOGD("adding alias: '%s'", tok);
+                }
+                free(aliases);
+            }
         }
     }
     mTraits = traits;
