@@ -26,6 +26,7 @@ close: 1
 mmap2: 1
 mmap: 1
 fstat64: 1
+fstat: 1
 stat64: 1
 statfs64: 1
 madvise: 1
@@ -47,6 +48,7 @@ ugetrlimit: 1
 readlinkat: 1
 _llseek: 1
 fstatfs64: 1
+fstatfs: 1
 pread64: 1
 mremap: 1
 dup: 1
