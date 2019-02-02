@@ -17,6 +17,8 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "ItemTable"
 
+#include <unordered_set>
+
 #include <ItemTable.h>
 #include <media/MediaExtractorPluginApi.h>
 #include <media/MediaExtractorPluginHelper.h>
@@ -1129,19 +1131,18 @@ status_t InfeBox::parse(off64_t offset, size_t size, ItemInfo *itemInfo) {
 
 struct IinfBox : public FullBox {
     IinfBox(DataSourceHelper *source, Vector<ItemInfo> *itemInfos) :
-        FullBox(source, FOURCC("iinf")),
-        mItemInfos(itemInfos), mHasGrids(false) {}
+        FullBox(source, FOURCC("iinf")), mItemInfos(itemInfos) {}
 
     status_t parse(off64_t offset, size_t size);
 
-    bool hasGrids() { return mHasGrids; }
+    bool hasFourCC(uint32_t type) { return mFourCCSeen.count(type) > 0; }
 
 protected:
     status_t onChunkData(uint32_t type, off64_t offset, size_t size) override;
 
 private:
     Vector<ItemInfo> *mItemInfos;
-    bool mHasGrids;
+    std::unordered_set<uint32_t> mFourCCSeen;
 };
 
 status_t IinfBox::parse(off64_t offset, size_t size) {
@@ -1188,7 +1189,7 @@ status_t IinfBox::onChunkData(uint32_t type, off64_t offset, size_t size) {
     status_t err = infeBox.parse(offset, size, &itemInfo);
     if (err == OK) {
         mItemInfos->push_back(itemInfo);
-        mHasGrids |= (itemInfo.itemType == FOURCC("grid"));
+        mFourCCSeen.insert(itemInfo.itemType);
     }
     // InfeBox parse returns ERROR_UNSUPPORTED if the box if an unsupported
     // version. Ignore this error as it's not fatal.
@@ -1277,7 +1278,7 @@ status_t ItemTable::parseIinfBox(off64_t offset, size_t size) {
         return err;
     }
 
-    if (iinfBox.hasGrids()) {
+    if (iinfBox.hasFourCC(FOURCC("grid")) || iinfBox.hasFourCC(FOURCC("Exif"))) {
         mRequiredBoxes.insert('iref');
     }
 
