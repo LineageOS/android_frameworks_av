@@ -106,7 +106,7 @@ status_t StreamHalHidl::setParameters(const String8& kvPairs) {
     status_t status = parametersFromHal(kvPairs, &hidlParams);
     if (status != OK) return status;
     return processReturn("setParameters",
-                         utils::setParameters(mStream, hidlParams, {} /* options */));
+                         utils::setParameters(mStream, {} /* context */, hidlParams));
 }
 
 status_t StreamHalHidl::getParameters(const String8& keys, String8 *values) {

@@ -706,6 +706,12 @@ status_t M3UParser::parse(const void *_data, size_t size) {
         ++lineNo;
     }
 
+    // playlist has no item, would cause exception
+    if (mItems.size() == 0) {
+        ALOGE("playlist has no item");
+        return ERROR_MALFORMED;
+    }
+
     // error checking of all fields that's required to appear once
     // (currently only checking "target-duration"), and
     // initialization of playlist properties (eg. mTargetDurationUs)

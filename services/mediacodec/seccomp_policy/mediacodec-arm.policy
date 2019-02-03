@@ -14,6 +14,7 @@ ppoll: 1
 mmap2: 1
 getrandom: 1
 memfd_create: 1
+ftruncate: 1
 ftruncate64: 1
 
 # mremap: Ensure |flags| are (MREMAP_MAYMOVE | MREMAP_FIXED) TODO: Once minijail

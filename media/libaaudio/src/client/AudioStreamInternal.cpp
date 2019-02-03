@@ -713,3 +713,7 @@ int32_t AudioStreamInternal::getFramesPerBurst() const {
 aaudio_result_t AudioStreamInternal::joinThread(void** returnArg) {
     return AudioStream::joinThread(returnArg, calculateReasonableTimeout(getFramesPerBurst()));
 }
+
+bool AudioStreamInternal::isClockModelInControl() const {
+    return isActive() && mAudioEndpoint.isFreeRunning() && mClockModel.isRunning();
+}

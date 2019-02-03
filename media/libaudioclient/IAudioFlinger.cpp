@@ -87,6 +87,8 @@ enum {
     SYSTEM_READY,
     FRAME_COUNT_HAL,
     GET_MICROPHONES,
+    SET_MASTER_BALANCE,
+    GET_MASTER_BALANCE,
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -240,6 +242,34 @@ public:
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
         remote()->transact(MASTER_MUTE, data, &reply);
         return reply.readInt32();
+    }
+
+    status_t setMasterBalance(float balance) override
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
+        data.writeFloat(balance);
+        status_t status = remote()->transact(SET_MASTER_BALANCE, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        return reply.readInt32();
+    }
+
+    status_t getMasterBalance(float *balance) const override
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
+        status_t status = remote()->transact(GET_MASTER_BALANCE, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = (status_t)reply.readInt32();
+        if (status != NO_ERROR) {
+            return status;
+        }
+        *balance = reply.readFloat();
+        return NO_ERROR;
     }
 
     virtual status_t setStreamVolume(audio_stream_type_t stream, float value,
@@ -1048,6 +1078,21 @@ status_t BnAudioFlinger::onTransact(
         case MASTER_MUTE: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
             reply->writeInt32( masterMute() );
+            return NO_ERROR;
+        } break;
+        case SET_MASTER_BALANCE: {
+            CHECK_INTERFACE(IAudioFlinger, data, reply);
+            reply->writeInt32( setMasterBalance(data.readFloat()) );
+            return NO_ERROR;
+        } break;
+        case GET_MASTER_BALANCE: {
+            CHECK_INTERFACE(IAudioFlinger, data, reply);
+            float f;
+            const status_t status = getMasterBalance(&f);
+            reply->writeInt32((int32_t)status);
+            if (status == NO_ERROR) {
+                (void)reply->writeFloat(f);
+            }
             return NO_ERROR;
         } break;
         case SET_STREAM_VOLUME: {

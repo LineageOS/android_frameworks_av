@@ -27,6 +27,7 @@ fstat: 1
 newfstatat: 1
 fstatfs: 1
 memfd_create: 1
+ftruncate: 1
 ftruncate64: 1
 
 # mremap: Ensure |flags| are (MREMAP_MAYMOVE | MREMAP_FIXED) TODO: Once minijail

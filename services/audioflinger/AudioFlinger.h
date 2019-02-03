@@ -30,6 +30,7 @@
 #include <sys/types.h>
 #include <limits.h>
 
+#include <android/os/BnExternalVibrationController.h>
 #include <android-base/macros.h>
 
 #include <cutils/atomic.h>
@@ -84,6 +85,8 @@
 #include <private/media/AudioEffectShared.h>
 #include <private/media/AudioTrackShared.h>
 
+#include <vibrator/ExternalVibration.h>
+
 #include "android/media/BnAudioRecord.h"
 
 namespace android {
@@ -136,6 +139,10 @@ public:
 
     virtual     float       masterVolume() const;
     virtual     bool        masterMute() const;
+
+    // Balance value must be within -1.f (left only) to 1.f (right only) inclusive.
+                status_t    setMasterBalance(float balance) override;
+                status_t    getMasterBalance(float *balance) const override;
 
     virtual     status_t    setStreamVolume(audio_stream_type_t stream, float value,
                                             audio_io_handle_t output);
@@ -284,6 +291,9 @@ public:
                             const sp<MmapStreamCallback>& callback,
                             sp<MmapStreamInterface>& interface,
                             audio_port_handle_t *handle);
+
+    static int onExternalVibrationStart(const sp<os::ExternalVibration>& externalVibration);
+    static void onExternalVibrationStop(const sp<os::ExternalVibration>& externalVibration);
 private:
     // FIXME The 400 is temporarily too high until a leak of writers in media.log is fixed.
     static const size_t kLogMemorySize = 400 * 1024;
@@ -776,6 +786,7 @@ using effect_buffer_t = int16_t;
                 // member variables below are protected by mLock
                 float                               mMasterVolume;
                 bool                                mMasterMute;
+                float                               mMasterBalance = 0.f;
                 // end of variables protected by mLock
 
                 DefaultKeyedVector< audio_io_handle_t, sp<RecordThread> >    mRecordThreads;
@@ -793,6 +804,7 @@ using effect_buffer_t = int16_t;
                 Vector<AudioSessionRef*> mAudioSessionRefs;
 
                 float       masterVolume_l() const;
+                float       getMasterBalance_l() const;
                 bool        masterMute_l() const;
                 audio_module_handle_t loadHwModule_l(const char *name);
 

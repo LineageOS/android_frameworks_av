@@ -77,6 +77,41 @@ cc_library_shared {
     },
 }
 
+cc_library_static {
+    name: "libstagefright_mpeg2extractor",
+
+    srcs: [
+        "Utils.cpp",
+        "MediaSource.cpp",
+        "HevcUtils.cpp",
+    ],
+
+    shared_libs: [
+        "liblog",
+        "libmedia",
+        "libmedia_omx",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    cflags: [
+        "-Wno-multichar",
+        "-Werror",
+        "-Wno-error=deprecated-declarations",
+        "-Wall",
+    ],
+
+    sanitize: {
+        cfi: true,
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+    },
+}
+
 cc_library {
     name: "libstagefright",
 

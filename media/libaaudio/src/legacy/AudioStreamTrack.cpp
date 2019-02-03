@@ -323,8 +323,8 @@ aaudio_result_t AudioStreamTrack::requestStop() {
     }
 
     setState(AAUDIO_STREAM_STATE_STOPPING);
-    incrementFramesRead(getFramesWritten() - getFramesRead()); // TODO review
-    mTimestampPosition.set(getFramesWritten());
+    mFramesRead.catchUpTo(getFramesWritten());
+    mTimestampPosition.catchUpTo(getFramesWritten());
     mFramesRead.reset32(); // service reads frames, service position reset on stop
     mTimestampPosition.reset32();
     mAudioTrack->stop();

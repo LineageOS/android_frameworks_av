@@ -97,7 +97,7 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
     mMediaClock->init();
 
     // set up an analytics record
-    mAnalyticsItem = new MediaAnalyticsItem(kKeyPlayer);
+    mAnalyticsItem = MediaAnalyticsItem::create(kKeyPlayer);
 
     mLooper->start(
             false, /* runOnCallingThread */
@@ -635,7 +635,7 @@ void NuPlayerDriver::logMetrics(const char *where) {
 
         // re-init in case we prepare() and start() again.
         delete mAnalyticsItem ;
-        mAnalyticsItem = new MediaAnalyticsItem("nuplayer");
+        mAnalyticsItem = MediaAnalyticsItem::create("nuplayer");
         if (mAnalyticsItem) {
             mAnalyticsItem->setUid(mClientUid);
         }

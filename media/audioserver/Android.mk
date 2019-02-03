@@ -19,7 +19,8 @@ LOCAL_SHARED_LIBRARIES := \
 	libnbaio \
 	libnblog \
 	libsoundtriggerservice \
-	libutils
+	libutils \
+	libvibrator
 
 # TODO oboeservice is the old folder name for aaudioservice. It will be changed.
 LOCAL_C_INCLUDES := \

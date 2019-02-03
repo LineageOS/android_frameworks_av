@@ -168,7 +168,7 @@ bool sendToMediaMetrics(const PerformanceData& data)
         return false;
     }
 
-    std::unique_ptr<MediaAnalyticsItem> item(new MediaAnalyticsItem("audiothread"));
+    std::unique_ptr<MediaAnalyticsItem> item(MediaAnalyticsItem::create("audiothread"));
 
     const Histogram &workHist = data.workHist;
     if (workHist.totalCount() > 0) {

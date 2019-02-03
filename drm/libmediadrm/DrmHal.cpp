@@ -168,7 +168,7 @@ static DrmPlugin::OfflineLicenseState toOfflineLicenseState(
     case OfflineLicenseState::USABLE:
         return DrmPlugin::kOfflineLicenseStateUsable;
     case OfflineLicenseState::INACTIVE:
-        return DrmPlugin::kOfflineLicenseStateInactive;
+        return DrmPlugin::kOfflineLicenseStateReleased;
     default:
         return DrmPlugin::kOfflineLicenseStateUnknown;
     }
@@ -1556,22 +1556,22 @@ void DrmHal::writeByteArray(Parcel &obj, hidl_vec<uint8_t> const &vec)
 
 void DrmHal::reportFrameworkMetrics() const
 {
-    MediaAnalyticsItem item("mediadrm");
-    item.generateSessionID();
-    item.setPkgName(mMetrics.GetAppPackageName().c_str());
+    std::unique_ptr<MediaAnalyticsItem> item(MediaAnalyticsItem::create("mediadrm"));
+    item->generateSessionID();
+    item->setPkgName(mMetrics.GetAppPackageName().c_str());
     String8 vendor;
     String8 description;
     status_t result = getPropertyStringInternal(String8("vendor"), vendor);
     if (result != OK) {
         ALOGE("Failed to get vendor from drm plugin: %d", result);
     } else {
-        item.setCString("vendor", vendor.c_str());
+        item->setCString("vendor", vendor.c_str());
     }
     result = getPropertyStringInternal(String8("description"), description);
     if (result != OK) {
         ALOGE("Failed to get description from drm plugin: %d", result);
     } else {
-        item.setCString("description", description.c_str());
+        item->setCString("description", description.c_str());
     }
 
     std::string serializedMetrics;
@@ -1582,9 +1582,9 @@ void DrmHal::reportFrameworkMetrics() const
     std::string b64EncodedMetrics = toBase64StringNoPad(serializedMetrics.data(),
                                                         serializedMetrics.size());
     if (!b64EncodedMetrics.empty()) {
-        item.setCString("serialized_metrics", b64EncodedMetrics.c_str());
+        item->setCString("serialized_metrics", b64EncodedMetrics.c_str());
     }
-    if (!item.selfrecord()) {
+    if (!item->selfrecord()) {
         ALOGE("Failed to self record framework metrics");
     }
 }
