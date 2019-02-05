@@ -206,6 +206,18 @@ AudioPolicyMixCollection::MixMatchStatus AudioPolicyMixCollection::mixMatch(
         const AudioMix* mix, size_t mixIndex, const audio_attributes_t& attributes, uid_t uid) {
 
     if (mix->mMixType == MIX_TYPE_PLAYERS) {
+        // Loopback render mixes are created from a public API and thus restricted
+        // to non sensible audio that have not opted out.
+        if (is_mix_loopback_render(mix->mRouteFlags)) {
+            if ((attributes.flags & AUDIO_FLAG_NO_CAPTURE) == AUDIO_FLAG_NO_CAPTURE) {
+                return MixMatchStatus::NO_MATCH;
+            }
+            if (!(attributes.usage == AUDIO_USAGE_UNKNOWN ||
+                  attributes.usage == AUDIO_USAGE_MEDIA ||
+                  attributes.usage == AUDIO_USAGE_GAME)) {
+                return MixMatchStatus::NO_MATCH;
+            }
+        }
         // TODO if adding more player rules (currently only 2), make rule handling "generic"
         //      as there is no difference in the treatment of usage- or uid-based rules
         bool hasUsageMatchRules = false;
