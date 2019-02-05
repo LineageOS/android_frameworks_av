@@ -18,22 +18,20 @@
 
 #include "Element.h"
 #include "EngineDefinition.h"
-#include <RoutingStrategy.h>
 #include <map>
 
 namespace android {
 namespace audio_policy {
 
 /**
- * @tparam routing_strategy: Applicable strategy for this stream.
+ * @tparam product_strategy_t: Applicable strategy for this stream.
  */
 template <>
 class Element<audio_stream_type_t>
 {
 public:
     Element(const std::string &name)
-        : mName(name),
-          mApplicableStrategy(STRATEGY_MEDIA)
+        : mName(name)
     {}
     ~Element() {}
 
@@ -61,7 +59,7 @@ public:
 
     /**
      * A Policy element may implement getter/setter function for a given property.
-     * Property may be routing_strategy, audio_stream_type_t, audio_usage_t, audio_source_t
+     * Property may be  audio_stream_type_t, audio_usage_t, audio_source_t
      * or a string.
      */
     template <typename Property>
@@ -77,8 +75,6 @@ private:
 
     std::string mName; /**< Unique literal Identifier of a policy base element*/
     audio_stream_type_t mIdentifier; /**< Unique numerical Identifier of a policy base element*/
-
-    routing_strategy mApplicableStrategy; /**< Applicable strategy for this stream. */
 
     audio_stream_type_t mVolumeProfile; /**< Volume Profile followed by this stream. */
 };

@@ -20,7 +20,6 @@
 #include <media/TypeConverter.h>
 
 using std::string;
-using android::routing_strategy;
 
 Stream::Stream(const string &/*mappingValue*/,
                CInstanceConfigurableElement *instanceConfigurableElement,
@@ -45,11 +44,8 @@ bool Stream::sendToHW(string & /*error*/)
     Applicable params;
     blackboardRead(&params, sizeof(params));
 
-    mPolicyPluginInterface->setStrategyForStream(mId,
-                                                 static_cast<routing_strategy>(params.strategy));
-
-    mPolicyPluginInterface->setVolumeProfileForStream(mId,
-                                                      static_cast<audio_stream_type_t>(params.volumeProfile));
+    mPolicyPluginInterface->setVolumeProfileForStream(
+                mId, static_cast<audio_stream_type_t>(params.volumeProfile));
 
     return true;
 

@@ -16,7 +16,7 @@
 
 #pragma once
 
-
+#include "EngineBase.h"
 #include "AudioPolicyManagerInterface.h"
 #include <AudioGain.h>
 #include <policy.h>
@@ -29,114 +29,69 @@ class AudioPolicyManagerObserver;
 namespace audio_policy
 {
 
-class Engine
+enum legacy_strategy {
+    STRATEGY_NONE = -1,
+    STRATEGY_MEDIA,
+    STRATEGY_PHONE,
+    STRATEGY_SONIFICATION,
+    STRATEGY_SONIFICATION_RESPECTFUL,
+    STRATEGY_DTMF,
+    STRATEGY_ENFORCED_AUDIBLE,
+    STRATEGY_TRANSMITTED_THROUGH_SPEAKER,
+    STRATEGY_ACCESSIBILITY,
+    STRATEGY_REROUTING,
+};
+
+class Engine : public EngineBase
 {
 public:
     Engine();
-    virtual ~Engine();
+    virtual ~Engine() = default;
 
     template <class RequestedInterface>
     RequestedInterface *queryInterface();
 
 private:
-    /// Interface members
-    class ManagerInterfaceImpl : public AudioPolicyManagerInterface
-    {
-    public:
-        explicit ManagerInterfaceImpl(Engine *policyEngine)
-            : mPolicyEngine(policyEngine) {}
+    ///
+    /// from EngineBase, so from AudioPolicyManagerInterface
+    ///
+    status_t setPhoneState(audio_mode_t mode) override;
 
-        virtual void setObserver(AudioPolicyManagerObserver *observer)
-        {
-            mPolicyEngine->setObserver(observer);
-        }
-        virtual status_t initCheck()
-        {
-            return mPolicyEngine->initCheck();
-        }
-        virtual audio_devices_t getDeviceForInputSource(audio_source_t inputSource) const
-        {
-            return mPolicyEngine->getDeviceForInputSource(inputSource);
-        }
-        virtual audio_devices_t getDeviceForStrategy(routing_strategy strategy) const
-        {
-            return mPolicyEngine->getDeviceForStrategy(strategy);
-        }
-        virtual routing_strategy getStrategyForStream(audio_stream_type_t stream)
-        {
-            return mPolicyEngine->getStrategyForStream(stream);
-        }
-        virtual routing_strategy getStrategyForUsage(audio_usage_t usage)
-        {
-            return mPolicyEngine->getStrategyForUsage(usage);
-        }
-        virtual status_t setPhoneState(audio_mode_t mode)
-        {
-            return mPolicyEngine->setPhoneState(mode);
-        }
-        virtual audio_mode_t getPhoneState() const
-        {
-            return mPolicyEngine->getPhoneState();
-        }
-        virtual status_t setForceUse(audio_policy_force_use_t usage,
-                                     audio_policy_forced_cfg_t config)
-        {
-            return mPolicyEngine->setForceUse(usage, config);
-        }
-        virtual audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage) const
-        {
-            return mPolicyEngine->getForceUse(usage);
-        }
-        virtual status_t setDeviceConnectionState(const sp<DeviceDescriptor> /*devDesc*/,
-                                                  audio_policy_dev_state_t /*state*/)
-        {
-            return NO_ERROR;
-        }
-    private:
-        Engine *mPolicyEngine;
-    } mManagerInterface;
+    status_t setForceUse(audio_policy_force_use_t usage,
+                         audio_policy_forced_cfg_t config) override;
+
+    DeviceVector getOutputDevicesForAttributes(const audio_attributes_t &attr,
+                                               const sp<DeviceDescriptor> &preferedDevice = nullptr,
+                                               bool fromCache = false) const override;
+
+    DeviceVector getOutputDevicesForStream(audio_stream_type_t stream,
+                                           bool fromCache = false) const override;
+
+    sp<DeviceDescriptor> getInputDeviceForAttributes(
+            const audio_attributes_t &attr, AudioMix **mix = nullptr) const override;
+
+    void updateDeviceSelectionCache() override;
 
 private:
     /* Copy facilities are put private to disable copy. */
     Engine(const Engine &object);
     Engine &operator=(const Engine &object);
 
-    void setObserver(AudioPolicyManagerObserver *observer);
-
-    status_t initCheck();
-
-    inline bool isInCall() const
-    {
-        return is_state_in_call(mPhoneState);
-    }
-
-    status_t setPhoneState(audio_mode_t mode);
-    audio_mode_t getPhoneState() const
-    {
-        return mPhoneState;
-    }
-    status_t setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config);
-    audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage) const
-    {
-        return mForceUse[usage];
-    }
     status_t setDefaultDevice(audio_devices_t device);
 
-    routing_strategy getStrategyForStream(audio_stream_type_t stream);
-    routing_strategy getStrategyForUsage(audio_usage_t usage);
-    audio_devices_t getDeviceForStrategy(routing_strategy strategy) const;
-    audio_devices_t getDeviceForStrategyInt(routing_strategy strategy,
-            DeviceVector availableOutputDevices,
-            DeviceVector availableInputDevices,
-            const SwAudioOutputCollection &outputs,
-            uint32_t outputDeviceTypesToIgnore) const;
+    audio_devices_t getDeviceForStrategyInt(legacy_strategy strategy,
+                                            DeviceVector availableOutputDevices,
+                                            DeviceVector availableInputDevices,
+                                            const SwAudioOutputCollection &outputs,
+                                            uint32_t outputDeviceTypesToIgnore) const;
+
+    DeviceVector getDevicesForProductStrategy(product_strategy_t strategy) const;
+
     audio_devices_t getDeviceForInputSource(audio_source_t inputSource) const;
-    audio_mode_t mPhoneState;  /**< current phone state. */
 
-    /** current forced use configuration. */
-    audio_policy_forced_cfg_t mForceUse[AUDIO_POLICY_FORCE_USE_CNT];
+    DeviceStrategyMap mDevicesForStrategies;
 
-    AudioPolicyManagerObserver *mApmObserver;
+    std::map<product_strategy_t, legacy_strategy> mLegacyStrategyMap;
 };
 } // namespace audio_policy
 } // namespace android

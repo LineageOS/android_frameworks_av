@@ -51,7 +51,6 @@
 #include <utils/Timers.h>
 #include <utils/Vector.h>
 
-#include <media/AudioPolicyHelper.h>
 #include <media/IMediaHTTPService.h>
 #include <media/IRemoteDisplay.h>
 #include <media/IRemoteDisplayClient.h>

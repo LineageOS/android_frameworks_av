@@ -45,7 +45,6 @@
 #include <utils/Timers.h>
 #include <utils/Vector.h>
 
-#include <media/AudioPolicyHelper.h>
 #include <media/IMediaHTTPService.h>
 #include <media/IRemoteDisplay.h>
 #include <media/IRemoteDisplayClient.h>
@@ -1627,7 +1626,7 @@ MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId, uid_t ui
         mAttributes = (audio_attributes_t *) calloc(1, sizeof(audio_attributes_t));
         if (mAttributes != NULL) {
             memcpy(mAttributes, attr, sizeof(audio_attributes_t));
-            mStreamType = audio_attributes_to_stream_type(attr);
+            mStreamType = AudioSystem::attributesToStreamType(*attr);
         }
     } else {
         mAttributes = NULL;
@@ -1816,7 +1815,7 @@ void MediaPlayerService::AudioOutput::setAudioAttributes(const audio_attributes_
             mAttributes = (audio_attributes_t *) calloc(1, sizeof(audio_attributes_t));
         }
         memcpy(mAttributes, attributes, sizeof(audio_attributes_t));
-        mStreamType = audio_attributes_to_stream_type(attributes);
+        mStreamType = AudioSystem::attributesToStreamType(*attributes);
     }
 }
 

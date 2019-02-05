@@ -302,7 +302,7 @@ sp<DeviceDescriptor> AudioPolicyMixCollection::getDeviceAndMixForOutput(
 }
 
 sp<DeviceDescriptor> AudioPolicyMixCollection::getDeviceAndMixForInputSource(
-        audio_source_t inputSource, const DeviceVector &availDevices, AudioMix **policyMix)
+        audio_source_t inputSource, const DeviceVector &availDevices, AudioMix **policyMix) const
 {
     for (size_t i = 0; i < size(); i++) {
         AudioMix *mix = valueAt(i)->getMix();

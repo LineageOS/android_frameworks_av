@@ -20,6 +20,7 @@
 #include <sys/types.h>
 
 #include <media/AudioPolicy.h>
+#include <media/AudioProductStrategy.h>
 #include <media/AudioIoDescriptor.h>
 #include <media/IAudioFlingerClient.h>
 #include <media/IAudioPolicyServiceClient.h>
@@ -363,6 +364,12 @@ public:
     static status_t setA11yServicesUids(const std::vector<uid_t>& uids);
 
     static bool     isHapticPlaybackSupported();
+
+    static status_t listAudioProductStrategies(AudioProductStrategyVector &strategies);
+    static product_strategy_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa);
+
+    static audio_attributes_t streamTypeToAttributes(audio_stream_type_t stream);
+    static audio_stream_type_t attributesToStreamType(const audio_attributes_t &attr);
 
     // ----------------------------------------------------------------------------
 

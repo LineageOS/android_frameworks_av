@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "DeviceDescriptor.h"
+
 namespace android {
 
 /**
@@ -33,5 +35,37 @@ public:
 
     virtual void setPatchHandle(audio_patch_handle_t handle) = 0;
 };
+
+template <class IoDescriptor, class Filter>
+sp<DeviceDescriptor> findPreferredDevice(
+        IoDescriptor& desc, Filter filter, bool& active, const DeviceVector& devices)
+{
+    auto activeClients = desc->clientsList(true /*activeOnly*/);
+    auto activeClientsWithRoute =
+        desc->clientsList(true /*activeOnly*/, filter, true /*preferredDevice*/);
+    active = activeClients.size() > 0;
+    if (active && activeClients.size() == activeClientsWithRoute.size()) {
+        return devices.getDeviceFromId(activeClientsWithRoute[0]->preferredDeviceId());
+    }
+    return nullptr;
+}
+
+template <class IoCollection, class Filter>
+sp<DeviceDescriptor> findPreferredDevice(
+        IoCollection& ioCollection, Filter filter, const DeviceVector& devices)
+{
+    sp<DeviceDescriptor> device;
+    for (size_t i = 0; i < ioCollection.size(); i++) {
+        auto desc = ioCollection.valueAt(i);
+        bool active;
+        sp<DeviceDescriptor> curDevice = findPreferredDevice(desc, filter, active, devices);
+        if (active && curDevice == nullptr) {
+            return nullptr;
+        } else if (curDevice != nullptr) {
+            device = curDevice;
+        }
+    }
+    return device;
+}
 
 } // namespace android
