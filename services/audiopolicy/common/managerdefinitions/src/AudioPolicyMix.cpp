@@ -42,7 +42,7 @@ void AudioPolicyMix::clearOutput()
     mOutput.clear();
 }
 
-void AudioPolicyMix::setMix(AudioMix &mix)
+void AudioPolicyMix::setMix(const AudioMix &mix)
 {
     mMix = mix;
 }
@@ -378,7 +378,7 @@ status_t AudioPolicyMixCollection::getInputMixForAttr(audio_attributes_t attr, A
     ALOGV("getInputMixForAttr looking for address %s\n  mixes available:", address.string());
     for (size_t i = 0; i < size(); i++) {
             sp<AudioPolicyMix> policyMix = valueAt(i);
-            AudioMix *mix = policyMix->getMix();
+            const AudioMix *mix = policyMix->getMix();
             ALOGV("\tmix %zu address=%s", i, mix->mDeviceAddress.string());
     }
 #endif
@@ -435,7 +435,7 @@ status_t AudioPolicyMixCollection::removeUidDeviceAffinities(uid_t uid) {
     // for each player mix: remove existing rules that match or exclude this uid
     for (size_t i = 0; i < size(); i++) {
         bool foundUidRule = false;
-        AudioMix *mix = valueAt(i)->getMix();
+        const AudioMix *mix = valueAt(i)->getMix();
         if (mix->mMixType != MIX_TYPE_PLAYERS) {
             continue;
         }
@@ -463,7 +463,7 @@ status_t AudioPolicyMixCollection::getDevicesForUid(uid_t uid,
     // for each player mix: find rules that don't exclude this uid, and add the device to the list
     for (size_t i = 0; i < size(); i++) {
         bool ruleAllowsUid = true;
-        AudioMix *mix = valueAt(i)->getMix();
+        const AudioMix *mix = valueAt(i)->getMix();
         if (mix->mMixType != MIX_TYPE_PLAYERS) {
             continue;
         }
