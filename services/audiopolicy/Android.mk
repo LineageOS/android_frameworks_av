@@ -11,8 +11,10 @@ LOCAL_SRC_FILES:= \
 LOCAL_C_INCLUDES := \
     frameworks/av/services/audioflinger \
     $(call include-path-for, audio-utils) \
-    frameworks/av/services/audiopolicy/common/include \
-    frameworks/av/services/audiopolicy/engine/interface \
+
+LOCAL_HEADER_LIBRARIES := \
+    libaudiopolicycommon \
+    libaudiopolicyengine_interface_headers \
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \
@@ -51,7 +53,7 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libutils \
     liblog \
-    libaudioclient \
+    libaudiopolicy \
     libsoundtrigger
 
 ifeq ($(USE_CONFIGURABLE_AUDIO_POLICY), 1)
@@ -76,9 +78,11 @@ LOCAL_SHARED_LIBRARIES += libaudiopolicyenginedefault
 endif # ifeq ($(USE_CONFIGURABLE_AUDIO_POLICY), 1)
 
 LOCAL_C_INCLUDES += \
-    frameworks/av/services/audiopolicy/common/include \
-    frameworks/av/services/audiopolicy/engine/interface \
     $(call include-path-for, audio-utils) \
+
+LOCAL_HEADER_LIBRARIES := \
+    libaudiopolicycommon \
+    libaudiopolicyengine_interface_headers
 
 LOCAL_STATIC_LIBRARIES := \
     libaudiopolicycomponents
@@ -114,9 +118,11 @@ LOCAL_STATIC_LIBRARIES := \
     libaudiopolicycomponents
 
 LOCAL_C_INCLUDES += \
-    frameworks/av/services/audiopolicy/common/include \
-    frameworks/av/services/audiopolicy/engine/interface \
     $(call include-path-for, audio-utils) \
+
+LOCAL_HEADER_LIBRARIES := \
+    libaudiopolicycommon \
+    libaudiopolicyengine_interface_headers
 
 LOCAL_CFLAGS := -Wall -Werror
 

@@ -44,9 +44,6 @@ AudioOutputDescriptor::AudioOutputDescriptor(const sp<AudioPort>& port,
         mMuteCount[i] = 0;
         mStopTime[i] = 0;
     }
-    for (int i = 0; i < NUM_STRATEGIES; i++) {
-        mStrategyMutedByDevice[i] = false;
-    }
     if (mPort.get() != nullptr) {
         mPort->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
         if (mPort->mGains.size() > 0) {
@@ -101,6 +98,7 @@ void AudioOutputDescriptor::changeStreamActiveCount(const sp<TrackClientDescript
         // return;
     }
     mActiveCount[stream] += delta;
+    mRoutingActivities[client->strategy()].changeActivityCount(delta);
 
     if (delta > 0) {
         mActiveClients[client] += delta;
@@ -120,6 +118,12 @@ void AudioOutputDescriptor::changeStreamActiveCount(const sp<TrackClientDescript
     }
 
     ALOGV("%s stream %d, count %d", __FUNCTION__, stream, mActiveCount[stream]);
+}
+
+void AudioOutputDescriptor::setStopTime(const sp<TrackClientDescriptor>& client, nsecs_t sysTime)
+{
+    mStopTime[client->stream()] = sysTime;
+    mRoutingActivities[client->strategy()].setStopTime(sysTime);
 }
 
 void AudioOutputDescriptor::setClientActive(const sp<TrackClientDescriptor>& client, bool active)
@@ -247,14 +251,15 @@ void AudioOutputDescriptor::toAudioPort(struct audio_port *port) const
     port->ext.mix.hw_module = getModuleHandle();
 }
 
-TrackClientVector AudioOutputDescriptor::clientsList(bool activeOnly, routing_strategy strategy,
+TrackClientVector AudioOutputDescriptor::clientsList(bool activeOnly, product_strategy_t strategy,
                                                      bool preferredDeviceOnly) const
 {
     TrackClientVector clients;
     for (const auto &client : getClientIterable()) {
         if ((!activeOnly || client->active())
-            && (strategy == STRATEGY_NONE || strategy == client->strategy())
-            && (!preferredDeviceOnly || client->hasPreferredDevice())) {
+            && (strategy == PRODUCT_STRATEGY_NONE || strategy == client->strategy())
+            && (!preferredDeviceOnly ||
+                (client->hasPreferredDevice() && !client->isPreferredDeviceForExclusiveUse()))) {
             clients.push_back(client);
         }
     }
@@ -693,6 +698,20 @@ bool SwAudioOutputCollection::isStreamActiveRemotely(audio_stream_type_t stream,
             if (outputDesc->mPolicyMix == NULL) {
                 return true;
             }
+        }
+    }
+    return false;
+}
+
+bool SwAudioOutputCollection::isStrategyActiveOnSameModule(product_strategy_t ps,
+                                                           const sp<SwAudioOutputDescriptor>& desc,
+                                                           uint32_t inPastMs, nsecs_t sysTime) const
+{
+    for (size_t i = 0; i < size(); i++) {
+        const sp<SwAudioOutputDescriptor> otherDesc = valueAt(i);
+        if (desc->sharesHwModuleWith(otherDesc) &&
+                otherDesc->isStrategyActive(ps, inPastMs, sysTime)) {
+            return true;
         }
     }
     return false;

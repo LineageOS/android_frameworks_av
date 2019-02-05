@@ -133,30 +133,6 @@
         </BitParameterBlock>
     </ComponentType>
 
-    <!-- Routing Strategy definition as an enumeration. Numerical value must match the value
-         of the routing strategy in policy header file. -->
-    <ComponentType Name="Strategy">
-        <EnumParameter Name="strategy" Size="32">
-            <ValuePair Literal="media" Numerical="0"/>
-            <ValuePair Literal="phone" Numerical="1"/>
-            <ValuePair Literal="sonification" Numerical="2"/>
-            <ValuePair Literal="sonification_respectful" Numerical="3"/>
-            <ValuePair Literal="dtmf" Numerical="4"/>
-            <ValuePair Literal="enforced_audible" Numerical="5"/>
-            <ValuePair Literal="transmitted_through_speaker" Numerical="6"/>
-            <ValuePair Literal="accessibility" Numerical="7"/>
-            <ValuePair Literal="rerouting" Numerical="8"/>
-        </EnumParameter>
-    </ComponentType>
-
-    <!--#################### STRATEGY COMMON TYPES BEGIN ####################-->
-
-    <ComponentType Name="StrategyConfig" Mapping="Strategy">
-        <Component Name="selected_output_devices" Type="OutputDevicesMask"/>
-    </ComponentType>
-
-    <!--#################### STRATEGY COMMON TYPES END ####################-->
-
     <!--#################### STREAM COMMON TYPES BEGIN ####################-->
 
     <ComponentType Name="VolumeProfileType">
@@ -178,20 +154,11 @@
     </ComponentType>
 
     <ComponentType Name="Stream"  Mapping="Stream">
-        <Component Name="applicable_strategy" Type="Strategy"/>
         <Component Name="applicable_volume_profile" Type="VolumeProfileType"
                    Description="Volume profile followed by a given stream type."/>
     </ComponentType>
 
     <!--#################### STREAM COMMON TYPES END ####################-->
-
-    <!--#################### USAGE COMMON TYPES BEGIN ####################-->
-
-    <ComponentType Name="Usage">
-        <Component Name="applicable_strategy" Type="Strategy" Mapping="Usage"/>
-    </ComponentType>
-
-    <!--#################### USAGE COMMON TYPES END ####################-->
 
     <!--#################### INPUT SOURCE COMMON TYPES BEGIN ####################-->
 
@@ -201,5 +168,15 @@
     </ComponentType>
 
     <!--#################### INPUT SOURCE COMMON TYPES END ####################-->
+
+    <!--#################### PRODUCT STRATEGY COMMON TYPES BEGIN ####################-->
+
+    <ComponentType Name="ProductStrategy" Mapping="ProductStrategy">
+        <Component Name="selected_output_devices" Type="OutputDevicesMask"/>
+        <StringParameter Name="device_address" MaxLength="256"
+                         Description="if any, device address associated"/>
+    </ComponentType>
+
+    <!--#################### PRODUCT STRATEGY COMMON TYPES END ####################-->
 
 </ComponentTypeSet>

@@ -34,7 +34,6 @@ public:
             const sp<DataSource> &source, const char *mime = NULL);
     static sp<IMediaExtractor> CreateFromService(
             const sp<DataSource> &source, const char *mime = NULL);
-    static void LoadPlugins(const ::std::string& apkPath);
     static status_t dump(int fd, const Vector<String16>& args);
     static std::unordered_set<std::string> getSupportedTypes();
     static void SetLinkedLibraries(const std::string& linkedLibraries);
@@ -46,8 +45,6 @@ private:
     static bool gIgnoreVersion;
     static std::string gLinkedLibraries;
 
-    static void RegisterExtractorsInApk(
-            const char *apkPath, std::list<sp<ExtractorPlugin>> &pluginList);
     static void RegisterExtractorsInSystem(
             const char *libDirPath, std::list<sp<ExtractorPlugin>> &pluginList);
     static void RegisterExtractorsInApex(
@@ -59,7 +56,7 @@ private:
             float *confidence, void **meta, FreeMetaFunc *freeMeta,
             sp<ExtractorPlugin> &plugin, uint32_t *creatorVersion);
 
-    static void UpdateExtractors(const char *newUpdateApkPath);
+    static void UpdateExtractors();
 };
 
 }  // namespace android

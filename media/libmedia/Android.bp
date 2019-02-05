@@ -144,18 +144,10 @@ cc_library_static {
     },
 }
 
-filegroup {
-    name: "mediaupdateservice_aidl",
-    srcs: [
-        "aidl/android/media/IMediaUpdateService.aidl",
-    ],
-}
-
 cc_library {
     name: "libmedia",
 
     srcs: [
-        ":mediaupdateservice_aidl",
         "IDataSource.cpp",
         "BufferingSettings.cpp",
         "mediaplayer.cpp",

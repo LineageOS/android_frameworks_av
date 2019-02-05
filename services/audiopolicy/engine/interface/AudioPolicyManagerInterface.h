@@ -17,7 +17,8 @@
 #pragma once
 
 #include <AudioPolicyManagerObserver.h>
-#include <RoutingStrategy.h>
+#include <media/AudioProductStrategy.h>
+#include <policy.h>
 #include <Volume.h>
 #include <HwModule.h>
 #include <DeviceDescriptor.h>
@@ -27,6 +28,10 @@
 #include <utils/Vector.h>
 
 namespace android {
+
+using DeviceStrategyMap = std::map<product_strategy_t, DeviceVector>;
+using StrategyVector = std::vector<product_strategy_t>;
+
 
 /**
  * This interface is dedicated to the policy manager that a Policy Engine shall implement.
@@ -48,42 +53,6 @@ public:
      * @param[in] observer handle on the manager.
      */
     virtual void setObserver(AudioPolicyManagerObserver *observer) = 0;
-
-    /**
-     * Get the input device selected for a given input source.
-     *
-     * @param[in] inputSource to get the selected input device associated to
-     *
-     * @return selected input device for the given input source, may be none if error.
-     */
-    virtual audio_devices_t getDeviceForInputSource(audio_source_t inputSource) const = 0;
-
-    /**
-     * Get the output device associated to a given strategy.
-     *
-     * @param[in] stream type for which the selected ouput device is requested.
-     *
-     * @return selected ouput device for the given strategy, may be none if error.
-     */
-    virtual audio_devices_t getDeviceForStrategy(routing_strategy stategy) const = 0;
-
-    /**
-     * Get the strategy selected for a given stream type.
-     *
-     * @param[in] stream: for which the selected strategy followed by is requested.
-     *
-     * @return strategy to be followed.
-     */
-    virtual routing_strategy getStrategyForStream(audio_stream_type_t stream) = 0;
-
-    /**
-     * Get the strategy selected for a given usage.
-     *
-     * @param[in] usage to get the selected strategy followed by.
-     *
-     * @return strategy to be followed.
-     */
-    virtual routing_strategy getStrategyForUsage(audio_usage_t usage) = 0;
 
     /**
      * Set the Telephony Mode.
@@ -132,6 +101,140 @@ public:
      */
     virtual status_t setDeviceConnectionState(const android::sp<android::DeviceDescriptor> devDesc,
                                               audio_policy_dev_state_t state) = 0;
+
+    /**
+     * Get the strategy selected for a given audio attributes.
+     *
+     * @param[in] audio attributes to get the selected @product_strategy_t followed by.
+     *
+     * @return @product_strategy_t to be followed.
+     */
+    virtual product_strategy_t getProductStrategyForAttributes(
+            const audio_attributes_t &attr) const = 0;
+
+    /**
+     * @brief getOutputDevicesForAttributes retrieves the devices to be used for given
+     * audio attributes.
+     * @param attributes of the output requesting Device(s) selection
+     * @param preferedDevice valid reference if a prefered device is requested, nullptr otherwise.
+     * @param fromCache if true, the device is returned from internal cache,
+     *                  otherwise it is determined by current state (device connected,phone state,
+     *                  force use, a2dp output...)
+     * @return vector of selected device descriptors.
+     *         Appropriate device for streams handled by the specified audio attributes according
+     *         to current phone state, forced states, connected devices...
+     *         if fromCache is true, the device is returned from internal cache,
+     *         otherwise it is determined by current state (device connected,phone state, force use,
+     *         a2dp output...)
+     * This allows to:
+     *      1 speed up process when the state is stable (when starting or stopping an output)
+     *      2 access to either current device selection (fromCache == true) or
+     *      "future" device selection (fromCache == false) when called from a context
+     *      where conditions are changing (setDeviceConnectionState(), setPhoneState()...) AND
+     *      before manager updates its outputs.
+     */
+    virtual DeviceVector getOutputDevicesForAttributes(
+            const audio_attributes_t &attributes,
+            const sp<DeviceDescriptor> &preferedDevice = nullptr,
+            bool fromCache = false) const = 0;
+
+    /**
+     * @brief getOutputDevicesForStream Legacy function retrieving devices from a stream type.
+     * @param stream type of the output requesting Device(s) selection
+     * @param fromCache if true, the device is returned from internal cache,
+     *                  otherwise it is determined by current state (device connected,phone state,
+     *                  force use, a2dp output...)
+     * @return appropriate device for streams handled by the specified audio attributes according
+     *         to current phone state, forced states, connected devices...
+     *         if fromCache is true, the device is returned from internal cache,
+     *         otherwise it is determined by current state (device connected,phone state, force use,
+     *         a2dp output...)
+     * This allows to:
+     *      1 speed up process when the state is stable (when starting or stopping an output)
+     *      2 access to either current device selection (fromCache == true) or
+     *      "future" device selection (fromCache == false) when called from a context
+     *      where conditions are changing (setDeviceConnectionState(), setPhoneState()...) AND
+     *      before manager updates its outputs.
+     */
+    virtual DeviceVector getOutputDevicesForStream(audio_stream_type_t stream,
+                                                   bool fromCache = false) const = 0;
+
+    /**
+     * Get the input device selected for given audio attributes.
+     *
+     * @param[in] attr audio attributes to consider
+     * @param[out] mix to be used if a mix has been installed for the given audio attributes.
+     * @return selected input device for the audio attributes, may be null if error.
+     */
+    virtual sp<DeviceDescriptor> getInputDeviceForAttributes(
+            const audio_attributes_t &attr, AudioMix **mix = nullptr) const = 0;
+
+    /**
+     * Get the legacy stream type for a given audio attributes.
+     *
+     * @param[in] audio attributes to get the associated audio_stream_type_t.
+     *
+     * @return audio_stream_type_t associated to the attributes.
+     */
+    virtual audio_stream_type_t getStreamTypeForAttributes(
+            const audio_attributes_t &attr) const = 0;
+
+    /**
+     * @brief getAttributesForStream get the audio attributes from legacy stream type
+     * @param stream to consider
+     * @return audio attributes matching the legacy stream type
+     */
+    virtual audio_attributes_t getAttributesForStreamType(audio_stream_type_t stream) const = 0;
+
+    /**
+     * @brief getStreamTypesForProductStrategy retrieves the list of legacy stream type following
+     * the given product strategy
+     * @param ps product strategy to consider
+     * @return associated legacy Stream Types vector of the given product strategy
+     */
+    virtual StreamTypeVector getStreamTypesForProductStrategy(product_strategy_t ps) const = 0;
+
+    /**
+     * @brief getAllAttributesForProductStrategy retrieves all the attributes following the given
+     * product strategy. Any attributes that "matches" with this one will follow the product
+     * strategy.
+     * "matching" means the usage shall match if reference attributes has a defined usage, AND
+     * content type shall match if reference attributes has a defined content type AND
+     * flags shall match if reference attributes has defined flags AND
+     * tags shall match if reference attributes has defined tags.
+     * @param ps product strategy to consider
+     * @return vector of product strategy ids, empty if unknown strategy.
+     */
+    virtual AttributesVector getAllAttributesForProductStrategy(product_strategy_t ps) const = 0;
+
+    /**
+     * @brief getOrderedAudioProductStrategies
+     * @return priority ordered product strategies to help the AudioPolicyManager evaluating the
+     * device selection per output according to the prioritized strategies.
+     */
+    virtual StrategyVector getOrderedProductStrategies() const = 0;
+
+    /**
+     * @brief updateDeviceSelectionCache. Device selection for AudioAttribute / Streams is cached
+     * in the engine in order to speed up process when the audio system is stable.
+     * When a device is connected, the android mode is changed, engine is notified and can update
+     * the cache.
+     * When starting / stopping an output with a stream that can affect notification, the engine
+     * needs to update the cache upon this function call.
+     */
+    virtual void updateDeviceSelectionCache() = 0;
+
+    /**
+     * @brief listAudioProductStrategies. Introspection API to retrieve a collection of
+     * AudioProductStrategyVector that allows to build AudioAttributes according to a
+     * product_strategy which is just an index. It has also a human readable name to help the
+     * Car/Oem/AudioManager identiying the use case.
+     * @param strategies collection.
+     * @return OK if the list has been retrieved, error code otherwise
+     */
+    virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies) const = 0;
+
+    virtual void dump(String8 *dst) const = 0;
 
 protected:
     virtual ~AudioPolicyManagerInterface() {}

@@ -82,10 +82,10 @@ void RecordClientDescriptor::dump(String8 *dst, int spaces, int index) const
 SourceClientDescriptor::SourceClientDescriptor(audio_port_handle_t portId, uid_t uid,
          audio_attributes_t attributes, const sp<AudioPatch>& patchDesc,
          const sp<DeviceDescriptor>& srcDevice, audio_stream_type_t stream,
-         routing_strategy strategy) :
+         product_strategy_t strategy) :
     TrackClientDescriptor::TrackClientDescriptor(portId, uid, AUDIO_SESSION_NONE, attributes,
         AUDIO_CONFIG_BASE_INITIALIZER, AUDIO_PORT_HANDLE_NONE,
-        stream, strategy, AUDIO_OUTPUT_FLAG_NONE),
+        stream, strategy, AUDIO_OUTPUT_FLAG_NONE, false),
         mPatchDesc(patchDesc), mSrcDevice(srcDevice)
 {
 }

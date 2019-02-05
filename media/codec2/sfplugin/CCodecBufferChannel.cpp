@@ -1550,13 +1550,13 @@ void CCodecBufferChannel::ReorderStash::emplace(
         int64_t timestamp,
         int32_t flags,
         const C2WorkOrdinalStruct &ordinal) {
-    for (auto it = mStash.begin(); it != mStash.end(); ++it) {
+    auto it = mStash.begin();
+    for (; it != mStash.end(); ++it) {
         if (less(ordinal, it->ordinal)) {
-            mStash.emplace(it, buffer, timestamp, flags, ordinal);
-            return;
+            break;
         }
     }
-    mStash.emplace_back(buffer, timestamp, flags, ordinal);
+    mStash.emplace(it, buffer, timestamp, flags, ordinal);
     while (!mStash.empty() && mStash.size() > mDepth) {
         mPending.push_back(mStash.front());
         mStash.pop_front();
@@ -2746,32 +2746,39 @@ void CCodecBufferChannel::sendOutputBuffers() {
     size_t index;
 
     while (true) {
-        {
-            Mutexed<ReorderStash>::Locked reorder(mReorderStash);
-            if (!reorder->hasPending()) {
-                break;
-            }
-            if (!reorder->pop(&entry)) {
-                break;
-            }
+        Mutexed<ReorderStash>::Locked reorder(mReorderStash);
+        if (!reorder->hasPending()) {
+            break;
         }
+        if (!reorder->pop(&entry)) {
+            break;
+        }
+
         Mutexed<std::unique_ptr<OutputBuffers>>::Locked buffers(mOutputBuffers);
         status_t err = (*buffers)->registerBuffer(entry.buffer, &index, &outBuffer);
         if (err != OK) {
+            bool outputBuffersChanged = false;
             if (err != WOULD_BLOCK) {
                 if (!(*buffers)->isArrayMode()) {
                     *buffers = (*buffers)->toArrayMode(mNumOutputSlots);
                 }
                 OutputBuffersArray *array = (OutputBuffersArray *)buffers->get();
                 array->realloc(entry.buffer);
+                outputBuffersChanged = true;
+            }
+            ALOGV("[%s] sendOutputBuffers: unable to register output buffer", mName);
+            reorder->defer(entry);
+
+            buffers.unlock();
+            reorder.unlock();
+
+            if (outputBuffersChanged) {
                 mCCodecCallback->onOutputBuffersChanged();
             }
-            buffers.unlock();
-            ALOGV("[%s] sendOutputBuffers: unable to register output buffer", mName);
-            mReorderStash.lock()->defer(entry);
             return;
         }
         buffers.unlock();
+        reorder.unlock();
 
         outBuffer->meta()->setInt64("timeUs", entry.timestamp);
         outBuffer->meta()->setInt32("flags", entry.flags);

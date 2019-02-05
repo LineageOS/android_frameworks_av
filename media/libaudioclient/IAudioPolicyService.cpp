@@ -92,7 +92,9 @@ enum {
     IS_HAPTIC_PLAYBACK_SUPPORTED,
     SET_UID_DEVICE_AFFINITY,
     REMOVE_UID_DEVICE_AFFINITY,
-    GET_OFFLOAD_FORMATS_A2DP
+    GET_OFFLOAD_FORMATS_A2DP,
+    LIST_AUDIO_PRODUCT_STRATEGIES,
+    GET_STRATEGY_FOR_ATTRIBUTES,
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -412,7 +414,7 @@ public:
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
         data.writeInt32(static_cast <uint32_t>(stream));
         remote()->transact(GET_STRATEGY_FOR_STREAM, data, &reply);
-        return reply.readInt32();
+        return reply.readUint32();
     }
 
     virtual audio_devices_t getDevicesForStream(audio_stream_type_t stream)
@@ -1051,18 +1053,60 @@ public:
         return status;
     }
 
-    virtual status_t removeUidDeviceAffinities(uid_t uid)
-    {
+    virtual status_t removeUidDeviceAffinities(uid_t uid) {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
 
         data.writeInt32((int32_t) uid);
 
-        status_t status = remote()->transact(REMOVE_UID_DEVICE_AFFINITY, data, &reply);
+        status_t status =
+            remote()->transact(REMOVE_UID_DEVICE_AFFINITY, data, &reply);
         if (status == NO_ERROR) {
-            status = (status_t)reply.readInt32();
+            status = (status_t) reply.readInt32();
         }
         return status;
+    }
+
+    virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+
+        status_t status = remote()->transact(LIST_AUDIO_PRODUCT_STRATEGIES, data, &reply);
+        if (status != NO_ERROR) {
+            ALOGE("%s: permission denied", __func__);
+            return status;
+        }
+        status = static_cast<status_t>(reply.readInt32());
+        if (status == NO_ERROR) {
+            uint32_t numStrategies = static_cast<uint32_t>(reply.readInt32());
+            for (size_t i = 0; i < numStrategies; i++) {
+                AudioProductStrategy strategy;
+                status = strategy.readFromParcel(&reply);
+                if (status != NO_ERROR) {
+                    ALOGE("%s: failed to read strategies", __FUNCTION__);
+                    strategies.clear();
+                    return status;
+                }
+                strategies.push_back(strategy);
+            }
+        }
+        return status;
+    }
+
+    virtual product_strategy_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        status_t status = aa.writeToParcel(&data);
+        if (status != NO_ERROR) {
+            return PRODUCT_STRATEGY_NONE;
+        }
+        status = remote()->transact(GET_STRATEGY_FOR_ATTRIBUTES, data, &reply);
+        if (status == NO_ERROR) {
+            return static_cast<product_strategy_t>(reply.readInt32());
+        }
+        return PRODUCT_STRATEGY_NONE;
     }
 };
 
@@ -1082,7 +1126,6 @@ status_t BnAudioPolicyService::onTransact(
         case START_INPUT:
         case STOP_INPUT:
         case RELEASE_INPUT:
-        case GET_STRATEGY_FOR_STREAM:
         case GET_OUTPUT_FOR_EFFECT:
         case REGISTER_EFFECT:
         case UNREGISTER_EFFECT:
@@ -1378,7 +1421,7 @@ status_t BnAudioPolicyService::onTransact(
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             audio_stream_type_t stream =
                     static_cast <audio_stream_type_t>(data.readInt32());
-            reply->writeInt32(getStrategyForStream(stream));
+            reply->writeUint32(getStrategyForStream(stream));
             return NO_ERROR;
         } break;
 
@@ -1932,6 +1975,46 @@ status_t BnAudioPolicyService::onTransact(
             const uid_t uid = (uid_t) data.readInt32();
             status_t status = removeUidDeviceAffinities(uid);
             reply->writeInt32(status);
+            return NO_ERROR;
+        }
+
+        case LIST_AUDIO_PRODUCT_STRATEGIES: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            AudioProductStrategyVector strategies;
+            status_t status = listAudioProductStrategies(strategies);
+            reply->writeInt32(status);
+            if (status != NO_ERROR) {
+                return status;
+            }
+            size_t size = strategies.size();
+            size_t sizePosition = reply->dataPosition();
+            reply->writeInt32(size);
+            size_t finalSize = size;
+            for (size_t i = 0; i < size; i++) {
+                size_t position = reply->dataPosition();
+                if (strategies[i].writeToParcel(reply) != NO_ERROR) {
+                    reply->setDataPosition(position);
+                    finalSize--;
+                }
+            }
+            if (size != finalSize) {
+                size_t position = reply->dataPosition();
+                reply->setDataPosition(sizePosition);
+                reply->writeInt32(finalSize);
+                reply->setDataPosition(position);
+            }
+            return NO_ERROR;
+        }
+
+        case GET_STRATEGY_FOR_ATTRIBUTES: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            AudioAttributes attributes;
+            status_t status = attributes.readFromParcel(&data);
+            if (status != NO_ERROR) {
+                return status;
+            }
+            product_strategy_t strategy = getProductStrategyFromAudioAttributes(attributes);
+            reply->writeUint32(static_cast<int>(strategy));
             return NO_ERROR;
         }
 

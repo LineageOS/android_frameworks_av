@@ -39,6 +39,9 @@ class ParameterMgrPlatformConnectorLogger;
 namespace android {
 namespace audio_policy {
 
+using ValuePair = std::pair<uint32_t, std::string>;
+using ValuePairs = std::vector<ValuePair>;
+
 class ParameterManagerWrapper
 {
 private:
@@ -118,6 +121,17 @@ public:
     status_t setDeviceConnectionState(const sp<DeviceDescriptor> devDesc,
                                       audio_policy_dev_state_t state);
 
+    /**
+     * @brief addCriterion to the policy pfw
+     * @param name of the criterion
+     * @param isInclusive if true, inclusive, if false exclusive criterion type
+     * @param pairs of numerical/literal values of the criterion
+     * @param defaultValue provided as literal.
+     * @return
+     */
+    status_t addCriterion(const std::string &name, bool isInclusive, ValuePairs pairs,
+                          const std::string &defaultValue);
+
 private:
     /**
      * Apply the configuration of the platform on the policy parameter manager.
@@ -130,13 +144,6 @@ private:
      *      - no if need to set more than one before triggering an apply configuration.
      */
     void applyPlatformConfiguration();
-
-    /**
-     * Load the criterion configuration file.
-     *
-     * @return NO_ERROR is parsing successful, error code otherwise.
-     */
-    status_t loadConfig();
 
      /**
      * Retrieve an element from a map by its name.

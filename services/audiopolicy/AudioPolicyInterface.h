@@ -240,6 +240,10 @@ public:
                 std::vector<audio_format_t> *formats) = 0;
 
     virtual void     setAppState(uid_t uid, app_state_t state);
+
+    virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies) = 0;
+
+    virtual product_strategy_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa) = 0;
 };
 
 

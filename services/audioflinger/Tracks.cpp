@@ -449,7 +449,7 @@ AudioFlinger::PlaybackThread::Track::Track(
             || thread->type() == ThreadBase::DUPLICATING;
 #ifdef TEE_SINK
     mTee.setId(std::string("_") + std::to_string(mThreadIoHandle)
-            + "_" + std::to_string(mId));
+            + "_" + std::to_string(mId) + "_T");
 #endif
 
     if (channelMask & AUDIO_CHANNEL_HAPTIC_ALL) {

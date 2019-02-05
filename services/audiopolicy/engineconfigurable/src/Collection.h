@@ -18,8 +18,6 @@
 
 #include "Element.h"
 #include "Stream.h"
-#include "Strategy.h"
-#include "Usage.h"
 #include "InputSource.h"
 #include <utils/Errors.h>
 #include <system/audio.h>
@@ -147,15 +145,9 @@ struct Collection<audio_stream_type_t>::collectionSupported {};
 template <>
 struct Collection<std::string>::collectionSupported {};
 template <>
-struct Collection<audio_usage_t>::collectionSupported {};
-template <>
 struct Collection<audio_source_t>::collectionSupported {};
-template <>
-struct Collection<routing_strategy>::collectionSupported {};
 
-typedef Collection<routing_strategy> StrategyCollection;
 typedef Collection<audio_stream_type_t> StreamCollection;
-typedef Collection<audio_usage_t> UsageCollection;
 typedef Collection<audio_source_t> InputSourceCollection;
 
 } // namespace audio_policy

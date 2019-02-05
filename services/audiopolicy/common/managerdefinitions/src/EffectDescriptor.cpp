@@ -24,8 +24,9 @@ namespace android {
 
 void EffectDescriptor::dump(String8 *dst, int spaces) const
 {
+    dst->appendFormat("%*sID: %d\n", spaces, "", mId);
     dst->appendFormat("%*sI/O: %d\n", spaces, "", mIo);
-    dst->appendFormat("%*sStrategy: %d\n", spaces, "", mStrategy);
+    dst->appendFormat("%*sMusic Effect: %s\n", spaces, "", isMusicEffect()? "yes" : "no");
     dst->appendFormat("%*sSession: %d\n", spaces, "", mSession);
     dst->appendFormat("%*sName: %s\n", spaces, "",  mDesc.name);
     dst->appendFormat("%*s%s\n", spaces, "",  mEnabled ? "Enabled" : "Disabled");
@@ -41,9 +42,8 @@ EffectDescriptorCollection::EffectDescriptorCollection() :
 
 status_t EffectDescriptorCollection::registerEffect(const effect_descriptor_t *desc,
                                                     audio_io_handle_t io,
-                                                    uint32_t strategy,
                                                     int session,
-                                                    int id)
+                                                    int id, bool isMusicEffect)
 {
     if (getEffect(id) != nullptr) {
         ALOGW("%s effect %s already registered", __FUNCTION__, desc->name);
@@ -59,18 +59,11 @@ status_t EffectDescriptorCollection::registerEffect(const effect_descriptor_t *d
     if (mTotalEffectsMemory > mTotalEffectsMemoryMaxUsed) {
         mTotalEffectsMemoryMaxUsed = mTotalEffectsMemory;
     }
-    ALOGV("registerEffect() effect %s, io %d, strategy %d session %d id %d",
-            desc->name, io, strategy, session, id);
+    ALOGV("registerEffect() effect %s, io %d, session %d id %d",
+            desc->name, io, session, id);
     ALOGV("registerEffect() memory %d, total memory %d", desc->memoryUsage, mTotalEffectsMemory);
 
-    sp<EffectDescriptor> effectDesc = new EffectDescriptor();
-    memcpy (&effectDesc->mDesc, desc, sizeof(effect_descriptor_t));
-    effectDesc->mId = id;
-    effectDesc->mIo = io;
-    effectDesc->mStrategy = static_cast<routing_strategy>(strategy);
-    effectDesc->mSession = session;
-    effectDesc->mEnabled = false;
-
+    sp<EffectDescriptor> effectDesc = new EffectDescriptor(desc, isMusicEffect, id, io, session);
     add(id, effectDesc);
 
     return NO_ERROR;
@@ -161,7 +154,7 @@ bool EffectDescriptorCollection::isNonOffloadableEffectEnabled() const
 {
     for (size_t i = 0; i < size(); i++) {
         sp<EffectDescriptor> effectDesc = valueAt(i);
-        if (effectDesc->mEnabled && (effectDesc->mStrategy == STRATEGY_MEDIA) &&
+        if (effectDesc->mEnabled && (effectDesc->isMusicEffect()) &&
                 ((effectDesc->mDesc.flags & EFFECT_FLAG_OFFLOAD_SUPPORTED) == 0)) {
             ALOGV("isNonOffloadableEffectEnabled() non offloadable effect %s enabled on session %d",
                   effectDesc->mDesc.name, effectDesc->mSession);

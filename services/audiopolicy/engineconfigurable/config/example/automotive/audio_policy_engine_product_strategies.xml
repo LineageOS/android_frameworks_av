@@ -1,0 +1,161 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- Copyright (C) 2018 The Android Open Source Project
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<ProductStrategies>
+    <!-- OEM Usages -->
+    <!-- product_strategy will be defined according this order
+    product_strategy is oem_traffic_anouncement if all the conditions are satisfied for
+    AudioAttributes aa
+
+    int type = 0;
+    if (bundle != null) {
+    type = bundle.getInt(KEY_OEM_TYPE, 0);
+    }
+    if(
+    ( aa.mContentType == AudioAttributes.AUDIO_CONTENT_TYPE_SPEECH ) &&
+    ( aa.mUsage == AudioAttributes.AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE ) &&
+    ( type == 1 ) )
+    -->
+
+    <ProductStrategy name="oem_traffic_anouncement">
+        <AttributesGroup>
+            <ContentType value="AUDIO_CONTENT_TYPE_SPEECH"/>
+            <Usage value="AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE"/>
+            <!--  traffic_annoucement = 1 -->
+            <Bundle key="oem" value="1"/>
+        </AttributesGroup>
+    </ProductStrategy>
+    <ProductStrategy name="oem_strategy_1">
+        <AttributesGroup>
+            <ContentType value="AUDIO_CONTENT_TYPE_SPEECH"/>
+            <Usage value="AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE"/>
+            <Bundle key="oem" value="2"/>
+        </AttributesGroup>
+    </ProductStrategy>
+    <ProductStrategy name="oem_strategy_2">
+        <AttributesGroup>
+            <ContentType value="AUDIO_CONTENT_TYPE_SPEECH"/>
+            <Usage value="AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE"/>
+            <Bundle key="oem" value="3"/>
+        </AttributesGroup>
+    </ProductStrategy>
+
+    <!-- Car Usages -->
+    <!-- Keep those lines only for car -->
+    <!-- Check car conditions if any OEM conditions matched -->
+    <!-- As defined by CarAudioAttributesUtil.java -->
+    <!-- product_strategy will be defined according this order
+    product_strategy is radio if all the conditions are satisfied for AudioAttributes aa
+
+        int type = CAR_AUDIO_TYPE_DEFAULT;
+        if (bundle != null) {
+        type = bundle.getInt(KEY_CAR_AUDIO_TYPE, CAR_AUDIO_TYPE_DEFAULT);
+        }
+        if(
+        ( aa.mContentType == AudioAttributes.AUDIO_CONTENT_TYPE_SPEECH ) &&
+        ( aa.mUsage == AudioAttributes.AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE ) &&
+        ( type == CAR_AUDIO_TYPE_RADIO ) )
+        -->
+    <ProductStrategy name="radio">
+        <AttributesGroup>
+            <ContentType value="AUDIO_CONTENT_TYPE_MUSIC"/>
+            <Usage value="AUDIO_USAGE_MEDIA"/>
+            <Bundle key="car_audio_type" value="3"/>
+        </AttributesGroup>
+    </ProductStrategy>
+    <ProductStrategy name="ext_audio_source">
+        <AttributesGroup>
+            <ContentType value="AUDIO_CONTENT_TYPE_MUSIC"/>
+            <Usage value="AUDIO_USAGE_MEDIA"/>
+            <Bundle key="car_audio_type" value="7"/>
+        </AttributesGroup>
+    </ProductStrategy>
+    <ProductStrategy name="voice_command">
+        <AttributesGroup>
+            <Attributes>
+                <ContentType value="AUDIO_CONTENT_TYPE_SPEECH"/>
+                <Usage value="AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE"/>
+                <!--  CAR_AUDIO_TYPE_VOICE_COMMAND = 1 -->
+                <Bundle key="car_audio_type" value="1"/>
+            </Attributes>
+            <Attributes> <Usage value="AUDIO_USAGE_ASSISTANCE_ACCESSIBILITY"/> </Attributes>
+            <Attributes> <Usage value="AUDIO_USAGE_ASSISTANT"/> </Attributes>
+        </AttributesGroup>
+    </ProductStrategy>
+    <ProductStrategy name="safety_alert">
+        <AttributesGroup>
+            <ContentType value="AUDIO_CONTENT_TYPE_SONIFICATION"/>
+            <Usage value="AUDIO_USAGE_NOTIFICATION"/>
+            <!--  CAR_AUDIO_TYPE_SAFETY_ALERT = 2 -->
+            <Bundle key="car_audio_type" value="2"/>
+        </AttributesGroup>
+    </ProductStrategy>
+
+    <!-- To be checked
+    CAR_AUDIO_TYPE_CARSERVICE_BOTTOM
+    CAR_AUDIO_TYPE_CARSERVICE_CAR_PROXY
+    CAR_AUDIO_TYPE_CARSERVICE_MEDIA_MUTE
+    -->
+
+    <!-- Generic Usages -->
+    <ProductStrategy name="music">
+        <AttributesGroup streamType="AUDIO_STREAM_MUSIC">
+            <Attributes> <Usage value="AUDIO_USAGE_MEDIA"/> </Attributes>
+            <Attributes> <Usage value="AUDIO_USAGE_GAME"/> </Attributes>
+            <!-- Default product strategy has empty attributes -->
+            <Attributes></Attributes>
+        </AttributesGroup>
+    </ProductStrategy>
+
+    <ProductStrategy name="nav_guidance">
+        <AttributesGroup>
+            <Usage value="AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE"/>
+        </AttributesGroup>
+    </ProductStrategy>
+    <ProductStrategy name="voice_call">
+        <AttributesGroup streamType="AUDIO_STREAM_VOICE_CALL">
+            <Attributes> <Usage value="AUDIO_USAGE_VOICE_COMMUNICATION"/> </Attributes>
+            <Attributes> <Usage value="AUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING"/> </Attributes>
+            <Attributes> <Flags value="AUDIO_FLAG_SCO"/> </Attributes>
+        </AttributesGroup>
+    </ProductStrategy>
+    <ProductStrategy name="alarm">
+        <AttributesGroup streamType="AUDIO_STREAM_ALARM">
+            <Usage value="AUDIO_USAGE_ALARM"/>
+        </AttributesGroup>
+    </ProductStrategy>
+    <ProductStrategy name="ring">
+        <AttributesGroup streamType="AUDIO_STREAM_RING">
+            <Usage value="AUDIO_USAGE_NOTIFICATION_TELEPHONY_RINGTONE"/>
+        </AttributesGroup>
+    </ProductStrategy>
+    <ProductStrategy name="notification">
+        <AttributesGroup streamType="AUDIO_STREAM_NOTIFICATION">
+            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION"/> </Attributes>
+            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_COMMUNICATION_INSTANT"/> </Attributes>
+            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_COMMUNICATION_DELAYED"/> </Attributes>
+            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_COMMUNICATION_REQUEST"/> </Attributes>
+            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_EVENT"/> </Attributes>
+        </AttributesGroup>
+    </ProductStrategy>
+    <ProductStrategy name="system">
+        <AttributesGroup streamType="AUDIO_STREAM_SYSTEM">
+            <Usage value="AUDIO_USAGE_ASSISTANCE_SONIFICATION"/>
+        </AttributesGroup>
+    </ProductStrategy>
+
+</ProductStrategies>
+
