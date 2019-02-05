@@ -654,7 +654,7 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDynamicDepthTags()
     bool isDepthExclusivePresent = std::find(chTags.data.i32, chTags.data.i32 + chTags.count,
             depthExclTag) != (chTags.data.i32 + chTags.count);
     bool isDepthSizePresent = std::find(chTags.data.i32, chTags.data.i32 + chTags.count,
-            depthExclTag) != (chTags.data.i32 + chTags.count);
+            depthSizesTag) != (chTags.data.i32 + chTags.count);
     if (!(isDepthExclusivePresent && isDepthSizePresent)) {
         // No depth support, nothing more to do.
         return OK;
@@ -682,7 +682,6 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDynamicDepthTags()
     getSupportedDynamicDepthSizes(supportedBlobSizes, supportedDepthSizes,
             &supportedDynamicDepthSizes, &internalDepthSizes);
     if (supportedDynamicDepthSizes.empty()) {
-        ALOGE("%s: No dynamic depth size matched!", __func__);
         // Nothing more to do.
         return OK;
     }
@@ -1734,11 +1733,10 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
                 __FUNCTION__, strerror(-res), res);
         return;
     }
-    res = addDynamicDepthTags();
-    if (OK != res) {
-        ALOGE("%s: Failed appending dynamic depth tags: %s (%d)", __FUNCTION__, strerror(-res),
-                res);
-        return;
+    auto stat = addDynamicDepthTags();
+    if (OK != stat) {
+        ALOGE("%s: Failed appending dynamic depth tags: %s (%d)", __FUNCTION__, strerror(-stat),
+                stat);
     }
     camera_metadata_entry flashAvailable =
             mCameraCharacteristics.find(ANDROID_FLASH_INFO_AVAILABLE);
