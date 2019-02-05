@@ -273,9 +273,16 @@ ssize_t MediaCodecList::findCodecByType(
 }
 
 ssize_t MediaCodecList::findCodecByName(const char *name) const {
+    Vector<AString> aliases;
     for (size_t i = 0; i < mCodecInfos.size(); ++i) {
         if (strcmp(mCodecInfos[i]->getCodecName(), name) == 0) {
             return i;
+        }
+        mCodecInfos[i]->getAliases(&aliases);
+        for (const AString &alias : aliases) {
+            if (alias == name) {
+                return i;
+            }
         }
     }
 
