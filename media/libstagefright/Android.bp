@@ -220,6 +220,7 @@ cc_library {
     ],
 
     header_libs:[
+        "libnativeloader-dummy-headers",
         "libstagefright_xmlparser_headers",
         "media_ndk_headers",
     ],
