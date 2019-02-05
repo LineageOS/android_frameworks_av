@@ -173,6 +173,10 @@ public:
 
     virtual status_t    shellCommand(int in, int out, int err, const Vector<String16>& args);
 
+    binder::Status      addListenerHelper(const sp<hardware::ICameraServiceListener>& listener,
+            /*out*/
+            std::vector<hardware::CameraStatus>* cameraStatuses, bool isVendor = false);
+
     /////////////////////////////////////////////////////////////////////
     // Client functionality
 
@@ -615,6 +619,10 @@ private:
         sp<BasicClient>* client,
         std::shared_ptr<resource_policy::ClientDescriptor<String8, sp<BasicClient>>>* partial);
 
+    // Should an operation attempt on a cameraId be rejected, if the camera id is
+    // advertised as a publically hidden secure camera, by the camera HAL ?
+    bool shouldRejectHiddenCameraConnection(const String8 & cameraId);
+
     // Single implementation shared between the various connect calls
     template<class CALLBACK, class CLIENT>
     binder::Status connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
@@ -781,7 +789,8 @@ private:
     sp<CameraProviderManager> mCameraProviderManager;
 
     // Guarded by mStatusListenerMutex
-    std::vector<sp<hardware::ICameraServiceListener>> mListenerList;
+    std::vector<std::pair<bool, sp<hardware::ICameraServiceListener>>> mListenerList;
+
     Mutex       mStatusListenerLock;
 
     /**

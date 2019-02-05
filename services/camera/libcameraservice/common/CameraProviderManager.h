@@ -264,6 +264,7 @@ public:
      */
     bool isLogicalCamera(const std::string& id, std::vector<std::string>* physicalCameraIds);
 
+    bool isPublicallyHiddenSecureCamera(const std::string& id);
     bool isHiddenPhysicalCamera(const std::string& cameraId);
 
     static const float kDepthARTolerance;
@@ -354,6 +355,7 @@ private:
             std::vector<std::string> mPhysicalIds;
             hardware::CameraInfo mInfo;
             sp<IBase> mSavedInterface;
+            bool mIsPublicallyHiddenSecureCamera = false;
 
             const hardware::camera::common::V1_0::CameraResourceCost mResourceCost;
 
@@ -471,6 +473,7 @@ private:
             CameraMetadata mCameraCharacteristics;
             std::unordered_map<std::string, CameraMetadata> mPhysicalCameraCharacteristics;
             void queryPhysicalCameraIds();
+            bool isPublicallyHiddenSecureCamera();
             status_t fixupMonochromeTags();
             status_t addDynamicDepthTags();
             static void getSupportedSizes(const CameraMetadata& ch, uint32_t tag,
