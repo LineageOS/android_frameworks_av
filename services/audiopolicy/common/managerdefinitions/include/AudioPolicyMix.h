@@ -71,7 +71,7 @@ public:
      * @param[out] desc to return if an primary output could be found.
      * @param[out] secondaryDesc other desc that the audio should be routed to.
      */
-    status_t getOutputForAttr(audio_attributes_t attributes, uid_t uid,
+    status_t getOutputForAttr(const audio_attributes_t& attributes, uid_t uid,
                 sp<SwAudioOutputDescriptor> &primaryDesc,
                 std::vector<sp<SwAudioOutputDescriptor>> *secondaryDescs);
 
@@ -102,7 +102,7 @@ public:
 private:
     enum class MixMatchStatus { MATCH, NO_MATCH, INVALID_MIX };
     MixMatchStatus mixMatch(const AudioMix* mix, size_t mixIndex,
-                            audio_attributes_t attributes, uid_t uid);
+                            const audio_attributes_t& attributes, uid_t uid);
 };
 
 } // namespace android
