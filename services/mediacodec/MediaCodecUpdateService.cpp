@@ -20,27 +20,11 @@
 #include <android/dlext.h>
 #include <dlfcn.h>
 #include <media/CodecServiceRegistrant.h>
+#include <nativeloader/dlext_namespaces.h>
 #include <utils/Log.h>
 #include <utils/String8.h>
 
 #include "MediaCodecUpdateService.h"
-
-// Copied from GraphicsEnv.cpp
-// TODO(b/37049319) Get this from a header once one exists
-extern "C" {
-  android_namespace_t* android_create_namespace(const char* name,
-                                                const char* ld_library_path,
-                                                const char* default_library_path,
-                                                uint64_t type,
-                                                const char* permitted_when_isolated_path,
-                                                android_namespace_t* parent);
-  bool android_link_namespaces(android_namespace_t* from,
-                               android_namespace_t* to,
-                               const char* shared_libs_sonames);
-  enum {
-     ANDROID_NAMESPACE_TYPE_ISOLATED = 1,
-  };
-}
 
 namespace android {
 

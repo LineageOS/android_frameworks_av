@@ -108,6 +108,9 @@ LOCAL_SHARED_LIBRARIES := \
     libutils \
     libziparchive \
 
+LOCAL_HEADER_LIBRARIES := \
+    libnativeloader-dummy-headers \
+
 LOCAL_MODULE := mediaswcodec
 LOCAL_INIT_RC := mediaswcodec.rc
 LOCAL_SANITIZE := scudo
