@@ -86,6 +86,7 @@ using android::DISPLAY_ORIENTATION_90;
 using android::INFO_FORMAT_CHANGED;
 using android::INFO_OUTPUT_BUFFERS_CHANGED;
 using android::INVALID_OPERATION;
+using android::NAME_NOT_FOUND;
 using android::NO_ERROR;
 using android::UNKNOWN_ERROR;
 
@@ -585,8 +586,12 @@ static status_t recordScreen(const char* fileName) {
     self->startThreadPool();
 
     // Get main display parameters.
-    sp<IBinder> mainDpy = SurfaceComposerClient::getBuiltInDisplay(
-            ISurfaceComposer::eDisplayIdMain);
+    const sp<IBinder> mainDpy = SurfaceComposerClient::getInternalDisplayToken();
+    if (mainDpy == nullptr) {
+        fprintf(stderr, "ERROR: no display\n");
+        return NAME_NOT_FOUND;
+    }
+
     DisplayInfo mainDpyInfo;
     err = SurfaceComposerClient::getDisplayInfo(mainDpy, &mainDpyInfo);
     if (err != NO_ERROR) {
