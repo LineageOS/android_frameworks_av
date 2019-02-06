@@ -97,13 +97,13 @@ status_t ClearKeyDescramblerFactory::createPlugin(
 ///////////////////////////////////////////////////////////////////////////////
 ClearKeyCasPlugin::ClearKeyCasPlugin(
         void *appData, CasPluginCallback callback)
-    : mCallback(callback), mAppData(appData) {
+    : mCallback(callback), mCallbackExt(NULL), mAppData(appData) {
     ALOGV("CTOR");
 }
 
 ClearKeyCasPlugin::ClearKeyCasPlugin(
         void *appData, CasPluginCallbackExt callback)
-    : mCallbackExt(callback), mAppData(appData) {
+    : mCallback(NULL), mCallbackExt(callback), mAppData(appData) {
     ALOGV("CTOR");
 }
 
