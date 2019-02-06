@@ -3595,7 +3595,7 @@ void MPEG4Writer::Track::bufferChunk(int64_t timestampUs) {
 }
 
 int64_t MPEG4Writer::Track::getDurationUs() const {
-    return mTrackDurationUs + getStartTimeOffsetTimeUs();
+    return mTrackDurationUs + getStartTimeOffsetTimeUs() + mOwner->getStartTimeOffsetBFramesUs();
 }
 
 int64_t MPEG4Writer::Track::getEstimatedTrackSizeBytes() const {
@@ -4059,7 +4059,7 @@ void MPEG4Writer::Track::writeEdtsBox(){
     // Prepone video playback.
     if (mMinCttsOffsetTicks != mMaxCttsOffsetTicks) {
         int32_t mvhdTimeScale = mOwner->getTimeScale();
-        uint32_t tkhdDuration = (mTrackDurationUs * mvhdTimeScale + 5E5) / 1E6;
+        uint32_t tkhdDuration = (getDurationUs() * mvhdTimeScale + 5E5) / 1E6;
         int64_t mediaTime = ((kMaxCttsOffsetTimeUs - getMinCttsOffsetTimeUs())
             * mTimeScale + 5E5) / 1E6;
         if (tkhdDuration > 0 && mediaTime > 0) {
