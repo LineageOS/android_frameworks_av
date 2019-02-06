@@ -34,6 +34,7 @@
 #include <media/ICrypto.h>
 
 #include "InputSurfaceWrapper.h"
+#include "PipelineWatcher.h"
 
 namespace android {
 
@@ -44,7 +45,6 @@ public:
     virtual ~CCodecCallback() = default;
     virtual void onError(status_t err, enum ActionCode actionCode) = 0;
     virtual void onOutputFramesRendered(int64_t mediaTimeUs, nsecs_t renderTimeNs) = 0;
-    virtual void onWorkQueued(bool eos) = 0;
     virtual void onOutputBuffersChanged() = 0;
 };
 
@@ -128,22 +128,21 @@ public:
      * @param workItems   finished work item.
      * @param outputFormat new output format if it has changed, otherwise nullptr
      * @param initData    new init data (CSD) if it has changed, otherwise nullptr
-     * @param numDiscardedInputBuffers the number of input buffers that are
-     *                    returned for the first time (not previously returned by
-     *                    onInputBufferDone()).
      */
     void onWorkDone(
             std::unique_ptr<C2Work> work, const sp<AMessage> &outputFormat,
-            const C2StreamInitDataInfo::output *initData,
-            size_t numDiscardedInputBuffers);
+            const C2StreamInitDataInfo::output *initData);
 
     /**
      * Make an input buffer available for the client as it is no longer needed
      * by the codec.
      *
-     * @param buffer The buffer that becomes unused.
+     * @param frameIndex The index of input work
+     * @param arrayIndex The index of buffer in the input work buffers.
      */
-    void onInputBufferDone(const std::shared_ptr<C2Buffer>& buffer);
+    void onInputBufferDone(uint64_t frameIndex, size_t arrayIndex);
+
+    PipelineWatcher::Clock::duration elapsed();
 
     enum MetaMode {
         MODE_NONE,
@@ -266,79 +265,7 @@ private:
 
     MetaMode mMetaMode;
 
-    // PipelineCapacity is used in the input buffer gating logic.
-    //
-    // There are three criteria that need to be met before
-    // onInputBufferAvailable() is called:
-    // 1. The number of input buffers that have been received by
-    //    CCodecBufferChannel but not returned via onWorkDone() or
-    //    onInputBufferDone() does not exceed a certain limit. (Let us call this
-    //    number the "input" capacity.)
-    // 2. The number of work items that have been received by
-    //    CCodecBufferChannel whose outputs have not been returned from the
-    //    component (by calling onWorkDone()) does not exceed a certain limit.
-    //    (Let us call this the "component" capacity.)
-    //
-    // These three criteria guarantee that a new input buffer that arrives from
-    // the invocation of onInputBufferAvailable() will not
-    // 1. overload CCodecBufferChannel's input buffers;
-    // 2. overload the component; or
-    //
-    struct PipelineCapacity {
-        // The number of available input capacity.
-        std::atomic_int input;
-        // The number of available component capacity.
-        std::atomic_int component;
-
-        PipelineCapacity();
-        // Set the values of #input and #component.
-        void initialize(int newInput, int newComponent,
-                        const char* newName = "<UNKNOWN COMPONENT>",
-                        const char* callerTag = nullptr);
-
-        // Return true and decrease #input and #component by one if
-        // they are all greater than zero; return false otherwise.
-        //
-        // callerTag is used for logging only.
-        //
-        // allocate() is called by CCodecBufferChannel to check whether it can
-        // receive another input buffer. If the return value is true,
-        // onInputBufferAvailable() and onOutputBufferAvailable() can be called
-        // afterwards.
-        bool allocate(const char* callerTag = nullptr);
-
-        // Increase #input and #component by one.
-        //
-        // callerTag is used for logging only.
-        //
-        // free() is called by CCodecBufferChannel after allocate() returns true
-        // but onInputBufferAvailable() cannot be called for any reasons. It
-        // essentially undoes an allocate() call.
-        void free(const char* callerTag = nullptr);
-
-        // Increase #input by @p numDiscardedInputBuffers.
-        //
-        // callerTag is used for logging only.
-        //
-        // freeInputSlots() is called by CCodecBufferChannel when onWorkDone()
-        // or onInputBufferDone() is called. @p numDiscardedInputBuffers is
-        // provided in onWorkDone(), and is 1 in onInputBufferDone().
-        int freeInputSlots(size_t numDiscardedInputBuffers,
-                           const char* callerTag = nullptr);
-
-        // Increase #component by one and return the updated value.
-        //
-        // callerTag is used for logging only.
-        //
-        // freeComponentSlot() is called by CCodecBufferChannel when
-        // onWorkDone() is called.
-        int freeComponentSlot(const char* callerTag = nullptr);
-
-    private:
-        // Component name. Used for logging.
-        const char* mName;
-    };
-    PipelineCapacity mAvailablePipelineCapacity;
+    Mutexed<PipelineWatcher> mPipelineWatcher;
 
     class ReorderStash {
     public:

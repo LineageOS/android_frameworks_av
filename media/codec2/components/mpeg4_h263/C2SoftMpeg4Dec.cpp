@@ -60,7 +60,11 @@ public:
         noInputLatency();
         noTimeStretch();
 
-        // TODO: output latency and reordering
+        // TODO: Proper support for reorder depth.
+        addParameter(
+                DefineParam(mActualOutputDelay, C2_PARAMKEY_OUTPUT_DELAY)
+                .withConstValue(new C2PortActualDelayTuning::output(1u))
+                .build());
 
         addParameter(
                 DefineParam(mAttrib, C2_PARAMKEY_COMPONENT_ATTRIBUTES)

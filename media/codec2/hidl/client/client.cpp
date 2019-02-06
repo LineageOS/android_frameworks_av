@@ -344,17 +344,13 @@ struct Codec2Client::Component::HidlListener : public IComponentListener {
             return Void();
         }
         // release input buffers potentially held by the component from queue
-        size_t numDiscardedInputBuffers = 0;
         std::shared_ptr<Codec2Client::Component> strongComponent =
                 component.lock();
         if (strongComponent) {
-            numDiscardedInputBuffers =
-                    strongComponent->handleOnWorkDone(workItems);
+            strongComponent->handleOnWorkDone(workItems);
         }
         if (std::shared_ptr<Codec2Client::Listener> listener = base.lock()) {
-            listener->onWorkDone(component,
-                                 workItems,
-                                 numDiscardedInputBuffers);
+            listener->onWorkDone(component, workItems);
         } else {
             LOG(DEBUG) << "onWorkDone -- listener died.";
         }
@@ -418,26 +414,15 @@ struct Codec2Client::Component::HidlListener : public IComponentListener {
             LOG(DEBUG) << "onInputBuffersReleased -- listener died.";
             return Void();
         }
-        std::shared_ptr<Codec2Client::Component> strongComponent =
-                component.lock();
-        if (!strongComponent) {
-            LOG(DEBUG) << "onInputBuffersReleased -- component died.";
-            return Void();
-        }
         for (const InputBuffer& inputBuffer : inputBuffers) {
-            std::shared_ptr<C2Buffer> buffer =
-                    strongComponent->freeInputBuffer(
-                        inputBuffer.frameIndex,
-                        inputBuffer.arrayIndex);
             LOG(VERBOSE) << "onInputBuffersReleased --"
                             " received death notification of"
                             " input buffer:"
                             " frameIndex = " << inputBuffer.frameIndex
                          << ", bufferIndex = " << inputBuffer.arrayIndex
                          << ".";
-            if (buffer) {
-                listener->onInputBufferDone(buffer);
-            }
+            listener->onInputBufferDone(
+                    inputBuffer.frameIndex, inputBuffer.arrayIndex);
         }
         return Void();
     }
@@ -918,43 +903,8 @@ c2_status_t Codec2Client::Component::destroyBlockPool(
     return static_cast<c2_status_t>(static_cast<Status>(transResult));
 }
 
-size_t Codec2Client::Component::handleOnWorkDone(
+void Codec2Client::Component::handleOnWorkDone(
         const std::list<std::unique_ptr<C2Work>> &workItems) {
-    // Input buffers' lifetime management
-    std::vector<uint64_t> inputDone;
-    for (const std::unique_ptr<C2Work> &work : workItems) {
-        if (work) {
-            if (work->worklets.empty()
-                    || !work->worklets.back()
-                    || (work->worklets.back()->output.flags &
-                        C2FrameData::FLAG_INCOMPLETE) == 0) {
-                // input is complete
-                inputDone.emplace_back(work->input.ordinal.frameIndex.peeku());
-            }
-        }
-    }
-
-    size_t numDiscardedInputBuffers = 0;
-    {
-        std::lock_guard<std::mutex> lock(mInputBuffersMutex);
-        for (uint64_t inputIndex : inputDone) {
-            auto it = mInputBuffers.find(inputIndex);
-            if (it == mInputBuffers.end()) {
-                LOG(VERBOSE) << "onWorkDone -- returned consumed/unknown "
-                                "input frame: index = "
-                             << inputIndex << ".";
-            } else {
-                LOG(VERBOSE) << "onWorkDone -- processed input frame: "
-                             << inputIndex
-                             << " (containing " << it->second.size()
-                                 << " buffers).";
-                mInputBuffers.erase(it);
-                mInputBufferCount.erase(inputIndex);
-                ++numDiscardedInputBuffers;
-            }
-        }
-    }
-
     // Output bufferqueue-based blocks' lifetime management
     mOutputBufferQueueMutex.lock();
     sp<IGraphicBufferProducer> igbp = mOutputIgbp;
@@ -965,72 +915,10 @@ size_t Codec2Client::Component::handleOnWorkDone(
     if (igbp) {
         holdBufferQueueBlocks(workItems, igbp, bqId, generation);
     }
-    return numDiscardedInputBuffers;
-}
-
-std::shared_ptr<C2Buffer> Codec2Client::Component::freeInputBuffer(
-        uint64_t frameIndex,
-        size_t bufferIndex) {
-    std::shared_ptr<C2Buffer> buffer;
-    std::lock_guard<std::mutex> lock(mInputBuffersMutex);
-    auto it = mInputBuffers.find(frameIndex);
-    if (it == mInputBuffers.end()) {
-        LOG(INFO) << "freeInputBuffer -- Unrecognized input frame index "
-                  << frameIndex << ".";
-        return nullptr;
-    }
-    if (bufferIndex >= it->second.size()) {
-        LOG(INFO) << "freeInputBuffer -- Input buffer number " << bufferIndex
-                  << " is not valid in input with frame index " << frameIndex
-                  << ".";
-        return nullptr;
-    }
-    buffer = it->second[bufferIndex];
-    if (!buffer) {
-        LOG(INFO) << "freeInputBuffer -- Input buffer number " << bufferIndex
-                  << " in input with frame index " << frameIndex
-                  << " has already been freed.";
-        return nullptr;
-    }
-    it->second[bufferIndex] = nullptr;
-    if (--mInputBufferCount[frameIndex] == 0) {
-        mInputBuffers.erase(it);
-        mInputBufferCount.erase(frameIndex);
-    }
-    return buffer;
 }
 
 c2_status_t Codec2Client::Component::queue(
         std::list<std::unique_ptr<C2Work>>* const items) {
-    // remember input buffers queued to hold reference to them
-    {
-        std::lock_guard<std::mutex> lock(mInputBuffersMutex);
-        for (const std::unique_ptr<C2Work> &work : *items) {
-            if (!work) {
-                continue;
-            }
-            if (work->input.buffers.size() == 0) {
-                continue;
-            }
-
-            uint64_t inputIndex = work->input.ordinal.frameIndex.peeku();
-            auto res = mInputBuffers.emplace(inputIndex, work->input.buffers);
-            if (!res.second) {
-                // TODO: append? - for now we are replacing
-                res.first->second = work->input.buffers;
-                LOG(INFO) << "queue -- duplicate input frame index: "
-                          << inputIndex
-                          << ". Discarding the old input frame...";
-            }
-            mInputBufferCount[inputIndex] = work->input.buffers.size();
-            LOG(VERBOSE) << "queue -- queuing input frame: "
-                         << "index = " << inputIndex
-                         << ", number of buffers = "
-                             << work->input.buffers.size()
-                         << ".";
-        }
-    }
-
     WorkBundle workBundle;
     if (!objcpy(&workBundle, *items, &mBufferPoolSender)) {
         LOG(ERROR) << "queue -- bad input.";
@@ -1088,24 +976,6 @@ c2_status_t Codec2Client::Component::flush(
         }
     }
 
-    // Input buffers' lifetime management
-    for (uint64_t flushedIndex : flushedIndices) {
-        std::lock_guard<std::mutex> lock(mInputBuffersMutex);
-        auto it = mInputBuffers.find(flushedIndex);
-        if (it == mInputBuffers.end()) {
-            LOG(VERBOSE) << "flush -- returned consumed/unknown input frame: "
-                            "index = " << flushedIndex << ".";
-        } else {
-            LOG(VERBOSE) << "flush -- returned unprocessed input frame: "
-                            "index = " << flushedIndex
-                         << ", number of buffers = "
-                             << mInputBufferCount[flushedIndex]
-                         << ".";
-            mInputBuffers.erase(it);
-            mInputBufferCount.erase(flushedIndex);
-        }
-    }
-
     // Output bufferqueue-based blocks' lifetime management
     mOutputBufferQueueMutex.lock();
     sp<IGraphicBufferProducer> igbp = mOutputIgbp;
@@ -1160,10 +1030,6 @@ c2_status_t Codec2Client::Component::stop() {
     if (status != C2_OK) {
         LOG(DEBUG) << "stop -- call failed: " << status << ".";
     }
-    mInputBuffersMutex.lock();
-    mInputBuffers.clear();
-    mInputBufferCount.clear();
-    mInputBuffersMutex.unlock();
     return status;
 }
 
@@ -1178,10 +1044,6 @@ c2_status_t Codec2Client::Component::reset() {
     if (status != C2_OK) {
         LOG(DEBUG) << "reset -- call failed: " << status << ".";
     }
-    mInputBuffersMutex.lock();
-    mInputBuffers.clear();
-    mInputBufferCount.clear();
-    mInputBuffersMutex.unlock();
     return status;
 }
 
@@ -1196,10 +1058,6 @@ c2_status_t Codec2Client::Component::release() {
     if (status != C2_OK) {
         LOG(DEBUG) << "release -- call failed: " << status << ".";
     }
-    mInputBuffersMutex.lock();
-    mInputBuffers.clear();
-    mInputBufferCount.clear();
-    mInputBuffersMutex.unlock();
     return status;
 }
 
