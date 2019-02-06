@@ -7608,6 +7608,13 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      */
     ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_MONOCHROME                = 12,
 
+    /**
+     * <p>The camera device is capable of writing image data into a region of memory
+     * inaccessible to Android userspace or the Android kernel, and only accessible to
+     * trusted execution environments (TEE).</p>
+     */
+    ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_SECURE_IMAGE_DATA         = 13,
+
 } acamera_metadata_enum_android_request_available_capabilities_t;
 
 

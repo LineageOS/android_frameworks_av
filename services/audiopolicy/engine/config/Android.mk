@@ -19,7 +19,6 @@ LOCAL_SRC_FILES := \
 LOCAL_CFLAGS += -Wall -Werror -Wextra
 
 LOCAL_SHARED_LIBRARIES := \
-    libparameter \
     libmedia_helper \
     libandroidicu \
     libxml2 \

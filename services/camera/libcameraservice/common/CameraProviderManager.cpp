@@ -499,6 +499,17 @@ void CameraProviderManager::ProviderInfo::DeviceInfo3::queryPhysicalCameraIds() 
     }
 }
 
+bool CameraProviderManager::ProviderInfo::DeviceInfo3::isPublicallyHiddenSecureCamera() {
+    camera_metadata_entry_t entryCap;
+    entryCap = mCameraCharacteristics.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    if (entryCap.count != 1) {
+        // Do NOT hide this camera device if the capabilities specify anything more
+        // than ANDROID_REQUEST_AVAILABLE_CAPABILITIES_SECURE_IMAGE_DATA.
+        return false;
+    }
+    return entryCap.data.u8[0] == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_SECURE_IMAGE_DATA;
+}
+
 void CameraProviderManager::ProviderInfo::DeviceInfo3::getSupportedSizes(
         const CameraMetadata& ch, uint32_t tag, android_pixel_format_t format,
         std::vector<std::tuple<size_t, size_t>> *sizes/*out*/) {
@@ -643,7 +654,7 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDynamicDepthTags()
     bool isDepthExclusivePresent = std::find(chTags.data.i32, chTags.data.i32 + chTags.count,
             depthExclTag) != (chTags.data.i32 + chTags.count);
     bool isDepthSizePresent = std::find(chTags.data.i32, chTags.data.i32 + chTags.count,
-            depthExclTag) != (chTags.data.i32 + chTags.count);
+            depthSizesTag) != (chTags.data.i32 + chTags.count);
     if (!(isDepthExclusivePresent && isDepthSizePresent)) {
         // No depth support, nothing more to do.
         return OK;
@@ -671,7 +682,6 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDynamicDepthTags()
     getSupportedDynamicDepthSizes(supportedBlobSizes, supportedDepthSizes,
             &supportedDynamicDepthSizes, &internalDepthSizes);
     if (supportedDynamicDepthSizes.empty()) {
-        ALOGE("%s: No dynamic depth size matched!", __func__);
         // Nothing more to do.
         return OK;
     }
@@ -875,6 +885,16 @@ bool CameraProviderManager::isLogicalCamera(const std::string& id,
         *physicalCameraIds = deviceInfo->mPhysicalIds;
     }
     return deviceInfo->mIsLogicalCamera;
+}
+
+bool CameraProviderManager::isPublicallyHiddenSecureCamera(const std::string& id) {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+
+    auto deviceInfo = findDeviceInfoLocked(id);
+    if (deviceInfo == nullptr) {
+        return false;
+    }
+    return deviceInfo->mIsPublicallyHiddenSecureCamera;
 }
 
 bool CameraProviderManager::isHiddenPhysicalCamera(const std::string& cameraId) {
@@ -1704,17 +1724,19 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
                 __FUNCTION__, id.c_str(), CameraProviderManager::statusToString(status), status);
         return;
     }
+
+    mIsPublicallyHiddenSecureCamera = isPublicallyHiddenSecureCamera();
+
     status_t res = fixupMonochromeTags();
     if (OK != res) {
         ALOGE("%s: Unable to fix up monochrome tags based for older HAL version: %s (%d)",
                 __FUNCTION__, strerror(-res), res);
         return;
     }
-    res = addDynamicDepthTags();
-    if (OK != res) {
-        ALOGE("%s: Failed appending dynamic depth tags: %s (%d)", __FUNCTION__, strerror(-res),
-                res);
-        return;
+    auto stat = addDynamicDepthTags();
+    if (OK != stat) {
+        ALOGE("%s: Failed appending dynamic depth tags: %s (%d)", __FUNCTION__, strerror(-stat),
+                stat);
     }
     camera_metadata_entry flashAvailable =
             mCameraCharacteristics.find(ANDROID_FLASH_INFO_AVAILABLE);
@@ -1726,6 +1748,7 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
     }
 
     queryPhysicalCameraIds();
+
     // Get physical camera characteristics if applicable
     auto castResult = device::V3_5::ICameraDevice::castFrom(interface);
     if (!castResult.isOk()) {
