@@ -972,7 +972,9 @@ status_t BnAudioPolicyService::onTransact(
             break;
     }
 
-    TimeCheck check("IAudioPolicyService");
+    char timeCheckString[64];
+    snprintf(timeCheckString, sizeof(timeCheckString), "IAudioPolicyService: %d", code);
+    TimeCheck check(timeCheckString);
 
     switch (code) {
         case SET_DEVICE_CONNECTION_STATE: {
