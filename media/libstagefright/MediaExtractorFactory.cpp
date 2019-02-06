@@ -30,6 +30,7 @@
 #include <media/stagefright/MediaExtractorFactory.h>
 #include <media/IMediaExtractor.h>
 #include <media/IMediaExtractorService.h>
+#include <nativeloader/dlext_namespaces.h>
 #include <private/android_filesystem_config.h>
 #include <cutils/properties.h>
 #include <utils/String8.h>
@@ -37,23 +38,6 @@
 
 #include <dirent.h>
 #include <dlfcn.h>
-
-// Copied from GraphicsEnv.cpp
-// TODO(b/37049319) Get this from a header once one exists
-extern "C" {
-  android_namespace_t* android_create_namespace(const char* name,
-                                                const char* ld_library_path,
-                                                const char* default_library_path,
-                                                uint64_t type,
-                                                const char* permitted_when_isolated_path,
-                                                android_namespace_t* parent);
-  bool android_link_namespaces(android_namespace_t* from,
-                               android_namespace_t* to,
-                               const char* shared_libs_sonames);
-  enum {
-     ANDROID_NAMESPACE_TYPE_ISOLATED = 1,
-  };
-}
 
 namespace android {
 
