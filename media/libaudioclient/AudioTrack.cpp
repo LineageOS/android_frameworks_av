@@ -2959,14 +2959,12 @@ status_t AudioTrack::removeAudioDeviceCallback(
         ALOGW("%s(%d): removing NULL callback!", __func__, mPortId);
         return BAD_VALUE;
     }
-    {
-        AutoMutex lock(mLock);
-        if (mDeviceCallback.unsafe_get() != callback.get()) {
-            ALOGW("%s removing different callback!", __FUNCTION__);
-            return INVALID_OPERATION;
-        }
-        mDeviceCallback.clear();
+    AutoMutex lock(mLock);
+    if (mDeviceCallback.unsafe_get() != callback.get()) {
+        ALOGW("%s removing different callback!", __FUNCTION__);
+        return INVALID_OPERATION;
     }
+    mDeviceCallback.clear();
     if (mOutput != AUDIO_IO_HANDLE_NONE) {
         AudioSystem::removeAudioDeviceCallback(this, mOutput);
     }

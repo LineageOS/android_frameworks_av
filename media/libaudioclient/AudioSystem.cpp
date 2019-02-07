@@ -522,11 +522,12 @@ void AudioSystem::AudioFlingerClient::ioConfigChanged(audio_io_config_event even
     if (ioDesc == 0 || ioDesc->mIoHandle == AUDIO_IO_HANDLE_NONE) return;
 
     audio_port_handle_t deviceId = AUDIO_PORT_HANDLE_NONE;
-    AudioDeviceCallbacks callbacks;
-    bool deviceValidOrChanged = false;
-    Mutex::Autolock _l(mCallbacksLock);
+    Vector<sp<AudioDeviceCallback>> callbacksToCall;
     {
         Mutex::Autolock _l(mLock);
+        bool deviceValidOrChanged = false;
+        bool sendCallbacks = false;
+        ssize_t ioIndex = -1;
 
         switch (event) {
         case AUDIO_OUTPUT_OPENED:
@@ -544,17 +545,16 @@ void AudioSystem::AudioFlingerClient::ioConfigChanged(audio_io_config_event even
             if (ioDesc->getDeviceId() != AUDIO_PORT_HANDLE_NONE) {
                 deviceId = ioDesc->getDeviceId();
                 if (event == AUDIO_OUTPUT_OPENED || event == AUDIO_INPUT_OPENED) {
-                    ssize_t ioIndex = mAudioDeviceCallbacks.indexOfKey(ioDesc->mIoHandle);
+                    ioIndex = mAudioDeviceCallbackProxies.indexOfKey(ioDesc->mIoHandle);
                     if (ioIndex >= 0) {
-                        callbacks = mAudioDeviceCallbacks.valueAt(ioIndex);
+                        sendCallbacks = true;
                         deviceValidOrChanged = true;
                     }
                 }
                 if (event == AUDIO_OUTPUT_REGISTERED || event == AUDIO_INPUT_REGISTERED) {
-                    ssize_t ioIndex = mAudioDeviceCallbacks.indexOfKey(ioDesc->mIoHandle);
-                    if ((ioIndex >= 0) && !mAudioDeviceCallbacks.valueAt(ioIndex).notifiedOnce()) {
-                        callbacks = mAudioDeviceCallbacks.valueAt(ioIndex);
-                    }
+                    ioIndex = mAudioDeviceCallbackProxies.indexOfKey(ioDesc->mIoHandle);
+                    sendCallbacks = (ioIndex >= 0)
+                            && !mAudioDeviceCallbackProxies.valueAt(ioIndex).notifiedOnce();
                 }
             }
             ALOGV("ioConfigChanged() new %s %s %d samplingRate %u, format %#x channel mask %#x "
@@ -577,7 +577,7 @@ void AudioSystem::AudioFlingerClient::ioConfigChanged(audio_io_config_event even
                   event == AUDIO_OUTPUT_CLOSED ? "output" : "input", ioDesc->mIoHandle);
 
             mIoDescriptors.removeItem(ioDesc->mIoHandle);
-            mAudioDeviceCallbacks.removeItem(ioDesc->mIoHandle);
+            mAudioDeviceCallbackProxies.removeItem(ioDesc->mIoHandle);
             } break;
 
         case AUDIO_OUTPUT_CONFIG_CHANGED:
@@ -594,10 +594,8 @@ void AudioSystem::AudioFlingerClient::ioConfigChanged(audio_io_config_event even
             if (deviceId != ioDesc->getDeviceId()) {
                 deviceValidOrChanged = true;
                 deviceId = ioDesc->getDeviceId();
-                ssize_t ioIndex = mAudioDeviceCallbacks.indexOfKey(ioDesc->mIoHandle);
-                if (ioIndex >= 0) {
-                    callbacks = mAudioDeviceCallbacks.valueAt(ioIndex);
-                }
+                ioIndex = mAudioDeviceCallbackProxies.indexOfKey(ioDesc->mIoHandle);
+                sendCallbacks = ioIndex >= 0;
             }
             ALOGV("ioConfigChanged() new config for %s %d samplingRate %u, format %#x "
                     "channel mask %#x frameCount %zu frameCountHAL %zu deviceId %d",
@@ -608,30 +606,34 @@ void AudioSystem::AudioFlingerClient::ioConfigChanged(audio_io_config_event even
 
         } break;
         }
-    }
-    // callbacks.size() != 0 =>  ioDesc->mIoHandle and deviceId are valid
-    if (callbacks.size() != 0) {
-        for (size_t i = 0; i < callbacks.size(); ) {
-            sp<AudioDeviceCallback> callback = callbacks[i].promote();
-            if (callback.get() != nullptr) {
-                // Call the callback only if the device actually changed, the input or output was
-                // opened or closed or the client was newly registered and the callback was never
-                // called
-                if (!callback->notifiedOnce() || deviceValidOrChanged) {
-                    // Must be called without mLock held. May lead to dead lock if calling for
-                    // example getRoutedDevice that updates the device and tries to acquire mLock.
-                    callback->onAudioDeviceUpdate(ioDesc->mIoHandle, deviceId);
-                    callback->setNotifiedOnce();
+
+        // sendCallbacks true =>  ioDesc->mIoHandle and deviceId are valid
+        if (sendCallbacks) {
+            AudioDeviceCallbackProxies &callbackProxies =
+                mAudioDeviceCallbackProxies.editValueAt(ioIndex);
+            for (size_t i = 0; i < callbackProxies.size(); ) {
+                sp<AudioDeviceCallback> callback = callbackProxies[i]->callback();
+                if (callback.get() != nullptr) {
+                    // Call the callback only if the device actually changed, the input or output
+                    // was opened or closed or the client was newly registered and the callback
+                    // was never called
+                    if (!callbackProxies[i]->notifiedOnce() || deviceValidOrChanged) {
+                        callbacksToCall.add(callback);
+                        callbackProxies[i]->setNotifiedOnce();
+                    }
+                    i++;
+                } else {
+                    callbackProxies.removeAt(i);
                 }
-                i++;
-            } else {
-                callbacks.removeAt(i);
             }
+            callbackProxies.setNotifiedOnce();
         }
-        callbacks.setNotifiedOnce();
-        // clean up callback list while we are here if some clients have disappeared without
-        // unregistering their callback, or if cb was served for the first time since registered
-        mAudioDeviceCallbacks.replaceValueFor(ioDesc->mIoHandle, callbacks);
+    }
+
+    // Callbacks must be called without mLock held. May lead to dead lock if calling for
+    // example getRoutedDevice that updates the device and tries to acquire mLock.
+    for (size_t i = 0; i < callbacksToCall.size(); i++) {
+        callbacksToCall[i]->onAudioDeviceUpdate(ioDesc->mIoHandle, deviceId);
     }
 }
 
@@ -686,48 +688,49 @@ sp<AudioIoDescriptor> AudioSystem::AudioFlingerClient::getIoDescriptor(audio_io_
 status_t AudioSystem::AudioFlingerClient::addAudioDeviceCallback(
         const wp<AudioDeviceCallback>& callback, audio_io_handle_t audioIo)
 {
-    Mutex::Autolock _l(mCallbacksLock);
-    AudioDeviceCallbacks callbacks;
-    ssize_t ioIndex = mAudioDeviceCallbacks.indexOfKey(audioIo);
+    Mutex::Autolock _l(mLock);
+    AudioDeviceCallbackProxies callbackProxies;
+    ssize_t ioIndex = mAudioDeviceCallbackProxies.indexOfKey(audioIo);
     if (ioIndex >= 0) {
-        callbacks = mAudioDeviceCallbacks.valueAt(ioIndex);
+        callbackProxies = mAudioDeviceCallbackProxies.valueAt(ioIndex);
     }
 
-    for (size_t cbIndex = 0; cbIndex < callbacks.size(); cbIndex++) {
-        if (callbacks[cbIndex].unsafe_get() == callback.unsafe_get()) {
+    for (size_t cbIndex = 0; cbIndex < callbackProxies.size(); cbIndex++) {
+        sp<AudioDeviceCallback> cbk = callbackProxies[cbIndex]->callback();
+        if (cbk.get() == callback.unsafe_get()) {
             return INVALID_OPERATION;
         }
     }
-    callbacks.add(callback);
-    callbacks.resetNotifiedOnce();
-    mAudioDeviceCallbacks.replaceValueFor(audioIo, callbacks);
+    callbackProxies.add(new AudioDeviceCallbackProxy(callback));
+    callbackProxies.resetNotifiedOnce();
+    mAudioDeviceCallbackProxies.replaceValueFor(audioIo, callbackProxies);
     return NO_ERROR;
 }
 
 status_t AudioSystem::AudioFlingerClient::removeAudioDeviceCallback(
         const wp<AudioDeviceCallback>& callback, audio_io_handle_t audioIo)
 {
-    Mutex::Autolock _l(mCallbacksLock);
-    ssize_t ioIndex = mAudioDeviceCallbacks.indexOfKey(audioIo);
+    Mutex::Autolock _l(mLock);
+    ssize_t ioIndex = mAudioDeviceCallbackProxies.indexOfKey(audioIo);
     if (ioIndex < 0) {
         return INVALID_OPERATION;
     }
-    AudioDeviceCallbacks callbacks = mAudioDeviceCallbacks.valueAt(ioIndex);
-
+    AudioDeviceCallbackProxies callbackProxies = mAudioDeviceCallbackProxies.valueAt(ioIndex);
     size_t cbIndex;
-    for (cbIndex = 0; cbIndex < callbacks.size(); cbIndex++) {
-        if (callbacks[cbIndex].unsafe_get() == callback.unsafe_get()) {
+    for (cbIndex = 0; cbIndex < callbackProxies.size(); cbIndex++) {
+        sp<AudioDeviceCallback> cbk = callbackProxies[cbIndex]->callback();
+        if (cbk.get() == callback.unsafe_get()) {
             break;
         }
     }
-    if (cbIndex == callbacks.size()) {
+    if (cbIndex == callbackProxies.size()) {
         return INVALID_OPERATION;
     }
-    callbacks.removeAt(cbIndex);
-    if (callbacks.size() != 0) {
-        mAudioDeviceCallbacks.replaceValueFor(audioIo, callbacks);
+    callbackProxies.removeAt(cbIndex);
+    if (callbackProxies.size() != 0) {
+        mAudioDeviceCallbackProxies.replaceValueFor(audioIo, callbackProxies);
     } else {
-        mAudioDeviceCallbacks.removeItem(audioIo);
+        mAudioDeviceCallbackProxies.removeItem(audioIo);
     }
     return NO_ERROR;
 }
