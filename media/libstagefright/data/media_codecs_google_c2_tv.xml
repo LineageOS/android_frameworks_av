@@ -17,6 +17,7 @@
 <Included>
     <Decoders>
         <MediaCodec name="c2.android.mpeg2.decoder" type="video/mpeg2">
+            <Alias name="OMX.google.mpeg2.decoder" />
             <!-- profiles and levels:  ProfileMain : LevelHL -->
             <Limit name="size" min="16x16" max="1920x1088" />
             <Limit name="alignment" value="2x2" />

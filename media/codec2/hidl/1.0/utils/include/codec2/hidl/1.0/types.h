@@ -120,11 +120,9 @@ bool objcpy(
         IComponentStore::ComponentTraits* d,
         const C2Component::Traits& s);
 
-// ComponentTraits -> C2Component::Traits, std::unique_ptr<std::vector<std::string>>
-// Note: The output d is only valid as long as aliasesBuffer remains alive.
+// ComponentTraits -> C2Component::Traits
 bool objcpy(
         C2Component::Traits* d,
-        std::unique_ptr<std::vector<std::string>>* aliasesBuffer,
         const IComponentStore::ComponentTraits& s);
 
 // C2StructDescriptor -> StructDescriptor

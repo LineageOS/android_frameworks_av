@@ -17,6 +17,7 @@
 <Included>
     <Decoders>
         <MediaCodec name="c2.android.gsm.decoder" type="audio/gsm">
+            <Alias name="OMX.google.gsm.decoder" />
             <Limit name="channel-count" max="1" />
             <Limit name="sample-rate" ranges="8000" />
             <Limit name="bitrate" range="13000" />

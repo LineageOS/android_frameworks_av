@@ -502,6 +502,7 @@ status_t MediaCodecsXmlParser::addMediaCodecFromAttributes(
     const char *name = nullptr;
     const char *type = nullptr;
     const char *update = nullptr;
+    const char *rank = nullptr;
 
     size_t i = 0;
     while (attrs[i] != nullptr) {
@@ -523,6 +524,12 @@ status_t MediaCodecsXmlParser::addMediaCodecFromAttributes(
                 return BAD_VALUE;
             }
             update = attrs[i];
+        } else if (strEq(attrs[i], "rank")) {
+            if (attrs[++i] == nullptr) {
+                ALOGE("addMediaCodecFromAttributes: rank is null");
+                return BAD_VALUE;
+            }
+            rank = attrs[i];
         } else {
             ALOGE("addMediaCodecFromAttributes: unrecognized attribute: %s", attrs[i]);
             return BAD_VALUE;
@@ -577,6 +584,15 @@ status_t MediaCodecsXmlParser::addMediaCodecFromAttributes(
                 return BAD_VALUE;
             }
         }
+    }
+
+    if (rank != nullptr) {
+        if (!mCurrentCodec->second.rank.empty() && mCurrentCodec->second.rank != rank) {
+            ALOGE("addMediaCodecFromAttributes: code \"%s\" rank changed from \"%s\" to \"%s\"",
+                    name, mCurrentCodec->second.rank.c_str(), rank);
+            return BAD_VALUE;
+        }
+        mCurrentCodec->second.rank = rank;
     }
 
     return OK;
@@ -1035,6 +1051,7 @@ void MediaCodecsXmlParser::generateRoleMap() const {
         const auto& codecName = codec.first;
         bool isEncoder = codec.second.isEncoder;
         size_t order = codec.second.order;
+        std::string rank = codec.second.rank;
         const auto& typeMap = codec.second.typeMap;
         for (const auto& type : typeMap) {
             const auto& typeName = type.first;
@@ -1089,6 +1106,9 @@ void MediaCodecsXmlParser::generateRoleMap() const {
                 if (strHasPrefix(quirk.c_str(), "attribute::")) {
                     nodeInfo.attributeList.push_back(Attribute{quirk, "present"});
                 }
+            }
+            if (!rank.empty()) {
+                nodeInfo.attributeList.push_back(Attribute{"rank", rank});
             }
             nodeList->insert(std::make_pair(
                     std::move(order), std::move(nodeInfo)));

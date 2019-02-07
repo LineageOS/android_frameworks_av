@@ -232,8 +232,6 @@ protected:
     mutable bool mListed;
     std::string mServiceName;
     mutable std::vector<C2Component::Traits> mTraitsList;
-    mutable std::vector<std::unique_ptr<std::vector<std::string>>>
-            mAliasesBuffer;
 
     sp<::android::hardware::media::bufferpool::V2_0::IClientManager>
             mHostPoolManager;

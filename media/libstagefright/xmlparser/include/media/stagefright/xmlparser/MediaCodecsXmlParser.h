@@ -66,6 +66,7 @@ public:
         QuirkSet quirkSet; ///< Set of quirks requested by this codec
         TypeMap typeMap;   ///< Map of types supported by this codec
         std::vector<std::string> aliases; ///< Name aliases for this codec
+        std::string rank;  ///< Rank of this codec. This is a numeric string.
     };
 
     typedef std::pair<std::string, CodecProperties> Codec;
