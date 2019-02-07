@@ -1160,8 +1160,6 @@ status_t BnAudioPolicyService::onTransact(
         case SET_STREAM_VOLUME:
         case REGISTER_POLICY_MIXES:
         case SET_MASTER_MONO:
-        case START_AUDIO_SOURCE:
-        case STOP_AUDIO_SOURCE:
         case GET_SURROUND_FORMATS:
         case SET_SURROUND_FORMAT_ENABLED:
         case SET_ASSISTANT_UID:
