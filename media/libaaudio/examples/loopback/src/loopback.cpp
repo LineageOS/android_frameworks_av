@@ -36,8 +36,11 @@
 #include "LoopbackAnalyzer.h"
 #include "../../utils/AAudioExampleUtils.h"
 
-// V0.4.00 = rectify and low-pass filter the echos, use auto-correlation on entire echo
-#define APP_VERSION             "0.4.00"
+// V0.4.00 = rectify and low-pass filter the echos, auto-correlate entire echo
+// V0.4.01 = add -h hang option
+//           fix -n option to set output buffer for -tm
+//           plot first glitch
+#define APP_VERSION             "0.4.01"
 
 // Tag for machine readable results as property = value pairs
 #define RESULT_TAG              "RESULT: "
@@ -396,7 +399,7 @@ int main(int argc, const char **argv)
     int32_t               requestedInputCapacity     = AAUDIO_UNSPECIFIED;
     aaudio_performance_mode_t inputPerformanceLevel  = AAUDIO_PERFORMANCE_MODE_LOW_LATENCY;
 
-    int32_t               outputFramesPerBurst = 0;
+    int32_t               outputFramesPerBurst       = 0;
 
     aaudio_format_t       actualOutputFormat         = AAUDIO_FORMAT_INVALID;
     int32_t               actualSampleRate           = 0;
@@ -476,6 +479,8 @@ int main(int argc, const char **argv)
     int32_t timeMillis = 0;
     int32_t recordingDuration = std::min(60 * 5, requestedDuration);
 
+    int32_t requestedOutputBursts = argParser.getNumberOfBursts();
+
     switch(testMode) {
         case TEST_SINE_MAGNITUDE:
             loopbackData.loopbackProcessor = &loopbackData.sineAnalyzer;
@@ -541,20 +546,19 @@ int main(int argc, const char **argv)
     }
     inputStream = loopbackData.inputStream = recorder.getStream();
 
-    argParser.compareWithStream(inputStream);
-
     {
         int32_t actualCapacity = AAudioStream_getBufferCapacityInFrames(inputStream);
         (void) AAudioStream_setBufferSizeInFrames(inputStream, actualCapacity);
 
-        if (testMode == TEST_SINE_MAGNITUDE) {
+        if (testMode == TEST_SINE_MAGNITUDE
+                && requestedOutputBursts == AAUDIO_UNSPECIFIED) {
             result = AAudioStream_setBufferSizeInFrames(outputStream, actualCapacity);
             if (result < 0) {
                 fprintf(stderr, "ERROR -  AAudioStream_setBufferSizeInFrames(output) returned %d\n",
                         result);
                 goto finish;
             } else {
-                printf("Output buffer size set to match input capacity = %d frames.\n", result);
+                printf("Output buffer size set to match input capacity = %d frames!\n", result);
             }
         }
 
@@ -564,6 +568,8 @@ int main(int argc, const char **argv)
             goto finish;
         }
     }
+
+    argParser.compareWithStream(inputStream);
 
     // ------- Setup loopbackData -----------------------------
     loopbackData.actualInputFormat = AAudioStream_getFormat(inputStream);
