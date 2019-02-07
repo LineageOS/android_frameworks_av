@@ -94,6 +94,11 @@ public:
      */
     virtual void getArray(Vector<sp<MediaCodecBuffer>> *) const {}
 
+    /**
+     * Return number of buffers the client owns.
+     */
+    virtual size_t numClientBuffers() const = 0;
+
 protected:
     std::string mComponentName; ///< name of component for debugging
     std::string mChannelName; ///< name of channel for debugging
@@ -151,11 +156,6 @@ public:
      * buffer from previous calls of requestNewBuffer().
      */
     virtual std::unique_ptr<InputBuffers> toArrayMode(size_t size) = 0;
-
-    /**
-     * Return number of buffers the client owns.
-     */
-    virtual size_t numClientBuffers() const = 0;
 
 protected:
     // Pool to obtain blocks for input buffers.
@@ -1226,6 +1226,10 @@ public:
         mImpl.realloc(alloc);
     }
 
+    size_t numClientBuffers() const final {
+        return mImpl.numClientBuffers();
+    }
+
 private:
     BuffersArrayImpl mImpl;
 };
@@ -1285,6 +1289,10 @@ public:
                 size,
                 [this]() { return allocateArrayBuffer(); });
         return std::move(array);
+    }
+
+    size_t numClientBuffers() const final {
+        return mImpl.numClientBuffers();
     }
 
     /**
@@ -1816,9 +1824,17 @@ void CCodecBufferChannel::feedInputBufferIfAvailable() {
 }
 
 void CCodecBufferChannel::feedInputBufferIfAvailableInternal() {
-    while (!mInputMetEos &&
-           !mReorderStash.lock()->hasPending() &&
-           !mPipelineWatcher.lock()->pipelineFull()) {
+    if (mInputMetEos ||
+           mReorderStash.lock()->hasPending() ||
+           mPipelineWatcher.lock()->pipelineFull()) {
+        return;
+    } else {
+        Mutexed<std::unique_ptr<OutputBuffers>>::Locked buffers(mOutputBuffers);
+        if ((*buffers)->numClientBuffers() >= mNumOutputSlots) {
+            return;
+        }
+    }
+    for (size_t i = 0; i < mNumInputSlots; ++i) {
         sp<MediaCodecBuffer> inBuffer;
         size_t index;
         {
