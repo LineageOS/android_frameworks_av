@@ -139,7 +139,10 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
     auto result = engineConfig::parse();
     if (result.parsedConfig == nullptr) {
         ALOGW("%s: No configuration found, using default matching phone experience.", __FUNCTION__);
-        result = {std::make_unique<engineConfig::Config>(gDefaultEngineConfig), 0};
+        engineConfig::Config config = gDefaultEngineConfig;
+        android::status_t ret = engineConfig::parseLegacyVolumes(config.volumeGroups);
+        result = {std::make_unique<engineConfig::Config>(config),
+                  static_cast<size_t>(ret == NO_ERROR ? 0 : 1)};
     }
     ALOGE_IF(result.nbSkippedElement != 0, "skipped %zu elements", result.nbSkippedElement);
     loadProductStrategies(result.parsedConfig->productStrategies, mProductStrategies);

@@ -113,6 +113,7 @@ struct ParsingResult {
  * @return audio policy usage @see Config
  */
 ParsingResult parse(const char* path = DEFAULT_PATH);
+android::status_t parseLegacyVolumes(VolumeGroups &volumeGroups);
 
 } // namespace engineConfig
 } // namespace android

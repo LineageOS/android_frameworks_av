@@ -23,7 +23,8 @@ LOCAL_SHARED_LIBRARIES := \
     libandroidicu \
     libxml2 \
     libutils \
-    liblog
+    liblog \
+    libcutils
 
 LOCAL_STATIC_LIBRARIES := \
     libaudiopolicycomponents
