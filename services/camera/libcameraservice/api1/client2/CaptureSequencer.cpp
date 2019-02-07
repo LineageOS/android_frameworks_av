@@ -117,6 +117,31 @@ void CaptureSequencer::notifyShutter(const CaptureResultExtras& resultExtras,
     }
 }
 
+void CaptureSequencer::notifyError(int32_t errorCode, const CaptureResultExtras& resultExtras) {
+    ATRACE_CALL();
+    bool jpegBufferLost = false;
+    if (errorCode == hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_BUFFER) {
+        sp<Camera2Client> client = mClient.promote();
+        if (client == nullptr) {
+            return;
+        }
+        int captureStreamId = client->getCaptureStreamId();
+        if (captureStreamId == resultExtras.errorStreamId) {
+            jpegBufferLost = true;
+        }
+    } else if (errorCode ==
+            hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_REQUEST) {
+        if (resultExtras.requestId == mShutterCaptureId) {
+            jpegBufferLost = true;
+        }
+    }
+
+    if (jpegBufferLost) {
+        sp<MemoryBase> emptyBuffer;
+        onCaptureAvailable(/*timestamp*/0, emptyBuffer, /*captureError*/true);
+    }
+}
+
 void CaptureSequencer::onResultAvailable(const CaptureResult &result) {
     ATRACE_CALL();
     ALOGV("%s: New result available.", __FUNCTION__);

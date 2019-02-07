@@ -885,14 +885,14 @@ status_t Camera3Device::convertMetadataListToRequestListLocked(
     return OK;
 }
 
-status_t Camera3Device::capture(CameraMetadata &request, int64_t* /*lastFrameNumber*/) {
+status_t Camera3Device::capture(CameraMetadata &request, int64_t* lastFrameNumber) {
     ATRACE_CALL();
 
     List<const PhysicalCameraSettingsList> requestsList;
     std::list<const SurfaceMap> surfaceMaps;
     convertToRequestList(requestsList, surfaceMaps, request);
 
-    return captureList(requestsList, surfaceMaps, /*lastFrameNumber*/NULL);
+    return captureList(requestsList, surfaceMaps, lastFrameNumber);
 }
 
 void Camera3Device::convertToRequestList(List<const PhysicalCameraSettingsList>& requestsList,

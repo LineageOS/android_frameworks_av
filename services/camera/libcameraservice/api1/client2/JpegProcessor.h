@@ -42,20 +42,13 @@ struct Parameters;
  * Still image capture output image processing
  */
 class JpegProcessor:
-            public Thread, public CpuConsumer::FrameAvailableListener,
-            public camera3::Camera3StreamBufferListener {
+            public Thread, public CpuConsumer::FrameAvailableListener {
   public:
     JpegProcessor(sp<Camera2Client> client, wp<CaptureSequencer> sequencer);
     ~JpegProcessor();
 
     // CpuConsumer listener implementation
     void onFrameAvailable(const BufferItem& item);
-
-    // Camera3StreamBufferListener implementation
-    void onBufferAcquired(const BufferInfo& bufferInfo) override;
-    void onBufferReleased(const BufferInfo& bufferInfo) override;
-    void onBufferRequestForFrameNumber(uint64_t frameNumber, int streamId,
-            const CameraMetadata& settings) override;
 
     status_t updateStream(const Parameters &params);
     status_t deleteStream();

@@ -65,6 +65,9 @@ class CaptureSequencer:
     void notifyShutter(const CaptureResultExtras& resultExtras,
                        nsecs_t timestamp);
 
+    // Notifications about shutter (capture start)
+    void notifyError(int32_t errorCode, const CaptureResultExtras& resultExtras);
+
     // Notification from the frame processor
     virtual void onResultAvailable(const CaptureResult &result);
 
