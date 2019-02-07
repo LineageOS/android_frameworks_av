@@ -315,7 +315,37 @@ status_t NV12Compressor::findJpegSize(uint8_t *jpegBuffer, size_t maxSize, size_
     return OK;
 }
 
-status_t NV12Compressor::getExifOrientation(const unsigned char *jpegBuffer, size_t jpegBufferSize,
+status_t NV12Compressor::getJpegImageDimensions(uint8_t *jpegBuffer,
+        size_t jpegBufferSize, size_t *width /*out*/, size_t *height /*out*/) {
+    if ((jpegBuffer == nullptr) || (width == nullptr) || (height == nullptr) ||
+            (jpegBufferSize == 0u)) {
+        return BAD_VALUE;
+    }
+
+    // Scan JPEG buffer until Start of Frame
+    bool foundSOF = false;
+    size_t currentPos;
+    for (currentPos = 0; currentPos <= jpegBufferSize - kMarkerLength; currentPos++) {
+        if (checkStartOfFrame(jpegBuffer + currentPos)) {
+            foundSOF = true;
+            currentPos += kMarkerLength;
+            break;
+        }
+    }
+
+    if (!foundSOF) {
+        ALOGE("%s: Start of Frame not found", __func__);
+        return BAD_VALUE;
+    }
+
+    sof_t *startOfFrame = reinterpret_cast<sof_t *> (jpegBuffer + currentPos);
+    *width = ntohs(startOfFrame->width);
+    *height = ntohs(startOfFrame->height);
+
+    return OK;
+}
+
+status_t NV12Compressor::getExifOrientation(uint8_t *jpegBuffer, size_t jpegBufferSize,
         ExifOrientation *exifValue /*out*/) {
     if ((jpegBuffer == nullptr) || (exifValue == nullptr) || (jpegBufferSize == 0u)) {
         return BAD_VALUE;

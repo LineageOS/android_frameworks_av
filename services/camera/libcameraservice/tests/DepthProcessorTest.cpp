@@ -50,7 +50,7 @@ void linkToDepthPhotoLibrary(void **libHandle /*out*/,
 }
 
 void generateColorJpegBuffer(int jpegQuality, ExifOrientation orientationValue, bool includeExif,
-        std::vector<uint8_t> *colorJpegBuffer /*out*/) {
+        bool switchDimensions, std::vector<uint8_t> *colorJpegBuffer /*out*/) {
     ASSERT_NE(colorJpegBuffer, nullptr);
 
     std::array<uint8_t, kTestBufferNV12Size> colorSourceBuffer;
@@ -59,15 +59,23 @@ void generateColorJpegBuffer(int jpegQuality, ExifOrientation orientationValue, 
     for (size_t i = 0; i < colorSourceBuffer.size(); i++) {
         colorSourceBuffer[i] = uniDist(gen);
     }
+
+    size_t width = kTestBufferWidth;
+    size_t height = kTestBufferHeight;
+    if (switchDimensions) {
+        width = kTestBufferHeight;
+        height = kTestBufferWidth;
+    }
+
     NV12Compressor jpegCompressor;
     if (includeExif) {
         ASSERT_TRUE(jpegCompressor.compressWithExifOrientation(
-                reinterpret_cast<const unsigned char*> (colorSourceBuffer.data()),
-                kTestBufferWidth, kTestBufferHeight, jpegQuality, orientationValue));
+                reinterpret_cast<const unsigned char*> (colorSourceBuffer.data()), width, height,
+                jpegQuality, orientationValue));
     } else {
         ASSERT_TRUE(jpegCompressor.compress(
-                reinterpret_cast<const unsigned char*> (colorSourceBuffer.data()),
-                kTestBufferWidth, kTestBufferHeight, jpegQuality));
+                reinterpret_cast<const unsigned char*> (colorSourceBuffer.data()), width, height,
+                jpegQuality));
     }
 
     *colorJpegBuffer = std::move(jpegCompressor.getCompressedData());
@@ -109,7 +117,7 @@ TEST(DepthProcessorTest, BadInput) {
 
     std::vector<uint8_t> colorJpegBuffer;
     generateColorJpegBuffer(jpegQuality, ExifOrientation::ORIENTATION_UNDEFINED,
-            /*includeExif*/ false, &colorJpegBuffer);
+            /*includeExif*/ false, /*switchDimensions*/ false, &colorJpegBuffer);
 
     std::array<uint16_t, kTestBufferDepthSize> depth16Buffer;
     generateDepth16Buffer(&depth16Buffer);
@@ -153,7 +161,7 @@ TEST(DepthProcessorTest, BasicDepthPhotoValidation) {
 
     std::vector<uint8_t> colorJpegBuffer;
     generateColorJpegBuffer(jpegQuality, ExifOrientation::ORIENTATION_UNDEFINED,
-            /*includeExif*/ false, &colorJpegBuffer);
+            /*includeExif*/ false, /*switchDimensions*/ false, &colorJpegBuffer);
 
     std::array<uint16_t, kTestBufferDepthSize> depth16Buffer;
     generateDepth16Buffer(&depth16Buffer);
@@ -209,12 +217,11 @@ TEST(DepthProcessorTest, TestDepthPhotoExifOrientation) {
     for (auto exifOrientation : exifOrientations) {
         std::vector<uint8_t> colorJpegBuffer;
         generateColorJpegBuffer(jpegQuality, exifOrientation, /*includeExif*/ true,
-                &colorJpegBuffer);
+                /*switchDimensions*/ false, &colorJpegBuffer);
         if (exifOrientation != ExifOrientation::ORIENTATION_UNDEFINED) {
             auto jpegExifOrientation = ExifOrientation::ORIENTATION_UNDEFINED;
-            ASSERT_EQ(NV12Compressor::getExifOrientation(
-                        reinterpret_cast<const unsigned char*> (colorJpegBuffer.data()),
-                        colorJpegBuffer.size(), &jpegExifOrientation), OK);
+            ASSERT_EQ(NV12Compressor::getExifOrientation(colorJpegBuffer.data(),
+                    colorJpegBuffer.size(), &jpegExifOrientation), OK);
             ASSERT_EQ(exifOrientation, jpegExifOrientation);
         }
 
@@ -252,8 +259,7 @@ TEST(DepthProcessorTest, TestDepthPhotoExifOrientation) {
 
         //Depth and confidence images must have the same EXIF orientation as the source
         auto depthJpegExifOrientation = ExifOrientation::ORIENTATION_UNDEFINED;
-        ASSERT_EQ(NV12Compressor::getExifOrientation(
-                reinterpret_cast<const unsigned char*> (depthPhotoBuffer.data() + mainJpegSize),
+        ASSERT_EQ(NV12Compressor::getExifOrientation(depthPhotoBuffer.data() + mainJpegSize,
                 depthMapSize, &depthJpegExifOrientation), OK);
         if (exifOrientation == ORIENTATION_UNDEFINED) {
             // In case of undefined or missing EXIF orientation, always expect 0 degrees in the
@@ -265,8 +271,8 @@ TEST(DepthProcessorTest, TestDepthPhotoExifOrientation) {
 
         auto confidenceJpegExifOrientation = ExifOrientation::ORIENTATION_UNDEFINED;
         ASSERT_EQ(NV12Compressor::getExifOrientation(
-                reinterpret_cast<const unsigned char*> (depthPhotoBuffer.data() + mainJpegSize +
-                    depthMapSize), confidenceMapSize, &confidenceJpegExifOrientation), OK);
+                depthPhotoBuffer.data() + mainJpegSize + depthMapSize,
+                confidenceMapSize, &confidenceJpegExifOrientation), OK);
         if (exifOrientation == ORIENTATION_UNDEFINED) {
             // In case of undefined or missing EXIF orientation, always expect 0 degrees in the
             // confidence map.
@@ -274,6 +280,102 @@ TEST(DepthProcessorTest, TestDepthPhotoExifOrientation) {
         } else {
             ASSERT_EQ(confidenceJpegExifOrientation, exifOrientation);
         }
+    }
+
+    dlclose(libHandle);
+}
+
+TEST(DepthProcessorTest, TestDephtPhotoPhysicalRotation) {
+    void *libHandle;
+    int jpegQuality = 95;
+
+    process_depth_photo_frame processFunc;
+    linkToDepthPhotoLibrary(&libHandle, &processFunc);
+    if (libHandle == nullptr) {
+        // Depth library no present, nothing more to test.
+        return;
+    }
+
+    // In case of physical rotation, the EXIF orientation must always be 0.
+    auto exifOrientation = ExifOrientation::ORIENTATION_0_DEGREES;
+    DepthPhotoOrientation depthOrientations[] = {
+            DepthPhotoOrientation::DEPTH_ORIENTATION_0_DEGREES,
+            DepthPhotoOrientation::DEPTH_ORIENTATION_90_DEGREES,
+            DepthPhotoOrientation::DEPTH_ORIENTATION_180_DEGREES,
+            DepthPhotoOrientation::DEPTH_ORIENTATION_270_DEGREES };
+    for (auto depthOrientation : depthOrientations) {
+        std::vector<uint8_t> colorJpegBuffer;
+        bool switchDimensions = false;
+        size_t expectedWidth = kTestBufferWidth;
+        size_t expectedHeight = kTestBufferHeight;
+        if ((depthOrientation == DepthPhotoOrientation::DEPTH_ORIENTATION_90_DEGREES) ||
+                (depthOrientation == DepthPhotoOrientation::DEPTH_ORIENTATION_270_DEGREES)) {
+            switchDimensions = true;
+            expectedWidth = kTestBufferHeight;
+            expectedHeight = kTestBufferWidth;
+        }
+        generateColorJpegBuffer(jpegQuality, exifOrientation, /*includeExif*/ true,
+                switchDimensions, &colorJpegBuffer);
+        auto jpegExifOrientation = ExifOrientation::ORIENTATION_UNDEFINED;
+        ASSERT_EQ(NV12Compressor::getExifOrientation(colorJpegBuffer.data(), colorJpegBuffer.size(),
+                &jpegExifOrientation), OK);
+        ASSERT_EQ(exifOrientation, jpegExifOrientation);
+
+        std::array<uint16_t, kTestBufferDepthSize> depth16Buffer;
+        generateDepth16Buffer(&depth16Buffer);
+
+        DepthPhotoInputFrame inputFrame;
+        inputFrame.mMainJpegBuffer = reinterpret_cast<const char*> (colorJpegBuffer.data());
+        inputFrame.mMainJpegSize = colorJpegBuffer.size();
+        // Worst case both depth and confidence maps have the same size as the main color image.
+        inputFrame.mMaxJpegSize = inputFrame.mMainJpegSize * 3;
+        inputFrame.mMainJpegWidth = kTestBufferWidth;
+        inputFrame.mMainJpegHeight = kTestBufferHeight;
+        inputFrame.mJpegQuality = jpegQuality;
+        inputFrame.mDepthMapBuffer = depth16Buffer.data();
+        inputFrame.mDepthMapWidth = inputFrame.mDepthMapStride = kTestBufferWidth;
+        inputFrame.mDepthMapHeight = kTestBufferHeight;
+        inputFrame.mOrientation = depthOrientation;
+
+        std::vector<uint8_t> depthPhotoBuffer(inputFrame.mMaxJpegSize);
+        size_t actualDepthPhotoSize = 0;
+        ASSERT_EQ(processFunc(inputFrame, depthPhotoBuffer.size(), depthPhotoBuffer.data(),
+                &actualDepthPhotoSize), 0);
+        ASSERT_TRUE((actualDepthPhotoSize > 0) &&
+                (depthPhotoBuffer.size() >= actualDepthPhotoSize));
+
+        size_t mainJpegSize = 0;
+        ASSERT_EQ(NV12Compressor::findJpegSize(depthPhotoBuffer.data(), actualDepthPhotoSize,
+                &mainJpegSize), OK);
+        ASSERT_TRUE((mainJpegSize > 0) && (mainJpegSize < actualDepthPhotoSize));
+        size_t depthMapSize = 0;
+        ASSERT_EQ(NV12Compressor::findJpegSize(depthPhotoBuffer.data() + mainJpegSize,
+                actualDepthPhotoSize - mainJpegSize, &depthMapSize), OK);
+        ASSERT_TRUE((depthMapSize > 0) && (depthMapSize < (actualDepthPhotoSize - mainJpegSize)));
+        size_t confidenceMapSize = actualDepthPhotoSize - (mainJpegSize + depthMapSize);
+
+        //Depth and confidence images must have the same EXIF orientation as the source
+        auto depthJpegExifOrientation = ExifOrientation::ORIENTATION_UNDEFINED;
+        ASSERT_EQ(NV12Compressor::getExifOrientation(depthPhotoBuffer.data() + mainJpegSize,
+                depthMapSize, &depthJpegExifOrientation), OK);
+        ASSERT_EQ(depthJpegExifOrientation, exifOrientation);
+        size_t depthMapWidth, depthMapHeight;
+        ASSERT_EQ(NV12Compressor::getJpegImageDimensions(depthPhotoBuffer.data() + mainJpegSize,
+                depthMapSize, &depthMapWidth, &depthMapHeight), OK);
+        ASSERT_EQ(depthMapWidth, expectedWidth);
+        ASSERT_EQ(depthMapHeight, expectedHeight);
+
+        auto confidenceJpegExifOrientation = ExifOrientation::ORIENTATION_UNDEFINED;
+        ASSERT_EQ(NV12Compressor::getExifOrientation(
+                depthPhotoBuffer.data() + mainJpegSize + depthMapSize, confidenceMapSize,
+                &confidenceJpegExifOrientation), OK);
+        ASSERT_EQ(confidenceJpegExifOrientation, exifOrientation);
+        size_t confidenceMapWidth, confidenceMapHeight;
+        ASSERT_EQ(NV12Compressor::getJpegImageDimensions(
+                depthPhotoBuffer.data() + mainJpegSize + depthMapSize, confidenceMapSize,
+                &confidenceMapWidth, &confidenceMapHeight), OK);
+        ASSERT_EQ(confidenceMapWidth, expectedWidth);
+        ASSERT_EQ(confidenceMapHeight, expectedHeight);
     }
 
     dlclose(libHandle);

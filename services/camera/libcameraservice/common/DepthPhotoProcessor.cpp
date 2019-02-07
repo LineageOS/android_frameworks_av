@@ -224,8 +224,106 @@ status_t encodeGrayscaleJpeg(size_t width, size_t height, uint8_t *in, void *out
     return ret;
 }
 
+inline void unpackDepth16(uint16_t value, std::vector<float> *points /*out*/,
+        std::vector<float> *confidence /*out*/, float *near /*out*/, float *far /*out*/) {
+    // Android densely packed depth map. The units for the range are in
+    // millimeters and need to be scaled to meters.
+    // The confidence value is encoded in the 3 most significant bits.
+    // The confidence data needs to be additionally normalized with
+    // values 1.0f, 0.0f representing maximum and minimum confidence
+    // respectively.
+    auto point = static_cast<float>(value & 0x1FFF) / 1000.f;
+    points->push_back(point);
+
+    auto conf = (value >> 13) & 0x7;
+    float normConfidence = (conf == 0) ? 1.f : (static_cast<float>(conf) - 1) / 7.f;
+    confidence->push_back(normConfidence);
+
+    if (*near > point) {
+        *near = point;
+    }
+    if (*far < point) {
+        *far = point;
+    }
+}
+
+// Trivial case, read forward from top,left corner.
+void rotate0AndUnpack(DepthPhotoInputFrame inputFrame, std::vector<float> *points /*out*/,
+        std::vector<float> *confidence /*out*/, float *near /*out*/, float *far /*out*/) {
+    for (size_t i = 0; i < inputFrame.mDepthMapHeight; i++) {
+        for (size_t j = 0; j < inputFrame.mDepthMapWidth; j++) {
+            unpackDepth16(inputFrame.mDepthMapBuffer[i*inputFrame.mDepthMapStride + j], points,
+                    confidence, near, far);
+        }
+    }
+}
+
+// 90 degrees CW rotation can be applied by starting to read from bottom, left corner
+// transposing rows and columns.
+void rotate90AndUnpack(DepthPhotoInputFrame inputFrame, std::vector<float> *points /*out*/,
+        std::vector<float> *confidence /*out*/, float *near /*out*/, float *far /*out*/) {
+    for (size_t i = 0; i < inputFrame.mDepthMapWidth; i++) {
+        for (ssize_t j = inputFrame.mDepthMapHeight-1; j >= 0; j--) {
+            unpackDepth16(inputFrame.mDepthMapBuffer[j*inputFrame.mDepthMapStride + i], points,
+                    confidence, near, far);
+        }
+    }
+}
+
+// 180 CW degrees rotation can be applied by starting to read backwards from bottom, right corner.
+void rotate180AndUnpack(DepthPhotoInputFrame inputFrame, std::vector<float> *points /*out*/,
+        std::vector<float> *confidence /*out*/, float *near /*out*/, float *far /*out*/) {
+    for (ssize_t i = inputFrame.mDepthMapHeight-1; i >= 0; i--) {
+        for (ssize_t j = inputFrame.mDepthMapWidth-1; j >= 0; j--) {
+            unpackDepth16(inputFrame.mDepthMapBuffer[i*inputFrame.mDepthMapStride + j], points,
+                    confidence, near, far);
+        }
+    }
+}
+
+// 270 degrees CW rotation can be applied by starting to read from top, right corner
+// transposing rows and columns.
+void rotate270AndUnpack(DepthPhotoInputFrame inputFrame, std::vector<float> *points /*out*/,
+        std::vector<float> *confidence /*out*/, float *near /*out*/, float *far /*out*/) {
+    for (ssize_t i = inputFrame.mDepthMapWidth-1; i >= 0; i--) {
+        for (size_t j = 0; j < inputFrame.mDepthMapHeight; j++) {
+            unpackDepth16(inputFrame.mDepthMapBuffer[j*inputFrame.mDepthMapStride + i], points,
+                    confidence, near, far);
+        }
+    }
+}
+
+bool rotateAndUnpack(DepthPhotoInputFrame inputFrame, std::vector<float> *points /*out*/,
+        std::vector<float> *confidence /*out*/, float *near /*out*/, float *far /*out*/) {
+    switch (inputFrame.mOrientation) {
+        case DepthPhotoOrientation::DEPTH_ORIENTATION_0_DEGREES:
+            rotate0AndUnpack(inputFrame, points, confidence, near, far);
+            return false;
+        case DepthPhotoOrientation::DEPTH_ORIENTATION_90_DEGREES:
+            rotate90AndUnpack(inputFrame, points, confidence, near, far);
+            return true;
+        case DepthPhotoOrientation::DEPTH_ORIENTATION_180_DEGREES:
+            rotate180AndUnpack(inputFrame, points, confidence, near, far);
+            return false;
+        case DepthPhotoOrientation::DEPTH_ORIENTATION_270_DEGREES:
+            rotate270AndUnpack(inputFrame, points, confidence, near, far);
+            return true;
+        default:
+            ALOGE("%s: Unsupported depth photo rotation: %d, default to 0", __FUNCTION__,
+                    inputFrame.mOrientation);
+            rotate0AndUnpack(inputFrame, points, confidence, near, far);
+    }
+
+    return false;
+}
+
 std::unique_ptr<dynamic_depth::DepthMap> processDepthMapFrame(DepthPhotoInputFrame inputFrame,
-        ExifOrientation exifOrientation, std::vector<std::unique_ptr<Item>> *items /*out*/) {
+        ExifOrientation exifOrientation, std::vector<std::unique_ptr<Item>> *items /*out*/,
+        bool *switchDimensions /*out*/) {
+    if ((items == nullptr) || (switchDimensions == nullptr)) {
+        return nullptr;
+    }
+
     std::vector<float> points, confidence;
 
     size_t pointCount = inputFrame.mDepthMapWidth * inputFrame.mDepthMapHeight;
@@ -233,29 +331,21 @@ std::unique_ptr<dynamic_depth::DepthMap> processDepthMapFrame(DepthPhotoInputFra
     confidence.reserve(pointCount);
     float near = UINT16_MAX;
     float far = .0f;
-    for (size_t i = 0; i < inputFrame.mDepthMapHeight; i++) {
-        for (size_t j = 0; j < inputFrame.mDepthMapWidth; j++) {
-            // Android densely packed depth map. The units for the range are in
-            // millimeters and need to be scaled to meters.
-            // The confidence value is encoded in the 3 most significant bits.
-            // The confidence data needs to be additionally normalized with
-            // values 1.0f, 0.0f representing maximum and minimum confidence
-            // respectively.
-            auto value = inputFrame.mDepthMapBuffer[i*inputFrame.mDepthMapStride + j];
-            auto point = static_cast<float>(value & 0x1FFF) / 1000.f;
-            points.push_back(point);
+    *switchDimensions = false;
+    // Physical rotation of depth and confidence maps may be needed in case
+    // the EXIF orientation is set to 0 degrees and the depth photo orientation
+    // (source color image) has some different value.
+    if (exifOrientation == ExifOrientation::ORIENTATION_0_DEGREES) {
+        *switchDimensions = rotateAndUnpack(inputFrame, &points, &confidence, &near, &far);
+    } else {
+        rotate0AndUnpack(inputFrame, &points, &confidence, &near, &far);
+    }
 
-            auto conf = (value >> 13) & 0x7;
-            float normConfidence = (conf == 0) ? 1.f : (static_cast<float>(conf) - 1) / 7.f;
-            confidence.push_back(normConfidence);
-
-            if (near > point) {
-                near = point;
-            }
-            if (far < point) {
-                far = point;
-            }
-        }
+    size_t width = inputFrame.mDepthMapWidth;
+    size_t height = inputFrame.mDepthMapHeight;
+    if (*switchDimensions) {
+        width = inputFrame.mDepthMapHeight;
+        height = inputFrame.mDepthMapWidth;
     }
 
     if (near == far) {
@@ -281,8 +371,8 @@ std::unique_ptr<dynamic_depth::DepthMap> processDepthMapFrame(DepthPhotoInputFra
     depthParams.depth_image_data.resize(inputFrame.mMaxJpegSize);
     depthParams.confidence_data.resize(inputFrame.mMaxJpegSize);
     size_t actualJpegSize;
-    auto ret = encodeGrayscaleJpeg(inputFrame.mDepthMapWidth, inputFrame.mDepthMapHeight,
-            pointsQuantized.data(), depthParams.depth_image_data.data(), inputFrame.mMaxJpegSize,
+    auto ret = encodeGrayscaleJpeg(width, height, pointsQuantized.data(),
+            depthParams.depth_image_data.data(), inputFrame.mMaxJpegSize,
             inputFrame.mJpegQuality, exifOrientation, actualJpegSize);
     if (ret != NO_ERROR) {
         ALOGE("%s: Depth map compression failed!", __FUNCTION__);
@@ -290,8 +380,8 @@ std::unique_ptr<dynamic_depth::DepthMap> processDepthMapFrame(DepthPhotoInputFra
     }
     depthParams.depth_image_data.resize(actualJpegSize);
 
-    ret = encodeGrayscaleJpeg(inputFrame.mDepthMapWidth, inputFrame.mDepthMapHeight,
-            confidenceQuantized.data(), depthParams.confidence_data.data(), inputFrame.mMaxJpegSize,
+    ret = encodeGrayscaleJpeg(width, height, confidenceQuantized.data(),
+            depthParams.confidence_data.data(), inputFrame.mMaxJpegSize,
             inputFrame.mJpegQuality, exifOrientation, actualJpegSize);
     if (ret != NO_ERROR) {
         ALOGE("%s: Confidence map compression failed!", __FUNCTION__);
@@ -321,7 +411,9 @@ extern "C" int processDepthPhotoFrame(DepthPhotoInputFrame inputFrame, size_t de
     ExifOrientation exifOrientation = getExifOrientation(
             reinterpret_cast<const unsigned char*> (inputFrame.mMainJpegBuffer),
             inputFrame.mMainJpegSize);
-    cameraParams->depth_map = processDepthMapFrame(inputFrame, exifOrientation, &items);
+    bool switchDimensions;
+    cameraParams->depth_map = processDepthMapFrame(inputFrame, exifOrientation, &items,
+            &switchDimensions);
     if (cameraParams->depth_map == nullptr) {
         ALOGE("%s: Depth map processing failed!", __FUNCTION__);
         return BAD_VALUE;
@@ -333,7 +425,13 @@ extern "C" int processDepthPhotoFrame(DepthPhotoInputFrame inputFrame, size_t de
         // [focalLengthX, focalLengthY, opticalCenterX, opticalCenterY, skew]
         const dynamic_depth::Point<double> focalLength(inputFrame.mInstrinsicCalibration[0],
                 inputFrame.mInstrinsicCalibration[1]);
-        const Dimension imageSize(inputFrame.mMainJpegWidth, inputFrame.mMainJpegHeight);
+        size_t width = inputFrame.mMainJpegWidth;
+        size_t height = inputFrame.mMainJpegHeight;
+        if (switchDimensions) {
+            width = inputFrame.mMainJpegHeight;
+            height = inputFrame.mMainJpegWidth;
+        }
+        const Dimension imageSize(width, height);
         ImagingModelParams imagingParams(focalLength, imageSize);
         imagingParams.principal_point.x = inputFrame.mInstrinsicCalibration[2];
         imagingParams.principal_point.y = inputFrame.mInstrinsicCalibration[3];

@@ -48,12 +48,19 @@ public:
      */
     const std::vector<unsigned char>& getCompressedData() const;
 
+    // Utility methods
     static android::status_t findJpegSize(uint8_t *jpegBuffer, size_t maxSize,
             size_t *size /*out*/);
 
-
-    static android::status_t getExifOrientation(const unsigned char *jpegBuffer,
+    static android::status_t getExifOrientation(uint8_t *jpegBuffer,
             size_t jpegBufferSize, android::camera3::ExifOrientation *exifValue /*out*/);
+
+    /* Get Jpeg image dimensions from the first Start Of Frame. Please note that due to the
+     * way the jpeg buffer is scanned if the image contains a thumbnail, then the size returned
+     * will be of the thumbnail and not the main image.
+     */
+    static android::status_t getJpegImageDimensions(uint8_t *jpegBuffer, size_t jpegBufferSize,
+            size_t *width /*out*/, size_t *height /*out*/);
 
 private:
 
@@ -79,14 +86,26 @@ private:
     static const uint8_t kMarker = 0xFF; // First byte of marker
     static const uint8_t kStartOfImage = 0xD8; // Start of Image
     static const uint8_t kEndOfImage = 0xD9; // End of Image
+    static const uint8_t kStartOfFrame = 0xC0; // Start of Frame
 
     struct __attribute__((packed)) segment_t {
         uint8_t marker[kMarkerLength];
         uint16_t length;
     };
 
+    struct __attribute__((packed)) sof_t {
+        uint16_t length;
+        uint8_t precision;
+        uint16_t height;
+        uint16_t width;
+    };
 
-    // check for Start of Image marker
+    // check for start of image marker
+    static bool checkStartOfFrame(uint8_t* buf) {
+        return buf[0] == kMarker && buf[1] == kStartOfFrame;
+    }
+
+    // check for start of image marker
     static bool checkJpegStart(uint8_t* buf) {
         return buf[0] == kMarker && buf[1] == kStartOfImage;
     }
