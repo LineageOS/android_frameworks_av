@@ -621,8 +621,10 @@ status_t AudioTrack::set(
     }
 
     // create the IAudioTrack
-    status = createTrack_l();
-
+    {
+        AutoMutex lock(mLock);
+        status = createTrack_l();
+    }
     if (status != NO_ERROR) {
         if (mAudioTrackThread != 0) {
             mAudioTrackThread->requestExit();   // see comment in AudioTrack.h
@@ -2957,12 +2959,14 @@ status_t AudioTrack::removeAudioDeviceCallback(
         ALOGW("%s(%d): removing NULL callback!", __func__, mPortId);
         return BAD_VALUE;
     }
-    AutoMutex lock(mLock);
-    if (mDeviceCallback.unsafe_get() != callback.get()) {
-        ALOGW("%s(%d): removing different callback!", __func__, mPortId);
-        return INVALID_OPERATION;
+    {
+        AutoMutex lock(mLock);
+        if (mDeviceCallback.unsafe_get() != callback.get()) {
+            ALOGW("%s removing different callback!", __FUNCTION__);
+            return INVALID_OPERATION;
+        }
+        mDeviceCallback.clear();
     }
-    mDeviceCallback.clear();
     if (mOutput != AUDIO_IO_HANDLE_NONE) {
         AudioSystem::removeAudioDeviceCallback(this, mOutput);
     }

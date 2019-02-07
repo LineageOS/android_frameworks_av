@@ -355,7 +355,10 @@ status_t AudioRecord::set(
     }
 
     // create the IAudioRecord
-    status = createRecord_l(0 /*epoch*/, mOpPackageName);
+    {
+        AutoMutex lock(mLock);
+        status = createRecord_l(0 /*epoch*/, mOpPackageName);
+    }
 
     ALOGV("%s(%d): status %d", __func__, mPortId, status);
 
@@ -1358,12 +1361,14 @@ status_t AudioRecord::removeAudioDeviceCallback(
         ALOGW("%s(%d): removing NULL callback!", __func__, mPortId);
         return BAD_VALUE;
     }
-    AutoMutex lock(mLock);
-    if (mDeviceCallback.unsafe_get() != callback.get()) {
-        ALOGW("%s(%d): removing different callback!", __func__, mPortId);
-        return INVALID_OPERATION;
+    {
+        AutoMutex lock(mLock);
+        if (mDeviceCallback.unsafe_get() != callback.get()) {
+            ALOGW("%s(%d): removing different callback!", __func__, mPortId);
+            return INVALID_OPERATION;
+        }
+        mDeviceCallback.clear();
     }
-    mDeviceCallback.clear();
     if (mInput != AUDIO_IO_HANDLE_NONE) {
         AudioSystem::removeAudioDeviceCallback(this, mInput);
     }

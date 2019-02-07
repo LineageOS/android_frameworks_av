@@ -677,7 +677,7 @@ private:
     sp<IMemory>             mCblkMemory;
     audio_track_cblk_t*     mCblk;              // re-load after mLock.unlock()
     sp<IMemory>             mBufferMemory;
-    audio_io_handle_t       mInput;             // returned by AudioSystem::getInput()
+    audio_io_handle_t       mInput = AUDIO_IO_HANDLE_NONE; // from AudioSystem::getInputforAttr()
 
     int                     mPreviousPriority;  // before start()
     SchedPolicy             mPreviousSchedulingGroup;

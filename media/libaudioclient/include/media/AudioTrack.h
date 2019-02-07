@@ -1021,7 +1021,7 @@ public:
     sp<IAudioTrack>         mAudioTrack;
     sp<IMemory>             mCblkMemory;
     audio_track_cblk_t*     mCblk;                  // re-load after mLock.unlock()
-    audio_io_handle_t       mOutput;                // returned by AudioSystem::getOutputForAttr()
+    audio_io_handle_t       mOutput = AUDIO_IO_HANDLE_NONE; // from AudioSystem::getOutputForAttr()
 
     sp<AudioTrackThread>    mAudioTrackThread;
     bool                    mThreadCanCallJava;
