@@ -34,6 +34,7 @@
 #include "AAudioSimpleRecorder.h"
 #include "AAudioExampleUtils.h"
 #include "LoopbackAnalyzer.h"
+#include "../../utils/AAudioExampleUtils.h"
 
 // V0.4.00 = rectify and low-pass filter the echos, use auto-correlation on entire echo
 #define APP_VERSION             "0.4.00"
@@ -47,10 +48,14 @@
 constexpr int kLogPeriodMillis       = 1000;
 constexpr int kNumInputChannels      = 1;
 constexpr int kNumCallbacksToDrain   = 20;
+constexpr int kNumCallbacksToNotRead = 0; // let input fill back up
 constexpr int kNumCallbacksToDiscard = 20;
+constexpr int kDefaultHangTimeMillis = 50;
+constexpr int kMaxGlitchEventsToSave = 32;
 
 struct LoopbackData {
     AAudioStream      *inputStream = nullptr;
+    AAudioStream      *outputStream = nullptr;
     int32_t            inputFramesMaximum = 0;
     int16_t           *inputShortData = nullptr;
     float             *inputFloatData = nullptr;
@@ -58,6 +63,7 @@ struct LoopbackData {
     int32_t            actualInputChannelCount = 0;
     int32_t            actualOutputChannelCount = 0;
     int32_t            numCallbacksToDrain = kNumCallbacksToDrain;
+    int32_t            numCallbacksToNotRead = kNumCallbacksToNotRead;
     int32_t            numCallbacksToDiscard = kNumCallbacksToDiscard;
     int32_t            minNumFrames = INT32_MAX;
     int32_t            maxNumFrames = 0;
@@ -65,6 +71,9 @@ struct LoopbackData {
     int32_t            insufficientReadFrames = 0;
     int32_t            framesReadTotal = 0;
     int32_t            framesWrittenTotal = 0;
+    int32_t            hangPeriodMillis = 5 * 1000; // time between hangs
+    int32_t            hangCountdownFrames = 5 * 48000; // frames til next hang
+    int32_t            hangTimeMillis = 0; // 0 for no hang
     bool               isDone = false;
 
     aaudio_result_t    inputError = AAUDIO_OK;
@@ -74,6 +83,29 @@ struct LoopbackData {
     EchoAnalyzer       echoAnalyzer;
     AudioRecording     audioRecording;
     LoopbackProcessor *loopbackProcessor;
+
+    int32_t            glitchFrames[kMaxGlitchEventsToSave];
+    int32_t            numGlitchEvents = 0;
+
+    void hangIfRequested(int32_t numFrames) {
+        if (hangTimeMillis > 0) {
+            hangCountdownFrames -= numFrames;
+            if (hangCountdownFrames <= 0) {
+                const int64_t startNanos = getNanoseconds();
+                usleep(hangTimeMillis * 1000);
+                const int64_t endNanos = getNanoseconds();
+                const int32_t elapsedMicros = (int32_t)
+                        ((endNanos - startNanos) / 1000);
+                printf("callback hanging for %d millis, actual = %d micros\n",
+                       hangTimeMillis, elapsedMicros);
+                hangCountdownFrames = (int64_t) hangPeriodMillis
+                        * AAudioStream_getSampleRate(outputStream)
+                        / 1000;
+            }
+        }
+
+
+    }
 };
 
 static void convertPcm16ToFloat(const int16_t *source,
@@ -166,6 +198,9 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
             myData->numCallbacksToDrain--;
         }
 
+    } else if (myData->numCallbacksToNotRead > 0) {
+        // Let the input fill up a bit so we are not so close to the write pointer.
+        myData->numCallbacksToNotRead--;
     } else if (myData->numCallbacksToDiscard > 0) {
         // Ignore. Allow the input to fill back up to equilibrium with the output.
         actualFramesRead = readFormattedData(myData, numFrames);
@@ -175,6 +210,7 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
         myData->numCallbacksToDiscard--;
 
     } else {
+        myData->hangIfRequested(numFrames);
 
         int32_t numInputBytes = numFrames * myData->actualInputChannelCount * sizeof(float);
         memset(myData->inputFloatData, 0 /* value */, numInputBytes);
@@ -191,7 +227,7 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
 
             if (actualFramesRead < numFrames) {
                 if(actualFramesRead < (int32_t) framesAvailable) {
-                    printf("insufficient but numFrames = %d"
+                    printf("insufficient for no reason, numFrames = %d"
                                    ", actualFramesRead = %d"
                                    ", inputFramesWritten = %d"
                                    ", inputFramesRead = %d"
@@ -212,16 +248,25 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
             if (myData->actualInputFormat == AAUDIO_FORMAT_PCM_I16) {
                 convertPcm16ToFloat(myData->inputShortData, myData->inputFloatData, numSamples);
             }
-            // Save for later.
-            myData->audioRecording.write(myData->inputFloatData,
-                                         myData->actualInputChannelCount,
-                                         numFrames);
+
             // Analyze the data.
-            myData->loopbackProcessor->process(myData->inputFloatData,
+            LoopbackProcessor::process_result procResult = myData->loopbackProcessor->process(myData->inputFloatData,
                                                myData->actualInputChannelCount,
                                                outputData,
                                                myData->actualOutputChannelCount,
                                                numFrames);
+
+            if (procResult == LoopbackProcessor::PROCESS_RESULT_GLITCH) {
+                if (myData->numGlitchEvents < kMaxGlitchEventsToSave) {
+                    myData->glitchFrames[myData->numGlitchEvents++] = myData->audioRecording.size();
+                }
+            }
+
+            // Save for later.
+            myData->audioRecording.write(myData->inputFloatData,
+                                         myData->actualInputChannelCount,
+                                         actualFramesRead);
+
             myData->isDone = myData->loopbackProcessor->isDone();
             if (myData->isDone) {
                 result = AAUDIO_CALLBACK_RESULT_STOP;
@@ -249,6 +294,7 @@ static void usage() {
     printf("      -C{channels}      number of input channels\n");
     printf("      -F{0,1,2}         input format, 1=I16, 2=FLOAT\n");
     printf("      -g{gain}          recirculating loopback gain\n");
+    printf("      -h{hangMillis}    occasionally hang in the callback\n");
     printf("      -P{inPerf}        set input AAUDIO_PERFORMANCE_MODE*\n");
     printf("          n for _NONE\n");
     printf("          l for _LATENCY\n");
@@ -307,9 +353,7 @@ static int parseTestMode(char c) {
     return testMode;
 }
 
-void printAudioGraph(AudioRecording &recording, int numSamples) {
-    int32_t start = recording.size() / 2;
-    int32_t end = start + numSamples;
+void printAudioGraphRegion(AudioRecording &recording, int32_t start, int32_t end) {
     if (end >= recording.size()) {
         end = recording.size() - 1;
     }
@@ -360,6 +404,7 @@ int main(int argc, const char **argv)
 
     int                   testMode                   = TEST_ECHO_LATENCY;
     double                gain                       = 1.0;
+    int                   hangTimeMillis             = 0;
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
@@ -388,6 +433,15 @@ int main(int argc, const char **argv)
                         break;
                     case 'g':
                         gain = atof(&arg[2]);
+                        break;
+                    case 'h':
+                        // Was there a number after the "-h"?
+                        if (arg[2]) {
+                            hangTimeMillis = atoi(&arg[2]);
+                        } else {
+                            // If no number then use the default.
+                            hangTimeMillis = kDefaultHangTimeMillis;
+                        }
                         break;
                     case 'P':
                         inputPerformanceLevel = parsePerformanceMode(arg[2]);
@@ -453,7 +507,7 @@ int main(int argc, const char **argv)
         fprintf(stderr, "ERROR -  player.open() returned %d\n", result);
         exit(1);
     }
-    outputStream = player.getStream();
+    outputStream = loopbackData.outputStream = player.getStream();
 
     actualOutputFormat = AAudioStream_getFormat(outputStream);
     if (actualOutputFormat != AAUDIO_FORMAT_PCM_FLOAT) {
@@ -487,20 +541,24 @@ int main(int argc, const char **argv)
     }
     inputStream = loopbackData.inputStream = recorder.getStream();
 
-    {
-        int32_t actualCapacity = AAudioStream_getBufferCapacityInFrames(inputStream);
-        result = AAudioStream_setBufferSizeInFrames(inputStream, actualCapacity);
-        if (result < 0) {
-            fprintf(stderr, "ERROR -  AAudioStream_setBufferSizeInFrames() returned %d\n", result);
-            goto finish;
-        } else {}
-    }
-
     argParser.compareWithStream(inputStream);
 
-    // If the input stream is too small then we cannot satisfy the output callback.
     {
         int32_t actualCapacity = AAudioStream_getBufferCapacityInFrames(inputStream);
+        (void) AAudioStream_setBufferSizeInFrames(inputStream, actualCapacity);
+
+        if (testMode == TEST_SINE_MAGNITUDE) {
+            result = AAudioStream_setBufferSizeInFrames(outputStream, actualCapacity);
+            if (result < 0) {
+                fprintf(stderr, "ERROR -  AAudioStream_setBufferSizeInFrames(output) returned %d\n",
+                        result);
+                goto finish;
+            } else {
+                printf("Output buffer size set to match input capacity = %d frames.\n", result);
+            }
+        }
+
+        // If the input stream is too small then we cannot satisfy the output callback.
         if (actualCapacity < 2 * outputFramesPerBurst) {
             fprintf(stderr, "ERROR - input capacity < 2 * outputFramesPerBurst\n");
             goto finish;
@@ -524,6 +582,8 @@ int main(int argc, const char **argv)
                                               loopbackData.actualInputChannelCount]{};
 
     loopbackData.loopbackProcessor->reset();
+
+    loopbackData.hangTimeMillis = hangTimeMillis;
 
     // Start OUTPUT first so INPUT does not overflow.
     result = player.start();
@@ -611,7 +671,17 @@ int main(int argc, const char **argv)
 
     if (loopbackData.inputError == AAUDIO_OK) {
         if (testMode == TEST_SINE_MAGNITUDE) {
-            printAudioGraph(loopbackData.audioRecording, 200);
+            if (loopbackData.numGlitchEvents > 0) {
+                // Graph around the first glitch if there is one.
+                const int32_t start = loopbackData.glitchFrames[0] - 8;
+                const int32_t end = start + outputFramesPerBurst + 8 + 8;
+                printAudioGraphRegion(loopbackData.audioRecording, start, end);
+            } else {
+                // Or graph the middle of the signal.
+                const int32_t start = loopbackData.audioRecording.size() / 2;
+                const int32_t end = start + 200;
+                printAudioGraphRegion(loopbackData.audioRecording, start, end);
+            }
         }
 
         loopbackData.loopbackProcessor->report();
@@ -661,6 +731,11 @@ finish:
     delete[] loopbackData.inputShortData;
 
 report_result:
+
+    for (int i = 0; i < loopbackData.numGlitchEvents; i++) {
+        printf("  glitch at frame %d\n", loopbackData.glitchFrames[i]);
+    }
+
     written = loopbackData.loopbackProcessor->save(FILENAME_PROCESSED);
     if (written > 0) {
         printf("main() wrote %8d processed samples to \"%s\" on Android device\n",

@@ -130,12 +130,10 @@ public:
     }
 
     int32_t getBufferCapacity() const {
-        printf("%s() returns %d\n", __func__, mBufferCapacity);
         return mBufferCapacity;
     }
 
     void setBufferCapacity(int32_t frames) {
-        printf("%s(%d)\n", __func__, frames);
         mBufferCapacity = frames;
     }
 
