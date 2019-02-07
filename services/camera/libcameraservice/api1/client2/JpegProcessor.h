@@ -54,7 +54,8 @@ class JpegProcessor:
     // Camera3StreamBufferListener implementation
     void onBufferAcquired(const BufferInfo& bufferInfo) override;
     void onBufferReleased(const BufferInfo& bufferInfo) override;
-    void onBufferRequestForFrameNumber(uint64_t frameNumber, int streamId) override;
+    void onBufferRequestForFrameNumber(uint64_t frameNumber, int streamId,
+            const CameraMetadata& settings) override;
 
     status_t updateStream(const Parameters &params);
     status_t deleteStream();

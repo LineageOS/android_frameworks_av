@@ -763,14 +763,15 @@ status_t Camera3Stream::getInputBufferProducer(sp<IGraphicBufferProducer> *produ
     return getInputBufferProducerLocked(producer);
 }
 
-void Camera3Stream::fireBufferRequestForFrameNumber(uint64_t frameNumber) {
+void Camera3Stream::fireBufferRequestForFrameNumber(uint64_t frameNumber,
+        const CameraMetadata& settings) {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
 
     for (auto &it : mBufferListenerList) {
         sp<Camera3StreamBufferListener> listener = it.promote();
         if (listener.get() != nullptr) {
-            listener->onBufferRequestForFrameNumber(frameNumber, getId());
+            listener->onBufferRequestForFrameNumber(frameNumber, getId(), settings);
         }
     }
 }

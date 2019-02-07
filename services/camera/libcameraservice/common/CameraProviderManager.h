@@ -494,6 +494,12 @@ private:
                     std::vector<std::tuple<size_t, size_t>> *internalDepthSizes /*out*/);
             status_t removeAvailableKeys(CameraMetadata& c, const std::vector<uint32_t>& keys,
                     uint32_t keyTag);
+            status_t fillHeicStreamCombinations(std::vector<int32_t>* outputs,
+                    std::vector<int64_t>* durations,
+                    std::vector<int64_t>* stallDurations,
+                    const camera_metadata_entry& halStreamConfigs,
+                    const camera_metadata_entry& halStreamDurations);
+            status_t deriveHeicTags();
         };
 
     private:

@@ -526,7 +526,15 @@ enum AIMAGE_FORMATS {
      * (in bytes) between adjacent rows.</p>
      *
      */
-    AIMAGE_FORMAT_Y8 = 0x20203859
+    AIMAGE_FORMAT_Y8 = 0x20203859,
+
+    /**
+     * Compressed HEIC format.
+     *
+     * <p>This format defines the HEIC brand of High Efficiency Image File
+     * Format as described in ISO/IEC 23008-12.</p>
+     */
+    AIMAGE_FORMAT_HEIC = 0x48454946,
 };
 
 /**
