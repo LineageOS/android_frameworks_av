@@ -872,13 +872,14 @@ status_t AudioSystem::getOutputForAttr(const audio_attributes_t *attr,
                                         const audio_config_t *config,
                                         audio_output_flags_t flags,
                                         audio_port_handle_t *selectedDeviceId,
-                                        audio_port_handle_t *portId)
+                                        audio_port_handle_t *portId,
+                                        std::vector<audio_io_handle_t> *secondaryOutputs)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return NO_INIT;
     return aps->getOutputForAttr(attr, output, session, stream, pid, uid,
                                  config,
-                                 flags, selectedDeviceId, portId);
+                                 flags, selectedDeviceId, portId, secondaryOutputs);
 }
 
 status_t AudioSystem::startOutput(audio_port_handle_t portId)

@@ -43,9 +43,8 @@ public:
 
             void        appendDumpHeader(String8& result);
             void        appendDump(String8& result, bool active);
-    virtual status_t    start(AudioSystem::sync_event_t event =
-                                    AudioSystem::SYNC_EVENT_NONE,
-                             audio_session_t triggerSession = AUDIO_SESSION_NONE);
+    virtual status_t    start(AudioSystem::sync_event_t event = AudioSystem::SYNC_EVENT_NONE,
+                              audio_session_t triggerSession = AUDIO_SESSION_NONE);
     virtual void        stop();
             void        pause();
 
@@ -129,6 +128,8 @@ public:
             }
             sp<os::ExternalVibration> getExternalVibration() const { return mExternalVibration; }
 
+            void    setTeePatches(TeePatches teePatches);
+
 protected:
     // for numerous
     friend class PlaybackThread;
@@ -139,8 +140,8 @@ protected:
     DISALLOW_COPY_AND_ASSIGN(Track);
 
     // AudioBufferProvider interface
-    virtual status_t getNextBuffer(AudioBufferProvider::Buffer* buffer);
-    // releaseBuffer() not overridden
+    status_t getNextBuffer(AudioBufferProvider::Buffer* buffer) override;
+    void releaseBuffer(AudioBufferProvider::Buffer* buffer) override;
 
     // ExtendedAudioBufferProvider interface
     virtual size_t framesReady() const;
@@ -220,6 +221,12 @@ protected:
     sp<os::ExternalVibration>    mExternalVibration;
 
 private:
+    void                interceptBuffer(const AudioBufferProvider::Buffer& buffer);
+    template <class F>
+    void                forEachTeePatchTrack(F f) {
+        for (auto& tp : mTeePatches) { f(tp.patchTrack); }
+    };
+
     // The following fields are only for fast tracks, and should be in a subclass
     int                 mFastIndex; // index within FastMixerState::mFastTracks[];
                                     // either mFastIndex == -1 if not isFastTrack()
@@ -239,6 +246,7 @@ private:
     audio_output_flags_t mFlags;
     // If the last track change was notified to the client with readAndClearHasChanged
     std::atomic_flag     mChangeNotified = ATOMIC_FLAG_INIT;
+    TeePatches  mTeePatches;
 };  // end of Track
 
 
@@ -318,7 +326,7 @@ private:
 };  // end of OutputTrack
 
 // playback track, used by PatchPanel
-class PatchTrack : public Track, public PatchProxyBufferProvider {
+class PatchTrack : public Track, public PatchTrackBase {
 public:
 
                         PatchTrack(PlaybackThread *playbackThread,
@@ -329,7 +337,8 @@ public:
                                    size_t frameCount,
                                    void *buffer,
                                    size_t bufferSize,
-                                   audio_output_flags_t flags);
+                                   audio_output_flags_t flags,
+                                   const Timeout& timeout = {});
     virtual             ~PatchTrack();
 
     virtual status_t    start(AudioSystem::sync_event_t event =
@@ -345,12 +354,7 @@ public:
                                      const struct timespec *timeOut = NULL);
     virtual void        releaseBuffer(Proxy::Buffer* buffer);
 
-            void setPeerProxy(PatchProxyBufferProvider *proxy) { mPeerProxy = proxy; }
-
 private:
             void restartIfDisabled();
 
-    sp<ClientProxy>             mProxy;
-    PatchProxyBufferProvider*   mPeerProxy;
-    struct timespec             mPeerTimeout;
 };  // end of PatchTrack

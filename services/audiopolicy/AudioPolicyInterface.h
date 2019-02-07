@@ -110,7 +110,8 @@ public:
                                         const audio_config_t *config,
                                         audio_output_flags_t *flags,
                                         audio_port_handle_t *selectedDeviceId,
-                                        audio_port_handle_t *portId) = 0;
+                                        audio_port_handle_t *portId,
+                                        std::vector<audio_io_handle_t> *secondaryOutputs) = 0;
     // indicates to the audio policy manager that the output starts being used by corresponding stream.
     virtual status_t startOutput(audio_port_handle_t portId) = 0;
     // indicates to the audio policy manager that the output stops being used by corresponding stream.

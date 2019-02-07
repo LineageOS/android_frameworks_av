@@ -8464,6 +8464,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         audio_output_flags_t flags =
                 (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_DIRECT);
         audio_port_handle_t deviceId = mDeviceId;
+        std::vector<audio_io_handle_t> secondaryOutputs;
         ret = AudioSystem::getOutputForAttr(&mAttr, &io,
                                             mSessionId,
                                             &stream,
@@ -8472,7 +8473,10 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
                                             &config,
                                             flags,
                                             &deviceId,
-                                            &portId);
+                                            &portId,
+                                            &secondaryOutputs);
+        ALOGD_IF(!secondaryOutputs.empty(),
+                 "MmapThread::start does not support secondary outputs, ignoring them");
     } else {
         audio_config_base_t config;
         config.sample_rate = mSampleRate;

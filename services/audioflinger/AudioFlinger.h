@@ -21,8 +21,11 @@
 #include "Configuration.h"
 #include <atomic>
 #include <mutex>
+#include <chrono>
 #include <deque>
 #include <map>
+#include <numeric>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -526,6 +529,9 @@ private:
     class EffectChain;
 
     struct AudioStreamIn;
+    struct TeePatch;
+    using TeePatches = std::vector<TeePatch>;
+
 
     struct  stream_type_t {
         stream_type_t()
@@ -723,6 +729,11 @@ using effect_buffer_t = int16_t;
 
         AudioStreamIn(AudioHwDevice *dev, sp<StreamInHalInterface> in, audio_input_flags_t flags) :
             audioHwDev(dev), stream(in), flags(flags) {}
+    };
+
+    struct TeePatch {
+        sp<RecordThread::PatchRecord> patchRecord;
+        sp<PlaybackThread::PatchTrack> patchTrack;
     };
 
     // for mAudioSessionRefs only

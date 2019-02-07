@@ -99,7 +99,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
         mId(android_atomic_inc(&nextTrackId)),
         mTerminated(false),
         mType(type),
-        mThreadIoHandle(thread->id()),
+        mThreadIoHandle(thread ? thread->id() : AUDIO_IO_HANDLE_NONE),
         mPortId(portId),
         mIsInvalid(false)
 {
@@ -276,6 +276,27 @@ status_t AudioFlinger::ThreadBase::TrackBase::setSyncEvent(const sp<SyncEvent>& 
     mSyncEvents.add(event);
     return NO_ERROR;
 }
+
+AudioFlinger::ThreadBase::PatchTrackBase::PatchTrackBase(sp<ClientProxy> proxy,
+                                                         const ThreadBase& thread,
+                                                         const Timeout& timeout)
+    : mProxy(proxy)
+{
+    if (timeout) {
+        setPeerTimeout(*timeout);
+    } else {
+        // Double buffer mixer
+        uint64_t mixBufferNs = ((uint64_t)2 * thread.frameCount() * 1000000000) /
+                                              thread.sampleRate();
+        setPeerTimeout(std::chrono::nanoseconds{mixBufferNs});
+    }
+}
+
+void AudioFlinger::ThreadBase::PatchTrackBase::setPeerTimeout(std::chrono::nanoseconds timeout) {
+    mPeerTimeout.tv_sec = timeout.count() / std::nano::den;
+    mPeerTimeout.tv_nsec = timeout.count() % std::nano::den;
+}
+
 
 // ----------------------------------------------------------------------------
 //      Playback
@@ -504,6 +525,7 @@ void AudioFlinger::PlaybackThread::Track::destroy()
             AudioSystem::releaseOutput(mPortId);
         }
     }
+    forEachTeePatchTrack([](auto patchTrack) { patchTrack->destroy(); });
 }
 
 void AudioFlinger::PlaybackThread::Track::appendDumpHeader(String8& result)
@@ -649,8 +671,7 @@ uint32_t AudioFlinger::PlaybackThread::Track::sampleRate() const {
 }
 
 // AudioBufferProvider interface
-status_t AudioFlinger::PlaybackThread::Track::getNextBuffer(
-        AudioBufferProvider::Buffer* buffer)
+status_t AudioFlinger::PlaybackThread::Track::getNextBuffer(AudioBufferProvider::Buffer* buffer)
 {
     ServerProxy::Buffer buf;
     size_t desiredFrames = buffer->frameCount;
@@ -665,8 +686,37 @@ status_t AudioFlinger::PlaybackThread::Track::getNextBuffer(
     } else {
         mAudioTrackServerProxy->tallyUnderrunFrames(0);
     }
-
     return status;
+}
+
+void AudioFlinger::PlaybackThread::Track::releaseBuffer(AudioBufferProvider::Buffer* buffer)
+{
+    interceptBuffer(*buffer);
+    TrackBase::releaseBuffer(buffer);
+}
+
+// TODO: compensate for time shift between HW modules.
+void AudioFlinger::PlaybackThread::Track::interceptBuffer(
+        const AudioBufferProvider::Buffer& buffer) {
+    for (auto& sink : mTeePatches) {
+        RecordThread::PatchRecord& patchRecord = *sink.patchRecord;
+        AudioBufferProvider::Buffer patchBuffer;
+        patchBuffer.frameCount = buffer.frameCount;
+        auto status = patchRecord.getNextBuffer(&patchBuffer);
+        if (status != NO_ERROR) {
+           ALOGW("%s PathRecord getNextBuffer failed with error %d: %s",
+                 __func__, status, strerror(-status));
+           continue;
+        }
+        // FIXME: On buffer wrap, the frame count will be less then requested,
+        //        retry to write the rest. (unlikely due to lcm buffer sizing)
+        ALOGW_IF(patchBuffer.frameCount != buffer.frameCount,
+                 "%s PatchRecord can not provide big enough buffer %zu/%zu, dropping %zu frames",
+                 __func__, patchBuffer.frameCount, buffer.frameCount,
+                 buffer.frameCount - patchBuffer.frameCount);
+        memcpy(patchBuffer.raw, buffer.raw, patchBuffer.frameCount * mFrameSize);
+        patchRecord.releaseBuffer(&patchBuffer);
+    }
 }
 
 // releaseBuffer() is not overridden
@@ -816,6 +866,9 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
     } else {
         status = BAD_VALUE;
     }
+    if (status == NO_ERROR) {
+        forEachTeePatchTrack([](auto patchTrack) { patchTrack->start(); });
+    }
     return status;
 }
 
@@ -849,6 +902,7 @@ void AudioFlinger::PlaybackThread::Track::stop()
                     __func__, mId, (int)mThreadIoHandle);
         }
     }
+    forEachTeePatchTrack([](auto patchTrack) { patchTrack->stop(); });
 }
 
 void AudioFlinger::PlaybackThread::Track::pause()
@@ -881,6 +935,8 @@ void AudioFlinger::PlaybackThread::Track::pause()
             break;
         }
     }
+    // Pausing the TeePatch to avoid a glitch on underrun, at the cost of buffered audio loss.
+    forEachTeePatchTrack([](auto patchTrack) { patchTrack->pause(); });
 }
 
 void AudioFlinger::PlaybackThread::Track::flush()
@@ -942,6 +998,8 @@ void AudioFlinger::PlaybackThread::Track::flush()
         // because the hardware buffer could hold a large amount of audio
         playbackThread->broadcast_l();
     }
+    // Flush the Tee to avoid on resume playing old data and glitching on the transition to new data
+    forEachTeePatchTrack([](auto patchTrack) { patchTrack->flush(); });
 }
 
 // must be called with thread lock held
@@ -1058,6 +1116,11 @@ void AudioFlinger::PlaybackThread::Track::copyMetadataTo(MetadataInserter& backI
             .content_type = mAttr.content_type,
             .gain = mFinalVolume,
     };
+}
+
+void AudioFlinger::PlaybackThread::Track::setTeePatches(TeePatches teePatches) {
+    forEachTeePatchTrack([](auto patchTrack) { patchTrack->destroy(); });
+    mTeePatches = std::move(teePatches);
 }
 
 status_t AudioFlinger::PlaybackThread::Track::getTimestamp(AudioTimestamp& timestamp)
@@ -1615,19 +1678,16 @@ AudioFlinger::PlaybackThread::PatchTrack::PatchTrack(PlaybackThread *playbackThr
                                                      size_t frameCount,
                                                      void *buffer,
                                                      size_t bufferSize,
-                                                     audio_output_flags_t flags)
+                                                     audio_output_flags_t flags,
+                                                     const Timeout& timeout)
     :   Track(playbackThread, NULL, streamType,
               audio_attributes_t{} /* currently unused for patch track */,
               sampleRate, format, channelMask, frameCount,
               buffer, bufferSize, nullptr /* sharedBuffer */,
               AUDIO_SESSION_NONE, AID_AUDIOSERVER, flags, TYPE_PATCH),
-              mProxy(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, true, true))
+        PatchTrackBase(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, true, true),
+                       *playbackThread, timeout)
 {
-    uint64_t mixBufferNs = ((uint64_t)2 * playbackThread->frameCount() * 1000000000) /
-                                                                    playbackThread->sampleRate();
-    mPeerTimeout.tv_sec = mixBufferNs / 1000000000;
-    mPeerTimeout.tv_nsec = (int) (mixBufferNs % 1000000000);
-
     ALOGV("%s(%d): sampleRate %d mPeerTimeout %d.%03d sec",
                                       __func__, mId, sampleRate,
                                       (int)mPeerTimeout.tv_sec,
@@ -2088,19 +2148,16 @@ AudioFlinger::RecordThread::PatchRecord::PatchRecord(RecordThread *recordThread,
                                                      size_t frameCount,
                                                      void *buffer,
                                                      size_t bufferSize,
-                                                     audio_input_flags_t flags)
+                                                     audio_input_flags_t flags,
+                                                     const Timeout& timeout)
     :   RecordTrack(recordThread, NULL,
                 audio_attributes_t{} /* currently unused for patch track */,
                 sampleRate, format, channelMask, frameCount,
                 buffer, bufferSize, AUDIO_SESSION_NONE, AID_AUDIOSERVER,
                 flags, TYPE_PATCH),
-                mProxy(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, false, true))
+        PatchTrackBase(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, false, true),
+                       *recordThread, timeout)
 {
-    uint64_t mixBufferNs = ((uint64_t)2 * recordThread->frameCount() * 1000000000) /
-                                                                recordThread->sampleRate();
-    mPeerTimeout.tv_sec = mixBufferNs / 1000000000;
-    mPeerTimeout.tv_nsec = (int) (mixBufferNs % 1000000000);
-
     ALOGV("%s(%d): sampleRate %d mPeerTimeout %d.%03d sec",
                                       __func__, mId, sampleRate,
                                       (int)mPeerTimeout.tv_sec,

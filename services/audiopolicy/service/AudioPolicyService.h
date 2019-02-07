@@ -74,16 +74,17 @@ public:
     virtual status_t setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config);
     virtual audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage);
     virtual audio_io_handle_t getOutput(audio_stream_type_t stream);
-    virtual status_t getOutputForAttr(const audio_attributes_t *attr,
-                                      audio_io_handle_t *output,
-                                      audio_session_t session,
-                                      audio_stream_type_t *stream,
-                                      pid_t pid,
-                                      uid_t uid,
-                                      const audio_config_t *config,
-                                      audio_output_flags_t flags,
-                                      audio_port_handle_t *selectedDeviceId,
-                                      audio_port_handle_t *portId);
+    status_t getOutputForAttr(const audio_attributes_t *attr,
+                              audio_io_handle_t *output,
+                              audio_session_t session,
+                              audio_stream_type_t *stream,
+                              pid_t pid,
+                              uid_t uid,
+                              const audio_config_t *config,
+                              audio_output_flags_t flags,
+                              audio_port_handle_t *selectedDeviceId,
+                              audio_port_handle_t *portId,
+                              std::vector<audio_io_handle_t> *secondaryOutputs) override;
     virtual status_t startOutput(audio_port_handle_t portId);
     virtual status_t stopOutput(audio_port_handle_t portId);
     virtual void releaseOutput(audio_port_handle_t portId);

@@ -329,3 +329,19 @@ public:
                                      const struct timespec *requested = NULL) = 0;
     virtual void        releaseBuffer(Proxy::Buffer* buffer) = 0;
 };
+
+class PatchTrackBase : public PatchProxyBufferProvider
+{
+public:
+    using Timeout = std::optional<std::chrono::nanoseconds>;
+                        PatchTrackBase(sp<ClientProxy> proxy, const ThreadBase& thread,
+                                       const Timeout& timeout);
+            void        setPeerTimeout(std::chrono::nanoseconds timeout);
+            void        setPeerProxy(PatchProxyBufferProvider *proxy) { mPeerProxy = proxy; }
+
+protected:
+    const sp<ClientProxy>       mProxy;
+    PatchProxyBufferProvider*   mPeerProxy = nullptr;
+    struct timespec             mPeerTimeout{};
+
+};

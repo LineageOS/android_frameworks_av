@@ -85,7 +85,8 @@ SourceClientDescriptor::SourceClientDescriptor(audio_port_handle_t portId, uid_t
          product_strategy_t strategy) :
     TrackClientDescriptor::TrackClientDescriptor(portId, uid, AUDIO_SESSION_NONE, attributes,
         AUDIO_CONFIG_BASE_INITIALIZER, AUDIO_PORT_HANDLE_NONE,
-        stream, strategy, AUDIO_OUTPUT_FLAG_NONE, false),
+        stream, strategy, AUDIO_OUTPUT_FLAG_NONE, false,
+        {} /* Sources do not support secondary outputs*/),
         mPatchDesc(patchDesc), mSrcDevice(srcDevice)
 {
 }
