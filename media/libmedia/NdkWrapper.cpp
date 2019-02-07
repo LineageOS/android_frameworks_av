@@ -95,6 +95,7 @@ static const char *AMediaFormatKeyGroupInt32[] = {
 
 static const char *AMediaFormatKeyGroupInt64[] = {
     AMEDIAFORMAT_KEY_DURATION,
+    AMEDIAFORMAT_KEY_MAX_PTS_GAP_TO_ENCODER,
     AMEDIAFORMAT_KEY_REPEAT_PREVIOUS_FRAME_AFTER,
     AMEDIAFORMAT_KEY_TIME_US,
 };
@@ -126,6 +127,7 @@ static const char *AMediaFormatKeyGroupRect[] = {
 static const char *AMediaFormatKeyGroupFloatInt32[] = {
     AMEDIAFORMAT_KEY_FRAME_RATE,
     AMEDIAFORMAT_KEY_I_FRAME_INTERVAL,
+    AMEDIAFORMAT_KEY_MAX_FPS_TO_ENCODER,
     AMEDIAFORMAT_KEY_OPERATING_RATE,
 };
 

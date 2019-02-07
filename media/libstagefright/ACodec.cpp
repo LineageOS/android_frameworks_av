@@ -37,6 +37,7 @@
 
 #include <media/stagefright/BufferProducerWrapper.h>
 #include <media/stagefright/MediaCodec.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/OMXClient.h>
 #include <media/stagefright/PersistentSurface.h>
@@ -1820,20 +1821,19 @@ status_t ACodec::configureCodec(
         }
 
         if (!msg->findInt64(
-                    "repeat-previous-frame-after",
-                    &mRepeatFrameDelayUs)) {
+                KEY_REPEAT_PREVIOUS_FRAME_AFTER, &mRepeatFrameDelayUs)) {
             mRepeatFrameDelayUs = -1LL;
         }
 
         // only allow 32-bit value, since we pass it as U32 to OMX.
-        if (!msg->findInt64("max-pts-gap-to-encoder", &mMaxPtsGapUs)) {
+        if (!msg->findInt64(KEY_MAX_PTS_GAP_TO_ENCODER, &mMaxPtsGapUs)) {
             mMaxPtsGapUs = 0LL;
         } else if (mMaxPtsGapUs > INT32_MAX || mMaxPtsGapUs < INT32_MIN) {
             ALOGW("Unsupported value for max pts gap %lld", (long long) mMaxPtsGapUs);
             mMaxPtsGapUs = 0LL;
         }
 
-        if (!msg->findFloat("max-fps-to-encoder", &mMaxFps)) {
+        if (!msg->findFloat(KEY_MAX_FPS_TO_ENCODER, &mMaxFps)) {
             mMaxFps = -1;
         }
 
@@ -1847,8 +1847,8 @@ status_t ACodec::configureCodec(
         }
 
         if (!msg->findInt32(
-                    "create-input-buffers-suspended",
-                    (int32_t*)&mCreateInputBuffersSuspended)) {
+                KEY_CREATE_INPUT_SURFACE_SUSPENDED,
+                (int32_t*)&mCreateInputBuffersSuspended)) {
             mCreateInputBuffersSuspended = false;
         }
     }
@@ -7429,7 +7429,7 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
     }
 
     int64_t timeOffsetUs;
-    if (params->findInt64("time-offset-us", &timeOffsetUs)) {
+    if (params->findInt64(PARAMETER_KEY_OFFSET_TIME, &timeOffsetUs)) {
         if (mGraphicBufferSource == NULL) {
             ALOGE("[%s] Invalid to set input buffer time offset without surface",
                     mComponentName.c_str());
@@ -7465,7 +7465,7 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
     }
 
     int32_t dropInputFrames;
-    if (params->findInt32("drop-input-frames", &dropInputFrames)) {
+    if (params->findInt32(PARAMETER_KEY_SUSPEND, &dropInputFrames)) {
         if (mGraphicBufferSource == NULL) {
             ALOGE("[%s] Invalid to set suspend without surface",
                     mComponentName.c_str());
@@ -7473,7 +7473,7 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
         }
 
         int64_t suspendStartTimeUs = -1;
-        (void) params->findInt64("drop-start-time-us", &suspendStartTimeUs);
+        (void) params->findInt64(PARAMETER_KEY_SUSPEND_TIME, &suspendStartTimeUs);
         status_t err = statusFromBinderStatus(
                 mGraphicBufferSource->setSuspend(dropInputFrames != 0, suspendStartTimeUs));
 

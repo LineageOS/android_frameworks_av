@@ -722,13 +722,14 @@ void CCodec::configure(const sp<AMessage> &msg) {
             {
                 config->mISConfig->mMinFps = 0;
                 int64_t value;
-                if (msg->findInt64("repeat-previous-frame-after", &value) && value > 0) {
+                if (msg->findInt64(KEY_REPEAT_PREVIOUS_FRAME_AFTER, &value) && value > 0) {
                     config->mISConfig->mMinFps = 1e6 / value;
                 }
-                (void)msg->findFloat("max-fps-to-encoder", &config->mISConfig->mMaxFps);
+                (void)msg->findFloat(
+                        KEY_MAX_FPS_TO_ENCODER, &config->mISConfig->mMaxFps);
                 config->mISConfig->mMinAdjustedFps = 0;
                 config->mISConfig->mFixedAdjustedFps = 0;
-                if (msg->findInt64("max-pts-gap-to-encoder", &value)) {
+                if (msg->findInt64(KEY_MAX_PTS_GAP_TO_ENCODER, &value)) {
                     if (value < 0 && value >= INT32_MIN) {
                         config->mISConfig->mFixedAdjustedFps = -1e6 / value;
                     } else if (value > 0 && value <= INT32_MAX) {
@@ -749,7 +750,7 @@ void CCodec::configure(const sp<AMessage> &msg) {
                 config->mISConfig->mSuspended = false;
                 config->mISConfig->mSuspendAtUs = -1;
                 int32_t value;
-                if (msg->findInt32("create-input-buffers-suspended", &value) && value) {
+                if (msg->findInt32(KEY_CREATE_INPUT_SURFACE_SUSPENDED, &value) && value) {
                     config->mISConfig->mSuspended = true;
                 }
             }
@@ -1372,7 +1373,7 @@ void CCodec::setParameters(const sp<AMessage> &params) {
      */
     if ((config->mDomain & (Config::IS_VIDEO | Config::IS_IMAGE))
             && (config->mDomain & Config::IS_ENCODER) && config->mInputSurface && config->mISConfig) {
-        (void)params->findInt64("time-offset-us", &config->mISConfig->mTimeOffsetUs);
+        (void)params->findInt64(PARAMETER_KEY_OFFSET_TIME, &config->mISConfig->mTimeOffsetUs);
 
         if (params->findInt64("skip-frames-before", &config->mISConfig->mStartAtUs)) {
             config->mISConfig->mStopped = false;
@@ -1381,10 +1382,10 @@ void CCodec::setParameters(const sp<AMessage> &params) {
         }
 
         int32_t value;
-        if (params->findInt32("drop-input-frames", &value)) {
+        if (params->findInt32(PARAMETER_KEY_SUSPEND, &value)) {
             config->mISConfig->mSuspended = value;
             config->mISConfig->mSuspendAtUs = -1;
-            (void)params->findInt64("drop-start-time-us", &config->mISConfig->mSuspendAtUs);
+            (void)params->findInt64(PARAMETER_KEY_SUSPEND_TIME, &config->mISConfig->mSuspendAtUs);
         }
 
         (void)config->mInputSurface->configure(*config->mISConfig);

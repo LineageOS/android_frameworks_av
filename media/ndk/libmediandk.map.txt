@@ -105,8 +105,10 @@ LIBMEDIANDK {
     AMEDIAFORMAT_KEY_LOOP; # var introduced=29
     AMEDIAFORMAT_KEY_LYRICIST; # var introduced=29
     AMEDIAFORMAT_KEY_MAX_BIT_RATE; # var introduced=29
+    AMEDIAFORMAT_KEY_MAX_FPS_TO_ENCODER; # var introduced=29
     AMEDIAFORMAT_KEY_MAX_HEIGHT; # var introduced=21
     AMEDIAFORMAT_KEY_MAX_INPUT_SIZE; # var introduced=21
+    AMEDIAFORMAT_KEY_MAX_PTS_GAP_TO_ENCODER; # var introduced=29
     AMEDIAFORMAT_KEY_MAX_WIDTH; # var introduced=21
     AMEDIAFORMAT_KEY_MIME; # var introduced=21
     AMEDIAFORMAT_KEY_MPEG_USER_DATA; # var introduced=28
