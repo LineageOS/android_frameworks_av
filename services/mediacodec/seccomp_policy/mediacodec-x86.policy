@@ -50,6 +50,9 @@ write: 1
 nanosleep: 1
 sched_setscheduler: 1
 uname: 1
+memfd_create: 1
+ftruncate: 1
+ftruncate64: 1
 
 # Required by AddressSanitizer
 gettid: 1
