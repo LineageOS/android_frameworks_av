@@ -81,13 +81,16 @@ private:
     class Endpoint {
     public:
         Endpoint() = default;
-        Endpoint(Endpoint&& other) { *this = std::move(other); }
-        Endpoint& operator=(Endpoint&& other) {
+        Endpoint(const Endpoint&) = delete;
+        Endpoint& operator=(const Endpoint&) = delete;
+        Endpoint(Endpoint&& other) noexcept { swap(other); }
+        Endpoint& operator=(Endpoint&& other) noexcept {
+            swap(other);
+            return *this;
+        }
+        ~Endpoint() {
             ALOGE_IF(mHandle != AUDIO_PATCH_HANDLE_NONE,
                     "A non empty Patch Endpoint leaked, handle %d", mHandle);
-            *this = other;
-            other.mHandle = AUDIO_PATCH_HANDLE_NONE;
-            return *this;
         }
 
         status_t checkTrack(TrackType *trackOrNull) const {
@@ -127,10 +130,19 @@ private:
         }
         void stopTrack() { if (mTrack) mTrack->stop(); }
 
-    private:
-        Endpoint(const Endpoint&) = default;
-        Endpoint& operator=(const Endpoint&) = default;
+        void swap(Endpoint &other) noexcept {
+            using std::swap;
+            swap(mThread, other.mThread);
+            swap(mCloseThread, other.mCloseThread);
+            swap(mHandle, other.mHandle);
+            swap(mTrack, other.mTrack);
+        }
 
+        friend void swap(Endpoint &a, Endpoint &b) noexcept {
+            a.swap(b);
+        }
+
+    private:
         sp<ThreadType> mThread;
         bool mCloseThread = true;
         audio_patch_handle_t mHandle = AUDIO_PATCH_HANDLE_NONE;

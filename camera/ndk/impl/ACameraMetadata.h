@@ -117,6 +117,7 @@ struct ACameraMetadata : public RefBase {
     static std::unordered_set<uint32_t> sSystemTags;
 
     std::vector<const char*> mStaticPhysicalCameraIds;
+    std::vector<String8> mStaticPhysicalCameraIdValues;
 };
 
 #endif // _ACAMERA_METADATA_H

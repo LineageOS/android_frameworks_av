@@ -748,10 +748,12 @@ int main(int argc, char **argv) {
         composerClient = new SurfaceComposerClient;
         CHECK_EQ((status_t)OK, composerClient->initCheck());
 
-        android::sp<IBinder> display(SurfaceComposerClient::getBuiltInDisplay(
-                ISurfaceComposer::eDisplayIdMain));
+        const android::sp<IBinder> display = SurfaceComposerClient::getInternalDisplayToken();
+        CHECK(display != nullptr);
+
         DisplayInfo info;
-        SurfaceComposerClient::getDisplayInfo(display, &info);
+        CHECK_EQ(SurfaceComposerClient::getDisplayInfo(display, &info), NO_ERROR);
+
         ssize_t displayWidth = info.w;
         ssize_t displayHeight = info.h;
 

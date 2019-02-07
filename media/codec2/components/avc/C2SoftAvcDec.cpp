@@ -51,6 +51,12 @@ public:
         noInputLatency();
         noTimeStretch();
 
+        // TODO: Proper support for reorder depth.
+        addParameter(
+                DefineParam(mActualOutputDelay, C2_PARAMKEY_OUTPUT_DELAY)
+                .withConstValue(new C2PortActualDelayTuning::output(8u))
+                .build());
+
         // TODO: output latency and reordering
 
         addParameter(
@@ -877,6 +883,8 @@ void C2SoftAvcDec::process(
     } else if (!hasPicture) {
         fillEmptyWork(work);
     }
+
+    work->input.buffers.clear();
 }
 
 c2_status_t C2SoftAvcDec::drainInternal(

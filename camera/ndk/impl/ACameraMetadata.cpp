@@ -104,7 +104,8 @@ ACameraMetadata::derivePhysicalCameraIds() {
     for (size_t i = 0; i < entry.count; ++i) {
         if (ids[i] == '\0') {
             if (start != i) {
-                mStaticPhysicalCameraIds.push_back((const char*)ids+start);
+                mStaticPhysicalCameraIdValues.push_back(String8((const char *)ids+start));
+                mStaticPhysicalCameraIds.push_back(mStaticPhysicalCameraIdValues.back().string());
             }
             start = i+1;
         }

@@ -55,12 +55,10 @@ struct CodecListener : public android::Codec2Client::Listener {
         : callBack(fn) {}
     virtual void onWorkDone(
         const std::weak_ptr<android::Codec2Client::Component>& comp,
-        std::list<std::unique_ptr<C2Work>>& workItems,
-        size_t numDiscardedInputBuffers) override {
+        std::list<std::unique_ptr<C2Work>>& workItems) override {
         /* TODO */
         ALOGD("onWorkDone called");
         (void)comp;
-        (void)numDiscardedInputBuffers;
         if (callBack) callBack(workItems);
     }
 
@@ -89,9 +87,10 @@ struct CodecListener : public android::Codec2Client::Listener {
     }
 
     virtual void onInputBufferDone(
-        const std::shared_ptr<C2Buffer>& buffer) override {
+        uint64_t frameIndex, size_t arrayIndex) override {
         /* TODO */
-        (void)buffer;
+        (void)frameIndex;
+        (void)arrayIndex;
     }
 
     virtual void onFrameRendered(

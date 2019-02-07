@@ -708,6 +708,7 @@ static CreatorFunc Sniff(
 }
 
 static const char *extensions[] = {
+    "mp2",
     "mp3",
     "mpeg",
     "mpg",
