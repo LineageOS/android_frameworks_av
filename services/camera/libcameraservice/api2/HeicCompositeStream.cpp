@@ -214,6 +214,10 @@ status_t HeicCompositeStream::deleteInternalStreams() {
         mAppSegmentStreamId = -1;
     }
 
+    if (mOutputSurface != nullptr) {
+        mOutputSurface->disconnect(NATIVE_WINDOW_API_CAMERA);
+        mOutputSurface.clear();
+    }
     return res;
 }
 

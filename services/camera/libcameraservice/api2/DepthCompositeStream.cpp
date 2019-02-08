@@ -634,6 +634,11 @@ status_t DepthCompositeStream::deleteInternalStreams() {
         mDepthStreamId = -1;
     }
 
+    if (mOutputSurface != nullptr) {
+        mOutputSurface->disconnect(NATIVE_WINDOW_API_CAMERA);
+        mOutputSurface.clear();
+    }
+
     return ret;
 }
 
