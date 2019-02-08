@@ -597,6 +597,9 @@ enum C2Config::level_t : uint32_t {
     LEVEL_AVC_5,                                ///< AVC (H.264) Level 5
     LEVEL_AVC_5_1,                              ///< AVC (H.264) Level 5.1
     LEVEL_AVC_5_2,                              ///< AVC (H.264) Level 5.2
+    LEVEL_AVC_6,                                ///< AVC (H.264) Level 6
+    LEVEL_AVC_6_1,                              ///< AVC (H.264) Level 6.1
+    LEVEL_AVC_6_2,                              ///< AVC (H.264) Level 6.2
 
     // HEVC (H.265) tiers and levels
     LEVEL_HEVC_MAIN_1 = _C2_PL_HEVC_BASE,       ///< HEVC (H.265) Main Tier Level 1
