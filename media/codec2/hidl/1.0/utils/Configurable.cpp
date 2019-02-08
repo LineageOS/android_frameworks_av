@@ -171,17 +171,15 @@ Return<void> CachedConfigurable::querySupportedValues(
             c2fields,
             mayBlock ? C2_MAY_BLOCK : C2_DONT_BLOCK);
     hidl_vec<FieldSupportedValuesQueryResult> outFields(inFields.size());
-    {
-        size_t ix = 0;
-        for (const C2FieldSupportedValuesQuery &result : c2fields) {
-            if (!objcpy(&outFields[ix], result)) {
-                ++ix;
-            } else {
-                outFields.resize(ix);
-                c2res = C2_CORRUPTED;
-                LOG(WARNING) << "querySupportedValues -- invalid output params.";
-                break;
-            }
+    size_t dstIx = 0;
+    for (const C2FieldSupportedValuesQuery &result : c2fields) {
+        if (objcpy(&outFields[dstIx], result)) {
+            ++dstIx;
+        } else {
+            outFields.resize(dstIx);
+            c2res = C2_CORRUPTED;
+            LOG(WARNING) << "querySupportedValues -- invalid output params.";
+            break;
         }
     }
     _hidl_cb((Status)c2res, outFields);
