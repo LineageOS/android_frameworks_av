@@ -43,12 +43,12 @@ public:
 
     android::AudioMix *getMix();
 
-    void setMix(AudioMix &mix);
+    void setMix(const AudioMix &mix);
 
     void dump(String8 *dst, int spaces, int index) const;
 
 private:
-    AudioMix    mMix;                   // Audio policy mix descriptor
+    AudioMix    mMix;                     // Audio policy mix descriptor
     sp<SwAudioOutputDescriptor> mOutput;  // Corresponding output stream
 };
 
