@@ -157,7 +157,7 @@ void AudioPolicyMixCollection::closeOutput(sp<SwAudioOutputDescriptor> &desc)
 }
 
 status_t AudioPolicyMixCollection::getOutputForAttr(
-        audio_attributes_t attributes, uid_t uid, sp<SwAudioOutputDescriptor> &primaryDesc,
+        const audio_attributes_t& attributes, uid_t uid, sp<SwAudioOutputDescriptor> &primaryDesc,
         std::vector<sp<SwAudioOutputDescriptor>> *secondaryDescs)
 {
     ALOGV("getOutputForAttr() querying %zu mixes:", size());
@@ -203,7 +203,7 @@ status_t AudioPolicyMixCollection::getOutputForAttr(
 }
 
 AudioPolicyMixCollection::MixMatchStatus AudioPolicyMixCollection::mixMatch(
-        const AudioMix* mix, size_t mixIndex, audio_attributes_t attributes, uid_t uid) {
+        const AudioMix* mix, size_t mixIndex, const audio_attributes_t& attributes, uid_t uid) {
 
     if (mix->mMixType == MIX_TYPE_PLAYERS) {
         // TODO if adding more player rules (currently only 2), make rule handling "generic"
