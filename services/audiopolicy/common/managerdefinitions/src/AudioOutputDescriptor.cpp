@@ -802,6 +802,19 @@ sp<SwAudioOutputDescriptor> SwAudioOutputCollection::getOutputForClient(audio_po
     return 0;
 }
 
+void SwAudioOutputCollection::clearSessionRoutesForDevice(
+        const sp<DeviceDescriptor> &disconnectedDevice)
+{
+    for (size_t i = 0; i < size(); i++) {
+        sp<AudioOutputDescriptor> outputDesc = valueAt(i);
+        for (const auto& client : outputDesc->getClientIterable()) {
+            if (client->preferredDeviceId() == disconnectedDevice->getId()) {
+                client->setPreferredDeviceId(AUDIO_PORT_HANDLE_NONE);
+            }
+        }
+    }
+}
+
 void SwAudioOutputCollection::dump(String8 *dst) const
 {
     dst->append("\nOutputs dump:\n");

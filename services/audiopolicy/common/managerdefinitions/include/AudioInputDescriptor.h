@@ -143,6 +143,16 @@ public:
 
     void trackEffectEnabled(const sp<EffectDescriptor> &effect, bool enabled);
 
+    /**
+    * @brief clearSessionRoutesForDevice: when a device is disconnected, and if this device has
+    * been chosen as the preferred device by any client, the policy manager shall
+    * prevent from using this device any more by clearing all the session routes involving this
+    * device.
+    * In other words, the preferred device port id of these clients will be resetted to NONE.
+    * @param disconnectedDevice device to be disconnected
+    */
+    void clearSessionRoutesForDevice(const sp<DeviceDescriptor> &disconnectedDevice);
+
     void dump(String8 *dst) const;
 };
 
