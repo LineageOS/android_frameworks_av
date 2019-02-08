@@ -26,11 +26,14 @@
 #include <string.h>
 #include <time.h>
 #include <aaudio/AAudio.h>
+
 #include "AAudioExampleUtils.h"
 #include "AAudioSimplePlayer.h"
 #include "AAudioArgsParser.h"
 
-#define APP_VERSION  "0.1.5"
+#define APP_VERSION  "0.1.6"
+
+constexpr int32_t kDefaultHangTimeMSec = 10;
 
 /**
  * Open stream, play some sine waves, then close the stream.
@@ -41,7 +44,7 @@
 static aaudio_result_t testOpenPlayClose(AAudioArgsParser &argParser,
                                          int32_t loopCount,
                                          int32_t prefixToneMsec,
-                                         bool forceUnderruns)
+                                         int32_t hangTimeMSec)
 {
     SineThreadedData_t myData;
     AAudioSimplePlayer &player = myData.simplePlayer;
@@ -53,10 +56,12 @@ static aaudio_result_t testOpenPlayClose(AAudioArgsParser &argParser,
     printf("----------------------- run complete test --------------------------\n");
     myData.schedulerChecked = false;
     myData.callbackCount = 0;
-    myData.forceUnderruns = forceUnderruns; // test AAudioStream_getXRunCount()
+    myData.hangTimeMSec = hangTimeMSec; // test AAudioStream_getXRunCount()
 
     result = player.open(argParser,
-                         SimplePlayerDataCallbackProc, SimplePlayerErrorCallbackProc, &myData);
+                         SimplePlayerDataCallbackProc,
+                         SimplePlayerErrorCallbackProc,
+                         &myData);
     if (result != AAUDIO_OK) {
         fprintf(stderr, "ERROR -  player.open() returned %s\n",
                 AAudio_convertResultToText(result));
@@ -115,12 +120,17 @@ static aaudio_result_t testOpenPlayClose(AAudioArgsParser &argParser,
             int64_t millis =
                     (getNanoseconds(CLOCK_MONOTONIC) - startedAtNanos) / NANOS_PER_MILLISECOND;
             result = myData.waker.get();
+            const int32_t framesWritten = (int32_t) AAudioStream_getFramesWritten(player.getStream());
+            const int32_t framesRead = (int32_t) AAudioStream_getFramesRead(player.getStream());
+            const int32_t xruns = AAudioStream_getXRunCount(player.getStream());
             printf(" waker result = %d, at %6d millis"
-                           ", second = %3d, framesWritten = %8d, underruns = %d\n",
+                           ", second = %3d, frames written %8d - read %8d = %8d, underruns = %d\n",
                    result, (int) millis,
                    second,
-                   (int) AAudioStream_getFramesWritten(player.getStream()),
-                   (int) AAudioStream_getXRunCount(player.getStream()));
+                   framesWritten,
+                   framesRead,
+                   framesWritten - framesRead,
+                   xruns);
             if (result != AAUDIO_OK) {
                 disconnected = (result == AAUDIO_ERROR_DISCONNECTED);
                 bailOut = true;
@@ -210,7 +220,9 @@ static void usage() {
     AAudioArgsParser::usage();
     printf("      -l{count} loopCount start/stop, every other one is silent\n");
     printf("      -t{msec}  play a high pitched tone at the beginning\n");
-    printf("      -z        force periodic underruns by sleeping in callback\n");
+    printf("      -h{msec}  force periodic underruns by hanging in callback\n");
+    printf("                If no value specified then %d used.\n",
+            kDefaultHangTimeMSec);
 }
 
 int main(int argc, const char **argv)
@@ -219,13 +231,14 @@ int main(int argc, const char **argv)
     aaudio_result_t    result;
     int32_t            loopCount = 1;
     int32_t            prefixToneMsec = 0;
-    bool               forceUnderruns = false;
+    int32_t            hangTimeMSec = 0;
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
 
-    printf("%s - Play a sine sweep using an AAudio callback V%s\n", argv[0], APP_VERSION);
+    printf("%s - Play a sine sweep using an AAudio callback V%s\n",
+        argv[0], APP_VERSION);
 
     for (int i = 1; i < argc; i++) {
         const char *arg = argv[i];
@@ -240,8 +253,10 @@ int main(int argc, const char **argv)
                     case 't':
                         prefixToneMsec = atoi(&arg[2]);
                         break;
-                    case 'z':
-                        forceUnderruns = true;  // Zzzzzzz
+                    case 'h':
+                        hangTimeMSec = (arg[2]) // value specified?
+                                ? atoi(&arg[2])
+                                : kDefaultHangTimeMSec;
                         break;
                     default:
                         usage();
@@ -257,7 +272,8 @@ int main(int argc, const char **argv)
     }
 
     // Keep looping until we can complete the test without disconnecting.
-    while((result = testOpenPlayClose(argParser, loopCount, prefixToneMsec, forceUnderruns))
+    while((result = testOpenPlayClose(argParser, loopCount,
+            prefixToneMsec, hangTimeMSec))
             == AAUDIO_ERROR_DISCONNECTED);
 
     return (result) ? EXIT_FAILURE : EXIT_SUCCESS;
