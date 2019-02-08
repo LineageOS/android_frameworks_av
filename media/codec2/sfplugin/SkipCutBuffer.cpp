@@ -20,7 +20,7 @@
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaBuffer.h>
-#include <media/stagefright/SkipCutBuffer.h>
+#include "SkipCutBuffer.h"
 
 namespace android {
 
