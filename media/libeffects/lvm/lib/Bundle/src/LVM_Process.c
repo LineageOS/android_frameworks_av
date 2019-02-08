@@ -21,6 +21,7 @@
 /*  Includes                                                                            */
 /*                                                                                      */
 /****************************************************************************************/
+#include <system/audio.h>
 
 #include "LVM_Private.h"
 #include "VectorArithmetic.h"
@@ -67,6 +68,7 @@ LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
     LVM_ReturnStatus_en  Status;
 #ifdef SUPPORT_MC
     LVM_INT32           NrChannels  = pInstance->NrChannels;
+    LVM_INT32           ChMask      = pInstance->ChMask;
 #define NrFrames SampleCount  // alias for clarity
 #endif
 
@@ -119,6 +121,7 @@ LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
 #ifdef SUPPORT_MC
         /* Update the local variable NrChannels from pInstance->NrChannels value */
         NrChannels = pInstance->NrChannels;
+        ChMask     = pInstance->ChMask;
 #endif
 
         if(Status != LVM_SUCCESS)
@@ -140,6 +143,7 @@ LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
         pToProcess = pOutData;
 #ifdef SUPPORT_MC
         NrChannels = 2;
+        ChMask     = AUDIO_CHANNEL_OUT_STEREO;
 #endif
     }
 
@@ -254,18 +258,24 @@ LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
 
             }
 #ifdef SUPPORT_MC
-            /* TODO - Multichannel support to be added */
-            if (NrChannels == 2)
+            /*
+             * Volume balance
+             */
+            LVC_MixSoft_1St_MC_float_SAT(&pInstance->VC_BalanceMix,
+                                          pProcessed,
+                                          pProcessed,
+                                          NrFrames,
+                                          NrChannels,
+                                          ChMask);
+#else
+            /*
+             * Volume balance
+             */
+            LVC_MixSoft_1St_2i_D16C31_SAT(&pInstance->VC_BalanceMix,
+                                          pProcessed,
+                                          pProcessed,
+                                          SampleCount);
 #endif
-            {
-                /*
-                 * Volume balance
-                 */
-                LVC_MixSoft_1St_2i_D16C31_SAT(&pInstance->VC_BalanceMix,
-                                              pProcessed,
-                                              pProcessed,
-                                              SampleCount);
-            }
 
             /*
              * Perform Parametric Spectum Analysis

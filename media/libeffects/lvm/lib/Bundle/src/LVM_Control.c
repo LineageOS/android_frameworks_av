@@ -93,6 +93,7 @@ LVM_ReturnStatus_en LVM_SetControlParameters(LVM_Handle_t           hInstance,
 
 #ifdef SUPPORT_MC
     pInstance->Params.NrChannels = pParams->NrChannels;
+    pInstance->Params.ChMask     = pParams->ChMask;
 #endif
     /*
      * Cinema Sound parameters
@@ -584,6 +585,7 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
 
 #ifdef SUPPORT_MC
     pInstance->NrChannels = LocalParams.NrChannels;
+    pInstance->ChMask = LocalParams.ChMask;
 #endif
 
     /* Clear all internal data if format change*/
