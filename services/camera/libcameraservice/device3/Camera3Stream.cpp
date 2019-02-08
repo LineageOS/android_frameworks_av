@@ -588,7 +588,11 @@ status_t Camera3Stream::getBuffer(camera3_stream_buffer *buffer,
     if (mState != STATE_CONFIGURED) {
         ALOGE("%s: Stream %d: Can't get buffers if stream is not in CONFIGURED state %d",
                 __FUNCTION__, mId, mState);
-        return INVALID_OPERATION;
+        if (mState == STATE_ABANDONED) {
+            return DEAD_OBJECT;
+        } else {
+            return INVALID_OPERATION;
+        }
     }
 
     // Wait for new buffer returned back if we are running into the limit.
