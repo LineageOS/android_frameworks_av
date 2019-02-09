@@ -42,6 +42,9 @@ apex {
         },
     },
     key: "com.android.media.key",
+    prefer_sanitize: {
+        cfi: true,
+    },
 }
 
 apex {
