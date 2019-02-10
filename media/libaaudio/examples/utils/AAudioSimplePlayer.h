@@ -32,8 +32,6 @@
 
 // Arbitrary period for glitches
 #define FORCED_UNDERRUN_PERIOD_FRAMES    (2 * 48000)
-// How long to sleep in a callback to cause an intentional glitch. For testing.
-#define FORCED_UNDERRUN_SLEEP_MICROS     (10 * 1000)
 
 #define MAX_TIMESTAMPS                   16
 
@@ -275,7 +273,7 @@ typedef struct SineThreadedData_s {
 
     int                scheduler = 0;
     bool               schedulerChecked = false;
-    bool               forceUnderruns = false;
+    int32_t            hangTimeMSec = 0;
 
     AAudioSimplePlayer simplePlayer;
     int32_t            callbackCount = 0;
@@ -327,10 +325,12 @@ aaudio_data_callback_result_t SimplePlayerDataCallbackProc(
         sineData->setupSineSweeps();
     }
 
-    if (sineData->forceUnderruns) {
+    if (sineData->hangTimeMSec > 0) {
         if (sineData->framesTotal > sineData->nextFrameToGlitch) {
-            usleep(FORCED_UNDERRUN_SLEEP_MICROS);
-            printf("Simulate glitch at %lld\n", (long long) sineData->framesTotal);
+            usleep(sineData->hangTimeMSec * 1000);
+            printf("Hang callback at %lld frames for %d msec\n",
+                    (long long) sineData->framesTotal,
+                   sineData->hangTimeMSec);
             sineData->nextFrameToGlitch += FORCED_UNDERRUN_PERIOD_FRAMES;
         }
     }

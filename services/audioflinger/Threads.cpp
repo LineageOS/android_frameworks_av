@@ -4784,7 +4784,10 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 track->mFillingUpStatus = Track::FS_ACTIVE;
                 if (track->mState == TrackBase::RESUMING) {
                     track->mState = TrackBase::ACTIVE;
-                    param = AudioMixer::RAMP_VOLUME;
+                    // If a new track is paused immediately after start, do not ramp on resume.
+                    if (cblk->mServer != 0) {
+                        param = AudioMixer::RAMP_VOLUME;
+                    }
                 }
                 mAudioMixer->setParameter(trackId, AudioMixer::RESAMPLE, AudioMixer::RESET, NULL);
                 mLeftVolFloat = -1.0;
@@ -5462,6 +5465,11 @@ void AudioFlinger::DirectOutputThread::onAddNewTrack_l()
                 mFlushPending = true;
             }
         }
+    } else if (previousTrack == 0) {
+        // there could be an old track added back during track transition for direct
+        // output, so always issues flush to flush data of the previous track if it
+        // was already destroyed with HAL paused, then flush can resume the playback
+        mFlushPending = true;
     }
     PlaybackThread::onAddNewTrack_l();
 }
@@ -5500,7 +5508,6 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::DirectOutputThread::prep
                 doHwPause = true;
                 mHwPaused = true;
             }
-            tracksToRemove->add(track);
         } else if (track->isFlushPending()) {
             track->flushAck();
             if (last) {
@@ -5597,7 +5604,8 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::DirectOutputThread::prep
 
                 int64_t framesWritten = mBytesWritten / mFrameSize;
                 if (mStandby || !last ||
-                        track->presentationComplete(framesWritten, audioHALFrames)) {
+                        track->presentationComplete(framesWritten, audioHALFrames) ||
+                        track->isPaused()) {
                     if (track->isStopping_2()) {
                         track->mState = TrackBase::STOPPED;
                     }
@@ -8464,6 +8472,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         audio_output_flags_t flags =
                 (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_DIRECT);
         audio_port_handle_t deviceId = mDeviceId;
+        std::vector<audio_io_handle_t> secondaryOutputs;
         ret = AudioSystem::getOutputForAttr(&mAttr, &io,
                                             mSessionId,
                                             &stream,
@@ -8472,7 +8481,10 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
                                             &config,
                                             flags,
                                             &deviceId,
-                                            &portId);
+                                            &portId,
+                                            &secondaryOutputs);
+        ALOGD_IF(!secondaryOutputs.empty(),
+                 "MmapThread::start does not support secondary outputs, ignoring them");
     } else {
         audio_config_base_t config;
         config.sample_rate = mSampleRate;

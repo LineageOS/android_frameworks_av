@@ -61,10 +61,7 @@ OmxStore::OmxStore(
         role.role = rolePair.first;
         role.type = rolePair.second.type;
         role.isEncoder = rolePair.second.isEncoder;
-        // TODO: Currently, preferPlatformNodes information is not available in
-        // the xml file. Once we have a way to provide this information, it
-        // should be parsed properly.
-        role.preferPlatformNodes = rolePair.first.compare(0, 5, "audio") == 0;
+        role.preferPlatformNodes = false; // deprecated and ignored, using rank instead
         hidl_vec<NodeInfo>& nodeList = role.nodes;
         nodeList.resize(rolePair.second.nodeList.size());
         size_t j = 0;

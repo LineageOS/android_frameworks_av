@@ -1757,16 +1757,18 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
 
     if (format == HAL_PIXEL_FORMAT_BLOB) {
         ssize_t blobBufferSize;
-        if (dataSpace != HAL_DATASPACE_DEPTH) {
-            blobBufferSize = getJpegBufferSize(width, height);
-            if (blobBufferSize <= 0) {
-                SET_ERR_L("Invalid jpeg buffer size %zd", blobBufferSize);
-                return BAD_VALUE;
-            }
-        } else {
+        if (dataSpace == HAL_DATASPACE_DEPTH) {
             blobBufferSize = getPointCloudBufferSize();
             if (blobBufferSize <= 0) {
                 SET_ERR_L("Invalid point cloud buffer size %zd", blobBufferSize);
+                return BAD_VALUE;
+            }
+        } else if (dataSpace == static_cast<android_dataspace>(HAL_DATASPACE_JPEG_APP_SEGMENTS)) {
+            blobBufferSize = width * height;
+        } else {
+            blobBufferSize = getJpegBufferSize(width, height);
+            if (blobBufferSize <= 0) {
+                SET_ERR_L("Invalid jpeg buffer size %zd", blobBufferSize);
                 return BAD_VALUE;
             }
         }
@@ -5473,8 +5475,22 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                     return TIMED_OUT;
                 }
             }
-            outputStream->fireBufferRequestForFrameNumber(
-                    captureRequest->mResultExtras.frameNumber);
+
+            {
+                sp<Camera3Device> parent = mParent.promote();
+                if (parent != nullptr) {
+                    const String8& streamCameraId = outputStream->getPhysicalCameraId();
+                    for (const auto& settings : captureRequest->mSettingsList) {
+                        if ((streamCameraId.isEmpty() &&
+                                parent->getId() == settings.cameraId.c_str()) ||
+                                streamCameraId == settings.cameraId.c_str()) {
+                            outputStream->fireBufferRequestForFrameNumber(
+                                    captureRequest->mResultExtras.frameNumber,
+                                    settings.metadata);
+                        }
+                    }
+                }
+            }
 
             String8 physicalCameraId = outputStream->getPhysicalCameraId();
 

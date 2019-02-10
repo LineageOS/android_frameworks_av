@@ -292,13 +292,16 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
         fullConfig.sample_rate = config->sample_rate;
         fullConfig.channel_mask = config->channel_mask;
         fullConfig.format = config->format;
+        std::vector<audio_io_handle_t> secondaryOutputs;
         ret = AudioSystem::getOutputForAttr(attr, &io,
                                             actualSessionId,
                                             &streamType, client.clientPid, client.clientUid,
                                             &fullConfig,
                                             (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ |
                                                     AUDIO_OUTPUT_FLAG_DIRECT),
-                                            deviceId, &portId);
+                                            deviceId, &portId, &secondaryOutputs);
+        ALOGW_IF(!secondaryOutputs.empty(),
+                 "%s does not support secondary outputs, ignoring them", __func__);
     } else {
         ret = AudioSystem::getInputForAttr(attr, &io,
                                               actualSessionId,
@@ -678,6 +681,7 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
     status_t lStatus;
     audio_stream_type_t streamType;
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
+    std::vector<audio_io_handle_t> secondaryOutputs;
 
     bool updatePid = (input.clientInfo.clientPid == -1);
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
@@ -712,7 +716,7 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
 
     lStatus = AudioSystem::getOutputForAttr(&input.attr, &output.outputId, sessionId, &streamType,
                                             clientPid, clientUid, &input.config, input.flags,
-                                            &output.selectedDeviceId, &portId);
+                                            &output.selectedDeviceId, &portId, &secondaryOutputs);
 
     if (lStatus != NO_ERROR || output.outputId == AUDIO_IO_HANDLE_NONE) {
         ALOGE("createTrack() getOutputForAttr() return error %d or invalid output handle", lStatus);
@@ -784,6 +788,59 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
         output.afSampleRate = thread->sampleRate();
         output.afLatencyMs = thread->latency();
         output.portId = portId;
+
+        if (lStatus == NO_ERROR) {
+            // Connect secondary outputs. Failure on a secondary output must not imped the primary
+            // Any secondary output setup failure will lead to a desync between the AP and AF until
+            // the track is destroyed.
+            TeePatches teePatches;
+            for (audio_io_handle_t secondaryOutput : secondaryOutputs) {
+                PlaybackThread *secondaryThread = checkPlaybackThread_l(secondaryOutput);
+                if (secondaryThread == NULL) {
+                    ALOGE("no playback thread found for secondary output %d", output.outputId);
+                    continue;
+                }
+
+                size_t frameCount = std::lcm(thread->frameCount(), secondaryThread->frameCount());
+
+                using namespace std::chrono_literals;
+                auto inChannelMask = audio_channel_mask_out_to_in(input.config.channel_mask);
+                sp patchRecord = new RecordThread::PatchRecord(nullptr /* thread */,
+                                                               output.sampleRate,
+                                                               inChannelMask,
+                                                               input.config.format,
+                                                               frameCount,
+                                                               NULL /* buffer */,
+                                                               (size_t)0 /* bufferSize */,
+                                                               AUDIO_INPUT_FLAG_DIRECT,
+                                                               0ns /* timeout */);
+                status_t status = patchRecord->initCheck();
+                if (status != NO_ERROR) {
+                    ALOGE("Secondary output patchRecord init failed: %d", status);
+                    continue;
+                }
+                sp patchTrack = new PlaybackThread::PatchTrack(secondaryThread,
+                                                               streamType,
+                                                               output.sampleRate,
+                                                               input.config.channel_mask,
+                                                               input.config.format,
+                                                               frameCount,
+                                                               patchRecord->buffer(),
+                                                               patchRecord->bufferSize(),
+                                                               output.flags,
+                                                               0ns /* timeout */);
+                status = patchTrack->initCheck();
+                if (status != NO_ERROR) {
+                    ALOGE("Secondary output patchTrack init failed: %d", status);
+                    continue;
+                }
+                teePatches.push_back({patchRecord, patchTrack});
+                secondaryThread->addPatchTrack(patchTrack);
+                patchTrack->setPeerProxy(patchRecord.get());
+                patchRecord->setPeerProxy(patchTrack.get());
+            }
+            track->setTeePatches(std::move(teePatches));
+        }
 
         // move effect chain to this output thread if an effect on same session was waiting
         // for a track to be created
@@ -3220,9 +3277,13 @@ sp<IEffect> AudioFlinger::createEffect(
             }
             // look for the thread where the specified audio session is present
             for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
-                if (mPlaybackThreads.valueAt(i)->hasAudioSession(sessionId) != 0) {
+                uint32_t sessionType = mPlaybackThreads.valueAt(i)->hasAudioSession(sessionId);
+                if (sessionType != 0) {
                     io = mPlaybackThreads.keyAt(i);
-                    break;
+                    // thread with same effect session is preferable
+                    if ((sessionType & ThreadBase::EFFECT_SESSION) != 0) {
+                        break;
+                    }
                 }
             }
             if (io == AUDIO_IO_HANDLE_NONE) {

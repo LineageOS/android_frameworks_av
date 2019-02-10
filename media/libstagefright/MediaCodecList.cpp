@@ -77,7 +77,8 @@ bool isProfilingNeeded() {
     return profilingNeeded;
 }
 
-OmxInfoBuilder sOmxInfoBuilder;
+OmxInfoBuilder sOmxInfoBuilder{true /* allowSurfaceEncoders */};
+OmxInfoBuilder sOmxNoSurfaceEncoderInfoBuilder{false /* allowSurfaceEncoders */};
 
 Mutex sCodec2InfoBuilderMutex;
 std::unique_ptr<MediaCodecListBuilderBase> sCodec2InfoBuilder;
@@ -98,7 +99,11 @@ std::vector<MediaCodecListBuilderBase *> GetBuilders() {
     sp<PersistentSurface> surfaceTest =
         StagefrightPluginLoader::GetCCodecInstance()->createInputSurface();
     if (surfaceTest == nullptr) {
+        ALOGD("Allowing all OMX codecs");
         builders.push_back(&sOmxInfoBuilder);
+    } else {
+        ALOGD("Allowing only non-surface-encoder OMX codecs");
+        builders.push_back(&sOmxNoSurfaceEncoderInfoBuilder);
     }
     builders.push_back(GetCodec2InfoBuilder());
     return builders;
@@ -219,6 +224,21 @@ MediaCodecList::MediaCodecList(std::vector<MediaCodecListBuilderBase*> builders)
                 return info1 == nullptr
                         || (info2 != nullptr && info1->getRank() < info2->getRank());
             });
+
+    // remove duplicate entries
+    bool dedupe = property_get_bool("debug.stagefright.dedupe-codecs", true);
+    if (dedupe) {
+        std::set<std::string> codecsSeen;
+        for (auto it = mCodecInfos.begin(); it != mCodecInfos.end(); ) {
+            std::string codecName = (*it)->getCodecName();
+            if (codecsSeen.count(codecName) == 0) {
+                codecsSeen.emplace(codecName);
+                it++;
+            } else {
+                it = mCodecInfos.erase(it);
+            }
+        }
+    }
 }
 
 MediaCodecList::~MediaCodecList() {
@@ -268,9 +288,16 @@ ssize_t MediaCodecList::findCodecByType(
 }
 
 ssize_t MediaCodecList::findCodecByName(const char *name) const {
+    Vector<AString> aliases;
     for (size_t i = 0; i < mCodecInfos.size(); ++i) {
         if (strcmp(mCodecInfos[i]->getCodecName(), name) == 0) {
             return i;
+        }
+        mCodecInfos[i]->getAliases(&aliases);
+        for (const AString &alias : aliases) {
+            if (alias == name) {
+                return i;
+            }
         }
     }
 

@@ -66,7 +66,8 @@ public:
                                       const audio_config_t *config,
                                       audio_output_flags_t flags,
                                       audio_port_handle_t *selectedDeviceId,
-                                      audio_port_handle_t *portId) = 0;
+                                      audio_port_handle_t *portId,
+                                      std::vector<audio_io_handle_t> *secondaryOutputs) = 0;
     virtual status_t startOutput(audio_port_handle_t portId) = 0;
     virtual status_t stopOutput(audio_port_handle_t portId) = 0;
     virtual void releaseOutput(audio_port_handle_t portId) = 0;

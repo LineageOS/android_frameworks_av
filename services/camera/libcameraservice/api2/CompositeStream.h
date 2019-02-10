@@ -23,6 +23,7 @@
 #include <android/hardware/camera2/ICameraDeviceCallbacks.h>
 #include <camera/CameraMetadata.h>
 #include <camera/camera2/OutputConfiguration.h>
+#include <gui/IProducerListener.h>
 #include "common/CameraDeviceBase.h"
 #include "device3/Camera3StreamInterface.h"
 
@@ -66,15 +67,24 @@ public:
     // Return composite stream id.
     virtual int getStreamId() = 0;
 
+    // Notify when shutter notify is triggered
+    virtual void onShutter(const CaptureResultExtras& /*resultExtras*/, nsecs_t /*timestamp*/) {}
+
     void onResultAvailable(const CaptureResult& result);
     bool onError(int32_t errorCode, const CaptureResultExtras& resultExtras);
 
     // Camera3StreamBufferListener implementation
     void onBufferAcquired(const BufferInfo& /*bufferInfo*/) override { /*Empty for now */ }
     void onBufferReleased(const BufferInfo& bufferInfo) override;
-    void onBufferRequestForFrameNumber(uint64_t frameNumber, int streamId) override;
+    void onBufferRequestForFrameNumber(uint64_t frameNumber, int streamId,
+            const CameraMetadata& settings) override;
 
 protected:
+    struct ProducerListener : public BnProducerListener {
+        // ProducerListener impementation
+        void onBufferReleased() override { /*No impl. for now*/ };
+    };
+
     status_t registerCompositeStreamListener(int32_t streamId);
     void eraseResult(int64_t frameNumber);
     void flagAnErrorFrameNumber(int64_t frameNumber);

@@ -65,7 +65,9 @@ ALookup<C2Config::level_t, int32_t> sAvcLevels = {
     { C2Config::LEVEL_AVC_5,    AVCLevel5 },
     { C2Config::LEVEL_AVC_5_1,  AVCLevel51 },
     { C2Config::LEVEL_AVC_5_2,  AVCLevel52 },
-
+    { C2Config::LEVEL_AVC_6,    AVCLevel6 },
+    { C2Config::LEVEL_AVC_6_1,  AVCLevel61 },
+    { C2Config::LEVEL_AVC_6_2,  AVCLevel62 },
 };
 
 ALookup<C2Config::profile_t, int32_t> sAvcProfiles = {

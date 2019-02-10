@@ -355,7 +355,10 @@ status_t AudioRecord::set(
     }
 
     // create the IAudioRecord
-    status = createRecord_l(0 /*epoch*/, mOpPackageName);
+    {
+        AutoMutex lock(mLock);
+        status = createRecord_l(0 /*epoch*/, mOpPackageName);
+    }
 
     ALOGV("%s(%d): status %d", __func__, mPortId, status);
 

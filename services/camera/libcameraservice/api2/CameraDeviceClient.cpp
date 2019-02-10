@@ -34,6 +34,7 @@
 #include <camera_metadata_hidden.h>
 
 #include "DepthCompositeStream.h"
+#include "HeicCompositeStream.h"
 
 // Convenience methods for constructing binder::Status objects for error returns
 
@@ -711,21 +712,35 @@ binder::Status CameraDeviceClient::isSessionConfigurationSupported(
                 return res;
 
             if (!isStreamInfoValid) {
-                if (camera3::DepthCompositeStream::isDepthCompositeStream(surface)) {
+                bool isDepthCompositeStream =
+                        camera3::DepthCompositeStream::isDepthCompositeStream(surface);
+                bool isHeicCompositeStream =
+                        camera3::HeicCompositeStream::isHeicCompositeStream(surface);
+                if (isDepthCompositeStream || isHeicCompositeStream) {
                     // We need to take in to account that composite streams can have
                     // additional internal camera streams.
                     std::vector<OutputStreamInfo> compositeStreams;
-                    ret = camera3::DepthCompositeStream::getCompositeStreamInfo(streamInfo,
+                    if (isDepthCompositeStream) {
+                        ret = camera3::DepthCompositeStream::getCompositeStreamInfo(streamInfo,
+                                mDevice->info(), &compositeStreams);
+                    } else {
+                        ret = camera3::HeicCompositeStream::getCompositeStreamInfo(streamInfo,
                             mDevice->info(), &compositeStreams);
+                    }
                     if (ret != OK) {
                         String8 msg = String8::format(
-                                "Camera %s: Failed adding depth composite streams: %s (%d)",
+                                "Camera %s: Failed adding composite streams: %s (%d)",
                                 mCameraIdStr.string(), strerror(-ret), ret);
                         ALOGE("%s: %s", __FUNCTION__, msg.string());
                         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
                     }
 
-                    if (compositeStreams.size() > 1) {
+                    if (compositeStreams.size() == 0) {
+                        // No internal streams means composite stream not
+                        // supported.
+                        *status = false;
+                        return binder::Status::ok();
+                    } else if (compositeStreams.size() > 1) {
                         streamCount += compositeStreams.size() - 1;
                         streamConfiguration.streams.resize(streamCount);
                     }
@@ -937,15 +952,16 @@ binder::Status CameraDeviceClient::createStream(
 
     int streamId = camera3::CAMERA3_STREAM_ID_INVALID;
     std::vector<int> surfaceIds;
-    if (!camera3::DepthCompositeStream::isDepthCompositeStream(surfaces[0])) {
-        err = mDevice->createStream(surfaces, deferredConsumer, streamInfo.width,
-                streamInfo.height, streamInfo.format, streamInfo.dataSpace,
-                static_cast<camera3_stream_rotation_t>(outputConfiguration.getRotation()),
-                &streamId, physicalCameraId, &surfaceIds, outputConfiguration.getSurfaceSetID(),
-                isShared);
-    } else {
-        sp<CompositeStream> compositeStream = new camera3::DepthCompositeStream(mDevice,
-                getRemoteCallback());
+    bool isDepthCompositeStream = camera3::DepthCompositeStream::isDepthCompositeStream(surfaces[0]);
+    bool isHeicCompisiteStream = camera3::HeicCompositeStream::isHeicCompositeStream(surfaces[0]);
+    if (isDepthCompositeStream || isHeicCompisiteStream) {
+        sp<CompositeStream> compositeStream;
+        if (isDepthCompositeStream) {
+            compositeStream = new camera3::DepthCompositeStream(mDevice, getRemoteCallback());
+        } else {
+            compositeStream = new camera3::HeicCompositeStream(mDevice, getRemoteCallback());
+        }
+
         err = compositeStream->createStream(surfaces, deferredConsumer, streamInfo.width,
                 streamInfo.height, streamInfo.format,
                 static_cast<camera3_stream_rotation_t>(outputConfiguration.getRotation()),
@@ -955,6 +971,12 @@ binder::Status CameraDeviceClient::createStream(
             mCompositeStreamMap.add(IInterface::asBinder(surfaces[0]->getIGraphicBufferProducer()),
                     compositeStream);
         }
+    } else {
+        err = mDevice->createStream(surfaces, deferredConsumer, streamInfo.width,
+                streamInfo.height, streamInfo.format, streamInfo.dataSpace,
+                static_cast<camera3_stream_rotation_t>(outputConfiguration.getRotation()),
+                &streamId, physicalCameraId, &surfaceIds, outputConfiguration.getSurfaceSetID(),
+                isShared);
     }
 
     if (err != OK) {
@@ -1437,6 +1459,8 @@ bool CameraDeviceClient::roundBufferDimensionNearest(int32_t width, int32_t heig
     camera_metadata_ro_entry streamConfigs =
             (dataSpace == HAL_DATASPACE_DEPTH) ?
             info.find(ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS) :
+            (dataSpace == static_cast<android_dataspace>(HAL_DATASPACE_HEIF)) ?
+            info.find(ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS) :
             info.find(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS);
 
     int32_t bestWidth = -1;
@@ -1930,6 +1954,10 @@ void CameraDeviceClient::notifyShutter(const CaptureResultExtras& resultExtras,
         remoteCb->onCaptureStarted(resultExtras, timestamp);
     }
     Camera2ClientBase::notifyShutter(resultExtras, timestamp);
+
+    for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
+        mCompositeStreamMap.valueAt(i)->onShutter(resultExtras, timestamp);
+    }
 }
 
 void CameraDeviceClient::notifyPrepared(int streamId) {

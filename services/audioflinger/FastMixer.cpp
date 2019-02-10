@@ -139,6 +139,75 @@ bool FastMixer::isSubClassCommand(FastThreadState::Command command)
     }
 }
 
+void FastMixer::updateMixerTrack(int index, Reason reason) {
+    const FastMixerState * const current = (const FastMixerState *) mCurrent;
+    const FastTrack * const fastTrack = &current->mFastTracks[index];
+
+    // check and update generation
+    if (reason == REASON_MODIFY && mGenerations[index] == fastTrack->mGeneration) {
+        return; // no change on an already configured track.
+    }
+    mGenerations[index] = fastTrack->mGeneration;
+
+    // mMixer == nullptr on configuration failure (check done after generation update).
+    if (mMixer == nullptr) {
+        return;
+    }
+
+    switch (reason) {
+    case REASON_REMOVE:
+        mMixer->destroy(index);
+        break;
+    case REASON_ADD: {
+        const status_t status = mMixer->create(
+                index, fastTrack->mChannelMask, fastTrack->mFormat, AUDIO_SESSION_OUTPUT_MIX);
+        LOG_ALWAYS_FATAL_IF(status != NO_ERROR,
+                "%s: cannot create fast track index"
+                " %d, mask %#x, format %#x in AudioMixer",
+                __func__, index, fastTrack->mChannelMask, fastTrack->mFormat);
+    }
+        [[fallthrough]];  // now fallthrough to update the newly created track.
+    case REASON_MODIFY:
+        mMixer->setBufferProvider(index, fastTrack->mBufferProvider);
+
+        float vlf, vrf;
+        if (fastTrack->mVolumeProvider != nullptr) {
+            const gain_minifloat_packed_t vlr = fastTrack->mVolumeProvider->getVolumeLR();
+            vlf = float_from_gain(gain_minifloat_unpack_left(vlr));
+            vrf = float_from_gain(gain_minifloat_unpack_right(vlr));
+        } else {
+            vlf = vrf = AudioMixer::UNITY_GAIN_FLOAT;
+        }
+
+        // set volume to avoid ramp whenever the track is updated (or created).
+        // Note: this does not distinguish from starting fresh or
+        // resuming from a paused state.
+        mMixer->setParameter(index, AudioMixer::VOLUME, AudioMixer::VOLUME0, &vlf);
+        mMixer->setParameter(index, AudioMixer::VOLUME, AudioMixer::VOLUME1, &vrf);
+
+        mMixer->setParameter(index, AudioMixer::RESAMPLE, AudioMixer::REMOVE, nullptr);
+        mMixer->setParameter(index, AudioMixer::TRACK, AudioMixer::MAIN_BUFFER,
+                (void *)mMixerBuffer);
+        mMixer->setParameter(index, AudioMixer::TRACK, AudioMixer::MIXER_FORMAT,
+                (void *)(uintptr_t)mMixerBufferFormat);
+        mMixer->setParameter(index, AudioMixer::TRACK, AudioMixer::FORMAT,
+                (void *)(uintptr_t)fastTrack->mFormat);
+        mMixer->setParameter(index, AudioMixer::TRACK, AudioMixer::CHANNEL_MASK,
+                (void *)(uintptr_t)fastTrack->mChannelMask);
+        mMixer->setParameter(index, AudioMixer::TRACK, AudioMixer::MIXER_CHANNEL_MASK,
+                (void *)(uintptr_t)mSinkChannelMask);
+        mMixer->setParameter(index, AudioMixer::TRACK, AudioMixer::HAPTIC_ENABLED,
+                (void *)(uintptr_t)fastTrack->mHapticPlaybackEnabled);
+        mMixer->setParameter(index, AudioMixer::TRACK, AudioMixer::HAPTIC_INTENSITY,
+                (void *)(uintptr_t)fastTrack->mHapticIntensity);
+
+        mMixer->enable(index);
+        break;
+    default:
+        LOG_ALWAYS_FATAL("%s: invalid update reason %d", __func__, reason);
+    }
+}
+
 void FastMixer::onStateChange()
 {
     const FastMixerState * const current = (const FastMixerState *) mCurrent;
@@ -240,21 +309,16 @@ void FastMixer::onStateChange()
     // check for change in active track set
     const unsigned currentTrackMask = current->mTrackMask;
     dumpState->mTrackMask = currentTrackMask;
+    dumpState->mNumTracks = popcount(currentTrackMask);
     if (current->mFastTracksGen != mFastTracksGen) {
-        ALOG_ASSERT(mMixerBuffer != NULL);
 
         // process removed tracks first to avoid running out of track names
         unsigned removedTracks = previousTrackMask & ~currentTrackMask;
         while (removedTracks != 0) {
             int i = __builtin_ctz(removedTracks);
             removedTracks &= ~(1 << i);
-            const FastTrack* fastTrack = &current->mFastTracks[i];
-            ALOG_ASSERT(fastTrack->mBufferProvider == NULL);
-            if (mMixer != NULL) {
-                mMixer->destroy(i);
-            }
+            updateMixerTrack(i, REASON_REMOVE);
             // don't reset track dump state, since other side is ignoring it
-            mGenerations[i] = fastTrack->mGeneration;
         }
 
         // now process added tracks
@@ -262,40 +326,7 @@ void FastMixer::onStateChange()
         while (addedTracks != 0) {
             int i = __builtin_ctz(addedTracks);
             addedTracks &= ~(1 << i);
-            const FastTrack* fastTrack = &current->mFastTracks[i];
-            AudioBufferProvider *bufferProvider = fastTrack->mBufferProvider;
-            if (mMixer != NULL) {
-                const int name = i; // for clarity, choose name as fast track index.
-                status_t status = mMixer->create(
-                        name,
-                        fastTrack->mChannelMask,
-                        fastTrack->mFormat, AUDIO_SESSION_OUTPUT_MIX);
-                LOG_ALWAYS_FATAL_IF(status != NO_ERROR,
-                        "%s: cannot create track name"
-                        " %d, mask %#x, format %#x, sessionId %d in AudioMixer",
-                        __func__, name,
-                        fastTrack->mChannelMask, fastTrack->mFormat, AUDIO_SESSION_OUTPUT_MIX);
-                mMixer->setBufferProvider(name, bufferProvider);
-                mMixer->setParameter(name, AudioMixer::TRACK, AudioMixer::MAIN_BUFFER,
-                        (void *)mMixerBuffer);
-                // newly allocated track names default to full scale volume
-                mMixer->setParameter(
-                        name,
-                        AudioMixer::TRACK,
-                        AudioMixer::MIXER_FORMAT, (void *)mMixerBufferFormat);
-                mMixer->setParameter(name, AudioMixer::TRACK, AudioMixer::FORMAT,
-                        (void *)(uintptr_t)fastTrack->mFormat);
-                mMixer->setParameter(name, AudioMixer::TRACK, AudioMixer::CHANNEL_MASK,
-                        (void *)(uintptr_t)fastTrack->mChannelMask);
-                mMixer->setParameter(name, AudioMixer::TRACK, AudioMixer::MIXER_CHANNEL_MASK,
-                        (void *)(uintptr_t)mSinkChannelMask);
-                mMixer->setParameter(name, AudioMixer::TRACK, AudioMixer::HAPTIC_ENABLED,
-                        (void *)(uintptr_t)fastTrack->mHapticPlaybackEnabled);
-                mMixer->setParameter(name, AudioMixer::TRACK, AudioMixer::HAPTIC_INTENSITY,
-                        (void *)(uintptr_t)fastTrack->mHapticIntensity);
-                mMixer->enable(name);
-            }
-            mGenerations[i] = fastTrack->mGeneration;
+            updateMixerTrack(i, REASON_ADD);
         }
 
         // finally process (potentially) modified tracks; these use the same slot
@@ -304,44 +335,10 @@ void FastMixer::onStateChange()
         while (modifiedTracks != 0) {
             int i = __builtin_ctz(modifiedTracks);
             modifiedTracks &= ~(1 << i);
-            const FastTrack* fastTrack = &current->mFastTracks[i];
-            if (fastTrack->mGeneration != mGenerations[i]) {
-                // this track was actually modified
-                AudioBufferProvider *bufferProvider = fastTrack->mBufferProvider;
-                ALOG_ASSERT(bufferProvider != NULL);
-                if (mMixer != NULL) {
-                    const int name = i;
-                    mMixer->setBufferProvider(name, bufferProvider);
-                    if (fastTrack->mVolumeProvider == NULL) {
-                        float f = AudioMixer::UNITY_GAIN_FLOAT;
-                        mMixer->setParameter(name, AudioMixer::VOLUME, AudioMixer::VOLUME0, &f);
-                        mMixer->setParameter(name, AudioMixer::VOLUME, AudioMixer::VOLUME1, &f);
-                    }
-                    mMixer->setParameter(name, AudioMixer::RESAMPLE,
-                            AudioMixer::REMOVE, NULL);
-                    mMixer->setParameter(
-                            name,
-                            AudioMixer::TRACK,
-                            AudioMixer::MIXER_FORMAT, (void *)mMixerBufferFormat);
-                    mMixer->setParameter(name, AudioMixer::TRACK, AudioMixer::FORMAT,
-                            (void *)(uintptr_t)fastTrack->mFormat);
-                    mMixer->setParameter(name, AudioMixer::TRACK, AudioMixer::CHANNEL_MASK,
-                            (void *)(uintptr_t)fastTrack->mChannelMask);
-                    mMixer->setParameter(name, AudioMixer::TRACK, AudioMixer::MIXER_CHANNEL_MASK,
-                            (void *)(uintptr_t)mSinkChannelMask);
-                    mMixer->setParameter(name, AudioMixer::TRACK, AudioMixer::HAPTIC_ENABLED,
-                            (void *)(uintptr_t)fastTrack->mHapticPlaybackEnabled);
-                    mMixer->setParameter(name, AudioMixer::TRACK, AudioMixer::HAPTIC_INTENSITY,
-                            (void *)(uintptr_t)fastTrack->mHapticIntensity);
-                    // already enabled
-                }
-                mGenerations[i] = fastTrack->mGeneration;
-            }
+            updateMixerTrack(i, REASON_MODIFY);
         }
 
         mFastTracksGen = current->mFastTracksGen;
-
-        dumpState->mNumTracks = popcount(currentTrackMask);
     }
 }
 
@@ -408,8 +405,8 @@ void FastMixer::onWork()
                 float vlf = float_from_gain(gain_minifloat_unpack_left(vlr));
                 float vrf = float_from_gain(gain_minifloat_unpack_right(vlr));
 
-                mMixer->setParameter(name, AudioMixer::VOLUME, AudioMixer::VOLUME0, &vlf);
-                mMixer->setParameter(name, AudioMixer::VOLUME, AudioMixer::VOLUME1, &vrf);
+                mMixer->setParameter(name, AudioMixer::RAMP_VOLUME, AudioMixer::VOLUME0, &vlf);
+                mMixer->setParameter(name, AudioMixer::RAMP_VOLUME, AudioMixer::VOLUME1, &vrf);
             }
             // FIXME The current implementation of framesReady() for fast tracks
             // takes a tryLock, which can block

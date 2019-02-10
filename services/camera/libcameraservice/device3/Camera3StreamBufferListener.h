@@ -17,6 +17,7 @@
 #ifndef ANDROID_SERVERS_CAMERA3_STREAMBUFFERLISTENER_H
 #define ANDROID_SERVERS_CAMERA3_STREAMBUFFERLISTENER_H
 
+#include <camera/CameraMetadata.h>
 #include <gui/Surface.h>
 #include <utils/RefBase.h>
 
@@ -42,7 +43,8 @@ public:
     // Buffer was released by the HAL
     virtual void onBufferReleased(const BufferInfo& bufferInfo) = 0;
     // Notify about incoming buffer request frame number
-    virtual void onBufferRequestForFrameNumber(uint64_t frameNumber, int streamId) = 0;
+    virtual void onBufferRequestForFrameNumber(uint64_t frameNumber, int streamId,
+            const CameraMetadata& settings) = 0;
 };
 
 }; //namespace camera3

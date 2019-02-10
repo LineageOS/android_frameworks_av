@@ -38,6 +38,8 @@
 #include <hwbinder/IPCThreadState.h>
 #include <utils/Trace.h>
 
+#include "api2/HeicCompositeStream.h"
+
 namespace android {
 
 using namespace ::android::hardware::camera;
@@ -872,6 +874,130 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::removeAvailableKeys(
     }
     res = c.update(keyTag, vKeys.data(), vKeys.size());
     return res;
+}
+
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::fillHeicStreamCombinations(
+        std::vector<int32_t>* outputs,
+        std::vector<int64_t>* durations,
+        std::vector<int64_t>* stallDurations,
+        const camera_metadata_entry& halStreamConfigs,
+        const camera_metadata_entry& halStreamDurations) {
+    if (outputs == nullptr || durations == nullptr || stallDurations == nullptr) {
+        return BAD_VALUE;
+    }
+
+    static bool supportInMemoryTempFile =
+            camera3::HeicCompositeStream::isInMemoryTempFileSupported();
+    if (!supportInMemoryTempFile) {
+        ALOGI("%s: No HEIC support due to absence of in memory temp file support",
+                __FUNCTION__);
+        return OK;
+    }
+
+    for (size_t i = 0; i < halStreamConfigs.count; i += 4) {
+        int32_t format = halStreamConfigs.data.i32[i];
+        // Only IMPLEMENTATION_DEFINED and YUV_888 can be used to generate HEIC
+        // image.
+        if (format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED &&
+                format != HAL_PIXEL_FORMAT_YCBCR_420_888) {
+            continue;
+        }
+
+        bool sizeAvail = false;
+        for (size_t j = 0; j < outputs->size(); j+= 4) {
+            if ((*outputs)[j+1] == halStreamConfigs.data.i32[i+1] &&
+                    (*outputs)[j+2] == halStreamConfigs.data.i32[i+2]) {
+                sizeAvail = true;
+                break;
+            }
+        }
+        if (sizeAvail) continue;
+
+        int64_t stall = 0;
+        bool useHeic, useGrid;
+        if (camera3::HeicCompositeStream::isSizeSupportedByHeifEncoder(
+                halStreamConfigs.data.i32[i+1], halStreamConfigs.data.i32[i+2],
+                &useHeic, &useGrid, &stall)) {
+            if (useGrid != (format == HAL_PIXEL_FORMAT_YCBCR_420_888)) {
+                continue;
+            }
+
+            // HEIC configuration
+            int32_t config[] = {HAL_PIXEL_FORMAT_BLOB, halStreamConfigs.data.i32[i+1],
+                    halStreamConfigs.data.i32[i+2], 0 /*isInput*/};
+            outputs->insert(outputs->end(), config, config + 4);
+
+            // HEIC minFrameDuration
+            for (size_t j = 0; j < halStreamDurations.count; j += 4) {
+                if (halStreamDurations.data.i64[j] == format &&
+                        halStreamDurations.data.i64[j+1] == halStreamConfigs.data.i32[i+1] &&
+                        halStreamDurations.data.i64[j+2] == halStreamConfigs.data.i32[i+2]) {
+                    int64_t duration[] = {HAL_PIXEL_FORMAT_BLOB, halStreamConfigs.data.i32[i+1],
+                            halStreamConfigs.data.i32[i+2], halStreamDurations.data.i64[j+3]};
+                    durations->insert(durations->end(), duration, duration+4);
+                    break;
+                }
+            }
+
+            // HEIC stallDuration
+            int64_t stallDuration[] = {HAL_PIXEL_FORMAT_BLOB, halStreamConfigs.data.i32[i+1],
+                    halStreamConfigs.data.i32[i+2], stall};
+            stallDurations->insert(stallDurations->end(), stallDuration, stallDuration+4);
+        }
+    }
+    return OK;
+}
+
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::deriveHeicTags() {
+    auto& c = mCameraCharacteristics;
+
+    camera_metadata_entry halHeicSupport = c.find(ANDROID_HEIC_INFO_SUPPORTED);
+    if (halHeicSupport.count > 1) {
+        ALOGE("%s: Invalid entry count %zu for ANDROID_HEIC_INFO_SUPPORTED",
+                __FUNCTION__, halHeicSupport.count);
+        return BAD_VALUE;
+    } else if (halHeicSupport.count == 0 ||
+            halHeicSupport.data.u8[0] == ANDROID_HEIC_INFO_SUPPORTED_FALSE) {
+        // Camera HAL doesn't support mandatory stream combinations for HEIC.
+        return OK;
+    }
+
+    camera_metadata_entry maxJpegAppsSegments =
+            c.find(ANDROID_HEIC_INFO_MAX_JPEG_APP_SEGMENTS_COUNT);
+    if (maxJpegAppsSegments.count != 1 || maxJpegAppsSegments.data.u8[0] == 0 ||
+            maxJpegAppsSegments.data.u8[0] > 16) {
+        ALOGE("%s: ANDROID_HEIC_INFO_MAX_JPEG_APP_SEGMENTS_COUNT must be within [1, 16]",
+                __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    // Populate HEIC output configurations and its related min frame duration
+    // and stall duration.
+    std::vector<int32_t> heicOutputs;
+    std::vector<int64_t> heicDurations;
+    std::vector<int64_t> heicStallDurations;
+
+    camera_metadata_entry halStreamConfigs =
+            c.find(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS);
+    camera_metadata_entry minFrameDurations =
+            c.find(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS);
+
+    status_t res = fillHeicStreamCombinations(&heicOutputs, &heicDurations, &heicStallDurations,
+            halStreamConfigs, minFrameDurations);
+    if (res != OK) {
+        ALOGE("%s: Failed to fill HEIC stream combinations: %s (%d)", __FUNCTION__,
+                strerror(-res), res);
+        return res;
+    }
+
+    c.update(ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS,
+           heicOutputs.data(), heicOutputs.size());
+    c.update(ANDROID_HEIC_AVAILABLE_HEIC_MIN_FRAME_DURATIONS,
+            heicDurations.data(), heicDurations.size());
+    c.update(ANDROID_HEIC_AVAILABLE_HEIC_STALL_DURATIONS,
+            heicStallDurations.data(), heicStallDurations.size());
+
+    return OK;
 }
 
 bool CameraProviderManager::isLogicalCamera(const std::string& id,
@@ -1738,6 +1864,12 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
         ALOGE("%s: Failed appending dynamic depth tags: %s (%d)", __FUNCTION__, strerror(-stat),
                 stat);
     }
+    res = deriveHeicTags();
+    if (OK != res) {
+        ALOGE("%s: Unable to derive HEIC tags based on camera and media capabilities: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
+    }
+
     camera_metadata_entry flashAvailable =
             mCameraCharacteristics.find(ANDROID_FLASH_INFO_AVAILABLE);
     if (flashAvailable.count == 1 &&

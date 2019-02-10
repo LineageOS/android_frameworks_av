@@ -189,16 +189,17 @@ public:
         return static_cast <audio_io_handle_t> (reply.readInt32());
     }
 
-    virtual status_t getOutputForAttr(const audio_attributes_t *attr,
-                                        audio_io_handle_t *output,
-                                        audio_session_t session,
-                                        audio_stream_type_t *stream,
-                                        pid_t pid,
-                                        uid_t uid,
-                                        const audio_config_t *config,
-                                        audio_output_flags_t flags,
-                                        audio_port_handle_t *selectedDeviceId,
-                                        audio_port_handle_t *portId)
+    status_t getOutputForAttr(const audio_attributes_t *attr,
+                              audio_io_handle_t *output,
+                              audio_session_t session,
+                              audio_stream_type_t *stream,
+                              pid_t pid,
+                              uid_t uid,
+                              const audio_config_t *config,
+                              audio_output_flags_t flags,
+                              audio_port_handle_t *selectedDeviceId,
+                              audio_port_handle_t *portId,
+                              std::vector<audio_io_handle_t> *secondaryOutputs) override
         {
             Parcel data, reply;
             data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
@@ -222,6 +223,10 @@ public:
             }
             if (portId == NULL) {
                 ALOGE("getOutputForAttr NULL portId - shouldn't happen");
+                return BAD_VALUE;
+            }
+            if (secondaryOutputs == NULL) {
+                ALOGE("getOutputForAttr NULL secondaryOutputs - shouldn't happen");
                 return BAD_VALUE;
             }
             if (attr == NULL) {
@@ -258,7 +263,9 @@ public:
             }
             *selectedDeviceId = (audio_port_handle_t)reply.readInt32();
             *portId = (audio_port_handle_t)reply.readInt32();
-            return status;
+            secondaryOutputs->resize(reply.readInt32());
+            return reply.read(secondaryOutputs->data(),
+                              secondaryOutputs->size() * sizeof(audio_io_handle_t));
         }
 
     virtual status_t startOutput(audio_port_handle_t portId)
@@ -1300,16 +1307,19 @@ status_t BnAudioPolicyService::onTransact(
             audio_port_handle_t selectedDeviceId = data.readInt32();
             audio_port_handle_t portId = (audio_port_handle_t)data.readInt32();
             audio_io_handle_t output = 0;
+            std::vector<audio_io_handle_t> secondaryOutputs;
             status_t status = getOutputForAttr(hasAttributes ? &attr : NULL,
                     &output, session, &stream, pid, uid,
                     &config,
-                    flags, &selectedDeviceId, &portId);
+                    flags, &selectedDeviceId, &portId, &secondaryOutputs);
             reply->writeInt32(status);
             reply->writeInt32(output);
             reply->writeInt32(stream);
             reply->writeInt32(selectedDeviceId);
             reply->writeInt32(portId);
-            return NO_ERROR;
+            reply->writeInt32(secondaryOutputs.size());
+            return reply->write(secondaryOutputs.data(),
+                                secondaryOutputs.size() * sizeof(audio_io_handle_t));
         } break;
 
         case START_OUTPUT: {

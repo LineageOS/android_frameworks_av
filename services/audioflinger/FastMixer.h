@@ -59,6 +59,14 @@ private:
     virtual void onStateChange();
     virtual void onWork();
 
+    enum Reason {
+        REASON_REMOVE,
+        REASON_ADD,
+        REASON_MODIFY,
+    };
+    // called when a fast track of index has been removed, added, or modified
+    void updateMixerTrack(int index, Reason reason);
+
     // FIXME these former local variables need comments
     static const FastMixerState sInitial;
 

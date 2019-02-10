@@ -380,6 +380,16 @@ public:
                                       uint32_t inPastMs = 0, nsecs_t sysTime = 0) const;
 
     /**
+     * @brief clearSessionRoutesForDevice: when a device is disconnected, and if this device has
+     * been chosen as the preferred device by any client, the policy manager shall
+     * prevent from using this device any more by clearing all the session routes involving this
+     * device.
+     * In other words, the preferred device port id of these clients will be resetted to NONE.
+     * @param disconnectedDevice device to be disconnected
+     */
+    void clearSessionRoutesForDevice(const sp<DeviceDescriptor> &disconnectedDevice);
+
+    /**
      * returns the A2DP output handle if it is open or 0 otherwise
      */
     audio_io_handle_t getA2dpOutput() const;

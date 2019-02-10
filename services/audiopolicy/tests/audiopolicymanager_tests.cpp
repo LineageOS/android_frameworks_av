@@ -214,7 +214,7 @@ void AudioPolicyManagerTest::getOutputForAttr(
     *portId = AUDIO_PORT_HANDLE_NONE;
     ASSERT_EQ(OK, mManager->getOutputForAttr(
                     &attr, &output, AUDIO_SESSION_NONE, &stream, 0 /*uid*/, &config, &flags,
-                    selectedDeviceId, portId));
+                    selectedDeviceId, portId, {}));
     ASSERT_NE(AUDIO_PORT_HANDLE_NONE, *portId);
 }
 

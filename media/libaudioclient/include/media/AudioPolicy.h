@@ -49,8 +49,12 @@ namespace android {
 #define MIX_STATE_IDLE 0
 #define MIX_STATE_MIXING 1
 
+/** Control to which device some audio is rendered */
 #define MIX_ROUTE_FLAG_RENDER 0x1
+/** Loop back some audio instead of rendering it */
 #define MIX_ROUTE_FLAG_LOOP_BACK (0x1 << 1)
+/** Loop back some audio while it is rendered */
+#define MIX_ROUTE_FLAG_LOOP_BACK_AND_RENDER (MIX_ROUTE_FLAG_RENDER | MIX_ROUTE_FLAG_LOOP_BACK)
 #define MIX_ROUTE_FLAG_ALL (MIX_ROUTE_FLAG_RENDER | MIX_ROUTE_FLAG_LOOP_BACK)
 
 #define MAX_MIXES_PER_POLICY 10
@@ -118,6 +122,11 @@ public:
 #define RECORD_CONFIG_EVENT_NONE -1
 #define RECORD_CONFIG_EVENT_START 1
 #define RECORD_CONFIG_EVENT_STOP  0
+
+static inline bool is_mix_loopback_render(uint32_t routeFlags) {
+    return (routeFlags & MIX_ROUTE_FLAG_LOOP_BACK_AND_RENDER)
+           == MIX_ROUTE_FLAG_LOOP_BACK_AND_RENDER;
+}
 
 }; // namespace android
 
