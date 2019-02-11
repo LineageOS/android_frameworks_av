@@ -364,7 +364,13 @@ status_t MyOggExtractor::findNextPage(
             return OK;
         }
 
-        ++*pageOffset;
+        // see how far ahead to skip; avoid some fruitless comparisons
+        unsigned int i;
+        for (i = 1; i < 4 ; i++) {
+            if (signature[i] == 'O')
+                break;
+        }
+        *pageOffset += i;
     }
 }
 
