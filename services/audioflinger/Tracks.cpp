@@ -697,26 +697,42 @@ void AudioFlinger::PlaybackThread::Track::releaseBuffer(AudioBufferProvider::Buf
 
 // TODO: compensate for time shift between HW modules.
 void AudioFlinger::PlaybackThread::Track::interceptBuffer(
-        const AudioBufferProvider::Buffer& buffer) {
+        const AudioBufferProvider::Buffer& sourceBuffer) {
+    const size_t frameCount = sourceBuffer.frameCount;
     for (auto& sink : mTeePatches) {
-        RecordThread::PatchRecord& patchRecord = *sink.patchRecord;
-        AudioBufferProvider::Buffer patchBuffer;
-        patchBuffer.frameCount = buffer.frameCount;
-        auto status = patchRecord.getNextBuffer(&patchBuffer);
-        if (status != NO_ERROR) {
-           ALOGW("%s PathRecord getNextBuffer failed with error %d: %s",
-                 __func__, status, strerror(-status));
-           continue;
+        RecordThread::PatchRecord* patchRecord = sink.patchRecord.get();
+
+        size_t framesWritten = writeFrames(patchRecord, sourceBuffer.i8, frameCount);
+        // On buffer wrap, the buffer frame count will be less than requested,
+        // when this happens a second buffer needs to be used to write the leftover audio
+        size_t framesLeft = frameCount - framesWritten;
+        if (framesWritten != 0 && framesLeft != 0) {
+            framesWritten +=
+                writeFrames(patchRecord, sourceBuffer.i8 + framesWritten * mFrameSize, framesLeft);
+            framesLeft = frameCount - framesWritten;
         }
-        // FIXME: On buffer wrap, the frame count will be less then requested,
-        //        retry to write the rest. (unlikely due to lcm buffer sizing)
-        ALOGW_IF(patchBuffer.frameCount != buffer.frameCount,
-                 "%s PatchRecord can not provide big enough buffer %zu/%zu, dropping %zu frames",
-                 __func__, patchBuffer.frameCount, buffer.frameCount,
-                 buffer.frameCount - patchBuffer.frameCount);
-        memcpy(patchBuffer.raw, buffer.raw, patchBuffer.frameCount * mFrameSize);
-        patchRecord.releaseBuffer(&patchBuffer);
+        ALOGW_IF(framesLeft != 0, "%s(%d) PatchRecord %d can not provide big enough "
+                 "buffer %zu/%zu, dropping %zu frames", __func__, mId, patchRecord->mId,
+                 framesWritten, frameCount, framesLeft);
     }
+}
+
+size_t AudioFlinger::PlaybackThread::Track::writeFrames(AudioBufferProvider* dest,
+                                                        const void* src,
+                                                        size_t frameCount) {
+    AudioBufferProvider::Buffer patchBuffer;
+    patchBuffer.frameCount = frameCount;
+    auto status = dest->getNextBuffer(&patchBuffer);
+    if (status != NO_ERROR) {
+       ALOGW("%s PathRecord getNextBuffer failed with error %d: %s",
+             __func__, status, strerror(-status));
+       return 0;
+    }
+    ALOG_ASSERT(patchBuffer.frameCount <= frameCount);
+    memcpy(patchBuffer.raw, src, patchBuffer.frameCount * mFrameSize);
+    auto framesWritten = patchBuffer.frameCount;
+    dest->releaseBuffer(&patchBuffer);
+    return framesWritten;
 }
 
 // releaseBuffer() is not overridden
