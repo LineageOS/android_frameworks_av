@@ -571,17 +571,12 @@ int lvmExecute(float *floatIn, float *floatOut, struct EffectContext *pContext,
                   0);                      /* Audio Time */
 }
 
-int lvmMainProcess(lvmConfigParams_t *plvmConfigParams, FILE *finp, FILE *fout) {
-  struct EffectContext context;
-  LVM_ControlParams_t params;
-
-  int errCode = lvmCreate(&context, plvmConfigParams, &params);
-  if (errCode) {
-    ALOGE("Error: lvmCreate returned with %d\n", errCode);
-    return errCode;
-  }
-
-  errCode = lvmControl(&context, plvmConfigParams, &params);
+int lvmMainProcess(EffectContext *pContext,
+                   LVM_ControlParams_t *pParams,
+                   lvmConfigParams_t *plvmConfigParams,
+                   FILE *finp,
+                   FILE *fout) {
+  int errCode = lvmControl(pContext, plvmConfigParams, pParams);
   if (errCode) {
     ALOGE("Error: lvmControl returned with %d\n", errCode);
     return errCode;
@@ -625,7 +620,7 @@ int lvmMainProcess(lvmConfigParams_t *plvmConfigParams, FILE *finp, FILE *fout) 
         }
     }
 #if 1
-    errCode = lvmExecute(floatIn.data(), floatOut.data(), &context, plvmConfigParams);
+    errCode = lvmExecute(floatIn.data(), floatOut.data(), pContext, plvmConfigParams);
     if (errCode) {
       printf("\nError: lvmExecute returned with %d\n", errCode);
       return errCode;
@@ -654,14 +649,15 @@ int main(int argc, const char *argv[]) {
   }
 
   lvmConfigParams_t lvmConfigParams{}; // default initialize
-  FILE *finp = nullptr, *fout = nullptr;
+  const char *infile = nullptr;
+  const char *outfile = nullptr;
 
   for (int i = 1; i < argc; i++) {
     printf("%s ", argv[i]);
     if (!strncmp(argv[i], "-i:", 3)) {
-      finp = fopen(argv[i] + 3, "rb");
+      infile = argv[i] + 3;
     } else if (!strncmp(argv[i], "-o:", 3)) {
-      fout = fopen(argv[i] + 3, "wb");
+      outfile = argv[i] + 3;
     } else if (!strncmp(argv[i], "-fs:", 4)) {
       const int samplingFreq = atoi(argv[i] + 4);
       if (samplingFreq != 8000 && samplingFreq != 11025 &&
@@ -671,21 +667,21 @@ int main(int argc, const char *argv[]) {
           samplingFreq != 48000 && samplingFreq != 88200 &&
           samplingFreq != 96000 && samplingFreq != 176400 &&
           samplingFreq != 192000) {
-        ALOGE("\nError: Unsupported Sampling Frequency : %d\n", samplingFreq);
+        printf("Error: Unsupported Sampling Frequency : %d\n", samplingFreq);
         return -1;
       }
       lvmConfigParams.samplingFreq = samplingFreq;
     } else if (!strncmp(argv[i], "-ch:", 4)) {
       const int nrChannels = atoi(argv[i] + 4);
       if (nrChannels > 8 || nrChannels < 1) {
-        ALOGE("\nError: Unsupported number of channels : %d\n", nrChannels);
+        printf("Error: Unsupported number of channels : %d\n", nrChannels);
         return -1;
       }
       lvmConfigParams.nrChannels = nrChannels;
     } else if (!strncmp(argv[i], "-fch:", 5)) {
       const int fChannels = atoi(argv[i] + 5);
       if (fChannels > 8 || fChannels < 1) {
-             ALOGE("\nError: Unsupported number of file channels : %d\n", fChannels);
+             printf("Error: Unsupported number of file channels : %d\n", fChannels);
              return -1;
            }
            lvmConfigParams.fChannels = fChannels;
@@ -694,7 +690,7 @@ int main(int argc, const char *argv[]) {
     } else if (!strncmp(argv[i], "-basslvl:", 9)) {
       const int bassEffectLevel = atoi(argv[i] + 9);
       if (bassEffectLevel > 15 || bassEffectLevel < 0) {
-        ALOGE("\nError: Unsupported Bass Effect Level : %d\n",
+        printf("Error: Unsupported Bass Effect Level : %d\n",
                bassEffectLevel);
         printUsage();
         return -1;
@@ -703,7 +699,7 @@ int main(int argc, const char *argv[]) {
     } else if (!strncmp(argv[i], "-eqPreset:", 10)) {
       const int eqPresetLevel = atoi(argv[i] + 10);
       if (eqPresetLevel > 9 || eqPresetLevel < 0) {
-        ALOGE("\nError: Unsupported Equalizer Preset : %d\n", eqPresetLevel);
+        printf("Error: Unsupported Equalizer Preset : %d\n", eqPresetLevel);
         printUsage();
         return -1;
       }
@@ -722,19 +718,47 @@ int main(int argc, const char *argv[]) {
     }
   }
 
-  if (finp == nullptr || fout == nullptr) {
-    ALOGE("\nError: missing input/output files\n");
+  if (infile == nullptr || outfile == nullptr) {
+    printf("Error: missing input/output files\n");
     printUsage();
-    // ok not to close.
     return -1;
   }
 
-  const int errCode = lvmMainProcess(&lvmConfigParams, finp, fout);
+  FILE *finp = fopen(infile, "rb");
+  if (finp == nullptr) {
+    printf("Cannot open input file %s", infile);
+    return -1;
+  }
+
+  FILE *fout = fopen(outfile, "wb");
+  if (fout == nullptr) {
+    printf("Cannot open output file %s", outfile);
+    fclose(finp);
+    return -1;
+  }
+
+  EffectContext context;
+  LVM_ControlParams_t params;
+  int errCode = lvmCreate(&context, &lvmConfigParams, &params);
+  if (errCode == 0) {
+    errCode = lvmMainProcess(&context, &params, &lvmConfigParams, finp, fout);
+    if (errCode != 0) {
+      printf("Error: lvmMainProcess returned with the error: %d",errCode);
+    }
+  } else {
+    printf("Error: lvmCreate returned with the error: %d", errCode);
+  }
   fclose(finp);
   fclose(fout);
+  /* Free the allocated buffers */
+  if (context.pBundledContext != nullptr) {
+    if (context.pBundledContext->hInstance != nullptr) {
+      LvmEffect_free(&context);
+    }
+    free(context.pBundledContext);
+  }
 
   if (errCode) {
-    ALOGE("Error: lvmMainProcess returns with the error: %d \n", errCode);
     return -1;
   }
   return 0;
