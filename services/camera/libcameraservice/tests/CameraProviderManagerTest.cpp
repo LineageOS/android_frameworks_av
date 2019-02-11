@@ -33,6 +33,7 @@ using android::hardware::camera::common::V1_0::VendorTagSection;
 using android::hardware::camera::common::V1_0::CameraMetadataType;
 using android::hardware::camera::device::V3_2::ICameraDeviceCallback;
 using android::hardware::camera::device::V3_2::ICameraDeviceSession;
+using android::hardware::camera::provider::V2_5::DeviceState;
 
 /**
  * Basic test implementation of a camera ver. 3.2 device interface
@@ -87,7 +88,7 @@ struct TestDeviceInterface : public device::V3_2::ICameraDevice {
 /**
  * Basic test implementation of a camera provider
  */
-struct TestICameraProvider : virtual public provider::V2_4::ICameraProvider {
+struct TestICameraProvider : virtual public provider::V2_5::ICameraProvider {
     sp<provider::V2_4::ICameraProviderCallback> mCallbacks;
     std::vector<hardware::hidl_string> mDeviceNames;
     sp<device::V3_2::ICameraDevice> mDeviceInterface;
@@ -101,6 +102,7 @@ struct TestICameraProvider : virtual public provider::V2_4::ICameraProvider {
 
     virtual hardware::Return<Status> setCallback(
             const sp<provider::V2_4::ICameraProviderCallback>& callbacks) override {
+        mCalledCounter[SET_CALLBACK]++;
         mCallbacks = callbacks;
         return hardware::Return<Status>(Status::OK);
     }
@@ -108,6 +110,7 @@ struct TestICameraProvider : virtual public provider::V2_4::ICameraProvider {
     using getVendorTags_cb = std::function<void(Status status,
             const hardware::hidl_vec<common::V1_0::VendorTagSection>& sections)>;
     hardware::Return<void> getVendorTags(getVendorTags_cb _hidl_cb) override {
+        mCalledCounter[GET_VENDOR_TAGS]++;
         _hidl_cb(Status::OK, mVendorTagSections);
         return hardware::Void();
     }
@@ -117,6 +120,7 @@ struct TestICameraProvider : virtual public provider::V2_4::ICameraProvider {
              bool support)>;
     virtual ::hardware::Return<void> isSetTorchModeSupported(
             isSetTorchModeSupported_cb _hidl_cb) override {
+        mCalledCounter[IS_SET_TORCH_MODE_SUPPORTED]++;
         _hidl_cb(Status::OK, false);
         return hardware::Void();
     }
@@ -124,6 +128,7 @@ struct TestICameraProvider : virtual public provider::V2_4::ICameraProvider {
     using getCameraIdList_cb = std::function<void(Status status,
             const hardware::hidl_vec<hardware::hidl_string>& cameraDeviceNames)>;
     virtual hardware::Return<void> getCameraIdList(getCameraIdList_cb _hidl_cb) override {
+        mCalledCounter[GET_CAMERA_ID_LIST]++;
         _hidl_cb(Status::OK, mDeviceNames);
         return hardware::Void();
     }
@@ -148,6 +153,25 @@ struct TestICameraProvider : virtual public provider::V2_4::ICameraProvider {
         return hardware::Void();
     }
 
+    virtual hardware::Return<void> notifyDeviceStateChange(
+            hardware::hidl_bitfield<DeviceState> newState) override {
+        mCalledCounter[NOTIFY_DEVICE_STATE]++;
+        mCurrentState = newState;
+        return hardware::Void();
+    }
+
+    enum MethodNames {
+        SET_CALLBACK,
+        GET_VENDOR_TAGS,
+        IS_SET_TORCH_MODE_SUPPORTED,
+        NOTIFY_DEVICE_STATE,
+        GET_CAMERA_ID_LIST,
+
+        METHOD_NAME_COUNT
+    };
+    int mCalledCounter[METHOD_NAME_COUNT] {0};
+
+    hardware::hidl_bitfield<DeviceState> mCurrentState = 0xFFFFFFFF; // Unlikely to be a real state
 };
 
 /**
@@ -209,11 +233,26 @@ TEST(CameraProviderManagerTest, InitializeTest) {
 
     res = providerManager->initialize(statusListener, &serviceProxy);
     ASSERT_EQ(res, OK) << "Unable to initialize provider manager";
+    // Check that both "legacy" and "external" providers (really the same object) are called
+    // once for all the init methods
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::SET_CALLBACK], 2) <<
+            "Only one call to setCallback per provider expected during init";
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::GET_VENDOR_TAGS], 2) <<
+            "Only one call to getVendorTags per provider expected during init";
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::IS_SET_TORCH_MODE_SUPPORTED], 2) <<
+            "Only one call to isSetTorchModeSupported per provider expected during init";
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::GET_CAMERA_ID_LIST], 2) <<
+            "Only one call to getCameraIdList per provider expected during init";
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::NOTIFY_DEVICE_STATE], 2) <<
+            "Only one call to notifyDeviceState per provider expected during init";
 
     std::string legacyInstanceName = "legacy/0";
     std::string externalInstanceName = "external/0";
     bool gotLegacy = false;
     bool gotExternal = false;
+    EXPECT_EQ(2u, serviceProxy.mLastRequestedServiceNames.size()) <<
+            "Only two service queries expected to be seen by hardware service manager";
+
     for (auto& serviceName : serviceProxy.mLastRequestedServiceNames) {
         if (serviceName == legacyInstanceName) gotLegacy = true;
         if (serviceName == externalInstanceName) gotExternal = true;
@@ -374,4 +413,36 @@ TEST(CameraProviderManagerTest, MultipleVendorTagTest) {
     metadata.dump(1, 2);
     metadataCopy.dump(1, 2);
     secondMetadata.dump(1, 2);
+}
+
+TEST(CameraProviderManagerTest, NotifyStateChangeTest) {
+    std::vector<hardware::hidl_string> deviceNames {
+        "device@3.2/test/0",
+        "device@1.0/test/0",
+        "device@3.2/test/1"};
+
+    hardware::hidl_vec<common::V1_0::VendorTagSection> vendorSection;
+    status_t res;
+    sp<CameraProviderManager> providerManager = new CameraProviderManager();
+    sp<TestStatusListener> statusListener = new TestStatusListener();
+    TestInteractionProxy serviceProxy;
+    sp<TestICameraProvider> provider =  new TestICameraProvider(deviceNames,
+            vendorSection);
+    serviceProxy.setProvider(provider);
+
+    res = providerManager->initialize(statusListener, &serviceProxy);
+    ASSERT_EQ(res, OK) << "Unable to initialize provider manager";
+
+    ASSERT_EQ(provider->mCurrentState,
+            static_cast<hardware::hidl_bitfield<DeviceState>>(DeviceState::NORMAL))
+            << "Initial device state not set";
+
+    res = providerManager->notifyDeviceStateChange(
+        static_cast<hardware::hidl_bitfield<DeviceState>>(DeviceState::FOLDED));
+
+    ASSERT_EQ(res, OK) << "Unable to call notifyDeviceStateChange";
+    ASSERT_EQ(provider->mCurrentState,
+            static_cast<hardware::hidl_bitfield<DeviceState>>(DeviceState::FOLDED))
+            << "Unable to change device state";
+
 }

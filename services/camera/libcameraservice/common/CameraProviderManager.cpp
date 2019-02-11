@@ -71,6 +71,8 @@ status_t CameraProviderManager::initialize(wp<CameraProviderManager::StatusListe
     }
     mListener = listener;
     mServiceProxy = proxy;
+    mDeviceState = static_cast<hardware::hidl_bitfield<provider::V2_5::DeviceState>>(
+        provider::V2_5::DeviceState::NORMAL);
 
     // Registering will trigger notifications for all already-known providers
     bool success = mServiceProxy->registerForNotifications(
@@ -274,6 +276,26 @@ status_t CameraProviderManager::setUpVendorTags() {
     return OK;
 }
 
+status_t CameraProviderManager::notifyDeviceStateChange(
+        hardware::hidl_bitfield<provider::V2_5::DeviceState> newState) {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    mDeviceState = newState;
+    status_t res = OK;
+    for (auto& provider : mProviders) {
+        ALOGV("%s: Notifying %s for new state 0x%" PRIx64,
+                __FUNCTION__, provider->mProviderName.c_str(), newState);
+        status_t singleRes = provider->notifyDeviceStateChange(mDeviceState);
+        if (singleRes != OK) {
+            ALOGE("%s: Unable to notify provider %s about device state change",
+                    __FUNCTION__,
+                    provider->mProviderName.c_str());
+            res = singleRes;
+            // continue to do the rest of the providers instead of returning now
+        }
+    }
+    return res;
+}
+
 status_t CameraProviderManager::openSession(const std::string &id,
         const sp<device::V3_2::ICameraDeviceCallback>& callback,
         /*out*/
@@ -359,7 +381,7 @@ void CameraProviderManager::saveRef(DeviceMode usageType, const std::string &cam
     if (!kEnableLazyHal) {
         return;
     }
-    ALOGI("Saving camera provider %s for camera device %s", provider->descriptor, cameraId.c_str());
+    ALOGV("Saving camera provider %s for camera device %s", provider->descriptor, cameraId.c_str());
     std::lock_guard<std::mutex> lock(mProviderInterfaceMapLock);
     std::unordered_map<std::string, sp<provider::V2_4::ICameraProvider>> *primaryMap, *alternateMap;
     if (usageType == DeviceMode::TORCH) {
@@ -383,7 +405,7 @@ void CameraProviderManager::removeRef(DeviceMode usageType, const std::string &c
     if (!kEnableLazyHal) {
         return;
     }
-    ALOGI("Removing camera device %s", cameraId.c_str());
+    ALOGV("Removing camera device %s", cameraId.c_str());
     std::unordered_map<std::string, sp<provider::V2_4::ICameraProvider>> *providerMap;
     if (usageType == DeviceMode::TORCH) {
         providerMap = &mTorchProviderByCameraId;
@@ -1088,7 +1110,7 @@ status_t CameraProviderManager::addProviderLocked(const std::string& newProvider
     }
 
     sp<ProviderInfo> providerInfo = new ProviderInfo(newProvider, this);
-    status_t res = providerInfo->initialize(interface);
+    status_t res = providerInfo->initialize(interface, mDeviceState);
     if (res != OK) {
         return res;
     }
@@ -1149,7 +1171,8 @@ CameraProviderManager::ProviderInfo::ProviderInfo(
 }
 
 status_t CameraProviderManager::ProviderInfo::initialize(
-        sp<provider::V2_4::ICameraProvider>& interface) {
+        sp<provider::V2_4::ICameraProvider>& interface,
+        hardware::hidl_bitfield<provider::V2_5::DeviceState> currentDeviceState) {
     status_t res = parseProviderName(mProviderName, &mType, &mId);
     if (res != OK) {
         ALOGE("%s: Invalid provider name, ignoring", __FUNCTION__);
@@ -1157,6 +1180,15 @@ status_t CameraProviderManager::ProviderInfo::initialize(
     }
     ALOGI("Connecting to new camera provider: %s, isRemote? %d",
             mProviderName.c_str(), interface->isRemote());
+
+    // Determine minor version
+    auto castResult = provider::V2_5::ICameraProvider::castFrom(interface);
+    if (castResult.isOk()) {
+        mMinorVersion = 5;
+    } else {
+        mMinorVersion = 4;
+    }
+
     // cameraDeviceStatusChange callbacks may be called (and causing new devices added)
     // before setCallback returns
     hardware::Return<Status> status = interface->setCallback(this);
@@ -1179,6 +1211,24 @@ status_t CameraProviderManager::ProviderInfo::initialize(
     } else if (!linked) {
         ALOGW("%s: Unable to link to provider '%s' death notifications",
                 __FUNCTION__, mProviderName.c_str());
+    }
+
+    if (!kEnableLazyHal) {
+        // Save HAL reference indefinitely
+        mSavedInterface = interface;
+    } else {
+        mActiveInterface = interface;
+    }
+
+    ALOGV("%s: Setting device state for %s: 0x%" PRIx64,
+            __FUNCTION__, mProviderName.c_str(), mDeviceState);
+    notifyDeviceStateChange(currentDeviceState);
+
+    res = setUpVendorTags();
+    if (res != OK) {
+        ALOGE("%s: Unable to set up vendor tags from provider '%s'",
+                __FUNCTION__, mProviderName.c_str());
+        return res;
     }
 
     // Get initial list of camera devices, if any
@@ -1237,34 +1287,28 @@ status_t CameraProviderManager::ProviderInfo::initialize(
         }
     }
 
-    res = setUpVendorTags();
-    if (res != OK) {
-        ALOGE("%s: Unable to set up vendor tags from provider '%s'",
-                __FUNCTION__, mProviderName.c_str());
-        return res;
-    }
-
     ALOGI("Camera provider %s ready with %zu camera devices",
             mProviderName.c_str(), mDevices.size());
 
     mInitialized = true;
-    if (!kEnableLazyHal) {
-        // Save HAL reference indefinitely
-        mSavedInterface = interface;
-    }
     return OK;
 }
 
 const sp<provider::V2_4::ICameraProvider>
 CameraProviderManager::ProviderInfo::startProviderInterface() {
     ATRACE_CALL();
-    ALOGI("Request to start camera provider: %s", mProviderName.c_str());
+    ALOGV("Request to start camera provider: %s", mProviderName.c_str());
     if (mSavedInterface != nullptr) {
         return mSavedInterface;
     }
+    if (!kEnableLazyHal) {
+        ALOGE("Bad provider state! Should not be here on a non-lazy HAL!");
+        return nullptr;
+    }
+
     auto interface = mActiveInterface.promote();
     if (interface == nullptr) {
-        ALOGI("Could not promote, calling getService(%s)", mProviderName.c_str());
+        ALOGI("Camera HAL provider needs restart, calling getService(%s)", mProviderName.c_str());
         interface = mManager->mServiceProxy->getService(mProviderName);
         interface->setCallback(this);
         hardware::Return<bool> linked = interface->linkToDeath(this, /*cookie*/ mId);
@@ -1277,9 +1321,22 @@ CameraProviderManager::ProviderInfo::startProviderInterface() {
             ALOGW("%s: Unable to link to provider '%s' death notifications",
                     __FUNCTION__, mProviderName.c_str());
         }
+        // Send current device state
+        if (mMinorVersion >= 5) {
+            auto castResult = provider::V2_5::ICameraProvider::castFrom(interface);
+            if (castResult.isOk()) {
+                sp<provider::V2_5::ICameraProvider> interface_2_5 = castResult;
+                if (interface_2_5 != nullptr) {
+                    ALOGV("%s: Initial device state for %s: 0x %" PRIx64,
+                            __FUNCTION__, mProviderName.c_str(), mDeviceState);
+                    interface_2_5->notifyDeviceStateChange(mDeviceState);
+                }
+            }
+        }
+
         mActiveInterface = interface;
     } else {
-        ALOGI("Camera provider (%s) already in use. Re-using instance.", mProviderName.c_str());
+        ALOGV("Camera provider (%s) already in use. Re-using instance.", mProviderName.c_str());
     }
     return interface;
 }
@@ -1364,8 +1421,10 @@ void CameraProviderManager::ProviderInfo::removeDevice(std::string id) {
 }
 
 status_t CameraProviderManager::ProviderInfo::dump(int fd, const Vector<String16>&) const {
-    dprintf(fd, "== Camera Provider HAL %s (v2.4, %s) static info: %zu devices: ==\n",
-            mProviderName.c_str(), mIsRemote ? "remote" : "passthrough",
+    dprintf(fd, "== Camera Provider HAL %s (v2.%d, %s) static info: %zu devices: ==\n",
+            mProviderName.c_str(),
+            mMinorVersion,
+            mIsRemote ? "remote" : "passthrough",
             mDevices.size());
 
     for (auto& device : mDevices) {
@@ -1561,6 +1620,26 @@ status_t CameraProviderManager::ProviderInfo::setUpVendorTags() {
         return res;
     }
 
+    return OK;
+}
+
+status_t CameraProviderManager::ProviderInfo::notifyDeviceStateChange(
+        hardware::hidl_bitfield<provider::V2_5::DeviceState> newDeviceState) {
+    mDeviceState = newDeviceState;
+    if (mMinorVersion >= 5) {
+        // Check if the provider is currently active - not going to start it up for this notification
+        auto interface = mSavedInterface != nullptr ? mSavedInterface : mActiveInterface.promote();
+        if (interface != nullptr) {
+            // Send current device state
+            auto castResult = provider::V2_5::ICameraProvider::castFrom(interface);
+            if (castResult.isOk()) {
+                sp<provider::V2_5::ICameraProvider> interface_2_5 = castResult;
+                if (interface_2_5 != nullptr) {
+                    interface_2_5->notifyDeviceStateChange(mDeviceState);
+                }
+            }
+        }
+    }
     return OK;
 }
 
