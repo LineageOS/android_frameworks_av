@@ -1654,6 +1654,49 @@ Status CameraService::notifySystemEvent(int32_t eventId,
     return Status::ok();
 }
 
+Status CameraService::notifyDeviceStateChange(int64_t newState) {
+    const int pid = CameraThreadState::getCallingPid();
+    const int selfPid = getpid();
+
+    // Permission checks
+    if (pid != selfPid) {
+        // Ensure we're being called by system_server, or similar process with
+        // permissions to notify the camera service about system events
+        if (!checkCallingPermission(
+                String16("android.permission.CAMERA_SEND_SYSTEM_EVENTS"))) {
+            const int uid = CameraThreadState::getCallingUid();
+            ALOGE("Permission Denial: cannot send updates to camera service about device"
+                    " state changes from pid=%d, uid=%d", pid, uid);
+            return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
+                    "No permission to send updates to camera service about device state"
+                    " changes from pid=%d, uid=%d", pid, uid);
+        }
+    }
+
+    ATRACE_CALL();
+
+    using hardware::camera::provider::V2_5::DeviceState;
+    hardware::hidl_bitfield<DeviceState> newDeviceState{};
+    if (newState & ICameraService::DEVICE_STATE_BACK_COVERED) {
+        newDeviceState |= DeviceState::BACK_COVERED;
+    }
+    if (newState & ICameraService::DEVICE_STATE_FRONT_COVERED) {
+        newDeviceState |= DeviceState::FRONT_COVERED;
+    }
+    if (newState & ICameraService::DEVICE_STATE_FOLDED) {
+        newDeviceState |= DeviceState::FOLDED;
+    }
+    // Only map vendor bits directly
+    uint64_t vendorBits = static_cast<uint64_t>(newState) & 0xFFFFFFFF00000000l;
+    newDeviceState |= vendorBits;
+
+    ALOGV("%s: New device state 0x%" PRIx64, __FUNCTION__, newDeviceState);
+    Mutex::Autolock l(mServiceLock);
+    mCameraProviderManager->notifyDeviceStateChange(newDeviceState);
+
+    return Status::ok();
+}
+
 Status CameraService::addListener(const sp<ICameraServiceListener>& listener,
         /*out*/
         std::vector<hardware::CameraStatus> *cameraStatuses) {
