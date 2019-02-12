@@ -58,79 +58,59 @@ public:
 
     // set all known fields from a metadata structure
     virtual bool setFromMetadata(const CameraMetadata& metadata,
+            const CameraMetadata& staticInfo,
             const size_t imageWidth,
             const size_t imageHeight);
 
     // sets the len aperture.
     // Returns false if memory allocation fails.
-    virtual bool setAperture(uint32_t numerator, uint32_t denominator);
-
-    // sets the value of brightness.
-    // Returns false if memory allocation fails.
-    virtual bool setBrightness(int32_t numerator, int32_t denominator);
+    virtual bool setAperture(float aperture);
 
     // sets the color space.
     // Returns false if memory allocation fails.
     virtual bool setColorSpace(uint16_t color_space);
-
-    // sets the information to compressed data.
-    // Returns false if memory allocation fails.
-    virtual bool setComponentsConfiguration(const std::string& components_configuration);
-
-    // sets the compression scheme used for the image data.
-    // Returns false if memory allocation fails.
-    virtual bool setCompression(uint16_t compression);
-
-    // sets image contrast.
-    // Returns false if memory allocation fails.
-    virtual bool setContrast(uint16_t contrast);
 
     // sets the date and time of image last modified. It takes local time. The
     // name of the tag is DateTime in IFD0.
     // Returns false if memory allocation fails.
     virtual bool setDateTime(const struct tm& t);
 
-    // sets the image description.
-    // Returns false if memory allocation fails.
-    virtual bool setDescription(const std::string& description);
-
     // sets the digital zoom ratio. If the numerator is 0, it means digital zoom
     // was not used.
     // Returns false if memory allocation fails.
-    virtual bool setDigitalZoomRatio(uint32_t numerator, uint32_t denominator);
+    virtual bool setDigitalZoomRatio(
+            uint32_t crop_width, uint32_t crop_height,
+            uint32_t sensor_width, uint32_t sensor_height);
 
-    // sets the exposure bias.
+    // Sets the exposure bias.
     // Returns false if memory allocation fails.
-    virtual bool setExposureBias(int32_t numerator, int32_t denominator);
+    virtual bool setExposureBias(int32_t ev,
+            uint32_t ev_step_numerator, uint32_t ev_step_denominator);
 
     // sets the exposure mode set when the image was shot.
     // Returns false if memory allocation fails.
-    virtual bool setExposureMode(uint16_t exposure_mode);
-
-    // sets the program used by the camera to set exposure when the picture is
-    // taken.
-    // Returns false if memory allocation fails.
-    virtual bool setExposureProgram(uint16_t exposure_program);
+    virtual bool setExposureMode(uint8_t exposure_mode);
 
     // sets the exposure time, given in seconds.
     // Returns false if memory allocation fails.
-    virtual bool setExposureTime(uint32_t numerator, uint32_t denominator);
+    virtual bool setExposureTime(float exposure_time);
 
     // sets the status of flash.
     // Returns false if memory allocation fails.
-    virtual bool setFlash(uint16_t flash);
+    virtual bool setFlash(uint8_t flash_available, uint8_t flash_state, uint8_t ae_mode);
 
     // sets the F number.
     // Returns false if memory allocation fails.
-    virtual bool setFNumber(uint32_t numerator, uint32_t denominator);
+    virtual bool setFNumber(float f_number);
 
     // sets the focal length of lens used to take the image in millimeters.
     // Returns false if memory allocation fails.
-    virtual bool setFocalLength(uint32_t numerator, uint32_t denominator);
+    virtual bool setFocalLength(float focal_length);
 
-    // sets the degree of overall image gain adjustment.
+    // sets the focal length of lens for 35mm film used to take the image in millimeters.
     // Returns false if memory allocation fails.
-    virtual bool setGainControl(uint16_t gain_control);
+    virtual bool setFocalLengthIn35mmFilm(float focal_length,
+            float sensor_size_x, float sensor_size_y);
 
     // sets the altitude in meters.
     // Returns false if memory allocation fails.
@@ -164,45 +144,21 @@ public:
     // Returns false if memory allocation fails.
     virtual bool setIsoSpeedRating(uint16_t iso_speed_ratings);
 
-    // sets the kind of light source.
-    // Returns false if memory allocation fails.
-    virtual bool setLightSource(uint16_t light_source);
-
     // sets the smallest F number of the lens.
     // Returns false if memory allocation fails.
-    virtual bool setMaxAperture(uint32_t numerator, uint32_t denominator);
-
-    // sets the metering mode.
-    // Returns false if memory allocation fails.
-    virtual bool setMeteringMode(uint16_t metering_mode);
+    virtual bool setMaxAperture(float aperture);
 
     // sets image orientation.
     // Returns false if memory allocation fails.
     virtual bool setOrientation(uint16_t orientation);
 
-    // sets the unit for measuring XResolution and YResolution.
-    // Returns false if memory allocation fails.
-    virtual bool setResolutionUnit(uint16_t resolution_unit);
-
-    // sets image saturation.
-    // Returns false if memory allocation fails.
-    virtual bool setSaturation(uint16_t saturation);
-
-    // sets the type of scene that was shot.
-    // Returns false if memory allocation fails.
-    virtual bool setSceneCaptureType(uint16_t type);
-
-    // sets image sharpness.
-    // Returns false if memory allocation fails.
-    virtual bool setSharpness(uint16_t sharpness);
-
     // sets the shutter speed.
     // Returns false if memory allocation fails.
-    virtual bool setShutterSpeed(int32_t numerator, int32_t denominator);
+    virtual bool setShutterSpeed(float exposure_time);
 
     // sets the distance to the subject, given in meters.
     // Returns false if memory allocation fails.
-    virtual bool setSubjectDistance(uint32_t numerator, uint32_t denominator);
+    virtual bool setSubjectDistance(float diopters);
 
     // sets the fractions of seconds for the <DateTime> tag.
     // Returns false if memory allocation fails.
@@ -210,28 +166,7 @@ public:
 
     // sets the white balance mode set when the image was shot.
     // Returns false if memory allocation fails.
-    virtual bool setWhiteBalance(uint16_t white_balance);
-
-    // sets the number of pixels per resolution unit in the image width.
-    // Returns false if memory allocation fails.
-    virtual bool setXResolution(uint32_t numerator, uint32_t denominator);
-
-    // sets the position of chrominance components in relation to the luminance
-    // component.
-    // Returns false if memory allocation fails.
-    virtual bool setYCbCrPositioning(uint16_t ycbcr_positioning);
-
-    // sets the number of pixels per resolution unit in the image length.
-    // Returns false if memory allocation fails.
-    virtual bool setYResolution(uint32_t numerator, uint32_t denominator);
-
-    // sets the manufacturer of camera.
-    // Returns false if memory allocation fails.
-    virtual bool setMake(const std::string& make);
-
-    // sets the model number of camera.
-    // Returns false if memory allocation fails.
-    virtual bool setModel(const std::string& model);
+    virtual bool setWhiteBalance(uint8_t white_balance);
 
     // Generates APP1 segment.
     // Returns false if generating APP1 segment fails.
@@ -280,6 +215,10 @@ public:
     virtual bool setString(ExifIfd ifd, ExifTag tag, ExifFormat format,
             const std::string& buffer, const std::string& msg);
 
+    float convertToApex(float val) {
+        return 2.0f * log2f(val);
+    }
+
     // Destroys the buffer of APP1 segment if exists.
     virtual void destroyApp1();
 
@@ -291,6 +230,8 @@ public:
     // The length of |app1_buffer_|.
     unsigned int app1_length_;
 
+    // How precise the float-to-rational conversion for EXIF tags would be.
+    const static int kRationalPrecision = 10000;
 };
 
 #define SET_SHORT(ifd, tag, value)                      \
@@ -373,35 +314,16 @@ bool ExifUtilsImpl::initialize(const unsigned char *app1Segment, size_t app1Segm
     return true;
 }
 
-bool ExifUtilsImpl::setAperture(uint32_t numerator, uint32_t denominator) {
-    SET_RATIONAL(EXIF_IFD_EXIF, EXIF_TAG_APERTURE_VALUE, numerator, denominator);
-    return true;
-}
-
-bool ExifUtilsImpl::setBrightness(int32_t numerator, int32_t denominator) {
-    SET_SRATIONAL(EXIF_IFD_EXIF, EXIF_TAG_BRIGHTNESS_VALUE, numerator, denominator);
+bool ExifUtilsImpl::setAperture(float aperture) {
+    float apexValue = convertToApex(aperture);
+    SET_RATIONAL(EXIF_IFD_EXIF, EXIF_TAG_APERTURE_VALUE,
+            static_cast<uint32_t>(std::round(apexValue * kRationalPrecision)),
+            kRationalPrecision);
     return true;
 }
 
 bool ExifUtilsImpl::setColorSpace(uint16_t color_space) {
     SET_SHORT(EXIF_IFD_EXIF, EXIF_TAG_COLOR_SPACE, color_space);
-    return true;
-}
-
-bool ExifUtilsImpl::setComponentsConfiguration(
-        const std::string& components_configuration) {
-    SET_STRING(EXIF_IFD_EXIF, EXIF_TAG_COMPONENTS_CONFIGURATION,
-            EXIF_FORMAT_UNDEFINED, components_configuration);
-    return true;
-}
-
-bool ExifUtilsImpl::setCompression(uint16_t compression) {
-    SET_SHORT(EXIF_IFD_0, EXIF_TAG_COMPRESSION, compression);
-    return true;
-}
-
-bool ExifUtilsImpl::setContrast(uint16_t contrast) {
-    SET_SHORT(EXIF_IFD_EXIF, EXIF_TAG_CONTRAST, contrast);
     return true;
 }
 
@@ -421,53 +343,111 @@ bool ExifUtilsImpl::setDateTime(const struct tm& t) {
     return true;
 }
 
-bool ExifUtilsImpl::setDescription(const std::string& description) {
-    SET_STRING(EXIF_IFD_0, EXIF_TAG_IMAGE_DESCRIPTION, EXIF_FORMAT_ASCII, description);
+bool ExifUtilsImpl::setDigitalZoomRatio(
+        uint32_t crop_width, uint32_t crop_height,
+        uint32_t sensor_width, uint32_t sensor_height) {
+    float zoomRatioX = (crop_width == 0) ? 1.0 : 1.0 * sensor_width / crop_width;
+    float zoomRatioY = (crop_height == 0) ? 1.0 : 1.0 * sensor_height / crop_height;
+    float zoomRatio = std::max(zoomRatioX, zoomRatioY);
+    const static float noZoomThreshold = 1.02f;
+
+    if (zoomRatio <= noZoomThreshold) {
+        SET_RATIONAL(EXIF_IFD_EXIF, EXIF_TAG_DIGITAL_ZOOM_RATIO, 0, 1);
+    } else {
+        SET_RATIONAL(EXIF_IFD_EXIF, EXIF_TAG_DIGITAL_ZOOM_RATIO,
+                static_cast<uint32_t>(std::round(zoomRatio * kRationalPrecision)),
+                kRationalPrecision);
+    }
     return true;
 }
 
-bool ExifUtilsImpl::setDigitalZoomRatio(uint32_t numerator, uint32_t denominator) {
-    SET_RATIONAL(EXIF_IFD_EXIF, EXIF_TAG_DIGITAL_ZOOM_RATIO, numerator, denominator);
+bool ExifUtilsImpl::setExposureMode(uint8_t exposure_mode) {
+    uint16_t exposureMode = (exposure_mode == ANDROID_CONTROL_AE_MODE_OFF) ? 1 : 0;
+    SET_SHORT(EXIF_IFD_EXIF, EXIF_TAG_EXPOSURE_MODE, exposureMode);
     return true;
 }
 
-bool ExifUtilsImpl::setExposureBias(int32_t numerator, int32_t denominator) {
-    SET_SRATIONAL(EXIF_IFD_EXIF, EXIF_TAG_EXPOSURE_BIAS_VALUE, numerator, denominator);
+bool ExifUtilsImpl::setExposureTime(float exposure_time) {
+    SET_RATIONAL(EXIF_IFD_EXIF, EXIF_TAG_EXPOSURE_TIME,
+            static_cast<uint32_t>(std::round(exposure_time * kRationalPrecision)),
+            kRationalPrecision);
     return true;
 }
 
-bool ExifUtilsImpl::setExposureMode(uint16_t exposure_mode) {
-    SET_SHORT(EXIF_IFD_EXIF, EXIF_TAG_EXPOSURE_MODE, exposure_mode);
-    return true;
-}
+bool ExifUtilsImpl::setFlash(uint8_t flash_available, uint8_t flash_state, uint8_t ae_mode) {
+    // EXIF_TAG_FLASH bits layout per EXIF standard:
+    // Bit 0:    0 - did not fire
+    //           1 - fired
+    // Bit 1-2:  status of return light
+    // Bit 3-4:  0 - unknown
+    //           1 - compulsory flash firing
+    //           2 - compulsory flash suppression
+    //           3 - auto mode
+    // Bit 5:    0 - flash function present
+    //           1 - no flash function
+    // Bit 6:    0 - no red-eye reduction mode or unknown
+    //           1 - red-eye reduction supported
+    uint16_t flash = 0x20;
 
-bool ExifUtilsImpl::setExposureProgram(uint16_t exposure_program) {
-    SET_SHORT(EXIF_IFD_EXIF, EXIF_TAG_EXPOSURE_PROGRAM, exposure_program);
-    return true;
-}
+    if (flash_available == ANDROID_FLASH_INFO_AVAILABLE_TRUE) {
+        flash = 0x00;
 
-bool ExifUtilsImpl::setExposureTime(uint32_t numerator, uint32_t denominator) {
-    SET_RATIONAL(EXIF_IFD_EXIF, EXIF_TAG_EXPOSURE_TIME, numerator, denominator);
-    return true;
-}
+        if (flash_state == ANDROID_FLASH_STATE_FIRED) {
+            flash |= 0x1;
+        }
+        if (ae_mode == ANDROID_CONTROL_AE_MODE_ON_AUTO_FLASH_REDEYE) {
+            flash |= 0x40;
+        }
 
-bool ExifUtilsImpl::setFlash(uint16_t flash) {
+        uint16_t flashMode = 0;
+        switch (ae_mode) {
+            case ANDROID_CONTROL_AE_MODE_ON_AUTO_FLASH:
+            case ANDROID_CONTROL_AE_MODE_ON_AUTO_FLASH_REDEYE:
+               flashMode = 3; // AUTO
+               break;
+            case ANDROID_CONTROL_AE_MODE_ON_ALWAYS_FLASH:
+            case ANDROID_CONTROL_AE_MODE_ON_EXTERNAL_FLASH:
+               flashMode = 1; // ON
+               break;
+            case ANDROID_CONTROL_AE_MODE_OFF:
+            case ANDROID_CONTROL_AE_MODE_ON:
+               flashMode = 2; // OFF
+               break;
+            default:
+               flashMode = 0; // UNKNOWN
+               break;
+        }
+        flash |= (flashMode << 3);
+    }
     SET_SHORT(EXIF_IFD_EXIF, EXIF_TAG_FLASH, flash);
     return true;
 }
 
-bool ExifUtilsImpl::setFNumber(uint32_t numerator, uint32_t denominator) {
-    SET_RATIONAL(EXIF_IFD_EXIF, EXIF_TAG_FNUMBER, numerator, denominator);
+bool ExifUtilsImpl::setFNumber(float f_number) {
+    SET_RATIONAL(EXIF_IFD_EXIF, EXIF_TAG_FNUMBER,
+            static_cast<uint32_t>(std::round(f_number * kRationalPrecision)),
+            kRationalPrecision);
     return true;
 }
 
-bool ExifUtilsImpl::setFocalLength(uint32_t numerator, uint32_t denominator) {
-    SET_RATIONAL(EXIF_IFD_EXIF, EXIF_TAG_FOCAL_LENGTH, numerator, denominator);
+bool ExifUtilsImpl::setFocalLength(float focal_length) {
+    uint32_t numerator = static_cast<uint32_t>(std::round(focal_length * kRationalPrecision));
+    SET_RATIONAL(EXIF_IFD_EXIF, EXIF_TAG_FOCAL_LENGTH, numerator, kRationalPrecision);
     return true;
 }
 
-bool ExifUtilsImpl::setGainControl(uint16_t gain_control) {
-    SET_SHORT(EXIF_IFD_EXIF, EXIF_TAG_GAIN_CONTROL, gain_control);
+bool ExifUtilsImpl::setFocalLengthIn35mmFilm(
+        float focal_length, float sensor_size_x, float sensor_size_y) {
+    static const float filmDiagonal = 43.27; // diagonal of 35mm film
+    static const float minSensorDiagonal = 0.01;
+    float sensorDiagonal = std::sqrt(
+            sensor_size_x * sensor_size_x + sensor_size_y * sensor_size_y);
+    sensorDiagonal = std::max(sensorDiagonal, minSensorDiagonal);
+    float focalLength35mmFilm = std::round(focal_length * filmDiagonal / sensorDiagonal);
+    focalLength35mmFilm = std::min(1.0f * 65535, focalLength35mmFilm);
+
+    SET_SHORT(EXIF_IFD_EXIF, EXIF_TAG_FOCAL_LENGTH_IN_35MM_FILM,
+            static_cast<uint16_t>(focalLength35mmFilm));
     return true;
 }
 
@@ -614,18 +594,18 @@ bool ExifUtilsImpl::setIsoSpeedRating(uint16_t iso_speed_ratings) {
     return true;
 }
 
-bool ExifUtilsImpl::setLightSource(uint16_t light_source) {
-    SET_SHORT(EXIF_IFD_EXIF, EXIF_TAG_LIGHT_SOURCE, light_source);
+bool ExifUtilsImpl::setMaxAperture(float aperture) {
+    float maxAperture = convertToApex(aperture);
+    SET_RATIONAL(EXIF_IFD_EXIF, EXIF_TAG_MAX_APERTURE_VALUE,
+            static_cast<uint32_t>(std::round(maxAperture * kRationalPrecision)),
+            kRationalPrecision);
     return true;
 }
 
-bool ExifUtilsImpl::setMaxAperture(uint32_t numerator, uint32_t denominator) {
-    SET_RATIONAL(EXIF_IFD_EXIF, EXIF_TAG_MAX_APERTURE_VALUE, numerator, denominator);
-    return true;
-}
-
-bool ExifUtilsImpl::setMeteringMode(uint16_t metering_mode) {
-    SET_SHORT(EXIF_IFD_EXIF, EXIF_TAG_METERING_MODE, metering_mode);
+bool ExifUtilsImpl::setExposureBias(int32_t ev,
+        uint32_t ev_step_numerator, uint32_t ev_step_denominator) {
+    SET_RATIONAL(EXIF_IFD_EXIF, EXIF_TAG_EXPOSURE_BIAS_VALUE,
+            ev * ev_step_numerator, ev_step_denominator);
     return true;
 }
 
@@ -658,33 +638,36 @@ bool ExifUtilsImpl::setOrientation(uint16_t orientation) {
     return true;
 }
 
-bool ExifUtilsImpl::setResolutionUnit(uint16_t resolution_unit) {
-    SET_SHORT(EXIF_IFD_EXIF, EXIF_TAG_RESOLUTION_UNIT, resolution_unit);
+bool ExifUtilsImpl::setShutterSpeed(float exposure_time) {
+    float shutterSpeed = -log2f(exposure_time);
+    SET_SRATIONAL(EXIF_IFD_EXIF, EXIF_TAG_SHUTTER_SPEED_VALUE,
+            static_cast<uint32_t>(shutterSpeed * kRationalPrecision), kRationalPrecision);
     return true;
 }
 
-bool ExifUtilsImpl::setSaturation(uint16_t saturation) {
-    SET_SHORT(EXIF_IFD_EXIF, EXIF_TAG_SATURATION, saturation);
-    return true;
-}
+bool ExifUtilsImpl::setSubjectDistance(float diopters) {
+    const static float kInfinityDiopters = 1.0e-6;
+    uint32_t numerator, denominator;
+    uint16_t distanceRange;
+    if (diopters > kInfinityDiopters) {
+        float focusDistance = 1.0f / diopters;
+        numerator = static_cast<uint32_t>(std::round(focusDistance * kRationalPrecision));
+        denominator = kRationalPrecision;
 
-bool ExifUtilsImpl::setSceneCaptureType(uint16_t type) {
-    SET_SHORT(EXIF_IFD_EXIF, EXIF_TAG_SCENE_CAPTURE_TYPE, type);
-    return true;
-}
-
-bool ExifUtilsImpl::setSharpness(uint16_t sharpness) {
-    SET_SHORT(EXIF_IFD_EXIF, EXIF_TAG_SHARPNESS, sharpness);
-    return true;
-}
-
-bool ExifUtilsImpl::setShutterSpeed(int32_t numerator, int32_t denominator) {
-    SET_SRATIONAL(EXIF_IFD_EXIF, EXIF_TAG_SHUTTER_SPEED_VALUE, numerator, denominator);
-    return true;
-}
-
-bool ExifUtilsImpl::setSubjectDistance(uint32_t numerator, uint32_t denominator) {
+        if (focusDistance < 1.0f) {
+            distanceRange = 1; // Macro
+        } else if (focusDistance < 3.0f) {
+            distanceRange = 2; // Close
+        } else {
+            distanceRange = 3; // Distant
+        }
+    } else {
+        numerator = 0xFFFFFFFF;
+        denominator = 1;
+        distanceRange = 3; // Distant
+    }
     SET_RATIONAL(EXIF_IFD_EXIF, EXIF_TAG_SUBJECT_DISTANCE, numerator, denominator);
+    SET_SHORT(EXIF_IFD_EXIF, EXIF_TAG_SUBJECT_DISTANCE_RANGE, distanceRange);
     return true;
 }
 
@@ -695,23 +678,9 @@ bool ExifUtilsImpl::setSubsecTime(const std::string& subsec_time) {
     return true;
 }
 
-bool ExifUtilsImpl::setWhiteBalance(uint16_t white_balance) {
-    SET_SHORT(EXIF_IFD_EXIF, EXIF_TAG_WHITE_BALANCE, white_balance);
-    return true;
-}
-
-bool ExifUtilsImpl::setXResolution(uint32_t numerator, uint32_t denominator) {
-    SET_RATIONAL(EXIF_IFD_EXIF, EXIF_TAG_X_RESOLUTION, numerator, denominator);
-    return true;
-}
-
-bool ExifUtilsImpl::setYCbCrPositioning(uint16_t ycbcr_positioning) {
-    SET_SHORT(EXIF_IFD_0, EXIF_TAG_YCBCR_POSITIONING, ycbcr_positioning);
-    return true;
-}
-
-bool ExifUtilsImpl::setYResolution(uint32_t numerator, uint32_t denominator) {
-    SET_RATIONAL(EXIF_IFD_EXIF, EXIF_TAG_Y_RESOLUTION, numerator, denominator);
+bool ExifUtilsImpl::setWhiteBalance(uint8_t white_balance) {
+    uint16_t whiteBalance = (white_balance == ANDROID_CONTROL_AWB_MODE_AUTO) ? 0 : 1;
+    SET_SHORT(EXIF_IFD_EXIF, EXIF_TAG_WHITE_BALANCE, whiteBalance);
     return true;
 }
 
@@ -745,16 +714,6 @@ unsigned int ExifUtilsImpl::getApp1Length() {
 
 bool ExifUtilsImpl::setExifVersion(const std::string& exif_version) {
     SET_STRING(EXIF_IFD_EXIF, EXIF_TAG_EXIF_VERSION, EXIF_FORMAT_UNDEFINED, exif_version);
-    return true;
-}
-
-bool ExifUtilsImpl::setMake(const std::string& make) {
-    SET_STRING(EXIF_IFD_0, EXIF_TAG_MAKE, EXIF_FORMAT_ASCII, make);
-    return true;
-}
-
-bool ExifUtilsImpl::setModel(const std::string& model) {
-    SET_STRING(EXIF_IFD_0, EXIF_TAG_MODEL, EXIF_FORMAT_ASCII, model);
     return true;
 }
 
@@ -898,9 +857,8 @@ void ExifUtilsImpl::destroyApp1() {
 }
 
 bool ExifUtilsImpl::setFromMetadata(const CameraMetadata& metadata,
+        const CameraMetadata& staticInfo,
         const size_t imageWidth, const size_t imageHeight) {
-    // How precise the float-to-rational conversion for EXIF tags would be.
-    constexpr int kRationalPrecision = 10000;
     if (!setImageWidth(imageWidth) ||
             !setImageHeight(imageHeight)) {
         ALOGE("%s: setting image resolution failed.", __FUNCTION__);
@@ -921,13 +879,35 @@ bool ExifUtilsImpl::setFromMetadata(const CameraMetadata& metadata,
     if (entry.count) {
         focal_length = entry.data.f[0];
 
-        if (!setFocalLength(
-                static_cast<uint32_t>(focal_length * kRationalPrecision), kRationalPrecision)) {
+        if (!setFocalLength(focal_length)) {
             ALOGE("%s: setting focal length failed.", __FUNCTION__);
             return false;
         }
+
+        camera_metadata_ro_entry sensorSizeEntry =
+                staticInfo.find(ANDROID_SENSOR_INFO_PHYSICAL_SIZE);
+        if (sensorSizeEntry.count == 2) {
+            if (!setFocalLengthIn35mmFilm(
+                    focal_length, sensorSizeEntry.data.f[0], sensorSizeEntry.data.f[1])) {
+                ALOGE("%s: setting focal length in 35mm failed.", __FUNCTION__);
+                return false;
+            }
+        }
     } else {
         ALOGV("%s: Cannot find focal length in metadata.", __FUNCTION__);
+    }
+
+    if (metadata.exists(ANDROID_SCALER_CROP_REGION) &&
+            staticInfo.exists(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE)) {
+        entry = metadata.find(ANDROID_SCALER_CROP_REGION);
+        camera_metadata_ro_entry activeArrayEntry =
+                staticInfo.find(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+
+        if (!setDigitalZoomRatio(entry.data.i32[2], entry.data.i32[3],
+                activeArrayEntry.data.i32[2], activeArrayEntry.data.i32[3])) {
+            ALOGE("%s: setting digital zoom ratio failed.", __FUNCTION__);
+            return false;
+        }
     }
 
     if (metadata.exists(ANDROID_JPEG_GPS_COORDINATES)) {
@@ -973,6 +953,18 @@ bool ExifUtilsImpl::setFromMetadata(const CameraMetadata& metadata,
         }
     }
 
+    if (staticInfo.exists(ANDROID_CONTROL_AE_COMPENSATION_STEP) &&
+            metadata.exists(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION)) {
+        entry = metadata.find(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION);
+        camera_metadata_ro_entry stepEntry =
+                staticInfo.find(ANDROID_CONTROL_AE_COMPENSATION_STEP);
+        if (!setExposureBias(entry.data.i32[0], stepEntry.data.r[0].numerator,
+                stepEntry.data.r[0].denominator)) {
+            ALOGE("%s: setting exposure bias failed.", __FUNCTION__);
+            return false;
+        }
+    }
+
     if (metadata.exists(ANDROID_JPEG_ORIENTATION)) {
         entry = metadata.find(ANDROID_JPEG_ORIENTATION);
         if (!setOrientation(entry.data.i32[0])) {
@@ -983,50 +975,97 @@ bool ExifUtilsImpl::setFromMetadata(const CameraMetadata& metadata,
 
     if (metadata.exists(ANDROID_SENSOR_EXPOSURE_TIME)) {
         entry = metadata.find(ANDROID_SENSOR_EXPOSURE_TIME);
-        // int64_t of nanoseconds
-        if (!setExposureTime(entry.data.i64[0],1000000000u)) {
+        float exposure_time = 1.0f * entry.data.i64[0] / 1e9;
+        if (!setExposureTime(exposure_time)) {
             ALOGE("%s: setting exposure time failed.", __FUNCTION__);
+            return false;
+        }
+
+        if (!setShutterSpeed(exposure_time)) {
+            ALOGE("%s: setting shutter speed failed.", __FUNCTION__);
+            return false;
+        }
+    }
+
+    if (metadata.exists(ANDROID_LENS_FOCUS_DISTANCE)) {
+        entry = metadata.find(ANDROID_LENS_FOCUS_DISTANCE);
+        if (!setSubjectDistance(entry.data.f[0])) {
+            ALOGE("%s: setting subject distance failed.", __FUNCTION__);
+            return false;
+        }
+    }
+
+    if (metadata.exists(ANDROID_SENSOR_SENSITIVITY)) {
+        entry = metadata.find(ANDROID_SENSOR_SENSITIVITY);
+        int32_t iso = entry.data.i32[0];
+        camera_metadata_ro_entry postRawSensEntry =
+                metadata.find(ANDROID_CONTROL_POST_RAW_SENSITIVITY_BOOST);
+        if (postRawSensEntry.count > 0) {
+            iso = iso * postRawSensEntry.data.i32[0] / 100;
+        }
+
+        if (!setIsoSpeedRating(static_cast<uint16_t>(iso))) {
+            ALOGE("%s: setting iso rating failed.", __FUNCTION__);
             return false;
         }
     }
 
     if (metadata.exists(ANDROID_LENS_APERTURE)) {
-        const int kAperturePrecision = 10000;
         entry = metadata.find(ANDROID_LENS_APERTURE);
-        if (!setFNumber(entry.data.f[0] * kAperturePrecision, kAperturePrecision)) {
+        if (!setFNumber(entry.data.f[0])) {
             ALOGE("%s: setting F number failed.", __FUNCTION__);
+            return false;
+        }
+        if (!setAperture(entry.data.f[0])) {
+            ALOGE("%s: setting aperture failed.", __FUNCTION__);
             return false;
         }
     }
 
-    if (metadata.exists(ANDROID_FLASH_INFO_AVAILABLE)) {
-        entry = metadata.find(ANDROID_FLASH_INFO_AVAILABLE);
-        if (entry.data.u8[0] == ANDROID_FLASH_INFO_AVAILABLE_FALSE) {
-            const uint32_t kNoFlashFunction = 0x20;
-            if (!setFlash(kNoFlashFunction)) {
-                ALOGE("%s: setting flash failed.", __FUNCTION__);
-                return false;
-            }
-        } else {
-            ALOGE("%s: Unsupported flash info: %d",__FUNCTION__, entry.data.u8[0]);
+    static const uint16_t kSRGBColorSpace = 1;
+    if (!setColorSpace(kSRGBColorSpace)) {
+        ALOGE("%s: setting color space failed.", __FUNCTION__);
+        return false;
+    }
+
+    if (staticInfo.exists(ANDROID_LENS_INFO_AVAILABLE_APERTURES)) {
+        entry = staticInfo.find(ANDROID_LENS_INFO_AVAILABLE_APERTURES);
+        if (!setMaxAperture(entry.data.f[0])) {
+            ALOGE("%s: setting max aperture failed.", __FUNCTION__);
+            return false;
+        }
+    }
+
+    if (staticInfo.exists(ANDROID_FLASH_INFO_AVAILABLE)) {
+        entry = staticInfo.find(ANDROID_FLASH_INFO_AVAILABLE);
+        camera_metadata_ro_entry flashStateEntry = metadata.find(ANDROID_FLASH_STATE);
+        camera_metadata_ro_entry aeModeEntry = metadata.find(ANDROID_CONTROL_AE_MODE);
+        uint8_t flashState = flashStateEntry.count > 0 ?
+                flashStateEntry.data.u8[0] : ANDROID_FLASH_STATE_UNAVAILABLE;
+        uint8_t aeMode = aeModeEntry.count > 0 ?
+                aeModeEntry.data.u8[0] : ANDROID_CONTROL_AE_MODE_OFF;
+
+        if (!setFlash(entry.data.u8[0], flashState, aeMode)) {
+            ALOGE("%s: setting flash failed.", __FUNCTION__);
             return false;
         }
     }
 
     if (metadata.exists(ANDROID_CONTROL_AWB_MODE)) {
         entry = metadata.find(ANDROID_CONTROL_AWB_MODE);
-        if (entry.data.u8[0] == ANDROID_CONTROL_AWB_MODE_AUTO) {
-            const uint16_t kAutoWhiteBalance = 0;
-            if (!setWhiteBalance(kAutoWhiteBalance)) {
-                ALOGE("%s: setting white balance failed.", __FUNCTION__);
-                return false;
-            }
-        } else {
-            ALOGE("%s: Unsupported awb mode: %d", __FUNCTION__, entry.data.u8[0]);
+        if (!setWhiteBalance(entry.data.u8[0])) {
+            ALOGE("%s: setting white balance failed.", __FUNCTION__);
             return false;
         }
     }
 
+    if (metadata.exists(ANDROID_CONTROL_AE_MODE)) {
+        entry = metadata.find(ANDROID_CONTROL_AE_MODE);
+        if (!setExposureMode(entry.data.u8[0])) {
+            ALOGE("%s: setting exposure mode failed.", __FUNCTION__);
+            return false;
+        }
+    }
     if (time_available) {
         char str[4];
         if (snprintf(str, sizeof(str), "%03ld", tp.tv_nsec / 1000000) < 0) {
