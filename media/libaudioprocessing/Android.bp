@@ -12,6 +12,11 @@ cc_defaults {
         "libnblog",
         "libsonic",
         "libutils",
+        "libvibrator",
+    ],
+
+    header_libs: [
+        "libbase_headers",
     ],
 
     cflags: [

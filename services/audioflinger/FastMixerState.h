@@ -49,7 +49,7 @@ struct FastTrack {
     audio_format_t          mFormat;         // track format
     int                     mGeneration;     // increment when any field is assigned
     bool                    mHapticPlaybackEnabled = false; // haptic playback is enabled or not
-    AudioMixer::haptic_intensity_t mHapticIntensity = AudioMixer::HAPTIC_SCALE_NONE; // intensity of
+    AudioMixer::haptic_intensity_t mHapticIntensity = AudioMixer::HAPTIC_SCALE_MUTE; // intensity of
                                                                                      // haptic data
 };
 

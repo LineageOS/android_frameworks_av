@@ -347,7 +347,7 @@ int AudioFlinger::onExternalVibrationStart(const sp<os::ExternalVibration>& exte
             return ret;
         }
     }
-    return AudioMixer::HAPTIC_SCALE_NONE;
+    return AudioMixer::HAPTIC_SCALE_MUTE;
 }
 
 /* static */
