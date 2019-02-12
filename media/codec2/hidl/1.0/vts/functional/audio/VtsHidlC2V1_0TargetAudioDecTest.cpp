@@ -272,7 +272,7 @@ void validateComponent(
 }
 
 // Set Default config param.
-void setupConfigParam(
+bool setupConfigParam(
     const std::shared_ptr<android::Codec2Client::Component>& component,
     int32_t* bitStreamInfo) {
     std::vector<std::unique_ptr<C2SettingResult>> failures;
@@ -282,8 +282,8 @@ void setupConfigParam(
     std::vector<C2Param*> configParam{&sampleRateInfo, &channelCountInfo};
     c2_status_t status =
         component->config(configParam, C2_DONT_BLOCK, &failures);
-    ASSERT_EQ(failures.size(), 0u);
-    ASSERT_EQ(status, C2_OK);
+    if (status == C2_OK && failures.size() == 0u) return true;
+    return false;
 }
 
 // In decoder components, often the input parameters get updated upon
@@ -557,7 +557,11 @@ TEST_P(Codec2AudioDecDecodeTest, DecodeTest) {
         ASSERT_NO_FATAL_FAILURE(
             getInputChannelInfo(mComponent, mCompName, bitStreamInfo));
     }
-    setupConfigParam(mComponent, bitStreamInfo);
+    if (!setupConfigParam(mComponent, bitStreamInfo)) {
+        std::cout << "[   WARN   ] Test Skipped \n";
+        return;
+    }
+    ASSERT_EQ(mComponent->start(), C2_OK);
     ALOGV("mURL : %s", mURL);
     eleStream.open(mURL, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
@@ -613,7 +617,6 @@ TEST_F(Codec2AudioDecHidlTest, ThumbnailTest) {
     description("Test Request for thumbnail");
     if (mDisableTest) return;
 
-    ASSERT_EQ(mComponent->start(), C2_OK);
     char mURL[512], info[512];
     std::ifstream eleStream, eleInfo;
 
@@ -642,7 +645,11 @@ TEST_F(Codec2AudioDecHidlTest, ThumbnailTest) {
         ASSERT_NO_FATAL_FAILURE(
             getInputChannelInfo(mComponent, mCompName, bitStreamInfo));
     }
-    setupConfigParam(mComponent, bitStreamInfo);
+    if (!setupConfigParam(mComponent, bitStreamInfo)) {
+        std::cout << "[   WARN   ] Test Skipped \n";
+        return;
+    }
+    ASSERT_EQ(mComponent->start(), C2_OK);
     ALOGV("mURL : %s", mURL);
 
     // request EOS for thumbnail
@@ -711,7 +718,6 @@ TEST_F(Codec2AudioDecHidlTest, FlushTest) {
     description("Tests Flush calls");
     if (mDisableTest) return;
     typedef std::unique_lock<std::mutex> ULock;
-    ASSERT_EQ(mComponent->start(), C2_OK);
     char mURL[512], info[512];
     std::ifstream eleStream, eleInfo;
 
@@ -741,7 +747,11 @@ TEST_F(Codec2AudioDecHidlTest, FlushTest) {
         ASSERT_NO_FATAL_FAILURE(
             getInputChannelInfo(mComponent, mCompName, bitStreamInfo));
     }
-    setupConfigParam(mComponent, bitStreamInfo);
+    if (!setupConfigParam(mComponent, bitStreamInfo)) {
+        std::cout << "[   WARN   ] Test Skipped \n";
+        return;
+    }
+    ASSERT_EQ(mComponent->start(), C2_OK);
     ALOGV("mURL : %s", mURL);
     eleStream.open(mURL, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
@@ -833,8 +843,6 @@ TEST_F(Codec2AudioDecHidlTest, DecodeTestEmptyBuffersInserted) {
     description("Decode with multiple empty input frames");
     if (mDisableTest) return;
 
-    ASSERT_EQ(mComponent->start(), C2_OK);
-
     char mURL[512], info[512];
     std::ifstream eleStream, eleInfo;
 
@@ -868,7 +876,19 @@ TEST_F(Codec2AudioDecHidlTest, DecodeTestEmptyBuffersInserted) {
         frameId++;
     }
     eleInfo.close();
-
+    int32_t bitStreamInfo[2] = {0};
+    if (mCompName == raw) {
+        bitStreamInfo[0] = 8000;
+        bitStreamInfo[1] = 1;
+    } else {
+        ASSERT_NO_FATAL_FAILURE(
+            getInputChannelInfo(mComponent, mCompName, bitStreamInfo));
+    }
+    if (!setupConfigParam(mComponent, bitStreamInfo)) {
+        std::cout << "[   WARN   ] Test Skipped \n";
+        return;
+    }
+    ASSERT_EQ(mComponent->start(), C2_OK);
     ALOGV("mURL : %s", mURL);
     eleStream.open(mURL, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
