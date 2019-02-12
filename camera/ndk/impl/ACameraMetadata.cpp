@@ -38,6 +38,8 @@ ACameraMetadata::ACameraMetadata(camera_metadata_t* buffer, ACAMERA_METADATA_TYP
         filterDurations(ANDROID_DEPTH_AVAILABLE_DEPTH_STALL_DURATIONS);
         filterDurations(ANDROID_HEIC_AVAILABLE_HEIC_MIN_FRAME_DURATIONS);
         filterDurations(ANDROID_HEIC_AVAILABLE_HEIC_STALL_DURATIONS);
+        filterDurations(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_MIN_FRAME_DURATIONS);
+        filterDurations(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STALL_DURATIONS);
     }
     // TODO: filter request/result keys
 }
@@ -186,6 +188,16 @@ ACameraMetadata::filterDurations(uint32_t tag) {
                     filteredDurations.push_back(duration);
                 }
                 break;
+            case ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_MIN_FRAME_DURATIONS:
+            case ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STALL_DURATIONS:
+                if (format == HAL_PIXEL_FORMAT_BLOB) {
+                    format = AIMAGE_FORMAT_DEPTH_JPEG;
+                    filteredDurations.push_back(format);
+                    filteredDurations.push_back(width);
+                    filteredDurations.push_back(height);
+                    filteredDurations.push_back(duration);
+                }
+                break;
             default:
                 // Should not reach here
                 ALOGE("%s: Unkown tag 0x%x", __FUNCTION__, tag);
@@ -284,6 +296,32 @@ ACameraMetadata::filterStreamConfigurations() {
         filteredHeicStreamConfigs.push_back(isInput);
     }
     mData.update(ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS, filteredHeicStreamConfigs);
+
+    entry = mData.find(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS);
+    Vector<int32_t> filteredDynamicDepthStreamConfigs;
+    filteredDynamicDepthStreamConfigs.setCapacity(entry.count);
+
+    for (size_t i = 0; i < entry.count; i += STREAM_CONFIGURATION_SIZE) {
+        int32_t format = entry.data.i32[i + STREAM_FORMAT_OFFSET];
+        int32_t width = entry.data.i32[i + STREAM_WIDTH_OFFSET];
+        int32_t height = entry.data.i32[i + STREAM_HEIGHT_OFFSET];
+        int32_t isInput = entry.data.i32[i + STREAM_IS_INPUT_OFFSET];
+        if (isInput == ACAMERA_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS_INPUT) {
+            // Hide input streams
+            continue;
+        }
+        // Translate HAL formats to NDK format
+        if (format == HAL_PIXEL_FORMAT_BLOB) {
+            format = AIMAGE_FORMAT_DEPTH_JPEG;
+        }
+
+        filteredDynamicDepthStreamConfigs.push_back(format);
+        filteredDynamicDepthStreamConfigs.push_back(width);
+        filteredDynamicDepthStreamConfigs.push_back(height);
+        filteredDynamicDepthStreamConfigs.push_back(isInput);
+    }
+    mData.update(ACAMERA_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS,
+            filteredDynamicDepthStreamConfigs);
 }
 
 bool
