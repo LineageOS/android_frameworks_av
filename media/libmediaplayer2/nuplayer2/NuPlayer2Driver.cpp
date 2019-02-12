@@ -81,7 +81,7 @@ private:
 };
 
 // key for media statistics
-static const char *kKeyPlayer = "nuplayer";
+static const char *kKeyPlayer = "nuplayer2";
 // attrs for media statistics
     // NB: these are matched with public Java API constants defined
     // in frameworks/base/media/java/android/media/MediaPlayer2.java
@@ -108,6 +108,8 @@ static const char *kPlayerRebuffering = "android.media.mediaplayer.rebufferingMs
 static const char *kPlayerRebufferingCount = "android.media.mediaplayer.rebuffers";
 static const char *kPlayerRebufferingAtExit = "android.media.mediaplayer.rebufferExit";
 
+static const char *kPlayerVersion = "android.media.mediaplayer.version";
+
 
 NuPlayer2Driver::NuPlayer2Driver(pid_t pid, uid_t uid, const sp<JObjectHolder> &context)
     : mState(STATE_IDLE),
@@ -127,6 +129,7 @@ NuPlayer2Driver::NuPlayer2Driver(pid_t pid, uid_t uid, const sp<JObjectHolder> &
       mPlayer(new NuPlayer2(pid, uid, mMediaClock, context)),
       mPlayerFlags(0),
       mMetricsHandle(0),
+      mPlayerVersion(0),
       mClientUid(uid),
       mAtEOS(false),
       mLooping(false),
@@ -137,9 +140,13 @@ NuPlayer2Driver::NuPlayer2Driver(pid_t pid, uid_t uid, const sp<JObjectHolder> &
 
     mMediaClock->init();
 
+    // XXX: what version are we?
+    // Ideally, this ticks with the apk version info for the APEX packaging
+
     // set up media metrics record
     mMetricsHandle = mediametrics_create(kKeyPlayer);
     mediametrics_setUid(mMetricsHandle, mClientUid);
+    mediametrics_setInt64(mMetricsHandle, kPlayerVersion, mPlayerVersion);
 
     mNuPlayer2Looper->start(
             false, /* runOnCallingThread */
@@ -473,7 +480,7 @@ void NuPlayer2Driver::updateMetrics(const char *where) {
                 float frameRate = 0;
                 if (stats->findFloat("frame-rate-output", &frameRate)) {
                     mediametrics_setInt64(mMetricsHandle, kPlayerFrameRate, frameRate);
-		}
+                }
 
             } else if (mime.startsWith("audio/")) {
                 mediametrics_setCString(mMetricsHandle, kPlayerAMime, mime.c_str());
@@ -524,6 +531,7 @@ void NuPlayer2Driver::logMetrics(const char *where) {
         mediametrics_delete(mMetricsHandle);
         mMetricsHandle = mediametrics_create(kKeyPlayer);
         mediametrics_setUid(mMetricsHandle, mClientUid);
+        mediametrics_setInt64(mMetricsHandle, kPlayerVersion, mPlayerVersion);
     } else {
         ALOGV("did not have anything to record");
     }
