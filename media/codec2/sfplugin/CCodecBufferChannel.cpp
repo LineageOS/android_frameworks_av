@@ -255,6 +255,34 @@ public:
         mSkipCutBuffer = scb;
     }
 
+    void handleImageData(const sp<Codec2Buffer> &buffer) {
+        sp<ABuffer> imageDataCandidate = buffer->getImageData();
+        if (imageDataCandidate == nullptr) {
+            return;
+        }
+        sp<ABuffer> imageData;
+        if (!mFormat->findBuffer("image-data", &imageData)
+                || imageDataCandidate->size() != imageData->size()
+                || memcmp(imageDataCandidate->data(), imageData->data(), imageData->size()) != 0) {
+            ALOGD("[%s] updating image-data", mName);
+            sp<AMessage> newFormat = dupFormat();
+            newFormat->setBuffer("image-data", imageDataCandidate);
+            MediaImage2 *img = (MediaImage2*)imageDataCandidate->data();
+            if (img->mNumPlanes > 0 && img->mType != img->MEDIA_IMAGE_TYPE_UNKNOWN) {
+                int32_t stride = img->mPlane[0].mRowInc;
+                newFormat->setInt32(KEY_STRIDE, stride);
+                ALOGD("[%s] updating stride = %d", mName, stride);
+                if (img->mNumPlanes > 1 && stride > 0) {
+                    int32_t vstride = (img->mPlane[1].mOffset - img->mPlane[0].mOffset) / stride;
+                    newFormat->setInt32(KEY_SLICE_HEIGHT, vstride);
+                    ALOGD("[%s] updating vstride = %d", mName, vstride);
+                }
+            }
+            setFormat(newFormat);
+            buffer->setFormat(newFormat);
+        }
+    }
+
 protected:
     sp<SkipCutBuffer> mSkipCutBuffer;
 
@@ -1152,6 +1180,7 @@ public:
             return WOULD_BLOCK;
         }
         submit(c2Buffer);
+        handleImageData(c2Buffer);
         *clientBuffer = c2Buffer;
         ALOGV("[%s] grabbed buffer %zu", mName, *index);
         return OK;
@@ -1250,6 +1279,7 @@ public:
         }
         newBuffer->setFormat(mFormat);
         *index = mImpl.assignSlot(newBuffer);
+        handleImageData(newBuffer);
         *clientBuffer = newBuffer;
         ALOGV("[%s] registered buffer %zu", mName, *index);
         return OK;

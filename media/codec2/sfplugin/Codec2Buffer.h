@@ -23,6 +23,7 @@
 #include <android/hardware/cas/native/1.0/types.h>
 #include <binder/IMemory.h>
 #include <media/hardware/VideoAPI.h>
+#include <media/stagefright/foundation/ABuffer.h>
 #include <media/MediaCodecBuffer.h>
 #include <media/ICrypto.h>
 
@@ -85,6 +86,8 @@ public:
         return false;
     }
 
+    sp<ABuffer> getImageData() const { return mImageData; }
+
 protected:
     /**
      * canCopy() implementation for linear buffers.
@@ -100,6 +103,8 @@ protected:
      * sets MediaImage data for flexible graphic buffers
      */
     void setImageData(const sp<ABuffer> &imageData);
+
+    sp<ABuffer> mImageData;
 };
 
 /**
@@ -239,7 +244,6 @@ private:
 
     C2GraphicView mView;
     std::shared_ptr<C2GraphicBlock> mBlock;
-    sp<ABuffer> mImageData;
     const bool mWrapped;
 };
 
