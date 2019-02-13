@@ -79,28 +79,28 @@
     </Decoders>
     <Encoders>
         <MediaCodec name="c2.android.aac.encoder" type="audio/mp4a-latm">
-            <Alias name="OMX.google.aac.decoder" />
+            <Alias name="OMX.google.aac.encoder" />
             <Limit name="channel-count" max="6" />
             <Limit name="sample-rate" ranges="8000,11025,12000,16000,22050,24000,32000,44100,48000" />
             <!-- also may support 64000, 88200  and 96000 Hz -->
             <Limit name="bitrate" range="8000-960000" />
         </MediaCodec>
         <MediaCodec name="c2.android.amrnb.encoder" type="audio/3gpp">
-            <Alias name="OMX.google.amrnb.decoder" />
+            <Alias name="OMX.google.amrnb.encoder" />
             <Limit name="channel-count" max="1" />
             <Limit name="sample-rate" ranges="8000" />
             <Limit name="bitrate" range="4750-12200" />
             <Feature name="bitrate-modes" value="CBR" />
         </MediaCodec>
         <MediaCodec name="c2.android.amrwb.encoder" type="audio/amr-wb">
-            <Alias name="OMX.google.amrwb.decoder" />
+            <Alias name="OMX.google.amrwb.encoder" />
             <Limit name="channel-count" max="1" />
             <Limit name="sample-rate" ranges="16000" />
             <Limit name="bitrate" range="6600-23850" />
             <Feature name="bitrate-modes" value="CBR" />
         </MediaCodec>
         <MediaCodec name="c2.android.flac.encoder" type="audio/flac">
-            <Alias name="OMX.google.flac.decoder" />
+            <Alias name="OMX.google.flac.encoder" />
             <Limit name="channel-count" max="2" />
             <Limit name="sample-rate" ranges="1-655350" />
             <Limit name="bitrate" range="1-21000000" />
