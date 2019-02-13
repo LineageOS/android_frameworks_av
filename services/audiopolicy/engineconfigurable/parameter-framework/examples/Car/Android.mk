@@ -23,26 +23,9 @@ BUILD_PFW_SETTINGS := $(TOOLS)/build_audio_pfw_settings.mk
 ##################################################################
 
 ########## Policy PFW Structures #########
-
-include $(CLEAR_VARS)
-LOCAL_MODULE := PolicySubsystem.xml.car
-LOCAL_MODULE_STEM := PolicySubsystem.xml
-LOCAL_MODULE_TAGS := optional
-LOCAL_MODULE_CLASS := ETC
-LOCAL_VENDOR_MODULE := true
-LOCAL_REQUIRED_MODULES := \
-    ProductStrategies.xml \
-    PolicySubsystem-Volume.xml \
-    PolicySubsystem-CommonTypes.xml \
-    libpolicy-subsystem
-
-LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Structure/Policy
-LOCAL_SRC_FILES := Structure/$(LOCAL_MODULE_STEM)
-include $(BUILD_PREBUILT)
-
 ######### Policy PFW Settings #########
 include $(CLEAR_VARS)
-LOCAL_MODULE := parameter-framework.policy.car
+LOCAL_MODULE := parameter-framework.policy
 LOCAL_MODULE_STEM := PolicyConfigurableDomains.xml
 LOCAL_MODULE_CLASS := ETC
 LOCAL_VENDOR_MODULE := true
@@ -57,7 +40,7 @@ LOCAL_ADDITIONAL_DEPENDENCIES := \
     $(PFW_EDD_FILES)
 
 LOCAL_REQUIRED_MODULES := \
-    PolicySubsystem.xml.car \
+    PolicySubsystem.xml \
     PolicyClass.xml \
     audio_policy_engine_criteria.xml \
     audio_policy_engine_criterion_types.xml \

@@ -159,7 +159,7 @@
         <name>phone</name>
         <indexMin>1</indexMin>
         <indexMax>40</indexMax>
-        <volume  deviceCategory="DEVICE_CATEGORY_SPEAKER">
+        <volume deviceCategory="DEVICE_CATEGORY_SPEAKER">
             <point>0,-4200</point>
             <point>33,-2800</point>
             <point>66,-1400</point>

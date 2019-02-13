@@ -62,10 +62,6 @@ ifneq ($(USE_XML_AUDIO_POLICY_CONF), 1)
 $(error Configurable policy does not support legacy conf file)
 endif #ifneq ($(USE_XML_AUDIO_POLICY_CONF), 1)
 
-LOCAL_REQUIRED_MODULES := \
-    parameter-framework.policy \
-    audio_policy_criteria.conf \
-
 LOCAL_C_INCLUDES += frameworks/av/services/audiopolicy/engineconfigurable/include
 LOCAL_C_INCLUDES += frameworks/av/include
 

@@ -10,16 +10,15 @@ PROVISION_CRITERION_TYPES := $(TOOLS)/provision_criterion_types_from_android_hea
 ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), phone_configurable)
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := audio_policy_engine_configuration_phone.xml
-LOCAL_MODULE_STEM := audio_policy_engine_configuration.xml
+LOCAL_MODULE := audio_policy_engine_configuration.xml
 
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
 LOCAL_VENDOR_MODULE := true
-LOCAL_SRC_FILES := phone/$(LOCAL_MODULE_STEM)
+LOCAL_SRC_FILES := phone/$(LOCAL_MODULE)
 
 LOCAL_REQUIRED_MODULES := \
-    audio_policy_engine_product_strategies_phone.xml  \
+    audio_policy_engine_product_strategies.xml  \
     audio_policy_engine_stream_volumes.xml \
     audio_policy_engine_default_stream_volumes.xml \
     audio_policy_engine_criteria.xml \
@@ -28,12 +27,11 @@ LOCAL_REQUIRED_MODULES := \
 include $(BUILD_PREBUILT)
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := audio_policy_engine_product_strategies_phone.xml
-LOCAL_MODULE_STEM := audio_policy_engine_product_strategies.xml
+LOCAL_MODULE := audio_policy_engine_product_strategies.xml
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
 LOCAL_VENDOR_MODULE := true
-LOCAL_SRC_FILES := phone/$(LOCAL_MODULE_STEM)
+LOCAL_SRC_FILES := phone/$(LOCAL_MODULE)
 include $(BUILD_PREBUILT)
 
 include $(CLEAR_VARS)
@@ -61,16 +59,14 @@ ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), automotive_configurable)
 # AUTOMOTIVE CONFIGURATION TOP FILE
 ##################################################################
 include $(CLEAR_VARS)
-LOCAL_MODULE := audio_policy_engine_configuration_automotive.xml
-LOCAL_MODULE_STEM := audio_policy_engine_configuration.xml
-
+LOCAL_MODULE := audio_policy_engine_configuration.xml
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
 LOCAL_VENDOR_MODULE := true
-LOCAL_SRC_FILES := automotive/$(LOCAL_MODULE_STEM)
+LOCAL_SRC_FILES := automotive/$(LOCAL_MODULE)
 
 LOCAL_REQUIRED_MODULES := \
-    audio_policy_engine_product_strategies_automotive.xml \
+    audio_policy_engine_product_strategies.xml \
     audio_policy_engine_criteria.xml \
     audio_policy_engine_criterion_types.xml \
     audio_policy_engine_volumes.xml
@@ -82,12 +78,11 @@ include $(BUILD_PREBUILT)
 ##################################################################
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := audio_policy_engine_product_strategies_automotive.xml
-LOCAL_MODULE_STEM := audio_policy_engine_product_strategies.xml
+LOCAL_MODULE := audio_policy_engine_product_strategies.xml
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
 LOCAL_VENDOR_MODULE := true
-LOCAL_SRC_FILES := automotive/$(LOCAL_MODULE_STEM)
+LOCAL_SRC_FILES := automotive/$(LOCAL_MODULE)
 include $(BUILD_PREBUILT)
 
 include $(CLEAR_VARS)

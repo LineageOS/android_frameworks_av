@@ -1,8 +1,8 @@
 supDomain: DeviceForProductStrategy
-	supDomain: Unknown
+	supDomain: Patch
 		domain: UnreachableDevices
 			conf: calibration
-				component: /Policy/policy/product_strategies/unknown/selected_output_devices/mask
+				component: /Policy/policy/product_strategies/patch/selected_output_devices/mask
 					earpiece = 0
 					speaker = 0
 					wired_headset = 0
@@ -31,6 +31,6 @@ supDomain: DeviceForProductStrategy
 					usb_headset = 0
 					bus = 0
 					stub = 0
-				/Policy/policy/product_strategies/unknown/device_address =
+				/Policy/policy/product_strategies/patch/device_address =
 
 
