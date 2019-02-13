@@ -1884,10 +1884,20 @@ void NuPlayer2::restartAudio(
     closeAudioSink();
     mRenderer->flush(true /* audio */, false /* notifyComplete */);
     if (mVideoDecoder != NULL) {
-        mRenderer->flush(false /* audio */, false /* notifyComplete */);
+        mDeferredActions.push_back(
+                new FlushDecoderAction(FLUSH_CMD_NONE /* audio */,
+                                       FLUSH_CMD_FLUSH /* video */));
+        mDeferredActions.push_back(
+                new SeekAction(currentPositionUs,
+                MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC /* mode */));
+        // After a flush without shutdown, decoder is paused.
+        // Don't resume it until source seek is done, otherwise it could
+        // start pulling stale data too soon.
+        mDeferredActions.push_back(new ResumeDecoderAction(false));
+        processDeferredActions();
+    } else {
+        performSeek(currentPositionUs, MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC /* mode */);
     }
-
-    performSeek(currentPositionUs, MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC /* mode */);
 
     if (forceNonOffload) {
         mRenderer->signalDisableOffloadAudio();
