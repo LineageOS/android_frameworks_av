@@ -9,7 +9,7 @@
 
 LOCAL_PATH := $(call my-dir)
 
-ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),$(filter $(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),phone_configurable automotive_configurable no-output_configurable no-input_configurable))
+ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),$(filter $(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),phone_configurable automotive_configurable caremu_configurable no-output_configurable no-input_configurable))
 
 PFW_CORE := external/parameter-framework
 #@TODO: upstream new domain generator
@@ -29,7 +29,7 @@ endif
 ##################################################################
 ######### Policy PFW top level file #########
 
-ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),$(filter $(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),phone_configurable automotive_configurable))
+ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),$(filter $(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),phone_configurable automotive_configurable caremu_configurable))
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := ParameterFrameworkConfigurationPolicy.xml
@@ -99,7 +99,7 @@ STRATEGIES_STRUCTURE_FILE := $(LOCAL_PATH)/common/Structure/$(LOCAL_MODULE).in
 
 include $(PROVISION_STRATEGIES_STRUCTURE)
 
-endif #ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),$(filter $(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),phone_configurable automotive_configurable))
+endif #ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),$(filter $(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),phone_configurable automotive_configurable caremu_configurable))
 
 ########## Policy PFW Example Structures #########
 ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),$(filter $(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),no-output_configurable no-input_configurable))

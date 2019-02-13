@@ -53,7 +53,7 @@ include $(BUILD_PREBUILT)
 endif # ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), phone_configurable)
 
 
-ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), automotive_configurable)
+ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),$(filter $(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),automotive_configurable caremu_configurable))
 
 ##################################################################
 # AUTOMOTIVE CONFIGURATION TOP FILE
@@ -72,6 +72,10 @@ LOCAL_REQUIRED_MODULES := \
     audio_policy_engine_volumes.xml
 
 include $(BUILD_PREBUILT)
+
+endif #ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),$(filter $(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),automotive_configurable caremu_configurable))
+
+ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), automotive_configurable)
 
 ##################################################################
 # CONFIGURATION FILES
@@ -95,7 +99,31 @@ include $(BUILD_PREBUILT)
 
 endif #ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), automotive_configurable)
 
-ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),$(filter $(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),phone_configurable automotive_configurable))
+ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), caremu_configurable)
+
+##################################################################
+# CONFIGURATION FILES
+##################################################################
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := audio_policy_engine_product_strategies.xml
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_VENDOR_MODULE := true
+LOCAL_SRC_FILES := caremu/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := audio_policy_engine_volumes.xml
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_CLASS := ETC
+LOCAL_VENDOR_MODULE := true
+LOCAL_SRC_FILES := caremu/$(LOCAL_MODULE)
+include $(BUILD_PREBUILT)
+
+endif #ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), caremu_configurable)
+
+ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),$(filter $(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),phone_configurable automotive_configurable caremu_configurable))
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := audio_policy_engine_criteria.xml
@@ -118,4 +146,4 @@ CRITERION_TYPES_FILE := $(LOCAL_PATH)/common/$(LOCAL_MODULE).in
 
 include $(PROVISION_CRITERION_TYPES)
 
-endif #ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),$(filter $(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),phone_configurable automotive_configurable))
+endif #ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),$(filter $(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),phone_configurable automotive_configurable caremu_configurable))
