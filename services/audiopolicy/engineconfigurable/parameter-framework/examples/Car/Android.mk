@@ -31,22 +31,11 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
 LOCAL_VENDOR_MODULE := true
 LOCAL_REQUIRED_MODULES := \
-    ProductStrategies.xml.car \
+    ProductStrategies.xml \
     PolicySubsystem-Volume.xml \
     PolicySubsystem-CommonTypes.xml \
     libpolicy-subsystem
 
-LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Structure/Policy
-LOCAL_SRC_FILES := Structure/$(LOCAL_MODULE_STEM)
-include $(BUILD_PREBUILT)
-
-
-include $(CLEAR_VARS)
-LOCAL_MODULE := ProductStrategies.xml.car
-LOCAL_MODULE_STEM := ProductStrategies.xml
-LOCAL_MODULE_TAGS := optional
-LOCAL_MODULE_CLASS := ETC
-LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Structure/Policy
 LOCAL_SRC_FILES := Structure/$(LOCAL_MODULE_STEM)
 include $(BUILD_PREBUILT)
