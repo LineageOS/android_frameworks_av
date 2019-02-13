@@ -4511,7 +4511,7 @@ void Camera3Device::HalInterface::signalPipelineDrain(const std::vector<int>& st
         return;
     }
 
-    auto err = mHidlSession_3_5->signalStreamFlush(streamIds, mNextStreamConfigCounter);
+    auto err = mHidlSession_3_5->signalStreamFlush(streamIds, mNextStreamConfigCounter - 1);
     if (!err.isOk()) {
         ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
         return;
@@ -5833,15 +5833,15 @@ sp<Camera3Device::CaptureRequest>
             if (mPaused == false) {
                 ALOGV("%s: RequestThread: Going idle", __FUNCTION__);
                 mPaused = true;
-                // Let the tracker know
-                sp<StatusTracker> statusTracker = mStatusTracker.promote();
-                if (statusTracker != 0) {
-                    statusTracker->markComponentIdle(mStatusId, Fence::NO_FENCE);
-                }
                 if (mNotifyPipelineDrain) {
                     mInterface->signalPipelineDrain(mStreamIdsToBeDrained);
                     mNotifyPipelineDrain = false;
                     mStreamIdsToBeDrained.clear();
+                }
+                // Let the tracker know
+                sp<StatusTracker> statusTracker = mStatusTracker.promote();
+                if (statusTracker != 0) {
+                    statusTracker->markComponentIdle(mStatusId, Fence::NO_FENCE);
                 }
                 sp<Camera3Device> parent = mParent.promote();
                 if (parent != nullptr) {
@@ -5926,15 +5926,15 @@ bool Camera3Device::RequestThread::waitIfPaused() {
         if (mPaused == false) {
             mPaused = true;
             ALOGV("%s: RequestThread: Paused", __FUNCTION__);
-            // Let the tracker know
-            sp<StatusTracker> statusTracker = mStatusTracker.promote();
-            if (statusTracker != 0) {
-                statusTracker->markComponentIdle(mStatusId, Fence::NO_FENCE);
-            }
             if (mNotifyPipelineDrain) {
                 mInterface->signalPipelineDrain(mStreamIdsToBeDrained);
                 mNotifyPipelineDrain = false;
                 mStreamIdsToBeDrained.clear();
+            }
+            // Let the tracker know
+            sp<StatusTracker> statusTracker = mStatusTracker.promote();
+            if (statusTracker != 0) {
+                statusTracker->markComponentIdle(mStatusId, Fence::NO_FENCE);
             }
             sp<Camera3Device> parent = mParent.promote();
             if (parent != nullptr) {
