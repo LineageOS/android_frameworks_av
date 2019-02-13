@@ -1156,8 +1156,7 @@ int64_t NuPlayer2::Renderer::getDurationUsIfPlayedAtSampleRate(uint32_t numFrame
         ALOGE("sampleRate is 0 in %s mode", offloadingAudio() ? "offload" : "non-offload");
         return 0;
     }
-    // TODO: remove the (int32_t) casting below as it may overflow at 12.4 hours.
-    return (int64_t)((int32_t)numFrames * 1000000LL / sampleRate);
+    return (int64_t)(numFrames * 1000000LL / sampleRate);
 }
 
 // Calculate duration of pending samples if played at normal rate (i.e., 1.0).
