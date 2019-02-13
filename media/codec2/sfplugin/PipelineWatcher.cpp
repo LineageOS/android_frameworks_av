@@ -127,19 +127,21 @@ bool PipelineWatcher::pipelineFull() const {
 }
 
 PipelineWatcher::Clock::duration PipelineWatcher::elapsed(
-        const PipelineWatcher::Clock::time_point &now) const {
-    return std::accumulate(
-            mFramesInPipeline.begin(),
-            mFramesInPipeline.end(),
-            Clock::duration::zero(),
-            [&now](const Clock::duration &current,
-                   const decltype(mFramesInPipeline)::value_type &value) {
-                Clock::duration elapsed = now - value.second.queuedAt;
-                ALOGV("elapsed: frameIndex = %llu elapsed = %lldms",
-                      (unsigned long long)value.first,
-                      std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count());
-                return current > elapsed ? current : elapsed;
-            });
+        const PipelineWatcher::Clock::time_point &now, size_t n) const {
+    if (mFramesInPipeline.size() <= n) {
+        return Clock::duration::zero();
+    }
+    std::vector<Clock::duration> durations;
+    for (const decltype(mFramesInPipeline)::value_type &value : mFramesInPipeline) {
+        Clock::duration elapsed = now - value.second.queuedAt;
+        ALOGV("elapsed: frameIndex = %llu elapsed = %lldms",
+              (unsigned long long)value.first,
+              std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count());
+        durations.push_back(elapsed);
+    }
+    nth_element(durations.begin(), durations.end(), durations.begin() + n,
+                std::greater<Clock::duration>());
+    return durations[n];
 }
 
 }  // namespace android

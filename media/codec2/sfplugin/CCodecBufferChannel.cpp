@@ -1557,6 +1557,7 @@ CCodecBufferChannel::CCodecBufferChannel(
       mCCodecCallback(callback),
       mNumInputSlots(kSmoothnessFactor),
       mNumOutputSlots(kSmoothnessFactor),
+      mDelay(0),
       mFrameIndex(0u),
       mFirstValidFrameIndex(0u),
       mMetaMode(MODE_NONE),
@@ -2104,11 +2105,13 @@ status_t CCodecBufferChannel::start(
         }
     }
 
-    mNumInputSlots =
-        (inputDelay ? inputDelay.value : 0) +
-        (pipelineDelay ? pipelineDelay.value : 0) +
-        kSmoothnessFactor;
-    mNumOutputSlots = (outputDelay ? outputDelay.value : 0) + kSmoothnessFactor;
+    uint32_t inputDelayValue = inputDelay ? inputDelay.value : 0;
+    uint32_t pipelineDelayValue = pipelineDelay ? pipelineDelay.value : 0;
+    uint32_t outputDelayValue = outputDelay ? outputDelay.value : 0;
+
+    mNumInputSlots = inputDelayValue + pipelineDelayValue + kSmoothnessFactor;
+    mNumOutputSlots = outputDelayValue + kSmoothnessFactor;
+    mDelay = inputDelayValue + pipelineDelayValue + outputDelayValue;
 
     // TODO: get this from input format
     bool secure = mComponent->getName().find(".secure") != std::string::npos;
@@ -2397,9 +2400,9 @@ status_t CCodecBufferChannel::start(
 
     {
         Mutexed<PipelineWatcher>::Locked watcher(mPipelineWatcher);
-        watcher->inputDelay(inputDelay ? inputDelay.value : 0)
-                .pipelineDelay(pipelineDelay ? pipelineDelay.value : 0)
-                .outputDelay(outputDelay ? outputDelay.value : 0)
+        watcher->inputDelay(inputDelayValue)
+                .pipelineDelay(pipelineDelayValue)
+                .outputDelay(outputDelayValue)
                 .smoothnessFactor(kSmoothnessFactor);
         watcher->flush();
     }
@@ -2816,7 +2819,11 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
 }
 
 PipelineWatcher::Clock::duration CCodecBufferChannel::elapsed() {
-    return mPipelineWatcher.lock()->elapsed(PipelineWatcher::Clock::now());
+    // When client pushed EOS, we want all the work to be done quickly.
+    // Otherwise, component may have stalled work due to input starvation up to
+    // the sum of the delay in the pipeline.
+    size_t n = mInputMetEos ? 0 : mDelay;
+    return mPipelineWatcher.lock()->elapsed(PipelineWatcher::Clock::now(), n);
 }
 
 void CCodecBufferChannel::setMetaMode(MetaMode mode) {
