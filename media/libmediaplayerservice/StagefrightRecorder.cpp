@@ -24,6 +24,7 @@
 
 #include <algorithm>
 
+#include <android-base/properties.h>
 #include <android/hardware/ICamera.h>
 
 #include <binder/IPCThreadState.h>
@@ -1761,13 +1762,26 @@ status_t StagefrightRecorder::setupVideoEncoder(
         }
     }
 
+    // Enable temporal layering if the expected (max) playback frame rate is greater than ~11% of
+    // the minimum display refresh rate on a typical device. Add layers until the base layer falls
+    // under this limit. Allow device manufacturers to override this limit.
+
+    // TODO: make this configurable by the application
+    std::string maxBaseLayerFpsProperty =
+        ::android::base::GetProperty("ro.media.recorder-max-base-layer-fps", "");
+    float maxBaseLayerFps = (float)::atof(maxBaseLayerFpsProperty.c_str());
+    // TRICKY: use !> to fix up any NaN values
+    if (!(maxBaseLayerFps >= kMinTypicalDisplayRefreshingRate / 0.9)) {
+        maxBaseLayerFps = kMinTypicalDisplayRefreshingRate / 0.9;
+    }
+
     for (uint32_t tryLayers = 1; tryLayers <= kMaxNumVideoTemporalLayers; ++tryLayers) {
         if (tryLayers > tsLayers) {
             tsLayers = tryLayers;
         }
         // keep going until the base layer fps falls below the typical display refresh rate
         float baseLayerFps = maxPlaybackFps / (1 << (tryLayers - 1));
-        if (baseLayerFps < kMinTypicalDisplayRefreshingRate / 0.9) {
+        if (baseLayerFps < maxBaseLayerFps) {
             break;
         }
     }
