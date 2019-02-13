@@ -112,8 +112,8 @@ public:
                                             MtpObjectHandle handle, bool succeeded) = 0;
 
     virtual MtpResponseCode         beginCopyObject(MtpObjectHandle handle, MtpObjectHandle newParent,
-                                            MtpStorageID newStorage);
-    virtual void                    endCopyObject(MtpObjectHandle handle, bool succeeded);
+                                            MtpStorageID newStorage) = 0;
+    virtual void                    endCopyObject(MtpObjectHandle handle, bool succeeded) = 0;
 };
 
 }; // namespace android
