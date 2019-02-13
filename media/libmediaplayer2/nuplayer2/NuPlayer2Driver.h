@@ -134,6 +134,7 @@ private:
     uint32_t mPlayerFlags;
 
     mediametrics_handle_t mMetricsHandle;
+    int64_t mPlayerVersion;
     uid_t mClientUid;
 
     bool mAtEOS;

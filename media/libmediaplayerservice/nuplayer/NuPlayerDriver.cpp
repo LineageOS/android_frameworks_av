@@ -778,7 +778,7 @@ status_t NuPlayerDriver::setParameter(
 
 status_t NuPlayerDriver::getParameter(int key, Parcel *reply) {
 
-    if (key == FOURCC('m','t','r','X')) {
+    if (key == FOURCC('m','t','r','X') && mAnalyticsItem != NULL) {
         // mtrX -- a play on 'metrics' (not matrix)
         // gather current info all together, parcel it, and send it back
         updateMetrics("api");
@@ -1006,7 +1006,7 @@ void NuPlayerDriver::notifyListener_l(
             // when we have an error, add it to the analytics for this playback.
             // ext1 is our primary 'error type' value. Only add ext2 when non-zero.
             // [test against msg is due to fall through from previous switch value]
-            if (msg == MEDIA_ERROR) {
+            if (msg == MEDIA_ERROR && mAnalyticsItem != NULL) {
                 mAnalyticsItem->setInt32(kPlayerError, ext1);
                 if (ext2 != 0) {
                     mAnalyticsItem->setInt32(kPlayerErrorCode, ext2);

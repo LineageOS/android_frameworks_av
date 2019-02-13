@@ -118,7 +118,6 @@ class Codec2VideoEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
         }
         mEos = false;
         mCsd = false;
-        mConfig = false;
         mFramesReceived = 0;
         mFailedWorkReceived = 0;
         if (mCompName == unknown_comp) mDisableTest = true;
@@ -134,7 +133,7 @@ class Codec2VideoEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
         Super::TearDown();
     }
 
-    void setupConfigParam(int32_t nWidth, int32_t nHeight);
+    bool setupConfigParam(int32_t nWidth, int32_t nHeight);
 
     // callback function to process onWorkDone received by Listener
     void handleWorkDone(std::list<std::unique_ptr<C2Work>>& workItems) {
@@ -228,14 +227,14 @@ void validateComponent(
 }
 
 // Set Default config param.
-void Codec2VideoEncHidlTest::setupConfigParam(int32_t nWidth, int32_t nHeight) {
+bool Codec2VideoEncHidlTest::setupConfigParam(int32_t nWidth, int32_t nHeight) {
     std::vector<std::unique_ptr<C2SettingResult>> failures;
     C2VideoSizeStreamTuning::input inputSize(0u, nWidth, nHeight);
     std::vector<C2Param*> configParam{&inputSize};
     c2_status_t status =
         mComponent->config(configParam, C2_DONT_BLOCK, &failures);
-    if (failures.size() == 0u ) mConfig = true;
-    ASSERT_EQ(status, C2_OK);
+    if (status == C2_OK && failures.size() == 0u) return true;
+    return false;
 }
 
 // LookUpTable of clips for component testing
@@ -360,8 +359,7 @@ TEST_F(Codec2VideoEncHidlTest, EncodeTest) {
     ASSERT_EQ(eleStream.is_open(), true) << mURL << " file not found";
     ALOGV("mURL : %s", mURL);
 
-    setupConfigParam(nWidth, nHeight);
-    if (!mConfig) {
+    if (!setupConfigParam(nWidth, nHeight)) {
         std::cout << "[   WARN   ] Test Skipped \n";
         return;
     }
@@ -439,7 +437,6 @@ TEST_F(Codec2VideoEncHidlTest, EOSTest) {
 TEST_F(Codec2VideoEncHidlTest, FlushTest) {
     description("Test Request for flush");
     if (mDisableTest) return;
-    ASSERT_EQ(mComponent->start(), C2_OK);
 
     typedef std::unique_lock<std::mutex> ULock;
     char mURL[512];
@@ -447,7 +444,12 @@ TEST_F(Codec2VideoEncHidlTest, FlushTest) {
     int32_t nHeight = ENC_DEFAULT_FRAME_HEIGHT;
     strcpy(mURL, gEnv->getRes().c_str());
     GetURLForComponent(mURL);
-    setupConfigParam(nWidth, nHeight);
+
+    if (!setupConfigParam(nWidth, nHeight)) {
+        std::cout << "[   WARN   ] Test Skipped \n";
+        return;
+    }
+    ASSERT_EQ(mComponent->start(), C2_OK);
 
     // Setting default configuration
     mFlushedIndices.clear();
@@ -522,12 +524,16 @@ TEST_F(Codec2VideoEncHidlTest, FlushTest) {
 TEST_F(Codec2VideoEncHidlTest, InvalidBufferTest) {
     description("Tests feeding larger/smaller input buffer");
     if (mDisableTest) return;
-    ASSERT_EQ(mComponent->start(), C2_OK);
 
     std::ifstream eleStream;
     int32_t nWidth = ENC_DEFAULT_FRAME_WIDTH / 2;
     int32_t nHeight = ENC_DEFAULT_FRAME_HEIGHT / 2;
-    setupConfigParam(nWidth, nHeight);
+
+    if (!setupConfigParam(nWidth, nHeight)) {
+        std::cout << "[   WARN   ] Test Skipped \n";
+        return;
+    }
+    ASSERT_EQ(mComponent->start(), C2_OK);
 
     ASSERT_NO_FATAL_FAILURE(
         encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
@@ -579,10 +585,12 @@ TEST_P(Codec2VideoEncResolutionTest, ResolutionTest) {
     int32_t nWidth = GetParam().first;
     int32_t nHeight = GetParam().second;
     ALOGD("Trying encode for width %d height %d", nWidth, nHeight);
-    mConfig = false;
     mEos = false;
-    setupConfigParam(nWidth, nHeight);
-    if (!mConfig) return;
+
+    if (!setupConfigParam(nWidth, nHeight)) {
+        std::cout << "[   WARN   ] Test Skipped \n";
+        return;
+    }
     ASSERT_EQ(mComponent->start(), C2_OK);
 
     ASSERT_NO_FATAL_FAILURE(

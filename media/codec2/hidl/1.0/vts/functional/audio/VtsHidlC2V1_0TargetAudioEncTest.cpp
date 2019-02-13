@@ -219,7 +219,7 @@ void validateComponent(
 }
 
 // Set Default config param.
-void setupConfigParam(
+bool setupConfigParam(
     const std::shared_ptr<android::Codec2Client::Component>& component,
     int32_t nChannels, int32_t nSampleRate) {
     std::vector<std::unique_ptr<C2SettingResult>> failures;
@@ -229,8 +229,8 @@ void setupConfigParam(
     std::vector<C2Param*> configParam{&sampleRateInfo, &channelCountInfo};
     c2_status_t status =
         component->config(configParam, C2_DONT_BLOCK, &failures);
-    ASSERT_EQ(failures.size(), 0u);
-    ASSERT_EQ(status, C2_OK);
+    if (status == C2_OK && failures.size() == 0u) return true;
+    return false;
 }
 
 // LookUpTable of clips and metadata for component testing
@@ -358,7 +358,6 @@ TEST_F(Codec2AudioEncHidlTest, validateCompName) {
 TEST_F(Codec2AudioEncHidlTest, EncodeTest) {
     ALOGV("EncodeTest");
     if (mDisableTest) return;
-    ASSERT_EQ(mComponent->start(), C2_OK);
     char mURL[512];
     strcpy(mURL, gEnv->getRes().c_str());
     GetURLForComponent(mCompName, mURL);
@@ -396,7 +395,11 @@ TEST_F(Codec2AudioEncHidlTest, EncodeTest) {
         default:
             ASSERT_TRUE(false);
     }
-    setupConfigParam(mComponent, nChannels, nSampleRate);
+    if (!setupConfigParam(mComponent, nChannels, nSampleRate)) {
+        std::cout << "[   WARN   ] Test Skipped \n";
+        return;
+    }
+    ASSERT_EQ(mComponent->start(), C2_OK);
     std::ifstream eleStream;
     uint32_t numFrames = 128;
     eleStream.open(mURL, std::ifstream::binary);
@@ -469,7 +472,6 @@ TEST_F(Codec2AudioEncHidlTest, EOSTest) {
 TEST_F(Codec2AudioEncHidlTest, FlushTest) {
     description("Test Request for flush");
     if (mDisableTest) return;
-    ASSERT_EQ(mComponent->start(), C2_OK);
 
     typedef std::unique_lock<std::mutex> ULock;
     char mURL[512];
@@ -510,7 +512,13 @@ TEST_F(Codec2AudioEncHidlTest, FlushTest) {
         default:
             ASSERT_TRUE(false);
     }
-    setupConfigParam(mComponent, nChannels, nSampleRate);
+
+    if (!setupConfigParam(mComponent, nChannels, nSampleRate)) {
+        std::cout << "[   WARN   ] Test Skipped \n";
+        return;
+    }
+    ASSERT_EQ(mComponent->start(), C2_OK);
+
     std::ifstream eleStream;
     uint32_t numFramesFlushed = 30;
     uint32_t numFrames = 128;
