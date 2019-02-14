@@ -1388,6 +1388,7 @@ static CreatorFunc Sniff(
 static const char *extensions[] = {
     "oga",
     "ogg",
+    "opus",
     NULL
 };
 

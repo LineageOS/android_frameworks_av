@@ -84,17 +84,7 @@ bool Codec2Buffer::copyLinear(const std::shared_ptr<C2Buffer> &buffer) {
 }
 
 void Codec2Buffer::setImageData(const sp<ABuffer> &imageData) {
-    meta()->setBuffer("image-data", imageData);
-    format()->setBuffer("image-data", imageData);
-    MediaImage2 *img = (MediaImage2*)imageData->data();
-    if (img->mNumPlanes > 0 && img->mType != img->MEDIA_IMAGE_TYPE_UNKNOWN) {
-        int32_t stride = img->mPlane[0].mRowInc;
-        format()->setInt32(KEY_STRIDE, stride);
-        if (img->mNumPlanes > 1 && stride > 0) {
-            int32_t vstride = (img->mPlane[1].mOffset - img->mPlane[0].mOffset) / stride;
-            format()->setInt32(KEY_SLICE_HEIGHT, vstride);
-        }
-    }
+    mImageData = imageData;
 }
 
 // LocalLinearBuffer
@@ -546,7 +536,6 @@ GraphicBlockBuffer::GraphicBlockBuffer(
     : Codec2Buffer(format, buffer),
       mView(view),
       mBlock(block),
-      mImageData(imageData),
       mWrapped(wrapped) {
     setImageData(imageData);
 }
@@ -683,9 +672,7 @@ ConstGraphicBlockBuffer::ConstGraphicBlockBuffer(
       mView(std::move(view)),
       mBufferRef(buffer),
       mWrapped(wrapped) {
-    if (imageData != nullptr) {
-        setImageData(imageData);
-    }
+    setImageData(imageData);
 }
 
 std::shared_ptr<C2Buffer> ConstGraphicBlockBuffer::asC2Buffer() {
