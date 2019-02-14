@@ -383,6 +383,8 @@ void AudioPolicyService::updateUidStates_l()
 //    OR The client is an accessibility service
 //        AND is on TOP OR latest started
 //        AND the source is VOICE_RECOGNITION or HOTWORD
+//    OR the source is one of: AUDIO_SOURCE_VOICE_DOWNLINK, AUDIO_SOURCE_VOICE_UPLINK,
+//       AUDIO_SOURCE_VOICE_CALL
 //    OR Any other client
 //        AND The assistant is not on TOP
 //        AND is on TOP OR latest started
@@ -463,6 +465,10 @@ void AudioPolicyService::updateUidStates_l()
                 (source == AUDIO_SOURCE_VOICE_RECOGNITION || source == AUDIO_SOURCE_HOTWORD)) {
                 forceIdle = false;
             }
+        } else if (source == AUDIO_SOURCE_VOICE_DOWNLINK ||
+                   source == AUDIO_SOURCE_VOICE_CALL ||
+                   (source == AUDIO_SOURCE_VOICE_UPLINK)) {
+            forceIdle = false;
         } else {
             if (!isAssistantOnTop && (isOnTop || isLatest) &&
                 (!isSensitiveActive || isLatestSensitive)) {
