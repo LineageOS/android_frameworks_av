@@ -588,6 +588,7 @@ static std::vector<std::pair<const char *, uint32_t>> stringMappings {
         { "genre", kKeyGenre },
         { "location", kKeyLocation },
         { "lyricist", kKeyWriter },
+        { "manufacturer", kKeyManufacturer },
         { "title", kKeyTitle },
         { "year", kKeyYear },
     }
