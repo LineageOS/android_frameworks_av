@@ -365,10 +365,10 @@ status_t PlaylistFetcher::decryptBuffer(
         if (err == ERROR_NOT_CONNECTED) {
             return ERROR_NOT_CONNECTED;
         } else if (err < 0) {
-            ALOGE("failed to fetch cipher key from '%s'.", keyURI.c_str());
+            ALOGE("failed to fetch cipher key from '%s'.", uriDebugString(keyURI).c_str());
             return ERROR_IO;
         } else if (key->size() != 16) {
-            ALOGE("key file '%s' wasn't 16 bytes in size.", keyURI.c_str());
+            ALOGE("key file '%s' wasn't 16 bytes in size.", uriDebugString(keyURI).c_str());
             return ERROR_MALFORMED;
         }
 
@@ -1366,7 +1366,7 @@ void PlaylistFetcher::onDownloadNext() {
         }
         if (bytesRead < 0) {
             status_t err = bytesRead;
-            ALOGE("failed to fetch .ts segment at url '%s'", uri.c_str());
+            ALOGE("failed to fetch .ts segment at url '%s'", uriDebugString(uri).c_str());
             notifyError(err);
             return;
         }

@@ -255,7 +255,7 @@ void ARTSPConnection::onConnect(const sp<AMessage> &msg) {
 
     struct hostent *ent = gethostbyname(host.c_str());
     if (ent == NULL) {
-        ALOGE("Unknown host %s", host.c_str());
+        ALOGE("Unknown host %s", uriDebugString(host).c_str());
 
         reply->setInt32("result", -ENOENT);
         reply->post();

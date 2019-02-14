@@ -1234,7 +1234,7 @@ bool LiveSession::resumeFetcher(
         const AString &uri, uint32_t streamMask, int64_t timeUs, bool newUri) {
     ssize_t index = mFetcherInfos.indexOfKey(uri);
     if (index < 0) {
-        ALOGE("did not find fetcher for uri: %s", uri.c_str());
+        ALOGE("did not find fetcher for uri: %s", uriDebugString(uri).c_str());
         return false;
     }
 
@@ -2005,7 +2005,7 @@ void LiveSession::tryToFinishBandwidthSwitch(const AString &oldUri) {
 
             if ((mNewStreamMask & stream) && mStreams[idx].mNewUri.empty()) {
                 ALOGW("swapping stream type %d %s to empty stream",
-                        stream, mStreams[idx].mUri.c_str());
+                        stream, uriDebugString(mStreams[idx].mUri).c_str());
             }
             mStreams[idx].mUri = mStreams[idx].mNewUri;
             mStreams[idx].mNewUri.clear();
@@ -2033,7 +2033,7 @@ void LiveSession::tryToFinishBandwidthSwitch(const AString &oldUri) {
         CHECK(idx >= 0);
         if (mStreams[idx].mNewUri.empty()) {
             ALOGW("swapping extra stream type %d %s to empty stream",
-                    stream, mStreams[idx].mUri.c_str());
+                    stream, uriDebugString(mStreams[idx].mUri).c_str());
         }
         mStreams[idx].mUri = mStreams[idx].mNewUri;
         mStreams[idx].mNewUri.clear();
@@ -2138,7 +2138,7 @@ void LiveSession::cancelBandwidthSwitch(bool resume) {
             ALOGV("stopping newUri = %s", newUri.c_str());
             ssize_t index = mFetcherInfos.indexOfKey(newUri);
             if (index < 0) {
-                ALOGE("did not find fetcher for newUri: %s", newUri.c_str());
+                ALOGE("did not find fetcher for newUri: %s", uriDebugString(newUri).c_str());
                 continue;
             }
             FetcherInfo &info = mFetcherInfos.editValueAt(index);

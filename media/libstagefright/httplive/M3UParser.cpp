@@ -1205,8 +1205,7 @@ status_t M3UParser::parseMedia(const AString &line) {
             if (val.size() < 2
                     || val.c_str()[0] != '"'
                     || val.c_str()[val.size() - 1] != '"') {
-                ALOGE("Expected quoted string for URI, got '%s' instead.",
-                      val.c_str());
+                ALOGE("Expected quoted string for URI.");
 
                 return ERROR_MALFORMED;
             }
