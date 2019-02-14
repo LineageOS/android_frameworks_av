@@ -88,6 +88,7 @@ cc_library_shared {
     vndk: {
         enabled: true,
     },
+    double_loadable: true,
     srcs: ["OMXUtils.cpp"],
     export_include_dirs: [
         "include",
