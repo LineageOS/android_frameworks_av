@@ -102,7 +102,6 @@ private:
     void createInputSurface();
     void setInputSurface(const sp<PersistentSurface> &surface);
     status_t setupInputSurface(const std::shared_ptr<InputSurfaceWrapper> &surface);
-    void setParameters(const sp<AMessage> &params);
 
     void setDeadline(
             const TimePoint &now,
