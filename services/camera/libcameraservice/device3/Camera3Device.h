@@ -1320,7 +1320,7 @@ class Camera3Device :
         void onInflightMapEmpty();
 
         // Events triggered by RequestThread
-        void onRequestSubmitted();
+        void onSubmittingRequest();
         void onRequestThreadPaused();
 
       private:
