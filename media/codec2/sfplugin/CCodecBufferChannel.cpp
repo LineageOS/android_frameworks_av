@@ -61,6 +61,10 @@ namespace {
 constexpr size_t kSmoothnessFactor = 4;
 constexpr size_t kRenderingDepth = 3;
 
+// This is for keeping IGBP's buffer dropping logic in legacy mode other
+// than making it non-blocking. Do not change this value.
+const static size_t kDequeueTimeoutNs = 0;
+
 }  // namespace
 
 CCodecBufferChannel::QueueGuard::QueueGuard(
@@ -1456,6 +1460,7 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
     sp<IGraphicBufferProducer> producer;
     if (newSurface) {
         newSurface->setScalingMode(NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
+        newSurface->setDequeueTimeout(kDequeueTimeoutNs);
         producer = newSurface->getIGraphicBufferProducer();
         producer->setGenerationNumber(generation);
     } else {
