@@ -132,8 +132,8 @@ void Copy_Float_Stereo_Mc(const LVM_FLOAT *src,
     src += NrChannels * (NrFrames - 1);
     for (ii = NrFrames; ii != 0; ii--)
     {
-        dst[0] = src_st[0];
         dst[1] = src_st[1];
+        dst[0] = src_st[0]; // copy 1 before 0 is required for NrChannels == 3.
         for (jj = 2; jj < NrChannels; jj++)
         {
             dst[jj] = src[jj];
