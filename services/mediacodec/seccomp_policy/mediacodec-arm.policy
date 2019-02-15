@@ -58,8 +58,4 @@ ugetrlimit: 1
 getdents64: 1
 getrandom: 1
 
-# Used by UBSan diagnostic messages
-readlink: 1
-open: 1
-
 @include /system/etc/seccomp_policy/crash_dump.arm.policy
