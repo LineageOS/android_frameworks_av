@@ -2372,6 +2372,7 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
             const int intensity = AudioFlinger::onExternalVibrationStart(
                     track->getExternalVibration());
             mLock.lock();
+            track->setHapticIntensity(static_cast<AudioMixer::haptic_intensity_t>(intensity));
             // Haptic playback should be enabled by vibrator service.
             if (track->getHapticPlaybackEnabled()) {
                 // Disable haptic playback of all active track to ensure only
@@ -2380,7 +2381,6 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
                     t->setHapticPlaybackEnabled(false);
                 }
             }
-            track->setHapticIntensity(intensity);
         }
 
         track->mResetDone = false;

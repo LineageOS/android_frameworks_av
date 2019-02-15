@@ -10,6 +10,7 @@ cc_defaults {
         "libcutils",
         "liblog",
         "libutils",
+        "libvibrator",
     ],
 
     cflags: [

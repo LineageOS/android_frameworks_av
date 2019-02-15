@@ -26,6 +26,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include <android/os/IExternalVibratorService.h>
 #include <media/AudioBufferProvider.h>
 #include <media/AudioResampler.h>
 #include <media/AudioResamplerPublic.h>
@@ -103,20 +104,21 @@ public:
                                   // parameter 'value' is a pointer to the new playback rate.
     };
 
-    enum { // Haptic intensity, should keep consistent with VibratorService
-        HAPTIC_SCALE_VERY_LOW = -2,
-        HAPTIC_SCALE_LOW = -1,
-        HAPTIC_SCALE_NONE = 0,
-        HAPTIC_SCALE_HIGH = 1,
-        HAPTIC_SCALE_VERY_HIGH = 2,
-    };
-    typedef int32_t haptic_intensity_t;
-    static constexpr float HAPTIC_SCALE_VERY_LOW_RATIO = 2 / 3;
-    static constexpr float HAPTIC_SCALE_LOW_RATIO = 3 / 4;
-    static const CONSTEXPR float HAPTIC_MAX_AMPLITUDE_FLOAT = 1.0f;
+    typedef enum { // Haptic intensity, should keep consistent with VibratorService
+        HAPTIC_SCALE_MUTE = os::IExternalVibratorService::SCALE_MUTE,
+        HAPTIC_SCALE_VERY_LOW = os::IExternalVibratorService::SCALE_VERY_LOW,
+        HAPTIC_SCALE_LOW = os::IExternalVibratorService::SCALE_LOW,
+        HAPTIC_SCALE_NONE = os::IExternalVibratorService::SCALE_NONE,
+        HAPTIC_SCALE_HIGH = os::IExternalVibratorService::SCALE_HIGH,
+        HAPTIC_SCALE_VERY_HIGH = os::IExternalVibratorService::SCALE_VERY_HIGH,
+    } haptic_intensity_t;
+    static constexpr float HAPTIC_SCALE_VERY_LOW_RATIO = 2.0f / 3.0f;
+    static constexpr float HAPTIC_SCALE_LOW_RATIO = 3.0f / 4.0f;
+    static const constexpr float HAPTIC_MAX_AMPLITUDE_FLOAT = 1.0f;
 
     static inline bool isValidHapticIntensity(haptic_intensity_t hapticIntensity) {
         switch (hapticIntensity) {
+        case HAPTIC_SCALE_MUTE:
         case HAPTIC_SCALE_VERY_LOW:
         case HAPTIC_SCALE_LOW:
         case HAPTIC_SCALE_NONE:
@@ -428,8 +430,9 @@ private:
         case HAPTIC_SCALE_NONE:
         case HAPTIC_SCALE_HIGH:
         case HAPTIC_SCALE_VERY_HIGH:
-        default:
             return 1.0f;
+        default:
+            return 0.0f;
         }
         }
 

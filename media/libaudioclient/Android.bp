@@ -74,6 +74,7 @@ cc_library_shared {
         "libnblog",
         "libprocessgroup",
         "libutils",
+        "libvibrator",
     ],
     export_shared_lib_headers: ["libbinder"],
 
