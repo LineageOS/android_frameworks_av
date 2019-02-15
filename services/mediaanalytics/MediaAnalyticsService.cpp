@@ -210,21 +210,24 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
 
     // XXX: if we have a sessionid in the new record, look to make
     // sure it doesn't appear in the finalized list.
-    // XXX: this is for security / DOS prevention.
-    // may also require that we persist the unique sessionIDs
-    // across boots [instead of within a single boot]
 
     if (item->count() == 0) {
-        // drop empty records
+        ALOGV("dropping empty record...");
         delete item;
         item = NULL;
         return MediaAnalyticsItem::SessionIDInvalid;
     }
 
     // save the new record
+    //
+    // send a copy to statsd
+    dump2Statsd(item);
+
+    // and keep our copy for dumpsys
     MediaAnalyticsItem::SessionID_t id = item->getSessionID();
     saveItem(item);
     mItemsFinalized++;
+
     return id;
 }
 
