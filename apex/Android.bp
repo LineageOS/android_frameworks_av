@@ -41,6 +41,7 @@ apex_defaults {
         },
     },
     key: "com.android.media.key",
+    certificate: ":com.android.media.certificate",
 }
 
 apex {
@@ -56,6 +57,7 @@ apex_defaults {
     ],
     use_vendor: true,
     key: "com.android.media.swcodec.key",
+    certificate: ":com.android.media.swcodec.certificate",
 }
 
 apex {
@@ -74,4 +76,14 @@ apex_key {
     name: "com.android.media.swcodec.key",
     public_key: "com.android.media.swcodec.avbpubkey",
     private_key: "com.android.media.swcodec.pem",
+}
+
+android_app_certificate {
+    name: "com.android.media.certificate",
+    certificate: "com.android.media",
+}
+
+android_app_certificate {
+    name: "com.android.media.swcodec.certificate",
+    certificate: "com.android.media.swcodec",
 }
