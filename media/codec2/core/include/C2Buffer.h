@@ -888,6 +888,7 @@ public:
      * \retval C2_OK        the operation was successful
      * \retval C2_NO_MEMORY not enough memory to complete any required allocation
      * \retval C2_TIMED_OUT the operation timed out
+     * \retval C2_BLOCKING  the operation is blocked
      * \retval C2_REFUSED   no permission to complete any required allocation
      * \retval C2_BAD_VALUE capacity or usage are not supported (invalid) (caller error)
      * \retval C2_OMITTED   this pool does not support linear blocks
@@ -916,6 +917,7 @@ public:
      * \retval C2_OK        the operation was successful
      * \retval C2_NO_MEMORY not enough memory to complete any required allocation
      * \retval C2_TIMED_OUT the operation timed out
+     * \retval C2_BLOCKING  the operation is blocked
      * \retval C2_REFUSED   no permission to complete any required allocation
      * \retval C2_BAD_VALUE capacity or usage are not supported (invalid) (caller error)
      * \retval C2_OMITTED   this pool does not support circular blocks
@@ -946,6 +948,7 @@ public:
      * \retval C2_OK        the operation was successful
      * \retval C2_NO_MEMORY not enough memory to complete any required allocation
      * \retval C2_TIMED_OUT the operation timed out
+     * \retval C2_BLOCKING  the operation is blocked
      * \retval C2_REFUSED   no permission to complete any required allocation
      * \retval C2_BAD_VALUE width, height, format or usage are not supported (invalid) (caller
      *                      error)
