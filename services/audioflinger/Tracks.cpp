@@ -698,6 +698,7 @@ void AudioFlinger::PlaybackThread::Track::releaseBuffer(AudioBufferProvider::Buf
 // TODO: compensate for time shift between HW modules.
 void AudioFlinger::PlaybackThread::Track::interceptBuffer(
         const AudioBufferProvider::Buffer& sourceBuffer) {
+    auto start = std::chrono::steady_clock::now();
     const size_t frameCount = sourceBuffer.frameCount;
     for (auto& sink : mTeePatches) {
         RecordThread::PatchRecord* patchRecord = sink.patchRecord.get();
@@ -715,6 +716,11 @@ void AudioFlinger::PlaybackThread::Track::interceptBuffer(
                  "buffer %zu/%zu, dropping %zu frames", __func__, mId, patchRecord->mId,
                  framesWritten, frameCount, framesLeft);
     }
+    auto spent = ceil<std::chrono::microseconds>(std::chrono::steady_clock::now() - start);
+    using namespace std::chrono_literals;
+    // Average is ~20us per track, this should virtually never be logged (Logging takes >200us)
+    ALOGD_IF(spent > 200us, "%s: took %lldus to intercept %zu tracks", __func__,
+             spent.count(), mTeePatches.size());
 }
 
 size_t AudioFlinger::PlaybackThread::Track::writeFrames(AudioBufferProvider* dest,
