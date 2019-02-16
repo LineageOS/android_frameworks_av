@@ -15,6 +15,7 @@
  */
 #include <assert.h>
 #include <inttypes.h>
+#include <iterator>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -102,20 +103,15 @@ void printUsage() {
   printf("\n     -M");
   printf("\n           Mono mode (force all input audio channels to be identical)");
   printf("\n     -basslvl:<effect_level>");
-  printf("\n           A value that ranges between 0 - 15 default 0");
+  printf("\n           A value that ranges between %d - %d default 0", LVM_BE_MIN_EFFECTLEVEL,
+    LVM_BE_MAX_EFFECTLEVEL);
   printf("\n");
   printf("\n     -eqPreset:<preset Value>");
-  printf("\n           0 - Normal");
-  printf("\n           1 - Classical");
-  printf("\n           2 - Dance");
-  printf("\n           3 - Flat");
-  printf("\n           4 - Folk");
-  printf("\n           5 - Heavy Metal");
-  printf("\n           6 - Hip Hop");
-  printf("\n           7 - Jazz");
-  printf("\n           8 - Pop");
-  printf("\n           9 - Rock");
-  printf("\n           default 0");
+  const size_t numPresetLvls  = std::size(gEqualizerPresets);
+  for (size_t i = 0; i < numPresetLvls; ++i) {
+    printf("\n           %zu - %s", i, gEqualizerPresets[i].name);
+  }
+  printf("\n           default - 0");
   printf("\n     -bE ");
   printf("\n           Enable Dynamic Bass Enhancement");
   printf("\n");
@@ -619,7 +615,7 @@ int lvmMainProcess(EffectContext *pContext,
             std::fill(fp + 1, fp + channelCount, *fp); // replicate ch 0
         }
     }
-#if 1
+#ifndef BYPASS_EXEC
     errCode = lvmExecute(floatIn.data(), floatOut.data(), pContext, plvmConfigParams);
     if (errCode) {
       printf("\nError: lvmExecute returned with %d\n", errCode);
@@ -689,7 +685,7 @@ int main(int argc, const char *argv[]) {
           lvmConfigParams.monoMode = true;
     } else if (!strncmp(argv[i], "-basslvl:", 9)) {
       const int bassEffectLevel = atoi(argv[i] + 9);
-      if (bassEffectLevel > 15 || bassEffectLevel < 0) {
+      if (bassEffectLevel > LVM_BE_MAX_EFFECTLEVEL || bassEffectLevel < LVM_BE_MIN_EFFECTLEVEL) {
         printf("Error: Unsupported Bass Effect Level : %d\n",
                bassEffectLevel);
         printUsage();
@@ -698,7 +694,8 @@ int main(int argc, const char *argv[]) {
       lvmConfigParams.bassEffectLevel = bassEffectLevel;
     } else if (!strncmp(argv[i], "-eqPreset:", 10)) {
       const int eqPresetLevel = atoi(argv[i] + 10);
-      if (eqPresetLevel > 9 || eqPresetLevel < 0) {
+      const int numPresetLvls = std::size(gEqualizerPresets);
+      if (eqPresetLevel >= numPresetLvls || eqPresetLevel < 0) {
         printf("Error: Unsupported Equalizer Preset : %d\n", eqPresetLevel);
         printUsage();
         return -1;
