@@ -4431,9 +4431,9 @@ status_t ACodec::setupAVCEncoderParameters(const sp<AMessage> &msg) {
         h264type.nRefFrames = 2;
         h264type.nBFrames = mLatency == 0 ? 1 : std::min(1U, mLatency - 1);
 
-        // disable B-frames until MPEG4Writer can guarantee finalizing files with B-frames
-        // h264type.nRefFrames = 1;
-        // h264type.nBFrames = 0;
+        // disable B-frames until we have explicit settings for enabling the feature.
+        h264type.nRefFrames = 1;
+        h264type.nBFrames = 0;
 
         h264type.nPFrames = setPFramesSpacing(iFrameInterval, frameRate, h264type.nBFrames);
         h264type.nAllowedPictureTypes =
