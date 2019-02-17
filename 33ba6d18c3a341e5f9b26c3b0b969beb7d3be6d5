@@ -22,6 +22,99 @@
       "revId": "33ba6d18c3a341e5f9b26c3b0b969beb7d3be6d5",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "5a3adac2_498f6bd0",
+        "filename": "services/audiopolicy/enginedefault/src/Engine.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 529,
+      "author": {
+        "id": 10258
+      },
+      "writtenOn": "2019-02-17T05:39:03Z",
+      "side": 1,
+      "message": "Consider the commit is a squashed one, ig this part belongs to voip fix. WFD audio works without this. We could strip it when we only want to support WFD audio. I\u0027m not sure if it\u0027s a valid bugfix, CAF added it since L or earlier: https://source.codeaurora.org/quic/la/platform/frameworks/av/tree/services/audiopolicy/AudioPolicyManager.cpp?h\u003dLA.AF.1.1.1#n5780 , but I highly suspect they just blindly ported from old codebase because the logic is duplicated with the part marked below",
+      "parentUuid": "9e052e0e_2ee8898c",
+      "range": {
+        "startLine": 525,
+        "startChar": 8,
+        "endLine": 529,
+        "endChar": 9
+      },
+      "revId": "33ba6d18c3a341e5f9b26c3b0b969beb7d3be6d5",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "66c0b99a_4703d855",
+        "filename": "services/audiopolicy/enginedefault/src/Engine.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 543,
+      "author": {
+        "id": 10258
+      },
+      "writtenOn": "2019-02-17T05:39:03Z",
+      "side": 1,
+      "message": "duplicated part",
+      "range": {
+        "startLine": 538,
+        "startChar": 0,
+        "endLine": 543,
+        "endChar": 9
+      },
+      "revId": "33ba6d18c3a341e5f9b26c3b0b969beb7d3be6d5",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "de263c29_c954a2dd",
+        "filename": "services/audiopolicy/enginedefault/src/Engine.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 588,
+      "author": {
+        "id": 10258
+      },
+      "writtenOn": "2019-02-17T05:39:03Z",
+      "side": 1,
+      "message": "Is this valid? Already wrapped with `switch (strategy) { case STRATEGY_MEDIA: {} }`",
+      "range": {
+        "startLine": 588,
+        "startChar": 45,
+        "endLine": 588,
+        "endChar": 84
+      },
+      "revId": "33ba6d18c3a341e5f9b26c3b0b969beb7d3be6d5",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "82d6d18c_00b573a8",
+        "filename": "services/audiopolicy/enginedefault/src/Engine.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 592,
+      "author": {
+        "id": 10258
+      },
+      "writtenOn": "2019-02-17T05:39:03Z",
+      "side": 1,
+      "message": "ditto",
+      "range": {
+        "startLine": 592,
+        "startChar": 45,
+        "endLine": 592,
+        "endChar": 84
+      },
+      "revId": "33ba6d18c3a341e5f9b26c3b0b969beb7d3be6d5",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
     }
   ]
 }
