@@ -32,7 +32,7 @@ LWGraphicBufferSource::LWGraphicBufferSource(
 
 BnStatus LWGraphicBufferSource::configure(
         const sp<IOMXNode>& omxNode, int32_t dataSpace) {
-    sp<IOmxNode> hOmxNode = omxNode->getHalInterface();
+    sp<IOmxNode> hOmxNode = omxNode->getHalInterface<IOmxNode>();
     return toBinderStatus(mBase->configure(
             hOmxNode == nullptr ? new TWOmxNode(omxNode) : hOmxNode,
             toHardwareDataspace(dataSpace)));
