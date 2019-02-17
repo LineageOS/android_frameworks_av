@@ -1289,6 +1289,7 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
             } else if (what == DecoderBase::kWhatShutdownCompleted) {
                 ALOGV("%s shutdown completed", audio ? "audio" : "video");
                 if (audio) {
+                    Mutex::Autolock autoLock(mDecoderLock);
                     mAudioDecoder.clear();
                     mAudioDecoderError = false;
                     ++mAudioDecoderGeneration;
@@ -1296,6 +1297,7 @@ void NuPlayer2::onMessageReceived(const sp<AMessage> &msg) {
                     CHECK_EQ((int)mFlushingAudio, (int)SHUTTING_DOWN_DECODER);
                     mFlushingAudio = SHUT_DOWN;
                 } else {
+                    Mutex::Autolock autoLock(mDecoderLock);
                     mVideoDecoder.clear();
                     mVideoDecoderError = false;
                     ++mVideoDecoderGeneration;
@@ -1967,6 +1969,7 @@ void NuPlayer2::restartAudio(
         int64_t currentPositionUs, bool forceNonOffload, bool needsToCreateAudioDecoder) {
     if (mAudioDecoder != NULL) {
         mAudioDecoder->pause();
+        Mutex::Autolock autoLock(mDecoderLock);
         mAudioDecoder.clear();
         mAudioDecoderError = false;
         ++mAudioDecoderGeneration;
@@ -2094,6 +2097,8 @@ status_t NuPlayer2::instantiateDecoder(
             format->setFloat("operating-rate", rate * mPlaybackSettings.mSpeed);
         }
     }
+
+    Mutex::Autolock autoLock(mDecoderLock);
 
     if (audio) {
         sp<AMessage> notify = new AMessage(kWhatAudioNotify, this);
@@ -2405,6 +2410,8 @@ void NuPlayer2::getStats(Vector<sp<AMessage> > *mTrackStats) {
     CHECK(mTrackStats != NULL);
 
     mTrackStats->clear();
+
+    Mutex::Autolock autoLock(mDecoderLock);
     if (mVideoDecoder != NULL) {
         mTrackStats->push_back(mVideoDecoder->getStats());
     }

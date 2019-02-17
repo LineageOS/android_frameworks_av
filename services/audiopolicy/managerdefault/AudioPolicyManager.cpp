@@ -560,6 +560,10 @@ uint32_t AudioPolicyManager::updateCallRouting(const DeviceVector &rxDevices, ui
         muteWaitMs = setOutputDevices(mPrimaryOutput, rxDevices, true, delayMs);
     } else { // create RX path audio patch
         mCallRxPatch = createTelephonyPatch(true /*isRx*/, rxDevices.itemAt(0), delayMs);
+
+        // If the TX device is on the primary HW module but RX device is
+        // on other HW module, SinkMetaData of telephony input should handle it
+        // assuming the device uses audio HAL V5.0 and above
     }
     if (createTxPatch) { // create TX path audio patch
         mCallTxPatch = createTelephonyPatch(false /*isRx*/, txSourceDevice, delayMs);

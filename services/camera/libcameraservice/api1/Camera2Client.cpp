@@ -1773,6 +1773,8 @@ void Camera2Client::notifyError(int32_t errorCode,
             break;
     }
 
+    mCaptureSequencer->notifyError(errorCode, resultExtras);
+
     ALOGE("%s: Error condition %d reported by HAL, requestId %" PRId32, __FUNCTION__, errorCode,
               resultExtras.requestId);
 
@@ -1927,9 +1929,6 @@ void Camera2Client::notifyAutoExposure(uint8_t newState, int triggerId) {
 
 void Camera2Client::notifyShutter(const CaptureResultExtras& resultExtras,
                                   nsecs_t timestamp) {
-    (void)resultExtras;
-    (void)timestamp;
-
     ALOGV("%s: Shutter notification for request id %" PRId32 " at time %" PRId64,
             __FUNCTION__, resultExtras.requestId, timestamp);
     mCaptureSequencer->notifyShutter(resultExtras, timestamp);

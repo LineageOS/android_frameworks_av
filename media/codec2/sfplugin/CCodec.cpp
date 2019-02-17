@@ -772,8 +772,16 @@ void CCodec::configure(const sp<AMessage> &msg) {
         }
 
         std::vector<std::unique_ptr<C2Param>> configUpdate;
+        // NOTE: We used to ignore "video-bitrate" at configure; replicate
+        //       the behavior here.
+        sp<AMessage> sdkParams = msg;
+        int32_t videoBitrate;
+        if (sdkParams->findInt32(PARAMETER_KEY_VIDEO_BITRATE, &videoBitrate)) {
+            sdkParams = msg->dup();
+            sdkParams->removeEntryAt(sdkParams->findEntryByName(PARAMETER_KEY_VIDEO_BITRATE));
+        }
         status_t err = config->getConfigUpdateFromSdkParams(
-                comp, msg, Config::IS_CONFIG, C2_DONT_BLOCK, &configUpdate);
+                comp, sdkParams, Config::IS_CONFIG, C2_DONT_BLOCK, &configUpdate);
         if (err != OK) {
             ALOGW("failed to convert configuration to c2 params");
         }
@@ -1415,11 +1423,7 @@ void CCodec::signalResume() {
     (void)mChannel->requestInitialInputBuffers();
 }
 
-void CCodec::signalSetParameters(const sp<AMessage> &params) {
-    setParameters(params);
-}
-
-void CCodec::setParameters(const sp<AMessage> &params) {
+void CCodec::signalSetParameters(const sp<AMessage> &msg) {
     std::shared_ptr<Codec2Client::Component> comp;
     auto checkState = [this, &comp] {
         Mutexed<State>::Locked state(mState);
@@ -1431,6 +1435,15 @@ void CCodec::setParameters(const sp<AMessage> &params) {
     };
     if (tryAndReportOnError(checkState) != OK) {
         return;
+    }
+
+    // NOTE: We used to ignore "bitrate" at setParameters; replicate
+    //       the behavior here.
+    sp<AMessage> params = msg;
+    int32_t bitrate;
+    if (params->findInt32(KEY_BIT_RATE, &bitrate)) {
+        params = msg->dup();
+        params->removeEntryAt(params->findEntryByName(KEY_BIT_RATE));
     }
 
     Mutexed<Config>::Locked config(mConfig);

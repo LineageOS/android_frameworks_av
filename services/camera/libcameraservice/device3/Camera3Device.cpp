@@ -885,14 +885,14 @@ status_t Camera3Device::convertMetadataListToRequestListLocked(
     return OK;
 }
 
-status_t Camera3Device::capture(CameraMetadata &request, int64_t* /*lastFrameNumber*/) {
+status_t Camera3Device::capture(CameraMetadata &request, int64_t* lastFrameNumber) {
     ATRACE_CALL();
 
     List<const PhysicalCameraSettingsList> requestsList;
     std::list<const SurfaceMap> surfaceMaps;
     convertToRequestList(requestsList, surfaceMaps, request);
 
-    return captureList(requestsList, surfaceMaps, /*lastFrameNumber*/NULL);
+    return captureList(requestsList, surfaceMaps, lastFrameNumber);
 }
 
 void Camera3Device::convertToRequestList(List<const PhysicalCameraSettingsList>& requestsList,
@@ -1027,11 +1027,22 @@ hardware::Return<void> Camera3Device::requestStreamBuffers(
             return hardware::Void();
         }
 
+        if (outputStream->isAbandoned()) {
+            bufRet.val.error(StreamBufferRequestError::STREAM_DISCONNECTED);
+            allReqsSucceeds = false;
+            continue;
+        }
+
         bufRet.streamId = streamId;
+        size_t handOutBufferCount = outputStream->getOutstandingBuffersCount();
         uint32_t numBuffersRequested = bufReq.numBuffersRequested;
-        size_t totalHandout = outputStream->getOutstandingBuffersCount() + numBuffersRequested;
-        if (totalHandout > outputStream->asHalStream()->max_buffers) {
+        size_t totalHandout = handOutBufferCount + numBuffersRequested;
+        uint32_t maxBuffers = outputStream->asHalStream()->max_buffers;
+        if (totalHandout > maxBuffers) {
             // Not able to allocate enough buffer. Exit early for this stream
+            ALOGE("%s: request too much buffers for stream %d: at HAL: %zu + requesting: %d"
+                    " > max: %d", __FUNCTION__, streamId, handOutBufferCount,
+                    numBuffersRequested, maxBuffers);
             bufRet.val.error(StreamBufferRequestError::MAX_BUFFER_EXCEEDED);
             allReqsSucceeds = false;
             continue;
@@ -2186,12 +2197,11 @@ status_t Camera3Device::waitUntilStateThenRelock(bool active, nsecs_t timeout) {
 
     mStatusWaiters++;
 
-    // Notify HAL to start draining. We need to notify the HalInterface layer
-    // even when the device is already IDLE, so HalInterface can reject incoming
-    // requestStreamBuffers call.
     if (!active && mUseHalBufManager) {
         auto streamIds = mOutputStreams.getStreamIds();
-        mRequestThread->signalPipelineDrain(streamIds);
+        if (mStatus == STATUS_ACTIVE) {
+            mRequestThread->signalPipelineDrain(streamIds);
+        }
         mRequestBufferSM.onWaitUntilIdle();
     }
 
@@ -3880,7 +3890,8 @@ Camera3Device::HalInterface::HalInterface(
             bool useHalBufManager) :
         mHidlSession(session),
         mRequestMetadataQueue(queue),
-        mUseHalBufManager(useHalBufManager) {
+        mUseHalBufManager(useHalBufManager),
+        mIsReconfigurationQuerySupported(true) {
     // Check with hardware service manager if we can downcast these interfaces
     // Somewhat expensive, so cache the results at startup
     auto castResult_3_5 = device::V3_5::ICameraDeviceSession::castFrom(mHidlSession);
@@ -3984,6 +3995,52 @@ status_t Camera3Device::HalInterface::constructDefaultRequestSettings(
     }
 
     return res;
+}
+
+bool Camera3Device::HalInterface::isReconfigurationRequired(CameraMetadata& oldSessionParams,
+        CameraMetadata& newSessionParams) {
+    // We do reconfiguration by default;
+    bool ret = true;
+    if ((mHidlSession_3_5 != nullptr) && mIsReconfigurationQuerySupported) {
+        android::hardware::hidl_vec<uint8_t> oldParams, newParams;
+        camera_metadata_t* oldSessioMeta = const_cast<camera_metadata_t*>(
+                oldSessionParams.getAndLock());
+        camera_metadata_t* newSessioMeta = const_cast<camera_metadata_t*>(
+                newSessionParams.getAndLock());
+        oldParams.setToExternal(reinterpret_cast<uint8_t*>(oldSessioMeta),
+                get_camera_metadata_size(oldSessioMeta));
+        newParams.setToExternal(reinterpret_cast<uint8_t*>(newSessioMeta),
+                get_camera_metadata_size(newSessioMeta));
+        hardware::camera::common::V1_0::Status callStatus;
+        bool required;
+        auto hidlCb = [&callStatus, &required] (hardware::camera::common::V1_0::Status s,
+                bool requiredFlag) {
+            callStatus = s;
+            required = requiredFlag;
+        };
+        auto err = mHidlSession_3_5->isReconfigurationRequired(oldParams, newParams, hidlCb);
+        oldSessionParams.unlock(oldSessioMeta);
+        newSessionParams.unlock(newSessioMeta);
+        if (err.isOk()) {
+            switch (callStatus) {
+                case hardware::camera::common::V1_0::Status::OK:
+                    ret = required;
+                    break;
+                case hardware::camera::common::V1_0::Status::METHOD_NOT_SUPPORTED:
+                    mIsReconfigurationQuerySupported = false;
+                    ret = true;
+                    break;
+                default:
+                    ALOGV("%s: Reconfiguration query failed: %d", __FUNCTION__, callStatus);
+                    ret = true;
+            }
+        } else {
+            ALOGE("%s: Unexpected binder error: %s", __FUNCTION__, err.description().c_str());
+            ret = true;
+        }
+    }
+
+    return ret;
 }
 
 status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *sessionParams,
@@ -5097,9 +5154,10 @@ bool Camera3Device::RequestThread::updateSessionParameters(const CameraMetadata&
     ATRACE_CALL();
     bool updatesDetected = false;
 
+    CameraMetadata updatedParams(mLatestSessionParams);
     for (auto tag : mSessionParamKeys) {
         camera_metadata_ro_entry entry = settings.find(tag);
-        camera_metadata_entry lastEntry = mLatestSessionParams.find(tag);
+        camera_metadata_entry lastEntry = updatedParams.find(tag);
 
         if (entry.count > 0) {
             bool isDifferent = false;
@@ -5128,17 +5186,26 @@ bool Camera3Device::RequestThread::updateSessionParameters(const CameraMetadata&
                 if (!skipHFRTargetFPSUpdate(tag, entry, lastEntry)) {
                     updatesDetected = true;
                 }
-                mLatestSessionParams.update(entry);
+                updatedParams.update(entry);
             }
         } else if (lastEntry.count > 0) {
             // Value has been removed
             ALOGV("%s: Session parameter tag id %d removed", __FUNCTION__, tag);
-            mLatestSessionParams.erase(tag);
+            updatedParams.erase(tag);
             updatesDetected = true;
         }
     }
 
-    return updatesDetected;
+    bool reconfigureRequired;
+    if (updatesDetected) {
+        reconfigureRequired = mInterface->isReconfigurationRequired(mLatestSessionParams,
+                updatedParams);
+        mLatestSessionParams = updatedParams;
+    } else {
+        reconfigureRequired = false;
+    }
+
+    return reconfigureRequired;
 }
 
 bool Camera3Device::RequestThread::threadLoop() {
@@ -5251,6 +5318,11 @@ bool Camera3Device::RequestThread::threadLoop() {
     ALOGVV("%s: %d: submitting %zu requests in a batch.", __FUNCTION__, __LINE__,
             mNextRequests.size());
 
+    sp<Camera3Device> parent = mParent.promote();
+    if (parent != nullptr) {
+        parent->mRequestBufferSM.onSubmittingRequest();
+    }
+
     bool submitRequestSuccess = false;
     nsecs_t tRequestStart = systemTime(SYSTEM_TIME_MONOTONIC);
     if (mInterface->supportBatchRequest()) {
@@ -5260,13 +5332,6 @@ bool Camera3Device::RequestThread::threadLoop() {
     }
     nsecs_t tRequestEnd = systemTime(SYSTEM_TIME_MONOTONIC);
     mRequestLatency.add(tRequestStart, tRequestEnd);
-
-    if (submitRequestSuccess) {
-        sp<Camera3Device> parent = mParent.promote();
-        if (parent != nullptr) {
-            parent->mRequestBufferSM.onRequestSubmitted();
-        }
-    }
 
     if (useFlushLock) {
         mFlushLock.unlock();
@@ -6429,9 +6494,11 @@ void Camera3Device::RequestBufferStateMachine::onStreamsConfigured() {
     return;
 }
 
-void Camera3Device::RequestBufferStateMachine::onRequestSubmitted() {
+void Camera3Device::RequestBufferStateMachine::onSubmittingRequest() {
     std::lock_guard<std::mutex> lock(mLock);
     mRequestThreadPaused = false;
+    // inflight map register actually happens in prepareHalRequest now, but it is close enough
+    // approximation.
     mInflightMapEmpty = false;
     if (mStatus == RB_STATUS_STOPPED) {
         mStatus = RB_STATUS_READY;

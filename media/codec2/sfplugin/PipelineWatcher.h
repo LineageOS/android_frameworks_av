@@ -54,7 +54,7 @@ public:
     void flush();
 
     bool pipelineFull() const;
-    Clock::duration elapsed(const Clock::time_point &now) const;
+    Clock::duration elapsed(const Clock::time_point &now, size_t n) const;
 
 private:
     uint32_t mInputDelay;

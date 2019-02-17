@@ -109,7 +109,10 @@ sp<AMessage> NuPlayer2::Decoder::getStats() const {
     mStats->setInt64("frames-dropped-output", mNumOutputFramesDropped);
     mStats->setFloat("frame-rate-total", mFrameRateTotal);
 
-    return mStats;
+    // i'm mutexed right now.
+    // make our own copy, so we aren't victim to any later changes.
+    sp<AMessage> copiedStats = mStats->dup();
+    return copiedStats;
 }
 
 status_t NuPlayer2::Decoder::setVideoSurface(const sp<ANativeWindowWrapper> &nww) {

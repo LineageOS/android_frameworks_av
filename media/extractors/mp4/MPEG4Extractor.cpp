@@ -2685,19 +2685,40 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC("ac-3"):
         {
             *offset += chunk_size;
-            return parseAC3SpecificBox(data_offset);
+            // bypass ac-3 if parse fail
+            if (parseAC3SpecificBox(data_offset) != OK) {
+                if (mLastTrack != NULL) {
+                    ALOGW("Fail to parse ac-3");
+                    mLastTrack->skipTrack = true;
+                }
+            }
+            return OK;
         }
 
         case FOURCC("ec-3"):
         {
             *offset += chunk_size;
-            return parseEAC3SpecificBox(data_offset);
+            // bypass ec-3 if parse fail
+            if (parseEAC3SpecificBox(data_offset) != OK) {
+                if (mLastTrack != NULL) {
+                    ALOGW("Fail to parse ec-3");
+                    mLastTrack->skipTrack = true;
+                }
+            }
+            return OK;
         }
 
         case FOURCC("ac-4"):
         {
             *offset += chunk_size;
-            return parseAC4SpecificBox(data_offset);
+            // bypass ac-4 if parse fail
+            if (parseAC4SpecificBox(data_offset) != OK) {
+                if (mLastTrack != NULL) {
+                    ALOGW("Fail to parse ac-4");
+                    mLastTrack->skipTrack = true;
+                }
+            }
+            return OK;
         }
 
         case FOURCC("ftyp"):

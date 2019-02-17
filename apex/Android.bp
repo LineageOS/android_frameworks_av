@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-apex {
-    name: "com.android.media",
-    manifest: "manifest.json",
+apex_defaults {
+    name: "com.android.media-defaults",
     java_libs: ["updatable-media"],
     compile_multilib: "both",
     multilib: {
@@ -42,19 +41,29 @@ apex {
         },
     },
     key: "com.android.media.key",
-    prefer_sanitize: {
-        cfi: true,
-    },
+    certificate: ":com.android.media.certificate",
 }
 
 apex {
-    name: "com.android.media.swcodec",
-    manifest: "manifest_codec.json",
+    name: "com.android.media",
+    manifest: "manifest.json",
+    defaults: ["com.android.media-defaults"],
+}
+
+apex_defaults {
+    name: "com.android.media.swcodec-defaults",
     native_shared_libs: [
         "libmedia_codecserviceregistrant",
     ],
     use_vendor: true,
     key: "com.android.media.swcodec.key",
+    certificate: ":com.android.media.swcodec.certificate",
+}
+
+apex {
+    name: "com.android.media.swcodec",
+    manifest: "manifest_codec.json",
+    defaults: ["com.android.media.swcodec-defaults"],
 }
 
 apex_key {
@@ -67,4 +76,14 @@ apex_key {
     name: "com.android.media.swcodec.key",
     public_key: "com.android.media.swcodec.avbpubkey",
     private_key: "com.android.media.swcodec.pem",
+}
+
+android_app_certificate {
+    name: "com.android.media.certificate",
+    certificate: "com.android.media",
+}
+
+android_app_certificate {
+    name: "com.android.media.swcodec.certificate",
+    certificate: "com.android.media.swcodec",
 }

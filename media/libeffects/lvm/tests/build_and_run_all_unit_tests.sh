@@ -54,21 +54,13 @@ fs_arr=(
     192000
 )
 
-ch_arr=(
-    1
-    2
-    4
-    6
-    8
-)
-
 # run multichannel effects at different configs, saving only the stereo channel
 # pair.
 for flags in "${flags_arr[@]}"
 do
     for fs in ${fs_arr[*]}
     do
-        for ch in ${ch_arr[*]}
+        for ch in {1..8}
         do
             adb shell $testdir/lvmtest -i:$testdir/sinesweepraw.raw \
                 -o:$testdir/sinesweep_$((ch))_$((fs)).raw -ch:$ch -fs:$fs $flags
