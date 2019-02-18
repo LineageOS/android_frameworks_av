@@ -1064,7 +1064,9 @@ c2_status_t Codec2Client::Component::setOutputSurface(
         C2BlockPool::local_id_t blockPoolId,
         const sp<IGraphicBufferProducer>& surface,
         uint32_t generation) {
-    sp<HGraphicBufferProducer> igbp = surface->getHalInterface();
+    sp<HGraphicBufferProducer> igbp =
+            surface->getHalInterface<HGraphicBufferProducer>();
+
     if (!igbp) {
         igbp = new TWGraphicBufferProducer<HGraphicBufferProducer>(surface);
     }
