@@ -52,78 +52,57 @@ public:
 
     // Set all known fields from a metadata structure
     virtual bool setFromMetadata(const CameraMetadata& metadata,
+            const CameraMetadata& staticInfo,
             const size_t imageWidth, const size_t imageHeight) = 0;
 
     // Sets the len aperture.
     // Returns false if memory allocation fails.
-    virtual bool setAperture(uint32_t numerator, uint32_t denominator) = 0;
+    virtual bool setAperture(float aperture) = 0;
 
-    // Sets the value of brightness.
-    // Returns false if memory allocation fails.
-    virtual bool setBrightness(int32_t numerator, int32_t denominator) = 0;
-
-    // Sets the color space.
+    // sets the color space.
     // Returns false if memory allocation fails.
     virtual bool setColorSpace(uint16_t color_space) = 0;
-
-    // Sets the information to compressed data.
-    // Returns false if memory allocation fails.
-    virtual bool setComponentsConfiguration(const std::string& components_configuration) = 0;
-
-    // Sets the compression scheme used for the image data.
-    // Returns false if memory allocation fails.
-    virtual bool setCompression(uint16_t compression) = 0;
-
-    // Sets image contrast.
-    // Returns false if memory allocation fails.
-    virtual bool setContrast(uint16_t contrast) = 0;
 
     // Sets the date and time of image last modified. It takes local time. The
     // name of the tag is DateTime in IFD0.
     // Returns false if memory allocation fails.
     virtual bool setDateTime(const struct tm& t) = 0;
 
-    // Sets the image description.
-    // Returns false if memory allocation fails.
-    virtual bool setDescription(const std::string& description) = 0;
-
     // Sets the digital zoom ratio. If the numerator is 0, it means digital zoom
     // was not used.
     // Returns false if memory allocation fails.
-    virtual bool setDigitalZoomRatio(uint32_t numerator, uint32_t denominator) = 0;
+    virtual bool setDigitalZoomRatio(uint32_t crop_width, uint32_t crop_height,
+            uint32_t sensor_width, uint32_t sensor_height) = 0;
 
     // Sets the exposure bias.
     // Returns false if memory allocation fails.
-    virtual bool setExposureBias(int32_t numerator, int32_t denominator) = 0;
+    virtual bool setExposureBias(int32_t ev,
+            uint32_t ev_step_numerator, uint32_t ev_step_denominator) = 0;
 
     // Sets the exposure mode set when the image was shot.
     // Returns false if memory allocation fails.
-    virtual bool setExposureMode(uint16_t exposure_mode) = 0;
-
-    // Sets the program used by the camera to set exposure when the picture is
-    // taken.
-    // Returns false if memory allocation fails.
-    virtual bool setExposureProgram(uint16_t exposure_program) = 0;
+    virtual bool setExposureMode(uint8_t exposure_mode) = 0;
 
     // Sets the exposure time, given in seconds.
     // Returns false if memory allocation fails.
-    virtual bool setExposureTime(uint32_t numerator, uint32_t denominator) = 0;
+    virtual bool setExposureTime(float exposure_time) = 0;
 
     // Sets the status of flash.
     // Returns false if memory allocation fails.
-    virtual bool setFlash(uint16_t flash) = 0;
+    virtual bool setFlash(uint8_t flash_available, uint8_t flash_state, uint8_t ae_mode) = 0;
 
     // Sets the F number.
     // Returns false if memory allocation fails.
-    virtual bool setFNumber(uint32_t numerator, uint32_t denominator) = 0;
+    virtual bool setFNumber(float f_number) = 0;
 
     // Sets the focal length of lens used to take the image in millimeters.
     // Returns false if memory allocation fails.
-    virtual bool setFocalLength(uint32_t numerator, uint32_t denominator) = 0;
+    virtual bool setFocalLength(float focal_length) = 0;
 
-    // Sets the degree of overall image gain adjustment.
+    // Sets the focal length of lens for 35mm film used to take the image in millimeters.
     // Returns false if memory allocation fails.
-    virtual bool setGainControl(uint16_t gain_control) = 0;
+    virtual bool setFocalLengthIn35mmFilm(float focal_length,
+            float sensor_size_x, float sensor_size_y) = 0;
 
     // Sets the altitude in meters.
     // Returns false if memory allocation fails.
@@ -157,45 +136,21 @@ public:
     // Returns false if memory allocation fails.
     virtual bool setIsoSpeedRating(uint16_t iso_speed_ratings) = 0;
 
-    // Sets the kind of light source.
-    // Returns false if memory allocation fails.
-    virtual bool setLightSource(uint16_t light_source) = 0;
-
     // Sets the smallest F number of the lens.
     // Returns false if memory allocation fails.
-    virtual bool setMaxAperture(uint32_t numerator, uint32_t denominator) = 0;
-
-    // Sets the metering mode.
-    // Returns false if memory allocation fails.
-    virtual bool setMeteringMode(uint16_t metering_mode) = 0;
+    virtual bool setMaxAperture(float aperture) = 0;
 
     // Sets image orientation.
     // Returns false if memory allocation fails.
     virtual bool setOrientation(uint16_t orientation) = 0;
 
-    // Sets the unit for measuring XResolution and YResolution.
-    // Returns false if memory allocation fails.
-    virtual bool setResolutionUnit(uint16_t resolution_unit) = 0;
-
-    // Sets image saturation.
-    // Returns false if memory allocation fails.
-    virtual bool setSaturation(uint16_t saturation) = 0;
-
-    // Sets the type of scene that was shot.
-    // Returns false if memory allocation fails.
-    virtual bool setSceneCaptureType(uint16_t type) = 0;
-
-    // Sets image sharpness.
-    // Returns false if memory allocation fails.
-    virtual bool setSharpness(uint16_t sharpness) = 0;
-
     // Sets the shutter speed.
     // Returns false if memory allocation fails.
-    virtual bool setShutterSpeed(int32_t numerator, int32_t denominator) = 0;
+    virtual bool setShutterSpeed(float exposure_time) = 0;
 
     // Sets the distance to the subject, given in meters.
     // Returns false if memory allocation fails.
-    virtual bool setSubjectDistance(uint32_t numerator, uint32_t denominator) = 0;
+    virtual bool setSubjectDistance(float diopters) = 0;
 
     // Sets the fractions of seconds for the <DateTime> tag.
     // Returns false if memory allocation fails.
@@ -203,28 +158,7 @@ public:
 
     // Sets the white balance mode set when the image was shot.
     // Returns false if memory allocation fails.
-    virtual bool setWhiteBalance(uint16_t white_balance) = 0;
-
-    // Sets the number of pixels per resolution unit in the image width.
-    // Returns false if memory allocation fails.
-    virtual bool setXResolution(uint32_t numerator, uint32_t denominator) = 0;
-
-    // Sets the position of chrominance components in relation to the luminance
-    // component.
-    // Returns false if memory allocation fails.
-    virtual bool setYCbCrPositioning(uint16_t ycbcr_positioning) = 0;
-
-    // Sets the number of pixels per resolution unit in the image length.
-    // Returns false if memory allocation fails.
-    virtual bool setYResolution(uint32_t numerator, uint32_t denominator) = 0;
-
-    // Sets the manufacturer of camera.
-    // Returns false if memory allocation fails.
-    virtual bool setMake(const std::string& make) = 0;
-
-    // Sets the model number of camera.
-    // Returns false if memory allocation fails.
-    virtual bool setModel(const std::string& model) = 0;
+    virtual bool setWhiteBalance(uint8_t white_blanace) = 0;
 
     // Generates APP1 segment.
     // Returns false if generating APP1 segment fails.
