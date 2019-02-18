@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "bfd6a6fe_f519f275",
+        "filename": "services/audiopolicy/enginedefault/src/Engine.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 584,
+      "author": {
+        "id": 18836
+      },
+      "writtenOn": "2019-02-18T09:06:51Z",
+      "side": 1,
+      "message": "I believe the check for strategy !\u003d STRATEGY_SONIFICATION was intended here judging from the comment below this line. strategy can be STRATEGY_SONIFICATION after the fallthrough from above.",
+      "revId": "67c1be4a67038c94096dc7f05e2eeed8ce15b947",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
