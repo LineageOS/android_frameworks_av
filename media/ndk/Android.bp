@@ -95,6 +95,10 @@ cc_library_shared {
         symbol_file: "libmediandk.map.txt",
         versions: ["29"],
     },
+
+    // Bug: http://b/124522995 libmediandk has linker errors when built with
+    // coverage
+    native_coverage: false,
 }
 
 llndk_library {
