@@ -77,7 +77,7 @@ protected:
 
     bool threadLoop() override;
     bool onStreamBufferError(const CaptureResultExtras& resultExtras) override;
-    void onResultError(const CaptureResultExtras& /*resultExtras*/) override {}
+    void onResultError(const CaptureResultExtras& resultExtras) override;
 
 private:
     //
@@ -145,12 +145,13 @@ private:
         int32_t                   orientation;
         int32_t                   quality;
 
-        CpuConsumer::LockedBuffer     appSegmentBuffer;
+        CpuConsumer::LockedBuffer          appSegmentBuffer;
         std::vector<CodecOutputBufferInfo> codecOutputBuffers;
+        std::unique_ptr<CameraMetadata>    result;
 
         // Fields that are only applicable to HEVC tiling.
-        CpuConsumer::LockedBuffer     yuvBuffer;
-        std::vector<CodecInputBufferInfo> codecInputBuffers;
+        CpuConsumer::LockedBuffer          yuvBuffer;
+        std::vector<CodecInputBufferInfo>  codecInputBuffers;
 
         bool                      error;
         bool                      errorNotified;
@@ -209,6 +210,7 @@ private:
     sp<Surface>       mAppSegmentSurface;
     bool              mAppSegmentBufferAcquired;
     size_t            mAppSegmentMaxSize;
+    CameraMetadata    mStaticInfo;
 
     int               mMainImageStreamId, mMainImageSurfaceId;
     sp<Surface>       mMainImageSurface;
