@@ -139,8 +139,8 @@ PipelineWatcher::Clock::duration PipelineWatcher::elapsed(
               std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count());
         durations.push_back(elapsed);
     }
-    nth_element(durations.begin(), durations.end(), durations.begin() + n,
-                std::greater<Clock::duration>());
+    std::nth_element(durations.begin(), durations.end(), durations.begin() + n,
+                     std::greater<Clock::duration>());
     return durations[n];
 }
 
