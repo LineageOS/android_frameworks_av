@@ -53,6 +53,17 @@ __BEGIN_DECLS
  */
 typedef struct ACameraDevice ACameraDevice;
 
+/**
+ * Struct to hold list of camera device Ids. This can refer to either the Ids
+ * of connected camera devices returned from {@link ACameraManager_getCameraIdList},
+ * or the physical camera Ids passed into
+ * {@link ACameraDevice_createCaptureRequest_withPhysicalIds}.
+ */
+typedef struct ACameraIdList {
+    int numCameras;          ///< Number of camera device Ids
+    const char** cameraIds;  ///< list of camera device Ids
+} ACameraIdList;
+
 /// Enum for ACameraDevice_ErrorStateCallback error code
 enum {
     /**
@@ -792,6 +803,47 @@ camera_status_t ACameraDevice_createCaptureSessionWithSessionParameters(
 camera_status_t ACaptureSessionPhysicalOutput_create(
         ACameraWindowType* anw, const char* physicalId,
         /*out*/ACaptureSessionOutput** output) __INTRODUCED_IN(29);
+
+/**
+ * Create a logical multi-camera ACaptureRequest for capturing images, initialized with template
+ * for a target use case, with the ability to specify physical camera settings.
+ *
+ * <p>The settings are chosen to be the best options for this camera device,
+ * so it is not recommended to reuse the same request for a different camera device.</p>
+ *
+ * <p>Note that for all keys in physical camera settings, only the keys
+ * advertised in ACAMERA_REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS are
+ * applicable. All other keys are ignored by the camera device.</p>
+ *
+ * @param device the camera device of interest
+ * @param templateId the type of capture request to be created.
+ *        See {@link ACameraDevice_request_template}.
+ * @param physicalIdList The list of physical camera Ids that can be used to
+ *        customize the request for a specific physical camera.
+ * @param request the output request will be stored here if the method call succeeds.
+ *
+ * @return <ul>
+ *         <li>{@link ACAMERA_OK} if the method call succeeds. The created capture request will be
+ *                                filled in request argument.</li>
+ *         <li>{@link ACAMERA_ERROR_INVALID_PARAMETER} if device, physicalIdList, or request is
+ *                                NULL, templateId is undefined or camera device does not support
+ *                                requested template, or if some Ids in physicalIdList isn't a
+ *                                valid physical camera backing the current camera device.</li>
+ *         <li>{@link ACAMERA_ERROR_CAMERA_DISCONNECTED} if the camera device is closed.</li>
+ *         <li>{@link ACAMERA_ERROR_CAMERA_DEVICE} if the camera device encounters fatal error.</li>
+ *         <li>{@link ACAMERA_ERROR_CAMERA_SERVICE} if the camera service encounters fatal error.</li>
+ *         <li>{@link ACAMERA_ERROR_UNKNOWN} if the method fails for some other reasons.</li></ul>
+ *
+ * @see TEMPLATE_PREVIEW
+ * @see TEMPLATE_RECORD
+ * @see TEMPLATE_STILL_CAPTURE
+ * @see TEMPLATE_VIDEO_SNAPSHOT
+ * @see TEMPLATE_MANUAL
+ */
+camera_status_t ACameraDevice_createCaptureRequest_withPhysicalIds(
+        const ACameraDevice* device, ACameraDevice_request_template templateId,
+        const ACameraIdList* physicalIdList,
+        /*out*/ACaptureRequest** request) __INTRODUCED_IN(29);
 
 #endif /* __ANDROID_API__ >= 29 */
 

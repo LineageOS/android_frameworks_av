@@ -78,7 +78,34 @@ camera_status_t ACameraDevice_createCaptureRequest(
             ALOGE("%s: unknown template ID %d", __FUNCTION__, templateId);
             return ACAMERA_ERROR_INVALID_PARAMETER;
     }
-    return device->createCaptureRequest(templateId, request);
+    return device->createCaptureRequest(templateId, nullptr /*physicalIdList*/, request);
+}
+
+EXPORT
+camera_status_t ACameraDevice_createCaptureRequest_withPhysicalIds(
+        const ACameraDevice* device,
+        ACameraDevice_request_template templateId,
+        const ACameraIdList* physicalCameraIdList,
+        ACaptureRequest** request) {
+    ATRACE_CALL();
+    if (device == nullptr || request == nullptr || physicalCameraIdList == nullptr) {
+        ALOGE("%s: invalid argument! device %p request %p, physicalCameraIdList %p",
+                __FUNCTION__, device, request, physicalCameraIdList);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    switch (templateId) {
+        case TEMPLATE_PREVIEW:
+        case TEMPLATE_STILL_CAPTURE:
+        case TEMPLATE_RECORD:
+        case TEMPLATE_VIDEO_SNAPSHOT:
+        case TEMPLATE_ZERO_SHUTTER_LAG:
+        case TEMPLATE_MANUAL:
+            break;
+        default:
+            ALOGE("%s: unknown template ID %d", __FUNCTION__, templateId);
+            return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    return device->createCaptureRequest(templateId, physicalCameraIdList, request);
 }
 
 EXPORT
