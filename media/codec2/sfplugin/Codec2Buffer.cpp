@@ -224,6 +224,7 @@ public:
             mInitCheck = BAD_VALUE;
             return;
         }
+        memset(mediaImage, 0, sizeof(*mediaImage));
         mAllocatedDepth = layout.planes[0].allocatedDepth;
         uint32_t bitDepth = layout.planes[0].bitDepth;
 
