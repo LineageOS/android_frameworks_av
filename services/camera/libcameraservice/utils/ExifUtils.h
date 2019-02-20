@@ -22,6 +22,24 @@
 namespace android {
 namespace camera3 {
 
+/*
+ * Orientation value:
+ *  1      2      3      4      5          6          7          8
+ *
+ *  888888 888888     88 88     8888888888 88                 88 8888888888
+ *  88         88     88 88     88  88     88  88         88  88     88  88
+ *  8888     8888   8888 8888   88         8888888888 8888888888         88
+ *  88         88     88 88
+ *  88         88 888888 888888
+ */
+enum ExifOrientation : uint16_t {
+    ORIENTATION_UNDEFINED   = 0x0,
+    ORIENTATION_0_DEGREES   = 0x1,
+    ORIENTATION_90_DEGREES  = 0x6,
+    ORIENTATION_180_DEGREES = 0x3,
+    ORIENTATION_270_DEGREES = 0x8,
+};
+
 // This is based on the camera HIDL shim implementation, which was in turned
 // based on original ChromeOS ARC implementation of a V4L2 HAL
 
@@ -49,6 +67,7 @@ public:
     // Initialize() can be called multiple times. The setting of Exif tags will be
     // cleared.
     virtual bool initialize(const unsigned char *app1Segment, size_t app1SegmentSize) = 0;
+    virtual bool initializeEmpty() = 0;
 
     // Set all known fields from a metadata structure
     virtual bool setFromMetadata(const CameraMetadata& metadata,
@@ -142,7 +161,11 @@ public:
 
     // Sets image orientation.
     // Returns false if memory allocation fails.
-    virtual bool setOrientation(uint16_t orientation) = 0;
+    virtual bool setOrientation(uint16_t degrees) = 0;
+
+    // Sets image orientation.
+    // Returns false if memory allocation fails.
+    virtual bool setOrientationValue(ExifOrientation orientationValue) = 0;
 
     // Sets the shutter speed.
     // Returns false if memory allocation fails.

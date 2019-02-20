@@ -339,6 +339,21 @@ status_t DepthCompositeStream::processInputFrame(const InputFrame &inputFrame) {
     } else {
         depthPhoto.mIsLensDistortionValid = 0;
     }
+    entry = inputFrame.result.find(ANDROID_JPEG_ORIENTATION);
+    if (entry.count > 0) {
+        // The camera jpeg orientation values must be within [0, 90, 180, 270].
+        switch (entry.data.i32[0]) {
+            case 0:
+            case 90:
+            case 180:
+            case 270:
+                depthPhoto.mOrientation = static_cast<DepthPhotoOrientation> (entry.data.i32[0]);
+                break;
+            default:
+                ALOGE("%s: Unexpected jpeg orientation value: %d, default to 0 degrees",
+                        __FUNCTION__, entry.data.i32[0]);
+        }
+    }
 
     size_t actualJpegSize = 0;
     res = mDepthPhotoProcess(depthPhoto, finalJpegBufferSize, dstBuffer, &actualJpegSize);
