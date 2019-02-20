@@ -144,6 +144,9 @@ enum {
     // The language code for this media
     kKeyMediaLanguage     = 'lang',  // cstring
 
+    // The manufacturer code for this media
+    kKeyManufacturer  = 'manu',  // cstring
+
     // To store the timed text format data
     kKeyTextFormatData    = 'text',  // raw data
 
