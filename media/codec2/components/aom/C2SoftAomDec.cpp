@@ -141,7 +141,7 @@ class C2SoftAomDec::IntfImpl : public SimpleInterface<void>::BaseParams {
 
     static C2R SizeSetter(bool mayBlock,
                           const C2P<C2StreamPictureSizeInfo::output>& oldMe,
-                          C2P<C2VideoSizeStreamInfo::output>& me) {
+                          C2P<C2StreamPictureSizeInfo::output>& me) {
         (void)mayBlock;
         C2R res = C2R::Ok();
         if (!me.F(me.v.width).supportsAtAll(me.v.width)) {
@@ -586,7 +586,7 @@ bool C2SoftAomDec::outputBuffer(
         mWidth = img->d_w;
         mHeight = img->d_h;
 
-        C2VideoSizeStreamInfo::output size(0u, mWidth, mHeight);
+        C2StreamPictureSizeInfo::output size(0u, mWidth, mHeight);
         std::vector<std::unique_ptr<C2SettingResult>> failures;
         c2_status_t err = mIntf->config({&size}, C2_MAY_BLOCK, &failures);
         if (err == C2_OK) {

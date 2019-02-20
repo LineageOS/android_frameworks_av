@@ -182,9 +182,9 @@ template <typename T> std::unique_ptr<T> makeParam() {
     return std::make_unique<T>();
 }
 
-template <> std::unique_ptr<C2PortMimeConfig::input> makeParam() {
+template <> std::unique_ptr<C2PortMediaTypeSetting::input> makeParam() {
     // TODO(hiroh): Set more precise length.
-    return C2PortMimeConfig::input::AllocUnique(100);
+    return C2PortMediaTypeSetting::input::AllocUnique(100);
 }
 
 #define TRACED_FAILURE(func)                            \
@@ -323,17 +323,17 @@ void C2CompIntfTest::configWritableParamInvalidValue(const T &newParam) {
     EXPECT_EQ(C2SettingResult::BAD_VALUE, failures[0]->failure);
 }
 
-// There is only used enum type for the field type, that is C2DomainKind.
+// There is only used enum type for the field type, that is C2Component::domain_t.
 // If another field type is added, it is necessary to add function for that.
 template <>
 void C2CompIntfTest::getTestValues(
         const C2FieldSupportedValues &validValueInfos,
-        std::vector<C2DomainKind> *const validValues,
-        std::vector<C2DomainKind> *const invalidValues) {
+        std::vector<C2Component::domain_t> *const validValues,
+        std::vector<C2Component::domain_t> *const invalidValues) {
     UNUSED(validValueInfos);
-    validValues->emplace_back(C2DomainVideo);
-    validValues->emplace_back(C2DomainAudio);
-    validValues->emplace_back(C2DomainOther);
+    validValues->emplace_back(C2Component::DOMAIN_VIDEO);
+    validValues->emplace_back(C2Component::DOMAIN_AUDIO);
+    validValues->emplace_back(C2Component::DOMAIN_OTHER);
 
     // There is no invalid value.
     UNUSED(invalidValues);
@@ -634,20 +634,20 @@ void C2CompIntfTest::testMain(std::shared_ptr<C2ComponentInterface> intf,
     std::vector<std::shared_ptr<C2ParamDescriptor>> supportedParams;
     ASSERT_EQ(C2_OK, mIntf->querySupportedParams_nb(&supportedParams));
 
-    EACH_TEST_SELF(C2ComponentLatencyInfo, TEST_U32_WRITABLE_FIELD);
-    EACH_TEST_SELF(C2ComponentTemporalInfo, TEST_U32_WRITABLE_FIELD);
-    EACH_TEST_INPUT(C2PortLatencyInfo, TEST_U32_WRITABLE_FIELD);
-    EACH_TEST_OUTPUT(C2PortLatencyInfo, TEST_U32_WRITABLE_FIELD);
-    EACH_TEST_INPUT(C2StreamFormatConfig, TEST_U32_WRITABLE_FIELD);
-    EACH_TEST_OUTPUT(C2StreamFormatConfig, TEST_U32_WRITABLE_FIELD);
-    EACH_TEST_INPUT(C2PortStreamCountConfig, TEST_U32_WRITABLE_FIELD);
-    EACH_TEST_OUTPUT(C2PortStreamCountConfig, TEST_U32_WRITABLE_FIELD);
+    EACH_TEST_SELF(C2ActualPipelineDelayTuning, TEST_U32_WRITABLE_FIELD);
+    EACH_TEST_SELF(C2ComponentAttributesSetting, TEST_U32_WRITABLE_FIELD);
+    EACH_TEST_INPUT(C2PortActualDelayTuning, TEST_U32_WRITABLE_FIELD);
+    EACH_TEST_OUTPUT(C2PortActualDelayTuning, TEST_U32_WRITABLE_FIELD);
+    EACH_TEST_INPUT(C2StreamBufferTypeSetting, TEST_U32_WRITABLE_FIELD);
+    EACH_TEST_OUTPUT(C2StreamBufferTypeSetting, TEST_U32_WRITABLE_FIELD);
+    EACH_TEST_INPUT(C2PortStreamCountTuning, TEST_U32_WRITABLE_FIELD);
+    EACH_TEST_OUTPUT(C2PortStreamCountTuning, TEST_U32_WRITABLE_FIELD);
 
-    EACH_TEST_SELF(C2ComponentDomainInfo, TEST_ENUM_WRITABLE_FIELD);
+    EACH_TEST_SELF(C2ComponentDomainSetting, TEST_ENUM_WRITABLE_FIELD);
 
     // TODO(hiroh): Support parameters based on uint32_t[] and char[].
-    // EACH_TEST_INPUT(C2PortMimeConfig, TEST_STRING_WRITABLE_FIELD);
-    // EACH_TEST_OUTPUT(C2PortMimeConfig, TEST_STRING_WRITABLE_FIELD);
+    // EACH_TEST_INPUT(C2PortMediaTypeSetting, TEST_STRING_WRITABLE_FIELD);
+    // EACH_TEST_OUTPUT(C2PortMediaTypeSetting, TEST_STRING_WRITABLE_FIELD);
     // EACH_TEST_INPUT(C2StreamMimeConfig, TEST_STRING_WRITABLE_FIELD);
     // EACH_TEST_OUTPUT(C2StreamMimeConfig, TEST_STRING_WRITABLE_FIELD);
 
@@ -656,10 +656,10 @@ void C2CompIntfTest::testMain(std::shared_ptr<C2ComponentInterface> intf,
     // EACH_TEST_SELF(C2ReadOnlyParamsInfo, TEST_U32ARRAY_WRITABLE_FIELD);
     // EACH_TEST_SELF(C2RequestedInfosInfo, TEST_U32ARRAY_WRITABLE_FIELD);
 
-    EACH_TEST_INPUT(C2VideoSizeStreamInfo, TEST_VSSTRUCT_WRITABLE_FIELD);
-    EACH_TEST_OUTPUT(C2VideoSizeStreamInfo, TEST_VSSTRUCT_WRITABLE_FIELD);
-    EACH_TEST_INPUT(C2VideoSizeStreamTuning, TEST_VSSTRUCT_WRITABLE_FIELD);
-    EACH_TEST_OUTPUT(C2VideoSizeStreamTuning, TEST_VSSTRUCT_WRITABLE_FIELD);
+    EACH_TEST_INPUT(C2StreamPictureSizeInfo, TEST_VSSTRUCT_WRITABLE_FIELD);
+    EACH_TEST_OUTPUT(C2StreamPictureSizeInfo, TEST_VSSTRUCT_WRITABLE_FIELD);
+    EACH_TEST_INPUT(C2StreamPictureSizeInfo, TEST_VSSTRUCT_WRITABLE_FIELD);
+    EACH_TEST_OUTPUT(C2StreamPictureSizeInfo, TEST_VSSTRUCT_WRITABLE_FIELD);
     EACH_TEST_INPUT(C2MaxVideoSizeHintPortSetting, TEST_VSSTRUCT_WRITABLE_FIELD);
     EACH_TEST_OUTPUT(C2MaxVideoSizeHintPortSetting, TEST_VSSTRUCT_WRITABLE_FIELD);
 

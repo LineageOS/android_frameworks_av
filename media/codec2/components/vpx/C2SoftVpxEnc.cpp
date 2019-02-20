@@ -633,7 +633,7 @@ void C2SoftVpxEnc::process(
             std::shared_ptr<C2Buffer> buffer = createLinearBuffer(block);
             if (encoded_packet->data.frame.flags & VPX_FRAME_IS_KEY) {
                 buffer->setInfo(std::make_shared<C2StreamPictureTypeMaskInfo::output>(
-                        0u /* stream id */, C2PictureTypeKeyFrame));
+                        0u /* stream id */, C2Config::SYNC_FRAME));
             }
             work->worklets.front()->output.buffers.push_back(buffer);
             work->worklets.front()->output.ordinal = work->input.ordinal;

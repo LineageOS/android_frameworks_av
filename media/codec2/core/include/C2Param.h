@@ -1012,15 +1012,6 @@ public:
           _mNamedValues(_NamedValuesGetter<B>::getNamedValues()),
           _mFieldId(offset) {}
 
-/*
-    template<typename T, typename B=typename std::remove_extent<T>::type>
-    inline C2FieldDescriptor<T, B, false>(T* offset, const char *name)
-        : _mType(this->GetType((B*)nullptr)),
-          _mExtent(std::is_array<T>::value ? std::extent<T>::value : 1),
-          _mName(name),
-          _mFieldId(offset) {}
-*/
-
     /// \deprecated
     template<typename T, typename S, class B=typename std::remove_extent<T>::type>
     inline C2FieldDescriptor(S*, T S::* field, const char *name)

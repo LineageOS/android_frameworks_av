@@ -712,8 +712,8 @@ c2_status_t C2PlatformComponentStore::ComponentModule::init(
         }
 
         uint32_t mediaTypeIndex =
-                traits->kind == C2Component::KIND_ENCODER ? C2PortMimeConfig::output::PARAM_TYPE
-                : C2PortMimeConfig::input::PARAM_TYPE;
+                traits->kind == C2Component::KIND_ENCODER ? C2PortMediaTypeSetting::output::PARAM_TYPE
+                : C2PortMediaTypeSetting::input::PARAM_TYPE;
         std::vector<std::unique_ptr<C2Param>> params;
         res = intf->query_vb({}, { mediaTypeIndex }, C2_MAY_BLOCK, &params);
         if (res != C2_OK) {
@@ -724,7 +724,7 @@ c2_status_t C2PlatformComponentStore::ComponentModule::init(
             ALOGD("failed to query interface: unexpected vector size: %zu", params.size());
             return mInit;
         }
-        C2PortMimeConfig *mediaTypeConfig = C2PortMimeConfig::From(params[0].get());
+        C2PortMediaTypeSetting *mediaTypeConfig = C2PortMediaTypeSetting::From(params[0].get());
         if (mediaTypeConfig == nullptr) {
             ALOGD("failed to query media type");
             return mInit;

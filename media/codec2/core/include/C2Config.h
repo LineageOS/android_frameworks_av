@@ -240,19 +240,6 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexTimestampGapAdjustment, // input-surface, struct
 
     kParamIndexSurfaceAllocator, // u32
-
-    // deprecated indices due to renaming
-    kParamIndexAacStreamFormat = kParamIndexAacPackaging,
-    kParamIndexCsd = kParamIndexInitData,
-    kParamIndexMaxVideoSizeHint = kParamIndexMaxPictureSize,
-    kParamIndexMime = kParamIndexMediaType,
-    kParamIndexRequestedInfos = kParamIndexSubscribedParamIndices,
-
-
-    // deprecated indices due to removal
-    kParamIndexSupportedParams = 0xDEAD0000,
-    kParamIndexReadOnlyParams,
-    kParamIndexTemporal,
 };
 
 }
@@ -337,13 +324,7 @@ constexpr char C2_PARAMKEY_COMPONENT_KIND[]  = "component.kind";
 // read-only
 typedef C2GlobalParam<C2Setting, C2SimpleValueStruct<C2Component::domain_t>, kParamIndexDomain>
         C2ComponentDomainSetting;
-typedef C2ComponentDomainSetting C2ComponentDomainInfo; // deprecated
-typedef C2Component::domain_t C2DomainKind; // deprecated
 constexpr char C2_PARAMKEY_COMPONENT_DOMAIN[]  = "component.domain";
-
-constexpr C2Component::domain_t C2DomainAudio = C2Component::DOMAIN_AUDIO; // deprecated
-constexpr C2Component::domain_t C2DomainOther = C2Component::DOMAIN_OTHER; // deprecate
-constexpr C2Component::domain_t C2DomainVideo = C2Component::DOMAIN_VIDEO; // deprecate
 
 /**
  * Component attributes.
@@ -358,9 +339,6 @@ C2ENUM(C2Component::attrib_t, uint64_t,
 typedef C2GlobalParam<C2Setting, C2SimpleValueStruct<C2Component::attrib_t>, kParamIndexAttributes>
         C2ComponentAttributesSetting;
 constexpr char C2_PARAMKEY_COMPONENT_ATTRIBUTES[] = "component.attributes";
-
-// deprecated
-typedef C2ComponentAttributesSetting C2ComponentTemporalInfo;
 
 /**
  * Time stretching.
@@ -707,7 +685,6 @@ struct C2ProfileLevelStruct {
 typedef C2StreamParam<C2Info, C2ProfileLevelStruct, kParamIndexProfileLevel>
         C2StreamProfileLevelInfo;
 constexpr char C2_PARAMKEY_PROFILE_LEVEL[] = "coded.pl";
-#define C2_PARAMKEY_STREAM_PROFILE_LEVEL C2_PARAMKEY_PROFILE_LEVEL
 
 /**
  * Codec-specific initialization data.
@@ -719,9 +696,7 @@ constexpr char C2_PARAMKEY_PROFILE_LEVEL[] = "coded.pl";
  * TODO: define for other codecs.
  */
 typedef C2StreamParam<C2Info, C2BlobValue, kParamIndexInitData> C2StreamInitDataInfo;
-typedef C2StreamInitDataInfo C2StreamCsdInfo; // deprecated
 constexpr char C2_PARAMKEY_INIT_DATA[] = "coded.init-data";
-#define C2_PARAMKEY_STREAM_INIT_DATA C2_PARAMKEY_INIT_DATA
 
 /**
  * Supplemental Data.
@@ -781,11 +756,8 @@ constexpr char C2_PARAMKEY_SUBSCRIBED_SUPPLEMENTAL_DATA[] = "output.subscribed-s
  * port media type.
  */
 typedef C2PortParam<C2Setting, C2StringValue, kParamIndexMediaType> C2PortMediaTypeSetting;
-typedef C2PortMediaTypeSetting C2PortMimeConfig; // deprecated
 constexpr char C2_PARAMKEY_INPUT_MEDIA_TYPE[] = "input.media-type";
 constexpr char C2_PARAMKEY_OUTPUT_MEDIA_TYPE[] = "output.media-type";
-#define C2_NAME_INPUT_PORT_MIME_SETTING C2_PARAMKEY_INPUT_MEDIA_TYPE
-#define C2_NAME_OUTPUT_PORT_MIME_SETTING C2_PARAMKEY_OUTPUT_MEDIA_TYPE
 
 typedef C2StreamParam<C2Setting, C2StringValue, kParamIndexMediaType> C2StreamMediaTypeSetting;
 
@@ -808,24 +780,20 @@ typedef C2StreamParam<C2Setting, C2StringValue, kParamIndexMediaType> C2StreamMe
  */
 
 typedef C2PortParam<C2Tuning, C2Uint32Value, kParamIndexDelayRequest> C2PortRequestedDelayTuning;
-typedef C2PortRequestedDelayTuning C2PortRequestedLatencyTuning; // deprecated
 constexpr char C2_PARAMKEY_INPUT_DELAY_REQUEST[] = "input.delay.requested";
 constexpr char C2_PARAMKEY_OUTPUT_DELAY_REQUEST[] = "output.delay.requested";
 
 typedef C2GlobalParam<C2Tuning, C2Uint32Value, kParamIndexDelayRequest>
         C2RequestedPipelineDelayTuning;
-typedef C2RequestedPipelineDelayTuning C2ComponentRequestedLatencyTuning; // deprecated
 constexpr char C2_PARAMKEY_PIPELINE_DELAY_REQUEST[] = "pipeline-delay.requested";
 
 // read-only
 typedef C2PortParam<C2Tuning, C2Uint32Value, kParamIndexDelay> C2PortActualDelayTuning;
-typedef C2PortActualDelayTuning C2PortLatencyInfo; // deprecated
 constexpr char C2_PARAMKEY_INPUT_DELAY[] = "input.delay.actual";
 constexpr char C2_PARAMKEY_OUTPUT_DELAY[] = "output.delay.actual";
 
 // read-only
 typedef C2GlobalParam<C2Tuning, C2Uint32Value, kParamIndexDelay> C2ActualPipelineDelayTuning;
-typedef C2ActualPipelineDelayTuning C2ComponentLatencyInfo; // deprecated
 constexpr char C2_PARAMKEY_PIPELINE_DELAY[] = "algo.delay.actual";
 
 /**
@@ -875,7 +843,6 @@ constexpr char C2_PARAMKEY_OUTPUT_REORDER_KEY[] = "output.reorder.key";
  */
 // private
 typedef C2PortParam<C2Tuning, C2Uint32Value, kParamIndexStreamCount> C2PortStreamCountTuning;
-typedef C2PortStreamCountTuning C2PortStreamCountConfig; // deprecated
 constexpr char C2_PARAMKEY_INPUT_STREAM_COUNT[] = "input.stream-count";
 constexpr char C2_PARAMKEY_OUTPUT_STREAM_COUNT[] = "output.stream-count";
 
@@ -985,19 +952,8 @@ constexpr char C2_PARAMKEY_MAX_PRIVATE_BUFFER_COUNT[] = "algo.buffers.max-count"
 typedef C2StreamParam<C2Setting, C2SimpleValueStruct<C2EasyEnum<C2BufferData::type_t>>,
                 kParamIndexBufferType>
         C2StreamBufferTypeSetting;
-
-constexpr C2BufferData::type_t C2FormatAudio      = C2BufferData::LINEAR; // deprecated
-constexpr C2BufferData::type_t C2FormatCompressed = C2BufferData::LINEAR; // deprecated
-constexpr C2BufferData::type_t C2FormatVideo      = C2BufferData::GRAPHIC; // deprecated
-typedef C2BufferData::type_t C2FormatKind; // deprecated
-
-typedef C2StreamBufferTypeSetting C2StreamFormatConfig; // deprecated
 constexpr char C2_PARAMKEY_INPUT_STREAM_BUFFER_TYPE[] = "input.buffers.type";
 constexpr char C2_PARAMKEY_OUTPUT_STREAM_BUFFER_TYPE[] = "output.buffers.type";
-
-// deprecated
-#define C2_NAME_INPUT_STREAM_FORMAT_SETTING C2_PARAMKEY_INPUT_STREAM_BUFFER_TYPE
-#define C2_NAME_OUTPUT_STREAM_FORMAT_SETTING C2_PARAMKEY_OUTPUT_STREAM_BUFFER_TYPE
 
 /**
  * Memory usage.
@@ -1007,8 +963,6 @@ constexpr char C2_PARAMKEY_OUTPUT_STREAM_BUFFER_TYPE[] = "output.buffers.type";
 typedef C2StreamParam<C2Tuning, C2Uint64Value, kParamIndexUsage> C2StreamUsageTuning;
 constexpr char C2_PARAMKEY_INPUT_STREAM_USAGE[] = "input.buffers.usage";
 constexpr char C2_PARAMKEY_OUTPUT_STREAM_USAGE[] = "output.buffers.usage";
-// deprecated
-#define C2_NAME_INPUT_STREAM_USAGE_SETTING C2_PARAMKEY_INPUT_STREAM_USAGE
 
 /**
  * Picture (video or image frame) size.
@@ -1067,8 +1021,6 @@ constexpr char C2_PARAMKEY_OUT_OF_MEMORY[] = "algo.oom";
 typedef C2StreamParam<C2Info, C2Uint32Value, kParamIndexMaxBufferSize> C2StreamMaxBufferSizeInfo;
 constexpr char C2_PARAMKEY_INPUT_MAX_BUFFER_SIZE[] = "input.buffers.max-size";
 constexpr char C2_PARAMKEY_OUTPUT_MAX_BUFFER_SIZE[] = "output.buffers.max-size";
-
-#define C2_NAME_STREAM_MAX_BUFFER_SIZE_SETTING C2_PARAMKEY_INPUT_MAX_BUFFER_SIZE
 
 /* ---------------------------------------- misc. state ---------------------------------------- */
 
@@ -1170,9 +1122,7 @@ constexpr char C2_PARAMKEY_SECURE_MODE[] = "algo.secure-mode";
  * Bitrate
  */
 typedef C2StreamParam<C2Info, C2Uint32Value, kParamIndexBitrate> C2StreamBitrateInfo;
-typedef C2StreamBitrateInfo C2BitrateTuning; // deprecated
 constexpr char C2_PARAMKEY_BITRATE[] = "coded.bitrate";
-#define C2_NAME_STREAM_BITRATE_SETTING C2_PARAMKEY_BITRATE
 
 /**
  * Bitrate mode.
@@ -1261,15 +1211,8 @@ constexpr char C2_PARAMKEY_PREPEND_HEADER_MODE[] = "output.buffers.prepend-heade
  *
  * This is used for the output of the video decoder, and the input of the video encoder.
  */
-typedef C2PictureSizeStruct C2VideoSizeStruct; // deprecated
-
 typedef C2StreamParam<C2Info, C2PictureSizeStruct, kParamIndexPictureSize> C2StreamPictureSizeInfo;
 constexpr char C2_PARAMKEY_PICTURE_SIZE[] = "raw.size";
-#define C2_PARAMKEY_STREAM_PICTURE_SIZE C2_PARAMKEY_PICTURE_SIZE
-#define C2_NAME_STREAM_VIDEO_SIZE_INFO C2_PARAMKEY_PICTURE_SIZE
-typedef C2StreamPictureSizeInfo C2VideoSizeStreamInfo; // deprecated
-typedef C2StreamPictureSizeInfo C2VideoSizeStreamTuning; // deprecated
-#define C2_NAME_STREAM_VIDEO_SIZE_SETTING C2_PARAMKEY_PICTURE_SIZE
 
 /**
  * Crop rectangle.
@@ -1344,12 +1287,10 @@ typedef C2StreamParam<C2Tuning, C2SimpleValueStruct<C2Config::scaling_method_t>,
                 kParamIndexScalingMethod>
         C2StreamScalingMethodTuning;
 constexpr char C2_PARAMKEY_SCALING_MODE[] = "raw.scaling-method";
-#define C2_PARAMKEY_STREAM_SCALING_MODE C2_PARAMKEY_SCALING_MODE
 
 typedef C2StreamParam<C2Tuning, C2PictureSizeStruct, kParamIndexScaledPictureSize>
         C2StreamScaledPictureSizeTuning;
 constexpr char C2_PARAMKEY_SCALED_PICTURE_SIZE[] = "raw.scaled-size";
-#define C2_PARAMKEY_STREAM_SCALED_PICTURE_SIZE C2_PARAMKEY_SCALED_PICTURE_SIZE
 
 typedef C2StreamParam<C2Tuning, C2RectStruct, kParamIndexScaledCropRect>
         C2StreamScaledCropRectTuning;
@@ -1504,14 +1445,7 @@ C2ENUM(C2Color::matrix_t, uint32_t,
     MATRIX_BT2020_CONSTANT,         ///< Rec.ITU-R BT.2020 constant luminance
     MATRIX_VENDOR_START = 0x80,     ///< vendor-specific matrix coefficient values start here
     MATRIX_OTHER = 0xff,            ///< max value, reserved for undefined values
-
-    MATRIX_SMPTE240M = MATRIX_240M, // deprecated
-    MATRIX_BT2020CONSTANT = MATRIX_BT2020_CONSTANT, // deprecated
 )
-
-constexpr C2Color::matrix_t MATRIX_BT470_6M = MATRIX_FCC47_73_682; // deprecated
-constexpr C2Color::matrix_t MATRIX_BT709_5 = MATRIX_BT709; // deprecated
-constexpr C2Color::matrix_t MATRIX_BT601_6 = MATRIX_BT601; // deprecated
 
 struct C2ColorAspectsStruct {
     C2Color::range_t range;
@@ -1635,7 +1569,6 @@ constexpr char C2_PARAMKEY_BLOCK_RATE[] = "coded.block-rate";
  */
 typedef C2StreamParam<C2Info, C2FloatValue, kParamIndexFrameRate> C2StreamFrameRateInfo;
 constexpr char C2_PARAMKEY_FRAME_RATE[] = "coded.frame-rate";
-#define C2_NAME_STREAM_FRAME_RATE_SETTING C2_PARAMKEY_FRAME_RATE
 
 typedef C2PortParam<C2Info, C2FloatValue, kParamIndexFrameRate> C2PortFrameRateInfo;
 constexpr char C2_PARAMKEY_INPUT_FRAME_RATE[] = "input.frame-rate";
@@ -1667,9 +1600,6 @@ C2ENUM(C2Config::picture_type_t, uint32_t,
     P_FRAME    = (1 << 2),  ///< inter predicted frame from previous frames
     B_FRAME    = (1 << 3),  ///< backward predicted (out-of-order) frame
 )
-
-typedef C2Config::picture_type_t C2PictureTypeMask; // deprecated
-constexpr C2Config::picture_type_t C2PictureTypeKeyFrame = C2Config::SYNC_FRAME; // deprecated
 
 /**
  * Allowed picture types.
@@ -1750,8 +1680,6 @@ constexpr char C2_PARAMKEY_REQUEST_SYNC_FRAME[] = "coding.request-sync-frame";
 typedef C2StreamParam<C2Tuning, C2Int64Value, kParamIndexSyncFrameInterval>
         C2StreamSyncFrameIntervalTuning;
 constexpr char C2_PARAMKEY_SYNC_FRAME_INTERVAL[] = "coding.sync-frame-interval";
-// deprecated
-#define C2_PARAMKEY_SYNC_FRAME_PERIOD C2_PARAMKEY_SYNC_FRAME_INTERVAL
 
 /**
  * Temporal layering
@@ -1885,8 +1813,6 @@ constexpr char C2_PARAMKEY_TILE_HANDLING[] = "coding.tile-handling";
 typedef C2StreamParam<C2Info, C2Uint32Value, kParamIndexSampleRate> C2StreamSampleRateInfo;
 constexpr char C2_PARAMKEY_SAMPLE_RATE[] = "raw.sample-rate";
 constexpr char C2_PARAMKEY_CODED_SAMPLE_RATE[] = "coded.sample-rate";
-// deprecated
-#define C2_NAME_STREAM_SAMPLE_RATE_SETTING C2_PARAMKEY_SAMPLE_RATE
 
 /**
  * Channel count.
@@ -1894,8 +1820,6 @@ constexpr char C2_PARAMKEY_CODED_SAMPLE_RATE[] = "coded.sample-rate";
 typedef C2StreamParam<C2Info, C2Uint32Value, kParamIndexChannelCount> C2StreamChannelCountInfo;
 constexpr char C2_PARAMKEY_CHANNEL_COUNT[] = "raw.channel-count";
 constexpr char C2_PARAMKEY_CODED_CHANNEL_COUNT[] = "coded.channel-count";
-// deprecated
-#define C2_NAME_STREAM_CHANNEL_COUNT_SETTING C2_PARAMKEY_CHANNEL_COUNT
 
 /**
  * Max channel count. Used to limit the number of coded or decoded channels.
@@ -2005,16 +1929,10 @@ C2ENUM(C2Config::aac_packaging_t, uint32_t,
     AAC_PACKAGING_ADTS
 )
 
-typedef C2Config::aac_packaging_t C2AacStreamFormatKind; // deprecated
-// deprecated
-constexpr C2Config::aac_packaging_t C2AacStreamFormatRaw = C2Config::AAC_PACKAGING_RAW;
-constexpr C2Config::aac_packaging_t C2AacStreamFormatAdts = C2Config::AAC_PACKAGING_ADTS;
-
 typedef C2StreamParam<C2Info, C2SimpleValueStruct<C2EasyEnum<C2Config::aac_packaging_t>>,
         kParamIndexAacPackaging> C2StreamAacPackagingInfo;
 typedef C2StreamAacPackagingInfo C2StreamAacFormatInfo;
 constexpr char C2_PARAMKEY_AAC_PACKAGING[] = "coded.aac-packaging";
-#define C2_NAME_STREAM_AAC_FORMAT_SETTING C2_PARAMKEY_AAC_PACKAGING
 
 /* ================================ PLATFORM-DEFINED PARAMETERS ================================ */
 
@@ -2134,7 +2052,6 @@ constexpr char C2_PARAMKEY_SURFACE_SCALING_MODE[] = "raw.surface-scaling";
 typedef C2GlobalParam<C2Tuning, C2EasyBoolValue, kParamIndexInputSurfaceEos>
         C2InputSurfaceEosTuning;
 constexpr char C2_PARAMKEY_INPUT_SURFACE_EOS[] = "input-surface.eos";
-#define C2_NAME_INPUT_SURFACE_EOS_TUNING C2_PARAMKEY_INPUT_SURFACE_EOS
 
 /**
  * Start/suspend/resume/stop controls and timestamps for input surface.

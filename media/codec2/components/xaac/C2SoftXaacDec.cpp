@@ -66,29 +66,29 @@ public:
         setDerivedInstance(this);
 
         addParameter(
-                DefineParam(mInputFormat, C2_NAME_INPUT_STREAM_FORMAT_SETTING)
-                .withConstValue(new C2StreamFormatConfig::input(0u, C2FormatCompressed))
+                DefineParam(mInputFormat, C2_PARAMKEY_INPUT_STREAM_BUFFER_TYPE)
+                .withConstValue(new C2StreamBufferTypeSetting::input(0u, C2BufferData::LINEAR))
                 .build());
 
         addParameter(
-                DefineParam(mOutputFormat, C2_NAME_OUTPUT_STREAM_FORMAT_SETTING)
-                .withConstValue(new C2StreamFormatConfig::output(0u, C2FormatAudio))
+                DefineParam(mOutputFormat, C2_PARAMKEY_OUTPUT_STREAM_BUFFER_TYPE)
+                .withConstValue(new C2StreamBufferTypeSetting::output(0u, C2BufferData::LINEAR))
                 .build());
 
         addParameter(
-                DefineParam(mInputMediaType, C2_NAME_INPUT_PORT_MIME_SETTING)
-                .withConstValue(AllocSharedString<C2PortMimeConfig::input>(
+                DefineParam(mInputMediaType, C2_PARAMKEY_INPUT_MEDIA_TYPE)
+                .withConstValue(AllocSharedString<C2PortMediaTypeSetting::input>(
                         MEDIA_MIMETYPE_AUDIO_AAC))
                 .build());
 
         addParameter(
-                DefineParam(mOutputMediaType, C2_NAME_OUTPUT_PORT_MIME_SETTING)
-                .withConstValue(AllocSharedString<C2PortMimeConfig::output>(
+                DefineParam(mOutputMediaType, C2_PARAMKEY_OUTPUT_MEDIA_TYPE)
+                .withConstValue(AllocSharedString<C2PortMediaTypeSetting::output>(
                         MEDIA_MIMETYPE_AUDIO_RAW))
                 .build());
 
         addParameter(
-                DefineParam(mSampleRate, C2_NAME_STREAM_SAMPLE_RATE_SETTING)
+                DefineParam(mSampleRate, C2_PARAMKEY_SAMPLE_RATE)
                 .withDefault(new C2StreamSampleRateInfo::output(0u, 44100))
                 .withFields({C2F(mSampleRate, value).oneOf({
                     7350, 8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000
@@ -97,15 +97,15 @@ public:
                 .build());
 
         addParameter(
-                DefineParam(mChannelCount, C2_NAME_STREAM_CHANNEL_COUNT_SETTING)
+                DefineParam(mChannelCount, C2_PARAMKEY_CHANNEL_COUNT)
                 .withDefault(new C2StreamChannelCountInfo::output(0u, 1))
                 .withFields({C2F(mChannelCount, value).inRange(1, 8)})
                 .withSetter(Setter<decltype(*mChannelCount)>::StrictValueWithNoDeps)
                 .build());
 
         addParameter(
-                DefineParam(mBitrate, C2_NAME_STREAM_BITRATE_SETTING)
-                .withDefault(new C2BitrateTuning::input(0u, 64000))
+                DefineParam(mBitrate, C2_PARAMKEY_BITRATE)
+                .withDefault(new C2StreamBitrateInfo::input(0u, 64000))
                 .withFields({C2F(mBitrate, value).inRange(8000, 960000)})
                 .withSetter(Setter<decltype(*mBitrate)>::NonStrictValueWithNoDeps)
                 .build());
@@ -116,10 +116,10 @@ public:
                 .build());
 
         addParameter(
-                DefineParam(mAacFormat, C2_NAME_STREAM_AAC_FORMAT_SETTING)
-                .withDefault(new C2StreamAacFormatInfo::input(0u, C2AacStreamFormatRaw))
+                DefineParam(mAacFormat, C2_PARAMKEY_AAC_PACKAGING)
+                .withDefault(new C2StreamAacFormatInfo::input(0u, C2Config::AAC_PACKAGING_RAW))
                 .withFields({C2F(mAacFormat, value).oneOf({
-                    C2AacStreamFormatRaw, C2AacStreamFormatAdts
+                    C2Config::AAC_PACKAGING_RAW, C2Config::AAC_PACKAGING_ADTS
                 })})
                 .withSetter(Setter<decltype(*mAacFormat)>::StrictValueWithNoDeps)
                 .build());
@@ -203,7 +203,7 @@ public:
                 .build());
     }
 
-    bool isAdts() const { return mAacFormat->value == C2AacStreamFormatAdts; }
+    bool isAdts() const { return mAacFormat->value == C2Config::AAC_PACKAGING_ADTS; }
     uint32_t getBitrate() const { return mBitrate->value; }
     static C2R ProfileLevelSetter(bool mayBlock, C2P<C2StreamProfileLevelInfo::input> &me) {
         (void)mayBlock;
@@ -218,13 +218,13 @@ public:
     int32_t getDrcEffectType() const { return mDrcEffectType->value; }
 
 private:
-    std::shared_ptr<C2StreamFormatConfig::input> mInputFormat;
-    std::shared_ptr<C2StreamFormatConfig::output> mOutputFormat;
-    std::shared_ptr<C2PortMimeConfig::input> mInputMediaType;
-    std::shared_ptr<C2PortMimeConfig::output> mOutputMediaType;
+    std::shared_ptr<C2StreamBufferTypeSetting::input> mInputFormat;
+    std::shared_ptr<C2StreamBufferTypeSetting::output> mOutputFormat;
+    std::shared_ptr<C2PortMediaTypeSetting::input> mInputMediaType;
+    std::shared_ptr<C2PortMediaTypeSetting::output> mOutputMediaType;
     std::shared_ptr<C2StreamSampleRateInfo::output> mSampleRate;
     std::shared_ptr<C2StreamChannelCountInfo::output> mChannelCount;
-    std::shared_ptr<C2BitrateTuning::input> mBitrate;
+    std::shared_ptr<C2StreamBitrateInfo::input> mBitrate;
     std::shared_ptr<C2StreamMaxBufferSizeInfo::input> mInputMaxBufSize;
     std::shared_ptr<C2StreamAacFormatInfo::input> mAacFormat;
     std::shared_ptr<C2StreamProfileLevelInfo::input> mProfileLevel;

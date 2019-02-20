@@ -186,7 +186,7 @@ public:
      * MediaCodec behavior.
      */
     virtual status_t registerCsd(
-            const C2StreamCsdInfo::output * /* csd */,
+            const C2StreamInitDataInfo::output * /* csd */,
             size_t * /* index */,
             sp<MediaCodecBuffer> * /* clientBuffer */) = 0;
 
@@ -1187,7 +1187,7 @@ public:
     }
 
     status_t registerCsd(
-            const C2StreamCsdInfo::output *csd,
+            const C2StreamInitDataInfo::output *csd,
             size_t *index,
             sp<MediaCodecBuffer> *clientBuffer) final {
         sp<Codec2Buffer> c2Buffer;
@@ -1286,7 +1286,7 @@ public:
     }
 
     status_t registerCsd(
-            const C2StreamCsdInfo::output *csd,
+            const C2StreamInitDataInfo::output *csd,
             size_t *index,
             sp<MediaCodecBuffer> *clientBuffer) final {
         sp<Codec2Buffer> newBuffer = new LocalLinearBuffer(
@@ -2153,7 +2153,7 @@ status_t CCodecBufferChannel::start(
             1 << C2PlatformAllocatorStore::BUFFERQUEUE);
 
     if (inputFormat != nullptr) {
-        bool graphic = (iStreamFormat.value == C2FormatVideo);
+        bool graphic = (iStreamFormat.value == C2BufferData::GRAPHIC);
         std::shared_ptr<C2BlockPool> pool;
         {
             Mutexed<BlockPools>::Locked pools(mBlockPools);
@@ -2274,7 +2274,7 @@ status_t CCodecBufferChannel::start(
             outputGeneration = output->generation;
         }
 
-        bool graphic = (oStreamFormat.value == C2FormatVideo);
+        bool graphic = (oStreamFormat.value == C2BufferData::GRAPHIC);
         C2BlockPool::local_id_t outputPoolId_;
 
         {
@@ -2447,7 +2447,7 @@ status_t CCodecBufferChannel::requestInitialInputBuffers() {
         return OK;
     }
 
-    C2StreamFormatConfig::output oStreamFormat(0u);
+    C2StreamBufferTypeSetting::output oStreamFormat(0u);
     c2_status_t err = mComponent->query({ &oStreamFormat }, {}, C2_DONT_BLOCK, nullptr);
     if (err != C2_OK) {
         return UNKNOWN_ERROR;
@@ -2734,7 +2734,7 @@ bool CCodecBufferChannel::handleWork(
             // TODO: properly translate these to metadata
             switch (info->coreIndex().coreIndex()) {
                 case C2StreamPictureTypeMaskInfo::CORE_INDEX:
-                    if (((C2StreamPictureTypeMaskInfo *)info.get())->value & C2PictureTypeKeyFrame) {
+                    if (((C2StreamPictureTypeMaskInfo *)info.get())->value & C2Config::SYNC_FRAME) {
                         flags |= MediaCodec::BUFFER_FLAG_SYNCFRAME;
                     }
                     break;
