@@ -8163,6 +8163,10 @@ bool ACodec::OutputPortSettingsChangedState::onOMXEvent(
                             OMX_CommandPortEnable, kPortIndexOutput);
                 }
 
+                // Clear the RenderQueue in which queued GraphicBuffers hold the
+                // actual buffer references in order to free them early.
+                mCodec->mRenderTracker.clear(systemTime(CLOCK_MONOTONIC));
+
                 if (err == OK) {
                     err = mCodec->allocateBuffersOnPort(kPortIndexOutput);
                     ALOGE_IF(err != OK, "Failed to allocate output port buffers after port "
