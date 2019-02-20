@@ -2151,7 +2151,11 @@ void Camera3Device::pauseStateNotify(bool enable) {
 
 // Pause to reconfigure
 status_t Camera3Device::internalPauseAndWaitLocked(nsecs_t maxExpectedDuration) {
-    mRequestThread->setPaused(true);
+    if (mRequestThread.get() != nullptr) {
+        mRequestThread->setPaused(true);
+    } else {
+        return NO_INIT;
+    }
 
     ALOGV("%s: Camera %s: Internal wait until idle (% " PRIi64 " ns)", __FUNCTION__, mId.string(),
           maxExpectedDuration);
