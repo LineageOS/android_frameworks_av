@@ -195,6 +195,7 @@ private:
     status_t copyOneYuvTile(sp<MediaCodecBuffer>& codecBuffer,
             const CpuConsumer::LockedBuffer& yuvBuffer,
             size_t top, size_t left, size_t width, size_t height);
+    void initCopyRowFunction(int32_t width);
     static size_t calcAppSegmentMaxSize(const CameraMetadata& info);
 
     static const nsecs_t kWaitDuration = 10000000; // 10 ms
@@ -244,6 +245,9 @@ private:
 
     // In most common use case, entries are accessed in order.
     std::map<int64_t, InputFrame> mPendingInputFrames;
+
+    // Function pointer of libyuv row copy.
+    void (*mFnCopyRow)(const uint8_t* src, uint8_t* dst, int width);
 };
 
 }; // namespace camera3
