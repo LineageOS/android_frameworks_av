@@ -1247,6 +1247,7 @@ status_t ACodec::allocateOutputBuffersFromNativeWindow() {
         info.mRenderInfo = NULL;
         info.mGraphicBuffer = graphicBuffer;
         info.mNewGraphicBuffer = false;
+        info.mDequeuedAt = mDequeueCounter;
 
         // TODO: We shouln't need to create MediaCodecBuffer. In metadata mode
         //       OMX doesn't use the shared memory buffer, but some code still
