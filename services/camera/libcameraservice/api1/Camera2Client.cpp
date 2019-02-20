@@ -1767,13 +1767,12 @@ void Camera2Client::notifyError(int32_t errorCode,
         case hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_BUFFER:
             ALOGW("%s: Received recoverable error %d from HAL - ignoring, requestId %" PRId32,
                     __FUNCTION__, errorCode, resultExtras.requestId);
+            mCaptureSequencer->notifyError(errorCode, resultExtras);
             return;
         default:
             err = CAMERA_ERROR_UNKNOWN;
             break;
     }
-
-    mCaptureSequencer->notifyError(errorCode, resultExtras);
 
     ALOGE("%s: Error condition %d reported by HAL, requestId %" PRId32, __FUNCTION__, errorCode,
               resultExtras.requestId);
