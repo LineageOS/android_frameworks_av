@@ -2,7 +2,7 @@
 <!-- Hearing aid Audio HAL Audio Policy Configuration file -->
 <module name="hearing_aid" halVersion="2.0">
     <mixPorts>
-        <mixPort name="hearing aid output" role="source" flags="AUDIO_OUTPUT_FLAG_PRIMARY">
+        <mixPort name="hearing aid output" role="source">
             <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
                      samplingRates="24000,16000"
                      channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
