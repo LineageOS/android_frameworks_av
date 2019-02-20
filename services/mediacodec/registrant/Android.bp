@@ -28,6 +28,7 @@ cc_library_shared {
         "libcodec2_soft_amrwbdec",
         "libcodec2_soft_amrwbenc",
         "libcodec2_soft_hevcdec",
+        "libcodec2_soft_hevcenc",
         "libcodec2_soft_g711alawdec",
         "libcodec2_soft_g711mlawdec",
         "libcodec2_soft_mpeg2dec",

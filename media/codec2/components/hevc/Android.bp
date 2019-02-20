@@ -9,8 +9,17 @@ cc_library_shared {
 
     static_libs: ["libhevcdec"],
 
-    include_dirs: [
-        "external/libhevc/decoder",
-        "external/libhevc/common",
+}
+
+cc_library_shared {
+    name: "libcodec2_soft_hevcenc",
+    defaults: [
+        "libcodec2_soft-defaults",
+        "libcodec2_soft_sanitize_signed-defaults",
     ],
+
+    srcs: ["C2SoftHevcEnc.cpp"],
+
+    static_libs: ["libhevcenc"],
+
 }
