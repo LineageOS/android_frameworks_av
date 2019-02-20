@@ -3907,14 +3907,18 @@ static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
     std::vector<const char*> fileNames;
     status_t ret;
 
-    if (property_get_bool("ro.bluetooth.a2dp_offload.supported", false) &&
-        property_get_bool("persist.bluetooth.a2dp_offload.disabled", false)) {
-        // A2DP offload supported but disabled: try to use special XML file
-        if (property_get_bool("persist.bluetooth.bluetooth_audio_hal.enabled", false)) {
-            fileNames.push_back(AUDIO_POLICY_BLUETOOTH_HAL_ENABLED_XML_CONFIG_FILE_NAME);
-        } else {
+    if (property_get_bool("ro.bluetooth.a2dp_offload.supported", false)) {
+        if (property_get_bool("persist.bluetooth.a2dp_offload.disabled", false)) {
             fileNames.push_back(AUDIO_POLICY_A2DP_OFFLOAD_DISABLED_XML_CONFIG_FILE_NAME);
+        } else if (property_get_bool("persist.bluetooth.bluetooth_audio_hal.enabled", false)) {
+            // This property persist.bluetooth.bluetooth_audio_hal.enabled is temporary only.
+            // xml files AUDIO_POLICY_BLUETOOTH_HAL_ENABLED_XML_CONFIG_FILE_NAME, although having
+            // the same name, must be different in offload and non offload cases in device
+            // specific configuration file.
+            fileNames.push_back(AUDIO_POLICY_BLUETOOTH_HAL_ENABLED_XML_CONFIG_FILE_NAME);
         }
+    } else if (property_get_bool("persist.bluetooth.bluetooth_audio_hal.enabled", false)) {
+        fileNames.push_back(AUDIO_POLICY_BLUETOOTH_HAL_ENABLED_XML_CONFIG_FILE_NAME);
     }
     fileNames.push_back(AUDIO_POLICY_XML_CONFIG_FILE_NAME);
 
