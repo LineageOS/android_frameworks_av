@@ -70,70 +70,34 @@ status_t AudioRecord::getMinFrameCount(
 
 // ---------------------------------------------------------------------------
 
-static std::string audioFormatTypeString(audio_format_t value) {
-    std::string formatType;
-    if (FormatConverter::toString(value, formatType)) {
-        return formatType;
-    }
-    char rawbuffer[16];  // room for "%d"
-    snprintf(rawbuffer, sizeof(rawbuffer), "%d", value);
-    return rawbuffer;
-}
-
-static std::string audioSourceString(audio_source_t value) {
-    std::string source;
-    if (SourceTypeConverter::toString(value, source)) {
-        return source;
-    }
-    char rawbuffer[16];  // room for "%d"
-    snprintf(rawbuffer, sizeof(rawbuffer), "%d", value);
-    return rawbuffer;
-}
-
 void AudioRecord::MediaMetrics::gather(const AudioRecord *record)
 {
-    // key for media statistics is defined in the header
-    // attrs for media statistics
-    // NB: these are matched with public Java API constants defined
-    // in frameworks/base/media/java/android/media/AudioRecord.java
-    // These must be kept synchronized with the constants there.
-    static constexpr char kAudioRecordEncoding[] = "android.media.audiorecord.encoding";
-    static constexpr char kAudioRecordSource[] = "android.media.audiorecord.source";
-    static constexpr char kAudioRecordLatency[] = "android.media.audiorecord.latency";
-    static constexpr char kAudioRecordSampleRate[] = "android.media.audiorecord.samplerate";
-    static constexpr char kAudioRecordChannelCount[] = "android.media.audiorecord.channels";
-    static constexpr char kAudioRecordCreated[] = "android.media.audiorecord.createdMs";
-    static constexpr char kAudioRecordDuration[] = "android.media.audiorecord.durationMs";
-    static constexpr char kAudioRecordCount[] = "android.media.audiorecord.n";
-    static constexpr char kAudioRecordError[] = "android.media.audiorecord.errcode";
-    static constexpr char kAudioRecordErrorFunction[] = "android.media.audiorecord.errfunc";
+#define MM_PREFIX "android.media.audiorecord." // avoid cut-n-paste errors.
 
-    // constructor guarantees mAnalyticsItem is valid
+    // Java API 28 entries, do not change.
+    mAnalyticsItem->setCString(MM_PREFIX "encoding", toString(record->mFormat).c_str());
+    mAnalyticsItem->setCString(MM_PREFIX "source", toString(record->mAttributes.source).c_str());
+    mAnalyticsItem->setInt32(MM_PREFIX "latency", (int32_t)record->mLatency); // bad estimate.
+    mAnalyticsItem->setInt32(MM_PREFIX "samplerate", (int32_t)record->mSampleRate);
+    mAnalyticsItem->setInt32(MM_PREFIX "channels", (int32_t)record->mChannelCount);
 
-    mAnalyticsItem->setInt32(kAudioRecordLatency, record->mLatency);
-    mAnalyticsItem->setInt32(kAudioRecordSampleRate, record->mSampleRate);
-    mAnalyticsItem->setInt32(kAudioRecordChannelCount, record->mChannelCount);
-    mAnalyticsItem->setCString(kAudioRecordEncoding,
-                               audioFormatTypeString(record->mFormat).c_str());
-    mAnalyticsItem->setCString(kAudioRecordSource,
-                               audioSourceString(record->mAttributes.source).c_str());
+    // Non-API entries, these can change.
+    mAnalyticsItem->setInt32(MM_PREFIX "portId", (int32_t)record->mPortId);
+    mAnalyticsItem->setInt32(MM_PREFIX "frameCount", (int32_t)record->mFrameCount);
+    mAnalyticsItem->setCString(MM_PREFIX "attributes", toString(record->mAttributes).c_str());
+    mAnalyticsItem->setInt64(MM_PREFIX "channelMask", (int64_t)record->mChannelMask);
 
-    // log total duration recording, including anything currently running [and count].
-    nsecs_t active = 0;
+    // log total duration recording, including anything currently running.
+    int64_t activeNs = 0;
     if (mStartedNs != 0) {
-        active = systemTime() - mStartedNs;
+        activeNs = systemTime() - mStartedNs;
     }
-    mAnalyticsItem->setInt64(kAudioRecordDuration, (mDurationNs + active) / (1000 * 1000));
-    mAnalyticsItem->setInt32(kAudioRecordCount, mCount);
-
-    // XXX I don't know that this adds a lot of value, long term
-    if (mCreatedNs != 0) {
-        mAnalyticsItem->setInt64(kAudioRecordCreated, mCreatedNs / (1000 * 1000));
-    }
+    mAnalyticsItem->setDouble(MM_PREFIX "durationMs", (mDurationNs + activeNs) * 1e-6);
+    mAnalyticsItem->setInt64(MM_PREFIX "startCount", (int64_t)mCount);
 
     if (mLastError != NO_ERROR) {
-        mAnalyticsItem->setInt32(kAudioRecordError, mLastError);
-        mAnalyticsItem->setCString(kAudioRecordErrorFunction, mLastErrorFunc.c_str());
+        mAnalyticsItem->setInt32(MM_PREFIX "lastError.code", (int32_t)mLastError);
+        mAnalyticsItem->setCString(MM_PREFIX "lastError.at", mLastErrorFunc.c_str());
     }
 }
 
