@@ -209,7 +209,26 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
             return BAD_VALUE;
         }
 
-        checkForDeviceAndOutputChanges([&]() {
+        // No need to evaluate playback routing when connecting a remote submix
+        // output device used by a dynamic policy of type recorder as no
+        // playback use case is affected.
+        bool doCheckForDeviceAndOutputChanges = true;
+        if (device->type() == AUDIO_DEVICE_OUT_REMOTE_SUBMIX
+                && strncmp(device_address, "0", AUDIO_DEVICE_MAX_ADDRESS_LEN) != 0) {
+            for (audio_io_handle_t output : outputs) {
+                sp<SwAudioOutputDescriptor> desc = mOutputs.valueFor(output);
+                if (desc->mPolicyMix != nullptr
+                        && desc->mPolicyMix->mMixType == MIX_TYPE_RECORDERS
+                        && strncmp(device_address,
+                                   desc->mPolicyMix->mDeviceAddress.string(),
+                                   AUDIO_DEVICE_MAX_ADDRESS_LEN) == 0) {
+                    doCheckForDeviceAndOutputChanges = false;
+                    break;
+                }
+            }
+        }
+
+        auto checkCloseOutputs = [&]() {
             // outputs must be closed after checkOutputForAllStrategies() is executed
             if (!outputs.isEmpty()) {
                 for (audio_io_handle_t output : outputs) {
@@ -218,7 +237,7 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
                     // been opened by checkOutputsForDevice() to query dynamic parameters
                     if ((state == AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE) ||
                             (((desc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != 0) &&
-                             (desc->mDirectOpenCount == 0))) {
+                                (desc->mDirectOpenCount == 0))) {
                         closeOutput(output);
                     }
                 }
@@ -226,7 +245,13 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
                 return true;
             }
             return false;
-        });
+        };
+
+        if (doCheckForDeviceAndOutputChanges) {
+            checkForDeviceAndOutputChanges(checkCloseOutputs);
+        } else {
+            checkCloseOutputs();
+        }
 
         if (mEngine->getPhoneState() == AUDIO_MODE_IN_CALL && hasPrimaryOutput()) {
             DeviceVector newDevices = getNewOutputDevices(mPrimaryOutput, false /*fromCache*/);
