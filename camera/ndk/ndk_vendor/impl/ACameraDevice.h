@@ -169,7 +169,12 @@ class CameraDevice final : public RefBase {
 
     camera_status_t updateOutputConfigurationLocked(ACaptureSessionOutput *output);
 
-    camera_status_t allocateCaptureRequest(
+    // Since this writes to ICameraDeviceUser's fmq, clients must take care that:
+    //   a) This function is called serially.
+    //   b) This function is called in accordance with ICameraDeviceUser.submitRequestList,
+    //      otherwise, the wrong capture request might have the wrong settings
+    //      metadata associated with it.
+    camera_status_t allocateCaptureRequestLocked(
             const ACaptureRequest* request, sp<CaptureRequest>& outReq);
 
     static ACaptureRequest* allocateACaptureRequest(sp<CaptureRequest>& req);
