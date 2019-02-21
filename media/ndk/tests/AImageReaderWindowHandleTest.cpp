@@ -27,6 +27,8 @@
 
 namespace android {
 
+using HGraphicBufferProducer = hardware::graphics::bufferqueue::V1_0::
+        IGraphicBufferProducer;
 using hardware::graphics::bufferqueue::V1_0::utils::H2BGraphicBufferProducer;
 using aimg::AImageReader_getHGBPFromHandle;
 

@@ -101,6 +101,10 @@ cc_library_shared {
 
     export_include_dirs: ["include"],
 
+    export_shared_lib_headers: [
+        "libgui",
+    ],
+
     product_variables: {
         pdk: {
             enabled: false,
