@@ -23,7 +23,7 @@
 #include "NdkImageReaderPriv.h"
 
 #include <android_media_Utils.h>
-#include <android_runtime/android_hardware_HardwareBuffer.h>
+#include <private/android/AHardwareBufferHelpers.h>
 #include <utils/Log.h>
 #include "hardware/camera3.h"
 
@@ -190,7 +190,7 @@ media_status_t AImage::lockImage() {
 
     auto lockedBuffer = std::make_unique<CpuConsumer::LockedBuffer>();
 
-    uint64_t grallocUsage = android_hardware_HardwareBuffer_convertToGrallocUsageBits(mUsage);
+    uint64_t grallocUsage = AHardwareBuffer_convertToGrallocUsageBits(mUsage);
 
     status_t ret =
             lockImageFromBuffer(mBuffer, grallocUsage, mBuffer->mFence->dup(), lockedBuffer.get());
