@@ -515,7 +515,6 @@ TEST_P(Codec2AudioDecDecodeTest, DecodeTest) {
     if (mDisableTest) return;
 
     uint32_t streamIndex = GetParam();
-    ASSERT_EQ(mComponent->start(), C2_OK);
     mTimestampDevTest = true;
     char mURL[512], info[512];
     std::ifstream eleStream, eleInfo;
