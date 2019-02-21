@@ -28,6 +28,7 @@
 #include <utils/RefBase.h>
 #include <utils/String8.h>
 #include <policy.h>
+#include <Volume.h>
 #include "AudioPatch.h"
 #include "EffectDescriptor.h"
 
@@ -62,7 +63,7 @@ public:
         mPreferredDeviceId = preferredDeviceId;
     }
     bool isPreferredDeviceForExclusiveUse() const { return mPreferredDeviceForExclusiveUse; }
-    void setActive(bool active) { mActive = active; }
+    virtual void setActive(bool active) { mActive = active; }
     bool active() const { return mActive; }
     bool hasPreferredDevice(bool activeOnly = false) const {
         return mPreferredDeviceId != AUDIO_PORT_HANDLE_NONE && (!activeOnly || mActive);
@@ -85,12 +86,13 @@ public:
     TrackClientDescriptor(audio_port_handle_t portId, uid_t uid, audio_session_t sessionId,
                           audio_attributes_t attributes, audio_config_base_t config,
                           audio_port_handle_t preferredDeviceId, audio_stream_type_t stream,
-                          product_strategy_t strategy, audio_output_flags_t flags,
+                          product_strategy_t strategy, VolumeSource volumeSource,
+                          audio_output_flags_t flags,
                           bool isPreferredDeviceForExclusiveUse,
                           std::vector<wp<SwAudioOutputDescriptor>> secondaryOutputs) :
         ClientDescriptor(portId, uid, sessionId, attributes, config, preferredDeviceId,
                          isPreferredDeviceForExclusiveUse),
-        mStream(stream), mStrategy(strategy), mFlags(flags),
+        mStream(stream), mStrategy(strategy), mVolumeSource(volumeSource), mFlags(flags),
         mSecondaryOutputs(std::move(secondaryOutputs)) {}
     ~TrackClientDescriptor() override = default;
 
@@ -104,12 +106,41 @@ public:
     const std::vector<wp<SwAudioOutputDescriptor>>& getSecondaryOutputs() const {
         return mSecondaryOutputs;
     };
+    VolumeSource volumeSource() const { return mVolumeSource; }
+
+    void setActive(bool active) override
+    {
+        int delta = active ? 1 : -1;
+        changeActivityCount(delta);
+    }
+    void changeActivityCount(int delta)
+    {
+        if (delta > 0) {
+            mActivityCount += delta;
+        } else {
+            LOG_ALWAYS_FATAL_IF(!mActivityCount, "%s(%s) invalid delta %d, inactive client",
+                                 __func__, toShortString().c_str(), delta);
+            LOG_ALWAYS_FATAL_IF(static_cast<int>(mActivityCount) < -delta,
+                                "%s(%s) invalid delta %d, active client count %d",
+                                 __func__, toShortString().c_str(), delta, mActivityCount);
+            mActivityCount += delta;
+        }
+        ClientDescriptor::setActive(mActivityCount > 0);
+    }
+    uint32_t getActivityCount() const { return mActivityCount; }
 
 private:
     const audio_stream_type_t mStream;
     const product_strategy_t mStrategy;
+    const VolumeSource mVolumeSource;
     const audio_output_flags_t mFlags;
     const std::vector<wp<SwAudioOutputDescriptor>> mSecondaryOutputs;
+
+    /**
+     * required for duplicating thread, prevent from removing active client from an output
+     * involved in a duplication.
+     */
+    uint32_t mActivityCount = 0;
 };
 
 class RecordClientDescriptor: public ClientDescriptor
@@ -148,7 +179,8 @@ class SourceClientDescriptor: public TrackClientDescriptor
 public:
     SourceClientDescriptor(audio_port_handle_t portId, uid_t uid, audio_attributes_t attributes,
                            const sp<AudioPatch>& patchDesc, const sp<DeviceDescriptor>& srcDevice,
-                           audio_stream_type_t stream, product_strategy_t strategy);
+                           audio_stream_type_t stream, product_strategy_t strategy,
+                           VolumeSource volumeSource);
     ~SourceClientDescriptor() override = default;
 
     sp<AudioPatch> patchDesc() const { return mPatchDesc; }

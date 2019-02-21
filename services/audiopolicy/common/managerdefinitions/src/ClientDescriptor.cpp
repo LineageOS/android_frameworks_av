@@ -20,6 +20,7 @@
 #include <sstream>
 #include <utils/Log.h>
 #include <utils/String8.h>
+#include <TypeConverter.h>
 #include "AudioGain.h"
 #include "AudioOutputDescriptor.h"
 #include "AudioPatch.h"
@@ -45,6 +46,7 @@ void ClientDescriptor::dump(String8 *dst, int spaces, int index) const
              mPortId, mSessionId, mUid);
     dst->appendFormat("%*s- Format: %08x Sampling rate: %d Channels: %08x\n", spaces, "",
              mConfig.format, mConfig.sample_rate, mConfig.channel_mask);
+    dst->appendFormat("%*s- Attributes: %s\n", spaces, "", toString(mAttributes).c_str());
     dst->appendFormat("%*s- Preferred Device Id: %08x\n", spaces, "", mPreferredDeviceId);
     dst->appendFormat("%*s- State: %s\n", spaces, "", mActive ? "Active" : "Inactive");
 }
@@ -53,6 +55,7 @@ void TrackClientDescriptor::dump(String8 *dst, int spaces, int index) const
 {
     ClientDescriptor::dump(dst, spaces, index);
     dst->appendFormat("%*s- Stream: %d flags: %08x\n", spaces, "", mStream, mFlags);
+    dst->appendFormat("%*s- Refcount: %d\n", spaces, "", mActivityCount);
 }
 
 std::string TrackClientDescriptor::toShortString() const
@@ -82,10 +85,10 @@ void RecordClientDescriptor::dump(String8 *dst, int spaces, int index) const
 SourceClientDescriptor::SourceClientDescriptor(audio_port_handle_t portId, uid_t uid,
          audio_attributes_t attributes, const sp<AudioPatch>& patchDesc,
          const sp<DeviceDescriptor>& srcDevice, audio_stream_type_t stream,
-         product_strategy_t strategy) :
+         product_strategy_t strategy, VolumeSource volumeSource) :
     TrackClientDescriptor::TrackClientDescriptor(portId, uid, AUDIO_SESSION_NONE, attributes,
         AUDIO_CONFIG_BASE_INITIALIZER, AUDIO_PORT_HANDLE_NONE,
-        stream, strategy, AUDIO_OUTPUT_FLAG_NONE, false,
+        stream, strategy, volumeSource, AUDIO_OUTPUT_FLAG_NONE, false,
         {} /* Sources do not support secondary outputs*/),
         mPatchDesc(patchDesc), mSrcDevice(srcDevice)
 {

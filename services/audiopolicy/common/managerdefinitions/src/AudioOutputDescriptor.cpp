@@ -34,16 +34,8 @@ namespace android {
 
 AudioOutputDescriptor::AudioOutputDescriptor(const sp<AudioPort>& port,
                                              AudioPolicyClientInterface *clientInterface)
-    : mPort(port)
-    , mClientInterface(clientInterface)
+    : mPort(port), mClientInterface(clientInterface)
 {
-    // clear usage count for all stream types
-    for (int i = 0; i < AUDIO_STREAM_CNT; i++) {
-        mActiveCount[i] = 0;
-        mCurVolume[i] = -1.0;
-        mMuteCount[i] = 0;
-        mStopTime[i] = 0;
-    }
     if (mPort.get() != nullptr) {
         mPort->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
         if (mPort->mGains.size() > 0) {
@@ -85,85 +77,54 @@ bool AudioOutputDescriptor::sharesHwModuleWith(
     return hasSameHwModuleAs(outputDesc);
 }
 
-void AudioOutputDescriptor::changeStreamActiveCount(const sp<TrackClientDescriptor>& client,
-                                                    int delta)
-{
-    if (delta == 0) return;
-    const audio_stream_type_t stream = client->stream();
-    if ((delta + (int)mActiveCount[stream]) < 0) {
-        // any mismatched active count will abort.
-        LOG_ALWAYS_FATAL("%s(%s) invalid delta %d, active stream count %d",
-              __func__, client->toShortString().c_str(), delta, mActiveCount[stream]);
-        // mActiveCount[stream] = 0;
-        // return;
-    }
-    mActiveCount[stream] += delta;
-    mRoutingActivities[client->strategy()].changeActivityCount(delta);
-
-    if (delta > 0) {
-        mActiveClients[client] += delta;
-    } else {
-        auto it = mActiveClients.find(client);
-        if (it == mActiveClients.end()) { // client not found!
-            LOG_ALWAYS_FATAL("%s(%s) invalid delta %d, inactive client",
-                    __func__, client->toShortString().c_str(), delta);
-        } else if (it->second < -delta) { // invalid delta!
-            LOG_ALWAYS_FATAL("%s(%s) invalid delta %d, active client count %zu",
-                    __func__, client->toShortString().c_str(), delta, it->second);
-        }
-        it->second += delta;
-        if (it->second == 0) {
-            (void)mActiveClients.erase(it);
-        }
-    }
-
-    ALOGV("%s stream %d, count %d", __FUNCTION__, stream, mActiveCount[stream]);
-}
-
 void AudioOutputDescriptor::setStopTime(const sp<TrackClientDescriptor>& client, nsecs_t sysTime)
 {
-    mStopTime[client->stream()] = sysTime;
+    mVolumeActivities[client->volumeSource()].setStopTime(sysTime);
     mRoutingActivities[client->strategy()].setStopTime(sysTime);
 }
 
 void AudioOutputDescriptor::setClientActive(const sp<TrackClientDescriptor>& client, bool active)
 {
-    LOG_ALWAYS_FATAL_IF(getClient(client->portId()) == nullptr,
-        "%s(%d) does not exist on output descriptor", __func__, client->portId());
-
-    if (active == client->active()) {
-        ALOGW("%s(%s): ignored active: %d, current stream count %d",
-                __func__, client->toShortString().c_str(),
-                active, mActiveCount[client->stream()]);
+    auto clientIter = std::find(begin(mActiveClients), end(mActiveClients), client);
+    if (active == (clientIter != end(mActiveClients))) {
+        ALOGW("%s(%s): ignored active: %d, current stream count %d", __func__,
+              client->toShortString().c_str(), active,
+              mRoutingActivities.at(client->strategy()).getActivityCount());
         return;
     }
+    if (active) {
+        mActiveClients.push_back(client);
+    } else {
+        mActiveClients.erase(clientIter);
+    }
     const int delta = active ? 1 : -1;
-    changeStreamActiveCount(client, delta);
+    // If ps is unknown, it is time to track it!
+    mRoutingActivities[client->strategy()].changeActivityCount(delta);
+    mVolumeActivities[client->volumeSource()].changeActivityCount(delta);
 
     // Handle non-client-specific activity ref count
     int32_t oldGlobalActiveCount = mGlobalActiveCount;
     if (!active && mGlobalActiveCount < 1) {
         ALOGW("%s(%s): invalid deactivation with globalRefCount %d",
-                __func__, client->toShortString().c_str(), mGlobalActiveCount);
+              __func__, client->toShortString().c_str(), mGlobalActiveCount);
         mGlobalActiveCount = 1;
     }
     mGlobalActiveCount += delta;
 
-    if ((oldGlobalActiveCount == 0) && (mGlobalActiveCount > 0)) {
-        if ((mPolicyMix != NULL) && ((mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0))
-        {
+    if ((mPolicyMix != NULL) && ((mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
+        if ((oldGlobalActiveCount == 0) || (mGlobalActiveCount == 0)) {
             mClientInterface->onDynamicPolicyMixStateUpdate(mPolicyMix->mDeviceAddress,
-                                                            MIX_STATE_MIXING);
-        }
-    } else if ((oldGlobalActiveCount > 0) && (mGlobalActiveCount == 0)) {
-        if ((mPolicyMix != NULL) && ((mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0))
-        {
-            mClientInterface->onDynamicPolicyMixStateUpdate(mPolicyMix->mDeviceAddress,
-                                                            MIX_STATE_IDLE);
+                mGlobalActiveCount > 0 ? MIX_STATE_MIXING : MIX_STATE_IDLE);
         }
     }
-
     client->setActive(active);
+}
+
+bool AudioOutputDescriptor::isActive(VolumeSource vs, uint32_t inPastMs, nsecs_t sysTime) const
+{
+    return (vs == VOLUME_SOURCE_NONE) ?
+                isActive(inPastMs) : (mVolumeActivities.find(vs) != std::end(mVolumeActivities)?
+                mVolumeActivities.at(vs).isActive(inPastMs, sysTime) : false);
 }
 
 bool AudioOutputDescriptor::isActive(uint32_t inPastMs) const
@@ -172,36 +133,16 @@ bool AudioOutputDescriptor::isActive(uint32_t inPastMs) const
     if (inPastMs != 0) {
         sysTime = systemTime();
     }
-    for (int i = 0; i < (int)AUDIO_STREAM_CNT; i++) {
-        if (i == AUDIO_STREAM_PATCH) {
+    for (const auto &iter : mVolumeActivities) {
+        if (iter.first == streamToVolumeSource(AUDIO_STREAM_PATCH)) {
             continue;
         }
-        if (isStreamActive((audio_stream_type_t)i, inPastMs, sysTime)) {
+        if (iter.second.isActive(inPastMs, sysTime)) {
             return true;
         }
     }
     return false;
 }
-
-bool AudioOutputDescriptor::isStreamActive(audio_stream_type_t stream,
-                                           uint32_t inPastMs,
-                                           nsecs_t sysTime) const
-{
-    if (mActiveCount[stream] != 0) {
-        return true;
-    }
-    if (inPastMs == 0) {
-        return false;
-    }
-    if (sysTime == 0) {
-        sysTime = systemTime();
-    }
-    if (ns2ms(sysTime - mStopTime[stream]) < inPastMs) {
-        return true;
-    }
-    return false;
-}
-
 
 bool AudioOutputDescriptor::isFixedVolume(audio_devices_t device __unused)
 {
@@ -217,9 +158,9 @@ bool AudioOutputDescriptor::setVolume(float volume,
     // We actually change the volume if:
     // - the float value returned by computeVolume() changed
     // - the force flag is set
-    if (volume != mCurVolume[stream] || force) {
+    if (volume != getCurVolume(static_cast<VolumeSource>(stream)) || force) {
         ALOGV("setVolume() for stream %d, volume %f, delay %d", stream, volume, delayMs);
-        mCurVolume[stream] = volume;
+        setCurVolume(static_cast<VolumeSource>(stream), volume);
         return true;
     }
     return false;
@@ -266,6 +207,13 @@ TrackClientVector AudioOutputDescriptor::clientsList(bool activeOnly, product_st
     return clients;
 }
 
+bool AudioOutputDescriptor::isAnyActive(VolumeSource volumeSourceToIgnore) const
+{
+    return std::find_if(begin(mActiveClients), end(mActiveClients),
+                        [&volumeSourceToIgnore](const auto &client) {
+        return client->volumeSource() != volumeSourceToIgnore; }) != end(mActiveClients);
+}
+
 void AudioOutputDescriptor::dump(String8 *dst) const
 {
     dst->appendFormat(" ID: %d\n", mId);
@@ -274,20 +222,22 @@ void AudioOutputDescriptor::dump(String8 *dst) const
     dst->appendFormat(" Channels: %08x\n", mChannelMask);
     dst->appendFormat(" Devices: %s\n", devices().toString().c_str());
     dst->appendFormat(" Global active count: %u\n", mGlobalActiveCount);
-    dst->append(" Stream volume activeCount muteCount\n");
-    for (int i = 0; i < (int)AUDIO_STREAM_CNT; i++) {
-        dst->appendFormat(" %02d     %.03f     %02d          %02d\n",
-                 i, mCurVolume[i], streamActiveCount((audio_stream_type_t)i), mMuteCount[i]);
+    for (const auto &iter : mRoutingActivities) {
+        dst->appendFormat(" Product Strategy id: %d", iter.first);
+        iter.second.dump(dst, 4);
+    }
+    for (const auto &iter : mVolumeActivities) {
+        dst->appendFormat(" Volume Activities id: %d", iter.first);
+        iter.second.dump(dst, 4);
     }
     dst->append(" AudioTrack Clients:\n");
     ClientMapHandler<TrackClientDescriptor>::dump(dst);
     dst->append("\n");
-    if (mActiveClients.size() > 0) {
+    if (!mActiveClients.empty()) {
         dst->append(" AudioTrack active (stream) clients:\n");
         size_t index = 0;
-        for (const auto& clientPair : mActiveClients) {
-            dst->appendFormat(" Refcount: %zu", clientPair.second);
-            clientPair.first->dump(dst, 2, index++);
+        for (const auto& client : mActiveClients) {
+            client->dump(dst, 2, index++);
         }
         dst->append(" \n");
     }
@@ -388,15 +338,14 @@ uint32_t SwAudioOutputDescriptor::latency()
     }
 }
 
-void SwAudioOutputDescriptor::changeStreamActiveCount(const sp<TrackClientDescriptor>& client,
-                                                       int delta)
+void SwAudioOutputDescriptor::setClientActive(const sp<TrackClientDescriptor>& client, bool active)
 {
     // forward usage count change to attached outputs
     if (isDuplicated()) {
-        mOutput1->changeStreamActiveCount(client, delta);
-        mOutput2->changeStreamActiveCount(client, delta);
+        mOutput1->setClientActive(client, active);
+        mOutput2->setClientActive(client, active);
     }
-    AudioOutputDescriptor::changeStreamActiveCount(client, delta);
+    AudioOutputDescriptor::setClientActive(client, active);
 }
 
 bool SwAudioOutputDescriptor::isFixedVolume(audio_devices_t device)
@@ -445,19 +394,16 @@ bool SwAudioOutputDescriptor::setVolume(float volume,
                                         uint32_t delayMs,
                                         bool force)
 {
-    bool changed = AudioOutputDescriptor::setVolume(volume, stream, device, delayMs, force);
-
-    if (changed) {
-        // Force VOICE_CALL to track BLUETOOTH_SCO stream volume when bluetooth audio is
-        // enabled
-        float volume = Volume::DbToAmpl(mCurVolume[stream]);
-        if (stream == AUDIO_STREAM_BLUETOOTH_SCO) {
-            mClientInterface->setStreamVolume(
-                    AUDIO_STREAM_VOICE_CALL, volume, mIoHandle, delayMs);
-        }
-        mClientInterface->setStreamVolume(stream, volume, mIoHandle, delayMs);
+    if (!AudioOutputDescriptor::setVolume(volume, stream, device, delayMs, force)) {
+        return false;
     }
-    return changed;
+    // Force VOICE_CALL to track BLUETOOTH_SCO stream volume when bluetooth audio is enabled
+    float volumeAmpl = Volume::DbToAmpl(getCurVolume(static_cast<VolumeSource>(stream)));
+    if (stream == AUDIO_STREAM_BLUETOOTH_SCO) {
+        mClientInterface->setStreamVolume(AUDIO_STREAM_VOICE_CALL, volumeAmpl, mIoHandle, delayMs);
+    }
+    mClientInterface->setStreamVolume(stream, volumeAmpl, mIoHandle, delayMs);
+    return true;
 }
 
 status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
@@ -660,24 +606,24 @@ bool HwAudioOutputDescriptor::setVolume(float volume,
 }
 
 // SwAudioOutputCollection implementation
-bool SwAudioOutputCollection::isStreamActive(audio_stream_type_t stream, uint32_t inPastMs) const
+bool SwAudioOutputCollection::isActive(VolumeSource volumeSource, uint32_t inPastMs) const
 {
     nsecs_t sysTime = systemTime();
     for (size_t i = 0; i < this->size(); i++) {
         const sp<SwAudioOutputDescriptor> outputDesc = this->valueAt(i);
-        if (outputDesc->isStreamActive(stream, inPastMs, sysTime)) {
+        if (outputDesc->isActive(volumeSource, inPastMs, sysTime)) {
             return true;
         }
     }
     return false;
 }
 
-bool SwAudioOutputCollection::isStreamActiveLocally(audio_stream_type_t stream, uint32_t inPastMs) const
+bool SwAudioOutputCollection::isActiveLocally(VolumeSource volumeSource, uint32_t inPastMs) const
 {
     nsecs_t sysTime = systemTime();
     for (size_t i = 0; i < this->size(); i++) {
         const sp<SwAudioOutputDescriptor> outputDesc = this->valueAt(i);
-        if (outputDesc->isStreamActive(stream, inPastMs, sysTime)
+        if (outputDesc->isActive(volumeSource, inPastMs, sysTime)
                 && ((outputDesc->devices().types() & APM_AUDIO_OUT_DEVICE_REMOTE_ALL) == 0)) {
             return true;
         }
@@ -685,14 +631,13 @@ bool SwAudioOutputCollection::isStreamActiveLocally(audio_stream_type_t stream, 
     return false;
 }
 
-bool SwAudioOutputCollection::isStreamActiveRemotely(audio_stream_type_t stream,
-                                                   uint32_t inPastMs) const
+bool SwAudioOutputCollection::isActiveRemotely(VolumeSource volumeSource, uint32_t inPastMs) const
 {
     nsecs_t sysTime = systemTime();
     for (size_t i = 0; i < size(); i++) {
         const sp<SwAudioOutputDescriptor> outputDesc = valueAt(i);
         if (((outputDesc->devices().types() & APM_AUDIO_OUT_DEVICE_REMOTE_ALL) != 0) &&
-                outputDesc->isStreamActive(stream, inPastMs, sysTime)) {
+                outputDesc->isActive(volumeSource, inPastMs, sysTime)) {
             // do not consider re routing (when the output is going to a dynamic policy)
             // as "remote playback"
             if (outputDesc->mPolicyMix == NULL) {
@@ -775,22 +720,6 @@ sp<SwAudioOutputDescriptor> SwAudioOutputCollection::getOutputFromId(audio_port_
     return NULL;
 }
 
-bool SwAudioOutputCollection::isAnyOutputActive(audio_stream_type_t streamToIgnore) const
-{
-    for (size_t s = 0 ; s < AUDIO_STREAM_CNT ; s++) {
-        if (s == (size_t) streamToIgnore) {
-            continue;
-        }
-        for (size_t i = 0; i < size(); i++) {
-            const sp<SwAudioOutputDescriptor> outputDesc = valueAt(i);
-            if (outputDesc->streamActiveCount((audio_stream_type_t)s)!= 0) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
 sp<SwAudioOutputDescriptor> SwAudioOutputCollection::getOutputForClient(audio_port_handle_t portId)
 {
     for (size_t i = 0; i < size(); i++) {
@@ -825,29 +754,13 @@ void SwAudioOutputCollection::dump(String8 *dst) const
 }
 
 // HwAudioOutputCollection implementation
-bool HwAudioOutputCollection::isStreamActive(audio_stream_type_t stream, uint32_t inPastMs) const
+bool HwAudioOutputCollection::isActive(VolumeSource volumeSource, uint32_t inPastMs) const
 {
     nsecs_t sysTime = systemTime();
     for (size_t i = 0; i < this->size(); i++) {
         const sp<HwAudioOutputDescriptor> outputDesc = this->valueAt(i);
-        if (outputDesc->isStreamActive(stream, inPastMs, sysTime)) {
+        if (outputDesc->isActive(volumeSource, inPastMs, sysTime)) {
             return true;
-        }
-    }
-    return false;
-}
-
-bool HwAudioOutputCollection::isAnyOutputActive(audio_stream_type_t streamToIgnore) const
-{
-    for (size_t s = 0 ; s < AUDIO_STREAM_CNT ; s++) {
-        if (s == (size_t) streamToIgnore) {
-            continue;
-        }
-        for (size_t i = 0; i < size(); i++) {
-            const sp<HwAudioOutputDescriptor> outputDesc = valueAt(i);
-            if (outputDesc->streamActiveCount((audio_stream_type_t)s) != 0) {
-                return true;
-            }
         }
     }
     return false;

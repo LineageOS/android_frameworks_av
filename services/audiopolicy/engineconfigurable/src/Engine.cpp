@@ -224,16 +224,16 @@ DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t ps) const
     audio_devices_t devices = AUDIO_DEVICE_NONE;
     if (ps == getProductStrategyForStream(AUDIO_STREAM_NOTIFICATION) &&
             !is_state_in_call(getPhoneState()) &&
-            !outputs.isStreamActiveRemotely(AUDIO_STREAM_MUSIC,
-                                            SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY) &&
-            outputs.isStreamActive(AUDIO_STREAM_MUSIC,
-                                   SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY)) {
+            !outputs.isActiveRemotely(streamToVolumeSource(AUDIO_STREAM_MUSIC),
+                                      SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY) &&
+            outputs.isActive(streamToVolumeSource(AUDIO_STREAM_MUSIC),
+                             SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY)) {
         product_strategy_t strategyForMedia =
                 getProductStrategyForStream(AUDIO_STREAM_MUSIC);
         devices = productStrategies.getDeviceTypesForProductStrategy(strategyForMedia);
     } else if (ps == getProductStrategyForStream(AUDIO_STREAM_ACCESSIBILITY) &&
-        (outputs.isStreamActive(AUDIO_STREAM_RING) ||
-         outputs.isStreamActive(AUDIO_STREAM_ALARM))) {
+        (outputs.isActive(streamToVolumeSource(AUDIO_STREAM_RING)) ||
+         outputs.isActive(streamToVolumeSource(AUDIO_STREAM_ALARM)))) {
             // do not route accessibility prompts to a digital output currently configured with a
             // compressed format as they would likely not be mixed and dropped.
             // Device For Sonification conf file has HDMI, SPDIF and HDMI ARC unreacheable.
