@@ -94,6 +94,7 @@ cc_library_shared {
         "libsensorprivacy",
         "libstagefright",
         "libstagefright_foundation",
+        "libyuv",
         "android.frameworks.cameraservice.common@2.0",
         "android.frameworks.cameraservice.service@2.0",
         "android.frameworks.cameraservice.device@2.0",
@@ -137,6 +138,7 @@ cc_library_shared {
     name: "libdepthphoto",
 
     srcs: [
+        "utils/ExifUtils.cpp",
         "common/DepthPhotoProcessor.cpp",
     ],
 
@@ -150,6 +152,8 @@ cc_library_shared {
         "libcutils",
         "libjpeg",
         "libmemunreachable",
+        "libexif",
+        "libcamera_client",
     ],
 
     include_dirs: [

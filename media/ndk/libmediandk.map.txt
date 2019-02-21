@@ -105,6 +105,7 @@ LIBMEDIANDK {
     AMEDIAFORMAT_KEY_LOCATION; # var introduced=29
     AMEDIAFORMAT_KEY_LOOP; # var introduced=29
     AMEDIAFORMAT_KEY_LYRICIST; # var introduced=29
+    AMEDIAFORMAT_KEY_MANUFACTURER; # var introduced=29
     AMEDIAFORMAT_KEY_MAX_BIT_RATE; # var introduced=29
     AMEDIAFORMAT_KEY_MAX_HEIGHT; # var introduced=21
     AMEDIAFORMAT_KEY_MAX_INPUT_SIZE; # var introduced=21

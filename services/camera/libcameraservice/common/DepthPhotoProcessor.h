@@ -23,19 +23,27 @@
 namespace android {
 namespace camera3 {
 
+enum DepthPhotoOrientation {
+    DEPTH_ORIENTATION_0_DEGREES   = 0,
+    DEPTH_ORIENTATION_90_DEGREES  = 90,
+    DEPTH_ORIENTATION_180_DEGREES = 180,
+    DEPTH_ORIENTATION_270_DEGREES = 270,
+};
+
 struct DepthPhotoInputFrame {
-    const char* mMainJpegBuffer;
-    size_t      mMainJpegSize;
-    size_t      mMainJpegWidth, mMainJpegHeight;
-    uint16_t*   mDepthMapBuffer;
-    size_t      mDepthMapWidth, mDepthMapHeight, mDepthMapStride;
-    size_t      mMaxJpegSize;
-    uint8_t     mJpegQuality;
-    uint8_t     mIsLogical;
-    float       mInstrinsicCalibration[5];
-    uint8_t     mIsInstrinsicCalibrationValid;
-    float       mLensDistortion[5];
-    uint8_t     mIsLensDistortionValid;
+    const char*           mMainJpegBuffer;
+    size_t                mMainJpegSize;
+    size_t                mMainJpegWidth, mMainJpegHeight;
+    uint16_t*             mDepthMapBuffer;
+    size_t                mDepthMapWidth, mDepthMapHeight, mDepthMapStride;
+    size_t                mMaxJpegSize;
+    uint8_t               mJpegQuality;
+    uint8_t               mIsLogical;
+    float                 mInstrinsicCalibration[5];
+    uint8_t               mIsInstrinsicCalibrationValid;
+    float                 mLensDistortion[5];
+    uint8_t               mIsLensDistortionValid;
+    DepthPhotoOrientation mOrientation;
 
     DepthPhotoInputFrame() :
             mMainJpegBuffer(nullptr),
@@ -52,7 +60,8 @@ struct DepthPhotoInputFrame {
             mInstrinsicCalibration{0.f},
             mIsInstrinsicCalibrationValid(0),
             mLensDistortion{0.f},
-            mIsLensDistortionValid(0) {}
+            mIsLensDistortionValid(0),
+            mOrientation(DepthPhotoOrientation::DEPTH_ORIENTATION_0_DEGREES) {}
 };
 
 static const char *kDepthPhotoLibrary = "libdepthphoto.so";

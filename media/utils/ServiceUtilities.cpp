@@ -85,7 +85,7 @@ static bool checkRecordingInternal(const String16& opPackageName, pid_t pid,
             return false;
         }
     } else {
-        if (appOps.noteOp(op, uid, resolvedOpPackageName) != AppOpsManager::MODE_ALLOWED) {
+        if (appOps.checkOp(op, uid, resolvedOpPackageName) != AppOpsManager::MODE_ALLOWED) {
             ALOGE("Request denied by app op: %d", op);
             return false;
         }

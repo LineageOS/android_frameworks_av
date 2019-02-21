@@ -23,6 +23,7 @@
 #include <sys/syscall.h>
 
 #include <android/hardware/camera/device/3.5/types.h>
+#include <libyuv.h>
 #include <gui/Surface.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
@@ -192,6 +193,7 @@ status_t HeicCompositeStream::createInternalStreams(const std::vector<sp<Surface
         return res;
     }
 
+    initCopyRowFunction(width);
     return res;
 }
 
@@ -1373,7 +1375,7 @@ status_t HeicCompositeStream::copyOneYuvTile(sp<MediaCodecBuffer>& codecBuffer,
     for (auto row = top; row < top+height; row++) {
         uint8_t *dst = codecBuffer->data() + imageInfo->mPlane[MediaImage2::Y].mOffset +
                 imageInfo->mPlane[MediaImage2::Y].mRowInc * (row - top);
-        memcpy(dst, yuvBuffer.data+row*yuvBuffer.stride+left, width);
+        mFnCopyRow(yuvBuffer.data+row*yuvBuffer.stride+left, dst, width);
     }
 
     // U is Cb, V is Cr
@@ -1406,24 +1408,25 @@ status_t HeicCompositeStream::copyOneYuvTile(sp<MediaCodecBuffer>& codecBuffer,
         for (auto row = top/2; row < (top+height)/2; row++) {
             uint8_t *dst = codecBuffer->data() + imageInfo->mPlane[dstPlane].mOffset +
                     imageInfo->mPlane[dstPlane].mRowInc * (row - top/2);
-            memcpy(dst, src+row*yuvBuffer.chromaStride+left, width);
+            mFnCopyRow(src+row*yuvBuffer.chromaStride+left, dst, width);
         }
     } else if (isCodecUvPlannar && yuvBuffer.chromaStep == 1) {
         // U plane
         for (auto row = top/2; row < (top+height)/2; row++) {
             uint8_t *dst = codecBuffer->data() + imageInfo->mPlane[MediaImage2::U].mOffset +
                     imageInfo->mPlane[MediaImage2::U].mRowInc * (row - top/2);
-            memcpy(dst, yuvBuffer.dataCb+row*yuvBuffer.chromaStride+left/2, width/2);
+            mFnCopyRow(yuvBuffer.dataCb+row*yuvBuffer.chromaStride+left/2, dst, width/2);
         }
 
         // V plane
         for (auto row = top/2; row < (top+height)/2; row++) {
             uint8_t *dst = codecBuffer->data() + imageInfo->mPlane[MediaImage2::V].mOffset +
                     imageInfo->mPlane[MediaImage2::V].mRowInc * (row - top/2);
-            memcpy(dst, yuvBuffer.dataCr+row*yuvBuffer.chromaStride+left/2, width/2);
+            mFnCopyRow(yuvBuffer.dataCr+row*yuvBuffer.chromaStride+left/2, dst, width/2);
         }
     } else {
-        // Convert between semiplannar and plannar
+        // Convert between semiplannar and plannar, or when UV orders are
+        // different.
         uint8_t *dst = codecBuffer->data();
         for (auto row = top/2; row < (top+height)/2; row++) {
             for (auto col = left/2; col < (left+width)/2; col++) {
@@ -1444,6 +1447,38 @@ status_t HeicCompositeStream::copyOneYuvTile(sp<MediaCodecBuffer>& codecBuffer,
         }
     }
     return OK;
+}
+
+void HeicCompositeStream::initCopyRowFunction(int32_t width)
+{
+    using namespace libyuv;
+
+    mFnCopyRow = CopyRow_C;
+#if defined(HAS_COPYROW_SSE2)
+    if (TestCpuFlag(kCpuHasSSE2)) {
+        mFnCopyRow = IS_ALIGNED(width, 32) ? CopyRow_SSE2 : CopyRow_Any_SSE2;
+    }
+#endif
+#if defined(HAS_COPYROW_AVX)
+    if (TestCpuFlag(kCpuHasAVX)) {
+        mFnCopyRow = IS_ALIGNED(width, 64) ? CopyRow_AVX : CopyRow_Any_AVX;
+    }
+#endif
+#if defined(HAS_COPYROW_ERMS)
+    if (TestCpuFlag(kCpuHasERMS)) {
+        mFnCopyRow = CopyRow_ERMS;
+    }
+#endif
+#if defined(HAS_COPYROW_NEON)
+    if (TestCpuFlag(kCpuHasNEON)) {
+        mFnCopyRow = IS_ALIGNED(width, 32) ? CopyRow_NEON : CopyRow_Any_NEON;
+    }
+#endif
+#if defined(HAS_COPYROW_MIPS)
+    if (TestCpuFlag(kCpuHasMIPS)) {
+        mFnCopyRow = CopyRow_MIPS;
+    }
+#endif
 }
 
 size_t HeicCompositeStream::calcAppSegmentMaxSize(const CameraMetadata& info) {
