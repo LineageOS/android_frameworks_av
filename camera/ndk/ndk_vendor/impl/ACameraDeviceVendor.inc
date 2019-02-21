@@ -73,7 +73,7 @@ camera_status_t CameraDevice::submitRequestsLocked(
     requestsV.setCapacity(numRequests);
     for (int i = 0; i < numRequests; i++) {
         sp<CaptureRequest> req;
-        ret = allocateCaptureRequest(requests[i], req);
+        ret = allocateCaptureRequestLocked(requests[i], req);
         // We need to call this method since after submitRequestList is called,
         // the request metadata queue might have removed the capture request
         // metadata. Therefore we simply add the metadata to its wrapper class,
