@@ -250,6 +250,7 @@ private:
     struct OutputSurface {
         sp<Surface> surface;
         uint32_t generation;
+        int maxDequeueBuffers;
     };
     Mutexed<OutputSurface> mOutputSurface;
 

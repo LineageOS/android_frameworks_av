@@ -1592,6 +1592,7 @@ CCodecBufferChannel::CCodecBufferChannel(
       mFirstValidFrameIndex(0u),
       mMetaMode(MODE_NONE),
       mInputMetEos(false) {
+    mOutputSurface.lock()->maxDequeueBuffers = kSmoothnessFactor + kRenderingDepth;
     Mutexed<std::unique_ptr<InputBuffers>>::Locked buffers(mInputBuffers);
     buffers->reset(new DummyInputBuffers(""));
 }
@@ -2269,8 +2270,12 @@ status_t CCodecBufferChannel::start(
         uint32_t outputGeneration;
         {
             Mutexed<OutputSurface>::Locked output(mOutputSurface);
+            output->maxDequeueBuffers = mNumOutputSlots + reorderDepth.value + kRenderingDepth;
             outputSurface = output->surface ?
                     output->surface->getIGraphicBufferProducer() : nullptr;
+            if (outputSurface) {
+                output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
+            }
             outputGeneration = output->generation;
         }
 
@@ -2638,6 +2643,11 @@ bool CCodecBufferChannel::handleWork(
                     mReorderStash.lock()->setDepth(reorderDepth.value);
                     ALOGV("[%s] onWorkDone: updated reorder depth to %u",
                           mName, reorderDepth.value);
+                    Mutexed<OutputSurface>::Locked output(mOutputSurface);
+                    output->maxDequeueBuffers = mNumOutputSlots + reorderDepth.value + kRenderingDepth;
+                    if (output->surface) {
+                        output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
+                    }
                 } else {
                     ALOGD("[%s] onWorkDone: failed to read reorder depth", mName);
                 }
@@ -2813,7 +2823,6 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
     sp<IGraphicBufferProducer> producer;
     if (newSurface) {
         newSurface->setScalingMode(NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
-        newSurface->setMaxDequeuedBufferCount(mNumOutputSlots + kRenderingDepth);
         producer = newSurface->getIGraphicBufferProducer();
         producer->setGenerationNumber(generation);
     } else {
@@ -2841,6 +2850,7 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
 
     {
         Mutexed<OutputSurface>::Locked output(mOutputSurface);
+        newSurface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
         output->surface = newSurface;
         output->generation = generation;
     }
