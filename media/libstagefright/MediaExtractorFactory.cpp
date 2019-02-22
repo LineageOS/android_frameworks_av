@@ -23,8 +23,6 @@
 #include <binder/PermissionCache.h>
 #include <binder/IServiceManager.h>
 #include <media/DataSource.h>
-#include <media/MediaAnalyticsItem.h>
-#include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/MediaExtractorFactory.h>
@@ -34,7 +32,6 @@
 #include <private/android_filesystem_config.h>
 #include <cutils/properties.h>
 #include <utils/String8.h>
-#include <ziparchive/zip_archive.h>
 
 #include <dirent.h>
 #include <dlfcn.h>
@@ -130,13 +127,6 @@ Mutex MediaExtractorFactory::gPluginMutex;
 std::shared_ptr<std::list<sp<ExtractorPlugin>>> MediaExtractorFactory::gPlugins;
 bool MediaExtractorFactory::gPluginsRegistered = false;
 bool MediaExtractorFactory::gIgnoreVersion = false;
-std::string MediaExtractorFactory::gLinkedLibraries;
-
-// static
-void MediaExtractorFactory::SetLinkedLibraries(const std::string& linkedLibraries) {
-    Mutex::Autolock autoLock(gPluginMutex);
-    gLinkedLibraries = linkedLibraries;
-}
 
 // static
 void *MediaExtractorFactory::sniff(
@@ -235,66 +225,12 @@ void MediaExtractorFactory::RegisterExtractor(const sp<ExtractorPlugin> &plugin,
 }
 
 //static
-void MediaExtractorFactory::RegisterExtractorsInSystem(
-        const char *libDirPath, std::list<sp<ExtractorPlugin>> &pluginList) {
+void MediaExtractorFactory::RegisterExtractors(
+        const char *libDirPath, const android_dlextinfo* dlextinfo,
+        std::list<sp<ExtractorPlugin>> &pluginList) {
     ALOGV("search for plugins at %s", libDirPath);
+
     DIR *libDir = opendir(libDirPath);
-    if (libDir) {
-        struct dirent* libEntry;
-        while ((libEntry = readdir(libDir))) {
-            if (libEntry->d_name[0] == '.') {
-                continue;
-            }
-            String8 libPath = String8(libDirPath) + "/" + libEntry->d_name;
-            void *libHandle = dlopen(libPath.string(), RTLD_NOW | RTLD_LOCAL);
-            if (libHandle) {
-                GetExtractorDef getDef =
-                    (GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
-                if (getDef) {
-                    ALOGV("registering sniffer for %s", libPath.string());
-                    RegisterExtractor(
-                            new ExtractorPlugin(getDef(), libHandle, libPath), pluginList);
-                } else {
-                    ALOGW("%s does not contain sniffer", libPath.string());
-                    dlclose(libHandle);
-                }
-            } else {
-                ALOGW("couldn't dlopen(%s) %s", libPath.string(), strerror(errno));
-            }
-        }
-
-        closedir(libDir);
-    } else {
-        ALOGE("couldn't opendir(%s)", libDirPath);
-    }
-}
-
-//static
-void MediaExtractorFactory::RegisterExtractorsInApex(
-        const char *libDirPath, std::list<sp<ExtractorPlugin>> &pluginList) {
-    ALOGV("search for plugins at %s", libDirPath);
-    ALOGV("linked libs %s", gLinkedLibraries.c_str());
-
-    std::string libDirPathEx = libDirPath;
-    libDirPathEx += "/extractors";
-    android_namespace_t *mediaNs = android_get_exported_namespace("media");
-    if (mediaNs == NULL) {
-        ALOGE("couldn't find media namespace.");
-        return;
-    }
-    const android_dlextinfo dlextinfo = {
-        .flags = ANDROID_DLEXT_USE_NAMESPACE,
-        .library_namespace = mediaNs,
-    };
-
-    // try extractors subfolder first
-    DIR *libDir = opendir(libDirPathEx.c_str());
-
-    if (libDir) {
-        libDirPath = libDirPathEx.c_str();
-    } else {
-        libDir = opendir(libDirPath);
-    }
     if (libDir) {
         struct dirent* libEntry;
         while ((libEntry = readdir(libDir))) {
@@ -307,7 +243,7 @@ void MediaExtractorFactory::RegisterExtractorsInApex(
             }
             void *libHandle = android_dlopen_ext(
                     libPath.string(),
-                    RTLD_NOW | RTLD_LOCAL, &dlextinfo);
+                    RTLD_NOW | RTLD_LOCAL, dlextinfo);
             if (libHandle) {
                 GetExtractorDef getDef =
                     (GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
@@ -347,17 +283,27 @@ void MediaExtractorFactory::UpdateExtractors() {
 
     std::shared_ptr<std::list<sp<ExtractorPlugin>>> newList(new std::list<sp<ExtractorPlugin>>());
 
-    RegisterExtractorsInApex("/apex/com.android.media/lib"
+    android_namespace_t *mediaNs = android_get_exported_namespace("media");
+    if (mediaNs != NULL) {
+        const android_dlextinfo dlextinfo = {
+            .flags = ANDROID_DLEXT_USE_NAMESPACE,
+            .library_namespace = mediaNs,
+        };
+        RegisterExtractors("/apex/com.android.media/lib"
 #ifdef __LP64__
-            "64"
+                "64"
 #endif
-            , *newList);
+                "/extractors", &dlextinfo, *newList);
 
-    RegisterExtractorsInSystem("/system/lib"
+    } else {
+        ALOGE("couldn't find media namespace.");
+    }
+
+    RegisterExtractors("/system/lib"
 #ifdef __LP64__
             "64"
 #endif
-            "/extractors", *newList);
+            "/extractors", NULL, *newList);
 
     newList->sort(compareFunc);
     gPlugins = newList;
