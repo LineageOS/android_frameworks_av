@@ -551,6 +551,8 @@ status_t AudioPolicyService::dump(int fd, const Vector<String16>& args __unused)
             mAudioPolicyManager->dump(fd);
         }
 
+        mPackageManager.dump(fd);
+
         if (locked) mLock.unlock();
     }
     return NO_ERROR;

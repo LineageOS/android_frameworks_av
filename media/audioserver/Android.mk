@@ -16,6 +16,7 @@ LOCAL_SHARED_LIBRARIES := \
 	libhwbinder \
 	libmedia \
 	libmedialogservice \
+	libmediautils \
 	libnbaio \
 	libnblog \
 	libsoundtriggerservice \
