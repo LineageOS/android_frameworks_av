@@ -182,8 +182,8 @@ public:
 private:
     KeyedVector<device_category, sp<VolumeCurve> > mOriginVolumeCurves;
     std::map<audio_devices_t, int> mIndexCur; /**< current volume index per device. */
-    /*const*/ int mIndexMin; /**< min volume index. */
-    /*const*/ int mIndexMax; /**< max volume index. */
+    int mIndexMin; /**< min volume index. */
+    int mIndexMax; /**< max volume index. */
     const bool mCanBeMuted = true; /**< true is the stream can be muted. */
 
     const audio_stream_type_t mStream; /**< Keep it for legacy. */
