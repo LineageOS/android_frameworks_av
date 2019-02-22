@@ -45,7 +45,7 @@ public:
         setDerivedInstance(this);
 
         addParameter(
-                DefineParam(mEos, C2_NAME_INPUT_SURFACE_EOS_TUNING)
+                DefineParam(mEos, C2_PARAMKEY_INPUT_SURFACE_EOS)
                 .withDefault(new C2InputSurfaceEosTuning(false))
                 .withFields({C2F(mEos, value).oneOf({true, false})})
                 .withSetter(EosSetter)

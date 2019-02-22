@@ -93,14 +93,14 @@ void workDone(
         std::vector<std::unique_ptr<C2SettingResult>> failures;
         for (size_t i = 0; i < updates.size(); ++i) {
             C2Param* param = updates[i].get();
-            if (param->index() == C2StreamCsdInfo::output::PARAM_TYPE) {
+            if (param->index() == C2StreamInitDataInfo::output::PARAM_TYPE) {
                 csd = true;
             } else if ((param->index() ==
                         C2StreamSampleRateInfo::output::PARAM_TYPE) ||
                        (param->index() ==
                         C2StreamChannelCountInfo::output::PARAM_TYPE) ||
                        (param->index() ==
-                        C2VideoSizeStreamInfo::output::PARAM_TYPE)) {
+                        C2StreamPictureSizeInfo::output::PARAM_TYPE)) {
                 configParam.push_back(param);
             }
         }

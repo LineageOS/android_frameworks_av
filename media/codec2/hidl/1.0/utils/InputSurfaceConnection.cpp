@@ -124,7 +124,7 @@ struct InputSurfaceConnection::Impl : public ComponentWrapper {
         }
 
         // TODO: read settings properly from the interface
-        C2VideoSizeStreamTuning::input inputSize;
+        C2StreamPictureSizeInfo::input inputSize;
         C2StreamUsageTuning::input usage;
         c2_status_t c2Status = queryFromSink({ &inputSize, &usage },
                                          {},

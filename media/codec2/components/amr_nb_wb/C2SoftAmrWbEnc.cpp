@@ -38,38 +38,38 @@ class C2SoftAmrWbEnc::IntfImpl : public C2InterfaceHelper {
         setDerivedInstance(this);
 
         addParameter(
-            DefineParam(mInputFormat, C2_NAME_INPUT_STREAM_FORMAT_SETTING)
+            DefineParam(mInputFormat, C2_PARAMKEY_INPUT_STREAM_BUFFER_TYPE)
                 .withConstValue(
-                    new C2StreamFormatConfig::input(0u, C2FormatAudio))
+                    new C2StreamBufferTypeSetting::input(0u, C2BufferData::LINEAR))
                 .build());
 
         addParameter(
-            DefineParam(mOutputFormat, C2_NAME_OUTPUT_STREAM_FORMAT_SETTING)
+            DefineParam(mOutputFormat, C2_PARAMKEY_OUTPUT_STREAM_BUFFER_TYPE)
                 .withConstValue(
-                    new C2StreamFormatConfig::output(0u, C2FormatCompressed))
+                    new C2StreamBufferTypeSetting::output(0u, C2BufferData::LINEAR))
                 .build());
 
         addParameter(
-            DefineParam(mInputMediaType, C2_NAME_INPUT_PORT_MIME_SETTING)
-                .withConstValue(AllocSharedString<C2PortMimeConfig::input>(
+            DefineParam(mInputMediaType, C2_PARAMKEY_INPUT_MEDIA_TYPE)
+                .withConstValue(AllocSharedString<C2PortMediaTypeSetting::input>(
                     MEDIA_MIMETYPE_AUDIO_RAW))
                 .build());
 
         addParameter(
-            DefineParam(mOutputMediaType, C2_NAME_OUTPUT_PORT_MIME_SETTING)
-                .withConstValue(AllocSharedString<C2PortMimeConfig::output>(
+            DefineParam(mOutputMediaType, C2_PARAMKEY_OUTPUT_MEDIA_TYPE)
+                .withConstValue(AllocSharedString<C2PortMediaTypeSetting::output>(
                     MEDIA_MIMETYPE_AUDIO_AMR_WB))
                 .build());
 
         addParameter(
-                DefineParam(mChannelCount, C2_NAME_STREAM_CHANNEL_COUNT_SETTING)
+                DefineParam(mChannelCount, C2_PARAMKEY_CHANNEL_COUNT)
                 .withDefault(new C2StreamChannelCountInfo::input(0u, 1))
                 .withFields({C2F(mChannelCount, value).equalTo(1)})
                 .withSetter((Setter<decltype(*mChannelCount)>::StrictValueWithNoDeps))
                 .build());
 
         addParameter(
-            DefineParam(mSampleRate, C2_NAME_STREAM_SAMPLE_RATE_SETTING)
+            DefineParam(mSampleRate, C2_PARAMKEY_SAMPLE_RATE)
                 .withDefault(new C2StreamSampleRateInfo::input(0u, 16000))
                 .withFields({C2F(mSampleRate, value).equalTo(16000)})
                 .withSetter(
@@ -77,8 +77,8 @@ class C2SoftAmrWbEnc::IntfImpl : public C2InterfaceHelper {
                 .build());
 
         addParameter(
-                DefineParam(mBitrate, C2_NAME_STREAM_BITRATE_SETTING)
-                .withDefault(new C2BitrateTuning::output(0u, 6600))
+                DefineParam(mBitrate, C2_PARAMKEY_BITRATE)
+                .withDefault(new C2StreamBitrateInfo::output(0u, 6600))
                 .withFields({C2F(mBitrate, value).inRange(6600, 23850)})
                 .withSetter(Setter<decltype(*mBitrate)>::NonStrictValueWithNoDeps)
                 .build());
@@ -94,13 +94,13 @@ class C2SoftAmrWbEnc::IntfImpl : public C2InterfaceHelper {
     uint32_t getBitrate() const { return mBitrate->value; }
 
    private:
-    std::shared_ptr<C2StreamFormatConfig::input> mInputFormat;
-    std::shared_ptr<C2StreamFormatConfig::output> mOutputFormat;
-    std::shared_ptr<C2PortMimeConfig::input> mInputMediaType;
-    std::shared_ptr<C2PortMimeConfig::output> mOutputMediaType;
+    std::shared_ptr<C2StreamBufferTypeSetting::input> mInputFormat;
+    std::shared_ptr<C2StreamBufferTypeSetting::output> mOutputFormat;
+    std::shared_ptr<C2PortMediaTypeSetting::input> mInputMediaType;
+    std::shared_ptr<C2PortMediaTypeSetting::output> mOutputMediaType;
     std::shared_ptr<C2StreamSampleRateInfo::input> mSampleRate;
     std::shared_ptr<C2StreamChannelCountInfo::input> mChannelCount;
-    std::shared_ptr<C2BitrateTuning::output> mBitrate;
+    std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
     std::shared_ptr<C2StreamMaxBufferSizeInfo::input> mInputMaxBufSize;
 };
 

@@ -229,7 +229,7 @@ void validateComponent(
 // Set Default config param.
 bool Codec2VideoEncHidlTest::setupConfigParam(int32_t nWidth, int32_t nHeight) {
     std::vector<std::unique_ptr<C2SettingResult>> failures;
-    C2VideoSizeStreamTuning::input inputSize(0u, nWidth, nHeight);
+    C2StreamPictureSizeInfo::input inputSize(0u, nWidth, nHeight);
     std::vector<C2Param*> configParam{&inputSize};
     c2_status_t status =
         mComponent->config(configParam, C2_DONT_BLOCK, &failures);

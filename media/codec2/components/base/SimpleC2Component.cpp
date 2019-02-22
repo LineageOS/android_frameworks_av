@@ -473,7 +473,7 @@ bool SimpleC2Component::processQueue() {
     if (!mOutputBlockPool) {
         c2_status_t err = [this] {
             // TODO: don't use query_vb
-            C2StreamFormatConfig::output outputFormat(0u);
+            C2StreamBufferTypeSetting::output outputFormat(0u);
             std::vector<std::unique_ptr<C2Param>> params;
             c2_status_t err = intf()->query_vb(
                     { &outputFormat },
@@ -485,7 +485,7 @@ bool SimpleC2Component::processQueue() {
                 return err;
             }
             C2BlockPool::local_id_t poolId =
-                outputFormat.value == C2FormatVideo
+                outputFormat.value == C2BufferData::GRAPHIC
                         ? C2BlockPool::BASIC_GRAPHIC
                         : C2BlockPool::BASIC_LINEAR;
             if (params.size()) {
