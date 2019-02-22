@@ -273,7 +273,7 @@ private:
             mPostDownmixReformatBufferProvider.reset(nullptr);
             mDownmixerBufferProvider.reset(nullptr);
             mReformatBufferProvider.reset(nullptr);
-            mAdjustChannelsNonDestructiveBufferProvider.reset(nullptr);
+            mContractChannelsNonDestructiveBufferProvider.reset(nullptr);
             mAdjustChannelsBufferProvider.reset(nullptr);
         }
 
@@ -347,8 +347,12 @@ private:
          * all pre-mixer track buffer conversions outside the AudioMixer class.
          *
          * 1) mInputBufferProvider: The AudioTrack buffer provider.
-         * 2) mAdjustChannelsBufferProvider: Expend or contracts data
-         * 3) mAdjustChannelsNonDestructiveBufferProvider: Non-destructively adjust sample data
+         * 2) mAdjustChannelsBufferProvider: Expands or contracts sample data from one interleaved
+         *    channel format to another. Expanded channels are filled with zeros and put at the end
+         *    of each audio frame. Contracted channels are copied to the end of the buffer.
+         * 3) mContractChannelsNonDestructiveBufferProvider: Non-destructively contract sample data.
+         *    This is currently using at audio-haptic coupled playback to separate audio and haptic
+         *    data. Contracted channels could be written to given buffer.
          * 4) mReformatBufferProvider: If not NULL, performs the audio reformat to
          *    match either mMixerInFormat or mDownmixRequiresFormat, if the downmixer
          *    requires reformat. For example, it may convert floating point input to
@@ -360,9 +364,10 @@ private:
          * 7) mTimestretchBufferProvider: Adds timestretching for playback rate
          */
         AudioBufferProvider*     mInputBufferProvider;    // externally provided buffer provider.
-        // TODO: combine AdjustChannelsBufferProvider and AdjustChannelsNonDestructiveBufferProvider
+        // TODO: combine mAdjustChannelsBufferProvider and
+        // mContractChannelsNonDestructiveBufferProvider
         std::unique_ptr<PassthruBufferProvider> mAdjustChannelsBufferProvider;
-        std::unique_ptr<PassthruBufferProvider> mAdjustChannelsNonDestructiveBufferProvider;
+        std::unique_ptr<PassthruBufferProvider> mContractChannelsNonDestructiveBufferProvider;
         std::unique_ptr<PassthruBufferProvider> mReformatBufferProvider;
         std::unique_ptr<PassthruBufferProvider> mDownmixerBufferProvider;
         std::unique_ptr<PassthruBufferProvider> mPostDownmixReformatBufferProvider;

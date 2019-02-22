@@ -408,8 +408,8 @@ status_t AudioMixer::Track::prepareForAdjustChannels()
 void AudioMixer::Track::unprepareForAdjustChannelsNonDestructive()
 {
     ALOGV("AUDIOMIXER::unprepareForAdjustChannelsNonDestructive");
-    if (mAdjustChannelsNonDestructiveBufferProvider.get() != nullptr) {
-        mAdjustChannelsNonDestructiveBufferProvider.reset(nullptr);
+    if (mContractChannelsNonDestructiveBufferProvider.get() != nullptr) {
+        mContractChannelsNonDestructiveBufferProvider.reset(nullptr);
         reconfigureBufferProviders();
     }
 }
@@ -426,13 +426,13 @@ status_t AudioMixer::Track::prepareForAdjustChannelsNonDestructive(size_t frames
                 ? (uint8_t*)mainBuffer + frames * audio_bytes_per_frame(
                         mMixerChannelCount, mMixerFormat)
                 : NULL;
-        mAdjustChannelsNonDestructiveBufferProvider.reset(
-                new AdjustChannelsNonDestructiveBufferProvider(
+        mContractChannelsNonDestructiveBufferProvider.reset(
+                new AdjustChannelsBufferProvider(
                         mFormat,
                         mAdjustNonDestructiveInChannelCount,
                         mAdjustNonDestructiveOutChannelCount,
-                        mKeepContractedChannels ? mMixerFormat : AUDIO_FORMAT_INVALID,
                         frames,
+                        mKeepContractedChannels ? mMixerFormat : AUDIO_FORMAT_INVALID,
                         buffer));
         reconfigureBufferProviders();
     }
@@ -441,9 +441,9 @@ status_t AudioMixer::Track::prepareForAdjustChannelsNonDestructive(size_t frames
 
 void AudioMixer::Track::clearContractedBuffer()
 {
-    if (mAdjustChannelsNonDestructiveBufferProvider.get() != nullptr) {
-        static_cast<AdjustChannelsNonDestructiveBufferProvider*>(
-                mAdjustChannelsNonDestructiveBufferProvider.get())->clearContractedFrames();
+    if (mContractChannelsNonDestructiveBufferProvider.get() != nullptr) {
+        static_cast<AdjustChannelsBufferProvider*>(
+                mContractChannelsNonDestructiveBufferProvider.get())->clearContractedFrames();
     }
 }
 
@@ -455,9 +455,9 @@ void AudioMixer::Track::reconfigureBufferProviders()
         mAdjustChannelsBufferProvider->setBufferProvider(bufferProvider);
         bufferProvider = mAdjustChannelsBufferProvider.get();
     }
-    if (mAdjustChannelsNonDestructiveBufferProvider.get() != nullptr) {
-        mAdjustChannelsNonDestructiveBufferProvider->setBufferProvider(bufferProvider);
-        bufferProvider = mAdjustChannelsNonDestructiveBufferProvider.get();
+    if (mContractChannelsNonDestructiveBufferProvider.get() != nullptr) {
+        mContractChannelsNonDestructiveBufferProvider->setBufferProvider(bufferProvider);
+        bufferProvider = mContractChannelsNonDestructiveBufferProvider.get();
     }
     if (mReformatBufferProvider.get() != nullptr) {
         mReformatBufferProvider->setBufferProvider(bufferProvider);
@@ -966,8 +966,8 @@ void AudioMixer::setBufferProvider(int name, AudioBufferProvider* bufferProvider
         track->mDownmixerBufferProvider->reset();
     } else if (track->mReformatBufferProvider.get() != nullptr) {
         track->mReformatBufferProvider->reset();
-    } else if (track->mAdjustChannelsNonDestructiveBufferProvider.get() != nullptr) {
-        track->mAdjustChannelsNonDestructiveBufferProvider->reset();
+    } else if (track->mContractChannelsNonDestructiveBufferProvider.get() != nullptr) {
+        track->mContractChannelsNonDestructiveBufferProvider->reset();
     } else if (track->mAdjustChannelsBufferProvider.get() != nullptr) {
         track->mAdjustChannelsBufferProvider->reset();
     }
