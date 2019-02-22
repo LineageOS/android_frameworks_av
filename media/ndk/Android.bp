@@ -68,7 +68,7 @@ cc_library_shared {
         "libbinder",
         "libmedia",
         "libmedia_omx",
-        "libmedia_jni",
+        "libmedia_jni_utils",
         "libmediadrm",
         "libmediaextractor",
         "libstagefright",
