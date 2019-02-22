@@ -277,19 +277,14 @@ void MediaExtractorFactory::RegisterExtractorsInApex(
 
     std::string libDirPathEx = libDirPath;
     libDirPathEx += "/extractors";
-    android_namespace_t *extractorNs = android_create_namespace("extractor",
-            nullptr,  // ld_library_path
-            libDirPath,  // default_library_path
-            ANDROID_NAMESPACE_TYPE_ISOLATED,
-            libDirPathEx.c_str(),  // permitted_when_isolated_path
-            nullptr); // parent
-    if (!android_link_namespaces(extractorNs, nullptr, gLinkedLibraries.c_str())) {
-        ALOGE("Failed to link namespace. Failed to load extractor plug-ins in apex.");
+    android_namespace_t *mediaNs = android_get_exported_namespace("media");
+    if (mediaNs == NULL) {
+        ALOGE("couldn't find media namespace.");
         return;
     }
     const android_dlextinfo dlextinfo = {
         .flags = ANDROID_DLEXT_USE_NAMESPACE,
-        .library_namespace = extractorNs,
+        .library_namespace = mediaNs,
     };
 
     // try extractors subfolder first
