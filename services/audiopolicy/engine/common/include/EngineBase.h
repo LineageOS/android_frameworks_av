@@ -19,6 +19,7 @@
 #include <EngineConfig.h>
 #include <AudioPolicyManagerInterface.h>
 #include <ProductStrategy.h>
+#include <StreamVolumeCurves.h>
 
 namespace android {
 namespace audio_policy {
@@ -67,6 +68,10 @@ public:
 
     status_t listAudioProductStrategies(AudioProductStrategyVector &strategies) const override;
 
+    VolumeCurves *getVolumeCurvesForAttributes(const audio_attributes_t &attr) override;
+
+    VolumeCurves *getVolumeCurvesForStreamType(audio_stream_type_t stream) override;
+
     void dump(String8 *dst) const override;
 
 
@@ -87,7 +92,16 @@ public:
         return is_state_in_call(getPhoneState());
     }
 
-private:
+    VolumeSource toVolumeSource(audio_stream_type_t stream) const
+    {
+        return static_cast<VolumeSource>(stream);
+    }
+
+    status_t switchVolumeCurve(audio_stream_type_t streamSrc, audio_stream_type_t streamDst);
+
+    status_t restoreOriginVolumeCurve(audio_stream_type_t stream);
+
+ private:
     AudioPolicyManagerObserver *mApmObserver = nullptr;
 
     ProductStrategyMap mProductStrategies;
@@ -95,6 +109,8 @@ private:
 
     /** current forced use configuration. */
     audio_policy_forced_cfg_t mForceUse[AUDIO_POLICY_FORCE_USE_CNT] = {};
+
+    StreamVolumeCurves mStreamVolumeCurves;
 };
 
 } // namespace audio_policy

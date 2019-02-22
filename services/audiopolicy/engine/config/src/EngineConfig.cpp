@@ -107,6 +107,35 @@ struct CriterionTraits : public BaseSerializerTraits<Criterion, Criteria> {
     static android::status_t deserialize(_xmlDoc *doc, const _xmlNode *root,
                                          Collection &collection);
 };
+struct VolumeTraits : public BaseSerializerTraits<VolumeCurve, VolumeCurves> {
+    static constexpr const char *tag = "volume";
+    static constexpr const char *collectionTag = "volumes";
+    static constexpr const char *volumePointTag = "point";
+
+    struct Attributes {
+        static constexpr const char *deviceCategory = "deviceCategory";
+        static constexpr const char *reference = "ref"; /**< For volume curves factorization. */
+    };
+
+    static android::status_t deserialize(_xmlDoc *doc, const _xmlNode *root,
+                                         Collection &collection);
+};
+struct VolumeGroupTraits : public BaseSerializerTraits<VolumeGroup, VolumeGroups> {
+    static constexpr const char *tag = "volumeGroup";
+    static constexpr const char *collectionTag = "volumeGroups";
+
+    struct Attributes {
+        static constexpr const char *name = "name";
+        static constexpr const char *stream = "stream"; // For legacy volume curves
+        static constexpr const char *indexMin = "indexMin";
+        static constexpr const char *indexMax = "indexMax";
+    };
+
+    static android::status_t deserialize(_xmlDoc *doc, const _xmlNode *root,
+                                         Collection &collection);
+};
+
+using xmlCharUnique = std::unique_ptr<xmlChar, decltype(xmlFree)>;
 
 using xmlCharUnique = std::unique_ptr<xmlChar, decltype(xmlFree)>;
 
@@ -383,6 +412,100 @@ status_t ProductStrategyTraits::deserialize(_xmlDoc *doc, const _xmlNode *child,
     return NO_ERROR;
 }
 
+status_t VolumeTraits::deserialize(_xmlDoc *doc, const _xmlNode *root, Collection &volumes)
+{
+    std::string deviceCategory = getXmlAttribute(root, Attributes::deviceCategory);
+    if (deviceCategory.empty()) {
+        ALOGW("%s: No %s found", __FUNCTION__, Attributes::deviceCategory);
+    }
+
+    std::string referenceName = getXmlAttribute(root, Attributes::reference);
+    const _xmlNode *ref = NULL;
+    if (!referenceName.empty()) {
+        getReference(xmlDocGetRootElement(doc), ref, referenceName, collectionTag);
+        if (ref == NULL) {
+            ALOGE("%s: No reference Ptr found for %s", __FUNCTION__, referenceName.c_str());
+            return BAD_VALUE;
+        }
+    }
+    // Retrieve curve point from reference element if found or directly from current curve
+    CurvePoints curvePoints;
+    for (const xmlNode *child = referenceName.empty() ?
+         root->xmlChildrenNode : ref->xmlChildrenNode; child != NULL; child = child->next) {
+        if (!xmlStrcmp(child->name, (const xmlChar *)volumePointTag)) {
+            xmlCharUnique pointXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
+            if (pointXml == NULL) {
+                return BAD_VALUE;
+            }
+            ALOGV("%s: %s=%s", __func__, tag, reinterpret_cast<const char*>(pointXml.get()));
+            std::vector<int> point;
+            collectionFromString<DefaultTraits<int>>(
+                        reinterpret_cast<const char*>(pointXml.get()), point, ",");
+            if (point.size() != 2) {
+                ALOGE("%s: Invalid %s: %s", __func__, volumePointTag,
+                      reinterpret_cast<const char*>(pointXml.get()));
+                return BAD_VALUE;
+            }
+            curvePoints.push_back({point[0], point[1]});
+        }
+    }
+    volumes.push_back({ deviceCategory, curvePoints });
+    return NO_ERROR;
+}
+
+status_t VolumeGroupTraits::deserialize(_xmlDoc *doc, const _xmlNode *root, Collection &volumes)
+{
+    std::string name;
+    std::string stream = {};
+    int indexMin = 0;
+    int indexMax = 0;
+
+    for (const xmlNode *child = root->xmlChildrenNode; child != NULL; child = child->next) {
+        if (not xmlStrcmp(child->name, (const xmlChar *)Attributes::name)) {
+            xmlCharUnique nameXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
+            if (nameXml == nullptr) {
+                return BAD_VALUE;
+            }
+            name = reinterpret_cast<const char*>(nameXml.get());
+        }
+        if (not xmlStrcmp(child->name, (const xmlChar *)Attributes::stream)) {
+            xmlCharUnique streamXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
+            if (streamXml == nullptr) {
+                return BAD_VALUE;
+            }
+            stream = reinterpret_cast<const char*>(streamXml.get());
+        }
+        if (not xmlStrcmp(child->name, (const xmlChar *)Attributes::indexMin)) {
+            xmlCharUnique indexMinXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
+            if (indexMinXml == nullptr) {
+                return BAD_VALUE;
+            }
+            std::string indexMinLiteral(reinterpret_cast<const char*>(indexMinXml.get()));
+            if (!convertTo(indexMinLiteral, indexMin)) {
+                return BAD_VALUE;
+            }
+        }
+        if (not xmlStrcmp(child->name, (const xmlChar *)Attributes::indexMax)) {
+            xmlCharUnique indexMaxXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
+            if (indexMaxXml == nullptr) {
+                return BAD_VALUE;
+            }
+            std::string indexMaxLiteral(reinterpret_cast<const char*>(indexMaxXml.get()));
+            if (!convertTo(indexMaxLiteral, indexMax)) {
+                return BAD_VALUE;
+            }
+        }
+    }
+    ALOGV("%s: group=%s stream=%s indexMin=%d, indexMax=%d",
+          __func__, name.c_str(), stream.c_str(), indexMin, indexMax);
+
+    VolumeCurves groupVolumeCurves;
+    size_t skipped = 0;
+    deserializeCollection<VolumeTraits>(doc, root, groupVolumeCurves, skipped);
+    volumes.push_back({ name, stream, indexMin, indexMax, groupVolumeCurves });
+    return NO_ERROR;
+}
+
 ParsingResult parse(const char* path) {
     xmlDocPtr doc;
     doc = xmlParseFile(path);
@@ -414,6 +537,9 @@ ParsingResult parse(const char* path) {
                 doc, cur, config->criteria, nbSkippedElements);
     deserializeCollection<CriterionTypeTraits>(
                 doc, cur, config->criterionTypes, nbSkippedElements);
+    deserializeCollection<VolumeGroupTraits>(
+                doc, cur, config->volumeGroups, nbSkippedElements);
+
     return {std::move(config), nbSkippedElements};
 }
 
