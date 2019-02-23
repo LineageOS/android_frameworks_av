@@ -431,7 +431,9 @@ audio_devices_t Engine::getDeviceForStrategyInt(legacy_strategy strategy,
                     outputDeviceTypesToIgnore);
             break;
         }
-        if (device2 == AUDIO_DEVICE_NONE) {
+        // FIXME: Find a better solution to prevent routing to BT hearing aid(b/122931261).
+        if ((device2 == AUDIO_DEVICE_NONE) &&
+                (getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) != AUDIO_POLICY_FORCE_NO_BT_A2DP)) {
             device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_HEARING_AID;
         }
         if ((device2 == AUDIO_DEVICE_NONE) &&
