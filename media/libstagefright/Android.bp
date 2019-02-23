@@ -319,21 +319,3 @@ cc_library_static {
     },
 }
 
-subdirs = [
-    "codec2",
-    "codecs/*",
-    "colorconversion",
-    "filters",
-    "flac/dec",
-    "foundation",
-    "http",
-    "httplive",
-    "id3",
-    "mpeg2ts",
-    "omx",
-    "rtsp",
-    "tests",
-    "timedtext",
-    "webm",
-    "xmlparser",
-]

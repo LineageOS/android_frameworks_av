@@ -1,5 +1,3 @@
-subdirs = ["*"]
-
 cc_library_headers {
     name: "libaaudio_example_utils",
     export_include_dirs: ["utils"],
