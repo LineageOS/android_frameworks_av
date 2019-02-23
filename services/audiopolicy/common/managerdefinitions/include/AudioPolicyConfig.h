@@ -20,6 +20,7 @@
 #include <unordered_set>
 
 #include <AudioGain.h>
+#include <VolumeCurve.h>
 #include <AudioPort.h>
 #include <AudioPatch.h>
 #include <DeviceDescriptor.h>
@@ -39,11 +40,13 @@ public:
     AudioPolicyConfig(HwModuleCollection &hwModules,
                       DeviceVector &availableOutputDevices,
                       DeviceVector &availableInputDevices,
-                      sp<DeviceDescriptor> &defaultOutputDevice)
+                      sp<DeviceDescriptor> &defaultOutputDevice,
+                      VolumeCurvesCollection *volumes = nullptr)
         : mHwModules(hwModules),
           mAvailableOutputDevices(availableOutputDevices),
           mAvailableInputDevices(availableInputDevices),
           mDefaultOutputDevice(defaultOutputDevice),
+          mVolumeCurves(volumes),
           mIsSpeakerDrcEnabled(false)
     {}
 
@@ -53,6 +56,13 @@ public:
 
     void setSource(const std::string& file) {
         mSource = file;
+    }
+
+    void setVolumes(const VolumeCurvesCollection &volumes)
+    {
+        if (mVolumeCurves != nullptr) {
+            *mVolumeCurves = volumes;
+        }
     }
 
     void setHwModules(const HwModuleCollection &hwModules)
@@ -172,6 +182,7 @@ private:
     DeviceVector &mAvailableOutputDevices;
     DeviceVector &mAvailableInputDevices;
     sp<DeviceDescriptor> &mDefaultOutputDevice;
+    VolumeCurvesCollection *mVolumeCurves;
     // TODO: remove when legacy conf file is removed. true on devices that use DRC on the
     // DEVICE_CATEGORY_SPEAKER path to boost soft sounds, used to adjust volume curves accordingly.
     // Note: remove also speaker_drc_enabled from global configuration of XML config file.

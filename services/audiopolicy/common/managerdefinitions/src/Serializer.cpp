@@ -201,6 +201,25 @@ struct GlobalConfigTraits
     static status_t deserialize(const xmlNode *root, AudioPolicyConfig *config);
 };
 
+struct VolumeTraits : public AndroidCollectionTraits<VolumeCurve, VolumeCurvesCollection>
+{
+    static constexpr const char *tag = "volume";
+    static constexpr const char *collectionTag = "volumes";
+    static constexpr const char *volumePointTag = "point";
+    static constexpr const char *referenceTag = "reference";
+
+    struct Attributes
+    {
+        static constexpr const char *stream = "stream";
+        static constexpr const char *deviceCategory = "deviceCategory";
+        static constexpr const char *reference = "ref";
+        static constexpr const char *referenceName = "name";
+    };
+
+    static Return<Element> deserialize(const xmlNode *cur, PtrSerializingCtx serializingContext);
+    // No Children
+};
+
 struct SurroundSoundTraits
 {
     static constexpr const char *tag = "surroundSound";
@@ -684,6 +703,67 @@ status_t GlobalConfigTraits::deserialize(const xmlNode *root, AudioPolicyConfig 
     return NO_ERROR;
 }
 
+Return<VolumeTraits::Element> VolumeTraits::deserialize(const xmlNode *cur,
+        PtrSerializingCtx /*serializingContext*/)
+{
+    std::string streamTypeLiteral = getXmlAttribute(cur, Attributes::stream);
+    if (streamTypeLiteral.empty()) {
+        ALOGE("%s: No %s found", __func__, Attributes::stream);
+        return Status::fromStatusT(BAD_VALUE);
+    }
+    audio_stream_type_t streamType;
+    if (!StreamTypeConverter::fromString(streamTypeLiteral, streamType)) {
+        ALOGE("%s: Invalid %s", __func__, Attributes::stream);
+        return Status::fromStatusT(BAD_VALUE);
+    }
+    std::string deviceCategoryLiteral = getXmlAttribute(cur, Attributes::deviceCategory);
+    if (deviceCategoryLiteral.empty()) {
+        ALOGE("%s: No %s found", __func__, Attributes::deviceCategory);
+        return Status::fromStatusT(BAD_VALUE);
+    }
+    device_category deviceCategory;
+    if (!DeviceCategoryConverter::fromString(deviceCategoryLiteral, deviceCategory)) {
+        ALOGE("%s: Invalid %s=%s", __func__, Attributes::deviceCategory,
+              deviceCategoryLiteral.c_str());
+        return Status::fromStatusT(BAD_VALUE);
+    }
+
+    std::string referenceName = getXmlAttribute(cur, Attributes::reference);
+    const xmlNode *ref = NULL;
+    if (!referenceName.empty()) {
+        ref = getReference<VolumeTraits>(cur->parent, referenceName);
+        if (ref == NULL) {
+            ALOGE("%s: No reference Ptr found for %s", __func__, referenceName.c_str());
+            return Status::fromStatusT(BAD_VALUE);
+        }
+    }
+
+    Element volCurve = new VolumeCurve(deviceCategory, streamType);
+
+    for (const xmlNode *child = referenceName.empty() ? cur->xmlChildrenNode : ref->xmlChildrenNode;
+         child != NULL; child = child->next) {
+        if (!xmlStrcmp(child->name, reinterpret_cast<const xmlChar*>(volumePointTag))) {
+            auto pointDefinition = make_xmlUnique(xmlNodeListGetString(
+                            child->doc, child->xmlChildrenNode, 1));
+            if (pointDefinition == nullptr) {
+                return Status::fromStatusT(BAD_VALUE);
+            }
+            ALOGV("%s: %s=%s",
+                    __func__, tag, reinterpret_cast<const char*>(pointDefinition.get()));
+            std::vector<int32_t> point;
+            collectionFromString<DefaultTraits<int32_t>>(
+                    reinterpret_cast<const char*>(pointDefinition.get()), point, ",");
+            if (point.size() != 2) {
+                ALOGE("%s: Invalid %s: %s", __func__, volumePointTag,
+                        reinterpret_cast<const char*>(pointDefinition.get()));
+                return Status::fromStatusT(BAD_VALUE);
+            }
+            volCurve->add(CurvePoint(point[0], point[1]));
+        }
+    }
+    return volCurve;
+}
+
 status_t SurroundSoundTraits::deserialize(const xmlNode *root, AudioPolicyConfig *config)
 {
     config->setDefaultSurroundFormats();
@@ -770,6 +850,14 @@ status_t PolicySerializer::deserialize(const char *configFile, AudioPolicyConfig
         return status;
     }
     config->setHwModules(modules);
+
+    // deserialize volume section
+    VolumeTraits::Collection volumes;
+    status = deserializeCollection<VolumeTraits>(root, &volumes, config);
+    if (status != NO_ERROR) {
+        return status;
+    }
+    config->setVolumes(volumes);
 
     // Global Configuration
     GlobalConfigTraits::deserialize(root, config);

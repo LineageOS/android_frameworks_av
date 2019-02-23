@@ -19,6 +19,7 @@ cc_library_static {
         "src/Serializer.cpp",
         "src/SoundTriggerSession.cpp",
         "src/TypeConverter.cpp",
+        "src/VolumeCurve.cpp",
     ],
     shared_libs: [
         "libcutils",

@@ -12,8 +12,6 @@ LOCAL_SRC_FILES := \
     src/EngineInstance.cpp \
     src/Stream.cpp \
     src/InputSource.cpp \
-    ../engine/common/src/VolumeCurve.cpp \
-    ../engine/common/src/StreamVolumeCurves.cpp \
     ../engine/common/src/ProductStrategy.cpp \
     ../engine/common/src/EngineBase.cpp
 
