@@ -179,6 +179,9 @@ public:
             /*out*/
             std::vector<hardware::CameraStatus>* cameraStatuses, bool isVendor = false);
 
+    // Monitored UIDs availability notification
+    void                notifyMonitoredUids();
+
     /////////////////////////////////////////////////////////////////////
     // Client functionality
 
@@ -543,10 +546,13 @@ private:
         void onUidGone(uid_t uid, bool disabled);
         void onUidActive(uid_t uid);
         void onUidIdle(uid_t uid, bool disabled);
-        void onUidStateChanged(uid_t uid __unused, int32_t procState __unused, int64_t procStateSeq __unused) {}
+        void onUidStateChanged(uid_t uid, int32_t procState, int64_t procStateSeq);
 
         void addOverrideUid(uid_t uid, String16 callingPackage, bool active);
         void removeOverrideUid(uid_t uid, String16 callingPackage);
+
+        void registerMonitorUid(uid_t uid);
+        void unregisterMonitorUid(uid_t uid);
 
         // IBinder::DeathRecipient implementation
         virtual void binderDied(const wp<IBinder> &who);
@@ -558,6 +564,8 @@ private:
         bool mRegistered;
         wp<CameraService> mService;
         std::unordered_set<uid_t> mActiveUids;
+        // Monitored uid map to cached procState and refCount pair
+        std::unordered_map<uid_t, std::pair<int32_t, size_t>> mMonitoredUids;
         std::unordered_map<uid_t, bool> mOverrideUids;
     }; // class UidPolicy
 
@@ -790,8 +798,33 @@ private:
 
     sp<CameraProviderManager> mCameraProviderManager;
 
+    class ServiceListener : public virtual IBinder::DeathRecipient {
+        public:
+            ServiceListener(sp<CameraService> parent, sp<hardware::ICameraServiceListener> listener,
+                    int uid) : mParent(parent), mListener(listener), mListenerUid(uid) {}
+
+            status_t initialize() {
+                return IInterface::asBinder(mListener)->linkToDeath(this);
+            }
+
+            virtual void binderDied(const wp<IBinder> &/*who*/) {
+                auto parent = mParent.promote();
+                if (parent.get() != nullptr) {
+                    parent->removeListener(mListener);
+                }
+            }
+
+            int getListenerUid() { return mListenerUid; }
+            sp<hardware::ICameraServiceListener> getListener() { return mListener; }
+
+        private:
+            wp<CameraService> mParent;
+            sp<hardware::ICameraServiceListener> mListener;
+            int mListenerUid;
+    };
+
     // Guarded by mStatusListenerMutex
-    std::vector<std::pair<bool, sp<hardware::ICameraServiceListener>>> mListenerList;
+    std::vector<std::pair<bool, sp<ServiceListener>>> mListenerList;
 
     Mutex       mStatusListenerLock;
 

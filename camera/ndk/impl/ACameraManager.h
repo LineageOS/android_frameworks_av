@@ -86,6 +86,11 @@ class CameraManagerGlobal final : public RefBase {
             return binder::Status::ok();
         }
 
+        // Access priority API not implemented yet
+        virtual binder::Status onCameraAccessPrioritiesChanged() {
+            return binder::Status::ok();
+        }
+
       private:
         const wp<CameraManagerGlobal> mCameraManager;
     };
