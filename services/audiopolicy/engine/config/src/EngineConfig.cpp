@@ -19,7 +19,6 @@
 
 #include "EngineConfig.h"
 #include <policy.h>
-#include <cutils/properties.h>
 #include <media/TypeConverter.h>
 #include <media/convert.h>
 #include <utils/Log.h>
@@ -27,7 +26,6 @@
 #include <libxml/xinclude.h>
 #include <string>
 #include <vector>
-#include <map>
 #include <sstream>
 #include <istream>
 
@@ -109,35 +107,6 @@ struct CriterionTraits : public BaseSerializerTraits<Criterion, Criteria> {
     static android::status_t deserialize(_xmlDoc *doc, const _xmlNode *root,
                                          Collection &collection);
 };
-struct VolumeTraits : public BaseSerializerTraits<VolumeCurve, VolumeCurves> {
-    static constexpr const char *tag = "volume";
-    static constexpr const char *collectionTag = "volumes";
-    static constexpr const char *volumePointTag = "point";
-
-    struct Attributes {
-        static constexpr const char *deviceCategory = "deviceCategory";
-        static constexpr const char *reference = "ref"; /**< For volume curves factorization. */
-    };
-
-    static android::status_t deserialize(_xmlDoc *doc, const _xmlNode *root,
-                                         Collection &collection);
-};
-struct VolumeGroupTraits : public BaseSerializerTraits<VolumeGroup, VolumeGroups> {
-    static constexpr const char *tag = "volumeGroup";
-    static constexpr const char *collectionTag = "volumeGroups";
-
-    struct Attributes {
-        static constexpr const char *name = "name";
-        static constexpr const char *stream = "stream"; // For legacy volume curves
-        static constexpr const char *indexMin = "indexMin";
-        static constexpr const char *indexMax = "indexMax";
-    };
-
-    static android::status_t deserialize(_xmlDoc *doc, const _xmlNode *root,
-                                         Collection &collection);
-};
-
-using xmlCharUnique = std::unique_ptr<xmlChar, decltype(xmlFree)>;
 
 using xmlCharUnique = std::unique_ptr<xmlChar, decltype(xmlFree)>;
 
@@ -414,178 +383,6 @@ status_t ProductStrategyTraits::deserialize(_xmlDoc *doc, const _xmlNode *child,
     return NO_ERROR;
 }
 
-status_t VolumeTraits::deserialize(_xmlDoc *doc, const _xmlNode *root, Collection &volumes)
-{
-    std::string deviceCategory = getXmlAttribute(root, Attributes::deviceCategory);
-    if (deviceCategory.empty()) {
-        ALOGW("%s: No %s found", __FUNCTION__, Attributes::deviceCategory);
-    }
-
-    std::string referenceName = getXmlAttribute(root, Attributes::reference);
-    const _xmlNode *ref = NULL;
-    if (!referenceName.empty()) {
-        getReference(xmlDocGetRootElement(doc), ref, referenceName, collectionTag);
-        if (ref == NULL) {
-            ALOGE("%s: No reference Ptr found for %s", __FUNCTION__, referenceName.c_str());
-            return BAD_VALUE;
-        }
-    }
-    // Retrieve curve point from reference element if found or directly from current curve
-    CurvePoints curvePoints;
-    for (const xmlNode *child = referenceName.empty() ?
-         root->xmlChildrenNode : ref->xmlChildrenNode; child != NULL; child = child->next) {
-        if (!xmlStrcmp(child->name, (const xmlChar *)volumePointTag)) {
-            xmlCharUnique pointXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
-            if (pointXml == NULL) {
-                return BAD_VALUE;
-            }
-            ALOGV("%s: %s=%s", __func__, tag, reinterpret_cast<const char*>(pointXml.get()));
-            std::vector<int> point;
-            collectionFromString<DefaultTraits<int>>(
-                        reinterpret_cast<const char*>(pointXml.get()), point, ",");
-            if (point.size() != 2) {
-                ALOGE("%s: Invalid %s: %s", __func__, volumePointTag,
-                      reinterpret_cast<const char*>(pointXml.get()));
-                return BAD_VALUE;
-            }
-            curvePoints.push_back({point[0], point[1]});
-        }
-    }
-    volumes.push_back({ deviceCategory, curvePoints });
-    return NO_ERROR;
-}
-
-status_t VolumeGroupTraits::deserialize(_xmlDoc *doc, const _xmlNode *root, Collection &volumes)
-{
-    std::string name;
-    std::string stream = {};
-    int indexMin = 0;
-    int indexMax = 0;
-
-    for (const xmlNode *child = root->xmlChildrenNode; child != NULL; child = child->next) {
-        if (not xmlStrcmp(child->name, (const xmlChar *)Attributes::name)) {
-            xmlCharUnique nameXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
-            if (nameXml == nullptr) {
-                return BAD_VALUE;
-            }
-            name = reinterpret_cast<const char*>(nameXml.get());
-        }
-        if (not xmlStrcmp(child->name, (const xmlChar *)Attributes::stream)) {
-            xmlCharUnique streamXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
-            if (streamXml == nullptr) {
-                return BAD_VALUE;
-            }
-            stream = reinterpret_cast<const char*>(streamXml.get());
-        }
-        if (not xmlStrcmp(child->name, (const xmlChar *)Attributes::indexMin)) {
-            xmlCharUnique indexMinXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
-            if (indexMinXml == nullptr) {
-                return BAD_VALUE;
-            }
-            std::string indexMinLiteral(reinterpret_cast<const char*>(indexMinXml.get()));
-            if (!convertTo(indexMinLiteral, indexMin)) {
-                return BAD_VALUE;
-            }
-        }
-        if (not xmlStrcmp(child->name, (const xmlChar *)Attributes::indexMax)) {
-            xmlCharUnique indexMaxXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
-            if (indexMaxXml == nullptr) {
-                return BAD_VALUE;
-            }
-            std::string indexMaxLiteral(reinterpret_cast<const char*>(indexMaxXml.get()));
-            if (!convertTo(indexMaxLiteral, indexMax)) {
-                return BAD_VALUE;
-            }
-        }
-    }
-    ALOGV("%s: group=%s stream=%s indexMin=%d, indexMax=%d",
-          __func__, name.c_str(), stream.c_str(), indexMin, indexMax);
-
-    VolumeCurves groupVolumeCurves;
-    size_t skipped = 0;
-    deserializeCollection<VolumeTraits>(doc, root, groupVolumeCurves, skipped);
-    volumes.push_back({ name, stream, indexMin, indexMax, groupVolumeCurves });
-    return NO_ERROR;
-}
-
-static constexpr const char *legacyVolumecollectionTag = "volumes";
-static constexpr const char *legacyVolumeTag = "volume";
-
-status_t deserializeLegacyVolume(_xmlDoc *doc, const _xmlNode *cur,
-                                 std::map<std::string, VolumeCurves> &legacyVolumes)
-{
-    std::string streamTypeLiteral = getXmlAttribute(cur, "stream");
-    if (streamTypeLiteral.empty()) {
-        ALOGE("%s: No attribute stream found", __func__);
-        return BAD_VALUE;
-    }
-    std::string deviceCategoryLiteral = getXmlAttribute(cur, "deviceCategory");
-    if (deviceCategoryLiteral.empty()) {
-        ALOGE("%s: No attribute deviceCategory found", __func__);
-        return BAD_VALUE;
-    }
-    std::string referenceName = getXmlAttribute(cur, "ref");
-    const xmlNode *ref = NULL;
-    if (!referenceName.empty()) {
-        getReference(xmlDocGetRootElement(doc), ref, referenceName, legacyVolumecollectionTag);
-        if (ref == NULL) {
-            ALOGE("%s: No reference Ptr found for %s", __func__, referenceName.c_str());
-            return BAD_VALUE;
-        }
-        ALOGV("%s: reference found for %s", __func__, referenceName.c_str());
-    }
-    CurvePoints curvePoints;
-    for (const xmlNode *child = referenceName.empty() ?
-         cur->xmlChildrenNode : ref->xmlChildrenNode; child != NULL; child = child->next) {
-        if (!xmlStrcmp(child->name, (const xmlChar *)VolumeTraits::volumePointTag)) {
-            xmlCharUnique pointXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
-            if (pointXml == NULL) {
-                return BAD_VALUE;
-            }
-            ALOGV("%s: %s=%s", __func__, legacyVolumeTag,
-                  reinterpret_cast<const char*>(pointXml.get()));
-            std::vector<int> point;
-            collectionFromString<DefaultTraits<int>>(
-                        reinterpret_cast<const char*>(pointXml.get()), point, ",");
-            if (point.size() != 2) {
-                ALOGE("%s: Invalid %s: %s", __func__, VolumeTraits::volumePointTag,
-                      reinterpret_cast<const char*>(pointXml.get()));
-                return BAD_VALUE;
-            }
-            curvePoints.push_back({point[0], point[1]});
-        }
-    }
-    legacyVolumes[streamTypeLiteral].push_back({ deviceCategoryLiteral, curvePoints });
-    return NO_ERROR;
-}
-
-static status_t deserializeLegacyVolumeCollection(_xmlDoc *doc, const _xmlNode *cur,
-                                                  VolumeGroups &volumeGroups,
-                                                  size_t &nbSkippedElement)
-{
-    std::map<std::string, VolumeCurves> legacyVolumeMap;
-    for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
-        if (xmlStrcmp(cur->name, (const xmlChar *)legacyVolumecollectionTag)) {
-            continue;
-        }
-        const xmlNode *child = cur->xmlChildrenNode;
-        for (; child != NULL; child = child->next) {
-            if (!xmlStrcmp(child->name, (const xmlChar *)legacyVolumeTag)) {
-
-                status_t status = deserializeLegacyVolume(doc, child, legacyVolumeMap);
-                if (status != NO_ERROR) {
-                    nbSkippedElement += 1;
-                }
-            }
-        }
-    }
-    for (const auto &volumeMapIter : legacyVolumeMap) {
-        volumeGroups.push_back({ volumeMapIter.first, volumeMapIter.first, 0, 100,
-                                 volumeMapIter.second });
-    }
-    return NO_ERROR;
-}
-
 ParsingResult parse(const char* path) {
     xmlDocPtr doc;
     doc = xmlParseFile(path);
@@ -617,65 +414,7 @@ ParsingResult parse(const char* path) {
                 doc, cur, config->criteria, nbSkippedElements);
     deserializeCollection<CriterionTypeTraits>(
                 doc, cur, config->criterionTypes, nbSkippedElements);
-    deserializeCollection<VolumeGroupTraits>(
-                doc, cur, config->volumeGroups, nbSkippedElements);
-
     return {std::move(config), nbSkippedElements};
-}
-
-android::status_t parseLegacyVolumeFile(const char* path, VolumeGroups &volumeGroups) {
-    xmlDocPtr doc;
-    doc = xmlParseFile(path);
-    if (doc == NULL) {
-        ALOGE("%s: Could not parse document %s", __FUNCTION__, path);
-        return BAD_VALUE;
-    }
-    xmlNodePtr cur = xmlDocGetRootElement(doc);
-    if (cur == NULL) {
-        ALOGE("%s: Could not parse: empty document %s", __FUNCTION__, path);
-        xmlFreeDoc(doc);
-        return BAD_VALUE;
-    }
-    if (xmlXIncludeProcess(doc) < 0) {
-        ALOGE("%s: libxml failed to resolve XIncludes on document %s", __FUNCTION__, path);
-        return BAD_VALUE;
-    }
-    size_t nbSkippedElements = 0;
-    return deserializeLegacyVolumeCollection(doc, cur, volumeGroups, nbSkippedElements);
-}
-
-static const char *kConfigLocationList[] = {"/odm/etc", "/vendor/etc", "/system/etc"};
-static const int kConfigLocationListSize =
-        (sizeof(kConfigLocationList) / sizeof(kConfigLocationList[0]));
-static const int gApmXmlConfigFilePathMaxLength = 128;
-
-static constexpr const char *apmXmlConfigFileName = "audio_policy_configuration.xml";
-static constexpr const char *apmA2dpOffloadDisabledXmlConfigFileName =
-        "audio_policy_configuration_a2dp_offload_disabled.xml";
-
-android::status_t parseLegacyVolumes(VolumeGroups &volumeGroups) {
-    char audioPolicyXmlConfigFile[gApmXmlConfigFilePathMaxLength];
-    std::vector<const char *> fileNames;
-    status_t ret;
-
-    if (property_get_bool("ro.bluetooth.a2dp_offload.supported", false) &&
-            property_get_bool("persist.bluetooth.a2dp_offload.disabled", false)) {
-        // A2DP offload supported but disabled: try to use special XML file
-        fileNames.push_back(apmA2dpOffloadDisabledXmlConfigFileName);
-    }
-    fileNames.push_back(apmXmlConfigFileName);
-
-    for (const char* fileName : fileNames) {
-        for (int i = 0; i < kConfigLocationListSize; i++) {
-            snprintf(audioPolicyXmlConfigFile, sizeof(audioPolicyXmlConfigFile),
-                     "%s/%s", kConfigLocationList[i], fileName);
-            ret = parseLegacyVolumeFile(audioPolicyXmlConfigFile, volumeGroups);
-            if (ret == NO_ERROR) {
-                return ret;
-            }
-        }
-    }
-    return BAD_VALUE;
 }
 
 } // namespace engineConfig

@@ -66,6 +66,35 @@ Engine::Engine()
     }
 }
 
+status_t Engine::setPhoneState(audio_mode_t state)
+{
+    ALOGV("setPhoneState() state %d", state);
+
+    if (state < 0 || state >= AUDIO_MODE_CNT) {
+        ALOGW("setPhoneState() invalid state %d", state);
+        return BAD_VALUE;
+    }
+
+    if (state == getPhoneState()) {
+        ALOGW("setPhoneState() setting same state %d", state);
+        return BAD_VALUE;
+    }
+
+    // store previous phone state for management of sonification strategy below
+    int oldState = getPhoneState();
+    EngineBase::setPhoneState(state);
+
+    if (!is_state_in_call(oldState) && is_state_in_call(state)) {
+        ALOGV("  Entering call in setPhoneState()");
+        getApmObserver()->getVolumeCurves().switchVolumeCurve(AUDIO_STREAM_VOICE_CALL,
+                                                          AUDIO_STREAM_DTMF);
+    } else if (is_state_in_call(oldState) && !is_state_in_call(state)) {
+        ALOGV("  Exiting call in setPhoneState()");
+        getApmObserver()->getVolumeCurves().restoreOriginVolumeCurve(AUDIO_STREAM_DTMF);
+    }
+    return NO_ERROR;
+}
+
 status_t Engine::setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config)
 {
     switch(usage) {

@@ -113,7 +113,7 @@ bool Engine::setVolumeProfileForStream(const audio_stream_type_t &stream,
                                        const audio_stream_type_t &profile)
 {
     if (setPropertyForKey<audio_stream_type_t, audio_stream_type_t>(stream, profile)) {
-        switchVolumeCurve(profile, stream);
+        getApmObserver()->getVolumeCurves().switchVolumeCurve(profile, stream);
         return true;
     }
     return false;

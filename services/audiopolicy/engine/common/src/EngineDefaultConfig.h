@@ -135,7 +135,6 @@ const engineConfig::Config gDefaultEngineConfig = {
     1.0,
     gOrderedStrategies,
     {},
-    {},
     {}
 };
 } // namespace android

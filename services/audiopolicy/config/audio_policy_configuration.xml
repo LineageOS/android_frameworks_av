@@ -191,11 +191,7 @@
     </modules>
     <!-- End of Modules section -->
 
-    <!-- Volume section:
-        IMPORTANT NOTE: Volume tables have been moved to engine configuration.
-                        Keep it here for legacy.
-                        Engine will fallback on these files if none are provided by engine.
-     -->
+    <!-- Volume section -->
 
     <xi:include href="audio_policy_volumes.xml"/>
     <xi:include href="default_volume_tables.xml"/>

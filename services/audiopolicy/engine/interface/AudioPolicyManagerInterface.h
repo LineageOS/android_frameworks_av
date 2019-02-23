@@ -18,7 +18,6 @@
 
 #include <AudioPolicyManagerObserver.h>
 #include <media/AudioProductStrategy.h>
-#include <IVolumeCurves.h>
 #include <policy.h>
 #include <Volume.h>
 #include <HwModule.h>
@@ -234,21 +233,6 @@ public:
      * @return OK if the list has been retrieved, error code otherwise
      */
     virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies) const = 0;
-
-    /**
-     * @brief getVolumeCurvesForAttributes retrieves the Volume Curves interface for the
-     *        requested Audio Attributes.
-     * @param attr to be considered
-     * @return IVolumeCurves interface pointer if found, nullptr otherwise
-     */
-    virtual IVolumeCurves *getVolumeCurvesForAttributes(const audio_attributes_t &attr) = 0;
-
-    /**
-     * @brief getVolumeCurvesForStreamType retrieves the Volume Curves interface for the stream
-     * @param stream to be considered
-     * @return IVolumeCurves interface pointer if found, nullptr otherwise
-     */
-    virtual IVolumeCurves *getVolumeCurvesForStreamType(audio_stream_type_t stream) = 0;
 
     virtual void dump(String8 *dst) const = 0;
 

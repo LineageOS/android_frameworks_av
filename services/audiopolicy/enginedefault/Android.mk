@@ -8,8 +8,6 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES := \
     src/Engine.cpp \
     src/EngineInstance.cpp \
-    ../engine/common/src/VolumeCurve.cpp \
-    ../engine/common/src/StreamVolumeCurves.cpp \
     ../engine/common/src/ProductStrategy.cpp \
     ../engine/common/src/EngineBase.cpp
 

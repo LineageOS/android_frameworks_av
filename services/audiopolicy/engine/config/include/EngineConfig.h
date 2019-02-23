@@ -45,27 +45,6 @@ struct AttributesGroup {
 
 using AttributesGroups = std::vector<AttributesGroup>;
 
-struct CurvePoint {
-    int index;
-    int attenuationInMb;
-};
-using CurvePoints = std::vector<CurvePoint>;
-
-struct VolumeCurve {
-    std::string deviceCategory;
-    CurvePoints curvePoints;
-};
-using VolumeCurves = std::vector<VolumeCurve>;
-
-struct VolumeGroup {
-    std::string name;
-    std::string stream;
-    int indexMin;
-    int indexMax;
-    VolumeCurves volumeCurves;
-};
-using VolumeGroups = std::vector<VolumeGroup>;
-
 struct ProductStrategy {
     std::string name;
     AttributesGroups attributesGroups;
@@ -99,7 +78,6 @@ struct Config {
     ProductStrategies productStrategies;
     Criteria criteria;
     CriterionTypes criterionTypes;
-    VolumeGroups volumeGroups;
 };
 
 /** Result of `parse(const char*)` */
@@ -113,7 +91,6 @@ struct ParsingResult {
  * @return audio policy usage @see Config
  */
 ParsingResult parse(const char* path = DEFAULT_PATH);
-android::status_t parseLegacyVolumes(VolumeGroups &volumeGroups);
 
 } // namespace engineConfig
 } // namespace android
