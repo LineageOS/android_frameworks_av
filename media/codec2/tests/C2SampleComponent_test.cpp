@@ -152,7 +152,7 @@ public:
 
     std::unordered_map<uint32_t, C2Param &> mMyParams;
 
-    C2ComponentDomainInfo mDomainInfo;
+    C2ComponentDomainSetting mDomainInfo;
 
     MyComponentInstance() {
         mMyParams.insert({mDomainInfo.index(), mDomainInfo});
@@ -187,12 +187,12 @@ public:
             c2_blocking_t mayBlock) const override {
         (void)mayBlock;
         for (C2FieldSupportedValuesQuery &query : fields) {
-            if (query.field() == C2ParamField(&mDomainInfo, &C2ComponentDomainInfo::value)) {
+            if (query.field() == C2ParamField(&mDomainInfo, &C2ComponentDomainSetting::value)) {
                 query.values = C2FieldSupportedValues(
                     false /* flag */,
                     &mDomainInfo.value
                     //,
-                    //{(int32_t)C2DomainVideo}
+                    //{(int32_t)C2Component::DOMAIN_VIDEO}
                 );
                 query.status = C2_OK;
             } else {
@@ -391,20 +391,20 @@ void dumpDesc(const C2ParamDescriptor &pd) {
 }
 
 TEST_F(C2SampleComponentTest, ReflectorTest) {
-    C2ComponentDomainInfo domainInfo;
+    C2ComponentDomainSetting domainInfo;
     std::shared_ptr<MyComponentInstance> myComp(new MyComponentInstance);
     std::shared_ptr<C2ComponentInterface> comp = myComp;
 
     std::unique_ptr<C2StructDescriptor> desc{
-        myComp->getParamReflector()->describe(C2ComponentDomainInfo::CORE_INDEX)};
+        myComp->getParamReflector()->describe(C2ComponentDomainSetting::CORE_INDEX)};
     dumpStruct(*desc);
 
     std::vector<C2FieldSupportedValuesQuery> query = {
-        { C2ParamField(&domainInfo, &C2ComponentDomainInfo::value),
+        { C2ParamField(&domainInfo, &C2ComponentDomainSetting::value),
           C2FieldSupportedValuesQuery::CURRENT },
-        C2FieldSupportedValuesQuery(C2ParamField(&domainInfo, &C2ComponentDomainInfo::value),
+        C2FieldSupportedValuesQuery(C2ParamField(&domainInfo, &C2ComponentDomainSetting::value),
           C2FieldSupportedValuesQuery::CURRENT),
-        C2FieldSupportedValuesQuery::Current(C2ParamField(&domainInfo, &C2ComponentDomainInfo::value)),
+        C2FieldSupportedValuesQuery::Current(C2ParamField(&domainInfo, &C2ComponentDomainSetting::value)),
     };
 
     EXPECT_EQ(C2_OK, comp->querySupportedValues_vb(query, C2_DONT_BLOCK));

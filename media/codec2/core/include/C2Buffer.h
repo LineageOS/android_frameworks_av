@@ -1994,7 +1994,6 @@ public:
         GRAPHIC,            ///< the buffer contains a single graphic block
         GRAPHIC_CHUNKS,     ///< the buffer contains one of more graphic blocks
     };
-    typedef type_t Type; // deprecated
 
     /**
      * Gets the type of this buffer (data).
@@ -2041,23 +2040,6 @@ public:
      * \return the buffer's data.
      */
     const C2BufferData data() const;
-
-    /**
-     * These will still work if used in onDeathNotify.
-     */
-#if 0
-    inline std::shared_ptr<C2LinearBuffer> asLinearBuffer() const {
-        return mType == LINEAR ? std::shared_ptr::reinterpret_cast<C2LinearBuffer>(this) : nullptr;
-    }
-
-    inline std::shared_ptr<C2GraphicBuffer> asGraphicBuffer() const {
-        return mType == GRAPHIC ? std::shared_ptr::reinterpret_cast<C2GraphicBuffer>(this) : nullptr;
-    }
-
-    inline std::shared_ptr<C2CircularBuffer> asCircularBuffer() const {
-        return mType == CIRCULAR ? std::shared_ptr::reinterpret_cast<C2CircularBuffer>(this) : nullptr;
-    }
-#endif
 
     ///@name Pre-destroy notification handling
     ///@{
@@ -2163,8 +2145,6 @@ public:
      */
     static std::shared_ptr<C2Buffer> CreateGraphicBuffer(const C2ConstGraphicBlock &block);
 
-
-
 protected:
     // no public constructor
     explicit C2Buffer(const std::vector<C2ConstLinearBlock> &blocks);
@@ -2173,7 +2153,6 @@ protected:
 private:
     class Impl;
     std::shared_ptr<Impl> mImpl;
-//    Type _mType;
 };
 
 /**
@@ -2199,109 +2178,6 @@ public:
 };
 
 /// @}
-
-/// \cond INTERNAL
-
-/// \todo These are no longer used
-
-/// \addtogroup linear
-/// @{
-
-/** \deprecated */
-class C2LinearBuffer
-    : public C2Buffer, public _C2LinearRangeAspect,
-      public std::enable_shared_from_this<C2LinearBuffer> {
-public:
-    /** \todo what is this? */
-    const C2Handle *handle() const;
-
-protected:
-    inline C2LinearBuffer(const C2ConstLinearBlock &block);
-
-private:
-    class Impl;
-    Impl *mImpl;
-};
-
-class C2ReadCursor;
-
-class C2WriteCursor {
-public:
-    uint32_t remaining() const; // remaining data to be read
-    void commit(); // commits the current position. discard data before current position
-    void reset() const;  // resets position to the last committed position
-    // slices off at most |size| bytes, and moves cursor ahead by the number of bytes
-    // sliced off.
-    C2ReadCursor slice(uint32_t size) const;
-    // slices off at most |size| bytes, and moves cursor ahead by the number of bytes
-    // sliced off.
-    C2WriteCursor reserve(uint32_t size);
-    // bool read(T&);
-    // bool write(T&);
-    C2Fence waitForSpace(uint32_t size);
-};
-
-/// @}
-
-/// \addtogroup graphic
-/// @{
-
-struct C2ColorSpace {
-//public:
-    enum Standard {
-        BT601,
-        BT709,
-        BT2020,
-        // TODO
-    };
-
-    enum Range {
-        LIMITED,
-        FULL,
-        // TODO
-    };
-
-    enum TransferFunction {
-        BT709Transfer,
-        BT2020Transfer,
-        HybridLogGamma2,
-        HybridLogGamma4,
-        // TODO
-    };
-};
-
-/** \deprecated */
-class C2GraphicBuffer : public C2Buffer {
-public:
-    // constant attributes
-    inline uint32_t width() const  { return mWidth; }
-    inline uint32_t height() const { return mHeight; }
-    inline uint32_t format() const { return mFormat; }
-    inline const C2MemoryUsage usage() const { return mUsage; }
-
-    // modifiable attributes
-
-
-    virtual const C2ColorSpace colorSpace() const = 0;
-    // best effort
-    virtual void setColorSpace_be(const C2ColorSpace &colorSpace) = 0;
-    virtual bool setColorSpace(const C2ColorSpace &colorSpace) = 0;
-
-    const C2Handle *handle() const;
-
-protected:
-    uint32_t mWidth;
-    uint32_t mHeight;
-    uint32_t mFormat;
-    C2MemoryUsage mUsage;
-
-    class Impl;
-    Impl *mImpl;
-};
-
-/// @}
-
-/// \endcond
 
 /// @}
 

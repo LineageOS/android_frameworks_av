@@ -123,15 +123,13 @@ status_t DeviceHalHidl::setVoiceVolume(float volume) {
 
 status_t DeviceHalHidl::setMasterVolume(float volume) {
     if (mDevice == 0) return NO_INIT;
-    if (mPrimaryDevice == 0) return INVALID_OPERATION;
-    return processReturn("setMasterVolume", mPrimaryDevice->setMasterVolume(volume));
+    return processReturn("setMasterVolume", mDevice->setMasterVolume(volume));
 }
 
 status_t DeviceHalHidl::getMasterVolume(float *volume) {
     if (mDevice == 0) return NO_INIT;
-    if (mPrimaryDevice == 0) return INVALID_OPERATION;
     Result retval;
-    Return<void> ret = mPrimaryDevice->getMasterVolume(
+    Return<void> ret = mDevice->getMasterVolume(
             [&](Result r, float v) {
                 retval = r;
                 if (retval == Result::OK) {

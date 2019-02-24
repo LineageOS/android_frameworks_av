@@ -289,7 +289,7 @@ camera_status_t CameraDevice::updateOutputConfigurationLocked(ACaptureSessionOut
 }
 
 camera_status_t
-CameraDevice::allocateCaptureRequest(
+CameraDevice::allocateCaptureRequestLocked(
         const ACaptureRequest* request, /*out*/sp<CaptureRequest> &outReq) {
     sp<CaptureRequest> req(new CaptureRequest());
     req->mCaptureRequest.physicalCameraSettings.resize(1);

@@ -45,36 +45,36 @@ public:
         setDerivedInstance(this);
 
         addParameter(
-                DefineParam(mInputFormat, C2_NAME_INPUT_STREAM_FORMAT_SETTING)
-                .withConstValue(new C2StreamFormatConfig::input(0u, C2FormatVideo))
+                DefineParam(mInputFormat, C2_PARAMKEY_INPUT_STREAM_BUFFER_TYPE)
+                .withConstValue(new C2StreamBufferTypeSetting::input(0u, C2BufferData::GRAPHIC))
                 .build());
 
         addParameter(
-                DefineParam(mOutputFormat, C2_NAME_OUTPUT_STREAM_FORMAT_SETTING)
-                .withConstValue(new C2StreamFormatConfig::output(0u, C2FormatCompressed))
+                DefineParam(mOutputFormat, C2_PARAMKEY_OUTPUT_STREAM_BUFFER_TYPE)
+                .withConstValue(new C2StreamBufferTypeSetting::output(0u, C2BufferData::LINEAR))
                 .build());
 
         addParameter(
-                DefineParam(mInputMediaType, C2_NAME_INPUT_PORT_MIME_SETTING)
-                .withConstValue(AllocSharedString<C2PortMimeConfig::input>(
+                DefineParam(mInputMediaType, C2_PARAMKEY_INPUT_MEDIA_TYPE)
+                .withConstValue(AllocSharedString<C2PortMediaTypeSetting::input>(
                         MEDIA_MIMETYPE_VIDEO_RAW))
                 .build());
 
         addParameter(
-                DefineParam(mOutputMediaType, C2_NAME_OUTPUT_PORT_MIME_SETTING)
-                .withConstValue(AllocSharedString<C2PortMimeConfig::output>(
+                DefineParam(mOutputMediaType, C2_PARAMKEY_OUTPUT_MEDIA_TYPE)
+                .withConstValue(AllocSharedString<C2PortMediaTypeSetting::output>(
                         MEDIA_MIMETYPE_VIDEO_AVC))
                 .build());
 
         addParameter(
-                DefineParam(mUsage, C2_NAME_INPUT_STREAM_USAGE_SETTING)
+                DefineParam(mUsage, C2_PARAMKEY_INPUT_STREAM_USAGE)
                 .withConstValue(new C2StreamUsageTuning::input(
                         0u, (uint64_t)C2MemoryUsage::CPU_READ))
                 .build());
 
         addParameter(
-                DefineParam(mSize, C2_NAME_STREAM_VIDEO_SIZE_SETTING)
-                .withDefault(new C2VideoSizeStreamTuning::input(0u, 320, 240))
+                DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
+                .withDefault(new C2StreamPictureSizeInfo::input(0u, 320, 240))
                 .withFields({
                     C2F(mSize, width).inRange(2, 2560, 2),
                     C2F(mSize, height).inRange(2, 2560, 2),
@@ -83,7 +83,7 @@ public:
                 .build());
 
         addParameter(
-                DefineParam(mFrameRate, C2_NAME_STREAM_FRAME_RATE_SETTING)
+                DefineParam(mFrameRate, C2_PARAMKEY_FRAME_RATE)
                 .withDefault(new C2StreamFrameRateInfo::output(0u, 30.))
                 // TODO: More restriction?
                 .withFields({C2F(mFrameRate, value).greaterThan(0.)})
@@ -91,8 +91,8 @@ public:
                 .build());
 
         addParameter(
-                DefineParam(mBitrate, C2_NAME_STREAM_BITRATE_SETTING)
-                .withDefault(new C2BitrateTuning::output(0u, 64000))
+                DefineParam(mBitrate, C2_PARAMKEY_BITRATE)
+                .withDefault(new C2StreamBitrateInfo::output(0u, 64000))
                 .withFields({C2F(mBitrate, value).inRange(4096, 12000000)})
                 .withSetter(BitrateSetter)
                 .build());
@@ -182,9 +182,9 @@ public:
     static C2R ProfileLevelSetter(
             bool mayBlock,
             C2P<C2StreamProfileLevelInfo::output> &me,
-            const C2P<C2VideoSizeStreamTuning::input> &size,
+            const C2P<C2StreamPictureSizeInfo::input> &size,
             const C2P<C2StreamFrameRateInfo::output> &frameRate,
-            const C2P<C2BitrateTuning::output> &bitrate) {
+            const C2P<C2StreamBitrateInfo::output> &bitrate) {
         (void)mayBlock;
         if (!me.F(me.v.profile).supportsAtAll(me.v.profile)) {
             me.set().profile = PROFILE_AVC_CONSTRAINED_BASELINE;
@@ -325,16 +325,16 @@ public:
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> getRequestSync_l() const { return mRequestSync; }
 
 private:
-    std::shared_ptr<C2StreamFormatConfig::input> mInputFormat;
-    std::shared_ptr<C2StreamFormatConfig::output> mOutputFormat;
-    std::shared_ptr<C2PortMimeConfig::input> mInputMediaType;
-    std::shared_ptr<C2PortMimeConfig::output> mOutputMediaType;
+    std::shared_ptr<C2StreamBufferTypeSetting::input> mInputFormat;
+    std::shared_ptr<C2StreamBufferTypeSetting::output> mOutputFormat;
+    std::shared_ptr<C2PortMediaTypeSetting::input> mInputMediaType;
+    std::shared_ptr<C2PortMediaTypeSetting::output> mOutputMediaType;
     std::shared_ptr<C2StreamUsageTuning::input> mUsage;
-    std::shared_ptr<C2VideoSizeStreamTuning::input> mSize;
+    std::shared_ptr<C2StreamPictureSizeInfo::input> mSize;
     std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
     std::shared_ptr<C2StreamIntraRefreshTuning::output> mIntraRefresh;
-    std::shared_ptr<C2BitrateTuning::output> mBitrate;
+    std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
     std::shared_ptr<C2StreamProfileLevelInfo::output> mProfileLevel;
     std::shared_ptr<C2StreamSyncFrameIntervalTuning::output> mSyncFramePeriod;
 };
@@ -1332,8 +1332,8 @@ void C2SoftAvcEnc::process(
 
         mSpsPpsHeaderReceived = true;
 
-        std::unique_ptr<C2StreamCsdInfo::output> csd =
-            C2StreamCsdInfo::output::AllocUnique(s_encode_op.s_out_buf.u4_bytes, 0u);
+        std::unique_ptr<C2StreamInitDataInfo::output> csd =
+            C2StreamInitDataInfo::output::AllocUnique(s_encode_op.s_out_buf.u4_bytes, 0u);
         if (!csd) {
             ALOGE("CSD allocation failed");
             mSignalledError = true;
@@ -1492,7 +1492,7 @@ void C2SoftAvcEnc::process(
         if (IV_IDR_FRAME == s_encode_op.u4_encoded_frame_type) {
             ALOGV("IDR frame produced");
             buffer->setInfo(std::make_shared<C2StreamPictureTypeMaskInfo::output>(
-                    0u /* stream id */, C2PictureTypeKeyFrame));
+                    0u /* stream id */, C2Config::SYNC_FRAME));
         }
         work->worklets.front()->output.buffers.push_back(buffer);
     }

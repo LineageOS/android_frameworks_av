@@ -186,7 +186,7 @@ public:
      * MediaCodec behavior.
      */
     virtual status_t registerCsd(
-            const C2StreamCsdInfo::output * /* csd */,
+            const C2StreamInitDataInfo::output * /* csd */,
             size_t * /* index */,
             sp<MediaCodecBuffer> * /* clientBuffer */) = 0;
 
@@ -1187,7 +1187,7 @@ public:
     }
 
     status_t registerCsd(
-            const C2StreamCsdInfo::output *csd,
+            const C2StreamInitDataInfo::output *csd,
             size_t *index,
             sp<MediaCodecBuffer> *clientBuffer) final {
         sp<Codec2Buffer> c2Buffer;
@@ -1286,7 +1286,7 @@ public:
     }
 
     status_t registerCsd(
-            const C2StreamCsdInfo::output *csd,
+            const C2StreamInitDataInfo::output *csd,
             size_t *index,
             sp<MediaCodecBuffer> *clientBuffer) final {
         sp<Codec2Buffer> newBuffer = new LocalLinearBuffer(
@@ -1592,6 +1592,7 @@ CCodecBufferChannel::CCodecBufferChannel(
       mFirstValidFrameIndex(0u),
       mMetaMode(MODE_NONE),
       mInputMetEos(false) {
+    mOutputSurface.lock()->maxDequeueBuffers = kSmoothnessFactor + kRenderingDepth;
     Mutexed<std::unique_ptr<InputBuffers>>::Locked buffers(mInputBuffers);
     buffers->reset(new DummyInputBuffers(""));
 }
@@ -2153,7 +2154,7 @@ status_t CCodecBufferChannel::start(
             1 << C2PlatformAllocatorStore::BUFFERQUEUE);
 
     if (inputFormat != nullptr) {
-        bool graphic = (iStreamFormat.value == C2FormatVideo);
+        bool graphic = (iStreamFormat.value == C2BufferData::GRAPHIC);
         std::shared_ptr<C2BlockPool> pool;
         {
             Mutexed<BlockPools>::Locked pools(mBlockPools);
@@ -2269,12 +2270,16 @@ status_t CCodecBufferChannel::start(
         uint32_t outputGeneration;
         {
             Mutexed<OutputSurface>::Locked output(mOutputSurface);
+            output->maxDequeueBuffers = mNumOutputSlots + reorderDepth.value + kRenderingDepth;
             outputSurface = output->surface ?
                     output->surface->getIGraphicBufferProducer() : nullptr;
+            if (outputSurface) {
+                output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
+            }
             outputGeneration = output->generation;
         }
 
-        bool graphic = (oStreamFormat.value == C2FormatVideo);
+        bool graphic = (oStreamFormat.value == C2BufferData::GRAPHIC);
         C2BlockPool::local_id_t outputPoolId_;
 
         {
@@ -2447,7 +2452,7 @@ status_t CCodecBufferChannel::requestInitialInputBuffers() {
         return OK;
     }
 
-    C2StreamFormatConfig::output oStreamFormat(0u);
+    C2StreamBufferTypeSetting::output oStreamFormat(0u);
     c2_status_t err = mComponent->query({ &oStreamFormat }, {}, C2_DONT_BLOCK, nullptr);
     if (err != C2_OK) {
         return UNKNOWN_ERROR;
@@ -2638,6 +2643,11 @@ bool CCodecBufferChannel::handleWork(
                     mReorderStash.lock()->setDepth(reorderDepth.value);
                     ALOGV("[%s] onWorkDone: updated reorder depth to %u",
                           mName, reorderDepth.value);
+                    Mutexed<OutputSurface>::Locked output(mOutputSurface);
+                    output->maxDequeueBuffers = mNumOutputSlots + reorderDepth.value + kRenderingDepth;
+                    if (output->surface) {
+                        output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
+                    }
                 } else {
                     ALOGD("[%s] onWorkDone: failed to read reorder depth", mName);
                 }
@@ -2734,7 +2744,7 @@ bool CCodecBufferChannel::handleWork(
             // TODO: properly translate these to metadata
             switch (info->coreIndex().coreIndex()) {
                 case C2StreamPictureTypeMaskInfo::CORE_INDEX:
-                    if (((C2StreamPictureTypeMaskInfo *)info.get())->value & C2PictureTypeKeyFrame) {
+                    if (((C2StreamPictureTypeMaskInfo *)info.get())->value & C2Config::SYNC_FRAME) {
                         flags |= MediaCodec::BUFFER_FLAG_SYNCFRAME;
                     }
                     break;
@@ -2813,7 +2823,6 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
     sp<IGraphicBufferProducer> producer;
     if (newSurface) {
         newSurface->setScalingMode(NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
-        newSurface->setMaxDequeuedBufferCount(mNumOutputSlots + kRenderingDepth);
         producer = newSurface->getIGraphicBufferProducer();
         producer->setGenerationNumber(generation);
     } else {
@@ -2841,6 +2850,7 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
 
     {
         Mutexed<OutputSurface>::Locked output(mOutputSurface);
+        newSurface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
         output->surface = newSurface;
         output->generation = generation;
     }
