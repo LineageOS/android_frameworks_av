@@ -70,7 +70,20 @@ product_strategy_t EngineBase::getProductStrategyForAttributes(const audio_attri
 
 audio_stream_type_t EngineBase::getStreamTypeForAttributes(const audio_attributes_t &attr) const
 {
-    return mProductStrategies.getStreamTypeForAttributes(attr);
+    audio_stream_type_t engineStream = mProductStrategies.getStreamTypeForAttributes(attr);
+    // ensure the audibility flag for sonification is honored for stream types
+    // Note this is typically implemented in the product strategy configuration files, but is
+    //   duplicated here for safety.
+    if (attr.usage == AUDIO_USAGE_ASSISTANCE_SONIFICATION
+            && ((attr.flags & AUDIO_FLAG_AUDIBILITY_ENFORCED) != 0)) {
+        engineStream = AUDIO_STREAM_ENFORCED_AUDIBLE;
+    }
+    // ensure the ENFORCED_AUDIBLE stream type reflects the "force use" setting:
+    if ((getForceUse(AUDIO_POLICY_FORCE_FOR_SYSTEM) != AUDIO_POLICY_FORCE_SYSTEM_ENFORCED)
+            && (engineStream == AUDIO_STREAM_ENFORCED_AUDIBLE)) {
+        return AUDIO_STREAM_SYSTEM;
+    }
+    return engineStream;
 }
 
 audio_attributes_t EngineBase::getAttributesForStreamType(audio_stream_type_t stream) const

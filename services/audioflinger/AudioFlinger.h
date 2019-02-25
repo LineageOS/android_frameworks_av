@@ -54,7 +54,9 @@
 #include <utils/TypeHelpers.h>
 #include <utils/Vector.h>
 
+#include <binder/AppOpsManager.h>
 #include <binder/BinderService.h>
+#include <binder/IAppOpsCallback.h>
 #include <binder/MemoryDealer.h>
 
 #include <system/audio.h>

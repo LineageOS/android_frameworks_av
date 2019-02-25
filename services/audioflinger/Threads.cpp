@@ -4708,9 +4708,14 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 // lacks any synchronization or barrier so VolumeProvider may read a stale value
                 const float vh = track->getVolumeHandler()->getVolume(
                         proxy->framesReleased()).first;
-                float volume = masterVolume
+                float volume;
+                if (track->isPlaybackRestricted()) {
+                    volume = 0.f;
+                } else {
+                    volume = masterVolume
                         * mStreamTypes[track->streamType()].volume
                         * vh;
+                }
                 track->mCachedVolume = volume;
                 gain_minifloat_packed_t vlr = proxy->getVolumeLR();
                 float vlf = volume * float_from_gain(gain_minifloat_unpack_left(vlr));
@@ -4860,7 +4865,8 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
             float typeVolume = mStreamTypes[track->streamType()].volume;
             float v = masterVolume * typeVolume;
 
-            if (track->isPausing() || mStreamTypes[track->streamType()].mute) {
+            if (track->isPausing() || mStreamTypes[track->streamType()].mute
+                    || track->isPlaybackRestricted()) {
                 vl = vr = 0;
                 vlf = vrf = vaf = 0.;
                 if (track->isPausing()) {
@@ -5447,7 +5453,7 @@ void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTr
 {
     float left, right;
 
-    if (mMasterMute || mStreamTypes[track->streamType()].mute) {
+    if (mMasterMute || mStreamTypes[track->streamType()].mute || track->isPlaybackRestricted()) {
         left = right = 0;
     } else {
         float typeVolume = mStreamTypes[track->streamType()].volume;
