@@ -872,6 +872,22 @@ void AudioFlinger::ThreadBase::dumpBase(int fd, const Vector<String16>& args __u
         dprintf(fd, "  Timestamp corrected: %s\n", isTimestampCorrectionEnabled() ? "yes" : "no");
     }
 
+    if (mLastIoBeginNs > 0) { // MMAP may not set this
+        dprintf(fd, "  Last %s occurred (msecs): %lld\n",
+                isOutput() ? "write" : "read",
+                (long long) (systemTime() - mLastIoBeginNs) / NANOS_PER_MILLISECOND);
+    }
+
+    if (mProcessTimeMs.getN() > 0) {
+        dprintf(fd, "  Process time ms stats: %s\n", mProcessTimeMs.toString().c_str());
+    }
+
+    if (mIoJitterMs.getN() > 0) {
+        dprintf(fd, "  Hal %s jitter ms stats: %s\n",
+                isOutput() ? "write" : "read",
+                mIoJitterMs.toString().c_str());
+    }
+
     if (locked) {
         mLock.unlock();
     }
@@ -1704,7 +1720,7 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
         // mStreamTypes[] initialized in constructor body
         mTracks(type == MIXER),
         mOutput(output),
-        mLastWriteTime(-1), mNumWrites(0), mNumDelayedWrites(0), mInWrite(false),
+        mNumWrites(0), mNumDelayedWrites(0), mInWrite(false),
         mMixerStatus(MIXER_IDLE),
         mMixerStatusIgnoringFastTracks(MIXER_IDLE),
         mStandbyDelayNs(AudioFlinger::mStandbyTimeInNsecs),
@@ -1857,8 +1873,6 @@ void AudioFlinger::PlaybackThread::dumpInternals(int fd, const Vector<String16>&
                 channelMaskToString(mHapticChannelMask, true /* output */).c_str());
     }
     dprintf(fd, "  Normal frame count: %zu\n", mNormalFrameCount);
-    dprintf(fd, "  Last write occurred (msecs): %llu\n",
-            (unsigned long long) ns2ms(systemTime() - mLastWriteTime));
     dprintf(fd, "  Total writes: %d\n", mNumWrites);
     dprintf(fd, "  Delayed writes: %d\n", mNumDelayedWrites);
     dprintf(fd, "  Blocked in write: %s\n", mInWrite ? "yes" : "no");
@@ -3189,8 +3203,8 @@ bool AudioFlinger::PlaybackThread::threadLoop()
     Vector< sp<Track> > tracksToRemove;
 
     mStandbyTimeNs = systemTime();
-    nsecs_t lastWriteFinished = -1; // time last server write completed
-    int64_t lastFramesWritten = -1; // track changes in timestamp server frames written
+    int64_t lastLoopCountWritten = -2; // never matches "previous" loop, when loopCount = 0.
+    int64_t lastFramesWritten = -1;    // track changes in timestamp server frames written
 
     // MIXER
     nsecs_t lastWarning = 0;
@@ -3236,7 +3250,8 @@ bool AudioFlinger::PlaybackThread::threadLoop()
     }
     audio_patch_handle_t lastDownstreamPatchHandle = AUDIO_PATCH_HANDLE_NONE;
 
-    while (!exitPending())
+    // loopCount is used for statistics and diagnostics.
+    for (int64_t loopCount = 0; !exitPending(); ++loopCount)
     {
         // Log merge requests are performed during AudioFlinger binder transactions, but
         // that does not cover audio playback. It's requested here for that reason.
@@ -3394,11 +3409,11 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                     // use the time before we called the HAL write - it is a bit more accurate
                     // to when the server last read data than the current time here.
                     //
-                    // If we haven't written anything, mLastWriteTime will be -1
+                    // If we haven't written anything, mLastIoBeginNs will be -1
                     // and we use systemTime().
                     mTimestamp.mPosition[ExtendedTimestamp::LOCATION_SERVER] = mFramesWritten;
-                    mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] = mLastWriteTime == -1
-                            ? systemTime() : mLastWriteTime;
+                    mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] = mLastIoBeginNs == -1
+                            ? systemTime() : mLastIoBeginNs;
                 }
 
                 for (const sp<Track> &t : mActiveTracks) {
@@ -3635,43 +3650,68 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             // mSleepTimeUs == 0 means we must write to audio hardware
             if (mSleepTimeUs == 0) {
                 ssize_t ret = 0;
-                // We save lastWriteFinished here, as previousLastWriteFinished,
-                // for throttling. On thread start, previousLastWriteFinished will be
-                // set to -1, which properly results in no throttling after the first write.
-                nsecs_t previousLastWriteFinished = lastWriteFinished;
-                nsecs_t delta = 0;
+                // writePeriodNs is updated >= 0 when ret > 0.
+                int64_t writePeriodNs = -1;
                 if (mBytesRemaining) {
                     // FIXME rewrite to reduce number of system calls
-                    mLastWriteTime = systemTime();  // also used for dumpsys
+                    const int64_t lastIoBeginNs = systemTime();
                     ret = threadLoop_write();
-                    lastWriteFinished = systemTime();
-                    delta = lastWriteFinished - mLastWriteTime;
+                    const int64_t lastIoEndNs = systemTime();
                     if (ret < 0) {
                         mBytesRemaining = 0;
-                    } else {
+                    } else if (ret > 0) {
                         mBytesWritten += ret;
                         mBytesRemaining -= ret;
-                        mFramesWritten += ret / mFrameSize;
+                        const int64_t frames = ret / mFrameSize;
+                        mFramesWritten += frames;
+
+                        writePeriodNs = lastIoEndNs - mLastIoEndNs;
+                        // process information relating to write time.
+                        if (audio_has_proportional_frames(mFormat)) {
+                            // we are in a continuous mixing cycle
+                            if (mMixerStatus == MIXER_TRACKS_READY &&
+                                    loopCount == lastLoopCountWritten + 1) {
+
+                                const double jitterMs =
+                                        TimestampVerifier<int64_t, int64_t>::computeJitterMs(
+                                                {frames, writePeriodNs},
+                                                {0, 0} /* lastTimestamp */, mSampleRate);
+                                const double processMs =
+                                       (lastIoBeginNs - mLastIoEndNs) * 1e-6;
+
+                                Mutex::Autolock _l(mLock);
+                                mIoJitterMs.add(jitterMs);
+                                mProcessTimeMs.add(processMs);
+                            }
+
+                            // write blocked detection
+                            const int64_t deltaWriteNs = lastIoEndNs - lastIoBeginNs;
+                            if (mType == MIXER && deltaWriteNs > maxPeriod) {
+                                mNumDelayedWrites++;
+                                if ((lastIoEndNs - lastWarning) > kWarningThrottleNs) {
+                                    ATRACE_NAME("underrun");
+                                    ALOGW("write blocked for %lld msecs, "
+                                            "%d delayed writes, thread %d",
+                                            (long long)deltaWriteNs / NANOS_PER_MILLISECOND,
+                                            mNumDelayedWrites, mId);
+                                    lastWarning = lastIoEndNs;
+                                }
+                            }
+                        }
+                        // update timing info.
+                        mLastIoBeginNs = lastIoBeginNs;
+                        mLastIoEndNs = lastIoEndNs;
+                        lastLoopCountWritten = loopCount;
                     }
                 } else if ((mMixerStatus == MIXER_DRAIN_TRACK) ||
                         (mMixerStatus == MIXER_DRAIN_ALL)) {
                     threadLoop_drain();
                 }
                 if (mType == MIXER && !mStandby) {
-                    // write blocked detection
-                    if (delta > maxPeriod) {
-                        mNumDelayedWrites++;
-                        if ((lastWriteFinished - lastWarning) > kWarningThrottleNs) {
-                            ATRACE_NAME("underrun");
-                            ALOGW("write blocked for %llu msecs, %d delayed writes, thread %p",
-                                    (unsigned long long) ns2ms(delta), mNumDelayedWrites, this);
-                            lastWarning = lastWriteFinished;
-                        }
-                    }
 
                     if (mThreadThrottle
                             && mMixerStatus == MIXER_TRACKS_READY // we are mixing (active tracks)
-                            && ret > 0) {                         // we wrote something
+                            && writePeriodNs > 0) {               // we have write period info
                         // Limit MixerThread data processing to no more than twice the
                         // expected processing rate.
                         //
@@ -3690,12 +3730,9 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                         // 2. threadLoop_mix (significant for heavy mixing, especially
                         //                    on low tier processors)
 
-                        // it's OK if deltaMs (and deltaNs) is an overestimate.
-                        nsecs_t deltaNs;
-                        // deltaNs = lastWriteFinished - previousLastWriteFinished;
-                        __builtin_sub_overflow(
-                            lastWriteFinished,previousLastWriteFinished, &deltaNs);
-                        const int32_t deltaMs = deltaNs / 1000000;
+                        // it's OK if deltaMs is an overestimate.
+
+                        const int32_t deltaMs = writePeriodNs / NANOS_PER_MILLISECOND;
 
                         const int32_t throttleMs = (int32_t)mHalfBufferMs - deltaMs;
                         if ((signed)mHalfBufferMs >= throttleMs && throttleMs > 0) {
@@ -3708,7 +3745,8 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                             mThreadThrottleTimeMs += throttleMs;
                             // Throttle must be attributed to the previous mixer loop's write time
                             // to allow back-to-back throttling.
-                            lastWriteFinished += throttleMs * 1000000;
+                            // This also ensures proper timing statistics.
+                            mLastIoEndNs = systemTime();  // we fetch the write end time again.
                         } else {
                             uint32_t diff = mThreadThrottleTimeMs - mThreadThrottleEndMs;
                             if (diff > 0) {
@@ -6751,8 +6789,10 @@ reacquire_wakelock:
     // used to request a deferred sleep, to be executed later while mutex is unlocked
     uint32_t sleepUs = 0;
 
+    int64_t lastLoopCountRead = -2;  // never matches "previous" loop, when loopCount = 0.
+
     // loop while there is work to do
-    for (;;) {
+    for (int64_t loopCount = 0;; ++loopCount) {  // loopCount used for statistics tracking
         Vector< sp<EffectChain> > effectChains;
 
         // activeTracks accumulates a copy of a subset of mActiveTracks
@@ -6951,6 +6991,7 @@ reacquire_wakelock:
 
         int32_t rear = mRsmpInRear & (mRsmpInFramesP2 - 1);
         ssize_t framesRead;
+        const int64_t lastIoBeginNs = systemTime(); // start IO timing
 
         // If an NBAIO source is present, use it to read the normal capture's data
         if (mPipeSource != 0) {
@@ -7008,10 +7049,12 @@ reacquire_wakelock:
             }
         }
 
+        const int64_t lastIoEndNs = systemTime(); // end IO timing
+
         // Update server timestamp with server stats
         // systemTime() is optional if the hardware supports timestamps.
         mTimestamp.mPosition[ExtendedTimestamp::LOCATION_SERVER] += framesRead;
-        mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] = systemTime();
+        mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] = lastIoEndNs;
 
         // Update server timestamp with kernel stats
         if (mPipeSource.get() == nullptr /* don't obtain for FastCapture, could block */) {
@@ -7059,6 +7102,24 @@ reacquire_wakelock:
         }
         ALOG_ASSERT(framesRead > 0);
         mFramesRead += framesRead;
+
+        if (audio_has_proportional_frames(mFormat)
+                && loopCount == lastLoopCountRead + 1) {
+            const int64_t readPeriodNs = lastIoEndNs - mLastIoEndNs;
+            const double jitterMs =
+                    TimestampVerifier<int64_t, int64_t>::computeJitterMs(
+                            {framesRead, readPeriodNs},
+                            {0, 0} /* lastTimestamp */, mSampleRate);
+            const double processMs = (lastIoBeginNs - mLastIoEndNs) * 1e-6;
+
+            Mutex::Autolock _l(mLock);
+            mIoJitterMs.add(jitterMs);
+            mProcessTimeMs.add(processMs);
+        }
+        // update timing info.
+        mLastIoBeginNs = lastIoBeginNs;
+        mLastIoEndNs = lastIoEndNs;
+        lastLoopCountRead = loopCount;
 
 #ifdef TEE_SINK
         (void)mTee.write((uint8_t*)mRsmpInBuffer + rear * mFrameSize, framesRead);
