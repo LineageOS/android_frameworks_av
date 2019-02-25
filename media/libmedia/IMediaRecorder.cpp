@@ -66,6 +66,8 @@ enum {
     ENABLE_AUDIO_DEVICE_CALLBACK,
     GET_ACTIVE_MICROPHONES,
     GET_PORT_ID,
+    SET_MICROPHONE_DIRECTION,
+    SET_MICROPHONE_FIELD_DIMENSION
 };
 
 class BpMediaRecorder: public BpInterface<IMediaRecorder>
@@ -407,6 +409,24 @@ public:
         return status;
     }
 
+    status_t setMicrophoneDirection(audio_microphone_direction_t direction) {
+        ALOGV("setMicrophoneDirection(%d)", direction);
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
+        data.writeInt32(direction);
+        status_t status = remote()->transact(SET_MICROPHONE_DIRECTION, data, &reply);
+        return status == NO_ERROR ? (status_t)reply.readInt32() : status;
+    }
+
+    status_t setMicrophoneFieldDimension(float zoom) {
+        ALOGV("setMicrophoneFieldDimension(%f)", zoom);
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
+        data.writeFloat(zoom);
+        status_t status = remote()->transact(SET_MICROPHONE_FIELD_DIMENSION, data, &reply);
+        return status == NO_ERROR ? (status_t)reply.readInt32() : status;
+    }
+
     status_t getPortId(audio_port_handle_t *portId)
     {
         ALOGV("getPortId");
@@ -687,6 +707,23 @@ status_t BnMediaRecorder::onTransact(
             if (status == NO_ERROR) {
                 reply->writeInt32(portId);
             }
+            return NO_ERROR;
+        }
+        case SET_MICROPHONE_DIRECTION: {
+            ALOGV("SET_MICROPHONE_DIRECTION");
+            CHECK_INTERFACE(IMediaRecorder, data, reply);
+            int direction = data.readInt32();
+            status_t status =
+                setMicrophoneDirection(static_cast<audio_microphone_direction_t>(direction));
+            reply->writeInt32(status);
+            return NO_ERROR;
+        }
+        case SET_MICROPHONE_FIELD_DIMENSION: {
+            ALOGV("SET_MICROPHONE_FIELD_DIMENSION");
+            CHECK_INTERFACE(IMediaRecorder, data, reply);
+            float zoom = data.readFloat();
+            status_t status = setMicrophoneFieldDimension(zoom);
+            reply->writeInt32(status);
             return NO_ERROR;
         }
         default:

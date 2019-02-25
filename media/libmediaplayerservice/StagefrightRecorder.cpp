@@ -118,7 +118,9 @@ StagefrightRecorder::StagefrightRecorder(const String16 &opPackageName)
       mVideoSource(VIDEO_SOURCE_LIST_END),
       mStarted(false),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
-      mDeviceCallbackEnabled(false) {
+      mDeviceCallbackEnabled(false),
+      mSelectedMicDirection(MIC_DIRECTION_UNSPECIFIED),
+      mSelectedMicFieldDimension(MIC_FIELD_DIMENSION_NORMAL) {
 
     ALOGV("Constructor");
 
@@ -1090,7 +1092,9 @@ sp<MediaCodecSource> StagefrightRecorder::createAudioSource() {
                 mSampleRate,
                 mClientUid,
                 mClientPid,
-                mSelectedDeviceId);
+                mSelectedDeviceId,
+                mSelectedMicDirection,
+                mSelectedMicFieldDimension);
 
     status_t err = audioSource->initCheck();
 
@@ -2265,6 +2269,24 @@ status_t StagefrightRecorder::getActiveMicrophones(
         std::vector<media::MicrophoneInfo>* activeMicrophones) {
     if (mAudioSourceNode != 0) {
         return mAudioSourceNode->getActiveMicrophones(activeMicrophones);
+    }
+    return NO_INIT;
+}
+
+status_t StagefrightRecorder::setMicrophoneDirection(audio_microphone_direction_t direction) {
+    ALOGV("setMicrophoneDirection(%d)", direction);
+    mSelectedMicDirection = direction;
+    if (mAudioSourceNode != 0) {
+        return mAudioSourceNode->setMicrophoneDirection(direction);
+    }
+    return NO_INIT;
+}
+
+status_t StagefrightRecorder::setMicrophoneFieldDimension(float zoom) {
+    ALOGV("setMicrophoneFieldDimension(%f)", zoom);
+    mSelectedMicFieldDimension = zoom;
+    if (mAudioSourceNode != 0) {
+        return mAudioSourceNode->setMicrophoneFieldDimension(zoom);
     }
     return NO_INIT;
 }

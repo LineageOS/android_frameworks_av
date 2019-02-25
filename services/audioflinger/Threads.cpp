@@ -7653,14 +7653,14 @@ status_t AudioFlinger::RecordThread::getActiveMicrophones(
 
 status_t AudioFlinger::RecordThread::setMicrophoneDirection(audio_microphone_direction_t direction)
 {
-    ALOGV("RecordThread::setMicrophoneDirection");
+    ALOGV("setMicrophoneDirection(%d)", direction);
     AutoMutex _l(mLock);
     return mInput->stream->setMicrophoneDirection(direction);
 }
 
 status_t AudioFlinger::RecordThread::setMicrophoneFieldDimension(float zoom)
 {
-    ALOGV("RecordThread::setMicrophoneFieldDimension");
+    ALOGV("setMicrophoneFieldDimension(%f)", zoom);
     AutoMutex _l(mLock);
     return mInput->stream->setMicrophoneFieldDimension(zoom);
 }
