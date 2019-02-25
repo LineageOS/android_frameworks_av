@@ -265,9 +265,11 @@ cc_library_static {
     srcs: [
         "ClearFileSource.cpp",
         "DataURISource.cpp",
+        "DataSourceBase.cpp",
         "HTTPBase.cpp",
         "HevcUtils.cpp",
         "MediaClock.cpp",
+        "MediaSource.cpp",
         "NdkUtils.cpp",
         "Utils.cpp",
         "VideoFrameSchedulerBase.cpp",

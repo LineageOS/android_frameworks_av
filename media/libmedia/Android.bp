@@ -259,6 +259,7 @@ cc_library_static {
     name: "libmedia_player2_util",
 
     srcs: [
+        "AudioParameter.cpp",
         "BufferingSettings.cpp",
         "DataSourceDesc.cpp",
         "MediaCodecBuffer.cpp",
