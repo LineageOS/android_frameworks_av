@@ -17,6 +17,8 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "NdkMediaDrm"
 
+#include <inttypes.h>
+
 #include <media/NdkMediaDrm.h>
 
 #include <cutils/properties.h>
@@ -40,10 +42,32 @@ struct DrmListener: virtual public BnDrmClient
 {
 private:
     AMediaDrm *mObj;
-    AMediaDrmEventListener mListener;
+    AMediaDrmEventListener mEventListener;
+    AMediaDrmExpirationUpdateListener mExpirationUpdateListener;
+    AMediaDrmKeysChangeListener mKeysChangeListener;
 
 public:
-    DrmListener(AMediaDrm *obj, AMediaDrmEventListener listener) : mObj(obj), mListener(listener) {}
+    DrmListener(AMediaDrm *obj, AMediaDrmEventListener listener) : mObj(obj),
+            mEventListener(listener), mExpirationUpdateListener(NULL), mKeysChangeListener(NULL) {}
+
+    DrmListener(AMediaDrm *obj, AMediaDrmExpirationUpdateListener listener) : mObj(obj),
+            mEventListener(NULL), mExpirationUpdateListener(listener), mKeysChangeListener(NULL) {}
+
+    DrmListener(AMediaDrm *obj, AMediaDrmKeysChangeListener listener) : mObj(obj),
+            mEventListener(NULL), mExpirationUpdateListener(NULL), mKeysChangeListener(listener) {}
+
+    void setEventListener(AMediaDrmEventListener listener) {
+        mEventListener = listener;
+    }
+
+    void setExpirationUpdateListener(AMediaDrmExpirationUpdateListener listener) {
+        mExpirationUpdateListener = listener;
+    }
+
+    void setKeysChangeListener(AMediaDrmKeysChangeListener listener) {
+        mKeysChangeListener = listener;
+    }
+
     void notify(DrmPlugin::EventType eventType, int extra, const Parcel *obj);
 };
 
@@ -62,27 +86,75 @@ struct AMediaDrm {
 };
 
 void DrmListener::notify(DrmPlugin::EventType eventType, int extra, const Parcel *obj) {
-    if (!mListener) {
+    if (!mEventListener && !mExpirationUpdateListener && !mKeysChangeListener) {
+        ALOGE("No listeners are specified");
         return;
     }
 
+    obj->setDataPosition(0);
+
     AMediaDrmSessionId sessionId = {NULL, 0};
     int32_t sessionIdSize = obj->readInt32();
-    if (sessionIdSize) {
-        uint8_t *sessionIdData = new uint8_t[sessionIdSize];
-        sessionId.ptr = sessionIdData;
-        sessionId.length = sessionIdSize;
-        obj->read(sessionIdData, sessionId.length);
+    if (sessionIdSize <= 0) {
+        ALOGE("Invalid session id size");
+        return;
     }
 
-    int32_t dataSize = obj->readInt32();
-    uint8_t *data = NULL;
-    if (dataSize) {
-        data = new uint8_t[dataSize];
-        obj->read(data, dataSize);
+    std::unique_ptr<uint8_t[]> sessionIdData(new uint8_t[sessionIdSize]);
+    sessionId.ptr = sessionIdData.get();
+    sessionId.length = sessionIdSize;
+    status_t err = obj->read(sessionIdData.get(), sessionId.length);
+    if (err != OK) {
+        ALOGE("Failed to read session id, error=%d", err);
+        return;
     }
 
-    // translate DrmPlugin event types into their NDK equivalents
+    if (DrmPlugin::kDrmPluginEventExpirationUpdate == eventType) {
+        int64_t expiryTimeInMS = obj->readInt64();
+        if (expiryTimeInMS >= 0) {
+            (*mExpirationUpdateListener)(mObj, &sessionId, expiryTimeInMS);
+        } else {
+            ALOGE("Failed to read expiry time, status=%" PRId64 "", expiryTimeInMS);
+        }
+        return;
+    } else if (DrmPlugin::kDrmPluginEventKeysChange == eventType) {
+        int32_t numKeys = 0;
+        err = obj->readInt32(&numKeys);
+        if (err != OK) {
+            ALOGE("Failed to read number of keys status, error=%d", err);
+            return;
+        }
+
+        Vector<AMediaDrmKeyStatus> keysStatus;
+        std::vector<std::unique_ptr<uint8_t[]> > dataPointers;
+        AMediaDrmKeyStatus keyStatus;
+
+        for (size_t i = 0; i < numKeys; ++i) {
+            keyStatus.keyId.ptr = nullptr;
+            keyStatus.keyId.length = 0;
+            int32_t idSize = obj->readInt32();
+            if (idSize > 0) {
+                std::unique_ptr<uint8_t[]> data(new uint8_t[idSize]);
+                err = obj->read(data.get(), idSize);
+                if (err != OK) {
+                    ALOGE("Failed to read key data, error=%d", err);
+                    return;
+                }
+                keyStatus.keyId.ptr = data.get();
+                keyStatus.keyId.length = idSize;
+                dataPointers.push_back(std::move(data));
+            }
+            keyStatus.keyType = static_cast<AMediaDrmKeyStatusType>(obj->readInt32());
+            keysStatus.push(keyStatus);
+        }
+
+        bool hasNewUsableKey = obj->readInt32();
+        (*mKeysChangeListener)(mObj, &sessionId, keysStatus.array(), numKeys, hasNewUsableKey);
+        return;
+    }
+
+    // Handles AMediaDrmEventListener below:
+    //  translates DrmPlugin event types into their NDK equivalents
     AMediaDrmEventType ndkEventType;
     switch(eventType) {
         case DrmPlugin::kDrmPluginEventProvisionRequired:
@@ -97,18 +169,29 @@ void DrmListener::notify(DrmPlugin::EventType eventType, int extra, const Parcel
         case DrmPlugin::kDrmPluginEventVendorDefined:
             ndkEventType = EVENT_VENDOR_DEFINED;
             break;
+        case DrmPlugin::kDrmPluginEventSessionReclaimed:
+            ndkEventType = EVENT_SESSION_RECLAIMED;
+            break;
         default:
             ALOGE("Invalid event DrmPlugin::EventType %d, ignored", (int)eventType);
-            goto cleanup;
+            return;
     }
 
-    (*mListener)(mObj, &sessionId, ndkEventType, extra, data, dataSize);
-
- cleanup:
-    delete [] sessionId.ptr;
-    delete [] data;
+    int32_t dataSize = obj->readInt32();
+    uint8_t *data = NULL;
+    if (dataSize > 0) {
+        data = new uint8_t[dataSize];
+        err = obj->read(data, dataSize);
+        if (err == OK) {
+            (*mEventListener)(mObj, &sessionId, ndkEventType, extra, data, dataSize);
+        } else {
+            ALOGE("Failed to read event data, error=%d", err);
+        }
+        delete [] data;
+    } else {
+        ALOGE("Error reading parcel: invalid event data size=%d", dataSize);
+    }
 }
-
 
 extern "C" {
 
@@ -198,6 +281,8 @@ EXPORT
 AMediaDrm* AMediaDrm_createByUUID(const AMediaUUID uuid) {
     AMediaDrm *mObj = new AMediaDrm();
     mObj->mDrm = CreateDrmFromUUID(uuid);
+
+    mObj->mListener.clear();
     return mObj;
 }
 
@@ -216,11 +301,47 @@ media_status_t AMediaDrm_setOnEventListener(AMediaDrm *mObj, AMediaDrmEventListe
     if (!mObj || mObj->mDrm == NULL) {
         return AMEDIA_ERROR_INVALID_OBJECT;
     }
-    mObj->mListener = new DrmListener(mObj, listener);
+
+    if (mObj->mListener.get()) {
+        mObj->mListener->setEventListener(listener);
+    } else {
+        mObj->mListener = new DrmListener(mObj, listener);
+    }
     mObj->mDrm->setListener(mObj->mListener);
     return AMEDIA_OK;
 }
 
+EXPORT
+media_status_t AMediaDrm_setOnExpirationUpdateListener(AMediaDrm *mObj,
+        AMediaDrmExpirationUpdateListener listener) {
+    if (!mObj || mObj->mDrm == NULL) {
+        return AMEDIA_ERROR_INVALID_OBJECT;
+    }
+
+    if (mObj->mListener.get()) {
+        mObj->mListener->setExpirationUpdateListener(listener);
+    } else {
+        mObj->mListener = new DrmListener(mObj, listener);
+    }
+    mObj->mDrm->setListener(mObj->mListener);
+    return AMEDIA_OK;
+}
+
+EXPORT
+media_status_t AMediaDrm_setOnKeysChangeListener(AMediaDrm *mObj,
+        AMediaDrmKeysChangeListener listener) {
+    if (!mObj || mObj->mDrm == NULL) {
+        return AMEDIA_ERROR_INVALID_OBJECT;
+    }
+
+    if (mObj->mListener.get()) {
+        mObj->mListener->setKeysChangeListener(listener);
+    } else {
+        mObj->mListener = new DrmListener(mObj, listener);
+    }
+    mObj->mDrm->setListener(mObj->mListener);
+    return AMEDIA_OK;
+}
 
 static bool findId(AMediaDrm *mObj, const AMediaDrmByteArray &id, List<idvec_t>::iterator &iter) {
     for (iter = mObj->mIds.begin(); iter != mObj->mIds.end(); ++iter) {

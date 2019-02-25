@@ -245,11 +245,29 @@ Return<void> DrmPlugin::provideKeyResponse(
 
     setPlayPolicy();
     std::vector<uint8_t> keySetId;
+    keySetId.clear();
+
     Status status = session->provideKeyResponse(response);
     if (status == Status::OK) {
-        // This is for testing AMediaDrm_setOnEventListener only.
-        sendEvent(EventType::VENDOR_DEFINED, 0, scope);
-        keySetId.clear();
+        // Test calling AMediaDrm listeners.
+        sendEvent(EventType::VENDOR_DEFINED, toVector(scope), toVector(scope));
+
+        sendExpirationUpdate(toVector(scope), 100);
+
+        std::vector<KeyStatus> keysStatus;
+        KeyStatus keyStatus;
+
+        std::vector<uint8_t> keyId1 = { 0xA, 0xB, 0xC };
+        keyStatus.keyId = keyId1;
+        keyStatus.type = V1_0::KeyStatusType::USABLE;
+        keysStatus.push_back(keyStatus);
+
+        std::vector<uint8_t> keyId2 = { 0xD, 0xE, 0xF };
+        keyStatus.keyId = keyId2;
+        keyStatus.type = V1_0::KeyStatusType::EXPIRED;
+        keysStatus.push_back(keyStatus);
+
+        sendKeysChange(toVector(scope), keysStatus, true);
     }
 
     installSecureStop(scope);
