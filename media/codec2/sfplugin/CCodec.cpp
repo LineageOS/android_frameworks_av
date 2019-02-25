@@ -709,6 +709,49 @@ void CCodec::configure(const sp<AMessage> &msg) {
         Mutexed<Config>::Locked config(mConfig);
         config->mUsingSurface = surface != nullptr;
 
+        // Enforce required parameters
+        int32_t i32;
+        float flt;
+        if (config->mDomain & Config::IS_AUDIO) {
+            if (!msg->findInt32(KEY_SAMPLE_RATE, &i32)) {
+                ALOGD("sample rate is missing, which is required for audio components.");
+                return BAD_VALUE;
+            }
+            if (!msg->findInt32(KEY_CHANNEL_COUNT, &i32)) {
+                ALOGD("channel count is missing, which is required for audio components.");
+                return BAD_VALUE;
+            }
+            if ((config->mDomain & Config::IS_ENCODER)
+                    && !mime.equalsIgnoreCase(MEDIA_MIMETYPE_AUDIO_FLAC)
+                    && !msg->findInt32(KEY_BIT_RATE, &i32)
+                    && !msg->findFloat(KEY_BIT_RATE, &flt)) {
+                ALOGD("bitrate is missing, which is required for audio encoders.");
+                return BAD_VALUE;
+            }
+        }
+        if (config->mDomain & (Config::IS_IMAGE | Config::IS_VIDEO)) {
+            if (!msg->findInt32(KEY_WIDTH, &i32)) {
+                ALOGD("width is missing, which is required for image/video components.");
+                return BAD_VALUE;
+            }
+            if (!msg->findInt32(KEY_HEIGHT, &i32)) {
+                ALOGD("height is missing, which is required for image/video components.");
+                return BAD_VALUE;
+            }
+            if ((config->mDomain & Config::IS_ENCODER) && (config->mDomain & Config::IS_VIDEO)) {
+                if (!msg->findInt32(KEY_BIT_RATE, &i32)
+                        && !msg->findFloat(KEY_BIT_RATE, &flt)) {
+                    ALOGD("bitrate is missing, which is required for video encoders.");
+                    return BAD_VALUE;
+                }
+                if (!msg->findInt32(KEY_I_FRAME_INTERVAL, &i32)
+                        && !msg->findFloat(KEY_I_FRAME_INTERVAL, &flt)) {
+                    ALOGD("I frame interval is missing, which is required for video encoders.");
+                    return BAD_VALUE;
+                }
+            }
+        }
+
         /*
          * Handle input surface configuration
          */
