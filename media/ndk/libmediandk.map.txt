@@ -163,6 +163,8 @@ LIBMEDIANDK {
     AMediaDrm_setOnEventListener;
     AMediaDrm_setPropertyByteArray;
     AMediaDrm_setPropertyString;
+    AMediaDrm_setOnExpirationUpdateListener; # introduced=29
+    AMediaDrm_setOnKeysChangeListener; # introduced=29
     AMediaDrm_sign;
     AMediaDrm_verify;
     AMediaExtractor_advance;
