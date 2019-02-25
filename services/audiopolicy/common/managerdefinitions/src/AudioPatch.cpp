@@ -41,9 +41,7 @@ static void dumpPatchEndpoints(
         const audio_port_config &cfg = cfgs[i];
         dst->appendFormat("%*s  [%s %d] ", spaces, "", prefix, i + 1);
         if (cfg.type == AUDIO_PORT_TYPE_DEVICE) {
-            std::string device;
-            deviceToString(cfg.ext.device.type, device);
-            dst->appendFormat("Device ID %d %s", cfg.id, device.c_str());
+            dst->appendFormat("Device ID %d %s", cfg.id, toString(cfg.ext.device.type).c_str());
         } else {
             dst->appendFormat("Mix ID %d I/O handle %d", cfg.id, cfg.ext.mix.handle);
         }

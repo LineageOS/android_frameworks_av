@@ -233,8 +233,6 @@ template<> const AudioFlagConverter::Table AudioFlagConverter::mTable[];
 
 bool deviceFromString(const std::string& literalDevice, audio_devices_t& device);
 
-bool deviceToString(audio_devices_t device, std::string& literalDevice);
-
 SampleRateTraits::Collection samplingRatesFromString(
         const std::string &samplingRates, const char *del = AudioParameter::valueListSeparator);
 
@@ -255,47 +253,53 @@ InputChannelTraits::Collection inputChannelMasksFromString(
 OutputChannelTraits::Collection outputChannelMasksFromString(
         const std::string &outChannels, const char *del = AudioParameter::valueListSeparator);
 
-static inline std::string toString(audio_usage_t usage)
+// counting enumerations
+template <typename T, std::enable_if_t<std::is_same<T, audio_content_type_t>::value
+                                    || std::is_same<T, audio_mode_t>::value
+                                    || std::is_same<T, audio_source_t>::value
+                                    || std::is_same<T, audio_stream_type_t>::value
+                                    || std::is_same<T, audio_usage_t>::value
+                                    , int> = 0>
+static inline std::string toString(const T& value)
 {
-    std::string usageLiteral;
-    if (!android::UsageTypeConverter::toString(usage, usageLiteral)) {
-        ALOGV("failed to convert usage: %d", usage);
-        return "AUDIO_USAGE_UNKNOWN";
-    }
-    return usageLiteral;
+    std::string result;
+    return TypeConverter<DefaultTraits<T>>::toString(value, result)
+            ? result : std::to_string(static_cast<int>(value));
+
 }
 
-static inline std::string toString(audio_content_type_t content)
+// flag enumerations
+template <typename T, std::enable_if_t<std::is_same<T, audio_gain_mode_t>::value
+                                    || std::is_same<T, audio_input_flags_t>::value
+                                    || std::is_same<T, audio_output_flags_t>::value
+                                    , int> = 0>
+static inline std::string toString(const T& value)
 {
-    std::string contentLiteral;
-    if (!android::AudioContentTypeConverter::toString(content, contentLiteral)) {
-        ALOGV("failed to convert content type: %d", content);
-        return "AUDIO_CONTENT_TYPE_UNKNOWN";
-    }
-    return contentLiteral;
+    std::string result;
+    TypeConverter<DefaultTraits<T>>::maskToString(value, result);
+    return result;
 }
 
-static inline std::string toString(audio_stream_type_t stream)
+static inline std::string toString(const audio_devices_t& devices)
 {
-    std::string streamLiteral;
-    if (!android::StreamTypeConverter::toString(stream, streamLiteral)) {
-        ALOGV("failed to convert stream: %d", stream);
-        return "AUDIO_STREAM_DEFAULT";
+    std::string result;
+    if ((devices & AUDIO_DEVICE_BIT_IN) != 0) {
+        InputDeviceConverter::maskToString(devices, result);
+    } else {
+        OutputDeviceConverter::maskToString(devices, result);
     }
-    return streamLiteral;
+    return result;
 }
 
-static inline std::string toString(audio_source_t source)
+// TODO: Remove when FormatTraits uses DefaultTraits.
+static inline std::string toString(const audio_format_t& format)
 {
-    std::string sourceLiteral;
-    if (!android::SourceTypeConverter::toString(source, sourceLiteral)) {
-        ALOGV("failed to convert source: %d", source);
-        return "AUDIO_SOURCE_DEFAULT";
-    }
-    return sourceLiteral;
+    std::string result;
+    return TypeConverter<VectorTraits<audio_format_t>>::toString(format, result)
+            ? result : std::to_string(static_cast<int>(format));
 }
 
-static inline std::string toString(const audio_attributes_t &attributes)
+static inline std::string toString(const audio_attributes_t& attributes)
 {
     std::ostringstream result;
     result << "{ Content type: " << toString(attributes.content_type)
@@ -306,16 +310,6 @@ static inline std::string toString(const audio_attributes_t &attributes)
            << " }";
 
     return result.str();
-}
-
-static inline std::string toString(audio_mode_t mode)
-{
-    std::string modeLiteral;
-    if (!android::AudioModeConverter::toString(mode, modeLiteral)) {
-        ALOGV("failed to convert mode: %d", mode);
-        return "AUDIO_MODE_INVALID";
-    }
-    return modeLiteral;
 }
 
 }; // namespace android

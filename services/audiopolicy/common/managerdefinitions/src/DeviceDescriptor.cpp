@@ -18,6 +18,7 @@
 //#define LOG_NDEBUG 0
 
 #include <audio_utils/string.h>
+#include <media/TypeConverter.h>
 #include <set>
 #include "DeviceDescriptor.h"
 #include "TypeConverter.h"
@@ -346,10 +347,9 @@ void DeviceDescriptor::dump(String8 *dst, int spaces, int index, bool verbose) c
     if (!mTagName.isEmpty()) {
         dst->appendFormat("%*s- tag name: %s\n", spaces, "", mTagName.string());
     }
-    std::string deviceLiteral;
-    if (deviceToString(mDeviceType, deviceLiteral)) {
-        dst->appendFormat("%*s- type: %-48s\n", spaces, "", deviceLiteral.c_str());
-    }
+
+    dst->appendFormat("%*s- type: %-48s\n", spaces, "", ::android::toString(mDeviceType).c_str());
+
     if (mAddress.size() != 0) {
         dst->appendFormat("%*s- address: %-32s\n", spaces, "", mAddress.string());
     }
@@ -401,9 +401,8 @@ bool DeviceVector::containsAllDevices(const DeviceVector &devices) const
 
 void DeviceDescriptor::log() const
 {
-    std::string device;
-    deviceToString(mDeviceType, device);
-    ALOGI("Device id:%d type:0x%08X:%s, addr:%s", mId,  mDeviceType, device.c_str(),
+    ALOGI("Device id:%d type:0x%08X:%s, addr:%s", mId,  mDeviceType,
+          ::android::toString(mDeviceType).c_str(),
           mAddress.string());
 
     AudioPort::log("  ");
