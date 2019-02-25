@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "5b2e2b6f_4f0a96b4",
+        "filename": "media/libmediaplayerservice/StagefrightRecorder.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 1997,
+      "author": {
+        "id": 10258
+      },
+      "writtenOn": "2019-02-25T04:26:15Z",
+      "side": 1,
+      "message": "Please move to https://review.lineageos.org/c/LineageOS/android_frameworks_av/+/242409 , CAF dropped this change on P",
+      "parentUuid": "0576e9b0_f399cbc2",
+      "range": {
+        "startLine": 1997,
+        "startChar": 34,
+        "endLine": 1997,
+        "endChar": 55
+      },
+      "revId": "3278627772df1c1112b2316cc7230748c1fa8cfd",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "9af672c4_a5bf2835",
         "filename": "media/libstagefright/CameraSource.cpp",
         "patchSetId": 1
