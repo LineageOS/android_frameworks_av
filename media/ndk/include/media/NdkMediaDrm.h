@@ -56,6 +56,7 @@ typedef AMediaDrmByteArray AMediaDrmSessionId;
 typedef AMediaDrmByteArray AMediaDrmScope;
 typedef AMediaDrmByteArray AMediaDrmKeySetId;
 typedef AMediaDrmByteArray AMediaDrmSecureStop;
+typedef AMediaDrmByteArray AMediaDrmKeyId;
 
 typedef enum AMediaDrmEventType {
     /**
@@ -81,11 +82,88 @@ typedef enum AMediaDrmEventType {
      * This event may indicate some specific vendor-defined condition, see your
      * DRM provider documentation for details
      */
-    EVENT_VENDOR_DEFINED = 4
+    EVENT_VENDOR_DEFINED = 4,
+
+    /**
+     * This event indicates that a session opened by the app has been reclaimed
+     * by the resource manager.
+     */
+    EVENT_SESSION_RECLAIMED = 5,
 } AMediaDrmEventType;
+
+typedef enum AMediaDrmKeyType {
+    /**
+     * This key request type specifies that the keys will be for online use, they will
+     * not be saved to the device for subsequent use when the device is not connected
+     * to a network.
+     */
+    KEY_TYPE_STREAMING = 1,
+
+    /**
+     * This key request type specifies that the keys will be for offline use, they
+     * will be saved to the device for use when the device is not connected to a network.
+     */
+    KEY_TYPE_OFFLINE = 2,
+
+    /**
+     * This key request type specifies that previously saved offline keys should be released.
+     */
+    KEY_TYPE_RELEASE = 3
+} AMediaDrmKeyType;
+
+/**
+ *  Data type containing {key, value} pair
+ */
+typedef struct AMediaDrmKeyValuePair {
+    const char *mKey;
+    const char *mValue;
+} AMediaDrmKeyValue;
+
+typedef enum AMediaKeyStatusType {
+    /**
+     * The key is currently usable to decrypt media data.
+     */
+    KEY_STATUS_TYPE_USABLE,
+
+    /**
+     * The key is no longer usable to decrypt media data because its expiration
+     * time has passed.
+     */
+    KEY_STATUS_TYPE_EXPIRED,
+
+    /**
+     * The key is not currently usable to decrypt media data because its output
+     * requirements cannot currently be met.
+     */
+    KEY_STATUS_TYPE_OUTPUTNOTALLOWED,
+
+    /**
+     * The status of the key is not yet known and is being determined.
+     */
+    KEY_STATUS_TYPE_STATUSPENDING,
+
+    /**
+     * The key is not currently usable to decrypt media data because of an
+     * internal error in processing unrelated to input parameters.
+     */
+    KEY_STATUS_TYPE_INTERNALERROR,
+
+} AMediaDrmKeyStatusType;
+
+typedef struct AMediaDrmKeyStatus {
+    AMediaDrmKeyId keyId;
+    AMediaDrmKeyStatusType keyType;
+} AMediaDrmKeyStatus;
 
 typedef void (*AMediaDrmEventListener)(AMediaDrm *, const AMediaDrmSessionId *sessionId,
         AMediaDrmEventType eventType, int extra, const uint8_t *data, size_t dataSize);
+
+typedef void (*AMediaDrmExpirationUpdateListener)(AMediaDrm *,
+        const AMediaDrmSessionId *sessionId, int64_t expiryTimeInMS);
+
+typedef void (*AMediaDrmKeysChangeListener)(AMediaDrm *,
+        const AMediaDrmSessionId *sessionId, const AMediaDrmKeyStatus *keyStatus,
+        size_t numKeys, bool hasNewUsableKey);
 
 #if __ANDROID_API__ >= 21
 
@@ -120,6 +198,22 @@ media_status_t AMediaDrm_setOnEventListener(AMediaDrm *,
         AMediaDrmEventListener listener) __INTRODUCED_IN(21);
 
 /**
+ * Register a callback to be invoked when an expiration update event occurs
+ *
+ * listener is the callback that will be invoked on event
+ */
+media_status_t AMediaDrm_setOnExpirationUpdateListener(AMediaDrm *,
+        AMediaDrmExpirationUpdateListener listener) __INTRODUCED_IN(29);
+
+/**
+ * Register a callback to be invoked when a key status change event occurs
+ *
+ * listener is the callback that will be invoked on event
+ */
+media_status_t AMediaDrm_setOnKeysChangeListener(AMediaDrm *,
+        AMediaDrmKeysChangeListener listener) __INTRODUCED_IN(29);
+
+/**
  * Open a new session with the MediaDrm object.  A session ID is returned.
  *
  * returns MEDIADRM_NOT_PROVISIONED_ERROR if provisioning is needed
@@ -134,34 +228,6 @@ media_status_t AMediaDrm_openSession(AMediaDrm *,
  */
 media_status_t AMediaDrm_closeSession(AMediaDrm *,
         const AMediaDrmSessionId *sessionId) __INTRODUCED_IN(21);
-
-typedef enum AMediaDrmKeyType {
-    /**
-     * This key request type species that the keys will be for online use, they will
-     * not be saved to the device for subsequent use when the device is not connected
-     * to a network.
-     */
-    KEY_TYPE_STREAMING = 1,
-
-    /**
-     * This key request type specifies that the keys will be for offline use, they
-     * will be saved to the device for use when the device is not connected to a network.
-     */
-    KEY_TYPE_OFFLINE = 2,
-
-    /**
-     * This key request type specifies that previously saved offline keys should be released.
-     */
-    KEY_TYPE_RELEASE = 3
-} AMediaDrmKeyType;
-
-/**
- *  Data type containing {key, value} pair
- */
-typedef struct AMediaDrmKeyValuePair {
-    const char *mKey;
-    const char *mValue;
-} AMediaDrmKeyValue;
 
 /**
  * A key request/response exchange occurs between the app and a license server
