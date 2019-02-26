@@ -30,9 +30,7 @@
 namespace android {
 
 MediaExtractorService::MediaExtractorService()
-        : BnMediaExtractorService() {
-    MediaExtractorFactory::SetLinkedLibraries(std::string(LINKED_LIBRARIES));
-}
+        : BnMediaExtractorService() { }
 
 sp<IMediaExtractor> MediaExtractorService::makeExtractor(
         const sp<IDataSource> &remoteSource, const char *mime) {
