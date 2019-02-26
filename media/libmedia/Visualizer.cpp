@@ -56,6 +56,19 @@ Visualizer::~Visualizer()
     setCaptureCallBack(NULL, NULL, 0, 0);
 }
 
+void Visualizer::release()
+{
+    ALOGV("Visualizer::release()");
+    setEnabled(false);
+    Mutex::Autolock _l(mCaptureLock);
+
+    mCaptureThread.clear();
+    mCaptureCallBack = NULL;
+    mCaptureCbkUser = NULL;
+    mCaptureFlags = 0;
+    mCaptureRate = 0;
+}
+
 status_t Visualizer::setEnabled(bool enabled)
 {
     Mutex::Autolock _l(mCaptureLock);
@@ -115,7 +128,7 @@ status_t Visualizer::setCaptureCallBack(capture_cbk_t cbk, void* user, uint32_t 
     mCaptureRate = rate;
 
     if (cbk != NULL) {
-        mCaptureThread = new CaptureThread(*this, rate, ((flags & CAPTURE_CALL_JAVA) != 0));
+        mCaptureThread = new CaptureThread(this, rate, ((flags & CAPTURE_CALL_JAVA) != 0));
     }
     ALOGV("setCaptureCallBack() rate: %d thread %p flags 0x%08x",
             rate, mCaptureThread.get(), mCaptureFlags);
@@ -402,7 +415,7 @@ void Visualizer::controlStatusChanged(bool controlGranted) {
 
 //-------------------------------------------------------------------------
 
-Visualizer::CaptureThread::CaptureThread(Visualizer& receiver, uint32_t captureRate,
+Visualizer::CaptureThread::CaptureThread(Visualizer* receiver, uint32_t captureRate,
         bool bCanCallJava)
     : Thread(bCanCallJava), mReceiver(receiver)
 {
@@ -413,10 +426,14 @@ Visualizer::CaptureThread::CaptureThread(Visualizer& receiver, uint32_t captureR
 bool Visualizer::CaptureThread::threadLoop()
 {
     ALOGV("CaptureThread %p enter", this);
+    sp<Visualizer> receiver = mReceiver.promote();
+    if (receiver == NULL) {
+        return false;
+    }
     while (!exitPending())
     {
         usleep(mSleepTimeUs);
-        mReceiver.periodicCapture();
+        receiver->periodicCapture();
     }
     ALOGV("CaptureThread %p exiting", this);
     return false;
