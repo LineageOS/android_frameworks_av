@@ -13,7 +13,7 @@ LOCAL_SRC_FILES := \
     src/Stream.cpp \
     src/InputSource.cpp \
     ../engine/common/src/VolumeCurve.cpp \
-    ../engine/common/src/StreamVolumeCurves.cpp \
+    ../engine/common/src/VolumeGroup.cpp \
     ../engine/common/src/ProductStrategy.cpp \
     ../engine/common/src/EngineBase.cpp
 

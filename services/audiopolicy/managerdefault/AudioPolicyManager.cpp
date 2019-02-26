@@ -377,7 +377,7 @@ audio_policy_dev_state_t AudioPolicyManager::getDeviceConnectionState(audio_devi
                                            (strlen(device_address) != 0)/*matchAddress*/);
 
     if (devDesc == 0) {
-        ALOGW("getDeviceConnectionState() undeclared device, type %08x, address: %s",
+        ALOGV("getDeviceConnectionState() undeclared device, type %08x, address: %s",
               device, device_address);
         return AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE;
     }
@@ -2373,16 +2373,13 @@ void AudioPolicyManager::closeAllInputs() {
     }
 }
 
-void AudioPolicyManager::initStreamVolume(audio_stream_type_t stream,
-                                            int indexMin,
-                                            int indexMax)
+void AudioPolicyManager::initStreamVolume(audio_stream_type_t stream, int indexMin, int indexMax)
 {
     ALOGV("initStreamVolume() stream %d, min %d, max %d", stream , indexMin, indexMax);
     if (indexMin < 0 || indexMax < 0) {
         ALOGE("%s for stream %d: invalid min %d or max %d", __func__, stream , indexMin, indexMax);
         return;
     }
-    // @todo: our proposal now use XML to store Indexes Min & Max
     getVolumeCurves(stream).initVolume(indexMin, indexMax);
 
     // initialize other private stream volumes which follow this one

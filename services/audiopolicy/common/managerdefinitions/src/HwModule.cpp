@@ -341,7 +341,7 @@ sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices
         }
     }
     if (!allowToCreate) {
-        ALOGE("%s: could not find HW module for device %s %04x address %s", __FUNCTION__,
+        ALOGV("%s: could not find HW module for device %s %04x address %s", __FUNCTION__,
               name, deviceType, address);
         return nullptr;
     }

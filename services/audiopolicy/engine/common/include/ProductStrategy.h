@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "VolumeGroup.h"
+
 #include <system/audio.h>
 #include <AudioPolicyManagerInterface.h>
 #include <utils/RefBase.h>
@@ -38,7 +40,7 @@ class ProductStrategy : public virtual RefBase, private HandleGenerator<uint32_t
 private:
     struct AudioAttributes {
         audio_stream_type_t mStream = AUDIO_STREAM_DEFAULT;
-        uint32_t mGroupId = 0;
+        volume_group_t mVolumeGroup = VOLUME_GROUP_NONE;
         audio_attributes_t mAttributes = AUDIO_ATTRIBUTES_INITIALIZER;
     };
 
@@ -85,6 +87,12 @@ public:
     audio_attributes_t getAttributesForStreamType(audio_stream_type_t stream) const;
     audio_stream_type_t getStreamTypeForAttributes(const audio_attributes_t &attr) const;
 
+    volume_group_t getVolumeGroupForAttributes(const audio_attributes_t &attr) const;
+
+    volume_group_t getVolumeGroupForStreamType(audio_stream_type_t stream) const;
+
+    volume_group_t getDefaultVolumeGroup() const;
+
     bool isDefault() const;
 
     void dump(String8 *dst, int spaces = 0) const;
@@ -107,6 +115,10 @@ private:
 class ProductStrategyMap : public std::map<product_strategy_t, sp<ProductStrategy> >
 {
 public:
+    /**
+     * @brief initialize: set default product strategy in cache.
+     */
+    void initialize();
     /**
      * @brief getProductStrategyForAttribute. The order of the vector is dimensionning.
      * @param attr
@@ -136,9 +148,16 @@ public:
 
     std::string getDeviceAddressForProductStrategy(product_strategy_t strategy) const;
 
+    volume_group_t getVolumeGroupForAttributes(const audio_attributes_t &attr) const;
+
+    volume_group_t getVolumeGroupForStreamType(audio_stream_type_t stream) const;
+
     product_strategy_t getDefault() const;
 
     void dump(String8 *dst, int spaces = 0) const;
+
+private:
+    product_strategy_t mDefaultStrategy = PRODUCT_STRATEGY_NONE;
 };
 
 } // namespace android
