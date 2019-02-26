@@ -535,6 +535,15 @@ enum AIMAGE_FORMATS {
      * Format as described in ISO/IEC 23008-12.</p>
      */
     AIMAGE_FORMAT_HEIC = 0x48454946,
+
+    /**
+     * Depth augmented compressed JPEG format.
+     *
+     * <p>JPEG compressed main image along with XMP embedded depth metadata
+     * following ISO 16684-1:2011(E).</p>
+     */
+    AIMAGE_FORMAT_DEPTH_JPEG = 0x69656963,
+
 };
 
 /**
