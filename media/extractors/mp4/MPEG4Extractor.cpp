@@ -3021,8 +3021,10 @@ status_t MPEG4Extractor::parseEAC3SpecificBox(off64_t offset) {
         }
 
         unsigned bsid = br.getBits(5);
-        if (bsid < 8) {
-            ALOGW("Incorrect bsid in EAC3 header. Possibly AC-3?");
+        if (bsid == 9 || bsid == 10) {
+            ALOGW("EAC3 stream (bsid=%d) may be silenced by the decoder", bsid);
+        } else if (bsid > 16) {
+            ALOGE("EAC3 stream (bsid=%d) is not compatible with ETSI TS 102 366 v1.4.1", bsid);
             delete[] chunk;
             return ERROR_MALFORMED;
         }
