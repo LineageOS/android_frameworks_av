@@ -21,7 +21,6 @@ cc_binary {
         "libutils",
         "libbinder",
         "libandroidicu",
-        "android.hardware.media.omx@1.0",
     ],
 
     static_libs: [
@@ -33,8 +32,6 @@ cc_binary {
         "frameworks/av/media/libmediaplayerservice",
         "frameworks/av/services/mediaresourcemanager",
     ],
-
-    compile_multilib: "32",
 
     init_rc: ["mediaserver.rc"],
 
