@@ -84,7 +84,7 @@ cc_library_shared {
         "liblog",
         "libutils",
         "libcutils",
-        "libandroid",
+        "libnativewindow",
         "libandroid_runtime",
         "libbinder",
         "libhidlbase",

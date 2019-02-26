@@ -55,8 +55,10 @@ status_t EngineBase::setPhoneState(audio_mode_t state)
 
     if (!is_state_in_call(oldState) && is_state_in_call(state)) {
         ALOGV("  Entering call in setPhoneState()");
+        switchVolumeCurve(AUDIO_STREAM_VOICE_CALL, AUDIO_STREAM_DTMF);
     } else if (is_state_in_call(oldState) && !is_state_in_call(state)) {
         ALOGV("  Exiting call in setPhoneState()");
+        restoreOriginVolumeCurve(AUDIO_STREAM_DTMF);
     }
     return NO_ERROR;
 }
@@ -108,14 +110,43 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
             productStrategies[strategyId] = strategy;
         }
     };
+    auto loadVolumeCurves = [](const auto &configVolumes, auto &streamVolumeCollection) {
+        for (auto &configVolume : configVolumes) {
+            audio_stream_type_t streamType = AUDIO_STREAM_DEFAULT;
+            if (configVolume.stream.empty() ||
+                    !StreamTypeConverter::fromString(configVolume.stream, streamType)) {
+                ALOGE("%s: Invalid stream type", __FUNCTION__);
+                continue;
+            }
+            VolumeCurves volumeCurves(streamType, configVolume.indexMin, configVolume.indexMax);
+            for (auto &configCurve : configVolume.volumeCurves) {
+                device_category deviceCategory = DEVICE_CATEGORY_SPEAKER;
+                if (!DeviceCategoryConverter::fromString(configCurve.deviceCategory,
+                                                         deviceCategory)) {
+                    ALOGE("%s: Invalid %s", __FUNCTION__, configCurve.deviceCategory.c_str());
+                    continue;
+                }
+                sp<VolumeCurve> curve = new VolumeCurve(deviceCategory);
+                for (auto &point : configCurve.curvePoints) {
+                    curve->add({point.index, point.attenuationInMb});
+                }
+                volumeCurves.add(curve);
+            }
+            streamVolumeCollection.add(volumeCurves, streamType);
+        }
+    };
 
     auto result = engineConfig::parse();
     if (result.parsedConfig == nullptr) {
         ALOGW("%s: No configuration found, using default matching phone experience.", __FUNCTION__);
-        result = {std::make_unique<engineConfig::Config>(gDefaultEngineConfig), 0};
+        engineConfig::Config config = gDefaultEngineConfig;
+        android::status_t ret = engineConfig::parseLegacyVolumes(config.volumeGroups);
+        result = {std::make_unique<engineConfig::Config>(config),
+                  static_cast<size_t>(ret == NO_ERROR ? 0 : 1)};
     }
     ALOGE_IF(result.nbSkippedElement != 0, "skipped %zu elements", result.nbSkippedElement);
     loadProductStrategies(result.parsedConfig->productStrategies, mProductStrategies);
+    loadVolumeCurves(result.parsedConfig->volumeGroups, mStreamVolumeCurves);
     return result;
 }
 
@@ -173,9 +204,30 @@ status_t EngineBase::listAudioProductStrategies(AudioProductStrategyVector &stra
     return NO_ERROR;
 }
 
+VolumeCurves *EngineBase::getVolumeCurvesForAttributes(const audio_attributes_t &attr)
+{
+    return &mStreamVolumeCurves.getVolumeCurvesForStream(getStreamTypeForAttributes(attr));
+}
+
+VolumeCurves *EngineBase::getVolumeCurvesForStreamType(audio_stream_type_t stream)
+{
+    return &mStreamVolumeCurves.getVolumeCurvesForStream(stream);
+}
+
+status_t EngineBase::switchVolumeCurve(audio_stream_type_t streamSrc, audio_stream_type_t streamDst)
+{
+    return mStreamVolumeCurves.switchVolumeCurve(streamSrc, streamDst);;
+}
+
+status_t EngineBase::restoreOriginVolumeCurve(audio_stream_type_t stream)
+{
+    return mStreamVolumeCurves.restoreOriginVolumeCurve(stream);
+}
+
 void EngineBase::dump(String8 *dst) const
 {
     mProductStrategies.dump(dst, 2);
+    mStreamVolumeCurves.dump(dst, 2);
 }
 
 } // namespace audio_policy

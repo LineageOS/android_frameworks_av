@@ -49,7 +49,7 @@
 #include <AudioPolicyMix.h>
 #include <EffectDescriptor.h>
 #include <SoundTriggerSession.h>
-#include <VolumeCurve.h>
+#include "TypeConverter.h"
 
 namespace android {
 
@@ -310,10 +310,22 @@ protected:
         {
             return mAvailableInputDevices;
         }
-        virtual IVolumeCurvesCollection &getVolumeCurves() { return *mVolumeCurves; }
         virtual const sp<DeviceDescriptor> &getDefaultOutputDevice() const
         {
             return mDefaultOutputDevice;
+        }
+
+        IVolumeCurves &getVolumeCurves(const audio_attributes_t &attr)
+        {
+            auto *curves = mEngine->getVolumeCurvesForAttributes(attr);
+            ALOG_ASSERT(curves != nullptr, "No curves for attributes %s", toString(attr).c_str());
+            return *curves;
+        }
+        IVolumeCurves &getVolumeCurves(audio_stream_type_t stream)
+        {
+            auto *curves = mEngine->getVolumeCurvesForStreamType(stream);
+            ALOG_ASSERT(curves != nullptr, "No curves for stream %s", toString(stream).c_str());
+            return *curves;
         }
 
         void addOutput(audio_io_handle_t output, const sp<SwAudioOutputDescriptor>& outputDesc);
@@ -624,12 +636,12 @@ protected:
         float   mLastVoiceVolume;            // last voice volume value sent to audio HAL
         bool    mA2dpSuspended;  // true if A2DP output is suspended
 
-        std::unique_ptr<IVolumeCurvesCollection> mVolumeCurves; // Volume Curves per use case and device category
         EffectDescriptorCollection mEffects;  // list of registered audio effects
         sp<DeviceDescriptor> mDefaultOutputDevice; // output device selected by default at boot time
         HwModuleCollection mHwModules; // contains only modules that have been loaded successfully
         HwModuleCollection mHwModulesAll; // normally not needed, used during construction and for
                                           // dumps
+
         AudioPolicyConfig mConfig;
 
         std::atomic<uint32_t> mAudioPortGeneration;

@@ -21,6 +21,7 @@
 #include "TypeConverter.h"
 #include <media/MediaAnalyticsItem.h>
 #include <mediautils/ServiceUtilities.h>
+#include <media/AudioPolicy.h>
 #include <utils/Log.h>
 
 namespace android {
@@ -1032,9 +1033,14 @@ status_t AudioPolicyService::releaseSoundTriggerSession(audio_session_t session)
 status_t AudioPolicyService::registerPolicyMixes(const Vector<AudioMix>& mixes, bool registration)
 {
     Mutex::Autolock _l(mLock);
-    if(!modifyAudioRoutingAllowed()) {
+
+    // loopback|render only need a MediaProjection (checked in caller AudioService.java)
+    bool needModifyAudioRouting = std::any_of(mixes.begin(), mixes.end(), [](auto& mix) {
+            return !is_mix_loopback_render(mix.mRouteFlags); });
+    if (needModifyAudioRouting && !modifyAudioRoutingAllowed()) {
         return PERMISSION_DENIED;
     }
+
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }

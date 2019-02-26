@@ -55,8 +55,6 @@ private:
     ///
     /// from EngineBase, so from AudioPolicyManagerInterface
     ///
-    status_t setPhoneState(audio_mode_t mode) override;
-
     status_t setForceUse(audio_policy_force_use_t usage,
                          audio_policy_forced_cfg_t config) override;
 

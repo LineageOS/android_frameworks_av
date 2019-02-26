@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include <IVolumeCurvesCollection.h>
 #include <AudioGain.h>
 #include <AudioPort.h>
 #include <AudioPatch.h>
@@ -50,8 +49,6 @@ public:
     virtual const DeviceVector &getAvailableOutputDevices() const = 0;
 
     virtual const DeviceVector &getAvailableInputDevices() const = 0;
-
-    virtual IVolumeCurvesCollection &getVolumeCurves() = 0;
 
     virtual const sp<DeviceDescriptor> &getDefaultOutputDevice() const = 0;
 
