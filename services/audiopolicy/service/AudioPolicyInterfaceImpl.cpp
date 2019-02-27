@@ -404,6 +404,9 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
         if (status == NO_ERROR) {
             // enforce permission (if any) required for each type of input
             switch (inputType) {
+            case AudioPolicyInterface::API_INPUT_MIX_PUBLIC_CAPTURE_PLAYBACK:
+                // this use case has been validated in audio service with a MediaProjection token,
+                // and doesn't rely on regular permissions
             case AudioPolicyInterface::API_INPUT_LEGACY:
                 break;
             case AudioPolicyInterface::API_INPUT_TELEPHONY_RX:

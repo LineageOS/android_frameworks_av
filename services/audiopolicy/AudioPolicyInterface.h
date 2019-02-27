@@ -58,10 +58,12 @@ public:
     typedef enum {
         API_INPUT_INVALID = -1,
         API_INPUT_LEGACY  = 0,// e.g. audio recording from a microphone
-        API_INPUT_MIX_CAPTURE,// used for "remote submix", capture of the media to play it remotely
+        API_INPUT_MIX_CAPTURE,// used for "remote submix" legacy mode (no DAP),
+                              // capture of the media to play it remotely
         API_INPUT_MIX_EXT_POLICY_REROUTE,// used for platform audio rerouting, where mixes are
                                          // handled by external and dynamically installed
                                          // policies which reroute audio mixes
+        API_INPUT_MIX_PUBLIC_CAPTURE_PLAYBACK,  // used for playback capture with a MediaProjection
         API_INPUT_TELEPHONY_RX, // used for capture from telephony RX path
     } input_type_t;
 
