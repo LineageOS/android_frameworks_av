@@ -1500,6 +1500,11 @@ void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args __unu
 
     write(fd, result.string(), result.length());
 
+    if (mEffectInterface != 0) {
+        dprintf(fd, "\tEffect ID %d HAL dump:\n", mId);
+        (void)mEffectInterface->dump(fd);
+    }
+
     if (locked) {
         mLock.unlock();
     }

@@ -18,6 +18,7 @@
 //#define LOG_NDEBUG 0
 
 #include <common/all-versions/VersionUtils.h>
+#include <cutils/native_handle.h>
 #include <hwbinder/IPCThreadState.h>
 #include <media/EffectsFactoryApi.h>
 #include <utils/Log.h>
@@ -278,6 +279,15 @@ status_t EffectHalHidl::close() {
     if (mEffect == 0) return NO_INIT;
     Return<Result> ret = mEffect->close();
     return ret.isOk() ? analyzeResult(ret) : FAILED_TRANSACTION;
+}
+
+status_t EffectHalHidl::dump(int fd) {
+    if (mEffect == 0) return NO_INIT;
+    native_handle_t* hidlHandle = native_handle_create(1, 0);
+    hidlHandle->data[0] = fd;
+    Return<void> ret = mEffect->debug(hidlHandle, {} /* options */);
+    native_handle_delete(hidlHandle);
+    return ret.isOk() ? OK : FAILED_TRANSACTION;
 }
 
 status_t EffectHalHidl::getConfigImpl(
