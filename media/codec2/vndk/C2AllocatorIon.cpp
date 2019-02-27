@@ -140,6 +140,7 @@ public:
 
 protected:
     class Impl;
+    class ImplV2;
     Impl *mImpl;
 
     // TODO: we could make this encapsulate shared_ptr and copiable
@@ -147,7 +148,7 @@ protected:
 };
 
 class C2AllocationIon::Impl {
-private:
+protected:
     /**
      * Constructs an ion allocation.
      *
@@ -191,11 +192,7 @@ public:
      * \return created ion allocation (implementation) which may be invalid if the
      * import failed.
      */
-    static Impl *Import(int ionFd, size_t capacity, int bufferFd, C2Allocator::id_t id) {
-        ion_user_handle_t buffer = -1;
-        int ret = ion_import(ionFd, bufferFd, &buffer);
-        return new Impl(ionFd, capacity, bufferFd, buffer, id, ret);
-    }
+    static Impl *Import(int ionFd, size_t capacity, int bufferFd, C2Allocator::id_t id);
 
     /**
      * Constructs an ion allocation by allocating an ion buffer.
@@ -209,24 +206,7 @@ public:
      * \return created ion allocation (implementation) which may be invalid if the
      * allocation failed.
      */
-    static Impl *Alloc(int ionFd, size_t size, size_t align, unsigned heapMask, unsigned flags, C2Allocator::id_t id) {
-        int bufferFd = -1;
-        ion_user_handle_t buffer = -1;
-        size_t alignedSize = align == 0 ? size : (size + align - 1) & ~(align - 1);
-        int ret = ion_alloc(ionFd, alignedSize, align, heapMask, flags, &buffer);
-        ALOGV("ion_alloc(ionFd = %d, size = %zu, align = %zu, prot = %d, flags = %d) "
-              "returned (%d) ; buffer = %d",
-              ionFd, alignedSize, align, heapMask, flags, ret, buffer);
-        if (ret == 0) {
-            // get buffer fd for native handle constructor
-            ret = ion_share(ionFd, buffer, &bufferFd);
-            if (ret != 0) {
-                ion_free(ionFd, buffer);
-                buffer = -1;
-            }
-        }
-        return new Impl(ionFd, alignedSize, bufferFd, buffer, id, ret);
-    }
+    static Impl *Alloc(int ionFd, size_t size, size_t align, unsigned heapMask, unsigned flags, C2Allocator::id_t id);
 
     c2_status_t map(size_t offset, size_t size, C2MemoryUsage usage, C2Fence *fence, void **addr) {
         (void)fence; // TODO: wait for fence
@@ -256,32 +236,7 @@ public:
         size_t mapSize = size + alignmentBytes;
         Mapping map = { nullptr, alignmentBytes, mapSize };
 
-        c2_status_t err = C2_OK;
-        if (mMapFd == -1) {
-            int ret = ion_map(mIonFd, mBuffer, mapSize, prot,
-                              flags, mapOffset, (unsigned char**)&map.addr, &mMapFd);
-            ALOGV("ion_map(ionFd = %d, handle = %d, size = %zu, prot = %d, flags = %d, "
-                  "offset = %zu) returned (%d)",
-                  mIonFd, mBuffer, mapSize, prot, flags, mapOffset, ret);
-            if (ret) {
-                mMapFd = -1;
-                map.addr = *addr = nullptr;
-                err = c2_map_errno<EINVAL>(-ret);
-            } else {
-                *addr = (uint8_t *)map.addr + alignmentBytes;
-            }
-        } else {
-            map.addr = mmap(nullptr, mapSize, prot, flags, mMapFd, mapOffset);
-            ALOGV("mmap(size = %zu, prot = %d, flags = %d, mapFd = %d, offset = %zu) "
-                  "returned (%d)",
-                  mapSize, prot, flags, mMapFd, mapOffset, errno);
-            if (map.addr == MAP_FAILED) {
-                map.addr = *addr = nullptr;
-                err = c2_map_errno<EINVAL>(errno);
-            } else {
-                *addr = (uint8_t *)map.addr + alignmentBytes;
-            }
-        }
+        c2_status_t err = mapInternal(mapSize, mapOffset, alignmentBytes, prot, flags, &(map.addr), addr);
         if (map.addr) {
             mMappings.push_back(map);
         }
@@ -289,7 +244,7 @@ public:
     }
 
     c2_status_t unmap(void *addr, size_t size, C2Fence *fence) {
-        if (mMapFd < 0 || mMappings.empty()) {
+        if (mMappings.empty()) {
             ALOGD("tried to unmap unmapped buffer");
             return C2_NOT_FOUND;
         }
@@ -307,14 +262,14 @@ public:
                 *fence = C2Fence(); // not using fences
             }
             (void)mMappings.erase(it);
-            ALOGV("successfully unmapped: %d", mBuffer);
+            ALOGV("successfully unmapped: %d", mHandle.bufferFd());
             return C2_OK;
         }
         ALOGD("unmap failed to find specified map");
         return C2_BAD_VALUE;
     }
 
-    ~Impl() {
+    virtual ~Impl() {
         if (!mMappings.empty()) {
             ALOGD("Dangling mappings!");
             for (const Mapping &map : mMappings) {
@@ -326,7 +281,9 @@ public:
             mMapFd = -1;
         }
         if (mInit == C2_OK) {
-            (void)ion_free(mIonFd, mBuffer);
+            if (mBuffer >= 0) {
+                (void)ion_free(mIonFd, mBuffer);
+            }
             native_handle_close(&mHandle);
         }
         if (mIonFd >= 0) {
@@ -346,11 +303,42 @@ public:
         return mId;
     }
 
-    ion_user_handle_t ionHandle() const {
+    virtual ion_user_handle_t ionHandle() const {
         return mBuffer;
     }
 
-private:
+protected:
+    virtual c2_status_t mapInternal(size_t mapSize, size_t mapOffset, size_t alignmentBytes,
+            int prot, int flags, void** base, void** addr) {
+        c2_status_t err = C2_OK;
+        if (mMapFd == -1) {
+            int ret = ion_map(mIonFd, mBuffer, mapSize, prot,
+                              flags, mapOffset, (unsigned char**)base, &mMapFd);
+            ALOGV("ion_map(ionFd = %d, handle = %d, size = %zu, prot = %d, flags = %d, "
+                  "offset = %zu) returned (%d)",
+                  mIonFd, mBuffer, mapSize, prot, flags, mapOffset, ret);
+            if (ret) {
+                mMapFd = -1;
+                *base = *addr = nullptr;
+                err = c2_map_errno<EINVAL>(-ret);
+            } else {
+                *addr = (uint8_t *)*base + alignmentBytes;
+            }
+        } else {
+            *base = mmap(nullptr, mapSize, prot, flags, mMapFd, mapOffset);
+            ALOGV("mmap(size = %zu, prot = %d, flags = %d, mapFd = %d, offset = %zu) "
+                  "returned (%d)",
+                  mapSize, prot, flags, mMapFd, mapOffset, errno);
+            if (*base == MAP_FAILED) {
+                *base = *addr = nullptr;
+                err = c2_map_errno<EINVAL>(errno);
+            } else {
+                *addr = (uint8_t *)*base + alignmentBytes;
+            }
+        }
+        return err;
+    }
+
     int mIonFd;
     C2HandleIon mHandle;
     ion_user_handle_t mBuffer;
@@ -364,6 +352,93 @@ private:
     };
     std::list<Mapping> mMappings;
 };
+
+class C2AllocationIon::ImplV2 : public C2AllocationIon::Impl {
+public:
+    /**
+     * Constructs an ion allocation for platforms with new (ion_4.12.h) api
+     *
+     * \note We always create an ion allocation, even if the allocation or import fails
+     * so that we can capture the error.
+     *
+     * \param ionFd     ion client (ownership transferred to created object)
+     * \param capacity  size of allocation
+     * \param bufferFd  buffer handle (ownership transferred to created object). Must be
+     *                  invalid if err is not 0.
+     * \param err       errno during buffer allocation or import
+     */
+    ImplV2(int ionFd, size_t capacity, int bufferFd, C2Allocator::id_t id, int err)
+        : Impl(ionFd, capacity, bufferFd, -1 /*buffer*/, id, err) {
+    }
+
+    virtual ~ImplV2() = default;
+
+    virtual ion_user_handle_t ionHandle() const {
+        return mHandle.bufferFd();
+    }
+
+protected:
+    virtual c2_status_t mapInternal(size_t mapSize, size_t mapOffset, size_t alignmentBytes,
+            int prot, int flags, void** base, void** addr) {
+        c2_status_t err = C2_OK;
+        *base = mmap(nullptr, mapSize, prot, flags, mHandle.bufferFd(), mapOffset);
+        ALOGV("mmapV2(size = %zu, prot = %d, flags = %d, mapFd = %d, offset = %zu) "
+              "returned (%d)",
+              mapSize, prot, flags, mHandle.bufferFd(), mapOffset, errno);
+        if (*base == MAP_FAILED) {
+            *base = *addr = nullptr;
+            err = c2_map_errno<EINVAL>(errno);
+        } else {
+            *addr = (uint8_t *)*base + alignmentBytes;
+        }
+        return err;
+    }
+
+};
+
+C2AllocationIon::Impl *C2AllocationIon::Impl::Import(int ionFd, size_t capacity, int bufferFd,
+        C2Allocator::id_t id) {
+    int ret = 0;
+    if (ion_is_legacy(ionFd)) {
+        ion_user_handle_t buffer = -1;
+        ret = ion_import(ionFd, bufferFd, &buffer);
+        return new Impl(ionFd, capacity, bufferFd, buffer, id, ret);
+    } else {
+        return new ImplV2(ionFd, capacity, bufferFd, id, ret);
+    }
+}
+
+C2AllocationIon::Impl *C2AllocationIon::Impl::Alloc(int ionFd, size_t size, size_t align,
+        unsigned heapMask, unsigned flags, C2Allocator::id_t id) {
+    int bufferFd = -1;
+    ion_user_handle_t buffer = -1;
+    size_t alignedSize = align == 0 ? size : (size + align - 1) & ~(align - 1);
+    int ret;
+
+    if (ion_is_legacy(ionFd)) {
+        ret = ion_alloc(ionFd, alignedSize, align, heapMask, flags, &buffer);
+        ALOGV("ion_alloc(ionFd = %d, size = %zu, align = %zu, prot = %d, flags = %d) "
+              "returned (%d) ; buffer = %d",
+              ionFd, alignedSize, align, heapMask, flags, ret, buffer);
+        if (ret == 0) {
+            // get buffer fd for native handle constructor
+            ret = ion_share(ionFd, buffer, &bufferFd);
+            if (ret != 0) {
+                ion_free(ionFd, buffer);
+                buffer = -1;
+            }
+        }
+        return new Impl(ionFd, alignedSize, bufferFd, buffer, id, ret);
+
+    } else {
+        ret = ion_alloc_fd(ionFd, alignedSize, align, heapMask, flags, &bufferFd);
+        ALOGV("ion_alloc_fd(ionFd = %d, size = %zu, align = %zu, prot = %d, flags = %d) "
+              "returned (%d) ; bufferFd = %d",
+              ionFd, alignedSize, align, heapMask, flags, ret, bufferFd);
+
+        return new ImplV2(ionFd, alignedSize, bufferFd, id, ret);
+    }
+}
 
 c2_status_t C2AllocationIon::map(
     size_t offset, size_t size, C2MemoryUsage usage, C2Fence *fence, void **addr) {

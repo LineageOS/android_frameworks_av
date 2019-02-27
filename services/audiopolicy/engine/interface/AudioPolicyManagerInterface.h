@@ -18,6 +18,7 @@
 
 #include <AudioPolicyManagerObserver.h>
 #include <media/AudioProductStrategy.h>
+#include <media/AudioVolumeGroup.h>
 #include <IVolumeCurves.h>
 #include <policy.h>
 #include <Volume.h>
@@ -32,7 +33,7 @@ namespace android {
 
 using DeviceStrategyMap = std::map<product_strategy_t, DeviceVector>;
 using StrategyVector = std::vector<product_strategy_t>;
-
+using VolumeGroupVector = std::vector<volume_group_t>;
 
 /**
  * This interface is dedicated to the policy manager that a Policy Engine shall implement.
@@ -182,6 +183,7 @@ public:
 
     /**
      * @brief getAttributesForStream get the audio attributes from legacy stream type
+     * Attributes returned might only be used to check upon routing decision, not volume decisions.
      * @param stream to consider
      * @return audio attributes matching the legacy stream type
      */
@@ -241,14 +243,58 @@ public:
      * @param attr to be considered
      * @return IVolumeCurves interface pointer if found, nullptr otherwise
      */
-    virtual IVolumeCurves *getVolumeCurvesForAttributes(const audio_attributes_t &attr) = 0;
+    virtual IVolumeCurves *getVolumeCurvesForAttributes(const audio_attributes_t &attr) const = 0;
 
     /**
      * @brief getVolumeCurvesForStreamType retrieves the Volume Curves interface for the stream
      * @param stream to be considered
      * @return IVolumeCurves interface pointer if found, nullptr otherwise
      */
-    virtual IVolumeCurves *getVolumeCurvesForStreamType(audio_stream_type_t stream) = 0;
+    virtual IVolumeCurves *getVolumeCurvesForStreamType(audio_stream_type_t stream) const = 0;
+
+    /**
+     * @brief getVolumeCurvesForVolumeGroup retrieves the Volume Curves interface for volume group
+     * @param group to be considered
+     * @return IVolumeCurves interface pointer if found, nullptr otherwise
+     */
+    virtual IVolumeCurves *getVolumeCurvesForVolumeGroup(volume_group_t group) const = 0;
+
+    /**
+     * @brief getVolumeGroups retrieves the collection of volume groups.
+     * @return vector of volume groups
+     */
+    virtual VolumeGroupVector getVolumeGroups() const = 0;
+
+    /**
+     * @brief getVolumeGroupForAttributes gets the appropriate volume group to be used for a given
+     * Audio Attributes.
+     * @param attr to be considered
+     * @return volume group associated to the given audio attributes, default group if none
+     * applicable, VOLUME_GROUP_NONE if no default group defined.
+     */
+    virtual volume_group_t getVolumeGroupForAttributes(const audio_attributes_t &attr) const = 0;
+
+    /**
+     * @brief getVolumeGroupForStreamType gets the appropriate volume group to be used for a given
+     * legacy stream type
+     * @param stream type to be considered
+     * @return volume group associated to the given stream type, default group if none applicable,
+     * VOLUME_GROUP_NONE if no default group defined.
+     */
+    virtual volume_group_t getVolumeGroupForStreamType(audio_stream_type_t stream) const = 0;
+
+    virtual StreamTypeVector getStreamTypesForVolumeGroup(volume_group_t volumeGroup) const = 0;
+
+    virtual AttributesVector getAllAttributesForVolumeGroup(volume_group_t volumeGroup) const = 0;
+
+    /**
+     * @brief listAudioVolumeGroups introspection API to get the Audio Volume Groups, aka
+     * former stream aliases in Audio Service, defining volume curves attached to one or more
+     * Audio Attributes.
+     * @param groups
+     * @return NO_ERROR if the volume groups were retrieved successfully, error code otherwise
+     */
+    virtual status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups) const = 0;
 
     virtual void dump(String8 *dst) const = 0;
 

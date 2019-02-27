@@ -21,6 +21,7 @@
 #include <math.h>
 
 namespace android {
+
 /**
  * VolumeSource is the discriminent for volume management on an output.
  * It used to be the stream type by legacy, it may be host volume group or a volume curves if

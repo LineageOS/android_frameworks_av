@@ -32,6 +32,7 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaCodec.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaCodecSource.h>
 #include <media/stagefright/MediaErrors.h>
@@ -362,7 +363,7 @@ sp<MediaCodecSource> MediaCodecSource::Create(
 
 status_t MediaCodecSource::setInputBufferTimeOffset(int64_t timeOffsetUs) {
     sp<AMessage> msg = new AMessage(kWhatSetInputBufferTimeOffset, mReflector);
-    msg->setInt64("time-offset-us", timeOffsetUs);
+    msg->setInt64(PARAMETER_KEY_OFFSET_TIME, timeOffsetUs);
     return postSynchronouslyAndReturnError(msg);
 }
 
@@ -490,7 +491,7 @@ status_t MediaCodecSource::initEncoder() {
     mCodecLooper->start();
 
     if (mFlags & FLAG_USE_SURFACE_INPUT) {
-        mOutputFormat->setInt32("create-input-buffers-suspended", 1);
+        mOutputFormat->setInt32(KEY_CREATE_INPUT_SURFACE_SUSPENDED, 1);
     }
 
     AString outputMIME;
@@ -677,9 +678,9 @@ void MediaCodecSource::resume(int64_t resumeStartTimeUs) {
     CHECK(mFlags & FLAG_USE_SURFACE_INPUT);
     if (mEncoder != NULL) {
         sp<AMessage> params = new AMessage;
-        params->setInt32("drop-input-frames", false);
+        params->setInt32(PARAMETER_KEY_SUSPEND, false);
         if (resumeStartTimeUs > 0) {
-            params->setInt64("drop-start-time-us", resumeStartTimeUs);
+            params->setInt64(PARAMETER_KEY_SUSPEND_TIME, resumeStartTimeUs);
         }
         mEncoder->setParameters(params);
     }
@@ -799,7 +800,7 @@ status_t MediaCodecSource::onStart(MetaData *params) {
     if (mFlags & FLAG_USE_SURFACE_INPUT) {
         if (mEncoder != NULL) {
             sp<AMessage> params = new AMessage;
-            params->setInt32("drop-input-frames", false);
+            params->setInt32(PARAMETER_KEY_SUSPEND, false);
             if (startTimeUs >= 0) {
                 params->setInt64("skip-frames-before", startTimeUs);
             }
@@ -832,8 +833,8 @@ status_t MediaCodecSource::onStart(MetaData *params) {
 void MediaCodecSource::onPause(int64_t pauseStartTimeUs) {
     if ((mFlags & FLAG_USE_SURFACE_INPUT) && (mEncoder != NULL)) {
         sp<AMessage> params = new AMessage;
-        params->setInt32("drop-input-frames", true);
-        params->setInt64("drop-start-time-us", pauseStartTimeUs);
+        params->setInt32(PARAMETER_KEY_SUSPEND, true);
+        params->setInt64(PARAMETER_KEY_SUSPEND_TIME, pauseStartTimeUs);
         mEncoder->setParameters(params);
     } else {
         CHECK(mPuller != NULL);
@@ -1096,12 +1097,12 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
         sp<AReplyToken> replyID;
         CHECK(msg->senderAwaitsResponse(&replyID));
         status_t err = OK;
-        CHECK(msg->findInt64("time-offset-us", &mInputBufferTimeOffsetUs));
+        CHECK(msg->findInt64(PARAMETER_KEY_OFFSET_TIME, &mInputBufferTimeOffsetUs));
 
         // Propagate the timestamp offset to GraphicBufferSource.
         if (mFlags & FLAG_USE_SURFACE_INPUT) {
             sp<AMessage> params = new AMessage;
-            params->setInt64("time-offset-us", mInputBufferTimeOffsetUs);
+            params->setInt64(PARAMETER_KEY_OFFSET_TIME, mInputBufferTimeOffsetUs);
             err = mEncoder->setParameters(params);
         }
 

@@ -27,7 +27,7 @@ enum product_strategy_t : uint32_t;
 const product_strategy_t PRODUCT_STRATEGY_NONE = static_cast<product_strategy_t>(-1);
 
 using AttributesVector = std::vector<audio_attributes_t>;
-using StreamTypes = std::vector<audio_stream_type_t>;
+using StreamTypeVector = std::vector<audio_stream_type_t>;
 
 constexpr bool operator==(const audio_attributes_t &lhs, const audio_attributes_t &rhs)
 {
@@ -38,5 +38,9 @@ constexpr bool operator!=(const audio_attributes_t &lhs, const audio_attributes_
 {
     return !(lhs==rhs);
 }
+
+enum volume_group_t : uint32_t;
+static const volume_group_t VOLUME_GROUP_NONE = static_cast<volume_group_t>(-1);
+
 } // namespace android
 

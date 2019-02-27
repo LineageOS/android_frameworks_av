@@ -40,6 +40,7 @@ using StreamVector = std::vector<audio_stream_type_t>;
 struct AttributesGroup {
     std::string name;
     audio_stream_type_t stream;
+    std::string volumeGroup;
     AttributesVector attributesVect;
 };
 
@@ -59,7 +60,6 @@ using VolumeCurves = std::vector<VolumeCurve>;
 
 struct VolumeGroup {
     std::string name;
-    std::string stream;
     int indexMin;
     int indexMax;
     VolumeCurves volumeCurves;

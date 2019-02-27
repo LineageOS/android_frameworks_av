@@ -66,9 +66,7 @@ void AudioPolicyMix::dump(String8 *dst, int spaces, int index) const
     RouteFlagTypeConverter::maskToString(mMix.mRouteFlags, routeFlagLiteral);
     dst->appendFormat("%*s- Route Flags: %s\n", spaces, "", routeFlagLiteral.c_str());
 
-    std::string deviceLiteral;
-    deviceToString(mMix.mDeviceType, deviceLiteral);
-    dst->appendFormat("%*s- device type: %s\n", spaces, "", deviceLiteral.c_str());
+    dst->appendFormat("%*s- device type: %s\n", spaces, "", toString(mMix.mDeviceType).c_str());
 
     dst->appendFormat("%*s- device address: %s\n", spaces, "", mMix.mDeviceAddress.string());
 

@@ -33,8 +33,8 @@
 #define AUDIO_POLICY_XML_CONFIG_FILE_NAME "audio_policy_configuration.xml"
 #define AUDIO_POLICY_A2DP_OFFLOAD_DISABLED_XML_CONFIG_FILE_NAME \
         "audio_policy_configuration_a2dp_offload_disabled.xml"
-#define AUDIO_POLICY_BLUETOOTH_HAL_ENABLED_XML_CONFIG_FILE_NAME \
-        "audio_policy_configuration_bluetooth_hal_enabled.xml"
+#define AUDIO_POLICY_BLUETOOTH_LEGACY_HAL_XML_CONFIG_FILE_NAME \
+        "audio_policy_configuration_bluetooth_legacy_hal.xml"
 
 #include <inttypes.h>
 #include <math.h>
@@ -377,7 +377,7 @@ audio_policy_dev_state_t AudioPolicyManager::getDeviceConnectionState(audio_devi
                                            (strlen(device_address) != 0)/*matchAddress*/);
 
     if (devDesc == 0) {
-        ALOGW("getDeviceConnectionState() undeclared device, type %08x, address: %s",
+        ALOGV("getDeviceConnectionState() undeclared device, type %08x, address: %s",
               device, device_address);
         return AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE;
     }
@@ -2373,16 +2373,13 @@ void AudioPolicyManager::closeAllInputs() {
     }
 }
 
-void AudioPolicyManager::initStreamVolume(audio_stream_type_t stream,
-                                            int indexMin,
-                                            int indexMax)
+void AudioPolicyManager::initStreamVolume(audio_stream_type_t stream, int indexMin, int indexMax)
 {
     ALOGV("initStreamVolume() stream %d, min %d, max %d", stream , indexMin, indexMax);
     if (indexMin < 0 || indexMax < 0) {
         ALOGE("%s for stream %d: invalid min %d or max %d", __func__, stream , indexMin, indexMax);
         return;
     }
-    // @todo: our proposal now use XML to store Indexes Min & Max
     getVolumeCurves(stream).initVolume(indexMin, indexMax);
 
     // initialize other private stream volumes which follow this one
@@ -4080,17 +4077,17 @@ static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
     status_t ret;
 
     if (property_get_bool("ro.bluetooth.a2dp_offload.supported", false)) {
-        if (property_get_bool("persist.bluetooth.a2dp_offload.disabled", false)) {
+        if (property_get_bool("persist.bluetooth.bluetooth_audio_hal.disabled", false) &&
+            property_get_bool("persist.bluetooth.a2dp_offload.disabled", false)) {
+            // Both BluetoothAudio@2.0 and BluetoothA2dp@1.0 (Offlaod) are disabled, and uses
+            // the legacy hardware module for A2DP and hearing aid.
+            fileNames.push_back(AUDIO_POLICY_BLUETOOTH_LEGACY_HAL_XML_CONFIG_FILE_NAME);
+        } else if (property_get_bool("persist.bluetooth.a2dp_offload.disabled", false)) {
+            // A2DP offload supported but disabled: try to use special XML file
             fileNames.push_back(AUDIO_POLICY_A2DP_OFFLOAD_DISABLED_XML_CONFIG_FILE_NAME);
-        } else if (property_get_bool("persist.bluetooth.bluetooth_audio_hal.enabled", false)) {
-            // This property persist.bluetooth.bluetooth_audio_hal.enabled is temporary only.
-            // xml files AUDIO_POLICY_BLUETOOTH_HAL_ENABLED_XML_CONFIG_FILE_NAME, although having
-            // the same name, must be different in offload and non offload cases in device
-            // specific configuration file.
-            fileNames.push_back(AUDIO_POLICY_BLUETOOTH_HAL_ENABLED_XML_CONFIG_FILE_NAME);
         }
-    } else if (property_get_bool("persist.bluetooth.bluetooth_audio_hal.enabled", false)) {
-        fileNames.push_back(AUDIO_POLICY_BLUETOOTH_HAL_ENABLED_XML_CONFIG_FILE_NAME);
+    } else if (property_get_bool("persist.bluetooth.bluetooth_audio_hal.disabled", false)) {
+        fileNames.push_back(AUDIO_POLICY_BLUETOOTH_LEGACY_HAL_XML_CONFIG_FILE_NAME);
     }
     fileNames.push_back(AUDIO_POLICY_XML_CONFIG_FILE_NAME);
 

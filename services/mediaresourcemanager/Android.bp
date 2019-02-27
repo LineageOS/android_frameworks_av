@@ -16,8 +16,6 @@ cc_library_shared {
         "liblog",
     ],
 
-    compile_multilib: "32",
-
     include_dirs: ["frameworks/av/include"],
 
     cflags: [

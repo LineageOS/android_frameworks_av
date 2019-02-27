@@ -43,7 +43,7 @@ status_t AudioAttributes::readFromParcel(const Parcel *parcel)
         strcpy(mAttributes.tags, "");
     }
     mStreamType = static_cast<audio_stream_type_t>(parcel->readInt32());
-    mGroupId = parcel->readUint32();
+    mGroupId = static_cast<volume_group_t>(parcel->readUint32());
     return NO_ERROR;
 }
 
@@ -60,7 +60,7 @@ status_t AudioAttributes::writeToParcel(Parcel *parcel) const
         parcel->writeUtf8AsUtf16(mAttributes.tags);
     }
     parcel->writeInt32(static_cast<int32_t>(mStreamType));
-    parcel->writeUint32(mGroupId);
+    parcel->writeUint32(static_cast<uint32_t>(mGroupId));
     return NO_ERROR;
 }
 

@@ -415,14 +415,6 @@ bool deviceFromString(const std::string& literalDevice, audio_devices_t& device)
             OutputDeviceConverter::fromString(literalDevice, device);
 }
 
-bool deviceToString(audio_devices_t device, std::string& literalDevice) {
-    if (device & AUDIO_DEVICE_BIT_IN) {
-        return InputDeviceConverter::toString(device, literalDevice);
-    } else {
-        return OutputDeviceConverter::toString(device, literalDevice);
-    }
-}
-
 SampleRateTraits::Collection samplingRatesFromString(
         const std::string &samplingRates, const char *del)
 {

@@ -457,52 +457,6 @@ const char *AudioFlinger::ThreadBase::threadTypeToString(AudioFlinger::ThreadBas
     }
 }
 
-std::string devicesToString(audio_devices_t devices)
-{
-    std::string result;
-    if (devices & AUDIO_DEVICE_BIT_IN) {
-        InputDeviceConverter::maskToString(devices, result);
-    } else {
-        OutputDeviceConverter::maskToString(devices, result);
-    }
-    return result;
-}
-
-std::string inputFlagsToString(audio_input_flags_t flags)
-{
-    std::string result;
-    InputFlagConverter::maskToString(flags, result);
-    return result;
-}
-
-std::string outputFlagsToString(audio_output_flags_t flags)
-{
-    std::string result;
-    OutputFlagConverter::maskToString(flags, result);
-    return result;
-}
-
-const char *sourceToString(audio_source_t source)
-{
-    switch (source) {
-    case AUDIO_SOURCE_DEFAULT:              return "default";
-    case AUDIO_SOURCE_MIC:                  return "mic";
-    case AUDIO_SOURCE_VOICE_UPLINK:         return "voice uplink";
-    case AUDIO_SOURCE_VOICE_DOWNLINK:       return "voice downlink";
-    case AUDIO_SOURCE_VOICE_CALL:           return "voice call";
-    case AUDIO_SOURCE_CAMCORDER:            return "camcorder";
-    case AUDIO_SOURCE_VOICE_RECOGNITION:    return "voice recognition";
-    case AUDIO_SOURCE_VOICE_COMMUNICATION:  return "voice communication";
-    case AUDIO_SOURCE_REMOTE_SUBMIX:        return "remote submix";
-    case AUDIO_SOURCE_UNPROCESSED:          return "unprocessed";
-    case AUDIO_SOURCE_VOICE_PERFORMANCE:    return "voice performance";
-    case AUDIO_SOURCE_ECHO_REFERENCE:       return "echo reference";
-    case AUDIO_SOURCE_FM_TUNER:             return "FM tuner";
-    case AUDIO_SOURCE_HOTWORD:              return "hotword";
-    default:                                return "unknown";
-    }
-}
-
 AudioFlinger::ThreadBase::ThreadBase(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
         audio_devices_t outDevice, audio_devices_t inDevice, type_t type, bool systemReady)
     :   Thread(false /*canCallJava*/),
@@ -717,8 +671,8 @@ void AudioFlinger::ThreadBase::processConfigEvents_l()
             event->mStatus = createAudioPatch_l(&data->mPatch, &data->mHandle);
             const audio_devices_t newDevice = getDevice();
             mLocalLog.log("CFG_EVENT_CREATE_AUDIO_PATCH: old device %#x (%s) new device %#x (%s)",
-                    (unsigned)oldDevice, devicesToString(oldDevice).c_str(),
-                    (unsigned)newDevice, devicesToString(newDevice).c_str());
+                    (unsigned)oldDevice, toString(oldDevice).c_str(),
+                    (unsigned)newDevice, toString(newDevice).c_str());
         } break;
         case CFG_EVENT_RELEASE_AUDIO_PATCH: {
             const audio_devices_t oldDevice = getDevice();
@@ -727,8 +681,8 @@ void AudioFlinger::ThreadBase::processConfigEvents_l()
             event->mStatus = releaseAudioPatch_l(data->mHandle);
             const audio_devices_t newDevice = getDevice();
             mLocalLog.log("CFG_EVENT_RELEASE_AUDIO_PATCH: old device %#x (%s) new device %#x (%s)",
-                    (unsigned)oldDevice, devicesToString(oldDevice).c_str(),
-                    (unsigned)newDevice, devicesToString(newDevice).c_str());
+                    (unsigned)oldDevice, toString(oldDevice).c_str(),
+                    (unsigned)newDevice, toString(newDevice).c_str());
         } break;
         default:
             ALOG_ASSERT(false, "processConfigEvents_l() unknown event type %d", event->mType);
@@ -858,9 +812,9 @@ void AudioFlinger::ThreadBase::dumpBase(int fd, const Vector<String16>& args __u
         dprintf(fd, " none\n");
     }
     // Note: output device may be used by capture threads for effects such as AEC.
-    dprintf(fd, "  Output device: %#x (%s)\n", mOutDevice, devicesToString(mOutDevice).c_str());
-    dprintf(fd, "  Input device: %#x (%s)\n", mInDevice, devicesToString(mInDevice).c_str());
-    dprintf(fd, "  Audio source: %d (%s)\n", mAudioSource, sourceToString(mAudioSource));
+    dprintf(fd, "  Output device: %#x (%s)\n", mOutDevice, toString(mOutDevice).c_str());
+    dprintf(fd, "  Input device: %#x (%s)\n", mInDevice, toString(mInDevice).c_str());
+    dprintf(fd, "  Audio source: %d (%s)\n", mAudioSource, toString(mAudioSource).c_str());
 
     // Dump timestamp statistics for the Thread types that support it.
     if (mType == RECORD
@@ -1885,7 +1839,7 @@ void AudioFlinger::PlaybackThread::dumpInternals(int fd, const Vector<String16>&
     AudioStreamOut *output = mOutput;
     audio_output_flags_t flags = output != NULL ? output->flags : AUDIO_OUTPUT_FLAG_NONE;
     dprintf(fd, "  AudioStreamOut: %p flags %#x (%s)\n",
-            output, flags, outputFlagsToString(flags).c_str());
+            output, flags, toString(flags).c_str());
     dprintf(fd, "  Frames written: %lld\n", (long long)mFramesWritten);
     dprintf(fd, "  Suspended frames: %lld\n", (long long)mSuspendedFrames);
     if (mPipeSink.get() != nullptr) {
@@ -7769,7 +7723,7 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
     AudioStreamIn *input = mInput;
     audio_input_flags_t flags = input != NULL ? input->flags : AUDIO_INPUT_FLAG_NONE;
     dprintf(fd, "  AudioStreamIn: %p flags %#x (%s)\n",
-            input, flags, inputFlagsToString(flags).c_str());
+            input, flags, toString(flags).c_str());
     dprintf(fd, "  Frames read: %lld\n", (long long)mFramesRead);
     if (mActiveTracks.isEmpty()) {
         dprintf(fd, "  No active record clients\n");

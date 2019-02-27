@@ -450,28 +450,14 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
     return NO_ERROR;
 }
 
-// this is replicated from frameworks/av/media/libaudioclient/AudioRecord.cpp
-// XXX -- figure out how to put it into a common, shared location
-
-static std::string audioSourceString(audio_source_t value) {
-    std::string source;
-    if (SourceTypeConverter::toString(value, source)) {
-        return source;
-    }
-    char rawbuffer[16];  // room for "%d"
-    snprintf(rawbuffer, sizeof(rawbuffer), "%d", value);
-    return rawbuffer;
-}
-
 std::string AudioPolicyService::getDeviceTypeStrForPortId(audio_port_handle_t portId) {
-    std::string typeStr;
     struct audio_port port = {};
     port.id = portId;
     status_t status = mAudioPolicyManager->getAudioPort(&port);
     if (status == NO_ERROR && port.type == AUDIO_PORT_TYPE_DEVICE) {
-        deviceToString(port.ext.device.type, typeStr);
+        return toString(port.ext.device.type);
     }
-    return typeStr;
+    return {};
 }
 
 status_t AudioPolicyService::startInput(audio_port_handle_t portId)
@@ -534,7 +520,7 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId)
             item->setInt32(kAudioPolicyStatus, status);
 
             item->setCString(kAudioPolicyRqstSrc,
-                             audioSourceString(client->attributes.source).c_str());
+                             toString(client->attributes.source).c_str());
             item->setInt32(kAudioPolicyRqstSession, client->session);
             if (client->opPackageName.size() != 0) {
                 item->setCString(kAudioPolicyRqstPkg,
@@ -554,7 +540,7 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId)
                 if (other->active) {
                     // keeps the last of the clients marked active
                     item->setCString(kAudioPolicyActiveSrc,
-                                     audioSourceString(other->attributes.source).c_str());
+                                     toString(other->attributes.source).c_str());
                     item->setInt32(kAudioPolicyActiveSession, other->session);
                     if (other->opPackageName.size() != 0) {
                         item->setCString(kAudioPolicyActivePkg,
@@ -1204,13 +1190,32 @@ status_t AudioPolicyService::listAudioProductStrategies(AudioProductStrategyVect
     return mAudioPolicyManager->listAudioProductStrategies(strategies);
 }
 
-product_strategy_t AudioPolicyService::getProductStrategyFromAudioAttributes(
-        const AudioAttributes &aa)
+status_t AudioPolicyService::getProductStrategyFromAudioAttributes(
+        const AudioAttributes &aa, product_strategy_t &productStrategy)
 {
     if (mAudioPolicyManager == NULL) {
-        return PRODUCT_STRATEGY_NONE;
+        return NO_INIT;
     }
     Mutex::Autolock _l(mLock);
-    return mAudioPolicyManager->getProductStrategyFromAudioAttributes(aa);
+    return mAudioPolicyManager->getProductStrategyFromAudioAttributes(aa, productStrategy);
+}
+
+status_t AudioPolicyService::listAudioVolumeGroups(AudioVolumeGroupVector &groups)
+{
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    return mAudioPolicyManager->listAudioVolumeGroups(groups);
+}
+
+status_t AudioPolicyService::getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
+                                                               volume_group_t &volumeGroup)
+{
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    return mAudioPolicyManager->getVolumeGroupFromAudioAttributes(aa, volumeGroup);
 }
 } // namespace android

@@ -143,9 +143,17 @@ public:
         virtual status_t stopInput(audio_port_handle_t portId);
         virtual void releaseInput(audio_port_handle_t portId);
         virtual void closeAllInputs();
-        virtual void initStreamVolume(audio_stream_type_t stream,
-                                                    int indexMin,
-                                                    int indexMax);
+        /**
+         * @brief initStreamVolume: even if the engine volume files provides min and max, keep this
+         * api for compatibility reason.
+         * AudioServer will get the min and max and may overwrite them if:
+         *      -using property (highest priority)
+         *      -not defined (-1 by convention), case when still using apm volume tables XML files
+         * @param stream to be considered
+         * @param indexMin to set
+         * @param indexMax to set
+         */
+        virtual void initStreamVolume(audio_stream_type_t stream, int indexMin, int indexMax);
         virtual status_t setStreamVolumeIndex(audio_stream_type_t stream,
                                               int index,
                                               audio_devices_t device);
@@ -260,9 +268,23 @@ public:
             return mEngine->listAudioProductStrategies(strategies);
         }
 
-        virtual product_strategy_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa)
+        virtual status_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa,
+                                                               product_strategy_t &productStrategy)
         {
-            return mEngine->getProductStrategyForAttributes(aa.getAttributes());
+            productStrategy = mEngine->getProductStrategyForAttributes(aa.getAttributes());
+            return productStrategy != PRODUCT_STRATEGY_NONE ? NO_ERROR : BAD_VALUE;
+        }
+
+        virtual status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups)
+        {
+            return mEngine->listAudioVolumeGroups(groups);
+        }
+
+        virtual status_t getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
+                                                           volume_group_t &volumeGroup)
+        {
+            volumeGroup = mEngine->getVolumeGroupForAttributes(aa.getAttributes());
+            return volumeGroup != VOLUME_GROUP_NONE ? NO_ERROR : BAD_VALUE;
         }
 
 protected:
