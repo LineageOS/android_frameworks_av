@@ -21,6 +21,7 @@
 
 #include <media/AudioPolicy.h>
 #include <media/AudioProductStrategy.h>
+#include <media/AudioVolumeGroup.h>
 #include <media/AudioIoDescriptor.h>
 #include <media/IAudioFlingerClient.h>
 #include <media/IAudioPolicyServiceClient.h>
@@ -367,10 +368,16 @@ public:
     static bool     isHapticPlaybackSupported();
 
     static status_t listAudioProductStrategies(AudioProductStrategyVector &strategies);
-    static product_strategy_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa);
+    static status_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa,
+                                                        product_strategy_t &productStrategy);
 
     static audio_attributes_t streamTypeToAttributes(audio_stream_type_t stream);
     static audio_stream_type_t attributesToStreamType(const audio_attributes_t &attr);
+
+    static status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups);
+
+    static status_t getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
+                                                      volume_group_t &volumeGroup);
 
     // ----------------------------------------------------------------------------
 

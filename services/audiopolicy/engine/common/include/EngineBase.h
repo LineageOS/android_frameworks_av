@@ -88,6 +88,8 @@ public:
 
     AttributesVector getAllAttributesForVolumeGroup(volume_group_t volumeGroup) const override;
 
+    status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups) const override;
+
     void dump(String8 *dst) const override;
 
 

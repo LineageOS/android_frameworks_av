@@ -268,9 +268,23 @@ public:
             return mEngine->listAudioProductStrategies(strategies);
         }
 
-        virtual product_strategy_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa)
+        virtual status_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa,
+                                                               product_strategy_t &productStrategy)
         {
-            return mEngine->getProductStrategyForAttributes(aa.getAttributes());
+            productStrategy = mEngine->getProductStrategyForAttributes(aa.getAttributes());
+            return productStrategy != PRODUCT_STRATEGY_NONE ? NO_ERROR : BAD_VALUE;
+        }
+
+        virtual status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups)
+        {
+            return mEngine->listAudioVolumeGroups(groups);
+        }
+
+        virtual status_t getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
+                                                           volume_group_t &volumeGroup)
+        {
+            volumeGroup = mEngine->getVolumeGroupForAttributes(aa.getAttributes());
+            return volumeGroup != VOLUME_GROUP_NONE ? NO_ERROR : BAD_VALUE;
         }
 
 protected:
