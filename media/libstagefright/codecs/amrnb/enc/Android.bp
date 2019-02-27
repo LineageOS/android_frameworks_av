@@ -62,7 +62,7 @@ cc_library_static {
         "src/ton_stab.cpp",
     ],
 
-    include_dirs: ["frameworks/av/media/libstagefright/include"],
+    header_libs: ["libstagefright_headers"],
     export_include_dirs: ["src"],
 
     cflags: [
@@ -86,20 +86,11 @@ cc_library_static {
 
 cc_library_shared {
     name: "libstagefright_soft_amrnbenc",
-    vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
+    defaults: ["libstagefright_softomx-defaults"],
 
     srcs: ["SoftAMRNBEncoder.cpp"],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include/media/openmax",
-    ],
     local_include_dirs: ["src"],
-
-    cflags: ["-Werror"],
 
     //addressing b/25409744
     //sanitize: {
@@ -110,12 +101,9 @@ cc_library_shared {
 
     static_libs: ["libstagefright_amrnbenc"],
 
-    defaults: ["omx_soft_libs"],
-
     shared_libs: [
         "libstagefright_amrnb_common",
     ],
-    compile_multilib: "32",
 }
 
 //###############################################################################

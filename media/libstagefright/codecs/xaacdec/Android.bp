@@ -1,18 +1,12 @@
 cc_library_shared {
     name: "libstagefright_soft_xaacdec",
-    vendor_available: true,
+    defaults: ["libstagefright_softomx-defaults"],
 
     srcs: [
         "SoftXAAC.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include/media/openmax",
-    ],
-
     cflags: [
-        "-Werror",
         "-DENABLE_MPEG_D_DRC"
     ],
 
@@ -24,11 +18,7 @@ cc_library_shared {
 
     static_libs: ["libxaacdec"],
 
-    defaults: ["omx_soft_libs"],
-
     shared_libs: [
         "libcutils",
     ],
-
-    compile_multilib: "32",
 }

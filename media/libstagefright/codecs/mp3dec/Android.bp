@@ -78,23 +78,14 @@ cc_library_static {
 
 cc_library_shared {
     name: "libstagefright_soft_mp3dec",
-    vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
+    defaults: ["libstagefright_softomx-defaults"],
 
     srcs: ["SoftMP3.cpp"],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include/media/openmax",
-    ],
     local_include_dirs: [
         "src",
         "include",
     ],
-
-    cflags: ["-Werror"],
 
     version_script: "exports.lds",
 
@@ -105,10 +96,7 @@ cc_library_shared {
         cfi: true,
     },
 
-    defaults: ["omx_soft_libs"],
-
     static_libs: ["libstagefright_mp3dec"],
-    compile_multilib: "32",
 }
 
 //###############################################################################
