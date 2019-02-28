@@ -12,10 +12,6 @@ LOCAL_SRC_FILES := \
     src/EngineInstance.cpp \
     src/Stream.cpp \
     src/InputSource.cpp \
-    ../engine/common/src/VolumeCurve.cpp \
-    ../engine/common/src/VolumeGroup.cpp \
-    ../engine/common/src/ProductStrategy.cpp \
-    ../engine/common/src/EngineBase.cpp
 
 audio_policy_engine_includes_common := \
     frameworks/av/services/audiopolicy/engineconfigurable/include \
@@ -37,7 +33,6 @@ LOCAL_C_INCLUDES := \
 
 LOCAL_HEADER_LIBRARIES := \
     libaudiopolicycommon \
-    libaudiopolicyengine_common_headers \
     libaudiopolicyengine_interface_headers
 
 LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
@@ -47,13 +42,15 @@ LOCAL_MODULE_TAGS := optional
 
 LOCAL_STATIC_LIBRARIES := \
     libaudiopolicypfwwrapper \
-    libaudiopolicycomponents
+    libaudiopolicycomponents \
+    libaudiopolicyengine_common \
+    libaudiopolicyengine_config \
 
 LOCAL_SHARED_LIBRARIES := \
-    libaudiopolicyengineconfig \
     liblog \
     libutils \
     liblog \
+    libcutils \
     libaudioutils \
     libparameter \
     libmedia_helper \
