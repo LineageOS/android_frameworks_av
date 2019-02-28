@@ -2847,12 +2847,19 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
         }
         streams.add(outputStream);
 
-        if (outputStream->format == HAL_PIXEL_FORMAT_BLOB &&
-                outputStream->data_space == HAL_DATASPACE_V0_JFIF) {
+        if (outputStream->format == HAL_PIXEL_FORMAT_BLOB) {
             size_t k = i + ((mInputStream != nullptr) ? 1 : 0); // Input stream if present should
                                                                 // always occupy the initial entry.
-            bufferSizes[k] = static_cast<uint32_t>(
-                    getJpegBufferSize(outputStream->width, outputStream->height));
+            if (outputStream->data_space == HAL_DATASPACE_V0_JFIF) {
+                bufferSizes[k] = static_cast<uint32_t>(
+                        getJpegBufferSize(outputStream->width, outputStream->height));
+            } else if (outputStream->data_space ==
+                    static_cast<android_dataspace>(HAL_DATASPACE_JPEG_APP_SEGMENTS)) {
+                bufferSizes[k] = outputStream->width * outputStream->height;
+            } else {
+                ALOGW("%s: Blob dataSpace %d not supported",
+                        __FUNCTION__, outputStream->data_space);
+            }
         }
     }
 
