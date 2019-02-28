@@ -842,6 +842,12 @@ void AudioFlinger::ThreadBase::dumpBase(int fd, const Vector<String16>& args __u
                 mIoJitterMs.toString().c_str());
     }
 
+    if (mLatencyMs.getN() > 0) {
+        dprintf(fd, "  Threadloop %s latency stats: %s\n",
+                isOutput() ? "write" : "read",
+                mLatencyMs.toString().c_str());
+    }
+
     if (locked) {
         mLock.unlock();
     }
@@ -3380,6 +3386,14 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                     }
                 }
             }
+
+            if (audio_has_proportional_frames(mFormat)) {
+                const double latencyMs = mTimestamp.getOutputServerLatencyMs(mSampleRate);
+                if (latencyMs != 0.) { // note 0. means timestamp is empty.
+                    mLatencyMs.add(latencyMs);
+                }
+            }
+
             } // if (mType ... ) { // no indentation
 #if 0
             // logFormat example
@@ -5296,13 +5310,6 @@ void AudioFlinger::MixerThread::dumpInternals(int fd, const Vector<String16>& ar
     dprintf(fd, "  Master balance: %f (%s)\n", mMasterBalance.load(),
             (hasFastMixer() ? std::to_string(mFastMixer->getMasterBalance())
                             : mBalance.toString()).c_str());
-    const double latencyMs = mTimestamp.getOutputServerLatencyMs(mSampleRate);
-    if (latencyMs != 0.) {
-        dprintf(fd, "  NormalMixer latency ms: %.2lf\n", latencyMs);
-    } else {
-        dprintf(fd, "  NormalMixer latency ms: unavail\n");
-    }
-
     if (hasFastMixer()) {
         dprintf(fd, "  FastMixer thread %p tid=%d", mFastMixer.get(), mFastMixer->getTid());
 
@@ -7042,6 +7049,15 @@ reacquire_wakelock:
                 mTimestampVerifier.error();
             }
         }
+
+        // From the timestamp, input read latency is negative output write latency.
+        const audio_input_flags_t flags = mInput != NULL ? mInput->flags : AUDIO_INPUT_FLAG_NONE;
+        const double latencyMs = RecordTrack::checkServerLatencySupported(mFormat, flags)
+                ? - mTimestamp.getOutputServerLatencyMs(mSampleRate) : 0.;
+        if (latencyMs != 0.) { // note 0. means timestamp is empty.
+            mLatencyMs.add(latencyMs);
+        }
+
         // Use this to track timestamp information
         // ALOGD("%s", mTimestamp.toString().c_str());
 
@@ -7732,14 +7748,6 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
     if (input != nullptr) {
         dprintf(fd, "  Hal stream dump:\n");
         (void)input->stream->dump(fd);
-    }
-
-    const double latencyMs = RecordTrack::checkServerLatencySupported(mFormat, flags)
-            ? - mTimestamp.getOutputServerLatencyMs(mSampleRate) : 0.;
-    if (latencyMs != 0.) {
-        dprintf(fd, "  NormalRecord latency ms: %.2lf\n", latencyMs);
-    } else {
-        dprintf(fd, "  NormalRecord latency ms: unavail\n");
     }
 
     dprintf(fd, "  Fast capture thread: %s\n", hasFastCapture() ? "yes" : "no");

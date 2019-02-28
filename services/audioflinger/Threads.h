@@ -520,6 +520,7 @@ protected:
                 // This should be read under ThreadBase lock (if not on the threadLoop thread).
                 audio_utils::Statistics<double> mIoJitterMs{0.995 /* alpha */};
                 audio_utils::Statistics<double> mProcessTimeMs{0.995 /* alpha */};
+                audio_utils::Statistics<double> mLatencyMs{0.995 /* alpha */};
 
                 bool                    mIsMsdDevice = false;
                 // A condition that must be evaluated by the thread loop has changed and
