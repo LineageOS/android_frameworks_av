@@ -256,7 +256,7 @@ extern "C" int EffectCreate(const effect_uuid_t *uuid,
         pContext->pBundledContext->NumberEffectsEnabled     = 0;
         pContext->pBundledContext->NumberEffectsCalled      = 0;
         pContext->pBundledContext->firstVolume              = LVM_TRUE;
-        pContext->pBundledContext->volume                   = -9600;
+        pContext->pBundledContext->volume                   = -96;
 
         #ifdef LVM_PCM
         char fileName[256];
