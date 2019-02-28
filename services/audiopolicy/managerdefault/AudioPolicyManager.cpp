@@ -1986,7 +1986,11 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
         if (status != NO_ERROR) {
             goto error;
         }
-        *inputType = API_INPUT_MIX_EXT_POLICY_REROUTE;
+        if (is_mix_loopback_render(policyMix->mRouteFlags)) {
+            *inputType = API_INPUT_MIX_PUBLIC_CAPTURE_PLAYBACK;
+        } else {
+            *inputType = API_INPUT_MIX_EXT_POLICY_REROUTE;
+        }
         device = mAvailableInputDevices.getDevice(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
                                                   String8(attr->tags + strlen("addr=")),
                                                   AUDIO_FORMAT_DEFAULT);
