@@ -260,7 +260,7 @@ bool AC4DSIParser::parse() {
 
     int32_t short_program_id = -1;
     if (bitstream_version > 1) {
-        if (ac4_dsi_version == 0){
+        if (ac4_dsi_version == 0) {
             ALOGE("invalid ac4 dsi");
             return false;
         }
@@ -295,6 +295,7 @@ bool AC4DSIParser::parse() {
         bool b_single_substream_group = false;
         uint32_t presentation_config = 0, presentation_version = 0;
         uint32_t pres_bytes = 0;
+        uint64_t start = 0;
 
         if (ac4_dsi_version == 0) {
             CHECK_BITS_LEFT(1 + 5 + 5);
@@ -315,6 +316,8 @@ bool AC4DSIParser::parse() {
                 mBitReader.skipBits(pres_bytes * 8);
                 continue;
             }
+            /* record a marker, less the size of the presentation_config */
+            start = (mDSISize - mBitReader.numBitsLeft()) / 8;
             // ac4_presentation_v0_dsi(), ac4_presentation_v1_dsi() and ac4_presentation_v2_dsi()
             // all start with a presentation_config of 5 bits
             CHECK_BITS_LEFT(5);
@@ -337,9 +340,6 @@ bool AC4DSIParser::parse() {
         ALOGV("%u: presentation_config = %u (%s)\n", presentation, presentation_config,
             (presentation_config >= NELEM(PresentationConfig) ?
             "reserved" : PresentationConfig[presentation_config]));
-
-        /* record a marker, less the size of the presentation_config */
-        uint64_t start = (mDSISize - mBitReader.numBitsLeft()) / 8;
 
         bool b_add_emdf_substreams = false;
         if (!b_single_substream_group && presentation_config == 6) {
@@ -535,14 +535,14 @@ bool AC4DSIParser::parse() {
                     }
                     break;
                 }
-                CHECK_BITS_LEFT(1 + 1);
-                bool b_pre_virtualized = (mBitReader.getBits(1) == 1);
-                mPresentations[presentation].mPreVirtualized = b_pre_virtualized;
-                b_add_emdf_substreams = (mBitReader.getBits(1) == 1);
-                ALOGV("%u: b_pre_virtualized = %s\n", presentation, BOOLSTR(b_pre_virtualized));
-                ALOGV("%u: b_add_emdf_substreams = %s\n", presentation,
-                    BOOLSTR(b_add_emdf_substreams));
             }
+            CHECK_BITS_LEFT(1 + 1);
+            bool b_pre_virtualized = (mBitReader.getBits(1) == 1);
+            mPresentations[presentation].mPreVirtualized = b_pre_virtualized;
+            b_add_emdf_substreams = (mBitReader.getBits(1) == 1);
+            ALOGV("%u: b_pre_virtualized = %s\n", presentation, BOOLSTR(b_pre_virtualized));
+            ALOGV("%u: b_add_emdf_substreams = %s\n", presentation,
+                BOOLSTR(b_add_emdf_substreams));
         }
         if (b_add_emdf_substreams) {
             CHECK_BITS_LEFT(7);
@@ -599,10 +599,6 @@ bool AC4DSIParser::parse() {
 
         if (ac4_dsi_version == 1) {
             uint64_t end = (mDSISize - mBitReader.numBitsLeft()) / 8;
-            if (mBitReader.numBitsLeft() % 8 != 0) {
-                end += 1;
-            }
-
             uint64_t presentation_bytes = end - start;
             uint64_t skip_bytes = pres_bytes - presentation_bytes;
             ALOGV("skipping = %" PRIu64 " bytes", skip_bytes);
@@ -612,7 +608,7 @@ bool AC4DSIParser::parse() {
 
         // we should know this or something is probably wrong
         // with the bitstream (or we don't support it)
-        if (mPresentations[presentation].mChannelMode == -1){
+        if (mPresentations[presentation].mChannelMode == -1) {
             ALOGE("could not determing channel mode of presentation %d", presentation);
             return false;
         }
