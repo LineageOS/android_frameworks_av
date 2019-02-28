@@ -150,6 +150,20 @@ void AudioPolicyService::setAudioPortCallbacksEnabled(bool enabled)
     mNotificationClients.valueFor(token)->setAudioPortCallbacksEnabled(enabled);
 }
 
+void AudioPolicyService::setAudioVolumeGroupCallbacksEnabled(bool enabled)
+{
+    Mutex::Autolock _l(mNotificationClientsLock);
+
+    uid_t uid = IPCThreadState::self()->getCallingUid();
+    pid_t pid = IPCThreadState::self()->getCallingPid();
+    int64_t token = ((int64_t)uid<<32) | pid;
+
+    if (mNotificationClients.indexOfKey(token) < 0) {
+        return;
+    }
+    mNotificationClients.valueFor(token)->setAudioVolumeGroupCallbacksEnabled(enabled);
+}
+
 // removeNotificationClient() is called when the client process dies.
 void AudioPolicyService::removeNotificationClient(uid_t uid, pid_t pid)
 {
@@ -197,6 +211,19 @@ void AudioPolicyService::doOnAudioPatchListUpdate()
     Mutex::Autolock _l(mNotificationClientsLock);
     for (size_t i = 0; i < mNotificationClients.size(); i++) {
         mNotificationClients.valueAt(i)->onAudioPatchListUpdate();
+    }
+}
+
+void AudioPolicyService::onAudioVolumeGroupChanged(volume_group_t group, int flags)
+{
+    mOutputCommandThread->changeAudioVolumeGroupCommand(group, flags);
+}
+
+void AudioPolicyService::doOnAudioVolumeGroupChanged(volume_group_t group, int flags)
+{
+    Mutex::Autolock _l(mNotificationClientsLock);
+    for (size_t i = 0; i < mNotificationClients.size(); i++) {
+        mNotificationClients.valueAt(i)->onAudioVolumeGroupChanged(group, flags);
     }
 }
 
@@ -270,7 +297,7 @@ AudioPolicyService::NotificationClient::NotificationClient(const sp<AudioPolicyS
                                                      uid_t uid,
                                                      pid_t pid)
     : mService(service), mUid(uid), mPid(pid), mAudioPolicyServiceClient(client),
-      mAudioPortCallbacksEnabled(false)
+      mAudioPortCallbacksEnabled(false), mAudioVolumeGroupCallbacksEnabled(false)
 {
 }
 
@@ -301,6 +328,15 @@ void AudioPolicyService::NotificationClient::onAudioPatchListUpdate()
     }
 }
 
+void AudioPolicyService::NotificationClient::onAudioVolumeGroupChanged(volume_group_t group, 
+                                                                      int flags)
+{
+    if (mAudioPolicyServiceClient != 0 && mAudioVolumeGroupCallbacksEnabled) {
+        mAudioPolicyServiceClient->onAudioVolumeGroupChanged(group, flags);
+    }
+}
+
+
 void AudioPolicyService::NotificationClient::onDynamicPolicyMixStateUpdate(
         const String8& regId, int32_t state)
 {
@@ -330,6 +366,10 @@ void AudioPolicyService::NotificationClient::setAudioPortCallbacksEnabled(bool e
     mAudioPortCallbacksEnabled = enabled;
 }
 
+void AudioPolicyService::NotificationClient::setAudioVolumeGroupCallbacksEnabled(bool enabled)
+{
+    mAudioVolumeGroupCallbacksEnabled = enabled;
+}
 
 void AudioPolicyService::binderDied(const wp<IBinder>& who) {
     ALOGW("binderDied() %p, calling pid %d", who.unsafe_get(),
@@ -1058,6 +1098,18 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
                     svc->doOnAudioPatchListUpdate();
                     mLock.lock();
                     }break;
+                case CHANGED_AUDIOVOLUMEGROUP: {
+                    AudioVolumeGroupData *data =
+                            static_cast<AudioVolumeGroupData *>(command->mParam.get());
+                    ALOGV("AudioCommandThread() processing update audio volume group");
+                    svc = mService.promote();
+                    if (svc == 0) {
+                        break;
+                    }
+                    mLock.unlock();
+                    svc->doOnAudioVolumeGroupChanged(data->mGroup, data->mFlags);
+                    mLock.lock();
+                    }break;
                 case SET_AUDIOPORT_CONFIG: {
                     SetAudioPortConfigData *data = (SetAudioPortConfigData *)command->mParam.get();
                     ALOGV("AudioCommandThread() processing set port config");
@@ -1299,6 +1351,19 @@ void AudioPolicyService::AudioCommandThread::updateAudioPatchListCommand()
     sp<AudioCommand>command = new AudioCommand();
     command->mCommand = UPDATE_AUDIOPATCH_LIST;
     ALOGV("AudioCommandThread() adding update audio patch list");
+    sendCommand(command);
+}
+
+void AudioPolicyService::AudioCommandThread::changeAudioVolumeGroupCommand(volume_group_t group,
+                                                                           int flags)
+{
+    sp<AudioCommand>command = new AudioCommand();
+    command->mCommand = CHANGED_AUDIOVOLUMEGROUP;
+    AudioVolumeGroupData *data= new AudioVolumeGroupData();
+    data->mGroup = group;
+    data->mFlags = flags;
+    command->mParam = data;
+    ALOGV("AudioCommandThread() adding audio volume group changed");
     sendCommand(command);
 }
 

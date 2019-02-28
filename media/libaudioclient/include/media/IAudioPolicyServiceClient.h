@@ -23,6 +23,8 @@
 #include <binder/IInterface.h>
 #include <system/audio.h>
 #include <system/audio_effect.h>
+#include <media/AudioPolicy.h>
+#include <media/AudioVolumeGroup.h>
 
 namespace android {
 
@@ -45,6 +47,8 @@ class IAudioPolicyServiceClient : public IInterface
 public:
     DECLARE_META_INTERFACE(AudioPolicyServiceClient);
 
+    // Notifies a change of volume group
+    virtual void onAudioVolumeGroupChanged(volume_group_t group, int flags) = 0;
     // Notifies a change of audio port configuration.
     virtual void onAudioPortListUpdate() = 0;
     // Notifies a change of audio patch configuration.

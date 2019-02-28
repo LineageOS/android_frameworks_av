@@ -689,6 +689,53 @@ status_t AudioPolicyService::getStreamVolumeIndex(audio_stream_type_t stream,
                                                     device);
 }
 
+status_t AudioPolicyService::setVolumeIndexForAttributes(const audio_attributes_t &attributes,
+                                                         int index, audio_devices_t device)
+{
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    if (!settingsAllowed()) {
+        return PERMISSION_DENIED;
+    }
+    Mutex::Autolock _l(mLock);
+    AutoCallerClear acc;
+    return mAudioPolicyManager->setVolumeIndexForAttributes(attributes, index, device);
+}
+
+status_t AudioPolicyService::getVolumeIndexForAttributes(const audio_attributes_t &attributes,
+                                                         int &index, audio_devices_t device)
+{
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    AutoCallerClear acc;
+    return mAudioPolicyManager->getVolumeIndexForAttributes(attributes, index, device);
+}
+
+status_t AudioPolicyService::getMinVolumeIndexForAttributes(const audio_attributes_t &attributes,
+                                                            int &index)
+{
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    AutoCallerClear acc;
+    return mAudioPolicyManager->getMinVolumeIndexForAttributes(attributes, index);
+}
+
+status_t AudioPolicyService::getMaxVolumeIndexForAttributes(const audio_attributes_t &attributes,
+                                                            int &index)
+{
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    AutoCallerClear acc;
+    return mAudioPolicyManager->getMaxVolumeIndexForAttributes(attributes, index);
+}
+
 uint32_t AudioPolicyService::getStrategyForStream(audio_stream_type_t stream)
 {
     if (uint32_t(stream) >= AUDIO_STREAM_PUBLIC_CNT) {

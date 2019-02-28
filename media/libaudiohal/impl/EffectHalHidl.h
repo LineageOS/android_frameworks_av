@@ -61,6 +61,8 @@ class EffectHalHidl : public EffectHalInterface
     // Whether it's a local implementation.
     virtual bool isLocal() const { return false; }
 
+    virtual status_t dump(int fd);
+
     uint64_t effectId() const { return mEffectId; }
 
     static void effectDescriptorToHal(

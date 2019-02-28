@@ -33,8 +33,8 @@
 #define AUDIO_POLICY_XML_CONFIG_FILE_NAME "audio_policy_configuration.xml"
 #define AUDIO_POLICY_A2DP_OFFLOAD_DISABLED_XML_CONFIG_FILE_NAME \
         "audio_policy_configuration_a2dp_offload_disabled.xml"
-#define AUDIO_POLICY_BLUETOOTH_LEGACY_HAL_XML_CONFIG_FILE_NAME \
-        "audio_policy_configuration_bluetooth_legacy_hal.xml"
+#define AUDIO_POLICY_BLUETOOTH_HAL_ENABLED_XML_CONFIG_FILE_NAME \
+        "audio_policy_configuration_bluetooth_hal_enabled.xml"
 
 #include <inttypes.h>
 #include <math.h>
@@ -2498,6 +2498,107 @@ status_t AudioPolicyManager::getStreamVolumeIndex(audio_stream_type_t stream,
     return NO_ERROR;
 }
 
+status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_t &attr,
+                                                         int index,
+                                                         audio_devices_t device)
+{
+    // Get Volume group matching the Audio Attributes
+    auto volumeGroup = mEngine->getVolumeGroupForAttributes(attr);
+    if (volumeGroup == VOLUME_GROUP_NONE) {
+        ALOGD("%s: could not find group matching with %s", __FUNCTION__, toString(attr).c_str());
+        return BAD_VALUE;
+    }
+    ALOGD("%s: FOUND group %d matching with %s", __FUNCTION__, volumeGroup, toString(attr).c_str());
+    return setVolumeGroupIndex(getVolumeCurves(attr), volumeGroup, index, device, attr);
+}
+
+status_t AudioPolicyManager::setVolumeGroupIndex(IVolumeCurves &curves, volume_group_t group,
+                                                 int index,
+                                                 audio_devices_t device,
+                                                 const audio_attributes_t /*attributes*/)
+{
+    ALOGVV("%s: group=%d", __func__, group);
+    status_t status = NO_ERROR;
+    setVolumeCurveIndex(group, index, device, curves);
+    // update volume on all outputs and streams matching the following:
+    // - The requested stream (or a stream matching for volume control) is active on the output
+    // - The device (or devices) selected by the engine for this stream includes
+    // the requested device
+    // - For non default requested device, currently selected device on the output is either the
+    // requested device or one of the devices selected by the engine for this stream
+    // - For default requested device (AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME), apply volume only if
+    // no specific device volume value exists for currently selected device.
+    // @TODO
+    mpClientInterface->onAudioVolumeGroupChanged(group, 0 /*flags*/);
+    return status;
+}
+
+status_t AudioPolicyManager::setVolumeCurveIndex(volume_group_t volumeGroup,
+                                                 int index,
+                                                 audio_devices_t device,
+                                                 IVolumeCurves &volumeCurves)
+{
+    // VOICE_CALL stream has minVolumeIndex > 0  but can be muted directly by an
+    // app that has MODIFY_PHONE_STATE permission.
+    // If voice is member of the volume group, it will contaminate all the member of this group
+    auto streams = mEngine->getStreamTypesForVolumeGroup(volumeGroup);
+    if (((index < volumeCurves.getVolumeIndexMin()) && !(hasVoiceStream(streams) && index == 0)) ||
+            (index > volumeCurves.getVolumeIndexMax())) {
+        ALOGD("%s: wrong index %d min=%d max=%d", __FUNCTION__, index,
+              volumeCurves.getVolumeIndexMin(), volumeCurves.getVolumeIndexMax());
+        return BAD_VALUE;
+    }
+    if (!audio_is_output_device(device)) {
+        return BAD_VALUE;
+    }
+
+    // Force max volume if stream cannot be muted
+    if (!volumeCurves.canBeMuted()) index = volumeCurves.getVolumeIndexMax();
+
+    ALOGD("%s device %08x, index %d", __FUNCTION__ , device, index);
+    volumeCurves.addCurrentVolumeIndex(device, index);
+    return NO_ERROR;
+}
+
+status_t AudioPolicyManager::getVolumeIndexForAttributes(const audio_attributes_t &attr,
+                                                         int &index,
+                                                         audio_devices_t device)
+{
+    // if device is AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME, return volume for device selected for this
+    // stream by the engine.
+    if (device == AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) {
+        device = mEngine->getOutputDevicesForAttributes(attr, nullptr, true /*fromCache*/).types();
+    }
+    return getVolumeIndex(getVolumeCurves(attr), index, device);
+}
+
+status_t AudioPolicyManager::getVolumeIndex(const IVolumeCurves &curves,
+                                            int &index,
+                                            audio_devices_t device) const
+{
+    if (!audio_is_output_device(device)) {
+        return BAD_VALUE;
+    }
+    device = Volume::getDeviceForVolume(device);
+    index = curves.getVolumeIndex(device);
+    ALOGV("%s: device %08x index %d", __FUNCTION__, device, index);
+    return NO_ERROR;
+}
+
+status_t AudioPolicyManager::getMinVolumeIndexForAttributes(const audio_attributes_t &attr,
+                                                            int &index)
+{
+    index = getVolumeCurves(attr).getVolumeIndexMin();
+    return NO_ERROR;
+}
+
+status_t AudioPolicyManager::getMaxVolumeIndexForAttributes(const audio_attributes_t &attr,
+                                                            int &index)
+{
+    index = getVolumeCurves(attr).getVolumeIndexMax();
+    return NO_ERROR;
+}
+
 audio_io_handle_t AudioPolicyManager::selectOutputForMusicEffects()
 {
     // select one output among several suitable for global effects.
@@ -4077,17 +4178,17 @@ static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
     status_t ret;
 
     if (property_get_bool("ro.bluetooth.a2dp_offload.supported", false)) {
-        if (property_get_bool("persist.bluetooth.bluetooth_audio_hal.disabled", false) &&
-            property_get_bool("persist.bluetooth.a2dp_offload.disabled", false)) {
-            // Both BluetoothAudio@2.0 and BluetoothA2dp@1.0 (Offlaod) are disabled, and uses
-            // the legacy hardware module for A2DP and hearing aid.
-            fileNames.push_back(AUDIO_POLICY_BLUETOOTH_LEGACY_HAL_XML_CONFIG_FILE_NAME);
-        } else if (property_get_bool("persist.bluetooth.a2dp_offload.disabled", false)) {
-            // A2DP offload supported but disabled: try to use special XML file
+        if (property_get_bool("persist.bluetooth.a2dp_offload.disabled", false)) {
             fileNames.push_back(AUDIO_POLICY_A2DP_OFFLOAD_DISABLED_XML_CONFIG_FILE_NAME);
+        } else if (property_get_bool("persist.bluetooth.bluetooth_audio_hal.enabled", false)) {
+            // This property persist.bluetooth.bluetooth_audio_hal.enabled is temporary only.
+            // xml files AUDIO_POLICY_BLUETOOTH_HAL_ENABLED_XML_CONFIG_FILE_NAME, although having
+            // the same name, must be different in offload and non offload cases in device
+            // specific configuration file.
+            fileNames.push_back(AUDIO_POLICY_BLUETOOTH_HAL_ENABLED_XML_CONFIG_FILE_NAME);
         }
-    } else if (property_get_bool("persist.bluetooth.bluetooth_audio_hal.disabled", false)) {
-        fileNames.push_back(AUDIO_POLICY_BLUETOOTH_LEGACY_HAL_XML_CONFIG_FILE_NAME);
+    } else if (property_get_bool("persist.bluetooth.bluetooth_audio_hal.enabled", false)) {
+        fileNames.push_back(AUDIO_POLICY_BLUETOOTH_HAL_ENABLED_XML_CONFIG_FILE_NAME);
     }
     fileNames.push_back(AUDIO_POLICY_XML_CONFIG_FILE_NAME);
 

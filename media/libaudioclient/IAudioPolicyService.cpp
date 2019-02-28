@@ -51,6 +51,10 @@ enum {
     INIT_STREAM_VOLUME,
     SET_STREAM_VOLUME,
     GET_STREAM_VOLUME,
+    SET_VOLUME_ATTRIBUTES,
+    GET_VOLUME_ATTRIBUTES,
+    GET_MIN_VOLUME_FOR_ATTRIBUTES,
+    GET_MAX_VOLUME_FOR_ATTRIBUTES,
     GET_STRATEGY_FOR_STREAM,
     GET_OUTPUT_FOR_EFFECT,
     REGISTER_EFFECT,
@@ -78,6 +82,7 @@ enum {
     START_AUDIO_SOURCE,
     STOP_AUDIO_SOURCE,
     SET_AUDIO_PORT_CALLBACK_ENABLED,
+    SET_AUDIO_VOLUME_GROUP_CALLBACK_ENABLED,
     SET_MASTER_MONO,
     GET_MASTER_MONO,
     GET_STREAM_VOLUME_DB,
@@ -417,6 +422,70 @@ public:
         return static_cast <status_t> (reply.readInt32());
     }
 
+    virtual status_t setVolumeIndexForAttributes(const audio_attributes_t &attr, int index,
+                                                 audio_devices_t device)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.write(&attr, sizeof(audio_attributes_t));
+        data.writeInt32(index);
+        data.writeInt32(static_cast <uint32_t>(device));
+        status_t status = remote()->transact(SET_VOLUME_ATTRIBUTES, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        return static_cast <status_t> (reply.readInt32());
+    }
+    virtual status_t getVolumeIndexForAttributes(const audio_attributes_t &attr, int &index,
+                                                 audio_devices_t device)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.write(&attr, sizeof(audio_attributes_t));
+        data.writeInt32(static_cast <uint32_t>(device));
+        status_t status = remote()->transact(GET_VOLUME_ATTRIBUTES, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = static_cast <status_t> (reply.readInt32());
+        if (status != NO_ERROR) {
+            return status;
+        }
+        index = reply.readInt32();
+        return NO_ERROR;
+    }
+    virtual status_t getMinVolumeIndexForAttributes(const audio_attributes_t &attr, int &index)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.write(&attr, sizeof(audio_attributes_t));
+        status_t status = remote()->transact(GET_MIN_VOLUME_FOR_ATTRIBUTES, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = static_cast <status_t> (reply.readInt32());
+        if (status != NO_ERROR) {
+            return status;
+        }
+        index = reply.readInt32();
+        return NO_ERROR;
+    }
+    virtual status_t getMaxVolumeIndexForAttributes(const audio_attributes_t &attr, int &index)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.write(&attr, sizeof(audio_attributes_t));
+        status_t status = remote()->transact(GET_MAX_VOLUME_FOR_ATTRIBUTES, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = static_cast <status_t> (reply.readInt32());
+        if (status != NO_ERROR) {
+            return status;
+        }
+        index = reply.readInt32();
+        return NO_ERROR;
+    }
     virtual uint32_t getStrategyForStream(audio_stream_type_t stream)
     {
         Parcel data, reply;
@@ -692,6 +761,14 @@ public:
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
         data.writeInt32(enabled ? 1 : 0);
         remote()->transact(SET_AUDIO_PORT_CALLBACK_ENABLED, data, &reply);
+    }
+
+    virtual void setAudioVolumeGroupCallbacksEnabled(bool enabled)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeInt32(enabled ? 1 : 0);
+        remote()->transact(SET_AUDIO_VOLUME_GROUP_CALLBACK_ENABLED, data, &reply);
     }
 
     virtual status_t acquireSoundTriggerSession(audio_session_t *session,
@@ -1492,6 +1569,73 @@ status_t BnAudioPolicyService::onTransact(
             return NO_ERROR;
         } break;
 
+        case SET_VOLUME_ATTRIBUTES: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            audio_attributes_t attributes = {};
+            status_t status = data.read(&attributes, sizeof(audio_attributes_t));
+            if (status != NO_ERROR) {
+                return status;
+            }
+            int index = data.readInt32();
+            audio_devices_t device = static_cast <audio_devices_t>(data.readInt32());
+
+            reply->writeInt32(static_cast <uint32_t>(setVolumeIndexForAttributes(attributes,
+                                                                                 index, device)));
+            return NO_ERROR;
+        } break;
+
+        case GET_VOLUME_ATTRIBUTES: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            audio_attributes_t attributes = {};
+            status_t status = data.read(&attributes, sizeof(audio_attributes_t));
+            if (status != NO_ERROR) {
+                return status;
+            }
+            audio_devices_t device = static_cast <audio_devices_t>(data.readInt32());
+
+            int index = 0;
+            status = getVolumeIndexForAttributes(attributes, index, device);
+            reply->writeInt32(static_cast <uint32_t>(status));
+            if (status == NO_ERROR) {
+                reply->writeInt32(index);
+            }
+            return NO_ERROR;
+        } break;
+
+        case GET_MIN_VOLUME_FOR_ATTRIBUTES: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            audio_attributes_t attributes = {};
+            status_t status = data.read(&attributes, sizeof(audio_attributes_t));
+            if (status != NO_ERROR) {
+                return status;
+            }
+
+            int index = 0;
+            status = getMinVolumeIndexForAttributes(attributes, index);
+            reply->writeInt32(static_cast <uint32_t>(status));
+            if (status == NO_ERROR) {
+                reply->writeInt32(index);
+            }
+            return NO_ERROR;
+        } break;
+
+        case GET_MAX_VOLUME_FOR_ATTRIBUTES: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            audio_attributes_t attributes = {};
+            status_t status = data.read(&attributes, sizeof(audio_attributes_t));
+            if (status != NO_ERROR) {
+                return status;
+            }
+
+            int index = 0;
+            status = getMaxVolumeIndexForAttributes(attributes, index);
+            reply->writeInt32(static_cast <uint32_t>(status));
+            if (status == NO_ERROR) {
+                reply->writeInt32(index);
+            }
+            return NO_ERROR;
+        } break;
+
         case GET_DEVICES_FOR_STREAM: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             audio_stream_type_t stream =
@@ -1737,6 +1881,12 @@ status_t BnAudioPolicyService::onTransact(
         case SET_AUDIO_PORT_CALLBACK_ENABLED: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             setAudioPortCallbacksEnabled(data.readInt32() == 1);
+            return NO_ERROR;
+        } break;
+
+        case SET_AUDIO_VOLUME_GROUP_CALLBACK_ENABLED: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            setAudioVolumeGroupCallbacksEnabled(data.readInt32() == 1);
             return NO_ERROR;
         } break;
 

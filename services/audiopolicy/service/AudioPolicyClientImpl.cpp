@@ -222,6 +222,12 @@ void AudioPolicyService::AudioPolicyClient::onRecordingConfigurationUpdate(
             clientConfig, clientEffects, deviceConfig, effects, patchHandle, source);
 }
 
+void AudioPolicyService::AudioPolicyClient::onAudioVolumeGroupChanged(volume_group_t group,
+                                                                      int flags)
+{
+    mAudioPolicyService->onAudioVolumeGroupChanged(group, flags);
+}
+
 audio_unique_id_t AudioPolicyService::AudioPolicyClient::newAudioUniqueId(audio_unique_id_use_t use)
 {
     return AudioSystem::newAudioUniqueId(use);

@@ -31,7 +31,8 @@ enum {
     PORT_LIST_UPDATE = IBinder::FIRST_CALL_TRANSACTION,
     PATCH_LIST_UPDATE,
     MIX_STATE_UPDATE,
-    RECORDING_CONFIGURATION_UPDATE
+    RECORDING_CONFIGURATION_UPDATE,
+    VOLUME_GROUP_CHANGED,
 };
 
 // ----------------------------------------------------------------------
@@ -108,6 +109,15 @@ public:
         remote()->transact(PATCH_LIST_UPDATE, data, &reply, IBinder::FLAG_ONEWAY);
     }
 
+    void onAudioVolumeGroupChanged(volume_group_t group, int flags)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyServiceClient::getInterfaceDescriptor());
+        data.writeUint32(group);
+        data.writeInt32(flags);
+        remote()->transact(VOLUME_GROUP_CHANGED, data, &reply, IBinder::FLAG_ONEWAY);
+    }
+
     void onDynamicPolicyMixStateUpdate(String8 regId, int32_t state)
     {
         Parcel data, reply;
@@ -155,6 +165,13 @@ status_t BnAudioPolicyServiceClient::onTransact(
     case PATCH_LIST_UPDATE: {
             CHECK_INTERFACE(IAudioPolicyServiceClient, data, reply);
             onAudioPatchListUpdate();
+            return NO_ERROR;
+        } break;
+    case VOLUME_GROUP_CHANGED: {
+            CHECK_INTERFACE(IAudioPolicyServiceClient, data, reply);
+            volume_group_t group = static_cast<volume_group_t>(data.readUint32());
+            int flags = data.readInt32();
+            onAudioVolumeGroupChanged(group, flags);
             return NO_ERROR;
         } break;
     case MIX_STATE_UPDATE: {
