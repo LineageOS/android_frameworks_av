@@ -31,6 +31,7 @@
 #include <media/ToneGenerator.h>
 #include <media/AudioEffect.h>
 #include <media/AudioPolicy.h>
+#include <mediautils/ServiceUtilities.h>
 #include "AudioPolicyEffects.h"
 #include "managerdefault/AudioPolicyManager.h"
 #include <android/hardware/BnSensorPrivacyListener.h>
@@ -819,6 +820,8 @@ private:
 
     DefaultKeyedVector< audio_port_handle_t, sp<AudioRecordClient> >   mAudioRecordClients;
     DefaultKeyedVector< audio_port_handle_t, sp<AudioPlaybackClient> >   mAudioPlaybackClients;
+
+    MediaPackageManager mPackageManager; // To check allowPlaybackCapture
 };
 
 } // namespace android
