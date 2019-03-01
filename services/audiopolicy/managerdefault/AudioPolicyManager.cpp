@@ -5612,7 +5612,7 @@ float AudioPolicyManager::computeVolume(audio_stream_type_t stream,
                                         audio_devices_t device)
 {
     auto &curves = getVolumeCurves(stream);
-    float volumeDB = curves.volIndexToDb(Volume::getDeviceCategory(device), index);
+    float volumeDb = curves.volIndexToDb(Volume::getDeviceCategory(device), index);
 
     // handle the case of accessibility active while a ringtone is playing: if the ringtone is much
     // louder than the accessibility prompt, the prompt cannot be heard, thus masking the touch
@@ -5622,7 +5622,7 @@ float AudioPolicyManager::computeVolume(audio_stream_type_t stream,
             && (AUDIO_MODE_RINGTONE == mEngine->getPhoneState())
             && isStreamActive(AUDIO_STREAM_RING, 0)) {
         const float ringVolumeDB = computeVolume(AUDIO_STREAM_RING, index, device);
-        return ringVolumeDB - 4 > volumeDB ? ringVolumeDB - 4 : volumeDB;
+        return ringVolumeDB - 4 > volumeDb ? ringVolumeDB - 4 : volumeDb;
     }
 
     // in-call: always cap volume by voice volume + some low headroom
@@ -5641,10 +5641,10 @@ float AudioPolicyManager::computeVolume(audio_stream_type_t stream,
             const float maxVoiceVolDb =
                 computeVolume(AUDIO_STREAM_VOICE_CALL, voiceVolumeIndex, device)
                 + IN_CALL_EARPIECE_HEADROOM_DB;
-            if (volumeDB > maxVoiceVolDb) {
+            if (volumeDb > maxVoiceVolDb) {
                 ALOGV("computeVolume() stream %d at vol=%f overriden by stream %d at vol=%f",
-                        stream, volumeDB, AUDIO_STREAM_VOICE_CALL, maxVoiceVolDb);
-                volumeDB = maxVoiceVolDb;
+                        stream, volumeDb, AUDIO_STREAM_VOICE_CALL, maxVoiceVolDb);
+                volumeDb = maxVoiceVolDb;
             }
             } break;
         default:
@@ -5677,7 +5677,7 @@ float AudioPolicyManager::computeVolume(audio_stream_type_t stream,
         // just stopped
         if (isStreamActive(AUDIO_STREAM_MUSIC, SONIFICATION_HEADSET_MUSIC_DELAY) ||
                 mLimitRingtoneVolume) {
-            volumeDB += SONIFICATION_HEADSET_VOLUME_FACTOR_DB;
+            volumeDb += SONIFICATION_HEADSET_VOLUME_FACTOR_DB;
             audio_devices_t musicDevice =
                     mEngine->getOutputDevicesForAttributes(attributes_initializer(AUDIO_USAGE_MEDIA),
                                                            nullptr, true /*fromCache*/).types();
@@ -5686,29 +5686,29 @@ float AudioPolicyManager::computeVolume(audio_stream_type_t stream,
                                    musicDevice);
             float minVolDB = (musicVolDB > SONIFICATION_HEADSET_VOLUME_MIN_DB) ?
                     musicVolDB : SONIFICATION_HEADSET_VOLUME_MIN_DB;
-            if (volumeDB > minVolDB) {
-                volumeDB = minVolDB;
+            if (volumeDb > minVolDB) {
+                volumeDb = minVolDB;
                 ALOGV("computeVolume limiting volume to %f musicVol %f", minVolDB, musicVolDB);
             }
             if (device & (AUDIO_DEVICE_OUT_BLUETOOTH_A2DP |
                     AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES)) {
                 // on A2DP, also ensure notification volume is not too low compared to media when
                 // intended to be played
-                if ((volumeDB > -96.0f) &&
-                        (musicVolDB - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB > volumeDB)) {
+                if ((volumeDb > -96.0f) &&
+                        (musicVolDB - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB > volumeDb)) {
                     ALOGV("computeVolume increasing volume for stream=%d device=0x%X from %f to %f",
                             stream, device,
-                            volumeDB, musicVolDB - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB);
-                    volumeDB = musicVolDB - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB;
+                            volumeDb, musicVolDB - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB);
+                    volumeDb = musicVolDB - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB;
                 }
             }
         } else if ((Volume::getDeviceForVolume(device) != AUDIO_DEVICE_OUT_SPEAKER) ||
                 (stream != AUDIO_STREAM_ALARM && stream != AUDIO_STREAM_RING)) {
-            volumeDB += SONIFICATION_HEADSET_VOLUME_FACTOR_DB;
+            volumeDb += SONIFICATION_HEADSET_VOLUME_FACTOR_DB;
         }
     }
 
-    return volumeDB;
+    return volumeDb;
 }
 
 int AudioPolicyManager::rescaleVolumeIndex(int srcIndex,

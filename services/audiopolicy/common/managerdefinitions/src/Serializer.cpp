@@ -64,7 +64,7 @@ struct StdCollectionTraits {
     }
 };
 
-struct AudioGainTraits : public AndroidCollectionTraits<AudioGain, AudioGainCollection>
+struct AudioGainTraits : public AndroidCollectionTraits<AudioGain, AudioGains>
 {
     static constexpr const char *tag = "gain";
     static constexpr const char *collectionTag = "gains";
@@ -84,6 +84,9 @@ struct AudioGainTraits : public AndroidCollectionTraits<AudioGain, AudioGainColl
         static constexpr const char *minRampMs = "minRampMs";
         /** needed if mode AUDIO_GAIN_MODE_RAMP. */
         static constexpr const char *maxRampMs = "maxRampMs";
+        /** needed to allow use setPortGain instead of setStreamVolume. */
+        static constexpr const char *useForVolume = "useForVolume";
+
     };
 
     static Return<Element> deserialize(const xmlNode *cur, PtrSerializingCtx serializingContext);
@@ -375,9 +378,14 @@ Return<AudioGainTraits::Element> AudioGainTraits::deserialize(const xmlNode *cur
     if (!maxRampMsLiteral.empty() && convertTo(maxRampMsLiteral, maxRampMs)) {
         gain->setMaxRampInMs(maxRampMs);
     }
-    ALOGV("%s: adding new gain mode %08x channel mask %08x min mB %d max mB %d", __func__,
-          gain->getMode(), gain->getChannelMask(), gain->getMinValueInMb(),
-          gain->getMaxValueInMb());
+    std::string useForVolumeLiteral = getXmlAttribute(cur, Attributes::useForVolume);
+    bool useForVolume = false;
+    if (!useForVolumeLiteral.empty() && convertTo(useForVolumeLiteral, useForVolume)) {
+        gain->setUseForVolume(useForVolume);
+    }
+    ALOGV("%s: adding new gain mode %08x channel mask %08x min mB %d max mB %d UseForVolume: %d",
+          __func__, gain->getMode(), gain->getChannelMask(), gain->getMinValueInMb(),
+          gain->getMaxValueInMb(), useForVolume);
 
     if (gain->getMode() != 0) {
         return gain;
