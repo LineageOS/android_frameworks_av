@@ -326,7 +326,8 @@ private:
 
     void silenceAllRecordings_l();
 
-    static bool isPrivacySensitive(audio_source_t source);
+    static bool isPrivacySensitiveSource(audio_source_t source);
+    static bool isVirtualSource(audio_source_t source);
 
     // If recording we need to make sure the UID is allowed to do that. If the UID is idle
     // then it cannot record and gets buffers with zeros - silence. As soon as the UID
