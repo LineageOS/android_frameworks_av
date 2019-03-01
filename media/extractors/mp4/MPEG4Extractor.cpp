@@ -143,6 +143,7 @@ private:
     uint8_t *mSrcBuffer;
 
     bool mIsHeif;
+    bool mIsAudio;
     sp<ItemTable> mItemTable;
 
     size_t parseNALSize(const uint8_t *data) const;
@@ -4030,6 +4031,7 @@ MPEG4Source::MPEG4Source(
     }
 
     mIsPcm = !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_RAW);
+    mIsAudio = !strncasecmp(mime, "audio/", 6);
 
     if (mIsPcm) {
         int32_t numChannels = 0;
@@ -4869,8 +4871,11 @@ status_t MPEG4Source::read(
                 findFlags = SampleTable::kFlagBefore;
             }
 
-            uint32_t syncSampleIndex;
-            if (err == OK) {
+            uint32_t syncSampleIndex = sampleIndex;
+            // assume every audio sample is a sync sample. This works around
+            // seek issues with files that were incorrectly written with an
+            // empty or single-sample stss block for the audio track
+            if (err == OK && !mIsAudio) {
                 err = mSampleTable->findSyncSampleNear(
                         sampleIndex, &syncSampleIndex, findFlags);
             }
