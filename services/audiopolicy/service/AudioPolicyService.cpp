@@ -450,7 +450,7 @@ void AudioPolicyService::updateUidStates_l()
     for (size_t i =0; i < mAudioRecordClients.size(); i++) {
         sp<AudioRecordClient> current = mAudioRecordClients[i];
         if (!current->active) continue;
-        if (isPrivacySensitive(current->attributes.source)) {
+        if (isPrivacySensitiveSource(current->attributes.source)) {
             if (current->startTimeNs > latestSensitiveStartNs) {
                 latestSensitiveActive = current;
                 latestSensitiveStartNs = current->startTimeNs;
@@ -489,7 +489,10 @@ void AudioPolicyService::updateUidStates_l()
         bool isLatest = current == latestActive;
         bool isLatestSensitive = current == latestSensitiveActive;
         bool forceIdle = true;
-        if (mUidPolicy->isAssistantUid(current->uid)) {
+
+        if (isVirtualSource(source)) {
+            forceIdle = false;
+        } else if (mUidPolicy->isAssistantUid(current->uid)) {
             if (isA11yOnTop) {
                 if (source == AUDIO_SOURCE_HOTWORD || source == AUDIO_SOURCE_VOICE_RECOGNITION) {
                     forceIdle = false;
@@ -505,10 +508,6 @@ void AudioPolicyService::updateUidStates_l()
                 (source == AUDIO_SOURCE_VOICE_RECOGNITION || source == AUDIO_SOURCE_HOTWORD)) {
                 forceIdle = false;
             }
-        } else if (source == AUDIO_SOURCE_VOICE_DOWNLINK ||
-                   source == AUDIO_SOURCE_VOICE_CALL ||
-                   (source == AUDIO_SOURCE_VOICE_UPLINK)) {
-            forceIdle = false;
         } else {
             if (!isAssistantOnTop && (isOnTop || isLatest) &&
                 (!isSensitiveActive || isLatestSensitive)) {
@@ -542,14 +541,27 @@ app_state_t AudioPolicyService::apmStatFromAmState(int amState) {
 }
 
 /* static */
-bool AudioPolicyService::isPrivacySensitive(audio_source_t source)
+bool AudioPolicyService::isPrivacySensitiveSource(audio_source_t source)
+{
+    switch (source) {
+        case AUDIO_SOURCE_CAMCORDER:
+        case AUDIO_SOURCE_VOICE_COMMUNICATION:
+            return true;
+        default:
+            break;
+    }
+    return false;
+}
+
+/* static */
+bool AudioPolicyService::isVirtualSource(audio_source_t source)
 {
     switch (source) {
         case AUDIO_SOURCE_VOICE_UPLINK:
         case AUDIO_SOURCE_VOICE_DOWNLINK:
         case AUDIO_SOURCE_VOICE_CALL:
-        case AUDIO_SOURCE_CAMCORDER:
-        case AUDIO_SOURCE_VOICE_COMMUNICATION:
+        case AUDIO_SOURCE_REMOTE_SUBMIX:
+        case AUDIO_SOURCE_FM_TUNER:
             return true;
         default:
             break;
