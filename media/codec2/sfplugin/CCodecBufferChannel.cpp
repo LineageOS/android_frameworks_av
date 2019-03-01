@@ -99,6 +99,34 @@ public:
      */
     virtual size_t numClientBuffers() const = 0;
 
+    void handleImageData(const sp<Codec2Buffer> &buffer) {
+        sp<ABuffer> imageDataCandidate = buffer->getImageData();
+        if (imageDataCandidate == nullptr) {
+            return;
+        }
+        sp<ABuffer> imageData;
+        if (!mFormat->findBuffer("image-data", &imageData)
+                || imageDataCandidate->size() != imageData->size()
+                || memcmp(imageDataCandidate->data(), imageData->data(), imageData->size()) != 0) {
+            ALOGD("[%s] updating image-data", mName);
+            sp<AMessage> newFormat = dupFormat();
+            newFormat->setBuffer("image-data", imageDataCandidate);
+            MediaImage2 *img = (MediaImage2*)imageDataCandidate->data();
+            if (img->mNumPlanes > 0 && img->mType != img->MEDIA_IMAGE_TYPE_UNKNOWN) {
+                int32_t stride = img->mPlane[0].mRowInc;
+                newFormat->setInt32(KEY_STRIDE, stride);
+                ALOGD("[%s] updating stride = %d", mName, stride);
+                if (img->mNumPlanes > 1 && stride > 0) {
+                    int32_t vstride = (img->mPlane[1].mOffset - img->mPlane[0].mOffset) / stride;
+                    newFormat->setInt32(KEY_SLICE_HEIGHT, vstride);
+                    ALOGD("[%s] updating vstride = %d", mName, vstride);
+                }
+            }
+            setFormat(newFormat);
+            buffer->setFormat(newFormat);
+        }
+    }
+
 protected:
     std::string mComponentName; ///< name of component for debugging
     std::string mChannelName; ///< name of channel for debugging
@@ -253,34 +281,6 @@ public:
      */
     void transferSkipCutBuffer(const sp<SkipCutBuffer> &scb) {
         mSkipCutBuffer = scb;
-    }
-
-    void handleImageData(const sp<Codec2Buffer> &buffer) {
-        sp<ABuffer> imageDataCandidate = buffer->getImageData();
-        if (imageDataCandidate == nullptr) {
-            return;
-        }
-        sp<ABuffer> imageData;
-        if (!mFormat->findBuffer("image-data", &imageData)
-                || imageDataCandidate->size() != imageData->size()
-                || memcmp(imageDataCandidate->data(), imageData->data(), imageData->size()) != 0) {
-            ALOGD("[%s] updating image-data", mName);
-            sp<AMessage> newFormat = dupFormat();
-            newFormat->setBuffer("image-data", imageDataCandidate);
-            MediaImage2 *img = (MediaImage2*)imageDataCandidate->data();
-            if (img->mNumPlanes > 0 && img->mType != img->MEDIA_IMAGE_TYPE_UNKNOWN) {
-                int32_t stride = img->mPlane[0].mRowInc;
-                newFormat->setInt32(KEY_STRIDE, stride);
-                ALOGD("[%s] updating stride = %d", mName, stride);
-                if (img->mNumPlanes > 1 && stride > 0) {
-                    int32_t vstride = (img->mPlane[1].mOffset - img->mPlane[0].mOffset) / stride;
-                    newFormat->setInt32(KEY_SLICE_HEIGHT, vstride);
-                    ALOGD("[%s] updating vstride = %d", mName, vstride);
-                }
-            }
-            setFormat(newFormat);
-            buffer->setFormat(newFormat);
-        }
     }
 
 protected:
@@ -783,6 +783,7 @@ public:
         status_t err = mImpl.grabBuffer(index, &c2Buffer);
         if (err == OK) {
             c2Buffer->setFormat(mFormat);
+            handleImageData(c2Buffer);
             *buffer = c2Buffer;
             return true;
         }
@@ -1053,6 +1054,7 @@ public:
             return false;
         }
         *index = mImpl.assignSlot(newBuffer);
+        handleImageData(newBuffer);
         *buffer = newBuffer;
         return true;
     }
