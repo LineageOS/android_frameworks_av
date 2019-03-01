@@ -34,7 +34,6 @@
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/NuMediaExtractor.h>
 #include <media/IMediaHTTPService.h>
-#include <android_runtime/AndroidRuntime.h>
 #include <android_util_Binder.h>
 
 #include <jni.h>

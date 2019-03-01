@@ -85,13 +85,18 @@ cc_library_shared {
         "libutils",
         "libcutils",
         "libnativewindow",
-        "libandroid_runtime",
         "libbinder",
         "libhidlbase",
         "libgui",
         "libui",
         "libmedia2_jni_core",
         "libmediandk_utils",
+    ],
+
+    required: [
+        // libmediandk may be used by Java and non-Java things. When lower-level things use it,
+        // they shouldn't have to take on the cost of loading libandroid_runtime.
+        "libandroid_runtime",
     ],
 
     export_include_dirs: ["include"],
