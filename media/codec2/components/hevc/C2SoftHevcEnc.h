@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Android Open Source Project
+ * Copyright 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,18 +17,18 @@
 #ifndef ANDROID_C2_SOFT_HEVC_ENC_H_
 #define ANDROID_C2_SOFT_HEVC_ENC_H_
 
-#include <map>
-#include <utils/Vector.h>
-#include <media/stagefright/foundation/ColorUtils.h>
 #include <SimpleC2Component.h>
+#include <algorithm>
+#include <map>
+#include <media/stagefright/foundation/ColorUtils.h>
+#include <utils/Vector.h>
 
 #include "ihevc_typedefs.h"
 
 namespace android {
-#define MIN(a, b) ((a) < (b)) ? (a) : (b)
 
 /** Get time */
-#define GETTIME(a, b) gettimeofday(a, b);
+#define GETTIME(a, b) gettimeofday(a, b)
 
 /** Compute difference between start and end */
 #define TIME_DIFF(start, end, diff)                      \
@@ -55,7 +55,7 @@ struct C2SoftHevcEnc : public SimpleC2Component {
                       const std::shared_ptr<C2BlockPool>& pool) override;
 
    protected:
-    virtual ~C2SoftHevcEnc();
+    ~C2SoftHevcEnc() override;
 
    private:
     std::shared_ptr<IntfImpl> mIntf;
