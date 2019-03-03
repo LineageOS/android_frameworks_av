@@ -151,8 +151,6 @@ Return<void> InputSurface::connect(
     return Void();
 }
 
-// Derived methods from IGraphicBufferProducer
-
 // Constructor is exclusive to ComponentStore.
 InputSurface::InputSurface(
         const sp<ComponentStore>& store,

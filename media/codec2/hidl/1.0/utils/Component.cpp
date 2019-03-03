@@ -272,7 +272,7 @@ Return<Status> Component::drain(bool withEos) {
 
 Return<Status> Component::setOutputSurface(
         uint64_t blockPoolId,
-        const sp<HGraphicBufferProducer>& surface) {
+        const sp<HGraphicBufferProducer2>& surface) {
     std::shared_ptr<C2BlockPool> pool;
     GetCodec2BlockPool(blockPoolId, mComponent, &pool);
     if (pool && pool->getAllocatorId() == C2PlatformAllocatorStore::BUFFERQUEUE) {
@@ -312,7 +312,7 @@ Return<void> Component::connectToInputSurface(
 }
 
 Return<void> Component::connectToOmxInputSurface(
-        const sp<HGraphicBufferProducer>& producer,
+        const sp<HGraphicBufferProducer1>& producer,
         const sp<::android::hardware::media::omx::V1_0::
         IGraphicBufferSource>& source,
         connectToOmxInputSurface_cb _hidl_cb) {

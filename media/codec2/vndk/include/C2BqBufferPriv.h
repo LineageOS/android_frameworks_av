@@ -17,10 +17,11 @@
 #ifndef STAGEFRIGHT_CODEC2_BQ_BUFFER_PRIV_H_
 #define STAGEFRIGHT_CODEC2_BQ_BUFFER_PRIV_H_
 
-#include <functional>
+#include <android/hardware/graphics/bufferqueue/2.0/IGraphicBufferProducer.h>
 
 #include <C2Buffer.h>
-#include <media/stagefright/bqhelper/WGraphicBufferProducer.h>
+
+#include <functional>
 
 class C2BufferQueueBlockPool : public C2BlockPool {
 public:
@@ -52,6 +53,8 @@ public:
      */
     virtual void setRenderCallback(const OnRenderCallback &renderCallback = OnRenderCallback());
 
+    typedef ::android::hardware::graphics::bufferqueue::V2_0::
+            IGraphicBufferProducer HGraphicBufferProducer;
     /**
      * Configures an IGBP in order to create blocks. A newly created block is
      * dequeued from the configured IGBP. Unique Id of IGBP and the slot number of
@@ -62,7 +65,7 @@ public:
      *
      * \param producer      the IGBP, which will be used to fetch blocks
      */
-    virtual void configureProducer(const android::sp<android::HGraphicBufferProducer> &producer);
+    virtual void configureProducer(const android::sp<HGraphicBufferProducer> &producer);
 
 private:
     const std::shared_ptr<C2Allocator> mAllocator;
