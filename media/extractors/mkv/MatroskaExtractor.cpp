@@ -1557,6 +1557,21 @@ void MatroskaExtractor::addTracks() {
                 } else if (!strcmp("A_FLAC", codecID)) {
                     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_FLAC);
                     err = addFlacMetadata(meta, codecPrivate, codecPrivateSize);
+                } else if ((!strcmp("A_MS/ACM", codecID))) {
+                    if ((NULL == codecPrivate) || (codecPrivateSize < 30)) {
+                        ALOGW("unsupported audio: A_MS/ACM has no valid private data: %s, size: %zu",
+                               codecPrivate == NULL ? "null" : "non-null", codecPrivateSize);
+                        continue;
+                    } else {
+                        uint16_t ID = *(uint16_t *)codecPrivate;
+                        if (ID == 0x0055) {
+                            AMediaFormat_setString(meta,
+                                    AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_MPEG);
+                        } else {
+                            ALOGW("A_MS/ACM unsupported type , continue");
+                            continue;
+                        }
+                    }
                 } else {
                     ALOGW("%s is not supported.", codecID);
                     continue;

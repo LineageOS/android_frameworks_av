@@ -58,6 +58,8 @@
 #include "CameraService.h"
 #include "utils/CameraThreadState.h"
 
+#include <tuple>
+
 using namespace android::camera3;
 using namespace android::hardware::camera;
 using namespace android::hardware::camera::device::V3_2;
@@ -1094,7 +1096,7 @@ hardware::Return<void> Camera3Device::requestStreamBuffers(
             hBuf.acquireFence.setTo(acquireFence, /*shouldOwn*/true);
             hBuf.releaseFence = nullptr;
 
-            res = mInterface->pushInflightRequestBuffer(bufferId, buffer);
+            res = mInterface->pushInflightRequestBuffer(bufferId, buffer, streamId);
             if (res != OK) {
                 ALOGE("%s: Can't get register request buffers for stream %d: %s (%d)",
                         __FUNCTION__, streamId, strerror(-res), res);
@@ -2847,12 +2849,19 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
         }
         streams.add(outputStream);
 
-        if (outputStream->format == HAL_PIXEL_FORMAT_BLOB &&
-                outputStream->data_space == HAL_DATASPACE_V0_JFIF) {
+        if (outputStream->format == HAL_PIXEL_FORMAT_BLOB) {
             size_t k = i + ((mInputStream != nullptr) ? 1 : 0); // Input stream if present should
                                                                 // always occupy the initial entry.
-            bufferSizes[k] = static_cast<uint32_t>(
-                    getJpegBufferSize(outputStream->width, outputStream->height));
+            if (outputStream->data_space == HAL_DATASPACE_V0_JFIF) {
+                bufferSizes[k] = static_cast<uint32_t>(
+                        getJpegBufferSize(outputStream->width, outputStream->height));
+            } else if (outputStream->data_space ==
+                    static_cast<android_dataspace>(HAL_DATASPACE_JPEG_APP_SEGMENTS)) {
+                bufferSizes[k] = outputStream->width * outputStream->height;
+            } else {
+                ALOGW("%s: Blob dataSpace %d not supported",
+                        __FUNCTION__, outputStream->data_space);
+            }
         }
     }
 
@@ -3270,7 +3279,15 @@ void Camera3Device::flushInflightRequests() {
     std::vector<std::pair<int32_t, int32_t>> inflightKeys;
     mInterface->getInflightBufferKeys(&inflightKeys);
 
-    int32_t inputStreamId = (mInputStream != nullptr) ? mInputStream->getId() : -1;
+    // Inflight buffers for HAL buffer manager
+    std::vector<uint64_t> inflightRequestBufferKeys;
+    mInterface->getInflightRequestBufferKeys(&inflightRequestBufferKeys);
+
+    // (streamId, frameNumber, buffer_handle_t*) tuple for all inflight buffers.
+    // frameNumber will be -1 for buffers from HAL buffer manager
+    std::vector<std::tuple<int32_t, int32_t, buffer_handle_t*>> inflightBuffers;
+    inflightBuffers.reserve(inflightKeys.size() + inflightRequestBufferKeys.size());
+
     for (auto& pair : inflightKeys) {
         int32_t frameNumber = pair.first;
         int32_t streamId = pair.second;
@@ -3281,6 +3298,26 @@ void Camera3Device::flushInflightRequests() {
                     __FUNCTION__, frameNumber, streamId);
             continue;
         }
+        inflightBuffers.push_back(std::make_tuple(streamId, frameNumber, buffer));
+    }
+
+    for (auto& bufferId : inflightRequestBufferKeys) {
+        int32_t streamId = -1;
+        buffer_handle_t* buffer = nullptr;
+        status_t res = mInterface->popInflightRequestBuffer(bufferId, &buffer, &streamId);
+        if (res != OK) {
+            ALOGE("%s: cannot find in-flight buffer %" PRIu64, __FUNCTION__, bufferId);
+            continue;
+        }
+        inflightBuffers.push_back(std::make_tuple(streamId, /*frameNumber*/-1, buffer));
+    }
+
+    int32_t inputStreamId = (mInputStream != nullptr) ? mInputStream->getId() : -1;
+    for (auto& tuple : inflightBuffers) {
+        status_t res = OK;
+        int32_t streamId = std::get<0>(tuple);
+        int32_t frameNumber = std::get<1>(tuple);
+        buffer_handle_t* buffer = std::get<2>(tuple);
 
         camera3_stream_buffer_t streamBuffer;
         streamBuffer.buffer = buffer;
@@ -4583,6 +4620,17 @@ void Camera3Device::HalInterface::getInflightBufferKeys(
     return;
 }
 
+void Camera3Device::HalInterface::getInflightRequestBufferKeys(
+        std::vector<uint64_t>* out) {
+    std::lock_guard<std::mutex> lock(mRequestedBuffersLock);
+    out->clear();
+    out->reserve(mRequestedBuffers.size());
+    for (auto& pair : mRequestedBuffers) {
+        out->push_back(pair.first);
+    }
+    return;
+}
+
 status_t Camera3Device::HalInterface::pushInflightBufferLocked(
         int32_t frameNumber, int32_t streamId, buffer_handle_t *buffer, int acquireFence) {
     uint64_t key = static_cast<uint64_t>(frameNumber) << 32 | static_cast<uint64_t>(streamId);
@@ -4610,9 +4658,9 @@ status_t Camera3Device::HalInterface::popInflightBuffer(
 }
 
 status_t Camera3Device::HalInterface::pushInflightRequestBuffer(
-        uint64_t bufferId, buffer_handle_t* buf) {
+        uint64_t bufferId, buffer_handle_t* buf, int32_t streamId) {
     std::lock_guard<std::mutex> lock(mRequestedBuffersLock);
-    auto pair = mRequestedBuffers.insert({bufferId, buf});
+    auto pair = mRequestedBuffers.insert({bufferId, {streamId, buf}});
     if (!pair.second) {
         ALOGE("%s: bufId %" PRIu64 " is already inflight!",
                 __FUNCTION__, bufferId);
@@ -4623,7 +4671,13 @@ status_t Camera3Device::HalInterface::pushInflightRequestBuffer(
 
 // Find and pop a buffer_handle_t based on bufferId
 status_t Camera3Device::HalInterface::popInflightRequestBuffer(
-        uint64_t bufferId, /*out*/ buffer_handle_t **buffer) {
+        uint64_t bufferId,
+        /*out*/ buffer_handle_t** buffer,
+        /*optional out*/ int32_t* streamId) {
+    if (buffer == nullptr) {
+        ALOGE("%s: buffer (%p) must not be null", __FUNCTION__, buffer);
+        return BAD_VALUE;
+    }
     std::lock_guard<std::mutex> lock(mRequestedBuffersLock);
     auto it = mRequestedBuffers.find(bufferId);
     if (it == mRequestedBuffers.end()) {
@@ -4631,7 +4685,10 @@ status_t Camera3Device::HalInterface::popInflightRequestBuffer(
                 __FUNCTION__, bufferId);
         return BAD_VALUE;
     }
-    *buffer = it->second;
+    *buffer = it->second.second;
+    if (streamId != nullptr) {
+        *streamId = it->second.first;
+    }
     mRequestedBuffers.erase(it);
     return OK;
 }

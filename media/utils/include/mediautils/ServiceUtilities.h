@@ -14,12 +14,21 @@
  * limitations under the License.
  */
 
+#ifndef ANDROID_MEDIAUTILS_SERVICEUTILITIES_H
+#define ANDROID_MEDIAUTILS_SERVICEUTILITIES_H
+
 #include <unistd.h>
 
+#include <android/content/pm/IPackageManagerNative.h>
 #include <binder/IMemory.h>
 #include <binder/PermissionController.h>
 #include <cutils/multiuser.h>
 #include <private/android_filesystem_config.h>
+
+#include <map>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace android {
 
@@ -72,4 +81,31 @@ bool modifyDefaultAudioEffectsAllowed();
 bool dumpAllowed();
 bool modifyPhoneStateAllowed(pid_t pid, uid_t uid);
 status_t checkIMemory(const sp<IMemory>& iMemory);
+
+class MediaPackageManager {
+public:
+    /** Query the PackageManager to check if all apps of an UID allow playback capture. */
+    bool allowPlaybackCapture(uid_t uid) {
+        auto result = doIsAllowed(uid);
+        if (!result) {
+            mPackageManagerErrors++;
+        }
+        return result.value_or(false);
+    }
+    void dump(int fd, int spaces = 0) const;
+private:
+    static constexpr const char* nativePackageManagerName = "package_native";
+    std::optional<bool> doIsAllowed(uid_t uid);
+    sp<content::pm::IPackageManagerNative> retreivePackageManager();
+    sp<content::pm::IPackageManagerNative> mPackageManager; // To check apps manifest
+    uint_t mPackageManagerErrors = 0;
+    struct Package {
+        std::string name;
+        bool playbackCaptureAllowed = false;
+    };
+    using Packages = std::vector<Package>;
+    std::map<uid_t, Packages> mDebugLog;
+};
 }
+
+#endif // ANDROID_MEDIAUTILS_SERVICEUTILITIES_H

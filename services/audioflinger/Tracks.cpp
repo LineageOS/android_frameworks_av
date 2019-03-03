@@ -700,8 +700,13 @@ void AudioFlinger::PlaybackThread::Track::interceptBuffer(
         const AudioBufferProvider::Buffer& sourceBuffer) {
     auto start = std::chrono::steady_clock::now();
     const size_t frameCount = sourceBuffer.frameCount;
-    for (auto& sink : mTeePatches) {
-        RecordThread::PatchRecord* patchRecord = sink.patchRecord.get();
+    if (frameCount == 0) {
+        return;  // No audio to intercept.
+        // Additionally PatchProxyBufferProvider::obtainBuffer (called by PathTrack::getNextBuffer)
+        // does not allow 0 frame size request contrary to getNextBuffer
+    }
+    for (auto& teePatch : mTeePatches) {
+        RecordThread::PatchRecord* patchRecord = teePatch.patchRecord.get();
 
         size_t framesWritten = writeFrames(patchRecord, sourceBuffer.i8, frameCount);
         // On buffer wrap, the buffer frame count will be less than requested,

@@ -149,7 +149,7 @@ bool AudioOutputDescriptor::isFixedVolume(audio_devices_t device __unused)
     return false;
 }
 
-bool AudioOutputDescriptor::setVolume(float volume,
+bool AudioOutputDescriptor::setVolume(float volumeDb,
                                       audio_stream_type_t stream,
                                       audio_devices_t device __unused,
                                       uint32_t delayMs,
@@ -158,9 +158,9 @@ bool AudioOutputDescriptor::setVolume(float volume,
     // We actually change the volume if:
     // - the float value returned by computeVolume() changed
     // - the force flag is set
-    if (volume != getCurVolume(static_cast<VolumeSource>(stream)) || force) {
-        ALOGV("setVolume() for stream %d, volume %f, delay %d", stream, volume, delayMs);
-        setCurVolume(static_cast<VolumeSource>(stream), volume);
+    if (volumeDb != getCurVolume(static_cast<VolumeSource>(stream)) || force) {
+        ALOGV("setVolume() for stream %d, volume %f, delay %d", stream, volumeDb, delayMs);
+        setCurVolume(static_cast<VolumeSource>(stream), volumeDb);
         return true;
     }
     return false;
@@ -388,14 +388,38 @@ void SwAudioOutputDescriptor::toAudioPort(
             mFlags & AUDIO_OUTPUT_FLAG_FAST ? AUDIO_LATENCY_LOW : AUDIO_LATENCY_NORMAL;
 }
 
-bool SwAudioOutputDescriptor::setVolume(float volume,
+bool SwAudioOutputDescriptor::setVolume(float volumeDb,
                                         audio_stream_type_t stream,
                                         audio_devices_t device,
                                         uint32_t delayMs,
                                         bool force)
 {
-    if (!AudioOutputDescriptor::setVolume(volume, stream, device, delayMs, force)) {
+    if (!AudioOutputDescriptor::setVolume(volumeDb, stream, device, delayMs, force)) {
         return false;
+    }
+    if (!devices().isEmpty()) {
+        // Assume first device to check upon Gain Crontroller availability
+        const auto &devicePort = devices().itemAt(0);
+        ALOGV("%s: device %s hasGC %d", __FUNCTION__,
+            devicePort->toString().c_str(), devices().itemAt(0)->hasGainController(true));
+        if (devicePort->hasGainController(true)) {
+            // @todo: default stream volume to max (0) when using HW Port gain?
+            float volumeAmpl = Volume::DbToAmpl(0);
+            mClientInterface->setStreamVolume(stream, volumeAmpl, mIoHandle, delayMs);
+
+            AudioGains gains = devicePort->getGains();
+            int gainMinValueInMb = gains[0]->getMinValueInMb();
+            int gainMaxValueInMb = gains[0]->getMaxValueInMb();
+            int gainStepValueInMb = gains[0]->getStepValueInMb();
+            int gainValueMb = ((volumeDb * 100)/ gainStepValueInMb) * gainStepValueInMb;
+            gainValueMb = std::max(gainMinValueInMb, std::min(gainValueMb, gainMaxValueInMb));
+
+            audio_port_config config = {};
+            devicePort->toAudioPortConfig(&config);
+            config.config_mask = AUDIO_PORT_CONFIG_GAIN;
+            config.gain.values[0] = gainValueMb;
+            return mClientInterface->setAudioPortConfig(&config, 0) == NO_ERROR;
+        }
     }
     // Force VOICE_CALL to track BLUETOOTH_SCO stream volume when bluetooth audio is enabled
     float volumeAmpl = Volume::DbToAmpl(getCurVolume(static_cast<VolumeSource>(stream)));
@@ -591,13 +615,13 @@ void HwAudioOutputDescriptor::toAudioPort(
 }
 
 
-bool HwAudioOutputDescriptor::setVolume(float volume,
+bool HwAudioOutputDescriptor::setVolume(float volumeDb,
                                         audio_stream_type_t stream,
                                         audio_devices_t device,
                                         uint32_t delayMs,
                                         bool force)
 {
-    bool changed = AudioOutputDescriptor::setVolume(volume, stream, device, delayMs, force);
+    bool changed = AudioOutputDescriptor::setVolume(volumeDb, stream, device, delayMs, force);
 
     if (changed) {
       // TODO: use gain controller on source device if any to adjust volume

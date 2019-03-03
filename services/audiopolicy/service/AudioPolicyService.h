@@ -31,6 +31,7 @@
 #include <media/ToneGenerator.h>
 #include <media/AudioEffect.h>
 #include <media/AudioPolicy.h>
+#include <mediautils/ServiceUtilities.h>
 #include "AudioPolicyEffects.h"
 #include "managerdefault/AudioPolicyManager.h"
 #include <android/hardware/BnSensorPrivacyListener.h>
@@ -326,7 +327,8 @@ private:
 
     void silenceAllRecordings_l();
 
-    static bool isPrivacySensitive(audio_source_t source);
+    static bool isPrivacySensitiveSource(audio_source_t source);
+    static bool isVirtualSource(audio_source_t source);
 
     // If recording we need to make sure the UID is allowed to do that. If the UID is idle
     // then it cannot record and gets buffers with zeros - silence. As soon as the UID
@@ -819,6 +821,8 @@ private:
 
     DefaultKeyedVector< audio_port_handle_t, sp<AudioRecordClient> >   mAudioRecordClients;
     DefaultKeyedVector< audio_port_handle_t, sp<AudioPlaybackClient> >   mAudioPlaybackClients;
+
+    MediaPackageManager mPackageManager; // To check allowPlaybackCapture
 };
 
 } // namespace android

@@ -98,7 +98,7 @@ public:
         ActivityTracking::dump(dst, spaces);
         dst->appendFormat(", Volume: %.03f, MuteCount: %02d\n", mCurVolumeDb, mMuteCount);
     }
-    void setVolume(float volume) { mCurVolumeDb = volume; }
+    void setVolume(float volumeDb) { mCurVolumeDb = volumeDb; }
     float getVolume() const { return mCurVolumeDb; }
 
 private:
@@ -156,7 +156,7 @@ public:
     virtual bool isDuplicated() const { return false; }
     virtual uint32_t latency() { return 0; }
     virtual bool isFixedVolume(audio_devices_t device);
-    virtual bool setVolume(float volume,
+    virtual bool setVolume(float volumeDb,
                            audio_stream_type_t stream,
                            audio_devices_t device,
                            uint32_t delayMs,
@@ -219,10 +219,10 @@ public:
     {
         return mVolumeActivities[vs].decMuteCount();
     }
-    void setCurVolume(VolumeSource vs, float volume)
+    void setCurVolume(VolumeSource vs, float volumeDb)
     {
         // Even if not activity for this group registered, need to create anyway
-        mVolumeActivities[vs].setVolume(volume);
+        mVolumeActivities[vs].setVolume(volumeDb);
     }
     float getCurVolume(VolumeSource vs) const
     {
@@ -327,7 +327,7 @@ public:
             setClientActive(client, false);
         }
     }
-    virtual bool setVolume(float volume,
+    virtual bool setVolume(float volumeDb,
                            audio_stream_type_t stream,
                            audio_devices_t device,
                            uint32_t delayMs,
@@ -401,7 +401,7 @@ public:
 
             void dump(String8 *dst) const override;
 
-    virtual bool setVolume(float volume,
+    virtual bool setVolume(float volumeDb,
                            audio_stream_type_t stream,
                            audio_devices_t device,
                            uint32_t delayMs,

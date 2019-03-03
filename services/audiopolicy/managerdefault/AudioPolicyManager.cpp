@@ -479,36 +479,16 @@ status_t AudioPolicyManager::getHwOffloadEncodingFormatsSupportedForA2DP(
                                     std::vector<audio_format_t> *formats)
 {
     ALOGV("getHwOffloadEncodingFormatsSupportedForA2DP()");
-    char *tok = NULL, *saveptr;
     status_t status = NO_ERROR;
-    char encoding_formats_list[PROPERTY_VALUE_MAX];
-    audio_format_t format = AUDIO_FORMAT_DEFAULT;
-    // FIXME This list should not come from a property but the supported encoded
-    // formats of declared A2DP devices in primary module
-    property_get("persist.bluetooth.a2dp_offload.cap", encoding_formats_list, "");
-    tok = strtok_r(encoding_formats_list, "-", &saveptr);
-    for (;tok != NULL; tok = strtok_r(NULL, "-", &saveptr)) {
-        if (strcmp(tok, "sbc") == 0) {
-            ALOGV("%s: SBC offload supported\n",__func__);
-            format = AUDIO_FORMAT_SBC;
-        } else if (strcmp(tok, "aptx") == 0) {
-            ALOGV("%s: APTX offload supported\n",__func__);
-            format = AUDIO_FORMAT_APTX;
-        } else if (strcmp(tok, "aptxhd") == 0) {
-            ALOGV("%s: APTX HD offload supported\n",__func__);
-            format = AUDIO_FORMAT_APTX_HD;
-        } else if (strcmp(tok, "ldac") == 0) {
-            ALOGV("%s: LDAC offload supported\n",__func__);
-            format = AUDIO_FORMAT_LDAC;
-        } else if (strcmp(tok, "aac") == 0) {
-            ALOGV("%s: AAC offload supported\n",__func__);
-            format = AUDIO_FORMAT_AAC;
-        } else {
-            ALOGE("%s: undefined token - %s\n",__func__, tok);
-            continue;
-        }
-        formats->push_back(format);
+    std::unordered_set<audio_format_t> formatSet;
+    sp<HwModule> primaryModule =
+            mHwModules.getModuleFromName(AUDIO_HARDWARE_MODULE_ID_PRIMARY);
+    DeviceVector declaredDevices = primaryModule->getDeclaredDevices().getDevicesFromTypeMask(
+            AUDIO_DEVICE_OUT_ALL_A2DP);
+    for (const auto& device : declaredDevices) {
+        formatSet.insert(device->encodedFormats().begin(), device->encodedFormats().end());
     }
+    formats->assign(formatSet.begin(), formatSet.end());
     return status;
 }
 
@@ -1986,7 +1966,11 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
         if (status != NO_ERROR) {
             goto error;
         }
-        *inputType = API_INPUT_MIX_EXT_POLICY_REROUTE;
+        if (is_mix_loopback_render(policyMix->mRouteFlags)) {
+            *inputType = API_INPUT_MIX_PUBLIC_CAPTURE_PLAYBACK;
+        } else {
+            *inputType = API_INPUT_MIX_EXT_POLICY_REROUTE;
+        }
         device = mAvailableInputDevices.getDevice(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
                                                   String8(attr->tags + strlen("addr=")),
                                                   AUDIO_FORMAT_DEFAULT);
@@ -5155,7 +5139,7 @@ DeviceVector AudioPolicyManager::getNewOutputDevices(const sp<SwAudioOutputDescr
 
         if ((hasVoiceStream(streams) &&
              (isInCall() || mOutputs.isStrategyActiveOnSameModule(productStrategy, outputDesc))) ||
-             (hasStream(streams, AUDIO_STREAM_ALARM) &&
+             ((hasStream(streams, AUDIO_STREAM_ALARM) || hasStream(streams, AUDIO_STREAM_ENFORCED_AUDIBLE)) &&
                 mOutputs.isStrategyActiveOnSameModule(productStrategy, outputDesc)) ||
                 outputDesc->isStrategyActive(productStrategy)) {
             // Retrieval of devices for voice DL is done on primary output profile, cannot
@@ -5628,7 +5612,7 @@ float AudioPolicyManager::computeVolume(audio_stream_type_t stream,
                                         audio_devices_t device)
 {
     auto &curves = getVolumeCurves(stream);
-    float volumeDB = curves.volIndexToDb(Volume::getDeviceCategory(device), index);
+    float volumeDb = curves.volIndexToDb(Volume::getDeviceCategory(device), index);
 
     // handle the case of accessibility active while a ringtone is playing: if the ringtone is much
     // louder than the accessibility prompt, the prompt cannot be heard, thus masking the touch
@@ -5638,7 +5622,7 @@ float AudioPolicyManager::computeVolume(audio_stream_type_t stream,
             && (AUDIO_MODE_RINGTONE == mEngine->getPhoneState())
             && isStreamActive(AUDIO_STREAM_RING, 0)) {
         const float ringVolumeDB = computeVolume(AUDIO_STREAM_RING, index, device);
-        return ringVolumeDB - 4 > volumeDB ? ringVolumeDB - 4 : volumeDB;
+        return ringVolumeDB - 4 > volumeDb ? ringVolumeDB - 4 : volumeDb;
     }
 
     // in-call: always cap volume by voice volume + some low headroom
@@ -5657,10 +5641,10 @@ float AudioPolicyManager::computeVolume(audio_stream_type_t stream,
             const float maxVoiceVolDb =
                 computeVolume(AUDIO_STREAM_VOICE_CALL, voiceVolumeIndex, device)
                 + IN_CALL_EARPIECE_HEADROOM_DB;
-            if (volumeDB > maxVoiceVolDb) {
+            if (volumeDb > maxVoiceVolDb) {
                 ALOGV("computeVolume() stream %d at vol=%f overriden by stream %d at vol=%f",
-                        stream, volumeDB, AUDIO_STREAM_VOICE_CALL, maxVoiceVolDb);
-                volumeDB = maxVoiceVolDb;
+                        stream, volumeDb, AUDIO_STREAM_VOICE_CALL, maxVoiceVolDb);
+                volumeDb = maxVoiceVolDb;
             }
             } break;
         default:
@@ -5693,7 +5677,7 @@ float AudioPolicyManager::computeVolume(audio_stream_type_t stream,
         // just stopped
         if (isStreamActive(AUDIO_STREAM_MUSIC, SONIFICATION_HEADSET_MUSIC_DELAY) ||
                 mLimitRingtoneVolume) {
-            volumeDB += SONIFICATION_HEADSET_VOLUME_FACTOR_DB;
+            volumeDb += SONIFICATION_HEADSET_VOLUME_FACTOR_DB;
             audio_devices_t musicDevice =
                     mEngine->getOutputDevicesForAttributes(attributes_initializer(AUDIO_USAGE_MEDIA),
                                                            nullptr, true /*fromCache*/).types();
@@ -5702,29 +5686,29 @@ float AudioPolicyManager::computeVolume(audio_stream_type_t stream,
                                    musicDevice);
             float minVolDB = (musicVolDB > SONIFICATION_HEADSET_VOLUME_MIN_DB) ?
                     musicVolDB : SONIFICATION_HEADSET_VOLUME_MIN_DB;
-            if (volumeDB > minVolDB) {
-                volumeDB = minVolDB;
+            if (volumeDb > minVolDB) {
+                volumeDb = minVolDB;
                 ALOGV("computeVolume limiting volume to %f musicVol %f", minVolDB, musicVolDB);
             }
             if (device & (AUDIO_DEVICE_OUT_BLUETOOTH_A2DP |
                     AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES)) {
                 // on A2DP, also ensure notification volume is not too low compared to media when
                 // intended to be played
-                if ((volumeDB > -96.0f) &&
-                        (musicVolDB - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB > volumeDB)) {
+                if ((volumeDb > -96.0f) &&
+                        (musicVolDB - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB > volumeDb)) {
                     ALOGV("computeVolume increasing volume for stream=%d device=0x%X from %f to %f",
                             stream, device,
-                            volumeDB, musicVolDB - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB);
-                    volumeDB = musicVolDB - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB;
+                            volumeDb, musicVolDB - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB);
+                    volumeDb = musicVolDB - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB;
                 }
             }
         } else if ((Volume::getDeviceForVolume(device) != AUDIO_DEVICE_OUT_SPEAKER) ||
                 (stream != AUDIO_STREAM_ALARM && stream != AUDIO_STREAM_RING)) {
-            volumeDB += SONIFICATION_HEADSET_VOLUME_FACTOR_DB;
+            volumeDb += SONIFICATION_HEADSET_VOLUME_FACTOR_DB;
         }
     }
 
-    return volumeDB;
+    return volumeDb;
 }
 
 int AudioPolicyManager::rescaleVolumeIndex(int srcIndex,
