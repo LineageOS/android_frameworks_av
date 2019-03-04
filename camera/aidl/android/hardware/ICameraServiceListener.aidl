@@ -76,4 +76,11 @@ interface ICameraServiceListener
     const int TORCH_STATUS_UNKNOWN = -1;
 
     oneway void onTorchStatusChanged(int status, String cameraId);
+
+    /**
+     * Notify registered clients about camera access priority changes.
+     * Clients which were previously unable to open a certain camera device
+     * can retry after receiving this callback.
+     */
+    oneway void onCameraAccessPrioritiesChanged();
 }

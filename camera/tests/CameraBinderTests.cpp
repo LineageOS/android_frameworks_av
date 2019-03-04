@@ -90,6 +90,11 @@ public:
         return binder::Status::ok();
     };
 
+    virtual binder::Status onCameraAccessPrioritiesChanged() {
+        // No op
+        return binder::Status::ok();
+    }
+
     bool waitForNumCameras(size_t num) const {
         Mutex::Autolock l(mLock);
 

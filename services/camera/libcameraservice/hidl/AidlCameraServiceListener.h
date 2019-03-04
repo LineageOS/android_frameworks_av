@@ -50,6 +50,10 @@ struct H2BCameraServiceListener :
 
     virtual ::android::binder::Status onTorchStatusChanged(
         int32_t status, const ::android::String16& cameraId) override;
+    virtual binder::Status onCameraAccessPrioritiesChanged() {
+        // TODO: no implementation yet.
+        return binder::Status::ok();
+    }
 };
 
 } // implementation
