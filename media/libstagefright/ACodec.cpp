@@ -6667,7 +6667,7 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
         return false;
     }
 
-    mDeathNotifier = new DeathNotifier(notify);
+    mDeathNotifier = new DeathNotifier(new AMessage(kWhatOMXDied, mCodec));
     auto tOmxNode = omxNode->getHalInterface<IOmxNode>();
     if (tOmxNode && !tOmxNode->linkToDeath(mDeathNotifier, 0)) {
         mDeathNotifier.clear();
