@@ -105,6 +105,60 @@ camera_status_t ACameraManager_unregisterAvailabilityCallback(
 }
 
 EXPORT
+camera_status_t ACameraManager_registerExtendedAvailabilityCallback(
+        ACameraManager* /*manager*/, const ACameraManager_ExtendedAvailabilityCallbacks *callback) {
+    ATRACE_CALL();
+    if (callback == nullptr) {
+        ALOGE("%s: invalid argument! callback is null!", __FUNCTION__);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    if ((callback->availabilityCallbacks.onCameraAvailable == nullptr) ||
+            (callback->availabilityCallbacks.onCameraUnavailable == nullptr) ||
+            (callback->onCameraAccessPrioritiesChanged == nullptr)) {
+        ALOGE("%s: invalid argument! callback %p, "
+                "onCameraAvailable %p, onCameraUnavailable %p onCameraAccessPrioritiesChanged %p",
+               __FUNCTION__, callback,
+               callback->availabilityCallbacks.onCameraAvailable,
+               callback->availabilityCallbacks.onCameraUnavailable,
+               callback->onCameraAccessPrioritiesChanged);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    auto reservedEntriesCount = sizeof(callback->reserved) / sizeof(callback->reserved[0]);
+    for (size_t i = 0; i < reservedEntriesCount; i++) {
+        if (callback->reserved[i] != nullptr) {
+            ALOGE("%s: invalid argument! callback reserved entries must be set to NULL",
+                    __FUNCTION__);
+            return ACAMERA_ERROR_INVALID_PARAMETER;
+        }
+    }
+    CameraManagerGlobal::getInstance().registerExtendedAvailabilityCallback(callback);
+    return ACAMERA_OK;
+}
+
+EXPORT
+camera_status_t ACameraManager_unregisterExtendedAvailabilityCallback(
+        ACameraManager* /*manager*/, const ACameraManager_ExtendedAvailabilityCallbacks *callback) {
+    ATRACE_CALL();
+    if (callback == nullptr) {
+        ALOGE("%s: invalid argument! callback is null!", __FUNCTION__);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    if ((callback->availabilityCallbacks.onCameraAvailable == nullptr) ||
+            (callback->availabilityCallbacks.onCameraUnavailable == nullptr) ||
+            (callback->onCameraAccessPrioritiesChanged == nullptr)) {
+        ALOGE("%s: invalid argument! callback %p, "
+                "onCameraAvailable %p, onCameraUnavailable %p onCameraAccessPrioritiesChanged %p",
+               __FUNCTION__, callback,
+               callback->availabilityCallbacks.onCameraAvailable,
+               callback->availabilityCallbacks.onCameraUnavailable,
+               callback->onCameraAccessPrioritiesChanged);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    CameraManagerGlobal::getInstance().unregisterExtendedAvailabilityCallback(callback);
+    return ACAMERA_OK;
+}
+
+EXPORT
 camera_status_t ACameraManager_getCameraCharacteristics(
         ACameraManager* mgr, const char* cameraId, ACameraMetadata** chars){
     ATRACE_CALL();
