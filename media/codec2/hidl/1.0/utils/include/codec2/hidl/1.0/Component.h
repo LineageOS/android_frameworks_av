@@ -26,6 +26,7 @@
 #include <android/hardware/media/c2/1.0/IComponentInterface.h>
 #include <android/hardware/media/c2/1.0/IComponentListener.h>
 #include <android/hardware/media/c2/1.0/IComponentStore.h>
+#include <android/hardware/media/c2/1.0/IInputSink.h>
 #include <hidl/Status.h>
 #include <hwbinder/IBinder.h>
 
@@ -94,6 +95,7 @@ struct Component : public IComponent,
     virtual Return<Status> reset() override;
     virtual Return<Status> release() override;
     virtual Return<sp<IComponentInterface>> getInterface() override;
+    virtual Return<sp<IInputSink>> asInputSink() override;
 
     // Returns a C2Component associated to the given sink if the sink is indeed
     // a local component. Returns nullptr otherwise.
