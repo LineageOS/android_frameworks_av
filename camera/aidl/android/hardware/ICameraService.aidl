@@ -108,7 +108,7 @@ interface ICameraService
      *
      * Also returns the set of currently-known camera IDs and state of each device.
      * Adding a listener will trigger the torch status listener to fire for all
-     * devices that have a flash unit
+     * devices that have a flash unit.
      */
     CameraStatus[] addListener(ICameraServiceListener listener);
 

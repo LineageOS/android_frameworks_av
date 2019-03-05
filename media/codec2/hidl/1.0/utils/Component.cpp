@@ -22,7 +22,6 @@
 #include <codec2/hidl/1.0/ComponentStore.h>
 #include <codec2/hidl/1.0/InputBufferManager.h>
 
-#include <android/hardware/media/c2/1.0/IInputSink.h>
 #include <hidl/HidlBinderSupport.h>
 #include <utils/Timers.h>
 
@@ -298,19 +297,12 @@ Return<Status> Component::setOutputSurface(
 Return<void> Component::connectToInputSurface(
         const sp<IInputSurface>& inputSurface,
         connectToInputSurface_cb _hidl_cb) {
-    sp<Sink> sink;
-    {
-        std::lock_guard<std::mutex> lock(mSinkMutex);
-        if (!mSink) {
-            mSink = new Sink(shared_from_this());
-        }
-        sink = mSink;
-    }
     Status status;
     sp<IInputSurfaceConnection> connection;
-    auto transStatus = inputSurface->connect(sink,
-            [&status, &connection](Status s,
-                                   const sp<IInputSurfaceConnection>& c) {
+    auto transStatus = inputSurface->connect(
+            asInputSink(),
+            [&status, &connection](
+                    Status s, const sp<IInputSurfaceConnection>& c) {
                 status = s;
                 connection = c;
             }
@@ -452,6 +444,14 @@ Return<Status> Component::release() {
 
 Return<sp<IComponentInterface>> Component::getInterface() {
     return sp<IComponentInterface>(mInterface);
+}
+
+Return<sp<IInputSink>> Component::asInputSink() {
+    std::lock_guard<std::mutex> lock(mSinkMutex);
+    if (!mSink) {
+        mSink = new Sink(shared_from_this());
+    }
+    return {mSink};
 }
 
 std::shared_ptr<C2Component> Component::findLocalComponent(

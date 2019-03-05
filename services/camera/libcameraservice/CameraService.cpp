@@ -227,7 +227,7 @@ void CameraService::broadcastTorchModeStatus(const String8& cameraId, TorchModeS
     Mutex::Autolock lock(mStatusListenerLock);
 
     for (auto& i : mListenerList) {
-        i.second->onTorchStatusChanged(mapToInterface(status), String16{cameraId});
+        i.second->getListener()->onTorchStatusChanged(mapToInterface(status), String16{cameraId});
     }
 }
 
@@ -1654,6 +1654,18 @@ Status CameraService::notifySystemEvent(int32_t eventId,
     return Status::ok();
 }
 
+void CameraService::notifyMonitoredUids() {
+    Mutex::Autolock lock(mStatusListenerLock);
+
+    for (const auto& it : mListenerList) {
+        auto ret = it.second->getListener()->onCameraAccessPrioritiesChanged();
+        if (!ret.isOk()) {
+            ALOGE("%s: Failed to trigger permission callback: %d", __FUNCTION__,
+                    ret.exceptionCode());
+        }
+    }
+}
+
 Status CameraService::notifyDeviceStateChange(int64_t newState) {
     const int pid = CameraThreadState::getCallingPid();
     const int selfPid = getpid();
@@ -1721,15 +1733,25 @@ Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listen
 
     {
         Mutex::Autolock lock(mStatusListenerLock);
-        for (auto& it : mListenerList) {
-            if (IInterface::asBinder(it.second) == IInterface::asBinder(listener)) {
+        for (const auto &it : mListenerList) {
+            if (IInterface::asBinder(it.second->getListener()) == IInterface::asBinder(listener)) {
                 ALOGW("%s: Tried to add listener %p which was already subscribed",
                       __FUNCTION__, listener.get());
                 return STATUS_ERROR(ERROR_ALREADY_EXISTS, "Listener already registered");
             }
         }
 
-        mListenerList.emplace_back(isVendorListener, listener);
+        auto clientUid = CameraThreadState::getCallingUid();
+        sp<ServiceListener> serviceListener = new ServiceListener(this, listener, clientUid);
+        auto ret = serviceListener->initialize();
+        if (ret != NO_ERROR) {
+            String8 msg = String8::format("Failed to initialize service listener: %s (%d)",
+                    strerror(-ret), ret);
+            ALOGE("%s: %s", __FUNCTION__, msg.string());
+            return STATUS_ERROR(ERROR_ILLEGAL_ARGUMENT, msg.string());
+        }
+        mListenerList.emplace_back(isVendorListener, serviceListener);
+        mUidPolicy->registerMonitorUid(clientUid);
     }
 
     /* Collect current devices and status */
@@ -1776,7 +1798,9 @@ Status CameraService::removeListener(const sp<ICameraServiceListener>& listener)
     {
         Mutex::Autolock lock(mStatusListenerLock);
         for (auto it = mListenerList.begin(); it != mListenerList.end(); it++) {
-            if (IInterface::asBinder(it->second) == IInterface::asBinder(listener)) {
+            if (IInterface::asBinder(it->second->getListener()) == IInterface::asBinder(listener)) {
+                mUidPolicy->unregisterMonitorUid(it->second->getListenerUid());
+                IInterface::asBinder(listener)->unlinkToDeath(it->second);
                 mListenerList.erase(it);
                 return Status::ok();
             }
@@ -2396,6 +2420,8 @@ status_t CameraService::BasicClient::startCameraOps() {
     sCameraService->updateProxyDeviceState(ICameraServiceProxy::CAMERA_STATE_OPEN,
             mCameraIdStr, mCameraFacing, mClientPackageName, apiLevel);
 
+    sCameraService->mUidPolicy->registerMonitorUid(mClientUid);
+
     return OK;
 }
 
@@ -2432,6 +2458,8 @@ status_t CameraService::BasicClient::finishCameraOps() {
         mAppOpsManager.stopWatchingMode(mOpsCallback);
     }
     mOpsCallback.clear();
+
+    sCameraService->mUidPolicy->unregisterMonitorUid(mClientUid);
 
     return OK;
 }
@@ -2523,7 +2551,7 @@ void CameraService::UidPolicy::registerSelf() {
     if (mRegistered) return;
     am.registerUidObserver(this, ActivityManager::UID_OBSERVER_GONE
             | ActivityManager::UID_OBSERVER_IDLE
-            | ActivityManager::UID_OBSERVER_ACTIVE,
+            | ActivityManager::UID_OBSERVER_ACTIVE | ActivityManager::UID_OBSERVER_PROCSTATE,
             ActivityManager::PROCESS_STATE_UNKNOWN,
             String16("cameraserver"));
     status_t res = am.linkToDeath(this);
@@ -2566,6 +2594,51 @@ void CameraService::UidPolicy::onUidIdle(uid_t uid, bool /* disabled */) {
         if (service != nullptr) {
             service->blockClientsForUid(uid);
         }
+    }
+}
+
+void CameraService::UidPolicy::onUidStateChanged(uid_t uid, int32_t procState,
+        int64_t /*procStateSeq*/) {
+    bool procStateChange = false;
+    {
+        Mutex::Autolock _l(mUidLock);
+        if ((mMonitoredUids.find(uid) != mMonitoredUids.end()) &&
+                (mMonitoredUids[uid].first != procState)) {
+            mMonitoredUids[uid].first = procState;
+            procStateChange = true;
+        }
+    }
+
+    if (procStateChange) {
+        sp<CameraService> service = mService.promote();
+        if (service != nullptr) {
+            service->notifyMonitoredUids();
+        }
+    }
+}
+
+void CameraService::UidPolicy::registerMonitorUid(uid_t uid) {
+    Mutex::Autolock _l(mUidLock);
+    auto it = mMonitoredUids.find(uid);
+    if (it != mMonitoredUids.end()) {
+        it->second.second++;
+    } else {
+        mMonitoredUids.emplace(
+                std::pair<uid_t, std::pair<int32_t, size_t>> (uid,
+                    std::pair<int32_t, size_t> (ActivityManager::PROCESS_STATE_NONEXISTENT, 1)));
+    }
+}
+
+void CameraService::UidPolicy::unregisterMonitorUid(uid_t uid) {
+    Mutex::Autolock _l(mUidLock);
+    auto it = mMonitoredUids.find(uid);
+    if (it != mMonitoredUids.end()) {
+        it->second.second--;
+        if (it->second.second == 0) {
+            mMonitoredUids.erase(it);
+        }
+    } else {
+        ALOGE("%s: Trying to unregister uid: %d which is not monitored!", __FUNCTION__, uid);
     }
 }
 
@@ -3118,7 +3191,8 @@ void CameraService::updateStatus(StatusInternal status, const String8& cameraId,
                           cameraId.c_str());
                     continue;
                 }
-                listener.second->onStatusChanged(mapToInterface(status), String16(cameraId));
+                listener.second->getListener()->onStatusChanged(mapToInterface(status),
+                        String16(cameraId));
             }
         });
 }
