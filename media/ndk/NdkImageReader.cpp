@@ -261,8 +261,8 @@ AImageReader::AImageReader(int32_t width,
 media_status_t
 AImageReader::init() {
     PublicFormat publicFormat = static_cast<PublicFormat>(mFormat);
-    mHalFormat = android_view_Surface_mapPublicFormatToHalFormat(publicFormat);
-    mHalDataSpace = android_view_Surface_mapPublicFormatToHalDataspace(publicFormat);
+    mHalFormat = mapPublicFormatToHalFormat(publicFormat);
+    mHalDataSpace = mapPublicFormatToHalDataspace(publicFormat);
     mHalUsage = AHardwareBuffer_convertToGrallocUsageBits(mUsage);
 
     sp<IGraphicBufferProducer> gbProducer;
