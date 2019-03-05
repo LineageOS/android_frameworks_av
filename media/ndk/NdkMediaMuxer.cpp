@@ -29,7 +29,6 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MediaMuxer.h>
 #include <media/IMediaHTTPService.h>
-#include <android_runtime/AndroidRuntime.h>
 #include <android_util_Binder.h>
 
 #include <jni.h>

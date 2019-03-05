@@ -25,7 +25,7 @@
 #include <cutils/atomic.h>
 #include <utils/Log.h>
 #include <android_media_Utils.h>
-#include <android_runtime/android_view_Surface.h>
+#include <ui/PublicFormat.h>
 #include <private/android/AHardwareBufferHelpers.h>
 #include <grallocusage/GrallocUsageConversion.h>
 
