@@ -6,7 +6,7 @@ LOCAL_CFLAGS := -Wall -Werror
 LOCAL_SRC_FILES := \
     MediaExtractorService.cpp
 
-LOCAL_SHARED_LIBRARIES := libmedia libstagefright libbinder libutils liblog
+LOCAL_SHARED_LIBRARIES := libmedia libstagefright libbinder libutils
 LOCAL_MODULE:= libmediaextractorservice
 include $(BUILD_SHARED_LIBRARY)
 
@@ -21,7 +21,7 @@ LOCAL_REQUIRED_MODULES_x86_64 := crash_dump.policy mediaextractor.policy
 
 LOCAL_SRC_FILES := main_extractorservice.cpp
 LOCAL_SHARED_LIBRARIES := libmedia libmediaextractorservice libbinder libutils \
-    liblog libbase libandroidicu libavservices_minijail
+    liblog libandroidicu libavservices_minijail
 LOCAL_STATIC_LIBRARIES := libicuandroid_utils
 LOCAL_MODULE:= mediaextractor
 LOCAL_INIT_RC := mediaextractor.rc
