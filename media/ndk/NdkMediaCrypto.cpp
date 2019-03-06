@@ -29,7 +29,6 @@
 #include <binder/IServiceManager.h>
 #include <media/ICrypto.h>
 #include <media/IMediaDrmService.h>
-#include <android_runtime/AndroidRuntime.h>
 #include <android_util_Binder.h>
 
 #include <jni.h>
