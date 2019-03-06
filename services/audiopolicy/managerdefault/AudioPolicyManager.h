@@ -643,7 +643,7 @@ private:
                 audio_format_t format,
                 audio_channel_mask_t channelMask,
                 audio_input_flags_t flags,
-                AudioMix *policyMix);
+                const sp<AudioPolicyMix> &policyMix);
 
         // internal function to derive a stream type value from audio attributes
         audio_stream_type_t streamTypefromAttributesInt(const audio_attributes_t *attr);
@@ -657,7 +657,7 @@ private:
         // select input device corresponding to requested audio source and return associated policy
         // mix if any. Calls getDeviceForInputSource().
         audio_devices_t getDeviceAndMixForInputSource(audio_source_t inputSource,
-                                                        AudioMix **policyMix = NULL);
+                                                      sp<AudioPolicyMix> *policyMix = NULL);
 
         // Called by setDeviceConnectionState().
         status_t setDeviceConnectionStateInt(audio_devices_t device,
