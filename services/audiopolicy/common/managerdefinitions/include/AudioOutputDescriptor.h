@@ -34,7 +34,7 @@
 namespace android {
 
 class IOProfile;
-class AudioMix;
+class AudioPolicyMix;
 class AudioPolicyClientInterface;
 
 class ActivityTracking
@@ -281,7 +281,7 @@ public:
     }
 
     DeviceVector mDevices; /**< current devices this output is routed to */
-    AudioMix *mPolicyMix = nullptr;              // non NULL when used by a dynamic policy
+    wp<AudioPolicyMix> mPolicyMix;  // non NULL when used by a dynamic policy
 
 protected:
     const sp<AudioPort> mPort;

@@ -19,6 +19,7 @@
 
 #include <AudioPolicyInterface.h>
 #include "AudioOutputDescriptor.h"
+#include "AudioPolicyMix.h"
 #include "IOProfile.h"
 #include "AudioGain.h"
 #include "Volume.h"
@@ -111,9 +112,10 @@ void AudioOutputDescriptor::setClientActive(const sp<TrackClientDescriptor>& cli
     }
     mGlobalActiveCount += delta;
 
-    if ((mPolicyMix != NULL) && ((mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
+    sp<AudioPolicyMix> policyMix = mPolicyMix.promote();
+    if ((policyMix != NULL) && ((policyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
         if ((oldGlobalActiveCount == 0) || (mGlobalActiveCount == 0)) {
-            mClientInterface->onDynamicPolicyMixStateUpdate(mPolicyMix->mDeviceAddress,
+            mClientInterface->onDynamicPolicyMixStateUpdate(policyMix->mDeviceAddress,
                 mGlobalActiveCount > 0 ? MIX_STATE_MIXING : MIX_STATE_IDLE);
         }
     }

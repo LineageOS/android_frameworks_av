@@ -217,10 +217,11 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
                 && strncmp(device_address, "0", AUDIO_DEVICE_MAX_ADDRESS_LEN) != 0) {
             for (audio_io_handle_t output : outputs) {
                 sp<SwAudioOutputDescriptor> desc = mOutputs.valueFor(output);
-                if (desc->mPolicyMix != nullptr
-                        && desc->mPolicyMix->mMixType == MIX_TYPE_RECORDERS
+                sp<AudioPolicyMix> policyMix = desc->mPolicyMix.promote();
+                if (policyMix != nullptr
+                        && policyMix->mMixType == MIX_TYPE_RECORDERS
                         && strncmp(device_address,
-                                   desc->mPolicyMix->mDeviceAddress.string(),
+                                   policyMix->mDeviceAddress.string(),
                                    AUDIO_DEVICE_MAX_ADDRESS_LEN) == 0) {
                     doCheckForDeviceAndOutputChanges = false;
                     break;
@@ -968,7 +969,7 @@ status_t AudioPolicyManager::getOutputForAttrInt(
     }
     if (usePrimaryOutputFromPolicyMixes) {
         *output = policyDesc->mIoHandle;
-        AudioMix *mix = policyDesc->mPolicyMix;
+        sp<AudioPolicyMix> mix = policyDesc->mPolicyMix.promote();
         sp<DeviceDescriptor> deviceDesc =
                 mAvailableOutputDevices.getDevice(mix->mDeviceType,
                                                   mix->mDeviceAddress,
@@ -1602,10 +1603,9 @@ status_t AudioPolicyManager::startSource(const sp<SwAudioOutputDescriptor>& outp
             (outputDesc->getPatchHandle() == AUDIO_PATCH_HANDLE_NONE);
 
     DeviceVector devices;
-    AudioMix *policyMix = NULL;
+    sp<AudioPolicyMix> policyMix = outputDesc->mPolicyMix.promote();
     const char *address = NULL;
-    if (outputDesc->mPolicyMix != NULL) {
-        policyMix = outputDesc->mPolicyMix;
+    if (policyMix != NULL) {
         audio_devices_t newDeviceType;
         address = policyMix->mDeviceAddress.string();
         if ((policyMix->mRouteFlags & MIX_ROUTE_FLAG_LOOP_BACK) == MIX_ROUTE_FLAG_LOOP_BACK) {
@@ -1775,12 +1775,13 @@ status_t AudioPolicyManager::stopSource(const sp<SwAudioOutputDescriptor>& outpu
         if (outputDesc->getActivityCount(clientVolSrc) == 1) {
             // Automatically disable the remote submix input when output is stopped on a
             // re routing mix of type MIX_TYPE_RECORDERS
+            sp<AudioPolicyMix> policyMix = outputDesc->mPolicyMix.promote();
             if (audio_is_remote_submix_device(outputDesc->devices().types()) &&
-                outputDesc->mPolicyMix != NULL &&
-                outputDesc->mPolicyMix->mMixType == MIX_TYPE_RECORDERS) {
+                policyMix != NULL &&
+                policyMix->mMixType == MIX_TYPE_RECORDERS) {
                 setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
                                             AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
-                                            outputDesc->mPolicyMix->mDeviceAddress,
+                                            policyMix->mDeviceAddress,
                                             "remote-submix", AUDIO_FORMAT_DEFAULT);
             }
         }
@@ -1895,7 +1896,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
     status_t status = NO_ERROR;
     audio_source_t halInputSource;
     audio_attributes_t attributes = *attr;
-    AudioMix *policyMix = NULL;
+    sp<AudioPolicyMix> policyMix;
     sp<DeviceDescriptor> device;
     sp<AudioInputDescriptor> inputDesc;
     sp<RecordClientDescriptor> clientDesc;
@@ -1992,7 +1993,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
             status = BAD_VALUE;
             goto error;
         }
-        if (policyMix != nullptr) {
+        if (policyMix) {
             ALOG_ASSERT(policyMix->mMixType == MIX_TYPE_RECORDERS, "Invalid Mix Type");
             // there is an external policy, but this input is attached to a mix of recorders,
             // meaning it receives audio injected into the framework, so the recorder doesn't
@@ -2044,7 +2045,7 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(const sp<DeviceDescripto
                                                         const audio_attributes_t &attributes,
                                                         const audio_config_base_t *config,
                                                         audio_input_flags_t flags,
-                                                        AudioMix *policyMix)
+                                                        const sp<AudioPolicyMix> &policyMix)
 {
     audio_io_handle_t input = AUDIO_IO_HANDLE_NONE;
     audio_source_t halInputSource = attributes.source;
@@ -2204,10 +2205,11 @@ status_t AudioPolicyManager::startInput(audio_port_handle_t portId)
     setInputDevice(input, device, true /* force */);
 
     if (inputDesc->activeCount()  == 1) {
+        sp<AudioPolicyMix> policyMix = inputDesc->mPolicyMix.promote();
         // if input maps to a dynamic policy with an activity listener, notify of state change
-        if ((inputDesc->mPolicyMix != NULL)
-                && ((inputDesc->mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
-            mpClientInterface->onDynamicPolicyMixStateUpdate(inputDesc->mPolicyMix->mDeviceAddress,
+        if ((policyMix != NULL)
+                && ((policyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
+            mpClientInterface->onDynamicPolicyMixStateUpdate(policyMix->mDeviceAddress,
                     MIX_STATE_MIXING);
         }
 
@@ -2222,10 +2224,10 @@ status_t AudioPolicyManager::startInput(audio_port_handle_t portId)
         // For remote submix (a virtual device), we open only one input per capture request.
         if (audio_is_remote_submix_device(inputDesc->getDeviceType())) {
             String8 address = String8("");
-            if (inputDesc->mPolicyMix == NULL) {
+            if (policyMix == NULL) {
                 address = String8("0");
-            } else if (inputDesc->mPolicyMix->mMixType == MIX_TYPE_PLAYERS) {
-                address = inputDesc->mPolicyMix->mDeviceAddress;
+            } else if (policyMix->mMixType == MIX_TYPE_PLAYERS) {
+                address = policyMix->mDeviceAddress;
             }
             if (address != "") {
                 setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
@@ -2262,10 +2264,11 @@ status_t AudioPolicyManager::stopInput(audio_port_handle_t portId)
     if (inputDesc->isActive()) {
         setInputDevice(input, getNewInputDevice(inputDesc), false /* force */);
     } else {
+        sp<AudioPolicyMix> policyMix = inputDesc->mPolicyMix.promote();
         // if input maps to a dynamic policy with an activity listener, notify of state change
-        if ((inputDesc->mPolicyMix != NULL)
-                && ((inputDesc->mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
-            mpClientInterface->onDynamicPolicyMixStateUpdate(inputDesc->mPolicyMix->mDeviceAddress,
+        if ((policyMix != NULL)
+                && ((policyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0)) {
+            mpClientInterface->onDynamicPolicyMixStateUpdate(policyMix->mDeviceAddress,
                     MIX_STATE_IDLE);
         }
 
@@ -2273,10 +2276,10 @@ status_t AudioPolicyManager::stopInput(audio_port_handle_t portId)
         // used by a policy mix of type MIX_TYPE_RECORDERS
         if (audio_is_remote_submix_device(inputDesc->getDeviceType())) {
             String8 address = String8("");
-            if (inputDesc->mPolicyMix == NULL) {
+            if (policyMix == NULL) {
                 address = String8("0");
-            } else if (inputDesc->mPolicyMix->mMixType == MIX_TYPE_PLAYERS) {
-                address = inputDesc->mPolicyMix->mDeviceAddress;
+            } else if (policyMix->mMixType == MIX_TYPE_PLAYERS) {
+                address = policyMix->mDeviceAddress;
             }
             if (address != "") {
                 setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
@@ -4582,7 +4585,7 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                         sp<AudioPolicyMix> policyMix;
                         if (mPolicyMixes.getAudioPolicyMix(address, policyMix) == NO_ERROR) {
                             policyMix->setOutput(desc);
-                            desc->mPolicyMix = policyMix->getMix();
+                            desc->mPolicyMix = policyMix;
                         } else {
                             ALOGW("checkOutputsForDevice() cannot find policy for address %s",
                                   address.string());
