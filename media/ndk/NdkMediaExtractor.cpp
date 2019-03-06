@@ -33,12 +33,69 @@
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/NuMediaExtractor.h>
 #include <media/IMediaHTTPService.h>
-#include <android_runtime/AndroidRuntime.h>
-#include <android_util_Binder.h>
 
 #include <jni.h>
 
+#include <mutex> // std::call_once,once_flag
+#include <dlfcn.h> // dlopen
+
 using namespace android;
+
+// load libandroid_runtime.so lazily.
+// A vendor process may use libmediandk but should not depend on libandroid_runtime.
+// TODO(jooyung): remove duplicate (b/125550121)
+// frameworks/native/libs/binder/ndk/ibinder_jni.cpp
+namespace {
+
+typedef JNIEnv* (*getJNIEnv_t)();
+typedef sp<IBinder> (*ibinderForJavaObject_t)(JNIEnv* env, jobject obj);
+
+getJNIEnv_t getJNIEnv_;
+ibinderForJavaObject_t ibinderForJavaObject_;
+
+std::once_flag mLoadFlag;
+
+void load() {
+    std::call_once(mLoadFlag, []() {
+        void* handle = dlopen("libandroid_runtime.so", RTLD_LAZY);
+        if (handle == nullptr) {
+            ALOGE("Could not open libandroid_runtime.");
+            return;
+        }
+
+        getJNIEnv_ = reinterpret_cast<getJNIEnv_t>(
+                dlsym(handle, "_ZN7android14AndroidRuntime9getJNIEnvEv"));
+        if (getJNIEnv_ == nullptr) {
+            ALOGE("Could not find AndroidRuntime::getJNIEnv.");
+            // no return
+        }
+
+        ibinderForJavaObject_ = reinterpret_cast<ibinderForJavaObject_t>(
+                dlsym(handle, "_ZN7android20ibinderForJavaObjectEP7_JNIEnvP8_jobject"));
+        if (ibinderForJavaObject_ == nullptr) {
+            ALOGE("Could not find ibinderForJavaObject.");
+            // no return
+        }
+    });
+}
+
+JNIEnv* getJNIEnv() {
+    load();
+    if (getJNIEnv_ == nullptr) {
+        return nullptr;
+    }
+    return (getJNIEnv_)();
+}
+
+sp<IBinder> ibinderForJavaObject(JNIEnv* env, jobject obj) {
+    load();
+    if (ibinderForJavaObject_ == nullptr) {
+        return nullptr;
+    }
+    return (ibinderForJavaObject_)(env, obj);
+}
+
+} // namespace
 
 static media_status_t translate_error(status_t err) {
     if (err == OK) {
@@ -87,7 +144,7 @@ media_status_t AMediaExtractor_setDataSource(AMediaExtractor *mData, const char 
     ALOGV("setDataSource(%s)", location);
     // TODO: add header support
 
-    JNIEnv *env = AndroidRuntime::getJNIEnv();
+    JNIEnv *env = getJNIEnv();
     jobject service = NULL;
     if (env == NULL) {
         ALOGE("setDataSource(path) must be called from Java thread");
