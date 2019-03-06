@@ -1022,7 +1022,8 @@ status_t AudioPolicyManager::getOutputForAttrInt(
         }
     }
     if (*output == AUDIO_IO_HANDLE_NONE) {
-        *output = getOutputForDevices(outputDevices, session, *stream, config, flags);
+        *output = getOutputForDevices(outputDevices, session, *stream, config,
+                flags, attr->flags & AUDIO_FLAG_MUTE_HAPTIC);
     }
     if (*output == AUDIO_IO_HANDLE_NONE) {
         return INVALID_OPERATION;
@@ -1100,10 +1101,15 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
         audio_session_t session,
         audio_stream_type_t stream,
         const audio_config_t *config,
-        audio_output_flags_t *flags)
+        audio_output_flags_t *flags,
+        bool forceMutingHaptic)
 {
     audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
     status_t status;
+
+    // Discard haptic channel mask when forcing muting haptic channels.
+    audio_channel_mask_t channelMask = forceMutingHaptic
+            ? (config->channel_mask & ~AUDIO_CHANNEL_HAPTIC_ALL) : config->channel_mask;
 
     // open a direct output if required by specified parameters
     //force direct flag if offload flag is set: offloading implies a direct output stream
@@ -1141,7 +1147,7 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
     // and not explicitly requested
     if (((*flags & AUDIO_OUTPUT_FLAG_DIRECT) == 0) &&
             audio_is_linear_pcm(config->format) && config->sample_rate <= SAMPLE_RATE_HZ_MAX &&
-            audio_channel_count_from_out_mask(config->channel_mask) <= 2) {
+            audio_channel_count_from_out_mask(channelMask) <= 2) {
         goto non_direct_output;
     }
 
@@ -1157,7 +1163,7 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
         profile = getProfileForOutput(devices,
                                    config->sample_rate,
                                    config->format,
-                                   config->channel_mask,
+                                   channelMask,
                                    (audio_output_flags_t)*flags,
                                    true /* directOnly */);
     }
@@ -1171,7 +1177,7 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
                 // and configured with same parameters
                 if ((config->sample_rate == desc->mSamplingRate) &&
                     (config->format == desc->mFormat) &&
-                    (config->channel_mask == desc->mChannelMask) &&
+                    (channelMask == desc->mChannelMask) &&
                     (session == desc->mDirectClientSession)) {
                     desc->mDirectOpenCount++;
                     ALOGI("%s reusing direct output %d for session %d", __func__, 
@@ -1213,11 +1219,11 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
         if (status != NO_ERROR ||
             (config->sample_rate != 0 && config->sample_rate != outputDesc->mSamplingRate) ||
             (config->format != AUDIO_FORMAT_DEFAULT && config->format != outputDesc->mFormat) ||
-            (config->channel_mask != 0 && config->channel_mask != outputDesc->mChannelMask)) {
+            (channelMask != 0 && channelMask != outputDesc->mChannelMask)) {
             ALOGV("%s failed opening direct output: output %d sample rate %d %d," 
                     "format %d %d, channel mask %04x %04x", __func__, output, config->sample_rate,
                     outputDesc->mSamplingRate, config->format, outputDesc->mFormat,
-                    config->channel_mask, outputDesc->mChannelMask);
+                    channelMask, outputDesc->mChannelMask);
             if (output != AUDIO_IO_HANDLE_NONE) {
                 outputDesc->close();
             }
@@ -1258,12 +1264,11 @@ non_direct_output:
 
         // at this stage we should ignore the DIRECT flag as no direct output could be found earlier
         *flags = (audio_output_flags_t)(*flags & ~AUDIO_OUTPUT_FLAG_DIRECT);
-        output = selectOutput(outputs, *flags, config->format,
-                config->channel_mask, config->sample_rate);
+        output = selectOutput(outputs, *flags, config->format, channelMask, config->sample_rate);
     }
     ALOGW_IF((output == 0), "getOutputForDevices() could not find output for stream %d, "
             "sampling rate %d, format %#x, channels %#x, flags %#x",
-            stream, config->sample_rate, config->format, config->channel_mask, *flags);
+            stream, config->sample_rate, config->format, channelMask, *flags);
 
     return output;
 }
