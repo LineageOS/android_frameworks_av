@@ -4391,8 +4391,11 @@ status_t Camera3Device::HalInterface::wrapAsHidlRequest(camera3_capture_request_
             dst.status = BufferStatus::OK;
             dst.releaseFence = nullptr;
 
-            pushInflightBufferLocked(captureRequest->frameNumber, streamId,
-                    src->buffer, src->acquire_fence);
+            // Output buffers are empty when using HAL buffer manager
+            if (!mUseHalBufManager) {
+                pushInflightBufferLocked(captureRequest->frameNumber, streamId,
+                        src->buffer, src->acquire_fence);
+            }
         }
     }
     return OK;
