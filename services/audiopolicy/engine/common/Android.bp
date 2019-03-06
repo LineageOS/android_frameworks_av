@@ -17,3 +17,31 @@ cc_library_headers {
     host_supported: true,
     export_include_dirs: ["include"],
 }
+
+cc_library_static {
+    name: "libaudiopolicyengine_common",
+    srcs: [
+        "src/EngineBase.cpp",
+        "src/ProductStrategy.cpp",
+        "src/VolumeCurve.cpp",
+        "src/VolumeGroup.cpp",
+    ],
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+    header_libs: [
+        "libbase_headers",
+        "libaudiopolicycommon",
+        "libaudiopolicyengine_common_headers",
+        "libaudiopolicyengine_interface_headers",
+    ],
+    export_header_lib_headers: [
+        "libaudiopolicyengine_common_headers",
+    ],
+    static_libs: [
+        "libaudiopolicycomponents",
+        "libaudiopolicyengine_config",
+    ],
+}
