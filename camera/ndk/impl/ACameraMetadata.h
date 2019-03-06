@@ -58,13 +58,16 @@ struct ACameraMetadata : public RefBase {
     camera_status_t getTags(/*out*/int32_t* numTags,
                             /*out*/const uint32_t** tags) const;
 
+    const CameraMetadata& getInternalData() const;
+
+  private:
+
     bool isNdkSupportedCapability(const int32_t capability);
     static inline bool isVendorTag(const uint32_t tag);
     static bool isCaptureRequestTag(const uint32_t tag);
     void filterUnsupportedFeatures(); // Hide features not yet supported by NDK
     void filterStreamConfigurations(); // Hide input streams, translate hal format to NDK formats
-
-    const CameraMetadata& getInternalData() const;
+    void filterDurations(uint32_t tag); // translate hal format to NDK formats
 
     template<typename INTERNAL_T, typename NDK_T>
     camera_status_t updateImpl(uint32_t tag, uint32_t count, const NDK_T* data) {
@@ -96,7 +99,6 @@ struct ACameraMetadata : public RefBase {
         }
     }
 
-  private:
     // guard access of public APIs: get/update/getTags
     mutable Mutex    mLock;
     CameraMetadata   mData;
