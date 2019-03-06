@@ -1426,8 +1426,10 @@ void AudioRecord::DeathNotifier::binderDied(const wp<IBinder>& who __unused)
 
 // =========================================================================
 
-AudioRecord::AudioRecordThread::AudioRecordThread(AudioRecord& receiver, bool bCanCallJava)
-    : Thread(bCanCallJava), mReceiver(receiver), mPaused(true), mPausedInt(false), mPausedNs(0LL),
+AudioRecord::AudioRecordThread::AudioRecordThread(AudioRecord& receiver,
+        bool bCanCallJava __unused)
+    : Thread(true /* bCanCallJava */)  // binder recursion on restoreRecord_l() may call Java.
+    , mReceiver(receiver), mPaused(true), mPausedInt(false), mPausedNs(0LL),
       mIgnoreNextPausedInt(false)
 {
 }
