@@ -1973,10 +1973,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                 case kWhatComponentConfigured:
                 {
-                    if (mState == UNINITIALIZED || mState == INITIALIZED) {
-                        // In case a kWhatError message came in and replied with error,
+                    if (mState == RELEASING || mState == UNINITIALIZED || mState == INITIALIZED) {
+                        // In case a kWhatError or kWhatRelease message came in and replied,
                         // we log a warning and ignore.
-                        ALOGW("configure interrupted by error, current state %d", mState);
+                        ALOGW("configure interrupted by error or release, current state %d",
+                              mState);
                         break;
                     }
                     CHECK_EQ(mState, CONFIGURING);
@@ -2067,6 +2068,13 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                 case kWhatStartCompleted:
                 {
+                    if (mState == RELEASING || mState == UNINITIALIZED) {
+                        // In case a kWhatRelease message came in and replied,
+                        // we log a warning and ignore.
+                        ALOGW("start interrupted by release, current state %d", mState);
+                        break;
+                    }
+
                     CHECK_EQ(mState, STARTING);
                     if (mIsVideo) {
                         addResource(
@@ -2632,11 +2640,12 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 break;
             }
 
-            // If we're flushing, or we're stopping but received a release
-            // request, post the reply for the pending call first, and consider
-            // it done. The reply token will be replaced after this, and we'll
-            // no longer be able to reply.
-            if (mState == FLUSHING || mState == STOPPING) {
+            // If we're flushing, stopping, configuring or starting  but
+            // received a release request, post the reply for the pending call
+            // first, and consider it done. The reply token will be replaced
+            // after this, and we'll no longer be able to reply.
+            if (mState == FLUSHING || mState == STOPPING
+                    || mState == CONFIGURING || mState == STARTING) {
                 (new AMessage)->postReply(mReplyID);
             }
 

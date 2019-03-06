@@ -457,8 +457,8 @@ status_t HevcParameterSets::makeHvcc(uint8_t *hvcc, size_t *hvccSize,
         if (numNalus == 0) {
             continue;
         }
-        // array_completeness set to 0.
-        header[0] = type;
+        // array_completeness set to 1.
+        header[0] = type | 0x80;
         header[1] = (numNalus >> 8) & 0xff;
         header[2] = numNalus & 0xff;
         header += 3;

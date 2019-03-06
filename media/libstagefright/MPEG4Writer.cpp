@@ -3128,8 +3128,8 @@ status_t MPEG4Writer::Track::threadEntry() {
         if (!mIsHeic) {
             if (mStszTableEntries->count() == 0) {
                 mFirstSampleTimeRealUs = systemTime() / 1000;
+                mOwner->setStartTimestampUs(timestampUs);
                 mStartTimestampUs = timestampUs;
-                mOwner->setStartTimestampUs(mStartTimestampUs);
                 previousPausedDurationUs = mStartTimestampUs;
             }
 
