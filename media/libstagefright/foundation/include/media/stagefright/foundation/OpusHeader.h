@@ -25,22 +25,37 @@
 namespace android {
 
 /* Constants used for delimiting Opus CSD */
-#define AOPUS_CSD_CODEC_DELAY_MARKER "AOPUSDLY"
-#define AOPUS_CSD_SEEK_PREROLL_MARKER "AOPUSPRL"
-#define AOPUS_CSD_SIZE 8
-#define AOPUS_LENGTH 8
+#define AOPUS_CSD_MARKER_PREFIX "AOPUS"
+#define AOPUS_CSD_MARKER_PREFIX_SIZE (sizeof(AOPUS_CSD_MARKER_PREFIX) - 1)
+#define AOPUS_CSD_OPUS_HEADER_MARKER AOPUS_CSD_MARKER_PREFIX "HDR"
+#define AOPUS_CSD_CODEC_DELAY_MARKER AOPUS_CSD_MARKER_PREFIX "DLY"
+#define AOPUS_CSD_SEEK_PREROLL_MARKER AOPUS_CSD_MARKER_PREFIX "PRL"
 #define AOPUS_MARKER_SIZE 8
-#define AOPUS_LENGTH_SIZE 8
-#define AOPUS_TOTAL_CSD_SIZE \
-    ((AOPUS_MARKER_SIZE) + (AOPUS_LENGTH_SIZE) + (AOPUS_CSD_SIZE))
-#define AOPUS_CSD0_MINSIZE 19
-#define AOPUS_UNIFIED_CSD_MINSIZE \
-    ((AOPUS_CSD0_MINSIZE) + 2 * (AOPUS_TOTAL_CSD_SIZE))
+#define AOPUS_LENGTH_SIZE sizeof(uint64_t)
+#define AOPUS_CSD_CODEC_DELAY_SIZE \
+     (AOPUS_MARKER_SIZE) + (AOPUS_LENGTH_SIZE) + sizeof(uint64_t)
+#define AOPUS_CSD_SEEK_PREROLL_SIZE \
+     (AOPUS_MARKER_SIZE) + (AOPUS_LENGTH_SIZE) + sizeof(uint64_t)
 
-/* CSD0 at max can be 22 bytes + max number of channels (255) */
-#define AOPUS_CSD0_MAXSIZE 277
+/* OpusHead csd minimum size is 19 */
+#define AOPUS_OPUSHEAD_MINSIZE 19
+#define AOPUS_CSD_OPUSHEAD_MINSIZE \
+    (AOPUS_MARKER_SIZE) + (AOPUS_LENGTH_SIZE) + (AOPUS_OPUSHEAD_MINSIZE)
+
+#define AOPUS_UNIFIED_CSD_MINSIZE \
+    ((AOPUS_CSD_OPUSHEAD_MINSIZE) + \
+     (AOPUS_CSD_CODEC_DELAY_SIZE) + \
+     (AOPUS_CSD_SEEK_PREROLL_SIZE))
+
+/* OpusHead csd at max can be AOPUS_CSD_OPUSHEAD_MINSIZE + 2 + max number of channels (255) */
+#define AOPUS_OPUSHEAD_MAXSIZE ((AOPUS_OPUSHEAD_MINSIZE) + 2 + 255)
+#define AOPUS_CSD_OPUSHEAD_MAXSIZE \
+    (AOPUS_MARKER_SIZE) + (AOPUS_LENGTH_SIZE) + (AOPUS_OPUSHEAD_MAXSIZE)
+
 #define AOPUS_UNIFIED_CSD_MAXSIZE \
-    ((AOPUS_CSD0_MAXSIZE) + 2 * (AOPUS_TOTAL_CSD_SIZE))
+    ((AOPUS_CSD_OPUSHEAD_MAXSIZE) + \
+     (AOPUS_CSD_CODEC_DELAY_SIZE) + \
+     (AOPUS_CSD_SEEK_PREROLL_SIZE))
 
 struct OpusHeader {
     int channels;
@@ -54,13 +69,14 @@ struct OpusHeader {
 
 bool ParseOpusHeader(const uint8_t* data, size_t data_size, OpusHeader* header);
 int WriteOpusHeader(const OpusHeader &header, int input_sample_rate, uint8_t* output, size_t output_size);
-void GetOpusHeaderBuffers(const uint8_t *data, size_t data_size,
+bool GetOpusHeaderBuffers(const uint8_t *data, size_t data_size,
                           void **opusHeadBuf, size_t *opusHeadSize,
                           void **codecDelayBuf, size_t *codecDelaySize,
                           void **seekPreRollBuf, size_t *seekPreRollSize);
 int WriteOpusHeaders(const OpusHeader &header, int inputSampleRate,
                      uint8_t* output, size_t outputSize, uint64_t codecDelay,
                      uint64_t seekPreRoll);
+bool IsOpusHeader(const uint8_t *data, size_t data_size);
 }  // namespace android
 
 #endif  // OPUS_HEADER_H_
