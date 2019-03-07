@@ -22,7 +22,6 @@
 #include <mediaplayer2/JAudioTrack.h>
 #include <mediaplayer2/JObjectHolder.h>
 
-#include <vector>
 #include <utility>
 #include <utils/String16.h>
 #include <utils/Vector.h>
@@ -125,7 +124,7 @@ private:
     audio_output_flags_t    mFlags;
     sp<JObjectHolder>       mPreferredDevice;
     mutable Mutex           mLock;
-    std::vector<std::pair<jobject, jobject>> mRoutingDelegates; // <listener, routingDelegate>
+    Vector<std::pair<jobject, jobject>> mRoutingDelegates; // <listener, routingDelegate>
 
     // static variables below not protected by mutex
     static bool             mIsOnEmulator;
