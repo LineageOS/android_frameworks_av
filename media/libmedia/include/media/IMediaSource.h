@@ -126,8 +126,8 @@ public:
 
     static const size_t kBinderMediaBuffers = 4; // buffers managed by BnMediaSource
     static const size_t kTransferSharedAsSharedThreshold = 4 * 1024;  // if >= shared, else inline
-    static const size_t kTransferInlineAsSharedThreshold = 64 * 1024; // if >= shared, else inline
-    static const size_t kInlineMaxTransfer = 256 * 1024; // Binder size limited to BINDER_VM_SIZE.
+    static const size_t kTransferInlineAsSharedThreshold = 8 * 1024; // if >= shared, else inline
+    static const size_t kInlineMaxTransfer = 64 * 1024; // Binder size limited to BINDER_VM_SIZE.
 
 protected:
     virtual ~BnMediaSource();
