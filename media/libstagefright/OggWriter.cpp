@@ -295,6 +295,18 @@ status_t OggWriter::threadFunc() {
                   mEstimatedSizeBytes, mMaxFileSizeLimitBytes);
             break;
         }
+
+        int32_t isCodecSpecific;
+        if ((buffer->meta_data().findInt32(kKeyIsCodecConfig, &isCodecSpecific)
+             && isCodecSpecific)
+            || IsOpusHeader((uint8_t*)buffer->data() + buffer->range_offset(),
+                         buffer->range_length())) {
+            ALOGV("Drop codec specific info buffer");
+            buffer->release();
+            buffer = nullptr;
+            continue;
+        }
+
         int64_t timestampUs;
         CHECK(buffer->meta_data().findInt64(kKeyTime, &timestampUs));
         if (timestampUs > mEstimatedDurationUs) {

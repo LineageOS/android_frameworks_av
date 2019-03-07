@@ -779,7 +779,8 @@ private:
                 audio_session_t session,
                 audio_stream_type_t stream,
                 const audio_config_t *config,
-                audio_output_flags_t *flags);
+                audio_output_flags_t *flags,
+                bool forceMutingHaptic = false);
 
         /**
          * @brief getInputForDevice selects an input handle for a given input device and
