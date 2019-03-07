@@ -40,6 +40,7 @@ static const std::string kDrmErrorTestValue("");
 static const std::string kResourceContentionValue("resourceContention");
 static const std::string kLostStateValue("lostState");
 static const std::string kFrameTooLargeValue("frameTooLarge");
+static const std::string kInvalidStateValue("invalidState");
 
 static const std::string kDeviceIdKey("deviceId");
 static const uint8_t kTestDeviceIdData[] =

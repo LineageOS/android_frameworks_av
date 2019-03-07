@@ -527,6 +527,10 @@ Return<Status> DrmPlugin::setPropertyString(
             mMockError = Status_V1_2::ERROR_DRM_SESSION_LOST_STATE;
         } else if (value == kFrameTooLargeValue) {
             mMockError = Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE;
+        } else if (value == kInvalidStateValue)  {
+            mMockError = Status_V1_2::ERROR_DRM_INVALID_STATE;
+        } else {
+            mMockError = Status_V1_2::ERROR_DRM_UNKNOWN;
         }
     }
 
@@ -683,6 +687,10 @@ Return<void> DrmPlugin::getMetrics(getMetrics_cb _hidl_cb) {
 Return<void> DrmPlugin::getOfflineLicenseKeySetIds(getOfflineLicenseKeySetIds_cb _hidl_cb) {
     std::vector<std::string> licenseNames = mFileHandle.ListLicenses();
     std::vector<KeySetId> keySetIds;
+    if (mMockError != Status_V1_2::OK) {
+        _hidl_cb(toStatus_1_0(mMockError), keySetIds);
+        return Void();
+    }
     for (const auto& name : licenseNames) {
         std::vector<uint8_t> keySetId(name.begin(), name.end());
         keySetIds.push_back(keySetId);
@@ -693,6 +701,9 @@ Return<void> DrmPlugin::getOfflineLicenseKeySetIds(getOfflineLicenseKeySetIds_cb
 
 
 Return<Status> DrmPlugin::removeOfflineLicense(const KeySetId& keySetId) {
+    if (mMockError != Status_V1_2::OK) {
+        return toStatus_1_0(mMockError);
+    }
     std::string licenseName(keySetId.begin(), keySetId.end());
     if (mFileHandle.DeleteLicense(licenseName)) {
         return Status::OK;
@@ -706,7 +717,9 @@ Return<void> DrmPlugin::getOfflineLicenseState(const KeySetId& keySetId,
     DeviceFiles::LicenseState state;
     std::string license;
     OfflineLicenseState hLicenseState;
-    if (mFileHandle.RetrieveLicense(licenseName, &state, &license)) {
+    if (mMockError != Status_V1_2::OK) {
+        _hidl_cb(toStatus_1_0(mMockError), OfflineLicenseState::UNKNOWN);
+    } else if (mFileHandle.RetrieveLicense(licenseName, &state, &license)) {
         switch (state) {
         case DeviceFiles::kLicenseStateActive:
             hLicenseState = OfflineLicenseState::USABLE;
