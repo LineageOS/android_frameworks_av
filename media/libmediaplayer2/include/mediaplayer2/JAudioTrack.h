@@ -17,7 +17,6 @@
 #ifndef ANDROID_JAUDIOTRACK_H
 #define ANDROID_JAUDIOTRACK_H
 
-#include <vector>
 #include <utility>
 #include <jni.h>
 #include <media/AudioResamplerPublic.h>
@@ -25,6 +24,7 @@
 #include <media/VolumeShaper.h>
 #include <system/audio.h>
 #include <utils/Errors.h>
+#include <utils/Vector.h>
 #include <mediaplayer2/JObjectHolder.h>
 #include <media/AudioTimestamp.h>   // It has dependency on audio.h/Errors.h, but doesn't
                                     // include them in it. Therefore it is included here at last.
@@ -405,7 +405,7 @@ public:
      * routingDelegates: backed-up routing delegates
      *
      */
-    void registerRoutingDelegates(std::vector<std::pair<jobject, jobject>>& routingDelegates);
+    void registerRoutingDelegates(Vector<std::pair<jobject, jobject>>& routingDelegates);
 
     /* get listener from RoutingDelegate object
      */
@@ -415,17 +415,6 @@ public:
      */
     static jobject getHandler(const jobject routingDelegateObj);
 
-    /* convert local reference to global reference.
-     */
-    static jobject addGlobalRef(const jobject obj);
-
-    /* erase global reference.
-     *
-     * Returns NO_ERROR if succeeds
-     *         BAD_VALUE if obj is NULL
-     */
-    static status_t removeGlobalRef(const jobject obj);
-
     /*
      * Parameters:
      * map and key
@@ -433,13 +422,13 @@ public:
      * Returns value if key is in the map
      *         nullptr if key is not in the map
      */
-    static jobject findByKey(std::vector<std::pair<jobject, jobject>>& mp, const jobject key);
+    static jobject findByKey(Vector<std::pair<jobject, jobject>>& mp, const jobject key);
 
     /*
      * Parameters:
      * map and key
      */
-    static void eraseByKey(std::vector<std::pair<jobject, jobject>>& mp, const jobject key);
+    static void eraseByKey(Vector<std::pair<jobject, jobject>>& mp, const jobject key);
 
 private:
     audio_output_flags_t mFlags;
