@@ -42,12 +42,25 @@ apex_defaults {
     },
     key: "com.android.media.key",
     certificate: ":com.android.media.certificate",
+
+    // Use a custom AndroidManifest.xml used for API targeting.
+    androidManifest: ":com.android.media-androidManifest",
 }
 
 apex {
     name: "com.android.media",
     manifest: "manifest.json",
     defaults: ["com.android.media-defaults"],
+}
+
+filegroup {
+    name: "com.android.media-androidManifest",
+    srcs: ["AndroidManifest-media.xml"],
+}
+
+filegroup {
+    name: "com.android.media.swcodec-androidManifest",
+    srcs: ["AndroidManifest-swcodec.xml"],
 }
 
 apex_defaults {
@@ -58,6 +71,9 @@ apex_defaults {
     use_vendor: true,
     key: "com.android.media.swcodec.key",
     certificate: ":com.android.media.swcodec.certificate",
+
+    // Use a custom AndroidManifest.xml used for API targeting.
+    androidManifest: ":com.android.media.swcodec-androidManifest",
 }
 
 apex {
