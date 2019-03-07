@@ -32,6 +32,7 @@ LOCAL_SHARED_LIBRARIES := \
     libbinder \
     libaudioclient \
     libmedialogservice \
+    libmediametrics \
     libmediautils \
     libnbaio \
     libnblog \
