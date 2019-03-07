@@ -573,7 +573,7 @@ status_t AudioTrack::set(
     mCbf = cbf;
 
     if (cbf != NULL) {
-        mAudioTrackThread = new AudioTrackThread(*this, threadCanCallJava);
+        mAudioTrackThread = new AudioTrackThread(*this);
         mAudioTrackThread->run("AudioTrack", ANDROID_PRIORITY_AUDIO, 0 /*stack*/);
         // thread begins in paused state, and will not reference us until start()
     }
@@ -3085,7 +3085,7 @@ void AudioTrack::DeathNotifier::binderDied(const wp<IBinder>& who __unused)
 
 // =========================================================================
 
-AudioTrack::AudioTrackThread::AudioTrackThread(AudioTrack& receiver, bool bCanCallJava __unused)
+AudioTrack::AudioTrackThread::AudioTrackThread(AudioTrack& receiver)
     : Thread(true /* bCanCallJava */)  // binder recursion on restoreTrack_l() may call Java.
     , mReceiver(receiver), mPaused(true), mPausedInt(false), mPausedNs(0LL),
       mIgnoreNextPausedInt(false)

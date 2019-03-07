@@ -313,7 +313,7 @@ status_t AudioRecord::set(
     mCbf = cbf;
 
     if (cbf != NULL) {
-        mAudioRecordThread = new AudioRecordThread(*this, threadCanCallJava);
+        mAudioRecordThread = new AudioRecordThread(*this);
         mAudioRecordThread->run("AudioRecord", ANDROID_PRIORITY_AUDIO);
         // thread begins in paused state, and will not reference us until start()
     }
@@ -1390,8 +1390,7 @@ void AudioRecord::DeathNotifier::binderDied(const wp<IBinder>& who __unused)
 
 // =========================================================================
 
-AudioRecord::AudioRecordThread::AudioRecordThread(AudioRecord& receiver,
-        bool bCanCallJava __unused)
+AudioRecord::AudioRecordThread::AudioRecordThread(AudioRecord& receiver)
     : Thread(true /* bCanCallJava */)  // binder recursion on restoreRecord_l() may call Java.
     , mReceiver(receiver), mPaused(true), mPausedInt(false), mPausedNs(0LL),
       mIgnoreNextPausedInt(false)

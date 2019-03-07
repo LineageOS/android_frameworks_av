@@ -562,7 +562,7 @@ private:
     class AudioRecordThread : public Thread
     {
     public:
-        AudioRecordThread(AudioRecord& receiver, bool bCanCallJava = false);
+        AudioRecordThread(AudioRecord& receiver);
 
         // Do not call Thread::requestExitAndWait() without first calling requestExit().
         // Thread::requestExitAndWait() is not virtual, and the implementation doesn't do enough.
