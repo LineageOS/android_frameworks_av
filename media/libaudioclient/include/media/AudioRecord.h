@@ -189,7 +189,10 @@ public:
                                     uid_t uid = AUDIO_UID_INVALID,
                                     pid_t pid = -1,
                                     const audio_attributes_t* pAttributes = NULL,
-                                    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
+                                    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE,
+                                    audio_microphone_direction_t
+                                        selectedMicDirection = MIC_DIRECTION_UNSPECIFIED,
+                                    float selectedMicFieldDimension = MIC_FIELD_DIMENSION_DEFAULT);
 
     /* Terminates the AudioRecord and unregisters it from AudioFlinger.
      * Also destroys all resources associated with the AudioRecord.
@@ -228,7 +231,10 @@ public:
                             uid_t uid = AUDIO_UID_INVALID,
                             pid_t pid = -1,
                             const audio_attributes_t* pAttributes = NULL,
-                            audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
+                            audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE,
+                            audio_microphone_direction_t
+                                selectedMicDirection = MIC_DIRECTION_UNSPECIFIED,
+                            float selectedMicFieldDimension = MIC_FIELD_DIMENSION_DEFAULT);
 
     /* Result of constructing the AudioRecord. This must be checked for successful initialization
      * before using any AudioRecord API (except for set()), because using
@@ -715,6 +721,9 @@ private:
                                               // May not match the app selection depending on other
                                               // activity and connected devices
     wp<AudioSystem::AudioDeviceCallback> mDeviceCallback;
+
+    audio_microphone_direction_t mSelectedMicDirection;
+    float mSelectedMicFieldDimension;
 
 private:
     class MediaMetrics {

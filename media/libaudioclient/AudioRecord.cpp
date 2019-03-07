@@ -117,7 +117,9 @@ AudioRecord::AudioRecord(const String16 &opPackageName)
     : mActive(false), mStatus(NO_INIT), mOpPackageName(opPackageName),
       mSessionId(AUDIO_SESSION_ALLOCATE),
       mPreviousPriority(ANDROID_PRIORITY_NORMAL), mPreviousSchedulingGroup(SP_DEFAULT),
-      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE), mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE)
+      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE), mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE),
+      mSelectedMicDirection(MIC_DIRECTION_UNSPECIFIED),
+      mSelectedMicFieldDimension(MIC_FIELD_DIMENSION_DEFAULT)
 {
 }
 
@@ -137,7 +139,9 @@ AudioRecord::AudioRecord(
         uid_t uid,
         pid_t pid,
         const audio_attributes_t* pAttributes,
-        audio_port_handle_t selectedDeviceId)
+        audio_port_handle_t selectedDeviceId,
+        audio_microphone_direction_t selectedMicDirection,
+        float microphoneFieldDimension)
     : mActive(false),
       mStatus(NO_INIT),
       mOpPackageName(opPackageName),
@@ -148,7 +152,8 @@ AudioRecord::AudioRecord(
 {
     (void)set(inputSource, sampleRate, format, channelMask, frameCount, cbf, user,
             notificationFrames, false /*threadCanCallJava*/, sessionId, transferType, flags,
-            uid, pid, pAttributes, selectedDeviceId);
+            uid, pid, pAttributes, selectedDeviceId,
+            selectedMicDirection, microphoneFieldDimension);
 }
 
 AudioRecord::~AudioRecord()
@@ -197,7 +202,9 @@ status_t AudioRecord::set(
         uid_t uid,
         pid_t pid,
         const audio_attributes_t* pAttributes,
-        audio_port_handle_t selectedDeviceId)
+        audio_port_handle_t selectedDeviceId,
+        audio_microphone_direction_t selectedMicDirection,
+        float microphoneFieldDimension)
 {
     status_t status = NO_ERROR;
     uint32_t channelCount;
@@ -213,6 +220,8 @@ status_t AudioRecord::set(
           sessionId, transferType, flags, String8(mOpPackageName).string(), uid, pid);
 
     mSelectedDeviceId = selectedDeviceId;
+    mSelectedMicDirection = selectedMicDirection;
+    mSelectedMicFieldDimension = microphoneFieldDimension;
 
     switch (transferType) {
     case TRANSFER_DEFAULT:
@@ -399,6 +408,10 @@ status_t AudioRecord::start(AudioSystem::sync_event_t event, audio_session_t tri
     if (flags & CBLK_INVALID) {
         status = restoreRecord_l("start");
     }
+
+    // Call these directly because we are already holding the lock.
+    mAudioRecord->setMicrophoneDirection(mSelectedMicDirection);
+    mAudioRecord->setMicrophoneFieldDimension(mSelectedMicFieldDimension);
 
     if (status != NO_ERROR) {
         mActive = false;
@@ -617,6 +630,8 @@ status_t AudioRecord::dump(int fd, const Vector<String16>& args __unused) const
              mNotificationFramesAct, mNotificationFramesReq);
     result.appendFormat("  input(%d), latency(%u), selected device Id(%d), routed device Id(%d)\n",
                         mInput, mLatency, mSelectedDeviceId, mRoutedDeviceId);
+    result.appendFormat("  mic direction(%d) mic field dimension(%f)",
+                        mSelectedMicDirection, mSelectedMicFieldDimension);
     ::write(fd, result.string(), result.size());
     return NO_ERROR;
 }
@@ -1369,12 +1384,34 @@ status_t AudioRecord::getActiveMicrophones(std::vector<media::MicrophoneInfo>* a
 status_t AudioRecord::setMicrophoneDirection(audio_microphone_direction_t direction)
 {
     AutoMutex lock(mLock);
-    return mAudioRecord->setMicrophoneDirection(direction).transactionError();
+    if (mSelectedMicDirection == direction) {
+        // NOP
+        return OK;
+    }
+
+    mSelectedMicDirection = direction;
+    if (mAudioRecord == 0) {
+        // the internal AudioRecord hasn't be created yet, so just stash the attribute.
+        return OK;
+    } else {
+        return mAudioRecord->setMicrophoneDirection(direction).transactionError();
+    }
 }
 
 status_t AudioRecord::setMicrophoneFieldDimension(float zoom) {
     AutoMutex lock(mLock);
-    return mAudioRecord->setMicrophoneFieldDimension(zoom).transactionError();
+    if (mSelectedMicFieldDimension == zoom) {
+        // NOP
+        return OK;
+    }
+
+    mSelectedMicFieldDimension = zoom;
+    if (mAudioRecord == 0) {
+        // the internal AudioRecord hasn't be created yet, so just stash the attribute.
+        return OK;
+    } else {
+        return mAudioRecord->setMicrophoneFieldDimension(zoom).transactionError();
+    }
 }
 
 // =========================================================================
