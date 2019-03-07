@@ -183,6 +183,10 @@ int main(int argc, char *argv[]) {
     // Initialize the encoder.
     if (!PVInitVideoEncoder(&handle, &encParams)) {
         fprintf(stderr, "Failed to initialize the encoder\n");
+        fclose(fpInput);
+        fclose(fpOutput);
+        free(inputBuf);
+        free(outputBuf);
         return EXIT_FAILURE;
     }
 
@@ -190,6 +194,10 @@ int main(int argc, char *argv[]) {
     int32_t headerLength = kOutputBufferSize;
     if (!PVGetVolHeader(&handle, outputBuf, &headerLength, 0)) {
         fprintf(stderr, "Failed to get VOL header\n");
+        fclose(fpInput);
+        fclose(fpOutput);
+        free(inputBuf);
+        free(outputBuf);
         return EXIT_FAILURE;
     }
     fwrite(outputBuf, 1, headerLength, fpOutput);
