@@ -90,7 +90,7 @@ public:
     virtual media_status_t getFormat(AMediaFormat *);
 
     virtual media_status_t read(MediaBufferHelper **buffer, const ReadOptions *options = NULL);
-    virtual bool supportNonblockingRead() { return true; }
+    bool supportsNonBlockingRead() override { return true; }
     virtual media_status_t fragmentedRead(
             MediaBufferHelper **buffer, const ReadOptions *options = NULL);
 
