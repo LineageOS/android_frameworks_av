@@ -54,7 +54,7 @@ void HalDeathHandler::serviceDied(uint64_t /*cookie*/, const wp<IBase>& /*who*/)
         handler.second();
     }
     ALOGE("HAL server crashed, audio server is restarting");
-    exit(1);
+    _exit(1);  // Avoid calling atexit handlers, as this code runs on a thread from RPC threadpool.
 }
 
 } // namespace android

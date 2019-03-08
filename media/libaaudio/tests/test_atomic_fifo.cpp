@@ -23,12 +23,12 @@
 #include "fifo/FifoController.h"
 
 using android::fifo_frames_t;
+using android::fifo_counter_t;
 using android::FifoController;
 using android::FifoBuffer;
 using android::WrappingBuffer;
 
-//void foo() {
-TEST(test_fifi_controller, fifo_indices) {
+TEST(test_fifo_controller, fifo_indices) {
     // Values are arbitrary primes designed to trigger edge cases.
     constexpr int capacity = 83;
     constexpr int threshold = 47;
@@ -73,18 +73,59 @@ TEST(test_fifi_controller, fifo_indices) {
     ASSERT_EQ(threshold - advance2, fifoController.getEmptyFramesAvailable());
 }
 
+TEST(test_fifo_controller, fifo_wrap_around_zero) {
+    constexpr int capacity = 7; // arbitrary prime
+    constexpr int threshold = capacity;
+    FifoController fifoController(capacity, threshold);
+    ASSERT_EQ(capacity, fifoController.getCapacity());
+    ASSERT_EQ(threshold, fifoController.getThreshold());
+
+    fifoController.setReadCounter(-10); // a bit less than negative capacity
+    for (int i = 0; i < 20; i++) {
+        EXPECT_EQ(i - 10, fifoController.getReadCounter());
+        EXPECT_GE(fifoController.getReadIndex(), 0);
+        EXPECT_LT(fifoController.getReadIndex(), capacity);
+        fifoController.advanceReadIndex(1);
+    }
+
+    fifoController.setWriteCounter(-10);
+    for (int i = 0; i < 20; i++) {
+        EXPECT_EQ(i - 10, fifoController.getWriteCounter());
+        EXPECT_GE(fifoController.getWriteIndex(), 0);
+        EXPECT_LT(fifoController.getWriteIndex(), capacity);
+        fifoController.advanceWriteIndex(1);
+    }
+}
+
+
 // TODO consider using a template for other data types.
+
+// Create a big array and then use a region in the middle for the  unit tests.
+// Then we can scan the rest of the array to see if it got clobbered.
+static constexpr fifo_frames_t kBigArraySize = 1024;
+static constexpr fifo_frames_t kFifoDataOffset = 128; // starting index of FIFO data
+static constexpr int16_t       kSafeDataValue = 0x7654; // original value of BigArray
+
 class TestFifoBuffer {
 public:
     explicit TestFifoBuffer(fifo_frames_t capacity, fifo_frames_t threshold = 0)
-        : mFifoBuffer(sizeof(int16_t), capacity) {
+        : mFifoBuffer(sizeof(int16_t), capacity,
+                      &mReadIndex,
+                      &mWriteIndex,
+                      &mVeryBigArray[kFifoDataOffset]) // address of start of FIFO data
+    {
+
+        // Assume a frame is one int16_t.
         // For reading and writing.
-        mData = new int16_t[capacity];
         if (threshold <= 0) {
             threshold = capacity;
         }
         mFifoBuffer.setThreshold(threshold);
         mThreshold = threshold;
+
+        for (fifo_frames_t i = 0; i < kBigArraySize; i++) {
+            mVeryBigArray[i] = kSafeDataValue;
+        }
     }
 
     void checkMisc() {
@@ -92,26 +133,70 @@ public:
         ASSERT_EQ(mThreshold, mFifoBuffer.getThreshold());
     }
 
+    void verifyAddressInRange(void *p, void *valid, size_t numBytes) {
+        uintptr_t p_int = (uintptr_t) p;
+        uintptr_t valid_int = (uintptr_t) valid;
+        EXPECT_GE(p_int, valid_int);
+        EXPECT_LT(p_int, (valid_int + numBytes));
+    }
+
+    void verifyStorageIntegrity() {
+        for (fifo_frames_t i = 0; i < kFifoDataOffset; i++) {
+            EXPECT_EQ(mVeryBigArray[i], kSafeDataValue);
+        }
+        fifo_frames_t firstFrameAfter = kFifoDataOffset + mFifoBuffer.getBufferCapacityInFrames();
+        for (fifo_frames_t i = firstFrameAfter; i < kBigArraySize; i++) {
+            EXPECT_EQ(mVeryBigArray[i], kSafeDataValue);
+        }
+    }
+
     // Verify that the available frames in each part add up correctly.
-    void checkWrappingBuffer() {
+    void verifyWrappingBuffer() {
         WrappingBuffer wrappingBuffer;
+
+
+        // Does the sum of the two parts match the available value returned?
+        // For EmptyRoom
         fifo_frames_t framesAvailable =
                 mFifoBuffer.getFifoControllerBase()->getEmptyFramesAvailable();
         fifo_frames_t wrapAvailable = mFifoBuffer.getEmptyRoomAvailable(&wrappingBuffer);
         EXPECT_EQ(framesAvailable, wrapAvailable);
         fifo_frames_t bothAvailable = wrappingBuffer.numFrames[0] + wrappingBuffer.numFrames[1];
         EXPECT_EQ(framesAvailable, bothAvailable);
-
+        // For FullData
         framesAvailable =
                 mFifoBuffer.getFifoControllerBase()->getFullFramesAvailable();
         wrapAvailable = mFifoBuffer.getFullDataAvailable(&wrappingBuffer);
         EXPECT_EQ(framesAvailable, wrapAvailable);
         bothAvailable = wrappingBuffer.numFrames[0] + wrappingBuffer.numFrames[1];
         EXPECT_EQ(framesAvailable, bothAvailable);
+
+        // Are frame counts in legal range?
+        fifo_frames_t capacity = mFifoBuffer.getBufferCapacityInFrames();
+        EXPECT_GE(wrappingBuffer.numFrames[0], 0);
+        EXPECT_LE(wrappingBuffer.numFrames[0], capacity);
+        EXPECT_GE(wrappingBuffer.numFrames[1], 0);
+        EXPECT_LE(wrappingBuffer.numFrames[1], capacity);
+
+        // Are addresses within the FIFO data area?
+        size_t validBytes = capacity * sizeof(int16_t);
+        if (wrappingBuffer.numFrames[0]) {
+            verifyAddressInRange(wrappingBuffer.data[0], mFifoStorage, validBytes);
+            uint8_t *last = ((uint8_t *)wrappingBuffer.data[0])
+                            + mFifoBuffer.convertFramesToBytes(wrappingBuffer.numFrames[0]) - 1;
+            verifyAddressInRange(last, mFifoStorage, validBytes);
+        }
+        if (wrappingBuffer.numFrames[1]) {
+            verifyAddressInRange(wrappingBuffer.data[1], mFifoStorage, validBytes);
+            uint8_t *last = ((uint8_t *)wrappingBuffer.data[1])
+                            + mFifoBuffer.convertFramesToBytes(wrappingBuffer.numFrames[1]) - 1;
+            verifyAddressInRange(last, mFifoStorage, validBytes);
+        }
+
     }
 
     // Write data but do not overflow.
-    void writeData(fifo_frames_t numFrames) {
+    void writeMultipleDataFrames(fifo_frames_t numFrames) {
         fifo_frames_t framesAvailable =
                 mFifoBuffer.getFifoControllerBase()->getEmptyFramesAvailable();
         fifo_frames_t framesToWrite = std::min(framesAvailable, numFrames);
@@ -122,8 +207,8 @@ public:
         ASSERT_EQ(framesToWrite, actual);
     }
 
-    // Read data but do not underflow.
-    void verifyData(fifo_frames_t numFrames) {
+    // Read whatever data is available, Do not underflow.
+    void verifyMultipleDataFrames(fifo_frames_t numFrames) {
         fifo_frames_t framesAvailable =
                 mFifoBuffer.getFifoControllerBase()->getFullFramesAvailable();
         fifo_frames_t framesToRead = std::min(framesAvailable, numFrames);
@@ -134,20 +219,35 @@ public:
         }
     }
 
+    // Read specified number of frames
+    void verifyRequestedData(fifo_frames_t numFrames) {
+        fifo_frames_t framesAvailable =
+                mFifoBuffer.getFifoControllerBase()->getFullFramesAvailable();
+        ASSERT_LE(numFrames, framesAvailable);
+        fifo_frames_t framesToRead = std::min(framesAvailable, numFrames);
+        fifo_frames_t actual = mFifoBuffer.read(mData, framesToRead);
+        ASSERT_EQ(actual, numFrames);
+        for (int i = 0; i < actual; i++) {
+            ASSERT_EQ(mNextVerifyIndex++, mData[i]);
+        }
+    }
+
     // Wrap around the end of the buffer.
     void checkWrappingWriteRead() {
         constexpr int frames1 = 43;
         constexpr int frames2 = 15;
 
-        writeData(frames1);
-        checkWrappingBuffer();
-        verifyData(frames1);
-        checkWrappingBuffer();
+        writeMultipleDataFrames(frames1);
+        verifyWrappingBuffer();
+        verifyRequestedData(frames1);
+        verifyWrappingBuffer();
 
-        writeData(frames2);
-        checkWrappingBuffer();
-        verifyData(frames2);
-        checkWrappingBuffer();
+        writeMultipleDataFrames(frames2);
+        verifyWrappingBuffer();
+        verifyRequestedData(frames2);
+        verifyWrappingBuffer();
+
+        verifyStorageIntegrity();
     }
 
     // Write and Read a specific amount of data.
@@ -156,10 +256,12 @@ public:
         // Wrap around with the smaller region in the second half.
         const int frames1 = capacity - 4;
         const int frames2 = 7; // arbitrary, small
-        writeData(frames1);
-        verifyData(frames1);
-        writeData(frames2);
-        verifyData(frames2);
+        writeMultipleDataFrames(frames1);
+        verifyRequestedData(frames1);
+        writeMultipleDataFrames(frames2);
+        verifyRequestedData(frames2);
+
+        verifyStorageIntegrity();
     }
 
     // Write and Read a specific amount of data.
@@ -168,10 +270,12 @@ public:
         // Wrap around with the larger region in the second half.
         const int frames1 = capacity - 4;
         const int frames2 = capacity - 9; // arbitrary, large
-        writeData(frames1);
-        verifyData(frames1);
-        writeData(frames2);
-        verifyData(frames2);
+        writeMultipleDataFrames(frames1);
+        verifyRequestedData(frames1);
+        writeMultipleDataFrames(frames2);
+        verifyRequestedData(frames2);
+
+        verifyStorageIntegrity();
     }
 
     // Randomly read or write up to the maximum amount of data.
@@ -180,30 +284,67 @@ public:
             fifo_frames_t framesEmpty =
                     mFifoBuffer.getFifoControllerBase()->getEmptyFramesAvailable();
             fifo_frames_t numFrames = (fifo_frames_t)(drand48() * framesEmpty);
-            writeData(numFrames);
+            writeMultipleDataFrames(numFrames);
 
             fifo_frames_t framesFull =
                     mFifoBuffer.getFifoControllerBase()->getFullFramesAvailable();
             numFrames = (fifo_frames_t)(drand48() * framesFull);
-            verifyData(numFrames);
+            verifyMultipleDataFrames(numFrames);
         }
+
+        verifyStorageIntegrity();
+    }
+
+    // Write and Read a specific amount of data.
+    void checkNegativeCounters() {
+        fifo_counter_t counter = -9876;
+        mFifoBuffer.setWriteCounter(counter);
+        mFifoBuffer.setReadCounter(counter);
+        checkWrappingWriteRead();
+    }
+
+    // Wrap over the boundary at 0x7FFFFFFFFFFFFFFF
+    // Note that the behavior of a signed overflow is technically undefined.
+    void checkHalfWrap() {
+        fifo_counter_t counter = INT64_MAX - 10;
+        mFifoBuffer.setWriteCounter(counter);
+        mFifoBuffer.setReadCounter(counter);
+        ASSERT_GT(mFifoBuffer.getWriteCounter(), 0);
+        checkWrappingWriteRead();
+        ASSERT_LT(mFifoBuffer.getWriteCounter(), 0); // did we wrap past INT64_MAX?
+    }
+
+    // Wrap over the boundary at 0xFFFFFFFFFFFFFFFF
+    void checkFullWrap() {
+        fifo_counter_t counter = -10;
+        mFifoBuffer.setWriteCounter(counter);
+        mFifoBuffer.setReadCounter(counter);
+        ASSERT_LT(mFifoBuffer.getWriteCounter(), 0);
+        writeMultipleDataFrames(20);
+        ASSERT_GT(mFifoBuffer.getWriteCounter(), 0); // did we wrap past zero?
+        verifyStorageIntegrity();
     }
 
     FifoBuffer     mFifoBuffer;
-    int16_t       *mData;
     fifo_frames_t  mNextWriteIndex = 0;
     fifo_frames_t  mNextVerifyIndex = 0;
     fifo_frames_t  mThreshold;
+
+    fifo_counter_t mReadIndex = 0;
+    fifo_counter_t mWriteIndex = 0;
+    int16_t        mVeryBigArray[kBigArraySize]; // Use the middle of this array for the FIFO.
+    int16_t       *mFifoStorage = &mVeryBigArray[kFifoDataOffset]; // Start here for storage.
+    int16_t        mData[kBigArraySize]{};
 };
 
-TEST(test_fifo_buffer, fifo_read_write) {
+TEST(test_fifo_buffer, fifo_write_read) {
     constexpr int capacity = 51; // arbitrary
     TestFifoBuffer tester(capacity);
     tester.checkMisc();
     tester.checkWriteRead();
 }
 
-TEST(test_fifo_buffer, fifo_wrapping_read_write) {
+TEST(test_fifo_buffer, fifo_wrapping_write_read) {
     constexpr int capacity = 59; // arbitrary, a little bigger this time
     TestFifoBuffer tester(capacity);
     tester.checkWrappingWriteRead();
@@ -226,4 +367,22 @@ TEST(test_fifo_buffer, fifo_random_threshold) {
     constexpr int threshold = 37; // arbitrary
     TestFifoBuffer tester(capacity, threshold);
     tester.checkRandomWriteRead();
+}
+
+TEST(test_fifo_buffer, fifo_negative_counters) {
+    constexpr int capacity = 49; // arbitrary
+    TestFifoBuffer tester(capacity);
+    tester.checkNegativeCounters();
+}
+
+TEST(test_fifo_buffer, fifo_half_wrap) {
+    constexpr int capacity = 57; // arbitrary
+    TestFifoBuffer tester(capacity);
+    tester.checkHalfWrap();
+}
+
+TEST(test_fifo_buffer, fifo_full_wrap) {
+    constexpr int capacity = 57; // arbitrary
+    TestFifoBuffer tester(capacity);
+    tester.checkFullWrap();
 }
