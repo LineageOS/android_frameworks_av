@@ -1487,8 +1487,13 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 }
             }
             if (duration != 0 && mLastTrack->timescale != 0) {
-                AMediaFormat_setInt64(mLastTrack->meta, AMEDIAFORMAT_KEY_DURATION,
-                        (duration * 1000000) / mLastTrack->timescale);
+                long double durationUs = ((long double)duration * 1000000) / mLastTrack->timescale;
+                if (durationUs < 0 || durationUs > INT64_MAX) {
+                    ALOGE("cannot represent %lld * 1000000 / %lld in 64 bits",
+                          (long long) duration, (long long) mLastTrack->timescale);
+                    return ERROR_MALFORMED;
+                }
+                AMediaFormat_setInt64(mLastTrack->meta, AMEDIAFORMAT_KEY_DURATION, durationUs);
             }
 
             uint8_t lang[2];
@@ -5402,7 +5407,7 @@ media_status_t MPEG4Source::read(
                     break;
             }
             if( mode != ReadOptions::SEEK_FRAME_INDEX) {
-                seekTimeUs += ((int64_t)mElstShiftStartTicks * 1000000) / mTimescale;
+                seekTimeUs += ((long double)mElstShiftStartTicks * 1000000) / mTimescale;
             }
 
             uint32_t sampleIndex;
@@ -5550,7 +5555,7 @@ media_status_t MPEG4Source::read(
                 AMediaFormat *meta = mBuffer->meta_data();
                 AMediaFormat_clear(meta);
                 AMediaFormat_setInt64(
-                      meta, AMEDIAFORMAT_KEY_TIME_US, ((int64_t)cts * 1000000) / mTimescale);
+                      meta, AMEDIAFORMAT_KEY_TIME_US, ((long double)cts * 1000000) / mTimescale);
                 AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, 1);
 
                 int32_t byteOrder;
@@ -5585,9 +5590,9 @@ media_status_t MPEG4Source::read(
                 AMediaFormat *meta = mBuffer->meta_data();
                 AMediaFormat_clear(meta);
                 AMediaFormat_setInt64(
-                        meta, AMEDIAFORMAT_KEY_TIME_US, ((int64_t)cts * 1000000) / mTimescale);
+                        meta, AMEDIAFORMAT_KEY_TIME_US, ((long double)cts * 1000000) / mTimescale);
                 AMediaFormat_setInt64(
-                        meta, AMEDIAFORMAT_KEY_DURATION, ((int64_t)stts * 1000000) / mTimescale);
+                        meta, AMEDIAFORMAT_KEY_DURATION, ((long double)stts * 1000000) / mTimescale);
 
                 if (targetSampleTimeUs >= 0) {
                     AMediaFormat_setInt64(
@@ -5641,9 +5646,9 @@ media_status_t MPEG4Source::read(
         AMediaFormat *meta = mBuffer->meta_data();
         AMediaFormat_clear(meta);
         AMediaFormat_setInt64(
-                meta, AMEDIAFORMAT_KEY_TIME_US, ((int64_t)cts * 1000000) / mTimescale);
+                meta, AMEDIAFORMAT_KEY_TIME_US, ((long double)cts * 1000000) / mTimescale);
         AMediaFormat_setInt64(
-                meta, AMEDIAFORMAT_KEY_DURATION, ((int64_t)stts * 1000000) / mTimescale);
+                meta, AMEDIAFORMAT_KEY_DURATION, ((long double)stts * 1000000) / mTimescale);
 
         if (targetSampleTimeUs >= 0) {
             AMediaFormat_setInt64(
@@ -5722,9 +5727,9 @@ media_status_t MPEG4Source::read(
         AMediaFormat *meta = mBuffer->meta_data();
         AMediaFormat_clear(meta);
         AMediaFormat_setInt64(
-                meta, AMEDIAFORMAT_KEY_TIME_US, ((int64_t)cts * 1000000) / mTimescale);
+                meta, AMEDIAFORMAT_KEY_TIME_US, ((long double)cts * 1000000) / mTimescale);
         AMediaFormat_setInt64(
-                meta, AMEDIAFORMAT_KEY_DURATION, ((int64_t)stts * 1000000) / mTimescale);
+                meta, AMEDIAFORMAT_KEY_DURATION, ((long double)stts * 1000000) / mTimescale);
 
         if (targetSampleTimeUs >= 0) {
             AMediaFormat_setInt64(
@@ -5771,7 +5776,7 @@ media_status_t MPEG4Source::fragmentedRead(
     ReadOptions::SeekMode mode;
     if (options && options->getSeekTo(&seekTimeUs, &mode)) {
 
-        seekTimeUs += ((int64_t)mElstShiftStartTicks * 1000000) / mTimescale;
+        seekTimeUs += ((long double)mElstShiftStartTicks * 1000000) / mTimescale;
         ALOGV("shifted seekTimeUs :%" PRId64 ", mElstShiftStartTicks:%" PRId32, seekTimeUs,
                 mElstShiftStartTicks);
 
@@ -5932,9 +5937,9 @@ media_status_t MPEG4Source::fragmentedRead(
             CHECK(mBuffer != NULL);
             mBuffer->set_range(0, size);
             AMediaFormat_setInt64(bufmeta,
-                    AMEDIAFORMAT_KEY_TIME_US, ((int64_t)cts * 1000000) / mTimescale);
+                    AMEDIAFORMAT_KEY_TIME_US, ((long double)cts * 1000000) / mTimescale);
             AMediaFormat_setInt64(bufmeta,
-                    AMEDIAFORMAT_KEY_DURATION, ((int64_t)smpl->duration * 1000000) / mTimescale);
+                    AMEDIAFORMAT_KEY_DURATION, ((long double)smpl->duration * 1000000) / mTimescale);
 
             if (targetSampleTimeUs >= 0) {
                 AMediaFormat_setInt64(bufmeta, AMEDIAFORMAT_KEY_TARGET_TIME, targetSampleTimeUs);
@@ -6047,9 +6052,9 @@ media_status_t MPEG4Source::fragmentedRead(
 
         AMediaFormat *bufmeta = mBuffer->meta_data();
         AMediaFormat_setInt64(bufmeta,
-                AMEDIAFORMAT_KEY_TIME_US, ((int64_t)cts * 1000000) / mTimescale);
+                AMEDIAFORMAT_KEY_TIME_US, ((long double)cts * 1000000) / mTimescale);
         AMediaFormat_setInt64(bufmeta,
-                AMEDIAFORMAT_KEY_DURATION, ((int64_t)smpl->duration * 1000000) / mTimescale);
+                AMEDIAFORMAT_KEY_DURATION, ((long double)smpl->duration * 1000000) / mTimescale);
 
         if (targetSampleTimeUs >= 0) {
             AMediaFormat_setInt64(bufmeta, AMEDIAFORMAT_KEY_TARGET_TIME, targetSampleTimeUs);
