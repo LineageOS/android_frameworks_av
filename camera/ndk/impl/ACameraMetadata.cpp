@@ -159,7 +159,7 @@ ACameraMetadata::filterStreamConfigurations() {
     const int STREAM_HEIGHT_OFFSET = 2;
     const int STREAM_IS_INPUT_OFFSET = 3;
     camera_metadata_entry entry = mData.find(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS);
-    if (entry.count == 0 || entry.count % 4 || entry.type != TYPE_INT32) {
+    if (entry.count > 0 && (entry.count % 4 || entry.type != TYPE_INT32)) {
         ALOGE("%s: malformed available stream configuration key! count %zu, type %d",
                 __FUNCTION__, entry.count, entry.type);
         return;
@@ -187,9 +187,17 @@ ACameraMetadata::filterStreamConfigurations() {
         filteredStreamConfigs.push_back(isInput);
     }
 
-    mData.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS, filteredStreamConfigs);
+    if (filteredStreamConfigs.size() > 0) {
+        mData.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS, filteredStreamConfigs);
+    }
 
     entry = mData.find(ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS);
+    if (entry.count > 0 && (entry.count % 4 || entry.type != TYPE_INT32)) {
+        ALOGE("%s: malformed available depth stream configuration key! count %zu, type %d",
+                __FUNCTION__, entry.count, entry.type);
+        return;
+    }
+
     Vector<int32_t> filteredDepthStreamConfigs;
     filteredDepthStreamConfigs.setCapacity(entry.count);
 
@@ -214,7 +222,12 @@ ACameraMetadata::filterStreamConfigurations() {
         filteredDepthStreamConfigs.push_back(height);
         filteredDepthStreamConfigs.push_back(isInput);
     }
-    mData.update(ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS, filteredDepthStreamConfigs);
+
+    if (filteredDepthStreamConfigs.size() > 0) {
+        mData.update(ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS,
+                filteredDepthStreamConfigs);
+    }
+
 }
 
 bool
