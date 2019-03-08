@@ -122,11 +122,11 @@ private:
             mThread = thread;
             mCloseThread = closeThread;
         }
-        void setTrackAndPeer(const sp<TrackType>& track,
-                             ThreadBase::PatchProxyBufferProvider *peer) {
+        template <typename T>
+        void setTrackAndPeer(const sp<TrackType>& track, const sp<T> &peer) {
             mTrack = track;
             mThread->addPatchTrack(mTrack);
-            mTrack->setPeerProxy(peer);
+            mTrack->setPeerProxy(peer, true /* holdReference */);
         }
         void stopTrack() { if (mTrack) mTrack->stop(); }
 

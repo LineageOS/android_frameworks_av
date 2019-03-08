@@ -836,8 +836,10 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
                 }
                 teePatches.push_back({patchRecord, patchTrack});
                 secondaryThread->addPatchTrack(patchTrack);
-                patchTrack->setPeerProxy(patchRecord.get());
-                patchRecord->setPeerProxy(patchTrack.get());
+                // In case the downstream patchTrack on the secondaryThread temporarily outlives
+                // our created track, ensure the corresponding patchRecord is still alive.
+                patchTrack->setPeerProxy(patchRecord, true /* holdReference */);
+                patchRecord->setPeerProxy(patchTrack, false /* holdReference */);
             }
             track->setTeePatches(std::move(teePatches));
         }
