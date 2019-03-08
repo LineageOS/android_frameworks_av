@@ -76,7 +76,7 @@ CameraDevice::CameraDevice(
                 __FUNCTION__, strerror(-err), err);
         setCameraDeviceErrorLocked(ACAMERA_ERROR_CAMERA_DEVICE);
     }
-    mHandler = new CallbackHandler();
+    mHandler = new CallbackHandler(id);
     mCbLooper->registerHandler(mHandler);
 
     const CameraMetadata& metadata = mChars->getInternalData();
@@ -96,6 +96,14 @@ CameraDevice::CameraDevice(
     } else {
         mShadingMapSize[0] = entry.data.i32[0];
         mShadingMapSize[1] = entry.data.i32[1];
+    }
+
+    size_t physicalIdCnt = 0;
+    const char*const* physicalCameraIds;
+    if (mChars->isLogicalMultiCamera(&physicalIdCnt, &physicalCameraIds)) {
+        for (size_t i = 0; i < physicalIdCnt; i++) {
+            mPhysicalIds.push_back(physicalCameraIds[i]);
+        }
     }
 }
 
@@ -129,8 +137,29 @@ CameraDevice::postSessionMsgAndCleanup(sp<AMessage>& msg) {
 camera_status_t
 CameraDevice::createCaptureRequest(
         ACameraDevice_request_template templateId,
+        const ACameraIdList* physicalIdList,
         ACaptureRequest** request) const {
     Mutex::Autolock _l(mDeviceLock);
+
+    if (physicalIdList != nullptr) {
+        if (physicalIdList->numCameras > static_cast<int>(mPhysicalIds.size())) {
+            ALOGE("%s: physicalIdList size %d exceeds number of available physical cameras %zu",
+                    __FUNCTION__, physicalIdList->numCameras, mPhysicalIds.size());
+            return ACAMERA_ERROR_INVALID_PARAMETER;
+        }
+        for (auto i = 0; i < physicalIdList->numCameras; i++) {
+            if (physicalIdList->cameraIds[i] == nullptr) {
+                ALOGE("%s: physicalId is null!", __FUNCTION__);
+                return ACAMERA_ERROR_INVALID_PARAMETER;
+            }
+            if (mPhysicalIds.end() == std::find(
+                    mPhysicalIds.begin(), mPhysicalIds.end(), physicalIdList->cameraIds[i])) {
+                ALOGE("%s: Invalid physicalId %s!", __FUNCTION__, physicalIdList->cameraIds[i]);
+                return ACAMERA_ERROR_INVALID_PARAMETER;
+            }
+        }
+    }
+
     camera_status_t ret = checkCameraClosedOrErrorLocked();
     if (ret != ACAMERA_OK) {
         return ret;
@@ -151,6 +180,12 @@ CameraDevice::createCaptureRequest(
     }
     ACaptureRequest* outReq = new ACaptureRequest();
     outReq->settings = new ACameraMetadata(rawRequest.release(), ACameraMetadata::ACM_REQUEST);
+    if (physicalIdList != nullptr) {
+        for (auto i = 0; i < physicalIdList->numCameras; i++) {
+            outReq->physicalSettings.emplace(physicalIdList->cameraIds[i],
+                    new ACameraMetadata(*(outReq->settings)));
+        }
+    }
     outReq->targets  = new ACameraOutputTargets();
     *request = outReq;
     return ACAMERA_OK;
@@ -275,8 +310,12 @@ CameraDevice::allocateCaptureRequest(
         const ACaptureRequest* request, /*out*/sp<CaptureRequest>& outReq) {
     camera_status_t ret;
     sp<CaptureRequest> req(new CaptureRequest());
-    req->mPhysicalCameraSettings.push_back({std::string(mCameraId.string()),
+    req->mPhysicalCameraSettings.push_back({getId(),
             request->settings->getInternalData()});
+    for (auto& entry : request->physicalSettings) {
+        req->mPhysicalCameraSettings.push_back({entry.first,
+                entry.second->getInternalData()});
+    }
     req->mIsReprocess = false; // NDK does not support reprocessing yet
     req->mContext = request->context;
     req->mSurfaceConverted = true; // set to true, and fill in stream/surface idx to speed up IPC
@@ -320,10 +359,17 @@ CameraDevice::allocateCaptureRequest(
 }
 
 ACaptureRequest*
-CameraDevice::allocateACaptureRequest(sp<CaptureRequest>& req) {
+CameraDevice::allocateACaptureRequest(sp<CaptureRequest>& req, const std::string& deviceId) {
     ACaptureRequest* pRequest = new ACaptureRequest();
-    CameraMetadata clone = req->mPhysicalCameraSettings.begin()->settings;
-    pRequest->settings = new ACameraMetadata(clone.release(), ACameraMetadata::ACM_REQUEST);
+    for (auto& entry : req->mPhysicalCameraSettings) {
+        CameraMetadata clone = entry.settings;
+        if (entry.id == deviceId) {
+            pRequest->settings = new ACameraMetadata(clone.release(), ACameraMetadata::ACM_REQUEST);
+        } else {
+            pRequest->physicalSettings.emplace(entry.id,
+                    new ACameraMetadata(clone.release(), ACameraMetadata::ACM_REQUEST));
+        }
+    }
     pRequest->targets  = new ACameraOutputTargets();
     for (size_t i = 0; i < req->mSurfaceList.size(); i++) {
         ANativeWindow* anw = static_cast<ANativeWindow*>(req->mSurfaceList[i].get());
@@ -340,6 +386,7 @@ CameraDevice::freeACaptureRequest(ACaptureRequest* req) {
         return;
     }
     req->settings.clear();
+    req->physicalSettings.clear();
     delete req->targets;
     delete req;
 }
@@ -786,6 +833,9 @@ CameraDevice::onCaptureErrorLocked(
     return;
 }
 
+CameraDevice::CallbackHandler::CallbackHandler(const char* id) : mId(id) {
+}
+
 void CameraDevice::CallbackHandler::onMessageReceived(
         const sp<AMessage> &msg) {
     switch (msg->what()) {
@@ -927,7 +977,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                         ALOGE("%s: Cannot find timestamp!", __FUNCTION__);
                         return;
                     }
-                    ACaptureRequest* request = allocateACaptureRequest(requestSp);
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, mId);
                     (*onStart)(context, session.get(), request, timestamp);
                     freeACaptureRequest(request);
                     break;
@@ -950,7 +1000,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                         return;
                     }
                     sp<ACameraMetadata> result(static_cast<ACameraMetadata*>(obj.get()));
-                    ACaptureRequest* request = allocateACaptureRequest(requestSp);
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, mId);
                     (*onResult)(context, session.get(), request, result.get());
                     freeACaptureRequest(request);
                     break;
@@ -1006,7 +1056,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                         physicalMetadataCopyPtrs.push_back(physicalMetadataCopy[i].get());
                     }
 
-                    ACaptureRequest* request = allocateACaptureRequest(requestSp);
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, mId);
                     (*onResult)(context, session.get(), request, result.get(),
                             physicalResultInfo.size(), physicalCameraIdPtrs.data(),
                             physicalMetadataCopyPtrs.data());
@@ -1034,7 +1084,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                             static_cast<CameraCaptureFailure*>(obj.get()));
                     ACameraCaptureFailure* failure =
                             static_cast<ACameraCaptureFailure*>(failureSp.get());
-                    ACaptureRequest* request = allocateACaptureRequest(requestSp);
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, mId);
                     (*onFail)(context, session.get(), request, failure);
                     freeACaptureRequest(request);
                     break;
@@ -1111,7 +1161,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                         return;
                     }
 
-                    ACaptureRequest* request = allocateACaptureRequest(requestSp);
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, mId);
                     (*onBufferLost)(context, session.get(), request, anw, frameNumber);
                     freeACaptureRequest(request);
                     break;

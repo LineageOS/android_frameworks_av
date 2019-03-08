@@ -74,12 +74,6 @@ ACameraManager* ACameraManager_create() __INTRODUCED_IN(24);
  */
 void ACameraManager_delete(ACameraManager* manager) __INTRODUCED_IN(24);
 
-/// Struct to hold list of camera devices
-typedef struct ACameraIdList {
-    int numCameras;          ///< Number of connected camera devices
-    const char** cameraIds;  ///< list of identifier of connected camera devices
-} ACameraIdList;
-
 /**
  * Create a list of currently connected camera devices, including
  * cameras that may be in use by other camera API clients.

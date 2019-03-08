@@ -11,6 +11,7 @@ LIBCAMERA2NDK {
     ACameraCaptureSession_updateSharedOutput; # introduced=28
     ACameraDevice_close;
     ACameraDevice_createCaptureRequest;
+    ACameraDevice_createCaptureRequest_withPhysicalIds; # introduced=29
     ACameraDevice_createCaptureSession;
     ACameraDevice_createCaptureSessionWithSessionParameters; # introduced=28
     ACameraDevice_getId;
@@ -34,14 +35,21 @@ LIBCAMERA2NDK {
     ACaptureRequest_free;
     ACaptureRequest_getAllTags;
     ACaptureRequest_getConstEntry;
+    ACaptureRequest_getConstEntry_physicalCamera; # introduced=29
     ACaptureRequest_getUserContext; # introduced=28
     ACaptureRequest_removeTarget;
     ACaptureRequest_setEntry_double;
+    ACaptureRequest_setEntry_physicalCamera_double; # introduced=29
     ACaptureRequest_setEntry_float;
+    ACaptureRequest_setEntry_physicalCamera_float; # introduced=29
     ACaptureRequest_setEntry_i32;
+    ACaptureRequest_setEntry_physicalCamera_i32; # introduced=29
     ACaptureRequest_setEntry_i64;
+    ACaptureRequest_setEntry_physicalCamera_i64; # introduced=29
     ACaptureRequest_setEntry_rational;
+    ACaptureRequest_setEntry_physicalCamera_rational; # introduced=29
     ACaptureRequest_setEntry_u8;
+    ACaptureRequest_setEntry_physicalCamera_u8; # introduced=29
     ACaptureRequest_setUserContext; # introduced=28
     ACaptureSessionOutputContainer_add;
     ACaptureSessionOutputContainer_create;

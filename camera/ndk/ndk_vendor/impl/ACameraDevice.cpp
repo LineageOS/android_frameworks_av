@@ -138,6 +138,7 @@ CameraDevice::postSessionMsgAndCleanup(sp<AMessage>& msg) {
 camera_status_t
 CameraDevice::createCaptureRequest(
         ACameraDevice_request_template templateId,
+        const ACameraIdList* physicalCameraIdList,
         ACaptureRequest** request) const {
     Mutex::Autolock _l(mDeviceLock);
     camera_status_t ret = checkCameraClosedOrErrorLocked();
@@ -168,6 +169,12 @@ CameraDevice::createCaptureRequest(
     }
     ACaptureRequest* outReq = new ACaptureRequest();
     outReq->settings = new ACameraMetadata(rawRequest.release(), ACameraMetadata::ACM_REQUEST);
+    if (physicalCameraIdList != nullptr) {
+        for (auto i = 0; i < physicalCameraIdList->numCameras; i++) {
+            outReq->physicalSettings.emplace(physicalCameraIdList->cameraIds[i],
+                    new ACameraMetadata(*(outReq->settings)));
+        }
+    }
     outReq->targets  = new ACameraOutputTargets();
     *request = outReq;
     return ACAMERA_OK;
@@ -292,29 +299,16 @@ camera_status_t
 CameraDevice::allocateCaptureRequestLocked(
         const ACaptureRequest* request, /*out*/sp<CaptureRequest> &outReq) {
     sp<CaptureRequest> req(new CaptureRequest());
-    req->mCaptureRequest.physicalCameraSettings.resize(1);
-    req->mCaptureRequest.physicalCameraSettings[0].id = mCameraId;
-    // TODO: Do we really need to copy the metadata here ?
-    CameraMetadata metadataCopy = request->settings->getInternalData();
-    const camera_metadata_t *cameraMetadata = metadataCopy.getAndLock();
-    HCameraMetadata hCameraMetadata;
-    utils::convertToHidl(cameraMetadata, &hCameraMetadata);
-    metadataCopy.unlock(cameraMetadata);
-    if (request->settings != nullptr) {
-        if (hCameraMetadata.data() != nullptr &&
-            mCaptureRequestMetadataQueue != nullptr &&
-            mCaptureRequestMetadataQueue->write(
-                reinterpret_cast<const uint8_t *>(hCameraMetadata.data()),
-                hCameraMetadata.size())) {
-            // The metadata field of the union would've been destructued, so no need
-            // to re-size it.
-            req->mCaptureRequest.physicalCameraSettings[0].settings.fmqMetadataSize(
-                hCameraMetadata.size());
-        } else {
-            ALOGE("Fmq write capture result failed, falling back to hwbinder");
-            req->mCaptureRequest.physicalCameraSettings[0].settings.metadata(
-                std::move(hCameraMetadata));
-        }
+    req->mCaptureRequest.physicalCameraSettings.resize(1 + request->physicalSettings.size());
+
+    size_t index = 0;
+    allocateOneCaptureRequestMetadata(
+            req->mCaptureRequest.physicalCameraSettings[index++], mCameraId, request->settings);
+
+    for (auto& physicalEntry : request->physicalSettings) {
+        allocateOneCaptureRequestMetadata(
+                req->mCaptureRequest.physicalCameraSettings[index++],
+                physicalEntry.first, physicalEntry.second);
     }
 
     std::vector<int32_t> requestStreamIdxList;
@@ -356,13 +350,48 @@ CameraDevice::allocateCaptureRequestLocked(
     return ACAMERA_OK;
 }
 
+void CameraDevice::allocateOneCaptureRequestMetadata(
+        PhysicalCameraSettings& cameraSettings,
+        const std::string& id, const sp<ACameraMetadata>& metadata) {
+    cameraSettings.id = id;
+    // TODO: Do we really need to copy the metadata here ?
+    CameraMetadata metadataCopy = metadata->getInternalData();
+    const camera_metadata_t *cameraMetadata = metadataCopy.getAndLock();
+    HCameraMetadata hCameraMetadata;
+    utils::convertToHidl(cameraMetadata, &hCameraMetadata);
+    metadataCopy.unlock(cameraMetadata);
+    if (metadata != nullptr) {
+        if (hCameraMetadata.data() != nullptr &&
+            mCaptureRequestMetadataQueue != nullptr &&
+            mCaptureRequestMetadataQueue->write(
+                reinterpret_cast<const uint8_t *>(hCameraMetadata.data()),
+                hCameraMetadata.size())) {
+            // The metadata field of the union would've been destructued, so no need
+            // to re-size it.
+            cameraSettings.settings.fmqMetadataSize(hCameraMetadata.size());
+        } else {
+            ALOGE("Fmq write capture result failed, falling back to hwbinder");
+            cameraSettings.settings.metadata(std::move(hCameraMetadata));
+        }
+    }
+}
+
+
 ACaptureRequest*
-CameraDevice::allocateACaptureRequest(sp<CaptureRequest>& req) {
+CameraDevice::allocateACaptureRequest(sp<CaptureRequest>& req, const char* deviceId) {
     ACaptureRequest* pRequest = new ACaptureRequest();
-    CameraMetadata clone;
-    utils::convertFromHidlCloned(req->mPhysicalCameraSettings[0].settings.metadata(), &clone);
-    pRequest->settings = new ACameraMetadata(clone.release(), ACameraMetadata::ACM_REQUEST);
-    pRequest->targets  = new ACameraOutputTargets();
+    for (size_t i = 0; i < req->mPhysicalCameraSettings.size(); i++) {
+        const std::string& id = req->mPhysicalCameraSettings[i].id;
+        CameraMetadata clone;
+        utils::convertFromHidlCloned(req->mPhysicalCameraSettings[i].settings.metadata(), &clone);
+        if (id == deviceId) {
+            pRequest->settings = new ACameraMetadata(clone.release(), ACameraMetadata::ACM_REQUEST);
+        } else {
+            pRequest->physicalSettings[req->mPhysicalCameraSettings[i].id] =
+                    new ACameraMetadata(clone.release(), ACameraMetadata::ACM_REQUEST);
+        }
+    }
+    pRequest->targets = new ACameraOutputTargets();
     for (size_t i = 0; i < req->mSurfaceList.size(); i++) {
         native_handle_t* anw = req->mSurfaceList[i];
         ACameraOutputTarget outputTarget(anw);
@@ -930,6 +959,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                 return;
             }
             sp<ACameraCaptureSession> session(static_cast<ACameraCaptureSession*>(obj.get()));
+            ACameraDevice* device = session->getDevice();
             mCachedSessions.push(session);
             sp<CaptureRequest> requestSp = nullptr;
             switch (msg->what()) {
@@ -979,7 +1009,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                         ALOGE("%s: Cannot find timestamp!", __FUNCTION__);
                         return;
                     }
-                    ACaptureRequest* request = allocateACaptureRequest(requestSp);
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, device->getId());
                     (*onStart)(context, session.get(), request, timestamp);
                     freeACaptureRequest(request);
                     break;
@@ -1002,7 +1032,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                         return;
                     }
                     sp<ACameraMetadata> result(static_cast<ACameraMetadata*>(obj.get()));
-                    ACaptureRequest* request = allocateACaptureRequest(requestSp);
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, device->getId());
                     (*onResult)(context, session.get(), request, result.get());
                     freeACaptureRequest(request);
                     break;
@@ -1055,7 +1085,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                         physicalMetadataCopyPtrs.push_back(physicalMetadataCopy[i].get());
                     }
 
-                    ACaptureRequest* request = allocateACaptureRequest(requestSp);
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, device->getId());
                     (*onResult)(context, session.get(), request, result.get(),
                             physicalResultInfo.size(), physicalCameraIdPtrs.data(),
                             physicalMetadataCopyPtrs.data());
@@ -1084,7 +1114,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                             static_cast<CameraCaptureFailure*>(obj.get()));
                     ACameraCaptureFailure* failure =
                             static_cast<ACameraCaptureFailure*>(failureSp.get());
-                    ACaptureRequest* request = allocateACaptureRequest(requestSp);
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, device->getId());
                     (*onFail)(context, session.get(), request, failure);
                     freeACaptureRequest(request);
                     break;
@@ -1161,7 +1191,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                         return;
                     }
 
-                    ACaptureRequest* request = allocateACaptureRequest(requestSp);
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, device->getId());
                     (*onBufferLost)(context, session.get(), request, anw, frameNumber);
                     freeACaptureRequest(request);
                     break;
