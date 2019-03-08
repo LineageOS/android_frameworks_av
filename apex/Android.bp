@@ -65,8 +65,13 @@ filegroup {
 
 apex_defaults {
     name: "com.android.media.swcodec-defaults",
-    native_shared_libs: [
-        "libmedia_codecserviceregistrant",
+    binaries: [
+        "mediaswcodec",
+    ],
+    prebuilts: [
+        "com.android.media.swcodec-mediaswcodec.rc",
+        "com.android.media.swcodec-ld.config.txt",
+        "mediaswcodec.policy",
     ],
     use_vendor: true,
     key: "com.android.media.swcodec.key",
@@ -74,6 +79,20 @@ apex_defaults {
 
     // Use a custom AndroidManifest.xml used for API targeting.
     androidManifest: ":com.android.media.swcodec-androidManifest",
+}
+
+prebuilt_etc {
+    name: "com.android.media.swcodec-mediaswcodec.rc",
+    src: "mediaswcodec.rc",
+    filename: "init.rc",
+    installable: false,
+}
+
+prebuilt_etc {
+    name: "com.android.media.swcodec-ld.config.txt",
+    src: "ld.config.txt",
+    filename: "ld.config.txt",
+    installable: false,
 }
 
 apex {
