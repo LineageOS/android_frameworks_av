@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <log/log.h>
 #include <utils/Log.h>
 
 #include "AC4Parser.h"
@@ -397,7 +398,6 @@ MPEG4Extractor::~MPEG4Extractor() {
     while (track) {
         Track *next = track->next;
 
-        AMediaFormat_delete(track->meta);
         delete track;
         track = next;
     }
@@ -672,7 +672,6 @@ status_t MPEG4Extractor::readMetaData() {
 
             ALOGV("adding HEIF image track %u", imageIndex);
             Track *track = new Track;
-            track->next = NULL;
             if (mLastTrack != NULL) {
                 mLastTrack->next = track;
             } else {
@@ -682,10 +681,7 @@ status_t MPEG4Extractor::readMetaData() {
 
             track->meta = meta;
             AMediaFormat_setInt32(track->meta, AMEDIAFORMAT_KEY_TRACK_ID, imageIndex);
-            track->includes_expensive_metadata = false;
-            track->skipTrack = false;
             track->timescale = 1000000;
-            track->elstShiftStartTicks = 0;
         }
     }
 
@@ -967,7 +963,6 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
                 ALOGV("adding new track");
                 Track *track = new Track;
-                track->next = NULL;
                 if (mLastTrack) {
                     mLastTrack->next = track;
                 } else {
@@ -975,15 +970,9 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 }
                 mLastTrack = track;
 
-                track->includes_expensive_metadata = false;
-                track->skipTrack = false;
-                track->timescale = 0;
                 track->meta = AMediaFormat_new();
                 AMediaFormat_setString(track->meta,
                         AMEDIAFORMAT_KEY_MIME, "application/octet-stream");
-                track->has_elst = false;
-                track->subsample_encryption = false;
-                track->elstShiftStartTicks = 0;
             }
 
             off64_t stop_offset = *offset + chunk_size;
@@ -1033,6 +1022,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     mLastTrack->skipTrack = true;
                 }
 
+
                 if (mLastTrack->skipTrack) {
                     ALOGV("skipping this track...");
                     Track *cur = mFirstTrack;
@@ -1053,6 +1043,21 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
                     return OK;
                 }
+
+                // place things we built elsewhere into their final locations
+
+                // put aggregated tx3g data into the metadata
+                if (mLastTrack->mTx3gFilled > 0) {
+                    ALOGV("Putting %zu bytes of tx3g data into meta data",
+                          mLastTrack->mTx3gFilled);
+                    AMediaFormat_setBuffer(mLastTrack->meta,
+                        AMEDIAFORMAT_KEY_TEXT_FORMAT_DATA,
+                        mLastTrack->mTx3gBuffer, mLastTrack->mTx3gFilled);
+                    // drop it now to reduce our footprint
+                    free(mLastTrack->mTx3gBuffer);
+                    mLastTrack->mTx3gBuffer = NULL;
+                }
+
             } else if (chunk_type == FOURCC("moov")) {
                 mInitCheck = OK;
 
@@ -2553,41 +2558,55 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             if (mLastTrack == NULL)
                 return ERROR_MALFORMED;
 
-            void *data;
-            size_t size = 0;
-            if (!AMediaFormat_getBuffer(mLastTrack->meta,
-                    AMEDIAFORMAT_KEY_TEXT_FORMAT_DATA, &data, &size)) {
-                size = 0;
-            }
-
-            if ((chunk_size > SIZE_MAX) || (SIZE_MAX - chunk_size <= size)) {
+            // complain about ridiculous chunks
+            if (chunk_size > kMaxAtomSize) {
                 return ERROR_MALFORMED;
             }
 
-            uint8_t *buffer = new (std::nothrow) uint8_t[size + chunk_size];
-            if (buffer == NULL) {
+            // complain about empty atoms
+            if (chunk_data_size <= 0) {
+                ALOGE("b/124330204");
+                android_errorWriteLog(0x534e4554, "124330204");
                 return ERROR_MALFORMED;
             }
 
-            if (size > 0) {
-                memcpy(buffer, data, size);
+            // should fill buffer based on "data_offset" and "chunk_data_size"
+            // instead of *offset and chunk_size;
+            // but we've been feeding the extra data to consumers for multiple releases and
+            // if those apps are compensating for it, we'd break them with such a change
+            //
+
+            if (mLastTrack->mTx3gSize - mLastTrack->mTx3gFilled < chunk_size) {
+                size_t growth = kTx3gGrowth;
+                if (growth < chunk_size) {
+                    growth = chunk_size;
+                }
+                // although this disallows 2 tx3g atoms of nearly kMaxAtomSize...
+                if ((uint64_t) mLastTrack->mTx3gSize + growth > kMaxAtomSize) {
+                    ALOGE("b/124330204 - too much space");
+                    android_errorWriteLog(0x534e4554, "124330204");
+                    return ERROR_MALFORMED;
+                }
+                uint8_t *updated = (uint8_t *)realloc(mLastTrack->mTx3gBuffer,
+                                                mLastTrack->mTx3gSize + growth);
+                if (updated == NULL) {
+                    return ERROR_MALFORMED;
+                }
+                mLastTrack->mTx3gBuffer = updated;
+                mLastTrack->mTx3gSize += growth;
             }
 
-            if ((size_t)(mDataSource->readAt(*offset, buffer + size, chunk_size))
+            if ((size_t)(mDataSource->readAt(*offset,
+                                             mLastTrack->mTx3gBuffer + mLastTrack->mTx3gFilled,
+                                             chunk_size))
                     < chunk_size) {
-                delete[] buffer;
-                buffer = NULL;
 
                 // advance read pointer so we don't end up reading this again
                 *offset += chunk_size;
                 return ERROR_IO;
             }
 
-            AMediaFormat_setBuffer(mLastTrack->meta,
-                    AMEDIAFORMAT_KEY_TEXT_FORMAT_DATA, buffer, size + chunk_size);
-
-            delete[] buffer;
-
+            mLastTrack->mTx3gFilled += chunk_size;
             *offset += chunk_size;
             break;
         }
