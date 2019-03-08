@@ -527,8 +527,8 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
     }
 
     // tie playback and record tracks together
-    mRecord.setTrackAndPeer(tempRecordTrack, tempPatchTrack.get());
-    mPlayback.setTrackAndPeer(tempPatchTrack, tempRecordTrack.get());
+    mRecord.setTrackAndPeer(tempRecordTrack, tempPatchTrack);
+    mPlayback.setTrackAndPeer(tempPatchTrack, tempRecordTrack);
 
     // start capture and playback
     mRecord.track()->start(AudioSystem::SYNC_EVENT_NONE, AUDIO_SESSION_NONE);
@@ -543,6 +543,7 @@ void AudioFlinger::PatchPanel::Patch::clearConnections(PatchPanel *panel)
             __func__, mRecord.handle(), mPlayback.handle());
     mRecord.stopTrack();
     mPlayback.stopTrack();
+    mRecord.track()->clearPeerProxy(); // mRecord stop is synchronous. Break PeerProxy sp<> cycle.
     mRecord.closeConnections(panel);
     mPlayback.closeConnections(panel);
 }

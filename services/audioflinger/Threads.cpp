@@ -7683,6 +7683,8 @@ bool AudioFlinger::RecordThread::stop(RecordThread::RecordTrack* recordTrack) {
     // note that threadLoop may still be processing the track at this point [without lock]
     recordTrack->mState = TrackBase::PAUSING;
 
+    // NOTE: Waiting here is important to keep stop synchronous.
+    // This is needed for proper patchRecord peer release.
     while (recordTrack->mState == TrackBase::PAUSING && !recordTrack->isInvalid()) {
         mWaitWorkCV.broadcast(); // signal thread to stop
         mStartStopCond.wait(mLock);
