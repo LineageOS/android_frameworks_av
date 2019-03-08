@@ -160,13 +160,13 @@ void VsyncTracker::updateModelLocked() {
     mPhase = (long) (atan2(sampleAvgY, sampleAvgX) / scale);
 }
 
-static void frameCallback(long frameTimeNanos, void* data) {
+static void frameCallback(int64_t frameTimeNanos, void* data) {
     if (data == NULL) {
         return;
     }
     sp<VsyncTracker> vsyncTracker(static_cast<VsyncTracker*>(data));
     vsyncTracker->addSample(frameTimeNanos);
-    AChoreographer_postFrameCallback(AChoreographer_getInstance(),
+    AChoreographer_postFrameCallback64(AChoreographer_getInstance(),
             frameCallback, static_cast<void*>(vsyncTracker.get()));
 }
 
@@ -247,7 +247,7 @@ status_t ChoreographerThread::readyToRun() {
     if (AChoreographer_getInstance() == NULL) {
         return NO_INIT;
     }
-    AChoreographer_postFrameCallback(AChoreographer_getInstance(), frameCallback, mData);
+    AChoreographer_postFrameCallback64(AChoreographer_getInstance(), frameCallback, mData);
     return OK;
 }
 
