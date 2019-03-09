@@ -421,8 +421,9 @@ TEST_F(Codec2VideoDecHidlTest, validateCompName) {
     ASSERT_EQ(mDisableTest, false);
 }
 
-class Codec2VideoDecDecodeTest : public Codec2VideoDecHidlTest,
-                                 public ::testing::WithParamInterface<int32_t> {
+class Codec2VideoDecDecodeTest
+    : public Codec2VideoDecHidlTest,
+      public ::testing::WithParamInterface<std::pair<int32_t, bool>> {
 };
 
 // Bitstream Test
@@ -430,7 +431,8 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
     description("Decodes input file");
     if (mDisableTest) return;
 
-    uint32_t streamIndex = GetParam();
+    uint32_t streamIndex = GetParam().first;
+    bool signalEOS = GetParam().second;
     char mURL[512], info[512];
     std::ifstream eleStream, eleInfo;
     strcpy(mURL, gEnv->getRes().c_str());
@@ -464,8 +466,18 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
     ASSERT_EQ(eleStream.is_open(), true);
     ASSERT_NO_FATAL_FAILURE(decodeNFrames(
         mComponent, mQueueLock, mQueueCondition, mWorkQueue, mFlushedIndices,
-        mLinearPool, eleStream, &Info, 0, (int)Info.size()));
+        mLinearPool, eleStream, &Info, 0, (int)Info.size(), signalEOS));
 
+    // If EOS is not sent, sending empty input with EOS flag
+    size_t infoSize = Info.size();
+    if (!signalEOS) {
+        ASSERT_NO_FATAL_FAILURE(
+            waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue, 1));
+        ASSERT_NO_FATAL_FAILURE(
+            testInputBuffer(mComponent, mQueueLock, mWorkQueue,
+                            C2FrameData::FLAG_END_OF_STREAM, false));
+        infoSize += 1;
+    }
     // blocking call to ensures application to Wait till all the inputs are
     // consumed
     if (!mEos) {
@@ -475,19 +487,22 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
     }
 
     eleStream.close();
-    if (mFramesReceived != Info.size()) {
+    if (mFramesReceived != infoSize) {
         ALOGE("Input buffer count and Output buffer count mismatch");
         ALOGV("framesReceived : %d inputFrames : %zu", mFramesReceived,
-              Info.size());
+              infoSize);
         ASSERT_TRUE(false);
     }
 
     if (mTimestampDevTest) EXPECT_EQ(mTimestampUslist.empty(), true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
-
-INSTANTIATE_TEST_CASE_P(StreamIndexes, Codec2VideoDecDecodeTest,
-                        ::testing::Values(0, 1));
+// DecodeTest with StreamIndex and EOS / No EOS
+INSTANTIATE_TEST_CASE_P(StreamIndexAndEOS, Codec2VideoDecDecodeTest,
+                        ::testing::Values(std::make_pair(0, false),
+                                          std::make_pair(0, true),
+                                          std::make_pair(1, false),
+                                          std::make_pair(1, true)));
 
 // Adaptive Test
 TEST_F(Codec2VideoDecHidlTest, AdaptiveDecodeTest) {
