@@ -400,12 +400,11 @@ status_t StagefrightRecorder::setNextOutputFile(int fd) {
 
     // start with a clean, empty file
     ftruncate(fd, 0);
-    int nextFd = dup(fd);
     if (mWriter == NULL) {
         ALOGE("setNextOutputFile failed. Writer has been freed");
         return INVALID_OPERATION;
     }
-    return mWriter->setNextFd(nextFd);
+    return mWriter->setNextFd(fd);
 }
 
 // Attempt to parse an float literal optionally surrounded by whitespace,
