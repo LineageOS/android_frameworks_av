@@ -1723,6 +1723,7 @@ AudioFlinger::PlaybackThread::PatchTrack::PatchTrack(PlaybackThread *playbackThr
 
 AudioFlinger::PlaybackThread::PatchTrack::~PatchTrack()
 {
+    ALOGV("%s(%d)", __func__, mId);
 }
 
 status_t AudioFlinger::PlaybackThread::PatchTrack::start(AudioSystem::sync_event_t event,
@@ -2193,6 +2194,7 @@ AudioFlinger::RecordThread::PatchRecord::PatchRecord(RecordThread *recordThread,
 
 AudioFlinger::RecordThread::PatchRecord::~PatchRecord()
 {
+    ALOGV("%s(%d)", __func__, mId);
 }
 
 // AudioBufferProvider interface

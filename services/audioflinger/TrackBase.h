@@ -337,10 +337,19 @@ public:
                         PatchTrackBase(sp<ClientProxy> proxy, const ThreadBase& thread,
                                        const Timeout& timeout);
             void        setPeerTimeout(std::chrono::nanoseconds timeout);
-            void        setPeerProxy(PatchProxyBufferProvider *proxy) { mPeerProxy = proxy; }
+            template <typename T>
+            void        setPeerProxy(const sp<T> &proxy, bool holdReference) {
+                            mPeerReferenceHold = holdReference ? proxy : nullptr;
+                            mPeerProxy = proxy.get();
+                        }
+            void        clearPeerProxy() {
+                            mPeerReferenceHold.clear();
+                            mPeerProxy = nullptr;
+                        }
 
 protected:
     const sp<ClientProxy>       mProxy;
+    sp<RefBase>                 mPeerReferenceHold;   // keeps mPeerProxy alive during access.
     PatchProxyBufferProvider*   mPeerProxy = nullptr;
     struct timespec             mPeerTimeout{};
 

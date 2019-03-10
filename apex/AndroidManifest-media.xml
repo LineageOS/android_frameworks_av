@@ -1,5 +1,6 @@
-/*
- * Copyright 2018 The Android Open Source Project
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,15 +13,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */
-
-#ifndef ANDROID_MEDIA_CODEC_UPDATE_SERVICE_H
-#define ANDROID_MEDIA_CODEC_UPDATE_SERVICE_H
-
-namespace android {
-
-void loadFromApex(const char *libDirPath);
-
-}   // namespace android
-
-#endif  // ANDROID_MEDIA_CODEC_UPDATE_SERVICE_H
+ -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  package="com.android.media">
+  <!-- APEX does not have classes.dex -->
+  <application android:hasCode="false" />
+  <uses-sdk
+      android:minSdkVersion="28"
+      android:targetSdkVersion="28"
+  />
+</manifest>

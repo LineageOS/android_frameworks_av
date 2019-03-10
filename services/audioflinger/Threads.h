@@ -399,6 +399,9 @@ public:
 
     virtual     void                dump(int fd, const Vector<String16>& args) = 0;
 
+                // deliver stats to mediametrics.
+                void                sendStatistics(bool force);
+
     mutable     Mutex                   mLock;
 
 protected:
@@ -521,6 +524,10 @@ protected:
                 audio_utils::Statistics<double> mIoJitterMs{0.995 /* alpha */};
                 audio_utils::Statistics<double> mProcessTimeMs{0.995 /* alpha */};
                 audio_utils::Statistics<double> mLatencyMs{0.995 /* alpha */};
+
+                // Save the last count when we delivered statistics to mediametrics.
+                int64_t                 mLastRecordedTimestampVerifierN = 0;
+                int64_t                 mLastRecordedTimeNs = 0;  // BOOTTIME to include suspend.
 
                 bool                    mIsMsdDevice = false;
                 // A condition that must be evaluated by the thread loop has changed and

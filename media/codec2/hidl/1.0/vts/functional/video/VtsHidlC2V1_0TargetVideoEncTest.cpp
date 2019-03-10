@@ -343,13 +343,18 @@ TEST_F(Codec2VideoEncHidlTest, validateCompName) {
     ASSERT_EQ(mDisableTest, false);
 }
 
-TEST_F(Codec2VideoEncHidlTest, EncodeTest) {
+class Codec2VideoEncEncodeTest : public Codec2VideoEncHidlTest,
+                                 public ::testing::WithParamInterface<bool> {
+};
+
+TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
     description("Encodes input file");
     if (mDisableTest) return;
 
     char mURL[512];
     int32_t nWidth = ENC_DEFAULT_FRAME_WIDTH;
     int32_t nHeight = ENC_DEFAULT_FRAME_HEIGHT;
+    bool signalEOS = GetParam();
 
     strcpy(mURL, gEnv->getRes().c_str());
     GetURLForComponent(mURL);
@@ -367,7 +372,18 @@ TEST_F(Codec2VideoEncHidlTest, EncodeTest) {
     ASSERT_NO_FATAL_FAILURE(
         encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
                       mFlushedIndices, mGraphicPool, eleStream,
-                      0, ENC_NUM_FRAMES, nWidth, nHeight));
+                      0, ENC_NUM_FRAMES, nWidth, nHeight, false, signalEOS));
+
+    // If EOS is not sent, sending empty input with EOS flag
+    uint32_t inputFrames = ENC_NUM_FRAMES;
+    if (!signalEOS) {
+        ASSERT_NO_FATAL_FAILURE(
+            waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue, 1));
+        ASSERT_NO_FATAL_FAILURE(
+            testInputBuffer(mComponent, mQueueLock, mWorkQueue,
+                            C2FrameData::FLAG_END_OF_STREAM, false));
+        inputFrames += 1;
+    }
 
     // blocking call to ensures application to Wait till all the inputs are
     // consumed
@@ -376,10 +392,10 @@ TEST_F(Codec2VideoEncHidlTest, EncodeTest) {
         waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
 
     eleStream.close();
-    if (mFramesReceived != ENC_NUM_FRAMES) {
+    if (mFramesReceived != inputFrames) {
         ALOGE("Input buffer count and Output buffer count mismatch");
         ALOGE("framesReceived : %d inputFrames : %d", mFramesReceived,
-              ENC_NUM_FRAMES);
+              inputFrames);
         ASSERT_TRUE(false);
     }
 
@@ -393,6 +409,10 @@ TEST_F(Codec2VideoEncHidlTest, EncodeTest) {
 
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
+
+// EncodeTest with EOS / No EOS
+INSTANTIATE_TEST_CASE_P(EncodeTestwithEOS, Codec2VideoEncEncodeTest,
+                        ::testing::Values(true, false));
 
 TEST_F(Codec2VideoEncHidlTest, EOSTest) {
     description("Test empty input buffer with EOS flag");

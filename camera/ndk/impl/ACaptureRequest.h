@@ -18,6 +18,7 @@
 
 #include <camera/NdkCaptureRequest.h>
 #include <set>
+#include <unordered_map>
 
 using namespace android;
 
@@ -59,7 +60,8 @@ struct ACaptureRequest {
         return ACAMERA_OK;
     }
 
-    sp<ACameraMetadata>   settings;
+    sp<ACameraMetadata> settings;
+    std::unordered_map<std::string, sp<ACameraMetadata>> physicalSettings;
     ACameraOutputTargets* targets;
     void*                 context;
 };

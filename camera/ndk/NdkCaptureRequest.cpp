@@ -98,6 +98,27 @@ camera_status_t ACaptureRequest_getConstEntry(
 }
 
 EXPORT
+camera_status_t ACaptureRequest_getConstEntry_physicalCamera(
+        const ACaptureRequest* req, const char* physicalId,
+        uint32_t tag, ACameraMetadata_const_entry* entry) {
+    ATRACE_CALL();
+    if (req == nullptr || entry == nullptr || physicalId == nullptr) {
+        ALOGE("%s: invalid argument! req %p, tag 0x%x, entry %p, physicalId %p",
+               __FUNCTION__, req, tag, entry, physicalId);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+
+    const auto& physicalSettings = req->physicalSettings.find(physicalId);
+    if (physicalSettings == req->physicalSettings.end()) {
+        ALOGE("%s: Failed to find metadata for physical camera id  %s",
+                __FUNCTION__, physicalId);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+
+    return physicalSettings->second->getConstEntry(tag, entry);
+}
+
+EXPORT
 camera_status_t ACaptureRequest_getAllTags(
         const ACaptureRequest* req, /*out*/int32_t* numTags, /*out*/const uint32_t** tags) {
     ATRACE_CALL();
@@ -131,6 +152,34 @@ SET_ENTRY(rational,ACameraMetadata_rational)
 
 #undef SET_ENTRY
 
+#define SET_PHYSICAL_ENTRY(NAME,NDK_TYPE)                                               \
+EXPORT                                                                                  \
+camera_status_t ACaptureRequest_setEntry_physicalCamera_##NAME(                         \
+        ACaptureRequest* req, const char* physicalId, uint32_t tag,                     \
+        uint32_t count, const NDK_TYPE* data) {                                         \
+    ATRACE_CALL();                                                                      \
+    if (req == nullptr || (count > 0 && data == nullptr) || physicalId == nullptr) {    \
+        ALOGE("%s: invalid argument! req %p, tag 0x%x, count %d, data 0x%p, physicalId %p", \
+               __FUNCTION__, req, tag, count, data, physicalId);                        \
+        return ACAMERA_ERROR_INVALID_PARAMETER;                                         \
+    }                                                                                   \
+    if (req->physicalSettings.find(physicalId) == req->physicalSettings.end()) {        \
+        ALOGE("%s: Failed to find metadata for physical camera id %s",                  \
+            __FUNCTION__, physicalId);                                                  \
+      return ACAMERA_ERROR_INVALID_PARAMETER;                                           \
+    }                                                                                   \
+    return req->physicalSettings[physicalId]->update(tag, count, data);                 \
+}
+
+SET_PHYSICAL_ENTRY(u8,uint8_t)
+SET_PHYSICAL_ENTRY(i32,int32_t)
+SET_PHYSICAL_ENTRY(float,float)
+SET_PHYSICAL_ENTRY(double,double)
+SET_PHYSICAL_ENTRY(i64,int64_t)
+SET_PHYSICAL_ENTRY(rational,ACameraMetadata_rational)
+
+#undef SET_PHYSICAL_ENTRY
+
 EXPORT
 void ACaptureRequest_free(ACaptureRequest* request) {
     ATRACE_CALL();
@@ -138,6 +187,7 @@ void ACaptureRequest_free(ACaptureRequest* request) {
         return;
     }
     request->settings.clear();
+    request->physicalSettings.clear();
     delete request->targets;
     delete request;
     return;
@@ -174,6 +224,9 @@ ACaptureRequest* ACaptureRequest_copy(const ACaptureRequest* src) {
 
     ACaptureRequest* pRequest = new ACaptureRequest();
     pRequest->settings = new ACameraMetadata(*(src->settings));
+    for (const auto& entry : src->physicalSettings) {
+        pRequest->physicalSettings[entry.first] = new ACameraMetadata(*(entry.second));
+    }
     pRequest->targets  = new ACameraOutputTargets();
     *(pRequest->targets)  = *(src->targets);
     pRequest->context = src->context;

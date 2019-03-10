@@ -3046,6 +3046,28 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_REQUEST_AVAILABLE_SESSION_KEYS =                    // int32[n]
             ACAMERA_REQUEST_START + 16,
+    /**
+     * <p>A subset of the available request keys that can be overridden for
+     * physical devices backing a logical multi-camera.</p>
+     *
+     * <p>Type: int32[n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>This is a subset of ACAMERA_REQUEST_AVAILABLE_REQUEST_KEYS which contains a list
+     * of keys that can be overridden using <a href="https://developer.android.com/reference/CaptureRequest/Builder.html#setPhysicalCameraKey">Builder#setPhysicalCameraKey</a>.
+     * The respective value of such request key can be obtained by calling
+     * <a href="https://developer.android.com/reference/CaptureRequest/Builder.html#getPhysicalCameraKey">Builder#getPhysicalCameraKey</a>. Capture requests that contain
+     * individual physical device requests must be built via
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraDevice.html#createCaptureRequest(int,">Set)</a>.</p>
+     *
+     * @see ACAMERA_REQUEST_AVAILABLE_REQUEST_KEYS
+     */
+    ACAMERA_REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS =    // int32[n]
+            ACAMERA_REQUEST_START + 17,
     ACAMERA_REQUEST_END,
 
     /**

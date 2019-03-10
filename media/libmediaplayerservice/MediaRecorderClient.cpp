@@ -538,6 +538,22 @@ status_t MediaRecorderClient::getActiveMicrophones(
     return NO_INIT;
 }
 
+status_t MediaRecorderClient::setMicrophoneDirection(audio_microphone_direction_t direction) {
+    ALOGV("setMicrophoneDirection(%d)", direction);
+    if (mRecorder != NULL) {
+        return mRecorder->setMicrophoneDirection(direction);
+    }
+    return NO_INIT;
+}
+
+status_t MediaRecorderClient::setMicrophoneFieldDimension(float zoom) {
+    ALOGV("setMicrophoneFieldDimension(%f)", zoom);
+    if (mRecorder != NULL) {
+        return mRecorder->setMicrophoneFieldDimension(zoom);
+    }
+    return NO_INIT;
+}
+
 status_t MediaRecorderClient::getPortId(audio_port_handle_t *portId) {
     ALOGV("getPortId");
     Mutex::Autolock lock(mLock);

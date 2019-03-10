@@ -934,7 +934,7 @@ public:
     class AudioTrackThread : public Thread
     {
     public:
-        AudioTrackThread(AudioTrack& receiver, bool bCanCallJava = false);
+        AudioTrackThread(AudioTrack& receiver);
 
         // Do not call Thread::requestExitAndWait() without first calling requestExit().
         // Thread::requestExitAndWait() is not virtual, and the implementation doesn't do enough.

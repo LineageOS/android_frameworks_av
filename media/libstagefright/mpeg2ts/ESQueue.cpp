@@ -1526,6 +1526,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitMPEGAudio() {
                 header, &frameSize, &samplingRate, &numChannels,
                 &bitrate, &numSamples)) {
         ALOGE("Failed to get audio frame size");
+        mBuffer->setRange(0, 0);
         return NULL;
     }
 
@@ -1548,6 +1549,22 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitMPEGAudio() {
     if (timeUs < 0LL) {
         ALOGE("Negative timeUs");
         return NULL;
+    }
+
+    if (mFormat != NULL) {
+        const char *mime;
+        if (mFormat->findCString(kKeyMIMEType, &mime)) {
+            if ((layer == 1) && strcmp (mime, MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_I)) {
+                ALOGE("Audio layer is not MPEG_LAYER_I");
+                return NULL;
+            } else if ((layer == 2) && strcmp (mime, MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II)) {
+                ALOGE("Audio layer is not MPEG_LAYER_II");
+                return NULL;
+            } else if ((layer == 3) && strcmp (mime, MEDIA_MIMETYPE_AUDIO_MPEG)) {
+                ALOGE("Audio layer is not AUDIO_MPEG");
+                return NULL;
+            }
+        }
     }
 
     accessUnit->meta()->setInt64("timeUs", timeUs);

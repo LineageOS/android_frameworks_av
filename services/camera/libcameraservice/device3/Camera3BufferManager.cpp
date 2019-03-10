@@ -237,7 +237,7 @@ status_t Camera3BufferManager::checkAndFreeBufferOnOtherStreamsLocked(
 }
 
 status_t Camera3BufferManager::getBufferForStream(int streamId, int streamSetId,
-        sp<GraphicBuffer>* gb, int* fenceFd) {
+        sp<GraphicBuffer>* gb, int* fenceFd, bool noFreeBufferAtConsumer) {
     ATRACE_CALL();
 
     Mutex::Autolock l(mLock);
@@ -253,14 +253,19 @@ status_t Camera3BufferManager::getBufferForStream(int streamId, int streamSetId,
     StreamSet &streamSet = mStreamSetMap.editValueFor(streamSetId);
     BufferCountMap& handOutBufferCounts = streamSet.handoutBufferCountMap;
     size_t& bufferCount = handOutBufferCounts.editValueFor(streamId);
+    BufferCountMap& attachedBufferCounts = streamSet.attachedBufferCountMap;
+    size_t& attachedBufferCount = attachedBufferCounts.editValueFor(streamId);
+
+    if (noFreeBufferAtConsumer) {
+        attachedBufferCount = bufferCount;
+    }
+
     if (bufferCount >= streamSet.maxAllowedBufferCount) {
         ALOGE("%s: bufferCount (%zu) exceeds the max allowed buffer count (%zu) of this stream set",
                 __FUNCTION__, bufferCount, streamSet.maxAllowedBufferCount);
         return INVALID_OPERATION;
     }
 
-    BufferCountMap& attachedBufferCounts = streamSet.attachedBufferCountMap;
-    size_t& attachedBufferCount = attachedBufferCounts.editValueFor(streamId);
     if (attachedBufferCount > bufferCount) {
         // We've already attached more buffers to this stream than we currently have
         // outstanding, so have the stream just use an already-attached buffer

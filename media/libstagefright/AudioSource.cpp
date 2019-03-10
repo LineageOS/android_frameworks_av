@@ -52,7 +52,9 @@ static void AudioRecordCallbackFunction(int event, void *user, void *info) {
 AudioSource::AudioSource(
         audio_source_t inputSource, const String16 &opPackageName,
         uint32_t sampleRate, uint32_t channelCount, uint32_t outSampleRate,
-        uid_t uid, pid_t pid, audio_port_handle_t selectedDeviceId)
+        uid_t uid, pid_t pid, audio_port_handle_t selectedDeviceId,
+        audio_microphone_direction_t selectedMicDirection,
+        float selectedMicFieldDimension)
     : mStarted(false),
       mSampleRate(sampleRate),
       mOutSampleRate(outSampleRate > 0 ? outSampleRate : sampleRate),
@@ -103,7 +105,9 @@ AudioSource::AudioSource(
                     uid,
                     pid,
                     NULL /*pAttributes*/,
-                    selectedDeviceId);
+                    selectedDeviceId,
+                    selectedMicDirection,
+                    selectedMicFieldDimension);
         mInitCheck = mRecord->initCheck();
         if (mInitCheck != OK) {
             mRecord.clear();
@@ -502,6 +506,22 @@ status_t AudioSource::getActiveMicrophones(
         std::vector<media::MicrophoneInfo>* activeMicrophones) {
     if (mRecord != 0) {
         return mRecord->getActiveMicrophones(activeMicrophones);
+    }
+    return NO_INIT;
+}
+
+status_t AudioSource::setMicrophoneDirection(audio_microphone_direction_t direction) {
+    ALOGV("setMicrophoneDirection(%d)", direction);
+    if (mRecord != 0) {
+        return mRecord->setMicrophoneDirection(direction);
+    }
+    return NO_INIT;
+}
+
+status_t AudioSource::setMicrophoneFieldDimension(float zoom) {
+    ALOGV("setMicrophoneFieldDimension(%f)", zoom);
+    if (mRecord != 0) {
+        return mRecord->setMicrophoneFieldDimension(zoom);
     }
     return NO_INIT;
 }

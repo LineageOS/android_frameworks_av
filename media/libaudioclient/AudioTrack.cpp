@@ -170,44 +170,8 @@ bool AudioTrack::isDirectOutputSupported(const audio_config_base_t& config,
 
 // ---------------------------------------------------------------------------
 
-static std::string audioContentTypeString(audio_content_type_t value) {
-    std::string contentType;
-    if (AudioContentTypeConverter::toString(value, contentType)) {
-        return contentType;
-    }
-    char rawbuffer[16];  // room for "%d"
-    snprintf(rawbuffer, sizeof(rawbuffer), "%d", value);
-    return rawbuffer;
-}
-
-static std::string audioUsageString(audio_usage_t value) {
-    std::string usage;
-    if (UsageTypeConverter::toString(value, usage)) {
-        return usage;
-    }
-    char rawbuffer[16];  // room for "%d"
-    snprintf(rawbuffer, sizeof(rawbuffer), "%d", value);
-    return rawbuffer;
-}
-
 void AudioTrack::MediaMetrics::gather(const AudioTrack *track)
 {
-
-    // key for media statistics is defined in the header
-    // attrs for media statistics
-    // NB: these are matched with public Java API constants defined
-    // in frameworks/base/media/java/android/media/AudioTrack.java
-    // These must be kept synchronized with the constants there.
-    static constexpr char kAudioTrackStreamType[] = "android.media.audiotrack.streamtype";
-    static constexpr char kAudioTrackContentType[] = "android.media.audiotrack.type";
-    static constexpr char kAudioTrackUsage[] = "android.media.audiotrack.usage";
-    static constexpr char kAudioTrackSampleRate[] = "android.media.audiotrack.samplerate";
-    static constexpr char kAudioTrackChannelMask[] = "android.media.audiotrack.channelmask";
-
-    // NB: These are not yet exposed as public Java API constants.
-    static constexpr char kAudioTrackUnderrunFrames[] = "android.media.audiotrack.underrunframes";
-    static constexpr char kAudioTrackStartupGlitch[] = "android.media.audiotrack.glitch.startup";
-
     // only if we're in a good state...
     // XXX: shall we gather alternative info if failing?
     const status_t lstatus = track->initCheck();
@@ -216,28 +180,22 @@ void AudioTrack::MediaMetrics::gather(const AudioTrack *track)
         return;
     }
 
-    // constructor guarantees mAnalyticsItem is valid
+#define MM_PREFIX "android.media.audiotrack." // avoid cut-n-paste errors.
 
-    const int32_t underrunFrames = track->getUnderrunFrames();
-    if (underrunFrames != 0) {
-        mAnalyticsItem->setInt32(kAudioTrackUnderrunFrames, underrunFrames);
-    }
+    // Java API 28 entries, do not change.
+    mAnalyticsItem->setCString(MM_PREFIX "streamtype", toString(track->streamType()).c_str());
+    mAnalyticsItem->setCString(MM_PREFIX "type",
+            toString(track->mAttributes.content_type).c_str());
+    mAnalyticsItem->setCString(MM_PREFIX "usage", toString(track->mAttributes.usage).c_str());
 
-    if (track->mTimestampStartupGlitchReported) {
-        mAnalyticsItem->setInt32(kAudioTrackStartupGlitch, 1);
-    }
-
-    if (track->mStreamType != -1) {
-        // deprecated, but this will tell us who still uses it.
-        mAnalyticsItem->setInt32(kAudioTrackStreamType, track->mStreamType);
-    }
-    // XXX: consider including from mAttributes: source type
-    mAnalyticsItem->setCString(kAudioTrackContentType,
-                               audioContentTypeString(track->mAttributes.content_type).c_str());
-    mAnalyticsItem->setCString(kAudioTrackUsage,
-                               audioUsageString(track->mAttributes.usage).c_str());
-    mAnalyticsItem->setInt32(kAudioTrackSampleRate, track->mSampleRate);
-    mAnalyticsItem->setInt64(kAudioTrackChannelMask, track->mChannelMask);
+    // Non-API entries, these can change due to a Java string mistake.
+    mAnalyticsItem->setInt32(MM_PREFIX "sampleRate", (int32_t)track->mSampleRate);
+    mAnalyticsItem->setInt64(MM_PREFIX "channelMask", (int64_t)track->mChannelMask);
+    // Non-API entries, these can change.
+    mAnalyticsItem->setInt32(MM_PREFIX "portId", (int32_t)track->mPortId);
+    mAnalyticsItem->setCString(MM_PREFIX "encoding", toString(track->mFormat).c_str());
+    mAnalyticsItem->setInt32(MM_PREFIX "frameCount", (int32_t)track->mFrameCount);
+    mAnalyticsItem->setCString(MM_PREFIX "attributes", toString(track->mAttributes).c_str());
 }
 
 // hand the user a snapshot of the metrics.
@@ -615,7 +573,7 @@ status_t AudioTrack::set(
     mCbf = cbf;
 
     if (cbf != NULL) {
-        mAudioTrackThread = new AudioTrackThread(*this, threadCanCallJava);
+        mAudioTrackThread = new AudioTrackThread(*this);
         mAudioTrackThread->run("AudioTrack", ANDROID_PRIORITY_AUDIO, 0 /*stack*/);
         // thread begins in paused state, and will not reference us until start()
     }
@@ -3127,7 +3085,7 @@ void AudioTrack::DeathNotifier::binderDied(const wp<IBinder>& who __unused)
 
 // =========================================================================
 
-AudioTrack::AudioTrackThread::AudioTrackThread(AudioTrack& receiver, bool bCanCallJava __unused)
+AudioTrack::AudioTrackThread::AudioTrackThread(AudioTrack& receiver)
     : Thread(true /* bCanCallJava */)  // binder recursion on restoreTrack_l() may call Java.
     , mReceiver(receiver), mPaused(true), mPausedInt(false), mPausedNs(0LL),
       mIgnoreNextPausedInt(false)

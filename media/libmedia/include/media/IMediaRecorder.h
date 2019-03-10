@@ -73,6 +73,8 @@ public:
     virtual status_t enableAudioDeviceCallback(bool enabled) = 0;
     virtual status_t getActiveMicrophones(
                         std::vector<media::MicrophoneInfo>* activeMicrophones) = 0;
+    virtual status_t setMicrophoneDirection(audio_microphone_direction_t direction) = 0;
+    virtual status_t setMicrophoneFieldDimension(float zoom) = 0;
     virtual status_t getPortId(audio_port_handle_t *portId) = 0;
 };
 

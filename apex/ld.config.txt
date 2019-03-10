@@ -1,0 +1,74 @@
+# Copyright (C) 2019 The Android Open Source Project
+#
+# Bionic loader config file for the media swcodec APEX.
+#
+# There are no versioned APEX paths here - this APEX module does not support
+# having several versions mounted.
+
+dir.swcodec = /apex/com.android.media.swcodec/bin/
+
+[swcodec]
+additional.namespaces = platform
+
+###############################################################################
+# "default" namespace
+#
+# This namespace is for the binaries and libraries on the swcodec APEX.
+###############################################################################
+
+namespace.default.isolated = true
+namespace.default.visible = true
+
+namespace.default.search.paths      = /apex/com.android.media.swcodec/${LIB}
+namespace.default.asan.search.paths = /apex/com.android.media.swcodec/${LIB}
+
+# Keep the below in sync with "sphal" namespace in system's /etc/ld.config.txt
+# Codec2 has dependencies on some SP-hals (eg. android.hardware.graphics.mapper@2.0)
+# These are dlopen'ed by libvndksupport.so.
+namespace.default.search.paths += /odm/${LIB}
+namespace.default.search.paths += /vendor/${LIB}
+
+namespace.default.permitted.paths  = /odm/${LIB}
+namespace.default.permitted.paths += /vendor/${LIB}
+namespace.default.permitted.paths += /vendor/${LIB}/hw
+namespace.default.permitted.paths += /system/vendor/${LIB}
+
+namespace.default.asan.search.paths += /data/asan/odm/${LIB}
+namespace.default.asan.search.paths +=           /odm/${LIB}
+namespace.default.asan.search.paths += /data/asan/vendor/${LIB}
+namespace.default.asan.search.paths +=           /vendor/${LIB}
+
+namespace.default.asan.permitted.paths  = /data/asan/odm/${LIB}
+namespace.default.asan.permitted.paths +=           /odm/${LIB}
+namespace.default.asan.permitted.paths += /data/asan/vendor/${LIB}
+namespace.default.asan.permitted.paths +=           /vendor/${LIB}
+
+namespace.default.links = platform
+
+# TODO: replace the following when apex has a way to auto-generate this list
+# namespace.default.link.platform.shared_libs  = %LLNDK_LIBRARIES%
+# namespace.default.link.platform.shared_libs += %SANITIZER_RUNTIME_LIBRARIES%
+namespace.default.link.platform.shared_libs = libEGL.so:libGLESv1_CM.so:libGLESv2.so:libGLESv3.so:libRS.so:libandroid_net.so:libc.so:libclang_rt.asan-aarch64-android.so:libclang_rt.asan-arm-android.so:libclang_rt.hwasan-aarch64-android.so:libclang_rt.asan-i686-android.so:libclang_rt.asan-x86_64-android.so:libdl.so:libft2.so:liblog.so:libm.so:libmediandk.so:libnativewindow.so:libneuralnetworks.so:libsync.so:libvndksupport.so:libvulkan.so
+
+###############################################################################
+# "platform" namespace
+#
+# This namespace is for linking to LLNDK and ASAN libraries on the system.
+###############################################################################
+
+namespace.platform.isolated = true
+
+namespace.platform.search.paths = /system/${LIB}
+namespace.platform.asan.search.paths = /data/asan/system/${LIB}
+
+# /system/lib/libc.so, etc are symlinks to /bionic/lib/libc.so, etc.
+# Add /bionic/lib to the permitted paths because linker uses realpath(3)
+# to check the accessibility of the lib. We could add this to search.paths
+# instead but that makes the resolution of bionic libs be dependent on
+# the order of /system/lib and /bionic/lib in search.paths. If /bionic/lib
+# is after /system/lib, then /bionic/lib is never tried because libc.so
+# is always found in /system/lib but fails to pass the accessibility test
+# because of its realpath.  It's better to not depend on the ordering if
+# possible.
+namespace.platform.permitted.paths = /bionic/${LIB}
+namespace.platform.asan.permitted.paths = /bionic/${LIB}

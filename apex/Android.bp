@@ -42,6 +42,9 @@ apex_defaults {
     },
     key: "com.android.media.key",
     certificate: ":com.android.media.certificate",
+
+    // Use a custom AndroidManifest.xml used for API targeting.
+    androidManifest: ":com.android.media-androidManifest",
 }
 
 apex {
@@ -50,14 +53,46 @@ apex {
     defaults: ["com.android.media-defaults"],
 }
 
+filegroup {
+    name: "com.android.media-androidManifest",
+    srcs: ["AndroidManifest-media.xml"],
+}
+
+filegroup {
+    name: "com.android.media.swcodec-androidManifest",
+    srcs: ["AndroidManifest-swcodec.xml"],
+}
+
 apex_defaults {
     name: "com.android.media.swcodec-defaults",
-    native_shared_libs: [
-        "libmedia_codecserviceregistrant",
+    binaries: [
+        "mediaswcodec",
+    ],
+    prebuilts: [
+        "com.android.media.swcodec-mediaswcodec.rc",
+        "com.android.media.swcodec-ld.config.txt",
+        "mediaswcodec.policy",
     ],
     use_vendor: true,
     key: "com.android.media.swcodec.key",
     certificate: ":com.android.media.swcodec.certificate",
+
+    // Use a custom AndroidManifest.xml used for API targeting.
+    androidManifest: ":com.android.media.swcodec-androidManifest",
+}
+
+prebuilt_etc {
+    name: "com.android.media.swcodec-mediaswcodec.rc",
+    src: "mediaswcodec.rc",
+    filename: "init.rc",
+    installable: false,
+}
+
+prebuilt_etc {
+    name: "com.android.media.swcodec-ld.config.txt",
+    src: "ld.config.txt",
+    filename: "ld.config.txt",
+    installable: false,
 }
 
 apex {

@@ -32,6 +32,10 @@ const char *MEDIA_MIMETYPE_VIDEO_MPEG2 = "video/mpeg2";
 const char *MEDIA_MIMETYPE_VIDEO_RAW = "video/raw";
 const char *MEDIA_MIMETYPE_VIDEO_DOLBY_VISION = "video/dolby-vision";
 const char *MEDIA_MIMETYPE_VIDEO_SCRAMBLED = "video/scrambled";
+const char *MEDIA_MIMETYPE_VIDEO_DIVX = "video/divx";
+const char *MEDIA_MIMETYPE_VIDEO_DIVX3 = "video/divx3";
+const char *MEDIA_MIMETYPE_VIDEO_XVID = "video/xvid";
+const char *MEDIA_MIMETYPE_VIDEO_MJPEG = "video/x-motion-jpeg";
 
 const char *MEDIA_MIMETYPE_AUDIO_AMR_NB = "audio/3gpp";
 const char *MEDIA_MIMETYPE_AUDIO_AMR_WB = "audio/amr-wb";

@@ -64,7 +64,7 @@ TEST_F(Codec2MasterHalTest, ListComponents) {
     C2String name = mClient->getName();
     EXPECT_NE(name.empty(), true) << "Invalid Codec2Client Name";
 
-    // Get List of components from HIDL Codec2Client instance
+    // Get List of components from all known services
     const std::vector<C2Component::Traits> listTraits =
         mClient->ListComponents();
 
@@ -78,8 +78,9 @@ TEST_F(Codec2MasterHalTest, ListComponents) {
             listener.reset(new CodecListener());
             ASSERT_NE(listener, nullptr);
 
-            mClient->createComponent(listTraits[i].name.c_str(), listener,
-                                     &component);
+            // Create component from all known services
+            component = mClient->CreateComponentByName(
+                listTraits[i].name.c_str(), listener, &mClient);
             ASSERT_NE(component, nullptr) << "Create component failed for "
                                           << listTraits[i].name.c_str();
         }

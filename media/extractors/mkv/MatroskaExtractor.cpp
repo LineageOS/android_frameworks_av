@@ -958,6 +958,59 @@ media_status_t MatroskaSource::read(
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// trans all FOURCC  to lower char
+static uint32_t FourCCtoLower(uint32_t fourcc) {
+    uint8_t ch_1 = tolower((fourcc >> 24) & 0xff);
+    uint8_t ch_2 = tolower((fourcc >> 16) & 0xff);
+    uint8_t ch_3 = tolower((fourcc >> 8) & 0xff);
+    uint8_t ch_4 = tolower((fourcc) & 0xff);
+    uint32_t fourcc_out = ch_1 << 24 | ch_2 << 16 | ch_3 << 8 | ch_4;
+
+    return fourcc_out;
+}
+
+static const char *MKVFourCC2MIME(uint32_t fourcc) {
+    ALOGV("MKVFourCC2MIME fourcc 0x%8.8x", fourcc);
+    uint32_t lowerFourcc = FourCCtoLower(fourcc);
+    switch (lowerFourcc) {
+        case FOURCC("mp4v"):
+            return MEDIA_MIMETYPE_VIDEO_MPEG4;
+
+        case FOURCC("s263"):
+        case FOURCC("h263"):
+            return MEDIA_MIMETYPE_VIDEO_H263;
+
+        case FOURCC("avc1"):
+        case FOURCC("h264"):
+            return MEDIA_MIMETYPE_VIDEO_AVC;
+
+        case FOURCC("mpg2"):
+            return MEDIA_MIMETYPE_VIDEO_MPEG2;
+
+        case FOURCC("xvid"):
+            return MEDIA_MIMETYPE_VIDEO_XVID;
+
+        case FOURCC("divx"):
+        case FOURCC("dx50"):
+            return MEDIA_MIMETYPE_VIDEO_DIVX;
+
+        case FOURCC("div3"):
+        case FOURCC("div4"):
+            return MEDIA_MIMETYPE_VIDEO_DIVX3;
+
+        case FOURCC("mjpg"):
+        case FOURCC("mppg"):
+            return MEDIA_MIMETYPE_VIDEO_MJPEG;
+
+        default:
+            char fourccString[5];
+            MakeFourCCString(fourcc, fourccString);
+            ALOGW("mkv unsupport fourcc %s", fourccString);
+            return "";
+    }
+}
+
+
 MatroskaExtractor::MatroskaExtractor(DataSourceHelper *source)
     : mDataSource(source),
       mReader(new DataSourceBaseReader(mDataSource)),
@@ -1308,6 +1361,89 @@ status_t MatroskaExtractor::synthesizeAVCC(TrackInfo *trackInfo, size_t index) {
     return OK;
 }
 
+status_t MatroskaExtractor::synthesizeMPEG2(TrackInfo *trackInfo, size_t index) {
+    ALOGV("synthesizeMPEG2");
+    BlockIterator iter(this, trackInfo->mTrackNum, index);
+    if (iter.eos()) {
+        return ERROR_MALFORMED;
+    }
+
+    const mkvparser::Block *block = iter.block();
+    if (block->GetFrameCount() <= 0) {
+        return ERROR_MALFORMED;
+    }
+
+    const mkvparser::Block::Frame &frame = block->GetFrame(0);
+    auto tmpData = heapbuffer<unsigned char>(frame.len);
+    long n = frame.Read(mReader, tmpData.get());
+    if (n != 0) {
+        return ERROR_MALFORMED;
+    }
+
+    size_t header_start = 0;
+    size_t header_lenth = 0;
+    for (header_start = 0; header_start < frame.len - 4; header_start++) {
+        if (ntohl(0x000001b3) == *(uint32_t*)((uint8_t*)tmpData.get() + header_start)) {
+            break;
+        }
+    }
+    bool isComplete_csd = false;
+    for (header_lenth = 0; header_lenth < frame.len - 4 - header_start; header_lenth++) {
+        if (ntohl(0x000001b8) == *(uint32_t*)((uint8_t*)tmpData.get()
+                                + header_start + header_lenth)) {
+            isComplete_csd = true;
+            break;
+        }
+    }
+    if (!isComplete_csd) {
+        ALOGE("can't parse complete csd for MPEG2!");
+        return ERROR_MALFORMED;
+    }
+    addESDSFromCodecPrivate(trackInfo->mMeta, false,
+                              (uint8_t*)(tmpData.get()) + header_start, header_lenth);
+
+    return OK;
+
+}
+
+status_t MatroskaExtractor::synthesizeMPEG4(TrackInfo *trackInfo, size_t index) {
+    ALOGV("synthesizeMPEG4");
+    BlockIterator iter(this, trackInfo->mTrackNum, index);
+    if (iter.eos()) {
+        return ERROR_MALFORMED;
+    }
+
+    const mkvparser::Block *block = iter.block();
+    if (block->GetFrameCount() <= 0) {
+        return ERROR_MALFORMED;
+    }
+
+    const mkvparser::Block::Frame &frame = block->GetFrame(0);
+    auto tmpData = heapbuffer<unsigned char>(frame.len);
+    long n = frame.Read(mReader, tmpData.get());
+    if (n != 0) {
+        return ERROR_MALFORMED;
+    }
+
+     size_t vosend;
+     bool isComplete_csd = false;
+     for (vosend = 0; (long)vosend < frame.len - 4; vosend++) {
+         if (ntohl(0x000001b6) == *(uint32_t*)((uint8_t*)tmpData.get() + vosend)) {
+             isComplete_csd = true;
+             break;  // Send VOS until VOP
+         }
+     }
+     if (!isComplete_csd) {
+         ALOGE("can't parse complete csd for MPEG4!");
+         return ERROR_MALFORMED;
+     }
+     addESDSFromCodecPrivate(trackInfo->mMeta, false, tmpData.get(), vosend);
+
+    return OK;
+
+}
+
+
 static inline bool isValidInt32ColourValue(long long value) {
     return value != mkvparser::Colour::kValueNotPresent
             && value >= INT32_MIN
@@ -1490,6 +1626,8 @@ void MatroskaExtractor::addTracks() {
         status_t err = OK;
         int32_t nalSize = -1;
 
+        bool isSetCsdFrom1stFrame = false;
+
         switch (track->GetType()) {
             case VIDEO_TRACK:
             {
@@ -1516,15 +1654,15 @@ void MatroskaExtractor::addTracks() {
                         continue;
                     }
                 } else if (!strcmp("V_MPEG4/ISO/ASP", codecID)) {
+                    AMediaFormat_setString(meta,
+                            AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_MPEG4);
                     if (codecPrivateSize > 0) {
-                        AMediaFormat_setString(meta,
-                                AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_MPEG4);
                         addESDSFromCodecPrivate(
                                 meta, false, codecPrivate, codecPrivateSize);
                     } else {
                         ALOGW("%s is detected, but does not have configuration.",
                                 codecID);
-                        continue;
+                        isSetCsdFrom1stFrame = true;
                     }
                 } else if (!strcmp("V_VP8", codecID)) {
                     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_VP8);
@@ -1538,6 +1676,49 @@ void MatroskaExtractor::addTracks() {
                     }
                 } else if (!strcmp("V_AV1", codecID)) {
                     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_AV1);
+                } else if (!strcmp("V_MPEG2", codecID) || !strcmp("V_MPEG1", codecID)) {
+                        AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME,
+                                MEDIA_MIMETYPE_VIDEO_MPEG2);
+                        if (codecPrivate != NULL) {
+                            addESDSFromCodecPrivate(meta, false, codecPrivate, codecPrivateSize);
+                        } else {
+                            ALOGW("No specific codec private data, find it from the first frame");
+                            isSetCsdFrom1stFrame = true;
+                        }
+                } else if (!strcmp("V_MJPEG", codecID)) {
+                        AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME,
+                                MEDIA_MIMETYPE_VIDEO_MJPEG);
+                } else if (!strcmp("V_MS/VFW/FOURCC", codecID)) {
+                    if (NULL == codecPrivate ||codecPrivateSize < 20) {
+                        ALOGE("V_MS/VFW/FOURCC has no valid private data(%p),codecPrivateSize:%zu",
+                                 codecPrivate, codecPrivateSize);
+                        continue;
+                    } else {
+                        uint32_t fourcc = *(uint32_t *)(codecPrivate + 16);
+                        fourcc = ntohl(fourcc);
+                        const char* mime = MKVFourCC2MIME(fourcc);
+                        ALOGV("V_MS/VFW/FOURCC type is %s", mime);
+                        if (!strncasecmp("video/", mime, 6)) {
+                            AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, mime);
+                        } else {
+                            ALOGE("V_MS/VFW/FOURCC continue,unsupport video type=%s,fourcc=0x%08x.",
+                                 mime, fourcc);
+                            continue;
+                        }
+                        if (!strcmp(mime, MEDIA_MIMETYPE_VIDEO_AVC) ||
+                            !strcmp(mime, MEDIA_MIMETYPE_VIDEO_MPEG4) ||
+                            !strcmp(mime, MEDIA_MIMETYPE_VIDEO_XVID) ||
+                            !strcmp(mime, MEDIA_MIMETYPE_VIDEO_DIVX) ||
+                            !strcmp(mime, MEDIA_MIMETYPE_VIDEO_DIVX3) ||
+                            !strcmp(mime, MEDIA_MIMETYPE_VIDEO_MPEG2) ||
+                            !strcmp(mime, MEDIA_MIMETYPE_VIDEO_H263)) {
+                            isSetCsdFrom1stFrame = true;
+                        } else {
+                            ALOGW("FourCC have unsupport codec, type=%s,fourcc=0x%08x.",
+                                  mime, fourcc);
+                            continue;
+                        }
+                    }
                 } else {
                     ALOGW("%s is not supported.", codecID);
                     continue;
@@ -1681,13 +1862,35 @@ void MatroskaExtractor::addTracks() {
         initTrackInfo(track, meta, trackInfo);
         trackInfo->mNalLengthSize = nalSize;
 
-        if (!strcmp("V_MPEG4/ISO/AVC", codecID) && codecPrivateSize == 0) {
+        const char *mimetype = "";
+        AMediaFormat_getString(meta, AMEDIAFORMAT_KEY_MIME, &mimetype);
+
+        if ((!strcmp("V_MPEG4/ISO/AVC", codecID) && codecPrivateSize == 0) ||
+            (!strcmp(mimetype, MEDIA_MIMETYPE_VIDEO_AVC) && isSetCsdFrom1stFrame)) {
             // Attempt to recover from AVC track without codec private data
             err = synthesizeAVCC(trackInfo, n);
             if (err != OK) {
                 mTracks.pop();
             }
+        } else if ((!strcmp("V_MPEG2", codecID) && codecPrivateSize == 0) ||
+            (!strcmp(mimetype, MEDIA_MIMETYPE_VIDEO_MPEG2) && isSetCsdFrom1stFrame)) {
+            // Attempt to recover from MPEG2 track without codec private data
+            err = synthesizeMPEG2(trackInfo, n);
+            if (err != OK) {
+                mTracks.pop();
+            }
+        } else if ((!strcmp("V_MPEG4/ISO/ASP", codecID) && codecPrivateSize == 0) ||
+            (!strcmp(mimetype, MEDIA_MIMETYPE_VIDEO_MPEG4) && isSetCsdFrom1stFrame) ||
+            (!strcmp(mimetype, MEDIA_MIMETYPE_VIDEO_XVID) && isSetCsdFrom1stFrame) ||
+            (!strcmp(mimetype, MEDIA_MIMETYPE_VIDEO_DIVX) && isSetCsdFrom1stFrame) ||
+            (!strcmp(mimetype, MEDIA_MIMETYPE_VIDEO_DIVX3) && isSetCsdFrom1stFrame)) {
+            // Attempt to recover from MPEG4 track without codec private data
+            err = synthesizeMPEG4(trackInfo, n);
+            if (err != OK) {
+                mTracks.pop();
+            }
         }
+
     }
 }
 

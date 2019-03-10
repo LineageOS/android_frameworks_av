@@ -109,6 +109,8 @@ public:
     virtual     status_t   enableAudioDeviceCallback(bool enabled);
     virtual     status_t   getActiveMicrophones(
                               std::vector<media::MicrophoneInfo>* activeMicrophones);
+    virtual     status_t   setMicrophoneDirection(audio_microphone_direction_t direction);
+    virtual     status_t   setMicrophoneFieldDimension(float zoom);
                 status_t   getPortId(audio_port_handle_t *portId) override;
 
 private:

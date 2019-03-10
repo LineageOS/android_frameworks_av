@@ -123,6 +123,7 @@ class Codec2AudioEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
         mFramesReceived = 0;
         if (mCompName == unknown_comp) mDisableTest = true;
         if (mDisableTest) std::cout << "[   WARN   ] Test Disabled \n";
+        getInputMaxBufSize();
     }
 
     virtual void TearDown() override {
@@ -157,6 +158,7 @@ class Codec2AudioEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
     bool mDisableTest;
     standardComp mCompName;
     uint32_t mFramesReceived;
+    int32_t mInputMaxBufSize;
     std::list<uint64_t> mFlushedIndices;
 
     C2BlockPool::local_id_t mBlockPoolId;
@@ -175,6 +177,27 @@ class Codec2AudioEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
     static void description(const std::string& description) {
         RecordProperty("description", description);
     }
+
+    // In encoder components, fetch the size of input buffer allocated
+    void getInputMaxBufSize() {
+        int32_t bitStreamInfo[1] = {0};
+        std::vector<std::unique_ptr<C2Param>> inParams;
+        c2_status_t status = mComponent->query(
+            {}, {C2StreamMaxBufferSizeInfo::input::PARAM_TYPE}, C2_DONT_BLOCK,
+            &inParams);
+        if (status != C2_OK && inParams.size() == 0) {
+            ALOGE("Query MaxBufferSizeInfo failed => %d", status);
+            ASSERT_TRUE(false);
+        } else {
+            size_t offset = sizeof(C2Param);
+            for (size_t i = 0; i < inParams.size(); ++i) {
+                C2Param* param = inParams[i].get();
+                bitStreamInfo[i] = *(int32_t*)((uint8_t*)param + offset);
+            }
+        }
+        mInputMaxBufSize = bitStreamInfo[0];
+    }
+
 };
 
 void validateComponent(
@@ -355,60 +378,79 @@ TEST_F(Codec2AudioEncHidlTest, validateCompName) {
     ASSERT_EQ(mDisableTest, false);
 }
 
-TEST_F(Codec2AudioEncHidlTest, EncodeTest) {
+class Codec2AudioEncEncodeTest
+    : public Codec2AudioEncHidlTest,
+      public ::testing::WithParamInterface<std::pair<bool, int32_t>> {
+};
+
+TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
     ALOGV("EncodeTest");
     if (mDisableTest) return;
     char mURL[512];
     strcpy(mURL, gEnv->getRes().c_str());
     GetURLForComponent(mCompName, mURL);
+    bool signalEOS = GetParam().first;
+    // Ratio w.r.t to mInputMaxBufSize
+    int32_t inputMaxBufRatio = GetParam().second;
 
-    // Setting default configuration
+    // Setting default sampleRate
     int32_t nChannels = 2;
     int32_t nSampleRate = 44100;
-    int32_t samplesPerFrame = 1024;
     switch (mCompName) {
         case aac:
             nChannels = 2;
             nSampleRate = 48000;
-            samplesPerFrame = 1024;
             break;
         case flac:
             nChannels = 2;
             nSampleRate = 48000;
-            samplesPerFrame = 1152;
             break;
         case opus:
             nChannels = 2;
             nSampleRate = 48000;
-            samplesPerFrame = 960;
             break;
         case amrnb:
             nChannels = 1;
             nSampleRate = 8000;
-            samplesPerFrame = 160;
             break;
         case amrwb:
             nChannels = 1;
             nSampleRate = 16000;
-            samplesPerFrame = 160;
             break;
         default:
             ASSERT_TRUE(false);
     }
+    int32_t samplesPerFrame =
+        ((mInputMaxBufSize / inputMaxBufRatio) / (nChannels * 2));
+    ALOGV("signalEOS %d mInputMaxBufSize %d samplesPerFrame %d", signalEOS,
+          mInputMaxBufSize, samplesPerFrame);
+
     if (!setupConfigParam(mComponent, nChannels, nSampleRate)) {
         std::cout << "[   WARN   ] Test Skipped \n";
         return;
     }
     ASSERT_EQ(mComponent->start(), C2_OK);
     std::ifstream eleStream;
-    uint32_t numFrames = 128;
+    uint32_t numFrames = 16;
     eleStream.open(mURL, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
     ALOGV("mURL : %s", mURL);
     ASSERT_NO_FATAL_FAILURE(
         encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
                       mFlushedIndices, mLinearPool, eleStream, numFrames,
-                      samplesPerFrame, nChannels, nSampleRate));
+                      samplesPerFrame, nChannels, nSampleRate, false,
+                      signalEOS));
+
+    // If EOS is not sent, sending empty input with EOS flag
+    if (!signalEOS) {
+        ASSERT_NO_FATAL_FAILURE(
+            waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue, 1));
+        ASSERT_NO_FATAL_FAILURE(
+            testInputBuffer(mComponent, mQueueLock, mWorkQueue,
+                            C2FrameData::FLAG_END_OF_STREAM, false));
+        numFrames += 1;
+    }
+
     // blocking call to ensures application to Wait till all the inputs are
     // consumed
     ASSERT_NO_FATAL_FAILURE(
@@ -428,6 +470,15 @@ TEST_F(Codec2AudioEncHidlTest, EncodeTest) {
     ASSERT_EQ(mEos, true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
+
+// EncodeTest with EOS / No EOS and inputMaxBufRatio
+// inputMaxBufRatio is ratio w.r.t. to mInputMaxBufSize
+INSTANTIATE_TEST_CASE_P(EncodeTest, Codec2AudioEncEncodeTest,
+                        ::testing::Values(std::make_pair(false, 1),
+                                          std::make_pair(false, 2),
+                                          std::make_pair(true, 1),
+                                          std::make_pair(true, 2)));
+
 
 TEST_F(Codec2AudioEncHidlTest, EOSTest) {
     description("Test empty input buffer with EOS flag");
