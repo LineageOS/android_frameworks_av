@@ -742,10 +742,21 @@ void CCodec::configure(const sp<AMessage> &msg) {
                 return BAD_VALUE;
             }
             if ((config->mDomain & Config::IS_ENCODER) && (config->mDomain & Config::IS_VIDEO)) {
-                if (!msg->findInt32(KEY_BIT_RATE, &i32)
-                        && !msg->findFloat(KEY_BIT_RATE, &flt)) {
-                    ALOGD("bitrate is missing, which is required for video encoders.");
-                    return BAD_VALUE;
+                C2Config::bitrate_mode_t mode = C2Config::BITRATE_VARIABLE;
+                if (msg->findInt32(KEY_BITRATE_MODE, &i32)) {
+                    mode = (C2Config::bitrate_mode_t) i32;
+                }
+                if (mode == BITRATE_MODE_CQ) {
+                    if (!msg->findInt32(KEY_QUALITY, &i32)) {
+                        ALOGD("quality is missing, which is required for video encoders in CQ.");
+                        return BAD_VALUE;
+                    }
+                } else {
+                    if (!msg->findInt32(KEY_BIT_RATE, &i32)
+                            && !msg->findFloat(KEY_BIT_RATE, &flt)) {
+                        ALOGD("bitrate is missing, which is required for video encoders.");
+                        return BAD_VALUE;
+                    }
                 }
                 if (!msg->findInt32(KEY_I_FRAME_INTERVAL, &i32)
                         && !msg->findFloat(KEY_I_FRAME_INTERVAL, &flt)) {
