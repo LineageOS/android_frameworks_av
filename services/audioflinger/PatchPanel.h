@@ -128,6 +128,7 @@ private:
             mThread->addPatchTrack(mTrack);
             mTrack->setPeerProxy(peer, true /* holdReference */);
         }
+        void clearTrackPeer() { if (mTrack) mTrack->clearPeerProxy(); }
         void stopTrack() { if (mTrack) mTrack->stop(); }
 
         void swap(Endpoint &other) noexcept {

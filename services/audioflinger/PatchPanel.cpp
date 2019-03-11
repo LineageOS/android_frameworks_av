@@ -543,7 +543,7 @@ void AudioFlinger::PatchPanel::Patch::clearConnections(PatchPanel *panel)
             __func__, mRecord.handle(), mPlayback.handle());
     mRecord.stopTrack();
     mPlayback.stopTrack();
-    mRecord.track()->clearPeerProxy(); // mRecord stop is synchronous. Break PeerProxy sp<> cycle.
+    mRecord.clearTrackPeer(); // mRecord stop is synchronous. Break PeerProxy sp<> cycle.
     mRecord.closeConnections(panel);
     mPlayback.closeConnections(panel);
 }
