@@ -31,24 +31,19 @@ namespace android {
 /**
  * custom mix entry in mPolicyMixes
  */
-class AudioPolicyMix : public RefBase {
+class AudioPolicyMix : public AudioMix, public RefBase {
 public:
-    AudioPolicyMix() {}
+    AudioPolicyMix(const AudioMix &mix) : AudioMix(mix) {}
+    AudioPolicyMix(const AudioPolicyMix&) = delete;
+    AudioPolicyMix& operator=(const AudioPolicyMix&) = delete;
 
-    const sp<SwAudioOutputDescriptor> &getOutput() const;
-
-    void setOutput(sp<SwAudioOutputDescriptor> &output);
-
-    void clearOutput();
-
-    android::AudioMix *getMix();
-
-    void setMix(const AudioMix &mix);
+    const sp<SwAudioOutputDescriptor> &getOutput() const { return mOutput; }
+    void setOutput(const sp<SwAudioOutputDescriptor> &output) { mOutput = output; }
+    void clearOutput() { mOutput.clear(); }
 
     void dump(String8 *dst, int spaces, int index) const;
 
 private:
-    AudioMix    mMix;                     // Audio policy mix descriptor
     sp<SwAudioOutputDescriptor> mOutput;  // Corresponding output stream
 };
 
@@ -77,21 +72,19 @@ public:
 
     sp<DeviceDescriptor> getDeviceAndMixForInputSource(audio_source_t inputSource,
                                                        const DeviceVector &availableDeviceTypes,
-                                                       AudioMix **policyMix) const;
+                                                       sp<AudioPolicyMix> *policyMix) const;
 
     /**
      * @brief try to find a matching mix for a given output descriptor and returns the associated
      * output device.
      * @param output to be considered
      * @param availableOutputDevices list of output devices currently reachable
-     * @param policyMix to be returned if any mix matching ouput descriptor
      * @return device selected from the mix attached to the output, null pointer otherwise
      */
     sp<DeviceDescriptor> getDeviceAndMixForOutput(const sp<SwAudioOutputDescriptor> &output,
-                                                  const DeviceVector &availableOutputDevices,
-                                                  AudioMix **policyMix = nullptr);
+                                                  const DeviceVector &availableOutputDevices);
 
-    status_t getInputMixForAttr(audio_attributes_t attr, AudioMix **policyMix);
+    status_t getInputMixForAttr(audio_attributes_t attr, sp<AudioPolicyMix> *policyMix);
 
     status_t setUidDeviceAffinities(uid_t uid, const Vector<AudioDeviceTypeAddr>& devices);
     status_t removeUidDeviceAffinities(uid_t uid);
