@@ -1756,7 +1756,11 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
                 size_t outsize = reassembleAVCC(csd0, csd1, avcc.data());
                 meta->setData(kKeyAVCC, kTypeAVCC, avcc.data(), outsize);
             }
-        } else if (mime == MEDIA_MIMETYPE_AUDIO_AAC || mime == MEDIA_MIMETYPE_VIDEO_MPEG4) {
+        } else if (mime == MEDIA_MIMETYPE_AUDIO_AAC ||
+                mime == MEDIA_MIMETYPE_VIDEO_MPEG4 ||
+                mime == MEDIA_MIMETYPE_AUDIO_WMA ||
+                mime == MEDIA_MIMETYPE_AUDIO_MS_ADPCM ||
+                mime == MEDIA_MIMETYPE_AUDIO_DVI_IMA_ADPCM) {
             std::vector<char> esds(csd0size + 31);
             // The written ESDS is actually for an audio stream, but it's enough
             // for transporting the CSD to muxers.

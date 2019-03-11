@@ -150,6 +150,7 @@ private:
         AAC,
         HEVC,
         MP3,
+        PCM,
         OTHER
     };
 
@@ -270,6 +271,8 @@ MatroskaSource::MatroskaSource(
         mType = AAC;
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_MPEG)) {
         mType = MP3;
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_RAW)) {
+        mType = PCM;
     }
 }
 
@@ -1054,6 +1057,27 @@ media_status_t MatroskaSource::read(
                     AMEDIAFORMAT_KEY_TARGET_TIME, targetSampleTimeUs);
         }
 
+        if (mType == PCM) {
+            int32_t bitPerFrame = 16;
+            int32_t bigEndian = 0;
+            AMediaFormat *meta = AMediaFormat_new();
+            if (getFormat(meta) == AMEDIA_OK && meta != NULL) {
+                AMediaFormat_getInt32(meta,
+                                AMEDIAFORMAT_KEY_BITS_PER_SAMPLE, &bitPerFrame);
+                AMediaFormat_getInt32(meta,
+                                AMEDIAFORMAT_KEY_PCM_BIG_ENDIAN, &bigEndian);
+            }
+            AMediaFormat_delete(meta);
+            if (bigEndian == 1 && bitPerFrame == 16) {
+                // Big-endian -> little-endian
+                uint16_t *dstData = (uint16_t *)frame->data() + frame->range_offset();
+                uint16_t *srcData = (uint16_t *)frame->data() + frame->range_offset();
+                for (size_t i = 0; i < frame->range_length() / 2; i++) {
+                    dstData[i] = ntohs(srcData[i]);
+                }
+            }
+        }
+
         *out = frame;
 
         return AMEDIA_OK;
@@ -1169,6 +1193,51 @@ media_status_t MatroskaSource::read(
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+
+enum WaveID {
+    MKV_RIFF_WAVE_FORMAT_PCM = 0x0001,
+    MKV_RIFF_WAVE_FORMAT_ADPCM_ms = 0x0002,
+    MKV_RIFF_WAVE_FORMAT_ADPCM_ima_wav = 0x0011,
+    MKV_RIFF_WAVE_FORMAT_MPEGL12 = 0x0050,
+    MKV_RIFF_WAVE_FORMAT_MPEGL3 = 0x0055,
+    MKV_RIFF_WAVE_FORMAT_WMAV1 = 0x0160,
+    MKV_RIFF_WAVE_FORMAT_WMAV2 = 0x0161,
+};
+
+static const char *MKVWave2MIME(uint16_t id) {
+    switch (id) {
+        case  MKV_RIFF_WAVE_FORMAT_MPEGL12:
+            return MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II;
+
+        case  MKV_RIFF_WAVE_FORMAT_MPEGL3:
+            return MEDIA_MIMETYPE_AUDIO_MPEG;
+
+        case MKV_RIFF_WAVE_FORMAT_PCM:
+            return MEDIA_MIMETYPE_AUDIO_RAW;
+
+        case MKV_RIFF_WAVE_FORMAT_ADPCM_ms:
+            return MEDIA_MIMETYPE_AUDIO_MS_ADPCM;
+        case MKV_RIFF_WAVE_FORMAT_ADPCM_ima_wav:
+            return MEDIA_MIMETYPE_AUDIO_DVI_IMA_ADPCM;
+
+        case MKV_RIFF_WAVE_FORMAT_WMAV1:
+        case MKV_RIFF_WAVE_FORMAT_WMAV2:
+            return MEDIA_MIMETYPE_AUDIO_WMA;
+        default:
+            ALOGW("unknown wave %x", id);
+            return "";
+    };
+}
+
+static bool isMkvAudioCsdSizeOK(const char* mime, size_t csdSize) {
+    if ((!strcmp(mime, MEDIA_MIMETYPE_AUDIO_MS_ADPCM) && csdSize < 50) ||
+        (!strcmp(mime, MEDIA_MIMETYPE_AUDIO_DVI_IMA_ADPCM) && csdSize < 20) ||
+        (!strcmp(mime, MEDIA_MIMETYPE_AUDIO_WMA) && csdSize < 28) ||
+        (!strcmp(mime, MEDIA_MIMETYPE_AUDIO_MPEG) && csdSize < 30)) {
+        return false;
+    }
+    return true;
+}
 
 // trans all FOURCC  to lower char
 static uint32_t FourCCtoLower(uint32_t fourcc) {
@@ -2036,19 +2105,39 @@ void MatroskaExtractor::addTracks() {
                 } else if (!strcmp("A_FLAC", codecID)) {
                     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_FLAC);
                     err = addFlacMetadata(meta, codecPrivate, codecPrivateSize);
+                } else if (!strcmp("A_MPEG/L2", codecID)) {
+                    AMediaFormat_setString(meta,
+                            AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II);
+                } else if (!strcmp("A_PCM/INT/LIT", codecID) ||
+                         !strcmp("A_PCM/INT/BIG", codecID)) {
+                    AMediaFormat_setString(meta,
+                            AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_RAW);
+                    int32_t bigEndian = !strcmp("A_PCM/INT/BIG", codecID) ? 1: 0;
+                    AMediaFormat_setInt32(meta,
+                            AMEDIAFORMAT_KEY_PCM_BIG_ENDIAN, bigEndian);
                 } else if ((!strcmp("A_MS/ACM", codecID))) {
-                    if ((NULL == codecPrivate) || (codecPrivateSize < 30)) {
+                    if ((NULL == codecPrivate) || (codecPrivateSize < 18)) {
                         ALOGW("unsupported audio: A_MS/ACM has no valid private data: %s, size: %zu",
                                codecPrivate == NULL ? "null" : "non-null", codecPrivateSize);
                         continue;
                     } else {
                         uint16_t ID = *(uint16_t *)codecPrivate;
-                        if (ID == 0x0055) {
-                            AMediaFormat_setString(meta,
-                                    AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_MPEG);
+                        const char* mime = MKVWave2MIME(ID);
+                        ALOGV("A_MS/ACM type is %s", mime);
+                        if (!strncasecmp("audio/", mime, 6) &&
+                                isMkvAudioCsdSizeOK(mime, codecPrivateSize)) {
+                            AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, mime);
                         } else {
-                            ALOGW("A_MS/ACM unsupported type , continue");
+                            ALOGE("A_MS/ACM continue, unsupported audio type=%s, csdSize:%zu",
+                                mime, codecPrivateSize);
                             continue;
+                        }
+                        if (!strcmp(mime, MEDIA_MIMETYPE_AUDIO_WMA)) {
+                            addESDSFromCodecPrivate(meta, true, codecPrivate, codecPrivateSize);
+                        } else if (!strcmp(mime, MEDIA_MIMETYPE_AUDIO_MS_ADPCM) ||
+                                    !strcmp(mime, MEDIA_MIMETYPE_AUDIO_DVI_IMA_ADPCM)) {
+                            uint32_t blockAlign = *(uint16_t*)(codecPrivate + 12);
+                            addESDSFromCodecPrivate(meta, true, &blockAlign, sizeof(blockAlign));
                         }
                     }
                 } else {
@@ -2058,6 +2147,7 @@ void MatroskaExtractor::addTracks() {
 
                 AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_SAMPLE_RATE, atrack->GetSamplingRate());
                 AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, atrack->GetChannels());
+                AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_BITS_PER_SAMPLE, atrack->GetBitDepth());
                 break;
             }
 
