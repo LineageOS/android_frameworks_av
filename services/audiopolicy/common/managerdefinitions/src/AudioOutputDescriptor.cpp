@@ -405,12 +405,12 @@ bool SwAudioOutputDescriptor::setVolume(float volumeDb,
     if (streams.empty()) {
         streams.push_back(AUDIO_STREAM_MUSIC);
     }
-    if (!devices().isEmpty()) {
-        // Assume first device to check upon Gain Crontroller availability
+    for (const auto& devicePort : devices()) {
         // APM loops on all group, so filter on active group to set the port gain,
         // let the other groups set the stream volume as per legacy
-        const auto &devicePort = devices().itemAt(0);
-        if (devicePort->hasGainController(true) && isActive(vs)) {
+        // TODO: Pass in the device address and check against it.
+        if (device == devicePort->type() &&
+                devicePort->hasGainController(true) && isActive(vs)) {
             ALOGV("%s: device %s has gain controller", __func__, devicePort->toString().c_str());
             // @todo: here we might be in trouble if the SwOutput has several active clients with
             // different Volume Source (or if we allow several curves within same volume group)
