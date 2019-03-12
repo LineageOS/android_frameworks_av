@@ -600,7 +600,7 @@ void CCodec::allocate(const sp<MediaCodecInfo> &codecInfo) {
     std::shared_ptr<Codec2Client> client;
 
     // set up preferred component store to access vendor store parameters
-    client = Codec2Client::CreateFromService("default", false);
+    client = Codec2Client::CreateFromService("default");
     if (client) {
         ALOGI("setting up '%s' as default (vendor) store", client->getServiceName().c_str());
         SetPreferredCodec2ComponentStore(
