@@ -1,5 +1,3 @@
 marcone@google.com
 # For AImage/AImageReader
-etalvala@google.com
-yinchiayeh@google.com
-zhijunhe@google.com
+include platform/frameworks/av/camera:/OWNERS
