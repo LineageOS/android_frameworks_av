@@ -39,51 +39,45 @@
 
 namespace android {
 
+namespace {
+
 #ifdef MPEG4
 constexpr char COMPONENT_NAME[] = "c2.android.mpeg4.encoder";
+const char *MEDIA_MIMETYPE_VIDEO = MEDIA_MIMETYPE_VIDEO_MPEG4;
 #else
 constexpr char COMPONENT_NAME[] = "c2.android.h263.encoder";
+const char *MEDIA_MIMETYPE_VIDEO = MEDIA_MIMETYPE_VIDEO_H263;
 #endif
 
-class C2SoftMpeg4Enc::IntfImpl : public C2InterfaceHelper {
+} // namepsace
+
+class C2SoftMpeg4Enc::IntfImpl : public SimpleInterface<void>::BaseParams {
    public:
-    explicit IntfImpl(const std::shared_ptr<C2ReflectorHelper>& helper)
-        : C2InterfaceHelper(helper) {
+    explicit IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helper)
+        : SimpleInterface<void>::BaseParams(
+                helper,
+                COMPONENT_NAME,
+                C2Component::KIND_ENCODER,
+                C2Component::DOMAIN_VIDEO,
+                MEDIA_MIMETYPE_VIDEO) {
+        noPrivateBuffers(); // TODO: account for our buffers here
+        noInputReferences();
+        noOutputReferences();
+        noInputLatency();
+        noTimeStretch();
         setDerivedInstance(this);
 
         addParameter(
-            DefineParam(mInputFormat, C2_PARAMKEY_INPUT_STREAM_BUFFER_TYPE)
-                .withConstValue(
-                    new C2StreamBufferTypeSetting::input(0u, C2BufferData::GRAPHIC))
+                DefineParam(mAttrib, C2_PARAMKEY_COMPONENT_ATTRIBUTES)
+                .withConstValue(new C2ComponentAttributesSetting(
+                    C2Component::ATTRIB_IS_TEMPORAL))
                 .build());
 
         addParameter(
-            DefineParam(mOutputFormat, C2_PARAMKEY_OUTPUT_STREAM_BUFFER_TYPE)
-                .withConstValue(
-                    new C2StreamBufferTypeSetting::output(0u, C2BufferData::LINEAR))
+                DefineParam(mUsage, C2_PARAMKEY_INPUT_STREAM_USAGE)
+                .withConstValue(new C2StreamUsageTuning::input(
+                        0u, (uint64_t)C2MemoryUsage::CPU_READ))
                 .build());
-
-        addParameter(
-            DefineParam(mInputMediaType, C2_PARAMKEY_INPUT_MEDIA_TYPE)
-                .withConstValue(AllocSharedString<C2PortMediaTypeSetting::input>(
-                    MEDIA_MIMETYPE_VIDEO_RAW))
-                .build());
-
-        addParameter(
-            DefineParam(mOutputMediaType, C2_PARAMKEY_OUTPUT_MEDIA_TYPE)
-                .withConstValue(AllocSharedString<C2PortMediaTypeSetting::output>(
-#ifdef MPEG4
-                    MEDIA_MIMETYPE_VIDEO_MPEG4
-#else
-                    MEDIA_MIMETYPE_VIDEO_H263
-#endif
-                    ))
-                .build());
-
-        addParameter(DefineParam(mUsage, C2_PARAMKEY_INPUT_STREAM_USAGE)
-                         .withConstValue(new C2StreamUsageTuning::input(
-                             0u, (uint64_t)C2MemoryUsage::CPU_READ))
-                         .build());
 
         addParameter(
             DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
@@ -217,10 +211,6 @@ class C2SoftMpeg4Enc::IntfImpl : public C2InterfaceHelper {
     }
 
    private:
-    std::shared_ptr<C2StreamBufferTypeSetting::input> mInputFormat;
-    std::shared_ptr<C2StreamBufferTypeSetting::output> mOutputFormat;
-    std::shared_ptr<C2PortMediaTypeSetting::input> mInputMediaType;
-    std::shared_ptr<C2PortMediaTypeSetting::output> mOutputMediaType;
     std::shared_ptr<C2StreamUsageTuning::input> mUsage;
     std::shared_ptr<C2StreamPictureSizeInfo::input> mSize;
     std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
