@@ -232,8 +232,10 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t         *phInstance,
     /*
      * Set pointer to data and coef memory
      */
-    pInstance->pData = pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_DATA].pBaseAddress;
-    pInstance->pCoef = pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].pBaseAddress;
+    pInstance->pData =
+         (LVDBE_Data_FLOAT_t *)pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_DATA].pBaseAddress;
+    pInstance->pCoef =
+         (LVDBE_Coef_FLOAT_t *)pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].pBaseAddress;
 
 
     /*

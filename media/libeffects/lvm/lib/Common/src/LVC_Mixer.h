@@ -19,9 +19,6 @@
 #define __LVC_MIXER_H__
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 
 #include "LVM_Types.h"
@@ -242,9 +239,6 @@ void LVC_MixSoft_1St_2i_D16C31_SAT( LVMixer3_2St_st         *pInstance,
                                         LVM_INT16           *dst,   /* dst can be equal to src */
                                         LVM_INT16           n);     /* Number of stereo samples */
 #endif
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 /**********************************************************************************/
 

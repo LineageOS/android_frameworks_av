@@ -163,7 +163,9 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t            *phInsta
     /*
      * Set the data, coefficient and temporary memory pointers
      */
-    pLVREV_Private->pFastData = InstAlloc_AddMember(&FastData, sizeof(LVREV_FastData_st));                              /* Fast data memory base address */
+    /* Fast data memory base address */
+    pLVREV_Private->pFastData = (LVREV_FastData_st *)
+        InstAlloc_AddMember(&FastData, sizeof(LVREV_FastData_st));
 #ifndef BUILD_FLOAT
     if(pInstanceParams->NumDelays == LVREV_DELAYLINES_4)
     {
@@ -211,19 +213,23 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t            *phInsta
 #else
     if(pInstanceParams->NumDelays == LVREV_DELAYLINES_4)
     {
-        pLVREV_Private->pDelay_T[3]     = InstAlloc_AddMember(&FastData, LVREV_MAX_T3_DELAY * \
+        pLVREV_Private->pDelay_T[3]     =
+            (LVM_FLOAT *)InstAlloc_AddMember(&FastData, LVREV_MAX_T3_DELAY * \
                                                               sizeof(LVM_FLOAT));
-        pLVREV_Private->pDelay_T[2]     = InstAlloc_AddMember(&FastData, LVREV_MAX_T2_DELAY * \
+        pLVREV_Private->pDelay_T[2]     =
+            (LVM_FLOAT *)InstAlloc_AddMember(&FastData, LVREV_MAX_T2_DELAY * \
                                                               sizeof(LVM_FLOAT));
-        pLVREV_Private->pDelay_T[1]     = InstAlloc_AddMember(&FastData, LVREV_MAX_T1_DELAY * \
+        pLVREV_Private->pDelay_T[1]     =
+            (LVM_FLOAT *)InstAlloc_AddMember(&FastData, LVREV_MAX_T1_DELAY * \
                                                               sizeof(LVM_FLOAT));
-        pLVREV_Private->pDelay_T[0]     = InstAlloc_AddMember(&FastData, LVREV_MAX_T0_DELAY * \
+        pLVREV_Private->pDelay_T[0]     =
+            (LVM_FLOAT *)InstAlloc_AddMember(&FastData, LVREV_MAX_T0_DELAY * \
                                                               sizeof(LVM_FLOAT));
 
         for(i = 0; i < 4; i++)
         {
             /* Scratch for each delay line output */
-            pLVREV_Private->pScratchDelayLine[i] = InstAlloc_AddMember(&Temporary,
+            pLVREV_Private->pScratchDelayLine[i] = (LVM_FLOAT *)InstAlloc_AddMember(&Temporary,
                                                                        sizeof(LVM_FLOAT) * \
                                                                        MaxBlockSize);
         }
@@ -236,15 +242,17 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t            *phInsta
 
     if(pInstanceParams->NumDelays == LVREV_DELAYLINES_2)
     {
-        pLVREV_Private->pDelay_T[1]  = InstAlloc_AddMember(&FastData, LVREV_MAX_T1_DELAY * \
+        pLVREV_Private->pDelay_T[1]  = (LVM_FLOAT *)
+                InstAlloc_AddMember(&FastData, LVREV_MAX_T1_DELAY * \
                                                            sizeof(LVM_FLOAT));
-        pLVREV_Private->pDelay_T[0]  = InstAlloc_AddMember(&FastData, LVREV_MAX_T0_DELAY * \
+        pLVREV_Private->pDelay_T[0]  = (LVM_FLOAT *)
+                InstAlloc_AddMember(&FastData, LVREV_MAX_T0_DELAY * \
                                                            sizeof(LVM_FLOAT));
 
         for(i = 0; i < 2; i++)
         {
             /* Scratch for each delay line output */
-            pLVREV_Private->pScratchDelayLine[i] = InstAlloc_AddMember(&Temporary,
+            pLVREV_Private->pScratchDelayLine[i] = (LVM_FLOAT *)InstAlloc_AddMember(&Temporary,
                                                                        sizeof(LVM_FLOAT) * \
                                                                        MaxBlockSize);
         }
@@ -255,13 +263,13 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t            *phInsta
 
     if(pInstanceParams->NumDelays == LVREV_DELAYLINES_1)
     {
-        pLVREV_Private->pDelay_T[0]  = InstAlloc_AddMember(&FastData,
+        pLVREV_Private->pDelay_T[0]  = (LVM_FLOAT *)InstAlloc_AddMember(&FastData,
                                                            LVREV_MAX_T0_DELAY * sizeof(LVM_FLOAT));
 
         for(i = 0; i < 1; i++)
         {
             /* Scratch for each delay line output */
-            pLVREV_Private->pScratchDelayLine[i] = InstAlloc_AddMember(&Temporary,
+            pLVREV_Private->pScratchDelayLine[i] = (LVM_FLOAT *)InstAlloc_AddMember(&Temporary,
                                                                        sizeof(LVM_FLOAT) * \
                                                                        MaxBlockSize);
         }
@@ -276,18 +284,25 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t            *phInsta
     pLVREV_Private->T[3]         = LVREV_MAX_T3_DELAY;
     pLVREV_Private->AB_Selection = 1;       /* Select smoothing A to B */
 
-
-    pLVREV_Private->pFastCoef       = InstAlloc_AddMember(&FastCoef, sizeof(LVREV_FastCoef_st));                        /* Fast coefficient memory base address */
+    /* Fast coefficient memory base address */
+    pLVREV_Private->pFastCoef       =
+        (LVREV_FastCoef_st *)InstAlloc_AddMember(&FastCoef, sizeof(LVREV_FastCoef_st));
 #ifndef BUILD_FLOAT
-    pLVREV_Private->pScratch        = InstAlloc_AddMember(&Temporary, sizeof(LVM_INT32) * MaxBlockSize);                /* General purpose scratch */
-    pLVREV_Private->pInputSave      = InstAlloc_AddMember(&Temporary, 2 * sizeof(LVM_INT32) * MaxBlockSize);            /* Mono->stereo input save for end mix */
+    /* General purpose scratch */
+    pLVREV_Private->pScratch        =
+            (LVM_FLOAT *)InstAlloc_AddMember(&Temporary, sizeof(LVM_INT32) * MaxBlockSize);
+    /* Mono->stereo input save for end mix */
+    pLVREV_Private->pInputSave      =
+            (LVM_FLOAT *)InstAlloc_AddMember(&Temporary, 2 * sizeof(LVM_INT32) * MaxBlockSize);
     LoadConst_32(0, pLVREV_Private->pInputSave, (LVM_INT16)(MaxBlockSize*2));
 #else
     /* General purpose scratch */
-    pLVREV_Private->pScratch        = InstAlloc_AddMember(&Temporary, sizeof(LVM_FLOAT) * \
+    pLVREV_Private->pScratch        =
+            (LVM_FLOAT *)InstAlloc_AddMember(&Temporary, sizeof(LVM_FLOAT) * \
                                                           MaxBlockSize);
     /* Mono->stereo input save for end mix */
-    pLVREV_Private->pInputSave      = InstAlloc_AddMember(&Temporary, 2 * sizeof(LVM_FLOAT) * \
+    pLVREV_Private->pInputSave      =
+            (LVM_FLOAT *)InstAlloc_AddMember(&Temporary, 2 * sizeof(LVM_FLOAT) * \
                                                           MaxBlockSize);
     LoadConst_Float(0, pLVREV_Private->pInputSave, (LVM_INT16)(MaxBlockSize * 2));
 #endif

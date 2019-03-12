@@ -18,9 +18,6 @@
 #ifndef __SCALARARITHMETIC_H__
 #define __SCALARARITHMETIC_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 
 /*######################################################################################*/
@@ -59,9 +56,6 @@ LVM_FLOAT dB_to_LinFloat(LVM_INT16    db_fix);
 LVM_INT32 dB_to_Lin32(LVM_INT16  db_fix);
 #endif
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif  /* __SCALARARITHMETIC_H__ */
 

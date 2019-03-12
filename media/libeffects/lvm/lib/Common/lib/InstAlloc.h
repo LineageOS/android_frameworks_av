@@ -18,9 +18,6 @@
 #ifndef __INSTALLOC_H__
 #define __INSTALLOC_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 #include "LVM_Types.h"
 /*######################################################################################*/
@@ -85,8 +82,5 @@ void    InstAlloc_InitAll( INST_ALLOC                      *pms,
 
 void    InstAlloc_InitAll_NULL( INST_ALLOC              *pms);
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif /* __JBS_INSTALLOC_H__ */

@@ -18,9 +18,6 @@
 #ifndef _FILTER_H_
 #define _FILTER_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 /**********************************************************************************
    INCLUDES
@@ -75,9 +72,6 @@ LVM_INT32   LVM_GetOmega(LVM_UINT16  Fc,
                          LVM_Fs_en   SampleRate);
 #endif
 /**********************************************************************************/
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif  /** _FILTER_H_ **/
 

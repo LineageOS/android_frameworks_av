@@ -53,9 +53,6 @@
 #ifndef __LVM_H__
 #define __LVM_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 
 /****************************************************************************************/
@@ -633,9 +630,6 @@ LVM_ReturnStatus_en LVM_SetVolumeNoSmoothing( LVM_Handle_t           hInstance,
                                               LVM_ControlParams_t    *pParams);
 
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif      /* __LVM_H__ */
 

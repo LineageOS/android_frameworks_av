@@ -19,9 +19,6 @@
 #define __AGC_H__
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 /**********************************************************************************/
 /*                                                                                */
@@ -94,9 +91,6 @@ void AGC_MIX_VOL_2St1Mon_D32_WRA(AGC_MIX_VOL_2St1Mon_D32_t  *pInstance,     /* I
                                  LVM_INT32                  *pDst,          /* Stereo destination */
                                  LVM_UINT16                 n);             /* Number of samples */
 #endif
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 
 #endif  /* __AGC_H__ */

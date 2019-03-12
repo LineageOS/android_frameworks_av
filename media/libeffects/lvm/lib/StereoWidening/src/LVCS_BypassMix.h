@@ -18,9 +18,6 @@
 #ifndef __LVCS_BYPASSMIX_H__
 #define __LVCS_BYPASSMIX_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 
 /************************************************************************************/
@@ -91,8 +88,5 @@ LVCS_ReturnStatus_en LVCS_BypassMixer(LVCS_Handle_t         hInstance,
                                       LVM_FLOAT       *pOutData,
                                       LVM_UINT16      NumSamples);
 #endif
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif  /* BYPASSMIX_H */
