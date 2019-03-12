@@ -48,6 +48,7 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MediaCodec.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaMuxer.h>
 #include <media/stagefright/PersistentSurface.h>
@@ -83,8 +84,6 @@ using android::status_t;
 using android::DISPLAY_ORIENTATION_0;
 using android::DISPLAY_ORIENTATION_180;
 using android::DISPLAY_ORIENTATION_90;
-using android::INFO_FORMAT_CHANGED;
-using android::INFO_OUTPUT_BUFFERS_CHANGED;
 using android::INVALID_OPERATION;
 using android::NAME_NOT_FOUND;
 using android::NO_ERROR;
@@ -113,6 +112,7 @@ static uint32_t gVideoWidth = 0;        // default width+height
 static uint32_t gVideoHeight = 0;
 static uint32_t gBitRate = 20000000;     // 20Mbps
 static uint32_t gTimeLimitSec = kMaxTimeLimitSec;
+static uint32_t gBframes = 0;
 
 // Set by signal handler to stop recording.
 static volatile bool gStopRequested = false;
@@ -184,13 +184,18 @@ static status_t prepareEncoder(float displayFps, sp<MediaCodec>* pCodec,
     }
 
     sp<AMessage> format = new AMessage;
-    format->setInt32("width", gVideoWidth);
-    format->setInt32("height", gVideoHeight);
-    format->setString("mime", kMimeTypeAvc);
-    format->setInt32("color-format", OMX_COLOR_FormatAndroidOpaque);
-    format->setInt32("bitrate", gBitRate);
-    format->setFloat("frame-rate", displayFps);
-    format->setInt32("i-frame-interval", 10);
+    format->setInt32(KEY_WIDTH, gVideoWidth);
+    format->setInt32(KEY_HEIGHT, gVideoHeight);
+    format->setString(KEY_MIME, kMimeTypeAvc);
+    format->setInt32(KEY_COLOR_FORMAT, OMX_COLOR_FormatAndroidOpaque);
+    format->setInt32(KEY_BIT_RATE, gBitRate);
+    format->setFloat(KEY_FRAME_RATE, displayFps);
+    format->setInt32(KEY_I_FRAME_INTERVAL, 10);
+    format->setInt32(KEY_MAX_B_FRAMES, gBframes);
+    if (gBframes > 0) {
+        format->setInt32(KEY_PROFILE, AVCProfileMain);
+        format->setInt32(KEY_LEVEL, AVCLevel41);
+    }
 
     sp<android::ALooper> looper = new android::ALooper;
     looper->setName("screenrecord_looper");
@@ -478,7 +483,7 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
         case -EAGAIN:                       // INFO_TRY_AGAIN_LATER
             ALOGV("Got -EAGAIN, looping");
             break;
-        case INFO_FORMAT_CHANGED:           // INFO_OUTPUT_FORMAT_CHANGED
+        case android::INFO_FORMAT_CHANGED:    // INFO_OUTPUT_FORMAT_CHANGED
             {
                 // Format includes CSD, which we must provide to muxer.
                 ALOGV("Encoder format changed");
@@ -495,7 +500,7 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                 }
             }
             break;
-        case INFO_OUTPUT_BUFFERS_CHANGED:   // INFO_OUTPUT_BUFFERS_CHANGED
+        case android::INFO_OUTPUT_BUFFERS_CHANGED:   // INFO_OUTPUT_BUFFERS_CHANGED
             // Not expected for an encoder; handle it anyway.
             ALOGV("Encoder buffers changed");
             err = encoder->getOutputBuffers(&buffers);
@@ -960,6 +965,7 @@ int main(int argc, char* const argv[]) {
         { "codec-name",         required_argument,  NULL, 'N' },
         { "monotonic-time",     no_argument,        NULL, 'm' },
         { "persistent-surface", no_argument,        NULL, 'p' },
+        { "bframes",            required_argument,  NULL, 'B' },
         { NULL,                 0,                  NULL, 0 }
     };
 
@@ -1051,6 +1057,11 @@ int main(int argc, char* const argv[]) {
             break;
         case 'p':
             gPersistentSurface = true;
+            break;
+        case 'B':
+            if (parseValueWithUnit(optarg, &gBframes) != NO_ERROR) {
+                return 2;
+            }
             break;
         default:
             if (ic != '?') {
