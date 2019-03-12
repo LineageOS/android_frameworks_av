@@ -171,9 +171,6 @@ public:
 
         virtual status_t getMinVolumeIndexForAttributes(const audio_attributes_t &attr, int &index);
 
-        status_t setVolumeGroupIndex(IVolumeCurves &volumeCurves, volume_group_t group, int index,
-                                     audio_devices_t device, const audio_attributes_t attributes);
-
         status_t setVolumeCurveIndex(int index,
                                      audio_devices_t device,
                                      IVolumeCurves &volumeCurves);
@@ -425,8 +422,8 @@ protected:
 
         // rescale volume index from srcStream within range of dstStream
         int rescaleVolumeIndex(int srcIndex,
-                               audio_stream_type_t srcStream,
-                               audio_stream_type_t dstStream);
+                               VolumeSource fromVolumeSource,
+                               VolumeSource toVolumeSource);
         // check that volume change is permitted, compute and send new volume to audio hardware
         virtual status_t checkAndSetVolume(IVolumeCurves &curves,
                                            VolumeSource volumeSource, int index,
@@ -461,14 +458,12 @@ protected:
          * @param outputDesc on which the client following the volume group shall be muted/umuted
          * @param delayMs
          * @param device
-         * @param activeOnly if true, mute only if the volume group is active on the output.
          */
         void setVolumeSourceMute(VolumeSource volumeSource,
                                  bool on,
                                  const sp<AudioOutputDescriptor>& outputDesc,
                                  int delayMs = 0,
-                                 audio_devices_t device = AUDIO_DEVICE_NONE,
-                                 bool activeOnly = false);
+                                 audio_devices_t device = AUDIO_DEVICE_NONE);
 
         audio_mode_t getPhoneState();
 
