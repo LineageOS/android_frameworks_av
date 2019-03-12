@@ -270,11 +270,7 @@ volume_group_t ProductStrategyMap::getVolumeGroupForAttributes(const audio_attri
             return group;
         }
     }
-    product_strategy_t defaultStrategy = getDefault();
-    if (defaultStrategy == PRODUCT_STRATEGY_NONE) {
-        return VOLUME_GROUP_NONE;
-    }
-    return at(defaultStrategy)->getDefaultVolumeGroup();
+    return getDefaultVolumeGroup();
 }
 
 volume_group_t ProductStrategyMap::getVolumeGroupForStreamType(audio_stream_type_t stream) const
@@ -285,6 +281,12 @@ volume_group_t ProductStrategyMap::getVolumeGroupForStreamType(audio_stream_type
             return group;
         }
     }
+    ALOGW("%s: no volume group for %s, using default", __func__, toString(stream).c_str());
+    return getDefaultVolumeGroup();
+}
+
+volume_group_t ProductStrategyMap::getDefaultVolumeGroup() const
+{
     product_strategy_t defaultStrategy = getDefault();
     if (defaultStrategy == PRODUCT_STRATEGY_NONE) {
         return VOLUME_GROUP_NONE;
