@@ -460,7 +460,7 @@ private:
 };
 
 MPEG4Writer::MPEG4Writer(int fd) {
-    initInternal(fd, true /*isFirstSession*/);
+    initInternal(dup(fd), true /*isFirstSession*/);
 }
 
 MPEG4Writer::~MPEG4Writer() {
@@ -481,7 +481,7 @@ MPEG4Writer::~MPEG4Writer() {
 
 void MPEG4Writer::initInternal(int fd, bool isFirstSession) {
     ALOGV("initInternal");
-    mFd = dup(fd);
+    mFd = fd;
     mNextFd = -1;
     mInitCheck = mFd < 0? NO_INIT: OK;
 
@@ -1044,6 +1044,10 @@ void MPEG4Writer::writeCompositionMatrix(int degrees) {
 void MPEG4Writer::release() {
     close(mFd);
     mFd = -1;
+    if (mNextFd != -1) {
+        close(mNextFd);
+        mNextFd = -1;
+    }
     mInitCheck = NO_INIT;
     mStarted = false;
     free(mInMemoryCache);
@@ -1981,7 +1985,7 @@ status_t MPEG4Writer::setNextFd(int fd) {
         // No need to set a new FD yet.
         return INVALID_OPERATION;
     }
-    mNextFd = fd;
+    mNextFd = dup(fd);
     return OK;
 }
 
@@ -2180,11 +2184,11 @@ void MPEG4Writer::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatSwitch:
         {
-            finishCurrentSession();
             mLock.lock();
             int fd = mNextFd;
             mNextFd = -1;
             mLock.unlock();
+            finishCurrentSession();
             initInternal(fd, false /*isFirstSession*/);
             start(mStartMeta.get());
             mSwitchPending = false;
