@@ -799,7 +799,7 @@ private:
                 const audio_attributes_t &attributes,
                 const audio_config_base_t *config,
                 audio_input_flags_t flags,
-                AudioMix *policyMix);
+                const sp<AudioPolicyMix> &policyMix);
 
         // event is one of STARTING_OUTPUT, STARTING_BEACON, STOPPING_OUTPUT, STOPPING_BEACON
         // returns 0 if no mute/unmute event happened, the largest latency of the device where

@@ -295,7 +295,7 @@ DeviceVector Engine::getOutputDevicesForStream(audio_stream_type_t stream, bool 
 }
 
 sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_t &attr,
-                                                         AudioMix **mix) const
+                                                         sp<AudioPolicyMix> *mix) const
 {
     const auto &policyMixes = getApmObserver()->getAudioPolicyMixCollection();
     const auto &availableInputDevices = getApmObserver()->getAvailableInputDevices();

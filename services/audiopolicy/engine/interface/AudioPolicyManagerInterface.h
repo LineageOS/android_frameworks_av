@@ -169,7 +169,7 @@ public:
      * @return selected input device for the audio attributes, may be null if error.
      */
     virtual sp<DeviceDescriptor> getInputDeviceForAttributes(
-            const audio_attributes_t &attr, AudioMix **mix = nullptr) const = 0;
+            const audio_attributes_t &attr, sp<AudioPolicyMix> *mix = nullptr) const = 0;
 
     /**
      * Get the legacy stream type for a given audio attributes.
