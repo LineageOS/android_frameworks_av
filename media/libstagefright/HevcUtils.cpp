@@ -312,7 +312,13 @@ status_t HevcParameterSets::parseSps(const uint8_t* data, size_t size) {
             for (uint32_t j = 0; j < numPics; ++j) {
                 skipUE(&reader); // delta_poc_s0|1_minus1[i]
                 reader.skipBits(1); // used_by_curr_pic_s0|1_flag[i]
+                if (reader.overRead()) {
+                    return ERROR_MALFORMED;
+                }
             }
+        }
+        if (reader.overRead()) {
+            return ERROR_MALFORMED;
         }
     }
     if (reader.getBitsWithFallback(1, 0)) { // long_term_ref_pics_present_flag
@@ -320,6 +326,9 @@ status_t HevcParameterSets::parseSps(const uint8_t* data, size_t size) {
         for (uint32_t i = 0; i < numLongTermRefPicSps; ++i) {
             reader.skipBits(log2MaxPicOrderCntLsb); // lt_ref_pic_poc_lsb_sps[i]
             reader.skipBits(1); // used_by_curr_pic_lt_sps_flag[i]
+            if (reader.overRead()) {
+                return ERROR_MALFORMED;
+            }
         }
     }
     reader.skipBits(1); // sps_temporal_mvp_enabled_flag
