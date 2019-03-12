@@ -2593,9 +2593,9 @@ bool CCodecBufferChannel::handleWork(
         return false;
     }
 
-    if (work->worklets.size() != 1u
+    if (mInputSurface == nullptr && (work->worklets.size() != 1u
             || !work->worklets.front()
-            || !(work->worklets.front()->output.flags & C2FrameData::FLAG_INCOMPLETE)) {
+            || !(work->worklets.front()->output.flags & C2FrameData::FLAG_INCOMPLETE))) {
         mPipelineWatcher.lock()->onWorkDone(work->input.ordinal.frameIndex.peeku());
     }
 
