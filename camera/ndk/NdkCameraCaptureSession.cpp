@@ -105,7 +105,9 @@ camera_status_t ACameraCaptureSession_logicalCamera_capture(
 
     if (session->isClosed()) {
         ALOGE("%s: session %p is already closed", __FUNCTION__, session);
-        *captureSequenceId = CAPTURE_SEQUENCE_ID_NONE;
+        if (captureSequenceId) {
+            *captureSequenceId = CAPTURE_SEQUENCE_ID_NONE;
+        }
         return ACAMERA_ERROR_SESSION_CLOSED;
     }
 
@@ -127,7 +129,9 @@ camera_status_t ACameraCaptureSession_setRepeatingRequest(
 
     if (session->isClosed()) {
         ALOGE("%s: session %p is already closed", __FUNCTION__, session);
-        *captureSequenceId = CAPTURE_SEQUENCE_ID_NONE;
+        if (captureSequenceId) {
+            *captureSequenceId = CAPTURE_SEQUENCE_ID_NONE;
+        }
         return ACAMERA_ERROR_SESSION_CLOSED;
     }
 
@@ -149,7 +153,9 @@ camera_status_t ACameraCaptureSession_logicalCamera_setRepeatingRequest(
 
     if (session->isClosed()) {
         ALOGE("%s: session %p is already closed", __FUNCTION__, session);
-        *captureSequenceId = CAPTURE_SEQUENCE_ID_NONE;
+        if (captureSequenceId) {
+            *captureSequenceId = CAPTURE_SEQUENCE_ID_NONE;
+        }
         return ACAMERA_ERROR_SESSION_CLOSED;
     }
 
