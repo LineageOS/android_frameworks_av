@@ -569,7 +569,6 @@ ACodec::ACodec()
       mFps(-1.0),
       mCaptureFps(-1.0),
       mCreateInputBuffersSuspended(false),
-      mLatency(0),
       mTunneled(false),
       mDescribeColorAspectsIndex((OMX_INDEXTYPE)0),
       mDescribeHDRStaticInfoIndex((OMX_INDEXTYPE)0),
@@ -4425,12 +4424,13 @@ status_t ACodec::setupAVCEncoderParameters(const sp<AMessage> &msg) {
             h264type.eProfile == OMX_VIDEO_AVCProfileHigh) {
         h264type.nSliceHeaderSpacing = 0;
         h264type.bUseHadamard = OMX_TRUE;
-        h264type.nRefFrames = 2;
-        h264type.nBFrames = mLatency == 0 ? 1 : std::min(1U, mLatency - 1);
-
-        // disable B-frames until we have explicit settings for enabling the feature.
-        h264type.nRefFrames = 1;
-        h264type.nBFrames = 0;
+        int32_t maxBframes = 0;
+        (void)msg->findInt32(KEY_MAX_B_FRAMES, &maxBframes);
+        h264type.nBFrames = uint32_t(maxBframes);
+        if (mLatency && h264type.nBFrames > *mLatency) {
+            h264type.nBFrames = *mLatency;
+        }
+        h264type.nRefFrames = h264type.nBFrames == 0 ? 1 : 2;
 
         h264type.nPFrames = setPFramesSpacing(iFrameInterval, frameRate, h264type.nBFrames);
         h264type.nAllowedPictureTypes =
