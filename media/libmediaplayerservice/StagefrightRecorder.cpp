@@ -400,12 +400,14 @@ status_t StagefrightRecorder::setNextOutputFile(int fd) {
         return -EBADF;
     }
 
-    // start with a clean, empty file
-    ftruncate(fd, 0);
-    if (mWriter == NULL) {
+    if (mWriter == nullptr) {
         ALOGE("setNextOutputFile failed. Writer has been freed");
         return INVALID_OPERATION;
     }
+
+    // start with a clean, empty file
+    ftruncate(fd, 0);
+
     return mWriter->setNextFd(fd);
 }
 
