@@ -41,3 +41,9 @@ cc_library_shared {
 
 }
 
+xsd_config {
+    name: "media_codecs",
+    srcs: ["media_codecs.xsd"],
+    package_name: "media.codecs",
+}
+
