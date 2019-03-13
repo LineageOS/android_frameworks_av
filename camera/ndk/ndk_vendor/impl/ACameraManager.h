@@ -64,6 +64,11 @@ class CameraManagerGlobal final : public RefBase {
     void unregisterAvailabilityCallback(
             const ACameraManager_AvailabilityCallbacks *callback);
 
+    void registerExtendedAvailabilityCallback(
+            const ACameraManager_ExtendedAvailabilityCallbacks* /*callback*/) {}
+    void unregisterExtendedAvailabilityCallback(
+            const ACameraManager_ExtendedAvailabilityCallbacks* /*callback*/) {}
+
     /**
      * Return camera IDs that support camera2
      */

@@ -54,6 +54,11 @@ class CameraManagerGlobal final : public RefBase {
     void unregisterAvailabilityCallback(
             const ACameraManager_AvailabilityCallbacks *callback);
 
+    void registerExtendedAvailabilityCallback(
+            const ACameraManager_ExtendedAvailabilityCallbacks* callback);
+    void unregisterExtendedAvailabilityCallback(
+            const ACameraManager_ExtendedAvailabilityCallbacks* callback);
+
     /**
      * Return camera IDs that support camera2
      */
@@ -86,10 +91,7 @@ class CameraManagerGlobal final : public RefBase {
             return binder::Status::ok();
         }
 
-        // Access priority API not implemented yet
-        virtual binder::Status onCameraAccessPrioritiesChanged() {
-            return binder::Status::ok();
-        }
+        virtual binder::Status onCameraAccessPrioritiesChanged();
 
       private:
         const wp<CameraManagerGlobal> mCameraManager;
@@ -101,11 +103,19 @@ class CameraManagerGlobal final : public RefBase {
         explicit Callback(const ACameraManager_AvailabilityCallbacks *callback) :
             mAvailable(callback->onCameraAvailable),
             mUnavailable(callback->onCameraUnavailable),
+            mAccessPriorityChanged(nullptr),
             mContext(callback->context) {}
+
+        explicit Callback(const ACameraManager_ExtendedAvailabilityCallbacks *callback) :
+            mAvailable(callback->availabilityCallbacks.onCameraAvailable),
+            mUnavailable(callback->availabilityCallbacks.onCameraUnavailable),
+            mAccessPriorityChanged(callback->onCameraAccessPrioritiesChanged),
+            mContext(callback->availabilityCallbacks.context) {}
 
         bool operator == (const Callback& other) const {
             return (mAvailable == other.mAvailable &&
                     mUnavailable == other.mUnavailable &&
+                    mAccessPriorityChanged == other.mAccessPriorityChanged &&
                     mContext == other.mContext);
         }
         bool operator != (const Callback& other) const {
@@ -114,6 +124,9 @@ class CameraManagerGlobal final : public RefBase {
         bool operator < (const Callback& other) const {
             if (*this == other) return false;
             if (mContext != other.mContext) return mContext < other.mContext;
+            if (mAccessPriorityChanged != other.mAccessPriorityChanged) {
+                return mAccessPriorityChanged < other.mAccessPriorityChanged;
+            }
             if (mAvailable != other.mAvailable) return mAvailable < other.mAvailable;
             return mUnavailable < other.mUnavailable;
         }
@@ -122,13 +135,15 @@ class CameraManagerGlobal final : public RefBase {
         }
         ACameraManager_AvailabilityCallback mAvailable;
         ACameraManager_AvailabilityCallback mUnavailable;
+        ACameraManager_AccessPrioritiesChangedCallback mAccessPriorityChanged;
         void*                               mContext;
     };
     std::set<Callback> mCallbacks;
 
     // definition of handler and message
     enum {
-        kWhatSendSingleCallback
+        kWhatSendSingleCallback,
+        kWhatSendSingleAccessCallback,
     };
     static const char* kCameraIdKey;
     static const char* kCallbackFpKey;
@@ -141,6 +156,7 @@ class CameraManagerGlobal final : public RefBase {
     sp<CallbackHandler> mHandler;
     sp<ALooper>         mCbLooper; // Looper thread where callbacks actually happen on
 
+    void onCameraAccessPrioritiesChanged();
     void onStatusChanged(int32_t status, const String8& cameraId);
     void onStatusChangedLocked(int32_t status, const String8& cameraId);
     // Utils for status

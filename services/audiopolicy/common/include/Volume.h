@@ -16,19 +16,22 @@
 
 #pragma once
 
+#include <media/AudioCommonTypes.h>
 #include <system/audio.h>
 #include <utils/Log.h>
 #include <math.h>
 
 namespace android {
 
+
 /**
  * VolumeSource is the discriminent for volume management on an output.
  * It used to be the stream type by legacy, it may be host volume group or a volume curves if
- * we allow to have more than one curve per volume group.
+ * we allow to have more than one curve per volume group (mandatory to get rid of AudioServer
+ * stream aliases.
  */
-enum VolumeSource : std::underlying_type<audio_stream_type_t>::type;
-static const VolumeSource VOLUME_SOURCE_NONE = static_cast<VolumeSource>(AUDIO_STREAM_DEFAULT);
+enum VolumeSource : std::underlying_type<volume_group_t>::type;
+static const VolumeSource VOLUME_SOURCE_NONE = static_cast<VolumeSource>(VOLUME_GROUP_NONE);
 
 static inline VolumeSource streamToVolumeSource(audio_stream_type_t stream) {
     return static_cast<VolumeSource>(stream);

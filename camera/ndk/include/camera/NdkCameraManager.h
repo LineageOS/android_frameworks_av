@@ -272,6 +272,105 @@ camera_status_t ACameraManager_openCamera(
 
 #endif /* __ANDROID_API__ >= 24 */
 
+#if __ANDROID_API__ >= 29
+
+/**
+ * Definition of camera access permission change callback.
+ *
+ * <p>Notification that camera access priorities have changed and the camera may
+ * now be openable. An application that was previously denied camera access due to
+ * a higher-priority user already using the camera, or that was disconnected from an
+ * active camera session due to a higher-priority user trying to open the camera,
+ * should try to open the camera again if it still wants to use it.  Note that
+ * multiple applications may receive this callback at the same time, and only one of
+ * them will succeed in opening the camera in practice, depending on exact access
+ * priority levels and timing. This method is useful in cases where multiple
+ * applications may be in the resumed state at the same time, and the user switches
+ * focus between them, or if the current camera-using application moves between
+ * full-screen and Picture-in-Picture (PiP) states. In such cases, the camera
+ * available/unavailable callbacks will not be invoked, but another application may
+ * now have higher priority for camera access than the current camera-using
+ * application.</p>
+
+ * @param context The optional application context provided by user in
+ *                {@link ACameraManager_AvailabilityListener}.
+ */
+typedef void (*ACameraManager_AccessPrioritiesChangedCallback)(void* context);
+
+/**
+ * A listener for camera devices becoming available/unavailable to open or when
+ * the camera access permissions change.
+ *
+ * <p>Cameras become available when they are no longer in use, or when a new
+ * removable camera is connected. They become unavailable when some
+ * application or service starts using a camera, or when a removable camera
+ * is disconnected.</p>
+ *
+ * @see ACameraManager_registerExtendedAvailabilityCallback
+ */
+typedef struct ACameraManager_ExtendedAvailabilityListener {
+    ///
+    ACameraManager_AvailabilityCallbacks availabilityCallbacks;
+
+    /// Called when there is camera access permission change
+    ACameraManager_AccessPrioritiesChangedCallback onCameraAccessPrioritiesChanged;
+
+    /// Reserved for future use, please ensure that all entries are set to NULL
+    void *reserved[6];
+} ACameraManager_ExtendedAvailabilityCallbacks;
+
+/**
+ * Register camera extended availability callbacks.
+ *
+ * <p>onCameraUnavailable will be called whenever a camera device is opened by any camera API
+ * client. Other camera API clients may still be able to open such a camera device, evicting the
+ * existing client if they have higher priority than the existing client of a camera device.
+ * See {@link ACameraManager_openCamera} for more details.</p>
+ *
+ * <p>The callbacks will be called on a dedicated thread shared among all ACameraManager
+ * instances.</p>
+ *
+ * <p>Since this callback will be registered with the camera service, remember to unregister it
+ * once it is no longer needed; otherwise the callback will continue to receive events
+ * indefinitely and it may prevent other resources from being released. Specifically, the
+ * callbacks will be invoked independently of the general activity lifecycle and independently
+ * of the state of individual ACameraManager instances.</p>
+ *
+ * @param manager the {@link ACameraManager} of interest.
+ * @param callback the {@link ACameraManager_ExtendedAvailabilityCallbacks} to be registered.
+ *
+ * @return <ul>
+ *         <li>{@link ACAMERA_OK} if the method call succeeds.</li>
+ *         <li>{@link ACAMERA_ERROR_INVALID_PARAMETER} if manager or callback is NULL, or
+ *                  {ACameraManager_ExtendedAvailabilityCallbacks#onCameraAccessPrioritiesChanged}
+ *                  or {ACameraManager_AvailabilityCallbacks#onCameraAvailable} or
+ *                  {ACameraManager_AvailabilityCallbacks#onCameraUnavailable} is NULL.</li></ul>
+ */
+camera_status_t ACameraManager_registerExtendedAvailabilityCallback(
+        ACameraManager* manager,
+        const ACameraManager_ExtendedAvailabilityCallbacks* callback) __INTRODUCED_IN(29);
+
+/**
+ * Unregister camera extended availability callbacks.
+ *
+ * <p>Removing a callback that isn't registered has no effect.</p>
+ *
+ * @param manager the {@link ACameraManager} of interest.
+ * @param callback the {@link ACameraManager_ExtendedAvailabilityCallbacks} to be unregistered.
+ *
+ * @return <ul>
+ *         <li>{@link ACAMERA_OK} if the method call succeeds.</li>
+ *         <li>{@link ACAMERA_ERROR_INVALID_PARAMETER} if callback,
+ *                  {ACameraManager_ExtendedAvailabilityCallbacks#onCameraAccessPrioritiesChanged}
+ *                  or {ACameraManager_AvailabilityCallbacks#onCameraAvailable} or
+ *                  {ACameraManager_AvailabilityCallbacks#onCameraUnavailable} is NULL.</li></ul>
+ */
+camera_status_t ACameraManager_unregisterExtendedAvailabilityCallback(
+        ACameraManager* manager,
+        const ACameraManager_ExtendedAvailabilityCallbacks* callback) __INTRODUCED_IN(29);
+
+#endif /* __ANDROID_API__ >= 29 */
+
 __END_DECLS
 
 #endif /* _NDK_CAMERA_MANAGER_H */

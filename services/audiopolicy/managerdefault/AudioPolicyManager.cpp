@@ -1085,7 +1085,7 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
         new TrackClientDescriptor(*portId, uid, session, resultAttr, clientConfig,
                                   sanitizedRequestedPortId, *stream,
                                   mEngine->getProductStrategyForAttributes(resultAttr),
-                                  streamToVolumeSource(*stream),
+                                  toVolumeSource(resultAttr),
                                   *flags, isRequestedDeviceForExclusiveUse,
                                   std::move(weakSecondaryOutputDescs));
     sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueFor(*output);
@@ -1694,8 +1694,9 @@ status_t AudioPolicyManager::startSource(const sp<SwAudioOutputDescriptor>& outp
                 setOutputDevices(outputDesc, devices, force, 0, NULL, requiresMuteCheck);
 
         // apply volume rules for current stream and device if necessary
-        checkAndSetVolume(stream,
-                          getVolumeCurves(stream).getVolumeIndex(outputDesc->devices().types()),
+        auto &curves = getVolumeCurves(client->attributes());
+        checkAndSetVolume(curves, client->volumeSource(),
+                          curves.getVolumeIndex(outputDesc->devices().types()),
                           outputDesc,
                           outputDesc->devices().types());
 
@@ -2387,107 +2388,27 @@ status_t AudioPolicyManager::setStreamVolumeIndex(audio_stream_type_t stream,
                                                   int index,
                                                   audio_devices_t device)
 {
-    auto &curves = getVolumeCurves(stream);
-    // VOICE_CALL and BLUETOOTH_SCO stream have minVolumeIndex > 0 but
-    // can be muted directly by an app that has MODIFY_PHONE_STATE permission.
-    if (((index < curves.getVolumeIndexMin()) &&
-            !((stream == AUDIO_STREAM_VOICE_CALL || stream == AUDIO_STREAM_BLUETOOTH_SCO) &&
-            index == 0)) ||
-            (index > curves.getVolumeIndexMax())) {
+    auto attributes = mEngine->getAttributesForStreamType(stream);
+    auto volumeGroup = mEngine->getVolumeGroupForStreamType(stream);
+    if (volumeGroup == VOLUME_GROUP_NONE) {
+        ALOGE("%s: no group matching with stream %s", __FUNCTION__, toString(stream).c_str());
         return BAD_VALUE;
     }
-    if (!audio_is_output_device(device)) {
-        return BAD_VALUE;
-    }
-
-    // Force max volume if stream cannot be muted
-    if (!curves.canBeMuted()) index = curves.getVolumeIndexMax();
-
-    ALOGV("setStreamVolumeIndex() stream %d, device %08x, index %d",
-          stream, device, index);
-
-    // update other private stream volumes which follow this one
-    for (int curStream = 0; curStream < AUDIO_STREAM_FOR_POLICY_CNT; curStream++) {
-        if (!streamsMatchForvolume(stream, (audio_stream_type_t)curStream)) {
-            continue;
-        }
-        auto &curCurves = getVolumeCurves(static_cast<audio_stream_type_t>(curStream));
-        curCurves.addCurrentVolumeIndex(device, index);
-    }
-
-    // update volume on all outputs and streams matching the following:
-    // - The requested stream (or a stream matching for volume control) is active on the output
-    // - The device (or devices) selected by the engine for this stream includes
-    // the requested device
-    // - For non default requested device, currently selected device on the output is either the
-    // requested device or one of the devices selected by the engine for this stream
-    // - For default requested device (AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME), apply volume only if
-    // no specific device volume value exists for currently selected device.
-    status_t status = NO_ERROR;
-    for (size_t i = 0; i < mOutputs.size(); i++) {
-        sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
-        audio_devices_t curDevice = desc->devices().types();
-        for (int curStream = 0; curStream < AUDIO_STREAM_FOR_POLICY_CNT; curStream++) {
-            if (!(streamsMatchForvolume(stream, (audio_stream_type_t)curStream))) {
-                continue;
-            }
-            if (!(desc->isActive(streamToVolumeSource((audio_stream_type_t)curStream)) || isInCall())) {
-                continue;
-            }
-            audio_devices_t curStreamDevice = Volume::getDeviceForVolume(
-                        mEngine->getOutputDevicesForStream((audio_stream_type_t)curStream,
-                                                           false /*fromCache*/).types());
-            if ((device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) &&
-                    ((curStreamDevice & device) == 0)) {
-                continue;
-            }
-            bool applyVolume;
-            if (device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) {
-                curStreamDevice |= device;
-                applyVolume = (Volume::getDeviceForVolume(curDevice) & curStreamDevice) != 0;
-            } else {
-                applyVolume = !curves.hasVolumeIndexForDevice(curStreamDevice);
-            }
-            // rescale index before applying to curStream as ranges may be different for
-            // stream and curStream
-            int idx = rescaleVolumeIndex(index, stream, (audio_stream_type_t)curStream);
-            if (applyVolume) {
-                //FIXME: workaround for truncated touch sounds
-                // delayed volume change for system stream to be removed when the problem is
-                // handled by system UI
-                status_t volStatus = checkAndSetVolume(
-                            (audio_stream_type_t)curStream, idx, desc, curDevice,
-                            (stream == AUDIO_STREAM_SYSTEM) ?
-                                TOUCH_SOUND_FIXED_DELAY_MS : 0);
-                if (volStatus != NO_ERROR) {
-                    status = volStatus;
-                }
-            }
-        }
-    }
-    return status;
+    ALOGV("%s: stream %s attributes=%s", __func__,
+          toString(stream).c_str(), toString(attributes).c_str());
+    return setVolumeGroupIndex(getVolumeCurves(stream), volumeGroup, index, device, attributes);
 }
 
 status_t AudioPolicyManager::getStreamVolumeIndex(audio_stream_type_t stream,
-                                                      int *index,
-                                                      audio_devices_t device)
+                                                  int *index,
+                                                  audio_devices_t device)
 {
-    if (index == NULL) {
-        return BAD_VALUE;
-    }
-    if (!audio_is_output_device(device)) {
-        return BAD_VALUE;
-    }
     // if device is AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME, return volume for device selected for this
     // stream by the engine.
     if (device == AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) {
         device = mEngine->getOutputDevicesForStream(stream, true /*fromCache*/).types();
     }
-    device = Volume::getDeviceForVolume(device);
-
-    *index =  getVolumeCurves(stream).getVolumeIndex(device);
-    ALOGV("getStreamVolumeIndex() stream %d device %08x index %d", stream, device, *index);
-    return NO_ERROR;
+    return getVolumeIndex(getVolumeCurves(stream), *index, device);
 }
 
 status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_t &attr,
@@ -2500,18 +2421,25 @@ status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_
         ALOGD("%s: could not find group matching with %s", __FUNCTION__, toString(attr).c_str());
         return BAD_VALUE;
     }
-    ALOGD("%s: FOUND group %d matching with %s", __FUNCTION__, volumeGroup, toString(attr).c_str());
+    ALOGV("%s: group %d matching with %s", __FUNCTION__, volumeGroup, toString(attr).c_str());
     return setVolumeGroupIndex(getVolumeCurves(attr), volumeGroup, index, device, attr);
 }
 
 status_t AudioPolicyManager::setVolumeGroupIndex(IVolumeCurves &curves, volume_group_t group,
                                                  int index,
                                                  audio_devices_t device,
-                                                 const audio_attributes_t /*attributes*/)
+                                                 const audio_attributes_t attributes)
 {
     ALOGVV("%s: group=%d", __func__, group);
     status_t status = NO_ERROR;
-    setVolumeCurveIndex(group, index, device, curves);
+    VolumeSource vs = toVolumeSource(group);
+    product_strategy_t strategy = mEngine->getProductStrategyForAttributes(attributes);
+
+    status = setVolumeCurveIndex(index, device, curves);
+    if (status != NO_ERROR) {
+        ALOGE("%s failed to set curve index for group %d device 0x%X", __func__, group, device);
+        return status;
+    }
     // update volume on all outputs and streams matching the following:
     // - The requested stream (or a stream matching for volume control) is active on the output
     // - The device (or devices) selected by the engine for this stream includes
@@ -2520,21 +2448,116 @@ status_t AudioPolicyManager::setVolumeGroupIndex(IVolumeCurves &curves, volume_g
     // requested device or one of the devices selected by the engine for this stream
     // - For default requested device (AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME), apply volume only if
     // no specific device volume value exists for currently selected device.
-    // @TODO
+    for (size_t i = 0; i < mOutputs.size(); i++) {
+        sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
+        audio_devices_t curDevice = Volume::getDeviceForVolume(desc->devices().types());
+
+        // Inter / intra volume group priority management: Loop on strategies arranged by priority
+        // If a higher priority strategy is active, and the output is routed to a device with a
+        // HW Gain management, do not change the volume
+        bool applyVolume = false;
+        if (desc->useHwGain()) {
+            if (!(desc->isActive(group) || isInCall())) {
+                continue;
+            }
+            for (const auto &productStrategy : mEngine->getOrderedProductStrategies()) {
+                auto activeClients = desc->clientsList(true /*activeOnly*/, productStrategy,
+                                                       false /*preferredDevice*/);
+                if (activeClients.empty()) {
+                    continue;
+                }
+                bool isPreempted = false;
+                bool isHigherPriority = productStrategy < strategy;
+                for (const auto &client : activeClients) {
+                    if (isHigherPriority && (client->volumeSource() != vs)) {
+                        ALOGV("%s: Strategy=%d (\nrequester:\n"
+                              " group %d, volumeGroup=%d attributes=%s)\n"
+                              " higher priority source active:\n"
+                              " volumeGroup=%d attributes=%s) \n"
+                              " on output %zu, bailing out", __func__, productStrategy,
+                              group, group, toString(attributes).c_str(),
+                              client->volumeSource(), toString(client->attributes()).c_str(), i);
+                        applyVolume = false;
+                        isPreempted = true;
+                        break;
+                    }
+                    // However, continue for loop to ensure no higher prio clients running on output
+                    if (client->volumeSource() == vs) {
+                        applyVolume = true;
+                    }
+                }
+                if (isPreempted || applyVolume) {
+                    break;
+                }
+            }
+            if (!applyVolume) {
+                continue; // next output
+            }
+            status_t volStatus = checkAndSetVolume(curves, vs, index, desc, curDevice,
+                                                   (vs == toVolumeSource(AUDIO_STREAM_SYSTEM)?
+                                                        TOUCH_SOUND_FIXED_DELAY_MS : 0));
+            if (volStatus != NO_ERROR) {
+                status = volStatus;
+            }
+            continue;
+        }
+        for (auto curVolGroup : getVolumeGroups()) {
+            VolumeSource curVolSrc = toVolumeSource(curVolGroup);
+            if (!(curVolSrc == vs || isInCall())) {
+                continue;
+            }
+            if (!(desc->isActive(vs) || isInCall())) {
+                continue;
+            }
+            audio_devices_t curSrcDevice;
+            auto &curCurves = getVolumeCurves(curVolSrc);
+            auto curCurvAttrs = curCurves.getAttributes();
+            if (!curCurvAttrs.empty() && curCurvAttrs.front() != defaultAttr) {
+                auto attr = curCurvAttrs.front();
+                curSrcDevice = mEngine->getOutputDevicesForAttributes(attr, nullptr, false).types();
+            } else if (!curCurves.getStreamTypes().empty()) {
+                auto stream = curCurves.getStreamTypes().front();
+                curSrcDevice = mEngine->getOutputDevicesForStream(stream, false).types();
+            } else {
+                ALOGE("%s: Invalid src %d: no valid attributes nor stream",__func__, curVolSrc);
+                continue;
+            }
+            curSrcDevice = Volume::getDeviceForVolume(curSrcDevice);
+            if ((device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) && ((curDevice & device) == 0)) {
+                continue;
+            }
+            if (device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) {
+                curSrcDevice |= device;
+                applyVolume = (curDevice & curSrcDevice) != 0;
+            } else {
+                applyVolume = !curves.hasVolumeIndexForDevice(curSrcDevice);
+            }
+            if (applyVolume) {
+                //FIXME: workaround for truncated touch sounds
+                // delayed volume change for system stream to be removed when the problem is
+                // handled by system UI
+                status_t volStatus = checkAndSetVolume(
+                            curCurves, curVolSrc, index, desc, curDevice,
+                            ((vs == toVolumeSource(AUDIO_STREAM_SYSTEM))?
+                                 TOUCH_SOUND_FIXED_DELAY_MS : 0));
+                if (volStatus != NO_ERROR) {
+                    status = volStatus;
+                }
+            }
+        }
+    }
     mpClientInterface->onAudioVolumeGroupChanged(group, 0 /*flags*/);
     return status;
 }
 
-status_t AudioPolicyManager::setVolumeCurveIndex(volume_group_t volumeGroup,
-                                                 int index,
+status_t AudioPolicyManager::setVolumeCurveIndex(int index,
                                                  audio_devices_t device,
                                                  IVolumeCurves &volumeCurves)
 {
     // VOICE_CALL stream has minVolumeIndex > 0  but can be muted directly by an
     // app that has MODIFY_PHONE_STATE permission.
-    // If voice is member of the volume group, it will contaminate all the member of this group
-    auto streams = mEngine->getStreamTypesForVolumeGroup(volumeGroup);
-    if (((index < volumeCurves.getVolumeIndexMin()) && !(hasVoiceStream(streams) && index == 0)) ||
+    bool hasVoice = hasVoiceStream(volumeCurves.getStreamTypes());
+    if (((index < volumeCurves.getVolumeIndexMin()) && !(hasVoice && index == 0)) ||
             (index > volumeCurves.getVolumeIndexMax())) {
         ALOGD("%s: wrong index %d min=%d max=%d", __FUNCTION__, index,
               volumeCurves.getVolumeIndexMin(), volumeCurves.getVolumeIndexMax());
@@ -2547,7 +2570,7 @@ status_t AudioPolicyManager::setVolumeCurveIndex(volume_group_t volumeGroup,
     // Force max volume if stream cannot be muted
     if (!volumeCurves.canBeMuted()) index = volumeCurves.getVolumeIndexMax();
 
-    ALOGD("%s device %08x, index %d", __FUNCTION__ , device, index);
+    ALOGV("%s device %08x, index %d", __FUNCTION__ , device, index);
     volumeCurves.addCurrentVolumeIndex(device, index);
     return NO_ERROR;
 }
@@ -2709,19 +2732,12 @@ status_t AudioPolicyManager::setEffectEnabled(int id, bool enabled)
 
 bool AudioPolicyManager::isStreamActive(audio_stream_type_t stream, uint32_t inPastMs) const
 {
-    bool active = false;
-    for (int curStream = 0; curStream < AUDIO_STREAM_FOR_POLICY_CNT && !active; curStream++) {
-        if (!streamsMatchForvolume(stream, (audio_stream_type_t)curStream)) {
-            continue;
-        }
-        active = mOutputs.isActive(streamToVolumeSource((audio_stream_type_t)curStream), inPastMs);
-    }
-    return active;
+    return mOutputs.isActive(toVolumeSource(stream), inPastMs);
 }
 
 bool AudioPolicyManager::isStreamActiveRemotely(audio_stream_type_t stream, uint32_t inPastMs) const
 {
-    return mOutputs.isActiveRemotely(streamToVolumeSource((audio_stream_type_t)stream), inPastMs);
+    return mOutputs.isActiveRemotely(toVolumeSource(stream), inPastMs);
 }
 
 bool AudioPolicyManager::isSourceActive(audio_source_t source) const
@@ -3750,11 +3766,11 @@ status_t AudioPolicyManager::startAudioSource(const struct audio_port_config *so
     struct audio_patch dummyPatch = {};
     sp<AudioPatch> patchDesc = new AudioPatch(&dummyPatch, uid);
 
-    sp<SourceClientDescriptor> sourceDesc = new SourceClientDescriptor(
-                *portId, uid, *attributes, patchDesc, srcDevice,
-                mEngine->getStreamTypeForAttributes(*attributes),
-                mEngine->getProductStrategyForAttributes(*attributes),
-                streamToVolumeSource(mEngine->getStreamTypeForAttributes(*attributes)));
+    sp<SourceClientDescriptor> sourceDesc =
+        new SourceClientDescriptor(*portId, uid, *attributes, patchDesc, srcDevice,
+                                   mEngine->getStreamTypeForAttributes(*attributes),
+                                   mEngine->getProductStrategyForAttributes(*attributes),
+                                   toVolumeSource(*attributes));
 
     status_t status = connectAudioSource(sourceDesc);
     if (status == NO_ERROR) {
@@ -3919,7 +3935,7 @@ status_t AudioPolicyManager::getMasterMono(bool *mono)
 float AudioPolicyManager::getStreamVolumeDB(
         audio_stream_type_t stream, int index, audio_devices_t device)
 {
-    return computeVolume(stream, index, device);
+    return computeVolume(getVolumeCurves(stream), toVolumeSource(stream), index, device);
 }
 
 status_t AudioPolicyManager::getSurroundFormats(unsigned int *numSurroundFormats,
@@ -5295,11 +5311,10 @@ uint32_t AudioPolicyManager::setBeaconMute(bool mute) {
         // mute/unmute AUDIO_STREAM_TTS on all outputs
         ALOGV("\t muting %d", mute);
         uint32_t maxLatency = 0;
+        auto ttsVolumeSource = toVolumeSource(AUDIO_STREAM_TTS);
         for (size_t i = 0; i < mOutputs.size(); i++) {
             sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
-            setStreamMute(AUDIO_STREAM_TTS, mute/*on*/,
-                    desc,
-                    0 /*delay*/, AUDIO_DEVICE_NONE);
+            setVolumeSourceMute(ttsVolumeSource, mute/*on*/, desc, 0 /*delay*/, AUDIO_DEVICE_NONE);
             const uint32_t latency = desc->latency() * 2;
             if (latency > maxLatency) {
                 maxLatency = latency;
@@ -5383,15 +5398,12 @@ uint32_t AudioPolicyManager::checkDeviceMuteStrategies(const sp<AudioOutputDescr
         if (muteWaitMs < tempMuteWaitMs) {
             muteWaitMs = tempMuteWaitMs;
         }
-
-        for (const auto &productStrategy : productStrategies) {
-            if (outputDesc->isStrategyActive(productStrategy)) {
-                // make sure that we do not start the temporary mute period too early in case of
-                // delayed device change
-                setStrategyMute(productStrategy, true, outputDesc, delayMs);
-                setStrategyMute(productStrategy, false, outputDesc, delayMs + tempMuteDurationMs,
+        for (const auto &activeVs : outputDesc->getActiveVolumeSources()) {
+            // make sure that we do not start the temporary mute period too early in case of
+            // delayed device change
+            setVolumeSourceMute(activeVs, true, outputDesc, delayMs);
+            setVolumeSourceMute(activeVs, false, outputDesc, delayMs + tempMuteDurationMs,
                                 devices.types());
-            }
         }
     }
 
@@ -5615,51 +5627,51 @@ sp<IOProfile> AudioPolicyManager::getInputProfile(const sp<DeviceDescriptor> &de
     return NULL;
 }
 
-float AudioPolicyManager::computeVolume(audio_stream_type_t stream,
+float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
+                                        VolumeSource volumeSource,
                                         int index,
                                         audio_devices_t device)
 {
-    auto &curves = getVolumeCurves(stream);
     float volumeDb = curves.volIndexToDb(Volume::getDeviceCategory(device), index);
 
     // handle the case of accessibility active while a ringtone is playing: if the ringtone is much
     // louder than the accessibility prompt, the prompt cannot be heard, thus masking the touch
     // exploration of the dialer UI. In this situation, bring the accessibility volume closer to
     // the ringtone volume
-    if ((stream == AUDIO_STREAM_ACCESSIBILITY)
-            && (AUDIO_MODE_RINGTONE == mEngine->getPhoneState())
-            && isStreamActive(AUDIO_STREAM_RING, 0)) {
-        const float ringVolumeDB = computeVolume(AUDIO_STREAM_RING, index, device);
-        return ringVolumeDB - 4 > volumeDb ? ringVolumeDB - 4 : volumeDb;
+    const auto callVolumeSrc = toVolumeSource(AUDIO_STREAM_VOICE_CALL);
+    const auto ringVolumeSrc = toVolumeSource(AUDIO_STREAM_RING);
+    const auto musicVolumeSrc = toVolumeSource(AUDIO_STREAM_MUSIC);
+    const auto alarmVolumeSrc = toVolumeSource(AUDIO_STREAM_ALARM);
+
+    if (volumeSource == toVolumeSource(AUDIO_STREAM_ACCESSIBILITY)
+            && (AUDIO_MODE_RINGTONE == mEngine->getPhoneState()) &&
+            mOutputs.isActive(ringVolumeSrc, 0)) {
+        auto &ringCurves = getVolumeCurves(AUDIO_STREAM_RING);
+        const float ringVolumeDb = computeVolume(ringCurves, ringVolumeSrc, index, device);
+        return ringVolumeDb - 4 > volumeDb ? ringVolumeDb - 4 : volumeDb;
     }
 
     // in-call: always cap volume by voice volume + some low headroom
-    if ((stream != AUDIO_STREAM_VOICE_CALL) &&
-            (isInCall() || mOutputs.isActiveLocally(streamToVolumeSource(AUDIO_STREAM_VOICE_CALL)))) {
-        switch (stream) {
-        case AUDIO_STREAM_SYSTEM:
-        case AUDIO_STREAM_RING:
-        case AUDIO_STREAM_MUSIC:
-        case AUDIO_STREAM_ALARM:
-        case AUDIO_STREAM_NOTIFICATION:
-        case AUDIO_STREAM_ENFORCED_AUDIBLE:
-        case AUDIO_STREAM_DTMF:
-        case AUDIO_STREAM_ACCESSIBILITY: {
-            int voiceVolumeIndex = getVolumeCurves(AUDIO_STREAM_VOICE_CALL).getVolumeIndex(device);
-            const float maxVoiceVolDb =
-                computeVolume(AUDIO_STREAM_VOICE_CALL, voiceVolumeIndex, device)
+    if ((volumeSource != callVolumeSrc && (isInCall() ||
+                                           mOutputs.isActiveLocally(callVolumeSrc))) &&
+            (volumeSource == toVolumeSource(AUDIO_STREAM_SYSTEM) ||
+             volumeSource == ringVolumeSrc || volumeSource == musicVolumeSrc ||
+             volumeSource == alarmVolumeSrc ||
+             volumeSource == toVolumeSource(AUDIO_STREAM_NOTIFICATION) ||
+             volumeSource == toVolumeSource(AUDIO_STREAM_ENFORCED_AUDIBLE) ||
+             volumeSource == toVolumeSource(AUDIO_STREAM_DTMF) ||
+             volumeSource == toVolumeSource(AUDIO_STREAM_ACCESSIBILITY))) {
+        auto &voiceCurves = getVolumeCurves(callVolumeSrc);
+        int voiceVolumeIndex = voiceCurves.getVolumeIndex(device);
+        const float maxVoiceVolDb =
+                computeVolume(voiceCurves, callVolumeSrc, voiceVolumeIndex, device)
                 + IN_CALL_EARPIECE_HEADROOM_DB;
-            if (volumeDb > maxVoiceVolDb) {
-                ALOGV("computeVolume() stream %d at vol=%f overriden by stream %d at vol=%f",
-                        stream, volumeDb, AUDIO_STREAM_VOICE_CALL, maxVoiceVolDb);
-                volumeDb = maxVoiceVolDb;
-            }
-            } break;
-        default:
-            break;
+        if (volumeDb > maxVoiceVolDb) {
+            ALOGV("%s volume source %d at vol=%f overriden by volume group %d at vol=%f", __func__,
+                  volumeSource, volumeDb, callVolumeSrc, maxVoiceVolDb);
+            volumeDb = maxVoiceVolDb;
         }
     }
-
     // if a headset is connected, apply the following rules to ring tones and notifications
     // to avoid sound level bursts in user's ears:
     // - always attenuate notifications volume by 6dB
@@ -5667,19 +5679,17 @@ float AudioPolicyManager::computeVolume(audio_stream_type_t stream,
     // speaker is part of the select devices
     // - if music is playing, always limit the volume to current music volume,
     // with a minimum threshold at -36dB so that notification is always perceived.
-    if ((device & (AUDIO_DEVICE_OUT_BLUETOOTH_A2DP |
-            AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES |
-            AUDIO_DEVICE_OUT_WIRED_HEADSET |
-            AUDIO_DEVICE_OUT_WIRED_HEADPHONE |
-            AUDIO_DEVICE_OUT_USB_HEADSET |
-            AUDIO_DEVICE_OUT_HEARING_AID)) &&
-        ((stream == AUDIO_STREAM_ALARM || stream == AUDIO_STREAM_RING)
-                || (stream == AUDIO_STREAM_NOTIFICATION)
-                || (stream == AUDIO_STREAM_SYSTEM)
-                || ((stream == AUDIO_STREAM_ENFORCED_AUDIBLE) &&
-                    (mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_SYSTEM) ==
-                     AUDIO_POLICY_FORCE_NONE))) &&
-            getVolumeCurves(stream).canBeMuted()) {
+    if ((device & (AUDIO_DEVICE_OUT_BLUETOOTH_A2DP | AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES |
+                   AUDIO_DEVICE_OUT_WIRED_HEADSET | AUDIO_DEVICE_OUT_WIRED_HEADPHONE |
+                   AUDIO_DEVICE_OUT_USB_HEADSET | AUDIO_DEVICE_OUT_HEARING_AID)) &&
+            ((volumeSource == alarmVolumeSrc ||
+              volumeSource == ringVolumeSrc) ||
+             (volumeSource == toVolumeSource(AUDIO_STREAM_NOTIFICATION)) ||
+             (volumeSource == toVolumeSource(AUDIO_STREAM_SYSTEM)) ||
+             ((volumeSource == toVolumeSource(AUDIO_STREAM_ENFORCED_AUDIBLE)) &&
+              (mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_SYSTEM) == AUDIO_POLICY_FORCE_NONE))) &&
+            curves.canBeMuted()) {
+
         // when the phone is ringing we must consider that music could have been paused just before
         // by the music application and behave as if music was active if the last music track was
         // just stopped
@@ -5689,29 +5699,29 @@ float AudioPolicyManager::computeVolume(audio_stream_type_t stream,
             audio_devices_t musicDevice =
                     mEngine->getOutputDevicesForAttributes(attributes_initializer(AUDIO_USAGE_MEDIA),
                                                            nullptr, true /*fromCache*/).types();
-            float musicVolDB = computeVolume(AUDIO_STREAM_MUSIC,
-                                   getVolumeCurves(AUDIO_STREAM_MUSIC).getVolumeIndex(musicDevice),
-                                   musicDevice);
-            float minVolDB = (musicVolDB > SONIFICATION_HEADSET_VOLUME_MIN_DB) ?
-                    musicVolDB : SONIFICATION_HEADSET_VOLUME_MIN_DB;
-            if (volumeDb > minVolDB) {
-                volumeDb = minVolDB;
-                ALOGV("computeVolume limiting volume to %f musicVol %f", minVolDB, musicVolDB);
+            auto &musicCurves = getVolumeCurves(AUDIO_STREAM_MUSIC);
+            float musicVolDb = computeVolume(musicCurves, musicVolumeSrc,
+                                             musicCurves.getVolumeIndex(musicDevice), musicDevice);
+            float minVolDb = (musicVolDb > SONIFICATION_HEADSET_VOLUME_MIN_DB) ?
+                        musicVolDb : SONIFICATION_HEADSET_VOLUME_MIN_DB;
+            if (volumeDb > minVolDb) {
+                volumeDb = minVolDb;
+                ALOGV("computeVolume limiting volume to %f musicVol %f", minVolDb, musicVolDb);
             }
             if (device & (AUDIO_DEVICE_OUT_BLUETOOTH_A2DP |
-                    AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES)) {
+                          AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES)) {
                 // on A2DP, also ensure notification volume is not too low compared to media when
                 // intended to be played
                 if ((volumeDb > -96.0f) &&
-                        (musicVolDB - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB > volumeDb)) {
-                    ALOGV("computeVolume increasing volume for stream=%d device=0x%X from %f to %f",
-                            stream, device,
-                            volumeDb, musicVolDB - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB);
-                    volumeDb = musicVolDB - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB;
+                        (musicVolDb - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB > volumeDb)) {
+                    ALOGV("%s increasing volume for volume source=%d device=0x%X from %f to %f",
+                          __func__, volumeSource, device, volumeDb,
+                          musicVolDb - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB);
+                    volumeDb = musicVolDb - SONIFICATION_A2DP_MAX_MEDIA_DIFF_DB;
                 }
             }
         } else if ((Volume::getDeviceForVolume(device) != AUDIO_DEVICE_OUT_SPEAKER) ||
-                (stream != AUDIO_STREAM_ALARM && stream != AUDIO_STREAM_RING)) {
+                   (!(volumeSource == alarmVolumeSrc || volumeSource == ringVolumeSrc))) {
             volumeDb += SONIFICATION_HEADSET_VOLUME_FACTOR_DB;
         }
     }
@@ -5745,58 +5755,61 @@ int AudioPolicyManager::rescaleVolumeIndex(int srcIndex,
     return (int)(minDst + ((srcIndex - minSrc) * (maxDst - minDst)) / (maxSrc - minSrc));
 }
 
-status_t AudioPolicyManager::checkAndSetVolume(audio_stream_type_t stream,
+status_t AudioPolicyManager::checkAndSetVolume(IVolumeCurves &curves,
+                                               VolumeSource volumeSource,
                                                int index,
                                                const sp<AudioOutputDescriptor>& outputDesc,
                                                audio_devices_t device,
                                                int delayMs,
                                                bool force)
 {
-    // do not change actual stream volume if the stream is muted
-    if (outputDesc->isMuted(streamToVolumeSource(stream))) {
-        ALOGVV("%s() stream %d muted count %d", __func__, stream, outputDesc->getMuteCount(stream));
+    // do not change actual attributes volume if the attributes is muted
+    if (outputDesc->isMuted(volumeSource)) {
+        ALOGVV("%s: volume source %d muted count %d active=%d", __func__, volumeSource,
+               outputDesc->getMuteCount(volumeSource), outputDesc->isActive(volumeSource));
         return NO_ERROR;
     }
+    VolumeSource callVolSrc = toVolumeSource(AUDIO_STREAM_VOICE_CALL);
+    VolumeSource btScoVolSrc = toVolumeSource(AUDIO_STREAM_BLUETOOTH_SCO);
+    bool isVoiceVolSrc = callVolSrc == volumeSource;
+    bool isBtScoVolSrc = btScoVolSrc == volumeSource;
+
     audio_policy_forced_cfg_t forceUseForComm =
             mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_COMMUNICATION);
     // do not change in call volume if bluetooth is connected and vice versa
-    if ((stream == AUDIO_STREAM_VOICE_CALL && forceUseForComm == AUDIO_POLICY_FORCE_BT_SCO) ||
-        (stream == AUDIO_STREAM_BLUETOOTH_SCO && forceUseForComm != AUDIO_POLICY_FORCE_BT_SCO)) {
-        ALOGV("checkAndSetVolume() cannot set stream %d volume with force use = %d for comm",
-             stream, forceUseForComm);
+    // if sco and call follow same curves, bypass forceUseForComm
+    if ((callVolSrc != btScoVolSrc) &&
+            ((isVoiceVolSrc && forceUseForComm == AUDIO_POLICY_FORCE_BT_SCO) ||
+             (isBtScoVolSrc && forceUseForComm != AUDIO_POLICY_FORCE_BT_SCO))) {
+        ALOGV("%s cannot set volume group %d volume with force use = %d for comm", __func__,
+             volumeSource, forceUseForComm);
         return INVALID_OPERATION;
     }
-
     if (device == AUDIO_DEVICE_NONE) {
         device = outputDesc->devices().types();
     }
 
-    float volumeDb = computeVolume(stream, index, device);
+    float volumeDb = computeVolume(curves, volumeSource, index, device);
     if (outputDesc->isFixedVolume(device) ||
             // Force VoIP volume to max for bluetooth SCO
-            ((stream == AUDIO_STREAM_VOICE_CALL || stream == AUDIO_STREAM_BLUETOOTH_SCO) &&
-             (device & AUDIO_DEVICE_OUT_ALL_SCO) != 0)) {
+            ((isVoiceVolSrc || isBtScoVolSrc) && (device & AUDIO_DEVICE_OUT_ALL_SCO) != 0)) {
         volumeDb = 0.0f;
     }
+    outputDesc->setVolume(volumeDb, volumeSource, curves.getStreamTypes(), device, delayMs, force);
 
-    outputDesc->setVolume(volumeDb, stream, device, delayMs, force);
-
-    if (stream == AUDIO_STREAM_VOICE_CALL ||
-        stream == AUDIO_STREAM_BLUETOOTH_SCO) {
+    if (isVoiceVolSrc || isBtScoVolSrc) {
         float voiceVolume;
         // Force voice volume to max for bluetooth SCO as volume is managed by the headset
-        if (stream == AUDIO_STREAM_VOICE_CALL) {
-            voiceVolume = (float)index/(float)getVolumeCurves(stream).getVolumeIndexMax();
+        if (isVoiceVolSrc) {
+            voiceVolume = (float)index/(float)curves.getVolumeIndexMax();
         } else {
             voiceVolume = 1.0;
         }
-
         if (voiceVolume != mLastVoiceVolume) {
             mpClientInterface->setVoiceVolume(voiceVolume, delayMs);
             mLastVoiceVolume = voiceVolume;
         }
     }
-
     return NO_ERROR;
 }
 
@@ -5806,14 +5819,10 @@ void AudioPolicyManager::applyStreamVolumes(const sp<AudioOutputDescriptor>& out
                                                 bool force)
 {
     ALOGVV("applyStreamVolumes() for device %08x", device);
-
-    for (int stream = 0; stream < AUDIO_STREAM_FOR_POLICY_CNT; stream++) {
-        checkAndSetVolume((audio_stream_type_t)stream,
-                          getVolumeCurves((audio_stream_type_t)stream).getVolumeIndex(device),
-                          outputDesc,
-                          device,
-                          delayMs,
-                          force);
+    for (const auto &volumeGroup : mEngine->getVolumeGroups()) {
+        auto &curves = getVolumeCurves(toVolumeSource(volumeGroup));
+        checkAndSetVolume(curves, toVolumeSource(volumeGroup),
+                          curves.getVolumeIndex(device), outputDesc, device, delayMs, force);
     }
 }
 
@@ -5823,43 +5832,54 @@ void AudioPolicyManager::setStrategyMute(product_strategy_t strategy,
                                          int delayMs,
                                          audio_devices_t device)
 {
-    for (auto stream: mEngine->getStreamTypesForProductStrategy(strategy)) {
-        ALOGVV("%s() stream %d, mute %d, output ID %d", __FUNCTION__, stream, on,
-               outputDesc->getId());
-        setStreamMute(stream, on, outputDesc, delayMs, device);
+    std::vector<VolumeSource> sourcesToMute;
+    for (auto attributes: mEngine->getAllAttributesForProductStrategy(strategy)) {
+        ALOGVV("%s() attributes %s, mute %d, output ID %d", __func__,
+               toString(attributes).c_str(), on, outputDesc->getId());
+        VolumeSource source = toVolumeSource(attributes);
+        if (std::find(begin(sourcesToMute), end(sourcesToMute), source) == end(sourcesToMute)) {
+            sourcesToMute.push_back(source);
+        }
     }
+    for (auto source : sourcesToMute) {
+        setVolumeSourceMute(source, on, outputDesc, delayMs, device);
+    }
+
 }
 
-void AudioPolicyManager::setStreamMute(audio_stream_type_t stream,
-                                           bool on,
-                                           const sp<AudioOutputDescriptor>& outputDesc,
-                                           int delayMs,
-                                           audio_devices_t device)
+void AudioPolicyManager::setVolumeSourceMute(VolumeSource volumeSource,
+                                             bool on,
+                                             const sp<AudioOutputDescriptor>& outputDesc,
+                                             int delayMs,
+                                             audio_devices_t device,
+                                             bool activeOnly)
 {
+    if (activeOnly && !outputDesc->isActive(volumeSource)) {
+        return;
+    }
     if (device == AUDIO_DEVICE_NONE) {
         device = outputDesc->devices().types();
     }
-
-    ALOGVV("setStreamMute() stream %d, mute %d, mMuteCount %d device %04x",
-          stream, on, outputDesc->getMuteCount(stream), device);
-    auto &curves = getVolumeCurves(stream);
+    auto &curves = getVolumeCurves(volumeSource);
     if (on) {
-        if (!outputDesc->isMuted(streamToVolumeSource(stream))) {
+        if (!outputDesc->isMuted(volumeSource)) {
             if (curves.canBeMuted() &&
-                    ((stream != AUDIO_STREAM_ENFORCED_AUDIBLE) ||
-                     (mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_SYSTEM) == AUDIO_POLICY_FORCE_NONE))) {
-                checkAndSetVolume(stream, 0, outputDesc, device, delayMs);
+                    (volumeSource != toVolumeSource(AUDIO_STREAM_ENFORCED_AUDIBLE) ||
+                     (mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_SYSTEM) ==
+                      AUDIO_POLICY_FORCE_NONE))) {
+                checkAndSetVolume(curves, volumeSource, 0, outputDesc, device, delayMs);
             }
         }
-        // increment mMuteCount after calling checkAndSetVolume() so that volume change is not ignored
-        outputDesc->incMuteCount(streamToVolumeSource(stream));
+        // increment mMuteCount after calling checkAndSetVolume() so that volume change is not
+        // ignored
+        outputDesc->incMuteCount(volumeSource);
     } else {
-        if (!outputDesc->isMuted(streamToVolumeSource(stream))) {
-            ALOGV("setStreamMute() unmuting non muted stream!");
+        if (!outputDesc->isMuted(volumeSource)) {
+            ALOGV("%s unmuting non muted attributes!", __func__);
             return;
         }
-        if (outputDesc->decMuteCount(streamToVolumeSource(stream)) == 0) {
-            checkAndSetVolume(stream,
+        if (outputDesc->decMuteCount(volumeSource) == 0) {
+            checkAndSetVolume(curves, volumeSource,
                               curves.getVolumeIndex(device),
                               outputDesc,
                               device,
