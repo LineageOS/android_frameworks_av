@@ -604,6 +604,7 @@ void CameraDeviceClient::mapStreamInfo(const OutputStreamInfo &streamInfo,
     stream->v3_2.usage = Camera3Device::mapToConsumerUsage(u);
     stream->v3_2.dataSpace = Camera3Device::mapToHidlDataspace(streamInfo.dataSpace);
     stream->v3_2.rotation = Camera3Device::mapToStreamRotation(rotation);
+    stream->v3_2.id = -1; // Invalid stream id
     stream->physicalCameraId = std::string(physicalId.string());
     stream->bufferSize = 0;
 }
