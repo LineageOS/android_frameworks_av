@@ -29,15 +29,8 @@ supDomain: DeviceForProductStrategy
 					ip = 0
 					proxy = 0
 					usb_headset = 0
+					bus = 0
 					stub = 0
 				/Policy/policy/product_strategies/rerouting/device_address =
 
-		domain: SelectedDevice
-			conf: Bus
-				component: /Policy/policy/product_strategies/rerouting/selected_output_devices/mask
-					bus = 1
-
-			conf: Default
-				component: /Policy/policy/product_strategies/rerouting/selected_output_devices/mask
-					bus = 0
 

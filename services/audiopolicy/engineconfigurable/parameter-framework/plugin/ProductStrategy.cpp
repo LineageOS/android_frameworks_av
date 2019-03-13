@@ -32,6 +32,8 @@ ProductStrategy::ProductStrategy(const string &mappingValue,
                                 (MappingKeyAmendEnd - MappingKeyAmend1 + 1),
                                 context)
 {
+    std::string name(context.getItem(MappingKeyName));
+
     ALOG_ASSERT(instanceConfigurableElement != nullptr, "Invalid Configurable Element");
     mPolicySubsystem = static_cast<const PolicySubsystem *>(
                 instanceConfigurableElement->getBelongingSubsystem());
@@ -40,7 +42,6 @@ ProductStrategy::ProductStrategy(const string &mappingValue,
     mPolicyPluginInterface = mPolicySubsystem->getPolicyPluginInterface();
     ALOG_ASSERT(mPolicyPluginInterface != nullptr, "Invalid Policy Plugin Interface");
 
-    std::string name(instanceConfigurableElement->getName());
     mId = mPolicyPluginInterface->getProductStrategyByName(name);
 
     ALOG_ASSERT(mId != PRODUCT_STRATEGY_INVALID, "Product Strategy %s not found", name.c_str());

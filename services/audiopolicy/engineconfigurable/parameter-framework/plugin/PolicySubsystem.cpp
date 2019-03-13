@@ -72,7 +72,7 @@ PolicySubsystem::PolicySubsystem(const std::string &name, core::log::Logger &log
         );
     addSubsystemObjectFactory(
         new TSubsystemObjectFactory<ProductStrategy>(
-            mProductStrategyComponentName, 0)
+            mProductStrategyComponentName, (1 << MappingKeyName))
         );
 }
 
