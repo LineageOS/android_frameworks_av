@@ -1,0 +1,108 @@
+// Signature format: 2.0
+package media.codecs {
+
+  public class Decoders {
+    ctor public Decoders();
+    method public java.util.List<media.codecs.MediaCodec> getMediaCodec();
+  }
+
+  public class Encoders {
+    ctor public Encoders();
+    method public java.util.List<media.codecs.MediaCodec> getMediaCodec();
+  }
+
+  public class Feature {
+    ctor public Feature();
+    method public String getName();
+    method public String getOptional();
+    method public String getRequired();
+    method public String getValue();
+    method public void setName(String);
+    method public void setOptional(String);
+    method public void setRequired(String);
+    method public void setValue(String);
+  }
+
+  public class Limit {
+    ctor public Limit();
+    method public String getIn();
+    method public String getMax();
+    method public String getMin();
+    method public String getName();
+    method public String getRange();
+    method public String getRanges();
+    method public String getScale();
+    method public String getValue();
+    method public String get_default();
+    method public void setIn(String);
+    method public void setMax(String);
+    method public void setMin(String);
+    method public void setName(String);
+    method public void setRange(String);
+    method public void setRanges(String);
+    method public void setScale(String);
+    method public void setValue(String);
+    method public void set_default(String);
+  }
+
+  public class MediaCodec {
+    ctor public MediaCodec();
+    method public java.util.List<media.codecs.Feature> getFeature();
+    method public java.util.List<media.codecs.Limit> getLimit();
+    method public String getName();
+    method public java.util.List<media.codecs.Quirk> getQuirk();
+    method public java.util.List<media.codecs.Type> getType();
+    method public String getType();
+    method public String getUpdate();
+    method public void setName(String);
+    method public void setType(String);
+    method public void setUpdate(String);
+  }
+
+  public class MediaCodecs {
+    ctor public MediaCodecs();
+    method public java.util.List<media.codecs.Decoders> getDecoders();
+    method public java.util.List<media.codecs.Encoders> getEncoders();
+    method public java.util.List<media.codecs.Settings> getSettings();
+  }
+
+  public class Quirk {
+    ctor public Quirk();
+    method public String getName();
+    method public void setName(String);
+  }
+
+  public class Setting {
+    ctor public Setting();
+    method public String getName();
+    method public String getUpdate();
+    method public String getValue();
+    method public void setName(String);
+    method public void setUpdate(String);
+    method public void setValue(String);
+  }
+
+  public class Settings {
+    ctor public Settings();
+    method public java.util.List<media.codecs.Setting> getSetting();
+  }
+
+  public class Type {
+    ctor public Type();
+    method public java.util.List<media.codecs.Feature> getFeature();
+    method public java.util.List<media.codecs.Limit> getLimit();
+    method public String getName();
+    method public String getUpdate();
+    method public void setName(String);
+    method public void setUpdate(String);
+  }
+
+  public class XmlParser {
+    ctor public XmlParser();
+    method public static media.codecs.MediaCodecs read(java.io.InputStream) throws javax.xml.datatype.DatatypeConfigurationException, java.io.IOException, org.xmlpull.v1.XmlPullParserException;
+    method public static String readText(org.xmlpull.v1.XmlPullParser) throws java.io.IOException, org.xmlpull.v1.XmlPullParserException;
+    method public static void skip(org.xmlpull.v1.XmlPullParser) throws java.io.IOException, org.xmlpull.v1.XmlPullParserException;
+  }
+
+}
+
