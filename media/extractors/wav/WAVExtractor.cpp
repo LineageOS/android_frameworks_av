@@ -81,7 +81,7 @@ struct WAVSource : public MediaTrackHelper {
     virtual media_status_t read(
             MediaBufferHelper **buffer, const ReadOptions *options = NULL);
 
-    bool supportsNonBlockingRead() override { return true; }
+    bool supportsNonBlockingRead() override { return false; }
 
 protected:
     virtual ~WAVSource();
