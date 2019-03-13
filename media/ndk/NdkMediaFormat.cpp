@@ -371,6 +371,7 @@ EXPORT const char* AMEDIAFORMAT_KEY_TEMPORAL_LAYER_COUNT = "temporal-layer-count
 EXPORT const char* AMEDIAFORMAT_KEY_TEMPORAL_LAYER_ID = "temporal-layer-id";
 EXPORT const char* AMEDIAFORMAT_KEY_TEMPORAL_LAYERING = "ts-schema";
 EXPORT const char* AMEDIAFORMAT_KEY_TEXT_FORMAT_DATA = "text-format-data";
+EXPORT const char* AMEDIAFORMAT_KEY_THUMBNAIL_CSD_HEVC = "thumbnail-csd-hevc";
 EXPORT const char* AMEDIAFORMAT_KEY_THUMBNAIL_HEIGHT = "thumbnail-height";
 EXPORT const char* AMEDIAFORMAT_KEY_THUMBNAIL_TIME = "thumbnail-time";
 EXPORT const char* AMEDIAFORMAT_KEY_THUMBNAIL_WIDTH = "thumbnail-width";
