@@ -1317,69 +1317,84 @@ IA_ERRORCODE C2SoftXaacDec::decodeXAACStream(uint8_t* inBuffer,
                                 &ui_exec_done);
     RETURN_IF_FATAL(err_code,  "IA_CMD_TYPE_DONE_QUERY");
 
-    if (ui_exec_done != 1) {
-        VOID* p_array;        // ITTIAM:buffer to handle gain payload
-        WORD32 buf_size = 0;  // ITTIAM:gain payload length
-        WORD32 bit_str_fmt = 1;
-        WORD32 gain_stream_flag = 1;
-
-        err_code = ixheaacd_dec_api(mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
-                                    IA_ENHAACPLUS_DEC_CONFIG_GAIN_PAYLOAD_LEN, &buf_size);
-        RETURN_IF_FATAL(err_code, "IA_ENHAACPLUS_DEC_CONFIG_GAIN_PAYLOAD_LEN");
-
-        err_code = ixheaacd_dec_api(mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
-                                    IA_ENHAACPLUS_DEC_CONFIG_GAIN_PAYLOAD_BUF, &p_array);
-        RETURN_IF_FATAL(err_code, "IA_ENHAACPLUS_DEC_CONFIG_GAIN_PAYLOAD_BUF");
-
-        if (buf_size > 0) {
-            /*Set bitstream_split_format */
-            err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
-                                      IA_DRC_DEC_CONFIG_PARAM_BITS_FORMAT, &bit_str_fmt);
-            RETURN_IF_FATAL(err_code, "IA_DRC_DEC_CONFIG_PARAM_BITS_FORMAT");
-
-            memcpy(mDrcInBuf, p_array, buf_size);
-            /* Set number of bytes to be processed */
-            err_code =
-                ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_INPUT_BYTES_BS, 0, &buf_size);
-            RETURN_IF_FATAL(err_code, "IA_DRC_DEC_CONFIG_PARAM_BITS_FORMAT");
-
-            err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
-                                      IA_DRC_DEC_CONFIG_GAIN_STREAM_FLAG, &gain_stream_flag);
-            RETURN_IF_FATAL(err_code, "IA_DRC_DEC_CONFIG_PARAM_BITS_FORMAT");
-
-            /* Execute process */
-            err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_INIT,
-                                      IA_CMD_TYPE_INIT_CPY_BSF_BUFF, nullptr);
-            RETURN_IF_FATAL(err_code, "IA_DRC_DEC_CONFIG_PARAM_BITS_FORMAT");
-
-            mMpegDDRCPresent = 1;
-        }
-    }
-
-    /* How much buffer is used in input buffers */
+    int32_t num_preroll = 0;
     err_code = ixheaacd_dec_api(mXheaacCodecHandle,
-                                IA_API_CMD_GET_CURIDX_INPUT_BUF,
-                                0,
-                                bytesConsumed);
-    RETURN_IF_FATAL(err_code,  "IA_API_CMD_GET_CURIDX_INPUT_BUF");
+                                IA_API_CMD_GET_CONFIG_PARAM,
+                                IA_ENHAACPLUS_DEC_CONFIG_GET_NUM_PRE_ROLL_FRAMES,
+                                &num_preroll);
+    RETURN_IF_FATAL(err_code, "IA_ENHAACPLUS_DEC_CONFIG_GET_NUM_PRE_ROLL_FRAMES");
 
-    /* Get the output bytes */
-    err_code = ixheaacd_dec_api(mXheaacCodecHandle,
-                                IA_API_CMD_GET_OUTPUT_BYTES,
-                                0,
-                                outBytes);
-    RETURN_IF_FATAL(err_code,  "IA_API_CMD_GET_OUTPUT_BYTES");
+    {
+      int32_t preroll_frame_offset = 0;
 
-    if (mMpegDDRCPresent == 1) {
-        memcpy(mDrcInBuf, mOutputBuffer, *outBytes);
-        err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_INPUT_BYTES, 0, outBytes);
-        RETURN_IF_FATAL(err_code, "IA_API_CMD_SET_INPUT_BYTES");
+        do {
+            if (ui_exec_done != 1) {
+                VOID* p_array;        // ITTIAM:buffer to handle gain payload
+                WORD32 buf_size = 0;  // ITTIAM:gain payload length
+                WORD32 bit_str_fmt = 1;
+                WORD32 gain_stream_flag = 1;
 
-        err_code =
-            ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_EXECUTE, IA_CMD_TYPE_DO_EXECUTE, nullptr);
-        RETURN_IF_FATAL(err_code, "IA_CMD_TYPE_DO_EXECUTE");
+                err_code = ixheaacd_dec_api(mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
+                                            IA_ENHAACPLUS_DEC_CONFIG_GAIN_PAYLOAD_LEN, &buf_size);
+                RETURN_IF_FATAL(err_code, "IA_ENHAACPLUS_DEC_CONFIG_GAIN_PAYLOAD_LEN");
 
-        memcpy(mOutputBuffer, mDrcOutBuf, *outBytes);
+                err_code = ixheaacd_dec_api(mXheaacCodecHandle, IA_API_CMD_GET_CONFIG_PARAM,
+                                            IA_ENHAACPLUS_DEC_CONFIG_GAIN_PAYLOAD_BUF, &p_array);
+                RETURN_IF_FATAL(err_code, "IA_ENHAACPLUS_DEC_CONFIG_GAIN_PAYLOAD_BUF");
+
+                if (buf_size > 0) {
+                    /*Set bitstream_split_format */
+                    err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+                                            IA_DRC_DEC_CONFIG_PARAM_BITS_FORMAT, &bit_str_fmt);
+                    RETURN_IF_FATAL(err_code, "IA_DRC_DEC_CONFIG_PARAM_BITS_FORMAT");
+
+                    memcpy(mDrcInBuf, p_array, buf_size);
+                    /* Set number of bytes to be processed */
+                    err_code =
+                        ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_INPUT_BYTES_BS, 0, &buf_size);
+                    RETURN_IF_FATAL(err_code, "IA_DRC_DEC_CONFIG_PARAM_BITS_FORMAT");
+
+                    err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_CONFIG_PARAM,
+                                            IA_DRC_DEC_CONFIG_GAIN_STREAM_FLAG, &gain_stream_flag);
+                    RETURN_IF_FATAL(err_code, "IA_DRC_DEC_CONFIG_PARAM_BITS_FORMAT");
+
+                    /* Execute process */
+                    err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_INIT,
+                                            IA_CMD_TYPE_INIT_CPY_BSF_BUFF, nullptr);
+                    RETURN_IF_FATAL(err_code, "IA_DRC_DEC_CONFIG_PARAM_BITS_FORMAT");
+
+                    mMpegDDRCPresent = 1;
+                }
+            }
+
+            /* How much buffer is used in input buffers */
+            err_code = ixheaacd_dec_api(mXheaacCodecHandle,
+                                        IA_API_CMD_GET_CURIDX_INPUT_BUF,
+                                        0,
+                                        bytesConsumed);
+            RETURN_IF_FATAL(err_code,  "IA_API_CMD_GET_CURIDX_INPUT_BUF");
+
+            /* Get the output bytes */
+            err_code = ixheaacd_dec_api(mXheaacCodecHandle,
+                                        IA_API_CMD_GET_OUTPUT_BYTES,
+                                        0,
+                                        outBytes);
+            RETURN_IF_FATAL(err_code,  "IA_API_CMD_GET_OUTPUT_BYTES");
+
+            if (mMpegDDRCPresent == 1) {
+                memcpy(mDrcInBuf, mOutputBuffer + preroll_frame_offset, *outBytes);
+                preroll_frame_offset += *outBytes;
+                err_code = ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_SET_INPUT_BYTES, 0, outBytes);
+                RETURN_IF_FATAL(err_code, "IA_API_CMD_SET_INPUT_BYTES");
+
+                err_code =
+                    ia_drc_dec_api(mMpegDDrcHandle, IA_API_CMD_EXECUTE, IA_CMD_TYPE_DO_EXECUTE, nullptr);
+                RETURN_IF_FATAL(err_code, "IA_CMD_TYPE_DO_EXECUTE");
+
+                memcpy(mOutputBuffer, mDrcOutBuf, *outBytes);
+            }
+            num_preroll--;
+        } while (num_preroll > 0);
     }
     return IA_NO_ERROR;
 }
