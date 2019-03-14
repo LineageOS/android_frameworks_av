@@ -67,7 +67,6 @@ enum {
     kKeyOpusHeader        = 'ohdr',  // raw data
     kKeyOpusCodecDelay    = 'ocod',  // uint64_t (codec delay in ns)
     kKeyOpusSeekPreRoll   = 'ospr',  // uint64_t (seek preroll in ns)
-    kKeyFlacMetadata      = 'flMd',  // raw data
     kKeyVp9CodecPrivate   = 'vp9p',  // raw data (vp9 csd information)
     kKeyIsSyncFrame       = 'sync',  // int32_t (bool)
     kKeyIsCodecConfig     = 'conf',  // int32_t (bool)
@@ -234,6 +233,11 @@ enum {
 
     // AC-4 AudioPresentationInfo
     kKeyAudioPresentationInfo = 'audP',  // raw data
+
+    // opaque codec specific data being passed from extractor to codec
+    kKeyOpaqueCSD0       = 'csd0',
+    kKeyOpaqueCSD1       = 'csd1',
+    kKeyOpaqueCSD2       = 'csd2',
 };
 
 enum {
