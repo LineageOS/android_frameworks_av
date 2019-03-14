@@ -356,6 +356,27 @@ public:
                     return hasAudioSession_l(sessionId);
                 }
 
+                template <typename T>
+                uint32_t hasAudioSession_l(audio_session_t sessionId, const T& tracks) const {
+                    uint32_t result = 0;
+                    if (getEffectChain_l(sessionId) != 0) {
+                        result = EFFECT_SESSION;
+                    }
+                    for (size_t i = 0; i < tracks.size(); ++i) {
+                        const sp<TrackBase>& track = tracks[i];
+                        if (sessionId == track->sessionId()
+                                && !track->isInvalid()       // not yet removed from tracks.
+                                && !track->isTerminated()) {
+                            result |= TRACK_SESSION;
+                            if (track->isFastTrack()) {
+                                result |= FAST_SESSION;  // caution, only represents first track.
+                            }
+                            break;
+                        }
+                    }
+                    return result;
+                }
+
                 // the value returned by default implementation is not important as the
                 // strategy is only meaningful for PlaybackThread which implements this method
                 virtual uint32_t getStrategyForSession_l(audio_session_t sessionId __unused)
@@ -810,7 +831,9 @@ public:
 
                 virtual status_t addEffectChain_l(const sp<EffectChain>& chain);
                 virtual size_t removeEffectChain_l(const sp<EffectChain>& chain);
-                virtual uint32_t hasAudioSession_l(audio_session_t sessionId) const;
+                        uint32_t hasAudioSession_l(audio_session_t sessionId) const override {
+                            return ThreadBase::hasAudioSession_l(sessionId, mTracks);
+                        }
                 virtual uint32_t getStrategyForSession_l(audio_session_t sessionId);
 
 
@@ -1550,7 +1573,9 @@ public:
 
     virtual status_t addEffectChain_l(const sp<EffectChain>& chain);
     virtual size_t removeEffectChain_l(const sp<EffectChain>& chain);
-    virtual uint32_t hasAudioSession_l(audio_session_t sessionId) const;
+            uint32_t hasAudioSession_l(audio_session_t sessionId) const override {
+                         return ThreadBase::hasAudioSession_l(sessionId, mTracks);
+                     }
 
             // Return the set of unique session IDs across all tracks.
             // The keys are the session IDs, and the associated values are meaningless.
@@ -1725,7 +1750,10 @@ class MmapThread : public ThreadBase
     virtual     status_t    checkEffectCompatibility_l(const effect_descriptor_t *desc,
                                                                audio_session_t sessionId);
 
-    virtual     uint32_t    hasAudioSession_l(audio_session_t sessionId) const;
+                uint32_t    hasAudioSession_l(audio_session_t sessionId) const override {
+                                // Note: using mActiveTracks as no mTracks here.
+                                return ThreadBase::hasAudioSession_l(sessionId, mActiveTracks);
+                            }
     virtual     status_t    setSyncEvent(const sp<SyncEvent>& event);
     virtual     bool        isValidSyncEvent(const sp<SyncEvent>& event) const;
 
