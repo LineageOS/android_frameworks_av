@@ -21,6 +21,7 @@
 
 #include "NdkImagePriv.h"
 #include "NdkImageReaderPriv.h"
+#include <private/media/NdkImage.h>
 
 #include <cutils/atomic.h>
 #include <utils/Log.h>
@@ -63,6 +64,7 @@ AImageReader::isSupportedFormatAndUsage(int32_t format, uint64_t usage) {
         case AIMAGE_FORMAT_YUV_420_888:
         case AIMAGE_FORMAT_JPEG:
         case AIMAGE_FORMAT_RAW16:
+        case AIMAGE_FORMAT_RAW_DEPTH:
         case AIMAGE_FORMAT_RAW_PRIVATE:
         case AIMAGE_FORMAT_RAW10:
         case AIMAGE_FORMAT_RAW12:
@@ -92,6 +94,7 @@ AImageReader::getNumPlanesForFormat(int32_t format) {
         case AIMAGE_FORMAT_RGBA_FP16:
         case AIMAGE_FORMAT_JPEG:
         case AIMAGE_FORMAT_RAW16:
+        case AIMAGE_FORMAT_RAW_DEPTH:
         case AIMAGE_FORMAT_RAW_PRIVATE:
         case AIMAGE_FORMAT_RAW10:
         case AIMAGE_FORMAT_RAW12:
