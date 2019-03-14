@@ -12,13 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-python_binary_host {
-    name: "buildPolicyCriterionTypes.py",
-    owner: "renault",
-    main: "buildPolicyCriterionTypes.py",
-    srcs: [
-        "buildPolicyCriterionTypes.py",
-    ],
+python_defaults {
+    name: "tools_default",
     version: {
         py2: {
             enabled: true,
@@ -29,3 +24,37 @@ python_binary_host {
     },
 }
 
+python_binary_host {
+    name: "buildPolicyCriterionTypes.py",
+    main: "buildPolicyCriterionTypes.py",
+    srcs: [
+        "buildPolicyCriterionTypes.py",
+    ],
+    defaults: ["tools_default"],
+}
+
+python_binary_host {
+    name: "domainGeneratorPolicy.py",
+    main: "domainGeneratorPolicy.py",
+    srcs: [
+        "domainGeneratorPolicy.py",
+    ],
+    defaults: ["tools_default"],
+    libs: [
+        "EddParser.py",
+        "hostConfig.py",
+        "PFWScriptGenerator.py",
+    ],
+    required: [
+        "domainGeneratorConnector",
+    ],
+}
+
+python_binary_host {
+    name: "buildStrategiesStructureFile.py",
+    main: "buildStrategiesStructureFile.py",
+    srcs: [
+        "buildStrategiesStructureFile.py",
+    ],
+    defaults: ["tools_default"],
+}

@@ -7,7 +7,7 @@
 #
 ################################################################################################
 
-ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), automotive_configurable)
+ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), caremu_configurable)
 LOCAL_PATH := $(call my-dir)
 
 PFW_CORE := external/parameter-framework
@@ -55,4 +55,4 @@ PFW_SCHEMAS_DIR := $(PFW_DEFAULT_SCHEMAS_DIR)
 
 include $(BUILD_PFW_SETTINGS)
 
-endif #ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), automotive_configurable)
+endif #ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION), caremu_configurable)

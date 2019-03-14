@@ -30,12 +30,12 @@ supDomain: DeviceForProductStrategies
 					proxy = 0
 					usb_headset = 0
 					stub = 0
-				/Policy/policy/product_strategies/oem_traffic_anouncement/device_address = BUS08_OEM1
+				/Policy/policy/product_strategies/oem_traffic_anouncement/device_address = BUS00_MEDIA
 
 		domain: SelectedDevice
 			conf: Bus
 				AvailableOutputDevices Includes Bus
-				AvailableOutputDevicesAddresses Includes BUS08_OEM1
+				AvailableOutputDevicesAddresses Includes BUS00_MEDIA
 
 				component: /Policy/policy/product_strategies/oem_traffic_anouncement/selected_output_devices/mask
 					bus = 1
@@ -75,12 +75,12 @@ supDomain: DeviceForProductStrategies
 					proxy = 0
 					usb_headset = 0
 					stub = 0
-				/Policy/policy/product_strategies/oem_strategy_1/device_address = BUS08_OEM1
+				/Policy/policy/product_strategies/oem_strategy_1/device_address = BUS02_OEM1
 
 		domain: SelectedDevice
 			conf: Bus
 				AvailableOutputDevices Includes Bus
-				AvailableOutputDevicesAddresses Includes BUS08_OEM1
+				AvailableOutputDevicesAddresses Includes BUS02_OEM1
 
 				component: /Policy/policy/product_strategies/oem_strategy_1/selected_output_devices/mask
 					bus = 1
@@ -122,12 +122,12 @@ supDomain: DeviceForProductStrategies
 					proxy = 0
 					usb_headset = 0
 					stub = 0
-				/Policy/policy/product_strategies/oem_strategy_2/device_address = BUS08_OEM1
+				/Policy/policy/product_strategies/oem_strategy_2/device_address = BUS01_NAV_GUIDANCE
 
 		domain: SelectedDevice
 			conf: Bus
 				AvailableOutputDevices Includes Bus
-				AvailableOutputDevicesAddresses Includes BUS08_OEM1
+				AvailableOutputDevicesAddresses Includes BUS01_NAV_GUIDANCE
 
 				component: /Policy/policy/product_strategies/oem_strategy_2/selected_output_devices/mask
 					bus = 1
@@ -143,6 +143,7 @@ supDomain: DeviceForProductStrategies
 			conf: calibration
 				component: /Policy/policy/product_strategies/radio/selected_output_devices/mask
 					earpiece = 0
+					speaker = 0
 					wired_headset = 0
 					wired_headphone = 0
 					bluetooth_sco = 0
@@ -168,26 +169,18 @@ supDomain: DeviceForProductStrategies
 					proxy = 0
 					usb_headset = 0
 					stub = 0
-				/Policy/policy/product_strategies/radio/device_address = BUS09_OEM2
+				/Policy/policy/product_strategies/radio/device_address = BUS00_MEDIA
 
 		domain: SelectedDevice
 			conf: Bus
 				AvailableOutputDevices Includes Bus
-				AvailableOutputDevicesAddresses Includes BUS09_OEM2
+				AvailableOutputDevicesAddresses Includes BUS00_MEDIA
 
 				component: /Policy/policy/product_strategies/radio/selected_output_devices/mask
-					speaker = 0
 					bus = 1
-
-			conf: Speaker
-				AvailableOutputDevices Includes Speaker
-				component: /Policy/policy/product_strategies/radio/selected_output_devices/mask
-					speaker = 1
-					bus = 0
 
 			conf: Default
 				component: /Policy/policy/product_strategies/radio/selected_output_devices/mask
-					speaker = 0
 					bus = 0
 
 	supDomain: ExtAudioSource
@@ -221,12 +214,12 @@ supDomain: DeviceForProductStrategies
 					proxy = 0
 					usb_headset = 0
 					stub = 0
-				/Policy/policy/product_strategies/ext_audio_source/device_address = BUS09_OEM2
+				/Policy/policy/product_strategies/ext_audio_source/device_address = BUS00_MEDIA
 
 		domain: SelectedDevice
 			conf: Bus
 				AvailableOutputDevices Includes Bus
-				AvailableOutputDevicesAddresses Includes BUS09_OEM2
+				AvailableOutputDevicesAddresses Includes BUS00_MEDIA
 
 				component: /Policy/policy/product_strategies/ext_audio_source/selected_output_devices/mask
 					bus = 1
@@ -242,6 +235,7 @@ supDomain: DeviceForProductStrategies
 			conf: calibration
 				component: /Policy/policy/product_strategies/voice_command/selected_output_devices/mask
 					earpiece = 0
+					speaker = 0
 					wired_headset = 0
 					wired_headphone = 0
 					bluetooth_sco = 0
@@ -267,26 +261,18 @@ supDomain: DeviceForProductStrategies
 					proxy = 0
 					usb_headset = 0
 					stub = 0
-				/Policy/policy/product_strategies/voice_command/device_address = BUS02_VOICE_COMMAND
+				/Policy/policy/product_strategies/voice_command/device_address = BUS04_VOICE
 
 		domain: SelectedDevice
 			conf: Bus
 				AvailableOutputDevices Includes Bus
-				AvailableOutputDevicesAddresses Includes BUS02_VOICE_COMMAND
+				AvailableOutputDevicesAddresses Includes BUS04_VOICE
 
 				component: /Policy/policy/product_strategies/voice_command/selected_output_devices/mask
-					speaker = 0
 					bus = 1
-
-			conf: Speaker
-				AvailableOutputDevices Includes Speaker
-				component: /Policy/policy/product_strategies/voice_command/selected_output_devices/mask
-					speaker = 1
-					bus = 0
 
 			conf: Default
 				component: /Policy/policy/product_strategies/voice_command/selected_output_devices/mask
-					speaker = 0
 					bus = 0
 
 
@@ -295,6 +281,7 @@ supDomain: DeviceForProductStrategies
 			conf: calibration
 				component: /Policy/policy/product_strategies/safety_alert/selected_output_devices/mask
 					earpiece = 0
+					speaker = 0
 					wired_headset = 0
 					wired_headphone = 0
 					bluetooth_sco = 0
@@ -328,18 +315,10 @@ supDomain: DeviceForProductStrategies
 				AvailableOutputDevicesAddresses Includes BUS00_MEDIA
 
 				component: /Policy/policy/product_strategies/safety_alert/selected_output_devices/mask
-					speaker = 0
 					bus = 1
-
-			conf: Speaker
-				AvailableOutputDevices Includes Speaker
-				component: /Policy/policy/product_strategies/safety_alert/selected_output_devices/mask
-					speaker = 1
-					bus = 0
 
 			conf: Default
 				component: /Policy/policy/product_strategies/safety_alert/selected_output_devices/mask
-					speaker = 0
 					bus = 0
 
 
@@ -348,6 +327,7 @@ supDomain: DeviceForProductStrategies
 			conf: calibration
 				component: /Policy/policy/product_strategies/music/selected_output_devices/mask
 					earpiece = 0
+					speaker = 0
 					wired_headset = 0
 					wired_headphone = 0
 					bluetooth_sco = 0
@@ -381,18 +361,10 @@ supDomain: DeviceForProductStrategies
 				AvailableOutputDevicesAddresses Includes BUS00_MEDIA
 
 				component: /Policy/policy/product_strategies/music/selected_output_devices/mask
-					speaker = 0
 					bus = 1
-
-			conf: Speaker
-				AvailableOutputDevices Includes Speaker
-				component: /Policy/policy/product_strategies/music/selected_output_devices/mask
-					speaker = 1
-					bus = 0
 
 			conf: Default
 				component: /Policy/policy/product_strategies/music/selected_output_devices/mask
-					speaker = 0
 					bus = 0
 
 
@@ -402,6 +374,7 @@ supDomain: DeviceForProductStrategies
 			conf: calibration
 				component: /Policy/policy/product_strategies/nav_guidance/selected_output_devices/mask
 					earpiece = 0
+					speaker = 0
 					wired_headset = 0
 					wired_headphone = 0
 					bluetooth_sco = 0
@@ -435,18 +408,10 @@ supDomain: DeviceForProductStrategies
 				AvailableOutputDevicesAddresses Includes BUS01_NAV_GUIDANCE
 
 				component: /Policy/policy/product_strategies/nav_guidance/selected_output_devices/mask
-					speaker = 0
 					bus = 1
-
-			conf: Speaker
-				AvailableOutputDevices Includes Speaker
-				component: /Policy/policy/product_strategies/nav_guidance/selected_output_devices/mask
-					speaker = 1
-					bus = 0
 
 			conf: Default
 				component: /Policy/policy/product_strategies/nav_guidance/selected_output_devices/mask
-					speaker = 0
 					bus = 0
 
 
@@ -455,6 +420,7 @@ supDomain: DeviceForProductStrategies
 			conf: calibration
 				component: /Policy/policy/product_strategies/voice_call/selected_output_devices/mask
 					earpiece = 0
+					speaker = 0
 					wired_headset = 0
 					wired_headphone = 0
 					bluetooth_sco = 0
@@ -480,26 +446,18 @@ supDomain: DeviceForProductStrategies
 					proxy = 0
 					usb_headset = 0
 					stub = 0
-				/Policy/policy/product_strategies/voice_call/device_address = BUS04_CALL
+				/Policy/policy/product_strategies/voice_call/device_address = BUS04_VOICE
 
 		domain: SelectedDevice
 			conf: Bus
 				AvailableOutputDevices Includes Bus
-				AvailableOutputDevicesAddresses Includes BUS04_CALL
+				AvailableOutputDevicesAddresses Includes BUS04_VOICE
 
 				component: /Policy/policy/product_strategies/voice_call/selected_output_devices/mask
-					speaker = 0
 					bus = 1
-
-			conf: Speaker
-				AvailableOutputDevices Includes Speaker
-				component: /Policy/policy/product_strategies/voice_call/selected_output_devices/mask
-					speaker = 1
-					bus = 0
 
 			conf: Default
 				component: /Policy/policy/product_strategies/voice_call/selected_output_devices/mask
-					speaker = 0
 					bus = 0
 
 
@@ -508,6 +466,7 @@ supDomain: DeviceForProductStrategies
 			conf: calibration
 				component: /Policy/policy/product_strategies/alarm/selected_output_devices/mask
 					earpiece = 0
+					speaker = 0
 					wired_headset = 0
 					wired_headphone = 0
 					bluetooth_sco = 0
@@ -533,26 +492,18 @@ supDomain: DeviceForProductStrategies
 					proxy = 0
 					usb_headset = 0
 					stub = 0
-				/Policy/policy/product_strategies/alarm/device_address = BUS05_ALARM
+				/Policy/policy/product_strategies/alarm/device_address = BUS00_MEDIA
 
 		domain: SelectedDevice
 			conf: Bus
 				AvailableOutputDevices Includes Bus
-				AvailableOutputDevicesAddresses Includes BUS05_ALARM
+				AvailableOutputDevicesAddresses Includes BUS00_MEDIA
 
 				component: /Policy/policy/product_strategies/alarm/selected_output_devices/mask
-					speaker = 0
 					bus = 1
-
-			conf: Speaker
-				AvailableOutputDevices Includes Speaker
-				component: /Policy/policy/product_strategies/alarm/selected_output_devices/mask
-					speaker = 1
-					bus = 0
 
 			conf: Default
 				component: /Policy/policy/product_strategies/alarm/selected_output_devices/mask
-					speaker = 0
 					bus = 0
 
 
@@ -561,6 +512,7 @@ supDomain: DeviceForProductStrategies
 			conf: calibration
 				component: /Policy/policy/product_strategies/ring/selected_output_devices/mask
 					earpiece = 0
+					speaker = 0
 					wired_headset = 0
 					wired_headphone = 0
 					bluetooth_sco = 0
@@ -586,26 +538,18 @@ supDomain: DeviceForProductStrategies
 					proxy = 0
 					usb_headset = 0
 					stub = 0
-				/Policy/policy/product_strategies/ring/device_address = BUS03_CALL_RING
+				/Policy/policy/product_strategies/ring/device_address = BUS04_VOICE
 
 		domain: SelectedDevice
 			conf: Bus
 				AvailableOutputDevices Includes Bus
-				AvailableOutputDevicesAddresses Includes BUS03_CALL_RING
+				AvailableOutputDevicesAddresses Includes BUS04_VOICE
 
 				component: /Policy/policy/product_strategies/ring/selected_output_devices/mask
-					speaker = 0
 					bus = 1
-
-			conf: Speaker
-				AvailableOutputDevices Includes Speaker
-				component: /Policy/policy/product_strategies/ring/selected_output_devices/mask
-					speaker = 1
-					bus = 0
 
 			conf: Default
 				component: /Policy/policy/product_strategies/ring/selected_output_devices/mask
-					speaker = 0
 					bus = 0
 
 
@@ -614,6 +558,7 @@ supDomain: DeviceForProductStrategies
 			conf: calibration
 				component: /Policy/policy/product_strategies/notification/selected_output_devices/mask
 					earpiece = 0
+					speaker = 0
 					wired_headset = 0
 					wired_headphone = 0
 					bluetooth_sco = 0
@@ -639,26 +584,18 @@ supDomain: DeviceForProductStrategies
 					proxy = 0
 					usb_headset = 0
 					stub = 0
-				/Policy/policy/product_strategies/notification/device_address = BUS06_NOTIFICATION
+				/Policy/policy/product_strategies/notification/device_address = BUS00_MEDIA
 
 		domain: SelectedDevice
 			conf: Bus
 				AvailableOutputDevices Includes Bus
-				AvailableOutputDevicesAddresses Includes BUS06_NOTIFICATION
+				AvailableOutputDevicesAddresses Includes BUS00_MEDIA
 
 				component: /Policy/policy/product_strategies/notification/selected_output_devices/mask
-					speaker = 0
 					bus = 1
-
-			conf: Speaker
-				AvailableOutputDevices Includes Speaker
-				component: /Policy/policy/product_strategies/notification/selected_output_devices/mask
-					speaker = 1
-					bus = 0
 
 			conf: Default
 				component: /Policy/policy/product_strategies/notification/selected_output_devices/mask
-					speaker = 0
 					bus = 0
 
 
@@ -667,6 +604,7 @@ supDomain: DeviceForProductStrategies
 			conf: calibration
 				component: /Policy/policy/product_strategies/system/selected_output_devices/mask
 					earpiece = 0
+					speaker = 0
 					wired_headset = 0
 					wired_headphone = 0
 					bluetooth_sco = 0
@@ -692,26 +630,18 @@ supDomain: DeviceForProductStrategies
 					proxy = 0
 					usb_headset = 0
 					stub = 0
-				/Policy/policy/product_strategies/system/device_address = BUS07_SYSTEM_SOUND
+				/Policy/policy/product_strategies/system/device_address = BUS03_SYSTEM_SOUND
 
 		domain: SelectedDevice
 			conf: Bus
 				AvailableOutputDevices Includes Bus
-				AvailableOutputDevicesAddresses Includes BUS07_SYSTEM_SOUND
+				AvailableOutputDevicesAddresses Includes BUS03_SYSTEM_SOUND
 
 				component: /Policy/policy/product_strategies/system/selected_output_devices/mask
-					speaker = 0
 					bus = 1
-
-			conf: Speaker
-				AvailableOutputDevices Includes Speaker
-				component: /Policy/policy/product_strategies/system/selected_output_devices/mask
-					speaker = 1
-					bus = 0
 
 			conf: Default
 				component: /Policy/policy/product_strategies/system/selected_output_devices/mask
-					speaker = 0
 					bus = 0
 
 	supDomain: Tts
@@ -746,7 +676,7 @@ supDomain: DeviceForProductStrategies
 					usb_headset = 0
 					stub = 0
 				/Policy/policy/product_strategies/tts/device_address = BUS00_MEDIA
-
+ 
 		domain: SelectedDevice
 			conf: Bus
 				AvailableOutputDevices Includes Bus
