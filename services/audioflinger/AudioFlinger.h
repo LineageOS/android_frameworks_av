@@ -558,6 +558,26 @@ using effect_buffer_t = int16_t;
 
 #include "PatchPanel.h"
 
+    // Find io handle by session id.
+    // Preference is given to an io handle with a matching effect chain to session id.
+    // If none found, AUDIO_IO_HANDLE_NONE is returned.
+    template <typename T>
+    static audio_io_handle_t findIoHandleBySessionId_l(
+            audio_session_t sessionId, const T& threads) {
+        audio_io_handle_t io = AUDIO_IO_HANDLE_NONE;
+
+        for (size_t i = 0; i < threads.size(); i++) {
+            const uint32_t sessionType = threads.valueAt(i)->hasAudioSession(sessionId);
+            if (sessionType != 0) {
+                io = threads.keyAt(i);
+                if ((sessionType & AudioFlinger::ThreadBase::EFFECT_SESSION) != 0) {
+                    break; // effect chain here.
+                }
+            }
+        }
+        return io;
+    }
+
     // server side of the client's IAudioTrack
     class TrackHandle : public android::BnAudioTrack {
     public:
