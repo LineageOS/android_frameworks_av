@@ -405,7 +405,8 @@ public:
      * routingDelegates: backed-up routing delegates
      *
      */
-    void registerRoutingDelegates(Vector<std::pair<jobject, jobject>>& routingDelegates);
+    void registerRoutingDelegates(
+            Vector<std::pair<sp<JObjectHolder>, sp<JObjectHolder>>>& routingDelegates);
 
     /* get listener from RoutingDelegate object
      */
@@ -422,13 +423,15 @@ public:
      * Returns value if key is in the map
      *         nullptr if key is not in the map
      */
-    static jobject findByKey(Vector<std::pair<jobject, jobject>>& mp, const jobject key);
+    static jobject findByKey(
+            Vector<std::pair<sp<JObjectHolder>, sp<JObjectHolder>>>& mp, const jobject key);
 
     /*
      * Parameters:
      * map and key
      */
-    static void eraseByKey(Vector<std::pair<jobject, jobject>>& mp, const jobject key);
+    static void eraseByKey(
+            Vector<std::pair<sp<JObjectHolder>, sp<JObjectHolder>>>& mp, const jobject key);
 
 private:
     audio_output_flags_t mFlags;
