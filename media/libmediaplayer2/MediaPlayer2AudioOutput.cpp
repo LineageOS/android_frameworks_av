@@ -521,15 +521,18 @@ jobject MediaPlayer2AudioOutput::getRoutedDevice() {
 status_t MediaPlayer2AudioOutput::addAudioDeviceCallback(jobject jRoutingDelegate) {
     ALOGV("addAudioDeviceCallback");
     Mutex::Autolock lock(mLock);
-    jobject listener = (new JObjectHolder(
-            JAudioTrack::getListener(jRoutingDelegate)))->getJObject();
+    jobject listener = JAudioTrack::getListener(jRoutingDelegate);
     if (JAudioTrack::findByKey(mRoutingDelegates, listener) == nullptr) {
-        jobject handler = (new JObjectHolder(
-                JAudioTrack::getHandler(jRoutingDelegate)))->getJObject();
-        jobject routingDelegate = (new JObjectHolder(jRoutingDelegate))->getJObject();
-        mRoutingDelegates.push_back(std::pair<jobject, jobject>(listener, routingDelegate));
+        sp<JObjectHolder> listenerHolder = new JObjectHolder(listener);
+        jobject handler = JAudioTrack::getHandler(jRoutingDelegate);
+        sp<JObjectHolder> routingDelegateHolder = new JObjectHolder(jRoutingDelegate);
+
+        mRoutingDelegates.push_back(std::pair<sp<JObjectHolder>, sp<JObjectHolder>>(
+                listenerHolder, routingDelegateHolder));
+
         if (mJAudioTrack != nullptr) {
-            return mJAudioTrack->addAudioDeviceCallback(routingDelegate, handler);
+            return mJAudioTrack->addAudioDeviceCallback(
+                    routingDelegateHolder->getJObject(), handler);
         }
     }
     return NO_ERROR;
