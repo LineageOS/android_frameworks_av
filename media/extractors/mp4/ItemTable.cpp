@@ -1540,7 +1540,8 @@ AMediaFormat *ItemTable::getImageMeta(const uint32_t imageIndex) {
                 AMediaFormat_setInt32(meta,
                         AMEDIAFORMAT_KEY_THUMBNAIL_HEIGHT, thumbnail.height);
                 AMediaFormat_setBuffer(meta,
-                        AMEDIAFORMAT_KEY_CSD_HEVC, thumbnail.hvcc->data(), thumbnail.hvcc->size());
+                        AMEDIAFORMAT_KEY_THUMBNAIL_CSD_HEVC,
+                        thumbnail.hvcc->data(), thumbnail.hvcc->size());
                 ALOGV("image[%u]: thumbnail: size %dx%d, item index %zd",
                         imageIndex, thumbnail.width, thumbnail.height, thumbItemIndex);
             } else {
