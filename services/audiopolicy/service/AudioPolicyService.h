@@ -753,13 +753,17 @@ private:
                 AudioRecordClient(const audio_attributes_t attributes,
                           const audio_io_handle_t io, uid_t uid, pid_t pid,
                           const audio_session_t session, const audio_port_handle_t deviceId,
-                          const String16& opPackageName) :
+                          const String16& opPackageName,
+                          bool canCaptureOutput, bool canCaptureHotword) :
                     AudioClient(attributes, io, uid, pid, session, deviceId),
-                    opPackageName(opPackageName), startTimeNs(0) {}
+                    opPackageName(opPackageName), startTimeNs(0),
+                    canCaptureOutput(canCaptureOutput), canCaptureHotword(canCaptureHotword) {}
                 ~AudioRecordClient() override = default;
 
         const String16 opPackageName;        // client package name
         nsecs_t startTimeNs;
+        const bool canCaptureOutput;
+        const bool canCaptureHotword;
     };
 
     // --- AudioPlaybackClient ---
