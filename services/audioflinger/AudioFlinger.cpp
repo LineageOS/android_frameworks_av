@@ -224,6 +224,14 @@ AudioFlinger::~AudioFlinger()
         // closeOutput_nonvirtual() will remove specified entry from mPlaybackThreads
         closeOutput_nonvirtual(mPlaybackThreads.keyAt(0));
     }
+    while (!mMmapThreads.isEmpty()) {
+        const audio_io_handle_t io = mMmapThreads.keyAt(0);
+        if (mMmapThreads.valueAt(0)->isOutput()) {
+            closeOutput_nonvirtual(io); // removes entry from mMmapThreads
+        } else {
+            closeInput_nonvirtual(io);  // removes entry from mMmapThreads
+        }
+    }
 
     for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
         // no mHardwareLock needed, as there are no other references to this
