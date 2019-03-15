@@ -8747,8 +8747,10 @@ bool AudioFlinger::MmapThread::threadLoop()
 
     while (!exitPending())
     {
-        Mutex::Autolock _l(mLock);
         Vector< sp<EffectChain> > effectChains;
+
+        { // under Thread lock
+        Mutex::Autolock _l(mLock);
 
         if (mSignalPending) {
             // A signal was raised while we were unlocked
@@ -8784,10 +8786,13 @@ bool AudioFlinger::MmapThread::threadLoop()
         updateMetadata_l();
 
         lockEffectChains_l(effectChains);
+        } // release Thread lock
+
         for (size_t i = 0; i < effectChains.size(); i ++) {
-            effectChains[i]->process_l();
+            effectChains[i]->process_l(); // Thread is not locked, but effect chain is locked
         }
-        // enable changes in effect chain
+
+        // enable changes in effect chain, including moving to another thread.
         unlockEffectChains(effectChains);
         // Effect chains will be actually deleted here if they were removed from
         // mEffectChains list during mixing or effects processing
