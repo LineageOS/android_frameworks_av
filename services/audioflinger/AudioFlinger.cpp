@@ -3297,7 +3297,8 @@ sp<IEffect> AudioFlinger::createEffect(
         // output threads.
         // If output is 0 here, sessionId is neither SESSION_OUTPUT_STAGE nor SESSION_OUTPUT_MIX
         // because of code checking output when entering the function.
-        // Note: io is never 0 when creating an effect on an input
+        // Note: io is never AUDIO_IO_HANDLE_NONE when creating an effect on an input by APM.
+        // An AudioEffect created from the Java API will have io as AUDIO_IO_HANDLE_NONE.
         if (io == AUDIO_IO_HANDLE_NONE) {
             // look for the thread where the specified audio session is present
             io = findIoHandleBySessionId_l(sessionId, mPlaybackThreads);
@@ -3307,6 +3308,25 @@ sp<IEffect> AudioFlinger::createEffect(
             if (io == AUDIO_IO_HANDLE_NONE) {
                 io = findIoHandleBySessionId_l(sessionId, mMmapThreads);
             }
+
+            // If you wish to create a Record preprocessing AudioEffect in Java,
+            // you MUST create an AudioRecord first and keep it alive so it is picked up above.
+            // Otherwise it will fail when created on a Playback thread by legacy
+            // handling below.  Ditto with Mmap, the associated Mmap track must be created
+            // before creating the AudioEffect or the io handle must be specified.
+            //
+            // Detect if the effect is created after an AudioRecord is destroyed.
+            if (getOrphanEffectChain_l(sessionId).get() != nullptr) {
+                ALOGE("%s: effect %s with no specified io handle is denied because the AudioRecord"
+                        " for session %d no longer exists",
+                         __func__, desc.name, sessionId);
+                lStatus = PERMISSION_DENIED;
+                goto Exit;
+            }
+
+            // Legacy handling of creating an effect on an expired or made-up
+            // session id.  We think that it is a Playback effect.
+            //
             // If no output thread contains the requested session ID, default to
             // first output. The effect chain will be moved to the correct output
             // thread when a track with the same session ID is created
