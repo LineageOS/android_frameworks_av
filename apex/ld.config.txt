@@ -61,14 +61,15 @@ namespace.platform.isolated = true
 namespace.platform.search.paths = /system/${LIB}
 namespace.platform.asan.search.paths = /data/asan/system/${LIB}
 
-# /system/lib/libc.so, etc are symlinks to /bionic/lib/libc.so, etc.
-# Add /bionic/lib to the permitted paths because linker uses realpath(3)
+# /system/lib/libc.so, etc are symlinks to
+/apex/com.android.lib/lib/bionic/libc.so, etc.
+# Add /apex/... pat to the permitted paths because linker uses realpath(3)
 # to check the accessibility of the lib. We could add this to search.paths
 # instead but that makes the resolution of bionic libs be dependent on
-# the order of /system/lib and /bionic/lib in search.paths. If /bionic/lib
-# is after /system/lib, then /bionic/lib is never tried because libc.so
+# the order of /system/lib and /apex/... in search.paths. If /apex/...
+# is after /system/lib, then /apex/... is never tried because libc.so
 # is always found in /system/lib but fails to pass the accessibility test
 # because of its realpath.  It's better to not depend on the ordering if
 # possible.
-namespace.platform.permitted.paths = /bionic/${LIB}
-namespace.platform.asan.permitted.paths = /bionic/${LIB}
+namespace.platform.permitted.paths = /apex/com.android.runtime/${LIB}/bionic
+namespace.platform.asan.permitted.paths = /apex/com.android.runtime/${LIB}/bionic
