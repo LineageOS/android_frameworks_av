@@ -2788,28 +2788,6 @@ status_t AudioFlinger::PlaybackThread::getRenderPosition(uint32_t *halFrames, ui
     }
 }
 
-// hasAudioSession_l() must be called with ThreadBase::mLock held
-uint32_t AudioFlinger::PlaybackThread::hasAudioSession_l(audio_session_t sessionId) const
-{
-    uint32_t result = 0;
-    if (getEffectChain_l(sessionId) != 0) {
-        result = EFFECT_SESSION;
-    }
-
-    for (size_t i = 0; i < mTracks.size(); ++i) {
-        sp<Track> track = mTracks[i];
-        if (sessionId == track->sessionId() && !track->isInvalid()) {
-            result |= TRACK_SESSION;
-            if (track->isFastTrack()) {
-                result |= FAST_SESSION;
-            }
-            break;
-        }
-    }
-
-    return result;
-}
-
 uint32_t AudioFlinger::PlaybackThread::getStrategyForSession_l(audio_session_t sessionId)
 {
     // session AUDIO_SESSION_OUTPUT_MIX is placed in same strategy as MUSIC stream so that
@@ -8219,27 +8197,6 @@ uint32_t AudioFlinger::RecordThread::getInputFramesLost()
     return 0;
 }
 
-// hasAudioSession_l() must be called with ThreadBase::mLock held
-uint32_t AudioFlinger::RecordThread::hasAudioSession_l(audio_session_t sessionId) const
-{
-    uint32_t result = 0;
-    if (getEffectChain_l(sessionId) != 0) {
-        result = EFFECT_SESSION;
-    }
-
-    for (size_t i = 0; i < mTracks.size(); ++i) {
-        if (sessionId == mTracks[i]->sessionId()) {
-            result |= TRACK_SESSION;
-            if (mTracks[i]->isFastTrack()) {
-                result |= FAST_SESSION;
-            }
-            break;
-        }
-    }
-
-    return result;
-}
-
 KeyedVector<audio_session_t, bool> AudioFlinger::RecordThread::sessionIds() const
 {
     KeyedVector<audio_session_t, bool> ids;
@@ -8747,8 +8704,10 @@ bool AudioFlinger::MmapThread::threadLoop()
 
     while (!exitPending())
     {
-        Mutex::Autolock _l(mLock);
         Vector< sp<EffectChain> > effectChains;
+
+        { // under Thread lock
+        Mutex::Autolock _l(mLock);
 
         if (mSignalPending) {
             // A signal was raised while we were unlocked
@@ -8784,10 +8743,13 @@ bool AudioFlinger::MmapThread::threadLoop()
         updateMetadata_l();
 
         lockEffectChains_l(effectChains);
+        } // release Thread lock
+
         for (size_t i = 0; i < effectChains.size(); i ++) {
-            effectChains[i]->process_l();
+            effectChains[i]->process_l(); // Thread is not locked, but effect chain is locked
         }
-        // enable changes in effect chain
+
+        // enable changes in effect chain, including moving to another thread.
         unlockEffectChains(effectChains);
         // Effect chains will be actually deleted here if they were removed from
         // mEffectChains list during mixing or effects processing
@@ -9046,28 +9008,6 @@ size_t AudioFlinger::MmapThread::removeEffectChain_l(const sp<EffectChain>& chai
         }
     }
     return mEffectChains.size();
-}
-
-// hasAudioSession_l() must be called with ThreadBase::mLock held
-uint32_t AudioFlinger::MmapThread::hasAudioSession_l(audio_session_t sessionId) const
-{
-    uint32_t result = 0;
-    if (getEffectChain_l(sessionId) != 0) {
-        result = EFFECT_SESSION;
-    }
-
-    for (size_t i = 0; i < mActiveTracks.size(); i++) {
-        sp<MmapTrack> track = mActiveTracks[i];
-        if (sessionId == track->sessionId()) {
-            result |= TRACK_SESSION;
-            if (track->isFastTrack()) {
-                result |= FAST_SESSION;
-            }
-            break;
-        }
-    }
-
-    return result;
 }
 
 void AudioFlinger::MmapThread::threadLoop_standby()

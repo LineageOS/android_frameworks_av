@@ -571,10 +571,9 @@ status_t JAudioTrack::removeAudioDeviceCallback(jobject listener) {
 }
 
 void JAudioTrack::registerRoutingDelegates(
-        Vector<std::pair<jobject, jobject>>& routingDelegates) {
-    for (Vector<std::pair<jobject, jobject>>::iterator it = routingDelegates.begin();
-            it != routingDelegates.end(); it++) {
-        addAudioDeviceCallback(it->second, getHandler(it->second));
+        Vector<std::pair<sp<JObjectHolder>, sp<JObjectHolder>>>& routingDelegates) {
+    for (auto it = routingDelegates.begin(); it != routingDelegates.end(); it++) {
+        addAudioDeviceCallback(it->second->getJObject(), getHandler(it->second->getJObject()));
     }
 }
 
@@ -597,20 +596,22 @@ jobject JAudioTrack::getHandler(const jobject routingDelegateObj) {
     return env->CallObjectMethod(routingDelegateObj, jGetHandler);
 }
 
-jobject JAudioTrack::findByKey(Vector<std::pair<jobject, jobject>>& mp, const jobject key) {
+jobject JAudioTrack::findByKey(
+        Vector<std::pair<sp<JObjectHolder>, sp<JObjectHolder>>>& mp, const jobject key) {
     JNIEnv *env = JavaVMHelper::getJNIEnv();
-    for (Vector<std::pair<jobject, jobject>>::iterator it = mp.begin(); it != mp.end(); it++) {
-        if (env->IsSameObject(it->first, key)) {
-            return it->second;
+    for (auto it = mp.begin(); it != mp.end(); it++) {
+        if (env->IsSameObject(it->first->getJObject(), key)) {
+            return it->second->getJObject();
         }
     }
     return nullptr;
 }
 
-void JAudioTrack::eraseByKey(Vector<std::pair<jobject, jobject>>& mp, const jobject key) {
+void JAudioTrack::eraseByKey(
+        Vector<std::pair<sp<JObjectHolder>, sp<JObjectHolder>>>& mp, const jobject key) {
     JNIEnv *env = JavaVMHelper::getJNIEnv();
-    for (Vector<std::pair<jobject, jobject>>::iterator it = mp.begin(); it != mp.end(); it++) {
-        if (env->IsSameObject(it->first, key)) {
+    for (auto it = mp.begin(); it != mp.end(); it++) {
+        if (env->IsSameObject(it->first->getJObject(), key)) {
             mp.erase(it);
             return;
         }

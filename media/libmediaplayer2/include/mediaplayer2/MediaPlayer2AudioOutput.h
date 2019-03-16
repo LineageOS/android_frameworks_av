@@ -124,7 +124,9 @@ private:
     audio_output_flags_t    mFlags;
     sp<JObjectHolder>       mPreferredDevice;
     mutable Mutex           mLock;
-    Vector<std::pair<jobject, jobject>> mRoutingDelegates; // <listener, routingDelegate>
+
+    // <listener, routingDelegate>
+    Vector<std::pair<sp<JObjectHolder>, sp<JObjectHolder>>> mRoutingDelegates;
 
     // static variables below not protected by mutex
     static bool             mIsOnEmulator;

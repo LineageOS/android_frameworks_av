@@ -94,6 +94,9 @@ public:
     virtual void        invalidate() { mIsInvalid = true; }
             bool        isInvalid() const { return mIsInvalid; }
 
+            void        terminate() { mTerminated = true; }
+            bool        isTerminated() const { return mTerminated; }
+
     audio_attributes_t  attributes() const { return mAttr; }
 
 #ifdef TEE_SINK
@@ -226,14 +229,6 @@ protected:
     }
     bool isStopping_2() const {
         return mState == STOPPING_2;
-    }
-
-    bool isTerminated() const {
-        return mTerminated;
-    }
-
-    void terminate() {
-        mTerminated = true;
     }
 
     // Upper case characters are final states.

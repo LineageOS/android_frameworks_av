@@ -76,9 +76,6 @@
 
 namespace android {
 
-    using namespace android::base;
-    using namespace android::content::pm;
-
 // individual records kept in memory: age or count
 // age: <= 28 hours (1 1/6 days)
 // count: hard limit of # records
@@ -649,7 +646,8 @@ void MediaAnalyticsService::setPkgInfo(MediaAnalyticsItem *item, uid_t uid, bool
         }
 
         if (binder != NULL) {
-            sp<IPackageManagerNative> package_mgr = interface_cast<IPackageManagerNative>(binder);
+            sp<content::pm::IPackageManagerNative> package_mgr =
+                            interface_cast<content::pm::IPackageManagerNative>(binder);
             binder::Status status;
 
             std::vector<int> uids;

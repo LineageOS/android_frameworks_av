@@ -224,6 +224,14 @@ AudioFlinger::~AudioFlinger()
         // closeOutput_nonvirtual() will remove specified entry from mPlaybackThreads
         closeOutput_nonvirtual(mPlaybackThreads.keyAt(0));
     }
+    while (!mMmapThreads.isEmpty()) {
+        const audio_io_handle_t io = mMmapThreads.keyAt(0);
+        if (mMmapThreads.valueAt(0)->isOutput()) {
+            closeOutput_nonvirtual(io); // removes entry from mMmapThreads
+        } else {
+            closeInput_nonvirtual(io);  // removes entry from mMmapThreads
+        }
+    }
 
     for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
         // no mHardwareLock needed, as there are no other references to this
@@ -3278,31 +3286,12 @@ sp<IEffect> AudioFlinger::createEffect(
                 goto Exit;
             }
             // look for the thread where the specified audio session is present
-            for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
-                uint32_t sessionType = mPlaybackThreads.valueAt(i)->hasAudioSession(sessionId);
-                if (sessionType != 0) {
-                    io = mPlaybackThreads.keyAt(i);
-                    // thread with same effect session is preferable
-                    if ((sessionType & ThreadBase::EFFECT_SESSION) != 0) {
-                        break;
-                    }
-                }
+            io = findIoHandleBySessionId_l(sessionId, mPlaybackThreads);
+            if (io == AUDIO_IO_HANDLE_NONE) {
+                io = findIoHandleBySessionId_l(sessionId, mRecordThreads);
             }
             if (io == AUDIO_IO_HANDLE_NONE) {
-                for (size_t i = 0; i < mRecordThreads.size(); i++) {
-                    if (mRecordThreads.valueAt(i)->hasAudioSession(sessionId) != 0) {
-                        io = mRecordThreads.keyAt(i);
-                        break;
-                    }
-                }
-            }
-            if (io == AUDIO_IO_HANDLE_NONE) {
-                for (size_t i = 0; i < mMmapThreads.size(); i++) {
-                    if (mMmapThreads.valueAt(i)->hasAudioSession(sessionId) != 0) {
-                        io = mMmapThreads.keyAt(i);
-                        break;
-                    }
-                }
+                io = findIoHandleBySessionId_l(sessionId, mMmapThreads);
             }
             // If no output thread contains the requested session ID, default to
             // first output. The effect chain will be moved to the correct output
