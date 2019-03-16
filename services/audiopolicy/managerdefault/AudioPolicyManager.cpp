@@ -2503,7 +2503,7 @@ status_t AudioPolicyManager::setVolumeGroupIndex(IVolumeCurves &curves, volume_g
         }
         for (auto curVolGroup : getVolumeGroups()) {
             VolumeSource curVolSrc = toVolumeSource(curVolGroup);
-            if (!(curVolSrc == vs || isInCall())) {
+            if (curVolSrc != vs) {
                 continue;
             }
             if (!(desc->isActive(vs) || isInCall())) {
