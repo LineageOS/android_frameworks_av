@@ -1397,6 +1397,18 @@ bool M3UParser::codecIsType(const AString &codec, const char *type) {
         case 'ulaw':
         case 'vdva':
         case 'ac-4':
+        case 'Opus':
+        case 'a3ds':
+        case 'dts+':
+        case 'dts-':
+        case 'dtsx':
+        case 'dtsy':
+        case 'ec+3':
+        case 'mha1':
+        case 'mha2':
+        case 'mhm1':
+        case 'mhm2':
+        case 'sevs':
             return !strcmp("audio", type);
 
         case 'avc1':
@@ -1445,6 +1457,35 @@ bool M3UParser::codecIsType(const AString &codec, const char *type) {
         case 'tga ':
         case 'tiff':
         case 'WRLE':
+        case 'a3d1':
+        case 'a3d2':
+        case 'a3d3':
+        case 'a3d4':
+        case 'avc3':
+        case 'avc4':
+        case 'dva1':
+        case 'dvav':
+        case 'dvh1':
+        case 'dvhe':
+        case 'hev1':
+        case 'hev2':
+        case 'hvc1':
+        case 'hvc2':
+        case 'hvt1':
+        case 'lhe1':
+        case 'lht1':
+        case 'lhv1':
+        case 'mjpg':
+        case 'mvc3':
+        case 'mvc4':
+        case 'mvd1':
+        case 'mvd2':
+        case 'mvd3':
+        case 'mvd4':
+        case 'rv60':
+        case 'svc2':
+        case 'vp08':
+        case 'vp09':
             return !strcmp("video", type);
 
         default:
