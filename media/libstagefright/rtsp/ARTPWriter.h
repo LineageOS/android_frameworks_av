@@ -47,6 +47,7 @@ struct ARTPWriter : public MediaWriter {
     void updateCVODegrees(int32_t cvoDegrees);
 
     virtual void onMessageReceived(const sp<AMessage> &msg);
+    virtual void setTMMBNInfo(uint32_t opponentID, uint32_t bitrate);
 
 protected:
     virtual ~ARTPWriter();
@@ -104,6 +105,9 @@ private:
     uint32_t mLastRTPTime;
     uint64_t mLastNTPTime;
 
+    uint32_t mOpponentID;
+    uint32_t mBitrate;
+
     int32_t mNumSRsSent;
     int32_t mRTPCVOExtMap;
     int32_t mRTPCVODegrees;
@@ -124,6 +128,7 @@ private:
 
     void addSR(const sp<ABuffer> &buffer);
     void addSDES(const sp<ABuffer> &buffer);
+    void addTMMBN(const sp<ABuffer> &buffer);
 
     void makeH264SPropParamSets(MediaBufferBase *buffer);
     void dumpSessionDesc();

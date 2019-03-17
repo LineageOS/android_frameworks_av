@@ -578,6 +578,8 @@ status_t StagefrightRecorder::setParamVideoEncodingBitRate(int32_t bitRate) {
         const float coefficient = 0.8f;
         mVideoBitRate = (bitRate * coefficient) / 1000 * 1000;
         mVideoEncoderSource->setEncodingBitrate(mVideoBitRate);
+        ARTPWriter* rtpWriter  = static_cast<ARTPWriter*>(mWriter.get());
+        rtpWriter->setTMMBNInfo(mOpponentID, bitRate);
     }
 
     return OK;
@@ -821,6 +823,11 @@ status_t StagefrightRecorder::setParamSelfID(int32_t selfID) {
     ALOGV("setParamSelfID: %x", selfID);
 
     mSelfID = selfID;
+    return OK;
+}
+
+status_t StagefrightRecorder::setParamVideoOpponentID(int32_t opponentID) {
+    mOpponentID = opponentID;
     return OK;
 }
 
