@@ -420,7 +420,8 @@ void ARTPConnection::onPollStreams() {
     }
 
     int64_t nowUs = ALooper::GetNowUs();
-    showRxBitrate(nowUs);
+    checkRxBitrate(nowUs);
+
     if (mLastReceiverReportTimeUs <= 0
             || mLastReceiverReportTimeUs + 5000000LL <= nowUs) {
         sp<ABuffer> buffer = new ABuffer(kMaxUDPSize);
@@ -445,10 +446,7 @@ void ARTPConnection::onPollStreams() {
             for (size_t i = 0; i < s->mSources.size(); ++i) {
                 sp<ARTPSource> source = s->mSources.valueAt(i);
 
-                if (source->isNeedToReport()) {
-                    source->addReceiverReport(buffer);
-                    source->addTMMBR(buffer);
-                }
+                source->addReceiverReport(buffer);
 
                 if (mFlags & kRegularlyRequestFIR) {
                     source->addFIR(buffer);
@@ -458,22 +456,7 @@ void ARTPConnection::onPollStreams() {
             if (buffer->size() > 0) {
                 ALOGV("Sending RR...");
 
-                struct sockaddr* pRemoteRTCPAddr;
-                int sizeSockSt;
-                if (s->isIPv6) {
-                    pRemoteRTCPAddr = (struct sockaddr *)&s->mRemoteRTCPAddr6;
-                    sizeSockSt = sizeof(struct sockaddr_in6);
-                } else {
-                    pRemoteRTCPAddr = (struct sockaddr *)&s->mRemoteRTCPAddr;
-                    sizeSockSt = sizeof(struct sockaddr_in);
-                }
-
-                ssize_t n;
-                do {
-                    n = sendto(
-                            s->mRTCPSocket, buffer->data(), buffer->size(), 0,
-                            pRemoteRTCPAddr, sizeSockSt);
-                } while (n < 0 && errno == EINTR);
+                ssize_t n = send(s, buffer);
 
                 if (n <= 0) {
                     ALOGW("failed to send RTCP receiver report (%s).",
@@ -517,6 +500,9 @@ status_t ARTPConnection::receive(StreamInfo *s, bool receiveRTP) {
         (!receiveRTP && s->mNumRTCPPacketsReceived == 0)
             ? sizeSockSt : 0;
 
+    if (mFlags & kViLTEConnection)
+        remoteAddrLen = 0;
+
     ssize_t nbytes;
     do {
         nbytes = recvfrom(
@@ -545,6 +531,36 @@ status_t ARTPConnection::receive(StreamInfo *s, bool receiveRTP) {
     }
 
     return err;
+}
+
+ssize_t ARTPConnection::send(const StreamInfo *info, const sp<ABuffer> buffer) {
+        struct sockaddr* pRemoteRTCPAddr;
+        int sizeSockSt;
+
+        /* It seems this isIPv6 variable is useless.
+         * We should remove it to prevent confusion */
+        if (info->isIPv6) {
+            pRemoteRTCPAddr = (struct sockaddr *)&info->mRemoteRTCPAddr6;
+            sizeSockSt = sizeof(struct sockaddr_in6);
+        } else {
+            pRemoteRTCPAddr = (struct sockaddr *)&info->mRemoteRTCPAddr;
+            sizeSockSt = sizeof(struct sockaddr_in);
+        }
+
+        if (mFlags & kViLTEConnection) {
+            ALOGV("ViLTE RTCP");
+            pRemoteRTCPAddr = NULL;
+            sizeSockSt = 0;
+        }
+
+        ssize_t n;
+        do {
+            n = sendto(
+                    info->mRTCPSocket, buffer->data(), buffer->size(), 0,
+                    pRemoteRTCPAddr, sizeSockSt);
+        } while (n < 0 && errno == EINTR);
+
+        return n;
 }
 
 status_t ARTPConnection::parseRTP(StreamInfo *s, const sp<ABuffer> &buffer) {
@@ -963,14 +979,56 @@ void ARTPConnection::setMinMaxBitrate(int32_t min, int32_t max) {
     mMaxBitrate = max;
 }
 
-void ARTPConnection::showRxBitrate(int64_t nowUs) {
+void ARTPConnection::checkRxBitrate(int64_t nowUs) {
     if (mLastBitrateReportTimeUs <= 0) {
         mCumulativeBytes = 0;
         mLastBitrateReportTimeUs = nowUs;
     }
     else if (mLastBitrateReportTimeUs + 1000000ll <= nowUs) {
         int32_t timeDiff = (nowUs - mLastBitrateReportTimeUs) / 1000000ll;
-        ALOGI("Actual Rx bitrate : %d bits/sec", mCumulativeBytes * 8 / timeDiff);
+        int32_t bitrate = mCumulativeBytes * 8 / timeDiff;
+        ALOGI("Actual Rx bitrate : %d bits/sec", bitrate);
+
+        sp<ABuffer> buffer = new ABuffer(kMaxUDPSize);
+        List<StreamInfo>::iterator it = mStreams.begin();
+        while (it != mStreams.end()) {
+            StreamInfo *s = &*it;
+            if (s->mIsInjected) {
+                ++it;
+                continue;
+            }
+
+            if (s->mNumRTCPPacketsReceived == 0) {
+                // We have never received any RTCP packets on this stream,
+                // we don't even know where to send a report.
+                ++it;
+                continue;
+            }
+
+            buffer->setRange(0, 0);
+
+            for (size_t i = 0; i < s->mSources.size(); ++i) {
+                sp<ARTPSource> source = s->mSources.valueAt(i);
+                source->setTargetBitrate();
+                source->addTMMBR(buffer);
+            }
+            if (buffer->size() > 0) {
+                ALOGV("Sending TMMBR...");
+
+                ssize_t n = send(s, buffer);
+
+                if (n <= 0) {
+                    ALOGW("failed to send RTCP TMMBR (%s).",
+                         n == 0 ? "connection gone" : strerror(errno));
+
+                    it = mStreams.erase(it);
+                    continue;
+                }
+
+                CHECK_EQ(n, (ssize_t)buffer->size());
+            }
+            ++it;
+        }
         mCumulativeBytes = 0;
         mLastBitrateReportTimeUs = nowUs;
     }

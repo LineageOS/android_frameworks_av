@@ -42,7 +42,7 @@ NuPlayer::RTPSource::RTPSource(
       mFinalResult(OK),
       mBuffering(false),
       mInPreparationPhase(true),
-      mRTPConn(new ARTPConnection),
+      mRTPConn(new ARTPConnection(ARTPConnection::kViLTEConnection)),
       mEOSTimeoutAudio(0),
       mEOSTimeoutVideo(0),
       mLastCVOUpdated(-1) {
@@ -111,7 +111,7 @@ void NuPlayer::RTPSource::prepareAsync() {
         // index(i) should be started from 1. 0 is reserved for [root]
         mRTPConn->addStream(sockRtp, sockRtcp, desc, i + 1, notify, false);
         mRTPConn->setSelfID(info->mSelfID);
-        mRTPConn->setMinMaxBitrate(videoMinBitrate, 512000);
+        mRTPConn->setMinMaxBitrate(videoMinBitrate, info->mAS * 1000);
 
         info->mRTPSocket = sockRtp;
         info->mRTCPSocket = sockRtcp;

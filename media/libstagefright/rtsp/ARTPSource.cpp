@@ -257,8 +257,6 @@ void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
         fraction = (intervalPacketLost << 8) / intervalExpected;
     }
 
-    mQualManager.setTargetBitrate(fraction);
-
     mPrevExpected = expected;
     mPrevNumBuffersReceived = mNumBuffersReceived;
     int32_t cumulativePacketLost = (int32_t)expected - mNumBuffersReceived;
@@ -324,7 +322,9 @@ void ARTPSource::addTMMBR(const sp<ABuffer> &buffer) {
         ALOGW("RTCP buffer too small to accomodate RR.");
         return;
     }
-    if (mQualManager.mTargetBitrate <= 0)
+
+    int32_t targetBitrate = mQualManager.getTargetBitrate();
+    if (targetBitrate <= 0)
         return;
 
     uint8_t *data = buffer->data() + buffer->size();
@@ -345,7 +345,6 @@ void ARTPSource::addTMMBR(const sp<ABuffer> &buffer) {
     data[14] = (mID >> 8) & 0xff;
     data[15] = mID & 0xff;
 
-    int32_t targetBitrate = mQualManager.mTargetBitrate;
     int32_t exp, mantissa;
 
     // Round off to the nearest 2^4th
@@ -363,12 +362,34 @@ void ARTPSource::addTMMBR(const sp<ABuffer> &buffer) {
     buffer->setRange(buffer->offset(), buffer->size() + 20);
 }
 
+uint32_t ARTPSource::getSelfID() {
+    return kSourceID;
+}
 void ARTPSource::setSelfID(const uint32_t selfID) {
     kSourceID = selfID;
 }
 
 void ARTPSource::setMinMaxBitrate(int32_t min, int32_t max) {
     mQualManager.setMinMaxBitrate(min, max);
+}
+
+void ARTPSource::setTargetBitrate() {
+    uint8_t fraction = 0;
+
+    // According to appendix A.3 in RFC 3550
+    uint32_t expected = mHighestSeqNumber - mBaseSeqNumber + 1;
+    int64_t intervalExpected = expected - mPrevExpected;
+    int64_t intervalReceived = mNumBuffersReceived - mPrevNumBuffersReceived;
+    int64_t intervalPacketLost = intervalExpected - intervalReceived;
+
+    if (intervalPacketLost < 0)
+        fraction = 0;
+    else if (intervalExpected <= intervalPacketLost || intervalExpected == 0)
+        fraction = 255;
+    else
+        fraction = (intervalPacketLost << 8) / intervalExpected;
+
+    mQualManager.setTargetBitrate(fraction, ALooper::GetNowUs());
 }
 
 bool ARTPSource::isNeedToReport() {
