@@ -24,6 +24,7 @@ class QualManager {
 public:
     QualManager() : mMinBitrate(-1), mMaxBitrate(-1), mTargetBitrate(512000),
                     mLastTargetBitrate(-1), mLastSetBitrateTime(0),
+                    mLowBitrateStartTime(0), mAutoDowngrade(false),
                     mIsNewTargetBitrate(false){};
 
     int32_t getTargetBitrate() {
@@ -36,6 +37,10 @@ public:
         }
     }
 
+    bool isNeedToDowngrade() {
+        return mAutoDowngrade;
+    }
+
     void setTargetBitrate(uint8_t fraction, int64_t nowUs) {
         if (fraction <= (256 * 2 /100)) {           // loss less than 2%
             mTargetBitrate += mBitrateStep;
@@ -46,6 +51,9 @@ public:
         if (mTargetBitrate > mMaxBitrate) {
             mTargetBitrate = mMaxBitrate;
         } else if (mTargetBitrate < mMinBitrate) {
+            if (mLowBitrateStartTime != 0) {
+                mLowBitrateStartTime = nowUs;
+            }
             mTargetBitrate = mMinBitrate;
         }
 
@@ -60,6 +68,25 @@ public:
         mMaxBitrate = max;
         mBitrateStep = (max - min) / 8;
     };
+
+    void setBitrateData(int32_t bitrate, int64_t now) {
+        int64_t lowBitrateDuration = 0;
+        if (bitrate < mMinBitrate)
+        {
+            if (mLowBitrateStartTime == 0) {
+                mLowBitrateStartTime = now;
+            } else {
+                lowBitrateDuration = now - mLowBitrateStartTime;
+            }
+        } else {
+            mLowBitrateStartTime = 0;
+        }
+        if (lowBitrateDuration > mPatientTime) {
+            mAutoDowngrade = true;
+        } else {
+            mAutoDowngrade = false;
+        }
+    }
 private:
     int32_t mMinBitrate;
     int32_t mMaxBitrate;
@@ -70,6 +97,10 @@ private:
 
     int64_t mLastSetBitrateTime;
 
+    const int64_t mPatientTime = 10000000ll;    // 10 sec
+    int64_t mLowBitrateStartTime;
+
+    bool mAutoDowngrade;
     bool mIsNewTargetBitrate;
 };
 

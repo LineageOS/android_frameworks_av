@@ -373,6 +373,10 @@ void ARTPSource::setMinMaxBitrate(int32_t min, int32_t max) {
     mQualManager.setMinMaxBitrate(min, max);
 }
 
+void ARTPSource::setBitrateData(int32_t bitrate, int64_t time) {
+    mQualManager.setBitrateData(bitrate, time);
+}
+
 void ARTPSource::setTargetBitrate() {
     uint8_t fraction = 0;
 
@@ -395,6 +399,10 @@ void ARTPSource::setTargetBitrate() {
 bool ARTPSource::isNeedToReport() {
     int64_t intervalReceived = mNumBuffersReceived - mPrevNumBuffersReceived;
     return (intervalReceived > 0) ? true : false;
+}
+
+bool ARTPSource::isNeedToDowngrade() {
+    return mQualManager.isNeedToDowngrade();
 }
 
 void ARTPSource::noticeAbandonBuffer(int cnt) {

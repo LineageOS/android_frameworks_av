@@ -409,6 +409,12 @@ void ARTPConnection::onPollStreams() {
 
             if (err == -ECONNRESET) {
                 // socket failure, this stream is dead, Jim.
+                sp<AMessage> notify = it->mNotifyMsg->dup();
+                notify->setInt32("IMS-Rx-notice", 1);
+                notify->setInt32("payload-type", 400);
+                notify->setInt32("feedback-type", 1);
+                notify->setInt32("sender", it->mSources.valueAt(0)->getSelfID());
+                notify->post();
 
                 ALOGW("failed to receive RTP/RTCP datagram.");
                 it = mStreams.erase(it);
@@ -1009,8 +1015,17 @@ void ARTPConnection::checkRxBitrate(int64_t nowUs) {
 
             for (size_t i = 0; i < s->mSources.size(); ++i) {
                 sp<ARTPSource> source = s->mSources.valueAt(i);
+                source->setBitrateData(bitrate, nowUs);
                 source->setTargetBitrate();
                 source->addTMMBR(buffer);
+                if (source->isNeedToDowngrade()) {
+                    sp<AMessage> notify = s->mNotifyMsg->dup();
+                    notify->setInt32("IMS-Rx-notice", 1);
+                    notify->setInt32("payload-type", 400);
+                    notify->setInt32("feedback-type", 1);
+                    notify->setInt32("sender", source->getSelfID());
+                    notify->post();
+                }
             }
             if (buffer->size() > 0) {
                 ALOGV("Sending TMMBR...");

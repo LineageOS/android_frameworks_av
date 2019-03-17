@@ -50,9 +50,11 @@ struct ARTPSource : public RefBase {
     uint32_t getSelfID();
     void setSelfID(const uint32_t selfID);
     void setMinMaxBitrate(int32_t min, int32_t max);
+    void setBitrateData(int32_t bitrate, int64_t time);
     void setTargetBitrate();
 
     bool isNeedToReport();
+    bool isNeedToDowngrade();
 
     void noticeAbandonBuffer(int cnt=1);
 
