@@ -248,6 +248,7 @@ enum {
     kKeyPayloadType      = 'pTyp', // int32_t, SDP negotiated payload type.
     kKeyRtpExtMap        = 'extm', // int32_t, rtp extension ID for cvo on RTP protocol.
     kKeyRtpCvoDegrees    = 'cvod', // int32_t, rtp cvo degrees as per 3GPP 26.114.
+    kKeySocketNetwork    = 'sNet', // int64_t, socket will be bound to network handle.
 };
 
 enum {

@@ -206,6 +206,7 @@ status_t ARTPWriter::start(MetaData * params) {
     mNumSRsSent = 0;
     mRTPCVOExtMap = -1;
     mRTPCVODegrees = 0;
+    mRTPSockNetwork = 0;
 
     const char *mime;
     CHECK(mSource->getFormat()->findCString(kKeyMIMEType, &mime));
@@ -225,6 +226,10 @@ status_t ARTPWriter::start(MetaData * params) {
     int32_t rtpCVODegrees = 0;
     if(params->findInt32(kKeyRtpCvoDegrees, &rtpCVODegrees))
         mRTPCVODegrees = rtpCVODegrees;
+
+    int64_t sockNetwork = 0;
+    if(params->findInt64(kKeySocketNetwork, &sockNetwork))
+        updateSocketNetwork(sockNetwork);
 
     mMode = INVALID;
     if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)) {
@@ -1175,6 +1180,25 @@ void ARTPWriter::updateCVODegrees(int32_t cvoDegrees) {
 void ARTPWriter::updatePayloadType(int32_t payloadType) {
     Mutex::Autolock autoLock(mLock);
     mPayloadType = payloadType;
+}
+
+void ARTPWriter::updateSocketNetwork(int64_t socketNetwork) {
+    mRTPSockNetwork = (net_handle_t)socketNetwork;
+    ALOGI("trying to bind rtp socket(%d) to network(%llu).",
+                mRTPSocket, (unsigned long long)mRTPSockNetwork);
+
+    int result = android_setsocknetwork(mRTPSockNetwork, mRTPSocket);
+    if (result != 0) {
+        ALOGW("failed(%d) to bind rtp socket(%d) to network(%llu)",
+                result, mRTPSocket, (unsigned long long)mRTPSockNetwork);
+    }
+    result = android_setsocknetwork(mRTPSockNetwork, mRTCPSocket);
+    if (result != 0) {
+        ALOGW("failed(%d) to bind rtcp socket(%d) to network(%llu)",
+                result, mRTCPSocket, (unsigned long long)mRTPSockNetwork);
+    }
+    ALOGI("done. bind rtp socket(%d) to network(%llu)",
+                mRTPSocket, (unsigned long long)mRTPSockNetwork);
 }
 
 uint32_t ARTPWriter::getSequenceNum() {
