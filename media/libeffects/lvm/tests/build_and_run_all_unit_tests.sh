@@ -56,6 +56,7 @@ fs_arr=(
 
 # run multichannel effects at different configs, saving only the stereo channel
 # pair.
+error_count=0
 for flags in "${flags_arr[@]}"
 do
     for fs in ${fs_arr[*]}
@@ -64,6 +65,13 @@ do
         do
             adb shell $testdir/lvmtest -i:$testdir/sinesweepraw.raw \
                 -o:$testdir/sinesweep_$((ch))_$((fs)).raw -ch:$ch -fs:$fs $flags
+
+            shell_ret=$?
+            if [ $shell_ret -ne 0 ]; then
+                echo "error: $shell_ret"
+                ((++error_count))
+            fi
+
 
             # two channel files should be identical to higher channel
             # computation (first 2 channels).
@@ -78,8 +86,17 @@ do
                     $testdir/sinesweep_$((ch))_$((fs)).raw -thr:90.308998
             fi
 
+            # both cmp and snr return EXIT_FAILURE on mismatch.
+            shell_ret=$?
+            if [ $shell_ret -ne 0 ]; then
+                echo "error: $shell_ret"
+                ((++error_count))
+            fi
+
         done
     done
 done
 
 adb shell rm -r $testdir
+echo "$error_count errors"
+exit $error_count

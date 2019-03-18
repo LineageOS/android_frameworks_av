@@ -84,6 +84,7 @@ int main(int argc, const char *argv[]) {
     printf("\nError: missing input/reference files\n");
     return -1;
   }
+  int ret = EXIT_SUCCESS;
   auto sn = pcm_format == 0
       ? getSignalNoise<short>(finp, fref)
       : getSignalNoise<float>(finp, fref);
@@ -92,6 +93,7 @@ int main(int argc, const char *argv[]) {
     // compare the measured snr value with threshold
     if (snr < thr) {
       printf("%.6f less than threshold %.6f\n", snr, thr);
+      ret = EXIT_FAILURE;
     } else {
       printf("%.6f\n", snr);
     }
@@ -99,5 +101,5 @@ int main(int argc, const char *argv[]) {
   fclose(finp);
   fclose(fref);
 
-  return 0;
+  return ret;
 }
