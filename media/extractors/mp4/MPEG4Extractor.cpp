@@ -5592,6 +5592,7 @@ static bool isCompatibleBrand(uint32_t fourcc) {
         FOURCC("mp41"),
         FOURCC("mp42"),
         FOURCC("dash"),
+        FOURCC("nvr1"),
 
         // Won't promise that the following file types can be played.
         // Just give these file types a chance.
