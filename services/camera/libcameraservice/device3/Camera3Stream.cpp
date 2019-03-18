@@ -321,7 +321,7 @@ status_t Camera3Stream::finishConfiguration() {
     // so. As documented in hardware/camera3.h:configure_streams().
     if (mState == STATE_IN_RECONFIG &&
             mOldUsage == mUsage &&
-            mOldMaxBuffers == camera3_stream::max_buffers) {
+            mOldMaxBuffers == camera3_stream::max_buffers && !mDataSpaceOverridden) {
         mState = STATE_CONFIGURED;
         return OK;
     }
