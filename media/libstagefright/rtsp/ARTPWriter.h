@@ -27,6 +27,8 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
+#include <android/multinetwork.h>
+
 #define LOG_TO_FILES    0
 
 namespace android {
@@ -47,6 +49,7 @@ struct ARTPWriter : public MediaWriter {
     virtual status_t pause();
     void updateCVODegrees(int32_t cvoDegrees);
     void updatePayloadType(int32_t payloadType);
+    void updateSocketNetwork(int64_t socketNetwork);
     uint32_t getSequenceNum();
 
     virtual void onMessageReceived(const sp<AMessage> &msg);
@@ -91,6 +94,7 @@ private:
     struct sockaddr_in6 mLocalAddr6;
     struct sockaddr_in6 mRTPAddr6;
     struct sockaddr_in6 mRTCPAddr6;
+    net_handle_t mRTPSockNetwork;
 
     AString mProfileLevel;
     AString mSeqParamSet;

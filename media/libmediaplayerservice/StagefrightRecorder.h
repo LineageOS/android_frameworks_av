@@ -148,6 +148,7 @@ private:
     int32_t mPayloadType;
     int32_t mRTPCVOExtMap;
     int32_t mRTPCVODegrees;
+    int64_t mRTPSockNetwork;
     uint32_t mLastSeqNo;
 
     int64_t mDurationRecordedUs;
@@ -240,6 +241,7 @@ private:
     status_t setParamPayloadType(int32_t payloadType);
     status_t setRTPCVOExtMap(int32_t extmap);
     status_t setRTPCVODegrees(int32_t cvoDegrees);
+    status_t setSocketNetwork(int64_t networkHandle);
     status_t requestIDRFrame();
     void clipVideoBitRate();
     void clipVideoFrameRate();
