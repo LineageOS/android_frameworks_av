@@ -7762,7 +7762,9 @@ typedef enum acamera_metadata_enum_acamera_scaler_cropping_type {
 typedef enum acamera_metadata_enum_acamera_scaler_available_recommended_stream_configurations {
     /**
      * <p>Preview must only include non-stalling processed stream configurations with
-     * output formats like YUV_420_888, IMPLEMENTATION_DEFINED, etc.</p>
+     * output formats like
+     * {@link AIMAGE_FORMAT_YUV_420_888 },
+     * {@link AIMAGE_FORMAT_PRIVATE }, etc.</p>
      */
     ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_PREVIEW
                                                                       = 0x0,
@@ -7777,19 +7779,20 @@ typedef enum acamera_metadata_enum_acamera_scaler_available_recommended_stream_c
 
     /**
      * <p>Video snapshot must include stream configurations at least as big as
-     * the maximum RECORD resolutions and only with format BLOB + DATASPACE_JFIF
-     * format/dataspace combination (JPEG). Additionally the configurations shouldn't cause
-     * preview glitches and also be able to run at 30 fps.</p>
+     * the maximum RECORD resolutions and only with
+     * {@link AIMAGE_FORMAT_JPEG JPEG output format}.
+     * Additionally the configurations shouldn't cause preview glitches and also be able to
+     * run at 30 fps.</p>
      */
     ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_VIDEO_SNAPSHOT
                                                                       = 0x2,
 
     /**
      * <p>Recommended snapshot stream configurations must include at least one with
-     * size close to ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE with BLOB + DATASPACE_JFIF
-     * format/dataspace combination (JPEG). Taking into account restrictions on aspect
-     * ratio, alignment etc. the area of the maximum suggested size shouldn’t be less than
-     * 97% of the sensor array size area.</p>
+     * size close to ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE and
+     * {@link AIMAGE_FORMAT_JPEG JPEG output format}.
+     * Taking into account restrictions on aspect ratio, alignment etc. the area of the
+     * maximum suggested size shouldn’t be less than 97% of the sensor array size area.</p>
      *
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
      */
@@ -7808,8 +7811,19 @@ typedef enum acamera_metadata_enum_acamera_scaler_available_recommended_stream_c
      */
     ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_RAW   = 0x5,
 
-    ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_PUBLIC_END
+    /**
+     * <p>If supported, the recommended low latency stream configurations must have
+     * end-to-end latency that does not exceed 200 ms. under standard operating conditions
+     * (reasonable light levels, not loaded system) and using template
+     * TEMPLATE_STILL_CAPTURE. This is primarily for listing configurations for the
+     * {@link AIMAGE_FORMAT_JPEG JPEG output format}
+     * however other supported output formats can be added as well.</p>
+     */
+    ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_LOW_LATENCY_SNAPSHOT
                                                                       = 0x6,
+
+    ACAMERA_SCALER_AVAILABLE_RECOMMENDED_STREAM_CONFIGURATIONS_PUBLIC_END
+                                                                      = 0x7,
 
     /**
      * <p>Vendor defined use cases. These depend on the vendor implementation.</p>
