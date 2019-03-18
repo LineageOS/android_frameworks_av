@@ -1177,7 +1177,7 @@ status_t HeicCompositeStream::initializeCodec(uint32_t width, uint32_t height,
     outputFormat->setInt32(KEY_BITRATE_MODE, BITRATE_MODE_CQ);
     outputFormat->setInt32(KEY_QUALITY, kDefaultJpegQuality);
     // Ask codec to skip timestamp check and encode all frames.
-    outputFormat->setInt64("max-pts-gap-to-encoder", kNoFrameDropMaxPtsGap);
+    outputFormat->setInt64(KEY_MAX_PTS_GAP_TO_ENCODER, kNoFrameDropMaxPtsGap);
 
     int32_t gridWidth, gridHeight, gridRows, gridCols;
     if (useGrid || mUseHeic) {
