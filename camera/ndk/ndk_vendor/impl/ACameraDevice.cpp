@@ -38,6 +38,7 @@ namespace acam {
 
 using HCameraMetadata = frameworks::cameraservice::device::V2_0::CameraMetadata;
 using OutputConfiguration = frameworks::cameraservice::device::V2_0::OutputConfiguration;
+using SessionConfiguration = frameworks::cameraservice::device::V2_0::SessionConfiguration;
 using hardware::Void;
 
 // Static member definitions
@@ -214,6 +215,47 @@ CameraDevice::createCaptureSession(
     mFlushing = false;
     *session = newSession;
     return ACAMERA_OK;
+}
+
+camera_status_t CameraDevice::isSessionConfigurationSupported(
+        const ACaptureSessionOutputContainer* sessionOutputContainer) const {
+    Mutex::Autolock _l(mDeviceLock);
+    camera_status_t ret = checkCameraClosedOrErrorLocked();
+    if (ret != ACAMERA_OK) {
+        return ret;
+    }
+
+    SessionConfiguration sessionConfig;
+    sessionConfig.inputWidth = 0;
+    sessionConfig.inputHeight = 0;
+    sessionConfig.inputFormat = -1;
+    sessionConfig.operationMode = StreamConfigurationMode::NORMAL_MODE;
+    sessionConfig.outputStreams.resize(sessionOutputContainer->mOutputs.size());
+    size_t index = 0;
+    for (const auto& output : sessionOutputContainer->mOutputs) {
+        sessionConfig.outputStreams[index].rotation = utils::convertToHidl(output.mRotation);
+        sessionConfig.outputStreams[index].windowGroupId = -1;
+        sessionConfig.outputStreams[index].windowHandles.resize(output.mSharedWindows.size() + 1);
+        sessionConfig.outputStreams[index].windowHandles[0] = output.mWindow;
+        sessionConfig.outputStreams[index].physicalCameraId = output.mPhysicalCameraId;
+        index++;
+    }
+
+    bool configSupported = false;
+    Status status = Status::NO_ERROR;
+    auto remoteRet = mRemote->isSessionConfigurationSupported(sessionConfig,
+        [&status, &configSupported](auto s, auto supported) {
+            status = s;
+            configSupported = supported;
+        });
+
+    if (status == Status::INVALID_OPERATION) {
+        return ACAMERA_ERROR_UNSUPPORTED_OPERATION;
+    } else if (!remoteRet.isOk()) {
+        return ACAMERA_ERROR_UNKNOWN;
+    } else {
+        return configSupported ? ACAMERA_OK : ACAMERA_ERROR_STREAM_CONFIGURE_FAIL;
+    }
 }
 
 void CameraDevice::addRequestSettingsMetadata(ACaptureRequest *aCaptureRequest,

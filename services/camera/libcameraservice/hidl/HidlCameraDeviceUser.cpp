@@ -41,6 +41,7 @@ using hardware::Return;
 using hardware::Void;
 using HSubmitInfo = device::V2_0::SubmitInfo;
 using hardware::camera2::params::OutputConfiguration;
+using hardware::camera2::params::SessionConfiguration;
 
 static constexpr int32_t CAMERA_REQUEST_METADATA_QUEUE_SIZE = 1 << 20 /* 1 MB */;
 static constexpr int32_t CAMERA_RESULT_METADATA_QUEUE_SIZE = 1 << 20 /* 1 MB */;
@@ -253,6 +254,18 @@ Return<HStatus> HidlCameraDeviceUser::updateOutputConfiguration(
     OutputConfiguration outputConfiguration = convertFromHidl(hOutputConfiguration);
     binder::Status ret = mDeviceRemote->updateOutputConfiguration(streamId, outputConfiguration);
     return B2HStatus(ret);
+}
+
+Return<void> HidlCameraDeviceUser::isSessionConfigurationSupported(
+    const HSessionConfiguration& hSessionConfiguration,
+    isSessionConfigurationSupported_cb _hidl_cb) {
+    bool supported = false;
+    SessionConfiguration sessionConfiguration = convertFromHidl(hSessionConfiguration);
+    binder::Status ret = mDeviceRemote->isSessionConfigurationSupported(
+            sessionConfiguration, &supported);
+    HStatus status = B2HStatus(ret);
+    _hidl_cb(status, supported);
+    return Void();
 }
 
 } // implementation
