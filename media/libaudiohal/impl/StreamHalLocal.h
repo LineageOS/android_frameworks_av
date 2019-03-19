@@ -205,10 +205,10 @@ class StreamInHalLocal : public StreamInHalInterface, public StreamHalLocal {
     virtual status_t getActiveMicrophones(std::vector<media::MicrophoneInfo> *microphones);
 
     // Sets microphone direction (for processing)
-    virtual status_t setMicrophoneDirection(audio_microphone_direction_t direction);
+    virtual status_t setPreferredMicrophoneDirection(audio_microphone_direction_t direction);
 
     // Sets microphone zoom (for processing)
-    virtual status_t setMicrophoneFieldDimension(float zoom);
+    virtual status_t setPreferredMicrophoneFieldDimension(float zoom);
 
     // Called when the metadata of the stream's sink has been changed.
     status_t updateSinkMetadata(const SinkMetadata& sinkMetadata) override;

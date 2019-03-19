@@ -70,8 +70,8 @@ struct AudioSource : public MediaSource, public MediaBufferObserver {
     status_t removeAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback);
 
     status_t getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
-    status_t setMicrophoneDirection(audio_microphone_direction_t direction);
-    status_t setMicrophoneFieldDimension(float zoom);
+    status_t setPreferredMicrophoneDirection(audio_microphone_direction_t direction);
+    status_t setPreferredMicrophoneFieldDimension(float zoom);
 
     status_t getPortId(audio_port_handle_t *portId) const;
 

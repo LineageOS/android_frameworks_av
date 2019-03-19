@@ -510,18 +510,18 @@ status_t AudioSource::getActiveMicrophones(
     return NO_INIT;
 }
 
-status_t AudioSource::setMicrophoneDirection(audio_microphone_direction_t direction) {
-    ALOGV("setMicrophoneDirection(%d)", direction);
+status_t AudioSource::setPreferredMicrophoneDirection(audio_microphone_direction_t direction) {
+    ALOGV("setPreferredMicrophoneDirection(%d)", direction);
     if (mRecord != 0) {
-        return mRecord->setMicrophoneDirection(direction);
+        return mRecord->setPreferredMicrophoneDirection(direction);
     }
     return NO_INIT;
 }
 
-status_t AudioSource::setMicrophoneFieldDimension(float zoom) {
-    ALOGV("setMicrophoneFieldDimension(%f)", zoom);
+status_t AudioSource::setPreferredMicrophoneFieldDimension(float zoom) {
+    ALOGV("setPreferredMicrophoneFieldDimension(%f)", zoom);
     if (mRecord != 0) {
-        return mRecord->setMicrophoneFieldDimension(zoom);
+        return mRecord->setPreferredMicrophoneFieldDimension(zoom);
     }
     return NO_INIT;
 }

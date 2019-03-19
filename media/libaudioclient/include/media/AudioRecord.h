@@ -542,11 +542,11 @@ public:
 
     /* Set the Microphone direction (for processing purposes).
      */
-            status_t    setMicrophoneDirection(audio_microphone_direction_t direction);
+            status_t    setPreferredMicrophoneDirection(audio_microphone_direction_t direction);
 
     /* Set the Microphone zoom factor (for processing purposes).
      */
-            status_t    setMicrophoneFieldDimension(float zoom);
+            status_t    setPreferredMicrophoneFieldDimension(float zoom);
 
      /* Get the unique port ID assigned to this AudioRecord instance by audio policy manager.
       * The ID is unique across all audioserver clients and can change during the life cycle
