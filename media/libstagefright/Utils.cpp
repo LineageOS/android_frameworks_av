@@ -646,6 +646,14 @@ static std::vector<std::pair<const char *, uint32_t>> bufferMappings {
     }
 };
 
+static std::vector<std::pair<const char *, uint32_t>> CSDMappings {
+    {
+        { "csd-0", kKeyOpaqueCSD0 },
+        { "csd-1", kKeyOpaqueCSD1 },
+        { "csd-2", kKeyOpaqueCSD2 },
+    }
+};
+
 void convertMessageToMetaDataFromMappings(const sp<AMessage> &msg, sp<MetaData> &meta) {
     for (auto elem : stringMappings) {
         AString value;
@@ -676,6 +684,14 @@ void convertMessageToMetaDataFromMappings(const sp<AMessage> &msg, sp<MetaData> 
     }
 
     for (auto elem : bufferMappings) {
+        sp<ABuffer> value;
+        if (msg->findBuffer(elem.first, &value)) {
+            meta->setData(elem.second,
+                    MetaDataBase::Type::TYPE_NONE, value->data(), value->size());
+        }
+    }
+
+    for (auto elem : CSDMappings) {
         sp<ABuffer> value;
         if (msg->findBuffer(elem.first, &value)) {
             meta->setData(elem.second,
@@ -719,6 +735,18 @@ void convertMetaDataToMessageFromMappings(const MetaDataBase *meta, sp<AMessage>
         size_t size;
         if (meta->findData(elem.second, &type, &data, &size)) {
             sp<ABuffer> buf = ABuffer::CreateAsCopy(data, size);
+            format->setBuffer(elem.first, buf);
+        }
+    }
+
+    for (auto elem : CSDMappings) {
+        uint32_t type;
+        const void* data;
+        size_t size;
+        if (meta->findData(elem.second, &type, &data, &size)) {
+            sp<ABuffer> buf = ABuffer::CreateAsCopy(data, size);
+            buf->meta()->setInt32("csd", true);
+            buf->meta()->setInt64("timeUs", 0);
             format->setBuffer(elem.first, buf);
         }
     }
@@ -1249,30 +1277,6 @@ status_t convertMetaDataToMessage(
     } else if (meta->findData(kKeyD263, &type, &data, &size)) {
         const uint8_t *ptr = (const uint8_t *)data;
         parseH263ProfileLevelFromD263(ptr, size, msg);
-    } else if (meta->findData(kKeyVorbisInfo, &type, &data, &size)) {
-        sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
-        if (buffer.get() == NULL || buffer->base() == NULL) {
-            return NO_MEMORY;
-        }
-        memcpy(buffer->data(), data, size);
-
-        buffer->meta()->setInt32("csd", true);
-        buffer->meta()->setInt64("timeUs", 0);
-        msg->setBuffer("csd-0", buffer);
-
-        if (!meta->findData(kKeyVorbisBooks, &type, &data, &size)) {
-            return -EINVAL;
-        }
-
-        buffer = new (std::nothrow) ABuffer(size);
-        if (buffer.get() == NULL || buffer->base() == NULL) {
-            return NO_MEMORY;
-        }
-        memcpy(buffer->data(), data, size);
-
-        buffer->meta()->setInt32("csd", true);
-        buffer->meta()->setInt64("timeUs", 0);
-        msg->setBuffer("csd-1", buffer);
     } else if (meta->findData(kKeyOpusHeader, &type, &data, &size)) {
         sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
         if (buffer.get() == NULL || buffer->base() == NULL) {
@@ -1311,16 +1315,6 @@ status_t convertMetaDataToMessage(
         buffer->meta()->setInt32("csd", true);
         buffer->meta()->setInt64("timeUs", 0);
         msg->setBuffer("csd-2", buffer);
-    } else if (meta->findData(kKeyFlacMetadata, &type, &data, &size)) {
-        sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
-        if (buffer.get() == NULL || buffer->base() == NULL) {
-            return NO_MEMORY;
-        }
-        memcpy(buffer->data(), data, size);
-
-        buffer->meta()->setInt32("csd", true);
-        buffer->meta()->setInt64("timeUs", 0);
-        msg->setBuffer("csd-0", buffer);
     } else if (meta->findData(kKeyVp9CodecPrivate, &type, &data, &size)) {
         sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
         if (buffer.get() == NULL || buffer->base() == NULL) {
@@ -1796,11 +1790,6 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             }
             if (seekPreRollBuf) {
                 meta->setData(kKeyOpusSeekPreRoll, 0, seekPreRollBuf, seekPreRollBufSize);
-            }
-        } else if (mime == MEDIA_MIMETYPE_AUDIO_VORBIS) {
-            meta->setData(kKeyVorbisInfo, 0, csd0->data(), csd0->size());
-            if (msg->findBuffer("csd-1", &csd1)) {
-                meta->setData(kKeyVorbisBooks, 0, csd1->data(), csd1->size());
             }
         } else if (mime == MEDIA_MIMETYPE_AUDIO_ALAC) {
             meta->setData(kKeyAlacMagicCookie, 0, csd0->data(), csd0->size());
