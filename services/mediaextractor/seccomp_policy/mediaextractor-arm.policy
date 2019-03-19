@@ -14,6 +14,7 @@ getuid32: 1
 setpriority: 1
 sigaltstack: 1
 openat: 1
+open: 1
 clone: 1
 read: 1
 clock_gettime: 1
