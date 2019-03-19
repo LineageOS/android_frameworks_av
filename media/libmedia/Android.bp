@@ -1,3 +1,10 @@
+cc_defaults {
+    name: "libmedia_defaults",
+    include_dirs: [
+        "bionic/libc/private",
+    ],
+}
+
 cc_library_headers {
     name: "libmedia_headers",
     vendor_available: true,
@@ -149,6 +156,8 @@ cc_library_static {
 cc_library {
     name: "libmedia",
 
+    defaults: [ "libmedia_defaults" ],
+
     srcs: [
         "IDataSource.cpp",
         "BufferingSettings.cpp",
@@ -258,6 +267,8 @@ cc_library {
 
 cc_library_static {
     name: "libmedia_player2_util",
+
+    defaults: [ "libmedia_defaults" ],
 
     srcs: [
         "AudioParameter.cpp",
