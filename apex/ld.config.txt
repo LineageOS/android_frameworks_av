@@ -61,8 +61,7 @@ namespace.platform.isolated = true
 namespace.platform.search.paths = /system/${LIB}
 namespace.platform.asan.search.paths = /data/asan/system/${LIB}
 
-# /system/lib/libc.so, etc are symlinks to
-/apex/com.android.lib/lib/bionic/libc.so, etc.
+# /system/lib/libc.so, etc are symlinks to /apex/com.android.lib/lib/bionic/libc.so, etc.
 # Add /apex/... pat to the permitted paths because linker uses realpath(3)
 # to check the accessibility of the lib. We could add this to search.paths
 # instead but that makes the resolution of bionic libs be dependent on

@@ -3216,22 +3216,42 @@ sp<IEffect> AudioFlinger::createEffect(
         goto Exit;
     }
 
-    // check audio settings permission for global effects
-    if (sessionId == AUDIO_SESSION_OUTPUT_MIX && !settingsAllowed()) {
-        lStatus = PERMISSION_DENIED;
-        goto Exit;
-    }
-
-    // Session AUDIO_SESSION_OUTPUT_STAGE is reserved for output stage effects
-    // that can only be created by audio policy manager
-    if (sessionId == AUDIO_SESSION_OUTPUT_STAGE && !isAudioServerUid(callingUid)) {
-        lStatus = PERMISSION_DENIED;
-        goto Exit;
-    }
-
     if (mEffectsFactoryHal == 0) {
+        ALOGE("%s: no effects factory hal", __func__);
         lStatus = NO_INIT;
         goto Exit;
+    }
+
+    // check audio settings permission for global effects
+    if (sessionId == AUDIO_SESSION_OUTPUT_MIX) {
+        if (!settingsAllowed()) {
+            ALOGE("%s: no permission for AUDIO_SESSION_OUTPUT_MIX", __func__);
+            lStatus = PERMISSION_DENIED;
+            goto Exit;
+        }
+    } else if (sessionId == AUDIO_SESSION_OUTPUT_STAGE) {
+        if (!isAudioServerUid(callingUid)) {
+            ALOGE("%s: only APM can create using AUDIO_SESSION_OUTPUT_STAGE", __func__);
+            lStatus = PERMISSION_DENIED;
+            goto Exit;
+        }
+
+        if (io == AUDIO_IO_HANDLE_NONE) {
+            ALOGE("%s: APM must specify output when using AUDIO_SESSION_OUTPUT_STAGE", __func__);
+            lStatus = BAD_VALUE;
+            goto Exit;
+        }
+    } else {
+        // general sessionId.
+
+        if (audio_unique_id_get_use(sessionId) != AUDIO_UNIQUE_ID_USE_SESSION) {
+            ALOGE("%s: invalid sessionId %d", __func__, sessionId);
+            lStatus = BAD_VALUE;
+            goto Exit;
+        }
+
+        // TODO: should we check if the callingUid (limited to pid) is in mAudioSessionRefs
+        // to prevent creating an effect when one doesn't actually have track with that session?
     }
 
     {
@@ -3279,12 +3299,6 @@ sp<IEffect> AudioFlinger::createEffect(
         // because of code checking output when entering the function.
         // Note: io is never 0 when creating an effect on an input
         if (io == AUDIO_IO_HANDLE_NONE) {
-            if (sessionId == AUDIO_SESSION_OUTPUT_STAGE) {
-                // output must be specified by AudioPolicyManager when using session
-                // AUDIO_SESSION_OUTPUT_STAGE
-                lStatus = BAD_VALUE;
-                goto Exit;
-            }
             // look for the thread where the specified audio session is present
             io = findIoHandleBySessionId_l(sessionId, mPlaybackThreads);
             if (io == AUDIO_IO_HANDLE_NONE) {

@@ -22,7 +22,6 @@ LOCAL_REQUIRED_MODULES_x86_64 := crash_dump.policy mediaextractor.policy
 LOCAL_SRC_FILES := main_extractorservice.cpp
 LOCAL_SHARED_LIBRARIES := libmedia libmediaextractorservice libbinder libutils \
     liblog libandroidicu libavservices_minijail
-LOCAL_STATIC_LIBRARIES := libicuandroid_utils
 LOCAL_MODULE:= mediaextractor
 LOCAL_INIT_RC := mediaextractor.rc
 LOCAL_C_INCLUDES := frameworks/av/media/libmedia
