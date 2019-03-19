@@ -86,6 +86,7 @@ cc_library_shared {
     export_shared_lib_headers: [
         "android.hidl.token@1.0-utils",
         "android.hardware.media.omx@1.0",
+        "libgui",
         "libstagefright_foundation",
         "libui",
     ],
