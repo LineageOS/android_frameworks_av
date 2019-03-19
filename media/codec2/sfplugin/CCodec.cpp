@@ -271,9 +271,12 @@ public:
             if (mNode != nullptr) {
                 OMX_PARAM_U32TYPE ptrGapParam = {};
                 ptrGapParam.nSize = sizeof(OMX_PARAM_U32TYPE);
-                ptrGapParam.nU32 = (config.mMinAdjustedFps > 0)
+                float gap = (config.mMinAdjustedFps > 0)
                         ? c2_min(INT32_MAX + 0., 1e6 / config.mMinAdjustedFps + 0.5)
                         : c2_max(0. - INT32_MAX, -1e6 / config.mFixedAdjustedFps - 0.5);
+                // float -> uint32_t is undefined if the value is negative.
+                // First convert to int32_t to ensure the expected behavior.
+                ptrGapParam.nU32 = int32_t(gap);
                 (void)mNode->setParameter(
                         (OMX_INDEXTYPE)OMX_IndexParamMaxFrameDurationForBitrateControl,
                         &ptrGapParam, sizeof(ptrGapParam));
@@ -282,7 +285,7 @@ public:
 
         // max fps
         // TRICKY: we do not unset max fps to 0 unless using fixed fps
-        if ((config.mMaxFps > 0 || (config.mFixedAdjustedFps > 0 && config.mMaxFps == 0))
+        if ((config.mMaxFps > 0 || (config.mFixedAdjustedFps > 0 && config.mMaxFps == -1))
                 && config.mMaxFps != mConfig.mMaxFps) {
             status_t res = GetStatus(mSource->setMaxFps(config.mMaxFps));
             status << " maxFps=" << config.mMaxFps;
@@ -764,13 +767,16 @@ void CCodec::configure(const sp<AMessage> &msg) {
                 if (msg->findInt64(KEY_REPEAT_PREVIOUS_FRAME_AFTER, &value) && value > 0) {
                     config->mISConfig->mMinFps = 1e6 / value;
                 }
-                (void)msg->findFloat(
-                        KEY_MAX_FPS_TO_ENCODER, &config->mISConfig->mMaxFps);
+                if (!msg->findFloat(
+                        KEY_MAX_FPS_TO_ENCODER, &config->mISConfig->mMaxFps)) {
+                    config->mISConfig->mMaxFps = -1;
+                }
                 config->mISConfig->mMinAdjustedFps = 0;
                 config->mISConfig->mFixedAdjustedFps = 0;
                 if (msg->findInt64(KEY_MAX_PTS_GAP_TO_ENCODER, &value)) {
                     if (value < 0 && value >= INT32_MIN) {
                         config->mISConfig->mFixedAdjustedFps = -1e6 / value;
+                        config->mISConfig->mMaxFps = -1;
                     } else if (value > 0 && value <= INT32_MAX) {
                         config->mISConfig->mMinAdjustedFps = 1e6 / value;
                     }
