@@ -80,19 +80,21 @@ const sp<ISoundTriggerHwService> SoundTrigger::getSoundTriggerHwService()
 }
 
 // Static methods
-status_t SoundTrigger::listModules(struct sound_trigger_module_descriptor *modules,
-                                 uint32_t *numModules)
+status_t SoundTrigger::listModules(const String16& opPackageName,
+                                   struct sound_trigger_module_descriptor *modules,
+                                   uint32_t *numModules)
 {
     ALOGV("listModules()");
     const sp<ISoundTriggerHwService> service = getSoundTriggerHwService();
     if (service == 0) {
         return NO_INIT;
     }
-    return service->listModules(modules, numModules);
+    return service->listModules(opPackageName, modules, numModules);
 }
 
-sp<SoundTrigger> SoundTrigger::attach(const sound_trigger_module_handle_t module,
-                                            const sp<SoundTriggerCallback>& callback)
+sp<SoundTrigger> SoundTrigger::attach(const String16& opPackageName,
+                                      const sound_trigger_module_handle_t module,
+                                      const sp<SoundTriggerCallback>& callback)
 {
     ALOGV("attach()");
     sp<SoundTrigger> soundTrigger;
@@ -101,7 +103,8 @@ sp<SoundTrigger> SoundTrigger::attach(const sound_trigger_module_handle_t module
         return soundTrigger;
     }
     soundTrigger = new SoundTrigger(module, callback);
-    status_t status = service->attach(module, soundTrigger, soundTrigger->mISoundTrigger);
+    status_t status = service->attach(opPackageName, module, soundTrigger,
+                                      soundTrigger->mISoundTrigger);
 
     if (status == NO_ERROR && soundTrigger->mISoundTrigger != 0) {
         IInterface::asBinder(soundTrigger->mISoundTrigger)->linkToDeath(soundTrigger);

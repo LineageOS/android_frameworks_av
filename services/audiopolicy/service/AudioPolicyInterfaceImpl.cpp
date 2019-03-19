@@ -385,7 +385,7 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
         return PERMISSION_DENIED;
     }
 
-    bool canCaptureHotword = captureHotwordAllowed(pid, uid);
+    bool canCaptureHotword = captureHotwordAllowed(opPackageName, pid, uid);
     if ((attr->source == AUDIO_SOURCE_HOTWORD) && !canCaptureHotword) {
         return BAD_VALUE;
     }
