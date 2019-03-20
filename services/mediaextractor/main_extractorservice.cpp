@@ -15,6 +15,7 @@
 ** limitations under the License.
 */
 
+#include <aicu/AIcu.h>
 #include <fcntl.h>
 #include <sys/prctl.h>
 #include <sys/wait.h>
@@ -29,7 +30,6 @@
 #include <utils/misc.h>
 
 // from LOCAL_C_INCLUDES
-#include "IcuUtils.h"
 #include "MediaExtractorService.h"
 #include "MediaExtractorUpdateService.h"
 #include "MediaUtils.h"
@@ -59,7 +59,7 @@ int main(int argc __unused, char** argv)
 
     SetUpMinijail(kSystemSeccompPolicyPath, kVendorSeccompPolicyPath);
 
-    InitializeIcuOrDie();
+    AIcu_initializeIcuOrDie();
 
     strcpy(argv[0], "media.extractor");
     sp<ProcessState> proc(ProcessState::self());
