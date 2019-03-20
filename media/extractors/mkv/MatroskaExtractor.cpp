@@ -32,6 +32,7 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaDataUtils.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <utils/String8.h>
 
 #include <arpa/inet.h>
@@ -147,6 +148,7 @@ private:
         AVC,
         AAC,
         HEVC,
+        MP3,
         OTHER
     };
 
@@ -158,6 +160,15 @@ private:
     ssize_t mNALSizeLen;  // for type AVC or HEVC
 
     List<MediaBufferHelper *> mPendingFrames;
+
+    int64_t mCurrentTS; // add for mp3
+    uint32_t mMP3Header;
+
+    media_status_t findMP3Header(uint32_t * header,
+        const uint8_t *dataSource, int length, int *outStartPos);
+    media_status_t mp3FrameRead(
+            MediaBufferHelper **out, const ReadOptions *options,
+            int64_t targetSampleTimeUs);
 
     status_t advance();
 
@@ -225,7 +236,9 @@ MatroskaSource::MatroskaSource(
       mBlockIter(mExtractor,
                  mExtractor->mTracks.itemAt(index).mTrackNum,
                  index),
-      mNALSizeLen(-1) {
+      mNALSizeLen(-1),
+      mCurrentTS(0),
+      mMP3Header(0) {
     MatroskaExtractor::TrackInfo &trackInfo = mExtractor->mTracks.editItemAt(index);
     AMediaFormat *meta = trackInfo.mMeta;
 
@@ -254,6 +267,8 @@ MatroskaSource::MatroskaSource(
         }
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC)) {
         mType = AAC;
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_MPEG)) {
+        mType = MP3;
     }
 }
 
@@ -269,6 +284,16 @@ media_status_t MatroskaSource::start() {
     // allocate one small initial buffer, but leave plenty of room to grow
     mBufferGroup->init(1 /* number of buffers */, 1024 /* buffer size */, 64 /* growth limit */);
     mBlockIter.reset();
+
+    if (mType == MP3 && mMP3Header == 0) {
+        int start = -1;
+        media_status_t err = findMP3Header(&mMP3Header, NULL, 0, &start);
+        if (err != OK) {
+            ALOGE("No mp3 header found");
+            clearPendingFrames();
+            return err;
+        }
+    }
 
     return AMEDIA_OK;
 }
@@ -796,6 +821,188 @@ media_status_t MatroskaSource::readBlock() {
     return AMEDIA_OK;
 }
 
+//the value of kMP3HeaderMask is from MP3Extractor
+static const uint32_t kMP3HeaderMask = 0xfffe0c00;
+
+media_status_t MatroskaSource::findMP3Header(uint32_t * header,
+        const uint8_t *dataSource, int length, int *outStartPos) {
+    if (NULL == header) {
+        ALOGE("header is null!");
+        return AMEDIA_ERROR_END_OF_STREAM;
+    }
+
+    //to find header start position
+    if (0 != *header) {
+        if (NULL == dataSource) {
+            *outStartPos = -1;
+            return AMEDIA_OK;
+        }
+        uint32_t tmpCode = 0;
+        for (int i = 0; i < length; i++) {
+            tmpCode = (tmpCode << 8) + dataSource[i];
+            if ((tmpCode & kMP3HeaderMask) == (*header & kMP3HeaderMask)) {
+                *outStartPos = i - 3;
+                return AMEDIA_OK;
+            }
+        }
+        *outStartPos = -1;
+        return AMEDIA_OK;
+    }
+
+    //to find mp3 header
+    uint32_t code = 0;
+    while (0 == *header) {
+        while (mPendingFrames.empty()) {
+            media_status_t err = readBlock();
+            if (err != OK) {
+                clearPendingFrames();
+                return err;
+            }
+        }
+        MediaBufferHelper *frame = *mPendingFrames.begin();
+        size_t size = frame->range_length();
+        size_t offset = frame->range_offset();
+        size_t i;
+        size_t frame_size;
+        for (i = 0; i < size; i++) {
+            ALOGV("data[%zu]=%x", i, *((uint8_t*)frame->data() + offset + i));
+            code = (code << 8) + *((uint8_t*)frame->data() + offset + i);
+            if (GetMPEGAudioFrameSize(code, &frame_size, NULL, NULL, NULL)) {
+                *header = code;
+                mBlockIter.reset();
+                clearPendingFrames();
+                return AMEDIA_OK;
+            }
+        }
+    }
+
+    return AMEDIA_ERROR_END_OF_STREAM;
+}
+
+media_status_t MatroskaSource::mp3FrameRead(
+        MediaBufferHelper **out, const ReadOptions *options,
+        int64_t targetSampleTimeUs) {
+    MediaBufferHelper *frame = *mPendingFrames.begin();
+    int64_t seekTimeUs;
+    ReadOptions::SeekMode mode;
+    if (options && options->getSeekTo(&seekTimeUs, &mode)) {
+        CHECK(AMediaFormat_getInt64(frame->meta_data(),
+                    AMEDIAFORMAT_KEY_TIME_US, &mCurrentTS));
+        if (mCurrentTS < 0) {
+            mCurrentTS = 0;
+            AMediaFormat_setInt64(frame->meta_data(),
+                    AMEDIAFORMAT_KEY_TIME_US, mCurrentTS);
+        }
+    }
+
+    int32_t start = -1;
+    while (start < 0) {
+        //find header start position
+        findMP3Header(&mMP3Header,
+            (const uint8_t*)frame->data() + frame->range_offset(),
+            frame->range_length(), &start);
+        ALOGV("start=%d, frame->range_length() = %zu, frame->range_offset() =%zu",
+                      start, frame->range_length(), frame->range_offset());
+        if (start >= 0)
+            break;
+        frame->release();
+        mPendingFrames.erase(mPendingFrames.begin());
+        while (mPendingFrames.empty()) {
+            media_status_t err = readBlock();
+            if (err != OK) {
+                clearPendingFrames();
+                return err;
+            }
+        }
+        frame = *mPendingFrames.begin();
+    }
+
+    frame->set_range(frame->range_offset() + start, frame->range_length() - start);
+
+    uint32_t header = *(uint32_t*)((uint8_t*)frame->data() + frame->range_offset());
+    header = ((header >> 24) & 0xff) | ((header >> 8) & 0xff00) |
+                    ((header << 8) & 0xff0000) | ((header << 24) & 0xff000000);
+    size_t frame_size;
+    int out_sampling_rate;
+    int out_channels;
+    int out_bitrate;
+    if (!GetMPEGAudioFrameSize(header, &frame_size,
+                               &out_sampling_rate, &out_channels, &out_bitrate)) {
+        ALOGE("MP3 Header read fail!!");
+        return AMEDIA_ERROR_UNSUPPORTED;
+    }
+
+    MediaBufferHelper *buffer;
+    mBufferGroup->acquire_buffer(&buffer, false /* nonblocking */, frame_size /* requested size */);
+    buffer->set_range(0, frame_size);
+
+    uint8_t *data = static_cast<uint8_t *>(buffer->data());
+    ALOGV("MP3 frame %zu frame->range_length() %zu", frame_size, frame->range_length());
+
+    if (frame_size > frame->range_length()) {
+        memcpy(data, (uint8_t*)(frame->data()) + frame->range_offset(), frame->range_length());
+        size_t sumSize = 0;
+        sumSize += frame->range_length();
+        size_t needSize = frame_size - frame->range_length();
+        frame->release();
+        mPendingFrames.erase(mPendingFrames.begin());
+        while (mPendingFrames.empty()) {
+            media_status_t err = readBlock();
+            if (err != OK) {
+                clearPendingFrames();
+                return err;
+            }
+        }
+        frame = *mPendingFrames.begin();
+        size_t offset = frame->range_offset();
+        size_t size = frame->range_length();
+
+        // the next buffer frame is not enough to fullfill mp3 frame,
+        // we have to read until mp3 frame is completed.
+        while (size < needSize) {
+            memcpy(data + sumSize, (uint8_t*)(frame->data()) + offset, size);
+            needSize -= size;
+            sumSize += size;
+            frame->release();
+            mPendingFrames.erase(mPendingFrames.begin());
+            while (mPendingFrames.empty()) {
+                media_status_t err = readBlock();
+                if (err != OK) {
+                    clearPendingFrames();
+                    return err;
+                }
+            }
+            frame = *mPendingFrames.begin();
+            offset = frame->range_offset();
+            size = frame->range_length();
+        }
+        memcpy(data + sumSize, (uint8_t*)(frame->data()) + offset, needSize);
+        frame->set_range(offset + needSize, size - needSize);
+     } else {
+        size_t offset = frame->range_offset();
+        size_t size = frame->range_length();
+        memcpy(data, (uint8_t*)(frame->data()) + offset, frame_size);
+        frame->set_range(offset + frame_size, size - frame_size);
+    }
+    if (frame->range_length() < 4) {
+        frame->release();
+        frame = NULL;
+        mPendingFrames.erase(mPendingFrames.begin());
+    }
+    ALOGV("MatroskaSource::read MP3 frame kKeyTime=%lld,kKeyTargetTime=%lld",
+                    (long long)mCurrentTS, (long long)targetSampleTimeUs);
+    AMediaFormat_setInt64(buffer->meta_data(),
+            AMEDIAFORMAT_KEY_TIME_US, mCurrentTS);
+    mCurrentTS += (int64_t)frame_size * 8000ll / out_bitrate;
+
+    if (targetSampleTimeUs >= 0ll)
+        AMediaFormat_setInt64(buffer->meta_data(),
+                AMEDIAFORMAT_KEY_TARGET_TIME, targetSampleTimeUs);
+    *out = buffer;
+    ALOGV("MatroskaSource::read MP3, keyTime=%lld for next frame", (long long)mCurrentTS);
+    return AMEDIA_OK;
+}
+
 media_status_t MatroskaSource::read(
         MediaBufferHelper **out, const ReadOptions *options) {
     *out = NULL;
@@ -831,6 +1038,10 @@ media_status_t MatroskaSource::read(
 
             return err;
         }
+    }
+
+    if (mType == MP3) {
+        return mp3FrameRead(out, options, targetSampleTimeUs);
     }
 
     MediaBufferHelper *frame = *mPendingFrames.begin();

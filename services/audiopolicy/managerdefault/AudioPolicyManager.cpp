@@ -2389,14 +2389,9 @@ status_t AudioPolicyManager::setStreamVolumeIndex(audio_stream_type_t stream,
                                                   audio_devices_t device)
 {
     auto attributes = mEngine->getAttributesForStreamType(stream);
-    auto volumeGroup = mEngine->getVolumeGroupForStreamType(stream);
-    if (volumeGroup == VOLUME_GROUP_NONE) {
-        ALOGE("%s: no group matching with stream %s", __FUNCTION__, toString(stream).c_str());
-        return BAD_VALUE;
-    }
     ALOGV("%s: stream %s attributes=%s", __func__,
           toString(stream).c_str(), toString(attributes).c_str());
-    return setVolumeGroupIndex(getVolumeCurves(stream), volumeGroup, index, device, attributes);
+    return setVolumeIndexForAttributes(attributes, index, device);
 }
 
 status_t AudioPolicyManager::getStreamVolumeIndex(audio_stream_type_t stream,
@@ -2411,27 +2406,19 @@ status_t AudioPolicyManager::getStreamVolumeIndex(audio_stream_type_t stream,
     return getVolumeIndex(getVolumeCurves(stream), *index, device);
 }
 
-status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_t &attr,
+status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_t &attributes,
                                                          int index,
                                                          audio_devices_t device)
 {
     // Get Volume group matching the Audio Attributes
-    auto volumeGroup = mEngine->getVolumeGroupForAttributes(attr);
-    if (volumeGroup == VOLUME_GROUP_NONE) {
-        ALOGD("%s: could not find group matching with %s", __FUNCTION__, toString(attr).c_str());
+    auto group = mEngine->getVolumeGroupForAttributes(attributes);
+    if (group == VOLUME_GROUP_NONE) {
+        ALOGD("%s: no group matching with %s", __FUNCTION__, toString(attributes).c_str());
         return BAD_VALUE;
     }
-    ALOGV("%s: group %d matching with %s", __FUNCTION__, volumeGroup, toString(attr).c_str());
-    return setVolumeGroupIndex(getVolumeCurves(attr), volumeGroup, index, device, attr);
-}
-
-status_t AudioPolicyManager::setVolumeGroupIndex(IVolumeCurves &curves, volume_group_t group,
-                                                 int index,
-                                                 audio_devices_t device,
-                                                 const audio_attributes_t attributes)
-{
-    ALOGVV("%s: group=%d", __func__, group);
+    ALOGV("%s: group %d matching with %s", __FUNCTION__, group, toString(attributes).c_str());
     status_t status = NO_ERROR;
+    IVolumeCurves &curves = getVolumeCurves(attributes);
     VolumeSource vs = toVolumeSource(group);
     product_strategy_t strategy = mEngine->getProductStrategyForAttributes(attributes);
 
@@ -2440,6 +2427,21 @@ status_t AudioPolicyManager::setVolumeGroupIndex(IVolumeCurves &curves, volume_g
         ALOGE("%s failed to set curve index for group %d device 0x%X", __func__, group, device);
         return status;
     }
+
+    audio_devices_t curSrcDevice;
+    auto curCurvAttrs = curves.getAttributes();
+    if (!curCurvAttrs.empty() && curCurvAttrs.front() != defaultAttr) {
+        auto attr = curCurvAttrs.front();
+        curSrcDevice = mEngine->getOutputDevicesForAttributes(attr, nullptr, false).types();
+    } else if (!curves.getStreamTypes().empty()) {
+        auto stream = curves.getStreamTypes().front();
+        curSrcDevice = mEngine->getOutputDevicesForStream(stream, false).types();
+    } else {
+        ALOGE("%s: Invalid src %d: no valid attributes nor stream",__func__, vs);
+        return BAD_VALUE;
+    }
+    curSrcDevice = Volume::getDeviceForVolume(curSrcDevice);
+
     // update volume on all outputs and streams matching the following:
     // - The requested stream (or a stream matching for volume control) is active on the output
     // - The device (or devices) selected by the engine for this stream includes
@@ -2450,7 +2452,7 @@ status_t AudioPolicyManager::setVolumeGroupIndex(IVolumeCurves &curves, volume_g
     // no specific device volume value exists for currently selected device.
     for (size_t i = 0; i < mOutputs.size(); i++) {
         sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
-        audio_devices_t curDevice = Volume::getDeviceForVolume(desc->devices().types());
+        audio_devices_t curDevice = desc->devices().types();
 
         // Inter / intra volume group priority management: Loop on strategies arranged by priority
         // If a higher priority strategy is active, and the output is routed to a device with a
@@ -2501,48 +2503,28 @@ status_t AudioPolicyManager::setVolumeGroupIndex(IVolumeCurves &curves, volume_g
             }
             continue;
         }
-        for (auto curVolGroup : getVolumeGroups()) {
-            VolumeSource curVolSrc = toVolumeSource(curVolGroup);
-            if (curVolSrc != vs) {
-                continue;
-            }
-            if (!(desc->isActive(vs) || isInCall())) {
-                continue;
-            }
-            audio_devices_t curSrcDevice;
-            auto &curCurves = getVolumeCurves(curVolSrc);
-            auto curCurvAttrs = curCurves.getAttributes();
-            if (!curCurvAttrs.empty() && curCurvAttrs.front() != defaultAttr) {
-                auto attr = curCurvAttrs.front();
-                curSrcDevice = mEngine->getOutputDevicesForAttributes(attr, nullptr, false).types();
-            } else if (!curCurves.getStreamTypes().empty()) {
-                auto stream = curCurves.getStreamTypes().front();
-                curSrcDevice = mEngine->getOutputDevicesForStream(stream, false).types();
-            } else {
-                ALOGE("%s: Invalid src %d: no valid attributes nor stream",__func__, curVolSrc);
-                continue;
-            }
-            curSrcDevice = Volume::getDeviceForVolume(curSrcDevice);
-            if ((device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) && ((curDevice & device) == 0)) {
-                continue;
-            }
-            if (device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) {
-                curSrcDevice |= device;
-                applyVolume = (curDevice & curSrcDevice) != 0;
-            } else {
-                applyVolume = !curves.hasVolumeIndexForDevice(curSrcDevice);
-            }
-            if (applyVolume) {
-                //FIXME: workaround for truncated touch sounds
-                // delayed volume change for system stream to be removed when the problem is
-                // handled by system UI
-                status_t volStatus = checkAndSetVolume(
-                            curCurves, curVolSrc, index, desc, curDevice,
-                            ((vs == toVolumeSource(AUDIO_STREAM_SYSTEM))?
-                                 TOUCH_SOUND_FIXED_DELAY_MS : 0));
-                if (volStatus != NO_ERROR) {
-                    status = volStatus;
-                }
+        if (!(desc->isActive(vs) || isInCall())) {
+            continue;
+        }
+        if ((device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) && ((curDevice & device) == 0)) {
+            continue;
+        }
+        if (device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) {
+            curSrcDevice |= device;
+            applyVolume = (Volume::getDeviceForVolume(curDevice) & curSrcDevice) != 0;
+        } else {
+            applyVolume = !curves.hasVolumeIndexForDevice(curSrcDevice);
+        }
+        if (applyVolume) {
+            //FIXME: workaround for truncated touch sounds
+            // delayed volume change for system stream to be removed when the problem is
+            // handled by system UI
+            status_t volStatus = checkAndSetVolume(
+                        curves, vs, index, desc, curDevice,
+                        ((vs == toVolumeSource(AUDIO_STREAM_SYSTEM))?
+                             TOUCH_SOUND_FIXED_DELAY_MS : 0));
+            if (volStatus != NO_ERROR) {
+                status = volStatus;
             }
         }
     }
@@ -5730,14 +5712,14 @@ float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
 }
 
 int AudioPolicyManager::rescaleVolumeIndex(int srcIndex,
-                                           audio_stream_type_t srcStream,
-                                           audio_stream_type_t dstStream)
+                                           VolumeSource fromVolumeSource,
+                                           VolumeSource toVolumeSource)
 {
-    if (srcStream == dstStream) {
+    if (fromVolumeSource == toVolumeSource) {
         return srcIndex;
     }
-    auto &srcCurves = getVolumeCurves(srcStream);
-    auto &dstCurves = getVolumeCurves(dstStream);
+    auto &srcCurves = getVolumeCurves(fromVolumeSource);
+    auto &dstCurves = getVolumeCurves(toVolumeSource);
     float minSrc = (float)srcCurves.getVolumeIndexMin();
     float maxSrc = (float)srcCurves.getVolumeIndexMax();
     float minDst = (float)dstCurves.getVolumeIndexMin();
@@ -5851,12 +5833,8 @@ void AudioPolicyManager::setVolumeSourceMute(VolumeSource volumeSource,
                                              bool on,
                                              const sp<AudioOutputDescriptor>& outputDesc,
                                              int delayMs,
-                                             audio_devices_t device,
-                                             bool activeOnly)
+                                             audio_devices_t device)
 {
-    if (activeOnly && !outputDesc->isActive(volumeSource)) {
-        return;
-    }
     if (device == AUDIO_DEVICE_NONE) {
         device = outputDesc->devices().types();
     }
