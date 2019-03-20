@@ -5695,6 +5695,8 @@ typedef enum acamera_metadata_tag {
      * <p>In both cases, all images generated for a particular capture request still carry the same
      * timestamps, so that they can be used to look up the matching frame number and
      * onCaptureStarted callback.</p>
+     * <p>This tag is only applicable if the logical camera device supports concurrent physical
+     * streams from different physical cameras.</p>
      */
     ACAMERA_LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE =             // byte (acamera_metadata_enum_android_logical_multi_camera_sensor_sync_type_t)
             ACAMERA_LOGICAL_MULTI_CAMERA_START + 1,
@@ -7581,14 +7583,23 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
     ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_MOTION_TRACKING           = 10,
 
     /**
-     * <p>The camera device is a logical camera backed by two or more physical cameras. In
-     * API level 28, the physical cameras must also be exposed to the application via
-     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraManager.html#getCameraIdList">CameraManager#getCameraIdList</a>. Starting from API
-     * level 29, some or all physical cameras may not be independently exposed to the
-     * application, in which case the physical camera IDs will not be available in
-     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraManager.html#getCameraIdList">CameraManager#getCameraIdList</a>. But the application
-     * can still query the physical cameras' characteristics by calling
-     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraManager.html#getCameraCharacteristics">CameraManager#getCameraCharacteristics</a>.</p>
+     * <p>The camera device is a logical camera backed by two or more physical cameras.</p>
+     * <p>In API level 28, the physical cameras must also be exposed to the application via
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraManager.html#getCameraIdList">CameraManager#getCameraIdList</a>.</p>
+     * <p>Starting from API level 29, some or all physical cameras may not be independently
+     * exposed to the application, in which case the physical camera IDs will not be
+     * available in <a href="https://developer.android.com/reference/android/hardware/camera2/CameraManager.html#getCameraIdList">CameraManager#getCameraIdList</a>. But the
+     * application can still query the physical cameras' characteristics by calling
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraManager.html#getCameraCharacteristics">CameraManager#getCameraCharacteristics</a>. Additionally,
+     * if a physical camera is hidden from camera ID list, the mandatory stream combinations
+     * for that physical camera must be supported through the logical camera using physical
+     * streams.</p>
+     * <p>Combinations of logical and physical streams, or physical streams from different
+     * physical cameras are not guaranteed. However, if the camera device supports
+     * {@link ACameraDevice_isSessionConfigurationSupported },
+     * application must be able to query whether a stream combination involving physical
+     * streams is supported by calling
+     * {@link ACameraDevice_isSessionConfigurationSupported }.</p>
      * <p>Camera application shouldn't assume that there are at most 1 rear camera and 1 front
      * camera in the system. For an application that switches between front and back cameras,
      * the recommendation is to switch between the first rear camera and the first front
@@ -7613,24 +7624,6 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      *   the same.</li>
      * <li>The logical camera must be LIMITED or higher device.</li>
      * </ul>
-     * <p>Both the logical camera device and its underlying physical devices support the
-     * mandatory stream combinations required for their device levels.</p>
-     * <p>Additionally, for each guaranteed stream combination, the logical camera supports:</p>
-     * <ul>
-     * <li>For each guaranteed stream combination, the logical camera supports replacing one
-     *   logical {@link AIMAGE_FORMAT_YUV_420_888 YUV_420_888}
-     *   or raw stream with two physical streams of the same size and format, each from a
-     *   separate physical camera, given that the size and format are supported by both
-     *   physical cameras.</li>
-     * <li>If the logical camera doesn't advertise RAW capability, but the underlying physical
-     *   cameras do, the logical camera will support guaranteed stream combinations for RAW
-     *   capability, except that the RAW streams will be physical streams, each from a separate
-     *   physical camera. This is usually the case when the physical cameras have different
-     *   sensor sizes.</li>
-     * </ul>
-     * <p>Using physical streams in place of a logical stream of the same size and format will
-     * not slow down the frame rate of the capture, as long as the minimum frame duration
-     * of the physical and logical streams are the same.</p>
      * <p>A logical camera device's dynamic metadata may contain
      * ACAMERA_LOGICAL_MULTI_CAMERA_ACTIVE_PHYSICAL_ID to notify the application of the current
      * active physical camera Id. An active physical camera is the physical camera from which
