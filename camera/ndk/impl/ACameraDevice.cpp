@@ -45,6 +45,7 @@ const char* CameraDevice::kCaptureFailureKey = "CaptureFailure";
 const char* CameraDevice::kSequenceIdKey     = "SequenceId";
 const char* CameraDevice::kFrameNumberKey    = "FrameNumber";
 const char* CameraDevice::kAnwKey            = "Anw";
+const char* CameraDevice::kFailingPhysicalCameraId= "FailingPhysicalCameraId";
 
 /**
  * CameraDevice Implementation
@@ -818,10 +819,19 @@ CameraDevice::onCaptureErrorLocked(
         failure->wasImageCaptured = (errorCode ==
                 hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT);
 
-        sp<AMessage> msg = new AMessage(kWhatCaptureFail, mHandler);
+        sp<AMessage> msg = new AMessage(cbh.mIsLogicalCameraCallback ? kWhatLogicalCaptureFail :
+                kWhatCaptureFail, mHandler);
         msg->setPointer(kContextKey, cbh.mContext);
         msg->setObject(kSessionSpKey, session);
-        msg->setPointer(kCallbackFpKey, (void*) onError);
+        if (cbh.mIsLogicalCameraCallback) {
+            if (resultExtras.errorPhysicalCameraId.size() > 0) {
+                String8 cameraId(resultExtras.errorPhysicalCameraId);
+                msg->setString(kFailingPhysicalCameraId, cameraId.string(), cameraId.size());
+            }
+            msg->setPointer(kCallbackFpKey, (void*) cbh.mOnLogicalCameraCaptureFailed);
+        } else {
+            msg->setPointer(kCallbackFpKey, (void*) onError);
+        }
         msg->setObject(kCaptureRequestKey, request);
         msg->setObject(kCaptureFailureKey, failure);
         postSessionMsgAndCleanup(msg);
@@ -846,6 +856,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
         case kWhatCaptureResult:
         case kWhatLogicalCaptureResult:
         case kWhatCaptureFail:
+        case kWhatLogicalCaptureFail:
         case kWhatCaptureSeqEnd:
         case kWhatCaptureSeqAbort:
         case kWhatCaptureBufferLost:
@@ -917,6 +928,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
         case kWhatCaptureResult:
         case kWhatLogicalCaptureResult:
         case kWhatCaptureFail:
+        case kWhatLogicalCaptureFail:
         case kWhatCaptureSeqEnd:
         case kWhatCaptureSeqAbort:
         case kWhatCaptureBufferLost:
@@ -935,6 +947,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                 case kWhatCaptureResult:
                 case kWhatLogicalCaptureResult:
                 case kWhatCaptureFail:
+                case kWhatLogicalCaptureFail:
                 case kWhatCaptureBufferLost:
                     found = msg->findObject(kCaptureRequestKey, &obj);
                     if (!found) {
@@ -1089,6 +1102,39 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                     freeACaptureRequest(request);
                     break;
                 }
+                case kWhatLogicalCaptureFail:
+                {
+                    ACameraCaptureSession_logicalCamera_captureCallback_failed onFail;
+                    found = msg->findPointer(kCallbackFpKey, (void**) &onFail);
+                    if (!found) {
+                        ALOGE("%s: Cannot find capture fail callback!", __FUNCTION__);
+                        return;
+                    }
+                    if (onFail == nullptr) {
+                        return;
+                    }
+
+                    found = msg->findObject(kCaptureFailureKey, &obj);
+                    if (!found) {
+                        ALOGE("%s: Cannot find capture failure!", __FUNCTION__);
+                        return;
+                    }
+                    sp<CameraCaptureFailure> failureSp(
+                            static_cast<CameraCaptureFailure*>(obj.get()));
+                    ALogicalCameraCaptureFailure failure;
+                    AString physicalCameraId;
+                    found = msg->findString(kFailingPhysicalCameraId, &physicalCameraId);
+                    if (found && !physicalCameraId.empty()) {
+                        failure.physicalCameraId = physicalCameraId.c_str();
+                    } else {
+                        failure.physicalCameraId = nullptr;
+                    }
+                    failure.captureFailure = *failureSp;
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, mId);
+                    (*onFail)(context, session.get(), request, &failure);
+                    freeACaptureRequest(request);
+                    break;
+                }
                 case kWhatCaptureSeqEnd:
                 {
                     ACameraCaptureSession_captureCallback_sequenceEnd onSeqEnd;
@@ -1184,6 +1230,7 @@ CameraDevice::CallbackHolder::CallbackHolder(
 
     if (cbs != nullptr) {
         mOnCaptureCompleted = cbs->onCaptureCompleted;
+        mOnCaptureFailed = cbs->onCaptureFailed;
     }
 }
 
@@ -1199,6 +1246,7 @@ CameraDevice::CallbackHolder::CallbackHolder(
 
     if (lcbs != nullptr) {
         mOnLogicalCameraCaptureCompleted = lcbs->onLogicalCameraCaptureCompleted;
+        mOnLogicalCameraCaptureFailed = lcbs->onLogicalCameraCaptureFailed;
     }
 }
 
