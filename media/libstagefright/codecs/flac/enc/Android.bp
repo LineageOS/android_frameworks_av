@@ -19,13 +19,7 @@ cc_library_shared {
         ],
         cfi: true,
     },
-
-    shared_libs: [
-        "libstagefright_omx",
-        "libstagefright_foundation",
-        "libutils",
-        "liblog",
-    ],
+    defaults: ["omx_soft_libs"],
 
     header_libs: ["libbase_headers"],
     static_libs: [

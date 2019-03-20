@@ -105,12 +105,7 @@ cc_library_shared {
         cfi: true,
     },
 
-    shared_libs: [
-        "libstagefright_omx",
-        "libstagefright_foundation",
-        "libutils",
-        "liblog",
-    ],
+    defaults: ["omx_soft_libs"],
 
     static_libs: ["libstagefright_mp3dec"],
     compile_multilib: "32",

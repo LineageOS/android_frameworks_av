@@ -23,7 +23,10 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AHandlerReflector.h>
 #include <media/stagefright/foundation/ColorUtils.h>
-#include <media/IOMX.h>
+#include <media/openmax/OMX_Core.h>
+#include <media/openmax/OMX_Video.h>
+#include <media/openmax/OMX_VideoExt.h>
+
 #include <media/hardware/HardwareAPI.h>
 
 #include <utils/RefBase.h>
