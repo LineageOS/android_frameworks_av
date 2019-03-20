@@ -232,7 +232,8 @@ typedef int32_t aaudio_performance_mode_t;
  * This information is used by certain platforms or routing policies
  * to make more refined volume or routing decisions.
  *
- * Note that these match the equivalent values in AudioAttributes in the Android Java API.
+ * Note that these match the equivalent values in {@link android.media.AudioAttributes}
+ * in the Android Java API.
  *
  * Added in API level 28.
  */
@@ -308,7 +309,8 @@ typedef int32_t aaudio_usage_t;
  * an audio book application) this information might be used by the audio framework to
  * enforce audio focus.
  *
- * Note that these match the equivalent values in AudioAttributes in the Android Java API.
+ * Note that these match the equivalent values in {@link android.media.AudioAttributes}
+ * in the Android Java API.
  *
  * Added in API level 28.
  */
@@ -382,6 +384,48 @@ enum {
     AAUDIO_INPUT_PRESET_VOICE_PERFORMANCE = 10,
 };
 typedef int32_t aaudio_input_preset_t;
+
+/**
+ * Specifying if audio may or may not be captured by other apps or the system.
+ *
+ * Note that these match the equivalent values in {@link android.media.AudioAttributes}
+ * in the Android Java API.
+ *
+ * Added in API level 29.
+ */
+enum {
+    /**
+     * Indicates that the audio may be captured by any app.
+     *
+     * For privacy, the following usages can not be recorded: AAUDIO_VOICE_COMMUNICATION*,
+     * AAUDIO_USAGE_NOTIFICATION*, AAUDIO_USAGE_ASSISTANCE* and AAUDIO_USAGE_ASSISTANT.
+     *
+     * On {@link Android.os.Build.VERSION_CODES.Q}, this means only {@link AAUDIO_USAGE_MEDIA}
+     * and {@link AAUDIO_USAGE_GAME} may be captured.
+     *
+     * See {@link android.media.AudioAttributes.ALLOW_CAPTURE_BY_ALL}.
+     */
+    AAUDIO_ALLOW_CAPTURE_BY_ALL = 1,
+    /**
+     * Indicates that the audio may only be captured by system apps.
+     *
+     * System apps can capture for many purposes like accessibility, user guidance...
+     * but have strong restriction. See
+     * {@link android.media.AudioAttributes.ALLOW_CAPTURE_BY_SYSTEM} for what the system apps
+     * can do with the capture audio.
+     */
+    AAUDIO_ALLOW_CAPTURE_BY_SYSTEM = 2,
+    /**
+     * Indicates that the audio may not be recorded by any app, even if it is a system app.
+     *
+     * It is encouraged to use {@link ALLOW_CAPTURE_BY_SYSTEM} instead of this value as system apps
+     * provide significant and useful features for the user (eg. accessibility).
+     * See {@link android.media.AudioAttributes.ALLOW_CAPTURE_BY_NONE}.
+     */
+    AAUDIO_ALLOW_CAPTURE_BY_NONE = 3,
+};
+
+typedef int32_t aaudio_allowed_capture_policy_t;
 
 /**
  * These may be used with AAudioStreamBuilder_setSessionId().
@@ -642,6 +686,22 @@ AAUDIO_API void AAudioStreamBuilder_setContentType(AAudioStreamBuilder* builder,
  */
 AAUDIO_API void AAudioStreamBuilder_setInputPreset(AAudioStreamBuilder* builder,
         aaudio_input_preset_t inputPreset) __INTRODUCED_IN(28);
+
+/**
+ * Specify whether this stream audio may or may not be captured by other apps or the system.
+ *
+ * The default is AAUDIO_ALLOW_CAPTURE_BY_ALL.
+ *
+ * Note that an application can also set its global policy, in which case the most restrictive
+ * policy is always applied. See {@link android.media.AudioAttributes.setAllowedCapturePolicy}
+ *
+ * Added in API level 29.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param inputPreset the desired level of opt-out from being captured.
+ */
+AAUDIO_API void AAudioStreamBuilder_setAllowedCapturePolicy(AAudioStreamBuilder* builder,
+        aaudio_allowed_capture_policy_t capturePolicy) __INTRODUCED_IN(29);
 
 /** Set the requested session ID.
  *
@@ -1276,6 +1336,18 @@ AAUDIO_API aaudio_content_type_t AAudioStream_getContentType(AAudioStream* strea
  */
 AAUDIO_API aaudio_input_preset_t AAudioStream_getInputPreset(AAudioStream* stream)
         __INTRODUCED_IN(28);
+
+/**
+ * Return the policy that determines whether the audio may or may not be captured
+ * by other apps or the system.
+ *
+ * Added in API level 29.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return the allowed capture policy, for example AAUDIO_ALLOW_CAPTURE_BY_ALL
+ */
+AAUDIO_API aaudio_allowed_capture_policy_t AAudioStream_getAllowedCapturePolicy(
+        AAudioStream* stream) __INTRODUCED_IN(29);
 
 #ifdef __cplusplus
 }

@@ -204,6 +204,12 @@ AAUDIO_API void AAudioStreamBuilder_setBufferCapacityInFrames(AAudioStreamBuilde
     streamBuilder->setBufferCapacity(frames);
 }
 
+AAUDIO_API void AAudioStreamBuilder_setAllowedCapturePolicy(
+        AAudioStreamBuilder* builder, aaudio_allowed_capture_policy_t policy) {
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setAllowedCapturePolicy(policy);
+}
+
 AAUDIO_API void AAudioStreamBuilder_setSessionId(AAudioStreamBuilder* builder,
                                                  aaudio_session_id_t sessionId)
 {
@@ -492,6 +498,13 @@ AAUDIO_API aaudio_input_preset_t AAudioStream_getInputPreset(AAudioStream* strea
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getInputPreset();
+}
+
+AAUDIO_API aaudio_allowed_capture_policy_t AAudioStream_getAllowedCapturePolicy(
+        AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->getAllowedCapturePolicy();
 }
 
 AAUDIO_API int32_t AAudioStream_getSessionId(AAudioStream* stream)

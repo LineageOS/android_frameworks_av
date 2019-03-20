@@ -217,6 +217,22 @@ audio_source_t AAudioConvert_inputPresetToAudioSource(aaudio_input_preset_t pres
     return (audio_source_t) preset; // same value
 }
 
+audio_flags_mask_t AAudioConvert_allowCapturePolicyToAudioFlagsMask(
+        aaudio_allowed_capture_policy_t policy) {
+    switch (policy) {
+        case AAUDIO_UNSPECIFIED:
+        case AAUDIO_ALLOW_CAPTURE_BY_ALL:
+            return AUDIO_FLAG_NONE;
+        case AAUDIO_ALLOW_CAPTURE_BY_SYSTEM:
+            return AUDIO_FLAG_NO_MEDIA_PROJECTION;
+        case AAUDIO_ALLOW_CAPTURE_BY_NONE:
+            return AUDIO_FLAG_NO_MEDIA_PROJECTION | AUDIO_FLAG_NO_SYSTEM_CAPTURE;
+        default:
+            ALOGE("%s() 0x%08X unrecognized", __func__, policy);
+            return AUDIO_FLAG_NONE; //
+    }
+}
+
 int32_t AAudioConvert_framesToBytes(int32_t numFrames,
                                     int32_t bytesPerFrame,
                                     int32_t *sizeInBytes) {
