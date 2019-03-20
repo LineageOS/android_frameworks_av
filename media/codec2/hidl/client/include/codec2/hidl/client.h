@@ -63,55 +63,29 @@
  * Codec2Client are all subclasses of Configurable.
  */
 
-// Forward declaration of Codec2.0 HIDL interfaces
-namespace android {
-namespace hardware {
-namespace media {
-namespace c2 {
-namespace V1_0 {
+// Forward declaration of relevant HIDL interfaces
+
+namespace android::hardware::media::c2::V1_0 {
 struct IConfigurable;
 struct IComponent;
 struct IComponentInterface;
 struct IComponentStore;
+struct IInputSink;
 struct IInputSurface;
 struct IInputSurfaceConnection;
-} // namespace V1_0
-} // namespace c2
-} // namespace media
-} // namespace hardware
-} // namespace android
+}  // namespace android::hardware::media::c2::V1_0
 
-namespace android {
-namespace hardware {
-namespace media {
-namespace bufferpool {
-namespace V2_0 {
+namespace android::hardware::media::bufferpool::V2_0 {
 struct IClientManager;
-} // namespace V2_0
-} // namespace bufferpool
-} // namespace media
-} // namespace hardware
-} // namespace android
+}  // namespace android::hardware::media::bufferpool::V2_0
 
-// Forward declarations of other classes
-namespace android {
-namespace hardware {
-namespace graphics {
-namespace bufferqueue {
-namespace V1_0 {
+namespace android::hardware::graphics::bufferqueue::V1_0 {
 struct IGraphicBufferProducer;
-} // namespace V1_0
-} // namespace bufferqueue
-} // namespace graphics
-namespace media {
-namespace omx {
-namespace V1_0 {
+}  // android::hardware::graphics::bufferqueue::V1_0
+
+namespace android::hardware::media::omx::V1_0 {
 struct IGraphicBufferSource;
-} // namespace V1_0
-} // namespace omx
-} // namespace media
-} // namespace hardware
-} // namespace android
+}  // namespace android::hardware::media::omx::V1_0
 
 namespace android {
 
@@ -324,7 +298,9 @@ struct Codec2Client::Component : public Codec2Client::Configurable {
             QueueBufferOutput QueueBufferOutput;
 
     typedef ::android::hardware::graphics::bufferqueue::V1_0::
-            IGraphicBufferProducer HGraphicBufferProducer;
+            IGraphicBufferProducer HGraphicBufferProducer1;
+    typedef ::android::hardware::graphics::bufferqueue::V2_0::
+            IGraphicBufferProducer HGraphicBufferProducer2;
     typedef ::android::hardware::media::omx::V1_0::
             IGraphicBufferSource HGraphicBufferSource;
 
@@ -362,7 +338,7 @@ struct Codec2Client::Component : public Codec2Client::Configurable {
             std::shared_ptr<InputSurfaceConnection>* connection);
 
     c2_status_t connectToOmxInputSurface(
-            const sp<HGraphicBufferProducer>& producer,
+            const sp<HGraphicBufferProducer1>& producer,
             const sp<HGraphicBufferSource>& source,
             std::shared_ptr<InputSurfaceConnection>* connection);
 

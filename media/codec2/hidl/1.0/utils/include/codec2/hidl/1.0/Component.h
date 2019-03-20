@@ -68,7 +68,9 @@ struct Component : public IComponent,
     c2_status_t status() const;
 
     typedef ::android::hardware::graphics::bufferqueue::V1_0::
-            IGraphicBufferProducer HGraphicBufferProducer;
+            IGraphicBufferProducer HGraphicBufferProducer1;
+    typedef ::android::hardware::graphics::bufferqueue::V2_0::
+            IGraphicBufferProducer HGraphicBufferProducer2;
 
     // Methods from IComponent follow.
     virtual Return<Status> queue(const WorkBundle& workBundle) override;
@@ -76,12 +78,12 @@ struct Component : public IComponent,
     virtual Return<Status> drain(bool withEos) override;
     virtual Return<Status> setOutputSurface(
             uint64_t blockPoolId,
-            const sp<HGraphicBufferProducer>& surface) override;
+            const sp<HGraphicBufferProducer2>& surface) override;
     virtual Return<void> connectToInputSurface(
             const sp<IInputSurface>& inputSurface,
             connectToInputSurface_cb _hidl_cb) override;
     virtual Return<void> connectToOmxInputSurface(
-            const sp<HGraphicBufferProducer>& producer,
+            const sp<HGraphicBufferProducer1>& producer,
             const sp<::android::hardware::media::omx::V1_0::
             IGraphicBufferSource>& source,
             connectToOmxInputSurface_cb _hidl_cb) override;

@@ -17,7 +17,7 @@
 #ifndef ANDROID_STAGEFRIGHT_C2BLOCK_INTERNAL_H_
 #define ANDROID_STAGEFRIGHT_C2BLOCK_INTERNAL_H_
 
-#include <android/hardware/graphics/bufferqueue/1.0/IGraphicBufferProducer.h>
+#include <android/hardware/graphics/bufferqueue/2.0/IGraphicBufferProducer.h>
 
 #include <C2Buffer.h>
 
@@ -291,7 +291,7 @@ struct _C2BlockFactory {
     bool AssignBlockToBufferQueue(
             const std::shared_ptr<_C2BlockPoolData>& poolData,
             const ::android::sp<::android::hardware::graphics::bufferqueue::
-                                V1_0::IGraphicBufferProducer>& igbp,
+                                V2_0::IGraphicBufferProducer>& igbp,
             uint32_t generation,
             uint64_t bqId,
             int32_t bqSlot,
@@ -314,7 +314,7 @@ struct _C2BlockFactory {
     bool HoldBlockFromBufferQueue(
             const std::shared_ptr<_C2BlockPoolData>& poolData,
             const ::android::sp<::android::hardware::graphics::bufferqueue::
-                                V1_0::IGraphicBufferProducer>& igbp = nullptr);
+                                V2_0::IGraphicBufferProducer>& igbp = nullptr);
 
     /**
      * Yield a block to the designated bufferqueue. This causes the destruction

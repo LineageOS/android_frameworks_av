@@ -18,9 +18,9 @@
 #define LOG_TAG "Codec2-types"
 #include <android-base/logging.h>
 
+#include <android/hardware/graphics/bufferqueue/2.0/IGraphicBufferProducer.h>
 #include <codec2/hidl/1.0/types.h>
-
-#include <media/stagefright/bqhelper/WGraphicBufferProducer.h>
+#include <gui/bufferqueue/2.0/B2HGraphicBufferProducer.h>
 #include <media/stagefright/foundation/AUtils.h>
 
 #include <C2AllocatorIon.h>
@@ -46,7 +46,6 @@ namespace c2 {
 namespace V1_0 {
 namespace utils {
 
-using namespace ::android;
 using ::android::hardware::Return;
 using ::android::hardware::media::bufferpool::BufferPoolData;
 using ::android::hardware::media::bufferpool::V2_0::BufferStatusMessage;
@@ -55,7 +54,10 @@ using ::android::hardware::media::bufferpool::V2_0::implementation::
         ClientManager;
 using ::android::hardware::media::bufferpool::V2_0::implementation::
         TransactionId;
-using ::android::TWGraphicBufferProducer;
+using HGraphicBufferProducer = ::android::hardware::graphics::bufferqueue::
+        V2_0::IGraphicBufferProducer;
+using B2HGraphicBufferProducer = ::android::hardware::graphics::bufferqueue::
+        V2_0::utils::B2HGraphicBufferProducer;
 
 const char* asString(Status status, const char* def) {
     return asString(static_cast<c2_status_t>(status), def);
@@ -1806,7 +1808,7 @@ sp<HGraphicBufferProducer> getHgbp(const sp<IGraphicBufferProducer>& igbp) {
     sp<HGraphicBufferProducer> hgbp =
             igbp->getHalInterface<HGraphicBufferProducer>();
     return hgbp ? hgbp :
-            new TWGraphicBufferProducer<HGraphicBufferProducer>(igbp);
+            new B2HGraphicBufferProducer(igbp);
 }
 
 } // unnamed namespace
