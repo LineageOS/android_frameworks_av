@@ -11,13 +11,6 @@ cc_library_shared {
         "OMXNodeInstance.cpp",
         "OMXUtils.cpp",
         "OmxGraphicBufferSource.cpp",
-        //TODO: remove the soft component code here and use
-        //libstagefright_omx_soft, once partner build is fixed 
-        "SimpleSoftOMXComponent.cpp",
-        "SoftOMXComponent.cpp",
-        "SoftOMXPlugin.cpp",
-        "SoftVideoDecoderOMXComponent.cpp",
-        "SoftVideoEncoderOMXComponent.cpp",
         "1.0/Omx.cpp",
         "1.0/OmxStore.cpp",
         "1.0/WGraphicBufferSource.cpp",
@@ -58,7 +51,7 @@ cc_library_shared {
         "libvndksupport",
         "android.hardware.media.omx@1.0",
         "android.hardware.graphics.bufferqueue@1.0",
-        //"libstagefright_omx_soft",
+        "libstagefright_omx_soft",
     ],
 
     export_shared_lib_headers: [
