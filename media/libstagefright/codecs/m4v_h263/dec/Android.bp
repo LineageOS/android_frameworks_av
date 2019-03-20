@@ -91,12 +91,7 @@ cc_library_shared {
 
     static_libs: ["libstagefright_m4vh263dec"],
 
-    shared_libs: [
-        "libstagefright_omx",
-        "libstagefright_foundation",
-        "libutils",
-        "liblog",
-    ],
+    defaults: ["omx_soft_libs"],
 
     sanitize: {
         misc_undefined: [
