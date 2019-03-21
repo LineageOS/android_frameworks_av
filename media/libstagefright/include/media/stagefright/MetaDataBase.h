@@ -236,6 +236,8 @@ enum {
     kKeyOpaqueCSD0       = 'csd0',
     kKeyOpaqueCSD1       = 'csd1',
     kKeyOpaqueCSD2       = 'csd2',
+
+    kKeyHapticChannelCount = 'hapC',
 };
 
 enum {
