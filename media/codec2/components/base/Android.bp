@@ -36,13 +36,18 @@ cc_library_shared {
     ldflags: ["-Wl,-Bsymbolic"],
 }
 
+filegroup {
+    name: "codec2_soft_exports",
+    srcs: [ "exports.lds" ],
+}
+
 // public dependency for software codec implementation
 // to be used by code under media/codecs/* only as its stability is not guaranteed
 cc_defaults {
     name: "libcodec2_soft-defaults",
     defaults: ["libcodec2-impl-defaults"],
     vendor_available: true,
-
+    version_script: ":codec2_soft_exports",
     export_shared_lib_headers: [
         "libsfplugin_ccodec_utils",
     ],
