@@ -19,7 +19,7 @@
 
 #include <codec2/hidl/1.0/ComponentStore.h>
 
-#include <android/hardware/graphics/bufferqueue/1.0/IGraphicBufferProducer.h>
+#include <android/hardware/graphics/bufferqueue/2.0/IGraphicBufferProducer.h>
 #include <android/hardware/media/c2/1.0/IInputSink.h>
 #include <android/hardware/media/c2/1.0/IInputSurface.h>
 #include <gui/IGraphicBufferProducer.h>
@@ -44,7 +44,7 @@ using ::android::sp;
 
 struct InputSurface : public IInputSurface {
 
-    typedef ::android::hardware::graphics::bufferqueue::V1_0::
+    typedef ::android::hardware::graphics::bufferqueue::V2_0::
             IGraphicBufferProducer HGraphicBufferProducer;
 
     typedef ::android::

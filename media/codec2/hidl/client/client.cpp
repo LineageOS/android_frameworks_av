@@ -29,9 +29,9 @@
 #include <android-base/properties.h>
 #include <bufferpool/ClientManager.h>
 #include <cutils/native_handle.h>
-#include <gui/bufferqueue/1.0/H2BGraphicBufferProducer.h>
+#include <gui/bufferqueue/2.0/B2HGraphicBufferProducer.h>
+#include <gui/bufferqueue/2.0/H2BGraphicBufferProducer.h>
 #include <hidl/HidlSupport.h>
-#include <media/stagefright/bqhelper/WGraphicBufferProducer.h>
 
 #include <android/hardware/media/bufferpool/2.0/IClientManager.h>
 #include <android/hardware/media/c2/1.0/IComponent.h>
@@ -50,12 +50,20 @@ using ::android::hardware::hidl_vec;
 using ::android::hardware::hidl_string;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
-using ::android::TWGraphicBufferProducer;
 
 using namespace ::android::hardware::media::c2::V1_0;
 using namespace ::android::hardware::media::c2::V1_0::utils;
 using namespace ::android::hardware::media::bufferpool::V2_0;
 using namespace ::android::hardware::media::bufferpool::V2_0::implementation;
+
+using HGraphicBufferProducer1 = ::android::hardware::graphics::bufferqueue::
+        V1_0::IGraphicBufferProducer;
+using HGraphicBufferProducer2 = ::android::hardware::graphics::bufferqueue::
+        V2_0::IGraphicBufferProducer;
+using B2HGraphicBufferProducer2 = ::android::hardware::graphics::bufferqueue::
+        V2_0::utils::B2HGraphicBufferProducer;
+using H2BGraphicBufferProducer2 = ::android::hardware::graphics::bufferqueue::
+        V2_0::utils::H2BGraphicBufferProducer;
 
 namespace /* unnamed */ {
 
@@ -1064,11 +1072,11 @@ c2_status_t Codec2Client::Component::setOutputSurface(
         C2BlockPool::local_id_t blockPoolId,
         const sp<IGraphicBufferProducer>& surface,
         uint32_t generation) {
-    sp<HGraphicBufferProducer> igbp =
-            surface->getHalInterface<HGraphicBufferProducer>();
+    sp<HGraphicBufferProducer2> igbp =
+            surface->getHalInterface<HGraphicBufferProducer2>();
 
     if (!igbp) {
-        igbp = new TWGraphicBufferProducer<HGraphicBufferProducer>(surface);
+        igbp = new B2HGraphicBufferProducer2(surface);
     }
 
     Return<Status> transStatus = mBase->setOutputSurface(
@@ -1195,7 +1203,7 @@ c2_status_t Codec2Client::Component::connectToInputSurface(
 }
 
 c2_status_t Codec2Client::Component::connectToOmxInputSurface(
-        const sp<HGraphicBufferProducer>& producer,
+        const sp<HGraphicBufferProducer1>& producer,
         const sp<HGraphicBufferSource>& source,
         std::shared_ptr<InputSurfaceConnection>* connection) {
     c2_status_t status;
@@ -1284,12 +1292,11 @@ Codec2Client::InputSurface::InputSurface(const sp<IInputSurface>& base)
         },
         mBase{base},
         mGraphicBufferProducer{new
-            ::android::hardware::graphics::bufferqueue::V1_0::utils::
-            H2BGraphicBufferProducer([base]() -> sp<HGraphicBufferProducer> {
-                Return<sp<HGraphicBufferProducer>> transResult =
+            H2BGraphicBufferProducer2([base]() -> sp<HGraphicBufferProducer2> {
+                Return<sp<HGraphicBufferProducer2>> transResult =
                         base->getGraphicBufferProducer();
                 return transResult.isOk() ?
-                        static_cast<sp<HGraphicBufferProducer>>(transResult) :
+                        static_cast<sp<HGraphicBufferProducer2>>(transResult) :
                         nullptr;
             }())} {
 }

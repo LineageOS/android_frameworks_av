@@ -19,29 +19,37 @@
 #include <utils/Log.h>
 
 #include <gui/BufferQueueDefs.h>
-#include <list>
-#include <map>
-#include <mutex>
+#include <gui/bufferqueue/2.0/B2HGraphicBufferProducer.h>
+#include <hidl/HidlSupport.h>
 
 #include <C2AllocatorGralloc.h>
 #include <C2BqBufferPriv.h>
 #include <C2BlockInternal.h>
 
-using ::android::AnwBuffer;
+#include <list>
+#include <map>
+#include <mutex>
+
 using ::android::BufferQueueDefs::NUM_BUFFER_SLOTS;
 using ::android::C2AllocatorGralloc;
 using ::android::C2AndroidMemoryUsage;
 using ::android::Fence;
 using ::android::GraphicBuffer;
-using ::android::HGraphicBufferProducer;
 using ::android::IGraphicBufferProducer;
-using ::android::hidl_handle;
 using ::android::sp;
 using ::android::status_t;
 using ::android::wp;
-
+using ::android::hardware::hidl_handle;
 using ::android::hardware::Return;
-using ::android::hardware::graphics::common::V1_0::PixelFormat;
+
+using HBuffer = ::android::hardware::graphics::common::V1_2::HardwareBuffer;
+using HStatus = ::android::hardware::graphics::bufferqueue::V2_0::Status;
+using ::android::hardware::graphics::bufferqueue::V2_0::utils::b2h;
+using ::android::hardware::graphics::bufferqueue::V2_0::utils::h2b;
+using ::android::hardware::graphics::bufferqueue::V2_0::utils::HFenceWrapper;
+
+using HGraphicBufferProducer = ::android::hardware::graphics::bufferqueue::V2_0
+        ::IGraphicBufferProducer;
 
 struct C2BufferQueueBlockPoolData : public _C2BlockPoolData {
 
@@ -185,57 +193,67 @@ private:
             C2MemoryUsage usage,
             std::shared_ptr<C2GraphicBlock> *block /* nonnull */) {
         // We have an IGBP now.
-        sp<Fence> fence = new Fence();
         C2AndroidMemoryUsage androidUsage = usage;
-        status_t status;
-        PixelFormat pixelFormat = static_cast<PixelFormat>(format);
-        int slot;
+        status_t status{};
+        int slot{};
+        bool bufferNeedsReallocation{};
+        sp<Fence> fence = new Fence();
         ALOGV("tries to dequeue buffer");
-        Return<void> transStatus = mProducer->dequeueBuffer(
-                width, height, pixelFormat, androidUsage.asGrallocUsage(), false,
-                [&status, &slot, &fence](
-                        int32_t tStatus, int32_t tSlot, hidl_handle const& tFence,
-                        HGraphicBufferProducer::FrameEventHistoryDelta const& tTs) {
-                    status = tStatus;
-                    slot = tSlot;
-                    if (!android::conversion::convertTo(fence.get(), tFence) &&
-                            status == android::NO_ERROR) {
-                        status = android::BAD_VALUE;
+
+        { // Call dequeueBuffer().
+            using Input = HGraphicBufferProducer::DequeueBufferInput;
+            using Output = HGraphicBufferProducer::DequeueBufferOutput;
+            Return<void> transResult = mProducer->dequeueBuffer(
+                    Input{
+                        width,
+                        height,
+                        format,
+                        androidUsage.asGrallocUsage()},
+                    [&status, &slot, &bufferNeedsReallocation,
+                     &fence](HStatus hStatus,
+                             int32_t hSlot,
+                             Output const& hOutput) {
+                        slot = static_cast<int>(hSlot);
+                        if (!h2b(hStatus, &status) ||
+                                !h2b(hOutput.fence, &fence)) {
+                            status = ::android::BAD_VALUE;
+                        } else {
+                            bufferNeedsReallocation =
+                                    hOutput.bufferNeedsReallocation;
+                        }
+                    });
+            if (!transResult.isOk() || status != android::OK) {
+                ALOGD("cannot dequeue buffer %d", status);
+                if (transResult.isOk()) {
+                    if (status == android::INVALID_OPERATION ||
+                        status == android::TIMED_OUT ||
+                        status == android::WOULD_BLOCK) {
+                        // Dequeue buffer is blocked temporarily. Retrying is
+                        // required.
+                        return C2_BLOCKING;
                     }
-                    (void) tTs;
-                });
-        // dequeueBuffer returns flag.
-        if (!transStatus.isOk() || status < android::OK) {
-            ALOGD("cannot dequeue buffer %d", status);
-            if (transStatus.isOk()) {
-                if (status == android::INVALID_OPERATION ||
-                    status == android::TIMED_OUT ||
-                    status == android::WOULD_BLOCK) {
-                    // Dequeue buffer is blocked temporarily. Retrying is
-                    // required.
-                    return C2_BLOCKING;
                 }
+                return C2_BAD_VALUE;
             }
+        }
+        HFenceWrapper hFenceWrapper{};
+        if (!b2h(fence, &hFenceWrapper)) {
+            ALOGE("Invalid fence received from dequeueBuffer.");
             return C2_BAD_VALUE;
         }
         ALOGV("dequeued a buffer successfully");
-        native_handle_t* nh = nullptr;
-        hidl_handle fenceHandle;
-        if (fence) {
-            android::conversion::wrapAs(&fenceHandle, &nh, *fence);
-        }
         if (fence) {
             static constexpr int kFenceWaitTimeMs = 10;
 
             status_t status = fence->wait(kFenceWaitTimeMs);
             if (status == -ETIME) {
                 // fence is not signalled yet.
-                (void)mProducer->cancelBuffer(slot, fenceHandle).isOk();
+                (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
                 return C2_BLOCKING;
             }
             if (status != android::NO_ERROR) {
                 ALOGD("buffer fence wait error %d", status);
-                (void)mProducer->cancelBuffer(slot, fenceHandle).isOk();
+                (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
                 return C2_BAD_VALUE;
             } else if (mRenderCallback) {
                 nsecs_t signalTime = fence->getSignalTime();
@@ -248,27 +266,31 @@ private:
         }
 
         sp<GraphicBuffer> &slotBuffer = mBuffers[slot];
-        if (status & IGraphicBufferProducer::BUFFER_NEEDS_REALLOCATION || !slotBuffer) {
+        if (bufferNeedsReallocation || !slotBuffer) {
             if (!slotBuffer) {
                 slotBuffer = new GraphicBuffer();
             }
             // N.B. This assumes requestBuffer# returns an existing allocation
             // instead of a new allocation.
-            Return<void> transStatus = mProducer->requestBuffer(
+            Return<void> transResult = mProducer->requestBuffer(
                     slot,
-                    [&status, &slotBuffer](int32_t tStatus, AnwBuffer const& tBuffer){
-                        status = tStatus;
-                        if (!android::conversion::convertTo(slotBuffer.get(), tBuffer) &&
-                                status == android::NO_ERROR) {
+                    [&status, &slotBuffer](
+                            HStatus hStatus,
+                            HBuffer const& hBuffer,
+                            uint32_t generationNumber){
+                        if (h2b(hStatus, &status) &&
+                                h2b(hBuffer, &slotBuffer) &&
+                                slotBuffer) {
+                            slotBuffer->setGenerationNumber(generationNumber);
+                        } else {
                             status = android::BAD_VALUE;
                         }
                     });
-
-            if (!transStatus.isOk()) {
+            if (!transResult.isOk()) {
                 return C2_BAD_VALUE;
             } else if (status != android::NO_ERROR) {
                 slotBuffer.clear();
-                (void)mProducer->cancelBuffer(slot, fenceHandle).isOk();
+                (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
                 return C2_BAD_VALUE;
             }
         }
@@ -292,13 +314,14 @@ private:
                 std::shared_ptr<C2BufferQueueBlockPoolData> poolData =
                         std::make_shared<C2BufferQueueBlockPoolData>(
                                 slotBuffer->getGenerationNumber(),
-                                mProducerId, slot, shared_from_this());
+                                mProducerId, slot,
+                                shared_from_this());
                 *block = _C2BlockFactory::CreateGraphicBlock(alloc, poolData);
                 return C2_OK;
             }
             // Block was not created. call requestBuffer# again next time.
             slotBuffer.clear();
-            (void)mProducer->cancelBuffer(slot, fenceHandle).isOk();
+            (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
         }
         return C2_BAD_VALUE;
     }
@@ -312,10 +335,10 @@ public:
         bool noInit = false;
         for (int i = 0; i < NUM_BUFFER_SLOTS; ++i) {
             if (!noInit && mProducer) {
-                Return<int32_t> transResult =
+                Return<HStatus> transResult =
                         mProducer->detachBuffer(static_cast<int32_t>(i));
                 noInit = !transResult.isOk() ||
-                         static_cast<int32_t>(transResult) == android::NO_INIT;
+                         static_cast<HStatus>(transResult) == HStatus::NO_INIT;
             }
             mBuffers[i].clear();
         }
@@ -373,32 +396,28 @@ public:
     }
 
     void configureProducer(const sp<HGraphicBufferProducer> &producer) {
-        int32_t status = android::OK;
         uint64_t producerId = 0;
         if (producer) {
-            Return<void> transStatus = producer->getUniqueId(
-                    [&status, &producerId](int32_t tStatus, int64_t tProducerId) {
-                        status = tStatus;
-                        producerId = tProducerId;
-                    });
-            if (!transStatus.isOk()) {
+            Return<uint64_t> transResult = producer->getUniqueId();
+            if (!transResult.isOk()) {
                 ALOGD("configureProducer -- failed to connect to the producer");
                 return;
             }
+            producerId = static_cast<uint64_t>(transResult);
         }
         {
             std::lock_guard<std::mutex> lock(mMutex);
             bool noInit = false;
             for (int i = 0; i < NUM_BUFFER_SLOTS; ++i) {
                 if (!noInit && mProducer) {
-                    Return<int32_t> transResult =
+                    Return<HStatus> transResult =
                             mProducer->detachBuffer(static_cast<int32_t>(i));
                     noInit = !transResult.isOk() ||
-                             static_cast<int32_t>(transResult) == android::NO_INIT;
+                             static_cast<HStatus>(transResult) == HStatus::NO_INIT;
                 }
                 mBuffers[i].clear();
             }
-            if (producer && status == android::OK) {
+            if (producer) {
                 mProducer = producer;
                 mProducerId = producerId;
             } else {
@@ -414,7 +433,7 @@ private:
     void cancel(uint64_t igbp_id, int32_t igbp_slot) {
         std::lock_guard<std::mutex> lock(mMutex);
         if (igbp_id == mProducerId && mProducer) {
-            (void)mProducer->cancelBuffer(igbp_slot, nullptr).isOk();
+            (void)mProducer->cancelBuffer(igbp_slot, hidl_handle{}).isOk();
         }
     }
 
@@ -455,7 +474,7 @@ C2BufferQueueBlockPoolData::~C2BufferQueueBlockPoolData() {
     if (local && localPool) {
         localPool->cancel(bqId, bqSlot);
     } else if (igbp) {
-        igbp->cancelBuffer(bqSlot, nullptr);
+        igbp->cancelBuffer(bqSlot, hidl_handle{}).isOk();
     }
 }
 

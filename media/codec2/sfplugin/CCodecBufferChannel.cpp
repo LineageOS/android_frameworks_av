@@ -2709,6 +2709,10 @@ bool CCodecBufferChannel::handleWork(
     c2_cntr64_t timestamp =
         worklet->output.ordinal.timestamp + work->input.ordinal.customOrdinal
                 - work->input.ordinal.timestamp;
+    if (mInputSurface != nullptr) {
+        // When using input surface we need to restore the original input timestamp.
+        timestamp = work->input.ordinal.customOrdinal;
+    }
     ALOGV("[%s] onWorkDone: input %lld, codec %lld => output %lld => %lld",
           mName,
           work->input.ordinal.customOrdinal.peekll(),
