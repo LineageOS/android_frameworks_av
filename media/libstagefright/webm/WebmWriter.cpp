@@ -177,8 +177,8 @@ sp<WebmElement> WebmWriter::audioTrack(const sp<MetaData>& md) {
         const void *headerData3;
         size_t headerSize1, headerSize2 = sizeof(headerData2), headerSize3;
 
-        if (!md->findData(kKeyVorbisInfo, &type, &headerData1, &headerSize1)
-            || !md->findData(kKeyVorbisBooks, &type, &headerData3, &headerSize3)) {
+        if (!md->findData(kKeyOpaqueCSD0, &type, &headerData1, &headerSize1)
+            || !md->findData(kKeyOpaqueCSD1, &type, &headerData3, &headerSize3)) {
             ALOGE("Missing header format keys for vorbis track");
             md->dumpToLog();
             return NULL;
