@@ -1525,6 +1525,7 @@ void CCodecBufferChannel::ReorderStash::setDepth(uint32_t depth) {
     mPending.splice(mPending.end(), mStash);
     mDepth = depth;
 }
+
 void CCodecBufferChannel::ReorderStash::setKey(C2Config::ordinal_key_t key) {
     mPending.splice(mPending.end(), mStash);
     mKey = key;
@@ -1547,13 +1548,25 @@ void CCodecBufferChannel::ReorderStash::emplace(
         int64_t timestamp,
         int32_t flags,
         const C2WorkOrdinalStruct &ordinal) {
-    auto it = mStash.begin();
-    for (; it != mStash.end(); ++it) {
-        if (less(ordinal, it->ordinal)) {
-            break;
+    bool eos = flags & MediaCodec::BUFFER_FLAG_EOS;
+    if (!buffer && eos) {
+        // TRICKY: we may be violating ordering of the stash here. Because we
+        // don't expect any more emplace() calls after this, the ordering should
+        // not matter.
+        mStash.emplace_back(buffer, timestamp, flags, ordinal);
+    } else {
+        flags = flags & ~MediaCodec::BUFFER_FLAG_EOS;
+        auto it = mStash.begin();
+        for (; it != mStash.end(); ++it) {
+            if (less(ordinal, it->ordinal)) {
+                break;
+            }
+        }
+        mStash.emplace(it, buffer, timestamp, flags, ordinal);
+        if (eos) {
+            mStash.back().flags = mStash.back().flags | MediaCodec::BUFFER_FLAG_EOS;
         }
     }
-    mStash.emplace(it, buffer, timestamp, flags, ordinal);
     while (!mStash.empty() && mStash.size() > mDepth) {
         mPending.push_back(mStash.front());
         mStash.pop_front();
@@ -2814,8 +2827,9 @@ void CCodecBufferChannel::sendOutputBuffers() {
 
         outBuffer->meta()->setInt64("timeUs", entry.timestamp);
         outBuffer->meta()->setInt32("flags", entry.flags);
-        ALOGV("[%s] sendOutputBuffers: out buffer index = %zu [%p] => %p + %zu",
-                mName, index, outBuffer.get(), outBuffer->data(), outBuffer->size());
+        ALOGV("[%s] sendOutputBuffers: out buffer index = %zu [%p] => %p + %zu (%lld)",
+                mName, index, outBuffer.get(), outBuffer->data(), outBuffer->size(),
+                (long long)entry.timestamp);
         mCallback->onOutputBufferAvailable(index, outBuffer);
     }
 }
