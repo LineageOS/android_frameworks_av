@@ -224,6 +224,14 @@ void LVC_MixSoft_2St_D16C31_SAT( LVMixer3_2St_st *pInstance,
 /* Gain values should not be more that 1.0                                        */
 /**********************************************************************************/
 #ifdef BUILD_FLOAT
+#ifdef SUPPORT_MC
+void LVC_MixSoft_1St_MC_float_SAT(LVMixer3_2St_FLOAT_st *pInstance,
+                                   const   LVM_FLOAT     *src,
+                                   LVM_FLOAT             *dst,   /* dst can be equal to src */
+                                   LVM_INT16             NrFrames,
+                                   LVM_INT32             NrChannels,
+                                   LVM_INT32             ChMask);
+#endif
 void LVC_MixSoft_1St_2i_D16C31_SAT(LVMixer3_2St_FLOAT_st *pInstance,
                                    const   LVM_FLOAT     *src,
                                    LVM_FLOAT             *dst,   /* dst can be equal to src */
