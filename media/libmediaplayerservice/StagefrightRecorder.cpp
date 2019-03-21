@@ -164,9 +164,12 @@ void StagefrightRecorder::updateMetrics() {
     mAnalyticsItem->setInt32(kRecorderVideoIframeInterval, mIFramesIntervalSec);
     // TBD mAudioSourceNode = 0;
     // TBD mUse64BitFileOffset = false;
-    mAnalyticsItem->setInt32(kRecorderMovieTimescale, mMovieTimeScale);
-    mAnalyticsItem->setInt32(kRecorderAudioTimescale, mAudioTimeScale);
-    mAnalyticsItem->setInt32(kRecorderVideoTimescale, mVideoTimeScale);
+    if (mMovieTimeScale != -1)
+        mAnalyticsItem->setInt32(kRecorderMovieTimescale, mMovieTimeScale);
+    if (mAudioTimeScale != -1)
+        mAnalyticsItem->setInt32(kRecorderAudioTimescale, mAudioTimeScale);
+    if (mVideoTimeScale != -1)
+        mAnalyticsItem->setInt32(kRecorderVideoTimescale, mVideoTimeScale);
     // TBD mCameraId        = 0;
     // TBD mStartTimeOffsetMs = -1;
     mAnalyticsItem->setInt32(kRecorderVideoProfile, mVideoEncoderProfile);
@@ -2210,7 +2213,7 @@ status_t StagefrightRecorder::getMaxAmplitude(int *max) {
 }
 
 status_t StagefrightRecorder::getMetrics(Parcel *reply) {
-    ALOGD("StagefrightRecorder::getMetrics");
+    ALOGV("StagefrightRecorder::getMetrics");
 
     if (reply == NULL) {
         ALOGE("Null pointer argument");
