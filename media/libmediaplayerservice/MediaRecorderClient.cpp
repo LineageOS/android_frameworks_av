@@ -538,18 +538,19 @@ status_t MediaRecorderClient::getActiveMicrophones(
     return NO_INIT;
 }
 
-status_t MediaRecorderClient::setMicrophoneDirection(audio_microphone_direction_t direction) {
-    ALOGV("setMicrophoneDirection(%d)", direction);
+status_t MediaRecorderClient::setPreferredMicrophoneDirection(
+            audio_microphone_direction_t direction) {
+    ALOGV("setPreferredMicrophoneDirection(%d)", direction);
     if (mRecorder != NULL) {
-        return mRecorder->setMicrophoneDirection(direction);
+        return mRecorder->setPreferredMicrophoneDirection(direction);
     }
     return NO_INIT;
 }
 
-status_t MediaRecorderClient::setMicrophoneFieldDimension(float zoom) {
-    ALOGV("setMicrophoneFieldDimension(%f)", zoom);
+status_t MediaRecorderClient::setPreferredMicrophoneFieldDimension(float zoom) {
+    ALOGV("setPreferredMicrophoneFieldDimension(%f)", zoom);
     if (mRecorder != NULL) {
-        return mRecorder->setMicrophoneFieldDimension(zoom);
+        return mRecorder->setPreferredMicrophoneFieldDimension(zoom);
     }
     return NO_INIT;
 }

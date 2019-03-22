@@ -66,8 +66,8 @@ enum {
     ENABLE_AUDIO_DEVICE_CALLBACK,
     GET_ACTIVE_MICROPHONES,
     GET_PORT_ID,
-    SET_MICROPHONE_DIRECTION,
-    SET_MICROPHONE_FIELD_DIMENSION
+    SET_PREFERRED_MICROPHONE_DIRECTION,
+    SET_PREFERRED_MICROPHONE_FIELD_DIMENSION
 };
 
 class BpMediaRecorder: public BpInterface<IMediaRecorder>
@@ -409,21 +409,21 @@ public:
         return status;
     }
 
-    status_t setMicrophoneDirection(audio_microphone_direction_t direction) {
-        ALOGV("setMicrophoneDirection(%d)", direction);
+    status_t setPreferredMicrophoneDirection(audio_microphone_direction_t direction) {
+        ALOGV("setPreferredMicrophoneDirection(%d)", direction);
         Parcel data, reply;
         data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
         data.writeInt32(direction);
-        status_t status = remote()->transact(SET_MICROPHONE_DIRECTION, data, &reply);
+        status_t status = remote()->transact(SET_PREFERRED_MICROPHONE_DIRECTION, data, &reply);
         return status == NO_ERROR ? (status_t)reply.readInt32() : status;
     }
 
-    status_t setMicrophoneFieldDimension(float zoom) {
-        ALOGV("setMicrophoneFieldDimension(%f)", zoom);
+    status_t setPreferredMicrophoneFieldDimension(float zoom) {
+        ALOGV("setPreferredMicrophoneFieldDimension(%f)", zoom);
         Parcel data, reply;
         data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
         data.writeFloat(zoom);
-        status_t status = remote()->transact(SET_MICROPHONE_FIELD_DIMENSION, data, &reply);
+        status_t status = remote()->transact(SET_PREFERRED_MICROPHONE_FIELD_DIMENSION, data, &reply);
         return status == NO_ERROR ? (status_t)reply.readInt32() : status;
     }
 
@@ -709,20 +709,20 @@ status_t BnMediaRecorder::onTransact(
             }
             return NO_ERROR;
         }
-        case SET_MICROPHONE_DIRECTION: {
-            ALOGV("SET_MICROPHONE_DIRECTION");
+        case SET_PREFERRED_MICROPHONE_DIRECTION: {
+            ALOGV("SET_PREFERRED_MICROPHONE_DIRECTION");
             CHECK_INTERFACE(IMediaRecorder, data, reply);
             int direction = data.readInt32();
-            status_t status =
-                setMicrophoneDirection(static_cast<audio_microphone_direction_t>(direction));
+            status_t status = setPreferredMicrophoneDirection(
+                    static_cast<audio_microphone_direction_t>(direction));
             reply->writeInt32(status);
             return NO_ERROR;
         }
-        case SET_MICROPHONE_FIELD_DIMENSION: {
+        case SET_PREFERRED_MICROPHONE_FIELD_DIMENSION: {
             ALOGV("SET_MICROPHONE_FIELD_DIMENSION");
             CHECK_INTERFACE(IMediaRecorder, data, reply);
             float zoom = data.readFloat();
-            status_t status = setMicrophoneFieldDimension(zoom);
+            status_t status = setPreferredMicrophoneFieldDimension(zoom);
             reply->writeInt32(status);
             return NO_ERROR;
         }

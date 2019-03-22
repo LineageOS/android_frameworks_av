@@ -39,9 +39,9 @@ interface IAudioRecord {
 
   /* Set the microphone direction (for processing).
    */
-  void setMicrophoneDirection(int /*audio_microphone_direction_t*/ direction);
+  void setPreferredMicrophoneDirection(int /*audio_microphone_direction_t*/ direction);
 
   /* Set the microphone zoom (for processing).
    */
-  void setMicrophoneFieldDimension(float zoom);
+  void setPreferredMicrophoneFieldDimension(float zoom);
 }

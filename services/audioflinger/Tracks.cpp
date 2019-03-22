@@ -1838,16 +1838,16 @@ binder::Status AudioFlinger::RecordHandle::getActiveMicrophones(
             mRecordTrack->getActiveMicrophones(activeMicrophones));
 }
 
-binder::Status AudioFlinger::RecordHandle::setMicrophoneDirection(
+binder::Status AudioFlinger::RecordHandle::setPreferredMicrophoneDirection(
         int /*audio_microphone_direction_t*/ direction) {
     ALOGV("%s()", __func__);
-    return binder::Status::fromStatusT(mRecordTrack->setMicrophoneDirection(
+    return binder::Status::fromStatusT(mRecordTrack->setPreferredMicrophoneDirection(
             static_cast<audio_microphone_direction_t>(direction)));
 }
 
-binder::Status AudioFlinger::RecordHandle::setMicrophoneFieldDimension(float zoom) {
+binder::Status AudioFlinger::RecordHandle::setPreferredMicrophoneFieldDimension(float zoom) {
     ALOGV("%s()", __func__);
-    return binder::Status::fromStatusT(mRecordTrack->setMicrophoneFieldDimension(zoom));
+    return binder::Status::fromStatusT(mRecordTrack->setPreferredMicrophoneFieldDimension(zoom));
 }
 
 // ----------------------------------------------------------------------------
@@ -2144,22 +2144,22 @@ status_t AudioFlinger::RecordThread::RecordTrack::getActiveMicrophones(
     }
 }
 
-status_t AudioFlinger::RecordThread::RecordTrack::setMicrophoneDirection(
+status_t AudioFlinger::RecordThread::RecordTrack::setPreferredMicrophoneDirection(
         audio_microphone_direction_t direction) {
     sp<ThreadBase> thread = mThread.promote();
     if (thread != 0) {
         RecordThread *recordThread = (RecordThread *)thread.get();
-        return recordThread->setMicrophoneDirection(direction);
+        return recordThread->setPreferredMicrophoneDirection(direction);
     } else {
         return BAD_VALUE;
     }
 }
 
-status_t AudioFlinger::RecordThread::RecordTrack::setMicrophoneFieldDimension(float zoom) {
+status_t AudioFlinger::RecordThread::RecordTrack::setPreferredMicrophoneFieldDimension(float zoom) {
     sp<ThreadBase> thread = mThread.promote();
     if (thread != 0) {
         RecordThread *recordThread = (RecordThread *)thread.get();
-        return recordThread->setMicrophoneFieldDimension(zoom);
+        return recordThread->setPreferredMicrophoneFieldDimension(zoom);
     } else {
         return BAD_VALUE;
     }
