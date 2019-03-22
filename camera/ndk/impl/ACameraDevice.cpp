@@ -227,6 +227,55 @@ CameraDevice::createCaptureSession(
     return ACAMERA_OK;
 }
 
+camera_status_t CameraDevice::isSessionConfigurationSupported(
+        const ACaptureSessionOutputContainer* sessionOutputContainer) const {
+    Mutex::Autolock _l(mDeviceLock);
+    camera_status_t ret = checkCameraClosedOrErrorLocked();
+    if (ret != ACAMERA_OK) {
+        return ret;
+    }
+
+    SessionConfiguration sessionConfiguration(0 /*inputWidth*/, 0 /*inputHeight*/,
+            -1 /*inputFormat*/, CAMERA3_STREAM_CONFIGURATION_NORMAL_MODE);
+    for (const auto& output : sessionOutputContainer->mOutputs) {
+        sp<IGraphicBufferProducer> iGBP(nullptr);
+        ret = getIGBPfromAnw(output.mWindow, iGBP);
+        if (ret != ACAMERA_OK) {
+            ALOGE("Camera device %s failed to extract graphic producer from native window",
+                    getId());
+            return ret;
+        }
+
+        String16 physicalId16(output.mPhysicalCameraId.c_str());
+        OutputConfiguration outConfig(iGBP, output.mRotation, physicalId16,
+                OutputConfiguration::INVALID_SET_ID, true);
+
+        for (auto& anw : output.mSharedWindows) {
+            ret = getIGBPfromAnw(anw, iGBP);
+            if (ret != ACAMERA_OK) {
+                ALOGE("Camera device %s failed to extract graphic producer from native window",
+                        getId());
+                return ret;
+            }
+            outConfig.addGraphicProducer(iGBP);
+        }
+
+        sessionConfiguration.addOutputConfiguration(outConfig);
+    }
+
+    bool supported = false;
+    binder::Status remoteRet = mRemote->isSessionConfigurationSupported(
+            sessionConfiguration, &supported);
+    if (remoteRet.serviceSpecificErrorCode() ==
+            hardware::ICameraService::ERROR_INVALID_OPERATION) {
+        return ACAMERA_ERROR_UNSUPPORTED_OPERATION;
+    } else if (!remoteRet.isOk()) {
+        return ACAMERA_ERROR_UNKNOWN;
+    } else {
+        return supported ? ACAMERA_OK : ACAMERA_ERROR_STREAM_CONFIGURE_FAIL;
+    }
+}
+
 camera_status_t CameraDevice::updateOutputConfigurationLocked(ACaptureSessionOutput *output) {
     camera_status_t ret = checkCameraClosedOrErrorLocked();
     if (ret != ACAMERA_OK) {

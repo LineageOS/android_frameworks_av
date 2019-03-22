@@ -101,6 +101,9 @@ class CameraDevice final : public RefBase {
             const ACameraCaptureSession_stateCallbacks* callbacks,
             /*out*/ACameraCaptureSession** session);
 
+    camera_status_t isSessionConfigurationSupported(
+            const ACaptureSessionOutputContainer* sessionOutputContainer) const;
+
     // Callbacks from camera service
     class ServiceCallback : public ICameraDeviceCallback {
       public:
@@ -395,6 +398,11 @@ struct ACameraDevice {
             const ACameraCaptureSession_stateCallbacks* callbacks,
             /*out*/ACameraCaptureSession** session) {
         return mDevice->createCaptureSession(outputs, sessionParameters, callbacks, session);
+    }
+
+    camera_status_t isSessionConfigurationSupported(
+            const ACaptureSessionOutputContainer* sessionOutputContainer) const {
+        return mDevice->isSessionConfigurationSupported(sessionOutputContainer);
     }
 
     /***********************

@@ -53,6 +53,7 @@ using TemplateId = frameworks::cameraservice::device::V2_0::TemplateId;
 using HCameraDeviceUser = device::V2_0::ICameraDeviceUser;
 using HCameraMetadata = cameraservice::service::V2_0::CameraMetadata;
 using HCaptureRequest = device::V2_0::CaptureRequest;
+using HSessionConfiguration = frameworks::cameraservice::device::V2_0::SessionConfiguration;
 using HOutputConfiguration = frameworks::cameraservice::device::V2_0::OutputConfiguration;
 using HPhysicalCameraSettings = frameworks::cameraservice::device::V2_0::PhysicalCameraSettings;
 using HStatus = frameworks::cameraservice::common::V2_0::Status;
@@ -96,6 +97,10 @@ struct HidlCameraDeviceUser final : public HCameraDeviceUser {
 
     virtual Return<HStatus> updateOutputConfiguration(
         int32_t streamId, const HOutputConfiguration& outputConfiguration) override;
+
+    virtual Return<void> isSessionConfigurationSupported(
+        const HSessionConfiguration& sessionConfiguration,
+        isSessionConfigurationSupported_cb _hidl_cb) override;
 
     bool initStatus() { return mInitSuccess; }
 
