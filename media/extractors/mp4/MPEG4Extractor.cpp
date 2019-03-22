@@ -5318,7 +5318,9 @@ size_t MPEG4Source::parseNALSize(const uint8_t *data) const {
 }
 
 int32_t MPEG4Source::parseHEVCLayerId(const uint8_t *data, size_t size) {
-    CHECK(data != nullptr && size >= (mNALLengthSize + 2));
+    if (data == nullptr || size < mNALLengthSize + 2) {
+        return -1;
+    }
 
     // HEVC NAL-header (16-bit)
     //  1   6      6     3
