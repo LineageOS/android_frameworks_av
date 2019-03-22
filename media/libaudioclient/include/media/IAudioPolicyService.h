@@ -135,6 +135,7 @@ public:
                                             audio_unique_id_t* id) = 0;
     virtual status_t removeSourceDefaultEffect(audio_unique_id_t id) = 0;
     virtual status_t removeStreamDefaultEffect(audio_unique_id_t id) = 0;
+    virtual status_t setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t flags) = 0;
    // Check if offload is possible for given format, stream type, sample rate,
     // bit rate, duration, video and streaming or offload property is enabled
     virtual bool isOffloadSupported(const audio_offload_info_t& info) = 0;

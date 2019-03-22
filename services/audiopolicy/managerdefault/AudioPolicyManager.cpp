@@ -945,6 +945,9 @@ status_t AudioPolicyManager::getOutputForAttrInt(
     if (status != NO_ERROR) {
         return status;
     }
+    if (auto it = mAllowedCapturePolicies.find(uid); it != end(mAllowedCapturePolicies)) {
+        resultAttr->flags |= it->second;
+    }
     *stream = mEngine->getStreamTypeForAttributes(*resultAttr);
 
     ALOGV("%s() attributes=%s stream=%s session %d selectedDeviceId %d", __func__,
@@ -3022,6 +3025,11 @@ void AudioPolicyManager::dump(String8 *dst) const
     mPolicyMixes.dump(dst);
     mAudioSources.dump(dst);
 
+    dst->appendFormat(" AllowedCapturePolicies:\n");
+    for (auto& policy : mAllowedCapturePolicies) {
+        dst->appendFormat("   - uid=%d flag_mask=%#x\n", policy.first, policy.second);
+    }
+
     dst->appendFormat("\nPolicy Engine dump:\n");
     mEngine->dump(dst);
 }
@@ -3031,6 +3039,12 @@ status_t AudioPolicyManager::dump(int fd)
     String8 result;
     dump(&result);
     write(fd, result.string(), result.size());
+    return NO_ERROR;
+}
+
+status_t AudioPolicyManager::setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t capturePolicy)
+{
+    mAllowedCapturePolicies[uid] = capturePolicy;
     return NO_ERROR;
 }
 
