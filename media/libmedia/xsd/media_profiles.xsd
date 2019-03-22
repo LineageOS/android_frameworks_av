@@ -42,6 +42,11 @@
                     <xs:attribute name="quality" type="xs:int"/>
                 </xs:complexType>
             </xs:element>
+            <xs:element name="ImageDecoding" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                    <xs:attribute name="memCap" type="xs:int"/>
+                </xs:complexType>
+            </xs:element>
         </xs:sequence>
         <xs:attribute name="cameraId" type="xs:int"/>
     </xs:complexType>
