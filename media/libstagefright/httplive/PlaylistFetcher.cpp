@@ -2125,7 +2125,10 @@ status_t PlaylistFetcher::extractAndQueueAccessUnits(
     size_t offset = 0;
     while (offset < buffer->size()) {
         const uint8_t *adtsHeader = buffer->data() + offset;
-        CHECK_LT(offset + 5, buffer->size());
+        if (buffer->size() <= offset+5) {
+            ALOGV("buffer does not contain a complete header");
+            return ERROR_MALFORMED;
+        }
         // non-const pointer for decryption if needed
         uint8_t *adtsFrame = buffer->data() + offset;
 
