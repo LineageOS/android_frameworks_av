@@ -3675,8 +3675,10 @@ status_t MPEG4Extractor::parseITunesMetaData(off64_t offset, size_t size) {
 
     void *tmpData;
     size_t tmpDataSize;
+    const char *s;
     if (size >= 8 && metadataKey &&
-            !AMediaFormat_getBuffer(mFileMetaData, metadataKey, &tmpData, &tmpDataSize)) {
+            !AMediaFormat_getBuffer(mFileMetaData, metadataKey, &tmpData, &tmpDataSize) &&
+            !AMediaFormat_getString(mFileMetaData, metadataKey, &s)) {
         if (!strcmp(metadataKey, "albumart")) {
             AMediaFormat_setBuffer(mFileMetaData, metadataKey,
                     buffer + 8, size - 8);
@@ -3918,10 +3920,9 @@ void MPEG4Extractor::parseID3v2MetaData(off64_t offset) {
         };
         static const size_t kNumMapEntries = sizeof(kMap) / sizeof(kMap[0]);
 
-        void *tmpData;
-        size_t tmpDataSize;
         for (size_t i = 0; i < kNumMapEntries; ++i) {
-            if (!AMediaFormat_getBuffer(mFileMetaData, kMap[i].key, &tmpData, &tmpDataSize)) {
+            const char *ss;
+            if (!AMediaFormat_getString(mFileMetaData, kMap[i].key, &ss)) {
                 ID3::Iterator *it = new ID3::Iterator(id3, kMap[i].tag1);
                 if (it->done()) {
                     delete it;
