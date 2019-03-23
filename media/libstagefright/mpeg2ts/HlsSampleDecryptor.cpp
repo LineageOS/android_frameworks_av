@@ -149,6 +149,11 @@ void HlsSampleDecryptor::processAAC(size_t adtsHdrSize, uint8_t *data, size_t si
     }
 
     // ADTS header is included in the size
+    if (size < adtsHdrSize) {
+        ALOGV("processAAC: size (%zu) < adtsHdrSize (%zu)", size, adtsHdrSize);
+        android_errorWriteLog(0x534e4554, "128433933");
+        return;
+    }
     size_t offset = adtsHdrSize;
     size_t remainingBytes = size - adtsHdrSize;
 

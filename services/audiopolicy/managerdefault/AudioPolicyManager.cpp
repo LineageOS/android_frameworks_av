@@ -4828,6 +4828,7 @@ void AudioPolicyManager::closeOutput(audio_io_handle_t output)
         ALOGW("closeOutput() unknown output %d", output);
         return;
     }
+    const bool closingOutputWasActive = closingOutput->isActive();
     mPolicyMixes.closeOutput(closingOutput);
 
     // look for duplicated outputs connected to the output being removed.
@@ -4867,6 +4868,9 @@ void AudioPolicyManager::closeOutput(audio_io_handle_t output)
         mpClientInterface->onAudioPatchListUpdate();
     }
 
+    if (closingOutputWasActive) {
+        closingOutput->stop();
+    }
     closingOutput->close();
 
     removeOutput(output);

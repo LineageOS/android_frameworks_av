@@ -967,6 +967,11 @@ status_t convertMetaDataToMessage(
         if (meta->findInt32(kKeyPcmEncoding, &pcmEncoding)) {
             msg->setInt32("pcm-encoding", pcmEncoding);
         }
+
+        int32_t hapticChannelCount;
+        if (meta->findInt32(kKeyHapticChannelCount, &hapticChannelCount)) {
+            msg->setInt32("haptic-channel-count", hapticChannelCount);
+        }
     }
 
     int32_t maxInputSize;
@@ -1707,6 +1712,11 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
         int32_t pcmEncoding;
         if (msg->findInt32("pcm-encoding", &pcmEncoding)) {
             meta->setInt32(kKeyPcmEncoding, pcmEncoding);
+        }
+
+        int32_t hapticChannelCount;
+        if (msg->findInt32("haptic-channel-count", &hapticChannelCount)) {
+            meta->setInt32(kKeyHapticChannelCount, hapticChannelCount);
         }
     }
 

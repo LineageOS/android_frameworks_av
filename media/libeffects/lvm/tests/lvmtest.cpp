@@ -24,6 +24,7 @@
 #include <audio_utils/channels.h>
 #include <audio_utils/primitives.h>
 #include <log/log.h>
+#include <system/audio.h>
 
 #include "EffectBundle.h"
 #include "LVM_Private.h"
@@ -76,6 +77,8 @@
 struct lvmConfigParams_t {
   int              samplingFreq    = 44100;
   int              nrChannels      = 2;
+  int              chMask          = AUDIO_CHANNEL_OUT_STEREO;
+  int              vcBal           = 0;
   int              fChannels       = 2;
   bool             monoMode        = false;
   int              bassEffectLevel = 0;
@@ -87,9 +90,36 @@ struct lvmConfigParams_t {
   LVM_Mode_en      csEnable        = LVM_MODE_OFF;
 };
 
+constexpr audio_channel_mask_t lvmConfigChMask[] = {
+    AUDIO_CHANNEL_OUT_MONO,
+    AUDIO_CHANNEL_OUT_STEREO,
+    AUDIO_CHANNEL_OUT_2POINT1,
+    AUDIO_CHANNEL_OUT_2POINT0POINT2,
+    AUDIO_CHANNEL_OUT_QUAD,
+    AUDIO_CHANNEL_OUT_QUAD_BACK,
+    AUDIO_CHANNEL_OUT_QUAD_SIDE,
+    AUDIO_CHANNEL_OUT_SURROUND,
+    (1 << 4) - 1,
+    AUDIO_CHANNEL_OUT_2POINT1POINT2,
+    AUDIO_CHANNEL_OUT_3POINT0POINT2,
+    AUDIO_CHANNEL_OUT_PENTA,
+    (1 << 5) - 1,
+    AUDIO_CHANNEL_OUT_3POINT1POINT2,
+    AUDIO_CHANNEL_OUT_5POINT1,
+    AUDIO_CHANNEL_OUT_5POINT1_BACK,
+    AUDIO_CHANNEL_OUT_5POINT1_SIDE,
+    (1 << 6) - 1,
+    AUDIO_CHANNEL_OUT_6POINT1,
+    (1 << 7) - 1,
+    AUDIO_CHANNEL_OUT_5POINT1POINT2,
+    AUDIO_CHANNEL_OUT_7POINT1,
+    (1 << 8) - 1,
+};
+
+
 void printUsage() {
   printf("\nUsage: ");
-  printf("\n     <exceutable> -i:<input_file> -o:<out_file> [options]\n");
+  printf("\n     <executable> -i:<input_file> -o:<out_file> [options]\n");
   printf("\nwhere, \n     <inputfile>  is the input file name");
   printf("\n                  on which LVM effects are applied");
   printf("\n     <outputfile> processed output file");
@@ -98,7 +128,34 @@ void printUsage() {
   printf("\n     -help (or) -h");
   printf("\n           Prints this usage information");
   printf("\n");
-  printf("\n     -ch:<process_channels> (1 through 8)\n\n");
+  printf("\n     -chMask:<channel_mask>\n");
+  printf("\n         0  - AUDIO_CHANNEL_OUT_MONO");
+  printf("\n         1  - AUDIO_CHANNEL_OUT_STEREO");
+  printf("\n         2  - AUDIO_CHANNEL_OUT_2POINT1");
+  printf("\n         3  - AUDIO_CHANNEL_OUT_2POINT0POINT2");
+  printf("\n         4  - AUDIO_CHANNEL_OUT_QUAD");
+  printf("\n         5  - AUDIO_CHANNEL_OUT_QUAD_BACK");
+  printf("\n         6  - AUDIO_CHANNEL_OUT_QUAD_SIDE");
+  printf("\n         7  - AUDIO_CHANNEL_OUT_SURROUND");
+  printf("\n         8  - canonical channel index mask for 4 ch: (1 << 4) - 1");
+  printf("\n         9  - AUDIO_CHANNEL_OUT_2POINT1POINT2");
+  printf("\n         10 - AUDIO_CHANNEL_OUT_3POINT0POINT2");
+  printf("\n         11 - AUDIO_CHANNEL_OUT_PENTA");
+  printf("\n         12 - canonical channel index mask for 5 ch: (1 << 5) - 1");
+  printf("\n         13 - AUDIO_CHANNEL_OUT_3POINT1POINT2");
+  printf("\n         14 - AUDIO_CHANNEL_OUT_5POINT1");
+  printf("\n         15 - AUDIO_CHANNEL_OUT_5POINT1_BACK");
+  printf("\n         16 - AUDIO_CHANNEL_OUT_5POINT1_SIDE");
+  printf("\n         17 - canonical channel index mask for 6 ch: (1 << 6) - 1");
+  printf("\n         18 - AUDIO_CHANNEL_OUT_6POINT1");
+  printf("\n         19 - canonical channel index mask for 7 ch: (1 << 7) - 1");
+  printf("\n         20 - AUDIO_CHANNEL_OUT_5POINT1POINT2");
+  printf("\n         21 - AUDIO_CHANNEL_OUT_7POINT1");
+  printf("\n         22 - canonical channel index mask for 8 ch: (1 << 8) - 1");
+  printf("\n         default 0");
+  printf("\n     -vcBal:<Left Right Balance control in dB [-96 to 96 dB]>");
+  printf("\n            -ve values reduce Right channel while +ve value reduces Left channel");
+  printf("\n                 default 0");
   printf("\n     -fch:<file_channels> (1 through 8)\n\n");
   printf("\n     -M");
   printf("\n           Mono mode (force all input audio channels to be identical)");
@@ -298,6 +355,7 @@ int LvmBundle_init(struct EffectContext *pContext, LVM_ControlParams_t *params) 
   params->OperatingMode = LVM_MODE_ON;
   params->SampleRate = LVM_FS_44100;
   params->SourceFormat = LVM_STEREO;
+  params->ChMask       = AUDIO_CHANNEL_OUT_STEREO;
   params->SpeakerType = LVM_HEADPHONES;
 
   pContext->pBundledContext->SampleRate = LVM_FS_44100;
@@ -452,13 +510,13 @@ int lvmControl(struct EffectContext *pContext,
   params->OperatingMode = LVM_MODE_ON;
   params->SpeakerType = LVM_HEADPHONES;
 
-  const int nrChannels = plvmConfigParams->nrChannels;
-  params->NrChannels = nrChannels;
-  if (nrChannels == 1) {
+  params->ChMask     = plvmConfigParams->chMask;
+  params->NrChannels = plvmConfigParams->nrChannels;
+  if (params->NrChannels == 1) {
     params->SourceFormat = LVM_MONO;
-  } else if (nrChannels == 2) {
+  } else if (params->NrChannels == 2) {
     params->SourceFormat = LVM_STEREO;
-  } else if (nrChannels > 2 && nrChannels <= 8) { // FCC_2 FCC_8
+  } else if (params->NrChannels > 2 && params->NrChannels <= 8) { // FCC_2 FCC_8
     params->SourceFormat = LVM_MULTICHANNEL;
   } else {
       return -EINVAL;
@@ -531,7 +589,7 @@ int lvmControl(struct EffectContext *pContext,
 
   /* Volume Control parameters */
   params->VC_EffectLevel = 0;
-  params->VC_Balance = 0;
+  params->VC_Balance = plvmConfigParams->vcBal;
 
   /* Treble Enhancement parameters */
   params->TE_OperatingMode = plvmConfigParams->trebleEnable;
@@ -667,13 +725,21 @@ int main(int argc, const char *argv[]) {
         return -1;
       }
       lvmConfigParams.samplingFreq = samplingFreq;
-    } else if (!strncmp(argv[i], "-ch:", 4)) {
-      const int nrChannels = atoi(argv[i] + 4);
-      if (nrChannels > 8 || nrChannels < 1) {
-        printf("Error: Unsupported number of channels : %d\n", nrChannels);
+    } else if (!strncmp(argv[i], "-chMask:", 8)) {
+      const int chMaskConfigIdx = atoi(argv[i] + 8);
+      if (chMaskConfigIdx < 0 || (size_t)chMaskConfigIdx >= std::size(lvmConfigChMask)) {
+        ALOGE("\nError: Unsupported Channel Mask : %d\n", chMaskConfigIdx);
         return -1;
       }
-      lvmConfigParams.nrChannels = nrChannels;
+      const audio_channel_mask_t chMask = lvmConfigChMask[chMaskConfigIdx];
+      lvmConfigParams.chMask = chMask;
+      lvmConfigParams.nrChannels = audio_channel_count_from_out_mask(chMask);
+    } else if (!strncmp(argv[i], "-vcBal:", 7)) {
+      const int vcBalance = atoi(argv[i] + 7);
+      if (vcBalance > 96 || vcBalance < -96) {
+        ALOGE("\nError: Unsupported volume balance value: %d\n", vcBalance);
+      }
+      lvmConfigParams.vcBal = vcBalance;
     } else if (!strncmp(argv[i], "-fch:", 5)) {
       const int fChannels = atoi(argv[i] + 5);
       if (fChannels > 8 || fChannels < 1) {
