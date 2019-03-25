@@ -2025,7 +2025,7 @@ exit:
         mSoundTriggerSessions.indexOfKey(session) > 0;
     *portId = AudioPort::getNextUniqueId();
 
-    clientDesc = new RecordClientDescriptor(*portId, uid, session, *attr, *config,
+    clientDesc = new RecordClientDescriptor(*portId, uid, session, attributes, *config,
                                             requestedDeviceId, attributes.source, flags,
                                             isSoundTrigger);
     inputDesc = mInputs.valueFor(*input);
