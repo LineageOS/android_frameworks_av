@@ -120,9 +120,9 @@ bool objcpy(C2WorkOrdinalStruct *d, const WorkOrdinal &s) {
     return true;
 }
 
-// C2FieldSupportedValues::range's type -> FieldSupportedValues::Range
+// C2FieldSupportedValues::range's type -> ValueRange
 bool objcpy(
-        FieldSupportedValues::Range* d,
+        ValueRange* d,
         const decltype(C2FieldSupportedValues::range)& s) {
     d->min = static_cast<PrimitiveValue>(s.min.u64);
     d->max = static_cast<PrimitiveValue>(s.max.u64);
@@ -135,45 +135,45 @@ bool objcpy(
 // C2FieldSupportedValues -> FieldSupportedValues
 bool objcpy(FieldSupportedValues *d, const C2FieldSupportedValues &s) {
     switch (s.type) {
-    case C2FieldSupportedValues::EMPTY:
-        d->type = FieldSupportedValues::Type::EMPTY;
-        d->values.resize(0);
-        break;
-    case C2FieldSupportedValues::RANGE:
-        d->type = FieldSupportedValues::Type::RANGE;
-        if (!objcpy(&d->range, s.range)) {
-            LOG(ERROR) << "Invalid C2FieldSupportedValues::range.";
-            return false;
+    case C2FieldSupportedValues::EMPTY: {
+            d->empty(::android::hidl::safe_union::V1_0::Monostate{});
+            break;
         }
-        d->values.resize(0);
-        break;
-    default:
-        switch (s.type) {
-        case C2FieldSupportedValues::VALUES:
-            d->type = FieldSupportedValues::Type::VALUES;
-            break;
-        case C2FieldSupportedValues::FLAGS:
-            d->type = FieldSupportedValues::Type::FLAGS;
-            break;
-        default:
-            LOG(DEBUG) << "Unrecognized C2FieldSupportedValues::type_t "
-                       << "with underlying value " << underlying_value(s.type)
-                       << ".";
-            d->type = static_cast<FieldSupportedValues::Type>(s.type);
-            if (!objcpy(&d->range, s.range)) {
+    case C2FieldSupportedValues::RANGE: {
+            ValueRange range{};
+            if (!objcpy(&range, s.range)) {
                 LOG(ERROR) << "Invalid C2FieldSupportedValues::range.";
+                d->range(range);
                 return false;
             }
+            d->range(range);
+            break;
         }
-        copyVector<uint64_t>(&d->values, s.values);
+    case C2FieldSupportedValues::VALUES: {
+            hidl_vec<PrimitiveValue> values;
+            copyVector<uint64_t>(&values, s.values);
+            d->values(values);
+            break;
+        }
+    case C2FieldSupportedValues::FLAGS: {
+            hidl_vec<PrimitiveValue> flags;
+            copyVector<uint64_t>(&flags, s.values);
+            d->flags(flags);
+            break;
+        }
+    default:
+        LOG(DEBUG) << "Unrecognized C2FieldSupportedValues::type_t "
+                   << "with underlying value " << underlying_value(s.type)
+                   << ".";
+        return false;
     }
     return true;
 }
 
-// FieldSupportedValues::Range -> C2FieldSupportedValues::range's type
+// ValueRange -> C2FieldSupportedValues::range's type
 bool objcpy(
         decltype(C2FieldSupportedValues::range)* d,
-        const FieldSupportedValues::Range& s) {
+        const ValueRange& s) {
     d->min.u64 = static_cast<uint64_t>(s.min);
     d->max.u64 = static_cast<uint64_t>(s.max);
     d->step.u64 = static_cast<uint64_t>(s.step);
@@ -184,37 +184,33 @@ bool objcpy(
 
 // FieldSupportedValues -> C2FieldSupportedValues
 bool objcpy(C2FieldSupportedValues *d, const FieldSupportedValues &s) {
-    switch (s.type) {
-    case FieldSupportedValues::Type::EMPTY:
-        d->type = C2FieldSupportedValues::EMPTY;
-        break;
-    case FieldSupportedValues::Type::RANGE:
-        d->type = C2FieldSupportedValues::RANGE;
-        if (!objcpy(&d->range, s.range)) {
-            LOG(ERROR) << "Invalid FieldSupportedValues::range.";
-            return false;
+    switch (s.getDiscriminator()) {
+    case FieldSupportedValues::hidl_discriminator::empty: {
+            d->type = C2FieldSupportedValues::EMPTY;
+            break;
         }
-        d->values.resize(0);
-        break;
-    default:
-        switch (s.type) {
-        case FieldSupportedValues::Type::VALUES:
-            d->type = C2FieldSupportedValues::VALUES;
-            break;
-        case FieldSupportedValues::Type::FLAGS:
-            d->type = C2FieldSupportedValues::FLAGS;
-            break;
-        default:
-            LOG(DEBUG) << "Unrecognized FieldSupportedValues::Type "
-                       << "with underlying value " << underlying_value(s.type)
-                       << ".";
-            d->type = static_cast<C2FieldSupportedValues::type_t>(s.type);
-            if (!objcpy(&d->range, s.range)) {
+    case FieldSupportedValues::hidl_discriminator::range: {
+            d->type = C2FieldSupportedValues::RANGE;
+            if (!objcpy(&d->range, s.range())) {
                 LOG(ERROR) << "Invalid FieldSupportedValues::range.";
                 return false;
             }
+            d->values.resize(0);
+            break;
         }
-        copyVector<uint64_t>(&d->values, s.values);
+    case FieldSupportedValues::hidl_discriminator::values: {
+            d->type = C2FieldSupportedValues::VALUES;
+            copyVector<uint64_t>(&d->values, s.values());
+            break;
+        }
+    case FieldSupportedValues::hidl_discriminator::flags: {
+            d->type = C2FieldSupportedValues::FLAGS;
+            copyVector<uint64_t>(&d->values, s.flags());
+            break;
+        }
+    default:
+        LOG(WARNING) << "Unrecognized FieldSupportedValues::getDiscriminator()";
+        return false;
     }
     return true;
 }
