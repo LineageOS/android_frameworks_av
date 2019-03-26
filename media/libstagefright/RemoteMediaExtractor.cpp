@@ -18,6 +18,7 @@
 #define LOG_TAG "RemoteMediaExtractor"
 #include <utils/Log.h>
 
+#include <binder/IPCThreadState.h>
 #include <media/stagefright/InterfaceUtils.h>
 #include <media/MediaAnalyticsItem.h>
 #include <media/MediaSource.h>
@@ -50,6 +51,11 @@ RemoteMediaExtractor::RemoteMediaExtractor(
     mAnalyticsItem = nullptr;
     if (MEDIA_LOG) {
         mAnalyticsItem = MediaAnalyticsItem::create(kKeyExtractor);
+
+        // we're in the extractor service, we want to attribute to the app
+        // that invoked us.
+        int uid = IPCThreadState::self()->getCallingUid();
+        mAnalyticsItem->setUid(uid);
 
         // track the container format (mpeg, aac, wvm, etc)
         size_t ntracks = extractor->countTracks();

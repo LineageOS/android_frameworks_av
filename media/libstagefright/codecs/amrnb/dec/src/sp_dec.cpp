@@ -268,13 +268,7 @@ Word16 GSMInitDecode(void **state_data,
     if (Decoder_amr_init(&s->decoder_amrState)
             || Post_Process_reset(&s->postHP_state))
     {
-        Speech_Decode_FrameState *tmp = s;
-        /*
-         *  dereferencing type-punned pointer avoid
-         *  breaking strict-aliasing rules
-         */
-        void** tempVoid = (void**) tmp;
-        GSMDecodeFrameExit(tempVoid);
+        free(s);
         return (-1);
     }
 
