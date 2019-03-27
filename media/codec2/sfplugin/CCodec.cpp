@@ -370,6 +370,10 @@ public:
         return err;
     }
 
+    void onInputBufferDone(c2_cntr64_t index) override {
+        mNode->onInputBufferDone(index);
+    }
+
 private:
     sp<BGraphicBufferSource> mSource;
     sp<C2OMXNode> mNode;
@@ -1583,6 +1587,13 @@ void CCodec::onWorkDone(std::list<std::unique_ptr<C2Work>> &workItems) {
 
 void CCodec::onInputBufferDone(uint64_t frameIndex, size_t arrayIndex) {
     mChannel->onInputBufferDone(frameIndex, arrayIndex);
+    if (arrayIndex == 0) {
+        // We always put no more than one buffer per work, if we use an input surface.
+        Mutexed<Config>::Locked config(mConfig);
+        if (config->mInputSurface) {
+            config->mInputSurface->onInputBufferDone(frameIndex);
+        }
+    }
 }
 
 void CCodec::onMessageReceived(const sp<AMessage> &msg) {
@@ -1714,6 +1725,9 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                     }
                     ++stream;
                 }
+            }
+            if (config->mInputSurface) {
+                config->mInputSurface->onInputBufferDone(work->input.ordinal.frameIndex);
             }
             mChannel->onWorkDone(
                     std::move(work), changed ? config->mOutputFormat : nullptr,

@@ -98,6 +98,13 @@ public:
         mDataSpace = dataSpace;
     }
 
+    /**
+     * Clean up C2Work related references if necessary. No-op by default.
+     *
+     * \param index index of input work.
+     */
+    virtual void onInputBufferDone(c2_cntr64_t /* index */) {}
+
 protected:
     android_dataspace mDataSpace;
 };
