@@ -30,7 +30,11 @@ cc_library_shared {
 
     static_libs: ["libvpx"],
 
-    defaults: ["omx_soft_libs"],
-
+    shared_libs: [
+        "libstagefright_omx",
+        "libstagefright_foundation",
+        "libutils",
+        "liblog",
+    ],
     compile_multilib: "32",
 }
