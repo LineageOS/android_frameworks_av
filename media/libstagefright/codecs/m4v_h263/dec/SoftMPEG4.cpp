@@ -118,8 +118,13 @@ void SoftMPEG4::onQueueFilled(OMX_U32 /* portIndex */) {
                 outHeader->nFlags = OMX_BUFFERFLAG_EOS;
 
                 List<BufferInfo *>::iterator it = outQueue.begin();
-                while ((*it)->mHeader != outHeader) {
+                while (it != outQueue.end() && (*it)->mHeader != outHeader) {
                     ++it;
+                }
+                if (it == outQueue.end()) {
+                    ALOGE("couldn't find port buffer %d in outQueue: b/109891727", mNumSamplesOutput & 1);
+                    android_errorWriteLog(0x534e4554, "109891727");
+                    return;
                 }
 
                 BufferInfo *outInfo = *it;
