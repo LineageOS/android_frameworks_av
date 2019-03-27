@@ -222,8 +222,7 @@ Return<void> ComponentStore::createInputSurface(createInputSurface_cb _hidl_cb) 
     sp<InputSurface> inputSurface = new InputSurface(
             this,
             std::make_shared<C2ReflectorHelper>(),
-            new ::android::hardware::graphics::bufferqueue::V2_0::utils::
-                B2HGraphicBufferProducer(source->getIGraphicBufferProducer()),
+            source->getHGraphicBufferProducer(),
             source);
     _hidl_cb(inputSurface ? Status::OK : Status::NO_MEMORY,
              inputSurface);

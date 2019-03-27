@@ -27,8 +27,6 @@
 #include <Codec2Mapper.h>
 
 #include <codec2/hidl/client.h>
-#include <media/stagefright/bqhelper/GraphicBufferSource.h>
-#include <media/stagefright/codec2/1.0/InputSurface.h>
 #include <media/stagefright/foundation/Mutexed.h>
 #include <media/stagefright/CodecBase.h>
 #include <media/ICrypto.h>
