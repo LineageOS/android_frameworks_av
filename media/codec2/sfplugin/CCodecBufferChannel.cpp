@@ -2483,6 +2483,7 @@ status_t CCodecBufferChannel::requestInitialInputBuffers() {
             bool post = true;
             if (!configs->empty()) {
                 sp<ABuffer> config = configs->front();
+                configs->pop_front();
                 if (buffer->capacity() >= config->size()) {
                     memcpy(buffer->base(), config->data(), config->size());
                     buffer->setRange(0, config->size());
