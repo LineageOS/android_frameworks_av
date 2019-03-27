@@ -7245,7 +7245,7 @@ reacquire_wakelock:
                 } else {
                     // FIXME could do a partial drop of framesOut
                     if (activeTrack->mFramesToDrop > 0) {
-                        activeTrack->mFramesToDrop -= framesOut;
+                        activeTrack->mFramesToDrop -= (ssize_t)framesOut;
                         if (activeTrack->mFramesToDrop <= 0) {
                             activeTrack->clearSyncStartEvent();
                         }
