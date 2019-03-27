@@ -130,6 +130,14 @@ bool captureAudioOutputAllowed(pid_t pid, uid_t uid) {
     return ok;
 }
 
+bool captureMediaOutputAllowed(pid_t pid, uid_t uid) {
+    if (isAudioServerOrRootUid(uid)) return true;
+    static const String16 sCaptureMediaOutput("android.permission.CAPTURE_MEDIA_OUTPUT");
+    bool ok = PermissionCache::checkPermission(sCaptureMediaOutput, pid, uid);
+    if (!ok) ALOGE("Request requires android.permission.CAPTURE_MEDIA_OUTPUT");
+    return ok;
+}
+
 bool captureHotwordAllowed(pid_t pid, uid_t uid) {
     // CAPTURE_AUDIO_HOTWORD permission implies RECORD_AUDIO permission
     bool ok = recordingAllowed(String16(""), pid, uid);

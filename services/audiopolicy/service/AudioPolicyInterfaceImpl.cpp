@@ -192,7 +192,7 @@ status_t AudioPolicyService::getOutputForAttr(const audio_attributes_t *original
     }
     audio_attributes_t attr = *originalAttr;
     if (!mPackageManager.allowPlaybackCapture(uid)) {
-        attr.flags |= AUDIO_FLAG_NO_CAPTURE;
+        attr.flags |= AUDIO_FLAG_NO_MEDIA_PROJECTION;
     }
     audio_output_flags_t originalFlags = flags;
     AutoCallerClear acc;
@@ -1080,6 +1080,14 @@ status_t AudioPolicyService::registerPolicyMixes(const Vector<AudioMix>& mixes, 
     bool needModifyAudioRouting = std::any_of(mixes.begin(), mixes.end(), [](auto& mix) {
             return !is_mix_loopback_render(mix.mRouteFlags); });
     if (needModifyAudioRouting && !modifyAudioRoutingAllowed()) {
+        return PERMISSION_DENIED;
+    }
+
+    bool needCaptureMediaOutput = std::any_of(mixes.begin(), mixes.end(), [](auto& mix) {
+            return mix.mAllowPrivilegedPlaybackCapture; });
+    const uid_t callingUid = IPCThreadState::self()->getCallingUid();
+    const pid_t callingPid = IPCThreadState::self()->getCallingPid();
+    if (needCaptureMediaOutput && !captureMediaOutputAllowed(callingPid, callingUid)) {
         return PERMISSION_DENIED;
     }
 
