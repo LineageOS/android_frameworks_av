@@ -24,6 +24,7 @@
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
+#include <media/IOMX.h>
 
 #include "mp4dec_api.h"
 

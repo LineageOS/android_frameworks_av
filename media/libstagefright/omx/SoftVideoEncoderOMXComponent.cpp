@@ -559,7 +559,7 @@ const uint8_t *SoftVideoEncoderOMXComponent::extractGraphicBuffer(
         if (nativeMeta.nFenceFd >= 0) {
             sp<Fence> fence = new Fence(nativeMeta.nFenceFd);
             nativeMeta.nFenceFd = -1;
-            status_t err = fence->wait(kFenceTimeoutMs);
+            status_t err = fence->wait(IOMX::kFenceTimeoutMs);
             if (err != OK) {
                 ALOGE("Timed out waiting on input fence");
                 return NULL;

@@ -30,7 +30,12 @@ cc_library_shared {
         cfi: true,
     },
 
-    defaults: ["omx_soft_libs"],
+    shared_libs: [
+        "libstagefright_omx",
+        "libstagefright_foundation",
+        "libutils",
+        "liblog",
+    ],
 
     // We need this because the current asm generates the following link error:
     // requires unsupported dynamic reloc R_ARM_REL32; recompile with -fPIC
