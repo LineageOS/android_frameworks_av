@@ -1127,9 +1127,10 @@ status_t AudioPolicyService::startAudioSource(const struct audio_port_config *so
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
+    // startAudioSource should be created as the calling uid
+    const uid_t callingUid = IPCThreadState::self()->getCallingUid();
     AutoCallerClear acc;
-    return mAudioPolicyManager->startAudioSource(source, attributes, portId,
-                                                 IPCThreadState::self()->getCallingUid());
+    return mAudioPolicyManager->startAudioSource(source, attributes, portId, callingUid);
 }
 
 status_t AudioPolicyService::stopAudioSource(audio_port_handle_t portId)
