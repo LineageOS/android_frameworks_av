@@ -385,11 +385,11 @@ status_t AudioSource::dataCallback(const AudioRecord::Buffer& audioBuffer) {
     }
     mLastFrameTimestampUs = timeUs;
 
-    size_t numLostBytes = 0;
+    uint64_t numLostBytes = 0; // AudioRecord::getInputFramesLost() returns uint32_t
     if (mNumFramesReceived > 0) {  // Ignore earlier frame lost
         // getInputFramesLost() returns the number of lost frames.
         // Convert number of frames lost to number of bytes lost.
-        numLostBytes = mRecord->getInputFramesLost() * mRecord->frameSize();
+        numLostBytes = (uint64_t)mRecord->getInputFramesLost() * mRecord->frameSize();
     }
 
     CHECK_EQ(numLostBytes & 1, 0u);
@@ -397,11 +397,11 @@ status_t AudioSource::dataCallback(const AudioRecord::Buffer& audioBuffer) {
     if (numLostBytes > 0) {
         // Loss of audio frames should happen rarely; thus the LOGW should
         // not cause a logging spam
-        ALOGW("Lost audio record data: %zu bytes", numLostBytes);
+        ALOGW("Lost audio record data: %" PRIu64 " bytes", numLostBytes);
     }
 
     while (numLostBytes > 0) {
-        size_t bufferSize = numLostBytes;
+        uint64_t bufferSize = numLostBytes;
         if (numLostBytes > kMaxBufferSize) {
             numLostBytes -= kMaxBufferSize;
             bufferSize = kMaxBufferSize;
