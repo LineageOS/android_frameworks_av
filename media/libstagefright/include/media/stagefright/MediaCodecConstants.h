@@ -772,6 +772,7 @@ constexpr char KEY_IS_TIMED_TEXT[] = "is-timed-text";
 constexpr char KEY_LANGUAGE[] = "language";
 constexpr char KEY_LATENCY[] = "latency";
 constexpr char KEY_LEVEL[] = "level";
+constexpr char KEY_MAX_B_FRAMES[] = "max-bframes";
 constexpr char KEY_MAX_BIT_RATE[] = "max-bitrate";
 constexpr char KEY_MAX_FPS_TO_ENCODER[] = "max-fps-to-encoder";
 constexpr char KEY_MAX_HEIGHT[] = "max-height";
