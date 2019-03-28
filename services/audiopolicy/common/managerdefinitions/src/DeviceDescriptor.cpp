@@ -40,7 +40,7 @@ DeviceDescriptor::DeviceDescriptor(audio_devices_t type, const FormatVector &enc
     mTagName(tagName), mDeviceType(type), mEncodedFormats(encodedFormats)
 {
     mCurrentEncodedFormat = AUDIO_FORMAT_DEFAULT;
-    if (type == AUDIO_DEVICE_IN_REMOTE_SUBMIX || type == AUDIO_DEVICE_OUT_REMOTE_SUBMIX ) {
+    if (audio_is_remote_submix_device(type)) {
         mAddress = String8("0");
     }
     /* If framework runs against a pre 5.0 Audio HAL, encoded formats are absent from the config.
