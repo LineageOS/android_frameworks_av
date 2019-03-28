@@ -14,12 +14,7 @@ cc_library_shared {
 
     static_libs: ["libvpx"],
 
-    shared_libs: [
-        "libstagefright_omx",
-        "libstagefright_foundation",
-        "libutils",
-        "liblog",
-    ],
+    defaults: ["omx_soft_libs"],
 
     cflags: ["-Werror"],
 
