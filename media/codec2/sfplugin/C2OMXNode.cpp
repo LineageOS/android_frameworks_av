@@ -272,19 +272,14 @@ status_t C2OMXNode::emptyBuffer(
     work->input.buffers.clear();
     if (block) {
         std::shared_ptr<C2Buffer> c2Buffer(
-                // TODO: fence
                 new Buffer2D(block->share(
-                        C2Rect(block->width(), block->height()), ::C2Fence())),
-                [buffer, source = getSource()](C2Buffer *ptr) {
-                    delete ptr;
-                    // TODO: fence
-                    (void)source->onInputBufferEmptied(buffer, -1);
-                });
+                        C2Rect(block->width(), block->height()), ::C2Fence())));
         work->input.buffers.push_back(c2Buffer);
     }
     work->worklets.clear();
     work->worklets.emplace_back(new C2Worklet);
     std::list<std::unique_ptr<C2Work>> items;
+    uint64_t index = work->input.ordinal.frameIndex.peeku();
     items.push_back(std::move(work));
 
     c2_status_t err = comp->queue(&items);
@@ -292,6 +287,7 @@ status_t C2OMXNode::emptyBuffer(
         return UNKNOWN_ERROR;
     }
 
+    (void)mBufferIdsInUse.emplace(index, buffer);
     return OK;
 }
 
@@ -324,6 +320,20 @@ sp<IOMXBufferSource> C2OMXNode::getSource() {
 void C2OMXNode::setFrameSize(uint32_t width, uint32_t height) {
     mWidth = width;
     mHeight = height;
+}
+
+void C2OMXNode::onInputBufferDone(c2_cntr64_t index) {
+    if (!mBufferSource) {
+        ALOGD("Buffer source not set (index=%llu)", index.peekull());
+        return;
+    }
+    auto it = mBufferIdsInUse.find(index.peeku());
+    if (it == mBufferIdsInUse.end()) {
+        ALOGV("Untracked input index %llu (maybe already removed)", index.peekull());
+        return;
+    }
+    (void)mBufferSource->onInputBufferEmptied(it->second, -1);
+    (void)mBufferIdsInUse.erase(it);
 }
 
 }  // namespace android

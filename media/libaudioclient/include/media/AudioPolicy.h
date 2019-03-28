@@ -114,6 +114,8 @@ public:
     audio_devices_t mDeviceType;
     String8         mDeviceAddress;
     uint32_t        mCbFlags; // flags indicating which callbacks to use, see kCbFlag*
+    /** Ignore the AUDIO_FLAG_NO_MEDIA_PROJECTION */
+    bool            mAllowPrivilegedPlaybackCapture = false;
 };
 
 
