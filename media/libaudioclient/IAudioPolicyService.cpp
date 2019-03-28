@@ -101,7 +101,8 @@ enum {
     LIST_AUDIO_PRODUCT_STRATEGIES,
     GET_STRATEGY_FOR_ATTRIBUTES,
     LIST_AUDIO_VOLUME_GROUPS,
-    GET_VOLUME_GROUP_FOR_ATTRIBUTES
+    GET_VOLUME_GROUP_FOR_ATTRIBUTES,
+    SET_ALLOWED_CAPTURE_POLICY,
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -601,6 +602,15 @@ public:
         }
         *count = retCount;
         return status;
+    }
+
+    status_t setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t flags) override {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeInt32(uid);
+        data.writeInt32(flags);
+        remote()->transact(SET_ALLOWED_CAPTURE_POLICY, data, &reply);
+        return reply.readInt32();
     }
 
     virtual bool isOffloadSupported(const audio_offload_info_t& info)
@@ -2168,7 +2178,7 @@ status_t BnAudioPolicyService::onTransact(
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             bool isSupported = isHapticPlaybackSupported();
             reply->writeBool(isSupported);
-            return NO_ERROR;    
+            return NO_ERROR;
         }
 
         case SET_UID_DEVICE_AFFINITY: {
@@ -2282,6 +2292,15 @@ status_t BnAudioPolicyService::onTransact(
                 return NO_ERROR;
             }
             reply->writeUint32(static_cast<int>(group));
+            return NO_ERROR;
+        }
+
+        case SET_ALLOWED_CAPTURE_POLICY: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            uid_t uid = data.readInt32();
+            audio_flags_mask_t flags = data.readInt32();
+            status_t status = setAllowedCapturePolicy(uid, flags);
+            reply->writeInt32(status);
             return NO_ERROR;
         }
 

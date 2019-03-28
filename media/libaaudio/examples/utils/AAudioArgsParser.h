@@ -36,11 +36,14 @@ static void (*s_setContentType)(AAudioStreamBuilder* builder,
                                 aaudio_content_type_t contentType) = nullptr;
 static void (*s_setInputPreset)(AAudioStreamBuilder* builder,
                                 aaudio_input_preset_t inputPreset) = nullptr;
+static void (*s_setAllowedCapturePolicy)(AAudioStreamBuilder* builder,
+                                          aaudio_allowed_capture_policy_t usage) = nullptr;
 
 static bool s_loadAttempted = false;
 static aaudio_usage_t (*s_getUsage)(AAudioStream *stream) = nullptr;
 static aaudio_content_type_t (*s_getContentType)(AAudioStream *stream) = nullptr;
 static aaudio_input_preset_t (*s_getInputPreset)(AAudioStream *stream) = nullptr;
+static aaudio_allowed_capture_policy_t (*s_getAllowedCapturePolicy)(AAudioStream *stream) = nullptr;
 
 // Link to test functions in shared library.
 static void loadFutureFunctions() {
@@ -61,6 +64,10 @@ static void loadFutureFunctions() {
                 dlsym(handle, "AAudioStreamBuilder_setInputPreset");
         if (s_setInputPreset == nullptr) goto error;
 
+        s_setAllowedCapturePolicy = (void (*)(AAudioStreamBuilder *, aaudio_input_preset_t))
+                dlsym(handle, "AAudioStreamBuilder_setAllowedCapturePolicy");
+        if (s_setAllowedCapturePolicy == nullptr) goto error;
+
         s_getUsage = (aaudio_usage_t (*)(AAudioStream *))
                 dlsym(handle, "AAudioStream_getUsage");
         if (s_getUsage == nullptr) goto error;
@@ -72,6 +79,10 @@ static void loadFutureFunctions() {
         s_getInputPreset = (aaudio_input_preset_t (*)(AAudioStream *))
                 dlsym(handle, "AAudioStream_getInputPreset");
         if (s_getInputPreset == nullptr) goto error;
+
+        s_getAllowedCapturePolicy = (aaudio_input_preset_t (*)(AAudioStream *))
+                dlsym(handle, "AAudioStream_getAllowedCapturePolicy");
+        if (s_getAllowedCapturePolicy == nullptr) goto error;
     }
     return;
 
@@ -169,6 +180,14 @@ public:
         mInputPreset = inputPreset;
     }
 
+    aaudio_allowed_capture_policy_t getAllowedCapturePolicy() const {
+        return mAllowedCapturePolicy;
+    }
+
+    void setAllowedCapturePolicy(aaudio_allowed_capture_policy_t policy) {
+        mAllowedCapturePolicy = policy;
+    }
+
     int32_t getDeviceId() const {
         return mDeviceId;
     }
@@ -223,6 +242,13 @@ public:
         } else if (mUsage != AAUDIO_UNSPECIFIED){
             printf("WARNING: setInputPreset not supported");
         }
+
+        // Call Q functions if supported.
+        if (s_setAllowedCapturePolicy != nullptr) {
+            s_setAllowedCapturePolicy(builder, mAllowedCapturePolicy);
+        } else if (mAllowedCapturePolicy != AAUDIO_UNSPECIFIED){
+            printf("WARNING: setAllowedCapturePolicy not supported");
+        }
     }
 
 private:
@@ -238,6 +264,7 @@ private:
     aaudio_usage_t             mUsage           = AAUDIO_UNSPECIFIED;
     aaudio_content_type_t      mContentType     = AAUDIO_UNSPECIFIED;
     aaudio_input_preset_t      mInputPreset     = AAUDIO_UNSPECIFIED;
+    aaudio_allowed_capture_policy_t mAllowedCapturePolicy     = AAUDIO_UNSPECIFIED;
 
     int32_t                    mNumberOfBursts  = AAUDIO_UNSPECIFIED;
     int32_t                    mFramesPerCallback = AAUDIO_UNSPECIFIED;
@@ -266,6 +293,9 @@ public:
                     break;
                 case 'c':
                     setChannelCount(atoi(&arg[2]));
+                    break;
+                case 'C':
+                    setAllowedCapturePolicy(parseAllowedCapturePolicy(arg[2]));
                     break;
                 case 'd':
                     setDeviceId(atoi(&arg[2]));
@@ -341,6 +371,10 @@ public:
         printf("      Default values are UNSPECIFIED unless otherwise stated.\n");
         printf("      -b{bufferCapacity} frames\n");
         printf("      -c{channels} for example 2 for stereo\n");
+        printf("      -C{a|s|n} set playback capture policy\n");
+        printf("          a = _ALL (default)\n");
+        printf("          s = _SYSTEM\n");
+        printf("          n = _NONE\n");
         printf("      -d{deviceId} default is %d\n", AAUDIO_UNSPECIFIED);
         printf("      -f{0|1|2} set format\n");
         printf("          0 = UNSPECIFIED\n");
@@ -363,6 +397,25 @@ public:
         printf("      -x to use EXCLUSIVE mode\n");
         printf("      -y{contentType} eg. 1 for AAUDIO_CONTENT_TYPE_SPEECH\n");
         printf("      -z{callbackSize} or block size, in frames, default = 0\n");
+    }
+
+    static aaudio_performance_mode_t parseAllowedCapturePolicy(char c) {
+        aaudio_allowed_capture_policy_t policy = AAUDIO_ALLOW_CAPTURE_BY_ALL;
+        switch (c) {
+            case 'a':
+                policy = AAUDIO_ALLOW_CAPTURE_BY_ALL;
+                break;
+            case 's':
+                policy = AAUDIO_ALLOW_CAPTURE_BY_SYSTEM;
+                break;
+            case 'n':
+                policy = AAUDIO_ALLOW_CAPTURE_BY_NONE;
+                break;
+            default:
+                printf("ERROR: invalid playback capture policy %c\n", c);
+                break;
+        }
+        return policy;
     }
 
     static aaudio_performance_mode_t parsePerformanceMode(char c) {
@@ -448,6 +501,11 @@ public:
 
         printf("  Is MMAP used? %s\n", AAudioStream_isMMapUsed(stream)
                ? "yes" : "no");
+
+        if (s_getAllowedCapturePolicy != nullptr) {
+            printf("  ContentType:  requested = %d, actual = %d\n",
+                   getAllowedCapturePolicy(), s_getAllowedCapturePolicy(stream));
+        }
 
     }
 

@@ -1133,6 +1133,12 @@ void AudioSystem::clearAudioConfigCache()
     }
 }
 
+status_t AudioSystem::setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t flags) {
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == nullptr) return PERMISSION_DENIED;
+    return aps->setAllowedCapturePolicy(uid, flags);
+}
+
 bool AudioSystem::isOffloadSupported(const audio_offload_info_t& info)
 {
     ALOGV("isOffloadSupported()");
