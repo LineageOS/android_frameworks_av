@@ -466,15 +466,8 @@ void AudioFlinger::dumpPermissionDenial(int fd, const Vector<String16>& args __u
 
 bool AudioFlinger::dumpTryLock(Mutex& mutex)
 {
-    bool locked = false;
-    for (int i = 0; i < kDumpLockRetries; ++i) {
-        if (mutex.tryLock() == NO_ERROR) {
-            locked = true;
-            break;
-        }
-        usleep(kDumpLockSleepUs);
-    }
-    return locked;
+    status_t err = mutex.timedLock(kDumpLockTimeoutNs);
+    return err == NO_ERROR;
 }
 
 status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
