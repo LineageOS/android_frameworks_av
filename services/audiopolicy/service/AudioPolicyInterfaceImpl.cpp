@@ -322,7 +322,7 @@ void AudioPolicyService::doReleaseOutput(audio_port_handle_t portId)
         return;
     }
     sp<AudioPlaybackClient> client = mAudioPlaybackClients.valueAt(index);
-    mAudioRecordClients.removeItem(portId);
+    mAudioPlaybackClients.removeItem(portId);
 
     // called from internal thread: no need to clear caller identity
     mAudioPolicyManager->releaseOutput(portId);
