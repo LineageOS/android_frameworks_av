@@ -22,8 +22,9 @@
 #define __STDINT_LIMITS
 #define __STDC_LIMIT_MACROS
 #include <stdint.h>
-
 #include <sys/time.h>
+
+#include <audio_utils/clock.h>
 #include <binder/IServiceManager.h>
 #include <utils/Log.h>
 #include <cutils/properties.h>
@@ -48,8 +49,7 @@ namespace android {
 static const char kDeadlockedString[] = "AudioPolicyService may be deadlocked\n";
 static const char kCmdDeadlockedString[] = "AudioPolicyService command thread may be deadlocked\n";
 
-static const int kDumpLockRetries = 50;
-static const int kDumpLockSleepUs = 20000;
+static const int kDumpLockTimeoutNs = 1 * NANOS_PER_SECOND;
 
 static const nsecs_t kAudioCommandTimeoutNs = seconds(3); // 3 seconds
 
@@ -376,17 +376,10 @@ void AudioPolicyService::binderDied(const wp<IBinder>& who) {
             IPCThreadState::self()->getCallingPid());
 }
 
-static bool tryLock(Mutex& mutex)
+static bool dumpTryLock(Mutex& mutex)
 {
-    bool locked = false;
-    for (int i = 0; i < kDumpLockRetries; ++i) {
-        if (mutex.tryLock() == NO_ERROR) {
-            locked = true;
-            break;
-        }
-        usleep(kDumpLockSleepUs);
-    }
-    return locked;
+    status_t err = mutex.timedLock(kDumpLockTimeoutNs);
+    return err == NO_ERROR;
 }
 
 status_t AudioPolicyService::dumpInternals(int fd)
@@ -627,7 +620,7 @@ status_t AudioPolicyService::dump(int fd, const Vector<String16>& args __unused)
     if (!dumpAllowed()) {
         dumpPermissionDenial(fd);
     } else {
-        bool locked = tryLock(mLock);
+        bool locked = dumpTryLock(mLock);
         if (!locked) {
             String8 result(kDeadlockedString);
             write(fd, result.string(), result.size());
@@ -1260,7 +1253,7 @@ status_t AudioPolicyService::AudioCommandThread::dump(int fd)
     result.append(buffer);
     write(fd, result.string(), result.size());
 
-    bool locked = tryLock(mLock);
+    bool locked = dumpTryLock(mLock);
     if (!locked) {
         String8 result2(kCmdDeadlockedString);
         write(fd, result2.string(), result2.size());

@@ -22,6 +22,7 @@
 #include <sys/types.h>
 #include <pthread.h>
 
+#include <audio_utils/clock.h>
 #include <system/sound_trigger.h>
 #include <cutils/atomic.h>
 #include <cutils/properties.h>
@@ -146,20 +147,12 @@ status_t SoundTriggerHwService::setCaptureState(bool active)
 }
 
 
-static const int kDumpLockRetries = 50;
-static const int kDumpLockSleep = 60000;
+static const int kDumpLockTimeoutNs = 1 * NANOS_PER_SECOND;
 
-static bool tryLock(Mutex& mutex)
+static bool dumpTryLock(Mutex& mutex)
 {
-    bool locked = false;
-    for (int i = 0; i < kDumpLockRetries; ++i) {
-        if (mutex.tryLock() == NO_ERROR) {
-            locked = true;
-            break;
-        }
-        usleep(kDumpLockSleep);
-    }
-    return locked;
+    status_t err = mutex.timedLock(kDumpLockTimeoutNs);
+    return err == NO_ERROR;
 }
 
 status_t SoundTriggerHwService::dump(int fd, const Vector<String16>& args __unused) {
@@ -168,7 +161,7 @@ status_t SoundTriggerHwService::dump(int fd, const Vector<String16>& args __unus
         result.appendFormat("Permission Denial: can't dump SoundTriggerHwService");
         write(fd, result.string(), result.size());
     } else {
-        bool locked = tryLock(mServiceLock);
+        bool locked = dumpTryLock(mServiceLock);
         // failed to lock - SoundTriggerHwService is probably deadlocked
         if (!locked) {
             result.append("SoundTriggerHwService may be deadlocked\n");
