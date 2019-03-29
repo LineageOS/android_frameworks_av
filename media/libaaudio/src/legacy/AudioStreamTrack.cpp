@@ -422,6 +422,10 @@ aaudio_result_t AudioStreamTrack::write(const void *buffer,
 
 aaudio_result_t AudioStreamTrack::setBufferSize(int32_t requestedFrames)
 {
+    // Do not ask for less than one burst.
+    if (requestedFrames < getFramesPerBurst()) {
+        requestedFrames = getFramesPerBurst();
+    }
     ssize_t result = mAudioTrack->setBufferSizeInFrames(requestedFrames);
     if (result < 0) {
         return AAudioConvert_androidToAAudioResult(result);
