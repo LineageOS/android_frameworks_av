@@ -786,12 +786,8 @@ String8 channelMaskToString(audio_channel_mask_t mask, bool output) {
     }
 }
 
-void AudioFlinger::ThreadBase::dumpBase(int fd, const Vector<String16>& args __unused)
+void AudioFlinger::ThreadBase::dump(int fd, const Vector<String16>& args)
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    String8 result;
-
     dprintf(fd, "\n%s thread %p, name %s, tid %d, type %d (%s):\n", isOutput() ? "Output" : "Input",
             this, mThreadName, getTid(), type(), threadTypeToString(type()));
 
@@ -800,6 +796,21 @@ void AudioFlinger::ThreadBase::dumpBase(int fd, const Vector<String16>& args __u
         dprintf(fd, "  Thread may be deadlocked\n");
     }
 
+    dumpBase_l(fd, args);
+    dumpInternals_l(fd, args);
+    dumpTracks_l(fd, args);
+    dumpEffectChains_l(fd, args);
+
+    if (locked) {
+        mLock.unlock();
+    }
+
+    dprintf(fd, "  Local log:\n");
+    mLocalLog.dump(fd, "   " /* prefix */, 40 /* lines */);
+}
+
+void AudioFlinger::ThreadBase::dumpBase_l(int fd, const Vector<String16>& args __unused)
+{
     dprintf(fd, "  I/O handle: %d\n", mId);
     dprintf(fd, "  Standby: %s\n", mStandby ? "yes" : "no");
     dprintf(fd, "  Sample rate: %u Hz\n", mSampleRate);
@@ -814,6 +825,8 @@ void AudioFlinger::ThreadBase::dumpBase(int fd, const Vector<String16>& args __u
     dprintf(fd, "  Pending config events:");
     size_t numConfig = mConfigEvents.size();
     if (numConfig) {
+        const size_t SIZE = 256;
+        char buffer[SIZE];
         for (size_t i = 0; i < numConfig; i++) {
             mConfigEvents[i]->dump(buffer, SIZE);
             dprintf(fd, "\n    %s", buffer);
@@ -858,17 +871,12 @@ void AudioFlinger::ThreadBase::dumpBase(int fd, const Vector<String16>& args __u
                 isOutput() ? "write" : "read",
                 mLatencyMs.toString().c_str());
     }
-
-    if (locked) {
-        mLock.unlock();
-    }
 }
 
-void AudioFlinger::ThreadBase::dumpEffectChains(int fd, const Vector<String16>& args)
+void AudioFlinger::ThreadBase::dumpEffectChains_l(int fd, const Vector<String16>& args)
 {
     const size_t SIZE = 256;
     char buffer[SIZE];
-    String8 result;
 
     size_t numEffectChains = mEffectChains.size();
     snprintf(buffer, SIZE, "  %zu Effect Chains\n", numEffectChains);
@@ -1819,16 +1827,24 @@ AudioFlinger::PlaybackThread::~PlaybackThread()
     free(mEffectBuffer);
 }
 
-void AudioFlinger::PlaybackThread::dump(int fd, const Vector<String16>& args)
+// Thread virtuals
+
+void AudioFlinger::PlaybackThread::onFirstRef()
 {
-    dumpInternals(fd, args);
-    dumpTracks(fd, args);
-    dumpEffectChains(fd, args);
-    dprintf(fd, "  Local log:\n");
-    mLocalLog.dump(fd, "   " /* prefix */, 40 /* lines */);
+    run(mThreadName, ANDROID_PRIORITY_URGENT_AUDIO);
 }
 
-void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& args __unused)
+// ThreadBase virtuals
+void AudioFlinger::PlaybackThread::preExit()
+{
+    ALOGV("  preExit()");
+    // FIXME this is using hard-coded strings but in the future, this functionality will be
+    //       converted to use audio HAL extensions required to support tunneling
+    status_t result = mOutput->stream->setParameters(String8("exiting=1"));
+    ALOGE_IF(result != OK, "Error when setting parameters on exit: %d", result);
+}
+
+void AudioFlinger::PlaybackThread::dumpTracks_l(int fd, const Vector<String16>& args __unused)
 {
     String8 result;
 
@@ -1893,10 +1909,8 @@ void AudioFlinger::PlaybackThread::dumpTracks(int fd, const Vector<String16>& ar
     write(fd, result.string(), result.size());
 }
 
-void AudioFlinger::PlaybackThread::dumpInternals(int fd, const Vector<String16>& args)
+void AudioFlinger::PlaybackThread::dumpInternals_l(int fd, const Vector<String16>& args __unused)
 {
-    dumpBase(fd, args);
-
     dprintf(fd, "  Master mute: %s\n", mMasterMute ? "on" : "off");
     if (mHapticChannelMask != AUDIO_CHANNEL_NONE) {
         dprintf(fd, "  Haptic channel mask: %#x (%s)\n", mHapticChannelMask,
@@ -1925,23 +1939,6 @@ void AudioFlinger::PlaybackThread::dumpInternals(int fd, const Vector<String16>&
         dprintf(fd, "  Hal stream dump:\n");
         (void)output->stream->dump(fd);
     }
-}
-
-// Thread virtuals
-
-void AudioFlinger::PlaybackThread::onFirstRef()
-{
-    run(mThreadName, ANDROID_PRIORITY_URGENT_AUDIO);
-}
-
-// ThreadBase virtuals
-void AudioFlinger::PlaybackThread::preExit()
-{
-    ALOGV("  preExit()");
-    // FIXME this is using hard-coded strings but in the future, this functionality will be
-    //       converted to use audio HAL extensions required to support tunneling
-    status_t result = mOutput->stream->setParameters(String8("exiting=1"));
-    ALOGE_IF(result != OK, "Error when setting parameters on exit: %d", result);
 }
 
 // PlaybackThread::createTrack_l() must be called with AudioFlinger::mLock held
@@ -5350,9 +5347,9 @@ bool AudioFlinger::MixerThread::checkForNewParameter_l(const String8& keyValuePa
 }
 
 
-void AudioFlinger::MixerThread::dumpInternals(int fd, const Vector<String16>& args)
+void AudioFlinger::MixerThread::dumpInternals_l(int fd, const Vector<String16>& args)
 {
-    PlaybackThread::dumpInternals(fd, args);
+    PlaybackThread::dumpInternals_l(fd, args);
     dprintf(fd, "  Thread throttle time (msecs): %u\n", mThreadThrottleTimeMs);
     dprintf(fd, "  AudioMixer tracks: %s\n", mAudioMixer->trackNames().c_str());
     dprintf(fd, "  Master mono: %s\n", mMasterMono ? "on" : "off");
@@ -5426,9 +5423,9 @@ AudioFlinger::DirectOutputThread::~DirectOutputThread()
 {
 }
 
-void AudioFlinger::DirectOutputThread::dumpInternals(int fd, const Vector<String16>& args)
+void AudioFlinger::DirectOutputThread::dumpInternals_l(int fd, const Vector<String16>& args)
 {
-    PlaybackThread::dumpInternals(fd, args);
+    PlaybackThread::dumpInternals_l(fd, args);
     dprintf(fd, "  Master balance: %f  Left: %f  Right: %f\n",
             mMasterBalance.load(), mMasterBalanceLeft, mMasterBalanceRight);
 }
@@ -6443,9 +6440,9 @@ void AudioFlinger::DuplicatingThread::threadLoop_standby()
     }
 }
 
-void AudioFlinger::DuplicatingThread::dumpInternals(int fd, const Vector<String16>& args __unused)
+void AudioFlinger::DuplicatingThread::dumpInternals_l(int fd, const Vector<String16>& args __unused)
 {
-    MixerThread::dumpInternals(fd, args);
+    MixerThread::dumpInternals_l(fd, args);
 
     std::stringstream ss;
     const size_t numTracks = mOutputTracks.size();
@@ -7775,19 +7772,8 @@ void AudioFlinger::RecordThread::removeTrack_l(const sp<RecordTrack>& track)
     }
 }
 
-void AudioFlinger::RecordThread::dump(int fd, const Vector<String16>& args)
+void AudioFlinger::RecordThread::dumpInternals_l(int fd, const Vector<String16>& args __unused)
 {
-    dumpInternals(fd, args);
-    dumpTracks(fd, args);
-    dumpEffectChains(fd, args);
-    dprintf(fd, "  Local log:\n");
-    mLocalLog.dump(fd, "   " /* prefix */, 40 /* lines */);
-}
-
-void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& args)
-{
-    dumpBase(fd, args);
-
     AudioStreamIn *input = mInput;
     audio_input_flags_t flags = input != NULL ? input->flags : AUDIO_INPUT_FLAG_NONE;
     dprintf(fd, "  AudioStreamIn: %p flags %#x (%s)\n",
@@ -7814,7 +7800,7 @@ void AudioFlinger::RecordThread::dumpInternals(int fd, const Vector<String16>& a
     copy->dump(fd);
 }
 
-void AudioFlinger::RecordThread::dumpTracks(int fd, const Vector<String16>& args __unused)
+void AudioFlinger::RecordThread::dumpTracks_l(int fd, const Vector<String16>& args __unused)
 {
     String8 result;
     size_t numtracks = mTracks.size();
@@ -9079,19 +9065,8 @@ void AudioFlinger::MmapThread::checkInvalidTracks_l()
     }
 }
 
-void AudioFlinger::MmapThread::dump(int fd, const Vector<String16>& args)
+void AudioFlinger::MmapThread::dumpInternals_l(int fd, const Vector<String16>& args __unused)
 {
-    dumpInternals(fd, args);
-    dumpTracks(fd, args);
-    dumpEffectChains(fd, args);
-    dprintf(fd, "  Local log:\n");
-    mLocalLog.dump(fd, "   " /* prefix */, 40 /* lines */);
-}
-
-void AudioFlinger::MmapThread::dumpInternals(int fd, const Vector<String16>& args)
-{
-    dumpBase(fd, args);
-
     dprintf(fd, "  Attributes: content type %d usage %d source %d\n",
             mAttr.content_type, mAttr.usage, mAttr.source);
     dprintf(fd, "  Session: %d port Id: %d\n", mSessionId, mPortId);
@@ -9100,7 +9075,7 @@ void AudioFlinger::MmapThread::dumpInternals(int fd, const Vector<String16>& arg
     }
 }
 
-void AudioFlinger::MmapThread::dumpTracks(int fd, const Vector<String16>& args __unused)
+void AudioFlinger::MmapThread::dumpTracks_l(int fd, const Vector<String16>& args __unused)
 {
     String8 result;
     size_t numtracks = mActiveTracks.size();
@@ -9323,9 +9298,9 @@ void AudioFlinger::MmapPlaybackThread::toAudioPortConfig(struct audio_port_confi
     }
 }
 
-void AudioFlinger::MmapPlaybackThread::dumpInternals(int fd, const Vector<String16>& args)
+void AudioFlinger::MmapPlaybackThread::dumpInternals_l(int fd, const Vector<String16>& args)
 {
-    MmapThread::dumpInternals(fd, args);
+    MmapThread::dumpInternals_l(fd, args);
 
     dprintf(fd, "  Stream type: %d Stream volume: %f HAL volume: %f Stream mute %d\n",
             mStreamType, mStreamVolume, mHalVolFloat, mStreamMute);
