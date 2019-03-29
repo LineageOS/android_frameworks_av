@@ -89,6 +89,7 @@ LIBMEDIANDK {
     AMEDIAFORMAT_KEY_GENRE; # var introduced=29
     AMEDIAFORMAT_KEY_GRID_COLUMNS; # var introduced=28
     AMEDIAFORMAT_KEY_GRID_ROWS; # var introduced=28
+    AMEDIAFORMAT_KEY_HAPTIC_CHANNEL_COUNT; # var introduced=29
     AMEDIAFORMAT_KEY_HDR_STATIC_INFO; # var introduced=28
     AMEDIAFORMAT_KEY_HEIGHT; # var introduced=21
     AMEDIAFORMAT_KEY_ICC_PROFILE; # var introduced=29

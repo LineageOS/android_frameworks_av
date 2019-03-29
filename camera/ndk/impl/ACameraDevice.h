@@ -35,6 +35,7 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <camera/CaptureResult.h>
 #include <camera/camera2/OutputConfiguration.h>
+#include <camera/camera2/SessionConfiguration.h>
 #include <camera/camera2/CaptureRequest.h>
 
 #include <camera/NdkCameraManager.h>
@@ -76,6 +77,9 @@ class CameraDevice final : public RefBase {
             const ACaptureRequest* sessionParameters,
             const ACameraCaptureSession_stateCallbacks* callbacks,
             /*out*/ACameraCaptureSession** session);
+
+    camera_status_t isSessionConfigurationSupported(
+            const ACaptureSessionOutputContainer* sessionOutputContainer) const;
 
     // Callbacks from camera service
     class ServiceCallback : public hardware::camera2::BnCameraDeviceCallbacks {
@@ -367,6 +371,11 @@ struct ACameraDevice {
             const ACameraCaptureSession_stateCallbacks* callbacks,
             /*out*/ACameraCaptureSession** session) {
         return mDevice->createCaptureSession(outputs, sessionParameters, callbacks, session);
+    }
+
+    camera_status_t isSessionConfigurationSupported(
+            const ACaptureSessionOutputContainer* sessionOutputContainer) const {
+        return mDevice->isSessionConfigurationSupported(sessionOutputContainer);
     }
 
     /***********************

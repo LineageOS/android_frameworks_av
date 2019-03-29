@@ -298,6 +298,7 @@ typedef struct
     LVM_PSA_DecaySpeed_en       PSA_PeakDecayRate;      /* Peak value decay rate*/
 #ifdef SUPPORT_MC
     LVM_INT32                   NrChannels;
+    LVM_INT32                   ChMask;
 #endif
 
 } LVM_ControlParams_t;

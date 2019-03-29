@@ -589,6 +589,21 @@ private:
     bool mIsHdr10Plus;
 };
 
+struct Av1ProfileLevelMapper : ProfileLevelMapperHelper {
+    virtual bool simpleMap(C2Config::level_t from, int32_t *to) {
+        return sAv1Levels.map(from, to);
+    }
+    virtual bool simpleMap(int32_t from, C2Config::level_t *to) {
+        return sAv1Levels.map(from, to);
+    }
+    virtual bool simpleMap(C2Config::profile_t from, int32_t *to) {
+        return sAv1Profiles.map(from, to);
+    }
+    virtual bool simpleMap(int32_t from, C2Config::profile_t *to) {
+        return sAv1Profiles.map(from, to);
+    }
+};
+
 } // namespace
 
 // static
@@ -613,6 +628,8 @@ C2Mapper::GetProfileLevelMapper(std::string mediaType) {
         return std::make_shared<Vp8ProfileLevelMapper>();
     } else if (mediaType == MIMETYPE_VIDEO_VP9) {
         return std::make_shared<Vp9ProfileLevelMapper>();
+    } else if (mediaType == MIMETYPE_VIDEO_AV1) {
+        return std::make_shared<Av1ProfileLevelMapper>();
     }
     return nullptr;
 }

@@ -173,7 +173,7 @@ Word16 lsp_init(lspState **st)
     *st = NULL;
 
     /* allocate memory */
-    if ((s = (lspState *) malloc(sizeof(lspState))) == NULL)
+    if ((s = (lspState *) calloc(sizeof(lspState), 1)) == NULL)
     {
         /* fprintf(stderr, "lsp_init: can not malloc state structure\n"); */
         return -1;
@@ -182,11 +182,13 @@ Word16 lsp_init(lspState **st)
     /* Initialize quantization state */
     if (0 != Q_plsf_init(&s->qSt))
     {
+        lsp_exit(&s);
         return -1;
     }
 
     if (0 != lsp_reset(s))
     {
+        lsp_exit(&s);
         return -1;
     }
 

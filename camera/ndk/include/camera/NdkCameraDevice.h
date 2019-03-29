@@ -845,6 +845,43 @@ camera_status_t ACameraDevice_createCaptureRequest_withPhysicalIds(
         const ACameraIdList* physicalIdList,
         /*out*/ACaptureRequest** request) __INTRODUCED_IN(29);
 
+/**
+ * Check whether a particular {@ACaptureSessionOutputContainer} is supported by
+ * the camera device.
+ *
+ * <p>This method performs a runtime check of a given {@link
+ * ACaptureSessionOutputContainer}. The result confirms whether or not the
+ * passed CaptureSession outputs can be successfully used to create a camera
+ * capture session using {@link ACameraDevice_createCaptureSession}.</p>
+ *
+ * <p>This method can be called at any point before, during and after active
+ * capture session. It must not impact normal camera behavior in any way and
+ * must complete significantly faster than creating a capture session.</p>
+ *
+ * <p>Although this method is faster than creating a new capture session, it is not intended
+ * to be used for exploring the entire space of supported stream combinations.</p>
+ *
+ * @param device the camera device of interest
+ * @param sessionOutputContainer the {@link ACaptureSessionOutputContainer} of
+ *                               interest.
+ *
+ * @return <ul>
+ *         <li>{@link ACAMERA_OK} if the given {@link ACaptureSessionOutputContainer}
+ *                                is supported by the camera device.</li>
+ *         <li>{@link ACAMERA_ERROR_INVALID_PARAMETER} if device, or sessionOutputContainer
+ *                                                     is NULL.</li>
+ *         <li>{@link ACAMERA_ERROR_STREAM_CONFIGURE_FAIL} if the given
+ *                                                         {@link ACaptureSessionOutputContainer}
+ *                                                         is not supported by
+ *                                                         the camera
+ *                                                         device.</li>
+ *        <li>{@link ACAMERA_ERROR_UNSUPPORTED_OPERATION} if the query operation is not
+ *                                                        supported by the camera device.</li>
+ */
+camera_status_t ACameraDevice_isSessionConfigurationSupported(
+        const ACameraDevice* device,
+        const ACaptureSessionOutputContainer* sessionOutputContainer) __INTRODUCED_IN(29);
+
 #endif /* __ANDROID_API__ >= 29 */
 
 __END_DECLS

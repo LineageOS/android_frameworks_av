@@ -855,25 +855,26 @@ status_t StreamInHalHidl::updateSinkMetadata(const
 #endif
 
 #if MAJOR_VERSION < 5
-status_t StreamInHalHidl::setMicrophoneDirection(audio_microphone_direction_t direction __unused) {
+status_t StreamInHalHidl::setPreferredMicrophoneDirection(
+            audio_microphone_direction_t direction __unused) {
     if (mStream == 0) return NO_INIT;
     return INVALID_OPERATION;
 }
 
-status_t StreamInHalHidl::setMicrophoneFieldDimension(float zoom __unused) {
+status_t StreamInHalHidl::setPreferredMicrophoneFieldDimension(float zoom __unused) {
     if (mStream == 0) return NO_INIT;
     return INVALID_OPERATION;
 }
 #else
-status_t StreamInHalHidl::setMicrophoneDirection(audio_microphone_direction_t direction) {
+status_t StreamInHalHidl::setPreferredMicrophoneDirection(audio_microphone_direction_t direction) {
     if (!mStream) return NO_INIT;
-    return processReturn("setMicrophoneDirection",
-                mStream->setMicrophoneDirection(static_cast<MicrophoneDirection>(direction)));
+    return processReturn("setPreferredMicrophoneDirection",
+        mStream->setMicrophoneDirection(static_cast<MicrophoneDirection>(direction)));
 }
 
-status_t StreamInHalHidl::setMicrophoneFieldDimension(float zoom) {
+status_t StreamInHalHidl::setPreferredMicrophoneFieldDimension(float zoom) {
     if (!mStream) return NO_INIT;
-    return processReturn("setMicrophoneFieldDimension",
+    return processReturn("setPreferredMicrophoneFieldDimension",
                 mStream->setMicrophoneFieldDimension(zoom));
 }
 #endif
