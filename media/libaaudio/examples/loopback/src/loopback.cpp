@@ -40,7 +40,8 @@
 // V0.4.01 = add -h hang option
 //           fix -n option to set output buffer for -tm
 //           plot first glitch
-#define APP_VERSION             "0.4.01"
+// V0.4.02 = allow -n0 for minimal buffer size
+#define APP_VERSION             "0.4.02"
 
 // Tag for machine readable results as property = value pairs
 #define RESULT_TAG              "RESULT: "
@@ -535,7 +536,7 @@ int main(int argc, const char **argv)
     printf("INPUT  stream ----------------------------------------\n");
     // Use different parameters for the input.
     argParser.setDeviceId(requestedInputDeviceId);
-    argParser.setNumberOfBursts(AAUDIO_UNSPECIFIED);
+    argParser.setNumberOfBursts(AAudioParameters::kDefaultNumberOfBursts);
     argParser.setFormat(requestedInputFormat);
     argParser.setPerformanceMode(inputPerformanceLevel);
     argParser.setChannelCount(requestedInputChannelCount);
