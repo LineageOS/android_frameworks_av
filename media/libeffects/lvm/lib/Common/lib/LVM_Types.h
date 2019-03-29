@@ -94,6 +94,7 @@ typedef     uint16_t            LVM_UINT16;         /* Unsigned 16-bit word */
 
 typedef     int32_t             LVM_INT32;          /* Signed 32-bit word */
 typedef     uint32_t            LVM_UINT32;         /* Unsigned 32-bit word */
+typedef     int64_t             LVM_INT64;          /* Signed 64-bit word */
 
 #ifdef BUILD_FLOAT
 
