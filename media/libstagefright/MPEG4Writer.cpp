@@ -71,6 +71,7 @@ static const uint8_t kNalUnitTypeSeqParamSet = 0x07;
 static const uint8_t kNalUnitTypePicParamSet = 0x08;
 static const int64_t kInitialDelayTimeUs     = 700000LL;
 static const int64_t kMaxMetadataSize = 0x4000000LL;   // 64MB max per-frame metadata size
+static const int64_t kMaxCttsOffsetTimeUs = 30 * 60 * 1000000LL;  // 30 minutes
 
 static const char kMetaKey_Version[]    = "com.android.version";
 static const char kMetaKey_Manufacturer[]      = "com.android.manufacturer";
@@ -136,13 +137,6 @@ public:
     void resetInternal();
 
 private:
-    enum {
-        // TODO: need to increase this considering the bug
-        // about camera app not sending video frames continuously?
-        kMaxCttsOffsetTimeUs = 1000000LL,  // 1 second
-        kSampleArraySize = 1000,
-    };
-
     // A helper class to handle faster write box with table entries
     template<class TYPE, unsigned ENTRY_SIZE>
     // ENTRY_SIZE: # of values in each entry
