@@ -59,7 +59,7 @@ struct ARTPConnection : public AHandler {
     static void MakeRTPSocketPair(
             int *rtpSocket, int *rtcpSocket,
             const char *localIp, const char *remoteIp,
-            unsigned localPort, unsigned remotePort);
+            unsigned localPort, unsigned remotePort, int64_t socketNetwork = 0);
 
 protected:
     virtual ~ARTPConnection();
