@@ -30,6 +30,8 @@
 #include <media/stagefright/foundation/AString.h>
 #include <media/stagefright/foundation/hexdump.h>
 
+#include <android/multinetwork.h>
+
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
@@ -154,7 +156,7 @@ void ARTPConnection::MakePortPair(
 // static
 void ARTPConnection::MakeRTPSocketPair(
         int *rtpSocket, int *rtcpSocket, const char *localIp, const char *remoteIp,
-        unsigned localPort, unsigned remotePort) {
+        unsigned localPort, unsigned remotePort, int64_t socketNetwork) {
     bool isIPv6 = false;
     if (strchr(localIp, ':') != NULL)
         isIPv6 = true;
@@ -166,6 +168,22 @@ void ARTPConnection::MakeRTPSocketPair(
 
     *rtcpSocket = socket(isIPv6 ? AF_INET6 : AF_INET, SOCK_DGRAM, 0);
     CHECK_GE(*rtcpSocket, 0);
+
+    if (socketNetwork != 0) {
+        ALOGD("trying to bind rtp socket(%d) to network(%llu).",
+                *rtpSocket, (unsigned long long)socketNetwork);
+
+        int result = android_setsocknetwork((net_handle_t)socketNetwork, *rtpSocket);
+        if (result != 0) {
+            ALOGW("failed(%d) to bind rtp socket(%d) to network(%llu)",
+                    result, *rtpSocket, (unsigned long long)socketNetwork);
+        }
+        result = android_setsocknetwork((net_handle_t)socketNetwork, *rtcpSocket);
+        if (result != 0) {
+            ALOGW("failed(%d) to bind rtcp socket(%d) to network(%llu)",
+                    result, *rtcpSocket, (unsigned long long)socketNetwork);
+        }
+    }
 
     bumpSocketBufferSize(*rtcpSocket);
 

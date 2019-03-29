@@ -102,7 +102,7 @@ void NuPlayer::RTPSource::prepareAsync() {
 
         int sockRtp, sockRtcp;
         ARTPConnection::MakeRTPSocketPair(&sockRtp, &sockRtcp, info->mLocalIp, info->mRemoteIp,
-                info->mLocalPort, info->mRemotePort);
+                info->mLocalPort, info->mRemotePort, info->mSocketNetwork);
 
         sp<AMessage> notify = new AMessage('accu', this);
 
@@ -691,6 +691,9 @@ status_t NuPlayer::RTPSource::setParameter(const String8 &key, const String8 &va
         info->mSelfID = atoi(value);
     } else if (key == "rtp-param-ext-cvo-extmap") {
         info->mCVOExtMap = atoi(value);
+    } else if (key == "rtp-param-set-socket-network") {
+        int64_t networkHandle = atoll(value);
+        setSocketNetwork(networkHandle);
     }
 
     return OK;
@@ -729,6 +732,20 @@ status_t NuPlayer::RTPSource::setParameters(const String8 &params) {
         key_start = semicolon_pos + 1;
     }
     return OK;
+}
+
+void NuPlayer::RTPSource::setSocketNetwork(int64_t networkHandle) {
+    ALOGV("setSocketNetwork: %llu", (unsigned long long)networkHandle);
+
+    TrackInfo *info = NULL;
+    for (size_t i = 0; i < mTracks.size(); ++i) {
+        info = &mTracks.editItemAt(i);
+
+        if (info == NULL)
+            break;
+
+        info->mSocketNetwork = networkHandle;
+    }
 }
 
 // Trim both leading and trailing whitespace from the given string.

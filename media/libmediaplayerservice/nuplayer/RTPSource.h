@@ -118,6 +118,7 @@ private:
         String8 mRemoteIp;
         int32_t mLocalPort;
         int32_t mRemotePort;
+        int64_t mSocketNetwork;
         int32_t mTimeScale;
         int32_t mAS;
 
@@ -205,6 +206,7 @@ private:
 
     status_t setParameters(const String8 &params);
     status_t setParameter(const String8 &key, const String8 &value);
+    void setSocketNetwork(int64_t networkHandle);
     static void TrimString(String8 *s);
 
     DISALLOW_EVIL_CONSTRUCTORS(RTPSource);
