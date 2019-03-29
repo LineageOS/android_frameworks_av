@@ -20,6 +20,7 @@
 #include <log/log.h>
 #include "DPFrequency.h"
 #include <algorithm>
+#include <sys/param.h>
 
 namespace dp_fx {
 
@@ -30,10 +31,6 @@ using Eigen::MatrixXd;
 #define CIRCULAR_BUFFER_UPSAMPLE 4  //4 times buffer size
 
 static constexpr float MIN_ENVELOPE = 1e-6f; //-120 dB
-//helper functionS
-static inline bool isPowerOf2(unsigned long n) {
-    return (n & (n - 1)) == 0;
-}
 static constexpr float EPSILON = 0.0000001f;
 
 static inline bool isZero(float f) {
@@ -151,7 +148,7 @@ void DPFrequency::configure(size_t blockSize, size_t overlapSize,
     } else if (mBlockSize < MIN_BLOCKSIZE) {
         mBlockSize = MIN_BLOCKSIZE;
     } else {
-        if (!isPowerOf2(blockSize)) {
+        if (!powerof2(blockSize)) {
             //find next highest power of 2.
             mBlockSize = 1 << (32 - __builtin_clz(blockSize));
         }
