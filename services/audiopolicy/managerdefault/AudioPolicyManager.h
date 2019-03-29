@@ -342,13 +342,13 @@ protected:
         {
             return mInputs;
         }
-        virtual const DeviceVector &getAvailableOutputDevices() const
+        virtual const DeviceVector getAvailableOutputDevices() const
         {
-            return mAvailableOutputDevices;
+            return mAvailableOutputDevices.filterForEngine();
         }
-        virtual const DeviceVector &getAvailableInputDevices() const
+        virtual const DeviceVector getAvailableInputDevices() const
         {
-            return mAvailableInputDevices;
+            return mAvailableInputDevices.filterForEngine();
         }
         virtual const sp<DeviceDescriptor> &getDefaultOutputDevice() const
         {

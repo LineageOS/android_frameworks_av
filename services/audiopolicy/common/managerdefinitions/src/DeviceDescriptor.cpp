@@ -399,6 +399,18 @@ bool DeviceVector::containsAllDevices(const DeviceVector &devices) const
     return filter(devices).size() == devices.size();
 }
 
+DeviceVector DeviceVector::filterForEngine() const
+{
+    DeviceVector filteredDevices;
+    for (const auto &device : *this) {
+        if (audio_is_remote_submix_device(device->type()) && device->address() != "0") {
+            continue;
+        }
+        filteredDevices.add(device);
+    }
+    return filteredDevices;
+}
+
 void DeviceDescriptor::log() const
 {
     ALOGI("Device id:%d type:0x%08X:%s, addr:%s", mId,  mDeviceType,

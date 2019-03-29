@@ -423,8 +423,7 @@ status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
     if (!audio_is_output_device(device) && !audio_is_input_device(device)) return BAD_VALUE;
 
     // Check if the device is currently connected
-    DeviceVector availableDevices = getAvailableOutputDevices();
-    DeviceVector deviceList = availableDevices.getDevicesFromTypeMask(device);
+    DeviceVector deviceList = mAvailableOutputDevices.getDevicesFromTypeMask(device);
     if (deviceList.empty()) {
         // Nothing to do: device is not connected
         return NO_ERROR;
