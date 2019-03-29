@@ -65,6 +65,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "libandroid_runtime_lazy",
         "libbinder",
         "libmedia",
         "libmedia_omx",
