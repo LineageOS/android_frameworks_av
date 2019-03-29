@@ -2,7 +2,5 @@ service mediaextractor /system/bin/mediaextractor
     class main
     user mediaex
     group drmrpc mediadrm
-    # TODO(b/123275379): Remove updatable when http://aosp/878198 has landed
-    updatable
     ioprio rt 4
     writepid /dev/cpuset/foreground/tasks
