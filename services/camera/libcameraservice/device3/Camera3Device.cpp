@@ -1062,14 +1062,18 @@ hardware::Return<void> Camera3Device::requestStreamBuffers(
             nsecs_t waitDuration = kBaseGetBufferWait + getExpectedInFlightDuration();
             status_t res = outputStream->getBuffer(&sb, waitDuration);
             if (res != OK) {
-                ALOGE("%s: Can't get output buffer for stream %d: %s (%d)",
-                        __FUNCTION__, streamId, strerror(-res), res);
                 if (res == NO_INIT || res == DEAD_OBJECT) {
+                    ALOGV("%s: Can't get output buffer for stream %d: %s (%d)",
+                            __FUNCTION__, streamId, strerror(-res), res);
                     bufRet.val.error(StreamBufferRequestError::STREAM_DISCONNECTED);
-                } else if (res == TIMED_OUT || res == NO_MEMORY) {
-                    bufRet.val.error(StreamBufferRequestError::NO_BUFFER_AVAILABLE);
                 } else {
-                    bufRet.val.error(StreamBufferRequestError::UNKNOWN_ERROR);
+                    ALOGE("%s: Can't get output buffer for stream %d: %s (%d)",
+                            __FUNCTION__, streamId, strerror(-res), res);
+                    if (res == TIMED_OUT || res == NO_MEMORY) {
+                        bufRet.val.error(StreamBufferRequestError::NO_BUFFER_AVAILABLE);
+                    } else {
+                        bufRet.val.error(StreamBufferRequestError::UNKNOWN_ERROR);
+                    }
                 }
                 currentReqSucceeds = false;
                 break;
@@ -3154,9 +3158,10 @@ void Camera3Device::returnOutputBuffers(
 
         // Note: stream may be deallocated at this point, if this buffer was
         // the last reference to it.
-        if (res != OK) {
-            ALOGE("Can't return buffer to its stream: %s (%d)",
-                strerror(-res), res);
+        if (res == NO_INIT || res == DEAD_OBJECT) {
+            ALOGV("Can't return buffer to its stream: %s (%d)", strerror(-res), res);
+        } else if (res != OK) {
+            ALOGE("Can't return buffer to its stream: %s (%d)", strerror(-res), res);
         }
 
         // Long processing consumers can cause returnBuffer timeout for shared stream
@@ -5580,7 +5585,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
 
             if (mUseHalBufManager) {
                 if (outputStream->isAbandoned()) {
-                    ALOGE("%s: stream %d is abandoned.", __FUNCTION__, streamId);
+                    ALOGV("%s: stream %d is abandoned, skipping request", __FUNCTION__, streamId);
                     return TIMED_OUT;
                 }
                 // HAL will request buffer through requestStreamBuffer API
@@ -5598,7 +5603,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                     // Can't get output buffer from gralloc queue - this could be due to
                     // abandoned queue or other consumer misbehavior, so not a fatal
                     // error
-                    ALOGE("RequestThread: Can't get output buffer, skipping request:"
+                    ALOGV("RequestThread: Can't get output buffer, skipping request:"
                             " %s (%d)", strerror(-res), res);
 
                     return TIMED_OUT;
