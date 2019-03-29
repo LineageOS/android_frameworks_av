@@ -847,6 +847,10 @@ private:
                                              const char *device_address,
                                              const char *device_name,
                                              audio_format_t encodedFormat);
+
+        void setEngineDeviceConnectionState(const sp<DeviceDescriptor> device,
+                                      audio_policy_dev_state_t state);
+
         void updateMono(audio_io_handle_t output) {
             AudioParameter param;
             param.addInt(String8(AudioParameter::keyMonoOutput), (int)mMasterMono);

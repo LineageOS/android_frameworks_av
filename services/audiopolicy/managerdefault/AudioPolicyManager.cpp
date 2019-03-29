@@ -169,8 +169,6 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
                 broadcastDeviceConnectionState(device, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE);
                 return INVALID_OPERATION;
             }
-            // Propagate device availability to Engine
-            mEngine->setDeviceConnectionState(device, state);
 
             // outputs should never be empty here
             ALOG_ASSERT(outputs.size() != 0, "setDeviceConnectionState():"
@@ -200,14 +198,15 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
             // Reset active device codec
             device->setEncodedFormat(AUDIO_FORMAT_DEFAULT);
 
-            // Propagate device availability to Engine
-            mEngine->setDeviceConnectionState(device, state);
             } break;
 
         default:
             ALOGE("%s() invalid state: %x", __func__, state);
             return BAD_VALUE;
         }
+
+        // Propagate device availability to Engine
+        setEngineDeviceConnectionState(device, state);
 
         // No need to evaluate playback routing when connecting a remote submix
         // output device used by a dynamic policy of type recorder as no
@@ -318,9 +317,6 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
             if (mAvailableInputDevices.add(device) < 0) {
                 return NO_MEMORY;
             }
-
-            // Propagate device availability to Engine
-            mEngine->setDeviceConnectionState(device, state);
         } break;
 
         // handle input device disconnection
@@ -337,15 +333,15 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
 
             checkInputsForDevice(device, state, inputs);
             mAvailableInputDevices.remove(device);
-
-            // Propagate device availability to Engine
-            mEngine->setDeviceConnectionState(device, state);
         } break;
 
         default:
             ALOGE("%s() invalid state: %x", __func__, state);
             return BAD_VALUE;
         }
+
+        // Propagate device availability to Engine
+        setEngineDeviceConnectionState(device, state);
 
         closeAllInputs();
         // As the input device list can impact the output device selection, update
@@ -368,6 +364,17 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
     ALOGW("%s() invalid device: %s", __func__, device->toString().c_str());
     return BAD_VALUE;
 }
+
+void AudioPolicyManager::setEngineDeviceConnectionState(const sp<DeviceDescriptor> device,
+                                      audio_policy_dev_state_t state) {
+
+    // the Engine does not have to know about remote submix devices used by dynamic audio policies
+    if (audio_is_remote_submix_device(device->type()) && device->address() != "0") {
+        return;
+    }
+    mEngine->setDeviceConnectionState(device, state);
+}
+
 
 audio_policy_dev_state_t AudioPolicyManager::getDeviceConnectionState(audio_devices_t device,
                                                                       const char *device_address)
@@ -4399,7 +4406,7 @@ status_t AudioPolicyManager::initialize() {
                 continue;
             }
             // Device is now validated and can be appended to the available devices of the engine
-            mEngine->setDeviceConnectionState(device, AUDIO_POLICY_DEVICE_STATE_AVAILABLE);
+            setEngineDeviceConnectionState(device, AUDIO_POLICY_DEVICE_STATE_AVAILABLE);
             i++;
         }
     };
@@ -4413,7 +4420,7 @@ status_t AudioPolicyManager::initialize() {
         status = NO_INIT;
     }
     // If microphones address is empty, set it according to device type
-    for (size_t i = 0; i  < mAvailableInputDevices.size(); i++) {
+    for (size_t i = 0; i < mAvailableInputDevices.size(); i++) {
         if (mAvailableInputDevices[i]->address().isEmpty()) {
             if (mAvailableInputDevices[i]->type() == AUDIO_DEVICE_IN_BUILTIN_MIC) {
                 mAvailableInputDevices[i]->setAddress(String8(AUDIO_BOTTOM_MICROPHONE_ADDRESS));
