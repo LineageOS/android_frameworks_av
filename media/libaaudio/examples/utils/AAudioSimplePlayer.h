@@ -120,10 +120,9 @@ public:
 
         if (result == AAUDIO_OK) {
             int32_t sizeInBursts = parameters.getNumberOfBursts();
-            if (sizeInBursts > 0) {
-                int32_t framesPerBurst = AAudioStream_getFramesPerBurst(mStream);
-                AAudioStream_setBufferSizeInFrames(mStream, sizeInBursts * framesPerBurst);
-            }
+            int32_t framesPerBurst = AAudioStream_getFramesPerBurst(mStream);
+            int32_t bufferSizeFrames = sizeInBursts * framesPerBurst;
+            AAudioStream_setBufferSizeInFrames(mStream, bufferSizeFrames);
         }
 
         AAudioStreamBuilder_delete(builder);

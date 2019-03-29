@@ -251,6 +251,8 @@ public:
         }
     }
 
+    static constexpr int32_t   kDefaultNumberOfBursts = 2;
+
 private:
     int32_t                    mChannelCount    = AAUDIO_UNSPECIFIED;
     aaudio_format_t            mFormat          = AAUDIO_FORMAT_UNSPECIFIED;
@@ -266,7 +268,7 @@ private:
     aaudio_input_preset_t      mInputPreset     = AAUDIO_UNSPECIFIED;
     aaudio_allowed_capture_policy_t mAllowedCapturePolicy     = AAUDIO_UNSPECIFIED;
 
-    int32_t                    mNumberOfBursts  = AAUDIO_UNSPECIFIED;
+    int32_t                    mNumberOfBursts  = kDefaultNumberOfBursts;
     int32_t                    mFramesPerCallback = AAUDIO_UNSPECIFIED;
 };
 
@@ -386,7 +388,7 @@ public:
         printf("          1 = _NEVER, never use MMAP\n");
         printf("          2 = _AUTO, use MMAP if available, default for -m with no number\n");
         printf("          3 = _ALWAYS, use MMAP or fail\n");
-        printf("      -n{numberOfBursts} for setBufferSize\n");
+        printf("      -n{numberOfBursts} for setBufferSize, default %d\n", kDefaultNumberOfBursts);
         printf("      -p{performanceMode} set output AAUDIO_PERFORMANCE_MODE*, default NONE\n");
         printf("          n for _NONE\n");
         printf("          l for _LATENCY\n");
@@ -460,17 +462,28 @@ public:
                getFormat(), AAudioStream_getFormat(stream));
 
         int32_t framesPerBurst = AAudioStream_getFramesPerBurst(stream);
-        int32_t sizeFrames = AAudioStream_getBufferSizeInFrames(stream);
         printf("  Buffer:       burst     = %d\n", framesPerBurst);
+
+        int32_t sizeFrames = AAudioStream_getBufferSizeInFrames(stream);
         if (framesPerBurst > 0) {
-            printf("  Buffer:       size      = %d = (%d * %d) + %d\n",
+            int32_t requestedSize = getNumberOfBursts() * framesPerBurst;
+            printf("  BufferSize:   requested = %4d, actual = %4d = (%d * %d) + %d\n",
+                   requestedSize,
                    sizeFrames,
                    (sizeFrames / framesPerBurst),
                    framesPerBurst,
                    (sizeFrames % framesPerBurst));
+        } else {
+             printf("  BufferSize:    %d\n", sizeFrames);
         }
-        printf("  Capacity:     requested = %d, actual = %d\n", getBufferCapacity(),
-               AAudioStream_getBufferCapacityInFrames(stream));
+
+        int32_t capacityFrames = AAudioStream_getBufferCapacityInFrames(stream);
+        printf("  Capacity:     requested = %4d, actual = %4d = (%d * %d) + %d\n",
+               getBufferCapacity(),
+               capacityFrames,
+               (capacityFrames / framesPerBurst),
+               framesPerBurst,
+               (capacityFrames % framesPerBurst));
 
         printf("  CallbackSize: requested = %d, actual = %d\n", getFramesPerCallback(),
                AAudioStream_getFramesPerDataCallback(stream));
