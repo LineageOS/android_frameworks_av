@@ -343,6 +343,20 @@ aaudio_result_t AAudioServiceStreamBase::sendServiceEvent(aaudio_service_event_t
     return writeUpMessageQueue(&command);
 }
 
+bool AAudioServiceStreamBase::isUpMessageQueueBusy() {
+    std::lock_guard<std::mutex> lock(mUpMessageQueueLock);
+    if (mUpMessageQueue == nullptr) {
+        ALOGE("%s(): mUpMessageQueue null! - stream not open", __func__);
+        return true;
+    }
+    int32_t framesAvailable = mUpMessageQueue->getFifoBuffer()
+        ->getFullFramesAvailable();
+    int32_t capacity = mUpMessageQueue->getFifoBuffer()
+        ->getBufferCapacityInFrames();
+    // Is it half full or more
+    return framesAvailable >= (capacity / 2);
+}
+
 aaudio_result_t AAudioServiceStreamBase::writeUpMessageQueue(AAudioServiceMessage *command) {
     std::lock_guard<std::mutex> lock(mUpMessageQueueLock);
     if (mUpMessageQueue == nullptr) {
@@ -366,6 +380,13 @@ aaudio_result_t AAudioServiceStreamBase::sendXRunCount(int32_t xRunCount) {
 
 aaudio_result_t AAudioServiceStreamBase::sendCurrentTimestamp() {
     AAudioServiceMessage command;
+    // It is not worth filling up the queue with timestamps.
+    // That can cause the stream to get suspended.
+    // So just drop the timestamp if the queue is getting full.
+    if (isUpMessageQueueBusy()) {
+        return AAUDIO_OK;
+    }
+
     // Send a timestamp for the clock model.
     aaudio_result_t result = getFreeRunningPosition(&command.timestamp.position,
                                                     &command.timestamp.timestamp);
