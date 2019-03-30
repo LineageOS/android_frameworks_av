@@ -135,9 +135,16 @@ public:
     /**
      * @brief filter the devices supported by this collection against another collection
      * @param devices to filter against
-     * @return
+     * @return a filtered DeviceVector
      */
     DeviceVector filter(const DeviceVector &devices) const;
+
+    /**
+     * @brief filter the devices supported by this collection before sending
+     * then to the Engine via AudioPolicyManagerObserver interface
+     * @return a filtered DeviceVector
+     */
+    DeviceVector filterForEngine() const;
 
     /**
      * @brief merge two vectors. As SortedVector Implementation is buggy (it does not check the size

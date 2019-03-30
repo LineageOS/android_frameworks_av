@@ -46,9 +46,9 @@ public:
 
     virtual const AudioInputCollection &getInputs() const = 0;
 
-    virtual const DeviceVector &getAvailableOutputDevices() const = 0;
+    virtual const DeviceVector getAvailableOutputDevices() const = 0;
 
-    virtual const DeviceVector &getAvailableInputDevices() const = 0;
+    virtual const DeviceVector getAvailableInputDevices() const = 0;
 
     virtual const sp<DeviceDescriptor> &getDefaultOutputDevice() const = 0;
 
