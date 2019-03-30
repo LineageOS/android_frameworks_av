@@ -84,6 +84,14 @@ audio_content_type_t AAudioConvert_contentTypeToInternal(aaudio_content_type_t c
  */
 audio_source_t AAudioConvert_inputPresetToAudioSource(aaudio_input_preset_t preset);
 
+/**
+ * Note that this function does not validate the passed in value.
+ * That is done somewhere else.
+ * @return internal audio flags mask
+ */
+audio_flags_mask_t AAudioConvert_allowCapturePolicyToAudioFlagsMask(
+        aaudio_allowed_capture_policy_t policy);
+
 // Note that this code may be replaced by Settings or by some other system configuration tool.
 
 #define AAUDIO_PROP_MMAP_POLICY           "aaudio.mmap_policy"

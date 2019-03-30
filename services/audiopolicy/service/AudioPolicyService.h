@@ -182,6 +182,7 @@ public:
                                      audio_io_handle_t output,
                                      int delayMs = 0);
     virtual status_t setVoiceVolume(float volume, int delayMs = 0);
+    status_t setAllowedCapturePolicy(uint_t uid, audio_flags_mask_t capturePolicy) override;
     virtual bool isOffloadSupported(const audio_offload_info_t &config);
     virtual bool isDirectOutputSupported(const audio_config_base_t& config,
                                          const audio_attributes_t& attributes);

@@ -35,17 +35,18 @@ AAudioStreamParameters::AAudioStreamParameters() {}
 AAudioStreamParameters::~AAudioStreamParameters() {}
 
 void AAudioStreamParameters::copyFrom(const AAudioStreamParameters &other) {
-    mSamplesPerFrame = other.mSamplesPerFrame;
-    mSampleRate      = other.mSampleRate;
-    mDeviceId        = other.mDeviceId;
-    mSessionId       = other.mSessionId;
-    mSharingMode     = other.mSharingMode;
-    mAudioFormat     = other.mAudioFormat;
-    mDirection       = other.mDirection;
-    mBufferCapacity  = other.mBufferCapacity;
-    mUsage           = other.mUsage;
-    mContentType     = other.mContentType;
-    mInputPreset     = other.mInputPreset;
+    mSamplesPerFrame      = other.mSamplesPerFrame;
+    mSampleRate           = other.mSampleRate;
+    mDeviceId             = other.mDeviceId;
+    mSessionId            = other.mSessionId;
+    mSharingMode          = other.mSharingMode;
+    mAudioFormat          = other.mAudioFormat;
+    mDirection            = other.mDirection;
+    mBufferCapacity       = other.mBufferCapacity;
+    mUsage                = other.mUsage;
+    mContentType          = other.mContentType;
+    mInputPreset          = other.mInputPreset;
+    mAllowedCapturePolicy = other.mAllowedCapturePolicy;
 }
 
 static aaudio_result_t isFormatValid(audio_format_t format) {
@@ -166,19 +167,32 @@ aaudio_result_t AAudioStreamParameters::validate() const {
             // break;
     }
 
+    switch (mAllowedCapturePolicy) {
+        case AAUDIO_UNSPECIFIED:
+        case AAUDIO_ALLOW_CAPTURE_BY_ALL:
+        case AAUDIO_ALLOW_CAPTURE_BY_SYSTEM:
+        case AAUDIO_ALLOW_CAPTURE_BY_NONE:
+            break; // valid
+        default:
+            ALOGE("allowed capture policy not valid = %d", mAllowedCapturePolicy);
+            return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
+            // break;
+    }
+
     return AAUDIO_OK;
 }
 
 void AAudioStreamParameters::dump() const {
-    ALOGD("mDeviceId        = %6d", mDeviceId);
-    ALOGD("mSessionId       = %6d", mSessionId);
-    ALOGD("mSampleRate      = %6d", mSampleRate);
-    ALOGD("mSamplesPerFrame = %6d", mSamplesPerFrame);
-    ALOGD("mSharingMode     = %6d", (int)mSharingMode);
-    ALOGD("mAudioFormat     = %6d", (int)mAudioFormat);
-    ALOGD("mDirection       = %6d", mDirection);
-    ALOGD("mBufferCapacity  = %6d", mBufferCapacity);
-    ALOGD("mUsage           = %6d", mUsage);
-    ALOGD("mContentType     = %6d", mContentType);
-    ALOGD("mInputPreset     = %6d", mInputPreset);
+    ALOGD("mDeviceId             = %6d", mDeviceId);
+    ALOGD("mSessionId            = %6d", mSessionId);
+    ALOGD("mSampleRate           = %6d", mSampleRate);
+    ALOGD("mSamplesPerFrame      = %6d", mSamplesPerFrame);
+    ALOGD("mSharingMode          = %6d", (int)mSharingMode);
+    ALOGD("mAudioFormat          = %6d", (int)mAudioFormat);
+    ALOGD("mDirection            = %6d", mDirection);
+    ALOGD("mBufferCapacity       = %6d", mBufferCapacity);
+    ALOGD("mUsage                = %6d", mUsage);
+    ALOGD("mContentType          = %6d", mContentType);
+    ALOGD("mInputPreset          = %6d", mInputPreset);
+    ALOGD("mAllowedCapturePolicy = %6d", mAllowedCapturePolicy);
 }

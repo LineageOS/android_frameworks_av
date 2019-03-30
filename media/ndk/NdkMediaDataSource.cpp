@@ -23,7 +23,8 @@
 #include <jni.h>
 #include <unistd.h>
 
-#include <binder/IBinder.h>
+#include <android_runtime/AndroidRuntime.h>
+#include <android_util_Binder.h>
 #include <cutils/properties.h>
 #include <utils/Log.h>
 #include <utils/StrongPointer.h>
@@ -39,66 +40,8 @@
 #include "../../libstagefright/include/NuCachedSource2.h"
 #include "NdkMediaDataSourceCallbacksPriv.h"
 
-#include <mutex> // std::call_once,once_flag
-#include <dlfcn.h> // dlopen
 
 using namespace android;
-
-// load libandroid_runtime.so lazily.
-// A vendor process may use libmediandk but should not depend on libandroid_runtime.
-// TODO(jooyung): remove duplicate (b/125550121)
-// frameworks/native/libs/binder/ndk/ibinder_jni.cpp
-namespace {
-
-typedef JNIEnv* (*getJNIEnv_t)();
-typedef sp<IBinder> (*ibinderForJavaObject_t)(JNIEnv* env, jobject obj);
-
-getJNIEnv_t getJNIEnv_;
-ibinderForJavaObject_t ibinderForJavaObject_;
-
-std::once_flag mLoadFlag;
-
-void load() {
-    std::call_once(mLoadFlag, []() {
-        void* handle = dlopen("libandroid_runtime.so", RTLD_LAZY);
-        if (handle == nullptr) {
-            ALOGE("Could not open libandroid_runtime.");
-            return;
-        }
-
-        getJNIEnv_ = reinterpret_cast<getJNIEnv_t>(
-                dlsym(handle, "_ZN7android14AndroidRuntime9getJNIEnvEv"));
-        if (getJNIEnv_ == nullptr) {
-            ALOGE("Could not find AndroidRuntime::getJNIEnv.");
-            // no return
-        }
-
-        ibinderForJavaObject_ = reinterpret_cast<ibinderForJavaObject_t>(
-                dlsym(handle, "_ZN7android20ibinderForJavaObjectEP7_JNIEnvP8_jobject"));
-        if (ibinderForJavaObject_ == nullptr) {
-            ALOGE("Could not find ibinderForJavaObject.");
-            // no return
-        }
-    });
-}
-
-JNIEnv* getJNIEnv() {
-    load();
-    if (getJNIEnv_ == nullptr) {
-        return nullptr;
-    }
-    return (getJNIEnv_)();
-}
-
-sp<IBinder> ibinderForJavaObject(JNIEnv* env, jobject obj) {
-    load();
-    if (ibinderForJavaObject_ == nullptr) {
-        return nullptr;
-    }
-    return (ibinderForJavaObject_)(env, obj);
-}
-
-} // namespace
 
 struct AMediaDataSource {
     void *userdata;
@@ -181,14 +124,9 @@ static sp<MediaHTTPService> createMediaHttpServiceFromJavaObj(JNIEnv *env, jobje
     if (obj == NULL) {
         return NULL;
     }
-    sp<IBinder> binder;
     switch (version) {
         case 1:
-            binder = ibinderForJavaObject(env, obj);
-            if (binder == NULL) {
-                return NULL;
-            }
-            return interface_cast<IMediaHTTPService>(binder);
+            return interface_cast<IMediaHTTPService>(ibinderForJavaObject(env, obj));
         case 2:
             return new JMedia2HTTPService(env, obj);
         default:
@@ -241,7 +179,7 @@ sp<MediaHTTPService> createMediaHttpService(const char *uri, int version) {
 
     switch (version) {
         case 1:
-            env = getJNIEnv();
+            env = AndroidRuntime::getJNIEnv();
             clazz = "android/media/MediaHTTPService";
             method = "createHttpServiceBinderIfNecessary";
             signature = "(Ljava/lang/String;)Landroid/os/IBinder;";

@@ -948,6 +948,20 @@ status_t AudioPolicyService::removeStreamDefaultEffect(audio_unique_id_t id)
     return audioPolicyEffects->removeStreamDefaultEffect(id);
 }
 
+status_t AudioPolicyService::setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t capturePolicy) {
+    Mutex::Autolock _l(mLock);
+    if (mAudioPolicyManager == NULL) {
+        ALOGV("%s() mAudioPolicyManager == NULL", __func__);
+        return NO_INIT;
+    }
+    uint_t callingUid = IPCThreadState::self()->getCallingUid();
+    if (uid != callingUid) {
+        ALOGD("%s() uid invalid %d != %d", __func__, uid, callingUid);
+        return PERMISSION_DENIED;
+    }
+    return mAudioPolicyManager->setAllowedCapturePolicy(uid, capturePolicy);
+}
+
 bool AudioPolicyService::isOffloadSupported(const audio_offload_info_t& info)
 {
     if (mAudioPolicyManager == NULL) {

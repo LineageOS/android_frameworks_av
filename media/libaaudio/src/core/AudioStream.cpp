@@ -94,6 +94,10 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     if (mInputPreset == AAUDIO_UNSPECIFIED) {
         mInputPreset = AAUDIO_INPUT_PRESET_VOICE_RECOGNITION;
     }
+    mAllowedCapturePolicy = builder.getAllowedCapturePolicy();
+    if (mAllowedCapturePolicy == AAUDIO_UNSPECIFIED) {
+        mAllowedCapturePolicy = AAUDIO_ALLOW_CAPTURE_BY_ALL;
+    }
 
     // callbacks
     mFramesPerDataCallback = builder.getFramesPerDataCallback();
@@ -113,8 +117,8 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
           mPerformanceMode,
           (isDataCallbackSet() ? "ON" : "OFF"),
           mFramesPerDataCallback);
-    ALOGI("open() usage  = %d, contentType = %d, inputPreset = %d",
-          mUsage, mContentType, mInputPreset);
+    ALOGI("open() usage  = %d, contentType = %d, inputPreset = %d, allowedCapturePolicy = %d",
+          mUsage, mContentType, mInputPreset, mAllowedCapturePolicy);
 
     return AAUDIO_OK;
 }

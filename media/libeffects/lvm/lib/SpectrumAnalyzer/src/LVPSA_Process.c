@@ -22,6 +22,17 @@
 
 #define LVM_MININT_32   0x80000000
 
+static LVM_INT32 mult32x32in32_shiftr(LVM_INT32 a, LVM_INT32 b, LVM_INT32 c) {
+  LVM_INT64 result = ((LVM_INT64)a * b) >> c;
+
+  if (result >= INT32_MAX) {
+    return INT32_MAX;
+  } else if (result <= INT32_MIN) {
+    return INT32_MIN;
+  } else {
+    return (LVM_INT32)result;
+  }
+}
 
 /************************************************************************************/
 /*                                                                                  */
@@ -123,10 +134,10 @@ LVPSA_RETURN LVPSA_Process           ( pLVPSA_Handle_t      hInstance,
 
     if(pLVPSA_Inst->pSpectralDataBufferWritePointer != pWrite_Save)
     {
-        MUL32x32INTO32((AudioTime + (LVM_INT32)((LVM_INT32)pLVPSA_Inst->LocalSamplesCount*1000)),
-                        (LVM_INT32)LVPSA_SampleRateInvTab[pLVPSA_Inst->CurrentParams.Fs],
-                        AudioTimeInc,
-                        LVPSA_FsInvertShift)
+        AudioTimeInc = mult32x32in32_shiftr(
+                (AudioTime + ((LVM_INT32)pLVPSA_Inst->LocalSamplesCount * 1000)),
+                (LVM_INT32)LVPSA_SampleRateInvTab[pLVPSA_Inst->CurrentParams.Fs],
+                LVPSA_FsInvertShift);
         pLVPSA_Inst->SpectralDataBufferAudioTime = AudioTime + AudioTimeInc;
     }
 

@@ -11,11 +11,6 @@ cc_library_shared {
         "OMXNodeInstance.cpp",
         "OMXUtils.cpp",
         "OmxGraphicBufferSource.cpp",
-        "SimpleSoftOMXComponent.cpp",
-        "SoftOMXComponent.cpp",
-        "SoftOMXPlugin.cpp",
-        "SoftVideoDecoderOMXComponent.cpp",
-        "SoftVideoEncoderOMXComponent.cpp",
         "1.0/Omx.cpp",
         "1.0/OmxStore.cpp",
         "1.0/WGraphicBufferSource.cpp",
@@ -56,6 +51,7 @@ cc_library_shared {
         "libvndksupport",
         "android.hardware.media.omx@1.0",
         "android.hardware.graphics.bufferqueue@1.0",
+        "libstagefright_omx_soft",
     ],
 
     export_shared_lib_headers: [
@@ -63,6 +59,64 @@ cc_library_shared {
         "libstagefright_foundation",
         "libstagefright_xmlparser",
         "libutils",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+        "-Wno-unused-parameter",
+        "-Wno-documentation",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "signed-integer-overflow",
+            "unsigned-integer-overflow",
+        ],
+        cfi: true,
+    },
+}
+
+cc_defaults {
+    name: "omx_soft_libs",
+    shared_libs: [
+        "libutils",
+        "liblog",
+        "libstagefright_foundation",
+        "libstagefright_omx_soft",
+    ],
+}
+
+cc_library_shared {
+    name: "libstagefright_omx_soft",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
+
+    srcs: [
+        "SimpleSoftOMXComponent.cpp",
+        "SoftOMXComponent.cpp",
+        "SoftOMXPlugin.cpp",
+        "SoftVideoDecoderOMXComponent.cpp",
+        "SoftVideoEncoderOMXComponent.cpp",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    shared_libs: [
+        "libutils",
+        "liblog",
+        "libui",
+        "libstagefright_foundation",
+    ],
+
+    export_shared_lib_headers: [
+        "libstagefright_foundation",
+        "libutils",
+        "liblog",
     ],
 
     cflags: [

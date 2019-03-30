@@ -28,12 +28,10 @@ cc_library_shared {
         cfi: true,
     },
 
+    defaults: ["omx_soft_libs"],
+
     shared_libs: [
-        "liblog",
         "libstagefright_flacdec",
-        "libstagefright_omx",
-        "libstagefright_foundation",
-        "libutils",
     ],
     compile_multilib: "32",
 }

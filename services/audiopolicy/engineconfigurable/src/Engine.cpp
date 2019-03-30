@@ -207,7 +207,7 @@ DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t ps) const
         ALOGE("%s: Trying to get device on invalid strategy %d", __FUNCTION__, ps);
         return {};
     }
-    const DeviceVector &availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
+    const DeviceVector availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
     const SwAudioOutputCollection &outputs = getApmObserver()->getOutputs();
     uint32_t availableOutputDevicesType = availableOutputDevices.types();
 
@@ -272,7 +272,7 @@ DeviceVector Engine::getOutputDevicesForAttributes(const audio_attributes_t &att
         return DeviceVector(preferredDevice);
     }
     product_strategy_t strategy = getProductStrategyForAttributes(attributes);
-    const DeviceVector &availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
+    const DeviceVector availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
     const SwAudioOutputCollection &outputs = getApmObserver()->getOutputs();
     //
     // @TODO: what is the priority of explicit routing? Shall it be considered first as it used to
@@ -298,7 +298,7 @@ sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_
                                                          sp<AudioPolicyMix> *mix) const
 {
     const auto &policyMixes = getApmObserver()->getAudioPolicyMixCollection();
-    const auto &availableInputDevices = getApmObserver()->getAvailableInputDevices();
+    const auto availableInputDevices = getApmObserver()->getAvailableInputDevices();
     const auto &inputs = getApmObserver()->getInputs();
     std::string address;
     //

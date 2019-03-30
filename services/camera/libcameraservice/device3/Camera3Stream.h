@@ -458,7 +458,7 @@ class Camera3Stream :
     // Zero for formats with fixed buffer size for given dimensions.
     const size_t mMaxSize;
 
-    enum {
+    enum StreamState {
         STATE_ERROR,
         STATE_CONSTRUCTED,
         STATE_IN_CONFIG,

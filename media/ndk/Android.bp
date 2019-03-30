@@ -73,6 +73,7 @@ cc_library_shared {
     shared_libs: [
         "android.hardware.graphics.bufferqueue@1.0",
         "android.hidl.token@1.0-utils",
+        "libandroid_runtime_lazy",
         "libbinder",
         "libmedia",
         "libmedia_omx",
@@ -91,12 +92,6 @@ cc_library_shared {
         "libui",
         "libmedia2_jni_core",
         "libmediandk_utils",
-    ],
-
-    required: [
-        // libmediandk may be used by Java and non-Java things. When lower-level things use it,
-        // they shouldn't have to take on the cost of loading libandroid_runtime.
-        "libandroid_runtime",
     ],
 
     export_include_dirs: ["include"],

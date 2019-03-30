@@ -101,11 +101,9 @@ cc_library_shared {
         "libstagefright_amrwbdec",
     ],
 
+    defaults: ["omx_soft_libs"],
+
     shared_libs: [
-        "libstagefright_omx",
-        "libstagefright_foundation",
-        "libutils",
-        "liblog",
         "libstagefright_amrnb_common",
     ],
     compile_multilib: "32",
