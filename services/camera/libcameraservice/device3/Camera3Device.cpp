@@ -3782,10 +3782,12 @@ void Camera3Device::notifyError(const camera3_error_msg_t &msg,
             hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_INVALID_ERROR;
 
     int streamId = 0;
+    String16 physicalCameraId;
     if (msg.error_stream != NULL) {
         Camera3Stream *stream =
                 Camera3Stream::cast(msg.error_stream);
         streamId = stream->getId();
+        physicalCameraId = String16(stream->physicalCameraId());
     }
     ALOGV("Camera %s: %s: HAL error, frame %d, stream %d: %d",
             mId.string(), __FUNCTION__, msg.frame_number,
@@ -3807,13 +3809,29 @@ void Camera3Device::notifyError(const camera3_error_msg_t &msg,
                     InFlightRequest &r = mInFlightMap.editValueAt(idx);
                     r.requestStatus = msg.error_code;
                     resultExtras = r.resultExtras;
-                    if (hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT == errorCode
+                    bool logicalDeviceResultError = false;
+                    if (hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT ==
+                            errorCode) {
+                        if (physicalCameraId.size() > 0) {
+                            String8 cameraId(physicalCameraId);
+                            if (r.physicalCameraIds.find(cameraId) == r.physicalCameraIds.end()) {
+                                ALOGE("%s: Reported result failure for physical camera device: %s "
+                                        " which is not part of the respective request!",
+                                        __FUNCTION__, cameraId.string());
+                                break;
+                            }
+                            resultExtras.errorPhysicalCameraId = physicalCameraId;
+                        } else {
+                            logicalDeviceResultError = true;
+                        }
+                    }
+
+                    if (logicalDeviceResultError
                             ||  hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_REQUEST ==
                             errorCode) {
                         r.skipResultMetadata = true;
                     }
-                    if (hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT ==
-                            errorCode) {
+                    if (logicalDeviceResultError) {
                         // In case of missing result check whether the buffers
                         // returned. If they returned, then remove inflight
                         // request.
