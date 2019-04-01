@@ -776,6 +776,17 @@ sp<MediaPlayerBase> MediaPlayerService::Client::setDataSource_pre(
                 store->linkToDeath(codecDeathListener, 0);
                 codecDeathListeners.emplace_back(codecDeathListener);
             }
+
+            store = ::android::hardware::media::c2::V1_0::
+                    IComponentStore::getService("software");
+            if (store == nullptr) {
+                ALOGD("Codec2 swcodec service is not available");
+            } else {
+                sp<ServiceDeathNotifier> codecDeathListener =
+                        new ServiceDeathNotifier(store, p, MEDIACODEC_PROCESS_DEATH);
+                store->linkToDeath(codecDeathListener, 0);
+                codecDeathListeners.emplace_back(codecDeathListener);
+            }
         }
     }
 
