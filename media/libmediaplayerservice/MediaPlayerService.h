@@ -30,7 +30,7 @@
 #include <media/Metadata.h>
 #include <media/stagefright/foundation/ABase.h>
 
-#include <android/hardware/media/omx/1.0/IOmx.h>
+#include <hidl/HidlSupport.h>
 
 #include <system/audio.h>
 
@@ -42,7 +42,6 @@ struct AVSyncSettings;
 class IDataSource;
 class IMediaRecorder;
 class IMediaMetadataRetriever;
-class IOMX;
 class IRemoteDisplay;
 class IRemoteDisplayClient;
 class MediaRecorderClient;
@@ -70,7 +69,6 @@ private:
 class MediaPlayerService : public BnMediaPlayerService
 {
     class Client;
-    typedef ::android::hardware::media::omx::V1_0::IOmx IOmx;
 
     class AudioOutput : public MediaPlayerBase::AudioSink
     {
@@ -400,7 +398,7 @@ private:
                     const sp<MediaPlayerBase>& listener,
                     int which);
             ServiceDeathNotifier(
-                    const sp<IOmx>& omx,
+                    const sp<android::hidl::base::V1_0::IBase>& hService,
                     const sp<MediaPlayerBase>& listener,
                     int which);
             virtual ~ServiceDeathNotifier();
@@ -413,7 +411,7 @@ private:
         private:
             int mWhich;
             sp<IBinder> mService;
-            sp<IOmx> mOmx;
+            sp<android::hidl::base::V1_0::IBase> mHService; // HIDL service
             wp<MediaPlayerBase> mListener;
         };
 
@@ -509,7 +507,7 @@ private:
         media::Metadata::Filter mMetadataUpdated;  // protected by mLock
 
         sp<ServiceDeathNotifier> mExtractorDeathListener;
-        sp<ServiceDeathNotifier> mCodecDeathListener;
+        std::vector<sp<ServiceDeathNotifier>> mCodecDeathListeners;
         sp<AudioDeviceUpdatedNotifier> mAudioDeviceUpdatedListener;
 #if CALLBACK_ANTAGONIZER
                     Antagonizer*                  mAntagonizer;
