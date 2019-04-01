@@ -859,11 +859,12 @@ void CCodec::configure(const sp<AMessage> &msg) {
         std::vector<std::unique_ptr<C2Param>> params;
         C2StreamUsageTuning::input usage(0u, 0u);
         C2StreamMaxBufferSizeInfo::input maxInputSize(0u, 0u);
+        C2PrependHeaderModeSetting prepend(PREPEND_HEADER_TO_NONE);
 
         std::initializer_list<C2Param::Index> indices {
         };
         c2_status_t c2err = comp->query(
-                { &usage, &maxInputSize },
+                { &usage, &maxInputSize, &prepend },
                 indices,
                 C2_DONT_BLOCK,
                 &params);
@@ -929,6 +930,16 @@ void CCodec::configure(const sp<AMessage> &msg) {
                         KEY_MAX_INPUT_SIZE,
                         (int32_t)(c2_min(maxInputSize.value, uint32_t(INT32_MAX))));
             }
+        }
+
+        int32_t clientPrepend;
+        if ((config->mDomain & Config::IS_VIDEO)
+                && (config->mDomain & Config::IS_ENCODER)
+                && msg->findInt32(KEY_PREPEND_HEADERS_TO_SYNC_FRAMES, &clientPrepend)
+                && clientPrepend
+                && (!prepend || prepend.value != PREPEND_HEADER_TO_ALL_SYNC)) {
+            ALOGE("Failed to set KEY_PREPEND_HEADERS_TO_SYNC_FRAMES");
+            return BAD_VALUE;
         }
 
         if ((config->mDomain & (Config::IS_VIDEO | Config::IS_IMAGE))) {
