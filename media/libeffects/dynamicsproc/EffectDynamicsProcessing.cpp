@@ -25,6 +25,7 @@
 #include <new>
 
 #include <log/log.h>
+#include <sys/param.h>
 
 #include <audio_effects/effect_dynamicsprocessing.h>
 #include <dsp/DPBase.h>
@@ -225,10 +226,6 @@ void DP_changeVariant(DynamicsProcessingContext *pContext, int newVariant) {
     } //switch
 }
 
-static inline bool isPowerOf2(unsigned long n) {
-    return (n & (n - 1)) == 0;
-}
-
 void DP_configureVariant(DynamicsProcessingContext *pContext, int newVariant) {
     ALOGV("DP_configureVariant %d", newVariant);
     switch(newVariant) {
@@ -242,7 +239,7 @@ void DP_configureVariant(DynamicsProcessingContext *pContext, int newVariant) {
                 desiredBlock);
         if (desiredBlock < minBlockSize) {
             currentBlock = minBlockSize;
-        } else if (!isPowerOf2(desiredBlock)) {
+        } else if (!powerof2(desiredBlock)) {
             //find next highest power of 2.
             currentBlock = 1 << (32 - __builtin_clz(desiredBlock));
         }
@@ -1297,4 +1294,3 @@ audio_effect_library_t AUDIO_EFFECT_LIBRARY_INFO_SYM = {
 };
 
 }; // extern "C"
-
