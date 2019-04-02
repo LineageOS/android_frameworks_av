@@ -1052,8 +1052,9 @@ status_t MediaCodec::configure(
         }
 
         // Prevent possible integer overflow in downstream code.
-        if ((uint64_t)mVideoWidth * mVideoHeight > (uint64_t)INT32_MAX / 4) {
-            ALOGE("buffer size is too big, width=%d, height=%d", mVideoWidth, mVideoHeight);
+        if (mVideoWidth < 0 || mVideoHeight < 0 ||
+               (uint64_t)mVideoWidth * mVideoHeight > (uint64_t)INT32_MAX / 4) {
+            ALOGE("Invalid size(s), width=%d, height=%d", mVideoWidth, mVideoHeight);
             return BAD_VALUE;
         }
     }
