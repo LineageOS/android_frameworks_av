@@ -126,20 +126,32 @@ void AudioPolicyMixCollection::closeOutput(sp<SwAudioOutputDescriptor> &desc)
 }
 
 status_t AudioPolicyMixCollection::getOutputForAttr(
-        const audio_attributes_t& attributes, uid_t uid, sp<SwAudioOutputDescriptor> &primaryDesc,
+        const audio_attributes_t& attributes, uid_t uid,
+        audio_output_flags_t flags,
+        sp<SwAudioOutputDescriptor> &primaryDesc,
         std::vector<sp<SwAudioOutputDescriptor>> *secondaryDescs)
 {
     ALOGV("getOutputForAttr() querying %zu mixes:", size());
     primaryDesc = 0;
     for (size_t i = 0; i < size(); i++) {
         sp<AudioPolicyMix> policyMix = valueAt(i);
+        const bool primaryOutputMix = !is_mix_loopback_render(policyMix->mRouteFlags);
+        if (!primaryOutputMix && (flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ)) {
+            // AAudio does not support MMAP_NO_IRQ loopback render, and there is no way with
+            // the current MmapStreamInterface::start to reject a specific client added to a shared
+            // mmap stream.
+            // As a result all MMAP_NOIRQ requests have to be rejected when an loopback render
+            // policy is present. That ensures no shared mmap stream is used when an loopback
+            // render policy is registered.
+            ALOGD("%s: Rejecting MMAP_NOIRQ request due to LOOPBACK|RENDER mix present.", __func__);
+            return INVALID_OPERATION;
+        }
+
         sp<SwAudioOutputDescriptor> policyDesc = policyMix->getOutput();
         if (!policyDesc) {
             ALOGV("%s: Skiping %zu: Mix has no output", __func__, i);
             continue;
         }
-
-        const bool primaryOutputMix = !is_mix_loopback_render(policyMix->mRouteFlags);
 
         if (primaryOutputMix && primaryDesc != 0) {
             ALOGV("%s: Skiping %zu: Primary output already found", __func__, i);
@@ -170,7 +182,7 @@ status_t AudioPolicyMixCollection::getOutputForAttr(
             }
         }
     }
-    return (primaryDesc == nullptr && secondaryDescs->empty()) ? BAD_VALUE : NO_ERROR;
+    return NO_ERROR;
 }
 
 AudioPolicyMixCollection::MixMatchStatus AudioPolicyMixCollection::mixMatch(
