@@ -643,6 +643,14 @@ camera_status_t ACaptureSessionOutputContainer_remove(
  * target combinations with sizes outside of these guarantees, but this can only be tested for
  * by attempting to create a session with such targets.</p>
  *
+ * <p>Exception on 176x144 (QCIF) resolution:
+ * Camera devices usually have a fixed capability for downscaling from larger resolution to
+ * smaller, and the QCIF resolution sometimes cannot be fully supported due to this
+ * limitation on devices with high-resolution image sensors. Therefore, trying to configure a
+ * QCIF resolution stream together with any other stream larger than 1920x1080 resolution
+ * (either width or height) might not be supported, and capture session creation will fail if it
+ * is not.</p>
+ *
  * @param device the camera device of interest.
  * @param outputs the {@link ACaptureSessionOutputContainer} describes all output streams.
  * @param callbacks the {@link ACameraCaptureSession_stateCallbacks capture session state callbacks}.
