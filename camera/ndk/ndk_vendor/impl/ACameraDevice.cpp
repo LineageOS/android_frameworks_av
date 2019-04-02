@@ -300,7 +300,6 @@ camera_status_t CameraDevice::updateOutputConfigurationLocked(ACaptureSessionOut
     OutputConfigurationWrapper outConfigW;
     OutputConfiguration &outConfig = outConfigW.mOutputConfiguration;
     outConfig.rotation = utils::convertToHidl(output->mRotation);
-    outConfig.windowGroupId = -1; // ndk doesn't support inter OutputConfiguration buffer sharing.
     outConfig.windowHandles.resize(output->mSharedWindows.size() + 1);
     outConfig.windowHandles[0] = output->mWindow;
     outConfig.physicalCameraId = output->mPhysicalCameraId;
