@@ -317,6 +317,10 @@ class Camera3OutputStream :
     // Check return status of IGBP calls and set abandoned state accordingly
     void checkRetAndSetAbandonedLocked(status_t res);
 
+    // If the status indicates abandonded stream, only log when state hasn't been updated to
+    // STATE_ABANDONED
+    static bool shouldLogError(status_t res, StreamState state);
+
     static const int32_t kDequeueLatencyBinSize = 5; // in ms
     CameraLatencyHistogram mDequeueBufferLatency;
 

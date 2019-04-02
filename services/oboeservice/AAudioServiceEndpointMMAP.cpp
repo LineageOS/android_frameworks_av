@@ -93,12 +93,14 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
     const audio_source_t source = (direction == AAUDIO_DIRECTION_INPUT)
             ? AAudioConvert_inputPresetToAudioSource(getInputPreset())
             : AUDIO_SOURCE_DEFAULT;
+    const audio_flags_mask_t flags = AUDIO_FLAG_LOW_LATENCY |
+            AAudioConvert_allowCapturePolicyToAudioFlagsMask(getAllowedCapturePolicy());
 
     const audio_attributes_t attributes = {
             .content_type = contentType,
             .usage = usage,
             .source = source,
-            .flags = AUDIO_FLAG_LOW_LATENCY,
+            .flags = flags,
             .tags = ""
     };
 

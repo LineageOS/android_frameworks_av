@@ -75,8 +75,22 @@ struct C2OMXNode : public BnOMXNode {
             OMX_INDEXTYPE *index) override;
     status_t dispatchMessage(const omx_message &msg) override;
 
+    /**
+     * Returns underlying IOMXBufferSource object.
+     */
     sp<IOMXBufferSource> getSource();
+
+    /**
+     * Configure the frame size.
+     */
     void setFrameSize(uint32_t width, uint32_t height);
+
+    /**
+     * Clean up work item reference.
+     *
+     * \param index input work index
+     */
+    void onInputBufferDone(c2_cntr64_t index);
 
 private:
     std::weak_ptr<Codec2Client::Component> mComp;
@@ -96,6 +110,8 @@ private:
     bool mFirstInputFrame; // true for first input
     c2_cntr64_t mPrevInputTimestamp; // input timestamp for previous frame
     c2_cntr64_t mPrevCodecTimestamp; // adjusted (codec) timestamp for previous frame
+
+    std::map<uint64_t, buffer_id> mBufferIdsInUse;
 };
 
 }  // namespace android

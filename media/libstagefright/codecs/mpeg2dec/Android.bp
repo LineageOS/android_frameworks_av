@@ -20,12 +20,7 @@ cc_library_shared {
         "frameworks/native/include/media/openmax",
     ],
 
-    shared_libs: [
-        "libstagefright_omx",
-        "libstagefright_foundation",
-        "libutils",
-        "liblog",
-    ],
+    defaults: ["omx_soft_libs"],
 
     ldflags: ["-Wl,-Bsymbolic"],
 

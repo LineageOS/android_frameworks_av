@@ -431,8 +431,7 @@ private:
     static uint32_t         mScreenState;
 
     // Internal dump utilities.
-    static const int kDumpLockRetries = 50;
-    static const int kDumpLockSleepUs = 20000;
+    static const int kDumpLockTimeoutNs = 1 * NANOS_PER_SECOND;
     static bool dumpTryLock(Mutex& mutex);
     void dumpPermissionDenial(int fd, const Vector<String16>& args);
     void dumpClients(int fd, const Vector<String16>& args);

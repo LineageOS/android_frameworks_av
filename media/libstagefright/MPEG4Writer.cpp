@@ -71,6 +71,7 @@ static const uint8_t kNalUnitTypeSeqParamSet = 0x07;
 static const uint8_t kNalUnitTypePicParamSet = 0x08;
 static const int64_t kInitialDelayTimeUs     = 700000LL;
 static const int64_t kMaxMetadataSize = 0x4000000LL;   // 64MB max per-frame metadata size
+static const int64_t kMaxCttsOffsetTimeUs = 30 * 60 * 1000000LL;  // 30 minutes
 
 static const char kMetaKey_Version[]    = "com.android.version";
 static const char kMetaKey_Manufacturer[]      = "com.android.manufacturer";
@@ -136,13 +137,6 @@ public:
     void resetInternal();
 
 private:
-    enum {
-        // TODO: need to increase this considering the bug
-        // about camera app not sending video frames continuously?
-        kMaxCttsOffsetTimeUs = 1000000LL,  // 1 second
-        kSampleArraySize = 1000,
-    };
-
     // A helper class to handle faster write box with table entries
     template<class TYPE, unsigned ENTRY_SIZE>
     // ENTRY_SIZE: # of values in each entry
@@ -2920,14 +2914,18 @@ void MPEG4Writer::Track::updateDriftTime(const sp<MetaData>& meta) {
 }
 
 void MPEG4Writer::Track::dumpTimeStamps() {
-    ALOGE("Dumping %s track's last 10 frames timestamp and frame type ", getTrackType());
-    std::string timeStampString;
-    for (std::list<TimestampDebugHelperEntry>::iterator entry = mTimestampDebugHelper.begin();
-            entry != mTimestampDebugHelper.end(); ++entry) {
-        timeStampString += "(" + std::to_string(entry->pts)+
-                "us, " + std::to_string(entry->dts) + "us " + entry->frameType + ") ";
+    if (!mTimestampDebugHelper.empty()) {
+        std::string timeStampString = "Dumping " + std::string(getTrackType()) + " track's last " +
+                                      std::to_string(mTimestampDebugHelper.size()) +
+                                      " frames' timestamps(pts, dts) and frame type : ";
+        for (const TimestampDebugHelperEntry& entry : mTimestampDebugHelper) {
+            timeStampString += "\n(" + std::to_string(entry.pts) + "us, " +
+                               std::to_string(entry.dts) + "us " + entry.frameType + ") ";
+        }
+        ALOGE("%s", timeStampString.c_str());
+    } else {
+        ALOGE("0 frames to dump timeStamps in %s track ", getTrackType());
     }
-    ALOGE("%s", timeStampString.c_str());
 }
 
 status_t MPEG4Writer::Track::threadEntry() {

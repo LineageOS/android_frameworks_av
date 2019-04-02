@@ -793,6 +793,15 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
         {
             EQNB_Params.SourceFormat = LVEQNB_STEREO;
         }
+#ifdef SUPPORT_MC
+        /* Note: Currently SourceFormat field of EQNB is not been
+         *       used by the module.
+         */
+        else if (LocalParams.SourceFormat == LVM_MULTICHANNEL)
+        {
+            EQNB_Params.SourceFormat = LVEQNB_MULTICHANNEL;
+        }
+#endif
         else
         {
             EQNB_Params.SourceFormat = LVEQNB_MONOINSTEREO;     /* Force to Mono-in-Stereo mode */
@@ -862,7 +871,16 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
             CS_Params.SpeakerType  = LVCS_HEADPHONES;
         }
 
+#ifdef SUPPORT_MC
+        /* Concert sound module processes only the left and right channels
+         * data. So the Source Format is set to LVCS_STEREO for multichannel
+         * input also.
+         */
+        if (LocalParams.SourceFormat == LVM_STEREO ||
+            LocalParams.SourceFormat == LVM_MULTICHANNEL)
+#else
         if (LocalParams.SourceFormat == LVM_STEREO)    /* Mono format not supported */
+#endif
         {
             CS_Params.SourceFormat = LVCS_STEREO;
         }

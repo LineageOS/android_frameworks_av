@@ -47,32 +47,29 @@ void AudioPolicyMix::dump(String8 *dst, int spaces, int index) const
 
     int indexCriterion = 0;
     for (const auto &criterion : mCriteria) {
-        dst->appendFormat("%*s- Criterion %d:\n", spaces + 2, "", indexCriterion++);
+        dst->appendFormat("%*s- Criterion %d: ", spaces + 2, "", indexCriterion++);
 
-        std::string usageLiteral;
-        if (!UsageTypeConverter::toString(criterion.mValue.mUsage, usageLiteral)) {
-            ALOGE("%s: failed to convert usage %d", __FUNCTION__, criterion.mValue.mUsage);
-            return;
+        std::string ruleType, ruleValue;
+        bool unknownRule = !RuleTypeConverter::toString(criterion.mRule, ruleType);
+        switch (criterion.mRule & ~RULE_EXCLUSION_MASK) { // no need to match RULE_EXCLUDE_...
+        case RULE_MATCH_ATTRIBUTE_USAGE:
+            UsageTypeConverter::toString(criterion.mValue.mUsage, ruleValue);
+            break;
+        case RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET:
+            SourceTypeConverter::toString(criterion.mValue.mSource, ruleValue);
+            break;
+        case RULE_MATCH_UID:
+            ruleValue = std::to_string(criterion.mValue.mUid);
+            break;
+        default:
+            unknownRule = true;
         }
-        dst->appendFormat("%*s- Usage:%s\n", spaces + 4, "", usageLiteral.c_str());
 
-        if (mMixType == MIX_TYPE_RECORDERS) {
-            std::string sourceLiteral;
-            if (!SourceTypeConverter::toString(criterion.mValue.mSource, sourceLiteral)) {
-                ALOGE("%s: failed to convert source %d", __FUNCTION__, criterion.mValue.mSource);
-                return;
-            }
-            dst->appendFormat("%*s- Source:%s\n", spaces + 4, "", sourceLiteral.c_str());
-
+        if (!unknownRule) {
+            dst->appendFormat("%s %s\n", ruleType.c_str(), ruleValue.c_str());
+        } else {
+            dst->appendFormat("Unknown rule type value 0x%x\n", criterion.mRule);
         }
-        dst->appendFormat("%*s- Uid:%d\n", spaces + 4, "", criterion.mValue.mUid);
-
-        std::string ruleLiteral;
-        if (!RuleTypeConverter::toString(criterion.mRule, ruleLiteral)) {
-            ALOGE("%s: failed to convert source %d", __FUNCTION__,criterion.mRule);
-            return;
-        }
-        dst->appendFormat("%*s- Rule:%s\n", spaces + 4, "", ruleLiteral.c_str());
     }
 }
 
@@ -180,7 +177,12 @@ AudioPolicyMixCollection::MixMatchStatus AudioPolicyMixCollection::mixMatch(
         // Loopback render mixes are created from a public API and thus restricted
         // to non sensible audio that have not opted out.
         if (is_mix_loopback_render(mix->mRouteFlags)) {
-            if ((attributes.flags & AUDIO_FLAG_NO_CAPTURE) == AUDIO_FLAG_NO_CAPTURE) {
+            auto hasFlag = [](auto flags, auto flag) { return (flags & flag) == flag; };
+            if (hasFlag(attributes.flags, AUDIO_FLAG_NO_SYSTEM_CAPTURE)) {
+                return MixMatchStatus::NO_MATCH;
+            }
+            if (!mix->mAllowPrivilegedPlaybackCapture &&
+                hasFlag(attributes.flags, AUDIO_FLAG_NO_MEDIA_PROJECTION)) {
                 return MixMatchStatus::NO_MATCH;
             }
             if (!(attributes.usage == AUDIO_USAGE_UNKNOWN ||

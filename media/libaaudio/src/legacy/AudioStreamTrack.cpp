@@ -134,12 +134,14 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             AAudioConvert_contentTypeToInternal(builder.getContentType());
     const audio_usage_t usage =
             AAudioConvert_usageToInternal(builder.getUsage());
+    const audio_flags_mask_t attributesFlags =
+        AAudioConvert_allowCapturePolicyToAudioFlagsMask(builder.getAllowedCapturePolicy());
 
     const audio_attributes_t attributes = {
             .content_type = contentType,
             .usage = usage,
             .source = AUDIO_SOURCE_DEFAULT, // only used for recording
-            .flags = AUDIO_FLAG_NONE, // Different than the AUDIO_OUTPUT_FLAGS
+            .flags = attributesFlags,
             .tags = ""
     };
 
@@ -420,6 +422,10 @@ aaudio_result_t AudioStreamTrack::write(const void *buffer,
 
 aaudio_result_t AudioStreamTrack::setBufferSize(int32_t requestedFrames)
 {
+    // Do not ask for less than one burst.
+    if (requestedFrames < getFramesPerBurst()) {
+        requestedFrames = getFramesPerBurst();
+    }
     ssize_t result = mAudioTrack->setBufferSizeInFrames(requestedFrames);
     if (result < 0) {
         return AAudioConvert_androidToAAudioResult(result);

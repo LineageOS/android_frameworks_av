@@ -167,16 +167,11 @@ cc_library_shared {
 
     static_libs: ["libstagefright_amrwbenc"],
 
+    defaults: ["omx_soft_libs"],
+
     shared_libs: [
-        "libstagefright_omx",
-        "libstagefright_foundation",
-        "libutils",
-        "liblog",
         "libstagefright_enc_common",
     ],
     compile_multilib: "32",
 }
 
-//###############################################################################
-
-subdirs = ["SampleCode"]

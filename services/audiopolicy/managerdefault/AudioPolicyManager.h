@@ -218,6 +218,7 @@ public:
 
         status_t dump(int fd) override;
 
+        status_t setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t capturePolicy) override;
         virtual bool isOffloadSupported(const audio_offload_info_t& offloadInfo);
 
         virtual bool isDirectOutputSupported(const audio_config_base_t& config,
@@ -341,13 +342,13 @@ protected:
         {
             return mInputs;
         }
-        virtual const DeviceVector &getAvailableOutputDevices() const
+        virtual const DeviceVector getAvailableOutputDevices() const
         {
-            return mAvailableOutputDevices;
+            return mAvailableOutputDevices.filterForEngine();
         }
-        virtual const DeviceVector &getAvailableInputDevices() const
+        virtual const DeviceVector getAvailableInputDevices() const
         {
-            return mAvailableInputDevices;
+            return mAvailableInputDevices.filterForEngine();
         }
         virtual const sp<DeviceDescriptor> &getDefaultOutputDevice() const
         {
@@ -754,6 +755,8 @@ protected:
         // Surround formats that are enabled manually. Taken into account when
         // "encoded surround" is forced into "manual" mode.
         std::unordered_set<audio_format_t> mManualSurroundFormats;
+
+        std::unordered_map<uid_t, audio_flags_mask_t> mAllowedCapturePolicies;
 private:
         // Add or remove AC3 DTS encodings based on user preferences.
         void modifySurroundFormats(const sp<DeviceDescriptor>& devDesc, FormatVector *formatsPtr);
@@ -844,6 +847,10 @@ private:
                                              const char *device_address,
                                              const char *device_name,
                                              audio_format_t encodedFormat);
+
+        void setEngineDeviceConnectionState(const sp<DeviceDescriptor> device,
+                                      audio_policy_dev_state_t state);
+
         void updateMono(audio_io_handle_t output) {
             AudioParameter param;
             param.addInt(String8(AudioParameter::keyMonoOutput), (int)mMasterMono);

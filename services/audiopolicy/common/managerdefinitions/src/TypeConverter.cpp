@@ -52,7 +52,6 @@ const RouteFlagTypeConverter::Table RouteFlagTypeConverter::mTable[] = {
 
 template <>
 const RuleTypeConverter::Table RuleTypeConverter::mTable[] = {
-    MAKE_STRING_FROM_ENUM(RULE_EXCLUSION_MASK),
     MAKE_STRING_FROM_ENUM(RULE_MATCH_ATTRIBUTE_USAGE),
     MAKE_STRING_FROM_ENUM(RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET),
     MAKE_STRING_FROM_ENUM(RULE_MATCH_UID),

@@ -128,3 +128,11 @@ void workDone(
         }
     }
 }
+
+// Return current time in micro seconds
+int64_t getNowUs() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    return (int64_t)tv.tv_usec + tv.tv_sec * 1000000ll;
+}

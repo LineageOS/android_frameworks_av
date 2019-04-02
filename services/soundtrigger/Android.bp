@@ -28,6 +28,7 @@ cc_library_shared {
         "libhardware",
         "libsoundtrigger",
         "libaudioclient",
+        "libaudioutils",
         "libmediautils",
 
         "libhwbinder",
