@@ -831,7 +831,9 @@ status_t MediaCodecSource::onStart(MetaData *params) {
 }
 
 void MediaCodecSource::onPause(int64_t pauseStartTimeUs) {
-    if ((mFlags & FLAG_USE_SURFACE_INPUT) && (mEncoder != NULL)) {
+    if (mStopping || mOutput.lock()->mEncoderReachedEOS) {
+        // Nothing to do
+    } else if ((mFlags & FLAG_USE_SURFACE_INPUT) && (mEncoder != NULL)) {
         sp<AMessage> params = new AMessage;
         params->setInt32(PARAMETER_KEY_SUSPEND, true);
         params->setInt64(PARAMETER_KEY_SUSPEND_TIME, pauseStartTimeUs);
