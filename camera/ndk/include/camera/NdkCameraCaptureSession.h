@@ -676,6 +676,41 @@ typedef void (*ACameraCaptureSession_logicalCamera_captureCallback_result)(
         size_t physicalResultCount, const char** physicalCameraIds,
         const ACameraMetadata** physicalResults);
 
+/// Struct to describe a logical camera capture failure
+typedef struct ALogicalCameraCaptureFailure {
+    /**
+     * The {@link ACameraCaptureFailure} contains information about regular logical device capture
+     * failure.
+     */
+    struct ACameraCaptureFailure captureFailure;
+
+    /**
+     * The physical camera device ID in case the capture failure comes from a capture request
+     * with configured physical camera streams for a logical camera. physicalCameraId will be set
+     * to NULL in case the capture request has no associated physical camera device.
+     *
+     */
+    const char*    physicalCameraId;
+} ALogicalCameraCaptureFailure;
+
+/**
+ * The definition of logical camera capture failure callback.
+ *
+ * @param context The optional application context provided by user in
+ *                {@link ACameraCaptureSession_captureCallbacks}.
+ * @param session The camera capture session of interest.
+ * @param request The capture request of interest. Note that this pointer points to a copy of
+ *                capture request sent by application, so the address is different to what
+ *                application sent but the content will match. This request will be freed by
+ *                framework immediately after this callback returns.
+ * @param failure The {@link ALogicalCameraCaptureFailure} desribes the capture failure. The memory
+ *                is managed by camera framework. Do not access this pointer after this callback
+ *                returns.
+ */
+typedef void (*ACameraCaptureSession_logicalCamera_captureCallback_failed)(
+        void* context, ACameraCaptureSession* session,
+        ACaptureRequest* request, ALogicalCameraCaptureFailure* failure);
+
 /**
  * This has the same functionality as ACameraCaptureSession_captureCallbacks,
  * with the exception that an onLogicalCameraCaptureCompleted callback is
@@ -708,9 +743,24 @@ typedef struct ACameraCaptureSession_logicalCamera_captureCallbacks {
     ACameraCaptureSession_logicalCamera_captureCallback_result onLogicalCameraCaptureCompleted;
 
     /**
+     * This callback is called instead of {@link onLogicalCameraCaptureCompleted} when the
+     * camera device failed to produce a capture result for the
+     * request.
+     *
+     * <p>Other requests are unaffected, and some or all image buffers from
+     * the capture may have been pushed to their respective output
+     * streams.</p>
+     *
+     * <p>Note that the ACaptureRequest pointer in the callback will not match what application has
+     * submitted, but the contents the ACaptureRequest will match what application submitted.</p>
+     *
+     * @see ALogicalCameraCaptureFailure
+     */
+    ACameraCaptureSession_logicalCamera_captureCallback_failed onLogicalCameraCaptureFailed;
+
+    /**
      * Same as ACameraCaptureSession_captureCallbacks
      */
-    ACameraCaptureSession_captureCallback_failed        onCaptureFailed;
     ACameraCaptureSession_captureCallback_sequenceEnd   onCaptureSequenceCompleted;
     ACameraCaptureSession_captureCallback_sequenceAbort onCaptureSequenceAborted;
     ACameraCaptureSession_captureCallback_bufferLost    onCaptureBufferLost;

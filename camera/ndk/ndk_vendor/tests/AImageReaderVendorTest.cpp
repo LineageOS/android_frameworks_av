@@ -323,7 +323,13 @@ class CameraHelper {
             }
             ch->mCompletedCaptureCallbackCount++;
         },
-        nullptr, // onCaptureFailed
+        [] (void * /*ctx*/, ACameraCaptureSession* /*session*/, ACaptureRequest* /*request*/,
+                ALogicalCameraCaptureFailure* failure) {
+            if (failure->physicalCameraId) {
+                ALOGD("%s: Physical camera id: %s result failure", __FUNCTION__,
+                        failure->physicalCameraId);
+            }
+        },
         nullptr, // onCaptureSequenceCompleted
         nullptr, // onCaptureSequenceAborted
         nullptr, // onCaptureBufferLost

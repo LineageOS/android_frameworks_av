@@ -157,6 +157,8 @@ HCaptureResultExtras convertToHidl(const CaptureResultExtras &captureResultExtra
     hCaptureResultExtras.frameNumber = captureResultExtras.frameNumber;
     hCaptureResultExtras.partialResultCount = captureResultExtras.partialResultCount;
     hCaptureResultExtras.errorStreamId = captureResultExtras.errorStreamId;
+    hCaptureResultExtras.errorPhysicalCameraId = hidl_string(String8(
+            captureResultExtras.errorPhysicalCameraId).string());
     return hCaptureResultExtras;
 }
 

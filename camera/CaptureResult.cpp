@@ -39,6 +39,16 @@ status_t CaptureResultExtras::readFromParcel(const android::Parcel *parcel) {
     parcel->readInt64(&frameNumber);
     parcel->readInt32(&partialResultCount);
     parcel->readInt32(&errorStreamId);
+    auto physicalCameraIdPresent = parcel->readBool();
+    if (physicalCameraIdPresent) {
+        String16 cameraId;
+        status_t res = OK;
+        if ((res = parcel->readString16(&cameraId)) != OK) {
+            ALOGE("%s: Failed to read camera id: %d", __FUNCTION__, res);
+            return res;
+        }
+        errorPhysicalCameraId = cameraId;
+    }
 
     return OK;
 }
@@ -56,6 +66,16 @@ status_t CaptureResultExtras::writeToParcel(android::Parcel *parcel) const {
     parcel->writeInt64(frameNumber);
     parcel->writeInt32(partialResultCount);
     parcel->writeInt32(errorStreamId);
+    if (errorPhysicalCameraId.size() > 0) {
+        parcel->writeBool(true);
+        status_t res = OK;
+        if ((res = parcel->writeString16(errorPhysicalCameraId)) != OK) {
+            ALOGE("%s: Failed to write physical camera ID to parcel: %d", __FUNCTION__, res);
+            return res;
+        }
+    } else {
+        parcel->writeBool(false);
+    }
 
     return OK;
 }

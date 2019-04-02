@@ -35,4 +35,3 @@ cc_library_headers {
     version_script: "libaaudio.map.txt",
 }
 
-subdirs = ["*"]
