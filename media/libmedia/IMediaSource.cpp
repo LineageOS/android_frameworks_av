@@ -368,13 +368,13 @@ status_t BnMediaSource::onTransact(
                         ALOGV("Use shared memory: %zu", length);
                         transferBuf = buf;
                     } else {
-                        ALOGD("Large buffer %zu without IMemory!", length);
+                        ALOGV("Large buffer %zu without IMemory!", length);
                         ret = mGroup->acquire_buffer(
                                 (MediaBufferBase **)&transferBuf, false /* nonBlocking */, length);
                         if (ret != OK
                                 || transferBuf == nullptr
                                 || transferBuf->mMemory == nullptr) {
-                            ALOGW("Failed to acquire shared memory, size %zu, ret %d",
+                            ALOGV("Failed to acquire shared memory, size %zu, ret %d",
                                     length, ret);
                             if (transferBuf != nullptr) {
                                 transferBuf->release();
