@@ -5239,8 +5239,30 @@ status_t MPEG4Source::parseTrackFragmentRun(off64_t offset, off64_t size) {
         sampleCtsOffset = 0;
     }
 
-    if (size < (off64_t)sampleCount * bytesPerSample) {
-        return -EINVAL;
+    if (bytesPerSample != 0) {
+        if (size < (off64_t)sampleCount * bytesPerSample) {
+            return -EINVAL;
+        }
+    } else {
+        if (sampleDuration == 0) {
+            ALOGW("b/123389881 sampleDuration == 0");
+            android_errorWriteLog(0x534e4554, "124389881 zero");
+            return -EINVAL;
+        }
+
+        // apply some sanity (vs strict legality) checks
+        //
+        // clamp the count of entries in the trun box, to avoid spending forever parsing
+        // this box. Clamping (vs error) lets us play *something*.
+        // 1 million is about 400 msecs on a Pixel3, should be no more than a couple seconds
+        // on the slowest devices.
+        static constexpr uint32_t kMaxTrunSampleCount = 1000000;
+        if (sampleCount > kMaxTrunSampleCount) {
+            ALOGW("b/123389881 clamp sampleCount(%u) @ kMaxTrunSampleCount(%u)",
+                  sampleCount, kMaxTrunSampleCount);
+            android_errorWriteLog(0x534e4554, "124389881 count");
+
+        }
     }
 
     Sample tmp;
