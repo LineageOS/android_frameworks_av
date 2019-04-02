@@ -81,7 +81,7 @@ public:
                 const Trex *trex,
                 off64_t firstMoofOffset,
                 const sp<ItemTable> &itemTable,
-                int32_t elstShiftStartTicks);
+                uint64_t elstShiftStartTicks);
     virtual status_t init();
 
     virtual media_status_t start();
@@ -147,7 +147,7 @@ private:
 
     // Start offset from composition time to presentation time.
     // Support shift only for video tracks through mElstShiftStartTicks for now.
-    int32_t mElstShiftStartTicks;
+    uint64_t mElstShiftStartTicks;
 
     size_t parseNALSize(const uint8_t *data) const;
     status_t parseChunk(off64_t *offset);
@@ -4040,7 +4040,7 @@ MediaTrackHelper *MPEG4Extractor::getTrack(size_t index) {
 
     if (track->has_elst and !strncasecmp("video/", mime, 6) and track->elst_media_time > 0) {
         track->elstShiftStartTicks = track->elst_media_time;
-        ALOGV("video track->elstShiftStartTicks :%" PRId64, track->elst_media_time);
+        ALOGV("video track->elstShiftStartTicks :%" PRIu64, track->elstShiftStartTicks);
     }
 
     MPEG4Source *source =  new MPEG4Source(
@@ -4450,7 +4450,7 @@ MPEG4Source::MPEG4Source(
         const Trex *trex,
         off64_t firstMoofOffset,
         const sp<ItemTable> &itemTable,
-        int32_t elstShiftStartTicks)
+        uint64_t elstShiftStartTicks)
     : mFormat(format),
       mDataSource(dataSource),
       mTimescale(timeScale),
@@ -4576,7 +4576,7 @@ status_t MPEG4Source::init() {
             // Start offset should be less or equal to composition time of first sample.
             // ISO : sample_composition_time_offset, version 0 (unsigned) for major brands.
             mElstShiftStartTicks = std::min(mElstShiftStartTicks,
-                (*mCurrentSamples.begin()).compositionOffset);
+                                            (uint64_t)(*mCurrentSamples.begin()).compositionOffset);
         }
         return err;
     }
@@ -4586,7 +4586,7 @@ status_t MPEG4Source::init() {
         err = mSampleTable->getMetaDataForSample(0, NULL, NULL, &firstSampleCTS);
         // Start offset should be less or equal to composition time of first sample.
         // Composition time stamp of first sample cannot be negative.
-        mElstShiftStartTicks = std::min(mElstShiftStartTicks, (int32_t)firstSampleCTS);
+        mElstShiftStartTicks = std::min(mElstShiftStartTicks, firstSampleCTS);
     }
 
     return err;
@@ -5496,7 +5496,11 @@ media_status_t MPEG4Source::read(
             err = mSampleTable->getMetaDataForSample(
                     mCurrentSampleIndex, &offset, &size, &cts, &isSyncSample, &stts);
             if(err == OK) {
-                cts -= mElstShiftStartTicks;
+                /* Composition Time Stamp cannot be negative. Some files have video Sample
+                * Time(STTS)delta with zero value(b/117402420).  Hence subtract only
+                * min(cts, mElstShiftStartTicks), so that audio tracks can be played.
+                */
+                cts -= std::min(cts, mElstShiftStartTicks);
             }
 
         } else {
@@ -5780,8 +5784,8 @@ media_status_t MPEG4Source::fragmentedRead(
     if (options && options->getSeekTo(&seekTimeUs, &mode)) {
 
         seekTimeUs += ((long double)mElstShiftStartTicks * 1000000) / mTimescale;
-        ALOGV("shifted seekTimeUs :%" PRId64 ", mElstShiftStartTicks:%" PRId32, seekTimeUs,
-                mElstShiftStartTicks);
+        ALOGV("shifted seekTimeUs :%" PRId64 ", mElstShiftStartTicks:%" PRIu64, seekTimeUs,
+              mElstShiftStartTicks);
 
         int numSidxEntries = mSegments.size();
         if (numSidxEntries != 0) {
@@ -5837,7 +5841,7 @@ media_status_t MPEG4Source::fragmentedRead(
 
     off64_t offset = 0;
     size_t size = 0;
-    uint32_t cts = 0;
+    uint64_t cts = 0;
     bool isSyncSample = false;
     bool newBuffer = false;
     if (mBuffer == NULL || mCurrentSampleIndex >= mCurrentSamples.size()) {
@@ -5869,7 +5873,11 @@ media_status_t MPEG4Source::fragmentedRead(
         offset = smpl->offset;
         size = smpl->size;
         cts = mCurrentTime + smpl->compositionOffset;
-        cts -= mElstShiftStartTicks;
+        /* Composition Time Stamp cannot be negative. Some files have video Sample
+        * Time(STTS)delta with zero value(b/117402420).  Hence subtract only
+        * min(cts, mElstShiftStartTicks), so that audio tracks can be played.
+        */
+        cts -= std::min(cts, mElstShiftStartTicks);
 
         mCurrentTime += smpl->duration;
         isSyncSample = (mCurrentSampleIndex == 0);
