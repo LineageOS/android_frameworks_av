@@ -83,9 +83,13 @@ private:
         bool includes_expensive_metadata;
         bool skipTrack;
         bool has_elst;
+        /* signed int, ISO Spec allows media_time = -1 for other use cases.
+         * but we don't support empty edits for now.
+         */
         int64_t elst_media_time;
         uint64_t elst_segment_duration;
-        int32_t elstShiftStartTicks;
+        // unsigned int, shift start offset only when media_time > 0.
+        uint64_t elstShiftStartTicks;
         bool subsample_encryption;
     };
 
