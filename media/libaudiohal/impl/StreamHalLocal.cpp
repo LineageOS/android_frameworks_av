@@ -33,7 +33,7 @@ StreamHalLocal::StreamHalLocal(audio_stream_t *stream, sp<DeviceHalLocal> device
           mStream(stream) {
     // Instrument audio signal power logging.
     // Note: This assumes channel mask, format, and sample rate do not change after creation.
-    if (mStream != nullptr && mStreamPowerLog.isUserDebugOrEngBuild()) {
+    if (mStream != nullptr /* && mStreamPowerLog.isUserDebugOrEngBuild() */) {
         mStreamPowerLog.init(mStream->get_sample_rate(mStream),
                 mStream->get_channels(mStream),
                 mStream->get_format(mStream));
