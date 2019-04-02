@@ -65,10 +65,13 @@ public:
      * @param[in] attributes to consider fowr the research of output descriptor.
      * @param[out] desc to return if an primary output could be found.
      * @param[out] secondaryDesc other desc that the audio should be routed to.
+     * @return OK if the request is valid
+     *         otherwise if the request is not supported
      */
     status_t getOutputForAttr(const audio_attributes_t& attributes, uid_t uid,
-                sp<SwAudioOutputDescriptor> &primaryDesc,
-                std::vector<sp<SwAudioOutputDescriptor>> *secondaryDescs);
+                              audio_output_flags_t flags,
+                              sp<SwAudioOutputDescriptor> &primaryDesc,
+                              std::vector<sp<SwAudioOutputDescriptor>> *secondaryDescs);
 
     sp<DeviceDescriptor> getDeviceAndMixForInputSource(audio_source_t inputSource,
                                                        const DeviceVector &availableDeviceTypes,
