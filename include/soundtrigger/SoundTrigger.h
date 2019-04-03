@@ -36,10 +36,12 @@ public:
 
     virtual ~SoundTrigger();
 
-    static  status_t listModules(struct sound_trigger_module_descriptor *modules,
+    static  status_t listModules(const String16& opPackageName,
+                                 struct sound_trigger_module_descriptor *modules,
                                  uint32_t *numModules);
-    static  sp<SoundTrigger> attach(const sound_trigger_module_handle_t module,
-                                       const sp<SoundTriggerCallback>& callback);
+    static  sp<SoundTrigger> attach(const String16& opPackageName,
+                                    const sound_trigger_module_handle_t module,
+                                    const sp<SoundTriggerCallback>& callback);
 
     static  status_t setCaptureState(bool active);
 
