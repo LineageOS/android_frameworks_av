@@ -153,16 +153,16 @@ audio_devices_t Engine::getDeviceForStrategyInt(legacy_strategy strategy,
         break;
 
     case STRATEGY_SONIFICATION_RESPECTFUL:
-        if (isInCall() || outputs.isActiveLocally(streamToVolumeSource(AUDIO_STREAM_VOICE_CALL))) {
+        if (isInCall() || outputs.isActiveLocally(toVolumeSource(AUDIO_STREAM_VOICE_CALL))) {
             device = getDeviceForStrategyInt(
                     STRATEGY_SONIFICATION, availableOutputDevices, availableInputDevices, outputs,
                     outputDeviceTypesToIgnore);
         } else {
             bool media_active_locally =
-                    outputs.isActiveLocally(streamToVolumeSource(AUDIO_STREAM_MUSIC),
+                    outputs.isActiveLocally(toVolumeSource(AUDIO_STREAM_MUSIC),
                                             SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY)
                     || outputs.isActiveLocally(
-                        streamToVolumeSource(AUDIO_STREAM_ACCESSIBILITY),
+                        toVolumeSource(AUDIO_STREAM_ACCESSIBILITY),
                         SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY);
             // routing is same as media without the "remote" device
             device = getDeviceForStrategyInt(STRATEGY_MEDIA,
@@ -297,7 +297,7 @@ audio_devices_t Engine::getDeviceForStrategyInt(legacy_strategy strategy,
 
         // If incall, just select the STRATEGY_PHONE device
         if (isInCall() ||
-                outputs.isActiveLocally(streamToVolumeSource(AUDIO_STREAM_VOICE_CALL))) {
+                outputs.isActiveLocally(toVolumeSource(AUDIO_STREAM_VOICE_CALL))) {
             device = getDeviceForStrategyInt(
                     STRATEGY_PHONE, availableOutputDevices, availableInputDevices, outputs,
                     outputDeviceTypesToIgnore);
@@ -370,8 +370,8 @@ audio_devices_t Engine::getDeviceForStrategyInt(legacy_strategy strategy,
             }
             availableOutputDevices =
                     availableOutputDevices.getDevicesFromTypeMask(availableOutputDevicesType);
-            if (outputs.isActive(streamToVolumeSource(AUDIO_STREAM_RING)) ||
-                    outputs.isActive(streamToVolumeSource(AUDIO_STREAM_ALARM))) {
+            if (outputs.isActive(toVolumeSource(AUDIO_STREAM_RING)) ||
+                    outputs.isActive(toVolumeSource(AUDIO_STREAM_ALARM))) {
                 return getDeviceForStrategyInt(
                     STRATEGY_SONIFICATION, availableOutputDevices, availableInputDevices, outputs,
                     outputDeviceTypesToIgnore);
