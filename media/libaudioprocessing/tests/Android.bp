@@ -5,8 +5,8 @@ cc_defaults {
 
     header_libs: ["libbase_headers"],
     shared_libs: [
-        "libaudioutils",
         "libaudioprocessing",
+        "libaudioutils",
         "libcutils",
         "liblog",
         "libutils",

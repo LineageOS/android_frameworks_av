@@ -243,7 +243,7 @@ void AudioResamplerDyn<TC, TI, TO>::createKaiserFir(Constants &c,
 {
     // compute the normalized transition bandwidth
     const double tbw = firKaiserTbw(c.mHalfNumCoefs, stopBandAtten);
-    const double halfbw = tbw / 2.;
+    const double halfbw = tbw * 0.5;
 
     double fcr; // compute fcr, the 3 dB amplitude cut-off.
     if (inSampleRate < outSampleRate) { // upsample
@@ -290,7 +290,7 @@ void AudioResamplerDyn<TC, TI, TO>::createKaiserFir(Constants &c,
 
 #if 0
     // Keep this debug code in case an app causes resampler design issues.
-    const double halfbw = tbw / 2.;
+    const double halfbw = tbw * 0.5;
     // print basic filter stats
     ALOGD("L:%d  hnc:%d  stopBandAtten:%lf  fcr:%lf  atten:%lf  tbw:%lf\n",
             c.mL, c.mHalfNumCoefs, stopBandAtten, fcr, attenuation, tbw);
@@ -305,7 +305,7 @@ void AudioResamplerDyn<TC, TI, TO>::createKaiserFir(Constants &c,
 
     const int32_t passSteps = 1000;
 
-    testFir(coefs, c.mL, c.mHalfNumCoefs, fp, fs, passSteps, passSteps * c.ML /*stopSteps*/,
+    testFir(coefs, c.mL, c.mHalfNumCoefs, fp, fs, passSteps, passSteps * c.mL /*stopSteps*/,
             passMin, passMax, passRipple, stopMax, stopRipple);
     ALOGD("passband(%lf, %lf): %.8lf %.8lf %.8lf\n", 0., fp, passMin, passMax, passRipple);
     ALOGD("stopband(%lf, %lf): %.8lf %.3lf\n", fs, 0.5, stopMax, stopRipple);
