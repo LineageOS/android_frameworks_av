@@ -91,7 +91,38 @@ private:
         // unsigned int, shift start offset only when media_time > 0.
         uint64_t elstShiftStartTicks;
         bool subsample_encryption;
+
+        uint8_t *mTx3gBuffer;
+        size_t mTx3gSize, mTx3gFilled;
+
+
+        Track() {
+            next = NULL;
+            meta = NULL;
+            timescale = 0;
+            includes_expensive_metadata = false;
+            skipTrack = false;
+            has_elst = false;
+            elst_media_time = 0;
+            elstShiftStartTicks = 0;
+            subsample_encryption = false;
+            mTx3gBuffer = NULL;
+            mTx3gSize = mTx3gFilled = 0;
+        }
+        ~Track() {
+            if (meta) {
+                AMediaFormat_delete(meta);
+                meta = NULL;
+            }
+            free (mTx3gBuffer);
+            mTx3gBuffer = NULL;
+        }
+
+      private:
+        DISALLOW_EVIL_CONSTRUCTORS(Track);
     };
+
+    static const int kTx3gGrowth = 16 * 1024;
 
     Vector<SidxEntry> mSidxEntries;
     off64_t mMoofOffset;
