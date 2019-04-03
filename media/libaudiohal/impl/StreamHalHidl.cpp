@@ -49,7 +49,7 @@ StreamHalHidl::StreamHalHidl(IStream *stream)
 
     // Instrument audio signal power logging.
     // Note: This assumes channel mask, format, and sample rate do not change after creation.
-    if (mStream != nullptr && mStreamPowerLog.isUserDebugOrEngBuild()) {
+    if (mStream != nullptr /* && mStreamPowerLog.isUserDebugOrEngBuild() */) {
         // Obtain audio properties (see StreamHalHidl::getAudioProperties() below).
         Return<void> ret = mStream->getAudioProperties(
                 [&](auto sr, auto m, auto f) {

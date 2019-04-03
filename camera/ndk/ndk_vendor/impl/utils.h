@@ -99,7 +99,15 @@ struct OutputConfigurationWrapper {
         return mOutputConfiguration;
     }
 
-    OutputConfigurationWrapper() = default;
+    OutputConfigurationWrapper() {
+        mOutputConfiguration.rotation = OutputConfiguration::Rotation::R0;
+        // The ndk currently doesn't support deferred surfaces
+        mOutputConfiguration.isDeferred = false;
+        mOutputConfiguration.width = 0;
+        mOutputConfiguration.height = 0;
+        // ndk doesn't support inter OutputConfiguration buffer sharing.
+        mOutputConfiguration.windowGroupId = -1;
+    };
 
     OutputConfigurationWrapper(OutputConfiguration &outputConfiguration)
             : mOutputConfiguration((outputConfiguration)) { }

@@ -398,6 +398,13 @@ void HwModuleCollection::cleanUpForDevice(const sp<DeviceDescriptor> &device)
         if (!moduleDevices.contains(device)) {
             continue;
         }
+
+        // removal of remote submix devices associated with a dynamic policy is
+        // handled by removeOutputProfile() and removeInputProfile()
+        if (audio_is_remote_submix_device(device->type()) && device->address() != "0") {
+            continue;
+        }
+
         device->detach();
         // Only remove from dynamic list, not from declared list!!!
         if (!hwModule->getDynamicDevices().contains(device)) {

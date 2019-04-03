@@ -312,6 +312,12 @@ protected:
     android::wp<AAudioServiceEndpoint> mServiceEndpointWeak;
 
 private:
+
+    /**
+     * @return true if the queue is getting full.
+     */
+    bool isUpMessageQueueBusy();
+
     aaudio_handle_t         mHandle = -1;
     bool                    mFlowing = false;
 
