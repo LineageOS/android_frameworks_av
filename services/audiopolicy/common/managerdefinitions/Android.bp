@@ -34,6 +34,7 @@ cc_library_static {
     ],
     header_libs: [
         "libaudiopolicycommon",
+        "libaudiopolicymanager_interface_headers",
     ],
     export_header_lib_headers: ["libaudiopolicycommon"],
 

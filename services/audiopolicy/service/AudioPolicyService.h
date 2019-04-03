@@ -33,7 +33,7 @@
 #include <media/AudioPolicy.h>
 #include <mediautils/ServiceUtilities.h>
 #include "AudioPolicyEffects.h"
-#include "managerdefault/AudioPolicyManager.h"
+#include <AudioPolicyInterface.h>
 #include <android/hardware/BnSensorPrivacyListener.h>
 
 #include <unordered_map>
