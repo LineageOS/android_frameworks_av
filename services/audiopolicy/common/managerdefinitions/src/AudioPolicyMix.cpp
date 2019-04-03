@@ -147,7 +147,10 @@ status_t AudioPolicyMixCollection::getOutputForAttr(
         }
 
         switch (mixMatch(policyMix.get(), i, attributes, uid)) {
-            case MixMatchStatus::INVALID_MIX: return BAD_VALUE; // TODO: Do we really want to abort?
+            case MixMatchStatus::INVALID_MIX:
+                // The mix has contradictory rules, ignore it
+                // TODO: reject invalid mix at registration
+                continue;
             case MixMatchStatus::NO_MATCH:
                 ALOGV("%s: Mix %zu: does not match", __func__, i);
                 continue; // skip the mix
