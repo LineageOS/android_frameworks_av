@@ -510,11 +510,11 @@ AAUDIO_API aaudio_result_t AAudio_createStreamBuilder(AAudioStreamBuilder** buil
  * Request an audio device identified device using an ID.
  * On Android, for example, the ID could be obtained from the Java AudioManager.
  *
- * The default, if you do not call this function, is AAUDIO_UNSPECIFIED,
+ * The default, if you do not call this function, is {@link #AAUDIO_UNSPECIFIED},
  * in which case the primary device will be used.
  *
  * @param builder reference provided by AAudio_createStreamBuilder()
- * @param deviceId device identifier or AAUDIO_UNSPECIFIED
+ * @param deviceId device identifier or {@link #AAUDIO_UNSPECIFIED}
  */
 AAUDIO_API void AAudioStreamBuilder_setDeviceId(AAudioStreamBuilder* builder,
                                                 int32_t deviceId) __INTRODUCED_IN(26);

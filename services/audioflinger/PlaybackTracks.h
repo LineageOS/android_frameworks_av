@@ -19,6 +19,36 @@
     #error This header file should only be included from AudioFlinger.h
 #endif
 
+// Checks and monitors OP_PLAY_AUDIO
+class OpPlayAudioMonitor : public RefBase {
+public:
+    OpPlayAudioMonitor(uid_t uid, audio_usage_t usage, int id, audio_stream_type_t streamType);
+    ~OpPlayAudioMonitor() override;
+    bool hasOpPlayAudio() const;
+
+private:
+    AppOpsManager mAppOpsManager;
+
+    class PlayAudioOpCallback : public BnAppOpsCallback {
+    public:
+        explicit PlayAudioOpCallback(const wp<OpPlayAudioMonitor>& monitor);
+        void opChanged(int32_t op, const String16& packageName) override;
+
+    private:
+        const wp<OpPlayAudioMonitor> mMonitor;
+    };
+
+    sp<PlayAudioOpCallback> mOpCallback;
+    // called by PlayAudioOpCallback when OP_PLAY_AUDIO is updated in AppOp callback
+    void checkPlayAudioForUsage();
+
+    std::atomic_bool mHasOpPlayAudio;
+    Vector<String16> mPackages;
+    const uid_t mUid;
+    const int32_t mUsage; // on purpose not audio_usage_t because always checked in appOps as int32_t
+    const int mId; // for logging purposes only
+};
+
 // playback track
 class Track : public TrackBase, public VolumeProvider {
 public:
@@ -179,6 +209,8 @@ public:
 
     int fastIndex() const { return mFastIndex; }
 
+    bool isPlaybackRestricted() const { return !mOpPlayAudioMonitor->hasOpPlayAudio(); }
+
 protected:
 
     // FILLED state is used for suppressing volume ramp at begin of playing
@@ -206,6 +238,8 @@ protected:
     ExtendedTimestamp  mSinkTimestamp;
 
     sp<media::VolumeHandler>  mVolumeHandler; // handles multiple VolumeShaper configs and operations
+
+    sp<OpPlayAudioMonitor>  mOpPlayAudioMonitor;
 
     bool                mHapticPlaybackEnabled = false; // indicates haptic playback enabled or not
     // intensity to play haptic data

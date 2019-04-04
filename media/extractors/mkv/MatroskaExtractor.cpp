@@ -20,6 +20,7 @@
 
 #include "FLACDecoder.h"
 #include "MatroskaExtractor.h"
+#include "common/webmids.h"
 
 #include <media/DataSourceBase.h>
 #include <media/ExtractorUtils.h>
@@ -461,7 +462,7 @@ void BlockIterator::seek(
         for (size_t index = 0; index < count; index++) {
             pEntry = pSH->GetEntry(index);
 
-            if (pEntry->id == 0x0C53BB6B) { // Cues ID
+            if (pEntry->id == libwebm::kMkvCues) { // Cues ID
                 long len; long long pos;
                 pSegment->ParseCues(pEntry->pos, pos, len);
                 pCues = pSegment->GetCues();
@@ -1282,7 +1283,7 @@ MatroskaExtractor::MatroskaExtractor(DataSourceHelper *source)
                 const mkvparser::SeekHead::Entry* mEntry;
                 for (size_t index = 0; index < count; index++) {
                     mEntry = mSH->GetEntry(index);
-                    if (mEntry->id == 0x0C53BB6B) {  // Cues ID
+                    if (mEntry->id == libwebm::kMkvCues) { // Cues ID
                         long len;
                         long long pos;
                         mSegment->ParseCues(mEntry->pos, pos, len);

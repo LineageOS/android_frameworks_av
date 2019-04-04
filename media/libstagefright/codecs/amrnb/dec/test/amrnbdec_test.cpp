@@ -67,6 +67,7 @@ int main(int argc, char *argv[]) {
     int bytesRead = fread(header, 1, kFileHeaderSize, fpInput);
     if (bytesRead != kFileHeaderSize || memcmp(header, "#!AMR\n", kFileHeaderSize)) {
         fprintf(stderr, "Invalid AMR-NB file\n");
+        fclose(fpInput);
         return 1;
     }
 
@@ -79,6 +80,7 @@ int main(int argc, char *argv[]) {
     SNDFILE *handle = sf_open(argv[2], SFM_WRITE, &sfInfo);
     if(!handle){
         fprintf(stderr, "Could not create %s\n", argv[2]);
+        fclose(fpInput);
         return 1;
     }
 
@@ -87,6 +89,8 @@ int main(int argc, char *argv[]) {
     int err = GSMInitDecode(&amrHandle, (Word8*)"AMRNBDecoder");
     if(err != 0){
         fprintf(stderr, "Error creating AMR-NB decoder instance\n");
+        fclose(fpInput);
+        sf_close(handle);
         return 1;
     }
 

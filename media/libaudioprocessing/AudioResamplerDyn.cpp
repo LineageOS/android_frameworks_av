@@ -243,7 +243,7 @@ void AudioResamplerDyn<TC, TI, TO>::createKaiserFir(Constants &c,
 {
     // compute the normalized transition bandwidth
     const double tbw = firKaiserTbw(c.mHalfNumCoefs, stopBandAtten);
-    const double halfbw = tbw / 2.;
+    const double halfbw = tbw * 0.5;
 
     double fcr; // compute fcr, the 3 dB amplitude cut-off.
     if (inSampleRate < outSampleRate) { // upsample
@@ -290,7 +290,7 @@ void AudioResamplerDyn<TC, TI, TO>::createKaiserFir(Constants &c,
 
 #if 0
     // Keep this debug code in case an app causes resampler design issues.
-    const double halfbw = tbw / 2.;
+    const double halfbw = tbw * 0.5;
     // print basic filter stats
     ALOGD("L:%d  hnc:%d  stopBandAtten:%lf  fcr:%lf  atten:%lf  tbw:%lf\n",
             c.mL, c.mHalfNumCoefs, stopBandAtten, fcr, attenuation, tbw);
@@ -305,7 +305,7 @@ void AudioResamplerDyn<TC, TI, TO>::createKaiserFir(Constants &c,
 
     const int32_t passSteps = 1000;
 
-    testFir(coefs, c.mL, c.mHalfNumCoefs, fp, fs, passSteps, passSteps * c.ML /*stopSteps*/,
+    testFir(coefs, c.mL, c.mHalfNumCoefs, fp, fs, passSteps, passSteps * c.mL /*stopSteps*/,
             passMin, passMax, passRipple, stopMax, stopRipple);
     ALOGD("passband(%lf, %lf): %.8lf %.8lf %.8lf\n", 0., fp, passMin, passMax, passRipple);
     ALOGD("stopband(%lf, %lf): %.8lf %.3lf\n", fs, 0.5, stopMax, stopRipple);
@@ -383,8 +383,16 @@ void AudioResamplerDyn<TC, TI, TO>::setSampleRate(int32_t inSampleRate)
                     ? 0.5 : 0.5 * mSampleRate / mInSampleRate;
             fcr *= mPropertyCutoffPercent / 100.;
         } else {
+            // Voice quality devices have lower sampling rates
+            // (and may be a consequence of downstream AMR-WB / G.722 codecs).
+            // For these devices, we ensure a wider resampler passband
+            // at the expense of aliasing noise (stopband attenuation
+            // and stopband frequency).
+            //
+            constexpr uint32_t kVoiceDeviceSampleRate = 16000;
+
             if (mFilterQuality == DYN_HIGH_QUALITY) {
-                // 32b coefficients, 64 length
+                // float or 32b coefficients
                 useS32 = true;
                 stopBandAtten = 98.;
                 if (inSampleRate >= mSampleRate * 4) {
@@ -394,8 +402,18 @@ void AudioResamplerDyn<TC, TI, TO>::setSampleRate(int32_t inSampleRate)
                 } else {
                     halfLength = 32;
                 }
+
+                if (mSampleRate <= kVoiceDeviceSampleRate) {
+                    if (inSampleRate >= mSampleRate * 2) {
+                        halfLength += 16;
+                    } else {
+                        halfLength += 8;
+                    }
+                    stopBandAtten = 84.;
+                    tbwCheat = 1.05;
+                }
             } else if (mFilterQuality == DYN_LOW_QUALITY) {
-                // 16b coefficients, 16-32 length
+                // float or 16b coefficients
                 useS32 = false;
                 stopBandAtten = 80.;
                 if (inSampleRate >= mSampleRate * 4) {
@@ -405,13 +423,18 @@ void AudioResamplerDyn<TC, TI, TO>::setSampleRate(int32_t inSampleRate)
                 } else {
                     halfLength = 8;
                 }
-                if (inSampleRate <= mSampleRate) {
+                if (mSampleRate <= kVoiceDeviceSampleRate) {
+                    if (inSampleRate >= mSampleRate * 2) {
+                        halfLength += 8;
+                    }
+                    tbwCheat = 1.05;
+                } else if (inSampleRate <= mSampleRate) {
                     tbwCheat = 1.05;
                 } else {
                     tbwCheat = 1.03;
                 }
             } else { // DYN_MED_QUALITY
-                // 16b coefficients, 32-64 length
+                // float or 16b coefficients
                 // note: > 64 length filters with 16b coefs can have quantization noise problems
                 useS32 = false;
                 stopBandAtten = 84.;
@@ -422,13 +445,34 @@ void AudioResamplerDyn<TC, TI, TO>::setSampleRate(int32_t inSampleRate)
                 } else {
                     halfLength = 16;
                 }
-                if (inSampleRate <= mSampleRate) {
+
+                if (mSampleRate <= kVoiceDeviceSampleRate) {
+                    if (inSampleRate >= mSampleRate * 2) {
+                        halfLength += 16;
+                    } else {
+                        halfLength += 8;
+                    }
+                    tbwCheat = 1.05;
+                } else if (inSampleRate <= mSampleRate) {
                     tbwCheat = 1.03;
                 } else {
                     tbwCheat = 1.01;
                 }
             }
         }
+
+        if (fcr > 0.) {
+            ALOGV("%s: mFilterQuality:%d inSampleRate:%d mSampleRate:%d halfLength:%d "
+                    "stopBandAtten:%lf fcr:%lf",
+                    __func__, mFilterQuality, inSampleRate, mSampleRate, halfLength,
+                    stopBandAtten, fcr);
+        } else {
+            ALOGV("%s: mFilterQuality:%d inSampleRate:%d mSampleRate:%d halfLength:%d "
+                    "stopBandAtten:%lf tbwCheat:%lf",
+                    __func__, mFilterQuality, inSampleRate, mSampleRate, halfLength,
+                    stopBandAtten, tbwCheat);
+        }
+
 
         // determine the number of polyphases in the filterbank.
         // for 16b, it is desirable to have 2^(16/2) = 256 phases.
