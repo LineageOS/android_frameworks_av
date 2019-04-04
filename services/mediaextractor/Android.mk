@@ -25,7 +25,7 @@ ifneq (true, $(filter true, $(MALLOC_SVELTE)))
 LOCAL_SHARED_LIBRARIES := libc_scudo
 endif
 LOCAL_SHARED_LIBRARIES += libmedia libmediaextractorservice libbinder libutils \
-    liblog libandroidicu libavservices_minijail
+    liblog libavservices_minijail
 LOCAL_MODULE:= mediaextractor
 LOCAL_INIT_RC := mediaextractor.rc
 LOCAL_C_INCLUDES := frameworks/av/media/libmedia
