@@ -287,3 +287,16 @@ camera_status_t ACameraDevice_createCaptureSessionWithSessionParameters(
     }
     return device->createCaptureSession(outputs, sessionParameters, callbacks, session);
 }
+
+EXPORT
+camera_status_t ACameraDevice_isSessionConfigurationSupported(
+        const ACameraDevice* device,
+        const ACaptureSessionOutputContainer* sessionOutputContainer) {
+    ATRACE_CALL();
+    if (device == nullptr || sessionOutputContainer == nullptr) {
+        ALOGE("%s: Error: invalid input: device %p, sessionOutputContainer %p",
+                __FUNCTION__, device, sessionOutputContainer);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    return device->isSessionConfigurationSupported(sessionOutputContainer);
+}

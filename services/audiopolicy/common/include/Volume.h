@@ -33,11 +33,6 @@ namespace android {
 enum VolumeSource : std::underlying_type<volume_group_t>::type;
 static const VolumeSource VOLUME_SOURCE_NONE = static_cast<VolumeSource>(VOLUME_GROUP_NONE);
 
-static inline VolumeSource streamToVolumeSource(audio_stream_type_t stream) {
-    return static_cast<VolumeSource>(stream);
-}
-
-
 } // namespace android
 
 // Absolute min volume in dB (can be represented in single precision normal float value)

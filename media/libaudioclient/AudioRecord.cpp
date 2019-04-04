@@ -410,8 +410,8 @@ status_t AudioRecord::start(AudioSystem::sync_event_t event, audio_session_t tri
     }
 
     // Call these directly because we are already holding the lock.
-    mAudioRecord->setMicrophoneDirection(mSelectedMicDirection);
-    mAudioRecord->setMicrophoneFieldDimension(mSelectedMicFieldDimension);
+    mAudioRecord->setPreferredMicrophoneDirection(mSelectedMicDirection);
+    mAudioRecord->setPreferredMicrophoneFieldDimension(mSelectedMicFieldDimension);
 
     if (status != NO_ERROR) {
         mActive = false;
@@ -1381,7 +1381,7 @@ status_t AudioRecord::getActiveMicrophones(std::vector<media::MicrophoneInfo>* a
     return mAudioRecord->getActiveMicrophones(activeMicrophones).transactionError();
 }
 
-status_t AudioRecord::setMicrophoneDirection(audio_microphone_direction_t direction)
+status_t AudioRecord::setPreferredMicrophoneDirection(audio_microphone_direction_t direction)
 {
     AutoMutex lock(mLock);
     if (mSelectedMicDirection == direction) {
@@ -1394,11 +1394,11 @@ status_t AudioRecord::setMicrophoneDirection(audio_microphone_direction_t direct
         // the internal AudioRecord hasn't be created yet, so just stash the attribute.
         return OK;
     } else {
-        return mAudioRecord->setMicrophoneDirection(direction).transactionError();
+        return mAudioRecord->setPreferredMicrophoneDirection(direction).transactionError();
     }
 }
 
-status_t AudioRecord::setMicrophoneFieldDimension(float zoom) {
+status_t AudioRecord::setPreferredMicrophoneFieldDimension(float zoom) {
     AutoMutex lock(mLock);
     if (mSelectedMicFieldDimension == zoom) {
         // NOP
@@ -1410,7 +1410,7 @@ status_t AudioRecord::setMicrophoneFieldDimension(float zoom) {
         // the internal AudioRecord hasn't be created yet, so just stash the attribute.
         return OK;
     } else {
-        return mAudioRecord->setMicrophoneFieldDimension(zoom).transactionError();
+        return mAudioRecord->setPreferredMicrophoneFieldDimension(zoom).transactionError();
     }
 }
 

@@ -547,8 +547,8 @@ static void testFir(const T* coef, int L, int halfNumCoef,
         wstart += wstep;
     }
     // renormalize - this is needed for integer filter types, use 1 for float or double.
-    constexpr int64_t integralShift = std::is_integral<T>::value ? (sizeof(T) * 8 - 1) : 0;
-    const double norm = 1. / (L << integralShift);
+    constexpr int integralShift = std::is_integral<T>::value ? (sizeof(T) * CHAR_BIT - 1) : 0;
+    const double norm = 1. / (int64_t{L} << integralShift);
 
     firMin = fmin * norm;
     firMax = fmax * norm;

@@ -94,6 +94,20 @@ class C2SoftHevcEnc::IntfImpl : public C2InterfaceHelper {
 
         // matches limits in codec library
         addParameter(
+            DefineParam(mBitrateMode, C2_PARAMKEY_BITRATE_MODE)
+                .withDefault(new C2StreamBitrateModeTuning::output(
+                        0u, C2Config::BITRATE_VARIABLE))
+                .withFields({
+                    C2F(mBitrateMode, value).oneOf({
+                        C2Config::BITRATE_CONST,
+                        C2Config::BITRATE_VARIABLE,
+                        C2Config::BITRATE_IGNORE})
+                })
+                .withSetter(
+                    Setter<decltype(*mBitrateMode)>::StrictValueWithNoDeps)
+                .build());
+
+        addParameter(
             DefineParam(mBitrate, C2_PARAMKEY_BITRATE)
                 .withDefault(new C2StreamBitrateInfo::output(0u, 64000))
                 .withFields({C2F(mBitrate, value).inRange(4096, 12000000)})
@@ -101,6 +115,20 @@ class C2SoftHevcEnc::IntfImpl : public C2InterfaceHelper {
                 .build());
 
         // matches levels allowed within codec library
+        addParameter(
+                DefineParam(mComplexity, C2_PARAMKEY_COMPLEXITY)
+                .withDefault(new C2StreamComplexityTuning::output(0u, 0))
+                .withFields({C2F(mComplexity, value).inRange(0, 10)})
+                .withSetter(Setter<decltype(*mComplexity)>::NonStrictValueWithNoDeps)
+                .build());
+
+        addParameter(
+                DefineParam(mQuality, C2_PARAMKEY_QUALITY)
+                .withDefault(new C2StreamQualityTuning::output(0u, 80))
+                .withFields({C2F(mQuality, value).inRange(0, 100)})
+                .withSetter(Setter<decltype(*mQuality)>::NonStrictValueWithNoDeps)
+                .build());
+
         addParameter(
             DefineParam(mProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
                 .withDefault(new C2StreamProfileLevelInfo::output(
@@ -287,11 +315,20 @@ class C2SoftHevcEnc::IntfImpl : public C2InterfaceHelper {
     std::shared_ptr<C2StreamFrameRateInfo::output> getFrameRate_l() const {
         return mFrameRate;
     }
+    std::shared_ptr<C2StreamBitrateModeTuning::output> getBitrateMode_l() const {
+        return mBitrateMode;
+    }
     std::shared_ptr<C2StreamBitrateInfo::output> getBitrate_l() const {
         return mBitrate;
     }
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> getRequestSync_l() const {
         return mRequestSync;
+    }
+    std::shared_ptr<C2StreamComplexityTuning::output> getComplexity_l() const {
+        return mComplexity;
+    }
+    std::shared_ptr<C2StreamQualityTuning::output> getQuality_l() const {
+        return mQuality;
     }
 
    private:
@@ -304,6 +341,9 @@ class C2SoftHevcEnc::IntfImpl : public C2InterfaceHelper {
     std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
     std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
+    std::shared_ptr<C2StreamBitrateModeTuning::output> mBitrateMode;
+    std::shared_ptr<C2StreamComplexityTuning::output> mComplexity;
+    std::shared_ptr<C2StreamQualityTuning::output> mQuality;
     std::shared_ptr<C2StreamProfileLevelInfo::output> mProfileLevel;
     std::shared_ptr<C2StreamSyncFrameIntervalTuning::output> mSyncFramePeriod;
 };
@@ -387,6 +427,19 @@ static void fillEmptyWork(const std::unique_ptr<C2Work>& work) {
     work->workletsProcessed = 1u;
 }
 
+static int getQpFromQuality(int quality) {
+    int qp;
+#define MIN_QP 4
+#define MAX_QP 50
+    /* Quality: 100 -> Qp : MIN_QP
+     * Quality: 0 -> Qp : MAX_QP
+     * Qp = ((MIN_QP - MAX_QP) * quality / 100) + MAX_QP;
+     */
+    qp = ((MIN_QP - MAX_QP) * quality / 100) + MAX_QP;
+    qp = std::min(qp, MAX_QP);
+    qp = std::max(qp, MIN_QP);
+    return qp;
+}
 c2_status_t C2SoftHevcEnc::initEncParams() {
     mCodecCtx = nullptr;
     mNumCores = std::min(GetCPUCoreCount(), (size_t) CODEC_MAX_CORES);
@@ -416,8 +469,36 @@ c2_status_t C2SoftHevcEnc::initEncParams() {
     mIvVideoColorFormat = IV_YUV_420P;
     mEncParams.s_multi_thrd_prms.i4_max_num_cores = mNumCores;
     mEncParams.s_out_strm_prms.i4_codec_profile = mHevcEncProfile;
-    mEncParams.s_config_prms.i4_rate_control_mode = 2;
     mEncParams.s_lap_prms.i4_rc_look_ahead_pics = 0;
+
+    switch (mBitrateMode->value) {
+        case C2Config::BITRATE_IGNORE:
+            mEncParams.s_config_prms.i4_rate_control_mode = 3;
+            mEncParams.s_tgt_lyr_prms.as_tgt_params[0].ai4_frame_qp[0] =
+                getQpFromQuality(mQuality->value);
+            break;
+        case C2Config::BITRATE_CONST:
+            mEncParams.s_config_prms.i4_rate_control_mode = 5;
+            break;
+        case C2Config::BITRATE_VARIABLE:
+            [[fallthrough]];
+        default:
+            mEncParams.s_config_prms.i4_rate_control_mode = 2;
+            break;
+        break;
+    }
+
+    if (mComplexity->value == 10) {
+        mEncParams.s_tgt_lyr_prms.as_tgt_params[0].i4_quality_preset = IHEVCE_QUALITY_P0;
+    } else if (mComplexity->value >= 8) {
+        mEncParams.s_tgt_lyr_prms.as_tgt_params[0].i4_quality_preset = IHEVCE_QUALITY_P2;
+    } else if (mComplexity->value >= 7) {
+        mEncParams.s_tgt_lyr_prms.as_tgt_params[0].i4_quality_preset = IHEVCE_QUALITY_P3;
+    } else if (mComplexity->value >= 5) {
+        mEncParams.s_tgt_lyr_prms.as_tgt_params[0].i4_quality_preset = IHEVCE_QUALITY_P4;
+    } else {
+        mEncParams.s_tgt_lyr_prms.as_tgt_params[0].i4_quality_preset = IHEVCE_QUALITY_P5;
+    }
 
     return C2_OK;
 }
@@ -447,11 +528,14 @@ c2_status_t C2SoftHevcEnc::initEncoder() {
     {
         IntfImpl::Lock lock = mIntf->lock();
         mSize = mIntf->getSize_l();
+        mBitrateMode = mIntf->getBitrateMode_l();
         mBitrate = mIntf->getBitrate_l();
         mFrameRate = mIntf->getFrameRate_l();
         mHevcEncProfile = mIntf->getProfile_l();
         mHevcEncLevel = mIntf->getLevel_l();
         mIDRInterval = mIntf->getSyncFramePeriod_l();
+        mComplexity = mIntf->getComplexity_l();
+        mQuality = mIntf->getQuality_l();
     }
 
     c2_status_t status = initEncParams();

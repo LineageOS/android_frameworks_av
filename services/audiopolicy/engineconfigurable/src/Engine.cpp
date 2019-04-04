@@ -207,7 +207,7 @@ DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t ps) const
         ALOGE("%s: Trying to get device on invalid strategy %d", __FUNCTION__, ps);
         return {};
     }
-    const DeviceVector &availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
+    const DeviceVector availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
     const SwAudioOutputCollection &outputs = getApmObserver()->getOutputs();
     uint32_t availableOutputDevicesType = availableOutputDevices.types();
 
@@ -224,16 +224,16 @@ DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t ps) const
     audio_devices_t devices = AUDIO_DEVICE_NONE;
     if (ps == getProductStrategyForStream(AUDIO_STREAM_NOTIFICATION) &&
             !is_state_in_call(getPhoneState()) &&
-            !outputs.isActiveRemotely(streamToVolumeSource(AUDIO_STREAM_MUSIC),
+            !outputs.isActiveRemotely(toVolumeSource(AUDIO_STREAM_MUSIC),
                                       SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY) &&
-            outputs.isActive(streamToVolumeSource(AUDIO_STREAM_MUSIC),
+            outputs.isActive(toVolumeSource(AUDIO_STREAM_MUSIC),
                              SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY)) {
         product_strategy_t strategyForMedia =
                 getProductStrategyForStream(AUDIO_STREAM_MUSIC);
         devices = productStrategies.getDeviceTypesForProductStrategy(strategyForMedia);
     } else if (ps == getProductStrategyForStream(AUDIO_STREAM_ACCESSIBILITY) &&
-        (outputs.isActive(streamToVolumeSource(AUDIO_STREAM_RING)) ||
-         outputs.isActive(streamToVolumeSource(AUDIO_STREAM_ALARM)))) {
+        (outputs.isActive(toVolumeSource(AUDIO_STREAM_RING)) ||
+         outputs.isActive(toVolumeSource(AUDIO_STREAM_ALARM)))) {
             // do not route accessibility prompts to a digital output currently configured with a
             // compressed format as they would likely not be mixed and dropped.
             // Device For Sonification conf file has HDMI, SPDIF and HDMI ARC unreacheable.
@@ -272,7 +272,7 @@ DeviceVector Engine::getOutputDevicesForAttributes(const audio_attributes_t &att
         return DeviceVector(preferredDevice);
     }
     product_strategy_t strategy = getProductStrategyForAttributes(attributes);
-    const DeviceVector &availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
+    const DeviceVector availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
     const SwAudioOutputCollection &outputs = getApmObserver()->getOutputs();
     //
     // @TODO: what is the priority of explicit routing? Shall it be considered first as it used to
@@ -298,7 +298,7 @@ sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_
                                                          sp<AudioPolicyMix> *mix) const
 {
     const auto &policyMixes = getApmObserver()->getAudioPolicyMixCollection();
-    const auto &availableInputDevices = getApmObserver()->getAvailableInputDevices();
+    const auto availableInputDevices = getApmObserver()->getAvailableInputDevices();
     const auto &inputs = getApmObserver()->getInputs();
     std::string address;
     //

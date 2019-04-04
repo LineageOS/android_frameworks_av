@@ -1280,7 +1280,7 @@ void MyOggExtractor::parseFileMetaData() {
         //ALOGI("comment #%d: '%s'", i + 1, mVc.user_comments[i]);
     }
 
-    AMediaFormat_getInt32(mFileMeta, "haptic", &mHapticChannelCount);
+    AMediaFormat_getInt32(mFileMeta, AMEDIAFORMAT_KEY_HAPTIC_CHANNEL_COUNT, &mHapticChannelCount);
 }
 
 void MyOggExtractor::setChannelMask(int channelCount) {
@@ -1297,6 +1297,8 @@ void MyOggExtractor::setChannelMask(int channelCount) {
             const audio_channel_mask_t channelMask = audio_channel_out_mask_from_count(
                     audioChannelCount) | hapticChannelMask;
             AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_CHANNEL_MASK, channelMask);
+            AMediaFormat_setInt32(
+                    mMeta, AMEDIAFORMAT_KEY_HAPTIC_CHANNEL_COUNT, mHapticChannelCount);
         }
     } else {
         AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_CHANNEL_MASK,

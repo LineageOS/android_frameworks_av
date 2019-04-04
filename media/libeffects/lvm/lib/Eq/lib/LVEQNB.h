@@ -184,6 +184,9 @@ typedef enum
 {
     LVEQNB_STEREO       = 0,
     LVEQNB_MONOINSTEREO = 1,
+#ifdef SUPPORT_MC
+    LVEQNB_MULTICHANNEL = 2,
+#endif
     LVEQNB_SOURCE_MAX   = LVM_MAXINT_32
 } LVEQNB_SourceFormat_en;
 

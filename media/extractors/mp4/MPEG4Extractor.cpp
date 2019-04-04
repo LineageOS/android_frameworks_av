@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <log/log.h>
 #include <utils/Log.h>
 
 #include "AC4Parser.h"
@@ -81,7 +82,7 @@ public:
                 const Trex *trex,
                 off64_t firstMoofOffset,
                 const sp<ItemTable> &itemTable,
-                int32_t elstShiftStartTicks);
+                uint64_t elstShiftStartTicks);
     virtual status_t init();
 
     virtual media_status_t start();
@@ -147,7 +148,7 @@ private:
 
     // Start offset from composition time to presentation time.
     // Support shift only for video tracks through mElstShiftStartTicks for now.
-    int32_t mElstShiftStartTicks;
+    uint64_t mElstShiftStartTicks;
 
     size_t parseNALSize(const uint8_t *data) const;
     status_t parseChunk(off64_t *offset);
@@ -397,7 +398,6 @@ MPEG4Extractor::~MPEG4Extractor() {
     while (track) {
         Track *next = track->next;
 
-        AMediaFormat_delete(track->meta);
         delete track;
         track = next;
     }
@@ -672,7 +672,6 @@ status_t MPEG4Extractor::readMetaData() {
 
             ALOGV("adding HEIF image track %u", imageIndex);
             Track *track = new Track;
-            track->next = NULL;
             if (mLastTrack != NULL) {
                 mLastTrack->next = track;
             } else {
@@ -682,10 +681,7 @@ status_t MPEG4Extractor::readMetaData() {
 
             track->meta = meta;
             AMediaFormat_setInt32(track->meta, AMEDIAFORMAT_KEY_TRACK_ID, imageIndex);
-            track->includes_expensive_metadata = false;
-            track->skipTrack = false;
             track->timescale = 1000000;
-            track->elstShiftStartTicks = 0;
         }
     }
 
@@ -967,7 +963,6 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
                 ALOGV("adding new track");
                 Track *track = new Track;
-                track->next = NULL;
                 if (mLastTrack) {
                     mLastTrack->next = track;
                 } else {
@@ -975,15 +970,9 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 }
                 mLastTrack = track;
 
-                track->includes_expensive_metadata = false;
-                track->skipTrack = false;
-                track->timescale = 0;
                 track->meta = AMediaFormat_new();
                 AMediaFormat_setString(track->meta,
                         AMEDIAFORMAT_KEY_MIME, "application/octet-stream");
-                track->has_elst = false;
-                track->subsample_encryption = false;
-                track->elstShiftStartTicks = 0;
             }
 
             off64_t stop_offset = *offset + chunk_size;
@@ -1033,6 +1022,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     mLastTrack->skipTrack = true;
                 }
 
+
                 if (mLastTrack->skipTrack) {
                     ALOGV("skipping this track...");
                     Track *cur = mFirstTrack;
@@ -1053,6 +1043,21 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
                     return OK;
                 }
+
+                // place things we built elsewhere into their final locations
+
+                // put aggregated tx3g data into the metadata
+                if (mLastTrack->mTx3gFilled > 0) {
+                    ALOGV("Putting %zu bytes of tx3g data into meta data",
+                          mLastTrack->mTx3gFilled);
+                    AMediaFormat_setBuffer(mLastTrack->meta,
+                        AMEDIAFORMAT_KEY_TEXT_FORMAT_DATA,
+                        mLastTrack->mTx3gBuffer, mLastTrack->mTx3gFilled);
+                    // drop it now to reduce our footprint
+                    free(mLastTrack->mTx3gBuffer);
+                    mLastTrack->mTx3gBuffer = NULL;
+                }
+
             } else if (chunk_type == FOURCC("moov")) {
                 mInitCheck = OK;
 
@@ -2553,41 +2558,55 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             if (mLastTrack == NULL)
                 return ERROR_MALFORMED;
 
-            void *data;
-            size_t size = 0;
-            if (!AMediaFormat_getBuffer(mLastTrack->meta,
-                    AMEDIAFORMAT_KEY_TEXT_FORMAT_DATA, &data, &size)) {
-                size = 0;
-            }
-
-            if ((chunk_size > SIZE_MAX) || (SIZE_MAX - chunk_size <= size)) {
+            // complain about ridiculous chunks
+            if (chunk_size > kMaxAtomSize) {
                 return ERROR_MALFORMED;
             }
 
-            uint8_t *buffer = new (std::nothrow) uint8_t[size + chunk_size];
-            if (buffer == NULL) {
+            // complain about empty atoms
+            if (chunk_data_size <= 0) {
+                ALOGE("b/124330204");
+                android_errorWriteLog(0x534e4554, "124330204");
                 return ERROR_MALFORMED;
             }
 
-            if (size > 0) {
-                memcpy(buffer, data, size);
+            // should fill buffer based on "data_offset" and "chunk_data_size"
+            // instead of *offset and chunk_size;
+            // but we've been feeding the extra data to consumers for multiple releases and
+            // if those apps are compensating for it, we'd break them with such a change
+            //
+
+            if (mLastTrack->mTx3gSize - mLastTrack->mTx3gFilled < chunk_size) {
+                size_t growth = kTx3gGrowth;
+                if (growth < chunk_size) {
+                    growth = chunk_size;
+                }
+                // although this disallows 2 tx3g atoms of nearly kMaxAtomSize...
+                if ((uint64_t) mLastTrack->mTx3gSize + growth > kMaxAtomSize) {
+                    ALOGE("b/124330204 - too much space");
+                    android_errorWriteLog(0x534e4554, "124330204");
+                    return ERROR_MALFORMED;
+                }
+                uint8_t *updated = (uint8_t *)realloc(mLastTrack->mTx3gBuffer,
+                                                mLastTrack->mTx3gSize + growth);
+                if (updated == NULL) {
+                    return ERROR_MALFORMED;
+                }
+                mLastTrack->mTx3gBuffer = updated;
+                mLastTrack->mTx3gSize += growth;
             }
 
-            if ((size_t)(mDataSource->readAt(*offset, buffer + size, chunk_size))
+            if ((size_t)(mDataSource->readAt(*offset,
+                                             mLastTrack->mTx3gBuffer + mLastTrack->mTx3gFilled,
+                                             chunk_size))
                     < chunk_size) {
-                delete[] buffer;
-                buffer = NULL;
 
                 // advance read pointer so we don't end up reading this again
                 *offset += chunk_size;
                 return ERROR_IO;
             }
 
-            AMediaFormat_setBuffer(mLastTrack->meta,
-                    AMEDIAFORMAT_KEY_TEXT_FORMAT_DATA, buffer, size + chunk_size);
-
-            delete[] buffer;
-
+            mLastTrack->mTx3gFilled += chunk_size;
             *offset += chunk_size;
             break;
         }
@@ -3675,8 +3694,10 @@ status_t MPEG4Extractor::parseITunesMetaData(off64_t offset, size_t size) {
 
     void *tmpData;
     size_t tmpDataSize;
+    const char *s;
     if (size >= 8 && metadataKey &&
-            !AMediaFormat_getBuffer(mFileMetaData, metadataKey, &tmpData, &tmpDataSize)) {
+            !AMediaFormat_getBuffer(mFileMetaData, metadataKey, &tmpData, &tmpDataSize) &&
+            !AMediaFormat_getString(mFileMetaData, metadataKey, &s)) {
         if (!strcmp(metadataKey, "albumart")) {
             AMediaFormat_setBuffer(mFileMetaData, metadataKey,
                     buffer + 8, size - 8);
@@ -3918,10 +3939,9 @@ void MPEG4Extractor::parseID3v2MetaData(off64_t offset) {
         };
         static const size_t kNumMapEntries = sizeof(kMap) / sizeof(kMap[0]);
 
-        void *tmpData;
-        size_t tmpDataSize;
         for (size_t i = 0; i < kNumMapEntries; ++i) {
-            if (!AMediaFormat_getBuffer(mFileMetaData, kMap[i].key, &tmpData, &tmpDataSize)) {
+            const char *ss;
+            if (!AMediaFormat_getString(mFileMetaData, kMap[i].key, &ss)) {
                 ID3::Iterator *it = new ID3::Iterator(id3, kMap[i].tag1);
                 if (it->done()) {
                     delete it;
@@ -4039,7 +4059,7 @@ MediaTrackHelper *MPEG4Extractor::getTrack(size_t index) {
 
     if (track->has_elst and !strncasecmp("video/", mime, 6) and track->elst_media_time > 0) {
         track->elstShiftStartTicks = track->elst_media_time;
-        ALOGV("video track->elstShiftStartTicks :%" PRId64, track->elst_media_time);
+        ALOGV("video track->elstShiftStartTicks :%" PRIu64, track->elstShiftStartTicks);
     }
 
     MPEG4Source *source =  new MPEG4Source(
@@ -4449,7 +4469,7 @@ MPEG4Source::MPEG4Source(
         const Trex *trex,
         off64_t firstMoofOffset,
         const sp<ItemTable> &itemTable,
-        int32_t elstShiftStartTicks)
+        uint64_t elstShiftStartTicks)
     : mFormat(format),
       mDataSource(dataSource),
       mTimescale(timeScale),
@@ -4575,7 +4595,7 @@ status_t MPEG4Source::init() {
             // Start offset should be less or equal to composition time of first sample.
             // ISO : sample_composition_time_offset, version 0 (unsigned) for major brands.
             mElstShiftStartTicks = std::min(mElstShiftStartTicks,
-                (*mCurrentSamples.begin()).compositionOffset);
+                                            (uint64_t)(*mCurrentSamples.begin()).compositionOffset);
         }
         return err;
     }
@@ -4585,7 +4605,7 @@ status_t MPEG4Source::init() {
         err = mSampleTable->getMetaDataForSample(0, NULL, NULL, &firstSampleCTS);
         // Start offset should be less or equal to composition time of first sample.
         // Composition time stamp of first sample cannot be negative.
-        mElstShiftStartTicks = std::min(mElstShiftStartTicks, (int32_t)firstSampleCTS);
+        mElstShiftStartTicks = std::min(mElstShiftStartTicks, firstSampleCTS);
     }
 
     return err;
@@ -5238,8 +5258,30 @@ status_t MPEG4Source::parseTrackFragmentRun(off64_t offset, off64_t size) {
         sampleCtsOffset = 0;
     }
 
-    if (size < (off64_t)sampleCount * bytesPerSample) {
-        return -EINVAL;
+    if (bytesPerSample != 0) {
+        if (size < (off64_t)sampleCount * bytesPerSample) {
+            return -EINVAL;
+        }
+    } else {
+        if (sampleDuration == 0) {
+            ALOGW("b/123389881 sampleDuration == 0");
+            android_errorWriteLog(0x534e4554, "124389881 zero");
+            return -EINVAL;
+        }
+
+        // apply some sanity (vs strict legality) checks
+        //
+        // clamp the count of entries in the trun box, to avoid spending forever parsing
+        // this box. Clamping (vs error) lets us play *something*.
+        // 1 million is about 400 msecs on a Pixel3, should be no more than a couple seconds
+        // on the slowest devices.
+        static constexpr uint32_t kMaxTrunSampleCount = 1000000;
+        if (sampleCount > kMaxTrunSampleCount) {
+            ALOGW("b/123389881 clamp sampleCount(%u) @ kMaxTrunSampleCount(%u)",
+                  sampleCount, kMaxTrunSampleCount);
+            android_errorWriteLog(0x534e4554, "124389881 count");
+
+        }
     }
 
     Sample tmp;
@@ -5318,7 +5360,9 @@ size_t MPEG4Source::parseNALSize(const uint8_t *data) const {
 }
 
 int32_t MPEG4Source::parseHEVCLayerId(const uint8_t *data, size_t size) {
-    CHECK(data != nullptr && size >= (mNALLengthSize + 2));
+    if (data == nullptr || size < mNALLengthSize + 2) {
+        return -1;
+    }
 
     // HEVC NAL-header (16-bit)
     //  1   6      6     3
@@ -5493,7 +5537,11 @@ media_status_t MPEG4Source::read(
             err = mSampleTable->getMetaDataForSample(
                     mCurrentSampleIndex, &offset, &size, &cts, &isSyncSample, &stts);
             if(err == OK) {
-                cts -= mElstShiftStartTicks;
+                /* Composition Time Stamp cannot be negative. Some files have video Sample
+                * Time(STTS)delta with zero value(b/117402420).  Hence subtract only
+                * min(cts, mElstShiftStartTicks), so that audio tracks can be played.
+                */
+                cts -= std::min(cts, mElstShiftStartTicks);
             }
 
         } else {
@@ -5777,8 +5825,8 @@ media_status_t MPEG4Source::fragmentedRead(
     if (options && options->getSeekTo(&seekTimeUs, &mode)) {
 
         seekTimeUs += ((long double)mElstShiftStartTicks * 1000000) / mTimescale;
-        ALOGV("shifted seekTimeUs :%" PRId64 ", mElstShiftStartTicks:%" PRId32, seekTimeUs,
-                mElstShiftStartTicks);
+        ALOGV("shifted seekTimeUs :%" PRId64 ", mElstShiftStartTicks:%" PRIu64, seekTimeUs,
+              mElstShiftStartTicks);
 
         int numSidxEntries = mSegments.size();
         if (numSidxEntries != 0) {
@@ -5834,7 +5882,7 @@ media_status_t MPEG4Source::fragmentedRead(
 
     off64_t offset = 0;
     size_t size = 0;
-    uint32_t cts = 0;
+    uint64_t cts = 0;
     bool isSyncSample = false;
     bool newBuffer = false;
     if (mBuffer == NULL || mCurrentSampleIndex >= mCurrentSamples.size()) {
@@ -5866,7 +5914,11 @@ media_status_t MPEG4Source::fragmentedRead(
         offset = smpl->offset;
         size = smpl->size;
         cts = mCurrentTime + smpl->compositionOffset;
-        cts -= mElstShiftStartTicks;
+        /* Composition Time Stamp cannot be negative. Some files have video Sample
+        * Time(STTS)delta with zero value(b/117402420).  Hence subtract only
+        * min(cts, mElstShiftStartTicks), so that audio tracks can be played.
+        */
+        cts -= std::min(cts, mElstShiftStartTicks);
 
         mCurrentTime += smpl->duration;
         isSyncSample = (mCurrentSampleIndex == 0);

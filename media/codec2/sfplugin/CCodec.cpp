@@ -370,6 +370,10 @@ public:
         return err;
     }
 
+    void onInputBufferDone(c2_cntr64_t index) override {
+        mNode->onInputBufferDone(index);
+    }
+
 private:
     sp<BGraphicBufferSource> mSource;
     sp<C2OMXNode> mNode;
@@ -742,10 +746,21 @@ void CCodec::configure(const sp<AMessage> &msg) {
                 return BAD_VALUE;
             }
             if ((config->mDomain & Config::IS_ENCODER) && (config->mDomain & Config::IS_VIDEO)) {
-                if (!msg->findInt32(KEY_BIT_RATE, &i32)
-                        && !msg->findFloat(KEY_BIT_RATE, &flt)) {
-                    ALOGD("bitrate is missing, which is required for video encoders.");
-                    return BAD_VALUE;
+                C2Config::bitrate_mode_t mode = C2Config::BITRATE_VARIABLE;
+                if (msg->findInt32(KEY_BITRATE_MODE, &i32)) {
+                    mode = (C2Config::bitrate_mode_t) i32;
+                }
+                if (mode == BITRATE_MODE_CQ) {
+                    if (!msg->findInt32(KEY_QUALITY, &i32)) {
+                        ALOGD("quality is missing, which is required for video encoders in CQ.");
+                        return BAD_VALUE;
+                    }
+                } else {
+                    if (!msg->findInt32(KEY_BIT_RATE, &i32)
+                            && !msg->findFloat(KEY_BIT_RATE, &flt)) {
+                        ALOGD("bitrate is missing, which is required for video encoders.");
+                        return BAD_VALUE;
+                    }
                 }
                 if (!msg->findInt32(KEY_I_FRAME_INTERVAL, &i32)
                         && !msg->findFloat(KEY_I_FRAME_INTERVAL, &flt)) {
@@ -1572,6 +1587,13 @@ void CCodec::onWorkDone(std::list<std::unique_ptr<C2Work>> &workItems) {
 
 void CCodec::onInputBufferDone(uint64_t frameIndex, size_t arrayIndex) {
     mChannel->onInputBufferDone(frameIndex, arrayIndex);
+    if (arrayIndex == 0) {
+        // We always put no more than one buffer per work, if we use an input surface.
+        Mutexed<Config>::Locked config(mConfig);
+        if (config->mInputSurface) {
+            config->mInputSurface->onInputBufferDone(frameIndex);
+        }
+    }
 }
 
 void CCodec::onMessageReceived(const sp<AMessage> &msg) {
@@ -1703,6 +1725,9 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                     }
                     ++stream;
                 }
+            }
+            if (config->mInputSurface) {
+                config->mInputSurface->onInputBufferDone(work->input.ordinal.frameIndex);
             }
             mChannel->onWorkDone(
                     std::move(work), changed ? config->mOutputFormat : nullptr,

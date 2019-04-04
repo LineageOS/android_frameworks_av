@@ -34,6 +34,8 @@
 
 #include <utils/misc.h>
 
+#include <android/hardware/media/omx/1.0/IOmxStore.h>
+#include <android/hardware/media/c2/1.0/IComponentStore.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <binder/MemoryHeapBase.h>
@@ -650,17 +652,17 @@ MediaPlayerService::Client::ServiceDeathNotifier::ServiceDeathNotifier(
         const sp<MediaPlayerBase>& listener,
         int which) {
     mService = service;
-    mOmx = nullptr;
+    mHService = nullptr;
     mListener = listener;
     mWhich = which;
 }
 
 MediaPlayerService::Client::ServiceDeathNotifier::ServiceDeathNotifier(
-        const sp<IOmx>& omx,
+        const sp<android::hidl::base::V1_0::IBase>& hService,
         const sp<MediaPlayerBase>& listener,
         int which) {
     mService = nullptr;
-    mOmx = omx;
+    mHService = hService;
     mListener = listener;
     mWhich = which;
 }
@@ -692,9 +694,9 @@ void MediaPlayerService::Client::ServiceDeathNotifier::unlinkToDeath() {
     if (mService != nullptr) {
         mService->unlinkToDeath(this);
         mService = nullptr;
-    } else if (mOmx != nullptr) {
-        mOmx->unlinkToDeath(this);
-        mOmx = nullptr;
+    } else if (mHService != nullptr) {
+        mHService->unlinkToDeath(this);
+        mHService = nullptr;
     }
 }
 
@@ -714,10 +716,12 @@ void MediaPlayerService::Client::clearDeathNotifiers_l() {
         mExtractorDeathListener->unlinkToDeath();
         mExtractorDeathListener = nullptr;
     }
-    if (mCodecDeathListener != nullptr) {
-        mCodecDeathListener->unlinkToDeath();
-        mCodecDeathListener = nullptr;
+    for (const sp<ServiceDeathNotifier>& codecDeathListener : mCodecDeathListeners) {
+        if (codecDeathListener != nullptr) {
+            codecDeathListener->unlinkToDeath();
+        }
     }
+    mCodecDeathListeners.clear();
 }
 
 sp<MediaPlayerBase> MediaPlayerService::Client::setDataSource_pre(
@@ -741,20 +745,56 @@ sp<MediaPlayerBase> MediaPlayerService::Client::setDataSource_pre(
             new ServiceDeathNotifier(binder, p, MEDIAEXTRACTOR_PROCESS_DEATH);
     binder->linkToDeath(extractorDeathListener);
 
-    sp<IOmx> omx = IOmx::getService();
-    if (omx == nullptr) {
-        ALOGE("IOmx service is not available");
-        return NULL;
+    std::vector<sp<ServiceDeathNotifier>> codecDeathListeners;
+    {
+        using ::android::hidl::base::V1_0::IBase;
+
+        // Listen to OMX's IOmxStore/default
+        {
+            sp<IBase> store = ::android::hardware::media::omx::V1_0::
+                    IOmxStore::getService();
+            if (store == nullptr) {
+                ALOGD("OMX service is not available");
+            } else {
+                sp<ServiceDeathNotifier> codecDeathListener =
+                        new ServiceDeathNotifier(store, p, MEDIACODEC_PROCESS_DEATH);
+                store->linkToDeath(codecDeathListener, 0);
+                codecDeathListeners.emplace_back(codecDeathListener);
+            }
+        }
+
+        // Listen to Codec2's IComponentStore/software
+        // TODO: Listen to all Codec2 services.
+        {
+            sp<IBase> store = ::android::hardware::media::c2::V1_0::
+                    IComponentStore::getService();
+            if (store == nullptr) {
+                ALOGD("Codec2 system service is not available");
+            } else {
+                sp<ServiceDeathNotifier> codecDeathListener =
+                        new ServiceDeathNotifier(store, p, MEDIACODEC_PROCESS_DEATH);
+                store->linkToDeath(codecDeathListener, 0);
+                codecDeathListeners.emplace_back(codecDeathListener);
+            }
+
+            store = ::android::hardware::media::c2::V1_0::
+                    IComponentStore::getService("software");
+            if (store == nullptr) {
+                ALOGD("Codec2 swcodec service is not available");
+            } else {
+                sp<ServiceDeathNotifier> codecDeathListener =
+                        new ServiceDeathNotifier(store, p, MEDIACODEC_PROCESS_DEATH);
+                store->linkToDeath(codecDeathListener, 0);
+                codecDeathListeners.emplace_back(codecDeathListener);
+            }
+        }
     }
-    sp<ServiceDeathNotifier> codecDeathListener =
-            new ServiceDeathNotifier(omx, p, MEDIACODEC_PROCESS_DEATH);
-    omx->linkToDeath(codecDeathListener, 0);
 
     Mutex::Autolock lock(mLock);
 
     clearDeathNotifiers_l();
     mExtractorDeathListener = extractorDeathListener;
-    mCodecDeathListener = codecDeathListener;
+    mCodecDeathListeners.swap(codecDeathListeners);
     mAudioDeviceUpdatedListener = new AudioDeviceUpdatedNotifier(p);
 
     if (!p->hardwareOutput()) {

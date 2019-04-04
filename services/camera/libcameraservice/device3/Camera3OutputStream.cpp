@@ -233,6 +233,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
      * queueBuffer
      */
     sp<ANativeWindow> currentConsumer = mConsumer;
+    StreamState state = mState;
     mLock.unlock();
 
     ANativeWindowBuffer *anwBuffer = container_of(buffer.buffer, ANativeWindowBuffer, handle);
@@ -244,7 +245,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
         if (mDropBuffers) {
             ALOGV("%s: Dropping a frame for stream %d.", __FUNCTION__, mId);
         } else if (buffer.status == CAMERA3_BUFFER_STATUS_ERROR) {
-            ALOGW("%s: A frame is dropped for stream %d due to buffer error.", __FUNCTION__, mId);
+            ALOGV("%s: A frame is dropped for stream %d due to buffer error.", __FUNCTION__, mId);
         } else {
             ALOGE("%s: Stream %d: timestamp shouldn't be 0", __FUNCTION__, mId);
         }
@@ -252,7 +253,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
         res = currentConsumer->cancelBuffer(currentConsumer.get(),
                 anwBuffer,
                 anwReleaseFence);
-        if (res != OK) {
+        if (shouldLogError(res, state)) {
             ALOGE("%s: Stream %d: Error cancelling buffer to native window:"
                   " %s (%d)", __FUNCTION__, mId, strerror(-res), res);
         }
@@ -284,9 +285,9 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
         }
 
         res = queueBufferToConsumer(currentConsumer, anwBuffer, anwReleaseFence, surface_ids);
-        if (res != OK) {
-            ALOGE("%s: Stream %d: Error queueing buffer to native window: "
-                  "%s (%d)", __FUNCTION__, mId, strerror(-res), res);
+        if (shouldLogError(res, state)) {
+            ALOGE("%s: Stream %d: Error queueing buffer to native window:"
+                  " %s (%d)", __FUNCTION__, mId, strerror(-res), res);
         }
     }
     mLock.lock();
@@ -534,10 +535,11 @@ status_t Camera3OutputStream::getBufferLockedCommon(ANativeWindowBuffer** anb, i
             // successful return.
             *anb = gb.get();
             res = mConsumer->attachBuffer(*anb);
-            if (res != OK) {
+            if (shouldLogError(res, mState)) {
                 ALOGE("%s: Stream %d: Can't attach the output buffer to this surface: %s (%d)",
                         __FUNCTION__, mId, strerror(-res), res);
-
+            }
+            if (res != OK) {
                 checkRetAndSetAbandonedLocked(res);
                 return res;
             }
@@ -592,9 +594,10 @@ status_t Camera3OutputStream::getBufferLockedCommon(ANativeWindowBuffer** anb, i
                 ALOGV("Stream %d: Attached new buffer", getId());
 
                 if (res != OK) {
-                    ALOGE("%s: Stream %d: Can't attach the output buffer to this surface: %s (%d)",
-                            __FUNCTION__, mId, strerror(-res), res);
-
+                    if (shouldLogError(res, mState)) {
+                        ALOGE("%s: Stream %d: Can't attach the output buffer to this surface:"
+                                " %s (%d)", __FUNCTION__, mId, strerror(-res), res);
+                    }
                     checkRetAndSetAbandonedLocked(res);
                     return res;
                 }
@@ -604,9 +607,10 @@ status_t Camera3OutputStream::getBufferLockedCommon(ANativeWindowBuffer** anb, i
                 return res;
             }
         } else if (res != OK) {
-            ALOGE("%s: Stream %d: Can't dequeue next output buffer: %s (%d)",
-                    __FUNCTION__, mId, strerror(-res), res);
-
+            if (shouldLogError(res, mState)) {
+                ALOGE("%s: Stream %d: Can't dequeue next output buffer: %s (%d)",
+                        __FUNCTION__, mId, strerror(-res), res);
+            }
             checkRetAndSetAbandonedLocked(res);
             return res;
         }
@@ -637,6 +641,16 @@ void Camera3OutputStream::checkRetAndSetAbandonedLocked(status_t res) {
     if ((res == NO_INIT || res == DEAD_OBJECT) && mState == STATE_CONFIGURED) {
         mState = STATE_ABANDONED;
     }
+}
+
+bool Camera3OutputStream::shouldLogError(status_t res, StreamState state) {
+    if (res == OK) {
+        return false;
+    }
+    if ((res == DEAD_OBJECT || res == NO_INIT) && state == STATE_ABANDONED) {
+        return false;
+    }
+    return true;
 }
 
 status_t Camera3OutputStream::disconnectLocked() {
@@ -838,7 +852,9 @@ status_t Camera3OutputStream::detachBufferLocked(sp<GraphicBuffer>* buffer, int*
         ALOGW("%s: the released buffer has already been freed by the buffer queue!", __FUNCTION__);
     } else if (res != OK) {
         // Treat other errors as abandonment
-        ALOGE("%s: detach next buffer failed: %s (%d).", __FUNCTION__, strerror(-res), res);
+        if (shouldLogError(res, mState)) {
+            ALOGE("%s: detach next buffer failed: %s (%d).", __FUNCTION__, strerror(-res), res);
+        }
         mState = STATE_ABANDONED;
         return res;
     }

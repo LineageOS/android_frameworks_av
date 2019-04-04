@@ -164,9 +164,12 @@ void StagefrightRecorder::updateMetrics() {
     mAnalyticsItem->setInt32(kRecorderVideoIframeInterval, mIFramesIntervalSec);
     // TBD mAudioSourceNode = 0;
     // TBD mUse64BitFileOffset = false;
-    mAnalyticsItem->setInt32(kRecorderMovieTimescale, mMovieTimeScale);
-    mAnalyticsItem->setInt32(kRecorderAudioTimescale, mAudioTimeScale);
-    mAnalyticsItem->setInt32(kRecorderVideoTimescale, mVideoTimeScale);
+    if (mMovieTimeScale != -1)
+        mAnalyticsItem->setInt32(kRecorderMovieTimescale, mMovieTimeScale);
+    if (mAudioTimeScale != -1)
+        mAnalyticsItem->setInt32(kRecorderAudioTimescale, mAudioTimeScale);
+    if (mVideoTimeScale != -1)
+        mAnalyticsItem->setInt32(kRecorderVideoTimescale, mVideoTimeScale);
     // TBD mCameraId        = 0;
     // TBD mStartTimeOffsetMs = -1;
     mAnalyticsItem->setInt32(kRecorderVideoProfile, mVideoEncoderProfile);
@@ -2210,7 +2213,7 @@ status_t StagefrightRecorder::getMaxAmplitude(int *max) {
 }
 
 status_t StagefrightRecorder::getMetrics(Parcel *reply) {
-    ALOGD("StagefrightRecorder::getMetrics");
+    ALOGV("StagefrightRecorder::getMetrics");
 
     if (reply == NULL) {
         ALOGE("Null pointer argument");
@@ -2274,20 +2277,20 @@ status_t StagefrightRecorder::getActiveMicrophones(
     return NO_INIT;
 }
 
-status_t StagefrightRecorder::setMicrophoneDirection(audio_microphone_direction_t direction) {
-    ALOGV("setMicrophoneDirection(%d)", direction);
+status_t StagefrightRecorder::setPreferredMicrophoneDirection(audio_microphone_direction_t direction) {
+    ALOGV("setPreferredMicrophoneDirection(%d)", direction);
     mSelectedMicDirection = direction;
     if (mAudioSourceNode != 0) {
-        return mAudioSourceNode->setMicrophoneDirection(direction);
+        return mAudioSourceNode->setPreferredMicrophoneDirection(direction);
     }
     return NO_INIT;
 }
 
-status_t StagefrightRecorder::setMicrophoneFieldDimension(float zoom) {
-    ALOGV("setMicrophoneFieldDimension(%f)", zoom);
+status_t StagefrightRecorder::setPreferredMicrophoneFieldDimension(float zoom) {
+    ALOGV("setPreferredMicrophoneFieldDimension(%f)", zoom);
     mSelectedMicFieldDimension = zoom;
     if (mAudioSourceNode != 0) {
-        return mAudioSourceNode->setMicrophoneFieldDimension(zoom);
+        return mAudioSourceNode->setPreferredMicrophoneFieldDimension(zoom);
     }
     return NO_INIT;
 }

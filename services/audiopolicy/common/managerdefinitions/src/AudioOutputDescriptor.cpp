@@ -137,9 +137,6 @@ bool AudioOutputDescriptor::isActive(uint32_t inPastMs) const
         sysTime = systemTime();
     }
     for (const auto &iter : mVolumeActivities) {
-        if (iter.first == streamToVolumeSource(AUDIO_STREAM_PATCH)) {
-            continue;
-        }
         if (iter.second.isActive(inPastMs, sysTime)) {
             return true;
         }

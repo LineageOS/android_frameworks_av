@@ -31,12 +31,6 @@ static const char kSystemSeccompPolicyPath[] =
 static const char kVendorSeccompPolicyPath[] =
         "/vendor/etc/seccomp_policy/mediaswcodec.policy";
 
-// Disable Scudo's mismatch allocation check, as it is being triggered
-// by some third party code.
-extern "C" const char *__scudo_default_options() {
-    return "DeallocationTypeMismatch=false";
-}
-
 extern "C" void RegisterCodecServices();
 
 int main(int argc __unused, char** /*argv*/)

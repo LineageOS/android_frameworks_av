@@ -43,9 +43,6 @@ public:
 
     virtual status_t    readyToRun();
 
-    void dumpBase(int fd, const Vector<String16>& args);
-    void dumpEffectChains(int fd, const Vector<String16>& args);
-
     void clearPowerManager();
 
     // base for record and playback
@@ -418,7 +415,7 @@ public:
 
                 bool                isMsdDevice() const { return mIsMsdDevice; }
 
-    virtual     void                dump(int fd, const Vector<String16>& args) = 0;
+                void                dump(int fd, const Vector<String16>& args);
 
                 // deliver stats to mediametrics.
                 void                sendStatistics(bool force);
@@ -469,6 +466,11 @@ protected:
                                     ExtendedTimestamp *timestamp __unused) const {
                                 return INVALID_OPERATION;
                             }
+
+    virtual     void        dumpInternals_l(int fd __unused, const Vector<String16>& args __unused)
+                            { }
+    virtual     void        dumpTracks_l(int fd __unused, const Vector<String16>& args __unused) { }
+
 
     friend class AudioFlinger;      // for mEffectChains
 
@@ -657,6 +659,10 @@ protected:
                 };
 
                 SimpleLog mLocalLog;
+
+private:
+                void dumpBase_l(int fd, const Vector<String16>& args);
+                void dumpEffectChains_l(int fd, const Vector<String16>& args);
 };
 
 class VolumeInterface {
@@ -709,8 +715,6 @@ public:
                    audio_io_handle_t id, audio_devices_t device, type_t type, bool systemReady);
     virtual             ~PlaybackThread();
 
-                void        dump(int fd, const Vector<String16>& args) override;
-
     // Thread virtuals
     virtual     bool        threadLoop();
 
@@ -759,6 +763,9 @@ protected:
                                 ThreadBase::acquireWakeLock_l();
                                 mActiveTracks.updatePowerState(this, true /* force */);
                             }
+
+                void        dumpInternals_l(int fd, const Vector<String16>& args) override;
+                void        dumpTracks_l(int fd, const Vector<String16>& args) override;
 
 public:
 
@@ -1009,9 +1016,6 @@ private:
     void        updateMetadata_l() final;
     virtual void sendMetadataToBackend_l(const StreamOutHalInterface::SourceMetadata& metadata);
 
-    virtual void dumpInternals(int fd, const Vector<String16>& args);
-    void        dumpTracks(int fd, const Vector<String16>& args);
-
     // The Tracks class manages tracks added and removed from the Thread.
     template <typename T>
     class Tracks {
@@ -1166,7 +1170,6 @@ public:
 
     virtual     bool        checkForNewParameter_l(const String8& keyValuePair,
                                                    status_t& status);
-    virtual     void        dumpInternals(int fd, const Vector<String16>& args);
 
     virtual     bool        isTrackAllowed_l(
                                     audio_channel_mask_t channelMask, audio_format_t format,
@@ -1184,6 +1187,8 @@ protected:
                     mTimestamp.mTimebaseOffset[ExtendedTimestamp::TIMEBASE_BOOTTIME]);
         }
     }
+
+                void        dumpInternals_l(int fd, const Vector<String16>& args) override;
 
     // threadLoop snippets
     virtual     ssize_t     threadLoop_write();
@@ -1266,8 +1271,6 @@ public:
     virtual     bool        checkForNewParameter_l(const String8& keyValuePair,
                                                    status_t& status);
 
-                void        dumpInternals(int fd, const Vector<String16>& args) override;
-
     virtual     void        flushHw_l();
 
                 void        setMasterBalance(float balance) override;
@@ -1277,6 +1280,8 @@ protected:
     virtual     uint32_t    idleSleepTimeUs() const;
     virtual     uint32_t    suspendSleepTimeUs() const;
     virtual     void        cacheParameters_l();
+
+                void        dumpInternals_l(int fd, const Vector<String16>& args) override;
 
     // threadLoop snippets
     virtual     mixer_state prepareTracks_l(Vector< sp<Track> > *tracksToRemove);
@@ -1397,8 +1402,6 @@ public:
     virtual                 ~DuplicatingThread();
 
     // Thread virtuals
-    virtual     void        dumpInternals(int fd, const Vector<String16>& args) override;
-
                 void        addOutputTrack(MixerThread* thread);
                 void        removeOutputTrack(MixerThread* thread);
                 uint32_t    waitTimeMs() const { return mWaitTimeMs; }
@@ -1407,6 +1410,7 @@ public:
                         const StreamOutHalInterface::SourceMetadata& metadata) override;
 protected:
     virtual     uint32_t    activeSleepTimeUs() const;
+                void        dumpInternals_l(int fd, const Vector<String16>& args) override;
 
 private:
                 bool        outputsReady(const SortedVector< sp<OutputTrack> > &outputTracks);
@@ -1512,9 +1516,6 @@ public:
     void        destroyTrack_l(const sp<RecordTrack>& track);
     void        removeTrack_l(const sp<RecordTrack>& track);
 
-    void        dumpInternals(int fd, const Vector<String16>& args);
-    void        dumpTracks(int fd, const Vector<String16>& args);
-
     // Thread virtuals
     virtual bool        threadLoop();
     virtual void        preExit();
@@ -1551,7 +1552,6 @@ public:
             // return true if the caller should then do it's part of the stopping process
             bool        stop(RecordTrack* recordTrack);
 
-            void        dump(int fd, const Vector<String16>& args) override;
             AudioStreamIn* clearInput();
             virtual sp<StreamHalInterface> stream() const;
 
@@ -1607,8 +1607,8 @@ public:
 
             status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
 
-            status_t    setMicrophoneDirection(audio_microphone_direction_t direction);
-            status_t    setMicrophoneFieldDimension(float zoom);
+            status_t    setPreferredMicrophoneDirection(audio_microphone_direction_t direction);
+            status_t    setPreferredMicrophoneFieldDimension(float zoom);
 
             void        updateMetadata_l() override;
 
@@ -1619,6 +1619,11 @@ public:
                             return audio_is_input_device(
                                     mInDevice & mTimestampCorrectedDevices);
                         }
+
+protected:
+            void        dumpInternals_l(int fd, const Vector<String16>& args) override;
+            void        dumpTracks_l(int fd, const Vector<String16>& args) override;
+
 private:
             // Enter standby if not already in standby, and set mStandby flag
             void    standbyIfNotAlreadyInStandby();
@@ -1768,11 +1773,9 @@ class MmapThread : public ThreadBase
                 // Sets the UID records silence
     virtual     void        setRecordSilenced(uid_t uid __unused, bool silenced __unused) {}
 
-                void        dump(int fd, const Vector<String16>& args) override;
-    virtual     void        dumpInternals(int fd, const Vector<String16>& args);
-                void        dumpTracks(int fd, const Vector<String16>& args);
-
  protected:
+                void        dumpInternals_l(int fd, const Vector<String16>& args) override;
+                void        dumpTracks_l(int fd, const Vector<String16>& args) override;
 
                 audio_attributes_t      mAttr;
                 audio_session_t         mSessionId;
@@ -1822,8 +1825,6 @@ public:
     virtual     void        checkSilentMode_l();
                 void        processVolume_l() override;
 
-    virtual     void        dumpInternals(int fd, const Vector<String16>& args);
-
     virtual     bool        isOutput() const override { return true; }
 
                 void        updateMetadata_l() override;
@@ -1831,6 +1832,7 @@ public:
     virtual     void        toAudioPortConfig(struct audio_port_config *config);
 
 protected:
+                void        dumpInternals_l(int fd, const Vector<String16>& args) override;
 
                 audio_stream_type_t         mStreamType;
                 float                       mMasterVolume;

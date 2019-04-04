@@ -299,6 +299,8 @@ public:
 
     static status_t setLowRamDevice(bool isLowRamDevice, int64_t totalMemory);
 
+    static status_t setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t flags);
+
     // Check if hw offload is possible for given format, stream type, sample rate,
     // bit rate, duration, video and streaming or offload property is enabled
     static bool isOffloadSupported(const audio_offload_info_t& info);

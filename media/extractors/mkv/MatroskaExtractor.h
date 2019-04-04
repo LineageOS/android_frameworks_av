@@ -61,10 +61,8 @@ private:
         TrackInfo() {
             mMeta = NULL;
         }
+
         ~TrackInfo() {
-            if (mMeta) {
-                AMediaFormat_delete(mMeta);
-            }
         }
         unsigned long mTrackNum;
         bool mEncrypted;

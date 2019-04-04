@@ -146,6 +146,51 @@ void LVC_Core_MixSoft_1St_2i_D16C31_WRA( LVMixer3_FLOAT_st        *ptrInstance1,
     pInstanceR->Current = CurrentR;
 
 }
+#ifdef SUPPORT_MC
+void LVC_Core_MixSoft_1St_MC_float_WRA (Mix_Private_FLOAT_st **ptrInstance,
+                                         const LVM_FLOAT      *src,
+                                         LVM_FLOAT            *dst,
+                                         LVM_INT16            NrFrames,
+                                         LVM_INT16            NrChannels)
+{
+    LVM_INT32   ii, ch;
+    LVM_FLOAT   Temp =0.0f;
+    LVM_FLOAT   tempCurrent[NrChannels];
+    for (ch = 0; ch < NrChannels; ch++)
+    {
+        tempCurrent[ch] = ptrInstance[ch]->Current;
+    }
+    for (ii = NrFrames; ii > 0; ii--)
+    {
+        for (ch = 0; ch < NrChannels; ch++)
+        {
+            Mix_Private_FLOAT_st *pInstance = ptrInstance[ch];
+            const LVM_FLOAT   Delta = pInstance->Delta;
+            LVM_FLOAT         Current = tempCurrent[ch];
+            const LVM_FLOAT   Target = pInstance->Target;
+            if (Current < Target)
+            {
+                ADD2_SAT_FLOAT(Current, Delta, Temp);
+                Current = Temp;
+                if (Current > Target)
+                    Current = Target;
+            }
+            else
+            {
+                Current -= Delta;
+                if (Current < Target)
+                    Current = Target;
+            }
+            *dst++ = *src++ * Current;
+            tempCurrent[ch] = Current;
+        }
+    }
+    for (ch = 0; ch < NrChannels; ch++)
+    {
+        ptrInstance[ch]->Current = tempCurrent[ch];
+    }
+}
+#endif
 #else
 void LVC_Core_MixSoft_1St_2i_D16C31_WRA( LVMixer3_st        *ptrInstance1,
                                          LVMixer3_st        *ptrInstance2,

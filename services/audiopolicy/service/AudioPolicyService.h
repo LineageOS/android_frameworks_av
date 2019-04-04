@@ -182,6 +182,7 @@ public:
                                      audio_io_handle_t output,
                                      int delayMs = 0);
     virtual status_t setVoiceVolume(float volume, int delayMs = 0);
+    status_t setAllowedCapturePolicy(uint_t uid, audio_flags_mask_t capturePolicy) override;
     virtual bool isOffloadSupported(const audio_offload_info_t &config);
     virtual bool isDirectOutputSupported(const audio_config_base_t& config,
                                          const audio_attributes_t& attributes);
@@ -753,13 +754,17 @@ private:
                 AudioRecordClient(const audio_attributes_t attributes,
                           const audio_io_handle_t io, uid_t uid, pid_t pid,
                           const audio_session_t session, const audio_port_handle_t deviceId,
-                          const String16& opPackageName) :
+                          const String16& opPackageName,
+                          bool canCaptureOutput, bool canCaptureHotword) :
                     AudioClient(attributes, io, uid, pid, session, deviceId),
-                    opPackageName(opPackageName), startTimeNs(0) {}
+                    opPackageName(opPackageName), startTimeNs(0),
+                    canCaptureOutput(canCaptureOutput), canCaptureHotword(canCaptureHotword) {}
                 ~AudioRecordClient() override = default;
 
         const String16 opPackageName;        // client package name
         nsecs_t startTimeNs;
+        const bool canCaptureOutput;
+        const bool canCaptureHotword;
     };
 
     // --- AudioPlaybackClient ---

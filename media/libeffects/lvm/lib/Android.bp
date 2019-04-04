@@ -132,6 +132,9 @@ cc_library_static {
     shared_libs: [
         "liblog",
     ],
+    header_libs: [
+        "libhardware_headers"
+    ],
     cflags: [
         "-fvisibility=hidden",
         "-DBUILD_FLOAT",

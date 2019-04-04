@@ -972,8 +972,9 @@ Status CameraService::validateClientPermissionsLocked(const String8& cameraId,
     userid_t clientUserId = multiuser_get_user_id(clientUid);
 
     // Only allow clients who are being used by the current foreground device user, unless calling
-    // from our own process.
-    if (callingPid != getpid() && (mAllowedUsers.find(clientUserId) == mAllowedUsers.end())) {
+    // from our own process OR the caller is using the cameraserver's HIDL interface.
+    if (!hardware::IPCThreadState::self()->isServingCall() && callingPid != getpid() &&
+            (mAllowedUsers.find(clientUserId) == mAllowedUsers.end())) {
         ALOGE("CameraService::connect X (PID %d) rejected (cannot connect from "
                 "device user %d, currently allowed device users: %s)", callingPid, clientUserId,
                 toString(mAllowedUsers).string());

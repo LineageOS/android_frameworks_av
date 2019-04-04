@@ -22,8 +22,9 @@
 #define __STDINT_LIMITS
 #define __STDC_LIMIT_MACROS
 #include <stdint.h>
-
 #include <sys/time.h>
+
+#include <audio_utils/clock.h>
 #include <binder/IServiceManager.h>
 #include <utils/Log.h>
 #include <cutils/properties.h>
@@ -48,8 +49,7 @@ namespace android {
 static const char kDeadlockedString[] = "AudioPolicyService may be deadlocked\n";
 static const char kCmdDeadlockedString[] = "AudioPolicyService command thread may be deadlocked\n";
 
-static const int kDumpLockRetries = 50;
-static const int kDumpLockSleepUs = 20000;
+static const int kDumpLockTimeoutNs = 1 * NANOS_PER_SECOND;
 
 static const nsecs_t kAudioCommandTimeoutNs = seconds(3); // 3 seconds
 
@@ -376,17 +376,10 @@ void AudioPolicyService::binderDied(const wp<IBinder>& who) {
             IPCThreadState::self()->getCallingPid());
 }
 
-static bool tryLock(Mutex& mutex)
+static bool dumpTryLock(Mutex& mutex)
 {
-    bool locked = false;
-    for (int i = 0; i < kDumpLockRetries; ++i) {
-        if (mutex.tryLock() == NO_ERROR) {
-            locked = true;
-            break;
-        }
-        usleep(kDumpLockSleepUs);
-    }
-    return locked;
+    status_t err = mutex.timedLock(kDumpLockTimeoutNs);
+    return err == NO_ERROR;
 }
 
 status_t AudioPolicyService::dumpInternals(int fd)
@@ -414,32 +407,35 @@ void AudioPolicyService::updateUidStates_l()
 {
 //    Go over all active clients and allow capture (does not force silence) in the
 //    following cases:
-//    The client is the assistant
+//    Another client in the same UID has already been allowed to capture
+//    OR The client is the assistant
 //        AND an accessibility service is on TOP
 //               AND the source is VOICE_RECOGNITION or HOTWORD
 //        OR uses VOICE_RECOGNITION AND is on TOP OR latest started
 //               OR uses HOTWORD
-//            AND there is no privacy sensitive active capture
+//            AND there is no active privacy sensitive capture or call
+//                OR client has CAPTURE_AUDIO_OUTPUT privileged permission
 //    OR The client is an accessibility service
 //        AND is on TOP OR latest started
 //        AND the source is VOICE_RECOGNITION or HOTWORD
-//    OR the source is one of: AUDIO_SOURCE_VOICE_DOWNLINK, AUDIO_SOURCE_VOICE_UPLINK,
-//       AUDIO_SOURCE_VOICE_CALL
+//    OR the client source is virtual (remote submix, call audio TX or RX...)
 //    OR Any other client
 //        AND The assistant is not on TOP
-//        AND is on TOP OR latest started
-//        AND there is no privacy sensitive active capture
+//        AND there is no active privacy sensitive capture or call
+//                OR client has CAPTURE_AUDIO_OUTPUT privileged permission
 //TODO: mamanage pre processing effects according to use case priority
 
     sp<AudioRecordClient> topActive;
     sp<AudioRecordClient> latestActive;
     sp<AudioRecordClient> latestSensitiveActive;
+
     nsecs_t topStartNs = 0;
     nsecs_t latestStartNs = 0;
     nsecs_t latestSensitiveStartNs = 0;
     bool isA11yOnTop = mUidPolicy->isA11yOnTop();
     bool isAssistantOnTop = false;
     bool isSensitiveActive = false;
+    bool isInCall = mPhoneState == AUDIO_MODE_IN_CALL;
 
     // if Sensor Privacy is enabled then all recordings should be silenced.
     if (mSensorPrivacyPolicy->isSensorPrivacyEnabled()) {
@@ -449,15 +445,18 @@ void AudioPolicyService::updateUidStates_l()
 
     for (size_t i =0; i < mAudioRecordClients.size(); i++) {
         sp<AudioRecordClient> current = mAudioRecordClients[i];
-        if (!current->active) continue;
-        if (isPrivacySensitiveSource(current->attributes.source)) {
-            if (current->startTimeNs > latestSensitiveStartNs) {
-                latestSensitiveActive = current;
-                latestSensitiveStartNs = current->startTimeNs;
-            }
-            isSensitiveActive = true;
+        if (!current->active) {
+            continue;
         }
-        if (mUidPolicy->getUidState(current->uid) == ActivityManager::PROCESS_STATE_TOP) {
+
+        app_state_t appState = apmStatFromAmState(mUidPolicy->getUidState(current->uid));
+        // clients which app is in IDLE state are not eligible for top active or
+        // latest active
+        if (appState == APP_STATE_IDLE) {
+            continue;
+        }
+
+        if (appState == APP_STATE_TOP) {
             if (current->startTimeNs > topStartNs) {
                 topActive = current;
                 topStartNs = current->startTimeNs;
@@ -470,72 +469,105 @@ void AudioPolicyService::updateUidStates_l()
             latestActive = current;
             latestStartNs = current->startTimeNs;
         }
+        if (isPrivacySensitiveSource(current->attributes.source)) {
+            if (current->startTimeNs > latestSensitiveStartNs) {
+                latestSensitiveActive = current;
+                latestSensitiveStartNs = current->startTimeNs;
+            }
+            isSensitiveActive = true;
+        }
     }
 
-    if (topActive == nullptr && latestActive == nullptr) {
-        return;
+    // if no active client with UI on Top, consider latest active as top
+    if (topActive == nullptr) {
+        topActive = latestActive;
     }
 
-    if (topActive != nullptr) {
-        latestActive = nullptr;
-    }
+    std::vector<uid_t> enabledUids;
 
     for (size_t i =0; i < mAudioRecordClients.size(); i++) {
         sp<AudioRecordClient> current = mAudioRecordClients[i];
-        if (!current->active) continue;
+        if (!current->active) {
+            continue;
+        }
+
+        // keep capture allowed if another client with the same UID has already
+        // been allowed to capture
+        if (std::find(enabledUids.begin(), enabledUids.end(), current->uid)
+                != enabledUids.end()) {
+            continue;
+        }
 
         audio_source_t source = current->attributes.source;
-        bool isOnTop = current == topActive;
-        bool isLatest = current == latestActive;
-        bool isLatestSensitive = current == latestSensitiveActive;
-        bool forceIdle = true;
+        bool isTopOrLatestActive = topActive == nullptr ? false : current->uid == topActive->uid;
+        bool isLatestSensitive = latestSensitiveActive == nullptr ?
+                                 false : current->uid == latestSensitiveActive->uid;
+
+        // By default allow capture if:
+        //     The assistant is not on TOP
+        //     AND there is no active privacy sensitive capture or call
+        //             OR client has CAPTURE_AUDIO_OUTPUT privileged permission
+        bool allowCapture = !isAssistantOnTop
+                && !(isSensitiveActive && !(isLatestSensitive || current->canCaptureOutput))
+                && !(isInCall && !current->canCaptureOutput);
 
         if (isVirtualSource(source)) {
-            forceIdle = false;
+            // Allow capture for virtual (remote submix, call audio TX or RX...) sources
+            allowCapture = true;
         } else if (mUidPolicy->isAssistantUid(current->uid)) {
+            // For assistant allow capture if:
+            //     An accessibility service is on TOP
+            //            AND the source is VOICE_RECOGNITION or HOTWORD
+            //     OR is on TOP OR latest started AND uses VOICE_RECOGNITION
+            //            OR uses HOTWORD
+            //         AND there is no active privacy sensitive capture or call
+            //             OR client has CAPTURE_AUDIO_OUTPUT privileged permission
             if (isA11yOnTop) {
                 if (source == AUDIO_SOURCE_HOTWORD || source == AUDIO_SOURCE_VOICE_RECOGNITION) {
-                    forceIdle = false;
+                    allowCapture = true;
                 }
             } else {
-                if ((((isOnTop || isLatest) && source == AUDIO_SOURCE_VOICE_RECOGNITION) ||
-                     source == AUDIO_SOURCE_HOTWORD) && !isSensitiveActive) {
-                    forceIdle = false;
+                if (((isTopOrLatestActive && source == AUDIO_SOURCE_VOICE_RECOGNITION) ||
+                        source == AUDIO_SOURCE_HOTWORD) &&
+                        (!(isSensitiveActive || isInCall) || current->canCaptureOutput)) {
+                    allowCapture = true;
                 }
             }
         } else if (mUidPolicy->isA11yUid(current->uid)) {
-            if ((isOnTop || isLatest) &&
-                (source == AUDIO_SOURCE_VOICE_RECOGNITION || source == AUDIO_SOURCE_HOTWORD)) {
-                forceIdle = false;
-            }
-        } else {
-            if (!isAssistantOnTop && (isOnTop || isLatest) &&
-                (!isSensitiveActive || isLatestSensitive)) {
-                forceIdle = false;
+            // For accessibility service allow capture if:
+            //     Is on TOP OR latest started
+            //     AND the source is VOICE_RECOGNITION or HOTWORD
+            if (isTopOrLatestActive &&
+                    (source == AUDIO_SOURCE_VOICE_RECOGNITION || source == AUDIO_SOURCE_HOTWORD)) {
+                allowCapture = true;
             }
         }
         setAppState_l(current->uid,
-                      forceIdle ? APP_STATE_IDLE :
-                                  apmStatFromAmState(mUidPolicy->getUidState(current->uid)));
+                      allowCapture ? apmStatFromAmState(mUidPolicy->getUidState(current->uid)) :
+                                APP_STATE_IDLE);
+        if (allowCapture) {
+            enabledUids.push_back(current->uid);
+        }
     }
 }
 
 void AudioPolicyService::silenceAllRecordings_l() {
     for (size_t i = 0; i < mAudioRecordClients.size(); i++) {
         sp<AudioRecordClient> current = mAudioRecordClients[i];
-        setAppState_l(current->uid, APP_STATE_IDLE);
+        if (!isVirtualSource(current->attributes.source)) {
+            setAppState_l(current->uid, APP_STATE_IDLE);
+        }
     }
 }
 
 /* static */
 app_state_t AudioPolicyService::apmStatFromAmState(int amState) {
-    switch (amState) {
-    case ActivityManager::PROCESS_STATE_UNKNOWN:
+
+    if (amState == ActivityManager::PROCESS_STATE_UNKNOWN) {
         return APP_STATE_IDLE;
-    case ActivityManager::PROCESS_STATE_TOP:
-        return APP_STATE_TOP;
-    default:
-        break;
+    } else if (amState <= ActivityManager::PROCESS_STATE_TOP) {
+      // include persistent services
+      return APP_STATE_TOP;
     }
     return APP_STATE_FOREGROUND;
 }
@@ -588,7 +620,7 @@ status_t AudioPolicyService::dump(int fd, const Vector<String16>& args __unused)
     if (!dumpAllowed()) {
         dumpPermissionDenial(fd);
     } else {
-        bool locked = tryLock(mLock);
+        bool locked = dumpTryLock(mLock);
         if (!locked) {
             String8 result(kDeadlockedString);
             write(fd, result.string(), result.size());
@@ -1221,7 +1253,7 @@ status_t AudioPolicyService::AudioCommandThread::dump(int fd)
     result.append(buffer);
     write(fd, result.string(), result.size());
 
-    bool locked = tryLock(mLock);
+    bool locked = dumpTryLock(mLock);
     if (!locked) {
         String8 result2(kCmdDeadlockedString);
         write(fd, result2.string(), result2.size());

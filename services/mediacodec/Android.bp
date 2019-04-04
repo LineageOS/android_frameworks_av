@@ -20,6 +20,15 @@ cc_binary {
             exclude_shared_libs: ["libavservices_minijail"],
             shared_libs: ["libavservices_minijail_vendor"],
         },
+        android: {
+            product_variables: {
+                malloc_not_svelte: {
+                    // Scudo increases memory footprint, so only enable on
+                    // non-svelte devices.
+                    shared_libs: ["libc_scudo"],
+                },
+            },
+        },
     },
 
     header_libs: [
@@ -35,10 +44,6 @@ cc_binary {
         "-Wall",
         "-Wno-error=deprecated-declarations",
     ],
-
-    sanitize: {
-        scudo: true,
-    },
 }
 
 prebuilt_etc {

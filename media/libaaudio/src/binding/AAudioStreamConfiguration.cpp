@@ -62,6 +62,8 @@ status_t AAudioStreamConfiguration::writeToParcel(Parcel* parcel) const {
     if (status != NO_ERROR) goto error;
     status = parcel->writeInt32((int32_t) getInputPreset());
     if (status != NO_ERROR) goto error;
+    status = parcel->writeInt32((int32_t) getAllowedCapturePolicy());
+    if (status != NO_ERROR) goto error;
     status = parcel->writeInt32(getSessionId());
     if (status != NO_ERROR) goto error;
     return NO_ERROR;
@@ -103,6 +105,9 @@ status_t AAudioStreamConfiguration::readFromParcel(const Parcel* parcel) {
     status = parcel->readInt32(&value);
     if (status != NO_ERROR) goto error;
     setInputPreset((aaudio_input_preset_t) value);
+    status = parcel->readInt32(&value);
+    if (status != NO_ERROR) goto error;
+    setAllowedCapturePolicy((aaudio_allowed_capture_policy_t) value);
     status = parcel->readInt32(&value);
     if (status != NO_ERROR) goto error;
     setSessionId(value);

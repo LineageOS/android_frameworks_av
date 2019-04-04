@@ -77,6 +77,9 @@ struct C2SoftHevcEnc : public SimpleC2Component {
     std::shared_ptr<C2StreamPictureSizeInfo::input> mSize;
     std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
     std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
+    std::shared_ptr<C2StreamBitrateModeTuning::output> mBitrateMode;
+    std::shared_ptr<C2StreamComplexityTuning::output> mComplexity;
+    std::shared_ptr<C2StreamQualityTuning::output> mQuality;
 
 #ifdef FILE_DUMP_ENABLE
     char mInFile[200];

@@ -1315,6 +1315,7 @@ int Effect_setConfig(EffectContext *pContext, effect_config_t *pConfig){
 
 #ifdef SUPPORT_MC
         ActiveParams.NrChannels = NrChannels;
+        ActiveParams.ChMask = pConfig->inputCfg.channels;
 #endif
 
         LvmStatus = LVM_SetControlParameters(pContext->pBundledContext->hInstance, &ActiveParams);

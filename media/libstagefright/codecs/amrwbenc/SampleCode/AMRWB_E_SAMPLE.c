@@ -134,14 +134,16 @@ int encode(
 	if(handle == 0)
 	{
 		printf("open dll error......");
-		return -1;
+		ret = -1;
+		goto safe_exit;
 	}
 
 	pfunc = dlsym(handle, "voGetAMRWBEncAPI");
 	if(pfunc == 0)
 	{
 		printf("open function error......");
-		return -1;
+		ret = -1;
+		goto safe_exit;
 	}
 
 	pGetAPI = (VOGETAUDIOENCAPI)pfunc;
@@ -150,7 +152,8 @@ int encode(
 	if(returnCode)
 	{
 		printf("get APIs error......");
-		return -1;
+		ret = -1;
+		goto safe_exit;
 	}
 #else
 	ret = voGetAMRWBEncAPI(&AudioAPI);
@@ -253,7 +256,8 @@ safe_exit:
 		fclose(fdst);
 
 #ifdef LINUX
-	dlclose(handle);
+	if (handle)
+		dlclose(handle);
 #endif
 
 	return ret;

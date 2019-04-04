@@ -101,6 +101,9 @@ class CameraDevice final : public RefBase {
             const ACameraCaptureSession_stateCallbacks* callbacks,
             /*out*/ACameraCaptureSession** session);
 
+    camera_status_t isSessionConfigurationSupported(
+            const ACaptureSessionOutputContainer* sessionOutputContainer) const;
+
     // Callbacks from camera service
     class ServiceCallback : public ICameraDeviceCallback {
       public:
@@ -239,6 +242,7 @@ class CameraDevice final : public RefBase {
         kWhatCaptureResult,    // onCaptureProgressed, onCaptureCompleted
         kWhatLogicalCaptureResult, // onLogicalCameraCaptureCompleted
         kWhatCaptureFail,      // onCaptureFailed
+        kWhatLogicalCaptureFail, // onLogicalCameraCaptureFailed
         kWhatCaptureSeqEnd,    // onCaptureSequenceCompleted
         kWhatCaptureSeqAbort,  // onCaptureSequenceAborted
         kWhatCaptureBufferLost,// onCaptureBufferLost
@@ -258,6 +262,7 @@ class CameraDevice final : public RefBase {
     static const char* kSequenceIdKey;
     static const char* kFrameNumberKey;
     static const char* kAnwKey;
+    static const char* kFailingPhysicalCameraId;
 
     class CallbackHandler : public AHandler {
       public:
@@ -304,6 +309,7 @@ class CameraDevice final : public RefBase {
             mOnCaptureProgressed = nullptr;
             mOnCaptureCompleted = nullptr;
             mOnLogicalCameraCaptureCompleted = nullptr;
+            mOnLogicalCameraCaptureFailed = nullptr;
             mOnCaptureFailed = nullptr;
             mOnCaptureSequenceCompleted = nullptr;
             mOnCaptureSequenceAborted = nullptr;
@@ -312,7 +318,6 @@ class CameraDevice final : public RefBase {
                 mContext = cbs->context;
                 mOnCaptureStarted = cbs->onCaptureStarted;
                 mOnCaptureProgressed = cbs->onCaptureProgressed;
-                mOnCaptureFailed = cbs->onCaptureFailed;
                 mOnCaptureSequenceCompleted = cbs->onCaptureSequenceCompleted;
                 mOnCaptureSequenceAborted = cbs->onCaptureSequenceAborted;
                 mOnCaptureBufferLost = cbs->onCaptureBufferLost;
@@ -329,6 +334,7 @@ class CameraDevice final : public RefBase {
         ACameraCaptureSession_captureCallback_result mOnCaptureProgressed;
         ACameraCaptureSession_captureCallback_result mOnCaptureCompleted;
         ACameraCaptureSession_logicalCamera_captureCallback_result mOnLogicalCameraCaptureCompleted;
+        ACameraCaptureSession_logicalCamera_captureCallback_failed mOnLogicalCameraCaptureFailed;
         ACameraCaptureSession_captureCallback_failed mOnCaptureFailed;
         ACameraCaptureSession_captureCallback_sequenceEnd mOnCaptureSequenceCompleted;
         ACameraCaptureSession_captureCallback_sequenceAbort mOnCaptureSequenceAborted;
@@ -395,6 +401,11 @@ struct ACameraDevice {
             const ACameraCaptureSession_stateCallbacks* callbacks,
             /*out*/ACameraCaptureSession** session) {
         return mDevice->createCaptureSession(outputs, sessionParameters, callbacks, session);
+    }
+
+    camera_status_t isSessionConfigurationSupported(
+            const ACaptureSessionOutputContainer* sessionOutputContainer) const {
+        return mDevice->isSessionConfigurationSupported(sessionOutputContainer);
     }
 
     /***********************

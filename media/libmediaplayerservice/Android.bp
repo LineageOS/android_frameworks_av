@@ -11,6 +11,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "android.hardware.media.c2@1.0",
         "android.hardware.media.omx@1.0",
         "libbase",
         "libaudioclient",
@@ -21,7 +22,6 @@ cc_library_shared {
         "libdl",
         "libgui",
         "libhidlbase",
-        "libhidlmemory",
         "liblog",
         "libmedia",
         "libmedia_omx",
@@ -69,6 +69,4 @@ cc_library_shared {
     },
 
 }
-
-subdirs = ["*"]
 

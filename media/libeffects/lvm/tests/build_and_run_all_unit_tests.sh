@@ -36,6 +36,10 @@ flags_arr=(
     "-csE -tE"
     "-csE -eqE" "-tE -eqE"
     "-csE -tE -bE -M -eqE"
+    "-tE -eqE -vcBal:96 -M"
+    "-tE -eqE -vcBal:-96 -M"
+    "-tE -eqE -vcBal:0 -M"
+    "-tE -eqE -bE -vcBal:30 -M"
 )
 
 fs_arr=(
@@ -56,26 +60,41 @@ fs_arr=(
 
 # run multichannel effects at different configs, saving only the stereo channel
 # pair.
+error_count=0
 for flags in "${flags_arr[@]}"
 do
     for fs in ${fs_arr[*]}
     do
-        for ch in {1..8}
+        for chMask in {0..22}
         do
             adb shell $testdir/lvmtest -i:$testdir/sinesweepraw.raw \
-                -o:$testdir/sinesweep_$((ch))_$((fs)).raw -ch:$ch -fs:$fs $flags
+                -o:$testdir/sinesweep_$((chMask))_$((fs)).raw -chMask:$chMask -fs:$fs $flags
+
+            shell_ret=$?
+            if [ $shell_ret -ne 0 ]; then
+                echo "error: $shell_ret"
+                ((++error_count))
+            fi
+
 
             # two channel files should be identical to higher channel
             # computation (first 2 channels).
             # Do not compare cases where -bE is in flags (due to mono computation)
-            if [[ $flags != *"-bE"* ]] && [ "$ch" -gt 2 ]
+            if [[ $flags != *"-bE"* ]] && [[ "$chMask" -gt 1 ]]
             then
-                adb shell cmp $testdir/sinesweep_2_$((fs)).raw \
-                    $testdir/sinesweep_$((ch))_$((fs)).raw
-            elif [[ $flags == *"-bE"* ]] && [ "$ch" -gt 2 ]
+                adb shell cmp $testdir/sinesweep_1_$((fs)).raw \
+                    $testdir/sinesweep_$((chMask))_$((fs)).raw
+            elif [[ $flags == *"-bE"* ]] && [[ "$chMask" -gt 1 ]]
             then
-                adb shell $testdir/snr $testdir/sinesweep_2_$((fs)).raw \
-                    $testdir/sinesweep_$((ch))_$((fs)).raw -thr:90.308998
+                adb shell $testdir/snr $testdir/sinesweep_1_$((fs)).raw \
+                    $testdir/sinesweep_$((chMask))_$((fs)).raw -thr:90.308998
+            fi
+
+            # both cmp and snr return EXIT_FAILURE on mismatch.
+            shell_ret=$?
+            if [ $shell_ret -ne 0 ]; then
+                echo "error: $shell_ret"
+                ((++error_count))
             fi
 
         done
@@ -83,3 +102,5 @@ do
 done
 
 adb shell rm -r $testdir
+echo "$error_count errors"
+exit $error_count

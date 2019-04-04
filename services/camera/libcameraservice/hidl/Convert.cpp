@@ -97,6 +97,21 @@ hardware::camera2::params::OutputConfiguration convertFromHidl(
     return outputConfiguration;
 }
 
+hardware::camera2::params::SessionConfiguration convertFromHidl(
+    const HSessionConfiguration &hSessionConfiguration) {
+    hardware::camera2::params::SessionConfiguration sessionConfig(
+            hSessionConfiguration.inputWidth, hSessionConfiguration.inputHeight,
+            hSessionConfiguration.inputFormat,
+            static_cast<int>(hSessionConfiguration.operationMode));
+
+    for (const auto& hConfig : hSessionConfiguration.outputStreams) {
+        hardware::camera2::params::OutputConfiguration config = convertFromHidl(hConfig);
+        sessionConfig.addOutputConfiguration(config);
+    }
+
+    return sessionConfig;
+}
+
 // The camera metadata here is cloned. Since we're reading metadata over
 // hwbinder we would need to clone it in order to avoid aligment issues.
 bool convertFromHidl(const HCameraMetadata &src, CameraMetadata *dst) {
@@ -142,6 +157,8 @@ HCaptureResultExtras convertToHidl(const CaptureResultExtras &captureResultExtra
     hCaptureResultExtras.frameNumber = captureResultExtras.frameNumber;
     hCaptureResultExtras.partialResultCount = captureResultExtras.partialResultCount;
     hCaptureResultExtras.errorStreamId = captureResultExtras.errorStreamId;
+    hCaptureResultExtras.errorPhysicalCameraId = hidl_string(String8(
+            captureResultExtras.errorPhysicalCameraId).string());
     return hCaptureResultExtras;
 }
 

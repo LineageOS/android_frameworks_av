@@ -192,7 +192,7 @@ status_t AudioPolicyService::getOutputForAttr(const audio_attributes_t *original
     }
     audio_attributes_t attr = *originalAttr;
     if (!mPackageManager.allowPlaybackCapture(uid)) {
-        attr.flags |= AUDIO_FLAG_NO_CAPTURE;
+        attr.flags |= AUDIO_FLAG_NO_MEDIA_PROJECTION;
     }
     audio_output_flags_t originalFlags = flags;
     AutoCallerClear acc;
@@ -322,7 +322,7 @@ void AudioPolicyService::doReleaseOutput(audio_port_handle_t portId)
         return;
     }
     sp<AudioPlaybackClient> client = mAudioPlaybackClients.valueAt(index);
-    mAudioRecordClients.removeItem(portId);
+    mAudioPlaybackClients.removeItem(portId);
 
     // called from internal thread: no need to clear caller identity
     mAudioPolicyManager->releaseOutput(portId);
@@ -376,15 +376,17 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
         return PERMISSION_DENIED;
     }
 
+    bool canCaptureOutput = captureAudioOutputAllowed(pid, uid);
     if ((attr->source == AUDIO_SOURCE_VOICE_UPLINK ||
         attr->source == AUDIO_SOURCE_VOICE_DOWNLINK ||
         attr->source == AUDIO_SOURCE_VOICE_CALL ||
         attr->source == AUDIO_SOURCE_ECHO_REFERENCE) &&
-        !captureAudioOutputAllowed(pid, uid)) {
+        !canCaptureOutput) {
         return PERMISSION_DENIED;
     }
 
-    if ((attr->source == AUDIO_SOURCE_HOTWORD) && !captureHotwordAllowed(pid, uid)) {
+    bool canCaptureHotword = captureHotwordAllowed(opPackageName, pid, uid);
+    if ((attr->source == AUDIO_SOURCE_HOTWORD) && !canCaptureHotword) {
         return BAD_VALUE;
     }
 
@@ -415,7 +417,7 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
             case AudioPolicyInterface::API_INPUT_TELEPHONY_RX:
                 // FIXME: use the same permission as for remote submix for now.
             case AudioPolicyInterface::API_INPUT_MIX_CAPTURE:
-                if (!captureAudioOutputAllowed(pid, uid)) {
+                if (!canCaptureOutput) {
                     ALOGE("getInputForAttr() permission denied: capture not allowed");
                     status = PERMISSION_DENIED;
                 }
@@ -442,7 +444,8 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
         }
 
         sp<AudioRecordClient> client = new AudioRecordClient(*attr, *input, uid, pid, session,
-                                                             *selectedDeviceId, opPackageName);
+                                                             *selectedDeviceId, opPackageName,
+                                                             canCaptureOutput, canCaptureHotword);
         mAudioRecordClients.add(*portId, client);
     }
 
@@ -945,6 +948,20 @@ status_t AudioPolicyService::removeStreamDefaultEffect(audio_unique_id_t id)
     return audioPolicyEffects->removeStreamDefaultEffect(id);
 }
 
+status_t AudioPolicyService::setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t capturePolicy) {
+    Mutex::Autolock _l(mLock);
+    if (mAudioPolicyManager == NULL) {
+        ALOGV("%s() mAudioPolicyManager == NULL", __func__);
+        return NO_INIT;
+    }
+    uint_t callingUid = IPCThreadState::self()->getCallingUid();
+    if (uid != callingUid) {
+        ALOGD("%s() uid invalid %d != %d", __func__, uid, callingUid);
+        return PERMISSION_DENIED;
+    }
+    return mAudioPolicyManager->setAllowedCapturePolicy(uid, capturePolicy);
+}
+
 bool AudioPolicyService::isOffloadSupported(const audio_offload_info_t& info)
 {
     if (mAudioPolicyManager == NULL) {
@@ -1080,6 +1097,14 @@ status_t AudioPolicyService::registerPolicyMixes(const Vector<AudioMix>& mixes, 
         return PERMISSION_DENIED;
     }
 
+    bool needCaptureMediaOutput = std::any_of(mixes.begin(), mixes.end(), [](auto& mix) {
+            return mix.mAllowPrivilegedPlaybackCapture; });
+    const uid_t callingUid = IPCThreadState::self()->getCallingUid();
+    const pid_t callingPid = IPCThreadState::self()->getCallingPid();
+    if (needCaptureMediaOutput && !captureMediaOutputAllowed(callingPid, callingUid)) {
+        return PERMISSION_DENIED;
+    }
+
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
@@ -1124,9 +1149,10 @@ status_t AudioPolicyService::startAudioSource(const struct audio_port_config *so
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
+    // startAudioSource should be created as the calling uid
+    const uid_t callingUid = IPCThreadState::self()->getCallingUid();
     AutoCallerClear acc;
-    return mAudioPolicyManager->startAudioSource(source, attributes, portId,
-                                                 IPCThreadState::self()->getCallingUid());
+    return mAudioPolicyManager->startAudioSource(source, attributes, portId, callingUid);
 }
 
 status_t AudioPolicyService::stopAudioSource(audio_port_handle_t portId)

@@ -291,6 +291,7 @@ typedef struct
 
 #ifdef SUPPORT_MC
     LVM_INT16              NrChannels;
+    LVM_INT32              ChMask;
 #endif
 
 } LVM_Instance_t;

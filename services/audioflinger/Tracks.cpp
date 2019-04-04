@@ -379,6 +379,82 @@ status_t AudioFlinger::TrackHandle::onTransact(
 }
 
 // ----------------------------------------------------------------------------
+//      AppOp for audio playback
+// -------------------------------
+AudioFlinger::PlaybackThread::OpPlayAudioMonitor::OpPlayAudioMonitor(uid_t uid, audio_usage_t usage,
+        int id, audio_stream_type_t streamType)
+            : mHasOpPlayAudio(true), mUid(uid), mUsage((int32_t) usage), mId(id)
+{
+    if (isAudioServerOrRootUid(uid)) {
+        ALOGD("OpPlayAudio: not muting track:%d usage:%d root or audioserver", mId, usage);
+        return;
+    }
+    // stream type has been filtered by audio policy to indicate whether it can be muted
+    if (streamType == AUDIO_STREAM_ENFORCED_AUDIBLE) {
+        ALOGD("OpPlayAudio: not muting track:%d usage:%d ENFORCED_AUDIBLE", mId, usage);
+        return;
+    }
+    PermissionController permissionController;
+    permissionController.getPackagesForUid(uid, mPackages);
+    checkPlayAudioForUsage();
+    if (!mPackages.isEmpty()) {
+        mOpCallback = new PlayAudioOpCallback(this);
+        mAppOpsManager.startWatchingMode(AppOpsManager::OP_PLAY_AUDIO, mPackages[0], mOpCallback);
+    }
+}
+
+AudioFlinger::PlaybackThread::OpPlayAudioMonitor::~OpPlayAudioMonitor()
+{
+    if (mOpCallback != 0) {
+        mAppOpsManager.stopWatchingMode(mOpCallback);
+    }
+    mOpCallback.clear();
+}
+
+bool AudioFlinger::PlaybackThread::OpPlayAudioMonitor::hasOpPlayAudio() const {
+    return mHasOpPlayAudio.load();
+}
+
+// Note this method is never called (and never to be) for audio server / root track
+// - not called from constructor due to check on UID,
+// - not called from PlayAudioOpCallback because the callback is not installed in this case
+void AudioFlinger::PlaybackThread::OpPlayAudioMonitor::checkPlayAudioForUsage()
+{
+    if (mPackages.isEmpty()) {
+        mHasOpPlayAudio.store(false);
+    } else {
+        bool hasIt = true;
+        for (const String16& packageName : mPackages) {
+            const int32_t mode = mAppOpsManager.checkAudioOpNoThrow(AppOpsManager::OP_PLAY_AUDIO,
+                    mUsage, mUid, packageName);
+            if (mode != AppOpsManager::MODE_ALLOWED) {
+                hasIt = false;
+                break;
+            }
+        }
+        ALOGD("OpPlayAudio: track:%d usage:%d %smuted", mId, mUsage, hasIt ? "not " : "");
+        mHasOpPlayAudio.store(hasIt);
+    }
+}
+
+AudioFlinger::PlaybackThread::OpPlayAudioMonitor::PlayAudioOpCallback::PlayAudioOpCallback(
+        const wp<OpPlayAudioMonitor>& monitor) : mMonitor(monitor)
+{ }
+
+void AudioFlinger::PlaybackThread::OpPlayAudioMonitor::PlayAudioOpCallback::opChanged(int32_t op,
+            const String16& packageName) {
+    // we only have uid, so we need to check all package names anyway
+    UNUSED(packageName);
+    if (op != AppOpsManager::OP_PLAY_AUDIO) {
+        return;
+    }
+    sp<OpPlayAudioMonitor> monitor = mMonitor.promote();
+    if (monitor != NULL) {
+        monitor->checkPlayAudioForUsage();
+    }
+}
+
+// ----------------------------------------------------------------------------
 #undef LOG_TAG
 #define LOG_TAG "AF::Track"
 
@@ -416,6 +492,7 @@ AudioFlinger::PlaybackThread::Track::Track(
     mPresentationCompleteFrames(0),
     mFrameMap(16 /* sink-frame-to-track-frame map memory */),
     mVolumeHandler(new media::VolumeHandler(sampleRate)),
+    mOpPlayAudioMonitor(new OpPlayAudioMonitor(uid, attr.usage, id(), streamType)),
     // mSinkTimestamp
     mFastIndex(-1),
     mCachedVolume(1.0),
@@ -1838,16 +1915,16 @@ binder::Status AudioFlinger::RecordHandle::getActiveMicrophones(
             mRecordTrack->getActiveMicrophones(activeMicrophones));
 }
 
-binder::Status AudioFlinger::RecordHandle::setMicrophoneDirection(
+binder::Status AudioFlinger::RecordHandle::setPreferredMicrophoneDirection(
         int /*audio_microphone_direction_t*/ direction) {
     ALOGV("%s()", __func__);
-    return binder::Status::fromStatusT(mRecordTrack->setMicrophoneDirection(
+    return binder::Status::fromStatusT(mRecordTrack->setPreferredMicrophoneDirection(
             static_cast<audio_microphone_direction_t>(direction)));
 }
 
-binder::Status AudioFlinger::RecordHandle::setMicrophoneFieldDimension(float zoom) {
+binder::Status AudioFlinger::RecordHandle::setPreferredMicrophoneFieldDimension(float zoom) {
     ALOGV("%s()", __func__);
-    return binder::Status::fromStatusT(mRecordTrack->setMicrophoneFieldDimension(zoom));
+    return binder::Status::fromStatusT(mRecordTrack->setPreferredMicrophoneFieldDimension(zoom));
 }
 
 // ----------------------------------------------------------------------------
@@ -2144,22 +2221,22 @@ status_t AudioFlinger::RecordThread::RecordTrack::getActiveMicrophones(
     }
 }
 
-status_t AudioFlinger::RecordThread::RecordTrack::setMicrophoneDirection(
+status_t AudioFlinger::RecordThread::RecordTrack::setPreferredMicrophoneDirection(
         audio_microphone_direction_t direction) {
     sp<ThreadBase> thread = mThread.promote();
     if (thread != 0) {
         RecordThread *recordThread = (RecordThread *)thread.get();
-        return recordThread->setMicrophoneDirection(direction);
+        return recordThread->setPreferredMicrophoneDirection(direction);
     } else {
         return BAD_VALUE;
     }
 }
 
-status_t AudioFlinger::RecordThread::RecordTrack::setMicrophoneFieldDimension(float zoom) {
+status_t AudioFlinger::RecordThread::RecordTrack::setPreferredMicrophoneFieldDimension(float zoom) {
     sp<ThreadBase> thread = mThread.promote();
     if (thread != 0) {
         RecordThread *recordThread = (RecordThread *)thread.get();
-        return recordThread->setMicrophoneFieldDimension(zoom);
+        return recordThread->setPreferredMicrophoneFieldDimension(zoom);
     } else {
         return BAD_VALUE;
     }

@@ -2335,13 +2335,10 @@ void AudioFlinger::EffectChain::syncHalEffectsState()
 
 void AudioFlinger::EffectChain::dump(int fd, const Vector<String16>& args)
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
     String8 result;
 
-    size_t numEffects = mEffects.size();
-    snprintf(buffer, SIZE, "    %zu effects for session %d\n", numEffects, mSessionId);
-    result.append(buffer);
+    const size_t numEffects = mEffects.size();
+    result.appendFormat("    %zu effects for session %d\n", numEffects, mSessionId);
 
     if (numEffects) {
         bool locked = AudioFlinger::dumpTryLock(mLock);
@@ -2369,6 +2366,8 @@ void AudioFlinger::EffectChain::dump(int fd, const Vector<String16>& args)
         if (locked) {
             mLock.unlock();
         }
+    } else {
+        write(fd, result.string(), result.size());
     }
 }
 

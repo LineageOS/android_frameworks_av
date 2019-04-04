@@ -112,6 +112,14 @@ public:
         mInputPreset = inputPreset;
     }
 
+    aaudio_allowed_capture_policy_t getAllowedCapturePolicy() const {
+        return mAllowedCapturePolicy;
+    }
+
+    void setAllowedCapturePolicy(aaudio_allowed_capture_policy_t policy) {
+        mAllowedCapturePolicy = policy;
+    }
+
     aaudio_session_id_t getSessionId() const {
         return mSessionId;
     }
@@ -138,17 +146,18 @@ public:
     void dump() const;
 
 private:
-    int32_t                    mSamplesPerFrame = AAUDIO_UNSPECIFIED;
-    int32_t                    mSampleRate      = AAUDIO_UNSPECIFIED;
-    int32_t                    mDeviceId        = AAUDIO_UNSPECIFIED;
-    aaudio_sharing_mode_t      mSharingMode     = AAUDIO_SHARING_MODE_SHARED;
-    audio_format_t             mAudioFormat     = AUDIO_FORMAT_DEFAULT;
-    aaudio_direction_t         mDirection       = AAUDIO_DIRECTION_OUTPUT;
-    aaudio_usage_t             mUsage           = AAUDIO_UNSPECIFIED;
-    aaudio_content_type_t      mContentType     = AAUDIO_UNSPECIFIED;
-    aaudio_input_preset_t      mInputPreset     = AAUDIO_UNSPECIFIED;
-    int32_t                    mBufferCapacity  = AAUDIO_UNSPECIFIED;
-    aaudio_session_id_t        mSessionId       = AAUDIO_SESSION_ID_NONE;
+    int32_t                         mSamplesPerFrame      = AAUDIO_UNSPECIFIED;
+    int32_t                         mSampleRate           = AAUDIO_UNSPECIFIED;
+    int32_t                         mDeviceId             = AAUDIO_UNSPECIFIED;
+    aaudio_sharing_mode_t           mSharingMode          = AAUDIO_SHARING_MODE_SHARED;
+    audio_format_t                  mAudioFormat          = AUDIO_FORMAT_DEFAULT;
+    aaudio_direction_t              mDirection            = AAUDIO_DIRECTION_OUTPUT;
+    aaudio_usage_t                  mUsage                = AAUDIO_UNSPECIFIED;
+    aaudio_content_type_t           mContentType          = AAUDIO_UNSPECIFIED;
+    aaudio_input_preset_t           mInputPreset          = AAUDIO_UNSPECIFIED;
+    int32_t                         mBufferCapacity       = AAUDIO_UNSPECIFIED;
+    aaudio_allowed_capture_policy_t mAllowedCapturePolicy = AAUDIO_UNSPECIFIED;
+    aaudio_session_id_t             mSessionId            = AAUDIO_SESSION_ID_NONE;
 };
 
 } /* namespace aaudio */

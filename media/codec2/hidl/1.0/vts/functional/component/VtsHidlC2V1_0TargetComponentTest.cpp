@@ -26,6 +26,32 @@
 #include <VtsHalHidlTargetTestBase.h>
 #include "media_c2_hidl_test_common.h"
 
+/* Time_Out for start(), stop(), reset(), release(), flush(), queue() are
+ * defined in hardware/interfaces/media/c2/1.0/IComponent.hal. Adding 50ms
+ * extra in case of timeout is 500ms, 1ms extra in case timeout is 1ms/5ms. All
+ * timeout is calculated in us.
+ */
+#define START_TIME_OUT                  550000
+#define STOP_TIME_OUT                   550000
+#define RESET_TIME_OUT                  550000
+#define RELEASE_TIME_OUT                550000
+#define FLUSH_TIME_OUT                  6000
+#define QUEUE_TIME_OUT                  2000
+
+// Time_Out for config(), query(), querySupportedParams() are defined in
+// hardware/interfaces/media/c2/1.0/IConfigurable.hal.
+#define CONFIG_TIME_OUT                 6000
+#define QUERY_TIME_OUT                  6000
+#define QUERYSUPPORTEDPARAMS_TIME_OUT   2000
+
+#define CHECK_TIMEOUT(timeConsumed, TIME_OUT, FuncName)          \
+    if (timeConsumed > TIME_OUT) {                               \
+        ALOGW(                                                   \
+            "TIMED_OUT %s  timeConsumed=%" PRId64 " us is "      \
+            "greater than threshold %d us",                      \
+            FuncName, timeConsumed, TIME_OUT);                   \
+    }
+
 static ComponentTestEnvironment* gEnv = nullptr;
 
 namespace {
@@ -243,6 +269,93 @@ INSTANTIATE_TEST_CASE_P(NonStdInputs, Codec2ComponentInputTests, ::testing::Valu
     std::make_pair(0, false),
     std::make_pair(C2FrameData::FLAG_CODEC_CONFIG, false),
     std::make_pair(C2FrameData::FLAG_END_OF_STREAM, false)));
+
+// Test API's Timeout
+TEST_F(Codec2ComponentHidlTest, Timeout) {
+    ALOGV("Timeout Test");
+    c2_status_t err = C2_OK;
+
+    int64_t startTime = getNowUs();
+    err = mComponent->start();
+    int64_t timeConsumed = getNowUs() - startTime;
+    CHECK_TIMEOUT(timeConsumed, START_TIME_OUT, "start()");
+    ALOGV("mComponent->start() timeConsumed=%" PRId64 " us", timeConsumed);
+    ASSERT_EQ(err, C2_OK);
+
+    startTime = getNowUs();
+    err = mComponent->reset();
+    timeConsumed = getNowUs() - startTime;
+    CHECK_TIMEOUT(timeConsumed, RESET_TIME_OUT, "reset()");
+    ALOGV("mComponent->reset() timeConsumed=%" PRId64 " us", timeConsumed);
+    ASSERT_EQ(err, C2_OK);
+
+    err = mComponent->start();
+    ASSERT_EQ(err, C2_OK);
+
+    // Query supported params by the component
+    std::vector<std::shared_ptr<C2ParamDescriptor>> params;
+    startTime = getNowUs();
+    err = mComponent->querySupportedParams(&params);
+    timeConsumed = getNowUs() - startTime;
+    CHECK_TIMEOUT(timeConsumed, QUERYSUPPORTEDPARAMS_TIME_OUT,
+                  "querySupportedParams()");
+    ALOGV("mComponent->querySupportedParams() timeConsumed=%" PRId64 " us",
+          timeConsumed);
+    ASSERT_EQ(err, C2_OK);
+
+    std::vector<std::unique_ptr<C2Param>> queried;
+    std::vector<std::unique_ptr<C2SettingResult>> failures;
+    // Query and config all the supported params
+    for (std::shared_ptr<C2ParamDescriptor> p : params) {
+        startTime = getNowUs();
+        err = mComponent->query({}, {p->index()}, C2_DONT_BLOCK, &queried);
+        timeConsumed = getNowUs() - startTime;
+        CHECK_TIMEOUT(timeConsumed, QUERY_TIME_OUT, "query()");
+        EXPECT_NE(queried.size(), 0u);
+        EXPECT_EQ(err, C2_OK);
+        ALOGV("mComponent->query() for %s timeConsumed=%" PRId64 " us",
+              p->name().c_str(), timeConsumed);
+
+        startTime = getNowUs();
+        err = mComponent->config({queried[0].get()}, C2_DONT_BLOCK, &failures);
+        timeConsumed = getNowUs() - startTime;
+        CHECK_TIMEOUT(timeConsumed, CONFIG_TIME_OUT, "config()");
+        ASSERT_EQ(err, C2_OK);
+        ASSERT_EQ(failures.size(), 0u);
+        ALOGV("mComponent->config() for %s timeConsumed=%" PRId64 " us",
+              p->name().c_str(), timeConsumed);
+    }
+
+    std::list<std::unique_ptr<C2Work>> workList;
+    startTime = getNowUs();
+    err = mComponent->queue(&workList);
+    timeConsumed = getNowUs() - startTime;
+    ALOGV("mComponent->queue() timeConsumed=%" PRId64 " us", timeConsumed);
+    CHECK_TIMEOUT(timeConsumed, QUEUE_TIME_OUT, "queue()");
+    ASSERT_EQ(err, C2_OK);
+
+    startTime = getNowUs();
+    err = mComponent->flush(C2Component::FLUSH_COMPONENT, &workList);
+    timeConsumed = getNowUs() - startTime;
+    ALOGV("mComponent->flush() timeConsumed=%" PRId64 " us", timeConsumed);
+    CHECK_TIMEOUT(timeConsumed, FLUSH_TIME_OUT, "flush()");
+    ASSERT_EQ(err, C2_OK);
+
+    startTime = getNowUs();
+    err = mComponent->stop();
+    timeConsumed = getNowUs() - startTime;
+    ALOGV("mComponent->stop() timeConsumed=%" PRId64 " us", timeConsumed);
+    CHECK_TIMEOUT(timeConsumed, STOP_TIME_OUT, "stop()");
+    ASSERT_EQ(err, C2_OK);
+
+    startTime = getNowUs();
+    err = mComponent->release();
+    timeConsumed = getNowUs() - startTime;
+    ALOGV("mComponent->release() timeConsumed=%" PRId64 " us", timeConsumed);
+    CHECK_TIMEOUT(timeConsumed, RELEASE_TIME_OUT, "release()");
+    ASSERT_EQ(err, C2_OK);
+
+}
 
 }  // anonymous namespace
 

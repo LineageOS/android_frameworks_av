@@ -38,6 +38,7 @@ namespace acam {
 
 using HCameraMetadata = frameworks::cameraservice::device::V2_0::CameraMetadata;
 using OutputConfiguration = frameworks::cameraservice::device::V2_0::OutputConfiguration;
+using SessionConfiguration = frameworks::cameraservice::device::V2_0::SessionConfiguration;
 using hardware::Void;
 
 // Static member definitions
@@ -54,6 +55,7 @@ const char* CameraDevice::kCaptureFailureKey = "CaptureFailure";
 const char* CameraDevice::kSequenceIdKey     = "SequenceId";
 const char* CameraDevice::kFrameNumberKey    = "FrameNumber";
 const char* CameraDevice::kAnwKey            = "Anw";
+const char* CameraDevice::kFailingPhysicalCameraId= "FailingPhysicalCameraId";
 
 /**
  * CameraDevice Implementation
@@ -216,6 +218,47 @@ CameraDevice::createCaptureSession(
     return ACAMERA_OK;
 }
 
+camera_status_t CameraDevice::isSessionConfigurationSupported(
+        const ACaptureSessionOutputContainer* sessionOutputContainer) const {
+    Mutex::Autolock _l(mDeviceLock);
+    camera_status_t ret = checkCameraClosedOrErrorLocked();
+    if (ret != ACAMERA_OK) {
+        return ret;
+    }
+
+    SessionConfiguration sessionConfig;
+    sessionConfig.inputWidth = 0;
+    sessionConfig.inputHeight = 0;
+    sessionConfig.inputFormat = -1;
+    sessionConfig.operationMode = StreamConfigurationMode::NORMAL_MODE;
+    sessionConfig.outputStreams.resize(sessionOutputContainer->mOutputs.size());
+    size_t index = 0;
+    for (const auto& output : sessionOutputContainer->mOutputs) {
+        sessionConfig.outputStreams[index].rotation = utils::convertToHidl(output.mRotation);
+        sessionConfig.outputStreams[index].windowGroupId = -1;
+        sessionConfig.outputStreams[index].windowHandles.resize(output.mSharedWindows.size() + 1);
+        sessionConfig.outputStreams[index].windowHandles[0] = output.mWindow;
+        sessionConfig.outputStreams[index].physicalCameraId = output.mPhysicalCameraId;
+        index++;
+    }
+
+    bool configSupported = false;
+    Status status = Status::NO_ERROR;
+    auto remoteRet = mRemote->isSessionConfigurationSupported(sessionConfig,
+        [&status, &configSupported](auto s, auto supported) {
+            status = s;
+            configSupported = supported;
+        });
+
+    if (status == Status::INVALID_OPERATION) {
+        return ACAMERA_ERROR_UNSUPPORTED_OPERATION;
+    } else if (!remoteRet.isOk()) {
+        return ACAMERA_ERROR_UNKNOWN;
+    } else {
+        return configSupported ? ACAMERA_OK : ACAMERA_ERROR_STREAM_CONFIGURE_FAIL;
+    }
+}
+
 void CameraDevice::addRequestSettingsMetadata(ACaptureRequest *aCaptureRequest,
         sp<CaptureRequest> &req) {
     CameraMetadata metadataCopy = aCaptureRequest->settings->getInternalData();
@@ -257,7 +300,6 @@ camera_status_t CameraDevice::updateOutputConfigurationLocked(ACaptureSessionOut
     OutputConfigurationWrapper outConfigW;
     OutputConfiguration &outConfig = outConfigW.mOutputConfiguration;
     outConfig.rotation = utils::convertToHidl(output->mRotation);
-    outConfig.windowGroupId = -1; // ndk doesn't support inter OutputConfiguration buffer sharing.
     outConfig.windowHandles.resize(output->mSharedWindows.size() + 1);
     outConfig.windowHandles[0] = output->mWindow;
     outConfig.physicalCameraId = output->mPhysicalCameraId;
@@ -852,10 +894,19 @@ CameraDevice::onCaptureErrorLocked(
         failure->sequenceId  = sequenceId;
         failure->wasImageCaptured = (errorCode == ErrorCode::CAMERA_RESULT);
 
-        sp<AMessage> msg = new AMessage(kWhatCaptureFail, mHandler);
+        sp<AMessage> msg = new AMessage(cbh.mIsLogicalCameraCallback ? kWhatLogicalCaptureFail :
+                kWhatCaptureFail, mHandler);
         msg->setPointer(kContextKey, cbh.mContext);
         msg->setObject(kSessionSpKey, session);
-        msg->setPointer(kCallbackFpKey, (void*) onError);
+        if (cbh.mIsLogicalCameraCallback) {
+            if (resultExtras.errorPhysicalCameraId.size() > 0) {
+                msg->setString(kFailingPhysicalCameraId, resultExtras.errorPhysicalCameraId.c_str(),
+                        resultExtras.errorPhysicalCameraId.size());
+            }
+            msg->setPointer(kCallbackFpKey, (void*) cbh.mOnLogicalCameraCaptureFailed);
+        } else {
+            msg->setPointer(kCallbackFpKey, (void*) onError);
+        }
         msg->setObject(kCaptureRequestKey, request);
         msg->setObject(kCaptureFailureKey, failure);
         postSessionMsgAndCleanup(msg);
@@ -877,6 +928,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
         case kWhatCaptureResult:
         case kWhatLogicalCaptureResult:
         case kWhatCaptureFail:
+        case kWhatLogicalCaptureFail:
         case kWhatCaptureSeqEnd:
         case kWhatCaptureSeqAbort:
         case kWhatCaptureBufferLost:
@@ -948,6 +1000,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
         case kWhatCaptureResult:
         case kWhatLogicalCaptureResult:
         case kWhatCaptureFail:
+        case kWhatLogicalCaptureFail:
         case kWhatCaptureSeqEnd:
         case kWhatCaptureSeqAbort:
         case kWhatCaptureBufferLost:
@@ -967,6 +1020,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                 case kWhatCaptureResult:
                 case kWhatLogicalCaptureResult:
                 case kWhatCaptureFail:
+                case kWhatLogicalCaptureFail:
                 case kWhatCaptureBufferLost:
                     found = msg->findObject(kCaptureRequestKey, &obj);
                     if (!found) {
@@ -1119,6 +1173,39 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                     freeACaptureRequest(request);
                     break;
                 }
+                case kWhatLogicalCaptureFail:
+                {
+                    ACameraCaptureSession_logicalCamera_captureCallback_failed onFail;
+                    found = msg->findPointer(kCallbackFpKey, (void**) &onFail);
+                    if (!found) {
+                        ALOGE("%s: Cannot find capture fail callback!", __FUNCTION__);
+                        return;
+                    }
+                    if (onFail == nullptr) {
+                        return;
+                    }
+
+                    found = msg->findObject(kCaptureFailureKey, &obj);
+                    if (!found) {
+                        ALOGE("%s: Cannot find capture failure!", __FUNCTION__);
+                        return;
+                    }
+                    sp<CameraCaptureFailure> failureSp(
+                            static_cast<CameraCaptureFailure*>(obj.get()));
+                    ALogicalCameraCaptureFailure failure;
+                    AString physicalCameraId;
+                    found = msg->findString(kFailingPhysicalCameraId, &physicalCameraId);
+                    if (found && !physicalCameraId.empty()) {
+                        failure.physicalCameraId = physicalCameraId.c_str();
+                    } else {
+                        failure.physicalCameraId = nullptr;
+                    }
+                    failure.captureFailure = *failureSp;
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, device->getId());
+                    (*onFail)(context, session.get(), request, &failure);
+                    freeACaptureRequest(request);
+                    break;
+                }
                 case kWhatCaptureSeqEnd:
                 {
                     ACameraCaptureSession_captureCallback_sequenceEnd onSeqEnd;
@@ -1214,6 +1301,7 @@ CameraDevice::CallbackHolder::CallbackHolder(
 
     if (cbs != nullptr) {
         mOnCaptureCompleted = cbs->onCaptureCompleted;
+        mOnCaptureFailed = cbs->onCaptureFailed;
     }
 }
 
@@ -1229,6 +1317,7 @@ CameraDevice::CallbackHolder::CallbackHolder(
 
     if (lcbs != nullptr) {
         mOnLogicalCameraCaptureCompleted = lcbs->onLogicalCameraCaptureCompleted;
+        mOnLogicalCameraCaptureFailed = lcbs->onLogicalCameraCaptureFailed;
     }
 }
 
@@ -1326,8 +1415,9 @@ android::hardware::Return<void>
 CameraDevice::ServiceCallback::onDeviceError(
         ErrorCode errorCode,
         const CaptureResultExtras& resultExtras) {
-    ALOGD("Device error received, code %d, frame number %" PRId64 ", request ID %d, subseq ID %d",
-            errorCode, resultExtras.frameNumber, resultExtras.requestId, resultExtras.burstId);
+    ALOGD("Device error received, code %d, frame number %" PRId64 ", request ID %d, subseq ID %d"
+            " physical camera ID %s", errorCode, resultExtras.frameNumber, resultExtras.requestId,
+            resultExtras.burstId, resultExtras.errorPhysicalCameraId.c_str());
     auto ret = Void();
     sp<CameraDevice> dev = mDevice.promote();
     if (dev == nullptr) {

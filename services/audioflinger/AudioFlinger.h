@@ -54,7 +54,9 @@
 #include <utils/TypeHelpers.h>
 #include <utils/Vector.h>
 
+#include <binder/AppOpsManager.h>
 #include <binder/BinderService.h>
+#include <binder/IAppOpsCallback.h>
 #include <binder/MemoryDealer.h>
 
 #include <system/audio.h>
@@ -431,8 +433,7 @@ private:
     static uint32_t         mScreenState;
 
     // Internal dump utilities.
-    static const int kDumpLockRetries = 50;
-    static const int kDumpLockSleepUs = 20000;
+    static const int kDumpLockTimeoutNs = 1 * NANOS_PER_SECOND;
     static bool dumpTryLock(Mutex& mutex);
     void dumpPermissionDenial(int fd, const Vector<String16>& args);
     void dumpClients(int fd, const Vector<String16>& args);
@@ -615,9 +616,9 @@ using effect_buffer_t = int16_t;
         virtual binder::Status   stop();
         virtual binder::Status   getActiveMicrophones(
                 std::vector<media::MicrophoneInfo>* activeMicrophones);
-        virtual binder::Status   setMicrophoneDirection(
+        virtual binder::Status   setPreferredMicrophoneDirection(
                 int /*audio_microphone_direction_t*/ direction);
-        virtual binder::Status   setMicrophoneFieldDimension(float zoom);
+        virtual binder::Status   setPreferredMicrophoneFieldDimension(float zoom);
 
     private:
         const sp<RecordThread::RecordTrack> mRecordTrack;

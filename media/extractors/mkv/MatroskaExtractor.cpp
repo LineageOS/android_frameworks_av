@@ -20,6 +20,7 @@
 
 #include "FLACDecoder.h"
 #include "MatroskaExtractor.h"
+#include "common/webmids.h"
 
 #include <media/DataSourceBase.h>
 #include <media/ExtractorUtils.h>
@@ -461,7 +462,7 @@ void BlockIterator::seek(
         for (size_t index = 0; index < count; index++) {
             pEntry = pSH->GetEntry(index);
 
-            if (pEntry->id == 0x0C53BB6B) { // Cues ID
+            if (pEntry->id == libwebm::kMkvCues) { // Cues ID
                 long len; long long pos;
                 pSegment->ParseCues(pEntry->pos, pos, len);
                 pCues = pSegment->GetCues();
@@ -1282,7 +1283,7 @@ MatroskaExtractor::MatroskaExtractor(DataSourceHelper *source)
                 const mkvparser::SeekHead::Entry* mEntry;
                 for (size_t index = 0; index < count; index++) {
                     mEntry = mSH->GetEntry(index);
-                    if (mEntry->id == 0x0C53BB6B) {  // Cues ID
+                    if (mEntry->id == libwebm::kMkvCues) { // Cues ID
                         long len;
                         long long pos;
                         mSegment->ParseCues(mEntry->pos, pos, len);
@@ -1336,6 +1337,13 @@ MatroskaExtractor::~MatroskaExtractor() {
     mReader = NULL;
 
     delete mDataSource;
+
+    for (size_t i = 0; i < mTracks.size(); ++i) {
+        TrackInfo *info = &mTracks.editItemAt(i);
+        if (info->mMeta) {
+            AMediaFormat_delete(info->mMeta);
+        }
+    }
 }
 
 size_t MatroskaExtractor::countTracks() {
@@ -1808,6 +1816,8 @@ status_t MatroskaExtractor::initTrackInfo(
 void MatroskaExtractor::addTracks() {
     const mkvparser::Tracks *tracks = mSegment->GetTracks();
 
+    AMediaFormat *meta = nullptr;
+
     for (size_t index = 0; index < tracks->GetTracksCount(); ++index) {
         const mkvparser::Track *track = tracks->GetTrackByIndex(index);
 
@@ -1832,7 +1842,11 @@ void MatroskaExtractor::addTracks() {
 
         enum { VIDEO_TRACK = 1, AUDIO_TRACK = 2 };
 
-        AMediaFormat *meta = AMediaFormat_new();
+        if (meta) {
+            AMediaFormat_clear(meta);
+        } else {
+            meta = AMediaFormat_new();
+        }
 
         status_t err = OK;
         int32_t nalSize = -1;
@@ -2067,14 +2081,18 @@ void MatroskaExtractor::addTracks() {
         long long durationNs = mSegment->GetDuration();
         AMediaFormat_setInt64(meta, AMEDIAFORMAT_KEY_DURATION, (durationNs + 500) / 1000);
 
+        const char *mimetype = "";
+        if (!AMediaFormat_getString(meta, AMEDIAFORMAT_KEY_MIME, &mimetype)) {
+            // do not add this track to the track list
+            ALOGW("ignoring track with unknown mime");
+            continue;
+        }
+
         mTracks.push();
         size_t n = mTracks.size() - 1;
         TrackInfo *trackInfo = &mTracks.editItemAt(n);
         initTrackInfo(track, meta, trackInfo);
         trackInfo->mNalLengthSize = nalSize;
-
-        const char *mimetype = "";
-        AMediaFormat_getString(meta, AMEDIAFORMAT_KEY_MIME, &mimetype);
 
         if ((!strcmp("V_MPEG4/ISO/AVC", codecID) && codecPrivateSize == 0) ||
             (!strcmp(mimetype, MEDIA_MIMETYPE_VIDEO_AVC) && isSetCsdFrom1stFrame)) {
@@ -2082,6 +2100,7 @@ void MatroskaExtractor::addTracks() {
             err = synthesizeAVCC(trackInfo, n);
             if (err != OK) {
                 mTracks.pop();
+                continue;
             }
         } else if ((!strcmp("V_MPEG2", codecID) && codecPrivateSize == 0) ||
             (!strcmp(mimetype, MEDIA_MIMETYPE_VIDEO_MPEG2) && isSetCsdFrom1stFrame)) {
@@ -2089,6 +2108,7 @@ void MatroskaExtractor::addTracks() {
             err = synthesizeMPEG2(trackInfo, n);
             if (err != OK) {
                 mTracks.pop();
+                continue;
             }
         } else if ((!strcmp("V_MPEG4/ISO/ASP", codecID) && codecPrivateSize == 0) ||
             (!strcmp(mimetype, MEDIA_MIMETYPE_VIDEO_MPEG4) && isSetCsdFrom1stFrame) ||
@@ -2099,9 +2119,14 @@ void MatroskaExtractor::addTracks() {
             err = synthesizeMPEG4(trackInfo, n);
             if (err != OK) {
                 mTracks.pop();
+                continue;
             }
         }
-
+        // the TrackInfo owns the metadata now
+        meta = nullptr;
+    }
+    if (meta) {
+        AMediaFormat_delete(meta);
     }
 }
 

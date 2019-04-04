@@ -25,12 +25,7 @@ cc_library_shared {
         cfi: true,
     },
 
-    shared_libs: [
-        "libstagefright_foundation",
-        "libstagefright_omx",
-        "libutils",
-        "liblog",
-    ],
+    defaults: ["omx_soft_libs"],
 
     static_libs: ["libgsm"],
     compile_multilib: "32",

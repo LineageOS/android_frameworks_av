@@ -53,6 +53,7 @@ using HGraphicBufferProducer = hardware::graphics::bufferqueue::V1_0::IGraphicBu
 using HOutputConfiguration = frameworks::cameraservice::device::V2_0::OutputConfiguration;
 using HPhysicalCameraSettings = frameworks::cameraservice::device::V2_0::PhysicalCameraSettings;
 using HPhysicalCaptureResultInfo = frameworks::cameraservice::device::V2_0::PhysicalCaptureResultInfo;
+using HSessionConfiguration = frameworks::cameraservice::device::V2_0::SessionConfiguration;
 using HSubmitInfo = frameworks::cameraservice::device::V2_0::SubmitInfo;
 using HStatus = frameworks::cameraservice::common::V2_0::Status;
 using HStreamConfigurationMode = frameworks::cameraservice::device::V2_0::StreamConfigurationMode;
@@ -69,6 +70,9 @@ bool convertFromHidl(const HCameraMetadata &src, CameraMetadata *dst);
 
 hardware::camera2::params::OutputConfiguration convertFromHidl(
     const HOutputConfiguration &hOutputConfiguration);
+
+hardware::camera2::params::SessionConfiguration convertFromHidl(
+    const HSessionConfiguration &hSessionConfiguration);
 
 HCameraDeviceStatus convertToHidlCameraDeviceStatus(int32_t status);
 

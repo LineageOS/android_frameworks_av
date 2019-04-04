@@ -121,6 +121,12 @@ class CameraHelper {
         cameraIdList.numCameras = idPointerList.size();
         cameraIdList.cameraIds = idPointerList.data();
 
+        ret = ACameraDevice_isSessionConfigurationSupported(mDevice, mOutputs);
+        if (ret != ACAMERA_OK && ret != ACAMERA_ERROR_UNSUPPORTED_OPERATION) {
+            ALOGE("ACameraDevice_isSessionConfigurationSupported failed, ret=%d", ret);
+            return ret;
+        }
+
         ret = ACameraDevice_createCaptureSession(mDevice, mOutputs, &mSessionCb, &mSession);
         if (ret != AMEDIA_OK) {
             ALOGE("ACameraDevice_createCaptureSession failed, ret=%d", ret);
@@ -317,7 +323,13 @@ class CameraHelper {
             }
             ch->mCompletedCaptureCallbackCount++;
         },
-        nullptr, // onCaptureFailed
+        [] (void * /*ctx*/, ACameraCaptureSession* /*session*/, ACaptureRequest* /*request*/,
+                ALogicalCameraCaptureFailure* failure) {
+            if (failure->physicalCameraId) {
+                ALOGD("%s: Physical camera id: %s result failure", __FUNCTION__,
+                        failure->physicalCameraId);
+            }
+        },
         nullptr, // onCaptureSequenceCompleted
         nullptr, // onCaptureSequenceAborted
         nullptr, // onCaptureBufferLost
