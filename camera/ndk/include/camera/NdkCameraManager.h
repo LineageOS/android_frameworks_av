@@ -85,6 +85,11 @@ void ACameraManager_delete(ACameraManager* manager) __INTRODUCED_IN(24);
  * <p>ACameraManager_getCameraIdList will allocate and return an {@link ACameraIdList}.
  * The caller must call {@link ACameraManager_deleteCameraIdList} to free the memory</p>
  *
+ * <p>Note: the returned camera list might be a subset to the output of <a href=
+ * "https://developer.android.com/reference/android/hardware/camera2/CameraManager.html#getCameraIdList()">
+ * SDK CameraManager#getCameraIdList API</a> as the NDK API does not support some legacy camera
+ * hardware.</p>
+ *
  * @param manager the {@link ACameraManager} of interest
  * @param cameraIdList the output {@link ACameraIdList} will be filled in here if the method call
  *        succeeds.
