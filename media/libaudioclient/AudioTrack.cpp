@@ -2754,27 +2754,32 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
     // Prevent retrograde motion in timestamp.
     // This is sometimes caused by erratic reports of the available space in the ALSA drivers.
     if (status == NO_ERROR) {
+        // Fix stale time when checking timestamp right after start().
+        // The position is at the last reported location but the time can be stale
+        // due to pause or standby or cold start latency.
+        //
+        // We keep advancing the time (but not the position) to ensure that the
+        // stale value does not confuse the application.
+        //
+        // For offload compatibility, use a default lag value here.
+        // Any time discrepancy between this update and the pause timestamp is handled
+        // by the retrograde check afterwards.
+        int64_t currentTimeNanos = audio_utils_ns_from_timespec(&timestamp.mTime);
+        const int64_t lagNs = int64_t(mAfLatency * 1000000LL);
+        const int64_t limitNs = mStartNs - lagNs;
+        if (currentTimeNanos < limitNs) {
+            ALOGD("%s(%d): correcting timestamp time for pause, "
+                    "currentTimeNanos: %lld < limitNs: %lld < mStartNs: %lld",
+                    __func__, mPortId,
+                    (long long)currentTimeNanos, (long long)limitNs, (long long)mStartNs);
+            timestamp.mTime = convertNsToTimespec(limitNs);
+            currentTimeNanos = limitNs;
+        }
+
         // previousTimestampValid is set to false when starting after a stop or flush.
         if (previousTimestampValid) {
             const int64_t previousTimeNanos =
                     audio_utils_ns_from_timespec(&mPreviousTimestamp.mTime);
-            int64_t currentTimeNanos = audio_utils_ns_from_timespec(&timestamp.mTime);
-
-            // Fix stale time when checking timestamp right after start().
-            //
-            // For offload compatibility, use a default lag value here.
-            // Any time discrepancy between this update and the pause timestamp is handled
-            // by the retrograde check afterwards.
-            const int64_t lagNs = int64_t(mAfLatency * 1000000LL);
-            const int64_t limitNs = mStartNs - lagNs;
-            if (currentTimeNanos < limitNs) {
-                ALOGD("%s(%d): correcting timestamp time for pause, "
-                        "currentTimeNanos: %lld < limitNs: %lld < mStartNs: %lld",
-                        __func__, mPortId,
-                        (long long)currentTimeNanos, (long long)limitNs, (long long)mStartNs);
-                timestamp.mTime = convertNsToTimespec(limitNs);
-                currentTimeNanos = limitNs;
-            }
 
             // retrograde check
             if (currentTimeNanos < previousTimeNanos) {
