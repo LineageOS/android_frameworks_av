@@ -963,10 +963,11 @@ status_t AudioPolicyManager::getOutputForAttrInt(
     //       otherwise, fallback to the dynamic policies, if none match, query the engine.
     // Secondary outputs are always found by dynamic policies as the engine do not support them
     sp<SwAudioOutputDescriptor> policyDesc;
-    if (mPolicyMixes.getOutputForAttr(*resultAttr, uid, policyDesc, secondaryDescs) != NO_ERROR) {
-        policyDesc = nullptr; // reset getOutputForAttr in case of failure
-        secondaryDescs->clear();
+    status = mPolicyMixes.getOutputForAttr(*resultAttr, uid, *flags, policyDesc, secondaryDescs);
+    if (status != OK) {
+        return status;
     }
+
     // Explicit routing is higher priority then any dynamic policy primary output
     bool usePrimaryOutputFromPolicyMixes = requestedDevice == nullptr && policyDesc != nullptr;
 
@@ -5064,12 +5065,12 @@ void AudioPolicyManager::checkSecondaryOutputs() {
     for (size_t i = 0; i < mOutputs.size(); i++) {
         const sp<SwAudioOutputDescriptor>& outputDescriptor = mOutputs[i];
         for (const sp<TrackClientDescriptor>& client : outputDescriptor->getClientIterable()) {
-            // FIXME code duplicated from getOutputForAttrInt
             sp<SwAudioOutputDescriptor> desc;
             std::vector<sp<SwAudioOutputDescriptor>> secondaryDescs;
-            mPolicyMixes.getOutputForAttr(client->attributes(), client->uid(), desc,
-                                          &secondaryDescs);
-            if (!std::equal(client->getSecondaryOutputs().begin(),
+            status_t status = mPolicyMixes.getOutputForAttr(client->attributes(), client->uid(),
+                                                            client->flags(), desc, &secondaryDescs);
+            if (status != OK ||
+                !std::equal(client->getSecondaryOutputs().begin(),
                             client->getSecondaryOutputs().end(),
                             secondaryDescs.begin(), secondaryDescs.end())) {
                 streamsToInvalidate.insert(client->stream());
