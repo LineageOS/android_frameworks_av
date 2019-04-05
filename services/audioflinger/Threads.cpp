@@ -3610,8 +3610,30 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
             // only process effects if we're going to write
             if (mSleepTimeUs == 0 && mType != OFFLOAD) {
+                audio_session_t activeHapticId = AUDIO_SESSION_NONE;
+                if (mHapticChannelCount > 0 && effectChains.size() > 0) {
+                    for (auto track : mActiveTracks) {
+                        if (track->getHapticPlaybackEnabled()) {
+                            activeHapticId = track->sessionId();
+                            break;
+                        }
+                    }
+                }
                 for (size_t i = 0; i < effectChains.size(); i ++) {
                     effectChains[i]->process_l();
+                    // TODO: Write haptic data directly to sink buffer when mixing.
+                    if (activeHapticId != AUDIO_SESSION_NONE
+                            && activeHapticId == effectChains[i]->sessionId()) {
+                        // Haptic data is active in this case, copy it directly from
+                        // in buffer to out buffer.
+                        const size_t audioBufferSize = mNormalFrameCount
+                                * audio_bytes_per_frame(mChannelCount, EFFECT_BUFFER_FORMAT);
+                        memcpy_by_audio_format(
+                                (uint8_t*)effectChains[i]->outBuffer() + audioBufferSize,
+                                EFFECT_BUFFER_FORMAT,
+                                (const uint8_t*)effectChains[i]->inBuffer() + audioBufferSize,
+                                EFFECT_BUFFER_FORMAT, mNormalFrameCount * mHapticChannelCount);
+                    }
                 }
             }
         }
