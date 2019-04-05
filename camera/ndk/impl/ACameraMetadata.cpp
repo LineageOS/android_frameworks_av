@@ -47,24 +47,14 @@ ACameraMetadata::ACameraMetadata(camera_metadata_t* buffer, ACAMERA_METADATA_TYP
 bool
 ACameraMetadata::isNdkSupportedCapability(int32_t capability) {
     switch (capability) {
-        case ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE:
-        case ANDROID_REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR:
-        case ANDROID_REQUEST_AVAILABLE_CAPABILITIES_MANUAL_POST_PROCESSING:
-        case ANDROID_REQUEST_AVAILABLE_CAPABILITIES_RAW:
-        case ANDROID_REQUEST_AVAILABLE_CAPABILITIES_READ_SENSOR_SETTINGS:
-        case ANDROID_REQUEST_AVAILABLE_CAPABILITIES_BURST_CAPTURE:
-        case ANDROID_REQUEST_AVAILABLE_CAPABILITIES_DEPTH_OUTPUT:
-        case ANDROID_REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA:
-            return true;
         case ANDROID_REQUEST_AVAILABLE_CAPABILITIES_YUV_REPROCESSING:
         case ANDROID_REQUEST_AVAILABLE_CAPABILITIES_PRIVATE_REPROCESSING:
         case ANDROID_REQUEST_AVAILABLE_CAPABILITIES_CONSTRAINED_HIGH_SPEED_VIDEO:
             return false;
         default:
-            // Newly defined capabilities will be unsupported by default (blacklist)
-            // TODO: Should we do whitelist or blacklist here?
-            ALOGE("%s: Unknonwn capability %d", __FUNCTION__, capability);
-            return false;
+            // Assuming every capability passed to this function is actually a
+            // valid capability.
+            return true;
     }
 }
 
