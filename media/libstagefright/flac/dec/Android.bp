@@ -11,11 +11,6 @@ cc_library {
 
     export_include_dirs: [ "." ],
 
-    include_dirs: [
-        "external/flac/include",
-        "frameworks/av/media/libstagefright/include",
-    ],
-
     cflags: ["-Werror"],
 
     sanitize: {
@@ -38,10 +33,17 @@ cc_library {
             "libFLAC",
             "libaudioutils",
         ],
+        export_static_lib_headers: [
+            "libFLAC",
+        ],
     },
 
     shared_libs: [
         "liblog",
     ],
-    header_libs: ["libmedia_headers"],
+
+    header_libs: [
+        "libmedia_headers",
+        "libFLAC-headers",
+    ],
 }

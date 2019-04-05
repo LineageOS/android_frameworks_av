@@ -1,26 +1,16 @@
 cc_library_shared {
     name: "libstagefright_soft_mpeg2dec",
-    vendor_available: true,
+    defaults: ["libstagefright_softomx-defaults"],
 
     static_libs: ["libmpeg2dec"],
     srcs: ["SoftMPEG2.cpp"],
 
     cflags: [
         "-Wall",
-        "-Werror",
         "-Wno-unused-variable",
     ],
 
     version_script: "exports.lds",
-
-    include_dirs: [
-        "external/libmpeg2/decoder",
-        "external/libmpeg2/common",
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include/media/openmax",
-    ],
-
-    defaults: ["omx_soft_libs"],
 
     ldflags: ["-Wl,-Bsymbolic"],
 
@@ -30,5 +20,4 @@ cc_library_shared {
         ],
         cfi: true,
     },
-    compile_multilib: "32",
 }

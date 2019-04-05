@@ -1,28 +1,15 @@
 cc_library_shared {
     name: "libstagefright_soft_avcdec",
-    vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
+    defaults: ["libstagefright_softomx-defaults"],
 
     static_libs: ["libavcdec"],
     srcs: ["SoftAVCDec.cpp"],
 
     cflags: [
         "-Wall",
-        "-Werror",
     ],
 
     version_script: "exports.lds",
-
-    include_dirs: [
-        "external/libavc/decoder",
-        "external/libavc/common",
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include/media/openmax",
-    ],
-
-    defaults: ["omx_soft_libs"],
 
     sanitize: {
         misc_undefined: [
@@ -32,5 +19,4 @@ cc_library_shared {
     },
 
     ldflags: ["-Wl,-Bsymbolic"],
-    compile_multilib: "32",
 }
