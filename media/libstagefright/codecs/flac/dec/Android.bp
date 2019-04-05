@@ -1,22 +1,10 @@
 cc_library_shared {
     name: "libstagefright_soft_flacdec",
-    vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
+    defaults: ["libstagefright_softomx-defaults"],
 
     srcs: [
         "SoftFlacDecoder.cpp",
     ],
-
-    include_dirs: [
-        "external/flac/include",
-        "frameworks/av/media/libstagefright/flac/dec",
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include/media/openmax",
-    ],
-
-    cflags: ["-Werror"],
 
     version_script: "exports.lds",
 
@@ -28,10 +16,7 @@ cc_library_shared {
         cfi: true,
     },
 
-    defaults: ["omx_soft_libs"],
-
     shared_libs: [
         "libstagefright_flacdec",
     ],
-    compile_multilib: "32",
 }

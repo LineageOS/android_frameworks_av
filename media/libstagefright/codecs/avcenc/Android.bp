@@ -1,22 +1,9 @@
 cc_library_shared {
     name: "libstagefright_soft_avcenc",
-    vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
+    defaults: ["libstagefright_softomx-defaults"],
 
     static_libs: ["libavcenc"],
     srcs: ["SoftAVCEnc.cpp"],
-
-    include_dirs: [
-        "external/libavc/encoder",
-        "external/libavc/common",
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include/media/hardware",
-        "frameworks/native/include/media/openmax",
-    ],
-
-    defaults: ["omx_soft_libs"],
 
     sanitize: {
         misc_undefined: [
@@ -27,12 +14,9 @@ cc_library_shared {
 
     cflags: [
         "-Wall",
-        "-Werror",
         "-Wno-unused-variable",
     ],
     ldflags: ["-Wl,-Bsymbolic"],
 
     version_script: "exports.lds",
-
-    compile_multilib: "32",
 }

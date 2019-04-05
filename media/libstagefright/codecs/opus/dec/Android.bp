@@ -1,24 +1,12 @@
 cc_library_shared {
     name: "libstagefright_soft_opusdec",
-    vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
+    defaults: ["libstagefright_softomx-defaults"],
 
     srcs: ["SoftOpus.cpp"],
-
-    include_dirs: [
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include/media/openmax",
-    ],
-
-    defaults: ["omx_soft_libs"],
 
     shared_libs: [
         "libopus",
     ],
-
-    cflags: ["-Werror"],
 
     version_script: "exports.lds",
 
@@ -29,5 +17,4 @@ cc_library_shared {
         ],
         cfi: true,
     },
-    compile_multilib: "32",
 }
