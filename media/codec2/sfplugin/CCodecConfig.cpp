@@ -486,19 +486,31 @@ void CCodecConfig::initializeStandardParams() {
     add(ConfigMapper(std::string(KEY_FEATURE_) + FEATURE_SecurePlayback,
                      C2_PARAMKEY_SECURE_MODE, "value"));
 
-    add(ConfigMapper("prepend-sps-pps-to-idr-frames",
+    add(ConfigMapper(KEY_PREPEND_HEADERS_TO_SYNC_FRAMES,
                      C2_PARAMKEY_PREPEND_HEADER_MODE, "value")
         .limitTo(D::ENCODER & D::VIDEO)
-        .withMapper([](C2Value v) -> C2Value {
+        .withMappers([](C2Value v) -> C2Value {
             int32_t value;
-            if (v.get(&value) && value) {
-                return C2Value(C2Config::PREPEND_HEADER_TO_ALL_SYNC);
-            } else {
-                return C2Value(C2Config::PREPEND_HEADER_TO_NONE);
+            if (v.get(&value)) {
+                return value ? C2Value(C2Config::PREPEND_HEADER_TO_ALL_SYNC)
+                             : C2Value(C2Config::PREPEND_HEADER_TO_NONE);
             }
+            return C2Value();
+        }, [](C2Value v) -> C2Value {
+            C2Config::prepend_header_mode_t value;
+            using C2ValueType=typename _c2_reduce_enum_to_underlying_type<decltype(value)>::type;
+            if (v.get((C2ValueType *)&value)) {
+                switch (value) {
+                    case C2Config::PREPEND_HEADER_TO_NONE:      return 0;
+                    case C2Config::PREPEND_HEADER_TO_ALL_SYNC:  return 1;
+                    case C2Config::PREPEND_HEADER_ON_CHANGE:    [[fallthrough]];
+                    default:                                    return C2Value();
+                }
+            }
+            return C2Value();
         }));
     // remove when codecs switch to PARAMKEY
-    deprecated(ConfigMapper("prepend-sps-pps-to-idr-frames",
+    deprecated(ConfigMapper(KEY_PREPEND_HEADERS_TO_SYNC_FRAMES,
                             "coding.add-csd-to-sync-frames", "value")
                .limitTo(D::ENCODER & D::VIDEO));
     // convert to timestamp base
