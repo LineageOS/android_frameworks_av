@@ -430,18 +430,6 @@ status_t NuMediaExtractor::unselectTrack(size_t index) {
     return OK;
 }
 
-void NuMediaExtractor::releaseOneSample(TrackInfo *info) {
-    if (info == NULL || info->mSamples.empty()) {
-        return;
-    }
-
-    auto it = info->mSamples.begin();
-    if (it->mBuffer != NULL) {
-        it->mBuffer->release();
-    }
-    info->mSamples.erase(it);
-}
-
 void NuMediaExtractor::releaseTrackSamples(TrackInfo *info) {
     if (info == NULL) {
         return;
@@ -472,7 +460,7 @@ ssize_t NuMediaExtractor::fetchAllTrackSamples(
         fetchTrackSamples(info, seekTimeUs, mode);
 
         status_t err = info->mFinalResult;
-        if (err != OK && err != ERROR_END_OF_STREAM) {
+        if (err != OK && err != ERROR_END_OF_STREAM && info->mSamples.empty()) {
             return err;
         }
 
@@ -527,14 +515,6 @@ void NuMediaExtractor::fetchTrackSamples(TrackInfo *info,
     info->mFinalResult = err;
     if (err != OK && err != ERROR_END_OF_STREAM) {
         ALOGW("read on track %zu failed with error %d", info->mTrackIndex, err);
-        size_t count = mediaBuffers.size();
-        for (size_t id = 0; id < count; ++id) {
-            MediaBufferBase *mbuf = mediaBuffers[id];
-            if (mbuf != NULL) {
-                mbuf->release();
-            }
-        }
-        return;
     }
 
     size_t count = mediaBuffers.size();
@@ -584,8 +564,26 @@ status_t NuMediaExtractor::advance() {
 
     TrackInfo *info = &mSelectedTracks.editItemAt(minIndex);
 
-    releaseOneSample(info);
+    if (info == NULL || info->mSamples.empty()) {
+        return ERROR_END_OF_STREAM;
+    }
 
+    auto it = info->mSamples.begin();
+    if (it->mBuffer != NULL) {
+        it->mBuffer->release();
+    }
+    info->mSamples.erase(it);
+
+    if (info->mSamples.empty()) {
+        minIndex = fetchAllTrackSamples();
+        if (minIndex < 0) {
+            return ERROR_END_OF_STREAM;
+        }
+        info = &mSelectedTracks.editItemAt(minIndex);
+        if (info == NULL || info->mSamples.empty()) {
+            return ERROR_END_OF_STREAM;
+        }
+    }
     return OK;
 }
 
