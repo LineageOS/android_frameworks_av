@@ -193,6 +193,13 @@ private:
               int32_t mPropertyCutoffPercent = 100;
                       // "ro.audio.resampler.psd.cutoff_percent"
 
+              // Specify the transition bandwidth extension beyond Nyquist.
+              // If this is nonzero then mPropertyCutoffPercent is ignored.
+              // A value of 100 or greater is typically used, where 100 means the
+              // stopband is at Nyquist (this is a typical design).
+              int32_t mPropertyTransitionBandwidthCheat = 0;
+                      // "ro.audio.resampler.psd.tbwcheat"
+
     // Filter creation design parameters, see setSampleRate()
              double mStopbandAttenuationDb = 0.;
              double mPassbandRippleDb = 0.;
