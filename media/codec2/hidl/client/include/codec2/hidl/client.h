@@ -144,53 +144,52 @@ struct Codec2Client : public Codec2ConfigurableClient {
 
     typedef Codec2Client Store;
 
-    std::string getServiceName() const { return mServiceName; }
+    std::string const& getServiceName() const;
 
     c2_status_t createComponent(
-            const C2String& name,
-            const std::shared_ptr<Listener>& listener,
+            C2String const& name,
+            std::shared_ptr<Listener> const& listener,
             std::shared_ptr<Component>* const component);
 
     c2_status_t createInterface(
-            const C2String& name,
+            C2String const& name,
             std::shared_ptr<Interface>* const interface);
 
     c2_status_t createInputSurface(
             std::shared_ptr<InputSurface>* const inputSurface);
 
-    const std::vector<C2Component::Traits>& listComponents() const;
+    std::vector<C2Component::Traits> const& listComponents() const;
 
     c2_status_t copyBuffer(
-            const std::shared_ptr<C2Buffer>& src,
-            const std::shared_ptr<C2Buffer>& dst);
+            std::shared_ptr<C2Buffer> const& src,
+            std::shared_ptr<C2Buffer> const& dst);
 
     std::shared_ptr<C2ParamReflector> getParamReflector();
 
-    static std::shared_ptr<Codec2Client> CreateFromService(
-            const char* serviceName,
-            bool waitForService = true);
+    static std::shared_ptr<Codec2Client> CreateFromService(char const* name);
 
     // Try to create a component with a given name from all known
     // IComponentStore services.
     static std::shared_ptr<Component> CreateComponentByName(
-            const char* componentName,
-            const std::shared_ptr<Listener>& listener,
+            char const* componentName,
+            std::shared_ptr<Listener> const& listener,
             std::shared_ptr<Codec2Client>* owner = nullptr);
 
     // Try to create a component interface with a given name from all known
     // IComponentStore services.
     static std::shared_ptr<Interface> CreateInterfaceByName(
-            const char* interfaceName,
+            char const* interfaceName,
             std::shared_ptr<Codec2Client>* owner = nullptr);
 
     // List traits from all known IComponentStore services.
-    static const std::vector<C2Component::Traits>& ListComponents();
+    static std::vector<C2Component::Traits> const& ListComponents();
 
     // Create an input surface.
-    static std::shared_ptr<InputSurface> CreateInputSurface();
+    static std::shared_ptr<InputSurface> CreateInputSurface(
+            char const* serviceName = nullptr);
 
     // base cannot be null.
-    Codec2Client(const sp<Base>& base, std::string serviceName);
+    Codec2Client(sp<Base> const& base, size_t serviceIndex);
 
 protected:
     sp<Base> mBase;
@@ -198,17 +197,22 @@ protected:
     // Finds the first store where the predicate returns OK, and returns the last
     // predicate result. Uses key to remember the last store found, and if cached,
     // it tries that store before trying all stores (one retry).
-    static c2_status_t ForAllStores(
+    static c2_status_t ForAllServices(
             const std::string& key,
-            std::function<c2_status_t(const std::shared_ptr<Codec2Client>&)> predicate);
+            std::function<c2_status_t(std::shared_ptr<Codec2Client> const&)>
+                predicate);
 
-    mutable std::mutex mMutex;
-    mutable bool mListed;
-    std::string mServiceName;
+    size_t mServiceIndex;
     mutable std::vector<C2Component::Traits> mTraitsList;
 
     sp<::android::hardware::media::bufferpool::V2_0::IClientManager>
             mHostPoolManager;
+
+    static std::shared_ptr<Codec2Client> _CreateFromIndex(size_t index);
+
+    std::vector<C2Component::Traits> _listComponents(bool* success) const;
+
+    class Cache;
 };
 
 struct Codec2Client::Interface : public Codec2Client::Configurable {
