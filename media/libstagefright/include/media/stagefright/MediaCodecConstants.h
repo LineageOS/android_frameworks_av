@@ -783,6 +783,7 @@ constexpr char KEY_MIME[] = "mime";
 constexpr char KEY_OPERATING_RATE[] = "operating-rate";
 constexpr char KEY_OUTPUT_REORDER_DEPTH[] = "output-reorder-depth";
 constexpr char KEY_PCM_ENCODING[] = "pcm-encoding";
+constexpr char KEY_PREPEND_HEADERS_TO_SYNC_FRAMES[] = "prepend-sps-pps-to-idr-frames";
 constexpr char KEY_PRIORITY[] = "priority";
 constexpr char KEY_PROFILE[] = "profile";
 constexpr char KEY_PUSH_BLANK_BUFFERS_ON_STOP[] = "push-blank-buffers-on-shutdown";
