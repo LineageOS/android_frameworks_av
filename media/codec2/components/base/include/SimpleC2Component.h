@@ -202,6 +202,8 @@ private:
 
     class WorkQueue {
     public:
+        typedef std::unordered_map<uint64_t, std::unique_ptr<C2Work>> PendingWork;
+
         inline WorkQueue() : mFlush(false), mGeneration(0ul) {}
 
         inline uint64_t generation() const { return mGeneration; }
@@ -218,6 +220,7 @@ private:
             return flush;
         }
         void clear();
+        PendingWork &pending() { return mPendingWork; }
 
     private:
         struct Entry {
@@ -228,11 +231,9 @@ private:
         bool mFlush;
         uint64_t mGeneration;
         std::list<Entry> mQueue;
+        PendingWork mPendingWork;
     };
     Mutexed<WorkQueue> mWorkQueue;
-
-    typedef std::unordered_map<uint64_t, std::unique_ptr<C2Work>> PendingWork;
-    Mutexed<PendingWork> mPendingWork;
 
     class BlockingBlockPool;
     std::shared_ptr<BlockingBlockPool> mOutputBlockPool;
