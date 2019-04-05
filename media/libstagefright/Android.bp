@@ -137,6 +137,7 @@ cc_library_shared {
         "libcamera_client",
         "libcutils",
         "libdl",
+        "libdl_android",
         "libdrmframework",
         "libgui",
         "libion",
