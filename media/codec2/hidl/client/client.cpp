@@ -75,82 +75,11 @@ namespace /* unnamed */ {
 // c2_status_t value that corresponds to hwbinder transaction failure.
 constexpr c2_status_t C2_TRANSACTION_FAILED = C2_CORRUPTED;
 
-// Returns the list of IComponentStore service names that are available on the
-// device. This list is specified at the build time in manifest files.
-// Note: A software service will have "_software" as a suffix.
-std::vector<std::string> const& getServiceNames() {
-    static std::vector<std::string> sServiceNames{[]() {
-        using ::android::hardware::media::c2::V1_0::IComponentStore;
-        using ::android::hidl::manager::V1_2::IServiceManager;
-
-        while (true) {
-            sp<IServiceManager> serviceManager = IServiceManager::getService();
-            CHECK(serviceManager) << "Hardware service manager is not running.";
-
-            // There are three categories of services based on names.
-            std::vector<std::string> defaultNames; // Prefixed with "default"
-            std::vector<std::string> vendorNames;  // Prefixed with "vendor"
-            std::vector<std::string> otherNames;   // Others
-            Return<void> transResult;
-            transResult = serviceManager->listManifestByInterface(
-                    IComponentStore::descriptor,
-                    [&defaultNames, &vendorNames, &otherNames](
-                            hidl_vec<hidl_string> const& instanceNames) {
-                        for (hidl_string const& instanceName : instanceNames) {
-                            char const* name = instanceName.c_str();
-                            if (strncmp(name, "default", 7) == 0) {
-                                defaultNames.emplace_back(name);
-                            } else if (strncmp(name, "vendor", 6) == 0) {
-                                vendorNames.emplace_back(name);
-                            } else {
-                                otherNames.emplace_back(name);
-                            }
-                        }
-                    });
-            if (transResult.isOk()) {
-                // Sort service names in each category.
-                std::sort(defaultNames.begin(), defaultNames.end());
-                std::sort(vendorNames.begin(), vendorNames.end());
-                std::sort(otherNames.begin(), otherNames.end());
-
-                // Concatenate the three lists in this order: default, vendor,
-                // other.
-                std::vector<std::string>& names = defaultNames;
-                names.reserve(names.size() + vendorNames.size() + otherNames.size());
-                names.insert(names.end(),
-                             std::make_move_iterator(vendorNames.begin()),
-                             std::make_move_iterator(vendorNames.end()));
-                names.insert(names.end(),
-                             std::make_move_iterator(otherNames.begin()),
-                             std::make_move_iterator(otherNames.end()));
-
-                // Summarize to logcat.
-                if (names.empty()) {
-                    LOG(INFO) << "No Codec2 services declared in the manifest.";
-                } else {
-                    std::stringstream stringOutput;
-                    stringOutput << "Available Codec2 services:";
-                    for (std::string const& name : names) {
-                        stringOutput << " \"" << name << "\"";
-                    }
-                    LOG(INFO) << stringOutput.str();
-                }
-
-                return names;
-            }
-            LOG(ERROR) << "Could not retrieve the list of service instances of "
-                       << IComponentStore::descriptor
-                       << ". Retrying...";
-        }
-    }()};
-    return sServiceNames;
-}
-
-// Searches for a name in getServiceNames() and returns the index found. If the
+// Searches for a name in GetServiceNames() and returns the index found. If the
 // name is not found, the returned index will be equal to
-// getServiceNames().size().
+// GetServiceNames().size().
 size_t getServiceIndex(char const* name) {
-    std::vector<std::string> const& names = getServiceNames();
+    std::vector<std::string> const& names = Codec2Client::GetServiceNames();
     size_t i = 0;
     for (; i < names.size(); ++i) {
         if (name == names[i]) {
@@ -175,17 +104,14 @@ class Codec2Client::Cache {
     std::vector<C2Component::Traits> mTraits;
     std::once_flag mTraitsInitializationFlag;
 
-    // The index of the service. This is based on getServiceNames().
+    // The index of the service. This is based on GetServiceNames().
     size_t mIndex;
-    // A "valid" cache object must have its mIndex set with init().
-    bool mValid{false};
     // Called by s() exactly once to initialize the cache. The index must be a
-    // valid index into the vector returned by getServiceNames(). Calling
+    // valid index into the vector returned by GetServiceNames(). Calling
     // init(index) will associate the cache to the service with name
-    // getServiceNames()[index].
+    // GetServiceNames()[index].
     void init(size_t index) {
         mIndex = index;
-        mValid = true;
     }
 
 public:
@@ -195,7 +121,6 @@ public:
     // If the service is unavailable but listed in the manifest, this function
     // will block indefinitely.
     std::shared_ptr<Codec2Client> getClient() {
-        CHECK(mValid) << "Uninitialized cache";
         std::scoped_lock lock{mClientMutex};
         if (!mClient) {
             mClient = Codec2Client::_CreateFromIndex(mIndex);
@@ -208,7 +133,6 @@ public:
     //
     // Note: This function is called only by ForAllServices().
     void invalidate() {
-        CHECK(mValid) << "Uninitialized cache";
         std::scoped_lock lock{mClientMutex};
         mClient = nullptr;
     }
@@ -216,7 +140,6 @@ public:
     // Returns a list of traits for components supported by the service. This
     // list is cached.
     std::vector<C2Component::Traits> const& getTraits() {
-        CHECK(mValid) << "Uninitialized cache";
         std::call_once(mTraitsInitializationFlag, [this]() {
             bool success{false};
             // Spin until _listComponents() is successful.
@@ -229,7 +152,7 @@ public:
                 using namespace std::chrono_literals;
                 static constexpr auto kServiceRetryPeriod = 5s;
                 LOG(INFO) << "Failed to retrieve component traits from service "
-                             "\"" << getServiceNames()[mIndex] << "\". "
+                             "\"" << GetServiceNames()[mIndex] << "\". "
                              "Retrying...";
                 std::this_thread::sleep_for(kServiceRetryPeriod);
             }
@@ -240,7 +163,7 @@ public:
     // List() returns the list of all caches.
     static std::vector<Cache>& List() {
         static std::vector<Cache> sCaches{[]() {
-            size_t numServices = getServiceNames().size();
+            size_t numServices = GetServiceNames().size();
             std::vector<Cache> caches(numServices);
             for (size_t i = 0; i < numServices; ++i) {
                 caches[i].init(i);
@@ -610,8 +533,12 @@ Codec2Client::Codec2Client(const sp<IComponentStore>& base,
     }
 }
 
+sp<Codec2Client::Base> const& Codec2Client::getBase() const {
+    return mBase;
+}
+
 std::string const& Codec2Client::getServiceName() const {
-    return getServiceNames()[mServiceIndex];
+    return GetServiceNames()[mServiceIndex];
 }
 
 c2_status_t Codec2Client::createComponent(
@@ -807,15 +734,94 @@ std::shared_ptr<C2ParamReflector>
     return std::make_shared<SimpleParamReflector>(mBase);
 };
 
+std::vector<std::string> const& Codec2Client::GetServiceNames() {
+    static std::vector<std::string> sServiceNames{[]() {
+        using ::android::hardware::media::c2::V1_0::IComponentStore;
+        using ::android::hidl::manager::V1_2::IServiceManager;
+
+        while (true) {
+            sp<IServiceManager> serviceManager = IServiceManager::getService();
+            CHECK(serviceManager) << "Hardware service manager is not running.";
+
+            // There are three categories of services based on names.
+            std::vector<std::string> defaultNames; // Prefixed with "default"
+            std::vector<std::string> vendorNames;  // Prefixed with "vendor"
+            std::vector<std::string> otherNames;   // Others
+            Return<void> transResult;
+            transResult = serviceManager->listManifestByInterface(
+                    IComponentStore::descriptor,
+                    [&defaultNames, &vendorNames, &otherNames](
+                            hidl_vec<hidl_string> const& instanceNames) {
+                        for (hidl_string const& instanceName : instanceNames) {
+                            char const* name = instanceName.c_str();
+                            if (strncmp(name, "default", 7) == 0) {
+                                defaultNames.emplace_back(name);
+                            } else if (strncmp(name, "vendor", 6) == 0) {
+                                vendorNames.emplace_back(name);
+                            } else {
+                                otherNames.emplace_back(name);
+                            }
+                        }
+                    });
+            if (transResult.isOk()) {
+                // Sort service names in each category.
+                std::sort(defaultNames.begin(), defaultNames.end());
+                std::sort(vendorNames.begin(), vendorNames.end());
+                std::sort(otherNames.begin(), otherNames.end());
+
+                // Concatenate the three lists in this order: default, vendor,
+                // other.
+                std::vector<std::string>& names = defaultNames;
+                names.reserve(names.size() + vendorNames.size() + otherNames.size());
+                names.insert(names.end(),
+                             std::make_move_iterator(vendorNames.begin()),
+                             std::make_move_iterator(vendorNames.end()));
+                names.insert(names.end(),
+                             std::make_move_iterator(otherNames.begin()),
+                             std::make_move_iterator(otherNames.end()));
+
+                // Summarize to logcat.
+                if (names.empty()) {
+                    LOG(INFO) << "No Codec2 services declared in the manifest.";
+                } else {
+                    std::stringstream stringOutput;
+                    stringOutput << "Available Codec2 services:";
+                    for (std::string const& name : names) {
+                        stringOutput << " \"" << name << "\"";
+                    }
+                    LOG(INFO) << stringOutput.str();
+                }
+
+                return names;
+            }
+            LOG(ERROR) << "Could not retrieve the list of service instances of "
+                       << IComponentStore::descriptor
+                       << ". Retrying...";
+        }
+    }()};
+    return sServiceNames;
+}
+
 std::shared_ptr<Codec2Client> Codec2Client::CreateFromService(
         const char* name) {
     size_t index = getServiceIndex(name);
-    return index == getServiceNames().size() ?
+    return index == GetServiceNames().size() ?
             nullptr : _CreateFromIndex(index);
 }
 
+std::vector<std::shared_ptr<Codec2Client>> Codec2Client::
+        CreateFromAllServices() {
+    std::vector<std::shared_ptr<Codec2Client>> clients(
+            GetServiceNames().size());
+    for (size_t i = GetServiceNames().size(); i > 0; ) {
+        --i;
+        clients[i] = _CreateFromIndex(i);
+    }
+    return clients;
+}
+
 std::shared_ptr<Codec2Client> Codec2Client::_CreateFromIndex(size_t index) {
-    std::string const& name = getServiceNames()[index];
+    std::string const& name = GetServiceNames()[index];
     LOG(INFO) << "Creating a Codec2 client to service \"" << name << "\"";
     sp<Base> baseStore = Base::getService(name);
     CHECK(baseStore) << "Codec2 service \"" << name << "\""
@@ -958,17 +964,17 @@ std::shared_ptr<Codec2Client::InputSurface> Codec2Client::CreateInputSurface(
     if (inputSurfaceSetting == 0) {
         return nullptr;
     }
-    size_t index = getServiceNames().size();
+    size_t index = GetServiceNames().size();
     if (serviceName) {
         index = getServiceIndex(serviceName);
-        if (index == getServiceNames().size()) {
+        if (index == GetServiceNames().size()) {
             LOG(DEBUG) << "CreateInputSurface -- invalid service name: \""
                        << serviceName << "\"";
         }
     }
 
     std::shared_ptr<Codec2Client::InputSurface> inputSurface;
-    if (index != getServiceNames().size()) {
+    if (index != GetServiceNames().size()) {
         std::shared_ptr<Codec2Client> client = Cache::List()[index].getClient();
         if (client->createInputSurface(&inputSurface) == C2_OK) {
             return inputSurface;
