@@ -172,6 +172,13 @@ status_t AudioPolicyService::AudioPolicyClient::moveEffects(audio_session_t sess
     return af->moveEffects(session, src_output, dst_output);
 }
 
+void AudioPolicyService::AudioPolicyClient::setEffectSuspended(int effectId,
+                                audio_session_t sessionId,
+                                bool suspended)
+{
+    mAudioPolicyService->setEffectSuspended(effectId, sessionId, suspended);
+}
+
 status_t AudioPolicyService::AudioPolicyClient::createAudioPatch(const struct audio_patch *patch,
                                                                   audio_patch_handle_t *handle,
                                                                   int delayMs)
