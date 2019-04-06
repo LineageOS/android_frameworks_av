@@ -40,7 +40,6 @@ cc_library_shared {
         "libmedia",
         "libmedia_omx",
         "libsfplugin_ccodec_utils",
-        "libstagefright_bufferqueue_helper",
         "libstagefright_codecbase",
         "libstagefright_foundation",
         "libstagefright_omx_utils",
