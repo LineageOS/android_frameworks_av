@@ -20,7 +20,6 @@ cc_library {
         "libhidltransport",
         "liblog",
         "libstagefright_bufferpool@2.0",
-        "libstagefright_bufferqueue_helper",
         "libui",
         "libutils",
     ],
@@ -30,8 +29,8 @@ cc_library {
     ],
 
     export_shared_lib_headers: [
-        "libcodec2_hidl@1.0",
         "libcodec2",
+        "libcodec2_hidl@1.0",
     ],
 
 }

@@ -201,6 +201,8 @@ AudioResamplerDyn<TC, TI, TO>::AudioResamplerDyn(
             "ro.audio.resampler.psd.stopband", mPropertyStopbandAttenuation);
     mPropertyCutoffPercent = property_get_int32(
             "ro.audio.resampler.psd.cutoff_percent", mPropertyCutoffPercent);
+    mPropertyTransitionBandwidthCheat = property_get_int32(
+            "ro.audio.resampler.psd.tbwcheat", mPropertyTransitionBandwidthCheat);
 }
 
 template<typename TC, typename TI, typename TO>
@@ -379,9 +381,17 @@ void AudioResamplerDyn<TC, TI, TO>::setSampleRate(int32_t inSampleRate)
             halfLength = mPropertyHalfFilterLength;
             stopBandAtten = mPropertyStopbandAttenuation;
             useS32 = true;
-            fcr = mInSampleRate <= mSampleRate
-                    ? 0.5 : 0.5 * mSampleRate / mInSampleRate;
-            fcr *= mPropertyCutoffPercent / 100.;
+
+            // Use either the stopband location for design (tbwCheat)
+            // or use the 3dB cutoff location for design (fcr).
+            // This choice is exclusive and based on whether fcr > 0.
+            if (mPropertyTransitionBandwidthCheat != 0) {
+                tbwCheat = mPropertyTransitionBandwidthCheat / 100.;
+            } else {
+                fcr = mInSampleRate <= mSampleRate
+                        ? 0.5 : 0.5 * mSampleRate / mInSampleRate;
+                fcr *= mPropertyCutoffPercent / 100.;
+            }
         } else {
             // Voice quality devices have lower sampling rates
             // (and may be a consequence of downstream AMR-WB / G.722 codecs).

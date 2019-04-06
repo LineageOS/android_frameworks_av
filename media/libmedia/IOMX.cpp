@@ -27,7 +27,6 @@
 #include <media/openmax/OMX_IndexExt.h>
 #include <media/OMXBuffer.h>
 #include <utils/NativeHandle.h>
-#include <gui/IGraphicBufferProducer.h>
 
 #include <media/omx/1.0/WOmxNode.h>
 #include <android/IGraphicBufferSource.h>
@@ -60,79 +59,6 @@ enum {
     CONFIGURE_VIDEO_TUNNEL_MODE,
     DISPATCH_MESSAGE,
     SET_QUIRKS,
-};
-
-class BpOMX : public BpInterface<IOMX> {
-public:
-    explicit BpOMX(const sp<IBinder> &impl)
-        : BpInterface<IOMX>(impl) {
-    }
-
-    virtual status_t listNodes(List<ComponentInfo> *list) {
-        list->clear();
-
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        remote()->transact(LIST_NODES, data, &reply);
-
-        int32_t n = reply.readInt32();
-        for (int32_t i = 0; i < n; ++i) {
-            list->push_back(ComponentInfo());
-            ComponentInfo &info = *--list->end();
-
-            info.mName = reply.readString8();
-            int32_t numRoles = reply.readInt32();
-            for (int32_t j = 0; j < numRoles; ++j) {
-                info.mRoles.push_back(reply.readString8());
-            }
-        }
-
-        return OK;
-    }
-
-    virtual status_t allocateNode(
-            const char *name, const sp<IOMXObserver> &observer,
-            sp<IOMXNode> *omxNode) {
-        Parcel data, reply;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        data.writeCString(name);
-        data.writeStrongBinder(IInterface::asBinder(observer));
-        remote()->transact(ALLOCATE_NODE, data, &reply);
-
-        status_t err = reply.readInt32();
-        if (err == OK) {
-            *omxNode = IOMXNode::asInterface(reply.readStrongBinder());
-        } else {
-            omxNode->clear();
-        }
-
-        return err;
-    }
-
-    virtual status_t createInputSurface(
-            sp<IGraphicBufferProducer> *bufferProducer,
-            sp<IGraphicBufferSource> *bufferSource) {
-        Parcel data, reply;
-        status_t err;
-        data.writeInterfaceToken(IOMX::getInterfaceDescriptor());
-        err = remote()->transact(CREATE_INPUT_SURFACE, data, &reply);
-        if (err != OK) {
-            ALOGW("binder transaction failed: %d", err);
-            return err;
-        }
-
-        err = reply.readInt32();
-        if (err != OK) {
-            return err;
-        }
-
-        *bufferProducer = IGraphicBufferProducer::asInterface(
-                reply.readStrongBinder());
-        *bufferSource = IGraphicBufferSource::asInterface(
-                reply.readStrongBinder());
-
-        return err;
-    }
 };
 
 class BpOMXNode : public BpInterface<IOMXNode> {
@@ -551,7 +477,6 @@ public:
     }
 };
 
-IMPLEMENT_META_INTERFACE(OMX, "android.hardware.IOMX");
 IMPLEMENT_HYBRID_META_INTERFACE(OMXNode, "android.hardware.IOMXNode");
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -561,82 +486,6 @@ IMPLEMENT_HYBRID_META_INTERFACE(OMXNode, "android.hardware.IOMXNode");
             ALOGW("Call incorrectly routed to " #interface); \
             return PERMISSION_DENIED; \
         } } while (0)
-
-status_t BnOMX::onTransact(
-    uint32_t code, const Parcel &data, Parcel *reply, uint32_t flags) {
-    switch (code) {
-        case LIST_NODES:
-        {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
-
-            List<ComponentInfo> list;
-            listNodes(&list);
-
-            reply->writeInt32(list.size());
-            for (List<ComponentInfo>::iterator it = list.begin();
-                 it != list.end(); ++it) {
-                ComponentInfo &cur = *it;
-
-                reply->writeString8(cur.mName);
-                reply->writeInt32(cur.mRoles.size());
-                for (List<String8>::iterator role_it = cur.mRoles.begin();
-                     role_it != cur.mRoles.end(); ++role_it) {
-                    reply->writeString8(*role_it);
-                }
-            }
-
-            return NO_ERROR;
-        }
-
-        case ALLOCATE_NODE:
-        {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
-
-            const char *name = data.readCString();
-
-            sp<IOMXObserver> observer =
-                interface_cast<IOMXObserver>(data.readStrongBinder());
-
-            if (name == NULL || observer == NULL) {
-                ALOGE("b/26392700");
-                reply->writeInt32(INVALID_OPERATION);
-                return NO_ERROR;
-            }
-
-            sp<IOMXNode> omxNode;
-
-            status_t err = allocateNode(name, observer, &omxNode);
-
-            reply->writeInt32(err);
-            if (err == OK) {
-                reply->writeStrongBinder(IInterface::asBinder(omxNode));
-            }
-
-            return NO_ERROR;
-        }
-
-        case CREATE_INPUT_SURFACE:
-        {
-            CHECK_OMX_INTERFACE(IOMX, data, reply);
-
-            sp<IGraphicBufferProducer> bufferProducer;
-            sp<IGraphicBufferSource> bufferSource;
-            status_t err = createInputSurface(&bufferProducer, &bufferSource);
-
-            reply->writeInt32(err);
-
-            if (err == OK) {
-                reply->writeStrongBinder(IInterface::asBinder(bufferProducer));
-                reply->writeStrongBinder(IInterface::asBinder(bufferSource));
-            }
-
-            return NO_ERROR;
-        }
-
-        default:
-            return BBinder::onTransact(code, data, reply, flags);
-    }
-}
 
 status_t BnOMXNode::onTransact(
     uint32_t code, const Parcel &data, Parcel *reply, uint32_t flags) {

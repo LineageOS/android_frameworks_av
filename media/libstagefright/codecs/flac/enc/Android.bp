@@ -1,14 +1,8 @@
 cc_library_shared {
+    name: "libstagefright_soft_flacenc",
+    defaults: ["libstagefright_softomx-defaults"],
 
     srcs: ["SoftFlacEncoder.cpp"],
-
-    include_dirs: [
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include/media/openmax",
-        "external/flac/include",
-    ],
-
-    cflags: ["-Werror"],
 
     version_script: "exports.lds",
 
@@ -19,19 +13,10 @@ cc_library_shared {
         ],
         cfi: true,
     },
-    defaults: ["omx_soft_libs"],
 
     header_libs: ["libbase_headers"],
     static_libs: [
         "libaudioutils",
         "libFLAC",
     ],
-
-    name: "libstagefright_soft_flacenc",
-    vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
-
-    compile_multilib: "32",
 }

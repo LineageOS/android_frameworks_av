@@ -7125,24 +7125,6 @@ reacquire_wakelock:
         ALOG_ASSERT(framesRead > 0);
         mFramesRead += framesRead;
 
-        if (audio_has_proportional_frames(mFormat)
-                && loopCount == lastLoopCountRead + 1) {
-            const int64_t readPeriodNs = lastIoEndNs - mLastIoEndNs;
-            const double jitterMs =
-                    TimestampVerifier<int64_t, int64_t>::computeJitterMs(
-                            {framesRead, readPeriodNs},
-                            {0, 0} /* lastTimestamp */, mSampleRate);
-            const double processMs = (lastIoBeginNs - mLastIoEndNs) * 1e-6;
-
-            Mutex::Autolock _l(mLock);
-            mIoJitterMs.add(jitterMs);
-            mProcessTimeMs.add(processMs);
-        }
-        // update timing info.
-        mLastIoBeginNs = lastIoBeginNs;
-        mLastIoEndNs = lastIoEndNs;
-        lastLoopCountRead = loopCount;
-
 #ifdef TEE_SINK
         (void)mTee.write((uint8_t*)mRsmpInBuffer + rear * mFrameSize, framesRead);
 #endif
@@ -7302,6 +7284,23 @@ unlock:
         // enable changes in effect chain
         unlockEffectChains(effectChains);
         // effectChains doesn't need to be cleared, since it is cleared by destructor at scope end
+        if (audio_has_proportional_frames(mFormat)
+            && loopCount == lastLoopCountRead + 1) {
+            const int64_t readPeriodNs = lastIoEndNs - mLastIoEndNs;
+            const double jitterMs =
+                TimestampVerifier<int64_t, int64_t>::computeJitterMs(
+                    {framesRead, readPeriodNs},
+                    {0, 0} /* lastTimestamp */, mSampleRate);
+            const double processMs = (lastIoBeginNs - mLastIoEndNs) * 1e-6;
+
+            Mutex::Autolock _l(mLock);
+            mIoJitterMs.add(jitterMs);
+            mProcessTimeMs.add(processMs);
+        }
+        // update timing info.
+        mLastIoBeginNs = lastIoBeginNs;
+        mLastIoEndNs = lastIoEndNs;
+        lastLoopCountRead = loopCount;
     }
 
     standbyIfNotAlreadyInStandby();

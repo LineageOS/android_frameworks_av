@@ -1,9 +1,6 @@
 cc_library_shared {
     name: "libstagefright_soft_vpxenc",
-    vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
+    defaults: ["libstagefright_softomx-defaults"],
 
     srcs: [
         "SoftVPXEncoder.cpp",
@@ -11,14 +8,9 @@ cc_library_shared {
         "SoftVP9Encoder.cpp",
     ],
 
-    cflags: ["-Wall", "-Werror"],
+    cflags: ["-Wall"],
 
     version_script: "exports.lds",
-
-    include_dirs: [
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include/media/openmax",
-    ],
 
     sanitize: {
         misc_undefined: [
@@ -29,8 +21,4 @@ cc_library_shared {
     },
 
     static_libs: ["libvpx"],
-
-    defaults: ["omx_soft_libs"],
-
-    compile_multilib: "32",
 }
