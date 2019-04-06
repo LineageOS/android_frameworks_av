@@ -160,6 +160,7 @@ PlaylistFetcher::PlaylistFetcher(
       mPlaylistTimeUs(-1LL),
       mSeqNumber(-1),
       mNumRetries(0),
+      mNumRetriesForMonitorQueue(0),
       mStartup(true),
       mIDRFound(false),
       mSeekMode(LiveSession::kSeekModeExactPosition),
@@ -849,7 +850,17 @@ void PlaylistFetcher::onMonitorQueue() {
     // in the middle of an unfinished download, delay
     // playlist refresh as it'll change seq numbers
     if (!mDownloadState->hasSavedState()) {
-        refreshPlaylist();
+        status_t err = refreshPlaylist();
+        if (err != OK) {
+            if (mNumRetriesForMonitorQueue < kMaxNumRetries) {
+                ++mNumRetriesForMonitorQueue;
+            } else {
+                notifyError(err);
+            }
+            return;
+        } else {
+            mNumRetriesForMonitorQueue = 0;
+        }
     }
 
     int64_t targetDurationUs = kMinBufferedDurationUs;
