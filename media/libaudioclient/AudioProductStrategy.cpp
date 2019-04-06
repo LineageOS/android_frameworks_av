@@ -86,7 +86,7 @@ bool AudioProductStrategy::attributesMatches(const audio_attributes_t refAttribu
              (clientAttritubes.content_type == refAttributes.content_type)) &&
             ((refAttributes.flags == AUDIO_FLAG_NONE) ||
              (clientAttritubes.flags != AUDIO_FLAG_NONE &&
-            (clientAttritubes.flags & refAttributes.flags) == clientAttritubes.flags)) &&
+            (clientAttritubes.flags & refAttributes.flags) == refAttributes.flags)) &&
             ((strlen(refAttributes.tags) == 0) ||
              (std::strcmp(clientAttritubes.tags, refAttributes.tags) == 0));
 }

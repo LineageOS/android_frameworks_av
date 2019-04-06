@@ -1,19 +1,8 @@
 cc_library_shared {
     name: "libstagefright_soft_gsmdec",
-    vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
+    defaults: ["libstagefright_softomx-defaults"],
 
     srcs: ["SoftGSM.cpp"],
-
-    include_dirs: [
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include/media/openmax",
-        "external/libgsm/inc",
-    ],
-
-    cflags: ["-Werror"],
 
     version_script: "exports.lds",
 
@@ -25,8 +14,5 @@ cc_library_shared {
         cfi: true,
     },
 
-    defaults: ["omx_soft_libs"],
-
     static_libs: ["libgsm"],
-    compile_multilib: "32",
 }

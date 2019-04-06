@@ -1,22 +1,10 @@
 cc_library_shared {
     name: "libstagefright_soft_vpxdec",
-    vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
+    defaults: ["libstagefright_softomx-defaults"],
 
     srcs: ["SoftVPX.cpp"],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include/media/openmax",
-    ],
-
     static_libs: ["libvpx"],
-
-    defaults: ["omx_soft_libs"],
-
-    cflags: ["-Werror"],
 
     version_script: "exports.lds",
 
@@ -27,5 +15,4 @@ cc_library_shared {
         ],
         cfi: true,
     },
-    compile_multilib: "32",
 }

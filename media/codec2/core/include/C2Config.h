@@ -1194,7 +1194,8 @@ C2ENUM(C2Config::prepend_header_mode_t, uint32_t,
     PREPEND_HEADER_TO_ALL_SYNC,
 )
 
-typedef C2GlobalParam<C2Setting, C2BoolValue, kParamIndexPrependHeaderMode>
+typedef C2GlobalParam<C2Setting, C2SimpleValueStruct<C2Config::prepend_header_mode_t>,
+                kParamIndexPrependHeaderMode>
         C2PrependHeaderModeSetting;
 constexpr char C2_PARAMKEY_PREPEND_HEADER_MODE[] = "output.buffers.prepend-header";
 

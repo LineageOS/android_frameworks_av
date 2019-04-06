@@ -70,6 +70,8 @@ struct ACameraMetadata : public RefBase {
 
   private:
 
+    // This function does not check whether the capability passed to it is valid.
+    // The caller must make sure that it is.
     bool isNdkSupportedCapability(const int32_t capability);
     static inline bool isVendorTag(const uint32_t tag);
     static bool isCaptureRequestTag(const uint32_t tag);

@@ -21,8 +21,12 @@
 #include <codec2/hidl/client.h>
 
 #include <deque>
+#include <iterator>
 #include <limits>
 #include <map>
+#include <mutex>
+#include <sstream>
+#include <thread>
 #include <type_traits>
 #include <vector>
 
@@ -39,6 +43,7 @@
 #include <android/hardware/media/c2/1.0/IComponentListener.h>
 #include <android/hardware/media/c2/1.0/IComponentStore.h>
 #include <android/hardware/media/c2/1.0/IConfigurable.h>
+#include <android/hidl/manager/1.2/IServiceManager.h>
 
 #include <C2Debug.h>
 #include <C2BufferPriv.h>
@@ -70,35 +75,181 @@ namespace /* unnamed */ {
 // c2_status_t value that corresponds to hwbinder transaction failure.
 constexpr c2_status_t C2_TRANSACTION_FAILED = C2_CORRUPTED;
 
-// List of known IComponentStore services in the decreasing order of preference.
-constexpr const char* kClientNames[] = {
-        "default",
-        "software",
-    };
+// Returns the list of IComponentStore service names that are available on the
+// device. This list is specified at the build time in manifest files.
+// Note: A software service will have "_software" as a suffix.
+std::vector<std::string> const& getServiceNames() {
+    static std::vector<std::string> sServiceNames{[]() {
+        using ::android::hardware::media::c2::V1_0::IComponentStore;
+        using ::android::hidl::manager::V1_2::IServiceManager;
 
-// Number of known IComponentStore services.
-constexpr size_t kNumClients = std::extent<decltype(kClientNames)>::value;
+        while (true) {
+            sp<IServiceManager> serviceManager = IServiceManager::getService();
+            CHECK(serviceManager) << "Hardware service manager is not running.";
 
-typedef std::array<std::shared_ptr<Codec2Client>, kNumClients> ClientList;
+            // There are three categories of services based on names.
+            std::vector<std::string> defaultNames; // Prefixed with "default"
+            std::vector<std::string> vendorNames;  // Prefixed with "vendor"
+            std::vector<std::string> otherNames;   // Others
+            Return<void> transResult;
+            transResult = serviceManager->listManifestByInterface(
+                    IComponentStore::descriptor,
+                    [&defaultNames, &vendorNames, &otherNames](
+                            hidl_vec<hidl_string> const& instanceNames) {
+                        for (hidl_string const& instanceName : instanceNames) {
+                            char const* name = instanceName.c_str();
+                            if (strncmp(name, "default", 7) == 0) {
+                                defaultNames.emplace_back(name);
+                            } else if (strncmp(name, "vendor", 6) == 0) {
+                                vendorNames.emplace_back(name);
+                            } else {
+                                otherNames.emplace_back(name);
+                            }
+                        }
+                    });
+            if (transResult.isOk()) {
+                // Sort service names in each category.
+                std::sort(defaultNames.begin(), defaultNames.end());
+                std::sort(vendorNames.begin(), vendorNames.end());
+                std::sort(otherNames.begin(), otherNames.end());
 
-// Convenience methods to obtain known clients.
-std::shared_ptr<Codec2Client> getClient(size_t index) {
-    uint32_t serviceMask = ::android::base::GetUintProperty(
-            "debug.media.codec2", uint32_t(0));
-    return Codec2Client::CreateFromService(
-            kClientNames[index],
-            (serviceMask & (1 << index)) != 0);
+                // Concatenate the three lists in this order: default, vendor,
+                // other.
+                std::vector<std::string>& names = defaultNames;
+                names.reserve(names.size() + vendorNames.size() + otherNames.size());
+                names.insert(names.end(),
+                             std::make_move_iterator(vendorNames.begin()),
+                             std::make_move_iterator(vendorNames.end()));
+                names.insert(names.end(),
+                             std::make_move_iterator(otherNames.begin()),
+                             std::make_move_iterator(otherNames.end()));
+
+                // Summarize to logcat.
+                if (names.empty()) {
+                    LOG(INFO) << "No Codec2 services declared in the manifest.";
+                } else {
+                    std::stringstream stringOutput;
+                    stringOutput << "Available Codec2 services:";
+                    for (std::string const& name : names) {
+                        stringOutput << " \"" << name << "\"";
+                    }
+                    LOG(INFO) << stringOutput.str();
+                }
+
+                return names;
+            }
+            LOG(ERROR) << "Could not retrieve the list of service instances of "
+                       << IComponentStore::descriptor
+                       << ". Retrying...";
+        }
+    }()};
+    return sServiceNames;
 }
 
-ClientList getClientList() {
-    ClientList list;
-    for (size_t i = 0; i < list.size(); ++i) {
-        list[i] = getClient(i);
+// Searches for a name in getServiceNames() and returns the index found. If the
+// name is not found, the returned index will be equal to
+// getServiceNames().size().
+size_t getServiceIndex(char const* name) {
+    std::vector<std::string> const& names = getServiceNames();
+    size_t i = 0;
+    for (; i < names.size(); ++i) {
+        if (name == names[i]) {
+            break;
+        }
     }
-    return list;
+    return i;
 }
 
-} // unnamed
+}  // unnamed namespace
+
+// This class caches a Codec2Client object and its component traits. The client
+// will be created the first time it is needed, and it can be refreshed if the
+// service dies (by calling invalidate()). The first time listComponents() is
+// called from the client, the result will be cached.
+class Codec2Client::Cache {
+    // Cached client
+    std::shared_ptr<Codec2Client> mClient;
+    mutable std::mutex mClientMutex;
+
+    // Cached component traits
+    std::vector<C2Component::Traits> mTraits;
+    std::once_flag mTraitsInitializationFlag;
+
+    // The index of the service. This is based on getServiceNames().
+    size_t mIndex;
+    // A "valid" cache object must have its mIndex set with init().
+    bool mValid{false};
+    // Called by s() exactly once to initialize the cache. The index must be a
+    // valid index into the vector returned by getServiceNames(). Calling
+    // init(index) will associate the cache to the service with name
+    // getServiceNames()[index].
+    void init(size_t index) {
+        mIndex = index;
+        mValid = true;
+    }
+
+public:
+    Cache() = default;
+
+    // Initializes mClient if needed, then returns mClient.
+    // If the service is unavailable but listed in the manifest, this function
+    // will block indefinitely.
+    std::shared_ptr<Codec2Client> getClient() {
+        CHECK(mValid) << "Uninitialized cache";
+        std::scoped_lock lock{mClientMutex};
+        if (!mClient) {
+            mClient = Codec2Client::_CreateFromIndex(mIndex);
+        }
+        return mClient;
+    }
+
+    // Causes a subsequent call to getClient() to create a new client. This
+    // function should be called after the service dies.
+    //
+    // Note: This function is called only by ForAllServices().
+    void invalidate() {
+        CHECK(mValid) << "Uninitialized cache";
+        std::scoped_lock lock{mClientMutex};
+        mClient = nullptr;
+    }
+
+    // Returns a list of traits for components supported by the service. This
+    // list is cached.
+    std::vector<C2Component::Traits> const& getTraits() {
+        CHECK(mValid) << "Uninitialized cache";
+        std::call_once(mTraitsInitializationFlag, [this]() {
+            bool success{false};
+            // Spin until _listComponents() is successful.
+            while (true) {
+                std::shared_ptr<Codec2Client> client = getClient();
+                mTraits = client->_listComponents(&success);
+                if (success) {
+                    break;
+                }
+                using namespace std::chrono_literals;
+                static constexpr auto kServiceRetryPeriod = 5s;
+                LOG(INFO) << "Failed to retrieve component traits from service "
+                             "\"" << getServiceNames()[mIndex] << "\". "
+                             "Retrying...";
+                std::this_thread::sleep_for(kServiceRetryPeriod);
+            }
+        });
+        return mTraits;
+    }
+
+    // List() returns the list of all caches.
+    static std::vector<Cache>& List() {
+        static std::vector<Cache> sCaches{[]() {
+            size_t numServices = getServiceNames().size();
+            std::vector<Cache> caches(numServices);
+            for (size_t i = 0; i < numServices; ++i) {
+                caches[i].init(i);
+            }
+            return caches;
+        }()};
+        return sCaches;
+    }
+};
 
 // Codec2ConfigurableClient
 
@@ -439,7 +590,7 @@ struct Codec2Client::Component::HidlListener : public IComponentListener {
 
 // Codec2Client
 Codec2Client::Codec2Client(const sp<IComponentStore>& base,
-                           std::string serviceName)
+                           size_t serviceIndex)
       : Configurable{
             [base]() -> sp<IConfigurable> {
                 Return<sp<IConfigurable>> transResult =
@@ -450,14 +601,17 @@ Codec2Client::Codec2Client(const sp<IComponentStore>& base,
             }()
         },
         mBase{base},
-        mListed{false},
-        mServiceName{serviceName} {
+        mServiceIndex{serviceIndex} {
     Return<sp<IClientManager>> transResult = base->getPoolClientManager();
     if (!transResult.isOk()) {
         LOG(ERROR) << "getPoolClientManager -- transaction failed.";
     } else {
         mHostPoolManager = static_cast<sp<IClientManager>>(transResult);
     }
+}
+
+std::string const& Codec2Client::getServiceName() const {
+    return getServiceNames()[mServiceIndex];
 }
 
 c2_status_t Codec2Client::createComponent(
@@ -558,33 +712,38 @@ c2_status_t Codec2Client::createInputSurface(
     return status;
 }
 
-const std::vector<C2Component::Traits>& Codec2Client::listComponents() const {
-    std::lock_guard<std::mutex> lock(mMutex);
-    if (mListed) {
-        return mTraitsList;
-    }
+std::vector<C2Component::Traits> const& Codec2Client::listComponents() const {
+    return Cache::List()[mServiceIndex].getTraits();
+}
+
+std::vector<C2Component::Traits> Codec2Client::_listComponents(
+        bool* success) const {
+    std::vector<C2Component::Traits> traits;
+    std::string const& serviceName = getServiceName();
     Return<void> transStatus = mBase->listComponents(
-            [this](Status s,
+            [&traits, &serviceName](Status s,
                    const hidl_vec<IComponentStore::ComponentTraits>& t) {
                 if (s != Status::OK) {
-                    LOG(DEBUG) << "listComponents -- call failed: "
+                    LOG(DEBUG) << "_listComponents -- call failed: "
                                << static_cast<c2_status_t>(s) << ".";
                     return;
                 }
-                mTraitsList.resize(t.size());
+                traits.resize(t.size());
                 for (size_t i = 0; i < t.size(); ++i) {
-                    if (!objcpy(&mTraitsList[i], t[i])) {
-                        LOG(ERROR) << "listComponents -- corrupted output.";
+                    if (!objcpy(&traits[i], t[i])) {
+                        LOG(ERROR) << "_listComponents -- corrupted output.";
                         return;
                     }
-                    mTraitsList[i].owner = mServiceName;
+                    traits[i].owner = serviceName;
                 }
             });
     if (!transStatus.isOk()) {
-        LOG(ERROR) << "listComponents -- transaction failed.";
+        LOG(ERROR) << "_listComponents -- transaction failed.";
+        *success = false;
+    } else {
+        *success = true;
     }
-    mListed = true;
-    return mTraitsList;
+    return traits;
 }
 
 c2_status_t Codec2Client::copyBuffer(
@@ -649,34 +808,29 @@ std::shared_ptr<C2ParamReflector>
 };
 
 std::shared_ptr<Codec2Client> Codec2Client::CreateFromService(
-        const char* serviceName, bool waitForService) {
-    if (!serviceName) {
-        return nullptr;
-    }
-    sp<Base> baseStore = waitForService ?
-            Base::getService(serviceName) :
-            Base::tryGetService(serviceName);
-    if (!baseStore) {
-        if (waitForService) {
-            LOG(WARNING) << "Codec2.0 service \"" << serviceName << "\""
-                            " inaccessible. Check the device manifest.";
-        } else {
-            LOG(DEBUG) << "Codec2.0 service \"" << serviceName << "\""
-                          " unavailable at the moment. "
-                          " Wait or check the device manifest.";
-        }
-        return nullptr;
-    }
-    return std::make_shared<Codec2Client>(baseStore, serviceName);
+        const char* name) {
+    size_t index = getServiceIndex(name);
+    return index == getServiceNames().size() ?
+            nullptr : _CreateFromIndex(index);
 }
 
-c2_status_t Codec2Client::ForAllStores(
+std::shared_ptr<Codec2Client> Codec2Client::_CreateFromIndex(size_t index) {
+    std::string const& name = getServiceNames()[index];
+    LOG(INFO) << "Creating a Codec2 client to service \"" << name << "\"";
+    sp<Base> baseStore = Base::getService(name);
+    CHECK(baseStore) << "Codec2 service \"" << name << "\""
+                        " inaccessible for unknown reasons.";
+    LOG(INFO) << "Client to Codec2 service \"" << name << "\" created";
+    return std::make_shared<Codec2Client>(baseStore, index);
+}
+
+c2_status_t Codec2Client::ForAllServices(
         const std::string &key,
         std::function<c2_status_t(const std::shared_ptr<Codec2Client>&)>
             predicate) {
     c2_status_t status = C2_NO_INIT;  // no IComponentStores present
 
-    // Cache the mapping key -> index of Codec2Client in getClient().
+    // Cache the mapping key -> index of Codec2Client in Cache::List().
     static std::mutex key2IndexMutex;
     static std::map<std::string, size_t> key2Index;
 
@@ -684,33 +838,36 @@ c2_status_t Codec2Client::ForAllStores(
     // the last known client fails, retry once. We do this by pushing the last
     // known client in front of the list of all clients.
     std::deque<size_t> indices;
-    for (size_t index = kNumClients; index > 0; ) {
+    for (size_t index = Cache::List().size(); index > 0; ) {
         indices.push_front(--index);
     }
 
     bool wasMapped = false;
-    std::unique_lock<std::mutex> lock(key2IndexMutex);
-    auto it = key2Index.find(key);
-    if (it != key2Index.end()) {
-        indices.push_front(it->second);
-        wasMapped = true;
+    {
+        std::scoped_lock lock{key2IndexMutex};
+        auto it = key2Index.find(key);
+        if (it != key2Index.end()) {
+            indices.push_front(it->second);
+            wasMapped = true;
+        }
     }
-    lock.unlock();
 
     for (size_t index : indices) {
-        std::shared_ptr<Codec2Client> client = getClient(index);
+        Cache& cache = Cache::List()[index];
+        std::shared_ptr<Codec2Client> client{cache.getClient()};
         if (client) {
             status = predicate(client);
             if (status == C2_OK) {
-                lock.lock();
+                std::scoped_lock lock{key2IndexMutex};
                 key2Index[key] = index; // update last known client index
-                return status;
+                return C2_OK;
             }
         }
         if (wasMapped) {
             LOG(INFO) << "Could not find \"" << key << "\""
                          " in the last instance. Retrying...";
             wasMapped = false;
+            cache.invalidate();
         }
     }
     return status;  // return the last status from a valid client
@@ -722,7 +879,7 @@ std::shared_ptr<Codec2Client::Component>
         const std::shared_ptr<Listener>& listener,
         std::shared_ptr<Codec2Client>* owner) {
     std::shared_ptr<Component> component;
-    c2_status_t status = ForAllStores(
+    c2_status_t status = ForAllServices(
             componentName,
             [owner, &component, componentName, &listener](
                     const std::shared_ptr<Codec2Client> &client)
@@ -755,7 +912,7 @@ std::shared_ptr<Codec2Client::Interface>
         const char* interfaceName,
         std::shared_ptr<Codec2Client>* owner) {
     std::shared_ptr<Interface> interface;
-    c2_status_t status = ForAllStores(
+    c2_status_t status = ForAllServices(
             interfaceName,
             [owner, &interface, interfaceName](
                     const std::shared_ptr<Codec2Client> &client)
@@ -782,50 +939,54 @@ std::shared_ptr<Codec2Client::Interface>
     return interface;
 }
 
-std::shared_ptr<Codec2Client::InputSurface> Codec2Client::CreateInputSurface() {
-    uint32_t serviceMask = ::android::base::GetUintProperty(
-            "debug.stagefright.c2inputsurface", uint32_t(0));
-    for (size_t i = 0; i < kNumClients; ++i) {
-        if ((1 << i) & serviceMask) {
-            std::shared_ptr<Codec2Client> client = getClient(i);
-            std::shared_ptr<Codec2Client::InputSurface> inputSurface;
-            if (client &&
-                    client->createInputSurface(&inputSurface) == C2_OK &&
-                    inputSurface) {
-                return inputSurface;
-            }
-        }
-    }
-    LOG(INFO) << "Could not create an input surface "
-                 "from any Codec2.0 services.";
-    return nullptr;
-}
-
-const std::vector<C2Component::Traits>& Codec2Client::ListComponents() {
-    static std::vector<C2Component::Traits> traitsList = [](){
+std::vector<C2Component::Traits> const& Codec2Client::ListComponents() {
+    static std::vector<C2Component::Traits> sList{[]() {
         std::vector<C2Component::Traits> list;
-        size_t listSize = 0;
-        ClientList clientList = getClientList();
-        for (const std::shared_ptr<Codec2Client>& client : clientList) {
-            if (!client) {
-                continue;
-            }
-            listSize += client->listComponents().size();
-        }
-        list.reserve(listSize);
-        for (const std::shared_ptr<Codec2Client>& client : clientList) {
-            if (!client) {
-                continue;
-            }
-            list.insert(
-                    list.end(),
-                    client->listComponents().begin(),
-                    client->listComponents().end());
+        for (Cache& cache : Cache::List()) {
+            std::vector<C2Component::Traits> const& traits = cache.getTraits();
+            list.insert(list.end(), traits.begin(), traits.end());
         }
         return list;
-    }();
+    }()};
+    return sList;
+}
 
-    return traitsList;
+std::shared_ptr<Codec2Client::InputSurface> Codec2Client::CreateInputSurface(
+        char const* serviceName) {
+    uint32_t inputSurfaceSetting = ::android::base::GetUintProperty(
+            "debug.stagefright.c2inputsurface", uint32_t(0));
+    if (inputSurfaceSetting == 0) {
+        return nullptr;
+    }
+    size_t index = getServiceNames().size();
+    if (serviceName) {
+        index = getServiceIndex(serviceName);
+        if (index == getServiceNames().size()) {
+            LOG(DEBUG) << "CreateInputSurface -- invalid service name: \""
+                       << serviceName << "\"";
+        }
+    }
+
+    std::shared_ptr<Codec2Client::InputSurface> inputSurface;
+    if (index != getServiceNames().size()) {
+        std::shared_ptr<Codec2Client> client = Cache::List()[index].getClient();
+        if (client->createInputSurface(&inputSurface) == C2_OK) {
+            return inputSurface;
+        }
+    }
+    LOG(INFO) << "CreateInputSurface -- attempting to create an input surface "
+                 "from all services...";
+    for (Cache& cache : Cache::List()) {
+        std::shared_ptr<Codec2Client> client = cache.getClient();
+        if (client->createInputSurface(&inputSurface) == C2_OK) {
+            LOG(INFO) << "CreateInputSurface -- input surface obtained from "
+                         "service \"" << client->getServiceName() << "\"";
+            return inputSurface;
+        }
+    }
+    LOG(WARNING) << "CreateInputSurface -- failed to create an input surface "
+                    "from all services";
+    return nullptr;
 }
 
 // Codec2Client::Listener
