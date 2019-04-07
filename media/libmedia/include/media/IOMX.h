@@ -47,8 +47,9 @@ struct omx_message;
 
 using hardware::media::omx::V1_0::IOmxNode;
 
-class IOMX : public RefBase {
+class IOMX : public IInterface {
 public:
+    DECLARE_META_INTERFACE(OMX);
 
     typedef uint32_t buffer_id;
 
@@ -223,6 +224,14 @@ public:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+
+class BnOMX : public BnInterface<IOMX> {
+public:
+    virtual status_t onTransact(
+            uint32_t code, const Parcel &data, Parcel *reply,
+            uint32_t flags = 0);
+};
+
 class BnOMXNode : public BnInterface<IOMXNode> {
 public:
     virtual status_t onTransact(
