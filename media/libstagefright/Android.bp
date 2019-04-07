@@ -187,7 +187,6 @@ cc_library {
         "liblog",
         "libmedia",
         "libmedia_omx",
-        "libmedia_omx_client",
         "libaudioclient",
         "libmediametrics",
         "libmediautils",
