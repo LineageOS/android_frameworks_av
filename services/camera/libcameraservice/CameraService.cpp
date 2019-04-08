@@ -117,6 +117,9 @@ static void setLogLevel(int level) {
 
 static const String16 sManageCameraPermission("android.permission.MANAGE_CAMERA");
 
+Mutex CameraService::sProxyMutex;
+sp<hardware::ICameraServiceProxy> CameraService::sCameraServiceProxy;
+
 CameraService::CameraService() :
         mEventLog(DEFAULT_EVENT_LOG_LENGTH),
         mNumberOfCameras(0),
@@ -203,18 +206,20 @@ status_t CameraService::enumerateProviders() {
 }
 
 sp<ICameraServiceProxy> CameraService::getCameraServiceProxy() {
-    sp<ICameraServiceProxy> proxyBinder = nullptr;
 #ifndef __BRILLO__
-    sp<IServiceManager> sm = defaultServiceManager();
-    // Use checkService because cameraserver normally starts before the
-    // system server and the proxy service. So the long timeout that getService
-    // has before giving up is inappropriate.
-    sp<IBinder> binder = sm->checkService(String16("media.camera.proxy"));
-    if (binder != nullptr) {
-        proxyBinder = interface_cast<ICameraServiceProxy>(binder);
+    Mutex::Autolock al(sProxyMutex);
+    if (sCameraServiceProxy == nullptr) {
+        sp<IServiceManager> sm = defaultServiceManager();
+        // Use checkService because cameraserver normally starts before the
+        // system server and the proxy service. So the long timeout that getService
+        // has before giving up is inappropriate.
+        sp<IBinder> binder = sm->checkService(String16("media.camera.proxy"));
+        if (binder != nullptr) {
+            sCameraServiceProxy = interface_cast<ICameraServiceProxy>(binder);
+        }
     }
 #endif
-    return proxyBinder;
+    return sCameraServiceProxy;
 }
 
 void CameraService::pingCameraServiceProxy() {
