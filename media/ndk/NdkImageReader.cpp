@@ -29,7 +29,7 @@
 #include <ui/PublicFormat.h>
 #include <private/android/AHardwareBufferHelpers.h>
 #include <grallocusage/GrallocUsageConversion.h>
-#include <gui/bufferqueue/1.0/WGraphicBufferProducer.h>
+#include <media/stagefright/bqhelper/WGraphicBufferProducer.h>
 
 using namespace android;
 

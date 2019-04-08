@@ -20,6 +20,7 @@ cc_library {
         "libhidltransport",
         "liblog",
         "libstagefright_bufferpool@2.0",
+        "libstagefright_bufferqueue_helper",
         "libui",
         "libutils",
     ],
