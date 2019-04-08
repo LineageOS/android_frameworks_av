@@ -281,27 +281,6 @@ private:
     }
 };
 
-struct GraphicBufferSource::ConsumerProxy : public BufferQueue::ConsumerListener {
-    ConsumerProxy(const sp<GraphicBufferSource> &gbs) : mGbs(gbs) {}
-
-    ~ConsumerProxy() = default;
-
-    void onFrameAvailable(const BufferItem& item) override {
-        mGbs->onFrameAvailable(item);
-    }
-
-    void onBuffersReleased() override {
-        mGbs->onBuffersReleased();
-    }
-
-    void onSidebandStreamChanged() override {
-        mGbs->onSidebandStreamChanged();
-    }
-
-private:
-    sp<GraphicBufferSource> mGbs;
-};
-
 GraphicBufferSource::GraphicBufferSource() :
     mInitCheck(UNKNOWN_ERROR),
     mNumAvailableUnacquiredBuffers(0),
@@ -338,7 +317,8 @@ GraphicBufferSource::GraphicBufferSource() :
     // reference once the ctor ends, as that would cause the refcount of 'this'
     // dropping to 0 at the end of the ctor.  Since all we need is a wp<...>
     // that's what we create.
-    wp<BufferQueue::ConsumerListener> listener = new ConsumerProxy(this);
+    wp<BufferQueue::ConsumerListener> listener =
+            static_cast<BufferQueue::ConsumerListener*>(this);
     sp<IConsumerListener> proxy =
             new BufferQueue::ProxyConsumerListener(listener);
 
