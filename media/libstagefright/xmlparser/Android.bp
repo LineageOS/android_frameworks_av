@@ -20,13 +20,10 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "libbase",
         "libexpat",
         "liblog",
         "libstagefright_omx_utils",
-    ],
-
-    header_libs: [
-        "libbase_headers",
     ],
 
     cflags: [

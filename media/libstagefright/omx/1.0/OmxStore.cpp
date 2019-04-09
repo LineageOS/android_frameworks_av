@@ -38,9 +38,8 @@ using ::android::hardware::media::omx::V1_0::IOmx;
 OmxStore::OmxStore(
         const sp<IOmx> &omx,
         const char* owner,
-        const char* const* searchDirs,
-        const char* mainXmlName,
-        const char* performanceXmlName,
+        const std::vector<std::string> &searchDirs,
+        const std::vector<std::string> &xmlNames,
         const char* profilingResultsXmlPath) {
     // retrieve list of omx nodes
     std::set<std::string> nodes;
@@ -55,10 +54,11 @@ OmxStore::OmxStore(
         });
     }
 
-    MediaCodecsXmlParser parser(searchDirs,
-            mainXmlName,
-            performanceXmlName,
-            profilingResultsXmlPath);
+    MediaCodecsXmlParser parser;
+    parser.parseXmlFilesInSearchDirs(xmlNames, searchDirs);
+    if (profilingResultsXmlPath != nullptr) {
+        parser.parseXmlPath(profilingResultsXmlPath);
+    }
     mParsingStatus = toStatus(parser.getParsingStatus());
 
     const auto& serviceAttributeMap = parser.getServiceAttributeMap();

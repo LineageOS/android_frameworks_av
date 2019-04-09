@@ -45,6 +45,8 @@ constexpr size_t kMaxNodeInstances = (1 << 16);
 Omx::Omx() :
     mMaster(new OMXMaster()),
     mParser() {
+    (void)mParser.parseXmlFilesInSearchDirs();
+    (void)mParser.parseXmlPath(mParser.defaultProfilingResultsXmlPath);
 }
 
 Omx::~Omx() {

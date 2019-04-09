@@ -248,10 +248,9 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
     // Obtain Codec2Client
     std::vector<Traits> traits = Codec2Client::ListComponents();
 
-    MediaCodecsXmlParser parser(
-            MediaCodecsXmlParser::defaultSearchDirs,
-            "media_codecs_c2.xml",
-            "media_codecs_performance_c2.xml");
+    MediaCodecsXmlParser parser;
+    parser.parseXmlFilesInSearchDirs(
+            { "media_codecs_c2.xml", "media_codecs_performance_c2.xml" });
     if (parser.getParsingStatus() != OK) {
         ALOGD("XML parser no good");
         return OK;
