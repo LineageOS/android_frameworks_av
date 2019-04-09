@@ -286,6 +286,7 @@ public:
                                     int id);
     static status_t unregisterEffect(int id);
     static status_t setEffectEnabled(int id, bool enabled);
+    static status_t moveEffectsToIo(const std::vector<int>& ids, audio_io_handle_t io);
 
     // clear stream to output mapping cache (gStreamOutputMap)
     // and output configuration cache (gOutputs)

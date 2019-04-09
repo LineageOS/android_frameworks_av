@@ -797,7 +797,7 @@ status_t AudioPolicyService::registerEffect(const effect_descriptor_t *desc,
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
-    Mutex::Autolock _l(mEffectsLock);
+    Mutex::Autolock _l(mLock);
     AutoCallerClear acc;
     return mAudioPolicyManager->registerEffect(desc, io, strategy, session, id);
 }
@@ -807,7 +807,7 @@ status_t AudioPolicyService::unregisterEffect(int id)
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
-    Mutex::Autolock _l(mEffectsLock);
+    Mutex::Autolock _l(mLock);
     AutoCallerClear acc;
     return mAudioPolicyManager->unregisterEffect(id);
 }
@@ -817,9 +817,19 @@ status_t AudioPolicyService::setEffectEnabled(int id, bool enabled)
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
-    Mutex::Autolock _l(mEffectsLock);
+    Mutex::Autolock _l(mLock);
     AutoCallerClear acc;
     return mAudioPolicyManager->setEffectEnabled(id, enabled);
+}
+
+status_t AudioPolicyService::moveEffectsToIo(const std::vector<int>& ids, audio_io_handle_t io)
+{
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    AutoCallerClear acc;
+    return mAudioPolicyManager->moveEffectsToIo(ids, io);
 }
 
 bool AudioPolicyService::isStreamActive(audio_stream_type_t stream, uint32_t inPastMs) const
@@ -973,8 +983,6 @@ bool AudioPolicyService::isOffloadSupported(const audio_offload_info_t& info)
         return false;
     }
     Mutex::Autolock _l(mLock);
-    Mutex::Autolock _le(mEffectsLock); // isOffloadSupported queries for
-                                      // non-offloadable effects
     AutoCallerClear acc;
     return mAudioPolicyManager->isOffloadSupported(info);
 }

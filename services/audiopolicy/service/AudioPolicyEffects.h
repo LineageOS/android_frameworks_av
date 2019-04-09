@@ -225,6 +225,8 @@ private:
                          size_t *totSize);
 
     // protects access to mInputSources, mInputSessions, mOutputStreams, mOutputSessions
+    // never hold AudioPolicyService::mLock when calling AudioPolicyEffects methods as
+    // those can call back into AudioPolicyService methods and try to acquire the mutex
     Mutex mLock;
     // Automatic input effects are configured per audio_source_t
     KeyedVector< audio_source_t, EffectDescVector* > mInputSources;

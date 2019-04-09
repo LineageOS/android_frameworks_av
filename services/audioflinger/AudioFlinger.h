@@ -369,7 +369,6 @@ private:
 
     AudioHwDevice*          findSuitableHwDev_l(audio_module_handle_t module,
                                                 audio_devices_t devices);
-    void                    purgeStaleEffects_l();
 
     // Set kEnableExtendedChannels to true to enable greater than stereo output
     // for the MixerThread and device sink.  Number of channels allowed is
@@ -696,8 +695,11 @@ using effect_buffer_t = int16_t;
 
               status_t moveEffectChain_l(audio_session_t sessionId,
                                      PlaybackThread *srcThread,
-                                     PlaybackThread *dstThread,
-                                     bool reRegister);
+                                     PlaybackThread *dstThread);
+
+              status_t moveAuxEffectToIo(int EffectId,
+                                         const sp<PlaybackThread>& dstThread,
+                                         sp<PlaybackThread> *srcThread);
 
               // return thread associated with primary hardware device, or NULL
               PlaybackThread *primaryPlaybackThread_l() const;
@@ -731,6 +733,8 @@ using effect_buffer_t = int16_t;
                 // and removed from mOrphanEffectChains if it does not contain any effect.
                 // Return true if the effect was found in mOrphanEffectChains, false otherwise.
                 bool            updateOrphanEffectChains(const sp<EffectModule>& effect);
+
+                std::vector< sp<EffectModule> > purgeStaleEffects_l();
 
                 void broacastParametersToRecordThreads_l(const String8& keyValuePairs);
                 void forwardParametersToDownstreamPatches_l(
