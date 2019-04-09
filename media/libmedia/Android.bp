@@ -65,7 +65,6 @@ cc_library_shared {
         "MediaCodecInfo.cpp",
         "OMXBuffer.cpp",
         "omx/1.0/WGraphicBufferSource.cpp",
-        "omx/1.0/WOmx.cpp",
         "omx/1.0/WOmxBufferSource.cpp",
         "omx/1.0/WOmxNode.cpp",
         "omx/1.0/WOmxObserver.cpp",
@@ -75,13 +74,16 @@ cc_library_shared {
         local_include_dirs: ["aidl"],
         export_aidl_headers: true,
     },
+    
+    local_include_dirs: [
+        "include",
+    ],
 
     shared_libs: [
         "android.hidl.token@1.0-utils",
         "android.hardware.media.omx@1.0",
         "libbinder",
         "libcutils",
-        "libgui",
         "libhidlbase",
         "libhidltransport",
         "liblog",
@@ -93,21 +95,84 @@ cc_library_shared {
     export_shared_lib_headers: [
         "android.hidl.token@1.0-utils",
         "android.hardware.media.omx@1.0",
-        "libgui",
         "libstagefright_foundation",
         "libui",
     ],
 
     header_libs: [
-        "libmedia_headers",
+        "libstagefright_headers",
+        "media_plugin_headers",
     ],
 
     export_header_lib_headers: [
-        "libmedia_headers",
+        "libstagefright_headers",
+        "media_plugin_headers",
     ],
 
     export_include_dirs: [
         "aidl",
+        "include",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wno-error=deprecated-declarations",
+        "-Wall",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+    },
+}
+
+
+cc_library_shared {
+    name: "libmedia_omx_client",
+
+    srcs: [
+        "omx/1.0/WOmx.cpp",
+    ],
+
+    local_include_dirs: [
+        "include",
+    ],
+
+    shared_libs: [
+        "libbinder",
+        "libcutils",
+        "libgui",
+        "libhidlbase",
+        "libhidltransport",
+        "liblog",
+        "libmedia_omx",
+        "libstagefright_foundation",
+        "libui",
+        "libutils",
+    ],
+
+    export_shared_lib_headers: [
+        "libgui",
+        "libmedia_omx",
+        "libstagefright_foundation",
+        "libui",
+    ],
+
+    header_libs: [
+        "libstagefright_headers",
+        "media_plugin_headers",
+    ],
+
+    export_header_lib_headers: [
+        "libstagefright_headers",
+        "media_plugin_headers",
+    ],
+
+    export_include_dirs: [
+        "include",
     ],
 
     cflags: [
