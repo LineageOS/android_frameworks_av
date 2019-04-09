@@ -31,12 +31,12 @@
 #include <ui/FenceTime.h>
 #include <cutils/native_handle.h>
 
-#include <ui/BufferQueueDefs.h>
 #include <ui/GraphicBuffer.h>
 #include <media/OMXFenceParcelable.h>
 #include <media/OMXBuffer.h>
 #include <media/hardware/VideoAPI.h>
 #include <media/stagefright/MediaErrors.h>
+#include <gui/IGraphicBufferProducer.h>
 
 #include <android/hardware/media/omx/1.0/types.h>
 #include <android/hardware/media/omx/1.0/IOmx.h>
@@ -282,8 +282,8 @@ inline Status toStatus(status_t l) {
     case TIMED_OUT:
     case ERROR_UNSUPPORTED:
     case UNKNOWN_ERROR:
-    case BufferQueueDefs::RELEASE_ALL_BUFFERS:
-    case BufferQueueDefs::BUFFER_NEEDS_REALLOCATION:
+    case IGraphicBufferProducer::RELEASE_ALL_BUFFERS:
+    case IGraphicBufferProducer::BUFFER_NEEDS_REALLOCATION:
         return static_cast<Status>(l);
     case NOT_ENOUGH_DATA:
         return Status::BUFFER_NEEDS_REALLOCATION;
