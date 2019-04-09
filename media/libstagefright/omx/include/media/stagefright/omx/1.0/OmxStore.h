@@ -20,6 +20,7 @@
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
+#include <android/hardware/media/omx/1.0/IOmx.h>
 #include <android/hardware/media/omx/1.0/IOmxStore.h>
 #include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
 
@@ -43,6 +44,7 @@ using ::android::wp;
 
 struct OmxStore : public IOmxStore {
     OmxStore(
+            const sp<IOmx> &omx = nullptr,
             const char* owner = "default",
             const char* const* searchDirs
                 = MediaCodecsXmlParser::defaultSearchDirs,
