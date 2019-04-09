@@ -71,6 +71,16 @@ static const struct {
 static const size_t kNumComponents =
     sizeof(kComponents) / sizeof(kComponents[0]);
 
+extern "C" OMXPluginBase* createOMXPlugin() {
+    ALOGI("createOMXPlugin");
+    return new SoftOMXPlugin();
+}
+
+extern "C" void destroyOMXPlugin(OMXPluginBase* plugin) {
+    ALOGI("destroyOMXPlugin");
+    delete plugin;
+}
+
 SoftOMXPlugin::SoftOMXPlugin() {
 }
 
