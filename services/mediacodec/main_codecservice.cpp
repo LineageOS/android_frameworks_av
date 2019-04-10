@@ -25,7 +25,6 @@
 #include <media/stagefright/omx/1.0/Omx.h>
 #include <media/stagefright/omx/1.0/OmxStore.h>
 
-#include <media/CodecServiceRegistrant.h>
 #include <dlfcn.h>
 
 using namespace android;

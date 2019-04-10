@@ -963,10 +963,11 @@ status_t AudioPolicyManager::getOutputForAttrInt(
     //       otherwise, fallback to the dynamic policies, if none match, query the engine.
     // Secondary outputs are always found by dynamic policies as the engine do not support them
     sp<SwAudioOutputDescriptor> policyDesc;
-    if (mPolicyMixes.getOutputForAttr(*resultAttr, uid, policyDesc, secondaryDescs) != NO_ERROR) {
-        policyDesc = nullptr; // reset getOutputForAttr in case of failure
-        secondaryDescs->clear();
+    status = mPolicyMixes.getOutputForAttr(*resultAttr, uid, *flags, policyDesc, secondaryDescs);
+    if (status != OK) {
+        return status;
     }
+
     // Explicit routing is higher priority then any dynamic policy primary output
     bool usePrimaryOutputFromPolicyMixes = requestedDevice == nullptr && policyDesc != nullptr;
 
@@ -2462,6 +2463,11 @@ status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_
     for (size_t i = 0; i < mOutputs.size(); i++) {
         sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
         audio_devices_t curDevice = desc->devices().types();
+
+        if (curDevice & AUDIO_DEVICE_OUT_SPEAKER_SAFE) {
+            curDevice |= AUDIO_DEVICE_OUT_SPEAKER;
+            curDevice &= ~AUDIO_DEVICE_OUT_SPEAKER_SAFE;
+        }
 
         // Inter / intra volume group priority management: Loop on strategies arranged by priority
         // If a higher priority strategy is active, and the output is routed to a device with a
@@ -5064,12 +5070,12 @@ void AudioPolicyManager::checkSecondaryOutputs() {
     for (size_t i = 0; i < mOutputs.size(); i++) {
         const sp<SwAudioOutputDescriptor>& outputDescriptor = mOutputs[i];
         for (const sp<TrackClientDescriptor>& client : outputDescriptor->getClientIterable()) {
-            // FIXME code duplicated from getOutputForAttrInt
             sp<SwAudioOutputDescriptor> desc;
             std::vector<sp<SwAudioOutputDescriptor>> secondaryDescs;
-            mPolicyMixes.getOutputForAttr(client->attributes(), client->uid(), desc,
-                                          &secondaryDescs);
-            if (!std::equal(client->getSecondaryOutputs().begin(),
+            status_t status = mPolicyMixes.getOutputForAttr(client->attributes(), client->uid(),
+                                                            client->flags(), desc, &secondaryDescs);
+            if (status != OK ||
+                !std::equal(client->getSecondaryOutputs().begin(),
                             client->getSecondaryOutputs().end(),
                             secondaryDescs.begin(), secondaryDescs.end())) {
                 streamsToInvalidate.insert(client->stream());

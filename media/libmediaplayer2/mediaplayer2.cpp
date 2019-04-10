@@ -1026,8 +1026,16 @@ void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const Play
     case MEDIA2_NOP: // interface test message
         break;
     case MEDIA2_PREPARED:
-        ALOGV("MediaPlayer2::notify() prepared");
-        mCurrentState = MEDIA_PLAYER2_PREPARED;
+        ALOGV("MediaPlayer2::notify() prepared, srcId=%lld", (long long)srcId);
+        if (srcId == mSrcId) {
+            mCurrentState = MEDIA_PLAYER2_PREPARED;
+        }
+        break;
+    case MEDIA2_STARTED:
+        ALOGV("MediaPlayer2::notify() started, srcId=%lld", (long long)srcId);
+        if (srcId == mSrcId) {
+            mCurrentState = MEDIA_PLAYER2_STARTED;
+        }
         break;
     case MEDIA2_DRM_INFO:
         ALOGV("MediaPlayer2::notify() MEDIA2_DRM_INFO(%lld, %d, %d, %d, %p)",
@@ -1038,7 +1046,7 @@ void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const Play
         if (mCurrentState == MEDIA_PLAYER2_IDLE) {
             ALOGE("playback complete in idle state");
         }
-        if (!mLoop) {
+        if (!mLoop && srcId == mSrcId) {
             mCurrentState = MEDIA_PLAYER2_PLAYBACK_COMPLETE;
         }
         break;
@@ -1054,6 +1062,10 @@ void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const Play
         // ext2: Implementation dependant error code.
         if (ext1 != MEDIA2_INFO_VIDEO_TRACK_LAGGING) {
             ALOGW("info/warning (%d, %d)", ext1, ext2);
+
+            if (ext1 == MEDIA2_INFO_DATA_SOURCE_START && srcId == mSrcId) {
+                mCurrentState = MEDIA_PLAYER2_STARTED;
+            }
         }
         break;
     case MEDIA2_SEEK_COMPLETE:

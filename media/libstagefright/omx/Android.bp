@@ -6,7 +6,6 @@ cc_library_shared {
     },
 
     srcs: [
-        "BWGraphicBufferSource.cpp",
         "OMXMaster.cpp",
         "OMXNodeInstance.cpp",
         "OMXUtils.cpp",
@@ -39,7 +38,6 @@ cc_library_shared {
         "libutils",
         "liblog",
         "libui",
-        "libgui",
         "libcutils",
         "libstagefright_foundation",
         "libstagefright_bufferqueue_helper",
@@ -55,7 +53,6 @@ cc_library_shared {
     ],
 
     export_shared_lib_headers: [
-        "libmedia_omx",
         "libstagefright_foundation",
         "libstagefright_xmlparser",
         "libutils",

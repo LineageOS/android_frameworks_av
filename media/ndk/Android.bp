@@ -81,7 +81,6 @@ cc_library_shared {
         "libmediadrm",
         "libstagefright",
         "libstagefright_foundation",
-        "libstagefright_bufferqueue_helper",
         "liblog",
         "libutils",
         "libcutils",
