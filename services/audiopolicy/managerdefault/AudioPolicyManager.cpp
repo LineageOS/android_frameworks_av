@@ -142,18 +142,7 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
                     __func__, device->toString().c_str(), encodedFormat);
 
             // register new device as available
-            index = mAvailableOutputDevices.add(device);
-            if (index >= 0) {
-                sp<HwModule> module = mHwModules.getModuleForDevice(device, encodedFormat);
-                if (module == 0) {
-                    ALOGD("setDeviceConnectionState() could not find HW module for device %s",
-                          device->toString().c_str());
-                    mAvailableOutputDevices.remove(device);
-                    return INVALID_OPERATION;
-                }
-                ALOGV("setDeviceConnectionState() module name=%s", module->getName());
-                mAvailableOutputDevices[index]->attach(module);
-            } else {
+            if (mAvailableOutputDevices.add(device) < 0) {
                 return NO_MEMORY;
             }
 
@@ -295,13 +284,6 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
                 ALOGW("%s() device already connected: %s", __func__, device->toString().c_str());
                 return INVALID_OPERATION;
             }
-            sp<HwModule> module = mHwModules.getModuleForDevice(device, AUDIO_FORMAT_DEFAULT);
-            if (module == NULL) {
-                ALOGW("setDeviceConnectionState(): could not find HW module for device %s",
-                      device->toString().c_str());
-                return INVALID_OPERATION;
-            }
-
             // Before checking intputs, broadcast connect event to allow HAL to retrieve dynamic
             // parameters on newly connected devices (instead of opening the inputs...)
             broadcastDeviceConnectionState(device, state);
