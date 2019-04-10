@@ -43,4 +43,5 @@ cc_binary {
         "-Wall",
     ],
 
+    vintf_fragments: ["manifest_media_c2_software.xml"],
 }
