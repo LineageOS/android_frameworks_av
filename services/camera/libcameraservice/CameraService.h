@@ -930,6 +930,11 @@ private:
     static StatusInternal mapToInternal(hardware::camera::common::V1_0::CameraDeviceStatus status);
     static int32_t mapToInterface(StatusInternal status);
 
+    // Guard mCameraServiceProxy
+    static Mutex sProxyMutex;
+    // Cached interface to the camera service proxy in system service
+    static sp<hardware::ICameraServiceProxy> sCameraServiceProxy;
+
     static sp<hardware::ICameraServiceProxy> getCameraServiceProxy();
     static void pingCameraServiceProxy();
 

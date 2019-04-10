@@ -32,7 +32,6 @@ LOCAL_REQUIRED_MODULES_x86 := mediacodec.policy
 endif
 LOCAL_SRC_FILES := main_codecservice.cpp
 LOCAL_SHARED_LIBRARIES := \
-    libmedia_omx \
     libbinder \
     libutils \
     liblog \

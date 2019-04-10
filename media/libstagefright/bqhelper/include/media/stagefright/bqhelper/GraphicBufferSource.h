@@ -68,7 +68,7 @@ struct FrameDropper;
  * (even if it was dropped) to reencode it after an interval if no further
  * frames are sent by the producer.
  */
-class GraphicBufferSource : public BufferQueue::ConsumerListener {
+class GraphicBufferSource : public RefBase {
 public:
     GraphicBufferSource();
 
@@ -190,8 +190,6 @@ public:
     status_t setColorAspects(int32_t aspectsPacked);
 
 protected:
-    // BQ::ConsumerListener interface
-    // ------------------------------
 
     // BufferQueue::ConsumerListener interface, called when a new frame of
     // data is available.  If we're executing and a codec buffer is
@@ -199,19 +197,24 @@ protected:
     // into the codec buffer, and call Empty[This]Buffer.  If we're not yet
     // executing or there's no codec buffer available, we just increment
     // mNumFramesAvailable and return.
-    void onFrameAvailable(const BufferItem& item) override;
+    void onFrameAvailable(const BufferItem& item) ;
 
     // BufferQueue::ConsumerListener interface, called when the client has
     // released one or more GraphicBuffers.  We clear out the appropriate
     // set of mBufferSlot entries.
-    void onBuffersReleased() override;
+    void onBuffersReleased() ;
 
     // BufferQueue::ConsumerListener interface, called when the client has
     // changed the sideband stream. GraphicBufferSource doesn't handle sideband
     // streams so this is a no-op (and should never be called).
-    void onSidebandStreamChanged() override;
+    void onSidebandStreamChanged() ;
 
 private:
+    // BQ::ConsumerListener interface
+    // ------------------------------
+    struct ConsumerProxy;
+    sp<ConsumerProxy> mConsumerProxy;
+
     // Lock, covers all member variables.
     mutable Mutex mMutex;
 

@@ -2464,6 +2464,11 @@ status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_
         sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
         audio_devices_t curDevice = desc->devices().types();
 
+        if (curDevice & AUDIO_DEVICE_OUT_SPEAKER_SAFE) {
+            curDevice |= AUDIO_DEVICE_OUT_SPEAKER;
+            curDevice &= ~AUDIO_DEVICE_OUT_SPEAKER_SAFE;
+        }
+
         // Inter / intra volume group priority management: Loop on strategies arranged by priority
         // If a higher priority strategy is active, and the output is routed to a device with a
         // HW Gain management, do not change the volume
