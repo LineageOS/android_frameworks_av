@@ -37,13 +37,10 @@ package media.codecs {
 
   public class Included {
     ctor public Included();
-    method public media.codecs.Decoders getDecoders_optional();
-    method public media.codecs.Encoders getEncoders_optional();
+    method public java.util.List<media.codecs.Decoders> getDecoders_optional();
+    method public java.util.List<media.codecs.Encoders> getEncoders_optional();
     method public java.util.List<media.codecs.Include> getInclude_optional();
-    method public media.codecs.Settings getSettings_optional();
-    method public void setDecoders_optional(media.codecs.Decoders);
-    method public void setEncoders_optional(media.codecs.Encoders);
-    method public void setSettings_optional(media.codecs.Settings);
+    method public java.util.List<media.codecs.Settings> getSettings_optional();
   }
 
   public class Limit {
@@ -85,13 +82,10 @@ package media.codecs {
 
   public class MediaCodecs {
     ctor public MediaCodecs();
-    method public media.codecs.Decoders getDecoders_optional();
-    method public media.codecs.Encoders getEncoders_optional();
+    method public java.util.List<media.codecs.Decoders> getDecoders_optional();
+    method public java.util.List<media.codecs.Encoders> getEncoders_optional();
     method public java.util.List<media.codecs.Include> getInclude_optional();
-    method public media.codecs.Settings getSettings_optional();
-    method public void setDecoders_optional(media.codecs.Decoders);
-    method public void setEncoders_optional(media.codecs.Encoders);
-    method public void setSettings_optional(media.codecs.Settings);
+    method public java.util.List<media.codecs.Settings> getSettings_optional();
   }
 
   public class Quirk {
