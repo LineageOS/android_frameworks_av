@@ -1934,6 +1934,13 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                 case kWhatComponentAllocated:
                 {
+                    if (mState == RELEASING || mState == UNINITIALIZED) {
+                        // In case a kWhatError or kWhatRelease message came in and replied,
+                        // we log a warning and ignore.
+                        ALOGW("allocate interrupted by error or release, current state %d",
+                              mState);
+                        break;
+                    }
                     CHECK_EQ(mState, INITIALIZING);
                     setState(INITIALIZED);
                     mFlags |= kFlagIsComponentAllocated;
