@@ -2603,6 +2603,20 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
                     ALOGV_IF(mPreviousLocation == ExtendedTimestamp::LOCATION_SERVER,
                             "%s(%d): location moved from server to kernel",
                             __func__, mPortId);
+
+                    if (ets.mPosition[ExtendedTimestamp::LOCATION_SERVER] ==
+                            ets.mPosition[ExtendedTimestamp::LOCATION_KERNEL]) {
+                        // In Q, we don't return errors as an invalid time
+                        // but instead we leave the last kernel good timestamp alone.
+                        //
+                        // If server is identical to kernel, the device data pipeline is idle.
+                        // A better start time is now.  The retrograde check ensures
+                        // timestamp monotonicity.
+                        const int64_t nowNs = systemTime();
+                        ALOGD("%s(%d) device stall, using current time %lld",
+                                __func__, mPortId, (long long)nowNs);
+                        timestamp.mTime = convertNsToTimespec(nowNs);
+                    }
                 }
 
                 // We update the timestamp time even when paused.
