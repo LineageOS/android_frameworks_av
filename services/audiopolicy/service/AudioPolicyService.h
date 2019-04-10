@@ -782,6 +782,12 @@ private:
         const audio_stream_type_t stream;
     };
 
+    void getPlaybackClientAndEffects(audio_port_handle_t portId,
+                                     sp<AudioPlaybackClient>& client,
+                                     sp<AudioPolicyEffects>& effects,
+                                     const char *context);
+
+
     // A class automatically clearing and restoring binder caller identity inside
     // a code block (scoped variable)
     // Declare one systematically before calling AudioPolicyManager methods so that they are
