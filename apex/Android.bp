@@ -99,7 +99,6 @@ apex {
     name: "com.android.media.swcodec",
     manifest: "manifest_codec.json",
     defaults: ["com.android.media.swcodec-defaults"],
-    vintf_fragments: ["manifest_media_c2_software.xml"],
 }
 
 apex_key {

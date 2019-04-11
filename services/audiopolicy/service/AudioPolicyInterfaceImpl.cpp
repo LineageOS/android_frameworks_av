@@ -225,6 +225,21 @@ status_t AudioPolicyService::getOutputForAttr(const audio_attributes_t *original
     return result;
 }
 
+void AudioPolicyService::getPlaybackClientAndEffects(audio_port_handle_t portId,
+                                                     sp<AudioPlaybackClient>& client,
+                                                     sp<AudioPolicyEffects>& effects,
+                                                     const char *context)
+{
+    Mutex::Autolock _l(mLock);
+    const ssize_t index = mAudioPlaybackClients.indexOfKey(portId);
+    if (index < 0) {
+        ALOGE("%s AudioTrack client not found for portId %d", context, portId);
+        return;
+    }
+    client = mAudioPlaybackClients.valueAt(index);
+    effects = mAudioPolicyEffects;
+}
+
 status_t AudioPolicyService::startOutput(audio_port_handle_t portId)
 {
     if (mAudioPolicyManager == NULL) {
@@ -233,16 +248,9 @@ status_t AudioPolicyService::startOutput(audio_port_handle_t portId)
     ALOGV("startOutput()");
     sp<AudioPlaybackClient> client;
     sp<AudioPolicyEffects>audioPolicyEffects;
-    {
-        Mutex::Autolock _l(mLock);
-        const ssize_t index = mAudioPlaybackClients.indexOfKey(portId);
-        if (index < 0) {
-            ALOGE("%s AudioTrack client not found for portId %d", __FUNCTION__, portId);
-            return INVALID_OPERATION;
-        }
-        client = mAudioPlaybackClients.valueAt(index);
-        audioPolicyEffects = mAudioPolicyEffects;
-    }
+
+    getPlaybackClientAndEffects(portId, client, audioPolicyEffects, __func__);
+
     if (audioPolicyEffects != 0) {
         // create audio processors according to stream
         status_t status = audioPolicyEffects->addOutputSessionEffects(
@@ -275,17 +283,9 @@ status_t  AudioPolicyService::doStopOutput(audio_port_handle_t portId)
     ALOGV("doStopOutput");
     sp<AudioPlaybackClient> client;
     sp<AudioPolicyEffects>audioPolicyEffects;
-    {
-        Mutex::Autolock _l(mLock);
 
-        const ssize_t index = mAudioPlaybackClients.indexOfKey(portId);
-        if (index < 0) {
-            ALOGE("%s AudioTrack client not found for portId %d", __FUNCTION__, portId);
-            return INVALID_OPERATION;
-        }
-        client = mAudioPlaybackClients.valueAt(index);
-        audioPolicyEffects = mAudioPolicyEffects;
-    }
+    getPlaybackClientAndEffects(portId, client, audioPolicyEffects, __func__);
+
     if (audioPolicyEffects != 0) {
         // release audio processors from the stream
         status_t status = audioPolicyEffects->releaseOutputSessionEffects(
@@ -315,13 +315,17 @@ void AudioPolicyService::releaseOutput(audio_port_handle_t portId)
 void AudioPolicyService::doReleaseOutput(audio_port_handle_t portId)
 {
     ALOGV("doReleaseOutput from tid %d", gettid());
-    Mutex::Autolock _l(mLock);
-    const ssize_t index = mAudioPlaybackClients.indexOfKey(portId);
-    if (index < 0) {
-        ALOGE("%s AudioTrack client not found for portId %d", __FUNCTION__, portId);
-        return;
+    sp<AudioPlaybackClient> client;
+    sp<AudioPolicyEffects> audioPolicyEffects;
+
+    getPlaybackClientAndEffects(portId, client, audioPolicyEffects, __func__);
+
+    if (audioPolicyEffects != 0 && client->active) {
+        // clean up effects if output was not stopped before being released
+        audioPolicyEffects->releaseOutputSessionEffects(
+            client->io, client->stream, client->session);
     }
-    sp<AudioPlaybackClient> client = mAudioPlaybackClients.valueAt(index);
+    Mutex::Autolock _l(mLock);
     mAudioPlaybackClients.removeItem(portId);
 
     // called from internal thread: no need to clear caller identity

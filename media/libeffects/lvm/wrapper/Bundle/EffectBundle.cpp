@@ -2686,7 +2686,7 @@ int Equalizer_getParameter(EffectContext *pContext,
         name[*pValueSize - 1] = 0;
         *pValueSize = strlen(name) + 1;
         ALOGVV("%s EQ_PARAM_GET_PRESET_NAME preset %d, name %s len %d",
-                __func__, preset, gEqualizerPresets[preset].name, *pValueSize);
+               __func__, preset, name, *pValueSize);
 
     } break;
 
