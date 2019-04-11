@@ -2603,6 +2603,20 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
                     ALOGV_IF(mPreviousLocation == ExtendedTimestamp::LOCATION_SERVER,
                             "%s(%d): location moved from server to kernel",
                             __func__, mPortId);
+
+                    if (ets.mPosition[ExtendedTimestamp::LOCATION_SERVER] ==
+                            ets.mPosition[ExtendedTimestamp::LOCATION_KERNEL]) {
+                        // In Q, we don't return errors as an invalid time
+                        // but instead we leave the last kernel good timestamp alone.
+                        //
+                        // If server is identical to kernel, the device data pipeline is idle.
+                        // A better start time is now.  The retrograde check ensures
+                        // timestamp monotonicity.
+                        const int64_t nowNs = systemTime();
+                        ALOGD("%s(%d) device stall, using current time %lld",
+                                __func__, mPortId, (long long)nowNs);
+                        timestamp.mTime = convertNsToTimespec(nowNs);
+                    }
                 }
 
                 // We update the timestamp time even when paused.
@@ -2740,27 +2754,32 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
     // Prevent retrograde motion in timestamp.
     // This is sometimes caused by erratic reports of the available space in the ALSA drivers.
     if (status == NO_ERROR) {
+        // Fix stale time when checking timestamp right after start().
+        // The position is at the last reported location but the time can be stale
+        // due to pause or standby or cold start latency.
+        //
+        // We keep advancing the time (but not the position) to ensure that the
+        // stale value does not confuse the application.
+        //
+        // For offload compatibility, use a default lag value here.
+        // Any time discrepancy between this update and the pause timestamp is handled
+        // by the retrograde check afterwards.
+        int64_t currentTimeNanos = audio_utils_ns_from_timespec(&timestamp.mTime);
+        const int64_t lagNs = int64_t(mAfLatency * 1000000LL);
+        const int64_t limitNs = mStartNs - lagNs;
+        if (currentTimeNanos < limitNs) {
+            ALOGD("%s(%d): correcting timestamp time for pause, "
+                    "currentTimeNanos: %lld < limitNs: %lld < mStartNs: %lld",
+                    __func__, mPortId,
+                    (long long)currentTimeNanos, (long long)limitNs, (long long)mStartNs);
+            timestamp.mTime = convertNsToTimespec(limitNs);
+            currentTimeNanos = limitNs;
+        }
+
         // previousTimestampValid is set to false when starting after a stop or flush.
         if (previousTimestampValid) {
             const int64_t previousTimeNanos =
                     audio_utils_ns_from_timespec(&mPreviousTimestamp.mTime);
-            int64_t currentTimeNanos = audio_utils_ns_from_timespec(&timestamp.mTime);
-
-            // Fix stale time when checking timestamp right after start().
-            //
-            // For offload compatibility, use a default lag value here.
-            // Any time discrepancy between this update and the pause timestamp is handled
-            // by the retrograde check afterwards.
-            const int64_t lagNs = int64_t(mAfLatency * 1000000LL);
-            const int64_t limitNs = mStartNs - lagNs;
-            if (currentTimeNanos < limitNs) {
-                ALOGD("%s(%d): correcting timestamp time for pause, "
-                        "currentTimeNanos: %lld < limitNs: %lld < mStartNs: %lld",
-                        __func__, mPortId,
-                        (long long)currentTimeNanos, (long long)limitNs, (long long)mStartNs);
-                timestamp.mTime = convertNsToTimespec(limitNs);
-                currentTimeNanos = limitNs;
-            }
 
             // retrograde check
             if (currentTimeNanos < previousTimeNanos) {
