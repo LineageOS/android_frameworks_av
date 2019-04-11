@@ -47,10 +47,10 @@ void work_func(void *) {
         CHECK(aiocbp->queued);
         int ret;
         if (aiocbp->read) {
-            ret = TEMP_FAILURE_RETRY(pread(aiocbp->aio_fildes,
+            ret = TEMP_FAILURE_RETRY(pread64(aiocbp->aio_fildes,
                     aiocbp->aio_buf, aiocbp->aio_nbytes, aiocbp->aio_offset));
         } else {
-            ret = TEMP_FAILURE_RETRY(pwrite(aiocbp->aio_fildes,
+            ret = TEMP_FAILURE_RETRY(pwrite64(aiocbp->aio_fildes,
                aiocbp->aio_buf, aiocbp->aio_nbytes, aiocbp->aio_offset));
         }
         {
@@ -139,7 +139,7 @@ int aio_suspend(struct aiocb *aiocbp[], int n,
     return 0;
 }
 
-void aio_prepare(struct aiocb *aiocbp, void* buf, size_t count, off_t offset) {
+void aio_prepare(struct aiocb *aiocbp, void* buf, size_t count, off64_t offset) {
     aiocbp->aio_buf = buf;
     aiocbp->aio_offset = offset;
     aiocbp->aio_nbytes = count;

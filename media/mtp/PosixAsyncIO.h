@@ -32,7 +32,7 @@ struct aiocb {
     int aio_fildes;
     void *aio_buf;
 
-    off_t aio_offset;
+    off64_t aio_offset;
     size_t aio_nbytes;
 
     // Used internally
@@ -61,7 +61,7 @@ int aio_error(const struct aiocb *);
 ssize_t aio_return(struct aiocb *);
 
 // Helper method for setting aiocb members
-void aio_prepare(struct aiocb *, void*, size_t, off_t);
+void aio_prepare(struct aiocb *, void*, size_t, off64_t);
 
 #endif // POSIXASYNCIO_H
 
