@@ -45,6 +45,7 @@ exit: 1
 exit_group: 1
 rt_sigreturn: 1
 ugetrlimit: 1
+readlink: 1
 readlinkat: 1
 _llseek: 1
 fstatfs64: 1
