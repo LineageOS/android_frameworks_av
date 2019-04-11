@@ -20,9 +20,10 @@
 #include <atomic>
 
 #include <android/IOMXBufferSource.h>
+#include <codec2/hidl/client.h>
+#include <media/stagefright/foundation/Mutexed.h>
 #include <media/IOMX.h>
 #include <media/OMXBuffer.h>
-#include <codec2/hidl/client.h>
 
 namespace android {
 
@@ -111,7 +112,7 @@ private:
     c2_cntr64_t mPrevInputTimestamp; // input timestamp for previous frame
     c2_cntr64_t mPrevCodecTimestamp; // adjusted (codec) timestamp for previous frame
 
-    std::map<uint64_t, buffer_id> mBufferIdsInUse;
+    Mutexed<std::map<uint64_t, buffer_id>> mBufferIdsInUse;
 };
 
 }  // namespace android
