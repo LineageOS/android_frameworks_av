@@ -241,6 +241,7 @@ MediaPlayer2::MediaPlayer2(int32_t sessionId, jobject context) {
     mSeekPosition = -1;
     mSeekMode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC;
     mCurrentState = MEDIA_PLAYER2_IDLE;
+    mTransitionToNext = false;
     mLoop = false;
     mVolume = 1.0;
     mVideoWidth = mVideoHeight = 0;
@@ -389,6 +390,7 @@ status_t MediaPlayer2::playNextDataSource(int64_t srcId) {
         return INVALID_OPERATION;
     }
     mSrcId = srcId;
+    mTransitionToNext = true;
     return mPlayer->playNextDataSource(srcId);
 }
 
@@ -568,6 +570,7 @@ status_t MediaPlayer2::pause() {
             mCurrentState = MEDIA_PLAYER2_STATE_ERROR;
         } else {
             mCurrentState = MEDIA_PLAYER2_PAUSED;
+            mTransitionToNext = false;
         }
         return ret;
     }
@@ -815,6 +818,7 @@ status_t MediaPlayer2::reset_l() {
         } else {
             mPlayer->setListener(NULL);
             mCurrentState = MEDIA_PLAYER2_IDLE;
+            mTransitionToNext = false;
         }
         // setDataSource has to be called again to create a
         // new mediaplayer.
@@ -1031,12 +1035,6 @@ void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const Play
             mCurrentState = MEDIA_PLAYER2_PREPARED;
         }
         break;
-    case MEDIA2_STARTED:
-        ALOGV("MediaPlayer2::notify() started, srcId=%lld", (long long)srcId);
-        if (srcId == mSrcId) {
-            mCurrentState = MEDIA_PLAYER2_STARTED;
-        }
-        break;
     case MEDIA2_DRM_INFO:
         ALOGV("MediaPlayer2::notify() MEDIA2_DRM_INFO(%lld, %d, %d, %d, %p)",
               (long long)srcId, msg, ext1, ext2, obj);
@@ -1063,8 +1061,9 @@ void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const Play
         if (ext1 != MEDIA2_INFO_VIDEO_TRACK_LAGGING) {
             ALOGW("info/warning (%d, %d)", ext1, ext2);
 
-            if (ext1 == MEDIA2_INFO_DATA_SOURCE_START && srcId == mSrcId) {
+            if (ext1 == MEDIA2_INFO_DATA_SOURCE_START && srcId == mSrcId && mTransitionToNext) {
                 mCurrentState = MEDIA_PLAYER2_STARTED;
+                mTransitionToNext = false;
             }
         }
         break;
