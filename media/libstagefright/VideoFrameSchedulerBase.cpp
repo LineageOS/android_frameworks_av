@@ -115,6 +115,7 @@ void VideoFrameSchedulerBase::PLL::test() {
 
 #endif
 
+__attribute__((no_sanitize("integer")))
 bool VideoFrameSchedulerBase::PLL::fit(
         nsecs_t phase, nsecs_t period, size_t numSamplesToUse,
         int64_t *a, int64_t *b, int64_t *err) {
