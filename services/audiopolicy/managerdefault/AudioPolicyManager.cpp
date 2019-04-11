@@ -2481,7 +2481,7 @@ status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_
         // HW Gain management, do not change the volume
         bool applyVolume = false;
         if (desc->useHwGain()) {
-            if (!(desc->isActive(group) || isInCall())) {
+            if (!(desc->isActive(toVolumeSource(group)) || isInCall())) {
                 continue;
             }
             for (const auto &productStrategy : mEngine->getOrderedProductStrategies()) {
