@@ -305,8 +305,8 @@ static inline std::string toString(const audio_attributes_t& attributes)
     result << "{ Content type: " << toString(attributes.content_type)
            << " Usage: " << toString(attributes.usage)
            << " Source: " << toString(attributes.source)
-           << " Flags: " << attributes.flags
-           << " Tags: " << attributes.tags
+           << std::hex << " Flags: 0x" << attributes.flags
+           << std::dec << " Tags: " << attributes.tags
            << " }";
 
     return result.str();
