@@ -33,6 +33,7 @@
 #include <media/stagefright/CodecBase.h>
 #include <media/ICrypto.h>
 
+#include "CCodecBuffers.h"
 #include "InputSurfaceWrapper.h"
 #include "PipelineWatcher.h"
 
@@ -150,11 +151,6 @@ public:
     };
 
     void setMetaMode(MetaMode mode);
-
-    // Internal classes
-    class Buffers;
-    class InputBuffers;
-    class OutputBuffers;
 
 private:
     class QueueGuard;
