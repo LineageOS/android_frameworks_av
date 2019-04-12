@@ -1183,10 +1183,14 @@ class Camera3Device :
     uint32_t               mNextResultFrameNumber;
     // the minimal frame number of the next reprocess result
     uint32_t               mNextReprocessResultFrameNumber;
+    // the minimal frame number of the next ZSL still capture result
+    uint32_t               mNextZslStillResultFrameNumber;
     // the minimal frame number of the next non-reprocess shutter
     uint32_t               mNextShutterFrameNumber;
     // the minimal frame number of the next reprocess shutter
     uint32_t               mNextReprocessShutterFrameNumber;
+    // the minimal frame number of the next ZSL still capture shutter
+    uint32_t               mNextZslStillShutterFrameNumber;
     List<CaptureResult>   mResultQueue;
     Condition              mResultSignal;
     wp<NotificationListener>  mListener;
@@ -1223,7 +1227,8 @@ class Camera3Device :
     void sendCaptureResult(CameraMetadata &pendingMetadata,
             CaptureResultExtras &resultExtras,
             CameraMetadata &collectedPartialResult, uint32_t frameNumber,
-            bool reprocess, const std::vector<PhysicalCaptureResultInfo>& physicalMetadatas);
+            bool reprocess, bool zslStillCapture,
+            const std::vector<PhysicalCaptureResultInfo>& physicalMetadatas);
 
     bool isLastFullResult(const InFlightRequest& inFlightRequest);
 

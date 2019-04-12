@@ -77,8 +77,10 @@ Camera3Device::Camera3Device(const String8 &id):
         mTimestampOffset(0),
         mNextResultFrameNumber(0),
         mNextReprocessResultFrameNumber(0),
+        mNextZslStillResultFrameNumber(0),
         mNextShutterFrameNumber(0),
         mNextReprocessShutterFrameNumber(0),
+        mNextZslStillShutterFrameNumber(0),
         mListener(NULL),
         mVendorTagId(CAMERA_METADATA_INVALID_VENDOR_ID),
         mLastTemplateId(-1),
@@ -3457,7 +3459,7 @@ void Camera3Device::sendCaptureResult(CameraMetadata &pendingMetadata,
         CaptureResultExtras &resultExtras,
         CameraMetadata &collectedPartialResult,
         uint32_t frameNumber,
-        bool reprocess,
+        bool reprocess, bool zslStillCapture,
         const std::vector<PhysicalCaptureResultInfo>& physicalMetadatas) {
     ATRACE_CALL();
     if (pendingMetadata.isEmpty())
@@ -3474,6 +3476,14 @@ void Camera3Device::sendCaptureResult(CameraMetadata &pendingMetadata,
             return;
         }
         mNextReprocessResultFrameNumber = frameNumber + 1;
+    } else if (zslStillCapture) {
+        if (frameNumber < mNextZslStillResultFrameNumber) {
+            SET_ERR("Out-of-order ZSL still capture result metadata submitted! "
+                "(got frame number %d, expecting %d)",
+                frameNumber, mNextZslStillResultFrameNumber);
+            return;
+        }
+        mNextZslStillResultFrameNumber = frameNumber + 1;
     } else {
         if (frameNumber < mNextResultFrameNumber) {
             SET_ERR("Out-of-order capture result metadata submitted! "
@@ -3728,7 +3738,8 @@ void Camera3Device::processCaptureResult(const camera3_capture_result *result) {
                 metadata = result->result;
                 sendCaptureResult(metadata, request.resultExtras,
                     collectedPartialResult, frameNumber,
-                    hasInputBufferInRequest, request.physicalMetadatas);
+                    hasInputBufferInRequest, request.zslCapture && request.stillCapture,
+                    request.physicalMetadatas);
             }
         }
 
@@ -3906,12 +3917,20 @@ void Camera3Device::notifyShutter(const camera3_shutter_msg_t &msg,
                 // TODO: need to track errors for tighter bounds on expected frame number.
                 if (r.hasInputBuffer) {
                     if (msg.frame_number < mNextReprocessShutterFrameNumber) {
-                        SET_ERR("Shutter notification out-of-order. Expected "
+                        SET_ERR("Reprocess shutter notification out-of-order. Expected "
                                 "notification for frame %d, got frame %d",
                                 mNextReprocessShutterFrameNumber, msg.frame_number);
                         return;
                     }
                     mNextReprocessShutterFrameNumber = msg.frame_number + 1;
+                } else if (r.zslCapture && r.stillCapture) {
+                    if (msg.frame_number < mNextZslStillShutterFrameNumber) {
+                        SET_ERR("ZSL still capture shutter notification out-of-order. Expected "
+                                "notification for frame %d, got frame %d",
+                                mNextZslStillShutterFrameNumber, msg.frame_number);
+                        return;
+                    }
+                    mNextZslStillShutterFrameNumber = msg.frame_number + 1;
                 } else {
                     if (msg.frame_number < mNextShutterFrameNumber) {
                         SET_ERR("Shutter notification out-of-order. Expected "
@@ -3935,7 +3954,8 @@ void Camera3Device::notifyShutter(const camera3_shutter_msg_t &msg,
                 // send pending result and buffers
                 sendCaptureResult(r.pendingMetadata, r.resultExtras,
                     r.collectedPartialResult, msg.frame_number,
-                    r.hasInputBuffer, r.physicalMetadatas);
+                    r.hasInputBuffer, r.zslCapture && r.stillCapture,
+                    r.physicalMetadatas);
             }
             bool timestampIncreasing = !(r.zslCapture || r.hasInputBuffer);
             returnOutputBuffers(r.pendingOutputBuffers.array(),
