@@ -650,6 +650,9 @@ int LvmBundle_init(EffectContext *pContext){
     params.SpeakerType            = LVM_HEADPHONES;
 
     pContext->pBundledContext->SampleRate = LVM_FS_44100;
+#ifdef SUPPORT_MC
+    pContext->pBundledContext->ChMask = AUDIO_CHANNEL_OUT_STEREO;
+#endif
 
     /* Concert Sound parameters */
     params.VirtualizerOperatingMode   = LVM_MODE_OFF;
@@ -695,6 +698,11 @@ int LvmBundle_init(EffectContext *pContext){
     params.TE_OperatingMode       = LVM_TE_OFF;
     params.TE_EffectLevel         = 0;
 
+#ifdef SUPPORT_MC
+    params.NrChannels             =
+        audio_channel_count_from_out_mask(AUDIO_CHANNEL_OUT_STEREO);
+    params.ChMask                 = AUDIO_CHANNEL_OUT_STEREO;
+#endif
     /* Activate the initial settings */
     LvmStatus = LVM_SetControlParameters(pContext->pBundledContext->hInstance,
                                          &params);
@@ -1297,7 +1305,12 @@ int Effect_setConfig(EffectContext *pContext, effect_config_t *pConfig){
         return -EINVAL;
     }
 
+#ifdef SUPPORT_MC
+    if (pContext->pBundledContext->SampleRate != SampleRate ||
+        pContext->pBundledContext->ChMask != pConfig->inputCfg.channels) {
+#else
     if(pContext->pBundledContext->SampleRate != SampleRate){
+#endif
 
         LVM_ControlParams_t     ActiveParams;
         LVM_ReturnStatus_en     LvmStatus = LVM_SUCCESS;
@@ -1323,6 +1336,9 @@ int Effect_setConfig(EffectContext *pContext, effect_config_t *pConfig){
         LVM_ERROR_CHECK(LvmStatus, "LVM_SetControlParameters", "Effect_setConfig")
         ALOGV("\tEffect_setConfig Succesfully called LVM_SetControlParameters\n");
         pContext->pBundledContext->SampleRate = SampleRate;
+#ifdef SUPPORT_MC
+        pContext->pBundledContext->ChMask = pConfig->inputCfg.channels;
+#endif
 
         LvmEffect_limitLevel(pContext);
 

@@ -149,7 +149,6 @@ private:
             MediaSource::ReadOptions::SeekMode mode =
                 MediaSource::ReadOptions::SEEK_CLOSEST_SYNC);
 
-    void releaseOneSample(TrackInfo *info);
     void releaseTrackSamples(TrackInfo *info);
     void releaseAllTrackSamples();
 

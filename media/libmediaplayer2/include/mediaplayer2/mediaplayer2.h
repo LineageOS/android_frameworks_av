@@ -143,6 +143,7 @@ private:
     Mutex                       mNotifyLock;
     sp<MediaPlayer2Listener>    mListener;
     media_player2_internal_states mCurrentState;
+    bool                        mTransitionToNext;
     int64_t                     mCurrentPosition;
     MediaPlayer2SeekMode        mCurrentSeekMode;
     int64_t                     mSeekPosition;
