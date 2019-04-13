@@ -5,6 +5,7 @@ cc_library_shared {
         "C2OMXNode.cpp",
         "CCodec.cpp",
         "CCodecBufferChannel.cpp",
+        "CCodecBuffers.cpp",
         "CCodecConfig.cpp",
         "Codec2Buffer.cpp",
         "Codec2InfoBuilder.cpp",
