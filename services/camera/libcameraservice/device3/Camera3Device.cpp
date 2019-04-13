@@ -4278,12 +4278,13 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
         // Start scan at i, with the assumption that the stream order matches
         size_t realIdx = i;
         bool found = false;
-        for (size_t idx = 0; idx < finalConfiguration.streams.size(); idx++) {
+        size_t halStreamCount = finalConfiguration.streams.size();
+        for (size_t idx = 0; idx < halStreamCount; idx++) {
             if (finalConfiguration.streams[realIdx].v3_2.id == streamId) {
                 found = true;
                 break;
             }
-            realIdx = (realIdx >= finalConfiguration.streams.size()) ? 0 : realIdx + 1;
+            realIdx = (realIdx >= halStreamCount - 1) ? 0 : realIdx + 1;
         }
         if (!found) {
             ALOGE("%s: Stream %d not found in stream configuration response from HAL",
