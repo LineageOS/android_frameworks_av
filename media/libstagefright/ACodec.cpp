@@ -780,6 +780,9 @@ status_t ACodec::handleSetSurface(const sp<Surface> &surface) {
     // need to enable allocation when attaching
     surface->getIGraphicBufferProducer()->allowAllocation(true);
 
+    // dequeueBuffer cannot time out
+    surface->setDequeueTimeout(-1);
+
     // for meta data mode, we move dequeud buffers to the new surface.
     // for non-meta mode, we must move all registered buffers
     for (size_t i = 0; i < buffers.size(); ++i) {
