@@ -739,6 +739,7 @@ bool ConstGraphicBlockBuffer::copy(const std::shared_ptr<C2Buffer> &buffer) {
         ALOGD("ConstGraphicBlockBuffer::copy: set back buffer failed");
         return false;
     }
+    setRange(0, aBuffer->size());  // align size info
     converter.copyToMediaImage();
     setImageData(converter.imageData());
     mBufferRef = buffer;
