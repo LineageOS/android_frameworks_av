@@ -90,7 +90,8 @@ void AAudioServiceEndpoint::disconnectRegisteredStreams() {
     std::lock_guard<std::mutex> lock(mLockStreams);
     mConnected.store(false);
     for (const auto& stream : mRegisteredStreams) {
-        ALOGD("disconnectRegisteredStreams() stop and disconnect %p", stream.get());
+        ALOGD("disconnectRegisteredStreams() stop and disconnect port %d",
+              stream->getPortHandle());
         stream->stop();
         stream->disconnect();
     }

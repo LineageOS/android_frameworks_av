@@ -102,6 +102,8 @@ public:
 
     virtual aaudio_result_t validate() const override;
 
+    void logParameters() const;
+
 private:
     bool                       mSharingModeMatchRequired = false; // must match sharing mode requested
     aaudio_performance_mode_t  mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
