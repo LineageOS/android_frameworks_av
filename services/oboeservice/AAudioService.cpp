@@ -132,11 +132,10 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
 
     if (result != AAUDIO_OK) {
         serviceStream.clear();
-        ALOGW("openStream(): failed, return %d = %s", result, AAudio_convertResultToText(result));
         return result;
     } else {
         aaudio_handle_t handle = mStreamTracker.addStreamForHandle(serviceStream.get());
-        ALOGD("openStream(): handle = 0x%08X", handle);
+        ALOGV("openStream(): handle = 0x%08X", handle);
         serviceStream->setHandle(handle);
         pid_t pid = request.getProcessId();
         AAudioClientTracker::getInstance().registerClientStream(pid, serviceStream);

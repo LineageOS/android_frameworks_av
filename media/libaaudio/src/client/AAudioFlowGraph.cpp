@@ -38,7 +38,7 @@ aaudio_result_t AAudioFlowGraph::configure(audio_format_t sourceFormat,
                           int32_t sinkChannelCount) {
     AudioFloatOutputPort *lastOutput = nullptr;
 
-    ALOGD("%s() source format = 0x%08x, channels = %d, sink format = 0x%08x, channels = %d",
+    ALOGV("%s() source format = 0x%08x, channels = %d, sink format = 0x%08x, channels = %d",
           __func__, sourceFormat, sourceChannelCount, sinkFormat, sinkChannelCount);
 
     switch (sourceFormat) {
