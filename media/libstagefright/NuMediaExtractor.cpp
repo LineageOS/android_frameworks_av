@@ -756,6 +756,9 @@ status_t NuMediaExtractor::getSampleMeta(sp<MetaData> *sampleMeta) {
 }
 
 status_t NuMediaExtractor::getMetrics(Parcel *reply) {
+    if (mImpl == NULL) {
+        return -EINVAL;
+    }
     status_t status = mImpl->getMetrics(reply);
     return status;
 }
