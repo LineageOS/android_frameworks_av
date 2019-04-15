@@ -348,7 +348,8 @@ protected:
         }
         virtual const DeviceVector getAvailableInputDevices() const
         {
-            return mAvailableInputDevices.filterForEngine();
+            // legacy and non-legacy remote-submix are managed by the engine, do not filter
+            return mAvailableInputDevices;
         }
         virtual const sp<DeviceDescriptor> &getDefaultOutputDevice() const
         {

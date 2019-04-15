@@ -287,7 +287,7 @@ status_t C2OMXNode::emptyBuffer(
         return UNKNOWN_ERROR;
     }
 
-    (void)mBufferIdsInUse.emplace(index, buffer);
+    mBufferIdsInUse.lock()->emplace(index, buffer);
     return OK;
 }
 
@@ -327,13 +327,19 @@ void C2OMXNode::onInputBufferDone(c2_cntr64_t index) {
         ALOGD("Buffer source not set (index=%llu)", index.peekull());
         return;
     }
-    auto it = mBufferIdsInUse.find(index.peeku());
-    if (it == mBufferIdsInUse.end()) {
-        ALOGV("Untracked input index %llu (maybe already removed)", index.peekull());
-        return;
+
+    int32_t bufferId = 0;
+    {
+        decltype(mBufferIdsInUse)::Locked bufferIds(mBufferIdsInUse);
+        auto it = bufferIds->find(index.peeku());
+        if (it == bufferIds->end()) {
+            ALOGV("Untracked input index %llu (maybe already removed)", index.peekull());
+            return;
+        }
+        bufferId = it->second;
+        (void)bufferIds->erase(it);
     }
-    (void)mBufferSource->onInputBufferEmptied(it->second, -1);
-    (void)mBufferIdsInUse.erase(it);
+    (void)mBufferSource->onInputBufferEmptied(bufferId, -1);
 }
 
 }  // namespace android
