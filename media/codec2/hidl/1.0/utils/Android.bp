@@ -1,4 +1,49 @@
 // DO NOT DEPEND ON THIS DIRECTLY
+// use libcodec2-hidl-client-defaults instead
+cc_library {
+    name: "libcodec2_hidl_client@1.0",
+
+    defaults: ["hidl_defaults"],
+
+    srcs: [
+        "ClientBlockHelper.cpp",
+        "types.cpp",
+    ],
+
+    header_libs: [
+        "libcodec2_internal", // private
+    ],
+
+    shared_libs: [
+        "android.hardware.media.bufferpool@2.0",
+        "android.hardware.media.c2@1.0",
+        "libbase",
+        "libcodec2",
+        "libcodec2_vndk",
+        "libcutils",
+        "libgui",
+        "libhidlbase",
+        "liblog",
+        "libstagefright_bufferpool@2.0",
+        "libui",
+        "libutils",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    export_shared_lib_headers: [
+        "android.hardware.media.c2@1.0",
+        "libcodec2",
+        "libgui",
+        "libstagefright_bufferpool@2.0",
+        "libui",
+    ],
+}
+
+
+// DO NOT DEPEND ON THIS DIRECTLY
 // use libcodec2-hidl-defaults instead
 cc_library {
     name: "libcodec2_hidl@1.0",
@@ -33,12 +78,10 @@ cc_library {
         "android.hardware.media.bufferpool@2.0",
         "android.hardware.media.c2@1.0",
         "android.hardware.media.omx@1.0",
-        "android.hidl.safe_union@1.0",
         "libbase",
         "libcodec2",
         "libcodec2_vndk",
         "libcutils",
-        "libgui",
         "libhidlbase",
         "libhidltransport",
         "libhwbinder",
@@ -58,7 +101,6 @@ cc_library {
         "libcodec2",
         "libhidlbase",
         "libstagefright_bufferpool@2.0",
-        "libstagefright_bufferqueue_helper",
         "libui",
     ],
 }
@@ -71,5 +113,16 @@ cc_defaults {
     shared_libs: [
         "android.hardware.media.c2@1.0",
         "libcodec2_hidl@1.0",
+    ],
+}
+
+// public dependency for Codec 2.0 HAL client
+cc_defaults {
+    name: "libcodec2-hidl-client-defaults",
+    defaults: ["libcodec2-impl-defaults"],
+
+    shared_libs: [
+        "android.hardware.media.c2@1.0",
+        "libcodec2_hidl_client@1.0",
     ],
 }

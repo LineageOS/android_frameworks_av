@@ -18,8 +18,12 @@
 #define LOG_TAG "C2BqBuffer"
 #include <utils/Log.h>
 
-#include <gui/BufferQueueDefs.h>
-#include <gui/bufferqueue/2.0/B2HGraphicBufferProducer.h>
+#include <ui/BufferQueueDefs.h>
+#include <ui/GraphicBuffer.h>
+#include <ui/Fence.h>
+
+#include <types.h>
+
 #include <hidl/HidlSupport.h>
 
 #include <C2AllocatorGralloc.h>
@@ -35,7 +39,6 @@ using ::android::C2AllocatorGralloc;
 using ::android::C2AndroidMemoryUsage;
 using ::android::Fence;
 using ::android::GraphicBuffer;
-using ::android::IGraphicBufferProducer;
 using ::android::sp;
 using ::android::status_t;
 using ::android::wp;
