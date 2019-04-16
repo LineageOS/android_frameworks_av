@@ -40,7 +40,6 @@
 #include <media/stagefright/BufferProducerWrapper.h>
 #include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/PersistentSurface.h>
-#include <media/stagefright/codec2/1.0/InputSurface.h>
 
 #include "C2OMXNode.h"
 #include "CCodec.h"
@@ -1034,7 +1033,8 @@ sp<PersistentSurface> CCodec::CreateOmxInputSurface() {
     OmxStatus s;
     android::sp<HGraphicBufferProducer> gbp;
     android::sp<HGraphicBufferSource> gbs;
-    android::Return<void> transStatus = omx->createInputSurface(
+    using ::android::hardware::Return;
+    Return<void> transStatus = omx->createInputSurface(
             [&s, &gbp, &gbs](
                     OmxStatus status,
                     const android::sp<HGraphicBufferProducer>& producer,

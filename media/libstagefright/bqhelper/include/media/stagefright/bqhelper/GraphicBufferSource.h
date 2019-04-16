@@ -86,6 +86,11 @@ public:
         return mProducer;
     }
 
+    // Returns the handle to the bufferqueue HAL producer side of the BufferQueue.
+    // Buffers queued on this will be received by GraphicBufferSource.
+    sp<::android::hardware::graphics::bufferqueue::V2_0::IGraphicBufferProducer>
+        getHGraphicBufferProducer() const;
+
     // This is called when component transitions to running state, which means
     // we can start handing it buffers.  If we already have buffers of data
     // sitting in the BufferQueue, this will send them to the codec.
