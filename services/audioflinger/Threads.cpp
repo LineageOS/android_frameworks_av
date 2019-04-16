@@ -2136,9 +2136,15 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
             // notify every HAL buffer, regardless of the size of the track buffer
             maxNotificationFrames = mFrameCount;
         } else {
-            // For normal tracks, use at least double-buffering if no sample rate conversion,
-            // or at least triple-buffering if there is sample rate conversion
-            const int nBuffering = sampleRate == mSampleRate ? 2 : 3;
+            // Triple buffer the notification period for a triple buffered mixer period;
+            // otherwise, double buffering for the notification period is fine.
+            //
+            // TODO: This should be moved to AudioTrack to modify the notification period
+            // on AudioTrack::setBufferSizeInFrames() changes.
+            const int nBuffering =
+                    (uint64_t{frameCount} * mSampleRate)
+                            / (uint64_t{mNormalFrameCount} * sampleRate) == 3 ? 3 : 2;
+
             maxNotificationFrames = frameCount / nBuffering;
             // If client requested a fast track but this was denied, then use the smaller maximum.
             if (requestedFlags & AUDIO_OUTPUT_FLAG_FAST) {
