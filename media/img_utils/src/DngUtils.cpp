@@ -173,8 +173,8 @@ status_t OpcodeListBuilder::addBayerGainMapsForMetadata(uint32_t lsmWidth,
 
     status_t err = addGainMap(/*top*/redTop,
                               /*left*/redLeft,
-                              /*bottom*/activeAreaHeight - 1,
-                              /*right*/activeAreaWidth - 1,
+                              /*bottom*/activeAreaHeight,
+                              /*right*/activeAreaWidth,
                               /*plane*/0,
                               /*planes*/1,
                               /*rowPitch*/2,
@@ -191,8 +191,8 @@ status_t OpcodeListBuilder::addBayerGainMapsForMetadata(uint32_t lsmWidth,
 
     err = addGainMap(/*top*/greenEvenTop,
                      /*left*/greenEvenLeft,
-                     /*bottom*/activeAreaHeight - 1,
-                     /*right*/activeAreaWidth - 1,
+                     /*bottom*/activeAreaHeight,
+                     /*right*/activeAreaWidth,
                      /*plane*/0,
                      /*planes*/1,
                      /*rowPitch*/2,
@@ -209,8 +209,8 @@ status_t OpcodeListBuilder::addBayerGainMapsForMetadata(uint32_t lsmWidth,
 
     err = addGainMap(/*top*/greenOddTop,
                      /*left*/greenOddLeft,
-                     /*bottom*/activeAreaHeight - 1,
-                     /*right*/activeAreaWidth - 1,
+                     /*bottom*/activeAreaHeight,
+                     /*right*/activeAreaWidth,
                      /*plane*/0,
                      /*planes*/1,
                      /*rowPitch*/2,
@@ -227,8 +227,8 @@ status_t OpcodeListBuilder::addBayerGainMapsForMetadata(uint32_t lsmWidth,
 
     err = addGainMap(/*top*/blueTop,
                      /*left*/blueLeft,
-                     /*bottom*/activeAreaHeight - 1,
-                     /*right*/activeAreaWidth - 1,
+                     /*bottom*/activeAreaHeight,
+                     /*right*/activeAreaWidth,
                      /*plane*/0,
                      /*planes*/1,
                      /*rowPitch*/2,
@@ -265,8 +265,8 @@ status_t OpcodeListBuilder::addMonochromeGainMapsForMetadata(uint32_t lsmWidth,
 
     status_t err = addGainMap(/*top*/0,
                               /*left*/0,
-                              /*bottom*/activeAreaHeight - 1,
-                              /*right*/activeAreaWidth - 1,
+                              /*bottom*/activeAreaHeight,
+                              /*right*/activeAreaWidth,
                               /*plane*/0,
                               /*planes*/1,
                               /*rowPitch*/1,
@@ -364,8 +364,8 @@ status_t OpcodeListBuilder::addWarpRectilinearForMetadata(const float* kCoeffs,
         return BAD_VALUE;
     }
 
-    double normalizedOCX = opticalCenterX / static_cast<double>(activeArrayWidth - 1);
-    double normalizedOCY = opticalCenterY / static_cast<double>(activeArrayHeight - 1);
+    double normalizedOCX = opticalCenterX / static_cast<double>(activeArrayWidth);
+    double normalizedOCY = opticalCenterY / static_cast<double>(activeArrayHeight);
 
     normalizedOCX = CLAMP(normalizedOCX, 0, 1);
     normalizedOCY = CLAMP(normalizedOCY, 0, 1);
