@@ -26,6 +26,7 @@ cc_library_shared {
         "C2PlatformStorePluginLoader.cpp",
         "C2Store.cpp",
         "platform/C2BqBuffer.cpp",
+        "types.cpp",
         "util/C2Debug.cpp",
         "util/C2InterfaceHelper.cpp",
         "util/C2InterfaceUtils.cpp",
@@ -38,7 +39,6 @@ cc_library_shared {
 
     export_shared_lib_headers: [
         "libbase",
-        "libgui",
         "android.hardware.media.bufferpool@2.0",
     ],
 
@@ -60,13 +60,12 @@ cc_library_shared {
         "libbinder",
         "libcutils",
         "libdl",
-        "libgui",
         "libhardware",
         "libhidlbase",
         "libion",
         "libfmq",
         "liblog",
-        "libstagefright_bufferqueue_helper",
+        "libnativewindow",
         "libstagefright_foundation",
         "libstagefright_bufferpool@2.0",
         "libui",
