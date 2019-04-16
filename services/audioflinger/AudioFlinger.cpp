@@ -3102,9 +3102,13 @@ sp<IEffect> AudioFlinger::createEffect(
             }
             // look for the thread where the specified audio session is present
             for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
-                if (mPlaybackThreads.valueAt(i)->hasAudioSession(sessionId) != 0) {
+                uint32_t sessionType = mPlaybackThreads.valueAt(i)->hasAudioSession(sessionId);
+                if (sessionType != 0) {
                     io = mPlaybackThreads.keyAt(i);
-                    break;
+                    // thread with same effect session is preferable
+                    if ((sessionType & ThreadBase::EFFECT_SESSION) != 0) {
+                        break;
+                    }
                 }
             }
             if (io == AUDIO_IO_HANDLE_NONE) {
@@ -3130,6 +3134,21 @@ sp<IEffect> AudioFlinger::createEffect(
                 io = mPlaybackThreads.keyAt(0);
             }
             ALOGV("createEffect() got io %d for effect %s", io, desc.name);
+        } else if (checkPlaybackThread_l(io) != nullptr) {
+            // allow only one effect chain per sessionId on mPlaybackThreads.
+            for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
+                const audio_io_handle_t checkIo = mPlaybackThreads.keyAt(i);
+                if (io == checkIo) continue;
+                const uint32_t sessionType =
+                        mPlaybackThreads.valueAt(i)->hasAudioSession(sessionId);
+                if ((sessionType & ThreadBase::EFFECT_SESSION) != 0) {
+                    ALOGE("%s: effect %s io %d denied because session %d effect exists on io %d",
+                            __func__, desc.name, (int)io, (int)sessionId, (int)checkIo);
+                    android_errorWriteLog(0x534e4554, "123237974");
+                    lStatus = BAD_VALUE;
+                    goto Exit;
+                }
+            }
         }
         ThreadBase *thread = checkRecordThread_l(io);
         if (thread == NULL) {
