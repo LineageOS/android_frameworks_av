@@ -338,6 +338,8 @@ static const char *FourCC2MIME(uint32_t fourcc) {
             return MEDIA_MIMETYPE_VIDEO_HEVC;
         case FOURCC("ac-4"):
             return MEDIA_MIMETYPE_AUDIO_AC4;
+        case FOURCC("Opus"):
+            return MEDIA_MIMETYPE_AUDIO_OPUS;
 
         case FOURCC("twos"):
         case FOURCC("sowt"):
@@ -1640,6 +1642,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC("enca"):
         case FOURCC("samr"):
         case FOURCC("sawb"):
+        case FOURCC("Opus"):
         case FOURCC("twos"):
         case FOURCC("sowt"):
         case FOURCC("alac"):
@@ -1728,6 +1731,47 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                    chunk, num_channels, sample_size, sample_rate);
             AMediaFormat_setInt32(mLastTrack->meta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, num_channels);
             AMediaFormat_setInt32(mLastTrack->meta, AMEDIAFORMAT_KEY_SAMPLE_RATE, sample_rate);
+
+            if (chunk_type == FOURCC("Opus")) {
+                uint8_t opusInfo[19];
+                data_offset += sizeof(buffer);
+                // Read Opus Header
+                if (mDataSource->readAt(
+                        data_offset, opusInfo, sizeof(opusInfo)) < (ssize_t)sizeof(opusInfo)) {
+                    return ERROR_IO;
+                }
+
+                // OpusHeader must start with this magic sequence
+                // http://wiki.xiph.org/OggOpus#ID_Header
+                strncpy((char *)opusInfo, "OpusHead", 8);
+
+                // Read Opus Specific Box values
+                size_t opusOffset = 10;
+                uint16_t pre_skip = U16_AT(&opusInfo[opusOffset]);
+                uint32_t sample_rate = U32_AT(&opusInfo[opusOffset + 2]);
+                uint16_t out_gain = U16_AT(&opusInfo[opusOffset + 6]);
+
+                // Convert Opus Specific Box values. ParseOpusHeader expects
+                // the values in LE, however MP4 stores these values as BE
+                // https://opus-codec.org/docs/opus_in_isobmff.html#4.3.2
+                memcpy(&opusInfo[opusOffset], &pre_skip, sizeof(pre_skip));
+                memcpy(&opusInfo[opusOffset + 2], &sample_rate, sizeof(sample_rate));
+                memcpy(&opusInfo[opusOffset + 6], &out_gain, sizeof(out_gain));
+
+                int64_t codecDelay = 6500000;
+                int64_t seekPreRollNs = 80000000;  // Fixed 80 msec
+
+                AMediaFormat_setBuffer(mLastTrack->meta,
+                            AMEDIAFORMAT_KEY_CSD_0, opusInfo, sizeof(opusInfo));
+                AMediaFormat_setBuffer(mLastTrack->meta,
+                        AMEDIAFORMAT_KEY_CSD_1, &codecDelay, sizeof(codecDelay));
+                AMediaFormat_setBuffer(mLastTrack->meta,
+                        AMEDIAFORMAT_KEY_CSD_2, &seekPreRollNs, sizeof(seekPreRollNs));
+
+                data_offset += sizeof(opusInfo);
+                *offset = data_offset;
+                CHECK_EQ(*offset, stop_offset);
+            }
 
             if (chunk_type == FOURCC("alac")) {
 
