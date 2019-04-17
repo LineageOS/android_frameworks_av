@@ -61,7 +61,7 @@ public:
 
     virtual aaudio_result_t startClient(const android::AudioClient& client,
                                         audio_port_handle_t *clientHandle) {
-        ALOGD("AAudioServiceEndpoint::startClient(%p, ...) AAUDIO_ERROR_UNAVAILABLE", &client);
+        ALOGD("AAudioServiceEndpoint::startClient(...) AAUDIO_ERROR_UNAVAILABLE");
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 

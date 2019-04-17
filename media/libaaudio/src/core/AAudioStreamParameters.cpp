@@ -56,7 +56,7 @@ static aaudio_result_t isFormatValid(audio_format_t format) {
         case AUDIO_FORMAT_PCM_FLOAT:
             break; // valid
         default:
-            ALOGE("audioFormat not valid, audio_format_t = 0x%08x", format);
+            ALOGD("audioFormat not valid, audio_format_t = 0x%08x", format);
             return AAUDIO_ERROR_INVALID_FORMAT;
             // break;
     }
@@ -66,12 +66,12 @@ static aaudio_result_t isFormatValid(audio_format_t format) {
 aaudio_result_t AAudioStreamParameters::validate() const {
     if (mSamplesPerFrame != AAUDIO_UNSPECIFIED
         && (mSamplesPerFrame < SAMPLES_PER_FRAME_MIN || mSamplesPerFrame > SAMPLES_PER_FRAME_MAX)) {
-        ALOGE("channelCount out of range = %d", mSamplesPerFrame);
+        ALOGD("channelCount out of range = %d", mSamplesPerFrame);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
 
     if (mDeviceId < 0) {
-        ALOGE("deviceId out of range = %d", mDeviceId);
+        ALOGD("deviceId out of range = %d", mDeviceId);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
 
@@ -89,7 +89,7 @@ aaudio_result_t AAudioStreamParameters::validate() const {
         case AAUDIO_SHARING_MODE_SHARED:
             break;
         default:
-            ALOGE("illegal sharingMode = %d", mSharingMode);
+            ALOGD("illegal sharingMode = %d", mSharingMode);
             return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
             // break;
     }
@@ -99,12 +99,12 @@ aaudio_result_t AAudioStreamParameters::validate() const {
 
     if (mSampleRate != AAUDIO_UNSPECIFIED
         && (mSampleRate < SAMPLE_RATE_HZ_MIN || mSampleRate > SAMPLE_RATE_HZ_MAX)) {
-        ALOGE("sampleRate out of range = %d", mSampleRate);
+        ALOGD("sampleRate out of range = %d", mSampleRate);
         return AAUDIO_ERROR_INVALID_RATE;
     }
 
     if (mBufferCapacity < 0) {
-        ALOGE("bufferCapacity out of range = %d", mBufferCapacity);
+        ALOGD("bufferCapacity out of range = %d", mBufferCapacity);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
 
@@ -113,7 +113,7 @@ aaudio_result_t AAudioStreamParameters::validate() const {
         case AAUDIO_DIRECTION_OUTPUT:
             break; // valid
         default:
-            ALOGE("direction not valid = %d", mDirection);
+            ALOGD("direction not valid = %d", mDirection);
             return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
             // break;
     }
@@ -134,7 +134,7 @@ aaudio_result_t AAudioStreamParameters::validate() const {
         case AAUDIO_USAGE_ASSISTANT:
             break; // valid
         default:
-            ALOGE("usage not valid = %d", mUsage);
+            ALOGD("usage not valid = %d", mUsage);
             return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
             // break;
     }
@@ -147,7 +147,7 @@ aaudio_result_t AAudioStreamParameters::validate() const {
         case AAUDIO_CONTENT_TYPE_SPEECH:
             break; // valid
         default:
-            ALOGE("content type not valid = %d", mContentType);
+            ALOGD("content type not valid = %d", mContentType);
             return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
             // break;
     }
@@ -162,7 +162,7 @@ aaudio_result_t AAudioStreamParameters::validate() const {
         case AAUDIO_INPUT_PRESET_VOICE_PERFORMANCE:
             break; // valid
         default:
-            ALOGE("input preset not valid = %d", mInputPreset);
+            ALOGD("input preset not valid = %d", mInputPreset);
             return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
             // break;
     }
@@ -174,7 +174,7 @@ aaudio_result_t AAudioStreamParameters::validate() const {
         case AAUDIO_ALLOW_CAPTURE_BY_NONE:
             break; // valid
         default:
-            ALOGE("allowed capture policy not valid = %d", mAllowedCapturePolicy);
+            ALOGD("allowed capture policy not valid = %d", mAllowedCapturePolicy);
             return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
             // break;
     }

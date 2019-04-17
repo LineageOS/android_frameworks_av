@@ -28,9 +28,17 @@
 
 using namespace aaudio;
 
+
+// Sequential number assigned to streams solely for debugging purposes.
+static aaudio_stream_id_t AAudio_getNextStreamId() {
+    static std::atomic <aaudio_stream_id_t> nextStreamId{1};
+    return nextStreamId++;
+}
+
 AudioStream::AudioStream()
         : mPlayerBase(new MyPlayerBase(this))
-{
+        , mStreamId(AAudio_getNextStreamId())
+        {
     // mThread is a pthread_t of unknown size so we need memset.
     memset(&mThread, 0, sizeof(mThread));
     setPeriodNanoseconds(0);
@@ -46,22 +54,6 @@ AudioStream::~AudioStream() {
                         AAudio_convertStreamStateToText(getState()));
 
     mPlayerBase->clearParentReference(); // remove reference to this AudioStream
-}
-
-static const char *AudioStream_convertSharingModeToShortText(aaudio_sharing_mode_t sharingMode) {
-    const char *result;
-    switch (sharingMode) {
-        case AAUDIO_SHARING_MODE_EXCLUSIVE:
-            result = "EX";
-            break;
-        case AAUDIO_SHARING_MODE_SHARED:
-            result = "SH";
-            break;
-        default:
-            result = "?!";
-            break;
-    }
-    return result;
 }
 
 aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
@@ -105,20 +97,6 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     mErrorCallbackProc = builder.getErrorCallbackProc();
     mDataCallbackUserData = builder.getDataCallbackUserData();
     mErrorCallbackUserData = builder.getErrorCallbackUserData();
-
-    // This is very helpful for debugging in the future. Please leave it in.
-    ALOGI("open() rate   = %d, channels    = %d, format   = %d, sharing = %s, dir = %s",
-          mSampleRate, mSamplesPerFrame, mFormat,
-          AudioStream_convertSharingModeToShortText(mSharingMode),
-          (getDirection() == AAUDIO_DIRECTION_OUTPUT) ? "OUTPUT" : "INPUT");
-    ALOGI("open() device = %d, sessionId   = %d, perfMode = %d, callback: %s with frames = %d",
-          mDeviceId,
-          mSessionId,
-          mPerformanceMode,
-          (isDataCallbackSet() ? "ON" : "OFF"),
-          mFramesPerDataCallback);
-    ALOGI("open() usage  = %d, contentType = %d, inputPreset = %d, allowedCapturePolicy = %d",
-          mUsage, mContentType, mInputPreset, mAllowedCapturePolicy);
 
     return AAUDIO_OK;
 }
@@ -278,15 +256,15 @@ aaudio_result_t AudioStream::safeClose() {
 }
 
 void AudioStream::setState(aaudio_stream_state_t state) {
-    ALOGV("%s(%p) from %d to %d", __func__, this, mState, state);
+    ALOGV("%s(%d) from %d to %d", __func__, getId(), mState, state);
     // CLOSED is a final state
     if (mState == AAUDIO_STREAM_STATE_CLOSED) {
-        ALOGE("%s(%p) tried to set to %d but already CLOSED", __func__, this, state);
+        ALOGE("%s(%d) tried to set to %d but already CLOSED", __func__, getId(), state);
 
     // Once DISCONNECTED, we can only move to CLOSED state.
     } else if (mState == AAUDIO_STREAM_STATE_DISCONNECTED
                && state != AAUDIO_STREAM_STATE_CLOSED) {
-        ALOGE("%s(%p) tried to set to %d but already DISCONNECTED", __func__, this, state);
+        ALOGE("%s(%d) tried to set to %d but already DISCONNECTED", __func__, getId(), state);
 
     } else {
         mState = state;
@@ -485,7 +463,6 @@ AudioStream::MyPlayerBase::MyPlayerBase(AudioStream *parent) : mParent(parent) {
 }
 
 AudioStream::MyPlayerBase::~MyPlayerBase() {
-    ALOGV("MyPlayerBase::~MyPlayerBase(%p) deleted", this);
 }
 
 void AudioStream::MyPlayerBase::registerWithAudioManager() {

@@ -97,8 +97,7 @@ const sp<IAAudioService> AAudioBinderClient::getAAudioService() {
                 status_t status = binder->linkToDeath(mAAudioClient);
                 // TODO review what we should do if this fails
                 if (status != NO_ERROR) {
-                    ALOGE("getAAudioService: linkToDeath(mAAudioClient = %p) returned %d",
-                          mAAudioClient.get(), status);
+                    ALOGE("%s() - linkToDeath() returned %d", __func__, status);
                 }
                 mAAudioService = interface_cast<IAAudioService>(binder);
                 needToRegister = true;

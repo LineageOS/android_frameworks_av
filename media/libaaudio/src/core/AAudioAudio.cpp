@@ -246,18 +246,20 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder* 
                                                      AAudioStream** streamPtr)
 {
     AudioStream *audioStream = nullptr;
+    aaudio_stream_id_t id = 0;
     // Please leave these logs because they are very helpful when debugging.
-    ALOGD("%s() called ----------------------------------------", __func__);
+    ALOGI("%s() called ----------------------------------------", __func__);
     AudioStreamBuilder *streamBuilder = COMMON_GET_FROM_BUILDER_OR_RETURN(streamPtr);
     aaudio_result_t result = streamBuilder->build(&audioStream);
-    ALOGD("AAudioStreamBuilder_openStream() returns %d = %s for (%p) ----------------",
-          result, AAudio_convertResultToText(result), audioStream);
     if (result == AAUDIO_OK) {
         audioStream->registerPlayerBase();
         *streamPtr = (AAudioStream*) audioStream;
+        id = audioStream->getId();
     } else {
         *streamPtr = nullptr;
     }
+    ALOGI("%s() returns %d = %s for s#%u ----------------",
+        __func__, result, AAudio_convertResultToText(result), id);
     return result;
 }
 
@@ -275,8 +277,9 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
 {
     aaudio_result_t result = AAUDIO_ERROR_NULL;
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    ALOGD("%s(%p) called ---------------", __func__, stream);
     if (audioStream != nullptr) {
+        aaudio_stream_id_t id = audioStream->getId();
+        ALOGD("%s(s#%u) called ---------------", __func__, id);
         result = audioStream->safeClose();
         // Close will only fail if called illegally, for example, from a callback.
         // That would result in deleting an active stream, which would cause a crash.
@@ -286,42 +289,39 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
         } else {
             ALOGW("%s attempt to close failed. Close it from another thread.", __func__);
         }
+        ALOGD("%s(s#%u) returned %d ---------", __func__, id, result);
     }
-    // We're potentially freeing `stream` above, so its use here makes some
-    // static analysis tools unhappy. Casting to uintptr_t helps assure
-    // said tools that we're not doing anything bad here.
-    ALOGD("%s(%#" PRIxPTR ") returned %d ---------", __func__,
-          reinterpret_cast<uintptr_t>(stream), result);
     return result;
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_requestStart(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    ALOGD("%s(%p) called --------------", __func__, stream);
+    aaudio_stream_id_t id = audioStream->getId();
+    ALOGD("%s(s#%u) called --------------", __func__, id);
     aaudio_result_t result = audioStream->systemStart();
-    ALOGD("%s(%p) returned %d ---------", __func__, stream, result);
+    ALOGD("%s(s#%u) returned %d ---------", __func__, id, result);
     return result;
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_requestPause(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    ALOGD("%s(%p) called", __func__, stream);
+    ALOGD("%s(s#%u) called", __func__, audioStream->getId());
     return audioStream->systemPause();
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_requestFlush(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    ALOGD("%s(%p) called", __func__, stream);
+    ALOGD("%s(s#%u) called", __func__, audioStream->getId());
     return audioStream->safeFlush();
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_requestStop(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    ALOGD("%s(%p) called", __func__, stream);
+    ALOGD("%s(s#%u) called", __func__, audioStream->getId());
     return audioStream->systemStopFromApp();
 }
 
@@ -371,7 +371,7 @@ AAUDIO_API aaudio_result_t AAudioStream_write(AAudioStream* stream,
 
     // Don't allow writes when playing with a callback.
     if (audioStream->isDataCallbackActive()) {
-        ALOGE("Cannot write to a callback stream when running.");
+        ALOGD("Cannot write to a callback stream when running.");
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
