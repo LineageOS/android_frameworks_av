@@ -346,7 +346,8 @@ static const char *FourCC2MIME(uint32_t fourcc) {
             return MEDIA_MIMETYPE_AUDIO_RAW;
         case FOURCC("alac"):
             return MEDIA_MIMETYPE_AUDIO_ALAC;
-
+        case FOURCC("fLaC"):
+            return MEDIA_MIMETYPE_AUDIO_FLAC;
         case FOURCC("av01"):
             return MEDIA_MIMETYPE_VIDEO_AV1;
         case FOURCC(".mp3"):
@@ -1646,6 +1647,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC("twos"):
         case FOURCC("sowt"):
         case FOURCC("alac"):
+        case FOURCC("fLaC"):
         case FOURCC(".mp3"):
         case 0x6D730055: // "ms U" mp3 audio
         {
@@ -1806,6 +1808,29 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 AMediaFormat_setBuffer(mLastTrack->meta,
                         AMEDIAFORMAT_KEY_CSD_0, cookie, sizeof(cookie));
                 data_offset += sizeof(cookie);
+                *offset = data_offset;
+                CHECK_EQ(*offset, stop_offset);
+            }
+
+            if (chunk_type == FOURCC("fLaC")) {
+
+                // From https://github.com/xiph/flac/blob/master/doc/isoflac.txt
+                // 4 for mime, 4 for blockType and BlockLen, 34 for metadata
+                uint8_t flacInfo[4 + 4 + 34];
+                // skipping dFla, version
+                data_offset += sizeof(buffer) + 12;
+                size_t flacOffset = 4;
+                // Add flaC header mime type to CSD
+                strncpy((char *)flacInfo, "fLaC", 4);
+                if (mDataSource->readAt(
+                        data_offset, flacInfo + flacOffset, sizeof(flacInfo) - flacOffset) <
+                        (ssize_t)sizeof(flacInfo) - flacOffset) {
+                    return ERROR_IO;
+                }
+                data_offset += sizeof(flacInfo) - flacOffset;
+
+                AMediaFormat_setBuffer(mLastTrack->meta, AMEDIAFORMAT_KEY_CSD_0, flacInfo,
+                                       sizeof(flacInfo));
                 *offset = data_offset;
                 CHECK_EQ(*offset, stop_offset);
             }
