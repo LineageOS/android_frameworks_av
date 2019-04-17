@@ -287,8 +287,11 @@ bool Camera3Stream::isConfiguring() const {
     return (mState == STATE_IN_CONFIG) || (mState == STATE_IN_RECONFIG);
 }
 
-status_t Camera3Stream::finishConfiguration() {
+status_t Camera3Stream::finishConfiguration(/*out*/bool* streamReconfigured) {
     ATRACE_CALL();
+    if (streamReconfigured != nullptr) {
+        *streamReconfigured = false;
+    }
     Mutex::Autolock l(mLock);
     switch (mState) {
         case STATE_ERROR:
@@ -313,7 +316,7 @@ status_t Camera3Stream::finishConfiguration() {
 
     // Register for idle tracking
     sp<StatusTracker> statusTracker = mStatusTracker.promote();
-    if (statusTracker != 0) {
+    if (statusTracker != 0 && mStatusId == StatusTracker::NO_STATUS_ID) {
         mStatusId = statusTracker->addComponent();
     }
 
@@ -332,6 +335,7 @@ status_t Camera3Stream::finishConfiguration() {
     mPrepareBlockRequest = true;
     mStreamUnpreparable = false;
 
+    bool reconfiguring = (mState == STATE_IN_RECONFIG);
     status_t res;
     res = configureQueueLocked();
     // configureQueueLocked could return error in case of abandoned surface.
@@ -348,6 +352,9 @@ status_t Camera3Stream::finishConfiguration() {
         return res;
     }
 
+    if (reconfiguring && streamReconfigured != nullptr) {
+        *streamReconfigured = true;
+    }
     mState = STATE_CONFIGURED;
 
     return res;
