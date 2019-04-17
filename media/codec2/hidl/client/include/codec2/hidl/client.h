@@ -18,8 +18,7 @@
 #define CODEC2_HIDL_CLIENT_H
 
 #include <gui/IGraphicBufferProducer.h>
-#include <codec2/hidl/1.0/types.h>
-
+#include <codec2/hidl/1.0/ClientBlockHelper.h>
 #include <C2PlatformSupport.h>
 #include <C2Component.h>
 #include <C2Buffer.h>

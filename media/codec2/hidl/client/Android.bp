@@ -12,7 +12,7 @@ cc_library {
         "libbase",
         "libbinder",
         "libcodec2",
-        "libcodec2_hidl@1.0",
+        "libcodec2_hidl_client@1.0",
         "libcodec2_vndk",
         "libcutils",
         "libgui",
@@ -30,7 +30,7 @@ cc_library {
 
     export_shared_lib_headers: [
         "libcodec2",
-        "libcodec2_hidl@1.0",
+        "libcodec2_hidl_client@1.0",
     ],
 
 }
