@@ -65,6 +65,11 @@ public:
     uint32_t getMaxEffectsMemory() const;
     bool isNonOffloadableEffectEnabled() const;
 
+    void moveEffects(audio_session_t session,
+                     audio_io_handle_t srcOutput,
+                     audio_io_handle_t dstOutput);
+    void moveEffects(const std::vector<int>& ids, audio_io_handle_t dstOutput);
+
     void dump(String8 *dst, int spaces = 0, bool verbose = true) const;
 
 private:

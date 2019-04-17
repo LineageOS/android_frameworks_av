@@ -174,6 +174,32 @@ uint32_t EffectDescriptorCollection::getMaxEffectsMemory() const
     return MAX_EFFECTS_MEMORY;
 }
 
+void EffectDescriptorCollection::moveEffects(audio_session_t session,
+                                             audio_io_handle_t srcOutput,
+                                             audio_io_handle_t dstOutput)
+{
+    ALOGV("%s session %d srcOutput %d dstOutput %d", __func__, session, srcOutput, dstOutput);
+    for (size_t i = 0; i < size(); i++) {
+        sp<EffectDescriptor> effect = valueAt(i);
+        if (effect->mSession == session && effect->mIo == srcOutput) {
+            effect->mIo = dstOutput;
+        }
+    }
+}
+
+void EffectDescriptorCollection::moveEffects(const std::vector<int>& ids,
+                                             audio_io_handle_t dstOutput)
+{
+    ALOGV("%s num effects %zu, first ID %d, dstOutput %d",
+        __func__, ids.size(), ids.size() ? ids[0] : 0, dstOutput);
+    for (size_t i = 0; i < size(); i++) {
+        sp<EffectDescriptor> effect = valueAt(i);
+        if (std::find(begin(ids), end(ids), effect->mId) != end(ids)) {
+            effect->mIo = dstOutput;
+        }
+    }
+}
+
 void EffectDescriptorCollection::dump(String8 *dst, int spaces, bool verbose) const
 {
     if (verbose) {

@@ -134,6 +134,7 @@ public:
                                     int id);
     virtual status_t unregisterEffect(int id);
     virtual status_t setEffectEnabled(int id, bool enabled);
+    status_t moveEffectsToIo(const std::vector<int>& ids, audio_io_handle_t io) override;
     virtual bool isStreamActive(audio_stream_type_t stream, uint32_t inPastMs = 0) const;
     virtual bool isStreamActiveRemotely(audio_stream_type_t stream, uint32_t inPastMs = 0) const;
     virtual bool isSourceActive(audio_source_t source) const;
@@ -810,7 +811,6 @@ private:
 
     mutable Mutex mLock;    // prevents concurrent access to AudioPolicy manager functions changing
                             // device connection state  or routing
-    mutable Mutex mEffectsLock; // serialize access to Effect state within APM.
     // Note: lock acquisition order is always mLock > mEffectsLock:
     // mLock protects AudioPolicyManager methods that can call into audio flinger
     // and possibly back in to audio policy service and acquire mEffectsLock.
@@ -824,6 +824,8 @@ private:
     DefaultKeyedVector< int64_t, sp<NotificationClient> >    mNotificationClients;
     Mutex mNotificationClientsLock;  // protects mNotificationClients
     // Manage all effects configured in audio_effects.conf
+    // never hold AudioPolicyService::mLock when calling AudioPolicyEffects methods as
+    // those can call back into AudioPolicyService methods and try to acquire the mutex
     sp<AudioPolicyEffects> mAudioPolicyEffects;
     audio_mode_t mPhoneState;
 

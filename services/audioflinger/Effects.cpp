@@ -168,6 +168,68 @@ status_t AudioFlinger::EffectModule::addHandle(EffectHandle *handle)
     return status;
 }
 
+status_t AudioFlinger::EffectModule::updatePolicyState()
+{
+    status_t status = NO_ERROR;
+    bool doRegister = false;
+    bool registered = false;
+    bool doEnable = false;
+    bool enabled = false;
+    audio_io_handle_t io;
+    uint32_t strategy;
+
+    {
+        Mutex::Autolock _l(mLock);
+        // register effect when first handle is attached and unregister when last handle is removed
+        if (mPolicyRegistered != mHandles.size() > 0) {
+            doRegister = true;
+            mPolicyRegistered = mHandles.size() > 0;
+            if (mPolicyRegistered) {
+              sp <EffectChain> chain = mChain.promote();
+              sp <ThreadBase> thread = mThread.promote();
+
+              if (thread == nullptr || chain == nullptr) {
+                    return INVALID_OPERATION;
+                }
+                io = thread->id();
+                strategy = chain->strategy();
+            }
+        }
+        // enable effect when registered according to enable state requested by controlling handle
+        if (mHandles.size() > 0) {
+            EffectHandle *handle = controlHandle_l();
+            if (handle != nullptr && mPolicyEnabled != handle->enabled()) {
+                doEnable = true;
+                mPolicyEnabled = handle->enabled();
+            }
+        }
+        registered = mPolicyRegistered;
+        enabled = mPolicyEnabled;
+        mPolicyLock.lock();
+    }
+    ALOGV("%s name %s id %d session %d doRegister %d registered %d doEnable %d enabled %d",
+        __func__, mDescriptor.name, mId, mSessionId, doRegister, registered, doEnable, enabled);
+    if (doRegister) {
+        if (registered) {
+            status = AudioSystem::registerEffect(
+                &mDescriptor,
+                io,
+                strategy,
+                mSessionId,
+                mId);
+        } else {
+            status = AudioSystem::unregisterEffect(mId);
+        }
+    }
+    if (registered && doEnable) {
+        status = AudioSystem::setEffectEnabled(mId, enabled);
+    }
+    mPolicyLock.unlock();
+
+    return status;
+}
+
+
 ssize_t AudioFlinger::EffectModule::removeHandle(EffectHandle *handle)
 {
     Mutex::Autolock _l(mLock);
@@ -230,7 +292,6 @@ ssize_t AudioFlinger::EffectModule::disconnectHandle(EffectHandle *handle, bool 
     Mutex::Autolock _l(mLock);
     ssize_t numHandles = removeHandle_l(handle);
     if ((numHandles == 0) && (!mPinned || unpinIfLast)) {
-        AudioSystem::unregisterEffect(mId);
         sp<AudioFlinger> af = mAudioFlinger.promote();
         if (af != 0) {
             mLock.unlock();
@@ -943,11 +1004,6 @@ status_t AudioFlinger::EffectModule::setEnabled_l(bool enabled)
     ALOGV("setEnabled %p enabled %d", this, enabled);
 
     if (enabled != isEnabled()) {
-        status_t status = AudioSystem::setEffectEnabled(mId, enabled);
-        if (enabled && status != NO_ERROR) {
-            return status;
-        }
-
         switch (mState) {
         // going from disabled to enabled
         case IDLE:
@@ -1253,14 +1309,11 @@ bool AudioFlinger::EffectModule::purgeHandles()
 {
     bool enabled = false;
     Mutex::Autolock _l(mLock);
-    for (size_t i = 0; i < mHandles.size(); i++) {
-        EffectHandle *handle = mHandles[i];
-        if (handle != NULL && !handle->disconnected()) {
-            if (handle->hasControl()) {
-                enabled = handle->enabled();
-            }
-        }
+    EffectHandle *handle = controlHandle_l();
+    if (handle != NULL) {
+        enabled = handle->enabled();
     }
+    mHandles.clear();
     return enabled;
 }
 
@@ -1572,6 +1625,12 @@ status_t AudioFlinger::EffectHandle::enable()
 
     mEnabled = true;
 
+    status_t status = effect->updatePolicyState();
+    if (status != NO_ERROR) {
+        mEnabled = false;
+        return status;
+    }
+
     sp<ThreadBase> thread = effect->thread().promote();
     if (thread != 0) {
         thread->checkSuspendOnEffectEnabled(effect, true, effect->sessionId());
@@ -1582,7 +1641,7 @@ status_t AudioFlinger::EffectHandle::enable()
         return NO_ERROR;
     }
 
-    status_t status = effect->setEnabled(true);
+    status = effect->setEnabled(true);
     if (status != NO_ERROR) {
         if (thread != 0) {
             thread->checkSuspendOnEffectEnabled(effect, false, effect->sessionId());
@@ -1625,6 +1684,8 @@ status_t AudioFlinger::EffectHandle::disable()
     }
     mEnabled = false;
 
+    effect->updatePolicyState();
+
     if (effect->suspended()) {
         return NO_ERROR;
     }
@@ -1660,20 +1721,17 @@ void AudioFlinger::EffectHandle::disconnect(bool unpinIfLast)
         return;
     }
     mDisconnected = true;
-    sp<ThreadBase> thread;
     {
         sp<EffectModule> effect = mEffect.promote();
         if (effect != 0) {
-            thread = effect->thread().promote();
-        }
-    }
-    if (thread != 0) {
-        thread->disconnectEffectHandle(this, unpinIfLast);
-    } else {
-        // try to cleanup as much as we can
-        sp<EffectModule> effect = mEffect.promote();
-        if (effect != 0 && effect->disconnectHandle(this, unpinIfLast) > 0) {
-            ALOGW("%s Effect handle %p disconnected after thread destruction", __FUNCTION__, this);
+            sp<ThreadBase> thread = effect->thread().promote();
+            if (thread != 0) {
+                thread->disconnectEffectHandle(this, unpinIfLast);
+            } else if (effect->disconnectHandle(this, unpinIfLast) > 0) {
+                ALOGW("%s Effect handle %p disconnected after thread destruction",
+                    __func__, this);
+            }
+            effect->updatePolicyState();
         }
     }
 
@@ -1945,6 +2003,16 @@ sp<AudioFlinger::EffectModule> AudioFlinger::EffectChain::getEffectFromType_l(
         }
     }
     return 0;
+}
+
+std::vector<int> AudioFlinger::EffectChain::getEffectIds()
+{
+    std::vector<int> ids;
+    Mutex::Autolock _l(mLock);
+    for (size_t i = 0; i < mEffects.size(); i++) {
+        ids.push_back(mEffects[i]->id());
+    }
+    return ids;
 }
 
 void AudioFlinger::EffectChain::clearInputBuffer()
