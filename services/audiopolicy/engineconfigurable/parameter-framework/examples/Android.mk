@@ -46,11 +46,11 @@ LOCAL_REQUIRED_MODULES := \
 
 # external/parameter-framework prevents from using debug interface
 AUDIO_PATTERN = @TUNING_ALLOWED@
-#ifeq ($(TARGET_BUILD_VARIANT),user)
+ifeq ($(TARGET_BUILD_VARIANT),user)
 AUDIO_VALUE = false
-#else
-#AUDIO_VALUE = true
-#endif
+else
+AUDIO_VALUE = true
+endif
 
 LOCAL_POST_INSTALL_CMD := $(hide) sed -i -e 's|$(AUDIO_PATTERN)|$(AUDIO_VALUE)|g' $(TARGET_OUT_VENDOR_ETC)/$(LOCAL_MODULE_RELATIVE_PATH)/$(LOCAL_MODULE)
 
