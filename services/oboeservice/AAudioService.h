@@ -87,6 +87,10 @@ public:
 
 private:
 
+    /** @return true if the client is the audioserver
+     */
+    bool isCallerInService();
+
     /**
      * Lookup stream and then validate access to the stream.
      * @param streamHandle
@@ -106,9 +110,10 @@ private:
 
     aaudio::AAudioStreamTracker     mStreamTracker;
 
-    enum constants {
-        DEFAULT_AUDIO_PRIORITY = 2
-    };
+    // TODO  Extract the priority constants from services/audioflinger/Threads.cpp
+    // and share them with this code. Look for "kPriorityFastMixer".
+    static constexpr int32_t        kRealTimeAudioPriorityClient = 2;
+    static constexpr int32_t        kRealTimeAudioPriorityService = 3;
 };
 
 } /* namespace android */

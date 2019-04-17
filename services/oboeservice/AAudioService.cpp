@@ -78,6 +78,11 @@ void AAudioService::registerClient(const sp<IAAudioClient>& client) {
     AAudioClientTracker::getInstance().registerClient(pid, client);
 }
 
+bool AAudioService::isCallerInService() {
+    return mAudioClient.clientPid == IPCThreadState::self()->getCallingPid() &&
+        mAudioClient.clientUid == IPCThreadState::self()->getCallingUid();
+}
+
 aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &request,
                                           aaudio::AAudioStreamConfiguration &configurationOutput) {
     aaudio_result_t result = AAUDIO_OK;
@@ -105,8 +110,7 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
     if (sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE) {
         // only trust audioserver for in service indication
         bool inService = false;
-        if (mAudioClient.clientPid == IPCThreadState::self()->getCallingPid() &&
-                mAudioClient.clientUid == IPCThreadState::self()->getCallingUid()) {
+        if (isCallerInService()) {
             inService = request.isInService();
         }
         serviceStream = new AAudioServiceStreamMMAP(*this, inService);
@@ -275,12 +279,14 @@ aaudio_result_t AAudioService::registerAudioThread(aaudio_handle_t streamHandle,
         result = AAUDIO_ERROR_INVALID_STATE;
     } else {
         const pid_t ownerPid = IPCThreadState::self()->getCallingPid(); // TODO review
+        int32_t priority = isCallerInService()
+            ? kRealTimeAudioPriorityService : kRealTimeAudioPriorityClient;
         serviceStream->setRegisteredThread(clientThreadId);
         int err = android::requestPriority(ownerPid, clientThreadId,
-                                           DEFAULT_AUDIO_PRIORITY, true /* isForApp */);
+                                           priority, true /* isForApp */);
         if (err != 0) {
             ALOGE("AAudioService::registerAudioThread(%d) failed, errno = %d, priority = %d",
-                  clientThreadId, errno, DEFAULT_AUDIO_PRIORITY);
+                  clientThreadId, errno, priority);
             result = AAUDIO_ERROR_INTERNAL;
         }
     }
