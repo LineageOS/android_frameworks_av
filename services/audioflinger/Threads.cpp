@@ -44,6 +44,7 @@
 #include <audio_utils/primitives.h>
 #include <audio_utils/format.h>
 #include <audio_utils/minifloat.h>
+#include <audio_utils/safe_math.h>
 #include <system/audio_effects/effect_ns.h>
 #include <system/audio_effects/effect_aec.h>
 #include <system/audio.h>
@@ -7904,7 +7905,7 @@ void AudioFlinger::RecordThread::ResamplerBufferProvider::sync(
     RecordThread *recordThread = (RecordThread *) threadBase.get();
     const int32_t rear = recordThread->mRsmpInRear;
     const int32_t front = mRsmpInFront;
-    const ssize_t filled = rear - front;
+    const ssize_t filled = audio_utils::safe_sub_overflow(rear, front);
 
     size_t framesIn;
     bool overrun = false;
@@ -7918,7 +7919,8 @@ void AudioFlinger::RecordThread::ResamplerBufferProvider::sync(
     } else {
         // client is not keeping up with server, but give it latest data
         framesIn = recordThread->mRsmpInFrames;
-        mRsmpInFront = /* front = */ rear - framesIn;
+        mRsmpInFront = /* front = */ audio_utils::safe_sub_overflow(
+                rear, static_cast<int32_t>(framesIn));
         overrun = true;
     }
     if (framesAvailable != NULL) {
@@ -7942,7 +7944,7 @@ status_t AudioFlinger::RecordThread::ResamplerBufferProvider::getNextBuffer(
     RecordThread *recordThread = (RecordThread *) threadBase.get();
     int32_t rear = recordThread->mRsmpInRear;
     int32_t front = mRsmpInFront;
-    ssize_t filled = rear - front;
+    ssize_t filled = audio_utils::safe_sub_overflow(rear, front);
     // FIXME should not be P2 (don't want to increase latency)
     // FIXME if client not keeping up, discard
     LOG_ALWAYS_FATAL_IF(!(0 <= filled && (size_t) filled <= recordThread->mRsmpInFrames));
@@ -7975,13 +7977,13 @@ status_t AudioFlinger::RecordThread::ResamplerBufferProvider::getNextBuffer(
 void AudioFlinger::RecordThread::ResamplerBufferProvider::releaseBuffer(
         AudioBufferProvider::Buffer* buffer)
 {
-    size_t stepCount = buffer->frameCount;
+    int32_t stepCount = static_cast<int32_t>(buffer->frameCount);
     if (stepCount == 0) {
         return;
     }
     ALOG_ASSERT(stepCount <= mRsmpInUnrel);
     mRsmpInUnrel -= stepCount;
-    mRsmpInFront += stepCount;
+    mRsmpInFront = audio_utils::safe_add_overflow(mRsmpInFront, stepCount);
     buffer->raw = NULL;
     buffer->frameCount = 0;
 }

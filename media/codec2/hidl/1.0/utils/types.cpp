@@ -18,9 +18,7 @@
 #define LOG_TAG "Codec2-types"
 #include <android-base/logging.h>
 
-#include <android/hardware/graphics/bufferqueue/2.0/IGraphicBufferProducer.h>
 #include <codec2/hidl/1.0/types.h>
-#include <gui/bufferqueue/2.0/B2HGraphicBufferProducer.h>
 #include <media/stagefright/foundation/AUtils.h>
 
 #include <C2AllocatorIon.h>
@@ -54,10 +52,6 @@ using ::android::hardware::media::bufferpool::V2_0::implementation::
         ClientManager;
 using ::android::hardware::media::bufferpool::V2_0::implementation::
         TransactionId;
-using HGraphicBufferProducer = ::android::hardware::graphics::bufferqueue::
-        V2_0::IGraphicBufferProducer;
-using B2HGraphicBufferProducer = ::android::hardware::graphics::bufferqueue::
-        V2_0::utils::B2HGraphicBufferProducer;
 
 const char* asString(Status status, const char* def) {
     return asString(static_cast<c2_status_t>(status), def);
@@ -1741,30 +1735,6 @@ c2_status_t toC2Status(ResultStatus rs) {
 
 namespace /* unnamed */ {
 
-// Create a GraphicBuffer object from a graphic block.
-sp<GraphicBuffer> createGraphicBuffer(const C2ConstGraphicBlock& block) {
-    uint32_t width;
-    uint32_t height;
-    uint32_t format;
-    uint64_t usage;
-    uint32_t stride;
-    uint32_t generation;
-    uint64_t bqId;
-    int32_t bqSlot;
-    _UnwrapNativeCodec2GrallocMetadata(
-            block.handle(), &width, &height, &format, &usage,
-            &stride, &generation, &bqId, reinterpret_cast<uint32_t*>(&bqSlot));
-    native_handle_t *grallocHandle =
-            UnwrapNativeCodec2GrallocHandle(block.handle());
-    sp<GraphicBuffer> graphicBuffer =
-            new GraphicBuffer(grallocHandle,
-                              GraphicBuffer::CLONE_HANDLE,
-                              width, height, format,
-                              1, usage, stride);
-    native_handle_delete(grallocHandle);
-    return graphicBuffer;
-}
-
 template <typename BlockProcessor>
 void forEachBlock(C2FrameData& frameData,
                   BlockProcessor process) {
@@ -1800,58 +1770,7 @@ void forEachBlock(const std::list<std::unique_ptr<C2Work>>& workList,
     }
 }
 
-sp<HGraphicBufferProducer> getHgbp(const sp<IGraphicBufferProducer>& igbp) {
-    sp<HGraphicBufferProducer> hgbp =
-            igbp->getHalInterface<HGraphicBufferProducer>();
-    return hgbp ? hgbp :
-            new B2HGraphicBufferProducer(igbp);
-}
-
 } // unnamed namespace
-
-status_t attachToBufferQueue(const C2ConstGraphicBlock& block,
-                             const sp<IGraphicBufferProducer>& igbp,
-                             uint32_t generation,
-                             int32_t* bqSlot) {
-    if (!igbp) {
-        LOG(WARNING) << "attachToBufferQueue -- null producer.";
-        return NO_INIT;
-    }
-
-    sp<GraphicBuffer> graphicBuffer = createGraphicBuffer(block);
-    graphicBuffer->setGenerationNumber(generation);
-
-    LOG(VERBOSE) << "attachToBufferQueue -- attaching buffer:"
-            << " block dimension " << block.width() << "x"
-                                   << block.height()
-            << ", graphicBuffer dimension " << graphicBuffer->getWidth() << "x"
-                                           << graphicBuffer->getHeight()
-            << std::hex << std::setfill('0')
-            << ", format 0x" << std::setw(8) << graphicBuffer->getPixelFormat()
-            << ", usage 0x" << std::setw(16) << graphicBuffer->getUsage()
-            << std::dec << std::setfill(' ')
-            << ", stride " << graphicBuffer->getStride()
-            << ", generation " << graphicBuffer->getGenerationNumber();
-
-    status_t result = igbp->attachBuffer(bqSlot, graphicBuffer);
-    if (result != OK) {
-        LOG(WARNING) << "attachToBufferQueue -- attachBuffer failed: "
-                        "status = " << result << ".";
-        return result;
-    }
-    LOG(VERBOSE) << "attachToBufferQueue -- attachBuffer returned slot #"
-                 << *bqSlot << ".";
-    return OK;
-}
-
-bool getBufferQueueAssignment(const C2ConstGraphicBlock& block,
-                              uint32_t* generation,
-                              uint64_t* bqId,
-                              int32_t* bqSlot) {
-    return _C2BlockFactory::GetBufferQueueData(
-            _C2BlockFactory::GetGraphicBlockPoolData(block),
-            generation, bqId, bqSlot);
-}
 
 bool yieldBufferQueueBlock(const C2ConstGraphicBlock& block) {
     std::shared_ptr<_C2BlockPoolData> data =
@@ -1867,74 +1786,6 @@ void yieldBufferQueueBlocks(
         const std::list<std::unique_ptr<C2Work>>& workList,
         bool processInput, bool processOutput) {
     forEachBlock(workList, yieldBufferQueueBlock, processInput, processOutput);
-}
-
-bool holdBufferQueueBlock(const C2ConstGraphicBlock& block,
-                            const sp<IGraphicBufferProducer>& igbp,
-                            uint64_t bqId,
-                            uint32_t generation) {
-    std::shared_ptr<_C2BlockPoolData> data =
-            _C2BlockFactory::GetGraphicBlockPoolData(block);
-    if (!data) {
-        return false;
-    }
-
-    uint32_t oldGeneration;
-    uint64_t oldId;
-    int32_t oldSlot;
-    // If the block is not bufferqueue-based, do nothing.
-    if (!_C2BlockFactory::GetBufferQueueData(
-            data, &oldGeneration, &oldId, &oldSlot) ||
-            (oldId == 0)) {
-        return false;
-    }
-
-    // If the block's bqId is the same as the desired bqId, just hold.
-    if ((oldId == bqId) && (oldGeneration == generation)) {
-        LOG(VERBOSE) << "holdBufferQueueBlock -- import without attaching:"
-                     << " bqId " << oldId
-                     << ", bqSlot " << oldSlot
-                     << ", generation " << generation
-                     << ".";
-        _C2BlockFactory::HoldBlockFromBufferQueue(data, getHgbp(igbp));
-        return true;
-    }
-
-    // Otherwise, attach to the given igbp, which must not be null.
-    if (!igbp) {
-        return false;
-    }
-
-    int32_t bqSlot;
-    status_t result = attachToBufferQueue(block, igbp, generation, &bqSlot);
-
-    if (result != OK) {
-        LOG(ERROR) << "holdBufferQueueBlock -- fail to attach:"
-                   << " target bqId " << bqId
-                   << ", generation " << generation
-                   << ".";
-        return false;
-    }
-
-    LOG(VERBOSE) << "holdBufferQueueBlock -- attached:"
-                 << " bqId " << bqId
-                 << ", bqSlot " << bqSlot
-                 << ", generation " << generation
-                 << ".";
-    _C2BlockFactory::AssignBlockToBufferQueue(
-            data, getHgbp(igbp), generation, bqId, bqSlot, true);
-    return true;
-}
-
-void holdBufferQueueBlocks(const std::list<std::unique_ptr<C2Work>>& workList,
-                           const sp<IGraphicBufferProducer>& igbp,
-                           uint64_t bqId,
-                           uint32_t generation,
-                           bool forInput) {
-    forEachBlock(workList,
-                 std::bind(holdBufferQueueBlock,
-                           std::placeholders::_1, igbp, bqId, generation),
-                 forInput, !forInput);
 }
 
 }  // namespace utils
