@@ -15,7 +15,6 @@
 apex_defaults {
     name: "com.android.media-defaults",
     java_libs: ["updatable-media"],
-    compile_multilib: "both",
     multilib: {
         first: {
             // Extractor process runs only with the primary ABI.
@@ -31,12 +30,6 @@ apex_defaults {
                 "libmpeg2extractor",
                 "liboggextractor",
                 "libwavextractor",
-            ],
-        },
-        both: {
-            native_shared_libs: [
-                // MediaPlayer2
-                "libmedia2_jni",
             ],
         },
     },
