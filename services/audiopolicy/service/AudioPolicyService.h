@@ -293,6 +293,9 @@ public:
 
             void onAudioVolumeGroupChanged(volume_group_t group, int flags);
             void doOnAudioVolumeGroupChanged(volume_group_t group, int flags);
+            void setEffectSuspended(int effectId,
+                                    audio_session_t sessionId,
+                                    bool suspended);
 
 private:
                         AudioPolicyService() ANDROID_API;
@@ -427,7 +430,8 @@ private:
             CHANGED_AUDIOVOLUMEGROUP,
             SET_AUDIOPORT_CONFIG,
             DYN_POLICY_MIX_STATE_UPDATE,
-            RECORDING_CONFIGURATION_UPDATE
+            RECORDING_CONFIGURATION_UPDATE,
+            SET_EFFECT_SUSPENDED,
         };
 
         AudioCommandThread (String8 name, const wp<AudioPolicyService>& service);
@@ -470,6 +474,9 @@ private:
                                                     std::vector<effect_descriptor_t> effects,
                                                     audio_patch_handle_t patchHandle,
                                                     audio_source_t source);
+                    void        setEffectSuspendedCommand(int effectId,
+                                                          audio_session_t sessionId,
+                                                          bool suspended);
                     void        insertCommand_l(AudioCommand *command, int delayMs = 0);
     private:
         class AudioCommandData;
@@ -567,6 +574,13 @@ private:
             audio_source_t mSource;
         };
 
+        class SetEffectSuspendedData : public AudioCommandData {
+        public:
+            int mEffectId;
+            audio_session_t mSessionId;
+            bool mSuspended;
+        };
+
         Mutex   mLock;
         Condition mWaitWorkCV;
         Vector < sp<AudioCommand> > mAudioCommands; // list of pending commands
@@ -651,6 +665,10 @@ private:
         virtual status_t moveEffects(audio_session_t session,
                                          audio_io_handle_t srcOutput,
                                          audio_io_handle_t dstOutput);
+
+                void setEffectSuspended(int effectId,
+                                        audio_session_t sessionId,
+                                        bool suspended) override;
 
         /* Create a patch between several source and sink ports */
         virtual status_t createAudioPatch(const struct audio_patch *patch,

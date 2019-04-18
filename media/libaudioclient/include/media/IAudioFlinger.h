@@ -457,6 +457,10 @@ public:
     virtual status_t moveEffects(audio_session_t session, audio_io_handle_t srcOutput,
                                     audio_io_handle_t dstOutput) = 0;
 
+    virtual void setEffectSuspended(int effectId,
+                                    audio_session_t sessionId,
+                                    bool suspended) = 0;
+
     virtual audio_module_handle_t loadHwModule(const char *name) = 0;
 
     // helpers for android.media.AudioManager.getProperty(), see description there for meaning

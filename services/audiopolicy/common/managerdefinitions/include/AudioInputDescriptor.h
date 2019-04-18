@@ -68,11 +68,13 @@ public:
     bool isSourceActive(audio_source_t source) const;
     audio_source_t source() const;
     bool isSoundTrigger() const;
+    sp<RecordClientDescriptor> getHighestPriorityClient() const;
     audio_attributes_t getHighestPriorityAttributes() const;
     void setClientActive(const sp<RecordClientDescriptor>& client, bool active);
     int32_t activeCount() { return mGlobalActiveCount; }
     void trackEffectEnabled(const sp<EffectDescriptor> &effect, bool enabled);
     EffectDescriptorCollection getEnabledEffects() const;
+    EffectDescriptorCollection getActiveEffects() const; // enabled and not suspended
     // implementation of AudioIODescriptorInterface
     audio_config_base_t getConfig() const override;
     audio_patch_handle_t getPatchHandle() const override;
@@ -99,6 +101,10 @@ public:
 
     // implementation of ClientMapHandler<RecordClientDescriptor>
     void addClient(const sp<RecordClientDescriptor> &client) override;
+
+    // Go over all active clients and suspend or restore effects according highest priority
+    // active use case
+    void checkSuspendEffects();
 
  private:
 

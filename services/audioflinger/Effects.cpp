@@ -1488,9 +1488,10 @@ void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args __unu
         result.append("\t\tCould not lock Fx mutex:\n");
     }
 
-    result.append("\t\tSession Status State Engine:\n");
-    result.appendFormat("\t\t%05d   %03d    %03d   %p\n",
-            mSessionId, mStatus, mState, mEffectInterface.get());
+    result.append("\t\tSession Status State Registered Enabled Suspended Engine:\n");
+    result.appendFormat("\t\t%05d   %03d    %03d   %s          %s       %s         %p\n",
+            mSessionId, mStatus, mState, mPolicyRegistered ? "y" : "n", mPolicyEnabled ? "y" : "n",
+            mSuspended ? "y" : "n", mEffectInterface.get());
 
     result.append("\t\tDescriptor:\n");
     char uuidStr[64];

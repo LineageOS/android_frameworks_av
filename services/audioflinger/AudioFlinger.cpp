@@ -1699,18 +1699,35 @@ void AudioFlinger::removeClient_l(pid_t pid)
 }
 
 // getEffectThread_l() must be called with AudioFlinger::mLock held
-sp<AudioFlinger::PlaybackThread> AudioFlinger::getEffectThread_l(audio_session_t sessionId,
-        int EffectId)
+sp<AudioFlinger::ThreadBase> AudioFlinger::getEffectThread_l(audio_session_t sessionId,
+        int effectId)
 {
-    sp<PlaybackThread> thread;
+    sp<ThreadBase> thread;
 
     for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
-        if (mPlaybackThreads.valueAt(i)->getEffect(sessionId, EffectId) != 0) {
+        if (mPlaybackThreads.valueAt(i)->getEffect(sessionId, effectId) != 0) {
             ALOG_ASSERT(thread == 0);
             thread = mPlaybackThreads.valueAt(i);
         }
     }
-
+    if (thread != nullptr) {
+        return thread;
+    }
+    for (size_t i = 0; i < mRecordThreads.size(); i++) {
+        if (mRecordThreads.valueAt(i)->getEffect(sessionId, effectId) != 0) {
+            ALOG_ASSERT(thread == 0);
+            thread = mRecordThreads.valueAt(i);
+        }
+    }
+    if (thread != nullptr) {
+        return thread;
+    }
+    for (size_t i = 0; i < mMmapThreads.size(); i++) {
+        if (mMmapThreads.valueAt(i)->getEffect(sessionId, effectId) != 0) {
+            ALOG_ASSERT(thread == 0);
+            thread = mMmapThreads.valueAt(i);
+        }
+    }
     return thread;
 }
 
@@ -3464,6 +3481,23 @@ status_t AudioFlinger::moveEffects(audio_session_t sessionId, audio_io_handle_t 
     return moveEffectChain_l(sessionId, srcThread, dstThread);
 }
 
+
+void AudioFlinger::setEffectSuspended(int effectId,
+                                audio_session_t sessionId,
+                                bool suspended)
+{
+    Mutex::Autolock _l(mLock);
+
+    sp<ThreadBase> thread = getEffectThread_l(sessionId, effectId);
+    if (thread == nullptr) {
+      return;
+    }
+    Mutex::Autolock _sl(thread->mLock);
+    sp<EffectModule> effect = thread->getEffect_l(sessionId, effectId);
+    thread->setEffectSuspended_l(&effect->desc().type, suspended, sessionId);
+}
+
+
 // moveEffectChain_l must be called with both srcThread and dstThread mLocks held
 status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
                                    AudioFlinger::PlaybackThread *srcThread,
@@ -3541,7 +3575,8 @@ status_t AudioFlinger::moveAuxEffectToIo(int EffectId,
 {
     status_t status = NO_ERROR;
     Mutex::Autolock _l(mLock);
-    sp<PlaybackThread> thread = getEffectThread_l(AUDIO_SESSION_OUTPUT_MIX, EffectId);
+    sp<PlaybackThread> thread =
+        static_cast<PlaybackThread *>(getEffectThread_l(AUDIO_SESSION_OUTPUT_MIX, EffectId).get());
 
     if (EffectId != 0 && thread != 0 && dstThread != thread.get()) {
         Mutex::Autolock _dl(dstThread->mLock);

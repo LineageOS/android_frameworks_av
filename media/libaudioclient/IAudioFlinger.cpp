@@ -89,6 +89,7 @@ enum {
     GET_MICROPHONES,
     SET_MASTER_BALANCE,
     GET_MASTER_BALANCE,
+    SET_EFFECT_SUSPENDED,
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -718,6 +719,18 @@ public:
         return reply.readInt32();
     }
 
+    virtual void setEffectSuspended(int effectId,
+                                    audio_session_t sessionId,
+                                    bool suspended)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
+        data.writeInt32(effectId);
+        data.writeInt32(sessionId);
+        data.writeInt32(suspended ? 1 : 0);
+        remote()->transact(SET_EFFECT_SUSPENDED, data, &reply);
+    }
+
     virtual audio_module_handle_t loadHwModule(const char *name)
     {
         Parcel data, reply;
@@ -913,6 +926,7 @@ status_t BnAudioFlinger::onTransact(
         case INVALIDATE_STREAM:
         case SET_VOICE_VOLUME:
         case MOVE_EFFECTS:
+        case SET_EFFECT_SUSPENDED:
         case LOAD_HW_MODULE:
         case LIST_AUDIO_PORTS:
         case GET_AUDIO_PORT:
@@ -926,6 +940,7 @@ status_t BnAudioFlinger::onTransact(
             // return status only for non void methods
             switch (code) {
                 case SET_RECORD_SILENCED:
+                case SET_EFFECT_SUSPENDED:
                     break;
                 default:
                     reply->writeInt32(static_cast<int32_t> (INVALID_OPERATION));
@@ -1369,6 +1384,14 @@ status_t BnAudioFlinger::onTransact(
             audio_io_handle_t srcOutput = (audio_io_handle_t) data.readInt32();
             audio_io_handle_t dstOutput = (audio_io_handle_t) data.readInt32();
             reply->writeInt32(moveEffects(session, srcOutput, dstOutput));
+            return NO_ERROR;
+        } break;
+        case SET_EFFECT_SUSPENDED: {
+            CHECK_INTERFACE(IAudioFlinger, data, reply);
+            int effectId = data.readInt32();
+            audio_session_t sessionId = (audio_session_t) data.readInt32();
+            bool suspended = data.readInt32() == 1;
+            setEffectSuspended(effectId, sessionId, suspended);
             return NO_ERROR;
         } break;
         case LOAD_HW_MODULE: {

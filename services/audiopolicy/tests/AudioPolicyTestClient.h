@@ -84,6 +84,9 @@ public:
                                         std::vector<effect_descriptor_t> effects __unused,
                                         audio_patch_handle_t patchHandle __unused,
                                         audio_source_t source __unused) override { }
+    void setEffectSuspended(int effectId __unused,
+                            audio_session_t sessionId __unused,
+                            bool suspended __unused) {}
 };
 
 } // namespace android
