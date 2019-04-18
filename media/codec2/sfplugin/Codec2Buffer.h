@@ -226,9 +226,9 @@ public:
             const std::shared_ptr<C2GraphicBlock> &block,
             std::function<sp<ABuffer>(size_t)> alloc);
 
-    std::shared_ptr<C2Buffer> asC2Buffer() override;
-
     virtual ~GraphicBlockBuffer() = default;
+
+    std::shared_ptr<C2Buffer> asC2Buffer() override;
 
 private:
     GraphicBlockBuffer(
@@ -260,10 +260,9 @@ public:
      */
     GraphicMetadataBuffer(
             const sp<AMessage> &format, const std::shared_ptr<C2Allocator> &alloc);
+    virtual ~GraphicMetadataBuffer() = default;
 
     std::shared_ptr<C2Buffer> asC2Buffer() override;
-
-    virtual ~GraphicMetadataBuffer() = default;
 
 private:
     GraphicMetadataBuffer() = delete;
@@ -307,11 +306,11 @@ public:
             const sp<AMessage> &format,
             std::function<sp<ABuffer>(size_t)> alloc);
 
+    virtual ~ConstGraphicBlockBuffer() = default;
+
     std::shared_ptr<C2Buffer> asC2Buffer() override;
     bool canCopy(const std::shared_ptr<C2Buffer> &buffer) const override;
     bool copy(const std::shared_ptr<C2Buffer> &buffer) override;
-
-    virtual ~ConstGraphicBlockBuffer() = default;
 
 private:
     ConstGraphicBlockBuffer(
