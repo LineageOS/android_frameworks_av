@@ -206,7 +206,9 @@ aaudio_result_t AudioStreamLegacy::getBestTimestamp(clockid_t clockId,
 
 void AudioStreamLegacy::onAudioDeviceUpdate(audio_port_handle_t deviceId)
 {
-    ALOGD("onAudioDeviceUpdate() deviceId %d", (int)deviceId);
+    // Device routing is a common source of errors and DISCONNECTS.
+    // Please leave this log in place.
+    ALOGD("%s() devId %d => %d", __func__, (int) getDeviceId(), (int)deviceId);
     if (getDeviceId() != AAUDIO_UNSPECIFIED && getDeviceId() != deviceId &&
             getState() != AAUDIO_STREAM_STATE_DISCONNECTED) {
         // Note that isDataCallbackActive() is affected by state so call it before DISCONNECTING.

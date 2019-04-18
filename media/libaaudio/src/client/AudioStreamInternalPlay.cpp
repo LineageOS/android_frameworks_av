@@ -65,7 +65,7 @@ aaudio_result_t AudioStreamInternalPlay::requestPause()
         return result;
     }
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
-        ALOGE("%s() mServiceStreamHandle invalid", __func__);
+        ALOGW("%s() mServiceStreamHandle invalid", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -77,7 +77,7 @@ aaudio_result_t AudioStreamInternalPlay::requestPause()
 
 aaudio_result_t AudioStreamInternalPlay::requestFlush() {
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
-        ALOGE("%s() mServiceStreamHandle invalid", __func__);
+        ALOGW("%s() mServiceStreamHandle invalid", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
 

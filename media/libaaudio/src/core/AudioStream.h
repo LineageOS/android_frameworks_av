@@ -36,6 +36,7 @@
 namespace aaudio {
 
 typedef void *(*aaudio_audio_thread_proc_t)(void *);
+typedef uint32_t aaudio_stream_id_t;
 
 class AudioStreamBuilder;
 
@@ -119,6 +120,12 @@ public:
      */
     virtual aaudio_result_t close() {
         return AAUDIO_OK;
+    }
+
+    // This is only used to identify a stream in the logs without
+    // revealing any pointers.
+    aaudio_stream_id_t getId() {
+        return mStreamId;
     }
 
     virtual aaudio_result_t setBufferSize(int32_t requestedFrames) = 0;
@@ -586,6 +593,8 @@ private:
     aaudio_audio_thread_proc_t  mThreadProc = nullptr;
     void                       *mThreadArg = nullptr;
     aaudio_result_t             mThreadRegistrationResult = AAUDIO_OK;
+
+    const aaudio_stream_id_t    mStreamId;
 
 };
 
