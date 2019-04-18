@@ -1659,10 +1659,12 @@ void MediaCodec::requestCpuBoostIfNeeded() {
         return;
     }
     int32_t colorFormat;
-    if (mSoftRenderer != NULL
-            && mOutputFormat->contains("hdr-static-info")
+    if (mOutputFormat->contains("hdr-static-info")
             && mOutputFormat->findInt32("color-format", &colorFormat)
-            && (colorFormat == OMX_COLOR_FormatYUV420Planar16)) {
+            // check format for OMX only, for C2 the format is always opaque since the
+            // software rendering doesn't go through client
+            && ((mSoftRenderer != NULL && colorFormat == OMX_COLOR_FormatYUV420Planar16)
+                    || mOwnerName.equalsIgnoreCase("codec2::software"))) {
         int32_t left, top, right, bottom, width, height;
         int64_t totalPixel = 0;
         if (mOutputFormat->findRect("crop", &left, &top, &right, &bottom)) {
@@ -1958,6 +1960,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     } else {
                         mFlags &= ~kFlagUsesSoftwareRenderer;
                     }
+                    mOwnerName = owner;
 
                     MediaResource::Type resourceType;
                     if (mComponentName.endsWith(".secure")) {
