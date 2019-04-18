@@ -315,6 +315,7 @@ public:
                 sp<EffectChain> getEffectChain(audio_session_t sessionId);
                 // same as getEffectChain() but must be called with ThreadBase mutex locked
                 sp<EffectChain> getEffectChain_l(audio_session_t sessionId) const;
+                std::vector<int> getEffectIds_l(audio_session_t sessionId);
                 // add an effect chain to the chain list (mEffectChains)
     virtual     status_t addEffectChain_l(const sp<EffectChain>& chain) = 0;
                 // remove an effect chain from the chain list (mEffectChains)
@@ -334,7 +335,8 @@ public:
                 sp<AudioFlinger::EffectModule> getEffect(audio_session_t sessionId, int effectId);
                 sp<AudioFlinger::EffectModule> getEffect_l(audio_session_t sessionId, int effectId);
                 // add and effect module. Also creates the effect chain is none exists for
-                // the effects audio session
+                // the effects audio session. Only called in a context of moving an effect
+                // from one thread to another
                 status_t addEffect_l(const sp< EffectModule>& effect);
                 // remove and effect module. Also removes the effect chain is this was the last
                 // effect

@@ -1250,8 +1250,10 @@ class Camera3Device :
     /**
      * Distortion correction support
      */
-
-    camera3::DistortionMapper mDistortionMapper;
+    // Map from camera IDs to its corresponding distortion mapper. Only contains
+    // 1 ID if the device isn't a logical multi-camera. Otherwise contains both
+    // logical camera and its physical subcameras.
+    std::unordered_map<std::string, camera3::DistortionMapper> mDistortionMappers;
 
     // Debug tracker for metadata tag value changes
     // - Enabled with the -m <taglist> option to dumpsys, such as

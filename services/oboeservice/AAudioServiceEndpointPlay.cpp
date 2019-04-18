@@ -43,7 +43,6 @@ using namespace aaudio;   // TODO just import names needed
 
 AAudioServiceEndpointPlay::AAudioServiceEndpointPlay(AAudioService &audioService)
         : mStreamInternalPlay(audioService, true) {
-    ALOGD("%s(%p) created", __func__, this);
     mStreamInternal = &mStreamInternalPlay;
 }
 

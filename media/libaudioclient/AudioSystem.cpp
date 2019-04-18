@@ -1067,6 +1067,13 @@ status_t AudioSystem::setEffectEnabled(int id, bool enabled)
     return aps->setEffectEnabled(id, enabled);
 }
 
+status_t AudioSystem::moveEffectsToIo(const std::vector<int>& ids, audio_io_handle_t io)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->moveEffectsToIo(ids, io);
+}
+
 status_t AudioSystem::isStreamActive(audio_stream_type_t stream, bool* state, uint32_t inPastMs)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();

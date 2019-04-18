@@ -1244,54 +1244,25 @@ status_t AudioFlinger::PlaybackThread::Track::getTimestamp(AudioTimestamp& times
 
 status_t AudioFlinger::PlaybackThread::Track::attachAuxEffect(int EffectId)
 {
-    status_t status = DEAD_OBJECT;
     sp<ThreadBase> thread = mThread.promote();
-    if (thread != 0) {
-        PlaybackThread *playbackThread = (PlaybackThread *)thread.get();
-        sp<AudioFlinger> af = mClient->audioFlinger();
+    if (thread == nullptr) {
+        return DEAD_OBJECT;
+    }
 
-        Mutex::Autolock _l(af->mLock);
+    sp<PlaybackThread> dstThread = (PlaybackThread *)thread.get();
+    sp<PlaybackThread> srcThread; // srcThread is initialized by call to moveAuxEffectToIo()
+    sp<AudioFlinger> af = mClient->audioFlinger();
+    status_t status = af->moveAuxEffectToIo(EffectId, dstThread, &srcThread);
 
-        sp<PlaybackThread> srcThread = af->getEffectThread_l(AUDIO_SESSION_OUTPUT_MIX, EffectId);
-
-        if (EffectId != 0 && srcThread != 0 && playbackThread != srcThread.get()) {
-            Mutex::Autolock _dl(playbackThread->mLock);
-            Mutex::Autolock _sl(srcThread->mLock);
-            sp<EffectChain> chain = srcThread->getEffectChain_l(AUDIO_SESSION_OUTPUT_MIX);
-            if (chain == 0) {
-                return INVALID_OPERATION;
-            }
-
-            sp<EffectModule> effect = chain->getEffectFromId_l(EffectId);
-            if (effect == 0) {
-                return INVALID_OPERATION;
-            }
-            srcThread->removeEffect_l(effect);
-            status = playbackThread->addEffect_l(effect);
-            if (status != NO_ERROR) {
-                srcThread->addEffect_l(effect);
-                return INVALID_OPERATION;
-            }
-            // removeEffect_l() has stopped the effect if it was active so it must be restarted
-            if (effect->state() == EffectModule::ACTIVE ||
-                    effect->state() == EffectModule::STOPPING) {
-                effect->start();
-            }
-
-            sp<EffectChain> dstChain = effect->chain().promote();
-            if (dstChain == 0) {
-                srcThread->addEffect_l(effect);
-                return INVALID_OPERATION;
-            }
-            AudioSystem::unregisterEffect(effect->id());
-            AudioSystem::registerEffect(&effect->desc(),
-                                        srcThread->id(),
-                                        dstChain->strategy(),
-                                        AUDIO_SESSION_OUTPUT_MIX,
-                                        effect->id());
-            AudioSystem::setEffectEnabled(effect->id(), effect->isEnabled());
+    if (EffectId != 0 && status == NO_ERROR) {
+        status = dstThread->attachAuxEffect(this, EffectId);
+        if (status == NO_ERROR) {
+            AudioSystem::moveEffectsToIo(std::vector<int>(EffectId), dstThread->id());
         }
-        status = playbackThread->attachAuxEffect(this, EffectId);
+    }
+
+    if (status != NO_ERROR && srcThread != nullptr) {
+        af->moveAuxEffectToIo(EffectId, srcThread, &dstThread);
     }
     return status;
 }
