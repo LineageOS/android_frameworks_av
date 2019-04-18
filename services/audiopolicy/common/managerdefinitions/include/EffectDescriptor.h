@@ -29,8 +29,8 @@ class EffectDescriptor : public RefBase
 {
 public:
     EffectDescriptor(const effect_descriptor_t *desc, bool isMusicEffect,
-                     int id, int io, int session) :
-        mId(id), mIo(io), mSession(session), mEnabled(false),
+                     int id, audio_io_handle_t io, audio_session_t session) :
+        mId(id), mIo(io), mSession(session), mEnabled(false), mSuspended(false),
         mIsMusicEffect(isMusicEffect)
     {
         memcpy (&mDesc, desc, sizeof(effect_descriptor_t));
@@ -38,11 +38,12 @@ public:
 
     void dump(String8 *dst, int spaces = 0) const;
 
-    int mId;                // effect unique ID
-    int mIo;                // io the effect is attached to
-    int mSession;               // audio session the effect is on
-    effect_descriptor_t mDesc;  // effect descriptor
-    bool mEnabled;              // enabled state: CPU load being used or not
+    int mId;                   // effect unique ID
+    audio_io_handle_t mIo;     // io the effect is attached to
+    audio_session_t mSession;  // audio session the effect is on
+    effect_descriptor_t mDesc; // effect descriptor
+    bool mEnabled;             // enabled state: CPU load being used or not
+    bool mSuspended;           // enabled but suspended by concurent capture policy
 
     bool isMusicEffect() const { return mIsMusicEffect; }
 
@@ -59,6 +60,7 @@ public:
                             int session, int id, bool isMusicEffect);
     status_t unregisterEffect(int id);
     sp<EffectDescriptor> getEffect(int id) const;
+    EffectDescriptorCollection getEffectsForIo(audio_io_handle_t io) const;
     status_t setEffectEnabled(int id, bool enabled);
     bool     isEffectEnabled(int id) const;
     uint32_t getMaxEffectsCpuLoad() const;

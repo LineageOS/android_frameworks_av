@@ -239,6 +239,10 @@ public:
     virtual status_t moveEffects(audio_session_t sessionId, audio_io_handle_t srcOutput,
                         audio_io_handle_t dstOutput);
 
+            void setEffectSuspended(int effectId,
+                                    audio_session_t sessionId,
+                                    bool suspended) override;
+
     virtual audio_module_handle_t loadHwModule(const char *name);
 
     virtual uint32_t getPrimaryOutputSamplingRate();
@@ -708,7 +712,7 @@ using effect_buffer_t = int16_t;
               // return the playback thread with smallest HAL buffer size, and prefer fast
               PlaybackThread *fastPlaybackThread_l() const;
 
-              sp<PlaybackThread> getEffectThread_l(audio_session_t sessionId, int EffectId);
+              sp<ThreadBase> getEffectThread_l(audio_session_t sessionId, int effectId);
 
 
                 void        removeClient_l(pid_t pid);
