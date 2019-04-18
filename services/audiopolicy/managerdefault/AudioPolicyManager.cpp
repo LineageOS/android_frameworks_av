@@ -1881,6 +1881,7 @@ void AudioPolicyManager::releaseOutput(audio_port_handle_t portId)
 
 status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
                                              audio_io_handle_t *input,
+                                             audio_unique_id_t riid,
                                              audio_session_t session,
                                              uid_t uid,
                                              const audio_config_base_t *config,
@@ -2024,7 +2025,7 @@ exit:
         mSoundTriggerSessions.indexOfKey(session) > 0;
     *portId = AudioPort::getNextUniqueId();
 
-    clientDesc = new RecordClientDescriptor(*portId, uid, session, attributes, *config,
+    clientDesc = new RecordClientDescriptor(*portId, riid, uid, session, attributes, *config,
                                             requestedDeviceId, attributes.source, flags,
                                             isSoundTrigger);
     inputDesc = mInputs.valueFor(*input);
