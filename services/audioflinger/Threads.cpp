@@ -7454,8 +7454,10 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
             // we formerly checked for a callback handler (non-0 tid),
             // but that is no longer required for TRANSFER_OBTAIN mode
             //
-            // frame count is not specified, or is exactly the pipe depth
-            ((frameCount == 0) || (frameCount == mPipeFramesP2)) &&
+            // Frame count is not specified (0), or is less than or equal the pipe depth.
+            // It is OK to provide a higher capacity than requested.
+            // We will force it to mPipeFramesP2 below.
+            (frameCount <= mPipeFramesP2) &&
             // PCM data
             audio_is_linear_pcm(format) &&
             // hardware format
