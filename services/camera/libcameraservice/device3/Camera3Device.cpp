@@ -132,12 +132,23 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager, const Stri
     bool isLogical = manager->isLogicalCamera(mId.string(), &physicalCameraIds);
     if (isLogical) {
         for (auto& physicalId : physicalCameraIds) {
-            res = manager->getCameraCharacteristics(physicalId, &mPhysicalDeviceInfoMap[physicalId]);
+            res = manager->getCameraCharacteristics(
+                    physicalId, &mPhysicalDeviceInfoMap[physicalId]);
             if (res != OK) {
                 SET_ERR_L("Could not retrieve camera %s characteristics: %s (%d)",
                         physicalId.c_str(), strerror(-res), res);
                 session->close();
                 return res;
+            }
+
+            if (DistortionMapper::isDistortionSupported(mPhysicalDeviceInfoMap[physicalId])) {
+                mDistortionMappers[physicalId].setupStaticInfo(mPhysicalDeviceInfoMap[physicalId]);
+                if (res != OK) {
+                    SET_ERR_L("Unable to read camera %s's calibration fields for distortion "
+                            "correction", physicalId.c_str());
+                    session->close();
+                    return res;
+                }
             }
         }
     }
@@ -308,7 +319,7 @@ status_t Camera3Device::initializeCommonLocked() {
     }
 
     if (DistortionMapper::isDistortionSupported(mDeviceInfo)) {
-        res = mDistortionMapper.setupStaticInfo(mDeviceInfo);
+        res = mDistortionMappers[mId.c_str()].setupStaticInfo(mDeviceInfo);
         if (res != OK) {
             SET_ERR_L("Unable to read necessary calibration fields for distortion correction");
             return res;
@@ -3503,12 +3514,27 @@ void Camera3Device::sendCaptureResult(CameraMetadata &pendingMetadata,
     }
 
     // Fix up some result metadata to account for HAL-level distortion correction
-    status_t res = mDistortionMapper.correctCaptureResult(&captureResult.mMetadata);
+    status_t res =
+            mDistortionMappers[mId.c_str()].correctCaptureResult(&captureResult.mMetadata);
     if (res != OK) {
         SET_ERR("Unable to correct capture result metadata for frame %d: %s (%d)",
                 frameNumber, strerror(res), res);
         return;
     }
+    for (auto& physicalMetadata : captureResult.mPhysicalMetadatas) {
+        String8 cameraId8(physicalMetadata.mPhysicalCameraId);
+        if (mDistortionMappers.find(cameraId8.c_str()) == mDistortionMappers.end()) {
+            continue;
+        }
+        res = mDistortionMappers[cameraId8.c_str()].correctCaptureResult(
+                &physicalMetadata.mPhysicalCameraMetadata);
+        if (res != OK) {
+            SET_ERR("Unable to correct physical capture result metadata for frame %d: %s (%d)",
+                    frameNumber, strerror(res), res);
+            return;
+        }
+    }
+
     // Fix up result metadata for monochrome camera.
     res = fixupMonochromeTags(mDeviceInfo, captureResult.mMetadata);
     if (res != OK) {
@@ -5482,13 +5508,21 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 // Correct metadata regions for distortion correction if enabled
                 sp<Camera3Device> parent = mParent.promote();
                 if (parent != nullptr) {
-                    res = parent->mDistortionMapper.correctCaptureRequest(
-                        &(captureRequest->mSettingsList.begin()->metadata));
-                    if (res != OK) {
-                        SET_ERR("RequestThread: Unable to correct capture requests "
-                                "for lens distortion for request %d: %s (%d)",
-                                halRequest->frame_number, strerror(-res), res);
-                        return INVALID_OPERATION;
+                    List<PhysicalCameraSettings>::iterator it;
+                    for (it = captureRequest->mSettingsList.begin();
+                            it != captureRequest->mSettingsList.end(); it++) {
+                        if (parent->mDistortionMappers.find(it->cameraId) ==
+                                parent->mDistortionMappers.end()) {
+                            continue;
+                        }
+                        res = parent->mDistortionMappers[it->cameraId].correctCaptureRequest(
+                            &(it->metadata));
+                        if (res != OK) {
+                            SET_ERR("RequestThread: Unable to correct capture requests "
+                                    "for lens distortion for request %d: %s (%d)",
+                                    halRequest->frame_number, strerror(-res), res);
+                            return INVALID_OPERATION;
+                        }
                     }
                 }
             }
