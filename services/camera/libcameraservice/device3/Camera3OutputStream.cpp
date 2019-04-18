@@ -491,8 +491,11 @@ status_t Camera3OutputStream::configureConsumerQueueLocked() {
      * sets the mBufferManager if device version is > HAL3.2, which guarantees that the buffer
      * manager setup is skipped in below code. Note that HAL3.2 is also excluded here, as some
      * HAL3.2 devices may not support the dynamic buffer registeration.
+     * Also Camera3BufferManager does not support display/texture streams as they have its own
+     * buffer management logic.
      */
-    if (mBufferManager != 0 && mSetId > CAMERA3_STREAM_SET_ID_INVALID) {
+    if (mBufferManager != 0 && mSetId > CAMERA3_STREAM_SET_ID_INVALID &&
+            !(isConsumedByHWComposer() || isConsumedByHWTexture())) {
         uint64_t consumerUsage = 0;
         getEndpointUsage(&consumerUsage);
         StreamInfo streamInfo(
