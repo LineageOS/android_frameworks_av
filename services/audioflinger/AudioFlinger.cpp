@@ -1238,8 +1238,8 @@ status_t AudioFlinger::setStreamVolume(audio_stream_type_t stream, float value,
     if (output == AUDIO_IO_HANDLE_NONE) {
         return BAD_VALUE;
     }
-    ALOG_ASSERT(stream != AUDIO_STREAM_PATCH || value == 1.0,
-        "attempt to change AUDIO_STREAM_PATCH volume");
+    LOG_ALWAYS_FATAL_IF(stream == AUDIO_STREAM_PATCH && value != 1.0f,
+                        "AUDIO_STREAM_PATCH must have full scale volume");
 
     AutoMutex lock(mLock);
     VolumeInterface *volumeInterface = getVolumeInterface_l(output);
