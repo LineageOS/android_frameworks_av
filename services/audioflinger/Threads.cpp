@@ -8248,11 +8248,6 @@ sp<StreamHalInterface> AudioFlinger::RecordThread::stream() const
 
 status_t AudioFlinger::RecordThread::addEffectChain_l(const sp<EffectChain>& chain)
 {
-    // only one chain per input thread
-    if (!mEffectChains.isEmpty()) {
-        ALOGW("addEffectChain_l() already one chain %p on thread %p", chain.get(), this);
-        return INVALID_OPERATION;
-    }
     ALOGV("addEffectChain_l() %p on thread %p", chain.get(), this);
     chain->setThread(this);
     chain->setInBuffer(NULL);
@@ -8272,13 +8267,14 @@ status_t AudioFlinger::RecordThread::addEffectChain_l(const sp<EffectChain>& cha
 size_t AudioFlinger::RecordThread::removeEffectChain_l(const sp<EffectChain>& chain)
 {
     ALOGV("removeEffectChain_l() %p from thread %p", chain.get(), this);
-    ALOGW_IF(mEffectChains.size() != 1,
-            "removeEffectChain_l() %p invalid chain size %zu on thread %p",
-            chain.get(), mEffectChains.size(), this);
-    if (mEffectChains.size() == 1) {
-        mEffectChains.removeAt(0);
+
+    for (size_t i = 0; i < mEffectChains.size(); i++) {
+        if (chain == mEffectChains[i]) {
+            mEffectChains.removeAt(i);
+            break;
+        }
     }
-    return 0;
+    return mEffectChains.size();
 }
 
 status_t AudioFlinger::RecordThread::createAudioPatch_l(const struct audio_patch *patch,

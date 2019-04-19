@@ -142,18 +142,7 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
                     __func__, device->toString().c_str(), encodedFormat);
 
             // register new device as available
-            index = mAvailableOutputDevices.add(device);
-            if (index >= 0) {
-                sp<HwModule> module = mHwModules.getModuleForDevice(device, encodedFormat);
-                if (module == 0) {
-                    ALOGD("setDeviceConnectionState() could not find HW module for device %s",
-                          device->toString().c_str());
-                    mAvailableOutputDevices.remove(device);
-                    return INVALID_OPERATION;
-                }
-                ALOGV("setDeviceConnectionState() module name=%s", module->getName());
-                mAvailableOutputDevices[index]->attach(module);
-            } else {
+            if (mAvailableOutputDevices.add(device) < 0) {
                 return NO_MEMORY;
             }
 
@@ -295,13 +284,6 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
                 ALOGW("%s() device already connected: %s", __func__, device->toString().c_str());
                 return INVALID_OPERATION;
             }
-            sp<HwModule> module = mHwModules.getModuleForDevice(device, AUDIO_FORMAT_DEFAULT);
-            if (module == NULL) {
-                ALOGW("setDeviceConnectionState(): could not find HW module for device %s",
-                      device->toString().c_str());
-                return INVALID_OPERATION;
-            }
-
             // Before checking intputs, broadcast connect event to allow HAL to retrieve dynamic
             // parameters on newly connected devices (instead of opening the inputs...)
             broadcastDeviceConnectionState(device, state);
@@ -2361,25 +2343,8 @@ void AudioPolicyManager::closeClient(audio_port_handle_t portId)
 }
 
 void AudioPolicyManager::closeAllInputs() {
-    bool patchRemoved = false;
-
-    for (size_t input_index = 0; input_index < mInputs.size(); input_index++) {
-        sp<AudioInputDescriptor> inputDesc = mInputs.valueAt(input_index);
-        ssize_t patch_index = mAudioPatches.indexOfKey(inputDesc->getPatchHandle());
-        if (patch_index >= 0) {
-            sp<AudioPatch> patchDesc = mAudioPatches.valueAt(patch_index);
-            (void) /*status_t status*/ mpClientInterface->releaseAudioPatch(patchDesc->mAfPatchHandle, 0);
-            mAudioPatches.removeItemsAt(patch_index);
-            patchRemoved = true;
-        }
-        inputDesc->close();
-    }
-    mInputs.clear();
-    SoundTrigger::setCaptureState(false);
-    nextAudioPortGeneration();
-
-    if (patchRemoved) {
-        mpClientInterface->onAudioPatchListUpdate();
+    while (mInputs.size() != 0) {
+        closeInput(mInputs.keyAt(0));
     }
 }
 
@@ -2481,7 +2446,7 @@ status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_
         // HW Gain management, do not change the volume
         bool applyVolume = false;
         if (desc->useHwGain()) {
-            if (!(desc->isActive(group) || isInCall())) {
+            if (!(desc->isActive(toVolumeSource(group)) || isInCall())) {
                 continue;
             }
             for (const auto &productStrategy : mEngine->getOrderedProductStrategies()) {
@@ -2713,12 +2678,21 @@ status_t AudioPolicyManager::unregisterEffect(int id)
     if (mEffects.getEffect(id) == nullptr) {
         return INVALID_OPERATION;
     }
-
     if (mEffects.isEffectEnabled(id)) {
         ALOGW("%s effect %d enabled", __FUNCTION__, id);
         setEffectEnabled(id, false);
     }
     return mEffects.unregisterEffect(id);
+}
+
+void AudioPolicyManager::cleanUpEffectsForIo(audio_io_handle_t io)
+{
+    EffectDescriptorCollection effects = mEffects.getEffectsForIo(io);
+    for (size_t i = 0; i < effects.size(); i++) {
+        ALOGW("%s removing stale effect %s, id %d on closed IO %d",
+              __func__, effects.valueAt(i)->mDesc.name, effects.keyAt(i), io);
+        unregisterEffect(effects.keyAt(i));
+    }
 }
 
 status_t AudioPolicyManager::setEffectEnabled(int id, bool enabled)
@@ -4113,15 +4087,8 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
 void AudioPolicyManager::setAppState(uid_t uid, app_state_t state)
 {
     ALOGV("%s(uid:%d, state:%d)", __func__, uid, state);
-
     for (size_t i = 0; i < mInputs.size(); i++) {
-        sp<AudioInputDescriptor> inputDesc = mInputs.valueAt(i);
-        RecordClientVector clients = inputDesc->clientsList(false /*activeOnly*/);
-        for (const auto& client : clients) {
-            if (uid == client->uid()) {
-                client->setAppState(state);
-            }
-        }
+        mInputs.valueAt(i)->setAppState(uid, state);
     }
 }
 
@@ -4932,6 +4899,8 @@ void AudioPolicyManager::closeOutput(audio_io_handle_t output)
             setMsdPatch();
         }
     }
+
+    cleanUpEffectsForIo(output);
 }
 
 void AudioPolicyManager::closeInput(audio_io_handle_t input)
@@ -4963,6 +4932,8 @@ void AudioPolicyManager::closeInput(audio_io_handle_t input)
             mInputs.activeInputsCountOnDevices(primaryInputDevices) == 0) {
         SoundTrigger::setCaptureState(false);
     }
+
+    cleanUpEffectsForIo(input);
 }
 
 SortedVector<audio_io_handle_t> AudioPolicyManager::getOutputsForDevices(
