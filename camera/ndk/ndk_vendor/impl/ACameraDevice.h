@@ -266,9 +266,11 @@ class CameraDevice final : public RefBase {
 
     class CallbackHandler : public AHandler {
       public:
+        explicit CallbackHandler(const char *id);
         void onMessageReceived(const sp<AMessage> &msg) override;
 
       private:
+        std::string mId;
         // This handler will cache all capture session sp until kWhatCleanUpSessions
         // is processed. This is used to guarantee the last session reference is always
         // being removed in callback thread without holding camera device lock
