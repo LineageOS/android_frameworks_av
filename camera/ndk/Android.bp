@@ -32,7 +32,7 @@ ndk_headers {
 }
 
 cc_library_shared {
-    name: "libcamera2",
+    name: "libcamera2ndk",
     srcs: [
         "NdkCameraManager.cpp",
         "NdkCameraMetadata.cpp",
