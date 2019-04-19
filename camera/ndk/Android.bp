@@ -69,4 +69,5 @@ cc_library_shared {
             enabled: false,
         },
     },
+    version_script: "libcamera2ndk.map.txt",
 }
