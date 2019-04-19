@@ -6,10 +6,8 @@ cc_library_shared {
     },
     double_loadable: true,
     srcs: [
-        "Conversion.cpp",
         "FrameDropper.cpp",
         "GraphicBufferSource.cpp",
-        "WProducerListener.cpp",
     ],
 
     export_include_dirs: [
@@ -27,7 +25,6 @@ cc_library_shared {
     shared_libs: [
         "libbinder",
         "libcutils",
-        "libgui",
         "libhidlbase",
         "libhidlmemory",
         "libhidltransport",
@@ -37,12 +34,25 @@ cc_library_shared {
         "libutils",
 
         "android.hardware.graphics.bufferqueue@1.0",
+        // Following libs are from libgui_bufferqueue_static
+        "android.hardware.graphics.bufferqueue@2.0",
+        "android.hidl.token@1.0-utils",
+        "libbase",
+        "libEGL",
+        "libhwbinder",
+        "libnativewindow",
+        "libvndksupport",
+    ],
+    
+    static_libs: [
+        "libgui_bufferqueue_static"
     ],
 
     export_shared_lib_headers: [
-        "libgui",
         "libhidlmemory",
         "libstagefright_foundation",
+        "android.hardware.graphics.bufferqueue@1.0",
+        "android.hardware.graphics.bufferqueue@2.0",
     ],
 
     cflags: [
