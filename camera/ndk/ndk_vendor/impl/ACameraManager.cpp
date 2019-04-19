@@ -22,6 +22,8 @@
 #include "ACameraMetadata.h"
 #include "ndk_vendor/impl/ACameraDevice.h"
 #include "utils.h"
+#include <CameraMetadata.h>
+#include <camera_metadata_hidden.h>
 
 #include <utils/Vector.h>
 #include <cutils/properties.h>
@@ -585,6 +587,26 @@ ACameraManager::openCamera(
     device->setDeviceMetadataQueues();
     *outDevice = device;
     return ACAMERA_OK;
+}
+
+camera_status_t
+ACameraManager::getTagFromName(const char *cameraId, const char *name, uint32_t *tag) {
+    sp<ACameraMetadata> rawChars;
+    camera_status_t ret = getCameraCharacteristics(cameraId, &rawChars);
+    if (ret != ACAMERA_OK) {
+        ALOGE("%s, Cannot retrieve camera characteristics for camera id %s", __FUNCTION__,
+                cameraId);
+        return ACAMERA_ERROR_METADATA_NOT_FOUND;
+    }
+    const CameraMetadata& metadata = rawChars->getInternalData();
+    const camera_metadata_t *rawMetadata = metadata.getAndLock();
+    metadata_vendor_id_t vendorTagId = get_camera_metadata_vendor_id(rawMetadata);
+    metadata.unlock(rawMetadata);
+    sp<VendorTagDescriptorCache> vtCache = VendorTagDescriptorCache::getGlobalVendorTagCache();
+    sp<VendorTagDescriptor> vTags = nullptr;
+    vtCache->getVendorTagDescriptor(vendorTagId, &vTags);
+    status_t status= metadata.getTagFromName(name, vTags.get(), tag);
+    return status == OK ? ACAMERA_OK : ACAMERA_ERROR_METADATA_NOT_FOUND;
 }
 
 ACameraManager::~ACameraManager() {
