@@ -49,6 +49,10 @@ cc_library {
         },
     },
 
+    include_dirs: [
+        // For android_mallopt definitions.
+        "bionic/libc/private"
+    ],
     local_include_dirs: ["include"],
     export_include_dirs: ["include"],
 }
