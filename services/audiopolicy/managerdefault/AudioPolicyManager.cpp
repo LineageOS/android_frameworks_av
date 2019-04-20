@@ -273,8 +273,6 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
 
     // handle input devices
     if (audio_is_input_device(deviceType)) {
-        SortedVector <audio_io_handle_t> inputs;
-
         ssize_t index = mAvailableInputDevices.indexOf(device);
         switch (state)
         {
@@ -284,11 +282,18 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
                 ALOGW("%s() device already connected: %s", __func__, device->toString().c_str());
                 return INVALID_OPERATION;
             }
+
+            if (mAvailableInputDevices.add(device) < 0) {
+                return NO_MEMORY;
+            }
+
             // Before checking intputs, broadcast connect event to allow HAL to retrieve dynamic
             // parameters on newly connected devices (instead of opening the inputs...)
             broadcastDeviceConnectionState(device, state);
 
-            if (checkInputsForDevice(device, state, inputs) != NO_ERROR) {
+            if (checkInputsForDevice(device, state) != NO_ERROR) {
+                mAvailableInputDevices.remove(device);
+
                 broadcastDeviceConnectionState(device, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE);
 
                 mHwModules.cleanUpForDevice(device);
@@ -296,9 +301,6 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
                 return INVALID_OPERATION;
             }
 
-            if (mAvailableInputDevices.add(device) < 0) {
-                return NO_MEMORY;
-            }
         } break;
 
         // handle input device disconnection
@@ -313,8 +315,9 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
             // Set Disconnect to HALs
             broadcastDeviceConnectionState(device, state);
 
-            checkInputsForDevice(device, state, inputs);
             mAvailableInputDevices.remove(device);
+
+            checkInputsForDevice(device, state);
         } break;
 
         default:
@@ -325,7 +328,7 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t deviceT
         // Propagate device availability to Engine
         setEngineDeviceConnectionState(device, state);
 
-        closeAllInputs();
+        checkCloseInputs();
         // As the input device list can impact the output device selection, update
         // getDeviceForStrategy() cache
         updateDevicesAndOutputs();
@@ -2342,9 +2345,39 @@ void AudioPolicyManager::closeClient(audio_port_handle_t portId)
     releaseInput(portId);
 }
 
-void AudioPolicyManager::closeAllInputs() {
-    while (mInputs.size() != 0) {
-        closeInput(mInputs.keyAt(0));
+void AudioPolicyManager::checkCloseInputs() {
+    // After connecting or disconnecting an input device, close input if:
+    // - it has no client (was just opened to check profile)  OR
+    // - none of its supported devices are connected anymore OR
+    // - one of its clients cannot be routed to one of its supported
+    // devices anymore. Otherwise update device selection
+    std::vector<audio_io_handle_t> inputsToClose;
+    for (size_t i = 0; i < mInputs.size(); i++) {
+        const sp<AudioInputDescriptor> input = mInputs.valueAt(i);
+        if (input->clientsList().size() == 0
+                || !mAvailableInputDevices.containsAtLeastOne(input->supportedDevices())) {
+            inputsToClose.push_back(mInputs.keyAt(i));
+        } else {
+            bool close = false;
+            for (const auto& client : input->clientsList()) {
+                sp<DeviceDescriptor> device =
+                    mEngine->getInputDeviceForAttributes(client->attributes());
+                if (!input->supportedDevices().contains(device)) {
+                    close = true;
+                    break;
+                }
+            }
+            if (close) {
+                inputsToClose.push_back(mInputs.keyAt(i));
+            } else {
+                setInputDevice(input->mIoHandle, getNewInputDevice(input));
+            }
+        }
+    }
+
+    for (const audio_io_handle_t handle : inputsToClose) {
+        ALOGV("%s closing input %d", __func__, handle);
+        closeInput(handle);
     }
 }
 
@@ -4684,8 +4717,7 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
 }
 
 status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& device,
-                                                  audio_policy_dev_state_t state,
-                                                  SortedVector<audio_io_handle_t>& inputs)
+                                                  audio_policy_dev_state_t state)
 {
     sp<AudioInputDescriptor> desc;
 
@@ -4695,16 +4727,7 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
     }
 
     if (state == AUDIO_POLICY_DEVICE_STATE_AVAILABLE) {
-        // first list already open inputs that can be routed to this device
-        for (size_t input_index = 0; input_index < mInputs.size(); input_index++) {
-            desc = mInputs.valueAt(input_index);
-            if (desc->mProfile->supportsDeviceTypes(device->type())) {
-                ALOGV("checkInputsForDevice(): adding opened input %d", mInputs.keyAt(input_index));
-               inputs.add(mInputs.keyAt(input_index));
-            }
-        }
-
-        // then look for input profiles that can be routed to this device
+        // look for input profiles that can be routed to this device
         SortedVector< sp<IOProfile> > profiles;
         for (const auto& hwModule : mHwModules) {
             for (size_t profile_index = 0;
@@ -4720,8 +4743,9 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
             }
         }
 
-        if (profiles.isEmpty() && inputs.isEmpty()) {
-            ALOGW("%s: No input available for device %s", __func__, device->toString().c_str());
+        if (profiles.isEmpty()) {
+            ALOGW("%s: No input profile available for device %s",
+                __func__, device->toString().c_str());
             return BAD_VALUE;
         }
 
@@ -4774,7 +4798,7 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
                     input = AUDIO_IO_HANDLE_NONE;
                 }
 
-                if (input != 0) {
+                if (input != AUDIO_IO_HANDLE_NONE) {
                     addInput(input, desc);
                 }
             } // endif input != 0
@@ -4785,7 +4809,6 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
                 profiles.removeAt(profile_index);
                 profile_index--;
             } else {
-                inputs.add(input);
                 if (audio_device_is_digital(device->type())) {
                     device->importAudioPort(profile);
                 }
@@ -4799,15 +4822,6 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
         }
     } else {
         // Disconnect
-        // check if one opened input is not needed any more after disconnecting one device
-        for (size_t input_index = 0; input_index < mInputs.size(); input_index++) {
-            desc = mInputs.valueAt(input_index);
-            if (!mAvailableInputDevices.containsAtLeastOne(desc->supportedDevices())) {
-                ALOGV("checkInputsForDevice(): disconnecting adding input %d",
-                      mInputs.keyAt(input_index));
-                inputs.add(mInputs.keyAt(input_index));
-            }
-        }
         // Clear any profiles associated with the disconnected device.
         for (const auto& hwModule : mHwModules) {
             for (size_t profile_index = 0;
