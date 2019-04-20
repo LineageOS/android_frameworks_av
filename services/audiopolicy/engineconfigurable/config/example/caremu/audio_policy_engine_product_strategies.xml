@@ -166,5 +166,19 @@ limitations under the License.
             <Attributes> <Flags value="AUDIO_FLAG_BEACON"/> </Attributes>
         </AttributesGroup>
     </ProductStrategy>
+
+    <!-- Routing Strategy rerouting may be removed as following media??? -->
+    <ProductStrategy name="rerouting">
+        <AttributesGroup streamType="AUDIO_STREAM_REROUTING" volumeGroup="rerouting">
+            <Attributes></Attributes>
+        </AttributesGroup>
+    </ProductStrategy>
+
+    <!-- Patch stream needs full scale volume, define it otherwise switch to default... -->
+    <ProductStrategy name="patch">
+        <AttributesGroup streamType="AUDIO_STREAM_PATCH" volumeGroup="patch">
+            <Attributes></Attributes>
+        </AttributesGroup>
+    </ProductStrategy>
 </ProductStrategies>
 

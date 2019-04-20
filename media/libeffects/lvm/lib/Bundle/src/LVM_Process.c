@@ -230,9 +230,15 @@ LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
              */
             if (pToProcess != pProcessed)
             {
+#ifdef SUPPORT_MC
+                Copy_Float(pToProcess,                             /* Source */
+                           pProcessed,                             /* Destination */
+                           (LVM_INT16)(NrChannels * NrFrames));    /* Copy all samples */
+#else
                 Copy_Float(pToProcess,                             /* Source */
                            pProcessed,                             /* Destination */
                            (LVM_INT16)(2 * SampleCount));          /* Left and right */
+#endif
             }
 
             /*

@@ -128,6 +128,13 @@ bool AudioInputDescriptor::isSourceActive(audio_source_t source) const
 audio_attributes_t AudioInputDescriptor::getHighestPriorityAttributes() const
 {
     audio_attributes_t attributes = { .source = AUDIO_SOURCE_DEFAULT };
+    sp<RecordClientDescriptor> topClient = getHighestPriorityClient();
+    return topClient ? topClient->attributes() : attributes;
+}
+
+sp<RecordClientDescriptor> AudioInputDescriptor::getHighestPriorityClient() const
+{
+    sp<RecordClientDescriptor> topClient;
 
     for (bool activeOnly : { true, false }) {
         int32_t topPriority = -1;
@@ -139,18 +146,18 @@ audio_attributes_t AudioInputDescriptor::getHighestPriorityAttributes() const
             app_state_t curState = client->appState();
             if (curState >= topState) {
                 int32_t curPriority = source_priority(client->source());
-                if (curPriority > topPriority) {
-                    attributes = client->attributes();
+                if (curPriority >= topPriority) {
+                    topClient = client;
                     topPriority = curPriority;
                 }
                 topState = curState;
             }
         }
-        if (attributes.source != AUDIO_SOURCE_DEFAULT) {
+        if (topClient != nullptr) {
             break;
         }
     }
-    return attributes;
+    return topClient;
 }
 
 bool AudioInputDescriptor::isSoundTrigger() const {
@@ -326,9 +333,10 @@ void AudioInputDescriptor::setClientActive(const sp<RecordClientDescriptor>& cli
 
     client->setActive(active);
 
+    checkSuspendEffects();
+
     int event = active ? RECORD_CONFIG_EVENT_START : RECORD_CONFIG_EVENT_STOP;
     updateClientRecordingConfiguration(event, client);
-
 }
 
 void AudioInputDescriptor::updateClientRecordingConfiguration(
@@ -397,42 +405,88 @@ void AudioInputDescriptor::trackEffectEnabled(const sp<EffectDescriptor> &effect
         mEnabledEffects.replaceValueFor(effect->mId, effect);
     } else {
         mEnabledEffects.removeItem(effect->mId);
+        // always exit from suspend when disabling an effect as only enabled effects
+        // are managed by checkSuspendEffects()
+        if (effect->mSuspended) {
+            effect->mSuspended = false;
+            mClientInterface->setEffectSuspended(effect->mId, effect->mSession, effect->mSuspended);
+        }
     }
 
     RecordClientVector clients = getClientsForSession((audio_session_t)effect->mSession);
+    RecordClientVector updatedClients;
+
     for (const auto& client : clients) {
         sp<EffectDescriptor> clientEffect = client->getEnabledEffects().getEffect(effect->mId);
         bool changed = (enabled && clientEffect == nullptr)
                 || (!enabled && clientEffect != nullptr);
         client->trackEffectEnabled(effect, enabled);
         if (changed && client->active()) {
-            updateClientRecordingConfiguration(RECORD_CONFIG_EVENT_START, client);
+            updatedClients.push_back(client);
         }
+    }
+
+    checkSuspendEffects();
+
+    for (const auto& client : updatedClients) {
+        updateClientRecordingConfiguration(RECORD_CONFIG_EVENT_START, client);
     }
 }
 
 EffectDescriptorCollection AudioInputDescriptor::getEnabledEffects() const
 {
-    EffectDescriptorCollection enabledEffects;
     // report effects for highest priority active source as applied to all clients
-    RecordClientVector clients =
-        clientsList(true /*activeOnly*/, source(), false /*preferredDeviceOnly*/);
-    if (clients.size() > 0) {
-        enabledEffects = clients[0]->getEnabledEffects();
+    EffectDescriptorCollection enabledEffects;
+    sp<RecordClientDescriptor> topClient = getHighestPriorityClient();
+    if (topClient != nullptr) {
+        enabledEffects = topClient->getEnabledEffects();
     }
     return enabledEffects;
 }
 
-void AudioInputDescriptor::setAppState(uid_t uid, app_state_t state) {
+void AudioInputDescriptor::setAppState(uid_t uid, app_state_t state)
+{
     RecordClientVector clients = clientsList(false /*activeOnly*/);
+    RecordClientVector updatedClients;
 
     for (const auto& client : clients) {
         if (uid == client->uid()) {
             bool wasSilenced = client->isSilenced();
             client->setAppState(state);
             if (client->active() && wasSilenced != client->isSilenced()) {
-                updateClientRecordingConfiguration(RECORD_CONFIG_EVENT_START, client);
+                updatedClients.push_back(client);
             }
+        }
+    }
+
+    checkSuspendEffects();
+
+    for (const auto& client : updatedClients) {
+        updateClientRecordingConfiguration(RECORD_CONFIG_EVENT_START, client);
+    }
+}
+
+void AudioInputDescriptor::checkSuspendEffects()
+{
+    sp<RecordClientDescriptor> topClient = getHighestPriorityClient();
+    if (topClient == nullptr) {
+        return;
+    }
+
+    for (size_t i = 0; i < mEnabledEffects.size(); i++) {
+        sp<EffectDescriptor> effect = mEnabledEffects.valueAt(i);
+        if (effect->mSession == topClient->session()) {
+            if (effect->mSuspended) {
+                effect->mSuspended = false;
+                mClientInterface->setEffectSuspended(effect->mId,
+                                                     effect->mSession,
+                                                     effect->mSuspended);
+            }
+        } else if (!effect->mSuspended) {
+            effect->mSuspended = true;
+            mClientInterface->setEffectSuspended(effect->mId,
+                                                 effect->mSession,
+                                                 effect->mSuspended);
         }
     }
 }
@@ -444,7 +498,7 @@ void AudioInputDescriptor::dump(String8 *dst) const
     dst->appendFormat(" Format: %d\n", mFormat);
     dst->appendFormat(" Channels: %08x\n", mChannelMask);
     dst->appendFormat(" Devices %s\n", mDevice->toString().c_str());
-    getEnabledEffects().dump(dst, 1 /*spaces*/, false /*verbose*/);
+    mEnabledEffects.dump(dst, 1 /*spaces*/, false /*verbose*/);
     dst->append(" AudioRecord Clients:\n");
     ClientMapHandler<RecordClientDescriptor>::dump(dst);
     dst->append("\n");

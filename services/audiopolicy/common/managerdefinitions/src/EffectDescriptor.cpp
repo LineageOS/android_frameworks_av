@@ -30,6 +30,7 @@ void EffectDescriptor::dump(String8 *dst, int spaces) const
     dst->appendFormat("%*sSession: %d\n", spaces, "", mSession);
     dst->appendFormat("%*sName: %s\n", spaces, "",  mDesc.name);
     dst->appendFormat("%*s%s\n", spaces, "",  mEnabled ? "Enabled" : "Disabled");
+    dst->appendFormat("%*s%s\n", spaces, "",  mSuspended ? "Suspended" : "Active");
 }
 
 EffectDescriptorCollection::EffectDescriptorCollection() :
@@ -63,7 +64,8 @@ status_t EffectDescriptorCollection::registerEffect(const effect_descriptor_t *d
             desc->name, io, session, id);
     ALOGV("registerEffect() memory %d, total memory %d", desc->memoryUsage, mTotalEffectsMemory);
 
-    sp<EffectDescriptor> effectDesc = new EffectDescriptor(desc, isMusicEffect, id, io, session);
+    sp<EffectDescriptor> effectDesc =
+        new EffectDescriptor(desc, isMusicEffect, id, io, (audio_session_t)session);
     add(id, effectDesc);
 
     return NO_ERROR;
@@ -172,6 +174,43 @@ uint32_t EffectDescriptorCollection::getMaxEffectsCpuLoad() const
 uint32_t EffectDescriptorCollection::getMaxEffectsMemory() const
 {
     return MAX_EFFECTS_MEMORY;
+}
+
+void EffectDescriptorCollection::moveEffects(audio_session_t session,
+                                             audio_io_handle_t srcOutput,
+                                             audio_io_handle_t dstOutput)
+{
+    ALOGV("%s session %d srcOutput %d dstOutput %d", __func__, session, srcOutput, dstOutput);
+    for (size_t i = 0; i < size(); i++) {
+        sp<EffectDescriptor> effect = valueAt(i);
+        if (effect->mSession == session && effect->mIo == srcOutput) {
+            effect->mIo = dstOutput;
+        }
+    }
+}
+
+void EffectDescriptorCollection::moveEffects(const std::vector<int>& ids,
+                                             audio_io_handle_t dstOutput)
+{
+    ALOGV("%s num effects %zu, first ID %d, dstOutput %d",
+        __func__, ids.size(), ids.size() ? ids[0] : 0, dstOutput);
+    for (size_t i = 0; i < size(); i++) {
+        sp<EffectDescriptor> effect = valueAt(i);
+        if (std::find(begin(ids), end(ids), effect->mId) != end(ids)) {
+            effect->mIo = dstOutput;
+        }
+    }
+}
+
+EffectDescriptorCollection EffectDescriptorCollection::getEffectsForIo(audio_io_handle_t io) const
+{
+    EffectDescriptorCollection effects;
+    for (size_t i = 0; i < size(); i++) {
+        if (valueAt(i)->mIo == io) {
+            effects.add(keyAt(i), valueAt(i));
+        }
+    }
+    return effects;
 }
 
 void EffectDescriptorCollection::dump(String8 *dst, int spaces, bool verbose) const

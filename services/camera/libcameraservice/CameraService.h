@@ -542,6 +542,7 @@ private:
         void unregisterSelf();
 
         bool isUidActive(uid_t uid, String16 callingPackage);
+        int32_t getProcState(uid_t uid);
 
         void onUidGone(uid_t uid, bool disabled);
         void onUidActive(uid_t uid);
@@ -558,6 +559,7 @@ private:
         virtual void binderDied(const wp<IBinder> &who);
     private:
         bool isUidActiveLocked(uid_t uid, String16 callingPackage);
+        int32_t getProcStateLocked(uid_t uid);
         void updateOverrideUid(uid_t uid, String16 callingPackage, bool active, bool insert);
 
         Mutex mUidLock;

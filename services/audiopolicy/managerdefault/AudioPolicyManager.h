@@ -200,6 +200,7 @@ public:
                                         int id);
         virtual status_t unregisterEffect(int id);
         virtual status_t setEffectEnabled(int id, bool enabled);
+        status_t moveEffectsToIo(const std::vector<int>& ids, audio_io_handle_t io) override;
 
         virtual bool isStreamActive(audio_stream_type_t stream, uint32_t inPastMs = 0) const;
         // return whether a stream is playing remotely, override to change the definition of
@@ -344,7 +345,7 @@ protected:
         }
         virtual const DeviceVector getAvailableOutputDevices() const
         {
-            return mAvailableOutputDevices.filterForEngine();
+            return mAvailableOutputDevices;
         }
         virtual const DeviceVector getAvailableInputDevices() const
         {
@@ -869,6 +870,8 @@ private:
                 int delayMs,
                 uid_t uid,
                 sp<AudioPatch> *patchDescPtr);
+
+        void cleanUpEffectsForIo(audio_io_handle_t io);
 };
 
 };
