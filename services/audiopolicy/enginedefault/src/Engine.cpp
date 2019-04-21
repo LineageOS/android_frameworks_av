@@ -506,7 +506,9 @@ audio_devices_t Engine::getDeviceForInputSource(audio_source_t inputSource) cons
     const DeviceVector availableInputDevices = getApmObserver()->getAvailableInputDevices();
     const SwAudioOutputCollection &outputs = getApmObserver()->getOutputs();
     audio_devices_t availableDeviceTypes = availableInputDevices.types() & ~AUDIO_DEVICE_BIT_IN;
-
+    sp<AudioOutputDescriptor> primaryOutput = outputs.getPrimaryOutput();
+    audio_devices_t availablePrimaryDeviceTypes = availableInputDevices.getDeviceTypesFromHwModule(
+        primaryOutput->getModuleHandle()) & ~AUDIO_DEVICE_BIT_IN;
     uint32_t device = AUDIO_DEVICE_NONE;
 
     // when a call is active, force device selection to match source VOICE_COMMUNICATION
@@ -528,13 +530,6 @@ audio_devices_t Engine::getDeviceForInputSource(audio_source_t inputSource) cons
     }
 
     switch (inputSource) {
-    case AUDIO_SOURCE_VOICE_UPLINK:
-      if (availableDeviceTypes & AUDIO_DEVICE_IN_VOICE_CALL) {
-          device = AUDIO_DEVICE_IN_VOICE_CALL;
-          break;
-      }
-      break;
-
     case AUDIO_SOURCE_DEFAULT:
     case AUDIO_SOURCE_MIC:
     if (availableDeviceTypes & AUDIO_DEVICE_IN_BLUETOOTH_A2DP) {
@@ -558,9 +553,7 @@ audio_devices_t Engine::getDeviceForInputSource(audio_source_t inputSource) cons
         // to voice call path.
         if ((getPhoneState() == AUDIO_MODE_IN_CALL) &&
                 (availableOutputDevices.types() & AUDIO_DEVICE_OUT_TELEPHONY_TX) == 0) {
-            sp<AudioOutputDescriptor> primaryOutput = outputs.getPrimaryOutput();
-            availableDeviceTypes = availableInputDevices.getDeviceTypesFromHwModule(
-                    primaryOutput->getModuleHandle()) & ~AUDIO_DEVICE_BIT_IN;
+            availableDeviceTypes = availablePrimaryDeviceTypes;
         }
 
         switch (getForceUse(AUDIO_POLICY_FORCE_FOR_COMMUNICATION)) {
@@ -597,6 +590,9 @@ audio_devices_t Engine::getDeviceForInputSource(audio_source_t inputSource) cons
     case AUDIO_SOURCE_VOICE_RECOGNITION:
     case AUDIO_SOURCE_UNPROCESSED:
     case AUDIO_SOURCE_HOTWORD:
+        if (inputSource == AUDIO_SOURCE_HOTWORD) {
+            availableDeviceTypes = availablePrimaryDeviceTypes;
+        }
         if (getForceUse(AUDIO_POLICY_FORCE_FOR_RECORD) == AUDIO_POLICY_FORCE_BT_SCO &&
                 availableDeviceTypes & AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET) {
             device = AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET;
@@ -622,6 +618,7 @@ audio_devices_t Engine::getDeviceForInputSource(audio_source_t inputSource) cons
         break;
     case AUDIO_SOURCE_VOICE_DOWNLINK:
     case AUDIO_SOURCE_VOICE_CALL:
+    case AUDIO_SOURCE_VOICE_UPLINK:
         if (availableDeviceTypes & AUDIO_DEVICE_IN_VOICE_CALL) {
             device = AUDIO_DEVICE_IN_VOICE_CALL;
         }
