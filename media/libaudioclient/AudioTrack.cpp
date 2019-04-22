@@ -605,7 +605,10 @@ status_t AudioTrack::set(
     mInUnderrun = false;
     mPreviousTimestampValid = false;
     mTimestampStartupGlitchReported = false;
-    mRetrogradeMotionReported = false;
+    mTimestampRetrogradePositionReported = false;
+    mTimestampRetrogradeTimeReported = false;
+    mTimestampStallReported = false;
+    mTimestampStaleTimeReported = false;
     mPreviousLocation = ExtendedTimestamp::LOCATION_INVALID;
     mStartTs.mPosition = 0;
     mUnderrunCountOffset = 0;
@@ -656,7 +659,10 @@ status_t AudioTrack::start()
         mPosition = 0;
         mPreviousTimestampValid = false;
         mTimestampStartupGlitchReported = false;
-        mRetrogradeMotionReported = false;
+        mTimestampRetrogradePositionReported = false;
+        mTimestampRetrogradeTimeReported = false;
+        mTimestampStallReported = false;
+        mTimestampStaleTimeReported = false;
         mPreviousLocation = ExtendedTimestamp::LOCATION_INVALID;
 
         if (!isOffloadedOrDirect_l()
@@ -2607,9 +2613,14 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
                         // A better start time is now.  The retrograde check ensures
                         // timestamp monotonicity.
                         const int64_t nowNs = systemTime();
-                        ALOGD("%s(%d) device stall, using current time %lld",
-                                __func__, mPortId, (long long)nowNs);
+                        if (!mTimestampStallReported) {
+                            ALOGD("%s(%d): device stall time corrected using current time %lld",
+                                    __func__, mPortId, (long long)nowNs);
+                            mTimestampStallReported = true;
+                        }
                         timestamp.mTime = convertNsToTimespec(nowNs);
+                    }  else {
+                        mTimestampStallReported = false;
                     }
                 }
 
@@ -2762,12 +2773,17 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
         const int64_t lagNs = int64_t(mAfLatency * 1000000LL);
         const int64_t limitNs = mStartNs - lagNs;
         if (currentTimeNanos < limitNs) {
-            ALOGD("%s(%d): correcting timestamp time for pause, "
-                    "currentTimeNanos: %lld < limitNs: %lld < mStartNs: %lld",
-                    __func__, mPortId,
-                    (long long)currentTimeNanos, (long long)limitNs, (long long)mStartNs);
+            if (!mTimestampStaleTimeReported) {
+                ALOGD("%s(%d): stale timestamp time corrected, "
+                        "currentTimeNanos: %lld < limitNs: %lld < mStartNs: %lld",
+                        __func__, mPortId,
+                        (long long)currentTimeNanos, (long long)limitNs, (long long)mStartNs);
+                mTimestampStaleTimeReported = true;
+            }
             timestamp.mTime = convertNsToTimespec(limitNs);
             currentTimeNanos = limitNs;
+        } else {
+            mTimestampStaleTimeReported = false;
         }
 
         // previousTimestampValid is set to false when starting after a stop or flush.
@@ -2777,11 +2793,15 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
 
             // retrograde check
             if (currentTimeNanos < previousTimeNanos) {
-                ALOGW("%s(%d): retrograde timestamp time corrected, %lld < %lld",
-                        __func__, mPortId,
-                        (long long)currentTimeNanos, (long long)previousTimeNanos);
+                if (!mTimestampRetrogradeTimeReported) {
+                    ALOGW("%s(%d): retrograde timestamp time corrected, %lld < %lld",
+                            __func__, mPortId,
+                            (long long)currentTimeNanos, (long long)previousTimeNanos);
+                    mTimestampRetrogradeTimeReported = true;
+                }
                 timestamp.mTime = mPreviousTimestamp.mTime;
-                // currentTimeNanos not used below.
+            } else {
+                mTimestampRetrogradeTimeReported = false;
             }
 
             // Looking at signed delta will work even when the timestamps
@@ -2790,16 +2810,16 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
                     - mPreviousTimestamp.mPosition).signedValue();
             if (deltaPosition < 0) {
                 // Only report once per position instead of spamming the log.
-                if (!mRetrogradeMotionReported) {
+                if (!mTimestampRetrogradePositionReported) {
                     ALOGW("%s(%d): retrograde timestamp position corrected, %d = %u - %u",
                             __func__, mPortId,
                             deltaPosition,
                             timestamp.mPosition,
                             mPreviousTimestamp.mPosition);
-                    mRetrogradeMotionReported = true;
+                    mTimestampRetrogradePositionReported = true;
                 }
             } else {
-                mRetrogradeMotionReported = false;
+                mTimestampRetrogradePositionReported = false;
             }
             if (deltaPosition < 0) {
                 timestamp.mPosition = mPreviousTimestamp.mPosition;
