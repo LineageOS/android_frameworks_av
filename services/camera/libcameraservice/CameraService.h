@@ -748,6 +748,11 @@ private:
             const char* reason);
 
     /**
+     * Add an event log message when a client calls setTorchMode succesfully.
+     */
+    void logTorchEvent(const char* cameraId, const char *torchState, int clientPid);
+
+    /**
      * Add an event log message that the current device user has been switched.
      */
     void logUserSwitch(const std::set<userid_t>& oldUserIds,
