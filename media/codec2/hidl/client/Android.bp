@@ -31,6 +31,7 @@ cc_library {
     export_shared_lib_headers: [
         "libcodec2",
         "libcodec2_hidl_client@1.0",
+        "libcodec2_vndk",
     ],
 
 }
