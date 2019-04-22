@@ -87,7 +87,7 @@ CameraDevice::CameraDevice(
                 __FUNCTION__, strerror(-err), err);
         setCameraDeviceErrorLocked(ACAMERA_ERROR_CAMERA_DEVICE);
     }
-    mHandler = new CallbackHandler();
+    mHandler = new CallbackHandler(id);
     mCbLooper->registerHandler(mHandler);
 
     const CameraMetadata& metadata = mChars->getInternalData();
@@ -918,6 +918,8 @@ CameraDevice::onCaptureErrorLocked(
     return;
 }
 
+CameraDevice::CallbackHandler::CallbackHandler(const char *id) : mId(id) { }
+
 void CameraDevice::CallbackHandler::onMessageReceived(
         const sp<AMessage> &msg) {
     switch (msg->what()) {
@@ -1012,9 +1014,9 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                 return;
             }
             sp<ACameraCaptureSession> session(static_cast<ACameraCaptureSession*>(obj.get()));
-            ACameraDevice* device = session->getDevice();
             mCachedSessions.push(session);
             sp<CaptureRequest> requestSp = nullptr;
+            const char *id_cstr = mId.c_str();
             switch (msg->what()) {
                 case kWhatCaptureStart:
                 case kWhatCaptureResult:
@@ -1063,7 +1065,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                         ALOGE("%s: Cannot find timestamp!", __FUNCTION__);
                         return;
                     }
-                    ACaptureRequest* request = allocateACaptureRequest(requestSp, device->getId());
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, id_cstr);
                     (*onStart)(context, session.get(), request, timestamp);
                     freeACaptureRequest(request);
                     break;
@@ -1086,7 +1088,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                         return;
                     }
                     sp<ACameraMetadata> result(static_cast<ACameraMetadata*>(obj.get()));
-                    ACaptureRequest* request = allocateACaptureRequest(requestSp, device->getId());
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, id_cstr);
                     (*onResult)(context, session.get(), request, result.get());
                     freeACaptureRequest(request);
                     break;
@@ -1139,7 +1141,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                         physicalMetadataCopyPtrs.push_back(physicalMetadataCopy[i].get());
                     }
 
-                    ACaptureRequest* request = allocateACaptureRequest(requestSp, device->getId());
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, id_cstr);
                     (*onResult)(context, session.get(), request, result.get(),
                             physicalResultInfo.size(), physicalCameraIdPtrs.data(),
                             physicalMetadataCopyPtrs.data());
@@ -1168,7 +1170,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                             static_cast<CameraCaptureFailure*>(obj.get()));
                     ACameraCaptureFailure* failure =
                             static_cast<ACameraCaptureFailure*>(failureSp.get());
-                    ACaptureRequest* request = allocateACaptureRequest(requestSp, device->getId());
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, id_cstr);
                     (*onFail)(context, session.get(), request, failure);
                     freeACaptureRequest(request);
                     break;
@@ -1201,7 +1203,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                         failure.physicalCameraId = nullptr;
                     }
                     failure.captureFailure = *failureSp;
-                    ACaptureRequest* request = allocateACaptureRequest(requestSp, device->getId());
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, id_cstr);
                     (*onFail)(context, session.get(), request, &failure);
                     freeACaptureRequest(request);
                     break;
@@ -1278,7 +1280,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                         return;
                     }
 
-                    ACaptureRequest* request = allocateACaptureRequest(requestSp, device->getId());
+                    ACaptureRequest* request = allocateACaptureRequest(requestSp, id_cstr);
                     (*onBufferLost)(context, session.get(), request, anw, frameNumber);
                     freeACaptureRequest(request);
                     break;
