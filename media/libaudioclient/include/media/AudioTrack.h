@@ -1151,8 +1151,11 @@ public:
                                                     // AudioTracks.
 
     bool                    mPreviousTimestampValid;// true if mPreviousTimestamp is valid
-    bool                    mTimestampStartupGlitchReported; // reduce log spam
-    bool                    mRetrogradeMotionReported; // reduce log spam
+    bool                    mTimestampStartupGlitchReported;      // reduce log spam
+    bool                    mTimestampRetrogradePositionReported; // reduce log spam
+    bool                    mTimestampRetrogradeTimeReported;     // reduce log spam
+    bool                    mTimestampStallReported;              // reduce log spam
+    bool                    mTimestampStaleTimeReported;          // reduce log spam
     AudioTimestamp          mPreviousTimestamp;     // used to detect retrograde motion
     ExtendedTimestamp::Location mPreviousLocation;  // location used for previous timestamp
 
