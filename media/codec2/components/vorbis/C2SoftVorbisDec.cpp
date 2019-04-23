@@ -270,7 +270,8 @@ void C2SoftVorbisDec::process(
     const uint8_t *data = rView.data() + inOffset;
     int32_t numChannels  = mVi->channels;
     int32_t samplingRate = mVi->rate;
-    if (inSize > 7 && !memcmp(&data[1], "vorbis", 6)) {
+    /* Decode vorbis headers only once */
+    if (inSize > 7 && !memcmp(&data[1], "vorbis", 6) && (!mInfoUnpacked || !mBooksUnpacked)) {
         if ((data[0] != 1) && (data[0] != 5)) {
             ALOGE("unexpected type received %d", data[0]);
             mSignalledError = true;
