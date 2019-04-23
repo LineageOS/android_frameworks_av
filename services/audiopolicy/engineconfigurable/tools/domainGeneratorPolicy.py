@@ -129,7 +129,7 @@ def parseCriteriaAndCriterionTypes(criteriaFile, criterionTypesFile):
                 criterion_values = []
 
                 values_node = criterion_types.find('values')
-                if values_node:
+                if values_node is not None:
                     for value in values_node.findall('value'):
                         criterion_values.append(value.get('literal'))
 
@@ -265,4 +265,4 @@ def main():
 
 # If this file is directly executed
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())
