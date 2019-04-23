@@ -1638,6 +1638,11 @@ Status CameraService::setTorchMode(const String16& cameraId, bool enabled,
         }
     }
 
+    int clientPid = CameraThreadState::getCallingPid();
+    const char *id_cstr = id.c_str();
+    const char *torchState = enabled ? "on" : "off";
+    ALOGI("Torch for camera id %s turned %s for client PID %d", id_cstr, torchState, clientPid);
+    logTorchEvent(id_cstr, torchState , clientPid);
     return Status::ok();
 }
 
@@ -2120,6 +2125,12 @@ void CameraService::logRejected(const char* cameraId, int clientPid,
     // Log the client rejected
     logEvent(String8::format("REJECT device %s client for package %s (PID %d), reason: (%s)",
             cameraId, clientPackage, clientPid, reason));
+}
+
+void CameraService::logTorchEvent(const char* cameraId, const char *torchState, int clientPid) {
+    // Log torch event
+    logEvent(String8::format("Torch for camera id %s turned %s for client PID %d", cameraId,
+            torchState, clientPid));
 }
 
 void CameraService::logUserSwitch(const std::set<userid_t>& oldUserIds,
