@@ -143,6 +143,8 @@ struct Codec2Client : public Codec2ConfigurableClient {
 
     typedef Codec2Client Store;
 
+    sp<Base> const& getBase() const;
+
     std::string const& getServiceName() const;
 
     c2_status_t createComponent(
@@ -165,7 +167,16 @@ struct Codec2Client : public Codec2ConfigurableClient {
 
     std::shared_ptr<C2ParamReflector> getParamReflector();
 
+    // Returns the list of IComponentStore service names that are available on
+    // the device. This list is specified at the build time in manifest files.
+    // Note: A software service will have "_software" as a suffix.
+    static std::vector<std::string> const& GetServiceNames();
+
+    // Create a service with a given service name.
     static std::shared_ptr<Codec2Client> CreateFromService(char const* name);
+
+    // Get clients to all services.
+    static std::vector<std::shared_ptr<Codec2Client>> CreateFromAllServices();
 
     // Try to create a component with a given name from all known
     // IComponentStore services.
