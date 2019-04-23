@@ -22,6 +22,8 @@
 #include "media/MemoryLeakTrackUtil.h"
 #include <sstream>
 
+#include <bionic_malloc.h>
+
 /*
  * The code here originally resided in MediaPlayerService.cpp
  */
@@ -47,29 +49,22 @@ extern std::string backtrace_string(const uintptr_t* frames, size_t frame_count)
 
 namespace android {
 
-extern "C" void get_malloc_leak_info(uint8_t** info, size_t* overallSize,
-        size_t* infoSize, size_t* totalMemory, size_t* backtraceSize);
-
-extern "C" void free_malloc_leak_info(uint8_t* info);
-
 std::string dumpMemoryAddresses(size_t limit)
 {
-    uint8_t *info;
-    size_t overallSize;
-    size_t infoSize;
-    size_t totalMemory;
-    size_t backtraceSize;
-    get_malloc_leak_info(&info, &overallSize, &infoSize, &totalMemory, &backtraceSize);
+    android_mallopt_leak_info_t leak_info;
+    if (!android_mallopt(M_GET_MALLOC_LEAK_INFO, &leak_info, sizeof(leak_info))) {
+      return "";
+    }
 
     size_t count;
-    if (info == nullptr || overallSize == 0 || infoSize == 0
-            || (count = overallSize / infoSize) == 0) {
+    if (leak_info.buffer == nullptr || leak_info.overall_size == 0 || leak_info.info_size == 0
+            || (count = leak_info.overall_size / leak_info.info_size) == 0) {
         ALOGD("no malloc info, libc.debug.malloc.program property should be set");
-        return std::string();
+        return "";
     }
 
     std::ostringstream oss;
-    oss << totalMemory << " bytes in " << count << " allocations\n";
+    oss << leak_info.total_memory << " bytes in " << count << " allocations\n";
     oss << "  ABI: '" ABI_STRING "'" << "\n\n";
     if (count > limit) count = limit;
 
@@ -83,14 +78,14 @@ std::string dumpMemoryAddresses(size_t limit)
             uintptr_t backtrace[];
         };
 
-        const AllocEntry * const e = (AllocEntry *)(info + i * infoSize);
+        const AllocEntry * const e = (AllocEntry *)(leak_info.buffer + i * leak_info.info_size);
 
         oss << (e->size * e->allocations)
                 << " bytes ( " << e->size << " bytes * " << e->allocations << " allocations )\n";
-        oss << backtrace_string(e->backtrace, backtraceSize) << "\n";
+        oss << backtrace_string(e->backtrace, leak_info.backtrace_size) << "\n";
     }
     oss << "\n";
-    free_malloc_leak_info(info);
+    android_mallopt(M_FREE_MALLOC_LEAK_INFO, &leak_info, sizeof(leak_info));
     return oss.str();
 }
 
