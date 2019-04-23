@@ -1128,6 +1128,11 @@ void LVM_BufferUnmanagedOut(LVM_Handle_t        hInstance,
     LVM_Instance_t      *pInstance  = (LVM_Instance_t  *)hInstance;
 #ifdef SUPPORT_MC
     LVM_INT16           NumChannels = pInstance->NrChannels;
+    if (NumChannels == 1)
+    {
+        /* Mono input is processed as stereo by LVM module */
+        NumChannels = 2;
+    }
 #undef NrFrames
 #define NrFrames (*pNumSamples) // alias for clarity
 #else
