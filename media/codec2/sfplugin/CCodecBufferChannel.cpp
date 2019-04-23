@@ -533,10 +533,12 @@ status_t CCodecBufferChannel::renderOutputBuffer(
     feedInputBufferIfAvailable();
     if (!c2Buffer) {
         if (released) {
-            ALOGD("[%s] The app is calling releaseOutputBuffer() with "
-                  "timestamp or render=true with non-video buffers. Apps should "
-                  "call releaseOutputBuffer() with render=false for those.",
-                  mName);
+            std::call_once(mRenderWarningFlag, [this] {
+                ALOGW("[%s] The app is calling releaseOutputBuffer() with "
+                      "timestamp or render=true with non-video buffers. Apps should "
+                      "call releaseOutputBuffer() with render=false for those.",
+                      mName);
+            });
         }
         return INVALID_OPERATION;
     }
