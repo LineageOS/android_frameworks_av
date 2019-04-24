@@ -76,6 +76,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     aaudio_result_t result = AAUDIO_OK;
     int32_t capacity;
     int32_t framesPerBurst;
+    int32_t framesPerHardwareBurst;
     AAudioStreamRequest request;
     AAudioStreamConfiguration configurationOutput;
 
@@ -89,6 +90,9 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     if (result < 0) {
         return result;
     }
+
+    const int32_t burstMinMicros = AAudioProperty_getHardwareBurstMinMicros();
+    int32_t burstMicros = 0;
 
     // We have to do volume scaling. So we prefer FLOAT format.
     if (getFormat() == AUDIO_FORMAT_DEFAULT) {
@@ -173,8 +177,22 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         goto error;
     }
 
-    // Validate result from server.
-    framesPerBurst = mEndpointDescriptor.dataQueueDescriptor.framesPerBurst;
+    framesPerHardwareBurst = mEndpointDescriptor.dataQueueDescriptor.framesPerBurst;
+
+    // Scale up the burst size to meet the minimum equivalent in microseconds.
+    // This is to avoid waking the CPU too often when the HW burst is very small
+    // or at high sample rates.
+    framesPerBurst = framesPerHardwareBurst;
+    do {
+        if (burstMicros > 0) {  // skip first loop
+            framesPerBurst *= 2;
+        }
+        burstMicros = framesPerBurst * static_cast<int64_t>(1000000) / getSampleRate();
+    } while (burstMicros < burstMinMicros);
+    ALOGD("%s() original HW burst = %d, minMicros = %d => SW burst = %d\n",
+          __func__, framesPerHardwareBurst, burstMinMicros, framesPerBurst);
+
+    // Validate final burst size.
     if (framesPerBurst < MIN_FRAMES_PER_BURST || framesPerBurst > MAX_FRAMES_PER_BURST) {
         ALOGE("%s - framesPerBurst out of range = %d", __func__, framesPerBurst);
         result = AAUDIO_ERROR_OUT_OF_RANGE;
@@ -190,7 +208,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     }
 
     mClockModel.setSampleRate(getSampleRate());
-    mClockModel.setFramesPerBurst(mFramesPerBurst);
+    mClockModel.setFramesPerBurst(framesPerHardwareBurst);
 
     if (isDataCallbackSet()) {
         mCallbackFrames = builder.getFramesPerDataCallback();

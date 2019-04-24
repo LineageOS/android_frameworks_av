@@ -305,6 +305,7 @@ private:
     Mutexed<ReorderStash> mReorderStash;
 
     std::atomic_bool mInputMetEos;
+    std::once_flag mRenderWarningFlag;
 
     inline bool hasCryptoOrDescrambler() {
         return mCrypto != nullptr || mDescrambler != nullptr;

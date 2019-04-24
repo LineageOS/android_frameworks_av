@@ -75,6 +75,8 @@ static int64_t kPauseDelayUs = 3000000ll;
 // a new sequence.
 static int32_t kMaxAllowedStaleAccessUnits = 20;
 
+static int64_t kTearDownTimeoutUs = 3000000ll;
+
 namespace android {
 
 static bool GetAttribute(const char *s, const char *key, AString *value) {
@@ -930,6 +932,14 @@ struct MyHandler : public AHandler {
                 request.append("\r\n");
 
                 mConn->sendRequest(request.c_str(), reply);
+
+                // If the response of teardown hasn't been received in 3 seconds,
+                // post 'tear' message to avoid ANR.
+                if (!msg->findInt32("reconnect", &reconnect) || !reconnect) {
+                    sp<AMessage> teardown = reply->dup();
+                    teardown->setInt32("result", -ECONNABORTED);
+                    teardown->post(kTearDownTimeoutUs);
+                }
                 break;
             }
 

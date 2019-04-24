@@ -19,6 +19,7 @@
 #include <utils/Log.h>
 
 #include <android/dlext.h>
+#include <android-base/logging.h>
 #include <binder/IPCThreadState.h>
 #include <binder/PermissionCache.h>
 #include <binder/IServiceManager.h>
@@ -244,20 +245,17 @@ void MediaExtractorFactory::RegisterExtractors(
             void *libHandle = android_dlopen_ext(
                     libPath.string(),
                     RTLD_NOW | RTLD_LOCAL, dlextinfo);
-            if (libHandle) {
-                GetExtractorDef getDef =
-                    (GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
-                if (getDef) {
-                    ALOGV("registering sniffer for %s", libPath.string());
-                    RegisterExtractor(
-                            new ExtractorPlugin(getDef(), libHandle, libPath), pluginList);
-                } else {
-                    ALOGW("%s does not contain sniffer", libPath.string());
-                    dlclose(libHandle);
-                }
-            } else {
-                ALOGW("couldn't dlopen(%s) %s", libPath.string(), strerror(errno));
-            }
+            CHECK(libHandle != nullptr)
+                    << "couldn't dlopen(" << libPath.string() << ") " << strerror(errno);
+
+            GetExtractorDef getDef =
+                (GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
+            CHECK(getDef != nullptr)
+                    << libPath.string() << " does not contain sniffer";
+
+            ALOGV("registering sniffer for %s", libPath.string());
+            RegisterExtractor(
+                    new ExtractorPlugin(getDef(), libHandle, libPath), pluginList);
         }
         closedir(libDir);
     } else {
