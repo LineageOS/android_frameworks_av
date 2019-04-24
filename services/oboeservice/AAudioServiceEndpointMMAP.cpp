@@ -77,9 +77,6 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
     audio_config_base_t config;
     audio_port_handle_t deviceId;
 
-    int32_t burstMinMicros = AAudioProperty_getHardwareBurstMinMicros();
-    int32_t burstMicros = 0;
-
     copyFrom(request.getConstantConfiguration());
 
     aaudio_direction_t direction = getDirection();
@@ -235,24 +232,12 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
     setFormat(config.format);
     setSampleRate(config.sample_rate);
 
-    // Scale up the burst size to meet the minimum equivalent in microseconds.
-    // This is to avoid waking the CPU too often when the HW burst is very small
-    // or at high sample rates.
-    do {
-        if (burstMicros > 0) {  // skip first loop
-            mFramesPerBurst *= 2;
-        }
-        burstMicros = mFramesPerBurst * static_cast<int64_t>(1000000) / getSampleRate();
-    } while (burstMicros < burstMinMicros);
+    ALOGD("%s() actual rate = %d, channels = %d"
+          ", deviceId = %d, capacity = %d\n",
+          __func__, getSampleRate(), getSamplesPerFrame(), deviceId, getBufferCapacity());
 
-    ALOGD("%s() original burst = %d, minMicros = %d => burst = %d\n",
-          __func__, mMmapBufferinfo.burst_size_frames, burstMinMicros, mFramesPerBurst);
-
-    ALOGD("%s() actual rate = %d, channels = %d, deviceId = %d\n",
-          __func__, getSampleRate(), getSamplesPerFrame(), deviceId);
-
-    ALOGD("%s() format = 0x%08x, frame size = %d",
-          __func__, getFormat(), calculateBytesPerFrame());
+    ALOGD("%s() format = 0x%08x, frame size = %d, burst size = %d",
+          __func__, getFormat(), calculateBytesPerFrame(), mFramesPerBurst);
 
     return result;
 
