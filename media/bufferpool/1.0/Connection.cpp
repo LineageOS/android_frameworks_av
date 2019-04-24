@@ -32,14 +32,22 @@ Return<void> Connection::fetch(uint64_t transactionId, uint32_t bufferId, fetch_
             status = mAccessor->fetch(
                     mConnectionId, transactionId, bufferId, &handle);
             if (status == ResultStatus::OK) {
-                _hidl_cb(status, Buffer{bufferId, handle});
+                Buffer buffer = {};
+                buffer.id = bufferId;
+                buffer.buffer = handle;
+                _hidl_cb(status, buffer);
                 return Void();
             }
         } else {
             mAccessor->cleanUp(false);
         }
     }
-    _hidl_cb(status, Buffer{0, nullptr});
+
+    Buffer buffer = {};
+    buffer.id = 0;
+    buffer.buffer = nullptr;
+
+    _hidl_cb(status, buffer);
     return Void();
 }
 
