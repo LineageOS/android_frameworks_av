@@ -74,6 +74,8 @@
             <BitParameter Name="proxy" Size="1" Pos="21"/>
             <BitParameter Name="usb_headset" Size="1" Pos="22"/>
             <BitParameter Name="bluetooth_ble" Size="1" Pos="23"/>
+            <BitParameter Name="hdmi_arc" Size="1" Pos="24"/>
+            <BitParameter Name="echo_reference" Size="1" Pos="25"/>
             <BitParameter Name="stub" Size="1" Pos="30"/>
         </BitParameterBlock>
     </ComponentType>
@@ -128,8 +130,10 @@
             <BitParameter Name="voice_communication" Size="1" Pos="7"/>
             <BitParameter Name="remote_submix" Size="1" Pos="8"/>
             <BitParameter Name="unprocessed" Size="1" Pos="9"/>
-            <BitParameter Name="fm_tuner" Size="1" Pos="10"/>
-            <BitParameter Name="hotword" Size="1" Pos="11"/>
+            <BitParameter Name="voice_performance" Size="1" Pos="10"/>
+            <BitParameter Name="echo_reference" Size="1" Pos="11"/>
+            <BitParameter Name="fm_tuner" Size="1" Pos="12"/>
+            <BitParameter Name="hotword" Size="1" Pos="13"/>
         </BitParameterBlock>
     </ComponentType>
 
