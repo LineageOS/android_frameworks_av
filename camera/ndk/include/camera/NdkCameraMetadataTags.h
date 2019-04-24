@@ -7511,18 +7511,19 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
 
     /**
      * <p>The camera device supports capturing high-resolution images at &gt;= 20 frames per
-     * second, in at least the uncompressed YUV format, when post-processing settings are set
-     * to FAST. Additionally, maximum-resolution images can be captured at &gt;= 10 frames
-     * per second.  Here, 'high resolution' means at least 8 megapixels, or the maximum
-     * resolution of the device, whichever is smaller.</p>
+     * second, in at least the uncompressed YUV format, when post-processing settings are
+     * set to FAST. Additionally, all image resolutions less than 24 megapixels can be
+     * captured at &gt;= 10 frames per second. Here, 'high resolution' means at least 8
+     * megapixels, or the maximum resolution of the device, whichever is smaller.</p>
      * <p>More specifically, this means that at least one output {@link AIMAGE_FORMAT_YUV_420_888 } size listed in
      * {@link ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS }
      * is larger or equal to the 'high resolution' defined above, and can be captured at at
      * least 20 fps.  For the largest {@link AIMAGE_FORMAT_YUV_420_888 } size listed in
      * {@link ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS },
-     * camera device can capture this size for at least 10 frames per second.  Also the
-     * ACAMERA_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES entry lists at least one FPS range where
-     * the minimum FPS is &gt;= 1 / minimumFrameDuration for the largest YUV_420_888 size.</p>
+     * camera device can capture this size for at least 10 frames per second if the size is
+     * less than 24 megapixels. Also the ACAMERA_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES entry
+     * lists at least one FPS range where the minimum FPS is &gt;= 1 / minimumFrameDuration
+     * for the largest YUV_420_888 size.</p>
      * <p>If the device supports the {@link AIMAGE_FORMAT_RAW10 }, {@link AIMAGE_FORMAT_RAW12 }, {@link AIMAGE_FORMAT_Y8 }, then those can also be
      * captured at the same rate as the maximum-size YUV_420_888 resolution is.</p>
      * <p>In addition, the ACAMERA_SYNC_MAX_LATENCY field is guaranted to have a value between 0
