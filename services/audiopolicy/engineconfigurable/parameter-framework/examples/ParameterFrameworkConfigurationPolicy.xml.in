@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ParameterFrameworkConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    SystemClassName="Policy" ServerPort="/dev/socket/audioserver/policy_debug"
+    SystemClassName="Policy" ServerPort="unix:///dev/socket/audioserver/policy_debug"
     TuningAllowed="@TUNING_ALLOWED@">
 
     <SubsystemPlugins>

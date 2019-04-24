@@ -18,7 +18,8 @@ LOCAL_STATIC_LIBRARIES := \
 
 LOCAL_HEADER_LIBRARIES := \
     libaudiopolicycommon \
-    libaudiopolicyengine_interface_headers
+    libaudiopolicyengine_interface_headers \
+    libaudiopolicymanager_interface_headers
 
 LOCAL_SRC_FILES := \
   audiopolicymanager_tests.cpp \
