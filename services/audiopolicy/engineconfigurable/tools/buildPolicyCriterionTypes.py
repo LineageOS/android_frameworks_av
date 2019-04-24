@@ -101,8 +101,16 @@ def generateXmlCriterionTypesFile(criterionTypes, addressCriteria, criterionType
         for criterion_name, values_list in addressCriteria.items():
             for criterion_type in criterion_types_root.findall('criterion_type'):
                 if criterion_type.get('name') == criterion_name:
-                    values_node = ET.SubElement(criterion_type, "values")
                     index = 0
+                    existing_values_node = criterion_type.find("values")
+                    if existing_values_node is not None:
+                        for existing_value in existing_values_node.findall('value'):
+                            if existing_value.get('numerical') == str(1 << index):
+                                index += 1
+                        values_node = existing_values_node
+                    else:
+                        values_node = ET.SubElement(criterion_type, "values")
+
                     for value in values_list:
                         value_node = ET.SubElement(values_node, "value", literal=value)
                         value_node.set('numerical', str(1 << index))
@@ -240,4 +248,4 @@ def main():
 
 # If this file is directly executed
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())
