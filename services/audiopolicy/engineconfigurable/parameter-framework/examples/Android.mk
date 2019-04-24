@@ -9,6 +9,8 @@
 
 LOCAL_PATH := $(call my-dir)
 
+ifdef BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION
+
 ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),$(filter $(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),phone_configurable automotive_configurable caremu_configurable no-output_configurable no-input_configurable))
 
 PFW_CORE := external/parameter-framework
@@ -39,16 +41,16 @@ LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_RELATIVE_PATH := parameter-framework
 LOCAL_SRC_FILES := $(LOCAL_MODULE).in
 LOCAL_REQUIRED_MODULES := \
-    PolicySubsystem.xml\
+    PolicySubsystem.xml \
     PolicyClass.xml
 
 # external/parameter-framework prevents from using debug interface
 AUDIO_PATTERN = @TUNING_ALLOWED@
-#ifeq ($(TARGET_BUILD_VARIANT),user)
+ifeq ($(TARGET_BUILD_VARIANT),user)
 AUDIO_VALUE = false
-#else
-#AUDIO_VALUE = true
-#endif
+else
+AUDIO_VALUE = true
+endif
 
 LOCAL_POST_INSTALL_CMD := $(hide) sed -i -e 's|$(AUDIO_PATTERN)|$(AUDIO_VALUE)|g' $(TARGET_OUT_VENDOR_ETC)/$(LOCAL_MODULE_RELATIVE_PATH)/$(LOCAL_MODULE)
 
@@ -106,26 +108,26 @@ endif #ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),$(filter $(BUILD_AUDIO_
 ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),$(filter $(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),no-output_configurable no-input_configurable))
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := PolicySubsystem-no-strategy.xml
-LOCAL_MODULE_STEM := PolicySubsystem.xml
+LOCAL_MODULE := PolicySubsystem.xml
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
 LOCAL_VENDOR_MODULE := true
 LOCAL_REQUIRED_MODULES := PolicySubsystem-CommonTypes.xml
 
 LOCAL_MODULE_RELATIVE_PATH := parameter-framework/Structure/Policy
-LOCAL_SRC_FILES := common/Structure/$(LOCAL_MODULE_STEM)
+LOCAL_SRC_FILES := common/Structure/$(LOCAL_MODULE)
 include $(BUILD_PREBUILT)
 
 include $(CLEAR_VARS)
-LOCAL_MODULE := ParameterFrameworkConfigurationPolicy.xml
+LOCAL_MODULE := ParameterFrameworkConfigurationPolicy-no-strategy.xml
+LOCAL_MODULE_STEM := ParameterFrameworkConfigurationPolicy.xml
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
 LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_RELATIVE_PATH := parameter-framework
 LOCAL_SRC_FILES := $(LOCAL_MODULE).in
 LOCAL_REQUIRED_MODULES := \
-    PolicySubsystem-no-strategy.xml\
+    PolicySubsystem.xml \
     PolicyClass.xml
 AUDIO_VALUE = false
 LOCAL_POST_INSTALL_CMD := $(hide) sed -i -e 's|$(AUDIO_PATTERN)|$(AUDIO_VALUE)|g' $(TARGET_OUT_VENDOR_ETC)/$(LOCAL_MODULE_RELATIVE_PATH)/$(LOCAL_MODULE)
@@ -181,4 +183,5 @@ endif #ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),no-input_configurable)
 
 include $(call all-makefiles-under,$(LOCAL_PATH))
 
+endif #ifdef BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION
 
