@@ -381,26 +381,28 @@ status_t AudioFlinger::TrackHandle::onTransact(
 // ----------------------------------------------------------------------------
 //      AppOp for audio playback
 // -------------------------------
-AudioFlinger::PlaybackThread::OpPlayAudioMonitor::OpPlayAudioMonitor(uid_t uid, audio_usage_t usage,
-        int id, audio_stream_type_t streamType)
-            : mHasOpPlayAudio(true), mUid(uid), mUsage((int32_t) usage), mId(id)
+
+// static
+sp<AudioFlinger::PlaybackThread::OpPlayAudioMonitor>
+AudioFlinger::PlaybackThread::OpPlayAudioMonitor::createIfNeeded(
+            uid_t uid, audio_usage_t usage, int id, audio_stream_type_t streamType)
 {
     if (isAudioServerOrRootUid(uid)) {
-        ALOGD("OpPlayAudio: not muting track:%d usage:%d root or audioserver", mId, usage);
-        return;
+        ALOGD("OpPlayAudio: not muting track:%d usage:%d root or audioserver", id, usage);
+        return nullptr;
     }
     // stream type has been filtered by audio policy to indicate whether it can be muted
     if (streamType == AUDIO_STREAM_ENFORCED_AUDIBLE) {
-        ALOGD("OpPlayAudio: not muting track:%d usage:%d ENFORCED_AUDIBLE", mId, usage);
-        return;
+        ALOGD("OpPlayAudio: not muting track:%d usage:%d ENFORCED_AUDIBLE", id, usage);
+        return nullptr;
     }
-    PermissionController permissionController;
-    permissionController.getPackagesForUid(uid, mPackages);
-    checkPlayAudioForUsage();
-    if (!mPackages.isEmpty()) {
-        mOpCallback = new PlayAudioOpCallback(this);
-        mAppOpsManager.startWatchingMode(AppOpsManager::OP_PLAY_AUDIO, mPackages[0], mOpCallback);
-    }
+    return new OpPlayAudioMonitor(uid, usage, id);
+}
+
+AudioFlinger::PlaybackThread::OpPlayAudioMonitor::OpPlayAudioMonitor(
+        uid_t uid, audio_usage_t usage, int id)
+        : mHasOpPlayAudio(true), mUid(uid), mUsage((int32_t) usage), mId(id)
+{
 }
 
 AudioFlinger::PlaybackThread::OpPlayAudioMonitor::~OpPlayAudioMonitor()
@@ -409,6 +411,17 @@ AudioFlinger::PlaybackThread::OpPlayAudioMonitor::~OpPlayAudioMonitor()
         mAppOpsManager.stopWatchingMode(mOpCallback);
     }
     mOpCallback.clear();
+}
+
+void AudioFlinger::PlaybackThread::OpPlayAudioMonitor::onFirstRef()
+{
+    PermissionController permissionController;
+    permissionController.getPackagesForUid(mUid, mPackages);
+    checkPlayAudioForUsage();
+    if (!mPackages.isEmpty()) {
+        mOpCallback = new PlayAudioOpCallback(this);
+        mAppOpsManager.startWatchingMode(AppOpsManager::OP_PLAY_AUDIO, mPackages[0], mOpCallback);
+    }
 }
 
 bool AudioFlinger::PlaybackThread::OpPlayAudioMonitor::hasOpPlayAudio() const {
@@ -492,7 +505,7 @@ AudioFlinger::PlaybackThread::Track::Track(
     mPresentationCompleteFrames(0),
     mFrameMap(16 /* sink-frame-to-track-frame map memory */),
     mVolumeHandler(new media::VolumeHandler(sampleRate)),
-    mOpPlayAudioMonitor(new OpPlayAudioMonitor(uid, attr.usage, id(), streamType)),
+    mOpPlayAudioMonitor(OpPlayAudioMonitor::createIfNeeded(uid, attr.usage, id(), streamType)),
     // mSinkTimestamp
     mFastIndex(-1),
     mCachedVolume(1.0),
