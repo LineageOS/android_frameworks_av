@@ -428,6 +428,7 @@ uint32_t AudioSystem::getInputFramesLost(audio_io_handle_t ioHandle)
 
 audio_unique_id_t AudioSystem::newAudioUniqueId(audio_unique_id_use_t use)
 {
+    // Must not use AF as IDs will re-roll on audioserver restart, b/130369529.
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af == 0) return AUDIO_UNIQUE_ID_ALLOCATE;
     return af->newAudioUniqueId(use);
@@ -924,6 +925,7 @@ void AudioSystem::releaseOutput(audio_port_handle_t portId)
 
 status_t AudioSystem::getInputForAttr(const audio_attributes_t *attr,
                                 audio_io_handle_t *input,
+                                audio_unique_id_t riid,
                                 audio_session_t session,
                                 pid_t pid,
                                 uid_t uid,
@@ -936,7 +938,7 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t *attr,
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return NO_INIT;
     return aps->getInputForAttr(
-            attr, input, session, pid, uid, opPackageName,
+            attr, input, riid, session, pid, uid, opPackageName,
             config, flags, selectedDeviceId, portId);
 }
 

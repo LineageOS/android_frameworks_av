@@ -50,6 +50,7 @@ inline void writeAudioConfigBaseToParcel(Parcel& data, const audio_config_base_t
 }
 
 inline void readRecordClientInfoFromParcel(const Parcel& data, record_client_info_t *clientInfo) {
+    clientInfo->riid = (audio_unique_id_t) data.readInt32();
     clientInfo->uid = (uid_t) data.readUint32();
     clientInfo->session = (audio_session_t) data.readInt32();
     clientInfo->source = (audio_source_t) data.readInt32();
@@ -58,6 +59,7 @@ inline void readRecordClientInfoFromParcel(const Parcel& data, record_client_inf
 }
 
 inline void writeRecordClientInfoToParcel(Parcel& data, const record_client_info_t *clientInfo) {
+    data.writeInt32((int32_t) clientInfo->riid);
     data.writeUint32((uint32_t) clientInfo->uid);
     data.writeInt32((int32_t) clientInfo->session);
     data.writeInt32((int32_t) clientInfo->source);
