@@ -29,6 +29,8 @@ struct CDataSource;
 
 static const char *extensions[] = {
    "m2p",
+   "m2ts",
+   "mts",
    "ts",
    NULL
 };
