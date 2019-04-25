@@ -531,23 +531,9 @@ status_t FLACParser::init()
             return NO_INIT;
         }
         // check sample rate
-        switch (getSampleRate()) {
-        case  8000:
-        case 11025:
-        case 12000:
-        case 16000:
-        case 22050:
-        case 24000:
-        case 32000:
-        case 44100:
-        case 48000:
-        case 88200:
-        case 96000:
-        case 176400:
-        case 192000:
-            break;
-        default:
-            // Note: internally we support arbitrary sample rates from 8kHz to 192kHz.
+        // Note: flac supports arbitrary sample rates up to 655350 Hz, but Android
+        // supports sample rates from 8kHz to 192kHz, so use that as the limit.
+        if (getSampleRate() < 8000 || getSampleRate() > 192000) {
             ALOGE("unsupported sample rate %u", getSampleRate());
             return NO_INIT;
         }
