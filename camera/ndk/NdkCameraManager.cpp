@@ -190,3 +190,17 @@ camera_status_t ACameraManager_openCamera(
     }
     return mgr->openCamera(cameraId, callback, device);
 }
+
+#ifdef __ANDROID_VNDK__
+EXPORT
+camera_status_t ACameraManager_getTagFromName(ACameraManager *mgr, const char* cameraId,
+        const char *name, /*out*/uint32_t *tag) {
+    ATRACE_CALL();
+    if (mgr == nullptr || cameraId == nullptr || name == nullptr) {
+        ALOGE("%s: invalid argument! mgr %p cameraId %p name %p",
+                __FUNCTION__, mgr, cameraId, name);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    return mgr->getTagFromName(cameraId, name, tag);
+}
+#endif
