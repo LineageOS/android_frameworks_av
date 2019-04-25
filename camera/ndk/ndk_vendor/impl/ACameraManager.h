@@ -204,6 +204,7 @@ struct ACameraManager {
     camera_status_t openCamera(const char* cameraId,
                                ACameraDevice_StateCallbacks* callback,
                                /*out*/ACameraDevice** device);
+    camera_status_t getTagFromName(const char *cameraId, const char *name, uint32_t *tag);
 
   private:
     enum {
