@@ -323,6 +323,7 @@ MyOggExtractor::MyOggExtractor(
       mFirstDataOffset(-1),
       mHapticChannelCount(0) {
     mCurrentPage.mNumSegments = 0;
+    mCurrentPage.mFlags = 0;
 
     vorbis_info_init(&mVi);
     vorbis_comment_init(&mVc);
@@ -414,19 +415,18 @@ status_t MyOggExtractor::findPrevGranulePosition(
 
     ALOGV("prevPageOffset at %lld, pageOffset at %lld",
             (long long)prevPageOffset, (long long)pageOffset);
-
+    uint8_t flag = 0;
     for (;;) {
         Page prevPage;
         ssize_t n = readPage(prevPageOffset, &prevPage);
 
         if (n <= 0) {
-            return (status_t)n;
+            return (flag & 0x4) ? OK : (status_t)n;
         }
-
+        flag = prevPage.mFlags;
         prevPageOffset += n;
-
+        *granulePos = prevPage.mGranulePosition;
         if (prevPageOffset == pageOffset) {
-            *granulePos = prevPage.mGranulePosition;
             return OK;
         }
     }
@@ -688,7 +688,7 @@ uint32_t MyOpusExtractor::getNumSamplesInPacket(MediaBufferHelper *buffer) const
         TRESPASS();
     }
 
-    uint32_t numSamples = frameSizeUs * numFrames * kOpusSampleRate / 1000000;
+    uint32_t numSamples = (uint32_t)((uint64_t)frameSizeUs * numFrames * kOpusSampleRate) / 1000000;
     return numSamples;
 }
 
@@ -868,6 +868,7 @@ media_status_t MyOggExtractor::_readNextPacket(MediaBufferHelper **out, bool cal
         CHECK_EQ(mNextLaceIndex, mCurrentPage.mNumSegments);
 
         mOffset += mCurrentPageSize;
+        uint8_t flag = mCurrentPage.mFlags;
         ssize_t n = readPage(mOffset, &mCurrentPage);
 
         if (n <= 0) {
@@ -878,6 +879,7 @@ media_status_t MyOggExtractor::_readNextPacket(MediaBufferHelper **out, bool cal
 
             ALOGV("readPage returned %zd", n);
 
+            if (flag & 0x04) return AMEDIA_ERROR_END_OF_STREAM;
             return (media_status_t) n;
         }
 
