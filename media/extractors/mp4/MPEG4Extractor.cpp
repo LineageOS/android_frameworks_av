@@ -5271,16 +5271,12 @@ status_t MPEG4Source::parseTrackFragmentRun(off64_t offset, off64_t size) {
 
         // apply some sanity (vs strict legality) checks
         //
-        // clamp the count of entries in the trun box, to avoid spending forever parsing
-        // this box. Clamping (vs error) lets us play *something*.
-        // 1 million is about 400 msecs on a Pixel3, should be no more than a couple seconds
-        // on the slowest devices.
-        static constexpr uint32_t kMaxTrunSampleCount = 1000000;
+        static constexpr uint32_t kMaxTrunSampleCount = 10000;
         if (sampleCount > kMaxTrunSampleCount) {
-            ALOGW("b/123389881 clamp sampleCount(%u) @ kMaxTrunSampleCount(%u)",
+            ALOGW("b/123389881 sampleCount(%u) > kMaxTrunSampleCount(%u)",
                   sampleCount, kMaxTrunSampleCount);
             android_errorWriteLog(0x534e4554, "124389881 count");
-
+            return -EINVAL;
         }
     }
 
@@ -5324,7 +5320,12 @@ status_t MPEG4Source::parseTrackFragmentRun(off64_t offset, off64_t size) {
         tmp.duration = sampleDuration;
         tmp.compositionOffset = sampleCtsOffset;
         memset(tmp.iv, 0, sizeof(tmp.iv));
-        mCurrentSamples.add(tmp);
+        if (mCurrentSamples.add(tmp) < 0) {
+            ALOGW("b/123389881 failed saving sample(n=%zu)", mCurrentSamples.size());
+            android_errorWriteLog(0x534e4554, "124389881 allocation");
+            mCurrentSamples.clear();
+            return NO_MEMORY;
+        }
 
         dataOffset += sampleSize;
     }
