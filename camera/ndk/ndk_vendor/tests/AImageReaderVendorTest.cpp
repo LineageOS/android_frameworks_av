@@ -799,6 +799,15 @@ TEST_F(AImageReaderVendorTest, CreateWindowNativeHandle) {
     bool isBC = isCapabilitySupported(staticMetadata,
             ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_BACKWARD_COMPATIBLE);
 
+    uint32_t namedTag = 0;
+    // Test that ACameraMetadata_getTagFromName works as expected for public tag
+    // names
+    camera_status_t status = ACameraManager_getTagFromName(mCameraManager, cameraId,
+            "android.control.aeMode", &namedTag);
+
+    ASSERT_EQ(status, ACAMERA_OK);
+    ASSERT_EQ(namedTag, ACAMERA_CONTROL_AE_MODE);
+
     ACameraMetadata_free(staticMetadata);
 
     if (!isBC) {

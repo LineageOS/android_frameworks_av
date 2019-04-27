@@ -64,6 +64,10 @@ cc_library_shared {
         "-Wextra",
         "-Werror",
     ],
+    // TODO: jchowdhary@, use header_libs instead b/131165718
+    include_dirs: [
+        "system/media/private/camera/include",
+    ],
     export_include_dirs: ["include"],
     export_shared_lib_headers: [
         "libnativewindow",
@@ -122,6 +126,10 @@ cc_library_shared {
     static_libs: [
         "android.hardware.camera.common@1.0-helper",
         "libarect",
+    ],
+    // TODO: jchowdhary@, use header_libs instead b/131165718
+    include_dirs: [
+        "system/media/private/camera/include",
     ],
     product_variables: {
         pdk: {

@@ -115,6 +115,9 @@ void VideoFrameSchedulerBase::PLL::test() {
 
 #endif
 
+// If overflow happens, the value is already incorrect, and no mater what value we get is OK.
+// And this part of calculation is not important, so it's OK to simply disable overflow check
+// instead of using double which makes code more complicated.
 __attribute__((no_sanitize("integer")))
 bool VideoFrameSchedulerBase::PLL::fit(
         nsecs_t phase, nsecs_t period, size_t numSamplesToUse,
