@@ -242,6 +242,7 @@ public:
     // or release it with releaseInput().
     static status_t getInputForAttr(const audio_attributes_t *attr,
                                     audio_io_handle_t *input,
+                                    audio_unique_id_t riid,
                                     audio_session_t session,
                                     pid_t pid,
                                     uid_t uid,

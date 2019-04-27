@@ -17,6 +17,9 @@
 #ifndef ANDROID_AUDIORECORD_H
 #define ANDROID_AUDIORECORD_H
 
+#include <memory>
+#include <vector>
+
 #include <binder/IMemory.h>
 #include <cutils/sched_policy.h>
 #include <media/AudioSystem.h>
@@ -24,9 +27,9 @@
 #include <media/MediaAnalyticsItem.h>
 #include <media/Modulo.h>
 #include <media/MicrophoneInfo.h>
+#include <media/RecordingActivityTracker.h>
 #include <utils/RefBase.h>
 #include <utils/threads.h>
-#include <vector>
 
 #include "android/media/IAudioRecord.h"
 
@@ -617,6 +620,8 @@ private:
 
     sp<AudioRecordThread>   mAudioRecordThread;
     mutable Mutex           mLock;
+
+    std::unique_ptr<RecordingActivityTracker> mTracker;
 
     // Current client state:  false = stopped, true = active.  Protected by mLock.  If more states
     // are added, consider changing this to enum State { ... } mState as in AudioTrack.

@@ -194,12 +194,12 @@ c2_status_t C2SoftOpusEnc::configureEncoder() {
         return C2_BAD_VALUE;
     }
 
-    // Unconstrained VBR
-    if (opus_multistream_encoder_ctl(mEncoder, OPUS_SET_VBR(0) != OPUS_OK)) {
+    // Constrained VBR
+    if (opus_multistream_encoder_ctl(mEncoder, OPUS_SET_VBR(1) != OPUS_OK)) {
         ALOGE("failed to set vbr type");
         return C2_BAD_VALUE;
     }
-    if (opus_multistream_encoder_ctl(mEncoder, OPUS_SET_VBR_CONSTRAINT(0) !=
+    if (opus_multistream_encoder_ctl(mEncoder, OPUS_SET_VBR_CONSTRAINT(1) !=
             OPUS_OK)) {
         ALOGE("failed to set vbr constraint");
         return C2_BAD_VALUE;

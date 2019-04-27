@@ -305,6 +305,7 @@ public:
 
     virtual status_t getInputForAttr(const audio_attributes_t *attr,
                                      audio_io_handle_t *input,
+                                     audio_unique_id_t riid,
                                      audio_session_t session,
                                      pid_t pid,
                                      uid_t uid,
@@ -334,6 +335,7 @@ public:
         }
         data.write(attr, sizeof(audio_attributes_t));
         data.writeInt32(*input);
+        data.writeInt32(riid);
         data.writeInt32(session);
         data.writeInt32(pid);
         data.writeInt32(uid);
@@ -1511,6 +1513,7 @@ status_t BnAudioPolicyService::onTransact(
             data.read(&attr, sizeof(audio_attributes_t));
             sanetizeAudioAttributes(&attr);
             audio_io_handle_t input = (audio_io_handle_t)data.readInt32();
+            audio_unique_id_t riid = (audio_unique_id_t)data.readInt32();
             audio_session_t session = (audio_session_t)data.readInt32();
             pid_t pid = (pid_t)data.readInt32();
             uid_t uid = (uid_t)data.readInt32();
@@ -1521,7 +1524,7 @@ status_t BnAudioPolicyService::onTransact(
             audio_input_flags_t flags = (audio_input_flags_t) data.readInt32();
             audio_port_handle_t selectedDeviceId = (audio_port_handle_t) data.readInt32();
             audio_port_handle_t portId = (audio_port_handle_t)data.readInt32();
-            status_t status = getInputForAttr(&attr, &input, session, pid, uid,
+            status_t status = getInputForAttr(&attr, &input, riid, session, pid, uid,
                                               opPackageName, &config,
                                               flags, &selectedDeviceId, &portId);
             reply->writeInt32(status);
