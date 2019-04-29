@@ -102,6 +102,7 @@ private:
 
     status_t  estimateDurationsFromTimesUsAtEnd();
 
+    size_t mHeaderSkip;
     DISALLOW_EVIL_CONSTRUCTORS(MPEG2TSExtractor);
 };
 
