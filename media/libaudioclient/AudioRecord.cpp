@@ -22,7 +22,11 @@
 #include <android-base/macros.h>
 #include <sys/resource.h>
 
+#include <audiomanager/AudioManager.h>
+#include <audiomanager/IAudioManager.h>
+#include <binder/Binder.h>
 #include <binder/IPCThreadState.h>
+#include <binder/IServiceManager.h>
 #include <media/AudioRecord.h>
 #include <utils/Log.h>
 #include <private/media/AudioTrackShared.h>
@@ -219,6 +223,8 @@ status_t AudioRecord::set(
           inputSource, sampleRate, format, channelMask, frameCount, notificationFrames,
           sessionId, transferType, flags, String8(mOpPackageName).string(), uid, pid);
 
+    mTracker.reset(new RecordingActivityTracker());
+
     mSelectedDeviceId = selectedDeviceId;
     mSelectedMicDirection = selectedMicDirection;
     mSelectedMicFieldDimension = microphoneFieldDimension;
@@ -396,6 +402,7 @@ status_t AudioRecord::start(AudioSystem::sync_event_t event, audio_session_t tri
     // This is legacy behavior.  This is not done in stop() to avoid a race condition
     // where the last marker event is issued twice.
     mMarkerReached = false;
+    // mActive is checked by restoreRecord_l
     mActive = true;
 
     status_t status = NO_ERROR;
@@ -416,7 +423,9 @@ status_t AudioRecord::start(AudioSystem::sync_event_t event, audio_session_t tri
     if (status != NO_ERROR) {
         mActive = false;
         ALOGE("%s(%d): status %d", __func__, mPortId, status);
+        mMediaMetrics.markError(status, __FUNCTION__);
     } else {
+        mTracker->recordingStarted();
         sp<AudioRecordThread> t = mAudioRecordThread;
         if (t != 0) {
             t->resume();
@@ -428,10 +437,6 @@ status_t AudioRecord::start(AudioSystem::sync_event_t event, audio_session_t tri
 
         // we've successfully started, log that time
         mMediaMetrics.logStart(systemTime());
-    }
-
-    if (status != NO_ERROR) {
-        mMediaMetrics.markError(status, __FUNCTION__);
     }
     return status;
 }
@@ -447,6 +452,7 @@ void AudioRecord::stop()
     mActive = false;
     mProxy->interrupt();
     mAudioRecord->stop();
+    mTracker->recordingStopped();
 
     // Note: legacy handling - stop does not clear record marker and
     // periodic update position; we update those on start().
@@ -711,6 +717,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
         }
     }
     input.opPackageName = opPackageName;
+    input.riid = mTracker->getRiid();
 
     input.flags = mFlags;
     // The notification frame count is the period between callbacks, as suggested by the client

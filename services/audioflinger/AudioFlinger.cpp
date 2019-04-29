@@ -46,6 +46,7 @@
 #include <cutils/properties.h>
 
 #include <system/audio.h>
+#include <audiomanager/AudioManager.h>
 
 #include "AudioFlinger.h"
 #include "NBAIO_Tee.h"
@@ -312,6 +313,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
                  "%s does not support secondary outputs, ignoring them", __func__);
     } else {
         ret = AudioSystem::getInputForAttr(attr, &io,
+                                              RECORD_RIID_INVALID,
                                               actualSessionId,
                                               client.clientPid,
                                               client.clientUid,
@@ -1889,6 +1891,7 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
         portId = AUDIO_PORT_HANDLE_NONE;
     }
     lStatus = AudioSystem::getInputForAttr(&input.attr, &output.inputId,
+                                      input.riid,
                                       sessionId,
                                     // FIXME compare to AudioTrack
                                       clientPid,

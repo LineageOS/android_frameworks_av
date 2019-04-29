@@ -31,6 +31,7 @@ namespace android {
 // ----------------------------------------------------------------------------
 
 struct record_client_info {
+    audio_unique_id_t riid;
     uid_t uid;
     audio_session_t session;
     audio_source_t source;
