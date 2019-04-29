@@ -46,17 +46,20 @@
 #define H265_NALU_SPS 0x21
 #define H265_NALU_PPS 0x22
 
+#define LINK_HEADER_SIZE 14
+#define IP_HEADER_SIZE 20
 #define UDP_HEADER_SIZE 8
+#define TCPIP_HEADER_SIZE (LINK_HEADER_SIZE + IP_HEADER_SIZE + UDP_HEADER_SIZE)
 #define RTP_HEADER_SIZE 12
-#define RTP_HEADER_EXT_SIZE 1
+#define RTP_HEADER_EXT_SIZE 8
 #define RTP_FU_HEADER_SIZE 2
-#define RTP_PAYLOAD_ROOM_SIZE 140
+#define RTP_PAYLOAD_ROOM_SIZE 100 // ROOM size for IPv6 header, ESP and etc.
 
 
 namespace android {
 
 // static const size_t kMaxPacketSize = 65507;  // maximum payload in UDP over IP
-static const size_t kMaxPacketSize = 1500;
+static const size_t kMaxPacketSize = 1280;
 static char kCNAME[255] = "someone@somewhere";
 
 static int UniformRand(int limit) {
@@ -937,8 +940,8 @@ void ARTPWriter::sendHEVCData(MediaBufferBase *mediaBuf) {
 
     sp<ABuffer> buffer = new ABuffer(kMaxPacketSize);
 
-    if (mediaBuf->range_length() + UDP_HEADER_SIZE + RTP_HEADER_SIZE + RTP_PAYLOAD_ROOM_SIZE
-            <= buffer->capacity()) {
+    if (mediaBuf->range_length() + TCPIP_HEADER_SIZE + RTP_HEADER_SIZE + RTP_HEADER_EXT_SIZE
+            + RTP_PAYLOAD_ROOM_SIZE <= buffer->capacity()) {
         // The data fits into a single packet
         uint8_t *data = buffer->data();
         data[0] = 0x80;
@@ -978,11 +981,11 @@ void ARTPWriter::sendHEVCData(MediaBufferBase *mediaBuf) {
         while (offset < mediaBuf->range_length()) {
             size_t size = mediaBuf->range_length() - offset;
             bool lastPacket = true;
-            if (size + UDP_HEADER_SIZE + RTP_HEADER_SIZE + RTP_FU_HEADER_SIZE +
-                    RTP_PAYLOAD_ROOM_SIZE > buffer->capacity()) {
+            if (size + TCPIP_HEADER_SIZE + RTP_HEADER_SIZE + RTP_HEADER_EXT_SIZE +
+                    RTP_FU_HEADER_SIZE + RTP_PAYLOAD_ROOM_SIZE > buffer->capacity()) {
                 lastPacket = false;
-                size = buffer->capacity() - UDP_HEADER_SIZE - RTP_HEADER_SIZE -
-                    RTP_FU_HEADER_SIZE - RTP_PAYLOAD_ROOM_SIZE;
+                size = buffer->capacity() - TCPIP_HEADER_SIZE - RTP_HEADER_SIZE -
+                    RTP_HEADER_EXT_SIZE - RTP_FU_HEADER_SIZE - RTP_PAYLOAD_ROOM_SIZE;
             }
 
             uint8_t *data = buffer->data();
@@ -1071,8 +1074,8 @@ void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
     }
 
     sp<ABuffer> buffer = new ABuffer(kMaxPacketSize);
-    if (mediaBuf->range_length() + UDP_HEADER_SIZE + RTP_HEADER_SIZE + RTP_PAYLOAD_ROOM_SIZE
-            <= buffer->capacity()) {
+    if (mediaBuf->range_length() + TCPIP_HEADER_SIZE + RTP_HEADER_SIZE + RTP_HEADER_EXT_SIZE
+            + RTP_PAYLOAD_ROOM_SIZE <= buffer->capacity()) {
         // The data fits into a single packet
         uint8_t *data = buffer->data();
         data[0] = 0x80;
@@ -1148,11 +1151,11 @@ void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
         while (offset < mediaBuf->range_length()) {
             size_t size = mediaBuf->range_length() - offset;
             bool lastPacket = true;
-            if (size + UDP_HEADER_SIZE + RTP_HEADER_SIZE + RTP_FU_HEADER_SIZE +
-                    RTP_PAYLOAD_ROOM_SIZE > buffer->capacity()) {
+            if (size + TCPIP_HEADER_SIZE + RTP_HEADER_SIZE + RTP_HEADER_EXT_SIZE +
+                    RTP_FU_HEADER_SIZE + RTP_PAYLOAD_ROOM_SIZE > buffer->capacity()) {
                 lastPacket = false;
-                size = buffer->capacity() - UDP_HEADER_SIZE - RTP_HEADER_SIZE -
-                    RTP_FU_HEADER_SIZE - RTP_PAYLOAD_ROOM_SIZE;
+                size = buffer->capacity() - TCPIP_HEADER_SIZE - RTP_HEADER_SIZE -
+                    RTP_HEADER_EXT_SIZE - RTP_FU_HEADER_SIZE - RTP_PAYLOAD_ROOM_SIZE;
             }
 
             uint8_t *data = buffer->data();
