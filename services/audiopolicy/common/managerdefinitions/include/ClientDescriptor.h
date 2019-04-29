@@ -22,6 +22,7 @@
 #include <sys/types.h>
 
 #include <system/audio.h>
+#include <audiomanager/AudioManager.h>
 #include <media/AudioProductStrategy.h>
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>
@@ -146,20 +147,23 @@ private:
 class RecordClientDescriptor: public ClientDescriptor
 {
 public:
-    RecordClientDescriptor(audio_port_handle_t portId, uid_t uid, audio_session_t sessionId,
-                        audio_attributes_t attributes, audio_config_base_t config,
-                        audio_port_handle_t preferredDeviceId,
+    RecordClientDescriptor(audio_port_handle_t portId, audio_unique_id_t riid, uid_t uid,
+                        audio_session_t sessionId, audio_attributes_t attributes,
+                        audio_config_base_t config, audio_port_handle_t preferredDeviceId,
                         audio_source_t source, audio_input_flags_t flags, bool isSoundTrigger) :
         ClientDescriptor(portId, uid, sessionId, attributes, config, preferredDeviceId),
-        mSource(source), mFlags(flags), mIsSoundTrigger(isSoundTrigger), mAppState(APP_STATE_IDLE) {}
+        mRIId(riid), mSource(source), mFlags(flags), mIsSoundTrigger(isSoundTrigger),
+        mAppState(APP_STATE_IDLE) {}
     ~RecordClientDescriptor() override = default;
 
     using ClientDescriptor::dump;
     void dump(String8 *dst, int spaces, int index) const override;
 
+    audio_unique_id_t riid() const { return mRIId; }
     audio_source_t source() const { return mSource; }
     audio_input_flags_t flags() const { return mFlags; }
     bool isSoundTrigger() const { return mIsSoundTrigger; }
+    bool isLowLevel() const { return mRIId == RECORD_RIID_INVALID; }
     void setAppState(app_state_t appState) { mAppState = appState; }
     app_state_t appState() { return mAppState; }
     bool isSilenced() const { return mAppState == APP_STATE_IDLE; }
@@ -167,6 +171,7 @@ public:
     EffectDescriptorCollection getEnabledEffects() const { return mEnabledEffects; }
 
 private:
+    const audio_unique_id_t mRIId;
     const audio_source_t mSource;
     const audio_input_flags_t mFlags;
     const bool mIsSoundTrigger;

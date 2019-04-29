@@ -17,6 +17,7 @@
 #define LOG_TAG "APM::AudioInputDescriptor"
 //#define LOG_NDEBUG 0
 
+#include <audiomanager/AudioManager.h>
 #include <media/AudioPolicy.h>
 #include <policy.h>
 #include <AudioPolicyInterface.h>
@@ -179,7 +180,9 @@ void AudioInputDescriptor::setPatchHandle(audio_patch_handle_t handle)
     mPatchHandle = handle;
     for (const auto &client : getClientIterable()) {
         if (client->active()) {
-            updateClientRecordingConfiguration(RECORD_CONFIG_EVENT_START, client);
+            updateClientRecordingConfiguration(
+                    client->isLowLevel() ? RECORD_CONFIG_EVENT_START : RECORD_CONFIG_EVENT_UPDATE,
+                    client);
         }
     }
 }
@@ -342,15 +345,19 @@ void AudioInputDescriptor::setClientActive(const sp<RecordClientDescriptor>& cli
 void AudioInputDescriptor::updateClientRecordingConfiguration(
     int event, const sp<RecordClientDescriptor>& client)
 {
+    ALOGV("%s riid %d uid %d port %d session %d event %d",
+            __func__, client->riid(), client->uid(), client->portId(), client->session(), event);
     // do not send callback if starting and no device is selected yet to avoid
     // double callbacks from startInput() before and after the device is selected
-    if (event ==  RECORD_CONFIG_EVENT_START
-            && mPatchHandle == AUDIO_PATCH_HANDLE_NONE) {
+    // "start" and "stop" events for "high level" clients (AudioRecord) are sent by the client side
+    if ((event == RECORD_CONFIG_EVENT_START && mPatchHandle == AUDIO_PATCH_HANDLE_NONE)
+            || (!client->isLowLevel()
+                    && (event == RECORD_CONFIG_EVENT_START || event == RECORD_CONFIG_EVENT_STOP))) {
         return;
     }
 
     const audio_config_base_t sessionConfig = client->config();
-    const record_client_info_t recordClientInfo{client->uid(), client->session(),
+    const record_client_info_t recordClientInfo{client->riid(), client->uid(), client->session(),
                                                 client->source(), client->portId(),
                                                 client->isSilenced()};
     const audio_config_base_t config = getConfig();
@@ -429,7 +436,7 @@ void AudioInputDescriptor::trackEffectEnabled(const sp<EffectDescriptor> &effect
     checkSuspendEffects();
 
     for (const auto& client : updatedClients) {
-        updateClientRecordingConfiguration(RECORD_CONFIG_EVENT_START, client);
+        updateClientRecordingConfiguration(RECORD_CONFIG_EVENT_UPDATE, client);
     }
 }
 
@@ -462,7 +469,7 @@ void AudioInputDescriptor::setAppState(uid_t uid, app_state_t state)
     checkSuspendEffects();
 
     for (const auto& client : updatedClients) {
-        updateClientRecordingConfiguration(RECORD_CONFIG_EVENT_START, client);
+        updateClientRecordingConfiguration(RECORD_CONFIG_EVENT_UPDATE, client);
     }
 }
 

@@ -59,6 +59,7 @@
 #include <media/nbaio/SourceAudioBufferProvider.h>
 #include <mediautils/BatteryNotifier.h>
 
+#include <audiomanager/AudioManager.h>
 #include <powermanager/PowerManager.h>
 
 #include <media/audiohal/EffectsFactoryHalInterface.h>
@@ -8561,6 +8562,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         config.format = mFormat;
         audio_port_handle_t deviceId = mDeviceId;
         ret = AudioSystem::getInputForAttr(&mAttr, &io,
+                                              RECORD_RIID_INVALID,
                                               mSessionId,
                                               client.clientPid,
                                               client.clientUid,

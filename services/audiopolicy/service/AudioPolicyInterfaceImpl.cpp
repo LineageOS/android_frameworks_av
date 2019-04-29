@@ -334,6 +334,7 @@ void AudioPolicyService::doReleaseOutput(audio_port_handle_t portId)
 
 status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
                                              audio_io_handle_t *input,
+                                             audio_unique_id_t riid,
                                              audio_session_t session,
                                              pid_t pid,
                                              uid_t uid,
@@ -403,7 +404,7 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
         {
             AutoCallerClear acc;
             // the audio_in_acoustics_t parameter is ignored by get_input()
-            status = mAudioPolicyManager->getInputForAttr(attr, input, session, uid,
+            status = mAudioPolicyManager->getInputForAttr(attr, input, riid, session, uid,
                                                          config,
                                                          flags, selectedDeviceId,
                                                          &inputType, portId);
