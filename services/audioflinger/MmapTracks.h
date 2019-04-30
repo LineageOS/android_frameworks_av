@@ -31,6 +31,7 @@ public:
                             bool isOut,
                             uid_t uid,
                             pid_t pid,
+                            pid_t creatorPid,
                             audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE);
     virtual             ~MmapTrack();
 
