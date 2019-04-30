@@ -26,6 +26,7 @@
 #include <C2Config.h>
 #include <C2PlatformStorePluginLoader.h>
 #include <C2PlatformSupport.h>
+#include <media/stagefright/foundation/ADebug.h>
 #include <util/C2InterfaceHelper.h>
 
 #include <dlfcn.h>
@@ -661,30 +662,36 @@ c2_status_t C2PlatformComponentStore::ComponentModule::init(
     ALOGV("in %s", __func__);
     ALOGV("loading dll");
     mLibHandle = dlopen(libPath.c_str(), RTLD_NOW|RTLD_NODELETE);
-    LOG_ALWAYS_FATAL_IF(mLibHandle == nullptr,
-            "could not dlopen %s: %s", libPath.c_str(), dlerror());
+    if (mLibHandle == nullptr) {
+        LOG_ALWAYS_FATAL_IN_CHILD_PROC("could not dlopen %s: %s", libPath.c_str(), dlerror());
+        mInit = C2_CORRUPTED;
+        return mInit;
+    }
 
     createFactory =
         (C2ComponentFactory::CreateCodec2FactoryFunc)dlsym(mLibHandle, "CreateCodec2Factory");
-    LOG_ALWAYS_FATAL_IF(createFactory == nullptr,
-            "createFactory is null in %s", libPath.c_str());
+    if (createFactory == nullptr) {
+        LOG_ALWAYS_FATAL_IN_CHILD_PROC("createFactory is null in %s", libPath.c_str());
+        mInit = C2_CORRUPTED;
+        return mInit;
+    }
 
     destroyFactory =
         (C2ComponentFactory::DestroyCodec2FactoryFunc)dlsym(mLibHandle, "DestroyCodec2Factory");
-    LOG_ALWAYS_FATAL_IF(destroyFactory == nullptr,
-            "destroyFactory is null in %s", libPath.c_str());
+    if (destroyFactory == nullptr) {
+        LOG_ALWAYS_FATAL_IN_CHILD_PROC("destroyFactory is null in %s", libPath.c_str());
+        mInit = C2_CORRUPTED;
+        return mInit;
+    }
 
     mComponentFactory = createFactory();
     if (mComponentFactory == nullptr) {
         ALOGD("could not create factory in %s", libPath.c_str());
         mInit = C2_NO_MEMORY;
-    } else {
-        mInit = C2_OK;
-    }
-
-    if (mInit != C2_OK) {
         return mInit;
     }
+
+    mInit = C2_OK;
 
     std::shared_ptr<C2ComponentInterface> intf;
     c2_status_t res = createInterface(0, &intf);
