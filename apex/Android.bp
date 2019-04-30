@@ -33,6 +33,9 @@ apex_defaults {
             ],
         },
     },
+    prebuilts: [
+        "mediaextractor.policy",
+    ],
     key: "com.android.media.key",
     certificate: ":com.android.media.certificate",
 
