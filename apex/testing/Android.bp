@@ -17,6 +17,13 @@ apex {
     manifest: "test_manifest.json",
     file_contexts: "com.android.media",
     defaults: ["com.android.media-defaults"],
+    multilib: {
+        both: {
+            // for test apex, built for both ABIs
+            native_shared_libs: com_android_media_extractors,
+        },
+    },
+    compile_multilib: "both",
     installable: false,
 }
 

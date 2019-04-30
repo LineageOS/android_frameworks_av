@@ -24,7 +24,7 @@ cc_library_shared {
     name: "libmp3extractor",
     relative_install_path: "extractors",
 
-    compile_multilib: "first",
+    compile_multilib: "both",
 
     cflags: [
         "-Werror",
