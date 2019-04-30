@@ -61,3 +61,24 @@ exit_group: 1
 restart_syscall: 1
 rt_sigreturn: 1
 getrandom: 1
+madvise: 1
+
+# crash dump policy additions
+sigreturn: 1
+clock_gettime: 1
+futex: 1
+getpid: 1
+gettid: 1
+pipe2: 1
+recvmsg: 1
+process_vm_readv: 1
+tgkill: 1
+rt_sigaction: 1
+rt_tgsigqueueinfo: 1
+#prctl: arg0 == PR_GET_NO_NEW_PRIVS || arg0 == 0x53564d41
+#mprotect: arg2 in 0x1|0x2
+#mmap2: arg2 in 0x1|0x2
+geteuid32: 1
+getgid32: 1
+getegid32: 1
+getgroups32: 1
