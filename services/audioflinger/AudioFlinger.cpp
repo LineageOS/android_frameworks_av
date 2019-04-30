@@ -701,8 +701,8 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
         updatePid = true;
     }
     pid_t clientPid = input.clientInfo.clientPid;
+    const pid_t callingPid = IPCThreadState::self()->getCallingPid();
     if (updatePid) {
-        const pid_t callingPid = IPCThreadState::self()->getCallingPid();
         ALOGW_IF(clientPid != -1 && clientPid != callingPid,
                  "%s uid %d pid %d tried to pass itself off as pid %d",
                  __func__, callingUid, callingPid, clientPid);
@@ -787,7 +787,8 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
                                       &output.frameCount, &output.notificationFrameCount,
                                       input.notificationsPerBuffer, input.speed,
                                       input.sharedBuffer, sessionId, &output.flags,
-                                      input.clientInfo.clientTid, clientUid, &lStatus, portId);
+                                      callingPid, input.clientInfo.clientTid, clientUid,
+                                      &lStatus, portId);
         LOG_ALWAYS_FATAL_IF((lStatus == NO_ERROR) && (track == 0));
         // we don't abort yet if lStatus != NO_ERROR; there is still work to be done regardless
 
@@ -1841,8 +1842,8 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
         updatePid = true;
     }
     pid_t clientPid = input.clientInfo.clientPid;
+    const pid_t callingPid = IPCThreadState::self()->getCallingPid();
     if (updatePid) {
-        const pid_t callingPid = IPCThreadState::self()->getCallingPid();
         ALOGW_IF(clientPid != -1 && clientPid != callingPid,
                  "%s uid %d pid %d tried to pass itself off as pid %d",
                  __func__, callingUid, callingPid, clientPid);
@@ -1919,7 +1920,7 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
                                                   input.config.format, input.config.channel_mask,
                                                   &output.frameCount, sessionId,
                                                   &output.notificationFrameCount,
-                                                  clientUid, &output.flags,
+                                                  callingPid, clientUid, &output.flags,
                                                   input.clientInfo.clientTid,
                                                   &lStatus, portId);
         LOG_ALWAYS_FATAL_IF((lStatus == NO_ERROR) && (recordTrack == 0));

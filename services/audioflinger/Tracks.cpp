@@ -73,6 +73,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
             void *buffer,
             size_t bufferSize,
             audio_session_t sessionId,
+            pid_t creatorPid,
             uid_t clientUid,
             bool isOut,
             alloc_type alloc,
@@ -101,7 +102,8 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
         mType(type),
         mThreadIoHandle(thread ? thread->id() : AUDIO_IO_HANDLE_NONE),
         mPortId(portId),
-        mIsInvalid(false)
+        mIsInvalid(false),
+        mCreatorPid(creatorPid)
 {
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
     if (!isAudioServerOrMediaServerUid(callingUid) || clientUid == AUDIO_UID_INVALID) {
@@ -485,6 +487,7 @@ AudioFlinger::PlaybackThread::Track::Track(
             size_t bufferSize,
             const sp<IMemory>& sharedBuffer,
             audio_session_t sessionId,
+            pid_t creatorPid,
             uid_t uid,
             audio_output_flags_t flags,
             track_type type,
@@ -492,7 +495,7 @@ AudioFlinger::PlaybackThread::Track::Track(
     :   TrackBase(thread, client, attr, sampleRate, format, channelMask, frameCount,
                   (sharedBuffer != 0) ? sharedBuffer->pointer() : buffer,
                   (sharedBuffer != 0) ? sharedBuffer->size() : bufferSize,
-                  sessionId, uid, true /*isOut*/,
+                  sessionId, creatorPid, uid, true /*isOut*/,
                   (type == TYPE_PATCH) ? ( buffer == NULL ? ALLOC_LOCAL : ALLOC_NONE) : ALLOC_CBLK,
                   type, portId),
     mFillingUpStatus(FS_INVALID),
@@ -1543,7 +1546,7 @@ AudioFlinger::PlaybackThread::OutputTrack::OutputTrack(
               audio_attributes_t{} /* currently unused for output track */,
               sampleRate, format, channelMask, frameCount,
               nullptr /* buffer */, (size_t)0 /* bufferSize */, nullptr /* sharedBuffer */,
-              AUDIO_SESSION_NONE, uid, AUDIO_OUTPUT_FLAG_NONE,
+              AUDIO_SESSION_NONE, getpid(), uid, AUDIO_OUTPUT_FLAG_NONE,
               TYPE_OUTPUT),
     mActive(false), mSourceThread(sourceThread)
 {
@@ -1772,7 +1775,7 @@ AudioFlinger::PlaybackThread::PatchTrack::PatchTrack(PlaybackThread *playbackThr
               audio_attributes_t{} /* currently unused for patch track */,
               sampleRate, format, channelMask, frameCount,
               buffer, bufferSize, nullptr /* sharedBuffer */,
-              AUDIO_SESSION_NONE, AID_AUDIOSERVER, flags, TYPE_PATCH),
+              AUDIO_SESSION_NONE, getpid(), AID_AUDIOSERVER, flags, TYPE_PATCH),
         PatchTrackBase(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, true, true),
                        *playbackThread, timeout)
 {
@@ -1927,12 +1930,14 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
             void *buffer,
             size_t bufferSize,
             audio_session_t sessionId,
+            pid_t creatorPid,
             uid_t uid,
             audio_input_flags_t flags,
             track_type type,
             audio_port_handle_t portId)
     :   TrackBase(thread, client, attr, sampleRate, format,
-                  channelMask, frameCount, buffer, bufferSize, sessionId, uid, false /*isOut*/,
+                  channelMask, frameCount, buffer, bufferSize, sessionId,
+                  creatorPid, uid, false /*isOut*/,
                   (type == TYPE_DEFAULT) ?
                           ((flags & AUDIO_INPUT_FLAG_FAST) ? ALLOC_PIPE : ALLOC_CBLK) :
                           ((buffer == NULL) ? ALLOC_LOCAL : ALLOC_NONE),
@@ -2242,7 +2247,7 @@ AudioFlinger::RecordThread::PatchRecord::PatchRecord(RecordThread *recordThread,
     :   RecordTrack(recordThread, NULL,
                 audio_attributes_t{} /* currently unused for patch track */,
                 sampleRate, format, channelMask, frameCount,
-                buffer, bufferSize, AUDIO_SESSION_NONE, AID_AUDIOSERVER,
+                buffer, bufferSize, AUDIO_SESSION_NONE, getpid(), AID_AUDIOSERVER,
                 flags, TYPE_PATCH),
         PatchTrackBase(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, false, true),
                        *recordThread, timeout)
@@ -2310,11 +2315,12 @@ AudioFlinger::MmapThread::MmapTrack::MmapTrack(ThreadBase *thread,
         bool isOut,
         uid_t uid,
         pid_t pid,
+        pid_t creatorPid,
         audio_port_handle_t portId)
     :   TrackBase(thread, NULL, attr, sampleRate, format,
                   channelMask, (size_t)0 /* frameCount */,
                   nullptr /* buffer */, (size_t)0 /* bufferSize */,
-                  sessionId, uid, isOut,
+                  sessionId, creatorPid, uid, isOut,
                   ALLOC_NONE,
                   TYPE_DEFAULT, portId),
         mPid(pid), mSilenced(false), mSilencedNotified(false)
