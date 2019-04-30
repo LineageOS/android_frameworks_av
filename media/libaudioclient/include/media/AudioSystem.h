@@ -438,32 +438,12 @@ public:
                                          audio_port_handle_t deviceId) = 0;
     };
 
-    class AudioDeviceCallbackProxy : public RefBase
-    {
-    public:
-
-          AudioDeviceCallbackProxy(wp<AudioDeviceCallback> callback)
-              : mCallback(callback) {}
-          ~AudioDeviceCallbackProxy() override {}
-
-          sp<AudioDeviceCallback> callback() const { return mCallback.promote(); };
-
-          bool notifiedOnce() const { return mNotifiedOnce; }
-          void setNotifiedOnce() { mNotifiedOnce = true; }
-    private:
-        /**
-         * @brief mNotifiedOnce it forces the callback to be called at least once when
-         * registered with a VALID AudioDevice, and allows not to flood other listeners
-         * on this iohandle that already know the valid device.
-         */
-         bool mNotifiedOnce = false;
-         wp<AudioDeviceCallback> mCallback;
-    };
-
     static status_t addAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
-                                           audio_io_handle_t audioIo);
+                                           audio_io_handle_t audioIo,
+                                           audio_port_handle_t portId);
     static status_t removeAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
-                                              audio_io_handle_t audioIo);
+                                              audio_io_handle_t audioIo,
+                                              audio_port_handle_t portId);
 
     static audio_port_handle_t getDeviceIdForIo(audio_io_handle_t audioIo);
 
@@ -494,9 +474,11 @@ private:
 
 
         status_t addAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
-                                               audio_io_handle_t audioIo);
+                                               audio_io_handle_t audioIo,
+                                               audio_port_handle_t portId);
         status_t removeAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
-                                           audio_io_handle_t audioIo);
+                                           audio_io_handle_t audioIo,
+                                           audio_port_handle_t portId);
 
         audio_port_handle_t getDeviceIdForIo(audio_io_handle_t audioIo);
 
@@ -504,26 +486,8 @@ private:
         Mutex                               mLock;
         DefaultKeyedVector<audio_io_handle_t, sp<AudioIoDescriptor> >   mIoDescriptors;
 
-        class AudioDeviceCallbackProxies : public Vector<sp<AudioDeviceCallbackProxy>>
-        {
-        public:
-            /**
-             * @brief notifiedOnce ensures that if a client adds a callback, it must at least be
-             * called once with the device on which it will be routed to.
-             * @return true if already notified or nobody waits for a callback, false otherwise.
-             */
-            bool notifiedOnce() const { return (size() == 0) || mNotifiedOnce; }
-            void setNotifiedOnce() { mNotifiedOnce = true; }
-            void resetNotifiedOnce() { mNotifiedOnce = false; }
-        private:
-            /**
-             * @brief mNotifiedOnce it forces each callback to be called at least once when
-             * registered with a VALID AudioDevice
-             */
-            bool mNotifiedOnce = false;
-        };
-        DefaultKeyedVector<audio_io_handle_t, AudioDeviceCallbackProxies>
-                mAudioDeviceCallbackProxies;
+        std::map<audio_io_handle_t, std::map<audio_port_handle_t, wp<AudioDeviceCallback>>>
+                mAudioDeviceCallbacks;
         // cached values for recording getInputBufferSize() queries
         size_t                              mInBuffSize;    // zero indicates cache is invalid
         uint32_t                            mInSamplingRate;

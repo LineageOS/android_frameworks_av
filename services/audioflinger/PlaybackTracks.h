@@ -69,6 +69,7 @@ public:
                                 size_t bufferSize,
                                 const sp<IMemory>& sharedBuffer,
                                 audio_session_t sessionId,
+                                pid_t creatorPid,
                                 uid_t uid,
                                 audio_output_flags_t flags,
                                 track_type type,
