@@ -1110,6 +1110,9 @@ status_t MediaCodec::configure(
             reset();
         }
         if (!isResourceError(err)) {
+            if (err == OK) {
+                disableLegacyBufferDropPostQ(surface);
+            }
             break;
         }
     }
@@ -1175,7 +1178,11 @@ status_t MediaCodec::setSurface(const sp<Surface> &surface) {
     msg->setObject("surface", surface);
 
     sp<AMessage> response;
-    return PostAndAwaitResponse(msg, &response);
+    status_t result = PostAndAwaitResponse(msg, &response);
+    if (result == OK) {
+        disableLegacyBufferDropPostQ(surface);
+    }
+    return result;
 }
 
 status_t MediaCodec::createInputSurface(
