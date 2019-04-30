@@ -1101,7 +1101,9 @@ status_t convertMetaDataToMessage(
     } else if (meta->findData(kKeyHVCC, &type, &data, &size)) {
         const uint8_t *ptr = (const uint8_t *)data;
 
-        if (size < 23 || ptr[0] != 1) {  // configurationVersion == 1
+        if (size < 23 || (ptr[0] != 1 && ptr[0] != 0)) {
+            // configurationVersion == 1 or 0
+            // 1 is what the standard dictates, but some old muxers may have used 0.
             ALOGE("b/23680780");
             return BAD_VALUE;
         }
