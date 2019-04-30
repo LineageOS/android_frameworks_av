@@ -5305,20 +5305,30 @@ status_t MPEG4Source::parseTrackFragmentRun(off64_t offset, off64_t size) {
 
     if (flags & kSampleSizePresent) {
         bytesPerSample += 4;
-    } else if (mTrackFragmentHeaderInfo.mFlags
-            & TrackFragmentHeaderInfo::kDefaultSampleSizePresent) {
-        sampleSize = mTrackFragmentHeaderInfo.mDefaultSampleSize;
     } else {
         sampleSize = mTrackFragmentHeaderInfo.mDefaultSampleSize;
+#ifdef VERY_VERY_VERBOSE_LOGGING
+        // We don't expect this, but also want to avoid spamming the log if
+        // we hit this case.
+        if (!(mTrackFragmentHeaderInfo.mFlags
+              & TrackFragmentHeaderInfo::kDefaultSampleSizePresent)) {
+            ALOGW("No sample size specified");
+        }
+#endif
     }
 
     if (flags & kSampleFlagsPresent) {
         bytesPerSample += 4;
-    } else if (mTrackFragmentHeaderInfo.mFlags
-            & TrackFragmentHeaderInfo::kDefaultSampleFlagsPresent) {
-        sampleFlags = mTrackFragmentHeaderInfo.mDefaultSampleFlags;
     } else {
         sampleFlags = mTrackFragmentHeaderInfo.mDefaultSampleFlags;
+#ifdef VERY_VERY_VERBOSE_LOGGING
+        // We don't expect this, but also want to avoid spamming the log if
+        // we hit this case.
+        if (!(mTrackFragmentHeaderInfo.mFlags
+              & TrackFragmentHeaderInfo::kDefaultSampleFlagsPresent)) {
+            ALOGW("No sample flags specified");
+        }
+#endif
     }
 
     if (flags & kSampleCompositionTimeOffsetPresent) {
