@@ -59,6 +59,7 @@ cc_library_shared {
         "IEffectClient.cpp",
         "ToneGenerator.cpp",
         "PlayerBase.cpp",
+        "RecordingActivityTracker.cpp",
         "TrackPlayerBase.cpp",
     ],
     shared_libs: [
