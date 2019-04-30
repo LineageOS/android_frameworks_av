@@ -3268,6 +3268,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
         cpuStats.sample(myName);
 
         Vector< sp<EffectChain> > effectChains;
+        audio_session_t activeHapticSessionId = AUDIO_SESSION_NONE;
 
         // If the device is AUDIO_DEVICE_OUT_BUS, check for downstream latency.
         //
@@ -3541,6 +3542,19 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             // during mixing and effect process as the audio buffers could be deleted
             // or modified if an effect is created or deleted
             lockEffectChains_l(effectChains);
+
+            // Determine which session to pick up haptic data.
+            // This must be done under the same lock as prepareTracks_l().
+            // TODO: Write haptic data directly to sink buffer when mixing.
+            if (mHapticChannelCount > 0 && effectChains.size() > 0) {
+                for (const auto& track : mActiveTracks) {
+                    if (track->getHapticPlaybackEnabled()) {
+                        activeHapticSessionId = track->sessionId();
+                        break;
+                    }
+                }
+            }
+
         } // mLock scope ends
 
         if (mBytesRemaining == 0) {
@@ -3613,20 +3627,11 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
             // only process effects if we're going to write
             if (mSleepTimeUs == 0 && mType != OFFLOAD) {
-                audio_session_t activeHapticId = AUDIO_SESSION_NONE;
-                if (mHapticChannelCount > 0 && effectChains.size() > 0) {
-                    for (auto track : mActiveTracks) {
-                        if (track->getHapticPlaybackEnabled()) {
-                            activeHapticId = track->sessionId();
-                            break;
-                        }
-                    }
-                }
                 for (size_t i = 0; i < effectChains.size(); i ++) {
                     effectChains[i]->process_l();
                     // TODO: Write haptic data directly to sink buffer when mixing.
-                    if (activeHapticId != AUDIO_SESSION_NONE
-                            && activeHapticId == effectChains[i]->sessionId()) {
+                    if (activeHapticSessionId != AUDIO_SESSION_NONE
+                            && activeHapticSessionId == effectChains[i]->sessionId()) {
                         // Haptic data is active in this case, copy it directly from
                         // in buffer to out buffer.
                         const size_t audioBufferSize = mNormalFrameCount
