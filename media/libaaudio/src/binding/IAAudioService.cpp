@@ -251,8 +251,15 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
             CHECK_INTERFACE(IAAudioService, data, reply);
             sp<IAAudioClient> client = interface_cast<IAAudioClient>(
                     data.readStrongBinder());
-            registerClient(client);
-            return NO_ERROR;
+            // readStrongBinder() can return null
+            if (client.get() == nullptr) {
+                ALOGE("BnAAudioService::%s(REGISTER_CLIENT) client is NULL!", __func__);
+                android_errorWriteLog(0x534e4554, "116230453");
+                return DEAD_OBJECT;
+            } else {
+                registerClient(client);
+                return NO_ERROR;
+            }
         } break;
 
         case OPEN_STREAM: {
