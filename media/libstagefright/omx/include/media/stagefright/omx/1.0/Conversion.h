@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0__CONVERSION_H
-#define ANDROID_HARDWARE_MEDIA_OMX_V1_0__CONVERSION_H
+#ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0_IMPL_CONVERSION_H
+#define ANDROID_HARDWARE_MEDIA_OMX_V1_0_IMPL_CONVERSION_H
 
 #include <vector>
 #include <list>
@@ -29,15 +29,15 @@
 
 #include <binder/Binder.h>
 #include <binder/Status.h>
+#include <ui/BufferQueueDefs.h>
 #include <ui/FenceTime.h>
 #include <cutils/native_handle.h>
-#include <gui/IGraphicBufferProducer.h>
 
 #include <media/OMXFenceParcelable.h>
 #include <media/OMXBuffer.h>
+#include <media/omx/1.0/Conversion.h>
 #include <media/hardware/VideoAPI.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/bqhelper/Conversion.h>
 
 #include <android/hidl/memory/1.0/IMemory.h>
 #include <android/hardware/graphics/bufferqueue/1.0/IProducerListener.h>
@@ -99,16 +99,9 @@ using ::android::IOMXBufferSource;
 
 typedef ::android::hardware::graphics::bufferqueue::V1_0::IGraphicBufferProducer
         HGraphicBufferProducer;
-typedef ::android::IGraphicBufferProducer
-        BGraphicBufferProducer;
 
-// We want to use all functions declared in ::android::conversion
-using namespace ::android::conversion;
-
-// Now specifically inject these two functions here, because we're going to
-// declare functions with the same name in this namespace.
-using ::android::conversion::convertTo;
-using ::android::conversion::toStatusT;
+// Use the conversion functions from libmedia_omx so that we don't need libgui
+using namespace ::android::hardware::media::omx::V1_0::utils;
 
 /**
  * Conversion functions
@@ -143,62 +136,6 @@ using ::android::conversion::toStatusT;
  */
 
 /**
- * \brief Convert `Status` to `status_t`. This is for legacy binder calls.
- *
- * \param[in] t The source `Status`.
- * \return the corresponding `status_t`.
- */
-// convert: Status -> status_t
-inline status_t toStatusT(Status const& t) {
-    switch (t) {
-    case Status::NO_ERROR:
-    case Status::NAME_NOT_FOUND:
-    case Status::WOULD_BLOCK:
-    case Status::NO_MEMORY:
-    case Status::ALREADY_EXISTS:
-    case Status::NO_INIT:
-    case Status::BAD_VALUE:
-    case Status::DEAD_OBJECT:
-    case Status::INVALID_OPERATION:
-    case Status::TIMED_OUT:
-    case Status::ERROR_UNSUPPORTED:
-    case Status::UNKNOWN_ERROR:
-    case Status::RELEASE_ALL_BUFFERS:
-        return static_cast<status_t>(t);
-    case Status::BUFFER_NEEDS_REALLOCATION:
-        return NOT_ENOUGH_DATA;
-    default:
-        ALOGW("Unrecognized status value: %" PRId32, static_cast<int32_t>(t));
-        return static_cast<status_t>(t);
-    }
-}
-
-/**
- * \brief Convert `Return<Status>` to `status_t`. This is for legacy binder
- * calls.
- *
- * \param[in] t The source `Return<Status>`.
- * \return The corresponding `status_t`.
- *
- * This function first check if \p t has a transport error. If it does, then the
- * return value is the transport error code. Otherwise, the return value is
- * converted from `Status` contained inside \p t.
- *
- * Note:
- * - This `Status` is omx-specific. It is defined in `types.hal`.
- * - The name of this function is not `convert`.
- */
-// convert: Status -> status_t
-inline status_t toStatusT(Return<Status> const& t) {
-    if (t.isOk()) {
-        return toStatusT(static_cast<Status>(t));
-    } else if (t.isDeadObject()) {
-        return DEAD_OBJECT;
-    }
-    return UNKNOWN_ERROR;
-}
-
-/**
  * \brief Convert `status_t` to `Status`.
  *
  * \param[in] l The source `status_t`.
@@ -219,8 +156,8 @@ inline Status toStatus(status_t l) {
     case TIMED_OUT:
     case ERROR_UNSUPPORTED:
     case UNKNOWN_ERROR:
-    case IGraphicBufferProducer::RELEASE_ALL_BUFFERS:
-    case IGraphicBufferProducer::BUFFER_NEEDS_REALLOCATION:
+    case BufferQueueDefs::RELEASE_ALL_BUFFERS:
+    case BufferQueueDefs::BUFFER_NEEDS_REALLOCATION:
         return static_cast<Status>(l);
     case NOT_ENOUGH_DATA:
         return Status::BUFFER_NEEDS_REALLOCATION;
@@ -572,7 +509,8 @@ inline bool convertTo(OMXBuffer* l, CodecBuffer const& t) {
             anwBuffer.nativeHandle = t.nativeHandle;
             anwBuffer.attr = t.attr.anwBuffer;
             sp<GraphicBuffer> graphicBuffer = new GraphicBuffer();
-            if (!convertTo(graphicBuffer.get(), anwBuffer)) {
+            if (!::android::hardware::media::omx::V1_0::utils::convertTo(
+                    graphicBuffer.get(), anwBuffer)) {
                 return false;
             }
             *l = OMXBuffer(graphicBuffer);
@@ -756,4 +694,4 @@ inline OMX_TICKS toOMXTicks(uint64_t t) {
 }  // namespace hardware
 }  // namespace android
 
-#endif  // ANDROID_HARDWARE_MEDIA_OMX_V1_0__CONVERSION_H
+#endif  // ANDROID_HARDWARE_MEDIA_OMX_V1_0_IMPL_CONVERSION_H

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0__CONVERSION_H
-#define ANDROID_HARDWARE_MEDIA_OMX_V1_0__CONVERSION_H
+#ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0_UTILS_CONVERSION_H
+#define ANDROID_HARDWARE_MEDIA_OMX_V1_0_UTILS_CONVERSION_H
 
 #include <vector>
 #include <list>
@@ -258,7 +258,12 @@ inline status_t toStatusT(Status const& t) {
  */
 // convert: Status -> status_t
 inline status_t toStatusT(Return<Status> const& t) {
-    return t.isOk() ? toStatusT(static_cast<Status>(t)) : UNKNOWN_ERROR;
+    if (t.isOk()) {
+        return toStatusT(static_cast<Status>(t));
+    } else if (t.isDeadObject()) {
+        return DEAD_OBJECT;
+    }
+    return UNKNOWN_ERROR;
 }
 
 /**
@@ -938,4 +943,4 @@ inline OMX_TICKS toOMXTicks(uint64_t t) {
 }  // namespace hardware
 }  // namespace android
 
-#endif  // ANDROID_HARDWARE_MEDIA_OMX_V1_0__CONVERSION_H
+#endif  // ANDROID_HARDWARE_MEDIA_OMX_V1_0_UTILS_CONVERSION_H

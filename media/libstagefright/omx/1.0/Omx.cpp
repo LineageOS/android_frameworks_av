@@ -18,7 +18,6 @@
 #include <list>
 
 #include <android-base/logging.h>
-#include <gui/IGraphicBufferProducer.h>
 #include <media/openmax/OMX_Core.h>
 #include <media/openmax/OMX_AsString.h>
 
@@ -28,7 +27,6 @@
 
 #include <media/stagefright/omx/1.0/WOmxNode.h>
 #include <media/stagefright/omx/1.0/WOmxObserver.h>
-#include <media/stagefright/omx/1.0/WGraphicBufferProducer.h>
 #include <media/stagefright/omx/1.0/WGraphicBufferSource.h>
 #include <media/stagefright/omx/1.0/Conversion.h>
 #include <media/stagefright/omx/1.0/Omx.h>
@@ -146,8 +144,6 @@ Return<void> Omx::allocateNode(
 }
 
 Return<void> Omx::createInputSurface(createInputSurface_cb _hidl_cb) {
-    sp<::android::IGraphicBufferProducer> bufferProducer;
-
     sp<OmxGraphicBufferSource> graphicBufferSource = new OmxGraphicBufferSource();
     status_t err = graphicBufferSource->initCheck();
     if (err != OK) {
@@ -157,10 +153,9 @@ Return<void> Omx::createInputSurface(createInputSurface_cb _hidl_cb) {
         _hidl_cb(toStatus(err), nullptr, nullptr);
         return Void();
     }
-    bufferProducer = graphicBufferSource->getIGraphicBufferProducer();
 
     _hidl_cb(toStatus(OK),
-            new TWGraphicBufferProducer(bufferProducer),
+            graphicBufferSource->getHGraphicBufferProducer_V1_0(),
             new TWGraphicBufferSource(graphicBufferSource));
     return Void();
 }
