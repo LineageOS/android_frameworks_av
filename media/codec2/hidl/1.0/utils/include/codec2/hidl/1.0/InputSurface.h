@@ -22,7 +22,6 @@
 #include <android/hardware/graphics/bufferqueue/2.0/IGraphicBufferProducer.h>
 #include <android/hardware/media/c2/1.0/IInputSink.h>
 #include <android/hardware/media/c2/1.0/IInputSurface.h>
-#include <gui/IGraphicBufferProducer.h>
 #include <hidl/Status.h>
 #include <media/stagefright/bqhelper/GraphicBufferSource.h>
 
