@@ -566,14 +566,16 @@ status_t AudioFlinger::ThreadBase::sendConfigEvent_l(sp<ConfigEvent>& event)
     return status;
 }
 
-void AudioFlinger::ThreadBase::sendIoConfigEvent(audio_io_config_event event, pid_t pid)
+void AudioFlinger::ThreadBase::sendIoConfigEvent(audio_io_config_event event, pid_t pid,
+                                                 audio_port_handle_t portId)
 {
     Mutex::Autolock _l(mLock);
-    sendIoConfigEvent_l(event, pid);
+    sendIoConfigEvent_l(event, pid, portId);
 }
 
 // sendIoConfigEvent_l() must be called with ThreadBase::mLock held
-void AudioFlinger::ThreadBase::sendIoConfigEvent_l(audio_io_config_event event, pid_t pid)
+void AudioFlinger::ThreadBase::sendIoConfigEvent_l(audio_io_config_event event, pid_t pid,
+                                                   audio_port_handle_t portId)
 {
     // The audio statistics history is exponentially weighted to forget events
     // about five or more seconds in the past.  In order to have
@@ -584,7 +586,7 @@ void AudioFlinger::ThreadBase::sendIoConfigEvent_l(audio_io_config_event event, 
     mProcessTimeMs.reset();
     mTimestampVerifier.discontinuity();
 
-    sp<ConfigEvent> configEvent = (ConfigEvent *)new IoConfigEvent(event, pid);
+    sp<ConfigEvent> configEvent = (ConfigEvent *)new IoConfigEvent(event, pid, portId);
     sendConfigEvent_l(configEvent);
 }
 
@@ -667,7 +669,7 @@ void AudioFlinger::ThreadBase::processConfigEvents_l()
         } break;
         case CFG_EVENT_IO: {
             IoConfigEventData *data = (IoConfigEventData *)event->mData.get();
-            ioConfigChanged(data->mEvent, data->mPid);
+            ioConfigChanged(data->mEvent, data->mPid, data->mPortId);
         } break;
         case CFG_EVENT_SET_PARAMETER: {
             SetParameterConfigEventData *data = (SetParameterConfigEventData *)event->mData.get();
@@ -1952,6 +1954,7 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         const sp<IMemory>& sharedBuffer,
         audio_session_t sessionId,
         audio_output_flags_t *flags,
+        pid_t creatorPid,
         pid_t tid,
         uid_t uid,
         status_t *status,
@@ -2235,7 +2238,7 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         track = new Track(this, client, streamType, attr, sampleRate, format,
                           channelMask, frameCount,
                           nullptr /* buffer */, (size_t)0 /* bufferSize */, sharedBuffer,
-                          sessionId, uid, *flags, TrackBase::TYPE_DEFAULT, portId);
+                          sessionId, creatorPid, uid, *flags, TrackBase::TYPE_DEFAULT, portId);
 
         lStatus = track != 0 ? track->initCheck() : (status_t) NO_MEMORY;
         if (lStatus != NO_ERROR) {
@@ -2391,6 +2394,7 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
             // to track the speaker usage
             addBatteryData(IMediaPlayerService::kBatteryDataAudioFlingerStart);
 #endif
+            sendIoConfigEvent_l(AUDIO_CLIENT_STARTED, track->creatorPid(), track->portId());
         }
 
         // set retry count for buffer fill
@@ -2499,7 +2503,8 @@ status_t AudioFlinger::DirectOutputThread::selectPresentation(int presentationId
     return mOutput->stream->selectPresentation(presentationId, programId);
 }
 
-void AudioFlinger::PlaybackThread::ioConfigChanged(audio_io_config_event event, pid_t pid) {
+void AudioFlinger::PlaybackThread::ioConfigChanged(audio_io_config_event event, pid_t pid,
+                                                   audio_port_handle_t portId) {
     sp<AudioIoDescriptor> desc = new AudioIoDescriptor();
     ALOGV("PlaybackThread::ioConfigChanged, thread %p, event %d", this, event);
 
@@ -2518,7 +2523,10 @@ void AudioFlinger::PlaybackThread::ioConfigChanged(audio_io_config_event event, 
         desc->mFrameCountHAL = mFrameCount;
         desc->mLatency = latency_l();
         break;
-
+    case AUDIO_CLIENT_STARTED:
+        desc->mPatch = mPatch;
+        desc->mPortId = portId;
+        break;
     case AUDIO_OUTPUT_CLOSED:
     default:
         break;
@@ -7405,6 +7413,7 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
         size_t *pFrameCount,
         audio_session_t sessionId,
         size_t *pNotificationFrameCount,
+        pid_t creatorPid,
         uid_t uid,
         audio_input_flags_t *flags,
         pid_t tid,
@@ -7542,7 +7551,7 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
 
         track = new RecordTrack(this, client, attr, sampleRate,
                       format, channelMask, frameCount,
-                      nullptr /* buffer */, (size_t)0 /* bufferSize */, sessionId, uid,
+                      nullptr /* buffer */, (size_t)0 /* bufferSize */, sessionId, creatorPid, uid,
                       *flags, TrackBase::TYPE_DEFAULT, portId);
 
         lStatus = track->initCheck();
@@ -7650,6 +7659,8 @@ status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrac
                 recordTrack->clearSyncStartEvent();
                 return status;
             }
+            sendIoConfigEvent_l(
+                AUDIO_CLIENT_STARTED, recordTrack->creatorPid(), recordTrack->portId());
         }
         // Catch up with current buffer indices if thread is already running.
         // This is what makes a new client discard all buffered data.  If the track's mRsmpInFront
@@ -8131,7 +8142,8 @@ String8 AudioFlinger::RecordThread::getParameters(const String8& keys)
     return String8();
 }
 
-void AudioFlinger::RecordThread::ioConfigChanged(audio_io_config_event event, pid_t pid) {
+void AudioFlinger::RecordThread::ioConfigChanged(audio_io_config_event event, pid_t pid,
+                                                 audio_port_handle_t portId) {
     sp<AudioIoDescriptor> desc = new AudioIoDescriptor();
 
     desc->mIoHandle = mId;
@@ -8148,7 +8160,10 @@ void AudioFlinger::RecordThread::ioConfigChanged(audio_io_config_event event, pi
         desc->mFrameCountHAL = mFrameCount;
         desc->mLatency = 0;
         break;
-
+    case AUDIO_CLIENT_STARTED:
+        desc->mPatch = mPatch;
+        desc->mPortId = portId;
+        break;
     case AUDIO_INPUT_CLOSED:
     default:
         break;
@@ -8606,7 +8621,8 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
 
     // Given that MmapThread::mAttr is mutable, should a MmapTrack have attributes ?
     sp<MmapTrack> track = new MmapTrack(this, mAttr, mSampleRate, mFormat, mChannelMask, mSessionId,
-                                        isOutput(), client.clientUid, client.clientPid, portId);
+                                        isOutput(), client.clientUid, client.clientPid,
+                                        IPCThreadState::self()->getCallingPid(), portId);
 
     if (isOutput()) {
         // force volume update when a new track is added
@@ -8832,7 +8848,8 @@ String8 AudioFlinger::MmapThread::getParameters(const String8& keys)
     return String8();
 }
 
-void AudioFlinger::MmapThread::ioConfigChanged(audio_io_config_event event, pid_t pid) {
+void AudioFlinger::MmapThread::ioConfigChanged(audio_io_config_event event, pid_t pid,
+                                               audio_port_handle_t portId __unused) {
     sp<AudioIoDescriptor> desc = new AudioIoDescriptor();
 
     desc->mIoHandle = mId;

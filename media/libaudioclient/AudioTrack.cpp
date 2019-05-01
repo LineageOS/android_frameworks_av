@@ -309,7 +309,7 @@ AudioTrack::~AudioTrack()
         }
         // No lock here: worst case we remove a NULL callback which will be a nop
         if (mDeviceCallback != 0 && mOutput != AUDIO_IO_HANDLE_NONE) {
-            AudioSystem::removeAudioDeviceCallback(this, mOutput);
+            AudioSystem::removeAudioDeviceCallback(this, mOutput, mPortId);
         }
         IInterface::asBinder(mAudioTrack)->unlinkToDeath(mDeathNotifier, this);
         mAudioTrack.clear();
@@ -1495,7 +1495,6 @@ status_t AudioTrack::createTrack_l()
     mAfFrameCount = output.afFrameCount;
     mAfSampleRate = output.afSampleRate;
     mAfLatency = output.afLatencyMs;
-    mPortId = output.portId;
 
     mLatency = mAfLatency + (1000LL * mFrameCount) / mSampleRate;
 
@@ -1543,14 +1542,15 @@ status_t AudioTrack::createTrack_l()
     mFlags = output.flags;
 
     //mOutput != output includes the case where mOutput == AUDIO_IO_HANDLE_NONE for first creation
-    if (mDeviceCallback != 0 && mOutput != output.outputId) {
+    if (mDeviceCallback != 0) {
         if (mOutput != AUDIO_IO_HANDLE_NONE) {
-            AudioSystem::removeAudioDeviceCallback(this, mOutput);
+            AudioSystem::removeAudioDeviceCallback(this, mOutput, mPortId);
         }
-        AudioSystem::addAudioDeviceCallback(this, output.outputId);
+        AudioSystem::addAudioDeviceCallback(this, output.outputId, output.portId);
         callbackAdded = true;
     }
 
+    mPortId = output.portId;
     // We retain a copy of the I/O handle, but don't own the reference
     mOutput = output.outputId;
     mRefreshRemaining = true;
@@ -1615,7 +1615,7 @@ status_t AudioTrack::createTrack_l()
 exit:
     if (status != NO_ERROR && callbackAdded) {
         // note: mOutput is always valid is callbackAdded is true
-        AudioSystem::removeAudioDeviceCallback(this, mOutput);
+        AudioSystem::removeAudioDeviceCallback(this, mOutput, mPortId);
     }
 
     mStatus = status;
@@ -2922,6 +2922,7 @@ uint32_t AudioTrack::getUnderrunFrames() const
 
 status_t AudioTrack::addAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback)
 {
+
     if (callback == 0) {
         ALOGW("%s(%d): adding NULL callback!", __func__, mPortId);
         return BAD_VALUE;
@@ -2935,9 +2936,9 @@ status_t AudioTrack::addAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCal
     if (mOutput != AUDIO_IO_HANDLE_NONE) {
         if (mDeviceCallback != 0) {
             ALOGW("%s(%d): callback already present!", __func__, mPortId);
-            AudioSystem::removeAudioDeviceCallback(this, mOutput);
+            AudioSystem::removeAudioDeviceCallback(this, mOutput, mPortId);
         }
-        status = AudioSystem::addAudioDeviceCallback(this, mOutput);
+        status = AudioSystem::addAudioDeviceCallback(this, mOutput, mPortId);
     }
     mDeviceCallback = callback;
     return status;
@@ -2957,7 +2958,7 @@ status_t AudioTrack::removeAudioDeviceCallback(
     }
     mDeviceCallback.clear();
     if (mOutput != AUDIO_IO_HANDLE_NONE) {
-        AudioSystem::removeAudioDeviceCallback(this, mOutput);
+        AudioSystem::removeAudioDeviceCallback(this, mOutput, mPortId);
     }
     return NO_ERROR;
 }
@@ -2979,6 +2980,7 @@ void AudioTrack::onAudioDeviceUpdate(audio_io_handle_t audioIo,
             mRoutedDeviceId = deviceId;
         }
     }
+
     if (callback.get() != nullptr) {
         callback->onAudioDeviceUpdate(mOutput, mRoutedDeviceId);
     }

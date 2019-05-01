@@ -32,6 +32,7 @@ public:
                                 void *buffer,
                                 size_t bufferSize,
                                 audio_session_t sessionId,
+                                pid_t creatorPid,
                                 uid_t uid,
                                 audio_input_flags_t flags,
                                 track_type type,

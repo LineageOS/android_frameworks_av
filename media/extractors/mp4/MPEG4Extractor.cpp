@@ -338,13 +338,16 @@ static const char *FourCC2MIME(uint32_t fourcc) {
             return MEDIA_MIMETYPE_VIDEO_HEVC;
         case FOURCC("ac-4"):
             return MEDIA_MIMETYPE_AUDIO_AC4;
+        case FOURCC("Opus"):
+            return MEDIA_MIMETYPE_AUDIO_OPUS;
 
         case FOURCC("twos"):
         case FOURCC("sowt"):
             return MEDIA_MIMETYPE_AUDIO_RAW;
         case FOURCC("alac"):
             return MEDIA_MIMETYPE_AUDIO_ALAC;
-
+        case FOURCC("fLaC"):
+            return MEDIA_MIMETYPE_AUDIO_FLAC;
         case FOURCC("av01"):
             return MEDIA_MIMETYPE_VIDEO_AV1;
         case FOURCC(".mp3"):
@@ -1640,9 +1643,11 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC("enca"):
         case FOURCC("samr"):
         case FOURCC("sawb"):
+        case FOURCC("Opus"):
         case FOURCC("twos"):
         case FOURCC("sowt"):
         case FOURCC("alac"):
+        case FOURCC("fLaC"):
         case FOURCC(".mp3"):
         case 0x6D730055: // "ms U" mp3 audio
         {
@@ -1729,6 +1734,47 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             AMediaFormat_setInt32(mLastTrack->meta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, num_channels);
             AMediaFormat_setInt32(mLastTrack->meta, AMEDIAFORMAT_KEY_SAMPLE_RATE, sample_rate);
 
+            if (chunk_type == FOURCC("Opus")) {
+                uint8_t opusInfo[19];
+                data_offset += sizeof(buffer);
+                // Read Opus Header
+                if (mDataSource->readAt(
+                        data_offset, opusInfo, sizeof(opusInfo)) < (ssize_t)sizeof(opusInfo)) {
+                    return ERROR_IO;
+                }
+
+                // OpusHeader must start with this magic sequence
+                // http://wiki.xiph.org/OggOpus#ID_Header
+                strncpy((char *)opusInfo, "OpusHead", 8);
+
+                // Read Opus Specific Box values
+                size_t opusOffset = 10;
+                uint16_t pre_skip = U16_AT(&opusInfo[opusOffset]);
+                uint32_t sample_rate = U32_AT(&opusInfo[opusOffset + 2]);
+                uint16_t out_gain = U16_AT(&opusInfo[opusOffset + 6]);
+
+                // Convert Opus Specific Box values. ParseOpusHeader expects
+                // the values in LE, however MP4 stores these values as BE
+                // https://opus-codec.org/docs/opus_in_isobmff.html#4.3.2
+                memcpy(&opusInfo[opusOffset], &pre_skip, sizeof(pre_skip));
+                memcpy(&opusInfo[opusOffset + 2], &sample_rate, sizeof(sample_rate));
+                memcpy(&opusInfo[opusOffset + 6], &out_gain, sizeof(out_gain));
+
+                int64_t codecDelay = 6500000;
+                int64_t seekPreRollNs = 80000000;  // Fixed 80 msec
+
+                AMediaFormat_setBuffer(mLastTrack->meta,
+                            AMEDIAFORMAT_KEY_CSD_0, opusInfo, sizeof(opusInfo));
+                AMediaFormat_setBuffer(mLastTrack->meta,
+                        AMEDIAFORMAT_KEY_CSD_1, &codecDelay, sizeof(codecDelay));
+                AMediaFormat_setBuffer(mLastTrack->meta,
+                        AMEDIAFORMAT_KEY_CSD_2, &seekPreRollNs, sizeof(seekPreRollNs));
+
+                data_offset += sizeof(opusInfo);
+                *offset = data_offset;
+                CHECK_EQ(*offset, stop_offset);
+            }
+
             if (chunk_type == FOURCC("alac")) {
 
                 // See 'external/alac/ALACMagicCookieDescription.txt for the detail'.
@@ -1762,6 +1808,29 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 AMediaFormat_setBuffer(mLastTrack->meta,
                         AMEDIAFORMAT_KEY_CSD_0, cookie, sizeof(cookie));
                 data_offset += sizeof(cookie);
+                *offset = data_offset;
+                CHECK_EQ(*offset, stop_offset);
+            }
+
+            if (chunk_type == FOURCC("fLaC")) {
+
+                // From https://github.com/xiph/flac/blob/master/doc/isoflac.txt
+                // 4 for mime, 4 for blockType and BlockLen, 34 for metadata
+                uint8_t flacInfo[4 + 4 + 34];
+                // skipping dFla, version
+                data_offset += sizeof(buffer) + 12;
+                size_t flacOffset = 4;
+                // Add flaC header mime type to CSD
+                strncpy((char *)flacInfo, "fLaC", 4);
+                if (mDataSource->readAt(
+                        data_offset, flacInfo + flacOffset, sizeof(flacInfo) - flacOffset) <
+                        (ssize_t)sizeof(flacInfo) - flacOffset) {
+                    return ERROR_IO;
+                }
+                data_offset += sizeof(flacInfo) - flacOffset;
+
+                AMediaFormat_setBuffer(mLastTrack->meta, AMEDIAFORMAT_KEY_CSD_0, flacInfo,
+                                       sizeof(flacInfo));
                 *offset = data_offset;
                 CHECK_EQ(*offset, stop_offset);
             }
@@ -5236,20 +5305,30 @@ status_t MPEG4Source::parseTrackFragmentRun(off64_t offset, off64_t size) {
 
     if (flags & kSampleSizePresent) {
         bytesPerSample += 4;
-    } else if (mTrackFragmentHeaderInfo.mFlags
-            & TrackFragmentHeaderInfo::kDefaultSampleSizePresent) {
-        sampleSize = mTrackFragmentHeaderInfo.mDefaultSampleSize;
     } else {
         sampleSize = mTrackFragmentHeaderInfo.mDefaultSampleSize;
+#ifdef VERY_VERY_VERBOSE_LOGGING
+        // We don't expect this, but also want to avoid spamming the log if
+        // we hit this case.
+        if (!(mTrackFragmentHeaderInfo.mFlags
+              & TrackFragmentHeaderInfo::kDefaultSampleSizePresent)) {
+            ALOGW("No sample size specified");
+        }
+#endif
     }
 
     if (flags & kSampleFlagsPresent) {
         bytesPerSample += 4;
-    } else if (mTrackFragmentHeaderInfo.mFlags
-            & TrackFragmentHeaderInfo::kDefaultSampleFlagsPresent) {
-        sampleFlags = mTrackFragmentHeaderInfo.mDefaultSampleFlags;
     } else {
         sampleFlags = mTrackFragmentHeaderInfo.mDefaultSampleFlags;
+#ifdef VERY_VERY_VERBOSE_LOGGING
+        // We don't expect this, but also want to avoid spamming the log if
+        // we hit this case.
+        if (!(mTrackFragmentHeaderInfo.mFlags
+              & TrackFragmentHeaderInfo::kDefaultSampleFlagsPresent)) {
+            ALOGW("No sample flags specified");
+        }
+#endif
     }
 
     if (flags & kSampleCompositionTimeOffsetPresent) {

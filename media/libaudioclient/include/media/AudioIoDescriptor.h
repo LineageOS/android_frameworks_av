@@ -28,6 +28,7 @@ enum audio_io_config_event {
     AUDIO_INPUT_OPENED,
     AUDIO_INPUT_CLOSED,
     AUDIO_INPUT_CONFIG_CHANGED,
+    AUDIO_CLIENT_STARTED,
 };
 
 // audio input/output descriptor used to cache output configurations in client process to avoid
@@ -37,7 +38,7 @@ public:
     AudioIoDescriptor() :
         mIoHandle(AUDIO_IO_HANDLE_NONE),
         mSamplingRate(0), mFormat(AUDIO_FORMAT_DEFAULT), mChannelMask(AUDIO_CHANNEL_NONE),
-        mFrameCount(0), mFrameCountHAL(0), mLatency(0)
+        mFrameCount(0), mFrameCountHAL(0), mLatency(0), mPortId(AUDIO_PORT_HANDLE_NONE)
     {
         memset(&mPatch, 0, sizeof(struct audio_patch));
     }
@@ -66,6 +67,7 @@ public:
     size_t                  mFrameCount;
     size_t                  mFrameCountHAL;
     uint32_t                mLatency;   // only valid for output
+    audio_port_handle_t     mPortId;    // valid for event AUDIO_CLIENT_STARTED
 };
 
 
