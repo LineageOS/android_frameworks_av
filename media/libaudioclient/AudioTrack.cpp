@@ -2144,9 +2144,27 @@ nsecs_t AudioTrack::processAudioBuffer()
                     const nsecs_t timeNow = systemTime();
                     ns = max((nsecs_t)0, ns - (timeNow - timeAfterCallbacks));
                 }
-                nsecs_t myns = framesToNanoseconds(mRemainingFrames - avail, sampleRate, speed);
-                if (ns < 0 /* NS_WHENEVER */ || myns < ns) {
-                    ns = myns;
+
+                // delayNs is first computed by the additional frames required in the buffer.
+                nsecs_t delayNs = framesToNanoseconds(
+                        mRemainingFrames - avail, sampleRate, speed);
+
+                // afNs is the AudioFlinger mixer period in ns.
+                const nsecs_t afNs = framesToNanoseconds(mAfFrameCount, mAfSampleRate, speed);
+
+                // If the AudioTrack is double buffered based on the AudioFlinger mixer period,
+                // we may have a race if we wait based on the number of frames desired.
+                // This is a possible issue with resampling and AAudio.
+                //
+                // The granularity of audioflinger processing is one mixer period; if
+                // our wait time is less than one mixer period, wait at most half the period.
+                if (delayNs < afNs) {
+                    delayNs = std::min(delayNs, afNs / 2);
+                }
+
+                // adjust our ns wait by delayNs.
+                if (ns < 0 /* NS_WHENEVER */ || delayNs < ns) {
+                    ns = delayNs;
                 }
                 return ns;
             }
