@@ -23,7 +23,6 @@
 #include <codec2/hidl/1.0/types.h>
 
 #include <android-base/file.h>
-#include <gui/bufferqueue/2.0/B2HGraphicBufferProducer.h>
 #include <media/stagefright/bqhelper/GraphicBufferSource.h>
 #include <utils/Errors.h>
 
