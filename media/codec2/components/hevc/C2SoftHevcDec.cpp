@@ -806,19 +806,20 @@ void C2SoftHevcDec::process(
         TIME_DIFF(mTimeStart, mTimeEnd, decodeTime);
         ALOGV("decodeTime=%6d delay=%6d numBytes=%6d", decodeTime, delay,
               s_decode_op.u4_num_bytes_consumed);
-        if (IVD_MEM_ALLOC_FAILED == (s_decode_op.u4_error_code & 0xFF)) {
+        if (IVD_MEM_ALLOC_FAILED == (s_decode_op.u4_error_code & IVD_ERROR_MASK)) {
             ALOGE("allocation failure in decoder");
             mSignalledError = true;
             work->workletsProcessed = 1u;
             work->result = C2_CORRUPTED;
             return;
-        } else if (IVD_STREAM_WIDTH_HEIGHT_NOT_SUPPORTED == (s_decode_op.u4_error_code & 0xFF)) {
+        } else if (IVD_STREAM_WIDTH_HEIGHT_NOT_SUPPORTED ==
+                   (s_decode_op.u4_error_code & IVD_ERROR_MASK)) {
             ALOGE("unsupported resolution : %dx%d", mWidth, mHeight);
             mSignalledError = true;
             work->workletsProcessed = 1u;
             work->result = C2_CORRUPTED;
             return;
-        } else if (IVD_RES_CHANGED == (s_decode_op.u4_error_code & 0xFF)) {
+        } else if (IVD_RES_CHANGED == (s_decode_op.u4_error_code & IVD_ERROR_MASK)) {
             ALOGV("resolution changed");
             drainInternal(DRAIN_COMPONENT_NO_EOS, pool, work);
             resetDecoder();
@@ -828,6 +829,12 @@ void C2SoftHevcDec::process(
             /* Decode header and get new dimensions */
             setParams(mStride, IVD_DECODE_HEADER);
             (void) ivdec_api_function(mDecHandle, &s_decode_ip, &s_decode_op);
+        } else if (IS_IVD_FATAL_ERROR(s_decode_op.u4_error_code)) {
+            ALOGE("Fatal error in decoder 0x%x", s_decode_op.u4_error_code);
+            mSignalledError = true;
+            work->workletsProcessed = 1u;
+            work->result = C2_CORRUPTED;
+            return;
         }
         if (0 < s_decode_op.u4_pic_wd && 0 < s_decode_op.u4_pic_ht) {
             if (mHeaderDecoded == false) {
