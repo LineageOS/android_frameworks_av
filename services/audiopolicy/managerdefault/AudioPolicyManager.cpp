@@ -36,12 +36,12 @@
 #define AUDIO_POLICY_BLUETOOTH_LEGACY_HAL_XML_CONFIG_FILE_NAME \
         "audio_policy_configuration_bluetooth_legacy_hal.xml"
 
+#include <algorithm>
 #include <inttypes.h>
 #include <math.h>
 #include <set>
 #include <unordered_set>
 #include <vector>
-
 #include <AudioPolicyManagerInterface.h>
 #include <AudioPolicyEngineInstance.h>
 #include <cutils/properties.h>
@@ -592,7 +592,7 @@ sp<AudioPatch> AudioPolicyManager::createTelephonyPatch(
                     AUDIO_DEVICE_OUT_TELEPHONY_TX, String8(), AUDIO_FORMAT_DEFAULT);
     SortedVector<audio_io_handle_t> outputs =
             getOutputsForDevices(DeviceVector(outputDevice), mOutputs);
-    audio_io_handle_t output = selectOutput(outputs, AUDIO_OUTPUT_FLAG_NONE, AUDIO_FORMAT_INVALID);
+    const audio_io_handle_t output = selectOutput(outputs);
     // request to reuse existing output stream if one is already opened to reach the target device
     if (output != AUDIO_IO_HANDLE_NONE) {
         sp<AudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
@@ -883,7 +883,7 @@ audio_io_handle_t AudioPolicyManager::getOutput(audio_stream_type_t stream)
     // and AudioSystem::getOutputSamplingRate().
 
     SortedVector<audio_io_handle_t> outputs = getOutputsForDevices(devices, mOutputs);
-    audio_io_handle_t output = selectOutput(outputs, AUDIO_OUTPUT_FLAG_NONE, AUDIO_FORMAT_INVALID);
+    const audio_io_handle_t output = selectOutput(outputs);
 
     ALOGV("getOutput() stream %d selected devices %s, output %d", stream,
           devices.toString().c_str(), output);
@@ -1430,108 +1430,125 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
                                                        audio_channel_mask_t channelMask,
                                                        uint32_t samplingRate)
 {
+    LOG_ALWAYS_FATAL_IF(!(format == AUDIO_FORMAT_INVALID || audio_is_linear_pcm(format)),
+        "%s called with format %#x", __func__, format);
+
+    // Flags disqualifying an output: the match must happen before calling selectOutput()
+    static const audio_output_flags_t kExcludedFlags = (audio_output_flags_t)
+        (AUDIO_OUTPUT_FLAG_HW_AV_SYNC | AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_DIRECT);
+
+    // Flags expressing a functional request: must be honored in priority over
+    // other criteria
+    static const audio_output_flags_t kFunctionalFlags = (audio_output_flags_t)
+        (AUDIO_OUTPUT_FLAG_VOIP_RX | AUDIO_OUTPUT_FLAG_INCALL_MUSIC |
+            AUDIO_OUTPUT_FLAG_TTS | AUDIO_OUTPUT_FLAG_DIRECT_PCM);
+    // Flags expressing a performance request: have lower priority than serving
+    // requested sampling rate or channel mask
+    static const audio_output_flags_t kPerformanceFlags = (audio_output_flags_t)
+        (AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_DEEP_BUFFER |
+            AUDIO_OUTPUT_FLAG_RAW | AUDIO_OUTPUT_FLAG_SYNC);
+
+    const audio_output_flags_t functionalFlags =
+        (audio_output_flags_t)(flags & kFunctionalFlags);
+    const audio_output_flags_t performanceFlags =
+        (audio_output_flags_t)(flags & kPerformanceFlags);
+
+    audio_io_handle_t bestOutput = (outputs.size() == 0) ? AUDIO_IO_HANDLE_NONE : outputs[0];
+
     // select one output among several that provide a path to a particular device or set of
     // devices (the list was previously build by getOutputsForDevices()).
     // The priority is as follows:
     // 1: the output supporting haptic playback when requesting haptic playback
-    // 2: the output with the highest number of requested policy flags
-    // 3: the output with the bit depth the closest to the requested one
-    // 4: the primary output
-    // 5: the first output in the list
+    // 2: the output with the highest number of requested functional flags
+    // 3: the output supporting the exact channel mask
+    // 4: the output with a higher channel count than requested
+    // 5: the output with a higher sampling rate than requested
+    // 6: the output with the highest number of requested performance flags
+    // 7: the output with the bit depth the closest to the requested one
+    // 8: the primary output
+    // 9: the first output in the list
 
-    if (outputs.size() == 0) {
-        return AUDIO_IO_HANDLE_NONE;
-    }
-    if (outputs.size() == 1) {
-        return outputs[0];
-    }
+    // matching criteria values in priority order for best matching output so far
+    std::vector<uint32_t> bestMatchCriteria(8, 0);
 
-    int maxCommonFlags = 0;
-    const size_t hapticChannelCount = audio_channel_count_from_out_mask(
-            channelMask & AUDIO_CHANNEL_HAPTIC_ALL);
-    audio_io_handle_t outputForFlags = AUDIO_IO_HANDLE_NONE;
-    audio_io_handle_t outputForPrimary = AUDIO_IO_HANDLE_NONE;
-    audio_io_handle_t outputForFormat = AUDIO_IO_HANDLE_NONE;
-    audio_format_t bestFormat = AUDIO_FORMAT_INVALID;
-    audio_format_t bestFormatForFlags = AUDIO_FORMAT_INVALID;
-
-    // Flags which must be present on both the request and the selected output
-    static const audio_output_flags_t kMandatedFlags = (audio_output_flags_t)
-        (AUDIO_OUTPUT_FLAG_HW_AV_SYNC | AUDIO_OUTPUT_FLAG_MMAP_NOIRQ);
+    const uint32_t channelCount = audio_channel_count_from_out_mask(channelMask);
+    const uint32_t hapticChannelCount = audio_channel_count_from_out_mask(
+        channelMask & AUDIO_CHANNEL_HAPTIC_ALL);
 
     for (audio_io_handle_t output : outputs) {
         sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
-        if (!outputDesc->isDuplicated()) {
-            if (outputDesc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) {
-                continue;
-            }
-            // If haptic channel is specified, use the haptic output if present.
-            // When using haptic output, same audio format and sample rate are required.
-            if (hapticChannelCount > 0) {
-                // If haptic channel is specified, use the first output that
-                // support haptic playback.
-                if (audio_channel_count_from_out_mask(
-                        outputDesc->mChannelMask & AUDIO_CHANNEL_HAPTIC_ALL) >= hapticChannelCount
-                        && format == outputDesc->mFormat
-                        && samplingRate == outputDesc->mSamplingRate) {
-                    return output;
-                }
-            } else {
-                // When haptic channel is not specified, skip haptic output.
-                if (outputDesc->mChannelMask & AUDIO_CHANNEL_HAPTIC_ALL) {
-                    continue;
-                }
-            }
-            if ((kMandatedFlags & flags) !=
-                (kMandatedFlags & outputDesc->mProfile->getFlags())) {
-                continue;
-            }
+        // matching criteria values in priority order for current output
+        std::vector<uint32_t> currentMatchCriteria(8, 0);
 
-            // if a valid format is specified, skip output if not compatible
-            if (format != AUDIO_FORMAT_INVALID) {
-                if (!audio_is_linear_pcm(format)) {
-                    continue;
-                }
-                if (AudioPort::isBetterFormatMatch(
-                        outputDesc->mFormat, bestFormat, format)) {
-                    outputForFormat = output;
-                    bestFormat = outputDesc->mFormat;
-                }
-            }
+        if (outputDesc->isDuplicated()) {
+            continue;
+        }
+        if ((kExcludedFlags & outputDesc->mFlags) != 0) {
+            continue;
+        }
 
-            int commonFlags = popcount(outputDesc->mProfile->getFlags() & flags);
-            if (commonFlags >= maxCommonFlags) {
-                if (commonFlags == maxCommonFlags) {
-                    if (format != AUDIO_FORMAT_INVALID
-                            && AudioPort::isBetterFormatMatch(
-                                    outputDesc->mFormat, bestFormatForFlags, format)) {
-                        outputForFlags = output;
-                        bestFormatForFlags = outputDesc->mFormat;
-                    }
-                } else {
-                    outputForFlags = output;
-                    maxCommonFlags = commonFlags;
-                    bestFormatForFlags = outputDesc->mFormat;
-                }
-                ALOGV("selectOutput() commonFlags for output %d, %04x", output, commonFlags);
+        // If haptic channel is specified, use the haptic output if present.
+        // When using haptic output, same audio format and sample rate are required.
+        const uint32_t outputHapticChannelCount = audio_channel_count_from_out_mask(
+            outputDesc->mChannelMask & AUDIO_CHANNEL_HAPTIC_ALL);
+        if ((hapticChannelCount == 0) != (outputHapticChannelCount == 0)) {
+            continue;
+        }
+        if (outputHapticChannelCount >= hapticChannelCount
+            && format == outputDesc->mFormat
+            && samplingRate == outputDesc->mSamplingRate) {
+                currentMatchCriteria[0] = outputHapticChannelCount;
+        }
+
+        // functional flags match
+        currentMatchCriteria[1] = popcount(outputDesc->mFlags & functionalFlags);
+
+        // channel mask and channel count match
+        uint32_t outputChannelCount = audio_channel_count_from_out_mask(outputDesc->mChannelMask);
+        if (channelMask != AUDIO_CHANNEL_NONE && channelCount > 2 &&
+            channelCount <= outputChannelCount) {
+            if ((audio_channel_mask_get_representation(channelMask) ==
+                    audio_channel_mask_get_representation(outputDesc->mChannelMask)) &&
+                    ((channelMask & outputDesc->mChannelMask) == channelMask)) {
+                currentMatchCriteria[2] = outputChannelCount;
             }
-            if (outputDesc->mProfile->getFlags() & AUDIO_OUTPUT_FLAG_PRIMARY) {
-                outputForPrimary = output;
-            }
+            currentMatchCriteria[3] = outputChannelCount;
+        }
+
+        // sampling rate match
+        if (samplingRate > SAMPLE_RATE_HZ_DEFAULT &&
+                samplingRate <= outputDesc->mSamplingRate) {
+            currentMatchCriteria[4] = outputDesc->mSamplingRate;
+        }
+
+        // performance flags match
+        currentMatchCriteria[5] = popcount(outputDesc->mFlags & performanceFlags);
+
+        // format match
+        if (format != AUDIO_FORMAT_INVALID) {
+            currentMatchCriteria[6] =
+                AudioPort::kFormatDistanceMax -
+                AudioPort::formatDistance(format, outputDesc->mFormat);
+        }
+
+        // primary output match
+        currentMatchCriteria[7] = outputDesc->mFlags & AUDIO_OUTPUT_FLAG_PRIMARY;
+
+        // compare match criteria by priority then value
+        if (std::lexicographical_compare(bestMatchCriteria.begin(), bestMatchCriteria.end(),
+                currentMatchCriteria.begin(), currentMatchCriteria.end())) {
+            bestMatchCriteria = currentMatchCriteria;
+            bestOutput = output;
+
+            std::stringstream result;
+            std::copy(bestMatchCriteria.begin(), bestMatchCriteria.end(),
+                std::ostream_iterator<int>(result, " "));
+            ALOGV("%s new bestOutput %d criteria %s",
+                __func__, bestOutput, result.str().c_str());
         }
     }
 
-    if (outputForFlags != AUDIO_IO_HANDLE_NONE) {
-        return outputForFlags;
-    }
-    if (outputForFormat != AUDIO_IO_HANDLE_NONE) {
-        return outputForFormat;
-    }
-    if (outputForPrimary != AUDIO_IO_HANDLE_NONE) {
-        return outputForPrimary;
-    }
-
-    return outputs[0];
+    return bestOutput;
 }
 
 status_t AudioPolicyManager::startOutput(audio_port_handle_t portId)
@@ -3485,7 +3502,7 @@ status_t AudioPolicyManager::createAudioPatch(const struct audio_patch *patch,
                             getOutputsForDevices(DeviceVector(sinkDevice), mOutputs);
                     // if the sink device is reachable via an opened output stream, request to go via
                     // this output stream by adding a second source to the patch description
-                    audio_io_handle_t output = selectOutput(outputs);
+                    const audio_io_handle_t output = selectOutput(outputs);
                     if (output != AUDIO_IO_HANDLE_NONE) {
                         sp<AudioOutputDescriptor> outputDesc = mOutputs.valueFor(output);
                         if (outputDesc->isDuplicated()) {
