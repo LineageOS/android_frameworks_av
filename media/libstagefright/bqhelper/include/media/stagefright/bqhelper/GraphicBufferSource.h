@@ -19,8 +19,6 @@
 #define GRAPHIC_BUFFER_SOURCE_H_
 
 #include <binder/Status.h>
-#include <gui/BufferQueue.h>
-#include <gui/IGraphicBufferProducer.h>
 #include <utils/RefBase.h>
 
 #include <media/hardware/VideoAPI.h>
@@ -28,13 +26,17 @@
 #include <media/stagefright/foundation/AHandlerReflector.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/bqhelper/ComponentWrapper.h>
+#include <android/hardware/graphics/bufferqueue/1.0/IGraphicBufferProducer.h>
+#include <android/hardware/graphics/bufferqueue/2.0/IGraphicBufferProducer.h>
 
 namespace android {
 
 using ::android::binder::Status;
 
 struct FrameDropper;
-
+class BufferItem;
+class IGraphicBufferProducer;
+class IGraphicBufferConsumer;
 /*
  * This class is used to feed codecs from a Surface via BufferQueue or
  * HW producer.
@@ -82,9 +84,12 @@ public:
 
     // Returns the handle to the producer side of the BufferQueue.  Buffers
     // queued on this will be received by GraphicBufferSource.
-    sp<IGraphicBufferProducer> getIGraphicBufferProducer() const {
-        return mProducer;
-    }
+    sp<IGraphicBufferProducer> getIGraphicBufferProducer() const;
+
+    // Returns the handle to the bufferqueue HAL (V1_0) producer side of the BufferQueue.
+    // Buffers queued on this will be received by GraphicBufferSource.
+    sp<::android::hardware::graphics::bufferqueue::V1_0::IGraphicBufferProducer>
+        getHGraphicBufferProducer_V1_0() const;
 
     // Returns the handle to the bufferqueue HAL producer side of the BufferQueue.
     // Buffers queued on this will be received by GraphicBufferSource.
