@@ -131,7 +131,7 @@ void deemphasis_32(
     int16 lo, hi;
 
     L_tmp  = ((int32)x_hi[0]) << 16;
-    L_tmp += ((int32)x_lo[0]) << 4;
+    L_tmp += (((int32)x_lo[0]) << 4) & 0xFFFF;
     L_tmp  = shl_int32(L_tmp, 3);
 
     L_tmp = fxp_mac_16by16(*mem, mu, L_tmp),
@@ -144,7 +144,7 @@ void deemphasis_32(
     for (i = 1; i < L - 1; i++)
     {
         L_tmp  = ((int32)hi) << 16;
-        L_tmp += ((int32)lo) << 4;
+        L_tmp += (((int32)lo) << 4) & 0xFFFF;
         L_tmp  = shl_int32(L_tmp, 3);
         L_tmp  = fxp_mac_16by16(y[i - 1], mu, L_tmp),
                  L_tmp  = shl_int32(L_tmp, 1);           /* saturation can occur here */
@@ -153,7 +153,7 @@ void deemphasis_32(
         hi     = x_hi[i+1];
     }
     L_tmp  = ((int32)hi) << 16;
-    L_tmp += ((int32)lo) << 4;
+    L_tmp += (((int32)lo) << 4) & 0xFFFF;
     L_tmp  = shl_int32(L_tmp, 3);
     L_tmp  = fxp_mac_16by16(y[i - 1], mu, L_tmp),
              L_tmp  = shl_int32(L_tmp, 1);           /* saturation can occur here */
