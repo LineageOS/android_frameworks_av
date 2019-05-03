@@ -67,6 +67,12 @@ aaudio_result_t AAudioClientTracker::registerClient(pid_t pid,
                                          const sp<IAAudioClient>& client) {
     ALOGV("registerClient(), calling pid = %d, getpid() = %d\n", pid, getpid());
 
+    if (client.get() == nullptr) {
+        ALOGE("AAudioClientTracker::%s() client is NULL!", __func__);
+        android_errorWriteLog(0x534e4554, "116230453");
+        return AAUDIO_ERROR_NULL;
+    }
+
     std::lock_guard<std::mutex> lock(mLock);
     if (mNotificationClients.count(pid) == 0) {
         sp<NotificationClient> notificationClient = new NotificationClient(pid);
