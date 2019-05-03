@@ -2025,7 +2025,7 @@ exit:
                 device->getId() : AUDIO_PORT_HANDLE_NONE;
 
     isSoundTrigger = attributes.source == AUDIO_SOURCE_HOTWORD &&
-        mSoundTriggerSessions.indexOfKey(session) > 0;
+        mSoundTriggerSessions.indexOfKey(session) >= 0;
     *portId = AudioPort::getNextUniqueId();
 
     clientDesc = new RecordClientDescriptor(*portId, riid, uid, session, attributes, *config,
