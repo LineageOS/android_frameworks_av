@@ -3003,22 +3003,11 @@ status_t AudioPolicyManager::setUidDeviceAffinities(uid_t uid,
 
 status_t AudioPolicyManager::removeUidDeviceAffinities(uid_t uid) {
     ALOGV("%s() uid=%d", __FUNCTION__, uid);
-    Vector<AudioDeviceTypeAddr> devices;
-    status_t res =  mPolicyMixes.getDevicesForUid(uid, devices);
-    if (res == NO_ERROR) {
-        // reevaluate outputs for all found devices
-        for (size_t i = 0; i < devices.size(); i++) {
-            sp<DeviceDescriptor> devDesc = mHwModules.getDeviceDescriptor(
-                    devices[i].mType, devices[i].mAddress, String8(),
-                    AUDIO_FORMAT_DEFAULT);
-            SortedVector<audio_io_handle_t> outputs;
-            if (checkOutputsForDevice(devDesc, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
-                    outputs) != NO_ERROR) {
-                ALOGE("%s() error in checkOutputsForDevice for device=%08x addr=%s",
-                        __FUNCTION__, devices[i].mType, devices[i].mAddress.string());
-                return INVALID_OPERATION;
-            }
-        }
+    status_t res = mPolicyMixes.removeUidDeviceAffinities(uid);
+    if (res != NO_ERROR) {
+        ALOGE("%s() Could not remove all device affinities fo uid = %d",
+            __FUNCTION__, uid);
+        return INVALID_OPERATION;
     }
 
     return res;
