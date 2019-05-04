@@ -24,7 +24,7 @@ cc_library_shared {
     name: "libflacextractor",
     relative_install_path: "extractors",
 
-    compile_multilib: "both",
+    compile_multilib: "first",
 
     cflags: [
         "-Werror",
