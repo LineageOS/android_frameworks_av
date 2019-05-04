@@ -3277,6 +3277,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
         Vector< sp<EffectChain> > effectChains;
         audio_session_t activeHapticSessionId = AUDIO_SESSION_NONE;
+        std::vector<sp<Track>> activeTracks;
 
         // If the device is AUDIO_DEVICE_OUT_BUS, check for downstream latency.
         //
@@ -3563,6 +3564,12 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                 }
             }
 
+            // Acquire a local copy of active tracks with lock (release w/o lock).
+            //
+            // Control methods on the track acquire the ThreadBase lock (e.g. start()
+            // stop(), pause(), etc.), but the threadLoop is entitled to call audio
+            // data / buffer methods on tracks from activeTracks without the ThreadBase lock.
+            activeTracks.insert(activeTracks.end(), mActiveTracks.begin(), mActiveTracks.end());
         } // mLock scope ends
 
         if (mBytesRemaining == 0) {
@@ -3577,6 +3584,13 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                 threadLoop_sleepTime();
                 if (mSleepTimeUs == 0) {
                     mCurrentWriteLength = mSinkBufferSize;
+
+                    // Tally underrun frames as we are inserting 0s here.
+                    for (const auto& track : activeTracks) {
+                        if (track->mFillingUpStatus == Track::FS_ACTIVE) {
+                            track->mAudioTrackServerProxy->tallyUnderrunFrames(mNormalFrameCount);
+                        }
+                    }
                 }
             }
             // Either threadLoop_mix() or threadLoop_sleepTime() should have set
