@@ -21,7 +21,6 @@
 
 #include <C2Component.h>
 #include <media/stagefright/bqhelper/GraphicBufferSource.h>
-#include <media/stagefright/bqhelper/WGraphicBufferProducer.h>
 #include <media/stagefright/codec2/1.0/InputSurfaceConnection.h>
 
 namespace android {
