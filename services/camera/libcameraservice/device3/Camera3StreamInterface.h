@@ -130,13 +130,15 @@ class Camera3StreamInterface : public virtual RefBase {
      * modified after this call, but can still be read until the destruction of
      * the stream.
      *
+     * streamReconfigured: set to true when a stream is being reconfigured.
+     *
      * Returns:
      *   OK on a successful configuration
      *   NO_INIT in case of a serious error from the HAL device
      *   NO_MEMORY in case of an error registering buffers
      *   INVALID_OPERATION in case connecting to the consumer failed
      */
-    virtual status_t finishConfiguration() = 0;
+    virtual status_t finishConfiguration(/*out*/bool* streamReconfigured = nullptr) = 0;
 
     /**
      * Cancels the stream configuration process. This returns the stream to the
