@@ -62,6 +62,7 @@ using ::android::sp;
 
 typedef drm::V1_1::KeyRequestType KeyRequestType_V1_1;
 typedef drm::V1_2::IDrmPluginListener IDrmPluginListener_V1_2;
+typedef drm::V1_2::KeyStatus KeyStatus_V1_2;
 typedef drm::V1_2::Status Status_V1_2;
 typedef drm::V1_2::HdcpLevel HdcpLevel_V1_2;
 
@@ -331,6 +332,15 @@ struct DrmPlugin : public IDrmPlugin {
             mListener->sendKeysChange(sessionId, keyStatusList, hasNewUsableKey);
         } else {
             ALOGE("Null event listener, event not sent");
+        }
+        return Void();
+    }
+
+    Return<void> sendKeysChange_1_2(
+            const hidl_vec<uint8_t>& sessionId,
+            const hidl_vec<KeyStatus_V1_2>& keyStatusList, bool hasNewUsableKey) {
+        if (mListenerV1_2 != NULL) {
+            mListenerV1_2->sendKeysChange_1_2(sessionId, keyStatusList, hasNewUsableKey);
         }
         return Void();
     }

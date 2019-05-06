@@ -37,14 +37,15 @@ using drm::V1_0::EventType;
 using drm::V1_0::IDrmFactory;
 using drm::V1_0::IDrmPlugin;
 using drm::V1_0::IDrmPluginListener;
-using drm::V1_0::KeyStatus;
 using drm::V1_1::SecurityLevel;
+using drm::V1_2::KeyStatus;
 using drm::V1_2::OfflineLicenseState;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 
 typedef drm::V1_2::IDrmPluginListener IDrmPluginListener_V1_2;
+typedef drm::V1_0::KeyStatus KeyStatus_V1_0;
 
 namespace android {
 
@@ -56,7 +57,7 @@ inline bool operator==(const Vector<uint8_t> &l, const Vector<uint8_t> &r) {
 }
 
 struct DrmHal : public BnDrm,
-             public IBinder::DeathRecipient,
+                public IBinder::DeathRecipient,
                 public IDrmPluginListener_V1_2 {
     DrmHal();
     virtual ~DrmHal();
@@ -180,6 +181,9 @@ struct DrmHal : public BnDrm,
             int64_t expiryTimeInMS);
 
     Return<void> sendKeysChange(const hidl_vec<uint8_t>& sessionId,
+            const hidl_vec<KeyStatus_V1_0>& keyStatusList, bool hasNewUsableKey);
+
+    Return<void> sendKeysChange_1_2(const hidl_vec<uint8_t>& sessionId,
             const hidl_vec<KeyStatus>& keyStatusList, bool hasNewUsableKey);
 
     Return<void> sendSessionLostState(const hidl_vec<uint8_t>& sessionId);
