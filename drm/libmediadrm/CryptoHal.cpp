@@ -301,7 +301,7 @@ status_t CryptoHal::toSharedBuffer(const sp<IMemory>& memory, int32_t seqNum, ::
     ssize_t offset;
     size_t size;
 
-    if (memory == NULL && buffer == NULL) {
+    if (memory == NULL || buffer == NULL) {
         return UNEXPECTED_NULL;
     }
 
