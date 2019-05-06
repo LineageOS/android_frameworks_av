@@ -15,7 +15,6 @@
 ** limitations under the License.
 */
 
-#include <aicu/AIcu.h>
 #include <fcntl.h>
 #include <sys/prctl.h>
 #include <sys/wait.h>
@@ -37,7 +36,7 @@
 using namespace android;
 
 static const char kSystemSeccompPolicyPath[] =
-        "/system/etc/seccomp_policy/mediaextractor.policy";
+        "/apex/com.android.media/etc/seccomp_policy/mediaextractor.policy";
 static const char kVendorSeccompPolicyPath[] =
         "/vendor/etc/seccomp_policy/mediaextractor.policy";
 
@@ -57,8 +56,6 @@ int main(int argc __unused, char** argv)
     android::report_sysprop_change();
 
     SetUpMinijail(kSystemSeccompPolicyPath, kVendorSeccompPolicyPath);
-
-    AIcu_initializeIcuOrDie();
 
     strcpy(argv[0], "media.extractor");
     sp<ProcessState> proc(ProcessState::self());
