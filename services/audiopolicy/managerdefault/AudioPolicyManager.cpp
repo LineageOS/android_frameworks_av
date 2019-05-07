@@ -1991,16 +1991,25 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
             strncmp(attributes.tags, "addr=", strlen("addr=")) == 0) {
         status = mPolicyMixes.getInputMixForAttr(attributes, &policyMix);
         if (status != NO_ERROR) {
+            ALOGW("%s could not find input mix for attr %s",
+                    __func__, toString(attributes).c_str());
             goto error;
         }
+        device = mAvailableInputDevices.getDevice(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
+                                                  String8(attr->tags + strlen("addr=")),
+                                                  AUDIO_FORMAT_DEFAULT);
+        if (device == nullptr) {
+            ALOGW("%s could not find device for source %d, tags %s",
+                    __func__, attributes.source, attributes.tags);
+            status = BAD_VALUE;
+            goto error;
+        }
+
         if (is_mix_loopback_render(policyMix->mRouteFlags)) {
             *inputType = API_INPUT_MIX_PUBLIC_CAPTURE_PLAYBACK;
         } else {
             *inputType = API_INPUT_MIX_EXT_POLICY_REROUTE;
         }
-        device = mAvailableInputDevices.getDevice(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
-                                                  String8(attr->tags + strlen("addr=")),
-                                                  AUDIO_FORMAT_DEFAULT);
     } else {
         if (explicitRoutingDevice != nullptr) {
             device = explicitRoutingDevice;
@@ -2867,14 +2876,12 @@ status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
             rSubmixModule->addInputProfile(address, &inputConfig,
                     AUDIO_DEVICE_IN_REMOTE_SUBMIX, address);
 
-            if (mix.mMixType == MIX_TYPE_PLAYERS) {
-                setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
-                        AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
-                        address.string(), "remote-submix", AUDIO_FORMAT_DEFAULT);
-            } else {
-                setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
-                        AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
-                        address.string(), "remote-submix", AUDIO_FORMAT_DEFAULT);
+            if ((res = setDeviceConnectionStateInt(mix.mDeviceType,
+                    AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                    address.string(), "remote-submix", AUDIO_FORMAT_DEFAULT)) != NO_ERROR) {
+                ALOGE("Failed to set remote submix device available, type %u, address %s",
+                        mix.mDeviceType, address.string());
+                break;
             }
         } else if ((mix.mRouteFlags & MIX_ROUTE_FLAG_RENDER) == MIX_ROUTE_FLAG_RENDER) {
             String8 address = mix.mDeviceAddress;

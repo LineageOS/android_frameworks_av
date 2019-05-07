@@ -1900,12 +1900,16 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
                                       input.opPackageName,
                                       &input.config,
                                       output.flags, &output.selectedDeviceId, &portId);
+    if (lStatus != NO_ERROR) {
+        ALOGE("createRecord() getInputForAttr return error %d", lStatus);
+        goto Exit;
+    }
 
     {
         Mutex::Autolock _l(mLock);
         RecordThread *thread = checkRecordThread_l(output.inputId);
         if (thread == NULL) {
-            ALOGE("createRecord() checkRecordThread_l failed");
+            ALOGE("createRecord() checkRecordThread_l failed, input handle %d", output.inputId);
             lStatus = BAD_VALUE;
             goto Exit;
         }
