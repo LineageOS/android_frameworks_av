@@ -305,6 +305,8 @@ class Camera3Device :
         // buffers
         void getInflightBufferKeys(std::vector<std::pair<int32_t, int32_t>>* out);
 
+        void onStreamReConfigured(int streamId);
+
       private:
         // Always valid
         sp<hardware::camera::device::V3_2::ICameraDeviceSession> mHidlSession;
