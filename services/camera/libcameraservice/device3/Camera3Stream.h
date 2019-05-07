@@ -197,6 +197,8 @@ class Camera3Stream :
      * after this call, but can still be read until the destruction of the
      * stream.
      *
+     * streamReconfigured: set to true when a stream is being reconfigured.
+     *
      * Returns:
      *   OK on a successful configuration
      *   NO_INIT in case of a serious error from the HAL device
@@ -204,7 +206,7 @@ class Camera3Stream :
      *   INVALID_OPERATION in case connecting to the consumer failed or consumer
      *       doesn't exist yet.
      */
-    status_t         finishConfiguration();
+    status_t         finishConfiguration(/*out*/bool* streamReconfigured = nullptr);
 
     /**
      * Cancels the stream configuration process. This returns the stream to the

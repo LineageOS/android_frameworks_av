@@ -66,7 +66,9 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     // Use stereo if unspecified.
     int32_t samplesPerFrame = (getSamplesPerFrame() == AAUDIO_UNSPECIFIED)
                               ? 2 : getSamplesPerFrame();
-    audio_channel_mask_t channelMask = audio_channel_out_mask_from_count(samplesPerFrame);
+    audio_channel_mask_t channelMask = samplesPerFrame <= 2 ?
+                            audio_channel_out_mask_from_count(samplesPerFrame) :
+                            audio_channel_mask_for_index_assignment_from_count(samplesPerFrame);
 
     audio_output_flags_t flags;
     aaudio_performance_mode_t perfMode = getPerformanceMode();

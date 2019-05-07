@@ -36,7 +36,7 @@
 using namespace android;
 
 static const char kSystemSeccompPolicyPath[] =
-        "/system/etc/seccomp_policy/mediaextractor.policy";
+        "/apex/com.android.media/etc/seccomp_policy/mediaextractor.policy";
 static const char kVendorSeccompPolicyPath[] =
         "/vendor/etc/seccomp_policy/mediaextractor.policy";
 

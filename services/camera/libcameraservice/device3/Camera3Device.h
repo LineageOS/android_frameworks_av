@@ -336,6 +336,8 @@ class Camera3Device :
         // Get a vector of bufferId of currently inflight buffers
         void getInflightRequestBufferKeys(std::vector<uint64_t>* out);
 
+        void onStreamReConfigured(int streamId);
+
         static const uint64_t BUFFER_ID_NO_BUFFER = 0;
       private:
         // Always valid
