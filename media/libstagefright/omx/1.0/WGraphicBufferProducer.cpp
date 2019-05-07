@@ -40,7 +40,7 @@ Return<void> TWGraphicBufferProducer::requestBuffer(
         int32_t slot, requestBuffer_cb _hidl_cb) {
     sp<GraphicBuffer> buf;
     status_t status = mBase->requestBuffer(slot, &buf);
-    AnwBuffer anwBuffer;
+    AnwBuffer anwBuffer{};
     if (buf != nullptr) {
         wrapAs(&anwBuffer, *buf);
     }
@@ -62,15 +62,15 @@ Return<void> TWGraphicBufferProducer::dequeueBuffer(
         uint32_t width, uint32_t height,
         PixelFormat format, uint32_t usage,
         bool getFrameTimestamps, dequeueBuffer_cb _hidl_cb) {
-    int slot;
+    int slot{};
     sp<Fence> fence;
     ::android::FrameEventHistoryDelta outTimestamps;
     status_t status = mBase->dequeueBuffer(
         &slot, &fence, width, height,
         static_cast<::android::PixelFormat>(format), usage, nullptr,
         getFrameTimestamps ? &outTimestamps : nullptr);
-    hidl_handle tFence;
-    FrameEventHistoryDelta tOutTimestamps;
+    hidl_handle tFence{};
+    FrameEventHistoryDelta tOutTimestamps{};
 
     native_handle_t* nh = nullptr;
     if ((fence == nullptr) || !wrapAs(&tFence, &nh, *fence)) {
@@ -118,8 +118,8 @@ Return<void> TWGraphicBufferProducer::detachNextBuffer(
     sp<GraphicBuffer> outBuffer;
     sp<Fence> outFence;
     status_t status = mBase->detachNextBuffer(&outBuffer, &outFence);
-    AnwBuffer tBuffer;
-    hidl_handle tFence;
+    AnwBuffer tBuffer{};
+    hidl_handle tFence{};
 
     if (outBuffer == nullptr) {
         LOG(ERROR) << "TWGraphicBufferProducer::detachNextBuffer - "
@@ -161,7 +161,7 @@ Return<void> TWGraphicBufferProducer::attachBuffer(
 Return<void> TWGraphicBufferProducer::queueBuffer(
         int32_t slot, const QueueBufferInput& input,
         queueBuffer_cb _hidl_cb) {
-    QueueBufferOutput tOutput;
+    QueueBufferOutput tOutput{};
     BGraphicBufferProducer::QueueBufferInput lInput(
             0, false, HAL_DATASPACE_UNKNOWN,
             ::android::Rect(0, 0, 1, 1),
@@ -223,7 +223,7 @@ Return<void> TWGraphicBufferProducer::connect(
             producerControlledByApp,
             &lOutput);
 
-    QueueBufferOutput tOutput;
+    QueueBufferOutput tOutput{};
     std::vector<std::vector<native_handle_t*> > nhAA;
     if (!wrapAs(&tOutput, &nhAA, lOutput)) {
         LOG(ERROR) << "TWGraphicBufferProducer::connect - "
@@ -295,11 +295,11 @@ Return<void> TWGraphicBufferProducer::getLastQueuedBuffer(
     status_t status = mBase->getLastQueuedBuffer(
             &lOutBuffer, &lOutFence, lOutTransformMatrix);
 
-    AnwBuffer tOutBuffer;
+    AnwBuffer tOutBuffer{};
     if (lOutBuffer != nullptr) {
         wrapAs(&tOutBuffer, *lOutBuffer);
     }
-    hidl_handle tOutFence;
+    hidl_handle tOutFence{};
     native_handle_t* nh = nullptr;
     if ((lOutFence == nullptr) || !wrapAs(&tOutFence, &nh, *lOutFence)) {
         LOG(ERROR) << "TWGraphicBufferProducer::getLastQueuedBuffer - "
@@ -322,7 +322,7 @@ Return<void> TWGraphicBufferProducer::getFrameTimestamps(
     ::android::FrameEventHistoryDelta lDelta;
     mBase->getFrameTimestamps(&lDelta);
 
-    FrameEventHistoryDelta tDelta;
+    FrameEventHistoryDelta tDelta{};
     std::vector<std::vector<native_handle_t*> > nhAA;
     if (!wrapAs(&tDelta, &nhAA, lDelta)) {
         LOG(ERROR) << "TWGraphicBufferProducer::getFrameTimestamps - "
@@ -341,7 +341,7 @@ Return<void> TWGraphicBufferProducer::getFrameTimestamps(
 }
 
 Return<void> TWGraphicBufferProducer::getUniqueId(getUniqueId_cb _hidl_cb) {
-    uint64_t outId;
+    uint64_t outId{};
     status_t status = mBase->getUniqueId(&outId);
     _hidl_cb(static_cast<int32_t>(status), outId);
     return Void();
