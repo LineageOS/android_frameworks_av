@@ -41,7 +41,6 @@ cc_library_shared {
         "libcutils",
         "libstagefright_foundation",
         "libstagefright_bufferqueue_helper",
-        "libstagefright_softomx",
         "libstagefright_xmlparser",
         "libdl",
         "libhidlbase",
@@ -79,14 +78,10 @@ cc_library_shared {
 cc_library_shared {
     name: "libstagefright_softomx",
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
 
     srcs: [
         "SimpleSoftOMXComponent.cpp",
         "SoftOMXComponent.cpp",
-        "SoftOMXPlugin.cpp",
         "SoftVideoDecoderOMXComponent.cpp",
         "SoftVideoEncoderOMXComponent.cpp",
     ],
@@ -107,6 +102,49 @@ cc_library_shared {
         "libstagefright_foundation",
         "liblog",
         "libui",
+        "libutils",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+        "-Wno-unused-parameter",
+        "-Wno-documentation",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "signed-integer-overflow",
+            "unsigned-integer-overflow",
+        ],
+        cfi: true,
+    },
+}
+
+cc_library_shared {
+    name: "libstagefright_softomx_plugin",
+    vendor_available: true,
+
+    srcs: [
+        "SoftOMXPlugin.cpp",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    header_libs: [
+        "media_plugin_headers",
+    ],
+
+    export_header_lib_headers: [
+        "media_plugin_headers",
+    ],
+
+    shared_libs: [
+        "libstagefright_softomx",
+        "libstagefright_foundation",
+        "liblog",
         "libutils",
     ],
 
