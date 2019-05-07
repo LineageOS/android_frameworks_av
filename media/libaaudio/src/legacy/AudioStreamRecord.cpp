@@ -63,7 +63,9 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     // TODO Support UNSPECIFIED in AudioRecord. For now, use stereo if unspecified.
     int32_t samplesPerFrame = (getSamplesPerFrame() == AAUDIO_UNSPECIFIED)
                               ? 2 : getSamplesPerFrame();
-    audio_channel_mask_t channelMask = audio_channel_in_mask_from_count(samplesPerFrame);
+    audio_channel_mask_t channelMask = samplesPerFrame <= 2 ?
+                               audio_channel_in_mask_from_count(samplesPerFrame) :
+                               audio_channel_mask_for_index_assignment_from_count(samplesPerFrame);
 
     size_t frameCount = (builder.getBufferCapacity() == AAUDIO_UNSPECIFIED) ? 0
                         : builder.getBufferCapacity();

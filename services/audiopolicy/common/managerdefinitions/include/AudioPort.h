@@ -112,6 +112,9 @@ public:
     static bool isBetterFormatMatch(audio_format_t newFormat,
                                         audio_format_t currentFormat,
                                         audio_format_t targetFormat);
+    static uint32_t formatDistance(audio_format_t format1,
+                                   audio_format_t format2);
+    static const uint32_t kFormatDistanceMax = 4;
 
     audio_module_handle_t getModuleHandle() const;
     uint32_t getModuleVersionMajor() const;
