@@ -212,6 +212,76 @@ void addSupportedColorFormats(
     }
 }
 
+class Switch {
+    enum Flags : uint8_t {
+        // flags
+        IS_ENABLED = (1 << 0),
+        BY_DEFAULT = (1 << 1),
+    };
+
+    constexpr Switch(uint8_t flags) : mFlags(flags) {}
+
+    uint8_t mFlags;
+
+public:
+    // have to create class due to this bool conversion operator...
+    constexpr operator bool() const {
+        return mFlags & IS_ENABLED;
+    }
+
+    constexpr Switch operator!() const {
+        return Switch(mFlags ^ IS_ENABLED);
+    }
+
+    static constexpr Switch DISABLED() { return 0; };
+    static constexpr Switch ENABLED() { return IS_ENABLED; };
+    static constexpr Switch DISABLED_BY_DEFAULT() { return BY_DEFAULT; };
+    static constexpr Switch ENABLED_BY_DEFAULT() { return IS_ENABLED | BY_DEFAULT; };
+
+    const char *toString(const char *def = "??") const {
+        switch (mFlags) {
+        case 0:                         return "0";
+        case IS_ENABLED:                return "1";
+        case BY_DEFAULT:                return "(0)";
+        case IS_ENABLED | BY_DEFAULT:   return "(1)";
+        default: return def;
+        }
+    }
+
+};
+
+const char *asString(const Switch &s, const char *def = "??") {
+    return s.toString(def);
+}
+
+Switch isSettingEnabled(
+        std::string setting, const MediaCodecsXmlParser::AttributeMap &settings,
+        Switch def = Switch::DISABLED_BY_DEFAULT()) {
+    const auto enablement = settings.find(setting);
+    if (enablement == settings.end()) {
+        return def;
+    }
+    return enablement->second == "1" ? Switch::ENABLED() : Switch::DISABLED();
+}
+
+Switch isVariantEnabled(
+        std::string variant, const MediaCodecsXmlParser::AttributeMap &settings) {
+    return isSettingEnabled("variant-" + variant, settings);
+}
+
+Switch isVariantExpressionEnabled(
+        std::string exp, const MediaCodecsXmlParser::AttributeMap &settings) {
+    if (!exp.empty() && exp.at(0) == '!') {
+        return !isVariantEnabled(exp.substr(1, exp.size() - 1), settings);
+    }
+    return isVariantEnabled(exp, settings);
+}
+
+Switch isDomainEnabled(
+        std::string domain, const MediaCodecsXmlParser::AttributeMap &settings) {
+    return isSettingEnabled("domain-" + domain, settings);
+}
+
 } // unnamed namespace
 
 status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
@@ -248,13 +318,31 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
     // Obtain Codec2Client
     std::vector<Traits> traits = Codec2Client::ListComponents();
 
-    MediaCodecsXmlParser parser(
-            MediaCodecsXmlParser::defaultSearchDirs,
-            "media_codecs_c2.xml",
-            "media_codecs_performance_c2.xml");
+    // parse APEX XML first, followed by vendor XML
+    MediaCodecsXmlParser parser;
+    parser.parseXmlFilesInSearchDirs(
+            parser.getDefaultXmlNames(),
+            { "/apex/com.android.media.swcodec/etc" });
+
+    // TODO: remove these c2-specific files once product moved to default file names
+    parser.parseXmlFilesInSearchDirs(
+            { "media_codecs_c2.xml", "media_codecs_performance_c2.xml" });
+
+    // parse default XML files
+    parser.parseXmlFilesInSearchDirs();
+
     if (parser.getParsingStatus() != OK) {
         ALOGD("XML parser no good");
         return OK;
+    }
+
+    MediaCodecsXmlParser::AttributeMap settings = parser.getServiceAttributeMap();
+    for (const auto &v : settings) {
+        if (!hasPrefix(v.first, "media-type-")
+                && !hasPrefix(v.first, "domain-")
+                && !hasPrefix(v.first, "variant-")) {
+            writer->addGlobalSetting(v.first.c_str(), v.second.c_str());
+        }
     }
 
     for (const Traits& trait : traits) {
@@ -341,12 +429,42 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                 break;
             }
 
+            const MediaCodecsXmlParser::CodecProperties &codec =
+                parser.getCodecMap().at(nameOrAlias);
+
+            // verify that either the codec is explicitly enabled, or one of its domains is
+            bool codecEnabled = codec.quirkSet.find("attribute::disabled") == codec.quirkSet.end();
+            if (!codecEnabled) {
+                for (const std::string &domain : codec.domainSet) {
+                    const Switch enabled = isDomainEnabled(domain, settings);
+                    ALOGV("codec entry '%s' is in domain '%s' that is '%s'",
+                            nameOrAlias.c_str(), domain.c_str(), asString(enabled));
+                    if (enabled) {
+                        codecEnabled = true;
+                        break;
+                    }
+                }
+            }
+            // if codec has variants, also check that at least one of them is enabled
+            bool variantEnabled = codec.variantSet.empty();
+            for (const std::string &variant : codec.variantSet) {
+                const Switch enabled = isVariantExpressionEnabled(variant, settings);
+                ALOGV("codec entry '%s' has a variant '%s' that is '%s'",
+                        nameOrAlias.c_str(), variant.c_str(), asString(enabled));
+                if (enabled) {
+                    variantEnabled = true;
+                    break;
+                }
+            }
+            if (!codecEnabled || !variantEnabled) {
+                ALOGD("codec entry for '%s' is disabled", nameOrAlias.c_str());
+                continue;
+            }
+
             ALOGV("adding codec entry for '%s'", nameOrAlias.c_str());
             std::unique_ptr<MediaCodecInfoWriter> codecInfo = writer->addMediaCodecInfo();
             codecInfo->setName(nameOrAlias.c_str());
             codecInfo->setOwner(("codec2::" + trait.owner).c_str());
-            const MediaCodecsXmlParser::CodecProperties &codec =
-                parser.getCodecMap().at(nameOrAlias);
 
             bool encoder = trait.kind == C2Component::KIND_ENCODER;
             typename std::underlying_type<MediaCodecInfo::Attributes>::type attrs = 0;
@@ -373,6 +491,7 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                     rank = xmlRank;
                 }
             }
+            ALOGV("rank: %u", (unsigned)rank);
             codecInfo->setRank(rank);
 
             for (const std::string &alias : codec.aliases) {
@@ -382,12 +501,39 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
 
             for (auto typeIt = codec.typeMap.begin(); typeIt != codec.typeMap.end(); ++typeIt) {
                 const std::string &mediaType = typeIt->first;
+                const Switch typeEnabled = isSettingEnabled(
+                        "media-type-" + mediaType, settings, Switch::ENABLED_BY_DEFAULT());
+                const Switch domainTypeEnabled = isSettingEnabled(
+                        "media-type-" + mediaType + (encoder ? "-encoder" : "-decoder"),
+                        settings, Switch::ENABLED_BY_DEFAULT());
+                ALOGV("type '%s-%s' is '%s/%s'",
+                        mediaType.c_str(), (encoder ? "encoder" : "decoder"),
+                        asString(typeEnabled), asString(domainTypeEnabled));
+                if (!typeEnabled || !domainTypeEnabled) {
+                    ALOGD("media type '%s' for codec entry '%s' is disabled", mediaType.c_str(),
+                            nameOrAlias.c_str());
+                    continue;
+                }
+
+                ALOGI("adding type '%s'", typeIt->first.c_str());
                 const MediaCodecsXmlParser::AttributeMap &attrMap = typeIt->second;
                 std::unique_ptr<MediaCodecInfo::CapabilitiesWriter> caps =
                     codecInfo->addMediaType(mediaType.c_str());
-                for (auto attrIt = attrMap.begin(); attrIt != attrMap.end(); ++attrIt) {
-                    std::string key, value;
-                    std::tie(key, value) = *attrIt;
+                for (const auto &v : attrMap) {
+                    std::string key = v.first;
+                    std::string value = v.second;
+
+                    size_t variantSep = key.find(":::");
+                    if (variantSep != std::string::npos) {
+                        std::string variant = key.substr(0, variantSep);
+                        const Switch enabled = isVariantExpressionEnabled(variant, settings);
+                        ALOGV("variant '%s' is '%s'", variant.c_str(), asString(enabled));
+                        if (!enabled) {
+                            continue;
+                        }
+                        key = key.substr(variantSep + 3);
+                    }
+
                     if (key.find("feature-") == 0 && key.find("feature-bitrate-modes") != 0) {
                         int32_t intValue = 0;
                         // Ignore trailing bad characters and default to 0.
