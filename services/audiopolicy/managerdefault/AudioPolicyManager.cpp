@@ -5685,7 +5685,16 @@ float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
         const float maxVoiceVolDb =
                 computeVolume(voiceCurves, callVolumeSrc, voiceVolumeIndex, device)
                 + IN_CALL_EARPIECE_HEADROOM_DB;
-        if (volumeDb > maxVoiceVolDb) {
+        // FIXME: Workaround for call screening applications until a proper audio mode is defined
+        // to support this scenario : Exempt the RING stream from the audio cap if the audio was
+        // programmatically muted.
+        // VOICE_CALL stream has minVolumeIndex > 0 : Users cannot set the volume of voice calls to
+        // 0. We don't want to cap volume when the system has programmatically muted the voice call
+        // stream. See setVolumeCurveIndex() for more information.
+        bool exemptFromCapping = (volumeSource == ringVolumeSrc) && (voiceVolumeIndex == 0);
+        ALOGV_IF(exemptFromCapping, "%s volume source %d at vol=%f not capped", __func__,
+                 volumeSource, volumeDb);
+        if ((volumeDb > maxVoiceVolDb) && !exemptFromCapping) {
             ALOGV("%s volume source %d at vol=%f overriden by volume group %d at vol=%f", __func__,
                   volumeSource, volumeDb, callVolumeSrc, maxVoiceVolDb);
             volumeDb = maxVoiceVolDb;
