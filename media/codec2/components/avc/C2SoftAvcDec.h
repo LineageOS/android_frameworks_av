@@ -21,6 +21,7 @@
 
 #include <media/stagefright/foundation/ColorUtils.h>
 
+#include <atomic>
 #include <SimpleC2Component.h>
 
 #include "ih264_typedefs.h"
@@ -163,6 +164,7 @@ private:
     bool mSignalledOutputEos;
     bool mSignalledError;
     bool mHeaderDecoded;
+    std::atomic_uint64_t mOutIndex;
     // Color aspects. These are ISO values and are meant to detect changes in aspects to avoid
     // converting them to C2 values for each frame
     struct VuiColorAspects {

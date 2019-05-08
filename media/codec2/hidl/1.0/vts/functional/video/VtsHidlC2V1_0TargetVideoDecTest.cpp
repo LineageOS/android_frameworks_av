@@ -107,17 +107,10 @@ class Codec2VideoDecHidlTest : public ::testing::VtsHalHidlTargetTestBase {
         const size_t kNumStringToName =
             sizeof(kStringToName) / sizeof(kStringToName[0]);
 
-        std::string substring;
-        std::string comp;
-        substring = std::string(gEnv->getComponent());
-        /* TODO: better approach to find the component */
-        /* "c2.android." => 11th position */
-        size_t pos = 11;
-        size_t len = substring.find(".decoder", pos);
-        comp = substring.substr(pos, len - pos);
-
+        // Find the component type
+        std::string comp = std::string(gEnv->getComponent());
         for (size_t i = 0; i < kNumStringToName; ++i) {
-            if (!strcasecmp(comp.c_str(), kStringToName[i].Name)) {
+            if (strcasestr(comp.c_str(), kStringToName[i].Name)) {
                 mCompName = kStringToName[i].CompName;
                 break;
             }
@@ -445,6 +438,9 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
     int bytesCount = 0;
     uint32_t flags = 0;
     uint32_t timestamp = 0;
+    mTimestampDevTest = true;
+    mFlushedIndices.clear();
+    mTimestampUslist.clear();
     while (1) {
         if (!(eleInfo >> bytesCount)) break;
         eleInfo >> flags;
