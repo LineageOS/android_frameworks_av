@@ -19,13 +19,14 @@
 
 #include <sys/types.h>
 #include <utils/Errors.h>
-#include <utils/Vector.h>
-#include <utils/StrongPointer.h>
 
-#include <string>
-#include <set>
 #include <map>
+#include <mutex>
+#include <set>
+#include <string>
 #include <vector>
+
+struct XML_ParserStruct; // from expat library
 
 namespace android {
 
@@ -33,20 +34,16 @@ class MediaCodecsXmlParser {
 public:
 
     // Treblized media codec list will be located in /odm/etc or /vendor/etc.
-    static constexpr char const* defaultSearchDirs[] =
-            {"/odm/etc", "/vendor/etc", "/etc", nullptr};
-    static constexpr char const* defaultMainXmlName =
-            "media_codecs.xml";
-    static constexpr char const* defaultPerformanceXmlName =
-            "media_codecs_performance.xml";
+    static std::vector<std::string> getDefaultSearchDirs() {
+            return { "/odm/etc", "/vendor/etc", "/etc" };
+    }
+    static std::vector<std::string> getDefaultXmlNames() {
+            return { "media_codecs.xml", "media_codecs_performance.xml" };
+    }
     static constexpr char const* defaultProfilingResultsXmlPath =
             "/data/misc/media/media_codecs_profiling_results.xml";
 
-    MediaCodecsXmlParser(
-            const char* const* searchDirs = defaultSearchDirs,
-            const char* mainXmlName = defaultMainXmlName,
-            const char* performanceXmlName = defaultPerformanceXmlName,
-            const char* profilingResultsXmlPath = defaultProfilingResultsXmlPath);
+    MediaCodecsXmlParser();
     ~MediaCodecsXmlParser();
 
     typedef std::pair<std::string, std::string> Attribute;
@@ -55,7 +52,7 @@ public:
     typedef std::pair<std::string, AttributeMap> Type;
     typedef std::map<std::string, AttributeMap> TypeMap;
 
-    typedef std::set<std::string> QuirkSet;
+    typedef std::set<std::string> StringSet;
 
     /**
      * Properties of a codec (node)
@@ -63,7 +60,9 @@ public:
     struct CodecProperties {
         bool isEncoder;    ///< Whether this codec is an encoder or a decoder
         size_t order;      ///< Order of appearance in the file (starting from 0)
-        QuirkSet quirkSet; ///< Set of quirks requested by this codec
+        StringSet quirkSet; ///< Set of quirks requested by this codec
+        StringSet domainSet; ///< Set of domains this codec is in
+        StringSet variantSet; ///< Set of variants this codec is enabled on
         TypeMap typeMap;   ///< Map of types supported by this codec
         std::vector<std::string> aliases; ///< Name aliases for this codec
         std::string rank;  ///< Rank of this codec. This is a numeric string.
@@ -119,70 +118,31 @@ public:
 
     status_t getParsingStatus() const;
 
+    /**
+     * Parse top level XML files from a group of search directories.
+     *
+     * @param xmlFiles ordered list of XML file names (no paths)
+     * @param searchDirs ordered list of paths to consider
+     *
+     * @return parsing status
+     */
+    status_t parseXmlFilesInSearchDirs(
+            const std::vector<std::string> &xmlFiles = getDefaultXmlNames(),
+            const std::vector<std::string> &searchDirs = getDefaultSearchDirs());
+
+
+    /**
+     * Parse a top level XML file.
+     *
+     * @param path XML file path
+     *
+     * @return parsing status
+     */
+    status_t parseXmlPath(const std::string &path);
+
 private:
-    enum Section {
-        SECTION_TOPLEVEL,
-        SECTION_SETTINGS,
-        SECTION_DECODERS,
-        SECTION_DECODER,
-        SECTION_DECODER_TYPE,
-        SECTION_ENCODERS,
-        SECTION_ENCODER,
-        SECTION_ENCODER_TYPE,
-        SECTION_INCLUDE,
-    };
-
-    status_t mParsingStatus;
-    Section mCurrentSection;
-    bool mUpdate;
-    std::vector<Section> mSectionStack;
-    std::string mHrefBase;
-
-    // Service attributes
-    AttributeMap mServiceAttributeMap;
-
-    // Codec attributes
-    std::string mCurrentName;
-    std::set<std::string> mCodecSet;
-    Codec mCodecListTemp[2048];
-    CodecMap mCodecMap;
-    size_t mCodecCounter;
-    CodecMap::iterator mCurrentCodec;
-    TypeMap::iterator mCurrentType;
-
-    // Role map
-    mutable RoleMap mRoleMap;
-
-    // Computed longest common prefix
-    mutable std::string mCommonPrefix;
-
-    bool parseTopLevelXMLFile(const char *path, bool ignore_errors = false);
-
-    void parseXMLFile(const char *path);
-
-    static void StartElementHandlerWrapper(
-            void *me, const char *name, const char **attrs);
-
-    static void EndElementHandlerWrapper(void *me, const char *name);
-
-    void startElementHandler(const char *name, const char **attrs);
-    void endElementHandler(const char *name);
-
-    status_t includeXMLFile(const char **attrs);
-    status_t addSettingFromAttributes(const char **attrs);
-    status_t addMediaCodecFromAttributes(bool encoder, const char **attrs);
-    void addMediaCodec(bool encoder, const char *name,
-            const char *type = nullptr);
-
-    status_t addQuirk(const char **attrs, const char *tag);
-    status_t addTypeFromAttributes(const char **attrs, bool encoder);
-    status_t addAlias(const char **attrs);
-    status_t addLimit(const char **attrs);
-    status_t addFeature(const char **attrs);
-    void addType(const char *name);
-
-    void generateRoleMap() const;
-    void generateCommonPrefix() const;
+    struct Impl;
+    std::shared_ptr<Impl> mImpl;
 
     MediaCodecsXmlParser(const MediaCodecsXmlParser&) = delete;
     MediaCodecsXmlParser& operator=(const MediaCodecsXmlParser&) = delete;
@@ -191,4 +151,3 @@ private:
 } // namespace android
 
 #endif // MEDIA_STAGEFRIGHT_XMLPARSER_H_
-
