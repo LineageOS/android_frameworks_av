@@ -148,7 +148,7 @@ struct MediaCodecsXmlParser::Impl {
             : mStatus(s),
               mError(error) {
             if (error.empty() && s) {
-                error = "Failed (" + std::string(asString(s)) + ")";
+                mError = "Failed (" + std::string(asString(s)) + ")";
             }
         }
         operator status_t() const { return mStatus; }
