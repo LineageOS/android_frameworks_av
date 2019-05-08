@@ -74,6 +74,7 @@ cc_library_shared {
         "android.hardware.graphics.bufferqueue@1.0",
         "android.hidl.token@1.0-utils",
         "libandroid_runtime_lazy",
+        "libbase",
         "libbinder",
         "libmedia",
         "libmedia_omx",
