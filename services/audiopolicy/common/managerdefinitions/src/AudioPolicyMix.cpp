@@ -26,6 +26,10 @@
 
 namespace android {
 
+AudioPolicyMix::AudioPolicyMix(const AudioMix &mix) : AudioMix(mix)
+{
+}
+
 void AudioPolicyMix::setOutput(sp<SwAudioOutputDescriptor> &output)
 {
     mOutput = output;
@@ -41,16 +45,6 @@ void AudioPolicyMix::clearOutput()
     mOutput.clear();
 }
 
-void AudioPolicyMix::setMix(AudioMix &mix)
-{
-    mMix = mix;
-}
-
-android::AudioMix *AudioPolicyMix::getMix()
-{
-    return &mMix;
-}
-
 status_t AudioPolicyMixCollection::registerMix(String8 address, AudioMix mix,
                                                sp<SwAudioOutputDescriptor> desc)
 {
@@ -59,12 +53,11 @@ status_t AudioPolicyMixCollection::registerMix(String8 address, AudioMix mix,
         ALOGE("registerPolicyMixes(): mix for address %s already registered", address.string());
         return BAD_VALUE;
     }
-    sp<AudioPolicyMix> policyMix = new AudioPolicyMix();
-    policyMix->setMix(mix);
+    sp<AudioPolicyMix> policyMix = new AudioPolicyMix(mix);
     add(address, policyMix);
 
     if (desc != 0) {
-        desc->mPolicyMix = policyMix->getMix();
+        desc->mPolicyMix = policyMix;
         policyMix->setOutput(desc);
     }
     return NO_ERROR;
@@ -110,8 +103,7 @@ status_t AudioPolicyMixCollection::getOutputForAttr(audio_attributes_t attribute
     ALOGV("getOutputForAttr() querying %zu mixes:", size());
     desc = 0;
     for (size_t i = 0; i < size(); i++) {
-        sp<AudioPolicyMix> policyMix = valueAt(i);
-        AudioMix *mix = policyMix->getMix();
+        sp<AudioPolicyMix> mix = valueAt(i);
 
         if (mix->mMixType == MIX_TYPE_PLAYERS) {
             // TODO if adding more player rules (currently only 2), make rule handling "generic"
@@ -208,7 +200,7 @@ status_t AudioPolicyMixCollection::getOutputForAttr(audio_attributes_t attribute
                       (hasUidExcludeRules && uidExclusionFound) ||
                       (hasUidMatchRules && !uidMatchFound))) {
                 ALOGV("\tgetOutputForAttr will use mix %zu", i);
-                desc = policyMix->getOutput();
+                desc = mix->getOutput();
             }
 
         } else if (mix->mMixType == MIX_TYPE_RECORDERS) {
@@ -217,7 +209,7 @@ status_t AudioPolicyMixCollection::getOutputForAttr(audio_attributes_t attribute
                     strncmp(attributes.tags + strlen("addr="),
                             mix->mDeviceAddress.string(),
                             AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - strlen("addr=") - 1) == 0) {
-                desc = policyMix->getOutput();
+                desc = mix->getOutput();
             }
         }
         if (desc != 0) {
@@ -228,12 +220,13 @@ status_t AudioPolicyMixCollection::getOutputForAttr(audio_attributes_t attribute
     return BAD_VALUE;
 }
 
-audio_devices_t AudioPolicyMixCollection::getDeviceAndMixForInputSource(audio_source_t inputSource,
-                                                                        audio_devices_t availDevices,
-                                                                        AudioMix **policyMix)
+audio_devices_t AudioPolicyMixCollection::getDeviceAndMixForInputSource(
+        audio_source_t inputSource,
+        audio_devices_t availDevices,
+        sp<AudioPolicyMix> *policyMix)
 {
     for (size_t i = 0; i < size(); i++) {
-        AudioMix *mix = valueAt(i)->getMix();
+        AudioPolicyMix *mix = valueAt(i).get();
 
         if (mix->mMixType != MIX_TYPE_RECORDERS) {
             continue;
@@ -256,7 +249,8 @@ audio_devices_t AudioPolicyMixCollection::getDeviceAndMixForInputSource(audio_so
     return AUDIO_DEVICE_NONE;
 }
 
-status_t AudioPolicyMixCollection::getInputMixForAttr(audio_attributes_t attr, AudioMix **policyMix)
+status_t AudioPolicyMixCollection::getInputMixForAttr(
+        audio_attributes_t attr, sp<AudioPolicyMix> *policyMix)
 {
     if (strncmp(attr.tags, "addr=", strlen("addr=")) != 0) {
         return BAD_VALUE;
@@ -266,8 +260,7 @@ status_t AudioPolicyMixCollection::getInputMixForAttr(audio_attributes_t attr, A
 #ifdef LOG_NDEBUG
     ALOGV("getInputMixForAttr looking for address %s\n  mixes available:", address.string());
     for (size_t i = 0; i < size(); i++) {
-            sp<AudioPolicyMix> policyMix = valueAt(i);
-            AudioMix *mix = policyMix->getMix();
+            sp<AudioPolicyMix> mix = valueAt(i);
             ALOGV("\tmix %zu address=%s", i, mix->mDeviceAddress.string());
     }
 #endif
@@ -278,13 +271,14 @@ status_t AudioPolicyMixCollection::getInputMixForAttr(audio_attributes_t attr, A
         return BAD_VALUE;
     }
     sp<AudioPolicyMix> audioPolicyMix = valueAt(index);
-    AudioMix *mix = audioPolicyMix->getMix();
 
-    if (mix->mMixType != MIX_TYPE_PLAYERS) {
+    if (audioPolicyMix->mMixType != MIX_TYPE_PLAYERS) {
         ALOGW("getInputMixForAttr() bad policy mix type for address %s", address.string());
         return BAD_VALUE;
     }
-    *policyMix = mix;
+    if (policyMix != nullptr) {
+        *policyMix = audioPolicyMix;
+    }
     return NO_ERROR;
 }
 
