@@ -14,9 +14,6 @@ cc_library_headers {
 cc_library_shared {
     name: "libcodec2_vndk",
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
 
     srcs: [
         "C2AllocatorIon.cpp",
