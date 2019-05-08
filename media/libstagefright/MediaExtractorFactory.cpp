@@ -71,8 +71,6 @@ sp<IMediaExtractor> MediaExtractorFactory::CreateFromService(
 
     ALOGV("MediaExtractorFactory::CreateFromService %s", mime);
 
-    UpdateExtractors();
-
     // initialize source decryption if needed
     source->DrmInitialization(nullptr /* mime */);
 
@@ -270,7 +268,7 @@ static bool compareFunc(const sp<ExtractorPlugin>& first, const sp<ExtractorPlug
 static std::unordered_set<std::string> gSupportedExtensions;
 
 // static
-void MediaExtractorFactory::UpdateExtractors() {
+void MediaExtractorFactory::LoadExtractors() {
     Mutex::Autolock autoLock(gPluginMutex);
 
     if (gPluginsRegistered) {
