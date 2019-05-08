@@ -262,12 +262,12 @@ camera_status_t CameraDevice::isSessionConfigurationSupported(
 void CameraDevice::addRequestSettingsMetadata(ACaptureRequest *aCaptureRequest,
         sp<CaptureRequest> &req) {
     CameraMetadata metadataCopy = aCaptureRequest->settings->getInternalData();
-    const camera_metadata_t *camera_metadata = metadataCopy.getAndLock();
+    camera_metadata_t *camera_metadata = metadataCopy.release();
     HCameraMetadata hCameraMetadata;
-    utils::convertToHidl(camera_metadata, &hCameraMetadata);
-    metadataCopy.unlock(camera_metadata);
+    utils::convertToHidl(camera_metadata, &hCameraMetadata, true);
     req->mPhysicalCameraSettings.resize(1);
     req->mPhysicalCameraSettings[0].settings.metadata(std::move(hCameraMetadata));
+    req->mPhysicalCameraSettings[0].id = getId();
 }
 
 camera_status_t CameraDevice::updateOutputConfigurationLocked(ACaptureSessionOutput *output) {
@@ -398,10 +398,9 @@ void CameraDevice::allocateOneCaptureRequestMetadata(
     cameraSettings.id = id;
     // TODO: Do we really need to copy the metadata here ?
     CameraMetadata metadataCopy = metadata->getInternalData();
-    const camera_metadata_t *cameraMetadata = metadataCopy.getAndLock();
+    camera_metadata_t *cameraMetadata = metadataCopy.release();
     HCameraMetadata hCameraMetadata;
-    utils::convertToHidl(cameraMetadata, &hCameraMetadata);
-    metadataCopy.unlock(cameraMetadata);
+    utils::convertToHidl(cameraMetadata, &hCameraMetadata, true);
     if (metadata != nullptr) {
         if (hCameraMetadata.data() != nullptr &&
             mCaptureRequestMetadataQueue != nullptr &&
@@ -426,11 +425,12 @@ CameraDevice::allocateACaptureRequest(sp<CaptureRequest>& req, const char* devic
         const std::string& id = req->mPhysicalCameraSettings[i].id;
         CameraMetadata clone;
         utils::convertFromHidlCloned(req->mPhysicalCameraSettings[i].settings.metadata(), &clone);
+        camera_metadata_t *clonep = clone.release();
         if (id == deviceId) {
-            pRequest->settings = new ACameraMetadata(clone.release(), ACameraMetadata::ACM_REQUEST);
+            pRequest->settings = new ACameraMetadata(clonep, ACameraMetadata::ACM_REQUEST);
         } else {
             pRequest->physicalSettings[req->mPhysicalCameraSettings[i].id] =
-                    new ACameraMetadata(clone.release(), ACameraMetadata::ACM_REQUEST);
+                    new ACameraMetadata(clonep, ACameraMetadata::ACM_REQUEST);
         }
     }
     pRequest->targets = new ACameraOutputTargets();
