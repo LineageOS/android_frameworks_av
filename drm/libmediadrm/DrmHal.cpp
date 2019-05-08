@@ -40,7 +40,6 @@
 #include <mediadrm/DrmSessionManager.h>
 
 using drm::V1_0::KeyedVector;
-using drm::V1_0::KeyStatusType;
 using drm::V1_0::KeyRequestType;
 using drm::V1_0::KeyType;
 using drm::V1_0::KeyValue;
@@ -51,6 +50,7 @@ using drm::V1_1::HdcpLevel;
 using drm::V1_1::SecureStopRelease;
 using drm::V1_1::SecurityLevel;
 using drm::V1_2::KeySetId;
+using drm::V1_2::KeyStatusType;
 using ::android::hardware::drm::V1_1::DrmMetricGroup;
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_string;
@@ -517,6 +517,17 @@ Return<void> DrmHal::sendExpirationUpdate(const hidl_vec<uint8_t>& sessionId,
 }
 
 Return<void> DrmHal::sendKeysChange(const hidl_vec<uint8_t>& sessionId,
+        const hidl_vec<KeyStatus_V1_0>& keyStatusList_V1_0, bool hasNewUsableKey) {
+    std::vector<KeyStatus> keyStatusVec;
+    for (const auto &keyStatus_V1_0 : keyStatusList_V1_0) {
+        keyStatusVec.push_back({keyStatus_V1_0.keyId,
+                static_cast<KeyStatusType>(keyStatus_V1_0.type)});
+    }
+    hidl_vec<KeyStatus> keyStatusList_V1_2(keyStatusVec);
+    return sendKeysChange_1_2(sessionId, keyStatusList_V1_2, hasNewUsableKey);
+}
+
+Return<void> DrmHal::sendKeysChange_1_2(const hidl_vec<uint8_t>& sessionId,
         const hidl_vec<KeyStatus>& keyStatusList, bool hasNewUsableKey) {
 
     mEventLock.lock();
@@ -545,6 +556,9 @@ Return<void> DrmHal::sendKeysChange(const hidl_vec<uint8_t>& sessionId,
                 break;
             case KeyStatusType::STATUSPENDING:
                 type = DrmPlugin::kKeyStatusType_StatusPending;
+                break;
+            case KeyStatusType::USABLEINFUTURE:
+                type = DrmPlugin::kKeyStatusType_UsableInFuture;
                 break;
             case KeyStatusType::INTERNALERROR:
             default:
