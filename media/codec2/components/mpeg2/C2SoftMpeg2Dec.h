@@ -17,6 +17,7 @@
 #ifndef ANDROID_C2_SOFT_MPEG2_DEC_H_
 #define ANDROID_C2_SOFT_MPEG2_DEC_H_
 
+#include <atomic>
 #include <SimpleC2Component.h>
 
 #include <media/stagefright/foundation/ColorUtils.h>
@@ -161,6 +162,7 @@ struct C2SoftMpeg2Dec : public SimpleC2Component {
     uint32_t mStride;
     bool mSignalledOutputEos;
     bool mSignalledError;
+    std::atomic_uint64_t mOutIndex;
 
     // Color aspects. These are ISO values and are meant to detect changes in aspects to avoid
     // converting them to C2 values for each frame
