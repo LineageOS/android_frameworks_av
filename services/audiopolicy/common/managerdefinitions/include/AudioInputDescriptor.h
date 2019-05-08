@@ -27,7 +27,7 @@
 namespace android {
 
 class IOProfile;
-class AudioMix;
+class AudioPolicyMix;
 
 // descriptor for audio inputs. Used to maintain current configuration of each opened audio input
 // and keep track of the usage of this input.
@@ -44,7 +44,7 @@ public:
 
     audio_io_handle_t             mIoHandle;       // input handle
     audio_devices_t               mDevice;         // current device this input is routed to
-    AudioMix                      *mPolicyMix;     // non NULL when used by a dynamic policy
+    wp<AudioPolicyMix>            mPolicyMix;      // non NULL when used by a dynamic policy
     const sp<IOProfile>           mProfile;        // I/O profile this output derives from
 
     virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
