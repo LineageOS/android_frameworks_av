@@ -18,6 +18,7 @@
 #define LOG_TAG "NdkMediaDrm"
 
 #include <inttypes.h>
+#include <unistd.h>
 
 #include <media/NdkMediaDrm.h>
 
@@ -26,6 +27,8 @@
 #include <utils/StrongPointer.h>
 #include <gui/Surface.h>
 
+#include <android-base/properties.h>
+#include <binder/PermissionController.h>
 #include <media/IDrm.h>
 #include <media/IDrmClient.h>
 #include <media/stagefright/MediaErrors.h>
@@ -231,6 +234,39 @@ static media_status_t translateStatus(status_t status) {
     return result;
 }
 
+static bool ShouldGetAppPackageName(void) {
+    // Check what this device's first API level was.
+    int32_t firstApiLevel = android::base::GetIntProperty<int32_t>("ro.product.first_api_level", 0);
+    if (firstApiLevel == 0) {
+        // First API Level is 0 on factory ROMs, but we can assume the current SDK
+        // version is the first if it's a factory ROM.
+        firstApiLevel = android::base::GetIntProperty<int32_t>("ro.build.version.sdk", 0);
+    }
+    return firstApiLevel >= 29;  // Android Q
+}
+
+static status_t GetAppPackageName(String8 *packageName) {
+    sp<IServiceManager> serviceManager = defaultServiceManager();
+    sp<IBinder> binder = serviceManager->getService(String16("permission"));
+
+    sp<IPermissionController> permissionContol = interface_cast<IPermissionController>(binder);
+    if (permissionContol == NULL) {
+        ALOGE("Failed to get permission service");
+        return UNKNOWN_ERROR;
+    }
+
+    Vector<String16> packages;
+    permissionContol->getPackagesForUid(getuid(), packages);
+
+    if (packages.isEmpty()) {
+        ALOGE("Unable to get package name for current UID");
+        return UNKNOWN_ERROR;
+    }
+
+    *packageName = String8(packages[0]);
+    return OK;
+}
+
 static sp<IDrm> CreateDrm() {
     sp<IServiceManager> sm = defaultServiceManager();
     sp<IBinder> binder = sm->getService(String16("media.drm"));
@@ -255,8 +291,16 @@ static sp<IDrm> CreateDrmFromUUID(const AMediaUUID uuid) {
         return NULL;
     }
 
-    String8 nullPackageName;
-    status_t err = drm->createPlugin(uuid, nullPackageName);
+    String8 packageName;
+    if (ShouldGetAppPackageName()) {
+        status_t err = GetAppPackageName(&packageName);
+
+        if (err != OK) {
+            return NULL;
+        }
+    }
+
+    status_t err = drm->createPlugin(uuid, packageName);
 
     if (err != OK) {
         return NULL;
