@@ -411,19 +411,19 @@ void AudioPolicyService::updateUidStates_l()
 //    OR The client is the assistant
 //        AND an accessibility service is on TOP
 //               AND the source is VOICE_RECOGNITION or HOTWORD
-//        OR uses VOICE_RECOGNITION AND is on TOP OR latest started
+//        OR uses VOICE_RECOGNITION AND is on TOP
 //               OR uses HOTWORD
 //            AND there is no active privacy sensitive capture or call
 //                OR client has CAPTURE_AUDIO_OUTPUT privileged permission
 //    OR The client is an accessibility service
-//        AND is on TOP OR latest started
+//        AND is on TOP
 //        AND the source is VOICE_RECOGNITION or HOTWORD
 //    OR the client source is virtual (remote submix, call audio TX or RX...)
-//    OR Any other client
+//    OR Any client
 //        AND The assistant is not on TOP
+//        AND is on TOP or latest started
 //        AND there is no active privacy sensitive capture or call
 //                OR client has CAPTURE_AUDIO_OUTPUT privileged permission
-//TODO: mamanage pre processing effects according to use case priority
 
     sp<AudioRecordClient> topActive;
     sp<AudioRecordClient> latestActive;
@@ -505,9 +505,11 @@ void AudioPolicyService::updateUidStates_l()
 
         // By default allow capture if:
         //     The assistant is not on TOP
+        //     AND is on TOP or latest started
         //     AND there is no active privacy sensitive capture or call
         //             OR client has CAPTURE_AUDIO_OUTPUT privileged permission
         bool allowCapture = !isAssistantOnTop
+                && ((isTopOrLatestActive && !isLatestSensitive) || isLatestSensitive)
                 && !(isSensitiveActive && !(isLatestSensitive || current->canCaptureOutput))
                 && !(isInCall && !current->canCaptureOutput);
 
@@ -518,7 +520,7 @@ void AudioPolicyService::updateUidStates_l()
             // For assistant allow capture if:
             //     An accessibility service is on TOP
             //            AND the source is VOICE_RECOGNITION or HOTWORD
-            //     OR is on TOP OR latest started AND uses VOICE_RECOGNITION
+            //     OR is on TOP AND uses VOICE_RECOGNITION
             //            OR uses HOTWORD
             //         AND there is no active privacy sensitive capture or call
             //             OR client has CAPTURE_AUDIO_OUTPUT privileged permission
@@ -527,7 +529,7 @@ void AudioPolicyService::updateUidStates_l()
                     allowCapture = true;
                 }
             } else {
-                if (((isTopOrLatestActive && source == AUDIO_SOURCE_VOICE_RECOGNITION) ||
+                if (((isAssistantOnTop && source == AUDIO_SOURCE_VOICE_RECOGNITION) ||
                         source == AUDIO_SOURCE_HOTWORD) &&
                         (!(isSensitiveActive || isInCall) || current->canCaptureOutput)) {
                     allowCapture = true;
@@ -535,9 +537,9 @@ void AudioPolicyService::updateUidStates_l()
             }
         } else if (mUidPolicy->isA11yUid(current->uid)) {
             // For accessibility service allow capture if:
-            //     Is on TOP OR latest started
+            //     Is on TOP
             //     AND the source is VOICE_RECOGNITION or HOTWORD
-            if (isTopOrLatestActive &&
+            if (isA11yOnTop &&
                     (source == AUDIO_SOURCE_VOICE_RECOGNITION || source == AUDIO_SOURCE_HOTWORD)) {
                 allowCapture = true;
             }
