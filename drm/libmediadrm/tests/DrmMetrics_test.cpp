@@ -30,7 +30,7 @@
 using ::android::drm_metrics::DrmFrameworkMetrics;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::drm::V1_0::EventType;
-using ::android::hardware::drm::V1_0::KeyStatusType;
+using ::android::hardware::drm::V1_2::KeyStatusType;
 using ::android::hardware::drm::V1_0::Status;
 using ::android::hardware::drm::V1_1::DrmMetricGroup;
 using ::android::os::PersistableBundle;
