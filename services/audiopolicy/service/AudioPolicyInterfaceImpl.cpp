@@ -511,6 +511,7 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId)
     }
 
     // including successes gets very verbose
+    // but once we cut over to westworld, log them all.
     if (status != NO_ERROR) {
 
         static constexpr char kAudioPolicy[] = "audiopolicy";
@@ -571,6 +572,9 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId)
             delete item;
             item = NULL;
         }
+    }
+
+    if (status != NO_ERROR) {
         client->active = false;
         client->startTimeNs = 0;
         updateUidStates_l();

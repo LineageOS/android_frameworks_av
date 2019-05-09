@@ -7,7 +7,21 @@ cc_binary {
     srcs: [
         "main_mediametrics.cpp",
         "MediaAnalyticsService.cpp",
+        "iface_statsd.cpp",
+        "statsd_audiopolicy.cpp",
+        "statsd_audiorecord.cpp",
+        "statsd_audiothread.cpp",
+        "statsd_audiotrack.cpp",
+        "statsd_codec.cpp",
+        "statsd_drm.cpp",
+        "statsd_extractor.cpp",
+        "statsd_nuplayer.cpp",
+        "statsd_recorder.cpp",
     ],
+
+    proto: {
+        type: "lite",
+    },
 
     shared_libs: [
         "libcutils",
@@ -21,10 +35,15 @@ cc_binary {
         "libmediautils",
         "libmediametrics",
         "libstagefright_foundation",
+        "libstatslog",
         "libutils",
+        "libprotobuf-cpp-lite",
     ],
 
-    static_libs: ["libregistermsext"],
+    static_libs: [
+        "libplatformprotos",
+        "libregistermsext",
+    ],
 
     include_dirs: [
         "frameworks/av/media/libstagefright/include",

@@ -112,6 +112,9 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
 
 };
 
+// hook to send things off to the statsd subsystem
+extern bool dump2Statsd(MediaAnalyticsItem *item);
+
 // ----------------------------------------------------------------------------
 
 }; // namespace android
