@@ -1,0 +1,15 @@
+// Copyright 2005 The Android Open Source Project
+//
+// Android.mk for resampler_tools
+//
+
+cc_binary_host {
+    name: "fir",
+
+    srcs: ["fir.cpp"],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+}
