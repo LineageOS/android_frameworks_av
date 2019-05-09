@@ -426,10 +426,8 @@ status_t IlocBox::parse(off64_t offset, size_t size) {
         }
         ALOGV("extent_count %d", extent_count);
 
-        if (extent_count > 1 && (offset_size == 0 || length_size == 0)) {
-            // if the item is dividec into more than one extents, offset and
-            // length must be present.
-            return ERROR_MALFORMED;
+        if (extent_count > 1) {
+            return ERROR_UNSUPPORTED;
         }
         offset += 2;
 
