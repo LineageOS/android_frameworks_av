@@ -654,7 +654,7 @@ void MediaCodecsXmlParser::Impl::Parser::startElementHandler(
                 nextSection = SECTION_ENCODERS;
             } else if (strEq(name, "Settings")) {
                 nextSection = SECTION_SETTINGS;
-            } else if (strEq(name, "MediaCodecs")) {
+            } else if (strEq(name, "MediaCodecs") || strEq(name, "Included")) {
                 return;
             } else {
                 break;
