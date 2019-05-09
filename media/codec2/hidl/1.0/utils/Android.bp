@@ -48,9 +48,6 @@ cc_library {
 cc_library {
     name: "libcodec2_hidl@1.0",
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
 
     defaults: ["hidl_defaults"],
 
