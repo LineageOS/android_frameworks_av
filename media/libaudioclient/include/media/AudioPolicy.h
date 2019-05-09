@@ -106,6 +106,12 @@ public:
 
     void setExcludeUid(uid_t uid) const;
     void setMatchUid(uid_t uid) const;
+    /** returns true if this mix has a rule to match or exclude the given uid */
+    bool hasUidRule(bool match, uid_t uid) const;
+    /** returns true if this mix has a rule for uid match (any uid) */
+    bool hasMatchUidRule() const;
+    /** returns true if this mix can be used for uid-device affinity routing */
+    bool isDeviceAffinityCompatible() const;
 
     mutable Vector<AudioMixMatchCriterion> mCriteria;
     uint32_t        mMixType;

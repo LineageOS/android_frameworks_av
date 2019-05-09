@@ -89,6 +89,16 @@ public:
 
     status_t getInputMixForAttr(audio_attributes_t attr, sp<AudioPolicyMix> *policyMix);
 
+    /**
+     * Updates the mix rules in order to make streams associated with the given uid
+     * be routed to the given audio devices.
+     * @param uid the uid for which the device affinity is set
+     * @param devices the vector of devices that this uid may be routed to. A typical
+     *    use is to pass the devices associated with a given zone in a multi-zone setup.
+     * @return NO_ERROR if the update was successful, INVALID_OPERATION otherwise.
+     *    An example of failure is when there are already rules in place to restrict
+     *    a mix to the given uid (i.e. when a MATCH_UID rule was set for it).
+     */
     status_t setUidDeviceAffinities(uid_t uid, const Vector<AudioDeviceTypeAddr>& devices);
     status_t removeUidDeviceAffinities(uid_t uid);
     status_t getDevicesForUid(uid_t uid, Vector<AudioDeviceTypeAddr>& devices) const;
