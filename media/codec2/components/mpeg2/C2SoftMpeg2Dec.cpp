@@ -315,7 +315,8 @@ C2SoftMpeg2Dec::C2SoftMpeg2Dec(
         mOutBufferDrain(nullptr),
         mIvColorformat(IV_YUV_420P),
         mWidth(320),
-        mHeight(240) {
+        mHeight(240),
+        mOutIndex(0u) {
     // If input dump is enabled, then open create an empty file
     GENERATE_FILE_NAMES();
     CREATE_DUMP_FILE(mInFile);
@@ -766,6 +767,33 @@ void C2SoftMpeg2Dec::finishWork(uint64_t index, const std::unique_ptr<C2Work> &w
         buffer->setInfo(mIntf->getColorAspects_l());
     }
 
+    class FillWork {
+       public:
+        FillWork(uint32_t flags, C2WorkOrdinalStruct ordinal,
+                 const std::shared_ptr<C2Buffer>& buffer)
+            : mFlags(flags), mOrdinal(ordinal), mBuffer(buffer) {}
+        ~FillWork() = default;
+
+        void operator()(const std::unique_ptr<C2Work>& work) {
+            work->worklets.front()->output.flags = (C2FrameData::flags_t)mFlags;
+            work->worklets.front()->output.buffers.clear();
+            work->worklets.front()->output.ordinal = mOrdinal;
+            work->workletsProcessed = 1u;
+            work->result = C2_OK;
+            if (mBuffer) {
+                work->worklets.front()->output.buffers.push_back(mBuffer);
+            }
+            ALOGV("timestamp = %lld, index = %lld, w/%s buffer",
+                  mOrdinal.timestamp.peekll(), mOrdinal.frameIndex.peekll(),
+                  mBuffer ? "" : "o");
+        }
+
+       private:
+        const uint32_t mFlags;
+        const C2WorkOrdinalStruct mOrdinal;
+        const std::shared_ptr<C2Buffer> mBuffer;
+    };
+
     auto fillWork = [buffer](const std::unique_ptr<C2Work> &work) {
         work->worklets.front()->output.flags = (C2FrameData::flags_t)0;
         work->worklets.front()->output.buffers.clear();
@@ -774,7 +802,20 @@ void C2SoftMpeg2Dec::finishWork(uint64_t index, const std::unique_ptr<C2Work> &w
         work->workletsProcessed = 1u;
     };
     if (work && c2_cntr64_t(index) == work->input.ordinal.frameIndex) {
-        fillWork(work);
+        bool eos = ((work->input.flags & C2FrameData::FLAG_END_OF_STREAM) != 0);
+        // TODO: Check if cloneAndSend can be avoided by tracking number of frames remaining
+        if (eos) {
+            if (buffer) {
+                mOutIndex = index;
+                C2WorkOrdinalStruct outOrdinal = work->input.ordinal;
+                cloneAndSend(
+                    mOutIndex, work,
+                    FillWork(C2FrameData::FLAG_INCOMPLETE, outOrdinal, buffer));
+                buffer.reset();
+            }
+        } else {
+            fillWork(work);
+        }
     } else {
         finish(index, fillWork);
     }

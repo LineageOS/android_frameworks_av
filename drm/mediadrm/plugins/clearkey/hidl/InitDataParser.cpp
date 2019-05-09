@@ -51,16 +51,16 @@ Status InitDataParser::parse(const std::vector<uint8_t>& initData,
     // Build a list of the key IDs
     std::vector<const uint8_t*> keyIds;
 
-    if (mimeType == kIsoBmffVideoMimeType ||
-        mimeType == kIsoBmffAudioMimeType ||
-        mimeType == kCencInitDataFormat) {
+    if (mimeType == kIsoBmffVideoMimeType.c_str() ||
+        mimeType == kIsoBmffAudioMimeType.c_str() ||
+        mimeType == kCencInitDataFormat.c_str()) {
         Status res = parsePssh(initData, &keyIds);
         if (res != Status::OK) {
             return res;
         }
-    } else if (mimeType == kWebmVideoMimeType ||
-        mimeType == kWebmAudioMimeType ||
-        mimeType == kWebmInitDataFormat) {
+    } else if (mimeType == kWebmVideoMimeType.c_str() ||
+        mimeType == kWebmAudioMimeType.c_str() ||
+        mimeType == kWebmInitDataFormat.c_str()) {
         // WebM "init data" is just a single key ID
         if (initData.size() != kKeyIdSize) {
             return Status::ERROR_DRM_CANNOT_HANDLE;
