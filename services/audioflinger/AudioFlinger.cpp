@@ -827,6 +827,12 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
                     ALOGE("Secondary output patchRecord init failed: %d", status);
                     continue;
                 }
+
+                // TODO: We could check compatibility of the secondaryThread with the PatchTrack
+                // for fast usage: thread has fast mixer, sample rate matches, etc.;
+                // for now, we exclude fast tracks by removing the Fast flag.
+                const audio_output_flags_t outputFlags =
+                        (audio_output_flags_t)(output.flags & ~AUDIO_OUTPUT_FLAG_FAST);
                 sp patchTrack = new PlaybackThread::PatchTrack(secondaryThread,
                                                                streamType,
                                                                output.sampleRate,
@@ -835,7 +841,7 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
                                                                frameCount,
                                                                patchRecord->buffer(),
                                                                patchRecord->bufferSize(),
-                                                               output.flags,
+                                                               outputFlags,
                                                                0ns /* timeout */);
                 status = patchTrack->initCheck();
                 if (status != NO_ERROR) {
