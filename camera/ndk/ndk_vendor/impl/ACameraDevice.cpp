@@ -259,15 +259,27 @@ camera_status_t CameraDevice::isSessionConfigurationSupported(
     }
 }
 
-void CameraDevice::addRequestSettingsMetadata(ACaptureRequest *aCaptureRequest,
-        sp<CaptureRequest> &req) {
-    CameraMetadata metadataCopy = aCaptureRequest->settings->getInternalData();
+static void addMetadataToPhysicalCameraSettings(const CameraMetadata *metadata,
+        const std::string &cameraId, PhysicalCameraSettings *physicalCameraSettings) {
+    CameraMetadata metadataCopy = *metadata;
     camera_metadata_t *camera_metadata = metadataCopy.release();
     HCameraMetadata hCameraMetadata;
-    utils::convertToHidl(camera_metadata, &hCameraMetadata, true);
-    req->mPhysicalCameraSettings.resize(1);
-    req->mPhysicalCameraSettings[0].settings.metadata(std::move(hCameraMetadata));
-    req->mPhysicalCameraSettings[0].id = getId();
+    utils::convertToHidl(camera_metadata, &hCameraMetadata, /*shouldOwn*/ true);
+    physicalCameraSettings->settings.metadata(std::move(hCameraMetadata));
+    physicalCameraSettings->id = cameraId;
+}
+
+void CameraDevice::addRequestSettingsMetadata(ACaptureRequest *aCaptureRequest,
+        sp<CaptureRequest> &req) {
+    req->mPhysicalCameraSettings.resize(1 + aCaptureRequest->physicalSettings.size());
+    addMetadataToPhysicalCameraSettings(&(aCaptureRequest->settings->getInternalData()), getId(),
+                    &(req->mPhysicalCameraSettings[0]));
+    size_t i = 1;
+    for (auto &physicalSetting : aCaptureRequest->physicalSettings) {
+        addMetadataToPhysicalCameraSettings(&(physicalSetting.second->getInternalData()),
+                physicalSetting.first, &(req->mPhysicalCameraSettings[i]));
+        i++;
+    }
 }
 
 camera_status_t CameraDevice::updateOutputConfigurationLocked(ACaptureSessionOutput *output) {
