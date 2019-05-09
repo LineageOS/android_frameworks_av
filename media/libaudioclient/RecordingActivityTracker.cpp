@@ -36,6 +36,9 @@ RecordingActivityTracker::RecordingActivityTracker()
 
 RecordingActivityTracker::~RecordingActivityTracker()
 {
+    if (mRIId != RECORD_RIID_INVALID && mAudioManager) {
+        mAudioManager->releaseRecorder(mRIId);
+    }
 }
 
 audio_unique_id_t RecordingActivityTracker::getRiid()
