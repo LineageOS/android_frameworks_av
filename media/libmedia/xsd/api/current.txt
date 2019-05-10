@@ -44,20 +44,20 @@ package media.profiles {
   public class CamcorderProfiles {
     ctor public CamcorderProfiles();
     method public int getCameraId();
-    method public java.util.List<media.profiles.EncoderProfile> getEncoderProfile();
-    method public java.util.List<media.profiles.CamcorderProfiles.ImageDecoding> getImageDecoding();
-    method public java.util.List<media.profiles.CamcorderProfiles.ImageEncoding> getImageEncoding();
+    method public java.util.List<media.profiles.EncoderProfile> getEncoderProfile_optional();
+    method public java.util.List<media.profiles.CamcorderProfiles.ImageDecodingOptional> getImageDecoding_optional();
+    method public java.util.List<media.profiles.CamcorderProfiles.ImageEncodingOptional> getImageEncoding_optional();
     method public void setCameraId(int);
   }
 
-  public static class CamcorderProfiles.ImageDecoding {
-    ctor public CamcorderProfiles.ImageDecoding();
+  public static class CamcorderProfiles.ImageDecodingOptional {
+    ctor public CamcorderProfiles.ImageDecodingOptional();
     method public int getMemCap();
     method public void setMemCap(int);
   }
 
-  public static class CamcorderProfiles.ImageEncoding {
-    ctor public CamcorderProfiles.ImageEncoding();
+  public static class CamcorderProfiles.ImageEncodingOptional {
+    ctor public CamcorderProfiles.ImageEncodingOptional();
     method public int getQuality();
     method public void setQuality(int);
   }
