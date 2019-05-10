@@ -168,8 +168,8 @@ HRotation convertToHidl(int rotation);
 
 bool convertFromHidlCloned(const HCameraMetadata &metadata, CameraMetadata *rawMetadata);
 
-// Note: existing data in dst will be gone. Caller still owns the memory of src
-void convertToHidl(const camera_metadata_t *src, HCameraMetadata* dst);
+// Note: existing data in dst will be gone.
+void convertToHidl(const camera_metadata_t *src, HCameraMetadata* dst, bool shouldOwn = false);
 
 TemplateId convertToHidl(ACameraDevice_request_template templateId);
 
