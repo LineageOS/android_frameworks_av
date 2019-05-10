@@ -296,13 +296,15 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
     audio_stream_type_t streamType = AUDIO_STREAM_DEFAULT;
     audio_io_handle_t io = AUDIO_IO_HANDLE_NONE;
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
+    audio_attributes_t localAttr = *attr;
     if (direction == MmapStreamInterface::DIRECTION_OUTPUT) {
         audio_config_t fullConfig = AUDIO_CONFIG_INITIALIZER;
         fullConfig.sample_rate = config->sample_rate;
         fullConfig.channel_mask = config->channel_mask;
         fullConfig.format = config->format;
         std::vector<audio_io_handle_t> secondaryOutputs;
-        ret = AudioSystem::getOutputForAttr(attr, &io,
+
+        ret = AudioSystem::getOutputForAttr(&localAttr, &io,
                                             actualSessionId,
                                             &streamType, client.clientPid, client.clientUid,
                                             &fullConfig,
@@ -312,7 +314,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
         ALOGW_IF(!secondaryOutputs.empty(),
                  "%s does not support secondary outputs, ignoring them", __func__);
     } else {
-        ret = AudioSystem::getInputForAttr(attr, &io,
+        ret = AudioSystem::getInputForAttr(&localAttr, &io,
                                               RECORD_RIID_INVALID,
                                               actualSessionId,
                                               client.clientPid,
@@ -330,7 +332,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
     sp<MmapThread> thread = mMmapThreads.valueFor(io);
     if (thread != 0) {
         interface = new MmapThreadHandle(thread);
-        thread->configure(attr, streamType, actualSessionId, callback, *deviceId, portId);
+        thread->configure(&localAttr, streamType, actualSessionId, callback, *deviceId, portId);
         *handle = portId;
         *sessionId = actualSessionId;
     } else {
@@ -691,7 +693,7 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
     uid_t clientUid = input.clientInfo.clientUid;
     audio_io_handle_t effectThreadId = AUDIO_IO_HANDLE_NONE;
     std::vector<int> effectIds;
-
+    audio_attributes_t localAttr = input.attr;
 
     if (!isAudioServerOrMediaServerUid(callingUid)) {
         ALOGW_IF(clientUid != callingUid,
@@ -720,8 +722,7 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
     output.sessionId = sessionId;
     output.outputId = AUDIO_IO_HANDLE_NONE;
     output.selectedDeviceId = input.selectedDeviceId;
-
-    lStatus = AudioSystem::getOutputForAttr(&input.attr, &output.outputId, sessionId, &streamType,
+    lStatus = AudioSystem::getOutputForAttr(&localAttr, &output.outputId, sessionId, &streamType,
                                             clientPid, clientUid, &input.config, input.flags,
                                             &output.selectedDeviceId, &portId, &secondaryOutputs);
 
@@ -782,7 +783,7 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
         output.notificationFrameCount = input.notificationFrameCount;
         output.flags = input.flags;
 
-        track = thread->createTrack_l(client, streamType, input.attr, &output.sampleRate,
+        track = thread->createTrack_l(client, streamType, localAttr, &output.sampleRate,
                                       input.config.format, input.config.channel_mask,
                                       &output.frameCount, &output.notificationFrameCount,
                                       input.notificationsPerBuffer, input.speed,
