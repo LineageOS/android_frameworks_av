@@ -37,6 +37,7 @@ public:
             const sp<DataSource> &source, const char *mime = NULL);
     static status_t dump(int fd, const Vector<String16>& args);
     static std::unordered_set<std::string> getSupportedTypes();
+    static void LoadExtractors();
 
 private:
     static Mutex gPluginMutex;
@@ -53,8 +54,6 @@ private:
     static void *sniff(const sp<DataSource> &source,
             float *confidence, void **meta, FreeMetaFunc *freeMeta,
             sp<ExtractorPlugin> &plugin, uint32_t *creatorVersion);
-
-    static void UpdateExtractors();
 };
 
 }  // namespace android
