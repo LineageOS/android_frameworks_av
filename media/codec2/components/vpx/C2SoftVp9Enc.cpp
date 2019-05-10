@@ -23,8 +23,6 @@
 
 namespace android {
 
-constexpr char COMPONENT_NAME[] = "c2.android.vp9.encoder";
-
 C2SoftVp9Enc::C2SoftVp9Enc(const char* name, c2_node_id_t id,
                            const std::shared_ptr<IntfImpl>& intfImpl)
     : C2SoftVpxEnc(name, id, intfImpl),
