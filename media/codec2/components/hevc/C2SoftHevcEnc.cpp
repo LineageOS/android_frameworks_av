@@ -38,40 +38,39 @@
 
 namespace android {
 
-class C2SoftHevcEnc::IntfImpl : public C2InterfaceHelper {
+namespace {
+
+constexpr char COMPONENT_NAME[] = "c2.android.hevc.encoder";
+
+} // namepsace
+
+class C2SoftHevcEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
   public:
-    explicit IntfImpl(const std::shared_ptr<C2ReflectorHelper>& helper)
-        : C2InterfaceHelper(helper) {
+    explicit IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helper)
+        : SimpleInterface<void>::BaseParams(
+                helper,
+                COMPONENT_NAME,
+                C2Component::KIND_ENCODER,
+                C2Component::DOMAIN_VIDEO,
+                MEDIA_MIMETYPE_VIDEO_HEVC) {
+        noPrivateBuffers(); // TODO: account for our buffers here
+        noInputReferences();
+        noOutputReferences();
+        noInputLatency();
+        noTimeStretch();
         setDerivedInstance(this);
 
         addParameter(
-            DefineParam(mInputFormat, C2_PARAMKEY_INPUT_STREAM_BUFFER_TYPE)
-                .withConstValue(
-                    new C2StreamBufferTypeSetting::input(0u, C2BufferData::GRAPHIC))
+                DefineParam(mAttrib, C2_PARAMKEY_COMPONENT_ATTRIBUTES)
+                .withConstValue(new C2ComponentAttributesSetting(
+                    C2Component::ATTRIB_IS_TEMPORAL))
                 .build());
 
         addParameter(
-            DefineParam(mOutputFormat, C2_PARAMKEY_OUTPUT_STREAM_BUFFER_TYPE)
-                .withConstValue(
-                    new C2StreamBufferTypeSetting::output(0u, C2BufferData::LINEAR))
+                DefineParam(mUsage, C2_PARAMKEY_INPUT_STREAM_USAGE)
+                .withConstValue(new C2StreamUsageTuning::input(
+                        0u, (uint64_t)C2MemoryUsage::CPU_READ))
                 .build());
-
-        addParameter(
-            DefineParam(mInputMediaType, C2_PARAMKEY_INPUT_MEDIA_TYPE)
-                .withConstValue(AllocSharedString<C2PortMediaTypeSetting::input>(
-                    MEDIA_MIMETYPE_VIDEO_RAW))
-                .build());
-
-        addParameter(
-            DefineParam(mOutputMediaType, C2_PARAMKEY_OUTPUT_MEDIA_TYPE)
-                .withConstValue(AllocSharedString<C2PortMediaTypeSetting::output>(
-                    MEDIA_MIMETYPE_VIDEO_HEVC))
-                .build());
-
-        addParameter(DefineParam(mUsage, C2_PARAMKEY_INPUT_STREAM_USAGE)
-                         .withConstValue(new C2StreamUsageTuning::input(
-                             0u, (uint64_t)C2MemoryUsage::CPU_READ))
-                         .build());
 
         // matches size limits in codec library
         addParameter(
@@ -332,10 +331,6 @@ class C2SoftHevcEnc::IntfImpl : public C2InterfaceHelper {
     }
 
    private:
-    std::shared_ptr<C2StreamBufferTypeSetting::input> mInputFormat;
-    std::shared_ptr<C2StreamBufferTypeSetting::output> mOutputFormat;
-    std::shared_ptr<C2PortMediaTypeSetting::input> mInputMediaType;
-    std::shared_ptr<C2PortMediaTypeSetting::output> mOutputMediaType;
     std::shared_ptr<C2StreamUsageTuning::input> mUsage;
     std::shared_ptr<C2StreamPictureSizeInfo::input> mSize;
     std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
@@ -347,8 +342,6 @@ class C2SoftHevcEnc::IntfImpl : public C2InterfaceHelper {
     std::shared_ptr<C2StreamProfileLevelInfo::output> mProfileLevel;
     std::shared_ptr<C2StreamSyncFrameIntervalTuning::output> mSyncFramePeriod;
 };
-
-constexpr char COMPONENT_NAME[] = "c2.android.hevc.encoder";
 
 static size_t GetCPUCoreCount() {
     long cpuCoreCount = 0;
