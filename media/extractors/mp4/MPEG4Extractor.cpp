@@ -45,6 +45,7 @@
 #include <media/stagefright/foundation/ColorUtils.h>
 #include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/hexdump.h>
+#include <media/stagefright/foundation/OpusHeader.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaDataBase.h>
@@ -1735,15 +1736,21 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             AMediaFormat_setInt32(mLastTrack->meta, AMEDIAFORMAT_KEY_SAMPLE_RATE, sample_rate);
 
             if (chunk_type == FOURCC("Opus")) {
-                uint8_t opusInfo[19];
+                uint8_t opusInfo[AOPUS_OPUSHEAD_MAXSIZE];
                 data_offset += sizeof(buffer);
+                size_t opusInfoSize = chunk_data_size - sizeof(buffer);
+
+                if (opusInfoSize < AOPUS_OPUSHEAD_MINSIZE ||
+                    opusInfoSize > AOPUS_OPUSHEAD_MAXSIZE) {
+                    return ERROR_MALFORMED;
+                }
                 // Read Opus Header
                 if (mDataSource->readAt(
-                        data_offset, opusInfo, sizeof(opusInfo)) < (ssize_t)sizeof(opusInfo)) {
+                        data_offset, opusInfo, opusInfoSize) < opusInfoSize) {
                     return ERROR_IO;
                 }
 
-                // OpusHeader must start with this magic sequence
+                // OpusHeader must start with this magic sequence, overwrite first 8 bytes
                 // http://wiki.xiph.org/OggOpus#ID_Header
                 strncpy((char *)opusInfo, "OpusHead", 8);
 
@@ -1760,17 +1767,18 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 memcpy(&opusInfo[opusOffset + 2], &sample_rate, sizeof(sample_rate));
                 memcpy(&opusInfo[opusOffset + 6], &out_gain, sizeof(out_gain));
 
-                int64_t codecDelay = 6500000;
-                int64_t seekPreRollNs = 80000000;  // Fixed 80 msec
+                static const int64_t kSeekPreRollNs = 80000000;  // Fixed 80 msec
+                static const int32_t kOpusSampleRate = 48000;
+                int64_t codecDelay = pre_skip * 1000000000ll / kOpusSampleRate;
 
                 AMediaFormat_setBuffer(mLastTrack->meta,
                             AMEDIAFORMAT_KEY_CSD_0, opusInfo, sizeof(opusInfo));
                 AMediaFormat_setBuffer(mLastTrack->meta,
                         AMEDIAFORMAT_KEY_CSD_1, &codecDelay, sizeof(codecDelay));
                 AMediaFormat_setBuffer(mLastTrack->meta,
-                        AMEDIAFORMAT_KEY_CSD_2, &seekPreRollNs, sizeof(seekPreRollNs));
+                        AMEDIAFORMAT_KEY_CSD_2, &kSeekPreRollNs, sizeof(kSeekPreRollNs));
 
-                data_offset += sizeof(opusInfo);
+                data_offset += opusInfoSize;
                 *offset = data_offset;
                 CHECK_EQ(*offset, stop_offset);
             }
