@@ -1999,7 +1999,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
                                                   String8(attr->tags + strlen("addr=")),
                                                   AUDIO_FORMAT_DEFAULT);
         if (device == nullptr) {
-            ALOGW("%s could not find device for source %d, tags %s",
+            ALOGW("%s could not find in Remote Submix device for source %d, tags %s",
                     __func__, attributes.source, attributes.tags);
             status = BAD_VALUE;
             goto error;
@@ -2957,17 +2957,17 @@ status_t AudioPolicyManager::unregisterPolicyMixes(Vector<AudioMix> mixes)
                 continue;
             }
 
-            if (getDeviceConnectionState(AUDIO_DEVICE_IN_REMOTE_SUBMIX, address.string()) ==
-                    AUDIO_POLICY_DEVICE_STATE_AVAILABLE)  {
-                setDeviceConnectionStateInt(AUDIO_DEVICE_IN_REMOTE_SUBMIX,
-                        AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
-                        address.string(), "remote-submix", AUDIO_FORMAT_DEFAULT);
-            }
-            if (getDeviceConnectionState(AUDIO_DEVICE_OUT_REMOTE_SUBMIX, address.string()) ==
-                    AUDIO_POLICY_DEVICE_STATE_AVAILABLE)  {
-                setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
-                        AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
-                        address.string(), "remote-submix", AUDIO_FORMAT_DEFAULT);
+            for (auto device : {AUDIO_DEVICE_IN_REMOTE_SUBMIX, AUDIO_DEVICE_OUT_REMOTE_SUBMIX}) {
+                if (getDeviceConnectionState(device, address.string()) ==
+                        AUDIO_POLICY_DEVICE_STATE_AVAILABLE)  {
+                    res = setDeviceConnectionStateInt(device, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                                                      address.string(), "remote-submix",
+                                                      AUDIO_FORMAT_DEFAULT);
+                    if (res != OK) {
+                        ALOGE("Error making RemoteSubmix device unavailable for mix "
+                              "with type %d, address %s", device, address.string());
+                    }
+                }
             }
             rSubmixModule->removeOutputProfile(address);
             rSubmixModule->removeInputProfile(address);
