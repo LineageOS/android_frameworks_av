@@ -506,7 +506,10 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
     }
     if (mPlayback.thread()->hasFastMixer()) {
         // Create a fast track if the playback thread has fast mixer to get better performance.
+        // Note: we should have matching channel mask, sample rate, and format by the logic above.
         outputFlags = (audio_output_flags_t) (outputFlags | AUDIO_OUTPUT_FLAG_FAST);
+    } else {
+        outputFlags = (audio_output_flags_t) (outputFlags & ~AUDIO_OUTPUT_FLAG_FAST);
     }
 
     // create a special playback track to render to playback thread.
