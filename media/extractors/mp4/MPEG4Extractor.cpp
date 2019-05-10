@@ -4305,6 +4305,77 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
         return ERROR_MALFORMED;
     }
 
+    if (objectTypeIndication == 0xdd) {
+        // vorbis audio
+        if (csd[0] != 0x02) {
+            return ERROR_MALFORMED;
+        }
+
+        // codecInfo starts with two lengths, len1 and len2, that are
+        // "Xiph-style-lacing encoded"..
+
+        size_t offset = 1;
+        size_t len1 = 0;
+        while (offset < csd_size && csd[offset] == 0xff) {
+            if (__builtin_add_overflow(len1, 0xff, &len1)) {
+                return ERROR_MALFORMED;
+            }
+            ++offset;
+        }
+        if (offset >= csd_size) {
+            return ERROR_MALFORMED;
+        }
+        if (__builtin_add_overflow(len1, csd[offset], &len1)) {
+            return ERROR_MALFORMED;
+        }
+        ++offset;
+        if (len1 == 0) {
+            return ERROR_MALFORMED;
+        }
+
+        size_t len2 = 0;
+        while (offset < csd_size && csd[offset] == 0xff) {
+            if (__builtin_add_overflow(len2, 0xff, &len2)) {
+                return ERROR_MALFORMED;
+            }
+            ++offset;
+        }
+        if (offset >= csd_size) {
+            return ERROR_MALFORMED;
+        }
+        if (__builtin_add_overflow(len2, csd[offset], &len2)) {
+            return ERROR_MALFORMED;
+        }
+        ++offset;
+        if (len2 == 0) {
+            return ERROR_MALFORMED;
+        }
+        if (offset >= csd_size || csd[offset] != 0x01) {
+            return ERROR_MALFORMED;
+        }
+        // formerly kKeyVorbisInfo
+        AMediaFormat_setBuffer(mLastTrack->meta,
+                AMEDIAFORMAT_KEY_CSD_0, &csd[offset], len1);
+
+        if (__builtin_add_overflow(offset, len1, &offset) ||
+                offset >= csd_size || csd[offset] != 0x03) {
+            return ERROR_MALFORMED;
+        }
+
+        if (__builtin_add_overflow(offset, len2, &offset) ||
+                offset >= csd_size || csd[offset] != 0x05) {
+            return ERROR_MALFORMED;
+        }
+
+        // formerly kKeyVorbisBooks
+        AMediaFormat_setBuffer(mLastTrack->meta,
+                AMEDIAFORMAT_KEY_CSD_1, &csd[offset], csd_size - offset);
+        AMediaFormat_setString(mLastTrack->meta,
+                AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_VORBIS);
+
+        return OK;
+    }
+
     static uint32_t kSamplingRate[] = {
         96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050,
         16000, 12000, 11025, 8000, 7350
