@@ -19,11 +19,11 @@
 #include <utils/Log.h>
 
 #include <android/dlext.h>
+#include <android-base/logging.h>
 #include <binder/IPCThreadState.h>
 #include <binder/PermissionCache.h>
 #include <binder/IServiceManager.h>
 #include <media/DataSource.h>
-#include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/MediaExtractorFactory.h>
@@ -70,8 +70,6 @@ sp<IMediaExtractor> MediaExtractorFactory::CreateFromService(
         const sp<DataSource> &source, const char *mime) {
 
     ALOGV("MediaExtractorFactory::CreateFromService %s", mime);
-
-    UpdateExtractors();
 
     // initialize source decryption if needed
     source->DrmInitialization(nullptr /* mime */);
@@ -245,21 +243,17 @@ void MediaExtractorFactory::RegisterExtractors(
             void *libHandle = android_dlopen_ext(
                     libPath.string(),
                     RTLD_NOW | RTLD_LOCAL, dlextinfo);
-            if (libHandle) {
-                GetExtractorDef getDef =
-                    (GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
-                if (getDef) {
-                    ALOGV("registering sniffer for %s", libPath.string());
-                    RegisterExtractor(
-                            new ExtractorPlugin(getDef(), libHandle, libPath), pluginList);
-                } else {
-                    LOG_ALWAYS_FATAL_IN_CHILD_PROC("%s does not contain sniffer", libPath.string());
-                    dlclose(libHandle);
-                }
-            } else {
-                LOG_ALWAYS_FATAL_IN_CHILD_PROC(
-                        "couldn't dlopen(%s) %s", libPath.string(), strerror(errno));
-            }
+            CHECK(libHandle != nullptr)
+                    << "couldn't dlopen(" << libPath.string() << ") " << strerror(errno);
+
+            GetExtractorDef getDef =
+                (GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
+            CHECK(getDef != nullptr)
+                    << libPath.string() << " does not contain sniffer";
+
+            ALOGV("registering sniffer for %s", libPath.string());
+            RegisterExtractor(
+                    new ExtractorPlugin(getDef(), libHandle, libPath), pluginList);
         }
         closedir(libDir);
     } else {
@@ -274,7 +268,7 @@ static bool compareFunc(const sp<ExtractorPlugin>& first, const sp<ExtractorPlug
 static std::unordered_set<std::string> gSupportedExtensions;
 
 // static
-void MediaExtractorFactory::UpdateExtractors() {
+void MediaExtractorFactory::LoadExtractors() {
     Mutex::Autolock autoLock(gPluginMutex);
 
     if (gPluginsRegistered) {
