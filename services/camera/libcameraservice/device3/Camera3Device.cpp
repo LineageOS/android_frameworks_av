@@ -1306,7 +1306,7 @@ status_t Camera3Device::readOneCameraMetadataLocked(
 void Camera3Device::processOneCaptureResultLocked(
         const hardware::camera::device::V3_2::CaptureResult& result,
         const hardware::hidl_vec<
-                hardware::camera::device::V3_4::PhysicalCameraMetadata> physicalCameraMetadatas) {
+                hardware::camera::device::V3_4::PhysicalCameraMetadata> physicalCameraMetadata) {
     camera3_capture_result r;
     status_t res;
     r.frame_number = result.frameNumber;
@@ -1322,21 +1322,21 @@ void Camera3Device::processOneCaptureResultLocked(
     r.result = reinterpret_cast<const camera_metadata_t*>(resultMetadata.data());
 
     // Read and validate physical camera metadata
-    size_t physResultCount = physicalCameraMetadatas.size();
+    size_t physResultCount = physicalCameraMetadata.size();
     std::vector<const char*> physCamIds(physResultCount);
     std::vector<const camera_metadata_t *> phyCamMetadatas(physResultCount);
     std::vector<hardware::camera::device::V3_2::CameraMetadata> physResultMetadata;
     physResultMetadata.resize(physResultCount);
-    for (size_t i = 0; i < physicalCameraMetadatas.size(); i++) {
-        res = readOneCameraMetadataLocked(physicalCameraMetadatas[i].fmqMetadataSize,
-                physResultMetadata[i], physicalCameraMetadatas[i].metadata);
+    for (size_t i = 0; i < physicalCameraMetadata.size(); i++) {
+        res = readOneCameraMetadataLocked(physicalCameraMetadata[i].fmqMetadataSize,
+                physResultMetadata[i], physicalCameraMetadata[i].metadata);
         if (res != OK) {
             ALOGE("%s: Frame %d: Failed to read capture result metadata for camera %s",
                     __FUNCTION__, result.frameNumber,
-                    physicalCameraMetadatas[i].physicalCameraId.c_str());
+                    physicalCameraMetadata[i].physicalCameraId.c_str());
             return;
         }
-        physCamIds[i] = physicalCameraMetadatas[i].physicalCameraId.c_str();
+        physCamIds[i] = physicalCameraMetadata[i].physicalCameraId.c_str();
         phyCamMetadatas[i] = reinterpret_cast<const camera_metadata_t*>(
                 physResultMetadata[i].data());
     }
@@ -3419,6 +3419,14 @@ void Camera3Device::insertResultLocked(CaptureResult *result,
         return;
     }
 
+    // Update vendor tag id for physical metadata
+    for (auto& physicalMetadata : result->mPhysicalMetadatas) {
+        camera_metadata_t *pmeta = const_cast<camera_metadata_t *>(
+                physicalMetadata.mPhysicalCameraMetadata.getAndLock());
+        set_camera_metadata_vendor_id(pmeta, mVendorTagId);
+        physicalMetadata.mPhysicalCameraMetadata.unlock(pmeta);
+    }
+
     // Valid result, insert into queue
     List<CaptureResult>::iterator queuedResult =
             mResultQueue.insert(mResultQueue.end(), CaptureResult(*result));
@@ -3550,8 +3558,14 @@ void Camera3Device::sendCaptureResult(CameraMetadata &pendingMetadata,
         }
     }
 
+    std::unordered_map<std::string, CameraMetadata> monitoredPhysicalMetadata;
+    for (auto& m : physicalMetadatas) {
+        monitoredPhysicalMetadata.emplace(String8(m.mPhysicalCameraId).string(),
+                CameraMetadata(m.mPhysicalCameraMetadata));
+    }
     mTagMonitor.monitorMetadata(TagMonitor::RESULT,
-            frameNumber, timestamp.data.i64[0], captureResult.mMetadata);
+            frameNumber, timestamp.data.i64[0], captureResult.mMetadata,
+            monitoredPhysicalMetadata);
 
     insertResultLocked(&captureResult, frameNumber);
 }
@@ -3965,8 +3979,11 @@ CameraMetadata Camera3Device::getLatestRequestLocked() {
 
 
 void Camera3Device::monitorMetadata(TagMonitor::eventSource source,
-        int64_t frameNumber, nsecs_t timestamp, const CameraMetadata& metadata) {
-    mTagMonitor.monitorMetadata(source, frameNumber, timestamp, metadata);
+        int64_t frameNumber, nsecs_t timestamp, const CameraMetadata& metadata,
+        const std::unordered_map<std::string, CameraMetadata>& physicalMetadata) {
+
+    mTagMonitor.monitorMetadata(source, frameNumber, timestamp, metadata,
+            physicalMetadata);
 }
 
 /**
@@ -5122,28 +5139,7 @@ bool Camera3Device::RequestThread::sendRequestsBatch() {
         NextRequest& nextRequest = mNextRequests.editItemAt(i);
         nextRequest.submitted = true;
 
-
-        // Update the latest request sent to HAL
-        if (nextRequest.halRequest.settings != NULL) { // Don't update if they were unchanged
-            Mutex::Autolock al(mLatestRequestMutex);
-
-            camera_metadata_t* cloned = clone_camera_metadata(nextRequest.halRequest.settings);
-            mLatestRequest.acquire(cloned);
-
-            sp<Camera3Device> parent = mParent.promote();
-            if (parent != NULL) {
-                parent->monitorMetadata(TagMonitor::REQUEST,
-                        nextRequest.halRequest.frame_number,
-                        0, mLatestRequest);
-            }
-        }
-
-        if (nextRequest.halRequest.settings != NULL) {
-            nextRequest.captureRequest->mSettingsList.begin()->metadata.unlock(
-                    nextRequest.halRequest.settings);
-        }
-
-        cleanupPhysicalSettings(nextRequest.captureRequest, &nextRequest.halRequest);
+        updateNextRequest(nextRequest);
 
         if (!triggerRemoveFailed) {
             // Remove any previously queued triggers (after unlock)
@@ -5198,26 +5194,7 @@ bool Camera3Device::RequestThread::sendRequestsOneByOne() {
         // Mark that the request has be submitted successfully.
         nextRequest.submitted = true;
 
-        // Update the latest request sent to HAL
-        if (nextRequest.halRequest.settings != NULL) { // Don't update if they were unchanged
-            Mutex::Autolock al(mLatestRequestMutex);
-
-            camera_metadata_t* cloned = clone_camera_metadata(nextRequest.halRequest.settings);
-            mLatestRequest.acquire(cloned);
-
-            sp<Camera3Device> parent = mParent.promote();
-            if (parent != NULL) {
-                parent->monitorMetadata(TagMonitor::REQUEST, nextRequest.halRequest.frame_number,
-                        0, mLatestRequest);
-            }
-        }
-
-        if (nextRequest.halRequest.settings != NULL) {
-            nextRequest.captureRequest->mSettingsList.begin()->metadata.unlock(
-                    nextRequest.halRequest.settings);
-        }
-
-        cleanupPhysicalSettings(nextRequest.captureRequest, &nextRequest.halRequest);
+        updateNextRequest(nextRequest);
 
         // Remove any previously queued triggers (after unlock)
         res = removeTriggers(mPrevRequest);
@@ -5277,6 +5254,37 @@ bool Camera3Device::RequestThread::skipHFRTargetFPSUpdate(int32_t tag,
     }
 
     return false;
+}
+
+void Camera3Device::RequestThread::updateNextRequest(NextRequest& nextRequest) {
+    // Update the latest request sent to HAL
+    if (nextRequest.halRequest.settings != NULL) { // Don't update if they were unchanged
+        Mutex::Autolock al(mLatestRequestMutex);
+
+        camera_metadata_t* cloned = clone_camera_metadata(nextRequest.halRequest.settings);
+        mLatestRequest.acquire(cloned);
+
+        mLatestPhysicalRequest.clear();
+        for (uint32_t i = 0; i < nextRequest.halRequest.num_physcam_settings; i++) {
+            cloned = clone_camera_metadata(nextRequest.halRequest.physcam_settings[i]);
+            mLatestPhysicalRequest.emplace(nextRequest.halRequest.physcam_id[i],
+                    CameraMetadata(cloned));
+        }
+
+        sp<Camera3Device> parent = mParent.promote();
+        if (parent != NULL) {
+            parent->monitorMetadata(TagMonitor::REQUEST,
+                    nextRequest.halRequest.frame_number,
+                    0, mLatestRequest, mLatestPhysicalRequest);
+        }
+    }
+
+    if (nextRequest.halRequest.settings != NULL) {
+        nextRequest.captureRequest->mSettingsList.begin()->metadata.unlock(
+                nextRequest.halRequest.settings);
+    }
+
+    cleanupPhysicalSettings(nextRequest.captureRequest, &nextRequest.halRequest);
 }
 
 bool Camera3Device::RequestThread::updateSessionParameters(const CameraMetadata& settings) {
