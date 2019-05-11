@@ -64,6 +64,10 @@ using dynamic_depth::Profiles;
 namespace android {
 namespace camera3 {
 
+// Depth samples with low confidence can skew the
+// near/far values and impact the range inverse coding.
+static const float CONFIDENCE_THRESHOLD = .15f;
+
 ExifOrientation getExifOrientation(const unsigned char *jpegBuffer, size_t jpegBufferSize) {
     if ((jpegBuffer == nullptr) || (jpegBufferSize == 0)) {
         return ExifOrientation::ORIENTATION_UNDEFINED;
@@ -238,6 +242,9 @@ inline void unpackDepth16(uint16_t value, std::vector<float> *points /*out*/,
     auto conf = (value >> 13) & 0x7;
     float normConfidence = (conf == 0) ? 1.f : (static_cast<float>(conf) - 1) / 7.f;
     confidence->push_back(normConfidence);
+    if (normConfidence < CONFIDENCE_THRESHOLD) {
+        return;
+    }
 
     if (*near > point) {
         *near = point;
@@ -358,8 +365,12 @@ std::unique_ptr<dynamic_depth::DepthMap> processDepthMapFrame(DepthPhotoInputFra
     auto pointIt = points.begin();
     auto confidenceIt = confidence.begin();
     while ((pointIt != points.end()) && (confidenceIt != confidence.end())) {
-        pointsQuantized.push_back(floorf(((far * (*pointIt - near)) /
-                (*pointIt * (far - near))) * 255.0f));
+        auto point = *pointIt;
+        if ((*confidenceIt) < CONFIDENCE_THRESHOLD) {
+            point = std::clamp(point, near, far);
+        }
+        pointsQuantized.push_back(floorf(((far * (point - near)) /
+                (point * (far - near))) * 255.0f));
         confidenceQuantized.push_back(floorf(*confidenceIt * 255.0f));
         confidenceIt++; pointIt++;
     }
