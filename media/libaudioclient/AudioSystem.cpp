@@ -864,7 +864,7 @@ audio_io_handle_t AudioSystem::getOutput(audio_stream_type_t stream)
     return aps->getOutput(stream);
 }
 
-status_t AudioSystem::getOutputForAttr(const audio_attributes_t *attr,
+status_t AudioSystem::getOutputForAttr(audio_attributes_t *attr,
                                         audio_io_handle_t *output,
                                         audio_session_t session,
                                         audio_stream_type_t *stream,
