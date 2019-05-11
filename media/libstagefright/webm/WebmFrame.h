@@ -25,7 +25,7 @@ struct WebmFrame : LightRefBase<WebmFrame> {
 public:
     const int mType;
     const bool mKey;
-    const uint64_t mAbsTimecode;
+    uint64_t mAbsTimecode;
     const sp<ABuffer> mData;
     const bool mEos;
 
@@ -33,6 +33,8 @@ public:
     WebmFrame(int type, bool key, uint64_t absTimecode, MediaBufferBase *buf);
     ~WebmFrame() {}
 
+    uint64_t getAbsTimecode();
+    void updateAbsTimecode(uint64_t newAbsTimecode);
     sp<WebmElement> SimpleBlock(uint64_t baseTimecode) const;
 
     bool operator<(const WebmFrame &other) const;
