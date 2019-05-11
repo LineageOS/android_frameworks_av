@@ -50,7 +50,6 @@
 #include <private/android_filesystem_config.h>
 #include <soundtrigger/SoundTrigger.h>
 #include <system/audio.h>
-#include <audio_policy_conf.h>
 #include "AudioPolicyManager.h"
 #include <Serializer.h>
 #include "TypeConverter.h"
@@ -4275,14 +4274,6 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
     loadConfig();
     initialize();
 }
-
-//  This check is to catch any legacy platform updating to Q without having
-//  switched to XML since its deprecation on O.
-// TODO: after Q release, remove this check and flag as XML is now the only
-//        option and all legacy platform should have transitioned to XML.
-#ifndef USE_XML_AUDIO_POLICY_CONF
-#error Audio policy no longer supports legacy .conf configuration format
-#endif
 
 void AudioPolicyManager::loadConfig() {
     if (deserializeAudioPolicyXmlConfig(getConfig()) != NO_ERROR) {
