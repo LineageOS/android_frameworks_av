@@ -4618,6 +4618,10 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
 
         // process fast tracks
         if (track->isFastTrack()) {
+            LOG_ALWAYS_FATAL_IF(mFastMixer.get() == nullptr,
+                    "%s(%d): FastTrack(%d) present without FastMixer",
+                     __func__, id(), track->id());
+
             if (track->getHapticPlaybackEnabled()) {
                 noFastHapticTrack = false;
             }
