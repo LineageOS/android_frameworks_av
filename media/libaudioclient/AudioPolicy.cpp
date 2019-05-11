@@ -159,4 +159,29 @@ void AudioMix::setMatchUid(uid_t uid) const {
     mCriteria.add(crit);
 }
 
+bool AudioMix::hasUidRule(bool match, uid_t uid) const {
+    const uint32_t rule = match ? RULE_MATCH_UID : RULE_EXCLUDE_UID;
+    for (size_t i = 0; i < mCriteria.size(); i++) {
+        if (mCriteria[i].mRule == rule
+                && mCriteria[i].mValue.mUid == uid) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AudioMix::hasMatchUidRule() const {
+    for (size_t i = 0; i < mCriteria.size(); i++) {
+        if (mCriteria[i].mRule == RULE_MATCH_UID) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AudioMix::isDeviceAffinityCompatible() const {
+    return ((mMixType == MIX_TYPE_PLAYERS)
+            && (mRouteFlags == MIX_ROUTE_FLAG_RENDER));
+}
+
 } // namespace android
