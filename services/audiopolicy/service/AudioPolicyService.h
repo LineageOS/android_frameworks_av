@@ -75,7 +75,7 @@ public:
     virtual status_t setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config);
     virtual audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage);
     virtual audio_io_handle_t getOutput(audio_stream_type_t stream);
-    status_t getOutputForAttr(const audio_attributes_t *attr,
+    status_t getOutputForAttr(audio_attributes_t *attr,
                               audio_io_handle_t *output,
                               audio_session_t session,
                               audio_stream_type_t *stream,

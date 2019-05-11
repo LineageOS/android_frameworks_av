@@ -35,6 +35,8 @@
 namespace android {
 
 static const String16 sAndroidPermissionRecordAudio("android.permission.RECORD_AUDIO");
+static const String16 sModifyPhoneState("android.permission.MODIFY_PHONE_STATE");
+static const String16 sModifyAudioRouting("android.permission.MODIFY_AUDIO_ROUTING");
 
 static String16 resolveCallingPackage(PermissionController& permissionController,
         const String16& opPackageName, uid_t uid) {
@@ -162,9 +164,8 @@ bool settingsAllowed() {
 }
 
 bool modifyAudioRoutingAllowed() {
-    static const String16 sModifyAudioRoutingAllowed("android.permission.MODIFY_AUDIO_ROUTING");
     // IMPORTANT: Use PermissionCache - not a runtime permission and may not change.
-    bool ok = PermissionCache::checkCallingPermission(sModifyAudioRoutingAllowed);
+    bool ok = PermissionCache::checkCallingPermission(sModifyAudioRouting);
     if (!ok) ALOGE("android.permission.MODIFY_AUDIO_ROUTING");
     return ok;
 }
@@ -200,9 +201,19 @@ bool dumpAllowed() {
 }
 
 bool modifyPhoneStateAllowed(pid_t pid, uid_t uid) {
-    static const String16 sModifyPhoneState("android.permission.MODIFY_PHONE_STATE");
     bool ok = PermissionCache::checkPermission(sModifyPhoneState, pid, uid);
-    if (!ok) ALOGE("Request requires android.permission.MODIFY_PHONE_STATE");
+    ALOGE_IF(!ok, "Request requires %s", String8(sModifyPhoneState).c_str());
+    return ok;
+}
+
+// privileged behavior needed by Dialer, Settings, SetupWizard and CellBroadcastReceiver
+bool bypassInterruptionPolicyAllowed(pid_t pid, uid_t uid) {
+    static const String16 sWriteSecureSettings("android.permission.WRITE_SECURE_SETTINGS");
+    bool ok = PermissionCache::checkPermission(sModifyPhoneState, pid, uid)
+        || PermissionCache::checkPermission(sWriteSecureSettings, pid, uid)
+        || PermissionCache::checkPermission(sModifyAudioRouting, pid, uid);
+    ALOGE_IF(!ok, "Request requires %s or %s",
+             String8(sModifyPhoneState).c_str(), String8(sWriteSecureSettings).c_str());
     return ok;
 }
 
