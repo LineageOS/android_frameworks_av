@@ -178,6 +178,7 @@ status_t AudioProfile::checkCompatibleChannelMask(audio_channel_mask_t channelMa
     const bool isRecordThread = portType == AUDIO_PORT_TYPE_MIX && portRole == AUDIO_PORT_ROLE_SINK;
     const bool isIndex = audio_channel_mask_get_representation(channelMask)
             == AUDIO_CHANNEL_REPRESENTATION_INDEX;
+    const uint32_t channelCount = audio_channel_count_from_in_mask(channelMask);
     int bestMatch = 0;
     for (size_t i = 0; i < mChannelMasks.size(); i ++) {
         audio_channel_mask_t supported = mChannelMasks[i];
@@ -201,11 +202,15 @@ status_t AudioProfile::checkCompatibleChannelMask(audio_channel_mask_t channelMa
             // OR
             // match score += 100 if the channel mask representations match
             // match score += number of channels matched.
+            // match score += 100 if the channel mask representations DO NOT match
+            //   but the profile has positional channel mask and less than 2 channels.
+            //   This is for audio HAL convention to not list index masks for less than 2 channels
             //
             // If there are no matched channels, the mask may still be accepted
             // but the playback or record will be silent.
             const bool isSupportedIndex = (audio_channel_mask_get_representation(supported)
                     == AUDIO_CHANNEL_REPRESENTATION_INDEX);
+            const uint32_t supportedChannelCount = audio_channel_count_from_in_mask(supported);
             int match;
             if (isIndex && isSupportedIndex) {
                 // index equivalence
@@ -213,13 +218,14 @@ status_t AudioProfile::checkCompatibleChannelMask(audio_channel_mask_t channelMa
                         audio_channel_mask_get_bits(channelMask)
                             & audio_channel_mask_get_bits(supported));
             } else if (isIndex && !isSupportedIndex) {
-                const uint32_t equivalentBits =
-                        (1 << audio_channel_count_from_in_mask(supported)) - 1 ;
+                const uint32_t equivalentBits = (1 << supportedChannelCount) - 1 ;
                 match = __builtin_popcount(
                         audio_channel_mask_get_bits(channelMask) & equivalentBits);
+                if (supportedChannelCount <= FCC_2) {
+                    match += 100;
+                }
             } else if (!isIndex && isSupportedIndex) {
-                const uint32_t equivalentBits =
-                        (1 << audio_channel_count_from_in_mask(channelMask)) - 1;
+                const uint32_t equivalentBits = (1 << channelCount) - 1;
                 match = __builtin_popcount(
                         equivalentBits & audio_channel_mask_get_bits(supported));
             } else {
