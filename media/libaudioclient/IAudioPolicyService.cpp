@@ -198,7 +198,7 @@ public:
         return static_cast <audio_io_handle_t> (reply.readInt32());
     }
 
-    status_t getOutputForAttr(const audio_attributes_t *attr,
+    status_t getOutputForAttr(audio_attributes_t *attr,
                               audio_io_handle_t *output,
                               audio_session_t session,
                               audio_stream_type_t *stream,
@@ -212,38 +212,27 @@ public:
         {
             Parcel data, reply;
             data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
-            if (attr == NULL) {
-                if (stream == NULL) {
-                    ALOGE("getOutputForAttr(): NULL audio attributes and stream type");
-                    return BAD_VALUE;
-                }
-                if (*stream == AUDIO_STREAM_DEFAULT) {
-                    ALOGE("getOutputForAttr unspecified stream type");
-                    return BAD_VALUE;
-                }
-            }
-            if (output == NULL) {
-                ALOGE("getOutputForAttr NULL output - shouldn't happen");
+            if (attr == nullptr) {
+                ALOGE("%s NULL audio attributes", __func__);
                 return BAD_VALUE;
             }
-            if (selectedDeviceId == NULL) {
-                ALOGE("getOutputForAttr NULL selectedDeviceId - shouldn't happen");
+            if (output == nullptr) {
+                ALOGE("%s NULL output - shouldn't happen", __func__);
                 return BAD_VALUE;
             }
-            if (portId == NULL) {
-                ALOGE("getOutputForAttr NULL portId - shouldn't happen");
+            if (selectedDeviceId == nullptr) {
+                ALOGE("%s NULL selectedDeviceId - shouldn't happen", __func__);
                 return BAD_VALUE;
             }
-            if (secondaryOutputs == NULL) {
-                ALOGE("getOutputForAttr NULL secondaryOutputs - shouldn't happen");
+            if (portId == nullptr) {
+                ALOGE("%s NULL portId - shouldn't happen", __func__);
                 return BAD_VALUE;
             }
-            if (attr == NULL) {
-                data.writeInt32(0);
-            } else {
-                data.writeInt32(1);
-                data.write(attr, sizeof(audio_attributes_t));
+            if (secondaryOutputs == nullptr) {
+                ALOGE("%s NULL secondaryOutputs - shouldn't happen", __func__);
+                return BAD_VALUE;
             }
+            data.write(attr, sizeof(audio_attributes_t));
             data.writeInt32(session);
             if (stream == NULL) {
                 data.writeInt32(0);
@@ -262,6 +251,10 @@ public:
                 return status;
             }
             status = (status_t)reply.readInt32();
+            if (status != NO_ERROR) {
+                return status;
+            }
+            status = (status_t)reply.read(&attr, sizeof(audio_attributes_t));
             if (status != NO_ERROR) {
                 return status;
             }
@@ -1449,12 +1442,12 @@ status_t BnAudioPolicyService::onTransact(
 
         case GET_OUTPUT_FOR_ATTR: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            audio_attributes_t attr = {};
-            bool hasAttributes = data.readInt32() != 0;
-            if (hasAttributes) {
-                data.read(&attr, sizeof(audio_attributes_t));
-                sanetizeAudioAttributes(&attr);
+            audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+            status_t status = data.read(&attr, sizeof(audio_attributes_t));
+            if (status != NO_ERROR) {
+                return status;
             }
+            sanetizeAudioAttributes(&attr);
             audio_session_t session = (audio_session_t)data.readInt32();
             audio_stream_type_t stream = AUDIO_STREAM_DEFAULT;
             bool hasStream = data.readInt32() != 0;
@@ -1472,11 +1465,15 @@ status_t BnAudioPolicyService::onTransact(
             audio_port_handle_t portId = (audio_port_handle_t)data.readInt32();
             audio_io_handle_t output = 0;
             std::vector<audio_io_handle_t> secondaryOutputs;
-            status_t status = getOutputForAttr(hasAttributes ? &attr : NULL,
+            status = getOutputForAttr(&attr,
                     &output, session, &stream, pid, uid,
                     &config,
                     flags, &selectedDeviceId, &portId, &secondaryOutputs);
             reply->writeInt32(status);
+            status = reply->write(&attr, sizeof(audio_attributes_t));
+            if (status != NO_ERROR) {
+                return status;
+            }
             reply->writeInt32(output);
             reply->writeInt32(stream);
             reply->writeInt32(selectedDeviceId);

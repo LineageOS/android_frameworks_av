@@ -20,6 +20,7 @@
 #include <vector>
 #include <atomic>
 #include <mutex>
+#include <unordered_map>
 
 #include <utils/RefBase.h>
 #include <utils/String8.h>
@@ -62,7 +63,8 @@ class TagMonitor {
 
     // Scan through the metadata and update the monitoring information
     void monitorMetadata(eventSource source, int64_t frameNumber,
-            nsecs_t timestamp, const CameraMetadata& metadata);
+            nsecs_t timestamp, const CameraMetadata& metadata,
+            const std::unordered_map<std::string, CameraMetadata>& physicalMetadata);
 
     // Dump current event log to the provided fd
     void dumpMonitoredMetadata(int fd);
@@ -71,6 +73,10 @@ class TagMonitor {
 
     static void printData(int fd, const uint8_t *data_ptr, uint32_t tag,
             int type, int count, int indentation);
+
+    void monitorSingleMetadata(TagMonitor::eventSource source, int64_t frameNumber,
+            nsecs_t timestamp, const std::string& cameraId, uint32_t tag,
+            const CameraMetadata& metadata);
 
     std::atomic<bool> mMonitoringEnabled;
     std::mutex mMonitorMutex;
@@ -82,6 +88,9 @@ class TagMonitor {
     CameraMetadata mLastMonitoredRequestValues;
     CameraMetadata mLastMonitoredResultValues;
 
+    std::unordered_map<std::string, CameraMetadata> mLastMonitoredPhysicalRequestKeys;
+    std::unordered_map<std::string, CameraMetadata> mLastMonitoredPhysicalResultKeys;
+
     /**
      * A monitoring event
      * Stores a new metadata field value and the timestamp at which it changed.
@@ -90,7 +99,7 @@ class TagMonitor {
     struct MonitorEvent {
         template<typename T>
         MonitorEvent(eventSource src, uint32_t frameNumber, nsecs_t timestamp,
-                const T &newValue);
+                const T &newValue, const std::string& cameraId);
         ~MonitorEvent();
 
         eventSource source;
@@ -99,6 +108,7 @@ class TagMonitor {
         uint32_t tag;
         uint8_t type;
         std::vector<uint8_t> newData;
+        std::string cameraId;
     };
 
     // A ring buffer for tracking the last kMaxMonitorEvents metadata changes

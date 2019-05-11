@@ -100,10 +100,13 @@ void TagMonitor::disableMonitoring() {
     mMonitoringEnabled = false;
     mLastMonitoredRequestValues.clear();
     mLastMonitoredResultValues.clear();
+    mLastMonitoredPhysicalRequestKeys.clear();
+    mLastMonitoredPhysicalResultKeys.clear();
 }
 
 void TagMonitor::monitorMetadata(eventSource source, int64_t frameNumber, nsecs_t timestamp,
-        const CameraMetadata& metadata) {
+        const CameraMetadata& metadata,
+        const std::unordered_map<std::string, CameraMetadata>& physicalMetadata) {
     if (!mMonitoringEnabled) return;
 
     std::lock_guard<std::mutex> lock(mMonitorMutex);
@@ -112,62 +115,77 @@ void TagMonitor::monitorMetadata(eventSource source, int64_t frameNumber, nsecs_
         timestamp = systemTime(SYSTEM_TIME_BOOTTIME);
     }
 
+    std::string emptyId;
     for (auto tag : mMonitoredTagList) {
-        camera_metadata_ro_entry entry = metadata.find(tag);
-        CameraMetadata &lastValues = (source == REQUEST) ?
-                mLastMonitoredRequestValues : mLastMonitoredResultValues;
-        if (lastValues.isEmpty()) {
-            lastValues = CameraMetadata(mMonitoredTagList.size());
-            const camera_metadata_t *metaBuffer =
-                    lastValues.getAndLock();
-            set_camera_metadata_vendor_id(
-                    const_cast<camera_metadata_t *> (metaBuffer), mVendorTagId);
-            lastValues.unlock(metaBuffer);
+        monitorSingleMetadata(source, frameNumber, timestamp, emptyId, tag, metadata);
+
+        for (auto& m : physicalMetadata) {
+            monitorSingleMetadata(source, frameNumber, timestamp, m.first, tag, m.second);
         }
+    }
+}
 
-        camera_metadata_entry lastEntry = lastValues.find(tag);
+void TagMonitor::monitorSingleMetadata(eventSource source, int64_t frameNumber, nsecs_t timestamp,
+        const std::string& cameraId, uint32_t tag, const CameraMetadata& metadata) {
 
-        if (entry.count > 0) {
-            bool isDifferent = false;
-            if (lastEntry.count > 0) {
-                // Have a last value, compare to see if changed
-                if (lastEntry.type == entry.type &&
-                        lastEntry.count == entry.count) {
-                    // Same type and count, compare values
-                    size_t bytesPerValue = camera_metadata_type_size[lastEntry.type];
-                    size_t entryBytes = bytesPerValue * lastEntry.count;
-                    int cmp = memcmp(entry.data.u8, lastEntry.data.u8, entryBytes);
-                    if (cmp != 0) {
-                        isDifferent = true;
-                    }
-                } else {
-                    // Count or type has changed
+    CameraMetadata &lastValues = (source == REQUEST) ?
+            (cameraId.empty() ? mLastMonitoredRequestValues :
+                    mLastMonitoredPhysicalRequestKeys[cameraId]) :
+            (cameraId.empty() ? mLastMonitoredResultValues :
+                    mLastMonitoredPhysicalResultKeys[cameraId]);
+
+    camera_metadata_ro_entry entry = metadata.find(tag);
+    if (lastValues.isEmpty()) {
+        lastValues = CameraMetadata(mMonitoredTagList.size());
+        const camera_metadata_t *metaBuffer =
+                lastValues.getAndLock();
+        set_camera_metadata_vendor_id(
+                const_cast<camera_metadata_t *> (metaBuffer), mVendorTagId);
+        lastValues.unlock(metaBuffer);
+    }
+
+    camera_metadata_entry lastEntry = lastValues.find(tag);
+
+    if (entry.count > 0) {
+        bool isDifferent = false;
+        if (lastEntry.count > 0) {
+            // Have a last value, compare to see if changed
+            if (lastEntry.type == entry.type &&
+                    lastEntry.count == entry.count) {
+                // Same type and count, compare values
+                size_t bytesPerValue = camera_metadata_type_size[lastEntry.type];
+                size_t entryBytes = bytesPerValue * lastEntry.count;
+                int cmp = memcmp(entry.data.u8, lastEntry.data.u8, entryBytes);
+                if (cmp != 0) {
                     isDifferent = true;
                 }
             } else {
-                // No last entry, so always consider to be different
+                // Count or type has changed
                 isDifferent = true;
             }
+        } else {
+            // No last entry, so always consider to be different
+            isDifferent = true;
+        }
 
-            if (isDifferent) {
-                ALOGV("%s: Tag %s changed", __FUNCTION__,
-                      get_local_camera_metadata_tag_name_vendor_id(
-                              tag, mVendorTagId));
-                lastValues.update(entry);
-                mMonitoringEvents.emplace(source, frameNumber, timestamp, entry);
-            }
-        } else if (lastEntry.count > 0) {
-            // Value has been removed
-            ALOGV("%s: Tag %s removed", __FUNCTION__,
+        if (isDifferent) {
+            ALOGV("%s: Tag %s changed", __FUNCTION__,
                   get_local_camera_metadata_tag_name_vendor_id(
                           tag, mVendorTagId));
-            lastValues.erase(tag);
-            entry.tag = tag;
-            entry.type = get_local_camera_metadata_tag_type_vendor_id(tag,
-                    mVendorTagId);
-            entry.count = 0;
-            mMonitoringEvents.emplace(source, frameNumber, timestamp, entry);
+            lastValues.update(entry);
+            mMonitoringEvents.emplace(source, frameNumber, timestamp, entry, cameraId);
         }
+    } else if (lastEntry.count > 0) {
+        // Value has been removed
+        ALOGV("%s: Tag %s removed", __FUNCTION__,
+              get_local_camera_metadata_tag_name_vendor_id(
+                      tag, mVendorTagId));
+        lastValues.erase(tag);
+        entry.tag = tag;
+        entry.type = get_local_camera_metadata_tag_type_vendor_id(tag,
+                mVendorTagId);
+        entry.count = 0;
+        mMonitoringEvents.emplace(source, frameNumber, timestamp, entry, cameraId);
     }
 }
 
@@ -190,8 +208,9 @@ void TagMonitor::dumpMonitoredMetadata(int fd) {
         dprintf(fd, "     Monitored tag event log:\n");
         for (const auto& event : mMonitoringEvents) {
             int indentation = (event.source == REQUEST) ? 15 : 30;
-            dprintf(fd, "        f%d:%" PRId64 "ns: %*s%s.%s: ",
+            dprintf(fd, "        f%d:%" PRId64 "ns:%*s%*s%s.%s: ",
                     event.frameNumber, event.timestamp,
+                    2, event.cameraId.c_str(),
                     indentation,
                     event.source == REQUEST ? "REQ:" : "RES:",
                     get_local_camera_metadata_section_name_vendor_id(event.tag,
@@ -296,13 +315,14 @@ void TagMonitor::printData(int fd, const uint8_t *data_ptr, uint32_t tag,
 
 template<typename T>
 TagMonitor::MonitorEvent::MonitorEvent(eventSource src, uint32_t frameNumber, nsecs_t timestamp,
-        const T &value) :
+        const T &value, const std::string& cameraId) :
         source(src),
         frameNumber(frameNumber),
         timestamp(timestamp),
         tag(value.tag),
         type(value.type),
-        newData(value.data.u8, value.data.u8 + camera_metadata_type_size[value.type] * value.count) {
+        newData(value.data.u8, value.data.u8 + camera_metadata_type_size[value.type] * value.count),
+        cameraId(cameraId) {
 }
 
 TagMonitor::MonitorEvent::~MonitorEvent() {
