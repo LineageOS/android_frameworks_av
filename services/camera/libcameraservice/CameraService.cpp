@@ -117,6 +117,11 @@ static void setLogLevel(int level) {
 
 static const String16 sManageCameraPermission("android.permission.MANAGE_CAMERA");
 
+// Matches with PERCEPTIBLE_APP_ADJ in ProcessList.java
+static constexpr int32_t kVendorClientScore = 200;
+// Matches with PROCESS_STATE_PERSISTENT_UI in ActivityManager.java
+static constexpr int32_t kVendorClientState = 1;
+
 Mutex CameraService::sProxyMutex;
 sp<hardware::ICameraServiceProxy> CameraService::sCameraServiceProxy;
 
@@ -1120,7 +1125,8 @@ status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clien
         std::map<int,resource_policy::ClientPriority> pidToPriorityMap;
         for (size_t i = 0; i < ownerPids.size() - 1; i++) {
             pidToPriorityMap.emplace(ownerPids[i],
-                    resource_policy::ClientPriority(priorityScores[i], states[i]));
+                    resource_policy::ClientPriority(priorityScores[i], states[i],
+                            /* isVendorClient won't get copied over*/ false));
         }
         mActiveClientManager.updatePriorities(pidToPriorityMap);
 
@@ -2980,8 +2986,12 @@ CameraService::DescriptorPtr CameraService::CameraClientManager::makeClientDescr
         const std::set<String8>& conflictingKeys, int32_t score, int32_t ownerId,
         int32_t state) {
 
+    bool isVendorClient = hardware::IPCThreadState::self()->isServingCall();
+    int32_t score_adj = isVendorClient ? kVendorClientScore : score;
+    int32_t state_adj = isVendorClient ? kVendorClientState: state;
+
     return std::make_shared<resource_policy::ClientDescriptor<String8, sp<BasicClient>>>(
-            key, value, cost, conflictingKeys, score, ownerId, state);
+            key, value, cost, conflictingKeys, score_adj, ownerId, state_adj, isVendorClient);
 }
 
 CameraService::DescriptorPtr CameraService::CameraClientManager::makeClientDescriptor(

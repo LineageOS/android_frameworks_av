@@ -33,11 +33,37 @@ namespace resource_policy {
 
 class ClientPriority {
 public:
-    ClientPriority(int32_t score, int32_t state) :
-        mScore(score), mState(state) {}
+    /**
+     * Choosing to set mIsVendorClient through a parameter instead of calling
+     * hardware::IPCThreadState::self()->isServingCall() to protect against the
+     * case where the construction is offloaded to another thread which isn't a
+     * hwbinder thread.
+     */
+    ClientPriority(int32_t score, int32_t state, bool isVendorClient) :
+            mScore(score), mState(state), mIsVendorClient(isVendorClient) { }
 
     int32_t getScore() const { return mScore; }
     int32_t getState() const { return mState; }
+
+    void setScore(int32_t score) {
+        // For vendor clients, the score is set once and for all during
+        // construction. Otherwise, it can get reset each time cameraserver
+        // queries ActivityManagerService for oom_adj scores / states .
+        if (!mIsVendorClient) {
+            mScore = score;
+        }
+    }
+
+    void setState(int32_t state) {
+      // For vendor clients, the score is set once and for all during
+      // construction. Otherwise, it can get reset each time cameraserver
+      // queries ActivityManagerService for oom_adj scores / states
+      // (ActivityManagerService returns a vendor process' state as
+      // PROCESS_STATE_NONEXISTENT.
+      if (!mIsVendorClient) {
+          mState = state;
+      }
+    }
 
     bool operator==(const ClientPriority& rhs) const {
         return (this->mScore == rhs.mScore) && (this->mState == rhs.mState);
@@ -66,6 +92,7 @@ public:
 private:
         int32_t mScore;
         int32_t mState;
+        bool mIsVendorClient = false;
 };
 
 // --------------------------------------------------------------------------------
@@ -82,9 +109,10 @@ template<class KEY, class VALUE>
 class ClientDescriptor final {
 public:
     ClientDescriptor(const KEY& key, const VALUE& value, int32_t cost,
-            const std::set<KEY>& conflictingKeys, int32_t score, int32_t ownerId, int32_t state);
+            const std::set<KEY>& conflictingKeys, int32_t score, int32_t ownerId, int32_t state,
+            bool isVendorClient);
     ClientDescriptor(KEY&& key, VALUE&& value, int32_t cost, std::set<KEY>&& conflictingKeys,
-            int32_t score, int32_t ownerId, int32_t state);
+            int32_t score, int32_t ownerId, int32_t state, bool isVendorClient);
 
     ~ClientDescriptor();
 
@@ -148,17 +176,19 @@ bool operator < (const ClientDescriptor<K, V>& a, const ClientDescriptor<K, V>& 
 
 template<class KEY, class VALUE>
 ClientDescriptor<KEY, VALUE>::ClientDescriptor(const KEY& key, const VALUE& value, int32_t cost,
-        const std::set<KEY>& conflictingKeys, int32_t score, int32_t ownerId, int32_t state) :
+        const std::set<KEY>& conflictingKeys, int32_t score, int32_t ownerId, int32_t state,
+        bool isVendorClient) :
         mKey{key}, mValue{value}, mCost{cost}, mConflicting{conflictingKeys},
-        mPriority(score, state),
+        mPriority(score, state, isVendorClient),
         mOwnerId{ownerId} {}
 
 template<class KEY, class VALUE>
 ClientDescriptor<KEY, VALUE>::ClientDescriptor(KEY&& key, VALUE&& value, int32_t cost,
-        std::set<KEY>&& conflictingKeys, int32_t score, int32_t ownerId, int32_t state) :
+        std::set<KEY>&& conflictingKeys, int32_t score, int32_t ownerId, int32_t state,
+        bool isVendorClient) :
         mKey{std::forward<KEY>(key)}, mValue{std::forward<VALUE>(value)}, mCost{cost},
         mConflicting{std::forward<std::set<KEY>>(conflictingKeys)},
-        mPriority(score, state), mOwnerId{ownerId} {}
+        mPriority(score, state, isVendorClient), mOwnerId{ownerId} {}
 
 template<class KEY, class VALUE>
 ClientDescriptor<KEY, VALUE>::~ClientDescriptor() {}
@@ -204,7 +234,13 @@ std::set<KEY> ClientDescriptor<KEY, VALUE>::getConflicting() const {
 
 template<class KEY, class VALUE>
 void ClientDescriptor<KEY, VALUE>::setPriority(const ClientPriority& priority) {
-    mPriority = priority;
+    // We don't use the usual copy constructor here since we want to remember
+    // whether a client is a vendor client or not. This could have been wiped
+    // off in the incoming priority argument since an AIDL thread might have
+    // called hardware::IPCThreadState::self()->isServingCall() after refreshing
+    // priorities for old clients through ProcessInfoService::getProcessStatesScoresFromPids().
+    mPriority.setScore(priority.getScore());
+    mPriority.setState(priority.getState());
 }
 
 // --------------------------------------------------------------------------------

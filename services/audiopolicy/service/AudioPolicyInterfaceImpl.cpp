@@ -166,7 +166,7 @@ audio_io_handle_t AudioPolicyService::getOutput(audio_stream_type_t stream)
     return mAudioPolicyManager->getOutput(stream);
 }
 
-status_t AudioPolicyService::getOutputForAttr(const audio_attributes_t *originalAttr,
+status_t AudioPolicyService::getOutputForAttr(audio_attributes_t *attr,
                                               audio_io_handle_t *output,
                                               audio_session_t session,
                                               audio_stream_type_t *stream,
@@ -190,13 +190,15 @@ status_t AudioPolicyService::getOutputForAttr(const audio_attributes_t *original
                 "%s uid %d tried to pass itself off as %d", __FUNCTION__, callingUid, uid);
         uid = callingUid;
     }
-    audio_attributes_t attr = *originalAttr;
     if (!mPackageManager.allowPlaybackCapture(uid)) {
-        attr.flags |= AUDIO_FLAG_NO_MEDIA_PROJECTION;
+        attr->flags |= AUDIO_FLAG_NO_MEDIA_PROJECTION;
+    }
+    if (!bypassInterruptionPolicyAllowed(pid, uid)) {
+        attr->flags &= ~(AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY|AUDIO_FLAG_BYPASS_MUTE);
     }
     audio_output_flags_t originalFlags = flags;
     AutoCallerClear acc;
-    status_t result = mAudioPolicyManager->getOutputForAttr(&attr, output, session, stream, uid,
+    status_t result = mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid,
                                                  config,
                                                  &flags, selectedDeviceId, portId,
                                                  secondaryOutputs);
@@ -212,14 +214,14 @@ status_t AudioPolicyService::getOutputForAttr(const audio_attributes_t *original
         *selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
         *portId = AUDIO_PORT_HANDLE_NONE;
         secondaryOutputs->clear();
-        result = mAudioPolicyManager->getOutputForAttr(&attr, output, session, stream, uid, config,
+        result = mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid, config,
                                                        &flags, selectedDeviceId, portId,
                                                        secondaryOutputs);
     }
 
     if (result == NO_ERROR) {
         sp <AudioPlaybackClient> client =
-            new AudioPlaybackClient(attr, *output, uid, pid, session, *selectedDeviceId, *stream);
+            new AudioPlaybackClient(*attr, *output, uid, pid, session, *selectedDeviceId, *stream);
         mAudioPlaybackClients.add(*portId, client);
     }
     return result;
@@ -511,6 +513,7 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId)
     }
 
     // including successes gets very verbose
+    // but once we cut over to westworld, log them all.
     if (status != NO_ERROR) {
 
         static constexpr char kAudioPolicy[] = "audiopolicy";
@@ -571,6 +574,9 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId)
             delete item;
             item = NULL;
         }
+    }
+
+    if (status != NO_ERROR) {
         client->active = false;
         client->startTimeNs = 0;
         updateUidStates_l();

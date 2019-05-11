@@ -151,6 +151,7 @@ private:
         HEVC,
         MP3,
         PCM,
+        VORBIS,
         OTHER
     };
 
@@ -273,6 +274,8 @@ MatroskaSource::MatroskaSource(
         mType = MP3;
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_RAW)) {
         mType = PCM;
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_VORBIS)) {
+        mType = VORBIS;
     }
 }
 
@@ -801,6 +804,26 @@ media_status_t MatroskaSource::readBlock() {
         AMediaFormat *meta = mbuf->meta_data();
         AMediaFormat_setInt64(meta, AMEDIAFORMAT_KEY_TIME_US, timeUs);
         AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, block->IsKey());
+
+        if (mType == VORBIS) {
+            int32_t sampleRate;
+            if (!AMediaFormat_getInt32(trackInfo->mMeta, AMEDIAFORMAT_KEY_SAMPLE_RATE,
+                                       &sampleRate)) {
+                return AMEDIA_ERROR_MALFORMED;
+            }
+            int64_t durationUs;
+            if (!AMediaFormat_getInt64(trackInfo->mMeta, AMEDIAFORMAT_KEY_DURATION,
+                                       &durationUs)) {
+                return AMEDIA_ERROR_MALFORMED;
+            }
+            // TODO: Explore if this can be handled similar to MPEG4 extractor where padding is
+            // signalled instead of VALID_SAMPLES
+            // Remaining valid samples in Vorbis track
+            if (durationUs > timeUs) {
+                int32_t validSamples = ((durationUs - timeUs) * sampleRate) / 1000000ll;
+                AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_VALID_SAMPLES, validSamples);
+            }
+        }
 
         status_t err = frame.Read(mExtractor->mReader, data + trackInfo->mHeaderLen);
         if (err == OK

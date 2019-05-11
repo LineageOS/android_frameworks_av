@@ -121,6 +121,13 @@ bool PipelineWatcher::pipelineFull() const {
               sizeWithInputReleased);
         return true;
     }
+
+    size_t sizeWithInputsPending = mFramesInPipeline.size() - sizeWithInputReleased;
+    if (sizeWithInputsPending > mPipelineDelay + mInputDelay + mSmoothnessFactor) {
+        ALOGV("pipelineFull: too many inputs pending (%zu) in pipeline, with inputs released (%zu)",
+              sizeWithInputsPending, sizeWithInputReleased);
+        return true;
+    }
     ALOGV("pipeline has room (total: %zu, input released: %zu)",
           mFramesInPipeline.size(), sizeWithInputReleased);
     return false;

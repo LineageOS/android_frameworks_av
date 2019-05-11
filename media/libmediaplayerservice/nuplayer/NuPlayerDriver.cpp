@@ -635,7 +635,7 @@ void NuPlayerDriver::logMetrics(const char *where) {
 
         // re-init in case we prepare() and start() again.
         delete mAnalyticsItem ;
-        mAnalyticsItem = MediaAnalyticsItem::create("nuplayer");
+        mAnalyticsItem = MediaAnalyticsItem::create(kKeyPlayer);
         if (mAnalyticsItem) {
             mAnalyticsItem->setUid(mClientUid);
         }

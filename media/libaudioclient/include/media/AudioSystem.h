@@ -223,7 +223,7 @@ public:
     static status_t setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config);
     static audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage);
 
-    static status_t getOutputForAttr(const audio_attributes_t *attr,
+    static status_t getOutputForAttr(audio_attributes_t *attr,
                                      audio_io_handle_t *output,
                                      audio_session_t session,
                                      audio_stream_type_t *stream,
