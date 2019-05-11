@@ -387,18 +387,24 @@ status_t AudioFlinger::TrackHandle::onTransact(
 // static
 sp<AudioFlinger::PlaybackThread::OpPlayAudioMonitor>
 AudioFlinger::PlaybackThread::OpPlayAudioMonitor::createIfNeeded(
-            uid_t uid, audio_usage_t usage, int id, audio_stream_type_t streamType)
+            uid_t uid, const audio_attributes_t& attr, int id, audio_stream_type_t streamType)
 {
     if (isAudioServerOrRootUid(uid)) {
-        ALOGD("OpPlayAudio: not muting track:%d usage:%d root or audioserver", id, usage);
+        ALOGD("OpPlayAudio: not muting track:%d usage:%d root or audioserver", id, attr.usage);
         return nullptr;
     }
     // stream type has been filtered by audio policy to indicate whether it can be muted
     if (streamType == AUDIO_STREAM_ENFORCED_AUDIBLE) {
-        ALOGD("OpPlayAudio: not muting track:%d usage:%d ENFORCED_AUDIBLE", id, usage);
+        ALOGD("OpPlayAudio: not muting track:%d usage:%d ENFORCED_AUDIBLE", id, attr.usage);
         return nullptr;
     }
-    return new OpPlayAudioMonitor(uid, usage, id);
+    if ((attr.flags & AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY)
+            == AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY) {
+        ALOGD("OpPlayAudio: not muting track:%d flags %#x have FLAG_BYPASS_INTERRUPTION_POLICY",
+            id, attr.flags);
+        return nullptr;
+    }
+    return new OpPlayAudioMonitor(uid, attr.usage, id);
 }
 
 AudioFlinger::PlaybackThread::OpPlayAudioMonitor::OpPlayAudioMonitor(
@@ -508,7 +514,7 @@ AudioFlinger::PlaybackThread::Track::Track(
     mPresentationCompleteFrames(0),
     mFrameMap(16 /* sink-frame-to-track-frame map memory */),
     mVolumeHandler(new media::VolumeHandler(sampleRate)),
-    mOpPlayAudioMonitor(OpPlayAudioMonitor::createIfNeeded(uid, attr.usage, id(), streamType)),
+    mOpPlayAudioMonitor(OpPlayAudioMonitor::createIfNeeded(uid, attr, id(), streamType)),
     // mSinkTimestamp
     mFastIndex(-1),
     mCachedVolume(1.0),

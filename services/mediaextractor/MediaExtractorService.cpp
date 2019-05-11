@@ -30,7 +30,9 @@
 namespace android {
 
 MediaExtractorService::MediaExtractorService()
-        : BnMediaExtractorService() { }
+        : BnMediaExtractorService() {
+    MediaExtractorFactory::LoadExtractors();
+}
 
 sp<IMediaExtractor> MediaExtractorService::makeExtractor(
         const sp<IDataSource> &remoteSource, const char *mime) {

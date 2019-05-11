@@ -114,15 +114,6 @@ inline static const char *asString(status_t i, const char *def = "??") {
 #define TRESPASS_DBG(...)
 #endif
 
-#ifndef LOG_ALWAYS_FATAL_IN_CHILD_PROC
-#define LOG_ALWAYS_FATAL_IN_CHILD_PROC(...)   \
-    do {                                      \
-        if (fork() == 0) {                    \
-            LOG_ALWAYS_FATAL(__VA_ARGS__);    \
-        }                                     \
-    } while (false)
-#endif
-
 struct ADebug {
     enum Level {
         kDebugNone,             // no debug

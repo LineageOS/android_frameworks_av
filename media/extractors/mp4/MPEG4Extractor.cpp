@@ -45,6 +45,7 @@
 #include <media/stagefright/foundation/ColorUtils.h>
 #include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/hexdump.h>
+#include <media/stagefright/foundation/OpusHeader.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaDataBase.h>
@@ -1735,15 +1736,21 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             AMediaFormat_setInt32(mLastTrack->meta, AMEDIAFORMAT_KEY_SAMPLE_RATE, sample_rate);
 
             if (chunk_type == FOURCC("Opus")) {
-                uint8_t opusInfo[19];
+                uint8_t opusInfo[AOPUS_OPUSHEAD_MAXSIZE];
                 data_offset += sizeof(buffer);
+                size_t opusInfoSize = chunk_data_size - sizeof(buffer);
+
+                if (opusInfoSize < AOPUS_OPUSHEAD_MINSIZE ||
+                    opusInfoSize > AOPUS_OPUSHEAD_MAXSIZE) {
+                    return ERROR_MALFORMED;
+                }
                 // Read Opus Header
                 if (mDataSource->readAt(
-                        data_offset, opusInfo, sizeof(opusInfo)) < (ssize_t)sizeof(opusInfo)) {
+                        data_offset, opusInfo, opusInfoSize) < opusInfoSize) {
                     return ERROR_IO;
                 }
 
-                // OpusHeader must start with this magic sequence
+                // OpusHeader must start with this magic sequence, overwrite first 8 bytes
                 // http://wiki.xiph.org/OggOpus#ID_Header
                 strncpy((char *)opusInfo, "OpusHead", 8);
 
@@ -1760,17 +1767,18 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 memcpy(&opusInfo[opusOffset + 2], &sample_rate, sizeof(sample_rate));
                 memcpy(&opusInfo[opusOffset + 6], &out_gain, sizeof(out_gain));
 
-                int64_t codecDelay = 6500000;
-                int64_t seekPreRollNs = 80000000;  // Fixed 80 msec
+                static const int64_t kSeekPreRollNs = 80000000;  // Fixed 80 msec
+                static const int32_t kOpusSampleRate = 48000;
+                int64_t codecDelay = pre_skip * 1000000000ll / kOpusSampleRate;
 
                 AMediaFormat_setBuffer(mLastTrack->meta,
                             AMEDIAFORMAT_KEY_CSD_0, opusInfo, sizeof(opusInfo));
                 AMediaFormat_setBuffer(mLastTrack->meta,
                         AMEDIAFORMAT_KEY_CSD_1, &codecDelay, sizeof(codecDelay));
                 AMediaFormat_setBuffer(mLastTrack->meta,
-                        AMEDIAFORMAT_KEY_CSD_2, &seekPreRollNs, sizeof(seekPreRollNs));
+                        AMEDIAFORMAT_KEY_CSD_2, &kSeekPreRollNs, sizeof(kSeekPreRollNs));
 
-                data_offset += sizeof(opusInfo);
+                data_offset += opusInfoSize;
                 *offset = data_offset;
                 CHECK_EQ(*offset, stop_offset);
             }
@@ -4295,6 +4303,77 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
 
     if (csd_size < 2) {
         return ERROR_MALFORMED;
+    }
+
+    if (objectTypeIndication == 0xdd) {
+        // vorbis audio
+        if (csd[0] != 0x02) {
+            return ERROR_MALFORMED;
+        }
+
+        // codecInfo starts with two lengths, len1 and len2, that are
+        // "Xiph-style-lacing encoded"..
+
+        size_t offset = 1;
+        size_t len1 = 0;
+        while (offset < csd_size && csd[offset] == 0xff) {
+            if (__builtin_add_overflow(len1, 0xff, &len1)) {
+                return ERROR_MALFORMED;
+            }
+            ++offset;
+        }
+        if (offset >= csd_size) {
+            return ERROR_MALFORMED;
+        }
+        if (__builtin_add_overflow(len1, csd[offset], &len1)) {
+            return ERROR_MALFORMED;
+        }
+        ++offset;
+        if (len1 == 0) {
+            return ERROR_MALFORMED;
+        }
+
+        size_t len2 = 0;
+        while (offset < csd_size && csd[offset] == 0xff) {
+            if (__builtin_add_overflow(len2, 0xff, &len2)) {
+                return ERROR_MALFORMED;
+            }
+            ++offset;
+        }
+        if (offset >= csd_size) {
+            return ERROR_MALFORMED;
+        }
+        if (__builtin_add_overflow(len2, csd[offset], &len2)) {
+            return ERROR_MALFORMED;
+        }
+        ++offset;
+        if (len2 == 0) {
+            return ERROR_MALFORMED;
+        }
+        if (offset >= csd_size || csd[offset] != 0x01) {
+            return ERROR_MALFORMED;
+        }
+        // formerly kKeyVorbisInfo
+        AMediaFormat_setBuffer(mLastTrack->meta,
+                AMEDIAFORMAT_KEY_CSD_0, &csd[offset], len1);
+
+        if (__builtin_add_overflow(offset, len1, &offset) ||
+                offset >= csd_size || csd[offset] != 0x03) {
+            return ERROR_MALFORMED;
+        }
+
+        if (__builtin_add_overflow(offset, len2, &offset) ||
+                offset >= csd_size || csd[offset] != 0x05) {
+            return ERROR_MALFORMED;
+        }
+
+        // formerly kKeyVorbisBooks
+        AMediaFormat_setBuffer(mLastTrack->meta,
+                AMEDIAFORMAT_KEY_CSD_1, &csd[offset], csd_size - offset);
+        AMediaFormat_setString(mLastTrack->meta,
+                AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_VORBIS);
+
+        return OK;
     }
 
     static uint32_t kSamplingRate[] = {

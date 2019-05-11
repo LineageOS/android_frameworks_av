@@ -37,39 +37,38 @@
 
 namespace android {
 
-class C2SoftAvcEnc::IntfImpl : public C2InterfaceHelper {
+namespace {
+
+constexpr char COMPONENT_NAME[] = "c2.android.avc.encoder";
+
+}  // namespace
+
+class C2SoftAvcEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
 public:
     explicit IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helper)
-        : C2InterfaceHelper(helper) {
-
+        : SimpleInterface<void>::BaseParams(
+                helper,
+                COMPONENT_NAME,
+                C2Component::KIND_ENCODER,
+                C2Component::DOMAIN_VIDEO,
+                MEDIA_MIMETYPE_VIDEO_AVC) {
+        noPrivateBuffers(); // TODO: account for our buffers here
+        noInputReferences();
+        noOutputReferences();
+        noInputLatency();
+        noTimeStretch();
         setDerivedInstance(this);
-
-        addParameter(
-                DefineParam(mInputFormat, C2_PARAMKEY_INPUT_STREAM_BUFFER_TYPE)
-                .withConstValue(new C2StreamBufferTypeSetting::input(0u, C2BufferData::GRAPHIC))
-                .build());
-
-        addParameter(
-                DefineParam(mOutputFormat, C2_PARAMKEY_OUTPUT_STREAM_BUFFER_TYPE)
-                .withConstValue(new C2StreamBufferTypeSetting::output(0u, C2BufferData::LINEAR))
-                .build());
-
-        addParameter(
-                DefineParam(mInputMediaType, C2_PARAMKEY_INPUT_MEDIA_TYPE)
-                .withConstValue(AllocSharedString<C2PortMediaTypeSetting::input>(
-                        MEDIA_MIMETYPE_VIDEO_RAW))
-                .build());
-
-        addParameter(
-                DefineParam(mOutputMediaType, C2_PARAMKEY_OUTPUT_MEDIA_TYPE)
-                .withConstValue(AllocSharedString<C2PortMediaTypeSetting::output>(
-                        MEDIA_MIMETYPE_VIDEO_AVC))
-                .build());
 
         addParameter(
                 DefineParam(mUsage, C2_PARAMKEY_INPUT_STREAM_USAGE)
                 .withConstValue(new C2StreamUsageTuning::input(
                         0u, (uint64_t)C2MemoryUsage::CPU_READ))
+                .build());
+
+        addParameter(
+                DefineParam(mAttrib, C2_PARAMKEY_COMPONENT_ATTRIBUTES)
+                .withConstValue(new C2ComponentAttributesSetting(
+                    C2Component::ATTRIB_IS_TEMPORAL))
                 .build());
 
         addParameter(
@@ -325,10 +324,6 @@ public:
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> getRequestSync_l() const { return mRequestSync; }
 
 private:
-    std::shared_ptr<C2StreamBufferTypeSetting::input> mInputFormat;
-    std::shared_ptr<C2StreamBufferTypeSetting::output> mOutputFormat;
-    std::shared_ptr<C2PortMediaTypeSetting::input> mInputMediaType;
-    std::shared_ptr<C2PortMediaTypeSetting::output> mOutputMediaType;
     std::shared_ptr<C2StreamUsageTuning::input> mUsage;
     std::shared_ptr<C2StreamPictureSizeInfo::input> mSize;
     std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
@@ -340,8 +335,6 @@ private:
 };
 
 #define ive_api_function  ih264e_api_function
-
-constexpr char COMPONENT_NAME[] = "c2.android.avc.encoder";
 
 namespace {
 

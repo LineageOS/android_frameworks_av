@@ -148,7 +148,7 @@ struct MediaCodecsXmlParser::Impl {
             : mStatus(s),
               mError(error) {
             if (error.empty() && s) {
-                error = "Failed (" + std::string(asString(s)) + ")";
+                mError = "Failed (" + std::string(asString(s)) + ")";
             }
         }
         operator status_t() const { return mStatus; }
@@ -654,7 +654,7 @@ void MediaCodecsXmlParser::Impl::Parser::startElementHandler(
                 nextSection = SECTION_ENCODERS;
             } else if (strEq(name, "Settings")) {
                 nextSection = SECTION_SETTINGS;
-            } else if (strEq(name, "MediaCodecs")) {
+            } else if (strEq(name, "MediaCodecs") || strEq(name, "Included")) {
                 return;
             } else {
                 break;

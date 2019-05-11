@@ -64,13 +64,14 @@ bool convertFromHidlCloned(const HCameraMetadata &metadata, CameraMetadata *rawM
     return true;
 }
 
-// Note: existing data in dst will be gone. Caller still owns the memory of src
-void convertToHidl(const camera_metadata_t *src, HCameraMetadata* dst) {
+// Note: existing data in dst will be gone. dst owns memory if shouldOwn is set
+//       to true.
+void convertToHidl(const camera_metadata_t *src, HCameraMetadata* dst, bool shouldOwn) {
     if (src == nullptr) {
         return;
     }
     size_t size = get_camera_metadata_size(src);
-    dst->setToExternal((uint8_t *) src, size);
+    dst->setToExternal((uint8_t *) src, size, shouldOwn);
     return;
 }
 
