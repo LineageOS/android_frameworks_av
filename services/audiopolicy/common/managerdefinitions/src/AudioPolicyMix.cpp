@@ -400,13 +400,29 @@ status_t AudioPolicyMixCollection::getInputMixForAttr(
 
 status_t AudioPolicyMixCollection::setUidDeviceAffinities(uid_t uid,
         const Vector<AudioDeviceTypeAddr>& devices) {
+    // verify feasibility: for each player mix: if it already contains a
+    //    "match uid" rule for this uid, return an error
+    //    (adding a uid-device affinity would result in contradictory rules)
+    for (size_t i = 0; i < size(); i++) {
+        const AudioPolicyMix* mix = valueAt(i).get();
+        if (!mix->isDeviceAffinityCompatible()) {
+            continue;
+        }
+        if (mix->hasUidRule(true /*match*/, uid)) {
+            return INVALID_OPERATION;
+        }
+    }
+
     // remove existing rules for this uid
     removeUidDeviceAffinities(uid);
 
-    // for each player mix: add a rule to match or exclude the uid based on the device
+    // for each player mix:
+    //   IF    device is not a target for the mix,
+    //     AND it doesn't have a "match uid" rule
+    //   THEN add a rule to exclude the uid
     for (size_t i = 0; i < size(); i++) {
         const AudioPolicyMix *mix = valueAt(i).get();
-        if (mix->mMixType != MIX_TYPE_PLAYERS) {
+        if (!mix->isDeviceAffinityCompatible()) {
             continue;
         }
         // check if this mix goes to a device in the list of devices
@@ -418,12 +434,14 @@ status_t AudioPolicyMixCollection::setUidDeviceAffinities(uid_t uid,
                 break;
             }
         }
-        if (deviceMatch) {
-            mix->setMatchUid(uid);
-        } else {
+        if (!deviceMatch && !mix->hasMatchUidRule()) {
             // this mix doesn't go to one of the listed devices for the given uid,
+            // and it's not already restricting the mix on a uid,
             // modify its rules to exclude the uid
-            mix->setExcludeUid(uid);
+            if (!mix->hasUidRule(false /*match*/, uid)) {
+                // no need to do it again if uid is already excluded
+                mix->setExcludeUid(uid);
+            }
         }
     }
 
@@ -435,14 +453,15 @@ status_t AudioPolicyMixCollection::removeUidDeviceAffinities(uid_t uid) {
     for (size_t i = 0; i < size(); i++) {
         bool foundUidRule = false;
         const AudioPolicyMix *mix = valueAt(i).get();
-        if (mix->mMixType != MIX_TYPE_PLAYERS) {
+        if (!mix->isDeviceAffinityCompatible()) {
             continue;
         }
         std::vector<size_t> criteriaToRemove;
         for (size_t j = 0; j < mix->mCriteria.size(); j++) {
             const uint32_t rule = mix->mCriteria[j].mRule;
-            // is this rule affecting the uid?
-            if ((rule == RULE_EXCLUDE_UID || rule == RULE_MATCH_UID)
+            // is this rule excluding the uid? (not considering uid match rules
+            // as those are not used for uid-device affinity)
+            if (rule == RULE_EXCLUDE_UID
                     && uid == mix->mCriteria[j].mValue.mUid) {
                 foundUidRule = true;
                 criteriaToRemove.insert(criteriaToRemove.begin(), j);
