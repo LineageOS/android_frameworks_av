@@ -35,7 +35,12 @@ namespace android {
     diff = (((end).tv_sec - (start).tv_sec) * 1000000) + \
            ((end).tv_usec - (start).tv_usec);
 
-#define CODEC_MAX_CORES 4
+#define CODEC_MAX_CORES  4
+#define MAX_B_FRAMES     1
+#define MAX_RC_LOOKAHEAD 1
+
+#define DEFAULT_B_FRAMES     0
+#define DEFAULT_RC_LOOKAHEAD 0
 
 struct C2SoftHevcEnc : public SimpleC2Component {
     class IntfImpl;
@@ -95,10 +100,15 @@ struct C2SoftHevcEnc : public SimpleC2Component {
     c2_status_t releaseEncoder();
     c2_status_t setEncodeArgs(ihevce_inp_buf_t* ps_encode_ip,
                               const C2GraphicView* const input,
-                              uint64_t timestamp);
+                              uint64_t workIndex);
+    void finishWork(uint64_t index, const std::unique_ptr<C2Work>& work,
+                    const std::shared_ptr<C2BlockPool>& pool,
+                    ihevce_out_buf_t* ps_encode_op);
+    c2_status_t drainInternal(uint32_t drainMode,
+                              const std::shared_ptr<C2BlockPool>& pool,
+                              const std::unique_ptr<C2Work>& work);
     C2_DO_NOT_COPY(C2SoftHevcEnc);
 };
-
 #ifdef FILE_DUMP_ENABLE
 
 #define INPUT_DUMP_PATH "/data/local/tmp/hevc"
