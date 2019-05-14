@@ -208,7 +208,7 @@ int WriteOpusHeaders(const OpusHeader &header, int inputSampleRate,
     headerLen += AOPUS_LENGTH_SIZE;
 
     int headerSize = WriteOpusHeader(header, inputSampleRate, output + headerLen,
-        outputSize);
+        outputSize - headerLen);
     if (headerSize < 0) {
         ALOGD("%s: WriteOpusHeader failed", __func__);
         return -1;
