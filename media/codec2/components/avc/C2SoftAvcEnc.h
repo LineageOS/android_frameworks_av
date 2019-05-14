@@ -33,6 +33,7 @@ namespace android {
 #define LEN_STATUS_BUFFER        (10  * 1024)
 #define MAX_VBV_BUFF_SIZE        (120 * 16384)
 #define MAX_NUM_IO_BUFS           3
+#define MAX_B_FRAMES              1
 
 #define DEFAULT_MAX_REF_FRM         2
 #define DEFAULT_MAX_REORDER_FRM     0
@@ -167,7 +168,6 @@ private:
     bool     mSpsPpsHeaderReceived;
 
     bool     mSawInputEOS;
-    bool     mSawOutputEOS;
     bool     mSignalledError;
     bool     mIntra4x4;
     bool     mEnableFastSad;
@@ -182,6 +182,8 @@ private:
     iv_mem_rec_t *mMemRecords;   // Memory records requested by the codec
     size_t mNumMemRecords;       // Number of memory records requested by codec
     size_t mNumCores;            // Number of cores used by the codec
+
+    std::shared_ptr<C2LinearBlock> mOutBlock;
 
     // configurations used by component in process
     // (TODO: keep this in intf but make them internal only)
@@ -230,7 +232,13 @@ private:
             const C2GraphicView *const input,
             uint8_t *base,
             uint32_t capacity,
-            uint64_t timestamp);
+            uint64_t workIndex);
+    void finishWork(uint64_t workIndex,
+            const std::unique_ptr<C2Work> &work,
+            ive_video_encode_op_t *ps_encode_op);
+    c2_status_t drainInternal(uint32_t drainMode,
+            const std::shared_ptr<C2BlockPool> &pool,
+            const std::unique_ptr<C2Work> &work);
 
     C2_DO_NOT_COPY(C2SoftAvcEnc);
 };

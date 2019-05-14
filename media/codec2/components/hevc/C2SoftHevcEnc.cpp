@@ -56,9 +56,18 @@ class C2SoftHevcEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
         noPrivateBuffers(); // TODO: account for our buffers here
         noInputReferences();
         noOutputReferences();
-        noInputLatency();
         noTimeStretch();
         setDerivedInstance(this);
+
+        addParameter(
+                DefineParam(mActualInputDelay, C2_PARAMKEY_INPUT_DELAY)
+                .withDefault(new C2PortActualDelayTuning::input(
+                    DEFAULT_B_FRAMES + DEFAULT_RC_LOOKAHEAD))
+                .withFields({C2F(mActualInputDelay, value).inRange(
+                    0, MAX_B_FRAMES + MAX_RC_LOOKAHEAD)})
+                .withSetter(
+                    Setter<decltype(*mActualInputDelay)>::StrictValueWithNoDeps)
+                .build());
 
         addParameter(
                 DefineParam(mAttrib, C2_PARAMKEY_COMPONENT_ATTRIBUTES)
@@ -462,7 +471,8 @@ c2_status_t C2SoftHevcEnc::initEncParams() {
     mIvVideoColorFormat = IV_YUV_420P;
     mEncParams.s_multi_thrd_prms.i4_max_num_cores = mNumCores;
     mEncParams.s_out_strm_prms.i4_codec_profile = mHevcEncProfile;
-    mEncParams.s_lap_prms.i4_rc_look_ahead_pics = 0;
+    mEncParams.s_lap_prms.i4_rc_look_ahead_pics = DEFAULT_RC_LOOKAHEAD;
+    mEncParams.s_coding_tools_prms.i4_max_temporal_layers = DEFAULT_B_FRAMES;
 
     switch (mBitrateMode->value) {
         case C2Config::BITRATE_IGNORE:
@@ -512,10 +522,9 @@ c2_status_t C2SoftHevcEnc::releaseEncoder() {
 
 c2_status_t C2SoftHevcEnc::drain(uint32_t drainMode,
                                  const std::shared_ptr<C2BlockPool>& pool) {
-    (void)drainMode;
-    (void)pool;
-    return C2_OK;
+    return drainInternal(drainMode, pool, nullptr);
 }
+
 c2_status_t C2SoftHevcEnc::initEncoder() {
     CHECK(!mCodecCtx);
     {
@@ -552,7 +561,7 @@ c2_status_t C2SoftHevcEnc::initEncoder() {
 
 c2_status_t C2SoftHevcEnc::setEncodeArgs(ihevce_inp_buf_t* ps_encode_ip,
                                          const C2GraphicView* const input,
-                                         uint64_t timestamp) {
+                                         uint64_t workIndex) {
     ihevce_static_cfg_params_t* params = &mEncParams;
     memset(ps_encode_ip, 0, sizeof(*ps_encode_ip));
 
@@ -696,7 +705,92 @@ c2_status_t C2SoftHevcEnc::setEncodeArgs(ihevce_inp_buf_t* ps_encode_ip,
     ps_encode_ip->i4_curr_peak_bitrate =
         params->s_tgt_lyr_prms.as_tgt_params[0].ai4_peak_bitrate[0];
     ps_encode_ip->i4_curr_rate_factor = params->s_config_prms.i4_rate_factor;
-    ps_encode_ip->u8_pts = timestamp;
+    ps_encode_ip->u8_pts = workIndex;
+    return C2_OK;
+}
+
+void C2SoftHevcEnc::finishWork(uint64_t index,
+                               const std::unique_ptr<C2Work>& work,
+                               const std::shared_ptr<C2BlockPool>& pool,
+                               ihevce_out_buf_t* ps_encode_op) {
+    std::shared_ptr<C2LinearBlock> block;
+    C2MemoryUsage usage = {C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
+    c2_status_t status =
+        pool->fetchLinearBlock(ps_encode_op->i4_bytes_generated, usage, &block);
+    if (C2_OK != status) {
+        ALOGE("fetchLinearBlock for Output failed with status 0x%x", status);
+        mSignalledError = true;
+        work->result = status;
+        work->workletsProcessed = 1u;
+        return;
+    }
+    C2WriteView wView = block->map().get();
+    if (C2_OK != wView.error()) {
+        ALOGE("write view map failed with status 0x%x", wView.error());
+        mSignalledError = true;
+        work->result = wView.error();
+        work->workletsProcessed = 1u;
+        return;
+    }
+    memcpy(wView.data(), ps_encode_op->pu1_output_buf,
+           ps_encode_op->i4_bytes_generated);
+
+    std::shared_ptr<C2Buffer> buffer =
+        createLinearBuffer(block, 0, ps_encode_op->i4_bytes_generated);
+
+    DUMP_TO_FILE(mOutFile, ps_encode_op->pu1_output_buf,
+                 ps_encode_op->i4_bytes_generated);
+
+    if (ps_encode_op->i4_is_key_frame) {
+        ALOGV("IDR frame produced");
+        buffer->setInfo(std::make_shared<C2StreamPictureTypeMaskInfo::output>(
+            0u /* stream id */, C2Config::SYNC_FRAME));
+    }
+
+    auto fillWork = [buffer](const std::unique_ptr<C2Work>& work) {
+        work->worklets.front()->output.flags = (C2FrameData::flags_t)0;
+        work->worklets.front()->output.buffers.clear();
+        work->worklets.front()->output.buffers.push_back(buffer);
+        work->worklets.front()->output.ordinal = work->input.ordinal;
+        work->workletsProcessed = 1u;
+    };
+    if (work && c2_cntr64_t(index) == work->input.ordinal.frameIndex) {
+        fillWork(work);
+        if (mSignalledEos) {
+            work->worklets.front()->output.flags =
+                C2FrameData::FLAG_END_OF_STREAM;
+        }
+    } else {
+        finish(index, fillWork);
+    }
+}
+
+c2_status_t C2SoftHevcEnc::drainInternal(
+        uint32_t drainMode,
+        const std::shared_ptr<C2BlockPool> &pool,
+        const std::unique_ptr<C2Work> &work) {
+
+    if (drainMode == NO_DRAIN) {
+        ALOGW("drain with NO_DRAIN: no-op");
+        return C2_OK;
+    }
+    if (drainMode == DRAIN_CHAIN) {
+        ALOGW("DRAIN_CHAIN not supported");
+        return C2_OMITTED;
+    }
+
+    while (true) {
+        ihevce_out_buf_t s_encode_op{};
+        memset(&s_encode_op, 0, sizeof(s_encode_op));
+
+        ihevce_encode(mCodecCtx, nullptr, &s_encode_op);
+        if (s_encode_op.i4_bytes_generated) {
+            finishWork(s_encode_op.u8_pts, work, pool, &s_encode_op);
+        } else {
+            if (work->workletsProcessed != 1u) fillEmptyWork(work);
+            break;
+        }
+    }
     return C2_OK;
 }
 
@@ -704,7 +798,7 @@ void C2SoftHevcEnc::process(const std::unique_ptr<C2Work>& work,
                             const std::shared_ptr<C2BlockPool>& pool) {
     // Initialize output work
     work->result = C2_OK;
-    work->workletsProcessed = 1u;
+    work->workletsProcessed = 0u;
     work->worklets.front()->output.flags = work->input.flags;
 
     if (mSignalledError || mSignalledEos) {
@@ -721,6 +815,7 @@ void C2SoftHevcEnc::process(const std::unique_ptr<C2Work>& work,
             ALOGE("Failed to initialize encoder : 0x%x", status);
             mSignalledError = true;
             work->result = status;
+            work->workletsProcessed = 1u;
             return;
         }
     }
@@ -728,6 +823,8 @@ void C2SoftHevcEnc::process(const std::unique_ptr<C2Work>& work,
     std::shared_ptr<const C2GraphicView> view;
     std::shared_ptr<C2Buffer> inputBuffer = nullptr;
     bool eos = ((work->input.flags & C2FrameData::FLAG_END_OF_STREAM) != 0);
+    if (eos) mSignalledEos = true;
+
     if (!work->input.buffers.empty()) {
         inputBuffer = work->input.buffers[0];
         view = std::make_shared<const C2GraphicView>(
@@ -736,13 +833,12 @@ void C2SoftHevcEnc::process(const std::unique_ptr<C2Work>& work,
             ALOGE("graphic view map err = %d", view->error());
             mSignalledError = true;
             work->result = C2_CORRUPTED;
+            work->workletsProcessed = 1u;
             return;
         }
     }
-
     IHEVCE_PLUGIN_STATUS_T err = IHEVCE_EOK;
 
-    fillEmptyWork(work);
     if (!mSpsPpsHeaderReceived) {
         ihevce_out_buf_t s_header_op{};
         err = ihevce_encode_header(mCodecCtx, &s_header_op);
@@ -754,6 +850,7 @@ void C2SoftHevcEnc::process(const std::unique_ptr<C2Work>& work,
                 ALOGE("CSD allocation failed");
                 mSignalledError = true;
                 work->result = C2_NO_MEMORY;
+                work->workletsProcessed = 1u;
                 return;
             }
             memcpy(csd->m.value, s_header_op.pu1_output_buf,
@@ -764,34 +861,40 @@ void C2SoftHevcEnc::process(const std::unique_ptr<C2Work>& work,
             mSpsPpsHeaderReceived = true;
         }
         if (!inputBuffer) {
+            work->workletsProcessed = 1u;
             return;
         }
     }
     ihevce_inp_buf_t s_encode_ip{};
     ihevce_out_buf_t s_encode_op{};
-    uint64_t timestamp = work->input.ordinal.timestamp.peekull();
+    uint64_t workIndex = work->input.ordinal.frameIndex.peekull();
 
-    status = setEncodeArgs(&s_encode_ip, view.get(), timestamp);
+    status = setEncodeArgs(&s_encode_ip, view.get(), workIndex);
     if (C2_OK != status) {
         ALOGE("setEncodeArgs failed : 0x%x", status);
         mSignalledError = true;
         work->result = status;
+        work->workletsProcessed = 1u;
         return;
     }
 
     uint64_t timeDelay = 0;
     uint64_t timeTaken = 0;
+    memset(&s_encode_op, 0, sizeof(s_encode_op));
     GETTIME(&mTimeStart, nullptr);
     TIME_DIFF(mTimeEnd, mTimeStart, timeDelay);
 
-    ihevce_inp_buf_t* ps_encode_ip = (inputBuffer) ? &s_encode_ip : nullptr;
-
-    err = ihevce_encode(mCodecCtx, ps_encode_ip, &s_encode_op);
-    if (IHEVCE_EOK != err) {
-        ALOGE("Encode Frame failed : 0x%x", err);
-        mSignalledError = true;
-        work->result = C2_CORRUPTED;
-        return;
+    if (inputBuffer) {
+        err = ihevce_encode(mCodecCtx, &s_encode_ip, &s_encode_op);
+        if (IHEVCE_EOK != err) {
+            ALOGE("Encode Frame failed : 0x%x", err);
+            mSignalledError = true;
+            work->result = C2_CORRUPTED;
+            work->workletsProcessed = 1u;
+            return;
+        }
+    } else if (!eos) {
+        fillEmptyWork(work);
     }
 
     GETTIME(&mTimeEnd, nullptr);
@@ -802,42 +905,11 @@ void C2SoftHevcEnc::process(const std::unique_ptr<C2Work>& work,
           (int)timeDelay, s_encode_op.i4_bytes_generated);
 
     if (s_encode_op.i4_bytes_generated) {
-        std::shared_ptr<C2LinearBlock> block;
-        C2MemoryUsage usage = {C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
-        status = pool->fetchLinearBlock(s_encode_op.i4_bytes_generated, usage, &block);
-        if (C2_OK != status) {
-            ALOGE("fetchLinearBlock for Output failed with status 0x%x", status);
-            work->result = C2_NO_MEMORY;
-            mSignalledError = true;
-            return;
-        }
-        C2WriteView wView = block->map().get();
-        if (C2_OK != wView.error()) {
-            ALOGE("write view map failed with status 0x%x", wView.error());
-            work->result = wView.error();
-            mSignalledError = true;
-            return;
-        }
-        memcpy(wView.data(), s_encode_op.pu1_output_buf,
-               s_encode_op.i4_bytes_generated);
-
-        std::shared_ptr<C2Buffer> buffer =
-            createLinearBuffer(block, 0, s_encode_op.i4_bytes_generated);
-
-        DUMP_TO_FILE(mOutFile, s_encode_op.pu1_output_buf,
-                     s_encode_op.i4_bytes_generated);
-
-        work->worklets.front()->output.ordinal.timestamp = s_encode_op.u8_pts;
-        if (s_encode_op.i4_is_key_frame) {
-            ALOGV("IDR frame produced");
-            buffer->setInfo(
-                std::make_shared<C2StreamPictureTypeMaskInfo::output>(
-                    0u /* stream id */, C2Config::SYNC_FRAME));
-        }
-        work->worklets.front()->output.buffers.push_back(buffer);
+        finishWork(s_encode_op.u8_pts, work, pool, &s_encode_op);
     }
+
     if (eos) {
-        mSignalledEos = true;
+        drainInternal(DRAIN_COMPONENT_WITH_EOS, pool, work);
     }
 }
 
