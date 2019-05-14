@@ -34,7 +34,6 @@
 #include <media/PatchBuilder.h>
 #include "AudioPolicyInterface.h"
 
-#include <AudioPolicyManagerInterface.h>
 #include <AudioPolicyManagerObserver.h>
 #include <AudioGain.h>
 #include <AudioPolicyConfig.h>
@@ -49,6 +48,7 @@
 #include <AudioPolicyMix.h>
 #include <EffectDescriptor.h>
 #include <SoundTriggerSession.h>
+#include "EngineLibrary.h"
 #include "TypeConverter.h"
 
 namespace android {
@@ -752,7 +752,7 @@ protected:
         uint32_t nextAudioPortGeneration();
 
         // Audio Policy Engine Interface.
-        AudioPolicyManagerInterface *mEngine;
+        EngineInstance mEngine;
 
         // Surround formats that are enabled manually. Taken into account when
         // "encoded surround" is forced into "manual" mode.

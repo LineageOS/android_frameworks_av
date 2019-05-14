@@ -19,6 +19,7 @@
 
 #include "ProductStrategy.h"
 
+#include <media/AudioProductStrategy.h>
 #include <media/TypeConverter.h>
 #include <utils/String8.h>
 #include <cstdint>

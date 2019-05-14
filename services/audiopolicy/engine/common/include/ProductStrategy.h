@@ -19,7 +19,6 @@
 #include "VolumeGroup.h"
 
 #include <system/audio.h>
-#include <AudioPolicyManagerInterface.h>
 #include <utils/RefBase.h>
 #include <HandleGenerator.h>
 #include <string>
@@ -27,6 +26,7 @@
 #include <map>
 #include <utils/Errors.h>
 #include <utils/String8.h>
+#include <media/AudioAttributes.h>
 
 namespace android {
 
