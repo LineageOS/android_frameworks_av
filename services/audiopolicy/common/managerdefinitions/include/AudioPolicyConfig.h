@@ -40,7 +40,8 @@ public:
                       DeviceVector &availableOutputDevices,
                       DeviceVector &availableInputDevices,
                       sp<DeviceDescriptor> &defaultOutputDevice)
-        : mHwModules(hwModules),
+        : mEngineLibraryNameSuffix(kDefaultEngineLibraryNameSuffix),
+          mHwModules(hwModules),
           mAvailableOutputDevices(availableOutputDevices),
           mAvailableInputDevices(availableInputDevices),
           mDefaultOutputDevice(defaultOutputDevice),
@@ -53,6 +54,14 @@ public:
 
     void setSource(const std::string& file) {
         mSource = file;
+    }
+
+    const std::string& getEngineLibraryNameSuffix() const {
+        return mEngineLibraryNameSuffix;
+    }
+
+    void setEngineLibraryNameSuffix(const std::string& suffix) {
+        mEngineLibraryNameSuffix = suffix;
     }
 
     void setHwModules(const HwModuleCollection &hwModules)
@@ -108,6 +117,7 @@ public:
     void setDefault(void)
     {
         mSource = "AudioPolicyConfig::setDefault";
+        mEngineLibraryNameSuffix = kDefaultEngineLibraryNameSuffix;
         mDefaultOutputDevice = new DeviceDescriptor(AUDIO_DEVICE_OUT_SPEAKER);
         mDefaultOutputDevice->addAudioProfile(AudioProfile::createFullDynamic());
         sp<DeviceDescriptor> defaultInputDevice = new DeviceDescriptor(AUDIO_DEVICE_IN_BUILTIN_MIC);
@@ -167,7 +177,10 @@ public:
     }
 
 private:
+    static const constexpr char* const kDefaultEngineLibraryNameSuffix = "default";
+
     std::string mSource;
+    std::string mEngineLibraryNameSuffix;
     HwModuleCollection &mHwModules; /**< Collection of Module, with Profiles, i.e. Mix Ports. */
     DeviceVector &mAvailableOutputDevices;
     DeviceVector &mAvailableInputDevices;
