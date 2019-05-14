@@ -109,7 +109,7 @@ public:
             data.writeInt32(0);
         } else {
             // serialize the headers
-            data.writeInt64(headers->size());
+            data.writeInt32(headers->size());
             for (size_t i = 0; i < headers->size(); ++i) {
                 data.writeString8(headers->keyAt(i));
                 data.writeString8(headers->valueAt(i));
@@ -318,11 +318,22 @@ status_t BnMediaMetadataRetriever::onTransact(
             }
 
             KeyedVector<String8, String8> headers;
-            size_t numHeaders = (size_t) data.readInt64();
+            size_t numHeaders = (size_t) data.readInt32();
             for (size_t i = 0; i < numHeaders; ++i) {
-                String8 key = data.readString8();
-                String8 value = data.readString8();
-                headers.add(key, value);
+                String8 key;
+                String8 value;
+                status_t status;
+                status = data.readString8(&key);
+                if (status != OK) {
+                    return status;
+                }
+                status = data.readString8(&value);
+                if (status != OK) {
+                    return status;
+                }
+                if (headers.add(key, value) < 0) {
+                    return UNKNOWN_ERROR;
+                }
             }
 
             reply->writeInt32(
