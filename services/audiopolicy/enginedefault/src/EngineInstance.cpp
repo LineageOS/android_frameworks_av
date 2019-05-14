@@ -14,41 +14,21 @@
  * limitations under the License.
  */
 
-#include <AudioPolicyManagerInterface.h>
-#include "AudioPolicyEngineInstance.h"
+#include <EngineInterface.h>
 #include "Engine.h"
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
 
-EngineInstance::EngineInstance()
+extern "C" EngineInterface* createEngineInstance()
 {
+    return new (std::nothrow) Engine();
 }
 
-EngineInstance *EngineInstance::getInstance()
+extern "C" void destroyEngineInstance(EngineInterface *engine)
 {
-    static EngineInstance instance;
-    return &instance;
-}
-
-EngineInstance::~EngineInstance()
-{
-}
-
-Engine *EngineInstance::getEngine() const
-{
-    static Engine engine;
-    return &engine;
-}
-
-template <>
-AudioPolicyManagerInterface *EngineInstance::queryInterface() const
-{
-    return getEngine()->queryInterface<AudioPolicyManagerInterface>();
+    delete static_cast<Engine*>(engine);
 }
 
 } // namespace audio_policy
 } // namespace android
-

@@ -42,8 +42,6 @@
 #include <set>
 #include <unordered_set>
 #include <vector>
-#include <AudioPolicyManagerInterface.h>
-#include <AudioPolicyEngineInstance.h>
 #include <cutils/properties.h>
 #include <utils/Log.h>
 #include <media/AudioParameter.h>
@@ -4284,17 +4282,18 @@ void AudioPolicyManager::loadConfig() {
 }
 
 status_t AudioPolicyManager::initialize() {
-    // Once policy config has been parsed, retrieve an instance of the engine and initialize it.
-    audio_policy::EngineInstance *engineInstance = audio_policy::EngineInstance::getInstance();
-    if (!engineInstance) {
-        ALOGE("%s:  Could not get an instance of policy engine", __FUNCTION__);
-        return NO_INIT;
-    }
-    // Retrieve the Policy Manager Interface
-    mEngine = engineInstance->queryInterface<AudioPolicyManagerInterface>();
-    if (mEngine == NULL) {
-        ALOGE("%s: Failed to get Policy Engine Interface", __FUNCTION__);
-        return NO_INIT;
+    {
+        auto engLib = EngineLibrary::load(
+                        "libaudiopolicyengine" + getConfig().getEngineLibraryNameSuffix() + ".so");
+        if (!engLib) {
+            ALOGE("%s: Failed to load the engine library", __FUNCTION__);
+            return NO_INIT;
+        }
+        mEngine = engLib->createEngine();
+        if (mEngine == nullptr) {
+            ALOGE("%s: Failed to instantiate the APM engine", __FUNCTION__);
+            return NO_INIT;
+        }
     }
     mEngine->setObserver(this);
     status_t status = mEngine->initCheck();
