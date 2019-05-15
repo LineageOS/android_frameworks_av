@@ -395,8 +395,13 @@ status_t ColorConverter::convertYUV420SemiPlanarUseLibYUV(
                 dst.mStride, src.cropWidth(), src.cropHeight());
         break;
 
-    case OMX_COLOR_Format32BitRGBA8888:
+    case OMX_COLOR_Format32bitBGRA8888:
         libyuv::NV12ToARGB(src_y, src.mStride, src_u, src.mStride, (uint8 *)dst_ptr,
+                dst.mStride, src.cropWidth(), src.cropHeight());
+        break;
+
+    case OMX_COLOR_Format32BitRGBA8888:
+        libyuv::NV12ToABGR(src_y, src.mStride, src_u, src.mStride, (uint8 *)dst_ptr,
                 dst.mStride, src.cropWidth(), src.cropHeight());
         break;
 
