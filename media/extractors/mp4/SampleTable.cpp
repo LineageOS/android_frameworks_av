@@ -540,6 +540,12 @@ status_t SampleTable::setSyncSampleParams(off64_t data_offset, size_t data_size)
     }
 
     uint64_t allocSize = (uint64_t)numSyncSamples * sizeof(uint32_t);
+    if (allocSize > data_size - 8) {
+        ALOGW("b/124771364 - allocSize(%lu) > size(%lu)",
+                (unsigned long)allocSize, (unsigned long)(data_size - 8));
+        android_errorWriteLog(0x534e4554, "124771364");
+        return ERROR_MALFORMED;
+    }
     if (allocSize > kMaxTotalSize) {
         ALOGE("Sync sample table size too large.");
         return ERROR_OUT_OF_RANGE;
