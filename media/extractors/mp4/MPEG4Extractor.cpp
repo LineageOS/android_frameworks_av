@@ -5061,26 +5061,32 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationSizes(
 }
 
 status_t MPEG4Source::parseSampleAuxiliaryInformationOffsets(
-        off64_t offset, off64_t /* size */) {
+        off64_t offset, off64_t size) {
     ALOGV("parseSampleAuxiliaryInformationOffsets");
+    if (size < 8) {
+        return -EINVAL;
+    }
     // 14496-12 8.7.13
     uint8_t version;
     if (mDataSource->readAt(offset, &version, sizeof(version)) != 1) {
         return ERROR_IO;
     }
     offset++;
+    size--;
 
     uint32_t flags;
     if (!mDataSource->getUInt24(offset, &flags)) {
         return ERROR_IO;
     }
     offset += 3;
+    size -= 3;
 
     uint32_t entrycount;
     if (!mDataSource->getUInt32(offset, &entrycount)) {
         return ERROR_IO;
     }
     offset += 4;
+    size -= 4;
     if (entrycount == 0) {
         return OK;
     }
@@ -5106,19 +5112,31 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationOffsets(
 
     for (size_t i = 0; i < entrycount; i++) {
         if (version == 0) {
+            if (size < 4) {
+                ALOGW("b/124526959");
+                android_errorWriteLog(0x534e4554, "124526959");
+                return -EINVAL;
+            }
             uint32_t tmp;
             if (!mDataSource->getUInt32(offset, &tmp)) {
                 return ERROR_IO;
             }
             mCurrentSampleInfoOffsets[i] = tmp;
             offset += 4;
+            size -= 4;
         } else {
+            if (size < 8) {
+                ALOGW("b/124526959");
+                android_errorWriteLog(0x534e4554, "124526959");
+                return -EINVAL;
+            }
             uint64_t tmp;
             if (!mDataSource->getUInt64(offset, &tmp)) {
                 return ERROR_IO;
             }
             mCurrentSampleInfoOffsets[i] = tmp;
             offset += 8;
+            size -= 8;
         }
     }
 
