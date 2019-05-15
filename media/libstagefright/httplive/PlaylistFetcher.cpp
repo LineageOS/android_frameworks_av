@@ -2160,7 +2160,9 @@ status_t PlaylistFetcher::extractAndQueueAccessUnits(
             return ERROR_MALFORMED;
         }
 
-        CHECK_LE(offset + aac_frame_length, buffer->size());
+        if (aac_frame_length > buffer->size() - offset) {
+            return ERROR_MALFORMED;
+        }
 
         int64_t unitTimeUs = timeUs + numSamples * 1000000LL / sampleRate;
         offset += aac_frame_length;
