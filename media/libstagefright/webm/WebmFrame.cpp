@@ -62,6 +62,14 @@ sp<WebmElement> WebmFrame::SimpleBlock(uint64_t baseTimecode) const {
             mData);
 }
 
+uint64_t WebmFrame::getAbsTimecode() {
+    return mAbsTimecode;
+}
+
+void WebmFrame::updateAbsTimecode(uint64_t newAbsTimecode) {
+    mAbsTimecode = newAbsTimecode;
+}
+
 bool WebmFrame::operator<(const WebmFrame &other) const {
     if (this->mEos) {
         return false;
