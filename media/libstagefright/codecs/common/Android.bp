@@ -1,9 +1,6 @@
 cc_library {
     name: "libstagefright_enc_common",
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
 
     srcs: ["cmnMemory.c"],
 
