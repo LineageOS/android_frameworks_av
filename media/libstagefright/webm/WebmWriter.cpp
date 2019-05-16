@@ -124,6 +124,11 @@ sp<WebmElement> WebmWriter::audioTrack(const sp<MetaData>& md) {
         return NULL;
     }
 
+    int32_t bitsPerSample = 0;
+    if (!md->findInt32(kKeyBitsPerSample, &bitsPerSample)) {
+        ALOGV("kKeyBitsPerSample not available");
+    }
+
     if (!strncasecmp(mimeType, MEDIA_MIMETYPE_AUDIO_OPUS, strlen(MEDIA_MIMETYPE_AUDIO_OPUS))) {
         // Opus in WebM is a well-known, yet under-documented, format. The codec private data
         // of the track is an Opus Ogg header (https://tools.ietf.org/html/rfc7845#section-5.1)
@@ -164,8 +169,8 @@ sp<WebmElement> WebmWriter::audioTrack(const sp<MetaData>& md) {
         uint8_t* codecPrivateData = codecPrivateBuf->data();
 
         memcpy(codecPrivateData + off, (uint8_t*)header_data, headerSize);
-        sp<WebmElement> entry =
-                WebmElement::AudioTrackEntry("A_OPUS", nChannels, samplerate, codecPrivateBuf);
+        sp<WebmElement> entry = WebmElement::AudioTrackEntry("A_OPUS", nChannels, samplerate,
+                                                             codecPrivateBuf, bitsPerSample);
         return entry;
     } else if (!strncasecmp(mimeType,
                             MEDIA_MIMETYPE_AUDIO_VORBIS,
@@ -203,8 +208,8 @@ sp<WebmElement> WebmWriter::audioTrack(const sp<MetaData>& md) {
         off += headerSize2;
         memcpy(codecPrivateData + off, headerData3, headerSize3);
 
-        sp<WebmElement> entry =
-                WebmElement::AudioTrackEntry("A_VORBIS", nChannels, samplerate, codecPrivateBuf);
+        sp<WebmElement> entry = WebmElement::AudioTrackEntry("A_VORBIS", nChannels, samplerate,
+                                                             codecPrivateBuf, bitsPerSample);
         return entry;
     } else {
         ALOGE("Track (%s) is not a supported audio format", mimeType);
