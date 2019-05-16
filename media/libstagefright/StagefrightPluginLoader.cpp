@@ -35,7 +35,7 @@ constexpr const char kCCodecPluginPath[] = "libsfplugin_ccodec.so";
 }  // unnamed namespace
 
 StagefrightPluginLoader::StagefrightPluginLoader(const char *libPath) {
-    if (android::base::GetIntProperty("debug.media.codec2", 0) == 0) {
+    if (android::base::GetIntProperty("ro.media.codec2.enable", 1) == 0) {
         ALOGD("CCodec is disabled.");
         return;
     }
