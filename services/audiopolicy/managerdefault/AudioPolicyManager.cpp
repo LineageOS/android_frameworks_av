@@ -2136,6 +2136,7 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(const sp<DeviceDescripto
         for (size_t i = 0; i < mInputs.size(); ) {
             sp <AudioInputDescriptor> desc = mInputs.valueAt(i);
             if (desc->mProfile != profile) {
+                i++;
                 continue;
             }
             // if sound trigger, reuse input if used by other sound trigger on same session
