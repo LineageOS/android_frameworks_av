@@ -261,12 +261,18 @@ void Accessor::Impl::handleInvalidateAck() {
         mBufferPool.mInvalidation.onHandleAck(&observers, &invalidationId);
     }
     // Do not hold lock for send invalidations
+    size_t deadClients = 0;
     for (auto it = observers.begin(); it != observers.end(); ++it) {
         const sp<IObserver> observer = it->second;
         if (observer) {
             Return<void> transResult = observer->onMessage(it->first, invalidationId);
-            (void) transResult;
+            if (!transResult.isOk()) {
+                ++deadClients;
+            }
         }
+    }
+    if (deadClients > 0) {
+        ALOGD("During invalidation found %zu dead clients", deadClients);
     }
 }
 
