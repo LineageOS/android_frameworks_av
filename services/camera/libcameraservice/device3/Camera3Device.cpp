@@ -4032,10 +4032,6 @@ void Camera3Device::HalInterface::clear() {
     mHidlSession.clear();
 }
 
-bool Camera3Device::HalInterface::supportBatchRequest() {
-    return mHidlSession != nullptr;
-}
-
 status_t Camera3Device::HalInterface::constructDefaultRequestSettings(
         camera3_request_template_t templateId,
         /*out*/ camera_metadata_t **requestTemplate) {
@@ -4608,20 +4604,6 @@ status_t Camera3Device::HalInterface::processBatchCaptureRequests(
     return CameraProviderManager::mapToStatusT(status);
 }
 
-status_t Camera3Device::HalInterface::processCaptureRequest(
-        camera3_capture_request_t *request) {
-    ATRACE_NAME("CameraHal::processCaptureRequest");
-    if (!valid()) return INVALID_OPERATION;
-    status_t res = OK;
-
-    uint32_t numRequestProcessed = 0;
-    std::vector<camera3_capture_request_t*> requests(1);
-    requests[0] = request;
-    res = processBatchCaptureRequests(requests, &numRequestProcessed);
-
-    return res;
-}
-
 status_t Camera3Device::HalInterface::flush() {
     ATRACE_NAME("CameraHal::flush");
     if (!valid()) return INVALID_OPERATION;
@@ -5172,43 +5154,6 @@ bool Camera3Device::RequestThread::sendRequestsBatch() {
     return true;
 }
 
-bool Camera3Device::RequestThread::sendRequestsOneByOne() {
-    status_t res;
-
-    for (auto& nextRequest : mNextRequests) {
-        // Submit request and block until ready for next one
-        ATRACE_ASYNC_BEGIN("frame capture", nextRequest.halRequest.frame_number);
-        res = mInterface->processCaptureRequest(&nextRequest.halRequest);
-
-        if (res != OK) {
-            // Should only get a failure here for malformed requests or device-level
-            // errors, so consider all errors fatal.  Bad metadata failures should
-            // come through notify.
-            SET_ERR("RequestThread: Unable to submit capture request %d to HAL"
-                    " device: %s (%d)", nextRequest.halRequest.frame_number, strerror(-res),
-                    res);
-            cleanUpFailedRequests(/*sendRequestError*/ false);
-            return false;
-        }
-
-        // Mark that the request has be submitted successfully.
-        nextRequest.submitted = true;
-
-        updateNextRequest(nextRequest);
-
-        // Remove any previously queued triggers (after unlock)
-        res = removeTriggers(mPrevRequest);
-        if (res != OK) {
-            SET_ERR("RequestThread: Unable to remove triggers "
-                  "(capture request %d, HAL device: %s (%d)",
-                  nextRequest.halRequest.frame_number, strerror(-res), res);
-            cleanUpFailedRequests(/*sendRequestError*/ false);
-            return false;
-        }
-    }
-    return true;
-}
-
 nsecs_t Camera3Device::RequestThread::calculateMaxExpectedDuration(const camera_metadata_t *request) {
     nsecs_t maxExpectedDuration = kDefaultExpectedDuration;
     camera_metadata_ro_entry_t e = camera_metadata_ro_entry_t();
@@ -5462,11 +5407,8 @@ bool Camera3Device::RequestThread::threadLoop() {
 
     bool submitRequestSuccess = false;
     nsecs_t tRequestStart = systemTime(SYSTEM_TIME_MONOTONIC);
-    if (mInterface->supportBatchRequest()) {
-        submitRequestSuccess = sendRequestsBatch();
-    } else {
-        submitRequestSuccess = sendRequestsOneByOne();
-    }
+    submitRequestSuccess = sendRequestsBatch();
+
     nsecs_t tRequestEnd = systemTime(SYSTEM_TIME_MONOTONIC);
     mRequestLatency.add(tRequestStart, tRequestEnd);
 
