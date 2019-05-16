@@ -4381,11 +4381,12 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
 
 status_t Camera3Device::HalInterface::wrapAsHidlRequest(camera3_capture_request_t* request,
         /*out*/device::V3_2::CaptureRequest* captureRequest,
-        /*out*/std::vector<native_handle_t*>* handlesCreated) {
+        /*out*/std::vector<native_handle_t*>* handlesCreated,
+        /*out*/std::vector<std::pair<int32_t, int32_t>>* inflightBuffers) {
     ATRACE_CALL();
-    if (captureRequest == nullptr || handlesCreated == nullptr) {
-        ALOGE("%s: captureRequest (%p) and handlesCreated (%p) must not be null",
-                __FUNCTION__, captureRequest, handlesCreated);
+    if (captureRequest == nullptr || handlesCreated == nullptr || inflightBuffers == nullptr) {
+        ALOGE("%s: captureRequest (%p), handlesCreated (%p), and inflightBuffers(%p) "
+                "must not be null", __FUNCTION__, captureRequest, handlesCreated, inflightBuffers);
         return BAD_VALUE;
     }
 
@@ -4415,8 +4416,8 @@ status_t Camera3Device::HalInterface::wrapAsHidlRequest(camera3_capture_request_
             captureRequest->inputBuffer.releaseFence = nullptr;
 
             pushInflightBufferLocked(captureRequest->frameNumber, streamId,
-                    request->input_buffer->buffer,
-                    request->input_buffer->acquire_fence);
+                    request->input_buffer->buffer);
+            inflightBuffers->push_back(std::make_pair(captureRequest->frameNumber, streamId));
         } else {
             captureRequest->inputBuffer.streamId = -1;
             captureRequest->inputBuffer.bufferId = BUFFER_ID_NO_BUFFER;
@@ -4455,12 +4456,29 @@ status_t Camera3Device::HalInterface::wrapAsHidlRequest(camera3_capture_request_
 
             // Output buffers are empty when using HAL buffer manager
             if (!mUseHalBufManager) {
-                pushInflightBufferLocked(captureRequest->frameNumber, streamId,
-                        src->buffer, src->acquire_fence);
+                pushInflightBufferLocked(captureRequest->frameNumber, streamId, src->buffer);
+                inflightBuffers->push_back(std::make_pair(captureRequest->frameNumber, streamId));
             }
         }
     }
     return OK;
+}
+
+void Camera3Device::HalInterface::cleanupNativeHandles(
+        std::vector<native_handle_t*> *handles, bool closeFd) {
+    if (handles == nullptr) {
+        return;
+    }
+    if (closeFd) {
+        for (auto& handle : *handles) {
+            native_handle_close(handle);
+        }
+    }
+    for (auto& handle : *handles) {
+        native_handle_delete(handle);
+    }
+    handles->clear();
+    return;
 }
 
 status_t Camera3Device::HalInterface::processBatchCaptureRequests(
@@ -4483,17 +4501,20 @@ status_t Camera3Device::HalInterface::processBatchCaptureRequests(
         captureRequests.resize(batchSize);
     }
     std::vector<native_handle_t*> handlesCreated;
+    std::vector<std::pair<int32_t, int32_t>> inflightBuffers;
 
     status_t res = OK;
     for (size_t i = 0; i < batchSize; i++) {
         if (hidlSession_3_4 != nullptr) {
             res = wrapAsHidlRequest(requests[i], /*out*/&captureRequests_3_4[i].v3_2,
-                    /*out*/&handlesCreated);
+                    /*out*/&handlesCreated, /*out*/&inflightBuffers);
         } else {
-            res = wrapAsHidlRequest(requests[i],
-                    /*out*/&captureRequests[i], /*out*/&handlesCreated);
+            res = wrapAsHidlRequest(requests[i], /*out*/&captureRequests[i],
+                    /*out*/&handlesCreated, /*out*/&inflightBuffers);
         }
         if (res != OK) {
+            popInflightBuffers(inflightBuffers);
+            cleanupNativeHandles(&handlesCreated);
             return res;
         }
     }
@@ -4590,18 +4611,30 @@ status_t Camera3Device::HalInterface::processBatchCaptureRequests(
     }
     if (!err.isOk()) {
         ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
-        return DEAD_OBJECT;
+        status = common::V1_0::Status::CAMERA_DISCONNECTED;
     }
+
     if (status == common::V1_0::Status::OK && *numRequestProcessed != batchSize) {
         ALOGE("%s: processCaptureRequest returns OK but processed %d/%zu requests",
                 __FUNCTION__, *numRequestProcessed, batchSize);
         status = common::V1_0::Status::INTERNAL_ERROR;
     }
 
-    for (auto& handle : handlesCreated) {
-        native_handle_delete(handle);
+    res = CameraProviderManager::mapToStatusT(status);
+    if (res == OK) {
+        if (mHidlSession->isRemote()) {
+            // Only close acquire fence FDs when the HIDL transaction succeeds (so the FDs have been
+            // sent to camera HAL processes)
+            cleanupNativeHandles(&handlesCreated, /*closeFd*/true);
+        } else {
+            // In passthrough mode the FDs are now owned by HAL
+            cleanupNativeHandles(&handlesCreated);
+        }
+    } else {
+        popInflightBuffers(inflightBuffers);
+        cleanupNativeHandles(&handlesCreated);
     }
-    return CameraProviderManager::mapToStatusT(status);
+    return res;
 }
 
 status_t Camera3Device::HalInterface::flush() {
@@ -4683,10 +4716,9 @@ void Camera3Device::HalInterface::getInflightRequestBufferKeys(
 }
 
 status_t Camera3Device::HalInterface::pushInflightBufferLocked(
-        int32_t frameNumber, int32_t streamId, buffer_handle_t *buffer, int acquireFence) {
+        int32_t frameNumber, int32_t streamId, buffer_handle_t *buffer) {
     uint64_t key = static_cast<uint64_t>(frameNumber) << 32 | static_cast<uint64_t>(streamId);
-    auto pair = std::make_pair(buffer, acquireFence);
-    mInflightBufferMap[key] = pair;
+    mInflightBufferMap[key] = buffer;
     return OK;
 }
 
@@ -4698,14 +4730,20 @@ status_t Camera3Device::HalInterface::popInflightBuffer(
     uint64_t key = static_cast<uint64_t>(frameNumber) << 32 | static_cast<uint64_t>(streamId);
     auto it = mInflightBufferMap.find(key);
     if (it == mInflightBufferMap.end()) return NAME_NOT_FOUND;
-    auto pair = it->second;
-    *buffer = pair.first;
-    int acquireFence = pair.second;
-    if (acquireFence > 0) {
-        ::close(acquireFence);
+    if (buffer != nullptr) {
+        *buffer = it->second;
     }
     mInflightBufferMap.erase(it);
     return OK;
+}
+
+void Camera3Device::HalInterface::popInflightBuffers(
+        const std::vector<std::pair<int32_t, int32_t>>& buffers) {
+    for (const auto& pair : buffers) {
+        int32_t frameNumber = pair.first;
+        int32_t streamId = pair.second;
+        popInflightBuffer(frameNumber, streamId, nullptr);
+    }
 }
 
 status_t Camera3Device::HalInterface::pushInflightRequestBuffer(
