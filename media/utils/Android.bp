@@ -25,11 +25,13 @@ cc_library {
         "ServiceUtilities.cpp",
         "TimeCheck.cpp",
     ],
+    static_libs: [
+        "libc_malloc_debug_backtrace",
+    ],
     shared_libs: [
         "libbinder",
         "liblog",
         "libutils",
-        "libmemunreachable",
         "libhidlbase",
         "android.hardware.graphics.bufferqueue@1.0",
         "android.hidl.token@1.0-utils",
