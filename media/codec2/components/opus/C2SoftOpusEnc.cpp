@@ -38,6 +38,8 @@ constexpr char COMPONENT_NAME[] = "c2.android.opus.encoder";
 
 }  // namespace
 
+static const int kMaxNumChannelsSupported = 2;
+
 class C2SoftOpusEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
 public:
     explicit IntfImpl(const std::shared_ptr<C2ReflectorHelper> &helper)
@@ -71,7 +73,7 @@ public:
         addParameter(
                 DefineParam(mChannelCount, C2_PARAMKEY_CHANNEL_COUNT)
                 .withDefault(new C2StreamChannelCountInfo::input(0u, 1))
-                .withFields({C2F(mChannelCount, value).inRange(1, 8)})
+                .withFields({C2F(mChannelCount, value).inRange(1, kMaxNumChannelsSupported)})
                 .withSetter((Setter<decltype(*mChannelCount)>::StrictValueWithNoDeps))
                 .build());
 
@@ -128,9 +130,8 @@ c2_status_t C2SoftOpusEnc::onInit() {
 }
 
 c2_status_t C2SoftOpusEnc::configureEncoder() {
-    unsigned char mono_mapping[256] = {0};
-    unsigned char stereo_mapping[256] = {0, 1};
-    unsigned char surround_mapping[256] = {0, 1, 255};
+    static const unsigned char mono_mapping[256] = {0};
+    static const unsigned char stereo_mapping[256] = {0, 1};
     mSampleRate = mIntf->getSampleRate();
     mChannelCount = mIntf->getChannelCount();
     uint32_t bitrate = mIntf->getBitrate();
@@ -140,13 +141,14 @@ c2_status_t C2SoftOpusEnc::configureEncoder() {
         mChannelCount * mNumSamplesPerFrame * sizeof(int16_t);
     int err = C2_OK;
 
-    unsigned char* mapping;
-    if (mChannelCount < 2) {
+    const unsigned char* mapping;
+    if (mChannelCount == 1) {
         mapping = mono_mapping;
     } else if (mChannelCount == 2) {
         mapping = stereo_mapping;
     } else {
-        mapping = surround_mapping;
+        ALOGE("Number of channels (%d) is not supported", mChannelCount);
+        return C2_BAD_VALUE;
     }
 
     if (mEncoder != nullptr) {
@@ -154,7 +156,7 @@ c2_status_t C2SoftOpusEnc::configureEncoder() {
     }
 
     mEncoder = opus_multistream_encoder_create(mSampleRate, mChannelCount,
-        1, 1, mapping, OPUS_APPLICATION_AUDIO, &err);
+        1, mChannelCount - 1, mapping, OPUS_APPLICATION_AUDIO, &err);
     if (err) {
         ALOGE("Could not create libopus encoder. Error code: %i", err);
         return C2_CORRUPTED;
