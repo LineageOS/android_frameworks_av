@@ -376,8 +376,8 @@ static sp<ABuffer> MakeMPEG4VideoCodecSpecificData(
     ALOGI("VOL dimensions = %dx%d", *width, *height);
 
     size_t len1 = config->size() + GetSizeWidth(config->size()) + 1;
-    size_t len2 = len1 + GetSizeWidth(len1) + 1 + 13;
-    size_t len3 = len2 + GetSizeWidth(len2) + 1 + 3;
+    size_t len2 = len1 + GetSizeWidth(len1 + 13) + 1 + 13;
+    size_t len3 = len2 + GetSizeWidth(len2 + 3) + 1 + 3;
 
     sp<ABuffer> csd = new ABuffer(len3);
     uint8_t *dst = csd->data();
