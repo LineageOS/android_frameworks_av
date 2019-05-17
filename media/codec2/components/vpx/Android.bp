@@ -7,7 +7,7 @@ cc_library_shared {
 
     srcs: ["C2SoftVpxDec.cpp"],
 
-    static_libs: ["libvpx"],
+    shared_libs: ["libvpx"],
 
     cflags: [
         "-DVP9",
@@ -23,7 +23,7 @@ cc_library_shared {
 
     srcs: ["C2SoftVpxDec.cpp"],
 
-    static_libs: ["libvpx"],
+    shared_libs: ["libvpx"],
 }
 
 cc_library_shared {
@@ -38,7 +38,7 @@ cc_library_shared {
         "C2SoftVpxEnc.cpp",
     ],
 
-    static_libs: ["libvpx"],
+    shared_libs: ["libvpx"],
 
     cflags: ["-DVP9"],
 }
@@ -55,6 +55,6 @@ cc_library_shared {
         "C2SoftVpxEnc.cpp",
     ],
 
-    static_libs: ["libvpx"],
+    shared_libs: ["libvpx"],
 }
 

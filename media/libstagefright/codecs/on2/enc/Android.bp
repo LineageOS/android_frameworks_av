@@ -20,5 +20,5 @@ cc_library_shared {
         cfi: true,
     },
 
-    static_libs: ["libvpx"],
+    shared_libs: ["libvpx"],
 }
