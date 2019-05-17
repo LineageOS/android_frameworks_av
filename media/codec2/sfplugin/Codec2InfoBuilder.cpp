@@ -313,7 +313,7 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
     //
     // Note: Currently, OMX components have default rank 0x100, while all
     // Codec2.0 software components have default rank 0x200.
-    int option = ::android::base::GetIntProperty("debug.stagefright.ccodec", 4);
+    int option = ::android::base::GetIntProperty("debug.stagefright.ccodec", 1);
 
     // Obtain Codec2Client
     std::vector<Traits> traits = Codec2Client::ListComponents();
