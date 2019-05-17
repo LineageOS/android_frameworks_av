@@ -466,9 +466,11 @@ bool C2SoftMpeg4Dec::handleResChange(const std::unique_ptr<C2Work> &work) {
 
 /* TODO: can remove temporary copy after library supports writing to display
  * buffer Y, U and V plane pointers using stride info. */
-static void copyOutputBufferToYV12Frame(uint8_t *dst, uint8_t *src, size_t dstYStride,
-                                        size_t srcYStride, uint32_t width, uint32_t height) {
-    size_t dstUVStride = align(dstYStride / 2, 16);
+static void copyOutputBufferToYuvPlanarFrame(
+        uint8_t *dst, uint8_t *src,
+        size_t dstYStride, size_t dstUVStride,
+        size_t srcYStride, uint32_t width,
+        uint32_t height) {
     size_t srcUVStride = srcYStride / 2;
     uint8_t *srcStart = src;
     uint8_t *dstStart = dst;
@@ -673,8 +675,14 @@ void C2SoftMpeg4Dec::process(
         }
 
         uint8_t *outputBufferY = wView.data()[C2PlanarLayout::PLANE_Y];
-        (void)copyOutputBufferToYV12Frame(outputBufferY, mOutputBuffer[mNumSamplesOutput & 1],
-                                          wView.width(), align(mWidth, 16), mWidth, mHeight);
+        C2PlanarLayout layout = wView.layout();
+        size_t dstYStride = layout.planes[C2PlanarLayout::PLANE_Y].rowInc;
+        size_t dstUVStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+        (void)copyOutputBufferToYuvPlanarFrame(
+                outputBufferY,
+                mOutputBuffer[mNumSamplesOutput & 1],
+                dstYStride, dstUVStride,
+                align(mWidth, 16), mWidth, mHeight);
 
         inPos += inSize - (size_t)tmpInSize;
         finishWork(workIndex, work);
