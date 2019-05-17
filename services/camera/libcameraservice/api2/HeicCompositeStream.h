@@ -71,7 +71,7 @@ public:
             const CameraMetadata& ch, std::vector<OutputStreamInfo>* compositeOutput /*out*/);
 
     static bool isSizeSupportedByHeifEncoder(int32_t width, int32_t height,
-            bool* useHeic, bool* useGrid, int64_t* stall);
+            bool* useHeic, bool* useGrid, int64_t* stall, AString* hevcName = nullptr);
     static bool isInMemoryTempFileSupported();
 protected:
 
