@@ -89,6 +89,10 @@ public:
 
     status_t findThumbnailSample(uint32_t *sample_index);
 
+    void setPredictSampleSize(uint32_t sampleSize) {
+        mDefaultSampleSize = sampleSize;
+    }
+
 protected:
     ~SampleTable();
 
