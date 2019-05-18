@@ -1,9 +1,6 @@
 cc_library {
     name: "libstagefright_flacdec",
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
 
     srcs: [
         "FLACDecoder.cpp",
