@@ -872,7 +872,6 @@ C2PlatformComponentStore::C2PlatformComponentStore()
     emplace("libcodec2_soft_vp8enc.so");
     emplace("libcodec2_soft_vp9dec.so");
     emplace("libcodec2_soft_vp9enc.so");
-    emplace("libcodec2_soft_xaacdec.so");
 }
 
 c2_status_t C2PlatformComponentStore::copyBuffer(
