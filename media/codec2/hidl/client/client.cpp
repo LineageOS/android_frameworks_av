@@ -959,9 +959,9 @@ std::vector<C2Component::Traits> const& Codec2Client::ListComponents() {
 
 std::shared_ptr<Codec2Client::InputSurface> Codec2Client::CreateInputSurface(
         char const* serviceName) {
-    uint32_t inputSurfaceSetting = ::android::base::GetUintProperty(
-            "debug.stagefright.c2inputsurface", uint32_t(0));
-    if (inputSurfaceSetting == 0) {
+    int32_t inputSurfaceSetting = ::android::base::GetIntProperty(
+            "debug.stagefright.c2inputsurface", int32_t(0));
+    if (inputSurfaceSetting <= 0) {
         return nullptr;
     }
     size_t index = GetServiceNames().size();
