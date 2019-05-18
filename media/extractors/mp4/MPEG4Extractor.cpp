@@ -1972,6 +1972,8 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 return err;
             }
 
+            adjustRawDefaultFrameSize();
+
             size_t max_size;
             err = mLastTrack->sampleTable->getMaxSampleSize(&max_size);
 
@@ -4606,6 +4608,20 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
     return OK;
 }
 
+void MPEG4Extractor::adjustRawDefaultFrameSize() {
+    int32_t chanCount = 0;
+    int32_t bitWidth = 0;
+    const char *mimeStr = NULL;
+
+    if(AMediaFormat_getString(mLastTrack->meta, AMEDIAFORMAT_KEY_MIME, &mimeStr) &&
+        !strcasecmp(mimeStr, MEDIA_MIMETYPE_AUDIO_RAW) &&
+        AMediaFormat_getInt32(mLastTrack->meta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, &chanCount) &&
+        AMediaFormat_getInt32(mLastTrack->meta, AMEDIAFORMAT_KEY_BITS_PER_SAMPLE, &bitWidth)) {
+        // samplesize in stsz may not right , so updade default samplesize
+        mLastTrack->sampleTable->setPredictSampleSize(chanCount * bitWidth / 8);
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 MPEG4Source::MPEG4Source(
@@ -4972,8 +4988,11 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
 }
 
 status_t MPEG4Source::parseSampleAuxiliaryInformationSizes(
-        off64_t offset, off64_t /* size */) {
+        off64_t offset, off64_t size) {
     ALOGV("parseSampleAuxiliaryInformationSizes");
+    if (size < 9) {
+        return -EINVAL;
+    }
     // 14496-12 8.7.12
     uint8_t version;
     if (mDataSource->readAt(
@@ -4986,25 +5005,32 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationSizes(
         return ERROR_UNSUPPORTED;
     }
     offset++;
+    size--;
 
     uint32_t flags;
     if (!mDataSource->getUInt24(offset, &flags)) {
         return ERROR_IO;
     }
     offset += 3;
+    size -= 3;
 
     if (flags & 1) {
+        if (size < 13) {
+            return -EINVAL;
+        }
         uint32_t tmp;
         if (!mDataSource->getUInt32(offset, &tmp)) {
             return ERROR_MALFORMED;
         }
         mCurrentAuxInfoType = tmp;
         offset += 4;
+        size -= 4;
         if (!mDataSource->getUInt32(offset, &tmp)) {
             return ERROR_MALFORMED;
         }
         mCurrentAuxInfoTypeParameter = tmp;
         offset += 4;
+        size -= 4;
     }
 
     uint8_t defsize;
@@ -5013,6 +5039,7 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationSizes(
     }
     mCurrentDefaultSampleInfoSize = defsize;
     offset++;
+    size--;
 
     uint32_t smplcnt;
     if (!mDataSource->getUInt32(offset, &smplcnt)) {
@@ -5020,7 +5047,12 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationSizes(
     }
     mCurrentSampleInfoCount = smplcnt;
     offset += 4;
-
+    size -= 4;
+    if(smplcnt > size) {
+        ALOGW("b/124525515 - smplcnt(%u) > size(%ld)", (unsigned int)smplcnt, (unsigned long)size);
+        android_errorWriteLog(0x534e4554, "124525515");
+        return -EINVAL;
+    }
     if (mCurrentDefaultSampleInfoSize != 0) {
         ALOGV("@@@@ using default sample info size of %d", mCurrentDefaultSampleInfoSize);
         return OK;
