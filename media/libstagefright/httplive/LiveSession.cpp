@@ -1384,7 +1384,7 @@ size_t LiveSession::getBandwidthIndex(int32_t bandwidthBps) {
         while (index > lowestBandwidth) {
             // be conservative (70%) to avoid overestimating and immediately
             // switching down again.
-            size_t adjustedBandwidthBps = bandwidthBps * 7 / 10;
+            size_t adjustedBandwidthBps = bandwidthBps * .7f;
             const BandwidthItem &item = mBandwidthItems[index];
             if (item.mBandwidth <= adjustedBandwidthBps
                     && isBandwidthValid(item)) {
