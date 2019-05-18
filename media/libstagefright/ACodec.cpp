@@ -1138,6 +1138,8 @@ status_t ACodec::configureOutputBuffersFromNativeWindow(
         return err;
     }
 
+    static_cast<Surface *>(mNativeWindow.get())->setDequeueTimeout(-1);
+
     // Exits here for tunneled video playback codecs -- i.e. skips native window
     // buffer allocation step as this is managed by the tunneled OMX omponent
     // itself and explicitly sets def.nBufferCountActual to 0.

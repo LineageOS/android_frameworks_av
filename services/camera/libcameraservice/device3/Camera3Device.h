@@ -289,9 +289,6 @@ class Camera3Device :
         // Reset this HalInterface object (does not call close())
         void clear();
 
-        // Check if HalInterface support sending requests in batch
-        bool supportBatchRequest();
-
         // Calls into the HAL interface
 
         // Caller takes ownership of requestTemplate
@@ -300,7 +297,11 @@ class Camera3Device :
         status_t configureStreams(const camera_metadata_t *sessionParams,
                 /*inout*/ camera3_stream_configuration *config,
                 const std::vector<uint32_t>& bufferSizes);
-        status_t processCaptureRequest(camera3_capture_request_t *request);
+
+        // When the call succeeds, the ownership of acquire fences in requests is transferred to
+        // HalInterface. More specifically, the current implementation will send the fence to
+        // HAL process and close the FD in cameraserver process. When the call fails, the ownership
+        // of the acquire fence still belongs to the caller.
         status_t processBatchCaptureRequests(
                 std::vector<camera3_capture_request_t*>& requests,
                 /*out*/uint32_t* numRequestProcessed);
@@ -895,9 +896,6 @@ class Camera3Device :
         // Clear repeating requests. Must be called with mRequestLock held.
         status_t clearRepeatingRequestsLocked(/*out*/ int64_t *lastFrameNumber = NULL);
 
-        // send request in mNextRequests to HAL one by one. Return true = sucssess
-        bool sendRequestsOneByOne();
-
         // send request in mNextRequests to HAL in a batch. Return true = sucssess
         bool sendRequestsBatch();
 
@@ -1186,10 +1184,14 @@ class Camera3Device :
     uint32_t               mNextResultFrameNumber;
     // the minimal frame number of the next reprocess result
     uint32_t               mNextReprocessResultFrameNumber;
+    // the minimal frame number of the next ZSL still capture result
+    uint32_t               mNextZslStillResultFrameNumber;
     // the minimal frame number of the next non-reprocess shutter
     uint32_t               mNextShutterFrameNumber;
     // the minimal frame number of the next reprocess shutter
     uint32_t               mNextReprocessShutterFrameNumber;
+    // the minimal frame number of the next ZSL still capture shutter
+    uint32_t               mNextZslStillShutterFrameNumber;
     List<CaptureResult>   mResultQueue;
     Condition              mResultSignal;
     wp<NotificationListener>  mListener;
@@ -1226,7 +1228,8 @@ class Camera3Device :
     void sendCaptureResult(CameraMetadata &pendingMetadata,
             CaptureResultExtras &resultExtras,
             CameraMetadata &collectedPartialResult, uint32_t frameNumber,
-            bool reprocess, const std::vector<PhysicalCaptureResultInfo>& physicalMetadatas);
+            bool reprocess, bool zslStillCapture,
+            const std::vector<PhysicalCaptureResultInfo>& physicalMetadatas);
 
     bool isLastFullResult(const InFlightRequest& inFlightRequest);
 
