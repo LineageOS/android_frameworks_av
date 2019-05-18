@@ -129,6 +129,7 @@ cc_library_static {
 
     shared_libs: [
         "libstagefright_enc_common",
+        "liblog",
     ],
 
     cflags: ["-Werror"],
