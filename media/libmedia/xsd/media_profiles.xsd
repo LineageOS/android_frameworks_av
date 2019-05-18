@@ -35,19 +35,19 @@
         </xs:complexType>
     </xs:element>
     <xs:complexType name="CamcorderProfiles">
-        <xs:sequence>
-            <xs:element name="EncoderProfile" type="EncoderProfile" minOccurs="0" maxOccurs="unbounded"/>
-            <xs:element name="ImageEncoding" minOccurs="0" maxOccurs="unbounded">
+        <xs:choice minOccurs="0" maxOccurs="unbounded">
+            <xs:element name="EncoderProfile" type="EncoderProfile"/>
+            <xs:element name="ImageEncoding">
                 <xs:complexType>
                     <xs:attribute name="quality" type="xs:int"/>
                 </xs:complexType>
             </xs:element>
-            <xs:element name="ImageDecoding" minOccurs="0" maxOccurs="unbounded">
+            <xs:element name="ImageDecoding">
                 <xs:complexType>
                     <xs:attribute name="memCap" type="xs:int"/>
                 </xs:complexType>
             </xs:element>
-        </xs:sequence>
+        </xs:choice>
         <xs:attribute name="cameraId" type="xs:int"/>
     </xs:complexType>
     <xs:complexType name="EncoderProfile">

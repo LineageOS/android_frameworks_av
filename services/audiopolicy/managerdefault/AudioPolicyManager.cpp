@@ -777,6 +777,12 @@ void AudioPolicyManager::setForceUse(audio_policy_force_use_t usage,
     // check for device and output changes triggered by new force usage
     checkForDeviceAndOutputChanges();
 
+    // force client reconnection to reevaluate flag AUDIO_FLAG_AUDIBILITY_ENFORCED
+    if (usage == AUDIO_POLICY_FORCE_FOR_SYSTEM) {
+        mpClientInterface->invalidateStream(AUDIO_STREAM_SYSTEM);
+        mpClientInterface->invalidateStream(AUDIO_STREAM_ENFORCED_AUDIBLE);
+    }
+
     //FIXME: workaround for truncated touch sounds
     // to be removed when the problem is handled by system UI
     uint32_t delayMs = 0;
@@ -910,6 +916,13 @@ status_t AudioPolicyManager::getAudioAttributes(audio_attributes_t *dstAttr,
         }
         *dstAttr = mEngine->getAttributesForStreamType(srcStream);
     }
+
+    // Only honor audibility enforced when required. The client will be
+    // forced to reconnect if the forced usage changes.
+    if (mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_SYSTEM) != AUDIO_POLICY_FORCE_SYSTEM_ENFORCED) {
+        dstAttr->flags &= ~AUDIO_FLAG_AUDIBILITY_ENFORCED;
+    }
+
     return NO_ERROR;
 }
 
@@ -2136,6 +2149,7 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(const sp<DeviceDescripto
         for (size_t i = 0; i < mInputs.size(); ) {
             sp <AudioInputDescriptor> desc = mInputs.valueAt(i);
             if (desc->mProfile != profile) {
+                i++;
                 continue;
             }
             // if sound trigger, reuse input if used by other sound trigger on same session

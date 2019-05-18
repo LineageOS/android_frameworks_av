@@ -1,9 +1,6 @@
 cc_library_shared {
     name: "libstagefright_amrnb_common",
     vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
 
     srcs: [
         "src/add.cpp",
