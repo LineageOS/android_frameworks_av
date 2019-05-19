@@ -865,6 +865,22 @@ void C2SoftHevcEnc::process(const std::unique_ptr<C2Work>& work,
             return;
         }
     }
+
+    // handle dynamic config parameters
+    {
+        IntfImpl::Lock lock = mIntf->lock();
+        std::shared_ptr<C2StreamBitrateInfo::output> bitrate = mIntf->getBitrate_l();
+        lock.unlock();
+
+        if (bitrate != mBitrate) {
+            mBitrate = bitrate;
+            mEncParams.s_tgt_lyr_prms.as_tgt_params[0].ai4_tgt_bitrate[0] =
+                mBitrate->value;
+            mEncParams.s_tgt_lyr_prms.as_tgt_params[0].ai4_peak_bitrate[0] =
+                mBitrate->value << 1;
+        }
+    }
+
     ihevce_inp_buf_t s_encode_ip{};
     ihevce_out_buf_t s_encode_op{};
     uint64_t workIndex = work->input.ordinal.frameIndex.peekull();
