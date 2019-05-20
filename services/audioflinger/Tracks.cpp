@@ -389,9 +389,16 @@ sp<AudioFlinger::PlaybackThread::OpPlayAudioMonitor>
 AudioFlinger::PlaybackThread::OpPlayAudioMonitor::createIfNeeded(
             uid_t uid, const audio_attributes_t& attr, int id, audio_stream_type_t streamType)
 {
-    if (isAudioServerOrRootUid(uid)) {
-        ALOGD("OpPlayAudio: not muting track:%d usage:%d root or audioserver", id, attr.usage);
-        return nullptr;
+    if (isServiceUid(uid)) {
+        Vector <String16> packages;
+        getPackagesForUid(uid, packages);
+        if (packages.isEmpty()) {
+            ALOGD("OpPlayAudio: not muting track:%d usage:%d for service UID %d",
+                  id,
+                  attr.usage,
+                  uid);
+            return nullptr;
+        }
     }
     // stream type has been filtered by audio policy to indicate whether it can be muted
     if (streamType == AUDIO_STREAM_ENFORCED_AUDIBLE) {
@@ -423,8 +430,7 @@ AudioFlinger::PlaybackThread::OpPlayAudioMonitor::~OpPlayAudioMonitor()
 
 void AudioFlinger::PlaybackThread::OpPlayAudioMonitor::onFirstRef()
 {
-    PermissionController permissionController;
-    permissionController.getPackagesForUid(mUid, mPackages);
+    getPackagesForUid(mUid, mPackages);
     checkPlayAudioForUsage();
     if (!mPackages.isEmpty()) {
         mOpCallback = new PlayAudioOpCallback(this);
@@ -473,6 +479,14 @@ void AudioFlinger::PlaybackThread::OpPlayAudioMonitor::PlayAudioOpCallback::opCh
     if (monitor != NULL) {
         monitor->checkPlayAudioForUsage();
     }
+}
+
+// static
+void AudioFlinger::PlaybackThread::OpPlayAudioMonitor::getPackagesForUid(
+    uid_t uid, Vector<String16>& packages)
+{
+    PermissionController permissionController;
+    permissionController.getPackagesForUid(uid, packages);
 }
 
 // ----------------------------------------------------------------------------
