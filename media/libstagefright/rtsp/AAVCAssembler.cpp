@@ -280,6 +280,11 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
     size_t totalCount = 1;
     bool complete = false;
 
+    int32_t rtpTimeStartAt;
+    CHECK(buffer->meta()->findInt32("rtp-time", &rtpTimeStartAt));
+    uint32_t startSeqNo = buffer->int32Data();
+    bool pFrame = nalType == 0x1;
+
     if (data[1] & 0x40) {
         // Huh? End bit also set on the first buffer.
 
@@ -297,16 +302,20 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
             size_t size = buffer->size();
 
             if ((uint32_t)buffer->int32Data() != expectedSeqNo) {
-                ALOGV("sequence not complete, expected seqNo %d, got %d",
-                     expectedSeqNo, (uint32_t)buffer->int32Data());
+                ALOGV("sequence not complete, expected seqNo %d, got %d, pFrame %d",
+                     expectedSeqNo, (uint32_t)buffer->int32Data(), pFrame);
 
-                return WRONG_SEQUENCE_NUMBER;
+                if (!pFrame)
+                    return WRONG_SEQUENCE_NUMBER;
             }
 
+            int32_t rtpTime;
+            CHECK(buffer->meta()->findInt32("rtp-time", &rtpTime));
             if (size < 2
                     || data[0] != indicator
                     || (data[1] & 0x1f) != nalType
-                    || (data[1] & 0x80)) {
+                    || (data[1] & 0x80)
+                    || rtpTime != rtpTimeStartAt) {
                 ALOGV("Ignoring malformed FU buffer.");
 
                 // Delete the whole start of the FU.
@@ -324,9 +333,26 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
             totalSize += size - 2;
             ++totalCount;
 
-            expectedSeqNo = expectedSeqNo + 1;
+            expectedSeqNo = buffer->int32Data() + 1;
 
             if (data[1] & 0x40) {
+                if (pFrame) {
+                    ALOGV("checking p-frame losses.. recvBufs %d diff %d drop? %d",
+                            (uint32_t)totalCount, expectedSeqNo - startSeqNo,
+                            totalCount < ((expectedSeqNo - startSeqNo) / 2));
+                    if (totalCount < ((expectedSeqNo - startSeqNo) / 2)) {
+                        ALOGI("drop p-frame. recvBufs %d lastSeq %d startSeq %d",
+                                (uint32_t)totalCount, expectedSeqNo - 1, startSeqNo);
+
+                        it = queue->begin();
+                        for (size_t i = 0; i <= totalCount; ++i) {
+                            it = queue->erase(it);
+                        }
+                        mNextExpectedSeqNo = expectedSeqNo;
+
+                        return MALFORMED_PACKET;
+                    }
+                }
                 // This is the last fragment.
                 complete = true;
                 break;

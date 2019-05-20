@@ -281,20 +281,19 @@ status_t NuPlayer::RTPSource::dequeueAccessUnit(
     }
 
     int32_t cvo;
-    if ((*accessUnit) != NULL && (*accessUnit)->meta()->findInt32("cvo", &cvo)) {
-        if (cvo != mLastCVOUpdated) {
-            sp<AMessage> msg = new AMessage();
-            msg->setInt32("payload-type", NuPlayer::RTPSource::RTP_CVO);
-            msg->setInt32("cvo", cvo);
+    if ((*accessUnit) != NULL && (*accessUnit)->meta()->findInt32("cvo", &cvo) &&
+            cvo != mLastCVOUpdated) {
+        sp<AMessage> msg = new AMessage();
+        msg->setInt32("payload-type", NuPlayer::RTPSource::RTP_CVO);
+        msg->setInt32("cvo", cvo);
 
-            sp<AMessage> notify = dupNotify();
-            notify->setInt32("what", kWhatIMSRxNotice);
-            notify->setMessage("message", msg);
-            notify->post();
+        sp<AMessage> notify = dupNotify();
+        notify->setInt32("what", kWhatIMSRxNotice);
+        notify->setMessage("message", msg);
+        notify->post();
 
-            ALOGV("notify cvo updated (%d)->(%d) to upper layer", mLastCVOUpdated, cvo);
-            mLastCVOUpdated = cvo;
-        }
+        ALOGV("notify cvo updated (%d)->(%d) to upper layer", mLastCVOUpdated, cvo);
+        mLastCVOUpdated = cvo;
     }
 
     return finalResult;
