@@ -47,6 +47,7 @@ ARTPSource::ARTPSource(
       mFirstSysTime(0),
       mClockRate(0),
       mJbTime(300), // default jitter buffer time is 300ms.
+      mFirstSsrc(0),
       mID(id),
       mHighestSeqNumber(0),
       mPrevExpected(0),
@@ -121,6 +122,9 @@ void ARTPSource::timeUpdate(uint32_t rtpTime, uint64_t ntpTime) {
 bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
     uint32_t seqNum = (uint32_t)buffer->int32Data();
 
+    int32_t ssrc = 0;
+    buffer->meta()->findInt32("ssrc", &ssrc);
+
     if (mNumBuffersReceived++ == 0 && mFirstSysTime == 0) {
         int32_t firstRtpTime;
         CHECK(buffer->meta()->findInt32("rtp-time", &firstRtpTime));
@@ -128,11 +132,17 @@ bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
         mHighestSeqNumber = seqNum;
         mBaseSeqNumber = seqNum;
         mFirstRtpTime = firstRtpTime;
-        ALOGV("first-rtp arrived: first-rtp-time=%d, sys-time=%lld, seq-num=%u",
-                mFirstRtpTime, (long long)mFirstSysTime, mHighestSeqNumber);
+        mFirstSsrc = ssrc;
+        ALOGD("first-rtp arrived: first-rtp-time=%d, sys-time=%lld, seq-num=%u, ssrc=%d",
+                mFirstRtpTime, (long long)mFirstSysTime, mHighestSeqNumber, mFirstSsrc);
         mClockRate = 90000;
         mQueue.push_back(buffer);
         return true;
+    }
+
+    if (mFirstSsrc != ssrc) {
+        ALOGW("Discarding a buffer due to unexpected ssrc");
+        return false;
     }
 
     // Only the lower 16-bit of the sequence numbers are transmitted,
