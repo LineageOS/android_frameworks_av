@@ -53,6 +53,7 @@ void Copy_Float_Mc_Stereo(       const LVM_FLOAT *src,
                                  LVM_INT16 NrFrames,
                                  LVM_INT32 NrChannels);
 void Copy_Float_Stereo_Mc(       const LVM_FLOAT *src,
+                                 LVM_FLOAT *StereoOut,
                                  LVM_FLOAT *dst,
                                  LVM_INT16 NrFrames,
                                  LVM_INT32 NrChannels);

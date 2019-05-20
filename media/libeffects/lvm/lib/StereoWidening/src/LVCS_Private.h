@@ -60,7 +60,11 @@ extern "C" {
 #define LVCS_COMPGAINFRAME          64          /* Compressor gain update interval */
 
 /* Memory */
+#ifdef SUPPORT_MC
+#define LVCS_SCRATCHBUFFERS              8      /* Number of buffers required for inplace processing */
+#else
 #define LVCS_SCRATCHBUFFERS              6      /* Number of buffers required for inplace processing */
+#endif
 #ifdef SUPPORT_MC
 /*
  * The Concert Surround module applies processing only on the first two

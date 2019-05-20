@@ -117,30 +117,31 @@ void Copy_Float_Mc_Stereo(const LVM_FLOAT *src,
     }
 }
 
-// Merge a multichannel source with stereo contained in dst, to dst.
+// Merge a multichannel source with stereo contained in StereoOut, to dst.
 void Copy_Float_Stereo_Mc(const LVM_FLOAT *src,
+                 LVM_FLOAT *StereoOut,
                  LVM_FLOAT *dst,
                  LVM_INT16 NrFrames, /* Number of frames*/
                  LVM_INT32 NrChannels)
 {
     LVM_INT16 ii, jj;
-    LVM_FLOAT *src_st = dst + 2 * (NrFrames - 1);
 
-    // repack dst which carries stereo information
+    // pack dst with stereo information of StereoOut
     // together with the upper channels of src.
+    StereoOut += 2 * (NrFrames - 1);
     dst += NrChannels * (NrFrames - 1);
     src += NrChannels * (NrFrames - 1);
     for (ii = NrFrames; ii != 0; ii--)
     {
-        dst[1] = src_st[1];
-        dst[0] = src_st[0]; // copy 1 before 0 is required for NrChannels == 3.
+        dst[1] = StereoOut[1];
+        dst[0] = StereoOut[0]; // copy 1 before 0 is required for NrChannels == 3.
         for (jj = 2; jj < NrChannels; jj++)
         {
             dst[jj] = src[jj];
         }
         dst    -= NrChannels;
         src    -= NrChannels;
-        src_st -= 2;
+        StereoOut -= 2;
     }
 }
 #endif
