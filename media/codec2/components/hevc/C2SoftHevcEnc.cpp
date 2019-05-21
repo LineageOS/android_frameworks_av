@@ -86,8 +86,8 @@ class C2SoftHevcEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
             DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
                 .withDefault(new C2StreamPictureSizeInfo::input(0u, 320, 240))
                 .withFields({
-                    C2F(mSize, width).inRange(320, 1920, 2),
-                    C2F(mSize, height).inRange(128, 1088, 2),
+                    C2F(mSize, width).inRange(2, 1920, 2),
+                    C2F(mSize, height).inRange(2, 1088, 2),
                 })
                 .withSetter(SizeSetter)
                 .build());
