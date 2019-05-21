@@ -18,6 +18,8 @@
 #define LOG_TAG "C2SoftVpxDec"
 #include <log/log.h>
 
+#include <algorithm>
+
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/MediaDefs.h>
 
@@ -303,13 +305,43 @@ private:
 #endif
 };
 
+C2SoftVpxDec::ConverterThread::ConverterThread(
+        const std::shared_ptr<Mutexed<ConversionQueue>> &queue)
+    : Thread(false), mQueue(queue) {}
+
+bool C2SoftVpxDec::ConverterThread::threadLoop() {
+    Mutexed<ConversionQueue>::Locked queue(*mQueue);
+    if (queue->entries.empty()) {
+        queue.waitForCondition(queue->cond);
+        if (queue->entries.empty()) {
+            return true;
+        }
+    }
+    std::function<void()> convert = queue->entries.front();
+    queue->entries.pop_front();
+    if (!queue->entries.empty()) {
+        queue->cond.signal();
+    }
+    queue.unlock();
+
+    convert();
+
+    queue.lock();
+    if (--queue->numPending == 0u) {
+        queue->cond.broadcast();
+    }
+    return true;
+}
+
 C2SoftVpxDec::C2SoftVpxDec(
         const char *name,
         c2_node_id_t id,
         const std::shared_ptr<IntfImpl> &intfImpl)
     : SimpleC2Component(std::make_shared<SimpleInterface<IntfImpl>>(name, id, intfImpl)),
       mIntf(intfImpl),
-      mCodecCtx(nullptr) {
+      mCodecCtx(nullptr),
+      mCoreCount(1),
+      mQueue(new Mutexed<ConversionQueue>) {
 }
 
 C2SoftVpxDec::~C2SoftVpxDec() {
@@ -399,7 +431,7 @@ status_t C2SoftVpxDec::initDecoder() {
 
     vpx_codec_dec_cfg_t cfg;
     memset(&cfg, 0, sizeof(vpx_codec_dec_cfg_t));
-    cfg.threads = GetCPUCoreCount();
+    cfg.threads = mCoreCount = GetCPUCoreCount();
 
     vpx_codec_flags_t flags;
     memset(&flags, 0, sizeof(vpx_codec_flags_t));
@@ -413,6 +445,18 @@ status_t C2SoftVpxDec::initDecoder() {
         return UNKNOWN_ERROR;
     }
 
+    if (mMode == MODE_VP9) {
+        using namespace std::string_literals;
+        for (int i = 0; i < mCoreCount; ++i) {
+            sp<ConverterThread> thread(new ConverterThread(mQueue));
+            mConverterThreads.push_back(thread);
+            if (thread->run(("vp9conv #"s + std::to_string(i)).c_str(),
+                            ANDROID_PRIORITY_AUDIO) != OK) {
+                return UNKNOWN_ERROR;
+            }
+        }
+    }
+
     return OK;
 }
 
@@ -422,6 +466,21 @@ status_t C2SoftVpxDec::destroyDecoder() {
         delete mCodecCtx;
         mCodecCtx = nullptr;
     }
+    bool running = true;
+    for (const sp<ConverterThread> &thread : mConverterThreads) {
+        thread->requestExit();
+    }
+    while (running) {
+        mQueue->lock()->cond.broadcast();
+        running = false;
+        for (const sp<ConverterThread> &thread : mConverterThreads) {
+            if (thread->isRunning()) {
+                running = true;
+                break;
+            }
+        }
+    }
+    mConverterThreads.clear();
 
     return OK;
 }
@@ -759,15 +818,35 @@ bool C2SoftVpxDec::outputBuffer(
         const uint16_t *srcV = (const uint16_t *)img->planes[VPX_PLANE_V];
 
         if (format == HAL_PIXEL_FORMAT_RGBA_1010102) {
-            convertYUV420Planar16ToY410((uint32_t *)dst, srcY, srcU, srcV, srcYStride / 2,
-                                    srcUStride / 2, srcVStride / 2,
-                                    dstYStride / sizeof(uint32_t),
-                                    mWidth, mHeight);
+            Mutexed<ConversionQueue>::Locked queue(*mQueue);
+            size_t i = 0;
+            constexpr size_t kHeight = 64;
+            for (; i < mHeight; i += kHeight) {
+                queue->entries.push_back(
+                        [dst, srcY, srcU, srcV,
+                         srcYStride, srcUStride, srcVStride, dstYStride,
+                         width = mWidth, height = std::min(mHeight - i, kHeight)] {
+                            convertYUV420Planar16ToY410(
+                                    (uint32_t *)dst, srcY, srcU, srcV, srcYStride / 2,
+                                    srcUStride / 2, srcVStride / 2, dstYStride / sizeof(uint32_t),
+                                    width, height);
+                        });
+                srcY += srcYStride / 2 * kHeight;
+                srcU += srcUStride / 2 * (kHeight / 2);
+                srcV += srcVStride / 2 * (kHeight / 2);
+                dst += dstYStride * kHeight;
+            }
+            CHECK_EQ(0u, queue->numPending);
+            queue->numPending = queue->entries.size();
+            while (queue->numPending > 0) {
+                queue->cond.signal();
+                queue.waitForCondition(queue->cond);
+            }
         } else {
             convertYUV420Planar16ToYUV420Planar(dst, srcY, srcU, srcV, srcYStride / 2,
-                                    srcUStride / 2, srcVStride / 2,
-                                    dstYStride, dstUVStride,
-                                    mWidth, mHeight);
+                                                srcUStride / 2, srcVStride / 2,
+                                                dstYStride, dstUVStride,
+                                                mWidth, mHeight);
         }
     } else {
         const uint8_t *srcY = (const uint8_t *)img->planes[VPX_PLANE_Y];

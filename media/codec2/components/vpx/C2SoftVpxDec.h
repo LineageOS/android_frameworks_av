@@ -50,6 +50,19 @@ struct C2SoftVpxDec : public SimpleC2Component {
         MODE_VP9,
     } mMode;
 
+    struct ConversionQueue;
+
+    class ConverterThread : public Thread {
+    public:
+        explicit ConverterThread(
+                const std::shared_ptr<Mutexed<ConversionQueue>> &queue);
+        ~ConverterThread() override = default;
+        bool threadLoop() override;
+
+    private:
+        std::shared_ptr<Mutexed<ConversionQueue>> mQueue;
+    };
+
     std::shared_ptr<IntfImpl> mIntf;
     vpx_codec_ctx_t *mCodecCtx;
     bool mFrameParallelMode;  // Frame parallel is only supported by VP9 decoder.
@@ -58,6 +71,15 @@ struct C2SoftVpxDec : public SimpleC2Component {
     uint32_t mHeight;
     bool mSignalledOutputEos;
     bool mSignalledError;
+
+    int mCoreCount;
+    struct ConversionQueue {
+        std::list<std::function<void()>> entries;
+        Condition cond;
+        size_t numPending{0u};
+    };
+    std::shared_ptr<Mutexed<ConversionQueue>> mQueue;
+    std::vector<sp<ConverterThread>> mConverterThreads;
 
     status_t initDecoder();
     status_t destroyDecoder();
