@@ -358,13 +358,21 @@ class Camera3Device :
         // Do not free input camera3_capture_request_t before output HIDL request
         status_t wrapAsHidlRequest(camera3_capture_request_t* in,
                 /*out*/hardware::camera::device::V3_2::CaptureRequest* out,
-                /*out*/std::vector<native_handle_t*>* handlesCreated);
+                /*out*/std::vector<native_handle_t*>* handlesCreated,
+                /*out*/std::vector<std::pair<int32_t, int32_t>>* inflightBuffers);
 
         status_t pushInflightBufferLocked(int32_t frameNumber, int32_t streamId,
-                buffer_handle_t *buffer, int acquireFence);
+                buffer_handle_t *buffer);
+
+        // Pop inflight buffers based on pairs of (frameNumber,streamId)
+        void popInflightBuffers(const std::vector<std::pair<int32_t, int32_t>>& buffers);
+
         // Cache of buffer handles keyed off (frameNumber << 32 | streamId)
-        // value is a pair of (buffer_handle_t*, acquire_fence FD)
-        std::unordered_map<uint64_t, std::pair<buffer_handle_t*, int>> mInflightBufferMap;
+        std::unordered_map<uint64_t, buffer_handle_t*> mInflightBufferMap;
+
+        // Delete and optionally close native handles and clear the input vector afterward
+        static void cleanupNativeHandles(
+                std::vector<native_handle_t*> *handles, bool closeFd = false);
 
         struct BufferHasher {
             size_t operator()(const buffer_handle_t& buf) const {
