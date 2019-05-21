@@ -223,10 +223,8 @@ void MediaExtractorFactory::RegisterExtractorsInApk(
         char abi[PROPERTY_VALUE_MAX];
         property_get("ro.product.cpu.abi", abi, "arm64-v8a");
         String8 prefix8 = String8::format("lib/%s/", abi);
-        ZipString prefix(prefix8.c_str());
-        ZipString suffix("extractor.so");
         void* cookie;
-        ret = StartIteration(zipHandle, &cookie, &prefix, &suffix);
+        ret = StartIteration(zipHandle, &cookie, prefix8.c_str(), "extractor.so");
         if (ret == 0) {
             ZipEntry entry;
             ZipString name;
