@@ -26,7 +26,6 @@
 #include <android/hardware/drm/1.2/types.h>
 #include <android/hidl/manager/1.2/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
-
 #include <media/EventMetric.h>
 #include <media/PluginMetricsReporting.h>
 #include <media/drm/DrmAPI.h>
@@ -57,7 +56,6 @@ using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
-using ::android::hidl::manager::V1_0::IServiceManager;
 using ::android::os::PersistableBundle;
 using ::android::sp;
 
@@ -394,7 +392,7 @@ Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
                     }
                 }
             );
-        manager->listByInterface(drm::V1_2::IDrmFactory::descriptor,
+        manager->listManifestByInterface(drm::V1_2::IDrmFactory::descriptor,
                 [&factories](const hidl_vec<hidl_string> &registered) {
                     for (const auto &instance : registered) {
                         auto factory = drm::V1_2::IDrmFactory::getService(instance);

@@ -19,9 +19,9 @@
 #include <utils/Log.h>
 
 #include <android/hardware/drm/1.0/types.h>
-#include <android/hidl/manager/1.0/IServiceManager.h>
-
+#include <android/hidl/manager/1.2/IServiceManager.h>
 #include <binder/IMemory.h>
+#include <hidl/ServiceManagement.h>
 #include <hidlmemory/FrameworkUtils.h>
 #include <media/hardware/CryptoAPI.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -47,7 +47,6 @@ using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
-using ::android::hidl::manager::V1_0::IServiceManager;
 using ::android::sp;
 
 typedef drm::V1_2::Status Status_V1_2;
@@ -129,9 +128,9 @@ CryptoHal::~CryptoHal() {
 Vector<sp<ICryptoFactory>> CryptoHal::makeCryptoFactories() {
     Vector<sp<ICryptoFactory>> factories;
 
-    auto manager = ::IServiceManager::getService();
+    auto manager = hardware::defaultServiceManager1_2();
     if (manager != NULL) {
-        manager->listByInterface(drm::V1_0::ICryptoFactory::descriptor,
+        manager->listManifestByInterface(drm::V1_0::ICryptoFactory::descriptor,
                 [&factories](const hidl_vec<hidl_string> &registered) {
                     for (const auto &instance : registered) {
                         auto factory = drm::V1_0::ICryptoFactory::getService(instance);
@@ -142,7 +141,7 @@ Vector<sp<ICryptoFactory>> CryptoHal::makeCryptoFactories() {
                     }
                 }
             );
-        manager->listByInterface(drm::V1_1::ICryptoFactory::descriptor,
+        manager->listManifestByInterface(drm::V1_1::ICryptoFactory::descriptor,
                 [&factories](const hidl_vec<hidl_string> &registered) {
                     for (const auto &instance : registered) {
                         auto factory = drm::V1_1::ICryptoFactory::getService(instance);
