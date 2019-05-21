@@ -22,11 +22,13 @@ cc_library {
         "ProcessInfo.cpp",
         "SchedulingPolicyService.cpp",
     ],
+    static_libs: [
+        "libc_malloc_debug_backtrace",
+    ],
     shared_libs: [
         "libbinder",
         "liblog",
         "libutils",
-        "libmemunreachable",
     ],
 
     cflags: [
