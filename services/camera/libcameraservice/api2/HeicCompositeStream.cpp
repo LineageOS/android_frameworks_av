@@ -330,9 +330,9 @@ status_t HeicCompositeStream::getCompositeStreamInfo(const OutputStreamInfo &str
 }
 
 bool HeicCompositeStream::isSizeSupportedByHeifEncoder(int32_t width, int32_t height,
-        bool* useHeic, bool* useGrid, int64_t* stall) {
+        bool* useHeic, bool* useGrid, int64_t* stall, AString* hevcName) {
     static HeicEncoderInfoManager& heicManager = HeicEncoderInfoManager::getInstance();
-    return heicManager.isSizeSupported(width, height, useHeic, useGrid, stall);
+    return heicManager.isSizeSupported(width, height, useHeic, useGrid, stall, hevcName);
 }
 
 bool HeicCompositeStream::isInMemoryTempFileSupported() {
@@ -1115,8 +1115,9 @@ status_t HeicCompositeStream::initializeCodec(uint32_t width, uint32_t height,
     ALOGV("%s", __FUNCTION__);
 
     bool useGrid = false;
+    AString hevcName;
     bool isSizeSupported = isSizeSupportedByHeifEncoder(width, height,
-            &mUseHeic, &useGrid, nullptr);
+            &mUseHeic, &useGrid, nullptr, &hevcName);
     if (!isSizeSupported) {
         ALOGE("%s: Encoder doesnt' support size %u x %u!",
                 __FUNCTION__, width, height);
@@ -1138,7 +1139,11 @@ status_t HeicCompositeStream::initializeCodec(uint32_t width, uint32_t height,
     }
 
     // Create HEIC/HEVC codec.
-    mCodec = MediaCodec::CreateByType(mCodecLooper, desiredMime, true /*encoder*/);
+    if (mUseHeic) {
+        mCodec = MediaCodec::CreateByType(mCodecLooper, desiredMime, true /*encoder*/);
+    } else {
+        mCodec = MediaCodec::CreateByComponentName(mCodecLooper, hevcName);
+    }
     if (mCodec == nullptr) {
         ALOGE("%s: Failed to create codec for %s", __FUNCTION__, desiredMime);
         return NO_INIT;
