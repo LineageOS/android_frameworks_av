@@ -1993,6 +1993,12 @@ void MatroskaExtractor::addTracks() {
                     }
                 } else if (!strcmp("V_AV1", codecID)) {
                     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_AV1);
+                    if (codecPrivateSize > 0) {
+                        // 'csd-0' for AV1 is the Blob of Codec Private data as
+                        // specified in https://aomediacodec.github.io/av1-isobmff/.
+                        AMediaFormat_setBuffer(
+                                meta, AMEDIAFORMAT_KEY_CSD_0, codecPrivate, codecPrivateSize);
+                    }
                 } else if (!strcmp("V_MPEG2", codecID) || !strcmp("V_MPEG1", codecID)) {
                         AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME,
                                 MEDIA_MIMETYPE_VIDEO_MPEG2);
