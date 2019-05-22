@@ -278,11 +278,9 @@ status_t ARTPWriter::pause() {
 }
 
 // return size of SPS if there is more NAL unit found following to SPS.
-static uint32_t StripStartcode(MediaBufferBase *buffer) {
-    uint32_t nalSize = 0;
-
+static void StripStartcode(MediaBufferBase *buffer) {
     if (buffer->range_length() < 4) {
-        return 0;
+        return;
     }
 
     const uint8_t *ptr =
@@ -292,55 +290,54 @@ static uint32_t StripStartcode(MediaBufferBase *buffer) {
         buffer->set_range(
                 buffer->range_offset() + 4, buffer->range_length() - 4);
     }
-
-    ptr = (const uint8_t *)buffer->data() + buffer->range_offset();
-
-    if ((*ptr & H264_NALU_MASK) == H264_NALU_SPS) {
-        for (uint32_t i = 0; i < buffer->range_length(); i++) {
-
-            if (!memcmp(ptr + i, "\x00\x00\x00\x01", 4)) {
-                // Now, we found one more NAL unit in the media buffer.
-                // Mostly, it will be a PPS.
-                nalSize = i;
-                ALOGV("SPS found. size=%d", nalSize);
-            }
-        }
-    }
-
-    return nalSize;
 }
 
-static void SpsPpsParser(MediaBufferBase *mediaBuffer,
-    MediaBufferBase **spsBuffer, MediaBufferBase **ppsBuffer, uint32_t spsSize) {
+static const uint8_t SPCSize = 4;      // Start Prefix Code Size
+static const uint8_t startPrefixCode[SPCSize] = {0,0,0,1};
+static void SpsPpsParser(MediaBufferBase *buffer,
+    MediaBufferBase **spsBuffer, MediaBufferBase **ppsBuffer) {
 
-    if (mediaBuffer == NULL || mediaBuffer->range_length() < 4)
-        return;
+    while (true) {
+        const uint8_t* NALPtr = (const uint8_t *)buffer->data() + buffer->range_offset();
 
-    if((*spsBuffer) != NULL) {
-        (*spsBuffer)->release();
-        (*spsBuffer) = NULL;
-    }
+        MediaBufferBase** targetPtr = NULL;
+        if ((*NALPtr & H264_NALU_MASK) == H264_NALU_SPS) {
+            targetPtr = spsBuffer;
+        } else if ((*NALPtr & H264_NALU_MASK) == H264_NALU_PPS) {
+            targetPtr = ppsBuffer;
+        } else {
+            return;
+        }
+        ALOGV("SPS(7) or PPS(8) found. Type %d", *NALPtr & H264_NALU_MASK);
 
-    if((*ppsBuffer) != NULL) {
-        (*ppsBuffer)->release();
-        (*ppsBuffer) = NULL;
-    }
+        uint32_t targetSize = buffer->range_length();
+        MediaBufferBase*& target = *targetPtr;
+        uint32_t j;
+        bool isBoundFound = false;
+        for (j = 0; j < targetSize - SPCSize ; j++) {
+            if (!memcmp(NALPtr + j, startPrefixCode, SPCSize)) {
+                isBoundFound = true;
+                break;
+            }
+        }
 
-    // we got sps/pps but startcode of sps is striped.
-    (*spsBuffer) = MediaBufferBase::Create(spsSize);
-    int32_t ppsSize = mediaBuffer->range_length() - spsSize - 4/*startcode*/;
-    (*ppsBuffer) = MediaBufferBase::Create(ppsSize);
-    memcpy((*spsBuffer)->data(),
-            (const uint8_t *)mediaBuffer->data() + mediaBuffer->range_offset(),
-            spsSize);
-
-    if (ppsSize > 0) {
-        ALOGV("PPS found. size=%d", (int)ppsSize);
-        mediaBuffer->set_range(mediaBuffer->range_offset() + spsSize + 4/*startcode*/,
-                mediaBuffer->range_length() - spsSize - 4/*startcode*/);
-        memcpy((*ppsBuffer)->data(),
-                (const uint8_t *)mediaBuffer->data() + mediaBuffer->range_offset(),
-                ppsSize);
+        if (target != NULL)
+            target->release();
+        if (isBoundFound) {
+            target = MediaBufferBase::Create(j);
+            memcpy(target->data(),
+                   (const uint8_t *)buffer->data() + buffer->range_offset(),
+                   j);
+            buffer->set_range(buffer->range_offset() + j + SPCSize,
+                              buffer->range_length() - j - SPCSize);
+        } else {
+            target = MediaBufferBase::Create(targetSize);
+            memcpy(target->data(),
+                   (const uint8_t *)buffer->data() + buffer->range_offset(),
+                   targetSize);
+            buffer->set_range(buffer->range_offset() + targetSize, 0);
+            return;
+        }
     }
 }
 
@@ -451,12 +448,10 @@ void ARTPWriter::onRead(const sp<AMessage> &msg) {
         ALOGV("read buffer of size %zu", mediaBuf->range_length());
 
         if (mMode == H264) {
-            uint32_t spsSize = 0;
-            if ((spsSize = StripStartcode(mediaBuf)) > 0) {
-                SpsPpsParser(mediaBuf, &mSPSBuf, &mPPSBuf, spsSize);
-            } else {
+            StripStartcode(mediaBuf);
+            SpsPpsParser(mediaBuf, &mSPSBuf, &mPPSBuf);
+            if (mediaBuf->range_length() > 0)
                 sendAVCData(mediaBuf);
-            }
         } else if (mMode == H265) {
             StripStartcode(mediaBuf);
             sendHEVCData(mediaBuf);
