@@ -49,7 +49,7 @@ HeicEncoderInfoManager::~HeicEncoderInfoManager() {
 }
 
 bool HeicEncoderInfoManager::isSizeSupported(int32_t width, int32_t height, bool* useHeic,
-        bool* useGrid, int64_t* stall) const {
+        bool* useGrid, int64_t* stall, AString* hevcName) const {
     if (useHeic == nullptr || useGrid == nullptr) {
         ALOGE("%s: invalid parameters: useHeic %p, useGrid %p",
                 __FUNCTION__, useHeic, useGrid);
@@ -71,6 +71,9 @@ bool HeicEncoderInfoManager::isSizeSupported(int32_t width, int32_t height, bool
         if (fullSizeSupportedByHevc && (mDisableGrid ||
                 (width <= 1920 && height <= 1080))) {
             enableGrid = false;
+        }
+        if (hevcName != nullptr) {
+            *hevcName = mHevcName;
         }
     } else {
         // No encoder available for the requested size.
@@ -113,9 +116,8 @@ status_t HeicEncoderInfoManager::initialize() {
     }
 
     sp<AMessage> heicDetails = getCodecDetails(codecsList, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC);
-    sp<AMessage> hevcDetails = getCodecDetails(codecsList, MEDIA_MIMETYPE_VIDEO_HEVC);
 
-    if (hevcDetails == nullptr) {
+    if (!getHevcCodecDetails(codecsList, MEDIA_MIMETYPE_VIDEO_HEVC)) {
         if (heicDetails != nullptr) {
             ALOGE("%s: Device must support HEVC codec if HEIC codec is available!",
                     __FUNCTION__);
@@ -123,22 +125,7 @@ status_t HeicEncoderInfoManager::initialize() {
         }
         return OK;
     }
-
-    // Check CQ mode for HEVC codec
-    {
-        AString bitrateModes;
-        auto hasItem = hevcDetails->findString("feature-bitrate-modes", &bitrateModes);
-        if (!hasItem) {
-            ALOGE("%s: Failed to query bitrate modes for HEVC codec", __FUNCTION__);
-            return BAD_VALUE;
-        }
-        ALOGV("%s: HEVC codec's feature-bitrate-modes value is %d, %s",
-                __FUNCTION__, hasItem, bitrateModes.c_str());
-        std::regex pattern("(^|,)CQ($|,)", std::regex_constants::icase);
-        if (!std::regex_search(bitrateModes.c_str(), pattern)) {
-            return OK;
-        }
-    }
+    mHasHEVC = true;
 
     // HEIC size range
     if (heicDetails != nullptr) {
@@ -150,19 +137,6 @@ status_t HeicEncoderInfoManager::initialize() {
             return BAD_VALUE;
         }
         mHasHEIC = true;
-    }
-
-    // HEVC size range
-    {
-        auto res = getCodecSizeRange(MEDIA_MIMETYPE_VIDEO_HEVC,
-                hevcDetails, &mMinSizeHevc, &mMaxSizeHevc, &mHevcFrameRateMaps);
-        if (res != OK) {
-            ALOGE("%s: Failed to get HEVC codec size range: %s (%d)", __FUNCTION__,
-                    strerror(-res), res);
-            return BAD_VALUE;
-        }
-
-        mHasHEVC = true;
     }
 
     return OK;
@@ -290,5 +264,80 @@ sp<AMessage> HeicEncoderInfoManager::getCodecDetails(
 
     return details;
 }
+
+bool HeicEncoderInfoManager::getHevcCodecDetails(
+        sp<IMediaCodecList> codecsList, const char* mime) {
+    bool found = false;
+    ssize_t idx = 0;
+    while ((idx = codecsList->findCodecByType(mime, true /*encoder*/, idx)) >= 0) {
+        const sp<MediaCodecInfo> info = codecsList->getCodecInfo(idx++);
+        if (info == nullptr) {
+            ALOGE("%s: Failed to get codec info for %s", __FUNCTION__, mime);
+            break;
+        }
+
+        // Filter out software ones as they may be too slow
+        if (!(info->getAttributes() & MediaCodecInfo::kFlagIsHardwareAccelerated)) {
+            continue;
+        }
+
+        const sp<MediaCodecInfo::Capabilities> caps =
+                info->getCapabilitiesFor(mime);
+        if (caps == nullptr) {
+            ALOGE("%s: [%s] Failed to get capabilities", __FUNCTION__,
+                    info->getCodecName());
+            break;
+        }
+        const sp<AMessage> details = caps->getDetails();
+        if (details == nullptr) {
+            ALOGE("%s: [%s] Failed to get details", __FUNCTION__,
+                    info->getCodecName());
+            break;
+        }
+
+        // Check CQ mode
+        AString bitrateModes;
+        auto hasItem = details->findString("feature-bitrate-modes", &bitrateModes);
+        if (!hasItem) {
+            ALOGE("%s: [%s] Failed to query bitrate modes", __FUNCTION__,
+                    info->getCodecName());
+            break;
+        }
+        ALOGV("%s: [%s] feature-bitrate-modes value is %d, %s",
+                __FUNCTION__, info->getCodecName(), hasItem, bitrateModes.c_str());
+        std::regex pattern("(^|,)CQ($|,)", std::regex_constants::icase);
+        if (!std::regex_search(bitrateModes.c_str(), pattern)) {
+            continue; // move on to next encoder
+        }
+
+        std::pair<int32_t, int32_t> minSizeHevc, maxSizeHevc;
+        FrameRateMaps hevcFrameRateMaps;
+        auto res = getCodecSizeRange(MEDIA_MIMETYPE_VIDEO_HEVC,
+                details, &minSizeHevc, &maxSizeHevc, &hevcFrameRateMaps);
+        if (res != OK) {
+            ALOGE("%s: [%s] Failed to get size range: %s (%d)", __FUNCTION__,
+                    info->getCodecName(), strerror(-res), res);
+            break;
+        }
+        if (kGridWidth < minSizeHevc.first
+                || kGridWidth > maxSizeHevc.first
+                || kGridHeight < minSizeHevc.second
+                || kGridHeight > maxSizeHevc.second) {
+            continue; // move on to next encoder
+        }
+
+        // Found: save name, size, frame rate
+        mHevcName = info->getCodecName();
+        mMinSizeHevc = minSizeHevc;
+        mMaxSizeHevc = maxSizeHevc;
+        mHevcFrameRateMaps = hevcFrameRateMaps;
+
+        found = true;
+        break;
+    }
+
+    return found;
+}
+
 } //namespace camera3
 } // namespace android

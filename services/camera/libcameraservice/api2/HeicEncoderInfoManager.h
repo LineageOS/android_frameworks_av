@@ -36,7 +36,7 @@ public:
     }
 
     bool isSizeSupported(int32_t width, int32_t height,
-            bool* useHeic, bool* useGrid, int64_t* stall) const;
+            bool* useHeic, bool* useGrid, int64_t* stall, AString* hevcName) const;
 
     static const auto kGridWidth = 512;
     static const auto kGridHeight = 512;
@@ -61,11 +61,13 @@ private:
     FrameRateMaps::const_iterator findClosestSize(const FrameRateMaps& maps,
             int32_t width, int32_t height) const;
     sp<AMessage> getCodecDetails(sp<IMediaCodecList> codecsList, const char* name);
+    bool getHevcCodecDetails(sp<IMediaCodecList> codecsList, const char* mime);
 
     bool mIsInited;
     std::pair<int32_t, int32_t> mMinSizeHeic, mMaxSizeHeic;
     std::pair<int32_t, int32_t> mMinSizeHevc, mMaxSizeHevc;
     bool mHasHEVC, mHasHEIC;
+    AString mHevcName;
     FrameRateMaps mHeicFrameRateMaps, mHevcFrameRateMaps;
     bool mDisableGrid;
 
