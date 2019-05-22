@@ -582,6 +582,10 @@ void BufferPoolClient::Impl::trySyncFromRemote() {
                         (void) outStatus;
                         (void) outBuffer;
                     });
+            if (!transResult.isOk()) {
+                ALOGD("sync from client %lld failed: bufferpool process died.",
+                      (long long)mConnectionId);
+            }
         }
         mRemoteSyncLock.unlock();
     }
