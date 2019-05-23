@@ -78,6 +78,7 @@ public:
         // IN PARAMS (CODEC WRAPPER)
         float mFixedAdjustedFps; // fixed fps via PTS manipulation
         float mMinAdjustedFps; // minimum fps via PTS manipulation
+        uint64_t mUsage; // consumer usage
     };
 
     /**
