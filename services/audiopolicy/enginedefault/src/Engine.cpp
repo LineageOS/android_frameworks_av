@@ -762,12 +762,6 @@ sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_
                                            AUDIO_FORMAT_DEFAULT);
 }
 
-template <>
-AudioPolicyManagerInterface *Engine::queryInterface()
-{
-    return this;
-}
-
 } // namespace audio_policy
 } // namespace android
 
