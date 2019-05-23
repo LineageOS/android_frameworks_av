@@ -3924,6 +3924,8 @@ status_t AudioPolicyManager::connectAudioSource(const sp<SourceClientDescriptor>
 
         if (status != NO_ERROR) {
             mpClientInterface->releaseAudioPatch(sourceDesc->patchDesc()->mAfPatchHandle, 0);
+            outputDesc->removeClient(sourceDesc->portId());
+            outputDesc->stop();
             return status;
         }
         sourceDesc->setSwOutput(outputDesc);
@@ -4188,6 +4190,7 @@ status_t AudioPolicyManager::disconnectAudioSource(const sp<SourceClientDescript
         if (status == NO_ERROR) {
             swOutputDesc->stop();
         }
+        swOutputDesc->removeClient(sourceDesc->portId());
         mpClientInterface->releaseAudioPatch(patchDesc->mAfPatchHandle, 0);
     } else {
         sp<HwAudioOutputDescriptor> hwOutputDesc = sourceDesc->hwOutput().promote();
