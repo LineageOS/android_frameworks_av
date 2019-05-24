@@ -1739,7 +1739,7 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                         //      block.width(), block.height());
                         updates.emplace_back(new C2StreamCropRectInfo::output(stream, block.crop()));
                         updates.emplace_back(new C2StreamPictureSizeInfo::output(
-                                stream, block.width(), block.height()));
+                                stream, block.crop().width, block.crop().height));
                         break; // for now only do the first block
                     }
                     ++stream;
