@@ -1,0 +1,43 @@
+cc_library_shared {
+    name: "libaudiopolicymanagerdefault",
+
+    srcs: [
+        "AudioPolicyManager.cpp",
+        "EngineLibrary.cpp",
+    ],
+
+    export_include_dirs: ["."],
+
+    shared_libs: [
+        "libcutils",
+        "libdl",
+        "libutils",
+        "liblog",
+        "libaudiopolicy",
+        "libsoundtrigger",
+        "libmedia_helper",
+        "libmediametrics",
+        "libbinder",
+        "libhidlbase",
+        "libxml2",
+        // The default audio policy engine is always present in the system image.
+        // libaudiopolicyengineconfigurable can be built in addition by specifying
+        // a dependency on it in the device makefile. There will be no build time
+        // conflict with libaudiopolicyenginedefault.
+        "libaudiopolicyenginedefault",
+    ],
+
+    header_libs: [
+        "libaudiopolicycommon",
+        "libaudiopolicyengine_interface_headers",
+        "libaudiopolicymanager_interface_headers",
+    ],
+
+    static_libs: ["libaudiopolicycomponents"],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+
+}

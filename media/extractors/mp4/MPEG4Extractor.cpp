@@ -1772,7 +1772,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 int64_t codecDelay = pre_skip * 1000000000ll / kOpusSampleRate;
 
                 AMediaFormat_setBuffer(mLastTrack->meta,
-                            AMEDIAFORMAT_KEY_CSD_0, opusInfo, sizeof(opusInfo));
+                            AMEDIAFORMAT_KEY_CSD_0, opusInfo, opusInfoSize);
                 AMediaFormat_setBuffer(mLastTrack->meta,
                         AMEDIAFORMAT_KEY_CSD_1, &codecDelay, sizeof(codecDelay));
                 AMediaFormat_setBuffer(mLastTrack->meta,
