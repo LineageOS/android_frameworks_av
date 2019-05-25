@@ -49,24 +49,33 @@
         </xs:sequence>
     </xs:complexType>
     <xs:complexType name="Settings">
-        <xs:sequence>
-            <xs:element name="Setting" type="Setting" maxOccurs="unbounded"/>
-        </xs:sequence>
+        <xs:choice minOccurs="0" maxOccurs="unbounded">
+            <xs:element name="Setting" type="Setting"/>
+            <xs:element name="Variant" type="Setting"/>
+            <xs:element name="Domain" type="Setting"/>
+        </xs:choice>
     </xs:complexType>
     <xs:complexType name="MediaCodec">
         <xs:choice minOccurs="0" maxOccurs="unbounded">
             <xs:element name="Quirk" type="Quirk" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element name="Attribute" type="Quirk" minOccurs="0" maxOccurs="unbounded"/>
             <xs:element name="Type" type="Type" minOccurs="0" maxOccurs="unbounded"/>
             <xs:element name="Alias" type="Alias" minOccurs="0" maxOccurs="unbounded"/>
             <xs:element name="Limit" type="Limit" minOccurs="0" maxOccurs="unbounded"/>
             <xs:element name="Feature" type="Feature" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element name="Variant" type="Variant" minOccurs="0" maxOccurs="unbounded"/>
         </xs:choice>
         <xs:attribute name="name" type="xs:string"/>
         <xs:attribute name="type" type="xs:string"/>
         <xs:attribute name="update" type="xs:string"/>
+        <xs:attribute name="rank" type="xs:string"/>
+        <xs:attribute name="domain" type="xs:string"/>
+        <xs:attribute name="variant" type="xs:string"/>
+        <xs:attribute name="enabled" type="xs:string"/>
     </xs:complexType>
     <xs:complexType name="Quirk">
         <xs:attribute name="name" type="xs:string"/>
+        <xs:attribute name="value" type="xs:string"/>
     </xs:complexType>
     <xs:complexType name="Type">
         <xs:sequence>
@@ -97,9 +106,13 @@
         <xs:attribute name="required" type="xs:string"/>
         <xs:attribute name="value" type="xs:string"/>
     </xs:complexType>
+    <xs:complexType name="Variant">
+        <xs:attribute name="name" type="xs:string"/>
+    </xs:complexType>
     <xs:complexType name="Setting">
         <xs:attribute name="name" type="xs:string"/>
         <xs:attribute name="value" type="xs:string"/>
+        <xs:attribute name="enabled" type="xs:string"/>
         <xs:attribute name="update" type="xs:string"/>
     </xs:complexType>
     <xs:complexType name="Include">
