@@ -62,11 +62,6 @@ void ChannelBuffer::initBuffers(unsigned int blockSize, unsigned int overlapSize
     cBInput.resize(mBlockSize * CIRCULAR_BUFFER_UPSAMPLE);
     cBOutput.resize(mBlockSize * CIRCULAR_BUFFER_UPSAMPLE);
 
-    //fill input with half block size...
-    for (unsigned int k = 0; k < mBlockSize/2; k++) {
-        cBInput.write(0);
-    }
-
     //temp vectors
     input.resize(mBlockSize);
     output.resize(mBlockSize);
@@ -169,6 +164,11 @@ void DPFrequency::configure(size_t blockSize, size_t overlapSize,
     mBlocksPerSecond = (float)mSamplingRate / (mBlockSize - mOverlapSize);
 
     fill_window(mVWindow, RDSP_WINDOW_HANNING_FLAT_TOP, mBlockSize, mOverlapSize);
+
+    //split window into analysis and synthesis. Both are the sqrt() of original
+    //window
+    Eigen::Map<Eigen::VectorXf> eWindow(&mVWindow[0], mVWindow.size());
+    eWindow = eWindow.array().sqrt();
 
     //compute window rms for energy compensation
     mWindowRms = 0;
@@ -666,6 +666,11 @@ size_t DPFrequency::processLastStages(ChannelBuffer &cb) {
     //##ifft directly to output.
     Eigen::Map<Eigen::VectorXf> eOutput(&cb.output[0], cb.output.size());
     mFftServer.inv(eOutput, cb.complexTemp);
+
+    //apply rest of window for resynthesis
+    Eigen::Map<Eigen::VectorXf> eWindow(&mVWindow[0], mVWindow.size());
+    eOutput = eOutput.cwiseProduct(eWindow);
+
     return mBlockSize;
 }
 

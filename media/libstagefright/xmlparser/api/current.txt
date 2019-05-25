@@ -68,16 +68,26 @@ package media.codecs {
   public class MediaCodec {
     ctor public MediaCodec();
     method public java.util.List<media.codecs.Alias> getAlias_optional();
+    method public java.util.List<media.codecs.Quirk> getAttribute_optional();
+    method public String getDomain();
+    method public String getEnabled();
     method public java.util.List<media.codecs.Feature> getFeature_optional();
     method public java.util.List<media.codecs.Limit> getLimit_optional();
     method public String getName();
     method public java.util.List<media.codecs.Quirk> getQuirk_optional();
+    method public String getRank();
     method public String getType();
     method public java.util.List<media.codecs.Type> getType_optional();
     method public String getUpdate();
+    method public String getVariant();
+    method public java.util.List<media.codecs.Variant> getVariant_optional();
+    method public void setDomain(String);
+    method public void setEnabled(String);
     method public void setName(String);
+    method public void setRank(String);
     method public void setType(String);
     method public void setUpdate(String);
+    method public void setVariant(String);
   }
 
   public class MediaCodecs {
@@ -91,14 +101,18 @@ package media.codecs {
   public class Quirk {
     ctor public Quirk();
     method public String getName();
+    method public String getValue();
     method public void setName(String);
+    method public void setValue(String);
   }
 
   public class Setting {
     ctor public Setting();
+    method public String getEnabled();
     method public String getName();
     method public String getUpdate();
     method public String getValue();
+    method public void setEnabled(String);
     method public void setName(String);
     method public void setUpdate(String);
     method public void setValue(String);
@@ -106,7 +120,9 @@ package media.codecs {
 
   public class Settings {
     ctor public Settings();
-    method public java.util.List<media.codecs.Setting> getSetting();
+    method public java.util.List<media.codecs.Setting> getDomain_optional();
+    method public java.util.List<media.codecs.Setting> getSetting_optional();
+    method public java.util.List<media.codecs.Setting> getVariant_optional();
   }
 
   public class Type {
@@ -118,6 +134,12 @@ package media.codecs {
     method public String getUpdate();
     method public void setName(String);
     method public void setUpdate(String);
+  }
+
+  public class Variant {
+    ctor public Variant();
+    method public String getName();
+    method public void setName(String);
   }
 
   public class XmlParser {
