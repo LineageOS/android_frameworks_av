@@ -19,7 +19,7 @@
 #include "DeviceDescriptor.h"
 #include <utils/RefBase.h>
 #include <media/AudioPolicy.h>
-#include <utils/KeyedVector.h>
+#include <utils/Vector.h>
 #include <system/audio.h>
 #include <utils/String8.h>
 
@@ -48,14 +48,15 @@ private:
 };
 
 
-class AudioPolicyMixCollection : public DefaultKeyedVector<String8, sp<AudioPolicyMix> >
+class AudioPolicyMixCollection : public Vector<sp<AudioPolicyMix>>
 {
 public:
-    status_t getAudioPolicyMix(const String8& address, sp<AudioPolicyMix> &policyMix) const;
+    status_t getAudioPolicyMix(audio_devices_t deviceType,
+            const String8& address, sp<AudioPolicyMix> &policyMix) const;
 
-    status_t registerMix(const String8& address, AudioMix mix, sp<SwAudioOutputDescriptor> desc);
+    status_t registerMix(AudioMix mix, sp<SwAudioOutputDescriptor> desc);
 
-    status_t unregisterMix(const String8& address);
+    status_t unregisterMix(const AudioMix& mix);
 
     void closeOutput(sp<SwAudioOutputDescriptor> &desc);
 
