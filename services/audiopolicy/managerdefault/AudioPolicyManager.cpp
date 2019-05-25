@@ -2865,13 +2865,16 @@ status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
             }
 
             String8 address = mix.mDeviceAddress;
+            audio_devices_t deviceTypeToMakeAvailable;
             if (mix.mMixType == MIX_TYPE_PLAYERS) {
-                mix.mDeviceType = AUDIO_DEVICE_IN_REMOTE_SUBMIX;
-            } else {
                 mix.mDeviceType = AUDIO_DEVICE_OUT_REMOTE_SUBMIX;
+                deviceTypeToMakeAvailable = AUDIO_DEVICE_IN_REMOTE_SUBMIX;
+            } else {
+                mix.mDeviceType = AUDIO_DEVICE_IN_REMOTE_SUBMIX;
+                deviceTypeToMakeAvailable = AUDIO_DEVICE_OUT_REMOTE_SUBMIX;
             }
 
-            if (mPolicyMixes.registerMix(address, mix, 0 /*output desc*/) != NO_ERROR) {
+            if (mPolicyMixes.registerMix(mix, 0 /*output desc*/) != NO_ERROR) {
                 ALOGE("Error registering mix %zu for address %s", i, address.string());
                 res = INVALID_OPERATION;
                 break;
@@ -2887,7 +2890,7 @@ status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
             rSubmixModule->addInputProfile(address, &inputConfig,
                     AUDIO_DEVICE_IN_REMOTE_SUBMIX, address);
 
-            if ((res = setDeviceConnectionStateInt(mix.mDeviceType,
+            if ((res = setDeviceConnectionStateInt(deviceTypeToMakeAvailable,
                     AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
                     address.string(), "remote-submix", AUDIO_FORMAT_DEFAULT)) != NO_ERROR) {
                 ALOGE("Failed to set remote submix device available, type %u, address %s",
@@ -2913,7 +2916,7 @@ status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
                 sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(j);
 
                 if (desc->supportedDevices().contains(device)) {
-                    if (mPolicyMixes.registerMix(address, mix, desc) != NO_ERROR) {
+                    if (mPolicyMixes.registerMix(mix, desc) != NO_ERROR) {
                         ALOGE("Could not register mix RENDER,  dev=0x%X addr=%s", type,
                               address.string());
                         res = INVALID_OPERATION;
@@ -2963,7 +2966,7 @@ status_t AudioPolicyManager::unregisterPolicyMixes(Vector<AudioMix> mixes)
 
             String8 address = mix.mDeviceAddress;
 
-            if (mPolicyMixes.unregisterMix(address) != NO_ERROR) {
+            if (mPolicyMixes.unregisterMix(mix) != NO_ERROR) {
                 res = INVALID_OPERATION;
                 continue;
             }
@@ -2984,7 +2987,7 @@ status_t AudioPolicyManager::unregisterPolicyMixes(Vector<AudioMix> mixes)
             rSubmixModule->removeInputProfile(address);
 
         } else if ((mix.mRouteFlags & MIX_ROUTE_FLAG_RENDER) == MIX_ROUTE_FLAG_RENDER) {
-            if (mPolicyMixes.unregisterMix(mix.mDeviceAddress) != NO_ERROR) {
+            if (mPolicyMixes.unregisterMix(mix) != NO_ERROR) {
                 res = INVALID_OPERATION;
                 continue;
             }
@@ -4643,7 +4646,8 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                     addOutput(output, desc);
                     if (device_distinguishes_on_address(deviceType) && address != "0") {
                         sp<AudioPolicyMix> policyMix;
-                        if (mPolicyMixes.getAudioPolicyMix(address, policyMix) == NO_ERROR) {
+                        if (mPolicyMixes.getAudioPolicyMix(deviceType, address, policyMix)
+                                == NO_ERROR) {
                             policyMix->setOutput(desc);
                             desc->mPolicyMix = policyMix;
                         } else {
