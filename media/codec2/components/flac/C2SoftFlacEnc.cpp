@@ -74,6 +74,14 @@ public:
                 .withSetter(Setter<decltype(*mBitrate)>::NonStrictValueWithNoDeps)
                 .build());
         addParameter(
+                DefineParam(mComplexity, C2_PARAMKEY_COMPLEXITY)
+                .withDefault(new C2StreamComplexityTuning::output(0u,
+                    FLAC_COMPRESSION_LEVEL_DEFAULT))
+                .withFields({C2F(mComplexity, value).inRange(
+                    FLAC_COMPRESSION_LEVEL_MIN, FLAC_COMPRESSION_LEVEL_MAX)})
+                .withSetter(Setter<decltype(*mComplexity)>::NonStrictValueWithNoDeps)
+                .build());
+        addParameter(
                 DefineParam(mInputMaxBufSize, C2_PARAMKEY_INPUT_MAX_BUFFER_SIZE)
                 .withConstValue(new C2StreamMaxBufferSizeInfo::input(0u, 4608))
                 .build());
@@ -93,12 +101,14 @@ public:
     uint32_t getSampleRate() const { return mSampleRate->value; }
     uint32_t getChannelCount() const { return mChannelCount->value; }
     uint32_t getBitrate() const { return mBitrate->value; }
+    uint32_t getComplexity() const { return mComplexity->value; }
     int32_t getPcmEncodingInfo() const { return mPcmEncodingInfo->value; }
 
 private:
     std::shared_ptr<C2StreamSampleRateInfo::input> mSampleRate;
     std::shared_ptr<C2StreamChannelCountInfo::input> mChannelCount;
     std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
+    std::shared_ptr<C2StreamComplexityTuning::output> mComplexity;
     std::shared_ptr<C2StreamMaxBufferSizeInfo::input> mInputMaxBufSize;
     std::shared_ptr<C2StreamPcmEncodingInfo::input> mPcmEncodingInfo;
 };
@@ -127,7 +137,6 @@ c2_status_t C2SoftFlacEnc::onInit() {
 
     mSignalledError = false;
     mSignalledOutputEos = false;
-    mCompressionLevel = FLAC_COMPRESSION_LEVEL_DEFAULT;
     mIsFirstFrame = true;
     mAnchorTimeStamp = 0ull;
     mProcessedSamples = 0u;
@@ -153,7 +162,6 @@ void C2SoftFlacEnc::onRelease() {
 }
 
 void C2SoftFlacEnc::onReset() {
-    mCompressionLevel = FLAC_COMPRESSION_LEVEL_DEFAULT;
     (void) onStop();
 }
 
@@ -369,7 +377,8 @@ status_t C2SoftFlacEnc::configureEncoder() {
     ok = ok && FLAC__stream_encoder_set_channels(mFlacStreamEncoder, mIntf->getChannelCount());
     ok = ok && FLAC__stream_encoder_set_sample_rate(mFlacStreamEncoder, mIntf->getSampleRate());
     ok = ok && FLAC__stream_encoder_set_bits_per_sample(mFlacStreamEncoder, bitsPerSample);
-    ok = ok && FLAC__stream_encoder_set_compression_level(mFlacStreamEncoder, mCompressionLevel);
+    ok = ok && FLAC__stream_encoder_set_compression_level(mFlacStreamEncoder,
+                    mIntf->getComplexity());
     ok = ok && FLAC__stream_encoder_set_verify(mFlacStreamEncoder, false);
     if (!ok) {
         ALOGE("unknown error when configuring encoder");
