@@ -17,7 +17,6 @@ LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \
         frameworks/av/media/libstagefright/include \
         frameworks/native/include/media/openmax \
-        external/jpeg \
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
 
