@@ -50,14 +50,8 @@ public:
 }  // namespace
 
 C2OMXNode::C2OMXNode(const std::shared_ptr<Codec2Client::Component> &comp)
-    : mComp(comp), mFrameIndex(0), mWidth(0), mHeight(0),
+    : mComp(comp), mFrameIndex(0), mWidth(0), mHeight(0), mUsage(0),
       mAdjustTimestampGapUs(0), mFirstInputFrame(true) {
-    // TODO: read from intf()
-    if (!strncmp(comp->getName().c_str(), "c2.android.", 11)) {
-        mUsage = GRALLOC_USAGE_SW_READ_OFTEN;
-    } else {
-        mUsage = GRALLOC_USAGE_HW_VIDEO_ENCODER;
-    }
 }
 
 status_t C2OMXNode::freeNode() {
@@ -103,13 +97,25 @@ status_t C2OMXNode::getParameter(OMX_INDEXTYPE index, void *params, size_t size)
 }
 
 status_t C2OMXNode::setParameter(OMX_INDEXTYPE index, const void *params, size_t size) {
-    // handle max/fixed frame duration control
-    if (index == (OMX_INDEXTYPE)OMX_IndexParamMaxFrameDurationForBitrateControl
-            && params != NULL
-            && size == sizeof(OMX_PARAM_U32TYPE)) {
-        // The incoming number is an int32_t contained in OMX_U32.
-        mAdjustTimestampGapUs = (int32_t)((OMX_PARAM_U32TYPE*)params)->nU32;
-        return OK;
+    if (params == NULL) {
+        return BAD_VALUE;
+    }
+    switch ((uint32_t)index) {
+        case OMX_IndexParamMaxFrameDurationForBitrateControl:
+            // handle max/fixed frame duration control
+            if (size != sizeof(OMX_PARAM_U32TYPE)) {
+                return BAD_VALUE;
+            }
+            // The incoming number is an int32_t contained in OMX_U32.
+            mAdjustTimestampGapUs = (int32_t)((OMX_PARAM_U32TYPE*)params)->nU32;
+            return OK;
+
+        case OMX_IndexParamConsumerUsageBits:
+            if (size != sizeof(OMX_U32)) {
+                return BAD_VALUE;
+            }
+            mUsage = *((OMX_U32 *)params);
+            return OK;
     }
     return ERROR_UNSUPPORTED;
 }
