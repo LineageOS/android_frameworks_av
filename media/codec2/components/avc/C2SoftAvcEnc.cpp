@@ -41,6 +41,37 @@ namespace {
 
 constexpr char COMPONENT_NAME[] = "c2.android.avc.encoder";
 
+void ParseGop(
+        const C2StreamGopTuning::output &gop,
+        uint32_t *syncInterval, uint32_t *iInterval, uint32_t *maxBframes) {
+    uint32_t syncInt = 1;
+    uint32_t iInt = 1;
+    for (size_t i = 0; i < gop.flexCount(); ++i) {
+        const C2GopLayerStruct &layer = gop.m.values[i];
+        if (layer.count == UINT32_MAX) {
+            syncInt = 0;
+        } else if (syncInt <= UINT32_MAX / (layer.count + 1)) {
+            syncInt *= (layer.count + 1);
+        }
+        if ((layer.type_ & I_FRAME) == 0) {
+            if (layer.count == UINT32_MAX) {
+                iInt = 0;
+            } else if (iInt <= UINT32_MAX / (layer.count + 1)) {
+                iInt *= (layer.count + 1);
+            }
+        }
+        if (layer.type_ == C2Config::picture_type_t(P_FRAME | B_FRAME) && maxBframes) {
+            *maxBframes = layer.count;
+        }
+    }
+    if (syncInterval) {
+        *syncInterval = syncInt;
+    }
+    if (iInterval) {
+        *iInterval = iInt;
+    }
+}
+
 }  // namespace
 
 class C2SoftAvcEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
@@ -81,10 +112,19 @@ public:
                 .build());
 
         addParameter(
+                DefineParam(mGop, C2_PARAMKEY_GOP)
+                .withDefault(C2StreamGopTuning::output::AllocShared(
+                        0 /* flexCount */, 0u /* stream */))
+                .withFields({C2F(mGop, m.values[0].type_).any(),
+                             C2F(mGop, m.values[0].count).any()})
+                .withSetter(GopSetter)
+                .build());
+
+        addParameter(
                 DefineParam(mActualInputDelay, C2_PARAMKEY_INPUT_DELAY)
                 .withDefault(new C2PortActualDelayTuning::input(DEFAULT_B_FRAMES))
                 .withFields({C2F(mActualInputDelay, value).inRange(0, MAX_B_FRAMES)})
-                .withSetter(Setter<decltype(*mActualInputDelay)>::StrictValueWithNoDeps)
+                .calculatedAs(InputDelaySetter, mGop)
                 .build());
 
         addParameter(
@@ -158,6 +198,17 @@ public:
                 .withFields({C2F(mSyncFramePeriod, value).any()})
                 .withSetter(Setter<decltype(*mSyncFramePeriod)>::StrictValueWithNoDeps)
                 .build());
+    }
+
+    static C2R InputDelaySetter(
+            bool mayBlock,
+            C2P<C2PortActualDelayTuning::input> &me,
+            const C2P<C2StreamGopTuning::output> &gop) {
+        (void)mayBlock;
+        uint32_t maxBframes = 0;
+        ParseGop(gop.v, nullptr, nullptr, &maxBframes);
+        me.set().value = maxBframes;
+        return C2R::Ok();
     }
 
     static C2R BitrateSetter(bool mayBlock, C2P<C2StreamBitrateInfo::output> &me) {
@@ -273,6 +324,18 @@ public:
         return res;
     }
 
+    static C2R GopSetter(bool mayBlock, C2P<C2StreamGopTuning::output> &me) {
+        (void)mayBlock;
+        for (size_t i = 0; i < me.v.flexCount(); ++i) {
+            const C2GopLayerStruct &layer = me.v.m.values[0];
+            if (layer.type_ == C2Config::picture_type_t(P_FRAME | B_FRAME)
+                    && layer.count > MAX_B_FRAMES) {
+                me.set().m.values[i].count = MAX_B_FRAMES;
+            }
+        }
+        return C2R::Ok();
+    }
+
     IV_PROFILE_T getProfile_l() const {
         switch (mProfileLevel->profile) {
         case PROFILE_AVC_CONSTRAINED_BASELINE:  [[fallthrough]];
@@ -314,6 +377,7 @@ public:
         ALOGD("Unrecognized level: %x", mProfileLevel->level);
         return 41;
     }
+
     uint32_t getSyncFramePeriod_l() const {
         if (mSyncFramePeriod->value < 0 || mSyncFramePeriod->value == INT64_MAX) {
             return 0;
@@ -328,6 +392,7 @@ public:
     std::shared_ptr<C2StreamFrameRateInfo::output> getFrameRate_l() const { return mFrameRate; }
     std::shared_ptr<C2StreamBitrateInfo::output> getBitrate_l() const { return mBitrate; }
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> getRequestSync_l() const { return mRequestSync; }
+    std::shared_ptr<C2StreamGopTuning::output> getGop_l() const { return mGop; }
 
 private:
     std::shared_ptr<C2StreamUsageTuning::input> mUsage;
@@ -338,6 +403,7 @@ private:
     std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
     std::shared_ptr<C2StreamProfileLevelInfo::output> mProfileLevel;
     std::shared_ptr<C2StreamSyncFrameIntervalTuning::output> mSyncFramePeriod;
+    std::shared_ptr<C2StreamGopTuning::output> mGop;
 };
 
 #define ive_api_function  ih264e_api_function
@@ -850,6 +916,7 @@ c2_status_t C2SoftAvcEnc::initEncoder() {
 
     c2_status_t errType = C2_OK;
 
+    std::shared_ptr<C2StreamGopTuning::output> gop;
     {
         IntfImpl::Lock lock = mIntf->lock();
         mSize = mIntf->getSize_l();
@@ -859,6 +926,25 @@ c2_status_t C2SoftAvcEnc::initEncoder() {
         mAVCEncLevel = mIntf->getLevel_l();
         mIInterval = mIntf->getSyncFramePeriod_l();
         mIDRInterval = mIntf->getSyncFramePeriod_l();
+        gop = mIntf->getGop_l();
+    }
+    if (gop && gop->flexCount() > 0) {
+        uint32_t syncInterval = 1;
+        uint32_t iInterval = 1;
+        uint32_t maxBframes = 0;
+        ParseGop(*gop, &syncInterval, &iInterval, &maxBframes);
+        if (syncInterval > 0) {
+            ALOGD("Updating IDR interval from GOP: old %u new %u", mIDRInterval, syncInterval);
+            mIDRInterval = syncInterval;
+        }
+        if (iInterval > 0) {
+            ALOGD("Updating I interval from GOP: old %u new %u", mIInterval, iInterval);
+            mIInterval = iInterval;
+        }
+        if (mBframes != maxBframes) {
+            ALOGD("Updating max B frames from GOP: old %u new %u", mBframes, maxBframes);
+            mBframes = maxBframes;
+        }
     }
     uint32_t width = mSize->width;
     uint32_t height = mSize->height;
@@ -868,8 +954,8 @@ c2_status_t C2SoftAvcEnc::initEncoder() {
     // TODO
     mIvVideoColorFormat = IV_YUV_420P;
 
-    ALOGD("Params width %d height %d level %d colorFormat %d", width,
-            height, mAVCEncLevel, mIvVideoColorFormat);
+    ALOGD("Params width %d height %d level %d colorFormat %d bframes %d", width,
+            height, mAVCEncLevel, mIvVideoColorFormat, mBframes);
 
     /* Getting Number of MemRecords */
     {
