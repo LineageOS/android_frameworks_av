@@ -18,10 +18,9 @@
   package="com.android.media">
   <!-- APEX does not have classes.dex -->
   <application android:hasCode="false" />
-  <!-- Setting maxSdk to lock the module to Q. minSdk is 28 for now to cover Q beta devices. -->
+  <!-- Setting maxSdk to lock the module to Q. minSdk is auto-set by build system -->
   <uses-sdk
-      android:minSdkVersion="28"
       android:maxSdkVersion="29"
-      android:targetSdkVersion="28"
+      android:targetSdkVersion="29"
   />
 </manifest>
