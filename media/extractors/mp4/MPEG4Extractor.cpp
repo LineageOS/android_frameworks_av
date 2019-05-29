@@ -1754,6 +1754,15 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 // http://wiki.xiph.org/OggOpus#ID_Header
                 strncpy((char *)opusInfo, "OpusHead", 8);
 
+                // Version shall be 0 as per mp4 Opus Specific Box
+                // (https://opus-codec.org/docs/opus_in_isobmff.html#4.3.2)
+                if (opusInfo[8]) {
+                    return ERROR_MALFORMED;
+                }
+                // Force version to 1 as per OpusHead definition
+                // (http://wiki.xiph.org/OggOpus#ID_Header)
+                opusInfo[8] = 1;
+
                 // Read Opus Specific Box values
                 size_t opusOffset = 10;
                 uint16_t pre_skip = U16_AT(&opusInfo[opusOffset]);
