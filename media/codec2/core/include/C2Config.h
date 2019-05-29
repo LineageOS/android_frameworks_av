@@ -1644,6 +1644,7 @@ constexpr char C2_PARAMKEY_PICTURE_TYPE[] = "coded.picture-type";
  * frames.
  */
 struct C2GopLayerStruct {
+    C2GopLayerStruct() : type_((C2Config::picture_type_t)0), count(0) {}
     C2GopLayerStruct(C2Config::picture_type_t type, uint32_t count_)
         : type_(type), count(count_) { }
 
