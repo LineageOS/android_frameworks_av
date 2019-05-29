@@ -31,7 +31,6 @@ LOCAL_C_INCLUDES := \
 	frameworks/av/services/audiopolicy/service \
 	frameworks/av/services/medialog \
 	frameworks/av/services/oboeservice \
-	frameworks/av/services/radio \
 	frameworks/av/services/soundtrigger \
 	frameworks/av/media/libaaudio/include \
 	frameworks/av/media/libaaudio/src \
