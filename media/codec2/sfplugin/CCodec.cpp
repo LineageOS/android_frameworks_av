@@ -183,15 +183,23 @@ public:
     GraphicBufferSourceWrapper(
             const sp<BGraphicBufferSource> &source,
             uint32_t width,
-            uint32_t height)
+            uint32_t height,
+            uint64_t usage)
         : mSource(source), mWidth(width), mHeight(height) {
         mDataSpace = HAL_DATASPACE_BT709;
+        mConfig.mUsage = usage;
     }
     ~GraphicBufferSourceWrapper() override = default;
 
     status_t connect(const std::shared_ptr<Codec2Client::Component> &comp) override {
         mNode = new C2OMXNode(comp);
         mNode->setFrameSize(mWidth, mHeight);
+
+        // Usage is queried during configure(), so setting it beforehand.
+        OMX_U32 usage = mConfig.mUsage & 0xFFFFFFFF;
+        (void)mNode->setParameter(
+                (OMX_INDEXTYPE)OMX_IndexParamConsumerUsageBits,
+                &usage, sizeof(usage));
 
         // NOTE: we do not use/pass through color aspects from GraphicBufferSource as we
         // communicate that directly to the component.
@@ -364,7 +372,8 @@ public:
 
         // color aspects (android._color-aspects)
 
-        // consumer usage
+        // consumer usage is queried earlier.
+
         ALOGD("ISConfig%s", status.str().c_str());
         return err;
     }
@@ -813,6 +822,7 @@ void CCodec::configure(const sp<AMessage> &msg) {
                     config->mISConfig->mSuspended = true;
                 }
             }
+            config->mISConfig->mUsage = 0;
         }
 
         /*
@@ -876,8 +886,14 @@ void CCodec::configure(const sp<AMessage> &msg) {
                     indices.size(), params.size());
             return UNKNOWN_ERROR;
         }
-        if (usage && (usage.value & C2MemoryUsage::CPU_READ)) {
-            config->mInputFormat->setInt32("using-sw-read-often", true);
+        if (usage) {
+            if (usage.value & C2MemoryUsage::CPU_READ) {
+                config->mInputFormat->setInt32("using-sw-read-often", true);
+            }
+            if (config->mISConfig) {
+                C2AndroidMemoryUsage androidUsage(C2MemoryUsage(usage.value));
+                config->mISConfig->mUsage = androidUsage.asGrallocUsage();
+            }
         }
 
         // NOTE: we don't blindly use client specified input size if specified as clients
@@ -1068,10 +1084,12 @@ void CCodec::createInputSurface() {
 
     sp<AMessage> inputFormat;
     sp<AMessage> outputFormat;
+    uint64_t usage = 0;
     {
         Mutexed<Config>::Locked config(mConfig);
         inputFormat = config->mInputFormat;
         outputFormat = config->mOutputFormat;
+        usage = config->mISConfig ? config->mISConfig->mUsage : 0;
     }
 
     sp<PersistentSurface> persistentSurface = CreateCompatibleInputSurface();
@@ -1095,7 +1113,7 @@ void CCodec::createInputSurface() {
         int32_t height = 0;
         (void)outputFormat->findInt32("height", &height);
         err = setupInputSurface(std::make_shared<GraphicBufferSourceWrapper>(
-                persistentSurface->getBufferSource(), width, height));
+                persistentSurface->getBufferSource(), width, height, usage));
         bufferProducer = persistentSurface->getBufferProducer();
     }
 
@@ -1155,10 +1173,12 @@ void CCodec::initiateSetInputSurface(const sp<PersistentSurface> &surface) {
 void CCodec::setInputSurface(const sp<PersistentSurface> &surface) {
     sp<AMessage> inputFormat;
     sp<AMessage> outputFormat;
+    uint64_t usage = 0;
     {
         Mutexed<Config>::Locked config(mConfig);
         inputFormat = config->mInputFormat;
         outputFormat = config->mOutputFormat;
+        usage = config->mISConfig ? config->mISConfig->mUsage : 0;
     }
     auto hidlTarget = surface->getHidlTarget();
     if (hidlTarget) {
@@ -1182,7 +1202,7 @@ void CCodec::setInputSurface(const sp<PersistentSurface> &surface) {
         int32_t height = 0;
         (void)outputFormat->findInt32("height", &height);
         status_t err = setupInputSurface(std::make_shared<GraphicBufferSourceWrapper>(
-                surface->getBufferSource(), width, height));
+                surface->getBufferSource(), width, height, usage));
         if (err != OK) {
             ALOGE("Failed to set up input surface: %d", err);
             mCallback->onInputSurfaceDeclined(err);
