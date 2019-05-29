@@ -69,7 +69,6 @@ private:
     std::shared_ptr<C2LinearBlock> mOutputBlock;
     bool mSignalledError;
     bool mSignalledOutputEos;
-    uint32_t mCompressionLevel;
     uint32_t mBlockSize;
     bool mIsFirstFrame;
     uint64_t mAnchorTimeStamp;
