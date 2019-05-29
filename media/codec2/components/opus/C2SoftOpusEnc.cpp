@@ -205,15 +205,6 @@ c2_status_t C2SoftOpusEnc::configureEncoder() {
         return C2_BAD_VALUE;
     }
 
-    // Get codecDelay
-    int32_t lookahead;
-    if (opus_multistream_encoder_ctl(mEncoder, OPUS_GET_LOOKAHEAD(&lookahead)) !=
-            OPUS_OK) {
-        ALOGE("failed to get lookahead");
-        return C2_BAD_VALUE;
-    }
-    mCodecDelay = lookahead * 1000000000ll / mSampleRate;
-
     // Set seek preroll to 80 ms
     mSeekPreRoll = 80000000;
     return C2_OK;
@@ -406,13 +397,26 @@ void C2SoftOpusEnc::process(const std::unique_ptr<C2Work>& work,
     if (!mHeaderGenerated) {
         uint8_t header[AOPUS_UNIFIED_CSD_MAXSIZE];
         memset(header, 0, sizeof(header));
+
+        // Get codecDelay
+        int32_t lookahead;
+        if (opus_multistream_encoder_ctl(mEncoder, OPUS_GET_LOOKAHEAD(&lookahead)) !=
+                OPUS_OK) {
+            ALOGE("failed to get lookahead");
+            mSignalledError = true;
+            work->result = C2_CORRUPTED;
+            return;
+        }
+        mCodecDelay = lookahead * 1000000000ll / mSampleRate;
+
         OpusHeader opusHeader;
+        memset(&opusHeader, 0, sizeof(opusHeader));
         opusHeader.channels = mChannelCount;
         opusHeader.num_streams = mChannelCount;
         opusHeader.num_coupled = 0;
         opusHeader.channel_mapping = ((mChannelCount > 8) ? 255 : (mChannelCount > 2));
         opusHeader.gain_db = 0;
-        opusHeader.skip_samples = 0;
+        opusHeader.skip_samples = lookahead;
         int headerLen = WriteOpusHeaders(opusHeader, mSampleRate, header,
             sizeof(header), mCodecDelay, mSeekPreRoll);
 
