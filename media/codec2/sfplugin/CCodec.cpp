@@ -772,6 +772,11 @@ void CCodec::configure(const sp<AMessage> &msg) {
                     ALOGD("I frame interval is missing, which is required for video encoders.");
                     return BAD_VALUE;
                 }
+                if (!msg->findInt32(KEY_FRAME_RATE, &i32)
+                        && !msg->findFloat(KEY_FRAME_RATE, &flt)) {
+                    ALOGD("frame rate is missing, which is required for video encoders.");
+                    return BAD_VALUE;
+                }
             }
         }
 
@@ -856,6 +861,22 @@ void CCodec::configure(const sp<AMessage> &msg) {
         if (err != OK) {
             ALOGW("failed to convert configuration to c2 params");
         }
+
+        int32_t maxBframes = 0;
+        if ((config->mDomain & Config::IS_ENCODER)
+                && (config->mDomain & Config::IS_VIDEO)
+                && sdkParams->findInt32(KEY_MAX_B_FRAMES, &maxBframes)
+                && maxBframes > 0) {
+            std::unique_ptr<C2StreamGopTuning::output> gop =
+                C2StreamGopTuning::output::AllocUnique(2 /* flexCount */, 0u /* stream */);
+            gop->m.values[0] = { P_FRAME, UINT32_MAX };
+            gop->m.values[1] = {
+                C2Config::picture_type_t(P_FRAME | B_FRAME),
+                uint32_t(maxBframes)
+            };
+            configUpdate.push_back(std::move(gop));
+        }
+
         err = config->setParameters(comp, configUpdate, C2_DONT_BLOCK);
         if (err != OK) {
             ALOGW("failed to configure c2 params");
