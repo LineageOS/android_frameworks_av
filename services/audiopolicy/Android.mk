@@ -13,7 +13,6 @@ LOCAL_C_INCLUDES := \
     $(call include-path-for, audio-utils) \
     frameworks/av/services/audiopolicy/common/include \
     frameworks/av/services/audiopolicy/engine/interface \
-    frameworks/av/services/audiopolicy/utilities
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \
@@ -74,7 +73,6 @@ endif # ifeq ($(USE_CONFIGURABLE_AUDIO_POLICY), 1)
 LOCAL_C_INCLUDES += \
     frameworks/av/services/audiopolicy/common/include \
     frameworks/av/services/audiopolicy/engine/interface \
-    frameworks/av/services/audiopolicy/utilities
 
 LOCAL_STATIC_LIBRARIES := \
     libaudiopolicycomponents
