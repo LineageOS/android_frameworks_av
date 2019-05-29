@@ -237,7 +237,7 @@
             <Limit name="sample-rate" ranges="8000,12000,16000,24000,48000" />
             <Limit name="bitrate" range="500-512000" />
             <Limit name="complexity" range="0-10"  default="5" />
-            <Feature name="bitrate-modes" value="CQ" />
+            <Feature name="bitrate-modes" value="CBR" />
         </MediaCodec>
         <MediaCodec name="c2.android.h263.encoder" type="video/3gpp">
             <Alias name="OMX.google.h263.encoder" />
