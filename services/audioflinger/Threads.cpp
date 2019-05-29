@@ -4918,6 +4918,10 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
             // read original volumes with volume control
             float typeVolume = mStreamTypes[track->streamType()].volume;
             float v = masterVolume * typeVolume;
+            // Always fetch volumeshaper volume to ensure state is updated.
+            const sp<AudioTrackServerProxy> proxy = track->mAudioTrackServerProxy;
+            const float vh = track->getVolumeHandler()->getVolume(
+                    track->mAudioTrackServerProxy->framesReleased()).first;
 
             if (track->isPausing() || mStreamTypes[track->streamType()].mute
                     || track->isPlaybackRestricted()) {
@@ -4927,7 +4931,6 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     track->setPaused();
                 }
             } else {
-                sp<AudioTrackServerProxy> proxy = track->mAudioTrackServerProxy;
                 gain_minifloat_packed_t vlr = proxy->getVolumeLR();
                 vlf = float_from_gain(gain_minifloat_unpack_left(vlr));
                 vrf = float_from_gain(gain_minifloat_unpack_right(vlr));
@@ -4940,8 +4943,6 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     ALOGV("Track right volume out of range: %.3g", vrf);
                     vrf = GAIN_FLOAT_UNITY;
                 }
-                const float vh = track->getVolumeHandler()->getVolume(
-                        track->mAudioTrackServerProxy->framesReleased()).first;
                 // now apply the master volume and stream type volume and shaper volume
                 vlf *= v * vh;
                 vrf *= v * vh;
@@ -5021,7 +5022,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 (void *)(uintptr_t)(mChannelMask | mHapticChannelMask));
             // limit track sample rate to 2 x output sample rate, which changes at re-configuration
             uint32_t maxSampleRate = mSampleRate * AUDIO_RESAMPLER_DOWN_RATIO_MAX;
-            uint32_t reqSampleRate = track->mAudioTrackServerProxy->getSampleRate();
+            uint32_t reqSampleRate = proxy->getSampleRate();
             if (reqSampleRate == 0) {
                 reqSampleRate = mSampleRate;
             } else if (reqSampleRate > maxSampleRate) {
@@ -5033,7 +5034,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 AudioMixer::SAMPLE_RATE,
                 (void *)(uintptr_t)reqSampleRate);
 
-            AudioPlaybackRate playbackRate = track->mAudioTrackServerProxy->getPlaybackRate();
+            AudioPlaybackRate playbackRate = proxy->getPlaybackRate();
             mAudioMixer->setParameter(
                 trackId,
                 AudioMixer::TIMESTRETCH,
@@ -5507,19 +5508,17 @@ void AudioFlinger::DirectOutputThread::processVolume_l(Track *track, bool lastTr
 {
     float left, right;
 
+    // Ensure volumeshaper state always advances even when muted.
+    const sp<AudioTrackServerProxy> proxy = track->mAudioTrackServerProxy;
+    const auto [shaperVolume, shaperActive] = track->getVolumeHandler()->getVolume(
+            proxy->framesReleased());
+    mVolumeShaperActive = shaperActive;
+
     if (mMasterMute || mStreamTypes[track->streamType()].mute || track->isPlaybackRestricted()) {
         left = right = 0;
     } else {
         float typeVolume = mStreamTypes[track->streamType()].volume;
-        float v = mMasterVolume * typeVolume;
-        sp<AudioTrackServerProxy> proxy = track->mAudioTrackServerProxy;
-
-        // Get volumeshaper scaling
-        std::pair<float /* volume */, bool /* active */>
-            vh = track->getVolumeHandler()->getVolume(
-                    track->mAudioTrackServerProxy->framesReleased());
-        v *= vh.first;
-        mVolumeShaperActive = vh.second;
+        const float v = mMasterVolume * typeVolume * shaperVolume;
 
         gain_minifloat_packed_t vlr = proxy->getVolumeLR();
         left = float_from_gain(gain_minifloat_unpack_left(vlr));
