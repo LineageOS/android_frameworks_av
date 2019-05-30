@@ -401,20 +401,25 @@ Return<void> DrmPlugin::provideKeyResponse(
 
         sendExpirationUpdate(sessionId, 100);
 
-        std::vector<KeyStatus> keysStatus;
-        KeyStatus keyStatus;
+        std::vector<KeyStatus_V1_2> keysStatus;
+        KeyStatus_V1_2 keyStatus;
 
         std::vector<uint8_t> keyId1 = { 0xA, 0xB, 0xC };
         keyStatus.keyId = keyId1;
-        keyStatus.type = V1_0::KeyStatusType::USABLE;
+        keyStatus.type = V1_2::KeyStatusType::USABLE;
         keysStatus.push_back(keyStatus);
 
         std::vector<uint8_t> keyId2 = { 0xD, 0xE, 0xF };
         keyStatus.keyId = keyId2;
-        keyStatus.type = V1_0::KeyStatusType::EXPIRED;
+        keyStatus.type = V1_2::KeyStatusType::EXPIRED;
         keysStatus.push_back(keyStatus);
 
-        sendKeysChange(sessionId, keysStatus, true);
+        std::vector<uint8_t> keyId3 = { 0x0, 0x1, 0x2 };
+        keyStatus.keyId = keyId3;
+        keyStatus.type = V1_2::KeyStatusType::USABLEINFUTURE;
+        keysStatus.push_back(keyStatus);
+
+        sendKeysChange_1_2(sessionId, keysStatus, true);
 
         installSecureStop(sessionId);
     } else {
