@@ -50,9 +50,6 @@ private:
 
     HANDLE_AACENCODER mAACEncoder;
 
-    int32_t mSBRMode;
-    int32_t mSBRRatio;
-    AUDIO_OBJECT_TYPE mAACProfile;
     UINT mNumBytesPerInputFrame;
     UINT mOutBufferSize;
 
