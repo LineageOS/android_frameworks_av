@@ -358,14 +358,7 @@ void CCodecConfig::initializeStandardParams() {
         .limitTo(D::ENCODER & D::VIDEO & D::PARAM));
     add(ConfigMapper(KEY_BITRATE_MODE, C2_PARAMKEY_BITRATE_MODE, "value")
         .limitTo(D::ENCODER & D::CODED)
-        .withMapper([](C2Value v) -> C2Value {
-            int32_t value;
-            C2Config::bitrate_mode_t mode;
-            if (v.get(&value) && C2Mapper::map(value, &mode)) {
-                return mode;
-            }
-            return C2Value();
-        }));
+        .withC2Mappers<C2Config::bitrate_mode_t>());
     // remove when codecs switch to PARAMKEY and new modes
     deprecated(ConfigMapper(KEY_BITRATE_MODE, "coded.bitrate-mode", "value")
                .limitTo(D::ENCODER));
