@@ -761,9 +761,11 @@ c2_status_t C2InterfaceHelper::query(
             if (p != nullptr) {
                 heapParams->push_back(std::move(p));
             } else {
+                heapParams->push_back(nullptr);
                 paramNoMemory = true;
             }
         } else {
+            heapParams->push_back(nullptr);
             paramNotFound = true;
         }
     }
