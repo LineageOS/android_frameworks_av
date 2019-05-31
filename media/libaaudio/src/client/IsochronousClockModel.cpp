@@ -108,17 +108,24 @@ void IsochronousClockModel::processTimestamp(int64_t framePosition, int64_t nano
     case STATE_RUNNING:
         if (nanosDelta < expectedNanosDelta) {
             // Earlier than expected timestamp.
-            // This data is probably more accurate so use it.
-            // or we may be drifting due to a slow HW clock.
-//            ALOGD("processTimestamp() - STATE_RUNNING - %d < %d micros - EARLY",
-//                 (int) (nanosDelta / 1000), (int)(expectedNanosDelta / 1000));
+            // This data is probably more accurate, so use it.
+            // Or we may be drifting due to a fast HW clock.
+//            int microsDelta = (int) (nanosDelta / 1000);
+//            int expectedMicrosDelta = (int) (expectedNanosDelta / 1000);
+//            ALOGD("processTimestamp() - STATE_RUNNING - %7d < %7d so %4d micros EARLY",
+//                 microsDelta, expectedMicrosDelta, (expectedMicrosDelta - microsDelta));
+
             setPositionAndTime(framePosition, nanoTime);
         } else if (nanosDelta > (expectedNanosDelta + mMaxLatenessInNanos)) {
             // Later than expected timestamp.
-//            ALOGD("processTimestamp() - STATE_RUNNING - %d > %d + %d micros - LATE",
-//                 (int) (nanosDelta / 1000), (int)(expectedNanosDelta / 1000),
-//                 (int) (mMaxLatenessInNanos / 1000));
-            setPositionAndTime(framePosition - mFramesPerBurst,  nanoTime - mMaxLatenessInNanos);
+//            int microsDelta = (int) (nanosDelta / 1000);
+//            int expectedMicrosDeadline = (int) ((expectedNanosDelta + mMaxLatenessInNanos) / 1000);
+//            ALOGD("processTimestamp() - STATE_RUNNING - %7d > %7d so %4d micros LATE",
+//                  microsDelta, expectedMicrosDeadline, (microsDelta - expectedMicrosDeadline));
+
+            // When we are late it may be because of preemption in the kernel or
+            //  we may be drifting due to a slow HW clock.
+            setPositionAndTime(framePosition,  nanoTime - mMaxLatenessInNanos);
         }
         break;
     default:
