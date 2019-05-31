@@ -391,8 +391,8 @@ public:
                 return;
         }
         mediaImage->mNumPlanes = layout.numPlanes;
-        mediaImage->mWidth = mWidth;
-        mediaImage->mHeight = mHeight;
+        mediaImage->mWidth = view.crop().width;
+        mediaImage->mHeight = view.crop().height;
         mediaImage->mBitDepth = bitDepth;
         mediaImage->mBitDepthAllocated = mAllocatedDepth;
 
