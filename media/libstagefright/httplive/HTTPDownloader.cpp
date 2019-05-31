@@ -157,6 +157,12 @@ ssize_t HTTPDownloader::fetchBlock(
                  buffer->size() + bufferRemaining);
 
             sp<ABuffer> copy = new ABuffer(buffer->size() + bufferRemaining);
+            if (copy->data() == NULL) {
+                android_errorWriteLog(0x534e4554, "68399439");
+                ALOGE("not enough memory to download: requesting %zu + %zu",
+                        buffer->size(), bufferRemaining);
+                return NO_MEMORY;
+            }
             memcpy(copy->data(), buffer->data(), buffer->size());
             copy->setRange(0, buffer->size());
 
