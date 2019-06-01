@@ -209,7 +209,7 @@ private:
 
     void feedInputBufferIfAvailable();
     void feedInputBufferIfAvailableInternal();
-    status_t queueInputBufferInternal(const sp<MediaCodecBuffer> &buffer);
+    status_t queueInputBufferInternal(sp<MediaCodecBuffer> buffer);
     bool handleWork(
             std::unique_ptr<C2Work> work, const sp<AMessage> &outputFormat,
             const C2StreamInitDataInfo::output *initData);
@@ -228,13 +228,26 @@ private:
     QueueSync mQueueSync;
     std::vector<std::unique_ptr<C2Param>> mParamsToBeSet;
 
-    size_t mNumInputSlots;
-    size_t mNumOutputSlots;
     size_t mDelay;
 
-    Mutexed<std::unique_ptr<InputBuffers>> mInputBuffers;
+    struct Input {
+        Input();
+
+        std::unique_ptr<InputBuffers> buffers;
+        size_t numSlots;
+        FlexBuffersImpl extraBuffers;
+        size_t numExtraSlots;
+        uint32_t inputDelay;
+        uint32_t pipelineDelay;
+    };
+    Mutexed<Input> mInput;
+    struct Output {
+        std::unique_ptr<OutputBuffers> buffers;
+        size_t numSlots;
+        uint32_t outputDelay;
+    };
+    Mutexed<Output> mOutput;
     Mutexed<std::list<sp<ABuffer>>> mFlushedConfigs;
-    Mutexed<std::unique_ptr<OutputBuffers>> mOutputBuffers;
 
     std::atomic_uint64_t mFrameIndex;
     std::atomic_uint64_t mFirstValidFrameIndex;
