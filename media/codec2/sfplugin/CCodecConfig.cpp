@@ -532,7 +532,6 @@ void CCodecConfig::initializeStandardParams() {
             }
             return C2Value();
         }));
-    add(ConfigMapper(KEY_QUALITY, C2_PARAMKEY_QUALITY, "value"));
     deprecated(ConfigMapper(PARAMETER_KEY_REQUEST_SYNC_FRAME,
                      "coding.request-sync", "value")
         .limitTo(D::PARAM & D::ENCODER)
@@ -798,11 +797,12 @@ void CCodecConfig::initializeStandardParams() {
             }
         }));
 
-    add(ConfigMapper(KEY_QUALITY, C2_PARAMKEY_QUALITY, "value"));
+    add(ConfigMapper(KEY_QUALITY, C2_PARAMKEY_QUALITY, "value")
+        .limitTo(D::ENCODER & (D::CONFIG | D::PARAM)));
     add(ConfigMapper(KEY_FLAC_COMPRESSION_LEVEL, C2_PARAMKEY_COMPLEXITY, "value")
         .limitTo(D::AUDIO & D::ENCODER));
     add(ConfigMapper("complexity", C2_PARAMKEY_COMPLEXITY, "value")
-        .limitTo(D::ENCODER));
+        .limitTo(D::ENCODER & (D::CONFIG | D::PARAM)));
 
     add(ConfigMapper(KEY_GRID_COLUMNS, C2_PARAMKEY_TILE_LAYOUT, "columns")
         .limitTo(D::IMAGE));
