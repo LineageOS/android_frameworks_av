@@ -229,8 +229,8 @@ public:
         uint32_t bitDepth = layout.planes[0].bitDepth;
 
         // align width and height to support subsampling cleanly
-        uint32_t mStride = align(mWidth, 2) * divUp(layout.planes[0].allocatedDepth, 8u);
-        uint32_t mVStride = align(mHeight, 2);
+        uint32_t stride = align(view.crop().width, 2) * divUp(layout.planes[0].allocatedDepth, 8u);
+        uint32_t vStride = align(view.crop().height, 2);
 
         switch (layout.type) {
             case C2PlanarLayout::TYPE_YUV:
@@ -295,19 +295,19 @@ public:
                     case COLOR_FormatYUV420PackedPlanar:
                         mediaImage->mPlane[mediaImage->Y].mOffset = 0;
                         mediaImage->mPlane[mediaImage->Y].mColInc = 1;
-                        mediaImage->mPlane[mediaImage->Y].mRowInc = mStride;
+                        mediaImage->mPlane[mediaImage->Y].mRowInc = stride;
                         mediaImage->mPlane[mediaImage->Y].mHorizSubsampling = 1;
                         mediaImage->mPlane[mediaImage->Y].mVertSubsampling = 1;
 
-                        mediaImage->mPlane[mediaImage->U].mOffset = mStride * mVStride;
+                        mediaImage->mPlane[mediaImage->U].mOffset = stride * vStride;
                         mediaImage->mPlane[mediaImage->U].mColInc = 1;
-                        mediaImage->mPlane[mediaImage->U].mRowInc = mStride / 2;
+                        mediaImage->mPlane[mediaImage->U].mRowInc = stride / 2;
                         mediaImage->mPlane[mediaImage->U].mHorizSubsampling = 2;
                         mediaImage->mPlane[mediaImage->U].mVertSubsampling = 2;
 
-                        mediaImage->mPlane[mediaImage->V].mOffset = mStride * mVStride * 5 / 4;
+                        mediaImage->mPlane[mediaImage->V].mOffset = stride * vStride * 5 / 4;
                         mediaImage->mPlane[mediaImage->V].mColInc = 1;
-                        mediaImage->mPlane[mediaImage->V].mRowInc = mStride / 2;
+                        mediaImage->mPlane[mediaImage->V].mRowInc = stride / 2;
                         mediaImage->mPlane[mediaImage->V].mHorizSubsampling = 2;
                         mediaImage->mPlane[mediaImage->V].mVertSubsampling = 2;
                         break;
@@ -316,19 +316,19 @@ public:
                     case COLOR_FormatYUV420PackedSemiPlanar:
                         mediaImage->mPlane[mediaImage->Y].mOffset = 0;
                         mediaImage->mPlane[mediaImage->Y].mColInc = 1;
-                        mediaImage->mPlane[mediaImage->Y].mRowInc = mStride;
+                        mediaImage->mPlane[mediaImage->Y].mRowInc = stride;
                         mediaImage->mPlane[mediaImage->Y].mHorizSubsampling = 1;
                         mediaImage->mPlane[mediaImage->Y].mVertSubsampling = 1;
 
-                        mediaImage->mPlane[mediaImage->U].mOffset = mStride * mVStride;
+                        mediaImage->mPlane[mediaImage->U].mOffset = stride * vStride;
                         mediaImage->mPlane[mediaImage->U].mColInc = 2;
-                        mediaImage->mPlane[mediaImage->U].mRowInc = mStride;
+                        mediaImage->mPlane[mediaImage->U].mRowInc = stride;
                         mediaImage->mPlane[mediaImage->U].mHorizSubsampling = 2;
                         mediaImage->mPlane[mediaImage->U].mVertSubsampling = 2;
 
-                        mediaImage->mPlane[mediaImage->V].mOffset = mStride * mVStride + 1;
+                        mediaImage->mPlane[mediaImage->V].mOffset = stride * vStride + 1;
                         mediaImage->mPlane[mediaImage->V].mColInc = 2;
-                        mediaImage->mPlane[mediaImage->V].mRowInc = mStride;
+                        mediaImage->mPlane[mediaImage->V].mRowInc = stride;
                         mediaImage->mPlane[mediaImage->V].mHorizSubsampling = 2;
                         mediaImage->mPlane[mediaImage->V].mVertSubsampling = 2;
                         break;
@@ -391,8 +391,8 @@ public:
                 return;
         }
         mediaImage->mNumPlanes = layout.numPlanes;
-        mediaImage->mWidth = mWidth;
-        mediaImage->mHeight = mHeight;
+        mediaImage->mWidth = view.crop().width;
+        mediaImage->mHeight = view.crop().height;
         mediaImage->mBitDepth = bitDepth;
         mediaImage->mBitDepthAllocated = mAllocatedDepth;
 
@@ -415,7 +415,7 @@ public:
                 mInitCheck = BAD_VALUE;
                 return;
             }
-            bufferSize += mStride * mVStride
+            bufferSize += stride * vStride
                     / plane.rowSampling / plane.colSampling;
         }
 
@@ -652,7 +652,8 @@ sp<ConstGraphicBlockBuffer> ConstGraphicBlockBuffer::AllocateEmpty(
         ALOGD("format had no width / height");
         return nullptr;
     }
-    sp<ABuffer> aBuffer(alloc(width * height * 4));
+    // NOTE: we currently only support YUV420 formats for byte-buffer mode.
+    sp<ABuffer> aBuffer(alloc(align(width, 16) * align(height, 16) * 3 / 2));
     return new ConstGraphicBlockBuffer(
             format,
             aBuffer,

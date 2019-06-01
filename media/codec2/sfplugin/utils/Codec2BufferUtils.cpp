@@ -118,7 +118,7 @@ static status_t _ImageCopy(View &view, const MediaImage2 *img, ImagePixel *imgBa
 }  // namespace
 
 status_t ImageCopy(uint8_t *imgBase, const MediaImage2 *img, const C2GraphicView &view) {
-    if (view.width() != img->mWidth || view.height() != img->mHeight) {
+    if (view.crop().width != img->mWidth || view.crop().height != img->mHeight) {
         return BAD_VALUE;
     }
     if ((IsNV12(view) && IsI420(img)) || (IsI420(view) && IsNV12(img))) {
@@ -153,7 +153,7 @@ status_t ImageCopy(uint8_t *imgBase, const MediaImage2 *img, const C2GraphicView
 }
 
 status_t ImageCopy(C2GraphicView &view, const uint8_t *imgBase, const MediaImage2 *img) {
-    if (view.width() != img->mWidth || view.height() != img->mHeight) {
+    if (view.crop().width != img->mWidth || view.crop().height != img->mHeight) {
         return BAD_VALUE;
     }
     if ((IsNV12(img) && IsI420(view)) || (IsI420(img) && IsNV12(view))) {
