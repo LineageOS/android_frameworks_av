@@ -98,6 +98,26 @@ void CCodecBuffers::handleImageData(const sp<Codec2Buffer> &buffer) {
     }
 }
 
+// InputBuffers
+
+sp<Codec2Buffer> InputBuffers::cloneAndReleaseBuffer(const sp<MediaCodecBuffer> &buffer) {
+    sp<Codec2Buffer> copy = createNewBuffer();
+    if (copy == nullptr) {
+        return nullptr;
+    }
+    std::shared_ptr<C2Buffer> c2buffer;
+    if (!releaseBuffer(buffer, &c2buffer, true)) {
+        return nullptr;
+    }
+    if (!copy->canCopy(c2buffer)) {
+        return nullptr;
+    }
+    if (!copy->copy(c2buffer)) {
+        return nullptr;
+    }
+    return copy;
+}
+
 // OutputBuffers
 
 void OutputBuffers::initSkipCutBuffer(
@@ -197,6 +217,8 @@ void LocalBufferPool::returnVector(std::vector<uint8_t> &&vec) {
     mPool.push_front(std::move(vec));
 }
 
+// FlexBuffersImpl
+
 size_t FlexBuffersImpl::assignSlot(const sp<Codec2Buffer> &buffer) {
     for (size_t i = 0; i < mBuffers.size(); ++i) {
         if (mBuffers[i].clientBuffer == nullptr
@@ -208,8 +230,6 @@ size_t FlexBuffersImpl::assignSlot(const sp<Codec2Buffer> &buffer) {
     mBuffers.push_back({ buffer, std::weak_ptr<C2Buffer>() });
     return mBuffers.size() - 1;
 }
-
-// FlexBuffersImpl
 
 bool FlexBuffersImpl::releaseSlot(
         const sp<MediaCodecBuffer> &buffer,
@@ -267,6 +287,14 @@ size_t FlexBuffersImpl::numClientBuffers() const {
             mBuffers.begin(), mBuffers.end(),
             [](const Entry &entry) {
                 return (entry.clientBuffer != nullptr);
+            });
+}
+
+size_t FlexBuffersImpl::numComponentBuffers() const {
+    return std::count_if(
+            mBuffers.begin(), mBuffers.end(),
+            [](const Entry &entry) {
+                return !entry.compBuffer.expired();
             });
 }
 
@@ -395,6 +423,14 @@ void BuffersArrayImpl::realloc(std::function<sp<Codec2Buffer>()> alloc) {
     }
 }
 
+void BuffersArrayImpl::grow(
+        size_t newSize, std::function<sp<Codec2Buffer>()> alloc) {
+    CHECK_LT(mBuffers.size(), newSize);
+    while (mBuffers.size() < newSize) {
+        mBuffers.push_back({ alloc(), std::weak_ptr<C2Buffer>(), false });
+    }
+}
+
 size_t BuffersArrayImpl::numClientBuffers() const {
     return std::count_if(
             mBuffers.begin(), mBuffers.end(),
@@ -409,6 +445,7 @@ void InputBuffersArray::initialize(
         const FlexBuffersImpl &impl,
         size_t minSize,
         std::function<sp<Codec2Buffer>()> allocate) {
+    mAllocate = allocate;
     mImpl.initialize(impl, minSize, allocate);
 }
 
@@ -448,18 +485,14 @@ size_t InputBuffersArray::numClientBuffers() const {
     return mImpl.numClientBuffers();
 }
 
+sp<Codec2Buffer> InputBuffersArray::createNewBuffer() {
+    return mAllocate();
+}
+
 // LinearInputBuffers
 
 bool LinearInputBuffers::requestNewBuffer(size_t *index, sp<MediaCodecBuffer> *buffer) {
-    int32_t capacity = kLinearBufferSize;
-    (void)mFormat->findInt32(KEY_MAX_INPUT_SIZE, &capacity);
-    if ((size_t)capacity > kMaxLinearBufferSize) {
-        ALOGD("client requested %d, capped to %zu", capacity, kMaxLinearBufferSize);
-        capacity = kMaxLinearBufferSize;
-    }
-    // TODO: proper max input size
-    // TODO: read usage from intf
-    sp<Codec2Buffer> newBuffer = alloc((size_t)capacity);
+    sp<Codec2Buffer> newBuffer = createNewBuffer();
     if (newBuffer == nullptr) {
         return false;
     }
@@ -486,16 +519,7 @@ void LinearInputBuffers::flush() {
     mImpl.flush();
 }
 
-std::unique_ptr<InputBuffers> LinearInputBuffers::toArrayMode(
-        size_t size) {
-    int32_t capacity = kLinearBufferSize;
-    (void)mFormat->findInt32(KEY_MAX_INPUT_SIZE, &capacity);
-    if ((size_t)capacity > kMaxLinearBufferSize) {
-        ALOGD("client requested %d, capped to %zu", capacity, kMaxLinearBufferSize);
-        capacity = kMaxLinearBufferSize;
-    }
-    // TODO: proper max input size
-    // TODO: read usage from intf
+std::unique_ptr<InputBuffers> LinearInputBuffers::toArrayMode(size_t size) {
     std::unique_ptr<InputBuffersArray> array(
             new InputBuffersArray(mComponentName.c_str(), "1D-Input[N]"));
     array->setPool(mPool);
@@ -503,7 +527,9 @@ std::unique_ptr<InputBuffers> LinearInputBuffers::toArrayMode(
     array->initialize(
             mImpl,
             size,
-            [this, capacity] () -> sp<Codec2Buffer> { return alloc(capacity); });
+            [pool = mPool, format = mFormat] () -> sp<Codec2Buffer> {
+                return Alloc(pool, format);
+            });
     return std::move(array);
 }
 
@@ -511,16 +537,30 @@ size_t LinearInputBuffers::numClientBuffers() const {
     return mImpl.numClientBuffers();
 }
 
-sp<Codec2Buffer> LinearInputBuffers::alloc(size_t size) {
+// static
+sp<Codec2Buffer> LinearInputBuffers::Alloc(
+        const std::shared_ptr<C2BlockPool> &pool, const sp<AMessage> &format) {
+    int32_t capacity = kLinearBufferSize;
+    (void)format->findInt32(KEY_MAX_INPUT_SIZE, &capacity);
+    if ((size_t)capacity > kMaxLinearBufferSize) {
+        ALOGD("client requested %d, capped to %zu", capacity, kMaxLinearBufferSize);
+        capacity = kMaxLinearBufferSize;
+    }
+
+    // TODO: read usage from intf
     C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
     std::shared_ptr<C2LinearBlock> block;
 
-    c2_status_t err = mPool->fetchLinearBlock(size, usage, &block);
+    c2_status_t err = pool->fetchLinearBlock(capacity, usage, &block);
     if (err != C2_OK) {
         return nullptr;
     }
 
-    return LinearBlockBuffer::Allocate(mFormat, block);
+    return LinearBlockBuffer::Allocate(format, block);
+}
+
+sp<Codec2Buffer> LinearInputBuffers::createNewBuffer() {
+    return Alloc(mPool, mFormat);
 }
 
 // EncryptedLinearInputBuffers
@@ -537,7 +577,7 @@ EncryptedLinearInputBuffers::EncryptedLinearInputBuffers(
       mUsage({0, 0}),
       mDealer(dealer),
       mCrypto(crypto),
-      mHeapSeqNum(heapSeqNum) {
+      mMemoryVector(new std::vector<Entry>){
     if (secure) {
         mUsage = { C2MemoryUsage::READ_PROTECTED, 0 };
     } else {
@@ -550,16 +590,48 @@ EncryptedLinearInputBuffers::EncryptedLinearInputBuffers(
                   mName, i);
             break;
         }
-        mMemoryVector.push_back({std::weak_ptr<C2LinearBlock>(), memory});
+        mMemoryVector->push_back({std::weak_ptr<C2LinearBlock>(), memory, heapSeqNum});
     }
 }
 
-sp<Codec2Buffer> EncryptedLinearInputBuffers::alloc(size_t size) {
+std::unique_ptr<InputBuffers> EncryptedLinearInputBuffers::toArrayMode(size_t size) {
+    std::unique_ptr<InputBuffersArray> array(
+            new InputBuffersArray(mComponentName.c_str(), "1D-EncryptedInput[N]"));
+    array->setPool(mPool);
+    array->setFormat(mFormat);
+    array->initialize(
+            mImpl,
+            size,
+            [pool = mPool,
+             format = mFormat,
+             usage = mUsage,
+             memoryVector = mMemoryVector] () -> sp<Codec2Buffer> {
+                return Alloc(pool, format, usage, memoryVector);
+            });
+    return std::move(array);
+}
+
+
+// static
+sp<Codec2Buffer> EncryptedLinearInputBuffers::Alloc(
+        const std::shared_ptr<C2BlockPool> &pool,
+        const sp<AMessage> &format,
+        C2MemoryUsage usage,
+        const std::shared_ptr<std::vector<EncryptedLinearInputBuffers::Entry>> &memoryVector) {
+    int32_t capacity = kLinearBufferSize;
+    (void)format->findInt32(KEY_MAX_INPUT_SIZE, &capacity);
+    if ((size_t)capacity > kMaxLinearBufferSize) {
+        ALOGD("client requested %d, capped to %zu", capacity, kMaxLinearBufferSize);
+        capacity = kMaxLinearBufferSize;
+    }
+
     sp<IMemory> memory;
     size_t slot = 0;
-    for (; slot < mMemoryVector.size(); ++slot) {
-        if (mMemoryVector[slot].block.expired()) {
-            memory = mMemoryVector[slot].memory;
+    int32_t heapSeqNum = -1;
+    for (; slot < memoryVector->size(); ++slot) {
+        if (memoryVector->at(slot).block.expired()) {
+            memory = memoryVector->at(slot).memory;
+            heapSeqNum = memoryVector->at(slot).heapSeqNum;
             break;
         }
     }
@@ -568,13 +640,18 @@ sp<Codec2Buffer> EncryptedLinearInputBuffers::alloc(size_t size) {
     }
 
     std::shared_ptr<C2LinearBlock> block;
-    c2_status_t err = mPool->fetchLinearBlock(size, mUsage, &block);
+    c2_status_t err = pool->fetchLinearBlock(capacity, usage, &block);
     if (err != C2_OK || block == nullptr) {
         return nullptr;
     }
 
-    mMemoryVector[slot].block = block;
-    return new EncryptedLinearBlockBuffer(mFormat, block, memory, mHeapSeqNum);
+    memoryVector->at(slot).block = block;
+    return new EncryptedLinearBlockBuffer(format, block, memory, heapSeqNum);
+}
+
+sp<Codec2Buffer> EncryptedLinearInputBuffers::createNewBuffer() {
+    // TODO: android_2020
+    return nullptr;
 }
 
 // GraphicMetadataInputBuffers
@@ -587,12 +664,7 @@ GraphicMetadataInputBuffers::GraphicMetadataInputBuffers(
 
 bool GraphicMetadataInputBuffers::requestNewBuffer(
         size_t *index, sp<MediaCodecBuffer> *buffer) {
-    std::shared_ptr<C2Allocator> alloc;
-    c2_status_t err = mStore->fetchAllocator(mPool->getAllocatorId(), &alloc);
-    if (err != C2_OK) {
-        return false;
-    }
-    sp<GraphicMetadataBuffer> newBuffer = new GraphicMetadataBuffer(mFormat, alloc);
+    sp<Codec2Buffer> newBuffer = createNewBuffer();
     if (newBuffer == nullptr) {
         return false;
     }
@@ -642,6 +714,15 @@ size_t GraphicMetadataInputBuffers::numClientBuffers() const {
     return mImpl.numClientBuffers();
 }
 
+sp<Codec2Buffer> GraphicMetadataInputBuffers::createNewBuffer() {
+    std::shared_ptr<C2Allocator> alloc;
+    c2_status_t err = mStore->fetchAllocator(mPool->getAllocatorId(), &alloc);
+    if (err != C2_OK) {
+        return nullptr;
+    }
+    return new GraphicMetadataBuffer(mFormat, alloc);
+}
+
 // GraphicInputBuffers
 
 GraphicInputBuffers::GraphicInputBuffers(
@@ -652,11 +733,7 @@ GraphicInputBuffers::GraphicInputBuffers(
               kMaxLinearBufferSize * numInputSlots)) { }
 
 bool GraphicInputBuffers::requestNewBuffer(size_t *index, sp<MediaCodecBuffer> *buffer) {
-    // TODO: proper max input size
-    // TODO: read usage from intf
-    C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
-    sp<GraphicBlockBuffer> newBuffer = AllocateGraphicBuffer(
-            mPool, mFormat, HAL_PIXEL_FORMAT_YV12, usage, mLocalBufferPool);
+    sp<Codec2Buffer> newBuffer = createNewBuffer();
     if (newBuffer == nullptr) {
         return false;
     }
@@ -703,12 +780,20 @@ size_t GraphicInputBuffers::numClientBuffers() const {
     return mImpl.numClientBuffers();
 }
 
+sp<Codec2Buffer> GraphicInputBuffers::createNewBuffer() {
+    // TODO: read usage from intf
+    C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
+    return AllocateGraphicBuffer(
+            mPool, mFormat, HAL_PIXEL_FORMAT_YV12, usage, mLocalBufferPool);
+}
+
 // OutputBuffersArray
 
 void OutputBuffersArray::initialize(
         const FlexBuffersImpl &impl,
         size_t minSize,
         std::function<sp<Codec2Buffer>()> allocate) {
+    mAlloc = allocate;
     mImpl.initialize(impl, minSize, allocate);
 }
 
@@ -781,8 +866,11 @@ void OutputBuffersArray::getArray(Vector<sp<MediaCodecBuffer>> *array) const {
     mImpl.getArray(array);
 }
 
+size_t OutputBuffersArray::numClientBuffers() const {
+    return mImpl.numClientBuffers();
+}
+
 void OutputBuffersArray::realloc(const std::shared_ptr<C2Buffer> &c2buffer) {
-    std::function<sp<Codec2Buffer>()> alloc;
     switch (c2buffer->data().type()) {
         case C2BufferData::LINEAR: {
             uint32_t size = kLinearBufferSize;
@@ -792,7 +880,7 @@ void OutputBuffersArray::realloc(const std::shared_ptr<C2Buffer> &c2buffer) {
             } else {
                 size = kMaxLinearBufferSize;
             }
-            alloc = [format = mFormat, size] {
+            mAlloc = [format = mFormat, size] {
                 return new LocalLinearBuffer(format, new ABuffer(size));
             };
             break;
@@ -808,11 +896,11 @@ void OutputBuffersArray::realloc(const std::shared_ptr<C2Buffer> &c2buffer) {
             ALOGD("Unsupported type: %d", (int)c2buffer->data().type());
             return;
     }
-    mImpl.realloc(alloc);
+    mImpl.realloc(mAlloc);
 }
 
-size_t OutputBuffersArray::numClientBuffers() const {
-    return mImpl.numClientBuffers();
+void OutputBuffersArray::grow(size_t newSize) {
+    mImpl.grow(newSize, mAlloc);
 }
 
 // FlexOutputBuffers
@@ -861,10 +949,8 @@ std::unique_ptr<OutputBuffers> FlexOutputBuffers::toArrayMode(size_t size) {
     std::unique_ptr<OutputBuffersArray> array(new OutputBuffersArray(mComponentName.c_str()));
     array->setFormat(mFormat);
     array->transferSkipCutBuffer(mSkipCutBuffer);
-    array->initialize(
-            mImpl,
-            size,
-            [this]() { return allocateArrayBuffer(); });
+    std::function<sp<Codec2Buffer>()> alloc = getAlloc();
+    array->initialize(mImpl, size, alloc);
     return std::move(array);
 }
 
@@ -906,9 +992,11 @@ sp<Codec2Buffer> LinearOutputBuffers::wrap(const std::shared_ptr<C2Buffer> &buff
     return clientBuffer;
 }
 
-sp<Codec2Buffer> LinearOutputBuffers::allocateArrayBuffer() {
-    // TODO: proper max output size
-    return new LocalLinearBuffer(mFormat, new ABuffer(kLinearBufferSize));
+std::function<sp<Codec2Buffer>()> LinearOutputBuffers::getAlloc() {
+    return [format = mFormat]{
+        // TODO: proper max output size
+        return new LocalLinearBuffer(format, new ABuffer(kLinearBufferSize));
+    };
 }
 
 // GraphicOutputBuffers
@@ -917,8 +1005,10 @@ sp<Codec2Buffer> GraphicOutputBuffers::wrap(const std::shared_ptr<C2Buffer> &buf
     return new DummyContainerBuffer(mFormat, buffer);
 }
 
-sp<Codec2Buffer> GraphicOutputBuffers::allocateArrayBuffer() {
-    return new DummyContainerBuffer(mFormat);
+std::function<sp<Codec2Buffer>()> GraphicOutputBuffers::getAlloc() {
+    return [format = mFormat]{
+        return new DummyContainerBuffer(format);
+    };
 }
 
 // RawGraphicOutputBuffers
@@ -952,12 +1042,14 @@ sp<Codec2Buffer> RawGraphicOutputBuffers::wrap(const std::shared_ptr<C2Buffer> &
     }
 }
 
-sp<Codec2Buffer> RawGraphicOutputBuffers::allocateArrayBuffer() {
-    return ConstGraphicBlockBuffer::AllocateEmpty(
-            mFormat,
-            [lbp = mLocalBufferPool](size_t capacity) {
-                return lbp->newBuffer(capacity);
-            });
+std::function<sp<Codec2Buffer>()> RawGraphicOutputBuffers::getAlloc() {
+    return [format = mFormat, lbp = mLocalBufferPool]{
+        return ConstGraphicBlockBuffer::AllocateEmpty(
+                format,
+                [lbp](size_t capacity) {
+                    return lbp->newBuffer(capacity);
+                });
+    };
 }
 
 }  // namespace android
