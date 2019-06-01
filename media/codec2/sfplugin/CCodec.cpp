@@ -1724,8 +1724,11 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                             & C2FrameData::FLAG_DISCARD_FRAME) == 0) {
 
                 // copy buffer info to config
-                std::vector<std::unique_ptr<C2Param>> updates =
-                    std::move(work->worklets.front()->output.configUpdate);
+                std::vector<std::unique_ptr<C2Param>> updates;
+                for (const std::unique_ptr<C2Param> &param
+                        : work->worklets.front()->output.configUpdate) {
+                    updates.push_back(C2Param::Copy(*param));
+                }
                 unsigned stream = 0;
                 for (const std::shared_ptr<C2Buffer> &buf : work->worklets.front()->output.buffers) {
                     for (const std::shared_ptr<const C2Info> &info : buf->info()) {
