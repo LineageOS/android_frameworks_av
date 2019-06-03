@@ -609,6 +609,9 @@ c2_status_t C2InterfaceHelper::config(
     // { depIx, paramIx } may be a suitable key
     std::map<size_t, std::pair<C2Param::Index, bool>> dependencies;
 
+    std::vector<std::unique_ptr<C2Param>> paramRequests;
+    std::vector<C2Param*> lateReadParams;
+
     // we cannot determine the last valid parameter, so add an extra
     // loop iteration after the last parameter
     for (size_t p_ix = 0; p_ix <= params.size(); ++p_ix) {
@@ -625,7 +628,27 @@ c2_status_t C2InterfaceHelper::config(
             }
 
             paramIx = p->index();
-            paramDepIx = getDependencyIndex_l(paramIx);
+
+            // convert parameter to request in case this is a split parameter
+            C2Param::Index requestParamIx = paramIx | C2Param::CoreIndex::IS_REQUEST_FLAG;
+
+            // setting a request directly is handled as normal
+            if (paramIx != requestParamIx) {
+                paramDepIx = getDependencyIndex_l(requestParamIx);
+                if (paramDepIx == SIZE_MAX) {
+                    // not a split parameter, handle it normally
+                    paramDepIx = getDependencyIndex_l(paramIx);
+                } else {
+                    // split parameter - replace with setting for the request - and queue to
+                    // read back actual value
+                    // TODO: read late params at the right time
+                    lateReadParams.emplace_back(p);
+                    std::unique_ptr<C2Param> request(C2Param::CopyAsRequest(*p));
+                    p = request.get();
+                    paramRequests.emplace_back(std::move(request));
+                }
+            }
+
             if (paramDepIx == SIZE_MAX) {
                 // unsupported parameter
                 paramNotFound = true;
@@ -712,6 +735,16 @@ c2_status_t C2InterfaceHelper::config(
                             << getDependencyIndex_l(ix) << ": " << it->second.first;
                 }
             }
+        }
+    }
+
+    // get late read parameters
+    for (C2Param *p : lateReadParams) {
+        std::shared_ptr<C2Param> value = _mFactory->getParamValue(p->index());
+        if (value) {
+            p->updateFrom(*value);
+        } else {
+            p->invalidate();
         }
     }
 
