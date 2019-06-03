@@ -145,7 +145,7 @@ status_t TextDescriptions2::extract3GPPGlobalDescriptions(
         tmpData += 8;
         size_t remaining = size - 8;
 
-        if (size < chunkSize) {
+        if (chunkSize <= 8 || size < chunkSize) {
             return OK;
         }
         switch(chunkType) {
