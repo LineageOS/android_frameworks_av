@@ -270,7 +270,7 @@ status_t Camera3Device::initializeCommonLocked() {
     }
 
     /** Register in-flight map to the status tracker */
-    mInFlightStatusId = mStatusTracker->addComponent();
+    mInFlightStatusId = mStatusTracker->addComponent("InflightRequests");
 
     if (mUseHalBufManager) {
         res = mRequestBufferSM.initialize(mStatusTracker);
@@ -1768,6 +1768,7 @@ status_t Camera3Device::waitUntilDrainedLocked(nsecs_t maxExpectedDuration) {
             maxExpectedDuration);
     status_t res = waitUntilStateThenRelock(/*active*/ false, maxExpectedDuration);
     if (res != OK) {
+        mStatusTracker->dumpActiveComponents();
         SET_ERR_L("Error waiting for HAL to drain: %s (%d)", strerror(-res),
                 res);
     }
@@ -3785,7 +3786,7 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mSessionParamKeys(sessionParamKeys),
         mLatestSessionParams(sessionParamKeys.size()),
         mUseHalBufManager(useHalBufManager) {
-    mStatusId = statusTracker->addComponent();
+    mStatusId = statusTracker->addComponent("RequestThread");
 }
 
 Camera3Device::RequestThread::~RequestThread() {}
@@ -5619,7 +5620,7 @@ status_t Camera3Device::RequestBufferStateMachine::initialize(
 
     std::lock_guard<std::mutex> lock(mLock);
     mStatusTracker = statusTracker;
-    mRequestBufferStatusId = statusTracker->addComponent();
+    mRequestBufferStatusId = statusTracker->addComponent("BufferRequestSM");
     return OK;
 }
 
