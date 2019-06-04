@@ -117,7 +117,7 @@ enum C2ParamIndexKind : C2Param::type_index_t {
 
     /* pipeline characteristics */
     kParamIndexMediaType,
-    kParamIndexDelayRequest,
+    __kParamIndexRESERVED_0,
     kParamIndexDelay,
     kParamIndexMaxReferenceAge,
     kParamIndexMaxReferenceCount,
@@ -150,6 +150,9 @@ enum C2ParamIndexKind : C2Param::type_index_t {
 
     /* protected content */
     kParamIndexSecureMode,
+
+    // deprecated
+    kParamIndexDelayRequest = kParamIndexDelay | C2Param::CoreIndex::IS_REQUEST_FLAG,
 
     /* ------------------------------------ (trans/en)coders ------------------------------------ */
 
@@ -779,22 +782,26 @@ typedef C2StreamParam<C2Setting, C2StringValue, kParamIndexMediaType> C2StreamMe
  * outstanding input frames queued to the component, it shall produce output.
  */
 
-typedef C2PortParam<C2Tuning, C2Uint32Value, kParamIndexDelayRequest> C2PortRequestedDelayTuning;
-constexpr char C2_PARAMKEY_INPUT_DELAY_REQUEST[] = "input.delay.requested";
-constexpr char C2_PARAMKEY_OUTPUT_DELAY_REQUEST[] = "output.delay.requested";
+typedef C2PortParam<C2Tuning, C2Uint32Value, kParamIndexDelay | C2Param::CoreIndex::IS_REQUEST_FLAG>
+        C2PortRequestedDelayTuning;
+constexpr char C2_PARAMKEY_INPUT_DELAY_REQUEST[] = "input.delay"; // deprecated
+constexpr char C2_PARAMKEY_OUTPUT_DELAY_REQUEST[] = "output.delay"; // deprecated
 
-typedef C2GlobalParam<C2Tuning, C2Uint32Value, kParamIndexDelayRequest>
+typedef C2GlobalParam<C2Tuning, C2Uint32Value,
+                kParamIndexDelay | C2Param::CoreIndex::IS_REQUEST_FLAG>
         C2RequestedPipelineDelayTuning;
-constexpr char C2_PARAMKEY_PIPELINE_DELAY_REQUEST[] = "pipeline-delay.requested";
+constexpr char C2_PARAMKEY_PIPELINE_DELAY_REQUEST[] = "algo.delay"; // deprecated
 
 // read-only
-typedef C2PortParam<C2Tuning, C2Uint32Value, kParamIndexDelay> C2PortActualDelayTuning;
-constexpr char C2_PARAMKEY_INPUT_DELAY[] = "input.delay.actual";
-constexpr char C2_PARAMKEY_OUTPUT_DELAY[] = "output.delay.actual";
+typedef C2PortParam<C2Tuning, C2Uint32Value, kParamIndexDelay> C2PortDelayTuning;
+typedef C2PortDelayTuning C2PortActualDelayTuning; // deprecated
+constexpr char C2_PARAMKEY_INPUT_DELAY[] = "input.delay";
+constexpr char C2_PARAMKEY_OUTPUT_DELAY[] = "output.delay";
 
 // read-only
-typedef C2GlobalParam<C2Tuning, C2Uint32Value, kParamIndexDelay> C2ActualPipelineDelayTuning;
-constexpr char C2_PARAMKEY_PIPELINE_DELAY[] = "algo.delay.actual";
+typedef C2GlobalParam<C2Tuning, C2Uint32Value, kParamIndexDelay> C2PipelineDelayTuning;
+typedef C2PipelineDelayTuning C2ActualPipelineDelayTuning; // deprecated
+constexpr char C2_PARAMKEY_PIPELINE_DELAY[] = "algo.delay";
 
 /**
  * Reference characteristics.
