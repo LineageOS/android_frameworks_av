@@ -316,6 +316,11 @@ bool NuPlayer::CCDecoder::extractFromMPEGUserData(const sp<ABuffer> &accessUnit)
     const size_t *userData = (size_t *)mpegUserData->data();
 
     for (size_t i = 0; i < mpegUserData->size() / sizeof(size_t); ++i) {
+        if (accessUnit->size() < userData[i]) {
+            ALOGW("b/129068792, skip invalid offset for user data");
+            android_errorWriteLog(0x534e4554, "129068792");
+            continue;
+        }
         trackAdded |= parseMPEGUserDataUnit(
                 timeUs, accessUnit->data() + userData[i], accessUnit->size() - userData[i]);
     }
@@ -325,6 +330,12 @@ bool NuPlayer::CCDecoder::extractFromMPEGUserData(const sp<ABuffer> &accessUnit)
 
 // returns true if a new CC track is found
 bool NuPlayer::CCDecoder::parseMPEGUserDataUnit(int64_t timeUs, const uint8_t *data, size_t size) {
+    if (size < 9) {
+        ALOGW("b/129068792, MPEG user data size too small %zu", size);
+        android_errorWriteLog(0x534e4554, "129068792");
+        return false;
+    }
+
     ABitReader br(data + 4, 5);
 
     uint32_t user_identifier = br.getBits(32);
@@ -377,8 +388,14 @@ bool NuPlayer::CCDecoder::parseMPEGCCData(int64_t timeUs, const uint8_t *data, s
                 mDTVCCPacket->setRange(0, mDTVCCPacket->size() + 2);
                 br.skipBits(16);
             } else if (mDTVCCPacket->size() > 0 && cc_type == 2) {
-                memcpy(mDTVCCPacket->data() + mDTVCCPacket->size(), br.data(), 2);
-                mDTVCCPacket->setRange(0, mDTVCCPacket->size() + 2);
+                if (mDTVCCPacket->capacity() - mDTVCCPacket->size() >= 2) {
+                    memcpy(mDTVCCPacket->data() + mDTVCCPacket->size(), br.data(), 2);
+                    mDTVCCPacket->setRange(0, mDTVCCPacket->size() + 2);
+                } else {
+                    ALOGW("b/129068792, skip CC due to too much data(%zu, %zu)",
+                          mDTVCCPacket->capacity(), mDTVCCPacket->size());
+                    android_errorWriteLog(0x534e4554, "129068792");
+                }
                 br.skipBits(16);
             } else if (cc_type == 0 || cc_type == 1) {
                 uint8_t cc_data_1 = br.getBits(8) & 0x7f;
@@ -465,6 +482,11 @@ bool NuPlayer::CCDecoder::parseDTVCCPacket(int64_t timeUs, const uint8_t *data, 
             size_t trackIndex = getTrackIndex(kTrackTypeCEA708, service_number, &trackAdded);
             if (mSelectedTrack == (ssize_t)trackIndex) {
                 sp<ABuffer> ccPacket = new ABuffer(block_size);
+                if (ccPacket->capacity() == 0) {
+                    ALOGW("b/129068792, no memory available, %zu", block_size);
+                    android_errorWriteLog(0x534e4554, "129068792");
+                    return false;
+                }
                 memcpy(ccPacket->data(), br.data(), block_size);
                 mCCMap.add(timeUs, ccPacket);
             }
