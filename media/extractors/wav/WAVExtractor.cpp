@@ -505,45 +505,40 @@ media_status_t WAVSource::read(
 
     // TODO: add capability to return data as float PCM instead of 16 bit PCM.
     if (mWaveFormat == WAVE_FORMAT_PCM) {
+        const size_t bytesPerFrame = (mBitsPerSample >> 3) * mNumChannels;
+        const size_t numFrames = n / bytesPerFrame;
+        const size_t numSamples = numFrames * mNumChannels;
         if (mOutputFloat) {
             float *fdest = (float *)buffer->data();
+            buffer->set_range(0, 4 * numSamples);
             switch (mBitsPerSample) {
             case 8: {
-                buffer->set_range(0, 4 * n);
-                memcpy_to_float_from_u8(fdest, (const uint8_t *)buffer->data(), n);
+                memcpy_to_float_from_u8(fdest, (const uint8_t *)buffer->data(), numSamples);
             } break;
             case 16: {
-                const size_t numSamples = n / 2;
-                buffer->set_range(0, 4 * numSamples);
                 memcpy_to_float_from_i16(fdest, (const int16_t *)buffer->data(), numSamples);
             } break;
             case 24: {
-                const size_t numSamples = n / 3;
-                buffer->set_range(0, 4 * numSamples);
                 memcpy_to_float_from_p24(fdest, (const uint8_t *)buffer->data(), numSamples);
             } break;
             case 32: { // buffer range is correct
-                const size_t numSamples = n / 4;
                 memcpy_to_float_from_i32(fdest, (const int32_t *)buffer->data(), numSamples);
             } break;
             }
         } else {
             int16_t *idest = (int16_t *)buffer->data();
+            buffer->set_range(0, 2 * numSamples);
             switch (mBitsPerSample) {
             case 8: {
-                buffer->set_range(0, 2 * n);
-                memcpy_to_i16_from_u8(idest, (const uint8_t *)buffer->data(), n);
+                memcpy_to_i16_from_u8(idest, (const uint8_t *)buffer->data(), numSamples);
             } break;
             case 16:
-                break; // no translation needed
+                // no conversion needed
+                break;
             case 24: {
-                const size_t numSamples = n / 3;
-                buffer->set_range(0, 2 * numSamples);
                 memcpy_to_i16_from_p24(idest, (const uint8_t *)buffer->data(), numSamples);
             } break;
             case 32: {
-                const size_t numSamples = n / 4;
-                buffer->set_range(0, 2 * numSamples);
                 memcpy_to_i16_from_i32(idest, (const int32_t *)buffer->data(), numSamples);
             } break;
             }

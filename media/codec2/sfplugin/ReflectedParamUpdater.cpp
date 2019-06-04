@@ -205,6 +205,13 @@ void ReflectedParamUpdater::addParamDesc(
         const std::shared_ptr<C2ParamReflector> &reflector, bool markVendor) {
     C2String paramName = desc->name();
 
+    // Do not reflect requested parameters
+    // TODO: split these once aliases are introduced into '.actual' and '.requested' and alias
+    // the name to '.actual'.
+    if (desc->index() & C2Param::CoreIndex::IS_REQUEST_FLAG) {
+        return;
+    }
+
     // prefix vendor parameters
     if (desc->index().isVendor() && markVendor) {
         paramName = "vendor." + paramName;

@@ -158,7 +158,8 @@ public:
     struct CoreIndex {
     //public:
         enum : uint32_t {
-            IS_FLEX_FLAG = 0x00010000,
+            IS_FLEX_FLAG    = 0x00010000,
+            IS_REQUEST_FLAG = 0x00020000,
         };
 
     protected:
@@ -175,9 +176,9 @@ public:
             DIR_INPUT      = 0x00000000,
             DIR_OUTPUT     = 0x10000000,
 
-            IS_STREAM_FLAG  = 0x02000000,
-            STREAM_ID_MASK  = 0x01FE0000,
-            STREAM_ID_SHIFT = 17,
+            IS_STREAM_FLAG  = 0x00100000,
+            STREAM_ID_MASK  = 0x03E00000,
+            STREAM_ID_SHIFT = 21,
             MAX_STREAM_ID   = STREAM_ID_MASK >> STREAM_ID_SHIFT,
             STREAM_MASK     = IS_STREAM_FLAG | STREAM_ID_MASK,
 
@@ -360,6 +361,10 @@ public:
             mIndex = (mIndex & ~(DIR_MASK | IS_STREAM_FLAG)) | DIR_GLOBAL;
         }
 
+        inline void convertToRequest() {
+            mIndex = mIndex | IS_REQUEST_FLAG;
+        }
+
         /**
          * Sets the stream index.
          * \return true on success, false if could not set index (e.g. not a stream param).
@@ -472,6 +477,15 @@ public:
         std::unique_ptr<C2Param> copy = Copy(orig);
         if (copy) {
             copy->_mIndex.convertToGlobal();
+        }
+        return copy;
+    }
+
+    /// Returns managed clone of |orig| as a stream parameter at heap.
+    inline static std::unique_ptr<C2Param> CopyAsRequest(const C2Param &orig) {
+        std::unique_ptr<C2Param> copy = Copy(orig);
+        if (copy) {
+            copy->_mIndex.convertToRequest();
         }
         return copy;
     }
