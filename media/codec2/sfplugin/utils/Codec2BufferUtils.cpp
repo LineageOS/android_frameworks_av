@@ -137,14 +137,14 @@ status_t ImageCopy(uint8_t *imgBase, const MediaImage2 *img, const C2GraphicView
         int32_t dst_stride_v = img->mPlane[2].mRowInc;
         if (IsNV12(view) && IsI420(img)) {
             if (!libyuv::NV12ToI420(src_y, src_stride_y, src_u, src_stride_u, dst_y, dst_stride_y,
-                                    dst_u, dst_stride_u, dst_v, dst_stride_v, view.width(),
-                                    view.height())) {
+                                    dst_u, dst_stride_u, dst_v, dst_stride_v, view.crop().width,
+                                    view.crop().height)) {
                 return OK;
             }
         } else {
             if (!libyuv::I420ToNV12(src_y, src_stride_y, src_u, src_stride_u, src_v, src_stride_v,
-                                    dst_y, dst_stride_y, dst_u, dst_stride_u, view.width(),
-                                    view.height())) {
+                                    dst_y, dst_stride_y, dst_u, dst_stride_u, view.crop().width,
+                                    view.crop().height)) {
                 return OK;
             }
         }
