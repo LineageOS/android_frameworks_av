@@ -47,7 +47,9 @@ struct C2SoftOpusEnc : public SimpleC2Component {
 private:
     /* OPUS_FRAMESIZE_20_MS */
     const int kFrameSize = 960;
-    const int kMaxPayload = 4000;
+    const int kMaxSampleRate = 48000;
+    const int kMinSampleRate = 8000;
+    const int kMaxPayload = (4000 * kMaxSampleRate) / kMinSampleRate;
     const int kMaxNumChannels = 8;
 
     std::shared_ptr<IntfImpl> mIntf;
