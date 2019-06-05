@@ -107,19 +107,22 @@ struct Component::Listener : public C2Component::Listener {
             WorkBundle workBundle;
 
             sp<Component> strongComponent = mComponent.promote();
+            beginTransferBufferQueueBlocks(c2workItems, true);
             if (!objcpy(&workBundle, c2workItems, strongComponent ?
                     &strongComponent->mBufferPoolSender : nullptr)) {
                 LOG(ERROR) << "Component::Listener::onWorkDone_nb -- "
                            << "received corrupted work items.";
+                endTransferBufferQueueBlocks(c2workItems, false, true);
                 return;
             }
             Return<void> transStatus = listener->onWorkDone(workBundle);
             if (!transStatus.isOk()) {
                 LOG(ERROR) << "Component::Listener::onWorkDone_nb -- "
                            << "transaction failed.";
+                endTransferBufferQueueBlocks(c2workItems, false, true);
                 return;
             }
-            yieldBufferQueueBlocks(c2workItems, true);
+            endTransferBufferQueueBlocks(c2workItems, true, true);
         }
     }
 
@@ -254,13 +257,14 @@ Return<void> Component::flush(flush_cb _hidl_cb) {
 
     WorkBundle flushedWorkBundle;
     Status res = static_cast<Status>(c2res);
+    beginTransferBufferQueueBlocks(c2flushedWorks, true);
     if (c2res == C2_OK) {
         if (!objcpy(&flushedWorkBundle, c2flushedWorks, &mBufferPoolSender)) {
             res = Status::CORRUPTED;
         }
     }
     _hidl_cb(res, flushedWorkBundle);
-    yieldBufferQueueBlocks(c2flushedWorks, true);
+    endTransferBufferQueueBlocks(c2flushedWorks, true, true);
     return Void();
 }
 

@@ -1080,15 +1080,7 @@ c2_status_t Codec2Client::Component::destroyBlockPool(
 void Codec2Client::Component::handleOnWorkDone(
         const std::list<std::unique_ptr<C2Work>> &workItems) {
     // Output bufferqueue-based blocks' lifetime management
-    mOutputBufferQueueMutex.lock();
-    sp<IGraphicBufferProducer> igbp = mOutputIgbp;
-    uint64_t bqId = mOutputBqId;
-    uint32_t generation = mOutputGeneration;
-    mOutputBufferQueueMutex.unlock();
-
-    if (igbp) {
-        holdBufferQueueBlocks(workItems, igbp, bqId, generation);
-    }
+    mOutputBufferQueue.holdBufferQueueBlocks(workItems);
 }
 
 c2_status_t Codec2Client::Component::queue(
@@ -1151,15 +1143,7 @@ c2_status_t Codec2Client::Component::flush(
     }
 
     // Output bufferqueue-based blocks' lifetime management
-    mOutputBufferQueueMutex.lock();
-    sp<IGraphicBufferProducer> igbp = mOutputIgbp;
-    uint64_t bqId = mOutputBqId;
-    uint32_t generation = mOutputGeneration;
-    mOutputBufferQueueMutex.unlock();
-
-    if (igbp) {
-        holdBufferQueueBlocks(*flushedWork, igbp, bqId, generation);
-    }
+    mOutputBufferQueue.holdBufferQueueBlocks(*flushedWork);
 
     return status;
 }
@@ -1239,15 +1223,31 @@ c2_status_t Codec2Client::Component::setOutputSurface(
         C2BlockPool::local_id_t blockPoolId,
         const sp<IGraphicBufferProducer>& surface,
         uint32_t generation) {
-    sp<HGraphicBufferProducer2> igbp =
-            surface->getHalInterface<HGraphicBufferProducer2>();
+    uint64_t bqId = 0;
+    sp<IGraphicBufferProducer> nullIgbp;
+    sp<HGraphicBufferProducer2> nullHgbp;
 
-    if (!igbp) {
+    sp<HGraphicBufferProducer2> igbp = surface ?
+            surface->getHalInterface<HGraphicBufferProducer2>() : nullHgbp;
+    if (surface && !igbp) {
         igbp = new B2HGraphicBufferProducer2(surface);
     }
 
+    if (!surface) {
+        mOutputBufferQueue.configure(nullIgbp, generation, 0);
+    } else if (surface->getUniqueId(&bqId) != OK) {
+        LOG(ERROR) << "setOutputSurface -- "
+                   "cannot obtain bufferqueue id.";
+        bqId = 0;
+        mOutputBufferQueue.configure(nullIgbp, generation, 0);
+    } else {
+        mOutputBufferQueue.configure(surface, generation, bqId);
+    }
+    ALOGD("generation remote change %u", generation);
+
     Return<Status> transStatus = mBase->setOutputSurface(
-            static_cast<uint64_t>(blockPoolId), igbp);
+            static_cast<uint64_t>(blockPoolId),
+            bqId == 0 ? nullHgbp : igbp);
     if (!transStatus.isOk()) {
         LOG(ERROR) << "setOutputSurface -- transaction failed.";
         return C2_TRANSACTION_FAILED;
@@ -1256,18 +1256,6 @@ c2_status_t Codec2Client::Component::setOutputSurface(
             static_cast<c2_status_t>(static_cast<Status>(transStatus));
     if (status != C2_OK) {
         LOG(DEBUG) << "setOutputSurface -- call failed: " << status << ".";
-    } else {
-        std::lock_guard<std::mutex> lock(mOutputBufferQueueMutex);
-        if (mOutputIgbp != surface) {
-            mOutputIgbp = surface;
-            if (!surface) {
-                mOutputBqId = 0;
-            } else if (surface->getUniqueId(&mOutputBqId) != OK) {
-                LOG(ERROR) << "setOutputSurface -- "
-                              "cannot obtain bufferqueue id.";
-            }
-        }
-        mOutputGeneration = generation;
     }
     return status;
 }
@@ -1276,74 +1264,7 @@ status_t Codec2Client::Component::queueToOutputSurface(
         const C2ConstGraphicBlock& block,
         const QueueBufferInput& input,
         QueueBufferOutput* output) {
-    uint32_t generation;
-    uint64_t bqId;
-    int32_t bqSlot;
-    if (!getBufferQueueAssignment(block, &generation, &bqId, &bqSlot) ||
-            bqId == 0) {
-        // Block not from bufferqueue -- it must be attached before queuing.
-
-        mOutputBufferQueueMutex.lock();
-        sp<IGraphicBufferProducer> outputIgbp = mOutputIgbp;
-        uint32_t outputGeneration = mOutputGeneration;
-        mOutputBufferQueueMutex.unlock();
-
-        status_t status = attachToBufferQueue(block,
-                                               outputIgbp,
-                                               outputGeneration,
-                                               &bqSlot);
-        if (status != OK) {
-            LOG(WARNING) << "queueToOutputSurface -- attaching failed.";
-            return INVALID_OPERATION;
-        }
-
-        status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
-                                         input, output);
-        if (status != OK) {
-            LOG(ERROR) << "queueToOutputSurface -- queueBuffer() failed "
-                          "on non-bufferqueue-based block. "
-                          "Error = " << status << ".";
-            return status;
-        }
-        return OK;
-    }
-
-    mOutputBufferQueueMutex.lock();
-    sp<IGraphicBufferProducer> outputIgbp = mOutputIgbp;
-    uint64_t outputBqId = mOutputBqId;
-    uint32_t outputGeneration = mOutputGeneration;
-    mOutputBufferQueueMutex.unlock();
-
-    if (!outputIgbp) {
-        LOG(VERBOSE) << "queueToOutputSurface -- output surface is null.";
-        return NO_INIT;
-    }
-
-    if (bqId != outputBqId || generation != outputGeneration) {
-        if (!holdBufferQueueBlock(block, mOutputIgbp, mOutputBqId, mOutputGeneration)) {
-            LOG(ERROR) << "queueToOutputSurface -- migration failed.";
-            return DEAD_OBJECT;
-        }
-        if (!getBufferQueueAssignment(block, &generation, &bqId, &bqSlot)) {
-            LOG(ERROR) << "queueToOutputSurface -- corrupted bufferqueue assignment.";
-            return UNKNOWN_ERROR;
-        }
-    }
-
-    status_t status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
-                                              input, output);
-    if (status != OK) {
-        LOG(DEBUG) << "queueToOutputSurface -- queueBuffer() failed "
-                      "on bufferqueue-based block. "
-                      "Error = " << status << ".";
-        return status;
-    }
-    if (!yieldBufferQueueBlock(block)) {
-        LOG(DEBUG) << "queueToOutputSurface -- cannot yield "
-                      "bufferqueue-based block to the bufferqueue.";
-        return UNKNOWN_ERROR;
-    }
-    return OK;
+    return mOutputBufferQueue.outputBuffer(block, input, output);
 }
 
 c2_status_t Codec2Client::Component::connectToInputSurface(
