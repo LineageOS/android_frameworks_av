@@ -471,11 +471,11 @@ void C2SoftOpusEnc::process(const std::unique_ptr<C2Work>& work,
         uint8_t* outPtr = wView.data() + mBytesEncoded;
         int encodedBytes =
             opus_multistream_encode(mEncoder, mInputBufferPcm16,
-                                    mNumSamplesPerFrame, outPtr, kMaxPayload);
+                                    mNumSamplesPerFrame, outPtr, kMaxPayload - mBytesEncoded);
         ALOGV("encoded %i Opus bytes from %zu PCM bytes", encodedBytes,
               processSize);
 
-        if (encodedBytes < 0 || encodedBytes > kMaxPayload) {
+        if (encodedBytes < 0 || encodedBytes > (kMaxPayload - mBytesEncoded)) {
             ALOGE("opus_encode failed, encodedBytes : %d", encodedBytes);
             mSignalledError = true;
             work->result = C2_CORRUPTED;
