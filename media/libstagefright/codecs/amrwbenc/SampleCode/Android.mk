@@ -14,7 +14,8 @@ LOCAL_CFLAGS :=
 
 LOCAL_SHARED_LIBRARIES := \
     libstagefright \
-    libdl
+    libdl \
+    liblog
 
 LOCAL_STATIC_LIBRARIES := \
     libstagefright_amrwbenc
