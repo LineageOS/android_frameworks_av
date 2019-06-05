@@ -87,6 +87,7 @@ filegroup {
         "aidl/android/hardware/camera2/ICameraDeviceCallbacks.aidl",
         "aidl/android/hardware/camera2/ICameraDeviceUser.aidl",
     ],
+    path: "aidl",
 }
 
 // Extra AIDL files that are used by framework.jar but not libcamera_client
@@ -97,4 +98,5 @@ filegroup {
         "aidl/android/hardware/ICamera.aidl",
         "aidl/android/hardware/ICameraClient.aidl",
     ],
+    path: "aidl",
 }
