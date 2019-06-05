@@ -44,6 +44,15 @@ cc_library {
     clang: true,
 }
 
+filegroup {
+    name: "libmedia_omx_aidl",
+    srcs: [
+        "aidl/android/IGraphicBufferSource.aidl",
+        "aidl/android/IOMXBufferSource.aidl",
+    ],
+    path: "aidl",
+}
+
 cc_library_shared {
     name: "libmedia_omx",
     vendor_available: true,
@@ -53,8 +62,7 @@ cc_library_shared {
     double_loadable: true,
 
     srcs: [
-        "aidl/android/IGraphicBufferSource.aidl",
-        "aidl/android/IOMXBufferSource.aidl",
+        ":libmedia_omx_aidl",
 
         "IMediaCodecList.cpp",
         "IOMX.cpp",
@@ -150,6 +158,7 @@ filegroup {
     srcs: [
         "aidl/android/media/IMediaExtractorUpdateService.aidl",
     ],
+    path: "aidl",
 }
 
 cc_library {
