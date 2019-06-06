@@ -293,7 +293,7 @@ public:
         status_t                        finishCameraOps();
 
     private:
-        AppOpsManager                   mAppOpsManager;
+        std::unique_ptr<AppOpsManager>  mAppOpsManager = nullptr;
 
         class OpsCallback : public BnAppOpsCallback {
         public:
