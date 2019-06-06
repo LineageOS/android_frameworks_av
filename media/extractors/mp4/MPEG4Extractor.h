@@ -179,6 +179,7 @@ private:
     status_t parseAC3SpecificBox(off64_t offset);
     status_t parseEAC3SpecificBox(off64_t offset);
     status_t parseAC4SpecificBox(off64_t offset);
+    status_t parseALACSampleEntry(off64_t *offset);
     void adjustRawDefaultFrameSize();
 
     MPEG4Extractor(const MPEG4Extractor &);
