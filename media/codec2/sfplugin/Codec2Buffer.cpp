@@ -201,9 +201,10 @@ public:
      * \param colorFormat desired SDK color format for the MediaImage (if this is a flexible format,
      *        an attempt is made to simply represent the graphic view as a flexible SDK format
      *        without a memcpy)
+     * \param copy whether the converter is used for copy or not
      */
     GraphicView2MediaImageConverter(
-            const C2GraphicView &view, int32_t colorFormat)
+            const C2GraphicView &view, int32_t colorFormat, bool copy)
         : mInitCheck(NO_INIT),
           mView(view),
           mWidth(view.width()),
@@ -255,41 +256,44 @@ public:
                 }
                 switch (mColorFormat) {
                     case COLOR_FormatYUV420Flexible:
-                    {  // try to map directly. check if the planes are near one another
-                        const uint8_t *minPtr = mView.data()[0];
-                        const uint8_t *maxPtr = mView.data()[0];
-                        int32_t planeSize = 0;
-                        for (uint32_t i = 0; i < layout.numPlanes; ++i) {
-                            const C2PlaneInfo &plane = layout.planes[i];
-                            ssize_t minOffset = plane.minOffset(mWidth, mHeight);
-                            ssize_t maxOffset = plane.maxOffset(mWidth, mHeight);
-                            if (minPtr > mView.data()[i] + minOffset) {
-                                minPtr = mView.data()[i] + minOffset;
-                            }
-                            if (maxPtr < mView.data()[i] + maxOffset) {
-                                maxPtr = mView.data()[i] + maxOffset;
-                            }
-                            planeSize += std::abs(plane.rowInc) * align(mHeight, 64)
-                                    / plane.rowSampling / plane.colSampling * divUp(mAllocatedDepth, 8u);
-                        }
-
-                        if ((maxPtr - minPtr + 1) <= planeSize) {
-                            // FIXME: this is risky as reading/writing data out of bound results in
-                            //        an undefined behavior, but gralloc does assume a contiguous
-                            //        mapping
+                        if (!copy) {
+                            // try to map directly. check if the planes are near one another
+                            const uint8_t *minPtr = mView.data()[0];
+                            const uint8_t *maxPtr = mView.data()[0];
+                            int32_t planeSize = 0;
                             for (uint32_t i = 0; i < layout.numPlanes; ++i) {
                                 const C2PlaneInfo &plane = layout.planes[i];
-                                mediaImage->mPlane[i].mOffset = mView.data()[i] - minPtr;
-                                mediaImage->mPlane[i].mColInc = plane.colInc;
-                                mediaImage->mPlane[i].mRowInc = plane.rowInc;
-                                mediaImage->mPlane[i].mHorizSubsampling = plane.colSampling;
-                                mediaImage->mPlane[i].mVertSubsampling = plane.rowSampling;
+                                ssize_t minOffset = plane.minOffset(mWidth, mHeight);
+                                ssize_t maxOffset = plane.maxOffset(mWidth, mHeight);
+                                if (minPtr > mView.data()[i] + minOffset) {
+                                    minPtr = mView.data()[i] + minOffset;
+                                }
+                                if (maxPtr < mView.data()[i] + maxOffset) {
+                                    maxPtr = mView.data()[i] + maxOffset;
+                                }
+                                planeSize += std::abs(plane.rowInc) * align(mHeight, 64)
+                                        / plane.rowSampling / plane.colSampling
+                                        * divUp(mAllocatedDepth, 8u);
                             }
-                            mWrapped = new ABuffer(const_cast<uint8_t *>(minPtr), maxPtr - minPtr + 1);
-                            break;
+
+                            if ((maxPtr - minPtr + 1) <= planeSize) {
+                                // FIXME: this is risky as reading/writing data out of bound results
+                                //        in an undefined behavior, but gralloc does assume a
+                                //        contiguous mapping
+                                for (uint32_t i = 0; i < layout.numPlanes; ++i) {
+                                    const C2PlaneInfo &plane = layout.planes[i];
+                                    mediaImage->mPlane[i].mOffset = mView.data()[i] - minPtr;
+                                    mediaImage->mPlane[i].mColInc = plane.colInc;
+                                    mediaImage->mPlane[i].mRowInc = plane.rowInc;
+                                    mediaImage->mPlane[i].mHorizSubsampling = plane.colSampling;
+                                    mediaImage->mPlane[i].mVertSubsampling = plane.rowSampling;
+                                }
+                                mWrapped = new ABuffer(const_cast<uint8_t *>(minPtr),
+                                                       maxPtr - minPtr + 1);
+                                break;
+                            }
                         }
-                    }
-                    [[fallthrough]];
+                        [[fallthrough]];
 
                     case COLOR_FormatYUV420Planar:
                     case COLOR_FormatYUV420PackedPlanar:
@@ -503,7 +507,7 @@ sp<GraphicBlockBuffer> GraphicBlockBuffer::Allocate(
     int32_t colorFormat = COLOR_FormatYUV420Flexible;
     (void)format->findInt32("color-format", &colorFormat);
 
-    GraphicView2MediaImageConverter converter(view, colorFormat);
+    GraphicView2MediaImageConverter converter(view, colorFormat, false /* copy */);
     if (converter.initCheck() != OK) {
         ALOGD("Converter init failed: %d", converter.initCheck());
         return nullptr;
@@ -615,7 +619,7 @@ sp<ConstGraphicBlockBuffer> ConstGraphicBlockBuffer::Allocate(
     int32_t colorFormat = COLOR_FormatYUV420Flexible;
     (void)format->findInt32("color-format", &colorFormat);
 
-    GraphicView2MediaImageConverter converter(*view, colorFormat);
+    GraphicView2MediaImageConverter converter(*view, colorFormat, false /* copy */);
     if (converter.initCheck() != OK) {
         ALOGD("Converter init failed: %d", converter.initCheck());
         return nullptr;
@@ -708,7 +712,7 @@ bool ConstGraphicBlockBuffer::canCopy(const std::shared_ptr<C2Buffer> &buffer) c
     const_cast<ConstGraphicBlockBuffer *>(this)->format()->findInt32("color-format", &colorFormat);
 
     GraphicView2MediaImageConverter converter(
-            buffer->data().graphicBlocks()[0].map().get(), colorFormat);
+            buffer->data().graphicBlocks()[0].map().get(), colorFormat, true /* copy */);
     if (converter.initCheck() != OK) {
         ALOGD("ConstGraphicBlockBuffer::canCopy: converter init failed: %d", converter.initCheck());
         return false;
@@ -730,7 +734,7 @@ bool ConstGraphicBlockBuffer::copy(const std::shared_ptr<C2Buffer> &buffer) {
     format()->findInt32("color-format", &colorFormat);
 
     GraphicView2MediaImageConverter converter(
-            buffer->data().graphicBlocks()[0].map().get(), colorFormat);
+            buffer->data().graphicBlocks()[0].map().get(), colorFormat, true /* copy */);
     if (converter.initCheck() != OK) {
         ALOGD("ConstGraphicBlockBuffer::copy: converter init failed: %d", converter.initCheck());
         return false;
