@@ -2876,7 +2876,8 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
     config.streams = streams.editArray();
 
     // Do the HAL configuration; will potentially touch stream
-    // max_buffers, usage, priv fields.
+    // max_buffers, usage, and priv fields, as well as data_space and format
+    // fields for IMPLEMENTATION_DEFINED formats.
 
     const camera_metadata_t *sessionBuffer = sessionParams.getAndLock();
     res = mInterface->configureStreams(sessionBuffer, &config, bufferSizes);
@@ -4202,10 +4203,19 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
         dst3_2.streamType = streamType;
         dst3_2.width = src->width;
         dst3_2.height = src->height;
-        dst3_2.format = mapToPixelFormat(src->format);
         dst3_2.usage = mapToConsumerUsage(cam3stream->getUsage());
-        dst3_2.dataSpace = mapToHidlDataspace(src->data_space);
         dst3_2.rotation = mapToStreamRotation((camera3_stream_rotation_t) src->rotation);
+        // For HidlSession version 3.5 or newer, the format and dataSpace sent
+        // to HAL are original, not the overriden ones.
+        if (mHidlSession_3_5 != nullptr) {
+            dst3_2.format = mapToPixelFormat(cam3stream->isFormatOverridden() ?
+                    cam3stream->getOriginalFormat() : src->format);
+            dst3_2.dataSpace = mapToHidlDataspace(cam3stream->isDataSpaceOverridden() ?
+                    cam3stream->getOriginalDataSpace() : src->data_space);
+        } else {
+            dst3_2.format = mapToPixelFormat(src->format);
+            dst3_2.dataSpace = mapToHidlDataspace(src->data_space);
+        }
         dst3_4.v3_2 = dst3_2;
         dst3_4.bufferSize = bufferSizes[i];
         if (src->physical_camera_id != nullptr) {
@@ -4266,7 +4276,7 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
                 return OK;
             };
 
-    // See if we have v3.4 or v3.3 HAL
+    // See which version of HAL we have
     if (mHidlSession_3_5 != nullptr) {
         ALOGV("%s: v3.5 device found", __FUNCTION__);
         device::V3_5::StreamConfiguration requestedConfiguration3_5;
@@ -4281,7 +4291,6 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
     } else if (mHidlSession_3_4 != nullptr) {
         // We do; use v3.4 for the call
         ALOGV("%s: v3.4 device found", __FUNCTION__);
-        device::V3_4::HalStreamConfiguration finalConfiguration3_4;
         auto err = mHidlSession_3_4->configureStreams_3_4(
                 requestedConfiguration3_4, configStream34Cb);
         res = postprocConfigStream34(err);
@@ -4352,12 +4361,12 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
         device::V3_3::HalStream &src = finalConfiguration.streams[realIdx];
 
         Camera3Stream* dstStream = Camera3Stream::cast(dst);
-        dstStream->setFormatOverride(false);
-        dstStream->setDataSpaceOverride(false);
         int overrideFormat = mapToFrameworkFormat(src.v3_2.overrideFormat);
         android_dataspace overrideDataSpace = mapToFrameworkDataspace(src.overrideDataSpace);
 
         if (dst->format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
+            dstStream->setFormatOverride(false);
+            dstStream->setDataSpaceOverride(false);
             if (dst->format != overrideFormat) {
                 ALOGE("%s: Stream %d: Format override not allowed for format 0x%x", __FUNCTION__,
                         streamId, dst->format);
@@ -4367,10 +4376,13 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
                         streamId, dst->format);
             }
         } else {
-            dstStream->setFormatOverride((dst->format != overrideFormat) ? true : false);
-            dstStream->setDataSpaceOverride((dst->data_space != overrideDataSpace) ? true : false);
-
+            bool needFormatOverride =
+                    requestedConfiguration3_2.streams[i].format != src.v3_2.overrideFormat;
+            bool needDataspaceOverride =
+                    requestedConfiguration3_2.streams[i].dataSpace != src.overrideDataSpace;
             // Override allowed with IMPLEMENTATION_DEFINED
+            dstStream->setFormatOverride(needFormatOverride);
+            dstStream->setDataSpaceOverride(needDataspaceOverride);
             dst->format = overrideFormat;
             dst->data_space = overrideDataSpace;
         }

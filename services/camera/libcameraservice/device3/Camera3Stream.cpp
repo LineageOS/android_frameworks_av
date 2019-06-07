@@ -67,6 +67,8 @@ Camera3Stream::Camera3Stream(int id,
     mBufferLimitLatency(kBufferLimitLatencyBinSize),
     mFormatOverridden(false),
     mOriginalFormat(-1),
+    mDataSpaceOverridden(false),
+    mOriginalDataSpace(HAL_DATASPACE_UNKNOWN),
     mPhysicalCameraId(physicalCameraId),
     mLastTimestamp(0) {
 
@@ -121,7 +123,9 @@ void Camera3Stream::setUsage(uint64_t usage) {
 
 void Camera3Stream::setFormatOverride(bool formatOverridden) {
     mFormatOverridden = formatOverridden;
-    if (formatOverridden) mOriginalFormat = camera3_stream::format;
+    if (formatOverridden && mOriginalFormat == -1) {
+        mOriginalFormat = camera3_stream::format;
+    }
 }
 
 bool Camera3Stream::isFormatOverridden() const {
@@ -134,7 +138,9 @@ int Camera3Stream::getOriginalFormat() const {
 
 void Camera3Stream::setDataSpaceOverride(bool dataSpaceOverridden) {
     mDataSpaceOverridden = dataSpaceOverridden;
-    if (dataSpaceOverridden) mOriginalDataSpace = camera3_stream::data_space;
+    if (dataSpaceOverridden && mOriginalDataSpace == HAL_DATASPACE_UNKNOWN) {
+        mOriginalDataSpace = camera3_stream::data_space;
+    }
 }
 
 bool Camera3Stream::isDataSpaceOverridden() const {
