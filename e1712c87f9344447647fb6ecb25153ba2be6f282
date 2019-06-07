@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fbddd120_c8b05f1e",
+        "filename": "services/audioflinger/AudioFlinger.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 2762,
+      "author": {
+        "id": 12604
+      },
+      "writtenOn": "2019-06-07T21:56:08Z",
+      "side": 1,
+      "message": "This should be NULL",
+      "range": {
+        "startLine": 2762,
+        "startChar": 48,
+        "endLine": 2762,
+        "endChar": 55
+      },
+      "revId": "e1712c87f9344447647fb6ecb25153ba2be6f282",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
