@@ -55,7 +55,7 @@ status_t Camera3SharedOutputStream::connectStreamSplitterLocked() {
 
     mStreamSplitter = new Camera3StreamSplitter(mUseHalBufManager);
 
-    uint64_t usage;
+    uint64_t usage = 0;
     getEndpointUsage(&usage);
 
     std::unordered_map<size_t, sp<Surface>> initialSurfaces;
