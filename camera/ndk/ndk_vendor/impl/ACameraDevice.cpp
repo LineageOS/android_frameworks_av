@@ -31,6 +31,17 @@
 
 #include "ACameraCaptureSession.inc"
 
+#define CHECK_TRANSACTION_AND_RET(remoteRet, status, callName) \
+    if (!remoteRet.isOk()) { \
+        ALOGE("%s: Transaction error during %s call %s", __FUNCTION__, callName, \
+                  remoteRet.description().c_str()); \
+        return ACAMERA_ERROR_UNKNOWN; \
+    } \
+    if (status != Status::NO_ERROR) { \
+        ALOGE("%s: %s call failed", __FUNCTION__, callName); \
+        return utils::convertFromHidl(status); \
+    }
+
 using namespace android;
 
 namespace android {
@@ -151,7 +162,7 @@ CameraDevice::createCaptureRequest(
         return ACAMERA_ERROR_CAMERA_DISCONNECTED;
     }
     CameraMetadata rawRequest;
-    Status status = Status::NO_ERROR;
+    Status status = Status::UNKNOWN_ERROR;
     auto remoteRet = mRemote->createDefaultRequest(
         utils::convertToHidl(templateId),
         [&status, &rawRequest](auto s, const hidl_vec<uint8_t> &metadata) {
@@ -161,14 +172,7 @@ CameraDevice::createCaptureRequest(
                 ALOGE("%s: Couldn't create default request", __FUNCTION__);
             }
         });
-    if (!remoteRet.isOk()) {
-        ALOGE("%s: Transaction error while trying to create default request %s", __FUNCTION__,
-              remoteRet.description().c_str());
-        return ACAMERA_ERROR_UNKNOWN;
-    }
-    if (status != Status::NO_ERROR) {
-        return utils::convertFromHidl(status);
-    }
+    CHECK_TRANSACTION_AND_RET(remoteRet, status, "createDefaultRequest()")
     ACaptureRequest* outReq = new ACaptureRequest();
     outReq->settings = new ACameraMetadata(rawRequest.release(), ACameraMetadata::ACM_REQUEST);
     if (physicalCameraIdList != nullptr) {
@@ -243,20 +247,15 @@ camera_status_t CameraDevice::isSessionConfigurationSupported(
     }
 
     bool configSupported = false;
-    Status status = Status::NO_ERROR;
+    Status status = Status::UNKNOWN_ERROR;
     auto remoteRet = mRemote->isSessionConfigurationSupported(sessionConfig,
         [&status, &configSupported](auto s, auto supported) {
             status = s;
             configSupported = supported;
         });
 
-    if (status == Status::INVALID_OPERATION) {
-        return ACAMERA_ERROR_UNSUPPORTED_OPERATION;
-    } else if (!remoteRet.isOk()) {
-        return ACAMERA_ERROR_UNKNOWN;
-    } else {
-        return configSupported ? ACAMERA_OK : ACAMERA_ERROR_STREAM_CONFIGURE_FAIL;
-    }
+    CHECK_TRANSACTION_AND_RET(remoteRet, status, "isSessionConfigurationSupported()");
+    return configSupported ? ACAMERA_OK : ACAMERA_ERROR_STREAM_CONFIGURE_FAIL;
 }
 
 static void addMetadataToPhysicalCameraSettings(const CameraMetadata *metadata,
@@ -525,16 +524,13 @@ CameraDevice::stopRepeatingLocked() {
         mRepeatingSequenceId = REQUEST_ID_NONE;
 
         int64_t lastFrameNumber;
-        Status status = Status::NO_ERROR;
+        Status status = Status::UNKNOWN_ERROR;
         auto remoteRet = mRemote->cancelRepeatingRequest(
                 [&status, &lastFrameNumber](Status s, auto frameNumber) {
                     status = s;
                     lastFrameNumber = frameNumber;
                 });
-        if (!remoteRet.isOk() || status != Status::NO_ERROR) {
-            ALOGE("%s: Unable to cancel active repeating request", __FUNCTION__);
-            return utils::convertFromHidl(status);
-        }
+        CHECK_TRANSACTION_AND_RET(remoteRet, status, "cancelRepeatingRequest()");
         checkRepeatingSequenceCompleteLocked(repeatingSequenceId, lastFrameNumber);
     }
     return ACAMERA_OK;
@@ -582,15 +578,12 @@ CameraDevice::flushLocked(ACameraCaptureSession* session) {
     }
 
     int64_t lastFrameNumber;
-    Status status;
+    Status status = Status::UNKNOWN_ERROR;
     auto remoteRet = mRemote->flush([&status, &lastFrameNumber](auto s, auto frameNumber) {
                                         status = s;
                                         lastFrameNumber = frameNumber;
                                     });
-    if (!remoteRet.isOk() || status != Status::NO_ERROR) {
-        ALOGE("%s: Abort captures failed", __FUNCTION__);
-        return utils::convertFromHidl(status);
-    }
+    CHECK_TRANSACTION_AND_RET(remoteRet, status, "flush()")
     if (mRepeatingSequenceId != REQUEST_ID_NONE) {
         checkRepeatingSequenceCompleteLocked(mRepeatingSequenceId, lastFrameNumber);
     }
@@ -611,10 +604,7 @@ CameraDevice::waitUntilIdleLocked() {
     }
 
     auto remoteRet = mRemote->waitUntilIdle();
-    if (!remoteRet.isOk()) {
-        ALOGE("%s: Transaction waitUntilIdle failed", __FUNCTION__);
-        return utils::convertFromHidl(remoteRet);
-    }
+    CHECK_TRANSACTION_AND_RET(remoteRet, remoteRet, "waitUntilIdle()")
     return ACAMERA_OK;
 }
 
@@ -689,34 +679,25 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
     mIdle = true;
 
     auto remoteRet = mRemote->beginConfigure();
-    if (!remoteRet.isOk()|| remoteRet != Status::NO_ERROR) {
-        ALOGE("Camera device %s begin configure failed", getId());
-        return utils::convertFromHidl(remoteRet);
-    }
+    CHECK_TRANSACTION_AND_RET(remoteRet, remoteRet, "beginConfigure()")
 
     // delete to-be-deleted streams
     for (auto streamId : deleteList) {
         remoteRet = mRemote->deleteStream(streamId);
-        if (!remoteRet.isOk() || remoteRet != Status::NO_ERROR) {
-            ALOGE("Camera device %s failed to remove stream %d", getId(), streamId);
-            return utils::convertFromHidl(remoteRet);
-        }
+        CHECK_TRANSACTION_AND_RET(remoteRet, remoteRet, "deleteStream()")
         mConfiguredOutputs.erase(streamId);
     }
 
     // add new streams
     for (auto outputPair : addSet) {
         int streamId;
-        Status status;
+        Status status = Status::UNKNOWN_ERROR;
         auto ret = mRemote->createStream(outputPair.second,
                                          [&status, &streamId](Status s, auto stream_id) {
                                              status = s;
                                              streamId = stream_id;
                                          });
-        if (!remoteRet.isOk() || status != Status::NO_ERROR) {
-            ALOGE("Camera device %s failed to create stream", getId());
-            return utils::convertFromHidl(status);
-        }
+        CHECK_TRANSACTION_AND_RET(ret, status, "createStream()")
         mConfiguredOutputs.insert(std::make_pair(streamId, outputPair));
     }
 
@@ -729,11 +710,8 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
         params.unlock(params_metadata);
     }
     remoteRet = mRemote->endConfigure(StreamConfigurationMode::NORMAL_MODE, hidlParams);
-    if (!remoteRet.isOk()) {
-        ALOGE("Transaction error: endConfigure failed %s", remoteRet.description().c_str());
-    }
-
-    return utils::convertFromHidl(remoteRet);
+    CHECK_TRANSACTION_AND_RET(remoteRet, remoteRet, "endConfigure()")
+    return ACAMERA_OK;
 }
 
 void
