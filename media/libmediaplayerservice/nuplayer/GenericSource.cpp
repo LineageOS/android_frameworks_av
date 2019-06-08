@@ -90,8 +90,11 @@ void NuPlayer::GenericSource::resetDataSource() {
     ALOGV("resetDataSource");
 
     mHTTPService.clear();
-    mHttpSource.clear();
-    mDisconnected = false;
+    {
+        Mutex::Autolock _l_d(mDisconnectLock);
+        mHttpSource.clear();
+        mDisconnected = false;
+    }
     mUri.clear();
     mUriHeaders.clear();
     mSources.clear();
@@ -152,7 +155,10 @@ status_t NuPlayer::GenericSource::setDataSource(const sp<DataSource>& source) {
     ALOGV("setDataSource (source: %p)", source.get());
 
     resetDataSource();
-    mDataSource = source;
+    {
+        Mutex::Autolock _l_d(mDisconnectLock);
+        mDataSource = source;
+    }
     return OK;
 }
 
@@ -163,8 +169,12 @@ sp<MetaData> NuPlayer::GenericSource::getFileFormatMeta() const {
 
 status_t NuPlayer::GenericSource::initFromDataSource() {
     sp<IMediaExtractor> extractor;
-    CHECK(mDataSource != NULL);
-    sp<DataSource> dataSource = mDataSource;
+    sp<DataSource> dataSource;
+    {
+        Mutex::Autolock _l_d(mDisconnectLock);
+        dataSource = mDataSource;
+    }
+    CHECK(dataSource != NULL);
 
     mLock.unlock();
     // This might take long time if data source is not reliable.
@@ -359,6 +369,7 @@ void NuPlayer::GenericSource::prepareAsync() {
 }
 
 void NuPlayer::GenericSource::onPrepareAsync() {
+    mDisconnectLock.lock();
     ALOGV("onPrepareAsync: mDataSource: %d", (mDataSource != NULL));
 
     // delayed data source creation
@@ -372,20 +383,30 @@ void NuPlayer::GenericSource::onPrepareAsync() {
             String8 contentType;
 
             if (!strncasecmp("http://", uri, 7) || !strncasecmp("https://", uri, 8)) {
-                mHttpSource = DataSourceFactory::CreateMediaHTTP(mHTTPService);
-                if (mHttpSource == NULL) {
+                sp<DataSource> httpSource;
+                mDisconnectLock.unlock();
+                httpSource = DataSourceFactory::CreateMediaHTTP(mHTTPService);
+                if (httpSource == NULL) {
                     ALOGE("Failed to create http source!");
                     notifyPreparedAndCleanup(UNKNOWN_ERROR);
+                    mDisconnectLock.lock();
                     return;
+                }
+                mDisconnectLock.lock();
+
+                if (!mDisconnected) {
+                    mHttpSource = httpSource;
                 }
             }
 
             mLock.unlock();
+            mDisconnectLock.unlock();
             // This might take long time if connection has some issue.
             sp<DataSource> dataSource = DataSourceFactory::CreateFromURI(
                    mHTTPService, uri, &mUriHeaders, &contentType,
                    static_cast<HTTPBase *>(mHttpSource.get()));
             mLock.lock();
+            mDisconnectLock.lock();
             if (!mDisconnected) {
                 mDataSource = dataSource;
             }
@@ -436,6 +457,8 @@ void NuPlayer::GenericSource::onPrepareAsync() {
     if (mDataSource->flags() & DataSource::kIsCachingDataSource) {
         mCachedSource = static_cast<NuCachedSource2 *>(mDataSource.get());
     }
+
+    mDisconnectLock.unlock();
 
     // For cached streaming cases, we need to wait for enough
     // buffering before reporting prepared.
@@ -503,9 +526,13 @@ void NuPlayer::GenericSource::finishPrepareAsync() {
 
 void NuPlayer::GenericSource::notifyPreparedAndCleanup(status_t err) {
     if (err != OK) {
-        mDataSource.clear();
+        {
+            Mutex::Autolock _l_d(mDisconnectLock);
+            mDataSource.clear();
+            mHttpSource.clear();
+        }
+
         mCachedSource.clear();
-        mHttpSource.clear();
 
         mBitrate = -1;
         mPrevBufferPercentage = -1;
@@ -547,7 +574,7 @@ void NuPlayer::GenericSource::resume() {
 void NuPlayer::GenericSource::disconnect() {
     sp<DataSource> dataSource, httpSource;
     {
-        Mutex::Autolock _l(mLock);
+        Mutex::Autolock _l_d(mDisconnectLock);
         dataSource = mDataSource;
         httpSource = mHttpSource;
         mDisconnected = true;
