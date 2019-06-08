@@ -120,8 +120,9 @@ status_t AudioPolicyMixCollection::getAudioPolicyMix(audio_devices_t deviceType,
 
     ALOGV("getAudioPolicyMix() for dev=0x%x addr=%s", deviceType, address.string());
     for (ssize_t i = 0; i < size(); i++) {
-        if (itemAt(i)->mDeviceType == deviceType
-                && itemAt(i)->mDeviceAddress.compare(address) == 0) {
+        // Workaround: when an in audio policy is registered, it opens an output
+        // that tries to find the audio policy, thus the device must be ignored.
+        if (itemAt(i)->mDeviceAddress.compare(address) == 0) {
             policyMix = itemAt(i);
             ALOGV("getAudioPolicyMix: found mix %zu match (devType=0x%x addr=%s)",
                     i, deviceType, address.string());
