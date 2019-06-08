@@ -33,6 +33,7 @@
 
 #include <android-base/macros.h>
 #include <android-base/parseint.h>
+#include <android-base/stringprintf.h>
 #include <binder/ActivityManager.h>
 #include <binder/AppOpsManager.h>
 #include <binder/IPCThreadState.h>
@@ -81,6 +82,7 @@ namespace {
 
 namespace android {
 
+using base::StringPrintf;
 using binder::Status;
 using frameworks::cameraservice::service::V2_0::implementation::HidlCameraService;
 using hardware::ICamera;
@@ -2366,6 +2368,13 @@ CameraService::BasicClient::BasicClient(const sp<CameraService>& cameraService,
         }
         mClientPackageName = packages[0];
     }
+    if (hardware::IPCThreadState::self()->isServingCall()) {
+        std::string vendorClient =
+                StringPrintf("vendor.client.pid<%d>", CameraThreadState::getCallingPid());
+        mClientPackageName = String16(vendorClient.c_str());
+    } else {
+        mAppOpsManager = std::make_unique<AppOpsManager>();
+    }
 }
 
 CameraService::BasicClient::~BasicClient() {
@@ -2381,8 +2390,7 @@ binder::Status CameraService::BasicClient::disconnect() {
     mDisconnected = true;
 
     sCameraService->removeByClient(this);
-    sCameraService->logDisconnected(mCameraIdStr, mClientPid,
-            String8(mClientPackageName));
+    sCameraService->logDisconnected(mCameraIdStr, mClientPid, String8(mClientPackageName));
     sCameraService->mCameraProviderManager->removeRef(CameraProviderManager::DeviceMode::CAMERA,
             mCameraIdStr.c_str());
 
@@ -2432,31 +2440,31 @@ bool CameraService::BasicClient::canCastToApiClient(apiLevel level) const {
 status_t CameraService::BasicClient::startCameraOps() {
     ATRACE_CALL();
 
-    int32_t res;
-    // Notify app ops that the camera is not available
-    mOpsCallback = new OpsCallback(this);
-
     {
         ALOGV("%s: Start camera ops, package name = %s, client UID = %d",
               __FUNCTION__, String8(mClientPackageName).string(), mClientUid);
     }
+    if (mAppOpsManager != nullptr) {
+        // Notify app ops that the camera is not available
+        mOpsCallback = new OpsCallback(this);
+        int32_t res;
+        mAppOpsManager->startWatchingMode(AppOpsManager::OP_CAMERA,
+                mClientPackageName, mOpsCallback);
+        res = mAppOpsManager->startOpNoThrow(AppOpsManager::OP_CAMERA,
+                mClientUid, mClientPackageName, /*startIfModeDefault*/ false);
 
-    mAppOpsManager.startWatchingMode(AppOpsManager::OP_CAMERA,
-            mClientPackageName, mOpsCallback);
-    res = mAppOpsManager.startOpNoThrow(AppOpsManager::OP_CAMERA,
-            mClientUid, mClientPackageName, /*startIfModeDefault*/ false);
+        if (res == AppOpsManager::MODE_ERRORED) {
+            ALOGI("Camera %s: Access for \"%s\" has been revoked",
+                    mCameraIdStr.string(), String8(mClientPackageName).string());
+            return PERMISSION_DENIED;
+        }
 
-    if (res == AppOpsManager::MODE_ERRORED) {
-        ALOGI("Camera %s: Access for \"%s\" has been revoked",
-                mCameraIdStr.string(), String8(mClientPackageName).string());
-        return PERMISSION_DENIED;
-    }
-
-    if (res == AppOpsManager::MODE_IGNORED) {
-        ALOGI("Camera %s: Access for \"%s\" has been restricted",
-                mCameraIdStr.string(), String8(mClientPackageName).string());
-        // Return the same error as for device policy manager rejection
-        return -EACCES;
+        if (res == AppOpsManager::MODE_IGNORED) {
+            ALOGI("Camera %s: Access for \"%s\" has been restricted",
+                    mCameraIdStr.string(), String8(mClientPackageName).string());
+            // Return the same error as for device policy manager rejection
+            return -EACCES;
+        }
     }
 
     mOpsActive = true;
@@ -2483,10 +2491,11 @@ status_t CameraService::BasicClient::finishCameraOps() {
     // Check if startCameraOps succeeded, and if so, finish the camera op
     if (mOpsActive) {
         // Notify app ops that the camera is available again
-        mAppOpsManager.finishOp(AppOpsManager::OP_CAMERA, mClientUid,
-                mClientPackageName);
-        mOpsActive = false;
-
+        if (mAppOpsManager != nullptr) {
+            mAppOpsManager->finishOp(AppOpsManager::OP_CAMERA, mClientUid,
+                    mClientPackageName);
+            mOpsActive = false;
+        }
         // This function is called when a client disconnects. This should
         // release the camera, but actually only if it was in a proper
         // functional state, i.e. with status NOT_AVAILABLE
@@ -2506,8 +2515,8 @@ status_t CameraService::BasicClient::finishCameraOps() {
                 mCameraIdStr, mCameraFacing, mClientPackageName, apiLevel);
     }
     // Always stop watching, even if no camera op is active
-    if (mOpsCallback != NULL) {
-        mAppOpsManager.stopWatchingMode(mOpsCallback);
+    if (mOpsCallback != nullptr && mAppOpsManager != nullptr) {
+        mAppOpsManager->stopWatchingMode(mOpsCallback);
     }
     mOpsCallback.clear();
 
@@ -2516,19 +2525,18 @@ status_t CameraService::BasicClient::finishCameraOps() {
     return OK;
 }
 
-void CameraService::BasicClient::opChanged(int32_t op, const String16& packageName) {
+void CameraService::BasicClient::opChanged(int32_t op, const String16&) {
     ATRACE_CALL();
-
-    String8 name(packageName);
-    String8 myName(mClientPackageName);
-
+    if (mAppOpsManager == nullptr) {
+        return;
+    }
     if (op != AppOpsManager::OP_CAMERA) {
         ALOGW("Unexpected app ops notification received: %d", op);
         return;
     }
 
     int32_t res;
-    res = mAppOpsManager.checkOp(AppOpsManager::OP_CAMERA,
+    res = mAppOpsManager->checkOp(AppOpsManager::OP_CAMERA,
             mClientUid, mClientPackageName);
     ALOGV("checkOp returns: %d, %s ", res,
             res == AppOpsManager::MODE_ALLOWED ? "ALLOWED" :
@@ -2538,7 +2546,7 @@ void CameraService::BasicClient::opChanged(int32_t op, const String16& packageNa
 
     if (res != AppOpsManager::MODE_ALLOWED) {
         ALOGI("Camera %s: Access for \"%s\" revoked", mCameraIdStr.string(),
-                myName.string());
+              String8(mClientPackageName).string());
         block();
     }
 }
