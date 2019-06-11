@@ -492,6 +492,12 @@ status_t OMXNodeInstance::freeNode() {
         }
 
         case OMX_StateLoaded:
+        {
+            if (mActiveBuffers.size() > 0) {
+                freeActiveBuffers();
+            }
+            FALLTHROUGH_INTENDED;
+        }
         case OMX_StateInvalid:
             break;
 
