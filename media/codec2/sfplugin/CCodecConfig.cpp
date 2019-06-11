@@ -508,7 +508,7 @@ void CCodecConfig::initializeStandardParams() {
                .limitTo(D::ENCODER & D::VIDEO));
     // convert to timestamp base
     add(ConfigMapper(KEY_I_FRAME_INTERVAL, C2_PARAMKEY_SYNC_FRAME_INTERVAL, "value")
-        .withMapper([](C2Value v) -> C2Value {
+        .withMappers([](C2Value v) -> C2Value {
             // convert from i32 to float
             int32_t i32Value;
             float fpValue;
@@ -516,6 +516,12 @@ void CCodecConfig::initializeStandardParams() {
                 return int64_t(1000000) * i32Value;
             } else if (v.get(&fpValue)) {
                 return int64_t(c2_min(1000000 * fpValue + 0.5, (double)INT64_MAX));
+            }
+            return C2Value();
+        }, [](C2Value v) -> C2Value {
+            int64_t i64;
+            if (v.get(&i64)) {
+                return float(i64) / 1000000;
             }
             return C2Value();
         }));
@@ -711,7 +717,7 @@ void CCodecConfig::initializeStandardParams() {
 
     // convert to dBFS and add default
     add(ConfigMapper(KEY_AAC_DRC_TARGET_REFERENCE_LEVEL, C2_PARAMKEY_DRC_TARGET_REFERENCE_LEVEL, "value")
-        .limitTo(D::AUDIO & D::DECODER)
+        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
         .withMapper([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < 0) {
@@ -722,7 +728,7 @@ void CCodecConfig::initializeStandardParams() {
 
     // convert to 0-1 (%) and add default
     add(ConfigMapper(KEY_AAC_DRC_ATTENUATION_FACTOR, C2_PARAMKEY_DRC_ATTENUATION_FACTOR, "value")
-        .limitTo(D::AUDIO & D::DECODER)
+        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
         .withMapper([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < 0) {
@@ -733,7 +739,7 @@ void CCodecConfig::initializeStandardParams() {
 
     // convert to 0-1 (%) and add default
     add(ConfigMapper(KEY_AAC_DRC_BOOST_FACTOR, C2_PARAMKEY_DRC_BOOST_FACTOR, "value")
-        .limitTo(D::AUDIO & D::DECODER)
+        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
         .withMapper([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < 0) {
@@ -744,7 +750,7 @@ void CCodecConfig::initializeStandardParams() {
 
     // convert to compression type and add default
     add(ConfigMapper(KEY_AAC_DRC_HEAVY_COMPRESSION, C2_PARAMKEY_DRC_COMPRESSION_MODE, "value")
-        .limitTo(D::AUDIO & D::DECODER)
+        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
         .withMapper([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < 0) {
@@ -755,7 +761,7 @@ void CCodecConfig::initializeStandardParams() {
 
     // convert to dBFS and add default
     add(ConfigMapper(KEY_AAC_ENCODED_TARGET_LEVEL, C2_PARAMKEY_DRC_ENCODED_TARGET_LEVEL, "value")
-        .limitTo(D::AUDIO & D::DECODER)
+        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
         .withMapper([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < 0) {
@@ -766,7 +772,7 @@ void CCodecConfig::initializeStandardParams() {
 
     // convert to effect type (these map to SDK values) and add default
     add(ConfigMapper(KEY_AAC_DRC_EFFECT_TYPE, C2_PARAMKEY_DRC_EFFECT_TYPE, "value")
-        .limitTo(D::AUDIO & D::DECODER)
+        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
         .withMapper([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < -1 || value > 8) {
