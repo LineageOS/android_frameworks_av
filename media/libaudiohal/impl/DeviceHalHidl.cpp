@@ -322,6 +322,14 @@ status_t DeviceHalHidl::createAudioPatch(
         const struct audio_port_config *sinks,
         audio_patch_handle_t *patch) {
     if (mDevice == 0) return NO_INIT;
+    if (patch == nullptr) return BAD_VALUE;
+
+    if (*patch != AUDIO_PATCH_HANDLE_NONE) {
+        status_t status = releaseAudioPatch(*patch);
+        ALOGW_IF(status != NO_ERROR, "%s error %d releasing patch handle %d",
+            __func__, status, *patch);
+    }
+
     hidl_vec<AudioPortConfig> hidlSources, hidlSinks;
     HidlUtils::audioPortConfigsFromHal(num_sources, sources, &hidlSources);
     HidlUtils::audioPortConfigsFromHal(num_sinks, sinks, &hidlSinks);
