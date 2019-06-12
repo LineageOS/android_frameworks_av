@@ -60,6 +60,8 @@ Camera3Stream::Camera3Stream(int id,
     mUsage(0),
     mOldUsage(0),
     mOldMaxBuffers(0),
+    mOldFormat(-1),
+    mOldDataSpace(HAL_DATASPACE_UNKNOWN),
     mPrepared(false),
     mPrepareBlockRequest(true),
     mPreparedBufferIdx(0),
@@ -256,6 +258,8 @@ camera3_stream* Camera3Stream::startConfiguration() {
 
     mOldUsage = mUsage;
     mOldMaxBuffers = camera3_stream::max_buffers;
+    mOldFormat = camera3_stream::format;
+    mOldDataSpace = camera3_stream::data_space;
 
     res = getEndpointUsage(&mUsage);
     if (res != OK) {
@@ -330,7 +334,9 @@ status_t Camera3Stream::finishConfiguration(/*out*/bool* streamReconfigured) {
     // so. As documented in hardware/camera3.h:configure_streams().
     if (mState == STATE_IN_RECONFIG &&
             mOldUsage == mUsage &&
-            mOldMaxBuffers == camera3_stream::max_buffers && !mDataSpaceOverridden) {
+            mOldMaxBuffers == camera3_stream::max_buffers &&
+            mOldDataSpace == camera3_stream::data_space &&
+            mOldFormat == camera3_stream::format) {
         mState = STATE_CONFIGURED;
         return OK;
     }
