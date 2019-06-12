@@ -193,7 +193,8 @@ status_t AudioPolicyService::getOutputForAttr(audio_attributes_t *attr,
     if (!mPackageManager.allowPlaybackCapture(uid)) {
         attr->flags |= AUDIO_FLAG_NO_MEDIA_PROJECTION;
     }
-    if (!bypassInterruptionPolicyAllowed(pid, uid)) {
+    if (((attr->flags & (AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY|AUDIO_FLAG_BYPASS_MUTE)) != 0)
+            && !bypassInterruptionPolicyAllowed(pid, uid)) {
         attr->flags &= ~(AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY|AUDIO_FLAG_BYPASS_MUTE);
     }
     audio_output_flags_t originalFlags = flags;
@@ -1316,4 +1317,12 @@ status_t AudioPolicyService::getVolumeGroupFromAudioAttributes(const AudioAttrib
     Mutex::Autolock _l(mLock);
     return mAudioPolicyManager->getVolumeGroupFromAudioAttributes(aa, volumeGroup);
 }
+
+status_t AudioPolicyService::setRttEnabled(bool enabled)
+{
+    Mutex::Autolock _l(mLock);
+    mUidPolicy->setRttEnabled(enabled);
+    return NO_ERROR;
+}
+
 } // namespace android
