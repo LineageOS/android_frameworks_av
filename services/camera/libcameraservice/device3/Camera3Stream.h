@@ -540,8 +540,12 @@ class Camera3Stream :
     uint64_t mUsage;
 
   private:
+    // Previously configured stream properties (post HAL override)
     uint64_t mOldUsage;
     uint32_t mOldMaxBuffers;
+    int mOldFormat;
+    android_dataspace mOldDataSpace;
+
     Condition mOutputBufferReturnedSignal;
     Condition mInputBufferReturnedSignal;
     static const nsecs_t kWaitForBufferDuration = 3000000000LL; // 3000 ms
