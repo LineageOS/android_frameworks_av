@@ -1512,6 +1512,13 @@ status_t AudioSystem::getVolumeGroupFromAudioAttributes(const AudioAttributes &a
     return aps->getVolumeGroupFromAudioAttributes(aa, volumeGroup);
 }
 
+status_t AudioSystem::setRttEnabled(bool enabled)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->setRttEnabled(enabled);
+}
+
 // ---------------------------------------------------------------------------
 
 int AudioSystem::AudioPolicyServiceClient::addAudioPortCallback(

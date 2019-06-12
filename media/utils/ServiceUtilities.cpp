@@ -128,7 +128,7 @@ bool captureAudioOutputAllowed(pid_t pid, uid_t uid) {
     if (isAudioServerOrRootUid(uid)) return true;
     static const String16 sCaptureAudioOutput("android.permission.CAPTURE_AUDIO_OUTPUT");
     bool ok = PermissionCache::checkPermission(sCaptureAudioOutput, pid, uid);
-    if (!ok) ALOGE("Request requires android.permission.CAPTURE_AUDIO_OUTPUT");
+    if (!ok) ALOGV("Request requires android.permission.CAPTURE_AUDIO_OUTPUT");
     return ok;
 }
 
@@ -149,7 +149,7 @@ bool captureHotwordAllowed(const String16& opPackageName, pid_t pid, uid_t uid) 
         // IMPORTANT: Use PermissionCache - not a runtime permission and may not change.
         ok = PermissionCache::checkPermission(sCaptureHotwordAllowed, pid, uid);
     }
-    if (!ok) ALOGE("android.permission.CAPTURE_AUDIO_HOTWORD");
+    if (!ok) ALOGV("android.permission.CAPTURE_AUDIO_HOTWORD");
     return ok;
 }
 
