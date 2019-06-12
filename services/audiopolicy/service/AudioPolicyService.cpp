@@ -409,7 +409,7 @@ void AudioPolicyService::updateUidStates_l()
 //    following cases:
 //    Another client in the same UID has already been allowed to capture
 //    OR The client is the assistant
-//        AND an accessibility service is on TOP
+//        AND an accessibility service is on TOP or a RTT call is active
 //               AND the source is VOICE_RECOGNITION or HOTWORD
 //        OR uses VOICE_RECOGNITION AND is on TOP
 //               OR uses HOTWORD
@@ -436,6 +436,9 @@ void AudioPolicyService::updateUidStates_l()
     bool isAssistantOnTop = false;
     bool isSensitiveActive = false;
     bool isInCall = mPhoneState == AUDIO_MODE_IN_CALL;
+    bool rttCallActive =
+            (mPhoneState == AUDIO_MODE_IN_CALL || mPhoneState == AUDIO_MODE_IN_COMMUNICATION)
+            && mUidPolicy->isRttEnabled();
 
     // if Sensor Privacy is enabled then all recordings should be silenced.
     if (mSensorPrivacyPolicy->isSensorPrivacyEnabled()) {
@@ -518,13 +521,13 @@ void AudioPolicyService::updateUidStates_l()
             allowCapture = true;
         } else if (mUidPolicy->isAssistantUid(current->uid)) {
             // For assistant allow capture if:
-            //     An accessibility service is on TOP
+            //     An accessibility service is on TOP or a RTT call is active
             //            AND the source is VOICE_RECOGNITION or HOTWORD
             //     OR is on TOP AND uses VOICE_RECOGNITION
             //            OR uses HOTWORD
             //         AND there is no active privacy sensitive capture or call
             //             OR client has CAPTURE_AUDIO_OUTPUT privileged permission
-            if (isA11yOnTop) {
+            if (isA11yOnTop || rttCallActive) {
                 if (source == AUDIO_SOURCE_HOTWORD || source == AUDIO_SOURCE_VOICE_RECOGNITION) {
                     allowCapture = true;
                 }
