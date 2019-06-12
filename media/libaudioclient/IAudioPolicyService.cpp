@@ -104,6 +104,7 @@ enum {
     GET_VOLUME_GROUP_FOR_ATTRIBUTES,
     SET_ALLOWED_CAPTURE_POLICY,
     MOVE_EFFECTS_TO_IO,
+    SET_RTT_ENABLED
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -1271,6 +1272,18 @@ public:
         volumeGroup = static_cast<volume_group_t>(reply.readInt32());
         return NO_ERROR;
     }
+
+    virtual status_t setRttEnabled(bool enabled)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeInt32(static_cast<int32_t>(enabled));
+        status_t status = remote()->transact(SET_RTT_ENABLED, data, &reply);
+        if (status != NO_ERROR) {
+           return status;
+        }
+        return static_cast<status_t>(reply.readInt32());
+    }
 };
 
 IMPLEMENT_META_INTERFACE(AudioPolicyService, "android.media.IAudioPolicyService");
@@ -1332,7 +1345,8 @@ status_t BnAudioPolicyService::onTransact(
         case REMOVE_UID_DEVICE_AFFINITY:
         case GET_OFFLOAD_FORMATS_A2DP:
         case LIST_AUDIO_VOLUME_GROUPS:
-        case GET_VOLUME_GROUP_FOR_ATTRIBUTES: {
+        case GET_VOLUME_GROUP_FOR_ATTRIBUTES:
+        case SET_RTT_ENABLED: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
@@ -2343,6 +2357,14 @@ status_t BnAudioPolicyService::onTransact(
             uid_t uid = data.readInt32();
             audio_flags_mask_t flags = data.readInt32();
             status_t status = setAllowedCapturePolicy(uid, flags);
+            reply->writeInt32(status);
+            return NO_ERROR;
+        }
+
+        case SET_RTT_ENABLED: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            bool enabled = static_cast<bool>(data.readInt32());
+            status_t status = setRttEnabled(enabled);
             reply->writeInt32(status);
             return NO_ERROR;
         }
