@@ -256,6 +256,8 @@ public:
     virtual status_t getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
                                                        volume_group_t &volumeGroup);
 
+    virtual status_t setRttEnabled(bool enabled);
+
             status_t doStopOutput(audio_port_handle_t portId);
             void doReleaseOutput(audio_port_handle_t portId);
 
@@ -345,7 +347,8 @@ private:
     class UidPolicy : public BnUidObserver, public virtual IBinder::DeathRecipient {
     public:
         explicit UidPolicy(wp<AudioPolicyService> service)
-                : mService(service), mObserverRegistered(false), mAssistantUid(0) {}
+                : mService(service), mObserverRegistered(false),
+                  mAssistantUid(0), mRttEnabled(false) {}
 
         void registerSelf();
         void unregisterSelf();
@@ -360,6 +363,8 @@ private:
         void setA11yUids(const std::vector<uid_t>& uids) { mA11yUids.clear(); mA11yUids = uids; }
         bool isA11yUid(uid_t uid);
         bool isA11yOnTop();
+        void setRttEnabled(bool enabled) { mRttEnabled = enabled; }
+        bool isRttEnabled() { return mRttEnabled; }
 
         // BnUidObserver implementation
         void onUidActive(uid_t uid) override;
@@ -387,6 +392,7 @@ private:
         std::unordered_map<uid_t, std::pair<bool, int>> mCachedUids;
         uid_t mAssistantUid;
         std::vector<uid_t> mA11yUids;
+        bool mRttEnabled;
     };
 
     // If sensor privacy is enabled then all apps, including those that are active, should be
