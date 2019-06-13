@@ -394,6 +394,8 @@ public:
     static status_t getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
                                                       volume_group_t &volumeGroup);
 
+    static status_t setRttEnabled(bool enabled);
+
     // ----------------------------------------------------------------------------
 
     class AudioVolumeGroupCallback : public RefBase
