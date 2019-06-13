@@ -1,5 +1,5 @@
 cc_library_static {
-    name: "VtsMediaC2V1_0CommonUtil",
+    name: "VtsHalMediaC2V1_0CommonUtil",
     defaults: [
         "VtsHalTargetTestDefaults",
         "libcodec2-hidl-client-defaults",
@@ -17,14 +17,14 @@ cc_library_static {
 }
 
 cc_defaults {
-    name: "VtsMediaC2V1_0Defaults",
+    name: "VtsHalMediaC2V1_0Defaults",
     defaults: [
         "VtsHalTargetTestDefaults",
         "libcodec2-hidl-client-defaults",
     ],
 
     static_libs: [
-        "VtsMediaC2V1_0CommonUtil",
+        "VtsHalMediaC2V1_0CommonUtil",
     ],
 
     shared_libs: [
