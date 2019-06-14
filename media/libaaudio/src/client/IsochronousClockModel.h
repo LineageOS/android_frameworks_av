@@ -18,6 +18,7 @@
 #define ANDROID_AAUDIO_ISOCHRONOUS_CLOCK_MODEL_H
 
 #include <stdint.h>
+#include "utility/AudioClock.h"
 
 namespace aaudio {
 
@@ -79,12 +80,33 @@ public:
     int64_t convertPositionToTime(int64_t framePosition) const;
 
     /**
+     * Calculate the latest estimated time that the stream will be at that position.
+     * The more jittery the clock is then the later this will be.
+     *
+     * @param framePosition
+     * @return time in nanoseconds
+     */
+    int64_t convertPositionToLatestTime(int64_t framePosition) const;
+
+    /**
      * Calculate an estimated position where the stream will be at the specified time.
      *
      * @param nanoTime time of interest
      * @return position in frames
      */
     int64_t convertTimeToPosition(int64_t nanoTime) const;
+
+    /**
+     * Calculate the corresponding estimated position based on the specified time being
+     * the latest possible time.
+     *
+     * For the same nanoTime, this may return an earlier position than
+     * convertTimeToPosition().
+     *
+     * @param nanoTime
+     * @return position in frames
+     */
+    int64_t convertLatestTimeToPosition(int64_t nanoTime) const;
 
     /**
      * @param framesDelta difference in frames
@@ -101,6 +123,9 @@ public:
     void dump() const;
 
 private:
+
+    int32_t getLateTimeOffsetNanos() const;
+
     enum clock_model_state_t {
         STATE_STOPPED,
         STATE_STARTING,
@@ -108,12 +133,22 @@ private:
         STATE_RUNNING
     };
 
+    // Amount of time to drift forward when we get a late timestamp.
+    // This value was calculated to allow tracking of a clock with 50 ppm error.
+    static constexpr int32_t   kDriftNanos         =  10 * 1000;
+    // TODO review value of kExtraLatenessNanos
+    static constexpr int32_t   kExtraLatenessNanos = 100 * 1000;
+
     int64_t             mMarkerFramePosition;
     int64_t             mMarkerNanoTime;
     int32_t             mSampleRate;
     int32_t             mFramesPerBurst;
-    int32_t             mMaxLatenessInNanos;
+    int32_t             mBurstPeriodNanos;
+    // Includes mBurstPeriodNanos because we sample randomly over time.
+    int32_t             mMaxMeasuredLatenessNanos;
     clock_model_state_t mState;
+
+    int32_t             mTimestampCount = 0;
 
     void update();
 };
