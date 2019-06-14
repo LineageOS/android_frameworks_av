@@ -24,6 +24,7 @@ cc_binary {
         "libui",
         "libgui",
         "libbinder",
+        "libhidlbase",
         "libhidltransport",
         "android.hardware.camera.common@1.0",
         "android.hardware.camera.provider@2.4",
