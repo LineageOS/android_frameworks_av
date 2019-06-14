@@ -58,6 +58,7 @@ aaudio_result_t AudioStreamInternalPlay::open(const AudioStreamBuilder &builder)
     return result;
 }
 
+// This must be called under mStreamLock.
 aaudio_result_t AudioStreamInternalPlay::requestPause()
 {
     aaudio_result_t result = stopCallback();
