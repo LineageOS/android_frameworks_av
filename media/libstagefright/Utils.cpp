@@ -227,6 +227,66 @@ static void parseAvcProfileLevelFromAvcc(const uint8_t *ptr, size_t size, sp<AMe
     }
 }
 
+static void parseDolbyVisionProfileLevelFromDvcc(const uint8_t *ptr, size_t size, sp<AMessage> &format) {
+    // dv_major_version == 1, dv_minor_version == 0
+    if (size < 4 || ptr[0] != 1 || ptr[1] != 0) {
+        return;
+    }
+
+    const uint8_t profile = ptr[2] >> 1;
+    const uint8_t level = ((ptr[2] & 0x1) << 5) | ((ptr[3] >> 3) & 0x1f);
+    const uint8_t rpu_present_flag = (ptr[3] >> 2) & 0x01;
+    const uint8_t el_present_flag = (ptr[3] >> 1) & 0x01;
+    const uint8_t bl_present_flag = (ptr[3] & 0x01);
+    const int32_t bl_compatibility_id = (int32_t)(ptr[4] >> 4);
+
+    ALOGV("profile-level-compatibility value in dv(c|v)c box %d-%d-%d",
+          profile, level, bl_compatibility_id);
+
+    // All Dolby Profiles will have profile and level info in MediaFormat
+    // Profile 8 and 9 will have bl_compatibility_id too.
+    const static ALookup<uint8_t, OMX_VIDEO_DOLBYVISIONPROFILETYPE> profiles{
+        {1, OMX_VIDEO_DolbyVisionProfileDvavPen},
+        {3, OMX_VIDEO_DolbyVisionProfileDvheDen},
+        {4, OMX_VIDEO_DolbyVisionProfileDvheDtr},
+        {5, OMX_VIDEO_DolbyVisionProfileDvheStn},
+        {6, OMX_VIDEO_DolbyVisionProfileDvheDth},
+        {7, OMX_VIDEO_DolbyVisionProfileDvheDtb},
+        {8, OMX_VIDEO_DolbyVisionProfileDvheSt},
+        {9, OMX_VIDEO_DolbyVisionProfileDvavSe},
+    };
+
+    const static ALookup<uint8_t, OMX_VIDEO_DOLBYVISIONLEVELTYPE> levels{
+        {0, OMX_VIDEO_DolbyVisionLevelUnknown},
+        {1, OMX_VIDEO_DolbyVisionLevelHd24},
+        {2, OMX_VIDEO_DolbyVisionLevelHd30},
+        {3, OMX_VIDEO_DolbyVisionLevelFhd24},
+        {4, OMX_VIDEO_DolbyVisionLevelFhd30},
+        {5, OMX_VIDEO_DolbyVisionLevelFhd60},
+        {6, OMX_VIDEO_DolbyVisionLevelUhd24},
+        {7, OMX_VIDEO_DolbyVisionLevelUhd30},
+        {8, OMX_VIDEO_DolbyVisionLevelUhd48},
+        {9, OMX_VIDEO_DolbyVisionLevelUhd60},
+    };
+    // set rpuAssoc
+    if (rpu_present_flag && el_present_flag && !bl_present_flag) {
+        format->setInt32("rpuAssoc", 1);
+    }
+    // set profile & level if they are recognized
+    OMX_VIDEO_DOLBYVISIONPROFILETYPE codecProfile;
+    OMX_VIDEO_DOLBYVISIONLEVELTYPE codecLevel;
+    if (profiles.map(profile, &codecProfile)) {
+        format->setInt32("profile", codecProfile);
+        if (codecProfile == OMX_VIDEO_DolbyVisionProfileDvheSt ||
+            codecProfile == OMX_VIDEO_DolbyVisionProfileDvavSe) {
+            format->setInt32("bl_compatibility_id", bl_compatibility_id);
+        }
+        if (levels.map(level, &codecLevel)) {
+            format->setInt32("level", codecLevel);
+        }
+    }
+}
+
 static void parseH263ProfileLevelFromD263(const uint8_t *ptr, size_t size, sp<AMessage> &format) {
     if (size < 7) {
         return;
@@ -1411,6 +1471,12 @@ status_t convertMetaDataToMessage(
         msg->setBuffer("csd-0", buffer);
     }
 
+    if (meta->findData(kKeyDVCC, &type, &data, &size)) {
+        const uint8_t *ptr = (const uint8_t *)data;
+        ALOGV("DV: calling parseDolbyVisionProfileLevelFromDvcc with data size %zu", size);
+        parseDolbyVisionProfileLevelFromDvcc(ptr, size, msg);
+    }
+
     *format = msg;
 
     return OK;
@@ -1839,6 +1905,30 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             meta->setData(kKeyHVCC, kTypeHVCC, hvcc.data(), outsize);
         } else if (mime == MEDIA_MIMETYPE_VIDEO_AV1) {
             meta->setData(kKeyAV1C, 0, csd0->data(), csd0->size());
+        } else if (mime == MEDIA_MIMETYPE_VIDEO_DOLBY_VISION) {
+            if (msg->findBuffer("csd-2", &csd2)) {
+                meta->setData(kKeyDVCC, kTypeDVCC, csd2->data(), csd2->size());
+
+                size_t dvcc_size = 1024;
+                uint8_t dvcc[dvcc_size];
+                memcpy(dvcc, csd2->data(), dvcc_size);
+                const uint8_t profile = dvcc[2] >> 1;
+
+                if (profile > 1 && profile < 9) {
+                    std::vector<uint8_t> hvcc(csd0size + 1024);
+                    size_t outsize = reassembleHVCC(csd0, hvcc.data(), hvcc.size(), 4);
+                    meta->setData(kKeyHVCC, kTypeHVCC, hvcc.data(), outsize);
+                } else {
+                    sp<ABuffer> csd1;
+                    if (msg->findBuffer("csd-1", &csd1)) {
+                        std::vector<char> avcc(csd0size + csd1->size() + 1024);
+                        size_t outsize = reassembleAVCC(csd0, csd1, avcc.data());
+                        meta->setData(kKeyAVCC, kTypeAVCC, avcc.data(), outsize);
+                    }
+                }
+            } else {
+                ALOGW("We need csd-2!!. %s", msg->debugString().c_str());
+            }
         } else if (mime == MEDIA_MIMETYPE_VIDEO_VP9) {
             meta->setData(kKeyVp9CodecPrivate, 0, csd0->data(), csd0->size());
         } else if (mime == MEDIA_MIMETYPE_AUDIO_OPUS) {
@@ -1885,8 +1975,18 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
         meta->setData(kKeyStreamHeader, 'mdat', csd0->data(), csd0->size());
     } else if (msg->findBuffer("d263", &csd0)) {
         meta->setData(kKeyD263, kTypeD263, csd0->data(), csd0->size());
-    }
+    } else if (mime == MEDIA_MIMETYPE_VIDEO_DOLBY_VISION && msg->findBuffer("csd-2", &csd2)) {
+        meta->setData(kKeyDVCC, kTypeDVCC, csd2->data(), csd2->size());
 
+        // Remove CSD-2 from the data here to avoid duplicate data in meta
+        meta->remove(kKeyOpaqueCSD2);
+
+        if (msg->findBuffer("csd-avc", &csd0)) {
+            meta->setData(kKeyAVCC, kTypeAVCC, csd0->data(), csd0->size());
+        } else if (msg->findBuffer("csd-hevc", &csd0)) {
+            meta->setData(kKeyHVCC, kTypeHVCC, csd0->data(), csd0->size());
+        }
+    }
     // XXX TODO add whatever other keys there are
 
 #if 0

@@ -2213,8 +2213,10 @@ void MPEG4Writer::Track::getCodecSpecificDataFromInputFormatIfPossible() {
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC) ||
                !strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC)) {
         mMeta->findData(kKeyHVCC, &type, &data, &size);
-    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_MPEG4)
-            || !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC)) {
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_DOLBY_VISION)) {
+        mMeta->findData(kKeyDVCC, &type, &data, &size);
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_MPEG4) ||
+               !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC)) {
         if (mMeta->findData(kKeyESDS, &type, &data, &size)) {
             ESDS esds(data, size);
             if (esds.getCodecSpecificInfo(&data, &size) == OK &&
