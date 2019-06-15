@@ -198,6 +198,18 @@ cc_test {
 }
 
 cc_test {
+    name: "test_stop_hang",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_stop_hang.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
     name: "test_full_queue",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_full_queue.cpp"],
