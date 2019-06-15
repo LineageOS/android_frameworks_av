@@ -211,6 +211,7 @@ aaudio_result_t AudioStream::systemStopFromApp() {
     return result;
 }
 
+// This must be called under mStreamLock.
 aaudio_result_t AudioStream::safeStop() {
 
     switch (getState()) {
@@ -247,6 +248,7 @@ aaudio_result_t AudioStream::safeStop() {
 }
 
 aaudio_result_t AudioStream::safeClose() {
+    // This get temporarily unlocked in the close when joining callback threads.
     std::lock_guard<std::mutex> lock(mStreamLock);
     if (collidesWithCallback()) {
         ALOGE("%s cannot be called from a callback!", __func__);
@@ -363,6 +365,7 @@ aaudio_result_t AudioStream::createThread(int64_t periodNanoseconds,
     }
 }
 
+// This must be called under mStreamLock.
 aaudio_result_t AudioStream::joinThread(void** returnArg, int64_t timeoutNanoseconds __unused)
 {
     if (!mHasThread) {
@@ -374,6 +377,8 @@ aaudio_result_t AudioStream::joinThread(void** returnArg, int64_t timeoutNanosec
     // then we don't need to join(). The thread is already about to exit.
     if (pthread_self() != mThread) {
         // Called from an app thread. Not the callback.
+        // Unlock because the callback may be trying to stop the stream but is blocked.
+        mStreamLock.unlock();
 #if 0
         // TODO implement equivalent of pthread_timedjoin_np()
         struct timespec abstime;
@@ -381,6 +386,7 @@ aaudio_result_t AudioStream::joinThread(void** returnArg, int64_t timeoutNanosec
 #else
         int err = pthread_join(mThread, returnArg);
 #endif
+        mStreamLock.lock();
         if (err) {
             ALOGE("%s() pthread_join() returns err = %d", __func__, err);
             result = AAudioConvert_androidToAAudioResult(-err);
