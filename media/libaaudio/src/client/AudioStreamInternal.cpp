@@ -241,22 +241,18 @@ error:
     return result;
 }
 
+// This must be called under mStreamLock.
 aaudio_result_t AudioStreamInternal::close() {
     aaudio_result_t result = AAUDIO_OK;
     ALOGV("%s(): mServiceStreamHandle = 0x%08X", __func__, mServiceStreamHandle);
     if (mServiceStreamHandle != AAUDIO_HANDLE_INVALID) {
         // Don't close a stream while it is running.
         aaudio_stream_state_t currentState = getState();
-        if (isActive()) {
+        // Don't close a stream while it is running. Stop it first.
+        // If DISCONNECTED then we should still try to stop in case the
+        // error callback is still running.
+        if (isActive() || currentState == AAUDIO_STREAM_STATE_DISCONNECTED) {
             requestStop();
-            aaudio_stream_state_t nextState;
-            int64_t timeoutNanoseconds = MIN_TIMEOUT_NANOS;
-            result = waitForStateChange(currentState, &nextState,
-                                                       timeoutNanoseconds);
-            if (result != AAUDIO_OK) {
-                ALOGW("%s() waitForStateChange() returned %d %s",
-                __func__, result, AAudio_convertResultToText(result));
-            }
         }
         setState(AAUDIO_STREAM_STATE_CLOSING);
         aaudio_handle_t serviceStreamHandle = mServiceStreamHandle;
@@ -357,20 +353,30 @@ int64_t AudioStreamInternal::calculateReasonableTimeout() {
     return calculateReasonableTimeout(getFramesPerBurst());
 }
 
+// This must be called under mStreamLock.
 aaudio_result_t AudioStreamInternal::stopCallback()
 {
-    if (isDataCallbackActive()) {
+    if (isDataCallbackSet()
+            && (isActive() || getState() == AAUDIO_STREAM_STATE_DISCONNECTED)) {
         mCallbackEnabled.store(false);
-        return joinThread(NULL);
+        return joinThread(NULL); // may temporarily unlock mStreamLock
     } else {
         return AAUDIO_OK;
     }
 }
 
+// This must be called under mStreamLock.
 aaudio_result_t AudioStreamInternal::requestStop() {
     aaudio_result_t result = stopCallback();
     if (result != AAUDIO_OK) {
         return result;
+    }
+    // The stream may have been unlocked temporarily to let a callback finish
+    // and the callback may have stopped the stream.
+    // Check to make sure the stream still needs to be stopped.
+    // See also AudioStream::safeStop().
+    if (!(isActive() || getState() == AAUDIO_STREAM_STATE_DISCONNECTED)) {
+        return AAUDIO_OK;
     }
 
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
@@ -728,6 +734,7 @@ int32_t AudioStreamInternal::getFramesPerBurst() const {
     return mFramesPerBurst;
 }
 
+// This must be called under mStreamLock.
 aaudio_result_t AudioStreamInternal::joinThread(void** returnArg) {
     return AudioStream::joinThread(returnArg, calculateReasonableTimeout(getFramesPerBurst()));
 }
