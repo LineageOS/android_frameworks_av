@@ -12,6 +12,7 @@ LOCAL_SHARED_LIBRARIES := \
 	libbinder \
 	libcutils \
 	liblog \
+	libhidlbase \
 	libhidltransport \
 	libhwbinder \
 	libmedia \

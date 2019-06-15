@@ -9,6 +9,7 @@ cc_binary {
     shared_libs: [
         "libavservices_minijail",
         "libbase",
+        "libhidlbase",
         "libhidltransport",
         "libhwbinder",
         "liblog",
