@@ -194,7 +194,8 @@ void addSupportedColorFormats(
     // TODO: get this from intf() as well, but how do we map them to
     // MediaCodec color formats?
     bool encoder = trait.kind == C2Component::KIND_ENCODER;
-    if (mediaType.find("video") != std::string::npos) {
+    if (mediaType.find("video") != std::string::npos
+            || mediaType.find("image") != std::string::npos) {
         // vendor video codecs prefer opaque format
         if (trait.name.find("android") == std::string::npos) {
             caps->addColorFormat(COLOR_FormatSurface);
