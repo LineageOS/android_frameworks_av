@@ -31,6 +31,7 @@
 #include <OMX_Index.h>
 #include <OMX_IndexExt.h>
 
+#include <android/fdsan.h>
 #include <media/stagefright/omx/OMXUtils.h>
 #include <media/stagefright/MediaErrors.h>
 #include <ui/Fence.h>
@@ -52,10 +53,12 @@ public:
 C2OMXNode::C2OMXNode(const std::shared_ptr<Codec2Client::Component> &comp)
     : mComp(comp), mFrameIndex(0), mWidth(0), mHeight(0), mUsage(0),
       mAdjustTimestampGapUs(0), mFirstInputFrame(true) {
+    android_fdsan_set_error_level(ANDROID_FDSAN_ERROR_LEVEL_WARN_ALWAYS);
 }
 
 status_t C2OMXNode::freeNode() {
     mComp.reset();
+    android_fdsan_set_error_level(ANDROID_FDSAN_ERROR_LEVEL_WARN_ONCE);
     return OK;
 }
 
@@ -227,6 +230,7 @@ status_t C2OMXNode::emptyBuffer(
             ? C2FrameData::FLAG_END_OF_STREAM : 0;
     std::shared_ptr<C2GraphicBlock> block;
 
+    android::base::unique_fd fd0, fd1;
     C2Handle *handle = nullptr;
     if (omxBuf.mBufferType == OMXBuffer::kBufferTypeANWBuffer
             && omxBuf.mGraphicBuffer != nullptr) {
@@ -238,8 +242,19 @@ status_t C2OMXNode::emptyBuffer(
                 omxBuf.mGraphicBuffer->format,
                 omxBuf.mGraphicBuffer->usage,
                 omxBuf.mGraphicBuffer->stride);
+        if (handle != nullptr) {
+            // unique_fd takes ownership of the fds, we'll get warning if these
+            // fds get closed by somebody else. Onwership will be released before
+            // we return, so that the fds get closed as usually when this function
+            // goes out of scope (when both items and block are gone).
+            native_handle_t *nativeHandle = reinterpret_cast<native_handle_t*>(handle);
+            fd0.reset(nativeHandle->numFds > 0 ? nativeHandle->data[0] : -1);
+            fd1.reset(nativeHandle->numFds > 1 ? nativeHandle->data[1] : -1);
+        }
         c2_status_t err = mAllocator->priorGraphicAllocation(handle, &alloc);
         if (err != OK) {
+            (void)fd0.release();
+            (void)fd1.release();
             return UNKNOWN_ERROR;
         }
         block = _C2BlockFactory::CreateGraphicBlock(alloc);
@@ -290,10 +305,17 @@ status_t C2OMXNode::emptyBuffer(
 
     c2_status_t err = comp->queue(&items);
     if (err != C2_OK) {
+        (void)fd0.release();
+        (void)fd1.release();
         return UNKNOWN_ERROR;
     }
 
     mBufferIdsInUse.lock()->emplace(index, buffer);
+
+    // release ownership of the fds
+    (void)fd0.release();
+    (void)fd1.release();
+
     return OK;
 }
 
