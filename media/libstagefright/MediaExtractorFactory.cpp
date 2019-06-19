@@ -227,10 +227,9 @@ void MediaExtractorFactory::RegisterExtractorsInApk(
         ret = StartIteration(zipHandle, &cookie, prefix8.c_str(), "extractor.so");
         if (ret == 0) {
             ZipEntry entry;
-            ZipString name;
+            std::string_view name;
             while (Next(cookie, &entry, &name) == 0) {
-                String8 libPath = String8(apkPath) + "!/" +
-                    String8(reinterpret_cast<const char*>(name.name), name.name_length);
+                String8 libPath = String8(apkPath) + "!/" + String8(name.data(), name.size());
                 // TODO: Open with a linker namespace so that it can be linked with sub-libraries
                 // within the apk instead of system libraries already loaded.
                 void *libHandle = dlopen(libPath.string(), RTLD_NOW | RTLD_LOCAL);
