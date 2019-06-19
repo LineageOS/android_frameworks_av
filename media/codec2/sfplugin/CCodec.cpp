@@ -1651,7 +1651,7 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatAllocate: {
             // C2ComponentStore::createComponent() should return within 100ms.
-            setDeadline(now, 150ms, "allocate");
+            setDeadline(now, 1500ms, "allocate");
             sp<RefBase> obj;
             CHECK(msg->findObject("codecInfo", &obj));
             allocate((MediaCodecInfo *)obj.get());
@@ -1659,7 +1659,7 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
         }
         case kWhatConfigure: {
             // C2Component::commit_sm() should return within 5ms.
-            setDeadline(now, 250ms, "configure");
+            setDeadline(now, 1500ms, "configure");
             sp<AMessage> format;
             CHECK(msg->findMessage("format", &format));
             configure(format);
@@ -1667,31 +1667,31 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
         }
         case kWhatStart: {
             // C2Component::start() should return within 500ms.
-            setDeadline(now, 550ms, "start");
+            setDeadline(now, 1500ms, "start");
             start();
             break;
         }
         case kWhatStop: {
             // C2Component::stop() should return within 500ms.
-            setDeadline(now, 550ms, "stop");
+            setDeadline(now, 1500ms, "stop");
             stop();
             break;
         }
         case kWhatFlush: {
             // C2Component::flush_sm() should return within 5ms.
-            setDeadline(now, 50ms, "flush");
+            setDeadline(now, 1500ms, "flush");
             flush();
             break;
         }
         case kWhatCreateInputSurface: {
             // Surface operations may be briefly blocking.
-            setDeadline(now, 100ms, "createInputSurface");
+            setDeadline(now, 1500ms, "createInputSurface");
             createInputSurface();
             break;
         }
         case kWhatSetInputSurface: {
             // Surface operations may be briefly blocking.
-            setDeadline(now, 100ms, "setInputSurface");
+            setDeadline(now, 1500ms, "setInputSurface");
             sp<RefBase> obj;
             CHECK(msg->findObject("surface", &obj));
             sp<PersistentSurface> surface(static_cast<PersistentSurface *>(obj.get()));
