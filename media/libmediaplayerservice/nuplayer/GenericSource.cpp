@@ -404,8 +404,8 @@ void NuPlayer::GenericSource::onPrepareAsync() {
             sp<DataSource> dataSource = DataSourceFactory::CreateFromURI(
                    mHTTPService, uri, &mUriHeaders, &contentType,
                    static_cast<HTTPBase *>(mHttpSource.get()));
-            mLock.lock();
             mDisconnectLock.lock();
+            mLock.lock();
             if (!mDisconnected) {
                 mDataSource = dataSource;
             }
