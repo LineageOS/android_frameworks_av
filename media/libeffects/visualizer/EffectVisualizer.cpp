@@ -388,7 +388,7 @@ int Visualizer_process(
             maxSample = fmax(maxSample, fabs(smp));
         }
         if (maxSample > 0.f) {
-            fscale = 127.f / maxSample;
+            fscale = 0.99f / maxSample;
             int exp; // unused
             const float significand = frexp(fscale, &exp);
             if (significand == 0.5f) {

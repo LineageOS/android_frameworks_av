@@ -1126,10 +1126,17 @@ typedef enum acamera_metadata_tag {
      * </ul>
      * <p>For devices at the LIMITED level or above:</p>
      * <ul>
-     * <li>For YUV_420_888 burst capture use case, this list will always include (<code>min</code>, <code>max</code>)
-     * and (<code>max</code>, <code>max</code>) where <code>min</code> &lt;= 15 and <code>max</code> = the maximum output frame rate of the
+     * <li>For devices that advertise NIR color filter arrangement in
+     * ACAMERA_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT, this list will always include
+     * (<code>max</code>, <code>max</code>) where <code>max</code> = the maximum output frame rate of the maximum YUV_420_888
+     * output size.</li>
+     * <li>For devices advertising any color filter arrangement other than NIR, or devices not
+     * advertising color filter arrangement, this list will always include (<code>min</code>, <code>max</code>) and
+     * (<code>max</code>, <code>max</code>) where <code>min</code> &lt;= 15 and <code>max</code> = the maximum output frame rate of the
      * maximum YUV_420_888 output size.</li>
      * </ul>
+     *
+     * @see ACAMERA_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT
      */
     ACAMERA_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES =            // int32[2*n]
             ACAMERA_CONTROL_START + 20,
@@ -8330,7 +8337,7 @@ typedef enum acamera_metadata_enum_acamera_info_supported_hardware_level {
      * fire the flash for flash power metering during precapture, and then fire the flash
      * for the final capture, if a flash is available on the device and the AE mode is set to
      * enable the flash.</p>
-     * <p>Devices that initially shipped with Android version <a href="https://developer.android.com/reference/android/os/Build.VERSION_CODES.html#Q">Q</a> or newer will not include any LEGACY-level devices.</p>
+     * <p>Devices that initially shipped with Android version <a href="https://developer.android.com/reference/android/os/Build/VERSION_CODES.html#Q">Q</a> or newer will not include any LEGACY-level devices.</p>
      *
      * @see ACAMERA_CONTROL_AE_PRECAPTURE_TRIGGER
      * @see ACAMERA_REQUEST_AVAILABLE_CAPABILITIES
