@@ -201,6 +201,22 @@ public:
         return res;
     }
 
+    static bool MigrateNativeHandle(
+            native_handle_t *handle,
+            uint32_t generation, uint64_t igbp_id, uint32_t igbp_slot) {
+        if (handle == nullptr || !isValid(handle)) {
+            return false;
+        }
+        ExtraData *ed = getExtraData(handle);
+        if (!ed) return false;
+        ed->generation = generation;
+        ed->igbp_id_lo = uint32_t(igbp_id & 0xFFFFFFFF);
+        ed->igbp_id_hi = uint32_t(igbp_id >> 32);
+        ed->igbp_slot = igbp_slot;
+        return true;
+    }
+
+
     static native_handle_t* UnwrapNativeHandle(
             const C2Handle *const handle) {
         const ExtraData *xd = getExtraData(handle);
@@ -269,6 +285,13 @@ C2Handle *WrapNativeCodec2GrallocHandle(
     return C2HandleGralloc::WrapNativeHandle(handle, width, height, format, usage, stride,
                                              generation, igbp_id, igbp_slot);
 }
+
+bool MigrateNativeCodec2GrallocHandle(
+        native_handle_t *handle,
+        uint32_t generation, uint64_t igbp_id, uint32_t igbp_slot) {
+    return C2HandleGralloc::MigrateNativeHandle(handle, generation, igbp_id, igbp_slot);
+}
+
 
 class C2AllocationGralloc : public C2GraphicAllocation {
 public:
