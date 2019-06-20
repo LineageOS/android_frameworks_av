@@ -299,26 +299,46 @@ c2_status_t toC2Status(::android::hardware::media::bufferpool::V2_0::
 // BufferQueue-Based Block Operations
 // ==================================
 
-// Disassociate the given block with its designated bufferqueue so that
-// cancelBuffer() will not be called when the block is destroyed. If the block
-// does not have a designated bufferqueue, the function returns false.
-// Otherwise, it returns true.
+// Call before transferring block to other processes.
 //
-// Note: This function should be called after attachBuffer() or queueBuffer() is
-// called manually.
-bool yieldBufferQueueBlock(const C2ConstGraphicBlock& block);
+// The given block is ready to transfer to other processes. This will guarantee
+// the given block data is not mutated by bufferqueue migration.
+bool beginTransferBufferQueueBlock(const C2ConstGraphicBlock& block);
 
-// Call yieldBufferQueueBlock() on blocks in the given workList. processInput
-// determines whether input blocks are yielded. processOutput works similarly on
-// output blocks. (The default value of processInput is false while the default
-// value of processOutput is true. This implies that in most cases, only output
-// buffers contain bufferqueue-based blocks.)
+// Call beginTransferBufferQueueBlock() on blocks in the given workList.
+// processInput determines whether input blocks are yielded. processOutput
+// works similarly on output blocks. (The default value of processInput is
+// false while the default value of processOutput is true. This implies that in
+// most cases, only output buffers contain bufferqueue-based blocks.)
+void beginTransferBufferQueueBlocks(
+        const std::list<std::unique_ptr<C2Work>>& workList,
+        bool processInput = false,
+        bool processOutput = true);
+
+// Call after transferring block is finished and make sure that
+// beginTransferBufferQueueBlock() is called before.
 //
-// Note: This function should be called after WorkBundle has been successfully
-// sent over the Treble boundary to another process.
-void yieldBufferQueueBlocks(const std::list<std::unique_ptr<C2Work>>& workList,
-                            bool processInput = false,
-                            bool processOutput = true);
+// The transfer of given block is finished. If transfer is successful the given
+// block is not owned by process anymore. Since transfer is finished the given
+// block data is OK to mutate by bufferqueue migration after this call.
+bool endTransferBufferQueueBlock(const C2ConstGraphicBlock& block,
+                                 bool transfer);
+
+// Call endTransferBufferQueueBlock() on blocks in the given workList.
+// processInput determines whether input blocks are yielded. processOutput
+// works similarly on output blocks. (The default value of processInput is
+// false while the default value of processOutput is true. This implies that in
+// most cases, only output buffers contain bufferqueue-based blocks.)
+void endTransferBufferQueueBlocks(
+        const std::list<std::unique_ptr<C2Work>>& workList,
+        bool transfer,
+        bool processInput = false,
+        bool processOutput = true);
+
+// The given block is ready to be rendered. the given block is not owned by
+// process anymore. If migration is in progress, this returns false in order
+// not to render.
+bool displayBufferQueueBlock(const C2ConstGraphicBlock& block);
 
 }  // namespace utils
 }  // namespace V1_0
