@@ -27,6 +27,7 @@
 #include <sys/types.h>
 #include <inttypes.h>
 #include <pthread.h>
+#include <string>
 
 #include <android/hardware/ICamera.h>
 #include <android/hardware/ICameraClient.h>
@@ -70,6 +71,8 @@
 #include "utils/CameraTraces.h"
 #include "utils/TagMonitor.h"
 
+#include <vendor/lineage/camera/motor/1.0/ICameraMotor.h>
+
 namespace {
     const char* kPermissionServiceName = "permission";
 }; // namespace anonymous
@@ -83,6 +86,7 @@ using hardware::ICameraServiceProxy;
 using hardware::ICameraServiceListener;
 using hardware::camera::common::V1_0::CameraDeviceStatus;
 using hardware::camera::common::V1_0::TorchModeStatus;
+using vendor::lineage::camera::motor::V1_0::ICameraMotor;
 
 // ----------------------------------------------------------------------------
 // Logging support -- this is for debugging only
@@ -1291,6 +1295,11 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         int api1CameraId, int halVersion, const String16& clientPackageName, int clientUid,
         int clientPid, apiLevel effectiveApiLevel, bool legacyMode, bool shimUpdateOnly,
         /*out*/sp<CLIENT>& device) {
+    sp<ICameraMotor> cameraMotor = ICameraMotor::getService();
+    if (cameraMotor != nullptr) {
+        cameraMotor->onConnect(std::stoi(cameraId.string()));
+    }
+
     binder::Status ret = binder::Status::ok();
 
     String8 clientName8(clientPackageName);
@@ -2176,6 +2185,11 @@ CameraService::BasicClient::~BasicClient() {
 }
 
 binder::Status CameraService::BasicClient::disconnect() {
+    sp<ICameraMotor> cameraMotor = ICameraMotor::getService();
+    if (cameraMotor != nullptr) {
+        cameraMotor->onDisconnect(std::stoi(mCameraIdStr.string()));
+    }
+
     binder::Status res = Status::ok();
     if (mDisconnected) {
         return res;
