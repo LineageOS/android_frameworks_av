@@ -369,10 +369,8 @@ protected:
     ::android::hardware::media::c2::V1_0::utils::DefaultBufferPoolSender
             mBufferPoolSender;
 
-    std::mutex mOutputBufferQueueMutex;
-    sp<IGraphicBufferProducer> mOutputIgbp;
-    uint64_t mOutputBqId;
-    uint32_t mOutputGeneration;
+    ::android::hardware::media::c2::V1_0::utils::OutputBufferQueue
+            mOutputBufferQueue;
 
     static c2_status_t setDeathListener(
             const std::shared_ptr<Component>& component,

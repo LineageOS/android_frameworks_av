@@ -28,62 +28,42 @@ namespace c2 {
 namespace V1_0 {
 namespace utils {
 
-
 // BufferQueue-Based Block Operations
 // ==================================
 
-// Create a GraphicBuffer object from a graphic block and attach it to an
-// IGraphicBufferProducer.
-status_t attachToBufferQueue(const C2ConstGraphicBlock& block,
-                             const sp<IGraphicBufferProducer>& igbp,
-                             uint32_t generation,
-                             int32_t* bqSlot);
+// Manage BufferQueue and graphic blocks for both component and codec.
+// Manage graphic blocks ownership consistently during surface change.
+struct OutputBufferQueue {
 
-// Return false if block does not come from a bufferqueue-based blockpool.
-// Otherwise, extract generation, bqId and bqSlot and return true.
-bool getBufferQueueAssignment(const C2ConstGraphicBlock& block,
-                              uint32_t* generation,
-                              uint64_t* bqId,
-                              int32_t* bqSlot);
+    OutputBufferQueue();
 
-// Assign the given block to a bufferqueue so that when the block is destroyed,
-// cancelBuffer() will be called.
-//
-// If the block does not come from a bufferqueue-based blockpool, this function
-// returns false.
-//
-// If the block already has a bufferqueue assignment that matches the given one,
-// the function returns true.
-//
-// If the block already has a bufferqueue assignment that does not match the
-// given one, the block will be reassigned to the given bufferqueue. This
-// will call attachBuffer() on the given igbp. The function then returns true on
-// success or false on any failure during the operation.
-//
-// Note: This function should be called after detachBuffer() or dequeueBuffer()
-// is called manually.
-bool holdBufferQueueBlock(const C2ConstGraphicBlock& block,
-                          const sp<IGraphicBufferProducer>& igbp,
-                          uint64_t bqId,
-                          uint32_t generation);
+    ~OutputBufferQueue();
 
-// Call holdBufferQueueBlock() on input or output blocks in the given workList.
-// Since the bufferqueue assignment for input and output buffers can be
-// different, this function takes forInput to determine whether the given
-// bufferqueue is for input buffers or output buffers. (The default value of
-// forInput is false.)
-//
-// In the (rare) case that both input and output buffers are bufferqueue-based,
-// this function must be called twice, once for the input buffers and once for
-// the output buffers.
-//
-// Note: This function should be called after WorkBundle has been received from
-// another process.
-void holdBufferQueueBlocks(const std::list<std::unique_ptr<C2Work>>& workList,
-                           const sp<IGraphicBufferProducer>& igbp,
-                           uint64_t bqId,
-                           uint32_t generation,
-                           bool forInput = false);
+    // Configure a new surface to render graphic blocks.
+    // Graphic blocks from older surface will be migrated to new surface.
+    bool configure(const sp<IGraphicBufferProducer>& igbp,
+                   uint32_t generation,
+                   uint64_t bqId);
+
+    // Render a graphic block to current surface.
+    status_t outputBuffer(
+            const C2ConstGraphicBlock& block,
+            const BnGraphicBufferProducer::QueueBufferInput& input,
+            BnGraphicBufferProducer::QueueBufferOutput* output);
+
+    // Call holdBufferQueueBlock() on output blocks in the given workList.
+    // The OutputBufferQueue will take the ownership of output blocks.
+    //
+    // Note: This function should be called after WorkBundle has been received
+    // from another process.
+    void holdBufferQueueBlocks(
+            const std::list<std::unique_ptr<C2Work>>& workList);
+
+private:
+
+    class Impl;
+    std::unique_ptr<Impl> mImpl;
+};
 
 }  // namespace utils
 }  // namespace V1_0
