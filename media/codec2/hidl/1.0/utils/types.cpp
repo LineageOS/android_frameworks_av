@@ -737,7 +737,15 @@ bool addBaseBlock(
                     bufferPoolSender, baseBlocks, baseBlockIndices);
         }
     case _C2BlockPoolData::TYPE_BUFFERQUEUE:
-        // Do the same thing as a NATIVE block.
+        uint32_t gen;
+        uint64_t bqId;
+        int32_t bqSlot;
+        // Update handle if migration happened.
+        if (_C2BlockFactory::GetBufferQueueData(
+                blockPoolData, &gen, &bqId, &bqSlot)) {
+            android::MigrateNativeCodec2GrallocHandle(
+                    const_cast<native_handle_t*>(handle), gen, bqId, bqSlot);
+        }
         return _addBaseBlock(
                 index, handle,
                 baseBlocks, baseBlockIndices);
@@ -1772,20 +1780,53 @@ void forEachBlock(const std::list<std::unique_ptr<C2Work>>& workList,
 
 } // unnamed namespace
 
-bool yieldBufferQueueBlock(const C2ConstGraphicBlock& block) {
+bool beginTransferBufferQueueBlock(const C2ConstGraphicBlock& block) {
     std::shared_ptr<_C2BlockPoolData> data =
             _C2BlockFactory::GetGraphicBlockPoolData(block);
     if (data && _C2BlockFactory::GetBufferQueueData(data)) {
-        _C2BlockFactory::YieldBlockToBufferQueue(data);
+        _C2BlockFactory::BeginTransferBlockToClient(data);
         return true;
     }
     return false;
 }
 
-void yieldBufferQueueBlocks(
+void beginTransferBufferQueueBlocks(
         const std::list<std::unique_ptr<C2Work>>& workList,
         bool processInput, bool processOutput) {
-    forEachBlock(workList, yieldBufferQueueBlock, processInput, processOutput);
+    forEachBlock(workList, beginTransferBufferQueueBlock,
+                 processInput, processOutput);
+}
+
+bool endTransferBufferQueueBlock(
+        const C2ConstGraphicBlock& block,
+        bool transfer) {
+    std::shared_ptr<_C2BlockPoolData> data =
+            _C2BlockFactory::GetGraphicBlockPoolData(block);
+    if (data && _C2BlockFactory::GetBufferQueueData(data)) {
+        _C2BlockFactory::EndTransferBlockToClient(data, transfer);
+        return true;
+    }
+    return false;
+}
+
+void endTransferBufferQueueBlocks(
+        const std::list<std::unique_ptr<C2Work>>& workList,
+        bool transfer,
+        bool processInput, bool processOutput) {
+    forEachBlock(workList,
+                 std::bind(endTransferBufferQueueBlock,
+                           std::placeholders::_1, transfer),
+                 processInput, processOutput);
+}
+
+bool displayBufferQueueBlock(const C2ConstGraphicBlock& block) {
+    std::shared_ptr<_C2BlockPoolData> data =
+            _C2BlockFactory::GetGraphicBlockPoolData(block);
+    if (data && _C2BlockFactory::GetBufferQueueData(data)) {
+        _C2BlockFactory::DisplayBlockToBufferQueue(data);
+        return true;
+    }
+    return false;
 }
 
 }  // namespace utils

@@ -1581,6 +1581,7 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
     if (newSurface) {
         newSurface->setScalingMode(NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
         newSurface->setDequeueTimeout(kDequeueTimeoutNs);
+        newSurface->setMaxDequeuedBufferCount(mOutputSurface.lock()->maxDequeueBuffers);
         producer = newSurface->getIGraphicBufferProducer();
         producer->setGenerationNumber(generation);
     } else {
@@ -1608,7 +1609,6 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
 
     {
         Mutexed<OutputSurface>::Locked output(mOutputSurface);
-        newSurface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
         output->surface = newSurface;
         output->generation = generation;
     }
