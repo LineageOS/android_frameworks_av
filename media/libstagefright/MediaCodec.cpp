@@ -1110,12 +1110,10 @@ status_t MediaCodec::configure(
             reset();
         }
         if (!isResourceError(err)) {
-            if (err == OK) {
-                disableLegacyBufferDropPostQ(surface);
-            }
             break;
         }
     }
+
     return err;
 }
 
@@ -1178,11 +1176,7 @@ status_t MediaCodec::setSurface(const sp<Surface> &surface) {
     msg->setObject("surface", surface);
 
     sp<AMessage> response;
-    status_t result = PostAndAwaitResponse(msg, &response);
-    if (result == OK) {
-        disableLegacyBufferDropPostQ(surface);
-    }
-    return result;
+    return PostAndAwaitResponse(msg, &response);
 }
 
 status_t MediaCodec::createInputSurface(
@@ -2005,6 +1999,13 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                     CHECK(msg->findMessage("input-format", &mInputFormat));
                     CHECK(msg->findMessage("output-format", &mOutputFormat));
+
+                    // limit to confirming the opt-in behavior to minimize any behavioral change
+                    if (mSurface != nullptr && !mAllowFrameDroppingBySurface) {
+                        // signal frame dropping mode in the input format as this may also be
+                        // meaningful and confusing for an encoder in a transcoder scenario
+                        mInputFormat->setInt32("allow-frame-drop", mAllowFrameDroppingBySurface);
+                    }
                     ALOGV("[%s] configured as input format: %s, output format: %s",
                             mComponentName.c_str(),
                             mInputFormat->debugString(4).c_str(),
@@ -2437,6 +2438,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             }
 
             if (obj != NULL) {
+                if (!format->findInt32("allow-frame-drop", &mAllowFrameDroppingBySurface)) {
+                    // allow frame dropping by surface by default
+                    mAllowFrameDroppingBySurface = true;
+                }
+
                 format->setObject("native-window", obj);
                 status_t err = handleSetSurface(static_cast<Surface *>(obj.get()));
                 if (err != OK) {
@@ -2444,6 +2450,9 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     break;
                 }
             } else {
+                // we are not using surface so this variable is not used, but initialize sensibly anyway
+                mAllowFrameDroppingBySurface = false;
+
                 handleSetSurface(NULL);
             }
 
@@ -3436,6 +3445,10 @@ status_t MediaCodec::connectToSurface(const sp<Surface> &surface) {
 
         if (err != OK) {
             ALOGE("nativeWindowConnect returned an error: %s (%d)", strerror(-err), err);
+        } else {
+            if (!mAllowFrameDroppingBySurface) {
+                disableLegacyBufferDropPostQ(surface);
+            }
         }
     }
     // do not return ALREADY_EXISTS unless surfaces are the same
