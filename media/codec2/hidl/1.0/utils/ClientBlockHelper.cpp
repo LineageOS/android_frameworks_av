@@ -82,21 +82,14 @@ void forEachBlock(C2FrameData& frameData,
 
 template <typename BlockProcessor>
 void forEachBlock(const std::list<std::unique_ptr<C2Work>>& workList,
-                  BlockProcessor process,
-                  bool processInput, bool processOutput) {
+                  BlockProcessor process) {
     for (const std::unique_ptr<C2Work>& work : workList) {
         if (!work) {
             continue;
         }
-        if (processInput) {
-            forEachBlock(work->input, process);
-        }
-        if (processOutput) {
-            for (const std::unique_ptr<C2Worklet>& worklet : work->worklets) {
-                if (worklet) {
-                    forEachBlock(worklet->output,
-                                 process);
-                }
+        for (const std::unique_ptr<C2Worklet>& worklet : work->worklets) {
+            if (worklet) {
+                forEachBlock(worklet->output, process);
             }
         }
     }
@@ -108,8 +101,6 @@ sp<HGraphicBufferProducer> getHgbp(const sp<IGraphicBufferProducer>& igbp) {
     return hgbp ? hgbp :
             new B2HGraphicBufferProducer(igbp);
 }
-
-} // unnamed namespace
 
 status_t attachToBufferQueue(const C2ConstGraphicBlock& block,
                              const sp<IGraphicBufferProducer>& igbp,
@@ -154,73 +145,221 @@ bool getBufferQueueAssignment(const C2ConstGraphicBlock& block,
             _C2BlockFactory::GetGraphicBlockPoolData(block),
             generation, bqId, bqSlot);
 }
+} // unnamed namespace
 
-bool holdBufferQueueBlock(const C2ConstGraphicBlock& block,
-                            const sp<IGraphicBufferProducer>& igbp,
-                            uint64_t bqId,
-                            uint32_t generation) {
-    std::shared_ptr<_C2BlockPoolData> data =
-            _C2BlockFactory::GetGraphicBlockPoolData(block);
-    if (!data) {
-        return false;
-    }
+class OutputBufferQueue::Impl {
+    std::mutex mMutex;
+    sp<IGraphicBufferProducer> mIgbp;
+    uint32_t mGeneration;
+    uint64_t mBqId;
+    std::shared_ptr<int> mOwner;
+    // To migrate existing buffers
+    sp<GraphicBuffer> mBuffers[BufferQueueDefs::NUM_BUFFER_SLOTS]; // find a better way
+    std::weak_ptr<_C2BlockPoolData>
+                    mPoolDatas[BufferQueueDefs::NUM_BUFFER_SLOTS];
 
-    uint32_t oldGeneration;
-    uint64_t oldId;
-    int32_t oldSlot;
-    // If the block is not bufferqueue-based, do nothing.
-    if (!_C2BlockFactory::GetBufferQueueData(
-            data, &oldGeneration, &oldId, &oldSlot) ||
-            (oldId == 0)) {
-        return false;
-    }
+public:
+    Impl(): mGeneration(0), mBqId(0) {}
 
-    // If the block's bqId is the same as the desired bqId, just hold.
-    if ((oldId == bqId) && (oldGeneration == generation)) {
-        LOG(VERBOSE) << "holdBufferQueueBlock -- import without attaching:"
-                     << " bqId " << oldId
-                     << ", bqSlot " << oldSlot
-                     << ", generation " << generation
-                     << ".";
-        _C2BlockFactory::HoldBlockFromBufferQueue(data, getHgbp(igbp));
+    bool configure(const sp<IGraphicBufferProducer>& igbp,
+                   uint32_t generation,
+                   uint64_t bqId) {
+        size_t tryNum = 0;
+        size_t success = 0;
+        sp<GraphicBuffer> buffers[BufferQueueDefs::NUM_BUFFER_SLOTS];
+        std::weak_ptr<_C2BlockPoolData>
+                poolDatas[BufferQueueDefs::NUM_BUFFER_SLOTS];
+        {
+            std::scoped_lock<std::mutex> l(mMutex);
+            if (generation == mGeneration) {
+                return false;
+            }
+            mIgbp = igbp;
+            mGeneration = generation;
+            mBqId = bqId;
+            mOwner = std::make_shared<int>(0);
+            for (int i = 0; i < BufferQueueDefs::NUM_BUFFER_SLOTS; ++i) {
+                if (mBqId == 0 || !mBuffers[i]) {
+                    continue;
+                }
+                std::shared_ptr<_C2BlockPoolData> data = mPoolDatas[i].lock();
+                if (!data ||
+                    !_C2BlockFactory::BeginAttachBlockToBufferQueue(data)) {
+                    continue;
+                }
+                ++tryNum;
+                int bqSlot;
+                mBuffers[i]->setGenerationNumber(generation);
+                status_t result = igbp->attachBuffer(&bqSlot, mBuffers[i]);
+                if (result != OK) {
+                    continue;
+                }
+                bool attach =
+                        _C2BlockFactory::EndAttachBlockToBufferQueue(
+                                data, mOwner, getHgbp(mIgbp),
+                                generation, bqId, bqSlot);
+                if (!attach) {
+                    igbp->cancelBuffer(bqSlot, Fence::NO_FENCE);
+                    continue;
+                }
+                buffers[bqSlot] = mBuffers[i];
+                poolDatas[bqSlot] = data;
+                ++success;
+            }
+            for (int i = 0; i < BufferQueueDefs::NUM_BUFFER_SLOTS; ++i) {
+                mBuffers[i] = buffers[i];
+                mPoolDatas[i] = poolDatas[i];
+            }
+        }
+        ALOGD("remote graphic buffer migration %zu/%zu", success, tryNum);
         return true;
     }
 
-    // Otherwise, attach to the given igbp, which must not be null.
-    if (!igbp) {
+    bool registerBuffer(const C2ConstGraphicBlock& block) {
+        std::shared_ptr<_C2BlockPoolData> data =
+                _C2BlockFactory::GetGraphicBlockPoolData(block);
+        if (!data) {
+            return false;
+        }
+        std::scoped_lock<std::mutex> l(mMutex);
+
+        if (!mIgbp) {
+            return false;
+        }
+
+        uint32_t oldGeneration;
+        uint64_t oldId;
+        int32_t oldSlot;
+        // If the block is not bufferqueue-based, do nothing.
+        if (!_C2BlockFactory::GetBufferQueueData(
+                data, &oldGeneration, &oldId, &oldSlot) || (oldId == 0)) {
+            return false;
+        }
+        // If the block's bqId is the same as the desired bqId, just hold.
+        if ((oldId == mBqId) && (oldGeneration == mGeneration)) {
+            LOG(VERBOSE) << "holdBufferQueueBlock -- import without attaching:"
+                         << " bqId " << oldId
+                         << ", bqSlot " << oldSlot
+                         << ", generation " << mGeneration
+                         << ".";
+            _C2BlockFactory::HoldBlockFromBufferQueue(data, mOwner, getHgbp(mIgbp));
+            mPoolDatas[oldSlot] = data;
+            mBuffers[oldSlot] = createGraphicBuffer(block);
+            mBuffers[oldSlot]->setGenerationNumber(mGeneration);
+            return true;
+        }
+        int32_t d = (int32_t) mGeneration - (int32_t) oldGeneration;
+        LOG(WARNING) << "receiving stale buffer: generation "
+                     << mGeneration << " , diff " << d  << " : slot "
+                     << oldSlot;
         return false;
     }
 
-    int32_t bqSlot;
-    status_t result = attachToBufferQueue(block, igbp, generation, &bqSlot);
+    status_t outputBuffer(
+            const C2ConstGraphicBlock& block,
+            const BnGraphicBufferProducer::QueueBufferInput& input,
+            BnGraphicBufferProducer::QueueBufferOutput* output) {
+        uint32_t generation;
+        uint64_t bqId;
+        int32_t bqSlot;
+        bool display = displayBufferQueueBlock(block);
+        if (!getBufferQueueAssignment(block, &generation, &bqId, &bqSlot) ||
+            bqId == 0) {
+            // Block not from bufferqueue -- it must be attached before queuing.
 
-    if (result != OK) {
-        LOG(ERROR) << "holdBufferQueueBlock -- fail to attach:"
-                   << " target bqId " << bqId
-                   << ", generation " << generation
-                   << ".";
-        return false;
+            mMutex.lock();
+            sp<IGraphicBufferProducer> outputIgbp = mIgbp;
+            uint32_t outputGeneration = mGeneration;
+            mMutex.unlock();
+
+            status_t status = attachToBufferQueue(
+                    block, outputIgbp, outputGeneration, &bqSlot);
+            if (status != OK) {
+                LOG(WARNING) << "outputBuffer -- attaching failed.";
+                return INVALID_OPERATION;
+            }
+
+            status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
+                                         input, output);
+            if (status != OK) {
+                LOG(ERROR) << "outputBuffer -- queueBuffer() failed "
+                           "on non-bufferqueue-based block. "
+                           "Error = " << status << ".";
+                return status;
+            }
+            return OK;
+        }
+
+        mMutex.lock();
+        sp<IGraphicBufferProducer> outputIgbp = mIgbp;
+        uint32_t outputGeneration = mGeneration;
+        uint64_t outputBqId = mBqId;
+        mMutex.unlock();
+
+        if (!outputIgbp) {
+            LOG(VERBOSE) << "outputBuffer -- output surface is null.";
+            return NO_INIT;
+        }
+
+        if (!display) {
+            LOG(WARNING) << "outputBuffer -- cannot display "
+                         "bufferqueue-based block to the bufferqueue.";
+            return UNKNOWN_ERROR;
+        }
+        if (bqId != outputBqId || generation != outputGeneration) {
+            int32_t diff = (int32_t) outputGeneration - (int32_t) generation;
+            LOG(WARNING) << "outputBuffer -- buffers from old generation to "
+                         << outputGeneration << " , diff: " << diff
+                         << " , slot: " << bqSlot;
+            return DEAD_OBJECT;
+        }
+
+        status_t status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
+                                              input, output);
+        if (status != OK) {
+            LOG(ERROR) << "outputBuffer -- queueBuffer() failed "
+                       "on bufferqueue-based block. "
+                       "Error = " << status << ".";
+            return status;
+        }
+        return OK;
     }
 
-    LOG(VERBOSE) << "holdBufferQueueBlock -- attached:"
-                 << " bqId " << bqId
-                 << ", bqSlot " << bqSlot
-                 << ", generation " << generation
-                 << ".";
-    _C2BlockFactory::AssignBlockToBufferQueue(
-            data, getHgbp(igbp), generation, bqId, bqSlot, true);
-    return true;
+    Impl *getPtr() {
+        return this;
+    }
+
+    ~Impl() {}
+};
+
+OutputBufferQueue::OutputBufferQueue(): mImpl(new Impl()) {}
+
+OutputBufferQueue::~OutputBufferQueue() {}
+
+bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
+                                  uint32_t generation,
+                                  uint64_t bqId) {
+    return mImpl && mImpl->configure(igbp, generation, bqId);
 }
 
-void holdBufferQueueBlocks(const std::list<std::unique_ptr<C2Work>>& workList,
-                           const sp<IGraphicBufferProducer>& igbp,
-                           uint64_t bqId,
-                           uint32_t generation,
-                           bool forInput) {
+status_t OutputBufferQueue::outputBuffer(
+    const C2ConstGraphicBlock& block,
+    const BnGraphicBufferProducer::QueueBufferInput& input,
+    BnGraphicBufferProducer::QueueBufferOutput* output) {
+    if (mImpl) {
+        return mImpl->outputBuffer(block, input, output);
+    }
+    return DEAD_OBJECT;
+}
+
+void OutputBufferQueue::holdBufferQueueBlocks(
+        const std::list<std::unique_ptr<C2Work>>& workList) {
+    if (!mImpl) {
+        return;
+    }
     forEachBlock(workList,
-                 std::bind(holdBufferQueueBlock,
-                           std::placeholders::_1, igbp, bqId, generation),
-                 forInput, !forInput);
+                 std::bind(&OutputBufferQueue::Impl::registerBuffer,
+                           mImpl->getPtr(), std::placeholders::_1));
 }
 
 }  // namespace utils
