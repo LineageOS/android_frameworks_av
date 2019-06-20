@@ -82,7 +82,12 @@ namespace android {
 // (0 for either of these disables that threshold)
 //
 static constexpr nsecs_t kMaxRecordAgeNs =  28 * 3600 * (1000*1000*1000ll);
-static constexpr int kMaxRecords    = 0;
+// 2019/6: average daily per device is currently 375-ish;
+// setting this to 2000 is large enough to catch most devices
+// we'll lose some data on very very media-active devices, but only for
+// the gms collection; statsd will have already covered those for us.
+// This also retains enough information to help with bugreports
+static constexpr int kMaxRecords    = 2000;
 
 // max we expire in a single call, to constrain how long we hold the
 // mutex, which also constrains how long a client might wait.
