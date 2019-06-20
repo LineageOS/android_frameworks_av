@@ -478,6 +478,11 @@ public:
      */
     size_t numClientBuffers() const;
 
+    /**
+     * Return the size of the array.
+     */
+    size_t arraySize() const;
+
 private:
     std::string mImplName; ///< name for debugging
     const char *mName; ///< C-string version of name
