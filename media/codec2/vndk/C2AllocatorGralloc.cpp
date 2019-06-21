@@ -22,6 +22,8 @@
 #include <android/hardware/graphics/mapper/2.0/IMapper.h>
 #include <android/hardware/graphics/allocator/3.0/IAllocator.h>
 #include <android/hardware/graphics/mapper/3.0/IMapper.h>
+#include <android/hardware/graphics/allocator/4.0/IAllocator.h>
+#include <android/hardware/graphics/mapper/4.0/IMapper.h>
 #include <cutils/native_handle.h>
 #include <hardware/gralloc.h>
 
@@ -66,6 +68,7 @@ using ::android::hardware::hidl_vec;
 using ::android::hardware::graphics::common::V1_0::BufferUsage;
 using PixelFormat2 = ::android::hardware::graphics::common::V1_0::PixelFormat;
 using PixelFormat3 = ::android::hardware::graphics::common::V1_2::PixelFormat;
+using PixelFormat4 = ::android::hardware::graphics::common::V1_2::PixelFormat;
 
 using IAllocator2 = ::android::hardware::graphics::allocator::V2_0::IAllocator;
 using BufferDescriptor2 = ::android::hardware::graphics::mapper::V2_0::BufferDescriptor;
@@ -77,6 +80,11 @@ using BufferDescriptor3 = ::android::hardware::graphics::mapper::V3_0::BufferDes
 using Error3 = ::android::hardware::graphics::mapper::V3_0::Error;
 using IMapper3 = ::android::hardware::graphics::mapper::V3_0::IMapper;
 
+using IAllocator4 = ::android::hardware::graphics::allocator::V4_0::IAllocator;
+using BufferDescriptor4 = ::android::hardware::graphics::mapper::V4_0::BufferDescriptor;
+using Error4 = ::android::hardware::graphics::mapper::V4_0::Error;
+using IMapper4 = ::android::hardware::graphics::mapper::V4_0::IMapper;
+
 namespace /* unnamed */ {
 
 struct BufferDescriptorInfo2 {
@@ -86,6 +94,11 @@ struct BufferDescriptorInfo2 {
 
 struct BufferDescriptorInfo3 {
     IMapper3::BufferDescriptorInfo mapperInfo;
+    uint32_t stride;
+};
+
+struct BufferDescriptorInfo4 {
+    IMapper4::BufferDescriptorInfo mapperInfo;
     uint32_t stride;
 };
 
@@ -110,6 +123,18 @@ c2_status_t maperr2error(Error3 maperr) {
         case Error3::BAD_VALUE:      return C2_BAD_VALUE;
         case Error3::NO_RESOURCES:   return C2_NO_MEMORY;
         case Error3::UNSUPPORTED:    return C2_CANNOT_DO;
+    }
+    return C2_CORRUPTED;
+}
+
+c2_status_t maperr2error(Error4 maperr) {
+    switch (maperr) {
+        case Error4::NONE:           return C2_OK;
+        case Error4::BAD_DESCRIPTOR: return C2_BAD_VALUE;
+        case Error4::BAD_BUFFER:     return C2_BAD_VALUE;
+        case Error4::BAD_VALUE:      return C2_BAD_VALUE;
+        case Error4::NO_RESOURCES:   return C2_NO_MEMORY;
+        case Error4::UNSUPPORTED:    return C2_CANNOT_DO;
     }
     return C2_CORRUPTED;
 }
@@ -321,6 +346,12 @@ public:
               hidl_handle &hidlHandle,
               const C2HandleGralloc *const handle,
               C2Allocator::id_t allocatorId);
+    C2AllocationGralloc(
+              const BufferDescriptorInfo4 &info,
+              const sp<IMapper4> &mapper,
+              hidl_handle &hidlHandle,
+              const C2HandleGralloc *const handle,
+              C2Allocator::id_t allocatorId);
     int dup() const;
     c2_status_t status() const;
 
@@ -329,6 +360,8 @@ private:
     const sp<IMapper2> mMapper2{nullptr};
     const BufferDescriptorInfo3 mInfo3{};
     const sp<IMapper3> mMapper3{nullptr};
+    const BufferDescriptorInfo4 mInfo4{};
+    const sp<IMapper4> mMapper4{nullptr};
     const hidl_handle mHidlHandle;
     const C2HandleGralloc *mHandle;
     buffer_handle_t mBuffer;
@@ -372,6 +405,23 @@ C2AllocationGralloc::C2AllocationGralloc(
       mAllocatorId(allocatorId) {
 }
 
+C2AllocationGralloc::C2AllocationGralloc(
+          const BufferDescriptorInfo4 &info,
+          const sp<IMapper4> &mapper,
+          hidl_handle &hidlHandle,
+          const C2HandleGralloc *const handle,
+          C2Allocator::id_t allocatorId)
+    : C2GraphicAllocation(info.mapperInfo.width, info.mapperInfo.height),
+      mInfo4(info),
+      mMapper4(mapper),
+      mHidlHandle(std::move(hidlHandle)),
+      mHandle(handle),
+      mBuffer(nullptr),
+      mLockedHandle(nullptr),
+      mLocked(false),
+      mAllocatorId(allocatorId) {
+}
+
 C2AllocationGralloc::~C2AllocationGralloc() {
     if (mBuffer && mLocked) {
         // implementation ignores addresss and rect
@@ -384,12 +434,18 @@ C2AllocationGralloc::~C2AllocationGralloc() {
                     mBuffer)).isOk()) {
                 ALOGE("failed transaction: freeBuffer");
             }
-        } else {
+        } else if (mMapper3) {
             if (!mMapper3->freeBuffer(const_cast<native_handle_t *>(
                     mBuffer)).isOk()) {
                 ALOGE("failed transaction: freeBuffer");
             }
+        } else {
+            if (!mMapper4->freeBuffer(const_cast<native_handle_t *>(
+                    mBuffer)).isOk()) {
+                ALOGE("failed transaction: freeBuffer");
+            }
         }
+
     }
     if (mHandle) {
         native_handle_delete(
@@ -435,7 +491,7 @@ c2_status_t C2AllocationGralloc::map(
                 ALOGE("failed transaction: importBuffer");
                 return C2_CORRUPTED;
             }
-        } else {
+        } else if (mMapper3) {
             if (!mMapper3->importBuffer(
                     mHidlHandle, [&err, this](const auto &maperr, const auto &buffer) {
                         err = maperr2error(maperr);
@@ -444,6 +500,17 @@ c2_status_t C2AllocationGralloc::map(
                         }
                     }).isOk()) {
                 ALOGE("failed transaction: importBuffer (@3.0)");
+                return C2_CORRUPTED;
+            }
+        } else {
+            if (!mMapper4->importBuffer(
+                    mHidlHandle, [&err, this](const auto &maperr, const auto &buffer) {
+                        err = maperr2error(maperr);
+                        if (err == C2_OK) {
+                            mBuffer = static_cast<buffer_handle_t>(buffer);
+                        }
+                    }).isOk()) {
+                ALOGE("failed transaction: importBuffer (@4.0)");
                 return C2_CORRUPTED;
             }
         }
@@ -466,19 +533,29 @@ c2_status_t C2AllocationGralloc::map(
                     mBuffer, mInfo2.mapperInfo.width, mInfo2.mapperInfo.height,
                     (uint32_t)mInfo2.mapperInfo.format, mInfo2.mapperInfo.usage,
                     mInfo2.stride, generation, igbp_id, igbp_slot);
-        } else {
+        } else if (mMapper3) {
             mLockedHandle = C2HandleGralloc::WrapAndMoveNativeHandle(
                     mBuffer, mInfo3.mapperInfo.width, mInfo3.mapperInfo.height,
                     (uint32_t)mInfo3.mapperInfo.format, mInfo3.mapperInfo.usage,
                     mInfo3.stride, generation, igbp_id, igbp_slot);
+        } else {
+            mLockedHandle = C2HandleGralloc::WrapAndMoveNativeHandle(
+                    mBuffer, mInfo4.mapperInfo.width, mInfo4.mapperInfo.height,
+                    (uint32_t)mInfo4.mapperInfo.format, mInfo4.mapperInfo.usage,
+                    mInfo4.stride, generation, igbp_id, igbp_slot);
         }
     }
 
-    PixelFormat3 format = mMapper2 ?
-            PixelFormat3(mInfo2.mapperInfo.format) :
-            PixelFormat3(mInfo3.mapperInfo.format);
+    PixelFormat4 format;
+    if (mMapper2) {
+        format = PixelFormat4(mInfo2.mapperInfo.format);
+    } else if (mMapper3) {
+        format = PixelFormat4(mInfo3.mapperInfo.format);
+    } else {
+        format = PixelFormat4(mInfo4.mapperInfo.format);
+    }
     switch (format) {
-        case PixelFormat3::RGBA_1010102: {
+        case PixelFormat4::RGBA_1010102: {
             // TRICKY: this is used for media as YUV444 in the case when it is queued directly to a
             // Surface. In all other cases it is RGBA. We don't know which case it is here, so
             // default to YUV for now.
@@ -500,7 +577,7 @@ c2_status_t C2AllocationGralloc::map(
                     ALOGE("failed transaction: lock(RGBA_1010102)");
                     return C2_CORRUPTED;
                 }
-            } else {
+            } else if (mMapper3) {
                 if (!mMapper3->lock(
                         const_cast<native_handle_t *>(mBuffer),
                         grallocUsage,
@@ -520,6 +597,26 @@ c2_status_t C2AllocationGralloc::map(
                     ALOGE("failed transaction: lock(RGBA_1010102) (@3.0)");
                     return C2_CORRUPTED;
                 }
+            } else {
+                if (!mMapper4->lock(
+                        const_cast<native_handle_t *>(mBuffer),
+                        grallocUsage,
+                        { (int32_t)rect.left, (int32_t)rect.top,
+                          (int32_t)rect.width, (int32_t)rect.height },
+                        // TODO: fence
+                        hidl_handle(),
+                        [&err, &pointer](const auto &maperr, const auto &mapPointer,
+                                         int32_t bytesPerPixel, int32_t bytesPerStride) {
+                            err = maperr2error(maperr);
+                            if (err == C2_OK) {
+                                pointer = mapPointer;
+                            }
+                            (void)bytesPerPixel;
+                            (void)bytesPerStride;
+                        }).isOk()) {
+                    ALOGE("failed transaction: lock(RGBA_1010102) (@4.0)");
+                    return C2_CORRUPTED;
+                }
             }
             if (err != C2_OK) {
                 ALOGD("lock failed: %d", err);
@@ -533,9 +630,14 @@ c2_status_t C2AllocationGralloc::map(
             layout->type = C2PlanarLayout::TYPE_YUVA;
             layout->numPlanes = 4;
             layout->rootPlanes = 1;
-            int32_t stride = mMapper2 ?
-                    int32_t(mInfo2.stride) :
-                    int32_t(mInfo3.stride);
+            int32_t stride;
+            if (mMapper2) {
+                stride = int32_t(mInfo2.stride);
+            } if (mMapper3) {
+                stride = int32_t(mInfo3.stride);
+            } else {
+                stride = int32_t(mInfo4.stride);
+            }
             layout->planes[C2PlanarLayout::PLANE_Y] = {
                 C2PlaneInfo::CHANNEL_Y,         // channel
                 4,                              // colInc
@@ -591,10 +693,10 @@ c2_status_t C2AllocationGralloc::map(
             break;
         }
 
-        case PixelFormat3::RGBA_8888:
+        case PixelFormat4::RGBA_8888:
             // TODO: alpha channel
             // fall-through
-        case PixelFormat3::RGBX_8888: {
+        case PixelFormat4::RGBX_8888: {
             void *pointer = nullptr;
             if (mMapper2) {
                 if (!mMapper2->lock(
@@ -613,7 +715,7 @@ c2_status_t C2AllocationGralloc::map(
                     ALOGE("failed transaction: lock(RGBA_8888)");
                     return C2_CORRUPTED;
                 }
-            } else {
+            } else if (mMapper3) {
                 if (!mMapper3->lock(
                         const_cast<native_handle_t *>(mBuffer),
                         grallocUsage,
@@ -633,6 +735,26 @@ c2_status_t C2AllocationGralloc::map(
                     ALOGE("failed transaction: lock(RGBA_8888) (@3.0)");
                     return C2_CORRUPTED;
                 }
+            } else {
+                if (!mMapper4->lock(
+                        const_cast<native_handle_t *>(mBuffer),
+                        grallocUsage,
+                        { (int32_t)rect.left, (int32_t)rect.top,
+                          (int32_t)rect.width, (int32_t)rect.height },
+                        // TODO: fence
+                        hidl_handle(),
+                        [&err, &pointer](const auto &maperr, const auto &mapPointer,
+                                         int32_t bytesPerPixel, int32_t bytesPerStride) {
+                            err = maperr2error(maperr);
+                            if (err == C2_OK) {
+                                pointer = mapPointer;
+                            }
+                            (void)bytesPerPixel;
+                            (void)bytesPerStride;
+                        }).isOk()) {
+                    ALOGE("failed transaction: lock(RGBA_8888) (@4.0)");
+                    return C2_CORRUPTED;
+                }
             }
             if (err != C2_OK) {
                 ALOGD("lock failed: %d", err);
@@ -644,9 +766,14 @@ c2_status_t C2AllocationGralloc::map(
             layout->type = C2PlanarLayout::TYPE_RGB;
             layout->numPlanes = 3;
             layout->rootPlanes = 1;
-            int32_t stride = mMapper2 ?
-                    int32_t(mInfo2.stride) :
-                    int32_t(mInfo3.stride);
+            int32_t stride;
+            if (mMapper2) {
+                stride = int32_t(mInfo2.stride);
+            } if (mMapper3) {
+                stride = int32_t(mInfo3.stride);
+            } else {
+                stride = int32_t(mInfo4.stride);
+            }
             layout->planes[C2PlanarLayout::PLANE_R] = {
                 C2PlaneInfo::CHANNEL_R,         // channel
                 4,                              // colInc
@@ -689,9 +816,9 @@ c2_status_t C2AllocationGralloc::map(
             break;
         }
 
-        case PixelFormat3::YCBCR_420_888:
+        case PixelFormat4::YCBCR_420_888:
             // fall-through
-        case PixelFormat3::YV12:
+        case PixelFormat4::YV12:
             // fall-through
         default: {
             struct YCbCrLayout {
@@ -725,7 +852,7 @@ c2_status_t C2AllocationGralloc::map(
                     ALOGE("failed transaction: lockYCbCr");
                     return C2_CORRUPTED;
                 }
-            } else {
+            } else if (mMapper3) {
                 if (!mMapper3->lockYCbCr(
                         const_cast<native_handle_t *>(mBuffer), grallocUsage,
                         { (int32_t)rect.left, (int32_t)rect.top,
@@ -745,6 +872,28 @@ c2_status_t C2AllocationGralloc::map(
                             }
                         }).isOk()) {
                     ALOGE("failed transaction: lockYCbCr (@3.0)");
+                    return C2_CORRUPTED;
+                }
+            } else {
+                if (!mMapper4->lockYCbCr(
+                        const_cast<native_handle_t *>(mBuffer), grallocUsage,
+                        { (int32_t)rect.left, (int32_t)rect.top,
+                          (int32_t)rect.width, (int32_t)rect.height },
+                        // TODO: fence
+                        hidl_handle(),
+                        [&err, &ycbcrLayout](const auto &maperr, const auto &mapLayout) {
+                            err = maperr2error(maperr);
+                            if (err == C2_OK) {
+                                ycbcrLayout = YCbCrLayout{
+                                        mapLayout.y,
+                                        mapLayout.cb,
+                                        mapLayout.cr,
+                                        mapLayout.yStride,
+                                        mapLayout.cStride,
+                                        mapLayout.chromaStep};
+                            }
+                        }).isOk()) {
+                    ALOGE("failed transaction: lockYCbCr (@4.0)");
                     return C2_CORRUPTED;
                 }
             }
@@ -839,7 +988,7 @@ c2_status_t C2AllocationGralloc::unmap(
             ALOGE("failed transaction: unlock");
             return C2_CORRUPTED;
         }
-    } else {
+    } else if (mMapper3) {
         if (!mMapper3->unlock(
                 const_cast<native_handle_t *>(mBuffer),
                 [&err, &fence](const auto &maperr, const auto &releaseFence) {
@@ -852,6 +1001,21 @@ c2_status_t C2AllocationGralloc::unmap(
                     }
                 }).isOk()) {
             ALOGE("failed transaction: unlock (@3.0)");
+            return C2_CORRUPTED;
+        }
+    } else {
+        if (!mMapper4->unlock(
+                const_cast<native_handle_t *>(mBuffer),
+                [&err, &fence](const auto &maperr, const auto &releaseFence) {
+                    // TODO
+                    (void) fence;
+                    (void) releaseFence;
+                    err = maperr2error(maperr);
+                    if (err == C2_OK) {
+                        // TODO: fence
+                    }
+                }).isOk()) {
+            ALOGE("failed transaction: unlock (@4.0)");
             return C2_CORRUPTED;
         }
     }
@@ -899,6 +1063,8 @@ private:
     sp<IMapper2> mMapper2;
     sp<IAllocator3> mAllocator3;
     sp<IMapper3> mMapper3;
+    sp<IAllocator4> mAllocator4;
+    sp<IMapper4> mMapper4;
     const bool mBufferQueue;
 };
 
@@ -918,17 +1084,23 @@ C2AllocatorGralloc::Impl::Impl(id_t id, bool bufferQueue)
     mTraits = std::make_shared<C2Allocator::Traits>(traits);
 
     // gralloc allocator is a singleton, so all objects share a global service
-    mAllocator3 = IAllocator3::getService();
-    mMapper3 = IMapper3::getService();
-    if (!mAllocator3 || !mMapper3) {
-        mAllocator3 = nullptr;
-        mMapper3 = nullptr;
-        mAllocator2 = IAllocator2::getService();
-        mMapper2 = IMapper2::getService();
-        if (!mAllocator2 || !mMapper2) {
-            mAllocator2 = nullptr;
-            mMapper2 = nullptr;
-            mInit = C2_CORRUPTED;
+    mAllocator4 = IAllocator4::getService();
+    mMapper4 = IMapper4::getService();
+    if (!mAllocator4 || !mMapper4) {
+        mAllocator4 = nullptr;
+        mMapper4 = nullptr;
+        mAllocator3 = IAllocator3::getService();
+        mMapper3 = IMapper3::getService();
+        if (!mAllocator3 || !mMapper3) {
+            mAllocator3 = nullptr;
+            mMapper3 = nullptr;
+            mAllocator2 = IAllocator2::getService();
+            mMapper2 = IMapper2::getService();
+            if (!mAllocator2 || !mMapper2) {
+                mAllocator2 = nullptr;
+                mMapper2 = nullptr;
+                mInit = C2_CORRUPTED;
+            }
         }
     }
 }
@@ -1000,13 +1172,13 @@ c2_status_t C2AllocatorGralloc::Impl::newGraphicAllocation(
                         0, 0, mBufferQueue ? ~0 : 0),
                 mTraits->id));
         return C2_OK;
-    } else {
+    } else if (mMapper3) {
         BufferDescriptorInfo3 info = {
             {
                 width,
                 height,
                 1u,  // layerCount
-                PixelFormat3(format),
+                PixelFormat4(format),
                 grallocUsage,
             },
             0u,  // stride placeholder
@@ -1057,6 +1229,63 @@ c2_status_t C2AllocatorGralloc::Impl::newGraphicAllocation(
                         0, 0, mBufferQueue ? ~0 : 0),
                 mTraits->id));
         return C2_OK;
+    } else {
+        BufferDescriptorInfo4 info = {
+            {
+                width,
+                height,
+                1u,  // layerCount
+                PixelFormat4(format),
+                grallocUsage,
+            },
+            0u,  // stride placeholder
+        };
+        BufferDescriptor4 desc;
+        if (!mMapper4->createDescriptor(
+                info.mapperInfo, [&err, &desc](const auto &maperr, const auto &descriptor) {
+                    err = maperr2error(maperr);
+                    if (err == C2_OK) {
+                        desc = descriptor;
+                    }
+                }).isOk()) {
+            ALOGE("failed transaction: createDescriptor");
+            return C2_CORRUPTED;
+        }
+        if (err != C2_OK) {
+            return err;
+        }
+
+        // IAllocator shares IMapper error codes.
+        if (!mAllocator4->allocate(
+                desc,
+                1u,
+                [&err, &buffer, &info](const auto &maperr, const auto &stride, auto &buffers) {
+                    err = maperr2error(maperr);
+                    if (err != C2_OK) {
+                        return;
+                    }
+                    if (buffers.size() != 1u) {
+                        err = C2_CORRUPTED;
+                        return;
+                    }
+                    info.stride = stride;
+                    buffer = buffers[0];
+                }).isOk()) {
+            ALOGE("failed transaction: allocate");
+            return C2_CORRUPTED;
+        }
+        if (err != C2_OK) {
+            return err;
+        }
+        allocation->reset(new C2AllocationGralloc(
+                info, mMapper4, buffer,
+                C2HandleGralloc::WrapAndMoveNativeHandle(
+                        buffer.getNativeHandle(),
+                        width, height,
+                        format, grallocUsage, info.stride,
+                        0, 0, mBufferQueue ? ~0 : 0),
+                mTraits->id));
+        return C2_OK;
     }
 }
 
@@ -1086,7 +1315,7 @@ c2_status_t C2AllocatorGralloc::Impl::priorGraphicAllocation(
         allocation->reset(new C2AllocationGralloc(
                 info, mMapper2, hidlHandle, grallocHandle, mTraits->id));
         return C2_OK;
-    } else {
+    } else if (mMapper3) {
         BufferDescriptorInfo3 info;
         info.mapperInfo.layerCount = 1u;
         uint32_t generation;
@@ -1108,6 +1337,29 @@ c2_status_t C2AllocatorGralloc::Impl::priorGraphicAllocation(
 
         allocation->reset(new C2AllocationGralloc(
                 info, mMapper3, hidlHandle, grallocHandle, mTraits->id));
+        return C2_OK;
+    } else {
+        BufferDescriptorInfo4 info;
+        info.mapperInfo.layerCount = 1u;
+        uint32_t generation;
+        uint64_t igbp_id;
+        uint32_t igbp_slot;
+        const C2HandleGralloc *grallocHandle = C2HandleGralloc::Import(
+                handle,
+                &info.mapperInfo.width, &info.mapperInfo.height,
+                (uint32_t *)&info.mapperInfo.format,
+                (uint64_t *)&info.mapperInfo.usage,
+                &info.stride,
+                &generation, &igbp_id, &igbp_slot);
+        if (grallocHandle == nullptr) {
+            return C2_BAD_VALUE;
+        }
+
+        hidl_handle hidlHandle;
+        hidlHandle.setTo(C2HandleGralloc::UnwrapNativeHandle(grallocHandle), true);
+
+        allocation->reset(new C2AllocationGralloc(
+                info, mMapper4, hidlHandle, grallocHandle, mTraits->id));
         return C2_OK;
     }
 }
