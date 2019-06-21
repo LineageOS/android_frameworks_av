@@ -45,6 +45,16 @@ C2Handle *WrapNativeCodec2GrallocHandle(
         uint32_t generation = 0, uint64_t igbp_id = 0, uint32_t igbp_slot = 0);
 
 /**
+ * When the gralloc handle is migrated to another bufferqueue, update
+ * bufferqueue information.
+ *
+ * @return {@code true} when native_handle is a wrapped codec2 handle.
+ */
+bool MigrateNativeCodec2GrallocHandle(
+        native_handle_t *handle,
+        uint32_t generation, uint64_t igbp_id, uint32_t igbp_slot);
+
+/**
  * \todo Get this from the buffer
  */
 void _UnwrapNativeCodec2GrallocMetadata(

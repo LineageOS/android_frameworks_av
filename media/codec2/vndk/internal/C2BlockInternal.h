@@ -206,22 +206,18 @@ struct _C2BlockFactory {
      *
      *   - GetBufferQueueData(): Returns generation, bqId and bqSlot.
      *   - HoldBlockFromBufferQueue(): Sets "held" status to true.
-     *   - YieldBlockToBufferQueue(): Sets "held" status to false.
-     *   - AssignBlockToBufferQueue(): Sets the bufferqueue assignment and
-     *     "held" status.
+     *   - BeginTransferBlockToClient()/EndTransferBlockToClient():
+     *     Clear "held" status to false if transfer was successful,
+     *     otherwise "held" status remains true.
+     *   - BeginAttachBlockToBufferQueue()/EndAttachBlockToBufferQueue():
+     *     The will keep "held" status true if attach was eligible.
+     *     Otherwise, "held" status is cleared to false. In that case,
+     *     ownership of buffer should be transferred to bufferqueue.
+     *   - DisplayBlockToBufferQueue()
+     *     This will clear "held" status to false.
      *
      * All these functions operate on _C2BlockPoolData, which can be obtained by
      * calling GetGraphicBlockPoolData().
-     *
-     * HoldBlockFromBufferQueue() will mark the block as held, while
-     * YieldBlockToBufferQueue() will do the opposite. These two functions do
-     * not modify the bufferqueue assignment, so it is not wrong to call
-     * HoldBlockFromBufferQueue() after YieldBlockToBufferQueue() if it can be
-     * guaranteed that the block is not destroyed during the period between the
-     * two calls.
-     *
-     * AssingBlockToBufferQueue() has a "held" status as an optional argument.
-     * The default value is true.
      *
      * Maintaining Consistency with IGraphicBufferProducer Operations
      * ==============================================================
@@ -232,16 +228,20 @@ struct _C2BlockFactory {
      *     information for _C2BlockPoolData, with "held" status set to true.
      *
      * queueBuffer()
-     *   - After queueBuffer() is called, YieldBlockToBufferQueue() should be
-     *     called.
+     *   - Before queueBuffer() is called, DisplayBlockToBufferQueue() should be
+     *     called to test eligibility. If it's not eligible, do not call
+     *     queueBuffer().
      *
-     * attachBuffer()
-     *   - After attachBuffer() is called, AssignBlockToBufferQueue() should be
-     *     called with "held" status set to true.
+     * attachBuffer() - remote migration only.
+     *   - Local migration on blockpool side will be done automatically by
+     *     blockpool.
+     *   - Before attachBuffer(), BeginAttachBlockToBufferQueue() should be called
+     *     to test eligiblity.
+     *   - After attachBuffer() is called, EndAttachBlockToBufferQueue() should
+     *     be called. This will set "held" status to true. If it returned
+     *     false, cancelBuffer() should be called.
      *
-     * detachBuffer()
-     *   - After detachBuffer() is called, HoldBlockFromBufferQueue() should be
-     *     called.
+     * detachBuffer() - no-op.
      */
 
     /**
@@ -261,41 +261,10 @@ struct _C2BlockFactory {
      */
     static
     bool GetBufferQueueData(
-            const std::shared_ptr<_C2BlockPoolData>& poolData,
+            const std::shared_ptr<const _C2BlockPoolData>& poolData,
             uint32_t* generation = nullptr,
             uint64_t* bqId = nullptr,
             int32_t* bqSlot = nullptr);
-
-    /**
-     * Set bufferqueue assignment and "held" status to a block created by a
-     * bufferqueue-based blockpool.
-     *
-     * \param poolData blockpool data associated to the block.
-     * \param igbp       \c IGraphicBufferProducer instance from the designated
-     *                   bufferqueue.
-     * \param generation Generation number that the buffer belongs to.
-     * \param bqId       Id of the bufferqueue that will own the buffer (block).
-     * \param bqSlot     Slot number of the buffer.
-     * \param held       Whether the block is held. This "held" status can be
-     *                   changed later by calling YieldBlockToBufferQueue() or
-     *                   HoldBlockFromBufferQueue().
-     *
-     * \return \c true if \p poolData is valid bufferqueue data;
-     *         \c false otherwise.
-     *
-     * Note: \p generation should match the latest generation number set on the
-     * bufferqueue, and \p bqId should match the unique id for the bufferqueue
-     * (obtainable by calling igbp->getUniqueId()).
-     */
-    static
-    bool AssignBlockToBufferQueue(
-            const std::shared_ptr<_C2BlockPoolData>& poolData,
-            const ::android::sp<::android::hardware::graphics::bufferqueue::
-                                V2_0::IGraphicBufferProducer>& igbp,
-            uint32_t generation,
-            uint64_t bqId,
-            int32_t bqSlot,
-            bool held = true);
 
     /**
      * Hold a block from the designated bufferqueue. This causes the destruction
@@ -305,6 +274,9 @@ struct _C2BlockFactory {
      * block. It does not check if that is the case.
      *
      * \param poolData blockpool data associated to the block.
+     * \param owner    block owner from client bufferqueue manager.
+     *                 If this is expired, the block is not owned by client
+     *                 anymore.
      * \param igbp     \c IGraphicBufferProducer instance to be assigned to the
      *                 block. This is not needed when the block is local.
      *
@@ -313,24 +285,96 @@ struct _C2BlockFactory {
     static
     bool HoldBlockFromBufferQueue(
             const std::shared_ptr<_C2BlockPoolData>& poolData,
+            const std::shared_ptr<int>& owner,
             const ::android::sp<::android::hardware::graphics::bufferqueue::
                                 V2_0::IGraphicBufferProducer>& igbp = nullptr);
 
     /**
-     * Yield a block to the designated bufferqueue. This causes the destruction
-     * of the block not to trigger a call to cancelBuffer();
+     * Prepare a block to be transferred to other process. This blocks
+     * bufferqueue migration from happening. The block should be in held.
      *
      * This function assumes that \p poolData comes from a bufferqueue-based
      * block. It does not check if that is the case.
      *
      * \param poolData blockpool data associated to the block.
      *
-     * \return The previous held status.
+     * \return true if transfer is eligible, false otherwise.
      */
     static
-    bool YieldBlockToBufferQueue(
+    bool BeginTransferBlockToClient(
             const std::shared_ptr<_C2BlockPoolData>& poolData);
 
+    /**
+     * Called after transferring the specified block is finished. Make sure
+     * that BeginTransferBlockToClient() was called before this call.
+     *
+     * This will unblock bufferqueue migration. If transfer result was
+     * successful, this causes the destruction of the block not to trigger a
+     * call to cancelBuffer().
+     * This function assumes that \p poolData comes from a bufferqueue-based
+     * block. It does not check if that is the case.
+     *
+     * \param poolData blockpool data associated to the block.
+     *
+     * \return true if transfer began before, false otherwise.
+     */
+    static
+    bool EndTransferBlockToClient(
+            const std::shared_ptr<_C2BlockPoolData>& poolData,
+            bool transferred);
+
+    /**
+     * Prepare a block to be migrated to another bufferqueue. This blocks
+     * rendering until migration has been finished.  The block should be in
+     * held.
+     *
+     * This function assumes that \p poolData comes from a bufferqueue-based
+     * block. It does not check if that is the case.
+     *
+     * \param poolData blockpool data associated to the block.
+     *
+     * \return true if migration is eligible, false otherwise.
+     */
+    static
+    bool BeginAttachBlockToBufferQueue(
+            const std::shared_ptr<_C2BlockPoolData>& poolData);
+
+    /**
+     * Called after migration of the specified block is finished. Make sure
+     * that BeginAttachBlockToBufferQueue() was called before this call.
+     *
+     * This will unblock rendering. if redering is tried during migration,
+     * this returns false. In that case, cancelBuffer() should be called.
+     * This function assumes that \p poolData comes from a bufferqueue-based
+     * block. It does not check if that is the case.
+     *
+     * \param poolData blockpool data associated to the block.
+     *
+     * \return true if migration is eligible, false otherwise.
+     */
+    static
+    bool EndAttachBlockToBufferQueue(
+            const std::shared_ptr<_C2BlockPoolData>& poolData,
+            const std::shared_ptr<int>& owner,
+            const ::android::sp<::android::hardware::graphics::bufferqueue::
+                                V2_0::IGraphicBufferProducer>& igbp,
+            uint32_t generation,
+            uint64_t bqId,
+            int32_t bqSlot);
+
+    /**
+     * Indicates a block to be rendered very soon.
+     *
+     * This function assumes that \p poolData comes from a bufferqueue-based
+     * block. It does not check if that is the case.
+     *
+     * \param poolData blockpool data associated to the block.
+     *
+     * \return true if migration is eligible, false otherwise.
+     */
+    static
+    bool DisplayBlockToBufferQueue(
+            const std::shared_ptr<_C2BlockPoolData>& poolData);
 };
 
 #endif // ANDROID_STAGEFRIGHT_C2BLOCK_INTERNAL_H_
