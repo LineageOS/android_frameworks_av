@@ -44,6 +44,16 @@
 
 using namespace android;
 
+ACameraDevice::~ACameraDevice() {
+    Mutex::Autolock _l(mDevice->mDeviceLock);
+    if (mDevice->mCbLooper != nullptr) {
+      mDevice->mCbLooper->unregisterHandler(mDevice->mHandler->id());
+      mDevice->mCbLooper->stop();
+    }
+    mDevice->mCbLooper.clear();
+    mDevice->mHandler.clear();
+}
+
 namespace android {
 namespace acam {
 
