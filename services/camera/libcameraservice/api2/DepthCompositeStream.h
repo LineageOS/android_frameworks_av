@@ -124,7 +124,7 @@ private:
 
     ssize_t              mMaxJpegSize;
     std::vector<std::tuple<size_t, size_t>> mSupportedDepthSizes;
-    std::vector<float>   mInstrinsicCalibration, mLensDistortion;
+    std::vector<float>   mIntrinsicCalibration, mLensDistortion;
     bool                 mIsLogicalCamera;
     void*                mDepthPhotoLibHandle;
     process_depth_photo_frame mDepthPhotoProcess;
