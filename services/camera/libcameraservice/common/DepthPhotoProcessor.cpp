@@ -61,6 +61,13 @@ using dynamic_depth::Pose;
 using dynamic_depth::Profile;
 using dynamic_depth::Profiles;
 
+template<>
+struct std::default_delete<jpeg_compress_struct> {
+    inline void operator()(jpeg_compress_struct* cinfo) const {
+        jpeg_destroy_compress(cinfo);
+    }
+};
+
 namespace android {
 namespace camera3 {
 
@@ -118,16 +125,16 @@ status_t encodeGrayscaleJpeg(size_t width, size_t height, uint8_t *in, void *out
         bool mSuccess;
     } dmgr;
 
-    jpeg_compress_struct cinfo = {};
+    std::unique_ptr<jpeg_compress_struct> cinfo = std::make_unique<jpeg_compress_struct>();
     jpeg_error_mgr jerr;
 
     // Initialize error handling with standard callbacks, but
     // then override output_message (to print to ALOG) and
     // error_exit to set a flag and print a message instead
     // of killing the whole process.
-    cinfo.err = jpeg_std_error(&jerr);
+    cinfo->err = jpeg_std_error(&jerr);
 
-    cinfo.err->output_message = [](j_common_ptr cinfo) {
+    cinfo->err->output_message = [](j_common_ptr cinfo) {
         char buffer[JMSG_LENGTH_MAX];
 
         /* Create the message */
@@ -135,7 +142,7 @@ status_t encodeGrayscaleJpeg(size_t width, size_t height, uint8_t *in, void *out
         ALOGE("libjpeg error: %s", buffer);
     };
 
-    cinfo.err->error_exit = [](j_common_ptr cinfo) {
+    cinfo->err->error_exit = [](j_common_ptr cinfo) {
         (*cinfo->err->output_message)(cinfo);
         if(cinfo->client_data) {
             auto & dmgr = *static_cast<CustomJpegDestMgr*>(cinfo->client_data);
@@ -144,12 +151,12 @@ status_t encodeGrayscaleJpeg(size_t width, size_t height, uint8_t *in, void *out
     };
 
     // Now that we initialized some callbacks, let's create our compressor
-    jpeg_create_compress(&cinfo);
+    jpeg_create_compress(cinfo.get());
     dmgr.mBuffer = static_cast<JOCTET*>(out);
     dmgr.mBufferSize = maxOutSize;
     dmgr.mEncodedSize = 0;
     dmgr.mSuccess = true;
-    cinfo.client_data = static_cast<void*>(&dmgr);
+    cinfo->client_data = static_cast<void*>(&dmgr);
 
     // These lambdas become C-style function pointers and as per C++11 spec
     // may not capture anything.
@@ -171,28 +178,28 @@ status_t encodeGrayscaleJpeg(size_t width, size_t height, uint8_t *in, void *out
         dmgr.mEncodedSize = dmgr.mBufferSize - dmgr.free_in_buffer;
         ALOGV("%s:%d Done with jpeg: %zu", __FUNCTION__, __LINE__, dmgr.mEncodedSize);
     };
-    cinfo.dest = reinterpret_cast<struct jpeg_destination_mgr*>(&dmgr);
-    cinfo.image_width = width;
-    cinfo.image_height = height;
-    cinfo.input_components = 1;
-    cinfo.in_color_space = JCS_GRAYSCALE;
+    cinfo->dest = static_cast<struct jpeg_destination_mgr*>(&dmgr);
+    cinfo->image_width = width;
+    cinfo->image_height = height;
+    cinfo->input_components = 1;
+    cinfo->in_color_space = JCS_GRAYSCALE;
 
     // Initialize defaults and then override what we want
-    jpeg_set_defaults(&cinfo);
+    jpeg_set_defaults(cinfo.get());
 
-    jpeg_set_quality(&cinfo, jpegQuality, 1);
-    jpeg_set_colorspace(&cinfo, JCS_GRAYSCALE);
-    cinfo.raw_data_in = 0;
-    cinfo.dct_method = JDCT_IFAST;
+    jpeg_set_quality(cinfo.get(), jpegQuality, 1);
+    jpeg_set_colorspace(cinfo.get(), JCS_GRAYSCALE);
+    cinfo->raw_data_in = 0;
+    cinfo->dct_method = JDCT_IFAST;
 
-    cinfo.comp_info[0].h_samp_factor = 1;
-    cinfo.comp_info[1].h_samp_factor = 1;
-    cinfo.comp_info[2].h_samp_factor = 1;
-    cinfo.comp_info[0].v_samp_factor = 1;
-    cinfo.comp_info[1].v_samp_factor = 1;
-    cinfo.comp_info[2].v_samp_factor = 1;
+    cinfo->comp_info[0].h_samp_factor = 1;
+    cinfo->comp_info[1].h_samp_factor = 1;
+    cinfo->comp_info[2].h_samp_factor = 1;
+    cinfo->comp_info[0].v_samp_factor = 1;
+    cinfo->comp_info[1].v_samp_factor = 1;
+    cinfo->comp_info[2].v_samp_factor = 1;
 
-    jpeg_start_compress(&cinfo, TRUE);
+    jpeg_start_compress(cinfo.get(), TRUE);
 
     if (exifOrientation != ExifOrientation::ORIENTATION_UNDEFINED) {
         std::unique_ptr<ExifUtils> utils(ExifUtils::create());
@@ -204,19 +211,19 @@ status_t encodeGrayscaleJpeg(size_t width, size_t height, uint8_t *in, void *out
         if (utils->generateApp1()) {
             const uint8_t* exifBuffer = utils->getApp1Buffer();
             size_t exifBufferSize = utils->getApp1Length();
-            jpeg_write_marker(&cinfo, JPEG_APP0 + 1, static_cast<const JOCTET*>(exifBuffer),
+            jpeg_write_marker(cinfo.get(), JPEG_APP0 + 1, static_cast<const JOCTET*>(exifBuffer),
                     exifBufferSize);
         } else {
             ALOGE("%s: Unable to generate App1 buffer", __FUNCTION__);
         }
     }
 
-    for (size_t i = 0; i < cinfo.image_height; i++) {
+    for (size_t i = 0; i < cinfo->image_height; i++) {
         auto currentRow  = static_cast<JSAMPROW>(in + i*width);
-        jpeg_write_scanlines(&cinfo, &currentRow, /*num_lines*/1);
+        jpeg_write_scanlines(cinfo.get(), &currentRow, /*num_lines*/1);
     }
 
-    jpeg_finish_compress(&cinfo);
+    jpeg_finish_compress(cinfo.get());
 
     actualSize = dmgr.mEncodedSize;
     if (dmgr.mSuccess) {
@@ -430,12 +437,12 @@ extern "C" int processDepthPhotoFrame(DepthPhotoInputFrame inputFrame, size_t de
         return BAD_VALUE;
     }
 
-    // It is not possible to generate an imaging model without instrinsic calibration.
-    if (inputFrame.mIsInstrinsicCalibrationValid) {
+    // It is not possible to generate an imaging model without intrinsic calibration.
+    if (inputFrame.mIsIntrinsicCalibrationValid) {
         // The camera intrinsic calibration layout is as follows:
         // [focalLengthX, focalLengthY, opticalCenterX, opticalCenterY, skew]
-        const dynamic_depth::Point<double> focalLength(inputFrame.mInstrinsicCalibration[0],
-                inputFrame.mInstrinsicCalibration[1]);
+        const dynamic_depth::Point<double> focalLength(inputFrame.mIntrinsicCalibration[0],
+                inputFrame.mIntrinsicCalibration[1]);
         size_t width = inputFrame.mMainJpegWidth;
         size_t height = inputFrame.mMainJpegHeight;
         if (switchDimensions) {
@@ -444,9 +451,9 @@ extern "C" int processDepthPhotoFrame(DepthPhotoInputFrame inputFrame, size_t de
         }
         const Dimension imageSize(width, height);
         ImagingModelParams imagingParams(focalLength, imageSize);
-        imagingParams.principal_point.x = inputFrame.mInstrinsicCalibration[2];
-        imagingParams.principal_point.y = inputFrame.mInstrinsicCalibration[3];
-        imagingParams.skew = inputFrame.mInstrinsicCalibration[4];
+        imagingParams.principal_point.x = inputFrame.mIntrinsicCalibration[2];
+        imagingParams.principal_point.y = inputFrame.mIntrinsicCalibration[3];
+        imagingParams.skew = inputFrame.mIntrinsicCalibration[4];
 
         // The camera lens distortion contains the following lens correction coefficients.
         // [kappa_1, kappa_2, kappa_3 kappa_4, kappa_5]
