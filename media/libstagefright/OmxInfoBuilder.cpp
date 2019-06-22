@@ -193,7 +193,7 @@ status_t OmxInfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                 // treat OMX.google codecs as non-hardware-accelerated and non-vendor
                 if (!isSoftware) {
                     attrs |= MediaCodecInfo::kFlagIsVendor;
-                    if (std::count_if(
+                    if (!std::count_if(
                             node.attributes.begin(), node.attributes.end(),
                             [](const IOmxStore::Attribute &i) -> bool {
                                 return i.key == "attribute::software-codec";
