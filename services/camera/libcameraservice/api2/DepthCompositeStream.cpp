@@ -58,8 +58,8 @@ DepthCompositeStream::DepthCompositeStream(wp<CameraDeviceBase> device,
 
         entry = staticInfo.find(ANDROID_LENS_INTRINSIC_CALIBRATION);
         if (entry.count == 5) {
-            mInstrinsicCalibration.reserve(5);
-            mInstrinsicCalibration.insert(mInstrinsicCalibration.end(), entry.data.f,
+            mIntrinsicCalibration.reserve(5);
+            mIntrinsicCalibration.insert(mIntrinsicCalibration.end(), entry.data.f,
                     entry.data.f + 5);
         } else {
             ALOGW("%s: Intrinsic calibration absent from camera characteristics!", __FUNCTION__);
@@ -323,12 +323,12 @@ status_t DepthCompositeStream::processInputFrame(const InputFrame &inputFrame) {
     depthPhoto.mMaxJpegSize = maxDepthJpegSize;
     // The camera intrinsic calibration layout is as follows:
     // [focalLengthX, focalLengthY, opticalCenterX, opticalCenterY, skew]
-    if (mInstrinsicCalibration.size() == 5) {
-        memcpy(depthPhoto.mInstrinsicCalibration, mInstrinsicCalibration.data(),
-                sizeof(depthPhoto.mInstrinsicCalibration));
-        depthPhoto.mIsInstrinsicCalibrationValid = 1;
+    if (mIntrinsicCalibration.size() == 5) {
+        memcpy(depthPhoto.mIntrinsicCalibration, mIntrinsicCalibration.data(),
+                sizeof(depthPhoto.mIntrinsicCalibration));
+        depthPhoto.mIsIntrinsicCalibrationValid = 1;
     } else {
-        depthPhoto.mIsInstrinsicCalibrationValid = 0;
+        depthPhoto.mIsIntrinsicCalibrationValid = 0;
     }
     // The camera lens distortion contains the following lens correction coefficients.
     // [kappa_1, kappa_2, kappa_3 kappa_4, kappa_5]
