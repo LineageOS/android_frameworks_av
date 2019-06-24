@@ -340,6 +340,7 @@ status_t C2SoftAomDec::initDecoder() {
     aom_codec_flags_t flags;
     memset(&flags, 0, sizeof(aom_codec_flags_t));
 
+    ALOGV("Using libaom AV1 software decoder.");
     aom_codec_err_t err;
     if ((err = aom_codec_dec_init(mCodecCtx, aom_codec_av1_dx(), &cfg, 0))) {
         ALOGE("av1 decoder failed to initialize. (%d)", err);
