@@ -5053,14 +5053,14 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationSizes(
     mCurrentSampleInfoCount = smplcnt;
     offset += 4;
     size -= 4;
+    if (mCurrentDefaultSampleInfoSize != 0) {
+        ALOGV("@@@@ using default sample info size of %d", mCurrentDefaultSampleInfoSize);
+        return OK;
+    }
     if(smplcnt > size) {
         ALOGW("b/124525515 - smplcnt(%u) > size(%ld)", (unsigned int)smplcnt, (unsigned long)size);
         android_errorWriteLog(0x534e4554, "124525515");
         return -EINVAL;
-    }
-    if (mCurrentDefaultSampleInfoSize != 0) {
-        ALOGV("@@@@ using default sample info size of %d", mCurrentDefaultSampleInfoSize);
-        return OK;
     }
     if (smplcnt > mCurrentSampleInfoAllocSize) {
         uint8_t * newPtr =  (uint8_t*) realloc(mCurrentSampleInfoSizes, smplcnt);
