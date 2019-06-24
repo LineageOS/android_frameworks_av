@@ -27,8 +27,6 @@
 
 namespace android {
 
-// TODO(vigneshv): This will be changed to c2.android.av1.decoder once this
-// component is fully functional.
 constexpr char COMPONENT_NAME[] = "c2.android.gav1.decoder";
 
 class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
@@ -338,6 +336,7 @@ bool C2SoftGav1Dec::initDecoder() {
   libgav1::DecoderSettings settings = {};
   settings.threads = GetCPUCoreCount();
 
+  ALOGV("Using libgav1 AV1 software decoder.");
   Libgav1StatusCode status = mCodecCtx->Init(&settings);
   if (status != kLibgav1StatusOk) {
     ALOGE("av1 decoder failed to initialize. status: %d.", status);
