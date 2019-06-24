@@ -109,6 +109,9 @@ class CameraDevice final : public RefBase {
 
     inline ACameraDevice* getWrapper() const { return mWrapper; };
 
+    // Stop the looper thread and unregister the handler
+    void stopLooper();
+
   private:
     friend ACameraCaptureSession;
     camera_status_t checkCameraClosedOrErrorLocked() const;
@@ -354,7 +357,7 @@ struct ACameraDevice {
                   sp<ACameraMetadata> chars) :
             mDevice(new android::acam::CameraDevice(id, cb, chars, this)) {}
 
-    ~ACameraDevice() {};
+    ~ACameraDevice();
 
     /*******************
      * NDK public APIs *

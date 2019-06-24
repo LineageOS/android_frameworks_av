@@ -45,13 +45,7 @@
 using namespace android;
 
 ACameraDevice::~ACameraDevice() {
-    Mutex::Autolock _l(mDevice->mDeviceLock);
-    if (mDevice->mCbLooper != nullptr) {
-      mDevice->mCbLooper->unregisterHandler(mDevice->mHandler->id());
-      mDevice->mCbLooper->stop();
-    }
-    mDevice->mCbLooper.clear();
-    mDevice->mHandler.clear();
+    mDevice->stopLooper();
 }
 
 namespace android {
@@ -140,13 +134,9 @@ CameraDevice::~CameraDevice() {
             disconnectLocked(session);
         }
         mCurrentSession = nullptr;
-        if (mCbLooper != nullptr) {
-            mCbLooper->unregisterHandler(mHandler->id());
-            mCbLooper->stop();
-        }
+        LOG_ALWAYS_FATAL_IF(mCbLooper != nullptr,
+            "CameraDevice looper should've been stopped before ~CameraDevice");
     }
-    mCbLooper.clear();
-    mHandler.clear();
 }
 
 void
@@ -1408,6 +1398,16 @@ CameraDevice::checkAndFireSequenceCompleteLocked() {
             ++it;
         }
     }
+}
+
+void CameraDevice::stopLooper() {
+    Mutex::Autolock _l(mDeviceLock);
+    if (mCbLooper != nullptr) {
+      mCbLooper->unregisterHandler(mHandler->id());
+      mCbLooper->stop();
+    }
+    mCbLooper.clear();
+    mHandler.clear();
 }
 
 /**
