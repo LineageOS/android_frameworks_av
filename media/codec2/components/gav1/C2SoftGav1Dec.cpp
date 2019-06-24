@@ -256,18 +256,494 @@ C2SoftGav1Dec::C2SoftGav1Dec(const char *name, c2_node_id_t id,
                              const std::shared_ptr<IntfImpl> &intfImpl)
     : SimpleC2Component(
           std::make_shared<SimpleInterface<IntfImpl>>(name, id, intfImpl)),
-      mIntf(intfImpl) {}
+      mIntf(intfImpl),
+      mCodecCtx(nullptr) {
+  gettimeofday(&mTimeStart, nullptr);
+  gettimeofday(&mTimeEnd, nullptr);
+}
 
-c2_status_t C2SoftGav1Dec::onInit() { return C2_OK; }
-c2_status_t C2SoftGav1Dec::onStop() { return C2_OK; }
-void C2SoftGav1Dec::onReset() {}
-void C2SoftGav1Dec::onRelease(){};
-c2_status_t C2SoftGav1Dec::onFlush_sm() { return C2_OK; }
-void C2SoftGav1Dec::process(const std::unique_ptr<C2Work> & /*work*/,
-                            const std::shared_ptr<C2BlockPool> & /*pool*/) {}
-c2_status_t C2SoftGav1Dec::drain(
-    uint32_t /*drainMode*/, const std::shared_ptr<C2BlockPool> & /*pool*/) {
+C2SoftGav1Dec::~C2SoftGav1Dec() { onRelease(); }
+
+c2_status_t C2SoftGav1Dec::onInit() {
+  return initDecoder() ? C2_OK : C2_CORRUPTED;
+}
+
+c2_status_t C2SoftGav1Dec::onStop() {
+  mSignalledError = false;
+  mSignalledOutputEos = false;
   return C2_OK;
+}
+
+void C2SoftGav1Dec::onReset() {
+  (void)onStop();
+  c2_status_t err = onFlush_sm();
+  if (err != C2_OK) {
+    ALOGW("Failed to flush the av1 decoder. Trying to hard reset.");
+    destroyDecoder();
+    if (!initDecoder()) {
+      ALOGE("Hard reset failed.");
+    }
+  }
+}
+
+void C2SoftGav1Dec::onRelease() { destroyDecoder(); }
+
+c2_status_t C2SoftGav1Dec::onFlush_sm() {
+  Libgav1StatusCode status =
+      mCodecCtx->EnqueueFrame(/*data=*/nullptr, /*size=*/0,
+                              /*user_private_data=*/0);
+  if (status != kLibgav1StatusOk) {
+    ALOGE("Failed to flush av1 decoder. status: %d.", status);
+    return C2_CORRUPTED;
+  }
+
+  // Dequeue frame (if any) that was enqueued previously.
+  const libgav1::DecoderBuffer *buffer;
+  status = mCodecCtx->DequeueFrame(&buffer);
+  if (status != kLibgav1StatusOk) {
+    ALOGE("Failed to dequeue frame after flushing the av1 decoder. status: %d",
+          status);
+    return C2_CORRUPTED;
+  }
+
+  mSignalledError = false;
+  mSignalledOutputEos = false;
+
+  return C2_OK;
+}
+
+static int GetCPUCoreCount() {
+  int cpuCoreCount = 1;
+#if defined(_SC_NPROCESSORS_ONLN)
+  cpuCoreCount = sysconf(_SC_NPROCESSORS_ONLN);
+#else
+  // _SC_NPROC_ONLN must be defined...
+  cpuCoreCount = sysconf(_SC_NPROC_ONLN);
+#endif
+  CHECK(cpuCoreCount >= 1);
+  ALOGV("Number of CPU cores: %d", cpuCoreCount);
+  return cpuCoreCount;
+}
+
+bool C2SoftGav1Dec::initDecoder() {
+  mSignalledError = false;
+  mSignalledOutputEos = false;
+  mCodecCtx.reset(new libgav1::Decoder());
+
+  if (mCodecCtx == nullptr) {
+    ALOGE("mCodecCtx is null");
+    return false;
+  }
+
+  libgav1::DecoderSettings settings = {};
+  settings.threads = GetCPUCoreCount();
+
+  Libgav1StatusCode status = mCodecCtx->Init(&settings);
+  if (status != kLibgav1StatusOk) {
+    ALOGE("av1 decoder failed to initialize. status: %d.", status);
+    return false;
+  }
+
+  return true;
+}
+
+void C2SoftGav1Dec::destroyDecoder() { mCodecCtx = nullptr; }
+
+void fillEmptyWork(const std::unique_ptr<C2Work> &work) {
+  uint32_t flags = 0;
+  if (work->input.flags & C2FrameData::FLAG_END_OF_STREAM) {
+    flags |= C2FrameData::FLAG_END_OF_STREAM;
+    ALOGV("signalling eos");
+  }
+  work->worklets.front()->output.flags = (C2FrameData::flags_t)flags;
+  work->worklets.front()->output.buffers.clear();
+  work->worklets.front()->output.ordinal = work->input.ordinal;
+  work->workletsProcessed = 1u;
+}
+
+void C2SoftGav1Dec::finishWork(uint64_t index,
+                               const std::unique_ptr<C2Work> &work,
+                               const std::shared_ptr<C2GraphicBlock> &block) {
+  std::shared_ptr<C2Buffer> buffer =
+      createGraphicBuffer(block, C2Rect(mWidth, mHeight));
+  auto fillWork = [buffer, index](const std::unique_ptr<C2Work> &work) {
+    uint32_t flags = 0;
+    if ((work->input.flags & C2FrameData::FLAG_END_OF_STREAM) &&
+        (c2_cntr64_t(index) == work->input.ordinal.frameIndex)) {
+      flags |= C2FrameData::FLAG_END_OF_STREAM;
+      ALOGV("signalling eos");
+    }
+    work->worklets.front()->output.flags = (C2FrameData::flags_t)flags;
+    work->worklets.front()->output.buffers.clear();
+    work->worklets.front()->output.buffers.push_back(buffer);
+    work->worklets.front()->output.ordinal = work->input.ordinal;
+    work->workletsProcessed = 1u;
+  };
+  if (work && c2_cntr64_t(index) == work->input.ordinal.frameIndex) {
+    fillWork(work);
+  } else {
+    finish(index, fillWork);
+  }
+}
+
+void C2SoftGav1Dec::process(const std::unique_ptr<C2Work> &work,
+                            const std::shared_ptr<C2BlockPool> &pool) {
+  work->result = C2_OK;
+  work->workletsProcessed = 0u;
+  work->worklets.front()->output.configUpdate.clear();
+  work->worklets.front()->output.flags = work->input.flags;
+  if (mSignalledError || mSignalledOutputEos) {
+    work->result = C2_BAD_VALUE;
+    return;
+  }
+
+  size_t inOffset = 0u;
+  size_t inSize = 0u;
+  C2ReadView rView = mDummyReadView;
+  if (!work->input.buffers.empty()) {
+    rView = work->input.buffers[0]->data().linearBlocks().front().map().get();
+    inSize = rView.capacity();
+    if (inSize && rView.error()) {
+      ALOGE("read view map failed %d", rView.error());
+      work->result = C2_CORRUPTED;
+      return;
+    }
+  }
+
+  bool codecConfig =
+      ((work->input.flags & C2FrameData::FLAG_CODEC_CONFIG) != 0);
+  bool eos = ((work->input.flags & C2FrameData::FLAG_END_OF_STREAM) != 0);
+
+  ALOGV("in buffer attr. size %zu timestamp %d frameindex %d, flags %x", inSize,
+        (int)work->input.ordinal.timestamp.peeku(),
+        (int)work->input.ordinal.frameIndex.peeku(), work->input.flags);
+
+  if (codecConfig) {
+    fillEmptyWork(work);
+    return;
+  }
+
+  int64_t frameIndex = work->input.ordinal.frameIndex.peekll();
+  if (inSize) {
+    uint8_t *bitstream = const_cast<uint8_t *>(rView.data() + inOffset);
+    int32_t decodeTime = 0;
+    int32_t delay = 0;
+
+    GETTIME(&mTimeStart, nullptr);
+    TIME_DIFF(mTimeEnd, mTimeStart, delay);
+
+    const Libgav1StatusCode status =
+        mCodecCtx->EnqueueFrame(bitstream, inSize, frameIndex);
+
+    GETTIME(&mTimeEnd, nullptr);
+    TIME_DIFF(mTimeStart, mTimeEnd, decodeTime);
+    ALOGV("decodeTime=%4d delay=%4d\n", decodeTime, delay);
+
+    if (status != kLibgav1StatusOk) {
+      ALOGE("av1 decoder failed to decode frame. status: %d.", status);
+      work->result = C2_CORRUPTED;
+      work->workletsProcessed = 1u;
+      mSignalledError = true;
+      return;
+    }
+
+  } else {
+    const Libgav1StatusCode status =
+        mCodecCtx->EnqueueFrame(/*data=*/nullptr, /*size=*/0,
+                                /*user_private_data=*/0);
+    if (status != kLibgav1StatusOk) {
+      ALOGE("Failed to flush av1 decoder. status: %d.", status);
+      work->result = C2_CORRUPTED;
+      work->workletsProcessed = 1u;
+      mSignalledError = true;
+      return;
+    }
+  }
+
+  (void)outputBuffer(pool, work);
+
+  if (eos) {
+    drainInternal(DRAIN_COMPONENT_WITH_EOS, pool, work);
+    mSignalledOutputEos = true;
+  } else if (!inSize) {
+    fillEmptyWork(work);
+  }
+}
+
+static void copyOutputBufferToYV12Frame(uint8_t *dst, const uint8_t *srcY,
+                                        const uint8_t *srcU,
+                                        const uint8_t *srcV, size_t srcYStride,
+                                        size_t srcUStride, size_t srcVStride,
+                                        uint32_t width, uint32_t height) {
+  const size_t dstYStride = align(width, 16);
+  const size_t dstUVStride = align(dstYStride / 2, 16);
+  uint8_t *const dstStart = dst;
+
+  for (size_t i = 0; i < height; ++i) {
+    memcpy(dst, srcY, width);
+    srcY += srcYStride;
+    dst += dstYStride;
+  }
+
+  dst = dstStart + dstYStride * height;
+  for (size_t i = 0; i < height / 2; ++i) {
+    memcpy(dst, srcV, width / 2);
+    srcV += srcVStride;
+    dst += dstUVStride;
+  }
+
+  dst = dstStart + (dstYStride * height) + (dstUVStride * height / 2);
+  for (size_t i = 0; i < height / 2; ++i) {
+    memcpy(dst, srcU, width / 2);
+    srcU += srcUStride;
+    dst += dstUVStride;
+  }
+}
+
+static void convertYUV420Planar16ToY410(uint32_t *dst, const uint16_t *srcY,
+                                        const uint16_t *srcU,
+                                        const uint16_t *srcV, size_t srcYStride,
+                                        size_t srcUStride, size_t srcVStride,
+                                        size_t dstStride, size_t width,
+                                        size_t height) {
+  // Converting two lines at a time, slightly faster
+  for (size_t y = 0; y < height; y += 2) {
+    uint32_t *dstTop = (uint32_t *)dst;
+    uint32_t *dstBot = (uint32_t *)(dst + dstStride);
+    uint16_t *ySrcTop = (uint16_t *)srcY;
+    uint16_t *ySrcBot = (uint16_t *)(srcY + srcYStride);
+    uint16_t *uSrc = (uint16_t *)srcU;
+    uint16_t *vSrc = (uint16_t *)srcV;
+
+    uint32_t u01, v01, y01, y23, y45, y67, uv0, uv1;
+    size_t x = 0;
+    for (; x < width - 3; x += 4) {
+      u01 = *((uint32_t *)uSrc);
+      uSrc += 2;
+      v01 = *((uint32_t *)vSrc);
+      vSrc += 2;
+
+      y01 = *((uint32_t *)ySrcTop);
+      ySrcTop += 2;
+      y23 = *((uint32_t *)ySrcTop);
+      ySrcTop += 2;
+      y45 = *((uint32_t *)ySrcBot);
+      ySrcBot += 2;
+      y67 = *((uint32_t *)ySrcBot);
+      ySrcBot += 2;
+
+      uv0 = (u01 & 0x3FF) | ((v01 & 0x3FF) << 20);
+      uv1 = (u01 >> 16) | ((v01 >> 16) << 20);
+
+      *dstTop++ = 3 << 30 | ((y01 & 0x3FF) << 10) | uv0;
+      *dstTop++ = 3 << 30 | ((y01 >> 16) << 10) | uv0;
+      *dstTop++ = 3 << 30 | ((y23 & 0x3FF) << 10) | uv1;
+      *dstTop++ = 3 << 30 | ((y23 >> 16) << 10) | uv1;
+
+      *dstBot++ = 3 << 30 | ((y45 & 0x3FF) << 10) | uv0;
+      *dstBot++ = 3 << 30 | ((y45 >> 16) << 10) | uv0;
+      *dstBot++ = 3 << 30 | ((y67 & 0x3FF) << 10) | uv1;
+      *dstBot++ = 3 << 30 | ((y67 >> 16) << 10) | uv1;
+    }
+
+    // There should be at most 2 more pixels to process. Note that we don't
+    // need to consider odd case as the buffer is always aligned to even.
+    if (x < width) {
+      u01 = *uSrc;
+      v01 = *vSrc;
+      y01 = *((uint32_t *)ySrcTop);
+      y45 = *((uint32_t *)ySrcBot);
+      uv0 = (u01 & 0x3FF) | ((v01 & 0x3FF) << 20);
+      *dstTop++ = ((y01 & 0x3FF) << 10) | uv0;
+      *dstTop++ = ((y01 >> 16) << 10) | uv0;
+      *dstBot++ = ((y45 & 0x3FF) << 10) | uv0;
+      *dstBot++ = ((y45 >> 16) << 10) | uv0;
+    }
+
+    srcY += srcYStride * 2;
+    srcU += srcUStride;
+    srcV += srcVStride;
+    dst += dstStride * 2;
+  }
+}
+
+static void convertYUV420Planar16ToYUV420Planar(
+    uint8_t *dst, const uint16_t *srcY, const uint16_t *srcU,
+    const uint16_t *srcV, size_t srcYStride, size_t srcUStride,
+    size_t srcVStride, size_t dstStride, size_t width, size_t height) {
+  uint8_t *dstY = (uint8_t *)dst;
+  size_t dstYSize = dstStride * height;
+  size_t dstUVStride = align(dstStride / 2, 16);
+  size_t dstUVSize = dstUVStride * height / 2;
+  uint8_t *dstV = dstY + dstYSize;
+  uint8_t *dstU = dstV + dstUVSize;
+
+  for (size_t y = 0; y < height; ++y) {
+    for (size_t x = 0; x < width; ++x) {
+      dstY[x] = (uint8_t)(srcY[x] >> 2);
+    }
+
+    srcY += srcYStride;
+    dstY += dstStride;
+  }
+
+  for (size_t y = 0; y < (height + 1) / 2; ++y) {
+    for (size_t x = 0; x < (width + 1) / 2; ++x) {
+      dstU[x] = (uint8_t)(srcU[x] >> 2);
+      dstV[x] = (uint8_t)(srcV[x] >> 2);
+    }
+
+    srcU += srcUStride;
+    srcV += srcVStride;
+    dstU += dstUVStride;
+    dstV += dstUVStride;
+  }
+}
+
+bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
+                                 const std::unique_ptr<C2Work> &work) {
+  if (!(work && pool)) return false;
+
+  const libgav1::DecoderBuffer *buffer;
+  const Libgav1StatusCode status = mCodecCtx->DequeueFrame(&buffer);
+
+  if (status != kLibgav1StatusOk) {
+    ALOGE("av1 decoder DequeueFrame failed. status: %d.", status);
+    return false;
+  }
+
+  // |buffer| can be NULL if status was equal to kLibgav1StatusOk. This is not
+  // an error. This could mean one of two things:
+  //  - The EnqueueFrame() call was either a flush (called with nullptr).
+  //  - The enqueued frame did not have any displayable frames.
+  if (!buffer) {
+    return false;
+  }
+
+  const int width = buffer->displayed_width[0];
+  const int height = buffer->displayed_height[0];
+  if (width != mWidth || height != mHeight) {
+    mWidth = width;
+    mHeight = height;
+
+    C2StreamPictureSizeInfo::output size(0u, mWidth, mHeight);
+    std::vector<std::unique_ptr<C2SettingResult>> failures;
+    c2_status_t err = mIntf->config({&size}, C2_MAY_BLOCK, &failures);
+    if (err == C2_OK) {
+      work->worklets.front()->output.configUpdate.push_back(
+          C2Param::Copy(size));
+    } else {
+      ALOGE("Config update size failed");
+      mSignalledError = true;
+      work->result = C2_CORRUPTED;
+      work->workletsProcessed = 1u;
+      return false;
+    }
+  }
+
+  // TODO(vigneshv): Add support for monochrome videos since AV1 supports it.
+  CHECK(buffer->image_format == libgav1::kImageFormatYuv420);
+
+  std::shared_ptr<C2GraphicBlock> block;
+  uint32_t format = HAL_PIXEL_FORMAT_YV12;
+  if (buffer->bitdepth == 10) {
+    IntfImpl::Lock lock = mIntf->lock();
+    std::shared_ptr<C2StreamColorAspectsTuning::output> defaultColorAspects =
+        mIntf->getDefaultColorAspects_l();
+
+    if (defaultColorAspects->primaries == C2Color::PRIMARIES_BT2020 &&
+        defaultColorAspects->matrix == C2Color::MATRIX_BT2020 &&
+        defaultColorAspects->transfer == C2Color::TRANSFER_ST2084) {
+      format = HAL_PIXEL_FORMAT_RGBA_1010102;
+    }
+  }
+  C2MemoryUsage usage = {C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
+
+  c2_status_t err = pool->fetchGraphicBlock(align(mWidth, 16), mHeight, format,
+                                            usage, &block);
+
+  if (err != C2_OK) {
+    ALOGE("fetchGraphicBlock for Output failed with status %d", err);
+    work->result = err;
+    return false;
+  }
+
+  C2GraphicView wView = block->map().get();
+
+  if (wView.error()) {
+    ALOGE("graphic view map failed %d", wView.error());
+    work->result = C2_CORRUPTED;
+    return false;
+  }
+
+  ALOGV("provided (%dx%d) required (%dx%d), out frameindex %d", block->width(),
+        block->height(), mWidth, mHeight, (int)buffer->user_private_data);
+
+  uint8_t *dst = const_cast<uint8_t *>(wView.data()[C2PlanarLayout::PLANE_Y]);
+  size_t srcYStride = buffer->stride[0];
+  size_t srcUStride = buffer->stride[1];
+  size_t srcVStride = buffer->stride[2];
+
+  if (buffer->bitdepth == 10) {
+    const uint16_t *srcY = (const uint16_t *)buffer->plane[0];
+    const uint16_t *srcU = (const uint16_t *)buffer->plane[1];
+    const uint16_t *srcV = (const uint16_t *)buffer->plane[2];
+
+    if (format == HAL_PIXEL_FORMAT_RGBA_1010102) {
+      convertYUV420Planar16ToY410(
+          (uint32_t *)dst, srcY, srcU, srcV, srcYStride / 2, srcUStride / 2,
+          srcVStride / 2, align(mWidth, 16), mWidth, mHeight);
+    } else {
+      convertYUV420Planar16ToYUV420Planar(dst, srcY, srcU, srcV, srcYStride / 2,
+                                          srcUStride / 2, srcVStride / 2,
+                                          align(mWidth, 16), mWidth, mHeight);
+    }
+  } else {
+    const uint8_t *srcY = (const uint8_t *)buffer->plane[0];
+    const uint8_t *srcU = (const uint8_t *)buffer->plane[1];
+    const uint8_t *srcV = (const uint8_t *)buffer->plane[2];
+    copyOutputBufferToYV12Frame(dst, srcY, srcU, srcV, srcYStride, srcUStride,
+                                srcVStride, mWidth, mHeight);
+  }
+  finishWork(buffer->user_private_data, work, std::move(block));
+  block = nullptr;
+  return true;
+}
+
+c2_status_t C2SoftGav1Dec::drainInternal(
+    uint32_t drainMode, const std::shared_ptr<C2BlockPool> &pool,
+    const std::unique_ptr<C2Work> &work) {
+  if (drainMode == NO_DRAIN) {
+    ALOGW("drain with NO_DRAIN: no-op");
+    return C2_OK;
+  }
+  if (drainMode == DRAIN_CHAIN) {
+    ALOGW("DRAIN_CHAIN not supported");
+    return C2_OMITTED;
+  }
+
+  Libgav1StatusCode status =
+      mCodecCtx->EnqueueFrame(/*data=*/nullptr, /*size=*/0,
+                              /*user_private_data=*/0);
+  if (status != kLibgav1StatusOk) {
+    ALOGE("Failed to flush av1 decoder. status: %d.", status);
+    return C2_CORRUPTED;
+  }
+
+  while (outputBuffer(pool, work)) {
+  }
+
+  if (drainMode == DRAIN_COMPONENT_WITH_EOS && work &&
+      work->workletsProcessed == 0u) {
+    fillEmptyWork(work);
+  }
+
+  return C2_OK;
+}
+
+c2_status_t C2SoftGav1Dec::drain(uint32_t drainMode,
+                                 const std::shared_ptr<C2BlockPool> &pool) {
+  return drainInternal(drainMode, pool, nullptr);
 }
 
 class C2SoftGav1Factory : public C2ComponentFactory {
