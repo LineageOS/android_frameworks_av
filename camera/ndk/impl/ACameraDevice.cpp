@@ -28,6 +28,10 @@
 
 #include "ACameraCaptureSession.inc"
 
+ACameraDevice::~ACameraDevice() {
+    mDevice->stopLooper();
+}
+
 namespace android {
 namespace acam {
 
@@ -116,14 +120,10 @@ CameraDevice::~CameraDevice() {
         if (!isClosed()) {
             disconnectLocked(session);
         }
+        LOG_ALWAYS_FATAL_IF(mCbLooper != nullptr,
+                "CameraDevice looper should've been stopped before ~CameraDevice");
         mCurrentSession = nullptr;
-        if (mCbLooper != nullptr) {
-            mCbLooper->unregisterHandler(mHandler->id());
-            mCbLooper->stop();
-        }
     }
-    mCbLooper.clear();
-    mHandler.clear();
 }
 
 void
@@ -890,6 +890,16 @@ CameraDevice::onCaptureErrorLocked(
         checkAndFireSequenceCompleteLocked();
     }
     return;
+}
+
+void CameraDevice::stopLooper() {
+    Mutex::Autolock _l(mDeviceLock);
+    if (mCbLooper != nullptr) {
+      mCbLooper->unregisterHandler(mHandler->id());
+      mCbLooper->stop();
+    }
+    mCbLooper.clear();
+    mHandler.clear();
 }
 
 CameraDevice::CallbackHandler::CallbackHandler(const char* id) : mId(id) {
