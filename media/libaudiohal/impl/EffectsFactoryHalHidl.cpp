@@ -35,12 +35,10 @@ namespace CPP_VERSION {
 using namespace ::android::hardware::audio::common::CPP_VERSION;
 using namespace ::android::hardware::audio::effect::CPP_VERSION;
 
-EffectsFactoryHalHidl::EffectsFactoryHalHidl() : ConversionHelperHidl("EffectsFactory") {
-    mEffectsFactory = IEffectsFactory::getService();
-    if (mEffectsFactory == 0) {
-        ALOGE("Failed to obtain IEffectsFactory service, terminating process.");
-        exit(1);
-    }
+EffectsFactoryHalHidl::EffectsFactoryHalHidl(sp<IEffectsFactory> effectsFactory)
+        : ConversionHelperHidl("EffectsFactory") {
+    ALOG_ASSERT(effectsFactory != nullptr, "Provided IDevicesFactory service is NULL");
+    mEffectsFactory = effectsFactory;
 }
 
 status_t EffectsFactoryHalHidl::queryAllDescriptors() {

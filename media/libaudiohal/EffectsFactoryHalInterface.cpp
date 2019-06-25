@@ -24,16 +24,10 @@ namespace android {
 
 // static
 sp<EffectsFactoryHalInterface> EffectsFactoryHalInterface::create() {
-    if (hardware::audio::effect::V5_0::IEffectsFactory::getService() != nullptr) {
-        return effect::V5_0::createEffectsFactoryHal();
-    }
-    if (hardware::audio::effect::V4_0::IEffectsFactory::getService() != nullptr) {
-        return effect::V4_0::createEffectsFactoryHal();
-    }
-    if (hardware::audio::effect::V2_0::IEffectsFactory::getService() != nullptr) {
-        return effect::V2_0::createEffectsFactoryHal();
-    }
-    return nullptr;
+    return effect::V5_0::createEffectsFactoryHal() ?:
+           effect::V4_0::createEffectsFactoryHal() ?:
+           effect::V2_0::createEffectsFactoryHal() ?:
+           nullptr;
 }
 
 // static

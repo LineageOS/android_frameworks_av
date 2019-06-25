@@ -35,13 +35,10 @@ using ::android::hardware::Return;
 namespace android {
 namespace CPP_VERSION {
 
-DevicesFactoryHalHidl::DevicesFactoryHalHidl() {
-    sp<IDevicesFactory> defaultFactory{IDevicesFactory::getService()};
-    if (!defaultFactory) {
-        ALOGE("Failed to obtain IDevicesFactory/default service, terminating process.");
-        exit(1);
-    }
-    mDeviceFactories.push_back(defaultFactory);
+DevicesFactoryHalHidl::DevicesFactoryHalHidl(sp<IDevicesFactory> devicesFactory) {
+    ALOG_ASSERT(devicesFactory != nullptr, "Provided IDevicesFactory service is NULL");
+
+    mDeviceFactories.push_back(devicesFactory);
     if (MAJOR_VERSION >= 4) {
         // The MSD factory is optional and only available starting at HAL 4.0
         sp<IDevicesFactory> msdFactory{IDevicesFactory::getService(AUDIO_HAL_SERVICE_NAME_MSD)};
