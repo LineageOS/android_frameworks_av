@@ -966,7 +966,7 @@ MtpResponseCode MtpServer::doSendObjectInfo() {
         (strcmp(name, "/") == 0) || (strcmp(basename(name), name) != 0)) {
         char errMsg[80];
 
-        sprintf(errMsg, "Invalid name: %s", (const char *) name);
+        snprintf(errMsg, sizeof(errMsg), "Invalid name: %s", (const char *) name);
         ALOGE("%s (b/130656917)", errMsg);
         android_errorWriteWithInfoLog(SN_EVENT_LOG_ID, "130656917", -1, errMsg,
                                       strlen(errMsg));
