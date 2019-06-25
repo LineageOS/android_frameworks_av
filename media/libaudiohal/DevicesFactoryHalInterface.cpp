@@ -22,10 +22,8 @@ namespace android {
 
 // static
 sp<DevicesFactoryHalInterface> DevicesFactoryHalInterface::create() {
-    return V5_0::createDevicesFactoryHal() ?:
-           V4_0::createDevicesFactoryHal() ?:
-           V2_0::createDevicesFactoryHal() ?:
-           nullptr;
+    return createPreferedImpl<DevicesFactoryHalInterface>();
 }
 
 } // namespace android
+
