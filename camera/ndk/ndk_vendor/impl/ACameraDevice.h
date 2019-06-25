@@ -133,6 +133,9 @@ class CameraDevice final : public RefBase {
     bool setDeviceMetadataQueues();
     inline ACameraDevice* getWrapper() const { return mWrapper; };
 
+    // Stop the looper thread and unregister the handler
+    void stopLooper();
+
   private:
     friend ACameraCaptureSession;
     friend ACameraDevice;
