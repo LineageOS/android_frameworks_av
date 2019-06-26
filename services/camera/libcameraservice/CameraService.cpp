@@ -1149,6 +1149,8 @@ status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clien
                 clientPid,
                 states[states.size() - 1]);
 
+        resource_policy::ClientPriority clientPriority = clientDescriptor->getPriority();
+
         // Find clients that would be evicted
         auto evicted = mActiveClientManager.wouldEvict(clientDescriptor);
 
@@ -1166,8 +1168,7 @@ status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clien
             String8 msg = String8::format("%s : DENIED connect device %s client for package %s "
                     "(PID %d, score %d state %d) due to eviction policy", curTime.string(),
                     cameraId.string(), packageName.string(), clientPid,
-                    priorityScores[priorityScores.size() - 1],
-                    states[states.size() - 1]);
+                    clientPriority.getScore(), clientPriority.getState());
 
             for (auto& i : incompatibleClients) {
                 msg.appendFormat("\n   - Blocked by existing device %s client for package %s"
@@ -1212,9 +1213,8 @@ status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clien
                     i->getKey().string(), String8{clientSp->getPackageName()}.string(),
                     i->getOwnerId(), i->getPriority().getScore(),
                     i->getPriority().getState(), cameraId.string(),
-                    packageName.string(), clientPid,
-                    priorityScores[priorityScores.size() - 1],
-                    states[states.size() - 1]));
+                    packageName.string(), clientPid, clientPriority.getScore(),
+                    clientPriority.getState()));
 
             // Notify the client of disconnection
             clientSp->notifyError(hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DISCONNECTED,
@@ -1348,14 +1348,19 @@ Status CameraService::connectDevice(
     Status ret = Status::ok();
     String8 id = String8(cameraId);
     sp<CameraDeviceClient> client = nullptr;
-
+    String16 clientPackageNameAdj = clientPackageName;
+    if (hardware::IPCThreadState::self()->isServingCall()) {
+        std::string vendorClient =
+                StringPrintf("vendor.client.pid<%d>", CameraThreadState::getCallingPid());
+        clientPackageNameAdj = String16(vendorClient.c_str());
+    }
     ret = connectHelper<hardware::camera2::ICameraDeviceCallbacks,CameraDeviceClient>(cameraCb, id,
             /*api1CameraId*/-1,
-            CAMERA_HAL_API_VERSION_UNSPECIFIED, clientPackageName,
+            CAMERA_HAL_API_VERSION_UNSPECIFIED, clientPackageNameAdj,
             clientUid, USE_CALLING_PID, API_2, /*shimUpdateOnly*/ false, /*out*/client);
 
     if(!ret.isOk()) {
-        logRejected(id, CameraThreadState::getCallingPid(), String8(clientPackageName),
+        logRejected(id, CameraThreadState::getCallingPid(), String8(clientPackageNameAdj),
                 ret.toString8());
         return ret;
     }
@@ -2368,11 +2373,7 @@ CameraService::BasicClient::BasicClient(const sp<CameraService>& cameraService,
         }
         mClientPackageName = packages[0];
     }
-    if (hardware::IPCThreadState::self()->isServingCall()) {
-        std::string vendorClient =
-                StringPrintf("vendor.client.pid<%d>", CameraThreadState::getCallingPid());
-        mClientPackageName = String16(vendorClient.c_str());
-    } else {
+    if (!hardware::IPCThreadState::self()->isServingCall()) {
         mAppOpsManager = std::make_unique<AppOpsManager>();
     }
 }
