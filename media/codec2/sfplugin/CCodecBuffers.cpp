@@ -439,6 +439,10 @@ size_t BuffersArrayImpl::numClientBuffers() const {
             });
 }
 
+size_t BuffersArrayImpl::arraySize() const {
+    return mBuffers.size();
+}
+
 // InputBuffersArray
 
 void InputBuffersArray::initialize(
@@ -883,11 +887,24 @@ void OutputBuffersArray::realloc(const std::shared_ptr<C2Buffer> &c2buffer) {
             mAlloc = [format = mFormat, size] {
                 return new LocalLinearBuffer(format, new ABuffer(size));
             };
+            ALOGD("[%s] reallocating with linear buffer of size %u", mName, size);
             break;
         }
 
-        // TODO: add support
-        case C2BufferData::GRAPHIC:         [[fallthrough]];
+        case C2BufferData::GRAPHIC: {
+            // This is only called for RawGraphicOutputBuffers.
+            mAlloc = [format = mFormat,
+                      lbp = LocalBufferPool::Create(kMaxLinearBufferSize * mImpl.arraySize())] {
+                return ConstGraphicBlockBuffer::AllocateEmpty(
+                        format,
+                        [lbp](size_t capacity) {
+                            return lbp->newBuffer(capacity);
+                        });
+            };
+            ALOGD("[%s] reallocating with graphic buffer: format = %s",
+                  mName, mFormat->debugString().c_str());
+            break;
+        }
 
         case C2BufferData::INVALID:         [[fallthrough]];
         case C2BufferData::LINEAR_CHUNKS:   [[fallthrough]];
