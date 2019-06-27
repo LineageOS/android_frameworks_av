@@ -3956,6 +3956,32 @@ status_t AudioFlinger::PlaybackThread::getTimestamp_l(AudioTimestamp& timestamp)
     return INVALID_OPERATION;
 }
 
+// For dedicated VoIP outputs, let the HAL apply the stream volume. Track volume is
+// still applied by the mixer.
+// All tracks attached to a mixer with flag VOIP_RX are tied to the same
+// stream type STREAM_VOICE_CALL so this will only change the HAL volume once even
+// if more than one track are active
+status_t AudioFlinger::PlaybackThread::handleVoipVolume_l(float *volume)
+{
+    status_t result = NO_ERROR;
+    if ((mOutput->flags & AUDIO_OUTPUT_FLAG_VOIP_RX) != 0) {
+        if (*volume != mLeftVolFloat) {
+            result = mOutput->stream->setVolume(*volume, *volume);
+            ALOGE_IF(result != OK,
+                     "Error when setting output stream volume: %d", result);
+            if (result == NO_ERROR) {
+                mLeftVolFloat = *volume;
+            }
+        }
+        // if stream volume was successfully sent to the HAL, mLeftVolFloat == v here and we
+        // remove stream volume contribution from software volume.
+        if (mLeftVolFloat == *volume) {
+            *volume = 1.0f;
+        }
+    }
+    return result;
+}
+
 status_t AudioFlinger::MixerThread::createAudioPatch_l(const struct audio_patch *patch,
                                                           audio_patch_handle_t *handle)
 {
@@ -4758,22 +4784,25 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     // no acknowledgement required for newly active tracks
                 }
                 sp<AudioTrackServerProxy> proxy = track->mAudioTrackServerProxy;
+                float volume;
+                if (track->isPlaybackRestricted() || mStreamTypes[track->streamType()].mute) {
+                    volume = 0.f;
+                } else {
+                    volume = masterVolume * mStreamTypes[track->streamType()].volume;
+                }
+
+                handleVoipVolume_l(&volume);
+
                 // cache the combined master volume and stream type volume for fast mixer; this
                 // lacks any synchronization or barrier so VolumeProvider may read a stale value
                 const float vh = track->getVolumeHandler()->getVolume(
-                        proxy->framesReleased()).first;
-                float volume;
-                if (track->isPlaybackRestricted()) {
-                    volume = 0.f;
-                } else {
-                    volume = masterVolume
-                        * mStreamTypes[track->streamType()].volume
-                        * vh;
-                }
+                    proxy->framesReleased()).first;
+                volume *= vh;
                 track->mCachedVolume = volume;
                 gain_minifloat_packed_t vlr = proxy->getVolumeLR();
                 float vlf = volume * float_from_gain(gain_minifloat_unpack_left(vlr));
                 float vrf = volume * float_from_gain(gain_minifloat_unpack_right(vlr));
+
                 track->setFinalVolume((vlf + vrf) / 2.f);
                 ++fastTracks;
             } else {
@@ -4916,20 +4945,22 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
             uint32_t vl, vr;       // in U8.24 integer format
             float vlf, vrf, vaf;   // in [0.0, 1.0] float format
             // read original volumes with volume control
-            float typeVolume = mStreamTypes[track->streamType()].volume;
-            float v = masterVolume * typeVolume;
+            float v = masterVolume * mStreamTypes[track->streamType()].volume;
             // Always fetch volumeshaper volume to ensure state is updated.
             const sp<AudioTrackServerProxy> proxy = track->mAudioTrackServerProxy;
             const float vh = track->getVolumeHandler()->getVolume(
                     track->mAudioTrackServerProxy->framesReleased()).first;
 
-            if (track->isPausing() || mStreamTypes[track->streamType()].mute
-                    || track->isPlaybackRestricted()) {
+            if (mStreamTypes[track->streamType()].mute || track->isPlaybackRestricted()) {
+                v = 0;
+            }
+
+            handleVoipVolume_l(&v);
+
+            if (track->isPausing()) {
                 vl = vr = 0;
                 vlf = vrf = vaf = 0.;
-                if (track->isPausing()) {
-                    track->setPaused();
-                }
+                track->setPaused();
             } else {
                 gain_minifloat_packed_t vlr = proxy->getVolumeLR();
                 vlf = float_from_gain(gain_minifloat_unpack_left(vlr));
@@ -4981,25 +5012,6 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 track->mHasVolumeController = false;
             }
 
-            // For dedicated VoIP outputs, let the HAL apply the stream volume. Track volume is
-            // still applied by the mixer.
-            if ((mOutput->flags & AUDIO_OUTPUT_FLAG_VOIP_RX) != 0) {
-                v = mStreamTypes[track->streamType()].mute ? 0.0f : v;
-                if (v != mLeftVolFloat) {
-                    status_t result = mOutput->stream->setVolume(v, v);
-                    ALOGE_IF(result != OK, "Error when setting output stream volume: %d", result);
-                    if (result == OK) {
-                        mLeftVolFloat = v;
-                    }
-                }
-                // if stream volume was successfully sent to the HAL, mLeftVolFloat == v here and we
-                // remove stream volume contribution from software volume.
-                if (v != 0.0f && mLeftVolFloat == v) {
-                   vlf = min(1.0f, vlf / v);
-                   vrf = min(1.0f, vrf / v);
-                   vaf = min(1.0f, vaf / v);
-               }
-            }
             // XXX: these things DON'T need to be done each time
             mAudioMixer->setBufferProvider(trackId, track);
             mAudioMixer->enable(trackId);
