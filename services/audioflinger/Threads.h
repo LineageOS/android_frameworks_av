@@ -747,6 +747,7 @@ protected:
                 // is safe to do so. That will drop the final ref count and destroy the tracks.
     virtual     mixer_state prepareTracks_l(Vector< sp<Track> > *tracksToRemove) = 0;
                 void        removeTracks_l(const Vector< sp<Track> >& tracksToRemove);
+                status_t    handleVoipVolume_l(float *volume);
 
     // StreamOutHalInterfaceCallback implementation
     virtual     void        onWriteReady();
