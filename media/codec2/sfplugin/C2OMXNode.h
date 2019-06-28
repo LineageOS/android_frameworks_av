@@ -113,6 +113,9 @@ private:
     c2_cntr64_t mPrevCodecTimestamp; // adjusted (codec) timestamp for previous frame
 
     Mutexed<std::map<uint64_t, buffer_id>> mBufferIdsInUse;
+
+    class QueueThread;
+    sp<QueueThread> mQueueThread;
 };
 
 }  // namespace android
