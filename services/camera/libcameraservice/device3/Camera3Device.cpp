@@ -29,6 +29,9 @@
 #define CLOGE(fmt, ...) ALOGE("Camera %s: %s: " fmt, mId.string(), __FUNCTION__, \
             ##__VA_ARGS__)
 
+#define CLOGW(fmt, ...) ALOGW("Camera %s: %s: " fmt, mId.string(), __FUNCTION__, \
+            ##__VA_ARGS__)
+
 // Convenience macros for transitioning to the error state
 #define SET_ERR(fmt, ...) setErrorState(   \
     "%s: " fmt, __FUNCTION__,              \
@@ -3267,14 +3270,19 @@ void Camera3Device::removeInFlightRequestIfReadyLocked(int idx) {
         ALOGVV("%s: removed frame %d from InFlightMap", __FUNCTION__, frameNumber);
      }
 
-    // Sanity check - if we have too many in-flight frames, something has
-    // likely gone wrong
-    if (!mIsConstrainedHighSpeedConfiguration && mInFlightMap.size() > kInFlightWarnLimit) {
-        CLOGE("In-flight list too large: %zu", mInFlightMap.size());
-    } else if (mIsConstrainedHighSpeedConfiguration && mInFlightMap.size() >
-            kInFlightWarnLimitHighSpeed) {
-        CLOGE("In-flight list too large for high speed configuration: %zu",
-                mInFlightMap.size());
+    // Sanity check - if we have too many in-flight frames with long total inflight duration,
+    // something has likely gone wrong. This might still be legit only if application send in
+    // a long burst of long exposure requests.
+    if (mExpectedInflightDuration > kMinWarnInflightDuration) {
+        if (!mIsConstrainedHighSpeedConfiguration && mInFlightMap.size() > kInFlightWarnLimit) {
+            CLOGW("In-flight list too large: %zu, total inflight duration %" PRIu64,
+                    mInFlightMap.size(), mExpectedInflightDuration);
+        } else if (mIsConstrainedHighSpeedConfiguration && mInFlightMap.size() >
+                kInFlightWarnLimitHighSpeed) {
+            CLOGW("In-flight list too large for high speed configuration: %zu,"
+                    "total inflight duration %" PRIu64,
+                    mInFlightMap.size(), mExpectedInflightDuration);
+        }
     }
 }
 
