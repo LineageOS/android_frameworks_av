@@ -127,14 +127,14 @@ status_t C2SoftVpxEnc::initEncoder() {
     }
 
     switch (mBitrateMode->value) {
-        case C2Config::BITRATE_VARIABLE:
-            mBitrateControlMode = VPX_VBR;
-            break;
         case C2Config::BITRATE_CONST:
-        default:
             mBitrateControlMode = VPX_CBR;
             break;
-        break;
+        case C2Config::BITRATE_VARIABLE:
+        [[fallthrough]];
+        default:
+            mBitrateControlMode = VPX_VBR;
+            break;
     }
 
     setCodecSpecificInterface();
