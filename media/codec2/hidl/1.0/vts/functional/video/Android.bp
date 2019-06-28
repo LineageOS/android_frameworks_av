@@ -15,14 +15,14 @@
  */
 
 cc_test {
-    name: "VtsHidlC2V1_0TargetVideoDecTest",
-    defaults: ["VtsMediaC2V1_0Defaults"],
-    srcs: ["VtsHidlC2V1_0TargetVideoDecTest.cpp"],
+    name: "VtsHalMeidaC2V1_0TargetVideoDecTest",
+    defaults: ["VtsHalMediaC2V1_0Defaults"],
+    srcs: ["VtsHalMediaC2V1_0TargetVideoDecTest.cpp"],
 }
 
 cc_test {
-    name: "VtsHidlC2V1_0TargetVideoEncTest",
-    defaults: ["VtsMediaC2V1_0Defaults"],
-    srcs: ["VtsHidlC2V1_0TargetVideoEncTest.cpp"],
+    name: "VtsHalMediaC2V1_0TargetVideoEncTest",
+    defaults: ["VtsHalMediaC2V1_0Defaults"],
+    srcs: ["VtsHalMediaC2V1_0TargetVideoEncTest.cpp"],
 }
 
