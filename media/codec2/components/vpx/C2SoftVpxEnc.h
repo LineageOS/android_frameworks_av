@@ -275,7 +275,7 @@ class C2SoftVpxEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
         addParameter(
             DefineParam(mBitrateMode, C2_PARAMKEY_BITRATE_MODE)
                 .withDefault(new C2StreamBitrateModeTuning::output(
-                        0u, C2Config::BITRATE_CONST))
+                        0u, C2Config::BITRATE_VARIABLE))
                 .withFields({
                     C2F(mBitrateMode, value).oneOf({
                         C2Config::BITRATE_CONST, C2Config::BITRATE_VARIABLE })
