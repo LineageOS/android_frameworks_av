@@ -395,7 +395,6 @@
         ScaleFilterCols_NEON*;
         ScaleFilterReduce;
         ScaleFilterRows_NEON*;
-        ScaleOffset;
         ScalePlane;
         ScalePlane_16;
         ScalePlaneBilinearDown;
