@@ -228,8 +228,6 @@ private:
     QueueSync mQueueSync;
     std::vector<std::unique_ptr<C2Param>> mParamsToBeSet;
 
-    size_t mDelay;
-
     struct Input {
         Input();
 
@@ -306,6 +304,7 @@ private:
                 const C2WorkOrdinalStruct &ordinal);
         void defer(const Entry &entry);
         bool hasPending() const;
+        uint32_t depth() const { return mDepth; }
 
     private:
         std::list<Entry> mPending;
