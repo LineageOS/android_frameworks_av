@@ -76,10 +76,11 @@ protected:
             Mutexed<Jobs>::Locked jobs(mJobs);
             nsecs_t nowNs = systemTime();
             bool queued = false;
-            for (auto it = jobs->queues.begin(); it != jobs->queues.end(); ++it) {
+            for (auto it = jobs->queues.begin(); it != jobs->queues.end(); ) {
                 Queue &queue = it->second;
                 if (queue.workList.empty()
                         || nowNs - queue.lastQueuedTimestampNs < kIntervalNs) {
+                    ++it;
                     continue;
                 }
                 std::shared_ptr<Codec2Client::Component> comp = queue.component.lock();
@@ -109,6 +110,7 @@ protected:
                 }
                 jobs.lock();
 
+                it = jobs->queues.upper_bound(comp);
                 queued = true;
             }
             if (queued) {
