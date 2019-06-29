@@ -1578,7 +1578,7 @@ void NuPlayer::GenericSource::onPollBuffering() {
         }
 
         if (mPreparing) {
-            notifyPreparedAndCleanup(finalStatus);
+            notifyPreparedAndCleanup(finalStatus == ERROR_END_OF_STREAM ? OK : finalStatus);
             mPreparing = false;
         } else if (mSentPauseOnBuffering) {
             sendCacheStats();

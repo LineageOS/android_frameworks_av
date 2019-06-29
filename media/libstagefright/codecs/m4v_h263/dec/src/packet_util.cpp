@@ -52,7 +52,11 @@ PV_STATUS PV_ReadVideoPacketHeader(VideoDecData *video, int *next_MB)
         PV_BitstreamByteAlign(stream);
         BitstreamReadBits32(stream, resync_marker_length);
 
-        *next_MB = (int) BitstreamReadBits16(stream, nbits);
+        int mbnum = (int) BitstreamReadBits16(stream, nbits);
+        if (mbnum < 0) {
+            return PV_FAIL;
+        }
+        *next_MB = mbnum;
 //      if (*next_MB <= video->mbnum)   /*  needs more investigation */
 //          *next_MB = video->mbnum+1;
 
