@@ -15,19 +15,19 @@
  */
 
 cc_test {
-    name: "VtsHidlC2V1_0TargetAudioDecTest",
-    defaults: ["VtsMediaC2V1_0Defaults"],
+    name: "VtsHalMediaC2V1_0TargetAudioDecTest",
+    defaults: ["VtsHalMediaC2V1_0Defaults"],
     srcs: [
-        "VtsHidlC2V1_0TargetAudioDecTest.cpp",
+        "VtsHalMediaC2V1_0TargetAudioDecTest.cpp",
         //"media_audio_hidl_test_common.cpp"
     ],
 }
 
 cc_test {
-    name: "VtsHidlC2V1_0TargetAudioEncTest",
-    defaults: ["VtsMediaC2V1_0Defaults"],
+    name: "VtsHalMediaC2V1_0TargetAudioEncTest",
+    defaults: ["VtsHalMediaC2V1_0Defaults"],
     srcs: [
-        "VtsHidlC2V1_0TargetAudioEncTest.cpp",
+        "VtsHalMediaC2V1_0TargetAudioEncTest.cpp",
         //"media_audio_hidl_test_common.cpp"
     ],
 }
