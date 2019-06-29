@@ -220,7 +220,6 @@ CCodecBufferChannel::CCodecBufferChannel(
         const std::shared_ptr<CCodecCallback> &callback)
     : mHeapSeqNum(-1),
       mCCodecCallback(callback),
-      mDelay(0),
       mFrameIndex(0u),
       mFirstValidFrameIndex(0u),
       mMetaMode(MODE_NONE),
@@ -814,7 +813,6 @@ status_t CCodecBufferChannel::start(
 
     size_t numInputSlots = inputDelayValue + pipelineDelayValue + kSmoothnessFactor;
     size_t numOutputSlots = outputDelayValue + kSmoothnessFactor;
-    mDelay = inputDelayValue + pipelineDelayValue + outputDelayValue;
 
     // TODO: get this from input format
     bool secure = mComponent->getName().find(".secure") != std::string::npos;
@@ -1377,24 +1375,34 @@ bool CCodecBufferChannel::handleWork(
                         (void)mPipelineWatcher.lock()->outputDelay(outputDelay.value);
 
                         bool outputBuffersChanged = false;
-                        Mutexed<Output>::Locked output(mOutput);
-                        output->outputDelay = outputDelay.value;
-                        size_t numOutputSlots = outputDelay.value + kSmoothnessFactor;
-                        if (output->numSlots < numOutputSlots) {
-                            output->numSlots = numOutputSlots;
-                            if (output->buffers->isArrayMode()) {
-                                OutputBuffersArray *array =
-                                    (OutputBuffersArray *)output->buffers.get();
-                                ALOGV("[%s] onWorkDone: growing output buffer array to %zu",
-                                      mName, numOutputSlots);
-                                array->grow(numOutputSlots);
-                                outputBuffersChanged = true;
+                        size_t numOutputSlots = 0;
+                        {
+                            Mutexed<Output>::Locked output(mOutput);
+                            output->outputDelay = outputDelay.value;
+                            numOutputSlots = outputDelay.value + kSmoothnessFactor;
+                            if (output->numSlots < numOutputSlots) {
+                                output->numSlots = numOutputSlots;
+                                if (output->buffers->isArrayMode()) {
+                                    OutputBuffersArray *array =
+                                        (OutputBuffersArray *)output->buffers.get();
+                                    ALOGV("[%s] onWorkDone: growing output buffer array to %zu",
+                                          mName, numOutputSlots);
+                                    array->grow(numOutputSlots);
+                                    outputBuffersChanged = true;
+                                }
                             }
+                            numOutputSlots = output->numSlots;
                         }
-                        output.unlock();
 
                         if (outputBuffersChanged) {
                             mCCodecCallback->onOutputBuffersChanged();
+                        }
+
+                        uint32_t depth = mReorderStash.lock()->depth();
+                        Mutexed<OutputSurface>::Locked output(mOutputSurface);
+                        output->maxDequeueBuffers = numOutputSlots + depth + kRenderingDepth;
+                        if (output->surface) {
+                            output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
                         }
                     }
                 }
@@ -1620,7 +1628,12 @@ PipelineWatcher::Clock::duration CCodecBufferChannel::elapsed() {
     // When client pushed EOS, we want all the work to be done quickly.
     // Otherwise, component may have stalled work due to input starvation up to
     // the sum of the delay in the pipeline.
-    size_t n = mInputMetEos ? 0 : mDelay;
+    size_t n = 0;
+    if (!mInputMetEos) {
+        size_t outputDelay = mOutput.lock()->outputDelay;
+        Mutexed<Input>::Locked input(mInput);
+        n = input->inputDelay + input->pipelineDelay + outputDelay;
+    }
     return mPipelineWatcher.lock()->elapsed(PipelineWatcher::Clock::now(), n);
 }
 
