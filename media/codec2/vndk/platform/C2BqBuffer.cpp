@@ -413,6 +413,7 @@ private:
         }
 
         sp<GraphicBuffer> &slotBuffer = mBuffers[slot];
+        uint32_t outGeneration;
         if (bufferNeedsReallocation || !slotBuffer) {
             if (!slotBuffer) {
                 slotBuffer = new GraphicBuffer();
@@ -421,7 +422,7 @@ private:
             // instead of a new allocation.
             Return<void> transResult = mProducer->requestBuffer(
                     slot,
-                    [&status, &slotBuffer](
+                    [&status, &slotBuffer, &outGeneration](
                             HStatus hStatus,
                             HBuffer const& hBuffer,
                             uint32_t generationNumber){
@@ -429,16 +430,22 @@ private:
                                 h2b(hBuffer, &slotBuffer) &&
                                 slotBuffer) {
                             slotBuffer->setGenerationNumber(generationNumber);
+                            outGeneration = generationNumber;
                         } else {
                             status = android::BAD_VALUE;
                         }
                     });
             if (!transResult.isOk()) {
+                slotBuffer.clear();
                 return C2_BAD_VALUE;
             } else if (status != android::NO_ERROR) {
                 slotBuffer.clear();
                 (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
                 return C2_BAD_VALUE;
+            }
+            if (mGeneration == 0) {
+                // getting generation # lazily due to dequeue failure.
+                mGeneration = outGeneration;
             }
         }
         if (slotBuffer) {
@@ -563,6 +570,10 @@ public:
             producerId = static_cast<uint64_t>(transResult);
             // TODO: provide gneration number from parameter.
             haveGeneration = getGenerationNumber(producer, &generation);
+            if (!haveGeneration) {
+                ALOGW("get generationNumber failed %llu",
+                      (unsigned long long)producerId);
+            }
         }
         int migrated = 0;
         {
@@ -580,10 +591,10 @@ public:
                 }
             }
             int32_t oldGeneration = mGeneration;
-            if (producer && haveGeneration) {
+            if (producer) {
                 mProducer = producer;
                 mProducerId = producerId;
-                mGeneration = generation;
+                mGeneration = haveGeneration ? generation : 0;
             } else {
                 mProducer = nullptr;
                 mProducerId = 0;
@@ -591,7 +602,7 @@ public:
                 ALOGW("invalid producer producer(%d), generation(%d)",
                       (bool)producer, haveGeneration);
             }
-            if (mProducer) { // migrate buffers
+            if (mProducer && haveGeneration) { // migrate buffers
                 for (int i = 0; i < NUM_BUFFER_SLOTS; ++i) {
                     std::shared_ptr<C2BufferQueueBlockPoolData> data =
                             mPoolDatas[i].lock();
