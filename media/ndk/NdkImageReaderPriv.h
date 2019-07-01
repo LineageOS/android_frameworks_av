@@ -134,7 +134,7 @@ struct AImageReader : public RefBase {
 
       private:
         AImageReader_ImageListener mListener = {nullptr, nullptr};
-        wp<AImageReader>           mReader;
+        const wp<AImageReader>     mReader;
         Mutex                      mLock;
     };
     sp<FrameListener> mFrameListener;
@@ -149,7 +149,7 @@ struct AImageReader : public RefBase {
 
        private:
         AImageReader_BufferRemovedListener mListener = {nullptr, nullptr};
-        wp<AImageReader>           mReader;
+        const wp<AImageReader>     mReader;
         Mutex                      mLock;
     };
     sp<BufferRemovedListener> mBufferRemovedListener;
