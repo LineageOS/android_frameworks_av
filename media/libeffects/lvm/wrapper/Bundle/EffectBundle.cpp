@@ -302,6 +302,8 @@ extern "C" int EffectCreate(const effect_uuid_t *uuid,
         for (int i = 0; i < FIVEBAND_NUMBANDS; i++) {
             pContext->pBundledContext->bandGaindB[i] = EQNB_5BandSoftPresets[i];
         }
+        pContext->pBundledContext->effectProcessCalled      = 0;
+        pContext->pBundledContext->effectInDrain            = 0;
 
         ALOGV("\tEffectCreate - Calling LvmBundle_init");
         ret = LvmBundle_init(pContext);
@@ -394,6 +396,8 @@ extern "C" int EffectRelease(effect_handle_t handle){
 
     // Clear the instantiated flag for the effect
     // protect agains the case where an effect is un-instantiated without being disabled
+
+    int &effectInDrain = pContext->pBundledContext->effectInDrain;
     if(pContext->EffectType == LVM_BASS_BOOST) {
         ALOGV("\tEffectRelease LVM_BASS_BOOST Clearing global intstantiated flag");
         pSessionContext->bBassInstantiated = LVM_FALSE;
@@ -418,12 +422,16 @@ extern "C" int EffectRelease(effect_handle_t handle){
     } else if(pContext->EffectType == LVM_VOLUME) {
         ALOGV("\tEffectRelease LVM_VOLUME Clearing global intstantiated flag");
         pSessionContext->bVolumeInstantiated = LVM_FALSE;
-        if (pContext->pBundledContext->bVolumeEnabled == LVM_TRUE){
+        // There is no samplesToExitCount for volume so we also use the drain flag to check
+        // if we should decrement the effects enabled.
+        if (pContext->pBundledContext->bVolumeEnabled == LVM_TRUE
+                || (effectInDrain & 1 << LVM_VOLUME) != 0) {
             pContext->pBundledContext->NumberEffectsEnabled--;
         }
     } else {
         ALOGV("\tLVM_ERROR : EffectRelease : Unsupported effect\n\n\n\n\n\n\n");
     }
+    effectInDrain &= ~(1 << pContext->EffectType); // no need to drain if released
 
     // Disable effect, in this case ignore errors (return codes)
     // if an effect has already been disabled
@@ -3124,8 +3132,9 @@ LVM_INT16 LVC_ToDB_s32Tos16(LVM_INT32 Lin_fix)
 
 int Effect_setEnabled(EffectContext *pContext, bool enabled)
 {
-    ALOGV("\tEffect_setEnabled() type %d, enabled %d", pContext->EffectType, enabled);
-
+    ALOGV("%s effectType %d, enabled %d, currently enabled %d", __func__,
+            pContext->EffectType, enabled, pContext->pBundledContext->NumberEffectsEnabled);
+    int &effectInDrain = pContext->pBundledContext->effectInDrain;
     if (enabled) {
         // Bass boost or Virtualizer can be temporarily disabled if playing over device speaker due
         // to their nature.
@@ -3139,6 +3148,7 @@ int Effect_setEnabled(EffectContext *pContext, bool enabled)
                 if(pContext->pBundledContext->SamplesToExitCountBb <= 0){
                     pContext->pBundledContext->NumberEffectsEnabled++;
                 }
+                effectInDrain &= ~(1 << LVM_BASS_BOOST);
                 pContext->pBundledContext->SamplesToExitCountBb =
                      (LVM_INT32)(pContext->pBundledContext->SamplesPerSecond*0.1);
                 pContext->pBundledContext->bBassEnabled = LVM_TRUE;
@@ -3152,6 +3162,7 @@ int Effect_setEnabled(EffectContext *pContext, bool enabled)
                 if(pContext->pBundledContext->SamplesToExitCountEq <= 0){
                     pContext->pBundledContext->NumberEffectsEnabled++;
                 }
+                effectInDrain &= ~(1 << LVM_EQUALIZER);
                 pContext->pBundledContext->SamplesToExitCountEq =
                      (LVM_INT32)(pContext->pBundledContext->SamplesPerSecond*0.1);
                 pContext->pBundledContext->bEqualizerEnabled = LVM_TRUE;
@@ -3164,6 +3175,7 @@ int Effect_setEnabled(EffectContext *pContext, bool enabled)
                 if(pContext->pBundledContext->SamplesToExitCountVirt <= 0){
                     pContext->pBundledContext->NumberEffectsEnabled++;
                 }
+                effectInDrain &= ~(1 << LVM_VIRTUALIZER);
                 pContext->pBundledContext->SamplesToExitCountVirt =
                      (LVM_INT32)(pContext->pBundledContext->SamplesPerSecond*0.1);
                 pContext->pBundledContext->bVirtualizerEnabled = LVM_TRUE;
@@ -3174,7 +3186,10 @@ int Effect_setEnabled(EffectContext *pContext, bool enabled)
                     ALOGV("\tEffect_setEnabled() LVM_VOLUME is already enabled");
                     return -EINVAL;
                 }
-                pContext->pBundledContext->NumberEffectsEnabled++;
+                if ((effectInDrain & 1 << LVM_VOLUME) == 0) {
+                    pContext->pBundledContext->NumberEffectsEnabled++;
+                }
+                effectInDrain &= ~(1 << LVM_VOLUME);
                 pContext->pBundledContext->bVolumeEnabled = LVM_TRUE;
                 break;
             default:
@@ -3192,6 +3207,7 @@ int Effect_setEnabled(EffectContext *pContext, bool enabled)
                     return -EINVAL;
                 }
                 pContext->pBundledContext->bBassEnabled = LVM_FALSE;
+                effectInDrain |= 1 << LVM_BASS_BOOST;
                 break;
             case LVM_EQUALIZER:
                 if (pContext->pBundledContext->bEqualizerEnabled == LVM_FALSE) {
@@ -3199,6 +3215,7 @@ int Effect_setEnabled(EffectContext *pContext, bool enabled)
                     return -EINVAL;
                 }
                 pContext->pBundledContext->bEqualizerEnabled = LVM_FALSE;
+                effectInDrain |= 1 << LVM_EQUALIZER;
                 break;
             case LVM_VIRTUALIZER:
                 if (pContext->pBundledContext->bVirtualizerEnabled == LVM_FALSE) {
@@ -3206,6 +3223,7 @@ int Effect_setEnabled(EffectContext *pContext, bool enabled)
                     return -EINVAL;
                 }
                 pContext->pBundledContext->bVirtualizerEnabled = LVM_FALSE;
+                effectInDrain |= 1 << LVM_VIRTUALIZER;
                 break;
             case LVM_VOLUME:
                 if (pContext->pBundledContext->bVolumeEnabled == LVM_FALSE) {
@@ -3213,6 +3231,7 @@ int Effect_setEnabled(EffectContext *pContext, bool enabled)
                     return -EINVAL;
                 }
                 pContext->pBundledContext->bVolumeEnabled = LVM_FALSE;
+                effectInDrain |= 1 << LVM_VOLUME;
                 break;
             default:
                 ALOGV("\tEffect_setEnabled() invalid effect type");
@@ -3283,6 +3302,38 @@ int Effect_process(effect_handle_t     self,
         ALOGV("\tLVM_ERROR : Effect_process() ERROR NULL INPUT POINTER OR FRAME COUNT IS WRONG");
         return -EINVAL;
     }
+
+    int &effectProcessCalled = pContext->pBundledContext->effectProcessCalled;
+    int &effectInDrain = pContext->pBundledContext->effectInDrain;
+    if ((effectProcessCalled & 1 << pContext->EffectType) != 0) {
+        ALOGW("Effect %d already called", pContext->EffectType);
+        const int undrainedEffects = effectInDrain & ~effectProcessCalled;
+        if ((undrainedEffects & 1 << LVM_BASS_BOOST) != 0) {
+            ALOGW("Draining BASS_BOOST");
+            pContext->pBundledContext->SamplesToExitCountBb = 0;
+            --pContext->pBundledContext->NumberEffectsEnabled;
+            effectInDrain &= ~(1 << LVM_BASS_BOOST);
+        }
+        if ((undrainedEffects & 1 << LVM_EQUALIZER) != 0) {
+            ALOGW("Draining EQUALIZER");
+            pContext->pBundledContext->SamplesToExitCountEq = 0;
+            --pContext->pBundledContext->NumberEffectsEnabled;
+            effectInDrain &= ~(1 << LVM_EQUALIZER);
+        }
+        if ((undrainedEffects & 1 << LVM_VIRTUALIZER) != 0) {
+            ALOGW("Draining VIRTUALIZER");
+            pContext->pBundledContext->SamplesToExitCountVirt = 0;
+            --pContext->pBundledContext->NumberEffectsEnabled;
+            effectInDrain &= ~(1 << LVM_VIRTUALIZER);
+        }
+        if ((undrainedEffects & 1 << LVM_VOLUME) != 0) {
+            ALOGW("Draining VOLUME");
+            --pContext->pBundledContext->NumberEffectsEnabled;
+            effectInDrain &= ~(1 << LVM_VOLUME);
+        }
+    }
+    effectProcessCalled |= 1 << pContext->EffectType;
+
     if ((pContext->pBundledContext->bBassEnabled == LVM_FALSE)&&
         (pContext->EffectType == LVM_BASS_BOOST)){
         //ALOGV("\tEffect_process() LVM_BASS_BOOST Effect is not enabled");
@@ -3291,9 +3342,12 @@ int Effect_process(effect_handle_t     self,
             //ALOGV("\tEffect_process: Waiting to turn off BASS_BOOST, %d samples left",
             //    pContext->pBundledContext->SamplesToExitCountBb);
         }
-        if(pContext->pBundledContext->SamplesToExitCountBb <= 0) {
+        if (pContext->pBundledContext->SamplesToExitCountBb <= 0) {
             status = -ENODATA;
-            pContext->pBundledContext->NumberEffectsEnabled--;
+            if ((effectInDrain & 1 << LVM_BASS_BOOST) != 0) {
+                pContext->pBundledContext->NumberEffectsEnabled--;
+                effectInDrain &= ~(1 << LVM_BASS_BOOST);
+            }
             ALOGV("\tEffect_process() this is the last frame for LVM_BASS_BOOST");
         }
     }
@@ -3301,7 +3355,10 @@ int Effect_process(effect_handle_t     self,
         (pContext->EffectType == LVM_VOLUME)){
         //ALOGV("\tEffect_process() LVM_VOLUME Effect is not enabled");
         status = -ENODATA;
-        pContext->pBundledContext->NumberEffectsEnabled--;
+        if ((effectInDrain & 1 << LVM_VOLUME) != 0) {
+            pContext->pBundledContext->NumberEffectsEnabled--;
+            effectInDrain &= ~(1 << LVM_VOLUME);
+        }
     }
     if ((pContext->pBundledContext->bEqualizerEnabled == LVM_FALSE)&&
         (pContext->EffectType == LVM_EQUALIZER)){
@@ -3311,9 +3368,12 @@ int Effect_process(effect_handle_t     self,
             //ALOGV("\tEffect_process: Waiting to turn off EQUALIZER, %d samples left",
             //    pContext->pBundledContext->SamplesToExitCountEq);
         }
-        if(pContext->pBundledContext->SamplesToExitCountEq <= 0) {
+        if (pContext->pBundledContext->SamplesToExitCountEq <= 0) {
             status = -ENODATA;
-            pContext->pBundledContext->NumberEffectsEnabled--;
+            if ((effectInDrain & 1 << LVM_EQUALIZER) != 0) {
+                pContext->pBundledContext->NumberEffectsEnabled--;
+                effectInDrain &= ~(1 << LVM_EQUALIZER);
+            }
             ALOGV("\tEffect_process() this is the last frame for LVM_EQUALIZER");
         }
     }
@@ -3326,9 +3386,12 @@ int Effect_process(effect_handle_t     self,
             //ALOGV("\tEffect_process: Waiting for to turn off VIRTUALIZER, %d samples left",
             //    pContext->pBundledContext->SamplesToExitCountVirt);
         }
-        if(pContext->pBundledContext->SamplesToExitCountVirt <= 0) {
+        if (pContext->pBundledContext->SamplesToExitCountVirt <= 0) {
             status = -ENODATA;
-            pContext->pBundledContext->NumberEffectsEnabled--;
+            if ((effectInDrain & 1 << LVM_VIRTUALIZER) != 0) {
+                pContext->pBundledContext->NumberEffectsEnabled--;
+                effectInDrain &= ~(1 << LVM_VIRTUALIZER);
+            }
             ALOGV("\tEffect_process() this is the last frame for LVM_VIRTUALIZER");
         }
     }
@@ -3337,8 +3400,18 @@ int Effect_process(effect_handle_t     self,
         pContext->pBundledContext->NumberEffectsCalled++;
     }
 
-    if(pContext->pBundledContext->NumberEffectsCalled ==
-       pContext->pBundledContext->NumberEffectsEnabled){
+    if (pContext->pBundledContext->NumberEffectsCalled >=
+            pContext->pBundledContext->NumberEffectsEnabled) {
+
+        // We expect the # effects called to be equal to # effects enabled in sequence (including
+        // draining effects).  Warn if this is not the case due to inconsistent calls.
+        ALOGW_IF(pContext->pBundledContext->NumberEffectsCalled >
+                pContext->pBundledContext->NumberEffectsEnabled,
+                "%s Number of effects called %d is greater than number of effects enabled %d",
+                __func__, pContext->pBundledContext->NumberEffectsCalled,
+                pContext->pBundledContext->NumberEffectsEnabled);
+        effectProcessCalled = 0; // reset our consistency check.
+
         //ALOGV("\tEffect_process     Calling process with %d effects enabled, %d called: Effect %d",
         //pContext->pBundledContext->NumberEffectsEnabled,
         //pContext->pBundledContext->NumberEffectsCalled, pContext->EffectType);
