@@ -629,7 +629,7 @@ private:
 // static
 std::shared_ptr<C2Mapper::ProfileLevelMapper>
 C2Mapper::GetProfileLevelMapper(std::string mediaType) {
-    std::transform(mediaType.begin(), mediaType.begin(), mediaType.end(), ::tolower);
+    std::transform(mediaType.begin(), mediaType.end(), mediaType.begin(), ::tolower);
     if (mediaType == MIMETYPE_AUDIO_AAC) {
         return std::make_shared<AacProfileLevelMapper>();
     } else if (mediaType == MIMETYPE_VIDEO_AVC) {
@@ -657,7 +657,7 @@ C2Mapper::GetProfileLevelMapper(std::string mediaType) {
 // static
 std::shared_ptr<C2Mapper::ProfileLevelMapper>
 C2Mapper::GetHdrProfileLevelMapper(std::string mediaType, bool isHdr10Plus) {
-    std::transform(mediaType.begin(), mediaType.begin(), mediaType.end(), ::tolower);
+    std::transform(mediaType.begin(), mediaType.end(), mediaType.begin(), ::tolower);
     if (mediaType == MIMETYPE_VIDEO_HEVC) {
         return std::make_shared<HevcProfileLevelMapper>(true, isHdr10Plus);
     } else if (mediaType == MIMETYPE_VIDEO_VP9) {
