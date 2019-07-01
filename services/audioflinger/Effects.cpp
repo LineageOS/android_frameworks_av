@@ -31,9 +31,9 @@
 #include <media/AudioEffect.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
+#include <mediautils/ServiceUtilities.h>
 
 #include "AudioFlinger.h"
-#include "ServiceUtilities.h"
 
 // ----------------------------------------------------------------------------
 
@@ -168,6 +168,68 @@ status_t AudioFlinger::EffectModule::addHandle(EffectHandle *handle)
     return status;
 }
 
+status_t AudioFlinger::EffectModule::updatePolicyState()
+{
+    status_t status = NO_ERROR;
+    bool doRegister = false;
+    bool registered = false;
+    bool doEnable = false;
+    bool enabled = false;
+    audio_io_handle_t io;
+    uint32_t strategy;
+
+    {
+        Mutex::Autolock _l(mLock);
+        // register effect when first handle is attached and unregister when last handle is removed
+        if (mPolicyRegistered != mHandles.size() > 0) {
+            doRegister = true;
+            mPolicyRegistered = mHandles.size() > 0;
+            if (mPolicyRegistered) {
+              sp <EffectChain> chain = mChain.promote();
+              sp <ThreadBase> thread = mThread.promote();
+
+              if (thread == nullptr || chain == nullptr) {
+                    return INVALID_OPERATION;
+                }
+                io = thread->id();
+                strategy = chain->strategy();
+            }
+        }
+        // enable effect when registered according to enable state requested by controlling handle
+        if (mHandles.size() > 0) {
+            EffectHandle *handle = controlHandle_l();
+            if (handle != nullptr && mPolicyEnabled != handle->enabled()) {
+                doEnable = true;
+                mPolicyEnabled = handle->enabled();
+            }
+        }
+        registered = mPolicyRegistered;
+        enabled = mPolicyEnabled;
+        mPolicyLock.lock();
+    }
+    ALOGV("%s name %s id %d session %d doRegister %d registered %d doEnable %d enabled %d",
+        __func__, mDescriptor.name, mId, mSessionId, doRegister, registered, doEnable, enabled);
+    if (doRegister) {
+        if (registered) {
+            status = AudioSystem::registerEffect(
+                &mDescriptor,
+                io,
+                strategy,
+                mSessionId,
+                mId);
+        } else {
+            status = AudioSystem::unregisterEffect(mId);
+        }
+    }
+    if (registered && doEnable) {
+        status = AudioSystem::setEffectEnabled(mId, enabled);
+    }
+    mPolicyLock.unlock();
+
+    return status;
+}
+
+
 ssize_t AudioFlinger::EffectModule::removeHandle(EffectHandle *handle)
 {
     Mutex::Autolock _l(mLock);
@@ -230,7 +292,6 @@ ssize_t AudioFlinger::EffectModule::disconnectHandle(EffectHandle *handle, bool 
     Mutex::Autolock _l(mLock);
     ssize_t numHandles = removeHandle_l(handle);
     if ((numHandles == 0) && (!mPinned || unpinIfLast)) {
-        AudioSystem::unregisterEffect(mId);
         sp<AudioFlinger> af = mAudioFlinger.promote();
         if (af != 0) {
             mLock.unlock();
@@ -309,8 +370,8 @@ void AudioFlinger::EffectModule::process()
     // input and output effect buffers without an intermediary effect process.
     // TODO: consider implementing channel conversion.
     const size_t safeInputOutputSampleCount =
-            inChannelCount != outChannelCount ? 0
-                    : outChannelCount * std::min(
+            mInChannelCountRequested != mOutChannelCountRequested ? 0
+                    : mOutChannelCountRequested * std::min(
                             mConfig.inputCfg.buffer.frameCount,
                             mConfig.outputCfg.buffer.frameCount);
     const auto accumulateInputToOutput = [this, safeInputOutputSampleCount]() {
@@ -480,7 +541,12 @@ void AudioFlinger::EffectModule::process()
         // accumulate input onto output
         sp<EffectChain> chain = mChain.promote();
         if (chain.get() != nullptr && chain->activeTrackCnt() != 0) {
-            accumulateInputToOutput();
+            // similar handling with data_bypass above.
+            if (mConfig.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
+                accumulateInputToOutput();
+            } else { // EFFECT_BUFFER_ACCESS_WRITE
+                copyInputToOutput();
+            }
         }
     }
 }
@@ -938,11 +1004,6 @@ status_t AudioFlinger::EffectModule::setEnabled_l(bool enabled)
     ALOGV("setEnabled %p enabled %d", this, enabled);
 
     if (enabled != isEnabled()) {
-        status_t status = AudioSystem::setEffectEnabled(mId, enabled);
-        if (enabled && status != NO_ERROR) {
-            return status;
-        }
-
         switch (mState) {
         // going from disabled to enabled
         case IDLE:
@@ -1131,7 +1192,8 @@ status_t AudioFlinger::EffectModule::setVolume(uint32_t *left, uint32_t *right, 
     // if controller flag is set (Note that controller == TRUE => EFFECT_FLAG_VOLUME_CTRL set)
     if (isProcessEnabled() &&
             ((mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK) == EFFECT_FLAG_VOLUME_CTRL ||
-            (mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK) == EFFECT_FLAG_VOLUME_IND)) {
+             (mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK) == EFFECT_FLAG_VOLUME_IND ||
+             (mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK) == EFFECT_FLAG_VOLUME_MONITOR)) {
         uint32_t volume[2];
         uint32_t *pVolume = NULL;
         uint32_t size = sizeof(volume);
@@ -1247,14 +1309,11 @@ bool AudioFlinger::EffectModule::purgeHandles()
 {
     bool enabled = false;
     Mutex::Autolock _l(mLock);
-    for (size_t i = 0; i < mHandles.size(); i++) {
-        EffectHandle *handle = mHandles[i];
-        if (handle != NULL && !handle->disconnected()) {
-            if (handle->hasControl()) {
-                enabled = handle->enabled();
-            }
-        }
+    EffectHandle *handle = controlHandle_l();
+    if (handle != NULL) {
+        enabled = handle->enabled();
     }
+    mHandles.clear();
     return enabled;
 }
 
@@ -1326,6 +1385,7 @@ String8 effectFlagsToString(uint32_t flags) {
     case EFFECT_FLAG_VOLUME_NONE: s.append("none"); break;
     case EFFECT_FLAG_VOLUME_CTRL: s.append("implements control"); break;
     case EFFECT_FLAG_VOLUME_IND: s.append("requires indication"); break;
+    case EFFECT_FLAG_VOLUME_MONITOR: s.append("monitors volume"); break;
     default: s.append("unknown/reserved"); break;
     }
     s.append(", ");
@@ -1428,9 +1488,10 @@ void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args __unu
         result.append("\t\tCould not lock Fx mutex:\n");
     }
 
-    result.append("\t\tSession Status State Engine:\n");
-    result.appendFormat("\t\t%05d   %03d    %03d   %p\n",
-            mSessionId, mStatus, mState, mEffectInterface.get());
+    result.append("\t\tSession Status State Registered Enabled Suspended Engine:\n");
+    result.appendFormat("\t\t%05d   %03d    %03d   %s          %s       %s         %p\n",
+            mSessionId, mStatus, mState, mPolicyRegistered ? "y" : "n", mPolicyEnabled ? "y" : "n",
+            mSuspended ? "y" : "n", mEffectInterface.get());
 
     result.append("\t\tDescriptor:\n");
     char uuidStr[64];
@@ -1492,6 +1553,11 @@ void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args __unu
     }
 
     write(fd, result.string(), result.length());
+
+    if (mEffectInterface != 0) {
+        dprintf(fd, "\tEffect ID %d HAL dump:\n", mId);
+        (void)mEffectInterface->dump(fd);
+    }
 
     if (locked) {
         mLock.unlock();
@@ -1560,6 +1626,12 @@ status_t AudioFlinger::EffectHandle::enable()
 
     mEnabled = true;
 
+    status_t status = effect->updatePolicyState();
+    if (status != NO_ERROR) {
+        mEnabled = false;
+        return status;
+    }
+
     sp<ThreadBase> thread = effect->thread().promote();
     if (thread != 0) {
         thread->checkSuspendOnEffectEnabled(effect, true, effect->sessionId());
@@ -1570,7 +1642,7 @@ status_t AudioFlinger::EffectHandle::enable()
         return NO_ERROR;
     }
 
-    status_t status = effect->setEnabled(true);
+    status = effect->setEnabled(true);
     if (status != NO_ERROR) {
         if (thread != 0) {
             thread->checkSuspendOnEffectEnabled(effect, false, effect->sessionId());
@@ -1613,6 +1685,8 @@ status_t AudioFlinger::EffectHandle::disable()
     }
     mEnabled = false;
 
+    effect->updatePolicyState();
+
     if (effect->suspended()) {
         return NO_ERROR;
     }
@@ -1648,20 +1722,17 @@ void AudioFlinger::EffectHandle::disconnect(bool unpinIfLast)
         return;
     }
     mDisconnected = true;
-    sp<ThreadBase> thread;
     {
         sp<EffectModule> effect = mEffect.promote();
         if (effect != 0) {
-            thread = effect->thread().promote();
-        }
-    }
-    if (thread != 0) {
-        thread->disconnectEffectHandle(this, unpinIfLast);
-    } else {
-        // try to cleanup as much as we can
-        sp<EffectModule> effect = mEffect.promote();
-        if (effect != 0 && effect->disconnectHandle(this, unpinIfLast) > 0) {
-            ALOGW("%s Effect handle %p disconnected after thread destruction", __FUNCTION__, this);
+            sp<ThreadBase> thread = effect->thread().promote();
+            if (thread != 0) {
+                thread->disconnectEffectHandle(this, unpinIfLast);
+            } else if (effect->disconnectHandle(this, unpinIfLast) > 0) {
+                ALOGW("%s Effect handle %p disconnected after thread destruction",
+                    __func__, this);
+            }
+            effect->updatePolicyState();
         }
     }
 
@@ -1859,7 +1930,7 @@ void AudioFlinger::EffectHandle::dumpToBuffer(char* buffer, size_t size)
     bool locked = mCblk != NULL && AudioFlinger::dumpTryLock(mCblk->lock);
 
     snprintf(buffer, size, "\t\t\t%5d    %5d  %3s    %3s  %5u  %5u\n",
-            (mClient == 0) ? getpid_cached : mClient->pid(),
+            (mClient == 0) ? getpid() : mClient->pid(),
             mPriority,
             mHasControl ? "yes" : "no",
             locked ? "yes" : "no",
@@ -1933,6 +2004,16 @@ sp<AudioFlinger::EffectModule> AudioFlinger::EffectChain::getEffectFromType_l(
         }
     }
     return 0;
+}
+
+std::vector<int> AudioFlinger::EffectChain::getEffectIds()
+{
+    std::vector<int> ids;
+    Mutex::Autolock _l(mLock);
+    for (size_t i = 0; i < mEffects.size(); i++) {
+        ids.push_back(mEffects[i]->id());
+    }
+    return ids;
 }
 
 void AudioFlinger::EffectChain::clearInputBuffer()
@@ -2272,7 +2353,7 @@ bool AudioFlinger::EffectChain::setVolume_l(uint32_t *left, uint32_t *right, boo
     }
     // then indicate volume to all other effects in chain.
     // Pass altered volume to effects before volume controller
-    // and requested volume to effects after controller
+    // and requested volume to effects after controller or with volume monitor flag
     uint32_t lVol = newLeft;
     uint32_t rVol = newRight;
 
@@ -2285,7 +2366,12 @@ bool AudioFlinger::EffectChain::setVolume_l(uint32_t *left, uint32_t *right, boo
             lVol = *left;
             rVol = *right;
         }
-        mEffects[i]->setVolume(&lVol, &rVol, false);
+        // Pass requested volume directly if this is volume monitor module
+        if (mEffects[i]->isVolumeMonitor()) {
+            mEffects[i]->setVolume(left, right, false);
+        } else {
+            mEffects[i]->setVolume(&lVol, &rVol, false);
+        }
     }
     *left = newLeft;
     *right = newRight;
@@ -2318,13 +2404,10 @@ void AudioFlinger::EffectChain::syncHalEffectsState()
 
 void AudioFlinger::EffectChain::dump(int fd, const Vector<String16>& args)
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
     String8 result;
 
-    size_t numEffects = mEffects.size();
-    snprintf(buffer, SIZE, "    %zu effects for session %d\n", numEffects, mSessionId);
-    result.append(buffer);
+    const size_t numEffects = mEffects.size();
+    result.appendFormat("    %zu effects for session %d\n", numEffects, mSessionId);
 
     if (numEffects) {
         bool locked = AudioFlinger::dumpTryLock(mLock);
@@ -2352,6 +2435,8 @@ void AudioFlinger::EffectChain::dump(int fd, const Vector<String16>& args)
         if (locked) {
             mLock.unlock();
         }
+    } else {
+        write(fd, result.string(), result.size());
     }
 }
 

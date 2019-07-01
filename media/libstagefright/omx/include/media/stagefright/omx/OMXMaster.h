@@ -52,13 +52,16 @@ struct OMXMaster : public OMXPluginBase {
 private:
     char mProcessName[16];
     Mutex mLock;
-    List<OMXPluginBase *> mPlugins;
+    struct Plugin {
+        OMXPluginBase *mOmx;
+        void *mLibHandle;
+    };
+    List<Plugin> mPlugins;
     KeyedVector<String8, OMXPluginBase *> mPluginByComponentName;
     KeyedVector<OMX_COMPONENTTYPE *, OMXPluginBase *> mPluginByInstance;
 
-    void *mVendorLibHandle;
-
     void addVendorPlugin();
+    void addPlatformPlugin();
     void addPlugin(const char *libname);
     void addPlugin(OMXPluginBase *plugin);
     void clearPlugins();

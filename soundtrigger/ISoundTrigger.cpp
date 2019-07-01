@@ -32,6 +32,7 @@ enum {
     UNLOAD_SOUND_MODEL,
     START_RECOGNITION,
     STOP_RECOGNITION,
+    GET_MODEL_STATE,
 };
 
 class BpSoundTrigger: public BpInterface<ISoundTrigger>
@@ -113,6 +114,18 @@ public:
         return status;
     }
 
+    virtual status_t getModelState(sound_model_handle_t handle)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(ISoundTrigger::getInterfaceDescriptor());
+        data.write(&handle, sizeof(sound_model_handle_t));
+        status_t status = remote()->transact(GET_MODEL_STATE, data, &reply);
+        if (status == NO_ERROR) {
+            status = (status_t)reply.readInt32();
+        }
+        return status;
+    }
+
 };
 
 IMPLEMENT_META_INTERFACE(SoundTrigger, "android.hardware.ISoundTrigger");
@@ -168,6 +181,17 @@ status_t BnSoundTrigger::onTransact(
             status_t status = stopRecognition(handle);
             reply->writeInt32(status);
             return NO_ERROR;
+        }
+        case GET_MODEL_STATE: {
+            CHECK_INTERFACE(ISoundTrigger, data, reply);
+            sound_model_handle_t handle;
+            status_t status = UNKNOWN_ERROR;
+            status_t ret = data.read(&handle, sizeof(sound_model_handle_t));
+            if (ret == NO_ERROR) {
+                status = getModelState(handle);
+            }
+            reply->writeInt32(status);
+            return ret;
         }
         default:
             return BBinder::onTransact(code, data, reply, flags);

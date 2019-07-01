@@ -36,7 +36,7 @@ namespace android {
 #define DEFAULT_MAX_REORDER_FRM     0
 #define DEFAULT_QP_MIN              10
 #define DEFAULT_QP_MAX              40
-#define DEFAULT_MAX_BITRATE         20000000
+#define DEFAULT_MAX_BITRATE         240000000
 #define DEFAULT_MAX_SRCH_RANGE_X    256
 #define DEFAULT_MAX_SRCH_RANGE_Y    256
 #define DEFAULT_MAX_FRAMERATE       120000
@@ -219,8 +219,8 @@ private:
     OMX_ERRORTYPE internalSetBitrateParams(
         const OMX_VIDEO_PARAM_BITRATETYPE *bitrate);
 
-    OMX_ERRORTYPE setConfig(
-        OMX_INDEXTYPE index, const OMX_PTR _params);
+    OMX_ERRORTYPE internalSetConfig(
+        OMX_INDEXTYPE index, const OMX_PTR _params, bool *frameConfig);
 
     OMX_ERRORTYPE getConfig(
         OMX_INDEXTYPE index, const OMX_PTR _params);

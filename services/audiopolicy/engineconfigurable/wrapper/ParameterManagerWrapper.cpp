@@ -18,7 +18,6 @@
 //#define LOG_NDEBUG 0
 
 #include "ParameterManagerWrapper.h"
-#include "audio_policy_criteria_conf.h"
 #include <ParameterMgrPlatformConnector.h>
 #include <SelectionCriterionTypeInterface.h>
 #include <SelectionCriterionInterface.h>
@@ -56,15 +55,37 @@ public:
     }
 };
 
-namespace android
-{
+namespace android {
 
 using utilities::convertTo;
 
-namespace audio_policy
-{
+namespace audio_policy {
+
 const char *const ParameterManagerWrapper::mPolicyPfwDefaultConfFileName =
     "/etc/parameter-framework/ParameterFrameworkConfigurationPolicy.xml";
+const char *const ParameterManagerWrapper::mPolicyPfwVendorConfFileName =
+    "/vendor/etc/parameter-framework/ParameterFrameworkConfigurationPolicy.xml";
+
+static const char *const gInputDeviceCriterionName = "AvailableInputDevices";
+static const char *const gOutputDeviceCriterionName = "AvailableOutputDevices";
+static const char *const gPhoneStateCriterionName = "TelephonyMode";
+static const char *const gOutputDeviceAddressCriterionName = "AvailableOutputDevicesAddresses";
+static const char *const gInputDeviceAddressCriterionName = "AvailableInputDevicesAddresses";
+
+/**
+ * Order MUST be align with defintiion of audio_policy_force_use_t within audio_policy.h
+ */
+static const char *const gForceUseCriterionTag[AUDIO_POLICY_FORCE_USE_CNT] =
+{
+    [AUDIO_POLICY_FORCE_FOR_COMMUNICATION] =        "ForceUseForCommunication",
+    [AUDIO_POLICY_FORCE_FOR_MEDIA] =                "ForceUseForMedia",
+    [AUDIO_POLICY_FORCE_FOR_RECORD] =               "ForceUseForRecord",
+    [AUDIO_POLICY_FORCE_FOR_DOCK] =                 "ForceUseForDock",
+    [AUDIO_POLICY_FORCE_FOR_SYSTEM] =               "ForceUseForSystem",
+    [AUDIO_POLICY_FORCE_FOR_HDMI_SYSTEM_AUDIO] =    "ForceUseForHdmiSystemAudio",
+    [AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND] =     "ForceUseForEncodedSurround",
+    [AUDIO_POLICY_FORCE_FOR_VIBRATE_RINGING] =      "ForceUseForVibrateRinging"
+};
 
 template <>
 struct ParameterManagerWrapper::parameterManagerElementSupported<ISelectionCriterionInterface> {};
@@ -75,18 +96,43 @@ ParameterManagerWrapper::ParameterManagerWrapper()
     : mPfwConnectorLogger(new ParameterMgrPlatformConnectorLogger)
 {
     // Connector
-    mPfwConnector = new CParameterMgrPlatformConnector(mPolicyPfwDefaultConfFileName);
+    if (access(mPolicyPfwVendorConfFileName, R_OK) == 0) {
+        mPfwConnector = new CParameterMgrPlatformConnector(mPolicyPfwVendorConfFileName);
+    } else {
+        mPfwConnector = new CParameterMgrPlatformConnector(mPolicyPfwDefaultConfFileName);
+    }
 
     // Logger
     mPfwConnector->setLogger(mPfwConnectorLogger);
+}
 
-    // Load criteria file
-    if ((loadAudioPolicyCriteriaConfig(gAudioPolicyCriteriaVendorConfFilePath) != NO_ERROR) &&
-        (loadAudioPolicyCriteriaConfig(gAudioPolicyCriteriaConfFilePath) != NO_ERROR)) {
-        ALOGE("%s: Neither vendor conf file (%s) nor system conf file (%s) could be found",
-              __FUNCTION__, gAudioPolicyCriteriaVendorConfFilePath,
-              gAudioPolicyCriteriaConfFilePath);
+status_t ParameterManagerWrapper::addCriterion(const std::string &name, bool isInclusive,
+                                               ValuePairs pairs, const std::string &defaultValue)
+{
+    ALOG_ASSERT(not isStarted(), "Cannot add a criterion if PFW is already started");
+    auto criterionType = mPfwConnector->createSelectionCriterionType(isInclusive);
+
+    for (auto pair : pairs) {
+        std::string error;
+        ALOGV("%s: Adding pair %d,%s for criterionType %s", __FUNCTION__, pair.first,
+              pair.second.c_str(), name.c_str());
+        criterionType->addValuePair(pair.first, pair.second, error);
     }
+    ALOG_ASSERT(mPolicyCriteria.find(name) == mPolicyCriteria.end(),
+                "%s: Criterion %s already added", __FUNCTION__, name.c_str());
+
+    auto criterion = mPfwConnector->createSelectionCriterion(name, criterionType);
+    mPolicyCriteria[name] = criterion;
+
+    if (not defaultValue.empty()) {
+        int numericalValue = 0;
+        if (not criterionType->getNumericalValue(defaultValue.c_str(), numericalValue)) {
+            ALOGE("%s; trying to apply invalid default literal value (%s)", __FUNCTION__,
+                  defaultValue.c_str());
+        }
+        criterion->setCriterionState(numericalValue);
+    }
+    return NO_ERROR;
 }
 
 ParameterManagerWrapper::~ParameterManagerWrapper()
@@ -112,112 +158,6 @@ status_t ParameterManagerWrapper::start()
     return NO_ERROR;
 }
 
-
-void ParameterManagerWrapper::addCriterionType(const string &typeName, bool isInclusive)
-{
-    ALOG_ASSERT(mPolicyCriterionTypes.find(typeName) == mPolicyCriterionTypes.end(),
-                      "CriterionType %s already added", typeName.c_str());
-    ALOGD("%s: Adding new criterionType %s", __FUNCTION__, typeName.c_str());
-
-    mPolicyCriterionTypes[typeName] = mPfwConnector->createSelectionCriterionType(isInclusive);
-}
-
-void ParameterManagerWrapper::addCriterionTypeValuePair(
-    const string &typeName,
-    uint32_t numericValue,
-    const string &literalValue)
-{
-    ALOG_ASSERT(mPolicyCriterionTypes.find(typeName) != mPolicyCriterionTypes.end(),
-                      "CriterionType %s not found", typeName.c_str());
-    ALOGV("%s: Adding new value pair (%d,%s) for criterionType %s", __FUNCTION__,
-          numericValue, literalValue.c_str(), typeName.c_str());
-    ISelectionCriterionTypeInterface *criterionType = mPolicyCriterionTypes[typeName];
-    std::string error;
-    criterionType->addValuePair(numericValue, literalValue, error);
-}
-
-void ParameterManagerWrapper::loadCriterionType(cnode *root, bool isInclusive)
-{
-    ALOG_ASSERT(root != NULL, "error in parsing file");
-    cnode *node;
-    for (node = root->first_child; node != NULL; node = node->next) {
-
-        ALOG_ASSERT(node != NULL, "error in parsing file");
-        const char *typeName = node->name;
-        char *valueNames = strndup(node->value, strlen(node->value));
-
-        addCriterionType(typeName, isInclusive);
-
-        uint32_t index = 0;
-        char *ctx;
-        char *valueName = strtok_r(valueNames, ",", &ctx);
-        while (valueName != NULL) {
-            if (strlen(valueName) != 0) {
-
-                // Conf file may use or not pair, if no pair, use incremental index, else
-                // use provided index.
-                if (strchr(valueName, ':') != NULL) {
-
-                    char *first = strtok(valueName, ":");
-                    char *second = strtok(NULL, ":");
-                    ALOG_ASSERT((first != NULL) && (strlen(first) != 0) &&
-                                      (second != NULL) && (strlen(second) != 0),
-                                      "invalid value pair");
-
-                    if (!convertTo<string, uint32_t>(first, index)) {
-                        ALOGE("%s: Invalid index(%s) found", __FUNCTION__, first);
-                    }
-                    addCriterionTypeValuePair(typeName, index, second);
-                } else {
-
-                    uint32_t pfwIndex = isInclusive ? 1 << index : index;
-                    addCriterionTypeValuePair(typeName, pfwIndex, valueName);
-                    index += 1;
-                }
-            }
-            valueName = strtok_r(NULL, ",", &ctx);
-        }
-        free(valueNames);
-    }
-}
-
-void ParameterManagerWrapper::loadInclusiveCriterionType(cnode *root)
-{
-    ALOG_ASSERT(root != NULL, "error in parsing file");
-    cnode *node = config_find(root, gInclusiveCriterionTypeTag.c_str());
-    if (node == NULL) {
-        return;
-    }
-    loadCriterionType(node, true);
-}
-
-void ParameterManagerWrapper::loadExclusiveCriterionType(cnode *root)
-{
-    ALOG_ASSERT(root != NULL, "error in parsing file");
-    cnode *node = config_find(root, gExclusiveCriterionTypeTag.c_str());
-    if (node == NULL) {
-        return;
-    }
-    loadCriterionType(node, false);
-}
-
-void ParameterManagerWrapper::parseChildren(cnode *root, string &defaultValue, string &type)
-{
-    ALOG_ASSERT(root != NULL, "error in parsing file");
-    cnode *node;
-    for (node = root->first_child; node != NULL; node = node->next) {
-        ALOG_ASSERT(node != NULL, "error in parsing file");
-
-        if (string(node->name) == gDefaultTag) {
-            defaultValue = node->value;
-        } else if (string(node->name) == gTypeTag) {
-            type = node->value;
-        } else {
-             ALOGE("%s: Unrecognized %s %s node", __FUNCTION__, node->name, node->value);
-        }
-    }
-}
-
 template <typename T>
 T *ParameterManagerWrapper::getElement(const string &name, std::map<string, T *> &elementsMap)
 {
@@ -236,97 +176,6 @@ const T *ParameterManagerWrapper::getElement(const string &name, const std::map<
     return it != elementsMap.end() ? it->second : NULL;
 }
 
-void ParameterManagerWrapper::loadCriteria(cnode *root)
-{
-    ALOG_ASSERT(root != NULL, "error in parsing file");
-    cnode *node = config_find(root, gCriterionTag.c_str());
-
-    if (node == NULL) {
-        ALOGW("%s: no inclusive criteria found", __FUNCTION__);
-        return;
-    }
-    for (node = node->first_child; node != NULL; node = node->next) {
-        loadCriterion(node);
-    }
-}
-
-void ParameterManagerWrapper::addCriterion(const string &name, const string &typeName,
-                              const string &defaultLiteralValue)
-{
-    ALOG_ASSERT(mPolicyCriteria.find(name) == mPolicyCriteria.end(),
-                "Route Criterion %s already added", name.c_str());
-
-    ISelectionCriterionTypeInterface *criterionType =
-            getElement<ISelectionCriterionTypeInterface>(typeName, mPolicyCriterionTypes);
-
-    ISelectionCriterionInterface *criterion =
-            mPfwConnector->createSelectionCriterion(name, criterionType);
-
-    mPolicyCriteria[name] = criterion;
-    int numericalValue = 0;
-    if (!criterionType->getNumericalValue(defaultLiteralValue.c_str(),  numericalValue)) {
-        ALOGE("%s; trying to apply invalid default literal value (%s)", __FUNCTION__,
-              defaultLiteralValue.c_str());
-    }
-    criterion->setCriterionState(numericalValue);
-}
-
-void ParameterManagerWrapper::loadCriterion(cnode *root)
-{
-    ALOG_ASSERT(root != NULL, "error in parsing file");
-    const char *criterionName = root->name;
-
-    ALOG_ASSERT(mPolicyCriteria.find(criterionName) == mPolicyCriteria.end(),
-                      "Criterion %s already added", criterionName);
-
-    string paramKeyName = "";
-    string path = "";
-    string typeName = "";
-    string defaultValue = "";
-
-    parseChildren(root, defaultValue, typeName);
-
-    addCriterion(criterionName, typeName, defaultValue);
-}
-
-void ParameterManagerWrapper::loadConfig(cnode *root)
-{
-    ALOG_ASSERT(root != NULL, "error in parsing file");
-    cnode *node = config_find(root, gPolicyConfTag.c_str());
-    if (node == NULL) {
-        ALOGW("%s: Could not find node for pfw", __FUNCTION__);
-        return;
-    }
-    ALOGD("%s: Loading conf for pfw", __FUNCTION__);
-    loadInclusiveCriterionType(node);
-    loadExclusiveCriterionType(node);
-    loadCriteria(node);
-}
-
-
-status_t ParameterManagerWrapper::loadAudioPolicyCriteriaConfig(const char *path)
-{
-    ALOG_ASSERT(path != NULL, "error in parsing file: empty path");
-    cnode *root;
-    char *data;
-    ALOGD("%s", __FUNCTION__);
-    data = (char *)load_file(path, NULL);
-    if (data == NULL) {
-        return -ENODEV;
-    }
-    root = config_node("", "");
-    ALOG_ASSERT(root != NULL, "Unable to allocate a configuration node");
-    config_load(root, data);
-
-    loadConfig(root);
-
-    config_free(root);
-    free(root);
-    free(data);
-    ALOGD("%s: loaded", __FUNCTION__);
-    return NO_ERROR;
-}
-
 bool ParameterManagerWrapper::isStarted()
 {
     return mPfwConnector && mPfwConnector->isStarted();
@@ -335,9 +184,9 @@ bool ParameterManagerWrapper::isStarted()
 status_t ParameterManagerWrapper::setPhoneState(audio_mode_t mode)
 {
     ISelectionCriterionInterface *criterion =
-            getElement<ISelectionCriterionInterface>(gPhoneStateCriterionTag, mPolicyCriteria);
+            getElement<ISelectionCriterionInterface>(gPhoneStateCriterionName, mPolicyCriteria);
     if (criterion == NULL) {
-        ALOGE("%s: no criterion found for %s", __FUNCTION__, gPhoneStateCriterionTag.c_str());
+        ALOGE("%s: no criterion found for %s", __FUNCTION__, gPhoneStateCriterionName);
         return BAD_VALUE;
     }
     if (!isValueValidForCriterion(criterion, static_cast<int>(mode))) {
@@ -351,9 +200,9 @@ status_t ParameterManagerWrapper::setPhoneState(audio_mode_t mode)
 audio_mode_t ParameterManagerWrapper::getPhoneState() const
 {
     const ISelectionCriterionInterface *criterion =
-            getElement<ISelectionCriterionInterface>(gPhoneStateCriterionTag, mPolicyCriteria);
+            getElement<ISelectionCriterionInterface>(gPhoneStateCriterionName, mPolicyCriteria);
     if (criterion == NULL) {
-        ALOGE("%s: no criterion found for %s", __FUNCTION__, gPhoneStateCriterionTag.c_str());
+        ALOGE("%s: no criterion found for %s", __FUNCTION__, gPhoneStateCriterionName);
         return AUDIO_MODE_NORMAL;
     }
     return static_cast<audio_mode_t>(criterion->getCriterionState());
@@ -370,7 +219,7 @@ status_t ParameterManagerWrapper::setForceUse(audio_policy_force_use_t usage,
     ISelectionCriterionInterface *criterion =
             getElement<ISelectionCriterionInterface>(gForceUseCriterionTag[usage], mPolicyCriteria);
     if (criterion == NULL) {
-        ALOGE("%s: no criterion found for %s", __FUNCTION__, gForceUseCriterionTag[usage].c_str());
+        ALOGE("%s: no criterion found for %s", __FUNCTION__, gForceUseCriterionTag[usage]);
         return BAD_VALUE;
     }
     if (!isValueValidForCriterion(criterion, static_cast<int>(config))) {
@@ -390,7 +239,7 @@ audio_policy_forced_cfg_t ParameterManagerWrapper::getForceUse(audio_policy_forc
     const ISelectionCriterionInterface *criterion =
             getElement<ISelectionCriterionInterface>(gForceUseCriterionTag[usage], mPolicyCriteria);
     if (criterion == NULL) {
-        ALOGE("%s: no criterion found for %s", __FUNCTION__, gForceUseCriterionTag[usage].c_str());
+        ALOGE("%s: no criterion found for %s", __FUNCTION__, gForceUseCriterionTag[usage]);
         return AUDIO_POLICY_FORCE_NONE;
     }
     return static_cast<audio_policy_forced_cfg_t>(criterion->getCriterionState());
@@ -404,12 +253,45 @@ bool ParameterManagerWrapper::isValueValidForCriterion(ISelectionCriterionInterf
     return interface->getLiteralValue(valueToCheck, literalValue);
 }
 
+status_t ParameterManagerWrapper::setDeviceConnectionState(const sp<DeviceDescriptor> devDesc,
+                                                           audio_policy_dev_state_t state)
+{
+    std::string criterionName = audio_is_output_device(devDesc->type()) ?
+                gOutputDeviceAddressCriterionName : gInputDeviceAddressCriterionName;
+
+    ALOGV("%s: device with address %s %s", __FUNCTION__, devDesc->address().string(),
+          state != AUDIO_POLICY_DEVICE_STATE_AVAILABLE? "disconnected" : "connected");
+    ISelectionCriterionInterface *criterion =
+            getElement<ISelectionCriterionInterface>(criterionName, mPolicyCriteria);
+
+    if (criterion == NULL) {
+        ALOGE("%s: no criterion found for %s", __FUNCTION__, criterionName.c_str());
+        return DEAD_OBJECT;
+    }
+
+    auto criterionType = criterion->getCriterionType();
+    int deviceAddressId;
+    if (not criterionType->getNumericalValue(devDesc->address().string(), deviceAddressId)) {
+        ALOGW("%s: unknown device address reported (%s)", __FUNCTION__, devDesc->address().c_str());
+        return BAD_TYPE;
+    }
+    int currentValueMask = criterion->getCriterionState();
+    if (state == AUDIO_POLICY_DEVICE_STATE_AVAILABLE) {
+        currentValueMask |= deviceAddressId;
+    }
+    else {
+        currentValueMask &= ~deviceAddressId;
+    }
+    criterion->setCriterionState(currentValueMask);
+    return NO_ERROR;
+}
+
 status_t ParameterManagerWrapper::setAvailableInputDevices(audio_devices_t inputDevices)
 {
     ISelectionCriterionInterface *criterion =
-            getElement<ISelectionCriterionInterface>(gInputDeviceCriterionTag, mPolicyCriteria);
+            getElement<ISelectionCriterionInterface>(gInputDeviceCriterionName, mPolicyCriteria);
     if (criterion == NULL) {
-        ALOGE("%s: no criterion found for %s", __FUNCTION__, gInputDeviceCriterionTag.c_str());
+        ALOGE("%s: no criterion found for %s", __FUNCTION__, gInputDeviceCriterionName);
         return DEAD_OBJECT;
     }
     criterion->setCriterionState(inputDevices & ~AUDIO_DEVICE_BIT_IN);
@@ -420,9 +302,9 @@ status_t ParameterManagerWrapper::setAvailableInputDevices(audio_devices_t input
 status_t ParameterManagerWrapper::setAvailableOutputDevices(audio_devices_t outputDevices)
 {
     ISelectionCriterionInterface *criterion =
-            getElement<ISelectionCriterionInterface>(gOutputDeviceCriterionTag, mPolicyCriteria);
+            getElement<ISelectionCriterionInterface>(gOutputDeviceCriterionName, mPolicyCriteria);
     if (criterion == NULL) {
-        ALOGE("%s: no criterion found for %s", __FUNCTION__, gOutputDeviceCriterionTag.c_str());
+        ALOGE("%s: no criterion found for %s", __FUNCTION__, gOutputDeviceCriterionName);
         return DEAD_OBJECT;
     }
     criterion->setCriterionState(outputDevices);

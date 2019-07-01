@@ -579,7 +579,7 @@ void ReverbBlock(LVM_FLOAT *pInput, LVM_FLOAT *pOutput,
                                pTemp,
                                pTemp,
                                (LVM_INT16)NumSamples);
-    
+
     /*
      *  Process all delay lines
      */

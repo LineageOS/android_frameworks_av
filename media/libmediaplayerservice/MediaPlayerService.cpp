@@ -34,6 +34,8 @@
 
 #include <utils/misc.h>
 
+#include <android/hardware/media/omx/1.0/IOmx.h>
+#include <android/hardware/media/c2/1.0/IComponentStore.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <binder/MemoryHeapBase.h>
@@ -45,7 +47,7 @@
 #include <utils/Timers.h>
 #include <utils/Vector.h>
 
-#include <media/AudioPolicyHelper.h>
+#include <codec2/hidl/client.h>
 #include <media/IMediaHTTPService.h>
 #include <media/IRemoteDisplay.h>
 #include <media/IRemoteDisplayClient.h>
@@ -590,7 +592,6 @@ MediaPlayerService::Client::~Client()
     if (mAudioAttributes != NULL) {
         free(mAudioAttributes);
     }
-    clearDeathNotifiers_l();
     mAudioDeviceUpdatedListener.clear();
 }
 
@@ -646,59 +647,6 @@ sp<MediaPlayerBase> MediaPlayerService::Client::createPlayer(player_type playerT
     return p;
 }
 
-MediaPlayerService::Client::ServiceDeathNotifier::ServiceDeathNotifier(
-        const sp<IBinder>& service,
-        const sp<MediaPlayerBase>& listener,
-        int which) {
-    mService = service;
-    mOmx = nullptr;
-    mListener = listener;
-    mWhich = which;
-}
-
-MediaPlayerService::Client::ServiceDeathNotifier::ServiceDeathNotifier(
-        const sp<IOmx>& omx,
-        const sp<MediaPlayerBase>& listener,
-        int which) {
-    mService = nullptr;
-    mOmx = omx;
-    mListener = listener;
-    mWhich = which;
-}
-
-MediaPlayerService::Client::ServiceDeathNotifier::~ServiceDeathNotifier() {
-}
-
-void MediaPlayerService::Client::ServiceDeathNotifier::binderDied(const wp<IBinder>& /*who*/) {
-    sp<MediaPlayerBase> listener = mListener.promote();
-    if (listener != NULL) {
-        listener->sendEvent(MEDIA_ERROR, MEDIA_ERROR_SERVER_DIED, mWhich);
-    } else {
-        ALOGW("listener for process %d death is gone", mWhich);
-    }
-}
-
-void MediaPlayerService::Client::ServiceDeathNotifier::serviceDied(
-        uint64_t /* cookie */,
-        const wp<::android::hidl::base::V1_0::IBase>& /* who */) {
-    sp<MediaPlayerBase> listener = mListener.promote();
-    if (listener != NULL) {
-        listener->sendEvent(MEDIA_ERROR, MEDIA_ERROR_SERVER_DIED, mWhich);
-    } else {
-        ALOGW("listener for process %d death is gone", mWhich);
-    }
-}
-
-void MediaPlayerService::Client::ServiceDeathNotifier::unlinkToDeath() {
-    if (mService != nullptr) {
-        mService->unlinkToDeath(this);
-        mService = nullptr;
-    } else if (mOmx != nullptr) {
-        mOmx->unlinkToDeath(this);
-        mOmx = nullptr;
-    }
-}
-
 void MediaPlayerService::Client::AudioDeviceUpdatedNotifier::onAudioDeviceUpdate(
         audio_io_handle_t audioIo,
         audio_port_handle_t deviceId) {
@@ -707,17 +655,6 @@ void MediaPlayerService::Client::AudioDeviceUpdatedNotifier::onAudioDeviceUpdate
         listener->sendEvent(MEDIA_AUDIO_ROUTING_CHANGED, audioIo, deviceId);
     } else {
         ALOGW("listener for process %d death is gone", MEDIA_AUDIO_ROUTING_CHANGED);
-    }
-}
-
-void MediaPlayerService::Client::clearDeathNotifiers_l() {
-    if (mExtractorDeathListener != nullptr) {
-        mExtractorDeathListener->unlinkToDeath();
-        mExtractorDeathListener = nullptr;
-    }
-    if (mCodecDeathListener != nullptr) {
-        mCodecDeathListener->unlinkToDeath();
-        mCodecDeathListener = nullptr;
     }
 }
 
@@ -732,30 +669,83 @@ sp<MediaPlayerBase> MediaPlayerService::Client::setDataSource_pre(
         return p;
     }
 
+    std::vector<DeathNotifier> deathNotifiers;
+
+    // Listen to death of media.extractor service
     sp<IServiceManager> sm = defaultServiceManager();
     sp<IBinder> binder = sm->getService(String16("media.extractor"));
     if (binder == NULL) {
         ALOGE("extractor service not available");
         return NULL;
     }
-    sp<ServiceDeathNotifier> extractorDeathListener =
-            new ServiceDeathNotifier(binder, p, MEDIAEXTRACTOR_PROCESS_DEATH);
-    binder->linkToDeath(extractorDeathListener);
+    deathNotifiers.emplace_back(
+            binder, [l = wp<MediaPlayerBase>(p)]() {
+        sp<MediaPlayerBase> listener = l.promote();
+        if (listener) {
+            ALOGI("media.extractor died. Sending death notification.");
+            listener->sendEvent(MEDIA_ERROR, MEDIA_ERROR_SERVER_DIED,
+                                MEDIAEXTRACTOR_PROCESS_DEATH);
+        } else {
+            ALOGW("media.extractor died without a death handler.");
+        }
+    });
 
-    sp<IOmx> omx = IOmx::getService();
-    if (omx == nullptr) {
-        ALOGE("IOmx service is not available");
-        return NULL;
+    {
+        using ::android::hidl::base::V1_0::IBase;
+
+        // Listen to death of OMX service
+        {
+            sp<IBase> base = ::android::hardware::media::omx::V1_0::
+                    IOmx::getService();
+            if (base == nullptr) {
+                ALOGD("OMX service is not available");
+            } else {
+                deathNotifiers.emplace_back(
+                        base, [l = wp<MediaPlayerBase>(p)]() {
+                    sp<MediaPlayerBase> listener = l.promote();
+                    if (listener) {
+                        ALOGI("OMX service died. "
+                              "Sending death notification.");
+                        listener->sendEvent(
+                                MEDIA_ERROR, MEDIA_ERROR_SERVER_DIED,
+                                MEDIACODEC_PROCESS_DEATH);
+                    } else {
+                        ALOGW("OMX service died without a death handler.");
+                    }
+                });
+            }
+        }
+
+        // Listen to death of Codec2 services
+        {
+            for (std::shared_ptr<Codec2Client> const& client :
+                    Codec2Client::CreateFromAllServices()) {
+                sp<IBase> base = client->getBase();
+                deathNotifiers.emplace_back(
+                        base, [l = wp<MediaPlayerBase>(p),
+                               name = std::string(client->getServiceName())]() {
+                    sp<MediaPlayerBase> listener = l.promote();
+                    if (listener) {
+                        ALOGI("Codec2 service \"%s\" died. "
+                              "Sending death notification.",
+                              name.c_str());
+                        listener->sendEvent(
+                                MEDIA_ERROR, MEDIA_ERROR_SERVER_DIED,
+                                MEDIACODEC_PROCESS_DEATH);
+                    } else {
+                        ALOGW("Codec2 service \"%s\" died "
+                              "without a death handler.",
+                              name.c_str());
+                    }
+                });
+            }
+        }
     }
-    sp<ServiceDeathNotifier> codecDeathListener =
-            new ServiceDeathNotifier(omx, p, MEDIACODEC_PROCESS_DEATH);
-    omx->linkToDeath(codecDeathListener, 0);
 
     Mutex::Autolock lock(mLock);
 
-    clearDeathNotifiers_l();
-    mExtractorDeathListener = extractorDeathListener;
-    mCodecDeathListener = codecDeathListener;
+    mDeathNotifiers.clear();
+    mDeathNotifiers.swap(deathNotifiers);
     mAudioDeviceUpdatedListener = new AudioDeviceUpdatedNotifier(p);
 
     if (!p->hardwareOutput()) {
@@ -1627,7 +1617,7 @@ MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId, uid_t ui
         mAttributes = (audio_attributes_t *) calloc(1, sizeof(audio_attributes_t));
         if (mAttributes != NULL) {
             memcpy(mAttributes, attr, sizeof(audio_attributes_t));
-            mStreamType = audio_attributes_to_stream_type(attr);
+            mStreamType = AudioSystem::attributesToStreamType(*attr);
         }
     } else {
         mAttributes = NULL;
@@ -1816,7 +1806,7 @@ void MediaPlayerService::AudioOutput::setAudioAttributes(const audio_attributes_
             mAttributes = (audio_attributes_t *) calloc(1, sizeof(audio_attributes_t));
         }
         memcpy(mAttributes, attributes, sizeof(audio_attributes_t));
-        mStreamType = audio_attributes_to_stream_type(attributes);
+        mStreamType = AudioSystem::attributesToStreamType(*attributes);
     }
 }
 

@@ -52,6 +52,7 @@ public:
         data.writeInt64(ioDesc->mFrameCount);
         data.writeInt64(ioDesc->mFrameCountHAL);
         data.writeInt32(ioDesc->mLatency);
+        data.writeInt32(ioDesc->mPortId);
         remote()->transact(IO_CONFIG_CHANGED, data, &reply, IBinder::FLAG_ONEWAY);
     }
 };
@@ -76,6 +77,7 @@ status_t BnAudioFlingerClient::onTransact(
             ioDesc->mFrameCount = data.readInt64();
             ioDesc->mFrameCountHAL = data.readInt64();
             ioDesc->mLatency = data.readInt32();
+            ioDesc->mPortId = data.readInt32();
             ioConfigChanged(event, ioDesc);
             return NO_ERROR;
         } break;

@@ -3,9 +3,13 @@ cc_library_shared {
     name: "libnblog",
 
     srcs: [
-        "NBLog.cpp",
+        "Entry.cpp",
+        "Merger.cpp",
         "PerformanceAnalysis.cpp",
+        "Reader.cpp",
         "ReportPerformance.cpp",
+        "Timeline.cpp",
+        "Writer.cpp",
     ],
 
     shared_libs: [
@@ -13,7 +17,12 @@ cc_library_shared {
         "libbinder",
         "libcutils",
         "liblog",
+        "libmediametrics",
         "libutils",
+    ],
+
+    static_libs: [
+        "libjsoncpp",
     ],
 
     cflags: [

@@ -23,13 +23,13 @@
 #include <sys/types.h>
 #include <binder/Parcel.h>
 #include <media/IMediaExtractorService.h>
-#include <media/MediaExtractor.h>
 
 namespace android {
 
 enum {
     MAKE_EXTRACTOR = IBinder::FIRST_CALL_TRANSACTION,
     MAKE_IDATA_SOURCE_FD,
+    GET_SUPPORTED_TYPES,
 };
 
 class BpMediaExtractorService : public BpInterface<IMediaExtractorService>
@@ -68,6 +68,24 @@ public:
             return interface_cast<IDataSource>(reply.readStrongBinder());
         }
         return nullptr;
+    }
+
+    virtual std::unordered_set<std::string> getSupportedTypes() {
+        std::unordered_set<std::string> supportedTypes;
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaExtractorService::getInterfaceDescriptor());
+        status_t ret = remote()->transact(GET_SUPPORTED_TYPES, data, &reply);
+        if (ret == NO_ERROR) {
+            // process reply
+            while(true) {
+                const char *ext = reply.readCString();
+                if (!ext) {
+                    break;
+                }
+                supportedTypes.insert(std::string(ext));
+            }
+        }
+        return supportedTypes;
     }
 };
 
@@ -114,6 +132,15 @@ status_t BnMediaExtractorService::onTransact(
             return NO_ERROR;
         }
 
+        case GET_SUPPORTED_TYPES:
+        {
+            CHECK_INTERFACE(IMediaExtractorService, data, reply);
+            std::unordered_set<std::string> supportedTypes = getSupportedTypes();
+            for (auto it = supportedTypes.begin(); it != supportedTypes.end(); ++it) {
+                reply->writeCString((*it).c_str());
+            }
+            return NO_ERROR;
+        }
         default:
             return BBinder::onTransact(code, data, reply, flags);
     }

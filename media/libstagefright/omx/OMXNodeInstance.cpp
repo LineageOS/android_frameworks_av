@@ -33,12 +33,13 @@
 
 #include <binder/IMemory.h>
 #include <cutils/properties.h>
-#include <gui/BufferQueue.h>
 #include <media/hardware/HardwareAPI.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ColorUtils.h>
 #include <media/stagefright/MediaErrors.h>
+#include <ui/GraphicBuffer.h>
+#include <ui/Fence.h>
 #include <utils/misc.h>
 #include <utils/NativeHandle.h>
 #include <media/OMXBuffer.h>

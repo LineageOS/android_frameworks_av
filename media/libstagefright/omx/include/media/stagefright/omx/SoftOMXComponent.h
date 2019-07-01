@@ -21,12 +21,15 @@
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AString.h>
 #include <utils/RefBase.h>
-
+#include <utils/Log.h>
 #include <OMX_Component.h>
 
 namespace android {
 
 struct SoftOMXComponent : public RefBase {
+    enum {
+        kFenceTimeoutMs = 1000
+    };
     SoftOMXComponent(
             const char *name,
             const OMX_CALLBACKTYPE *callbacks,

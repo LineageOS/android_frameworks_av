@@ -16,11 +16,14 @@ cc_library {
     name: "libmediautils",
 
     srcs: [
+        "AImageReaderUtils.cpp",
         "BatteryNotifier.cpp",
         "ISchedulingPolicyService.cpp",
         "MemoryLeakTrackUtil.cpp",
         "ProcessInfo.cpp",
         "SchedulingPolicyService.cpp",
+        "ServiceUtilities.cpp",
+        "TimeCheck.cpp",
     ],
     static_libs: [
         "libc_malloc_debug_backtrace",
@@ -29,7 +32,12 @@ cc_library {
         "libbinder",
         "liblog",
         "libutils",
+        "libhidlbase",
+        "android.hardware.graphics.bufferqueue@1.0",
+        "android.hidl.token@1.0-utils",
     ],
+
+    logtags: ["EventLogTags.logtags"],
 
     cflags: [
         "-Wall",
@@ -37,11 +45,16 @@ cc_library {
         "-Werror",
     ],
 
+    product_variables: {
+        product_is_iot: {
+            cflags: ["-DTARGET_ANDROID_THINGS"],
+        },
+    },
+
     include_dirs: [
         // For android_mallopt definitions.
         "bionic/libc/private"
     ],
-
     local_include_dirs: ["include"],
     export_include_dirs: ["include"],
 }

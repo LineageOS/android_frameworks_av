@@ -617,6 +617,7 @@ void idctrow(
     return;
 }
 
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idctrow_intra(
     int16 *blk, PIXEL *comp, int width
 )

@@ -55,6 +55,8 @@ class EffectHalInterface : public RefBase
     // Whether it's a local implementation.
     virtual bool isLocal() const = 0;
 
+    virtual status_t dump(int fd) = 0;
+
   protected:
     // Subclasses can not be constructed directly by clients.
     EffectHalInterface() {}

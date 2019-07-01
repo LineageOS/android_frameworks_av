@@ -24,6 +24,7 @@ namespace android {
 
 class DataSourceBase;
 class String8;
+class DataSourceHelper;
 
 struct ID3 {
     enum Version {
@@ -35,6 +36,7 @@ struct ID3 {
         ID3_V2_4,
     };
 
+    explicit ID3(DataSourceHelper *source, bool ignoreV1 = false, off64_t offset = 0);
     explicit ID3(DataSourceBase *source, bool ignoreV1 = false, off64_t offset = 0);
     ID3(const uint8_t *data, size_t size, bool ignoreV1 = false);
     ~ID3();

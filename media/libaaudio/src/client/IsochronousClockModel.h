@@ -36,7 +36,15 @@ public:
     void start(int64_t nanoTime);
     void stop(int64_t nanoTime);
 
-    bool isStarting();
+    /**
+     * @return true if the model is starting up
+     */
+    bool isStarting() const;
+
+    /**
+     * @return true if the model is running and producing valid results
+     */
+    bool isRunning() const;
 
     void processTimestamp(int64_t framePosition, int64_t nanoTime);
 

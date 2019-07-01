@@ -22,8 +22,6 @@
 #include <cutils/properties.h> // for property_get
 #include <utils/Log.h>
 
-#include <media/AudioPolicyHelper.h>
-#include <media/AudioTrack.h>
 #include <media/stagefright/foundation/ADebug.h>
 
 namespace {
@@ -44,31 +42,28 @@ status_t MediaPlayer2AudioOutput::dump(int fd, const Vector<String16>& args) con
     String8 result;
 
     result.append(" MediaPlayer2AudioOutput\n");
-    snprintf(buffer, 255, "  stream type(%d), left - right volume(%f, %f)\n",
-            mStreamType, mLeftVolume, mRightVolume);
+    snprintf(buffer, 255, "  volume(%f)\n", mVolume);
     result.append(buffer);
     snprintf(buffer, 255, "  msec per frame(%f), latency (%d)\n",
-            mMsecsPerFrame, (mTrack != 0) ? mTrack->latency() : -1);
+            mMsecsPerFrame, (mJAudioTrack != nullptr) ? mJAudioTrack->latency() : -1);
     result.append(buffer);
     snprintf(buffer, 255, "  aux effect id(%d), send level (%f)\n",
             mAuxEffectId, mSendLevel);
     result.append(buffer);
 
     ::write(fd, result.string(), result.size());
-    if (mTrack != 0) {
-        mTrack->dump(fd, args);
+    if (mJAudioTrack != nullptr) {
+        mJAudioTrack->dump(fd, args);
     }
     return NO_ERROR;
 }
 
-MediaPlayer2AudioOutput::MediaPlayer2AudioOutput(audio_session_t sessionId, uid_t uid, int pid,
-        const audio_attributes_t* attr, const sp<AudioSystem::AudioDeviceCallback>& deviceCallback)
-    : mCallback(NULL),
-      mCallbackCookie(NULL),
-      mCallbackData(NULL),
-      mStreamType(AUDIO_STREAM_MUSIC),
-      mLeftVolume(1.0),
-      mRightVolume(1.0),
+MediaPlayer2AudioOutput::MediaPlayer2AudioOutput(int32_t sessionId, uid_t uid, int pid,
+        const jobject attributes)
+    : mCallback(nullptr),
+      mCallbackCookie(nullptr),
+      mCallbackData(nullptr),
+      mVolume(1.0),
       mPlaybackRate(AUDIO_PLAYBACK_RATE_DEFAULT),
       mSampleRateHz(0),
       mMsecsPerFrame(0),
@@ -78,28 +73,19 @@ MediaPlayer2AudioOutput::MediaPlayer2AudioOutput(audio_session_t sessionId, uid_
       mPid(pid),
       mSendLevel(0.0),
       mAuxEffectId(0),
-      mFlags(AUDIO_OUTPUT_FLAG_NONE),
-      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
-      mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE),
-      mDeviceCallbackEnabled(false),
-      mDeviceCallback(deviceCallback) {
+      mFlags(AUDIO_OUTPUT_FLAG_NONE) {
     ALOGV("MediaPlayer2AudioOutput(%d)", sessionId);
-    if (attr != NULL) {
-        mAttributes = (audio_attributes_t *) calloc(1, sizeof(audio_attributes_t));
-        if (mAttributes != NULL) {
-            memcpy(mAttributes, attr, sizeof(audio_attributes_t));
-            mStreamType = audio_attributes_to_stream_type(attr);
-        }
-    } else {
-        mAttributes = NULL;
+
+    if (attributes != nullptr) {
+        mAttributes = new JObjectHolder(attributes);
     }
 
     setMinBufferCount();
+    mRoutingDelegates.clear();
 }
 
 MediaPlayer2AudioOutput::~MediaPlayer2AudioOutput() {
     close();
-    free(mAttributes);
     delete mCallbackData;
 }
 
@@ -126,31 +112,31 @@ int MediaPlayer2AudioOutput::getMinBufferCount() {
 
 ssize_t MediaPlayer2AudioOutput::bufferSize() const {
     Mutex::Autolock lock(mLock);
-    if (mTrack == 0) {
+    if (mJAudioTrack == nullptr) {
         return NO_INIT;
     }
-    return mTrack->frameCount() * mFrameSize;
+    return mJAudioTrack->frameCount() * mFrameSize;
 }
 
 ssize_t MediaPlayer2AudioOutput::frameCount() const {
     Mutex::Autolock lock(mLock);
-    if (mTrack == 0) {
+    if (mJAudioTrack == nullptr) {
         return NO_INIT;
     }
-    return mTrack->frameCount();
+    return mJAudioTrack->frameCount();
 }
 
 ssize_t MediaPlayer2AudioOutput::channelCount() const {
     Mutex::Autolock lock(mLock);
-    if (mTrack == 0) {
+    if (mJAudioTrack == nullptr) {
         return NO_INIT;
     }
-    return mTrack->channelCount();
+    return mJAudioTrack->channelCount();
 }
 
 ssize_t MediaPlayer2AudioOutput::frameSize() const {
     Mutex::Autolock lock(mLock);
-    if (mTrack == 0) {
+    if (mJAudioTrack == nullptr) {
         return NO_INIT;
     }
     return mFrameSize;
@@ -158,10 +144,10 @@ ssize_t MediaPlayer2AudioOutput::frameSize() const {
 
 uint32_t MediaPlayer2AudioOutput::latency () const {
     Mutex::Autolock lock(mLock);
-    if (mTrack == 0) {
+    if (mJAudioTrack == nullptr) {
         return 0;
     }
-    return mTrack->latency();
+    return mJAudioTrack->latency();
 }
 
 float MediaPlayer2AudioOutput::msecsPerFrame() const {
@@ -171,18 +157,18 @@ float MediaPlayer2AudioOutput::msecsPerFrame() const {
 
 status_t MediaPlayer2AudioOutput::getPosition(uint32_t *position) const {
     Mutex::Autolock lock(mLock);
-    if (mTrack == 0) {
+    if (mJAudioTrack == nullptr) {
         return NO_INIT;
     }
-    return mTrack->getPosition(position);
+    return mJAudioTrack->getPosition(position);
 }
 
 status_t MediaPlayer2AudioOutput::getTimestamp(AudioTimestamp &ts) const {
     Mutex::Autolock lock(mLock);
-    if (mTrack == 0) {
+    if (mJAudioTrack == nullptr) {
         return NO_INIT;
     }
-    return mTrack->getTimestamp(ts);
+    return mJAudioTrack->getTimestamp(ts);
 }
 
 // TODO: Remove unnecessary calls to getPlayedOutDurationUs()
@@ -195,7 +181,7 @@ status_t MediaPlayer2AudioOutput::getTimestamp(AudioTimestamp &ts) const {
 // Calculate duration of played samples if played at normal rate (i.e., 1.0).
 int64_t MediaPlayer2AudioOutput::getPlayedOutDurationUs(int64_t nowUs) const {
     Mutex::Autolock lock(mLock);
-    if (mTrack == 0 || mSampleRateHz == 0) {
+    if (mJAudioTrack == nullptr || mSampleRateHz == 0) {
         return 0;
     }
 
@@ -203,22 +189,18 @@ int64_t MediaPlayer2AudioOutput::getPlayedOutDurationUs(int64_t nowUs) const {
     int64_t numFramesPlayedAtUs;
     AudioTimestamp ts;
 
-    status_t res = mTrack->getTimestamp(ts);
+    status_t res = mJAudioTrack->getTimestamp(ts);
+
     if (res == OK) {                 // case 1: mixing audio tracks and offloaded tracks.
         numFramesPlayed = ts.mPosition;
         numFramesPlayedAtUs = ts.mTime.tv_sec * 1000000LL + ts.mTime.tv_nsec / 1000;
         //ALOGD("getTimestamp: OK %d %lld", numFramesPlayed, (long long)numFramesPlayedAtUs);
-    } else if (res == WOULD_BLOCK) { // case 2: transitory state on start of a new track
+    } else {                         // case 2: transitory state on start of a new track
+                                     // case 3: transitory at new track or audio fast tracks.
         numFramesPlayed = 0;
         numFramesPlayedAtUs = nowUs;
         //ALOGD("getTimestamp: WOULD_BLOCK %d %lld",
         //        numFramesPlayed, (long long)numFramesPlayedAtUs);
-    } else {                         // case 3: transitory at new track or audio fast tracks.
-        res = mTrack->getPosition(&numFramesPlayed);
-        CHECK_EQ(res, (status_t)OK);
-        numFramesPlayedAtUs = nowUs;
-        numFramesPlayedAtUs += 1000LL * mTrack->latency() / 2; /* XXX */
-        //ALOGD("getPosition: %u %lld", numFramesPlayed, (long long)numFramesPlayedAtUs);
     }
 
     // CHECK_EQ(numFramesPlayed & (1 << 31), 0);  // can't be negative until 12.4 hrs, test
@@ -244,108 +226,55 @@ int64_t MediaPlayer2AudioOutput::getPlayedOutDurationUs(int64_t nowUs) const {
 
 status_t MediaPlayer2AudioOutput::getFramesWritten(uint32_t *frameswritten) const {
     Mutex::Autolock lock(mLock);
-    if (mTrack == 0) {
+    if (mJAudioTrack == nullptr) {
         return NO_INIT;
     }
     ExtendedTimestamp ets;
-    status_t status = mTrack->getTimestamp(&ets);
+    status_t status = mJAudioTrack->getTimestamp(&ets);
     if (status == OK || status == WOULD_BLOCK) {
         *frameswritten = (uint32_t)ets.mPosition[ExtendedTimestamp::LOCATION_CLIENT];
     }
     return status;
 }
 
-status_t MediaPlayer2AudioOutput::setParameters(const String8& keyValuePairs) {
+void MediaPlayer2AudioOutput::setAudioAttributes(const jobject attributes) {
     Mutex::Autolock lock(mLock);
-    if (mTrack == 0) {
-        return NO_INIT;
-    }
-    return mTrack->setParameters(keyValuePairs);
+    mAttributes = (attributes == nullptr) ? nullptr : new JObjectHolder(attributes);
 }
 
-String8  MediaPlayer2AudioOutput::getParameters(const String8& keys) {
+audio_stream_type_t MediaPlayer2AudioOutput::getAudioStreamType() const {
+    ALOGV("getAudioStreamType");
     Mutex::Autolock lock(mLock);
-    if (mTrack == 0) {
-        return String8::empty();
+    if (mJAudioTrack == nullptr) {
+        return AUDIO_STREAM_DEFAULT;
     }
-    return mTrack->getParameters(keys);
-}
-
-void MediaPlayer2AudioOutput::setAudioAttributes(const audio_attributes_t * attributes) {
-    Mutex::Autolock lock(mLock);
-    if (attributes == NULL) {
-        free(mAttributes);
-        mAttributes = NULL;
-    } else {
-        if (mAttributes == NULL) {
-            mAttributes = (audio_attributes_t *) calloc(1, sizeof(audio_attributes_t));
-        }
-        memcpy(mAttributes, attributes, sizeof(audio_attributes_t));
-        mStreamType = audio_attributes_to_stream_type(attributes);
-    }
-}
-
-void MediaPlayer2AudioOutput::setAudioStreamType(audio_stream_type_t streamType) {
-    Mutex::Autolock lock(mLock);
-    // do not allow direct stream type modification if attributes have been set
-    if (mAttributes == NULL) {
-        mStreamType = streamType;
-    }
+    return mJAudioTrack->getAudioStreamType();
 }
 
 void MediaPlayer2AudioOutput::close_l() {
-    mTrack.clear();
+    mJAudioTrack.clear();
 }
 
 status_t MediaPlayer2AudioOutput::open(
         uint32_t sampleRate, int channelCount, audio_channel_mask_t channelMask,
-        audio_format_t format, int bufferCount,
+        audio_format_t format,
         AudioCallback cb, void *cookie,
         audio_output_flags_t flags,
         const audio_offload_info_t *offloadInfo,
-        bool doNotReconnect,
         uint32_t suggestedFrameCount) {
-    ALOGV("open(%u, %d, 0x%x, 0x%x, %d, %d 0x%x)", sampleRate, channelCount, channelMask,
-                format, bufferCount, mSessionId, flags);
+    ALOGV("open(%u, %d, 0x%x, 0x%x, %d 0x%x)", sampleRate, channelCount, channelMask,
+                format, mSessionId, flags);
 
     // offloading is only supported in callback mode for now.
     // offloadInfo must be present if offload flag is set
     if (((flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) != 0) &&
-            ((cb == NULL) || (offloadInfo == NULL))) {
+            ((cb == nullptr) || (offloadInfo == nullptr))) {
         return BAD_VALUE;
     }
 
     // compute frame count for the AudioTrack internal buffer
-    size_t frameCount;
-    if ((flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) != 0) {
-        frameCount = 0; // AudioTrack will get frame count from AudioFlinger
-    } else {
-        // try to estimate the buffer processing fetch size from AudioFlinger.
-        // framesPerBuffer is approximate and generally correct, except when it's not :-).
-        uint32_t afSampleRate;
-        size_t afFrameCount;
-        if (AudioSystem::getOutputFrameCount(&afFrameCount, mStreamType) != NO_ERROR) {
-            return NO_INIT;
-        }
-        if (AudioSystem::getOutputSamplingRate(&afSampleRate, mStreamType) != NO_ERROR) {
-            return NO_INIT;
-        }
-        const size_t framesPerBuffer =
-                (unsigned long long)sampleRate * afFrameCount / afSampleRate;
-
-        if (bufferCount == 0) {
-            // use suggestedFrameCount
-            bufferCount = (suggestedFrameCount + framesPerBuffer - 1) / framesPerBuffer;
-        }
-        // Check argument bufferCount against the mininum buffer count
-        if (bufferCount != 0 && bufferCount < mMinBufferCount) {
-            ALOGV("bufferCount (%d) increased to %d", bufferCount, mMinBufferCount);
-            bufferCount = mMinBufferCount;
-        }
-        // if frameCount is 0, then AudioTrack will get frame count from AudioFlinger
-        // which will be the minimum size permitted.
-        frameCount = bufferCount * framesPerBuffer;
-    }
+    const size_t frameCount =
+           ((flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) != 0) ? 0 : suggestedFrameCount;
 
     if (channelMask == CHANNEL_MASK_USE_CHANNEL_ORDER) {
         channelMask = audio_channel_out_mask_from_count(channelCount);
@@ -359,32 +288,23 @@ status_t MediaPlayer2AudioOutput::open(
     mCallback = cb;
     mCallbackCookie = cookie;
 
-    sp<AudioTrack> t;
-    CallbackData *newcbd = NULL;
+    sp<JAudioTrack> jT;
+    CallbackData *newcbd = nullptr;
 
-    ALOGV("creating new AudioTrack");
+    ALOGV("creating new JAudioTrack");
 
-    if (mCallback != NULL) {
+    if (mCallback != nullptr) {
         newcbd = new CallbackData(this);
-        t = new AudioTrack(
-                mStreamType,
-                sampleRate,
-                format,
-                channelMask,
-                frameCount,
-                flags,
-                CallbackWrapper,
-                newcbd,
-                0,  // notification frames
-                mSessionId,
-                AudioTrack::TRANSFER_CALLBACK,
-                offloadInfo,
-                mUid,
-                mPid,
-                mAttributes,
-                doNotReconnect,
-                1.0f,  // default value for maxRequiredSpeed
-                mSelectedDeviceId);
+        jT = new JAudioTrack(
+                 sampleRate,
+                 format,
+                 channelMask,
+                 CallbackWrapper,
+                 newcbd,
+                 frameCount,
+                 mSessionId,
+                 mAttributes != nullptr ? mAttributes->getJObject() : nullptr,
+                 1.0f);  // default value for maxRequiredSpeed
     } else {
         // TODO: Due to buffer memory concerns, we use a max target playback speed
         // based on mPlaybackRate at the time of open (instead of kMaxRequiredSpeed),
@@ -394,73 +314,62 @@ status_t MediaPlayer2AudioOutput::open(
         ALOGW_IF(targetSpeed != mPlaybackRate.mSpeed,
                 "track target speed:%f clamped from playback speed:%f",
                 targetSpeed, mPlaybackRate.mSpeed);
-        t = new AudioTrack(
-                mStreamType,
-                sampleRate,
-                format,
-                channelMask,
-                frameCount,
-                flags,
-                NULL, // callback
-                NULL, // user data
-                0, // notification frames
-                mSessionId,
-                AudioTrack::TRANSFER_DEFAULT,
-                NULL, // offload info
-                mUid,
-                mPid,
-                mAttributes,
-                doNotReconnect,
-                targetSpeed,
-                mSelectedDeviceId);
+        jT = new JAudioTrack(
+                 sampleRate,
+                 format,
+                 channelMask,
+                 nullptr,
+                 nullptr,
+                 frameCount,
+                 mSessionId,
+                 mAttributes != nullptr ? mAttributes->getJObject() : nullptr,
+                 targetSpeed);
     }
 
-    if ((t == 0) || (t->initCheck() != NO_ERROR)) {
+    if (jT == 0) {
         ALOGE("Unable to create audio track");
         delete newcbd;
         // t goes out of scope, so reference count drops to zero
         return NO_INIT;
-    } else {
-        // successful AudioTrack initialization implies a legacy stream type was generated
-        // from the audio attributes
-        mStreamType = t->streamType();
     }
 
-    CHECK((t != NULL) && ((mCallback == NULL) || (newcbd != NULL)));
+    CHECK((jT != nullptr) && ((mCallback == nullptr) || (newcbd != nullptr)));
 
     mCallbackData = newcbd;
     ALOGV("setVolume");
-    t->setVolume(mLeftVolume, mRightVolume);
+    jT->setVolume(mVolume);
 
     mSampleRateHz = sampleRate;
     mFlags = flags;
     mMsecsPerFrame = 1E3f / (mPlaybackRate.mSpeed * sampleRate);
-    mFrameSize = t->frameSize();
-    mTrack = t;
+    mFrameSize = jT->frameSize();
+    mJAudioTrack = jT;
 
     return updateTrack_l();
 }
 
 status_t MediaPlayer2AudioOutput::updateTrack_l() {
-    if (mTrack == NULL) {
+    if (mJAudioTrack == nullptr) {
         return NO_ERROR;
     }
 
     status_t res = NO_ERROR;
     // Note some output devices may give us a direct track even though we don't specify it.
     // Example: Line application b/17459982.
-    if ((mTrack->getFlags()
+    if ((mJAudioTrack->getFlags()
             & (AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD | AUDIO_OUTPUT_FLAG_DIRECT)) == 0) {
-        res = mTrack->setPlaybackRate(mPlaybackRate);
+        res = mJAudioTrack->setPlaybackRate(mPlaybackRate);
         if (res == NO_ERROR) {
-            mTrack->setAuxEffectSendLevel(mSendLevel);
-            res = mTrack->attachAuxEffect(mAuxEffectId);
+            mJAudioTrack->setAuxEffectSendLevel(mSendLevel);
+            res = mJAudioTrack->attachAuxEffect(mAuxEffectId);
         }
     }
-    mTrack->setOutputDevice(mSelectedDeviceId);
-    if (mDeviceCallbackEnabled) {
-        mTrack->addAudioDeviceCallback(mDeviceCallback.promote());
+    if (mPreferredDevice != nullptr) {
+        mJAudioTrack->setPreferredDevice(mPreferredDevice->getJObject());
     }
+
+    mJAudioTrack->registerRoutingDelegates(mRoutingDelegates);
+
     ALOGV("updateTrack_l() DONE status %d", res);
     return res;
 }
@@ -468,13 +377,13 @@ status_t MediaPlayer2AudioOutput::updateTrack_l() {
 status_t MediaPlayer2AudioOutput::start() {
     ALOGV("start");
     Mutex::Autolock lock(mLock);
-    if (mCallbackData != NULL) {
+    if (mCallbackData != nullptr) {
         mCallbackData->endTrackSwitch();
     }
-    if (mTrack != 0) {
-        mTrack->setVolume(mLeftVolume, mRightVolume);
-        mTrack->setAuxEffectSendLevel(mSendLevel);
-        status_t status = mTrack->start();
+    if (mJAudioTrack != nullptr) {
+        mJAudioTrack->setVolume(mVolume);
+        mJAudioTrack->setAuxEffectSendLevel(mSendLevel);
+        status_t status = mJAudioTrack->start();
         return status;
     }
     return NO_INIT;
@@ -482,11 +391,11 @@ status_t MediaPlayer2AudioOutput::start() {
 
 ssize_t MediaPlayer2AudioOutput::write(const void* buffer, size_t size, bool blocking) {
     Mutex::Autolock lock(mLock);
-    LOG_ALWAYS_FATAL_IF(mCallback != NULL, "Don't call write if supplying a callback.");
+    LOG_ALWAYS_FATAL_IF(mCallback != nullptr, "Don't call write if supplying a callback.");
 
     //ALOGV("write(%p, %u)", buffer, size);
-    if (mTrack != 0) {
-        return mTrack->write(buffer, size, blocking);
+    if (mJAudioTrack != nullptr) {
+        return mJAudioTrack->write(buffer, size, blocking);
     }
     return NO_INIT;
 }
@@ -494,45 +403,44 @@ ssize_t MediaPlayer2AudioOutput::write(const void* buffer, size_t size, bool blo
 void MediaPlayer2AudioOutput::stop() {
     ALOGV("stop");
     Mutex::Autolock lock(mLock);
-    if (mTrack != 0) {
-        mTrack->stop();
+    if (mJAudioTrack != nullptr) {
+        mJAudioTrack->stop();
     }
 }
 
 void MediaPlayer2AudioOutput::flush() {
     ALOGV("flush");
     Mutex::Autolock lock(mLock);
-    if (mTrack != 0) {
-        mTrack->flush();
+    if (mJAudioTrack != nullptr) {
+        mJAudioTrack->flush();
     }
 }
 
 void MediaPlayer2AudioOutput::pause() {
     ALOGV("pause");
     Mutex::Autolock lock(mLock);
-    if (mTrack != 0) {
-        mTrack->pause();
+    if (mJAudioTrack != nullptr) {
+        mJAudioTrack->pause();
     }
 }
 
 void MediaPlayer2AudioOutput::close() {
     ALOGV("close");
-    sp<AudioTrack> track;
+    sp<JAudioTrack> track;
     {
         Mutex::Autolock lock(mLock);
-        track = mTrack;
-        close_l(); // clears mTrack
+        track = mJAudioTrack;
+        close_l(); // clears mJAudioTrack
     }
     // destruction of the track occurs outside of mutex.
 }
 
-void MediaPlayer2AudioOutput::setVolume(float left, float right) {
-    ALOGV("setVolume(%f, %f)", left, right);
+void MediaPlayer2AudioOutput::setVolume(float volume) {
+    ALOGV("setVolume(%f)", volume);
     Mutex::Autolock lock(mLock);
-    mLeftVolume = left;
-    mRightVolume = right;
-    if (mTrack != 0) {
-        mTrack->setVolume(left, right);
+    mVolume = volume;
+    if (mJAudioTrack != nullptr) {
+        mJAudioTrack->setVolume(volume);
     }
 }
 
@@ -540,12 +448,12 @@ status_t MediaPlayer2AudioOutput::setPlaybackRate(const AudioPlaybackRate &rate)
     ALOGV("setPlaybackRate(%f %f %d %d)",
                 rate.mSpeed, rate.mPitch, rate.mFallbackMode, rate.mStretchMode);
     Mutex::Autolock lock(mLock);
-    if (mTrack == 0) {
+    if (mJAudioTrack == 0) {
         // remember rate so that we can set it when the track is opened
         mPlaybackRate = rate;
         return OK;
     }
-    status_t res = mTrack->setPlaybackRate(rate);
+    status_t res = mJAudioTrack->setPlaybackRate(rate);
     if (res != NO_ERROR) {
         return res;
     }
@@ -559,12 +467,12 @@ status_t MediaPlayer2AudioOutput::setPlaybackRate(const AudioPlaybackRate &rate)
 }
 
 status_t MediaPlayer2AudioOutput::getPlaybackRate(AudioPlaybackRate *rate) {
-    ALOGV("setPlaybackRate");
+    ALOGV("getPlaybackRate");
     Mutex::Autolock lock(mLock);
-    if (mTrack == 0) {
+    if (mJAudioTrack == 0) {
         return NO_INIT;
     }
-    *rate = mTrack->getPlaybackRate();
+    *rate = mJAudioTrack->getPlaybackRate();
     return NO_ERROR;
 }
 
@@ -572,8 +480,8 @@ status_t MediaPlayer2AudioOutput::setAuxEffectSendLevel(float level) {
     ALOGV("setAuxEffectSendLevel(%f)", level);
     Mutex::Autolock lock(mLock);
     mSendLevel = level;
-    if (mTrack != 0) {
-        return mTrack->setAuxEffectSendLevel(level);
+    if (mJAudioTrack != nullptr) {
+        return mJAudioTrack->setAuxEffectSendLevel(level);
     }
     return NO_ERROR;
 }
@@ -582,44 +490,63 @@ status_t MediaPlayer2AudioOutput::attachAuxEffect(int effectId) {
     ALOGV("attachAuxEffect(%d)", effectId);
     Mutex::Autolock lock(mLock);
     mAuxEffectId = effectId;
-    if (mTrack != 0) {
-        return mTrack->attachAuxEffect(effectId);
+    if (mJAudioTrack != nullptr) {
+        return mJAudioTrack->attachAuxEffect(effectId);
     }
     return NO_ERROR;
 }
 
-status_t MediaPlayer2AudioOutput::setOutputDevice(audio_port_handle_t deviceId) {
-    ALOGV("setOutputDevice(%d)", deviceId);
+status_t MediaPlayer2AudioOutput::setPreferredDevice(jobject device) {
+    ALOGV("setPreferredDevice");
     Mutex::Autolock lock(mLock);
-    mSelectedDeviceId = deviceId;
-    if (mTrack != 0) {
-        return mTrack->setOutputDevice(deviceId);
+    status_t ret = NO_ERROR;
+    if (mJAudioTrack != nullptr) {
+        ret = mJAudioTrack->setPreferredDevice(device);
     }
-    return NO_ERROR;
+    if (ret == NO_ERROR) {
+        mPreferredDevice = new JObjectHolder(device);
+    }
+    return ret;
 }
 
-status_t MediaPlayer2AudioOutput::getRoutedDeviceId(audio_port_handle_t* deviceId) {
-    ALOGV("getRoutedDeviceId");
+jobject MediaPlayer2AudioOutput::getRoutedDevice() {
+    ALOGV("getRoutedDevice");
     Mutex::Autolock lock(mLock);
-    if (mTrack != 0) {
-        mRoutedDeviceId = mTrack->getRoutedDeviceId();
+    if (mJAudioTrack != nullptr) {
+        return mJAudioTrack->getRoutedDevice();
     }
-    *deviceId = mRoutedDeviceId;
-    return NO_ERROR;
+    return nullptr;
 }
 
-status_t MediaPlayer2AudioOutput::enableAudioDeviceCallback(bool enabled) {
-    ALOGV("enableAudioDeviceCallback, %d", enabled);
+status_t MediaPlayer2AudioOutput::addAudioDeviceCallback(jobject jRoutingDelegate) {
+    ALOGV("addAudioDeviceCallback");
     Mutex::Autolock lock(mLock);
-    mDeviceCallbackEnabled = enabled;
-    if (mTrack != 0) {
-        status_t status;
-        if (enabled) {
-            status = mTrack->addAudioDeviceCallback(mDeviceCallback.promote());
-        } else {
-            status = mTrack->removeAudioDeviceCallback(mDeviceCallback.promote());
+    jobject listener = JAudioTrack::getListener(jRoutingDelegate);
+    if (JAudioTrack::findByKey(mRoutingDelegates, listener) == nullptr) {
+        sp<JObjectHolder> listenerHolder = new JObjectHolder(listener);
+        jobject handler = JAudioTrack::getHandler(jRoutingDelegate);
+        sp<JObjectHolder> routingDelegateHolder = new JObjectHolder(jRoutingDelegate);
+
+        mRoutingDelegates.push_back(std::pair<sp<JObjectHolder>, sp<JObjectHolder>>(
+                listenerHolder, routingDelegateHolder));
+
+        if (mJAudioTrack != nullptr) {
+            return mJAudioTrack->addAudioDeviceCallback(
+                    routingDelegateHolder->getJObject(), handler);
         }
-        return status;
+    }
+    return NO_ERROR;
+}
+
+status_t MediaPlayer2AudioOutput::removeAudioDeviceCallback(jobject listener) {
+    ALOGV("removeAudioDeviceCallback");
+    Mutex::Autolock lock(mLock);
+    jobject routingDelegate = nullptr;
+    if ((routingDelegate = JAudioTrack::findByKey(mRoutingDelegates, listener)) != nullptr) {
+        if (mJAudioTrack != nullptr) {
+            mJAudioTrack->removeAudioDeviceCallback(routingDelegate);
+        }
+        JAudioTrack::eraseByKey(mRoutingDelegates, listener);
     }
     return NO_ERROR;
 }
@@ -632,21 +559,21 @@ void MediaPlayer2AudioOutput::CallbackWrapper(
     // lock to ensure we aren't caught in the middle of a track switch.
     data->lock();
     MediaPlayer2AudioOutput *me = data->getOutput();
-    AudioTrack::Buffer *buffer = (AudioTrack::Buffer *)info;
-    if (me == NULL) {
+    JAudioTrack::Buffer *buffer = (JAudioTrack::Buffer *)info;
+    if (me == nullptr) {
         // no output set, likely because the track was scheduled to be reused
         // by another player, but the format turned out to be incompatible.
         data->unlock();
-        if (buffer != NULL) {
-            buffer->size = 0;
+        if (buffer != nullptr) {
+            buffer->mSize = 0;
         }
         return;
     }
 
     switch(event) {
-    case AudioTrack::EVENT_MORE_DATA: {
+    case JAudioTrack::EVENT_MORE_DATA: {
         size_t actualSize = (*me->mCallback)(
-                me, buffer->raw, buffer->size, me->mCallbackCookie,
+                me, buffer->mData, buffer->mSize, me->mCallbackCookie,
                 CB_EVENT_FILL_BUFFER);
 
         // Log when no data is returned from the callback.
@@ -658,25 +585,25 @@ void MediaPlayer2AudioOutput::CallbackWrapper(
         // This is a benign busy-wait, with the next data request generated 10 ms or more later;
         // nevertheless for power reasons, we don't want to see too many of these.
 
-        ALOGV_IF(actualSize == 0 && buffer->size > 0, "callbackwrapper: empty buffer returned");
+        ALOGV_IF(actualSize == 0 && buffer->mSize > 0, "callbackwrapper: empty buffer returned");
 
-        buffer->size = actualSize;
+        buffer->mSize = actualSize;
         } break;
 
-    case AudioTrack::EVENT_STREAM_END:
+    case JAudioTrack::EVENT_STREAM_END:
         // currently only occurs for offloaded callbacks
         ALOGV("callbackwrapper: deliver EVENT_STREAM_END");
-        (*me->mCallback)(me, NULL /* buffer */, 0 /* size */,
+        (*me->mCallback)(me, nullptr /* buffer */, 0 /* size */,
                 me->mCallbackCookie, CB_EVENT_STREAM_END);
         break;
 
-    case AudioTrack::EVENT_NEW_IAUDIOTRACK :
+    case JAudioTrack::EVENT_NEW_IAUDIOTRACK :
         ALOGV("callbackwrapper: deliver EVENT_TEAR_DOWN");
-        (*me->mCallback)(me,  NULL /* buffer */, 0 /* size */,
+        (*me->mCallback)(me,  nullptr /* buffer */, 0 /* size */,
                 me->mCallbackCookie, CB_EVENT_TEAR_DOWN);
         break;
 
-    case AudioTrack::EVENT_UNDERRUN:
+    case JAudioTrack::EVENT_UNDERRUN:
         // This occurs when there is no data available, typically
         // when there is a failure to supply data to the AudioTrack.  It can also
         // occur in non-offloaded mode when the audio device comes out of standby.
@@ -696,29 +623,31 @@ void MediaPlayer2AudioOutput::CallbackWrapper(
     data->unlock();
 }
 
-audio_session_t MediaPlayer2AudioOutput::getSessionId() const
-{
+int32_t MediaPlayer2AudioOutput::getSessionId() const {
     Mutex::Autolock lock(mLock);
     return mSessionId;
 }
 
-uint32_t MediaPlayer2AudioOutput::getSampleRate() const
-{
+void MediaPlayer2AudioOutput::setSessionId(const int32_t sessionId) {
     Mutex::Autolock lock(mLock);
-    if (mTrack == 0) {
-        return 0;
-    }
-    return mTrack->getSampleRate();
+    mSessionId = sessionId;
 }
 
-int64_t MediaPlayer2AudioOutput::getBufferDurationInUs() const
-{
+uint32_t MediaPlayer2AudioOutput::getSampleRate() const {
     Mutex::Autolock lock(mLock);
-    if (mTrack == 0) {
+    if (mJAudioTrack == 0) {
+        return 0;
+    }
+    return mJAudioTrack->getSampleRate();
+}
+
+int64_t MediaPlayer2AudioOutput::getBufferDurationInUs() const {
+    Mutex::Autolock lock(mLock);
+    if (mJAudioTrack == 0) {
         return 0;
     }
     int64_t duration;
-    if (mTrack->getBufferDurationInUs(&duration) != OK) {
+    if (mJAudioTrack->getBufferDurationInUs(&duration) != OK) {
         return 0;
     }
     return duration;

@@ -37,6 +37,7 @@ using namespace android;
 
 const int64_t kTimeoutWaitForOutputUs = 500000; // 0.5 seconds
 const int64_t kTimeoutWaitForInputUs = 5000; // 5 milliseconds
+const int kTimeoutMaxRetries = 20;
 
 //static
 sp<SimpleDecodingSource> SimpleDecodingSource::Create(
@@ -242,7 +243,7 @@ status_t SimpleDecodingSource::doRead(
         return ERROR_END_OF_STREAM;
     }
 
-    for (int retries = 0; ++retries; ) {
+    for (int retries = 0; retries < kTimeoutMaxRetries; ++retries) {
         // If we fill all available input buffers, we should expect that
         // the codec produces at least one output buffer. Also, the codec
         // should produce an output buffer in at most 1 seconds. Retry a

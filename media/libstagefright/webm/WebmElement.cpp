@@ -305,6 +305,7 @@ sp<WebmElement> WebmElement::SegmentInfo(uint64_t scale, double dur) {
 }
 
 sp<WebmElement> WebmElement::AudioTrackEntry(
+        const char *codec,
         int chans,
         double rate,
         const sp<ABuffer> &buf,
@@ -322,7 +323,7 @@ sp<WebmElement> WebmElement::AudioTrackEntry(
             uid,
             lacing,
             lang,
-            "A_VORBIS",
+            codec,
             kAudioType,
             trackEntryFields);
 

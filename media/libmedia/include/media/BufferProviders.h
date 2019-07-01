@@ -78,6 +78,7 @@ public:
 
     // Overrides PassthruBufferProvider
     virtual void reset();
+    void setBufferProvider(AudioBufferProvider *p) override;
 
     // this function should be supplied by the derived class.  It converts
     // #frames in the *src pointer to the *dst pointer.  It is public because
@@ -186,6 +187,7 @@ public:
 
     // Overrides PassthruBufferProvider
     virtual void reset();
+    void setBufferProvider(AudioBufferProvider *p) override;
 
     virtual status_t setPlaybackRate(const AudioPlaybackRate &playbackRate);
 
@@ -216,6 +218,41 @@ private:
     bool                 mAudioPlaybackRateValid; // flag for current parameters validity
 };
 
+// AdjustChannelsBufferProvider derives from CopyBufferProvider to adjust sample data.
+// Expands or contracts sample data from one interleaved channel format to another.
+// Extra expanded channels are filled with zeros and put at the end of each audio frame.
+// Contracted channels are copied to the end of the output buffer(storage should be
+// allocated appropriately).
+// Contracted channels could be written to output buffer.
+class AdjustChannelsBufferProvider : public CopyBufferProvider {
+public:
+    AdjustChannelsBufferProvider(audio_format_t format, size_t inChannelCount,
+            size_t outChannelCount, size_t frameCount) : AdjustChannelsBufferProvider(
+                    format, inChannelCount, outChannelCount,
+                    frameCount, AUDIO_FORMAT_INVALID, nullptr) { }
+    // Contracted data is converted to contractedFormat and put into contractedBuffer.
+    AdjustChannelsBufferProvider(audio_format_t format, size_t inChannelCount,
+            size_t outChannelCount, size_t frameCount, audio_format_t contractedFormat,
+            void* contractedBuffer);
+    //Overrides
+    status_t getNextBuffer(Buffer* pBuffer) override;
+    void copyFrames(void *dst, const void *src, size_t frames) override;
+    void reset() override;
+
+    void clearContractedFrames() { mContractedWrittenFrames = 0; }
+
+protected:
+    const audio_format_t mFormat;
+    const size_t         mInChannelCount;
+    const size_t         mOutChannelCount;
+    const size_t         mSampleSizeInBytes;
+    const size_t         mFrameCount;
+    const size_t         mContractedChannelCount;
+    const audio_format_t mContractedFormat;
+    void                *mContractedBuffer;
+    size_t               mContractedWrittenFrames;
+    size_t               mContractedFrameSize;
+};
 // ----------------------------------------------------------------------------
 } // namespace android
 

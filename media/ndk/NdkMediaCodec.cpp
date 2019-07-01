@@ -21,8 +21,8 @@
 
 #include <media/NdkMediaCodec.h>
 #include <media/NdkMediaError.h>
+#include <media/NdkMediaFormatPriv.h>
 #include "NdkMediaCryptoPriv.h"
-#include "NdkMediaFormatPriv.h"
 
 #include <utils/Log.h>
 #include <utils/StrongPointer.h>

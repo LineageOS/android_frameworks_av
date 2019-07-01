@@ -17,9 +17,9 @@
 #include "Stream.h"
 #include "PolicyMappingKeys.h"
 #include "PolicySubsystem.h"
+#include <media/TypeConverter.h>
 
 using std::string;
-using android::routing_strategy;
 
 Stream::Stream(const string &/*mappingValue*/,
                CInstanceConfigurableElement *instanceConfigurableElement,
@@ -29,10 +29,14 @@ Stream::Stream(const string &/*mappingValue*/,
                            instanceConfigurableElement->getBelongingSubsystem())),
       mPolicyPluginInterface(mPolicySubsystem->getPolicyPluginInterface())
 {
-    mId = static_cast<audio_stream_type_t>(context.getItemAsInteger(MappingKeyIdentifier));
+    std::string name(context.getItem(MappingKeyName));
+
+    if (not android::StreamTypeConverter::fromString(name, mId)) {
+        LOG_ALWAYS_FATAL("Invalid Stream type name: %s, invalid XML structure file", name.c_str());
+    }
 
     // Declares the strategy to audio policy engine
-    mPolicyPluginInterface->addStream(getFormattedMappingValue(), mId);
+    mPolicyPluginInterface->addStream(name, mId);
 }
 
 bool Stream::sendToHW(string & /*error*/)
@@ -40,11 +44,8 @@ bool Stream::sendToHW(string & /*error*/)
     Applicable params;
     blackboardRead(&params, sizeof(params));
 
-    mPolicyPluginInterface->setStrategyForStream(mId,
-                                                 static_cast<routing_strategy>(params.strategy));
-
-    mPolicyPluginInterface->setVolumeProfileForStream(mId,
-                                                      static_cast<audio_stream_type_t>(params.volumeProfile));
+    mPolicyPluginInterface->setVolumeProfileForStream(
+                mId, static_cast<audio_stream_type_t>(params.volumeProfile));
 
     return true;
 

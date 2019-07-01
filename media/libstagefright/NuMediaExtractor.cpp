@@ -21,10 +21,8 @@
 #include <media/stagefright/NuMediaExtractor.h>
 
 #include "include/ESDS.h"
-#include "include/NuCachedSource2.h"
 
 #include <media/DataSource.h>
-#include <media/MediaExtractor.h>
 #include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -34,6 +32,7 @@
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
+#include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
@@ -203,15 +202,6 @@ status_t NuMediaExtractor::setMediaCas(const HInterfaceToken &casToken) {
     }
 
     return OK;
-}
-
-void NuMediaExtractor::disconnect() {
-    if (mDataSource != NULL) {
-        // disconnect data source
-        if (mDataSource->flags() & DataSource::kIsCachingDataSource) {
-            static_cast<NuCachedSource2 *>(mDataSource.get())->disconnect();
-        }
-    }
 }
 
 status_t NuMediaExtractor::updateDurationAndBitrate() {
@@ -440,18 +430,6 @@ status_t NuMediaExtractor::unselectTrack(size_t index) {
     return OK;
 }
 
-void NuMediaExtractor::releaseOneSample(TrackInfo *info) {
-    if (info == NULL || info->mSamples.empty()) {
-        return;
-    }
-
-    auto it = info->mSamples.begin();
-    if (it->mBuffer != NULL) {
-        it->mBuffer->release();
-    }
-    info->mSamples.erase(it);
-}
-
 void NuMediaExtractor::releaseTrackSamples(TrackInfo *info) {
     if (info == NULL) {
         return;
@@ -482,7 +460,7 @@ ssize_t NuMediaExtractor::fetchAllTrackSamples(
         fetchTrackSamples(info, seekTimeUs, mode);
 
         status_t err = info->mFinalResult;
-        if (err != OK && err != ERROR_END_OF_STREAM) {
+        if (err != OK && err != ERROR_END_OF_STREAM && info->mSamples.empty()) {
             return err;
         }
 
@@ -537,14 +515,6 @@ void NuMediaExtractor::fetchTrackSamples(TrackInfo *info,
     info->mFinalResult = err;
     if (err != OK && err != ERROR_END_OF_STREAM) {
         ALOGW("read on track %zu failed with error %d", info->mTrackIndex, err);
-        size_t count = mediaBuffers.size();
-        for (size_t id = 0; id < count; ++id) {
-            MediaBufferBase *mbuf = mediaBuffers[id];
-            if (mbuf != NULL) {
-                mbuf->release();
-            }
-        }
-        return;
     }
 
     size_t count = mediaBuffers.size();
@@ -594,8 +564,26 @@ status_t NuMediaExtractor::advance() {
 
     TrackInfo *info = &mSelectedTracks.editItemAt(minIndex);
 
-    releaseOneSample(info);
+    if (info == NULL || info->mSamples.empty()) {
+        return ERROR_END_OF_STREAM;
+    }
 
+    auto it = info->mSamples.begin();
+    if (it->mBuffer != NULL) {
+        it->mBuffer->release();
+    }
+    info->mSamples.erase(it);
+
+    if (info->mSamples.empty()) {
+        minIndex = fetchAllTrackSamples();
+        if (minIndex < 0) {
+            return ERROR_END_OF_STREAM;
+        }
+        info = &mSelectedTracks.editItemAt(minIndex);
+        if (info == NULL || info->mSamples.empty()) {
+            return ERROR_END_OF_STREAM;
+        }
+    }
     return OK;
 }
 
@@ -766,6 +754,9 @@ status_t NuMediaExtractor::getSampleMeta(sp<MetaData> *sampleMeta) {
 }
 
 status_t NuMediaExtractor::getMetrics(Parcel *reply) {
+    if (mImpl == NULL) {
+        return -EINVAL;
+    }
     status_t status = mImpl->getMetrics(reply);
     return status;
 }
@@ -790,22 +781,50 @@ bool NuMediaExtractor::getCachedDuration(
         int64_t *durationUs, bool *eos) const {
     Mutex::Autolock autoLock(mLock);
 
+    off64_t cachedDataRemaining = -1;
+    status_t finalStatus = mDataSource->getAvailableSize(-1, &cachedDataRemaining);
+
     int64_t bitrate;
-    if ((mDataSource->flags() & DataSource::kIsCachingDataSource)
+    if (cachedDataRemaining >= 0
             && getTotalBitrate(&bitrate)) {
-        sp<NuCachedSource2> cachedSource =
-            static_cast<NuCachedSource2 *>(mDataSource.get());
-
-        status_t finalStatus;
-        size_t cachedDataRemaining =
-            cachedSource->approxDataRemaining(&finalStatus);
-
         *durationUs = cachedDataRemaining * 8000000ll / bitrate;
         *eos = (finalStatus != OK);
         return true;
     }
 
     return false;
+}
+
+// Return OK if we have received an audio presentation info.
+// Return ERROR_END_OF_STREAM if no tracks are available.
+// Return ERROR_UNSUPPORTED if the track has no audio presentation.
+// Return INVALID_OPERATION if audio presentation metadata version does not match.
+status_t NuMediaExtractor::getAudioPresentations(
+        size_t trackIndex, AudioPresentationCollection *presentations) {
+    Mutex::Autolock autoLock(mLock);
+    ssize_t minIndex = fetchAllTrackSamples();
+    if (minIndex < 0) {
+        return ERROR_END_OF_STREAM;
+    }
+    for (size_t i = 0; i < mSelectedTracks.size(); ++i) {
+        TrackInfo *info = &mSelectedTracks.editItemAt(i);
+
+        if (info->mTrackIndex == trackIndex) {
+            sp<MetaData> meta = new MetaData(info->mSamples.begin()->mBuffer->meta_data());
+
+            uint32_t type;
+            const void *data;
+            size_t size;
+            if (meta != NULL && meta->findData(kKeyAudioPresentationInfo, &type, &data, &size)) {
+                std::istringstream inStream(std::string(static_cast<const char*>(data), size));
+                return deserializeAudioPresentations(&inStream, presentations);
+            }
+            ALOGV("Track %zu does not contain any audio presentation", trackIndex);
+            return ERROR_UNSUPPORTED;
+        }
+    }
+    ALOGV("Source does not contain any audio presentation");
+    return ERROR_UNSUPPORTED;
 }
 
 }  // namespace android

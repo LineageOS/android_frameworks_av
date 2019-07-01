@@ -49,12 +49,29 @@ namespace android {
 #define MIX_STATE_IDLE 0
 #define MIX_STATE_MIXING 1
 
+/** Control to which device some audio is rendered */
 #define MIX_ROUTE_FLAG_RENDER 0x1
+/** Loop back some audio instead of rendering it */
 #define MIX_ROUTE_FLAG_LOOP_BACK (0x1 << 1)
+/** Loop back some audio while it is rendered */
+#define MIX_ROUTE_FLAG_LOOP_BACK_AND_RENDER (MIX_ROUTE_FLAG_RENDER | MIX_ROUTE_FLAG_LOOP_BACK)
 #define MIX_ROUTE_FLAG_ALL (MIX_ROUTE_FLAG_RENDER | MIX_ROUTE_FLAG_LOOP_BACK)
 
 #define MAX_MIXES_PER_POLICY 10
 #define MAX_CRITERIA_PER_MIX 20
+
+class AudioDeviceTypeAddr {
+public:
+    AudioDeviceTypeAddr() {}
+    AudioDeviceTypeAddr(audio_devices_t type, String8 address) :
+        mType(type), mAddress(address) {}
+
+    status_t readFromParcel(Parcel *parcel);
+    status_t writeToParcel(Parcel *parcel) const;
+
+    audio_devices_t mType;
+    String8 mAddress;
+};
 
 class AudioMixMatchCriterion {
 public:
@@ -87,21 +104,37 @@ public:
     status_t readFromParcel(Parcel *parcel);
     status_t writeToParcel(Parcel *parcel) const;
 
-    Vector<AudioMixMatchCriterion> mCriteria;
+    void setExcludeUid(uid_t uid) const;
+    void setMatchUid(uid_t uid) const;
+    /** returns true if this mix has a rule to match or exclude the given uid */
+    bool hasUidRule(bool match, uid_t uid) const;
+    /** returns true if this mix has a rule for uid match (any uid) */
+    bool hasMatchUidRule() const;
+    /** returns true if this mix can be used for uid-device affinity routing */
+    bool isDeviceAffinityCompatible() const;
+
+    mutable Vector<AudioMixMatchCriterion> mCriteria;
     uint32_t        mMixType;
     audio_config_t  mFormat;
     uint32_t        mRouteFlags;
     audio_devices_t mDeviceType;
     String8         mDeviceAddress;
     uint32_t        mCbFlags; // flags indicating which callbacks to use, see kCbFlag*
+    /** Ignore the AUDIO_FLAG_NO_MEDIA_PROJECTION */
+    bool            mAllowPrivilegedPlaybackCapture = false;
 };
 
 
-// definitions for audio recording configuration updates
-// which update type is reported
-#define RECORD_CONFIG_EVENT_NONE -1
-#define RECORD_CONFIG_EVENT_START 1
-#define RECORD_CONFIG_EVENT_STOP  0
+// definitions for audio recording configuration updates;
+// keep in sync with AudioManager.java for values used from native code
+#define RECORD_CONFIG_EVENT_START  0
+#define RECORD_CONFIG_EVENT_STOP   1
+#define RECORD_CONFIG_EVENT_UPDATE 2
+
+static inline bool is_mix_loopback_render(uint32_t routeFlags) {
+    return (routeFlags & MIX_ROUTE_FLAG_LOOP_BACK_AND_RENDER)
+           == MIX_ROUTE_FLAG_LOOP_BACK_AND_RENDER;
+}
 
 }; // namespace android
 

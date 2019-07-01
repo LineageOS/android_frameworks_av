@@ -23,15 +23,20 @@
 #include <utils/Errors.h>
 #include <utils/String8.h>
 #include <utils/RefBase.h>
+#include <jni.h>
 
 #include <media/AVSyncSettings.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
 #include <media/AudioTimestamp.h>
 #include <media/BufferingSettings.h>
-#include <media/Metadata.h>
 #include <media/stagefright/foundation/AHandler.h>
 #include <mediaplayer2/MediaPlayer2Types.h>
+
+#include "jni.h"
+#include "mediaplayer2.pb.h"
+
+using android::media::MediaPlayer2Proto::PlayerMessage;
 
 // Fwd decl to make sure everyone agrees that the scope of struct sockaddr_in is
 // global, and not in android::
@@ -43,7 +48,6 @@ struct DataSourceDesc;
 class Parcel;
 struct ANativeWindowWrapper;
 
-#define DEFAULT_AUDIOSINK_BUFFERCOUNT 4
 #define DEFAULT_AUDIOSINK_BUFFERSIZE 1200
 #define DEFAULT_AUDIOSINK_SAMPLERATE 44100
 
@@ -56,7 +60,8 @@ struct ANativeWindowWrapper;
 class MediaPlayer2InterfaceListener: public RefBase
 {
 public:
-    virtual void notify(int64_t srcId, int msg, int ext1, int ext2, const Parcel *obj) = 0;
+    virtual void notify(int64_t srcId, int msg, int ext1, int ext2,
+           const PlayerMessage *obj) = 0;
 };
 
 class MediaPlayer2Interface : public AHandler {
@@ -88,7 +93,7 @@ public:
         virtual status_t getTimestamp(AudioTimestamp &ts) const = 0;
         virtual int64_t getPlayedOutDurationUs(int64_t nowUs) const = 0;
         virtual status_t getFramesWritten(uint32_t *frameswritten) const = 0;
-        virtual audio_session_t getSessionId() const = 0;
+        virtual int32_t getSessionId() const = 0;
         virtual audio_stream_type_t getAudioStreamType() const = 0;
         virtual uint32_t getSampleRate() const = 0;
         virtual int64_t getBufferDurationInUs() const = 0;
@@ -98,12 +103,10 @@ public:
         virtual status_t open(
                 uint32_t sampleRate, int channelCount, audio_channel_mask_t channelMask,
                 audio_format_t format=AUDIO_FORMAT_PCM_16_BIT,
-                int bufferCount=DEFAULT_AUDIOSINK_BUFFERCOUNT,
                 AudioCallback cb = NULL,
                 void *cookie = NULL,
                 audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE,
                 const audio_offload_info_t *offloadInfo = NULL,
-                bool doNotReconnect = false,
                 uint32_t suggestedFrameCount = 0) = 0;
 
         virtual status_t start() = 0;
@@ -139,9 +142,10 @@ public:
         }
 
         // AudioRouting
-        virtual status_t    setOutputDevice(audio_port_handle_t deviceId);
-        virtual status_t    getRoutedDeviceId(audio_port_handle_t* deviceId);
-        virtual status_t    enableAudioDeviceCallback(bool enabled);
+        virtual status_t    setPreferredDevice(jobject device);
+        virtual jobject     getRoutedDevice();
+        virtual status_t    addAudioDeviceCallback(jobject routingDelegate);
+        virtual status_t    removeAudioDeviceCallback(jobject listener);
     };
 
     MediaPlayer2Interface() : mListener(NULL) { }
@@ -171,7 +175,6 @@ public:
 
     virtual status_t prepareAsync() = 0;
     virtual status_t start() = 0;
-    virtual status_t stop() = 0;
     virtual status_t pause() = 0;
     virtual bool isPlaying() = 0;
     virtual status_t setPlaybackSettings(const AudioPlaybackRate& rate) {
@@ -211,6 +214,8 @@ public:
     virtual status_t setParameter(int key, const Parcel &request) = 0;
     virtual status_t getParameter(int key, Parcel *reply) = 0;
 
+    virtual status_t getMetrics(char **buffer, size_t *length) = 0;
+
     // Invoke a generic method on the player by using opaque parcels
     // for the request and reply.
     //
@@ -218,26 +223,14 @@ public:
     //                data sent by the java layer.
     // @param[out] reply Parcel to hold the reply data. Cannot be null.
     // @return OK if the call was successful.
-    virtual status_t invoke(const Parcel& request, Parcel *reply) = 0;
-
-    // The Client in the MetadataPlayerService calls this method on
-    // the native player to retrieve all or a subset of metadata.
-    //
-    // @param ids SortedList of metadata ID to be fetch. If empty, all
-    //            the known metadata should be returned.
-    // @param[inout] records Parcel where the player appends its metadata.
-    // @return OK if the call was successful.
-    virtual status_t getMetadata(const media::Metadata::Filter& /* ids */,
-                                 Parcel* /* records */) {
-        return INVALID_OPERATION;
-    };
+    virtual status_t invoke(const PlayerMessage &request, PlayerMessage *reply) = 0;
 
     void setListener(const sp<MediaPlayer2InterfaceListener> &listener) {
         Mutex::Autolock autoLock(mListenerLock);
         mListener = listener;
     }
 
-    void sendEvent(int64_t srcId, int msg, int ext1=0, int ext2=0, const Parcel *obj=NULL) {
+    void sendEvent(int64_t srcId, int msg, int ext1=0, int ext2=0, const PlayerMessage *obj=NULL) {
         sp<MediaPlayer2InterfaceListener> listener;
         {
             Mutex::Autolock autoLock(mListenerLock);
@@ -256,11 +249,11 @@ public:
     virtual void onMessageReceived(const sp<AMessage> & /* msg */) override { }
 
     // Modular DRM
-    virtual status_t prepareDrm(const uint8_t /* uuid */[16],
+    virtual status_t prepareDrm(int64_t /*srcId*/, const uint8_t /* uuid */[16],
                                 const Vector<uint8_t>& /* drmSessionId */) {
         return INVALID_OPERATION;
     }
-    virtual status_t releaseDrm() {
+    virtual status_t releaseDrm(int64_t /*srcId*/) {
         return INVALID_OPERATION;
     }
 

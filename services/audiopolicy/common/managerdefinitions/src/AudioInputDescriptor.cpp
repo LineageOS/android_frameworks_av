@@ -17,22 +17,21 @@
 #define LOG_TAG "APM::AudioInputDescriptor"
 //#define LOG_NDEBUG 0
 
-#include <AudioPolicyInterface.h>
-#include "AudioInputDescriptor.h"
-#include "IOProfile.h"
-#include "AudioGain.h"
-#include "HwModule.h"
+#include <audiomanager/AudioManager.h>
 #include <media/AudioPolicy.h>
 #include <policy.h>
+#include <AudioPolicyInterface.h>
+#include "AudioInputDescriptor.h"
+#include "AudioGain.h"
+#include "AudioPolicyMix.h"
+#include "HwModule.h"
 
 namespace android {
 
 AudioInputDescriptor::AudioInputDescriptor(const sp<IOProfile>& profile,
                                            AudioPolicyClientInterface *clientInterface)
-    : mIoHandle(0),
-      mDevice(AUDIO_DEVICE_NONE), mPolicyMix(NULL),
-      mProfile(profile), mPatchHandle(AUDIO_PATCH_HANDLE_NONE), mId(0),
-      mClientInterface(clientInterface)
+    : mProfile(profile)
+    ,  mClientInterface(clientInterface)
 {
     if (profile != NULL) {
         profile->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
@@ -50,19 +49,14 @@ audio_module_handle_t AudioInputDescriptor::getModuleHandle() const
     return mProfile->getModuleHandle();
 }
 
-uint32_t AudioInputDescriptor::getOpenRefCount() const
-{
-    return mSessions.getOpenCount();
-}
-
 audio_port_handle_t AudioInputDescriptor::getId() const
 {
     return mId;
 }
 
-audio_source_t AudioInputDescriptor::inputSource(bool activeOnly) const
+audio_source_t AudioInputDescriptor::source() const
 {
-    return getHighestPrioritySource(activeOnly);
+    return getHighestPriorityAttributes().source;
 }
 
 void AudioInputDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
@@ -83,7 +77,7 @@ void AudioInputDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig
     dstConfig->type = AUDIO_PORT_TYPE_MIX;
     dstConfig->ext.mix.hw_module = getModuleHandle();
     dstConfig->ext.mix.handle = mIoHandle;
-    dstConfig->ext.mix.usecase.source = inputSource();
+    dstConfig->ext.mix.usecase.source = source();
 }
 
 void AudioInputDescriptor::toAudioPort(struct audio_port *port) const
@@ -118,57 +112,62 @@ void AudioInputDescriptor::clearPreemptedSessions()
     mPreemptedSessions.clear();
 }
 
-bool AudioInputDescriptor::isActive() const {
-    return mSessions.hasActiveSession();
-}
-
 bool AudioInputDescriptor::isSourceActive(audio_source_t source) const
 {
-    return mSessions.isSourceActive(source);
+    for (const auto &client : getClientIterable()) {
+        if (client->active() &&
+            ((client->source() == source) ||
+                ((source == AUDIO_SOURCE_VOICE_RECOGNITION) &&
+                    (client->source() == AUDIO_SOURCE_HOTWORD) &&
+                    client->isSoundTrigger()))) {
+            return true;
+        }
+    }
+    return false;
 }
 
-audio_source_t AudioInputDescriptor::getHighestPrioritySource(bool activeOnly) const
+audio_attributes_t AudioInputDescriptor::getHighestPriorityAttributes() const
 {
+    audio_attributes_t attributes = { .source = AUDIO_SOURCE_DEFAULT };
+    sp<RecordClientDescriptor> topClient = getHighestPriorityClient();
+    return topClient ? topClient->attributes() : attributes;
+}
 
-    return mSessions.getHighestPrioritySource(activeOnly);
+sp<RecordClientDescriptor> AudioInputDescriptor::getHighestPriorityClient() const
+{
+    sp<RecordClientDescriptor> topClient;
+
+    for (bool activeOnly : { true, false }) {
+        int32_t topPriority = -1;
+        app_state_t topState = APP_STATE_IDLE;
+        for (const auto &client : getClientIterable()) {
+            if (activeOnly && !client->active()) {
+              continue;
+            }
+            app_state_t curState = client->appState();
+            if (curState >= topState) {
+                int32_t curPriority = source_priority(client->source());
+                if (curPriority >= topPriority) {
+                    topClient = client;
+                    topPriority = curPriority;
+                }
+                topState = curState;
+            }
+        }
+        if (topClient != nullptr) {
+            break;
+        }
+    }
+    return topClient;
 }
 
 bool AudioInputDescriptor::isSoundTrigger() const {
-    // sound trigger and non sound trigger sessions are not mixed
-    // on a given input
-    return mSessions.valueAt(0)->isSoundTrigger();
-}
-
-sp<AudioSession> AudioInputDescriptor::getAudioSession(
-                                              audio_session_t session) const {
-    return mSessions.valueFor(session);
-}
-
-AudioSessionCollection AudioInputDescriptor::getAudioSessions(bool activeOnly) const
-{
-    if (activeOnly) {
-        return mSessions.getActiveSessions();
-    } else {
-        return mSessions;
+    // sound trigger and non sound trigger clients are not mixed on a given input
+    // so check only first client
+    if (getClientCount() == 0) {
+        return false;
     }
-}
-
-size_t AudioInputDescriptor::getAudioSessionCount(bool activeOnly) const
-{
-    if (activeOnly) {
-        return mSessions.getActiveSessionCount();
-    } else {
-        return mSessions.size();
-    }
-}
-
-status_t AudioInputDescriptor::addAudioSession(audio_session_t session,
-                         const sp<AudioSession>& audioSession) {
-    return mSessions.addSession(session, audioSession, /*AudioSessionInfoProvider*/this);
-}
-
-status_t AudioInputDescriptor::removeAudioSession(audio_session_t session) {
-    return mSessions.removeSession(session);
+    return getClientIterable().begin()->isSoundTrigger();
 }
 
 audio_patch_handle_t AudioInputDescriptor::getPatchHandle() const
@@ -179,7 +178,13 @@ audio_patch_handle_t AudioInputDescriptor::getPatchHandle() const
 void AudioInputDescriptor::setPatchHandle(audio_patch_handle_t handle)
 {
     mPatchHandle = handle;
-    mSessions.onSessionInfoUpdate();
+    for (const auto &client : getClientIterable()) {
+        if (client->active()) {
+            updateClientRecordingConfiguration(
+                    client->isLowLevel() ? RECORD_CONFIG_EVENT_START : RECORD_CONFIG_EVENT_UPDATE,
+                    client);
+        }
+    }
 }
 
 audio_config_base_t AudioInputDescriptor::getConfig() const
@@ -190,8 +195,7 @@ audio_config_base_t AudioInputDescriptor::getConfig() const
 }
 
 status_t AudioInputDescriptor::open(const audio_config_t *config,
-                                       audio_devices_t device,
-                                       const String8& address,
+                                       const sp<DeviceDescriptor> &device,
                                        audio_source_t source,
                                        audio_input_flags_t flags,
                                        audio_io_handle_t *input)
@@ -208,24 +212,26 @@ status_t AudioInputDescriptor::open(const audio_config_t *config,
 
     mDevice = device;
 
-    ALOGV("opening input for device %08x address %s profile %p name %s",
-          mDevice, address.string(), mProfile.get(), mProfile->getName().string());
+    ALOGV("opening input for device %s profile %p name %s",
+          mDevice->toString().c_str(), mProfile.get(), mProfile->getName().string());
+
+    audio_devices_t deviceType = mDevice->type();
 
     status_t status = mClientInterface->openInput(mProfile->getModuleHandle(),
                                                   input,
                                                   &lConfig,
-                                                  &mDevice,
-                                                  address,
+                                                  &deviceType,
+                                                  mDevice->address(),
                                                   source,
                                                   flags);
-    LOG_ALWAYS_FATAL_IF(mDevice != device,
+    LOG_ALWAYS_FATAL_IF(mDevice->type() != deviceType,
                         "%s openInput returned device %08x when given device %08x",
-                        __FUNCTION__, mDevice, device);
+                        __FUNCTION__, mDevice->type(), deviceType);
 
     if (status == NO_ERROR) {
         LOG_ALWAYS_FATAL_IF(*input == AUDIO_IO_HANDLE_NONE,
-                            "%s openInput returned input handle %d for device %08x",
-                            __FUNCTION__, *input, device);
+                            "%s openInput returned input handle %d for device %s",
+                            __FUNCTION__, *input, mDevice->toString().c_str());
         mSamplingRate = lConfig.sample_rate;
         mChannelMask = lConfig.channel_mask;
         mFormat = lConfig.format;
@@ -239,7 +245,7 @@ status_t AudioInputDescriptor::open(const audio_config_t *config,
 
 status_t AudioInputDescriptor::start()
 {
-    if (getAudioSessionCount(true/*activeOnly*/) == 1) {
+    if (!isActive()) {
         if (!mProfile->canStartNewIo()) {
             ALOGI("%s mProfile->curActiveCount %d", __func__, mProfile->curActiveCount);
             return INVALID_OPERATION;
@@ -262,42 +268,247 @@ void AudioInputDescriptor::stop()
 void AudioInputDescriptor::close()
 {
     if (mIoHandle != AUDIO_IO_HANDLE_NONE) {
+        // clean up active clients if any (can happen if close() is called to force
+        // clients to reconnect
+        for (const auto &client : getClientIterable()) {
+            if (client->active()) {
+                ALOGW("%s client with port ID %d still active on input %d",
+                    __func__, client->portId(), mId);
+                setClientActive(client, false);
+                stop();
+            }
+        }
+
         mClientInterface->closeInput(mIoHandle);
         LOG_ALWAYS_FATAL_IF(mProfile->curOpenCount < 1, "%s profile open count %u",
                             __FUNCTION__, mProfile->curOpenCount);
-        // do not call stop() here as stop() is supposed to be called after
-        // AudioSession::changeActiveCount(-1) and we don't know how many sessions
-        // are still active at this time
-        if (isActive()) {
-            mProfile->curActiveCount--;
-        }
+
         mProfile->curOpenCount--;
+        LOG_ALWAYS_FATAL_IF(mProfile->curOpenCount <  mProfile->curActiveCount,
+                "%s(%d): mProfile->curOpenCount %d < mProfile->curActiveCount %d.",
+                __func__, mId, mProfile->curOpenCount, mProfile->curActiveCount);
         mIoHandle = AUDIO_IO_HANDLE_NONE;
     }
 }
 
-status_t AudioInputDescriptor::dump(int fd)
+void AudioInputDescriptor::addClient(const sp<RecordClientDescriptor> &client) {
+    ClientMapHandler<RecordClientDescriptor>::addClient(client);
+
+    for (size_t i = 0; i < mEnabledEffects.size(); i++) {
+        if (mEnabledEffects.valueAt(i)->mSession == client->session()) {
+            client->trackEffectEnabled(mEnabledEffects.valueAt(i), true);
+        }
+    }
+}
+
+void AudioInputDescriptor::setClientActive(const sp<RecordClientDescriptor>& client, bool active)
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    String8 result;
+    LOG_ALWAYS_FATAL_IF(getClient(client->portId()) == nullptr,
+        "%s(%d) does not exist on input descriptor", __func__, client->portId());
+    if (active == client->active()) {
+        return;
+    }
 
-    snprintf(buffer, SIZE, " ID: %d\n", getId());
-    result.append(buffer);
-    snprintf(buffer, SIZE, " Sampling rate: %d\n", mSamplingRate);
-    result.append(buffer);
-    snprintf(buffer, SIZE, " Format: %d\n", mFormat);
-    result.append(buffer);
-    snprintf(buffer, SIZE, " Channels: %08x\n", mChannelMask);
-    result.append(buffer);
-    snprintf(buffer, SIZE, " Devices %08x\n", mDevice);
-    result.append(buffer);
+    // Handle non-client-specific activity ref count
+    int32_t oldGlobalActiveCount = mGlobalActiveCount;
+    if (!active && mGlobalActiveCount < 1) {
+        LOG_ALWAYS_FATAL("%s(%d) invalid deactivation with globalActiveCount %d",
+               __func__, client->portId(), mGlobalActiveCount);
+        // mGlobalActiveCount = 1;
+    }
+    const int delta = active ? 1 : -1;
+    mGlobalActiveCount += delta;
 
-    write(fd, result.string(), result.size());
+    sp<AudioPolicyMix> policyMix = mPolicyMix.promote();
+    if ((oldGlobalActiveCount == 0) && (mGlobalActiveCount > 0)) {
+        if ((policyMix != NULL) && ((policyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0))
+        {
+            mClientInterface->onDynamicPolicyMixStateUpdate(policyMix->mDeviceAddress,
+                                                            MIX_STATE_MIXING);
+        }
+    } else if ((oldGlobalActiveCount > 0) && (mGlobalActiveCount == 0)) {
+        if ((policyMix != NULL) && ((policyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0))
+        {
+            mClientInterface->onDynamicPolicyMixStateUpdate(policyMix->mDeviceAddress,
+                                                            MIX_STATE_IDLE);
+        }
+    }
 
-    mSessions.dump(fd, 1);
+    client->setActive(active);
 
-    return NO_ERROR;
+    checkSuspendEffects();
+
+    int event = active ? RECORD_CONFIG_EVENT_START : RECORD_CONFIG_EVENT_STOP;
+    updateClientRecordingConfiguration(event, client);
+}
+
+void AudioInputDescriptor::updateClientRecordingConfiguration(
+    int event, const sp<RecordClientDescriptor>& client)
+{
+    ALOGV("%s riid %d uid %d port %d session %d event %d",
+            __func__, client->riid(), client->uid(), client->portId(), client->session(), event);
+    // do not send callback if starting and no device is selected yet to avoid
+    // double callbacks from startInput() before and after the device is selected
+    // "start" and "stop" events for "high level" clients (AudioRecord) are sent by the client side
+    if ((event == RECORD_CONFIG_EVENT_START && mPatchHandle == AUDIO_PATCH_HANDLE_NONE)
+            || (!client->isLowLevel()
+                    && (event == RECORD_CONFIG_EVENT_START || event == RECORD_CONFIG_EVENT_STOP))) {
+        return;
+    }
+
+    const audio_config_base_t sessionConfig = client->config();
+    const record_client_info_t recordClientInfo{client->riid(), client->uid(), client->session(),
+                                                client->source(), client->portId(),
+                                                client->isSilenced()};
+    const audio_config_base_t config = getConfig();
+
+    std::vector<effect_descriptor_t> clientEffects;
+    EffectDescriptorCollection effectsList = client->getEnabledEffects();
+    for (size_t i = 0; i < effectsList.size(); i++) {
+        clientEffects.push_back(effectsList.valueAt(i)->mDesc);
+    }
+
+    std::vector<effect_descriptor_t> effects;
+    effectsList = getEnabledEffects();
+    for (size_t i = 0; i < effectsList.size(); i++) {
+        effects.push_back(effectsList.valueAt(i)->mDesc);
+    }
+
+    mClientInterface->onRecordingConfigurationUpdate(event, &recordClientInfo, &sessionConfig,
+                                                     clientEffects, &config, effects,
+                                                     mPatchHandle, source());
+}
+
+RecordClientVector AudioInputDescriptor::getClientsForSession(
+    audio_session_t session)
+{
+    RecordClientVector clients;
+    for (const auto &client : getClientIterable()) {
+        if (client->session() == session) {
+            clients.push_back(client);
+        }
+    }
+    return clients;
+}
+
+RecordClientVector AudioInputDescriptor::clientsList(bool activeOnly, audio_source_t source,
+                                                     bool preferredDeviceOnly) const
+{
+    RecordClientVector clients;
+    for (const auto &client : getClientIterable()) {
+        if ((!activeOnly || client->active())
+            && (source == AUDIO_SOURCE_DEFAULT || source == client->source())
+            && (!preferredDeviceOnly || client->hasPreferredDevice())) {
+            clients.push_back(client);
+        }
+    }
+    return clients;
+}
+
+void AudioInputDescriptor::trackEffectEnabled(const sp<EffectDescriptor> &effect,
+                                              bool enabled)
+{
+    if (enabled) {
+        mEnabledEffects.replaceValueFor(effect->mId, effect);
+    } else {
+        mEnabledEffects.removeItem(effect->mId);
+        // always exit from suspend when disabling an effect as only enabled effects
+        // are managed by checkSuspendEffects()
+        if (effect->mSuspended) {
+            effect->mSuspended = false;
+            mClientInterface->setEffectSuspended(effect->mId, effect->mSession, effect->mSuspended);
+        }
+    }
+
+    RecordClientVector clients = getClientsForSession((audio_session_t)effect->mSession);
+    RecordClientVector updatedClients;
+
+    for (const auto& client : clients) {
+        sp<EffectDescriptor> clientEffect = client->getEnabledEffects().getEffect(effect->mId);
+        bool changed = (enabled && clientEffect == nullptr)
+                || (!enabled && clientEffect != nullptr);
+        client->trackEffectEnabled(effect, enabled);
+        if (changed && client->active()) {
+            updatedClients.push_back(client);
+        }
+    }
+
+    checkSuspendEffects();
+
+    for (const auto& client : updatedClients) {
+        updateClientRecordingConfiguration(RECORD_CONFIG_EVENT_UPDATE, client);
+    }
+}
+
+EffectDescriptorCollection AudioInputDescriptor::getEnabledEffects() const
+{
+    // report effects for highest priority active source as applied to all clients
+    EffectDescriptorCollection enabledEffects;
+    sp<RecordClientDescriptor> topClient = getHighestPriorityClient();
+    if (topClient != nullptr) {
+        enabledEffects = topClient->getEnabledEffects();
+    }
+    return enabledEffects;
+}
+
+void AudioInputDescriptor::setAppState(uid_t uid, app_state_t state)
+{
+    RecordClientVector clients = clientsList(false /*activeOnly*/);
+    RecordClientVector updatedClients;
+
+    for (const auto& client : clients) {
+        if (uid == client->uid()) {
+            bool wasSilenced = client->isSilenced();
+            client->setAppState(state);
+            if (client->active() && wasSilenced != client->isSilenced()) {
+                updatedClients.push_back(client);
+            }
+        }
+    }
+
+    checkSuspendEffects();
+
+    for (const auto& client : updatedClients) {
+        updateClientRecordingConfiguration(RECORD_CONFIG_EVENT_UPDATE, client);
+    }
+}
+
+void AudioInputDescriptor::checkSuspendEffects()
+{
+    sp<RecordClientDescriptor> topClient = getHighestPriorityClient();
+    if (topClient == nullptr) {
+        return;
+    }
+
+    for (size_t i = 0; i < mEnabledEffects.size(); i++) {
+        sp<EffectDescriptor> effect = mEnabledEffects.valueAt(i);
+        if (effect->mSession == topClient->session()) {
+            if (effect->mSuspended) {
+                effect->mSuspended = false;
+                mClientInterface->setEffectSuspended(effect->mId,
+                                                     effect->mSession,
+                                                     effect->mSuspended);
+            }
+        } else if (!effect->mSuspended) {
+            effect->mSuspended = true;
+            mClientInterface->setEffectSuspended(effect->mId,
+                                                 effect->mSession,
+                                                 effect->mSuspended);
+        }
+    }
+}
+
+void AudioInputDescriptor::dump(String8 *dst) const
+{
+    dst->appendFormat(" ID: %d\n", getId());
+    dst->appendFormat(" Sampling rate: %d\n", mSamplingRate);
+    dst->appendFormat(" Format: %d\n", mFormat);
+    dst->appendFormat(" Channels: %08x\n", mChannelMask);
+    dst->appendFormat(" Devices %s\n", mDevice->toString().c_str());
+    mEnabledEffects.dump(dst, 1 /*spaces*/, false /*verbose*/);
+    dst->append(" AudioRecord Clients:\n");
+    ClientMapHandler<RecordClientDescriptor>::dump(dst);
+    dst->append("\n");
 }
 
 bool AudioInputCollection::isSourceActive(audio_source_t source) const
@@ -322,56 +533,74 @@ sp<AudioInputDescriptor> AudioInputCollection::getInputFromId(audio_port_handle_
     return NULL;
 }
 
-uint32_t AudioInputCollection::activeInputsCountOnDevices(audio_devices_t devices) const
+uint32_t AudioInputCollection::activeInputsCountOnDevices(const DeviceVector &devices) const
 {
     uint32_t count = 0;
     for (size_t i = 0; i < size(); i++) {
         const sp<AudioInputDescriptor>  inputDescriptor = valueAt(i);
         if (inputDescriptor->isActive() &&
-                ((devices == AUDIO_DEVICE_IN_DEFAULT) ||
-                 ((inputDescriptor->mDevice & devices & ~AUDIO_DEVICE_BIT_IN) != 0))) {
+                (devices.isEmpty() || devices.contains(inputDescriptor->getDevice()))) {
             count++;
         }
     }
     return count;
 }
 
-Vector<sp <AudioInputDescriptor> > AudioInputCollection::getActiveInputs(bool ignoreVirtualInputs)
+Vector<sp <AudioInputDescriptor> > AudioInputCollection::getActiveInputs()
 {
     Vector<sp <AudioInputDescriptor> > activeInputs;
 
     for (size_t i = 0; i < size(); i++) {
         const sp<AudioInputDescriptor>  inputDescriptor = valueAt(i);
-        if ((inputDescriptor->isActive())
-                && (!ignoreVirtualInputs ||
-                    !is_virtual_input_device(inputDescriptor->mDevice))) {
+        if (inputDescriptor->isActive()) {
             activeInputs.add(inputDescriptor);
         }
     }
     return activeInputs;
 }
 
-audio_devices_t AudioInputCollection::getSupportedDevices(audio_io_handle_t handle) const
+sp<AudioInputDescriptor> AudioInputCollection::getInputForClient(audio_port_handle_t portId)
 {
-    sp<AudioInputDescriptor> inputDesc = valueFor(handle);
-    audio_devices_t devices = inputDesc->mProfile->getSupportedDevicesType();
-    return devices;
+    for (size_t i = 0; i < size(); i++) {
+        sp<AudioInputDescriptor> inputDesc = valueAt(i);
+        if (inputDesc->getClient(portId) != nullptr) {
+            return inputDesc;
+        }
+    }
+    return 0;
 }
 
-status_t AudioInputCollection::dump(int fd) const
+void AudioInputCollection::trackEffectEnabled(const sp<EffectDescriptor> &effect,
+                                            bool enabled)
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-
-    snprintf(buffer, SIZE, "\nInputs dump:\n");
-    write(fd, buffer, strlen(buffer));
     for (size_t i = 0; i < size(); i++) {
-        snprintf(buffer, SIZE, "- Input %d dump:\n", keyAt(i));
-        write(fd, buffer, strlen(buffer));
-        valueAt(i)->dump(fd);
+        sp<AudioInputDescriptor> inputDesc = valueAt(i);
+        if (inputDesc->mIoHandle == effect->mIo) {
+            return inputDesc->trackEffectEnabled(effect, enabled);
+        }
     }
+}
 
-    return NO_ERROR;
+void AudioInputCollection::clearSessionRoutesForDevice(
+    const sp<DeviceDescriptor> &disconnectedDevice)
+{
+    for (size_t i = 0; i < size(); i++) {
+        sp<AudioInputDescriptor> inputDesc = valueAt(i);
+        for (const auto& client : inputDesc->getClientIterable()) {
+            if (client->preferredDeviceId() == disconnectedDevice->getId()) {
+                client->setPreferredDeviceId(AUDIO_PORT_HANDLE_NONE);
+            }
+        }
+    }
+}
+
+void AudioInputCollection::dump(String8 *dst) const
+{
+    dst->append("\nInputs dump:\n");
+    for (size_t i = 0; i < size(); i++) {
+        dst->appendFormat("- Input %d dump:\n", keyAt(i));
+        valueAt(i)->dump(dst);
+    }
 }
 
 }; //namespace android

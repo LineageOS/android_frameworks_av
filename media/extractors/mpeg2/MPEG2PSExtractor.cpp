@@ -24,7 +24,6 @@
 #include "mpeg2ts/ESQueue.h"
 
 #include <media/DataSourceBase.h>
-#include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -34,22 +33,23 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
+#include <media/stagefright/Utils.h>
 #include <utils/String8.h>
 
 #include <inttypes.h>
 
 namespace android {
 
-struct MPEG2PSExtractor::Track : public MediaTrack, public RefBase {
+struct MPEG2PSExtractor::Track : public MediaTrackHelper {
     Track(MPEG2PSExtractor *extractor,
           unsigned stream_id, unsigned stream_type);
 
-    virtual status_t start(MetaDataBase *params);
-    virtual status_t stop();
-    virtual status_t getFormat(MetaDataBase &);
+    virtual media_status_t start();
+    virtual media_status_t stop();
+    virtual media_status_t getFormat(AMediaFormat *);
 
-    virtual status_t read(
-            MediaBufferBase **buffer, const ReadOptions *options);
+    virtual media_status_t read(
+            MediaBufferHelper **buffer, const ReadOptions *options);
 
 protected:
     virtual ~Track();
@@ -72,29 +72,29 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(Track);
 };
 
-struct MPEG2PSExtractor::WrappedTrack : public MediaTrack {
-    WrappedTrack(MPEG2PSExtractor *extractor, const sp<Track> &track);
+struct MPEG2PSExtractor::WrappedTrack : public MediaTrackHelper {
+    WrappedTrack(MPEG2PSExtractor *extractor, Track *track);
 
-    virtual status_t start(MetaDataBase *params);
-    virtual status_t stop();
-    virtual status_t getFormat(MetaDataBase &);
+    virtual media_status_t start();
+    virtual media_status_t stop();
+    virtual media_status_t getFormat(AMediaFormat *);
 
-    virtual status_t read(
-            MediaBufferBase **buffer, const ReadOptions *options);
+    virtual media_status_t read(
+            MediaBufferHelper **buffer, const ReadOptions *options);
 
 protected:
     virtual ~WrappedTrack();
 
 private:
     MPEG2PSExtractor *mExtractor;
-    sp<MPEG2PSExtractor::Track> mTrack;
+    MPEG2PSExtractor::Track *mTrack;
 
     DISALLOW_EVIL_CONSTRUCTORS(WrappedTrack);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 
-MPEG2PSExtractor::MPEG2PSExtractor(DataSourceBase *source)
+MPEG2PSExtractor::MPEG2PSExtractor(DataSourceHelper *source)
     : mDataSource(source),
       mOffset(0),
       mFinalResult(OK),
@@ -108,25 +108,27 @@ MPEG2PSExtractor::MPEG2PSExtractor(DataSourceBase *source)
     }
 
     // Remove all tracks that were unable to determine their format.
-    MetaDataBase meta;
+    AMediaFormat *meta = AMediaFormat_new();
     for (size_t i = mTracks.size(); i > 0;) {
         i--;
-        if (mTracks.valueAt(i)->getFormat(meta) != OK) {
+        if (mTracks.valueAt(i)->getFormat(meta) != AMEDIA_OK) {
             mTracks.removeItemsAt(i);
         }
     }
+    AMediaFormat_delete(meta);
 
     mScanning = false;
 }
 
 MPEG2PSExtractor::~MPEG2PSExtractor() {
+    delete mDataSource;
 }
 
 size_t MPEG2PSExtractor::countTracks() {
     return mTracks.size();
 }
 
-MediaTrack *MPEG2PSExtractor::getTrack(size_t index) {
+MediaTrackHelper *MPEG2PSExtractor::getTrack(size_t index) {
     if (index >= mTracks.size()) {
         return NULL;
     }
@@ -134,20 +136,20 @@ MediaTrack *MPEG2PSExtractor::getTrack(size_t index) {
     return new WrappedTrack(this, mTracks.valueAt(index));
 }
 
-status_t MPEG2PSExtractor::getTrackMetaData(
-        MetaDataBase &meta,
+media_status_t MPEG2PSExtractor::getTrackMetaData(
+        AMediaFormat *meta,
         size_t index, uint32_t /* flags */) {
     if (index >= mTracks.size()) {
-        return UNKNOWN_ERROR;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
     return mTracks.valueAt(index)->getFormat(meta);
 }
 
-status_t MPEG2PSExtractor::getMetaData(MetaDataBase &meta) {
-    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_CONTAINER_MPEG2PS);
+media_status_t MPEG2PSExtractor::getMetaData(AMediaFormat *meta) {
+    AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_CONTAINER_MPEG2PS);
 
-    return OK;
+    return AMEDIA_OK;
 }
 
 uint32_t MPEG2PSExtractor::flags() const {
@@ -635,42 +637,55 @@ MPEG2PSExtractor::Track::~Track() {
     mQueue = NULL;
 }
 
-status_t MPEG2PSExtractor::Track::start(MetaDataBase *) {
+media_status_t MPEG2PSExtractor::Track::start() {
     if (mSource == NULL) {
-        return NO_INIT;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
-    return mSource->start(NULL); // AnotherPacketSource::start doesn't use its argument
+    // initialize with one small buffer, but allow growth
+    mBufferGroup->init(1 /* one buffer */, 256 /* buffer size */, 64 /* max number of buffers */);
+
+    if (mSource->start(NULL) == OK) { // AnotherPacketSource::start doesn't use its argument
+        return AMEDIA_OK;
+    }
+    return AMEDIA_ERROR_UNKNOWN;
 }
 
-status_t MPEG2PSExtractor::Track::stop() {
+media_status_t MPEG2PSExtractor::Track::stop() {
     if (mSource == NULL) {
-        return NO_INIT;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
-    return mSource->stop();
+    if (mSource->stop() == OK) {
+        return AMEDIA_OK;
+    }
+    return AMEDIA_ERROR_UNKNOWN;
 }
 
-status_t MPEG2PSExtractor::Track::getFormat(MetaDataBase &meta) {
+void copyAMessageToAMediaFormat(AMediaFormat *format, sp<AMessage> msg);
+
+media_status_t MPEG2PSExtractor::Track::getFormat(AMediaFormat *meta) {
     if (mSource == NULL) {
-        return NO_INIT;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
     sp<MetaData> sourceMeta = mSource->getFormat();
-    meta = *sourceMeta;
-    return OK;
+    sp<AMessage> msg;
+    convertMetaDataToMessage(sourceMeta, &msg);
+    copyAMessageToAMediaFormat(meta, msg);
+    return AMEDIA_OK;
 }
 
-status_t MPEG2PSExtractor::Track::read(
-        MediaBufferBase **buffer, const ReadOptions *options) {
+media_status_t MPEG2PSExtractor::Track::read(
+        MediaBufferHelper **buffer, const ReadOptions *options) {
     if (mSource == NULL) {
-        return NO_INIT;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
     status_t finalResult;
     while (!mSource->hasBufferAvailable(&finalResult)) {
         if (finalResult != OK) {
-            return ERROR_END_OF_STREAM;
+            return AMEDIA_ERROR_END_OF_STREAM;
         }
 
         status_t err = mExtractor->feedMore();
@@ -680,7 +695,50 @@ status_t MPEG2PSExtractor::Track::read(
         }
     }
 
-    return mSource->read(buffer, options);
+    MediaBufferBase *mbuf;
+    mSource->read(&mbuf, (MediaTrack::ReadOptions*) options);
+    size_t length = mbuf->range_length();
+    MediaBufferHelper *outbuf;
+    mBufferGroup->acquire_buffer(&outbuf, false, length);
+    memcpy(outbuf->data(), mbuf->data(), length);
+    outbuf->set_range(0, length);
+    *buffer = outbuf;
+    MetaDataBase &inMeta = mbuf->meta_data();
+    AMediaFormat *outMeta = outbuf->meta_data();
+    int64_t val64;
+    if (inMeta.findInt64(kKeyTime, &val64)) {
+        AMediaFormat_setInt64(outMeta, AMEDIAFORMAT_KEY_TIME_US, val64);
+    }
+    int32_t val32;
+    if (inMeta.findInt32(kKeyIsSyncFrame, &val32)) {
+        AMediaFormat_setInt32(outMeta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, val32);
+    }
+    if (inMeta.findInt32(kKeyCryptoMode, &val32)) {
+        AMediaFormat_setInt32(outMeta, AMEDIAFORMAT_KEY_CRYPTO_MODE, val32);
+    }
+    uint32_t bufType;
+    const void *bufData;
+    size_t bufSize;
+    if (inMeta.findData(kKeyCryptoIV, &bufType, &bufData, &bufSize)) {
+        AMediaFormat_setBuffer(outMeta, AMEDIAFORMAT_KEY_CRYPTO_IV, bufData, bufSize);
+    }
+    if (inMeta.findData(kKeyCryptoKey, &bufType, &bufData, &bufSize)) {
+        AMediaFormat_setBuffer(outMeta, AMEDIAFORMAT_KEY_CRYPTO_KEY, bufData, bufSize);
+    }
+    if (inMeta.findData(kKeyPlainSizes, &bufType, &bufData, &bufSize)) {
+        AMediaFormat_setBuffer(outMeta, AMEDIAFORMAT_KEY_CRYPTO_PLAIN_SIZES, bufData, bufSize);
+    }
+    if (inMeta.findData(kKeyEncryptedSizes, &bufType, &bufData, &bufSize)) {
+        AMediaFormat_setBuffer(outMeta, AMEDIAFORMAT_KEY_CRYPTO_ENCRYPTED_SIZES, bufData, bufSize);
+    }
+    if (inMeta.findData(kKeySEI, &bufType, &bufData, &bufSize)) {
+        AMediaFormat_setBuffer(outMeta, AMEDIAFORMAT_KEY_SEI, bufData, bufSize);
+    }
+    if (inMeta.findData(kKeyAudioPresentationInfo, &bufType, &bufData, &bufSize)) {
+        AMediaFormat_setBuffer(outMeta, AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_INFO, bufData, bufSize);
+    }
+    mbuf->release();
+    return AMEDIA_OK;
 }
 
 status_t MPEG2PSExtractor::Track::appendPESData(
@@ -726,7 +784,7 @@ status_t MPEG2PSExtractor::Track::appendPESData(
 ////////////////////////////////////////////////////////////////////////////////
 
 MPEG2PSExtractor::WrappedTrack::WrappedTrack(
-        MPEG2PSExtractor *extractor, const sp<Track> &track)
+        MPEG2PSExtractor *extractor, Track *track)
     : mExtractor(extractor),
       mTrack(track) {
 }
@@ -734,27 +792,28 @@ MPEG2PSExtractor::WrappedTrack::WrappedTrack(
 MPEG2PSExtractor::WrappedTrack::~WrappedTrack() {
 }
 
-status_t MPEG2PSExtractor::WrappedTrack::start(MetaDataBase *params) {
-    return mTrack->start(params);
+media_status_t MPEG2PSExtractor::WrappedTrack::start() {
+    mTrack->mBufferGroup = mBufferGroup;
+    return mTrack->start();
 }
 
-status_t MPEG2PSExtractor::WrappedTrack::stop() {
+media_status_t MPEG2PSExtractor::WrappedTrack::stop() {
     return mTrack->stop();
 }
 
-status_t MPEG2PSExtractor::WrappedTrack::getFormat(MetaDataBase &meta) {
+media_status_t MPEG2PSExtractor::WrappedTrack::getFormat(AMediaFormat *meta) {
     return mTrack->getFormat(meta);
 }
 
-status_t MPEG2PSExtractor::WrappedTrack::read(
-        MediaBufferBase **buffer, const ReadOptions *options) {
+media_status_t MPEG2PSExtractor::WrappedTrack::read(
+        MediaBufferHelper **buffer, const ReadOptions *options) {
     return mTrack->read(buffer, options);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 bool SniffMPEG2PS(
-        DataSourceBase *source, float *confidence) {
+        DataSourceHelper *source, float *confidence) {
     uint8_t header[5];
     if (source->readAt(0, header, sizeof(header)) < (ssize_t)sizeof(header)) {
         return false;

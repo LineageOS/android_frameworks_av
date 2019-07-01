@@ -104,8 +104,8 @@ static inline bool isAudioPlaybackRateEqual(const AudioPlaybackRate &pr1,
         const AudioPlaybackRate &pr2) {
     return fabs(pr1.mSpeed - pr2.mSpeed) < AUDIO_TIMESTRETCH_SPEED_MIN_DELTA &&
            fabs(pr1.mPitch - pr2.mPitch) < AUDIO_TIMESTRETCH_PITCH_MIN_DELTA &&
-           pr2.mStretchMode == pr2.mStretchMode &&
-           pr2.mFallbackMode == pr2.mFallbackMode;
+           pr1.mStretchMode == pr2.mStretchMode &&
+           pr1.mFallbackMode == pr2.mFallbackMode;
 }
 
 static inline bool isAudioPlaybackRateValid(const AudioPlaybackRate &playbackRate) {

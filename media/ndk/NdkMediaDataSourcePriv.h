@@ -32,6 +32,7 @@
 #include <sys/types.h>
 
 #include <media/DataSource.h>
+#include <media/MediaHTTPService.h>
 #include <media/NdkMediaDataSource.h>
 #include <utils/Mutex.h>
 #include <utils/String8.h>
@@ -43,11 +44,13 @@ struct NdkDataSource : public DataSource {
     NdkDataSource(AMediaDataSource *);
 
     virtual status_t initCheck() const;
+    virtual uint32_t flags();
     virtual ssize_t readAt(off64_t offset, void *data, size_t size);
     virtual status_t getSize(off64_t *);
     virtual String8 toString();
     virtual String8 getMIMEType() const;
     virtual void close();
+    virtual status_t getAvailableSize(off64_t offset, off64_t *size);
 
 protected:
     virtual ~NdkDataSource();
@@ -58,6 +61,8 @@ private:
     AMediaDataSource *mDataSource;
 
 };
+
+sp<MediaHTTPService> createMediaHttpService(const char *uri, int version);
 
 #endif // _NDK_MEDIA_DATASOURCE_PRIV_H
 

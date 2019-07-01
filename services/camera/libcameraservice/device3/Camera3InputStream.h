@@ -62,6 +62,7 @@ class Camera3InputStream : public Camera3IOStreamBase,
             const camera3_stream_buffer &buffer,
             nsecs_t timestamp,
             bool output,
+            const std::vector<size_t>& surface_ids,
             /*out*/
             sp<Fence> *releaseFenceOut);
 

@@ -55,6 +55,11 @@ public:
     virtual size_t resample(int32_t* out, size_t outFrameCount,
             AudioBufferProvider* provider);
 
+    void reset() override {
+        AudioResampler::reset();
+        mInBuffer.reset();
+    }
+
     // Make available key design criteria for testing
     int getHalfLength() const {
         return mConstants.mHalfNumCoefs;
@@ -187,6 +192,13 @@ private:
               // Set to a value between 50 and 100.
               int32_t mPropertyCutoffPercent = 100;
                       // "ro.audio.resampler.psd.cutoff_percent"
+
+              // Specify the transition bandwidth extension beyond Nyquist.
+              // If this is nonzero then mPropertyCutoffPercent is ignored.
+              // A value of 100 or greater is typically used, where 100 means the
+              // stopband is at Nyquist (this is a typical design).
+              int32_t mPropertyTransitionBandwidthCheat = 0;
+                      // "ro.audio.resampler.psd.tbwcheat"
 
     // Filter creation design parameters, see setSampleRate()
              double mStopbandAttenuationDb = 0.;

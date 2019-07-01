@@ -37,7 +37,9 @@
 #include <media/stagefright/foundation/ALookup.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/ByteUtils.h>
+#include <media/stagefright/foundation/OpusHeader.h>
 #include <media/stagefright/MetaData.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/AudioSystem.h>
 #include <media/MediaPlayerInterface.h>
@@ -74,7 +76,7 @@ static void convertMetaDataToMessageInt32(
 }
 #endif
 
-static void convertMetaDataToMessageColorAspects(const sp<MetaData> &meta, sp<AMessage> &msg) {
+static void convertMetaDataToMessageColorAspects(const MetaDataBase *meta, sp<AMessage> &msg) {
     // 0 values are unspecified
     int32_t range = 0;
     int32_t primaries = 0;
@@ -119,7 +121,8 @@ static bool isHdr(const sp<AMessage> &format) {
     }
 
     // if user/container supplied HDR static info without transfer set, assume true
-    if (format->contains("hdr-static-info") && !format->contains("color-transfer")) {
+    if ((format->contains("hdr-static-info") || format->contains("hdr10-plus-info"))
+            && !format->contains("color-transfer")) {
         return true;
     }
     // otherwise, verify that an HDR transfer function is set
@@ -190,6 +193,9 @@ static void parseAvcProfileLevelFromAvcc(const uint8_t *ptr, size_t size, sp<AMe
         { 50, OMX_VIDEO_AVCLevel5  },
         { 51, OMX_VIDEO_AVCLevel51 },
         { 52, OMX_VIDEO_AVCLevel52 },
+        { 60, OMX_VIDEO_AVCLevel6  },
+        { 61, OMX_VIDEO_AVCLevel61 },
+        { 62, OMX_VIDEO_AVCLevel62 },
     };
     const static ALookup<uint8_t, OMX_VIDEO_AVCPROFILETYPE> profiles {
         { 66, OMX_VIDEO_AVCProfileBaseline },
@@ -568,8 +574,254 @@ static void parseVp9ProfileLevelFromCsd(const sp<ABuffer> &csd, sp<AMessage> &fo
     }
 }
 
+static void parseAV1ProfileLevelFromCsd(const sp<ABuffer> &csd, sp<AMessage> &format) {
+    // Parse CSD structure to extract profile level information
+    // https://aomediacodec.github.io/av1-isobmff/#av1codecconfigurationbox
+    const uint8_t *data = csd->data();
+    size_t remaining = csd->size();
+    if (remaining < 4 || data[0] != 0x81) {  // configurationVersion == 1
+        return;
+    }
+    uint8_t profileData = (data[1] & 0xE0) >> 5;
+    uint8_t levelData = data[1] & 0x1F;
+    uint8_t highBitDepth = (data[2] & 0x40) >> 6;
+
+    const static ALookup<std::pair<uint8_t, uint8_t>, int32_t> profiles {
+        { { 0, 0 }, AV1ProfileMain8 },
+        { { 1, 0 }, AV1ProfileMain10 },
+    };
+
+    int32_t profile;
+    if (profiles.map(std::make_pair(highBitDepth, profileData), &profile)) {
+        // bump to HDR profile
+        if (isHdr(format) && profile == AV1ProfileMain10) {
+            if (format->contains("hdr10-plus-info")) {
+                profile = AV1ProfileMain10HDR10Plus;
+            } else {
+                profile = AV1ProfileMain10HDR10;
+            }
+        }
+        format->setInt32("profile", profile);
+    }
+    const static ALookup<uint8_t, int32_t> levels {
+        { 0, AV1Level2   },
+        { 1, AV1Level21  },
+        { 2, AV1Level22  },
+        { 3, AV1Level23  },
+        { 4, AV1Level3   },
+        { 5, AV1Level31  },
+        { 6, AV1Level32  },
+        { 7, AV1Level33  },
+        { 8, AV1Level4   },
+        { 9, AV1Level41  },
+        { 10, AV1Level42  },
+        { 11, AV1Level43  },
+        { 12, AV1Level5   },
+        { 13, AV1Level51  },
+        { 14, AV1Level52  },
+        { 15, AV1Level53  },
+        { 16, AV1Level6   },
+        { 17, AV1Level61  },
+        { 18, AV1Level62  },
+        { 19, AV1Level63  },
+        { 20, AV1Level7   },
+        { 21, AV1Level71  },
+        { 22, AV1Level72  },
+        { 23, AV1Level73  },
+    };
+
+    int32_t level;
+    if (levels.map(levelData, &level)) {
+        format->setInt32("level", level);
+    }
+}
+
+
+static std::vector<std::pair<const char *, uint32_t>> stringMappings {
+    {
+        { "album", kKeyAlbum },
+        { "albumartist", kKeyAlbumArtist },
+        { "artist", kKeyArtist },
+        { "author", kKeyAuthor },
+        { "cdtracknum", kKeyCDTrackNumber },
+        { "compilation", kKeyCompilation },
+        { "composer", kKeyComposer },
+        { "date", kKeyDate },
+        { "discnum", kKeyDiscNumber },
+        { "genre", kKeyGenre },
+        { "location", kKeyLocation },
+        { "lyricist", kKeyWriter },
+        { "manufacturer", kKeyManufacturer },
+        { "title", kKeyTitle },
+        { "year", kKeyYear },
+    }
+};
+
+static std::vector<std::pair<const char *, uint32_t>> floatMappings {
+    {
+        { "capture-rate", kKeyCaptureFramerate },
+    }
+};
+
+static std::vector<std::pair<const char *, uint32_t>> int64Mappings {
+    {
+        { "exif-offset", kKeyExifOffset },
+        { "exif-size", kKeyExifSize },
+        { "target-time", kKeyTargetTime },
+        { "thumbnail-time", kKeyThumbnailTime },
+        { "timeUs", kKeyTime },
+        { "durationUs", kKeyDuration },
+    }
+};
+
+static std::vector<std::pair<const char *, uint32_t>> int32Mappings {
+    {
+        { "loop", kKeyAutoLoop },
+        { "time-scale", kKeyTimeScale },
+        { "crypto-mode", kKeyCryptoMode },
+        { "crypto-default-iv-size", kKeyCryptoDefaultIVSize },
+        { "crypto-encrypted-byte-block", kKeyEncryptedByteBlock },
+        { "crypto-skip-byte-block", kKeySkipByteBlock },
+        { "frame-count", kKeyFrameCount },
+        { "max-bitrate", kKeyMaxBitRate },
+        { "pcm-big-endian", kKeyPcmBigEndian },
+        { "temporal-layer-count", kKeyTemporalLayerCount },
+        { "temporal-layer-id", kKeyTemporalLayerId },
+        { "thumbnail-width", kKeyThumbnailWidth },
+        { "thumbnail-height", kKeyThumbnailHeight },
+        { "valid-samples", kKeyValidSamples },
+    }
+};
+
+static std::vector<std::pair<const char *, uint32_t>> bufferMappings {
+    {
+        { "albumart", kKeyAlbumArt },
+        { "audio-presentation-info", kKeyAudioPresentationInfo },
+        { "pssh", kKeyPssh },
+        { "crypto-iv", kKeyCryptoIV },
+        { "crypto-key", kKeyCryptoKey },
+        { "crypto-encrypted-sizes", kKeyEncryptedSizes },
+        { "crypto-plain-sizes", kKeyPlainSizes },
+        { "icc-profile", kKeyIccProfile },
+        { "sei", kKeySEI },
+        { "text-format-data", kKeyTextFormatData },
+        { "thumbnail-csd-hevc", kKeyThumbnailHVCC },
+    }
+};
+
+static std::vector<std::pair<const char *, uint32_t>> CSDMappings {
+    {
+        { "csd-0", kKeyOpaqueCSD0 },
+        { "csd-1", kKeyOpaqueCSD1 },
+        { "csd-2", kKeyOpaqueCSD2 },
+    }
+};
+
+void convertMessageToMetaDataFromMappings(const sp<AMessage> &msg, sp<MetaData> &meta) {
+    for (auto elem : stringMappings) {
+        AString value;
+        if (msg->findString(elem.first, &value)) {
+            meta->setCString(elem.second, value.c_str());
+        }
+    }
+
+    for (auto elem : floatMappings) {
+        float value;
+        if (msg->findFloat(elem.first, &value)) {
+            meta->setFloat(elem.second, value);
+        }
+    }
+
+    for (auto elem : int64Mappings) {
+        int64_t value;
+        if (msg->findInt64(elem.first, &value)) {
+            meta->setInt64(elem.second, value);
+        }
+    }
+
+    for (auto elem : int32Mappings) {
+        int32_t value;
+        if (msg->findInt32(elem.first, &value)) {
+            meta->setInt32(elem.second, value);
+        }
+    }
+
+    for (auto elem : bufferMappings) {
+        sp<ABuffer> value;
+        if (msg->findBuffer(elem.first, &value)) {
+            meta->setData(elem.second,
+                    MetaDataBase::Type::TYPE_NONE, value->data(), value->size());
+        }
+    }
+
+    for (auto elem : CSDMappings) {
+        sp<ABuffer> value;
+        if (msg->findBuffer(elem.first, &value)) {
+            meta->setData(elem.second,
+                    MetaDataBase::Type::TYPE_NONE, value->data(), value->size());
+        }
+    }
+}
+
+void convertMetaDataToMessageFromMappings(const MetaDataBase *meta, sp<AMessage> format) {
+    for (auto elem : stringMappings) {
+        const char *value;
+        if (meta->findCString(elem.second, &value)) {
+            format->setString(elem.first, value, strlen(value));
+        }
+    }
+
+    for (auto elem : floatMappings) {
+        float value;
+        if (meta->findFloat(elem.second, &value)) {
+            format->setFloat(elem.first, value);
+        }
+    }
+
+    for (auto elem : int64Mappings) {
+        int64_t value;
+        if (meta->findInt64(elem.second, &value)) {
+            format->setInt64(elem.first, value);
+        }
+    }
+
+    for (auto elem : int32Mappings) {
+        int32_t value;
+        if (meta->findInt32(elem.second, &value)) {
+            format->setInt32(elem.first, value);
+        }
+    }
+
+    for (auto elem : bufferMappings) {
+        uint32_t type;
+        const void* data;
+        size_t size;
+        if (meta->findData(elem.second, &type, &data, &size)) {
+            sp<ABuffer> buf = ABuffer::CreateAsCopy(data, size);
+            format->setBuffer(elem.first, buf);
+        }
+    }
+
+    for (auto elem : CSDMappings) {
+        uint32_t type;
+        const void* data;
+        size_t size;
+        if (meta->findData(elem.second, &type, &data, &size)) {
+            sp<ABuffer> buf = ABuffer::CreateAsCopy(data, size);
+            buf->meta()->setInt32("csd", true);
+            buf->meta()->setInt64("timeUs", 0);
+            format->setBuffer(elem.first, buf);
+        }
+    }
+}
+
 status_t convertMetaDataToMessage(
         const sp<MetaData> &meta, sp<AMessage> *format) {
+    return convertMetaDataToMessage(meta.get(), format);
+}
+
+status_t convertMetaDataToMessage(
+        const MetaDataBase *meta, sp<AMessage> *format) {
 
     format->clear();
 
@@ -586,6 +838,8 @@ status_t convertMetaDataToMessage(
     sp<AMessage> msg = new AMessage;
     msg->setString("mime", mime);
 
+    convertMetaDataToMessageFromMappings(meta, msg);
+
     uint32_t type;
     const void *data;
     size_t size;
@@ -596,6 +850,16 @@ status_t convertMetaDataToMessage(
         }
 
         msg->setBuffer("ca-session-id", buffer);
+        memcpy(buffer->data(), data, size);
+    }
+
+    if (meta->findData(kKeyCAPrivateData, &type, &data, &size)) {
+        sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
+        if (buffer.get() == NULL || buffer->base() == NULL) {
+            return NO_MEMORY;
+        }
+
+        msg->setBuffer("ca-private-data", buffer);
         memcpy(buffer->data(), data, size);
     }
 
@@ -712,6 +976,16 @@ status_t convertMetaDataToMessage(
             ColorUtils::setHDRStaticInfoIntoFormat(*(HDRStaticInfo*)data, msg);
         }
 
+        if (meta->findData(kKeyHdr10PlusInfo, &type, &data, &size)
+                && size > 0) {
+            sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
+            if (buffer.get() == NULL || buffer->base() == NULL) {
+                return NO_MEMORY;
+            }
+            memcpy(buffer->data(), data, size);
+            msg->setBuffer("hdr10-plus-info", buffer);
+        }
+
         convertMetaDataToMessageColorAspects(meta, msg);
     } else if (!strncasecmp("audio/", mime, 6)) {
         int32_t numChannels, sampleRate;
@@ -722,6 +996,11 @@ status_t convertMetaDataToMessage(
 
         msg->setInt32("channel-count", numChannels);
         msg->setInt32("sample-rate", sampleRate);
+
+        int32_t bitsPerSample;
+        if (meta->findInt32(kKeyBitsPerSample, &bitsPerSample)) {
+            msg->setInt32("bits-per-sample", bitsPerSample);
+        }
 
         int32_t channelMask;
         if (meta->findInt32(kKeyChannelMask, &channelMask)) {
@@ -750,6 +1029,11 @@ status_t convertMetaDataToMessage(
         int32_t pcmEncoding;
         if (meta->findInt32(kKeyPcmEncoding, &pcmEncoding)) {
             msg->setInt32("pcm-encoding", pcmEncoding);
+        }
+
+        int32_t hapticChannelCount;
+        if (meta->findInt32(kKeyHapticChannelCount, &hapticChannelCount)) {
+            msg->setInt32("haptic-channel-count", hapticChannelCount);
         }
     }
 
@@ -880,7 +1164,9 @@ status_t convertMetaDataToMessage(
     } else if (meta->findData(kKeyHVCC, &type, &data, &size)) {
         const uint8_t *ptr = (const uint8_t *)data;
 
-        if (size < 23 || ptr[0] != 1) {  // configurationVersion == 1
+        if (size < 23 || (ptr[0] != 1 && ptr[0] != 0)) {
+            // configurationVersion == 1 or 0
+            // 1 is what the standard dictates, but some old muxers may have used 0.
             ALOGE("b/23680780");
             return BAD_VALUE;
         }
@@ -1001,6 +1287,17 @@ status_t convertMetaDataToMessage(
         }
 
         parseHevcProfileLevelFromHvcc((const uint8_t *)data, dataSize, msg);
+    } else if (meta->findData(kKeyAV1C, &type, &data, &size)) {
+        sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
+        if (buffer.get() == NULL || buffer->base() == NULL) {
+            return NO_MEMORY;
+        }
+        memcpy(buffer->data(), data, size);
+
+        buffer->meta()->setInt32("csd", true);
+        buffer->meta()->setInt64("timeUs", 0);
+        msg->setBuffer("csd-0", buffer);
+        parseAV1ProfileLevelFromCsd(buffer, msg);
     } else if (meta->findData(kKeyESDS, &type, &data, &size)) {
         ESDS esds((const char *)data, size);
         if (esds.InitCheck() != (status_t)OK) {
@@ -1048,33 +1345,9 @@ status_t convertMetaDataToMessage(
                 msg->setInt32("max-bitrate", (int32_t)maxBitrate);
             }
         }
-    } else if (meta->findData(kTypeD263, &type, &data, &size)) {
+    } else if (meta->findData(kKeyD263, &type, &data, &size)) {
         const uint8_t *ptr = (const uint8_t *)data;
         parseH263ProfileLevelFromD263(ptr, size, msg);
-    } else if (meta->findData(kKeyVorbisInfo, &type, &data, &size)) {
-        sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
-        if (buffer.get() == NULL || buffer->base() == NULL) {
-            return NO_MEMORY;
-        }
-        memcpy(buffer->data(), data, size);
-
-        buffer->meta()->setInt32("csd", true);
-        buffer->meta()->setInt64("timeUs", 0);
-        msg->setBuffer("csd-0", buffer);
-
-        if (!meta->findData(kKeyVorbisBooks, &type, &data, &size)) {
-            return -EINVAL;
-        }
-
-        buffer = new (std::nothrow) ABuffer(size);
-        if (buffer.get() == NULL || buffer->base() == NULL) {
-            return NO_MEMORY;
-        }
-        memcpy(buffer->data(), data, size);
-
-        buffer->meta()->setInt32("csd", true);
-        buffer->meta()->setInt64("timeUs", 0);
-        msg->setBuffer("csd-1", buffer);
     } else if (meta->findData(kKeyOpusHeader, &type, &data, &size)) {
         sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
         if (buffer.get() == NULL || buffer->base() == NULL) {
@@ -1113,16 +1386,6 @@ status_t convertMetaDataToMessage(
         buffer->meta()->setInt32("csd", true);
         buffer->meta()->setInt64("timeUs", 0);
         msg->setBuffer("csd-2", buffer);
-    } else if (meta->findData(kKeyFlacMetadata, &type, &data, &size)) {
-        sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
-        if (buffer.get() == NULL || buffer->base() == NULL) {
-            return NO_MEMORY;
-        }
-        memcpy(buffer->data(), data, size);
-
-        buffer->meta()->setInt32("csd", true);
-        buffer->meta()->setInt64("timeUs", 0);
-        msg->setBuffer("csd-0", buffer);
     } else if (meta->findData(kKeyVp9CodecPrivate, &type, &data, &size)) {
         sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
         if (buffer.get() == NULL || buffer->base() == NULL) {
@@ -1146,13 +1409,6 @@ status_t convertMetaDataToMessage(
         buffer->meta()->setInt32("csd", true);
         buffer->meta()->setInt64("timeUs", 0);
         msg->setBuffer("csd-0", buffer);
-    }
-
-    // TODO expose "crypto-key"/kKeyCryptoKey through public api
-    if (meta->findData(kKeyCryptoKey, &type, &data, &size)) {
-        sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
-        msg->setBuffer("crypto-key", buffer);
-        memcpy(buffer->data(), data, size);
     }
 
     *format = msg;
@@ -1353,6 +1609,21 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
         ALOGW("did not find mime type");
     }
 
+    convertMessageToMetaDataFromMappings(msg, meta);
+
+    int32_t systemId;
+    if (msg->findInt32("ca-system-id", &systemId)) {
+        meta->setInt32(kKeyCASystemID, systemId);
+
+        sp<ABuffer> caSessionId, caPvtData;
+        if (msg->findBuffer("ca-session-id", &caSessionId)) {
+            meta->setData(kKeyCASessionID, 0, caSessionId->data(), caSessionId->size());
+        }
+        if (msg->findBuffer("ca-private-data", &caPvtData)) {
+            meta->setData(kKeyCAPrivateData, 0, caPvtData->data(), caPvtData->size());
+        }
+    }
+
     int64_t durationUs;
     if (msg->findInt64("durationUs", &durationUs)) {
         meta->setInt64(kKeyDuration, durationUs);
@@ -1384,7 +1655,7 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             meta->setInt32(kKeyWidth, width);
             meta->setInt32(kKeyHeight, height);
         } else {
-            ALOGW("did not find width and/or height");
+            ALOGV("did not find width and/or height");
         }
 
         int32_t sarWidth, sarHeight;
@@ -1447,6 +1718,12 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             }
         }
 
+        sp<ABuffer> hdr10PlusInfo;
+        if (msg->findBuffer("hdr10-plus-info", &hdr10PlusInfo)) {
+            meta->setData(kKeyHdr10PlusInfo, 0,
+                    hdr10PlusInfo->data(), hdr10PlusInfo->size());
+        }
+
         convertMessageToMetaDataColorAspects(msg, meta);
 
         AString tsSchema;
@@ -1471,6 +1748,10 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
         if (msg->findInt32("sample-rate", &sampleRate)) {
             meta->setInt32(kKeySampleRate, sampleRate);
         }
+        int32_t bitsPerSample;
+        if (msg->findInt32("bits-per-sample", &bitsPerSample)) {
+            meta->setInt32(kKeyBitsPerSample, bitsPerSample);
+        }
         int32_t channelMask;
         if (msg->findInt32("channel-mask", &channelMask)) {
             meta->setInt32(kKeyChannelMask, channelMask);
@@ -1489,9 +1770,19 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             meta->setInt32(kKeyIsADTS, isADTS);
         }
 
+        int32_t aacProfile = -1;
+        if (msg->findInt32("aac-profile", &aacProfile)) {
+            meta->setInt32(kKeyAACAOT, aacProfile);
+        }
+
         int32_t pcmEncoding;
         if (msg->findInt32("pcm-encoding", &pcmEncoding)) {
             meta->setInt32(kKeyPcmEncoding, pcmEncoding);
+        }
+
+        int32_t hapticChannelCount;
+        if (msg->findInt32("haptic-channel-count", &hapticChannelCount)) {
+            meta->setInt32(kKeyHapticChannelCount, hapticChannelCount);
         }
     }
 
@@ -1529,42 +1820,71 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             if (msg->findBuffer("csd-1", &csd1)) {
                 std::vector<char> avcc(csd0size + csd1->size() + 1024);
                 size_t outsize = reassembleAVCC(csd0, csd1, avcc.data());
-                meta->setData(kKeyAVCC, kKeyAVCC, avcc.data(), outsize);
+                meta->setData(kKeyAVCC, kTypeAVCC, avcc.data(), outsize);
             }
-        } else if (mime == MEDIA_MIMETYPE_AUDIO_AAC || mime == MEDIA_MIMETYPE_VIDEO_MPEG4) {
+        } else if (mime == MEDIA_MIMETYPE_AUDIO_AAC ||
+                mime == MEDIA_MIMETYPE_VIDEO_MPEG4 ||
+                mime == MEDIA_MIMETYPE_AUDIO_WMA ||
+                mime == MEDIA_MIMETYPE_AUDIO_MS_ADPCM ||
+                mime == MEDIA_MIMETYPE_AUDIO_DVI_IMA_ADPCM) {
             std::vector<char> esds(csd0size + 31);
             // The written ESDS is actually for an audio stream, but it's enough
             // for transporting the CSD to muxers.
             reassembleESDS(csd0, esds.data());
-            meta->setData(kKeyESDS, kKeyESDS, esds.data(), esds.size());
+            meta->setData(kKeyESDS, kTypeESDS, esds.data(), esds.size());
         } else if (mime == MEDIA_MIMETYPE_VIDEO_HEVC ||
                    mime == MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC) {
             std::vector<uint8_t> hvcc(csd0size + 1024);
             size_t outsize = reassembleHVCC(csd0, hvcc.data(), hvcc.size(), 4);
-            meta->setData(kKeyHVCC, kKeyHVCC, hvcc.data(), outsize);
+            meta->setData(kKeyHVCC, kTypeHVCC, hvcc.data(), outsize);
+        } else if (mime == MEDIA_MIMETYPE_VIDEO_AV1) {
+            meta->setData(kKeyAV1C, 0, csd0->data(), csd0->size());
         } else if (mime == MEDIA_MIMETYPE_VIDEO_VP9) {
             meta->setData(kKeyVp9CodecPrivate, 0, csd0->data(), csd0->size());
         } else if (mime == MEDIA_MIMETYPE_AUDIO_OPUS) {
-            meta->setData(kKeyOpusHeader, 0, csd0->data(), csd0->size());
+            size_t opusHeadSize = csd0->size();
+            size_t codecDelayBufSize = 0;
+            size_t seekPreRollBufSize = 0;
+            void *opusHeadBuf = csd0->data();
+            void *codecDelayBuf = NULL;
+            void *seekPreRollBuf = NULL;
             if (msg->findBuffer("csd-1", &csd1)) {
-                meta->setData(kKeyOpusCodecDelay, 0, csd1->data(), csd1->size());
+                codecDelayBufSize = csd1->size();
+                codecDelayBuf = csd1->data();
             }
             if (msg->findBuffer("csd-2", &csd2)) {
-                meta->setData(kKeyOpusSeekPreRoll, 0, csd2->data(), csd2->size());
+                seekPreRollBufSize = csd2->size();
+                seekPreRollBuf = csd2->data();
             }
-        } else if (mime == MEDIA_MIMETYPE_AUDIO_VORBIS) {
-            meta->setData(kKeyVorbisInfo, 0, csd0->data(), csd0->size());
-            if (msg->findBuffer("csd-1", &csd1)) {
-                meta->setData(kKeyVorbisBooks, 0, csd1->data(), csd1->size());
+            /* Extract codec delay and seek pre roll from csd-0,
+             * if csd-1 and csd-2 are not present */
+            if (!codecDelayBuf && !seekPreRollBuf) {
+                GetOpusHeaderBuffers(csd0->data(), csd0->size(), &opusHeadBuf,
+                                    &opusHeadSize, &codecDelayBuf,
+                                    &codecDelayBufSize, &seekPreRollBuf,
+                                    &seekPreRollBufSize);
+            }
+            meta->setData(kKeyOpusHeader, 0, opusHeadBuf, opusHeadSize);
+            if (codecDelayBuf) {
+                meta->setData(kKeyOpusCodecDelay, 0, codecDelayBuf, codecDelayBufSize);
+            }
+            if (seekPreRollBuf) {
+                meta->setData(kKeyOpusSeekPreRoll, 0, seekPreRollBuf, seekPreRollBufSize);
             }
         } else if (mime == MEDIA_MIMETYPE_AUDIO_ALAC) {
             meta->setData(kKeyAlacMagicCookie, 0, csd0->data(), csd0->size());
         }
-    }
-
-    int32_t timeScale;
-    if (msg->findInt32("time-scale", &timeScale)) {
-        meta->setInt32(kKeyTimeScale, timeScale);
+    } else if (mime == MEDIA_MIMETYPE_VIDEO_AVC && msg->findBuffer("csd-avc", &csd0)) {
+        meta->setData(kKeyAVCC, kTypeAVCC, csd0->data(), csd0->size());
+    } else if ((mime == MEDIA_MIMETYPE_VIDEO_HEVC || mime == MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC)
+            && msg->findBuffer("csd-hevc", &csd0)) {
+        meta->setData(kKeyHVCC, kTypeHVCC, csd0->data(), csd0->size());
+    } else if (msg->findBuffer("esds", &csd0)) {
+        meta->setData(kKeyESDS, kTypeESDS, csd0->data(), csd0->size());
+    } else if (msg->findBuffer("mpeg2-stream-header", &csd0)) {
+        meta->setData(kKeyStreamHeader, 'mdat', csd0->data(), csd0->size());
+    } else if (msg->findBuffer("d263", &csd0)) {
+        meta->setData(kKeyD263, kTypeD263, csd0->data(), csd0->size());
     }
 
     // XXX TODO add whatever other keys there are
@@ -1640,6 +1960,9 @@ static const struct mime_conv_t mimeLookup[] = {
     { MEDIA_MIMETYPE_AUDIO_VORBIS,      AUDIO_FORMAT_VORBIS },
     { MEDIA_MIMETYPE_AUDIO_OPUS,        AUDIO_FORMAT_OPUS},
     { MEDIA_MIMETYPE_AUDIO_AC3,         AUDIO_FORMAT_AC3},
+    { MEDIA_MIMETYPE_AUDIO_EAC3,        AUDIO_FORMAT_E_AC3},
+    { MEDIA_MIMETYPE_AUDIO_EAC3_JOC,    AUDIO_FORMAT_E_AC3_JOC},
+    { MEDIA_MIMETYPE_AUDIO_AC4,         AUDIO_FORMAT_AC4},
     { MEDIA_MIMETYPE_AUDIO_FLAC,        AUDIO_FORMAT_FLAC},
     { MEDIA_MIMETYPE_AUDIO_ALAC,        AUDIO_FORMAT_ALAC },
     { 0, AUDIO_FORMAT_INVALID }
@@ -1693,43 +2016,43 @@ const struct aac_format_conv_t* p = &profileLookup[0];
     return;
 }
 
-bool canOffloadStream(const sp<MetaData>& meta, bool hasVideo,
-                      bool isStreaming, audio_stream_type_t streamType)
+status_t getAudioOffloadInfo(const sp<MetaData>& meta, bool hasVideo,
+        bool isStreaming, audio_stream_type_t streamType, audio_offload_info_t *info)
 {
     const char *mime;
     if (meta == NULL) {
-        return false;
+        return BAD_VALUE;
     }
     CHECK(meta->findCString(kKeyMIMEType, &mime));
 
-    audio_offload_info_t info = AUDIO_INFO_INITIALIZER;
+    (*info) = AUDIO_INFO_INITIALIZER;
 
-    info.format = AUDIO_FORMAT_INVALID;
-    if (mapMimeToAudioFormat(info.format, mime) != OK) {
+    info->format = AUDIO_FORMAT_INVALID;
+    if (mapMimeToAudioFormat(info->format, mime) != OK) {
         ALOGE(" Couldn't map mime type \"%s\" to a valid AudioSystem::audio_format !", mime);
-        return false;
+        return BAD_VALUE;
     } else {
-        ALOGV("Mime type \"%s\" mapped to audio_format %d", mime, info.format);
+        ALOGV("Mime type \"%s\" mapped to audio_format %d", mime, info->format);
     }
 
-    if (AUDIO_FORMAT_INVALID == info.format) {
+    if (AUDIO_FORMAT_INVALID == info->format) {
         // can't offload if we don't know what the source format is
         ALOGE("mime type \"%s\" not a known audio format", mime);
-        return false;
+        return BAD_VALUE;
     }
 
     // Redefine aac format according to its profile
     // Offloading depends on audio DSP capabilities.
     int32_t aacaot = -1;
     if (meta->findInt32(kKeyAACAOT, &aacaot)) {
-        mapAACProfileToAudioFormat(info.format,(OMX_AUDIO_AACPROFILETYPE) aacaot);
+        mapAACProfileToAudioFormat(info->format,(OMX_AUDIO_AACPROFILETYPE) aacaot);
     }
 
     int32_t srate = -1;
     if (!meta->findInt32(kKeySampleRate, &srate)) {
         ALOGV("track of type '%s' does not publish sample rate", mime);
     }
-    info.sample_rate = srate;
+    info->sample_rate = srate;
 
     int32_t cmask = 0;
     if (!meta->findInt32(kKeyChannelMask, &cmask) || cmask == CHANNEL_MASK_USE_CHANNEL_ORDER) {
@@ -1743,25 +2066,34 @@ bool canOffloadStream(const sp<MetaData>& meta, bool hasVideo,
             cmask = audio_channel_out_mask_from_count(channelCount);
         }
     }
-    info.channel_mask = cmask;
+    info->channel_mask = cmask;
 
     int64_t duration = 0;
     if (!meta->findInt64(kKeyDuration, &duration)) {
         ALOGV("track of type '%s' does not publish duration", mime);
     }
-    info.duration_us = duration;
+    info->duration_us = duration;
 
     int32_t brate = -1;
     if (!meta->findInt32(kKeyBitRate, &brate)) {
         ALOGV("track of type '%s' does not publish bitrate", mime);
     }
-    info.bit_rate = brate;
+    info->bit_rate = brate;
 
 
-    info.stream_type = streamType;
-    info.has_video = hasVideo;
-    info.is_streaming = isStreaming;
+    info->stream_type = streamType;
+    info->has_video = hasVideo;
+    info->is_streaming = isStreaming;
+    return OK;
+}
 
+bool canOffloadStream(const sp<MetaData>& meta, bool hasVideo,
+                      bool isStreaming, audio_stream_type_t streamType)
+{
+    audio_offload_info_t info = AUDIO_INFO_INITIALIZER;
+    if (OK != getAudioOffloadInfo(meta, hasVideo, isStreaming, streamType, &info)) {
+        return false;
+    }
     // Check if offload is possible for given format, stream type, sample rate,
     // bit rate, duration, video and streaming
     return AudioSystem::isOffloadSupported(info);
@@ -1931,4 +2263,3 @@ AString nameForFd(int fd) {
 }
 
 }  // namespace android
-

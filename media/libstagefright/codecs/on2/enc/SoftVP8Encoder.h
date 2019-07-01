@@ -23,8 +23,6 @@
 #include <OMX_VideoExt.h>
 #include <OMX_IndexExt.h>
 
-#include <hardware/gralloc.h>
-
 #include "vpx/vpx_encoder.h"
 #include "vpx/vpx_codec.h"
 #include "vpx/vp8cx.h"

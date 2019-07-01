@@ -22,6 +22,22 @@
 namespace android {
 
 //
+//  AudioDeviceTypeAddr implementation
+//
+status_t AudioDeviceTypeAddr::readFromParcel(Parcel *parcel) {
+    mType = (audio_devices_t) parcel->readInt32();
+    mAddress = parcel->readString8();
+    return NO_ERROR;
+}
+
+status_t AudioDeviceTypeAddr::writeToParcel(Parcel *parcel) const {
+    parcel->writeInt32((int32_t) mType);
+    parcel->writeString8(mAddress);
+    return NO_ERROR;
+}
+
+
+//
 //  AudioMixMatchCriterion implementation
 //
 AudioMixMatchCriterion::AudioMixMatchCriterion(audio_usage_t usage,
@@ -40,11 +56,22 @@ AudioMixMatchCriterion::AudioMixMatchCriterion(audio_usage_t usage,
 status_t AudioMixMatchCriterion::readFromParcel(Parcel *parcel)
 {
     mRule = parcel->readInt32();
-    if (mRule == RULE_MATCH_ATTRIBUTE_USAGE ||
-            mRule == RULE_EXCLUDE_ATTRIBUTE_USAGE) {
-        mValue.mUsage = (audio_usage_t)parcel->readInt32();
-    } else {
-        mValue.mSource = (audio_source_t)parcel->readInt32();
+    switch (mRule) {
+    case RULE_MATCH_ATTRIBUTE_USAGE:
+    case RULE_EXCLUDE_ATTRIBUTE_USAGE:
+        mValue.mUsage = (audio_usage_t) parcel->readInt32();
+        break;
+    case RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET:
+    case RULE_EXCLUDE_ATTRIBUTE_CAPTURE_PRESET:
+        mValue.mSource = (audio_source_t) parcel->readInt32();
+        break;
+    case RULE_MATCH_UID:
+    case RULE_EXCLUDE_UID:
+        mValue.mUid = (uid_t) parcel->readInt32();
+        break;
+    default:
+        ALOGE("Trying to build AudioMixMatchCriterion from unknown rule %d", mRule);
+        return BAD_VALUE;
     }
     return NO_ERROR;
 }
@@ -70,6 +97,7 @@ status_t AudioMix::readFromParcel(Parcel *parcel)
     mDeviceType = (audio_devices_t) parcel->readInt32();
     mDeviceAddress = parcel->readString8();
     mCbFlags = (uint32_t)parcel->readInt32();
+    mAllowPrivilegedPlaybackCapture = parcel->readBool();
     size_t size = (size_t)parcel->readInt32();
     if (size > MAX_CRITERIA_PER_MIX) {
         size = MAX_CRITERIA_PER_MIX;
@@ -93,6 +121,7 @@ status_t AudioMix::writeToParcel(Parcel *parcel) const
     parcel->writeInt32(mDeviceType);
     parcel->writeString8(mDeviceAddress);
     parcel->writeInt32(mCbFlags);
+    parcel->writeBool(mAllowPrivilegedPlaybackCapture);
     size_t size = mCriteria.size();
     if (size > MAX_CRITERIA_PER_MIX) {
         size = MAX_CRITERIA_PER_MIX;
@@ -114,6 +143,45 @@ status_t AudioMix::writeToParcel(Parcel *parcel) const
         parcel->setDataPosition(position);
     }
     return NO_ERROR;
+}
+
+void AudioMix::setExcludeUid(uid_t uid) const {
+    AudioMixMatchCriterion crit;
+    crit.mRule = RULE_EXCLUDE_UID;
+    crit.mValue.mUid = uid;
+    mCriteria.add(crit);
+}
+
+void AudioMix::setMatchUid(uid_t uid) const {
+    AudioMixMatchCriterion crit;
+    crit.mRule = RULE_MATCH_UID;
+    crit.mValue.mUid = uid;
+    mCriteria.add(crit);
+}
+
+bool AudioMix::hasUidRule(bool match, uid_t uid) const {
+    const uint32_t rule = match ? RULE_MATCH_UID : RULE_EXCLUDE_UID;
+    for (size_t i = 0; i < mCriteria.size(); i++) {
+        if (mCriteria[i].mRule == rule
+                && mCriteria[i].mValue.mUid == uid) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AudioMix::hasMatchUidRule() const {
+    for (size_t i = 0; i < mCriteria.size(); i++) {
+        if (mCriteria[i].mRule == RULE_MATCH_UID) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AudioMix::isDeviceAffinityCompatible() const {
+    return ((mMixType == MIX_TYPE_PLAYERS)
+            && (mRouteFlags == MIX_ROUTE_FLAG_RENDER));
 }
 
 } // namespace android

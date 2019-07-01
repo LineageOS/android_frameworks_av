@@ -20,8 +20,6 @@
 
 #include "AMRExtractor.h"
 
-#include <media/DataSourceBase.h>
-#include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
@@ -31,29 +29,29 @@
 
 namespace android {
 
-class AMRSource : public MediaTrack {
+class AMRSource : public MediaTrackHelper {
 public:
     AMRSource(
-            DataSourceBase *source,
-            MetaDataBase &meta,
+            DataSourceHelper *source,
+            AMediaFormat *meta,
             bool isWide,
             const off64_t *offset_table,
             size_t offset_table_length);
 
-    virtual status_t start(MetaDataBase *params = NULL);
-    virtual status_t stop();
+    virtual media_status_t start();
+    virtual media_status_t stop();
 
-    virtual status_t getFormat(MetaDataBase &);
+    virtual media_status_t getFormat(AMediaFormat *);
 
-    virtual status_t read(
-            MediaBufferBase **buffer, const ReadOptions *options = NULL);
+    virtual media_status_t read(
+            MediaBufferHelper **buffer, const ReadOptions *options = NULL);
 
 protected:
     virtual ~AMRSource();
 
 private:
-    DataSourceBase *mDataSource;
-    MetaDataBase mMeta;
+    DataSourceHelper *mDataSource;
+    AMediaFormat *mMeta;
     bool mIsWide;
 
     off64_t mOffset;
@@ -98,27 +96,27 @@ static size_t getFrameSize(bool isWide, unsigned FT) {
     return frameSize;
 }
 
-static status_t getFrameSizeByOffset(DataSourceBase *source,
+static media_status_t getFrameSizeByOffset(DataSourceHelper *source,
         off64_t offset, bool isWide, size_t *frameSize) {
     uint8_t header;
     ssize_t count = source->readAt(offset, &header, 1);
     if (count == 0) {
-        return ERROR_END_OF_STREAM;
+        return AMEDIA_ERROR_END_OF_STREAM;
     } else if (count < 0) {
-        return ERROR_IO;
+        return AMEDIA_ERROR_IO;
     }
 
     unsigned FT = (header >> 3) & 0x0f;
 
     *frameSize = getFrameSize(isWide, FT);
     if (*frameSize == 0) {
-        return ERROR_MALFORMED;
+        return AMEDIA_ERROR_MALFORMED;
     }
-    return OK;
+    return AMEDIA_OK;
 }
 
 static bool SniffAMR(
-        DataSourceBase *source, bool *isWide, float *confidence) {
+        DataSourceHelper *source, bool *isWide, float *confidence) {
     char header[9];
 
     if (source->readAt(0, header, sizeof(header)) != sizeof(header)) {
@@ -144,7 +142,7 @@ static bool SniffAMR(
     return false;
 }
 
-AMRExtractor::AMRExtractor(DataSourceBase *source)
+AMRExtractor::AMRExtractor(DataSourceHelper *source)
     : mDataSource(source),
       mInitCheck(NO_INIT),
       mOffsetTableLength(0) {
@@ -153,12 +151,12 @@ AMRExtractor::AMRExtractor(DataSourceBase *source)
         return;
     }
 
-    mMeta.setCString(
-            kKeyMIMEType, mIsWide ? MEDIA_MIMETYPE_AUDIO_AMR_WB
-                                  : MEDIA_MIMETYPE_AUDIO_AMR_NB);
+    mMeta = AMediaFormat_new();
+    AMediaFormat_setString(mMeta, AMEDIAFORMAT_KEY_MIME,
+            mIsWide ? MEDIA_MIMETYPE_AUDIO_AMR_WB : MEDIA_MIMETYPE_AUDIO_AMR_NB);
 
-    mMeta.setInt32(kKeyChannelCount, 1);
-    mMeta.setInt32(kKeySampleRate, mIsWide ? 16000 : 8000);
+    AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, 1);
+    AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_SAMPLE_RATE, mIsWide ? 16000 : 8000);
 
     off64_t offset = mIsWide ? 9 : 6;
     off64_t streamSize;
@@ -166,11 +164,11 @@ AMRExtractor::AMRExtractor(DataSourceBase *source)
     int64_t duration = 0;
 
     if (mDataSource->getSize(&streamSize) == OK) {
-         while (offset < streamSize) {
-             status_t status = getFrameSizeByOffset(source, offset, mIsWide, &frameSize);
-             if (status == ERROR_END_OF_STREAM) {
-                 break;
-             } else if (status != OK) {
+        while (offset < streamSize) {
+            status_t status = getFrameSizeByOffset(source, offset, mIsWide, &frameSize);
+            if (status == ERROR_END_OF_STREAM) {
+                break;
+            } else if (status != OK) {
                 return;
             }
 
@@ -185,30 +183,33 @@ AMRExtractor::AMRExtractor(DataSourceBase *source)
             numFrames ++;
         }
 
-        mMeta.setInt64(kKeyDuration, duration);
+        AMediaFormat_setInt64(mMeta, AMEDIAFORMAT_KEY_DURATION, duration);
     }
 
     mInitCheck = OK;
 }
 
 AMRExtractor::~AMRExtractor() {
+    delete mDataSource;
+    AMediaFormat_delete(mMeta);
 }
 
-status_t AMRExtractor::getMetaData(MetaDataBase &meta) {
-    meta.clear();
+media_status_t AMRExtractor::getMetaData(AMediaFormat *meta) {
+    AMediaFormat_clear(meta);
 
     if (mInitCheck == OK) {
-        meta.setCString(kKeyMIMEType, mIsWide ? "audio/amr-wb" : "audio/amr");
+        AMediaFormat_setString(meta,
+                AMEDIAFORMAT_KEY_MIME, mIsWide ? MEDIA_MIMETYPE_AUDIO_AMR_WB : "audio/amr");
     }
 
-    return OK;
+    return AMEDIA_OK;
 }
 
 size_t AMRExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrack *AMRExtractor::getTrack(size_t index) {
+MediaTrackHelper *AMRExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index != 0) {
         return NULL;
     }
@@ -217,19 +218,18 @@ MediaTrack *AMRExtractor::getTrack(size_t index) {
             mOffsetTable, mOffsetTableLength);
 }
 
-status_t AMRExtractor::getTrackMetaData(MetaDataBase &meta, size_t index, uint32_t /* flags */) {
+media_status_t AMRExtractor::getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t /* flags */) {
     if (mInitCheck != OK || index != 0) {
-        return UNKNOWN_ERROR;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
-    meta = mMeta;
-    return OK;
+    return AMediaFormat_copy(meta, mMeta);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 AMRSource::AMRSource(
-        DataSourceBase *source, MetaDataBase &meta,
+        DataSourceHelper *source, AMediaFormat *meta,
         bool isWide, const off64_t *offset_table, size_t offset_table_length)
     : mDataSource(source),
       mMeta(meta),
@@ -250,35 +250,30 @@ AMRSource::~AMRSource() {
     }
 }
 
-status_t AMRSource::start(MetaDataBase * /* params */) {
+media_status_t AMRSource::start() {
     CHECK(!mStarted);
 
     mOffset = mIsWide ? 9 : 6;
     mCurrentTimeUs = 0;
-    mGroup = new MediaBufferGroup;
-    mGroup->add_buffer(MediaBufferBase::Create(128));
+    mBufferGroup->add_buffer(128);
     mStarted = true;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t AMRSource::stop() {
+media_status_t AMRSource::stop() {
     CHECK(mStarted);
 
-    delete mGroup;
-    mGroup = NULL;
-
     mStarted = false;
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t AMRSource::getFormat(MetaDataBase &meta) {
-    meta = mMeta;
-    return OK;
+media_status_t AMRSource::getFormat(AMediaFormat *meta) {
+    return AMediaFormat_copy(meta, mMeta);
 }
 
-status_t AMRSource::read(
-        MediaBufferBase **out, const ReadOptions *options) {
+media_status_t AMRSource::read(
+        MediaBufferHelper **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t seekTimeUs;
@@ -296,7 +291,7 @@ status_t AMRSource::read(
         mOffset = mOffsetTable[index] + (mIsWide ? 9 : 6);
 
         for (size_t i = 0; i< seekFrame - index * 50; i++) {
-            status_t err;
+            media_status_t err;
             if ((err = getFrameSizeByOffset(mDataSource, mOffset,
                             mIsWide, &size)) != OK) {
                 return err;
@@ -309,7 +304,7 @@ status_t AMRSource::read(
     ssize_t n = mDataSource->readAt(mOffset, &header, 1);
 
     if (n < 1) {
-        return ERROR_END_OF_STREAM;
+        return AMEDIA_ERROR_END_OF_STREAM;
     }
 
     if (header & 0x83) {
@@ -317,20 +312,20 @@ status_t AMRSource::read(
 
         ALOGE("padding bits must be 0, header is 0x%02x", header);
 
-        return ERROR_MALFORMED;
+        return AMEDIA_ERROR_MALFORMED;
     }
 
     unsigned FT = (header >> 3) & 0x0f;
 
     size_t frameSize = getFrameSize(mIsWide, FT);
     if (frameSize == 0) {
-        return ERROR_MALFORMED;
+        return AMEDIA_ERROR_MALFORMED;
     }
 
-    MediaBufferBase *buffer;
-    status_t err = mGroup->acquire_buffer(&buffer);
+    MediaBufferHelper *buffer;
+    status_t err = mBufferGroup->acquire_buffer(&buffer);
     if (err != OK) {
-        return err;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
     n = mDataSource->readAt(mOffset, buffer->data(), frameSize);
@@ -340,50 +335,63 @@ status_t AMRSource::read(
         buffer = NULL;
 
         if (n < 0) {
-            return ERROR_IO;
+            return AMEDIA_ERROR_IO;
         } else {
             // only partial frame is available, treat it as EOS.
             mOffset += n;
-            return ERROR_END_OF_STREAM;
+            return AMEDIA_ERROR_END_OF_STREAM;
         }
     }
 
     buffer->set_range(0, frameSize);
-    buffer->meta_data().setInt64(kKeyTime, mCurrentTimeUs);
-    buffer->meta_data().setInt32(kKeyIsSyncFrame, 1);
+    AMediaFormat *meta = buffer->meta_data();
+    AMediaFormat_setInt64(meta, AMEDIAFORMAT_KEY_TIME_US, mCurrentTimeUs);
+    AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, 1);
 
     mOffset += frameSize;
     mCurrentTimeUs += 20000;  // Each frame is 20ms
 
     *out = buffer;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
+static const char *extensions[] = {
+    "amr",
+    "awb",
+    NULL
+};
+
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("c86639c9-2f31-40ac-a715-fa01b4493aaf"),
         1,
         "AMR Extractor",
-        [](
-                DataSourceBase *source,
-                float *confidence,
-                void **,
-                MediaExtractor::FreeMetaFunc *) -> MediaExtractor::CreatorFunc {
-            if (SniffAMR(source, nullptr, confidence)) {
-                return [](
-                        DataSourceBase *source,
-                        void *) -> MediaExtractor* {
-                    return new AMRExtractor(source);};
-            }
-            return NULL;
-        }
+        {
+           .v3 = {
+               [](
+                   CDataSource *source,
+                   float *confidence,
+                   void **,
+                   FreeMetaFunc *) -> CreatorFunc {
+                   DataSourceHelper helper(source);
+                   if (SniffAMR(&helper, nullptr, confidence)) {
+                       return [](
+                               CDataSource *source,
+                               void *) -> CMediaExtractor* {
+                           return wrap(new AMRExtractor(new DataSourceHelper(source)));};
+                   }
+                   return NULL;
+               },
+               extensions
+           },
+        },
     };
 }
 

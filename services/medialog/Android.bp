@@ -10,7 +10,7 @@ cc_library_shared {
         "libaudioutils",
         "libbinder",
         "liblog",
-        "libnbaio",
+        "libmediautils",
         "libnblog",
         "libutils",
     ],

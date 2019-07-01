@@ -18,6 +18,7 @@
 #define ANDROID_SERVERS_CAMERA_CAMERASERVICE_H
 
 #include <android/hardware/BnCameraService.h>
+#include <android/hardware/BnSensorPrivacyListener.h>
 #include <android/hardware/ICameraServiceListener.h>
 #include <android/hardware/ICameraServiceProxy.h>
 
@@ -153,9 +154,16 @@ public:
     virtual binder::Status    notifySystemEvent(int32_t eventId,
             const std::vector<int32_t>& args);
 
+    virtual binder::Status    notifyDeviceStateChange(int64_t newState);
+
     // OK = supports api of that version, -EOPNOTSUPP = does not support
     virtual binder::Status    supportsCameraApi(
             const String16& cameraId, int32_t apiVersion,
+            /*out*/
+            bool *isSupported);
+
+    virtual binder::Status    isHiddenPhysicalCamera(
+            const String16& cameraId,
             /*out*/
             bool *isSupported);
 
@@ -166,6 +174,13 @@ public:
     virtual status_t    dump(int fd, const Vector<String16>& args);
 
     virtual status_t    shellCommand(int in, int out, int err, const Vector<String16>& args);
+
+    binder::Status      addListenerHelper(const sp<hardware::ICameraServiceListener>& listener,
+            /*out*/
+            std::vector<hardware::CameraStatus>* cameraStatuses, bool isVendor = false);
+
+    // Monitored UIDs availability notification
+    void                notifyMonitoredUids();
 
     /////////////////////////////////////////////////////////////////////
     // Client functionality
@@ -278,7 +293,7 @@ public:
         status_t                        finishCameraOps();
 
     private:
-        AppOpsManager                   mAppOpsManager;
+        std::unique_ptr<AppOpsManager>  mAppOpsManager = nullptr;
 
         class OpsCallback : public BnAppOpsCallback {
         public:
@@ -527,28 +542,63 @@ private:
         void unregisterSelf();
 
         bool isUidActive(uid_t uid, String16 callingPackage);
+        int32_t getProcState(uid_t uid);
 
         void onUidGone(uid_t uid, bool disabled);
         void onUidActive(uid_t uid);
         void onUidIdle(uid_t uid, bool disabled);
+        void onUidStateChanged(uid_t uid, int32_t procState, int64_t procStateSeq);
 
         void addOverrideUid(uid_t uid, String16 callingPackage, bool active);
         void removeOverrideUid(uid_t uid, String16 callingPackage);
+
+        void registerMonitorUid(uid_t uid);
+        void unregisterMonitorUid(uid_t uid);
 
         // IBinder::DeathRecipient implementation
         virtual void binderDied(const wp<IBinder> &who);
     private:
         bool isUidActiveLocked(uid_t uid, String16 callingPackage);
+        int32_t getProcStateLocked(uid_t uid);
         void updateOverrideUid(uid_t uid, String16 callingPackage, bool active, bool insert);
 
         Mutex mUidLock;
         bool mRegistered;
         wp<CameraService> mService;
         std::unordered_set<uid_t> mActiveUids;
+        // Monitored uid map to cached procState and refCount pair
+        std::unordered_map<uid_t, std::pair<int32_t, size_t>> mMonitoredUids;
         std::unordered_map<uid_t, bool> mOverrideUids;
     }; // class UidPolicy
 
+    // If sensor privacy is enabled then all apps, including those that are active, should be
+    // prevented from accessing the camera.
+    class SensorPrivacyPolicy : public hardware::BnSensorPrivacyListener,
+            public virtual IBinder::DeathRecipient {
+        public:
+            explicit SensorPrivacyPolicy(wp<CameraService> service)
+                    : mService(service), mSensorPrivacyEnabled(false), mRegistered(false) {}
+
+            void registerSelf();
+            void unregisterSelf();
+
+            bool isSensorPrivacyEnabled();
+
+            binder::Status onSensorPrivacyChanged(bool enabled);
+
+            // IBinder::DeathRecipient implementation
+            virtual void binderDied(const wp<IBinder> &who);
+
+        private:
+            wp<CameraService> mService;
+            Mutex mSensorPrivacyLock;
+            bool mSensorPrivacyEnabled;
+            bool mRegistered;
+    };
+
     sp<UidPolicy> mUidPolicy;
+
+    sp<SensorPrivacyPolicy> mSensorPrivacyPolicy;
 
     // Delay-load the Camera HAL module
     virtual void onFirstRef();
@@ -581,12 +631,15 @@ private:
         sp<BasicClient>* client,
         std::shared_ptr<resource_policy::ClientDescriptor<String8, sp<BasicClient>>>* partial);
 
+    // Should an operation attempt on a cameraId be rejected, if the camera id is
+    // advertised as a publically hidden secure camera, by the camera HAL ?
+    bool shouldRejectHiddenCameraConnection(const String8 & cameraId);
+
     // Single implementation shared between the various connect calls
     template<class CALLBACK, class CLIENT>
     binder::Status connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
             int api1CameraId, int halVersion, const String16& clientPackageName,
-            int clientUid, int clientPid,
-            apiLevel effectiveApiLevel, bool legacyMode, bool shimUpdateOnly,
+            int clientUid, int clientPid, apiLevel effectiveApiLevel, bool shimUpdateOnly,
             /*out*/sp<CLIENT>& device);
 
     // Lock guarding camera service state
@@ -695,6 +748,11 @@ private:
             const char* reason);
 
     /**
+     * Add an event log message when a client calls setTorchMode succesfully.
+     */
+    void logTorchEvent(const char* cameraId, const char *torchState, int clientPid);
+
+    /**
      * Add an event log message that the current device user has been switched.
      */
     void logUserSwitch(const std::set<userid_t>& oldUserIds,
@@ -747,8 +805,34 @@ private:
 
     sp<CameraProviderManager> mCameraProviderManager;
 
+    class ServiceListener : public virtual IBinder::DeathRecipient {
+        public:
+            ServiceListener(sp<CameraService> parent, sp<hardware::ICameraServiceListener> listener,
+                    int uid) : mParent(parent), mListener(listener), mListenerUid(uid) {}
+
+            status_t initialize() {
+                return IInterface::asBinder(mListener)->linkToDeath(this);
+            }
+
+            virtual void binderDied(const wp<IBinder> &/*who*/) {
+                auto parent = mParent.promote();
+                if (parent.get() != nullptr) {
+                    parent->removeListener(mListener);
+                }
+            }
+
+            int getListenerUid() { return mListenerUid; }
+            sp<hardware::ICameraServiceListener> getListener() { return mListener; }
+
+        private:
+            wp<CameraService> mParent;
+            sp<hardware::ICameraServiceListener> mListener;
+            int mListenerUid;
+    };
+
     // Guarded by mStatusListenerMutex
-    std::vector<sp<hardware::ICameraServiceListener>> mListenerList;
+    std::vector<std::pair<bool, sp<ServiceListener>>> mListenerList;
+
     Mutex       mStatusListenerLock;
 
     /**
@@ -820,6 +904,9 @@ private:
     // Blocks all clients from the UID
     void blockClientsForUid(uid_t uid);
 
+    // Blocks all active clients.
+    void blockAllClients();
+
     // Overrides the UID state as if it is idle
     status_t handleSetUidState(const Vector<String16>& args, int err);
 
@@ -832,10 +919,6 @@ private:
     // Prints the shell command help
     status_t printHelp(int out);
 
-    static int getCallingPid();
-
-    static int getCallingUid();
-
     /**
      * Get the current system time as a formatted string.
      */
@@ -844,7 +927,7 @@ private:
     static binder::Status makeClient(const sp<CameraService>& cameraService,
             const sp<IInterface>& cameraCb, const String16& packageName, const String8& cameraId,
             int api1CameraId, int facing, int clientPid, uid_t clientUid, int servicePid,
-            bool legacyMode, int halVersion, int deviceVersion, apiLevel effectiveApiLevel,
+            int halVersion, int deviceVersion, apiLevel effectiveApiLevel,
             /*out*/sp<BasicClient>* client);
 
     status_t checkCameraAccess(const String16& opPackageName);
@@ -853,6 +936,11 @@ private:
     static int32_t mapToInterface(hardware::camera::common::V1_0::TorchModeStatus status);
     static StatusInternal mapToInternal(hardware::camera::common::V1_0::CameraDeviceStatus status);
     static int32_t mapToInterface(StatusInternal status);
+
+    // Guard mCameraServiceProxy
+    static Mutex sProxyMutex;
+    // Cached interface to the camera service proxy in system service
+    static sp<hardware::ICameraServiceProxy> sCameraServiceProxy;
 
     static sp<hardware::ICameraServiceProxy> getCameraServiceProxy();
     static void pingCameraServiceProxy();

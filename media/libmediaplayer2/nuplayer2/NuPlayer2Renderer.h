@@ -20,6 +20,7 @@
 
 #include <media/AudioResamplerPublic.h>
 #include <media/AVSyncSettings.h>
+#include <mediaplayer2/JObjectHolder.h>
 
 #include "NuPlayer2.h"
 
@@ -28,7 +29,7 @@ namespace android {
 class  JWakeLock;
 struct MediaClock;
 class MediaCodecBuffer;
-struct VideoFrameScheduler;
+struct VideoFrameSchedulerBase;
 
 struct NuPlayer2::Renderer : public AHandler {
     enum Flags {
@@ -38,6 +39,7 @@ struct NuPlayer2::Renderer : public AHandler {
     Renderer(const sp<MediaPlayer2Interface::AudioSink> &sink,
              const sp<MediaClock> &mediaClock,
              const sp<AMessage> &notify,
+             const sp<JObjectHolder> &context,
              uint32_t flags = 0);
 
     static size_t AudioSinkCallback(
@@ -156,7 +158,7 @@ private:
     List<QueueEntry> mAudioQueue;
     List<QueueEntry> mVideoQueue;
     uint32_t mNumFramesWritten;
-    sp<VideoFrameScheduler> mVideoScheduler;
+    sp<VideoFrameSchedulerBase> mVideoScheduler;
 
     bool mDrainAudioQueuePending;
     bool mDrainVideoQueuePending;
@@ -167,7 +169,6 @@ private:
     int32_t mAudioEOSGeneration;
 
     const sp<MediaClock> mMediaClock;
-    float mPlaybackRate; // audio track rate
 
     AudioPlaybackRate mPlaybackSettings;
     AVSyncSettings mSyncSettings;

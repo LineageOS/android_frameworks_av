@@ -37,12 +37,13 @@ public:
     virtual status_t read(
             MediaBufferBase **buffer,
             const MediaSource::ReadOptions *options = NULL);
+    virtual bool supportNonblockingRead();
     virtual status_t pause();
     virtual status_t setStopTimeUs(int64_t stopTimeUs);
 
 private:
     sp<RemoteMediaExtractor> mExtractor;
-    MediaTrack *mSource;
+    MediaTrack *mTrack;
     sp<RefBase> mExtractorPlugin;
 
     explicit RemoteMediaSource(

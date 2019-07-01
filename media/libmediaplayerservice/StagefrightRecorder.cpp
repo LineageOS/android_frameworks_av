@@ -24,6 +24,7 @@
 
 #include <algorithm>
 
+#include <android-base/properties.h>
 #include <android/hardware/ICamera.h>
 
 #include <binder/IPCThreadState.h>
@@ -46,6 +47,7 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MediaCodecSource.h>
+#include <media/stagefright/OggWriter.h>
 #include <media/stagefright/PersistentSurface.h>
 #include <media/MediaProfiles.h>
 #include <camera/CameraParameters.h>
@@ -116,7 +118,9 @@ StagefrightRecorder::StagefrightRecorder(const String16 &opPackageName)
       mVideoSource(VIDEO_SOURCE_LIST_END),
       mStarted(false),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
-      mDeviceCallbackEnabled(false) {
+      mDeviceCallbackEnabled(false),
+      mSelectedMicDirection(MIC_DIRECTION_UNSPECIFIED),
+      mSelectedMicFieldDimension(MIC_FIELD_DIMENSION_NORMAL) {
 
     ALOGV("Constructor");
 
@@ -160,9 +164,12 @@ void StagefrightRecorder::updateMetrics() {
     mAnalyticsItem->setInt32(kRecorderVideoIframeInterval, mIFramesIntervalSec);
     // TBD mAudioSourceNode = 0;
     // TBD mUse64BitFileOffset = false;
-    mAnalyticsItem->setInt32(kRecorderMovieTimescale, mMovieTimeScale);
-    mAnalyticsItem->setInt32(kRecorderAudioTimescale, mAudioTimeScale);
-    mAnalyticsItem->setInt32(kRecorderVideoTimescale, mVideoTimeScale);
+    if (mMovieTimeScale != -1)
+        mAnalyticsItem->setInt32(kRecorderMovieTimescale, mMovieTimeScale);
+    if (mAudioTimeScale != -1)
+        mAnalyticsItem->setInt32(kRecorderAudioTimescale, mAudioTimeScale);
+    if (mVideoTimeScale != -1)
+        mAnalyticsItem->setInt32(kRecorderVideoTimescale, mVideoTimeScale);
     // TBD mCameraId        = 0;
     // TBD mStartTimeOffsetMs = -1;
     mAnalyticsItem->setInt32(kRecorderVideoProfile, mVideoEncoderProfile);
@@ -201,7 +208,7 @@ void StagefrightRecorder::flushAndResetMetrics(bool reinitialize) {
     }
     mAnalyticsDirty = false;
     if (reinitialize) {
-        mAnalyticsItem = new MediaAnalyticsItem(kKeyRecorder);
+        mAnalyticsItem = MediaAnalyticsItem::create(kKeyRecorder);
     }
 }
 
@@ -396,14 +403,15 @@ status_t StagefrightRecorder::setNextOutputFile(int fd) {
         return -EBADF;
     }
 
-    // start with a clean, empty file
-    ftruncate(fd, 0);
-    int nextFd = dup(fd);
-    if (mWriter == NULL) {
+    if (mWriter == nullptr) {
         ALOGE("setNextOutputFile failed. Writer has been freed");
         return INVALID_OPERATION;
     }
-    return mWriter->setNextFd(nextFd);
+
+    // start with a clean, empty file
+    ftruncate(fd, 0);
+
+    return mWriter->setNextFd(fd);
 }
 
 // Attempt to parse an float literal optionally surrounded by whitespace,
@@ -948,6 +956,10 @@ status_t StagefrightRecorder::prepareInternal() {
             status = setupMPEG2TSRecording();
             break;
 
+        case OUTPUT_FORMAT_OGG:
+            status = setupOggRecording();
+            break;
+
         default:
             ALOGE("Unsupported output file format: %d", mOutputFormat);
             status = UNKNOWN_ERROR;
@@ -1013,6 +1025,7 @@ status_t StagefrightRecorder::start() {
         case OUTPUT_FORMAT_AAC_ADTS:
         case OUTPUT_FORMAT_RTP_AVP:
         case OUTPUT_FORMAT_MPEG2TS:
+        case OUTPUT_FORMAT_OGG:
         {
             sp<MetaData> meta = new MetaData;
             int64_t startTimeUs = systemTime() / 1000;
@@ -1083,7 +1096,9 @@ sp<MediaCodecSource> StagefrightRecorder::createAudioSource() {
                 mSampleRate,
                 mClientUid,
                 mClientPid,
-                mSelectedDeviceId);
+                mSelectedDeviceId,
+                mSelectedMicDirection,
+                mSelectedMicFieldDimension);
 
     status_t err = audioSource->initCheck();
 
@@ -1112,6 +1127,9 @@ sp<MediaCodecSource> StagefrightRecorder::createAudioSource() {
         case AUDIO_ENCODER_AAC_ELD:
             format->setString("mime", MEDIA_MIMETYPE_AUDIO_AAC);
             format->setInt32("aac-profile", OMX_AUDIO_AACObjectELD);
+            break;
+        case AUDIO_ENCODER_OPUS:
+            format->setString("mime", MEDIA_MIMETYPE_AUDIO_OPUS);
             break;
 
         default:
@@ -1166,6 +1184,13 @@ status_t StagefrightRecorder::setupAACRecording() {
     CHECK(mAudioSource != AUDIO_SOURCE_CNT);
 
     mWriter = new AACWriter(mOutputFd);
+    return setupRawAudioRecording();
+}
+
+status_t StagefrightRecorder::setupOggRecording() {
+    CHECK_EQ(mOutputFormat, OUTPUT_FORMAT_OGG);
+
+    mWriter = new OggWriter(mOutputFd);
     return setupRawAudioRecording();
 }
 
@@ -1745,13 +1770,26 @@ status_t StagefrightRecorder::setupVideoEncoder(
         }
     }
 
+    // Enable temporal layering if the expected (max) playback frame rate is greater than ~11% of
+    // the minimum display refresh rate on a typical device. Add layers until the base layer falls
+    // under this limit. Allow device manufacturers to override this limit.
+
+    // TODO: make this configurable by the application
+    std::string maxBaseLayerFpsProperty =
+        ::android::base::GetProperty("ro.media.recorder-max-base-layer-fps", "");
+    float maxBaseLayerFps = (float)::atof(maxBaseLayerFpsProperty.c_str());
+    // TRICKY: use !> to fix up any NaN values
+    if (!(maxBaseLayerFps >= kMinTypicalDisplayRefreshingRate / 0.9)) {
+        maxBaseLayerFps = kMinTypicalDisplayRefreshingRate / 0.9;
+    }
+
     for (uint32_t tryLayers = 1; tryLayers <= kMaxNumVideoTemporalLayers; ++tryLayers) {
         if (tryLayers > tsLayers) {
             tsLayers = tryLayers;
         }
         // keep going until the base layer fps falls below the typical display refresh rate
         float baseLayerFps = maxPlaybackFps / (1 << (tryLayers - 1));
-        if (baseLayerFps < kMinTypicalDisplayRefreshingRate / 0.9) {
+        if (baseLayerFps < maxBaseLayerFps) {
             break;
         }
     }
@@ -1813,6 +1851,7 @@ status_t StagefrightRecorder::setupAudioEncoder(const sp<MediaWriter>& writer) {
         case AUDIO_ENCODER_AAC:
         case AUDIO_ENCODER_HE_AAC:
         case AUDIO_ENCODER_AAC_ELD:
+        case AUDIO_ENCODER_OPUS:
             break;
 
         default:
@@ -1863,19 +1902,18 @@ status_t StagefrightRecorder::setupMPEG4orWEBMRecording() {
         mTotalBitRate += mVideoBitRate;
     }
 
-    if (mOutputFormat != OUTPUT_FORMAT_WEBM) {
-        // Audio source is added at the end if it exists.
-        // This help make sure that the "recoding" sound is suppressed for
-        // camcorder applications in the recorded files.
-        // TODO Audio source is currently unsupported for webm output; vorbis encoder needed.
-        // disable audio for time lapse recording
-        bool disableAudio = mCaptureFpsEnable && mCaptureFps < mFrameRate;
-        if (!disableAudio && mAudioSource != AUDIO_SOURCE_CNT) {
-            err = setupAudioEncoder(writer);
-            if (err != OK) return err;
-            mTotalBitRate += mAudioBitRate;
-        }
+    // Audio source is added at the end if it exists.
+    // This help make sure that the "recoding" sound is suppressed for
+    // camcorder applications in the recorded files.
+    // disable audio for time lapse recording
+    const bool disableAudio = mCaptureFpsEnable && mCaptureFps < mFrameRate;
+    if (!disableAudio && mAudioSource != AUDIO_SOURCE_CNT) {
+        err = setupAudioEncoder(writer);
+        if (err != OK) return err;
+        mTotalBitRate += mAudioBitRate;
+    }
 
+    if (mOutputFormat != OUTPUT_FORMAT_WEBM) {
         if (mCaptureFpsEnable) {
             mp4writer->setCaptureRate(mCaptureFps);
         }
@@ -2175,7 +2213,7 @@ status_t StagefrightRecorder::getMaxAmplitude(int *max) {
 }
 
 status_t StagefrightRecorder::getMetrics(Parcel *reply) {
-    ALOGD("StagefrightRecorder::getMetrics");
+    ALOGV("StagefrightRecorder::getMetrics");
 
     if (reply == NULL) {
         ALOGE("Null pointer argument");
@@ -2239,6 +2277,30 @@ status_t StagefrightRecorder::getActiveMicrophones(
     return NO_INIT;
 }
 
+status_t StagefrightRecorder::setPreferredMicrophoneDirection(audio_microphone_direction_t direction) {
+    ALOGV("setPreferredMicrophoneDirection(%d)", direction);
+    mSelectedMicDirection = direction;
+    if (mAudioSourceNode != 0) {
+        return mAudioSourceNode->setPreferredMicrophoneDirection(direction);
+    }
+    return NO_INIT;
+}
+
+status_t StagefrightRecorder::setPreferredMicrophoneFieldDimension(float zoom) {
+    ALOGV("setPreferredMicrophoneFieldDimension(%f)", zoom);
+    mSelectedMicFieldDimension = zoom;
+    if (mAudioSourceNode != 0) {
+        return mAudioSourceNode->setPreferredMicrophoneFieldDimension(zoom);
+    }
+    return NO_INIT;
+}
+
+status_t StagefrightRecorder::getPortId(audio_port_handle_t *portId) const {
+    if (mAudioSourceNode != 0) {
+        return mAudioSourceNode->getPortId(portId);
+    }
+    return NO_INIT;
+}
 
 status_t StagefrightRecorder::dump(
         int fd, const Vector<String16>& args) const {

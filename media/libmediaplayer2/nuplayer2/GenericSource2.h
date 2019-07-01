@@ -37,11 +37,9 @@ struct ARTSPController;
 class DataSource;
 class IDataSource;
 class IMediaSource;
-struct MediaHTTPService;
 struct MediaSource;
 class MediaBuffer;
 struct MediaClock;
-struct NuCachedSource2;
 
 struct NuPlayer2::GenericSource2 : public NuPlayer2::Source,
                                    public MediaBufferObserver // Modular DRM
@@ -50,7 +48,6 @@ struct NuPlayer2::GenericSource2 : public NuPlayer2::Source,
                    const sp<MediaClock> &mediaClock);
 
     status_t setDataSource(
-            const sp<MediaHTTPService> &httpService,
             const char *url,
             const KeyedVector<String8, String8> *headers);
 
@@ -62,7 +59,7 @@ struct NuPlayer2::GenericSource2 : public NuPlayer2::Source,
             BufferingSettings* buffering /* nonnull */) override;
     virtual status_t setBufferingSettings(const BufferingSettings& buffering) override;
 
-    virtual void prepareAsync();
+    virtual void prepareAsync(int64_t startTimeUs);
 
     virtual void start();
     virtual void stop();
@@ -151,7 +148,6 @@ private:
     bool mIsStreaming;
     uid_t mUID;
     const sp<MediaClock> mMediaClock;
-    sp<MediaHTTPService> mHTTPService;
     AString mUri;
     KeyedVector<String8, String8> mUriHeaders;
     int mFd;
@@ -159,9 +155,6 @@ private:
     int64_t mLength;
 
     bool mDisconnected;
-    sp<DataSource> mDataSource;
-    sp<NuCachedSource2> mCachedSource;
-    sp<DataSource> mHttpSource;
     sp<MetaData> mFileMeta;
     sp<AMediaDataSourceWrapper> mDataSourceWrapper;
     sp<AMediaExtractorWrapper> mExtractor;
@@ -194,7 +187,7 @@ private:
     void onSeek(const sp<AMessage>& msg);
     status_t doSeek(int64_t seekTimeUs, MediaPlayer2SeekMode mode);
 
-    void onPrepareAsync();
+    void onPrepareAsync(int64_t startTimeUs);
 
     void fetchTextData(
             uint32_t what, media_track_type type,
@@ -231,8 +224,6 @@ private:
     void schedulePollBuffering();
     void onPollBuffering();
     void notifyBufferingUpdate(int32_t percentage);
-
-    void sendCacheStats();
 
     sp<AMessage> getFormat_l(bool audio);
     sp<MetaData> getFormatMeta_l(bool audio);

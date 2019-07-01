@@ -38,7 +38,7 @@ public:
 class AudioRouteVector : public Vector<sp<AudioRoute> >
 {
 public:
-    status_t dump(int fd, int spaces) const;
+    void dump(String8 *dst, int spaces) const;
 };
 
 } // namespace android

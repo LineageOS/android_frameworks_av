@@ -47,10 +47,12 @@ public:
     virtual             ~SoundTriggerHwService();
 
     // ISoundTriggerHwService
-    virtual status_t listModules(struct sound_trigger_module_descriptor *modules,
+    virtual status_t listModules(const String16& opPackageName,
+                                 struct sound_trigger_module_descriptor *modules,
                                  uint32_t *numModules);
 
-    virtual status_t attach(const sound_trigger_module_handle_t handle,
+    virtual status_t attach(const String16& opPackageName,
+                            const sound_trigger_module_handle_t handle,
                             const sp<ISoundTriggerClient>& client,
                             sp<ISoundTrigger>& module);
 
@@ -122,6 +124,7 @@ public:
        virtual status_t startRecognition(sound_model_handle_t handle,
                                          const sp<IMemory>& dataMemory);
        virtual status_t stopRecognition(sound_model_handle_t handle);
+       virtual status_t getModelState(sound_model_handle_t handle);
 
        sp<SoundTriggerHalInterface> halInterface() const { return mHalInterface; }
        struct sound_trigger_module_descriptor descriptor() { return mDescriptor; }
@@ -132,7 +135,8 @@ public:
 
        void setCaptureState_l(bool active);
 
-       sp<ModuleClient> addClient(const sp<ISoundTriggerClient>& client);
+       sp<ModuleClient> addClient(const sp<ISoundTriggerClient>& client,
+                                  const String16& opPackageName);
 
        void detach(const sp<ModuleClient>& moduleClient);
 
@@ -155,7 +159,8 @@ public:
     public:
 
        ModuleClient(const sp<Module>& module,
-              const sp<ISoundTriggerClient>& client);
+              const sp<ISoundTriggerClient>& client,
+              const String16& opPackageName);
 
        virtual ~ModuleClient();
 
@@ -169,6 +174,7 @@ public:
        virtual status_t startRecognition(sound_model_handle_t handle,
                                          const sp<IMemory>& dataMemory);
        virtual status_t stopRecognition(sound_model_handle_t handle);
+       virtual status_t getModelState(sound_model_handle_t handle);
 
        virtual status_t dump(int fd, const Vector<String16>& args);
 
@@ -188,6 +194,7 @@ public:
         mutable Mutex               mLock;
         wp<Module>                  mModule;
         sp<ISoundTriggerClient>     mClient;
+        const String16              mOpPackageName;
     }; // class ModuleClient
 
     class CallbackThread : public Thread {

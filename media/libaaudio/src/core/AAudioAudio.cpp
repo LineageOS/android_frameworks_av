@@ -146,14 +146,14 @@ AAUDIO_API void AAudioStreamBuilder_setSampleRate(AAudioStreamBuilder* builder,
 AAUDIO_API void AAudioStreamBuilder_setChannelCount(AAudioStreamBuilder* builder,
                                                     int32_t channelCount)
 {
-    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
-    streamBuilder->setSamplesPerFrame(channelCount);
+    AAudioStreamBuilder_setSamplesPerFrame(builder, channelCount);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setSamplesPerFrame(AAudioStreamBuilder* builder,
-                                                       int32_t channelCount)
+                                                       int32_t samplesPerFrame)
 {
-    AAudioStreamBuilder_setChannelCount(builder, channelCount);
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setSamplesPerFrame(samplesPerFrame);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setDirection(AAudioStreamBuilder* builder,
@@ -167,7 +167,9 @@ AAUDIO_API void AAudioStreamBuilder_setFormat(AAudioStreamBuilder* builder,
                                                    aaudio_format_t format)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
-    streamBuilder->setFormat(format);
+    // Use audio_format_t everywhere internally.
+    const audio_format_t internalFormat = AAudioConvert_aaudioToAndroidDataFormat(format);
+    streamBuilder->setFormat(internalFormat);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setSharingMode(AAudioStreamBuilder* builder,
@@ -200,6 +202,12 @@ AAUDIO_API void AAudioStreamBuilder_setBufferCapacityInFrames(AAudioStreamBuilde
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setBufferCapacity(frames);
+}
+
+AAUDIO_API void AAudioStreamBuilder_setAllowedCapturePolicy(
+        AAudioStreamBuilder* builder, aaudio_allowed_capture_policy_t policy) {
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setAllowedCapturePolicy(policy);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setSessionId(AAudioStreamBuilder* builder,
@@ -238,18 +246,20 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder* 
                                                      AAudioStream** streamPtr)
 {
     AudioStream *audioStream = nullptr;
+    aaudio_stream_id_t id = 0;
     // Please leave these logs because they are very helpful when debugging.
-    ALOGD("AAudioStreamBuilder_openStream() called ----------------------------------------");
+    ALOGI("%s() called ----------------------------------------", __func__);
     AudioStreamBuilder *streamBuilder = COMMON_GET_FROM_BUILDER_OR_RETURN(streamPtr);
     aaudio_result_t result = streamBuilder->build(&audioStream);
-    ALOGD("AAudioStreamBuilder_openStream() returns %d = %s for (%p) ----------------",
-          result, AAudio_convertResultToText(result), audioStream);
     if (result == AAUDIO_OK) {
         audioStream->registerPlayerBase();
         *streamPtr = (AAudioStream*) audioStream;
+        id = audioStream->getId();
     } else {
         *streamPtr = nullptr;
     }
+    ALOGI("%s() returns %d = %s for s#%u ----------------",
+        __func__, result, AAudio_convertResultToText(result), id);
     return result;
 }
 
@@ -267,8 +277,9 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
 {
     aaudio_result_t result = AAUDIO_ERROR_NULL;
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    ALOGD("AAudioStream_close(%p) called ---------------", stream);
     if (audioStream != nullptr) {
+        aaudio_stream_id_t id = audioStream->getId();
+        ALOGD("%s(s#%u) called ---------------", __func__, id);
         result = audioStream->safeClose();
         // Close will only fail if called illegally, for example, from a callback.
         // That would result in deleting an active stream, which would cause a crash.
@@ -278,43 +289,40 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
         } else {
             ALOGW("%s attempt to close failed. Close it from another thread.", __func__);
         }
+        ALOGD("%s(s#%u) returned %d ---------", __func__, id, result);
     }
-    // We're potentially freeing `stream` above, so its use here makes some
-    // static analysis tools unhappy. Casting to uintptr_t helps assure
-    // said tools that we're not doing anything bad here.
-    ALOGD("AAudioStream_close(%#" PRIxPTR ") returned %d ---------",
-          reinterpret_cast<uintptr_t>(stream), result);
     return result;
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_requestStart(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    ALOGD("AAudioStream_requestStart(%p) called --------------", stream);
+    aaudio_stream_id_t id = audioStream->getId();
+    ALOGD("%s(s#%u) called --------------", __func__, id);
     aaudio_result_t result = audioStream->systemStart();
-    ALOGD("AAudioStream_requestStart(%p) returned %d ---------", stream, result);
+    ALOGD("%s(s#%u) returned %d ---------", __func__, id, result);
     return result;
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_requestPause(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    ALOGD("AAudioStream_requestPause(%p)", stream);
+    ALOGD("%s(s#%u) called", __func__, audioStream->getId());
     return audioStream->systemPause();
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_requestFlush(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    ALOGD("AAudioStream_requestFlush(%p)", stream);
+    ALOGD("%s(s#%u) called", __func__, audioStream->getId());
     return audioStream->safeFlush();
 }
 
 AAUDIO_API aaudio_result_t  AAudioStream_requestStop(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    ALOGD("AAudioStream_requestStop(%p)", stream);
-    return audioStream->systemStop();
+    ALOGD("%s(s#%u) called", __func__, audioStream->getId());
+    return audioStream->systemStopFromApp();
 }
 
 AAUDIO_API aaudio_result_t AAudioStream_waitForStateChange(AAudioStream* stream,
@@ -363,7 +371,7 @@ AAUDIO_API aaudio_result_t AAudioStream_write(AAudioStream* stream,
 
     // Don't allow writes when playing with a callback.
     if (audioStream->isDataCallbackActive()) {
-        ALOGE("Cannot write to a callback stream when running.");
+        ALOGD("Cannot write to a callback stream when running.");
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -408,7 +416,9 @@ AAUDIO_API aaudio_stream_state_t AAudioStream_getState(AAudioStream* stream)
 AAUDIO_API aaudio_format_t AAudioStream_getFormat(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
-    return audioStream->getFormat();
+    // Use audio_format_t internally.
+    audio_format_t internalFormat = audioStream->getFormat();
+    return AAudioConvert_androidToAAudioDataFormat(internalFormat);
 }
 
 AAUDIO_API aaudio_result_t AAudioStream_setBufferSizeInFrames(AAudioStream* stream,
@@ -488,6 +498,13 @@ AAUDIO_API aaudio_input_preset_t AAudioStream_getInputPreset(AAudioStream* strea
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->getInputPreset();
+}
+
+AAUDIO_API aaudio_allowed_capture_policy_t AAudioStream_getAllowedCapturePolicy(
+        AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->getAllowedCapturePolicy();
 }
 
 AAUDIO_API int32_t AAudioStream_getSessionId(AAudioStream* stream)

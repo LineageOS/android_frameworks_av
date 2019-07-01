@@ -23,26 +23,10 @@
 
 namespace android {
 
-struct DeviceCategoryTraits
-{
-    typedef device_category Type;
-    typedef Vector<Type> Collection;
-};
-struct MixTypeTraits
-{
-    typedef int32_t Type;
-    typedef Vector<Type> Collection;
-};
-struct RouteFlagTraits
-{
-    typedef uint32_t Type;
-    typedef Vector<Type> Collection;
-};
-struct RuleTraits
-{
-    typedef uint32_t Type;
-    typedef Vector<Type> Collection;
-};
+struct RuleTraits : public DefaultTraits<uint32_t> {};
+using DeviceCategoryTraits = DefaultTraits<device_category>;
+struct MixTypeTraits : public DefaultTraits<int32_t> {};
+struct RouteFlagTraits : public DefaultTraits<uint32_t> {};
 
 typedef TypeConverter<DeviceCategoryTraits> DeviceCategoryConverter;
 typedef TypeConverter<MixTypeTraits> MixTypeConverter;

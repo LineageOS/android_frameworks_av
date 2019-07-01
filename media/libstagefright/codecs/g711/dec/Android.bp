@@ -1,25 +1,8 @@
 cc_library_shared {
     name: "libstagefright_soft_g711dec",
-    vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
+    defaults: ["libstagefright_softomx-defaults"],
 
     srcs: ["SoftG711.cpp"],
-
-    include_dirs: [
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include/media/openmax",
-    ],
-
-    shared_libs: [
-        "libstagefright_foundation",
-        "libstagefright_omx",
-        "libutils",
-        "liblog",
-    ],
-
-    cflags: ["-Werror"],
 
     version_script: "exports.lds",
 
@@ -30,5 +13,4 @@ cc_library_shared {
         ],
         cfi: true,
     },
-    compile_multilib: "32",
 }

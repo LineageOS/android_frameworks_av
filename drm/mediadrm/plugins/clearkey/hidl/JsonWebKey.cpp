@@ -22,18 +22,21 @@
 #include "Base64.h"
 
 namespace {
+const std::string kBase64Padding("=");
 const std::string kKeysTag("keys");
 const std::string kKeyTypeTag("kty");
-const std::string kSymmetricKeyValue("oct");
 const std::string kKeyTag("k");
 const std::string kKeyIdTag("kid");
-const std::string kBase64Padding("=");
+const std::string kMediaSessionType("type");
+const std::string kPersistentLicenseSession("persistent-license");
+const std::string kSymmetricKeyValue("oct");
+const std::string kTemporaryLicenseSession("temporary");
 }
 
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_1 {
+namespace V1_2 {
 namespace clearkey {
 
 JsonWebKey::JsonWebKey() {
@@ -268,7 +271,7 @@ bool JsonWebKey::parseJsonWebKeySet(const std::string& jsonWebKeySet,
 }
 
 } // namespace clearkey
-} // namespace V1_1
+} // namespace V1_2
 } // namespace drm
 } // namespace hardware
 } // namespace android

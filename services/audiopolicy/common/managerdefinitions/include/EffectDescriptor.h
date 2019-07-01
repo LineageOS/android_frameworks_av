@@ -16,25 +16,39 @@
 
 #pragma once
 
-#include <RoutingStrategy.h>
+#include <policy.h>
 #include <system/audio_effect.h>
 #include <utils/KeyedVector.h>
 #include <utils/RefBase.h>
 #include <utils/Errors.h>
+#include <utils/String8.h>
 
 namespace android {
-
 
 class EffectDescriptor : public RefBase
 {
 public:
-    status_t dump(int fd);
+    EffectDescriptor(const effect_descriptor_t *desc, bool isMusicEffect,
+                     int id, audio_io_handle_t io, audio_session_t session) :
+        mId(id), mIo(io), mSession(session), mEnabled(false), mSuspended(false),
+        mIsMusicEffect(isMusicEffect)
+    {
+        memcpy (&mDesc, desc, sizeof(effect_descriptor_t));
+    }
 
-    int mIo;                // io the effect is attached to
-    routing_strategy mStrategy; // routing strategy the effect is associated to
-    int mSession;               // audio session the effect is on
-    effect_descriptor_t mDesc;  // effect descriptor
-    bool mEnabled;              // enabled state: CPU load being used or not
+    void dump(String8 *dst, int spaces = 0) const;
+
+    int mId;                   // effect unique ID
+    audio_io_handle_t mIo;     // io the effect is attached to
+    audio_session_t mSession;  // audio session the effect is on
+    effect_descriptor_t mDesc; // effect descriptor
+    bool mEnabled;             // enabled state: CPU load being used or not
+    bool mSuspended;           // enabled but suspended by concurent capture policy
+
+    bool isMusicEffect() const { return mIsMusicEffect; }
+
+private:
+    bool mIsMusicEffect;
 };
 
 class EffectDescriptorCollection : public KeyedVector<int, sp<EffectDescriptor> >
@@ -43,14 +57,22 @@ public:
     EffectDescriptorCollection();
 
     status_t registerEffect(const effect_descriptor_t *desc, audio_io_handle_t io,
-                            uint32_t strategy, int session, int id);
+                            int session, int id, bool isMusicEffect);
     status_t unregisterEffect(int id);
+    sp<EffectDescriptor> getEffect(int id) const;
+    EffectDescriptorCollection getEffectsForIo(audio_io_handle_t io) const;
     status_t setEffectEnabled(int id, bool enabled);
+    bool     isEffectEnabled(int id) const;
     uint32_t getMaxEffectsCpuLoad() const;
     uint32_t getMaxEffectsMemory() const;
-    bool isNonOffloadableEffectEnabled();
+    bool isNonOffloadableEffectEnabled() const;
 
-    status_t dump(int fd);
+    void moveEffects(audio_session_t session,
+                     audio_io_handle_t srcOutput,
+                     audio_io_handle_t dstOutput);
+    void moveEffects(const std::vector<int>& ids, audio_io_handle_t dstOutput);
+
+    void dump(String8 *dst, int spaces = 0, bool verbose = true) const;
 
 private:
     status_t setEffectEnabled(const sp<EffectDescriptor> &effectDesc, bool enabled);

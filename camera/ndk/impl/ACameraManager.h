@@ -35,6 +35,7 @@
 #include <map>
 
 namespace android {
+namespace acam {
 
 /**
  * Per-process singleton instance of CameraManger. Shared by all ACameraManager
@@ -52,6 +53,11 @@ class CameraManagerGlobal final : public RefBase {
             const ACameraManager_AvailabilityCallbacks *callback);
     void unregisterAvailabilityCallback(
             const ACameraManager_AvailabilityCallbacks *callback);
+
+    void registerExtendedAvailabilityCallback(
+            const ACameraManager_ExtendedAvailabilityCallbacks* callback);
+    void unregisterExtendedAvailabilityCallback(
+            const ACameraManager_ExtendedAvailabilityCallbacks* callback);
 
     /**
      * Return camera IDs that support camera2
@@ -85,6 +91,8 @@ class CameraManagerGlobal final : public RefBase {
             return binder::Status::ok();
         }
 
+        virtual binder::Status onCameraAccessPrioritiesChanged();
+
       private:
         const wp<CameraManagerGlobal> mCameraManager;
     };
@@ -95,11 +103,19 @@ class CameraManagerGlobal final : public RefBase {
         explicit Callback(const ACameraManager_AvailabilityCallbacks *callback) :
             mAvailable(callback->onCameraAvailable),
             mUnavailable(callback->onCameraUnavailable),
+            mAccessPriorityChanged(nullptr),
             mContext(callback->context) {}
+
+        explicit Callback(const ACameraManager_ExtendedAvailabilityCallbacks *callback) :
+            mAvailable(callback->availabilityCallbacks.onCameraAvailable),
+            mUnavailable(callback->availabilityCallbacks.onCameraUnavailable),
+            mAccessPriorityChanged(callback->onCameraAccessPrioritiesChanged),
+            mContext(callback->availabilityCallbacks.context) {}
 
         bool operator == (const Callback& other) const {
             return (mAvailable == other.mAvailable &&
                     mUnavailable == other.mUnavailable &&
+                    mAccessPriorityChanged == other.mAccessPriorityChanged &&
                     mContext == other.mContext);
         }
         bool operator != (const Callback& other) const {
@@ -108,6 +124,9 @@ class CameraManagerGlobal final : public RefBase {
         bool operator < (const Callback& other) const {
             if (*this == other) return false;
             if (mContext != other.mContext) return mContext < other.mContext;
+            if (mAccessPriorityChanged != other.mAccessPriorityChanged) {
+                return mAccessPriorityChanged < other.mAccessPriorityChanged;
+            }
             if (mAvailable != other.mAvailable) return mAvailable < other.mAvailable;
             return mUnavailable < other.mUnavailable;
         }
@@ -116,13 +135,15 @@ class CameraManagerGlobal final : public RefBase {
         }
         ACameraManager_AvailabilityCallback mAvailable;
         ACameraManager_AvailabilityCallback mUnavailable;
+        ACameraManager_AccessPrioritiesChangedCallback mAccessPriorityChanged;
         void*                               mContext;
     };
     std::set<Callback> mCallbacks;
 
     // definition of handler and message
     enum {
-        kWhatSendSingleCallback
+        kWhatSendSingleCallback,
+        kWhatSendSingleAccessCallback,
     };
     static const char* kCameraIdKey;
     static const char* kCallbackFpKey;
@@ -135,6 +156,7 @@ class CameraManagerGlobal final : public RefBase {
     sp<CallbackHandler> mHandler;
     sp<ALooper>         mCbLooper; // Looper thread where callbacks actually happen on
 
+    void onCameraAccessPrioritiesChanged();
     void onStatusChanged(int32_t status, const String8& cameraId);
     void onStatusChangedLocked(int32_t status, const String8& cameraId);
     // Utils for status
@@ -172,6 +194,7 @@ class CameraManagerGlobal final : public RefBase {
     ~CameraManagerGlobal();
 };
 
+} // namespace acam;
 } // namespace android;
 
 /**
@@ -180,13 +203,13 @@ class CameraManagerGlobal final : public RefBase {
  */
 struct ACameraManager {
     ACameraManager() :
-            mGlobalManager(&(android::CameraManagerGlobal::getInstance())) {}
+            mGlobalManager(&(android::acam::CameraManagerGlobal::getInstance())) {}
     ~ACameraManager();
     camera_status_t getCameraIdList(ACameraIdList** cameraIdList);
     static void     deleteCameraIdList(ACameraIdList* cameraIdList);
 
     camera_status_t getCameraCharacteristics(
-            const char *cameraId, ACameraMetadata **characteristics);
+            const char* cameraId, android::sp<ACameraMetadata>* characteristics);
     camera_status_t openCamera(const char* cameraId,
                                ACameraDevice_StateCallbacks* callback,
                                /*out*/ACameraDevice** device);
@@ -196,7 +219,7 @@ struct ACameraManager {
         kCameraIdListNotInit = -1
     };
     android::Mutex         mLock;
-    android::sp<android::CameraManagerGlobal> mGlobalManager;
+    android::sp<android::acam::CameraManagerGlobal> mGlobalManager;
 };
 
 #endif //_ACAMERA_MANAGER_H

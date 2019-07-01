@@ -34,53 +34,27 @@ AudioPatch::AudioPatch(const struct audio_patch *patch, uid_t uid) :
 {
 }
 
-status_t AudioPatch::dump(int fd, int spaces, int index) const
+static void dumpPatchEndpoints(
+        String8 *dst, int spaces, const char *prefix, int count, const audio_port_config *cfgs)
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    String8 result;
-
-    snprintf(buffer, SIZE, "%*sAudio patch %d:\n", spaces, "", index+1);
-    result.append(buffer);
-    snprintf(buffer, SIZE, "%*s- handle: %2d\n", spaces, "", mHandle);
-    result.append(buffer);
-    snprintf(buffer, SIZE, "%*s- audio flinger handle: %2d\n", spaces, "", mAfPatchHandle);
-    result.append(buffer);
-    snprintf(buffer, SIZE, "%*s- owner uid: %2d\n", spaces, "", mUid);
-    result.append(buffer);
-    snprintf(buffer, SIZE, "%*s- %d sources:\n", spaces, "", mPatch.num_sources);
-    result.append(buffer);
-    for (size_t i = 0; i < mPatch.num_sources; i++) {
-        if (mPatch.sources[i].type == AUDIO_PORT_TYPE_DEVICE) {
-            std::string device;
-            deviceToString(mPatch.sources[i].ext.device.type, device);
-            snprintf(buffer, SIZE, "%*s- Device ID %d %s\n", spaces + 2, "",
-                     mPatch.sources[i].id,
-                     device.c_str());
+    for (int i = 0; i < count; ++i) {
+        const audio_port_config &cfg = cfgs[i];
+        dst->appendFormat("%*s  [%s %d] ", spaces, "", prefix, i + 1);
+        if (cfg.type == AUDIO_PORT_TYPE_DEVICE) {
+            dst->appendFormat("Device ID %d %s", cfg.id, toString(cfg.ext.device.type).c_str());
         } else {
-            snprintf(buffer, SIZE, "%*s- Mix ID %d I/O handle %d\n", spaces + 2, "",
-                     mPatch.sources[i].id, mPatch.sources[i].ext.mix.handle);
+            dst->appendFormat("Mix ID %d I/O handle %d", cfg.id, cfg.ext.mix.handle);
         }
-        result.append(buffer);
+        dst->append("\n");
     }
-    snprintf(buffer, SIZE, "%*s- %d sinks:\n", spaces, "", mPatch.num_sinks);
-    result.append(buffer);
-    for (size_t i = 0; i < mPatch.num_sinks; i++) {
-        if (mPatch.sinks[i].type == AUDIO_PORT_TYPE_DEVICE) {
-            std::string device;
-            deviceToString(mPatch.sinks[i].ext.device.type, device);
-            snprintf(buffer, SIZE, "%*s- Device ID %d %s\n", spaces + 2, "",
-                     mPatch.sinks[i].id,
-                     device.c_str());
-        } else {
-            snprintf(buffer, SIZE, "%*s- Mix ID %d I/O handle %d\n", spaces + 2, "",
-                     mPatch.sinks[i].id, mPatch.sinks[i].ext.mix.handle);
-        }
-        result.append(buffer);
-    }
+}
 
-    write(fd, result.string(), result.size());
-    return NO_ERROR;
+void AudioPatch::dump(String8 *dst, int spaces, int index) const
+{
+    dst->appendFormat("%*sPatch %d: owner uid %4d, handle %2d, af handle %2d\n",
+            spaces, "", index + 1, mUid, mHandle, mAfPatchHandle);
+    dumpPatchEndpoints(dst, spaces, "src ", mPatch.num_sources, mPatch.sources);
+    dumpPatchEndpoints(dst, spaces, "sink", mPatch.num_sinks, mPatch.sinks);
 }
 
 status_t AudioPatchCollection::addAudioPatch(audio_patch_handle_t handle,
@@ -161,16 +135,12 @@ status_t AudioPatchCollection::listAudioPatches(unsigned int *num_patches,
     return NO_ERROR;
 }
 
-status_t AudioPatchCollection::dump(int fd) const
+void AudioPatchCollection::dump(String8 *dst) const
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
-    snprintf(buffer, SIZE, "\nAudio Patches:\n");
-    write(fd, buffer, strlen(buffer));
+    dst->append("\nAudio Patches:\n");
     for (size_t i = 0; i < size(); i++) {
-        valueAt(i)->dump(fd, 2, i);
+        valueAt(i)->dump(dst, 2, i);
     }
-    return NO_ERROR;
 }
 
 } // namespace android

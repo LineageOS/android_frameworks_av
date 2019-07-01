@@ -70,6 +70,13 @@ struct CaptureResultExtras : public android::Parcelable {
     int32_t errorStreamId;
 
     /**
+     * For capture result errors, the physical camera ID in case the respective request contains
+     * a reference to physical camera device.
+     * Empty otherwise.
+     */
+    String16  errorPhysicalCameraId;
+
+    /**
      * Constructor initializes object as invalid by setting requestId to be -1.
      */
     CaptureResultExtras()
@@ -79,7 +86,8 @@ struct CaptureResultExtras : public android::Parcelable {
           precaptureTriggerId(0),
           frameNumber(0),
           partialResultCount(0),
-          errorStreamId(-1) {
+          errorStreamId(-1),
+          errorPhysicalCameraId() {
     }
 
     /**

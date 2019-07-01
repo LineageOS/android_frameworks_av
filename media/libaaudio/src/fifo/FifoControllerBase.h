@@ -102,6 +102,9 @@ public:
     /**
      * You can request that the buffer not be filled above a maximum
      * number of frames.
+     *
+     * The threshold will be clipped between zero and the buffer capacity.
+     *
      * @param threshold effective size of the buffer
      */
     void setThreshold(fifo_frames_t threshold);

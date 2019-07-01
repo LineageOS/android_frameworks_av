@@ -35,7 +35,7 @@ FastTrack::~FastTrack()
 FastMixerState::FastMixerState() : FastThreadState(),
     // mFastTracks
     mFastTracksGen(0), mTrackMask(0), mOutputSink(NULL), mOutputSinkGen(0),
-    mFrameCount(0), mTeeSink(NULL)
+    mFrameCount(0)
 {
     int ok = pthread_once(&sMaxFastTracksOnce, sMaxFastTracksInit);
     if (ok != 0) {

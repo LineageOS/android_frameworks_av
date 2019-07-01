@@ -430,8 +430,17 @@ void SoftOpus::onQueueFilled(OMX_U32 /* portIndex */) {
                 return;
             }
 
+            if (size < sizeof(int64_t)) {
+                // The 2nd and 3rd input buffer are expected to contain
+                //  an int64_t (see below), so make sure we get at least
+                //  that much. The first input buffer must contain 19 bytes,
+                //  but that is checked already.
+                notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
+                return;
+            }
+
             if (mInputBufferCount == 0) {
-                CHECK(mHeader == NULL);
+                delete mHeader;
                 mHeader = new OpusHeader();
                 memset(mHeader, 0, sizeof(*mHeader));
                 if (!ParseOpusHeader(data, size, mHeader)) {
@@ -452,6 +461,9 @@ void SoftOpus::onQueueFilled(OMX_U32 /* portIndex */) {
                 }
 
                 int status = OPUS_INVALID_STATE;
+                if (mDecoder != NULL) {
+                    opus_multistream_decoder_destroy(mDecoder);
+                }
                 mDecoder = opus_multistream_decoder_create(kRate,
                                                            mHeader->channels,
                                                            mHeader->num_streams,

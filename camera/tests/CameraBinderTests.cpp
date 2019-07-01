@@ -29,6 +29,7 @@
 #include <utils/Condition.h>
 #include <utils/Mutex.h>
 #include <system/graphics.h>
+#include <hardware/camera3.h>
 #include <hardware/gralloc.h>
 
 #include <camera/CameraMetadata.h>
@@ -40,6 +41,7 @@
 #include <android/hardware/camera2/BnCameraDeviceCallbacks.h>
 #include <camera/camera2/CaptureRequest.h>
 #include <camera/camera2/OutputConfiguration.h>
+#include <camera/camera2/SessionConfiguration.h>
 #include <camera/camera2/SubmitInfo.h>
 
 #include <gui/BufferItemConsumer.h>
@@ -55,6 +57,8 @@
 #include <algorithm>
 
 using namespace android;
+using ::android::hardware::ICameraServiceDefault;
+using ::android::hardware::camera2::ICameraDeviceUser;
 
 #define ASSERT_NOT_NULL(x) \
     ASSERT_TRUE((x) != nullptr)
@@ -85,6 +89,11 @@ public:
         mTorchCondition.broadcast();
         return binder::Status::ok();
     };
+
+    virtual binder::Status onCameraAccessPrioritiesChanged() {
+        // No op
+        return binder::Status::ok();
+    }
 
     bool waitForNumCameras(size_t num) const {
         Mutex::Autolock l(mLock);
@@ -476,7 +485,8 @@ TEST_F(CameraClientBinderTest, CheckBinderCameraDeviceUser) {
 
         sp<Surface> surface(new Surface(gbProducer, /*controlledByApp*/false));
 
-        OutputConfiguration output(gbProducer, /*rotation*/0);
+        String16 noPhysicalId;
+        OutputConfiguration output(gbProducer, /*rotation*/0, noPhysicalId);
 
         // Can we configure?
         res = device->beginConfigure();
@@ -489,6 +499,19 @@ TEST_F(CameraClientBinderTest, CheckBinderCameraDeviceUser) {
         res = device->endConfigure(/*isConstrainedHighSpeed*/ false, sessionParams);
         EXPECT_TRUE(res.isOk()) << res;
         EXPECT_FALSE(callbacks->hadError());
+
+        // Session configuration must also be supported in this case
+        SessionConfiguration sessionConfiguration = { /*inputWidth*/ 0, /*inputHeight*/0,
+                /*inputFormat*/ -1, CAMERA3_STREAM_CONFIGURATION_NORMAL_MODE};
+        sessionConfiguration.addOutputConfiguration(output);
+        bool queryStatus;
+        res = device->isSessionConfigurationSupported(sessionConfiguration, &queryStatus);
+        EXPECT_TRUE(res.isOk() ||
+                (res.serviceSpecificErrorCode() == ICameraServiceDefault::ERROR_INVALID_OPERATION))
+                << res;
+        if (res.isOk()) {
+            EXPECT_TRUE(queryStatus);
+        }
 
         // Can we make requests?
         CameraMetadata requestTemplate;

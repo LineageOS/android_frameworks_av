@@ -17,9 +17,10 @@
 #ifndef ANDROID_MEDIA_MEDIAANALYTICSITEM_H
 #define ANDROID_MEDIA_MEDIAANALYTICSITEM_H
 
-#include <cutils/properties.h>
 #include <string>
 #include <sys/types.h>
+
+#include <cutils/properties.h>
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>
 #include <utils/RefBase.h>
@@ -81,12 +82,19 @@ class MediaAnalyticsItem {
             PROTO_LAST = PROTO_V1,
         };
 
+    private:
+        // use the ::create() method instead
+        MediaAnalyticsItem();
+        MediaAnalyticsItem(Key);
+        MediaAnalyticsItem(const MediaAnalyticsItem&);
+        MediaAnalyticsItem &operator=(const MediaAnalyticsItem&);
 
     public:
 
+        static MediaAnalyticsItem* create(Key key);
+        static MediaAnalyticsItem* create();
+
         // access functions for the class
-        MediaAnalyticsItem();
-        MediaAnalyticsItem(Key);
         ~MediaAnalyticsItem();
 
         // SessionID ties multiple submissions for same key together
@@ -134,6 +142,7 @@ class MediaAnalyticsItem {
         bool getRate(Attr, int64_t *count, int64_t *duration, double *rate);
         // Caller owns the returned string
         bool getCString(Attr, char **value);
+        bool getString(Attr, std::string *value);
 
         // parameter indicates whether to close any existing open
         // record with same key before establishing a new record
@@ -174,11 +183,21 @@ class MediaAnalyticsItem {
         int32_t writeToParcel(Parcel *);
         int32_t readFromParcel(const Parcel&);
 
+        // supports the stable interface
+        bool dumpAttributes(char **pbuffer, size_t *plength);
+
         std::string toString();
         std::string toString(int version);
+        const char *toCString();
+        const char *toCString(int version);
 
         // are we collecting analytics data
         static bool isEnabled();
+
+    private:
+        // handle Parcel version 0
+        int32_t writeToParcel0(Parcel *);
+        int32_t readFromParcel0(const Parcel&);
 
     protected:
 

@@ -17,15 +17,22 @@
 #define _ACAMERA_CAPTURE_SESSION_H
 
 #include <set>
+#include <string>
 #include <hardware/camera3.h>
 #include <camera/NdkCameraDevice.h>
+
+#ifdef __ANDROID_VNDK__
+#include "ndk_vendor/impl/ACameraDevice.h"
+#include "ndk_vendor/impl/ACameraCaptureSessionVendor.h"
+#else
 #include "ACameraDevice.h"
 
 using namespace android;
 
 struct ACaptureSessionOutput {
-    explicit ACaptureSessionOutput(ANativeWindow* window, bool isShared = false) :
-            mWindow(window), mIsShared(isShared) {};
+    explicit ACaptureSessionOutput(ACameraWindowType* window, bool isShared = false,
+            const char* physicalCameraId = "") :
+            mWindow(window), mIsShared(isShared), mPhysicalCameraId(physicalCameraId) {};
 
     bool operator == (const ACaptureSessionOutput& other) const {
         return mWindow == other.mWindow;
@@ -40,11 +47,13 @@ struct ACaptureSessionOutput {
         return mWindow > other.mWindow;
     }
 
-    ANativeWindow* mWindow;
-    std::set<ANativeWindow *> mSharedWindows;
+    ACameraWindowType* mWindow;
+    std::set<ACameraWindowType *> mSharedWindows;
     bool           mIsShared;
     int            mRotation = CAMERA3_STREAM_ROTATION_0;
+    std::string mPhysicalCameraId;
 };
+#endif
 
 struct ACaptureSessionOutputContainer {
     std::set<ACaptureSessionOutput> mOutputs;
@@ -60,7 +69,7 @@ struct ACameraCaptureSession : public RefBase {
             int id,
             const ACaptureSessionOutputContainer* outputs,
             const ACameraCaptureSession_stateCallbacks* cb,
-            CameraDevice* device) :
+            android::acam::CameraDevice* device) :
             mId(id), mOutput(*outputs), mUserSessionCallback(*cb),
             mDevice(device) {}
 
@@ -82,13 +91,15 @@ struct ACameraCaptureSession : public RefBase {
 
     camera_status_t abortCaptures();
 
+    template<class T>
     camera_status_t setRepeatingRequest(
-            /*optional*/ACameraCaptureSession_captureCallbacks* cbs,
+            /*optional*/T* cbs,
             int numRequests, ACaptureRequest** requests,
             /*optional*/int* captureSequenceId);
 
+    template<class T>
     camera_status_t capture(
-            /*optional*/ACameraCaptureSession_captureCallbacks* cbs,
+            /*optional*/T* cbs,
             int numRequests, ACaptureRequest** requests,
             /*optional*/int* captureSequenceId);
 
@@ -97,18 +108,18 @@ struct ACameraCaptureSession : public RefBase {
     ACameraDevice* getDevice();
 
   private:
-    friend class CameraDevice;
+    friend class android::acam::CameraDevice;
 
     // Close session because app close camera device, camera device got ERROR_DISCONNECTED,
     // or a new session is replacing this session.
     void closeByDevice();
 
-    sp<CameraDevice> getDeviceSp();
+    sp<android::acam::CameraDevice> getDeviceSp();
 
     const int mId;
     const ACaptureSessionOutputContainer mOutput;
     const ACameraCaptureSession_stateCallbacks mUserSessionCallback;
-    const wp<CameraDevice> mDevice;
+    const wp<android::acam::CameraDevice> mDevice;
     bool  mIsClosed = false;
     bool  mClosedByApp = false;
     Mutex mSessionLock;

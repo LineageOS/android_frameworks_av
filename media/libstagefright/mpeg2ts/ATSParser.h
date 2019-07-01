@@ -23,6 +23,7 @@
 #include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/AudioPresentationInfo.h>
 #include <utils/KeyedVector.h>
 #include <utils/Vector.h>
 #include <utils/RefBase.h>
@@ -142,6 +143,7 @@ struct ATSParser : public RefBase {
         STREAMTYPE_MPEG2_VIDEO          = 0x02,
         STREAMTYPE_MPEG1_AUDIO          = 0x03,
         STREAMTYPE_MPEG2_AUDIO          = 0x04,
+        STREAMTYPE_PES_PRIVATE_DATA     = 0x06,
         STREAMTYPE_MPEG2_AUDIO_ADTS     = 0x0f,
         STREAMTYPE_MPEG4_VIDEO          = 0x10,
         STREAMTYPE_METADATA             = 0x15,
@@ -153,11 +155,27 @@ struct ATSParser : public RefBase {
         // Stream type 0x83 is non-standard,
         // it could be LPCM or TrueHD AC3
         STREAMTYPE_LPCM_AC3             = 0x83,
+        STREAMTYPE_EAC3                 = 0x87,
 
         //Sample Encrypted types
         STREAMTYPE_H264_ENCRYPTED       = 0xDB,
         STREAMTYPE_AAC_ENCRYPTED        = 0xCF,
         STREAMTYPE_AC3_ENCRYPTED        = 0xC1,
+    };
+
+    enum {
+        // From ISO/IEC 13818-1: 2007 (E), Table 2-45
+        DESCRIPTOR_CA                   = 0x09,
+
+        // DVB BlueBook A038 Table 12
+        DESCRIPTOR_DVB_EXTENSION        = 0x7F,
+    };
+
+    // DVB BlueBook A038 Table 109
+    enum {
+        EXT_DESCRIPTOR_DVB_AC4                  = 0x15,
+        EXT_DESCRIPTOR_DVB_AUDIO_PRESELECTION   = 0x19,
+        EXT_DESCRIPTOR_DVB_RESERVED_MAX         = 0x7F,
     };
 
 protected:
@@ -169,9 +187,18 @@ private:
     struct PSISection;
     struct CasManager;
     struct CADescriptor {
-        int32_t mSystemID;
+        CADescriptor() : mPID(0), mSystemID(-1) {}
         unsigned mPID;
+        int32_t mSystemID;
         std::vector<uint8_t> mPrivateData;
+    };
+
+    struct StreamInfo {
+        unsigned mType;
+        unsigned mTypeExt;
+        unsigned mPID;
+        CADescriptor mCADescriptor;
+        AudioPresentationCollection mAudioPresentations;
     };
 
     sp<CasManager> mCasManager;

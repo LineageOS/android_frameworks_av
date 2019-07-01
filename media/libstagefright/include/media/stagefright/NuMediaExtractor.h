@@ -20,6 +20,7 @@
 #include <list>
 #include <media/mediaplayer.h>
 #include <media/stagefright/foundation/ABase.h>
+#include <media/stagefright/foundation/AudioPresentationInfo.h>
 #include <media/IMediaExtractor.h>
 #include <media/MediaSource.h>
 #include <utils/Errors.h>
@@ -64,8 +65,6 @@ struct NuMediaExtractor : public RefBase {
 
     status_t setMediaCas(const HInterfaceToken &casToken);
 
-    void disconnect();
-
     size_t countTracks() const;
     status_t getTrackFormat(size_t index, sp<AMessage> *format, uint32_t flags = 0) const;
 
@@ -96,6 +95,8 @@ struct NuMediaExtractor : public RefBase {
     status_t getMetrics(Parcel *reply);
 
     bool getCachedDuration(int64_t *durationUs, bool *eos) const;
+
+    status_t getAudioPresentations(size_t trackIdx, AudioPresentationCollection *presentations);
 
 protected:
     virtual ~NuMediaExtractor();
@@ -148,7 +149,6 @@ private:
             MediaSource::ReadOptions::SeekMode mode =
                 MediaSource::ReadOptions::SEEK_CLOSEST_SYNC);
 
-    void releaseOneSample(TrackInfo *info);
     void releaseTrackSamples(TrackInfo *info);
     void releaseAllTrackSamples();
 

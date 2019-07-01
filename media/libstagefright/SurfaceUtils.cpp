@@ -18,9 +18,12 @@
 #define LOG_TAG "SurfaceUtils"
 #include <utils/Log.h>
 
+#include <android/api-level.h>
 #include <media/hardware/VideoAPI.h>
 #include <media/stagefright/SurfaceUtils.h>
 #include <gui/Surface.h>
+
+extern "C" int android_get_application_target_sdk_version();
 
 namespace android {
 
@@ -290,6 +293,29 @@ status_t nativeWindowDisconnect(ANativeWindow *surface, const char *reason) {
     ALOGE_IF(err != OK, "Failed to disconnect from surface %p, err %d", surface, err);
 
     return err;
+}
+
+status_t disableLegacyBufferDropPostQ(const sp<Surface> &surface) {
+    sp<IGraphicBufferProducer> igbp =
+            surface ? surface->getIGraphicBufferProducer() : nullptr;
+    if (igbp) {
+        int targetSdk = android_get_application_target_sdk_version();
+        // When the caller is not an app (e.g. MediaPlayer in mediaserver)
+        // targetSdk is __ANDROID_API_FUTURE__.
+        bool drop =
+                targetSdk < __ANDROID_API_Q__ ||
+                targetSdk == __ANDROID_API_FUTURE__;
+        if (!drop) {
+            status_t err = igbp->setLegacyBufferDrop(false);
+            if (err == NO_ERROR) {
+                ALOGD("legacy buffer drop disabled: target sdk (%d)",
+                      targetSdk);
+            } else {
+                ALOGD("disabling legacy buffer drop failed: %d", err);
+            }
+        }
+    }
+    return NO_ERROR;
 }
 }  // namespace android
 

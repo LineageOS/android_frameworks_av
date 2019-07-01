@@ -20,6 +20,7 @@
 
 #include "FLACDecoder.h"
 
+#include <audio_utils/primitives.h> // float_from_i32
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaDefs.h>
@@ -117,104 +118,43 @@ void FLACDecoder::errorCallback(FLAC__StreamDecoderErrorStatus status)
     mErrorStatus = status;
 }
 
-// Copy samples from FLAC native 32-bit non-interleaved to 16-bit interleaved.
+// Copy samples from FLAC native 32-bit non-interleaved to 16-bit signed
+// or 32-bit float interleaved.
+// TODO: Consider moving to audio_utils.  See similar code at FLACExtractor.cpp
 // These are candidates for optimization if needed.
-static void copyMono8(
-        int16_t *dst,
-        const int * src[FLACDecoder::kMaxChannels],
+static void copyTo16Signed(
+        short *dst,
+        const int *const *src,
         unsigned nSamples,
-        unsigned /* nChannels */) {
-    for (unsigned i = 0; i < nSamples; ++i) {
-        *dst++ = src[0][i] << 8;
-    }
-}
-
-static void copyStereo8(
-        int16_t *dst,
-        const int * src[FLACDecoder::kMaxChannels],
-        unsigned nSamples,
-        unsigned /* nChannels */) {
-    for (unsigned i = 0; i < nSamples; ++i) {
-        *dst++ = src[0][i] << 8;
-        *dst++ = src[1][i] << 8;
-    }
-}
-
-static void copyMultiCh8(
-        int16_t *dst,
-        const int * src[FLACDecoder::kMaxChannels],
-        unsigned nSamples,
-        unsigned nChannels) {
-    for (unsigned i = 0; i < nSamples; ++i) {
-        for (unsigned c = 0; c < nChannels; ++c) {
-            *dst++ = src[c][i] << 8;
+        unsigned nChannels,
+        unsigned bitsPerSample) {
+    const int leftShift = 16 - (int)bitsPerSample; // cast to int to prevent unsigned overflow.
+    if (leftShift >= 0) {
+        for (unsigned i = 0; i < nSamples; ++i) {
+            for (unsigned c = 0; c < nChannels; ++c) {
+                *dst++ = src[c][i] << leftShift;
+            }
+        }
+    } else {
+        const int rightShift = -leftShift;
+        for (unsigned i = 0; i < nSamples; ++i) {
+            for (unsigned c = 0; c < nChannels; ++c) {
+                *dst++ = src[c][i] >> rightShift;
+            }
         }
     }
 }
 
-static void copyMono16(
-        int16_t *dst,
-        const int * src[FLACDecoder::kMaxChannels],
+static void copyToFloat(
+        float *dst,
+        const int *const *src,
         unsigned nSamples,
-        unsigned /* nChannels */) {
-    for (unsigned i = 0; i < nSamples; ++i) {
-        *dst++ = src[0][i];
-    }
-}
-
-static void copyStereo16(
-        int16_t *dst,
-        const int * src[FLACDecoder::kMaxChannels],
-        unsigned nSamples,
-        unsigned /* nChannels */) {
-    for (unsigned i = 0; i < nSamples; ++i) {
-        *dst++ = src[0][i];
-        *dst++ = src[1][i];
-    }
-}
-
-static void copyMultiCh16(
-        int16_t *dst,
-        const int * src[FLACDecoder::kMaxChannels],
-        unsigned nSamples,
-        unsigned nChannels) {
+        unsigned nChannels,
+        unsigned bitsPerSample) {
+    const unsigned leftShift = 32 - bitsPerSample;
     for (unsigned i = 0; i < nSamples; ++i) {
         for (unsigned c = 0; c < nChannels; ++c) {
-            *dst++ = src[c][i];
-        }
-    }
-}
-
-// TODO: 24-bit versions should do dithering or noise-shaping, here or in AudioFlinger
-static void copyMono24(
-        int16_t *dst,
-        const int * src[FLACDecoder::kMaxChannels],
-        unsigned nSamples,
-        unsigned /* nChannels */) {
-    for (unsigned i = 0; i < nSamples; ++i) {
-        *dst++ = src[0][i] >> 8;
-    }
-}
-
-static void copyStereo24(
-        int16_t *dst,
-        const int * src[FLACDecoder::kMaxChannels],
-        unsigned nSamples,
-        unsigned /* nChannels */) {
-    for (unsigned i = 0; i < nSamples; ++i) {
-        *dst++ = src[0][i] >> 8;
-        *dst++ = src[1][i] >> 8;
-    }
-}
-
-static void copyMultiCh24(
-        int16_t *dst,
-        const int * src[FLACDecoder::kMaxChannels],
-        unsigned nSamples,
-        unsigned nChannels) {
-    for (unsigned i = 0; i < nSamples; ++i) {
-        for (unsigned c = 0; c < nChannels; ++c) {
-            *dst++ = src[c][i] >> 8;
+            *dst++ = float_from_i32(src[c][i] << leftShift);
         }
     }
 }
@@ -238,8 +178,7 @@ FLACDecoder::FLACDecoder()
       mStreamInfoValid(false),
       mWriteRequested(false),
       mWriteCompleted(false),
-      mErrorStatus((FLAC__StreamDecoderErrorStatus) -1),
-      mCopy(nullptr) {
+      mErrorStatus((FLAC__StreamDecoderErrorStatus) -1) {
     ALOGV("ctor:");
     memset(&mStreamInfo, 0, sizeof(mStreamInfo));
     memset(&mWriteHeader, 0, sizeof(mWriteHeader));
@@ -379,37 +318,13 @@ status_t FLACDecoder::parseMetadata(const uint8_t *inBuffer, size_t inBufferLen)
         case 8:
         case 16:
         case 24:
+        case 32: // generally rare, but is supported in the framework
             break;
 
         default:
             ALOGE("parseMetadata: unsupported bits per sample %u", getBitsPerSample());
             mStreamInfoValid = false;
             return ERROR_MALFORMED;
-    }
-
-    // configure the appropriate copy function, defaulting to trespass
-    static const struct {
-        unsigned mChannels;
-        unsigned mBitsPerSample;
-        void (*mCopy)(int16_t *dst, const int * src[kMaxChannels],
-                unsigned nSamples, unsigned nChannels);
-    } table[] = {
-        { 1,  8, copyMono8     },
-        { 2,  8, copyStereo8   },
-        { 8,  8, copyMultiCh8  },
-        { 1, 16, copyMono16    },
-        { 2, 16, copyStereo16  },
-        { 8, 16, copyMultiCh16 },
-        { 1, 24, copyMono24    },
-        { 2, 24, copyStereo24  },
-        { 8, 24, copyMultiCh24 },
-    };
-    for (const auto &entry : table) {
-        if (entry.mChannels >= getChannels() &&
-                entry.mBitsPerSample == getBitsPerSample()) {
-            mCopy = entry.mCopy;
-            break;
-        }
     }
 
     // Now we have all metadata blocks.
@@ -420,7 +335,7 @@ status_t FLACDecoder::parseMetadata(const uint8_t *inBuffer, size_t inBufferLen)
 }
 
 status_t FLACDecoder::decodeOneFrame(const uint8_t *inBuffer, size_t inBufferLen,
-        int16_t *outBuffer, size_t *outBufferLen) {
+        void *outBuffer, size_t *outBufferLen, bool outputFloat) {
     ALOGV("decodeOneFrame: input size(%zu)", inBufferLen);
 
     if (!mStreamInfoValid) {
@@ -469,21 +384,33 @@ status_t FLACDecoder::decodeOneFrame(const uint8_t *inBuffer, size_t inBufferLen
         return ERROR_MALFORMED;
     }
 
-    size_t bufferSize = blocksize * getChannels() * sizeof(int16_t);
+    const unsigned channels = getChannels();
+    const size_t sampleSize = outputFloat ? sizeof(float) : sizeof(int16_t);
+    const size_t frameSize = channels * sampleSize;
+    size_t bufferSize = blocksize * frameSize;
     if (bufferSize > *outBufferLen) {
         ALOGW("decodeOneFrame: output buffer holds only partial frame %zu:%zu",
                 *outBufferLen, bufferSize);
-        blocksize = *outBufferLen / (getChannels() * sizeof(int16_t));
-        bufferSize = blocksize * getChannels() * sizeof(int16_t);
+        blocksize = *outBufferLen / frameSize;
+        bufferSize = blocksize * frameSize;
     }
 
-    if (mCopy == nullptr) {
-        ALOGE("decodeOneFrame: format is not supported: channels(%d), BitsPerSample(%d)",
-                getChannels(), getBitsPerSample());
-        return ERROR_UNSUPPORTED;
-    }
     // copy PCM from FLAC write buffer to output buffer, with interleaving
-    (*mCopy)(outBuffer, mWriteBuffer, blocksize, getChannels());
+
+    const unsigned bitsPerSample = getBitsPerSample();
+    if (outputFloat) {
+        copyToFloat(reinterpret_cast<float*>(outBuffer),
+                    mWriteBuffer,
+                    blocksize,
+                    channels,
+                    bitsPerSample);
+    } else {
+        copyTo16Signed(reinterpret_cast<short*>(outBuffer),
+                       mWriteBuffer,
+                       blocksize,
+                       channels,
+                       bitsPerSample);
+    }
     *outBufferLen = bufferSize;
     return OK;
 }

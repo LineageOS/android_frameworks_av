@@ -33,7 +33,10 @@ FrameProcessor::FrameProcessor(wp<CameraDeviceBase> device,
     FrameProcessorBase(device),
     mClient(client),
     mLastFrameNumberOfFaces(0),
-    mLast3AFrameNumber(-1) {
+    mLast3AFrameNumber(-1),
+    mLastAEFrameNumber(-1),
+    mLastAFrameNumber(-1),
+    mLastAWBFrameNumber(-1) {
 
     sp<CameraDeviceBase> d = device.promote();
     mSynthesize3ANotify = !(d->willNotify3A());
@@ -262,24 +265,73 @@ status_t FrameProcessor::process3aState(const CaptureResult &frame,
     bool gotAllStates = true;
 
     // TODO: Also use AE mode, AE trigger ID
-    gotAllStates &= updatePendingState<uint8_t>(metadata, ANDROID_CONTROL_AF_MODE,
+    bool gotAFState = updatePendingState<uint8_t>(metadata, ANDROID_CONTROL_AF_MODE,
             &pendingState.afMode, frameNumber, cameraId);
 
-    gotAllStates &= updatePendingState<uint8_t>(metadata, ANDROID_CONTROL_AWB_MODE,
+    bool gotAWBState = updatePendingState<uint8_t>(metadata, ANDROID_CONTROL_AWB_MODE,
             &pendingState.awbMode, frameNumber, cameraId);
 
-    gotAllStates &= updatePendingState<uint8_t>(metadata, ANDROID_CONTROL_AE_STATE,
+    bool gotAEState = updatePendingState<uint8_t>(metadata, ANDROID_CONTROL_AE_STATE,
             &pendingState.aeState, frameNumber, cameraId);
 
-    gotAllStates &= updatePendingState<uint8_t>(metadata, ANDROID_CONTROL_AF_STATE,
+    gotAFState &= updatePendingState<uint8_t>(metadata, ANDROID_CONTROL_AF_STATE,
             &pendingState.afState, frameNumber, cameraId);
 
-    gotAllStates &= updatePendingState<uint8_t>(metadata, ANDROID_CONTROL_AWB_STATE,
+    gotAWBState &= updatePendingState<uint8_t>(metadata, ANDROID_CONTROL_AWB_STATE,
             &pendingState.awbState, frameNumber, cameraId);
 
     pendingState.afTriggerId = frame.mResultExtras.afTriggerId;
     pendingState.aeTriggerId = frame.mResultExtras.precaptureTriggerId;
 
+    if (gotAEState && (frameNumber > mLastAEFrameNumber)) {
+        if (pendingState.aeState != m3aState.aeState ||
+                pendingState.aeTriggerId > m3aState.aeTriggerId) {
+            ALOGV("%s: Camera %d: AE state %d->%d",
+                    __FUNCTION__, cameraId,
+                    m3aState.aeState, pendingState.aeState);
+            client->notifyAutoExposure(pendingState.aeState, pendingState.aeTriggerId);
+
+            m3aState.aeState = pendingState.aeState;
+            m3aState.aeTriggerId = pendingState.aeTriggerId;
+            mLastAEFrameNumber = frameNumber;
+        }
+    }
+
+    if (gotAFState && (frameNumber > mLastAFrameNumber)) {
+        if (pendingState.afState != m3aState.afState ||
+                pendingState.afMode != m3aState.afMode ||
+                pendingState.afTriggerId != m3aState.afTriggerId) {
+            ALOGV("%s: Camera %d: AF state %d->%d. AF mode %d->%d. Trigger %d->%d",
+                    __FUNCTION__, cameraId,
+                    m3aState.afState, pendingState.afState,
+                    m3aState.afMode, pendingState.afMode,
+                    m3aState.afTriggerId, pendingState.afTriggerId);
+            client->notifyAutoFocus(pendingState.afState, pendingState.afTriggerId);
+
+            m3aState.afState = pendingState.afState;
+            m3aState.afMode = pendingState.afMode;
+            m3aState.afTriggerId = pendingState.afTriggerId;
+            mLastAFrameNumber = frameNumber;
+        }
+    }
+
+    if (gotAWBState && (frameNumber > mLastAWBFrameNumber)) {
+        if (pendingState.awbState != m3aState.awbState ||
+                pendingState.awbMode != m3aState.awbMode) {
+            ALOGV("%s: Camera %d: AWB state %d->%d. AWB mode %d->%d",
+                    __FUNCTION__, cameraId,
+                    m3aState.awbState, pendingState.awbState,
+                    m3aState.awbMode, pendingState.awbMode);
+            client->notifyAutoWhitebalance(pendingState.awbState,
+                    pendingState.aeTriggerId);
+
+            m3aState.awbMode = pendingState.awbMode;
+            m3aState.awbState = pendingState.awbState;
+            mLastAWBFrameNumber = frameNumber;
+        }
+    }
+
+    gotAllStates &= gotAEState & gotAFState & gotAWBState;
     if (!gotAllStates) {
         // If not all states are received, put the pending state to mPending3AStates.
         if (index == NAME_NOT_FOUND) {
@@ -290,40 +342,10 @@ status_t FrameProcessor::process3aState(const CaptureResult &frame,
         return NOT_ENOUGH_DATA;
     }
 
-    // Once all 3A states are received, notify the client about 3A changes.
-    if (pendingState.aeState != m3aState.aeState ||
-            pendingState.aeTriggerId > m3aState.aeTriggerId) {
-        ALOGV("%s: Camera %d: AE state %d->%d",
-                __FUNCTION__, cameraId,
-                m3aState.aeState, pendingState.aeState);
-        client->notifyAutoExposure(pendingState.aeState, pendingState.aeTriggerId);
-    }
-
-    if (pendingState.afState != m3aState.afState ||
-        pendingState.afMode != m3aState.afMode ||
-        pendingState.afTriggerId != m3aState.afTriggerId) {
-        ALOGV("%s: Camera %d: AF state %d->%d. AF mode %d->%d. Trigger %d->%d",
-                __FUNCTION__, cameraId,
-                m3aState.afState, pendingState.afState,
-                m3aState.afMode, pendingState.afMode,
-                m3aState.afTriggerId, pendingState.afTriggerId);
-        client->notifyAutoFocus(pendingState.afState, pendingState.afTriggerId);
-    }
-    if (pendingState.awbState != m3aState.awbState ||
-        pendingState.awbMode != m3aState.awbMode) {
-        ALOGV("%s: Camera %d: AWB state %d->%d. AWB mode %d->%d",
-                __FUNCTION__, cameraId,
-                m3aState.awbState, pendingState.awbState,
-                m3aState.awbMode, pendingState.awbMode);
-        client->notifyAutoWhitebalance(pendingState.awbState,
-                pendingState.aeTriggerId);
-    }
-
     if (index != NAME_NOT_FOUND) {
         mPending3AStates.removeItemsAt(index);
     }
 
-    m3aState = pendingState;
     mLast3AFrameNumber = frameNumber;
 
     return OK;

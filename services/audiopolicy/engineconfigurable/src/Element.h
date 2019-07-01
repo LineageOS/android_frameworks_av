@@ -22,10 +22,8 @@
 #include <system/audio.h>
 #include <utils/Log.h>
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
 
 template <typename Key>
 class Element
@@ -64,7 +62,7 @@ public:
 
     /**
      * A Policy element may implement getter/setter function for a given property.
-     * Property may be routing_strategy, audio_stream_type_t, audio_usage_t, audio_source_t
+     * Property may be audio_stream_type_t, audio_usage_t, audio_source_t
      * or a string.
      *
      * @tparam Property for which this policy element has setter / getter.
@@ -75,7 +73,7 @@ public:
 
     /**
      * A Policy element may implement getter/setter function for a given property.
-     * Property may be routing_strategy, audio_stream_type_t, audio_usage_t, audio_source_t
+     * Property may be audio_stream_type_t, audio_usage_t, audio_source_t
      * or a string.
      *
      * @tparam Property for which this policy element has setter / getter.

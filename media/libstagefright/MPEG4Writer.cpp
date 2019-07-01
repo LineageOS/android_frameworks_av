@@ -71,6 +71,8 @@ static const uint8_t kNalUnitTypeSeqParamSet = 0x07;
 static const uint8_t kNalUnitTypePicParamSet = 0x08;
 static const int64_t kInitialDelayTimeUs     = 700000LL;
 static const int64_t kMaxMetadataSize = 0x4000000LL;   // 64MB max per-frame metadata size
+static const int64_t kMaxCttsOffsetTimeUs = 30 * 60 * 1000000LL;  // 30 minutes
+static const size_t kESDSScratchBufferSize = 10;  // kMaxAtomSize in Mpeg4Extractor 64MB
 
 static const char kMetaKey_Version[]    = "com.android.version";
 static const char kMetaKey_Manufacturer[]      = "com.android.manufacturer";
@@ -85,7 +87,7 @@ static const char kMetaKey_TemporalLayerCount[] = "com.android.video.temporal_la
 static const int kTimestampDebugCount = 10;
 static const int kItemIdBase = 10000;
 static const char kExifHeader[] = {'E', 'x', 'i', 'f', '\0', '\0'};
-static const int32_t kTiffHeaderOffset = htonl(sizeof(kExifHeader));
+static const uint8_t kExifApp1Marker[] = {'E', 'x', 'i', 'f', 0xff, 0xe1};
 
 static const uint8_t kMandatoryHevcNalUnitTypes[3] = {
     kHevcNalUnitTypeVps,
@@ -125,7 +127,7 @@ public:
     bool isAudio() const { return mIsAudio; }
     bool isMPEG4() const { return mIsMPEG4; }
     bool usePrefix() const { return mIsAvc || mIsHevc || mIsHeic; }
-    bool isExifData(const MediaBufferBase *buffer) const;
+    bool isExifData(MediaBufferBase *buffer, uint32_t *tiffHdrOffset) const;
     void addChunkOffset(off64_t offset);
     void addItemOffsetAndSize(off64_t offset, size_t size, bool isExif);
     void flushItemRefs();
@@ -136,11 +138,6 @@ public:
     void resetInternal();
 
 private:
-    enum {
-        kMaxCttsOffsetTimeUs = 1000000LL,  // 1 second
-        kSampleArraySize = 1000,
-    };
-
     // A helper class to handle faster write box with table entries
     template<class TYPE, unsigned ENTRY_SIZE>
     // ENTRY_SIZE: # of values in each entry
@@ -317,6 +314,7 @@ private:
     ListTableEntries<uint32_t, 1> *mStssTableEntries;
     ListTableEntries<uint32_t, 2> *mSttsTableEntries;
     ListTableEntries<uint32_t, 2> *mCttsTableEntries;
+    ListTableEntries<uint32_t, 3> *mElstTableEntries; // 3columns: segDuration, mediaTime, mediaRate
 
     int64_t mMinCttsOffsetTimeUs;
     int64_t mMinCttsOffsetTicks;
@@ -361,7 +359,7 @@ private:
 
     Vector<uint16_t> mProperties;
     ItemRefs mDimgRefs;
-    ItemRefs mCdscRefs;
+    Vector<uint16_t> mExifList;
     uint16_t mImageItemId;
     int32_t mIsPrimary;
     int32_t mWidth, mHeight;
@@ -416,6 +414,8 @@ private:
     // Duration is time scale based
     void addOneSttsTableEntry(size_t sampleCount, int32_t timescaledDur);
     void addOneCttsTableEntry(size_t sampleCount, int32_t timescaledDur);
+    void addOneElstTableEntry(uint32_t segmentDuration, int32_t mediaTime,
+        int16_t mediaRate, int16_t mediaRateFraction);
 
     bool isTrackMalFormed() const;
     void sendTrackSummary(bool hasMultipleTracks);
@@ -448,13 +448,14 @@ private:
     void writeVideoFourCCBox();
     void writeMetadataFourCCBox();
     void writeStblBox(bool use32BitOffset);
+    void writeEdtsBox();
 
     Track(const Track &);
     Track &operator=(const Track &);
 };
 
 MPEG4Writer::MPEG4Writer(int fd) {
-    initInternal(fd, true /*isFirstSession*/);
+    initInternal(dup(fd), true /*isFirstSession*/);
 }
 
 MPEG4Writer::~MPEG4Writer() {
@@ -475,7 +476,7 @@ MPEG4Writer::~MPEG4Writer() {
 
 void MPEG4Writer::initInternal(int fd, bool isFirstSession) {
     ALOGV("initInternal");
-    mFd = dup(fd);
+    mFd = fd;
     mNextFd = -1;
     mInitCheck = mFd < 0? NO_INIT: OK;
 
@@ -483,6 +484,7 @@ void MPEG4Writer::initInternal(int fd, bool isFirstSession) {
 
     mStartTimestampUs = -1LL;
     mStartTimeOffsetMs = -1;
+    mStartTimeOffsetBFramesUs = 0;
     mPaused = false;
     mStarted = false;
     mWriterThreadStarted = false;
@@ -1037,6 +1039,10 @@ void MPEG4Writer::writeCompositionMatrix(int degrees) {
 void MPEG4Writer::release() {
     close(mFd);
     mFd = -1;
+    if (mNextFd != -1) {
+        close(mNextFd);
+        mNextFd = -1;
+    }
     mInitCheck = NO_INIT;
     mStarted = false;
     free(mInMemoryCache);
@@ -1272,6 +1278,10 @@ void MPEG4Writer::writeMoovBox(int64_t durationUs) {
     // Adjust the global start time.
     mStartTimestampUs += minCttsOffsetTimeUs - kMaxCttsOffsetTimeUs;
 
+    // Add mStartTimeOffsetBFramesUs(-ve or zero) to the duration of first entry in STTS.
+    mStartTimeOffsetBFramesUs = minCttsOffsetTimeUs - kMaxCttsOffsetTimeUs;
+    ALOGV("mStartTimeOffsetBFramesUs :%" PRId32, mStartTimeOffsetBFramesUs);
+
     for (List<Track *>::iterator it = mTracks.begin();
         it != mTracks.end(); ++it) {
         if (!(*it)->isHeic()) {
@@ -1357,14 +1367,16 @@ void MPEG4Writer::unlock() {
 }
 
 off64_t MPEG4Writer::addSample_l(
-        MediaBuffer *buffer, bool usePrefix, bool isExif, size_t *bytesWritten) {
+        MediaBuffer *buffer, bool usePrefix,
+        uint32_t tiffHdrOffset, size_t *bytesWritten) {
     off64_t old_offset = mOffset;
 
     if (usePrefix) {
         addMultipleLengthPrefixedSamples_l(buffer);
     } else {
-        if (isExif) {
-            ::write(mFd, &kTiffHeaderOffset, 4); // exif_tiff_header_offset field
+        if (tiffHdrOffset > 0) {
+            tiffHdrOffset = htonl(tiffHdrOffset);
+            ::write(mFd, &tiffHdrOffset, 4); // exif_tiff_header_offset field
             mOffset += 4;
         }
 
@@ -1747,6 +1759,11 @@ int64_t MPEG4Writer::getStartTimestampUs() {
     return mStartTimestampUs;
 }
 
+int32_t MPEG4Writer::getStartTimeOffsetBFramesUs() {
+    Mutex::Autolock autoLock(mLock);
+    return mStartTimeOffsetBFramesUs;
+}
+
 size_t MPEG4Writer::numTracks() {
     Mutex::Autolock autolock(mLock);
     return mTracks.size();
@@ -1776,6 +1793,7 @@ MPEG4Writer::Track::Track(
       mStssTableEntries(new ListTableEntries<uint32_t, 1>(1000)),
       mSttsTableEntries(new ListTableEntries<uint32_t, 2>(1000)),
       mCttsTableEntries(new ListTableEntries<uint32_t, 2>(1000)),
+      mElstTableEntries(new ListTableEntries<uint32_t, 3>(3)), // Reserve 3 rows, a row has 3 items
       mMinCttsOffsetTimeUs(0),
       mMinCttsOffsetTicks(0),
       mMaxCttsOffsetTicks(0),
@@ -1786,7 +1804,6 @@ MPEG4Writer::Track::Track(
       mStartTimestampUs(-1),
       mRotation(0),
       mDimgRefs("dimg"),
-      mCdscRefs("cdsc"),
       mImageItemId(0),
       mIsPrimary(0),
       mWidth(0),
@@ -1842,46 +1859,48 @@ MPEG4Writer::Track::Track(
 
 // Clear all the internal states except the CSD data.
 void MPEG4Writer::Track::resetInternal() {
-      mDone = false;
-      mPaused = false;
-      mResumed = false;
-      mStarted = false;
-      mGotStartKeyFrame = false;
-      mIsMalformed = false;
-      mTrackDurationUs = 0;
-      mEstimatedTrackSizeBytes = 0;
-      mSamplesHaveSameSize = 0;
-      if (mStszTableEntries != NULL) {
-         delete mStszTableEntries;
-         mStszTableEntries = new ListTableEntries<uint32_t, 1>(1000);
-      }
-
-      if (mStcoTableEntries != NULL) {
-         delete mStcoTableEntries;
-         mStcoTableEntries = new ListTableEntries<uint32_t, 1>(1000);
-      }
-      if (mCo64TableEntries != NULL) {
-         delete mCo64TableEntries;
-         mCo64TableEntries = new ListTableEntries<off64_t, 1>(1000);
-      }
-
-      if (mStscTableEntries != NULL) {
-         delete mStscTableEntries;
-         mStscTableEntries = new ListTableEntries<uint32_t, 3>(1000);
-      }
-      if (mStssTableEntries != NULL) {
-         delete mStssTableEntries;
-         mStssTableEntries = new ListTableEntries<uint32_t, 1>(1000);
-      }
-      if (mSttsTableEntries != NULL) {
-         delete mSttsTableEntries;
-         mSttsTableEntries = new ListTableEntries<uint32_t, 2>(1000);
-      }
-      if (mCttsTableEntries != NULL) {
-         delete mCttsTableEntries;
-         mCttsTableEntries = new ListTableEntries<uint32_t, 2>(1000);
-      }
-      mReachedEOS = false;
+    mDone = false;
+    mPaused = false;
+    mResumed = false;
+    mStarted = false;
+    mGotStartKeyFrame = false;
+    mIsMalformed = false;
+    mTrackDurationUs = 0;
+    mEstimatedTrackSizeBytes = 0;
+    mSamplesHaveSameSize = 0;
+    if (mStszTableEntries != NULL) {
+        delete mStszTableEntries;
+        mStszTableEntries = new ListTableEntries<uint32_t, 1>(1000);
+    }
+    if (mStcoTableEntries != NULL) {
+        delete mStcoTableEntries;
+        mStcoTableEntries = new ListTableEntries<uint32_t, 1>(1000);
+    }
+    if (mCo64TableEntries != NULL) {
+        delete mCo64TableEntries;
+        mCo64TableEntries = new ListTableEntries<off64_t, 1>(1000);
+    }
+    if (mStscTableEntries != NULL) {
+        delete mStscTableEntries;
+        mStscTableEntries = new ListTableEntries<uint32_t, 3>(1000);
+    }
+    if (mStssTableEntries != NULL) {
+        delete mStssTableEntries;
+        mStssTableEntries = new ListTableEntries<uint32_t, 1>(1000);
+    }
+    if (mSttsTableEntries != NULL) {
+        delete mSttsTableEntries;
+        mSttsTableEntries = new ListTableEntries<uint32_t, 2>(1000);
+    }
+    if (mCttsTableEntries != NULL) {
+        delete mCttsTableEntries;
+        mCttsTableEntries = new ListTableEntries<uint32_t, 2>(1000);
+    }
+    if (mElstTableEntries != NULL) {
+        delete mElstTableEntries;
+        mElstTableEntries = new ListTableEntries<uint32_t, 3>(3);
+    }
+    mReachedEOS = false;
 }
 
 void MPEG4Writer::Track::updateTrackSizeEstimate() {
@@ -1900,6 +1919,7 @@ void MPEG4Writer::Track::updateTrackSizeEstimate() {
                                     mStssTableEntries->count() * 4 +   // stss box size
                                     mSttsTableEntries->count() * 8 +   // stts box size
                                     mCttsTableEntries->count() * 8 +   // ctts box size
+                                    mElstTableEntries->count() * 12 +   // elst box size
                                     stcoBoxSizeBytes +           // stco box size
                                     stszBoxSizeBytes;            // stsz box size
     }
@@ -1936,6 +1956,16 @@ void MPEG4Writer::Track::addOneCttsTableEntry(
     mCttsTableEntries->add(htonl(duration));
 }
 
+void MPEG4Writer::Track::addOneElstTableEntry(
+    uint32_t segmentDuration, int32_t mediaTime, int16_t mediaRate, int16_t mediaRateFraction) {
+    ALOGV("segmentDuration:%u, mediaTime:%d", segmentDuration, mediaTime);
+    ALOGV("mediaRate :%" PRId16 ", mediaRateFraction :%" PRId16 ", Ored %u", mediaRate,
+        mediaRateFraction, ((((uint32_t)mediaRate) << 16) | ((uint32_t)mediaRateFraction)));
+    mElstTableEntries->add(htonl(segmentDuration));
+    mElstTableEntries->add(htonl(mediaTime));
+    mElstTableEntries->add(htonl((((uint32_t)mediaRate) << 16) | (uint32_t)mediaRateFraction));
+}
+
 status_t MPEG4Writer::setNextFd(int fd) {
     ALOGV("addNextFd");
     Mutex::Autolock l(mLock);
@@ -1950,15 +1980,38 @@ status_t MPEG4Writer::setNextFd(int fd) {
         // No need to set a new FD yet.
         return INVALID_OPERATION;
     }
-    mNextFd = fd;
+    mNextFd = dup(fd);
     return OK;
 }
 
-bool MPEG4Writer::Track::isExifData(const MediaBufferBase *buffer) const {
-    return mIsHeic
-            && (buffer->range_length() > sizeof(kExifHeader))
-            && !memcmp((uint8_t *)buffer->data() + buffer->range_offset(),
-                    kExifHeader, sizeof(kExifHeader));
+bool MPEG4Writer::Track::isExifData(
+        MediaBufferBase *buffer, uint32_t *tiffHdrOffset) const {
+    if (!mIsHeic) {
+        return false;
+    }
+
+    // Exif block starting with 'Exif\0\0'
+    size_t length = buffer->range_length();
+    uint8_t *data = (uint8_t *)buffer->data() + buffer->range_offset();
+    if ((length > sizeof(kExifHeader))
+        && !memcmp(data, kExifHeader, sizeof(kExifHeader))) {
+        *tiffHdrOffset = sizeof(kExifHeader);
+        return true;
+    }
+
+    // Exif block starting with fourcc 'Exif' followed by APP1 marker
+    if ((length > sizeof(kExifApp1Marker) + 2 + sizeof(kExifHeader))
+            && !memcmp(data, kExifApp1Marker, sizeof(kExifApp1Marker))
+            && !memcmp(data + sizeof(kExifApp1Marker) + 2, kExifHeader, sizeof(kExifHeader))) {
+        // skip 'Exif' fourcc
+        buffer->set_range(4, buffer->range_length() - 4);
+
+        // 2-byte APP1 + 2-byte size followed by kExifHeader
+        *tiffHdrOffset = 2 + 2 + sizeof(kExifHeader);
+        return true;
+    }
+
+    return false;
 }
 
 void MPEG4Writer::Track::addChunkOffset(off64_t offset) {
@@ -1984,7 +2037,7 @@ void MPEG4Writer::Track::addItemOffsetAndSize(off64_t offset, size_t size, bool 
     }
 
     if (isExif) {
-         mCdscRefs.value.push_back(mOwner->addItem_l({
+         mExifList.push_back(mOwner->addItem_l({
             .itemType = "Exif",
             .isPrimary = false,
             .isHidden = false,
@@ -2087,7 +2140,16 @@ void MPEG4Writer::Track::flushItemRefs() {
 
     if (mImageItemId > 0) {
         mOwner->addRefs_l(mImageItemId, mDimgRefs);
-        mOwner->addRefs_l(mImageItemId, mCdscRefs);
+
+        if (!mExifList.empty()) {
+            // The "cdsc" ref is from the metadata/exif item to the image item.
+            // So the refs all contain the image item.
+            ItemRefs cdscRefs("cdsc");
+            cdscRefs.value.push_back(mImageItemId);
+            for (uint16_t exifItem : mExifList) {
+                mOwner->addRefs_l(exifItem, cdscRefs);
+            }
+        }
     }
 }
 
@@ -2117,11 +2179,11 @@ void MPEG4Writer::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatSwitch:
         {
-            finishCurrentSession();
             mLock.lock();
             int fd = mNextFd;
             mNextFd = -1;
             mLock.unlock();
+            finishCurrentSession();
             initInternal(fd, false /*isFirstSession*/);
             start(mStartMeta.get());
             mSwitchPending = false;
@@ -2173,6 +2235,7 @@ MPEG4Writer::Track::~Track() {
     delete mSttsTableEntries;
     delete mStssTableEntries;
     delete mCttsTableEntries;
+    delete mElstTableEntries;
 
     mStszTableEntries = NULL;
     mStcoTableEntries = NULL;
@@ -2181,6 +2244,7 @@ MPEG4Writer::Track::~Track() {
     mSttsTableEntries = NULL;
     mStssTableEntries = NULL;
     mCttsTableEntries = NULL;
+    mElstTableEntries = NULL;
 
     if (mCodecSpecificData != NULL) {
         free(mCodecSpecificData);
@@ -2237,14 +2301,16 @@ void MPEG4Writer::writeChunkToFile(Chunk* chunk) {
     while (!chunk->mSamples.empty()) {
         List<MediaBuffer *>::iterator it = chunk->mSamples.begin();
 
-        int32_t isExif;
-        if (!(*it)->meta_data().findInt32(kKeyIsExif, &isExif)) {
-            isExif = 0;
+        uint32_t tiffHdrOffset;
+        if (!(*it)->meta_data().findInt32(
+                kKeyExifTiffOffset, (int32_t*)&tiffHdrOffset)) {
+            tiffHdrOffset = 0;
         }
+        bool isExif = (tiffHdrOffset > 0);
         bool usePrefix = chunk->mTrack->usePrefix() && !isExif;
 
         size_t bytesWritten;
-        off64_t offset = addSample_l(*it, usePrefix, isExif, &bytesWritten);
+        off64_t offset = addSample_l(*it, usePrefix, tiffHdrOffset, &bytesWritten);
 
         if (chunk->mTrack->isHeic()) {
             chunk->mTrack->addItemOffsetAndSize(offset, bytesWritten, isExif);
@@ -2849,14 +2915,18 @@ void MPEG4Writer::Track::updateDriftTime(const sp<MetaData>& meta) {
 }
 
 void MPEG4Writer::Track::dumpTimeStamps() {
-    ALOGE("Dumping %s track's last 10 frames timestamp and frame type ", getTrackType());
-    std::string timeStampString;
-    for (std::list<TimestampDebugHelperEntry>::iterator entry = mTimestampDebugHelper.begin();
-            entry != mTimestampDebugHelper.end(); ++entry) {
-        timeStampString += "(" + std::to_string(entry->pts)+
-                "us, " + std::to_string(entry->dts) + "us " + entry->frameType + ") ";
+    if (!mTimestampDebugHelper.empty()) {
+        std::string timeStampString = "Dumping " + std::string(getTrackType()) + " track's last " +
+                                      std::to_string(mTimestampDebugHelper.size()) +
+                                      " frames' timestamps(pts, dts) and frame type : ";
+        for (const TimestampDebugHelperEntry& entry : mTimestampDebugHelper) {
+            timeStampString += "\n(" + std::to_string(entry.pts) + "us, " +
+                               std::to_string(entry.dts) + "us " + entry.frameType + ") ";
+        }
+        ALOGE("%s", timeStampString.c_str());
+    } else {
+        ALOGE("0 frames to dump timeStamps in %s track ", getTrackType());
     }
-    ALOGE("%s", timeStampString.c_str());
 }
 
 status_t MPEG4Writer::Track::threadEntry() {
@@ -2970,10 +3040,11 @@ status_t MPEG4Writer::Track::threadEntry() {
         }
 
         bool isExif = false;
+        uint32_t tiffHdrOffset = 0;
         int32_t isMuxerData;
         if (buffer->meta_data().findInt32(kKeyIsMuxerData, &isMuxerData) && isMuxerData) {
             // We only support one type of muxer data, which is Exif data block.
-            isExif = isExifData(buffer);
+            isExif = isExifData(buffer, &tiffHdrOffset);
             if (!isExif) {
                 ALOGW("Ignoring bad Exif data block");
                 buffer->release();
@@ -2995,7 +3066,7 @@ status_t MPEG4Writer::Track::threadEntry() {
         buffer = NULL;
 
         if (isExif) {
-            copy->meta_data().setInt32(kKeyIsExif, 1);
+            copy->meta_data().setInt32(kKeyExifTiffOffset, tiffHdrOffset);
         }
         bool usePrefix = this->usePrefix() && !isExif;
 
@@ -3060,8 +3131,8 @@ status_t MPEG4Writer::Track::threadEntry() {
         if (!mIsHeic) {
             if (mStszTableEntries->count() == 0) {
                 mFirstSampleTimeRealUs = systemTime() / 1000;
+                mOwner->setStartTimestampUs(timestampUs);
                 mStartTimestampUs = timestampUs;
-                mOwner->setStartTimestampUs(mStartTimestampUs);
                 previousPausedDurationUs = mStartTimestampUs;
             }
 
@@ -3268,7 +3339,8 @@ status_t MPEG4Writer::Track::threadEntry() {
         }
         if (!hasMultipleTracks) {
             size_t bytesWritten;
-            off64_t offset = mOwner->addSample_l(copy, usePrefix, isExif, &bytesWritten);
+            off64_t offset = mOwner->addSample_l(
+                    copy, usePrefix, tiffHdrOffset, &bytesWritten);
 
             if (mIsHeic) {
                 addItemOffsetAndSize(offset, bytesWritten, isExif);
@@ -3526,7 +3598,7 @@ void MPEG4Writer::Track::bufferChunk(int64_t timestampUs) {
 }
 
 int64_t MPEG4Writer::Track::getDurationUs() const {
-    return mTrackDurationUs + getStartTimeOffsetTimeUs();
+    return mTrackDurationUs + getStartTimeOffsetTimeUs() + mOwner->getStartTimeOffsetBFramesUs();
 }
 
 int64_t MPEG4Writer::Track::getEstimatedTrackSizeBytes() const {
@@ -3612,6 +3684,7 @@ void MPEG4Writer::Track::writeTrackHeader(bool use32BitOffset) {
     uint32_t now = getMpeg4Time();
     mOwner->beginBox("trak");
         writeTkhdBox(now);
+        writeEdtsBox();
         mOwner->beginBox("mdia");
             writeMdhdBox(now);
             writeHdlrBox();
@@ -3674,6 +3747,29 @@ void MPEG4Writer::Track::writeMetadataFourCCBox() {
         TRESPASS();
     }
     mOwner->beginBox(fourcc);    // TextMetaDataSampleEntry
+
+    //  HACK to make the metadata track compliant with the ISO standard.
+    //
+    //  Metadata track is added from API 26 and the original implementation does not
+    //  fully followed the TextMetaDataSampleEntry specified in ISO/IEC 14496-12-2015
+    //  in that only the mime_format is written out. content_encoding and
+    //  data_reference_index have not been written out. This leads to the failure
+    //  when some MP4 parser tries to parse the metadata track according to the
+    //  standard. The hack here will make the metadata track compliant with the
+    //  standard while still maintaining backwards compatibility. This would enable
+    //  Android versions before API 29 to be able to read out the standard compliant
+    //  Metadata track generated with Android API 29 and upward. The trick is based
+    //  on the fact that the Metadata track must start with prefix “application/” and
+    //  those missing fields are not used in Android's Metadata track. By writting
+    //  out the mime_format twice, the first mime_format will be used to fill out the
+    //  missing reserved, data_reference_index and content encoding fields. On the
+    //  parser side, the extracter before API 29  will read out the first mime_format
+    //  correctly and drop the second mime_format. The extractor from API 29 will
+    //  check if the reserved, data_reference_index and content encoding are filled
+    //  with “application” to detect if this is a standard compliant metadata track
+    //  and read out the data accordingly.
+    mOwner->writeCString(mime);
+
     mOwner->writeCString(mime);  // metadata mime_format
     mOwner->endBox(); // mett
 }
@@ -3787,22 +3883,52 @@ void MPEG4Writer::Track::writeAudioFourCCBox() {
     mOwner->endBox();
 }
 
+static void generateEsdsSize(size_t dataLength, size_t* sizeGenerated, uint8_t* buffer) {
+    size_t offset = 0, cur = 0;
+    size_t more = 0x00;
+    *sizeGenerated = 0;
+    /* Start with the LSB(7 bits) of dataLength and build the byte sequence upto MSB.
+     * Continuation flag(most significant bit) will be set on the first N-1 bytes.
+     */
+    do {
+        buffer[cur++] = (dataLength & 0x7f) | more;
+        dataLength >>= 7;
+        more = 0x80;
+        ++(*sizeGenerated);
+    } while (dataLength > 0u);
+    --cur;
+    // Reverse the newly formed byte sequence.
+    while (cur > offset) {
+        uint8_t tmp = buffer[cur];
+        buffer[cur--] = buffer[offset];
+        buffer[offset++] = tmp;
+    }
+}
+
 void MPEG4Writer::Track::writeMp4aEsdsBox() {
-    mOwner->beginBox("esds");
     CHECK(mCodecSpecificData);
     CHECK_GT(mCodecSpecificDataSize, 0u);
 
-    // Make sure all sizes encode to a single byte.
-    CHECK_LT(mCodecSpecificDataSize + 23, 128u);
+    uint8_t sizeESDBuffer[kESDSScratchBufferSize];
+    uint8_t sizeDCDBuffer[kESDSScratchBufferSize];
+    uint8_t sizeDSIBuffer[kESDSScratchBufferSize];
+    size_t sizeESD = 0;
+    size_t sizeDCD = 0;
+    size_t sizeDSI = 0;
+    generateEsdsSize(mCodecSpecificDataSize, &sizeDSI, sizeDSIBuffer);
+    generateEsdsSize(mCodecSpecificDataSize + sizeDSI + 14, &sizeDCD, sizeDCDBuffer);
+    generateEsdsSize(mCodecSpecificDataSize + sizeDSI + sizeDCD + 21, &sizeESD, sizeESDBuffer);
+
+    mOwner->beginBox("esds");
 
     mOwner->writeInt32(0);     // version=0, flags=0
     mOwner->writeInt8(0x03);   // ES_DescrTag
-    mOwner->writeInt8(23 + mCodecSpecificDataSize);
+    mOwner->write(sizeESDBuffer, sizeESD);
     mOwner->writeInt16(0x0000);// ES_ID
     mOwner->writeInt8(0x00);
 
     mOwner->writeInt8(0x04);   // DecoderConfigDescrTag
-    mOwner->writeInt8(15 + mCodecSpecificDataSize);
+    mOwner->write(sizeDCDBuffer, sizeDCD);
     mOwner->writeInt8(0x40);   // objectTypeIndication ISO/IEC 14492-2
     mOwner->writeInt8(0x15);   // streamType AudioStream
 
@@ -3817,7 +3943,7 @@ void MPEG4Writer::Track::writeMp4aEsdsBox() {
     mOwner->writeInt32(avgBitrate);
 
     mOwner->writeInt8(0x05);   // DecoderSpecificInfoTag
-    mOwner->writeInt8(mCodecSpecificDataSize);
+    mOwner->write(sizeDSIBuffer, sizeDSI);
     mOwner->write(mCodecSpecificData, mCodecSpecificDataSize);
 
     static const uint8_t kData2[] = {
@@ -3834,20 +3960,27 @@ void MPEG4Writer::Track::writeMp4vEsdsBox() {
     CHECK(mCodecSpecificData);
     CHECK_GT(mCodecSpecificDataSize, 0u);
 
-    // Make sure all sizes encode to a single byte.
-    CHECK_LT(23 + mCodecSpecificDataSize, 128u);
+    uint8_t sizeESDBuffer[kESDSScratchBufferSize];
+    uint8_t sizeDCDBuffer[kESDSScratchBufferSize];
+    uint8_t sizeDSIBuffer[kESDSScratchBufferSize];
+    size_t sizeESD = 0;
+    size_t sizeDCD = 0;
+    size_t sizeDSI = 0;
+    generateEsdsSize(mCodecSpecificDataSize, &sizeDSI, sizeDSIBuffer);
+    generateEsdsSize(mCodecSpecificDataSize + sizeDSI + 14, &sizeDCD, sizeDCDBuffer);
+    generateEsdsSize(mCodecSpecificDataSize + sizeDSI + sizeDCD + 21, &sizeESD, sizeESDBuffer);
 
     mOwner->beginBox("esds");
 
     mOwner->writeInt32(0);    // version=0, flags=0
 
     mOwner->writeInt8(0x03);  // ES_DescrTag
-    mOwner->writeInt8(23 + mCodecSpecificDataSize);
+    mOwner->write(sizeESDBuffer, sizeESD);
     mOwner->writeInt16(0x0000);  // ES_ID
     mOwner->writeInt8(0x1f);
 
     mOwner->writeInt8(0x04);  // DecoderConfigDescrTag
-    mOwner->writeInt8(15 + mCodecSpecificDataSize);
+    mOwner->write(sizeDCDBuffer, sizeDCD);
     mOwner->writeInt8(0x20);  // objectTypeIndication ISO/IEC 14492-2
     mOwner->writeInt8(0x11);  // streamType VisualStream
 
@@ -3865,7 +3998,7 @@ void MPEG4Writer::Track::writeMp4vEsdsBox() {
 
     mOwner->writeInt8(0x05);  // DecoderSpecificInfoTag
 
-    mOwner->writeInt8(mCodecSpecificDataSize);
+    mOwner->write(sizeDSIBuffer, sizeDSI);
     mOwner->write(mCodecSpecificData, mCodecSpecificDataSize);
 
     static const uint8_t kData2[] = {
@@ -3957,6 +4090,33 @@ void MPEG4Writer::Track::writeHdlrBox() {
     // Removing "r" for the name string just makes the string 4 byte aligned
     mOwner->writeCString(mIsAudio ? "SoundHandle": (mIsVideo ? "VideoHandle" : "MetadHandle"));
     mOwner->endBox();
+}
+
+void MPEG4Writer::Track::writeEdtsBox(){
+    ALOGV("%s : getStartTimeOffsetTimeUs of track:%" PRId64 " us", getTrackType(),
+        getStartTimeOffsetTimeUs());
+
+    // Prepone video playback.
+    if (mMinCttsOffsetTicks != mMaxCttsOffsetTicks) {
+        int32_t mvhdTimeScale = mOwner->getTimeScale();
+        uint32_t tkhdDuration = (getDurationUs() * mvhdTimeScale + 5E5) / 1E6;
+        int64_t mediaTime = ((kMaxCttsOffsetTimeUs - getMinCttsOffsetTimeUs())
+            * mTimeScale + 5E5) / 1E6;
+        if (tkhdDuration > 0 && mediaTime > 0) {
+            addOneElstTableEntry(tkhdDuration, mediaTime, 1, 0);
+        }
+    }
+
+    if (mElstTableEntries->count() == 0) {
+        return;
+    }
+
+    mOwner->beginBox("edts");
+        mOwner->beginBox("elst");
+            mOwner->writeInt32(0); // version=0, flags=0
+            mElstTableEntries->write(mOwner);
+        mOwner->endBox(); // elst;
+    mOwner->endBox(); // edts
 }
 
 void MPEG4Writer::Track::writeMdhdBox(uint32_t now) {
@@ -4095,7 +4255,9 @@ void MPEG4Writer::Track::writeSttsBox() {
         uint32_t duration;
         CHECK(mSttsTableEntries->get(duration, 1));
         duration = htonl(duration);  // Back to host byte order
-        mSttsTableEntries->set(htonl(duration + getStartTimeOffsetScaledTime()), 1);
+        int32_t startTimeOffsetScaled = (((getStartTimeOffsetTimeUs() +
+            mOwner->getStartTimeOffsetBFramesUs()) * mTimeScale) + 500000LL) / 1000000LL;
+        mSttsTableEntries->set(htonl((int32_t)duration + startTimeOffsetScaled), 1);
     }
     mSttsTableEntries->write(mOwner);
     mOwner->endBox();  // stts

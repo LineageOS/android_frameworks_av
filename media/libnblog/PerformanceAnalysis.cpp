@@ -17,13 +17,16 @@
 
 #define LOG_TAG "PerformanceAnalysis"
 // #define LOG_NDEBUG 0
+// #define WRITE_TO_FILE
 
 #include <algorithm>
 #include <climits>
 #include <deque>
-#include <iostream>
+#include <iomanip>
 #include <math.h>
 #include <numeric>
+#include <sstream>
+#include <string>
 #include <vector>
 #include <stdarg.h>
 #include <stdint.h>
@@ -32,19 +35,125 @@
 #include <sys/prctl.h>
 #include <time.h>
 #include <new>
+#include <audio_utils/LogPlot.h>
 #include <audio_utils/roundup.h>
 #include <media/nblog/NBLog.h>
 #include <media/nblog/PerformanceAnalysis.h>
 #include <media/nblog/ReportPerformance.h>
 #include <utils/Log.h>
 #include <utils/String8.h>
+#include <utils/Timers.h>
 
 #include <queue>
 #include <utility>
 
 namespace android {
-
 namespace ReportPerformance {
+
+void Histogram::add(double value)
+{
+    if (mBinSize <= 0 || mBins.size() < 2) {
+        return;
+    }
+    // TODO Handle domain and range error exceptions?
+    const int unboundedIndex = lround((value - mLow) / mBinSize) + 1;
+    // std::clamp is introduced in C++17
+    //const int index = std::clamp(unboundedIndex, 0, (int)(mBins.size() - 1));
+    const int index = std::max(0, std::min((int)(mBins.size() - 1), unboundedIndex));
+    mBins[index]++;
+    mTotalCount++;
+}
+
+void Histogram::clear()
+{
+    std::fill(mBins.begin(), mBins.end(), 0);
+    mTotalCount = 0;
+}
+
+uint64_t Histogram::totalCount() const
+{
+    return mTotalCount;
+}
+
+std::string Histogram::toString() const {
+    std::stringstream ss;
+    static constexpr char kDivider = '|';
+    ss << kVersion << "," << mBinSize << "," << mNumBins << "," << mLow << ",{";
+    bool first = true;
+    for (size_t i = 0; i < mBins.size(); i++) {
+        if (mBins[i] != 0) {
+            if (!first) {
+                ss << ",";
+            }
+            ss << static_cast<int>(i) - 1 << kDivider << mBins[i];
+            first = false;
+        }
+    }
+    ss << "}";
+
+    return ss.str();
+}
+
+std::string Histogram::asciiArtString(size_t indent) const {
+    if (totalCount() == 0 || mBinSize <= 0 || mBins.size() < 2) {
+        return "";
+    }
+
+    static constexpr char kMarker = '-';
+    // One increment is considered one step of a bin's height.
+    static constexpr size_t kMarkersPerIncrement = 2;
+    static constexpr size_t kMaxIncrements = 64 + 1;
+    static constexpr size_t kMaxNumberWidth = 7;
+    static const std::string kMarkers(kMarkersPerIncrement * kMaxIncrements, kMarker);
+    static const std::string kSpaces(kMarkersPerIncrement * kMaxIncrements, ' ');
+    // get the last n characters of s, or the whole string if it is shorter
+    auto getTail = [](const size_t n, const std::string &s) {
+        return s.c_str() + s.size() - std::min(n, s.size());
+    };
+
+    // Since totalCount() > 0, mBins is not empty and maxCount > 0.
+    const unsigned maxCount = *std::max_element(mBins.begin(), mBins.end());
+    const size_t maxIncrements = log2(maxCount) + 1;
+
+    std::stringstream ss;
+
+    // Non-zero bins must exist at this point because totalCount() > 0.
+    size_t firstNonZeroBin = 0;
+    // If firstNonZeroBin reaches mBins.size() - 1, then it must be a nonzero bin.
+    for (; firstNonZeroBin < mBins.size() - 1 && mBins[firstNonZeroBin] == 0; firstNonZeroBin++) {}
+    const size_t firstBinToPrint = firstNonZeroBin == 0 ? 0 : firstNonZeroBin - 1;
+
+    size_t lastNonZeroBin = mBins.size() - 1;
+    // If lastNonZeroBin reaches 0, then it must be a nonzero bin.
+    for (; lastNonZeroBin > 0 && mBins[lastNonZeroBin] == 0; lastNonZeroBin--) {}
+    const size_t lastBinToPrint = lastNonZeroBin == mBins.size() - 1 ? lastNonZeroBin
+            : lastNonZeroBin + 1;
+
+    for (size_t bin = firstBinToPrint; bin <= lastBinToPrint; bin++) {
+        ss << std::setw(indent + kMaxNumberWidth);
+        if (bin == 0) {
+            ss << "<";
+        } else if (bin == mBins.size() - 1) {
+            ss << ">";
+        } else {
+            ss << mLow + (bin - 1) * mBinSize;
+        }
+        ss << " |";
+        size_t increments = 0;
+        const uint64_t binCount = mBins[bin];
+        if (binCount > 0) {
+            increments = log2(binCount) + 1;
+            ss << getTail(increments * kMarkersPerIncrement, kMarkers);
+        }
+        ss << getTail((maxIncrements - increments + 1) * kMarkersPerIncrement, kSpaces)
+                << binCount << "\n";
+    }
+    ss << "\n";
+
+    return ss.str();
+}
+
+//------------------------------------------------------------------------------
 
 // Given an audio processing wakeup timestamp, buckets the time interval
 // since the previous timestamp into a histogram, searches for
@@ -208,27 +317,6 @@ bool PerformanceAnalysis::detectAndStoreOutlier(const msInterval diffMs) {
     return isOutlier;
 }
 
-static int widthOf(int x) {
-    int width = 0;
-    if (x < 0) {
-        width++;
-        x = x == INT_MIN ? INT_MAX : -x;
-    }
-    // assert (x >= 0)
-    do {
-        ++width;
-        x /= 10;
-    } while (x > 0);
-    return width;
-}
-
-// computes the column width required for a specific histogram value
-inline int numberWidth(double number, int leftPadding) {
-    // Added values account for whitespaces needed around numbers, and for the
-    // dot and decimal digit not accounted for by widthOf
-    return std::max(std::max(widthOf(static_cast<int>(number)) + 3, 2), leftPadding + 1);
-}
-
 // rounds value to precision based on log-distance from mean
 __attribute__((no_sanitize("signed-integer-overflow")))
 inline double logRound(double x, double mean) {
@@ -254,7 +342,7 @@ inline double logRound(double x, double mean) {
 // of PerformanceAnalysis
 void PerformanceAnalysis::reportPerformance(String8 *body, int author, log_hash_t hash,
                                             int maxHeight) {
-    if (mHists.empty()) {
+    if (mHists.empty() || body == nullptr) {
         return;
     }
 
@@ -273,69 +361,16 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int author, log_hash_
         }
     }
 
-    // underscores and spaces length corresponds to maximum width of histogram
-    static const int kLen = 200;
-    std::string underscores(kLen, '_');
-    std::string spaces(kLen, ' ');
-
-    auto it = buckets.begin();
-    double maxDelta = it->first;
-    int maxCount = it->second;
-    // Compute maximum values
-    while (++it != buckets.end()) {
-        if (it->first > maxDelta) {
-            maxDelta = it->first;
-        }
-        if (it->second > maxCount) {
-            maxCount = it->second;
-        }
-    }
-    int height = log2(maxCount) + 1; // maxCount > 0, safe to call log2
-    const int leftPadding = widthOf(1 << height);
-    const int bucketWidth = numberWidth(maxDelta, leftPadding);
-    int scalingFactor = 1;
-    // scale data if it exceeds maximum height
-    if (height > maxHeight) {
-        scalingFactor = (height + maxHeight) / maxHeight;
-        height /= scalingFactor;
-    }
-    body->appendFormat("\n%*s %3.2f %s", leftPadding + 11,
-            "Occurrences in", (elapsedMs / kMsPerSec), "seconds of audio:");
-    body->appendFormat("\n%*s%d, %lld, %lld\n", leftPadding + 11,
+    static const int SIZE = 128;
+    char title[SIZE];
+    snprintf(title, sizeof(title), "\n%s %3.2f %s\n%s%d, %lld, %lld\n",
+            "Occurrences in", (elapsedMs / kMsPerSec), "seconds of audio:",
             "Thread, hash, starting timestamp: ", author,
-            static_cast<long long int>(hash), static_cast<long long int>(startingTs));
-    // write histogram label line with bucket values
-    body->appendFormat("\n%s", " ");
-    body->appendFormat("%*s", leftPadding, " ");
-    for (auto const &x : buckets) {
-        const int colWidth = numberWidth(x.first, leftPadding);
-        body->appendFormat("%*d", colWidth, x.second);
-    }
-    // write histogram ascii art
-    body->appendFormat("\n%s", " ");
-    for (int row = height * scalingFactor; row >= 0; row -= scalingFactor) {
-        const int value = 1 << row;
-        body->appendFormat("%.*s", leftPadding, spaces.c_str());
-        for (auto const &x : buckets) {
-            const int colWidth = numberWidth(x.first, leftPadding);
-            body->appendFormat("%.*s%s", colWidth - 1,
-                               spaces.c_str(), x.second < value ? " " : "|");
-        }
-        body->appendFormat("\n%s", " ");
-    }
-    // print x-axis
-    const int columns = static_cast<int>(buckets.size());
-    body->appendFormat("%*c", leftPadding, ' ');
-    body->appendFormat("%.*s", (columns + 1) * bucketWidth, underscores.c_str());
-    body->appendFormat("\n%s", " ");
+            static_cast<long long>(hash), static_cast<long long>(startingTs));
+    static const char * const kLabel = "ms";
 
-    // write footer with bucket labels
-    body->appendFormat("%*s", leftPadding, " ");
-    for (auto const &x : buckets) {
-        const int colWidth = numberWidth(x.first, leftPadding);
-        body->appendFormat("%*.*f", colWidth, 1, x.first);
-    }
-    body->appendFormat("%.*s%s", bucketWidth, spaces.c_str(), "ms\n");
+    body->appendFormat("%s",
+            audio_utils_plot_histogram(buckets, title, kLabel, maxHeight).c_str());
 
     // Now report glitches
     body->appendFormat("\ntime elapsed between glitches and glitch timestamps:\n");
@@ -350,7 +385,9 @@ void PerformanceAnalysis::reportPerformance(String8 *body, int author, log_hash_
 // writes summary of performance into specified file descriptor
 void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis) {
     String8 body;
+#ifdef WRITE_TO_FILE
     const char* const kDirectory = "/data/misc/audioserver/";
+#endif
     for (auto & thread : threadPerformanceAnalysis) {
         for (auto & hash: thread.second) {
             PerformanceAnalysis& curr = hash.second;
@@ -360,9 +397,11 @@ void dump(int fd, int indent, PerformanceAnalysisMap &threadPerformanceAnalysis)
                 dumpLine(fd, indent, body);
                 body.clear();
             }
-            // write to file
+#ifdef WRITE_TO_FILE
+            // write to file. Enable by uncommenting macro at top of file.
             writeToFile(curr.mHists, curr.mOutlierData, curr.mPeakTimestamps,
                         kDirectory, false, thread.first, hash.first);
+#endif
         }
     }
 }
@@ -374,5 +413,4 @@ void dumpLine(int fd, int indent, const String8 &body) {
 }
 
 } // namespace ReportPerformance
-
 }   // namespace android

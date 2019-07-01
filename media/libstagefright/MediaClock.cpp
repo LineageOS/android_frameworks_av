@@ -110,7 +110,7 @@ void MediaClock::updateAnchor(
     if (mAnchorTimeRealUs != -1) {
         int64_t oldNowMediaUs =
             mAnchorTimeMediaUs + (nowUs - mAnchorTimeRealUs) * (double)mPlaybackRate;
-        if (nowMediaUs < oldNowMediaUs
+        if (nowMediaUs < oldNowMediaUs + kAnchorFluctuationAllowedUs
                 && nowMediaUs > oldNowMediaUs - kAnchorFluctuationAllowedUs) {
             return;
         }

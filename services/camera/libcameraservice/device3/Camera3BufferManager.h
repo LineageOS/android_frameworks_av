@@ -112,6 +112,10 @@ public:
      *
      * After this call, the client takes over the ownership of this buffer if it is not freed.
      *
+     * Sometimes free buffers are discarded from consumer side and the dequeueBuffer call returns
+     * TIMED_OUT, in this case calling getBufferForStream again with noFreeBufferAtConsumer set to
+     * true will notify buffer manager to update its states and also tries to allocate a new buffer.
+     *
      * Return values:
      *
      *  OK:        Getting buffer for this stream was successful.
@@ -122,7 +126,9 @@ public:
      *             to this buffer manager before.
      *  NO_MEMORY: Unable to allocate a buffer for this stream at this time.
      */
-    status_t getBufferForStream(int streamId, int streamSetId, sp<GraphicBuffer>* gb, int* fenceFd);
+    status_t getBufferForStream(
+            int streamId, int streamSetId, sp<GraphicBuffer>* gb, int* fenceFd,
+            bool noFreeBufferAtConsumer = false);
 
     /**
      * This method notifies the manager that a buffer has been released by the consumer.

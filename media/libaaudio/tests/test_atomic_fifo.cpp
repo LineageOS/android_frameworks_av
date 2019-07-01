@@ -158,14 +158,14 @@ public:
         // Does the sum of the two parts match the available value returned?
         // For EmptyRoom
         fifo_frames_t framesAvailable =
-                mFifoBuffer.getFifoControllerBase()->getEmptyFramesAvailable();
+                mFifoBuffer.getEmptyFramesAvailable();
         fifo_frames_t wrapAvailable = mFifoBuffer.getEmptyRoomAvailable(&wrappingBuffer);
         EXPECT_EQ(framesAvailable, wrapAvailable);
         fifo_frames_t bothAvailable = wrappingBuffer.numFrames[0] + wrappingBuffer.numFrames[1];
         EXPECT_EQ(framesAvailable, bothAvailable);
         // For FullData
         framesAvailable =
-                mFifoBuffer.getFifoControllerBase()->getFullFramesAvailable();
+                mFifoBuffer.getFullFramesAvailable();
         wrapAvailable = mFifoBuffer.getFullDataAvailable(&wrappingBuffer);
         EXPECT_EQ(framesAvailable, wrapAvailable);
         bothAvailable = wrappingBuffer.numFrames[0] + wrappingBuffer.numFrames[1];
@@ -198,7 +198,7 @@ public:
     // Write data but do not overflow.
     void writeMultipleDataFrames(fifo_frames_t numFrames) {
         fifo_frames_t framesAvailable =
-                mFifoBuffer.getFifoControllerBase()->getEmptyFramesAvailable();
+                mFifoBuffer.getEmptyFramesAvailable();
         fifo_frames_t framesToWrite = std::min(framesAvailable, numFrames);
         for (int i = 0; i < framesToWrite; i++) {
             mData[i] = mNextWriteIndex++;
@@ -210,7 +210,7 @@ public:
     // Read whatever data is available, Do not underflow.
     void verifyMultipleDataFrames(fifo_frames_t numFrames) {
         fifo_frames_t framesAvailable =
-                mFifoBuffer.getFifoControllerBase()->getFullFramesAvailable();
+                mFifoBuffer.getFullFramesAvailable();
         fifo_frames_t framesToRead = std::min(framesAvailable, numFrames);
         fifo_frames_t actual = mFifoBuffer.read(mData, framesToRead);
         ASSERT_EQ(framesToRead, actual);
@@ -222,7 +222,7 @@ public:
     // Read specified number of frames
     void verifyRequestedData(fifo_frames_t numFrames) {
         fifo_frames_t framesAvailable =
-                mFifoBuffer.getFifoControllerBase()->getFullFramesAvailable();
+                mFifoBuffer.getFullFramesAvailable();
         ASSERT_LE(numFrames, framesAvailable);
         fifo_frames_t framesToRead = std::min(framesAvailable, numFrames);
         fifo_frames_t actual = mFifoBuffer.read(mData, framesToRead);
@@ -282,12 +282,12 @@ public:
     void checkRandomWriteRead() {
         for (int i = 0; i < 20; i++) {
             fifo_frames_t framesEmpty =
-                    mFifoBuffer.getFifoControllerBase()->getEmptyFramesAvailable();
+                    mFifoBuffer.getEmptyFramesAvailable();
             fifo_frames_t numFrames = (fifo_frames_t)(drand48() * framesEmpty);
             writeMultipleDataFrames(numFrames);
 
             fifo_frames_t framesFull =
-                    mFifoBuffer.getFifoControllerBase()->getFullFramesAvailable();
+                    mFifoBuffer.getFullFramesAvailable();
             numFrames = (fifo_frames_t)(drand48() * framesFull);
             verifyMultipleDataFrames(numFrames);
         }

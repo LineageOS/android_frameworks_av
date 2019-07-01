@@ -26,6 +26,8 @@
 
 namespace android {
 
+struct ABuffer;
+
 struct SoftVPX : public SoftVideoDecoderOMXComponent {
     SoftVPX(const char *name,
             const char *componentRole,
@@ -41,6 +43,7 @@ protected:
     virtual void onPortFlushCompleted(OMX_U32 portIndex);
     virtual void onReset();
     virtual bool supportDescribeHdrStaticInfo();
+    virtual bool supportDescribeHdr10PlusInfo();
 
 private:
     enum {
@@ -60,7 +63,11 @@ private:
 
     void *mCtx;
     bool mFrameParallelMode;  // Frame parallel is only supported by VP9 decoder.
-    OMX_TICKS mTimeStamps[kNumBuffers];
+    struct PrivInfo {
+        OMX_TICKS mTimeStamp;
+        sp<ABuffer> mHdr10PlusInfo;
+    };
+    PrivInfo mPrivInfo[kNumBuffers];
     uint8_t mTimeStampIdx;
     vpx_image_t *mImg;
 

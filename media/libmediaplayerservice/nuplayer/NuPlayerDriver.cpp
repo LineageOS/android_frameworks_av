@@ -53,6 +53,7 @@ static const char *kPlayerWidth = "android.media.mediaplayer.width";
 static const char *kPlayerHeight = "android.media.mediaplayer.height";
 static const char *kPlayerFrames = "android.media.mediaplayer.frames";
 static const char *kPlayerFramesDropped = "android.media.mediaplayer.dropped";
+static const char *kPlayerFrameRate = "android.media.mediaplayer.fps";
 static const char *kPlayerAMime = "android.media.mediaplayer.audio.mime";
 static const char *kPlayerACodec = "android.media.mediaplayer.audio.codec";
 static const char *kPlayerDuration = "android.media.mediaplayer.durationMs";
@@ -96,7 +97,7 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
     mMediaClock->init();
 
     // set up an analytics record
-    mAnalyticsItem = new MediaAnalyticsItem(kKeyPlayer);
+    mAnalyticsItem = MediaAnalyticsItem::create(kKeyPlayer);
 
     mLooper->start(
             false, /* runOnCallingThread */
@@ -328,7 +329,7 @@ status_t NuPlayerDriver::prepareAsync() {
 }
 
 status_t NuPlayerDriver::start() {
-    ALOGD("start(%p), state is %d, eos is %d", this, mState, mAtEOS);
+    ALOGV("start(%p), state is %d, eos is %d", this, mState, mAtEOS);
     Mutex::Autolock autoLock(mLock);
     return start_l();
 }
@@ -470,7 +471,7 @@ status_t NuPlayerDriver::getSyncSettings(AVSyncSettings *sync, float *videoFps) 
 }
 
 status_t NuPlayerDriver::seekTo(int msec, MediaPlayerSeekMode mode) {
-    ALOGD("seekTo(%p) (%d ms, %d) at state %d", this, msec, mode, mState);
+    ALOGV("seekTo(%p) (%d ms, %d) at state %d", this, msec, mode, mState);
     Mutex::Autolock autoLock(mLock);
 
     int64_t seekTimeUs = msec * 1000LL;
@@ -577,6 +578,10 @@ void NuPlayerDriver::updateMetrics(const char *where) {
                 mAnalyticsItem->setInt64(kPlayerFrames, numFramesTotal);
                 mAnalyticsItem->setInt64(kPlayerFramesDropped, numFramesDropped);
 
+                float frameRate = 0;
+                if (stats->findFloat("frame-rate-total", &frameRate)) {
+                    mAnalyticsItem->setDouble(kPlayerFrameRate, (double) frameRate);
+                }
 
             } else if (mime.startsWith("audio/")) {
                 mAnalyticsItem->setCString(kPlayerAMime, mime.c_str());
@@ -602,6 +607,7 @@ void NuPlayerDriver::updateMetrics(const char *where) {
         mAnalyticsItem->setInt64(kPlayerRebuffering, (mRebufferingTimeUs+500)/1000 );
         mAnalyticsItem->setInt32(kPlayerRebufferingCount, mRebufferingEvents);
         mAnalyticsItem->setInt32(kPlayerRebufferingAtExit, mRebufferingAtExit);
+
     }
 
     mAnalyticsItem->setCString(kPlayerDataSourceType, mPlayer->getDataSourceType());
@@ -629,7 +635,7 @@ void NuPlayerDriver::logMetrics(const char *where) {
 
         // re-init in case we prepare() and start() again.
         delete mAnalyticsItem ;
-        mAnalyticsItem = new MediaAnalyticsItem("nuplayer");
+        mAnalyticsItem = MediaAnalyticsItem::create(kKeyPlayer);
         if (mAnalyticsItem) {
             mAnalyticsItem->setUid(mClientUid);
         }
@@ -959,7 +965,7 @@ void NuPlayerDriver::notifyListener(
 
 void NuPlayerDriver::notifyListener_l(
         int msg, int ext1, int ext2, const Parcel *in) {
-    ALOGD("notifyListener_l(%p), (%d, %d, %d, %d), loop setting(%d, %d)",
+    ALOGV("notifyListener_l(%p), (%d, %d, %d, %d), loop setting(%d, %d)",
             this, msg, ext1, ext2, (in == NULL ? -1 : (int)in->dataSize()), mAutoLoop, mLooping);
     switch (msg) {
         case MEDIA_PLAYBACK_COMPLETE:

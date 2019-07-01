@@ -30,6 +30,8 @@
 #include <utils/Vector.h>
 #include <utils/StrongPointer.h>
 
+#include <type_traits>
+
 namespace android {
 
 struct AMessage;
@@ -51,21 +53,47 @@ struct MediaCodecInfo : public RefBase {
 
     struct CapabilitiesWriter;
 
+    enum Attributes : int32_t {
+        // attribute flags
+        kFlagIsEncoder = 1 << 0,
+        kFlagIsVendor = 1 << 1,
+        kFlagIsSoftwareOnly = 1 << 2,
+        kFlagIsHardwareAccelerated = 1 << 3,
+    };
+
     struct Capabilities : public RefBase {
-        enum {
-            // decoder flags
-            kFlagSupportsAdaptivePlayback = 1 << 0,
-            kFlagSupportsSecurePlayback = 1 << 1,
-            kFlagSupportsTunneledPlayback = 1 << 2,
+        constexpr static char FEATURE_ADAPTIVE_PLAYBACK[] = "feature-adaptive-playback";
+        constexpr static char FEATURE_DYNAMIC_TIMESTAMP[] = "feature-dynamic-timestamp";
+        constexpr static char FEATURE_FRAME_PARSING[] = "feature-frame-parsing";
+        constexpr static char FEATURE_INTRA_REFRESH[] = "feature-frame-parsing";
+        constexpr static char FEATURE_MULTIPLE_FRAMES[] = "feature-multiple-frames";
+        constexpr static char FEATURE_SECURE_PLAYBACK[] = "feature-secure-playback";
+        constexpr static char FEATURE_TUNNELED_PLAYBACK[] = "feature-tunneled-playback";
 
-            // encoder flags
-            kFlagSupportsIntraRefresh = 1 << 0,
-
-        };
-
+        /**
+         * Returns the supported levels for each supported profile in a target array.
+         *
+         * @param profileLevels target array for the profile levels.
+         */
         void getSupportedProfileLevels(Vector<ProfileLevel> *profileLevels) const;
+
+        /**
+         * Returns the supported color formats in a target array. Only used for video/image
+         * components.
+         *
+         * @param colorFormats target array for the color formats.
+         */
         void getSupportedColorFormats(Vector<uint32_t> *colorFormats) const;
-        uint32_t getFlags() const;
+
+        /**
+         * Returns metadata associated with this codec capability.
+         *
+         * This contains:
+         * - features,
+         * - performance data.
+         *
+         * TODO: expose this as separate API-s and wrap here.
+         */
         const sp<AMessage> getDetails() const;
 
     protected:
@@ -73,7 +101,6 @@ struct MediaCodecInfo : public RefBase {
         SortedVector<ProfileLevel> mProfileLevelsSorted;
         Vector<uint32_t> mColorFormats;
         SortedVector<uint32_t> mColorFormatsSorted;
-        uint32_t mFlags;
         sp<AMessage> mDetails;
 
         Capabilities();
@@ -93,8 +120,7 @@ struct MediaCodecInfo : public RefBase {
     /**
      * This class is used for modifying information inside a `Capabilities`
      * object. An object of type `CapabilitiesWriter` can be obtained by calling
-     * `MediaCodecInfoWriter::addMime()` or
-     * `MediaCodecInfoWriter::updateMime()`.
+     * `MediaCodecInfoWriter::addMediaType()`.
      */
     struct CapabilitiesWriter {
         /**
@@ -122,6 +148,13 @@ struct MediaCodecInfo : public RefBase {
          */
         void addDetail(const char* key, int32_t value);
         /**
+         * Removes a key-value pair from the list of details. If the key is not
+         * present, this call does nothing.
+         *
+         * @param key The key.
+         */
+        void removeDetail(const char* key);
+        /**
          * Add a profile-level pair. If this profile-level pair already exists,
          * it will be ignored.
          *
@@ -136,13 +169,7 @@ struct MediaCodecInfo : public RefBase {
          * @param format The color format.
          */
         void addColorFormat(uint32_t format);
-        /**
-         * Add flags. The underlying operation is bitwise-or. In other words,
-         * bits that have already been set will be ignored.
-         *
-         * @param flags The additional flags.
-         */
-        void addFlags(uint32_t flags);
+
     private:
         /**
          * The associated `Capabilities` object.
@@ -158,10 +185,26 @@ struct MediaCodecInfo : public RefBase {
         friend MediaCodecInfoWriter;
     };
 
-    bool isEncoder() const;
-    void getSupportedMimes(Vector<AString> *mimes) const;
-    const sp<Capabilities> getCapabilitiesFor(const char *mime) const;
+    inline bool isEncoder() const {
+        return getAttributes() & kFlagIsEncoder;
+    }
+
+    Attributes getAttributes() const;
+    void getSupportedMediaTypes(Vector<AString> *mediaTypes) const;
+    const sp<Capabilities> getCapabilitiesFor(const char *mediaType) const;
     const char *getCodecName() const;
+
+    /**
+     * Returns a vector containing alternate names for the codec.
+     *
+     * \param aliases the destination array for the aliases. This is cleared.
+     *
+     * Multiple codecs may share alternate names as long as their supported media types are
+     * distinct; however, these will result in different aliases for the MediaCodec user as
+     * the canonical codec has to be resolved without knowing the media type in
+     * MediaCodec::CreateByComponentName.
+     */
+    void getAliases(Vector<AString> *aliases) const;
 
     /**
      * Return the name of the service that hosts the codec. This value is not
@@ -170,7 +213,14 @@ struct MediaCodecInfo : public RefBase {
      * Currently, this is the "instance name" of the IOmx service.
      */
     const char *getOwnerName() const;
-    uint32_t rank() const;
+
+    /**
+     * Returns the rank of the component.
+     *
+     * Technically this is defined to be per media type, but that makes ordering the MediaCodecList
+     * impossible as MediaCodecList is ordered by codec name.
+     */
+    uint32_t getRank() const;
 
     /**
      * Serialization over Binder
@@ -181,11 +231,12 @@ struct MediaCodecInfo : public RefBase {
 private:
     AString mName;
     AString mOwner;
-    bool mIsEncoder;
+    Attributes mAttributes;
     KeyedVector<AString, sp<Capabilities> > mCaps;
+    Vector<AString> mAliases;
     uint32_t mRank;
 
-    ssize_t getCapabilityIndex(const char *mime) const;
+    ssize_t getCapabilityIndex(const char *mediaType) const;
 
     /**
      * Construct an `MediaCodecInfo` object. After the construction, its
@@ -219,6 +270,13 @@ struct MediaCodecInfoWriter {
      */
     void setName(const char* name);
     /**
+     * Adds an alias (alternate name) for the codec. Multiple codecs can share an alternate name
+     * as long as their supported media types are distinct.
+     *
+     * @param name an alternate name.
+     */
+    void addAlias(const char* name);
+    /**
      * Set the owner name of the codec.
      *
      * This "owner name" is the name of the `IOmx` instance that supports this
@@ -228,32 +286,32 @@ struct MediaCodecInfoWriter {
      */
     void setOwner(const char* owner);
     /**
-     * Set whether this codec is an encoder or a decoder.
+     * Sets codec attributes.
      *
-     * @param isEncoder Whether this codec is an encoder or a decoder.
+     * @param attributes Codec attributes.
      */
-    void setEncoder(bool isEncoder = true);
+    void setAttributes(typename std::underlying_type<MediaCodecInfo::Attributes>::type attributes);
     /**
-     * Add a mime to an indexed list and return a `CapabilitiesWriter` object
+     * Add a media type to an indexed list and return a `CapabilitiesWriter` object
      * that can be used for modifying the associated `Capabilities`.
      *
-     * If the mime already exists, this function will return the
-     * `CapabilitiesWriter` associated with the mime.
+     * If the media type already exists, this function will return the
+     * `CapabilitiesWriter` associated with the media type.
      *
-     * @param[in] mime The name of a new mime to add.
+     * @param[in] mediaType The name of a new media type to add.
      * @return writer The `CapabilitiesWriter` object for modifying the
-     * `Capabilities` associated with the mime. `writer` will be valid
-     * regardless of whether `mime` already exists or not.
+     * `Capabilities` associated with the media type. `writer` will be valid
+     * regardless of whether `mediaType` already exists or not.
      */
-    std::unique_ptr<MediaCodecInfo::CapabilitiesWriter> addMime(
-            const char* mime);
+    std::unique_ptr<MediaCodecInfo::CapabilitiesWriter> addMediaType(
+            const char* mediaType);
     /**
-     * Remove a mime.
+     * Remove a media type.
      *
-     * @param mime The name of the mime to remove.
-     * @return `true` if `mime` is removed; `false` if `mime` is not found.
+     * @param mediaType The name of the media type to remove.
+     * @return `true` if `mediaType` is removed; `false` if `mediaType` is not found.
      */
-    bool removeMime(const char* mime);
+    bool removeMediaType(const char* mediaType);
     /**
      * Set rank of the codec. MediaCodecList will stable-sort the list according
      * to rank in non-descending order.

@@ -83,6 +83,8 @@ class FrameProcessorBase: public Thread {
                               const sp<CameraDeviceBase> &device);
 
     CameraMetadata mLastFrame;
+    std::vector<PhysicalCaptureResultInfo> mLastPhysicalFrames;
+
 };
 
 

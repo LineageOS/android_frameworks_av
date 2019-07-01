@@ -74,6 +74,8 @@ public:
                                     // in the mapping from frame position to presentation time.
                                     // See AudioTimestamp for the information included with event.
 #endif
+        EVENT_CAN_WRITE_MORE_DATA = 9,// Notification that more data can be given by write()
+                                    // This event only occurs for TRANSFER_SYNC_NOTIF_CALLBACK.
     };
 
     /* Client should declare a Buffer and pass the address to obtainBuffer()
@@ -145,6 +147,12 @@ public:
                                      audio_stream_type_t streamType,
                                      uint32_t sampleRate);
 
+    /* Check if direct playback is possible for the given audio configuration and attributes.
+     * Return true if output is possible for the given parameters. Otherwise returns false.
+     */
+    static bool isDirectOutputSupported(const audio_config_base_t& config,
+                                        const audio_attributes_t& attributes);
+
     /* How data is transferred to AudioTrack
      */
     enum transfer_type {
@@ -153,6 +161,7 @@ public:
         TRANSFER_OBTAIN,    // call obtainBuffer() and releaseBuffer()
         TRANSFER_SYNC,      // synchronous write()
         TRANSFER_SHARED,    // shared memory
+        TRANSFER_SYNC_NOTIF_CALLBACK, // synchronous write(), notif EVENT_CAN_WRITE_MORE_DATA
     };
 
     /* Constructs an uninitialized AudioTrack. No connection with
@@ -295,6 +304,8 @@ public:
      * Parameters not listed in the AudioTrack constructors above:
      *
      * threadCanCallJava:  Whether callbacks are made from an attached thread and thus can call JNI.
+     *      Only set to true when AudioTrack object is used for a java android.media.AudioTrack
+     *      in its JNI code.
      *
      * Internal state post condition:
      *      (mStreamType == AUDIO_STREAM_DEFAULT) implies this AudioTrack has valid attributes
@@ -907,7 +918,14 @@ public:
                 AutoMutex lock(mLock);
                 return mState == STATE_ACTIVE || mState == STATE_STOPPING;
             }
-protected:
+
+    /* Get the unique port ID assigned to this AudioTrack instance by audio policy manager.
+     * The ID is unique across all audioserver clients and can change during the life cycle
+     * of a given AudioTrack instance if the connection to audioserver is restored.
+     */
+            audio_port_handle_t getPortId() const { return mPortId; };
+
+ protected:
     /* copying audio tracks is not allowed */
                         AudioTrack(const AudioTrack& other);
             AudioTrack& operator = (const AudioTrack& other);
@@ -916,7 +934,7 @@ protected:
     class AudioTrackThread : public Thread
     {
     public:
-        AudioTrackThread(AudioTrack& receiver, bool bCanCallJava = false);
+        AudioTrackThread(AudioTrack& receiver);
 
         // Do not call Thread::requestExitAndWait() without first calling requestExit().
         // Thread::requestExitAndWait() is not virtual, and the implementation doesn't do enough.
@@ -1003,7 +1021,7 @@ protected:
     sp<IAudioTrack>         mAudioTrack;
     sp<IMemory>             mCblkMemory;
     audio_track_cblk_t*     mCblk;                  // re-load after mLock.unlock()
-    audio_io_handle_t       mOutput;                // returned by AudioSystem::getOutputForAttr()
+    audio_io_handle_t       mOutput = AUDIO_IO_HANDLE_NONE; // from AudioSystem::getOutputForAttr()
 
     sp<AudioTrackThread>    mAudioTrackThread;
     bool                    mThreadCanCallJava;
@@ -1057,6 +1075,19 @@ protected:
         STATE_FLUSHED,
         STATE_STOPPING,
     }                       mState;
+
+    static constexpr const char *stateToString(State state)
+    {
+        switch (state) {
+        case STATE_ACTIVE:          return "STATE_ACTIVE";
+        case STATE_STOPPED:         return "STATE_STOPPED";
+        case STATE_PAUSED:          return "STATE_PAUSED";
+        case STATE_PAUSED_STOPPING: return "STATE_PAUSED_STOPPING";
+        case STATE_FLUSHED:         return "STATE_FLUSHED";
+        case STATE_STOPPING:        return "STATE_STOPPING";
+        default:                    return "UNKNOWN";
+        }
+    }
 
     // for client callback handler
     callback_t              mCbf;                   // callback handler for events, or NULL
@@ -1120,8 +1151,11 @@ protected:
                                                     // AudioTracks.
 
     bool                    mPreviousTimestampValid;// true if mPreviousTimestamp is valid
-    bool                    mTimestampStartupGlitchReported; // reduce log spam
-    bool                    mRetrogradeMotionReported; // reduce log spam
+    bool                    mTimestampStartupGlitchReported;      // reduce log spam
+    bool                    mTimestampRetrogradePositionReported; // reduce log spam
+    bool                    mTimestampRetrogradeTimeReported;     // reduce log spam
+    bool                    mTimestampStallReported;              // reduce log spam
+    bool                    mTimestampStaleTimeReported;          // reduce log spam
     AudioTimestamp          mPreviousTimestamp;     // used to detect retrograde motion
     ExtendedTimestamp::Location mPreviousLocation;  // location used for previous timestamp
 
@@ -1148,6 +1182,7 @@ protected:
 
     audio_session_t         mSessionId;
     int                     mAuxEffectId;
+    audio_port_handle_t     mPortId;                    // Id from Audio Policy Manager
 
     mutable Mutex           mLock;
 
@@ -1195,7 +1230,7 @@ private:
 private:
     class MediaMetrics {
       public:
-        MediaMetrics() : mAnalyticsItem(new MediaAnalyticsItem("audiotrack")) {
+        MediaMetrics() : mAnalyticsItem(MediaAnalyticsItem::create("audiotrack")) {
         }
         ~MediaMetrics() {
             // mAnalyticsItem alloc failure will be flagged in the constructor

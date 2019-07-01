@@ -107,6 +107,7 @@ public:
         data.writeInterfaceToken(BpMediaSource::getInterfaceDescriptor());
         status_t ret = remote()->transact(GETFORMAT, data, &reply);
         if (ret == NO_ERROR) {
+            AutoMutex _l(mLock);
             mMetaData = MetaData::createFromParcel(reply);
             return mMetaData;
         }
@@ -186,6 +187,9 @@ public:
         ret = reply.readInt32();
         ALOGV("readMultiple status %d, bufferCount %u, sinceStop %u",
                 ret, bufferCount, mBuffersSinceStop);
+        if (bufferCount && ret == WOULD_BLOCK) {
+            ret = OK;
+        }
         return ret;
     }
 
@@ -219,6 +223,8 @@ private:
     // NuPlayer passes pointers-to-metadata around, so we use this to keep the metadata alive
     // XXX: could we use this for caching, or does metadata change on the fly?
     sp<MetaData> mMetaData;
+    // ensure synchronize access to mMetaData
+    Mutex mLock;
 
     // Cache all IMemory objects received from MediaExtractor.
     // We gc IMemory objects that are no longer active (referenced by a MediaBuffer).
@@ -362,13 +368,13 @@ status_t BnMediaSource::onTransact(
                         ALOGV("Use shared memory: %zu", length);
                         transferBuf = buf;
                     } else {
-                        ALOGD("Large buffer %zu without IMemory!", length);
+                        ALOGV("Large buffer %zu without IMemory!", length);
                         ret = mGroup->acquire_buffer(
                                 (MediaBufferBase **)&transferBuf, false /* nonBlocking */, length);
                         if (ret != OK
                                 || transferBuf == nullptr
                                 || transferBuf->mMemory == nullptr) {
-                            ALOGW("Failed to acquire shared memory, size %zu, ret %d",
+                            ALOGV("Failed to acquire shared memory, size %zu, ret %d",
                                     length, ret);
                             if (transferBuf != nullptr) {
                                 transferBuf->release();

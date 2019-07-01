@@ -64,6 +64,9 @@ public:
     static const char * const keyPresentationId;
     static const char * const keyProgramId;
 
+    //  keyAudioLanguagePreferred: Preferred audio language
+    static const char * const keyAudioLanguagePreferred;
+
     //  keyStreamConnect / Disconnect: value is an int in audio_devices_t
     static const char * const keyStreamConnect;
     static const char * const keyStreamDisconnect;

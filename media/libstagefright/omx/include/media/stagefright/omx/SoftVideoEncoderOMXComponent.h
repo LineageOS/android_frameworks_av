@@ -18,7 +18,9 @@
 
 #define SOFT_VIDEO_ENCODER_OMX_COMPONENT_H_
 
-#include <media/IOMX.h>
+#include <media/openmax/OMX_Core.h>
+#include <media/openmax/OMX_Video.h>
+#include <media/openmax/OMX_VideoExt.h>
 
 #include "SimpleSoftOMXComponent.h"
 

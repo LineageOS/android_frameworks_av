@@ -19,6 +19,18 @@ cc_test {
 }
 
 cc_test {
+    name: "test_clock_model",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_clock_model.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libaudioutils",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
     name: "test_block_adapter",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_block_adapter.cpp"],
@@ -30,13 +42,6 @@ cc_test {
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_timestamps.cpp"],
     header_libs: ["libaaudio_example_utils"],
-    shared_libs: ["libaaudio"],
-}
-
-cc_test {
-    name: "test_linear_ramp",
-    defaults: ["libaaudio_tests_defaults"],
-    srcs: ["test_linear_ramp.cpp"],
     shared_libs: ["libaaudio"],
 }
 
@@ -165,5 +170,48 @@ cc_test {
     name: "test_atomic_fifo",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_atomic_fifo.cpp"],
+    shared_libs: ["libaaudio"],
+}
+
+cc_test {
+    name: "test_flowgraph",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_flowgraph.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
+    name: "test_return_stop",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_return_stop.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
+    name: "test_stop_hang",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_stop_hang.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
+    name: "test_full_queue",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_full_queue.cpp"],
     shared_libs: ["libaaudio"],
 }

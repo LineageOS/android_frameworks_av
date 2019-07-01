@@ -2,6 +2,7 @@ cc_library_shared {
 
     srcs: [
         "ActivityManager.cpp",
+        "DeathNotifier.cpp",
         "MediaPlayerFactory.cpp",
         "MediaPlayerService.cpp",
         "MediaRecorderClient.cpp",
@@ -11,24 +12,26 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "android.hardware.media.c2@1.0",
         "android.hardware.media.omx@1.0",
+        "libbase",
         "libaudioclient",
         "libbinder",
         "libcamera_client",
+        "libcodec2_client",
         "libcrypto",
         "libcutils",
         "libdl",
         "libgui",
         "libhidlbase",
-        "libhidlmemory",
         "liblog",
         "libmedia",
         "libmedia_omx",
-        "libmediaextractor",
         "libmediadrm",
         "libmediametrics",
         "libmediautils",
         "libmemunreachable",
+        "libnetd_client",
         "libpowermanager",
         "libstagefright",
         "libstagefright_foundation",
@@ -63,13 +66,9 @@ cc_library_shared {
 
     name: "libmediaplayerservice",
 
-    compile_multilib: "32",
-
     sanitize: {
         cfi: true,
     },
 
 }
-
-subdirs = ["*"]
 

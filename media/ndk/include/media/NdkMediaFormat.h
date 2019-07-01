@@ -83,13 +83,9 @@ void AMediaFormat_setString(AMediaFormat*, const char* name, const char* value) 
 /**
  * The provided data is copied into the format.
  */
-void AMediaFormat_setBuffer(AMediaFormat*, const char* name, void* data, size_t size) __INTRODUCED_IN(21);
+void AMediaFormat_setBuffer(AMediaFormat*, const char* name, const void* data, size_t size) __INTRODUCED_IN(21);
 
 
-
-/**
- * XXX should these be ints/enums that we look up in a table as needed?
- */
 extern const char* AMEDIAFORMAT_KEY_AAC_DRC_ATTENUATION_FACTOR __INTRODUCED_IN(28);
 extern const char* AMEDIAFORMAT_KEY_AAC_DRC_BOOST_FACTOR __INTRODUCED_IN(28);
 extern const char* AMEDIAFORMAT_KEY_AAC_DRC_HEAVY_COMPRESSION __INTRODUCED_IN(28);
@@ -156,7 +152,6 @@ extern const char* AMEDIAFORMAT_KEY_TIME_US __INTRODUCED_IN(28);
 extern const char* AMEDIAFORMAT_KEY_TRACK_ID __INTRODUCED_IN(28);
 extern const char* AMEDIAFORMAT_KEY_TRACK_INDEX __INTRODUCED_IN(28);
 extern const char* AMEDIAFORMAT_KEY_WIDTH __INTRODUCED_IN(21);
-
 #endif /* __ANDROID_API__ >= 21 */
 
 #if __ANDROID_API__ >= 28
@@ -169,6 +164,78 @@ void AMediaFormat_setSize(AMediaFormat*, const char* name, size_t value) __INTRO
 void AMediaFormat_setRect(AMediaFormat*, const char* name,
         int32_t left, int32_t top, int32_t right, int32_t bottom) __INTRODUCED_IN(28);
 #endif /* __ANDROID_API__ >= 28 */
+
+#if __ANDROID_API__ >= 29
+/**
+ * remove all key/value pairs from the given AMediaFormat
+ */
+void AMediaFormat_clear(AMediaFormat*) __INTRODUCED_IN(29);
+
+/**
+ * copy one AMediaFormat to another
+ */
+media_status_t AMediaFormat_copy(AMediaFormat *to, AMediaFormat *from) __INTRODUCED_IN(29);
+
+extern const char* AMEDIAFORMAT_KEY_ALBUM __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_ALBUMART __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_ALBUMARTIST __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_ARTIST __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_INFO __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_PRESENTATION_ID __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_PROGRAM_ID __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_AUTHOR __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_BITS_PER_SAMPLE __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_CDTRACKNUMBER __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_COMPILATION __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_COMPOSER __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_CREATE_INPUT_SURFACE_SUSPENDED __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_CRYPTO_DEFAULT_IV_SIZE __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_CRYPTO_ENCRYPTED_BYTE_BLOCK __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_CRYPTO_ENCRYPTED_SIZES __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_CRYPTO_IV __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_CRYPTO_KEY __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_CRYPTO_MODE __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_CRYPTO_PLAIN_SIZES __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_CRYPTO_SKIP_BYTE_BLOCK __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_CSD_AVC __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_CSD_HEVC __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_D263 __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_DATE __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_DISCNUMBER __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_ENCODER_DELAY __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_ENCODER_PADDING __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_ESDS __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_EXIF_OFFSET __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_EXIF_SIZE __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_FRAME_COUNT __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_GENRE __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_HAPTIC_CHANNEL_COUNT __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_ICC_PROFILE __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_IS_SYNC_FRAME __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_LOCATION __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_LOOP __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_LYRICIST __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_MANUFACTURER __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_MAX_BIT_RATE __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_MAX_FPS_TO_ENCODER __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_MAX_PTS_GAP_TO_ENCODER __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_MPEG2_STREAM_HEADER __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_PCM_BIG_ENDIAN __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_PSSH __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_SAR_HEIGHT __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_SAR_WIDTH __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_TARGET_TIME __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_TEMPORAL_LAYER_COUNT __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_TEXT_FORMAT_DATA __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_THUMBNAIL_CSD_HEVC __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_THUMBNAIL_HEIGHT __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_THUMBNAIL_TIME __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_THUMBNAIL_WIDTH __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_TITLE __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_VALID_SAMPLES __INTRODUCED_IN(29);
+extern const char* AMEDIAFORMAT_KEY_YEAR __INTRODUCED_IN(29);
+
+#endif /* __ANDROID_API__ >= 29 */
 
 __END_DECLS
 

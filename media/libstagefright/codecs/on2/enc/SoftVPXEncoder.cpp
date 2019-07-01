@@ -401,8 +401,8 @@ OMX_ERRORTYPE SoftVPXEncoder::internalSetParameter(OMX_INDEXTYPE index,
     }
 }
 
-OMX_ERRORTYPE SoftVPXEncoder::setConfig(
-        OMX_INDEXTYPE index, const OMX_PTR _params) {
+OMX_ERRORTYPE SoftVPXEncoder::internalSetConfig(
+        OMX_INDEXTYPE index, const OMX_PTR _params, bool *frameConfig) {
     switch (index) {
         case OMX_IndexConfigVideoIntraVOPRefresh:
         {
@@ -442,7 +442,7 @@ OMX_ERRORTYPE SoftVPXEncoder::setConfig(
         }
 
         default:
-            return SimpleSoftOMXComponent::setConfig(index, _params);
+            return SimpleSoftOMXComponent::internalSetConfig(index, _params, frameConfig);
     }
 }
 

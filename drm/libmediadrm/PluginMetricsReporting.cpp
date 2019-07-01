@@ -34,17 +34,17 @@ constexpr char kSerializedMetricsField[] = "serialized_metrics";
 status_t reportVendorMetrics(const std::string& metrics,
                              const String8& name,
                              const String8& appPackageName) {
-    MediaAnalyticsItem analyticsItem(name.c_str());
-    analyticsItem.generateSessionID();
+    std::unique_ptr<MediaAnalyticsItem> analyticsItem(MediaAnalyticsItem::create(name.c_str()));
+    analyticsItem->generateSessionID();
 
     std::string app_package_name(appPackageName.c_str(), appPackageName.size());
-    analyticsItem.setPkgName(app_package_name);
+    analyticsItem->setPkgName(app_package_name);
     if (metrics.size() > 0) {
-        analyticsItem.setCString(kSerializedMetricsField, metrics.c_str());
+        analyticsItem->setCString(kSerializedMetricsField, metrics.c_str());
     }
 
-    if (!analyticsItem.selfrecord()) {
-      ALOGE("selfrecord() returned false. sessioId %" PRId64, analyticsItem.getSessionID());
+    if (!analyticsItem->selfrecord()) {
+      ALOGE("selfrecord() returned false. sessioId %" PRId64, analyticsItem->getSessionID());
     }
 
     return OK;

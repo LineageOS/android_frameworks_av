@@ -40,10 +40,10 @@ private:
     static Mutex sMutex;
     static std::unique_ptr<StagefrightPluginLoader> sInstance;
 
-    void *mLibHandle;
-    CodecBase::CreateCodecFunc mCreateCodec;
-    MediaCodecListBuilderBase::CreateBuilderFunc mCreateBuilder;
-    CodecBase::CreateInputSurfaceFunc mCreateInputSurface;
+    void *mLibHandle{nullptr};
+    CodecBase::CreateCodecFunc mCreateCodec{nullptr};
+    MediaCodecListBuilderBase::CreateBuilderFunc mCreateBuilder{nullptr};
+    CodecBase::CreateInputSurfaceFunc mCreateInputSurface{nullptr};
 };
 
 }  // namespace android

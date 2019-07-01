@@ -18,10 +18,8 @@
 
 #include "Element.h"
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
 
 /**
  * Specialization of policy base class element for audio_source_t
@@ -61,7 +59,7 @@ public:
 
     /**
      * A Policy element may implement getter/setter function for a given property.
-     * Property may be routing_strategy, audio_stream_type_t, audio_usage_t, audio_source_t
+     * Property may be audio_stream_type_t, audio_usage_t, audio_source_t
      * or a string.
      */
     template <typename Property>

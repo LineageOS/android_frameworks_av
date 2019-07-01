@@ -84,6 +84,8 @@ class DeviceHalInterface : public RefBase
             audio_input_flags_t flags,
             const char *address,
             audio_source_t source,
+            audio_devices_t outputDevice,
+            const char *outputDeviceAddress,
             sp<StreamInHalInterface> *inStream) = 0;
 
     // Returns whether createAudioPatch and releaseAudioPatch operations are supported.

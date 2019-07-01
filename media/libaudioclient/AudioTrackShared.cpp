@@ -20,6 +20,7 @@
 #include <android-base/macros.h>
 #include <private/media/AudioTrackShared.h>
 #include <utils/Log.h>
+#include <audio_utils/safe_math.h>
 
 #include <linux/futex.h>
 #include <sys/syscall.h>
@@ -186,7 +187,7 @@ status_t ClientProxy::obtainBuffer(Buffer* buffer, const struct timespec *reques
             front = cblk->u.mStreaming.mFront;
         }
         // write to rear, read from front
-        ssize_t filled = rear - front;
+        ssize_t filled = audio_utils::safe_sub_overflow(rear, front);
         // pipe should not be overfull
         if (!(0 <= filled && (size_t) filled <= mFrameCount)) {
             if (mIsOut) {
@@ -684,7 +685,7 @@ void ServerProxy::flushBufferIfNeeded()
         const size_t overflowBit = mFrameCountP2 << 1;
         const size_t mask = overflowBit - 1;
         int32_t newFront = (front & ~mask) | (flush & mask);
-        ssize_t filled = rear - newFront;
+        ssize_t filled = audio_utils::safe_sub_overflow(rear, newFront);
         if (filled >= (ssize_t)overflowBit) {
             // front and rear offsets span the overflow bit of the p2 mask
             // so rebasing newFront on the front offset is off by the overflow bit.
@@ -726,7 +727,7 @@ int32_t AudioTrackServerProxy::getRear() const
         const size_t overflowBit = mFrameCountP2 << 1;
         const size_t mask = overflowBit - 1;
         int32_t newRear = (rear & ~mask) | (stop & mask);
-        ssize_t filled = newRear - front;
+        ssize_t filled = audio_utils::safe_sub_overflow(newRear, front);
         // overflowBit is unsigned, so cast to signed for comparison.
         if (filled >= (ssize_t)overflowBit) {
             // front and rear offsets span the overflow bit of the p2 mask
@@ -778,7 +779,7 @@ status_t ServerProxy::obtainBuffer(Buffer* buffer, bool ackFlush)
         front = android_atomic_acquire_load(&cblk->u.mStreaming.mFront);
         rear = cblk->u.mStreaming.mRear;
     }
-    ssize_t filled = rear - front;
+    ssize_t filled = audio_utils::safe_sub_overflow(rear, front);
     // pipe should not already be overfull
     if (!(0 <= filled && (size_t) filled <= mFrameCount)) {
         ALOGE("Shared memory control block is corrupt (filled=%zd, mFrameCount=%zu); shutting down",
@@ -905,7 +906,7 @@ size_t AudioTrackServerProxy::framesReady()
         return mFrameCount;
     }
     const int32_t rear = getRear();
-    ssize_t filled = rear - cblk->u.mStreaming.mFront;
+    ssize_t filled = audio_utils::safe_sub_overflow(rear, cblk->u.mStreaming.mFront);
     // pipe should not already be overfull
     if (!(0 <= filled && (size_t) filled <= mFrameCount)) {
         ALOGE("Shared memory control block is corrupt (filled=%zd, mFrameCount=%zu); shutting down",
@@ -931,7 +932,7 @@ size_t AudioTrackServerProxy::framesReadySafe() const
         return mFrameCount;
     }
     const int32_t rear = getRear();
-    const ssize_t filled = rear - cblk->u.mStreaming.mFront;
+    const ssize_t filled = audio_utils::safe_sub_overflow(rear, cblk->u.mStreaming.mFront);
     if (!(0 <= filled && (size_t) filled <= mFrameCount)) {
         return 0; // error condition, silently return 0.
     }
@@ -1231,6 +1232,21 @@ int32_t StaticAudioTrackServerProxy::getRear() const
 {
     LOG_ALWAYS_FATAL("getRear() not permitted for static tracks");
     return 0;
+}
+
+__attribute__((no_sanitize("integer")))
+size_t AudioRecordServerProxy::framesReadySafe() const
+{
+    if (mIsShutdown) {
+        return 0;
+    }
+    const int32_t front = android_atomic_acquire_load(&mCblk->u.mStreaming.mFront);
+    const int32_t rear = mCblk->u.mStreaming.mRear;
+    const ssize_t filled = audio_utils::safe_sub_overflow(rear, front);
+    if (!(0 <= filled && (size_t) filled <= mFrameCount)) {
+        return 0; // error condition, silently return 0.
+    }
+    return filled;
 }
 
 // ---------------------------------------------------------------------------

@@ -86,7 +86,7 @@ private:
     sp<IMemory> mMemory;
     std::unique_ptr<HeifStream> mStream;
     bool mEOS;
-    std::unique_ptr<uint8_t> mCache;
+    std::unique_ptr<uint8_t[]> mCache;
     off64_t mCachedOffset;
     size_t mCachedSize;
     size_t mCacheBufferSize;
@@ -165,7 +165,7 @@ ssize_t HeifDataSource::readAt(off64_t offset, size_t size) {
         // it's reaching max cache buffer size, need to roll window, and possibly
         // expand the cache buffer.
         size_t newCacheBufferSize = mCacheBufferSize;
-        std::unique_ptr<uint8_t> newCache;
+        std::unique_ptr<uint8_t[]> newCache;
         uint8_t* dst = mCache.get();
         if (newCacheBufferSize < kMaxCacheBufferSize) {
             newCacheBufferSize = kMaxCacheBufferSize;

@@ -22,8 +22,8 @@
 #include "mp4enc_api.h"
 #include "OMX_Video.h"
 
-#include <HardwareAPI.h>
-#include <MetadataBufferType.h>
+#include <media/hardware/HardwareAPI.h>
+#include <media/hardware/MetadataBufferType.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/MediaDefs.h>

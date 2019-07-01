@@ -27,6 +27,8 @@
 #include <media/hardware/VideoAPI.h>
 #include <system/graphics.h>
 
+struct AMediaFormat;
+
 namespace android {
 
 struct ColorUtils {
@@ -135,6 +137,9 @@ struct ColorUtils {
     static void convertIsoColorAspectsToCodecAspects(
             int32_t primaries, int32_t transfer, int32_t coeffs, bool fullRange,
             ColorAspects &aspects);
+    static void convertIsoColorAspectsToPlatformAspects(
+        int32_t primaries, int32_t isotransfer, int32_t coeffs, bool fullRange,
+        int32_t *range, int32_t *standard, int32_t *transfer);
 
     // unpack a uint32_t to a full ColorAspects struct
     static ColorAspects unpackToColorAspects(uint32_t packed);
@@ -180,6 +185,8 @@ struct ColorUtils {
 
     // writes |info| into format.
     static void setHDRStaticInfoIntoFormat(const HDRStaticInfo &info, sp<AMessage> &format);
+    // writes |info| into format.
+    static void setHDRStaticInfoIntoAMediaFormat(const HDRStaticInfo &info, AMediaFormat *format);
 };
 
 inline static const char *asString(android::ColorUtils::ColorStandard i, const char *def = "??") {

@@ -17,6 +17,8 @@
 #include <ios>
 #include <list>
 
+#define LOG_TAG "OmxStore"
+
 #include <android-base/logging.h>
 
 #include <media/stagefright/omx/1.0/Conversion.h>
@@ -30,16 +32,33 @@ namespace omx {
 namespace V1_0 {
 namespace implementation {
 
+using ::android::hardware::media::omx::V1_0::Status;
+using ::android::hardware::media::omx::V1_0::IOmx;
+
 OmxStore::OmxStore(
+        const sp<IOmx> &omx,
         const char* owner,
-        const char* const* searchDirs,
-        const char* mainXmlName,
-        const char* performanceXmlName,
+        const std::vector<std::string> &searchDirs,
+        const std::vector<std::string> &xmlNames,
         const char* profilingResultsXmlPath) {
-    MediaCodecsXmlParser parser(searchDirs,
-            mainXmlName,
-            performanceXmlName,
-            profilingResultsXmlPath);
+    // retrieve list of omx nodes
+    std::set<std::string> nodes;
+    if (omx != nullptr) {
+        omx->listNodes([&nodes](const Status &status,
+                                const hidl_vec<IOmx::ComponentInfo> &nodeList) {
+            if (status == Status::OK) {
+                for (const IOmx::ComponentInfo& info : nodeList) {
+                    nodes.emplace(info.mName.c_str());
+                }
+            }
+        });
+    }
+
+    MediaCodecsXmlParser parser;
+    parser.parseXmlFilesInSearchDirs(xmlNames, searchDirs);
+    if (profilingResultsXmlPath != nullptr) {
+        parser.parseXmlPath(profilingResultsXmlPath);
+    }
     mParsingStatus = toStatus(parser.getParsingStatus());
 
     const auto& serviceAttributeMap = parser.getServiceAttributeMap();
@@ -61,14 +80,18 @@ OmxStore::OmxStore(
         role.role = rolePair.first;
         role.type = rolePair.second.type;
         role.isEncoder = rolePair.second.isEncoder;
-        // TODO: Currently, preferPlatformNodes information is not available in
-        // the xml file. Once we have a way to provide this information, it
-        // should be parsed properly.
-        role.preferPlatformNodes = rolePair.first.compare(0, 5, "audio") == 0;
+        role.preferPlatformNodes = false; // deprecated and ignored, using rank instead
         hidl_vec<NodeInfo>& nodeList = role.nodes;
         nodeList.resize(rolePair.second.nodeList.size());
         size_t j = 0;
         for (const auto& nodePair : rolePair.second.nodeList) {
+            if (!nodes.count(nodePair.second.name)) {
+                // not supported by this OMX instance
+                if (!strncasecmp(nodePair.second.name.c_str(), "omx.", 4)) {
+                    LOG(INFO) << "node [" << nodePair.second.name.c_str() << "] not found in IOmx";
+                }
+                continue;
+            }
             NodeInfo node;
             node.name = nodePair.second.name;
             node.owner = owner;
@@ -85,6 +108,7 @@ OmxStore::OmxStore(
             nodeList[j] = std::move(node);
             ++j;
         }
+        nodeList.resize(j);
         mRoleList[i] = std::move(role);
         ++i;
     }

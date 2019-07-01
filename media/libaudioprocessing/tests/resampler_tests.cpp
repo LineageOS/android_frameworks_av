@@ -246,7 +246,8 @@ void testStopbandDownconversion(size_t channels,
 }
 
 void testFilterResponse(
-        size_t channels, unsigned inputFreq, unsigned outputFreq)
+        size_t channels, unsigned inputFreq, unsigned outputFreq,
+        android::AudioResampler::src_quality quality = android::AudioResampler::DYN_HIGH_QUALITY)
 {
     // create resampler
     using ResamplerType = android::AudioResamplerDyn<float, float, float>;
@@ -256,7 +257,7 @@ void testFilterResponse(
                             AUDIO_FORMAT_PCM_FLOAT,
                             channels,
                             outputFreq,
-                            android::AudioResampler::DYN_HIGH_QUALITY)));
+                            quality)));
     rdyn->setSampleRate(inputFreq);
 
     // get design parameters
@@ -268,17 +269,20 @@ void testFilterResponse(
     const double attenuation = rdyn->getFilterAttenuation();
     const double stopbandDb = rdyn->getStopbandAttenuationDb();
     const double passbandDb = rdyn->getPassbandRippleDb();
-    const double fp = fcr - tbw / 2;
-    const double fs = fcr + tbw / 2;
+    const double fp = fcr - tbw * 0.5;
+    const double fs = fcr + tbw * 0.5;
+    const double idealfs = inputFreq <= outputFreq
+        ? 0.5                            // upsample
+        : 0.5 * outputFreq  / inputFreq; // downsample
 
-    printf("inputFreq:%d outputFreq:%d design"
+    printf("inputFreq:%d outputFreq:%d design quality %d"
             " phases:%d halfLength:%d"
-            " fcr:%lf fp:%lf fs:%lf tbw:%lf"
+            " fcr:%lf fp:%lf fs:%lf tbw:%lf fcrp:%lf"
             " attenuation:%lf stopRipple:%.lf passRipple:%lf"
             "\n",
-            inputFreq, outputFreq,
+            inputFreq, outputFreq, quality,
             phases, halfLength,
-            fcr, fp, fs, tbw,
+            fcr, fp, fs, tbw, fcr * 100. / idealfs,
             attenuation, stopbandDb, passbandDb);
 
     // verify design parameters
@@ -541,8 +545,36 @@ TEST(audioflinger_resampler, stopbandresponse_float_multichannel) {
     }
 }
 
-TEST(audioflinger_resampler, filterresponse) {
-    std::vector<int> inSampleRates{
+// Selected downsampling responses for various frequencies relating to hearing aid.
+TEST(audioflinger_resampler, downsamplingresponse) {
+    static constexpr android::AudioResampler::src_quality qualities[] = {
+        android::AudioResampler::DYN_LOW_QUALITY,
+        android::AudioResampler::DYN_MED_QUALITY,
+        android::AudioResampler::DYN_HIGH_QUALITY,
+    };
+    static constexpr int inSampleRates[] = {
+        32000,
+        44100,
+        48000,
+    };
+    static constexpr int outSampleRates[] = {
+        16000,
+        24000,
+    };
+
+    for (auto quality : qualities) {
+        for (int outSampleRate : outSampleRates) {
+            for (int inSampleRate : inSampleRates) {
+                testFilterResponse(2 /* channels */, inSampleRate, outSampleRate, quality);
+            }
+        }
+    }
+}
+
+// General responses for typical output device scenarios - 44.1, 48, 96 kHz
+// (48, 96 are part of the same resampler generation family).
+TEST(audioflinger_resampler, generalresponse) {
+    static constexpr int inSampleRates[] = {
         8000,
         11025,
         12000,
@@ -557,7 +589,8 @@ TEST(audioflinger_resampler, filterresponse) {
         176400,
         192000,
     };
-    std::vector<int> outSampleRates{
+    static constexpr int outSampleRates[] = {
+        44100,
         48000,
         96000,
     };

@@ -18,7 +18,6 @@
 #include <list>
 
 #include <android-base/logging.h>
-#include <gui/IGraphicBufferProducer.h>
 #include <media/openmax/OMX_Core.h>
 #include <media/openmax/OMX_AsString.h>
 
@@ -28,7 +27,6 @@
 
 #include <media/stagefright/omx/1.0/WOmxNode.h>
 #include <media/stagefright/omx/1.0/WOmxObserver.h>
-#include <media/stagefright/omx/1.0/WGraphicBufferProducer.h>
 #include <media/stagefright/omx/1.0/WGraphicBufferSource.h>
 #include <media/stagefright/omx/1.0/Conversion.h>
 #include <media/stagefright/omx/1.0/Omx.h>
@@ -45,6 +43,8 @@ constexpr size_t kMaxNodeInstances = (1 << 16);
 Omx::Omx() :
     mMaster(new OMXMaster()),
     mParser() {
+    (void)mParser.parseXmlFilesInSearchDirs();
+    (void)mParser.parseXmlPath(mParser.defaultProfilingResultsXmlPath);
 }
 
 Omx::~Omx() {
@@ -124,11 +124,11 @@ Return<void> Omx::allocateNode(
         } else {
             uint32_t quirks = 0;
             for (const auto& quirk : codec->second.quirkSet) {
-                if (quirk == "requires-allocate-on-input-ports") {
+                if (quirk == "quirk::requires-allocate-on-input-ports") {
                     quirks |= OMXNodeInstance::
                             kRequiresAllocateBufferOnInputPorts;
                 }
-                if (quirk == "requires-allocate-on-output-ports") {
+                if (quirk == "quirk::requires-allocate-on-output-ports") {
                     quirks |= OMXNodeInstance::
                             kRequiresAllocateBufferOnOutputPorts;
                 }
@@ -146,8 +146,6 @@ Return<void> Omx::allocateNode(
 }
 
 Return<void> Omx::createInputSurface(createInputSurface_cb _hidl_cb) {
-    sp<::android::IGraphicBufferProducer> bufferProducer;
-
     sp<OmxGraphicBufferSource> graphicBufferSource = new OmxGraphicBufferSource();
     status_t err = graphicBufferSource->initCheck();
     if (err != OK) {
@@ -157,10 +155,9 @@ Return<void> Omx::createInputSurface(createInputSurface_cb _hidl_cb) {
         _hidl_cb(toStatus(err), nullptr, nullptr);
         return Void();
     }
-    bufferProducer = graphicBufferSource->getIGraphicBufferProducer();
 
     _hidl_cb(toStatus(OK),
-            new TWGraphicBufferProducer(bufferProducer),
+            graphicBufferSource->getHGraphicBufferProducer_V1_0(),
             new TWGraphicBufferSource(graphicBufferSource));
     return Void();
 }

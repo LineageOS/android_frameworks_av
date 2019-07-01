@@ -107,10 +107,16 @@ NuPlayer::Decoder::~Decoder() {
 }
 
 sp<AMessage> NuPlayer::Decoder::getStats() const {
+
     mStats->setInt64("frames-total", mNumFramesTotal);
     mStats->setInt64("frames-dropped-input", mNumInputFramesDropped);
     mStats->setInt64("frames-dropped-output", mNumOutputFramesDropped);
-    return mStats;
+    mStats->setFloat("frame-rate-total", mFrameRateTotal);
+
+    // i'm mutexed right now.
+    // make our own copy, so we aren't victim to any later changes.
+    sp<AMessage> copiedStats = mStats->dup();
+    return copiedStats;
 }
 
 status_t NuPlayer::Decoder::setVideoSurface(const sp<Surface> &surface) {
@@ -677,7 +683,7 @@ bool NuPlayer::Decoder::handleAnInputBuffer(size_t index) {
         msg->setSize("buffer-ix", index);
 
         sp<ABuffer> buffer = mCSDsToSubmit.itemAt(0);
-        ALOGI("[%s] resubmitting CSD", mComponentName.c_str());
+        ALOGV("[%s] resubmitting CSD", mComponentName.c_str());
         msg->setBuffer("buffer", buffer);
         mCSDsToSubmit.removeAt(0);
         if (!onInputBufferFetched(msg)) {
@@ -748,7 +754,7 @@ bool NuPlayer::Decoder::handleAnOutputBuffer(
     reply->setSize("size", size);
 
     if (eos) {
-        ALOGI("[%s] saw output EOS", mIsAudio ? "audio" : "video");
+        ALOGV("[%s] saw output EOS", mIsAudio ? "audio" : "video");
 
         buffer->meta()->setInt32("eos", true);
         reply->setInt32("eos", true);
@@ -1028,7 +1034,7 @@ bool NuPlayer::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
             int64_t resumeAtMediaTimeUs;
             if (extra->findInt64(
                         "resume-at-mediaTimeUs", &resumeAtMediaTimeUs)) {
-                ALOGI("[%s] suppressing rendering until %lld us",
+                ALOGV("[%s] suppressing rendering until %lld us",
                         mComponentName.c_str(), (long long)resumeAtMediaTimeUs);
                 mSkipRenderingUntilMediaTimeUs = resumeAtMediaTimeUs;
             }
@@ -1069,6 +1075,12 @@ bool NuPlayer::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
                         static_cast<MediaBufferHolder*>(holder.get())->mediaBuffer() : nullptr;
                 }
                 if (mediaBuf != NULL) {
+                    if (mediaBuf->size() > codecBuffer->capacity()) {
+                        handleError(ERROR_BUFFER_TOO_SMALL);
+                        mDequeuedInputBuffers.push_back(bufferIx);
+                        return false;
+                    }
+
                     codecBuffer->setRange(0, mediaBuf->size());
                     memcpy(codecBuffer->data(), mediaBuf->data(), mediaBuf->size());
 

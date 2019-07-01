@@ -34,8 +34,7 @@ enum media2_event_type {
     MEDIA2_SET_VIDEO_SIZE    = 5,
     MEDIA2_STARTED           = 6,
     MEDIA2_PAUSED            = 7,
-    MEDIA2_STOPPED           = 8,
-    MEDIA2_SKIPPED           = 9,
+    MEDIA2_SKIPPED           = 8,
     MEDIA2_NOTIFY_TIME       = 98,
     MEDIA2_TIMED_TEXT        = 99,
     MEDIA2_ERROR             = 100,
@@ -43,7 +42,6 @@ enum media2_event_type {
     MEDIA2_SUBTITLE_DATA     = 201,
     MEDIA2_META_DATA         = 202,
     MEDIA2_DRM_INFO          = 210,
-    MEDIA2_AUDIO_ROUTING_CHANGED = 10000,
 };
 
 // Generic error codes for the media player framework.  Errors are fatal, the
@@ -96,17 +94,20 @@ enum media2_error_type {
 enum media2_info_type {
     // 0xx
     MEDIA2_INFO_UNKNOWN = 1,
-    // The player was started because it was used as the next player for another
-    // player, which just completed playback
-    MEDIA2_INFO_STARTED_AS_NEXT = 2,
+    // The player just started the playback of this data source.
+    MEDIA2_INFO_DATA_SOURCE_START = 2,
     // The player just pushed the very first video frame for rendering
     MEDIA2_INFO_VIDEO_RENDERING_START = 3,
     // The player just pushed the very first audio frame for rendering
     MEDIA2_INFO_AUDIO_RENDERING_START = 4,
     // The player just completed the playback of this data source
-    MEDIA2_INFO_PLAYBACK_COMPLETE = 5,
-    // The player just completed the playback of the full play list
-    MEDIA2_INFO_PLAYLIST_END = 6,
+    MEDIA2_INFO_DATA_SOURCE_END = 5,
+    // The player just completed the playback of all data sources.
+    // But this is not visible in native code. Just keep this entry for completeness.
+    MEDIA2_INFO_DATA_SOURCE_LIST_END = 6,
+    // The player just completed an iteration of playback loop. This event is sent only when
+    // looping is enabled.
+    MEDIA2_INFO_DATA_SOURCE_REPEAT = 7,
 
     //1xx
     // The player just prepared a data source.
@@ -150,11 +151,11 @@ enum media2_info_type {
 
 // Do not change these values without updating their counterparts in MediaPlayer2.java
 enum mediaplayer2_states {
-    MEDIAPLAYER2_STATE_IDLE         = 1,
-    MEDIAPLAYER2_STATE_PREPARED     = 2,
-    MEDIAPLAYER2_STATE_PLAYING      = 3,
-    MEDIAPLAYER2_STATE_PAUSED       = 4,
-    MEDIAPLAYER2_STATE_ERROR        = 5,
+    MEDIAPLAYER2_STATE_IDLE         = 1001,
+    MEDIAPLAYER2_STATE_PREPARED     = 1002,
+    MEDIAPLAYER2_STATE_PAUSED       = 1003,
+    MEDIAPLAYER2_STATE_PLAYING      = 1004,
+    MEDIAPLAYER2_STATE_ERROR        = 1005,
 };
 
 enum media_player2_internal_states {
@@ -165,8 +166,7 @@ enum media_player2_internal_states {
     MEDIA_PLAYER2_PREPARED           = 1 << 3,
     MEDIA_PLAYER2_STARTED            = 1 << 4,
     MEDIA_PLAYER2_PAUSED             = 1 << 5,
-    MEDIA_PLAYER2_STOPPED            = 1 << 6,
-    MEDIA_PLAYER2_PLAYBACK_COMPLETE  = 1 << 7
+    MEDIA_PLAYER2_PLAYBACK_COMPLETE  = 1 << 6
 };
 
 // Keep KEY_PARAMETER_* in sync with MediaPlayer2.java.

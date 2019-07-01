@@ -167,6 +167,30 @@ TEST(DistortionMapperTest, IdentityTransform) {
     }
 }
 
+TEST(DistortionMapperTest, ClampConsistency) {
+    status_t res;
+
+    std::array<int32_t, 4> activeArray = {0, 0, 4032, 3024};
+    DistortionMapper m;
+    setupTestMapper(&m, identityDistortion, testICal, /*activeArray*/ activeArray.data(),
+            /*preCorrectionActiveArray*/ activeArray.data());
+
+    auto rectsOrig = activeArray;
+    res = m.mapCorrectedRectToRaw(activeArray.data(), 1, /*clamp*/true, /*simple*/ true);
+    ASSERT_EQ(res, OK);
+
+    for (size_t i = 0; i < activeArray.size(); i++) {
+        EXPECT_EQ(activeArray[i], rectsOrig[i]);
+    }
+
+    res = m.mapRawRectToCorrected(activeArray.data(), 1, /*clamp*/true, /*simple*/ true);
+    ASSERT_EQ(res, OK);
+
+    for (size_t i = 0; i < activeArray.size(); i++) {
+        EXPECT_EQ(activeArray[i], rectsOrig[i]);
+    }
+}
+
 TEST(DistortionMapperTest, SimpleTransform) {
     status_t res;
 

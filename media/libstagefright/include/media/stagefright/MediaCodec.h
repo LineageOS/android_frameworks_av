@@ -313,6 +313,7 @@ private:
     sp<ALooper> mCodecLooper;
     sp<CodecBase> mCodec;
     AString mComponentName;
+    AString mOwnerName;
     sp<MediaCodecInfo> mCodecInfo;
     sp<AReplyToken> mReplyID;
     uint32_t mFlags;
@@ -339,6 +340,7 @@ private:
     int32_t mVideoWidth;
     int32_t mVideoHeight;
     int32_t mRotationDegrees;
+    int32_t mAllowFrameDroppingBySurface;
 
     // initial create parameters
     AString mInitName;

@@ -37,49 +37,51 @@
 
 #include <media/IMediaAnalyticsService.h>
 
+using google::protobuf::RepeatedPtrField;
+using android::media::MediaPlayer2Proto::Value;
+
 static const int kDumpLockRetries = 50;
 static const int kDumpLockSleepUs = 20000;
 
 namespace android {
 
-struct ParcelWrapper : public RefBase {
-    static sp<ParcelWrapper> Create(const Parcel *p) {
+struct PlayerMessageWrapper : public RefBase {
+    static sp<PlayerMessageWrapper> Create(const PlayerMessage *p) {
         if (p != NULL) {
-            sp<ParcelWrapper> pw = new ParcelWrapper();
-            if (pw->appendFrom(p) == OK) {
-                return pw;
-            }
+            sp<PlayerMessageWrapper> pw = new PlayerMessageWrapper();
+            pw->copyFrom(p);
+            return pw;
         }
         return NULL;
     }
 
-    const Parcel *getParcel() {
-        return mParcel;
+    const PlayerMessage *getPlayerMessage() {
+        return mPlayerMessage;
     }
 
 protected:
-    virtual ~ParcelWrapper() {
-        if (mParcel != NULL) {
-            delete mParcel;
+    virtual ~PlayerMessageWrapper() {
+        if (mPlayerMessage != NULL) {
+            delete mPlayerMessage;
         }
     }
 
 private:
-    ParcelWrapper()
-        : mParcel(NULL) { }
+    PlayerMessageWrapper()
+        : mPlayerMessage(NULL) { }
 
-    status_t appendFrom(const Parcel *p) {
-        if (mParcel == NULL) {
-            mParcel = new Parcel;
+    void copyFrom(const PlayerMessage *p) {
+        if (mPlayerMessage == NULL) {
+            mPlayerMessage = new PlayerMessage;
         }
-        return mParcel->appendFrom(p, 0 /* start */, p->dataSize());
+        mPlayerMessage->CopyFrom(*p);
     }
 
-    Parcel *mParcel;
+    PlayerMessage *mPlayerMessage;
 };
 
 // key for media statistics
-static const char *kKeyPlayer = "nuplayer";
+static const char *kKeyPlayer = "nuplayer2";
 // attrs for media statistics
     // NB: these are matched with public Java API constants defined
     // in frameworks/base/media/java/android/media/MediaPlayer2.java
@@ -90,6 +92,7 @@ static const char *kPlayerWidth = "android.media.mediaplayer.width";
 static const char *kPlayerHeight = "android.media.mediaplayer.height";
 static const char *kPlayerFrames = "android.media.mediaplayer.frames";
 static const char *kPlayerFramesDropped = "android.media.mediaplayer.dropped";
+static const char *kPlayerFrameRate = "android.media.mediaplayer.fps";
 static const char *kPlayerAMime = "android.media.mediaplayer.audio.mime";
 static const char *kPlayerACodec = "android.media.mediaplayer.audio.codec";
 static const char *kPlayerDuration = "android.media.mediaplayer.durationMs";
@@ -105,8 +108,10 @@ static const char *kPlayerRebuffering = "android.media.mediaplayer.rebufferingMs
 static const char *kPlayerRebufferingCount = "android.media.mediaplayer.rebuffers";
 static const char *kPlayerRebufferingAtExit = "android.media.mediaplayer.rebufferExit";
 
+static const char *kPlayerVersion = "android.media.mediaplayer.version";
 
-NuPlayer2Driver::NuPlayer2Driver(pid_t pid, uid_t uid)
+
+NuPlayer2Driver::NuPlayer2Driver(pid_t pid, uid_t uid, const sp<JObjectHolder> &context)
     : mState(STATE_IDLE),
       mAsyncResult(UNKNOWN_ERROR),
       mSrcId(0),
@@ -121,9 +126,10 @@ NuPlayer2Driver::NuPlayer2Driver(pid_t pid, uid_t uid)
       mLooper(new ALooper),
       mNuPlayer2Looper(new ALooper),
       mMediaClock(new MediaClock),
-      mPlayer(new NuPlayer2(pid, uid, mMediaClock)),
+      mPlayer(new NuPlayer2(pid, uid, mMediaClock, context)),
       mPlayerFlags(0),
-      mAnalyticsItem(NULL),
+      mMetricsHandle(0),
+      mPlayerVersion(0),
       mClientUid(uid),
       mAtEOS(false),
       mLooping(false),
@@ -134,9 +140,13 @@ NuPlayer2Driver::NuPlayer2Driver(pid_t pid, uid_t uid)
 
     mMediaClock->init();
 
-    // set up an analytics record
-    mAnalyticsItem = new MediaAnalyticsItem(kKeyPlayer);
-    mAnalyticsItem->setUid(mClientUid);
+    // XXX: what version are we?
+    // Ideally, this ticks with the apk version info for the APEX packaging
+
+    // set up media metrics record
+    mMetricsHandle = mediametrics_create(kKeyPlayer);
+    mediametrics_setUid(mMetricsHandle, mClientUid);
+    mediametrics_setInt64(mMetricsHandle, kPlayerVersion, mPlayerVersion);
 
     mNuPlayer2Looper->start(
             false, /* runOnCallingThread */
@@ -157,10 +167,7 @@ NuPlayer2Driver::~NuPlayer2Driver() {
     updateMetrics("destructor");
     logMetrics("destructor");
 
-    if (mAnalyticsItem != NULL) {
-        delete mAnalyticsItem;
-        mAnalyticsItem = NULL;
-    }
+    mediametrics_delete(mMetricsHandle);
 }
 
 status_t NuPlayer2Driver::initCheck() {
@@ -273,13 +280,6 @@ status_t NuPlayer2Driver::prepareAsync() {
             mState = STATE_PREPARING;
             mPlayer->prepareAsync();
             return OK;
-        case STATE_STOPPED:
-            // this is really just paused. handle as seek to start
-            mAtEOS = false;
-            mState = STATE_STOPPED_AND_PREPARING;
-            mPlayer->seekToAsync(0, MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC /* mode */,
-                    true /* needNotify */);
-            return OK;
         default:
             return INVALID_OPERATION;
     };
@@ -294,7 +294,6 @@ status_t NuPlayer2Driver::start() {
 status_t NuPlayer2Driver::start_l() {
     switch (mState) {
         case STATE_PAUSED:
-        case STATE_STOPPED_AND_PREPARED:
         case STATE_PREPARED:
         {
             mPlayer->start();
@@ -304,7 +303,7 @@ status_t NuPlayer2Driver::start_l() {
         case STATE_RUNNING:
         {
             if (mAtEOS) {
-                mPlayer->seekToAsync(0);
+                mPlayer->rewind();
                 mAtEOS = false;
                 mPositionUs = -1;
             }
@@ -316,34 +315,6 @@ status_t NuPlayer2Driver::start_l() {
     }
 
     mState = STATE_RUNNING;
-
-    return OK;
-}
-
-status_t NuPlayer2Driver::stop() {
-    ALOGD("stop(%p)", this);
-    Mutex::Autolock autoLock(mLock);
-
-    switch (mState) {
-        case STATE_RUNNING:
-            mPlayer->pause();
-            // fall through
-
-        case STATE_PAUSED:
-            mState = STATE_STOPPED;
-            //notifyListener_l(MEDIA2_STOPPED);
-            break;
-
-        case STATE_PREPARED:
-        case STATE_STOPPED:
-        case STATE_STOPPED_AND_PREPARING:
-        case STATE_STOPPED_AND_PREPARED:
-            mState = STATE_STOPPED;
-            break;
-
-        default:
-            return INVALID_OPERATION;
-    }
 
     return OK;
 }
@@ -361,9 +332,9 @@ status_t NuPlayer2Driver::pause() {
 
     switch (mState) {
         case STATE_PAUSED:
-        case STATE_PREPARED:
             return OK;
 
+        case STATE_PREPARED:
         case STATE_RUNNING:
             mState = STATE_PAUSED;
             mPlayer->pause();
@@ -386,15 +357,6 @@ status_t NuPlayer2Driver::setPlaybackSettings(const AudioPlaybackRate &rate) {
         // try to update position
         int64_t unused;
         getCurrentPosition(&unused);
-        Mutex::Autolock autoLock(mLock);
-        if (rate.mSpeed == 0.f && mState == STATE_RUNNING) {
-            mState = STATE_PAUSED;
-        } else if (rate.mSpeed != 0.f
-                && (mState == STATE_PAUSED
-                    || mState == STATE_STOPPED_AND_PREPARED
-                    || mState == STATE_PREPARED)) {
-            err = start_l();
-        }
     }
     return err;
 }
@@ -419,7 +381,6 @@ status_t NuPlayer2Driver::seekTo(int64_t msec, MediaPlayer2SeekMode mode) {
 
     switch (mState) {
         case STATE_PREPARED:
-        case STATE_STOPPED_AND_PREPARED:
         case STATE_PAUSED:
         case STATE_RUNNING:
         {
@@ -497,15 +458,15 @@ void NuPlayer2Driver::updateMetrics(const char *where) {
 
             if (mime.startsWith("video/")) {
                 int32_t width, height;
-                mAnalyticsItem->setCString(kPlayerVMime, mime.c_str());
+                mediametrics_setCString(mMetricsHandle, kPlayerVMime, mime.c_str());
                 if (!name.empty()) {
-                    mAnalyticsItem->setCString(kPlayerVCodec, name.c_str());
+                    mediametrics_setCString(mMetricsHandle, kPlayerVCodec, name.c_str());
                 }
 
                 if (stats->findInt32("width", &width)
                         && stats->findInt32("height", &height)) {
-                    mAnalyticsItem->setInt32(kPlayerWidth, width);
-                    mAnalyticsItem->setInt32(kPlayerHeight, height);
+                    mediametrics_setInt32(mMetricsHandle, kPlayerWidth, width);
+                    mediametrics_setInt32(mMetricsHandle, kPlayerHeight, height);
                 }
 
                 int64_t numFramesTotal = 0;
@@ -513,14 +474,18 @@ void NuPlayer2Driver::updateMetrics(const char *where) {
                 stats->findInt64("frames-total", &numFramesTotal);
                 stats->findInt64("frames-dropped-output", &numFramesDropped);
 
-                mAnalyticsItem->setInt64(kPlayerFrames, numFramesTotal);
-                mAnalyticsItem->setInt64(kPlayerFramesDropped, numFramesDropped);
+                mediametrics_setInt64(mMetricsHandle, kPlayerFrames, numFramesTotal);
+                mediametrics_setInt64(mMetricsHandle, kPlayerFramesDropped, numFramesDropped);
 
+                float frameRate = 0;
+                if (stats->findFloat("frame-rate-output", &frameRate)) {
+                    mediametrics_setInt64(mMetricsHandle, kPlayerFrameRate, frameRate);
+                }
 
             } else if (mime.startsWith("audio/")) {
-                mAnalyticsItem->setCString(kPlayerAMime, mime.c_str());
+                mediametrics_setCString(mMetricsHandle, kPlayerAMime, mime.c_str());
                 if (!name.empty()) {
-                    mAnalyticsItem->setCString(kPlayerACodec, name.c_str());
+                    mediametrics_setCString(mMetricsHandle, kPlayerACodec, name.c_str());
                 }
             }
         }
@@ -531,17 +496,17 @@ void NuPlayer2Driver::updateMetrics(const char *where) {
     // getDuration() uses mLock for mutex -- careful where we use it.
     int64_t duration_ms = -1;
     getDuration(&duration_ms);
-    mAnalyticsItem->setInt64(kPlayerDuration, duration_ms);
+    mediametrics_setInt64(mMetricsHandle, kPlayerDuration, duration_ms);
 
-    mAnalyticsItem->setInt64(kPlayerPlaying, (mPlayingTimeUs+500)/1000 );
+    mediametrics_setInt64(mMetricsHandle, kPlayerPlaying, (mPlayingTimeUs+500)/1000 );
 
     if (mRebufferingEvents != 0) {
-        mAnalyticsItem->setInt64(kPlayerRebuffering, (mRebufferingTimeUs+500)/1000 );
-        mAnalyticsItem->setInt32(kPlayerRebufferingCount, mRebufferingEvents);
-        mAnalyticsItem->setInt32(kPlayerRebufferingAtExit, mRebufferingAtExit);
+        mediametrics_setInt64(mMetricsHandle, kPlayerRebuffering, (mRebufferingTimeUs+500)/1000 );
+        mediametrics_setInt32(mMetricsHandle, kPlayerRebufferingCount, mRebufferingEvents);
+        mediametrics_setInt32(mMetricsHandle, kPlayerRebufferingAtExit, mRebufferingAtExit);
     }
 
-    mAnalyticsItem->setCString(kPlayerDataSourceType, mPlayer->getDataSourceType());
+    mediametrics_setCString(mMetricsHandle, kPlayerDataSourceType, mPlayer->getDataSourceType());
 }
 
 
@@ -551,7 +516,7 @@ void NuPlayer2Driver::logMetrics(const char *where) {
     }
     ALOGV("logMetrics(%p) from %s at state %d", this, where, mState);
 
-    if (mAnalyticsItem == NULL || mAnalyticsItem->isEnabled() == false) {
+    if (mMetricsHandle == 0 || mediametrics_isEnabled() == false) {
         return;
     }
 
@@ -560,16 +525,13 @@ void NuPlayer2Driver::logMetrics(const char *where) {
     // and that always injects 3 fields (duration, playing time, and
     // datasource) into the record.
     // So the canonical "empty" record has 3 elements in it.
-    if (mAnalyticsItem->count() > 3) {
-
-        mAnalyticsItem->selfrecord();
-
+    if (mediametrics_count(mMetricsHandle) > 3) {
+        mediametrics_selfRecord(mMetricsHandle);
         // re-init in case we prepare() and start() again.
-        delete mAnalyticsItem ;
-        mAnalyticsItem = new MediaAnalyticsItem(kKeyPlayer);
-        if (mAnalyticsItem) {
-            mAnalyticsItem->setUid(mClientUid);
-        }
+        mediametrics_delete(mMetricsHandle);
+        mMetricsHandle = mediametrics_create(kKeyPlayer);
+        mediametrics_setUid(mMetricsHandle, mClientUid);
+        mediametrics_setInt64(mMetricsHandle, kPlayerVersion, mPlayerVersion);
     } else {
         ALOGV("did not have anything to record");
     }
@@ -601,10 +563,6 @@ status_t NuPlayer2Driver::reset() {
             break;
     }
 
-    if (mState != STATE_STOPPED) {
-        // notifyListener_l(MEDIA2_STOPPED);
-    }
-
     mState = STATE_RESET_IN_PROGRESS;
     mPlayer->resetAsync();
 
@@ -633,50 +591,51 @@ status_t NuPlayer2Driver::setLooping(int loop) {
     return OK;
 }
 
-status_t NuPlayer2Driver::invoke(const Parcel &request, Parcel *reply) {
-    if (reply == NULL) {
+status_t NuPlayer2Driver::invoke(const PlayerMessage &request, PlayerMessage *response) {
+    if (response == NULL) {
         ALOGE("reply is a NULL pointer");
         return BAD_VALUE;
     }
 
-    int32_t methodId;
-    status_t ret = request.readInt32(&methodId);
-    if (ret != OK) {
-        ALOGE("Failed to retrieve the requested method to invoke, err(%d)", ret);
-        return ret;
-    }
+    RepeatedPtrField<const Value>::const_iterator it = request.values().cbegin();
+    int32_t methodId = (it++)->int32_value();
 
     switch (methodId) {
         case MEDIA_PLAYER2_INVOKE_ID_SET_VIDEO_SCALING_MODE:
         {
-            int mode = request.readInt32();
+            int mode = (it++)->int32_value();
             return mPlayer->setVideoScalingMode(mode);
         }
 
         case MEDIA_PLAYER2_INVOKE_ID_GET_TRACK_INFO:
         {
-            return mPlayer->getTrackInfo(reply);
+            int64_t srcId = (it++)->int64_value();
+            return mPlayer->getTrackInfo(srcId, response);
         }
 
         case MEDIA_PLAYER2_INVOKE_ID_SELECT_TRACK:
         {
-            int trackIndex = request.readInt32();
+            int64_t srcId = (it++)->int64_value();
+            int trackIndex = (it++)->int32_value();
             int64_t msec = 0;
             // getCurrentPosition should always return OK
             getCurrentPosition(&msec);
-            return mPlayer->selectTrack(trackIndex, true /* select */, msec * 1000LL);
+            return mPlayer->selectTrack(srcId, trackIndex, true /* select */, msec * 1000LL);
         }
 
         case MEDIA_PLAYER2_INVOKE_ID_UNSELECT_TRACK:
         {
-            int trackIndex = request.readInt32();
-            return mPlayer->selectTrack(trackIndex, false /* select */, 0xdeadbeef /* not used */);
+            int64_t srcId = (it++)->int64_value();
+            int trackIndex = (it++)->int32_value();
+            return mPlayer->selectTrack(
+                    srcId, trackIndex, false /* select */, 0xdeadbeef /* not used */);
         }
 
         case MEDIA_PLAYER2_INVOKE_ID_GET_SELECTED_TRACK:
         {
-            int32_t type = request.readInt32();
-            return mPlayer->getSelectedTrack(type, reply);
+            int64_t srcId = (it++)->int64_value();
+            int32_t type = (it++)->int32_value();
+            return mPlayer->getSelectedTrack(srcId, type, response);
         }
 
         default:
@@ -696,44 +655,16 @@ status_t NuPlayer2Driver::setParameter(
     return INVALID_OPERATION;
 }
 
-status_t NuPlayer2Driver::getParameter(int key, Parcel *reply) {
-
-    if (key == FOURCC('m','t','r','X')) {
-        // mtrX -- a play on 'metrics' (not matrix)
-        // gather current info all together, parcel it, and send it back
-        updateMetrics("api");
-        mAnalyticsItem->writeToParcel(reply);
-        return OK;
-    }
-
+status_t NuPlayer2Driver::getParameter(int key __unused, Parcel *reply __unused) {
     return INVALID_OPERATION;
 }
 
-status_t NuPlayer2Driver::getMetadata(
-        const media::Metadata::Filter& /* ids */, Parcel *records) {
-    Mutex::Autolock autoLock(mLock);
-
-    using media::Metadata;
-
-    Metadata meta(records);
-
-    meta.appendBool(
-            Metadata::kPauseAvailable,
-            mPlayerFlags & NuPlayer2::Source::FLAG_CAN_PAUSE);
-
-    meta.appendBool(
-            Metadata::kSeekBackwardAvailable,
-            mPlayerFlags & NuPlayer2::Source::FLAG_CAN_SEEK_BACKWARD);
-
-    meta.appendBool(
-            Metadata::kSeekForwardAvailable,
-            mPlayerFlags & NuPlayer2::Source::FLAG_CAN_SEEK_FORWARD);
-
-    meta.appendBool(
-            Metadata::kSeekAvailable,
-            mPlayerFlags & NuPlayer2::Source::FLAG_CAN_SEEK);
-
-    return OK;
+status_t NuPlayer2Driver::getMetrics(char **buffer, size_t *length) {
+    updateMetrics("api");
+    if (mediametrics_getAttributes(mMetricsHandle, buffer, length))
+        return OK;
+    else
+        return FAILED_TRANSACTION;
 }
 
 void NuPlayer2Driver::notifyResetComplete(int64_t /* srcId */) {
@@ -780,20 +711,7 @@ void NuPlayer2Driver::notifySeekComplete(int64_t srcId) {
     ALOGV("notifySeekComplete(%p)", this);
     Mutex::Autolock autoLock(mLock);
     mSeekInProgress = false;
-    notifySeekComplete_l(srcId);
-}
-
-void NuPlayer2Driver::notifySeekComplete_l(int64_t srcId) {
-    bool wasSeeking = true;
-    if (mState == STATE_STOPPED_AND_PREPARING) {
-        wasSeeking = false;
-        mState = STATE_STOPPED_AND_PREPARED;
-        mCondition.broadcast();
-    } else if (mState == STATE_STOPPED) {
-        // no need to notify listener
-        return;
-    }
-    notifyListener_l(srcId, wasSeeking ? MEDIA2_SEEK_COMPLETE : MEDIA2_PREPARED);
+    notifyListener_l(srcId, MEDIA2_SEEK_COMPLETE);
 }
 
 status_t NuPlayer2Driver::dump(
@@ -884,12 +802,12 @@ void NuPlayer2Driver::onMessageReceived(const sp<AMessage> &msg) {
             CHECK(msg->findInt32("messageId", &msgId));
             msg->findInt32("ext1", &ext1);
             msg->findInt32("ext2", &ext2);
-            sp<ParcelWrapper> in;
+            sp<PlayerMessageWrapper> in;
             sp<RefBase> obj;
-            if (msg->findObject("parcel", &obj) && obj != NULL) {
-                in = static_cast<ParcelWrapper *>(obj.get());
+            if (msg->findObject("obj", &obj) && obj != NULL) {
+                in = static_cast<PlayerMessageWrapper *>(obj.get());
             }
-            sendEvent(srcId, msgId, ext1, ext2, (in == NULL ? NULL : in->getParcel()));
+            sendEvent(srcId, msgId, ext1, ext2, (in == NULL ? NULL : in->getPlayerMessage()));
             break;
         }
         default:
@@ -898,16 +816,16 @@ void NuPlayer2Driver::onMessageReceived(const sp<AMessage> &msg) {
 }
 
 void NuPlayer2Driver::notifyListener(
-        int64_t srcId, int msg, int ext1, int ext2, const Parcel *in) {
+        int64_t srcId, int msg, int ext1, int ext2, const PlayerMessage *in) {
     Mutex::Autolock autoLock(mLock);
     notifyListener_l(srcId, msg, ext1, ext2, in);
 }
 
 void NuPlayer2Driver::notifyListener_l(
-        int64_t srcId, int msg, int ext1, int ext2, const Parcel *in) {
+        int64_t srcId, int msg, int ext1, int ext2, const PlayerMessage *in) {
     ALOGD("notifyListener_l(%p), (%lld, %d, %d, %d, %d), loop setting(%d, %d)",
             this, (long long)srcId, msg, ext1, ext2,
-            (in == NULL ? -1 : (int)in->dataSize()), mAutoLoop, mLooping);
+            (in == NULL ? -1 : (int)in->ByteSize()), mAutoLoop, mLooping);
     if (srcId == mSrcId) {
         switch (msg) {
             case MEDIA2_PLAYBACK_COMPLETE:
@@ -924,13 +842,18 @@ void NuPlayer2Driver::notifyListener_l(
                         }
                     }
                     if (mLooping || mAutoLoop) {
-                        mPlayer->seekToAsync(0);
+                        mPlayer->rewind();
                         if (mAudioSink != NULL) {
                             // The renderer has stopped the sink at the end in order to play out
                             // the last little bit of audio. In looping mode, we need to restart it.
                             mAudioSink->start();
                         }
-                        // don't send completion event when looping
+
+                        sp<AMessage> notify = new AMessage(kWhatNotifyListener, this);
+                        notify->setInt64("srcId", srcId);
+                        notify->setInt32("messageId", MEDIA2_INFO);
+                        notify->setInt32("ext1", MEDIA2_INFO_DATA_SOURCE_REPEAT);
+                        notify->post();
                         return;
                     }
                     if (property_get_bool("persist.debug.sf.stats", false)) {
@@ -949,11 +872,11 @@ void NuPlayer2Driver::notifyListener_l(
                 // ext1 is our primary 'error type' value. Only add ext2 when non-zero.
                 // [test against msg is due to fall through from previous switch value]
                 if (msg == MEDIA2_ERROR) {
-                    mAnalyticsItem->setInt32(kPlayerError, ext1);
+                    mediametrics_setInt32(mMetricsHandle, kPlayerError, ext1);
                     if (ext2 != 0) {
-                        mAnalyticsItem->setInt32(kPlayerErrorCode, ext2);
+                        mediametrics_setInt32(mMetricsHandle, kPlayerErrorCode, ext2);
                     }
-                    mAnalyticsItem->setCString(kPlayerErrorState, stateString(mState).c_str());
+                    mediametrics_setCString(mMetricsHandle, kPlayerErrorState, stateString(mState).c_str());
                 }
                 mAtEOS = true;
                 break;
@@ -969,7 +892,7 @@ void NuPlayer2Driver::notifyListener_l(
     notify->setInt32("messageId", msg);
     notify->setInt32("ext1", ext1);
     notify->setInt32("ext2", ext2);
-    notify->setObject("parcel", ParcelWrapper::Create(in));
+    notify->setObject("obj", PlayerMessageWrapper::Create((PlayerMessage*)in));
     notify->post();
 }
 
@@ -1036,24 +959,25 @@ void NuPlayer2Driver::notifyFlagsChanged(int64_t /* srcId */, uint32_t flags) {
 }
 
 // Modular DRM
-status_t NuPlayer2Driver::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId)
+status_t NuPlayer2Driver::prepareDrm(
+        int64_t srcId, const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId)
 {
     ALOGV("prepareDrm(%p) state: %d", this, mState);
 
     // leaving the state verification for mediaplayer.cpp
-    status_t ret = mPlayer->prepareDrm(uuid, drmSessionId);
+    status_t ret = mPlayer->prepareDrm(srcId, uuid, drmSessionId);
 
     ALOGV("prepareDrm ret: %d", ret);
 
     return ret;
 }
 
-status_t NuPlayer2Driver::releaseDrm()
+status_t NuPlayer2Driver::releaseDrm(int64_t srcId)
 {
     ALOGV("releaseDrm(%p) state: %d", this, mState);
 
     // leaving the state verification for mediaplayer.cpp
-    status_t ret = mPlayer->releaseDrm();
+    status_t ret = mPlayer->releaseDrm(srcId);
 
     ALOGV("releaseDrm ret: %d", ret);
 
@@ -1073,9 +997,6 @@ std::string NuPlayer2Driver::stateString(State state) {
         case STATE_RUNNING: rval = "RUNNING"; break;
         case STATE_PAUSED: rval = "PAUSED"; break;
         case STATE_RESET_IN_PROGRESS: rval = "RESET_IN_PROGRESS"; break;
-        case STATE_STOPPED: rval = "STOPPED"; break;
-        case STATE_STOPPED_AND_PREPARING: rval = "STOPPED_AND_PREPARING"; break;
-        case STATE_STOPPED_AND_PREPARED: rval = "STOPPED_AND_PREPARED"; break;
         default:
             // yes, this buffer is shared and vulnerable to races
             snprintf(rawbuffer, sizeof(rawbuffer), "%d", state);

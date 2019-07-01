@@ -926,7 +926,7 @@ int Session_ReleaseEffect(preproc_session_t *session,
         delete session->revBuf;
         session->revBuf = NULL;
 
-        session->io = 0;
+        session->id = 0;
     }
 
     return 0;
@@ -1155,7 +1155,7 @@ preproc_session_t *PreProc_GetSession(int32_t procId, int32_t  sessionId, int32_
 {
     size_t i;
     for (i = 0; i < PREPROC_NUM_SESSIONS; i++) {
-        if (sSessions[i].io == ioId) {
+        if (sSessions[i].id == sessionId) {
             if (sSessions[i].createdMsk & (1 << procId)) {
                 return NULL;
             }
@@ -1163,7 +1163,7 @@ preproc_session_t *PreProc_GetSession(int32_t procId, int32_t  sessionId, int32_
         }
     }
     for (i = 0; i < PREPROC_NUM_SESSIONS; i++) {
-        if (sSessions[i].io == 0) {
+        if (sSessions[i].id == 0) {
             sSessions[i].id = sessionId;
             sSessions[i].io = ioId;
             return &sSessions[i];
@@ -1915,7 +1915,7 @@ int PreProcessingLib_Create(const effect_uuid_t *uuid,
     status = Session_CreateEffect(session, procId, pInterface);
 
     if (status < 0 && session->createdMsk == 0) {
-        session->io = 0;
+        session->id = 0;
     }
     return status;
 }
@@ -1929,7 +1929,7 @@ int PreProcessingLib_Release(effect_handle_t interface)
 
     preproc_effect_t *fx = (preproc_effect_t *)interface;
 
-    if (fx->session->io == 0) {
+    if (fx->session->id == 0) {
         return -EINVAL;
     }
     return Session_ReleaseEffect(fx->session, fx);

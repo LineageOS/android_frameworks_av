@@ -21,7 +21,9 @@
 #include <media/stagefright/foundation/avc_utils.h>
 
 #include <media/stagefright/foundation/ByteUtils.h>
-#include <media/DataSourceBase.h>
+
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
 
 namespace android {
 
@@ -79,7 +81,7 @@ bool XINGSeeker::getOffsetForTime(int64_t *timeUs, off64_t *pos) {
 
 // static
 XINGSeeker *XINGSeeker::CreateFromSource(
-        DataSourceBase *source, off64_t first_frame_pos) {
+        DataSourceHelper *source, off64_t first_frame_pos) {
 
     uint8_t buffer[4];
     int offset = first_frame_pos;

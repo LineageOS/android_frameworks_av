@@ -15,6 +15,9 @@
 -->
 
 <audioPolicyConfiguration version="1.0" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <!-- Global configuration Decalaration -->
+    <globalConfiguration speaker_drc_enabled="false"/>
+
     <modules>
         <!-- Stub Audio HAL -->
         <xi:include href="stub_audio_policy_configuration.xml"/>
@@ -26,5 +29,6 @@
 
     <xi:include href="audio_policy_volumes.xml"/>
     <xi:include href="default_volume_tables.xml"/>
+    <xi:include href="surround_sound_configuration_5_0.xml"/>
 
 </audioPolicyConfiguration>

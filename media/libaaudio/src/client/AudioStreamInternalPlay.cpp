@@ -43,13 +43,22 @@ constexpr int kRampMSec = 10; // time to apply a change in volume
 aaudio_result_t AudioStreamInternalPlay::open(const AudioStreamBuilder &builder) {
     aaudio_result_t result = AudioStreamInternal::open(builder);
     if (result == AAUDIO_OK) {
+        result = mFlowGraph.configure(getFormat(),
+                             getSamplesPerFrame(),
+                             getDeviceFormat(),
+                             getDeviceChannelCount());
+
+        if (result != AAUDIO_OK) {
+            close();
+        }
         // Sample rate is constrained to common values by now and should not overflow.
         int32_t numFrames = kRampMSec * getSampleRate() / AAUDIO_MILLIS_PER_SECOND;
-        mVolumeRamp.setLengthInFrames(numFrames);
+        mFlowGraph.setRampLengthInFrames(numFrames);
     }
     return result;
 }
 
+// This must be called under mStreamLock.
 aaudio_result_t AudioStreamInternalPlay::requestPause()
 {
     aaudio_result_t result = stopCallback();
@@ -57,19 +66,19 @@ aaudio_result_t AudioStreamInternalPlay::requestPause()
         return result;
     }
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
-        ALOGE("%s() mServiceStreamHandle invalid", __func__);
+        ALOGW("%s() mServiceStreamHandle invalid", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
     mClockModel.stop(AudioClock::getNanoseconds());
     setState(AAUDIO_STREAM_STATE_PAUSING);
-    mAtomicTimestamp.clear();
+    mAtomicInternalTimestamp.clear();
     return mServiceInterface.pauseStream(mServiceStreamHandle);
 }
 
 aaudio_result_t AudioStreamInternalPlay::requestFlush() {
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
-        ALOGE("%s() mServiceStreamHandle invalid", __func__);
+        ALOGW("%s() mServiceStreamHandle invalid", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -216,22 +225,10 @@ aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buff
             }
 
             int32_t numBytes = getBytesPerFrame() * framesToWrite;
-            // Data conversion.
-            float levelFrom;
-            float levelTo;
-            mVolumeRamp.nextSegment(framesToWrite, &levelFrom, &levelTo);
 
-            AAudioDataConverter::FormattedData source(
-                    (void *)byteBuffer,
-                    getFormat(),
-                    getSamplesPerFrame());
-            AAudioDataConverter::FormattedData destination(
-                    wrappingBuffer.data[partIndex],
-                    getDeviceFormat(),
-                    getDeviceChannelCount());
-
-            AAudioDataConverter::convert(source, destination, framesToWrite,
-                                         levelFrom, levelTo);
+            mFlowGraph.process((void *)byteBuffer,
+                               wrappingBuffer.data[partIndex],
+                               framesToWrite);
 
             byteBuffer += numBytes;
             framesLeft -= framesToWrite;
@@ -246,27 +243,17 @@ aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buff
     return framesWritten;
 }
 
-int64_t AudioStreamInternalPlay::getFramesRead()
-{
-    int64_t framesReadHardware;
-    if (isActive()) {
-        framesReadHardware = mClockModel.convertTimeToPosition(AudioClock::getNanoseconds());
-    } else {
-        framesReadHardware = mAudioEndpoint.getDataReadCounter();
-    }
-    int64_t framesRead = framesReadHardware + mFramesOffsetFromService;
-    // Prevent retrograde motion.
-    if (framesRead < mLastFramesRead) {
-        framesRead = mLastFramesRead;
-    } else {
-        mLastFramesRead = framesRead;
-    }
-    return framesRead;
+int64_t AudioStreamInternalPlay::getFramesRead() {
+    const int64_t framesReadHardware = isClockModelInControl()
+            ? mClockModel.convertTimeToPosition(AudioClock::getNanoseconds())
+            : mAudioEndpoint.getDataReadCounter();
+    // Add service offset and prevent retrograde motion.
+    mLastFramesRead = std::max(mLastFramesRead, framesReadHardware + mFramesOffsetFromService);
+    return mLastFramesRead;
 }
 
-int64_t AudioStreamInternalPlay::getFramesWritten()
-{
-    int64_t framesWritten = mAudioEndpoint.getDataWriteCounter()
+int64_t AudioStreamInternalPlay::getFramesWritten() {
+    const int64_t framesWritten = mAudioEndpoint.getDataWriteCounter()
                                + mFramesOffsetFromService;
     return framesWritten;
 }
@@ -297,7 +284,8 @@ void *AudioStreamInternalPlay::callbackLoop() {
                 break;
             }
         } else if (callbackResult == AAUDIO_CALLBACK_RESULT_STOP) {
-            ALOGV("%s(): callback returned AAUDIO_CALLBACK_RESULT_STOP", __func__);
+            ALOGD("%s(): callback returned AAUDIO_CALLBACK_RESULT_STOP", __func__);
+            result = systemStopFromCallback();
             break;
         }
     }
@@ -313,6 +301,6 @@ status_t AudioStreamInternalPlay::doSetVolume() {
     float combinedVolume = mStreamVolume * getDuckAndMuteVolume();
     ALOGD("%s() mStreamVolume * duckAndMuteVolume = %f * %f = %f",
           __func__, mStreamVolume, getDuckAndMuteVolume(), combinedVolume);
-    mVolumeRamp.setTarget(combinedVolume);
+    mFlowGraph.setTargetVolume(combinedVolume);
     return android::NO_ERROR;
 }
