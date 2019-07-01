@@ -886,6 +886,8 @@ status_t CCodecBufferChannel::start(
 
         bool forceArrayMode = false;
         Mutexed<Input>::Locked input(mInput);
+        input->inputDelay = inputDelayValue;
+        input->pipelineDelay = pipelineDelayValue;
         input->numSlots = numInputSlots;
         input->extraBuffers.flush();
         input->numExtraSlots = 0u;
@@ -1052,6 +1054,7 @@ status_t CCodecBufferChannel::start(
         }
 
         Mutexed<Output>::Locked output(mOutput);
+        output->outputDelay = outputDelayValue;
         output->numSlots = numOutputSlots;
         if (graphic) {
             if (outputSurface) {
