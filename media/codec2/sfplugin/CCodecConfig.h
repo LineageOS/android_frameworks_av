@@ -134,6 +134,8 @@ struct CCodecConfig {
     /// For now support a validation function.
     std::map<C2Param::Index, LocalParamValidator> mLocalParams;
 
+    std::set<std::string> mLastConfig;
+
     CCodecConfig();
 
     /// initializes the members required to manage the format: descriptors, reflector,
