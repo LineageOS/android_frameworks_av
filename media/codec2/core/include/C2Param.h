@@ -176,9 +176,9 @@ public:
             DIR_INPUT      = 0x00000000,
             DIR_OUTPUT     = 0x10000000,
 
-            IS_STREAM_FLAG  = 0x00100000,
-            STREAM_ID_MASK  = 0x03E00000,
-            STREAM_ID_SHIFT = 21,
+            IS_STREAM_FLAG  = 0x02000000,
+            STREAM_ID_MASK  = 0x01F00000,
+            STREAM_ID_SHIFT = 20,
             MAX_STREAM_ID   = STREAM_ID_MASK >> STREAM_ID_SHIFT,
             STREAM_MASK     = IS_STREAM_FLAG | STREAM_ID_MASK,
 
