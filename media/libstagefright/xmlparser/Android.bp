@@ -27,6 +27,12 @@ cc_library_shared {
         "libstagefright_omx_utils",
     ],
 
+    target: {
+        vendor: {
+            cflags: ["-D__ANDROID_VNDK__"],
+        },
+    },
+
     cflags: [
         "-Werror",
         "-Wall",
