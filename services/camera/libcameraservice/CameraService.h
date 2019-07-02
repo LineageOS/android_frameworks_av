@@ -25,6 +25,7 @@
 #include <cutils/multiuser.h>
 #include <utils/Vector.h>
 #include <utils/KeyedVector.h>
+#include <binder/ActivityManager.h>
 #include <binder/AppOpsManager.h>
 #include <binder/BinderService.h>
 #include <binder/IAppOpsCallback.h>
@@ -564,6 +565,7 @@ private:
 
         Mutex mUidLock;
         bool mRegistered;
+        ActivityManager mAm;
         wp<CameraService> mService;
         std::unordered_set<uid_t> mActiveUids;
         // Monitored uid map to cached procState and refCount pair
