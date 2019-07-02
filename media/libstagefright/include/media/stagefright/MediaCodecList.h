@@ -83,6 +83,7 @@ private:
     };
 
     static sp<BinderDeathObserver> sBinderDeathObserver;
+    static sp<IBinder> sMediaPlayer;
 
     static sp<IMediaCodecList> sCodecList;
     static sp<IMediaCodecList> sRemoteList;
