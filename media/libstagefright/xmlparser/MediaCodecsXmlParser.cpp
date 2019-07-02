@@ -117,6 +117,36 @@ status_t combineStatus(status_t a, status_t b) {
     }
 }
 
+std::string getVendorXmlPath(const std::string &path) {
+    std::string vendorPath;
+    std::string result = path;
+
+    if (!strncmp(path.c_str(), "/vendor/etc/media_codecs.xml",
+                    strlen("/vendor/etc/media_codecs.xml"))) {
+        vendorPath = "/vendor/etc/media_codecs_vendor";
+    } else if (!strncmp(path.c_str(), "/vendor/etc/media_codecs_performance.xml",
+                    strlen("/vendor/etc/media_codecs_performance.xml"))) {
+        vendorPath = "/vendor/etc/media_codecs_performance";
+    }
+
+    if (!vendorPath.empty()) {
+        if (fileExists(vendorPath + std::string(".xml"))) {
+            char version[PROP_VALUE_MAX] = {0};
+            result = vendorPath + std::string(".xml");
+            property_get("vendor.media.target.version", version, "0");
+            if (atoi(version) > 0) {
+                std::string versionedXml = vendorPath + std::string("_v") +
+                                 std::string(version) + std::string(".xml");
+                if(fileExists(versionedXml)) {
+                    result = versionedXml;
+                }
+            }
+        }
+        ALOGI("getVendorXmlPath (%s)", result.c_str());
+    }
+    return result;
+}
+
 MediaCodecsXmlParser::StringSet parseCommaSeparatedStringSet(const char *s) {
     MediaCodecsXmlParser::StringSet result;
     for (const char *ptr = s ? : ""; *ptr; ) {
@@ -442,20 +472,22 @@ status_t MediaCodecsXmlParser::Impl::parseXmlFilesInSearchDirs(
 
 status_t MediaCodecsXmlParser::Impl::parseXmlPath(const std::string &path) {
     std::lock_guard<std::mutex> guard(mLock);
-    if (!fileExists(path)) {
-        ALOGV("Cannot find %s", path.c_str());
+    std::string vendorPath = getVendorXmlPath(path);
+
+    if (!fileExists(vendorPath)) {
+        ALOGV("Cannot find %s", vendorPath.c_str());
         mParsingStatus = combineStatus(mParsingStatus, NAME_NOT_FOUND);
         return NAME_NOT_FOUND;
     }
 
     // save state (even though we should always be at toplevel here)
     State::RestorePoint rp = mState.createRestorePoint();
-    Parser parser(&mState, path);
+    Parser parser(&mState, vendorPath);
     parser.parseXmlFile();
     mState.restore(rp);
 
     if (parser.getStatus() != OK) {
-        ALOGD("parseXmlPath(%s) failed with %s", path.c_str(), asString(parser.getStatus()));
+        ALOGD("parseXmlPath(%s) failed with %s", vendorPath.c_str(), asString(parser.getStatus()));
     }
     mParsingStatus = combineStatus(mParsingStatus, parser.getStatus());
     return parser.getStatus();
