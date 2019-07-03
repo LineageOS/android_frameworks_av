@@ -89,7 +89,11 @@ aaudio_result_t AudioStreamInternalCapture::processDataNow(void *buffer, int32_t
     if (mAudioEndpoint.isFreeRunning()) {
         //ALOGD("AudioStreamInternalCapture::processDataNow() - update remote counter");
         // Update data queue based on the timing model.
-        int64_t estimatedRemoteCounter = mClockModel.convertTimeToPosition(currentNanoTime);
+        // Jitter in the DSP can cause late writes to the FIFO.
+        // This might be caused by resampling.
+        // We want to read the FIFO after the latest possible time
+        // that the DSP could have written the data.
+        int64_t estimatedRemoteCounter = mClockModel.convertLatestTimeToPosition(currentNanoTime);
         // TODO refactor, maybe use setRemoteCounter()
         mAudioEndpoint.setDataWriteCounter(estimatedRemoteCounter);
     }
@@ -139,7 +143,7 @@ aaudio_result_t AudioStreamInternalCapture::processDataNow(void *buffer, int32_t
                 // the writeCounter might have just advanced in the background,
                 // causing us to sleep until a later burst.
                 int64_t nextPosition = mAudioEndpoint.getDataReadCounter() + mFramesPerBurst;
-                wakeTime = mClockModel.convertPositionToTime(nextPosition);
+                wakeTime = mClockModel.convertPositionToLatestTime(nextPosition);
             }
                 break;
             default:
