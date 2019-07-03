@@ -472,6 +472,10 @@ status_t AudioPolicyManager::getHwOffloadEncodingFormatsSupportedForA2DP(
     std::unordered_set<audio_format_t> formatSet;
     sp<HwModule> primaryModule =
             mHwModules.getModuleFromName(AUDIO_HARDWARE_MODULE_ID_PRIMARY);
+    if (primaryModule == nullptr) {
+        ALOGE("%s() unable to get primary module", __func__);
+        return NO_INIT;
+    }
     DeviceVector declaredDevices = primaryModule->getDeclaredDevices().getDevicesFromTypeMask(
             AUDIO_DEVICE_OUT_ALL_A2DP);
     for (const auto& device : declaredDevices) {
@@ -836,7 +840,7 @@ sp<IOProfile> AudioPolicyManager::getProfileForOutput(
         // if explicitly requested
         static const uint32_t kRelevantFlags =
                 (AUDIO_OUTPUT_FLAG_HW_AV_SYNC | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD |
-                 AUDIO_OUTPUT_FLAG_VOIP_RX);
+                 AUDIO_OUTPUT_FLAG_VOIP_RX | AUDIO_OUTPUT_FLAG_MMAP_NOIRQ);
         flags =
             (audio_output_flags_t)((flags & kRelevantFlags) | AUDIO_OUTPUT_FLAG_DIRECT);
     }
