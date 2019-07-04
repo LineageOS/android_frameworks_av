@@ -582,9 +582,9 @@ class Camera3Stream :
     static const int32_t kBufferLimitLatencyBinSize = 33; //in ms
     CameraLatencyHistogram mBufferLimitLatency;
 
-    //Keep track of original format in case it gets overridden
+    //Keep track of original format when the stream is created in case it gets overridden
     bool mFormatOverridden;
-    int mOriginalFormat;
+    const int mOriginalFormat;
 
     //Keep track of original dataSpace in case it gets overridden
     bool mDataSpaceOverridden;
