@@ -333,9 +333,10 @@ sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices
             if (encodedFormat != AUDIO_FORMAT_DEFAULT) {
                 moduleDevice->setEncodedFormat(encodedFormat);
             }
-            moduleDevice->setAddress(devAddress);
             if (allowToCreate) {
                 moduleDevice->attach(hwModule);
+                moduleDevice->setAddress(devAddress);
+                moduleDevice->setName(String8(name));
             }
             return moduleDevice;
         }
