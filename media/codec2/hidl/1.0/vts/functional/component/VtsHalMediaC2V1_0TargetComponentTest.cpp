@@ -144,8 +144,7 @@ TEST_F(Codec2ComponentHidlTest, QueueEmptyWork) {
 
     // Queueing an empty WorkBundle
     std::list<std::unique_ptr<C2Work>> workList;
-    err = mComponent->queue(&workList);
-    ASSERT_EQ(err, C2_OK);
+    mComponent->queue(&workList);
 
     err = mComponent->reset();
     ASSERT_EQ(err, C2_OK);
@@ -183,33 +182,23 @@ TEST_F(Codec2ComponentHidlTest, Config) {
 // Test Multiple Start Stop Reset Test
 TEST_F(Codec2ComponentHidlTest, MultipleStartStopReset) {
     ALOGV("Multiple Start Stop and Reset Test");
-    c2_status_t err = C2_OK;
 
     for (size_t i = 0; i < MAX_RETRY; i++) {
-        err = mComponent->start();
-        ASSERT_EQ(err, C2_OK);
-
-        err = mComponent->stop();
-        ASSERT_EQ(err, C2_OK);
+        mComponent->start();
+        mComponent->stop();
     }
 
-    err = mComponent->start();
-    ASSERT_EQ(err, C2_OK);
+    ASSERT_EQ(mComponent->start(), C2_OK);
 
     for (size_t i = 0; i < MAX_RETRY; i++) {
-        err = mComponent->reset();
-        ASSERT_EQ(err, C2_OK);
+        mComponent->reset();
     }
 
-    err = mComponent->start();
-    ASSERT_EQ(err, C2_OK);
-
-    err = mComponent->stop();
-    ASSERT_EQ(err, C2_OK);
+    ASSERT_EQ(mComponent->start(), C2_OK);
+    ASSERT_EQ(mComponent->stop(), C2_OK);
 
     // Second stop should return error
-    err = mComponent->stop();
-    ASSERT_NE(err, C2_OK);
+    ASSERT_NE(mComponent->stop(), C2_OK);
 }
 
 // Test Component Release API
@@ -233,8 +222,7 @@ TEST_F(Codec2ComponentHidlTest, MultipleRelease) {
     ASSERT_EQ(failures.size(), 0u);
 
     for (size_t i = 0; i < MAX_RETRY; i++) {
-        err = mComponent->release();
-        ASSERT_EQ(err, C2_OK);
+        mComponent->release();
     }
 }
 
@@ -332,14 +320,12 @@ TEST_F(Codec2ComponentHidlTest, Timeout) {
     timeConsumed = getNowUs() - startTime;
     ALOGV("mComponent->queue() timeConsumed=%" PRId64 " us", timeConsumed);
     CHECK_TIMEOUT(timeConsumed, QUEUE_TIME_OUT, "queue()");
-    ASSERT_EQ(err, C2_OK);
 
     startTime = getNowUs();
     err = mComponent->flush(C2Component::FLUSH_COMPONENT, &workList);
     timeConsumed = getNowUs() - startTime;
     ALOGV("mComponent->flush() timeConsumed=%" PRId64 " us", timeConsumed);
     CHECK_TIMEOUT(timeConsumed, FLUSH_TIME_OUT, "flush()");
-    ASSERT_EQ(err, C2_OK);
 
     startTime = getNowUs();
     err = mComponent->stop();
