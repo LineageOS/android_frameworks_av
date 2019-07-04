@@ -4364,7 +4364,7 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
         int overrideFormat = mapToFrameworkFormat(src.v3_2.overrideFormat);
         android_dataspace overrideDataSpace = mapToFrameworkDataspace(src.overrideDataSpace);
 
-        if (dst->format != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
+        if (dstStream->getOriginalFormat() != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
             dstStream->setFormatOverride(false);
             dstStream->setDataSpaceOverride(false);
             if (dst->format != overrideFormat) {
