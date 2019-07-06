@@ -113,12 +113,12 @@ AImageReader::getNumPlanesForFormat(int32_t format) {
 
 void
 AImageReader::FrameListener::onFrameAvailable(const BufferItem& /*item*/) {
-    Mutex::Autolock _l(mLock);
     sp<AImageReader> reader = mReader.promote();
     if (reader == nullptr) {
         ALOGW("A frame is available after AImageReader closed!");
         return; // reader has been closed
     }
+    Mutex::Autolock _l(mLock);
     if (mListener.onImageAvailable == nullptr) {
         return; // No callback registered
     }
@@ -143,12 +143,12 @@ AImageReader::FrameListener::setImageListener(AImageReader_ImageListener* listen
 
 void
 AImageReader::BufferRemovedListener::onBufferFreed(const wp<GraphicBuffer>& graphicBuffer) {
-    Mutex::Autolock _l(mLock);
     sp<AImageReader> reader = mReader.promote();
     if (reader == nullptr) {
         ALOGW("A frame is available after AImageReader closed!");
         return; // reader has been closed
     }
+    Mutex::Autolock _l(mLock);
     if (mListener.onBufferRemoved == nullptr) {
         return; // No callback registered
     }
