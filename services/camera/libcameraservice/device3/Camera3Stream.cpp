@@ -68,7 +68,7 @@ Camera3Stream::Camera3Stream(int id,
     mLastMaxCount(Camera3StreamInterface::ALLOCATE_PIPELINE_MAX),
     mBufferLimitLatency(kBufferLimitLatencyBinSize),
     mFormatOverridden(false),
-    mOriginalFormat(-1),
+    mOriginalFormat(format),
     mDataSpaceOverridden(false),
     mOriginalDataSpace(HAL_DATASPACE_UNKNOWN),
     mPhysicalCameraId(physicalCameraId),
@@ -125,9 +125,6 @@ void Camera3Stream::setUsage(uint64_t usage) {
 
 void Camera3Stream::setFormatOverride(bool formatOverridden) {
     mFormatOverridden = formatOverridden;
-    if (formatOverridden && mOriginalFormat == -1) {
-        mOriginalFormat = camera3_stream::format;
-    }
 }
 
 bool Camera3Stream::isFormatOverridden() const {
