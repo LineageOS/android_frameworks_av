@@ -36,7 +36,7 @@
 using namespace android;
 
 const int64_t kTimeoutWaitForOutputUs = 500000; // 0.5 seconds
-const int64_t kTimeoutWaitForInputUs = 5000; // 5 milliseconds
+const int64_t kTimeoutWaitForInputUs = 0; // don't wait
 const int kTimeoutMaxRetries = 20;
 
 //static
