@@ -94,7 +94,7 @@ void AudioPolicyManager::broadcastDeviceConnectionState(const sp<DeviceDescripto
 {
     AudioParameter param(device->address());
     const String8 key(state == AUDIO_POLICY_DEVICE_STATE_AVAILABLE ?
-                AudioParameter::keyStreamConnect : AudioParameter::keyStreamDisconnect);
+                AudioParameter::keyDeviceConnect : AudioParameter::keyDeviceDisconnect);
     param.addInt(key, device->type());
     mpClientInterface->setParameters(AUDIO_IO_HANDLE_NONE, param.toString());
 }
