@@ -67,9 +67,9 @@ public:
     //  keyAudioLanguagePreferred: Preferred audio language
     static const char * const keyAudioLanguagePreferred;
 
-    //  keyStreamConnect / Disconnect: value is an int in audio_devices_t
-    static const char * const keyStreamConnect;
-    static const char * const keyStreamDisconnect;
+    //  keyDeviceConnect / Disconnect: value is an int in audio_devices_t
+    static const char * const keyDeviceConnect;
+    static const char * const keyDeviceDisconnect;
 
     // For querying stream capabilities. All the returned values are lists.
     //   keyStreamSupportedFormats: audio_format_t
