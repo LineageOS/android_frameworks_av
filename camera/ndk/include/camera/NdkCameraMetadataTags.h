@@ -140,7 +140,7 @@ typedef enum acamera_metadata_tag {
      * application controls how the color mapping is performed.</p>
      * <p>We define the expected processing pipeline below. For consistency
      * across devices, this is always the case with TRANSFORM_MATRIX.</p>
-     * <p>When either FULL or HIGH_QUALITY is used, the camera device may
+     * <p>When either FAST or HIGH_QUALITY is used, the camera device may
      * do additional processing but ACAMERA_COLOR_CORRECTION_GAINS and
      * ACAMERA_COLOR_CORRECTION_TRANSFORM will still be provided by the
      * camera device (in the results) and be roughly correct.</p>
@@ -1734,6 +1734,77 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_CONTROL_AF_SCENE_CHANGE =                           // byte (acamera_metadata_enum_android_control_af_scene_change_t)
             ACAMERA_CONTROL_START + 42,
+    /**
+     * <p>The list of bokeh modes that are supported by this camera device, and each bokeh mode's
+     * maximum streaming (non-stall) size with bokeh effect.</p>
+     *
+     * <p>Type: int32[3*n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>For OFF mode, the camera behaves normally with no bokeh effect.</p>
+     * <p>For STILL_CAPTURE mode, the maximum streaming dimension specifies the limit under which
+     * bokeh is effective when capture intent is PREVIEW. Note that when capture intent is
+     * PREVIEW, the bokeh effect may not be as high quality compared to STILL_CAPTURE intent
+     * in order to maintain reasonable frame rate. The maximum streaming dimension must be one
+     * of the YUV_420_888 or PRIVATE resolutions in availableStreamConfigurations, or (0, 0)
+     * if preview bokeh is not supported. If the application configures a stream larger than
+     * the maximum streaming dimension, bokeh effect may not be applied for this stream for
+     * PREVIEW intent.</p>
+     * <p>For CONTINUOUS mode, the maximum streaming dimension specifies the limit under which
+     * bokeh is effective. This dimension must be one of the YUV_420_888 or PRIVATE resolutions
+     * in availableStreamConfigurations, and if the sensor maximum resolution is larger than or
+     * equal to 1080p, the maximum streaming dimension must be at least 1080p. If the
+     * application configures a stream with larger dimension, the stream may not have bokeh
+     * effect applied.</p>
+     */
+    ACAMERA_CONTROL_AVAILABLE_BOKEH_CAPABILITIES =              // int32[3*n]
+            ACAMERA_CONTROL_START + 43,
+    /**
+     * <p>Whether bokeh mode is enabled for a particular capture request.</p>
+     *
+     * <p>Type: byte (acamera_metadata_enum_android_control_bokeh_mode_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     *   <li>ACaptureRequest</li>
+     * </ul></p>
+     *
+     * <p>With bokeh mode, the camera device may blur out the parts of scene that are not in
+     * focus, creating a bokeh (or shallow depth of field) effect for people or objects.</p>
+     * <p>When set to STILL_CAPTURE bokeh mode with STILL_CAPTURE capture intent, due to the extra
+     * processing needed for high quality bokeh effect, the stall may be longer than when
+     * capture intent is not STILL_CAPTURE.</p>
+     * <p>When set to STILL_CAPTURE bokeh mode with PREVIEW capture intent,</p>
+     * <ul>
+     * <li>If the camera device has BURST_CAPTURE capability, the frame rate requirement of
+     * BURST_CAPTURE must still be met.</li>
+     * <li>All streams not larger than the maximum streaming dimension for STILL_CAPTURE mode
+     * (queried via {@link ACAMERA_CONTROL_AVAILABLE_BOKEH_CAPABILITIES })
+     * will have preview bokeh effect applied.</li>
+     * </ul>
+     * <p>When set to CONTINUOUS mode, configured streams dimension should not exceed this mode's
+     * maximum streaming dimension in order to have bokeh effect applied. Bokeh effect may not
+     * be available for streams larger than the maximum streaming dimension.</p>
+     * <p>Switching between different bokeh modes may involve reconfiguration of the camera
+     * pipeline, resulting in long latency. The application should check this key against the
+     * available session keys queried via
+     * {@link ACameraManager_getCameraCharacteristics }.</p>
+     * <p>When bokeh mode is on, the camera device may override certain control parameters, such as
+     * reduce frame rate or use face priority scene mode, to achieve best power and quality
+     * tradeoffs. When turned on, AE, AWB, and AF run in auto modes, and only the mandatory
+     * stream combinations of LIMITED hardware level are guaranteed.</p>
+     * <p>For a logical multi-camera, bokeh may be implemented by stereo vision from sub-cameras
+     * with different field of view. As a result, when bokeh mode is enabled, the camera device
+     * may override android.scaler.CropRegion, and the field of view will be smaller than when
+     * bokeh mode is off.</p>
+     */
+    ACAMERA_CONTROL_BOKEH_MODE =                                // byte (acamera_metadata_enum_android_control_bokeh_mode_t)
+            ACAMERA_CONTROL_START + 44,
     ACAMERA_CONTROL_END,
 
     /**
@@ -7001,6 +7072,31 @@ typedef enum acamera_metadata_enum_acamera_control_af_scene_change {
     ACAMERA_CONTROL_AF_SCENE_CHANGE_DETECTED                         = 1,
 
 } acamera_metadata_enum_android_control_af_scene_change_t;
+
+// ACAMERA_CONTROL_BOKEH_MODE
+typedef enum acamera_metadata_enum_acamera_control_bokeh_mode {
+    /**
+     * <p>Bokeh mode is disabled.</p>
+     */
+    ACAMERA_CONTROL_BOKEH_MODE_OFF                                   = 0,
+
+    /**
+     * <p>High quality bokeh mode is enabled for all non-raw streams (including YUV,
+     * JPEG, and IMPLEMENTATION_DEFINED) when capture intent is STILL_CAPTURE. Due to the
+     * extra image processing, this mode may introduce additional stall to non-raw streams.
+     * This mode should be used in high quality still capture use case.</p>
+     */
+    ACAMERA_CONTROL_BOKEH_MODE_STILL_CAPTURE                         = 1,
+
+    /**
+     * <p>Bokeh effect must not slow down capture rate relative to sensor raw output,
+     * and the effect is applied to all processed streams no larger than the maximum
+     * streaming dimension. This mode should be used if performance and power are a
+     * priority, such as video recording.</p>
+     */
+    ACAMERA_CONTROL_BOKEH_MODE_CONTINUOUS                            = 2,
+
+} acamera_metadata_enum_android_control_bokeh_mode_t;
 
 
 
