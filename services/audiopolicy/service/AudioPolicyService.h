@@ -23,6 +23,7 @@
 #include <utils/String8.h>
 #include <utils/Vector.h>
 #include <utils/SortedVector.h>
+#include <binder/ActivityManager.h>
 #include <binder/BinderService.h>
 #include <binder/IUidObserver.h>
 #include <system/audio.h>
@@ -302,6 +303,7 @@ private:
 
         wp<AudioPolicyService> mService;
         Mutex mLock;
+        ActivityManager mAm;
         bool mObserverRegistered;
         std::unordered_map<uid_t, bool> mOverrideUids;
         std::unordered_map<uid_t, bool> mCachedUids;
