@@ -25,6 +25,7 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
 #include <nativebase/nativebase.h>
+#include <ui/Fence.h>
 
 #include <C2AllocatorGralloc.h>
 #include <C2BlockInternal.h>
@@ -590,7 +591,12 @@ std::shared_ptr<C2Buffer> GraphicMetadataBuffer::asC2Buffer() {
     std::shared_ptr<C2GraphicBlock> block = _C2BlockFactory::CreateGraphicBlock(alloc);
 
     meta->pBuffer = 0;
-    // TODO: fence
+    // TODO: wrap this in C2Fence so that the component can wait when it
+    //       actually starts processing.
+    if (meta->nFenceFd >= 0) {
+        sp<Fence> fence(new Fence(meta->nFenceFd));
+        fence->waitForever(LOG_TAG);
+    }
     return C2Buffer::CreateGraphicBuffer(
             block->share(C2Rect(buffer->width, buffer->height), C2Fence()));
 #else
