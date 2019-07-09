@@ -3157,6 +3157,12 @@ typedef enum acamera_metadata_tag {
      * IMPLEMENTATION_DEFINED | same as YUV_420_888                  | Any            |</p>
      * <p>Refer to ACAMERA_REQUEST_AVAILABLE_CAPABILITIES for additional
      * mandatory stream configurations on a per-capability basis.</p>
+     * <p>Exception on 176x144 (QCIF) resolution: camera devices usually have a fixed capability for
+     * downscaling from larger resolution to smaller, and the QCIF resolution sometimes is not
+     * fully supported due to this limitation on devices with high-resolution image sensors.
+     * Therefore, trying to configure a QCIF resolution stream together with any other
+     * stream larger than 1920x1080 resolution (either width or height) might not be supported,
+     * and capture session creation will fail if it is not.</p>
      *
      * @see ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL
      * @see ACAMERA_REQUEST_AVAILABLE_CAPABILITIES
@@ -5154,7 +5160,7 @@ typedef enum acamera_metadata_tag {
      * <li><code>LEVEL_3</code> devices additionally support YUV reprocessing and RAW image capture, along
      *   with additional output stream configurations.</li>
      * <li><code>EXTERNAL</code> devices are similar to <code>LIMITED</code> devices with exceptions like some sensor or
-     *   lens information not reorted or less stable framerates.</li>
+     *   lens information not reported or less stable framerates.</li>
      * </ul>
      * <p>See the individual level enums for full descriptions of the supported capabilities.  The
      * ACAMERA_REQUEST_AVAILABLE_CAPABILITIES entry describes the device's capabilities at a
