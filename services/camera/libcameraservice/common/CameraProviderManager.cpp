@@ -2058,6 +2058,13 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::getCameraInfo(
     return OK;
 }
 bool CameraProviderManager::ProviderInfo::DeviceInfo3::isAPI1Compatible() const {
+    // Do not advertise NIR cameras to API1 camera app.
+    camera_metadata_ro_entry cfa = mCameraCharacteristics.find(
+            ANDROID_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT);
+    if (cfa.count == 1 && cfa.data.u8[0] == ANDROID_SENSOR_INFO_COLOR_FILTER_ARRANGEMENT_NIR) {
+        return false;
+    }
+
     bool isBackwardCompatible = false;
     camera_metadata_ro_entry_t caps = mCameraCharacteristics.find(
             ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
