@@ -57,7 +57,7 @@
 #include <algorithm>
 
 using namespace android;
-using ::android::hardware::ICameraServiceDefault;
+using ::android::hardware::ICameraService;
 using ::android::hardware::camera2::ICameraDeviceUser;
 
 #define ASSERT_NOT_NULL(x) \
@@ -507,7 +507,7 @@ TEST_F(CameraClientBinderTest, CheckBinderCameraDeviceUser) {
         bool queryStatus;
         res = device->isSessionConfigurationSupported(sessionConfiguration, &queryStatus);
         EXPECT_TRUE(res.isOk() ||
-                (res.serviceSpecificErrorCode() == ICameraServiceDefault::ERROR_INVALID_OPERATION))
+                (res.serviceSpecificErrorCode() == ICameraService::ERROR_INVALID_OPERATION))
                 << res;
         if (res.isOk()) {
             EXPECT_TRUE(queryStatus);

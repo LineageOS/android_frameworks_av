@@ -40,8 +40,8 @@ const char * const AudioParameter::keyAudioLanguagePreferred =
         AUDIO_PARAMETER_KEY_AUDIO_LANGUAGE_PREFERRED;
 const char * const AudioParameter::keyMonoOutput = AUDIO_PARAMETER_MONO_OUTPUT;
 const char * const AudioParameter::keyStreamHwAvSync = AUDIO_PARAMETER_STREAM_HW_AV_SYNC;
-const char * const AudioParameter::keyStreamConnect = AUDIO_PARAMETER_DEVICE_CONNECT;
-const char * const AudioParameter::keyStreamDisconnect = AUDIO_PARAMETER_DEVICE_DISCONNECT;
+const char * const AudioParameter::keyDeviceConnect = AUDIO_PARAMETER_DEVICE_CONNECT;
+const char * const AudioParameter::keyDeviceDisconnect = AUDIO_PARAMETER_DEVICE_DISCONNECT;
 const char * const AudioParameter::keyStreamSupportedFormats = AUDIO_PARAMETER_STREAM_SUP_FORMATS;
 const char * const AudioParameter::keyStreamSupportedChannels = AUDIO_PARAMETER_STREAM_SUP_CHANNELS;
 const char * const AudioParameter::keyStreamSupportedSamplingRates =
