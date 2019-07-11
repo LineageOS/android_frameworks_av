@@ -508,7 +508,8 @@ void CCodecConfig::initializeStandardParams() {
                .limitTo(D::ENCODER & D::VIDEO));
     // convert to timestamp base
     add(ConfigMapper(KEY_I_FRAME_INTERVAL, C2_PARAMKEY_SYNC_FRAME_INTERVAL, "value")
-        .withMappers([](C2Value v) -> C2Value {
+        .limitTo(D::VIDEO & D::ENCODER & D::CONFIG)
+        .withMapper([](C2Value v) -> C2Value {
             // convert from i32 to float
             int32_t i32Value;
             float fpValue;
@@ -516,12 +517,6 @@ void CCodecConfig::initializeStandardParams() {
                 return int64_t(1000000) * i32Value;
             } else if (v.get(&fpValue)) {
                 return int64_t(c2_min(1000000 * fpValue + 0.5, (double)INT64_MAX));
-            }
-            return C2Value();
-        }, [](C2Value v) -> C2Value {
-            int64_t i64;
-            if (v.get(&i64)) {
-                return float(i64) / 1000000;
             }
             return C2Value();
         }));
