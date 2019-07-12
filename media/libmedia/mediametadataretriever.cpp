@@ -179,18 +179,16 @@ sp<IMemory> MediaMetadataRetriever::getImageRectAtIndex(
             index, colorFormat, left, top, right, bottom);
 }
 
-status_t MediaMetadataRetriever::getFrameAtIndex(
-        std::vector<sp<IMemory> > *frames,
-        int frameIndex, int numFrames, int colorFormat, bool metaOnly) {
-    ALOGV("getFrameAtIndex: frameIndex(%d), numFrames(%d), colorFormat(%d) metaOnly(%d)",
-            frameIndex, numFrames, colorFormat, metaOnly);
+sp<IMemory>  MediaMetadataRetriever::getFrameAtIndex(
+        int index, int colorFormat, bool metaOnly) {
+    ALOGV("getFrameAtIndex: index(%d), colorFormat(%d) metaOnly(%d)",
+            index, colorFormat, metaOnly);
     Mutex::Autolock _l(mLock);
     if (mRetriever == 0) {
         ALOGE("retriever is not initialized");
-        return INVALID_OPERATION;
+        return NULL;
     }
-    return mRetriever->getFrameAtIndex(
-            frames, frameIndex, numFrames, colorFormat, metaOnly);
+    return mRetriever->getFrameAtIndex(index, colorFormat, metaOnly);
 }
 
 const char* MediaMetadataRetriever::extractMetadata(int keyCode)
