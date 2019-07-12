@@ -73,6 +73,5 @@ cc_library {
         "libcutils",
         "libutils",
         "libbinder",
-        "libaudiomanager",
     ],
 }
