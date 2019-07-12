@@ -45,6 +45,7 @@
 #include "CCodec.h"
 #include "CCodecBufferChannel.h"
 #include "InputSurfaceWrapper.h"
+#include "Omx2IGraphicBufferSource.h"
 
 extern "C" android::PersistentSurface *CreateInputSurface();
 
@@ -1067,6 +1068,7 @@ sp<PersistentSurface> CCodec::CreateOmxInputSurface() {
     OmxStatus s;
     android::sp<HGraphicBufferProducer> gbp;
     android::sp<HGraphicBufferSource> gbs;
+
     using ::android::hardware::Return;
     Return<void> transStatus = omx->createInputSurface(
             [&s, &gbp, &gbs](
@@ -1852,15 +1854,30 @@ extern "C" android::CodecBase *CreateCodec() {
 
 // Create Codec 2.0 input surface
 extern "C" android::PersistentSurface *CreateInputSurface() {
+    using namespace android;
     // Attempt to create a Codec2's input surface.
-    std::shared_ptr<android::Codec2Client::InputSurface> inputSurface =
-            android::Codec2Client::CreateInputSurface();
+    std::shared_ptr<Codec2Client::InputSurface> inputSurface =
+            Codec2Client::CreateInputSurface();
     if (!inputSurface) {
-        return nullptr;
+        if (property_get_int32("debug.stagefright.c2inputsurface", 0) == -1) {
+            sp<IGraphicBufferProducer> gbp;
+            sp<OmxGraphicBufferSource> gbs = new OmxGraphicBufferSource();
+            status_t err = gbs->initCheck();
+            if (err != OK) {
+                ALOGE("Failed to create persistent input surface: error %d", err);
+                return nullptr;
+            }
+            return new PersistentSurface(
+                    gbs->getIGraphicBufferProducer(),
+                    sp<IGraphicBufferSource>(
+                        new Omx2IGraphicBufferSource(gbs)));
+        } else {
+            return nullptr;
+        }
     }
-    return new android::PersistentSurface(
+    return new PersistentSurface(
             inputSurface->getGraphicBufferProducer(),
-            static_cast<android::sp<android::hidl::base::V1_0::IBase>>(
+            static_cast<sp<android::hidl::base::V1_0::IBase>>(
             inputSurface->getHalInterface()));
 }
 
