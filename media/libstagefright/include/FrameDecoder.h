@@ -44,12 +44,9 @@ struct FrameDecoder : public RefBase {
             const sp<MetaData> &trackMeta,
             const sp<IMediaSource> &source);
 
-    status_t init(
-            int64_t frameTimeUs, size_t numFrames, int option, int colorFormat);
+    status_t init(int64_t frameTimeUs, int option, int colorFormat);
 
     sp<IMemory> extractFrame(FrameRect *rect = NULL);
-
-    status_t extractFrames(std::vector<sp<IMemory> >* frames);
 
     static sp<IMemory> getMetadataOnly(
             const sp<MetaData> &trackMeta, int colorFormat, bool thumbnail = false);
@@ -59,7 +56,6 @@ protected:
 
     virtual sp<AMessage> onGetFormatAndSeekOptions(
             int64_t frameTimeUs,
-            size_t numFrames,
             int seekMode,
             MediaSource::ReadOptions *options) = 0;
 
@@ -80,10 +76,7 @@ protected:
     sp<MetaData> trackMeta()     const      { return mTrackMeta; }
     OMX_COLOR_FORMATTYPE dstFormat() const  { return mDstFormat; }
     int32_t dstBpp()             const      { return mDstBpp; }
-
-    void addFrame(const sp<IMemory> &frame) {
-        mFrames.push_back(frame);
-    }
+    void setFrame(const sp<IMemory> &frameMem) { mFrameMemory = frameMem; }
 
 private:
     AString mComponentName;
@@ -91,7 +84,7 @@ private:
     sp<IMediaSource> mSource;
     OMX_COLOR_FORMATTYPE mDstFormat;
     int32_t mDstBpp;
-    std::vector<sp<IMemory> > mFrames;
+    sp<IMemory> mFrameMemory;
     MediaSource::ReadOptions mReadOptions;
     sp<MediaCodec> mDecoder;
     sp<AMessage> mOutputFormat;
@@ -112,7 +105,6 @@ struct VideoFrameDecoder : public FrameDecoder {
 protected:
     virtual sp<AMessage> onGetFormatAndSeekOptions(
             int64_t frameTimeUs,
-            size_t numFrames,
             int seekMode,
             MediaSource::ReadOptions *options) override;
 
@@ -134,11 +126,10 @@ protected:
             bool *done) override;
 
 private:
+    VideoFrame *mFrame;
     bool mIsAvcOrHevc;
     MediaSource::ReadOptions::SeekMode mSeekMode;
     int64_t mTargetTimeUs;
-    size_t mNumFrames;
-    size_t mNumFramesDecoded;
 };
 
 struct ImageDecoder : public FrameDecoder {
@@ -150,7 +141,6 @@ struct ImageDecoder : public FrameDecoder {
 protected:
     virtual sp<AMessage> onGetFormatAndSeekOptions(
             int64_t frameTimeUs,
-            size_t numFrames,
             int seekMode,
             MediaSource::ReadOptions *options) override;
 

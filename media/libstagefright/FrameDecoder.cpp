@@ -195,14 +195,14 @@ FrameDecoder::~FrameDecoder() {
 }
 
 status_t FrameDecoder::init(
-        int64_t frameTimeUs, size_t numFrames, int option, int colorFormat) {
+        int64_t frameTimeUs, int option, int colorFormat) {
     if (!getDstColorFormat(
             (android_pixel_format_t)colorFormat, &mDstFormat, &mDstBpp)) {
         return ERROR_UNSUPPORTED;
     }
 
     sp<AMessage> videoFormat = onGetFormatAndSeekOptions(
-            frameTimeUs, numFrames, option, &mReadOptions);
+            frameTimeUs, option, &mReadOptions);
     if (videoFormat == NULL) {
         ALOGE("video format or seek mode not supported");
         return ERROR_UNSUPPORTED;
@@ -253,19 +253,7 @@ sp<IMemory> FrameDecoder::extractFrame(FrameRect *rect) {
         return NULL;
     }
 
-    return mFrames.size() > 0 ? mFrames[0] : NULL;
-}
-
-status_t FrameDecoder::extractFrames(std::vector<sp<IMemory> >* frames) {
-    status_t err = extractInternal();
-    if (err != OK) {
-        return err;
-    }
-
-    for (size_t i = 0; i < mFrames.size(); i++) {
-        frames->push_back(mFrames[i]);
-    }
-    return OK;
+    return mFrameMemory;
 }
 
 status_t FrameDecoder::extractInternal() {
@@ -404,22 +392,20 @@ VideoFrameDecoder::VideoFrameDecoder(
         const sp<MetaData> &trackMeta,
         const sp<IMediaSource> &source)
     : FrameDecoder(componentName, trackMeta, source),
+      mFrame(NULL),
       mIsAvcOrHevc(false),
       mSeekMode(MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC),
-      mTargetTimeUs(-1LL),
-      mNumFrames(0),
-      mNumFramesDecoded(0) {
+      mTargetTimeUs(-1LL) {
 }
 
 sp<AMessage> VideoFrameDecoder::onGetFormatAndSeekOptions(
-        int64_t frameTimeUs, size_t numFrames, int seekMode, MediaSource::ReadOptions *options) {
+        int64_t frameTimeUs, int seekMode, MediaSource::ReadOptions *options) {
     mSeekMode = static_cast<MediaSource::ReadOptions::SeekMode>(seekMode);
     if (mSeekMode < MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC ||
             mSeekMode > MediaSource::ReadOptions::SEEK_FRAME_INDEX) {
         ALOGE("Unknown seek mode: %d", mSeekMode);
         return NULL;
     }
-    mNumFrames = numFrames;
 
     const char *mime;
     if (!trackMeta()->findCString(kKeyMIMEType, &mime)) {
@@ -495,7 +481,7 @@ status_t VideoFrameDecoder::onOutputReceived(
         return OK;
     }
 
-    *done = (++mNumFramesDecoded >= mNumFrames);
+    *done = true;
 
     if (outputFormat == NULL) {
         return ERROR_MALFORMED;
@@ -518,15 +504,18 @@ status_t VideoFrameDecoder::onOutputReceived(
         crop_bottom = height - 1;
     }
 
-    sp<IMemory> frameMem = allocVideoFrame(
-            trackMeta(),
-            (crop_right - crop_left + 1),
-            (crop_bottom - crop_top + 1),
-            0,
-            0,
-            dstBpp());
-    addFrame(frameMem);
-    VideoFrame* frame = static_cast<VideoFrame*>(frameMem->pointer());
+    if (mFrame == NULL) {
+        sp<IMemory> frameMem = allocVideoFrame(
+                trackMeta(),
+                (crop_right - crop_left + 1),
+                (crop_bottom - crop_top + 1),
+                0,
+                0,
+                dstBpp());
+        mFrame = static_cast<VideoFrame*>(frameMem->pointer());
+
+        setFrame(frameMem);
+    }
 
     ColorConverter converter((OMX_COLOR_FORMATTYPE)srcFormat, dstFormat());
 
@@ -547,8 +536,8 @@ status_t VideoFrameDecoder::onOutputReceived(
                 (const uint8_t *)videoFrameBuffer->data(),
                 width, height, stride,
                 crop_left, crop_top, crop_right, crop_bottom,
-                frame->getFlattenedData(),
-                frame->mWidth, frame->mHeight, frame->mRowBytes,
+                mFrame->getFlattenedData(),
+                mFrame->mWidth, mFrame->mHeight, mFrame->mRowBytes,
                 crop_left, crop_top, crop_right, crop_bottom);
         return OK;
     }
@@ -577,8 +566,7 @@ ImageDecoder::ImageDecoder(
 }
 
 sp<AMessage> ImageDecoder::onGetFormatAndSeekOptions(
-        int64_t frameTimeUs, size_t /*numFrames*/,
-        int /*seekMode*/, MediaSource::ReadOptions *options) {
+        int64_t frameTimeUs, int /*seekMode*/, MediaSource::ReadOptions *options) {
     sp<MetaData> overrideMeta;
     if (frameTimeUs < 0) {
         uint32_t type;
@@ -705,7 +693,7 @@ status_t ImageDecoder::onOutputReceived(
                 trackMeta(), mWidth, mHeight, mTileWidth, mTileHeight, dstBpp());
         mFrame = static_cast<VideoFrame*>(frameMem->pointer());
 
-        addFrame(frameMem);
+        setFrame(frameMem);
     }
 
     int32_t srcFormat;

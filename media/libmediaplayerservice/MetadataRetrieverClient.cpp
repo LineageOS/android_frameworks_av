@@ -242,31 +242,27 @@ sp<IMemory> MetadataRetrieverClient::getImageRectAtIndex(
     sp<IMemory> frame = mRetriever->getImageRectAtIndex(
             index, colorFormat, left, top, right, bottom);
     if (frame == NULL) {
-        ALOGE("failed to extract image");
-        return NULL;
+        ALOGE("failed to extract image at index %d", index);
     }
     return frame;
 }
 
-status_t MetadataRetrieverClient::getFrameAtIndex(
-            std::vector<sp<IMemory> > *frames,
-            int frameIndex, int numFrames, int colorFormat, bool metaOnly) {
-    ALOGV("getFrameAtIndex: frameIndex(%d), numFrames(%d), colorFormat(%d), metaOnly(%d)",
-            frameIndex, numFrames, colorFormat, metaOnly);
+sp<IMemory> MetadataRetrieverClient::getFrameAtIndex(
+            int index, int colorFormat, bool metaOnly) {
+    ALOGV("getFrameAtIndex: index(%d), colorFormat(%d), metaOnly(%d)",
+            index, colorFormat, metaOnly);
     Mutex::Autolock lock(mLock);
     Mutex::Autolock glock(sLock);
     if (mRetriever == NULL) {
         ALOGE("retriever is not initialized");
-        return INVALID_OPERATION;
+        return NULL;
     }
 
-    status_t err = mRetriever->getFrameAtIndex(
-            frames, frameIndex, numFrames, colorFormat, metaOnly);
-    if (err != OK) {
-        frames->clear();
-        return err;
+    sp<IMemory> frame = mRetriever->getFrameAtIndex(index, colorFormat, metaOnly);
+    if (frame == NULL) {
+        ALOGE("failed to extract frame at index %d", index);
     }
-    return OK;
+    return frame;
 }
 
 sp<IMemory> MetadataRetrieverClient::extractAlbumArt()
