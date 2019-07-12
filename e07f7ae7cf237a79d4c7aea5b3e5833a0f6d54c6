@@ -1,0 +1,44 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3eeeefe7_e3959b68",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 4
+      },
+      "lineNbr": 30,
+      "author": {
+        "id": 11883
+      },
+      "writtenOn": "2019-07-12T07:54:02Z",
+      "side": 1,
+      "message": "can be removed then",
+      "revId": "e07f7ae7cf237a79d4c7aea5b3e5833a0f6d54c6",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "ebd733f5_0ccb121c",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 4
+      },
+      "lineNbr": 1447,
+      "author": {
+        "id": 11883
+      },
+      "writtenOn": "2019-07-12T07:54:02Z",
+      "side": 1,
+      "message": "Can we pass cameraId.string() directly there?\nHIDL support strings iirc",
+      "range": {
+        "startLine": 1447,
+        "startChar": 39,
+        "endLine": 1447,
+        "endChar": 67
+      },
+      "revId": "e07f7ae7cf237a79d4c7aea5b3e5833a0f6d54c6",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
