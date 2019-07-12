@@ -896,6 +896,9 @@ status_t CCodecBufferChannel::start(
                 input->buffers.reset(new DummyInputBuffers(mName));
             } else if (mMetaMode == MODE_ANW) {
                 input->buffers.reset(new GraphicMetadataInputBuffers(mName));
+                // This is to ensure buffers do not get released prematurely.
+                // TODO: handle this without going into array mode
+                forceArrayMode = true;
             } else {
                 input->buffers.reset(new GraphicInputBuffers(numInputSlots, mName));
             }
