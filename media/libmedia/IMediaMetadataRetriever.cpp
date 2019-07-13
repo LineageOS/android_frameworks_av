@@ -213,15 +213,14 @@ public:
         return interface_cast<IMemory>(reply.readStrongBinder());
     }
 
-    status_t getFrameAtIndex(std::vector<sp<IMemory> > *frames,
-            int frameIndex, int numFrames, int colorFormat, bool metaOnly)
+    sp<IMemory> getFrameAtIndex(
+            int index, int colorFormat, bool metaOnly)
     {
-        ALOGV("getFrameAtIndex: frameIndex(%d), numFrames(%d), colorFormat(%d) metaOnly(%d)",
-                frameIndex, numFrames, colorFormat, metaOnly);
+        ALOGV("getFrameAtIndex: index(%d), colorFormat(%d) metaOnly(%d)",
+                index, colorFormat, metaOnly);
         Parcel data, reply;
         data.writeInterfaceToken(IMediaMetadataRetriever::getInterfaceDescriptor());
-        data.writeInt32(frameIndex);
-        data.writeInt32(numFrames);
+        data.writeInt32(index);
         data.writeInt32(colorFormat);
         data.writeInt32(metaOnly);
 #ifndef DISABLE_GROUP_SCHEDULE_HACK
@@ -230,16 +229,9 @@ public:
         remote()->transact(GET_FRAME_AT_INDEX, data, &reply);
         status_t ret = reply.readInt32();
         if (ret != NO_ERROR) {
-            return ret;
+            return NULL;
         }
-        int retNumFrames = reply.readInt32();
-        if (retNumFrames < numFrames) {
-            numFrames = retNumFrames;
-        }
-        for (int i = 0; i < numFrames; i++) {
-            frames->push_back(interface_cast<IMemory>(reply.readStrongBinder()));
-        }
-        return OK;
+        return interface_cast<IMemory>(reply.readStrongBinder());
     }
 
     sp<IMemory> extractAlbumArt()
@@ -442,24 +434,20 @@ status_t BnMediaMetadataRetriever::onTransact(
 
         case GET_FRAME_AT_INDEX: {
             CHECK_INTERFACE(IMediaMetadataRetriever, data, reply);
-            int frameIndex = data.readInt32();
-            int numFrames = data.readInt32();
+            int index = data.readInt32();
             int colorFormat = data.readInt32();
             bool metaOnly = (data.readInt32() != 0);
-            ALOGV("getFrameAtIndex: frameIndex(%d), numFrames(%d), colorFormat(%d), metaOnly(%d)",
-                    frameIndex, numFrames, colorFormat, metaOnly);
+            ALOGV("getFrameAtIndex: index(%d), colorFormat(%d), metaOnly(%d)",
+                    index, colorFormat, metaOnly);
 #ifndef DISABLE_GROUP_SCHEDULE_HACK
             setSchedPolicy(data);
 #endif
-            std::vector<sp<IMemory> > frames;
-            status_t err = getFrameAtIndex(
-                    &frames, frameIndex, numFrames, colorFormat, metaOnly);
-            reply->writeInt32(err);
-            if (OK == err) {
-                reply->writeInt32(frames.size());
-                for (size_t i = 0; i < frames.size(); i++) {
-                    reply->writeStrongBinder(IInterface::asBinder(frames[i]));
-                }
+            sp<IMemory> frame = getFrameAtIndex(index, colorFormat, metaOnly);
+            if (frame != nullptr) {  // Don't send NULL across the binder interface
+                reply->writeInt32(NO_ERROR);
+                reply->writeStrongBinder(IInterface::asBinder(frame));
+            } else {
+                reply->writeInt32(UNKNOWN_ERROR);
             }
 #ifndef DISABLE_GROUP_SCHEDULE_HACK
             restoreSchedPolicy();

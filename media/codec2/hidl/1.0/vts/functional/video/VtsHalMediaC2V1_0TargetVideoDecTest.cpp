@@ -124,6 +124,13 @@ class Codec2VideoDecHidlTest : public ::testing::VtsHalHidlTargetTestBase {
         mTimestampUs = 0u;
         mTimestampDevTest = false;
         if (mCompName == unknown_comp) mDisableTest = true;
+
+        C2SecureModeTuning secureModeTuning{};
+        mComponent->query({ &secureModeTuning }, {}, C2_MAY_BLOCK, nullptr);
+        if (secureModeTuning.value == C2Config::SM_READ_PROTECTED) {
+            mDisableTest = true;
+        }
+
         if (mDisableTest) std::cout << "[   WARN   ] Test Disabled \n";
     }
 
