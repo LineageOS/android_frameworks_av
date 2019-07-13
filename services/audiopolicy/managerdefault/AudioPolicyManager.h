@@ -307,6 +307,8 @@ public:
             return volumeGroup != VOLUME_GROUP_NONE ? NO_ERROR : BAD_VALUE;
         }
 
+        status_t initialize();
+
 protected:
         // A constructor that allows more fine-grained control over initialization process,
         // used in automatic tests.
@@ -321,7 +323,6 @@ protected:
         //   - initialize.
         AudioPolicyConfig& getConfig() { return mConfig; }
         void loadConfig();
-        status_t initialize();
 
         // From AudioPolicyManagerObserver
         virtual const AudioPatchCollection &getAudioPatches() const

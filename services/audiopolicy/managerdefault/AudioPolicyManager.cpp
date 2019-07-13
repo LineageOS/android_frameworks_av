@@ -4306,7 +4306,6 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
         : AudioPolicyManager(clientInterface, false /*forTesting*/)
 {
     loadConfig();
-    initialize();
 }
 
 void AudioPolicyManager::loadConfig() {
