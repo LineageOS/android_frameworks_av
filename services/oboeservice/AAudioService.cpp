@@ -58,7 +58,7 @@ status_t AAudioService::dump(int fd, const Vector<String16>& args) {
 
     if (!dumpAllowed()) {
         std::stringstream ss;
-        ss << "Permission denial: can't dump AAudioService from pid="
+        ss << "Permission Denial: can't dump AAudioService from pid="
                 << IPCThreadState::self()->getCallingPid() << ", uid="
                 << IPCThreadState::self()->getCallingUid() << "\n";
         result = ss.str();
