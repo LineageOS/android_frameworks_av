@@ -72,7 +72,6 @@ cc_library_shared {
         cfi: true,
     },
 
-    compile_multilib: "32",
 }
 
 cc_library_shared {
