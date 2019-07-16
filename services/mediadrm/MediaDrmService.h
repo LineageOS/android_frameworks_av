@@ -34,7 +34,6 @@ public:
     static void instantiate();
 
     // IMediaDrmService interface
-    virtual sp<ICrypto> makeCrypto();
     virtual sp<IDrm> makeDrm();
 private:
     MediaDrmService() {}
