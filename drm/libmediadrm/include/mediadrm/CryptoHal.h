@@ -97,7 +97,6 @@ private:
     };
 
     KeyedVector<int32_t, HeapBase> mHeapBases;
-    uint32_t mNextBufferId;
     int32_t mHeapSeqNum;
 
     Vector<sp<ICryptoFactory>> makeCryptoFactories();
