@@ -343,6 +343,7 @@ static const char *FourCC2MIME(uint32_t fourcc) {
         case FOURCC("dva1"):
         case FOURCC("dvhe"):
         case FOURCC("dvh1"):
+        case FOURCC("dav1"):
             return MEDIA_MIMETYPE_VIDEO_DOLBY_VISION;
 
         case FOURCC("ac-4"):
@@ -1083,7 +1084,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                         const uint8_t bl_compatibility_id = (ptr[4]) >> 4;
 
                         if (4 == profile || 7 == profile ||
-                                (profile >= 8 && profile < 10 && bl_compatibility_id)) {
+                                (profile >= 8 && profile < 11 && bl_compatibility_id)) {
                             // we need a backward compatible track
                             ALOGV("Adding new backward compatible track");
                             Track *track_b = new Track;
@@ -1117,6 +1118,9 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                             } else if (9 == profile) {
                                 AMediaFormat_setString(track_b->meta,
                                         AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_AVC);
+                            } else if (10 == profile) {
+                                AMediaFormat_setString(track_b->meta,
+                                        AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_AV1);
                             } // Should never get to else part
 
                             mLastTrack = track_b;
@@ -1895,6 +1899,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC("dva1"):
         case FOURCC("dvhe"):
         case FOURCC("dvh1"):
+        case FOURCC("dav1"):
         case FOURCC("av01"):
         {
             uint8_t buffer[78];
@@ -4226,8 +4231,8 @@ MediaTrackHelper *MPEG4Extractor::getTrack(size_t index) {
 
         const uint8_t *ptr = (const uint8_t *)data;
 
-        if (size != 24 || ptr[0] != 1 || ptr[1] != 0) {
-            // dv_version_major == 1, dv_version_minor == 0;
+        // dv_major.dv_minor Should be 1.0 or 2.1
+        if (size != 24 || ((ptr[0] != 1 || ptr[1] != 0) && (ptr[0] != 2 || ptr[1] != 1))) {
             return NULL;
         }
    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AV1)) {
@@ -4831,42 +4836,43 @@ MPEG4Source::MPEG4Source(
         CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
 
         mNALLengthSize = 1 + (ptr[14 + 7] & 3);
-   } else if (mIsDolbyVision) {
-       ALOGV("%s DolbyVision stream detected", __FUNCTION__);
-       void *data;
-       size_t size;
-       CHECK(AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_2, &data, &size));
+    } else if (mIsDolbyVision) {
+        ALOGV("%s DolbyVision stream detected", __FUNCTION__);
+        void *data;
+        size_t size;
+        CHECK(AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_2, &data, &size));
 
-       const uint8_t *ptr = (const uint8_t *)data;
+        const uint8_t *ptr = (const uint8_t *)data;
 
-       CHECK(size == 24);
-       CHECK_EQ((unsigned)ptr[0], 1u);  // dv_major_version == 1
-       CHECK_EQ((unsigned)ptr[1], 0u);  // dv_minor_version == 0
+        CHECK(size == 24);
 
-       const uint8_t profile = ptr[2] >> 1;
+        // dv_major.dv_minor Should be 1.0 or 2.1
+        CHECK(!((ptr[0] != 1 || ptr[1] != 0) && (ptr[0] != 2 || ptr[1] != 1)));
 
-       // profile == (0,1,9) --> AVC; profile = (2,3,4,5,6,7,8) --> HEVC;
-       if (profile > 1 &&  profile < 9) {
+        const uint8_t profile = ptr[2] >> 1;
+        // profile == (unknown,1,9) --> AVC; profile = (2,3,4,5,6,7,8) --> HEVC;
+        // profile == (10) --> AV1
+        if (profile > 1 && profile < 9) {
+            CHECK(AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_HEVC, &data, &size));
 
-           CHECK(AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_HEVC, &data, &size));
+            const uint8_t *ptr = (const uint8_t *)data;
 
-           const uint8_t *ptr = (const uint8_t *)data;
+            CHECK(size >= 22);
+            CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
 
-           CHECK(size >= 22);
-           CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
+            mNALLengthSize = 1 + (ptr[14 + 7] & 3);
+        } else if (10 == profile) {
+            /* AV1 profile nothing to do */
+        } else {
+            CHECK(AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_AVC, &data, &size));
+            const uint8_t *ptr = (const uint8_t *)data;
 
-           mNALLengthSize = 1 + (ptr[14 + 7] & 3);
-         } else {
-
-           CHECK(AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_AVC, &data, &size));
-           const uint8_t *ptr = (const uint8_t *)data;
-
-           CHECK(size >= 7);
-           CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
-           // The number of bytes used to encode the length of a NAL unit.
-           mNALLengthSize = 1 + (ptr[4] & 3);
-       }
-   }
+            CHECK(size >= 7);
+            CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
+            // The number of bytes used to encode the length of a NAL unit.
+            mNALLengthSize = 1 + (ptr[4] & 3);
+        }
+    }
 
     mIsPcm = !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_RAW);
     mIsAudio = !strncasecmp(mime, "audio/", 6);
@@ -5933,7 +5939,7 @@ media_status_t MPEG4Source::read(
         }
     }
 
-    if (!mIsAVC && !mIsHEVC && !mIsDolbyVision && !mIsAC4) {
+    if (!mIsAVC && !mIsHEVC && !(mIsDolbyVision && mNALLengthSize) && !mIsAC4) {
         if (newBuffer) {
             if (mIsPcm) {
                 // The twos' PCM block reader assumes that all samples has the same size.
@@ -6323,7 +6329,7 @@ media_status_t MPEG4Source::fragmentedRead(
         AMediaFormat_setBuffer(bufmeta, AMEDIAFORMAT_KEY_CRYPTO_IV, iv, ivlength);
     }
 
-    if (!mIsAVC && !mIsHEVC && !mIsDolbyVision) {
+    if (!mIsAVC && !mIsHEVC && !(mIsDolbyVision && mNALLengthSize)) {
         if (newBuffer) {
             if (!isInRange((size_t)0u, mBuffer->size(), size)) {
                 mBuffer->release();

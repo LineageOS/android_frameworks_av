@@ -190,6 +190,7 @@ ALookup<C2Config::profile_t, int32_t> sDolbyVisionProfiles = {
     { C2Config::PROFILE_DV_HE_07, DolbyVisionProfileDvheDtb },
     { C2Config::PROFILE_DV_HE_08, DolbyVisionProfileDvheSt },
     { C2Config::PROFILE_DV_AV_09, DolbyVisionProfileDvavSe },
+    { C2Config::PROFILE_DV_AV1_10, DolbyVisionProfileDvav110 },
 };
 
 ALookup<C2Config::level_t, int32_t> sH263Levels = {

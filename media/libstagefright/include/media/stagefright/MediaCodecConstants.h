@@ -510,22 +510,24 @@ constexpr int32_t DolbyVisionProfileDvheDtr = 0x10;
 constexpr int32_t DolbyVisionProfileDvheStn = 0x20;
 constexpr int32_t DolbyVisionProfileDvheDth = 0x40;
 constexpr int32_t DolbyVisionProfileDvheDtb = 0x80;
-constexpr int32_t DolbyVisionProfileDvheSt = 0x100;
-constexpr int32_t DolbyVisionProfileDvavSe = 0x200;
+constexpr int32_t DolbyVisionProfileDvheSt  = 0x100;
+constexpr int32_t DolbyVisionProfileDvavSe  = 0x200;
+constexpr int32_t DolbyVisionProfileDvav110 = 0x400;
 
 inline static const char *asString_DolbyVisionProfile(int32_t i, const char *def = "??") {
     switch (i) {
-        case DolbyVisionProfileDvavPer: return "DvavPer";
-        case DolbyVisionProfileDvavPen: return "DvavPen";
-        case DolbyVisionProfileDvheDer: return "DvheDer";
-        case DolbyVisionProfileDvheDen: return "DvheDen";
-        case DolbyVisionProfileDvheDtr: return "DvheDtr";
-        case DolbyVisionProfileDvheStn: return "DvheStn";
-        case DolbyVisionProfileDvheDth: return "DvheDth";
-        case DolbyVisionProfileDvheDtb: return "DvheDtb";
-        case DolbyVisionProfileDvheSt:  return "DvheSt";
-        case DolbyVisionProfileDvavSe:  return "DvavSe";
-        default:                        return def;
+        case DolbyVisionProfileDvavPer:  return "DvavPer";
+        case DolbyVisionProfileDvavPen:  return "DvavPen";
+        case DolbyVisionProfileDvheDer:  return "DvheDer";
+        case DolbyVisionProfileDvheDen:  return "DvheDen";
+        case DolbyVisionProfileDvheDtr:  return "DvheDtr";
+        case DolbyVisionProfileDvheStn:  return "DvheStn";
+        case DolbyVisionProfileDvheDth:  return "DvheDth";
+        case DolbyVisionProfileDvheDtb:  return "DvheDtb";
+        case DolbyVisionProfileDvheSt:   return "DvheSt";
+        case DolbyVisionProfileDvavSe:   return "DvavSe";
+        case DolbyVisionProfileDvav110:  return "Dav110";
+        default:                         return def;
     }
 }
 

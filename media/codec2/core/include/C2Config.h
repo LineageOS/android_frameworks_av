@@ -521,6 +521,7 @@ enum C2Config::profile_t : uint32_t {
     PROFILE_DV_HE_07 = _C2_PL_DV_BASE + 7,      ///< Dolby Vision dvhe.07 profile
     PROFILE_DV_HE_08 = _C2_PL_DV_BASE + 8,      ///< Dolby Vision dvhe.08 profile
     PROFILE_DV_AV_09 = _C2_PL_DV_BASE + 9,      ///< Dolby Vision dvav.09 profile
+    PROFILE_DV_AV1_10 = _C2_PL_DV_BASE + 10,    ///< Dolby Vision dav1.10 profile
 
     // AV1 profiles
     PROFILE_AV1_0 = _C2_PL_AV1_BASE,            ///< AV1 Profile 0 (4:2:0, 8 to 10 bit)

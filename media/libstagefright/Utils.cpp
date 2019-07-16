@@ -228,8 +228,9 @@ static void parseAvcProfileLevelFromAvcc(const uint8_t *ptr, size_t size, sp<AMe
 }
 
 static void parseDolbyVisionProfileLevelFromDvcc(const uint8_t *ptr, size_t size, sp<AMessage> &format) {
-    // dv_major_version == 1, dv_minor_version == 0
-    if (size < 4 || ptr[0] != 1 || ptr[1] != 0) {
+    // dv_major.dv_minor Should be 1.0 or 2.1
+    if (size != 24 || ((ptr[0] != 1 || ptr[1] != 0) && (ptr[0] != 2 || ptr[1] != 1))) {
+        ALOGV("Size %zu, dv_major %d, dv_minor %d", size, ptr[0], ptr[1]);
         return;
     }
 
@@ -254,6 +255,7 @@ static void parseDolbyVisionProfileLevelFromDvcc(const uint8_t *ptr, size_t size
         {7, OMX_VIDEO_DolbyVisionProfileDvheDtb},
         {8, OMX_VIDEO_DolbyVisionProfileDvheSt},
         {9, OMX_VIDEO_DolbyVisionProfileDvavSe},
+        {10, OMX_VIDEO_DolbyVisionProfileDvav110},
     };
 
     const static ALookup<uint8_t, OMX_VIDEO_DOLBYVISIONLEVELTYPE> levels{
@@ -1918,6 +1920,8 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
                     std::vector<uint8_t> hvcc(csd0size + 1024);
                     size_t outsize = reassembleHVCC(csd0, hvcc.data(), hvcc.size(), 4);
                     meta->setData(kKeyHVCC, kTypeHVCC, hvcc.data(), outsize);
+                } else if (DolbyVisionProfileDvav110 == profile) {
+                    meta->setData(kKeyAV1C, 0, csd0->data(), csd0->size());
                 } else {
                     sp<ABuffer> csd1;
                     if (msg->findBuffer("csd-1", &csd1)) {
