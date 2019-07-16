@@ -8,7 +8,7 @@ cc_library_static {
         "MediaFilter.cpp",
         "RSFilter.cpp",
         "SaturationFilter.cpp",
-        "saturationARGB.rs",
+        "saturationARGB.rscript",
         "SimpleFilter.cpp",
         "ZeroFilter.cpp",
     ],
