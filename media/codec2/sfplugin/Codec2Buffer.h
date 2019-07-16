@@ -21,6 +21,7 @@
 #include <C2Buffer.h>
 
 #include <android/hardware/cas/native/1.0/types.h>
+#include <android/hardware/drm/1.0/types.h>
 #include <binder/IMemory.h>
 #include <media/hardware/VideoAPI.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -361,7 +362,8 @@ public:
      *
      * \param source  source buffer structure to fill.
      */
-    void fillSourceBuffer(ICrypto::SourceBuffer *source);
+    void fillSourceBuffer(
+            hardware::drm::V1_0::SharedBuffer *source);
     void fillSourceBuffer(
             hardware::cas::native::V1_0::SharedBuffer *source);
 

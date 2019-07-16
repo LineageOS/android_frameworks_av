@@ -21,6 +21,7 @@
 #include <numeric>
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
+#include <android/hardware/drm/1.0/types.h>
 #include <binder/MemoryDealer.h>
 #include <hidlmemory/FrameworkUtils.h>
 #include <media/openmax/OMX_Core.h>
@@ -41,6 +42,7 @@ using hardware::hidl_string;
 using hardware::hidl_vec;
 using namespace hardware::cas::V1_0;
 using namespace hardware::cas::native::V1_0;
+using DrmBufferType = hardware::drm::V1_0::BufferType;
 using BufferInfo = ACodecBufferChannel::BufferInfo;
 using BufferInfoIterator = std::vector<const BufferInfo>::const_iterator;
 
@@ -131,18 +133,18 @@ status_t ACodecBufferChannel::queueSecureInputBuffer(
     ssize_t result = -1;
     ssize_t codecDataOffset = 0;
     if (mCrypto != NULL) {
-        ICrypto::DestinationBuffer destination;
+        hardware::drm::V1_0::DestinationBuffer destination;
         if (secure) {
-            destination.mType = ICrypto::kDestinationTypeNativeHandle;
-            destination.mHandle = secureHandle;
+            destination.type = DrmBufferType::NATIVE_HANDLE;
+            destination.secureMemory = hidl_handle(secureHandle);
         } else {
-            destination.mType = ICrypto::kDestinationTypeSharedMemory;
-            destination.mSharedMemory = mDecryptDestination;
+            destination.type = DrmBufferType::SHARED_MEMORY;
+            IMemoryToSharedBuffer(
+                    mDecryptDestination, mHeapSeqNum, &destination.nonsecureMemory);
         }
 
-        ICrypto::SourceBuffer source;
-        source.mSharedMemory = it->mSharedEncryptedBuffer;
-        source.mHeapSeqNum = mHeapSeqNum;
+        hardware::drm::V1_0::SharedBuffer source;
+        IMemoryToSharedBuffer(it->mSharedEncryptedBuffer, mHeapSeqNum, &source);
 
         result = mCrypto->decrypt(key, iv, mode, pattern,
                 source, it->mClientBuffer->offset(),
@@ -152,9 +154,8 @@ status_t ACodecBufferChannel::queueSecureInputBuffer(
             return result;
         }
 
-        if (destination.mType == ICrypto::kDestinationTypeSharedMemory) {
-            memcpy(it->mCodecBuffer->base(),
-                destination.mSharedMemory->unsecurePointer(), result);
+        if (destination.type == DrmBufferType::SHARED_MEMORY) {
+            memcpy(it->mCodecBuffer->base(), mDecryptDestination->unsecurePointer(), result);
         }
     } else {
         // Here we cast CryptoPlugin::SubSample to hardware::cas::native::V1_0::SubSample
@@ -315,7 +316,8 @@ sp<MemoryDealer> ACodecBufferChannel::makeMemoryDealer(size_t heapSize) {
     }
     dealer = new MemoryDealer(heapSize, "ACodecBufferChannel");
     if (mCrypto != nullptr) {
-        int32_t seqNum = mCrypto->setHeap(dealer->getMemoryHeap());
+        sp<HidlMemory> hHeap = fromHeap(dealer->getMemoryHeap());
+        int32_t seqNum = mCrypto->setHeap(hHeap);
         if (seqNum >= 0) {
             mHeapSeqNum = seqNum;
             ALOGV("setHeap returned mHeapSeqNum=%d", mHeapSeqNum);
