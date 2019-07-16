@@ -35,6 +35,7 @@ AImage::AImage(AImageReader* reader, int32_t format, uint64_t usage, BufferItem*
         int64_t timestamp, int32_t width, int32_t height, int32_t numPlanes) :
         mReader(reader), mFormat(format), mUsage(usage), mBuffer(buffer), mLockedBuffer(nullptr),
         mTimestamp(timestamp), mWidth(width), mHeight(height), mNumPlanes(numPlanes) {
+    LOG_FATAL_IF(reader == nullptr, "AImageReader shouldn't be null while creating AImage");
 }
 
 AImage::~AImage() {
@@ -57,14 +58,9 @@ AImage::close(int releaseFenceFd) {
     if (mIsClosed) {
         return;
     }
-    sp<AImageReader> reader = mReader.promote();
-    if (reader != nullptr) {
-        reader->releaseImageLocked(this, releaseFenceFd);
-    } else if (mBuffer != nullptr) {
-        LOG_ALWAYS_FATAL("%s: parent AImageReader closed without releasing image %p",
-                __FUNCTION__, this);
+    if (!mReader->mIsClosed) {
+        mReader->releaseImageLocked(this, releaseFenceFd);
     }
-
     // Should have been set to nullptr in releaseImageLocked
     // Set to nullptr here for extra safety only
     mBuffer = nullptr;
@@ -83,22 +79,12 @@ AImage::free() {
 
 void
 AImage::lockReader() const {
-    sp<AImageReader> reader = mReader.promote();
-    if (reader == nullptr) {
-        // Reader has been closed
-        return;
-    }
-    reader->mLock.lock();
+    mReader->mLock.lock();
 }
 
 void
 AImage::unlockReader() const {
-    sp<AImageReader> reader = mReader.promote();
-    if (reader == nullptr) {
-        // Reader has been closed
-        return;
-    }
-    reader->mLock.unlock();
+    mReader->mLock.unlock();
 }
 
 media_status_t
