@@ -54,6 +54,26 @@ public:
             sp<VendorTagDescriptor>& descriptor);
 };
 
+enum SystemCameraKind {
+   /**
+    * These camera devices are visible to all apps and system components alike
+    */
+   PUBLIC = 0,
+
+   /**
+    * These camera devices are visible only to processes having the
+    * android.permission.SYSTEM_CAMERA permission. They are not exposed to 3P
+    * apps.
+    */
+   SYSTEM_ONLY_CAMERA,
+
+   /**
+    * These camera devices are visible only to HAL clients (that try to connect
+    * on a hwbinder thread).
+    */
+   HIDDEN_SECURE_CAMERA
+};
+
 /**
  * A manager for all camera providers available on an Android device.
  *
@@ -272,7 +292,7 @@ public:
      */
     bool isLogicalCamera(const std::string& id, std::vector<std::string>* physicalCameraIds);
 
-    bool isPublicallyHiddenSecureCamera(const std::string& id);
+    SystemCameraKind getSystemCameraKind(const std::string& id);
     bool isHiddenPhysicalCamera(const std::string& cameraId);
 
     static const float kDepthARTolerance;
@@ -379,7 +399,7 @@ private:
             std::vector<std::string> mPhysicalIds;
             hardware::CameraInfo mInfo;
             sp<IBase> mSavedInterface;
-            bool mIsPublicallyHiddenSecureCamera = false;
+            SystemCameraKind mSystemCameraKind = SystemCameraKind::PUBLIC;
 
             const hardware::camera::common::V1_0::CameraResourceCost mResourceCost;
 
@@ -497,7 +517,7 @@ private:
             CameraMetadata mCameraCharacteristics;
             std::unordered_map<std::string, CameraMetadata> mPhysicalCameraCharacteristics;
             void queryPhysicalCameraIds();
-            bool isPublicallyHiddenSecureCamera();
+            SystemCameraKind getSystemCameraKind();
             status_t fixupMonochromeTags();
             status_t addDynamicDepthTags();
             static void getSupportedSizes(const CameraMetadata& ch, uint32_t tag,
