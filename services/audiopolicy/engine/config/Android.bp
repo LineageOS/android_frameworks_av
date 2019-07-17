@@ -3,7 +3,6 @@ cc_library_static {
     export_include_dirs: ["include"],
     include_dirs: [
         "external/libxml2/include",
-        "external/icu/icu4c/source/common",
     ],
     srcs: [
         "src/EngineConfig.cpp",
