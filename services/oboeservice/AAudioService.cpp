@@ -33,6 +33,7 @@
 #include "AAudioServiceStreamMMAP.h"
 #include "AAudioServiceStreamShared.h"
 #include "binding/IAAudioService.h"
+#include "core/AudioGlobal.h"
 #include "ServiceUtilities.h"
 
 using namespace android;
@@ -128,7 +129,7 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
     if (result != AAUDIO_OK) {
         serviceStream.clear();
         ALOGE("openStream(): failed, return %d = %s",
-              result, AAudio_convertResultToText(result));
+              result, AudioGlobal_convertResultToText(result));
         return result;
     } else {
         aaudio_handle_t handle = mStreamTracker.addStreamForHandle(serviceStream.get());

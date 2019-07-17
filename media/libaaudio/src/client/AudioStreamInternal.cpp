@@ -36,6 +36,7 @@
 #include "binding/AAudioStreamConfiguration.h"
 #include "binding/IAAudioService.h"
 #include "binding/AAudioServiceMessage.h"
+#include "core/AudioGlobal.h"
 #include "core/AudioStreamBuilder.h"
 #include "fifo/FifoBuffer.h"
 #include "utility/AudioClock.h"
@@ -241,7 +242,7 @@ aaudio_result_t AudioStreamInternal::close() {
                                                        timeoutNanoseconds);
             if (result != AAUDIO_OK) {
                 ALOGE("%s() waitForStateChange() returned %d %s",
-                __func__, result, AAudio_convertResultToText(result));
+                __func__, result, AudioGlobal_convertResultToText(result));
             }
         }
         setState(AAUDIO_STREAM_STATE_CLOSING);
