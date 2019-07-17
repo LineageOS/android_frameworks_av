@@ -11,7 +11,7 @@ cc_test {
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_marshalling.cpp"],
     shared_libs: [
-        "libaaudio",
+        "libaaudio_internal",
         "libbinder",
         "libcutils",
         "libutils",
@@ -23,7 +23,7 @@ cc_test {
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_clock_model.cpp"],
     shared_libs: [
-        "libaaudio",
+        "libaaudio_internal",
         "libaudioutils",
         "libcutils",
         "libutils",
@@ -34,7 +34,7 @@ cc_test {
     name: "test_block_adapter",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_block_adapter.cpp"],
-    shared_libs: ["libaaudio"],
+    shared_libs: ["libaaudio_internal"],
 }
 
 cc_test {
@@ -170,7 +170,7 @@ cc_test {
     name: "test_atomic_fifo",
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_atomic_fifo.cpp"],
-    shared_libs: ["libaaudio"],
+    shared_libs: ["libaaudio_internal"],
 }
 
 cc_test {
@@ -178,7 +178,7 @@ cc_test {
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_flowgraph.cpp"],
     shared_libs: [
-        "libaaudio",
+        "libaaudio_internal",
         "libbinder",
         "libcutils",
         "libutils",

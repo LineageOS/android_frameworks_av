@@ -43,7 +43,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "libaaudio",
+        "libaaudio_internal",
         "libaudioclient",
         "libaudioflinger",
         "libbase",
