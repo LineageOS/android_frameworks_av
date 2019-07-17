@@ -272,6 +272,11 @@ AImageReader::AImageReader(int32_t width,
       mFrameListener(new FrameListener(this)),
       mBufferRemovedListener(new BufferRemovedListener(this)) {}
 
+AImageReader::~AImageReader() {
+    Mutex::Autolock _l(mLock);
+    LOG_FATAL_IF("AImageReader not closed before destruction", mIsClosed != true);
+}
+
 media_status_t
 AImageReader::init() {
     PublicFormat publicFormat = static_cast<PublicFormat>(mFormat);
@@ -347,8 +352,12 @@ AImageReader::init() {
     return AMEDIA_OK;
 }
 
-AImageReader::~AImageReader() {
+void AImageReader::close() {
     Mutex::Autolock _l(mLock);
+    if (mIsClosed) {
+        return;
+    }
+    mIsClosed = true;
     AImageReader_ImageListener nullListener = {nullptr, nullptr};
     setImageListenerLocked(&nullListener);
 
@@ -741,6 +750,7 @@ EXPORT
 void AImageReader_delete(AImageReader* reader) {
     ALOGV("%s", __FUNCTION__);
     if (reader != nullptr) {
+        reader->close();
         reader->decStrong((void*) AImageReader_delete);
     }
     return;
