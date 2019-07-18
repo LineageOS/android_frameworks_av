@@ -153,9 +153,9 @@ include $(BUILD_EXECUTABLE)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= \
-        filters/argbtorgba.rs \
-        filters/nightvision.rs \
-        filters/saturation.rs \
+        filters/argbtorgba.rscript \
+        filters/nightvision.rscript \
+        filters/saturation.rscript \
         mediafilter.cpp \
 
 LOCAL_SHARED_LIBRARIES := \
