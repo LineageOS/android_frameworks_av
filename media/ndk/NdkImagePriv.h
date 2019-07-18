@@ -72,7 +72,7 @@ struct AImage {
     uint32_t getJpegSize() const;
 
     // When reader is close, AImage will only accept close API call
-    wp<AImageReader>           mReader;
+    const sp<AImageReader>     mReader;
     const int32_t              mFormat;
     const uint64_t             mUsage;  // AHARDWAREBUFFER_USAGE_* flags.
     BufferItem*                mBuffer;

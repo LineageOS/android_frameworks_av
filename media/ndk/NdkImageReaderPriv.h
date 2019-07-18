@@ -76,6 +76,7 @@ struct AImageReader : public RefBase {
     int32_t        getHeight()    const { return mHeight; };
     int32_t        getFormat()    const { return mFormat; };
     int32_t        getMaxImages() const { return mMaxImages; };
+    void           close();
 
   private:
 
@@ -165,6 +166,7 @@ struct AImageReader : public RefBase {
     native_handle_t*           mWindowHandle = nullptr;
 
     List<AImage*>              mAcquiredImages;
+    bool                       mIsClosed = false;
 
     Mutex                      mLock;
 };
