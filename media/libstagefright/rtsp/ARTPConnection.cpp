@@ -79,6 +79,7 @@ ARTPConnection::ARTPConnection(uint32_t flags)
       mPollEventPending(false),
       mLastReceiverReportTimeUs(-1),
       mLastBitrateReportTimeUs(-1),
+      mTargetBitrate(-1),
       mJbTime(300) {
 }
 
@@ -1022,7 +1023,6 @@ sp<ARTPSource> ARTPConnection::findSource(StreamInfo *info, uint32_t srcId) {
 
         source->setSelfID(mSelfID);
         source->setJbTime(mJbTime > 0 ? mJbTime : 300);
-        source->setMinMaxBitrate(mMinBitrate, mMaxBitrate);
         info->mSources.add(srcId, source);
     } else {
         source = info->mSources.valueAt(index);
@@ -1046,9 +1046,8 @@ void ARTPConnection::setJbTime(const uint32_t jbTime) {
     mJbTime = jbTime;
 }
 
-void ARTPConnection::setMinMaxBitrate(int32_t min, int32_t max) {
-    mMinBitrate = min;
-    mMaxBitrate = max;
+void ARTPConnection::setTargetBitrate(int32_t targetBitrate) {
+    mTargetBitrate = targetBitrate;
 }
 
 void ARTPConnection::checkRxBitrate(int64_t nowUs) {
@@ -1081,17 +1080,8 @@ void ARTPConnection::checkRxBitrate(int64_t nowUs) {
 
             for (size_t i = 0; i < s->mSources.size(); ++i) {
                 sp<ARTPSource> source = s->mSources.valueAt(i);
-                source->setBitrateData(bitrate, nowUs);
-                source->setTargetBitrate();
-                source->addTMMBR(buffer);
-                if (source->isNeedToDowngrade()) {
-                    sp<AMessage> notify = s->mNotifyMsg->dup();
-                    notify->setInt32("rtcp-event", 1);
-                    notify->setInt32("payload-type", 400);
-                    notify->setInt32("feedback-type", 1);
-                    notify->setInt32("sender", source->getSelfID());
-                    notify->post();
-                }
+                source->notifyPktInfo(bitrate, nowUs);
+                source->addTMMBR(buffer, mTargetBitrate);
             }
             if (buffer->size() > 0) {
                 ALOGV("Sending TMMBR...");

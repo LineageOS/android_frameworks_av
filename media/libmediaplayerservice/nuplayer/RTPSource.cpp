@@ -115,7 +115,6 @@ void NuPlayer::RTPSource::prepareAsync() {
         mRTPConn->addStream(sockRtp, sockRtcp, desc, i + 1, notify, false);
         mRTPConn->setSelfID(info->mSelfID);
         mRTPConn->setJbTime((info->mJbTime <= 3000 && info->mJbTime >= 40) ? info->mJbTime : 300);
-        mRTPConn->setMinMaxBitrate(kMinVideoBitrate, info->mAS * 1000 /* kbps */);
 
         info->mRTPSocket = sockRtp;
         info->mRTCPSocket = sockRtcp;
@@ -488,6 +487,10 @@ void NuPlayer::RTPSource::onMessageReceived(const sp<AMessage> &msg) {
         default:
             TRESPASS();
     }
+}
+
+void NuPlayer::RTPSource::setTargetBitrate(int32_t bitrate) {
+    mRTPConn->setTargetBitrate(bitrate);
 }
 
 void NuPlayer::RTPSource::onTimeUpdate(int32_t trackIndex, uint32_t rtpTime, uint64_t ntpTime) {
