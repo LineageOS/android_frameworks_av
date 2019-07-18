@@ -52,6 +52,9 @@ struct NuPlayer::RTPSource : public NuPlayer::Source {
             const String8& rtpParams);
 
     enum {
+        RTP_FIRST_PACKET = 100,
+        RTCP_FIRST_PACKET = 101,
+        RTP_QUALITY = 102,
         RTCP_TSFB = 205,
         RTCP_PSFB = 206,
         RTP_CVO = 300,
@@ -79,6 +82,8 @@ struct NuPlayer::RTPSource : public NuPlayer::Source {
 
     void onMessageReceived(const sp<AMessage> &msg);
 
+    virtual void setTargetBitrate(int32_t bitrate) override;
+
 protected:
     virtual ~RTPSource();
 
@@ -95,7 +100,6 @@ private:
     };
 
     const int64_t kBufferingPollIntervalUs = 1000000ll;
-    const int32_t kMinVideoBitrate = 192000; /* bps */
 
     enum State {
         DISCONNECTED,

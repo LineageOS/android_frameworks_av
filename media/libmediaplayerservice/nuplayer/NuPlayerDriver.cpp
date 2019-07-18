@@ -817,7 +817,11 @@ void NuPlayerDriver::setAudioSink(const sp<AudioSink> &audioSink) {
 }
 
 status_t NuPlayerDriver::setParameter(
-        int /* key */, const Parcel & /* request */) {
+        int key, const Parcel& request ) {
+    if (key == KEY_PARAMETER_RTP_ATTRIBUTES) {
+        mPlayer->setTargetBitrate(request.readInt32());
+        return OK;
+    }
     return INVALID_OPERATION;
 }
 

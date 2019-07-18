@@ -1702,6 +1702,11 @@ void NuPlayer::updateInternalTimers() {
     updateRebufferingTimer(false /* stopping */, false /* exiting */);
 }
 
+void NuPlayer::setTargetBitrate(int bitrate) {
+    if (mSource != NULL)
+        mSource->setTargetBitrate(bitrate);
+}
+
 void NuPlayer::onPause() {
 
     updatePlaybackTimer(true /* stopping */, "onPause");
@@ -2866,6 +2871,27 @@ void NuPlayer::sendIMSRxNotice(const sp<AMessage> &msg) {
                 CHECK(msg->findInt32("bit-rate", &bitrate));
                 in.writeInt32(bitrate);
             }
+            break;
+        }
+        case NuPlayer::RTPSource::RTP_QUALITY:
+        {
+            int32_t feedbackType, bitrate;
+            int32_t highestSeqNum, baseSeqNum, prevExpected;
+            int32_t numBufRecv, prevNumBufRecv;
+            CHECK(msg->findInt32("feedback-type", &feedbackType));
+            CHECK(msg->findInt32("bit-rate", &bitrate));
+            CHECK(msg->findInt32("highest-seq-num", &highestSeqNum));
+            CHECK(msg->findInt32("base-seq-num", &baseSeqNum));
+            CHECK(msg->findInt32("prev-expected", &prevExpected));
+            CHECK(msg->findInt32("num-buf-recv", &numBufRecv));
+            CHECK(msg->findInt32("prev-num-buf-recv", &prevNumBufRecv));
+            in.writeInt32(feedbackType);
+            in.writeInt32(bitrate);
+            in.writeInt32(highestSeqNum);
+            in.writeInt32(baseSeqNum);
+            in.writeInt32(prevExpected);
+            in.writeInt32(numBufRecv);
+            in.writeInt32(prevNumBufRecv);
             break;
         }
         case NuPlayer::RTPSource::RTP_CVO:

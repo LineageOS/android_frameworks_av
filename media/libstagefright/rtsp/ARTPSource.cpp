@@ -54,6 +54,8 @@ ARTPSource::ARTPSource(
       mBaseSeqNumber(0),
       mNumBuffersReceived(0),
       mPrevNumBuffersReceived(0),
+      mPrevExpectedForRR(0),
+      mPrevNumBuffersReceivedForRR(0),
       mLastNTPTime(0),
       mLastNTPTimeUpdateUs(0),
       mIssueFIRRequests(false),
@@ -266,16 +268,16 @@ void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
 
     // According to appendix A.3 in RFC 3550
     uint32_t expected = mHighestSeqNumber - mBaseSeqNumber + 1;
-    int64_t intervalExpected = expected - mPrevExpected;
-    int64_t intervalReceived = mNumBuffersReceived - mPrevNumBuffersReceived;
+    int64_t intervalExpected = expected - mPrevExpectedForRR;
+    int64_t intervalReceived = mNumBuffersReceived - mPrevNumBuffersReceivedForRR;
     int64_t intervalPacketLost = intervalExpected - intervalReceived;
 
     if (intervalExpected > 0 && intervalPacketLost > 0) {
         fraction = (intervalPacketLost << 8) / intervalExpected;
     }
 
-    mPrevExpected = expected;
-    mPrevNumBuffersReceived = mNumBuffersReceived;
+    mPrevExpectedForRR = expected;
+    mPrevNumBuffersReceivedForRR = mNumBuffersReceived;
     int32_t cumulativePacketLost = (int32_t)expected - mNumBuffersReceived;
 
     uint8_t *data = buffer->data() + buffer->size();
@@ -332,13 +334,12 @@ void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
     buffer->setRange(buffer->offset(), buffer->size() + 32);
 }
 
-void ARTPSource::addTMMBR(const sp<ABuffer> &buffer) {
+void ARTPSource::addTMMBR(const sp<ABuffer> &buffer, int32_t targetBitrate) {
     if (buffer->size() + 20 > buffer->capacity()) {
         ALOGW("RTCP buffer too small to accommodate RR.");
         return;
     }
 
-    int32_t targetBitrate = mQualManager.getTargetBitrate();
     if (targetBitrate <= 0)
         return;
 
@@ -388,42 +389,23 @@ void ARTPSource::setJbTime(const uint32_t jbTime) {
     mJbTime = jbTime;
 }
 
-void ARTPSource::setMinMaxBitrate(int32_t min, int32_t max) {
-    mQualManager.setMinMaxBitrate(min, max);
-}
+void ARTPSource::notifyPktInfo(int32_t bitrate, int64_t /*time*/) {
+    sp<AMessage> notify = mNotify->dup();
+    notify->setInt32("rtcp-event", 1);
+    notify->setInt32("payload-type", 102);
+    notify->setInt32("feedback-type", 0);
+    // sending target bitrate up to application to share rtp quality.
+    notify->setInt32("bit-rate", bitrate);
+    notify->setInt32("highest-seq-num", mHighestSeqNumber);
+    notify->setInt32("base-seq-num", mBaseSeqNumber);
+    notify->setInt32("prev-expected", mPrevExpected);
+    notify->setInt32("num-buf-recv", mNumBuffersReceived);
+    notify->setInt32("prev-num-buf-recv", mPrevNumBuffersReceived);
+    notify->post();
 
-void ARTPSource::setBitrateData(int32_t bitrate, int64_t time) {
-    mQualManager.setBitrateData(bitrate, time);
-}
-
-void ARTPSource::setTargetBitrate() {
-    uint8_t fraction = 0;
-
-    // According to appendix A.3 in RFC 3550
     uint32_t expected = mHighestSeqNumber - mBaseSeqNumber + 1;
-    int64_t intervalExpected = expected - mPrevExpected;
-    int64_t intervalReceived = mNumBuffersReceived - mPrevNumBuffersReceived;
-    int64_t intervalPacketLost = intervalExpected - intervalReceived;
-
-    ALOGI("UID %p expectedPkts %lld lostPkts %lld", this, (long long)intervalExpected, (long long)intervalPacketLost);
-
-    if (intervalPacketLost < 0 || intervalExpected == 0)
-        fraction = 0;
-    else if (intervalExpected <= intervalPacketLost)
-        fraction = 255;
-    else
-        fraction = (intervalPacketLost << 8) / intervalExpected;
-
-    mQualManager.setTargetBitrate(fraction, ALooper::GetNowUs(), intervalExpected < 5);
-}
-
-bool ARTPSource::isNeedToReport() {
-    int64_t intervalReceived = mNumBuffersReceived - mPrevNumBuffersReceived;
-    return (intervalReceived > 0) ? true : false;
-}
-
-bool ARTPSource::isNeedToDowngrade() {
-    return mQualManager.isNeedToDowngrade();
+    mPrevExpected = expected;
+    mPrevNumBuffersReceived = mNumBuffersReceived;
 }
 
 void ARTPSource::noticeAbandonBuffer(int cnt) {

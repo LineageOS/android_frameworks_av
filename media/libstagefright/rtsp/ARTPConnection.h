@@ -47,7 +47,7 @@ struct ARTPConnection : public AHandler {
 
     void setSelfID(const uint32_t selfID);
     void setJbTime(const uint32_t jbTime);
-    void setMinMaxBitrate(int32_t min, int32_t max);
+    void setTargetBitrate(int32_t targetBitrate);
 
     // Creates a pair of UDP datagram sockets bound to adjacent ports
     // (the rtpSocket is bound to an even port, the rtcpSocket to the
@@ -86,9 +86,7 @@ private:
     int64_t mLastBitrateReportTimeUs;
 
     int32_t mSelfID;
-
-    int32_t mMinBitrate;
-    int32_t mMaxBitrate;
+    int32_t mTargetBitrate;
 
     uint32_t mJbTime;
 
