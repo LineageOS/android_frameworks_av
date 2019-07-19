@@ -481,16 +481,20 @@ void AudioPolicyService::updateUidStates_l()
             continue;
         }
 
+        bool isAssistant = mUidPolicy->isAssistantUid(current->uid);
         if (appState == APP_STATE_TOP) {
             if (current->startTimeNs > topStartNs) {
                 topActive = current;
                 topStartNs = current->startTimeNs;
             }
-            if (mUidPolicy->isAssistantUid(current->uid)) {
+            if (isAssistant) {
                 isAssistantOnTop = true;
             }
         }
-        if (current->startTimeNs > latestStartNs) {
+        // Assistant capturing for HOTWORD not considered for latest active to avoid
+        // masking regular clients started before
+        if (current->startTimeNs > latestStartNs &&
+            !(current->attributes.source == AUDIO_SOURCE_HOTWORD && isAssistant)) {
             latestActive = current;
             latestStartNs = current->startTimeNs;
         }
