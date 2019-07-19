@@ -12,10 +12,10 @@ cc_library_shared {
     shared_libs: [
         "liblog",
         "libmediandk",
+        "libstagefright_flacdec",
     ],
 
     static_libs: [
-        "libstagefright_flacdec",
         "libstagefright_foundation",
         "libstagefright_metadatautils",
         "libwebm",
