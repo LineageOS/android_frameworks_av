@@ -37,6 +37,7 @@
 
 #include <binder/IPCThreadState.h>
 #include <utils/Errors.h>
+#include <utils/SystemClock.h>
 #include <utils/Timers.h>
 #include <utils/Trace.h>
 
@@ -95,6 +96,8 @@ static const uint32_t kMaxTimeLimitSec = 180;       // 3 minutes
 static const uint32_t kFallbackWidth = 1280;        // 720p
 static const uint32_t kFallbackHeight = 720;
 static const char* kMimeTypeAvc = "video/avc";
+static const char* kMimeTypeApplicationOctetstream = "application/octet-stream";
+static const char* kWinscopeMagicString = "#VV1NSC0PET1ME!#";
 
 // Command-line parameters.
 static bool gVerbose = false;           // chatty on stdout
@@ -350,6 +353,50 @@ static status_t prepareVirtualDisplay(const DisplayInfo& mainDpyInfo,
 }
 
 /*
+ * Writes an unsigned integer byte-by-byte in little endian order regardless
+ * of the platform endianness.
+ */
+template <typename UINT>
+static void writeValueLE(UINT value, uint8_t* buffer) {
+    for (int i = 0; i < sizeof(UINT); ++i) {
+        buffer[i] = static_cast<uint8_t>(value);
+        value >>= 8;
+    }
+}
+
+/*
+ * Saves frames presentation time relative to the elapsed realtime clock in microseconds
+ * preceded by a Winscope magic string and frame count to a metadata track.
+ * This metadata is used by the Winscope tool to sync video with SurfaceFlinger
+ * and WindowManager traces.
+ *
+ * The metadata is written as a binary array as follows:
+ * - winscope magic string (kWinscopeMagicString constant), without trailing null char,
+ * - the number of recorded frames (as little endian uint32),
+ * - for every frame its presentation time relative to the elapsed realtime clock in microseconds
+ *   (as little endian uint64).
+ */
+static status_t writeWinscopeMetadata(const Vector<int64_t>& timestamps,
+        const ssize_t metaTrackIdx, const sp<MediaMuxer>& muxer) {
+    ALOGV("Writing metadata");
+    int64_t systemTimeToElapsedTimeOffsetMicros = (android::elapsedRealtimeNano()
+        - systemTime(SYSTEM_TIME_MONOTONIC)) / 1000;
+    sp<ABuffer> buffer = new ABuffer(timestamps.size() * sizeof(int64_t)
+        + sizeof(uint32_t) + strlen(kWinscopeMagicString));
+    uint8_t* pos = buffer->data();
+    strcpy(reinterpret_cast<char*>(pos), kWinscopeMagicString);
+    pos += strlen(kWinscopeMagicString);
+    writeValueLE<uint32_t>(timestamps.size(), pos);
+    pos += sizeof(uint32_t);
+    for (size_t idx = 0; idx < timestamps.size(); ++idx) {
+        writeValueLE<uint64_t>(static_cast<uint64_t>(timestamps[idx]
+            + systemTimeToElapsedTimeOffsetMicros), pos);
+        pos += sizeof(uint64_t);
+    }
+    return muxer->writeSampleData(buffer, metaTrackIdx, timestamps[0], 0);
+}
+
+/*
  * Runs the MediaCodec encoder, sending the output to the MediaMuxer.  The
  * input frames are coming from the virtual display as fast as SurfaceFlinger
  * wants to send them.
@@ -364,10 +411,12 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
     static int kTimeout = 250000;   // be responsive on signal
     status_t err;
     ssize_t trackIdx = -1;
+    ssize_t metaTrackIdx = -1;
     uint32_t debugNumFrames = 0;
     int64_t startWhenNsec = systemTime(CLOCK_MONOTONIC);
     int64_t endWhenNsec = startWhenNsec + seconds_to_nanoseconds(gTimeLimitSec);
     DisplayInfo mainDpyInfo;
+    Vector<int64_t> timestamps;
 
     assert((rawFp == NULL && muxer != NULL) || (rawFp != NULL && muxer == NULL));
 
@@ -465,6 +514,9 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                             "Failed writing data to muxer (err=%d)\n", err);
                         return err;
                     }
+                    if (gOutputFormat == FORMAT_MP4) {
+                        timestamps.add(ptsUsec);
+                    }
                 }
                 debugNumFrames++;
             }
@@ -491,6 +543,11 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                 encoder->getOutputFormat(&newFormat);
                 if (muxer != NULL) {
                     trackIdx = muxer->addTrack(newFormat);
+                    if (gOutputFormat == FORMAT_MP4) {
+                        sp<AMessage> metaFormat = new AMessage;
+                        metaFormat->setString(KEY_MIME, kMimeTypeApplicationOctetstream);
+                        metaTrackIdx = muxer->addTrack(metaFormat);
+                    }
                     ALOGV("Starting muxer");
                     err = muxer->start();
                     if (err != NO_ERROR) {
@@ -526,6 +583,13 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                 debugNumFrames, nanoseconds_to_seconds(
                         systemTime(CLOCK_MONOTONIC) - startWhenNsec));
         fflush(stdout);
+    }
+    if (metaTrackIdx >= 0 && !timestamps.isEmpty()) {
+        err = writeWinscopeMetadata(timestamps, metaTrackIdx, muxer);
+        if (err != NO_ERROR) {
+            fprintf(stderr, "Failed writing metadata to muxer (err=%d)\n", err);
+            return err;
+        }
     }
     return NO_ERROR;
 }
