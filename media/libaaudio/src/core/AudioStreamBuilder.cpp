@@ -27,6 +27,7 @@
 #include "binding/AAudioBinderClient.h"
 #include "client/AudioStreamInternalCapture.h"
 #include "client/AudioStreamInternalPlay.h"
+#include "core/AudioGlobal.h"
 #include "core/AudioStream.h"
 #include "core/AudioStreamBuilder.h"
 #include "legacy/AudioStreamRecord.h"
@@ -112,7 +113,7 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     }
 
     // The API setting is the highest priority.
-    aaudio_policy_t mmapPolicy = AAudio_getMMapPolicy();
+    aaudio_policy_t mmapPolicy = AudioGlobal_getMMapPolicy();
     // If not specified then get from a system property.
     if (mmapPolicy == AAUDIO_UNSPECIFIED) {
         mmapPolicy = AAudioProperty_getMMapPolicy();

@@ -25,8 +25,9 @@
 #include "AudioStreamBuilder.h"
 #include "AudioStream.h"
 #include "AudioClock.h"
+#include "AudioGlobal.h"
 
-using namespace aaudio;
+namespace aaudio {
 
 
 // Sequential number assigned to streams solely for debugging purposes.
@@ -51,7 +52,7 @@ AudioStream::~AudioStream() {
                           || getState() == AAUDIO_STREAM_STATE_UNINITIALIZED
                           || getState() == AAUDIO_STREAM_STATE_DISCONNECTED),
                         "~AudioStream() - still in use, state = %s",
-                        AAudio_convertStreamStateToText(getState()));
+                        AudioGlobal_convertStreamStateToText(getState()));
 
     mPlayerBase->clearParentReference(); // remove reference to this AudioStream
 }
@@ -155,7 +156,7 @@ aaudio_result_t AudioStream::systemPause() {
         case AAUDIO_STREAM_STATE_CLOSED:
         default:
             ALOGW("safePause() stream not running, state = %s",
-                  AAudio_convertStreamStateToText(getState()));
+                  AudioGlobal_convertStreamStateToText(getState()));
             return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -240,7 +241,7 @@ aaudio_result_t AudioStream::safeStop() {
         case AAUDIO_STREAM_STATE_CLOSED:
         default:
             ALOGW("%s() stream not running, state = %s", __func__,
-                  AAudio_convertStreamStateToText(getState()));
+                  AudioGlobal_convertStreamStateToText(getState()));
             return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -488,3 +489,5 @@ void AudioStream::MyPlayerBase::unregisterWithAudioManager() {
 void AudioStream::MyPlayerBase::destroy() {
     unregisterWithAudioManager();
 }
+
+}  // namespace aaudio
