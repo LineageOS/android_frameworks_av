@@ -41,11 +41,6 @@ class DevicesFactoryHalHybrid : public DevicesFactoryHalInterface
     sp<DevicesFactoryHalInterface> mHidlFactory;
 };
 
-sp<DevicesFactoryHalInterface> createDevicesFactoryHal() {
-    auto service = IDevicesFactory::getService();
-    return service ? new DevicesFactoryHalHybrid(service) : nullptr;
-}
-
 } // namespace CPP_VERSION
 } // namespace android
 

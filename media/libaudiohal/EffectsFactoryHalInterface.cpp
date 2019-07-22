@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,20 +14,15 @@
  * limitations under the License.
  */
 
-#include <android/hardware/audio/effect/2.0/IEffectsFactory.h>
-#include <android/hardware/audio/effect/4.0/IEffectsFactory.h>
-#include <android/hardware/audio/effect/5.0/IEffectsFactory.h>
-
 #include <libaudiohal/FactoryHalHidl.h>
+
+#include <media/audiohal/EffectsFactoryHalInterface.h>
 
 namespace android {
 
 // static
 sp<EffectsFactoryHalInterface> EffectsFactoryHalInterface::create() {
-    return effect::V5_0::createEffectsFactoryHal() ?:
-           effect::V4_0::createEffectsFactoryHal() ?:
-           effect::V2_0::createEffectsFactoryHal() ?:
-           nullptr;
+    return createPreferedImpl<EffectsFactoryHalInterface>();
 }
 
 // static
