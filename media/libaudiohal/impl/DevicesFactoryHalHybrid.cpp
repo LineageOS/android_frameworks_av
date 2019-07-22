@@ -24,9 +24,9 @@
 namespace android {
 namespace CPP_VERSION {
 
-DevicesFactoryHalHybrid::DevicesFactoryHalHybrid()
+DevicesFactoryHalHybrid::DevicesFactoryHalHybrid(sp<IDevicesFactory> hidlFactory)
         : mLocalFactory(new DevicesFactoryHalLocal()),
-          mHidlFactory(new DevicesFactoryHalHidl()) {
+          mHidlFactory(new DevicesFactoryHalHidl(hidlFactory)) {
 }
 
 status_t DevicesFactoryHalHybrid::openDevice(const char *name, sp<DeviceHalInterface> *device) {
