@@ -10,14 +10,70 @@ cc_library {
         "legacy",
         "utility",
     ],
-    export_include_dirs: ["."],
     header_libs: ["libaaudio_headers"],
     export_header_lib_headers: ["libaaudio_headers"],
 
     srcs: [
+        "core/AAudioAudio.cpp",
+    ],
+
+    cflags: [
+        "-Wno-unused-parameter",
+        "-Wall",
+        "-Werror",
+
+        // By default, all symbols are hidden.
+        // "-fvisibility=hidden",
+        // AAUDIO_API is used to explicitly export a function or a variable as a visible symbol.
+        "-DAAUDIO_API=__attribute__((visibility(\"default\")))",
+    ],
+
+    shared_libs: [
+        "libaaudio_internal",
+        "libaudioclient",
+        "libaudioutils",
+        "liblog",
+        "libcutils",
+        "libutils",
+        "libbinder",
+    ],
+}
+
+cc_library {
+    name: "libaaudio_internal",
+
+    local_include_dirs: [
+        "binding",
+        "client",
+        "core",
+        "fifo",
+        "legacy",
+        "utility",
+    ],
+
+    export_include_dirs: ["."],
+    header_libs: ["libaaudio_headers"],
+    export_header_lib_headers: ["libaaudio_headers"],
+
+    shared_libs: [
+        "libaudioclient",
+        "libaudioutils",
+        "liblog",
+        "libcutils",
+        "libutils",
+        "libbinder",
+    ],
+
+    cflags: [
+        "-Wno-unused-parameter",
+        "-Wall",
+        "-Werror",
+    ],
+
+    srcs: [
+        "core/AudioGlobal.cpp",
         "core/AudioStream.cpp",
         "core/AudioStreamBuilder.cpp",
-        "core/AAudioAudio.cpp",
         "core/AAudioStreamParameters.cpp",
         "legacy/AudioStreamLegacy.cpp",
         "legacy/AudioStreamRecord.cpp",
@@ -53,25 +109,5 @@ cc_library {
         "flowgraph/SourceFloat.cpp",
         "flowgraph/SourceI16.cpp",
         "flowgraph/SourceI24.cpp",
-    ],
-
-    cflags: [
-        "-Wno-unused-parameter",
-        "-Wall",
-        "-Werror",
-
-        // By default, all symbols are hidden.
-        // "-fvisibility=hidden",
-        // AAUDIO_API is used to explicitly export a function or a variable as a visible symbol.
-        "-DAAUDIO_API=__attribute__((visibility(\"default\")))",
-    ],
-
-    shared_libs: [
-        "libaudioclient",
-        "libaudioutils",
-        "liblog",
-        "libcutils",
-        "libutils",
-        "libbinder",
     ],
 }

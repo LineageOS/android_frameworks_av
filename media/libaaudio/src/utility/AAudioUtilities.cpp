@@ -24,6 +24,7 @@
 #include <utils/Errors.h>
 
 #include "aaudio/AAudio.h"
+#include "core/AudioGlobal.h"
 #include <aaudio/AAudioTesting.h>
 #include <math.h>
 #include <system/audio-base.h>
@@ -355,7 +356,7 @@ aaudio_result_t AAudio_isFlushAllowed(aaudio_stream_state_t state) {
         case AAUDIO_STREAM_STATE_DISCONNECTED:
         default:
             ALOGE("can only flush stream when PAUSED, OPEN or STOPPED, state = %s",
-                  AAudio_convertStreamStateToText(state));
+                  aaudio::AudioGlobal_convertStreamStateToText(state));
             result =  AAUDIO_ERROR_INVALID_STATE;
             break;
     }
