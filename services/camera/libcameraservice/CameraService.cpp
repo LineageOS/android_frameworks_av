@@ -87,6 +87,24 @@ using hardware::camera::common::V1_0::CameraDeviceStatus;
 using hardware::camera::common::V1_0::TorchModeStatus;
 using vendor::lineage::camera::motor::V1_0::ICameraMotor;
 
+static sp<ICameraMotor> gCameraMotor = nullptr;
+static bool gCameraMotorHalExists = true;
+
+// Retrieve a copy of CameraMotor
+sp<ICameraMotor> getCameraMotor() {
+    if (gCameraMotorHalExists && gCameraMotor == nullptr) {
+        gCameraMotor = ICameraMotor::getService();
+        if (gCameraMotor != nullptr) {
+            ALOGI("Loaded camera motor service");
+        } else {
+            ALOGI("Couldn't load camera motor service");
+            gCameraMotorHalExists = false;
+        }
+    }
+    return gCameraMotor;
+}
+
+
 // ----------------------------------------------------------------------------
 // Logging support -- this is for debugging only
 // Use "adb shell dumpsys media.camera -v 1" to change it.
@@ -1441,7 +1459,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
             // Otherwise, add client to active clients list
             finishConnectLocked(client, partial);
 
-            sp<ICameraMotor> cameraMotor = ICameraMotor::getService();
+            sp<ICameraMotor> cameraMotor = getCameraMotor();
             if (cameraMotor != nullptr) {
                 cameraMotor->onConnect(cameraId.string());
             }
@@ -2190,7 +2208,7 @@ binder::Status CameraService::BasicClient::disconnect() {
     }
     mDisconnected = true;
 
-    sp<ICameraMotor> cameraMotor = ICameraMotor::getService();
+    sp<ICameraMotor> cameraMotor = getCameraMotor();
     if (cameraMotor != nullptr) {
         cameraMotor->onDisconnect(mCameraIdStr.string());
     }
