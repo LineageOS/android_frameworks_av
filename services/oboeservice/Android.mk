@@ -46,7 +46,7 @@ LOCAL_CFLAGS += -Wno-unused-parameter
 LOCAL_CFLAGS += -Wall -Werror
 
 LOCAL_SHARED_LIBRARIES :=  \
-    libaaudio \
+    libaaudio_internal \
     libaudioflinger \
     libaudioclient \
     libbinder \

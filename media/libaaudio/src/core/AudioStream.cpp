@@ -25,8 +25,9 @@
 #include "AudioStreamBuilder.h"
 #include "AudioStream.h"
 #include "AudioClock.h"
+#include "AudioGlobal.h"
 
-using namespace aaudio;
+namespace aaudio {
 
 AudioStream::AudioStream()
         : mPlayerBase(new MyPlayerBase(this))
@@ -37,14 +38,14 @@ AudioStream::AudioStream()
 }
 
 AudioStream::~AudioStream() {
-    ALOGD("destroying %p, state = %s", this, AAudio_convertStreamStateToText(getState()));
+    ALOGD("destroying %p, state = %s", this, AudioGlobal_convertStreamStateToText(getState()));
     // If the stream is deleted when OPEN or in use then audio resources will leak.
     // This would indicate an internal error. So we want to find this ASAP.
     LOG_ALWAYS_FATAL_IF(!(getState() == AAUDIO_STREAM_STATE_CLOSED
                           || getState() == AAUDIO_STREAM_STATE_UNINITIALIZED
                           || getState() == AAUDIO_STREAM_STATE_DISCONNECTED),
                         "~AudioStream() - still in use, state = %s",
-                        AAudio_convertStreamStateToText(getState()));
+                        AudioGlobal_convertStreamStateToText(getState()));
 
     mPlayerBase->clearParentReference(); // remove reference to this AudioStream
 }
@@ -166,7 +167,7 @@ aaudio_result_t AudioStream::safePause() {
         case AAUDIO_STREAM_STATE_CLOSED:
         default:
             ALOGW("safePause() stream not running, state = %s",
-                  AAudio_convertStreamStateToText(getState()));
+                  AudioGlobal_convertStreamStateToText(getState()));
             return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -226,7 +227,7 @@ aaudio_result_t AudioStream::safeStop() {
         case AAUDIO_STREAM_STATE_CLOSED:
         default:
             ALOGW("requestStop() stream not running, state = %s",
-                  AAudio_convertStreamStateToText(getState()));
+                  AudioGlobal_convertStreamStateToText(getState()));
             return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -458,3 +459,5 @@ void AudioStream::MyPlayerBase::unregisterWithAudioManager() {
 void AudioStream::MyPlayerBase::destroy() {
     unregisterWithAudioManager();
 }
+
+}  // namespace aaudio
