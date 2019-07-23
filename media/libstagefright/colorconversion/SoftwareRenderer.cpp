@@ -269,10 +269,21 @@ std::list<FrameRenderTracker::Info> SoftwareRenderer::render(
 
     Rect bounds(mCropWidth, mCropHeight);
 
-    void *dst;
-    CHECK_EQ(0, mapper.lock(buf->handle,
-            GRALLOC_USAGE_SW_READ_NEVER | GRALLOC_USAGE_SW_WRITE_RARELY,
-            bounds, &dst));
+    void *dst = NULL;
+    struct android_ycbcr ycbcr;
+    if ( !mConverter &&
+         (mColorFormat == OMX_COLOR_FormatYUV420Planar ||
+         mColorFormat == OMX_COLOR_FormatYUV420SemiPlanar ||
+         mColorFormat == OMX_TI_COLOR_FormatYUV420PackedSemiPlanar ||
+         mColorFormat == OMX_COLOR_FormatYUV420Planar16)) {
+        CHECK_EQ(0, mapper.lockYCbCr(buf->handle,
+                GRALLOC_USAGE_SW_READ_NEVER | GRALLOC_USAGE_SW_WRITE_RARELY,
+                bounds, &ycbcr));
+    } else {
+        CHECK_EQ(0, mapper.lock(buf->handle,
+                GRALLOC_USAGE_SW_READ_NEVER | GRALLOC_USAGE_SW_WRITE_RARELY,
+                bounds, &dst));
+    }
 
     // TODO move the other conversions also into ColorConverter, and
     // fix cropping issues (when mCropLeft/Top != 0 or mWidth != mCropWidth)
@@ -289,12 +300,10 @@ std::list<FrameRenderTracker::Info> SoftwareRenderer::render(
         const uint8_t *src_u = (const uint8_t *)data + mStride * mHeight + mCropTop * mStride / 4;
         const uint8_t *src_v = (const uint8_t *)src_u + mStride * mHeight / 4;
 
-        uint8_t *dst_y = (uint8_t *)dst;
-        size_t dst_y_size = buf->stride * buf->height;
+        uint8_t *dst_y = (uint8_t *)ycbcr.y;
+        uint8_t *dst_v = (uint8_t *)ycbcr.cr;
+        uint8_t *dst_u = (uint8_t *)ycbcr.cb;
         size_t dst_c_stride = ALIGN(buf->stride / 2, 16);
-        size_t dst_c_size = dst_c_stride * buf->height / 2;
-        uint8_t *dst_v = dst_y + dst_y_size;
-        uint8_t *dst_u = dst_v + dst_c_size;
 
         dst_y += mCropTop * buf->stride + mCropLeft;
         dst_v += (mCropTop/2) * dst_c_stride + mCropLeft/2;
@@ -321,12 +330,10 @@ std::list<FrameRenderTracker::Info> SoftwareRenderer::render(
         const uint8_t *src_u = (const uint8_t *)data + mStride * mHeight + mCropTop * mStride / 4;
         const uint8_t *src_v = (const uint8_t *)src_u + mStride * mHeight / 4;
 
-        uint8_t *dst_y = (uint8_t *)dst;
-        size_t dst_y_size = buf->stride * buf->height;
+        uint8_t *dst_y = (uint8_t *)ycbcr.y;
+        uint8_t *dst_v = (uint8_t *)ycbcr.cr;
+        uint8_t *dst_u = (uint8_t *)ycbcr.cb;
         size_t dst_c_stride = ALIGN(buf->stride / 2, 16);
-        size_t dst_c_size = dst_c_stride * buf->height / 2;
-        uint8_t *dst_v = dst_y + dst_y_size;
-        uint8_t *dst_u = dst_v + dst_c_size;
 
         dst_y += mCropTop * buf->stride + mCropLeft;
         dst_v += (mCropTop / 2) * dst_c_stride + mCropLeft / 2;
@@ -361,13 +368,10 @@ std::list<FrameRenderTracker::Info> SoftwareRenderer::render(
         src_y += mCropLeft + mCropTop * mWidth;
         src_uv += (mCropLeft + mCropTop * mWidth) / 2;
 
-        uint8_t *dst_y = (uint8_t *)dst;
-
-        size_t dst_y_size = buf->stride * buf->height;
+        uint8_t *dst_y = (uint8_t *)ycbcr.y;
+        uint8_t *dst_v = (uint8_t *)ycbcr.cr;
+        uint8_t *dst_u = (uint8_t *)ycbcr.cb;
         size_t dst_c_stride = ALIGN(buf->stride / 2, 16);
-        size_t dst_c_size = dst_c_stride * buf->height / 2;
-        uint8_t *dst_v = dst_y + dst_y_size;
-        uint8_t *dst_u = dst_v + dst_c_size;
 
         dst_y += mCropTop * buf->stride + mCropLeft;
         dst_v += (mCropTop/2) * dst_c_stride + mCropLeft/2;

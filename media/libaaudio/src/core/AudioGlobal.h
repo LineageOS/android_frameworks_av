@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,21 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#ifndef AAUDIO_AUDIOGLOBAL_H
+#define AAUDIO_AUDIOGLOBAL_H
 
-#include <libaudiohal/FactoryHalHidl.h>
+#include <aaudio/AAudio.h>
+#include <aaudio/AAudioTesting.h>
 
-#include <media/audiohal/EffectsFactoryHalInterface.h>
 
-namespace android {
+namespace aaudio {
 
-// static
-sp<EffectsFactoryHalInterface> EffectsFactoryHalInterface::create() {
-    return createPreferedImpl<EffectsFactoryHalInterface>();
+aaudio_policy_t AudioGlobal_getMMapPolicy();
+aaudio_result_t AudioGlobal_setMMapPolicy(aaudio_policy_t policy);
+
+const char* AudioGlobal_convertResultToText(aaudio_result_t returnCode);
+const char* AudioGlobal_convertStreamStateToText(aaudio_stream_state_t state);
+
 }
 
-// static
-bool EffectsFactoryHalInterface::isNullUuid(const effect_uuid_t *pEffectUuid) {
-    return memcmp(pEffectUuid, EFFECT_UUID_NULL, sizeof(effect_uuid_t)) == 0;
-}
+#endif  // AAUDIO_AUDIOGLOBAL_H
 
-} // namespace android

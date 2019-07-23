@@ -17,16 +17,17 @@
 #define LOG_TAG "DevicesFactoryHalHybrid"
 //#define LOG_NDEBUG 0
 
+#include "DevicesFactoryHalHidl.h"
 #include "DevicesFactoryHalHybrid.h"
 #include "DevicesFactoryHalLocal.h"
-#include "DevicesFactoryHalHidl.h"
+#include <libaudiohal/FactoryHalHidl.h>
 
 namespace android {
 namespace CPP_VERSION {
 
-DevicesFactoryHalHybrid::DevicesFactoryHalHybrid()
+DevicesFactoryHalHybrid::DevicesFactoryHalHybrid(sp<IDevicesFactory> hidlFactory)
         : mLocalFactory(new DevicesFactoryHalLocal()),
-          mHidlFactory(new DevicesFactoryHalHidl()) {
+          mHidlFactory(new DevicesFactoryHalHidl(hidlFactory)) {
 }
 
 status_t DevicesFactoryHalHybrid::openDevice(const char *name, sp<DeviceHalInterface> *device) {
@@ -36,6 +37,12 @@ status_t DevicesFactoryHalHybrid::openDevice(const char *name, sp<DeviceHalInter
     }
     return mLocalFactory->openDevice(name, device);
 }
-
 } // namespace CPP_VERSION
+
+template <>
+sp<DevicesFactoryHalInterface> createFactoryHal<AudioHALVersion::CPP_VERSION>() {
+    auto service = hardware::audio::CPP_VERSION::IDevicesFactory::getService();
+    return service ? new CPP_VERSION::DevicesFactoryHalHybrid(service) : nullptr;
+}
+
 } // namespace android

@@ -18,7 +18,6 @@
 #define ANDROID_HARDWARE_EFFECTS_FACTORY_HAL_HIDL_H
 
 #include PATH(android/hardware/audio/effect/FILE_VERSION/IEffectsFactory.h)
-#include PATH(android/hardware/audio/effect/FILE_VERSION/types.h)
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 
 #include "ConversionHelperHidl.h"
@@ -34,7 +33,7 @@ using namespace ::android::hardware::audio::effect::CPP_VERSION;
 class EffectsFactoryHalHidl : public EffectsFactoryHalInterface, public ConversionHelperHidl
 {
   public:
-    EffectsFactoryHalHidl();
+    EffectsFactoryHalHidl(sp<IEffectsFactory> effectsFactory);
 
     // Returns the number of different effects in all loaded libraries.
     virtual status_t queryNumberEffects(uint32_t *pNumEffects);
@@ -65,10 +64,6 @@ class EffectsFactoryHalHidl : public EffectsFactoryHalInterface, public Conversi
 
     status_t queryAllDescriptors();
 };
-
-sp<EffectsFactoryHalInterface> createEffectsFactoryHal() {
-    return new EffectsFactoryHalHidl();
-}
 
 } // namespace CPP_VERSION
 } // namespace effect
