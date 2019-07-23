@@ -11,6 +11,7 @@ cc_library {
     ],
     header_libs: ["libaaudio_headers"],
     export_header_lib_headers: ["libaaudio_headers"],
+    version_script: "libaaudio.map.txt",
 
     srcs: [
         "core/AAudioAudio.cpp",
