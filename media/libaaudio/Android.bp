@@ -24,7 +24,7 @@ ndk_headers {
 ndk_library {
     name: "libaaudio",
     // deliberately includes symbols from AAudioTesting.h
-    symbol_file: "libaaudio.map.txt",
+    symbol_file: "src/libaaudio.map.txt",
     first_version: "26",
     unversioned_until: "current",
 }
@@ -32,6 +32,5 @@ ndk_library {
 cc_library_headers {
     name: "libaaudio_headers",
     export_include_dirs: ["include"],
-    version_script: "libaaudio.map.txt",
 }
 
