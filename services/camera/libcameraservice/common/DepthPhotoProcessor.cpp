@@ -419,7 +419,7 @@ extern "C" int processDepthPhotoFrame(DepthPhotoInputFrame inputFrame, size_t de
 
     std::vector<std::unique_ptr<Item>> items;
     std::vector<std::unique_ptr<Camera>> cameraList;
-    auto image = Image::FromDataForPrimaryImage("android/mainimage", &items);
+    auto image = Image::FromDataForPrimaryImage("image/jpeg", &items);
     std::unique_ptr<CameraParams> cameraParams(new CameraParams(std::move(image)));
     if (cameraParams == nullptr) {
         ALOGE("%s: Failed to initialize camera parameters", __FUNCTION__);
