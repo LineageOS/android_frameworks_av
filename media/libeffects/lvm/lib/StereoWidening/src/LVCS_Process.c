@@ -106,7 +106,7 @@ LVCS_ReturnStatus_en LVCS_Process_CS(LVCS_Handle_t              hInstance,
      * The Concert Surround module carries out processing only on L, R.
      */
     pInput = pScratch + (2 * NrFrames);
-    pStIn  = pScratch + (LVCS_SCRATCHBUFFERS * NrFrames);
+    pStIn  = pScratch + ((LVCS_SCRATCHBUFFERS - 2) * NrFrames);
     /* The first two channel data is extracted from the input data and
      * copied into pInput buffer
      */
@@ -303,13 +303,45 @@ LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
      */
     if (pInstance->Params.OperatingMode != LVCS_OFF)
     {
+#ifdef SUPPORT_MC
+        LVM_FLOAT *pStereoOut;
+        /*
+         * LVCS_Process_CS uses output buffer to store intermediate outputs of StereoEnhancer,
+         * Equalizer, ReverbGenerator and BypassMixer.
+         * So, to avoid i/o data overlapping, when i/o buffers are common, use scratch buffer
+         * to store intermediate outputs.
+         */
+        if (pOutData == pInData)
+        {
+          /*
+           * Scratch memory is used in 4 chunks of (2 * NrFrames) size.
+           * First chunk of memory is used by LVCS_StereoEnhancer and LVCS_ReverbGenerator,
+           * second and fourth are used as input buffers by pInput and pStIn in LVCS_Process_CS.
+           * Hence, pStereoOut is pointed to use unused third portion of scratch memory.
+           */
+            pStereoOut = (LVM_FLOAT *) \
+                          pInstance->MemoryTable. \
+                          Region[LVCS_MEMREGION_TEMPORARY_FAST].pBaseAddress +
+                          ((LVCS_SCRATCHBUFFERS - 4) * NrFrames);
+        }
+        else
+        {
+            pStereoOut = pOutData;
+        }
+
         /*
          * Call CS process function
          */
             err = LVCS_Process_CS(hInstance,
                                   pInData,
+                                  pStereoOut,
+                                  NrFrames);
+#else
+            err = LVCS_Process_CS(hInstance,
+                                  pInData,
                                   pOutData,
                                   NumSamples);
+#endif
 
 
         /*
@@ -329,10 +361,17 @@ LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
 
             if(NumSamples < LVCS_COMPGAINFRAME)
             {
+#ifdef SUPPORT_MC
+                NonLinComp_Float(Gain,                    /* Compressor gain setting */
+                                 pStereoOut,
+                                 pStereoOut,
+                                 (LVM_INT32)(2 * NrFrames));
+#else
                 NonLinComp_Float(Gain,                    /* Compressor gain setting */
                                  pOutData,
                                  pOutData,
                                  (LVM_INT32)(2 * NumSamples));
+#endif
             }
             else
             {
@@ -361,7 +400,11 @@ LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
 
                 FinalGain = Gain;
                 Gain = pInstance->CompressGain;
+#ifdef SUPPORT_MC
+                pOutPtr = pStereoOut;
+#else
                 pOutPtr = pOutData;
+#endif
 
                 while(SampleToProcess > 0)
                 {
@@ -428,6 +471,7 @@ LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
         }
 #ifdef SUPPORT_MC
         Copy_Float_Stereo_Mc(pInData,
+                             pStereoOut,
                              pOutData,
                              NrFrames,
                              channels);
