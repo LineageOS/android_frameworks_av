@@ -73,6 +73,26 @@ static const std::vector<audio_channel_mask_t> surroundChannelMasksOrder = {{
         AUDIO_CHANNEL_OUT_2POINT1POINT2, AUDIO_CHANNEL_OUT_2POINT0POINT2,
         AUDIO_CHANNEL_OUT_5POINT1, AUDIO_CHANNEL_OUT_STEREO }};
 
+template <typename T>
+bool operator== (const SortedVector<T> &left, const SortedVector<T> &right)
+{
+    if (left.size() != right.size()) {
+        return false;
+    }
+    for (size_t index = 0; index < right.size(); index++) {
+        if (left[index] != right[index]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+template <typename T>
+bool operator!= (const SortedVector<T> &left, const SortedVector<T> &right)
+{
+    return !(left == right);
+}
+
 // ----------------------------------------------------------------------------
 // AudioPolicyInterface implementation
 // ----------------------------------------------------------------------------
@@ -1339,13 +1359,13 @@ status_t AudioPolicyManager::getBestMsdAudioProfileFor(const sp<DeviceDescriptor
     // Each IOProfile represents a MixPort from audio_policy_configuration.xml
     for (const auto &inProfile : inputProfiles) {
         if (hwAvSync == ((inProfile->getFlags() & AUDIO_INPUT_FLAG_HW_AV_SYNC) != 0)) {
-            msdProfiles.appendVector(inProfile->getAudioProfiles());
+            msdProfiles.appendProfiles(inProfile->getAudioProfiles());
         }
     }
     AudioProfileVector deviceProfiles;
     for (const auto &outProfile : outputProfiles) {
         if (hwAvSync == ((outProfile->getFlags() & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) != 0)) {
-            deviceProfiles.appendVector(outProfile->getAudioProfiles());
+            deviceProfiles.appendProfiles(outProfile->getAudioProfiles());
         }
     }
     struct audio_config_base bestSinkConfig;
@@ -6084,24 +6104,24 @@ void AudioPolicyManager::modifySurroundFormats(
         formatSet.insert(enforcedSurround.begin(), enforcedSurround.end());
     }
     for (const auto& format : formatSet) {
-        formatsPtr->push(format);
+        formatsPtr->push_back(format);
     }
 }
 
-void AudioPolicyManager::modifySurroundChannelMasks(ChannelsVector *channelMasksPtr) {
-    ChannelsVector &channelMasks = *channelMasksPtr;
+void AudioPolicyManager::modifySurroundChannelMasks(ChannelMaskSet *channelMasksPtr) {
+    ChannelMaskSet &channelMasks = *channelMasksPtr;
     audio_policy_forced_cfg_t forceUse = mEngine->getForceUse(
             AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND);
 
     // If NEVER, then remove support for channelMasks > stereo.
     if (forceUse == AUDIO_POLICY_FORCE_ENCODED_SURROUND_NEVER) {
-        for (size_t maskIndex = 0; maskIndex < channelMasks.size(); ) {
-            audio_channel_mask_t channelMask = channelMasks[maskIndex];
+        for (auto it = channelMasks.begin(); it != channelMasks.end();) {
+            audio_channel_mask_t channelMask = *it;
             if (channelMask & ~AUDIO_CHANNEL_OUT_STEREO) {
                 ALOGI("%s: force NEVER, so remove channelMask 0x%08x", __FUNCTION__, channelMask);
-                channelMasks.removeAt(maskIndex);
+                it = channelMasks.erase(it);
             } else {
-                maskIndex++;
+                ++it;
             }
         }
     // If ALWAYS or MANUAL, then make sure we at least support 5.1
@@ -6117,7 +6137,7 @@ void AudioPolicyManager::modifySurroundChannelMasks(ChannelsVector *channelMasks
         }
         // If not then add 5.1 support.
         if (!supports5dot1) {
-            channelMasks.add(AUDIO_CHANNEL_OUT_5POINT1);
+            channelMasks.insert(AUDIO_CHANNEL_OUT_5POINT1);
             ALOGI("%s: force MANUAL or ALWAYS, so adding channelMask for 5.1 surround", __func__);
         }
     }
@@ -6150,8 +6170,8 @@ void AudioPolicyManager::updateAudioProfiles(const sp<DeviceDescriptor>& devDesc
     }
 
     for (audio_format_t format : profiles.getSupportedFormats()) {
-        ChannelsVector channelMasks;
-        SampleRateVector samplingRates;
+        ChannelMaskSet channelMasks;
+        SampleRateSet samplingRates;
         AudioParameter requestedParameters;
         requestedParameters.addInt(String8(AudioParameter::keyFormat), format);
 

@@ -762,7 +762,7 @@ protected:
 private:
         // Add or remove AC3 DTS encodings based on user preferences.
         void modifySurroundFormats(const sp<DeviceDescriptor>& devDesc, FormatVector *formatsPtr);
-        void modifySurroundChannelMasks(ChannelsVector *channelMasksPtr);
+        void modifySurroundChannelMasks(ChannelMaskSet *channelMasksPtr);
 
         // Support for Multi-Stream Decoder (MSD) module
         sp<DeviceDescriptor> getMsdAudioInDevice() const;
