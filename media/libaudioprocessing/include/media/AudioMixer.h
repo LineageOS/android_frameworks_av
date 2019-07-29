@@ -43,10 +43,6 @@
 
 namespace android {
 
-namespace NBLog {
-class Writer;
-}   // namespace NBLog
-
 // ----------------------------------------------------------------------------
 
 class AudioMixer
@@ -186,10 +182,6 @@ public:
             ss << pair.first << " ";
         }
         return ss.str();
-    }
-
-    void        setNBLogWriter(NBLog::Writer *logWriter) {
-        mNBLogWriter = logWriter;
     }
 
     static inline bool isValidFormat(audio_format_t format) {
@@ -490,8 +482,6 @@ private:
     // initialization constants
     const uint32_t mSampleRate;
     const size_t mFrameCount;
-
-    NBLog::Writer *mNBLogWriter = nullptr;   // associated NBLog::Writer
 
     process_hook_t mHook = &AudioMixer::process__nop;   // one of process__*, never nullptr
 
