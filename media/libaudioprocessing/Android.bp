@@ -4,13 +4,9 @@ cc_defaults {
     export_include_dirs: ["include"],
 
     shared_libs: [
-        "libaudiohal",
         "libaudioutils",
         "libcutils",
         "liblog",
-        "libnbaio",
-        "libnblog",
-        "libsonic",
         "libutils",
         "libvibrator",
     ],
@@ -36,6 +32,12 @@ cc_library_shared {
         "BufferProviders.cpp",
         "RecordBufferConverter.cpp",
     ],
+
+    shared_libs: [
+        "libaudiohal",
+        "libsonic",
+    ],
+
     whole_static_libs: ["libaudioprocessing_arm"],
 }
 

@@ -124,7 +124,7 @@ bool FastThread::threadLoop()
             mDumpState = next->mDumpState != NULL ? next->mDumpState : mDummyDumpState;
             tlNBLogWriter = next->mNBLogWriter != NULL ?
                     next->mNBLogWriter : mDummyNBLogWriter.get();
-            setNBLogWriter(tlNBLogWriter); // FastMixer informs its AudioMixer, FastCapture ignores
+            setNBLogWriter(tlNBLogWriter); // This is used for debugging only
 
             // We want to always have a valid reference to the previous (non-idle) state.
             // However, the state queue only guarantees access to current and previous states.
