@@ -351,7 +351,17 @@ ResultStatus ClientManager::Impl::allocate(
         }
         client = it->second;
     }
-    return client->allocate(params, handle, buffer);
+    native_handle_t *origHandle;
+    ResultStatus res = client->allocate(params, &origHandle, buffer);
+    if (res != ResultStatus::OK) {
+        return res;
+    }
+    *handle = native_handle_clone(origHandle);
+    if (handle == NULL) {
+        buffer->reset();
+        return ResultStatus::NO_MEMORY;
+    }
+    return ResultStatus::OK;
 }
 
 ResultStatus ClientManager::Impl::receive(
@@ -367,7 +377,18 @@ ResultStatus ClientManager::Impl::receive(
         }
         client = it->second;
     }
-    return client->receive(transactionId, bufferId, timestampUs, handle, buffer);
+    native_handle_t *origHandle;
+    ResultStatus res = client->receive(
+            transactionId, bufferId, timestampUs, &origHandle, buffer);
+    if (res != ResultStatus::OK) {
+        return res;
+    }
+    *handle = native_handle_clone(origHandle);
+    if (handle == NULL) {
+        buffer->reset();
+        return ResultStatus::NO_MEMORY;
+    }
+    return ResultStatus::OK;
 }
 
 ResultStatus ClientManager::Impl::postSend(
