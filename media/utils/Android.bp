@@ -45,12 +45,6 @@ cc_library {
         "-Werror",
     ],
 
-    product_variables: {
-        product_is_iot: {
-            cflags: ["-DTARGET_ANDROID_THINGS"],
-        },
-    },
-
     include_dirs: [
         // For android_mallopt definitions.
         "bionic/libc/private"
