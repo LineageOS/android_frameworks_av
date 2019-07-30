@@ -303,7 +303,7 @@ Accessor::Impl::Impl::BufferPool::~BufferPool() {
     ALOGD("Destruction - bufferpool2 %p "
           "cached: %zu/%zuM, %zu/%d%% in use; "
           "allocs: %zu, %d%% recycled; "
-          "transfers: %zu, %d%% unfetced",
+          "transfers: %zu, %d%% unfetched",
           this, mStats.mBuffersCached, mStats.mSizeCached >> 20,
           mStats.mBuffersInUse, percentage(mStats.mBuffersInUse, mStats.mBuffersCached),
           mStats.mTotalAllocations, percentage(mStats.mTotalRecycles, mStats.mTotalAllocations),
