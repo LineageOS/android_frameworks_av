@@ -176,18 +176,7 @@ bool modifyDefaultAudioEffectsAllowed() {
     // IMPORTANT: Use PermissionCache - not a runtime permission and may not change.
     bool ok = PermissionCache::checkCallingPermission(sModifyDefaultAudioEffectsAllowed);
 
-#ifdef TARGET_ANDROID_THINGS
-    if (!ok) {
-        // Use a secondary permission on Android Things to allow a more lenient level of protection.
-        static const String16 sModifyDefaultAudioEffectsAndroidThingsAllowed(
-                "com.google.android.things.permission.MODIFY_DEFAULT_AUDIO_EFFECTS");
-        ok = PermissionCache::checkCallingPermission(
-                sModifyDefaultAudioEffectsAndroidThingsAllowed);
-    }
-    if (!ok) ALOGE("com.google.android.things.permission.MODIFY_DEFAULT_AUDIO_EFFECTS");
-#else
     if (!ok) ALOGE("android.permission.MODIFY_DEFAULT_AUDIO_EFFECTS");
-#endif
     return ok;
 }
 
