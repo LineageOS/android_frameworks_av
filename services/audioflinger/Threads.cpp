@@ -5289,11 +5289,11 @@ bool AudioFlinger::MixerThread::isTrackAllowed_l(
         return false;
     }
     // Check validity as we don't call AudioMixer::create() here.
-    if (!AudioMixer::isValidFormat(format)) {
+    if (!mAudioMixer->isValidFormat(format)) {
         ALOGW("%s: invalid format: %#x", __func__, format);
         return false;
     }
-    if (!AudioMixer::isValidChannelMask(channelMask)) {
+    if (!mAudioMixer->isValidChannelMask(channelMask)) {
         ALOGW("%s: invalid channelMask: %#x", __func__, channelMask);
         return false;
     }
