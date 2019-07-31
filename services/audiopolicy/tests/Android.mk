@@ -7,6 +7,7 @@ LOCAL_C_INCLUDES := \
   $(call include-path-for, audio-utils) \
 
 LOCAL_SHARED_LIBRARIES := \
+  libaudiofoundation \
   libaudiopolicymanagerdefault \
   libbase \
   liblog \
@@ -41,6 +42,7 @@ include $(BUILD_NATIVE_TEST)
 include $(CLEAR_VARS)
 
 LOCAL_SHARED_LIBRARIES := \
+  libaudiofoundation \
   libbase \
   liblog \
   libmedia_helper \

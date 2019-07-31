@@ -22,7 +22,6 @@
 #include "HwModule.h"
 #include "AudioPort.h"
 #include "IOProfile.h"
-#include "AudioGain.h"
 #include <AudioOutputDescriptor.h>
 
 namespace android {

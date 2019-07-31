@@ -24,7 +24,6 @@
 #include <media/AudioResamplerPublic.h>
 #include <utils/Errors.h>
 
-#include "AudioGain.h"
 #include "AudioPort.h"
 #include "AudioProfile.h"
 #include "HwModule.h"
