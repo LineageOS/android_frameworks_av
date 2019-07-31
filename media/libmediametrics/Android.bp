@@ -37,6 +37,10 @@ cc_library_shared {
             "1" ,
         ]
     },
+
+    header_abi_checker: {
+        enabled: true,
+    },
 }
 
 
