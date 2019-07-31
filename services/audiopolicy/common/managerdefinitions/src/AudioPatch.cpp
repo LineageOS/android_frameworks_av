@@ -18,7 +18,6 @@
 //#define LOG_NDEBUG 0
 
 #include "AudioPatch.h"
-#include "AudioGain.h"
 #include "TypeConverter.h"
 
 #include <log/log.h>

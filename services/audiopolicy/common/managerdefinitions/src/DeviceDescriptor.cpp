@@ -22,7 +22,6 @@
 #include <set>
 #include "DeviceDescriptor.h"
 #include "TypeConverter.h"
-#include "AudioGain.h"
 #include "HwModule.h"
 
 namespace android {

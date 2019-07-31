@@ -20,7 +20,6 @@
 #include <system/audio-base.h>
 #include "IOProfile.h"
 #include "HwModule.h"
-#include "AudioGain.h"
 #include "TypeConverter.h"
 
 namespace android {

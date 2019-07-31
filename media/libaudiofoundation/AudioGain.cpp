@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "APM::AudioGain"
+#define LOG_TAG "AudioGain"
 //#define LOG_NDEBUG 0
 
 //#define VERY_VERBOSE_LOGGING
@@ -24,9 +24,9 @@
 #define ALOGVV(a...) do { } while(0)
 #endif
 
-#include "AudioGain.h"
+#include <android-base/stringprintf.h>
+#include <media/AudioGain.h>
 #include <utils/Log.h>
-#include <utils/String8.h>
 
 #include <math.h>
 
@@ -98,17 +98,17 @@ status_t AudioGain::checkConfig(const struct audio_gain_config *config)
     return NO_ERROR;
 }
 
-void AudioGain::dump(String8 *dst, int spaces, int index) const
+void AudioGain::dump(std::string *dst, int spaces, int index) const
 {
-    dst->appendFormat("%*sGain %d:\n", spaces, "", index+1);
-    dst->appendFormat("%*s- mode: %08x\n", spaces, "", mGain.mode);
-    dst->appendFormat("%*s- channel_mask: %08x\n", spaces, "", mGain.channel_mask);
-    dst->appendFormat("%*s- min_value: %d mB\n", spaces, "", mGain.min_value);
-    dst->appendFormat("%*s- max_value: %d mB\n", spaces, "", mGain.max_value);
-    dst->appendFormat("%*s- default_value: %d mB\n", spaces, "", mGain.default_value);
-    dst->appendFormat("%*s- step_value: %d mB\n", spaces, "", mGain.step_value);
-    dst->appendFormat("%*s- min_ramp_ms: %d ms\n", spaces, "", mGain.min_ramp_ms);
-    dst->appendFormat("%*s- max_ramp_ms: %d ms\n", spaces, "", mGain.max_ramp_ms);
+    dst->append(base::StringPrintf("%*sGain %d:\n", spaces, "", index+1));
+    dst->append(base::StringPrintf("%*s- mode: %08x\n", spaces, "", mGain.mode));
+    dst->append(base::StringPrintf("%*s- channel_mask: %08x\n", spaces, "", mGain.channel_mask));
+    dst->append(base::StringPrintf("%*s- min_value: %d mB\n", spaces, "", mGain.min_value));
+    dst->append(base::StringPrintf("%*s- max_value: %d mB\n", spaces, "", mGain.max_value));
+    dst->append(base::StringPrintf("%*s- default_value: %d mB\n", spaces, "", mGain.default_value));
+    dst->append(base::StringPrintf("%*s- step_value: %d mB\n", spaces, "", mGain.step_value));
+    dst->append(base::StringPrintf("%*s- min_ramp_ms: %d ms\n", spaces, "", mGain.min_ramp_ms));
+    dst->append(base::StringPrintf("%*s- max_ramp_ms: %d ms\n", spaces, "", mGain.max_ramp_ms));
 }
 
 } // namespace android

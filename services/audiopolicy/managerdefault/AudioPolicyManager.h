@@ -35,7 +35,6 @@
 #include "AudioPolicyInterface.h"
 
 #include <AudioPolicyManagerObserver.h>
-#include <AudioGain.h>
 #include <AudioPolicyConfig.h>
 #include <AudioPort.h>
 #include <AudioPatch.h>

@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include <AudioGain.h>
 #include <AudioPort.h>
 #include <HwModule.h>
 #include <DeviceDescriptor.h>
