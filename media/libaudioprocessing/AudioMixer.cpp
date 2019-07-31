@@ -18,6 +18,7 @@
 #define LOG_TAG "AudioMixer"
 //#define LOG_NDEBUG 0
 
+#include <sstream>
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
@@ -58,10 +59,6 @@
 #define ALOGVV(a...) do { } while (0)
 #endif
 
-#ifndef ARRAY_SIZE
-#define ARRAY_SIZE(x) (sizeof(x)/sizeof((x)[0]))
-#endif
-
 // Set kUseNewMixer to true to use the new mixer engine always. Otherwise the
 // original code will be used for stereo sinks, the new mixer for multichannel.
 static constexpr bool kUseNewMixer = true;
@@ -79,8 +76,11 @@ static_assert(kUseNewMixer && kUseFloat,
 using TYPE_AUX = int32_t; // q4.27
 #endif
 
+// TODO: remove BLOCKSIZE unit of processing - it isn't needed anymore.
+static constexpr int BLOCKSIZE = 16;
+
 // Set to default copy buffer size in frames for input processing.
-static const size_t kCopyBufferFrameCount = 256;
+static constexpr size_t kCopyBufferFrameCount = 256;
 
 namespace android {
 
@@ -786,28 +786,28 @@ void AudioMixer::setParameter(int name, int target, int param, void *value)
             }
         }
         break;
-        case TIMESTRETCH:
-            switch (param) {
-            case PLAYBACK_RATE: {
-                const AudioPlaybackRate *playbackRate =
-                        reinterpret_cast<AudioPlaybackRate*>(value);
-                ALOGW_IF(!isAudioPlaybackRateValid(*playbackRate),
-                        "bad parameters speed %f, pitch %f",
-                        playbackRate->mSpeed, playbackRate->mPitch);
-                if (track->setPlaybackRate(*playbackRate)) {
-                    ALOGV("setParameter(TIMESTRETCH, PLAYBACK_RATE, STRETCH_MODE, FALLBACK_MODE "
-                            "%f %f %d %d",
-                            playbackRate->mSpeed,
-                            playbackRate->mPitch,
-                            playbackRate->mStretchMode,
-                            playbackRate->mFallbackMode);
-                    // invalidate();  (should not require reconfigure)
-                }
-            } break;
-            default:
-                LOG_ALWAYS_FATAL("setParameter timestretch: bad param %d", param);
+    case TIMESTRETCH:
+        switch (param) {
+        case PLAYBACK_RATE: {
+            const AudioPlaybackRate *playbackRate =
+                    reinterpret_cast<AudioPlaybackRate*>(value);
+            ALOGW_IF(!isAudioPlaybackRateValid(*playbackRate),
+                    "bad parameters speed %f, pitch %f",
+                    playbackRate->mSpeed, playbackRate->mPitch);
+            if (track->setPlaybackRate(*playbackRate)) {
+                ALOGV("setParameter(TIMESTRETCH, PLAYBACK_RATE, STRETCH_MODE, FALLBACK_MODE "
+                        "%f %f %d %d",
+                        playbackRate->mSpeed,
+                        playbackRate->mPitch,
+                        playbackRate->mStretchMode,
+                        playbackRate->mFallbackMode);
+                // invalidate();  (should not require reconfigure)
             }
-            break;
+        } break;
+        default:
+            LOG_ALWAYS_FATAL("setParameter timestretch: bad param %d", param);
+        }
+        break;
 
     default:
         LOG_ALWAYS_FATAL("setParameter: bad target %d", target);
@@ -949,6 +949,14 @@ size_t AudioMixer::getUnreleasedFrames(int name) const
     return 0;
 }
 
+std::string AudioMixer::trackNames() const {
+    std::stringstream ss;
+    for (const auto &pair : mTracks) {
+        ss << pair.first << " ";
+    }
+    return ss.str();
+}
+
 void AudioMixer::setBufferProvider(int name, AudioBufferProvider* bufferProvider)
 {
     LOG_ALWAYS_FATAL_IF(!exists(name), "invalid name: %d", name);
@@ -1080,7 +1088,7 @@ void AudioMixer::process__validate()
         "all16BitsStereoNoResample=%d, resampling=%d, volumeRamp=%d",
         mEnabled.size(), all16BitsStereoNoResample, resampling, volumeRamp);
 
-   process();
+    process();
 
     // Now that the volume ramp has been done, set optimal state and
     // track hooks for subsequent mixer process
