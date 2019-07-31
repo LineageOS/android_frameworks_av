@@ -105,13 +105,8 @@ const FastThreadState *FastMixer::poll()
     return mSQ.poll();
 }
 
-void FastMixer::setNBLogWriter(NBLog::Writer *logWriter)
+void FastMixer::setNBLogWriter(NBLog::Writer *logWriter __unused)
 {
-    // FIXME If mMixer is set or changed prior to this, we don't inform correctly.
-    //       Should cache logWriter and re-apply it at the assignment to mMixer.
-    if (mMixer != NULL) {
-        mMixer->setNBLogWriter(logWriter);
-    }
 }
 
 void FastMixer::onIdle()
