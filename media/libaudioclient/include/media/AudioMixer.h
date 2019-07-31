@@ -20,7 +20,7 @@
 
 #include <map>
 #include <pthread.h>
-#include <sstream>
+#include <string>
 #include <stdint.h>
 #include <sys/types.h>
 #include <unordered_map>
@@ -176,13 +176,7 @@ public:
 
     size_t      getUnreleasedFrames(int name) const;
 
-    std::string trackNames() const {
-        std::stringstream ss;
-        for (const auto &pair : mTracks) {
-            ss << pair.first << " ";
-        }
-        return ss.str();
-    }
+    std::string trackNames() const;
 
     static inline bool isValidFormat(audio_format_t format) {
         switch (format) {
@@ -355,7 +349,7 @@ private:
          *    the downmixer requirements to the mixer engine input requirements.
          * 7) mTimestretchBufferProvider: Adds timestretching for playback rate
          */
-        AudioBufferProvider*     mInputBufferProvider;    // externally provided buffer provider.
+        AudioBufferProvider* mInputBufferProvider;    // externally provided buffer provider.
         // TODO: combine mAdjustChannelsBufferProvider and
         // mContractChannelsNonDestructiveBufferProvider
         std::unique_ptr<PassthruBufferProvider> mAdjustChannelsBufferProvider;
@@ -448,9 +442,6 @@ private:
         template <int MIXTYPE, typename TO, typename TI, typename TA>
         void track__NoResample(TO* out, size_t frameCount, TO* temp __unused, TA* aux);
     };
-
-    // TODO: remove BLOCKSIZE unit of processing - it isn't needed anymore.
-    static constexpr int BLOCKSIZE = 16;
 
     bool setChannelMasks(int name,
             audio_channel_mask_t trackChannelMask, audio_channel_mask_t mixerChannelMask);
