@@ -111,4 +111,64 @@ void AudioGain::dump(std::string *dst, int spaces, int index) const
     dst->append(base::StringPrintf("%*s- max_ramp_ms: %d ms\n", spaces, "", mGain.max_ramp_ms));
 }
 
+status_t AudioGain::writeToParcel(android::Parcel *parcel) const
+{
+    status_t status = NO_ERROR;
+    if ((status = parcel->writeInt32(mIndex)) != NO_ERROR) return status;
+    if ((status = parcel->writeBool(mUseInChannelMask)) != NO_ERROR) return status;
+    if ((status = parcel->writeBool(mUseForVolume)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mGain.mode)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mGain.channel_mask)) != NO_ERROR) return status;
+    if ((status = parcel->writeInt32(mGain.min_value)) != NO_ERROR) return status;
+    if ((status = parcel->writeInt32(mGain.max_value)) != NO_ERROR) return status;
+    if ((status = parcel->writeInt32(mGain.default_value)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mGain.step_value)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mGain.min_ramp_ms)) != NO_ERROR) return status;
+    status = parcel->writeUint32(mGain.max_ramp_ms);
+    return status;
+}
+
+status_t AudioGain::readFromParcel(const android::Parcel *parcel)
+{
+    status_t status = NO_ERROR;
+    if ((status = parcel->readInt32(&mIndex)) != NO_ERROR) return status;
+    if ((status = parcel->readBool(&mUseInChannelMask)) != NO_ERROR) return status;
+    if ((status = parcel->readBool(&mUseForVolume)) != NO_ERROR) return status;
+    if ((status = parcel->readUint32(&mGain.mode)) != NO_ERROR) return status;
+    if ((status = parcel->readUint32(&mGain.channel_mask)) != NO_ERROR) return status;
+    if ((status = parcel->readInt32(&mGain.min_value)) != NO_ERROR) return status;
+    if ((status = parcel->readInt32(&mGain.max_value)) != NO_ERROR) return status;
+    if ((status = parcel->readInt32(&mGain.default_value)) != NO_ERROR) return status;
+    if ((status = parcel->readUint32(&mGain.step_value)) != NO_ERROR) return status;
+    if ((status = parcel->readUint32(&mGain.min_ramp_ms)) != NO_ERROR) return status;
+    status = parcel->readUint32(&mGain.max_ramp_ms);
+    return status;
+}
+
+status_t AudioGains::writeToParcel(android::Parcel *parcel) const {
+    status_t status = NO_ERROR;
+    if ((status = parcel->writeUint64(this->size())) != NO_ERROR) return status;
+    for (const auto &audioGain : *this) {
+        if ((status = parcel->writeParcelable(*audioGain)) != NO_ERROR) {
+            break;
+        }
+    }
+    return status;
+}
+
+status_t AudioGains::readFromParcel(const android::Parcel *parcel) {
+    status_t status = NO_ERROR;
+    uint64_t count;
+    if ((status = parcel->readUint64(&count)) != NO_ERROR) return status;
+    for (uint64_t i = 0; i < count; i++) {
+        sp<AudioGain> audioGain = new AudioGain(0, false);
+        if ((status = parcel->readParcelable(audioGain.get())) != NO_ERROR) {
+            this->clear();
+            break;
+        }
+        this->push_back(audioGain);
+    }
+    return status;
+}
+
 } // namespace android
