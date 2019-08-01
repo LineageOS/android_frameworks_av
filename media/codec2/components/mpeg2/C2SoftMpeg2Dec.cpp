@@ -47,6 +47,12 @@ public:
         noInputLatency();
         noTimeStretch();
 
+        // TODO: Proper support for reorder depth.
+        addParameter(
+                DefineParam(mActualOutputDelay, C2_PARAMKEY_OUTPUT_DELAY)
+                .withConstValue(new C2PortActualDelayTuning::output(3u))
+                .build());
+
         // TODO: output latency and reordering
 
         addParameter(
