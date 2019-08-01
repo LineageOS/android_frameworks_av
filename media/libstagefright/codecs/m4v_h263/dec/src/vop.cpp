@@ -1355,6 +1355,14 @@ PV_STATUS DecodeShortHeader(VideoDecData *video, Vop *currVop)
             int tmpHeight = (tmpDisplayHeight + 15) & -16;
             int tmpWidth = (tmpDisplayWidth + 15) & -16;
 
+            if (tmpWidth > video->width)
+            {
+                // while allowed by the spec, this decoder does not actually
+                // support an increase in size.
+                ALOGE("width increase not supported");
+                status = PV_FAIL;
+                goto return_point;
+            }
             if (tmpHeight * tmpWidth > video->size)
             {
                 // This is just possibly "b/37079296".
