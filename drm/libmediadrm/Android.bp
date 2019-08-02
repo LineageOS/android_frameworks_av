@@ -17,7 +17,6 @@ cc_library_shared {
     srcs: [
         "DrmPluginPath.cpp",
         "DrmSessionManager.cpp",
-        "IDrmClient.cpp",
         "IMediaDrmService.cpp",
         "SharedLibrary.cpp",
         "DrmHal.cpp",

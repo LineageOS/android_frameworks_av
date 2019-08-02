@@ -58,7 +58,6 @@ inline bool operator==(const Vector<uint8_t> &l, const Vector<uint8_t> &r) {
 }
 
 struct DrmHal : public IDrm,
-                public IBinder::DeathRecipient,
                 public IDrmPluginListener_V1_2 {
 
     struct DrmSessionClient;
@@ -191,8 +190,6 @@ struct DrmHal : public IDrm,
             const hidl_vec<KeyStatus>& keyStatusList, bool hasNewUsableKey);
 
     Return<void> sendSessionLostState(const hidl_vec<uint8_t>& sessionId);
-
-    virtual void binderDied(const wp<IBinder> &the_late_who);
 
 private:
     static Mutex mLock;

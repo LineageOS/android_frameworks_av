@@ -479,12 +479,6 @@ status_t DrmHal::initCheck() const {
 status_t DrmHal::setListener(const sp<IDrmClient>& listener)
 {
     Mutex::Autolock lock(mEventLock);
-    if (mListener != NULL){
-        IInterface::asBinder(mListener)->unlinkToDeath(this);
-    }
-    if (listener != NULL) {
-        IInterface::asBinder(listener)->linkToDeath(this);
-    }
     mListener = listener;
     return NO_ERROR;
 }
@@ -1565,11 +1559,6 @@ status_t DrmHal::signRSA(Vector<uint8_t> const &sessionId,
         );
 
     return hResult.isOk() ? err : DEAD_OBJECT;
-}
-
-void DrmHal::binderDied(const wp<IBinder> &the_late_who __unused)
-{
-    cleanup();
 }
 
 void DrmHal::reportFrameworkMetrics() const
