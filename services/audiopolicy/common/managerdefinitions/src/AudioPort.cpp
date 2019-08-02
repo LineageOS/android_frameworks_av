@@ -19,7 +19,6 @@
 #include "TypeConverter.h"
 #include "AudioPort.h"
 #include "HwModule.h"
-#include "AudioGain.h"
 #include <policy.h>
 
 #ifndef ARRAY_SIZE
@@ -366,7 +365,9 @@ void AudioPort::dump(String8 *dst, int spaces, bool verbose) const
         if (mGains.size() != 0) {
             dst->appendFormat("%*s- gains:\n", spaces, "");
             for (size_t i = 0; i < mGains.size(); i++) {
-                mGains[i]->dump(dst, spaces + 2, i);
+                std::string gainStr;
+                mGains[i]->dump(&gainStr, spaces + 2, i);
+                dst->append(gainStr.c_str());
             }
         }
     }
