@@ -18,7 +18,6 @@
 
 #include "EngineBase.h"
 #include "EngineInterface.h"
-#include <AudioGain.h>
 #include <policy.h>
 
 namespace android
@@ -74,15 +73,14 @@ private:
 
     status_t setDefaultDevice(audio_devices_t device);
 
-    audio_devices_t getDeviceForStrategyInt(legacy_strategy strategy,
-                                            DeviceVector availableOutputDevices,
-                                            DeviceVector availableInputDevices,
-                                            const SwAudioOutputCollection &outputs,
-                                            uint32_t outputDeviceTypesToIgnore) const;
+    DeviceVector getDevicesForStrategyInt(legacy_strategy strategy,
+                                          DeviceVector availableOutputDevices,
+                                          DeviceVector availableInputDevices,
+                                          const SwAudioOutputCollection &outputs) const;
 
     DeviceVector getDevicesForProductStrategy(product_strategy_t strategy) const;
 
-    audio_devices_t getDeviceForInputSource(audio_source_t inputSource) const;
+    sp<DeviceDescriptor> getDeviceForInputSource(audio_source_t inputSource) const;
 
     DeviceStrategyMap mDevicesForStrategies;
 

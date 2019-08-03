@@ -22,7 +22,6 @@
 #include <set>
 #include "DeviceDescriptor.h"
 #include "TypeConverter.h"
-#include "AudioGain.h"
 #include "HwModule.h"
 
 namespace android {
@@ -256,7 +255,6 @@ DeviceVector DeviceVector::getDevicesFromTypeMask(audio_devices_t type) const
         audio_devices_t curType = itemAt(i)->type() & ~AUDIO_DEVICE_BIT_IN;
         if ((isOutput == curIsOutput) && ((type & curType) != 0)) {
             devices.add(itemAt(i));
-            type &= ~curType;
             ALOGV("DeviceVector::%s() for type %08x found %p",
                     __func__, itemAt(i)->type(), itemAt(i).get());
         }
@@ -272,6 +270,38 @@ sp<DeviceDescriptor> DeviceVector::getDeviceFromTagName(const String8 &tagName) 
         }
     }
     return nullptr;
+}
+
+DeviceVector DeviceVector::getFirstDevicesFromTypes(
+        std::vector<audio_devices_t> orderedTypes) const
+{
+    DeviceVector devices;
+    for (auto deviceType : orderedTypes) {
+        if (!(devices = getDevicesFromTypeMask(deviceType)).isEmpty()) {
+            break;
+        }
+    }
+    return devices;
+}
+
+sp<DeviceDescriptor> DeviceVector::getFirstExistingDevice(
+        std::vector<audio_devices_t> orderedTypes) const {
+    sp<DeviceDescriptor> device;
+    for (auto deviceType : orderedTypes) {
+        if ((device = getDevice(deviceType, String8(""), AUDIO_FORMAT_DEFAULT)) != nullptr) {
+            break;
+        }
+    }
+    return device;
+}
+
+void DeviceVector::replaceDevicesByType(
+        audio_devices_t typeToRemove, const DeviceVector &devicesToAdd) {
+    DeviceVector devicesToRemove = getDevicesFromTypeMask(typeToRemove);
+    if (!devicesToRemove.isEmpty() && !devicesToAdd.isEmpty()) {
+        remove(devicesToRemove);
+        add(devicesToAdd);
+    }
 }
 
 void DeviceVector::dump(String8 *dst, const String8 &tag, int spaces, bool verbose) const

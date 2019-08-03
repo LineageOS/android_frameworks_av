@@ -22,7 +22,6 @@
 #include <policy.h>
 #include <AudioPolicyInterface.h>
 #include "AudioInputDescriptor.h"
-#include "AudioGain.h"
 #include "AudioPolicyMix.h"
 #include "HwModule.h"
 

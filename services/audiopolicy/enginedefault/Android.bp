@@ -21,6 +21,7 @@ cc_library_shared {
         "libaudiopolicyengine_config",
     ],
     shared_libs: [
+        "libaudiofoundation",
         "liblog",
         "libcutils",
         "libutils",

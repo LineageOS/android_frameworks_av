@@ -9,6 +9,7 @@ LOCAL_SHARED_LIBRARIES := \
 	libaaudioservice \
 	libaudioflinger \
 	libaudiopolicyservice \
+	libaudioprocessing \
 	libbinder \
 	libcutils \
 	liblog \
