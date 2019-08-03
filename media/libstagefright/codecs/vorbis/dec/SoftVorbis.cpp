@@ -290,7 +290,7 @@ OMX_ERRORTYPE SoftVorbis::internalSetParameter(
 }
 
 bool SoftVorbis::isConfigured() const {
-    return mInputBufferCount >= 2;
+    return (mState != NULL && mVi != NULL);
 }
 
 static void makeBitReader(
