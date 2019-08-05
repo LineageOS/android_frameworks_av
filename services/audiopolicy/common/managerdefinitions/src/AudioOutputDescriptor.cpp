@@ -19,6 +19,7 @@
 
 #include <AudioPolicyInterface.h>
 #include "AudioOutputDescriptor.h"
+#include "AudioPolicyMix.h"
 #include "IOProfile.h"
 #include "AudioGain.h"
 #include "Volume.h"
@@ -307,17 +308,18 @@ void SwAudioOutputDescriptor::changeRefCount(audio_stream_type_t stream,
     } else {
         mGlobalRefCount += delta;
     }
+    sp<AudioPolicyMix> policyMix = mPolicyMix.promote();
     if ((oldGlobalRefCount == 0) && (mGlobalRefCount > 0)) {
-        if ((mPolicyMix != NULL) && ((mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0))
+        if ((policyMix != NULL) && ((policyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0))
         {
-            mClientInterface->onDynamicPolicyMixStateUpdate(mPolicyMix->mDeviceAddress,
+            mClientInterface->onDynamicPolicyMixStateUpdate(policyMix->mDeviceAddress,
                     MIX_STATE_MIXING);
         }
 
     } else if ((oldGlobalRefCount > 0) && (mGlobalRefCount == 0)) {
-        if ((mPolicyMix != NULL) && ((mPolicyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0))
+        if ((policyMix != NULL) && ((policyMix->mCbFlags & AudioMix::kCbFlagNotifyActivity) != 0))
         {
-            mClientInterface->onDynamicPolicyMixStateUpdate(mPolicyMix->mDeviceAddress,
+            mClientInterface->onDynamicPolicyMixStateUpdate(policyMix->mDeviceAddress,
                     MIX_STATE_IDLE);
         }
     }
