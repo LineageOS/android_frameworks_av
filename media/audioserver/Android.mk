@@ -35,7 +35,6 @@ LOCAL_C_INCLUDES := \
 	frameworks/av/media/libaaudio/src \
 	frameworks/av/media/libaaudio/src/binding \
 	frameworks/av/media/libmedia \
-	$(call include-path-for, audio-utils) \
 	external/sonic \
 
 # If AUDIOSERVER_MULTILIB in device.mk is non-empty then it is used to control
