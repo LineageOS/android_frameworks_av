@@ -1,4 +1,3 @@
-
 cc_defaults {
     name: "libnbaio_mono_defaults",
     srcs: [
@@ -20,6 +19,9 @@ cc_defaults {
         "libaudioutils",
         "liblog",
         "libutils",
+    ],
+    export_shared_lib_headers: [
+        "libaudioutils",
     ],
 
     export_include_dirs: ["include_mono"],
@@ -65,8 +67,6 @@ cc_library_shared {
         "-Werror",
         "-Wall",
     ],
-
-    include_dirs: ["system/media/audio_utils/include"],
 
     export_include_dirs: ["include"],
 }
