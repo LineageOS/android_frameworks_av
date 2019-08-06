@@ -74,14 +74,15 @@ private:
 
     status_t setDefaultDevice(audio_devices_t device);
 
-    DeviceVector getDevicesForStrategyInt(legacy_strategy strategy,
-                                          DeviceVector availableOutputDevices,
-                                          DeviceVector availableInputDevices,
-                                          const SwAudioOutputCollection &outputs) const;
+    audio_devices_t getDeviceForStrategyInt(legacy_strategy strategy,
+                                            DeviceVector availableOutputDevices,
+                                            DeviceVector availableInputDevices,
+                                            const SwAudioOutputCollection &outputs,
+                                            uint32_t outputDeviceTypesToIgnore) const;
 
     DeviceVector getDevicesForProductStrategy(product_strategy_t strategy) const;
 
-    sp<DeviceDescriptor> getDeviceForInputSource(audio_source_t inputSource) const;
+    audio_devices_t getDeviceForInputSource(audio_source_t inputSource) const;
 
     DeviceStrategyMap mDevicesForStrategies;
 
