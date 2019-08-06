@@ -42,6 +42,10 @@ cc_library_shared {
         enabled: true,
         symbol_file: "libmediametrics.map.txt",
     },
+
+    visibility: [
+        "//frameworks/av:__subpackages__",
+        "//frameworks/base/core/jni",
+        "//frameworks/base/media/jni",
+    ],
 }
-
-
