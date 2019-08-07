@@ -116,6 +116,13 @@ public:
     DeviceVector getDevicesFromHwModule(audio_module_handle_t moduleHandle) const;
     audio_devices_t getDeviceTypesFromHwModule(audio_module_handle_t moduleHandle) const;
 
+    DeviceVector getFirstDevicesFromTypes(std::vector<audio_devices_t> orderedTypes) const;
+    sp<DeviceDescriptor> getFirstExistingDevice(std::vector<audio_devices_t> orderedTypes) const;
+
+    // If there are devices with the given type and the devices to add is not empty,
+    // remove all the devices with the given type and add all the devices to add.
+    void replaceDevicesByType(audio_devices_t typeToRemove, const DeviceVector &devicesToAdd);
+
     bool contains(const sp<DeviceDescriptor>& item) const { return indexOf(item) >= 0; }
 
     /**
