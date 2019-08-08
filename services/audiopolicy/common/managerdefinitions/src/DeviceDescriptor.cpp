@@ -47,9 +47,9 @@ DeviceDescriptor::DeviceDescriptor(audio_devices_t type, const FormatVector &enc
      * For now, the workaround to remove AC3 and IEC61937 support on HDMI is to declare
      * something like 'encodedFormats="AUDIO_FORMAT_PCM_16_BIT"' on the HDMI devicePort.
      */
-    if (type == AUDIO_DEVICE_OUT_HDMI && mEncodedFormats.isEmpty()) {
-        mEncodedFormats.add(AUDIO_FORMAT_AC3);
-        mEncodedFormats.add(AUDIO_FORMAT_IEC61937);
+    if (type == AUDIO_DEVICE_OUT_HDMI && mEncodedFormats.empty()) {
+        mEncodedFormats.push_back(AUDIO_FORMAT_AC3);
+        mEncodedFormats.push_back(AUDIO_FORMAT_IEC61937);
     }
 }
 
@@ -96,7 +96,7 @@ bool DeviceDescriptor::hasCurrentEncodedFormat() const
     if (!device_has_encoding_capability(type())) {
         return true;
     }
-    if (mEncodedFormats.isEmpty()) {
+    if (mEncodedFormats.empty()) {
         return true;
     }
 
@@ -105,7 +105,7 @@ bool DeviceDescriptor::hasCurrentEncodedFormat() const
 
 bool DeviceDescriptor::supportsFormat(audio_format_t format)
 {
-    if (mEncodedFormats.isEmpty()) {
+    if (mEncodedFormats.empty()) {
         return true;
     }
 

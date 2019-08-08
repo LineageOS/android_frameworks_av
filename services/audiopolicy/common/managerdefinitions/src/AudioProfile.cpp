@@ -21,6 +21,7 @@
 #define LOG_TAG "APM::AudioProfile"
 //#define LOG_NDEBUG 0
 
+#include <media/AudioContainers.h>
 #include <media/AudioResamplerPublic.h>
 #include <utils/Errors.h>
 
@@ -30,28 +31,6 @@
 #include "TypeConverter.h"
 
 namespace android {
-
-ChannelsVector ChannelsVector::asInMask() const
-{
-    ChannelsVector inMaskVector;
-    for (const auto& channel : *this) {
-        if (audio_channel_mask_out_to_in(channel) != AUDIO_CHANNEL_INVALID) {
-            inMaskVector.add(audio_channel_mask_out_to_in(channel));
-        }
-    }
-    return inMaskVector;
-}
-
-ChannelsVector ChannelsVector::asOutMask() const
-{
-    ChannelsVector outMaskVector;
-    for (const auto& channel : *this) {
-        if (audio_channel_mask_in_to_out(channel) != AUDIO_CHANNEL_INVALID) {
-            outMaskVector.add(audio_channel_mask_in_to_out(channel));
-        }
-    }
-    return outMaskVector;
-}
 
 bool operator == (const AudioProfile &left, const AudioProfile &compareTo)
 {
@@ -63,7 +42,7 @@ bool operator == (const AudioProfile &left, const AudioProfile &compareTo)
 static AudioProfile* createFullDynamicImpl()
 {
     AudioProfile* dynamicProfile = new AudioProfile(gDynamicFormat,
-            ChannelsVector(), SampleRateVector());
+            ChannelMaskSet(), SampleRateSet());
     dynamicProfile->setDynamicFormat(true);
     dynamicProfile->setDynamicChannels(true);
     dynamicProfile->setDynamicRate(true);
@@ -83,26 +62,26 @@ AudioProfile::AudioProfile(audio_format_t format,
         mName(String8("")),
         mFormat(format)
 {
-    mChannelMasks.add(channelMasks);
-    mSamplingRates.add(samplingRate);
+    mChannelMasks.insert(channelMasks);
+    mSamplingRates.insert(samplingRate);
 }
 
 AudioProfile::AudioProfile(audio_format_t format,
-                           const ChannelsVector &channelMasks,
-                           const SampleRateVector &samplingRateCollection) :
+                           const ChannelMaskSet &channelMasks,
+                           const SampleRateSet &samplingRateCollection) :
         mName(String8("")),
         mFormat(format),
         mChannelMasks(channelMasks),
         mSamplingRates(samplingRateCollection) {}
 
-void AudioProfile::setChannels(const ChannelsVector &channelMasks)
+void AudioProfile::setChannels(const ChannelMaskSet &channelMasks)
 {
     if (mIsDynamicChannels) {
         mChannelMasks = channelMasks;
     }
 }
 
-void AudioProfile::setSampleRates(const SampleRateVector &sampleRates)
+void AudioProfile::setSampleRates(const SampleRateSet &sampleRates)
 {
     if (mIsDynamicRate) {
         mSamplingRates = sampleRates;
@@ -135,7 +114,7 @@ status_t AudioProfile::checkCompatibleSamplingRate(uint32_t samplingRate,
 {
     ALOG_ASSERT(samplingRate > 0);
 
-    if (mSamplingRates.isEmpty()) {
+    if (mSamplingRates.empty()) {
         updatedSamplingRate = samplingRate;
         return NO_ERROR;
     }
@@ -143,19 +122,18 @@ status_t AudioProfile::checkCompatibleSamplingRate(uint32_t samplingRate,
     // Search for the closest supported sampling rate that is above (preferred)
     // or below (acceptable) the desired sampling rate, within a permitted ratio.
     // The sampling rates are sorted in ascending order.
-    size_t orderOfDesiredRate = mSamplingRates.orderOf(samplingRate);
+    auto desiredRate = mSamplingRates.lower_bound(samplingRate);
 
     // Prefer to down-sample from a higher sampling rate, as we get the desired frequency spectrum.
-    if (orderOfDesiredRate < mSamplingRates.size()) {
-        uint32_t candidate = mSamplingRates[orderOfDesiredRate];
-        if (candidate / AUDIO_RESAMPLER_DOWN_RATIO_MAX <= samplingRate) {
-            updatedSamplingRate = candidate;
+    if (desiredRate != mSamplingRates.end()) {
+        if (*desiredRate / AUDIO_RESAMPLER_DOWN_RATIO_MAX <= samplingRate) {
+            updatedSamplingRate = *desiredRate;
             return NO_ERROR;
         }
     }
     // But if we have to up-sample from a lower sampling rate, that's OK.
-    if (orderOfDesiredRate != 0) {
-        uint32_t candidate = mSamplingRates[orderOfDesiredRate - 1];
+    if (desiredRate != mSamplingRates.begin()) {
+        uint32_t candidate = *(--desiredRate);
         if (candidate * AUDIO_RESAMPLER_UP_RATIO_MAX >= samplingRate) {
             updatedSamplingRate = candidate;
             return NO_ERROR;
@@ -170,7 +148,7 @@ status_t AudioProfile::checkCompatibleChannelMask(audio_channel_mask_t channelMa
                                                   audio_port_type_t portType,
                                                   audio_port_role_t portRole) const
 {
-    if (mChannelMasks.isEmpty()) {
+    if (mChannelMasks.empty()) {
         updatedChannelMask = channelMask;
         return NO_ERROR;
     }
@@ -179,8 +157,7 @@ status_t AudioProfile::checkCompatibleChannelMask(audio_channel_mask_t channelMa
             == AUDIO_CHANNEL_REPRESENTATION_INDEX;
     const uint32_t channelCount = audio_channel_count_from_in_mask(channelMask);
     int bestMatch = 0;
-    for (size_t i = 0; i < mChannelMasks.size(); i ++) {
-        audio_channel_mask_t supported = mChannelMasks[i];
+    for (const auto &supported : mChannelMasks) {
         if (supported == channelMask) {
             // Exact matches always taken.
             updatedChannelMask = channelMask;
@@ -270,20 +247,20 @@ void AudioProfile::dump(String8 *dst, int spaces) const
     if (FormatConverter::toString(mFormat, formatLiteral)) {
         dst->appendFormat("%*s- format: %s\n", spaces, "", formatLiteral.c_str());
     }
-    if (!mSamplingRates.isEmpty()) {
+    if (!mSamplingRates.empty()) {
         dst->appendFormat("%*s- sampling rates:", spaces, "");
-        for (size_t i = 0; i < mSamplingRates.size(); i++) {
-            dst->appendFormat("%d", mSamplingRates[i]);
-            dst->append(i == (mSamplingRates.size() - 1) ? "" : ", ");
+        for (auto it = mSamplingRates.begin(); it != mSamplingRates.end();) {
+            dst->appendFormat("%d", *it);
+            dst->append(++it == mSamplingRates.end() ? "" : ", ");
         }
         dst->append("\n");
     }
 
-    if (!mChannelMasks.isEmpty()) {
+    if (!mChannelMasks.empty()) {
         dst->appendFormat("%*s- channel masks:", spaces, "");
-        for (size_t i = 0; i < mChannelMasks.size(); i++) {
-            dst->appendFormat("0x%04x", mChannelMasks[i]);
-            dst->append(i == (mChannelMasks.size() - 1) ? "" : ", ");
+        for (auto it = mChannelMasks.begin(); it != mChannelMasks.end();) {
+            dst->appendFormat("0x%04x", *it);
+            dst->append(++it == mChannelMasks.end() ? "" : ", ");
         }
         dst->append("\n");
     }
@@ -291,13 +268,14 @@ void AudioProfile::dump(String8 *dst, int spaces) const
 
 ssize_t AudioProfileVector::add(const sp<AudioProfile> &profile)
 {
-    ssize_t index = Vector::add(profile);
+    ssize_t index = size();
+    push_back(profile);
     // we sort from worst to best, so that AUDIO_FORMAT_DEFAULT is always the first entry.
-    // TODO: compareFormats could be a lambda to convert between pointer-to-format to format:
-    // [](const audio_format_t *format1, const audio_format_t *format2) {
-    //     return compareFormats(*format1, *format2);
-    // }
-    sort(compareFormats);
+    std::sort(begin(), end(),
+            [](const sp<AudioProfile> & a, const sp<AudioProfile> & b)
+            {
+                return AudioPort::compareFormats(a->getFormat(), b->getFormat()) < 0;
+            });
     return index;
 }
 
@@ -309,7 +287,7 @@ ssize_t AudioProfileVector::addProfileFromHal(const sp<AudioProfile> &profileToA
     }
     if (!profileToAdd->hasValidChannels() && !profileToAdd->hasValidRates()) {
         FormatVector formats;
-        formats.add(profileToAdd->getFormat());
+        formats.push_back(profileToAdd->getFormat());
         setFormats(FormatVector(formats));
         return 0;
     }
@@ -323,7 +301,7 @@ ssize_t AudioProfileVector::addProfileFromHal(const sp<AudioProfile> &profileToA
     }
     // Go through the list of profile to avoid duplicates
     for (size_t profileIndex = 0; profileIndex < size(); profileIndex++) {
-        const sp<AudioProfile> &profile = itemAt(profileIndex);
+        const sp<AudioProfile> &profile = at(profileIndex);
         if (profile->isValid() && profile == profileToAdd) {
             // Nothing to do
             return profileIndex;
@@ -337,7 +315,7 @@ status_t AudioProfileVector::checkExactProfile(uint32_t samplingRate,
                                                audio_channel_mask_t channelMask,
                                                audio_format_t format) const
 {
-    if (isEmpty()) {
+    if (empty()) {
         return NO_ERROR;
     }
 
@@ -355,7 +333,7 @@ status_t AudioProfileVector::checkCompatibleProfile(uint32_t &samplingRate,
                                                     audio_port_type_t portType,
                                                     audio_port_role_t portRole) const
 {
-    if (isEmpty()) {
+    if (empty()) {
         return NO_ERROR;
     }
 
@@ -365,7 +343,7 @@ status_t AudioProfileVector::checkCompatibleProfile(uint32_t &samplingRate,
 
     // iterate from best format to worst format (reverse order)
     for (ssize_t i = size() - 1; i >= 0 ; --i) {
-        const sp<AudioProfile> profile = itemAt(i);
+        const sp<AudioProfile> profile = at(i);
         audio_format_t formatToCompare = profile->getFormat();
         if (formatToCompare == format ||
                 (checkInexact
@@ -391,13 +369,13 @@ status_t AudioProfileVector::checkCompatibleProfile(uint32_t &samplingRate,
 
 void AudioProfileVector::clearProfiles()
 {
-    for (size_t i = size(); i != 0; ) {
-        sp<AudioProfile> profile = itemAt(--i);
-        if (profile->isDynamicFormat() && profile->hasValidFormat()) {
-            removeAt(i);
-            continue;
+    for (auto it = begin(); it != end();) {
+        if ((*it)->isDynamicFormat() && (*it)->hasValidFormat()) {
+            it = erase(it);
+        } else {
+            (*it)->clear();
+            ++it;
         }
-        profile->clear();
     }
 }
 
@@ -448,16 +426,16 @@ status_t AudioProfileVector::findBestMatchingOutputConfig(const AudioProfileVect
         if (inputProfile == nullptr || outputProfile == nullptr) {
             continue;
         }
-        auto channels = intersectFilterAndOrder(inputProfile->getChannels().asOutMask(),
+        auto channels = intersectFilterAndOrder(asOutMask(inputProfile->getChannels()),
                 outputProfile->getChannels(), preferredOutputChannels);
         if (channels.empty()) {
             continue;
         }
         auto sampleRates = preferHigherSamplingRates ?
                 intersectAndOrder(inputProfile->getSampleRates(), outputProfile->getSampleRates(),
-                        std::greater<typename SampleRateVector::value_type>()) :
+                        std::greater<typename SampleRateSet::value_type>()) :
                 intersectAndOrder(inputProfile->getSampleRates(), outputProfile->getSampleRates(),
-                        std::less<typename SampleRateVector::value_type>());
+                        std::less<typename SampleRateSet::value_type>());
         if (sampleRates.empty()) {
             continue;
         }
@@ -473,30 +451,30 @@ status_t AudioProfileVector::findBestMatchingOutputConfig(const AudioProfileVect
 
 sp<AudioProfile> AudioProfileVector::getFirstValidProfile() const
 {
-    for (size_t i = 0; i < size(); i++) {
-        if (itemAt(i)->isValid()) {
-            return itemAt(i);
+    for (const auto &profile : *this) {
+        if (profile->isValid()) {
+            return profile;
         }
     }
-    return 0;
+    return nullptr;
 }
 
 sp<AudioProfile> AudioProfileVector::getFirstValidProfileFor(audio_format_t format) const
 {
-    for (size_t i = 0; i < size(); i++) {
-        if (itemAt(i)->isValid() && itemAt(i)->getFormat() == format) {
-            return itemAt(i);
+    for (const auto &profile : *this) {
+        if (profile->isValid() && profile->getFormat() == format) {
+            return profile;
         }
     }
-    return 0;
+    return nullptr;
 }
 
 FormatVector AudioProfileVector::getSupportedFormats() const
 {
     FormatVector supportedFormats;
-    for (size_t i = 0; i < size(); i++) {
-        if (itemAt(i)->hasValidFormat()) {
-            supportedFormats.add(itemAt(i)->getFormat());
+    for (const auto &profile : *this) {
+        if (profile->hasValidFormat()) {
+            supportedFormats.push_back(profile->getFormat());
         }
     }
     return supportedFormats;
@@ -504,8 +482,7 @@ FormatVector AudioProfileVector::getSupportedFormats() const
 
 bool AudioProfileVector::hasDynamicChannelsFor(audio_format_t format) const
 {
-    for (size_t i = 0; i < size(); i++) {
-        sp<AudioProfile> profile = itemAt(i);
+    for (const auto &profile : *this) {
         if (profile->getFormat() == format && profile->isDynamicChannels()) {
             return true;
         }
@@ -515,8 +492,8 @@ bool AudioProfileVector::hasDynamicChannelsFor(audio_format_t format) const
 
 bool AudioProfileVector::hasDynamicProfile() const
 {
-    for (size_t i = 0; i < size(); i++) {
-        if (itemAt(i)->isDynamic()) {
+    for (const auto &profile : *this) {
+        if (profile->isDynamic()) {
             return true;
         }
     }
@@ -525,8 +502,7 @@ bool AudioProfileVector::hasDynamicProfile() const
 
 bool AudioProfileVector::hasDynamicRateFor(audio_format_t format) const
 {
-    for (size_t i = 0; i < size(); i++) {
-        sp<AudioProfile> profile = itemAt(i);
+    for (const auto &profile : *this) {
         if (profile->getFormat() == format && profile->isDynamicRate()) {
             return true;
         }
@@ -541,8 +517,8 @@ void AudioProfileVector::setFormats(const FormatVector &formats)
     if (dynamicFormatProfile == 0) {
         return;
     }
-    for (size_t i = 0; i < formats.size(); i++) {
-        sp<AudioProfile> profile = new AudioProfile(formats[i],
+    for (const auto &format : formats) {
+        sp<AudioProfile> profile = new AudioProfile(format,
                 dynamicFormatProfile->getChannels(),
                 dynamicFormatProfile->getSampleRates());
         profile->setDynamicFormat(true);
@@ -557,25 +533,24 @@ void AudioProfileVector::dump(String8 *dst, int spaces) const
     dst->appendFormat("%*s- Profiles:\n", spaces, "");
     for (size_t i = 0; i < size(); i++) {
         dst->appendFormat("%*sProfile %zu:", spaces + 4, "", i);
-        itemAt(i)->dump(dst, spaces + 8);
+        at(i)->dump(dst, spaces + 8);
     }
 }
 
 sp<AudioProfile> AudioProfileVector::getProfileFor(audio_format_t format) const
 {
-    for (size_t i = 0; i < size(); i++) {
-        if (itemAt(i)->getFormat() == format) {
-            return itemAt(i);
+    for (const auto &profile : *this) {
+        if (profile->getFormat() == format) {
+            return profile;
         }
     }
-    return 0;
+    return nullptr;
 }
 
 void AudioProfileVector::setSampleRatesFor(
-        const SampleRateVector &sampleRates, audio_format_t format)
+        const SampleRateSet &sampleRates, audio_format_t format)
 {
-    for (size_t i = 0; i < size(); i++) {
-        sp<AudioProfile> profile = itemAt(i);
+    for (const auto &profile : *this) {
         if (profile->getFormat() == format && profile->isDynamicRate()) {
             if (profile->hasValidRates()) {
                 // Need to create a new profile with same format
@@ -591,10 +566,9 @@ void AudioProfileVector::setSampleRatesFor(
     }
 }
 
-void AudioProfileVector::setChannelsFor(const ChannelsVector &channelMasks, audio_format_t format)
+void AudioProfileVector::setChannelsFor(const ChannelMaskSet &channelMasks, audio_format_t format)
 {
-    for (size_t i = 0; i < size(); i++) {
-        sp<AudioProfile> profile = itemAt(i);
+    for (const auto &profile : *this) {
         if (profile->getFormat() == format && profile->isDynamicChannels()) {
             if (profile->hasValidChannels()) {
                 // Need to create a new profile with same format
@@ -608,13 +582,6 @@ void AudioProfileVector::setChannelsFor(const ChannelsVector &channelMasks, audi
             return;
         }
     }
-}
-
-// static
-int AudioProfileVector::compareFormats(const sp<AudioProfile> *profile1,
-                                       const sp<AudioProfile> *profile2)
-{
-    return AudioPort::compareFormats((*profile1)->getFormat(), (*profile2)->getFormat());
 }
 
 } // namespace android
