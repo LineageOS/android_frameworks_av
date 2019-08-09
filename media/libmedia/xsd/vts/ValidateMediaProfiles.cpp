@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#include <string>
+
+#include <android-base/file.h>
+#include <android-base/properties.h>
 #include "utility/ValidateXml.h"
 
 TEST(CheckConfig, mediaProfilesValidation) {
@@ -21,8 +25,12 @@ TEST(CheckConfig, mediaProfilesValidation) {
                    "Verify that the media profiles file "
                    "is valid according to the schema");
 
-    const char* location = "/vendor/etc";
+    std::string mediaSettingsPath = android::base::GetProperty("media.settings.xml", "");
+    if (mediaSettingsPath.empty()) {
+        mediaSettingsPath.assign("/vendor/etc/media_profiles_V1_0.xml");
+    }
 
-    EXPECT_ONE_VALID_XML_MULTIPLE_LOCATIONS("media_profiles_V1_0.xml", {location},
+    EXPECT_ONE_VALID_XML_MULTIPLE_LOCATIONS(android::base::Basename(mediaSettingsPath).c_str(),
+                                            {android::base::Dirname(mediaSettingsPath).c_str()},
                                             "/data/local/tmp/media_profiles.xsd");
 }
