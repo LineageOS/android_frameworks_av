@@ -283,7 +283,7 @@ private:
     };
 
     struct ResourceManagerServiceProxy : public IBinder::DeathRecipient {
-        ResourceManagerServiceProxy(pid_t pid, uid_t uid);
+        ResourceManagerServiceProxy(pid_t pid);
         ~ResourceManagerServiceProxy();
 
         void init();
@@ -304,7 +304,6 @@ private:
         Mutex mLock;
         sp<IResourceManagerService> mService;
         pid_t mPid;
-        uid_t mUid;
     };
 
     State mState;
@@ -426,6 +425,7 @@ private:
     status_t onSetParameters(const sp<AMessage> &params);
 
     status_t amendOutputFormatWithCodecSpecificData(const sp<MediaCodecBuffer> &buffer);
+    void updateBatteryStat();
     bool isExecuting() const;
 
     uint64_t getGraphicBufferSize();

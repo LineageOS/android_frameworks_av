@@ -57,6 +57,7 @@
 #include <media/stagefright/OMXClient.h>
 #include <media/stagefright/PersistentSurface.h>
 #include <media/stagefright/SurfaceUtils.h>
+#include <mediautils/BatteryNotifier.h>
 #include <private/android_filesystem_config.h>
 #include <utils/Singleton.h>
 
@@ -165,9 +166,8 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(ResourceManagerClient);
 };
 
-MediaCodec::ResourceManagerServiceProxy::ResourceManagerServiceProxy(
-        pid_t pid, uid_t uid)
-        : mPid(pid), mUid(uid) {
+MediaCodec::ResourceManagerServiceProxy::ResourceManagerServiceProxy(pid_t pid)
+        : mPid(pid) {
     if (mPid == MediaCodec::kNoPid) {
         mPid = IPCThreadState::self()->getCallingPid();
     }
@@ -204,7 +204,7 @@ void MediaCodec::ResourceManagerServiceProxy::addResource(
     if (mService == NULL) {
         return;
     }
-    mService->addResource(mPid, mUid, clientId, client, resources);
+    mService->addResource(mPid, clientId, client, resources);
 }
 
 void MediaCodec::ResourceManagerServiceProxy::removeResource(int64_t clientId) {
@@ -517,6 +517,8 @@ MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
       mStickyError(OK),
       mSoftRenderer(NULL),
       mAnalyticsItem(NULL),
+      mResourceManagerClient(new ResourceManagerClient(this)),
+      mResourceManagerService(new ResourceManagerServiceProxy(pid)),
       mBatteryStatNotified(false),
       mIsVideo(false),
       mVideoWidth(0),
@@ -535,8 +537,6 @@ MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
     } else {
         mUid = uid;
     }
-    mResourceManagerClient = new ResourceManagerClient(this);
-    mResourceManagerService = new ResourceManagerServiceProxy(pid, mUid);
 
     initAnalyticsItem();
 }
@@ -1977,11 +1977,6 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     if (mIsVideo) {
                         // audio codec is currently ignored.
                         addResource(resourceType, MediaResource::kVideoCodec, 1);
-                        // TODO: track battery on/off by actual queueing/dequeueing
-                        // For now, keep existing behavior and request battery on/off
-                        // together with codec init/uninit. We'll improve the tracking
-                        // later by adding/removing this based on queue/dequeue timing.
-                        addResource(MediaResource::kBattery, MediaResource::kVideoCodec, 1);
                     }
 
                     (new AMessage)->postReply(mReplyID);
@@ -3131,6 +3126,8 @@ void MediaCodec::setState(State newState) {
     mState = newState;
 
     cancelPendingDequeueOperations();
+
+    updateBatteryStat();
 }
 
 void MediaCodec::returnBuffersToCodec(bool isReclaim) {
@@ -3632,6 +3629,20 @@ status_t MediaCodec::amendOutputFormatWithCodecSpecificData(
     }
 
     return OK;
+}
+
+void MediaCodec::updateBatteryStat() {
+    if (!mIsVideo) {
+        return;
+    }
+
+    if (mState == CONFIGURED && !mBatteryStatNotified) {
+        BatteryNotifier::getInstance().noteStartVideo(mUid);
+        mBatteryStatNotified = true;
+    } else if (mState == UNINITIALIZED && mBatteryStatNotified) {
+        BatteryNotifier::getInstance().noteStopVideo(mUid);
+        mBatteryStatNotified = false;
+    }
 }
 
 std::string MediaCodec::stateString(State state) {

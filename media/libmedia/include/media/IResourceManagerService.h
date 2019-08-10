@@ -39,7 +39,6 @@ public:
 
     virtual void addResource(
             int pid,
-            int uid,
             int64_t clientId,
             const sp<IResourceManagerClient> client,
             const Vector<MediaResource> &resources) = 0;

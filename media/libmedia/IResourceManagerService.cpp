@@ -72,14 +72,12 @@ public:
 
     virtual void addResource(
             int pid,
-            int uid,
             int64_t clientId,
             const sp<IResourceManagerClient> client,
             const Vector<MediaResource> &resources) {
         Parcel data, reply;
         data.writeInterfaceToken(IResourceManagerService::getInterfaceDescriptor());
         data.writeInt32(pid);
-        data.writeInt32(uid);
         data.writeInt64(clientId);
         data.writeStrongBinder(IInterface::asBinder(client));
         writeToParcel(&data, resources);
@@ -131,7 +129,6 @@ status_t BnResourceManagerService::onTransact(
         case ADD_RESOURCE: {
             CHECK_INTERFACE(IResourceManagerService, data, reply);
             int pid = data.readInt32();
-            int uid = data.readInt32();
             int64_t clientId = data.readInt64();
             sp<IResourceManagerClient> client(
                     interface_cast<IResourceManagerClient>(data.readStrongBinder()));
@@ -140,7 +137,7 @@ status_t BnResourceManagerService::onTransact(
             }
             Vector<MediaResource> resources;
             readFromParcel(data, &resources);
-            addResource(pid, uid, clientId, client, resources);
+            addResource(pid, clientId, client, resources);
             return NO_ERROR;
         } break;
 
