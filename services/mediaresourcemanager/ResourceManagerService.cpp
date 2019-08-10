@@ -21,8 +21,11 @@
 
 #include <binder/IMediaResourceMonitor.h>
 #include <binder/IServiceManager.h>
+#include <cutils/sched_policy.h>
 #include <dirent.h>
 #include <media/stagefright/ProcessInfo.h>
+#include <mediautils/BatteryNotifier.h>
+#include <mediautils/SchedulingPolicyService.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -31,8 +34,7 @@
 
 #include "ResourceManagerService.h"
 #include "ServiceLog.h"
-#include "mediautils/SchedulingPolicyService.h"
-#include <cutils/sched_policy.h>
+
 namespace android {
 
 namespace {
@@ -101,6 +103,7 @@ static ResourceInfos& getResourceInfosForEdit(
 }
 
 static ResourceInfo& getResourceInfoForEdit(
+        uid_t uid,
         int64_t clientId,
         const sp<IResourceManagerClient>& client,
         ResourceInfos& infos) {
@@ -110,9 +113,11 @@ static ResourceInfo& getResourceInfoForEdit(
         }
     }
     ResourceInfo info;
+    info.uid = uid;
     info.clientId = clientId;
     info.client = client;
     info.cpuBoost = false;
+    info.batteryNoted = false;
     infos.push_back(info);
     return infos.editItemAt(infos.size() - 1);
 }
@@ -204,7 +209,9 @@ ResourceManagerService::ResourceManagerService(sp<ProcessInfoInterface> processI
       mServiceLog(new ServiceLog()),
       mSupportsMultipleSecureCodecs(true),
       mSupportsSecureWithNonSecureCodec(true),
-      mCpuBoostCount(0) {}
+      mCpuBoostCount(0) {
+    BatteryNotifier::getInstance().noteResetVideo();
+}
 
 ResourceManagerService::~ResourceManagerService() {}
 
@@ -226,6 +233,7 @@ void ResourceManagerService::config(const Vector<MediaResourcePolicy> &policies)
 
 void ResourceManagerService::addResource(
         int pid,
+        int uid,
         int64_t clientId,
         const sp<IResourceManagerClient> client,
         const Vector<MediaResource> &resources) {
@@ -239,7 +247,7 @@ void ResourceManagerService::addResource(
         return;
     }
     ResourceInfos& infos = getResourceInfosForEdit(pid, mMap);
-    ResourceInfo& info = getResourceInfoForEdit(clientId, client, infos);
+    ResourceInfo& info = getResourceInfoForEdit(uid, clientId, client, infos);
     // TODO: do the merge instead of append.
     info.resources.appendVector(resources);
 
@@ -253,6 +261,11 @@ void ResourceManagerService::addResource(
                 ALOGW("couldn't request cpuset boost");
             }
             mCpuBoostCount++;
+        } else if (resources[i].mType == MediaResource::kBattery
+                && resources[i].mSubType == MediaResource::kVideoCodec
+                && !info.batteryNoted) {
+            info.batteryNoted = true;
+            BatteryNotifier::getInstance().noteStartVideo(info.uid);
         }
     }
     if (info.deathNotifier == nullptr) {
@@ -290,6 +303,9 @@ void ResourceManagerService::removeResource(int pid, int64_t clientId, bool chec
                 if (--mCpuBoostCount == 0) {
                     requestCpusetBoost(false, this);
                 }
+            }
+            if (infos[j].batteryNoted) {
+                BatteryNotifier::getInstance().noteStopVideo(infos[j].uid);
             }
             IInterface::asBinder(infos[j].client)->unlinkToDeath(infos[j].deathNotifier);
             j = infos.removeAt(j);
