@@ -47,9 +47,9 @@ DeviceDescriptor::DeviceDescriptor(audio_devices_t type, const FormatVector &enc
      * For now, the workaround to remove AC3 and IEC61937 support on HDMI is to declare
      * something like 'encodedFormats="AUDIO_FORMAT_PCM_16_BIT"' on the HDMI devicePort.
      */
-    if (type == AUDIO_DEVICE_OUT_HDMI && mEncodedFormats.isEmpty()) {
-        mEncodedFormats.add(AUDIO_FORMAT_AC3);
-        mEncodedFormats.add(AUDIO_FORMAT_IEC61937);
+    if (type == AUDIO_DEVICE_OUT_HDMI && mEncodedFormats.empty()) {
+        mEncodedFormats.push_back(AUDIO_FORMAT_AC3);
+        mEncodedFormats.push_back(AUDIO_FORMAT_IEC61937);
     }
 }
 
@@ -96,7 +96,7 @@ bool DeviceDescriptor::hasCurrentEncodedFormat() const
     if (!device_has_encoding_capability(type())) {
         return true;
     }
-    if (mEncodedFormats.isEmpty()) {
+    if (mEncodedFormats.empty()) {
         return true;
     }
 
@@ -105,7 +105,7 @@ bool DeviceDescriptor::hasCurrentEncodedFormat() const
 
 bool DeviceDescriptor::supportsFormat(audio_format_t format)
 {
-    if (mEncodedFormats.isEmpty()) {
+    if (mEncodedFormats.empty()) {
         return true;
     }
 
@@ -255,7 +255,6 @@ DeviceVector DeviceVector::getDevicesFromTypeMask(audio_devices_t type) const
         audio_devices_t curType = itemAt(i)->type() & ~AUDIO_DEVICE_BIT_IN;
         if ((isOutput == curIsOutput) && ((type & curType) != 0)) {
             devices.add(itemAt(i));
-            type &= ~curType;
             ALOGV("DeviceVector::%s() for type %08x found %p",
                     __func__, itemAt(i)->type(), itemAt(i).get());
         }
@@ -271,6 +270,38 @@ sp<DeviceDescriptor> DeviceVector::getDeviceFromTagName(const String8 &tagName) 
         }
     }
     return nullptr;
+}
+
+DeviceVector DeviceVector::getFirstDevicesFromTypes(
+        std::vector<audio_devices_t> orderedTypes) const
+{
+    DeviceVector devices;
+    for (auto deviceType : orderedTypes) {
+        if (!(devices = getDevicesFromTypeMask(deviceType)).isEmpty()) {
+            break;
+        }
+    }
+    return devices;
+}
+
+sp<DeviceDescriptor> DeviceVector::getFirstExistingDevice(
+        std::vector<audio_devices_t> orderedTypes) const {
+    sp<DeviceDescriptor> device;
+    for (auto deviceType : orderedTypes) {
+        if ((device = getDevice(deviceType, String8(""), AUDIO_FORMAT_DEFAULT)) != nullptr) {
+            break;
+        }
+    }
+    return device;
+}
+
+void DeviceVector::replaceDevicesByType(
+        audio_devices_t typeToRemove, const DeviceVector &devicesToAdd) {
+    DeviceVector devicesToRemove = getDevicesFromTypeMask(typeToRemove);
+    if (!devicesToRemove.isEmpty() && !devicesToAdd.isEmpty()) {
+        remove(devicesToRemove);
+        add(devicesToAdd);
+    }
 }
 
 void DeviceVector::dump(String8 *dst, const String8 &tag, int spaces, bool verbose) const

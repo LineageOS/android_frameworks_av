@@ -64,30 +64,19 @@ void AudioPort::toAudioPort(struct audio_port *port) const
 {
     // TODO: update this function once audio_port structure reflects the new profile definition.
     // For compatibility reason: flatening the AudioProfile into audio_port structure.
-    SortedVector<audio_format_t> flatenedFormats;
-    SampleRateVector flatenedRates;
-    ChannelsVector flatenedChannels;
+    FormatSet flatenedFormats;
+    SampleRateSet flatenedRates;
+    ChannelMaskSet flatenedChannels;
     for (const auto& profile : mProfiles) {
         if (profile->isValid()) {
             audio_format_t formatToExport = profile->getFormat();
-            const SampleRateVector &ratesToExport = profile->getSampleRates();
-            const ChannelsVector &channelsToExport = profile->getChannels();
+            const SampleRateSet &ratesToExport = profile->getSampleRates();
+            const ChannelMaskSet &channelsToExport = profile->getChannels();
 
-            if (flatenedFormats.indexOf(formatToExport) < 0) {
-                flatenedFormats.add(formatToExport);
-            }
-            for (size_t rateIndex = 0; rateIndex < ratesToExport.size(); rateIndex++) {
-                uint32_t rate = ratesToExport[rateIndex];
-                if (flatenedRates.indexOf(rate) < 0) {
-                    flatenedRates.add(rate);
-                }
-            }
-            for (size_t chanIndex = 0; chanIndex < channelsToExport.size(); chanIndex++) {
-                audio_channel_mask_t channels = channelsToExport[chanIndex];
-                if (flatenedChannels.indexOf(channels) < 0) {
-                    flatenedChannels.add(channels);
-                }
-            }
+            flatenedFormats.insert(formatToExport);
+            flatenedRates.insert(ratesToExport.begin(), ratesToExport.end());
+            flatenedChannels.insert(channelsToExport.begin(), channelsToExport.end());
+
             if (flatenedRates.size() > AUDIO_PORT_MAX_SAMPLING_RATES ||
                     flatenedChannels.size() > AUDIO_PORT_MAX_CHANNEL_MASKS ||
                     flatenedFormats.size() > AUDIO_PORT_MAX_FORMATS) {
@@ -102,23 +91,16 @@ void AudioPort::toAudioPort(struct audio_port *port) const
     port->num_sample_rates = flatenedRates.size();
     port->num_channel_masks = flatenedChannels.size();
     port->num_formats = flatenedFormats.size();
-    for (size_t i = 0; i < flatenedRates.size(); i++) {
-        port->sample_rates[i] = flatenedRates[i];
-    }
-    for (size_t i = 0; i < flatenedChannels.size(); i++) {
-        port->channel_masks[i] = flatenedChannels[i];
-    }
-    for (size_t i = 0; i < flatenedFormats.size(); i++) {
-        port->formats[i] = flatenedFormats[i];
-    }
+    std::copy(flatenedRates.begin(), flatenedRates.end(), port->sample_rates);
+    std::copy(flatenedChannels.begin(), flatenedChannels.end(), port->channel_masks);
+    std::copy(flatenedFormats.begin(), flatenedFormats.end(), port->formats);
 
     ALOGV("AudioPort::toAudioPort() num gains %zu", mGains.size());
 
-    uint32_t i;
-    for (i = 0; i < mGains.size() && i < AUDIO_PORT_MAX_GAINS; i++) {
+    port->num_gains = std::min(mGains.size(), (size_t) AUDIO_PORT_MAX_GAINS);
+    for (size_t i = 0; i < port->num_gains; i++) {
         port->gains[i] = mGains[i]->getGain();
     }
-    port->num_gains = i;
 }
 
 void AudioPort::importAudioPort(const sp<AudioPort>& port, bool force __unused)
@@ -162,7 +144,7 @@ status_t AudioPort::checkExactAudioProfile(const struct audio_port_config *confi
     return status;
 }
 
-void AudioPort::pickSamplingRate(uint32_t &pickedRate,const SampleRateVector &samplingRates) const
+void AudioPort::pickSamplingRate(uint32_t &pickedRate,const SampleRateSet &samplingRates) const
 {
     pickedRate = 0;
     // For direct outputs, pick minimum sampling rate: this helps ensuring that the
@@ -170,9 +152,9 @@ void AudioPort::pickSamplingRate(uint32_t &pickedRate,const SampleRateVector &sa
     // sink
     if (isDirectOutput()) {
         uint32_t samplingRate = UINT_MAX;
-        for (size_t i = 0; i < samplingRates.size(); i ++) {
-            if ((samplingRates[i] < samplingRate) && (samplingRates[i] > 0)) {
-                samplingRate = samplingRates[i];
+        for (const auto rate : samplingRates) {
+            if ((rate < samplingRate) && (rate > 0)) {
+                samplingRate = rate;
             }
         }
         pickedRate = (samplingRate == UINT_MAX) ? 0 : samplingRate;
@@ -188,16 +170,16 @@ void AudioPort::pickSamplingRate(uint32_t &pickedRate,const SampleRateVector &sa
         // TODO: should mSamplingRates[] be ordered in terms of our preference
         // and we return the first (and hence most preferred) match?  This is of concern if
         // we want to choose 96kHz over 192kHz for USB driver stability or resource constraints.
-        for (size_t i = 0; i < samplingRates.size(); i ++) {
-            if ((samplingRates[i] > pickedRate) && (samplingRates[i] <= maxRate)) {
-                pickedRate = samplingRates[i];
+        for (const auto rate : samplingRates) {
+            if ((rate > pickedRate) && (rate <= maxRate)) {
+                pickedRate = rate;
             }
         }
     }
 }
 
 void AudioPort::pickChannelMask(audio_channel_mask_t &pickedChannelMask,
-                                const ChannelsVector &channelMasks) const
+                                const ChannelMaskSet &channelMasks) const
 {
     pickedChannelMask = AUDIO_CHANNEL_NONE;
     // For direct outputs, pick minimum channel count: this helps ensuring that the
@@ -205,15 +187,15 @@ void AudioPort::pickChannelMask(audio_channel_mask_t &pickedChannelMask,
     // sink
     if (isDirectOutput()) {
         uint32_t channelCount = UINT_MAX;
-        for (size_t i = 0; i < channelMasks.size(); i ++) {
+        for (const auto channelMask : channelMasks) {
             uint32_t cnlCount;
             if (useInputChannelMask()) {
-                cnlCount = audio_channel_count_from_in_mask(channelMasks[i]);
+                cnlCount = audio_channel_count_from_in_mask(channelMask);
             } else {
-                cnlCount = audio_channel_count_from_out_mask(channelMasks[i]);
+                cnlCount = audio_channel_count_from_out_mask(channelMask);
             }
             if ((cnlCount < channelCount) && (cnlCount > 0)) {
-                pickedChannelMask = channelMasks[i];
+                pickedChannelMask = channelMask;
                 channelCount = cnlCount;
             }
         }
@@ -226,15 +208,15 @@ void AudioPort::pickChannelMask(audio_channel_mask_t &pickedChannelMask,
         if (mType != AUDIO_PORT_TYPE_MIX) {
             maxCount = UINT_MAX;
         }
-        for (size_t i = 0; i < channelMasks.size(); i ++) {
+        for (const auto channelMask : channelMasks) {
             uint32_t cnlCount;
             if (useInputChannelMask()) {
-                cnlCount = audio_channel_count_from_in_mask(channelMasks[i]);
+                cnlCount = audio_channel_count_from_in_mask(channelMask);
             } else {
-                cnlCount = audio_channel_count_from_out_mask(channelMasks[i]);
+                cnlCount = audio_channel_count_from_out_mask(channelMask);
             }
             if ((cnlCount > channelCount) && (cnlCount <= maxCount)) {
-                pickedChannelMask = channelMasks[i];
+                pickedChannelMask = channelMask;
                 channelCount = cnlCount;
             }
         }
