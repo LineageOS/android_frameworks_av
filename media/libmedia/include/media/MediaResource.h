@@ -31,13 +31,12 @@ public:
         kNonSecureCodec,
         kGraphicMemory,
         kCpuBoost,
-        kBattery,
     };
 
     enum SubType {
         kUnspecifiedSubType = 0,
         kAudioCodec,
-        kVideoCodec,
+        kVideoCodec
     };
 
     MediaResource();
