@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "aaaf8ca4_a2b9f4d5",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 100,
+      "author": {
+        "id": 2936
+      },
+      "writtenOn": "2019-08-11T19:22:22Z",
+      "side": 1,
+      "message": "Should this be ALOGW or ALOGE?",
+      "range": {
+        "startLine": 100,
+        "startChar": 12,
+        "endLine": 100,
+        "endChar": 17
+      },
+      "revId": "993e86d95de8aa9b8d9ce6a943f5c3ddfb4ad4f7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
