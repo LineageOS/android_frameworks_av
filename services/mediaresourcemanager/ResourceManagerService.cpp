@@ -71,9 +71,9 @@ static String8 getString(const Vector<T> &items) {
     return itemsStr;
 }
 
-static bool hasResourceType(MediaResource::Type type, const Vector<MediaResource>& resources) {
-    for (size_t i = 0; i < resources.size(); ++i) {
-        if (resources[i].mType == type) {
+static bool hasResourceType(MediaResource::Type type, const ResourceList& resources) {
+    for (auto it = resources.begin(); it != resources.end(); it++) {
+        if (it->second.mType == type) {
             return true;
         }
     }
@@ -107,19 +107,18 @@ static ResourceInfo& getResourceInfoForEdit(
         int64_t clientId,
         const sp<IResourceManagerClient>& client,
         ResourceInfos& infos) {
-    for (size_t i = 0; i < infos.size(); ++i) {
-        if (infos[i].clientId == clientId) {
-            return infos.editItemAt(i);
-        }
+    ssize_t index = infos.indexOfKey(clientId);
+
+    if (index < 0) {
+        ResourceInfo info;
+        info.uid = uid;
+        info.clientId = clientId;
+        info.client = client;
+
+        index = infos.add(clientId, info);
     }
-    ResourceInfo info;
-    info.uid = uid;
-    info.clientId = clientId;
-    info.client = client;
-    info.cpuBoost = false;
-    info.batteryNoted = false;
-    infos.push_back(info);
-    return infos.editItemAt(infos.size() - 1);
+
+    return infos.editValueAt(index);
 }
 
 static void notifyResourceGranted(int pid, const Vector<MediaResource> &resources) {
@@ -186,10 +185,10 @@ status_t ResourceManagerService::dump(int fd, const Vector<String16>& /* args */
             snprintf(buffer, SIZE, "        Name: %s\n", infos[j].client->getName().string());
             result.append(buffer);
 
-            Vector<MediaResource> resources = infos[j].resources;
+            const ResourceList &resources = infos[j].resources;
             result.append("        Resources:\n");
-            for (size_t k = 0; k < resources.size(); ++k) {
-                snprintf(buffer, SIZE, "          %s\n", resources[k].toString().string());
+            for (auto it = resources.begin(); it != resources.end(); it++) {
+                snprintf(buffer, SIZE, "          %s\n", it->second.toString().string());
                 result.append(buffer);
             }
         }
@@ -231,6 +230,38 @@ void ResourceManagerService::config(const Vector<MediaResourcePolicy> &policies)
     }
 }
 
+void ResourceManagerService::onFirstAdded(
+        const MediaResource& resource, const ResourceInfo& clientInfo) {
+    // first time added
+    if (resource.mType == MediaResource::kCpuBoost
+     && resource.mSubType == MediaResource::kUnspecifiedSubType) {
+        // Request it on every new instance of kCpuBoost, as the media.codec
+        // could have died, if we only do it the first time subsequent instances
+        // never gets the boost.
+        if (requestCpusetBoost(true, this) != OK) {
+            ALOGW("couldn't request cpuset boost");
+        }
+        mCpuBoostCount++;
+    } else if (resource.mType == MediaResource::kBattery
+            && resource.mSubType == MediaResource::kVideoCodec) {
+        BatteryNotifier::getInstance().noteStartVideo(clientInfo.uid);
+    }
+}
+
+void ResourceManagerService::onLastRemoved(
+        const MediaResource& resource, const ResourceInfo& clientInfo) {
+    if (resource.mType == MediaResource::kCpuBoost
+            && resource.mSubType == MediaResource::kUnspecifiedSubType
+            && mCpuBoostCount > 0) {
+        if (--mCpuBoostCount == 0) {
+            requestCpusetBoost(false, this);
+        }
+    } else if (resource.mType == MediaResource::kBattery
+            && resource.mSubType == MediaResource::kVideoCodec) {
+        BatteryNotifier::getInstance().noteStopVideo(clientInfo.uid);
+    }
+}
+
 void ResourceManagerService::addResource(
         int pid,
         int uid,
@@ -248,24 +279,14 @@ void ResourceManagerService::addResource(
     }
     ResourceInfos& infos = getResourceInfosForEdit(pid, mMap);
     ResourceInfo& info = getResourceInfoForEdit(uid, clientId, client, infos);
-    // TODO: do the merge instead of append.
-    info.resources.appendVector(resources);
 
     for (size_t i = 0; i < resources.size(); ++i) {
-        if (resources[i].mType == MediaResource::kCpuBoost && !info.cpuBoost) {
-            info.cpuBoost = true;
-            // Request it on every new instance of kCpuBoost, as the media.codec
-            // could have died, if we only do it the first time subsequent instances
-            // never gets the boost.
-            if (requestCpusetBoost(true, this) != OK) {
-                ALOGW("couldn't request cpuset boost");
-            }
-            mCpuBoostCount++;
-        } else if (resources[i].mType == MediaResource::kBattery
-                && resources[i].mSubType == MediaResource::kVideoCodec
-                && !info.batteryNoted) {
-            info.batteryNoted = true;
-            BatteryNotifier::getInstance().noteStartVideo(info.uid);
+        const auto resType = std::make_pair(resources[i].mType, resources[i].mSubType);
+        if (info.resources.find(resType) == info.resources.end()) {
+            onFirstAdded(resources[i], info);
+            info.resources[resType] = resources[i];
+        } else {
+            info.resources[resType].mValue += resources[i].mValue;
         }
     }
     if (info.deathNotifier == nullptr) {
@@ -275,7 +296,48 @@ void ResourceManagerService::addResource(
     notifyResourceGranted(pid, resources);
 }
 
-void ResourceManagerService::removeResource(int pid, int64_t clientId) {
+void ResourceManagerService::removeResource(int pid, int64_t clientId,
+        const Vector<MediaResource> &resources) {
+    String8 log = String8::format("removeResource(pid %d, clientId %lld, resources %s)",
+            pid, (long long) clientId, getString(resources).string());
+    mServiceLog->add(log);
+
+    Mutex::Autolock lock(mLock);
+    if (!mProcessInfo->isValidPid(pid)) {
+        ALOGE("Rejected removeResource call with invalid pid.");
+        return;
+    }
+    ssize_t index = mMap.indexOfKey(pid);
+    if (index < 0) {
+        ALOGV("removeResource: didn't find pid %d for clientId %lld", pid, (long long) clientId);
+        return;
+    }
+    ResourceInfos &infos = mMap.editValueAt(index);
+
+    index = infos.indexOfKey(clientId);
+    if (index < 0) {
+        ALOGV("removeResource: didn't find clientId %lld", (long long) clientId);
+        return;
+    }
+
+    ResourceInfo &info = infos.editValueAt(index);
+
+    for (size_t i = 0; i < resources.size(); ++i) {
+        const auto resType = std::make_pair(resources[i].mType, resources[i].mSubType);
+        // ignore if we don't have it
+        if (info.resources.find(resType) != info.resources.end()) {
+            MediaResource &resource = info.resources[resType];
+            if (resource.mValue > resources[i].mValue) {
+                resource.mValue -= resources[i].mValue;
+            } else {
+                onLastRemoved(resources[i], info);
+                info.resources.erase(resType);
+            }
+        }
+    }
+}
+
+void ResourceManagerService::removeClient(int pid, int64_t clientId) {
     removeResource(pid, clientId, true);
 }
 
@@ -295,27 +357,22 @@ void ResourceManagerService::removeResource(int pid, int64_t clientId, bool chec
         ALOGV("removeResource: didn't find pid %d for clientId %lld", pid, (long long) clientId);
         return;
     }
-    bool found = false;
     ResourceInfos &infos = mMap.editValueAt(index);
-    for (size_t j = 0; j < infos.size(); ++j) {
-        if (infos[j].clientId == clientId) {
-            if (infos[j].cpuBoost && mCpuBoostCount > 0) {
-                if (--mCpuBoostCount == 0) {
-                    requestCpusetBoost(false, this);
-                }
-            }
-            if (infos[j].batteryNoted) {
-                BatteryNotifier::getInstance().noteStopVideo(infos[j].uid);
-            }
-            IInterface::asBinder(infos[j].client)->unlinkToDeath(infos[j].deathNotifier);
-            j = infos.removeAt(j);
-            found = true;
-            break;
-        }
+
+    index = infos.indexOfKey(clientId);
+    if (index < 0) {
+        ALOGV("removeResource: didn't find clientId %lld", (long long) clientId);
+        return;
     }
-    if (!found) {
-        ALOGV("didn't find client");
+
+    const ResourceInfo &info = infos[index];
+    for (auto it = info.resources.begin(); it != info.resources.end(); it++) {
+        onLastRemoved(it->second, info);
     }
+
+    IInterface::asBinder(info.client)->unlinkToDeath(info.deathNotifier);
+
+    infos.removeItemsAt(index);
 }
 
 void ResourceManagerService::getClientForResource_l(
@@ -426,7 +483,7 @@ bool ResourceManagerService::reclaimResource(
             ResourceInfos &infos = mMap.editValueAt(i);
             for (size_t j = 0; j < infos.size();) {
                 if (infos[j].client == failedClient) {
-                    j = infos.removeAt(j);
+                    j = infos.removeItemsAt(j);
                     found = true;
                 } else {
                     ++j;
@@ -554,11 +611,12 @@ bool ResourceManagerService::getBiggestClient_l(
     uint64_t largestValue = 0;
     const ResourceInfos &infos = mMap.valueAt(index);
     for (size_t i = 0; i < infos.size(); ++i) {
-        Vector<MediaResource> resources = infos[i].resources;
-        for (size_t j = 0; j < resources.size(); ++j) {
-            if (resources[j].mType == type) {
-                if (resources[j].mValue > largestValue) {
-                    largestValue = resources[j].mValue;
+        const ResourceList &resources = infos[i].resources;
+        for (auto it = resources.begin(); it != resources.end(); it++) {
+            const MediaResource &resource = it->second;
+            if (resource.mType == type) {
+                if (resource.mValue > largestValue) {
+                    largestValue = resource.mValue;
                     clientTemp = infos[i].client;
                 }
             }

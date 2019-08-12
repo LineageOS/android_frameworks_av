@@ -212,7 +212,7 @@ void MediaCodec::ResourceManagerServiceProxy::removeResource(int64_t clientId) {
     if (mService == NULL) {
         return;
     }
-    mService->removeResource(mPid, clientId);
+    mService->removeClient(mPid, clientId);
 }
 
 bool MediaCodec::ResourceManagerServiceProxy::reclaimResource(
