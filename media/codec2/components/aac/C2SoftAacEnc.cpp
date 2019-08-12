@@ -157,7 +157,7 @@ C2SoftAacEnc::C2SoftAacEnc(
       mSentCodecSpecificData(false),
       mInputTimeSet(false),
       mInputSize(0),
-      mNextFrameTimestampUs(0),
+      mInputTimeUs(0),
       mSignalledError(false),
       mOutIndex(0u) {
 }
@@ -183,7 +183,7 @@ c2_status_t C2SoftAacEnc::onStop() {
     mSentCodecSpecificData = false;
     mInputTimeSet = false;
     mInputSize = 0u;
-    mNextFrameTimestampUs = 0;
+    mInputTimeUs = 0;
     mSignalledError = false;
     return C2_OK;
 }
@@ -201,7 +201,7 @@ c2_status_t C2SoftAacEnc::onFlush_sm() {
     mSentCodecSpecificData = false;
     mInputTimeSet = false;
     mInputSize = 0u;
-    mNextFrameTimestampUs = 0;
+    mInputTimeUs = 0;
     return C2_OK;
 }
 
@@ -365,18 +365,17 @@ void C2SoftAacEnc::process(
         capacity = view.capacity();
     }
     if (!mInputTimeSet && capacity > 0) {
-        mNextFrameTimestampUs = work->input.ordinal.timestamp;
+        mInputTimeUs = work->input.ordinal.timestamp;
         mInputTimeSet = true;
     }
 
     size_t numFrames = (capacity + mInputSize + (eos ? mNumBytesPerInputFrame - 1 : 0))
             / mNumBytesPerInputFrame;
-    ALOGV("capacity = %zu; mInputSize = %zu; numFrames = %zu "
-          "mNumBytesPerInputFrame = %u inputTS = %lld",
-          capacity, mInputSize, numFrames,
-          mNumBytesPerInputFrame, work->input.ordinal.timestamp.peekll());
+    ALOGV("capacity = %zu; mInputSize = %zu; numFrames = %zu mNumBytesPerInputFrame = %u",
+          capacity, mInputSize, numFrames, mNumBytesPerInputFrame);
 
     std::shared_ptr<C2LinearBlock> block;
+    std::shared_ptr<C2Buffer> buffer;
     std::unique_ptr<C2WriteView> wView;
     uint8_t *outPtr = temp;
     size_t outAvailable = 0u;
@@ -443,11 +442,7 @@ void C2SoftAacEnc::process(
         const std::shared_ptr<C2Buffer> mBuffer;
     };
 
-    struct OutputBuffer {
-        std::shared_ptr<C2Buffer> buffer;
-        c2_cntr64_t timestampUs;
-    };
-    std::list<OutputBuffer> outputBuffers;
+    C2WorkOrdinalStruct outOrdinal = work->input.ordinal;
 
     while (encoderErr == AACENC_OK && inargs.numInSamples > 0) {
         if (numFrames && !block) {
@@ -478,22 +473,29 @@ void C2SoftAacEnc::process(
                                   &outargs);
 
         if (encoderErr == AACENC_OK) {
+            if (buffer) {
+                outOrdinal.frameIndex = mOutIndex++;
+                outOrdinal.timestamp = mInputTimeUs;
+                cloneAndSend(
+                        inputIndex,
+                        work,
+                        FillWork(C2FrameData::FLAG_INCOMPLETE, outOrdinal, buffer));
+                buffer.reset();
+            }
+
             if (outargs.numOutBytes > 0) {
                 mInputSize = 0;
                 int consumed = (capacity / sizeof(int16_t)) - inargs.numInSamples
                         + outargs.numInSamples;
-                c2_cntr64_t currentFrameTimestampUs = mNextFrameTimestampUs;
-                mNextFrameTimestampUs = work->input.ordinal.timestamp
+                mInputTimeUs = work->input.ordinal.timestamp
                         + (consumed * 1000000ll / channelCount / sampleRate);
-                std::shared_ptr<C2Buffer> buffer = createLinearBuffer(block, 0, outargs.numOutBytes);
+                buffer = createLinearBuffer(block, 0, outargs.numOutBytes);
 #if defined(LOG_NDEBUG) && !LOG_NDEBUG
                 hexdump(outPtr, std::min(outargs.numOutBytes, 256));
 #endif
                 outPtr = temp;
                 outAvailable = 0;
                 block.reset();
-
-                outputBuffers.push_back({buffer, currentFrameTimestampUs});
             } else {
                 mInputSize += outargs.numInSamples * sizeof(int16_t);
             }
@@ -504,9 +506,8 @@ void C2SoftAacEnc::process(
                 inargs.numInSamples -= outargs.numInSamples;
             }
         }
-        ALOGV("encoderErr = %d mInputSize = %zu "
-              "inargs.numInSamples = %d, mNextFrameTimestampUs = %lld",
-              encoderErr, mInputSize, inargs.numInSamples, mNextFrameTimestampUs.peekll());
+        ALOGV("encoderErr = %d mInputSize = %zu inargs.numInSamples = %d, mInputTimeUs = %lld",
+              encoderErr, mInputSize, inargs.numInSamples, mInputTimeUs.peekll());
     }
 
     if (eos && inBufferSize[0] > 0) {
@@ -541,27 +542,10 @@ void C2SoftAacEnc::process(
                            &outargs);
     }
 
-    while (outputBuffers.size() > 1) {
-        const OutputBuffer& front = outputBuffers.front();
-        C2WorkOrdinalStruct ordinal = work->input.ordinal;
-        ordinal.frameIndex = mOutIndex++;
-        ordinal.timestamp = front.timestampUs;
-        cloneAndSend(
-                inputIndex,
-                work,
-                FillWork(C2FrameData::FLAG_INCOMPLETE, ordinal, front.buffer));
-        outputBuffers.pop_front();
-    }
-    std::shared_ptr<C2Buffer> buffer;
-    C2WorkOrdinalStruct ordinal = work->input.ordinal;
-    ordinal.frameIndex = mOutIndex++;
-    if (!outputBuffers.empty()) {
-        ordinal.timestamp = outputBuffers.front().timestampUs;
-        buffer = outputBuffers.front().buffer;
-    }
-    // Mark the end of frame
+    outOrdinal.frameIndex = mOutIndex++;
+    outOrdinal.timestamp = mInputTimeUs;
     FillWork((C2FrameData::flags_t)(eos ? C2FrameData::FLAG_END_OF_STREAM : 0),
-             ordinal, buffer)(work);
+             outOrdinal, buffer)(work);
 }
 
 c2_status_t C2SoftAacEnc::drain(
@@ -585,7 +569,7 @@ c2_status_t C2SoftAacEnc::drain(
     mSentCodecSpecificData = false;
     mInputTimeSet = false;
     mInputSize = 0u;
-    mNextFrameTimestampUs = 0;
+    mInputTimeUs = 0;
 
     // TODO: we don't have any pending work at this time to drain.
     return C2_OK;
