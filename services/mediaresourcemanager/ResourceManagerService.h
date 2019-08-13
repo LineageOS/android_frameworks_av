@@ -35,10 +35,12 @@ struct ProcessInfoInterface;
 
 struct ResourceInfo {
     int64_t clientId;
+    uid_t uid;
     sp<IResourceManagerClient> client;
     sp<IBinder::DeathRecipient> deathNotifier;
     Vector<MediaResource> resources;
     bool cpuBoost;
+    bool batteryNoted;
 };
 
 typedef Vector<ResourceInfo> ResourceInfos;
@@ -61,6 +63,7 @@ public:
 
     virtual void addResource(
             int pid,
+            int uid,
             int64_t clientId,
             const sp<IResourceManagerClient> client,
             const Vector<MediaResource> &resources);
