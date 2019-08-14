@@ -19,7 +19,7 @@
 
 #include <time.h>
 #include <audio_utils/fifo.h>
-#include <media/SingleStateQueue.h>
+#include <media/nbaio/SingleStateQueue.h>
 #include <media/nbaio/NBAIO.h>
 
 namespace android {
