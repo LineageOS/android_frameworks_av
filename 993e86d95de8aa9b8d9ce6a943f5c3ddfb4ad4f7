@@ -22,6 +22,24 @@
       "revId": "993e86d95de8aa9b8d9ce6a943f5c3ddfb4ad4f7",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c1c241e0_4faa748c",
+        "filename": "services/camera/libcameraservice/CameraService.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 100,
+      "author": {
+        "id": 11883
+      },
+      "writtenOn": "2019-08-14T13:36:32Z",
+      "side": 1,
+      "message": "Probably, but I just followed google there",
+      "parentUuid": "aaaf8ca4_a2b9f4d5",
+      "revId": "993e86d95de8aa9b8d9ce6a943f5c3ddfb4ad4f7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
     }
   ]
 }
