@@ -96,10 +96,18 @@ ssize_t MediaMuxer::addTrack(const sp<AMessage> &format) {
 
     sp<MediaAdapter> newTrack = new MediaAdapter(trackMeta);
     status_t result = mWriter->addSource(newTrack);
-    if (result == OK) {
-        return mTrackList.add(newTrack);
+    if (result != OK) {
+        return -1;
     }
-    return -1;
+    float captureFps = -1.0;
+    if (format->findAsFloat("time-lapse-fps", &captureFps)) {
+        ALOGV("addTrack() time-lapse-fps: %f", captureFps);
+        result = mWriter->setCaptureRate(captureFps);
+        if (result != OK) {
+            ALOGW("addTrack() setCaptureRate failed :%d", result);
+        }
+    }
+    return mTrackList.add(newTrack);
 }
 
 status_t MediaMuxer::setOrientationHint(int degrees) {
