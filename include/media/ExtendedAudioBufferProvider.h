@@ -1,1 +1,1 @@
-../../media/libmedia/include/media/ExtendedAudioBufferProvider.h
+../../media/libaudioclient/include/media/ExtendedAudioBufferProvider.h
