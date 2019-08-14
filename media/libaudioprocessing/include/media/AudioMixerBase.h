@@ -188,12 +188,19 @@ public:
     enum {
         TRACKTYPE_NOP,
         TRACKTYPE_RESAMPLE,
+        TRACKTYPE_RESAMPLESTEREO,
         TRACKTYPE_NORESAMPLE,
         TRACKTYPE_NORESAMPLEMONO,
+        TRACKTYPE_NORESAMPLESTEREO,
     };
 
     // process hook functionality
     using process_hook_t = void(AudioMixerBase::*)();
+
+    static bool isAudioChannelPositionMask(audio_channel_mask_t channelMask) {
+        return audio_channel_mask_get_representation(channelMask)
+                == AUDIO_CHANNEL_REPRESENTATION_POSITION;
+    }
 
     struct TrackBase;
     using hook_t = void(TrackBase::*)(
@@ -218,6 +225,9 @@ public:
         void        adjustVolumeRamp(bool aux, bool useFloat = false);
         size_t      getUnreleasedFrames() const { return mResampler.get() != nullptr ?
                                                     mResampler->getUnreleasedFrames() : 0; };
+
+        bool        useStereoVolume() const { return channelMask == AUDIO_CHANNEL_OUT_STEREO
+                                        && isAudioChannelPositionMask(mMixerChannelMask); }
 
         static hook_t getTrackHook(int trackType, uint32_t channelCount,
                 audio_format_t mixerInFormat, audio_format_t mixerOutFormat);
@@ -327,7 +337,8 @@ public:
     void process__noResampleOneTrack();
 
     static process_hook_t getProcessHook(int processType, uint32_t channelCount,
-            audio_format_t mixerInFormat, audio_format_t mixerOutFormat);
+            audio_format_t mixerInFormat, audio_format_t mixerOutFormat,
+            bool useStereoVolume);
 
     static void convertMixerFormat(void *out, audio_format_t mixerOutFormat,
             void *in, audio_format_t mixerInFormat, size_t sampleCount);
