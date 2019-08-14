@@ -35,6 +35,10 @@ struct MediaWriter : public RefBase {
     virtual status_t start(MetaData *params = NULL) = 0;
     virtual status_t stop() = 0;
     virtual status_t pause() = 0;
+    virtual status_t setCaptureRate(float /* captureFps */) {
+        ALOGW("setCaptureRate unsupported");
+        return ERROR_UNSUPPORTED;
+    }
 
     virtual void setMaxFileSize(int64_t bytes) { mMaxFileSizeLimitBytes = bytes; }
     virtual void setMaxFileDuration(int64_t durationUs) { mMaxFileDurationLimitUs = durationUs; }
