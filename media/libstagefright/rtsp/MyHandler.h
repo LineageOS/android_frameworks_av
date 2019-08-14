@@ -257,6 +257,10 @@ struct MyHandler : public AHandler {
         msg->post();
     }
 
+    sp<ARTSPConnection> getARTSPConnection() {
+      return mConn;
+    }
+
     static void addRR(const sp<ABuffer> &buf) {
         uint8_t *ptr = buf->data() + buf->size();
         ptr[0] = 0x80 | 0;
