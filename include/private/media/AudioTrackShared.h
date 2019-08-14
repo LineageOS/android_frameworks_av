@@ -28,7 +28,7 @@
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioTimestamp.h>
 #include <media/Modulo.h>
-#include <media/SingleStateQueue.h>
+#include <media/nbaio/SingleStateQueue.h>
 
 namespace android {
 
