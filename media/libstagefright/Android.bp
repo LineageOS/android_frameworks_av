@@ -129,7 +129,6 @@ cc_library {
         "CameraSource.cpp",
         "CameraSourceTimeLapse.cpp",
         "DataConverter.cpp",
-        "DataSourceBase.cpp",
         "DataSourceFactory.cpp",
         "DataURISource.cpp",
         "ClearFileSource.cpp",
@@ -267,7 +266,6 @@ cc_library_static {
     srcs: [
         "ClearFileSource.cpp",
         "DataURISource.cpp",
-        "DataSourceBase.cpp",
         "HTTPBase.cpp",
         "HevcUtils.cpp",
         "MediaClock.cpp",
