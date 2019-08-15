@@ -643,8 +643,14 @@ void AudioMixerBase::process__validate()
             if (n & NEEDS_RESAMPLE) {
                 all16BitsStereoNoResample = false;
                 resampling = true;
-                if ((n & NEEDS_CHANNEL_COUNT__MASK) >= NEEDS_CHANNEL_2
-                    && t->useStereoVolume()) {
+                if ((n & NEEDS_CHANNEL_COUNT__MASK) == NEEDS_CHANNEL_1
+                        && t->channelMask == AUDIO_CHANNEL_OUT_MONO // MONO_HACK
+                        && isAudioChannelPositionMask(t->mMixerChannelMask)) {
+                    t->hook = TrackBase::getTrackHook(
+                            TRACKTYPE_RESAMPLEMONO, t->mMixerChannelCount,
+                            t->mMixerInFormat, t->mMixerFormat);
+                } else if ((n & NEEDS_CHANNEL_COUNT__MASK) >= NEEDS_CHANNEL_2
+                        && t->useStereoVolume()) {
                     t->hook = TrackBase::getTrackHook(
                             TRACKTYPE_RESAMPLESTEREO, t->mMixerChannelCount,
                             t->mMixerInFormat, t->mMixerFormat);
@@ -658,7 +664,7 @@ void AudioMixerBase::process__validate()
             } else {
                 if ((n & NEEDS_CHANNEL_COUNT__MASK) == NEEDS_CHANNEL_1){
                     t->hook = TrackBase::getTrackHook(
-                            (t->mMixerChannelMask == AUDIO_CHANNEL_OUT_STEREO  // TODO: MONO_HACK
+                            (isAudioChannelPositionMask(t->mMixerChannelMask)  // TODO: MONO_HACK
                                     && t->channelMask == AUDIO_CHANNEL_OUT_MONO)
                                 ? TRACKTYPE_NORESAMPLEMONO : TRACKTYPE_NORESAMPLE,
                             t->mMixerChannelCount,
@@ -1494,7 +1500,8 @@ void AudioMixerBase::TrackBase::track__Resample(TO* out, size_t outFrameCount, T
     ALOGVV("track__Resample\n");
     mResampler->setSampleRate(sampleRate);
     const bool ramp = needsRamp();
-    if (ramp || aux != NULL) {
+    if (MIXTYPE == MIXTYPE_MONOEXPAND || MIXTYPE == MIXTYPE_STEREOEXPAND
+            || ramp || aux != NULL) {
         // if ramp:        resample with unity gain to temp buffer and scale/mix in 2nd step.
         // if aux != NULL: resample with unity gain to temp buffer then apply send level.
 
@@ -1623,6 +1630,23 @@ AudioMixerBase::hook_t AudioMixerBase::TrackBase::getTrackHook(int trackType, ui
         case AUDIO_FORMAT_PCM_16_BIT:
             return (AudioMixerBase::hook_t) &TrackBase::track__Resample<
                     MIXTYPE_MULTI_STEREOVOL, int32_t /*TO*/, int16_t /*TI*/,
+                    TYPE_AUX>;
+        default:
+            LOG_ALWAYS_FATAL("bad mixerInFormat: %#x", mixerInFormat);
+            break;
+        }
+        break;
+    // RESAMPLEMONO needs MIXTYPE_STEREOEXPAND since resampler will upmix mono
+    // track to stereo track
+    case TRACKTYPE_RESAMPLEMONO:
+        switch (mixerInFormat) {
+        case AUDIO_FORMAT_PCM_FLOAT:
+            return (AudioMixerBase::hook_t) &TrackBase::track__Resample<
+                    MIXTYPE_STEREOEXPAND, float /*TO*/, float /*TI*/,
+                    TYPE_AUX>;
+        case AUDIO_FORMAT_PCM_16_BIT:
+            return (AudioMixerBase::hook_t) &TrackBase::track__Resample<
+                    MIXTYPE_STEREOEXPAND, int32_t /*TO*/, int16_t /*TI*/,
                     TYPE_AUX>;
         default:
             LOG_ALWAYS_FATAL("bad mixerInFormat: %#x", mixerInFormat);
