@@ -47,6 +47,10 @@
 
 #include "q_pulse.h"
 
+#undef LOG_TAG
+#define LOG_TAG "amrwbenc"
+#include "log/log.h"
+
 static Word16 tipos[36] = {
     0, 1, 2, 3,                            /* starting point &ipos[0], 1st iter */
     1, 2, 3, 0,                            /* starting point &ipos[4], 2nd iter */
@@ -745,11 +749,16 @@ void ACELP_4t64_fx(
 
         i = (Word16)((vo_L_mult(track, NPMAXPT) >> 1));
 
-        while (ind[i] >= 0)
+        while (i < NPMAXPT * NB_TRACK && ind[i] >= 0)
         {
             i += 1;
         }
-        ind[i] = index;
+        if (i < NPMAXPT * NB_TRACK) {
+            ind[i] = index;
+        } else {
+            ALOGE("b/132647222, OOB access in ind array track=%d i=%d", track, i);
+            android_errorWriteLog(0x534e4554, "132647222");
+        }
     }
 
     k = 0;
