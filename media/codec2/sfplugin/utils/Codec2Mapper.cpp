@@ -382,10 +382,11 @@ ALookup<C2Config::profile_t, int32_t> sAv1Profiles = {
     // TODO: will need to disambiguate between Main8 and Main10
     { C2Config::PROFILE_AV1_0, AV1ProfileMain8 },
     { C2Config::PROFILE_AV1_0, AV1ProfileMain10 },
+    { C2Config::PROFILE_AV1_0, AV1ProfileMain10HDR10 },
+    { C2Config::PROFILE_AV1_0, AV1ProfileMain10HDR10Plus },
 };
 
 ALookup<C2Config::profile_t, int32_t> sAv1HdrProfiles = {
-    { C2Config::PROFILE_AV1_0, AV1ProfileMain10 },
     { C2Config::PROFILE_AV1_0, AV1ProfileMain10HDR10 },
 };
 
@@ -662,6 +663,8 @@ C2Mapper::GetHdrProfileLevelMapper(std::string mediaType, bool isHdr10Plus) {
         return std::make_shared<HevcProfileLevelMapper>(true, isHdr10Plus);
     } else if (mediaType == MIMETYPE_VIDEO_VP9) {
         return std::make_shared<Vp9ProfileLevelMapper>(true, isHdr10Plus);
+    } else if (mediaType == MIMETYPE_VIDEO_AV1) {
+        return std::make_shared<Av1ProfileLevelMapper>(true, isHdr10Plus);
     }
     return nullptr;
 }

@@ -117,8 +117,9 @@ void addSupportedProfileLevels(
         }
     }
 
-    // For VP9, the static info is always propagated by framework.
+    // For VP9/AV1, the static info is always propagated by framework.
     supportsHdr |= (mediaType == MIMETYPE_VIDEO_VP9);
+    supportsHdr |= (mediaType == MIMETYPE_VIDEO_AV1);
 
     for (C2Value::Primitive profile : profileQuery[0].values.values) {
         pl.profile = (C2Config::profile_t)profile.ref<uint32_t>();
