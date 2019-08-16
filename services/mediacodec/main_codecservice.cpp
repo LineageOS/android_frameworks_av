@@ -21,6 +21,7 @@
 #include "minijail.h"
 
 #include <binder/ProcessState.h>
+#include <cutils/properties.h>
 #include <hidl/HidlTransportSupport.h>
 #include <media/stagefright/omx/1.0/Omx.h>
 #include <media/stagefright/omx/1.0/OmxStore.h>
@@ -57,7 +58,8 @@ int main(int argc __unused, char** argv)
     } else {
         LOG(INFO) << "IOmx HAL service created.";
     }
-    sp<IOmxStore> omxStore = new implementation::OmxStore(omx);
+    sp<IOmxStore> omxStore = new implementation::OmxStore(
+            property_get_int64("vendor.media.omx", 1) ? omx : nullptr);
     if (omxStore == nullptr) {
         LOG(ERROR) << "Cannot create IOmxStore HAL service.";
     } else if (omxStore->registerAsService() != OK) {
