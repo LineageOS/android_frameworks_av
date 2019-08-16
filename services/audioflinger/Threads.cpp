@@ -2953,9 +2953,11 @@ ssize_t AudioFlinger::PlaybackThread::threadLoop_write()
             ALOG_ASSERT(mCallbackThread != 0);
             mCallbackThread->setWriteBlocked(mWriteAckSequence);
         }
+        ATRACE_BEGIN("write");
         // FIXME We should have an implementation of timestamps for direct output threads.
         // They are used e.g for multichannel PCM playback over HDMI.
         bytesWritten = mOutput->write((char *)mSinkBuffer + offset, mBytesRemaining);
+        ATRACE_END();
 
         if (mUseAsyncWrite &&
                 ((bytesWritten < 0) || (bytesWritten == (ssize_t)mBytesRemaining))) {
@@ -5646,10 +5648,17 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::DirectOutputThread::prep
             minFrames = 1;
         }
 
-        if ((track->framesReady() >= minFrames) && track->isReady() && !track->isPaused() &&
+        const size_t framesReady = track->framesReady();
+        const int trackId = track->id();
+        if (ATRACE_ENABLED()) {
+            std::string traceName("nRdy");
+            traceName += std::to_string(trackId);
+            ATRACE_INT(traceName.c_str(), framesReady);
+        }
+        if ((framesReady >= minFrames) && track->isReady() && !track->isPaused() &&
                 !track->isStopping_2() && !track->isStopped())
         {
-            ALOGVV("track(%d) s=%08x [OK]", track->id(), cblk->mServer);
+            ALOGVV("track(%d) s=%08x [OK]", trackId, cblk->mServer);
 
             if (track->mFillingUpStatus == Track::FS_FILLED) {
                 track->mFillingUpStatus = Track::FS_ACTIVE;
@@ -5726,7 +5735,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::DirectOutputThread::prep
                 // fill a buffer, then remove it from active list.
                 // Only consider last track started for mixer state control
                 if (--(track->mRetryCount) <= 0) {
-                    ALOGV("BUFFER TIMEOUT: remove track(%d) from active list", track->id());
+                    ALOGV("BUFFER TIMEOUT: remove track(%d) from active list", trackId);
                     tracksToRemove->add(track);
                     // indicate to client process that the track was disabled because of underrun;
                     // it will then automatically call start() when data is available
@@ -5734,7 +5743,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::DirectOutputThread::prep
                 } else if (last) {
                     ALOGW("pause because of UNDERRUN, framesReady = %zu,"
                             "minFrames = %u, mFormat = %#x",
-                            track->framesReady(), minFrames, mFormat);
+                            framesReady, minFrames, mFormat);
                     mixerStatus = MIXER_TRACKS_ENABLED;
                     if (mHwSupportsPause && !mHwPaused && !mStandby) {
                         doHwPause = true;
