@@ -104,4 +104,38 @@ bool statsd_widevineCDM(MediaAnalyticsItem *item)
     return true;
 }
 
+// drmmanager
+bool statsd_drmmanager(MediaAnalyticsItem *item)
+{
+    if (item == NULL) return false;
+
+    nsecs_t timestamp = item->getTimestamp();
+    std::string pkgName = item->getPkgName();
+    int64_t pkgVersionCode = item->getPkgVersionCode();
+    int64_t mediaApexVersion = 0;
+
+    char *plugin_id = NULL;
+    (void) item->getCString("plugin_id", &plugin_id);
+    char *description = NULL;
+    (void) item->getCString("description", &description);
+    int32_t method_id = -1;
+    (void) item->getInt32("method_id", &method_id);
+    char *mime_types = NULL;
+    (void) item->getCString("mime_types", &mime_types);
+
+    if (enabled_statsd) {
+        android::util::stats_write(android::util::MEDIAMETRICS_DRMMANAGER_REPORTED,
+                                   timestamp, pkgName.c_str(), pkgVersionCode,
+                                   mediaApexVersion,
+                                   plugin_id, description,
+                                   method_id, mime_types);
+    } else {
+        ALOGV("NOT sending: drmmanager data");
+    }
+
+    free(plugin_id);
+    free(description);
+    free(mime_types);
+    return true;
+}
 } // namespace android
