@@ -18,6 +18,7 @@
 
 #include "AudioPort.h"
 #include "DeviceDescriptor.h"
+#include "policy.h"
 #include <utils/String8.h>
 #include <system/audio.h>
 

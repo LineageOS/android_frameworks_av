@@ -438,7 +438,7 @@ Return<MixPortTraits::Element> MixPortTraits::deserialize(const xmlNode *child,
         return Status::fromStatusT(status);
     }
     if (profiles.empty()) {
-        profiles.add(AudioProfile::createFullDynamic());
+        profiles.add(AudioProfile::createFullDynamic(gDynamicFormat));
     }
     mixPort->setAudioProfiles(profiles);
 
@@ -522,7 +522,7 @@ Return<DevicePortTraits::Element> DevicePortTraits::deserialize(const xmlNode *c
         return Status::fromStatusT(status);
     }
     if (profiles.empty()) {
-        profiles.add(AudioProfile::createFullDynamic());
+        profiles.add(AudioProfile::createFullDynamic(gDynamicFormat));
     }
     deviceDesc->setAudioProfiles(profiles);
 
