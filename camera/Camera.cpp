@@ -347,6 +347,13 @@ status_t Camera::setPreviewCallbackTarget(
     return c->setPreviewCallbackTarget(callbackProducer);
 }
 
+int32_t Camera::setAudioRestriction(int32_t mode)
+{
+    sp <::android::hardware::ICamera> c = mCamera;
+    if (c == 0) return NO_INIT;
+    return c->setAudioRestriction(mode);
+}
+
 // callback from camera service
 void Camera::notifyCallback(int32_t msgType, int32_t ext1, int32_t ext2)
 {

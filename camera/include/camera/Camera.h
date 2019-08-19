@@ -167,6 +167,8 @@ public:
 
             sp<ICameraRecordingProxy> getRecordingProxy();
 
+            int32_t      setAudioRestriction(int32_t mode);
+
     // ICameraClient interface
     virtual void        notifyCallback(int32_t msgType, int32_t ext, int32_t ext2);
     virtual void        dataCallback(int32_t msgType, const sp<IMemory>& dataPtr,

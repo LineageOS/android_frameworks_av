@@ -258,6 +258,14 @@ public:
 
         // Block the client form using the camera
         virtual void block();
+
+        // set audio restriction from client
+        // Will call into camera service and hold mServiceLock
+        virtual int32_t setAudioRestriction(int32_t mode);
+
+        virtual int32_t getAudioRestriction() const;
+
+        static bool isValidAudioRestriction(int32_t mode);
     protected:
         BasicClient(const sp<CameraService>& cameraService,
                 const sp<IBinder>& remoteCallback,
@@ -285,6 +293,9 @@ public:
         const uid_t                     mClientUid;
         const pid_t                     mServicePid;
         bool                            mDisconnected;
+
+        mutable Mutex                   mAudioRestrictionLock;
+        int32_t                         mAudioRestriction;
 
         // - The app-side Binder interface to receive callbacks from us
         sp<IBinder>                     mRemoteBinder;   // immutable after constructor
@@ -438,6 +449,9 @@ public:
                 const CameraService::DescriptorPtr& partial);
 
     }; // class CameraClientManager
+
+    int32_t updateAudioRestriction();
+    int32_t updateAudioRestrictionLocked();
 
 private:
 
@@ -966,6 +980,13 @@ private:
 
     void broadcastTorchModeStatus(const String8& cameraId,
             hardware::camera::common::V1_0::TorchModeStatus status);
+
+    // TODO: right now each BasicClient holds one AppOpsManager instance.
+    // We can refactor the code so all of clients share this instance
+    AppOpsManager mAppOps;
+
+    // Aggreated audio restriction mode for all camera clients
+    int32_t mAudioRestriction;
 };
 
 } // namespace android

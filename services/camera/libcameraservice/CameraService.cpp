@@ -135,7 +135,8 @@ sp<hardware::ICameraServiceProxy> CameraService::sCameraServiceProxy;
 CameraService::CameraService() :
         mEventLog(DEFAULT_EVENT_LOG_LENGTH),
         mNumberOfCameras(0),
-        mSoundRef(0), mInitialized(false) {
+        mSoundRef(0), mInitialized(false),
+        mAudioRestriction(hardware::camera2::ICameraDeviceUser::AUDIO_RESTRICTION_NONE) {
     ALOGI("CameraService started (pid=%d)", getpid());
     mServiceLockWrapper = std::make_shared<WaitableMutexWrapper>(&mServiceLock);
 }
@@ -164,6 +165,7 @@ void CameraService::onFirstRef()
     mUidPolicy->registerSelf();
     mSensorPrivacyPolicy = new SensorPrivacyPolicy(this);
     mSensorPrivacyPolicy->registerSelf();
+    mAppOps.setCameraAudioRestriction(mAudioRestriction);
     sp<HidlCameraService> hcs = HidlCameraService::getInstance(this);
     if (hcs->registerAsService() != android::OK) {
         ALOGE("%s: Failed to register default android.frameworks.cameraservice.service@1.0",
@@ -2027,6 +2029,7 @@ void CameraService::removeByClient(const BasicClient* client) {
             mActiveClientManager.remove(i);
         }
     }
+    updateAudioRestrictionLocked();
 }
 
 bool CameraService::evictClientIdByRemote(const wp<IBinder>& remote) {
@@ -2400,6 +2403,7 @@ CameraService::BasicClient::BasicClient(const sp<CameraService>& cameraService,
         mClientPackageName(clientPackageName), mClientPid(clientPid), mClientUid(clientUid),
         mServicePid(servicePid),
         mDisconnected(false),
+        mAudioRestriction(hardware::camera2::ICameraDeviceUser::AUDIO_RESTRICTION_NONE),
         mRemoteBinder(remoteCallback)
 {
     if (sCameraService == nullptr) {
@@ -2501,6 +2505,30 @@ uid_t CameraService::BasicClient::getClientUid() const {
 bool CameraService::BasicClient::canCastToApiClient(apiLevel level) const {
     // Defaults to API2.
     return level == API_2;
+}
+
+int32_t CameraService::BasicClient::setAudioRestriction(int32_t mode) {
+    {
+        Mutex::Autolock l(mAudioRestrictionLock);
+        mAudioRestriction = mode;
+    }
+    return sCameraService->updateAudioRestriction();
+}
+
+int32_t CameraService::BasicClient::getAudioRestriction() const {
+    Mutex::Autolock l(mAudioRestrictionLock);
+    return mAudioRestriction;
+}
+
+bool CameraService::BasicClient::isValidAudioRestriction(int32_t mode) {
+    switch (mode) {
+        case hardware::camera2::ICameraDeviceUser::AUDIO_RESTRICTION_NONE:
+        case hardware::camera2::ICameraDeviceUser::AUDIO_RESTRICTION_VIBRATION:
+        case hardware::camera2::ICameraDeviceUser::AUDIO_RESTRICTION_VIBRATION_SOUND:
+            return true;
+        default:
+            return false;
+    }
 }
 
 status_t CameraService::BasicClient::startCameraOps() {
@@ -3530,6 +3558,27 @@ status_t CameraService::printHelp(int out) {
         "  set-uid-state <PACKAGE> <active|idle> [--user USER_ID] overrides the uid state\n"
         "  reset-uid-state <PACKAGE> [--user USER_ID] clears the uid state override\n"
         "  help print this message\n");
+}
+
+int32_t CameraService::updateAudioRestriction() {
+    Mutex::Autolock lock(mServiceLock);
+    return updateAudioRestrictionLocked();
+}
+
+int32_t CameraService::updateAudioRestrictionLocked() {
+    int32_t mode = 0;
+    // iterate through all active client
+    for (const auto& i : mActiveClientManager.getAll()) {
+        const auto clientSp = i->getValue();
+        mode |= clientSp->getAudioRestriction();
+    }
+
+    bool modeChanged = (mAudioRestriction != mode);
+    mAudioRestriction = mode;
+    if (modeChanged) {
+        mAppOps.setCameraAudioRestriction(mode);
+    }
+    return mode;
 }
 
 }; // namespace android

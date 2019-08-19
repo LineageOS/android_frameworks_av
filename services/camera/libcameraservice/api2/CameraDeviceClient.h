@@ -152,6 +152,10 @@ public:
     virtual binder::Status finalizeOutputConfigurations(int32_t streamId,
             const hardware::camera2::params::OutputConfiguration &outputConfiguration) override;
 
+    virtual binder::Status setCameraAudioRestriction(int32_t mode,
+            /*out*/
+            int32_t* outMode = NULL) override;
+
     /**
      * Interface used by CameraService
      */
