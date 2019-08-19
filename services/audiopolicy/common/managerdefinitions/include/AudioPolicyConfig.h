@@ -29,6 +29,7 @@
 #include <AudioPolicyMix.h>
 #include <EffectDescriptor.h>
 #include <SoundTriggerSession.h>
+#include <media/AudioProfile.h>
 
 namespace android {
 
@@ -118,9 +119,9 @@ public:
         mSource = "AudioPolicyConfig::setDefault";
         mEngineLibraryNameSuffix = kDefaultEngineLibraryNameSuffix;
         mDefaultOutputDevice = new DeviceDescriptor(AUDIO_DEVICE_OUT_SPEAKER);
-        mDefaultOutputDevice->addAudioProfile(AudioProfile::createFullDynamic());
+        mDefaultOutputDevice->addAudioProfile(AudioProfile::createFullDynamic(gDynamicFormat));
         sp<DeviceDescriptor> defaultInputDevice = new DeviceDescriptor(AUDIO_DEVICE_IN_BUILTIN_MIC);
-        defaultInputDevice->addAudioProfile(AudioProfile::createFullDynamic());
+        defaultInputDevice->addAudioProfile(AudioProfile::createFullDynamic(gDynamicFormat));
         sp<AudioProfile> micProfile = new AudioProfile(
                 AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_MONO, 8000);
         defaultInputDevice->addAudioProfile(micProfile);

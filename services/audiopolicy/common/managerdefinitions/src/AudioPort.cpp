@@ -342,7 +342,9 @@ void AudioPort::dump(String8 *dst, int spaces, bool verbose) const
         dst->appendFormat("%*s- name: %s\n", spaces, "", mName.string());
     }
     if (verbose) {
-        mProfiles.dump(dst, spaces);
+        std::string profilesStr;
+        mProfiles.dump(&profilesStr, spaces);
+        dst->append(profilesStr.c_str());
 
         if (mGains.size() != 0) {
             dst->appendFormat("%*s- gains:\n", spaces, "");
