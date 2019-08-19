@@ -40,8 +40,8 @@ AudioOutputDescriptor::AudioOutputDescriptor(const sp<AudioPort>& port,
 {
     if (mPort.get() != nullptr) {
         mPort->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
-        if (mPort->mGains.size() > 0) {
-            mPort->mGains[0]->getDefaultConfig(&mGain);
+        if (mPort->getGains().size() > 0) {
+            mPort->getGains()[0]->getDefaultConfig(&mGain);
         }
     }
 }
@@ -483,7 +483,7 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
     mFlags = (audio_output_flags_t)(mFlags | flags);
 
     ALOGV("opening output for device %s profile %p name %s",
-          mDevices.toString().c_str(), mProfile.get(), mProfile->getName().string());
+          mDevices.toString().c_str(), mProfile.get(), mProfile->getName().c_str());
 
     status_t status = mClientInterface->openOutput(mProfile->getModuleHandle(),
                                                    output,

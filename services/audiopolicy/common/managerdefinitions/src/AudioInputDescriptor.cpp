@@ -34,8 +34,8 @@ AudioInputDescriptor::AudioInputDescriptor(const sp<IOProfile>& profile,
 {
     if (profile != NULL) {
         profile->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
-        if (profile->mGains.size() > 0) {
-            profile->mGains[0]->getDefaultConfig(&mGain);
+        if (profile->getGains().size() > 0) {
+            profile->getGains()[0]->getDefaultConfig(&mGain);
         }
     }
 }
@@ -212,7 +212,7 @@ status_t AudioInputDescriptor::open(const audio_config_t *config,
     mDevice = device;
 
     ALOGV("opening input for device %s profile %p name %s",
-          mDevice->toString().c_str(), mProfile.get(), mProfile->getName().string());
+          mDevice->toString().c_str(), mProfile.get(), mProfile->getName().c_str());
 
     audio_devices_t deviceType = mDevice->type();
 

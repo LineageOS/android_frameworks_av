@@ -10,6 +10,7 @@ cc_library_shared {
 
     srcs: [
         "AudioGain.cpp",
+        "AudioPortBase.cpp",
         "AudioProfile.cpp",
     ],
 

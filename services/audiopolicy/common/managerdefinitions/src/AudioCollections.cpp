@@ -24,7 +24,7 @@
 
 namespace android {
 
-sp<AudioPort> AudioPortVector::findByTagName(const String8 &tagName) const
+sp<AudioPort> AudioPortVector::findByTagName(const std::string &tagName) const
 {
     for (const auto& port : *this) {
         if (port->getTagName() == tagName) {

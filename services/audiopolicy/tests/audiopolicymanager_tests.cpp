@@ -317,12 +317,11 @@ void AudioPolicyManagerTestMsd::SetUpConfig(AudioPolicyConfig *config) {
     mMsdOutputDevice->attach(msdModule);
     mMsdInputDevice->attach(msdModule);
 
-    sp<OutputProfile> msdOutputProfile = new OutputProfile(String8("msd input"));
+    sp<OutputProfile> msdOutputProfile = new OutputProfile("msd input");
     msdOutputProfile->addAudioProfile(pcmOutputProfile);
     msdOutputProfile->addSupportedDevice(mMsdOutputDevice);
     msdModule->addOutputProfile(msdOutputProfile);
-    sp<OutputProfile> msdCompressedOutputProfile =
-            new OutputProfile(String8("msd compressed input"));
+    sp<OutputProfile> msdCompressedOutputProfile = new OutputProfile("msd compressed input");
     msdCompressedOutputProfile->addAudioProfile(ac3OutputProfile);
     msdCompressedOutputProfile->setFlags(
             AUDIO_OUTPUT_FLAG_DIRECT | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD |
@@ -330,7 +329,7 @@ void AudioPolicyManagerTestMsd::SetUpConfig(AudioPolicyConfig *config) {
     msdCompressedOutputProfile->addSupportedDevice(mMsdOutputDevice);
     msdModule->addOutputProfile(msdCompressedOutputProfile);
 
-    sp<InputProfile> msdInputProfile = new InputProfile(String8("msd output"));
+    sp<InputProfile> msdInputProfile = new InputProfile("msd output");
     msdInputProfile->addAudioProfile(pcmInputProfile);
     msdInputProfile->addSupportedDevice(mMsdInputDevice);
     msdModule->addInputProfile(msdInputProfile);
@@ -340,7 +339,7 @@ void AudioPolicyManagerTestMsd::SetUpConfig(AudioPolicyConfig *config) {
     sp<AudioProfile> dtsOutputProfile = new AudioProfile(
             AUDIO_FORMAT_DTS, AUDIO_CHANNEL_OUT_5POINT1, 48000);
     config->getDefaultOutputDevice()->addAudioProfile(dtsOutputProfile);
-    sp<OutputProfile> primaryEncodedOutputProfile = new OutputProfile(String8("encoded"));
+    sp<OutputProfile> primaryEncodedOutputProfile = new OutputProfile("encoded");
     primaryEncodedOutputProfile->addAudioProfile(dtsOutputProfile);
     primaryEncodedOutputProfile->setFlags(AUDIO_OUTPUT_FLAG_DIRECT);
     primaryEncodedOutputProfile->addSupportedDevice(config->getDefaultOutputDevice());

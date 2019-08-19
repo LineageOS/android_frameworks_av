@@ -342,7 +342,7 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
             // compressed format as they would likely not be mixed and dropped.
             for (size_t i = 0; i < outputs.size(); i++) {
                 sp<AudioOutputDescriptor> desc = outputs.valueAt(i);
-                if (desc->isActive() && !audio_is_linear_pcm(desc->mFormat)) {
+                if (desc->isActive() && !audio_is_linear_pcm(desc->getFormat())) {
                     availableOutputDevices.remove(desc->devices().getDevicesFromTypeMask(
                             AUDIO_DEVICE_OUT_HDMI | AUDIO_DEVICE_OUT_SPDIF
                             | AUDIO_DEVICE_OUT_HDMI_ARC));
