@@ -26,11 +26,11 @@ namespace android
 void AudioRoute::dump(String8 *dst, int spaces) const
 {
     dst->appendFormat("%*s- Type: %s\n", spaces, "", mType == AUDIO_ROUTE_MUX ? "Mux" : "Mix");
-    dst->appendFormat("%*s- Sink: %s\n", spaces, "", mSink->getTagName().string());
+    dst->appendFormat("%*s- Sink: %s\n", spaces, "", mSink->getTagName().c_str());
     if (mSources.size() != 0) {
         dst->appendFormat("%*s- Sources: \n", spaces, "");
         for (size_t i = 0; i < mSources.size(); i++) {
-            dst->appendFormat("%*s%s \n", spaces + 4, "", mSources[i]->getTagName().string());
+            dst->appendFormat("%*s%s \n", spaces + 4, "", mSources[i]->getTagName().c_str());
         }
     }
     dst->append("\n");
@@ -41,10 +41,10 @@ bool AudioRoute::supportsPatch(const sp<AudioPort> &srcPort, const sp<AudioPort>
     if (mSink == 0 || dstPort == 0 || dstPort != mSink) {
         return false;
     }
-    ALOGV("%s: sinks %s matching", __FUNCTION__, mSink->getTagName().string());
+    ALOGV("%s: sinks %s matching", __FUNCTION__, mSink->getTagName().c_str());
     for (const auto &sourcePort : mSources) {
         if (sourcePort == srcPort) {
-            ALOGV("%s: sources %s matching", __FUNCTION__, sourcePort->getTagName().string());
+            ALOGV("%s: sources %s matching", __FUNCTION__, sourcePort->getTagName().c_str());
             return true;
         }
     }

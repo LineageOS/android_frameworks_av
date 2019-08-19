@@ -133,14 +133,14 @@ public:
         mDefaultOutputDevice->attach(module);
         defaultInputDevice->attach(module);
 
-        sp<OutputProfile> outProfile = new OutputProfile(String8("primary"));
+        sp<OutputProfile> outProfile = new OutputProfile("primary");
         outProfile->addAudioProfile(
                 new AudioProfile(AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, 44100));
         outProfile->addSupportedDevice(mDefaultOutputDevice);
         outProfile->setFlags(AUDIO_OUTPUT_FLAG_PRIMARY);
         module->addOutputProfile(outProfile);
 
-        sp<InputProfile> inProfile = new InputProfile(String8("primary"));
+        sp<InputProfile> inProfile = new InputProfile("primary");
         inProfile->addAudioProfile(micProfile);
         inProfile->addSupportedDevice(defaultInputDevice);
         module->addInputProfile(inProfile);

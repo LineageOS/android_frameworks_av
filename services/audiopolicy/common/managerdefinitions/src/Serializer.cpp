@@ -430,7 +430,7 @@ Return<MixPortTraits::Element> MixPortTraits::deserialize(const xmlNode *child,
     audio_port_role_t portRole = (role == Attributes::roleSource) ?
             AUDIO_PORT_ROLE_SOURCE : AUDIO_PORT_ROLE_SINK;
 
-    Element mixPort = new IOProfile(String8(name.c_str()), portRole);
+    Element mixPort = new IOProfile(name, portRole);
 
     AudioProfileTraits::Collection profiles;
     status_t status = deserializeCollection<AudioProfileTraits>(child, &profiles, NULL);
@@ -508,7 +508,7 @@ Return<DevicePortTraits::Element> DevicePortTraits::deserialize(const xmlNode *c
     if (!encodedFormatsLiteral.empty()) {
         encodedFormats = formatsFromString(encodedFormatsLiteral, " ");
     }
-    Element deviceDesc = new DeviceDescriptor(type, encodedFormats, String8(name.c_str()));
+    Element deviceDesc = new DeviceDescriptor(type, encodedFormats, name);
 
     std::string address = getXmlAttribute(cur, Attributes::address);
     if (!address.empty()) {
@@ -532,7 +532,7 @@ Return<DevicePortTraits::Element> DevicePortTraits::deserialize(const xmlNode *c
         return Status::fromStatusT(status);
     }
     ALOGV("%s: adding device tag %s type %08x address %s", __func__,
-          deviceDesc->getName().string(), type, deviceDesc->address().string());
+          deviceDesc->getName().c_str(), type, deviceDesc->address().string());
     return deviceDesc;
 }
 
@@ -555,7 +555,7 @@ Return<RouteTraits::Element> RouteTraits::deserialize(const xmlNode *cur, PtrSer
         return Status::fromStatusT(BAD_VALUE);
     }
     // Convert Sink name to port pointer
-    sp<AudioPort> sink = ctx->findPortByTagName(String8(sinkAttr.c_str()));
+    sp<AudioPort> sink = ctx->findPortByTagName(sinkAttr);
     if (sink == NULL) {
         ALOGE("%s: no sink found with name=%s", __func__, sinkAttr.c_str());
         return Status::fromStatusT(BAD_VALUE);
@@ -574,7 +574,7 @@ Return<RouteTraits::Element> RouteTraits::deserialize(const xmlNode *cur, PtrSer
     char *devTag = strtok(sourcesLiteral.get(), ",");
     while (devTag != NULL) {
         if (strlen(devTag) != 0) {
-            sp<AudioPort> source = ctx->findPortByTagName(String8(devTag));
+            sp<AudioPort> source = ctx->findPortByTagName(devTag);
             if (source == NULL) {
                 ALOGE("%s: no source found with name=%s", __func__, devTag);
                 return Status::fromStatusT(BAD_VALUE);
@@ -648,7 +648,7 @@ Return<ModuleTraits::Element> ModuleTraits::deserialize(const xmlNode *cur, PtrS
                         ALOGV("%s: %s %s=%s", __func__, tag, childAttachedDeviceTag,
                                 reinterpret_cast<const char*>(attachedDevice.get()));
                         sp<DeviceDescriptor> device = module->getDeclaredDevices().
-                                getDeviceFromTagName(String8(reinterpret_cast<const char*>(
+                                getDeviceFromTagName(std::string(reinterpret_cast<const char*>(
                                                         attachedDevice.get())));
                         ctx->addAvailableDevice(device);
                     }
@@ -663,7 +663,7 @@ Return<ModuleTraits::Element> ModuleTraits::deserialize(const xmlNode *cur, PtrS
                 ALOGV("%s: %s %s=%s", __func__, tag, childDefaultOutputDeviceTag,
                         reinterpret_cast<const char*>(defaultOutputDevice.get()));
                 sp<DeviceDescriptor> device = module->getDeclaredDevices().getDeviceFromTagName(
-                        String8(reinterpret_cast<const char*>(defaultOutputDevice.get())));
+                        std::string(reinterpret_cast<const char*>(defaultOutputDevice.get())));
                 if (device != 0 && ctx->getDefaultOutputDevice() == 0) {
                     ctx->setDefaultOutputDevice(device);
                     ALOGV("%s: default is %08x",
