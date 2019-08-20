@@ -14,11 +14,20 @@
  * limitations under the License.
  */
 
+#include <cutils/multiuser.h>
+#include <private/android_filesystem_config.h>
 #include <unistd.h>
 
 #include <binder/PermissionController.h>
 
 namespace android {
+
+// Used for calls that should originate from system services.
+// We allow that some services might have separate processes to
+// handle multiple users, e.g. u10_system, u10_bluetooth, u10_radio.
+static inline bool isServiceUid(uid_t uid) {
+    return multiuser_get_app_id(uid) < AID_APP_START;
+}
 
 extern pid_t getpid_cached;
 bool isTrustedCallingUid(uid_t uid);
