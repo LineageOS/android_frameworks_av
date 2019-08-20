@@ -38,7 +38,7 @@ int main(int /* argc */, char** /* argv */) {
     configureRpcThreadpool(8, true /* callerWillJoin */);
 
     // Setup hwbinder service
-    LazyServiceRegistrar serviceRegistrar;
+    auto serviceRegistrar = LazyServiceRegistrar::getInstance();
 
     // Setup hwbinder service
     CHECK_EQ(serviceRegistrar.registerService(drmFactory, "clearkey"), android::NO_ERROR)
