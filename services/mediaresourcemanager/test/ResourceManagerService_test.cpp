@@ -58,7 +58,7 @@ struct TestClient : public BnResourceManagerClient {
 
     virtual bool reclaimResource() {
         sp<IResourceManagerClient> client(this);
-        mService->removeResource(mPid, (int64_t) client.get());
+        mService->removeClient(mPid, (int64_t) client.get());
         mReclaimed = true;
         return true;
     }
@@ -86,7 +86,10 @@ private:
 };
 
 static const int kTestPid1 = 30;
+static const int kTestUid1 = 1010;
+
 static const int kTestPid2 = 20;
+static const int kTestUid2 = 1011;
 
 static const int kLowPriorityPid = 40;
 static const int kMidPriorityPid = 25;
@@ -103,20 +106,21 @@ public:
 
 protected:
     static bool isEqualResources(const Vector<MediaResource> &resources1,
-            const Vector<MediaResource> &resources2) {
-        if (resources1.size() != resources2.size()) {
-            return false;
-        }
+            const ResourceList &resources2) {
+        // convert resource1 to ResourceList
+        ResourceList r1;
         for (size_t i = 0; i < resources1.size(); ++i) {
-            if (resources1[i] != resources2[i]) {
-                return false;
-            }
+            const auto resType = std::make_pair(resources1[i].mType, resources1[i].mSubType);
+            r1[resType] = resources1[i];
         }
-        return true;
+        return r1 == resources2;
     }
 
-    static void expectEqResourceInfo(const ResourceInfo &info, sp<IResourceManagerClient> client,
+    static void expectEqResourceInfo(const ResourceInfo &info,
+            int uid,
+            sp<IResourceManagerClient> client,
             const Vector<MediaResource> &resources) {
+        EXPECT_EQ(uid, info.uid);
         EXPECT_EQ(client, info.client);
         EXPECT_TRUE(isEqualResources(resources, info.resources));
     }
@@ -153,24 +157,24 @@ protected:
         // kTestPid1 mTestClient1
         Vector<MediaResource> resources1;
         resources1.push_back(MediaResource(MediaResource::kSecureCodec, 1));
-        mService->addResource(kTestPid1, getId(mTestClient1), mTestClient1, resources1);
+        mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
         resources1.push_back(MediaResource(MediaResource::kGraphicMemory, 200));
         Vector<MediaResource> resources11;
         resources11.push_back(MediaResource(MediaResource::kGraphicMemory, 200));
-        mService->addResource(kTestPid1, getId(mTestClient1), mTestClient1, resources11);
+        mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources11);
 
         // kTestPid2 mTestClient2
         Vector<MediaResource> resources2;
         resources2.push_back(MediaResource(MediaResource::kNonSecureCodec, 1));
         resources2.push_back(MediaResource(MediaResource::kGraphicMemory, 300));
-        mService->addResource(kTestPid2, getId(mTestClient2), mTestClient2, resources2);
+        mService->addResource(kTestPid2, kTestUid2, getId(mTestClient2), mTestClient2, resources2);
 
         // kTestPid2 mTestClient3
         Vector<MediaResource> resources3;
-        mService->addResource(kTestPid2, getId(mTestClient3), mTestClient3, resources3);
+        mService->addResource(kTestPid2, kTestUid2, getId(mTestClient3), mTestClient3, resources3);
         resources3.push_back(MediaResource(MediaResource::kSecureCodec, 1));
         resources3.push_back(MediaResource(MediaResource::kGraphicMemory, 100));
-        mService->addResource(kTestPid2, getId(mTestClient3), mTestClient3, resources3);
+        mService->addResource(kTestPid2, kTestUid2, getId(mTestClient3), mTestClient3, resources3);
 
         const PidResourceInfosMap &map = mService->mMap;
         EXPECT_EQ(2u, map.size());
@@ -178,14 +182,14 @@ protected:
         ASSERT_GE(index1, 0);
         const ResourceInfos &infos1 = map[index1];
         EXPECT_EQ(1u, infos1.size());
-        expectEqResourceInfo(infos1[0], mTestClient1, resources1);
+        expectEqResourceInfo(infos1.valueFor(getId(mTestClient1)), kTestUid1, mTestClient1, resources1);
 
         ssize_t index2 = map.indexOfKey(kTestPid2);
         ASSERT_GE(index2, 0);
         const ResourceInfos &infos2 = map[index2];
         EXPECT_EQ(2u, infos2.size());
-        expectEqResourceInfo(infos2[0], mTestClient2, resources2);
-        expectEqResourceInfo(infos2[1], mTestClient3, resources3);
+        expectEqResourceInfo(infos2.valueFor(getId(mTestClient2)), kTestUid2, mTestClient2, resources2);
+        expectEqResourceInfo(infos2.valueFor(getId(mTestClient3)), kTestUid2, mTestClient3, resources3);
     }
 
     void testConfig() {
@@ -219,10 +223,84 @@ protected:
         EXPECT_TRUE(mService->mSupportsSecureWithNonSecureCodec);
     }
 
+    void testCombineResource() {
+        // kTestPid1 mTestClient1
+        Vector<MediaResource> resources1;
+        resources1.push_back(MediaResource(MediaResource::kSecureCodec, 1));
+        mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
+
+        Vector<MediaResource> resources11;
+        resources11.push_back(MediaResource(MediaResource::kGraphicMemory, 200));
+        mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources11);
+
+        const PidResourceInfosMap &map = mService->mMap;
+        EXPECT_EQ(1u, map.size());
+        ssize_t index1 = map.indexOfKey(kTestPid1);
+        ASSERT_GE(index1, 0);
+        const ResourceInfos &infos1 = map[index1];
+        EXPECT_EQ(1u, infos1.size());
+
+        // test adding existing types to combine values
+        resources1.push_back(MediaResource(MediaResource::kGraphicMemory, 100));
+        mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
+
+        Vector<MediaResource> expected;
+        expected.push_back(MediaResource(MediaResource::kSecureCodec, 2));
+        expected.push_back(MediaResource(MediaResource::kGraphicMemory, 300));
+        expectEqResourceInfo(infos1.valueFor(getId(mTestClient1)), kTestUid1, mTestClient1, expected);
+
+        // test adding new types (including types that differs only in subType)
+        resources11.push_back(MediaResource(MediaResource::kNonSecureCodec, 1));
+        resources11.push_back(MediaResource(MediaResource::kSecureCodec, MediaResource::kVideoCodec, 1));
+        mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources11);
+
+        expected.clear();
+        expected.push_back(MediaResource(MediaResource::kSecureCodec, 2));
+        expected.push_back(MediaResource(MediaResource::kNonSecureCodec, 1));
+        expected.push_back(MediaResource(MediaResource::kSecureCodec, MediaResource::kVideoCodec, 1));
+        expected.push_back(MediaResource(MediaResource::kGraphicMemory, 500));
+        expectEqResourceInfo(infos1.valueFor(getId(mTestClient1)), kTestUid1, mTestClient1, expected);
+    }
+
     void testRemoveResource() {
+        // kTestPid1 mTestClient1
+        Vector<MediaResource> resources1;
+        resources1.push_back(MediaResource(MediaResource::kSecureCodec, 1));
+        mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
+
+        Vector<MediaResource> resources11;
+        resources11.push_back(MediaResource(MediaResource::kGraphicMemory, 200));
+        mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources11);
+
+        const PidResourceInfosMap &map = mService->mMap;
+        EXPECT_EQ(1u, map.size());
+        ssize_t index1 = map.indexOfKey(kTestPid1);
+        ASSERT_GE(index1, 0);
+        const ResourceInfos &infos1 = map[index1];
+        EXPECT_EQ(1u, infos1.size());
+
+        // test partial removal
+        resources11.editItemAt(0).mValue = 100;
+        mService->removeResource(kTestPid1, getId(mTestClient1), resources11);
+
+        Vector<MediaResource> expected;
+        expected.push_back(MediaResource(MediaResource::kSecureCodec, 1));
+        expected.push_back(MediaResource(MediaResource::kGraphicMemory, 100));
+        expectEqResourceInfo(infos1.valueFor(getId(mTestClient1)), kTestUid1, mTestClient1, expected);
+
+        // test complete removal with overshoot value
+        resources11.editItemAt(0).mValue = 1000;
+        mService->removeResource(kTestPid1, getId(mTestClient1), resources11);
+
+        expected.clear();
+        expected.push_back(MediaResource(MediaResource::kSecureCodec, 1));
+        expectEqResourceInfo(infos1.valueFor(getId(mTestClient1)), kTestUid1, mTestClient1, expected);
+    }
+
+    void testRemoveClient() {
         addResource();
 
-        mService->removeResource(kTestPid2, getId(mTestClient2));
+        mService->removeClient(kTestPid2, getId(mTestClient2));
 
         const PidResourceInfosMap &map = mService->mMap;
         EXPECT_EQ(2u, map.size());
@@ -231,6 +309,7 @@ protected:
         EXPECT_EQ(1u, infos1.size());
         EXPECT_EQ(1u, infos2.size());
         // mTestClient2 has been removed.
+        // (OK to use infos2[0] as there is only 1 entry)
         EXPECT_EQ(mTestClient3, infos2[0].client);
     }
 
@@ -246,6 +325,7 @@ protected:
         EXPECT_TRUE(mService->getAllClients_l(kHighPriorityPid, type, &clients));
 
         EXPECT_EQ(2u, clients.size());
+        // (OK to require ordering in clients[], as the pid map is sorted)
         EXPECT_EQ(mTestClient3, clients[0]);
         EXPECT_EQ(mTestClient1, clients[1]);
     }
@@ -438,7 +518,7 @@ protected:
             verifyClients(true /* c1 */, false /* c2 */, false /* c3 */);
 
             // clean up client 3 which still left
-            mService->removeResource(kTestPid2, getId(mTestClient3));
+            mService->removeClient(kTestPid2, getId(mTestClient3));
         }
     }
 
@@ -512,8 +592,16 @@ TEST_F(ResourceManagerServiceTest, addResource) {
     addResource();
 }
 
+TEST_F(ResourceManagerServiceTest, combineResource) {
+    testCombineResource();
+}
+
 TEST_F(ResourceManagerServiceTest, removeResource) {
     testRemoveResource();
+}
+
+TEST_F(ResourceManagerServiceTest, removeClient) {
+    testRemoveClient();
 }
 
 TEST_F(ResourceManagerServiceTest, reclaimResource) {

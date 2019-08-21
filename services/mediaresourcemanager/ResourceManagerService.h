@@ -33,15 +33,17 @@ namespace android {
 class ServiceLog;
 struct ProcessInfoInterface;
 
+typedef std::map<std::pair<MediaResource::Type, MediaResource::SubType>, MediaResource> ResourceList;
 struct ResourceInfo {
     int64_t clientId;
+    uid_t uid;
     sp<IResourceManagerClient> client;
     sp<IBinder::DeathRecipient> deathNotifier;
-    Vector<MediaResource> resources;
-    bool cpuBoost;
+    ResourceList resources;
 };
 
-typedef Vector<ResourceInfo> ResourceInfos;
+// TODO: convert these to std::map
+typedef KeyedVector<int64_t, ResourceInfo> ResourceInfos;
 typedef KeyedVector<int, ResourceInfos> PidResourceInfosMap;
 
 class ResourceManagerService
@@ -61,11 +63,15 @@ public:
 
     virtual void addResource(
             int pid,
+            int uid,
             int64_t clientId,
             const sp<IResourceManagerClient> client,
             const Vector<MediaResource> &resources);
 
-    virtual void removeResource(int pid, int64_t clientId);
+    virtual void removeResource(int pid, int64_t clientId,
+            const Vector<MediaResource> &resources);
+
+    virtual void removeClient(int pid, int64_t clientId);
 
     // Tries to reclaim resource from processes with lower priority than the calling process
     // according to the requested resources.
@@ -106,6 +112,9 @@ private:
     // to the given Vector.
     void getClientForResource_l(
         int callingPid, const MediaResource *res, Vector<sp<IResourceManagerClient>> *clients);
+
+    void onFirstAdded(const MediaResource& res, const ResourceInfo& clientInfo);
+    void onLastRemoved(const MediaResource& res, const ResourceInfo& clientInfo);
 
     mutable Mutex mLock;
     sp<ProcessInfoInterface> mProcessInfo;
