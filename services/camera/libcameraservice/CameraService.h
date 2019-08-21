@@ -633,9 +633,20 @@ private:
         sp<BasicClient>* client,
         std::shared_ptr<resource_policy::ClientDescriptor<String8, sp<BasicClient>>>* partial);
 
-    // Should an operation attempt on a cameraId be rejected, if the camera id is
-    // advertised as a publically hidden secure camera, by the camera HAL ?
-    bool shouldRejectHiddenCameraConnection(const String8 & cameraId);
+    // Should an operation attempt on a cameraId be rejected ? (this can happen
+    // under various conditions. For example if a camera device is advertised as
+    // system only or hidden secure camera, amongst possible others.
+    bool shouldRejectSystemCameraConnection(const String8 & cameraId) const;
+
+    // Should a device status update be skipped for a particular camera device ? (this can happen
+    // under various conditions. For example if a camera device is advertised as
+    // system only or hidden secure camera, amongst possible others.
+    bool shouldSkipStatusUpdates(const String8& cameraId, bool isVendorListener, int clientPid,
+            int clientUid) const;
+
+    inline SystemCameraKind getSystemCameraKind(const String8& cameraId) const {
+        return mCameraProviderManager->getSystemCameraKind(cameraId.c_str());
+    }
 
     // Single implementation shared between the various connect calls
     template<class CALLBACK, class CLIENT>
@@ -810,7 +821,9 @@ private:
     class ServiceListener : public virtual IBinder::DeathRecipient {
         public:
             ServiceListener(sp<CameraService> parent, sp<hardware::ICameraServiceListener> listener,
-                    int uid) : mParent(parent), mListener(listener), mListenerUid(uid) {}
+                    int uid, int pid, bool isVendorClient)
+                    : mParent(parent), mListener(listener), mListenerUid(uid), mListenerPid(pid),
+                      mIsVendorListener(isVendorClient) { }
 
             status_t initialize() {
                 return IInterface::asBinder(mListener)->linkToDeath(this);
@@ -824,16 +837,20 @@ private:
             }
 
             int getListenerUid() { return mListenerUid; }
+            int getListenerPid() { return mListenerPid; }
             sp<hardware::ICameraServiceListener> getListener() { return mListener; }
+            bool isVendorListener() { return mIsVendorListener; }
 
         private:
             wp<CameraService> mParent;
             sp<hardware::ICameraServiceListener> mListener;
-            int mListenerUid;
+            int mListenerUid = -1;
+            int mListenerPid = -1;
+            bool mIsVendorListener = false;
     };
 
     // Guarded by mStatusListenerMutex
-    std::vector<std::pair<bool, sp<ServiceListener>>> mListenerList;
+    std::vector<sp<ServiceListener>> mListenerList;
 
     Mutex       mStatusListenerLock;
 

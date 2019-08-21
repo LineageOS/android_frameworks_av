@@ -534,15 +534,23 @@ void CameraProviderManager::ProviderInfo::DeviceInfo3::queryPhysicalCameraIds() 
     }
 }
 
-bool CameraProviderManager::ProviderInfo::DeviceInfo3::isPublicallyHiddenSecureCamera() {
+SystemCameraKind CameraProviderManager::ProviderInfo::DeviceInfo3::getSystemCameraKind() {
     camera_metadata_entry_t entryCap;
     entryCap = mCameraCharacteristics.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
-    if (entryCap.count != 1) {
-        // Do NOT hide this camera device if the capabilities specify anything more
-        // than ANDROID_REQUEST_AVAILABLE_CAPABILITIES_SECURE_IMAGE_DATA.
-        return false;
+    if (entryCap.count == 1 &&
+            entryCap.data.u8[0] == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_SECURE_IMAGE_DATA) {
+        return SystemCameraKind::HIDDEN_SECURE_CAMERA;
     }
-    return entryCap.data.u8[0] == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_SECURE_IMAGE_DATA;
+
+    // Go through the capabilities and check if it has
+    // ANDROID_REQUEST_AVAILABLE_CAPABILITIES_SYSTEM_CAMERA
+    for (size_t i = 0; i < entryCap.count; ++i) {
+        uint8_t capability = entryCap.data.u8[i];
+        if (capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_SYSTEM_CAMERA) {
+            return SystemCameraKind::SYSTEM_ONLY_CAMERA;
+        }
+    }
+    return SystemCameraKind::PUBLIC;
 }
 
 void CameraProviderManager::ProviderInfo::DeviceInfo3::getSupportedSizes(
@@ -1046,14 +1054,14 @@ bool CameraProviderManager::isLogicalCamera(const std::string& id,
     return deviceInfo->mIsLogicalCamera;
 }
 
-bool CameraProviderManager::isPublicallyHiddenSecureCamera(const std::string& id) {
+SystemCameraKind CameraProviderManager::getSystemCameraKind(const std::string& id) {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
 
     auto deviceInfo = findDeviceInfoLocked(id);
     if (deviceInfo == nullptr) {
-        return false;
+        return SystemCameraKind::PUBLIC;
     }
-    return deviceInfo->mIsPublicallyHiddenSecureCamera;
+    return deviceInfo->mSystemCameraKind;
 }
 
 bool CameraProviderManager::isHiddenPhysicalCamera(const std::string& cameraId) {
@@ -1937,7 +1945,7 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
         return;
     }
 
-    mIsPublicallyHiddenSecureCamera = isPublicallyHiddenSecureCamera();
+    mSystemCameraKind = getSystemCameraKind();
 
     status_t res = fixupMonochromeTags();
     if (OK != res) {
