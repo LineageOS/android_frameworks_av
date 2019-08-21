@@ -417,6 +417,7 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
     int64_t endWhenNsec = startWhenNsec + seconds_to_nanoseconds(gTimeLimitSec);
     DisplayInfo mainDpyInfo;
     Vector<int64_t> timestamps;
+    bool firstFrame = true;
 
     assert((rawFp == NULL && muxer != NULL) || (rawFp != NULL && muxer == NULL));
 
@@ -432,6 +433,11 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
         size_t bufIndex, offset, size;
         int64_t ptsUsec;
         uint32_t flags;
+
+        if (firstFrame) {
+            ATRACE_NAME("first_frame");
+            firstFrame = false;
+        }
 
         if (systemTime(CLOCK_MONOTONIC) > endWhenNsec) {
             if (gVerbose) {
