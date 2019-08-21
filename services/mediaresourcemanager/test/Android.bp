@@ -2,6 +2,7 @@
 cc_test {
     name: "ResourceManagerService_test",
     srcs: ["ResourceManagerService_test.cpp"],
+    test_suites: ["device-tests"],
     shared_libs: [
         "libbinder",
         "liblog",
@@ -23,6 +24,7 @@ cc_test {
 cc_test {
     name: "ServiceLog_test",
     srcs: ["ServiceLog_test.cpp"],
+    test_suites: ["device-tests"],
     shared_libs: [
         "liblog",
         "libmedia",
