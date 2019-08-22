@@ -70,7 +70,7 @@ Camera3Stream::Camera3Stream(int id,
     mFormatOverridden(false),
     mOriginalFormat(format),
     mDataSpaceOverridden(false),
-    mOriginalDataSpace(HAL_DATASPACE_UNKNOWN),
+    mOriginalDataSpace(dataSpace),
     mPhysicalCameraId(physicalCameraId),
     mLastTimestamp(0) {
 
@@ -137,9 +137,6 @@ int Camera3Stream::getOriginalFormat() const {
 
 void Camera3Stream::setDataSpaceOverride(bool dataSpaceOverridden) {
     mDataSpaceOverridden = dataSpaceOverridden;
-    if (dataSpaceOverridden && mOriginalDataSpace == HAL_DATASPACE_UNKNOWN) {
-        mOriginalDataSpace = camera3_stream::data_space;
-    }
 }
 
 bool Camera3Stream::isDataSpaceOverridden() const {
