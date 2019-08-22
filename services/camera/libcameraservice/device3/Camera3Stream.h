@@ -588,7 +588,7 @@ class Camera3Stream :
 
     //Keep track of original dataSpace in case it gets overridden
     bool mDataSpaceOverridden;
-    android_dataspace mOriginalDataSpace;
+    const android_dataspace mOriginalDataSpace;
 
     String8 mPhysicalCameraId;
     nsecs_t mLastTimestamp;
