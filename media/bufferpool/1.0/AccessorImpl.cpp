@@ -151,6 +151,7 @@ ResultStatus Accessor::Impl::connect(
                 newConnection->initialize(accessor, id);
                 *connection = newConnection;
                 *pConnectionId = id;
+                mBufferPool.mConnectionIds.insert(id);
                 ++sSeqId;
             }
         }
@@ -305,7 +306,12 @@ bool Accessor::Impl::BufferPool::handleTransferTo(const BufferStatusMessage &mes
         found->second->mSenderValidated = true;
         return true;
     }
-    // TODO: verify there is target connection Id
+    if (mConnectionIds.find(message.targetConnectionId) == mConnectionIds.end()) {
+        // N.B: it could be fake or receive connection already closed.
+        ALOGD("bufferpool %p receiver connection %lld is no longer valid",
+              this, (long long)message.targetConnectionId);
+        return false;
+    }
     mStats.onBufferSent();
     mTransactions.insert(std::make_pair(
             message.transactionId,
@@ -450,6 +456,7 @@ bool Accessor::Impl::BufferPool::handleClose(ConnectionId connectionId) {
             }
         }
     }
+    mConnectionIds.erase(connectionId);
     return true;
 }
 
