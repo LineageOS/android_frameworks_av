@@ -48,6 +48,7 @@
 #include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/ACodec.h>
+#include <media/stagefright/BatteryChecker.h>
 #include <media/stagefright/BufferProducerWrapper.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecList.h>
@@ -116,7 +117,6 @@ static bool isResourceError(status_t err) {
 static const int kMaxRetry = 2;
 static const int kMaxReclaimWaitTimeInUs = 500000;  // 0.5s
 static const int kNumBuffersAlign = 16;
-static const int kBatteryStatsTimeoutUs = 3000000ll; // 3 seconds
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -539,10 +539,7 @@ MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
       mHaveInputSurface(false),
       mHavePendingInputBuffers(false),
       mCpuBoostRequested(false),
-      mLatencyUnknown(0),
-      mLastActivityTimeUs(-1ll),
-      mBatteryStatNotified(false),
-      mBatteryCheckerGeneration(0) {
+      mLatencyUnknown(0) {
     if (uid == kNoUid) {
         mUid = IPCThreadState::self()->getCallingUid();
     } else {
@@ -755,7 +752,11 @@ void MediaCodec::statsBufferSent(int64_t presentationUs) {
         return;
     }
 
-    scheduleBatteryCheckerIfNeeded();
+    if (mBatteryChecker != nullptr) {
+        mBatteryChecker->onCodecActivity([this] () {
+            addResource(MediaResource::kBattery, MediaResource::kVideoCodec, 1);
+        });
+    }
 
     const int64_t nowNs = systemTime(SYSTEM_TIME_MONOTONIC);
     BufferFlightTiming_t startdata = { presentationUs, nowNs };
@@ -791,7 +792,11 @@ void MediaCodec::statsBufferReceived(int64_t presentationUs) {
         return;
     }
 
-    scheduleBatteryCheckerIfNeeded();
+    if (mBatteryChecker != nullptr) {
+        mBatteryChecker->onCodecActivity([this] () {
+            addResource(MediaResource::kBattery, MediaResource::kVideoCodec, 1);
+        });
+    }
 
     BufferFlightTiming_t startdata;
     bool valid = false;
@@ -979,6 +984,10 @@ status_t MediaCodec::init(const AString &name) {
     if (mAnalyticsItem != NULL) {
         mAnalyticsItem->setCString(kCodecCodec, name.c_str());
         mAnalyticsItem->setCString(kCodecMode, mIsVideo ? kCodecModeVideo : kCodecModeAudio);
+    }
+
+    if (mIsVideo) {
+        mBatteryChecker = new BatteryChecker(new AMessage(kWhatCheckBatteryStats, this));
     }
 
     status_t err;
@@ -1706,19 +1715,27 @@ void MediaCodec::requestCpuBoostIfNeeded() {
     }
 }
 
-void MediaCodec::scheduleBatteryCheckerIfNeeded() {
-    if (!mIsVideo || !isExecuting()) {
+BatteryChecker::BatteryChecker(const sp<AMessage> &msg, int64_t timeoutUs)
+    : mTimeoutUs(timeoutUs)
+    , mLastActivityTimeUs(-1ll)
+    , mBatteryStatNotified(false)
+    , mBatteryCheckerGeneration(0)
+    , mIsExecuting(false)
+    , mBatteryCheckerMsg(msg) {}
+
+void BatteryChecker::onCodecActivity(std::function<void()> batteryOnCb) {
+    if (!isExecuting()) {
         // ignore if not executing
         return;
     }
     if (!mBatteryStatNotified) {
-        addResource(MediaResource::kBattery, MediaResource::kVideoCodec, 1);
+        batteryOnCb();
         mBatteryStatNotified = true;
-        sp<AMessage> msg = new AMessage(kWhatCheckBatteryStats, this);
+        sp<AMessage> msg = mBatteryCheckerMsg->dup();
         msg->setInt32("generation", mBatteryCheckerGeneration);
 
         // post checker and clear last activity time
-        msg->post(kBatteryStatsTimeoutUs);
+        msg->post(mTimeoutUs);
         mLastActivityTimeUs = -1ll;
     } else {
         // update last activity time
@@ -1726,7 +1743,8 @@ void MediaCodec::scheduleBatteryCheckerIfNeeded() {
     }
 }
 
-void MediaCodec::onBatteryChecker(const sp<AMessage> &msg) {
+void BatteryChecker::onCheckBatteryTimer(
+        const sp<AMessage> &msg, std::function<void()> batteryOffCb) {
     // ignore if this checker already expired because the client resource was removed
     int32_t generation;
     if (!msg->findInt32("generation", &generation)
@@ -1736,13 +1754,18 @@ void MediaCodec::onBatteryChecker(const sp<AMessage> &msg) {
 
     if (mLastActivityTimeUs < 0ll) {
         // timed out inactive, do not repost checker
-        removeResource(MediaResource::kBattery, MediaResource::kVideoCodec, 1);
+        batteryOffCb();
         mBatteryStatNotified = false;
     } else {
         // repost checker and clear last activity time
-        msg->post(kBatteryStatsTimeoutUs + mLastActivityTimeUs - ALooper::GetNowUs());
+        msg->post(mTimeoutUs + mLastActivityTimeUs - ALooper::GetNowUs());
         mLastActivityTimeUs = -1ll;
     }
+}
+
+void BatteryChecker::onClientRemoved() {
+    mBatteryStatNotified = false;
+    mBatteryCheckerGeneration++;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2382,8 +2405,10 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     mFlags &= ~kFlagIsComponentAllocated;
 
                     // off since we're removing all resources including the battery on
-                    mBatteryStatNotified = false;
-                    mBatteryCheckerGeneration++;
+                    if (mBatteryChecker != nullptr) {
+                        mBatteryChecker->onClientRemoved();
+                    }
+
                     mResourceManagerService->removeClient(getId(mResourceManagerClient));
 
                     (new AMessage)->postReply(mReplyID);
@@ -3097,7 +3122,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
         case kWhatCheckBatteryStats:
         {
-            onBatteryChecker(msg);
+            if (mBatteryChecker != nullptr) {
+                mBatteryChecker->onCheckBatteryTimer(msg, [this] () {
+                    removeResource(MediaResource::kBattery, MediaResource::kVideoCodec, 1);
+                });
+            }
             break;
         }
 
@@ -3196,6 +3225,10 @@ void MediaCodec::setState(State newState) {
     }
 
     mState = newState;
+
+    if (mBatteryChecker != nullptr) {
+        mBatteryChecker->setExecuting(isExecuting());
+    }
 
     cancelPendingDequeueOperations();
 }
