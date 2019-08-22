@@ -3679,7 +3679,7 @@ void Camera3Device::processCaptureResult(const camera3_capture_result *result) {
         // Did we get the (final) result metadata for this capture?
         if (result->result != NULL && !isPartialResult) {
             if (request.physicalCameraIds.size() != result->num_physcam_metadata) {
-                SET_ERR("Requested physical Camera Ids %d not equal to number of metadata %d",
+                SET_ERR("Expected physical Camera metadata count %d not equal to actual count %d",
                         request.physicalCameraIds.size(), result->num_physcam_metadata);
                 return;
             }
@@ -3873,12 +3873,14 @@ void Camera3Device::notifyError(const camera3_error_msg_t &msg,
                             errorCode) {
                         if (physicalCameraId.size() > 0) {
                             String8 cameraId(physicalCameraId);
-                            if (r.physicalCameraIds.find(cameraId) == r.physicalCameraIds.end()) {
+                            auto iter = r.physicalCameraIds.find(cameraId);
+                            if (iter == r.physicalCameraIds.end()) {
                                 ALOGE("%s: Reported result failure for physical camera device: %s "
                                         " which is not part of the respective request!",
                                         __FUNCTION__, cameraId.string());
                                 break;
                             }
+                            r.physicalCameraIds.erase(iter);
                             resultExtras.errorPhysicalCameraId = physicalCameraId;
                         } else {
                             logicalDeviceResultError = true;
