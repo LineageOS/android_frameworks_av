@@ -117,7 +117,12 @@ static void setLogLevel(int level) {
 
 // ----------------------------------------------------------------------------
 
+static const String16 sDumpPermission("android.permission.DUMP");
 static const String16 sManageCameraPermission("android.permission.MANAGE_CAMERA");
+static const String16 sCameraPermission("android.permission.CAMERA");
+static const String16 sSystemCameraPermission("android.permission.SYSTEM_CAMERA");
+static const String16
+        sCameraSendSystemEventsPermission("android.permission.CAMERA_SEND_SYSTEM_EVENTS");
 
 // Matches with PERCEPTIBLE_APP_ADJ in ProcessList.java
 static constexpr int32_t kVendorClientScore = 200;
@@ -239,7 +244,7 @@ void CameraService::broadcastTorchModeStatus(const String8& cameraId, TorchModeS
     Mutex::Autolock lock(mStatusListenerLock);
 
     for (auto& i : mListenerList) {
-        i.second->getListener()->onTorchStatusChanged(mapToInterface(status), String16{cameraId});
+        i->getListener()->onTorchStatusChanged(mapToInterface(status), String16{cameraId});
     }
 }
 
@@ -514,6 +519,11 @@ Status CameraService::getCameraCharacteristics(const String16& cameraId,
                 "Camera subsystem is not available");;
     }
 
+    if (shouldRejectSystemCameraConnection(String8(cameraId))) {
+        return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION, "Unable to retrieve camera"
+                "characteristics for system only device %s: ", String8(cameraId).string());
+    }
+
     Status ret{};
 
     status_t res = mCameraProviderManager->getCameraCharacteristics(
@@ -527,9 +537,12 @@ Status CameraService::getCameraCharacteristics(const String16& cameraId,
     int callingPid = CameraThreadState::getCallingPid();
     int callingUid = CameraThreadState::getCallingUid();
     std::vector<int32_t> tagsRemoved;
-    // If it's not calling from cameraserver, check the permission.
+    // If it's not calling from cameraserver, check the permission only if
+    // android.permission.CAMERA is required. If android.permission.SYSTEM_CAMERA was needed,
+    // it would've already been checked in shouldRejectSystemCameraConnection.
     if ((callingPid != getpid()) &&
-            !checkPermission(String16("android.permission.CAMERA"), callingPid, callingUid)) {
+            (getSystemCameraKind(String8(cameraId)) != SystemCameraKind::SYSTEM_ONLY_CAMERA) &&
+            !checkPermission(sCameraPermission, callingPid, callingUid)) {
         res = cameraInfo->removePermissionEntries(
                 mCameraProviderManager->getProviderTagIdLocked(String8(cameraId).string()),
                 &tagsRemoved);
@@ -969,9 +982,18 @@ Status CameraService::validateClientPermissionsLocked(const String8& cameraId,
                 clientName8.string(), clientUid, clientPid);
     }
 
-    // If it's not calling from cameraserver, check the permission.
+    if (shouldRejectSystemCameraConnection(cameraId)) {
+        ALOGW("Attempting to connect to system-only camera id %s, connection rejected",
+                cameraId.c_str());
+        return STATUS_ERROR_FMT(ERROR_DISCONNECTED, "No camera device with ID \"%s\" is"
+                                "available", cameraId.string());
+    }
+    // If it's not calling from cameraserver, check the permission if the
+    // device isn't a system only camera (shouldRejectSystemCameraConnection already checks for
+    // android.permission.SYSTEM_CAMERA for system only camera devices).
     if (callingPid != getpid() &&
-            !checkPermission(String16("android.permission.CAMERA"), clientPid, clientUid)) {
+                (getSystemCameraKind(cameraId) != SystemCameraKind::SYSTEM_ONLY_CAMERA) &&
+                !checkPermission(sCameraPermission, clientPid, clientUid)) {
         ALOGE("Permission Denial: can't use the camera pid=%d, uid=%d", clientPid, clientUid);
         return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
                 "Caller \"%s\" (PID %d, UID %d) cannot open camera \"%s\" without camera permission",
@@ -1324,15 +1346,63 @@ Status CameraService::connectLegacy(
     return ret;
 }
 
-bool CameraService::shouldRejectHiddenCameraConnection(const String8 & cameraId) {
-    // If the thread serving this call is not a hwbinder thread and the caller
-    // isn't the cameraserver itself, and the camera id being requested is to be
-    // publically hidden, we should reject the connection.
-    if (!hardware::IPCThreadState::self()->isServingCall() &&
-            CameraThreadState::getCallingPid() != getpid() &&
-            mCameraProviderManager->isPublicallyHiddenSecureCamera(cameraId.c_str())) {
+static bool hasPermissionsForSystemCamera(int callingPid, int callingUid) {
+    return checkPermission(sSystemCameraPermission, callingPid, callingUid) &&
+            checkPermission(sCameraPermission, callingPid, callingUid);
+}
+
+bool CameraService::shouldSkipStatusUpdates(const String8& cameraId, bool isVendorListener,
+        int clientPid, int clientUid) const {
+    SystemCameraKind systemCameraKind = getSystemCameraKind(cameraId);
+    // If the client is not a vendor client, don't add listener if
+    //   a) the camera is a publicly hidden secure camera OR
+    //   b) the camera is a system only camera and the client doesn't
+    //      have android.permission.SYSTEM_CAMERA permissions.
+    if (!isVendorListener && (systemCameraKind == SystemCameraKind::HIDDEN_SECURE_CAMERA ||
+            (systemCameraKind == SystemCameraKind::SYSTEM_ONLY_CAMERA &&
+            !hasPermissionsForSystemCamera(clientPid, clientUid)))) {
         return true;
     }
+    return false;
+}
+
+bool CameraService::shouldRejectSystemCameraConnection(const String8& cameraId) const {
+    // Rules for rejection:
+    // 1) If cameraserver tries to access this camera device, accept the
+    //    connection.
+    // 2) The camera device is a publicly hidden secure camera device AND some
+    //    component is trying to access it on a non-hwbinder thread (generally a non HAL client),
+    //    reject it.
+    // 3) if the camera device is advertised by the camera HAL as SYSTEM_ONLY
+    //    and the serving thread is a non hwbinder thread, the client must have
+    //    android.permission.SYSTEM_CAMERA permissions to connect.
+
+    int cPid = CameraThreadState::getCallingPid();
+    int cUid = CameraThreadState::getCallingUid();
+    SystemCameraKind systemCameraKind = getSystemCameraKind(cameraId);
+
+    // (1) Cameraserver trying to connect, accept.
+    if (CameraThreadState::getCallingPid() == getpid()) {
+        return false;
+    }
+    // (2)
+    if (!hardware::IPCThreadState::self()->isServingCall() &&
+            systemCameraKind == SystemCameraKind::HIDDEN_SECURE_CAMERA) {
+        ALOGW("Rejecting access to secure hidden camera %s", cameraId.c_str());
+        return true;
+    }
+    // (3) Here we only check for permissions if it is a system only camera device. This is since
+    //     getCameraCharacteristics() allows for calls to succeed (albeit after hiding some
+    //     characteristics) even if clients don't have android.permission.CAMERA. We do not want the
+    //     same behavior for system camera devices.
+    if (!hardware::IPCThreadState::self()->isServingCall() &&
+            systemCameraKind == SystemCameraKind::SYSTEM_ONLY_CAMERA &&
+            !hasPermissionsForSystemCamera(cPid, cUid)) {
+        ALOGW("Rejecting access to system only camera %s, inadequete permissions",
+                cameraId.c_str());
+        return true;
+    }
+
     return false;
 }
 
@@ -1385,14 +1455,6 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
             (halVersion == -1) ? "default" : std::to_string(halVersion).c_str(),
             static_cast<int>(effectiveApiLevel));
 
-    if (shouldRejectHiddenCameraConnection(cameraId)) {
-        ALOGW("Attempting to connect to system-only camera id %s, connection rejected",
-              cameraId.c_str());
-        return STATUS_ERROR_FMT(ERROR_DISCONNECTED,
-                                "No camera device with ID \"%s\" currently available",
-                                cameraId.string());
-
-    }
     sp<CLIENT> client = nullptr;
     {
         // Acquire mServiceLock and prevent other clients from connecting
@@ -1668,8 +1730,7 @@ Status CameraService::notifySystemEvent(int32_t eventId,
     if (pid != selfPid) {
         // Ensure we're being called by system_server, or similar process with
         // permissions to notify the camera service about system events
-        if (!checkCallingPermission(
-                String16("android.permission.CAMERA_SEND_SYSTEM_EVENTS"))) {
+        if (!checkCallingPermission(sCameraSendSystemEventsPermission)) {
             const int uid = CameraThreadState::getCallingUid();
             ALOGE("Permission Denial: cannot send updates to camera service about system"
                     " events from pid=%d, uid=%d", pid, uid);
@@ -1704,7 +1765,7 @@ void CameraService::notifyMonitoredUids() {
     Mutex::Autolock lock(mStatusListenerLock);
 
     for (const auto& it : mListenerList) {
-        auto ret = it.second->getListener()->onCameraAccessPrioritiesChanged();
+        auto ret = it->getListener()->onCameraAccessPrioritiesChanged();
         if (!ret.isOk()) {
             ALOGE("%s: Failed to trigger permission callback: %d", __FUNCTION__,
                     ret.exceptionCode());
@@ -1720,8 +1781,7 @@ Status CameraService::notifyDeviceStateChange(int64_t newState) {
     if (pid != selfPid) {
         // Ensure we're being called by system_server, or similar process with
         // permissions to notify the camera service about system events
-        if (!checkCallingPermission(
-                String16("android.permission.CAMERA_SEND_SYSTEM_EVENTS"))) {
+        if (!checkCallingPermission(sCameraSendSystemEventsPermission)) {
             const int uid = CameraThreadState::getCallingUid();
             ALOGE("Permission Denial: cannot send updates to camera service about device"
                     " state changes from pid=%d, uid=%d", pid, uid);
@@ -1775,20 +1835,23 @@ Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listen
         return STATUS_ERROR(ERROR_ILLEGAL_ARGUMENT, "Null listener given to addListener");
     }
 
+    auto clientUid = CameraThreadState::getCallingUid();
+    auto clientPid = CameraThreadState::getCallingPid();
+
     Mutex::Autolock lock(mServiceLock);
 
     {
         Mutex::Autolock lock(mStatusListenerLock);
         for (const auto &it : mListenerList) {
-            if (IInterface::asBinder(it.second->getListener()) == IInterface::asBinder(listener)) {
+            if (IInterface::asBinder(it->getListener()) == IInterface::asBinder(listener)) {
                 ALOGW("%s: Tried to add listener %p which was already subscribed",
                       __FUNCTION__, listener.get());
                 return STATUS_ERROR(ERROR_ALREADY_EXISTS, "Listener already registered");
             }
         }
 
-        auto clientUid = CameraThreadState::getCallingUid();
-        sp<ServiceListener> serviceListener = new ServiceListener(this, listener, clientUid);
+        sp<ServiceListener> serviceListener =
+                new ServiceListener(this, listener, clientUid, clientPid, isVendorListener);
         auto ret = serviceListener->initialize();
         if (ret != NO_ERROR) {
             String8 msg = String8::format("Failed to initialize service listener: %s (%d)",
@@ -1796,7 +1859,10 @@ Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listen
             ALOGE("%s: %s", __FUNCTION__, msg.string());
             return STATUS_ERROR(ERROR_ILLEGAL_ARGUMENT, msg.string());
         }
-        mListenerList.emplace_back(isVendorListener, serviceListener);
+        // The listener still needs to be added to the list of listeners, regardless of what
+        // permissions the listener process has / whether it is a vendor listener. Since it might be
+        // eligible to listen to other camera ids.
+        mListenerList.emplace_back(serviceListener);
         mUidPolicy->registerMonitorUid(clientUid);
     }
 
@@ -1804,8 +1870,7 @@ Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listen
     {
         Mutex::Autolock lock(mCameraStatesLock);
         for (auto& i : mCameraStates) {
-            if (!isVendorListener &&
-                mCameraProviderManager->isPublicallyHiddenSecureCamera(i.first.c_str())) {
+            if (shouldSkipStatusUpdates(i.first, isVendorListener, clientPid, clientUid)) {
                 ALOGV("Cannot add public listener for hidden system-only %s for pid %d",
                       i.first.c_str(), CameraThreadState::getCallingPid());
                 continue;
@@ -1844,9 +1909,9 @@ Status CameraService::removeListener(const sp<ICameraServiceListener>& listener)
     {
         Mutex::Autolock lock(mStatusListenerLock);
         for (auto it = mListenerList.begin(); it != mListenerList.end(); it++) {
-            if (IInterface::asBinder(it->second->getListener()) == IInterface::asBinder(listener)) {
-                mUidPolicy->unregisterMonitorUid(it->second->getListenerUid());
-                IInterface::asBinder(listener)->unlinkToDeath(it->second);
+            if (IInterface::asBinder((*it)->getListener()) == IInterface::asBinder(listener)) {
+                mUidPolicy->unregisterMonitorUid((*it)->getListenerUid());
+                IInterface::asBinder(listener)->unlinkToDeath(*it);
                 mListenerList.erase(it);
                 return Status::ok();
             }
@@ -3029,7 +3094,7 @@ static bool tryLock(Mutex& mutex)
 status_t CameraService::dump(int fd, const Vector<String16>& args) {
     ATRACE_CALL();
 
-    if (checkCallingPermission(String16("android.permission.DUMP")) == false) {
+    if (checkCallingPermission(sDumpPermission) == false) {
         dprintf(fd, "Permission Denial: can't dump CameraService from pid=%d, uid=%d\n",
                 CameraThreadState::getCallingPid(),
                 CameraThreadState::getCallingUid());
@@ -3261,13 +3326,13 @@ void CameraService::updateStatus(StatusInternal status, const String8& cameraId,
             Mutex::Autolock lock(mStatusListenerLock);
 
             for (auto& listener : mListenerList) {
-                if (!listener.first &&
-                    mCameraProviderManager->isPublicallyHiddenSecureCamera(cameraId.c_str())) {
+                if (shouldSkipStatusUpdates(cameraId, listener->isVendorListener(),
+                        listener->getListenerPid(), listener->getListenerUid())) {
                     ALOGV("Skipping camera discovery callback for system-only camera %s",
-                          cameraId.c_str());
+                            cameraId.c_str());
                     continue;
                 }
-                listener.second->getListener()->onStatusChanged(mapToInterface(status),
+                listener->getListener()->onStatusChanged(mapToInterface(status),
                         String16(cameraId));
             }
         });

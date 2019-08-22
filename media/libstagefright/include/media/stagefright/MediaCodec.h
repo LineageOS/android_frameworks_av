@@ -257,6 +257,7 @@ private:
         kWhatSetCallback                    = 'setC',
         kWhatSetNotification                = 'setN',
         kWhatDrmReleaseCrypto               = 'rDrm',
+        kWhatCheckBatteryStats              = 'chkB',
     };
 
     enum {
@@ -296,7 +297,11 @@ private:
                 const sp<IResourceManagerClient> &client,
                 const Vector<MediaResource> &resources);
 
-        void removeResource(int64_t clientId);
+        void removeResource(
+                int64_t clientId,
+                const Vector<MediaResource> &resources);
+
+        void removeClient(int64_t clientId);
 
         bool reclaimResource(const Vector<MediaResource> &resources);
 
@@ -336,7 +341,6 @@ private:
     sp<IResourceManagerClient> mResourceManagerClient;
     sp<ResourceManagerServiceProxy> mResourceManagerService;
 
-    bool mBatteryStatNotified;
     bool mIsVideo;
     int32_t mVideoWidth;
     int32_t mVideoHeight;
@@ -430,6 +434,7 @@ private:
 
     uint64_t getGraphicBufferSize();
     void addResource(MediaResource::Type type, MediaResource::SubType subtype, uint64_t value);
+    void removeResource(MediaResource::Type type, MediaResource::SubType subtype, uint64_t value);
     void requestCpuBoostIfNeeded();
 
     bool hasPendingBuffer(int portIndex);
@@ -457,6 +462,12 @@ private:
     std::deque<BufferFlightTiming_t> mBuffersInFlight;
     Mutex mLatencyLock;
     int64_t mLatencyUnknown;    // buffers for which we couldn't calculate latency
+
+    int64_t mLastActivityTimeUs;
+    bool mBatteryStatNotified;
+    int32_t mBatteryCheckerGeneration;
+    void onBatteryChecker(const sp<AMessage>& msg);
+    void scheduleBatteryCheckerIfNeeded();
 
     void statsBufferSent(int64_t presentationUs);
     void statsBufferReceived(int64_t presentationUs);

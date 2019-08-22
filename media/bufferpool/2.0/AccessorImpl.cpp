@@ -163,6 +163,7 @@ ResultStatus Accessor::Impl::connect(
                 *connection = newConnection;
                 *pConnectionId = id;
                 *pMsgId = mBufferPool.mInvalidation.mInvalidationId;
+                mBufferPool.mConnectionIds.insert(id);
                 mBufferPool.mInvalidationChannel.getDesc(invDescPtr);
                 mBufferPool.mInvalidation.onConnect(id, observer);
                 ++sSeqId;
@@ -474,7 +475,12 @@ bool Accessor::Impl::BufferPool::handleTransferTo(const BufferStatusMessage &mes
         found->second->mSenderValidated = true;
         return true;
     }
-    // TODO: verify there is target connection Id
+    if (mConnectionIds.find(message.targetConnectionId) == mConnectionIds.end()) {
+        // N.B: it could be fake or receive connection already closed.
+        ALOGD("bufferpool2 %p receiver connection %lld is no longer valid",
+              this, (long long)message.targetConnectionId);
+        return false;
+    }
     mStats.onBufferSent();
     mTransactions.insert(std::make_pair(
             message.transactionId,
@@ -644,6 +650,7 @@ bool Accessor::Impl::BufferPool::handleClose(ConnectionId connectionId) {
             }
         }
     }
+    mConnectionIds.erase(connectionId);
     return true;
 }
 
@@ -774,11 +781,19 @@ void Accessor::Impl::invalidatorThread(
             std::mutex &mutex,
             std::condition_variable &cv,
             bool &ready) {
+    constexpr uint32_t NUM_SPIN_TO_INCREASE_SLEEP = 1024;
+    constexpr uint32_t NUM_SPIN_TO_LOG = 1024*8;
+    constexpr useconds_t MAX_SLEEP_US = 10000;
+    uint32_t numSpin = 0;
+    useconds_t sleepUs = 1;
+
     while(true) {
         std::map<uint32_t, const std::weak_ptr<Accessor::Impl>> copied;
         {
             std::unique_lock<std::mutex> lock(mutex);
             if (!ready) {
+                numSpin = 0;
+                sleepUs = 1;
                 cv.wait(lock);
             }
             copied.insert(accessors.begin(), accessors.end());
@@ -800,9 +815,20 @@ void Accessor::Impl::invalidatorThread(
             if (accessors.size() == 0) {
                 ready = false;
             } else {
-                // prevent draining cpu.
+                // TODO Use an efficient way to wait over FMQ.
+                // N.B. Since there is not a efficient way to wait over FMQ,
+                // polling over the FMQ is the current way to prevent draining
+                // CPU.
                 lock.unlock();
-                std::this_thread::yield();
+                ++numSpin;
+                if (numSpin % NUM_SPIN_TO_INCREASE_SLEEP == 0 &&
+                    sleepUs < MAX_SLEEP_US) {
+                    sleepUs *= 10;
+                }
+                if (numSpin % NUM_SPIN_TO_LOG == 0) {
+                    ALOGW("invalidator thread spinning");
+                }
+                ::usleep(sleepUs);
             }
         }
     }
