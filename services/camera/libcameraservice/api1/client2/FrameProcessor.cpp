@@ -86,6 +86,12 @@ bool FrameProcessor::processSingleFrame(CaptureResult &frame,
         process3aState(frame, client);
     }
 
+    if (mCurrentRequestId != frame.mResultExtras.requestId) {
+        mCurrentRequestId = frame.mResultExtras.requestId;
+
+        client->notifyRequestId(mCurrentRequestId);
+    }
+
     return FrameProcessorBase::processSingleFrame(frame, device);
 }
 

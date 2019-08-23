@@ -959,6 +959,11 @@ void Camera2Client::stopPreviewL() {
         case Parameters::RECORD:
         case Parameters::PREVIEW:
             syncWithDevice();
+            // Due to flush a camera device sync is not a sufficient
+            // guarantee that the current client parameters are
+            // correctly applied. To resolve this wait for the current
+            // request id to return in the results.
+            waitUntilCurrentRequestIdLocked();
             res = stopStream();
             if (res != OK) {
                 ALOGE("%s: Camera %d: Can't stop streaming: %s (%d)",
@@ -2257,6 +2262,46 @@ int32_t Camera2Client::setAudioRestriction(int /*mode*/) {
     // Empty implementation. setAudioRestriction is hidden interface and not
     // supported by android.hardware.Camera API
     return INVALID_OPERATION;
+}
+
+status_t Camera2Client::waitUntilCurrentRequestIdLocked() {
+    int32_t activeRequestId = mStreamingProcessor->getActiveRequestId();
+    if (activeRequestId != 0) {
+        auto res = waitUntilRequestIdApplied(activeRequestId,
+                mDevice->getExpectedInFlightDuration());
+        if (res == TIMED_OUT) {
+            ALOGE("%s: Camera %d: Timed out waiting for current request id to return in results!",
+                    __FUNCTION__, mCameraId);
+            return res;
+        } else if (res != OK) {
+            ALOGE("%s: Camera %d: Error while waiting for current request id to return in results!",
+                    __FUNCTION__, mCameraId);
+            return res;
+        }
+    }
+
+    return OK;
+}
+
+status_t Camera2Client::waitUntilRequestIdApplied(int32_t requestId, nsecs_t timeout) {
+    Mutex::Autolock l(mLatestRequestMutex);
+    while (mLatestRequestId != requestId) {
+        nsecs_t startTime = systemTime();
+
+        auto res = mLatestRequestSignal.waitRelative(mLatestRequestMutex, timeout);
+        if (res != OK) return res;
+
+        timeout -= (systemTime() - startTime);
+    }
+
+    return OK;
+}
+
+void Camera2Client::notifyRequestId(int32_t requestId) {
+    Mutex::Autolock al(mLatestRequestMutex);
+
+    mLatestRequestId = requestId;
+    mLatestRequestSignal.signal();
 }
 
 const char* Camera2Client::kAutofocusLabel = "autofocus";
