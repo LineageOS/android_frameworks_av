@@ -237,12 +237,7 @@ AudioFlinger::ThreadBase::TrackBase::~TrackBase()
 {
     // delete the proxy before deleting the shared memory it refers to, to avoid dangling reference
     mServerProxy.clear();
-    if (mCblk != NULL) {
-        mCblk->~audio_track_cblk_t();   // destroy our shared-structure.
-        if (mClient == 0) {
-            free(mCblk);
-        }
-    }
+    releaseCblk();
     mCblkMemory.clear();    // free the shared memory before releasing the heap it belongs to
     if (mClient != 0) {
         // Client destructor must run with AudioFlinger client mutex locked
@@ -549,6 +544,12 @@ AudioFlinger::PlaybackThread::Track::Track(
         return;
     }
 
+    if (!thread->isTrackAllowed_l(channelMask, format, sessionId, uid)) {
+        ALOGE("%s(%d): no more tracks available", __func__, mId);
+        releaseCblk(); // this makes the track invalid.
+        return;
+    }
+
     if (sharedBuffer == 0) {
         mAudioTrackServerProxy = new AudioTrackServerProxy(mCblk, mBuffer, frameCount,
                 mFrameSize, !isExternalTrack(), sampleRate);
@@ -558,10 +559,6 @@ AudioFlinger::PlaybackThread::Track::Track(
     }
     mServerProxy = mAudioTrackServerProxy;
 
-    if (!thread->isTrackAllowed_l(channelMask, format, sessionId, uid)) {
-        ALOGE("%s(%d): no more tracks available", __func__, mId);
-        return;
-    }
     // only allocate a fast track index if we were able to allocate a normal track name
     if (flags & AUDIO_OUTPUT_FLAG_FAST) {
         // FIXME: Not calling framesReadyIsCalledByMultipleThreads() exposes a potential
