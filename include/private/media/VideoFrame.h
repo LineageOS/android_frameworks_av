@@ -41,7 +41,7 @@ public:
             uint32_t angle, uint32_t bpp, bool hasData, size_t iccSize):
         mWidth(width), mHeight(height),
         mDisplayWidth(displayWidth), mDisplayHeight(displayHeight),
-        mTileWidth(tileWidth), mTileHeight(tileHeight),
+        mTileWidth(tileWidth), mTileHeight(tileHeight), mDurationUs(0),
         mRotationAngle(angle), mBytesPerPixel(bpp), mRowBytes(bpp * width),
         mSize(hasData ? (bpp * width * height) : 0),
         mIccSize(iccSize), mReserved(0) {
@@ -78,6 +78,7 @@ public:
     uint32_t mDisplayHeight;   // Display height before rotation
     uint32_t mTileWidth;       // Tile width (0 if image doesn't have grid)
     uint32_t mTileHeight;      // Tile height (0 if image doesn't have grid)
+    int64_t  mDurationUs;      // Frame duration in microseconds
     int32_t  mRotationAngle;   // Rotation angle, clockwise, should be multiple of 90
     uint32_t mBytesPerPixel;   // Number of bytes per pixel
     uint32_t mRowBytes;        // Number of bytes per row before rotation

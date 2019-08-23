@@ -139,6 +139,8 @@ private:
     bool mIsAvcOrHevc;
     MediaSource::ReadOptions::SeekMode mSeekMode;
     int64_t mTargetTimeUs;
+    List<int64_t> mSampleDurations;
+    int64_t mDefaultSampleDurationUs;
 
     sp<Surface> initSurfaceControl();
     status_t captureSurfaceControl();
