@@ -30,5 +30,6 @@ extern bool statsd_recorder(MediaAnalyticsItem *);
 
 extern bool statsd_mediadrm(MediaAnalyticsItem *);
 extern bool statsd_widevineCDM(MediaAnalyticsItem *);
+extern bool statsd_drmmanager(MediaAnalyticsItem *);
 
 } // namespace android
