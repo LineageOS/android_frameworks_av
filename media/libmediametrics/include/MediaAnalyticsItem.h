@@ -17,6 +17,8 @@
 #ifndef ANDROID_MEDIA_MEDIAANALYTICSITEM_H
 #define ANDROID_MEDIA_MEDIAANALYTICSITEM_H
 
+#include "MediaMetrics.h"
+
 #include <string>
 #include <sys/types.h>
 
@@ -93,6 +95,9 @@ class MediaAnalyticsItem {
 
         static MediaAnalyticsItem* create(Key key);
         static MediaAnalyticsItem* create();
+
+        static MediaAnalyticsItem* convert(mediametrics_handle_t);
+        static mediametrics_handle_t convert(MediaAnalyticsItem *);
 
         // access functions for the class
         ~MediaAnalyticsItem();
