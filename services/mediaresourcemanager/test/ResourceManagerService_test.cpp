@@ -52,6 +52,62 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(TestProcessInfo);
 };
 
+struct TestSystemCallback :
+        public ResourceManagerService::SystemCallbackInterface {
+    TestSystemCallback() :
+        mLastEvent({EventType::INVALID, 0}), mEventCount(0) {}
+
+    enum EventType {
+        INVALID          = -1,
+        VIDEO_ON         = 0,
+        VIDEO_OFF        = 1,
+        VIDEO_RESET      = 2,
+        CPUSET_ENABLE    = 3,
+        CPUSET_DISABLE   = 4,
+    };
+
+    struct EventEntry {
+        EventType type;
+        int arg;
+    };
+
+    virtual void noteStartVideo(int uid) override {
+        mLastEvent = {EventType::VIDEO_ON, uid};
+        mEventCount++;
+    }
+
+    virtual void noteStopVideo(int uid) override {
+        mLastEvent = {EventType::VIDEO_OFF, uid};
+        mEventCount++;
+    }
+
+    virtual void noteResetVideo() override {
+        mLastEvent = {EventType::VIDEO_RESET, 0};
+        mEventCount++;
+    }
+
+    virtual bool requestCpusetBoost(
+            bool enable, const sp<IInterface> &/*client*/) override {
+        mLastEvent = {enable ? EventType::CPUSET_ENABLE : EventType::CPUSET_DISABLE, 0};
+        mEventCount++;
+        return true;
+    }
+
+    size_t eventCount() { return mEventCount; }
+    EventType lastEventType() { return mLastEvent.type; }
+    EventEntry lastEvent() { return mLastEvent; }
+
+protected:
+    virtual ~TestSystemCallback() {}
+
+private:
+    EventEntry mLastEvent;
+    size_t mEventCount;
+
+    DISALLOW_EVIL_CONSTRUCTORS(TestSystemCallback);
+};
+
+
 struct TestClient : public BnResourceManagerClient {
     TestClient(int pid, sp<ResourceManagerService> service)
         : mReclaimed(false), mPid(pid), mService(service) {}
@@ -95,10 +151,17 @@ static const int kLowPriorityPid = 40;
 static const int kMidPriorityPid = 25;
 static const int kHighPriorityPid = 10;
 
+using EventType = TestSystemCallback::EventType;
+using EventEntry = TestSystemCallback::EventEntry;
+bool operator== (const EventEntry& lhs, const EventEntry& rhs) {
+    return lhs.type == rhs.type && lhs.arg == rhs.arg;
+}
+
 class ResourceManagerServiceTest : public ::testing::Test {
 public:
     ResourceManagerServiceTest()
-        : mService(new ResourceManagerService(new TestProcessInfo)),
+        : mSystemCB(new TestSystemCallback()),
+          mService(new ResourceManagerService(new TestProcessInfo, mSystemCB)),
           mTestClient1(new TestClient(kTestPid1, mService)),
           mTestClient2(new TestClient(kTestPid2, mService)),
           mTestClient3(new TestClient(kTestPid2, mService)) {
@@ -578,6 +641,84 @@ protected:
         EXPECT_TRUE(mService->isCallingPriorityHigher_l(99, 100));
     }
 
+    void testBatteryStats() {
+        // reset should always be called when ResourceManagerService is created (restarted)
+        EXPECT_EQ(1u, mSystemCB->eventCount());
+        EXPECT_EQ(EventType::VIDEO_RESET, mSystemCB->lastEventType());
+
+        // new client request should cause VIDEO_ON
+        Vector<MediaResource> resources1;
+        resources1.push_back(MediaResource(MediaResource::kBattery, MediaResource::kVideoCodec, 1));
+        mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
+        EXPECT_EQ(2u, mSystemCB->eventCount());
+        EXPECT_EQ(EventEntry({EventType::VIDEO_ON, kTestUid1}), mSystemCB->lastEvent());
+
+        // each client should only cause 1 VIDEO_ON
+        mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
+        EXPECT_EQ(2u, mSystemCB->eventCount());
+
+        // new client request should cause VIDEO_ON
+        Vector<MediaResource> resources2;
+        resources2.push_back(MediaResource(MediaResource::kBattery, MediaResource::kVideoCodec, 2));
+        mService->addResource(kTestPid2, kTestUid2, getId(mTestClient2), mTestClient2, resources2);
+        EXPECT_EQ(3u, mSystemCB->eventCount());
+        EXPECT_EQ(EventEntry({EventType::VIDEO_ON, kTestUid2}), mSystemCB->lastEvent());
+
+        // partially remove mTestClient1's request, shouldn't be any VIDEO_OFF
+        mService->removeResource(kTestPid1, getId(mTestClient1), resources1);
+        EXPECT_EQ(3u, mSystemCB->eventCount());
+
+        // remove mTestClient1's request, should be VIDEO_OFF for kTestUid1
+        // (use resource2 to test removing more instances than previously requested)
+        mService->removeResource(kTestPid1, getId(mTestClient1), resources2);
+        EXPECT_EQ(4u, mSystemCB->eventCount());
+        EXPECT_EQ(EventEntry({EventType::VIDEO_OFF, kTestUid1}), mSystemCB->lastEvent());
+
+        // remove mTestClient2, should be VIDEO_OFF for kTestUid2
+        mService->removeClient(kTestPid2, getId(mTestClient2));
+        EXPECT_EQ(5u, mSystemCB->eventCount());
+        EXPECT_EQ(EventEntry({EventType::VIDEO_OFF, kTestUid2}), mSystemCB->lastEvent());
+    }
+
+    void testCpusetBoost() {
+        // reset should always be called when ResourceManagerService is created (restarted)
+        EXPECT_EQ(1u, mSystemCB->eventCount());
+        EXPECT_EQ(EventType::VIDEO_RESET, mSystemCB->lastEventType());
+
+        // new client request should cause CPUSET_ENABLE
+        Vector<MediaResource> resources1;
+        resources1.push_back(MediaResource(MediaResource::kCpuBoost, 1));
+        mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
+        EXPECT_EQ(2u, mSystemCB->eventCount());
+        EXPECT_EQ(EventType::CPUSET_ENABLE, mSystemCB->lastEventType());
+
+        // each client should only cause 1 CPUSET_ENABLE
+        mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
+        EXPECT_EQ(2u, mSystemCB->eventCount());
+
+        // new client request should cause CPUSET_ENABLE
+        Vector<MediaResource> resources2;
+        resources2.push_back(MediaResource(MediaResource::kCpuBoost, 2));
+        mService->addResource(kTestPid2, kTestUid2, getId(mTestClient2), mTestClient2, resources2);
+        EXPECT_EQ(3u, mSystemCB->eventCount());
+        EXPECT_EQ(EventType::CPUSET_ENABLE, mSystemCB->lastEventType());
+
+        // remove mTestClient2 should not cause CPUSET_DISABLE, mTestClient1 still active
+        mService->removeClient(kTestPid2, getId(mTestClient2));
+        EXPECT_EQ(3u, mSystemCB->eventCount());
+
+        // remove 1 cpuboost from mTestClient1, should not be CPUSET_DISABLE (still 1 left)
+        mService->removeResource(kTestPid1, getId(mTestClient1), resources1);
+        EXPECT_EQ(3u, mSystemCB->eventCount());
+
+        // remove 2 cpuboost from mTestClient1, should be CPUSET_DISABLE
+        // (use resource2 to test removing more than previously requested)
+        mService->removeResource(kTestPid1, getId(mTestClient1), resources2);
+        EXPECT_EQ(4u, mSystemCB->eventCount());
+        EXPECT_EQ(EventType::CPUSET_DISABLE, mSystemCB->lastEventType());
+    }
+
+    sp<TestSystemCallback> mSystemCB;
     sp<ResourceManagerService> mService;
     sp<IResourceManagerClient> mTestClient1;
     sp<IResourceManagerClient> mTestClient2;
@@ -627,6 +768,14 @@ TEST_F(ResourceManagerServiceTest, getBiggestClient_l) {
 
 TEST_F(ResourceManagerServiceTest, isCallingPriorityHigher_l) {
     testIsCallingPriorityHigher();
+}
+
+TEST_F(ResourceManagerServiceTest, testBatteryStats) {
+    testBatteryStats();
+}
+
+TEST_F(ResourceManagerServiceTest, testCpusetBoost) {
+    testCpusetBoost();
 }
 
 } // namespace android
