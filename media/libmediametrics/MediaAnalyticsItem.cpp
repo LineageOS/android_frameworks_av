@@ -64,6 +64,16 @@ MediaAnalyticsItem *MediaAnalyticsItem::create(MediaAnalyticsItem::Key key)
     return item;
 }
 
+MediaAnalyticsItem* MediaAnalyticsItem::convert(mediametrics_handle_t handle) {
+    MediaAnalyticsItem *item = (android::MediaAnalyticsItem *) handle;
+    return item;
+}
+
+mediametrics_handle_t MediaAnalyticsItem::convert(MediaAnalyticsItem *item ) {
+    mediametrics_handle_t handle = (mediametrics_handle_t) item;
+    return handle;
+}
+
 // access functions for the class
 MediaAnalyticsItem::MediaAnalyticsItem()
     : mPid(-1),

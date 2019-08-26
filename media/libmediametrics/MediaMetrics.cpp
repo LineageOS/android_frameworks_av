@@ -169,6 +169,11 @@ bool mediametrics_selfRecord(mediametrics_handle_t handle) {
     return item->selfrecord();
 }
 
+mediametrics_handle_t mediametrics_dup(mediametrics_handle_t handle) {
+    android::MediaAnalyticsItem *item = (android::MediaAnalyticsItem *) handle;
+    if (item == NULL) return android::MediaAnalyticsItem::convert(item);
+    return android::MediaAnalyticsItem::convert(item->dup());
+}
 
 const char *mediametrics_readable(mediametrics_handle_t handle) {
     android::MediaAnalyticsItem *item = (android::MediaAnalyticsItem *) handle;
