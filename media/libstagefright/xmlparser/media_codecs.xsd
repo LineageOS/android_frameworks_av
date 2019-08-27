@@ -107,6 +107,13 @@
         <xs:attribute name="value" type="xs:string"/>
     </xs:complexType>
     <xs:complexType name="Variant">
+        <xs:choice minOccurs="0" maxOccurs="unbounded">
+            <xs:element name="Quirk" type="Quirk"/>
+            <xs:element name="Attribute" type="Quirk"/>
+            <xs:element name="Alias" type="Alias"/>
+            <xs:element name="Limit" type="Limit"/>
+            <xs:element name="Feature" type="Feature"/>
+        </xs:choice>
         <xs:attribute name="name" type="xs:string"/>
     </xs:complexType>
     <xs:complexType name="Setting">
