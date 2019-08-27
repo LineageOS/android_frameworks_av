@@ -51,12 +51,22 @@ class ResourceManagerService
       public BnResourceManagerService
 {
 public:
+    struct SystemCallbackInterface : public RefBase {
+        virtual void noteStartVideo(int uid) = 0;
+        virtual void noteStopVideo(int uid) = 0;
+        virtual void noteResetVideo() = 0;
+        virtual bool requestCpusetBoost(
+                bool enable, const sp<IInterface> &client) = 0;
+    };
+
     static char const *getServiceName() { return "media.resource_manager"; }
 
     virtual status_t dump(int fd, const Vector<String16>& args);
 
     ResourceManagerService();
-    explicit ResourceManagerService(sp<ProcessInfoInterface> processInfo);
+    explicit ResourceManagerService(
+            const sp<ProcessInfoInterface> &processInfo,
+            const sp<SystemCallbackInterface> &systemResource);
 
     // IResourceManagerService interface
     virtual void config(const Vector<MediaResourcePolicy> &policies);
@@ -118,6 +128,7 @@ private:
 
     mutable Mutex mLock;
     sp<ProcessInfoInterface> mProcessInfo;
+    sp<SystemCallbackInterface> mSystemCB;
     sp<ServiceLog> mServiceLog;
     PidResourceInfosMap mMap;
     bool mSupportsMultipleSecureCodecs;

@@ -60,6 +60,7 @@ struct statsd_hooks  statsd_handlers[] =
     { "audiotrack", statsd_audiotrack },
     { "codec", statsd_codec},
     { "drm.vendor.Google.WidevineCDM", statsd_widevineCDM },
+    { "drmmanager", statsd_drmmanager },
     { "extractor", statsd_extractor },
     { "mediadrm", statsd_mediadrm },
     { "nuplayer", statsd_nuplayer },

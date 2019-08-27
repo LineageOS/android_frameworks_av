@@ -200,16 +200,44 @@ status_t ResourceManagerService::dump(int fd, const Vector<String16>& /* args */
     return OK;
 }
 
-ResourceManagerService::ResourceManagerService()
-    : ResourceManagerService(new ProcessInfo()) {}
+struct SystemCallbackImpl :
+        public ResourceManagerService::SystemCallbackInterface {
+    SystemCallbackImpl() {}
 
-ResourceManagerService::ResourceManagerService(sp<ProcessInfoInterface> processInfo)
+    virtual void noteStartVideo(int uid) override {
+        BatteryNotifier::getInstance().noteStartVideo(uid);
+    }
+    virtual void noteStopVideo(int uid) override {
+        BatteryNotifier::getInstance().noteStopVideo(uid);
+    }
+    virtual void noteResetVideo() override {
+        BatteryNotifier::getInstance().noteResetVideo();
+    }
+    virtual bool requestCpusetBoost(
+            bool enable, const sp<IInterface> &client) override {
+        return android::requestCpusetBoost(enable, client);
+    }
+
+protected:
+    virtual ~SystemCallbackImpl() {}
+
+private:
+    DISALLOW_EVIL_CONSTRUCTORS(SystemCallbackImpl);
+};
+
+ResourceManagerService::ResourceManagerService()
+    : ResourceManagerService(new ProcessInfo(), new SystemCallbackImpl()) {}
+
+ResourceManagerService::ResourceManagerService(
+        const sp<ProcessInfoInterface> &processInfo,
+        const sp<SystemCallbackInterface> &systemResource)
     : mProcessInfo(processInfo),
+      mSystemCB(systemResource),
       mServiceLog(new ServiceLog()),
       mSupportsMultipleSecureCodecs(true),
       mSupportsSecureWithNonSecureCodec(true),
       mCpuBoostCount(0) {
-    BatteryNotifier::getInstance().noteResetVideo();
+    mSystemCB->noteResetVideo();
 }
 
 ResourceManagerService::~ResourceManagerService() {}
@@ -238,13 +266,13 @@ void ResourceManagerService::onFirstAdded(
         // Request it on every new instance of kCpuBoost, as the media.codec
         // could have died, if we only do it the first time subsequent instances
         // never gets the boost.
-        if (requestCpusetBoost(true, this) != OK) {
+        if (mSystemCB->requestCpusetBoost(true, this) != OK) {
             ALOGW("couldn't request cpuset boost");
         }
         mCpuBoostCount++;
     } else if (resource.mType == MediaResource::kBattery
             && resource.mSubType == MediaResource::kVideoCodec) {
-        BatteryNotifier::getInstance().noteStartVideo(clientInfo.uid);
+        mSystemCB->noteStartVideo(clientInfo.uid);
     }
 }
 
@@ -254,11 +282,11 @@ void ResourceManagerService::onLastRemoved(
             && resource.mSubType == MediaResource::kUnspecifiedSubType
             && mCpuBoostCount > 0) {
         if (--mCpuBoostCount == 0) {
-            requestCpusetBoost(false, this);
+            mSystemCB->requestCpusetBoost(false, this);
         }
     } else if (resource.mType == MediaResource::kBattery
             && resource.mSubType == MediaResource::kVideoCodec) {
-        BatteryNotifier::getInstance().noteStopVideo(clientInfo.uid);
+        mSystemCB->noteStopVideo(clientInfo.uid);
     }
 }
 

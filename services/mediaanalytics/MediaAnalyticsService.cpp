@@ -169,6 +169,7 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(MediaAnalyticsItem
     ALOGV("caller has uid=%d, embedded uid=%d", uid, uid_given);
 
     switch (uid)  {
+        case AID_DRM:
         case AID_MEDIA:
         case AID_MEDIA_CODEC:
         case AID_MEDIA_EX:

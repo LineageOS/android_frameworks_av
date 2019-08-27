@@ -29,7 +29,8 @@
 
 namespace android {
 
-constexpr char COMPONENT_NAME[] = "c2.android.av1.decoder";
+// codecname set and passed in as a compile flag from Android.bp
+constexpr char COMPONENT_NAME[] = CODECNAME;
 
 class C2SoftAomDec::IntfImpl : public SimpleInterface<void>::BaseParams {
   public:
