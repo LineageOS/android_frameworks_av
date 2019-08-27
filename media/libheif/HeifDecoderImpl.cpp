@@ -44,8 +44,7 @@ void initFrameInfo(HeifFrameInfo *info, const VideoFrame *videoFrame) {
     info->mHeight = videoFrame->mHeight;
     info->mRotationAngle = videoFrame->mRotationAngle;
     info->mBytesPerPixel = videoFrame->mBytesPerPixel;
-    // TODO: retrieve per-frame duration from extractor/metadataretriever.
-    info->mDurationUs = 33333;
+    info->mDurationUs = videoFrame->mDurationUs;
     if (videoFrame->mIccSize > 0) {
         info->mIccData.assign(
                 videoFrame->getFlattenedIccData(),
