@@ -138,7 +138,12 @@ package media.codecs {
 
   public class Variant {
     ctor public Variant();
+    method public java.util.List<media.codecs.Alias> getAlias_optional();
+    method public java.util.List<media.codecs.Quirk> getAttribute_optional();
+    method public java.util.List<media.codecs.Feature> getFeature_optional();
+    method public java.util.List<media.codecs.Limit> getLimit_optional();
     method public String getName();
+    method public java.util.List<media.codecs.Quirk> getQuirk_optional();
     method public void setName(String);
   }
 
