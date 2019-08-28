@@ -27,3 +27,21 @@ cc_test {
         "-Wall",
     ],
 }
+
+cc_test {
+    name: "BatteryChecker_test",
+    srcs: ["BatteryChecker_test.cpp"],
+    test_suites: ["device-tests"],
+
+    shared_libs: [
+        "libstagefright",
+        "libstagefright_foundation",
+        "libutils",
+        "liblog",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+}
