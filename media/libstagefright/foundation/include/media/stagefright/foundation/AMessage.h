@@ -63,6 +63,7 @@ struct AMessage : public RefBase {
     AMessage();
     AMessage(uint32_t what, const sp<const AHandler> &handler);
 
+#ifndef __ANDROID_VNDK__
     // Construct an AMessage from a parcel.
     // nestingAllowed determines how many levels AMessage can be nested inside
     // AMessage. The default value here is arbitrarily set to 255.
@@ -87,6 +88,7 @@ struct AMessage : public RefBase {
     // All items in the AMessage must have types that are recognized by
     // FromParcel(); otherwise, TRESPASS error will occur.
     void writeToParcel(Parcel *parcel) const;
+#endif
 
     void setWhat(uint32_t what);
     uint32_t what() const;
