@@ -1391,7 +1391,7 @@ static CreatorFunc Sniff(
         return NULL;
     }
 
-    *confidence = 0.2f;
+    *confidence = 0.5f;
 
     return CreateExtractor;
 }
