@@ -104,7 +104,9 @@ struct ClientManager : public IClientManager {
     ResultStatus flush(ConnectionId connectionId);
 
     /**
-     * Allocates a buffer from the specified connection.
+     * Allocates a buffer from the specified connection. The output parameter
+     * handle is cloned from the internal handle. So it is safe to use directly,
+     * and it should be deleted and destroyed after use.
      *
      * @param connectionId  The id of the connection.
      * @param params        The allocation parameters.
@@ -123,7 +125,9 @@ struct ClientManager : public IClientManager {
                           std::shared_ptr<BufferPoolData> *buffer);
 
     /**
-     * Receives a buffer for the transaction.
+     * Receives a buffer for the transaction. The output parameter handle is
+     * cloned from the internal handle. So it is safe to use directly, and it
+     * should be deleted and destoyed after use.
      *
      * @param connectionId  The id of the receiving connection.
      * @param transactionId The id for the transaction.

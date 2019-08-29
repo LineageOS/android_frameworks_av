@@ -1434,6 +1434,11 @@ bool objcpy(C2BaseBlock* d, const BaseBlock& s) {
                 d->type = C2BaseBlock::GRAPHIC;
                 return true;
             }
+            if (cHandle) {
+                // Though we got cloned handle, creating block failed.
+                native_handle_close(cHandle);
+                native_handle_delete(cHandle);
+            }
 
             LOG(ERROR) << "Unknown handle type in BaseBlock::pooledBlock.";
             return false;
