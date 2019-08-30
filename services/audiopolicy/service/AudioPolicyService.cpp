@@ -569,7 +569,7 @@ void AudioPolicyService::updateUidStates_l()
                 }
             }
         }
-        setAppState_l(current->uid,
+        setAppState_l(current->portId,
                       allowCapture ? apmStatFromAmState(mUidPolicy->getUidState(current->uid)) :
                                 APP_STATE_IDLE);
         if (allowCapture) {
@@ -582,7 +582,7 @@ void AudioPolicyService::silenceAllRecordings_l() {
     for (size_t i = 0; i < mAudioRecordClients.size(); i++) {
         sp<AudioRecordClient> current = mAudioRecordClients[i];
         if (!isVirtualSource(current->attributes.source)) {
-            setAppState_l(current->uid, APP_STATE_IDLE);
+            setAppState_l(current->portId, APP_STATE_IDLE);
         }
     }
 }
@@ -628,17 +628,17 @@ bool AudioPolicyService::isVirtualSource(audio_source_t source)
     return false;
 }
 
-void AudioPolicyService::setAppState_l(uid_t uid, app_state_t state)
+void AudioPolicyService::setAppState_l(audio_port_handle_t portId, app_state_t state)
 {
     AutoCallerClear acc;
 
     if (mAudioPolicyManager) {
-        mAudioPolicyManager->setAppState(uid, state);
+        mAudioPolicyManager->setAppState(portId, state);
     }
     sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
     if (af) {
         bool silenced = state == APP_STATE_IDLE;
-        af->setRecordSilenced(uid, silenced);
+        af->setRecordSilenced(portId, silenced);
     }
 }
 

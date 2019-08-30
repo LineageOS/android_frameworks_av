@@ -7934,12 +7934,12 @@ void AudioFlinger::RecordThread::dumpTracks_l(int fd, const Vector<String16>& ar
     write(fd, result.string(), result.size());
 }
 
-void AudioFlinger::RecordThread::setRecordSilenced(uid_t uid, bool silenced)
+void AudioFlinger::RecordThread::setRecordSilenced(audio_port_handle_t portId, bool silenced)
 {
     Mutex::Autolock _l(mLock);
     for (size_t i = 0; i < mTracks.size() ; i++) {
         sp<RecordTrack> track = mTracks[i];
-        if (track != 0 && track->uid() == uid) {
+        if (track != 0 && track->portId() == portId) {
             track->setSilenced(silenced);
         }
     }
@@ -9477,11 +9477,11 @@ void AudioFlinger::MmapCaptureThread::updateMetadata_l()
     mInput->stream->updateSinkMetadata(metadata);
 }
 
-void AudioFlinger::MmapCaptureThread::setRecordSilenced(uid_t uid, bool silenced)
+void AudioFlinger::MmapCaptureThread::setRecordSilenced(audio_port_handle_t portId, bool silenced)
 {
     Mutex::Autolock _l(mLock);
     for (size_t i = 0; i < mActiveTracks.size() ; i++) {
-        if (mActiveTracks[i]->uid() == uid) {
+        if (mActiveTracks[i]->portId() == portId) {
             mActiveTracks[i]->setSilenced_l(silenced);
             broadcast_l();
         }

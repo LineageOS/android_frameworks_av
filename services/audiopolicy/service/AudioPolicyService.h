@@ -311,7 +311,7 @@ private:
     virtual status_t shellCommand(int in, int out, int err, Vector<String16>& args);
 
     // Sets whether the given UID records only silence
-    virtual void setAppState_l(uid_t uid, app_state_t state);
+    virtual void setAppState_l(audio_port_handle_t portId, app_state_t state);
 
     // Overrides the UID state as if it is idle
     status_t handleSetUidState(Vector<String16>& args, int err);
@@ -759,9 +759,10 @@ private:
     public:
                 AudioClient(const audio_attributes_t attributes,
                             const audio_io_handle_t io, uid_t uid, pid_t pid,
-                            const audio_session_t session, const audio_port_handle_t deviceId) :
+                            const audio_session_t session,  audio_port_handle_t portId,
+                            const audio_port_handle_t deviceId) :
                                 attributes(attributes), io(io), uid(uid), pid(pid),
-                                session(session), deviceId(deviceId), active(false) {}
+                                session(session), portId(portId), deviceId(deviceId), active(false) {}
                 ~AudioClient() override = default;
 
 
@@ -770,6 +771,7 @@ private:
         const uid_t uid;                     // client UID
         const pid_t pid;                     // client PID
         const audio_session_t session;       // audio session ID
+        const audio_port_handle_t portId;
         const audio_port_handle_t deviceId;  // selected input device port ID
               bool active;                   // Playback/Capture is active or inactive
     };
@@ -781,10 +783,10 @@ private:
     public:
                 AudioRecordClient(const audio_attributes_t attributes,
                           const audio_io_handle_t io, uid_t uid, pid_t pid,
-                          const audio_session_t session, const audio_port_handle_t deviceId,
-                          const String16& opPackageName,
+                          const audio_session_t session, audio_port_handle_t portId,
+                          const audio_port_handle_t deviceId, const String16& opPackageName,
                           bool canCaptureOutput, bool canCaptureHotword) :
-                    AudioClient(attributes, io, uid, pid, session, deviceId),
+                    AudioClient(attributes, io, uid, pid, session, portId, deviceId),
                     opPackageName(opPackageName), startTimeNs(0),
                     canCaptureOutput(canCaptureOutput), canCaptureHotword(canCaptureHotword) {}
                 ~AudioRecordClient() override = default;
@@ -802,9 +804,9 @@ private:
     public:
                 AudioPlaybackClient(const audio_attributes_t attributes,
                       const audio_io_handle_t io, uid_t uid, pid_t pid,
-                            const audio_session_t session, audio_port_handle_t deviceId,
-                            audio_stream_type_t stream) :
-                    AudioClient(attributes, io, uid, pid, session, deviceId), stream(stream) {}
+                            const audio_session_t session, audio_port_handle_t portId,
+                            audio_port_handle_t deviceId, audio_stream_type_t stream) :
+                    AudioClient(attributes, io, uid, pid, session, portId, deviceId), stream(stream) {}
                 ~AudioPlaybackClient() override = default;
 
         const audio_stream_type_t stream;

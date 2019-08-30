@@ -450,13 +450,13 @@ EffectDescriptorCollection AudioInputDescriptor::getEnabledEffects() const
     return enabledEffects;
 }
 
-void AudioInputDescriptor::setAppState(uid_t uid, app_state_t state)
+void AudioInputDescriptor::setAppState(audio_port_handle_t portId, app_state_t state)
 {
     RecordClientVector clients = clientsList(false /*activeOnly*/);
     RecordClientVector updatedClients;
 
     for (const auto& client : clients) {
-        if (uid == client->uid()) {
+        if (portId == client->portId()) {
             bool wasSilenced = client->isSilenced();
             client->setAppState(state);
             if (client->active() && wasSilenced != client->isSilenced()) {
