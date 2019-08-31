@@ -152,10 +152,10 @@ public:
             ServiceInteractionProxy *proxy = &sHardwareServiceInteractionProxy);
 
     /**
-     * Retrieve the total number of available cameras. This value may change dynamically as cameras
-     * are added or removed.
+     * Retrieve the total number of available cameras.
+     * This value may change dynamically as cameras are added or removed.
      */
-    int getCameraCount() const;
+    std::pair<int, int> getCameraCount() const;
 
     std::vector<std::string> getCameraDeviceIds() const;
 
@@ -292,7 +292,7 @@ public:
      */
     bool isLogicalCamera(const std::string& id, std::vector<std::string>* physicalCameraIds);
 
-    SystemCameraKind getSystemCameraKind(const std::string& id);
+    SystemCameraKind getSystemCameraKind(const std::string& id) const;
     bool isHiddenPhysicalCamera(const std::string& cameraId);
 
     static const float kDepthARTolerance;
@@ -615,6 +615,12 @@ private:
     status_t getCameraCharacteristicsLocked(const std::string &id,
             CameraMetadata* characteristics) const;
     void filterLogicalCameraIdsLocked(std::vector<std::string>& deviceIds) const;
+
+    SystemCameraKind getSystemCameraKindLocked(const std::string& id) const;
+
+    void collectDeviceIdsLocked(const std::vector<std::string> deviceIds,
+            std::vector<std::string>& normalDeviceIds,
+            std::vector<std::string>& systemCameraDeviceIds) const;
 };
 
 } // namespace android

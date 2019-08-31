@@ -667,6 +667,13 @@ private:
         return mCameraProviderManager->getSystemCameraKind(cameraId.c_str());
     }
 
+    // Update the set of API1Compatible camera devices without including system
+    // cameras and secure cameras. This is used for hiding system only cameras
+    // from clients using camera1 api and not having android.permission.SYSTEM_CAMERA.
+    // This function expects @param normalDeviceIds, to have normalDeviceIds
+    // sorted in alpha-numeric order.
+    void filterAPI1SystemCameraLocked(const std::vector<std::string> &normalDeviceIds);
+
     // Single implementation shared between the various connect calls
     template<class CALLBACK, class CLIENT>
     binder::Status connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
@@ -821,9 +828,14 @@ private:
      */
     void updateCameraNumAndIds();
 
+    // Number of camera devices (excluding hidden secure cameras)
     int                 mNumberOfCameras;
+    // Number of camera devices (excluding hidden secure cameras and
+    // system cameras)
+    int                 mNumberOfCamerasWithoutSystemCamera;
 
     std::vector<std::string> mNormalDeviceIds;
+    std::vector<std::string> mNormalDeviceIdsWithoutSystemCamera;
 
     // sounds
     sp<MediaPlayer>     newMediaPlayer(const char *file);

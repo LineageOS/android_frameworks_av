@@ -104,13 +104,25 @@ status_t CameraProviderManager::initialize(wp<CameraProviderManager::StatusListe
     return OK;
 }
 
-int CameraProviderManager::getCameraCount() const {
+std::pair<int, int> CameraProviderManager::getCameraCount() const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
-    int count = 0;
+    int systemCameraCount = 0;
+    int publicCameraCount = 0;
     for (auto& provider : mProviders) {
-        count += provider->mUniqueCameraIds.size();
+        for (auto &id : provider->mUniqueCameraIds) {
+            switch(getSystemCameraKindLocked(id)) {
+                case SystemCameraKind::PUBLIC:
+                    publicCameraCount++;
+                    break;
+                case SystemCameraKind::SYSTEM_ONLY_CAMERA:
+                    systemCameraCount++;
+                    break;
+                default:
+                    break;
+            }
+        }
     }
-    return count;
+    return std::make_pair(systemCameraCount, publicCameraCount);
 }
 
 std::vector<std::string> CameraProviderManager::getCameraDeviceIds() const {
@@ -124,21 +136,38 @@ std::vector<std::string> CameraProviderManager::getCameraDeviceIds() const {
     return deviceIds;
 }
 
+void CameraProviderManager::collectDeviceIdsLocked(const std::vector<std::string> deviceIds,
+        std::vector<std::string>& publicDeviceIds,
+        std::vector<std::string>& systemDeviceIds) const {
+    for (auto &deviceId : deviceIds) {
+        if (getSystemCameraKindLocked(deviceId) == SystemCameraKind::SYSTEM_ONLY_CAMERA) {
+            systemDeviceIds.push_back(deviceId);
+        } else {
+            publicDeviceIds.push_back(deviceId);
+        }
+    }
+}
+
 std::vector<std::string> CameraProviderManager::getAPI1CompatibleCameraDeviceIds() const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    std::vector<std::string> publicDeviceIds;
+    std::vector<std::string> systemDeviceIds;
     std::vector<std::string> deviceIds;
     for (auto& provider : mProviders) {
         std::vector<std::string> providerDeviceIds = provider->mUniqueAPI1CompatibleCameraIds;
-
+        // Secure cameras should not be exposed through camera 1 api
+        providerDeviceIds.erase(std::remove_if(providerDeviceIds.begin(), providerDeviceIds.end(),
+                [this](const std::string& s) {
+                bool rem = this->getSystemCameraKindLocked(s) ==
+                        SystemCameraKind::HIDDEN_SECURE_CAMERA;
+                return rem;}), providerDeviceIds.end());
         // API1 app doesn't handle logical and physical camera devices well. So
         // for each camera facing, only take the first id advertised by HAL in
         // all [logical, physical1, physical2, ...] id combos, and filter out the rest.
         filterLogicalCameraIdsLocked(providerDeviceIds);
-
-        deviceIds.insert(deviceIds.end(), providerDeviceIds.begin(), providerDeviceIds.end());
+        collectDeviceIdsLocked(providerDeviceIds, publicDeviceIds, systemDeviceIds);
     }
-
-    std::sort(deviceIds.begin(), deviceIds.end(),
+    auto sortFunc =
             [](const std::string& a, const std::string& b) -> bool {
                 uint32_t aUint = 0, bUint = 0;
                 bool aIsUint = base::ParseUint(a, &aUint);
@@ -154,7 +183,13 @@ std::vector<std::string> CameraProviderManager::getAPI1CompatibleCameraDeviceIds
                 }
                 // Simple string compare if both id are not uint
                 return a < b;
-            });
+            };
+    // We put device ids for system cameras at the end since they will be pared
+    // off for processes not having system camera permissions.
+    std::sort(publicDeviceIds.begin(), publicDeviceIds.end(), sortFunc);
+    std::sort(systemDeviceIds.begin(), systemDeviceIds.end(), sortFunc);
+    deviceIds.insert(deviceIds.end(), publicDeviceIds.begin(), publicDeviceIds.end());
+    deviceIds.insert(deviceIds.end(), systemDeviceIds.begin(), systemDeviceIds.end());
     return deviceIds;
 }
 
@@ -1054,9 +1089,12 @@ bool CameraProviderManager::isLogicalCamera(const std::string& id,
     return deviceInfo->mIsLogicalCamera;
 }
 
-SystemCameraKind CameraProviderManager::getSystemCameraKind(const std::string& id) {
+SystemCameraKind CameraProviderManager::getSystemCameraKind(const std::string& id) const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    return getSystemCameraKindLocked(id);
+}
 
+SystemCameraKind CameraProviderManager::getSystemCameraKindLocked(const std::string& id) const {
     auto deviceInfo = findDeviceInfoLocked(id);
     if (deviceInfo == nullptr) {
         return SystemCameraKind::PUBLIC;
