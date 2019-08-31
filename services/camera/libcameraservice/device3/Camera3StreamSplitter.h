@@ -102,6 +102,13 @@ private:
     void onFrameAvailable(const BufferItem& item) override;
 
     // From IConsumerListener
+    //
+    // Similar to onFrameAvailable, but buffer item is indeed replacing a buffer
+    // in the buffer queue. This can happen when buffer queue is in droppable
+    // mode.
+    void onFrameReplaced(const BufferItem& item) override;
+
+    // From IConsumerListener
     // We don't care about released buffers because we detach each buffer as
     // soon as we acquire it. See the comment for onBufferReleased below for
     // some clarifying notes about the name.

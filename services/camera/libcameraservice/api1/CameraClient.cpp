@@ -1171,4 +1171,18 @@ status_t CameraClient::setVideoTarget(const sp<IGraphicBufferProducer>& bufferPr
     return INVALID_OPERATION;
 }
 
+int32_t CameraClient::setAudioRestriction(int mode) {
+    if (!isValidAudioRestriction(mode)) {
+        ALOGE("%s: invalid audio restriction mode %d", __FUNCTION__, mode);
+        return BAD_VALUE;
+    }
+
+    Mutex::Autolock lock(mLock);
+    if (checkPidAndHardware() != NO_ERROR) {
+        return INVALID_OPERATION;
+    }
+    return BasicClient::setAudioRestriction(mode);
+}
+
+
 }; // namespace android
