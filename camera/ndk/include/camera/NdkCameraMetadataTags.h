@@ -3543,11 +3543,19 @@ typedef enum acamera_metadata_tag {
      * output capture result.</p>
      * <p>This control is only effective if ACAMERA_CONTROL_AE_MODE or ACAMERA_CONTROL_MODE is set to
      * OFF; otherwise the auto-exposure algorithm will override this value.</p>
+     * <p>Note that for devices supporting postRawSensitivityBoost, the total sensitivity applied
+     * to the final processed image is the combination of ACAMERA_SENSOR_SENSITIVITY and
+     * ACAMERA_CONTROL_POST_RAW_SENSITIVITY_BOOST. In case the application uses the sensor
+     * sensitivity from last capture result of an auto request for a manual request, in order
+     * to achieve the same brightness in the output image, the application should also
+     * set postRawSensitivityBoost.</p>
      *
      * @see ACAMERA_CONTROL_AE_MODE
      * @see ACAMERA_CONTROL_MODE
+     * @see ACAMERA_CONTROL_POST_RAW_SENSITIVITY_BOOST
      * @see ACAMERA_SENSOR_INFO_SENSITIVITY_RANGE
      * @see ACAMERA_SENSOR_MAX_ANALOG_SENSITIVITY
+     * @see ACAMERA_SENSOR_SENSITIVITY
      */
     ACAMERA_SENSOR_SENSITIVITY =                                // int32
             ACAMERA_SENSOR_START + 2,
