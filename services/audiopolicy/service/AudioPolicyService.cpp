@@ -552,19 +552,17 @@ void AudioPolicyService::updateUidStates_l()
             }
         } else if (mUidPolicy->isA11yUid(current->uid)) {
             // For accessibility service allow capture if:
-            //     Is on TOP
-            //          AND the source is VOICE_RECOGNITION or HOTWORD
-            //     Or
-            //          The assistant is not on TOP
-            //          AND there is no active privacy sensitive capture or call
+            //     The assistant is not on TOP
+            //         AND there is no active privacy sensitive capture or call
             //             OR client has CAPTURE_AUDIO_OUTPUT privileged permission
+            //     OR
+            //         Is on TOP AND the source is VOICE_RECOGNITION or HOTWORD
+            if (!isAssistantOnTop
+                    && (!(isSensitiveActive || isInCall) || current->canCaptureOutput)) {
+                allowCapture = true;
+            }
             if (isA11yOnTop) {
                 if (source == AUDIO_SOURCE_VOICE_RECOGNITION || source == AUDIO_SOURCE_HOTWORD) {
-                    allowCapture = true;
-                }
-            } else {
-                if (!isAssistantOnTop
-                        && (!(isSensitiveActive || isInCall) || current->canCaptureOutput)) {
                     allowCapture = true;
                 }
             }
@@ -993,8 +991,7 @@ void AudioPolicyService::UidPolicy::updateUidLocked(std::unordered_map<uid_t,
 
 bool AudioPolicyService::UidPolicy::isA11yOnTop() {
     for (const auto &uid : mCachedUids) {
-        std::vector<uid_t>::iterator it = find(mA11yUids.begin(), mA11yUids.end(), uid.first);
-        if (it == mA11yUids.end()) {
+        if (!isA11yUid(uid.first)) {
             continue;
         }
         if (uid.second.second >= ActivityManager::PROCESS_STATE_TOP
