@@ -36,6 +36,8 @@ const char * const AudioParameter::keyBtNrec = AUDIO_PARAMETER_KEY_BT_NREC;
 const char * const AudioParameter::keyHwAvSync = AUDIO_PARAMETER_HW_AV_SYNC;
 const char * const AudioParameter::keyPresentationId = AUDIO_PARAMETER_STREAM_PRESENTATION_ID;
 const char * const AudioParameter::keyProgramId = AUDIO_PARAMETER_STREAM_PROGRAM_ID;
+const char * const AudioParameter::keyAudioLanguagePreferred =
+        AUDIO_PARAMETER_KEY_AUDIO_LANGUAGE_PREFERRED;
 const char * const AudioParameter::keyMonoOutput = AUDIO_PARAMETER_MONO_OUTPUT;
 const char * const AudioParameter::keyStreamHwAvSync = AUDIO_PARAMETER_STREAM_HW_AV_SYNC;
 const char * const AudioParameter::keyStreamConnect = AUDIO_PARAMETER_DEVICE_CONNECT;

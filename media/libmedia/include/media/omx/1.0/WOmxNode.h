@@ -59,7 +59,7 @@ using ::android::sp;
  * - TW = Treble Wrapper --- It wraps a legacy object inside a Treble object.
  */
 
-struct LWOmxNode : public H2BConverter<IOmxNode, IOMXNode, BnOMXNode> {
+struct LWOmxNode : public H2BConverter<IOmxNode, BnOMXNode> {
     LWOmxNode(sp<IOmxNode> const& base) : CBase(base) {}
     status_t freeNode() override;
     status_t sendCommand(

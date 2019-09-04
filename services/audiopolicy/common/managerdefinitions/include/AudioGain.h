@@ -18,7 +18,9 @@
 
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
+#include <utils/String8.h>
 #include <system/audio.h>
+#include <vector>
 
 namespace android {
 
@@ -53,10 +55,13 @@ public:
     int getMaxRampInMs() const { return mGain.max_ramp_ms; }
 
     // TODO: remove dump from here (split serialization)
-    void dump(int fd, int spaces, int index) const;
+    void dump(String8 *dst, int spaces, int index) const;
 
     void getDefaultConfig(struct audio_gain_config *config);
     status_t checkConfig(const struct audio_gain_config *config);
+
+    void setUseForVolume(bool canUseForVolume) { mUseForVolume = canUseForVolume; }
+    bool canUseForVolume() const { return mUseForVolume; }
 
     const struct audio_gain &getGain() const { return mGain; }
 
@@ -64,6 +69,27 @@ private:
     int               mIndex;
     struct audio_gain mGain;
     bool              mUseInChannelMask;
+    bool              mUseForVolume = false;
+};
+
+class AudioGains : public std::vector<sp<AudioGain> >
+{
+public:
+    bool canUseForVolume() const
+    {
+        for (const auto &gain: *this) {
+            if (gain->canUseForVolume()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    int32_t add(const sp<AudioGain> gain)
+    {
+        push_back(gain);
+        return 0;
+    }
 };
 
 } // namespace android

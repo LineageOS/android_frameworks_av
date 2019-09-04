@@ -89,12 +89,27 @@ void FrameProcessorBase::dump(int fd, const Vector<String16>& /*args*/) {
     write(fd, result.string(), result.size());
 
     CameraMetadata lastFrame;
+    std::map<std::string, CameraMetadata> lastPhysicalFrames;
     {
         // Don't race while dumping metadata
         Mutex::Autolock al(mLastFrameMutex);
         lastFrame = CameraMetadata(mLastFrame);
+
+        for (const auto& physicalFrame : mLastPhysicalFrames) {
+            lastPhysicalFrames.emplace(String8(physicalFrame.mPhysicalCameraId),
+                    physicalFrame.mPhysicalCameraMetadata);
+        }
     }
-    lastFrame.dump(fd, 2, 6);
+    lastFrame.dump(fd, /*verbosity*/2, /*indentation*/6);
+
+    for (const auto& physicalFrame : lastPhysicalFrames) {
+        result = String8::format("   Latest received frame for physical camera %s:\n",
+                physicalFrame.first.c_str());
+        write(fd, result.string(), result.size());
+        CameraMetadata lastPhysicalMetadata = CameraMetadata(physicalFrame.second);
+        lastPhysicalMetadata.sort();
+        lastPhysicalMetadata.dump(fd, /*verbosity*/2, /*indentation*/6);
+    }
 }
 
 bool FrameProcessorBase::threadLoop() {
@@ -145,6 +160,8 @@ void FrameProcessorBase::processNewFrames(const sp<CameraDeviceBase> &device) {
         if (!result.mMetadata.isEmpty()) {
             Mutex::Autolock al(mLastFrameMutex);
             mLastFrame.acquire(result.mMetadata);
+
+            mLastPhysicalFrames = std::move(result.mPhysicalMetadatas);
         }
     }
     if (res != NOT_ENOUGH_DATA) {

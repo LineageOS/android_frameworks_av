@@ -29,7 +29,6 @@ class Stream : public CSubsystemObject
 private:
     struct Applicable
     {
-        uint32_t strategy; /**< applicable strategy for this stream. */
         uint32_t volumeProfile; /**< applicable strategy for this stream. */
     } __attribute__((packed));
 

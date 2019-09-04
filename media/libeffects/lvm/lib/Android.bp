@@ -129,11 +129,17 @@ cc_library_static {
         "Common/lib",
         "Bundle/lib",
     ],
-
+    shared_libs: [
+        "liblog",
+    ],
+    header_libs: [
+        "libhardware_headers"
+    ],
     cflags: [
         "-fvisibility=hidden",
         "-DBUILD_FLOAT",
         "-DHIGHER_FS",
+        "-DSUPPORT_MC",
 
         "-Wall",
         "-Werror",

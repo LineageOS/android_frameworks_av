@@ -32,6 +32,11 @@
 #include <media/hardware/MetadataBufferType.h>
 #include <ui/GraphicBuffer.h>
 #include <gui/BufferItem.h>
+#include <gui/BufferQueue.h>
+#include <gui/bufferqueue/1.0/WGraphicBufferProducer.h>
+#include <gui/bufferqueue/2.0/B2HGraphicBufferProducer.h>
+#include <gui/IGraphicBufferProducer.h>
+#include <gui/IGraphicBufferConsumer.h>
 #include <media/hardware/HardwareAPI.h>
 
 #include <inttypes.h>
@@ -281,6 +286,39 @@ private:
     }
 };
 
+struct GraphicBufferSource::ConsumerProxy : public BufferQueue::ConsumerListener {
+    ConsumerProxy(const wp<GraphicBufferSource> &gbs) : mGbs(gbs) {}
+
+    ~ConsumerProxy() = default;
+
+    void onFrameAvailable(const BufferItem& item) override {
+        sp<GraphicBufferSource> gbs = mGbs.promote();
+        if (gbs != nullptr) {
+            gbs->onFrameAvailable(item);
+        }
+    }
+
+    void onBuffersReleased() override {
+        sp<GraphicBufferSource> gbs = mGbs.promote();
+        if (gbs != nullptr) {
+            gbs->onBuffersReleased();
+        }
+    }
+
+    void onSidebandStreamChanged() override {
+        sp<GraphicBufferSource> gbs = mGbs.promote();
+        if (gbs != nullptr) {
+            gbs->onSidebandStreamChanged();
+        }
+    }
+
+private:
+    // Note that GraphicBufferSource is holding an sp to us, we can't hold
+    // an sp back to GraphicBufferSource as the circular dependency will
+    // make both immortal.
+    wp<GraphicBufferSource> mGbs;
+};
+
 GraphicBufferSource::GraphicBufferSource() :
     mInitCheck(UNKNOWN_ERROR),
     mNumAvailableUnacquiredBuffers(0),
@@ -313,14 +351,12 @@ GraphicBufferSource::GraphicBufferSource() :
     BufferQueue::createBufferQueue(&mProducer, &mConsumer);
     mConsumer->setConsumerName(name);
 
-    // Note that we can't create an sp<...>(this) in a ctor that will not keep a
-    // reference once the ctor ends, as that would cause the refcount of 'this'
-    // dropping to 0 at the end of the ctor.  Since all we need is a wp<...>
-    // that's what we create.
-    wp<BufferQueue::ConsumerListener> listener =
-            static_cast<BufferQueue::ConsumerListener*>(this);
+    // create the consumer listener interface, and hold sp so that this
+    // interface lives as long as the GraphicBufferSource.
+    mConsumerProxy = new ConsumerProxy(this);
+
     sp<IConsumerListener> proxy =
-            new BufferQueue::ProxyConsumerListener(listener);
+            new BufferQueue::ProxyConsumerListener(mConsumerProxy);
 
     mInitCheck = mConsumer->consumerConnect(proxy, false);
     if (mInitCheck != NO_ERROR) {
@@ -355,6 +391,24 @@ GraphicBufferSource::~GraphicBufferSource() {
             ALOGW("consumerDisconnect failed: %d", err);
         }
     }
+}
+
+sp<IGraphicBufferProducer> GraphicBufferSource::getIGraphicBufferProducer() const {
+    return mProducer;
+}
+
+sp<::android::hardware::graphics::bufferqueue::V1_0::IGraphicBufferProducer>
+GraphicBufferSource::getHGraphicBufferProducer_V1_0() const {
+    using TWGraphicBufferProducer = ::android::TWGraphicBufferProducer<
+        ::android::hardware::graphics::bufferqueue::V1_0::IGraphicBufferProducer>;
+
+    return new TWGraphicBufferProducer(getIGraphicBufferProducer());
+}
+
+sp<::android::hardware::graphics::bufferqueue::V2_0::IGraphicBufferProducer>
+GraphicBufferSource::getHGraphicBufferProducer() const {
+    return new ::android::hardware::graphics::bufferqueue::V2_0::utils::
+                    B2HGraphicBufferProducer(getIGraphicBufferProducer());
 }
 
 Status GraphicBufferSource::start() {
@@ -767,7 +821,7 @@ bool GraphicBufferSource::calculateCodecTimestamp_l(
             double nFrames = (timeUs - mPrevCaptureUs) * mCaptureFps / 1000000;
             if (nFrames < 0.5 - kTimestampFluctuation) {
                 // skip this frame as it's too close to previous capture
-                ALOGV("skipping frame, timeUs %lld", static_cast<long long>(timeUs));
+                ALOGD("skipping frame, timeUs %lld", static_cast<long long>(timeUs));
                 return false;
             }
             if (nFrames <= 1.0) {
@@ -1105,6 +1159,14 @@ status_t GraphicBufferSource::configure(
 
         consumerUsage |= GRALLOC_USAGE_HW_VIDEO_ENCODER;
         mConsumer->setConsumerUsageBits(consumerUsage);
+
+        // Set impl. defined format as default. Depending on the usage flags
+        // the device-specific implementation will derive the exact format.
+        err = mConsumer->setDefaultBufferFormat(HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED);
+        if (err != NO_ERROR) {
+            ALOGE("Failed to configure surface default format ret: %d", err);
+            return err;
+        }
 
         // Sets the default buffer data space
         ALOGD("setting dataspace: %#x, acquired=%d", dataSpace, mNumOutstandingAcquires);

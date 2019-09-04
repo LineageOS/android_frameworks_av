@@ -25,6 +25,7 @@ extern const char *MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC;
 
 extern const char *MEDIA_MIMETYPE_VIDEO_VP8;
 extern const char *MEDIA_MIMETYPE_VIDEO_VP9;
+extern const char *MEDIA_MIMETYPE_VIDEO_AV1;
 extern const char *MEDIA_MIMETYPE_VIDEO_AVC;
 extern const char *MEDIA_MIMETYPE_VIDEO_HEVC;
 extern const char *MEDIA_MIMETYPE_VIDEO_MPEG4;
@@ -33,6 +34,10 @@ extern const char *MEDIA_MIMETYPE_VIDEO_MPEG2;
 extern const char *MEDIA_MIMETYPE_VIDEO_RAW;
 extern const char *MEDIA_MIMETYPE_VIDEO_DOLBY_VISION;
 extern const char *MEDIA_MIMETYPE_VIDEO_SCRAMBLED;
+extern const char *MEDIA_MIMETYPE_VIDEO_DIVX;
+extern const char *MEDIA_MIMETYPE_VIDEO_DIVX3;
+extern const char *MEDIA_MIMETYPE_VIDEO_XVID;
+extern const char *MEDIA_MIMETYPE_VIDEO_MJPEG;
 
 extern const char *MEDIA_MIMETYPE_AUDIO_AMR_NB;
 extern const char *MEDIA_MIMETYPE_AUDIO_AMR_WB;
@@ -52,8 +57,14 @@ extern const char *MEDIA_MIMETYPE_AUDIO_AAC_ADTS;
 extern const char *MEDIA_MIMETYPE_AUDIO_MSGSM;
 extern const char *MEDIA_MIMETYPE_AUDIO_AC3;
 extern const char *MEDIA_MIMETYPE_AUDIO_EAC3;
+extern const char *MEDIA_MIMETYPE_AUDIO_EAC3_JOC;
+extern const char *MEDIA_MIMETYPE_AUDIO_AC4;
 extern const char *MEDIA_MIMETYPE_AUDIO_SCRAMBLED;
 extern const char *MEDIA_MIMETYPE_AUDIO_ALAC;
+extern const char *MEDIA_MIMETYPE_AUDIO_WMA;
+extern const char *MEDIA_MIMETYPE_AUDIO_MS_ADPCM;
+extern const char *MEDIA_MIMETYPE_AUDIO_DVI_IMA_ADPCM;
+
 
 extern const char *MEDIA_MIMETYPE_CONTAINER_MPEG4;
 extern const char *MEDIA_MIMETYPE_CONTAINER_WAV;

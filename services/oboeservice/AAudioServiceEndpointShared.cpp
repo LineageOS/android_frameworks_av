@@ -78,6 +78,7 @@ aaudio_result_t AAudioServiceEndpointShared::open(const aaudio::AAudioStreamRequ
     setSamplesPerFrame(mStreamInternal->getSamplesPerFrame());
     setDeviceId(mStreamInternal->getDeviceId());
     setSessionId(mStreamInternal->getSessionId());
+    setFormat(AUDIO_FORMAT_PCM_FLOAT); // force for mixer
     mFramesPerBurst = mStreamInternal->getFramesPerBurst();
 
     return result;
@@ -180,8 +181,8 @@ aaudio_result_t AAudioServiceEndpointShared::stopStream(sp<AAudioServiceStreamBa
 // Get timestamp that was written by the real-time service thread, eg. mixer.
 aaudio_result_t AAudioServiceEndpointShared::getFreeRunningPosition(int64_t *positionFrames,
                                                                   int64_t *timeNanos) {
-    if (mAtomicTimestamp.isValid()) {
-        Timestamp timestamp = mAtomicTimestamp.read();
+    if (mAtomicEndpointTimestamp.isValid()) {
+        Timestamp timestamp = mAtomicEndpointTimestamp.read();
         *positionFrames = timestamp.getPosition();
         *timeNanos = timestamp.getNanoseconds();
         return AAUDIO_OK;

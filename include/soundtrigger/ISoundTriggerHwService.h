@@ -33,12 +33,14 @@ public:
 
     DECLARE_META_INTERFACE(SoundTriggerHwService);
 
-    virtual status_t listModules(struct sound_trigger_module_descriptor *modules,
+    virtual status_t listModules(const String16& opPackageName,
+                                 struct sound_trigger_module_descriptor *modules,
                                  uint32_t *numModules) = 0;
 
-    virtual status_t attach(const sound_trigger_module_handle_t handle,
-                                      const sp<ISoundTriggerClient>& client,
-                                      sp<ISoundTrigger>& module) = 0;
+    virtual status_t attach(const String16& opPackageName,
+                            const sound_trigger_module_handle_t handle,
+                            const sp<ISoundTriggerClient>& client,
+                            sp<ISoundTrigger>& module) = 0;
 
     virtual status_t setCaptureState(bool active) = 0;
 };

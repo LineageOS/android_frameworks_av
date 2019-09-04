@@ -96,7 +96,8 @@ status_t NuPlayer2::RTSPSource2::setBufferingSettings(const BufferingSettings& b
     return OK;
 }
 
-void NuPlayer2::RTSPSource2::prepareAsync() {
+// TODO: fetch data starting from |startTimeUs|
+void NuPlayer2::RTSPSource2::prepareAsync(int64_t /* startTimeUs */) {
     if (mIsSDP && mHTTPService == NULL) {
         notifyPrepared(BAD_VALUE);
         return;
@@ -104,7 +105,7 @@ void NuPlayer2::RTSPSource2::prepareAsync() {
 
     if (mLooper == NULL) {
         mLooper = new ALooper;
-        mLooper->setName("rtsp");
+        mLooper->setName("rtsp2");
         mLooper->start();
 
         mLooper->registerHandler(this);

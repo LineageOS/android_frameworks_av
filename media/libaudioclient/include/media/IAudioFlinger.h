@@ -146,6 +146,7 @@ public:
             afSampleRate = parcel->readInt64();
             afLatencyMs = parcel->readInt32();
             (void)parcel->read(&outputId, sizeof(audio_io_handle_t));
+            (void)parcel->read(&portId, sizeof(audio_port_handle_t));
             return NO_ERROR;
         }
 
@@ -163,6 +164,7 @@ public:
             (void)parcel->writeInt64(afSampleRate);
             (void)parcel->writeInt32(afLatencyMs);
             (void)parcel->write(&outputId, sizeof(audio_io_handle_t));
+            (void)parcel->write(&portId, sizeof(audio_port_handle_t));
             return NO_ERROR;
         }
 
@@ -179,6 +181,7 @@ public:
         uint32_t afSampleRate;
         uint32_t afLatencyMs;
         audio_io_handle_t outputId;
+        audio_port_handle_t portId;
     };
 
     /* CreateRecordInput contains all input arguments sent by AudioRecord to AudioFlinger
@@ -202,6 +205,9 @@ public:
                 return DEAD_OBJECT;
             }
             opPackageName = parcel->readString16();
+            if (parcel->read(&riid, sizeof(audio_unique_id_t)) != NO_ERROR) {
+                return DEAD_OBJECT;
+            }
 
             /* input/output arguments*/
             (void)parcel->read(&flags, sizeof(audio_input_flags_t));
@@ -218,6 +224,7 @@ public:
             (void)parcel->write(&config, sizeof(audio_config_base_t));
             (void)clientInfo.writeToParcel(parcel);
             (void)parcel->writeString16(opPackageName);
+            (void)parcel->write(&riid, sizeof(audio_unique_id_t));
 
             /* input/output arguments*/
             (void)parcel->write(&flags, sizeof(audio_input_flags_t));
@@ -233,6 +240,7 @@ public:
         audio_config_base_t config;
         AudioClient clientInfo;
         String16 opPackageName;
+        audio_unique_id_t riid;
 
         /* input/output */
         audio_input_flags_t flags;
@@ -271,6 +279,7 @@ public:
                     return BAD_VALUE;
                 }
             }
+            (void)parcel->read(&portId, sizeof(audio_port_handle_t));
             return NO_ERROR;
         }
 
@@ -297,6 +306,7 @@ public:
             } else {
                 (void)parcel->writeInt32(0);
             }
+            (void)parcel->write(&portId, sizeof(audio_port_handle_t));
 
             return NO_ERROR;
         }
@@ -313,6 +323,7 @@ public:
         audio_io_handle_t inputId;
         sp<IMemory> cblk;
         sp<IMemory> buffers;
+        audio_port_handle_t portId;
     };
 
     // invariant on exit for all APIs that return an sp<>:
@@ -352,6 +363,9 @@ public:
 
     virtual     float       masterVolume() const = 0;
     virtual     bool        masterMute() const = 0;
+
+    virtual     status_t    setMasterBalance(float balance) = 0;
+    virtual     status_t    getMasterBalance(float *balance) const = 0;
 
     /* set/get stream type state. This will probably be used by
      * the preference panel, mostly.
@@ -428,7 +442,9 @@ public:
     virtual status_t queryEffect(uint32_t index, effect_descriptor_t *pDescriptor) const = 0;
 
     virtual status_t getEffectDescriptor(const effect_uuid_t *pEffectUUID,
-                                        effect_descriptor_t *pDescriptor) const = 0;
+                                         const effect_uuid_t *pTypeUUID,
+                                         uint32_t preferredTypeFlag,
+                                         effect_descriptor_t *pDescriptor) const = 0;
 
     virtual sp<IEffect> createEffect(
                                     effect_descriptor_t *pDesc,
@@ -445,6 +461,10 @@ public:
 
     virtual status_t moveEffects(audio_session_t session, audio_io_handle_t srcOutput,
                                     audio_io_handle_t dstOutput) = 0;
+
+    virtual void setEffectSuspended(int effectId,
+                                    audio_session_t sessionId,
+                                    bool suspended) = 0;
 
     virtual audio_module_handle_t loadHwModule(const char *name) = 0;
 

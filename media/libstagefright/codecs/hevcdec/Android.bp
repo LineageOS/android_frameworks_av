@@ -1,27 +1,16 @@
 cc_library_shared {
     name: "libstagefright_soft_hevcdec",
-    vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
+    defaults: ["libstagefright_softomx-defaults"],
 
     static_libs: ["libhevcdec"],
     srcs: ["SoftHEVC.cpp"],
 
     cflags: [
         "-Wall",
-        "-Werror",
         "-Wno-unused-variable",
     ],
 
     version_script: "exports.lds",
-
-    include_dirs: [
-        "external/libhevc/decoder",
-        "external/libhevc/common",
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include/media/openmax",
-    ],
 
     sanitize: {
         misc_undefined: [
@@ -30,16 +19,8 @@ cc_library_shared {
         cfi: true,
     },
 
-    shared_libs: [
-        "libstagefright_omx",
-        "libstagefright_foundation",
-        "libutils",
-        "liblog",
-    ],
-
     // We need this because the current asm generates the following link error:
     // requires unsupported dynamic reloc R_ARM_REL32; recompile with -fPIC
     // Bug: 16853291
     ldflags: ["-Wl,-Bsymbolic"],
-    compile_multilib: "32",
 }

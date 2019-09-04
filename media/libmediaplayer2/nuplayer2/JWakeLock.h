@@ -18,7 +18,7 @@
 #define J_WAKELOCK_H_
 
 #include <media/stagefright/foundation/ABase.h>
-#include <powermanager/IPowerManager.h>
+#include <mediaplayer2/JObjectHolder.h>
 #include <utils/RefBase.h>
 
 namespace android {
@@ -26,7 +26,7 @@ namespace android {
 class JWakeLock : public RefBase {
 
 public:
-    JWakeLock();
+    JWakeLock(const sp<JObjectHolder> &context);
 
     // NOTE: acquire and release are not thread safe
 
@@ -37,28 +37,11 @@ public:
     virtual ~JWakeLock();
 
 private:
-    sp<IPowerManager> mPowerManager;
-    sp<IBinder>       mWakeLockToken;
-    uint32_t          mWakeLockCount;
+    uint32_t                mWakeLockCount;
+    sp<JObjectHolder>       mWakeLock;
+    const sp<JObjectHolder> mContext;
 
-    class PMDeathRecipient : public IBinder::DeathRecipient {
-    public:
-        explicit PMDeathRecipient(JWakeLock *wakeLock) : mWakeLock(wakeLock) {}
-        virtual ~PMDeathRecipient() {}
-
-        // IBinder::DeathRecipient
-        virtual void binderDied(const wp<IBinder> &who);
-
-    private:
-        PMDeathRecipient(const PMDeathRecipient&);
-        PMDeathRecipient& operator= (const PMDeathRecipient&);
-
-        JWakeLock *mWakeLock;
-    };
-
-    const sp<PMDeathRecipient> mDeathRecipient;
-
-    void clearPowerManager();
+    void clearJavaWakeLock();
 
     DISALLOW_EVIL_CONSTRUCTORS(JWakeLock);
 };

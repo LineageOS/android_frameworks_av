@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0__CONVERSION_H
-#define ANDROID_HARDWARE_MEDIA_OMX_V1_0__CONVERSION_H
+#ifndef ANDROID_HARDWARE_MEDIA_OMX_V1_0_UTILS_CONVERSION_H
+#define ANDROID_HARDWARE_MEDIA_OMX_V1_0_UTILS_CONVERSION_H
 
 #include <vector>
 #include <list>
@@ -31,12 +31,12 @@
 #include <ui/FenceTime.h>
 #include <cutils/native_handle.h>
 
+#include <ui/BufferQueueDefs.h>
 #include <ui/GraphicBuffer.h>
 #include <media/OMXFenceParcelable.h>
 #include <media/OMXBuffer.h>
 #include <media/hardware/VideoAPI.h>
 #include <media/stagefright/MediaErrors.h>
-#include <gui/IGraphicBufferProducer.h>
 
 #include <android/hardware/media/omx/1.0/types.h>
 #include <android/hardware/media/omx/1.0/IOmx.h>
@@ -258,7 +258,12 @@ inline status_t toStatusT(Status const& t) {
  */
 // convert: Status -> status_t
 inline status_t toStatusT(Return<Status> const& t) {
-    return t.isOk() ? toStatusT(static_cast<Status>(t)) : UNKNOWN_ERROR;
+    if (t.isOk()) {
+        return toStatusT(static_cast<Status>(t));
+    } else if (t.isDeadObject()) {
+        return DEAD_OBJECT;
+    }
+    return UNKNOWN_ERROR;
 }
 
 /**
@@ -282,8 +287,8 @@ inline Status toStatus(status_t l) {
     case TIMED_OUT:
     case ERROR_UNSUPPORTED:
     case UNKNOWN_ERROR:
-    case IGraphicBufferProducer::RELEASE_ALL_BUFFERS:
-    case IGraphicBufferProducer::BUFFER_NEEDS_REALLOCATION:
+    case BufferQueueDefs::RELEASE_ALL_BUFFERS:
+    case BufferQueueDefs::BUFFER_NEEDS_REALLOCATION:
         return static_cast<Status>(l);
     case NOT_ENOUGH_DATA:
         return Status::BUFFER_NEEDS_REALLOCATION;
@@ -620,8 +625,18 @@ inline void wrapAs(AnwBuffer* t, GraphicBuffer const& l) {
 // convert: AnwBuffer -> GraphicBuffer
 // Ref: frameworks/native/libs/ui/GraphicBuffer.cpp: GraphicBuffer::flatten
 inline bool convertTo(GraphicBuffer* l, AnwBuffer const& t) {
-    native_handle_t* handle = t.nativeHandle == nullptr ?
-            nullptr : native_handle_clone(t.nativeHandle);
+    native_handle_t* handle = nullptr;
+
+    if (t.nativeHandle != nullptr) {
+        handle = native_handle_clone(t.nativeHandle);
+        if (handle == nullptr) {
+            ALOGE("Failed to clone handle: numFds=%d, data[0]=%d, data[1]=%d",
+                    t.nativeHandle->numFds,
+                    (t.nativeHandle->numFds > 0) ? t.nativeHandle->data[0] : -1,
+                    (t.nativeHandle->numFds > 1) ? t.nativeHandle->data[1] : -1);
+            return false;
+        }
+    }
 
     size_t const numInts = 12 + (handle ? handle->numInts : 0);
     int32_t* ints = new int32_t[numInts];
@@ -751,7 +766,12 @@ inline bool convertTo(OMXBuffer* l, CodecBuffer const& t) {
                 return true;
             }
             AnwBuffer anwBuffer;
-            anwBuffer.nativeHandle = t.nativeHandle;
+            // Explicitly get the native_handle_t* (in stead of assigning t.nativeHandle)
+            // so that we don't do an extra native_handle_clone() in this step, as the
+            // convertion to GraphicBuffer below will do a clone regardless.
+            // If we encounter an invalid handle, the convertTo() below would fail (while
+            // the assigning of hidl_handle would abort and cause a crash).
+            anwBuffer.nativeHandle = t.nativeHandle.getNativeHandle();
             anwBuffer.attr = t.attr.anwBuffer;
             sp<GraphicBuffer> graphicBuffer = new GraphicBuffer();
             if (!convertTo(graphicBuffer.get(), anwBuffer)) {
@@ -938,4 +958,4 @@ inline OMX_TICKS toOMXTicks(uint64_t t) {
 }  // namespace hardware
 }  // namespace android
 
-#endif  // ANDROID_HARDWARE_MEDIA_OMX_V1_0__CONVERSION_H
+#endif  // ANDROID_HARDWARE_MEDIA_OMX_V1_0_UTILS_CONVERSION_H

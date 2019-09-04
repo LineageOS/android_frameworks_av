@@ -69,7 +69,7 @@ struct NuPlayer2::Source : public AHandler {
             BufferingSettings* buffering /* nonnull */) = 0;
     virtual status_t setBufferingSettings(const BufferingSettings& buffering) = 0;
 
-    virtual void prepareAsync() = 0;
+    virtual void prepareAsync(int64_t startTimeUs) = 0;
 
     virtual void start() = 0;
     virtual void stop() {}

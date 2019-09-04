@@ -74,7 +74,7 @@ struct HeifFrameInfo
     int32_t  mRotationAngle;           // Rotation angle, clockwise, should be multiple of 90
     uint32_t mBytesPerPixel;           // Number of bytes for one pixel
     uint32_t mIccSize;                 // Number of bytes in mIccData
-    std::unique_ptr<uint8_t> mIccData; // Actual ICC data, memory is owned by this structure
+    std::unique_ptr<uint8_t[]> mIccData; // Actual ICC data, memory is owned by this structure
 };
 
 /*

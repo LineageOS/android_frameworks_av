@@ -18,10 +18,12 @@
 #define ANDROID_AUDIO_FAST_MIXER_H
 
 #include <atomic>
+#include <audio_utils/Balance.h>
 #include "FastThread.h"
 #include "StateQueue.h"
 #include "FastMixerState.h"
 #include "FastMixerDumpState.h"
+#include "NBAIO_Tee.h"
 
 namespace android {
 
@@ -32,12 +34,16 @@ typedef StateQueue<FastMixerState> FastMixerStateQueue;
 class FastMixer : public FastThread {
 
 public:
-            FastMixer();
+    /** FastMixer constructor takes as param the parent MixerThread's io handle (id)
+        for purposes of identification. */
+    explicit FastMixer(audio_io_handle_t threadIoHandle);
     virtual ~FastMixer();
 
             FastMixerStateQueue* sq();
 
     virtual void setMasterMono(bool mono) { mMasterMono.store(mono); /* memory_order_seq_cst */ }
+    virtual void setMasterBalance(float balance) { mMasterBalance.store(balance); }
+    virtual float getMasterBalance() const { return mMasterBalance.load(); }
     virtual void setBoottimeOffset(int64_t boottimeOffset) {
         mBoottimeOffset.store(boottimeOffset); /* memory_order_seq_cst */
     }
@@ -52,6 +58,14 @@ private:
     virtual bool isSubClassCommand(FastThreadState::Command command);
     virtual void onStateChange();
     virtual void onWork();
+
+    enum Reason {
+        REASON_REMOVE,
+        REASON_ADD,
+        REASON_MODIFY,
+    };
+    // called when a fast track of index has been removed, added, or modified
+    void updateMixerTrack(int index, Reason reason);
 
     // FIXME these former local variables need comments
     static const FastMixerState sInitial;
@@ -71,7 +85,9 @@ private:
     audio_channel_mask_t mSinkChannelMask;
     void*           mMixerBuffer;       // mixer output buffer.
     size_t          mMixerBufferSize;
-    audio_format_t  mMixerBufferFormat; // mixer output format: AUDIO_FORMAT_PCM_(16_BIT|FLOAT).
+    static constexpr audio_format_t mMixerBufferFormat = AUDIO_FORMAT_PCM_FLOAT;
+
+    uint32_t        mAudioChannelCount; // audio channel count, excludes haptic channels.
 
     enum {UNDEFINED, MIXED, ZEROED} mMixerBufferState;
     NBAIO_Format    mFormat;
@@ -84,9 +100,17 @@ private:
     ExtendedTimestamp mTimestamp;
     int64_t         mNativeFramesWrittenButNotPresented;
 
+    audio_utils::Balance mBalance;
+
     // accessed without lock between multiple threads.
     std::atomic_bool mMasterMono;
+    std::atomic<float> mMasterBalance{};
     std::atomic_int_fast64_t mBoottimeOffset;
+
+    const audio_io_handle_t mThreadIoHandle; // parent thread id for debugging purposes
+#ifdef TEE_SINK
+    NBAIO_Tee       mTee;
+#endif
 };  // class FastMixer
 
 }   // namespace android

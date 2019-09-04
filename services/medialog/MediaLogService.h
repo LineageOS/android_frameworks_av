@@ -19,6 +19,7 @@
 
 #include <binder/BinderService.h>
 #include <media/IMediaLogService.h>
+#include <media/nblog/Merger.h>
 #include <media/nblog/NBLog.h>
 
 namespace android {
@@ -55,7 +56,7 @@ private:
 
     Mutex               mLock;
 
-    Vector<NBLog::NamedReader> mNamedReaders;   // protected by mLock
+    Vector<sp<NBLog::DumpReader>> mDumpReaders;   // protected by mLock
 
     // FIXME Need comments on all of these, especially about locking
     NBLog::Shared *mMergerShared;

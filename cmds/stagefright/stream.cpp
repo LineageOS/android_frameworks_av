@@ -24,7 +24,6 @@
 #include <media/DataSource.h>
 #include <media/IMediaHTTPService.h>
 #include <media/IStreamSource.h>
-#include <media/MediaExtractor.h>
 #include <media/mediaplayer.h>
 #include <media/MediaSource.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -32,6 +31,7 @@
 #include <media/stagefright/DataSourceFactory.h>
 #include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MPEG2TSWriter.h>
+#include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
 
@@ -318,10 +318,12 @@ int main(int argc, char **argv) {
     sp<SurfaceComposerClient> composerClient = new SurfaceComposerClient;
     CHECK_EQ(composerClient->initCheck(), (status_t)OK);
 
-    sp<IBinder> display(SurfaceComposerClient::getBuiltInDisplay(
-            ISurfaceComposer::eDisplayIdMain));
+    const sp<IBinder> display = SurfaceComposerClient::getInternalDisplayToken();
+    CHECK(display != nullptr);
+
     DisplayInfo info;
-    SurfaceComposerClient::getDisplayInfo(display, &info);
+    CHECK_EQ(SurfaceComposerClient::getDisplayInfo(display, &info), NO_ERROR);
+
     ssize_t displayWidth = info.w;
     ssize_t displayHeight = info.h;
 

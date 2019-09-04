@@ -82,6 +82,9 @@ void Camera3IOStreamBase::dump(int fd, const Vector<String16> &args) const {
     lines.appendFormat("      Max size: %zu\n", mMaxSize);
     lines.appendFormat("      Combined usage: %" PRIu64 ", max HAL buffers: %d\n",
             mUsage | consumerUsage, camera3_stream::max_buffers);
+    if (strlen(camera3_stream::physical_camera_id) > 0) {
+        lines.appendFormat("      Physical camera id: %s\n", camera3_stream::physical_camera_id);
+    }
     lines.appendFormat("      Frames produced: %d, last timestamp: %" PRId64 " ns\n",
             mFrameCount, mLastTimestamp);
     lines.appendFormat("      Total buffers: %zu, currently dequeued: %zu\n",
@@ -116,7 +119,7 @@ size_t Camera3IOStreamBase::getBufferCountLocked() {
     return mTotalBufferCount;
 }
 
-size_t Camera3IOStreamBase::getHandoutOutputBufferCountLocked() {
+size_t Camera3IOStreamBase::getHandoutOutputBufferCountLocked() const {
     return mHandoutOutputBufferCount;
 }
 
@@ -219,7 +222,8 @@ status_t Camera3IOStreamBase::returnBufferPreconditionCheckLocked() const {
 status_t Camera3IOStreamBase::returnAnyBufferLocked(
         const camera3_stream_buffer &buffer,
         nsecs_t timestamp,
-        bool output) {
+        bool output,
+        const std::vector<size_t>& surface_ids) {
     status_t res;
 
     // returnBuffer may be called from a raw pointer, not a sp<>, and we'll be
@@ -235,7 +239,7 @@ status_t Camera3IOStreamBase::returnAnyBufferLocked(
     }
 
     sp<Fence> releaseFence;
-    res = returnBufferCheckedLocked(buffer, timestamp, output,
+    res = returnBufferCheckedLocked(buffer, timestamp, output, surface_ids,
                                     &releaseFence);
     // Res may be an error, but we still want to decrement our owned count
     // to enable clean shutdown. So we'll just return the error but otherwise

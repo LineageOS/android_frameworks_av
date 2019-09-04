@@ -20,6 +20,7 @@
 #include <inttypes.h>
 
 #include <media/NdkMediaFormat.h>
+#include <media/NdkMediaFormatPriv.h>
 
 #include <utils/Log.h>
 #include <utils/StrongPointer.h>
@@ -31,30 +32,7 @@
 
 using namespace android;
 
-struct AMediaFormat {
-    sp<AMessage> mFormat;
-    String8 mDebug;
-    KeyedVector<String8, String8> mStringCache;
-};
-
 extern "C" {
-
-// private functions for conversion to/from AMessage
-AMediaFormat* AMediaFormat_fromMsg(const void* data) {
-    ALOGV("private ctor");
-    AMediaFormat* mData = new AMediaFormat();
-    mData->mFormat = *((sp<AMessage>*)data);
-    if (mData->mFormat == NULL) {
-        ALOGW("got NULL format");
-        mData->mFormat = new AMessage;
-    }
-    return mData;
-}
-
-void AMediaFormat_getFormat(const AMediaFormat* mData, void* dest) {
-    *((sp<AMessage>*)dest) = mData->mFormat;
-}
-
 
 /*
  * public function follow
@@ -70,6 +48,21 @@ EXPORT
 media_status_t AMediaFormat_delete(AMediaFormat *mData) {
     ALOGV("dtor");
     delete mData;
+    return AMEDIA_OK;
+}
+
+EXPORT
+void AMediaFormat_clear(AMediaFormat *format) {
+    format->mFormat->clear();
+}
+
+EXPORT
+media_status_t AMediaFormat_copy(AMediaFormat *to, AMediaFormat *from) {
+    if (!to || !from) {
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+    to->mFormat->clear();
+    to->mFormat->extend(from->mFormat);
     return AMEDIA_OK;
 }
 
@@ -255,7 +248,7 @@ void AMediaFormat_setString(AMediaFormat* format, const char* name, const char* 
 }
 
 EXPORT
-void AMediaFormat_setBuffer(AMediaFormat* format, const char* name, void* data, size_t size) {
+void AMediaFormat_setBuffer(AMediaFormat* format, const char* name, const void* data, size_t size) {
     // the ABuffer(void*, size_t) constructor doesn't take ownership of the data, so create
     // a new buffer and copy the data into it
     sp<ABuffer> buf = new ABuffer(size);
@@ -274,65 +267,124 @@ EXPORT const char* AMEDIAFORMAT_KEY_AAC_ENCODED_TARGET_LEVEL = "aac-encoded-targ
 EXPORT const char* AMEDIAFORMAT_KEY_AAC_MAX_OUTPUT_CHANNEL_COUNT = "aac-max-output-channel_count";
 EXPORT const char* AMEDIAFORMAT_KEY_AAC_PROFILE = "aac-profile";
 EXPORT const char* AMEDIAFORMAT_KEY_AAC_SBR_MODE = "aac-sbr-mode";
+EXPORT const char* AMEDIAFORMAT_KEY_ALBUM = "album";
+EXPORT const char* AMEDIAFORMAT_KEY_ALBUMART = "albumart";
+EXPORT const char* AMEDIAFORMAT_KEY_ALBUMARTIST = "albumartist";
+EXPORT const char* AMEDIAFORMAT_KEY_ARTIST = "artist";
+EXPORT const char* AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_INFO = "audio-presentation-info";
+EXPORT const char* AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_PRESENTATION_ID =
+        "audio-presentation-presentation-id";
+EXPORT const char* AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_PROGRAM_ID = "audio-presentation-program-id";
 EXPORT const char* AMEDIAFORMAT_KEY_AUDIO_SESSION_ID = "audio-session-id";
+EXPORT const char* AMEDIAFORMAT_KEY_AUTHOR = "author";
 EXPORT const char* AMEDIAFORMAT_KEY_BITRATE_MODE = "bitrate-mode";
 EXPORT const char* AMEDIAFORMAT_KEY_BIT_RATE = "bitrate";
+EXPORT const char* AMEDIAFORMAT_KEY_BITS_PER_SAMPLE = "bits-per-sample";
 EXPORT const char* AMEDIAFORMAT_KEY_CAPTURE_RATE = "capture-rate";
+EXPORT const char* AMEDIAFORMAT_KEY_CDTRACKNUMBER = "cdtracknum";
 EXPORT const char* AMEDIAFORMAT_KEY_CHANNEL_COUNT = "channel-count";
 EXPORT const char* AMEDIAFORMAT_KEY_CHANNEL_MASK = "channel-mask";
 EXPORT const char* AMEDIAFORMAT_KEY_COLOR_FORMAT = "color-format";
 EXPORT const char* AMEDIAFORMAT_KEY_COLOR_RANGE = "color-range";
 EXPORT const char* AMEDIAFORMAT_KEY_COLOR_STANDARD = "color-standard";
 EXPORT const char* AMEDIAFORMAT_KEY_COLOR_TRANSFER = "color-transfer";
+EXPORT const char* AMEDIAFORMAT_KEY_COMPILATION = "compilation";
 EXPORT const char* AMEDIAFORMAT_KEY_COMPLEXITY = "complexity";
+EXPORT const char* AMEDIAFORMAT_KEY_COMPOSER = "composer";
+EXPORT const char* AMEDIAFORMAT_KEY_CREATE_INPUT_SURFACE_SUSPENDED = "create-input-buffers-suspended";
+EXPORT const char* AMEDIAFORMAT_KEY_CRYPTO_DEFAULT_IV_SIZE = "crypto-default-iv-size";
+EXPORT const char* AMEDIAFORMAT_KEY_CRYPTO_ENCRYPTED_BYTE_BLOCK = "crypto-encrypted-byte-block";
+EXPORT const char* AMEDIAFORMAT_KEY_CRYPTO_ENCRYPTED_SIZES = "crypto-encrypted-sizes";
+EXPORT const char* AMEDIAFORMAT_KEY_CRYPTO_IV = "crypto-iv";
+EXPORT const char* AMEDIAFORMAT_KEY_CRYPTO_KEY = "crypto-key";
+EXPORT const char* AMEDIAFORMAT_KEY_CRYPTO_MODE = "crypto-mode";
+EXPORT const char* AMEDIAFORMAT_KEY_CRYPTO_PLAIN_SIZES = "crypto-plain-sizes";
+EXPORT const char* AMEDIAFORMAT_KEY_CRYPTO_SKIP_BYTE_BLOCK = "crypto-skip-byte-block";
 EXPORT const char* AMEDIAFORMAT_KEY_CSD = "csd";
 EXPORT const char* AMEDIAFORMAT_KEY_CSD_0 = "csd-0";
 EXPORT const char* AMEDIAFORMAT_KEY_CSD_1 = "csd-1";
 EXPORT const char* AMEDIAFORMAT_KEY_CSD_2 = "csd-2";
+EXPORT const char* AMEDIAFORMAT_KEY_CSD_AVC = "csd-avc";
+EXPORT const char* AMEDIAFORMAT_KEY_CSD_HEVC = "csd-hevc";
+EXPORT const char* AMEDIAFORMAT_KEY_D263 = "d263";
+EXPORT const char* AMEDIAFORMAT_KEY_DATE = "date";
+EXPORT const char* AMEDIAFORMAT_KEY_DISCNUMBER = "discnum";
 EXPORT const char* AMEDIAFORMAT_KEY_DISPLAY_CROP = "crop";
 EXPORT const char* AMEDIAFORMAT_KEY_DISPLAY_HEIGHT = "display-height";
 EXPORT const char* AMEDIAFORMAT_KEY_DISPLAY_WIDTH = "display-width";
 EXPORT const char* AMEDIAFORMAT_KEY_DURATION = "durationUs";
+EXPORT const char* AMEDIAFORMAT_KEY_ENCODER_DELAY = "encoder-delay";
+EXPORT const char* AMEDIAFORMAT_KEY_ENCODER_PADDING = "encoder-padding";
+EXPORT const char* AMEDIAFORMAT_KEY_ESDS = "esds";
+EXPORT const char* AMEDIAFORMAT_KEY_EXIF_OFFSET = "exif-offset";
+EXPORT const char* AMEDIAFORMAT_KEY_EXIF_SIZE = "exif-size";
 EXPORT const char* AMEDIAFORMAT_KEY_FLAC_COMPRESSION_LEVEL = "flac-compression-level";
+EXPORT const char* AMEDIAFORMAT_KEY_FRAME_COUNT = "frame-count";
 EXPORT const char* AMEDIAFORMAT_KEY_FRAME_RATE = "frame-rate";
+EXPORT const char* AMEDIAFORMAT_KEY_GENRE = "genre";
 EXPORT const char* AMEDIAFORMAT_KEY_GRID_COLUMNS = "grid-cols";
 EXPORT const char* AMEDIAFORMAT_KEY_GRID_ROWS = "grid-rows";
+EXPORT const char* AMEDIAFORMAT_KEY_HAPTIC_CHANNEL_COUNT = "haptic-channel-count";
 EXPORT const char* AMEDIAFORMAT_KEY_HDR_STATIC_INFO = "hdr-static-info";
+EXPORT const char* AMEDIAFORMAT_KEY_HDR10_PLUS_INFO = "hdr10-plus-info";
 EXPORT const char* AMEDIAFORMAT_KEY_HEIGHT = "height";
+EXPORT const char* AMEDIAFORMAT_KEY_ICC_PROFILE = "icc-profile";
 EXPORT const char* AMEDIAFORMAT_KEY_INTRA_REFRESH_PERIOD = "intra-refresh-period";
 EXPORT const char* AMEDIAFORMAT_KEY_IS_ADTS = "is-adts";
 EXPORT const char* AMEDIAFORMAT_KEY_IS_AUTOSELECT = "is-autoselect";
 EXPORT const char* AMEDIAFORMAT_KEY_IS_DEFAULT = "is-default";
 EXPORT const char* AMEDIAFORMAT_KEY_IS_FORCED_SUBTITLE = "is-forced-subtitle";
+EXPORT const char* AMEDIAFORMAT_KEY_IS_SYNC_FRAME = "is-sync-frame";
 EXPORT const char* AMEDIAFORMAT_KEY_I_FRAME_INTERVAL = "i-frame-interval";
 EXPORT const char* AMEDIAFORMAT_KEY_LANGUAGE = "language";
 EXPORT const char* AMEDIAFORMAT_KEY_LATENCY = "latency";
 EXPORT const char* AMEDIAFORMAT_KEY_LEVEL = "level";
+EXPORT const char* AMEDIAFORMAT_KEY_LOCATION = "location";
+EXPORT const char* AMEDIAFORMAT_KEY_LOOP = "loop";
+EXPORT const char* AMEDIAFORMAT_KEY_LYRICIST = "lyricist";
+EXPORT const char* AMEDIAFORMAT_KEY_MANUFACTURER = "manufacturer";
+EXPORT const char* AMEDIAFORMAT_KEY_MAX_BIT_RATE = "max-bitrate";
+EXPORT const char* AMEDIAFORMAT_KEY_MAX_FPS_TO_ENCODER = "max-fps-to-encoder";
 EXPORT const char* AMEDIAFORMAT_KEY_MAX_HEIGHT = "max-height";
 EXPORT const char* AMEDIAFORMAT_KEY_MAX_INPUT_SIZE = "max-input-size";
+EXPORT const char* AMEDIAFORMAT_KEY_MAX_PTS_GAP_TO_ENCODER = "max-pts-gap-to-encoder";
 EXPORT const char* AMEDIAFORMAT_KEY_MAX_WIDTH = "max-width";
 EXPORT const char* AMEDIAFORMAT_KEY_MIME = "mime";
 EXPORT const char* AMEDIAFORMAT_KEY_MPEG_USER_DATA = "mpeg-user-data";
+EXPORT const char* AMEDIAFORMAT_KEY_MPEG2_STREAM_HEADER = "mpeg2-stream-header";
 EXPORT const char* AMEDIAFORMAT_KEY_OPERATING_RATE = "operating-rate";
 EXPORT const char* AMEDIAFORMAT_KEY_PCM_ENCODING = "pcm-encoding";
 EXPORT const char* AMEDIAFORMAT_KEY_PRIORITY = "priority";
 EXPORT const char* AMEDIAFORMAT_KEY_PROFILE = "profile";
+EXPORT const char* AMEDIAFORMAT_KEY_PCM_BIG_ENDIAN = "pcm-big-endian";
+EXPORT const char* AMEDIAFORMAT_KEY_PSSH = "pssh";
 EXPORT const char* AMEDIAFORMAT_KEY_PUSH_BLANK_BUFFERS_ON_STOP = "push-blank-buffers-on-shutdown";
 EXPORT const char* AMEDIAFORMAT_KEY_REPEAT_PREVIOUS_FRAME_AFTER = "repeat-previous-frame-after";
 EXPORT const char* AMEDIAFORMAT_KEY_ROTATION = "rotation-degrees";
 EXPORT const char* AMEDIAFORMAT_KEY_SAMPLE_RATE = "sample-rate";
+EXPORT const char* AMEDIAFORMAT_KEY_SAR_HEIGHT = "sar-height";
+EXPORT const char* AMEDIAFORMAT_KEY_SAR_WIDTH = "sar-width";
 EXPORT const char* AMEDIAFORMAT_KEY_SEI = "sei";
 EXPORT const char* AMEDIAFORMAT_KEY_SLICE_HEIGHT = "slice-height";
 EXPORT const char* AMEDIAFORMAT_KEY_STRIDE = "stride";
+EXPORT const char* AMEDIAFORMAT_KEY_TARGET_TIME = "target-time";
+EXPORT const char* AMEDIAFORMAT_KEY_TEMPORAL_LAYER_COUNT = "temporal-layer-count";
 EXPORT const char* AMEDIAFORMAT_KEY_TEMPORAL_LAYER_ID = "temporal-layer-id";
 EXPORT const char* AMEDIAFORMAT_KEY_TEMPORAL_LAYERING = "ts-schema";
+EXPORT const char* AMEDIAFORMAT_KEY_TEXT_FORMAT_DATA = "text-format-data";
+EXPORT const char* AMEDIAFORMAT_KEY_THUMBNAIL_CSD_HEVC = "thumbnail-csd-hevc";
+EXPORT const char* AMEDIAFORMAT_KEY_THUMBNAIL_HEIGHT = "thumbnail-height";
+EXPORT const char* AMEDIAFORMAT_KEY_THUMBNAIL_TIME = "thumbnail-time";
+EXPORT const char* AMEDIAFORMAT_KEY_THUMBNAIL_WIDTH = "thumbnail-width";
 EXPORT const char* AMEDIAFORMAT_KEY_TILE_HEIGHT = "tile-height";
 EXPORT const char* AMEDIAFORMAT_KEY_TILE_WIDTH = "tile-width";
 EXPORT const char* AMEDIAFORMAT_KEY_TIME_US = "timeUs";
+EXPORT const char* AMEDIAFORMAT_KEY_TITLE = "title";
 EXPORT const char* AMEDIAFORMAT_KEY_TRACK_ID = "track-id";
 EXPORT const char* AMEDIAFORMAT_KEY_TRACK_INDEX = "track-index";
+EXPORT const char* AMEDIAFORMAT_KEY_VALID_SAMPLES = "valid-samples";
 EXPORT const char* AMEDIAFORMAT_KEY_WIDTH = "width";
-
+EXPORT const char* AMEDIAFORMAT_KEY_YEAR = "year";
 
 } // extern "C"
 

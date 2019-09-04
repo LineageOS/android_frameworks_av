@@ -19,30 +19,31 @@
 #define WAV_EXTRACTOR_H_
 
 #include <utils/Errors.h>
-#include <media/MediaExtractor.h>
-#include <media/stagefright/MetaDataBase.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
+#include <media/NdkMediaFormat.h>
 
 namespace android {
 
 struct AMessage;
-class DataSourceBase;
+struct CDataSource;
 class String8;
 
-class WAVExtractor : public MediaExtractor {
+class WAVExtractor : public MediaExtractorPluginHelper {
 public:
-    explicit WAVExtractor(DataSourceBase *source);
+    explicit WAVExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
-    virtual MediaTrack *getTrack(size_t index);
-    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
+    virtual MediaTrackHelper *getTrack(size_t index);
+    virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
-    virtual status_t getMetaData(MetaDataBase& meta);
+    virtual media_status_t getMetaData(AMediaFormat *meta);
     virtual const char * name() { return "WAVExtractor"; }
 
     virtual ~WAVExtractor();
 
 private:
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     status_t mInitCheck;
     bool mValidFormat;
     uint16_t mWaveFormat;
@@ -52,7 +53,7 @@ private:
     uint16_t mBitsPerSample;
     off64_t mDataOffset;
     size_t mDataSize;
-    MetaDataBase mTrackMeta;
+    AMediaFormat *mTrackMeta;
 
     status_t init();
 

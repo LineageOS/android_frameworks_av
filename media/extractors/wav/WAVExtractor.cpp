@@ -20,20 +20,31 @@
 
 #include "WAVExtractor.h"
 
+#include <android/binder_ibinder.h> // for AIBinder_getCallingUid
 #include <audio_utils/primitives.h>
-#include <media/DataSourceBase.h>
-#include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
+#include <private/android_filesystem_config.h> // for AID_MEDIA
+#include <system/audio.h>
 #include <utils/String8.h>
 #include <cutils/bitops.h>
 
 #define CHANNEL_MASK_USE_CHANNEL_ORDER 0
 
+// NOTE: This code assumes the device processor is little endian.
+
 namespace android {
+
+// MediaServer is capable of handling float extractor output, but general processes
+// may not be able to do so.
+// TODO: Improve API to set extractor float output.
+// (Note: duplicated with FLACExtractor.cpp)
+static inline bool shouldExtractorOutputFloat(int bitsPerSample)
+{
+    return bitsPerSample > 16 && AIBinder_getCallingUid() == AID_MEDIA;
+}
 
 enum {
     WAVE_FORMAT_PCM        = 0x0001,
@@ -55,22 +66,22 @@ static uint16_t U16_LE_AT(const uint8_t *ptr) {
     return ptr[1] << 8 | ptr[0];
 }
 
-struct WAVSource : public MediaTrack {
+struct WAVSource : public MediaTrackHelper {
     WAVSource(
-            DataSourceBase *dataSource,
-            MetaDataBase &meta,
+            DataSourceHelper *dataSource,
+            AMediaFormat *meta,
             uint16_t waveFormat,
-            int32_t bitsPerSample,
+            bool outputFloat,
             off64_t offset, size_t size);
 
-    virtual status_t start(MetaDataBase *params = NULL);
-    virtual status_t stop();
-    virtual status_t getFormat(MetaDataBase &meta);
+    virtual media_status_t start();
+    virtual media_status_t stop();
+    virtual media_status_t getFormat(AMediaFormat *meta);
 
-    virtual status_t read(
-            MediaBufferBase **buffer, const ReadOptions *options = NULL);
+    virtual media_status_t read(
+            MediaBufferHelper **buffer, const ReadOptions *options = NULL);
 
-    virtual bool supportNonblockingRead() { return true; }
+    bool supportsNonBlockingRead() override { return false; }
 
 protected:
     virtual ~WAVSource();
@@ -78,64 +89,72 @@ protected:
 private:
     static const size_t kMaxFrameSize;
 
-    DataSourceBase *mDataSource;
-    MetaDataBase &mMeta;
+    DataSourceHelper *mDataSource;
+    AMediaFormat *mMeta;
     uint16_t mWaveFormat;
+    const bool mOutputFloat;
     int32_t mSampleRate;
     int32_t mNumChannels;
     int32_t mBitsPerSample;
     off64_t mOffset;
     size_t mSize;
     bool mStarted;
-    MediaBufferGroup *mGroup;
     off64_t mCurrentPos;
 
     WAVSource(const WAVSource &);
     WAVSource &operator=(const WAVSource &);
 };
 
-WAVExtractor::WAVExtractor(DataSourceBase *source)
+WAVExtractor::WAVExtractor(DataSourceHelper *source)
     : mDataSource(source),
       mValidFormat(false),
       mChannelMask(CHANNEL_MASK_USE_CHANNEL_ORDER) {
+    mTrackMeta = AMediaFormat_new();
     mInitCheck = init();
 }
 
 WAVExtractor::~WAVExtractor() {
+    delete mDataSource;
+    AMediaFormat_delete(mTrackMeta);
 }
 
-status_t WAVExtractor::getMetaData(MetaDataBase &meta) {
-    meta.clear();
+media_status_t WAVExtractor::getMetaData(AMediaFormat *meta) {
+    AMediaFormat_clear(meta);
     if (mInitCheck == OK) {
-        meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_CONTAINER_WAV);
+        AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_CONTAINER_WAV);
     }
 
-    return OK;
+    return AMEDIA_OK;
 }
 
 size_t WAVExtractor::countTracks() {
     return mInitCheck == OK ? 1 : 0;
 }
 
-MediaTrack *WAVExtractor::getTrack(size_t index) {
+MediaTrackHelper *WAVExtractor::getTrack(size_t index) {
     if (mInitCheck != OK || index > 0) {
         return NULL;
     }
 
     return new WAVSource(
             mDataSource, mTrackMeta,
-            mWaveFormat, mBitsPerSample, mDataOffset, mDataSize);
+            mWaveFormat, shouldExtractorOutputFloat(mBitsPerSample), mDataOffset, mDataSize);
 }
 
-status_t WAVExtractor::getTrackMetaData(
-        MetaDataBase &meta,
+media_status_t WAVExtractor::getTrackMetaData(
+        AMediaFormat *meta,
         size_t index, uint32_t /* flags */) {
     if (mInitCheck != OK || index > 0) {
-        return UNKNOWN_ERROR;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
-    meta = mTrackMeta;
-    return OK;
+    const media_status_t status = AMediaFormat_copy(meta, mTrackMeta);
+    if (status == OK) {
+        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_PCM_ENCODING,
+                shouldExtractorOutputFloat(mBitsPerSample)
+                        ? kAudioEncodingPcmFloat : kAudioEncodingPcm16bit);
+    }
+    return status;
 }
 
 status_t WAVExtractor::init() {
@@ -185,7 +204,7 @@ status_t WAVExtractor::init() {
                     && mWaveFormat != WAVE_FORMAT_MULAW
                     && mWaveFormat != WAVE_FORMAT_MSGSM
                     && mWaveFormat != WAVE_FORMAT_EXTENSIBLE) {
-                return ERROR_UNSUPPORTED;
+                return AMEDIA_ERROR_UNSUPPORTED;
             }
 
             uint8_t fmtSize = 16;
@@ -198,13 +217,13 @@ status_t WAVExtractor::init() {
 
             mNumChannels = U16_LE_AT(&formatSpec[2]);
 
-            if (mNumChannels < 1 || mNumChannels > 8) {
+            if (mNumChannels < 1 || mNumChannels > FCC_8) {
                 ALOGE("Unsupported number of channels (%d)", mNumChannels);
-                return ERROR_UNSUPPORTED;
+                return AMEDIA_ERROR_UNSUPPORTED;
             }
 
             if (mWaveFormat != WAVE_FORMAT_EXTENSIBLE) {
-                if (mNumChannels != 1 && mNumChannels != 2) {
+                if (mNumChannels != 1 && mNumChannels != FCC_2) {
                     ALOGW("More than 2 channels (%d) in non-WAVE_EXT, unknown channel mask",
                             mNumChannels);
                 }
@@ -224,7 +243,7 @@ status_t WAVExtractor::init() {
                     if (validBitsPerSample != 0) {
                         ALOGE("validBits(%d) != bitsPerSample(%d) are not supported",
                                 validBitsPerSample, mBitsPerSample);
-                        return ERROR_UNSUPPORTED;
+                        return AMEDIA_ERROR_UNSUPPORTED;
                     } else {
                         // we only support valitBitsPerSample == bitsPerSample but some WAV_EXT
                         // writers don't correctly set the valid bits value, and leave it at 0.
@@ -284,35 +303,33 @@ status_t WAVExtractor::init() {
                 mDataOffset = offset;
                 mDataSize = chunkSize;
 
-                mTrackMeta.clear();
+                AMediaFormat_clear(mTrackMeta);
 
                 switch (mWaveFormat) {
                     case WAVE_FORMAT_PCM:
                     case WAVE_FORMAT_IEEE_FLOAT:
-                        mTrackMeta.setCString(
-                                kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_RAW);
+                        AMediaFormat_setString(mTrackMeta,
+                                AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_RAW);
                         break;
                     case WAVE_FORMAT_ALAW:
-                        mTrackMeta.setCString(
-                                kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_G711_ALAW);
+                        AMediaFormat_setString(mTrackMeta,
+                                AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_G711_ALAW);
                         break;
                     case WAVE_FORMAT_MSGSM:
-                        mTrackMeta.setCString(
-                                kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_MSGSM);
+                        AMediaFormat_setString(mTrackMeta,
+                                AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_MSGSM);
                         break;
                     default:
                         CHECK_EQ(mWaveFormat, (uint16_t)WAVE_FORMAT_MULAW);
-                        mTrackMeta.setCString(
-                                kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_G711_MLAW);
+                        AMediaFormat_setString(mTrackMeta,
+                                AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_G711_MLAW);
                         break;
                 }
 
-                mTrackMeta.setInt32(kKeyChannelCount, mNumChannels);
-                mTrackMeta.setInt32(kKeyChannelMask, mChannelMask);
-                mTrackMeta.setInt32(kKeySampleRate, mSampleRate);
-                mTrackMeta.setInt32(kKeyBitsPerSample, mBitsPerSample);
-                mTrackMeta.setInt32(kKeyPcmEncoding, kAudioEncodingPcm16bit);
-
+                AMediaFormat_setInt32(mTrackMeta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, mNumChannels);
+                AMediaFormat_setInt32(mTrackMeta, AMEDIAFORMAT_KEY_CHANNEL_MASK, mChannelMask);
+                AMediaFormat_setInt32(mTrackMeta, AMEDIAFORMAT_KEY_SAMPLE_RATE, mSampleRate);
+                AMediaFormat_setInt32(mTrackMeta, AMEDIAFORMAT_KEY_BITS_PER_SAMPLE, mBitsPerSample);
                 int64_t durationUs = 0;
                 if (mWaveFormat == WAVE_FORMAT_MSGSM) {
                     // 65 bytes decode to 320 8kHz samples
@@ -322,18 +339,18 @@ status_t WAVExtractor::init() {
                     size_t bytesPerSample = mBitsPerSample >> 3;
 
                     if (!bytesPerSample || !mNumChannels)
-                        return ERROR_MALFORMED;
+                        return AMEDIA_ERROR_MALFORMED;
 
                     size_t num_samples = mDataSize / (mNumChannels * bytesPerSample);
 
                     if (!mSampleRate)
-                        return ERROR_MALFORMED;
+                        return AMEDIA_ERROR_MALFORMED;
 
                     durationUs =
                         1000000LL * num_samples / mSampleRate;
                 }
 
-                mTrackMeta.setInt64(kKeyDuration, durationUs);
+                AMediaFormat_setInt64(mTrackMeta, AMEDIAFORMAT_KEY_DURATION, durationUs);
 
                 return OK;
             }
@@ -348,25 +365,21 @@ status_t WAVExtractor::init() {
 const size_t WAVSource::kMaxFrameSize = 32768;
 
 WAVSource::WAVSource(
-        DataSourceBase *dataSource,
-        MetaDataBase &meta,
+        DataSourceHelper *dataSource,
+        AMediaFormat *meta,
         uint16_t waveFormat,
-        int32_t bitsPerSample,
+        bool outputFloat,
         off64_t offset, size_t size)
     : mDataSource(dataSource),
       mMeta(meta),
       mWaveFormat(waveFormat),
-      mSampleRate(0),
-      mNumChannels(0),
-      mBitsPerSample(bitsPerSample),
+      mOutputFloat(outputFloat),
       mOffset(offset),
       mSize(size),
-      mStarted(false),
-      mGroup(NULL) {
-    CHECK(mMeta.findInt32(kKeySampleRate, &mSampleRate));
-    CHECK(mMeta.findInt32(kKeyChannelCount, &mNumChannels));
-
-    mMeta.setInt32(kKeyMaxInputSize, kMaxFrameSize);
+      mStarted(false) {
+    CHECK(AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_SAMPLE_RATE, &mSampleRate));
+    CHECK(AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, &mNumChannels));
+    CHECK(AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_BITS_PER_SAMPLE, &mBitsPerSample));
 }
 
 WAVSource::~WAVSource() {
@@ -375,52 +388,51 @@ WAVSource::~WAVSource() {
     }
 }
 
-status_t WAVSource::start(MetaDataBase * /* params */) {
+media_status_t WAVSource::start() {
     ALOGV("WAVSource::start");
 
     CHECK(!mStarted);
 
     // some WAV files may have large audio buffers that use shared memory transfer.
-    mGroup = new MediaBufferGroup(4 /* buffers */, kMaxFrameSize);
-
-    if (mBitsPerSample == 8) {
-        // As a temporary buffer for 8->16 bit conversion.
-        mGroup->add_buffer(MediaBufferBase::Create(kMaxFrameSize));
+    if (!mBufferGroup->init(4 /* buffers */, kMaxFrameSize)) {
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
     mCurrentPos = mOffset;
 
     mStarted = true;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t WAVSource::stop() {
+media_status_t WAVSource::stop() {
     ALOGV("WAVSource::stop");
 
     CHECK(mStarted);
 
-    delete mGroup;
-    mGroup = NULL;
-
     mStarted = false;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t WAVSource::getFormat(MetaDataBase &meta) {
+media_status_t WAVSource::getFormat(AMediaFormat *meta) {
     ALOGV("WAVSource::getFormat");
 
-    meta = mMeta;
-    return OK;
+    const media_status_t status = AMediaFormat_copy(meta, mMeta);
+    if (status == OK) {
+        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, kMaxFrameSize);
+        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_PCM_ENCODING,
+                mOutputFloat ? kAudioEncodingPcmFloat : kAudioEncodingPcm16bit);
+    }
+    return status;
 }
 
-status_t WAVSource::read(
-        MediaBufferBase **out, const ReadOptions *options) {
+media_status_t WAVSource::read(
+        MediaBufferHelper **out, const ReadOptions *options) {
     *out = NULL;
 
-    if (options != nullptr && options->getNonBlocking() && !mGroup->has_buffers()) {
-        return WOULD_BLOCK;
+    if (options != nullptr && options->getNonBlocking() && !mBufferGroup->has_buffers()) {
+        return AMEDIA_ERROR_WOULD_BLOCK;
     }
 
     int64_t seekTimeUs;
@@ -442,18 +454,22 @@ status_t WAVSource::read(
         mCurrentPos = pos + mOffset;
     }
 
-    MediaBufferBase *buffer;
-    status_t err = mGroup->acquire_buffer(&buffer);
+    MediaBufferHelper *buffer;
+    media_status_t err = mBufferGroup->acquire_buffer(&buffer);
     if (err != OK) {
         return err;
     }
 
-    // make sure that maxBytesToRead is multiple of 3, in 24-bit case
-    size_t maxBytesToRead =
-        mBitsPerSample == 8 ? kMaxFrameSize / 2 : 
-        (mBitsPerSample == 24 ? 3*(kMaxFrameSize/3): kMaxFrameSize);
+    // maxBytesToRead may be reduced so that in-place data conversion will fit in buffer size.
+    const size_t bufferSize = std::min(buffer->size(), kMaxFrameSize);
+    size_t maxBytesToRead;
+    if (mOutputFloat) { // destination is float at 4 bytes per sample, source may be less.
+        maxBytesToRead = (mBitsPerSample / 8) * (bufferSize / 4);
+    } else { // destination is int16_t at 2 bytes per sample, only source of 8 bits is less.
+        maxBytesToRead = mBitsPerSample == 8 ? bufferSize / 2 : bufferSize;
+    }
 
-    size_t maxBytesAvailable =
+    const size_t maxBytesAvailable =
         (mCurrentPos - mOffset >= (off64_t)mSize)
             ? 0 : mSize - (mCurrentPos - mOffset);
 
@@ -482,45 +498,59 @@ status_t WAVSource::read(
         buffer->release();
         buffer = NULL;
 
-        return ERROR_END_OF_STREAM;
+        return AMEDIA_ERROR_END_OF_STREAM;
     }
 
     buffer->set_range(0, n);
 
     // TODO: add capability to return data as float PCM instead of 16 bit PCM.
     if (mWaveFormat == WAVE_FORMAT_PCM) {
-        if (mBitsPerSample == 8) {
-            // Convert 8-bit unsigned samples to 16-bit signed.
-
-            // Create new buffer with 2 byte wide samples
-            MediaBufferBase *tmp;
-            CHECK_EQ(mGroup->acquire_buffer(&tmp), (status_t)OK);
-            tmp->set_range(0, 2 * n);
-
-            memcpy_to_i16_from_u8((int16_t *)tmp->data(), (const uint8_t *)buffer->data(), n);
-            buffer->release();
-            buffer = tmp;
-        } else if (mBitsPerSample == 24) {
-            // Convert 24-bit signed samples to 16-bit signed in place
-            const size_t numSamples = n / 3;
-
-            memcpy_to_i16_from_p24((int16_t *)buffer->data(), (const uint8_t *)buffer->data(), numSamples);
+        const size_t bytesPerFrame = (mBitsPerSample >> 3) * mNumChannels;
+        const size_t numFrames = n / bytesPerFrame;
+        const size_t numSamples = numFrames * mNumChannels;
+        if (mOutputFloat) {
+            float *fdest = (float *)buffer->data();
+            buffer->set_range(0, 4 * numSamples);
+            switch (mBitsPerSample) {
+            case 8: {
+                memcpy_to_float_from_u8(fdest, (const uint8_t *)buffer->data(), numSamples);
+            } break;
+            case 16: {
+                memcpy_to_float_from_i16(fdest, (const int16_t *)buffer->data(), numSamples);
+            } break;
+            case 24: {
+                memcpy_to_float_from_p24(fdest, (const uint8_t *)buffer->data(), numSamples);
+            } break;
+            case 32: { // buffer range is correct
+                memcpy_to_float_from_i32(fdest, (const int32_t *)buffer->data(), numSamples);
+            } break;
+            }
+        } else {
+            int16_t *idest = (int16_t *)buffer->data();
             buffer->set_range(0, 2 * numSamples);
-        }  else if (mBitsPerSample == 32) {
-            // Convert 32-bit signed samples to 16-bit signed in place
-            const size_t numSamples = n / 4;
-
-            memcpy_to_i16_from_i32((int16_t *)buffer->data(), (const int32_t *)buffer->data(), numSamples);
-            buffer->set_range(0, 2 * numSamples);
+            switch (mBitsPerSample) {
+            case 8: {
+                memcpy_to_i16_from_u8(idest, (const uint8_t *)buffer->data(), numSamples);
+            } break;
+            case 16:
+                // no conversion needed
+                break;
+            case 24: {
+                memcpy_to_i16_from_p24(idest, (const uint8_t *)buffer->data(), numSamples);
+            } break;
+            case 32: {
+                memcpy_to_i16_from_i32(idest, (const int32_t *)buffer->data(), numSamples);
+            } break;
+            }
         }
     } else if (mWaveFormat == WAVE_FORMAT_IEEE_FLOAT) {
-        if (mBitsPerSample == 32) {
-            // Convert 32-bit float samples to 16-bit signed in place
+        if (!mOutputFloat) { // mBitsPerSample == 32
+            int16_t *idest = (int16_t *)buffer->data();
             const size_t numSamples = n / 4;
-
-            memcpy_to_i16_from_float((int16_t *)buffer->data(), (const float *)buffer->data(), numSamples);
+            memcpy_to_i16_from_float(idest, (const float *)buffer->data(), numSamples);
             buffer->set_range(0, 2 * numSamples);
         }
+        // Note: if output encoding is float, no need to convert if source is float.
     }
 
     int64_t timeStampUs = 0;
@@ -533,39 +563,43 @@ status_t WAVSource::read(
                 / (mNumChannels * bytesPerSample) / mSampleRate;
     }
 
-    buffer->meta_data().setInt64(kKeyTime, timeStampUs);
+    AMediaFormat *meta = buffer->meta_data();
+    AMediaFormat_setInt64(meta, AMEDIAFORMAT_KEY_TIME_US, timeStampUs);
+    AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, 1);
 
-    buffer->meta_data().setInt32(kKeyIsSyncFrame, 1);
     mCurrentPos += n;
 
     *out = buffer;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static MediaExtractor* CreateExtractor(
-        DataSourceBase *source,
+static CMediaExtractor* CreateExtractor(
+        CDataSource *source,
         void *) {
-    return new WAVExtractor(source);
+    return wrap(new WAVExtractor(new DataSourceHelper(source)));
 }
 
-static MediaExtractor::CreatorFunc Sniff(
-        DataSourceBase *source,
+static CreatorFunc Sniff(
+        CDataSource *source,
         float *confidence,
         void **,
-        MediaExtractor::FreeMetaFunc *) {
+        FreeMetaFunc *) {
+    DataSourceHelper *helper = new DataSourceHelper(source);
     char header[12];
-    if (source->readAt(0, header, sizeof(header)) < (ssize_t)sizeof(header)) {
+    if (helper->readAt(0, header, sizeof(header)) < (ssize_t)sizeof(header)) {
+        delete helper;
         return NULL;
     }
 
     if (memcmp(header, "RIFF", 4) || memcmp(&header[8], "WAVE", 4)) {
+        delete helper;
         return NULL;
     }
 
-    MediaExtractor *extractor = new WAVExtractor(source);
+    WAVExtractor *extractor = new WAVExtractor(helper); // extractor owns the helper
     int numTracks = extractor->countTracks();
     delete extractor;
     if (numTracks == 0) {
@@ -577,16 +611,21 @@ static MediaExtractor::CreatorFunc Sniff(
     return CreateExtractor;
 }
 
+static const char *extensions[] = {
+    "wav",
+    NULL
+};
+
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("7d613858-5837-4a38-84c5-332d1cddee27"),
         1, // version
         "WAV Extractor",
-        Sniff
+        { .v3 = {Sniff, extensions} },
     };
 }
 

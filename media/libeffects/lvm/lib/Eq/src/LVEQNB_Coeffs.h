@@ -109,7 +109,9 @@
 #define LVEQNB_2PiOn_48000                               0.000131f
 
 #ifdef HIGHER_FS
+#define LVEQNB_2PiOn_88200                               0.000071f
 #define LVEQNB_2PiOn_96000                               0.000065f
+#define LVEQNB_2PiOn_176400                              0.000036f
 #define LVEQNB_2PiOn_192000                              0.000033f
 #endif
 

@@ -8,13 +8,17 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "libbinder_ndk",
         "liblog",
-        "libmediaextractor",
+        "libmediandk",
     ],
 
     static_libs: [
+        "libaudioutils",
         "libFLAC",
         "libstagefright_foundation",
+        "libstagefright_metadatautils",
+        "libutils",
     ],
 
     name: "libflacextractor",

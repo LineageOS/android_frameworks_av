@@ -21,6 +21,7 @@
 #include <aaudio/AAudio.h>
 
 #include "binding/AAudioServiceInterface.h"
+#include "client/AAudioFlowGraph.h"
 #include "client/AudioStreamInternal.h"
 
 using android::sp;
@@ -93,7 +94,7 @@ private:
 
     int64_t                  mLastFramesRead = 0; // used to prevent retrograde motion
 
-    LinearRamp               mVolumeRamp;
+    AAudioFlowGraph          mFlowGraph;
 
 };
 

@@ -77,7 +77,6 @@ public:
 
     virtual int64_t incrementClientFrameCounter(int32_t frames)  = 0;
 
-
     virtual int64_t getFramesWritten() override {
         return mFramesWritten.get();
     }

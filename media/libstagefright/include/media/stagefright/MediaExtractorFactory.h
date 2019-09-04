@@ -19,10 +19,10 @@
 #define MEDIA_EXTRACTOR_FACTORY_H_
 
 #include <stdio.h>
+#include <unordered_set>
 
+#include <android/dlext.h>
 #include <media/IMediaExtractor.h>
-#include <media/MediaExtractor.h>
-#include <utils/List.h>
 
 namespace android {
 
@@ -35,26 +35,25 @@ public:
             const sp<DataSource> &source, const char *mime = NULL);
     static sp<IMediaExtractor> CreateFromService(
             const sp<DataSource> &source, const char *mime = NULL);
-    static void LoadPlugins(const ::std::string& apkPath);
     static status_t dump(int fd, const Vector<String16>& args);
+    static std::unordered_set<std::string> getSupportedTypes();
+    static void LoadExtractors();
 
 private:
     static Mutex gPluginMutex;
-    static std::shared_ptr<List<sp<ExtractorPlugin>>> gPlugins;
+    static std::shared_ptr<std::list<sp<ExtractorPlugin>>> gPlugins;
     static bool gPluginsRegistered;
+    static bool gIgnoreVersion;
 
-    static void RegisterExtractorsInApk(
-            const char *apkPath, List<sp<ExtractorPlugin>> &pluginList);
-    static void RegisterExtractorsInSystem(
-            const char *libDirPath, List<sp<ExtractorPlugin>> &pluginList);
+    static void RegisterExtractors(
+            const char *libDirPath, const android_dlextinfo* dlextinfo,
+            std::list<sp<ExtractorPlugin>> &pluginList);
     static void RegisterExtractor(
-            const sp<ExtractorPlugin> &plugin, List<sp<ExtractorPlugin>> &pluginList);
+            const sp<ExtractorPlugin> &plugin, std::list<sp<ExtractorPlugin>> &pluginList);
 
-    static MediaExtractor::CreatorFunc sniff(DataSourceBase *source,
-            float *confidence, void **meta, MediaExtractor::FreeMetaFunc *freeMeta,
-            sp<ExtractorPlugin> &plugin);
-
-    static void UpdateExtractors(const char *newUpdateApkPath);
+    static void *sniff(const sp<DataSource> &source,
+            float *confidence, void **meta, FreeMetaFunc *freeMeta,
+            sp<ExtractorPlugin> &plugin, uint32_t *creatorVersion);
 };
 
 }  // namespace android

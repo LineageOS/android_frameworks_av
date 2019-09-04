@@ -43,7 +43,7 @@ SharedMemoryParcelable::~SharedMemoryParcelable() {};
 
 void SharedMemoryParcelable::setup(const unique_fd& fd, int32_t sizeInBytes) {
     mFd.reset(dup(fd.get())); // store a duplicate fd
-    ALOGV("setup(%d -> %d, %d) this = %p\n", fd.get(), mFd.get(), sizeInBytes, this);
+    ALOGV("setup(fd = %d -> %d, size = %d) this = %p\n", fd.get(), mFd.get(), sizeInBytes, this);
     mSizeInBytes = sizeInBytes;
 }
 
@@ -104,7 +104,8 @@ aaudio_result_t SharedMemoryParcelable::resolveSharedMemory(const unique_fd& fd)
     mResolvedAddress = (uint8_t *) mmap(0, mSizeInBytes, PROT_READ | PROT_WRITE,
                                         MAP_SHARED, fd.get(), 0);
     if (mResolvedAddress == MMAP_UNRESOLVED_ADDRESS) {
-        ALOGE("mmap() failed for fd = %d, errno = %s", fd.get(), strerror(errno));
+        ALOGE("mmap() failed for fd = %d, nBytes = %d, errno = %s",
+              fd.get(), mSizeInBytes, strerror(errno));
         return AAUDIO_ERROR_INTERNAL;
     }
     return AAUDIO_OK;
@@ -156,5 +157,4 @@ aaudio_result_t SharedMemoryParcelable::validate() const {
 void SharedMemoryParcelable::dump() {
     ALOGD("mFd = %d", mFd.get());
     ALOGD("mSizeInBytes = %d", mSizeInBytes);
-    ALOGD("mResolvedAddress = %p", mResolvedAddress);
 }

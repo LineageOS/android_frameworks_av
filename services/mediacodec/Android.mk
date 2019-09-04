@@ -22,17 +22,17 @@ _software_codecs := \
     libstagefright_soft_vorbisdec \
     libstagefright_soft_vpxdec \
     libstagefright_soft_vpxenc \
+    libstagefright_softomx_plugin \
 
 # service executable
 include $(CLEAR_VARS)
 # seccomp is not required for coverage build.
 ifneq ($(NATIVE_COVERAGE),true)
-LOCAL_REQUIRED_MODULES_arm := crash_dump.policy mediacodec.policy
-LOCAL_REQUIRED_MODULES_x86 := crash_dump.policy mediacodec.policy
+LOCAL_REQUIRED_MODULES_arm := mediacodec.policy
+LOCAL_REQUIRED_MODULES_x86 := mediacodec.policy
 endif
 LOCAL_SRC_FILES := main_codecservice.cpp
 LOCAL_SHARED_LIBRARIES := \
-    libmedia_omx \
     libbinder \
     libutils \
     liblog \
@@ -40,6 +40,7 @@ LOCAL_SHARED_LIBRARIES := \
     libavservices_minijail_vendor \
     libcutils \
     libhwbinder \
+    libhidlbase \
     libhidltransport \
     libstagefright_omx \
     libstagefright_xmlparser \
@@ -63,12 +64,15 @@ LOCAL_INIT_RC := android.hardware.media.omx@1.0-service.rc
 
 include $(BUILD_EXECUTABLE)
 
+####################################################################
+
 # service seccomp policy
 ifeq ($(TARGET_ARCH), $(filter $(TARGET_ARCH), x86 x86_64 arm arm64))
 include $(CLEAR_VARS)
 LOCAL_MODULE := mediacodec.policy
 LOCAL_MODULE_CLASS := ETC
 LOCAL_MODULE_PATH := $(TARGET_OUT)/etc/seccomp_policy
+LOCAL_REQUIRED_MODULES := crash_dump.policy
 # mediacodec runs in 32-bit combatibility mode. For 64 bit architectures,
 # use the 32 bit policy
 ifdef TARGET_2ND_ARCH
@@ -82,5 +86,8 @@ else
 endif
 include $(BUILD_PREBUILT)
 endif
+
+####################################################################
+
 
 include $(call all-makefiles-under, $(LOCAL_PATH))

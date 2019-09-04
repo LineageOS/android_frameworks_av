@@ -5,6 +5,29 @@ cc_library_headers {
 }
 
 cc_library_shared {
+    name: "libaudiopolicy",
+    srcs: [
+        "AudioAttributes.cpp",
+        "AudioPolicy.cpp",
+        "AudioProductStrategy.cpp",
+        "AudioVolumeGroup.cpp",
+    ],
+    shared_libs: [
+        "libaudioutils",
+        "libbinder",
+        "libcutils",
+        "liblog",
+        "libutils",
+    ],
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+    include_dirs: ["system/media/audio_utils/include"],
+    export_include_dirs: ["include"],
+}
+
+cc_library_shared {
     name: "libaudioclient",
 
     aidl: {
@@ -23,7 +46,6 @@ cc_library_shared {
         ":libaudioclient_aidl",
 
         "AudioEffect.cpp",
-        "AudioPolicy.cpp",
         "AudioRecord.cpp",
         "AudioSystem.cpp",
         "AudioTrack.cpp",
@@ -37,19 +59,24 @@ cc_library_shared {
         "IEffectClient.cpp",
         "ToneGenerator.cpp",
         "PlayerBase.cpp",
+        "RecordingActivityTracker.cpp",
         "TrackPlayerBase.cpp",
     ],
     shared_libs: [
-        "liblog",
-        "libcutils",
-        "libprocessgroup",
-        "libutils",
-        "libbinder",
-        "libdl",
         "libaudioutils",
+        "libaudiopolicy",
         "libaudiomanager",
+        "libbinder",
+        "libcutils",
+        "libdl",
+        "liblog",
         "libmedia_helper",
         "libmediametrics",
+        "libmediautils",
+        "libnblog",
+        "libprocessgroup",
+        "libutils",
+        "libvibrator",
     ],
     export_shared_lib_headers: ["libbinder"],
 

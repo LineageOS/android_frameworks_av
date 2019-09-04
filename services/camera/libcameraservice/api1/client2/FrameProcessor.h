@@ -104,8 +104,7 @@ class FrameProcessor : public FrameProcessorBase {
     // Track most recent frame number for which 3A notifications were sent for.
     // Used to filter against sending 3A notifications for the same frame
     // several times.
-    int32_t mLast3AFrameNumber;
-
+    int32_t mLast3AFrameNumber, mLastAEFrameNumber, mLastAFrameNumber, mLastAWBFrameNumber;
     // Emit FaceDetection event to java if faces changed
     void callbackFaceDetection(const sp<Camera2Client>& client,
                                const camera_frame_metadata &metadata);

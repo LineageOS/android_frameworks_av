@@ -21,6 +21,7 @@
 
 #include <android/hardware/drm/1.0/types.h>
 #include <android/hardware/drm/1.1/types.h>
+#include <android/hardware/drm/1.2/types.h>
 #include <binder/PersistableBundle.h>
 #include <media/CounterMetric.h>
 #include <media/EventMetric.h>
@@ -50,7 +51,7 @@ class MediaDrmMetrics {
   CounterMetric<status_t> mProvideProvisionResponseCounter;
 
   // Count of key status events broken out by status type.
-  CounterMetric<::android::hardware::drm::V1_0::KeyStatusType>
+  CounterMetric<::android::hardware::drm::V1_2::KeyStatusType>
       mKeyStatusChangeCounter;
   // Count of events broken out by event type
   CounterMetric<::android::hardware::drm::V1_0::EventType> mEventCounter;

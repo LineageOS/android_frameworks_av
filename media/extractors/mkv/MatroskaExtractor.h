@@ -20,8 +20,9 @@
 
 #include "mkvparser/mkvparser.h"
 
-#include <media/MediaExtractor.h>
-#include <media/stagefright/MetaDataBase.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
+#include <media/NdkMediaFormat.h>
 #include <utils/Vector.h>
 #include <utils/threads.h>
 
@@ -34,16 +35,16 @@ class MetaData;
 struct DataSourceBaseReader;
 struct MatroskaSource;
 
-struct MatroskaExtractor : public MediaExtractor {
-    explicit MatroskaExtractor(DataSourceBase *source);
+struct MatroskaExtractor : public MediaExtractorPluginHelper {
+    explicit MatroskaExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
 
-    virtual MediaTrack *getTrack(size_t index);
+    virtual MediaTrackHelper *getTrack(size_t index);
 
-    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
+    virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
-    virtual status_t getMetaData(MetaDataBase& meta);
+    virtual media_status_t getMetaData(AMediaFormat *meta);
 
     virtual uint32_t flags() const;
 
@@ -57,9 +58,15 @@ private:
     friend struct BlockIterator;
 
     struct TrackInfo {
+        TrackInfo() {
+            mMeta = NULL;
+        }
+
+        ~TrackInfo() {
+        }
         unsigned long mTrackNum;
         bool mEncrypted;
-        MetaDataBase mMeta;
+        AMediaFormat *mMeta;
         const MatroskaExtractor *mExtractor;
         Vector<const mkvparser::CuePoint*> mCuePoints;
 
@@ -68,6 +75,7 @@ private:
         // in ~MatroskaExtractor.
         unsigned char *mHeader;
         size_t mHeaderLen;
+        int32_t mNalLengthSize;
 
         const mkvparser::Track* getTrack() const;
         const mkvparser::CuePoint::TrackPosition *find(long long timeNs) const;
@@ -76,7 +84,7 @@ private:
     Mutex mLock;
     Vector<TrackInfo> mTracks;
 
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     DataSourceBaseReader *mReader;
     mkvparser::Segment *mSegment;
     bool mExtractedThumbnails;
@@ -85,15 +93,17 @@ private:
     int64_t mSeekPreRollNs;
 
     status_t synthesizeAVCC(TrackInfo *trackInfo, size_t index);
+    status_t synthesizeMPEG2(TrackInfo *trackInfo, size_t index);
+    status_t synthesizeMPEG4(TrackInfo *trackInfo, size_t index);
     status_t initTrackInfo(
             const mkvparser::Track *track,
-            MetaDataBase &meta,
+            AMediaFormat *meta,
             TrackInfo *trackInfo);
     void addTracks();
     void findThumbnails();
     void getColorInformation(
             const mkvparser::VideoTrack *vtrack,
-            MetaDataBase &meta);
+            AMediaFormat *meta);
     bool isLiveStreaming() const;
 
     MatroskaExtractor(const MatroskaExtractor &);

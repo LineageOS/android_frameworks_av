@@ -39,4 +39,3 @@ cc_library_shared {
     cflags: ["-Werror"],
 }
 
-subdirs = ["plugins/*"]

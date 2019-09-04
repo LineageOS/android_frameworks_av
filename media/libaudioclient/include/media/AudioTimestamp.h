@@ -135,8 +135,23 @@ struct alignas(8) /* bug 29096183, bug 29108507 */ ExtendedTimestamp {
         return INVALID_OPERATION;
     }
 
+    double getOutputServerLatencyMs(uint32_t sampleRate) const {
+        return getLatencyMs(sampleRate, LOCATION_SERVER, LOCATION_KERNEL);
+    }
+
+    double getLatencyMs(uint32_t sampleRate, Location location1, Location location2) const {
+        if (sampleRate > 0 && mTimeNs[location1] > 0 && mTimeNs[location2] > 0) {
+            const int64_t frameDifference =
+                    mPosition[location1] - mPosition[location2];
+            const int64_t timeDifferenceNs =
+                    mTimeNs[location1] - mTimeNs[location2];
+            return ((double)frameDifference * 1e9 / sampleRate - timeDifferenceNs) * 1e-6;
+        }
+        return 0.;
+    }
+
     // convert fields to a printable string
-    std::string toString() {
+    std::string toString() const {
         std::stringstream ss;
 
         ss << "BOOTTIME offset " << mTimebaseOffset[TIMEBASE_BOOTTIME] << "\n";

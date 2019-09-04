@@ -20,34 +20,22 @@
 
 #include <stdio.h>
 
-#include <media/DataSource.h>
+#include <media/stagefright/ClearFileSource.h>
 #include <media/stagefright/MediaErrors.h>
 #include <utils/threads.h>
 #include <drm/DrmManagerClient.h>
 
 namespace android {
 
-class FileSource : public DataSource {
+class FileSource : public ClearFileSource {
 public:
     FileSource(const char *filename);
     // FileSource takes ownership and will close the fd
     FileSource(int fd, int64_t offset, int64_t length);
 
-    virtual status_t initCheck() const;
-
     virtual ssize_t readAt(off64_t offset, void *data, size_t size);
 
-    virtual status_t getSize(off64_t *size);
-
-    virtual uint32_t flags() {
-        return kIsLocalFileSource;
-    }
-
     virtual sp<DecryptHandle> DrmInitialization(const char *mime);
-
-    virtual String8 toString() {
-        return mName;
-    }
 
     static bool requiresDrm(int fd, int64_t offset, int64_t length, const char *mime);
 
@@ -55,12 +43,6 @@ protected:
     virtual ~FileSource();
 
 private:
-    int mFd;
-    int64_t mOffset;
-    int64_t mLength;
-    Mutex mLock;
-    String8 mName;
-
     /*for DRM*/
     sp<DecryptHandle> mDecryptHandle;
     DrmManagerClient *mDrmManagerClient;
@@ -68,7 +50,7 @@ private:
     ssize_t mDrmBufSize;
     unsigned char *mDrmBuf;
 
-    ssize_t readAtDRM(off64_t offset, void *data, size_t size);
+    ssize_t readAtDRM_l(off64_t offset, void *data, size_t size);
 
     FileSource(const FileSource &);
     FileSource &operator=(const FileSource &);

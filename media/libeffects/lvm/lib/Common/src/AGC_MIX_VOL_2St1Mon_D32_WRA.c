@@ -305,4 +305,150 @@ void AGC_MIX_VOL_2St1Mon_D32_WRA(AGC_MIX_VOL_2St1Mon_FLOAT_t  *pInstance,     /*
 
     return;
 }
+#ifdef SUPPORT_MC
+/****************************************************************************************/
+/*                                                                                      */
+/* FUNCTION:                  AGC_MIX_VOL_Mc1Mon_D32_WRA                                */
+/*                                                                                      */
+/* DESCRIPTION:                                                                         */
+/*    Apply AGC and mix signals                                                         */
+/*                                                                                      */
+/*                                                                                      */
+/*  McSrc   ------------------|                                                         */
+/*                            |                                                         */
+/*              ______       _|_        ________                                        */
+/*             |      |     |   |      |        |                                       */
+/*  MonoSrc -->| AGC  |---->| + |----->| Volume |------------------------------+--->    */
+/*             | Gain |     |___|      | Gain   |                              |        */
+/*             |______|                |________|                              |        */
+/*                /|\                               __________     ________    |        */
+/*                 |                               |          |   |        |   |        */
+/*                 |-------------------------------| AGC Gain |<--| Peak   |<--|        */
+/*                                                 | Update   |   | Detect |            */
+/*                                                 |__________|   |________|            */
+/*                                                                                      */
+/*                                                                                      */
+/* PARAMETERS:                                                                          */
+/*  pInstance               Instance pointer                                            */
+/*  pMcSrc                  Multichannel source                                         */
+/*  pMonoSrc                Mono band pass source                                       */
+/*  pDst                    Multichannel destination                                    */
+/*  NrFrames                Number of frames                                            */
+/*  NrChannels              Number of channels                                          */
+/*                                                                                      */
+/* RETURNS:                                                                             */
+/*  Void                                                                                */
+/*                                                                                      */
+/* NOTES:                                                                               */
+/*                                                                                      */
+/****************************************************************************************/
+void AGC_MIX_VOL_Mc1Mon_D32_WRA(AGC_MIX_VOL_2St1Mon_FLOAT_t  *pInstance,
+                                 const LVM_FLOAT            *pMcSrc,
+                                 const LVM_FLOAT            *pMonoSrc,
+                                 LVM_FLOAT                  *pDst,
+                                 LVM_UINT16                 NrFrames,
+                                 LVM_UINT16                 NrChannels)
+{
+
+    /*
+     * General variables
+     */
+    LVM_UINT16      i, jj;                                      /* Sample index */
+    LVM_FLOAT       SampleVal;                                  /* Sample value */
+    LVM_FLOAT       Mono;                                       /* Mono sample */
+    LVM_FLOAT       AbsPeak;                                    /* Absolute peak signal */
+    LVM_FLOAT       AGC_Mult;                                   /* Short AGC gain */
+    LVM_FLOAT       Vol_Mult;                                   /* Short volume */
+
+
+    /*
+     * Instance control variables
+     */
+    LVM_FLOAT      AGC_Gain      = pInstance->AGC_Gain;         /* Get the current AGC gain */
+    LVM_FLOAT      AGC_MaxGain   = pInstance->AGC_MaxGain;      /* Get maximum AGC gain */
+    LVM_FLOAT      AGC_Attack    = pInstance->AGC_Attack;       /* Attack scaler */
+    /* Decay scaler */
+    LVM_FLOAT      AGC_Decay     = (pInstance->AGC_Decay * (1 << (DECAY_SHIFT)));
+    LVM_FLOAT      AGC_Target    = pInstance->AGC_Target;       /* Get the target level */
+    LVM_FLOAT      Vol_Current   = pInstance->Volume;           /* Actual volume setting */
+    LVM_FLOAT      Vol_Target    = pInstance->Target;           /* Target volume setting */
+    LVM_FLOAT      Vol_TC        = pInstance->VolumeTC;         /* Time constant */
+
+
+    /*
+     * Process on a sample by sample basis
+     */
+    for (i = 0; i < NrFrames; i++)                                  /* For each frame */
+    {
+
+        /*
+         * Get the scalers
+         */
+        AGC_Mult    = (LVM_FLOAT)(AGC_Gain);              /* Get the AGC gain */
+        Vol_Mult    = (LVM_FLOAT)(Vol_Current);           /* Get the volume gain */
+
+        AbsPeak = 0.0f;
+        /*
+         * Get the input samples
+         */
+        for (jj = 0; jj < NrChannels; jj++)
+        {
+            SampleVal  = *pMcSrc++;                       /* Get the sample value of jj Channel*/
+            Mono       = *pMonoSrc;                       /* Get the mono sample */
+
+            /*
+             * Apply the AGC gain to the mono input and mix with the input signal
+             */
+            SampleVal  += (Mono * AGC_Mult);                        /* Mix in the mono signal */
+
+            /*
+             * Apply the volume and write to the output stream
+             */
+            SampleVal  = SampleVal  * Vol_Mult;
+
+            *pDst++ = SampleVal;                                         /* Save the results */
+
+            /*
+             * Update the AGC gain
+             */
+            AbsPeak = Abs_Float(SampleVal) > AbsPeak ? Abs_Float(SampleVal) : AbsPeak;
+        }
+        if (AbsPeak > AGC_Target)
+        {
+            /*
+             * The signal is too large so decrease the gain
+             */
+            AGC_Gain = AGC_Gain * AGC_Attack;
+        }
+        else
+        {
+            /*
+             * The signal is too small so increase the gain
+             */
+            if (AGC_Gain > AGC_MaxGain)
+            {
+                AGC_Gain -= (AGC_Decay);
+            }
+            else
+            {
+                AGC_Gain += (AGC_Decay);
+            }
+        }
+        pMonoSrc++;
+        /*
+         * Update the gain
+         */
+        Vol_Current +=  (Vol_Target - Vol_Current) * ((LVM_FLOAT)Vol_TC / VOL_TC_FLOAT);
+    }
+
+
+    /*
+     * Update the parameters
+     */
+    pInstance->Volume = Vol_Current;                            /* Actual volume setting */
+    pInstance->AGC_Gain = AGC_Gain;
+
+    return;
+}
+#endif /*SUPPORT_MC*/
 #endif /*BUILD_FLOAT*/

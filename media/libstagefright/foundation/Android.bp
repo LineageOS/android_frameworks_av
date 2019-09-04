@@ -4,8 +4,8 @@ cc_library_headers {
     vendor_available: true,
 }
 
-cc_library {
-    name: "libstagefright_foundation",
+cc_defaults {
+    name: "libstagefright_foundation_defaults",
     vendor_available: true,
     vndk: {
         enabled: true,
@@ -25,6 +25,7 @@ cc_library {
     header_libs: [
         "libhardware_headers",
         "libstagefright_foundation_headers",
+        "media_ndk_headers",
         "media_plugin_headers",
     ],
 
@@ -56,18 +57,22 @@ cc_library {
         "ABuffer.cpp",
         "ADebug.cpp",
         "AHandler.cpp",
-        "AHierarchicalStateMachine.cpp",
         "ALooper.cpp",
         "ALooperRoster.cpp",
         "AMessage.cpp",
-        "ANetworkSession.cpp",
         "AString.cpp",
         "AStringUtils.cpp",
+        "AudioPresentationInfo.cpp",
         "ByteUtils.cpp",
         "ColorUtils.cpp",
+        "MediaBuffer.cpp",
+        "MediaBufferBase.cpp",
+        "MediaBufferGroup.cpp",
         "MediaDefs.cpp",
         "MediaKeys.cpp",
-        "ParsedMessage.cpp",
+        "MetaData.cpp",
+        "MetaDataBase.cpp",
+        "OpusHeader.cpp",
         "avc_utils.cpp",
         "base64.cpp",
         "hexdump.cpp",
@@ -82,4 +87,21 @@ cc_library {
         ],
         cfi: true,
     },
+}
+
+cc_library {
+    name: "libstagefright_foundation",
+    defaults: ["libstagefright_foundation_defaults"],
+}
+
+cc_library_static {
+    name: "libstagefright_foundation_without_imemory",
+    defaults: ["libstagefright_foundation_defaults"],
+
+    cflags: [
+        "-Wno-multichar",
+        "-Werror",
+        "-Wall",
+        "-DNO_IMEMORY",
+    ],
 }

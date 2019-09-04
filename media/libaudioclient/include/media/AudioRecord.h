@@ -17,6 +17,9 @@
 #ifndef ANDROID_AUDIORECORD_H
 #define ANDROID_AUDIORECORD_H
 
+#include <memory>
+#include <vector>
+
 #include <binder/IMemory.h>
 #include <cutils/sched_policy.h>
 #include <media/AudioSystem.h>
@@ -24,9 +27,9 @@
 #include <media/MediaAnalyticsItem.h>
 #include <media/Modulo.h>
 #include <media/MicrophoneInfo.h>
+#include <media/RecordingActivityTracker.h>
 #include <utils/RefBase.h>
 #include <utils/threads.h>
-#include <vector>
 
 #include "android/media/IAudioRecord.h"
 
@@ -189,7 +192,10 @@ public:
                                     uid_t uid = AUDIO_UID_INVALID,
                                     pid_t pid = -1,
                                     const audio_attributes_t* pAttributes = NULL,
-                                    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
+                                    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE,
+                                    audio_microphone_direction_t
+                                        selectedMicDirection = MIC_DIRECTION_UNSPECIFIED,
+                                    float selectedMicFieldDimension = MIC_FIELD_DIMENSION_DEFAULT);
 
     /* Terminates the AudioRecord and unregisters it from AudioFlinger.
      * Also destroys all resources associated with the AudioRecord.
@@ -228,7 +234,10 @@ public:
                             uid_t uid = AUDIO_UID_INVALID,
                             pid_t pid = -1,
                             const audio_attributes_t* pAttributes = NULL,
-                            audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
+                            audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE,
+                            audio_microphone_direction_t
+                                selectedMicDirection = MIC_DIRECTION_UNSPECIFIED,
+                            float selectedMicFieldDimension = MIC_FIELD_DIMENSION_DEFAULT);
 
     /* Result of constructing the AudioRecord. This must be checked for successful initialization
      * before using any AudioRecord API (except for set()), because using
@@ -534,9 +543,23 @@ public:
      */
             status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
 
-    /*
-     * Dumps the state of an audio record.
+    /* Set the Microphone direction (for processing purposes).
      */
+            status_t    setPreferredMicrophoneDirection(audio_microphone_direction_t direction);
+
+    /* Set the Microphone zoom factor (for processing purposes).
+     */
+            status_t    setPreferredMicrophoneFieldDimension(float zoom);
+
+     /* Get the unique port ID assigned to this AudioRecord instance by audio policy manager.
+      * The ID is unique across all audioserver clients and can change during the life cycle
+      * of a given AudioRecord instance if the connection to audioserver is restored.
+      */
+            audio_port_handle_t getPortId() const { return mPortId; };
+
+     /*
+      * Dumps the state of an audio record.
+      */
             status_t    dump(int fd, const Vector<String16>& args) const;
 
 private:
@@ -548,7 +571,7 @@ private:
     class AudioRecordThread : public Thread
     {
     public:
-        AudioRecordThread(AudioRecord& receiver, bool bCanCallJava = false);
+        AudioRecordThread(AudioRecord& receiver);
 
         // Do not call Thread::requestExitAndWait() without first calling requestExit().
         // Thread::requestExitAndWait() is not virtual, and the implementation doesn't do enough.
@@ -597,6 +620,8 @@ private:
 
     sp<AudioRecordThread>   mAudioRecordThread;
     mutable Mutex           mLock;
+
+    std::unique_ptr<RecordingActivityTracker> mTracker;
 
     // Current client state:  false = stopped, true = active.  Protected by mLock.  If more states
     // are added, consider changing this to enum State { ... } mState as in AudioTrack.
@@ -654,6 +679,7 @@ private:
     audio_input_flags_t     mOrigFlags;             // as specified in constructor or set(), const
 
     audio_session_t         mSessionId;
+    audio_port_handle_t     mPortId;                    // Id from Audio Policy Manager
     transfer_type           mTransfer;
 
     // Next 5 fields may be changed if IAudioRecord is re-created, but always != 0
@@ -662,7 +688,7 @@ private:
     sp<IMemory>             mCblkMemory;
     audio_track_cblk_t*     mCblk;              // re-load after mLock.unlock()
     sp<IMemory>             mBufferMemory;
-    audio_io_handle_t       mInput;             // returned by AudioSystem::getInput()
+    audio_io_handle_t       mInput = AUDIO_IO_HANDLE_NONE; // from AudioSystem::getInputforAttr()
 
     int                     mPreviousPriority;  // before start()
     SchedPolicy             mPreviousSchedulingGroup;
@@ -701,10 +727,13 @@ private:
                                               // activity and connected devices
     wp<AudioSystem::AudioDeviceCallback> mDeviceCallback;
 
+    audio_microphone_direction_t mSelectedMicDirection;
+    float mSelectedMicFieldDimension;
+
 private:
     class MediaMetrics {
       public:
-        MediaMetrics() : mAnalyticsItem(new MediaAnalyticsItem("audiorecord")),
+        MediaMetrics() : mAnalyticsItem(MediaAnalyticsItem::create("audiorecord")),
                          mCreatedNs(systemTime(SYSTEM_TIME_REALTIME)),
                          mStartedNs(0), mDurationNs(0), mCount(0),
                          mLastError(NO_ERROR) {

@@ -190,6 +190,9 @@ class Camera3OutputStream :
      */
     virtual ssize_t getSurfaceId(const sp<Surface> &/*surface*/) { return 0; }
 
+    virtual status_t getUniqueSurfaceIds(const std::vector<size_t>&,
+            /*out*/std::vector<size_t>*) { return INVALID_OPERATION; };
+
     /**
      * Update the stream output surfaces.
      */
@@ -197,6 +200,11 @@ class Camera3OutputStream :
             const std::vector<OutputStreamInfo> &outputInfo,
             const std::vector<size_t> &removedSurfaceIds,
             KeyedVector<sp<Surface>, size_t> *outputMap/*out*/);
+
+    /**
+     * Apply ZSL related consumer usage quirk.
+     */
+    static void applyZSLUsageQuirk(int format, uint64_t *consumerUsage /*inout*/);
 
   protected:
     Camera3OutputStream(int id, camera3_stream_type_t type,
@@ -213,6 +221,7 @@ class Camera3OutputStream :
             const camera3_stream_buffer &buffer,
             nsecs_t timestamp,
             bool output,
+            const std::vector<size_t>& surface_ids,
             /*out*/
             sp<Fence> *releaseFenceOut);
 
@@ -285,10 +294,11 @@ class Camera3OutputStream :
 
     virtual status_t returnBufferLocked(
             const camera3_stream_buffer &buffer,
-            nsecs_t timestamp);
+            nsecs_t timestamp, const std::vector<size_t>& surface_ids);
 
     virtual status_t queueBufferToConsumer(sp<ANativeWindow>& consumer,
-            ANativeWindowBuffer* buffer, int anwReleaseFence);
+            ANativeWindowBuffer* buffer, int anwReleaseFence,
+            const std::vector<size_t>& surface_ids);
 
     virtual status_t configureQueueLocked();
 
@@ -299,6 +309,17 @@ class Camera3OutputStream :
      */
     void onBuffersRemovedLocked(const std::vector<sp<GraphicBuffer>>&);
     status_t detachBufferLocked(sp<GraphicBuffer>* buffer, int* fenceFd);
+    // Call this after each dequeueBuffer/attachBuffer/detachNextBuffer call to get update on
+    // removed buffers. Set notifyBufferManager to false when the call is initiated by buffer
+    // manager so buffer manager doesn't need to be notified.
+    void checkRemovedBuffersLocked(bool notifyBufferManager = true);
+
+    // Check return status of IGBP calls and set abandoned state accordingly
+    void checkRetAndSetAbandonedLocked(status_t res);
+
+    // If the status indicates abandonded stream, only log when state hasn't been updated to
+    // STATE_ABANDONED
+    static bool shouldLogError(status_t res, StreamState state);
 
     static const int32_t kDequeueLatencyBinSize = 5; // in ms
     CameraLatencyHistogram mDequeueBufferLatency;

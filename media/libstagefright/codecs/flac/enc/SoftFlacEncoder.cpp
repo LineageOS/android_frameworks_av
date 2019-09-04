@@ -20,7 +20,7 @@
 #include <utils/Log.h>
 
 #include "SoftFlacEncoder.h"
-
+#include <audio_utils/primitives.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaDefs.h>
 
@@ -75,7 +75,9 @@ SoftFlacEncoder::SoftFlacEncoder(
     }
 
     if (!mSignalledError) { // no use allocating input buffer if we had an error above
-        mInputBufferPcm32 = (FLAC__int32*) malloc(sizeof(FLAC__int32) * 2 * kMaxNumSamplesPerFrame);
+        // 2x the pcm16 samples can exist with the same size as pcmFloat samples.
+        mInputBufferPcm32 = (FLAC__int32*) malloc(
+                sizeof(FLAC__int32) * kNumSamplesPerFrame * kMaxChannels * 2);
         if (mInputBufferPcm32 == NULL) {
             ALOGE("SoftFlacEncoder::SoftFlacEncoder(name=%s) error allocating internal input buffer", name);
             mSignalledError = true;
@@ -115,14 +117,14 @@ void SoftFlacEncoder::initPorts() {
     // configure input port of the encoder
     def.nPortIndex = 0;
     def.eDir = OMX_DirInput;
-    def.nBufferCountMin = kNumBuffers;// TODO verify that 1 is enough
+    def.nBufferCountMin = kNumBuffers;
     def.nBufferCountActual = def.nBufferCountMin;
     def.nBufferSize = kMaxInputBufferSize;
     def.bEnabled = OMX_TRUE;
     def.bPopulated = OMX_FALSE;
     def.eDomain = OMX_PortDomainAudio;
     def.bBuffersContiguous = OMX_FALSE;
-    def.nBufferAlignment = 2;
+    def.nBufferAlignment = sizeof(float);
 
     def.format.audio.cMIMEType = const_cast<char *>("audio/raw");
     def.format.audio.pNativeRender = NULL;
@@ -134,7 +136,7 @@ void SoftFlacEncoder::initPorts() {
     // configure output port of the encoder
     def.nPortIndex = 1;
     def.eDir = OMX_DirOutput;
-    def.nBufferCountMin = kNumBuffers;// TODO verify that 1 is enough
+    def.nBufferCountMin = kNumBuffers;
     def.nBufferCountActual = def.nBufferCountMin;
     def.nBufferSize = kMaxOutputBufferSize;
     def.bEnabled = OMX_TRUE;
@@ -193,10 +195,10 @@ OMX_ERRORTYPE SoftFlacEncoder::internalGetParameter(
                 return OMX_ErrorUndefined;
             }
 
-            pcmParams->eNumData = OMX_NumericalDataSigned;
+            pcmParams->eNumData = mNumericalData;
             pcmParams->eEndian = OMX_EndianBig;
             pcmParams->bInterleaved = OMX_TRUE;
-            pcmParams->nBitPerSample = 16;
+            pcmParams->nBitPerSample = mBitsPerSample;
             pcmParams->ePCMMode = OMX_AUDIO_PCMModeLinear;
             pcmParams->eChannelMapping[0] = OMX_AUDIO_ChannelLF;
             pcmParams->eChannelMapping[1] = OMX_AUDIO_ChannelRF;
@@ -270,12 +272,26 @@ OMX_ERRORTYPE SoftFlacEncoder::internalSetParameter(
                 return OMX_ErrorUndefined;
             }
 
-            if (pcmParams->nChannels < 1 || pcmParams->nChannels > 2) {
+            if (pcmParams->nChannels < 1 || pcmParams->nChannels > kMaxChannels) {
                 return OMX_ErrorUndefined;
             }
 
             mNumChannels = pcmParams->nChannels;
             mSampleRate = pcmParams->nSamplingRate;
+
+            if (pcmParams->eNumData == OMX_NumericalDataFloat && pcmParams->nBitPerSample == 32) {
+                mNumericalData = OMX_NumericalDataFloat;
+                mBitsPerSample = 32;
+            } else if (pcmParams->eNumData == OMX_NumericalDataSigned
+                     && pcmParams->nBitPerSample == 16) {
+                mNumericalData = OMX_NumericalDataSigned;
+                mBitsPerSample = 16;
+            } else {
+                ALOGE("%s: invalid eNumData %d, nBitsPerSample %d",
+                        __func__, pcmParams->eNumData, pcmParams->nBitPerSample);
+                return OMX_ErrorUndefined;
+            }
+
             ALOGV("will encode %d channels at %dHz", mNumChannels, mSampleRate);
 
             return configureEncoder();
@@ -356,6 +372,10 @@ void SoftFlacEncoder::onQueueFilled(OMX_U32 portIndex) {
     List<BufferInfo *> &inQueue = getPortQueue(0);
     List<BufferInfo *> &outQueue = getPortQueue(1);
 
+    const bool inputFloat = mNumericalData == OMX_NumericalDataFloat;
+    const size_t sampleSize = inputFloat ? sizeof(float) : sizeof(int16_t);
+    const size_t frameSize = sampleSize * mNumChannels;
+
     FLAC__bool ok = true;
 
     while ((!inQueue.empty() || mSawInputEOS) && !outQueue.empty() && !mSentOutputEOS) {
@@ -381,13 +401,21 @@ void SoftFlacEncoder::onQueueFilled(OMX_U32 portIndex) {
             mEncoderReturnedNbBytes = 0;
             mCurrentInputTimeStamp = inHeader->nTimeStamp;
 
-            const unsigned nbInputFrames = inHeader->nFilledLen / (2 * mNumChannels);
-            const unsigned nbInputSamples = inHeader->nFilledLen / 2;
-            const OMX_S16 * const pcm16 = reinterpret_cast<OMX_S16 *>(inHeader->pBuffer);
+            const unsigned nbInputFrames = inHeader->nFilledLen / frameSize;
+            const unsigned nbInputSamples = inHeader->nFilledLen / sampleSize;
 
-            CHECK_LE(nbInputSamples, 2 * kMaxNumSamplesPerFrame);
-            for (unsigned i=0 ; i < nbInputSamples ; i++) {
-                mInputBufferPcm32[i] = (FLAC__int32) pcm16[i];
+            if (inputFloat) {
+                CHECK_LE(nbInputSamples, kNumSamplesPerFrame * kMaxChannels);
+                const float * const pcmFloat = reinterpret_cast<float *>(inHeader->pBuffer);
+                 memcpy_to_q8_23_from_float_with_clamp(
+                         mInputBufferPcm32, pcmFloat, nbInputSamples);
+            } else {
+                // note nbInputSamples may be 2x as large for pcm16 data.
+                CHECK_LE(nbInputSamples, kNumSamplesPerFrame * kMaxChannels * 2);
+                const int16_t * const pcm16 = reinterpret_cast<int16_t *>(inHeader->pBuffer);
+                for (unsigned i = 0; i < nbInputSamples; ++i) {
+                    mInputBufferPcm32[i] = (FLAC__int32) pcm16[i];
+                }
             }
             ALOGV(" about to encode %u samples per channel", nbInputFrames);
             ok = FLAC__stream_encoder_process_interleaved(
@@ -526,10 +554,12 @@ OMX_ERRORTYPE SoftFlacEncoder::configureEncoder() {
         return OMX_ErrorInvalidState;
     }
 
+    const bool inputFloat = mNumericalData == OMX_NumericalDataFloat;
+    const int codecBitsPerSample = inputFloat ? 24 : 16;
     FLAC__bool ok = true;
     ok = ok && FLAC__stream_encoder_set_channels(mFlacStreamEncoder, mNumChannels);
     ok = ok && FLAC__stream_encoder_set_sample_rate(mFlacStreamEncoder, mSampleRate);
-    ok = ok && FLAC__stream_encoder_set_bits_per_sample(mFlacStreamEncoder, 16);
+    ok = ok && FLAC__stream_encoder_set_bits_per_sample(mFlacStreamEncoder, codecBitsPerSample);
     ok = ok && FLAC__stream_encoder_set_compression_level(mFlacStreamEncoder,
             (unsigned)mCompressionLevel);
     ok = ok && FLAC__stream_encoder_set_verify(mFlacStreamEncoder, false);

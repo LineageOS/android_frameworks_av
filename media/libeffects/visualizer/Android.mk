@@ -9,6 +9,7 @@ LOCAL_SRC_FILES:= \
 
 LOCAL_CFLAGS+= -O2 -fvisibility=hidden
 LOCAL_CFLAGS += -Wall -Werror
+LOCAL_CFLAGS += -DBUILD_FLOAT -DSUPPORT_MC
 
 LOCAL_SHARED_LIBRARIES := \
 	libcutils \
@@ -19,7 +20,8 @@ LOCAL_MODULE_RELATIVE_PATH := soundfx
 LOCAL_MODULE:= libvisualizer
 
 LOCAL_C_INCLUDES := \
-	$(call include-path-for, audio-effects)
+	$(call include-path-for, audio-effects) \
+	$(call include-path-for, audio-utils)
 
 
 LOCAL_HEADER_LIBRARIES += libhardware_headers

@@ -45,10 +45,14 @@ protected:
     virtual void onReset() override;
 
 private:
+    static constexpr unsigned int kNumSamplesPerFrame = 2048; // adjusted based on stream.
+
     enum {
         kNumInputBuffers   = 4,
         kNumOutputBuffers  = 4,
     };
+    OMX_NUMERICALDATATYPE mNumericalData = OMX_NumericalDataSigned;
+    OMX_U32 mBitsPerSample = 16;
 
     FLACDecoder *mFLACDecoder;
     FLAC__StreamMetadata_StreamInfo mStreamInfo;

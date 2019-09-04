@@ -107,6 +107,9 @@ struct BundledEffectContext{
     LVM_FLOAT                       *pInputBuffer;
     LVM_FLOAT                       *pOutputBuffer;
 #endif
+#ifdef SUPPORT_MC
+    LVM_INT32                       ChMask;
+#endif
 };
 
 /* SessionContext : One session */

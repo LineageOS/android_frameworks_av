@@ -33,6 +33,7 @@
 #include "api1/client2/CaptureSequencer.h"
 #include "api1/client2/CallbackProcessor.h"
 #include "api1/client2/ZslProcessor.h"
+#include "utils/CameraThreadState.h"
 
 #define ALOG1(...) ALOGD_IF(gLogLevel >= 1, __VA_ARGS__);
 #define ALOG2(...) ALOGD_IF(gLogLevel >= 2, __VA_ARGS__);
@@ -44,10 +45,6 @@
 namespace android {
 using namespace camera2;
 
-static int getCallingPid() {
-    return IPCThreadState::self()->getCallingPid();
-}
-
 // Interface used by CameraService
 
 Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
@@ -58,8 +55,7 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
         int cameraFacing,
         int clientPid,
         uid_t clientUid,
-        int servicePid,
-        bool legacyMode):
+        int servicePid):
         Camera2ClientBase(cameraService, cameraClient, clientPackageName,
                 cameraDeviceId, api1CameraId, cameraFacing,
                 clientPid, clientUid, servicePid),
@@ -69,8 +65,6 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
 
     SharedParameters::Lock l(mParameters);
     l.mParameters.state = Parameters::DISCONNECTED;
-
-    mLegacyMode = legacyMode;
 }
 
 status_t Camera2Client::initialize(sp<CameraProviderManager> manager, const String8& monitorTags) {
@@ -405,7 +399,7 @@ binder::Status Camera2Client::disconnect() {
 
     binder::Status res = binder::Status::ok();
     // Allow both client and the cameraserver to disconnect at all times
-    int callingPid = getCallingPid();
+    int callingPid = CameraThreadState::getCallingPid();
     if (callingPid != mClientPid && callingPid != mServicePid) return res;
 
     if (mDevice == 0) return res;
@@ -460,8 +454,6 @@ binder::Status Camera2Client::disconnect() {
 
     mDevice->disconnect();
 
-    mDevice.clear();
-
     CameraService::Client::disconnect();
 
     return res;
@@ -472,14 +464,14 @@ status_t Camera2Client::connect(const sp<hardware::ICameraClient>& client) {
     ALOGV("%s: E", __FUNCTION__);
     Mutex::Autolock icl(mBinderSerializationLock);
 
-    if (mClientPid != 0 && getCallingPid() != mClientPid) {
+    if (mClientPid != 0 && CameraThreadState::getCallingPid() != mClientPid) {
         ALOGE("%s: Camera %d: Connection attempt from pid %d; "
                 "current locked to pid %d", __FUNCTION__,
-                mCameraId, getCallingPid(), mClientPid);
+                mCameraId, CameraThreadState::getCallingPid(), mClientPid);
         return BAD_VALUE;
     }
 
-    mClientPid = getCallingPid();
+    mClientPid = CameraThreadState::getCallingPid();
 
     mRemoteCallback = client;
     mSharedCameraCallbacks = client;
@@ -492,16 +484,16 @@ status_t Camera2Client::lock() {
     ALOGV("%s: E", __FUNCTION__);
     Mutex::Autolock icl(mBinderSerializationLock);
     ALOGV("%s: Camera %d: Lock call from pid %d; current client pid %d",
-            __FUNCTION__, mCameraId, getCallingPid(), mClientPid);
+            __FUNCTION__, mCameraId, CameraThreadState::getCallingPid(), mClientPid);
 
     if (mClientPid == 0) {
-        mClientPid = getCallingPid();
+        mClientPid = CameraThreadState::getCallingPid();
         return OK;
     }
 
-    if (mClientPid != getCallingPid()) {
+    if (mClientPid != CameraThreadState::getCallingPid()) {
         ALOGE("%s: Camera %d: Lock call from pid %d; currently locked to pid %d",
-                __FUNCTION__, mCameraId, getCallingPid(), mClientPid);
+                __FUNCTION__, mCameraId, CameraThreadState::getCallingPid(), mClientPid);
         return EBUSY;
     }
 
@@ -513,9 +505,9 @@ status_t Camera2Client::unlock() {
     ALOGV("%s: E", __FUNCTION__);
     Mutex::Autolock icl(mBinderSerializationLock);
     ALOGV("%s: Camera %d: Unlock call from pid %d; current client pid %d",
-            __FUNCTION__, mCameraId, getCallingPid(), mClientPid);
+            __FUNCTION__, mCameraId, CameraThreadState::getCallingPid(), mClientPid);
 
-    if (mClientPid == getCallingPid()) {
+    if (mClientPid == CameraThreadState::getCallingPid()) {
         SharedParameters::Lock l(mParameters);
         if (l.mParameters.state == Parameters::RECORD ||
                 l.mParameters.state == Parameters::VIDEO_SNAPSHOT) {
@@ -529,7 +521,7 @@ status_t Camera2Client::unlock() {
     }
 
     ALOGE("%s: Camera %d: Unlock call from pid %d; currently locked to pid %d",
-            __FUNCTION__, mCameraId, getCallingPid(), mClientPid);
+            __FUNCTION__, mCameraId, CameraThreadState::getCallingPid(), mClientPid);
     return EBUSY;
 }
 
@@ -1447,13 +1439,14 @@ status_t Camera2Client::cancelAutoFocus() {
     return OK;
 }
 
-status_t Camera2Client::takePicture(int msgType) {
+status_t Camera2Client::takePicture(int /*msgType*/) {
     ATRACE_CALL();
     Mutex::Autolock icl(mBinderSerializationLock);
     status_t res;
     if ( (res = checkPid(__FUNCTION__) ) != OK) return res;
 
     int takePictureCounter;
+    bool shouldSyncWithDevice = true;
     {
         SharedParameters::Lock l(mParameters);
         switch (l.mParameters.state) {
@@ -1539,14 +1532,25 @@ status_t Camera2Client::takePicture(int msgType) {
                     __FUNCTION__, mCameraId);
             mZslProcessor->clearZslQueue();
         }
+
+        // We should always sync with the device in case flash is turned on,
+        // the camera device suggests that flash is needed (AE state FLASH_REQUIRED)
+        // or we are in some other AE state different from CONVERGED that may need
+        // precapture trigger.
+        if (l.mParameters.flashMode != Parameters::FLASH_MODE_ON &&
+                (l.mParameters.aeState == ANDROID_CONTROL_AE_STATE_CONVERGED)) {
+            shouldSyncWithDevice  = false;
+        }
     }
 
     ATRACE_ASYNC_BEGIN(kTakepictureLabel, takePictureCounter);
 
-    // Need HAL to have correct settings before (possibly) triggering precapture
-    syncWithDevice();
+    // Make sure HAL has correct settings in case precapture trigger is needed.
+    if (shouldSyncWithDevice) {
+        syncWithDevice();
+    }
 
-    res = mCaptureSequencer->startCapture(msgType);
+    res = mCaptureSequencer->startCapture();
     if (res != OK) {
         ALOGE("%s: Camera %d: Unable to start capture: %s (%d)",
                 __FUNCTION__, mCameraId, strerror(-res), res);
@@ -1583,7 +1587,7 @@ String8 Camera2Client::getParameters() const {
     ALOGV("%s: Camera %d", __FUNCTION__, mCameraId);
     Mutex::Autolock icl(mBinderSerializationLock);
     // The camera service can unconditionally get the parameters at all times
-    if (getCallingPid() != mServicePid && checkPid(__FUNCTION__) != OK) return String8();
+    if (CameraThreadState::getCallingPid() != mServicePid && checkPid(__FUNCTION__) != OK) return String8();
 
     SharedParameters::ReadLock l(mParameters);
 
@@ -1664,27 +1668,6 @@ status_t Camera2Client::commandEnableShutterSoundL(bool enable) {
     if (enable) {
         l.mParameters.playShutterSound = true;
         return OK;
-    }
-
-    // the camera2 api legacy mode can unconditionally disable the shutter sound
-    if (mLegacyMode) {
-        ALOGV("%s: Disable shutter sound in legacy mode", __FUNCTION__);
-        l.mParameters.playShutterSound = false;
-        return OK;
-    }
-
-    // Disabling shutter sound may not be allowed. In that case only
-    // allow the mediaserver process to disable the sound.
-    char value[PROPERTY_VALUE_MAX];
-    property_get("ro.camera.sound.forced", value, "0");
-    if (strncmp(value, "0", 2) != 0) {
-        // Disabling shutter sound is not allowed. Deny if the current
-        // process is not mediaserver.
-        if (getCallingPid() != getpid()) {
-            ALOGE("Failed to disable shutter sound. Permission denied (pid %d)",
-                    getCallingPid());
-            return PERMISSION_DENIED;
-        }
     }
 
     l.mParameters.playShutterSound = false;
@@ -1784,6 +1767,7 @@ void Camera2Client::notifyError(int32_t errorCode,
         case hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_BUFFER:
             ALOGW("%s: Received recoverable error %d from HAL - ignoring, requestId %" PRId32,
                     __FUNCTION__, errorCode, resultExtras.requestId);
+            mCaptureSequencer->notifyError(errorCode, resultExtras);
             return;
         default:
             err = CAMERA_ERROR_UNKNOWN;
@@ -1934,14 +1918,16 @@ void Camera2Client::notifyAutoFocus(uint8_t newState, int triggerId) {
 void Camera2Client::notifyAutoExposure(uint8_t newState, int triggerId) {
     ALOGV("%s: Autoexposure state now %d, last trigger %d",
             __FUNCTION__, newState, triggerId);
+    {
+        SharedParameters::Lock l(mParameters);
+        // Update state
+        l.mParameters.aeState = newState;
+    }
     mCaptureSequencer->notifyAutoExposure(newState, triggerId);
 }
 
 void Camera2Client::notifyShutter(const CaptureResultExtras& resultExtras,
                                   nsecs_t timestamp) {
-    (void)resultExtras;
-    (void)timestamp;
-
     ALOGV("%s: Shutter notification for request id %" PRId32 " at time %" PRId64,
             __FUNCTION__, resultExtras.requestId, timestamp);
     mCaptureSequencer->notifyShutter(resultExtras, timestamp);

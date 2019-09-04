@@ -30,6 +30,8 @@ namespace android {
 
 struct AMessage;
 status_t convertMetaDataToMessage(
+        const MetaDataBase *meta, sp<AMessage> *format);
+status_t convertMetaDataToMessage(
         const sp<MetaData> &meta, sp<AMessage> *format);
 void convertMessageToMetaData(
         const sp<AMessage> &format, sp<MetaData> &meta);
@@ -49,6 +51,10 @@ void mapAACProfileToAudioFormat(audio_format_t& format, uint64_t eAacProfile);
 
 // Send information from MetaData to the HAL via AudioSink
 status_t sendMetaDataToHal(sp<MediaPlayerBase::AudioSink>& sink, const sp<MetaData>& meta);
+
+// Return |audio_offload_info_t| filled from given metadata
+status_t getAudioOffloadInfo(const sp<MetaData>& meta, bool hasVideo,
+        bool isStreaming, audio_stream_type_t streamType, audio_offload_info_t *info);
 
 // Check whether the stream defined by meta can be offloaded to hardware
 bool canOffloadStream(const sp<MetaData>& meta, bool hasVideo,

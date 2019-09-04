@@ -17,32 +17,42 @@
 #ifndef CLEARKEY_DRM_PLUGIN_H_
 #define CLEARKEY_DRM_PLUGIN_H_
 
-#include <android/hardware/drm/1.1/IDrmPlugin.h>
+#include <android/hardware/drm/1.2/IDrmPlugin.h>
+#include <android/hardware/drm/1.2/IDrmPluginListener.h>
 
-#include <stdio.h>
 #include <map>
+#include <stdio.h>
 
+#include <utils/List.h>
+
+#include "DeviceFiles.h"
 #include "SessionLibrary.h"
 #include "Utils.h"
 
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_1 {
+namespace V1_2 {
 namespace clearkey {
 
-using ::android::hardware::drm::V1_0::EventType;
-using ::android::hardware::drm::V1_0::IDrmPluginListener;
-using ::android::hardware::drm::V1_0::KeyStatus;
-using ::android::hardware::drm::V1_0::KeyType;
-using ::android::hardware::drm::V1_0::KeyValue;
-using ::android::hardware::drm::V1_0::SecureStop;
-using ::android::hardware::drm::V1_0::SecureStopId;
-using ::android::hardware::drm::V1_0::SessionId;
-using ::android::hardware::drm::V1_0::Status;
-using ::android::hardware::drm::V1_1::DrmMetricGroup;
-using ::android::hardware::drm::V1_1::IDrmPlugin;
-using ::android::hardware::drm::V1_1::KeyRequestType;
+namespace drm = ::android::hardware::drm;
+using drm::V1_0::EventType;
+using drm::V1_0::IDrmPluginListener;
+using drm::V1_0::KeyRequestType;
+using drm::V1_0::KeyStatus;
+using drm::V1_0::KeyType;
+using drm::V1_0::KeyValue;
+using drm::V1_0::SecureStop;
+using drm::V1_0::SecureStopId;
+using drm::V1_0::SessionId;
+using drm::V1_0::Status;
+using drm::V1_1::DrmMetricGroup;
+using drm::V1_1::HdcpLevel;
+using drm::V1_1::SecureStopRelease;
+using drm::V1_1::SecurityLevel;
+using drm::V1_2::IDrmPlugin;
+using drm::V1_2::KeySetId;
+using drm::V1_2::OfflineLicenseState;
 
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
@@ -50,10 +60,16 @@ using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::sp;
 
+typedef drm::V1_1::KeyRequestType KeyRequestType_V1_1;
+typedef drm::V1_2::IDrmPluginListener IDrmPluginListener_V1_2;
+typedef drm::V1_2::KeyStatus KeyStatus_V1_2;
+typedef drm::V1_2::Status Status_V1_2;
+typedef drm::V1_2::HdcpLevel HdcpLevel_V1_2;
+
 struct DrmPlugin : public IDrmPlugin {
     explicit DrmPlugin(SessionLibrary* sessionLibrary);
 
-    virtual ~DrmPlugin() {}
+    virtual ~DrmPlugin() { mFileHandle.DeleteAllLicenses(); }
 
     Return<void> openSession(openSession_cb _hidl_cb) override;
     Return<void> openSession_1_1(SecurityLevel securityLevel,
@@ -77,6 +93,14 @@ struct DrmPlugin : public IDrmPlugin {
         const hidl_vec<KeyValue>& optionalParameters,
         getKeyRequest_1_1_cb _hidl_cb) override;
 
+    Return<void> getKeyRequest_1_2(
+        const hidl_vec<uint8_t>& scope,
+        const hidl_vec<uint8_t>& initData,
+        const hidl_string& mimeType,
+        KeyType keyType,
+        const hidl_vec<KeyValue>& optionalParameters,
+        getKeyRequest_1_2_cb _hidl_cb) override;
+
     Return<void> provideKeyResponse(
         const hidl_vec<uint8_t>& scope,
         const hidl_vec<uint8_t>& response,
@@ -91,13 +115,7 @@ struct DrmPlugin : public IDrmPlugin {
 
     Return<Status> restoreKeys(
         const hidl_vec<uint8_t>& sessionId,
-        const hidl_vec<uint8_t>& keySetId) {
-
-        if (sessionId.size() == 0 || keySetId.size() == 0) {
-            return Status::BAD_VALUE;
-        }
-        return Status::ERROR_DRM_CANNOT_HANDLE;
-    }
+        const hidl_vec<uint8_t>& keySetId) override;
 
     Return<void> queryKeyStatus(
         const hidl_vec<uint8_t>& sessionId,
@@ -112,6 +130,18 @@ struct DrmPlugin : public IDrmPlugin {
 
         hidl_string defaultUrl;
         _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, hidl_vec<uint8_t>(), defaultUrl);
+        return Void();
+    }
+
+    Return<void> getProvisionRequest_1_2(
+        const hidl_string& certificateType,
+        const hidl_string& certificateAuthority,
+        getProvisionRequest_1_2_cb _hidl_cb) {
+        UNUSED(certificateType);
+        UNUSED(certificateAuthority);
+
+        hidl_string defaultUrl;
+        _hidl_cb(Status_V1_2::ERROR_DRM_CANNOT_HANDLE, hidl_vec<uint8_t>(), defaultUrl);
         return Void();
     }
 
@@ -134,12 +164,26 @@ struct DrmPlugin : public IDrmPlugin {
         return Void();
     }
 
+    Return<void> getHdcpLevels_1_2(getHdcpLevels_1_2_cb _hidl_cb) {
+        HdcpLevel_V1_2 connectedLevel = HdcpLevel_V1_2::HDCP_NONE;
+        HdcpLevel_V1_2 maxLevel = HdcpLevel_V1_2::HDCP_NO_OUTPUT;
+        _hidl_cb(Status_V1_2::OK, connectedLevel, maxLevel);
+        return Void();
+    }
+
     Return<void> getNumberOfSessions(getNumberOfSessions_cb _hidl_cb) override;
 
     Return<void> getSecurityLevel(const hidl_vec<uint8_t>& sessionId,
             getSecurityLevel_cb _hidl_cb) override;
 
     Return<void> getMetrics(getMetrics_cb _hidl_cb) override;
+
+    Return<void> getOfflineLicenseKeySetIds(getOfflineLicenseKeySetIds_cb _hidl_cb) override;
+
+    Return<Status> removeOfflineLicense(const KeySetId &keySetId) override;
+
+    Return<void> getOfflineLicenseState(const KeySetId &keySetId,
+            getOfflineLicenseState_cb _hidl_cb) override;
 
     Return<void> getPropertyString(
         const hidl_string& name,
@@ -248,12 +292,17 @@ struct DrmPlugin : public IDrmPlugin {
 
     Return<void> setListener(const sp<IDrmPluginListener>& listener) {
         mListener = listener;
+        mListenerV1_2 = IDrmPluginListener_V1_2::castFrom(listener);
         return Void();
     };
 
-    Return<void> sendEvent(EventType eventType, const hidl_vec<uint8_t>& sessionId,
+    Return<void> sendEvent(
+            EventType eventType,
+            const hidl_vec<uint8_t>& sessionId,
             const hidl_vec<uint8_t>& data) {
-        if (mListener != NULL) {
+        if (mListenerV1_2 != NULL) {
+            mListenerV1_2->sendEvent(eventType, sessionId, data);
+        } else if (mListener != NULL) {
             mListener->sendEvent(eventType, sessionId, data);
         } else {
             ALOGE("Null event listener, event not sent");
@@ -261,8 +310,12 @@ struct DrmPlugin : public IDrmPlugin {
         return Void();
     }
 
-    Return<void> sendExpirationUpdate(const hidl_vec<uint8_t>& sessionId, int64_t expiryTimeInMS) {
-        if (mListener != NULL) {
+    Return<void> sendExpirationUpdate(
+            const hidl_vec<uint8_t>& sessionId,
+            int64_t expiryTimeInMS) {
+        if (mListenerV1_2 != NULL) {
+            mListenerV1_2->sendExpirationUpdate(sessionId, expiryTimeInMS);
+        } else if (mListener != NULL) {
             mListener->sendExpirationUpdate(sessionId, expiryTimeInMS);
         } else {
             ALOGE("Null event listener, event not sent");
@@ -270,12 +323,32 @@ struct DrmPlugin : public IDrmPlugin {
         return Void();
     }
 
-    Return<void> sendKeysChange(const hidl_vec<uint8_t>& sessionId,
+    Return<void> sendKeysChange(
+            const hidl_vec<uint8_t>& sessionId,
             const hidl_vec<KeyStatus>& keyStatusList, bool hasNewUsableKey) {
-        if (mListener != NULL) {
+        if (mListenerV1_2 != NULL) {
+            mListenerV1_2->sendKeysChange(sessionId, keyStatusList, hasNewUsableKey);
+        } else if (mListener != NULL) {
             mListener->sendKeysChange(sessionId, keyStatusList, hasNewUsableKey);
         } else {
             ALOGE("Null event listener, event not sent");
+        }
+        return Void();
+    }
+
+    Return<void> sendKeysChange_1_2(
+            const hidl_vec<uint8_t>& sessionId,
+            const hidl_vec<KeyStatus_V1_2>& keyStatusList, bool hasNewUsableKey) {
+        if (mListenerV1_2 != NULL) {
+            mListenerV1_2->sendKeysChange_1_2(sessionId, keyStatusList, hasNewUsableKey);
+        }
+        return Void();
+    }
+
+    Return<void> sendSessionLostState(
+            const hidl_vec<uint8_t>& sessionId) {
+        if (mListenerV1_2 != NULL) {
+            mListenerV1_2->sendSessionLostState(sessionId);
         }
         return Void();
     }
@@ -300,18 +373,19 @@ struct DrmPlugin : public IDrmPlugin {
 private:
     void initProperties();
     void installSecureStop(const hidl_vec<uint8_t>& sessionId);
+    bool makeKeySetId(std::string* keySetId);
     void setPlayPolicy();
 
     Return<Status> setSecurityLevel(const hidl_vec<uint8_t>& sessionId,
             SecurityLevel level);
 
-    Status getKeyRequestCommon(const hidl_vec<uint8_t>& scope,
+    Status_V1_2 getKeyRequestCommon(const hidl_vec<uint8_t>& scope,
             const hidl_vec<uint8_t>& initData,
             const hidl_string& mimeType,
             KeyType keyType,
             const hidl_vec<KeyValue>& optionalParameters,
             std::vector<uint8_t> *request,
-            KeyRequestType *getKeyRequestType,
+            KeyRequestType_V1_1 *getKeyRequestType,
             std::string *defaultUrl);
 
     struct ClearkeySecureStop {
@@ -323,19 +397,31 @@ private:
     std::vector<KeyValue> mPlayPolicy;
     std::map<std::string, std::string> mStringProperties;
     std::map<std::string, std::vector<uint8_t> > mByteArrayProperties;
+    std::map<std::string, std::vector<uint8_t> > mReleaseKeysMap;
     std::map<std::vector<uint8_t>, SecurityLevel> mSecurityLevel;
     sp<IDrmPluginListener> mListener;
+    sp<IDrmPluginListener_V1_2> mListenerV1_2;
     SessionLibrary *mSessionLibrary;
     int64_t mOpenSessionOkCount;
     int64_t mCloseSessionOkCount;
     int64_t mCloseSessionNotOpenedCount;
     uint32_t mNextSecureStopId;
 
+    // set by property to mock error scenarios
+    Status_V1_2 mMockError;
+
+    void processMockError(const sp<Session> &session) {
+        session->setMockError(mMockError);
+        mMockError = Status_V1_2::OK;
+    }
+
+    DeviceFiles mFileHandle;
+
     CLEARKEY_DISALLOW_COPY_AND_ASSIGN_AND_NEW(DrmPlugin);
 };
 
 } // namespace clearkey
-} // namespace V1_1
+} // namespace V1_2
 } // namespace drm
 } // namespace hardware
 } // namespace android

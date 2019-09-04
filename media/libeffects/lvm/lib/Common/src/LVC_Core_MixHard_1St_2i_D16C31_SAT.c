@@ -59,6 +59,31 @@ void LVC_Core_MixHard_1St_2i_D16C31_SAT( LVMixer3_FLOAT_st        *ptrInstance1,
 
 
 }
+#ifdef SUPPORT_MC
+void LVC_Core_MixHard_1St_MC_float_SAT (Mix_Private_FLOAT_st **ptrInstance,
+                                         const LVM_FLOAT      *src,
+                                         LVM_FLOAT            *dst,
+                                         LVM_INT16            NrFrames,
+                                         LVM_INT16            NrChannels)
+{
+    LVM_FLOAT  Temp;
+    LVM_INT16 ii, jj;
+    for (ii = NrFrames; ii != 0; ii--)
+    {
+        for (jj = 0; jj < NrChannels; jj++)
+        {
+            Mix_Private_FLOAT_st  *pInstance1 = (Mix_Private_FLOAT_st *)(ptrInstance[jj]);
+            Temp = ((LVM_FLOAT)*(src++) * (LVM_FLOAT)pInstance1->Current);
+            if (Temp > 1.0f)
+                *dst++ = 1.0f;
+            else if (Temp < -1.0f)
+                *dst++ = -1.0f;
+            else
+                *dst++ = (LVM_FLOAT)Temp;
+        }
+    }
+}
+#endif
 #else
 void LVC_Core_MixHard_1St_2i_D16C31_SAT( LVMixer3_st        *ptrInstance1,
                                          LVMixer3_st        *ptrInstance2,

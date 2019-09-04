@@ -155,17 +155,6 @@ String8 AudioPolicyService::AudioPolicyClient::getParameters(audio_io_handle_t i
     return result;
 }
 
-status_t AudioPolicyService::AudioPolicyClient::startTone(audio_policy_tone_t tone,
-              audio_stream_type_t stream)
-{
-    return mAudioPolicyService->startTone(tone, stream);
-}
-
-status_t AudioPolicyService::AudioPolicyClient::stopTone()
-{
-    return mAudioPolicyService->stopTone();
-}
-
 status_t AudioPolicyService::AudioPolicyClient::setVoiceVolume(float volume, int delay_ms)
 {
     return mAudioPolicyService->setVoiceVolume(volume, delay_ms);
@@ -181,6 +170,13 @@ status_t AudioPolicyService::AudioPolicyClient::moveEffects(audio_session_t sess
     }
 
     return af->moveEffects(session, src_output, dst_output);
+}
+
+void AudioPolicyService::AudioPolicyClient::setEffectSuspended(int effectId,
+                                audio_session_t sessionId,
+                                bool suspended)
+{
+    mAudioPolicyService->setEffectSuspended(effectId, sessionId, suspended);
 }
 
 status_t AudioPolicyService::AudioPolicyClient::createAudioPatch(const struct audio_patch *patch,
@@ -220,12 +216,23 @@ void AudioPolicyService::AudioPolicyClient::onDynamicPolicyMixStateUpdate(
 }
 
 void AudioPolicyService::AudioPolicyClient::onRecordingConfigurationUpdate(
-        int event, const record_client_info_t *clientInfo,
-        const audio_config_base_t *clientConfig, const audio_config_base_t *deviceConfig,
-        audio_patch_handle_t patchHandle)
+                                                    int event,
+                                                    const record_client_info_t *clientInfo,
+                                                    const audio_config_base_t *clientConfig,
+                                                    std::vector<effect_descriptor_t> clientEffects,
+                                                    const audio_config_base_t *deviceConfig,
+                                                    std::vector<effect_descriptor_t> effects,
+                                                    audio_patch_handle_t patchHandle,
+                                                    audio_source_t source)
 {
     mAudioPolicyService->onRecordingConfigurationUpdate(event, clientInfo,
-            clientConfig, deviceConfig, patchHandle);
+            clientConfig, clientEffects, deviceConfig, effects, patchHandle, source);
+}
+
+void AudioPolicyService::AudioPolicyClient::onAudioVolumeGroupChanged(volume_group_t group,
+                                                                      int flags)
+{
+    mAudioPolicyService->onAudioVolumeGroupChanged(group, flags);
 }
 
 audio_unique_id_t AudioPolicyService::AudioPolicyClient::newAudioUniqueId(audio_unique_id_use_t use)

@@ -21,13 +21,19 @@
 #include "Configuration.h"
 #include <atomic>
 #include <mutex>
+#include <chrono>
 #include <deque>
 #include <map>
+#include <numeric>
+#include <optional>
+#include <set>
+#include <string>
 #include <vector>
 #include <stdint.h>
 #include <sys/types.h>
 #include <limits.h>
 
+#include <android/os/BnExternalVibrationController.h>
 #include <android-base/macros.h>
 
 #include <cutils/atomic.h>
@@ -48,7 +54,9 @@
 #include <utils/TypeHelpers.h>
 #include <utils/Vector.h>
 
+#include <binder/AppOpsManager.h>
 #include <binder/BinderService.h>
+#include <binder/IAppOpsCallback.h>
 #include <binder/MemoryDealer.h>
 
 #include <system/audio.h>
@@ -62,7 +70,10 @@
 #include <media/LinearMap.h>
 #include <media/VolumeShaper.h>
 
+#include <audio_utils/clock.h>
+#include <audio_utils/FdToString.h>
 #include <audio_utils/SimpleLog.h>
+#include <audio_utils/TimestampVerifier.h>
 
 #include "FastCapture.h"
 #include "FastMixer.h"
@@ -71,12 +82,15 @@
 #include "AudioStreamOut.h"
 #include "SpdifStreamOut.h"
 #include "AudioHwDevice.h"
+#include "NBAIO_Tee.h"
 
 #include <powermanager/IPowerManager.h>
 
 #include <media/nblog/NBLog.h>
 #include <private/media/AudioEffectShared.h>
 #include <private/media/AudioTrackShared.h>
+
+#include <vibrator/ExternalVibration.h>
 
 #include "android/media/BnAudioRecord.h"
 
@@ -130,6 +144,10 @@ public:
 
     virtual     float       masterVolume() const;
     virtual     bool        masterMute() const;
+
+    // Balance value must be within -1.f (left only) to 1.f (right only) inclusive.
+                status_t    setMasterBalance(float balance) override;
+                status_t    getMasterBalance(float *balance) const override;
 
     virtual     status_t    setStreamVolume(audio_stream_type_t stream, float value,
                                             audio_io_handle_t output);
@@ -202,6 +220,8 @@ public:
     virtual status_t queryEffect(uint32_t index, effect_descriptor_t *descriptor) const;
 
     virtual status_t getEffectDescriptor(const effect_uuid_t *pUuid,
+                                         const effect_uuid_t *pTypeUuid,
+                                         uint32_t preferredTypeFlag,
                                          effect_descriptor_t *descriptor) const;
 
     virtual sp<IEffect> createEffect(
@@ -218,6 +238,10 @@ public:
 
     virtual status_t moveEffects(audio_session_t sessionId, audio_io_handle_t srcOutput,
                         audio_io_handle_t dstOutput);
+
+            void setEffectSuspended(int effectId,
+                                    audio_session_t sessionId,
+                                    bool suspended) override;
 
     virtual audio_module_handle_t loadHwModule(const char *name);
 
@@ -276,6 +300,9 @@ public:
                             const sp<MmapStreamCallback>& callback,
                             sp<MmapStreamInterface>& interface,
                             audio_port_handle_t *handle);
+
+    static int onExternalVibrationStart(const sp<os::ExternalVibration>& externalVibration);
+    static void onExternalVibrationStop(const sp<os::ExternalVibration>& externalVibration);
 private:
     // FIXME The 400 is temporarily too high until a leak of writers in media.log is fixed.
     static const size_t kLogMemorySize = 400 * 1024;
@@ -346,7 +373,6 @@ private:
 
     AudioHwDevice*          findSuitableHwDev_l(audio_module_handle_t module,
                                                 audio_devices_t devices);
-    void                    purgeStaleEffects_l();
 
     // Set kEnableExtendedChannels to true to enable greater than stereo output
     // for the MixerThread and device sink.  Number of channels allowed is
@@ -357,16 +383,17 @@ private:
     static inline bool isValidPcmSinkChannelMask(audio_channel_mask_t channelMask) {
         switch (audio_channel_mask_get_representation(channelMask)) {
         case AUDIO_CHANNEL_REPRESENTATION_POSITION: {
-            uint32_t channelCount = FCC_2; // stereo is default
-            if (kEnableExtendedChannels) {
-                channelCount = audio_channel_count_from_out_mask(channelMask);
-                if (channelCount < FCC_2 // mono is not supported at this time
-                        || channelCount > AudioMixer::MAX_NUM_CHANNELS) {
-                    return false;
-                }
+            // Haptic channel mask is only applicable for channel position mask.
+            const uint32_t channelCount = audio_channel_count_from_out_mask(
+                    channelMask & ~AUDIO_CHANNEL_HAPTIC_ALL);
+            const uint32_t maxChannelCount = kEnableExtendedChannels
+                    ? AudioMixer::MAX_NUM_CHANNELS : FCC_2;
+            if (channelCount < FCC_2 // mono is not supported at this time
+                    || channelCount > maxChannelCount) {
+                return false;
             }
             // check that channelMask is the "canonical" one we expect for the channelCount.
-            return channelMask == audio_channel_out_mask_from_count(channelCount);
+            return audio_channel_position_mask_is_out_canonical(channelMask);
             }
         case AUDIO_CHANNEL_REPRESENTATION_INDEX:
             if (kEnableExtendedChannels) {
@@ -409,12 +436,16 @@ private:
     static uint32_t         mScreenState;
 
     // Internal dump utilities.
-    static const int kDumpLockRetries = 50;
-    static const int kDumpLockSleepUs = 20000;
+    static const int kDumpLockTimeoutNs = 1 * NANOS_PER_SECOND;
     static bool dumpTryLock(Mutex& mutex);
     void dumpPermissionDenial(int fd, const Vector<String16>& args);
     void dumpClients(int fd, const Vector<String16>& args);
     void dumpInternals(int fd, const Vector<String16>& args);
+
+    SimpleLog mThreadLog{16}; // 16 Thread history limit
+
+    class ThreadBase;
+    void dumpToThreadLog_l(const sp<ThreadBase> &thread);
 
     // --- Client ---
     class Client : public RefBase {
@@ -502,6 +533,9 @@ private:
     class EffectChain;
 
     struct AudioStreamIn;
+    struct TeePatch;
+    using TeePatches = std::vector<TeePatch>;
+
 
     struct  stream_type_t {
         stream_type_t()
@@ -528,6 +562,26 @@ using effect_buffer_t = int16_t;
 
 #include "PatchPanel.h"
 
+    // Find io handle by session id.
+    // Preference is given to an io handle with a matching effect chain to session id.
+    // If none found, AUDIO_IO_HANDLE_NONE is returned.
+    template <typename T>
+    static audio_io_handle_t findIoHandleBySessionId_l(
+            audio_session_t sessionId, const T& threads) {
+        audio_io_handle_t io = AUDIO_IO_HANDLE_NONE;
+
+        for (size_t i = 0; i < threads.size(); i++) {
+            const uint32_t sessionType = threads.valueAt(i)->hasAudioSession(sessionId);
+            if (sessionType != 0) {
+                io = threads.keyAt(i);
+                if ((sessionType & AudioFlinger::ThreadBase::EFFECT_SESSION) != 0) {
+                    break; // effect chain here.
+                }
+            }
+        }
+        return io;
+    }
+
     // server side of the client's IAudioTrack
     class TrackHandle : public android::BnAudioTrack {
     public:
@@ -540,6 +594,7 @@ using effect_buffer_t = int16_t;
         virtual void        pause();
         virtual status_t    attachAuxEffect(int effectId);
         virtual status_t    setParameters(const String8& keyValuePairs);
+        virtual status_t    selectPresentation(int presentationId, int programId);
         virtual media::VolumeShaper::Status applyVolumeShaper(
                 const sp<media::VolumeShaper::Configuration>& configuration,
                 const sp<media::VolumeShaper::Operation>& operation) override;
@@ -564,6 +619,10 @@ using effect_buffer_t = int16_t;
         virtual binder::Status   stop();
         virtual binder::Status   getActiveMicrophones(
                 std::vector<media::MicrophoneInfo>* activeMicrophones);
+        virtual binder::Status   setPreferredMicrophoneDirection(
+                int /*audio_microphone_direction_t*/ direction);
+        virtual binder::Status   setPreferredMicrophoneFieldDimension(float zoom);
+
     private:
         const sp<RecordThread::RecordTrack> mRecordTrack;
 
@@ -605,7 +664,9 @@ using effect_buffer_t = int16_t;
                                            audio_devices_t device,
                                            const String8& address,
                                            audio_source_t source,
-                                           audio_input_flags_t flags);
+                                           audio_input_flags_t flags,
+                                           audio_devices_t outputDevice,
+                                           const String8& outputDeviceAddress);
               sp<ThreadBase> openOutput_l(audio_module_handle_t module,
                                               audio_io_handle_t *output,
                                               audio_config_t *config,
@@ -638,8 +699,11 @@ using effect_buffer_t = int16_t;
 
               status_t moveEffectChain_l(audio_session_t sessionId,
                                      PlaybackThread *srcThread,
-                                     PlaybackThread *dstThread,
-                                     bool reRegister);
+                                     PlaybackThread *dstThread);
+
+              status_t moveAuxEffectToIo(int EffectId,
+                                         const sp<PlaybackThread>& dstThread,
+                                         sp<PlaybackThread> *srcThread);
 
               // return thread associated with primary hardware device, or NULL
               PlaybackThread *primaryPlaybackThread_l() const;
@@ -648,7 +712,7 @@ using effect_buffer_t = int16_t;
               // return the playback thread with smallest HAL buffer size, and prefer fast
               PlaybackThread *fastPlaybackThread_l() const;
 
-              sp<PlaybackThread> getEffectThread_l(audio_session_t sessionId, int EffectId);
+              sp<ThreadBase> getEffectThread_l(audio_session_t sessionId, int effectId);
 
 
                 void        removeClient_l(pid_t pid);
@@ -674,7 +738,12 @@ using effect_buffer_t = int16_t;
                 // Return true if the effect was found in mOrphanEffectChains, false otherwise.
                 bool            updateOrphanEffectChains(const sp<EffectModule>& effect);
 
+                std::vector< sp<EffectModule> > purgeStaleEffects_l();
+
                 void broacastParametersToRecordThreads_l(const String8& keyValuePairs);
+                void forwardParametersToDownstreamPatches_l(
+                        audio_io_handle_t upStream, const String8& keyValuePairs,
+                        std::function<bool(const sp<PlaybackThread>&)> useThread = nullptr);
 
     // AudioStreamIn is immutable, so their fields are const.
     // For emphasis, we could also make all pointers to them be "const *",
@@ -689,6 +758,11 @@ using effect_buffer_t = int16_t;
 
         AudioStreamIn(AudioHwDevice *dev, sp<StreamInHalInterface> in, audio_input_flags_t flags) :
             audioHwDev(dev), stream(in), flags(flags) {}
+    };
+
+    struct TeePatch {
+        sp<RecordThread::PatchRecord> patchRecord;
+        sp<PlaybackThread::PatchTrack> patchTrack;
     };
 
     // for mAudioSessionRefs only
@@ -752,6 +826,7 @@ using effect_buffer_t = int16_t;
                 // member variables below are protected by mLock
                 float                               mMasterVolume;
                 bool                                mMasterMute;
+                float                               mMasterBalance = 0.f;
                 // end of variables protected by mLock
 
                 DefaultKeyedVector< audio_io_handle_t, sp<RecordThread> >    mRecordThreads;
@@ -769,6 +844,7 @@ using effect_buffer_t = int16_t;
                 Vector<AudioSessionRef*> mAudioSessionRefs;
 
                 float       masterVolume_l() const;
+                float       getMasterBalance_l() const;
                 bool        masterMute_l() const;
                 audio_module_handle_t loadHwModule_l(const char *name);
 
@@ -791,44 +867,19 @@ private:
 
     // for use from destructor
     status_t    closeOutput_nonvirtual(audio_io_handle_t output);
-    void        closeOutputInternal_l(const sp<PlaybackThread>& thread);
+    void        closeThreadInternal_l(const sp<PlaybackThread>& thread);
     status_t    closeInput_nonvirtual(audio_io_handle_t input);
-    void        closeInputInternal_l(const sp<RecordThread>& thread);
+    void        closeThreadInternal_l(const sp<RecordThread>& thread);
     void        setAudioHwSyncForSession_l(PlaybackThread *thread, audio_session_t sessionId);
 
     status_t    checkStreamType(audio_stream_type_t stream) const;
 
     void        filterReservedParameters(String8& keyValuePairs, uid_t callingUid);
-
-#ifdef TEE_SINK
-    // all record threads serially share a common tee sink, which is re-created on format change
-    sp<NBAIO_Sink>   mRecordTeeSink;
-    sp<NBAIO_Source> mRecordTeeSource;
-#endif
+    void        logFilteredParameters(size_t originalKVPSize, const String8& originalKVPs,
+                                      size_t rejectedKVPSize, const String8& rejectedKVPs,
+                                      uid_t callingUid);
 
 public:
-
-#ifdef TEE_SINK
-    // tee sink, if enabled by property, allows dumpsys to write most recent audio to .wav file
-    static void dumpTee(int fd, const sp<NBAIO_Source>& source, audio_io_handle_t id, char suffix);
-
-    // whether tee sink is enabled by property
-    static bool mTeeSinkInputEnabled;
-    static bool mTeeSinkOutputEnabled;
-    static bool mTeeSinkTrackEnabled;
-
-    // runtime configured size of each tee sink pipe, in frames
-    static size_t mTeeSinkInputFrames;
-    static size_t mTeeSinkOutputFrames;
-    static size_t mTeeSinkTrackFrames;
-
-    // compile-time default size of tee sink pipes, in frames
-    // 0x200000 stereo 16-bit PCM frames = 47.5 seconds at 44.1 kHz, 8 megabytes
-    static const size_t kTeeSinkInputFramesDefault = 0x200000;
-    static const size_t kTeeSinkOutputFramesDefault = 0x200000;
-    static const size_t kTeeSinkTrackFramesDefault = 0x200000;
-#endif
-
     // These methods read variables atomically without mLock,
     // though the variables are updated with mLock.
     bool    isLowRamDevice() const { return mIsLowRamDevice; }
@@ -843,10 +894,15 @@ private:
 
     nsecs_t mGlobalEffectEnableTime;  // when a global effect was last enabled
 
-    sp<PatchPanel> mPatchPanel;
+    // protected by mLock
+    PatchPanel mPatchPanel;
     sp<EffectsFactoryHalInterface> mEffectsFactoryHal;
 
-    bool        mSystemReady;
+    bool       mSystemReady;
+
+    SimpleLog  mRejectedSetParameterLog;
+    SimpleLog  mAppSetParameterLog;
+    SimpleLog  mSystemSetParameterLog;
 };
 
 #undef INCLUDING_FROM_AUDIOFLINGER_H

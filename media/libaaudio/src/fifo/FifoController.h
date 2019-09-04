@@ -30,7 +30,7 @@ namespace android {
 class FifoController : public FifoControllerBase
 {
 public:
-    FifoController(fifo_counter_t bufferSize, fifo_counter_t threshold)
+    FifoController(fifo_frames_t bufferSize, fifo_frames_t threshold)
     : FifoControllerBase(bufferSize, threshold)
     , mReadCounter(0)
     , mWriteCounter(0)

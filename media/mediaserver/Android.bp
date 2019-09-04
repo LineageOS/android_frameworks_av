@@ -33,6 +33,7 @@ cc_binary {
         "frameworks/av/services/mediaresourcemanager",
     ],
 
+    // back to 32-bit, b/126502613
     compile_multilib: "32",
 
     init_rc: ["mediaserver.rc"],
@@ -42,4 +43,5 @@ cc_binary {
         "-Wall",
     ],
 
+    vintf_fragments: ["manifest_media_c2_software.xml"],
 }

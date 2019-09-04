@@ -26,11 +26,11 @@
 #include <system/audio.h>
 
 #include <media/IMediaPlayerClient.h>
-#include <media/IMediaPlayer.h>
 #include <media/IMediaMetadataRetriever.h>
 
 namespace android {
 
+class IMediaPlayer;
 class IMediaCodecList;
 struct IMediaHTTPService;
 class IMediaRecorder;

@@ -30,6 +30,11 @@ struct MediaHTTPService;
 // A binder interface for implementing a stagefright DataSource remotely.
 struct DataSourceDesc : public RefBase {
 public:
+    // intentionally less than INT64_MAX
+    // keep consistent with JAVA code
+    static const int64_t kMaxTimeMs = 0x7ffffffffffffffll / 1000;
+    static const int64_t kMaxTimeUs = kMaxTimeMs * 1000;
+
     enum {
         /* No data source has been set yet */
         TYPE_NONE     = 0,

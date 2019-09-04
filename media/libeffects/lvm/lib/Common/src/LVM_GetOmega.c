@@ -53,7 +53,9 @@ const LVM_INT32     LVVDL_2PiOnFsShiftTable[]={LVVDL_2PiByFs_SHIFT1 ,         /*
 #define LVVDL_2PiBy_48000_f       0.000130900f
 
 #ifdef HIGHER_FS
+#define LVVDL_2PiBy_88200_f       0.000071238f
 #define LVVDL_2PiBy_96000_f       0.000065450f
+#define LVVDL_2PiBy_176400_f      0.000035619f
 #define LVVDL_2PiBy_192000_f      0.000032725f
 #endif
 const LVM_FLOAT     LVVDL_2PiOnFsTable[] =  {LVVDL_2PiBy_8000_f,
@@ -66,7 +68,9 @@ const LVM_FLOAT     LVVDL_2PiOnFsTable[] =  {LVVDL_2PiBy_8000_f,
                                              LVVDL_2PiBy_44100_f,
                                              LVVDL_2PiBy_48000_f
 #ifdef HIGHER_FS
+                                            ,LVVDL_2PiBy_88200_f
                                             ,LVVDL_2PiBy_96000_f
+                                            ,LVVDL_2PiBy_176400_f
                                             ,LVVDL_2PiBy_192000_f
 #endif
                                            };

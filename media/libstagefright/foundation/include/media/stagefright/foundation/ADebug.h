@@ -53,19 +53,17 @@ inline static const char *asString(status_t i, const char *def = "??") {
 #define LITERAL_TO_STRING_INTERNAL(x)    #x
 #define LITERAL_TO_STRING(x) LITERAL_TO_STRING_INTERNAL(x)
 
-#ifdef CHECK
-#undef CHECK
-#endif
+// allow to use CHECK_OP from android-base/logging.h
+// TODO: longterm replace this with android-base/logging.h, but there are some nuances, e.g.
+// android-base CHECK_OP requires a copy constructor, whereas we don't.
+#ifndef CHECK_OP
+
 #define CHECK(condition)                                \
     LOG_ALWAYS_FATAL_IF(                                \
             !(condition),                               \
             "%s",                                       \
             __FILE__ ":" LITERAL_TO_STRING(__LINE__)    \
             " CHECK(" #condition ") failed.")
-
-#ifdef CHECK_OP
-#undef CHECK_OP
-#endif
 
 #define CHECK_OP(x,y,suffix,op)                                         \
     do {                                                                \
@@ -82,21 +80,14 @@ inline static const char *asString(status_t i, const char *def = "??") {
         }                                                               \
     } while (false)
 
-#ifdef CHECK_EQ
-#undef CHECK_EQ
-#undef CHECK_NE
-#undef CHECK_LE
-#undef CHECK_LT
-#undef CHECK_GE
-#undef CHECK_GT
-#endif
-
 #define CHECK_EQ(x,y)   CHECK_OP(x,y,EQ,==)
 #define CHECK_NE(x,y)   CHECK_OP(x,y,NE,!=)
 #define CHECK_LE(x,y)   CHECK_OP(x,y,LE,<=)
 #define CHECK_LT(x,y)   CHECK_OP(x,y,LT,<)
 #define CHECK_GE(x,y)   CHECK_OP(x,y,GE,>=)
 #define CHECK_GT(x,y)   CHECK_OP(x,y,GT,>)
+
+#endif
 
 #define TRESPASS(...) \
         LOG_ALWAYS_FATAL(                                       \

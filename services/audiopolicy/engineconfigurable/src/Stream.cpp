@@ -21,10 +21,8 @@
 
 using std::string;
 
-namespace android
-{
-namespace audio_policy
-{
+namespace android {
+namespace audio_policy {
 
 status_t Element<audio_stream_type_t>::setIdentifier(audio_stream_type_t identifier)
 {
@@ -34,32 +32,6 @@ status_t Element<audio_stream_type_t>::setIdentifier(audio_stream_type_t identif
     mIdentifier = identifier;
     ALOGD("%s: Stream %s identifier 0x%X", __FUNCTION__, getName().c_str(), identifier);
     return NO_ERROR;
-}
-
-/**
-* Set the strategy to follow for this stream.
-* It checks if the strategy is valid.
-*
-* @param[in] strategy to be followed.
-*
-* @return NO_ERROR if the strategy is set correctly, error code otherwise.
-*/
-template <>
-status_t Element<audio_stream_type_t>::set<routing_strategy>(routing_strategy strategy)
-{
-    if (strategy >= NUM_STRATEGIES) {
-        return BAD_VALUE;
-    }
-    mApplicableStrategy = strategy;
-    ALOGD("%s: 0x%X for Stream %s", __FUNCTION__, strategy, getName().c_str());
-    return NO_ERROR;
-}
-
-template <>
-routing_strategy Element<audio_stream_type_t>::get<routing_strategy>() const
-{
-    ALOGV("%s: 0x%X for Stream %s", __FUNCTION__, mApplicableStrategy, getName().c_str());
-    return mApplicableStrategy;
 }
 
 template <>

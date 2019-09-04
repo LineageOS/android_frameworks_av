@@ -20,9 +20,9 @@
 
 #include <arpa/inet.h>
 
-#include <media/DataSourceBase.h>
-#include <media/MediaExtractor.h>
-#include <media/stagefright/MetaDataBase.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
+#include <media/NdkMediaFormat.h>
 #include <media/stagefright/foundation/AString.h>
 #include <utils/KeyedVector.h>
 #include <utils/List.h>
@@ -31,8 +31,8 @@
 
 namespace android {
 struct AMessage;
-class DataSourceBase;
-struct CachedRangedDataSource;
+struct CDataSource;
+class DataSourceHelper;
 class SampleTable;
 class String8;
 namespace heif {
@@ -53,15 +53,15 @@ struct Trex {
     uint32_t default_sample_flags;
 };
 
-class MPEG4Extractor : public MediaExtractor {
+class MPEG4Extractor : public MediaExtractorPluginHelper {
 public:
-    explicit MPEG4Extractor(DataSourceBase *source, const char *mime = NULL);
+    explicit MPEG4Extractor(DataSourceHelper *source, const char *mime = NULL);
 
     virtual size_t countTracks();
-    virtual MediaTrack *getTrack(size_t index);
-    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
+    virtual MediaTrackHelper *getTrack(size_t index);
+    virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
-    virtual status_t getMetaData(MetaDataBase& meta);
+    virtual media_status_t getMetaData(AMediaFormat *meta);
     virtual uint32_t flags() const;
     virtual const char * name() { return "MPEG4Extractor"; }
 
@@ -77,16 +77,52 @@ private:
     };
     struct Track {
         Track *next;
-        MetaDataBase meta;
+        AMediaFormat *meta;
         uint32_t timescale;
         sp<SampleTable> sampleTable;
         bool includes_expensive_metadata;
         bool skipTrack;
         bool has_elst;
+        /* signed int, ISO Spec allows media_time = -1 for other use cases.
+         * but we don't support empty edits for now.
+         */
         int64_t elst_media_time;
         uint64_t elst_segment_duration;
+        // unsigned int, shift start offset only when media_time > 0.
+        uint64_t elstShiftStartTicks;
         bool subsample_encryption;
+
+        uint8_t *mTx3gBuffer;
+        size_t mTx3gSize, mTx3gFilled;
+
+
+        Track() {
+            next = NULL;
+            meta = NULL;
+            timescale = 0;
+            includes_expensive_metadata = false;
+            skipTrack = false;
+            has_elst = false;
+            elst_media_time = 0;
+            elstShiftStartTicks = 0;
+            subsample_encryption = false;
+            mTx3gBuffer = NULL;
+            mTx3gSize = mTx3gFilled = 0;
+        }
+        ~Track() {
+            if (meta) {
+                AMediaFormat_delete(meta);
+                meta = NULL;
+            }
+            free (mTx3gBuffer);
+            mTx3gBuffer = NULL;
+        }
+
+      private:
+        DISALLOW_EVIL_CONSTRUCTORS(Track);
     };
+
+    static const int kTx3gGrowth = 16 * 1024;
 
     Vector<SidxEntry> mSidxEntries;
     off64_t mMoofOffset;
@@ -97,8 +133,7 @@ private:
 
     Vector<Trex> mTrex;
 
-    DataSourceBase *mDataSource;
-    CachedRangedDataSource *mCachedSource;
+    DataSourceHelper *mDataSource;
     status_t mInitCheck;
     uint32_t mHeaderTimescale;
     bool mIsQT;
@@ -108,7 +143,7 @@ private:
 
     Track *mFirstTrack, *mLastTrack;
 
-    MetaDataBase mFileMetaData;
+    AMediaFormat *mFileMetaData;
 
     Vector<uint32_t> mPath;
     String8 mLastCommentMean;
@@ -139,16 +174,17 @@ private:
 
     Track *findTrackByMimePrefix(const char *mimePrefix);
 
-    status_t parseAC3SampleEntry(off64_t offset);
-    status_t parseAC3SpecificBox(off64_t offset, uint16_t sampleRate);
+    status_t parseChannelCountSampleRate(
+            off64_t *offset, uint16_t *channelCount, uint16_t *sampleRate);
+    status_t parseAC3SpecificBox(off64_t offset);
+    status_t parseEAC3SpecificBox(off64_t offset);
+    status_t parseAC4SpecificBox(off64_t offset);
+    status_t parseALACSampleEntry(off64_t *offset);
+    void adjustRawDefaultFrameSize();
 
     MPEG4Extractor(const MPEG4Extractor &);
     MPEG4Extractor &operator=(const MPEG4Extractor &);
 };
-
-bool SniffMPEG4(
-        DataSourceBase *source, String8 *mimeType, float *confidence,
-        sp<AMessage> *);
 
 }  // namespace android
 

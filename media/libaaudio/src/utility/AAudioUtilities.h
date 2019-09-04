@@ -45,156 +45,6 @@ aaudio_result_t AAudioConvert_androidToAAudioResult(android::status_t status);
 audio_session_t AAudioConvert_aaudioToAndroidSessionId(aaudio_session_id_t sessionId);
 
 /**
- * Convert an array of floats to an array of int16_t.
- *
- * @param source
- * @param destination
- * @param numSamples number of values in the array
- * @param amplitude level between 0.0 and 1.0
- */
-void AAudioConvert_floatToPcm16(const float *source,
-                                int16_t *destination,
-                                int32_t numSamples,
-                                float amplitude);
-
-/**
- * Convert floats to int16_t and scale by a linear ramp.
- *
- * The ramp stops just short of reaching amplitude2 so that the next
- * ramp can start at amplitude2 without causing a discontinuity.
- *
- * @param source
- * @param destination
- * @param numFrames
- * @param samplesPerFrame AKA number of channels
- * @param amplitude1 level at start of ramp, between 0.0 and 1.0
- * @param amplitude2 level past end of ramp, between 0.0 and 1.0
- */
-void AAudioConvert_floatToPcm16(const float *source,
-                                int16_t *destination,
-                                int32_t numFrames,
-                                int32_t samplesPerFrame,
-                                float amplitude1,
-                                float amplitude2);
-
-/**
- * Convert int16_t array to float array ranging from -1.0 to +1.0.
- * @param source
- * @param destination
- * @param numSamples
- */
-//void AAudioConvert_pcm16ToFloat(const int16_t *source, int32_t numSamples,
-//                                float *destination);
-
-/**
- *
- * Convert int16_t array to float array ranging from +/- amplitude.
- * @param source
- * @param destination
- * @param numSamples
- * @param amplitude
- */
-void AAudioConvert_pcm16ToFloat(const int16_t *source,
-                                float *destination,
-                                int32_t numSamples,
-                                float amplitude);
-
-/**
- * Convert floats to int16_t and scale by a linear ramp.
- *
- * The ramp stops just short of reaching amplitude2 so that the next
- * ramp can start at amplitude2 without causing a discontinuity.
- *
- * @param source
- * @param destination
- * @param numFrames
- * @param samplesPerFrame AKA number of channels
- * @param amplitude1 level at start of ramp, between 0.0 and 1.0
- * @param amplitude2 level at end of ramp, between 0.0 and 1.0
- */
-void AAudioConvert_pcm16ToFloat(const int16_t *source,
-                                float *destination,
-                                int32_t numFrames,
-                                int32_t samplesPerFrame,
-                                float amplitude1,
-                                float amplitude2);
-
-/**
- * Scale floats by a linear ramp.
- *
- * The ramp stops just short of reaching amplitude2 so that the next
- * ramp can start at amplitude2 without causing a discontinuity.
- *
- * @param source
- * @param destination
- * @param numFrames
- * @param samplesPerFrame
- * @param amplitude1
- * @param amplitude2
- */
-void AAudio_linearRamp(const float *source,
-                       float *destination,
-                       int32_t numFrames,
-                       int32_t samplesPerFrame,
-                       float amplitude1,
-                       float amplitude2);
-
-/**
- * Scale int16_t's by a linear ramp.
- *
- * The ramp stops just short of reaching amplitude2 so that the next
- * ramp can start at amplitude2 without causing a discontinuity.
- *
- * @param source
- * @param destination
- * @param numFrames
- * @param samplesPerFrame
- * @param amplitude1
- * @param amplitude2
- */
-void AAudio_linearRamp(const int16_t *source,
-                       int16_t *destination,
-                       int32_t numFrames,
-                       int32_t samplesPerFrame,
-                       float amplitude1,
-                       float amplitude2);
-
-class AAudioDataConverter {
-public:
-
-    struct FormattedData {
-
-        FormattedData(void *data, aaudio_format_t format, int32_t channelCount)
-            : data(data)
-            , format(format)
-            , channelCount(channelCount) {}
-
-        const void            *data = nullptr;
-        const aaudio_format_t  format = AAUDIO_FORMAT_UNSPECIFIED;
-        const int32_t          channelCount = 1;
-    };
-
-    static void convert(const FormattedData &source,
-                        const FormattedData &destination,
-                        int32_t numFrames,
-                        float levelFrom,
-                        float levelTo);
-
-private:
-    static void convertMonoToStereo(const FormattedData &source,
-                                    const FormattedData &destination,
-                                    int32_t numFrames,
-                                    float levelFrom,
-                                    float levelTo);
-
-    static void convertChannelsMatch(const FormattedData &source,
-                                     const FormattedData &destination,
-                                     int32_t numFrames,
-                                     float levelFrom,
-                                     float levelTo);
-};
-
-/**
  * Calculate the number of bytes and prevent numeric overflow.
  * The *sizeInBytes will be set to zero if there is an error.
  *
@@ -235,10 +85,12 @@ audio_content_type_t AAudioConvert_contentTypeToInternal(aaudio_content_type_t c
 audio_source_t AAudioConvert_inputPresetToAudioSource(aaudio_input_preset_t preset);
 
 /**
- * @return the size of a sample of the given format in bytes or AAUDIO_ERROR_ILLEGAL_ARGUMENT
+ * Note that this function does not validate the passed in value.
+ * That is done somewhere else.
+ * @return internal audio flags mask
  */
-int32_t AAudioConvert_formatToSizeInBytes(aaudio_format_t format);
-
+audio_flags_mask_t AAudioConvert_allowCapturePolicyToAudioFlagsMask(
+        aaudio_allowed_capture_policy_t policy);
 
 // Note that this code may be replaced by Settings or by some other system configuration tool.
 

@@ -20,55 +20,50 @@
 
 #include "JWakeLock.h"
 
-#include <binder/IPCThreadState.h>
-#include <binder/IServiceManager.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include <powermanager/PowerManager.h>
-
 
 namespace android {
 
-//TODO: use JAVA PowerManager, instead of binder
-JWakeLock::JWakeLock() :
-    mPowerManager(NULL),
-    mWakeLockToken(NULL),
+JWakeLock::JWakeLock(const sp<JObjectHolder> &context) :
     mWakeLockCount(0),
-    mDeathRecipient(new PMDeathRecipient(this)) {}
+    mWakeLock(NULL),
+    mContext(context) {}
 
 JWakeLock::~JWakeLock() {
-    if (mPowerManager != NULL) {
-        sp<IBinder> binder = IInterface::asBinder(mPowerManager);
-        binder->unlinkToDeath(mDeathRecipient);
-    }
-    clearPowerManager();
+    clearJavaWakeLock();
 }
 
 bool JWakeLock::acquire() {
     if (mWakeLockCount == 0) {
-        CHECK(mWakeLockToken == NULL);
-        if (mPowerManager == NULL) {
-            // use checkService() to avoid blocking if power service is not up yet
-            sp<IBinder> binder =
-                defaultServiceManager()->checkService(String16("power"));
-            if (binder == NULL) {
-                ALOGW("could not get the power manager service");
-            } else {
-                mPowerManager = interface_cast<IPowerManager>(binder);
-                binder->linkToDeath(mDeathRecipient);
-            }
+        if (mWakeLock == NULL) {
+            JNIEnv *env = JavaVMHelper::getJNIEnv();
+            jclass jContextCls = env->FindClass("android/content/Context");
+            jclass jPowerManagerCls = env->FindClass("android/os/PowerManager");
+
+            jmethodID jGetSystemService = env->GetMethodID(jContextCls,
+                    "getSystemService", "(Ljava/lang/String;)Ljava/lang/Object;");
+            jobject javaPowerManagerObj = env->CallObjectMethod(mContext->getJObject(),
+                    jGetSystemService, env->NewStringUTF("power"));
+
+            jfieldID jPARTIAL_WAKE_LOCK = env->GetStaticFieldID(jPowerManagerCls,
+                    "PARTIAL_WAKE_LOCK", "I");
+            jint PARTIAL_WAKE_LOCK = env->GetStaticIntField(jPowerManagerCls, jPARTIAL_WAKE_LOCK);
+
+            jmethodID jNewWakeLock = env->GetMethodID(jPowerManagerCls,
+                    "newWakeLock", "(ILjava/lang/String;)Landroid/os/PowerManager$WakeLock;");
+            jobject javaWakeLock = env->CallObjectMethod(javaPowerManagerObj,
+                    jNewWakeLock, PARTIAL_WAKE_LOCK, env->NewStringUTF("JWakeLock"));
+            mWakeLock = new JObjectHolder(javaWakeLock);
+            env->DeleteLocalRef(javaPowerManagerObj);
+            env->DeleteLocalRef(javaWakeLock);
         }
-        if (mPowerManager != NULL) {
-            sp<IBinder> binder = new BBinder();
-            int64_t token = IPCThreadState::self()->clearCallingIdentity();
-            status_t status = mPowerManager->acquireWakeLock(
-                    POWERMANAGER_PARTIAL_WAKE_LOCK,
-                    binder, String16("JWakeLock"), String16("media"));
-            IPCThreadState::self()->restoreCallingIdentity(token);
-            if (status == NO_ERROR) {
-                mWakeLockToken = binder;
-                mWakeLockCount++;
-                return true;
-            }
+        if (mWakeLock != NULL) {
+            JNIEnv *env = JavaVMHelper::getJNIEnv();
+            jclass wakeLockCls = env->FindClass("android/os/PowerManager$WakeLock");
+            jmethodID jAcquire = env->GetMethodID(wakeLockCls, "acquire", "()V");
+            env->CallVoidMethod(mWakeLock->getJObject(), jAcquire);
+            mWakeLockCount++;
+            return true;
         }
     } else {
         mWakeLockCount++;
@@ -86,25 +81,17 @@ void JWakeLock::release(bool force) {
         mWakeLockCount = 1;
     }
     if (--mWakeLockCount == 0) {
-        CHECK(mWakeLockToken != NULL);
-        if (mPowerManager != NULL) {
-            int64_t token = IPCThreadState::self()->clearCallingIdentity();
-            mPowerManager->releaseWakeLock(mWakeLockToken, 0 /* flags */);
-            IPCThreadState::self()->restoreCallingIdentity(token);
+        if (mWakeLock != NULL) {
+            JNIEnv *env = JavaVMHelper::getJNIEnv();
+            jclass wakeLockCls = env->FindClass("android/os/PowerManager$WakeLock");
+            jmethodID jRelease = env->GetMethodID(wakeLockCls, "release", "()V");
+            env->CallVoidMethod(mWakeLock->getJObject(), jRelease);
         }
-        mWakeLockToken.clear();
     }
 }
 
-void JWakeLock::clearPowerManager() {
+void JWakeLock::clearJavaWakeLock() {
     release(true);
-    mPowerManager.clear();
-}
-
-void JWakeLock::PMDeathRecipient::binderDied(const wp<IBinder>& who __unused) {
-    if (mWakeLock != NULL) {
-        mWakeLock->clearPowerManager();
-    }
 }
 
 }  // namespace android

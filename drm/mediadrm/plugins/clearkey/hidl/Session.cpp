@@ -28,7 +28,7 @@
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_1 {
+namespace V1_2 {
 namespace clearkey {
 
 using ::android::hardware::drm::V1_0::KeyValue;
@@ -42,9 +42,10 @@ using android::Mutex;
 Status Session::getKeyRequest(
         const std::vector<uint8_t>& initData,
         const std::string& mimeType,
+        V1_0::KeyType keyType,
         std::vector<uint8_t>* keyRequest) const {
     InitDataParser parser;
-    return parser.parse(initData, mimeType, keyRequest);
+    return parser.parse(initData, mimeType, keyType, keyRequest);
 }
 
 Status Session::provideKeyResponse(const std::vector<uint8_t>& response) {
@@ -67,11 +68,15 @@ Status Session::provideKeyResponse(const std::vector<uint8_t>& response) {
     }
 }
 
-Status Session::decrypt(
+Status_V1_2 Session::decrypt(
         const KeyId keyId, const Iv iv, const uint8_t* srcPtr,
         uint8_t* destPtr, const std::vector<SubSample> subSamples,
         size_t* bytesDecryptedOut) {
     Mutex::Autolock lock(mMapLock);
+
+    if (getMockError() != Status_V1_2::OK) {
+        return getMockError();
+    }
 
     std::vector<uint8_t> keyIdVector;
     keyIdVector.clear();
@@ -79,17 +84,18 @@ Status Session::decrypt(
     std::map<std::vector<uint8_t>, std::vector<uint8_t> >::iterator itr;
     itr = mKeyMap.find(keyIdVector);
     if (itr == mKeyMap.end()) {
-        return Status::ERROR_DRM_NO_LICENSE;
+        return Status_V1_2::ERROR_DRM_NO_LICENSE;
     }
 
     AesCtrDecryptor decryptor;
-    return decryptor.decrypt(
+    Status status = decryptor.decrypt(
             itr->second /*key*/, iv, srcPtr, destPtr, subSamples,
             subSamples.size(), bytesDecryptedOut);
+    return static_cast<Status_V1_2>(status);
 }
 
 } // namespace clearkey
-} // namespace V1_1
+} // namespace V1_2
 } // namespace drm
 } // namespace hardware
 } // namespace android

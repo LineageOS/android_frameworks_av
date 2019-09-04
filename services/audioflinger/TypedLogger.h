@@ -97,8 +97,42 @@ constexpr uint64_t hash(const char (&file)[n], uint32_t line) {
 #define LOG_AUDIO_STATE() do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
         x->logEventHistTs(NBLog::EVENT_AUDIO_STATE, hash(__FILE__, __LINE__)); } while(0)
 
+// Log the difference bewteen frames presented by HAL and frames written to HAL output sink,
+// divided by the sample rate. Parameter ms is of type double.
+#define LOG_LATENCY(ms) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+        x->log<NBLog::EVENT_LATENCY>(ms); } while (0)
+
+// Record thread overrun event nanosecond timestamp. Parameter ns is an int64_t.
+#define LOG_OVERRUN(ns) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+        x->log<NBLog::EVENT_OVERRUN>(ns); } while (0)
+
+// Record thread info. This currently includes type, frameCount, and sampleRate.
+// Parameter type is thread_info_t as defined in NBLog.h.
+#define LOG_THREAD_INFO(info) do { NBLog::Writer *x = tlNBLogWriter; \
+        if (x != nullptr) x->log<NBLog::EVENT_THREAD_INFO>(info); } while (0)
+
+#define LOG_THREAD_PARAMS(params) do {NBLog::Writer *x = tlNBLogWriter; \
+        if (x != nullptr) x->log<NBLog::EVENT_THREAD_PARAMS>(params); } while (0)
+
+// Record thread underrun event nanosecond timestamp. Parameter ns is an int64_t.
+#define LOG_UNDERRUN(ns) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+        x->log<NBLog::EVENT_UNDERRUN>(ns); } while (0)
+
+// Record thread warmup time in milliseconds. Parameter ms is of type double.
+#define LOG_WARMUP_TIME(ms) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+        x->log<NBLog::EVENT_WARMUP_TIME>(ms); } while (0)
+
+// Record a typed entry that represents a thread's work time in nanoseconds.
+// Parameter ns should be of type uint32_t.
+#define LOG_WORK_TIME(ns) do { NBLog::Writer *x = tlNBLogWriter; if (x != nullptr) \
+        x->log<NBLog::EVENT_WORK_TIME>(ns); } while (0)
+
 namespace android {
 extern "C" {
+// TODO consider adding a thread_local NBLog::Writer tlDummyNBLogWriter and then
+// initialize below tlNBLogWriter to &tlDummyNBLogWriter to remove the need to
+// check for nullptr every time. Also reduces the need to add a new logging macro above
+// each time we want to log a new type.
 extern thread_local NBLog::Writer *tlNBLogWriter;
 }
 } // namespace android

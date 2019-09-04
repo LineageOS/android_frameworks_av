@@ -17,7 +17,6 @@
 #include "SineSource.h"
 
 #include <binder/ProcessState.h>
-#include <media/MediaExtractor.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -28,6 +27,7 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaCodecSource.h>
 #include <media/stagefright/MetaData.h>
+#include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MPEG4Writer.h>
 #include <media/stagefright/SimpleDecodingSource.h>

@@ -20,9 +20,11 @@
 
 #include <android/hardware/drm/1.0/IDrmFactory.h>
 #include <android/hardware/drm/1.0/IDrmPlugin.h>
-#include <android/hardware/drm/1.0/IDrmPluginListener.h>
 #include <android/hardware/drm/1.1/IDrmFactory.h>
 #include <android/hardware/drm/1.1/IDrmPlugin.h>
+#include <android/hardware/drm/1.2/IDrmFactory.h>
+#include <android/hardware/drm/1.2/IDrmPlugin.h>
+#include <android/hardware/drm/1.2/IDrmPluginListener.h>
 
 #include <media/MediaAnalyticsItem.h>
 #include <mediadrm/DrmMetrics.h>
@@ -35,10 +37,15 @@ using drm::V1_0::EventType;
 using drm::V1_0::IDrmFactory;
 using drm::V1_0::IDrmPlugin;
 using drm::V1_0::IDrmPluginListener;
-using drm::V1_0::KeyStatus;
+using drm::V1_1::SecurityLevel;
+using drm::V1_2::KeyStatus;
+using drm::V1_2::OfflineLicenseState;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
+
+typedef drm::V1_2::IDrmPluginListener IDrmPluginListener_V1_2;
+typedef drm::V1_0::KeyStatus KeyStatus_V1_0;
 
 namespace android {
 
@@ -50,14 +57,17 @@ inline bool operator==(const Vector<uint8_t> &l, const Vector<uint8_t> &r) {
 }
 
 struct DrmHal : public BnDrm,
-             public IBinder::DeathRecipient,
-             public IDrmPluginListener {
+                public IBinder::DeathRecipient,
+                public IDrmPluginListener_V1_2 {
     DrmHal();
     virtual ~DrmHal();
 
     virtual status_t initCheck() const;
 
-    virtual bool isCryptoSchemeSupported(const uint8_t uuid[16], const String8 &mimeType);
+    virtual status_t isCryptoSchemeSupported(const uint8_t uuid[16],
+                                             const String8& mimeType,
+                                             DrmPlugin::SecurityLevel level,
+                                             bool *isSupported);
 
     virtual status_t createPlugin(const uint8_t uuid[16],
                                   const String8 &appPackageName);
@@ -113,6 +123,11 @@ struct DrmHal : public BnDrm,
     virtual status_t getSecurityLevel(Vector<uint8_t> const &sessionId,
             DrmPlugin::SecurityLevel *level) const;
 
+    virtual status_t getOfflineLicenseKeySetIds(List<Vector<uint8_t>> &keySetIds) const;
+    virtual status_t removeOfflineLicense(Vector<uint8_t> const &keySetId);
+    virtual status_t getOfflineLicenseState(Vector<uint8_t> const &keySetId,
+            DrmPlugin::OfflineLicenseState *licenseState) const;
+
     virtual status_t getPropertyString(String8 const &name, String8 &value ) const;
     virtual status_t getPropertyByteArray(String8 const &name,
                                           Vector<uint8_t> &value ) const;
@@ -166,7 +181,12 @@ struct DrmHal : public BnDrm,
             int64_t expiryTimeInMS);
 
     Return<void> sendKeysChange(const hidl_vec<uint8_t>& sessionId,
+            const hidl_vec<KeyStatus_V1_0>& keyStatusList, bool hasNewUsableKey);
+
+    Return<void> sendKeysChange_1_2(const hidl_vec<uint8_t>& sessionId,
             const hidl_vec<KeyStatus>& keyStatusList, bool hasNewUsableKey);
+
+    Return<void> sendSessionLostState(const hidl_vec<uint8_t>& sessionId);
 
     virtual void binderDied(const wp<IBinder> &the_late_who);
 
@@ -182,6 +202,7 @@ private:
     const Vector<sp<IDrmFactory>> mFactories;
     sp<IDrmPlugin> mPlugin;
     sp<drm::V1_1::IDrmPlugin> mPluginV1_1;
+    sp<drm::V1_2::IDrmPlugin> mPluginV1_2;
     String8 mAppPackageName;
 
     // Mutable to allow modification within GetPropertyByteArray.
@@ -210,6 +231,11 @@ private:
     status_t getPropertyStringInternal(String8 const &name, String8 &value) const;
     status_t getPropertyByteArrayInternal(String8 const &name,
                                           Vector<uint8_t> &value) const;
+    status_t matchMimeTypeAndSecurityLevel(const sp<IDrmFactory> &factory,
+                                           const uint8_t uuid[16],
+                                           const String8 &mimeType,
+                                           DrmPlugin::SecurityLevel level,
+                                           bool *isSupported);
 
     DISALLOW_EVIL_CONSTRUCTORS(DrmHal);
 };

@@ -24,7 +24,7 @@ supDomain: SelectedStrategyForUsages
 			# In case of Ring or Alarm stream type active, switching to sonification
 			# @todo: handle this dynamic case. As a WA, using Ringtone mode...
 			#
-			TelephonyMode Is RingTone
+			TelephonyMode Is Ringtone
 
 			/Policy/policy/usages/assistance_accessibility/applicable_strategy/strategy = sonification
 

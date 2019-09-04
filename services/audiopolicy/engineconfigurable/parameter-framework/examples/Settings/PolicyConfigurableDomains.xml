@@ -8472,7 +8472,7 @@
     <Configurations>
       <Configuration Name="Sonification">
         <CompoundRule Type="All">
-          <SelectionCriterionRule SelectionCriterion="TelephonyMode" MatchesWhen="Is" Value="RingTone"/>
+          <SelectionCriterionRule SelectionCriterion="TelephonyMode" MatchesWhen="Is" Value="Ringtone"/>
         </CompoundRule>
       </Configuration>
       <Configuration Name="Phone">

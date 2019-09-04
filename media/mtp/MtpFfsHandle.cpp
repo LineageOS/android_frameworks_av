@@ -47,6 +47,9 @@ constexpr unsigned FFS_NUM_EVENTS = 5;
 constexpr unsigned MAX_FILE_CHUNK_SIZE = AIO_BUFS_MAX * AIO_BUF_LEN;
 
 constexpr uint32_t MAX_MTP_FILE_SIZE = 0xFFFFFFFF;
+// Note: POLL_TIMEOUT_MS = 0 means return immediately i.e. no sleep.
+// And this will cause high CPU usage.
+constexpr int32_t POLL_TIMEOUT_MS = 500;
 
 struct timespec ZERO_TIMEOUT = { 0, 0 };
 
@@ -212,7 +215,6 @@ int MtpFfsHandle::handleControlRequest(const struct usb_ctrlrequest *setup) {
     uint16_t value = setup->wValue;
     std::vector<char> buf;
     buf.resize(length);
-    int ret = 0;
 
     if (!(type & USB_DIR_IN)) {
         if (::read(mControl, buf.data(), length) != length) {
@@ -225,8 +227,8 @@ int MtpFfsHandle::handleControlRequest(const struct usb_ctrlrequest *setup) {
         case MTP_REQ_RESET:
         case MTP_REQ_CANCEL:
             errno = ECANCELED;
-            ret = -1;
-            break;
+            return -1;
+        //    break;
         case MTP_REQ_GET_DEVICE_STATUS:
         {
             if (length < sizeof(struct mtp_device_status) + 4) {
@@ -306,7 +308,7 @@ int MtpFfsHandle::waitEvents(struct io_buffer *buf, int min_events, struct io_ev
     int error = 0;
 
     while (num_events < min_events) {
-        if (poll(mPollFds, 2, 0) == -1) {
+        if (poll(mPollFds, 2, POLL_TIMEOUT_MS) == -1) {
             PLOG(ERROR) << "Mtp error during poll()";
             return -1;
         }

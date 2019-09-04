@@ -1,18 +1,8 @@
 cc_library_shared {
     name: "libstagefright_soft_aacenc",
-    vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
+    defaults: ["libstagefright_softomx-defaults"],
 
     srcs: ["SoftAACEncoder2.cpp"],
-
-    include_dirs: [
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/native/include/media/openmax",
-    ],
-
-    cflags: ["-Werror"],
 
     version_script: "exports.lds",
 
@@ -25,12 +15,4 @@ cc_library_shared {
     },
 
     static_libs: ["libFraunhoferAAC"],
-
-    shared_libs: [
-        "libstagefright_omx",
-        "libstagefright_foundation",
-        "libutils",
-        "liblog",
-    ],
-    compile_multilib: "32",
 }

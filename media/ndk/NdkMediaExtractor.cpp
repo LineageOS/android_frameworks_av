@@ -20,8 +20,9 @@
 
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaExtractor.h>
+#include <media/NdkMediaErrorPriv.h>
+#include <media/NdkMediaFormatPriv.h>
 #include "NdkMediaDataSourcePriv.h"
-#include "NdkMediaFormatPriv.h"
 
 
 #include <inttypes.h>
@@ -33,30 +34,28 @@
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/NuMediaExtractor.h>
 #include <media/IMediaHTTPService.h>
-#include <android_runtime/AndroidRuntime.h>
 #include <android_util_Binder.h>
 
 #include <jni.h>
 
 using namespace android;
 
-static media_status_t translate_error(status_t err) {
-    if (err == OK) {
-        return AMEDIA_OK;
-    } else if (err == ERROR_END_OF_STREAM) {
-        return AMEDIA_ERROR_END_OF_STREAM;
-    } else if (err == ERROR_IO) {
-        return AMEDIA_ERROR_IO;
-    }
-
-    ALOGE("sf error code: %d", err);
-    return AMEDIA_ERROR_UNKNOWN;
-}
-
 struct AMediaExtractor {
     sp<NuMediaExtractor> mImpl;
     sp<ABuffer> mPsshBuf;
 };
+
+sp<ABuffer> U32ArrayToSizeBuf(size_t numSubSamples, uint32_t *data) {
+    if (numSubSamples >  SIZE_MAX / sizeof(size_t)) {
+        return NULL;
+    }
+    sp<ABuffer> sizebuf = new ABuffer(numSubSamples * sizeof(size_t));
+    size_t *sizes = (size_t *)sizebuf->data();
+    for (size_t i = 0; sizes != NULL && i < numSubSamples; i++) {
+        sizes[i] = data[i];
+    }
+    return sizebuf;
+}
 
 extern "C" {
 
@@ -82,47 +81,35 @@ media_status_t AMediaExtractor_setDataSourceFd(AMediaExtractor *mData, int fd, o
     return translate_error(mData->mImpl->setDataSource(fd, offset, length));
 }
 
+media_status_t AMediaExtractor_setDataSourceWithHeaders(AMediaExtractor *mData,
+        const char *uri,
+        int numheaders,
+        const char * const *keys,
+        const char * const *values) {
+
+    ALOGV("setDataSource(%s)", uri);
+
+    sp<MediaHTTPService> httpService = createMediaHttpService(uri, /* version = */ 1);
+    if (httpService == NULL) {
+        ALOGE("can't create http service");
+        return AMEDIA_ERROR_UNSUPPORTED;
+    }
+
+    KeyedVector<String8, String8> headers;
+    for (int i = 0; i < numheaders; ++i) {
+        String8 key8(keys[i]);
+        String8 value8(values[i]);
+        headers.add(key8, value8);
+    }
+
+    status_t err;
+    err = mData->mImpl->setDataSource(httpService, uri, numheaders > 0 ? &headers : NULL);
+    return translate_error(err);
+}
+
 EXPORT
 media_status_t AMediaExtractor_setDataSource(AMediaExtractor *mData, const char *location) {
-    ALOGV("setDataSource(%s)", location);
-    // TODO: add header support
-
-    JNIEnv *env = AndroidRuntime::getJNIEnv();
-    jobject service = NULL;
-    if (env == NULL) {
-        ALOGE("setDataSource(path) must be called from Java thread");
-        return AMEDIA_ERROR_UNSUPPORTED;
-    }
-
-    jclass mediahttpclass = env->FindClass("android/media/MediaHTTPService");
-    if (mediahttpclass == NULL) {
-        ALOGE("can't find MediaHttpService");
-        env->ExceptionClear();
-        return AMEDIA_ERROR_UNSUPPORTED;
-    }
-
-    jmethodID mediaHttpCreateMethod = env->GetStaticMethodID(mediahttpclass,
-            "createHttpServiceBinderIfNecessary", "(Ljava/lang/String;)Landroid/os/IBinder;");
-    if (mediaHttpCreateMethod == NULL) {
-        ALOGE("can't find method");
-        env->ExceptionClear();
-        return AMEDIA_ERROR_UNSUPPORTED;
-    }
-
-    jstring jloc = env->NewStringUTF(location);
-
-    service = env->CallStaticObjectMethod(mediahttpclass, mediaHttpCreateMethod, jloc);
-    env->DeleteLocalRef(jloc);
-
-    sp<IMediaHTTPService> httpService;
-    if (service != NULL) {
-        sp<IBinder> binder = ibinderForJavaObject(env, service);
-        httpService = interface_cast<IMediaHTTPService>(binder);
-    }
-
-    status_t err = mData->mImpl->setDataSource(httpService, location, NULL);
-    env->ExceptionClear();
-    return translate_error(err);
+    return AMediaExtractor_setDataSourceWithHeaders(mData, location, 0, NULL, NULL);
 }
 
 EXPORT
@@ -363,7 +350,7 @@ AMediaCodecCryptoInfo *AMediaExtractor_getSampleCryptoInfo(AMediaExtractor *ex) 
     if (!meta->findData(kKeyEncryptedSizes, &type, &crypteddata, &cryptedsize)) {
         return NULL;
     }
-    size_t numSubSamples = cryptedsize / sizeof(size_t);
+    size_t numSubSamples = cryptedsize / sizeof(uint32_t);
 
     const void *cleardata;
     size_t clearsize;
@@ -395,6 +382,16 @@ AMediaCodecCryptoInfo *AMediaExtractor_getSampleCryptoInfo(AMediaExtractor *ex) 
     int32_t mode;
     if (!meta->findInt32(kKeyCryptoMode, &mode)) {
         mode = CryptoPlugin::kMode_AES_CTR;
+    }
+
+    if (sizeof(uint32_t) != sizeof(size_t)) {
+        sp<ABuffer> clearbuf   = U32ArrayToSizeBuf(numSubSamples, (uint32_t *)cleardata);
+        sp<ABuffer> cryptedbuf = U32ArrayToSizeBuf(numSubSamples, (uint32_t *)crypteddata);
+        cleardata   = clearbuf    == NULL ? NULL : clearbuf->data();
+        crypteddata = crypteddata == NULL ? NULL : cryptedbuf->data();
+        if(crypteddata == NULL || cleardata == NULL) {
+            return NULL;
+        }
     }
 
     return AMediaCodecCryptoInfo_new(
@@ -470,6 +467,16 @@ media_status_t AMediaExtractor_getSampleFormat(AMediaExtractor *ex, AMediaFormat
             kKeyMpegUserData, &dataType, &mpegUserDataPointer, &mpegUserDataLength)) {
         sp<ABuffer> mpegUserData = ABuffer::CreateAsCopy(mpegUserDataPointer, mpegUserDataLength);
         meta->setBuffer(AMEDIAFORMAT_KEY_MPEG_USER_DATA, mpegUserData);
+    }
+
+    const void *audioPresentationsPointer;
+    size_t audioPresentationsLength;
+    if (sampleMeta->findData(
+            kKeyAudioPresentationInfo, &dataType,
+            &audioPresentationsPointer, &audioPresentationsLength)) {
+        sp<ABuffer> audioPresentationsData = ABuffer::CreateAsCopy(
+                audioPresentationsPointer, audioPresentationsLength);
+        meta->setBuffer(AMEDIAFORMAT_KEY_AUDIO_PRESENTATION_INFO, audioPresentationsData);
     }
 
     return AMEDIA_OK;

@@ -18,6 +18,7 @@
 #define LOG_TAG "NdkMediaDrm"
 
 #include <inttypes.h>
+#include <unistd.h>
 
 #include <media/NdkMediaDrm.h>
 
@@ -26,6 +27,8 @@
 #include <utils/StrongPointer.h>
 #include <gui/Surface.h>
 
+#include <android-base/properties.h>
+#include <binder/PermissionController.h>
 #include <media/IDrm.h>
 #include <media/IDrmClient.h>
 #include <media/stagefright/MediaErrors.h>
@@ -231,6 +234,39 @@ static media_status_t translateStatus(status_t status) {
     return result;
 }
 
+static bool ShouldGetAppPackageName(void) {
+    // Check what this device's first API level was.
+    int32_t firstApiLevel = android::base::GetIntProperty<int32_t>("ro.product.first_api_level", 0);
+    if (firstApiLevel == 0) {
+        // First API Level is 0 on factory ROMs, but we can assume the current SDK
+        // version is the first if it's a factory ROM.
+        firstApiLevel = android::base::GetIntProperty<int32_t>("ro.build.version.sdk", 0);
+    }
+    return firstApiLevel >= 29;  // Android Q
+}
+
+static status_t GetAppPackageName(String8 *packageName) {
+    sp<IServiceManager> serviceManager = defaultServiceManager();
+    sp<IBinder> binder = serviceManager->getService(String16("permission"));
+
+    sp<IPermissionController> permissionContol = interface_cast<IPermissionController>(binder);
+    if (permissionContol == NULL) {
+        ALOGE("Failed to get permission service");
+        return UNKNOWN_ERROR;
+    }
+
+    Vector<String16> packages;
+    permissionContol->getPackagesForUid(getuid(), packages);
+
+    if (packages.isEmpty()) {
+        ALOGE("Unable to get package name for current UID");
+        return UNKNOWN_ERROR;
+    }
+
+    *packageName = String8(packages[0]);
+    return OK;
+}
+
 static sp<IDrm> CreateDrm() {
     sp<IServiceManager> sm = defaultServiceManager();
     sp<IBinder> binder = sm->getService(String16("media.drm"));
@@ -255,8 +291,16 @@ static sp<IDrm> CreateDrmFromUUID(const AMediaUUID uuid) {
         return NULL;
     }
 
-    String8 nullPackageName;
-    status_t err = drm->createPlugin(uuid, nullPackageName);
+    String8 packageName;
+    if (ShouldGetAppPackageName()) {
+        status_t err = GetAppPackageName(&packageName);
+
+        if (err != OK) {
+            return NULL;
+        }
+    }
+
+    status_t err = drm->createPlugin(uuid, packageName);
 
     if (err != OK) {
         return NULL;
@@ -274,7 +318,10 @@ bool AMediaDrm_isCryptoSchemeSupported(const AMediaUUID uuid, const char *mimeTy
     }
 
     String8 mimeStr = mimeType ? String8(mimeType) : String8("");
-    return drm->isCryptoSchemeSupported(uuid, mimeStr);
+    bool isSupported = false;
+    status_t status = drm->isCryptoSchemeSupported(uuid, mimeStr,
+            DrmPlugin::kSecurityLevelUnknown, &isSupported);
+    return (status == OK) && isSupported;
 }
 
 EXPORT
@@ -430,6 +477,7 @@ media_status_t AMediaDrm_getKeyRequest(AMediaDrm *mObj, const AMediaDrmScope *sc
     }
     String8 defaultUrl;
     DrmPlugin::KeyRequestType keyRequestType;
+    mObj->mKeyRequest.clear();
     status_t status = mObj->mDrm->getKeyRequest(*iter, mdInit, String8(mimeType),
             mdKeyType, mdOptionalParameters, mObj->mKeyRequest, defaultUrl,
             &keyRequestType);
@@ -697,7 +745,7 @@ media_status_t AMediaDrm_setPropertyByteArray(AMediaDrm *mObj,
     Vector<uint8_t> byteArray;
     byteArray.appendArray(value, valueSize);
 
-    return translateStatus(mObj->mDrm->getPropertyByteArray(String8(propertyName),
+    return translateStatus(mObj->mDrm->setPropertyByteArray(String8(propertyName),
                     byteArray));
 }
 

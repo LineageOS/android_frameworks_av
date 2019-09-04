@@ -26,9 +26,10 @@
 #include <stdlib.h>
 #include <camera/VendorTagDescriptor.h>
 
-using namespace android;
+using namespace android::acam;
 
 namespace android {
+namespace acam {
 // Static member definitions
 const char* CameraManagerGlobal::kCameraIdKey   = "CameraId";
 const char* CameraManagerGlobal::kCallbackFpKey = "CallbackFp";
@@ -192,6 +193,20 @@ void CameraManagerGlobal::DeathNotifier::binderDied(const wp<IBinder>&)
     }
 }
 
+void CameraManagerGlobal::registerExtendedAvailabilityCallback(
+        const ACameraManager_ExtendedAvailabilityCallbacks *callback) {
+    Mutex::Autolock _l(mLock);
+    Callback cb(callback);
+    mCallbacks.insert(cb);
+}
+
+void CameraManagerGlobal::unregisterExtendedAvailabilityCallback(
+        const ACameraManager_ExtendedAvailabilityCallbacks *callback) {
+    Mutex::Autolock _l(mLock);
+    Callback cb(callback);
+    mCallbacks.erase(cb);
+}
+
 void CameraManagerGlobal::registerAvailabilityCallback(
         const ACameraManager_AvailabilityCallbacks *callback) {
     Mutex::Autolock _l(mLock);
@@ -288,10 +303,38 @@ void CameraManagerGlobal::CallbackHandler::onMessageReceived(
             (*cb)(context, cameraId.c_str());
             break;
         }
+        case kWhatSendSingleAccessCallback:
+        {
+            ACameraManager_AccessPrioritiesChangedCallback cb;
+            void* context;
+            AString cameraId;
+            bool found = msg->findPointer(kCallbackFpKey, (void**) &cb);
+            if (!found) {
+                ALOGE("%s: Cannot find camera callback fp!", __FUNCTION__);
+                return;
+            }
+            found = msg->findPointer(kContextKey, &context);
+            if (!found) {
+                ALOGE("%s: Cannot find callback context!", __FUNCTION__);
+                return;
+            }
+            (*cb)(context);
+            break;
+        }
         default:
             ALOGE("%s: unknown message type %d", __FUNCTION__, msg->what());
             break;
     }
+}
+
+binder::Status CameraManagerGlobal::CameraServiceListener::onCameraAccessPrioritiesChanged() {
+    sp<CameraManagerGlobal> cm = mCameraManager.promote();
+    if (cm != nullptr) {
+        cm->onCameraAccessPrioritiesChanged();
+    } else {
+        ALOGE("Cannot deliver camera access priority callback. Global camera manager died");
+    }
+    return binder::Status::ok();
 }
 
 binder::Status CameraManagerGlobal::CameraServiceListener::onStatusChanged(
@@ -303,6 +346,19 @@ binder::Status CameraManagerGlobal::CameraServiceListener::onStatusChanged(
         ALOGE("Cannot deliver status change. Global camera manager died");
     }
     return binder::Status::ok();
+}
+
+void CameraManagerGlobal::onCameraAccessPrioritiesChanged() {
+    Mutex::Autolock _l(mLock);
+    for (auto cb : mCallbacks) {
+        sp<AMessage> msg = new AMessage(kWhatSendSingleAccessCallback, mHandler);
+        ACameraManager_AccessPrioritiesChangedCallback cbFp = cb.mAccessPriorityChanged;
+        if (cbFp != nullptr) {
+            msg->setPointer(kCallbackFpKey, (void *) cbFp);
+            msg->setPointer(kContextKey, cb.mContext);
+            msg->post();
+        }
+    }
 }
 
 void CameraManagerGlobal::onStatusChanged(
@@ -345,6 +401,7 @@ void CameraManagerGlobal::onStatusChangedLocked(
     }
 }
 
+} // namespace acam
 } // namespace android
 
 /**
@@ -402,7 +459,7 @@ ACameraManager::deleteCameraIdList(ACameraIdList* cameraIdList) {
 }
 
 camera_status_t ACameraManager::getCameraCharacteristics(
-        const char *cameraIdStr, ACameraMetadata **characteristics) {
+        const char* cameraIdStr, sp<ACameraMetadata>* characteristics) {
     Mutex::Autolock _l(mLock);
 
     sp<hardware::ICameraService> cs = CameraManagerGlobal::getInstance().getCameraService();
@@ -437,18 +494,16 @@ ACameraManager::openCamera(
         const char* cameraId,
         ACameraDevice_StateCallbacks* callback,
         /*out*/ACameraDevice** outDevice) {
-    ACameraMetadata* rawChars;
-    camera_status_t ret = getCameraCharacteristics(cameraId, &rawChars);
+    sp<ACameraMetadata> chars;
+    camera_status_t ret = getCameraCharacteristics(cameraId, &chars);
     Mutex::Autolock _l(mLock);
     if (ret != ACAMERA_OK) {
         ALOGE("%s: cannot get camera characteristics for camera %s. err %d",
                 __FUNCTION__, cameraId, ret);
         return ACAMERA_ERROR_INVALID_PARAMETER;
     }
-    std::unique_ptr<ACameraMetadata> chars(rawChars);
-    rawChars = nullptr;
 
-    ACameraDevice* device = new ACameraDevice(cameraId, callback, std::move(chars));
+    ACameraDevice* device = new ACameraDevice(cameraId, callback, chars);
 
     sp<hardware::ICameraService> cs = CameraManagerGlobal::getInstance().getCameraService();
     if (cs == nullptr) {

@@ -170,6 +170,7 @@ private:
     sp<ABuffer> mGlobalTimedText;
 
     mutable Mutex mLock;
+    mutable Mutex mDisconnectLock; // Protects mDataSource, mHttpSource and mDisconnected
 
     sp<ALooper> mLooper;
 

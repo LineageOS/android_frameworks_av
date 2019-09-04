@@ -17,12 +17,19 @@
 #define _ACAMERA_METADATA_H
 
 #include <unordered_set>
+#include <vector>
 
 #include <sys/types.h>
 #include <utils/Mutex.h>
 #include <utils/RefBase.h>
 #include <utils/Vector.h>
+
+#ifdef __ANDROID_VNDK__
+#include <CameraMetadata.h>
+using CameraMetadata = android::hardware::camera::common::V1_0::helper::CameraMetadata;
+#else
 #include <camera/CameraMetadata.h>
+#endif
 
 #include <camera/NdkCameraMetadata.h>
 
@@ -59,15 +66,19 @@ struct ACameraMetadata : public RefBase {
                             /*out*/const uint32_t** tags) const;
 
     const CameraMetadata& getInternalData() const;
+    bool isLogicalMultiCamera(size_t* count, const char* const** physicalCameraIds) const;
 
   private:
 
+    // This function does not check whether the capability passed to it is valid.
+    // The caller must make sure that it is.
     bool isNdkSupportedCapability(const int32_t capability);
     static inline bool isVendorTag(const uint32_t tag);
     static bool isCaptureRequestTag(const uint32_t tag);
     void filterUnsupportedFeatures(); // Hide features not yet supported by NDK
     void filterStreamConfigurations(); // Hide input streams, translate hal format to NDK formats
     void filterDurations(uint32_t tag); // translate hal format to NDK formats
+    void derivePhysicalCameraIds(); // Derive array of physical ids.
 
     template<typename INTERNAL_T, typename NDK_T>
     camera_status_t updateImpl(uint32_t tag, uint32_t count, const NDK_T* data) {
@@ -106,6 +117,9 @@ struct ACameraMetadata : public RefBase {
     const ACAMERA_METADATA_TYPE mType;
 
     static std::unordered_set<uint32_t> sSystemTags;
+
+    std::vector<const char*> mStaticPhysicalCameraIds;
+    std::vector<String8> mStaticPhysicalCameraIdValues;
 };
 
 #endif // _ACAMERA_METADATA_H

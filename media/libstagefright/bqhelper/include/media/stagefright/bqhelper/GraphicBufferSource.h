@@ -19,8 +19,6 @@
 #define GRAPHIC_BUFFER_SOURCE_H_
 
 #include <binder/Status.h>
-#include <gui/BufferQueue.h>
-#include <gui/IGraphicBufferProducer.h>
 #include <utils/RefBase.h>
 
 #include <media/hardware/VideoAPI.h>
@@ -28,13 +26,17 @@
 #include <media/stagefright/foundation/AHandlerReflector.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/bqhelper/ComponentWrapper.h>
+#include <android/hardware/graphics/bufferqueue/1.0/IGraphicBufferProducer.h>
+#include <android/hardware/graphics/bufferqueue/2.0/IGraphicBufferProducer.h>
 
 namespace android {
 
 using ::android::binder::Status;
 
 struct FrameDropper;
-
+class BufferItem;
+class IGraphicBufferProducer;
+class IGraphicBufferConsumer;
 /*
  * This class is used to feed codecs from a Surface via BufferQueue or
  * HW producer.
@@ -68,7 +70,7 @@ struct FrameDropper;
  * (even if it was dropped) to reencode it after an interval if no further
  * frames are sent by the producer.
  */
-class GraphicBufferSource : public BufferQueue::ConsumerListener {
+class GraphicBufferSource : public RefBase {
 public:
     GraphicBufferSource();
 
@@ -82,9 +84,17 @@ public:
 
     // Returns the handle to the producer side of the BufferQueue.  Buffers
     // queued on this will be received by GraphicBufferSource.
-    sp<IGraphicBufferProducer> getIGraphicBufferProducer() const {
-        return mProducer;
-    }
+    sp<IGraphicBufferProducer> getIGraphicBufferProducer() const;
+
+    // Returns the handle to the bufferqueue HAL (V1_0) producer side of the BufferQueue.
+    // Buffers queued on this will be received by GraphicBufferSource.
+    sp<::android::hardware::graphics::bufferqueue::V1_0::IGraphicBufferProducer>
+        getHGraphicBufferProducer_V1_0() const;
+
+    // Returns the handle to the bufferqueue HAL producer side of the BufferQueue.
+    // Buffers queued on this will be received by GraphicBufferSource.
+    sp<::android::hardware::graphics::bufferqueue::V2_0::IGraphicBufferProducer>
+        getHGraphicBufferProducer() const;
 
     // This is called when component transitions to running state, which means
     // we can start handing it buffers.  If we already have buffers of data
@@ -190,8 +200,6 @@ public:
     status_t setColorAspects(int32_t aspectsPacked);
 
 protected:
-    // BQ::ConsumerListener interface
-    // ------------------------------
 
     // BufferQueue::ConsumerListener interface, called when a new frame of
     // data is available.  If we're executing and a codec buffer is
@@ -199,19 +207,24 @@ protected:
     // into the codec buffer, and call Empty[This]Buffer.  If we're not yet
     // executing or there's no codec buffer available, we just increment
     // mNumFramesAvailable and return.
-    void onFrameAvailable(const BufferItem& item) override;
+    void onFrameAvailable(const BufferItem& item) ;
 
     // BufferQueue::ConsumerListener interface, called when the client has
     // released one or more GraphicBuffers.  We clear out the appropriate
     // set of mBufferSlot entries.
-    void onBuffersReleased() override;
+    void onBuffersReleased() ;
 
     // BufferQueue::ConsumerListener interface, called when the client has
     // changed the sideband stream. GraphicBufferSource doesn't handle sideband
     // streams so this is a no-op (and should never be called).
-    void onSidebandStreamChanged() override;
+    void onSidebandStreamChanged() ;
 
 private:
+    // BQ::ConsumerListener interface
+    // ------------------------------
+    struct ConsumerProxy;
+    sp<ConsumerProxy> mConsumerProxy;
+
     // Lock, covers all member variables.
     mutable Mutex mMutex;
 

@@ -22,6 +22,11 @@
 #include <media/stagefright/foundation/AHandler.h>
 
 #include <mediaplayer2/MediaPlayer2Interface.h>
+#include <mediaplayer2/JObjectHolder.h>
+
+#include "mediaplayer2.pb.h"
+
+using android::media::MediaPlayer2Proto::PlayerMessage;
 
 namespace android {
 
@@ -38,7 +43,8 @@ class MetaData;
 struct NuPlayer2Driver;
 
 struct NuPlayer2 : public AHandler {
-    explicit NuPlayer2(pid_t pid, uid_t uid, const sp<MediaClock> &mediaClock);
+    explicit NuPlayer2(pid_t pid, uid_t uid,
+            const sp<MediaClock> &mediaClock, const sp<JObjectHolder> &context);
 
     void setDriver(const wp<NuPlayer2Driver> &driver);
 
@@ -75,11 +81,12 @@ struct NuPlayer2 : public AHandler {
             int64_t seekTimeUs,
             MediaPlayer2SeekMode mode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC,
             bool needNotify = false);
+    void rewind();
 
     status_t setVideoScalingMode(int32_t mode);
-    status_t getTrackInfo(Parcel* reply) const;
-    status_t getSelectedTrack(int32_t type, Parcel* reply) const;
-    status_t selectTrack(size_t trackIndex, bool select, int64_t timeUs);
+    status_t getTrackInfo(int64_t srcId, PlayerMessage* reply) const;
+    status_t getSelectedTrack(int64_t srcId, int32_t type, PlayerMessage* reply) const;
+    status_t selectTrack(int64_t srcId, size_t trackIndex, bool select, int64_t timeUs);
     status_t getCurrentPosition(int64_t *mediaUs);
     void getStats(Vector<sp<AMessage> > *mTrackStats);
 
@@ -87,8 +94,8 @@ struct NuPlayer2 : public AHandler {
     float getFrameRate();
 
     // Modular DRM
-    status_t prepareDrm(const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId);
-    status_t releaseDrm();
+    status_t prepareDrm(int64_t srcId, const uint8_t uuid[16], const Vector<uint8_t> &drmSessionId);
+    status_t releaseDrm(int64_t srcId);
 
     const char *getDataSourceType();
 
@@ -150,6 +157,32 @@ private:
         kWhatSetBufferingSettings       = 'sBuS',
         kWhatPrepareDrm                 = 'pDrm',
         kWhatReleaseDrm                 = 'rDrm',
+        kWhatRewind                     = 'reWd',
+        kWhatEOSMonitor                 = 'eosM',
+    };
+
+    typedef enum {
+        DATA_SOURCE_TYPE_NONE,
+        DATA_SOURCE_TYPE_HTTP_LIVE,
+        DATA_SOURCE_TYPE_RTSP,
+        DATA_SOURCE_TYPE_GENERIC_URL,
+        DATA_SOURCE_TYPE_GENERIC_FD,
+        DATA_SOURCE_TYPE_MEDIA,
+    } DATA_SOURCE_TYPE;
+
+    struct SourceInfo {
+        SourceInfo();
+        SourceInfo &operator=(const SourceInfo &);
+
+        sp<Source> mSource;
+        std::atomic<DATA_SOURCE_TYPE> mDataSourceType;
+        int64_t mSrcId;
+        uint32_t mSourceFlags;
+        int64_t mStartTimeUs;
+        int64_t mEndTimeUs;
+        // Modular DRM
+        sp<AMediaCryptoWrapper> mCrypto;
+        bool mIsDrmProtected = false;
     };
 
     wp<NuPlayer2Driver> mDriver;
@@ -157,23 +190,21 @@ private:
     uid_t mUID;
     const sp<MediaClock> mMediaClock;
     Mutex mSourceLock;  // guard |mSource|.
-    sp<Source> mSource;
-    int64_t mSrcId;
-    uint32_t mSourceFlags;
-    sp<Source> mNextSource;
-    int64_t mNextSrcId;
-    uint32_t mNextSourceFlags;
+    SourceInfo mCurrentSourceInfo;
+    SourceInfo mNextSourceInfo;
     sp<ANativeWindowWrapper> mNativeWindow;
     sp<MediaPlayer2Interface::AudioSink> mAudioSink;
     sp<DecoderBase> mVideoDecoder;
     bool mOffloadAudio;
     sp<DecoderBase> mAudioDecoder;
+    Mutex mDecoderLock;  // guard |mAudioDecoder| and |mVideoDecoder|.
     sp<CCDecoder> mCCDecoder;
     sp<Renderer> mRenderer;
     sp<ALooper> mRendererLooper;
     int32_t mAudioDecoderGeneration;
     int32_t mVideoDecoderGeneration;
     int32_t mRendererGeneration;
+    int32_t mEOSMonitorGeneration;
 
     Mutex mPlayingTimeLock;
     int64_t mLastStartedPlayingTimeNs;
@@ -244,21 +275,8 @@ private:
     // Pause state as requested by source (internally) due to buffering
     bool mPausedForBuffering;
 
-    // Modular DRM
-    sp<AMediaCryptoWrapper> mCrypto;
-    bool mIsDrmProtected;
-
-    typedef enum {
-        DATA_SOURCE_TYPE_NONE,
-        DATA_SOURCE_TYPE_HTTP_LIVE,
-        DATA_SOURCE_TYPE_RTSP,
-        DATA_SOURCE_TYPE_GENERIC_URL,
-        DATA_SOURCE_TYPE_GENERIC_FD,
-        DATA_SOURCE_TYPE_MEDIA,
-    } DATA_SOURCE_TYPE;
-
-    std::atomic<DATA_SOURCE_TYPE> mDataSourceType;
-    std::atomic<DATA_SOURCE_TYPE> mNextDataSourceType;
+    // Passed from JAVA
+    const sp<JObjectHolder> mContext;
 
     inline const sp<DecoderBase> &getDecoder(bool audio) {
         return audio ? mAudioDecoder : mVideoDecoder;
@@ -292,12 +310,14 @@ private:
             const sp<AMessage> &inputFormat,
             const sp<AMessage> &outputFormat = NULL);
 
-    void notifyListener(int64_t srcId, int msg, int ext1, int ext2, const Parcel *in = NULL);
+    void notifyListener(int64_t srcId, int msg, int ext1, int ext2, const PlayerMessage *in = NULL);
+
+    void addEndTimeMonitor();
 
     void handleFlushComplete(bool audio, bool isDecoder);
     void finishFlushIfPossible();
 
-    void onStart();
+    void onStart(bool play);
     void onResume();
     void onPause();
 
@@ -333,10 +353,13 @@ private:
     void sendTimedMetaData(const sp<ABuffer> &buffer);
     void sendTimedTextData(const sp<ABuffer> &buffer);
 
-    void writeTrackInfo(Parcel* reply, const sp<AMessage>& format) const;
+    void writeTrackInfo(PlayerMessage* reply, const sp<AMessage>& format) const;
 
     status_t onPrepareDrm(const sp<AMessage> &msg);
-    status_t onReleaseDrm();
+    status_t onReleaseDrm(const sp<AMessage> &msg);
+
+    SourceInfo* getSourceInfoByIdInMsg(const sp<AMessage> &msg);
+    void resetSourceInfo(SourceInfo &srcInfo);
 
     DISALLOW_EVIL_CONSTRUCTORS(NuPlayer2);
 };

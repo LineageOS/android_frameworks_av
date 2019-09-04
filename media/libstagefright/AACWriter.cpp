@@ -85,7 +85,7 @@ status_t AACWriter::addSource(const sp<MediaSource> &source) {
     CHECK(!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC));
     CHECK(meta->findInt32(kKeyChannelCount, &mChannelCount));
     CHECK(meta->findInt32(kKeySampleRate, &mSampleRate));
-    CHECK(mChannelCount >= 1 && mChannelCount <= 2);
+    CHECK(mChannelCount >= 1 && mChannelCount <= 7);
 
     // Optionally, we want to check whether AACProfile is also set.
     if (meta->findInt32(kKeyAACProfile, &mAACProfile)) {
@@ -154,11 +154,11 @@ status_t AACWriter::reset() {
     mDone = true;
 
     void *dummy;
+    status_t status = mSource->stop();
     pthread_join(mThread, &dummy);
 
     status_t err = static_cast<status_t>(reinterpret_cast<uintptr_t>(dummy));
     {
-        status_t status = mSource->stop();
         if (err == OK &&
             (status != OK && status != ERROR_END_OF_STREAM)) {
             err = status;

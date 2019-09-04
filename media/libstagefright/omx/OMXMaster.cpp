@@ -29,8 +29,7 @@
 
 namespace android {
 
-OMXMaster::OMXMaster()
-    : mVendorLibHandle(NULL) {
+OMXMaster::OMXMaster() {
 
     pid_t pid = getpid();
     char filename[20];
@@ -52,46 +51,51 @@ OMXMaster::OMXMaster()
     }
 
     addVendorPlugin();
-    addPlugin(new SoftOMXPlugin);
+    addPlatformPlugin();
 }
 
 OMXMaster::~OMXMaster() {
     clearPlugins();
-
-    if (mVendorLibHandle != NULL) {
-        dlclose(mVendorLibHandle);
-        mVendorLibHandle = NULL;
-    }
 }
 
 void OMXMaster::addVendorPlugin() {
     addPlugin("libstagefrighthw.so");
 }
 
-void OMXMaster::addPlugin(const char *libname) {
-    mVendorLibHandle = android_load_sphal_library(libname, RTLD_NOW);
+void OMXMaster::addPlatformPlugin() {
+    addPlugin("libstagefright_softomx_plugin.so");
+}
 
-    if (mVendorLibHandle == NULL) {
+void OMXMaster::addPlugin(const char *libname) {
+    void *libHandle = android_load_sphal_library(libname, RTLD_NOW);
+
+    if (libHandle == NULL) {
         return;
     }
 
     typedef OMXPluginBase *(*CreateOMXPluginFunc)();
     CreateOMXPluginFunc createOMXPlugin =
         (CreateOMXPluginFunc)dlsym(
-                mVendorLibHandle, "createOMXPlugin");
+                libHandle, "createOMXPlugin");
     if (!createOMXPlugin)
         createOMXPlugin = (CreateOMXPluginFunc)dlsym(
-                mVendorLibHandle, "_ZN7android15createOMXPluginEv");
+                libHandle, "_ZN7android15createOMXPluginEv");
 
+    OMXPluginBase *plugin = nullptr;
     if (createOMXPlugin) {
-        addPlugin((*createOMXPlugin)());
+        plugin = (*createOMXPlugin)();
+    }
+
+    if (plugin) {
+        mPlugins.push_back({ plugin, libHandle });
+        addPlugin(plugin);
+    } else {
+        android_unload_sphal_library(libHandle);
     }
 }
 
 void OMXMaster::addPlugin(OMXPluginBase *plugin) {
     Mutex::Autolock autoLock(mLock);
-
-    mPlugins.push_back(plugin);
 
     OMX_U32 index = 0;
 
@@ -120,20 +124,20 @@ void OMXMaster::addPlugin(OMXPluginBase *plugin) {
 void OMXMaster::clearPlugins() {
     Mutex::Autolock autoLock(mLock);
 
-    typedef void (*DestroyOMXPluginFunc)(OMXPluginBase*);
-    DestroyOMXPluginFunc destroyOMXPlugin =
-        (DestroyOMXPluginFunc)dlsym(
-                mVendorLibHandle, "destroyOMXPlugin");
-
     mPluginByComponentName.clear();
+    mPluginByInstance.clear();
 
-    for (List<OMXPluginBase *>::iterator it = mPlugins.begin();
-            it != mPlugins.end(); ++it) {
+    typedef void (*DestroyOMXPluginFunc)(OMXPluginBase*);
+    for (const Plugin &plugin : mPlugins) {
+        DestroyOMXPluginFunc destroyOMXPlugin =
+            (DestroyOMXPluginFunc)dlsym(
+                    plugin.mLibHandle, "destroyOMXPlugin");
         if (destroyOMXPlugin)
-            destroyOMXPlugin(*it);
+            destroyOMXPlugin(plugin.mOmx);
         else
-            delete *it;
-        *it = NULL;
+            delete plugin.mOmx;
+
+        android_unload_sphal_library(plugin.mLibHandle);
     }
 
     mPlugins.clear();

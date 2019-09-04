@@ -41,7 +41,7 @@ class AAudioServiceEndpoint
         , public AAudioStreamParameters {
 public:
 
-    virtual ~AAudioServiceEndpoint();
+    virtual ~AAudioServiceEndpoint() = default;
 
     virtual std::string dump() const;
 
@@ -61,7 +61,7 @@ public:
 
     virtual aaudio_result_t startClient(const android::AudioClient& client,
                                         audio_port_handle_t *clientHandle) {
-        ALOGD("AAudioServiceEndpoint::startClient(%p, ...) AAUDIO_ERROR_UNAVAILABLE", &client);
+        ALOGD("AAudioServiceEndpoint::startClient(...) AAUDIO_ERROR_UNAVAILABLE");
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
@@ -121,7 +121,7 @@ protected:
     mutable std::mutex       mLockStreams;
     std::vector<android::sp<AAudioServiceStreamBase>> mRegisteredStreams;
 
-    SimpleDoubleBuffer<Timestamp>  mAtomicTimestamp;
+    SimpleDoubleBuffer<Timestamp>  mAtomicEndpointTimestamp;
 
     android::AudioClient     mMmapClient;   // set in open, used in open and startStream
 

@@ -37,6 +37,16 @@ std::unique_ptr<MediaCodecInfoWriter>
             new MediaCodecInfoWriter(info.get()));
 }
 
+std::unique_ptr<MediaCodecInfoWriter>
+        MediaCodecListWriter::findMediaCodecInfo(const char *name) {
+    for (const sp<MediaCodecInfo> &info : mCodecInfos) {
+        if (!strcmp(info->getCodecName(), name)) {
+            return std::unique_ptr<MediaCodecInfoWriter>(new MediaCodecInfoWriter(info.get()));
+        }
+    }
+    return nullptr;
+}
+
 void MediaCodecListWriter::writeGlobalSettings(
         const sp<AMessage> &globalSettings) const {
     for (const std::pair<std::string, std::string> &kv : mGlobalSettings) {

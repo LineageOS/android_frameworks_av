@@ -20,6 +20,7 @@
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
+#include <android/hardware/media/omx/1.0/IOmx.h>
 #include <android/hardware/media/omx/1.0/IOmxStore.h>
 #include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
 
@@ -43,15 +44,14 @@ using ::android::wp;
 
 struct OmxStore : public IOmxStore {
     OmxStore(
+            const sp<IOmx> &omx = nullptr,
             const char* owner = "default",
-            const char* const* searchDirs
-                = MediaCodecsXmlParser::defaultSearchDirs,
-            const char* mainXmlName
-                = MediaCodecsXmlParser::defaultMainXmlName,
-            const char* performanceXmlName
-                = MediaCodecsXmlParser::defaultPerformanceXmlName,
-            const char* profilingResultsXmlPath
-                = MediaCodecsXmlParser::defaultProfilingResultsXmlPath);
+            const std::vector<std::string> &searchDirs =
+                MediaCodecsXmlParser::getDefaultSearchDirs(),
+            const std::vector<std::string> &xmlFiles =
+                MediaCodecsXmlParser::getDefaultXmlNames(),
+            const char *xmlProfilingResultsPath =
+                MediaCodecsXmlParser::defaultProfilingResultsXmlPath);
 
     virtual ~OmxStore();
 

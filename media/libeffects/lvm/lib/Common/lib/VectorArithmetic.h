@@ -47,6 +47,16 @@ void LoadConst_32(            const LVM_INT32 val,
 void Copy_Float(                 const LVM_FLOAT *src,
                                  LVM_FLOAT *dst,
                                  LVM_INT16 n );
+#ifdef SUPPORT_MC
+void Copy_Float_Mc_Stereo(       const LVM_FLOAT *src,
+                                 LVM_FLOAT *dst,
+                                 LVM_INT16 NrFrames,
+                                 LVM_INT32 NrChannels);
+void Copy_Float_Stereo_Mc(       const LVM_FLOAT *src,
+                                 LVM_FLOAT *dst,
+                                 LVM_INT16 NrFrames,
+                                 LVM_INT32 NrChannels);
+#endif
 #else
 void Copy_16(                 const LVM_INT16 *src,
                                     LVM_INT16 *dst,
@@ -181,6 +191,12 @@ void MonoTo2I_32(             const LVM_INT32  *src,
 void From2iToMono_Float(         const LVM_FLOAT  *src,
                                  LVM_FLOAT  *dst,
                                  LVM_INT16 n);
+#ifdef SUPPORT_MC
+void FromMcToMono_Float(const LVM_FLOAT *src,
+                        LVM_FLOAT *dst,
+                        LVM_INT16 NrFrames,
+                        LVM_INT16 NrChannels);
+#endif
 #else
 void From2iToMono_32(         const LVM_INT32  *src,
                                     LVM_INT32  *dst,

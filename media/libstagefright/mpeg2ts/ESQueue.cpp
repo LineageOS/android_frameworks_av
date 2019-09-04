@@ -86,6 +86,21 @@ void ElementaryStreamQueue::setCasInfo(
     mCasSessionId = sessionId;
 }
 
+static int32_t readVariableBits(ABitReader &bits, int32_t nbits) {
+    int32_t value = 0;
+    int32_t more_bits = 1;
+
+    while (more_bits) {
+        value += bits.getBits(nbits);
+        more_bits = bits.getBits(1);
+        if (!more_bits)
+            break;
+        value++;
+        value <<= nbits;
+    }
+    return value;
+}
+
 // Parse AC3 header assuming the current ptr is start position of syncframe,
 // update metadata only applicable, and return the payload size
 static unsigned parseAC3SyncFrame(
@@ -195,8 +210,153 @@ static unsigned parseAC3SyncFrame(
     return payloadSize;
 }
 
-static bool IsSeeminglyValidAC3Header(const uint8_t *ptr, size_t size) {
-    return parseAC3SyncFrame(ptr, size, NULL) > 0;
+// Parse EAC3 header assuming the current ptr is start position of syncframe,
+// update metadata only applicable, and return the payload size
+// ATSC A/52:2012 E2.3.1
+static unsigned parseEAC3SyncFrame(
+    const uint8_t *ptr, size_t size, sp<MetaData> *metaData) {
+    static const unsigned channelCountTable[] = {2, 1, 2, 3, 3, 4, 4, 5};
+    static const unsigned samplingRateTable[] = {48000, 44100, 32000};
+    static const unsigned samplingRateTable2[] = {24000, 22050, 16000};
+
+    ABitReader bits(ptr, size);
+    if (bits.numBitsLeft() < 16) {
+        ALOGE("Not enough bits left for further parsing");
+        return 0;
+    }
+    if (bits.getBits(16) != 0x0B77) {
+        ALOGE("No valid sync word in EAC3 header");
+        return 0;
+    }
+
+    // we parse up to bsid so there needs to be at least that many bits
+    if (bits.numBitsLeft() < 2 + 3 + 11 + 2 + 2 + 3 + 1 + 5) {
+        ALOGE("Not enough bits left for further parsing");
+        return 0;
+    }
+
+    unsigned strmtyp = bits.getBits(2);
+    if (strmtyp == 3) {
+        ALOGE("Incorrect strmtyp in EAC3 header");
+        return 0;
+    }
+
+    unsigned substreamid = bits.getBits(3);
+    // only the first independent stream is supported
+    if ((strmtyp == 0 || strmtyp == 2) && substreamid != 0)
+        return 0;
+
+    unsigned frmsiz = bits.getBits(11);
+    unsigned fscod = bits.getBits(2);
+
+    unsigned samplingRate = 0;
+    if (fscod == 0x3) {
+        unsigned fscod2 = bits.getBits(2);
+        if (fscod2 == 3) {
+            ALOGW("Incorrect fscod2 in EAC3 header");
+            return 0;
+        }
+        samplingRate = samplingRateTable2[fscod2];
+    } else {
+        samplingRate = samplingRateTable[fscod];
+        unsigned numblkscod __unused = bits.getBits(2);
+    }
+
+    unsigned acmod = bits.getBits(3);
+    unsigned lfeon = bits.getBits(1);
+    unsigned bsid = bits.getBits(5);
+    if (bsid < 11 || bsid > 16) {
+        ALOGW("Incorrect bsid in EAC3 header. Could be AC-3 or some unknown EAC3 format");
+        return 0;
+    }
+
+    // we currently only support the first independant stream
+    if (metaData != NULL && (strmtyp == 0 || strmtyp == 2)) {
+        unsigned channelCount = channelCountTable[acmod] + lfeon;
+        ALOGV("EAC3 channelCount = %d", channelCount);
+        ALOGV("EAC3 samplingRate = %d", samplingRate);
+        (*metaData)->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_EAC3);
+        (*metaData)->setInt32(kKeyChannelCount, channelCount);
+        (*metaData)->setInt32(kKeySampleRate, samplingRate);
+        (*metaData)->setInt32(kKeyIsSyncFrame, 1);
+    }
+
+    unsigned payloadSize = frmsiz + 1;
+    payloadSize <<= 1;  // convert from 16-bit words to bytes
+
+    return payloadSize;
+}
+
+// Parse AC4 header assuming the current ptr is start position of syncframe
+// and update frameSize and metadata.
+static status_t parseAC4SyncFrame(
+        const uint8_t *ptr, size_t size, unsigned &frameSize, sp<MetaData> *metaData) {
+    // ETSI TS 103 190-2 V1.1.1 (2015-09), Annex C
+    // The sync_word can be either 0xAC40 or 0xAC41.
+    static const int kSyncWordAC40 = 0xAC40;
+    static const int kSyncWordAC41 = 0xAC41;
+
+    size_t headerSize = 0;
+    ABitReader bits(ptr, size);
+    int32_t syncWord = bits.getBits(16);
+    if ((syncWord != kSyncWordAC40) && (syncWord != kSyncWordAC41)) {
+        ALOGE("Invalid syncword in AC4 header");
+        return ERROR_MALFORMED;
+    }
+    headerSize += 2;
+
+    frameSize = bits.getBits(16);
+    headerSize += 2;
+    if (frameSize == 0xFFFF) {
+        frameSize = bits.getBits(24);
+        headerSize += 3;
+    }
+
+    if (frameSize == 0) {
+        ALOGE("Invalid frame size in AC4 header");
+        return ERROR_MALFORMED;
+    }
+    frameSize += headerSize;
+    // If the sync_word is 0xAC41, a crc_word is also transmitted.
+    if (syncWord == kSyncWordAC41) {
+        frameSize += 2; // crc_word
+    }
+    ALOGV("AC4 frameSize = %u", frameSize);
+
+    // ETSI TS 103 190-2 V1.1.1 6.2.1.1
+    uint32_t bitstreamVersion = bits.getBits(2);
+    if (bitstreamVersion == 3) {
+        bitstreamVersion += readVariableBits(bits, 2);
+    }
+
+    bits.skipBits(10); // Sequence Counter
+
+    uint32_t bWaitFrames = bits.getBits(1);
+    if (bWaitFrames) {
+        uint32_t waitFrames = bits.getBits(3);
+        if (waitFrames > 0) {
+            bits.skipBits(2); // br_code;
+        }
+    }
+
+    // ETSI TS 103 190 V1.1.1 Table 82
+    bool fsIndex = bits.getBits(1);
+    uint32_t samplingRate = fsIndex ? 48000 : 44100;
+
+    if (metaData != NULL) {
+        ALOGV("dequeueAccessUnitAC4 Setting mFormat");
+        (*metaData)->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AC4);
+        (*metaData)->setInt32(kKeyIsSyncFrame, 1);
+        // [FIXME] AC4 channel count is defined per presentation. Provide a default channel count
+        // as stereo for the entire stream.
+        (*metaData)->setInt32(kKeyChannelCount, 2);
+        (*metaData)->setInt32(kKeySampleRate, samplingRate);
+    }
+    return OK;
+}
+
+static status_t IsSeeminglyValidAC4Header(const uint8_t *ptr, size_t size, unsigned &frameSize) {
+    return parseAC4SyncFrame(ptr, size, frameSize, NULL);
 }
 
 static bool IsSeeminglyValidADTSHeader(
@@ -279,7 +439,8 @@ status_t ElementaryStreamQueue::appendData(
         ALOGE("appending data after EOS");
         return ERROR_MALFORMED;
     }
-    if (mBuffer == NULL || mBuffer->size() == 0) {
+
+    if (!isScrambled() && (mBuffer == NULL || mBuffer->size() == 0)) {
         switch (mMode) {
             case H264:
             case MPEG_VIDEO:
@@ -390,12 +551,19 @@ status_t ElementaryStreamQueue::appendData(
             }
 
             case AC3:
+            case EAC3:
             {
                 uint8_t *ptr = (uint8_t *)data;
 
                 ssize_t startOffset = -1;
                 for (size_t i = 0; i < size; ++i) {
-                    if (IsSeeminglyValidAC3Header(&ptr[i], size - i)) {
+                    unsigned payloadSize = 0;
+                    if (mMode == AC3) {
+                        payloadSize = parseAC3SyncFrame(&ptr[i], size - i, NULL);
+                    } else if (mMode == EAC3) {
+                        payloadSize = parseEAC3SyncFrame(&ptr[i], size - i, NULL);
+                    }
+                    if (payloadSize > 0) {
                         startOffset = i;
                         break;
                     }
@@ -406,9 +574,46 @@ status_t ElementaryStreamQueue::appendData(
                 }
 
                 if (startOffset > 0) {
-                    ALOGI("found something resembling an AC3 syncword at "
+                    ALOGI("found something resembling an (E)AC3 syncword at "
                           "offset %zd",
                           startOffset);
+                }
+
+                data = &ptr[startOffset];
+                size -= startOffset;
+                break;
+            }
+
+            case AC4:
+            {
+                uint8_t *ptr = (uint8_t *)data;
+                unsigned frameSize = 0;
+                ssize_t startOffset = -1;
+
+                // A valid AC4 stream should have minimum of 7 bytes in its buffer.
+                // (Sync header 4 bytes + AC4 toc 3 bytes)
+                if (size < 7) {
+                    return ERROR_MALFORMED;
+                }
+                for (size_t i = 0; i < size; ++i) {
+                    if (IsSeeminglyValidAC4Header(&ptr[i], size - i, frameSize) == OK) {
+                        startOffset = i;
+                        break;
+                    }
+                }
+
+                if (startOffset < 0) {
+                    return ERROR_MALFORMED;
+                }
+
+                if (startOffset > 0) {
+                    ALOGI("found something resembling an AC4 syncword at "
+                          "offset %zd",
+                          startOffset);
+                }
+                if (frameSize != size - startOffset) {
+                    ALOGV("AC4 frame size is %u bytes, while the buffer size is %zd bytes.",
+                          frameSize, size - startOffset);
                 }
 
                 data = &ptr[startOffset];
@@ -494,6 +699,7 @@ status_t ElementaryStreamQueue::appendData(
 
 void ElementaryStreamQueue::appendScrambledData(
         const void *data, size_t size,
+        size_t leadingClearBytes,
         int32_t keyId, bool isSync,
         sp<ABuffer> clearSizes, sp<ABuffer> encSizes) {
     if (!isScrambled()) {
@@ -521,6 +727,7 @@ void ElementaryStreamQueue::appendScrambledData(
 
     ScrambledRangeInfo scrambledInfo;
     scrambledInfo.mLength = size;
+    scrambledInfo.mLeadingClearBytes = leadingClearBytes;
     scrambledInfo.mKeyId = keyId;
     scrambledInfo.mIsSync = isSync;
     scrambledInfo.mClearSizes = clearSizes;
@@ -533,7 +740,6 @@ void ElementaryStreamQueue::appendScrambledData(
 
 sp<ABuffer> ElementaryStreamQueue::dequeueScrambledAccessUnit() {
     size_t nextScan = mBuffer->size();
-    mBuffer->setRange(0, 0);
     int32_t pesOffset = 0, pesScramblingControl = 0;
     int64_t timeUs = fetchTimestamp(nextScan, &pesOffset, &pesScramblingControl);
     if (timeUs < 0ll) {
@@ -544,6 +750,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueScrambledAccessUnit() {
     // return scrambled unit
     int32_t keyId = pesScramblingControl, isSync = 0, scrambledLength = 0;
     sp<ABuffer> clearSizes, encSizes;
+    size_t leadingClearBytes;
     while (mScrambledRangeInfos.size() > mRangeInfos.size()) {
         auto it = mScrambledRangeInfos.begin();
         ALOGV("[stream %d] fetching scrambled range: size=%zu", mMode, it->mLength);
@@ -561,6 +768,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueScrambledAccessUnit() {
         clearSizes = it->mClearSizes;
         encSizes = it->mEncSizes;
         isSync = it->mIsSync;
+        leadingClearBytes = it->mLeadingClearBytes;
         mScrambledRangeInfos.erase(it);
     }
     if (scrambledLength == 0) {
@@ -568,25 +776,73 @@ sp<ABuffer> ElementaryStreamQueue::dequeueScrambledAccessUnit() {
         return NULL;
     }
 
-    // skip the PES header, and copy the rest into scrambled access unit
-    sp<ABuffer> scrambledAccessUnit = ABuffer::CreateAsCopy(
-            mScrambledBuffer->data() + pesOffset,
-            scrambledLength - pesOffset);
-
-    // fix up first sample size after skipping the PES header
-    if (pesOffset > 0) {
-        int32_t &firstClearSize = *(int32_t*)clearSizes->data();
-        int32_t &firstEncSize = *(int32_t*)encSizes->data();
-        // Cut away the PES header
-        if (firstClearSize >= pesOffset) {
-            // This is for TS-level scrambling, we descrambled the first
-            // (or it was clear to begin with)
-            firstClearSize -= pesOffset;
-        } else if (firstEncSize >= pesOffset) {
-            // This can only be PES-level scrambling
-            firstEncSize -= pesOffset;
-        }
+    // Retrieve the leading clear bytes info, and use it to set the clear
+    // range on mBuffer. Note that the leading clear bytes includes the
+    // PES header portion, while mBuffer doesn't.
+    if ((int32_t)leadingClearBytes > pesOffset) {
+        mBuffer->setRange(0, leadingClearBytes - pesOffset);
+    } else {
+        mBuffer->setRange(0, 0);
     }
+
+    // Try to parse formats, and if unavailable set up a dummy format.
+    // Only support the following modes for scrambled content for now.
+    // (will be expanded later).
+    if (mFormat == NULL) {
+        mFormat = new MetaData;
+        switch (mMode) {
+            case H264:
+            {
+                if (!MakeAVCCodecSpecificData(
+                        *mFormat, mBuffer->data(), mBuffer->size())) {
+                    ALOGI("Creating dummy AVC format for scrambled content");
+
+                    mFormat->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
+                    mFormat->setInt32(kKeyWidth, 1280);
+                    mFormat->setInt32(kKeyHeight, 720);
+                }
+                break;
+            }
+            case AAC:
+            {
+                if (!MakeAACCodecSpecificData(
+                        *mFormat, mBuffer->data(), mBuffer->size())) {
+                    ALOGI("Creating dummy AAC format for scrambled content");
+
+                    MakeAACCodecSpecificData(*mFormat,
+                            1 /*profile*/, 7 /*sampling_freq_index*/, 1 /*channel_config*/);
+                    mFormat->setInt32(kKeyIsADTS, true);
+                }
+
+                break;
+            }
+            case MPEG_VIDEO:
+            {
+                ALOGI("Creating dummy MPEG format for scrambled content");
+
+                mFormat->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_MPEG2);
+                mFormat->setInt32(kKeyWidth, 1280);
+                mFormat->setInt32(kKeyHeight, 720);
+                break;
+            }
+            default:
+            {
+                ALOGE("Unknown mode for scrambled content");
+                return NULL;
+            }
+        }
+
+        // for MediaExtractor.CasInfo
+        mFormat->setInt32(kKeyCASystemID, mCASystemId);
+        mFormat->setData(kKeyCASessionID,
+                0, mCasSessionId.data(), mCasSessionId.size());
+    }
+
+    mBuffer->setRange(0, 0);
+
+    // copy into scrambled access unit
+    sp<ABuffer> scrambledAccessUnit = ABuffer::CreateAsCopy(
+            mScrambledBuffer->data(), scrambledLength);
 
     scrambledAccessUnit->meta()->setInt64("timeUs", timeUs);
     if (isSync) {
@@ -600,6 +856,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueScrambledAccessUnit() {
     scrambledAccessUnit->meta()->setInt32("cryptoKey", keyId);
     scrambledAccessUnit->meta()->setBuffer("clearBytes", clearSizes);
     scrambledAccessUnit->meta()->setBuffer("encBytes", encSizes);
+    scrambledAccessUnit->meta()->setInt32("pesOffset", pesOffset);
 
     memmove(mScrambledBuffer->data(),
             mScrambledBuffer->data() + scrambledLength,
@@ -614,7 +871,11 @@ sp<ABuffer> ElementaryStreamQueue::dequeueScrambledAccessUnit() {
 }
 
 sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnit() {
-    if ((mFlags & kFlag_AlignedData) && mMode == H264 && !isScrambled()) {
+    if (isScrambled()) {
+        return dequeueScrambledAccessUnit();
+    }
+
+    if ((mFlags & kFlag_AlignedData) && mMode == H264) {
         if (mRangeInfos.empty()) {
             return NULL;
         }
@@ -648,7 +909,10 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnit() {
         case AAC:
             return dequeueAccessUnitAAC();
         case AC3:
-            return dequeueAccessUnitAC3();
+        case EAC3:
+            return dequeueAccessUnitEAC3();
+        case AC4:
+            return dequeueAccessUnitAC4();
         case MPEG_VIDEO:
             return dequeueAccessUnitMPEGVideo();
         case MPEG4_VIDEO:
@@ -666,41 +930,44 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnit() {
     }
 }
 
-sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAC3() {
+sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitEAC3() {
     unsigned syncStartPos = 0;  // in bytes
     unsigned payloadSize = 0;
     sp<MetaData> format = new MetaData;
 
-    ALOGV("dequeueAccessUnit_AC3[%d]: mBuffer %p(%zu)", mAUIndex, mBuffer->data(), mBuffer->size());
+    ALOGV("dequeueAccessUnitEAC3[%d]: mBuffer %p(%zu)", mAUIndex,
+            mBuffer->data(), mBuffer->size());
 
     while (true) {
         if (syncStartPos + 2 >= mBuffer->size()) {
             return NULL;
         }
 
-        payloadSize = parseAC3SyncFrame(
-                mBuffer->data() + syncStartPos,
-                mBuffer->size() - syncStartPos,
-                &format);
+        uint8_t *ptr = mBuffer->data() + syncStartPos;
+        size_t size = mBuffer->size() - syncStartPos;
+        if (mMode == AC3) {
+            payloadSize = parseAC3SyncFrame(ptr, size, &format);
+        } else if (mMode == EAC3) {
+            payloadSize = parseEAC3SyncFrame(ptr, size, &format);
+        }
         if (payloadSize > 0) {
             break;
         }
 
-        ALOGV("dequeueAccessUnit_AC3[%d]: syncStartPos %u payloadSize %u",
+        ALOGV("dequeueAccessUnitEAC3[%d]: syncStartPos %u payloadSize %u",
                 mAUIndex, syncStartPos, payloadSize);
 
         ++syncStartPos;
     }
 
     if (mBuffer->size() < syncStartPos + payloadSize) {
-        ALOGV("Not enough buffer size for AC3");
+        ALOGV("Not enough buffer size for E/AC3");
         return NULL;
     }
 
     if (mFormat == NULL) {
         mFormat = format;
     }
-
 
     int64_t timeUs = fetchTimestamp(syncStartPos + payloadSize);
     if (timeUs < 0ll) {
@@ -710,7 +977,12 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAC3() {
 
     // Not decrypting if key info not available (e.g., scanner/extractor parsing ts files)
     if (mSampleDecryptor != NULL) {
-        mSampleDecryptor->processAC3(mBuffer->data() + syncStartPos, payloadSize);
+        if (mMode == AC3) {
+            mSampleDecryptor->processAC3(mBuffer->data() + syncStartPos, payloadSize);
+        } else if (mMode == EAC3) {
+            ALOGE("EAC3 AU is encrypted and decryption is not supported");
+            return NULL;
+        }
     }
     mAUIndex++;
 
@@ -727,6 +999,69 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAC3() {
 
     mBuffer->setRange(0, mBuffer->size() - syncStartPos - payloadSize);
 
+    return accessUnit;
+}
+
+sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAC4() {
+    unsigned syncStartPos = 0;
+    unsigned payloadSize = 0;
+    sp<MetaData> format = new MetaData;
+    ALOGV("dequeueAccessUnit_AC4[%d]: mBuffer %p(%zu)", mAUIndex, mBuffer->data(), mBuffer->size());
+
+    // A valid AC4 stream should have minimum of 7 bytes in its buffer.
+    // (Sync header 4 bytes + AC4 toc 3 bytes)
+    if (mBuffer->size() < 7) {
+        return NULL;
+    }
+
+    while (true) {
+        if (syncStartPos + 2 >= mBuffer->size()) {
+            return NULL;
+        }
+
+        status_t status = parseAC4SyncFrame(
+                    mBuffer->data() + syncStartPos,
+                    mBuffer->size() - syncStartPos,
+                    payloadSize,
+                    &format);
+        if (status == OK) {
+            break;
+        }
+
+        ALOGV("dequeueAccessUnit_AC4[%d]: syncStartPos %u payloadSize %u",
+                mAUIndex, syncStartPos, payloadSize);
+
+        ++syncStartPos;
+    }
+
+    if (mBuffer->size() < syncStartPos + payloadSize) {
+        ALOGV("Not enough buffer size for AC4");
+        return NULL;
+    }
+
+    if (mFormat == NULL) {
+        mFormat = format;
+    }
+
+    int64_t timeUs = fetchTimestamp(syncStartPos + payloadSize);
+    if (timeUs < 0ll) {
+        ALOGE("negative timeUs");
+        return NULL;
+    }
+    mAUIndex++;
+
+    sp<ABuffer> accessUnit = new ABuffer(syncStartPos + payloadSize);
+    memcpy(accessUnit->data(), mBuffer->data(), syncStartPos + payloadSize);
+
+    accessUnit->meta()->setInt64("timeUs", timeUs);
+    accessUnit->meta()->setInt32("isSync", 1);
+
+    memmove(
+            mBuffer->data(),
+            mBuffer->data() + syncStartPos + payloadSize,
+            mBuffer->size() - syncStartPos - payloadSize);
+
+    mBuffer->setRange(0, mBuffer->size() - syncStartPos - payloadSize);
     return accessUnit;
 }
 
@@ -851,25 +1186,11 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAAC() {
         bool protection_absent = bits.getBits(1) != 0;
 
         if (mFormat == NULL) {
-            unsigned profile = bits.getBits(2);
-            if (profile == 3u) {
-                ALOGE("profile should not be 3");
-                return NULL;
-            }
-            unsigned sampling_freq_index = bits.getBits(4);
-            bits.getBits(1);  // private_bit
-            unsigned channel_configuration = bits.getBits(3);
-            if (channel_configuration == 0u) {
-                ALOGE("channel_config should not be 0");
-                return NULL;
-            }
-            bits.skipBits(2);  // original_copy, home
-
             mFormat = new MetaData;
-            MakeAACCodecSpecificData(*mFormat,
-                    profile, sampling_freq_index, channel_configuration);
-
-            mFormat->setInt32(kKeyIsADTS, true);
+            if (!MakeAACCodecSpecificData(
+                    *mFormat, mBuffer->data() + offset, mBuffer->size() - offset)) {
+                return NULL;
+            }
 
             int32_t sampleRate;
             int32_t numChannels;
@@ -884,11 +1205,11 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAAC() {
 
             ALOGI("found AAC codec config (%d Hz, %d channels)",
                  sampleRate, numChannels);
-        } else {
-            // profile_ObjectType, sampling_frequency_index, private_bits,
-            // channel_configuration, original_copy, home
-            bits.skipBits(12);
         }
+
+        // profile_ObjectType, sampling_frequency_index, private_bits,
+        // channel_configuration, original_copy, home
+        bits.skipBits(12);
 
         // adts_variable_header
 
@@ -1004,27 +1325,6 @@ int64_t ElementaryStreamQueue::fetchTimestamp(
 }
 
 sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitH264() {
-    if (isScrambled()) {
-        if (mBuffer == NULL || mBuffer->size() == 0) {
-            return NULL;
-        }
-        if (mFormat == NULL) {
-            mFormat = new MetaData;
-            if (!MakeAVCCodecSpecificData(*mFormat, mBuffer->data(), mBuffer->size())) {
-                ALOGW("Creating dummy AVC format for scrambled content");
-                mFormat = new MetaData;
-                mFormat->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
-                mFormat->setInt32(kKeyWidth, 1280);
-                mFormat->setInt32(kKeyHeight, 720);
-            }
-            // for MediaExtractor.CasInfo
-            mFormat->setInt32(kKeyCASystemID, mCASystemId);
-            mFormat->setData(kKeyCASessionID, 0,
-                    mCasSessionId.data(), mCasSessionId.size());
-        }
-        return dequeueScrambledAccessUnit();
-    }
-
     const uint8_t *data = mBuffer->data();
 
     size_t size = mBuffer->size();
@@ -1226,6 +1526,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitMPEGAudio() {
                 header, &frameSize, &samplingRate, &numChannels,
                 &bitrate, &numSamples)) {
         ALOGE("Failed to get audio frame size");
+        mBuffer->setRange(0, 0);
         return NULL;
     }
 
@@ -1248,6 +1549,22 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitMPEGAudio() {
     if (timeUs < 0LL) {
         ALOGE("Negative timeUs");
         return NULL;
+    }
+
+    if (mFormat != NULL) {
+        const char *mime;
+        if (mFormat->findCString(kKeyMIMEType, &mime)) {
+            if ((layer == 1) && strcmp (mime, MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_I)) {
+                ALOGE("Audio layer is not MPEG_LAYER_I");
+                return NULL;
+            } else if ((layer == 2) && strcmp (mime, MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II)) {
+                ALOGE("Audio layer is not MPEG_LAYER_II");
+                return NULL;
+            } else if ((layer == 3) && strcmp (mime, MEDIA_MIMETYPE_AUDIO_MPEG)) {
+                ALOGE("Audio layer is not AUDIO_MPEG");
+                return NULL;
+            }
+        }
     }
 
     accessUnit->meta()->setInt64("timeUs", timeUs);
@@ -1324,25 +1641,6 @@ static sp<ABuffer> MakeMPEGVideoESDS(const sp<ABuffer> &csd) {
 }
 
 sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitMPEGVideo() {
-    if (isScrambled()) {
-        if (mBuffer == NULL || mBuffer->size() == 0) {
-            return NULL;
-        }
-        if (mFormat == NULL) {
-            ALOGI("Creating dummy MPEG format for scrambled content");
-            mFormat = new MetaData;
-            mFormat->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_MPEG2);
-            mFormat->setInt32(kKeyWidth, 1280);
-            mFormat->setInt32(kKeyHeight, 720);
-
-            // for MediaExtractor.CasInfo
-            mFormat->setInt32(kKeyCASystemID, mCASystemId);
-            mFormat->setData(kKeyCASessionID, 0,
-                    mCasSessionId.data(), mCasSessionId.size());
-        }
-        return dequeueScrambledAccessUnit();
-    }
-
     const uint8_t *data = mBuffer->data();
     size_t size = mBuffer->size();
 

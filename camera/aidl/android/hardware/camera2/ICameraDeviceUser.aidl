@@ -19,6 +19,7 @@ package android.hardware.camera2;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.impl.CameraMetadataNative;
 import android.hardware.camera2.params.OutputConfiguration;
+import android.hardware.camera2.params.SessionConfiguration;
 import android.hardware.camera2.utils.SubmitInfo;
 import android.view.Surface;
 
@@ -82,6 +83,16 @@ interface ICameraDeviceUser
      * @param sessionParams Session wide camera parameters
      */
     void endConfigure(int operatingMode, in CameraMetadataNative sessionParams);
+
+    /**
+      * Check whether a particular session configuration has camera device
+      * support.
+      *
+      * @param sessionConfiguration Specific session configuration to be verified.
+      * @return true  - in case the stream combination is supported.
+      *         false - in case there is no device support.
+      */
+    boolean isSessionConfigurationSupported(in SessionConfiguration sessionConfiguration);
 
     void deleteStream(int streamId);
 
