@@ -1205,9 +1205,9 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
             if (!desc->isDuplicated() && (profile == desc->mProfile)) {
                 // reuse direct output if currently open by the same client
                 // and configured with same parameters
-                if ((config->sample_rate == desc->mSamplingRate) &&
-                    (config->format == desc->mFormat) &&
-                    (channelMask == desc->mChannelMask) &&
+                if ((config->sample_rate == desc->getSamplingRate()) &&
+                    (config->format == desc->getFormat()) &&
+                    (channelMask == desc->getChannelMask()) &&
                     (session == desc->mDirectClientSession)) {
                     desc->mDirectOpenCount++;
                     ALOGI("%s reusing direct output %d for session %d", __func__, 
@@ -1247,13 +1247,13 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
 
         // only accept an output with the requested parameters
         if (status != NO_ERROR ||
-            (config->sample_rate != 0 && config->sample_rate != outputDesc->mSamplingRate) ||
-            (config->format != AUDIO_FORMAT_DEFAULT && config->format != outputDesc->mFormat) ||
-            (channelMask != 0 && channelMask != outputDesc->mChannelMask)) {
+            (config->sample_rate != 0 && config->sample_rate != outputDesc->getSamplingRate()) ||
+            (config->format != AUDIO_FORMAT_DEFAULT && config->format != outputDesc->getFormat()) ||
+            (channelMask != 0 && channelMask != outputDesc->getChannelMask())) {
             ALOGV("%s failed opening direct output: output %d sample rate %d %d," 
                     "format %d %d, channel mask %04x %04x", __func__, output, config->sample_rate,
-                    outputDesc->mSamplingRate, config->format, outputDesc->mFormat,
-                    channelMask, outputDesc->mChannelMask);
+                    outputDesc->getSamplingRate(), config->format, outputDesc->getFormat(),
+                    channelMask, outputDesc->getChannelMask());
             if (output != AUDIO_IO_HANDLE_NONE) {
                 outputDesc->close();
             }
@@ -1524,13 +1524,13 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
         // If haptic channel is specified, use the haptic output if present.
         // When using haptic output, same audio format and sample rate are required.
         const uint32_t outputHapticChannelCount = audio_channel_count_from_out_mask(
-            outputDesc->mChannelMask & AUDIO_CHANNEL_HAPTIC_ALL);
+            outputDesc->getChannelMask() & AUDIO_CHANNEL_HAPTIC_ALL);
         if ((hapticChannelCount == 0) != (outputHapticChannelCount == 0)) {
             continue;
         }
         if (outputHapticChannelCount >= hapticChannelCount
-            && format == outputDesc->mFormat
-            && samplingRate == outputDesc->mSamplingRate) {
+            && format == outputDesc->getFormat()
+            && samplingRate == outputDesc->getSamplingRate()) {
                 currentMatchCriteria[0] = outputHapticChannelCount;
         }
 
@@ -1538,12 +1538,13 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
         currentMatchCriteria[1] = popcount(outputDesc->mFlags & functionalFlags);
 
         // channel mask and channel count match
-        uint32_t outputChannelCount = audio_channel_count_from_out_mask(outputDesc->mChannelMask);
+        uint32_t outputChannelCount = audio_channel_count_from_out_mask(
+                outputDesc->getChannelMask());
         if (channelMask != AUDIO_CHANNEL_NONE && channelCount > 2 &&
             channelCount <= outputChannelCount) {
             if ((audio_channel_mask_get_representation(channelMask) ==
-                    audio_channel_mask_get_representation(outputDesc->mChannelMask)) &&
-                    ((channelMask & outputDesc->mChannelMask) == channelMask)) {
+                    audio_channel_mask_get_representation(outputDesc->getChannelMask())) &&
+                    ((channelMask & outputDesc->getChannelMask()) == channelMask)) {
                 currentMatchCriteria[2] = outputChannelCount;
             }
             currentMatchCriteria[3] = outputChannelCount;
@@ -1551,8 +1552,8 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
 
         // sampling rate match
         if (samplingRate > SAMPLE_RATE_HZ_DEFAULT &&
-                samplingRate <= outputDesc->mSamplingRate) {
-            currentMatchCriteria[4] = outputDesc->mSamplingRate;
+                samplingRate <= outputDesc->getSamplingRate()) {
+            currentMatchCriteria[4] = outputDesc->getSamplingRate();
         }
 
         // performance flags match
@@ -1562,7 +1563,7 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
         if (format != AUDIO_FORMAT_INVALID) {
             currentMatchCriteria[6] =
                 AudioPort::kFormatDistanceMax -
-                AudioPort::formatDistance(format, outputDesc->mFormat);
+                AudioPort::formatDistance(format, outputDesc->getFormat());
         }
 
         // primary output match
@@ -2921,9 +2922,9 @@ status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
             // stereo and let audio flinger do the channel conversion if needed.
             outputConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
             inputConfig.channel_mask = AUDIO_CHANNEL_IN_STEREO;
-            rSubmixModule->addOutputProfile(address, &outputConfig,
+            rSubmixModule->addOutputProfile(address.c_str(), &outputConfig,
                     AUDIO_DEVICE_OUT_REMOTE_SUBMIX, address);
-            rSubmixModule->addInputProfile(address, &inputConfig,
+            rSubmixModule->addInputProfile(address.c_str(), &inputConfig,
                     AUDIO_DEVICE_IN_REMOTE_SUBMIX, address);
 
             if ((res = setDeviceConnectionStateInt(deviceTypeToMakeAvailable,
@@ -3019,8 +3020,8 @@ status_t AudioPolicyManager::unregisterPolicyMixes(Vector<AudioMix> mixes)
                     }
                 }
             }
-            rSubmixModule->removeOutputProfile(address);
-            rSubmixModule->removeInputProfile(address);
+            rSubmixModule->removeOutputProfile(address.c_str());
+            rSubmixModule->removeInputProfile(address.c_str());
 
         } else if ((mix.mRouteFlags & MIX_ROUTE_FLAG_RENDER) == MIX_ROUTE_FLAG_RENDER) {
             if (mPolicyMixes.unregisterMix(mix) != NO_ERROR) {
@@ -3232,7 +3233,7 @@ bool AudioPolicyManager::isDirectOutputSupported(const audio_config_base_t& conf
     ALOGV("%s() profile %sfound with name: %s, "
         "sample rate: %u, format: 0x%x, channel_mask: 0x%x, output flags: 0x%x",
         __FUNCTION__, profile != 0 ? "" : "NOT ",
-        (profile != 0 ? profile->getTagName().string() : "null"),
+        (profile != 0 ? profile->getTagName().c_str() : "null"),
         config.sample_rate, config.format, config.channel_mask, output_flags);
     return (profile != 0);
 }
@@ -3896,7 +3897,7 @@ status_t AudioPolicyManager::connectAudioSource(const sp<SourceClientDescriptor>
     if (srcDevice->hasSameHwModuleAs(sinkDevice) &&
             srcDevice->getModuleVersionMajor() >= 3 &&
             sinkDevice->getModule()->supportsPatch(srcDevice, sinkDevice) &&
-            srcDevice->getAudioPort()->mGains.size() > 0) {
+            srcDevice->getAudioPort()->getGains().size() > 0) {
         ALOGV("%s Device to Device route supported by >=3.0 HAL", __FUNCTION__);
         // TODO: may explicitly specify whether we should use HW or SW patch
         //   create patch between src device and output device
@@ -4136,7 +4137,7 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
     for (size_t i = 0; i < hdmiOutputDevices.size(); i++) {
         // Simulate reconnection to update enabled surround sound formats.
         String8 address = hdmiOutputDevices[i]->address();
-        String8 name = hdmiOutputDevices[i]->getName();
+        std::string name = hdmiOutputDevices[i]->getName();
         status_t status = setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_HDMI,
                                                       AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
                                                       address.c_str(),
@@ -4158,7 +4159,7 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
     for (size_t i = 0; i < hdmiInputDevices.size(); i++) {
         // Simulate reconnection to update enabled surround sound formats.
         String8 address = hdmiInputDevices[i]->address();
-        String8 name = hdmiInputDevices[i]->getName();
+        std::string name = hdmiInputDevices[i]->getName();
         status_t status = setDeviceConnectionStateInt(AUDIO_DEVICE_IN_HDMI,
                                                       AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
                                                       address.c_str(),
@@ -4641,7 +4642,7 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
             }
 
             ALOGV("opening output for device %08x with params %s profile %p name %s",
-                  deviceType, address.string(), profile.get(), profile->getName().string());
+                  deviceType, address.string(), profile.get(), profile->getName().c_str());
             desc = new SwAudioOutputDescriptor(profile, mpClientInterface);
             audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
             status_t status = desc->open(nullptr, DeviceVector(device),

@@ -26,14 +26,14 @@
 
 namespace android {
 
-DeviceDescriptor::DeviceDescriptor(audio_devices_t type, const String8 &tagName) :
+DeviceDescriptor::DeviceDescriptor(audio_devices_t type, const std::string &tagName) :
         DeviceDescriptor(type, FormatVector{}, tagName)
 {
 }
 
 DeviceDescriptor::DeviceDescriptor(audio_devices_t type, const FormatVector &encodedFormats,
-        const String8 &tagName) :
-    AudioPort(String8(""), AUDIO_PORT_TYPE_DEVICE,
+        const std::string &tagName) :
+    AudioPort("", AUDIO_PORT_TYPE_DEVICE,
               audio_is_output_device(type) ? AUDIO_PORT_ROLE_SINK :
                                              AUDIO_PORT_ROLE_SOURCE),
     mTagName(tagName), mDeviceType(type), mEncodedFormats(encodedFormats)
@@ -262,7 +262,7 @@ DeviceVector DeviceVector::getDevicesFromTypeMask(audio_devices_t type) const
     return devices;
 }
 
-sp<DeviceDescriptor> DeviceVector::getDeviceFromTagName(const String8 &tagName) const
+sp<DeviceDescriptor> DeviceVector::getDeviceFromTagName(const std::string &tagName) const
 {
     for (const auto& device : *this) {
         if (device->getTagName() == tagName) {
@@ -374,8 +374,8 @@ void DeviceDescriptor::dump(String8 *dst, int spaces, int index, bool verbose) c
     if (mId != 0) {
         dst->appendFormat("%*s- id: %2d\n", spaces, "", mId);
     }
-    if (!mTagName.isEmpty()) {
-        dst->appendFormat("%*s- tag name: %s\n", spaces, "", mTagName.string());
+    if (!mTagName.empty()) {
+        dst->appendFormat("%*s- tag name: %s\n", spaces, "", mTagName.c_str());
     }
 
     dst->appendFormat("%*s- type: %-48s\n", spaces, "", ::android::toString(mDeviceType).c_str());
@@ -383,7 +383,9 @@ void DeviceDescriptor::dump(String8 *dst, int spaces, int index, bool verbose) c
     if (mAddress.size() != 0) {
         dst->appendFormat("%*s- address: %-32s\n", spaces, "", mAddress.string());
     }
-    AudioPort::dump(dst, spaces, verbose);
+    std::string portStr;
+    AudioPort::dump(&portStr, spaces, verbose);
+    dst->append(portStr.c_str());
 }
 
 std::string DeviceDescriptor::toString() const
