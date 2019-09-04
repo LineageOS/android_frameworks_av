@@ -194,6 +194,8 @@ class Camera3Device :
      */
     status_t dropStreamBuffers(bool dropping, int streamId) override;
 
+    nsecs_t getExpectedInFlightDuration() override;
+
     /**
      * Helper functions to map between framework and HIDL values
      */
@@ -1109,12 +1111,6 @@ class Camera3Device :
             bool callback, nsecs_t maxExpectedDuration, std::set<String8>& physicalCameraIds,
             bool isStillCapture, bool isZslCapture,
             const SurfaceMap& outputSurfaces);
-
-    /**
-     * Returns the maximum expected time it'll take for all currently in-flight
-     * requests to complete, based on their settings
-     */
-    nsecs_t getExpectedInFlightDuration();
 
     /**
      * Tracking for idle detection

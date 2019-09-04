@@ -383,6 +383,12 @@ class CameraDeviceBase : public virtual RefBase {
      * drop buffers for stream of streamId.
      */
     virtual status_t dropStreamBuffers(bool /*dropping*/, int /*streamId*/) = 0;
+
+    /**
+     * Returns the maximum expected time it'll take for all currently in-flight
+     * requests to complete, based on their settings
+     */
+    virtual nsecs_t getExpectedInFlightDuration() = 0;
 };
 
 }; // namespace android
