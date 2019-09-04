@@ -18,12 +18,14 @@
 
 #define LOG_TAG "AudioFlinger"
 //#define LOG_NDEBUG 0
+#define ATRACE_TAG ATRACE_TAG_AUDIO
 
 #include "Configuration.h"
 #include <linux/futex.h>
 #include <math.h>
 #include <sys/syscall.h>
 #include <utils/Log.h>
+#include <utils/Trace.h>
 
 #include <private/media/AudioTrackShared.h>
 
@@ -1828,9 +1830,19 @@ status_t AudioFlinger::PlaybackThread::PatchTrack::getNextBuffer(
     ALOG_ASSERT(mPeerProxy != 0, "%s(%d): called without peer proxy", __func__, mId);
     Proxy::Buffer buf;
     buf.mFrameCount = buffer->frameCount;
+    if (ATRACE_ENABLED()) {
+        std::string traceName("PTnReq");
+        traceName += std::to_string(id());
+        ATRACE_INT(traceName.c_str(), buf.mFrameCount);
+    }
     status_t status = mPeerProxy->obtainBuffer(&buf, &mPeerTimeout);
     ALOGV_IF(status != NO_ERROR, "%s(%d): getNextBuffer status %d", __func__, mId, status);
     buffer->frameCount = buf.mFrameCount;
+    if (ATRACE_ENABLED()) {
+        std::string traceName("PTnObt");
+        traceName += std::to_string(id());
+        ATRACE_INT(traceName.c_str(), buf.mFrameCount);
+    }
     if (buf.mFrameCount == 0) {
         return WOULD_BLOCK;
     }
@@ -2294,6 +2306,11 @@ status_t AudioFlinger::RecordThread::PatchRecord::getNextBuffer(
     ALOGV_IF(status != NO_ERROR,
              "%s(%d): mPeerProxy->obtainBuffer status %d", __func__, mId, status);
     buffer->frameCount = buf.mFrameCount;
+    if (ATRACE_ENABLED()) {
+        std::string traceName("PRnObt");
+        traceName += std::to_string(id());
+        ATRACE_INT(traceName.c_str(), buf.mFrameCount);
+    }
     if (buf.mFrameCount == 0) {
         return WOULD_BLOCK;
     }
