@@ -5063,10 +5063,12 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
     // also take into account external policy-related changes: add all outputs which are
     // associated with policies in the "before" and "after" output vectors
     ALOGVV("%s(): policy related outputs", __func__);
+    bool hasDynamicPolicy = false;
     for (size_t i = 0 ; i < mPreviousOutputs.size() ; i++) {
         const sp<SwAudioOutputDescriptor> desc = mPreviousOutputs.valueAt(i);
         if (desc != 0 && desc->mPolicyMix != NULL) {
             srcOutputs.add(desc->mIoHandle);
+            hasDynamicPolicy = true;
             ALOGVV(" previous outputs: adding %d", desc->mIoHandle);
         }
     }
@@ -5074,6 +5076,7 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
         const sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
         if (desc != 0 && desc->mPolicyMix != NULL) {
             dstOutputs.add(desc->mIoHandle);
+            hasDynamicPolicy = true;
             ALOGVV(" new outputs: adding %d", desc->mIoHandle);
         }
     }
@@ -5082,12 +5085,28 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
         // get maximum latency of all source outputs to determine the minimum mute time guaranteeing
         // audio from invalidated tracks will be rendered when unmuting
         uint32_t maxLatency = 0;
+        bool invalidate = hasDynamicPolicy;
         for (audio_io_handle_t srcOut : srcOutputs) {
             sp<SwAudioOutputDescriptor> desc = mPreviousOutputs.valueFor(srcOut);
-            if (desc != 0 && maxLatency < desc->latency()) {
+            if (desc == nullptr) continue;
+
+            if (desc->isStrategyActive(psId) && maxLatency < desc->latency()) {
                 maxLatency = desc->latency();
             }
+
+            if (invalidate) continue;
+
+            for (auto client : desc->clientsList(false /*activeOnly*/)) {
+                const audio_io_handle_t newOutput = selectOutput(dstOutputs,
+                        client->flags(), client->config().format,
+                        client->config().channel_mask, client->config().sample_rate);
+                if (newOutput != srcOut) {
+                    invalidate = true;
+                    break;
+                }
+            }
         }
+
         ALOGV_IF(!(srcOutputs.isEmpty() || dstOutputs.isEmpty()),
               "%s: strategy %d, moving from output %s to output %s", __func__, psId,
               std::to_string(srcOutputs[0]).c_str(),
@@ -5095,7 +5114,9 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
         // mute strategy while moving tracks from one output to another
         for (audio_io_handle_t srcOut : srcOutputs) {
             sp<SwAudioOutputDescriptor> desc = mPreviousOutputs.valueFor(srcOut);
-            if (desc != 0 && desc->isStrategyActive(psId)) {
+            if (desc == nullptr) continue;
+
+            if (desc->isStrategyActive(psId)) {
                 setStrategyMute(psId, true, desc);
                 setStrategyMute(psId, false, desc, maxLatency * LATENCY_MUTE_FACTOR,
                                 newDevices.types());
@@ -5111,8 +5132,10 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
             selectOutputForMusicEffects();
         }
         // Move tracks associated to this stream (and linked) from previous output to new output
-        for (auto stream :  mEngine->getStreamTypesForProductStrategy(psId)) {
-            mpClientInterface->invalidateStream(stream);
+        if (invalidate) {
+            for (auto stream :  mEngine->getStreamTypesForProductStrategy(psId)) {
+                mpClientInterface->invalidateStream(stream);
+            }
         }
     }
 }
