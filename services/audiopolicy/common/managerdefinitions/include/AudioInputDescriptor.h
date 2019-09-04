@@ -97,7 +97,7 @@ public:
     RecordClientVector clientsList(bool activeOnly = false,
         audio_source_t source = AUDIO_SOURCE_DEFAULT, bool preferredDeviceOnly = false) const;
 
-    void setAppState(uid_t uid, app_state_t state);
+    void setAppState(audio_port_handle_t portId, app_state_t state);
 
     // implementation of ClientMapHandler<RecordClientDescriptor>
     void addClient(const sp<RecordClientDescriptor> &client) override;

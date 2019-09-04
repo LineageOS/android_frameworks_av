@@ -384,7 +384,7 @@ public:
     // mic mute/state
     virtual     status_t    setMicMute(bool state) = 0;
     virtual     bool        getMicMute() const = 0;
-    virtual     void        setRecordSilenced(uid_t uid, bool silenced) = 0;
+    virtual     void        setRecordSilenced(audio_port_handle_t portId, bool silenced) = 0;
 
     virtual     status_t    setParameters(audio_io_handle_t ioHandle,
                                     const String8& keyValuePairs) = 0;

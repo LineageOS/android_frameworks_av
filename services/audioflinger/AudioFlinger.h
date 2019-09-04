@@ -162,7 +162,7 @@ public:
     virtual     status_t    setMicMute(bool state);
     virtual     bool        getMicMute() const;
 
-    virtual     void        setRecordSilenced(uid_t uid, bool silenced);
+    virtual     void        setRecordSilenced(audio_port_handle_t portId, bool silenced);
 
     virtual     status_t    setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs);
     virtual     String8     getParameters(audio_io_handle_t ioHandle, const String8& keys) const;

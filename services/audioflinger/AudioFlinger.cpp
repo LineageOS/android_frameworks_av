@@ -1132,16 +1132,16 @@ bool AudioFlinger::getMicMute() const
     return mute;
 }
 
-void AudioFlinger::setRecordSilenced(uid_t uid, bool silenced)
+void AudioFlinger::setRecordSilenced(audio_port_handle_t portId, bool silenced)
 {
-    ALOGV("AudioFlinger::setRecordSilenced(uid:%d, silenced:%d)", uid, silenced);
+    ALOGV("AudioFlinger::setRecordSilenced(portId:%d, silenced:%d)", portId, silenced);
 
     AutoMutex lock(mLock);
     for (size_t i = 0; i < mRecordThreads.size(); i++) {
-        mRecordThreads[i]->setRecordSilenced(uid, silenced);
+        mRecordThreads[i]->setRecordSilenced(portId, silenced);
     }
     for (size_t i = 0; i < mMmapThreads.size(); i++) {
-        mMmapThreads[i]->setRecordSilenced(uid, silenced);
+        mMmapThreads[i]->setRecordSilenced(portId, silenced);
     }
 }
 

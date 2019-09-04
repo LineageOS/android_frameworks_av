@@ -4183,11 +4183,11 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
     return profileUpdated ? NO_ERROR : INVALID_OPERATION;
 }
 
-void AudioPolicyManager::setAppState(uid_t uid, app_state_t state)
+void AudioPolicyManager::setAppState(audio_port_handle_t portId, app_state_t state)
 {
-    ALOGV("%s(uid:%d, state:%d)", __func__, uid, state);
+    ALOGV("%s(portId:%d, state:%d)", __func__, portId, state);
     for (size_t i = 0; i < mInputs.size(); i++) {
-        mInputs.valueAt(i)->setAppState(uid, state);
+        mInputs.valueAt(i)->setAppState(portId, state);
     }
 }
 

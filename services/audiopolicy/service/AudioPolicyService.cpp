@@ -406,8 +406,7 @@ void AudioPolicyService::updateUidStates_l()
 {
 //    Go over all active clients and allow capture (does not force silence) in the
 //    following cases:
-//    Another client in the same UID has already been allowed to capture
-//    OR The client is the assistant
+//    The client is the assistant
 //        AND an accessibility service is on TOP or a RTT call is active
 //                AND the source is VOICE_RECOGNITION or HOTWORD
 //            OR uses VOICE_RECOGNITION AND is on TOP
@@ -498,18 +497,9 @@ void AudioPolicyService::updateUidStates_l()
         topActive = latestActive;
     }
 
-    std::vector<uid_t> enabledUids;
-
     for (size_t i =0; i < mAudioRecordClients.size(); i++) {
         sp<AudioRecordClient> current = mAudioRecordClients[i];
         if (!current->active) {
-            continue;
-        }
-
-        // keep capture allowed if another client with the same UID has already
-        // been allowed to capture
-        if (std::find(enabledUids.begin(), enabledUids.end(), current->uid)
-                != enabledUids.end()) {
             continue;
         }
 
@@ -567,12 +557,9 @@ void AudioPolicyService::updateUidStates_l()
                 }
             }
         }
-        setAppState_l(current->uid,
+        setAppState_l(current->portId,
                       allowCapture ? apmStatFromAmState(mUidPolicy->getUidState(current->uid)) :
                                 APP_STATE_IDLE);
-        if (allowCapture) {
-            enabledUids.push_back(current->uid);
-        }
     }
 }
 
@@ -580,7 +567,7 @@ void AudioPolicyService::silenceAllRecordings_l() {
     for (size_t i = 0; i < mAudioRecordClients.size(); i++) {
         sp<AudioRecordClient> current = mAudioRecordClients[i];
         if (!isVirtualSource(current->attributes.source)) {
-            setAppState_l(current->uid, APP_STATE_IDLE);
+            setAppState_l(current->portId, APP_STATE_IDLE);
         }
     }
 }
@@ -626,17 +613,17 @@ bool AudioPolicyService::isVirtualSource(audio_source_t source)
     return false;
 }
 
-void AudioPolicyService::setAppState_l(uid_t uid, app_state_t state)
+void AudioPolicyService::setAppState_l(audio_port_handle_t portId, app_state_t state)
 {
     AutoCallerClear acc;
 
     if (mAudioPolicyManager) {
-        mAudioPolicyManager->setAppState(uid, state);
+        mAudioPolicyManager->setAppState(portId, state);
     }
     sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
     if (af) {
         bool silenced = state == APP_STATE_IDLE;
-        af->setRecordSilenced(uid, silenced);
+        af->setRecordSilenced(portId, silenced);
     }
 }
 
