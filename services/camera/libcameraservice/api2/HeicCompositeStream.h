@@ -199,6 +199,7 @@ private:
             size_t top, size_t left, size_t width, size_t height);
     void initCopyRowFunction(int32_t width);
     static size_t calcAppSegmentMaxSize(const CameraMetadata& info);
+    void updateCodecQualityLocked(int32_t quality);
 
     static const nsecs_t kWaitDuration = 10000000; // 10 ms
     static const int32_t kDefaultJpegQuality = 99;
@@ -240,6 +241,7 @@ private:
     std::vector<CodecOutputBufferInfo> mCodecOutputBuffers;
     std::queue<int64_t> mCodecOutputBufferTimestamps;
     size_t mCodecOutputCounter;
+    int32_t mQuality;
 
     // Keep all incoming Yuv buffer pending tiling and encoding (for HEVC YUV tiling only)
     std::vector<int64_t> mInputYuvBuffers;
