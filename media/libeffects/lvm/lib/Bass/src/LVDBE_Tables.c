@@ -88,11 +88,21 @@ const BQ_FLOAT_Coefs_t LVDBE_HPF_Table[] = {
      -HPF_Fs48000_Fc55_B2,
      -HPF_Fs48000_Fc55_B1},
 #ifdef HIGHER_FS
+    {HPF_Fs88200_Fc55_A2,                /* 88kS/s coefficients */
+     HPF_Fs88200_Fc55_A1,
+     HPF_Fs88200_Fc55_A0,
+     -HPF_Fs88200_Fc55_B2,
+     -HPF_Fs88200_Fc55_B1},
     {HPF_Fs96000_Fc55_A2,                /* 96kS/s coefficients */
      HPF_Fs96000_Fc55_A1,
      HPF_Fs96000_Fc55_A0,
      -HPF_Fs96000_Fc55_B2,
      -HPF_Fs96000_Fc55_B1},
+    {HPF_Fs176400_Fc55_A2,                /* 176kS/s coefficients */
+     HPF_Fs176400_Fc55_A1,
+     HPF_Fs176400_Fc55_A0,
+     -HPF_Fs176400_Fc55_B2,
+     -HPF_Fs176400_Fc55_B1},
     {HPF_Fs192000_Fc55_A2,                /* 192kS/s coefficients */
      HPF_Fs192000_Fc55_A1,
      HPF_Fs192000_Fc55_A0,
@@ -147,11 +157,21 @@ const BQ_FLOAT_Coefs_t LVDBE_HPF_Table[] = {
      -HPF_Fs48000_Fc66_B2,
      -HPF_Fs48000_Fc66_B1},
 #ifdef HIGHER_FS
+    {HPF_Fs88200_Fc66_A2,                /* 88kS/s coefficients */
+     HPF_Fs88200_Fc66_A1,
+     HPF_Fs88200_Fc66_A0,
+     -HPF_Fs88200_Fc66_B2,
+     -HPF_Fs88200_Fc66_B1},
     {HPF_Fs96000_Fc66_A2,                /* 96kS/s coefficients */
      HPF_Fs96000_Fc66_A1,
      HPF_Fs96000_Fc66_A0,
      -HPF_Fs96000_Fc66_B2,
      -HPF_Fs96000_Fc66_B1},
+    {HPF_Fs176400_Fc66_A2,                /* 176kS/s coefficients */
+     HPF_Fs176400_Fc66_A1,
+     HPF_Fs176400_Fc66_A0,
+     -HPF_Fs176400_Fc66_B2,
+     -HPF_Fs176400_Fc66_B1},
     {HPF_Fs192000_Fc66_A2,                /* 192kS/s coefficients */
      HPF_Fs192000_Fc66_A1,
      HPF_Fs192000_Fc66_A0,
@@ -207,11 +227,21 @@ const BQ_FLOAT_Coefs_t LVDBE_HPF_Table[] = {
      -HPF_Fs48000_Fc78_B2,
      -HPF_Fs48000_Fc78_B1},
 #ifdef HIGHER_FS
+    {HPF_Fs88200_Fc78_A2,                /* 88kS/s coefficients */
+     HPF_Fs88200_Fc78_A1,
+     HPF_Fs88200_Fc78_A0,
+     -HPF_Fs88200_Fc78_B2,
+     -HPF_Fs88200_Fc78_B1},
     {HPF_Fs96000_Fc78_A2,                /* 96kS/s coefficients */
      HPF_Fs96000_Fc78_A1,
      HPF_Fs96000_Fc78_A0,
      -HPF_Fs96000_Fc78_B2,
      -HPF_Fs96000_Fc78_B1},
+    {HPF_Fs176400_Fc78_A2,                /* 176kS/s coefficients */
+     HPF_Fs176400_Fc78_A1,
+     HPF_Fs176400_Fc78_A0,
+     -HPF_Fs176400_Fc78_B2,
+     -HPF_Fs176400_Fc78_B1},
     {HPF_Fs192000_Fc78_A2,                /* 192kS/s coefficients */
      HPF_Fs192000_Fc78_A1,
      HPF_Fs192000_Fc78_A0,
@@ -269,11 +299,21 @@ const BQ_FLOAT_Coefs_t LVDBE_HPF_Table[] = {
 
 #ifdef HIGHER_FS
     ,
+    {HPF_Fs88200_Fc90_A2,                /* 88kS/s coefficients */
+     HPF_Fs88200_Fc90_A1,
+     HPF_Fs88200_Fc90_A0,
+     -HPF_Fs88200_Fc90_B2,
+     -HPF_Fs88200_Fc90_B1},
     {HPF_Fs96000_Fc90_A2,                /* 96kS/s coefficients */
      HPF_Fs96000_Fc90_A1,
      HPF_Fs96000_Fc90_A0,
      -HPF_Fs96000_Fc90_B2,
      -HPF_Fs96000_Fc90_B1},
+    {HPF_Fs176400_Fc90_A2,                /* 176kS/s coefficients */
+     HPF_Fs176400_Fc90_A1,
+     HPF_Fs176400_Fc90_A0,
+     -HPF_Fs176400_Fc90_B2,
+     -HPF_Fs176400_Fc90_B1},
     {HPF_Fs192000_Fc90_A2,                /* 192kS/s coefficients */
      HPF_Fs192000_Fc90_A1,
      HPF_Fs192000_Fc90_A0,
@@ -320,9 +360,15 @@ const BP_FLOAT_Coefs_t LVDBE_BPF_Table[] = {
      -BPF_Fs48000_Fc55_B2,
      -BPF_Fs48000_Fc55_B1},
 #ifdef HIGHER_FS
+     {BPF_Fs88200_Fc55_A0,                /* 88kS/s coefficients */
+      -BPF_Fs88200_Fc55_B2,
+      -BPF_Fs88200_Fc55_B1},
      {BPF_Fs96000_Fc55_A0,                /* 96kS/s coefficients */
      -BPF_Fs96000_Fc55_B2,
      -BPF_Fs96000_Fc55_B1},
+     {BPF_Fs176400_Fc55_A0,                /* 176kS/s coefficients */
+      -BPF_Fs176400_Fc55_B2,
+      -BPF_Fs176400_Fc55_B1},
      {BPF_Fs192000_Fc55_A0,                /* 192kS/s coefficients */
      -BPF_Fs192000_Fc55_B2,
      -BPF_Fs192000_Fc55_B1},
@@ -357,9 +403,15 @@ const BP_FLOAT_Coefs_t LVDBE_BPF_Table[] = {
      -BPF_Fs48000_Fc66_B2,
      -BPF_Fs48000_Fc66_B1},
 #ifdef HIGHER_FS
+    {BPF_Fs88200_Fc66_A0,                /* 88kS/s coefficients */
+     -BPF_Fs88200_Fc66_B2,
+     -BPF_Fs88200_Fc66_B1},
     {BPF_Fs96000_Fc66_A0,                /* 96kS/s coefficients */
      -BPF_Fs96000_Fc66_B2,
      -BPF_Fs96000_Fc66_B1},
+    {BPF_Fs176400_Fc66_A0,                /* 176kS/s coefficients */
+     -BPF_Fs176400_Fc66_B2,
+     -BPF_Fs176400_Fc66_B1},
     {BPF_Fs192000_Fc66_A0,                /* 192kS/s coefficients */
      -BPF_Fs192000_Fc66_B2,
      -BPF_Fs192000_Fc66_B1},
@@ -394,9 +446,15 @@ const BP_FLOAT_Coefs_t LVDBE_BPF_Table[] = {
      -BPF_Fs48000_Fc78_B2,
      -BPF_Fs48000_Fc78_B1},
 #ifdef HIGHER_FS
+    {BPF_Fs88200_Fc66_A0,                /* 88kS/s coefficients */
+     -BPF_Fs88200_Fc66_B2,
+     -BPF_Fs88200_Fc66_B1},
     {BPF_Fs96000_Fc78_A0,                /* 96kS/s coefficients */
      -BPF_Fs96000_Fc78_B2,
      -BPF_Fs96000_Fc78_B1},
+    {BPF_Fs176400_Fc66_A0,                /* 176kS/s coefficients */
+     -BPF_Fs176400_Fc66_B2,
+     -BPF_Fs176400_Fc66_B1},
     {BPF_Fs192000_Fc78_A0,                /* 192kS/s coefficients */
      -BPF_Fs192000_Fc78_B2,
      -BPF_Fs192000_Fc78_B1},
@@ -432,9 +490,15 @@ const BP_FLOAT_Coefs_t LVDBE_BPF_Table[] = {
      -BPF_Fs48000_Fc90_B1}
 #ifdef HIGHER_FS
     ,
+    {BPF_Fs88200_Fc90_A0,                /* 88kS/s coefficients */
+     -BPF_Fs88200_Fc90_B2,
+     -BPF_Fs88200_Fc90_B1},
     {BPF_Fs96000_Fc90_A0,                /* 96kS/s coefficients */
      -BPF_Fs96000_Fc90_B2,
      -BPF_Fs96000_Fc90_B1},
+    {BPF_Fs176400_Fc90_A0,                /* 176kS/s coefficients */
+     -BPF_Fs176400_Fc90_B2,
+     -BPF_Fs176400_Fc90_B1},
     {BPF_Fs192000_Fc90_A0,                /* 192kS/s coefficients */
      -BPF_Fs192000_Fc90_B2,
      -BPF_Fs192000_Fc90_B1}
@@ -466,7 +530,9 @@ const LVM_FLOAT LVDBE_AGC_ATTACK_Table[] = {
     AGC_ATTACK_Fs44100,
     AGC_ATTACK_Fs48000
 #ifdef HIGHER_FS
+    ,AGC_ATTACK_Fs88200
     ,AGC_ATTACK_Fs96000
+    ,AGC_ATTACK_Fs176400
     ,AGC_ATTACK_Fs192000
 #endif
 
@@ -488,7 +554,9 @@ const LVM_FLOAT LVDBE_AGC_DECAY_Table[] = {
     AGC_DECAY_Fs44100,
     AGC_DECAY_Fs48000
 #ifdef HIGHER_FS
+    ,AGC_DECAY_Fs88200
     ,AGC_DECAY_FS96000
+    ,AGC_DECAY_Fs176400
     ,AGC_DECAY_FS192000
 #endif
 
@@ -583,7 +651,9 @@ const LVM_FLOAT LVDBE_VolumeTCTable[] = {
     VOL_TC_Fs44100,
     VOL_TC_Fs48000
 #ifdef HIGHER_FS
+    ,VOL_TC_Fs88200
     ,VOL_TC_Fs96000
+    ,VOL_TC_Fs176400
     ,VOL_TC_Fs192000
 #endif
 };
@@ -602,7 +672,9 @@ const LVM_INT16 LVDBE_MixerTCTable[] = {
     MIX_TC_Fs44100,
     MIX_TC_Fs48000
 #ifdef HIGHER_FS
+    ,MIX_TC_Fs88200
     ,MIX_TC_Fs96000
+    ,MIX_TC_Fs176400
     ,MIX_TC_Fs192000
 #endif
 

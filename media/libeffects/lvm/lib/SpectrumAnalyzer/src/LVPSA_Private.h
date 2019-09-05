@@ -46,7 +46,7 @@ extern "C" {
 #ifndef HIGHER_FS
 #define LVPSA_NR_SUPPORTED_RATE          9      /* From 8000Hz to 48000Hz*/
 #else
-#define LVPSA_NR_SUPPORTED_RATE          11      /* From 8000Hz to 192000Hz*/
+#define LVPSA_NR_SUPPORTED_RATE          13      /* From 8000Hz to 192000Hz*/
 #endif
 #define LVPSA_NR_SUPPORTED_SPEED         3      /* LOW, MEDIUM, HIGH                                                */
 

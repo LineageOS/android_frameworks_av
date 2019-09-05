@@ -501,9 +501,15 @@ status_t VideoFrameDecoder::onOutputReceived(
         return ERROR_MALFORMED;
     }
 
-    int32_t width, height;
-    CHECK(outputFormat->findInt32("width", &width));
-    CHECK(outputFormat->findInt32("height", &height));
+    int32_t width, height, stride, srcFormat;
+    if (!outputFormat->findInt32("width", &width) ||
+            !outputFormat->findInt32("height", &height) ||
+            !outputFormat->findInt32("stride", &stride) ||
+            !outputFormat->findInt32("color-format", &srcFormat)) {
+        ALOGE("format missing dimension or color: %s",
+                outputFormat->debugString().c_str());
+        return ERROR_MALFORMED;
+    }
 
     int32_t crop_left, crop_top, crop_right, crop_bottom;
     if (!outputFormat->findRect("crop", &crop_left, &crop_top, &crop_right, &crop_bottom)) {
@@ -522,19 +528,27 @@ status_t VideoFrameDecoder::onOutputReceived(
     addFrame(frameMem);
     VideoFrame* frame = static_cast<VideoFrame*>(frameMem->pointer());
 
-    int32_t srcFormat;
-    CHECK(outputFormat->findInt32("color-format", &srcFormat));
-
     ColorConverter converter((OMX_COLOR_FORMATTYPE)srcFormat, dstFormat());
+
+    uint32_t standard, range, transfer;
+    if (!outputFormat->findInt32("color-standard", (int32_t*)&standard)) {
+        standard = 0;
+    }
+    if (!outputFormat->findInt32("color-range", (int32_t*)&range)) {
+        range = 0;
+    }
+    if (!outputFormat->findInt32("color-transfer", (int32_t*)&transfer)) {
+        transfer = 0;
+    }
+    converter.setSrcColorSpace(standard, range, transfer);
 
     if (converter.isValid()) {
         converter.convert(
                 (const uint8_t *)videoFrameBuffer->data(),
-                width, height,
+                width, height, stride,
                 crop_left, crop_top, crop_right, crop_bottom,
                 frame->getFlattenedData(),
-                frame->mWidth,
-                frame->mHeight,
+                frame->mWidth, frame->mHeight, frame->mRowBytes,
                 crop_left, crop_top, crop_right, crop_bottom);
         return OK;
     }
@@ -681,9 +695,10 @@ status_t ImageDecoder::onOutputReceived(
         return ERROR_MALFORMED;
     }
 
-    int32_t width, height;
+    int32_t width, height, stride;
     CHECK(outputFormat->findInt32("width", &width));
     CHECK(outputFormat->findInt32("height", &height));
+    CHECK(outputFormat->findInt32("stride", &stride));
 
     if (mFrame == NULL) {
         sp<IMemory> frameMem = allocVideoFrame(
@@ -697,6 +712,18 @@ status_t ImageDecoder::onOutputReceived(
     CHECK(outputFormat->findInt32("color-format", &srcFormat));
 
     ColorConverter converter((OMX_COLOR_FORMATTYPE)srcFormat, dstFormat());
+
+    uint32_t standard, range, transfer;
+    if (!outputFormat->findInt32("color-standard", (int32_t*)&standard)) {
+        standard = 0;
+    }
+    if (!outputFormat->findInt32("color-range", (int32_t*)&range)) {
+        range = 0;
+    }
+    if (!outputFormat->findInt32("color-transfer", (int32_t*)&transfer)) {
+        transfer = 0;
+    }
+    converter.setSrcColorSpace(standard, range, transfer);
 
     int32_t dstLeft, dstTop, dstRight, dstBottom;
     dstLeft = mTilesDecoded % mGridCols * width;
@@ -727,11 +754,10 @@ status_t ImageDecoder::onOutputReceived(
     if (converter.isValid()) {
         converter.convert(
                 (const uint8_t *)videoFrameBuffer->data(),
-                width, height,
+                width, height, stride,
                 crop_left, crop_top, crop_right, crop_bottom,
                 mFrame->getFlattenedData(),
-                mFrame->mWidth,
-                mFrame->mHeight,
+                mFrame->mWidth, mFrame->mHeight, mFrame->mRowBytes,
                 dstLeft, dstTop, dstRight, dstBottom);
         return OK;
     }

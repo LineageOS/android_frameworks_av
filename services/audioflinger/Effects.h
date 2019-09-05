@@ -134,10 +134,15 @@ public:
     bool             isVolumeControl() const
                         { return (mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK)
                             == EFFECT_FLAG_VOLUME_CTRL; }
+    bool             isVolumeMonitor() const
+                        { return (mDescriptor.flags & EFFECT_FLAG_VOLUME_MASK)
+                            == EFFECT_FLAG_VOLUME_MONITOR; }
     status_t         setOffloaded(bool offloaded, audio_io_handle_t io);
     bool             isOffloaded() const;
     void             addEffectToHal_l();
     void             release_l();
+
+    status_t         updatePolicyState();
 
     void             dump(int fd, const Vector<String16>& args);
 
@@ -201,6 +206,16 @@ mutable Mutex               mLock;      // mutex for process, commands and handl
     static constexpr pid_t INVALID_PID = (pid_t)-1;
     // this tid is allowed to call setVolume() without acquiring the mutex.
     pid_t mSetVolumeReentrantTid = INVALID_PID;
+
+    // Audio policy effect state management
+    // Mutex protecting transactions with audio policy manager as mLock cannot
+    // be held to avoid cross deadlocks with audio policy mutex
+    Mutex   mPolicyLock;
+    // Effect is registered in APM or not
+    bool    mPolicyRegistered = false;
+    // Effect enabled state communicated to APM. Enabled state corresponds to
+    // state requested by the EffectHandle with control
+    bool    mPolicyEnabled = false;
 };
 
 // The EffectHandle class implements the IEffect interface. It provides resources
@@ -331,6 +346,7 @@ public:
     sp<EffectModule> getEffectFromDesc_l(effect_descriptor_t *descriptor);
     sp<EffectModule> getEffectFromId_l(int id);
     sp<EffectModule> getEffectFromType_l(const effect_uuid_t *type);
+    std::vector<int> getEffectIds();
     // FIXME use float to improve the dynamic range
     bool setVolume_l(uint32_t *left, uint32_t *right, bool force = false);
     void resetVolume_l();

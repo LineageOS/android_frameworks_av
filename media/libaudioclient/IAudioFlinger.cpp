@@ -24,10 +24,8 @@
 
 #include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
-#include <cutils/multiuser.h>
 #include <media/TimeCheck.h>
-#include <private/android_filesystem_config.h>
-
+#include <mediautils/ServiceUtilities.h>
 #include "IAudioFlinger.h"
 
 namespace android {
@@ -89,6 +87,9 @@ enum {
     SYSTEM_READY,
     FRAME_COUNT_HAL,
     GET_MICROPHONES,
+    SET_MASTER_BALANCE,
+    GET_MASTER_BALANCE,
+    SET_EFFECT_SUSPENDED,
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -242,6 +243,34 @@ public:
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
         remote()->transact(MASTER_MUTE, data, &reply);
         return reply.readInt32();
+    }
+
+    status_t setMasterBalance(float balance) override
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
+        data.writeFloat(balance);
+        status_t status = remote()->transact(SET_MASTER_BALANCE, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        return reply.readInt32();
+    }
+
+    status_t getMasterBalance(float *balance) const override
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
+        status_t status = remote()->transact(GET_MASTER_BALANCE, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = (status_t)reply.readInt32();
+        if (status != NO_ERROR) {
+            return status;
+        }
+        *balance = reply.readFloat();
+        return NO_ERROR;
     }
 
     virtual status_t setStreamVolume(audio_stream_type_t stream, float value,
@@ -600,14 +629,18 @@ public:
     }
 
     virtual status_t getEffectDescriptor(const effect_uuid_t *pUuid,
-            effect_descriptor_t *pDescriptor) const
+                                         const effect_uuid_t *pType,
+                                         uint32_t preferredTypeFlag,
+                                         effect_descriptor_t *pDescriptor) const
     {
-        if (pUuid == NULL || pDescriptor == NULL) {
+        if (pUuid == NULL || pType == NULL || pDescriptor == NULL) {
             return BAD_VALUE;
         }
         Parcel data, reply;
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
         data.write(pUuid, sizeof(effect_uuid_t));
+        data.write(pType, sizeof(effect_uuid_t));
+        data.writeUint32(preferredTypeFlag);
         status_t status = remote()->transact(GET_EFFECT_DESCRIPTOR, data, &reply);
         if (status != NO_ERROR) {
             return status;
@@ -636,10 +669,10 @@ public:
         sp<IEffect> effect;
 
         if (pDesc == NULL) {
-            return effect;
             if (status != NULL) {
                 *status = BAD_VALUE;
             }
+            return effect;
         }
 
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
@@ -684,6 +717,18 @@ public:
         data.writeInt32((int32_t) dstOutput);
         remote()->transact(MOVE_EFFECTS, data, &reply);
         return reply.readInt32();
+    }
+
+    virtual void setEffectSuspended(int effectId,
+                                    audio_session_t sessionId,
+                                    bool suspended)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
+        data.writeInt32(effectId);
+        data.writeInt32(sessionId);
+        data.writeInt32(suspended ? 1 : 0);
+        remote()->transact(SET_EFFECT_SUSPENDED, data, &reply);
     }
 
     virtual audio_module_handle_t loadHwModule(const char *name)
@@ -881,6 +926,7 @@ status_t BnAudioFlinger::onTransact(
         case INVALIDATE_STREAM:
         case SET_VOICE_VOLUME:
         case MOVE_EFFECTS:
+        case SET_EFFECT_SUSPENDED:
         case LOAD_HW_MODULE:
         case LIST_AUDIO_PORTS:
         case GET_AUDIO_PORT:
@@ -894,6 +940,7 @@ status_t BnAudioFlinger::onTransact(
             // return status only for non void methods
             switch (code) {
                 case SET_RECORD_SILENCED:
+                case SET_EFFECT_SUSPENDED:
                     break;
                 default:
                     reply->writeInt32(static_cast<int32_t> (INVALID_OPERATION));
@@ -912,7 +959,7 @@ status_t BnAudioFlinger::onTransact(
         case SET_MIC_MUTE:
         case SET_LOW_RAM_DEVICE:
         case SYSTEM_READY: {
-            if (multiuser_get_app_id(IPCThreadState::self()->getCallingUid()) >= AID_APP_START) {
+            if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
                       IPCThreadState::self()->getCallingUid());
@@ -951,9 +998,8 @@ status_t BnAudioFlinger::onTransact(
             break;
     }
 
-    char timeCheckString[64];
-    snprintf(timeCheckString, sizeof(timeCheckString), "IAudioFlinger: %d", code);
-    TimeCheck check(timeCheckString);
+    std::string tag("IAudioFlinger command " + std::to_string(code));
+    TimeCheck check(tag.c_str());
 
     switch (code) {
         case CREATE_TRACK: {
@@ -1047,6 +1093,21 @@ status_t BnAudioFlinger::onTransact(
         case MASTER_MUTE: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
             reply->writeInt32( masterMute() );
+            return NO_ERROR;
+        } break;
+        case SET_MASTER_BALANCE: {
+            CHECK_INTERFACE(IAudioFlinger, data, reply);
+            reply->writeInt32( setMasterBalance(data.readFloat()) );
+            return NO_ERROR;
+        } break;
+        case GET_MASTER_BALANCE: {
+            CHECK_INTERFACE(IAudioFlinger, data, reply);
+            float f;
+            const status_t status = getMasterBalance(&f);
+            reply->writeInt32((int32_t)status);
+            if (status == NO_ERROR) {
+                (void)reply->writeFloat(f);
+            }
             return NO_ERROR;
         } break;
         case SET_STREAM_VOLUME: {
@@ -1280,8 +1341,11 @@ status_t BnAudioFlinger::onTransact(
             CHECK_INTERFACE(IAudioFlinger, data, reply);
             effect_uuid_t uuid;
             data.read(&uuid, sizeof(effect_uuid_t));
+            effect_uuid_t type;
+            data.read(&type, sizeof(effect_uuid_t));
+            uint32_t preferredTypeFlag = data.readUint32();
             effect_descriptor_t desc = {};
-            status_t status = getEffectDescriptor(&uuid, &desc);
+            status_t status = getEffectDescriptor(&uuid, &type, preferredTypeFlag, &desc);
             reply->writeInt32(status);
             if (status == NO_ERROR) {
                 reply->write(&desc, sizeof(effect_descriptor_t));
@@ -1320,6 +1384,14 @@ status_t BnAudioFlinger::onTransact(
             audio_io_handle_t srcOutput = (audio_io_handle_t) data.readInt32();
             audio_io_handle_t dstOutput = (audio_io_handle_t) data.readInt32();
             reply->writeInt32(moveEffects(session, srcOutput, dstOutput));
+            return NO_ERROR;
+        } break;
+        case SET_EFFECT_SUSPENDED: {
+            CHECK_INTERFACE(IAudioFlinger, data, reply);
+            int effectId = data.readInt32();
+            audio_session_t sessionId = (audio_session_t) data.readInt32();
+            bool suspended = data.readInt32() == 1;
+            setEffectSuspended(effectId, sessionId, suspended);
             return NO_ERROR;
         } break;
         case LOAD_HW_MODULE: {

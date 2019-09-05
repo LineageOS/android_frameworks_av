@@ -39,7 +39,7 @@ cc_library_static {
         cfi: true,
     },
 
-    shared_libs: ["libmedia"],
+    shared_libs: ["libmedia", "libmediandk"],
 }
 
 cc_library_shared {
@@ -77,16 +77,51 @@ cc_library_shared {
     },
 }
 
-cc_library_shared {
+cc_library_static {
+    name: "libstagefright_mpeg2extractor",
+
+    srcs: [
+        "Utils.cpp",
+        "MediaSource.cpp",
+        "HevcUtils.cpp",
+    ],
+
+    shared_libs: [
+        "liblog",
+        "libmedia",
+        "libmedia_omx",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    cflags: [
+        "-Wno-multichar",
+        "-Werror",
+        "-Wno-error=deprecated-declarations",
+        "-Wall",
+    ],
+
+    sanitize: {
+        cfi: true,
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+    },
+}
+
+cc_library {
     name: "libstagefright",
 
     srcs: [
+        "AACWriter.cpp",
         "ACodec.cpp",
         "ACodecBufferChannel.cpp",
-        "AACWriter.cpp",
+        "AHierarchicalStateMachine.cpp",
         "AMRWriter.cpp",
         "AudioPlayer.cpp",
-        "AudioPresentationInfo.cpp",
         "AudioSource.cpp",
         "BufferImpl.cpp",
         "CallbackDataSource.cpp",
@@ -94,8 +129,10 @@ cc_library_shared {
         "CameraSource.cpp",
         "CameraSourceTimeLapse.cpp",
         "DataConverter.cpp",
+        "DataSourceBase.cpp",
         "DataSourceFactory.cpp",
         "DataURISource.cpp",
+        "ClearFileSource.cpp",
         "FileSource.cpp",
         "FrameDecoder.cpp",
         "HTTPBase.cpp",
@@ -110,12 +147,17 @@ cc_library_shared {
         "MediaCodecList.cpp",
         "MediaCodecListOverrides.cpp",
         "MediaCodecSource.cpp",
+        "MediaExtractor.cpp",
         "MediaExtractorFactory.cpp",
+        "MediaSource.cpp",
         "MediaSync.cpp",
+        "MediaTrack.cpp",
+        "http/ClearMediaHTTP.cpp",
         "http/MediaHTTP.cpp",
         "MediaMuxer.cpp",
         "NuCachedSource2.cpp",
         "NuMediaExtractor.cpp",
+        "OggWriter.cpp",
         "OMXClient.cpp",
         "OmxInfoBuilder.cpp",
         "RemoteMediaExtractor.cpp",
@@ -128,11 +170,13 @@ cc_library_shared {
         "SurfaceUtils.cpp",
         "Utils.cpp",
         "ThrottledSource.cpp",
+        "VideoFrameSchedulerBase.cpp",
         "VideoFrameScheduler.cpp",
     ],
 
     shared_libs: [
         "libaudioutils",
+        "libbase",
         "libbinder",
         "libcamera_client",
         "libcutils",
@@ -140,32 +184,26 @@ cc_library_shared {
         "libdl_android",
         "libdrmframework",
         "libgui",
-        "libion",
         "liblog",
         "libmedia",
         "libmedia_omx",
+        "libmedia_omx_client",
         "libaudioclient",
-        "libmediaextractor",
         "libmediametrics",
         "libmediautils",
-        "libnetd_client",
         "libui",
         "libutils",
         "libmedia_helper",
         "libstagefright_codecbase",
         "libstagefright_foundation",
         "libstagefright_omx_utils",
-        "libstagefright_xmlparser",
         "libRScpp",
         "libhidlallocatorutils",
         "libhidlbase",
         "libhidlmemory",
-        "libziparchive",
         "android.hidl.allocator@1.0",
         "android.hardware.cas.native@1.0",
         "android.hardware.media.omx@1.0",
-        "android.hardware.graphics.allocator@2.0",
-        "android.hardware.graphics.mapper@2.0",
     ],
 
     static_libs: [
@@ -174,14 +212,22 @@ cc_library_shared {
         "libstagefright_mediafilter",
         "libstagefright_webm",
         "libstagefright_timedtext",
-        "libvpx",
+        "libogg",
         "libwebm",
         "libstagefright_esds",
         "libstagefright_id3",
         "libFLAC",
     ],
 
+    header_libs:[
+        "libnativeloader-dummy-headers",
+        "libstagefright_xmlparser_headers",
+        "media_ndk_headers",
+    ],
+
     export_shared_lib_headers: [
+        "libgui",
+        "libhidlmemory",
         "libmedia",
         "android.hidl.allocator@1.0",
     ],
@@ -215,58 +261,36 @@ cc_library_shared {
     },
 }
 
-cc_library {
+cc_library_static {
     name: "libstagefright_player2",
 
     srcs: [
-        "CallbackDataSource.cpp",
-        "CallbackMediaSource.cpp",
-        "DataSourceFactory.cpp",
+        "ClearFileSource.cpp",
         "DataURISource.cpp",
-        "FileSource.cpp",
+        "DataSourceBase.cpp",
         "HTTPBase.cpp",
         "HevcUtils.cpp",
-        "InterfaceUtils.cpp",
         "MediaClock.cpp",
-        "MediaExtractorFactory.cpp",
+        "MediaSource.cpp",
         "NdkUtils.cpp",
-        "NuCachedSource2.cpp",
-        "RemoteMediaExtractor.cpp",
-        "RemoteMediaSource.cpp",
         "Utils.cpp",
-        "VideoFrameScheduler.cpp",
-        "http/MediaHTTP.cpp",
+        "VideoFrameSchedulerBase.cpp",
+        "VideoFrameScheduler2.cpp",
+        "http/ClearMediaHTTP.cpp",
     ],
 
     shared_libs: [
-        "libbinder",
-        "libcutils",
-        "libdrmframework",
         "libgui",
         "liblog",
-        "libmedia_player2_util",
-        "libaudioclient",
-        "libmediaextractor",
-        "libmediametrics",
-        "libmediautils",
         "libnetd_client",
-        "libui",
         "libutils",
-        "libmedia_helper",
         "libstagefright_foundation",
-        "libziparchive",
+        "libandroid",
     ],
 
     static_libs: [
-        "libstagefright_esds",
-    ],
-
-    header_libs:[
-        "media_plugin_headers",
-    ],
-
-    export_shared_lib_headers: [
         "libmedia_player2_util",
+        "libmedia2_jni_core",
     ],
 
     export_include_dirs: [
@@ -296,21 +320,3 @@ cc_library {
     },
 }
 
-subdirs = [
-    "codec2",
-    "codecs/*",
-    "colorconversion",
-    "filters",
-    "flac/dec",
-    "foundation",
-    "http",
-    "httplive",
-    "id3",
-    "mpeg2ts",
-    "omx",
-    "rtsp",
-    "tests",
-    "timedtext",
-    "webm",
-    "xmlparser",
-]

@@ -20,7 +20,8 @@
 
 #include <media/NdkMediaMuxer.h>
 #include <media/NdkMediaCodec.h>
-#include "NdkMediaFormatPriv.h"
+#include <media/NdkMediaErrorPriv.h>
+#include <media/NdkMediaFormatPriv.h>
 
 
 #include <utils/Log.h>
@@ -34,14 +35,6 @@
 #include <jni.h>
 
 using namespace android;
-
-static media_status_t translate_error(status_t err) {
-    if (err == OK) {
-        return AMEDIA_OK;
-    }
-    ALOGE("sf error code: %d", err);
-    return AMEDIA_ERROR_UNKNOWN;
-}
 
 struct AMediaMuxer {
     sp<MediaMuxer> mImpl;

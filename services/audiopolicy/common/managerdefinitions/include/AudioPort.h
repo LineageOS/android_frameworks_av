@@ -18,6 +18,7 @@
 
 #include "AudioCollections.h"
 #include "AudioProfile.h"
+#include "AudioGain.h"
 #include "HandleGenerator.h"
 #include <utils/String8.h>
 #include <utils/Vector.h>
@@ -29,9 +30,7 @@
 namespace android {
 
 class HwModule;
-class AudioGain;
 class AudioRoute;
-typedef Vector<sp<AudioGain> > AudioGainCollection;
 
 class AudioPort : public virtual RefBase, private HandleGenerator<audio_port_handle_t>
 {
@@ -49,8 +48,8 @@ public:
 
     virtual const String8 getTagName() const = 0;
 
-    void setGains(const AudioGainCollection &gains) { mGains = gains; }
-    const AudioGainCollection &getGains() const { return mGains; }
+    void setGains(const AudioGains &gains) { mGains = gains; }
+    const AudioGains &getGains() const { return mGains; }
 
     virtual void setFlags(uint32_t flags)
     {
@@ -65,6 +64,7 @@ public:
     uint32_t getFlags() const { return mFlags; }
 
     virtual void attach(const sp<HwModule>& module);
+    virtual void detach();
     bool isAttached() { return mModule != 0; }
 
     // Audio port IDs are in a different namespace than AudioFlinger unique IDs
@@ -112,10 +112,14 @@ public:
     static bool isBetterFormatMatch(audio_format_t newFormat,
                                         audio_format_t currentFormat,
                                         audio_format_t targetFormat);
+    static uint32_t formatDistance(audio_format_t format1,
+                                   audio_format_t format2);
+    static const uint32_t kFormatDistanceMax = 4;
 
     audio_module_handle_t getModuleHandle() const;
     uint32_t getModuleVersionMajor() const;
     const char *getModuleName() const;
+    sp<HwModule> getModule() const { return mModule; }
 
     bool useInputChannelMask() const
     {
@@ -132,16 +136,17 @@ public:
     void addRoute(const sp<AudioRoute> &route) { mRoutes.add(route); }
     const AudioRouteVector &getRoutes() const { return mRoutes; }
 
-    void dump(int fd, int spaces, bool verbose = true) const;
+    void dump(String8 *dst, int spaces, bool verbose = true) const;
+
     void log(const char* indent) const;
 
-    AudioGainCollection mGains; // gain controllers
-    sp<HwModule> mModule;                 // audio HW module exposing this I/O stream
+    AudioGains mGains; // gain controllers
 
 private:
     void pickChannelMask(audio_channel_mask_t &channelMask, const ChannelsVector &channelMasks) const;
     void pickSamplingRate(uint32_t &rate,const SampleRateVector &samplingRates) const;
 
+    sp<HwModule> mModule;                 // audio HW module exposing this I/O stream
     String8  mName;
     audio_port_type_t mType;
     audio_port_role_t mRole;
@@ -153,22 +158,22 @@ private:
 class AudioPortConfig : public virtual RefBase
 {
 public:
-    AudioPortConfig();
-    virtual ~AudioPortConfig() {}
-
     status_t applyAudioPortConfig(const struct audio_port_config *config,
                                   struct audio_port_config *backupConfig = NULL);
     virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
                                    const struct audio_port_config *srcConfig = NULL) const = 0;
     virtual sp<AudioPort> getAudioPort() const = 0;
     virtual bool hasSameHwModuleAs(const sp<AudioPortConfig>& other) const {
-        return (other != 0) &&
+        return (other != 0) && (other->getAudioPort() != 0) && (getAudioPort() != 0) &&
                 (other->getAudioPort()->getModuleHandle() == getAudioPort()->getModuleHandle());
     }
-    uint32_t mSamplingRate;
-    audio_format_t mFormat;
-    audio_channel_mask_t mChannelMask;
-    struct audio_gain_config mGain;
+    bool hasGainController(bool canUseForVolume = false) const;
+
+    unsigned int mSamplingRate = 0u;
+    audio_format_t mFormat = AUDIO_FORMAT_INVALID;
+    audio_channel_mask_t mChannelMask = AUDIO_CHANNEL_NONE;
+    struct audio_gain_config mGain = { .index = -1 };
+    union audio_io_flags mFlags = { AUDIO_INPUT_FLAG_NONE };
 };
 
 } // namespace android

@@ -107,7 +107,12 @@ sp<AMessage> NuPlayer2::Decoder::getStats() const {
     mStats->setInt64("frames-total", mNumFramesTotal);
     mStats->setInt64("frames-dropped-input", mNumInputFramesDropped);
     mStats->setInt64("frames-dropped-output", mNumOutputFramesDropped);
-    return mStats;
+    mStats->setFloat("frame-rate-total", mFrameRateTotal);
+
+    // i'm mutexed right now.
+    // make our own copy, so we aren't victim to any later changes.
+    sp<AMessage> copiedStats = mStats->dup();
+    return copiedStats;
 }
 
 status_t NuPlayer2::Decoder::setVideoSurface(const sp<ANativeWindowWrapper> &nww) {
@@ -1088,6 +1093,12 @@ bool NuPlayer2::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
                         static_cast<MediaBufferHolder*>(holder.get())->mediaBuffer() : nullptr;
                 }
                 if (mediaBuf != NULL) {
+                    if (mediaBuf->size() > codecBuffer->capacity()) {
+                        handleError(ERROR_BUFFER_TOO_SMALL);
+                        mDequeuedInputBuffers.push_back(bufferIx);
+                        return false;
+                    }
+
                     codecBuffer->setRange(0, mediaBuf->size());
                     memcpy(codecBuffer->data(), mediaBuf->data(), mediaBuf->size());
 
@@ -1101,6 +1112,11 @@ bool NuPlayer2::Decoder::onInputBufferFetched(const sp<AMessage> &msg) {
                 }
             } // buffer->data()
         } // needsCopy
+
+        sp<RefBase> cryptInfoObj;
+        if (buffer->meta()->findObject("cryptInfo", &cryptInfoObj)) {
+            cryptInfo = static_cast<AMediaCodecCryptoInfoWrapper *>(cryptInfoObj.get());
+        }
 
         status_t err;
         if (cryptInfo != NULL) {

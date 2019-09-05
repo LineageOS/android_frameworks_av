@@ -17,13 +17,15 @@
 #ifndef CLEARKEY_UTILS_H_
 #define CLEARKEY_UTILS_H_
 
+#include <string>
 #include <utils/Vector.h>
 
+namespace android {
 // Add a comparison operator for this Vector specialization so that it can be
 // used as a key in a KeyedVector.
-namespace android {
-
 bool operator<(const Vector<uint8_t> &lhs, const Vector<uint8_t> &rhs);
+
+std::string ByteArrayToHexString(const uint8_t* in_buffer, size_t length);
 
 } // namespace android
 

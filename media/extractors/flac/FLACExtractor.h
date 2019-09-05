@@ -18,44 +18,43 @@
 #define FLAC_EXTRACTOR_H_
 
 #include <media/DataSourceBase.h>
-#include <media/MediaExtractor.h>
-#include <media/stagefright/MetaDataBase.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
+#include <media/NdkMediaFormat.h>
 #include <utils/String8.h>
 
 namespace android {
 
 class FLACParser;
 
-class FLACExtractor : public MediaExtractor {
+class FLACExtractor : public MediaExtractorPluginHelper {
 
 public:
-    explicit FLACExtractor(DataSourceBase *source);
+    explicit FLACExtractor(DataSourceHelper *source);
 
     virtual size_t countTracks();
-    virtual MediaTrack *getTrack(size_t index);
-    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
+    virtual MediaTrackHelper *getTrack(size_t index);
+    virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
-    virtual status_t getMetaData(MetaDataBase& meta);
+    virtual media_status_t getMetaData(AMediaFormat *meta);
     virtual const char * name() { return "FLACExtractor"; }
 
 protected:
     virtual ~FLACExtractor();
 
 private:
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     FLACParser *mParser;
     status_t mInitCheck;
-    MetaDataBase mFileMetadata;
+    AMediaFormat *mFileMetadata;
 
     // There is only one track
-    MetaDataBase mTrackMetadata;
+    AMediaFormat *mTrackMetadata;
 
     FLACExtractor(const FLACExtractor &);
     FLACExtractor &operator=(const FLACExtractor &);
 
 };
-
-bool SniffFLAC(DataSourceBase *source, float *confidence);
 
 }  // namespace android
 

@@ -18,7 +18,6 @@
 #define INTERFACE_UTILS_H_
 
 #include <utils/RefBase.h>
-#include <media/MediaExtractor.h>
 #include <media/stagefright/RemoteMediaExtractor.h>
 #include <media/MediaSource.h>
 #include <media/IMediaExtractor.h>

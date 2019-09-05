@@ -35,7 +35,7 @@ LVM_FLOAT LVC_Mixer_GetTarget( LVMixer3_FLOAT_st *pStream)
 {
     LVM_FLOAT       TargetGain;
     Mix_Private_FLOAT_st  *pInstance = (Mix_Private_FLOAT_st *)pStream->PrivateParams;
-    
+
     TargetGain = pInstance->Target;  // TargetGain
     return TargetGain;
 }

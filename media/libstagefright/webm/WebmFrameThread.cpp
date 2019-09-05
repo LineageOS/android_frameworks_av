@@ -78,6 +78,7 @@ WebmFrameSinkThread::WebmFrameSinkThread(
       mVideoFrames(videoThread->mSink),
       mAudioFrames(audioThread->mSink),
       mCues(cues),
+      mStartOffsetTimecode(UINT64_MAX),
       mDone(true) {
 }
 
@@ -92,6 +93,7 @@ WebmFrameSinkThread::WebmFrameSinkThread(
       mVideoFrames(videoSource),
       mAudioFrames(audioSource),
       mCues(cues),
+      mStartOffsetTimecode(UINT64_MAX),
       mDone(true) {
 }
 
@@ -213,6 +215,11 @@ void WebmFrameSinkThread::run() {
         const sp<WebmFrame> audioFrame = mAudioFrames.peek();
         ALOGV("a frame: %p", audioFrame.get());
 
+        if (mStartOffsetTimecode == UINT64_MAX) {
+            mStartOffsetTimecode =
+                    std::min(audioFrame->getAbsTimecode(), videoFrame->getAbsTimecode());
+        }
+
         if (videoFrame->mEos && audioFrame->mEos) {
             break;
         }
@@ -220,10 +227,12 @@ void WebmFrameSinkThread::run() {
         if (*audioFrame < *videoFrame) {
             ALOGV("take a frame");
             mAudioFrames.take();
+            audioFrame->updateAbsTimecode(audioFrame->getAbsTimecode() - mStartOffsetTimecode);
             outstandingFrames.push_back(audioFrame);
         } else {
             ALOGV("take v frame");
             mVideoFrames.take();
+            videoFrame->updateAbsTimecode(videoFrame->getAbsTimecode() - mStartOffsetTimecode);
             outstandingFrames.push_back(videoFrame);
             if (videoFrame->mKey)
                 numVideoKeyFrames++;
@@ -350,7 +359,6 @@ void WebmFrameMediaSourceThread::run() {
         if (mStartTimeUs == kUninitialized) {
             mStartTimeUs = timestampUs;
         }
-        timestampUs -= mStartTimeUs;
 
         if (mPaused && !mResumed) {
             lastDurationUs = timestampUs - lastTimestampUs;

@@ -48,6 +48,13 @@ struct MediaCodecListWriter {
      * added `MediaCodecInfo` object.
      */
     std::unique_ptr<MediaCodecInfoWriter> addMediaCodecInfo();
+    /**
+     * Find an existing `MediaCodecInfo` object for a codec name and return a
+     * `MediaCodecInfoWriter` object associated with the found added `MediaCodecInfo`.
+     *
+     * @return The `MediaCodecInfoWriter` object if found, or nullptr if not found.
+     */
+    std::unique_ptr<MediaCodecInfoWriter> findMediaCodecInfo(const char *codecName);
 private:
     MediaCodecListWriter() = default;
 

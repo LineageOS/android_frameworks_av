@@ -66,8 +66,9 @@ status_t AudioStreamOut::getRenderPosition(uint64_t *frames)
     // Maintain a 64-bit render position using the 32-bit result from the HAL.
     // This delta calculation relies on the arithmetic overflow behavior
     // of integers. For example (100 - 0xFFFFFFF0) = 116.
-    uint32_t truncatedPosition = (uint32_t)mRenderPosition;
-    int32_t deltaHalPosition = (int32_t)(halPosition - truncatedPosition);
+    const uint32_t truncatedPosition = (uint32_t)mRenderPosition;
+    int32_t deltaHalPosition; // initialization not needed, overwitten by __builtin_sub_overflow()
+    (void) __builtin_sub_overflow(halPosition, truncatedPosition, &deltaHalPosition);
     if (deltaHalPosition > 0) {
         mRenderPosition += deltaHalPosition;
     }

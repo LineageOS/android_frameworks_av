@@ -142,7 +142,7 @@ status_t BnMediaAnalyticsService::onTransact(
             CHECK_INTERFACE(IMediaAnalyticsService, data, reply);
 
             bool forcenew;
-            MediaAnalyticsItem *item = new MediaAnalyticsItem;
+            MediaAnalyticsItem *item = MediaAnalyticsItem::create();
 
             data.readBool(&forcenew);
             item->readFromParcel(data);

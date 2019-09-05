@@ -26,6 +26,8 @@
 #include <utils/String8.h>
 #include <utils/List.h>
 
+#include <future>
+
 #include <media/IMediaAnalyticsService.h>
 
 namespace android {
@@ -43,6 +45,8 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
 
                             MediaAnalyticsService();
     virtual                 ~MediaAnalyticsService();
+
+    bool processExpirations();
 
  private:
     MediaAnalyticsItem::SessionID_t generateUniqueSessionID();
@@ -65,6 +69,8 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
     int32_t mMaxRecords;
     // by time (none older than this long agan
     nsecs_t mMaxRecordAgeNs;
+    // max to expire per expirations_l() invocation
+    int32_t mMaxRecordsExpiredAtOnce;
     //
     // # of sets of summaries
     int32_t mMaxRecordSets;
@@ -78,6 +84,9 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
     // (oldest at front) so it prints nicely for dumpsys
     List<MediaAnalyticsItem *> mItems;
     void saveItem(MediaAnalyticsItem *);
+
+    bool expirations_l(MediaAnalyticsItem *);
+    std::future<bool> mExpireFuture;
 
     // support for generating output
     int mDumpProto;
@@ -102,6 +111,9 @@ class MediaAnalyticsService : public BnMediaAnalyticsService
     void setPkgInfo(MediaAnalyticsItem *item, uid_t uid, bool setName, bool setVersion);
 
 };
+
+// hook to send things off to the statsd subsystem
+extern bool dump2Statsd(MediaAnalyticsItem *item);
 
 // ----------------------------------------------------------------------------
 

@@ -61,6 +61,72 @@
 /*                                                                                      */
 /****************************************************************************************/
 
+/*
+ * 4 Types of Memory Regions of LVM
+ * TODO: Allocate on the fly.
+ * i)   LVM_MEMREGION_PERSISTENT_SLOW_DATA - For Instance Handles
+ * ii)  LVM_MEMREGION_PERSISTENT_FAST_DATA - Persistent Buffers
+ * iii) LVM_MEMREGION_PERSISTENT_FAST_COEF - For Holding Structure values
+ * iv)  LVM_MEMREGION_TEMPORARY_FAST       - For Holding Structure values
+ *
+ * LVM_MEMREGION_PERSISTENT_SLOW_DATA:
+ *   Total Memory size:
+ *     sizeof(LVM_Instance_t) + \
+ *     sizeof(LVM_Buffer_t) + \
+ *     sizeof(LVPSA_InstancePr_t) + \
+ *     sizeof(LVM_Buffer_t) - needed if buffer mode is LVM_MANAGED_BUFFER
+ *
+ * LVM_MEMREGION_PERSISTENT_FAST_DATA:
+ *   Total Memory size:
+ *     sizeof(LVM_TE_Data_t) + \
+ *     2 * pInstParams->EQNB_NumBands * sizeof(LVM_EQNB_BandDef_t) + \
+ *     sizeof(LVCS_Data_t) + \
+ *     sizeof(LVDBE_Data_FLOAT_t) + \
+ *     sizeof(Biquad_2I_Order2_FLOAT_Taps_t) + \
+ *     sizeof(Biquad_2I_Order2_FLOAT_Taps_t) + \
+ *     pInstParams->EQNB_NumBands * sizeof(Biquad_2I_Order2_FLOAT_Taps_t) + \
+ *     pInstParams->EQNB_NumBands * sizeof(LVEQNB_BandDef_t) + \
+ *     pInstParams->EQNB_NumBands * sizeof(LVEQNB_BiquadType_en) + \
+ *     2 * LVM_HEADROOM_MAX_NBANDS * sizeof(LVM_HeadroomBandDef_t) + \
+ *     PSA_InitParams.nBands * sizeof(Biquad_1I_Order2_Taps_t) + \
+ *     PSA_InitParams.nBands * sizeof(QPD_Taps_t)
+ *
+ * LVM_MEMREGION_PERSISTENT_FAST_COEF:
+ *   Total Memory size:
+ *     sizeof(LVM_TE_Coefs_t) + \
+ *     sizeof(LVCS_Coefficient_t) + \
+ *     sizeof(LVDBE_Coef_FLOAT_t) + \
+ *     sizeof(Biquad_FLOAT_Instance_t) + \
+ *     sizeof(Biquad_FLOAT_Instance_t) + \
+ *     pInstParams->EQNB_NumBands * sizeof(Biquad_FLOAT_Instance_t) + \
+ *     PSA_InitParams.nBands * sizeof(Biquad_Instance_t) + \
+ *     PSA_InitParams.nBands * sizeof(QPD_State_t)
+ *
+ * LVM_MEMREGION_TEMPORARY_FAST (Scratch):
+ *   Total Memory Size:
+ *     BundleScratchSize + \
+ *     MAX_INTERNAL_BLOCKSIZE * sizeof(LVM_FLOAT) + \
+ *     MaxScratchOf (CS, EQNB, DBE, PSA)
+ *
+ *     a)BundleScratchSize:
+ *         3 * LVM_MAX_CHANNELS \
+ *         * (MIN_INTERNAL_BLOCKSIZE + InternalBlockSize) * sizeof(LVM_FLOAT)
+ *       This Memory is allocated only when Buffer mode is LVM_MANAGED_BUFFER.
+ *     b)MaxScratchOf (CS, EQNB, DBE, PSA)
+ *       This Memory is needed for scratch usage for CS, EQNB, DBE, PSA.
+ *       CS   = (LVCS_SCRATCHBUFFERS * sizeof(LVM_FLOAT)
+ *               * pCapabilities->MaxBlockSize)
+ *       EQNB = (LVEQNB_SCRATCHBUFFERS * sizeof(LVM_FLOAT)
+ *               * pCapabilities->MaxBlockSize)
+ *       DBE  = (LVDBE_SCRATCHBUFFERS_INPLACE*sizeof(LVM_FLOAT)
+ *               * pCapabilities->MaxBlockSize)
+ *       PSA  = (2 * pInitParams->MaxInputBlockSize * sizeof(LVM_FLOAT))
+ *              one MaxInputBlockSize for input and another for filter output
+ *     c)MAX_INTERNAL_BLOCKSIZE
+ *       This Memory is needed for PSAInput - Temp memory to store output
+ *       from McToMono block and given as input to PSA block
+ */
+
 LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
                                        LVM_MemTab_t         *pMemoryTable,
                                        LVM_InstParams_t     *pInstParams)
@@ -168,7 +234,13 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
     AlgScratchSize    = 0;
     if (pInstParams->BufferMode == LVM_MANAGED_BUFFERS)
     {
+#ifdef BUILD_FLOAT
+        BundleScratchSize = 3 * LVM_MAX_CHANNELS \
+                            * (MIN_INTERNAL_BLOCKSIZE + InternalBlockSize) \
+                            * sizeof(LVM_FLOAT);
+#else
         BundleScratchSize = 6 * (MIN_INTERNAL_BLOCKSIZE + InternalBlockSize) * sizeof(LVM_INT16);
+#endif
         InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_TEMPORARY_FAST],        /* Scratch buffer */
                             BundleScratchSize);
         InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_SLOW_DATA],
@@ -233,7 +305,13 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
          * Set the capabilities
          */
 #if defined(BUILD_FLOAT) && defined(HIGHER_FS)
-        DBE_Capabilities.SampleRate      = LVDBE_CAP_FS_8000 | LVDBE_CAP_FS_11025 | LVDBE_CAP_FS_12000 | LVDBE_CAP_FS_16000 | LVDBE_CAP_FS_22050 | LVDBE_CAP_FS_24000 | LVDBE_CAP_FS_32000 | LVDBE_CAP_FS_44100 | LVDBE_CAP_FS_48000 | LVDBE_CAP_FS_96000 | LVDBE_CAP_FS_192000;
+        DBE_Capabilities.SampleRate      = LVDBE_CAP_FS_8000 | LVDBE_CAP_FS_11025 |
+                                           LVDBE_CAP_FS_12000 | LVDBE_CAP_FS_16000 |
+                                           LVDBE_CAP_FS_22050 | LVDBE_CAP_FS_24000 |
+                                           LVDBE_CAP_FS_32000 | LVDBE_CAP_FS_44100 |
+                                           LVDBE_CAP_FS_48000 | LVDBE_CAP_FS_88200 |
+                                           LVDBE_CAP_FS_96000 | LVDBE_CAP_FS_176400 |
+                                           LVDBE_CAP_FS_192000;
 #else
         DBE_Capabilities.SampleRate      = LVDBE_CAP_FS_8000 | LVDBE_CAP_FS_11025 | LVDBE_CAP_FS_12000 | LVDBE_CAP_FS_16000 | LVDBE_CAP_FS_22050 | LVDBE_CAP_FS_24000 | LVDBE_CAP_FS_32000 | LVDBE_CAP_FS_44100 | LVDBE_CAP_FS_48000;
 #endif
@@ -270,7 +348,13 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
          * Set the capabilities
          */
 #if defined(BUILD_FLOAT) && defined(HIGHER_FS)
-        EQNB_Capabilities.SampleRate   = LVEQNB_CAP_FS_8000 | LVEQNB_CAP_FS_11025 | LVEQNB_CAP_FS_12000 | LVEQNB_CAP_FS_16000 | LVEQNB_CAP_FS_22050 | LVEQNB_CAP_FS_24000 | LVEQNB_CAP_FS_32000 | LVEQNB_CAP_FS_44100 | LVEQNB_CAP_FS_48000 | LVEQNB_CAP_FS_96000 | LVEQNB_CAP_FS_192000;
+        EQNB_Capabilities.SampleRate   = LVEQNB_CAP_FS_8000 | LVEQNB_CAP_FS_11025 |
+                                         LVEQNB_CAP_FS_12000 | LVEQNB_CAP_FS_16000 |
+                                         LVEQNB_CAP_FS_22050 | LVEQNB_CAP_FS_24000 |
+                                         LVEQNB_CAP_FS_32000 | LVEQNB_CAP_FS_44100 |
+                                         LVEQNB_CAP_FS_48000 | LVEQNB_CAP_FS_88200 |
+                                         LVEQNB_CAP_FS_96000 | LVEQNB_CAP_FS_176400 |
+                                         LVEQNB_CAP_FS_192000;
 #else
         EQNB_Capabilities.SampleRate   = LVEQNB_CAP_FS_8000 | LVEQNB_CAP_FS_11025 | LVEQNB_CAP_FS_12000 | LVEQNB_CAP_FS_16000 | LVEQNB_CAP_FS_22050 | LVEQNB_CAP_FS_24000 | LVEQNB_CAP_FS_32000 | LVEQNB_CAP_FS_44100 | LVEQNB_CAP_FS_48000;
 #endif
@@ -357,8 +441,13 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
                 PSA_MemTab.Region[LVM_PERSISTENT_FAST_COEF].Size);
 
             /* Fast Temporary */
+#ifdef BUILD_FLOAT
+            InstAlloc_AddMember(&AllocMem[LVM_TEMPORARY_FAST],
+                                MAX_INTERNAL_BLOCKSIZE * sizeof(LVM_FLOAT));
+#else
             InstAlloc_AddMember(&AllocMem[LVM_TEMPORARY_FAST],
                                 MAX_INTERNAL_BLOCKSIZE * sizeof(LVM_INT16));
+#endif
 
             if (PSA_MemTab.Region[LVM_TEMPORARY_FAST].Size > AlgScratchSize)
             {
@@ -547,13 +636,20 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
          */
         pInstance->pBufferManagement = InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_SLOW_DATA],
                                                            sizeof(LVM_Buffer_t));
+#ifdef BUILD_FLOAT
+        BundleScratchSize = (LVM_INT32)
+                            (3 * LVM_MAX_CHANNELS \
+                             * (MIN_INTERNAL_BLOCKSIZE + InternalBlockSize) \
+                             * sizeof(LVM_FLOAT));
+#else
         BundleScratchSize = (LVM_INT32)(6 * (MIN_INTERNAL_BLOCKSIZE + InternalBlockSize) * sizeof(LVM_INT16));
+#endif
         pInstance->pBufferManagement->pScratch = InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_TEMPORARY_FAST],   /* Scratch 1 buffer */
                                                                      (LVM_UINT32)BundleScratchSize);
 #ifdef BUILD_FLOAT
         LoadConst_Float(0,                                   /* Clear the input delay buffer */
                         (LVM_FLOAT *)&pInstance->pBufferManagement->InDelayBuffer,
-                        (LVM_INT16)(2 * MIN_INTERNAL_BLOCKSIZE));
+                        (LVM_INT16)(LVM_MAX_CHANNELS * MIN_INTERNAL_BLOCKSIZE));
 #else
         LoadConst_16(0,                                                        /* Clear the input delay buffer */
                      (LVM_INT16 *)&pInstance->pBufferManagement->InDelayBuffer,
@@ -584,8 +680,11 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
     /*
      * DC removal filter
      */
+#ifdef SUPPORT_MC
+    DC_Mc_D16_TRC_WRA_01_Init(&pInstance->DC_RemovalInstance);
+#else
     DC_2I_D16_TRC_WRA_01_Init(&pInstance->DC_RemovalInstance);
-
+#endif
 
     /*
      * Treble Enhancement
@@ -744,7 +843,13 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
          * Set the initialisation capabilities
          */
 #if defined(BUILD_FLOAT) && defined(HIGHER_FS)
-        DBE_Capabilities.SampleRate      = LVDBE_CAP_FS_8000 | LVDBE_CAP_FS_11025 | LVDBE_CAP_FS_12000 | LVDBE_CAP_FS_16000 | LVDBE_CAP_FS_22050 | LVDBE_CAP_FS_24000 | LVDBE_CAP_FS_32000 | LVDBE_CAP_FS_44100 | LVDBE_CAP_FS_48000 | LVDBE_CAP_FS_96000 | LVDBE_CAP_FS_192000;
+        DBE_Capabilities.SampleRate      = LVDBE_CAP_FS_8000 | LVDBE_CAP_FS_11025 |
+                                           LVDBE_CAP_FS_12000 | LVDBE_CAP_FS_16000 |
+                                           LVDBE_CAP_FS_22050 | LVDBE_CAP_FS_24000 |
+                                           LVDBE_CAP_FS_32000 | LVDBE_CAP_FS_44100 |
+                                           LVDBE_CAP_FS_48000 | LVDBE_CAP_FS_88200 |
+                                           LVDBE_CAP_FS_96000 | LVDBE_CAP_FS_176400 |
+                                           LVDBE_CAP_FS_192000;
 #else
         DBE_Capabilities.SampleRate      = LVDBE_CAP_FS_8000 | LVDBE_CAP_FS_11025 | LVDBE_CAP_FS_12000 | LVDBE_CAP_FS_16000 | LVDBE_CAP_FS_22050 | LVDBE_CAP_FS_24000 | LVDBE_CAP_FS_32000 | LVDBE_CAP_FS_44100 | LVDBE_CAP_FS_48000;
 #endif
@@ -802,7 +907,13 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
          * Set the initialisation capabilities
          */
 #if defined(BUILD_FLOAT) && defined(HIGHER_FS)
-        EQNB_Capabilities.SampleRate      = LVEQNB_CAP_FS_8000 | LVEQNB_CAP_FS_11025 | LVEQNB_CAP_FS_12000 | LVEQNB_CAP_FS_16000 | LVEQNB_CAP_FS_22050 | LVEQNB_CAP_FS_24000 | LVEQNB_CAP_FS_32000 | LVEQNB_CAP_FS_44100 | LVEQNB_CAP_FS_48000 | LVEQNB_CAP_FS_96000 | LVEQNB_CAP_FS_192000;
+        EQNB_Capabilities.SampleRate      = LVEQNB_CAP_FS_8000 | LVEQNB_CAP_FS_11025 |
+                                            LVEQNB_CAP_FS_12000 | LVEQNB_CAP_FS_16000 |
+                                            LVEQNB_CAP_FS_22050 | LVEQNB_CAP_FS_24000 |
+                                            LVEQNB_CAP_FS_32000 | LVEQNB_CAP_FS_44100 |
+                                            LVEQNB_CAP_FS_48000 | LVEQNB_CAP_FS_88200 |
+                                            LVEQNB_CAP_FS_96000 | LVEQNB_CAP_FS_176400 |
+                                            LVEQNB_CAP_FS_192000;
 #else
         EQNB_Capabilities.SampleRate      = LVEQNB_CAP_FS_8000 | LVEQNB_CAP_FS_11025 | LVEQNB_CAP_FS_12000 | LVEQNB_CAP_FS_16000 | LVEQNB_CAP_FS_22050 | LVEQNB_CAP_FS_24000 | LVEQNB_CAP_FS_32000 | LVEQNB_CAP_FS_44100 | LVEQNB_CAP_FS_48000;
 #endif
@@ -1039,7 +1150,11 @@ LVM_ReturnStatus_en LVM_ClearAudioBuffers(LVM_Handle_t  hInstance)
     LVM_SetHeadroomParams(hInstance, &HeadroomParams);
 
     /* DC removal filter */
+#ifdef SUPPORT_MC
+    DC_Mc_D16_TRC_WRA_01_Init(&pInstance->DC_RemovalInstance);
+#else
     DC_2I_D16_TRC_WRA_01_Init(&pInstance->DC_RemovalInstance);
+#endif
 
     return LVM_SUCCESS;
 }

@@ -168,18 +168,23 @@ int SoundTriggerHalHidl::loadSoundModel(struct sound_trigger_sound_model *sound_
     int ret;
     SoundModelHandle halHandle;
     sp<V2_1_ISoundTriggerHw> soundtrigger_2_1 = toService2_1(soundtrigger);
+    sp<V2_2_ISoundTriggerHw> soundtrigger_2_2 = toService2_2(soundtrigger);
     if (sound_model->type == SOUND_MODEL_TYPE_KEYPHRASE) {
-        if (!soundtrigger_2_1) {
-            ISoundTriggerHw::PhraseSoundModel halSoundModel;
-            convertPhraseSoundModelToHal(&halSoundModel, sound_model);
-            AutoMutex lock(mHalLock);
-            hidlReturn = soundtrigger->loadPhraseSoundModel(
-                    halSoundModel,
-                    this, modelId, [&](int32_t retval, auto res) {
-                        ret = retval;
-                        halHandle = res;
-                    });
-        } else {
+        if (soundtrigger_2_2) {
+            V2_2_ISoundTriggerHw::PhraseSoundModel halSoundModel;
+            auto result = convertPhraseSoundModelToHal(&halSoundModel, sound_model);
+            if (result.first) {
+                AutoMutex lock(mHalLock);
+                hidlReturn = soundtrigger_2_2->loadPhraseSoundModel_2_1(
+                        halSoundModel,
+                        this, modelId, [&](int32_t retval, auto res) {
+                            ret = retval;
+                            halHandle = res;
+                        });
+            } else {
+                return NO_MEMORY;
+            }
+        } else if (soundtrigger_2_1) {
             V2_1_ISoundTriggerHw::PhraseSoundModel halSoundModel;
             auto result = convertPhraseSoundModelToHal(&halSoundModel, sound_model);
             if (result.first) {
@@ -193,18 +198,32 @@ int SoundTriggerHalHidl::loadSoundModel(struct sound_trigger_sound_model *sound_
             } else {
                 return NO_MEMORY;
             }
-        }
-    } else {
-        if (!soundtrigger_2_1) {
-            ISoundTriggerHw::SoundModel halSoundModel;
-            convertSoundModelToHal(&halSoundModel, sound_model);
+        } else {
+            ISoundTriggerHw::PhraseSoundModel halSoundModel;
+            convertPhraseSoundModelToHal(&halSoundModel, sound_model);
             AutoMutex lock(mHalLock);
-            hidlReturn = soundtrigger->loadSoundModel(halSoundModel,
+            hidlReturn = soundtrigger->loadPhraseSoundModel(
+                    halSoundModel,
                     this, modelId, [&](int32_t retval, auto res) {
                         ret = retval;
                         halHandle = res;
                     });
-        } else {
+        }
+    } else {
+        if (soundtrigger_2_2) {
+            V2_2_ISoundTriggerHw::SoundModel halSoundModel;
+            auto result = convertSoundModelToHal(&halSoundModel, sound_model);
+            if (result.first) {
+                AutoMutex lock(mHalLock);
+                hidlReturn = soundtrigger_2_2->loadSoundModel_2_1(halSoundModel,
+                        this, modelId, [&](int32_t retval, auto res) {
+                            ret = retval;
+                            halHandle = res;
+                        });
+            } else {
+                return NO_MEMORY;
+            }
+        } else if (soundtrigger_2_1) {
             V2_1_ISoundTriggerHw::SoundModel halSoundModel;
             auto result = convertSoundModelToHal(&halSoundModel, sound_model);
             if (result.first) {
@@ -217,6 +236,15 @@ int SoundTriggerHalHidl::loadSoundModel(struct sound_trigger_sound_model *sound_
             } else {
                 return NO_MEMORY;
             }
+        } else {
+            ISoundTriggerHw::SoundModel halSoundModel;
+            convertSoundModelToHal(&halSoundModel, sound_model);
+            AutoMutex lock(mHalLock);
+            hidlReturn = soundtrigger->loadSoundModel(halSoundModel,
+                    this, modelId, [&](int32_t retval, auto res) {
+                        ret = retval;
+                        halHandle = res;
+                    });
         }
     }
 
@@ -282,16 +310,20 @@ int SoundTriggerHalHidl::startRecognition(sound_model_handle_t handle,
     model->mRecognitionCookie = cookie;
 
     sp<V2_1_ISoundTriggerHw> soundtrigger_2_1 = toService2_1(soundtrigger);
+    sp<V2_2_ISoundTriggerHw> soundtrigger_2_2 = toService2_2(soundtrigger);
     Return<int32_t> hidlReturn(0);
 
-    if (!soundtrigger_2_1) {
-        ISoundTriggerHw::RecognitionConfig halConfig;
-        convertRecognitionConfigToHal(&halConfig, config);
-        {
+    if (soundtrigger_2_2) {
+        V2_2_ISoundTriggerHw::RecognitionConfig halConfig;
+        auto result = convertRecognitionConfigToHal(&halConfig, config);
+        if (result.first) {
             AutoMutex lock(mHalLock);
-            hidlReturn = soundtrigger->startRecognition(model->mHalHandle, halConfig, this, handle);
+            hidlReturn = soundtrigger_2_2->startRecognition_2_1(
+                    model->mHalHandle, halConfig, this, handle);
+        } else {
+            return NO_MEMORY;
         }
-    } else {
+    } else if (soundtrigger_2_1) {
         V2_1_ISoundTriggerHw::RecognitionConfig halConfig;
         auto result = convertRecognitionConfigToHal(&halConfig, config);
         if (result.first) {
@@ -300,6 +332,13 @@ int SoundTriggerHalHidl::startRecognition(sound_model_handle_t handle,
                     model->mHalHandle, halConfig, this, handle);
         } else {
             return NO_MEMORY;
+        }
+    } else {
+        ISoundTriggerHw::RecognitionConfig halConfig;
+        convertRecognitionConfigToHal(&halConfig, config);
+        {
+            AutoMutex lock(mHalLock);
+            hidlReturn = soundtrigger->startRecognition(model->mHalHandle, halConfig, this, handle);
         }
     }
 
@@ -356,6 +395,38 @@ int SoundTriggerHalHidl::stopAllRecognitions()
     return hidlReturn;
 }
 
+int SoundTriggerHalHidl::getModelState(sound_model_handle_t handle)
+{
+    sp<ISoundTriggerHw> soundtrigger = getService();
+    if (soundtrigger == 0) {
+        return -ENODEV;
+    }
+
+    sp<V2_2_ISoundTriggerHw> soundtrigger_2_2 = toService2_2(soundtrigger);
+    if (soundtrigger_2_2 == 0) {
+        ALOGE("getModelState not supported");
+        return -ENODEV;
+    }
+
+    sp<SoundModel> model = getModel(handle);
+    if (model == 0) {
+        ALOGE("getModelState model not found for handle %u", handle);
+        return -EINVAL;
+    }
+
+    int ret = NO_ERROR;
+    Return<int32_t> hidlReturn(0);
+    {
+        AutoMutex lock(mHalLock);
+        hidlReturn = soundtrigger_2_2->getModelState(model->mHalHandle);
+    }
+    if (!hidlReturn.isOk()) {
+        ALOGE("getModelState error %s", hidlReturn.description().c_str());
+        ret = FAILED_TRANSACTION;
+    }
+    return ret;
+}
+
 SoundTriggerHalHidl::SoundTriggerHalHidl(const char *moduleName)
     : mModuleName(moduleName), mNextUniqueId(1)
 {
@@ -386,6 +457,12 @@ sp<V2_1_ISoundTriggerHw> SoundTriggerHalHidl::toService2_1(const sp<ISoundTrigge
 {
     auto castResult_2_1 = V2_1_ISoundTriggerHw::castFrom(s);
     return castResult_2_1.isOk() ? static_cast<sp<V2_1_ISoundTriggerHw>>(castResult_2_1) : nullptr;
+}
+
+sp<V2_2_ISoundTriggerHw> SoundTriggerHalHidl::toService2_2(const sp<ISoundTriggerHw>& s)
+{
+    auto castResult_2_2 = V2_2_ISoundTriggerHw::castFrom(s);
+    return castResult_2_2.isOk() ? static_cast<sp<V2_2_ISoundTriggerHw>>(castResult_2_2) : nullptr;
 }
 
 sp<SoundTriggerHalHidl::SoundModel> SoundTriggerHalHidl::getModel(sound_model_handle_t handle)

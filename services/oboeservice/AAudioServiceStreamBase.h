@@ -204,6 +204,20 @@ public:
     }
 
     /**
+     * Set false when the stream should not longer be processed.
+     * This may be caused by a message queue overflow.
+     * Set true when stream is started.
+     * @param suspended
+     */
+    void setSuspended(bool suspended) {
+        mSuspended = suspended;
+    }
+
+    bool isSuspended() const {
+        return mSuspended;
+    }
+
+    /**
      * Atomically increment the number of active references to the stream by AAudioService.
      *
      * This is called under a global lock in AAudioStreamTracker.
@@ -287,7 +301,7 @@ protected:
     // TODO rename mClientHandle to mPortHandle to be more consistent with AudioFlinger.
     audio_port_handle_t     mClientHandle = AUDIO_PORT_HANDLE_NONE;
 
-    SimpleDoubleBuffer<Timestamp>  mAtomicTimestamp;
+    SimpleDoubleBuffer<Timestamp>  mAtomicStreamTimestamp;
 
     android::AAudioService &mAudioService;
 
@@ -298,13 +312,24 @@ protected:
     android::wp<AAudioServiceEndpoint> mServiceEndpointWeak;
 
 private:
+
+    /**
+     * @return true if the queue is getting full.
+     */
+    bool isUpMessageQueueBusy();
+
     aaudio_handle_t         mHandle = -1;
     bool                    mFlowing = false;
 
     // This is modified under a global lock in AAudioStreamTracker.
     int32_t                 mCallingCount = 0;
 
+    // This indicates that a stream that is being referenced by a binder call needs to closed.
     std::atomic<bool>       mCloseNeeded{false};
+
+    // This indicate that a running stream should not be processed because of an error,
+    // for example a full message queue. Note that this atomic is unrelated to mCloseNeeded.
+    std::atomic<bool>       mSuspended{false};
 };
 
 } /* namespace aaudio */

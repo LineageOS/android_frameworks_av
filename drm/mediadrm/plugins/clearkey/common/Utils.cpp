@@ -27,4 +27,18 @@ bool operator<(const Vector<uint8_t> &lhs, const Vector<uint8_t> &rhs) {
     return memcmp((void *)lhs.array(), (void *)rhs.array(), rhs.size()) < 0;
 }
 
+std::string ByteArrayToHexString(const uint8_t* in_buffer, size_t length) {
+    static const char kHexChars[] = "0123456789ABCDEF";
+
+    // Each input byte creates two output hex characters.
+    std::string out_buffer(length * 2, '\0');
+
+    for (size_t i = 0; i < length; ++i) {
+        char byte = in_buffer[i];
+        out_buffer[(i * 2)] = kHexChars[(byte >> 4) & 0xf];
+        out_buffer[(i * 2) + 1] = kHexChars[byte & 0xf];
+    }
+    return out_buffer;
+}
+
 } // namespace android

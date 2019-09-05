@@ -20,7 +20,6 @@
 #include <math.h>
 #include <utils/Log.h>
 #include <cutils/properties.h>
-#include <media/AudioPolicyHelper.h>
 #include "media/ToneGenerator.h"
 
 
@@ -1242,7 +1241,7 @@ bool ToneGenerator::initAudioTrack() {
     if (mStreamType == AUDIO_STREAM_VOICE_CALL) {
         streamType = AUDIO_STREAM_DTMF;
     }
-    stream_type_to_audio_attributes(streamType, &attr);
+    attr = AudioSystem::streamTypeToAttributes(streamType);
 
     const size_t frameCount = mProcessSize;
     status_t status = mpAudioTrack->set(

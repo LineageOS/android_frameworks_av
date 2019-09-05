@@ -39,7 +39,6 @@ namespace aaudio {
 class AAudioServiceEndpointPlay : public AAudioServiceEndpointShared {
 public:
     explicit AAudioServiceEndpointPlay(android::AAudioService &audioService);
-    virtual ~AAudioServiceEndpointPlay();
 
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override;
 

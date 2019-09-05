@@ -50,8 +50,7 @@ CaptureSequencer::CaptureSequencer(wp<Camera2Client> client):
         mStateTransitionCount(0),
         mTriggerId(0),
         mTimeoutCount(0),
-        mCaptureId(Camera2Client::kCaptureRequestIdStart),
-        mMsgType(0) {
+        mCaptureId(Camera2Client::kCaptureRequestIdStart) {
     ALOGV("%s", __FUNCTION__);
 }
 
@@ -64,7 +63,7 @@ void CaptureSequencer::setZslProcessor(const wp<ZslProcessor>& processor) {
     mZslProcessor = processor;
 }
 
-status_t CaptureSequencer::startCapture(int msgType) {
+status_t CaptureSequencer::startCapture() {
     ALOGV("%s", __FUNCTION__);
     ATRACE_CALL();
     Mutex::Autolock l(mInputMutex);
@@ -73,7 +72,6 @@ status_t CaptureSequencer::startCapture(int msgType) {
         return INVALID_OPERATION;
     }
     if (!mStartCapture) {
-        mMsgType = msgType;
         mStartCapture = true;
         mStartCaptureSignal.signal();
     }
@@ -116,6 +114,31 @@ void CaptureSequencer::notifyShutter(const CaptureResultExtras& resultExtras,
     if (!mHalNotifiedShutter && resultExtras.requestId == mShutterCaptureId) {
         mHalNotifiedShutter = true;
         mShutterNotifySignal.signal();
+    }
+}
+
+void CaptureSequencer::notifyError(int32_t errorCode, const CaptureResultExtras& resultExtras) {
+    ATRACE_CALL();
+    bool jpegBufferLost = false;
+    if (errorCode == hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_BUFFER) {
+        sp<Camera2Client> client = mClient.promote();
+        if (client == nullptr) {
+            return;
+        }
+        int captureStreamId = client->getCaptureStreamId();
+        if (captureStreamId == resultExtras.errorStreamId) {
+            jpegBufferLost = true;
+        }
+    } else if (errorCode ==
+            hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_REQUEST) {
+        if (resultExtras.requestId == mShutterCaptureId) {
+            jpegBufferLost = true;
+        }
+    }
+
+    if (jpegBufferLost) {
+        sp<MemoryBase> emptyBuffer;
+        onCaptureAvailable(/*timestamp*/0, emptyBuffer, /*captureError*/true);
     }
 }
 
@@ -386,7 +409,7 @@ CaptureSequencer::CaptureState CaptureSequencer::manageZslStart(
 
     SharedParameters::Lock l(client->getParameters());
     /* warning: this also locks a SharedCameraCallbacks */
-    shutterNotifyLocked(l.mParameters, client, mMsgType);
+    shutterNotifyLocked(l.mParameters, client);
     mShutterNotified = true;
     mTimeoutCount = kMaxTimeoutsForCaptureEnd;
     return STANDARD_CAPTURE_WAIT;
@@ -606,7 +629,7 @@ CaptureSequencer::CaptureState CaptureSequencer::manageStandardCaptureWait(
         if (!mShutterNotified) {
             SharedParameters::Lock l(client->getParameters());
             /* warning: this also locks a SharedCameraCallbacks */
-            shutterNotifyLocked(l.mParameters, client, mMsgType);
+            shutterNotifyLocked(l.mParameters, client);
             mShutterNotified = true;
         }
     } else if (mTimeoutCount <= 0) {
@@ -723,12 +746,11 @@ status_t CaptureSequencer::updateCaptureRequest(const Parameters &params,
 }
 
 /*static*/ void CaptureSequencer::shutterNotifyLocked(const Parameters &params,
-            const sp<Camera2Client>& client, int msgType) {
+            const sp<Camera2Client>& client) {
     ATRACE_CALL();
 
     if (params.state == Parameters::STILL_CAPTURE
-        && params.playShutterSound
-        && (msgType & CAMERA_MSG_SHUTTER)) {
+        && params.playShutterSound) {
         client->getCameraService()->playSound(CameraService::SOUND_SHUTTER);
     }
 

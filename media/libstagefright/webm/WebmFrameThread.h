@@ -83,6 +83,7 @@ private:
     LinkedBlockingQueue<const sp<WebmFrame> >& mVideoFrames;
     LinkedBlockingQueue<const sp<WebmFrame> >& mAudioFrames;
     List<sp<WebmElement> >& mCues;
+    uint64_t mStartOffsetTimecode;
 
     volatile bool mDone;
 

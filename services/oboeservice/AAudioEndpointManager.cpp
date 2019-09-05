@@ -140,9 +140,8 @@ sp<AAudioServiceEndpointShared> AAudioEndpointManager::findSharedEndpoint_l(
 }
 
 sp<AAudioServiceEndpoint> AAudioEndpointManager::openEndpoint(AAudioService &audioService,
-                                        const aaudio::AAudioStreamRequest &request,
-                                        aaudio_sharing_mode_t sharingMode) {
-    if (sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE) {
+                                        const aaudio::AAudioStreamRequest &request) {
+    if (request.getConstantConfiguration().getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE) {
         return openExclusiveEndpoint(audioService, request);
     } else {
         return openSharedEndpoint(audioService, request);
@@ -173,7 +172,7 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openExclusiveEndpoint(
 
         aaudio_result_t result = endpoint->open(request);
         if (result != AAUDIO_OK) {
-            ALOGE("openExclusiveEndpoint(), open failed");
+            ALOGV("openExclusiveEndpoint(), open failed");
             endpoint.clear();
         } else {
             mExclusiveStreams.push_back(endpointMMap);

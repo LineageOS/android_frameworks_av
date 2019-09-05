@@ -78,6 +78,15 @@ void AGC_MIX_VOL_2St1Mon_D32_WRA(AGC_MIX_VOL_2St1Mon_FLOAT_t  *pInstance,     /*
                                  const LVM_FLOAT            *pMonoSrc,      /* Mono source */
                                  LVM_FLOAT                  *pDst,          /* Stereo destination */
                                  LVM_UINT16                 n);             /* Number of samples */
+#ifdef SUPPORT_MC
+void AGC_MIX_VOL_Mc1Mon_D32_WRA(AGC_MIX_VOL_2St1Mon_FLOAT_t  *pInstance,  /* Instance pointer */
+                                 const LVM_FLOAT            *pStSrc,      /* Source */
+                                 const LVM_FLOAT            *pMonoSrc,    /* Mono source */
+                                 LVM_FLOAT                  *pDst,        /* Destination */
+                                 LVM_UINT16                 NrFrames,     /* Number of frames */
+                                 LVM_UINT16                 NrChannels);  /* Number of channels */
+#endif
+
 #else
 void AGC_MIX_VOL_2St1Mon_D32_WRA(AGC_MIX_VOL_2St1Mon_D32_t  *pInstance,     /* Instance pointer */
                                  const LVM_INT32            *pStSrc,        /* Stereo source */

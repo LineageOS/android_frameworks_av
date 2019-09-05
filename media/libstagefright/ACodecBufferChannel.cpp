@@ -129,6 +129,7 @@ status_t ACodecBufferChannel::queueSecureInputBuffer(
         secureHandle = static_cast<native_handle_t *>(secureData->getDestinationPointer());
     }
     ssize_t result = -1;
+    ssize_t codecDataOffset = 0;
     if (mCrypto != NULL) {
         ICrypto::DestinationBuffer destination;
         if (secure) {
@@ -180,9 +181,16 @@ status_t ACodecBufferChannel::queueSecureInputBuffer(
 
         Status status = Status::OK;
         hidl_string detailedError;
+        ScramblingControl sctrl = ScramblingControl::UNSCRAMBLED;
+
+        if (key != NULL) {
+            sctrl = (ScramblingControl)key[0];
+            // Adjust for the PES offset
+            codecDataOffset = key[2] | (key[3] << 8);
+        }
 
         auto returnVoid = mDescrambler->descramble(
-                key != NULL ? (ScramblingControl)key[0] : ScramblingControl::UNSCRAMBLED,
+                sctrl,
                 hidlSubSamples,
                 srcBuffer,
                 0,
@@ -202,6 +210,11 @@ status_t ACodecBufferChannel::queueSecureInputBuffer(
             return UNKNOWN_ERROR;
         }
 
+        if (result < codecDataOffset) {
+            ALOGD("invalid codec data offset: %zd, result %zd", codecDataOffset, result);
+            return BAD_VALUE;
+        }
+
         ALOGV("descramble succeeded, %zd bytes", result);
 
         if (dstBuffer.type == BufferType::SHARED_MEMORY) {
@@ -210,7 +223,7 @@ status_t ACodecBufferChannel::queueSecureInputBuffer(
         }
     }
 
-    it->mCodecBuffer->setRange(0, result);
+    it->mCodecBuffer->setRange(codecDataOffset, result - codecDataOffset);
 
     // Copy metadata from client to codec buffer.
     it->mCodecBuffer->meta()->clear();

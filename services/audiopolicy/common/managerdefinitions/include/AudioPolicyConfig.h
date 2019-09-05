@@ -16,8 +16,10 @@
 
 #pragma once
 
+#include <unordered_map>
+#include <unordered_set>
+
 #include <AudioGain.h>
-#include <VolumeCurve.h>
 #include <AudioPort.h>
 #include <AudioPatch.h>
 #include <DeviceDescriptor.h>
@@ -28,7 +30,6 @@
 #include <AudioPolicyMix.h>
 #include <EffectDescriptor.h>
 #include <SoundTriggerSession.h>
-#include <SessionRoute.h>
 
 namespace android {
 
@@ -38,21 +39,20 @@ public:
     AudioPolicyConfig(HwModuleCollection &hwModules,
                       DeviceVector &availableOutputDevices,
                       DeviceVector &availableInputDevices,
-                      sp<DeviceDescriptor> &defaultOutputDevices,
-                      VolumeCurvesCollection *volumes = nullptr)
+                      sp<DeviceDescriptor> &defaultOutputDevice)
         : mHwModules(hwModules),
           mAvailableOutputDevices(availableOutputDevices),
           mAvailableInputDevices(availableInputDevices),
-          mDefaultOutputDevices(defaultOutputDevices),
-          mVolumeCurves(volumes),
+          mDefaultOutputDevice(defaultOutputDevice),
           mIsSpeakerDrcEnabled(false)
     {}
 
-    void setVolumes(const VolumeCurvesCollection &volumes)
-    {
-        if (mVolumeCurves != nullptr) {
-            *mVolumeCurves = volumes;
-        }
+    const std::string& getSource() const {
+        return mSource;
+    }
+
+    void setSource(const std::string& file) {
+        mSource = file;
     }
 
     void setHwModules(const HwModuleCollection &hwModules)
@@ -100,51 +100,83 @@ public:
 
     void setDefaultOutputDevice(const sp<DeviceDescriptor> &defaultDevice)
     {
-        mDefaultOutputDevices = defaultDevice;
+        mDefaultOutputDevice = defaultDevice;
     }
 
-    const sp<DeviceDescriptor> &getDefaultOutputDevice() const { return mDefaultOutputDevices; }
+    const sp<DeviceDescriptor> &getDefaultOutputDevice() const { return mDefaultOutputDevice; }
 
     void setDefault(void)
     {
-        mDefaultOutputDevices = new DeviceDescriptor(AUDIO_DEVICE_OUT_SPEAKER);
-        sp<HwModule> module;
+        mSource = "AudioPolicyConfig::setDefault";
+        mDefaultOutputDevice = new DeviceDescriptor(AUDIO_DEVICE_OUT_SPEAKER);
+        mDefaultOutputDevice->addAudioProfile(AudioProfile::createFullDynamic());
         sp<DeviceDescriptor> defaultInputDevice = new DeviceDescriptor(AUDIO_DEVICE_IN_BUILTIN_MIC);
-        mAvailableOutputDevices.add(mDefaultOutputDevices);
+        defaultInputDevice->addAudioProfile(AudioProfile::createFullDynamic());
+        sp<AudioProfile> micProfile = new AudioProfile(
+                AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_MONO, 8000);
+        defaultInputDevice->addAudioProfile(micProfile);
+        mAvailableOutputDevices.add(mDefaultOutputDevice);
         mAvailableInputDevices.add(defaultInputDevice);
 
-        module = new HwModule(AUDIO_HARDWARE_MODULE_ID_PRIMARY);
+        sp<HwModule> module = new HwModule(AUDIO_HARDWARE_MODULE_ID_PRIMARY, 2 /*halVersionMajor*/);
+        mHwModules.add(module);
+        mDefaultOutputDevice->attach(module);
+        defaultInputDevice->attach(module);
 
-        sp<OutputProfile> outProfile;
-        outProfile = new OutputProfile(String8("primary"));
-        outProfile->attach(module);
+        sp<OutputProfile> outProfile = new OutputProfile(String8("primary"));
         outProfile->addAudioProfile(
                 new AudioProfile(AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, 44100));
-        outProfile->addSupportedDevice(mDefaultOutputDevices);
+        outProfile->addSupportedDevice(mDefaultOutputDevice);
         outProfile->setFlags(AUDIO_OUTPUT_FLAG_PRIMARY);
         module->addOutputProfile(outProfile);
 
-        sp<InputProfile> inProfile;
-        inProfile = new InputProfile(String8("primary"));
-        inProfile->attach(module);
-        inProfile->addAudioProfile(
-                new AudioProfile(AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_MONO, 8000));
+        sp<InputProfile> inProfile = new InputProfile(String8("primary"));
+        inProfile->addAudioProfile(micProfile);
         inProfile->addSupportedDevice(defaultInputDevice);
         module->addInputProfile(inProfile);
 
-        mHwModules.add(module);
+        setDefaultSurroundFormats();
+    }
+
+    // Surround formats, with an optional list of subformats that are equivalent from users' POV.
+    using SurroundFormats = std::unordered_map<audio_format_t, std::unordered_set<audio_format_t>>;
+
+    const SurroundFormats &getSurroundFormats() const
+    {
+        return mSurroundFormats;
+    }
+
+    void setSurroundFormats(const SurroundFormats &surroundFormats)
+    {
+        mSurroundFormats = surroundFormats;
+    }
+
+    void setDefaultSurroundFormats()
+    {
+        mSurroundFormats = {
+            {AUDIO_FORMAT_AC3, {}},
+            {AUDIO_FORMAT_E_AC3, {}},
+            {AUDIO_FORMAT_DTS, {}},
+            {AUDIO_FORMAT_DTS_HD, {}},
+            {AUDIO_FORMAT_AAC_LC, {
+                    AUDIO_FORMAT_AAC_HE_V1, AUDIO_FORMAT_AAC_HE_V2, AUDIO_FORMAT_AAC_ELD,
+                    AUDIO_FORMAT_AAC_XHE}},
+            {AUDIO_FORMAT_DOLBY_TRUEHD, {}},
+            {AUDIO_FORMAT_E_AC3_JOC, {}},
+            {AUDIO_FORMAT_AC4, {}}};
     }
 
 private:
+    std::string mSource;
     HwModuleCollection &mHwModules; /**< Collection of Module, with Profiles, i.e. Mix Ports. */
     DeviceVector &mAvailableOutputDevices;
     DeviceVector &mAvailableInputDevices;
-    sp<DeviceDescriptor> &mDefaultOutputDevices;
-    VolumeCurvesCollection *mVolumeCurves;
+    sp<DeviceDescriptor> &mDefaultOutputDevice;
     // TODO: remove when legacy conf file is removed. true on devices that use DRC on the
     // DEVICE_CATEGORY_SPEAKER path to boost soft sounds, used to adjust volume curves accordingly.
     // Note: remove also speaker_drc_enabled from global configuration of XML config file.
     bool mIsSpeakerDrcEnabled;
+    SurroundFormats mSurroundFormats;
 };
 
 } // namespace android

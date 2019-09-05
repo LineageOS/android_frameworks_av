@@ -12,29 +12,110 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+apex_defaults {
+    name: "com.android.media-defaults",
+    java_libs: ["updatable-media"],
+    multilib: {
+        first: {
+            // Extractor process runs only with the primary ABI.
+            native_shared_libs: [
+                // Extractor plugins
+                "libaacextractor",
+                "libamrextractor",
+                "libflacextractor",
+                "libmidiextractor",
+                "libmkvextractor",
+                "libmp3extractor",
+                "libmp4extractor",
+                "libmpeg2extractor",
+                "liboggextractor",
+                "libwavextractor",
+            ],
+        },
+    },
+    prebuilts: [
+        "mediaextractor.policy",
+    ],
+    key: "com.android.media.key",
+    certificate: ":com.android.media.certificate",
+
+    // Use a custom AndroidManifest.xml used for API targeting.
+    androidManifest: ":com.android.media-androidManifest",
+}
+
 apex {
     name: "com.android.media",
     manifest: "manifest.json",
-    native_shared_libs: [
-        // Extractor plugins
-        "libaacextractor",
-        "libamrextractor",
-        "libflacextractor",
-        "libmidiextractor",
-        "libmkvextractor",
-        "libmp3extractor",
-        "libmp4extractor",
-        "libmpeg2extractor",
-        "liboggextractor",
-        "libwavextractor",
-        // MediaPlayer2
-        "libmedia2_jni",
+    defaults: ["com.android.media-defaults"],
+}
+
+filegroup {
+    name: "com.android.media-androidManifest",
+    srcs: ["AndroidManifest-media.xml"],
+}
+
+filegroup {
+    name: "com.android.media.swcodec-androidManifest",
+    srcs: ["AndroidManifest-swcodec.xml"],
+}
+
+apex_defaults {
+    name: "com.android.media.swcodec-defaults",
+    binaries: [
+        "mediaswcodec",
     ],
-    key: "com.android.media.key",
+    prebuilts: [
+        "com.android.media.swcodec-mediaswcodec.rc",
+        "com.android.media.swcodec-ld.config.txt",
+        "mediaswcodec.policy",
+        "mediaswcodec.xml",
+    ],
+    use_vendor: true,
+    key: "com.android.media.swcodec.key",
+    certificate: ":com.android.media.swcodec.certificate",
+
+    // Use a custom AndroidManifest.xml used for API targeting.
+    androidManifest: ":com.android.media.swcodec-androidManifest",
+}
+
+prebuilt_etc {
+    name: "com.android.media.swcodec-mediaswcodec.rc",
+    src: "mediaswcodec.rc",
+    filename: "init.rc",
+    installable: false,
+}
+
+prebuilt_etc {
+    name: "com.android.media.swcodec-ld.config.txt",
+    src: "ld.config.txt",
+    filename: "ld.config.txt",
+    installable: false,
+}
+
+apex {
+    name: "com.android.media.swcodec",
+    manifest: "manifest_codec.json",
+    defaults: ["com.android.media.swcodec-defaults"],
 }
 
 apex_key {
     name: "com.android.media.key",
     public_key: "com.android.media.avbpubkey",
     private_key: "com.android.media.pem",
+}
+
+apex_key {
+    name: "com.android.media.swcodec.key",
+    public_key: "com.android.media.swcodec.avbpubkey",
+    private_key: "com.android.media.swcodec.pem",
+}
+
+android_app_certificate {
+    name: "com.android.media.certificate",
+    certificate: "com.android.media",
+}
+
+android_app_certificate {
+    name: "com.android.media.swcodec.certificate",
+    certificate: "com.android.media.swcodec",
 }

@@ -34,4 +34,3 @@ cc_library_headers {
     export_include_dirs: ["include"],
 }
 
-subdirs = ["*"]

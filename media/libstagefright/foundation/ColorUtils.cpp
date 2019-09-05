@@ -23,6 +23,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALookup.h>
 #include <media/stagefright/foundation/ColorUtils.h>
+#include <media/NdkMediaFormatPriv.h>
 
 namespace android {
 
@@ -340,6 +341,14 @@ void ColorUtils::convertIsoColorAspectsToCodecAspects(
         aspects.mMatrixCoeffs = ColorAspects::MatrixUnspecified;
     }
     aspects.mRange = fullRange ? ColorAspects::RangeFull : ColorAspects::RangeLimited;
+}
+
+void ColorUtils::convertIsoColorAspectsToPlatformAspects(
+        int32_t primaries, int32_t intransfer, int32_t coeffs, bool fullRange,
+        int32_t *range, int32_t *standard, int32_t *outtransfer) {
+    ColorAspects aspects;
+    convertIsoColorAspectsToCodecAspects(primaries, intransfer, coeffs, fullRange, aspects);
+    convertCodecColorAspectsToPlatformAspects(aspects, range, standard, outtransfer);
 }
 
 // static
@@ -682,6 +691,13 @@ void ColorUtils::setColorAspectsIntoFormat(
             range, asString((ColorRange)range),
             standard, asString((ColorStandard)standard),
             transfer, asString((ColorTransfer)transfer));
+}
+
+
+// static
+void ColorUtils::setHDRStaticInfoIntoAMediaFormat(
+        const HDRStaticInfo &info, AMediaFormat *format) {
+    setHDRStaticInfoIntoFormat(info, format->mFormat);
 }
 
 // static

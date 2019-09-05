@@ -71,6 +71,14 @@ public:
          */
         virtual int stopAllRecognitions() = 0;
 
+        /* Get the current state of a given model.
+         * Returns 0 or an error code. If successful the state will be returned asynchronously
+         * via a recognition event in the callback method that was registered in the
+         * startRecognition() method.
+         * Only supported for device api versions SOUND_TRIGGER_DEVICE_API_VERSION_1_2 or above.
+         */
+        virtual int getModelState(sound_model_handle_t handle) = 0;
+
 protected:
         SoundTriggerHalInterface() {}
 };

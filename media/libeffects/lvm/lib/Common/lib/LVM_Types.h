@@ -94,6 +94,7 @@ typedef     uint16_t            LVM_UINT16;         /* Unsigned 16-bit word */
 
 typedef     int32_t             LVM_INT32;          /* Signed 32-bit word */
 typedef     uint32_t            LVM_UINT32;         /* Unsigned 32-bit word */
+typedef     int64_t             LVM_INT64;          /* Signed 64-bit word */
 
 #ifdef BUILD_FLOAT
 
@@ -122,6 +123,12 @@ typedef     int16_t             effect_buffer_t;
 
 #endif // NATIVE_FLOAT_BUFFER
 
+#ifdef SUPPORT_MC
+#define LVM_MAX_CHANNELS 8 // FCC_8
+#else
+#define LVM_MAX_CHANNELS 2 // FCC_2
+#endif
+
 /****************************************************************************************/
 /*                                                                                      */
 /*  Standard Enumerated types                                                           */
@@ -143,6 +150,9 @@ typedef enum
     LVM_STEREO          = 0,
     LVM_MONOINSTEREO    = 1,
     LVM_MONO            = 2,
+#ifdef SUPPORT_MC
+    LVM_MULTICHANNEL    = 3,
+#endif
     LVM_SOURCE_DUMMY    = LVM_MAXENUM
 } LVM_Format_en;
 
@@ -160,8 +170,10 @@ typedef enum
     LVM_FS_44100 = 7,
     LVM_FS_48000 = 8,
 #ifdef HIGHER_FS
-    LVM_FS_96000 = 9,
-    LVM_FS_192000 = 10,
+    LVM_FS_88200 = 9,
+    LVM_FS_96000 = 10,
+    LVM_FS_176400 = 11,
+    LVM_FS_192000 = 12,
 #endif
     LVM_FS_INVALID = LVM_MAXENUM-1,
     LVM_FS_DUMMY = LVM_MAXENUM

@@ -34,7 +34,10 @@ struct IDrm : public IInterface {
 
     virtual status_t initCheck() const = 0;
 
-    virtual bool isCryptoSchemeSupported(const uint8_t uuid[16], const String8 &mimeType) = 0;
+    virtual status_t isCryptoSchemeSupported(const uint8_t uuid[16],
+                                             const String8 &mimeType,
+                                             DrmPlugin::SecurityLevel securityLevel,
+                                             bool *result) = 0;
 
     virtual status_t createPlugin(const uint8_t uuid[16],
                                   const String8 &appPackageName) = 0;
@@ -75,8 +78,8 @@ struct IDrm : public IInterface {
                                               Vector<uint8_t> &certificate,
                                               Vector<uint8_t> &wrappedKey) = 0;
 
-    virtual status_t getSecureStops(List<Vector<uint8_t> > &secureStops) = 0;
-    virtual status_t getSecureStopIds(List<Vector<uint8_t> > &secureStopIds) = 0;
+    virtual status_t getSecureStops(List<Vector<uint8_t>> &secureStops) = 0;
+    virtual status_t getSecureStopIds(List<Vector<uint8_t>> &secureStopIds) = 0;
     virtual status_t getSecureStop(Vector<uint8_t> const &ssid, Vector<uint8_t> &secureStop) = 0;
 
     virtual status_t releaseSecureStops(Vector<uint8_t> const &ssRelease) = 0;
@@ -90,6 +93,11 @@ struct IDrm : public IInterface {
             uint32_t *maxSessions) const = 0;
     virtual status_t getSecurityLevel(Vector<uint8_t> const &sessionId,
             DrmPlugin::SecurityLevel *level) const = 0;
+
+    virtual status_t getOfflineLicenseKeySetIds(List<Vector<uint8_t>> &keySetIds) const = 0;
+    virtual status_t removeOfflineLicense(Vector<uint8_t> const &keySetId) = 0;
+    virtual status_t getOfflineLicenseState(Vector<uint8_t> const &keySetId,
+            DrmPlugin::OfflineLicenseState *licenseState) const = 0;
 
     virtual status_t getPropertyString(String8 const &name, String8 &value) const = 0;
     virtual status_t getPropertyByteArray(String8 const &name,

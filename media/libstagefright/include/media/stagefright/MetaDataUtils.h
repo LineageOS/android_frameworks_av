@@ -20,12 +20,23 @@
 
 #include <media/stagefright/MetaData.h>
 
+struct AMediaFormat;
+
 namespace android {
 
 struct ABuffer;
 bool MakeAVCCodecSpecificData(MetaDataBase &meta, const uint8_t *data, size_t size);
+bool MakeAVCCodecSpecificData(AMediaFormat *meta, const uint8_t *data, size_t size);
+
+bool MakeAACCodecSpecificData(MetaDataBase &meta, const uint8_t *data, size_t size);
 bool MakeAACCodecSpecificData(MetaDataBase &meta, unsigned profile, unsigned sampling_freq_index,
         unsigned channel_configuration);
+
+bool MakeAACCodecSpecificData(AMediaFormat *meta, unsigned profile, unsigned sampling_freq_index,
+        unsigned channel_configuration);
+
+void parseVorbisComment(
+        AMediaFormat *fileMeta, const char *comment, size_t commentLength);
 
 }  // namespace android
 

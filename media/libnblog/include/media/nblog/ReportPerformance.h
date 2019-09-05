@@ -22,11 +22,25 @@
 #include <vector>
 
 namespace android {
-
-// The String8 class is used by reportPerformance function
-class String8;
-
 namespace ReportPerformance {
+
+struct PerformanceData;
+
+// Dumps performance data in a JSON format.
+void dumpJson(int fd, const std::map<int, PerformanceData>& threadDataMap);
+
+//Dumps performance data as visualized plots.
+void dumpPlots(int fd, const std::map<int, PerformanceData>& threadDataMap);
+
+// Dumps snapshots at important events in the past.
+void dumpRetro(int fd, const std::map<int, PerformanceData>& threadDataMap);
+
+// Send one thread's data to media metrics, if the performance data is nontrivial (i.e. not
+// all zero values). Return true if data was sent, false if there is nothing to write
+// or an error occurred while writing.
+bool sendToMediaMetrics(const PerformanceData& data);
+
+//------------------------------------------------------------------------------
 
 constexpr int kMsPerSec = 1000;
 constexpr int kSecPerMin = 60;
@@ -34,7 +48,7 @@ constexpr int kSecPerMin = 60;
 constexpr int kJiffyPerMs = 10; // time unit for histogram as a multiple of milliseconds
 
 // stores a histogram: key: observed buffer period (multiple of jiffy). value: count
-using Histogram = std::map<int, int>;
+using Hist = std::map<int, int>;
 
 using msInterval = double;
 using jiffyInterval = double;
@@ -57,13 +71,12 @@ static inline uint32_t log2(uint32_t x) {
 }
 
 // Writes outlier intervals, timestamps, peaks timestamps, and histograms to a file.
-void writeToFile(const std::deque<std::pair<timestamp, Histogram>> &hists,
+void writeToFile(const std::deque<std::pair<timestamp, Hist>> &hists,
                  const std::deque<std::pair<msInterval, timestamp>> &outlierData,
                  const std::deque<timestamp> &peakTimestamps,
                  const char * kDirectory, bool append, int author, log_hash_t hash);
 
-} // namespace ReportPerformance
-
+}   // namespace ReportPerformance
 }   // namespace android
 
 #endif  // ANDROID_MEDIA_REPORTPERFORMANCE_H

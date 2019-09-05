@@ -18,11 +18,12 @@
 #define MIDI_EXTRACTOR_H_
 
 #include <media/DataSourceBase.h>
-#include <media/MediaExtractor.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/MediaBufferBase.h>
 #include <media/stagefright/MediaBufferGroup.h>
-#include <media/stagefright/MetaDataBase.h>
 #include <media/MidiIoWrapper.h>
+#include <media/NdkMediaFormat.h>
 #include <utils/String8.h>
 #include <libsonivox/eas.h>
 
@@ -30,48 +31,48 @@ namespace android {
 
 class MidiEngine {
 public:
-    explicit MidiEngine(DataSourceBase *dataSource,
-            MetaDataBase *fileMetadata,
-            MetaDataBase *trackMetadata);
+    explicit MidiEngine(CDataSource *dataSource,
+            AMediaFormat *fileMetadata,
+            AMediaFormat *trackMetadata);
     ~MidiEngine();
 
     status_t initCheck();
 
-    status_t allocateBuffers();
+    status_t allocateBuffers(MediaBufferGroupHelper *group);
     status_t releaseBuffers();
     status_t seekTo(int64_t positionUs);
-    MediaBufferBase* readBuffer();
+    MediaBufferHelper* readBuffer();
 private:
     MidiIoWrapper *mIoWrapper;
-    MediaBufferGroup *mGroup;
+    MediaBufferGroupHelper *mGroup;
     EAS_DATA_HANDLE mEasData;
     EAS_HANDLE mEasHandle;
     const S_EAS_LIB_CONFIG* mEasConfig;
     bool mIsInitialized;
 };
 
-class MidiExtractor : public MediaExtractor {
+class MidiExtractor : public MediaExtractorPluginHelper {
 
 public:
-    explicit MidiExtractor(DataSourceBase *source);
+    explicit MidiExtractor(CDataSource *source);
 
     virtual size_t countTracks();
-    virtual MediaTrack *getTrack(size_t index);
-    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
+    virtual MediaTrackHelper *getTrack(size_t index);
+    virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
-    virtual status_t getMetaData(MetaDataBase& meta);
+    virtual media_status_t getMetaData(AMediaFormat *meta);
     virtual const char * name() { return "MidiExtractor"; }
 
 protected:
     virtual ~MidiExtractor();
 
 private:
-    DataSourceBase *mDataSource;
+    CDataSource *mDataSource;
     status_t mInitCheck;
-    MetaDataBase mFileMetadata;
+    AMediaFormat *mFileMetadata;
 
     // There is only one track
-    MetaDataBase mTrackMetadata;
+    AMediaFormat *mTrackMetadata;
 
     MidiEngine *mEngine;
 
@@ -88,7 +89,7 @@ private:
 
 };
 
-bool SniffMidi(DataSourceBase *source, float *confidence);
+bool SniffMidi(CDataSource *source, float *confidence);
 
 }  // namespace android
 

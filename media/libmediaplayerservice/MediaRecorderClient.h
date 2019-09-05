@@ -18,10 +18,12 @@
 #ifndef ANDROID_MEDIARECORDERCLIENT_H
 #define ANDROID_MEDIARECORDERCLIENT_H
 
+#include "DeathNotifier.h"
+
 #include <media/AudioSystem.h>
 #include <media/IMediaRecorder.h>
 
-#include <android/hardware/media/omx/1.0/IOmx.h>
+#include <vector>
 
 namespace android {
 
@@ -31,34 +33,6 @@ class ICameraRecordingProxy;
 
 class MediaRecorderClient : public BnMediaRecorder
 {
-    typedef ::android::hardware::media::omx::V1_0::IOmx IOmx;
-
-    class ServiceDeathNotifier :
-            public IBinder::DeathRecipient,
-            public ::android::hardware::hidl_death_recipient
-    {
-    public:
-        ServiceDeathNotifier(
-                const sp<IBinder>& service,
-                const sp<IMediaRecorderClient>& listener,
-                int which);
-        ServiceDeathNotifier(
-                const sp<IOmx>& omx,
-                const sp<IMediaRecorderClient>& listener,
-                int which);
-        virtual ~ServiceDeathNotifier();
-        virtual void binderDied(const wp<IBinder>& who);
-        virtual void serviceDied(
-                uint64_t cookie,
-                const wp<::android::hidl::base::V1_0::IBase>& who);
-        void unlinkToDeath();
-    private:
-        int mWhich;
-        sp<IBinder> mService;
-        sp<IOmx> mOmx;
-        wp<IMediaRecorderClient> mListener;
-    };
-
     class AudioDeviceUpdatedNotifier: public AudioSystem::AudioDeviceCallback
     {
     public:
@@ -70,8 +44,6 @@ class MediaRecorderClient : public BnMediaRecorder
     private:
         wp<IMediaRecorderClient> mListener;
     };
-
-    void clearDeathNotifiers_l();
 
 public:
     virtual     status_t   setCamera(const sp<hardware::ICamera>& camera,
@@ -109,6 +81,9 @@ public:
     virtual     status_t   enableAudioDeviceCallback(bool enabled);
     virtual     status_t   getActiveMicrophones(
                               std::vector<media::MicrophoneInfo>* activeMicrophones);
+    virtual     status_t   setPreferredMicrophoneDirection(audio_microphone_direction_t direction);
+    virtual     status_t   setPreferredMicrophoneFieldDimension(float zoom);
+                status_t   getPortId(audio_port_handle_t *portId) override;
 
 private:
     friend class           MediaPlayerService;  // for accessing private constructor
@@ -119,8 +94,7 @@ private:
                                                                const String16& opPackageName);
     virtual                ~MediaRecorderClient();
 
-    sp<ServiceDeathNotifier> mCameraDeathListener;
-    sp<ServiceDeathNotifier> mCodecDeathListener;
+    std::vector<DeathNotifier> mDeathNotifiers;
     sp<AudioDeviceUpdatedNotifier> mAudioDeviceUpdatedNotifier;
 
     pid_t                  mPid;

@@ -117,6 +117,11 @@ size_t RecordBufferConverter::convert(void *dst,
         // format convert to destination buffer
         convertResampler(dst, mBuf, frames);
     }
+    // Release unused frames in the InputConverterProvider buffer so that
+    // the RecordThread is able to properly account for consumed frames.
+    if (mInputConverterProvider != nullptr) {
+        mInputConverterProvider->reset();
+    }
     return frames;
 }
 

@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 #include <media/stagefright/DataURISource.h>
 
 #include <media/stagefright/foundation/ABuffer.h>
@@ -39,15 +38,27 @@ sp<DataURISource> DataURISource::Create(const char *uri) {
     AString tmp(&uri[5], commaPos - &uri[5]);
 
     if (tmp.endsWith(";base64")) {
-        AString encoded(commaPos + 1);
 
-        // Strip CR and LF...
-        for (size_t i = encoded.size(); i > 0;) {
-            i--;
-            if (encoded.c_str()[i] == '\r' || encoded.c_str()[i] == '\n') {
-                encoded.erase(i, 1);
+        // strip all CR and LF characters.
+        const char *src = commaPos+1;
+        int len = strlen(src) + 1;
+        char *cleansed = (char *) malloc(len);
+        if (cleansed == NULL) return NULL;
+        char *keeping = cleansed;
+        int left = len;
+        for (int i = 0; i < len ; i++)
+        {
+            const char c = *src++;
+            if (c == '\r' || c == '\n') {
+                continue;
             }
+            *keeping++ = c;
+            left--;
         }
+        memset(keeping, 0, left);
+
+        AString encoded(cleansed);
+        free(cleansed);
 
         buffer = decodeBase64(encoded);
 

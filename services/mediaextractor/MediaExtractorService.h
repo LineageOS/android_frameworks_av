@@ -27,7 +27,7 @@ class MediaExtractorService : public BinderService<MediaExtractorService>, publi
 {
     friend class BinderService<MediaExtractorService>;    // for MediaExtractorService()
 public:
-    MediaExtractorService() : BnMediaExtractorService() { }
+    MediaExtractorService();
     virtual ~MediaExtractorService() { }
     virtual void onFirstRef() { }
 
@@ -36,6 +36,8 @@ public:
     virtual sp<IMediaExtractor> makeExtractor(const sp<IDataSource> &source, const char *mime);
 
     virtual sp<IDataSource> makeIDataSource(int fd, int64_t offset, int64_t length);
+
+    virtual std::unordered_set<std::string> getSupportedTypes();
 
     virtual status_t    dump(int fd, const Vector<String16>& args);
 

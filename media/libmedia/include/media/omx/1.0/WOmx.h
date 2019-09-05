@@ -47,7 +47,6 @@ using ::android::sp;
 
 using ::android::List;
 using ::android::IOMX;
-using ::android::BnOMX;
 
 /**
  * Wrapper classes for conversion
@@ -58,7 +57,7 @@ using ::android::BnOMX;
  * - TW = Treble Wrapper --- It wraps a legacy object inside a Treble object.
  */
 
-struct LWOmx : public BnOMX {
+struct LWOmx : public IOMX {
     sp<IOmx> mBase;
     LWOmx(sp<IOmx> const& base);
     status_t listNodes(List<IOMX::ComponentInfo>* list) override;

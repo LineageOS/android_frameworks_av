@@ -24,6 +24,7 @@
 
 #include <aaudio/AAudio.h>
 #include <mediautils/SchedulingPolicyService.h>
+#include <mediautils/ServiceUtilities.h>
 #include <utils/String16.h>
 
 #include "binding/AAudioServiceMessage.h"
@@ -33,8 +34,6 @@
 #include "AAudioServiceStreamMMAP.h"
 #include "AAudioServiceStreamShared.h"
 #include "binding/IAAudioService.h"
-#include "core/AudioGlobal.h"
-#include "ServiceUtilities.h"
 
 using namespace android;
 using namespace aaudio;
@@ -119,21 +118,24 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
         }
     }
 
-    // if SHARED requested or if EXCLUSIVE failed
-    if (sharingMode == AAUDIO_SHARING_MODE_SHARED
-         || (serviceStream.get() == nullptr && !sharingModeMatchRequired)) {
+    // Try SHARED if SHARED requested or if EXCLUSIVE failed.
+    if (sharingMode == AAUDIO_SHARING_MODE_SHARED) {
         serviceStream =  new AAudioServiceStreamShared(*this);
         result = serviceStream->open(request);
+    } else if (serviceStream.get() == nullptr && !sharingModeMatchRequired) {
+        aaudio::AAudioStreamRequest modifiedRequest = request;
+        // Overwrite the original EXCLUSIVE mode with SHARED.
+        modifiedRequest.getConfiguration().setSharingMode(AAUDIO_SHARING_MODE_SHARED);
+        serviceStream =  new AAudioServiceStreamShared(*this);
+        result = serviceStream->open(modifiedRequest);
     }
 
     if (result != AAUDIO_OK) {
         serviceStream.clear();
-        ALOGE("openStream(): failed, return %d = %s",
-              result, AudioGlobal_convertResultToText(result));
         return result;
     } else {
         aaudio_handle_t handle = mStreamTracker.addStreamForHandle(serviceStream.get());
-        ALOGD("openStream(): handle = 0x%08X", handle);
+        ALOGV("openStream(): handle = 0x%08X", handle);
         serviceStream->setHandle(handle);
         pid_t pid = request.getProcessId();
         AAudioClientTracker::getInstance().registerClientStream(pid, serviceStream);

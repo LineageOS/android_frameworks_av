@@ -52,8 +52,7 @@ public:
 
     aaudio_result_t getTimestamp(int64_t *positionFrames, int64_t *timeNanos) override;
 
-    virtual void            *callbackLoop() = 0;
-
+    virtual void   *callbackLoop() = 0;
 
 protected:
 

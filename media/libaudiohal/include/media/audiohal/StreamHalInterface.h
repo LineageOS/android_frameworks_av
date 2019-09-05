@@ -109,6 +109,9 @@ class StreamOutHalInterface : public virtual StreamHalInterface {
     // Use this method in situations where audio mixing is done in the hardware.
     virtual status_t setVolume(float left, float right) = 0;
 
+    // Selects the audio presentation (if available).
+    virtual status_t selectPresentation(int presentationId, int programId) = 0;
+
     // Write audio buffer to driver.
     virtual status_t write(const void *buffer, size_t bytes, size_t *written) = 0;
 
@@ -175,6 +178,12 @@ class StreamInHalInterface : public virtual StreamHalInterface {
 
     // Get active microphones
     virtual status_t getActiveMicrophones(std::vector<media::MicrophoneInfo> *microphones) = 0;
+
+    // Set direction for capture processing
+    virtual status_t setPreferredMicrophoneDirection(audio_microphone_direction_t) = 0;
+
+    // Set zoom factor for capture stream
+    virtual status_t setPreferredMicrophoneFieldDimension(float zoom) = 0;
 
     struct SinkMetadata {
         std::vector<record_track_metadata_t> tracks;

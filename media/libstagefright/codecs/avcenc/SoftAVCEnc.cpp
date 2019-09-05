@@ -21,8 +21,8 @@
 
 #include "OMX_Video.h"
 
-#include <HardwareAPI.h>
-#include <MetadataBufferType.h>
+#include <media/hardware/HardwareAPI.h>
+#include <media/hardware/MetadataBufferType.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
@@ -1058,8 +1058,8 @@ OMX_ERRORTYPE SoftAVC::getConfig(
     }
 }
 
-OMX_ERRORTYPE SoftAVC::setConfig(
-        OMX_INDEXTYPE index, const OMX_PTR _params) {
+OMX_ERRORTYPE SoftAVC::internalSetConfig(
+        OMX_INDEXTYPE index, const OMX_PTR _params, bool *frameConfig) {
     switch ((int)index) {
         case OMX_IndexConfigVideoIntraVOPRefresh:
         {
@@ -1125,7 +1125,7 @@ OMX_ERRORTYPE SoftAVC::setConfig(
         }
 
         default:
-            return SimpleSoftOMXComponent::setConfig(index, _params);
+            return SimpleSoftOMXComponent::internalSetConfig(index, _params, frameConfig);
     }
 }
 

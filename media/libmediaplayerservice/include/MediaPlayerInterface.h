@@ -151,13 +151,13 @@ public:
 
         virtual media::VolumeShaper::Status applyVolumeShaper(
                                     const sp<media::VolumeShaper::Configuration>& configuration,
-                                    const sp<media::VolumeShaper::Operation>& operation);
-        virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id);
+                                    const sp<media::VolumeShaper::Operation>& operation) = 0;
+        virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) = 0;
 
         // AudioRouting
-        virtual status_t    setOutputDevice(audio_port_handle_t deviceId);
-        virtual status_t    getRoutedDeviceId(audio_port_handle_t* deviceId);
-        virtual status_t    enableAudioDeviceCallback(bool enabled);
+        virtual status_t    setOutputDevice(audio_port_handle_t deviceId) = 0;
+        virtual status_t    getRoutedDeviceId(audio_port_handle_t* deviceId) = 0;
+        virtual status_t    enableAudioDeviceCallback(bool enabled) = 0;
     };
 
                         MediaPlayerBase() {}

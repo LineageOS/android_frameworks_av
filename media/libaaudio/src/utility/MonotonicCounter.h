@@ -41,10 +41,12 @@ public:
     }
 
     /**
-     * set the current value of the counter
+     * advance the current value to match the counter
      */
-    void set(int64_t counter) {
-        mCounter64 = counter;
+    void catchUpTo(int64_t counter) {
+        if ((counter - mCounter64) > 0) {
+            mCounter64 = counter;
+        }
     }
 
     /**

@@ -19,13 +19,15 @@
 
 #include <set>
 
+#include <media/NdkMediaFormat.h>
+
 #include <media/stagefright/foundation/ADebug.h>
 #include <utils/KeyedVector.h>
 #include <utils/RefBase.h>
 
 namespace android {
 
-class DataSourceBase;
+class DataSourceHelper;
 class MetaData;
 
 namespace heif {
@@ -45,13 +47,13 @@ struct ItemReference;
 
 class ItemTable : public RefBase {
 public:
-    explicit ItemTable(DataSourceBase *source);
+    explicit ItemTable(DataSourceHelper *source);
 
     status_t parse(uint32_t type, off64_t offset, size_t size);
 
     bool isValid() { return mImageItemsValid; }
     uint32_t countImages() const;
-    sp<MetaData> getImageMeta(const uint32_t imageIndex);
+    AMediaFormat *getImageMeta(const uint32_t imageIndex);
     status_t findImageItem(const uint32_t imageIndex, uint32_t *itemIndex);
     status_t findThumbnailItem(const uint32_t imageIndex, uint32_t *itemIndex);
     status_t getImageOffsetAndSize(
@@ -62,7 +64,7 @@ protected:
     ~ItemTable();
 
 private:
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
 
     KeyedVector<uint32_t, ItemLoc> mItemLocs;
     Vector<ItemInfo> mItemInfos;

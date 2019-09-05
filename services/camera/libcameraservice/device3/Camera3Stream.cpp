@@ -60,14 +60,19 @@ Camera3Stream::Camera3Stream(int id,
     mUsage(0),
     mOldUsage(0),
     mOldMaxBuffers(0),
+    mOldFormat(-1),
+    mOldDataSpace(HAL_DATASPACE_UNKNOWN),
     mPrepared(false),
     mPrepareBlockRequest(true),
     mPreparedBufferIdx(0),
     mLastMaxCount(Camera3StreamInterface::ALLOCATE_PIPELINE_MAX),
     mBufferLimitLatency(kBufferLimitLatencyBinSize),
     mFormatOverridden(false),
-    mOriginalFormat(-1),
-    mPhysicalCameraId(physicalCameraId) {
+    mOriginalFormat(format),
+    mDataSpaceOverridden(false),
+    mOriginalDataSpace(HAL_DATASPACE_UNKNOWN),
+    mPhysicalCameraId(physicalCameraId),
+    mLastTimestamp(0) {
 
     camera3_stream::stream_type = type;
     camera3_stream::width = width;
@@ -120,7 +125,6 @@ void Camera3Stream::setUsage(uint64_t usage) {
 
 void Camera3Stream::setFormatOverride(bool formatOverridden) {
     mFormatOverridden = formatOverridden;
-    if (formatOverridden) mOriginalFormat = camera3_stream::format;
 }
 
 bool Camera3Stream::isFormatOverridden() const {
@@ -133,7 +137,9 @@ int Camera3Stream::getOriginalFormat() const {
 
 void Camera3Stream::setDataSpaceOverride(bool dataSpaceOverridden) {
     mDataSpaceOverridden = dataSpaceOverridden;
-    if (dataSpaceOverridden) mOriginalDataSpace = camera3_stream::data_space;
+    if (dataSpaceOverridden && mOriginalDataSpace == HAL_DATASPACE_UNKNOWN) {
+        mOriginalDataSpace = camera3_stream::data_space;
+    }
 }
 
 bool Camera3Stream::isDataSpaceOverridden() const {
@@ -249,6 +255,8 @@ camera3_stream* Camera3Stream::startConfiguration() {
 
     mOldUsage = mUsage;
     mOldMaxBuffers = camera3_stream::max_buffers;
+    mOldFormat = camera3_stream::format;
+    mOldDataSpace = camera3_stream::data_space;
 
     res = getEndpointUsage(&mUsage);
     if (res != OK) {
@@ -323,7 +331,9 @@ status_t Camera3Stream::finishConfiguration(/*out*/bool* streamReconfigured) {
     // so. As documented in hardware/camera3.h:configure_streams().
     if (mState == STATE_IN_RECONFIG &&
             mOldUsage == mUsage &&
-            mOldMaxBuffers == camera3_stream::max_buffers && !mDataSpaceOverridden) {
+            mOldMaxBuffers == camera3_stream::max_buffers &&
+            mOldDataSpace == camera3_stream::data_space &&
+            mOldFormat == camera3_stream::format) {
         mState = STATE_CONFIGURED;
         return OK;
     }
@@ -594,7 +604,11 @@ status_t Camera3Stream::getBuffer(camera3_stream_buffer *buffer,
     if (mState != STATE_CONFIGURED) {
         ALOGE("%s: Stream %d: Can't get buffers if stream is not in CONFIGURED state %d",
                 __FUNCTION__, mId, mState);
-        return INVALID_OPERATION;
+        if (mState == STATE_ABANDONED) {
+            return DEAD_OBJECT;
+        } else {
+            return INVALID_OPERATION;
+        }
     }
 
     // Wait for new buffer returned back if we are running into the limit.
@@ -661,7 +675,8 @@ void Camera3Stream::removeOutstandingBuffer(const camera3_stream_buffer &buffer)
 }
 
 status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
-        nsecs_t timestamp) {
+        nsecs_t timestamp, bool timestampIncreasing,
+         const std::vector<size_t>& surface_ids, uint64_t frameNumber) {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
 
@@ -673,6 +688,15 @@ status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
 
     removeOutstandingBuffer(buffer);
 
+    // Buffer status may be changed, so make a copy of the stream_buffer struct.
+    camera3_stream_buffer b = buffer;
+    if (timestampIncreasing && timestamp != 0 && timestamp <= mLastTimestamp) {
+        ALOGE("%s: Stream %d: timestamp %" PRId64 " is not increasing. Prev timestamp %" PRId64,
+                __FUNCTION__, mId, timestamp, mLastTimestamp);
+        b.status = CAMERA3_BUFFER_STATUS_ERROR;
+    }
+    mLastTimestamp = timestamp;
+
     /**
      * TODO: Check that the state is valid first.
      *
@@ -681,9 +705,9 @@ status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
      *
      * Do this for getBuffer as well.
      */
-    status_t res = returnBufferLocked(buffer, timestamp);
+    status_t res = returnBufferLocked(b, timestamp, surface_ids);
     if (res == OK) {
-        fireBufferListenersLocked(buffer, /*acquired*/false, /*output*/true);
+        fireBufferListenersLocked(b, /*acquired*/false, /*output*/true, timestamp, frameNumber);
     }
 
     // Even if returning the buffer failed, we still want to signal whoever is waiting for the
@@ -759,8 +783,22 @@ status_t Camera3Stream::getInputBufferProducer(sp<IGraphicBufferProducer> *produ
     return getInputBufferProducerLocked(producer);
 }
 
+void Camera3Stream::fireBufferRequestForFrameNumber(uint64_t frameNumber,
+        const CameraMetadata& settings) {
+    ATRACE_CALL();
+    Mutex::Autolock l(mLock);
+
+    for (auto &it : mBufferListenerList) {
+        sp<Camera3StreamBufferListener> listener = it.promote();
+        if (listener.get() != nullptr) {
+            listener->onBufferRequestForFrameNumber(frameNumber, getId(), settings);
+        }
+    }
+}
+
 void Camera3Stream::fireBufferListenersLocked(
-        const camera3_stream_buffer& buffer, bool acquired, bool output) {
+        const camera3_stream_buffer& buffer, bool acquired, bool output, nsecs_t timestamp,
+        uint64_t frameNumber) {
     List<wp<Camera3StreamBufferListener> >::iterator it, end;
 
     // TODO: finish implementing
@@ -769,6 +807,8 @@ void Camera3Stream::fireBufferListenersLocked(
         Camera3StreamBufferListener::BufferInfo();
     info.mOutput = output;
     info.mError = (buffer.status == CAMERA3_BUFFER_STATUS_ERROR);
+    info.mFrameNumber = frameNumber;
+    info.mTimestamp = timestamp;
     // TODO: rest of fields
 
     for (it = mBufferListenerList.begin(), end = mBufferListenerList.end();
@@ -790,6 +830,12 @@ bool Camera3Stream::hasOutstandingBuffers() const {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
     return hasOutstandingBuffersLocked();
+}
+
+size_t Camera3Stream::getOutstandingBuffersCount() const {
+    ATRACE_CALL();
+    Mutex::Autolock l(mLock);
+    return getHandoutOutputBufferCountLocked();
 }
 
 status_t Camera3Stream::setStatusTracker(sp<StatusTracker> statusTracker) {
@@ -834,7 +880,7 @@ status_t Camera3Stream::getBufferLocked(camera3_stream_buffer *,
     return INVALID_OPERATION;
 }
 status_t Camera3Stream::returnBufferLocked(const camera3_stream_buffer &,
-                                           nsecs_t) {
+                                           nsecs_t, const std::vector<size_t>&) {
     ALOGE("%s: This type of stream does not support output", __FUNCTION__);
     return INVALID_OPERATION;
 }

@@ -26,7 +26,6 @@
 namespace android {
 
 class DataSource;
-class MediaExtractor;
 struct ImageDecoder;
 struct FrameRect;
 

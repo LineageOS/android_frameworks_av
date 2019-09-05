@@ -43,12 +43,7 @@ using namespace aaudio;   // TODO just import names needed
 
 AAudioServiceEndpointPlay::AAudioServiceEndpointPlay(AAudioService &audioService)
         : mStreamInternalPlay(audioService, true) {
-    ALOGD("%s(%p) created", __func__, this);
     mStreamInternal = &mStreamInternalPlay;
-}
-
-AAudioServiceEndpointPlay::~AAudioServiceEndpointPlay() {
-    ALOGD("%s(%p) destroyed", __func__, this);
 }
 
 aaudio_result_t AAudioServiceEndpointPlay::open(const aaudio::AAudioStreamRequest &request) {
@@ -87,6 +82,10 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
             for (const auto& clientStream : mRegisteredStreams) {
                 int64_t clientFramesRead = 0;
                 bool allowUnderflow = true;
+
+                if (clientStream->isSuspended()) {
+                    continue; // dead stream
+                }
 
                 aaudio_stream_state_t state = clientStream->getState();
                 if (state == AAUDIO_STREAM_STATE_STOPPING) {

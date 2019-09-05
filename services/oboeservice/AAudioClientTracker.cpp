@@ -67,6 +67,12 @@ aaudio_result_t AAudioClientTracker::registerClient(pid_t pid,
                                          const sp<IAAudioClient>& client) {
     ALOGV("registerClient(), calling pid = %d, getpid() = %d\n", pid, getpid());
 
+    if (client.get() == nullptr) {
+        ALOGE("AAudioClientTracker::%s() client is NULL!", __func__);
+        android_errorWriteLog(0x534e4554, "116230453");
+        return AAUDIO_ERROR_NULL;
+    }
+
     std::lock_guard<std::mutex> lock(mLock);
     if (mNotificationClients.count(pid) == 0) {
         sp<NotificationClient> notificationClient = new NotificationClient(pid);
@@ -101,7 +107,7 @@ int32_t AAudioClientTracker::getStreamCount(pid_t pid) {
 aaudio_result_t
 AAudioClientTracker::registerClientStream(pid_t pid, sp<AAudioServiceStreamBase> serviceStream) {
     aaudio_result_t result = AAUDIO_OK;
-    ALOGV("registerClientStream(%d, %p)\n", pid, serviceStream.get());
+    ALOGV("registerClientStream(%d,)\n", pid);
     std::lock_guard<std::mutex> lock(mLock);
     sp<NotificationClient> notificationClient = mNotificationClients[pid];
     if (notificationClient == 0) {
@@ -118,27 +124,23 @@ AAudioClientTracker::registerClientStream(pid_t pid, sp<AAudioServiceStreamBase>
 aaudio_result_t
 AAudioClientTracker::unregisterClientStream(pid_t pid,
                                             sp<AAudioServiceStreamBase> serviceStream) {
-    ALOGV("unregisterClientStream(%d, %p)\n", pid, serviceStream.get());
+    ALOGV("unregisterClientStream(%d,)\n", pid);
     std::lock_guard<std::mutex> lock(mLock);
     auto it = mNotificationClients.find(pid);
     if (it != mNotificationClients.end()) {
-        ALOGV("unregisterClientStream(%d, %p) found NotificationClient\n",
-              pid, serviceStream.get());
+        ALOGV("unregisterClientStream(%d,) found NotificationClient\n", pid);
         it->second->unregisterClientStream(serviceStream);
     } else {
-        ALOGE("unregisterClientStream(%d, %p) missing NotificationClient\n",
-              pid, serviceStream.get());
+        ALOGE("unregisterClientStream(%d,) missing NotificationClient\n", pid);
     }
     return AAUDIO_OK;
 }
 
 AAudioClientTracker::NotificationClient::NotificationClient(pid_t pid)
         : mProcessId(pid) {
-    //ALOGD("NotificationClient(%d) created %p\n", pid, this);
 }
 
 AAudioClientTracker::NotificationClient::~NotificationClient() {
-    //ALOGD("~NotificationClient() destroyed %p\n", this);
 }
 
 int32_t AAudioClientTracker::NotificationClient::getStreamCount() {

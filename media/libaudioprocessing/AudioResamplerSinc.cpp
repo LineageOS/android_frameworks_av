@@ -19,6 +19,7 @@
 
 #define __STDC_CONSTANT_MACROS
 #include <malloc.h>
+#include <pthread.h>
 #include <string.h>
 #include <stdlib.h>
 #include <dlfcn.h>

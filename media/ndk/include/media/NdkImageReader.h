@@ -37,6 +37,9 @@
 #define _NDK_IMAGE_READER_H
 
 #include <sys/cdefs.h>
+#ifdef __ANDROID_VNDK__
+#include <cutils/native_handle.h>
+#endif
 
 #include <android/native_window.h>
 #include "NdkMediaError.h"
@@ -460,6 +463,23 @@ typedef struct AImageReader_BufferRemovedListener {
  */
 media_status_t AImageReader_setBufferRemovedListener(
         AImageReader* reader, AImageReader_BufferRemovedListener* listener) __INTRODUCED_IN(26);
+
+#ifdef __ANDROID_VNDK__
+/*
+ * Get the native_handle_t corresponding to the ANativeWindow owned by the
+ * AImageReader provided.
+ *
+ * @param reader The image reader of interest.
+ * @param handle The output native_handle_t. This native handle is owned by
+ *               this image reader.
+ *
+ * @return AMEDIA_OK if the method call succeeds.
+ *         AMEDIA_ERROR_INVALID_PARAMETER if reader or handle are NULL.
+ *         AMEDIA_ERROR_UNKNOWN if some other error is encountered.
+ */
+media_status_t AImageReader_getWindowNativeHandle(
+    AImageReader *reader, /* out */native_handle_t **handle);
+#endif
 
 #endif /* __ANDROID_API__ >= 26 */
 

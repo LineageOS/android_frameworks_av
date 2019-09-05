@@ -61,6 +61,15 @@ extern "C" {
 
 /* Memory */
 #define LVCS_SCRATCHBUFFERS              6      /* Number of buffers required for inplace processing */
+#ifdef SUPPORT_MC
+/*
+ * The Concert Surround module applies processing only on the first two
+ * channels of a multichannel input. The data of first two channels is copied
+ * from the multichannel input into scratch buffer. The buffers added here
+ * are used for this purpose
+ */
+#define LVCS_MC_SCRATCHBUFFERS           2
+#endif
 
 /* General */
 #define LVCS_INVALID                0xFFFF      /* Invalid init parameter */

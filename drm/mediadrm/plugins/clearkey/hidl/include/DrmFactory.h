@@ -17,15 +17,15 @@
 #ifndef CLEARKEY_DRM_FACTORY_H_
 #define CLEARKEY_DRM_FACTORY_H_
 
-#include <android/hardware/drm/1.1/IDrmPlugin.h>
-#include <android/hardware/drm/1.1/IDrmFactory.h>
+#include <android/hardware/drm/1.2/IDrmPlugin.h>
+#include <android/hardware/drm/1.2/IDrmFactory.h>
 
 #include "ClearKeyTypes.h"
 
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_1 {
+namespace V1_2 {
 namespace clearkey {
 
 using ::android::hardware::hidl_array;
@@ -38,6 +38,10 @@ struct DrmFactory : public IDrmFactory {
 
     Return<bool> isCryptoSchemeSupported(const hidl_array<uint8_t, 16>& uuid)
             override;
+
+    Return<bool> isCryptoSchemeSupported_1_2(const hidl_array<uint8_t, 16>& uuid,
+                                             const hidl_string& mimeType,
+                                             SecurityLevel level) override;
 
     Return<bool> isContentTypeSupported(const hidl_string &mimeType)
             override;
@@ -52,7 +56,7 @@ private:
 };
 
 } // namespace clearkey
-} // namespace V1_1
+} // namespace V1_2
 } // namespace drm
 } // namespace hardware
 } // namespace android

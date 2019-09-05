@@ -61,7 +61,10 @@ enum {
     GET_NUMBER_OF_SESSIONS,
     GET_SECURITY_LEVEL,
     REMOVE_SECURE_STOP,
-    GET_SECURE_STOP_IDS
+    GET_SECURE_STOP_IDS,
+    GET_OFFLINE_LICENSE_KEYSET_IDS,
+    REMOVE_OFFLINE_LICENSE,
+    GET_OFFLINE_LICENSE_STATE
 };
 
 struct BpDrm : public BpInterface<IDrm> {
@@ -80,18 +83,22 @@ struct BpDrm : public BpInterface<IDrm> {
         return reply.readInt32();
     }
 
-    virtual bool isCryptoSchemeSupported(const uint8_t uuid[16], const String8 &mimeType) {
+    virtual status_t isCryptoSchemeSupported(const uint8_t uuid[16], const String8 &mimeType,
+            DrmPlugin::SecurityLevel level, bool *isSupported) {
         Parcel data, reply;
         data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
         data.write(uuid, 16);
         data.writeString8(mimeType);
+        data.writeInt32(level);
+
         status_t status = remote()->transact(IS_CRYPTO_SUPPORTED, data, &reply);
         if (status != OK) {
             ALOGE("isCryptoSchemeSupported: binder call failed: %d", status);
-            return false;
+            return status;
         }
+        *isSupported = static_cast<bool>(reply.readInt32());
 
-        return reply.readInt32() != 0;
+        return reply.readInt32();
     }
 
     virtual status_t createPlugin(const uint8_t uuid[16],
@@ -120,11 +127,11 @@ struct BpDrm : public BpInterface<IDrm> {
         return reply.readInt32();
     }
 
-    virtual status_t openSession(DrmPlugin::SecurityLevel securityLevel,
+    virtual status_t openSession(DrmPlugin::SecurityLevel level,
             Vector<uint8_t> &sessionId) {
         Parcel data, reply;
         data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
-        data.writeInt32(securityLevel);
+        data.writeInt32(level);
 
         status_t status = remote()->transact(OPEN_SESSION, data, &reply);
         if (status != OK) {
@@ -373,6 +380,52 @@ struct BpDrm : public BpInterface<IDrm> {
             return status;
         }
 
+        return reply.readInt32();
+    }
+
+    virtual status_t getOfflineLicenseKeySetIds(List<Vector<uint8_t> > &keySetIds) const {
+        Parcel data, reply;
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        status_t status = remote()->transact(GET_OFFLINE_LICENSE_KEYSET_IDS, data, &reply);
+        if (status != OK) {
+            return status;
+        }
+
+        keySetIds.clear();
+        uint32_t count = reply.readInt32();
+        for (size_t i = 0; i < count; i++) {
+            Vector<uint8_t> keySetId;
+            readVector(reply, keySetId);
+            keySetIds.push_back(keySetId);
+        }
+        return reply.readInt32();
+    }
+
+    virtual status_t removeOfflineLicense(Vector<uint8_t> const &keySetId) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        writeVector(data, keySetId);
+        status_t status = remote()->transact(REMOVE_OFFLINE_LICENSE, data, &reply);
+        if (status != OK) {
+            return status;
+        }
+        return reply.readInt32();
+    }
+
+    virtual status_t getOfflineLicenseState(Vector<uint8_t> const &keySetId,
+            DrmPlugin::OfflineLicenseState *licenseState) const {
+        Parcel data, reply;
+        data.writeInterfaceToken(IDrm::getInterfaceDescriptor());
+
+        writeVector(data, keySetId);
+        status_t status = remote()->transact(GET_OFFLINE_LICENSE_STATE, data, &reply);
+        if (status != OK) {
+            *licenseState = DrmPlugin::OfflineLicenseState::kOfflineLicenseStateUnknown;
+            return status;
+        }
+        *licenseState = static_cast<DrmPlugin::OfflineLicenseState>(reply.readInt32());
         return reply.readInt32();
     }
 
@@ -719,7 +772,12 @@ status_t BnDrm::onTransact(
             uint8_t uuid[16];
             data.read(uuid, sizeof(uuid));
             String8 mimeType = data.readString8();
-            reply->writeInt32(isCryptoSchemeSupported(uuid, mimeType));
+            DrmPlugin::SecurityLevel level =
+                    static_cast<DrmPlugin::SecurityLevel>(data.readInt32());
+            bool isSupported = false;
+            status_t result = isCryptoSchemeSupported(uuid, mimeType, level, &isSupported);
+            reply->writeInt32(isSupported);
+            reply->writeInt32(result);
             return OK;
         }
 
@@ -976,6 +1034,45 @@ status_t BnDrm::onTransact(
             DrmPlugin::SecurityLevel level = DrmPlugin::kSecurityLevelUnknown;
             status_t result = getSecurityLevel(sessionId, &level);
             reply->writeInt32(level);
+            reply->writeInt32(result);
+            return OK;
+        }
+
+        case GET_OFFLINE_LICENSE_KEYSET_IDS:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+            List<Vector<uint8_t> > keySetIds;
+            status_t result = getOfflineLicenseKeySetIds(keySetIds);
+            size_t count = keySetIds.size();
+            reply->writeInt32(count);
+            List<Vector<uint8_t> >::iterator iter = keySetIds.begin();
+            while(iter != keySetIds.end()) {
+                size_t size = iter->size();
+                reply->writeInt32(size);
+                reply->write(iter->array(), iter->size());
+                iter++;
+            }
+            reply->writeInt32(result);
+            return OK;
+        }
+
+        case REMOVE_OFFLINE_LICENSE:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+            Vector<uint8_t> keySetId;
+            readVector(data, keySetId);
+            reply->writeInt32(removeOfflineLicense(keySetId));
+            return OK;
+        }
+
+        case GET_OFFLINE_LICENSE_STATE:
+        {
+            CHECK_INTERFACE(IDrm, data, reply);
+            Vector<uint8_t> keySetId;
+            readVector(data, keySetId);
+            DrmPlugin::OfflineLicenseState state;
+            status_t result = getOfflineLicenseState(keySetId, &state);
+            reply->writeInt32(static_cast<DrmPlugin::OfflineLicenseState>(state));
             reply->writeInt32(result);
             return OK;
         }

@@ -24,8 +24,6 @@
 #include "VBRISeeker.h"
 #include "XINGSeeker.h"
 
-#include <media/DataSourceBase.h>
-#include <media/MediaTrack.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/avc_utils.h>
@@ -46,7 +44,7 @@ namespace android {
 static const uint32_t kMask = 0xfffe0c00;
 
 static bool Resync(
-        DataSourceBase *source, uint32_t match_header,
+        DataSourceHelper *source, uint32_t match_header,
         off64_t *inout_pos, off64_t *post_id3_pos, uint32_t *out_header) {
     if (post_id3_pos != NULL) {
         *post_id3_pos = 0;
@@ -209,35 +207,34 @@ static bool Resync(
     return valid;
 }
 
-class MP3Source : public MediaTrack {
+class MP3Source : public MediaTrackHelper {
 public:
     MP3Source(
-            MetaDataBase &meta, DataSourceBase *source,
+            AMediaFormat *meta, DataSourceHelper *source,
             off64_t first_frame_pos, uint32_t fixed_header,
             MP3Seeker *seeker);
 
-    virtual status_t start(MetaDataBase *params = NULL);
-    virtual status_t stop();
+    virtual media_status_t start();
+    virtual media_status_t stop();
 
-    virtual status_t getFormat(MetaDataBase &meta);
+    virtual media_status_t getFormat(AMediaFormat *meta);
 
-    virtual status_t read(
-            MediaBufferBase **buffer, const ReadOptions *options = NULL);
+    virtual media_status_t read(
+            MediaBufferHelper **buffer, const ReadOptions *options = NULL);
 
 protected:
     virtual ~MP3Source();
 
 private:
     static const size_t kMaxFrameSize;
-    MetaDataBase &mMeta;
-    DataSourceBase *mDataSource;
+    AMediaFormat *mMeta;
+    DataSourceHelper *mDataSource;
     off64_t mFirstFramePos;
     uint32_t mFixedHeader;
     off64_t mCurrentPos;
     int64_t mCurrentTimeUs;
     bool mStarted;
     MP3Seeker *mSeeker;
-    MediaBufferGroup *mGroup;
 
     int64_t mBasisTimeUs;
     int64_t mSamplesRead;
@@ -253,7 +250,7 @@ struct Mp3Meta {
 };
 
 MP3Extractor::MP3Extractor(
-        DataSourceBase *source, Mp3Meta *meta)
+        DataSourceHelper *source, Mp3Meta *meta)
     : mInitCheck(NO_INIT),
       mDataSource(source),
       mFirstFramePos(-1),
@@ -285,6 +282,7 @@ MP3Extractor::MP3Extractor(
     mFixedHeader = header;
     XINGSeeker *seeker = XINGSeeker::CreateFromSource(mDataSource, mFirstFramePos);
 
+    mMeta = AMediaFormat_new();
     if (seeker == NULL) {
         mSeeker = VBRISeeker::CreateFromSource(mDataSource, post_id3_pos);
     } else {
@@ -292,8 +290,8 @@ MP3Extractor::MP3Extractor(
         int encd = seeker->getEncoderDelay();
         int encp = seeker->getEncoderPadding();
         if (encd != 0 || encp != 0) {
-            mMeta.setInt32(kKeyEncoderDelay, encd);
-            mMeta.setInt32(kKeyEncoderPadding, encp);
+            AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_ENCODER_DELAY, encd);
+            AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_ENCODER_PADDING, encp);
         }
     }
 
@@ -329,21 +327,23 @@ MP3Extractor::MP3Extractor(
 
     switch (layer) {
         case 1:
-            mMeta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_I);
+            AMediaFormat_setString(mMeta,
+                    AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_I);
             break;
         case 2:
-            mMeta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II);
+            AMediaFormat_setString(mMeta,
+                    AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II);
             break;
         case 3:
-            mMeta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_MPEG);
+            AMediaFormat_setString(mMeta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_MPEG);
             break;
         default:
             TRESPASS();
     }
 
-    mMeta.setInt32(kKeySampleRate, sample_rate);
-    mMeta.setInt32(kKeyBitRate, bitrate * 1000);
-    mMeta.setInt32(kKeyChannelCount, num_channels);
+    AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_SAMPLE_RATE, sample_rate);
+    AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_BIT_RATE, bitrate * 1000);
+    AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, num_channels);
 
     int64_t durationUs;
 
@@ -363,7 +363,7 @@ MP3Extractor::MP3Extractor(
     }
 
     if (durationUs >= 0) {
-        mMeta.setInt64(kKeyDuration, durationUs);
+        AMediaFormat_setInt64(mMeta, AMEDIAFORMAT_KEY_DURATION, durationUs);
     }
 
     mInitCheck = OK;
@@ -371,7 +371,8 @@ MP3Extractor::MP3Extractor(
     // Get iTunes-style gapless info if present.
     // When getting the id3 tag, skip the V1 tags to prevent the source cache
     // from being iterated to the end of the file.
-    ID3 id3(mDataSource, true);
+    DataSourceHelper helper(mDataSource);
+    ID3 id3(&helper, true);
     if (id3.isValid()) {
         ID3::Iterator *com = new ID3::Iterator(id3, "COM");
         if (com->done()) {
@@ -390,8 +391,8 @@ MP3Extractor::MP3Extractor(
 
                 int32_t delay, padding;
                 if (sscanf(value, " %*x %x %x %*x", &delay, &padding) == 2) {
-                    mMeta.setInt32(kKeyEncoderDelay, delay);
-                    mMeta.setInt32(kKeyEncoderPadding, padding);
+                    AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_ENCODER_DELAY, delay);
+                    AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_ENCODER_PADDING, padding);
                 }
                 break;
             }
@@ -404,13 +405,15 @@ MP3Extractor::MP3Extractor(
 
 MP3Extractor::~MP3Extractor() {
     delete mSeeker;
+    delete mDataSource;
+    AMediaFormat_delete(mMeta);
 }
 
 size_t MP3Extractor::countTracks() {
     return mInitCheck != OK ? 0 : 1;
 }
 
-MediaTrack *MP3Extractor::getTrack(size_t index) {
+MediaTrackHelper *MP3Extractor::getTrack(size_t index) {
     if (mInitCheck != OK || index != 0) {
         return NULL;
     }
@@ -420,14 +423,14 @@ MediaTrack *MP3Extractor::getTrack(size_t index) {
             mSeeker);
 }
 
-status_t MP3Extractor::getTrackMetaData(
-        MetaDataBase &meta,
+media_status_t MP3Extractor::getTrackMetaData(
+        AMediaFormat *meta,
         size_t index, uint32_t /* flags */) {
     if (mInitCheck != OK || index != 0) {
-        return UNKNOWN_ERROR;
+        return AMEDIA_ERROR_UNKNOWN;
     }
-    meta = mMeta;
-    return OK;
+    AMediaFormat_copy(meta, mMeta);
+    return AMEDIA_OK;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -440,7 +443,7 @@ status_t MP3Extractor::getTrackMetaData(
 // Set our max frame size to the nearest power of 2 above this size (aka, 4kB)
 const size_t MP3Source::kMaxFrameSize = (1 << 12); /* 4096 bytes */
 MP3Source::MP3Source(
-        MetaDataBase &meta, DataSourceBase *source,
+        AMediaFormat *meta, DataSourceHelper *source,
         off64_t first_frame_pos, uint32_t fixed_header,
         MP3Seeker *seeker)
     : mMeta(meta),
@@ -451,7 +454,6 @@ MP3Source::MP3Source(
       mCurrentTimeUs(0),
       mStarted(false),
       mSeeker(seeker),
-      mGroup(NULL),
       mBasisTimeUs(0),
       mSamplesRead(0) {
 }
@@ -462,12 +464,10 @@ MP3Source::~MP3Source() {
     }
 }
 
-status_t MP3Source::start(MetaDataBase *) {
+media_status_t MP3Source::start() {
     CHECK(!mStarted);
 
-    mGroup = new MediaBufferGroup;
-
-    mGroup->add_buffer(MediaBufferBase::Create(kMaxFrameSize));
+    mBufferGroup->add_buffer(kMaxFrameSize);
 
     mCurrentPos = mFirstFramePos;
     mCurrentTimeUs = 0;
@@ -477,27 +477,23 @@ status_t MP3Source::start(MetaDataBase *) {
 
     mStarted = true;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t MP3Source::stop() {
+media_status_t MP3Source::stop() {
     CHECK(mStarted);
-
-    delete mGroup;
-    mGroup = NULL;
 
     mStarted = false;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t MP3Source::getFormat(MetaDataBase &meta) {
-    meta = mMeta;
-    return OK;
+media_status_t MP3Source::getFormat(AMediaFormat *meta) {
+    return AMediaFormat_copy(meta, mMeta);
 }
 
-status_t MP3Source::read(
-        MediaBufferBase **out, const ReadOptions *options) {
+media_status_t MP3Source::read(
+        MediaBufferHelper **out, const ReadOptions *options) {
     *out = NULL;
 
     int64_t seekTimeUs;
@@ -509,11 +505,11 @@ status_t MP3Source::read(
         if (mSeeker == NULL
                 || !mSeeker->getOffsetForTime(&actualSeekTimeUs, &mCurrentPos)) {
             int32_t bitrate;
-            if (!mMeta.findInt32(kKeyBitRate, &bitrate)) {
+            if (!AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_BIT_RATE, &bitrate)) {
                 // bitrate is in bits/sec.
                 ALOGI("no bitrate");
 
-                return ERROR_UNSUPPORTED;
+                return AMEDIA_ERROR_UNSUPPORTED;
             }
 
             mCurrentTimeUs = seekTimeUs;
@@ -527,10 +523,10 @@ status_t MP3Source::read(
         mSamplesRead = 0;
     }
 
-    MediaBufferBase *buffer;
-    status_t err = mGroup->acquire_buffer(&buffer);
+    MediaBufferHelper *buffer;
+    status_t err = mBufferGroup->acquire_buffer(&buffer);
     if (err != OK) {
-        return err;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
     size_t frame_size;
@@ -543,7 +539,8 @@ status_t MP3Source::read(
             buffer->release();
             buffer = NULL;
 
-            return (n < 0 ? n : ERROR_END_OF_STREAM);
+            return ((n < 0 && n != ERROR_END_OF_STREAM) ?
+                    AMEDIA_ERROR_UNKNOWN : AMEDIA_ERROR_END_OF_STREAM);
         }
 
         uint32_t header = U32_AT((const uint8_t *)buffer->data());
@@ -572,7 +569,7 @@ status_t MP3Source::read(
             buffer->release();
             buffer = NULL;
 
-            return ERROR_END_OF_STREAM;
+            return AMEDIA_ERROR_END_OF_STREAM;
         }
 
         mCurrentPos = pos;
@@ -587,13 +584,15 @@ status_t MP3Source::read(
         buffer->release();
         buffer = NULL;
 
-        return (n < 0 ? n : ERROR_END_OF_STREAM);
+        return ((n < 0 && n != ERROR_END_OF_STREAM) ?
+                AMEDIA_ERROR_UNKNOWN : AMEDIA_ERROR_END_OF_STREAM);
     }
 
     buffer->set_range(0, frame_size);
 
-    buffer->meta_data().setInt64(kKeyTime, mCurrentTimeUs);
-    buffer->meta_data().setInt32(kKeyIsSyncFrame, 1);
+    AMediaFormat *meta = buffer->meta_data();
+    AMediaFormat_setInt64(meta, AMEDIAFORMAT_KEY_TIME_US, mCurrentTimeUs);
+    AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, 1);
 
     mCurrentPos += frame_size;
 
@@ -602,39 +601,40 @@ status_t MP3Source::read(
 
     *out = buffer;
 
-    return OK;
+    return AMEDIA_OK;
 }
 
-status_t MP3Extractor::getMetaData(MetaDataBase &meta) {
-    meta.clear();
+media_status_t MP3Extractor::getMetaData(AMediaFormat *meta) {
+    AMediaFormat_clear(meta);
     if (mInitCheck != OK) {
-        return UNKNOWN_ERROR;
+        return AMEDIA_ERROR_UNKNOWN;
     }
-    meta.setCString(kKeyMIMEType, "audio/mpeg");
+    AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_MPEG);
 
-    ID3 id3(mDataSource);
+    DataSourceHelper helper(mDataSource);
+    ID3 id3(&helper);
 
     if (!id3.isValid()) {
-        return OK;
+        return AMEDIA_OK;
     }
 
     struct Map {
-        int key;
+        const char *key;
         const char *tag1;
         const char *tag2;
     };
     static const Map kMap[] = {
-        { kKeyAlbum, "TALB", "TAL" },
-        { kKeyArtist, "TPE1", "TP1" },
-        { kKeyAlbumArtist, "TPE2", "TP2" },
-        { kKeyComposer, "TCOM", "TCM" },
-        { kKeyGenre, "TCON", "TCO" },
-        { kKeyTitle, "TIT2", "TT2" },
-        { kKeyYear, "TYE", "TYER" },
-        { kKeyAuthor, "TXT", "TEXT" },
-        { kKeyCDTrackNumber, "TRK", "TRCK" },
-        { kKeyDiscNumber, "TPA", "TPOS" },
-        { kKeyCompilation, "TCP", "TCMP" },
+        { AMEDIAFORMAT_KEY_ALBUM, "TALB", "TAL" },
+        { AMEDIAFORMAT_KEY_ARTIST, "TPE1", "TP1" },
+        { AMEDIAFORMAT_KEY_ALBUMARTIST, "TPE2", "TP2" },
+        { AMEDIAFORMAT_KEY_COMPOSER, "TCOM", "TCM" },
+        { AMEDIAFORMAT_KEY_GENRE, "TCON", "TCO" },
+        { AMEDIAFORMAT_KEY_TITLE, "TIT2", "TT2" },
+        { AMEDIAFORMAT_KEY_YEAR, "TYE", "TYER" },
+        { AMEDIAFORMAT_KEY_AUTHOR, "TXT", "TEXT" },
+        { AMEDIAFORMAT_KEY_CDTRACKNUMBER, "TRK", "TRCK" },
+        { AMEDIAFORMAT_KEY_DISCNUMBER, "TPA", "TPOS" },
+        { AMEDIAFORMAT_KEY_COMPILATION, "TCP", "TCMP" },
     };
     static const size_t kNumMapEntries = sizeof(kMap) / sizeof(kMap[0]);
 
@@ -654,7 +654,7 @@ status_t MP3Extractor::getMetaData(MetaDataBase &meta) {
         it->getString(&s);
         delete it;
 
-        meta.setCString(kMap[i].key, s);
+        AMediaFormat_setString(meta, kMap[i].key, s.string());
     }
 
     size_t dataSize;
@@ -662,28 +662,28 @@ status_t MP3Extractor::getMetaData(MetaDataBase &meta) {
     const void *data = id3.getAlbumArt(&dataSize, &mime);
 
     if (data) {
-        meta.setData(kKeyAlbumArt, MetaData::TYPE_NONE, data, dataSize);
-        meta.setCString(kKeyAlbumArtMIME, mime.string());
+        AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_ALBUMART, data, dataSize);
     }
 
-    return OK;
+    return AMEDIA_OK;
 }
 
-static MediaExtractor* CreateExtractor(
-        DataSourceBase *source,
+static CMediaExtractor* CreateExtractor(
+        CDataSource *source,
         void *meta) {
     Mp3Meta *metaData = static_cast<Mp3Meta *>(meta);
-    return new MP3Extractor(source, metaData);
+    return wrap(new MP3Extractor(new DataSourceHelper(source), metaData));
 }
 
-static MediaExtractor::CreatorFunc Sniff(
-        DataSourceBase *source, float *confidence, void **meta,
-        MediaExtractor::FreeMetaFunc *freeMeta) {
+static CreatorFunc Sniff(
+        CDataSource *source, float *confidence, void **meta,
+        FreeMetaFunc *freeMeta) {
     off64_t pos = 0;
     off64_t post_id3_pos;
     uint32_t header;
     uint8_t mpeg_header[5];
-    if (source->readAt(0, mpeg_header, sizeof(mpeg_header)) < (ssize_t)sizeof(mpeg_header)) {
+    DataSourceHelper helper(source);
+    if (helper.readAt(0, mpeg_header, sizeof(mpeg_header)) < (ssize_t)sizeof(mpeg_header)) {
         return NULL;
     }
 
@@ -691,7 +691,7 @@ static MediaExtractor::CreatorFunc Sniff(
         ALOGV("MPEG1PS container is not supported!");
         return NULL;
     }
-    if (!Resync(source, 0, &pos, &post_id3_pos, &header)) {
+    if (!Resync(&helper, 0, &pos, &post_id3_pos, &header)) {
         return NULL;
     }
 
@@ -707,16 +707,25 @@ static MediaExtractor::CreatorFunc Sniff(
     return CreateExtractor;
 }
 
+static const char *extensions[] = {
+    "mp2",
+    "mp3",
+    "mpeg",
+    "mpg",
+    "mpga",
+    NULL
+};
+
 extern "C" {
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
-MediaExtractor::ExtractorDef GETEXTRACTORDEF() {
+ExtractorDef GETEXTRACTORDEF() {
     return {
-        MediaExtractor::EXTRACTORDEF_VERSION,
+        EXTRACTORDEF_VERSION,
         UUID("812a3f6c-c8cf-46de-b529-3774b14103d4"),
         1, // version
         "MP3 Extractor",
-        Sniff
+        { .v3 = {Sniff, extensions} }
     };
 }
 

@@ -35,21 +35,32 @@ struct ColorConverter {
 
     bool isDstRGB() const;
 
+    void setSrcColorSpace(uint32_t standard, uint32_t range, uint32_t transfer);
+
     status_t convert(
             const void *srcBits,
-            size_t srcWidth, size_t srcHeight,
+            size_t srcWidth, size_t srcHeight, size_t srcStride,
             size_t srcCropLeft, size_t srcCropTop,
             size_t srcCropRight, size_t srcCropBottom,
             void *dstBits,
-            size_t dstWidth, size_t dstHeight,
+            size_t dstWidth, size_t dstHeight, size_t dstStride,
             size_t dstCropLeft, size_t dstCropTop,
             size_t dstCropRight, size_t dstCropBottom);
 
 private:
+    struct ColorSpace {
+        uint32_t mStandard;
+        uint32_t mRange;
+        uint32_t mTransfer;
+
+        bool isBt709();
+        bool isJpeg();
+    };
+
     struct BitmapParams {
         BitmapParams(
                 void *bits,
-                size_t width, size_t height,
+                size_t width, size_t height, size_t stride,
                 size_t cropLeft, size_t cropTop,
                 size_t cropRight, size_t cropBottom,
                 OMX_COLOR_FORMATTYPE colorFromat);
@@ -65,6 +76,7 @@ private:
     };
 
     OMX_COLOR_FORMATTYPE mSrcFormat, mDstFormat;
+    ColorSpace mSrcColorSpace;
     uint8_t *mClip;
 
     uint8_t *initClip();
@@ -76,6 +88,9 @@ private:
             const BitmapParams &src, const BitmapParams &dst);
 
     status_t convertYUV420PlanarUseLibYUV(
+            const BitmapParams &src, const BitmapParams &dst);
+
+    status_t convertYUV420SemiPlanarUseLibYUV(
             const BitmapParams &src, const BitmapParams &dst);
 
     status_t convertYUV420Planar16(

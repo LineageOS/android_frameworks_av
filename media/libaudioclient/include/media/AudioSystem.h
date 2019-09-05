@@ -20,6 +20,8 @@
 #include <sys/types.h>
 
 #include <media/AudioPolicy.h>
+#include <media/AudioProductStrategy.h>
+#include <media/AudioVolumeGroup.h>
 #include <media/AudioIoDescriptor.h>
 #include <media/IAudioFlingerClient.h>
 #include <media/IAudioPolicyServiceClient.h>
@@ -35,9 +37,14 @@ namespace android {
 
 typedef void (*audio_error_callback)(status_t err);
 typedef void (*dynamic_policy_callback)(int event, String8 regId, int val);
-typedef void (*record_config_callback)(int event, const record_client_info_t *clientInfo,
-                const audio_config_base_t *clientConfig, const audio_config_base_t *deviceConfig,
-                audio_patch_handle_t patchHandle);
+typedef void (*record_config_callback)(int event,
+                                       const record_client_info_t *clientInfo,
+                                       const audio_config_base_t *clientConfig,
+                                       std::vector<effect_descriptor_t> clientEffects,
+                                       const audio_config_base_t *deviceConfig,
+                                       std::vector<effect_descriptor_t> effects,
+                                       audio_patch_handle_t patchHandle,
+                                       audio_source_t source);
 
 class IAudioFlinger;
 class IAudioPolicyService;
@@ -204,17 +211,19 @@ public:
     // IAudioPolicyService interface (see AudioPolicyInterface for method descriptions)
     //
     static status_t setDeviceConnectionState(audio_devices_t device, audio_policy_dev_state_t state,
-                                             const char *device_address, const char *device_name);
+                                             const char *device_address, const char *device_name,
+                                             audio_format_t encodedFormat);
     static audio_policy_dev_state_t getDeviceConnectionState(audio_devices_t device,
                                                                 const char *device_address);
     static status_t handleDeviceConfigChange(audio_devices_t device,
                                              const char *device_address,
-                                             const char *device_name);
+                                             const char *device_name,
+                                             audio_format_t encodedFormat);
     static status_t setPhoneState(audio_mode_t state);
     static status_t setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config);
     static audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage);
 
-    static status_t getOutputForAttr(const audio_attributes_t *attr,
+    static status_t getOutputForAttr(audio_attributes_t *attr,
                                      audio_io_handle_t *output,
                                      audio_session_t session,
                                      audio_stream_type_t *stream,
@@ -223,21 +232,17 @@ public:
                                      const audio_config_t *config,
                                      audio_output_flags_t flags,
                                      audio_port_handle_t *selectedDeviceId,
-                                     audio_port_handle_t *portId);
-    static status_t startOutput(audio_io_handle_t output,
-                                audio_stream_type_t stream,
-                                audio_session_t session);
-    static status_t stopOutput(audio_io_handle_t output,
-                               audio_stream_type_t stream,
-                               audio_session_t session);
-    static void releaseOutput(audio_io_handle_t output,
-                              audio_stream_type_t stream,
-                              audio_session_t session);
+                                     audio_port_handle_t *portId,
+                                     std::vector<audio_io_handle_t> *secondaryOutputs);
+    static status_t startOutput(audio_port_handle_t portId);
+    static status_t stopOutput(audio_port_handle_t portId);
+    static void releaseOutput(audio_port_handle_t portId);
 
     // Client must successfully hand off the handle reference to AudioFlinger via createRecord(),
     // or release it with releaseInput().
     static status_t getInputForAttr(const audio_attributes_t *attr,
                                     audio_io_handle_t *input,
+                                    audio_unique_id_t riid,
                                     audio_session_t session,
                                     pid_t pid,
                                     uid_t uid,
@@ -247,8 +252,7 @@ public:
                                     audio_port_handle_t *selectedDeviceId,
                                     audio_port_handle_t *portId);
 
-    static status_t startInput(audio_port_handle_t portId,
-                               bool *silenced);
+    static status_t startInput(audio_port_handle_t portId);
     static status_t stopInput(audio_port_handle_t portId);
     static void releaseInput(audio_port_handle_t portId);
     static status_t initStreamVolume(audio_stream_type_t stream,
@@ -261,6 +265,17 @@ public:
                                          int *index,
                                          audio_devices_t device);
 
+    static status_t setVolumeIndexForAttributes(const audio_attributes_t &attr,
+                                                int index,
+                                                audio_devices_t device);
+    static status_t getVolumeIndexForAttributes(const audio_attributes_t &attr,
+                                                int &index,
+                                                audio_devices_t device);
+
+    static status_t getMaxVolumeIndexForAttributes(const audio_attributes_t &attr, int &index);
+
+    static status_t getMinVolumeIndexForAttributes(const audio_attributes_t &attr, int &index);
+
     static uint32_t getStrategyForStream(audio_stream_type_t stream);
     static audio_devices_t getDevicesForStream(audio_stream_type_t stream);
 
@@ -272,6 +287,7 @@ public:
                                     int id);
     static status_t unregisterEffect(int id);
     static status_t setEffectEnabled(int id, bool enabled);
+    static status_t moveEffectsToIo(const std::vector<int>& ids, audio_io_handle_t io);
 
     // clear stream to output mapping cache (gStreamOutputMap)
     // and output configuration cache (gOutputs)
@@ -284,6 +300,8 @@ public:
     static size_t getPrimaryOutputFrameCount();
 
     static status_t setLowRamDevice(bool isLowRamDevice, int64_t totalMemory);
+
+    static status_t setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t flags);
 
     // Check if hw offload is possible for given format, stream type, sample rate,
     // bit rate, duration, video and streaming or offload property is enabled
@@ -327,18 +345,28 @@ public:
 
     static status_t registerPolicyMixes(const Vector<AudioMix>& mixes, bool registration);
 
+    static status_t setUidDeviceAffinities(uid_t uid, const Vector<AudioDeviceTypeAddr>& devices);
+
+    static status_t removeUidDeviceAffinities(uid_t uid);
+
     static status_t startAudioSource(const struct audio_port_config *source,
-                                      const audio_attributes_t *attributes,
-                                      audio_patch_handle_t *handle);
-    static status_t stopAudioSource(audio_patch_handle_t handle);
+                                     const audio_attributes_t *attributes,
+                                     audio_port_handle_t *portId);
+    static status_t stopAudioSource(audio_port_handle_t portId);
 
     static status_t setMasterMono(bool mono);
     static status_t getMasterMono(bool *mono);
+
+    static status_t setMasterBalance(float balance);
+    static status_t getMasterBalance(float *balance);
 
     static float    getStreamVolumeDB(
             audio_stream_type_t stream, int index, audio_devices_t device);
 
     static status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones);
+
+    static status_t getHwOffloadEncodingFormatsSupportedForA2DP(
+                                    std::vector<audio_format_t> *formats);
 
     // numSurroundFormats holds the maximum number of formats and bool value allowed in the array.
     // When numSurroundFormats is 0, surroundFormats and surroundFormatsEnabled will not be
@@ -349,7 +377,41 @@ public:
                                        bool reported);
     static status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled);
 
+    static status_t setAssistantUid(uid_t uid);
+    static status_t setA11yServicesUids(const std::vector<uid_t>& uids);
+
+    static bool     isHapticPlaybackSupported();
+
+    static status_t listAudioProductStrategies(AudioProductStrategyVector &strategies);
+    static status_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa,
+                                                        product_strategy_t &productStrategy);
+
+    static audio_attributes_t streamTypeToAttributes(audio_stream_type_t stream);
+    static audio_stream_type_t attributesToStreamType(const audio_attributes_t &attr);
+
+    static status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups);
+
+    static status_t getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
+                                                      volume_group_t &volumeGroup);
+
+    static status_t setRttEnabled(bool enabled);
+
     // ----------------------------------------------------------------------------
+
+    class AudioVolumeGroupCallback : public RefBase
+    {
+    public:
+
+        AudioVolumeGroupCallback() {}
+        virtual ~AudioVolumeGroupCallback() {}
+
+        virtual void onAudioVolumeGroupChanged(volume_group_t group, int flags) = 0;
+        virtual void onServiceDied() = 0;
+
+    };
+
+    static status_t addAudioVolumeGroupCallback(const sp<AudioVolumeGroupCallback>& callback);
+    static status_t removeAudioVolumeGroupCallback(const sp<AudioVolumeGroupCallback>& callback);
 
     class AudioPortCallback : public RefBase
     {
@@ -379,9 +441,11 @@ public:
     };
 
     static status_t addAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
-                                           audio_io_handle_t audioIo);
+                                           audio_io_handle_t audioIo,
+                                           audio_port_handle_t portId);
     static status_t removeAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
-                                              audio_io_handle_t audioIo);
+                                              audio_io_handle_t audioIo,
+                                              audio_port_handle_t portId);
 
     static audio_port_handle_t getDeviceIdForIo(audio_io_handle_t audioIo);
 
@@ -412,17 +476,20 @@ private:
 
 
         status_t addAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
-                                               audio_io_handle_t audioIo);
+                                               audio_io_handle_t audioIo,
+                                               audio_port_handle_t portId);
         status_t removeAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
-                                           audio_io_handle_t audioIo);
+                                           audio_io_handle_t audioIo,
+                                           audio_port_handle_t portId);
 
         audio_port_handle_t getDeviceIdForIo(audio_io_handle_t audioIo);
 
     private:
         Mutex                               mLock;
         DefaultKeyedVector<audio_io_handle_t, sp<AudioIoDescriptor> >   mIoDescriptors;
-        DefaultKeyedVector<audio_io_handle_t, Vector < wp<AudioDeviceCallback> > >
-                                                                        mAudioDeviceCallbacks;
+
+        std::map<audio_io_handle_t, std::map<audio_port_handle_t, wp<AudioDeviceCallback>>>
+                mAudioDeviceCallbacks;
         // cached values for recording getInputBufferSize() queries
         size_t                              mInBuffSize;    // zero indicates cache is invalid
         uint32_t                            mInSamplingRate;
@@ -442,21 +509,31 @@ private:
         int removeAudioPortCallback(const sp<AudioPortCallback>& callback);
         bool isAudioPortCbEnabled() const { return (mAudioPortCallbacks.size() != 0); }
 
+        int addAudioVolumeGroupCallback(const sp<AudioVolumeGroupCallback>& callback);
+        int removeAudioVolumeGroupCallback(const sp<AudioVolumeGroupCallback>& callback);
+        bool isAudioVolumeGroupCbEnabled() const { return (mAudioVolumeGroupCallback.size() != 0); }
+
         // DeathRecipient
         virtual void binderDied(const wp<IBinder>& who);
 
         // IAudioPolicyServiceClient
         virtual void onAudioPortListUpdate();
         virtual void onAudioPatchListUpdate();
+        virtual void onAudioVolumeGroupChanged(volume_group_t group, int flags);
         virtual void onDynamicPolicyMixStateUpdate(String8 regId, int32_t state);
         virtual void onRecordingConfigurationUpdate(int event,
-                        const record_client_info_t *clientInfo,
-                        const audio_config_base_t *clientConfig,
-                        const audio_config_base_t *deviceConfig, audio_patch_handle_t patchHandle);
+                                                    const record_client_info_t *clientInfo,
+                                                    const audio_config_base_t *clientConfig,
+                                                    std::vector<effect_descriptor_t> clientEffects,
+                                                    const audio_config_base_t *deviceConfig,
+                                                    std::vector<effect_descriptor_t> effects,
+                                                    audio_patch_handle_t patchHandle,
+                                                    audio_source_t source);
 
     private:
         Mutex                               mLock;
         Vector <sp <AudioPortCallback> >    mAudioPortCallbacks;
+        Vector <sp <AudioVolumeGroupCallback> > mAudioVolumeGroupCallback;
     };
 
     static audio_io_handle_t getOutput(audio_stream_type_t stream);

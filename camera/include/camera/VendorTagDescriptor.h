@@ -99,6 +99,11 @@ class VendorTagDescriptor : public Parcelable {
         void dump(int fd, int verbosity, int indentation) const;
 
         /**
+         * Get Section for corresponding tag.
+         */
+        ssize_t getSectionIndex(uint32_t tag) const;
+
+        /**
          * Read values VendorTagDescriptor object from the given parcel.
          *
          * Returns OK on success, or a negative error code.
@@ -205,6 +210,9 @@ class VendorTagDescriptorCache : public Parcelable {
      * Dump the currently configured vendor tags to a file descriptor.
      */
     void dump(int fd, int verbosity, int indentation) const;
+
+    const std::unordered_map<metadata_vendor_id_t, sp<android::VendorTagDescriptor>> &
+            getVendorIdsAndTagDescriptors();
 
   protected:
     std::unordered_map<metadata_vendor_id_t, sp<android::VendorTagDescriptor>> mVendorMap;

@@ -72,7 +72,6 @@ media_status_t AMediaExtractor_setDataSourceFd(AMediaExtractor*, int fd, off64_t
  */
 media_status_t AMediaExtractor_setDataSource(AMediaExtractor*,
         const char *location) __INTRODUCED_IN(21);
-        // TODO support headers
 
 #if __ANDROID_API__ >= 28
 

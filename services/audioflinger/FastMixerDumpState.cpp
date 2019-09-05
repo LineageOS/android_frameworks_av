@@ -19,7 +19,7 @@
 
 #include "Configuration.h"
 #ifdef FAST_THREAD_STATISTICS
-#include <cpustats/CentralTendencyStatistics.h>
+#include <audio_utils/Statistics.h>
 #ifdef CPU_FREQUENCY_STATISTICS
 #include <cpustats/ThreadCpuUsage.h>
 #endif
@@ -68,21 +68,22 @@ void FastMixerDumpState::dump(int fd) const
     dprintf(fd, "  FastMixer command=%s writeSequence=%u framesWritten=%u\n"
                 "            numTracks=%u writeErrors=%u underruns=%u overruns=%u\n"
                 "            sampleRate=%u frameCount=%zu measuredWarmup=%.3g ms, warmupCycles=%u\n"
-                "            mixPeriod=%.2f ms\n",
+                "            mixPeriod=%.2f ms latency=%.2f ms\n",
                 FastMixerState::commandToString(mCommand), mWriteSequence, mFramesWritten,
                 mNumTracks, mWriteErrors, mUnderruns, mOverruns,
                 mSampleRate, mFrameCount, measuredWarmupMs, mWarmupCycles,
-                mixPeriodSec * 1e3);
+                mixPeriodSec * 1e3, mLatencyMs);
+    dprintf(fd, "  FastMixer Timestamp stats: %s\n", mTimestampVerifier.toString().c_str());
 #ifdef FAST_THREAD_STATISTICS
     // find the interval of valid samples
-    uint32_t bounds = mBounds;
-    uint32_t newestOpen = bounds & 0xFFFF;
+    const uint32_t bounds = mBounds;
+    const uint32_t newestOpen = bounds & 0xFFFF;
     uint32_t oldestClosed = bounds >> 16;
 
     //uint32_t n = (newestOpen - oldestClosed) & 0xFFFF;
     uint32_t n;
     __builtin_sub_overflow(newestOpen, oldestClosed, &n);
-    n = n & 0xFFFF;
+    n &= 0xFFFF;
 
     if (n > mSamplingN) {
         ALOGE("too many samples %u", n);
@@ -90,9 +91,9 @@ void FastMixerDumpState::dump(int fd) const
     }
     // statistics for monotonic (wall clock) time, thread raw CPU load in time, CPU clock frequency,
     // and adjusted CPU load in MHz normalized for CPU clock frequency
-    CentralTendencyStatistics wall, loadNs;
+    audio_utils::Statistics<double> wall, loadNs;
 #ifdef CPU_FREQUENCY_STATISTICS
-    CentralTendencyStatistics kHz, loadMHz;
+    audio_utils::Statistics<double> kHz, loadMHz;
     uint32_t previousCpukHz = 0;
 #endif
     // Assuming a normal distribution for cycle times, three standard deviations on either side of
@@ -107,18 +108,18 @@ void FastMixerDumpState::dump(int fd) const
         if (tail != NULL) {
             tail[j] = wallNs;
         }
-        wall.sample(wallNs);
+        wall.add(wallNs);
         uint32_t sampleLoadNs = mLoadNs[i];
-        loadNs.sample(sampleLoadNs);
+        loadNs.add(sampleLoadNs);
 #ifdef CPU_FREQUENCY_STATISTICS
         uint32_t sampleCpukHz = mCpukHz[i];
         // skip bad kHz samples
         if ((sampleCpukHz & ~0xF) != 0) {
-            kHz.sample(sampleCpukHz >> 4);
+            kHz.add(sampleCpukHz >> 4);
             if (sampleCpukHz == previousCpukHz) {
                 double megacycles = (double) sampleLoadNs * (double) (sampleCpukHz >> 4) * 1e-12;
                 double adjMHz = megacycles / mixPeriodSec;  // _not_ wallNs * 1e9
-                loadMHz.sample(adjMHz);
+                loadMHz.add(adjMHz);
             }
         }
         previousCpukHz = sampleCpukHz;
@@ -126,42 +127,42 @@ void FastMixerDumpState::dump(int fd) const
     }
     if (n) {
         dprintf(fd, "  Simple moving statistics over last %.1f seconds:\n",
-                    wall.n() * mixPeriodSec);
+                    wall.getN() * mixPeriodSec);
         dprintf(fd, "    wall clock time in ms per mix cycle:\n"
                     "      mean=%.2f min=%.2f max=%.2f stddev=%.2f\n",
-                    wall.mean()*1e-6, wall.minimum()*1e-6, wall.maximum()*1e-6,
-                    wall.stddev()*1e-6);
+                    wall.getMean()*1e-6, wall.getMin()*1e-6, wall.getMax()*1e-6,
+                    wall.getStdDev()*1e-6);
         dprintf(fd, "    raw CPU load in us per mix cycle:\n"
                     "      mean=%.0f min=%.0f max=%.0f stddev=%.0f\n",
-                    loadNs.mean()*1e-3, loadNs.minimum()*1e-3, loadNs.maximum()*1e-3,
-                    loadNs.stddev()*1e-3);
+                    loadNs.getMean()*1e-3, loadNs.getMin()*1e-3, loadNs.getMax()*1e-3,
+                    loadNs.getStdDev()*1e-3);
     } else {
         dprintf(fd, "  No FastMixer statistics available currently\n");
     }
 #ifdef CPU_FREQUENCY_STATISTICS
     dprintf(fd, "  CPU clock frequency in MHz:\n"
                 "    mean=%.0f min=%.0f max=%.0f stddev=%.0f\n",
-                kHz.mean()*1e-3, kHz.minimum()*1e-3, kHz.maximum()*1e-3, kHz.stddev()*1e-3);
+                kHz.getMean()*1e-3, kHz.getMin()*1e-3, kHz.getMax()*1e-3, kHz.getStdDev()*1e-3);
     dprintf(fd, "  adjusted CPU load in MHz (i.e. normalized for CPU clock frequency):\n"
                 "    mean=%.1f min=%.1f max=%.1f stddev=%.1f\n",
-                loadMHz.mean(), loadMHz.minimum(), loadMHz.maximum(), loadMHz.stddev());
+                loadMHz.getMean(), loadMHz.getMin(), loadMHz.getMax(), loadMHz.getStdDev());
 #endif
     if (tail != NULL) {
         qsort(tail, n, sizeof(uint32_t), compare_uint32_t);
         // assume same number of tail samples on each side, left and right
         uint32_t count = n / kTailDenominator;
-        CentralTendencyStatistics left, right;
+        audio_utils::Statistics<double> left, right;
         for (uint32_t i = 0; i < count; ++i) {
-            left.sample(tail[i]);
-            right.sample(tail[n - (i + 1)]);
+            left.add(tail[i]);
+            right.add(tail[n - (i + 1)]);
         }
         dprintf(fd, "  Distribution of mix cycle times in ms for the tails "
                     "(> ~3 stddev outliers):\n"
                     "    left tail: mean=%.2f min=%.2f max=%.2f stddev=%.2f\n"
                     "    right tail: mean=%.2f min=%.2f max=%.2f stddev=%.2f\n",
-                    left.mean()*1e-6, left.minimum()*1e-6, left.maximum()*1e-6, left.stddev()*1e-6,
-                    right.mean()*1e-6, right.minimum()*1e-6, right.maximum()*1e-6,
-                    right.stddev()*1e-6);
+                    left.getMean()*1e-6, left.getMin()*1e-6, left.getMax()*1e-6, left.getStdDev()*1e-6,
+                    right.getMean()*1e-6, right.getMin()*1e-6, right.getMax()*1e-6,
+                    right.getStdDev()*1e-6);
         delete[] tail;
     }
 #endif

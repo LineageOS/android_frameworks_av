@@ -487,6 +487,97 @@
 #define HPF_Fs48000_Gain15_B2                         0.000000
 
 #ifdef HIGHER_FS
+/* Coefficients for sample rate 88200 */
+/* Gain = 1.000000 dB */
+#define HPF_Fs88200_Gain1_A0                          1.094374f
+#define HPF_Fs88200_Gain1_A1                          (-0.641256f)
+#define HPF_Fs88200_Gain1_A2                          0.000000f
+#define HPF_Fs88200_Gain1_B1                          (-0.546882f)
+#define HPF_Fs88200_Gain1_B2                          0.000000f
+/* Gain = 2.000000 dB */
+#define HPF_Fs88200_Gain2_A0                          1.200264f
+#define HPF_Fs88200_Gain2_A1                          (-0.747146f)
+#define HPF_Fs88200_Gain2_A2                          0.000000f
+#define HPF_Fs88200_Gain2_B1                          (-0.546882f)
+#define HPF_Fs88200_Gain2_B2                          0.000000f
+/* Gain = 3.000000 dB */
+#define HPF_Fs88200_Gain3_A0                          1.319074f
+#define HPF_Fs88200_Gain3_A1                          (-0.865956f)
+#define HPF_Fs88200_Gain3_A2                          0.000000f
+#define HPF_Fs88200_Gain3_B1                          (-0.546882f)
+#define HPF_Fs88200_Gain3_B2                          0.000000f
+/* Gain = 4.000000 dB */
+#define HPF_Fs88200_Gain4_A0                          1.452380f
+#define HPF_Fs88200_Gain4_A1                          (-0.999263f)
+#define HPF_Fs88200_Gain4_A2                          0.000000f
+#define HPF_Fs88200_Gain4_B1                          (-0.546882f)
+#define HPF_Fs88200_Gain4_B2                          0.000000f
+/* Gain = 5.000000 dB */
+#define HPF_Fs88200_Gain5_A0                          1.601953f
+#define HPF_Fs88200_Gain5_A1                          (-1.148836f)
+#define HPF_Fs88200_Gain5_A2                          0.000000f
+#define HPF_Fs88200_Gain5_B1                          (-0.546882f)
+#define HPF_Fs88200_Gain5_B2                          0.000000f
+/* Gain = 6.000000 dB */
+#define HPF_Fs88200_Gain6_A0                          1.769777f
+#define HPF_Fs88200_Gain6_A1                          (-1.316659f)
+#define HPF_Fs88200_Gain6_A2                          0.000000f
+#define HPF_Fs88200_Gain6_B1                          (-0.546882f)
+#define HPF_Fs88200_Gain6_B2                          0.000000f
+/* Gain = 7.000000 dB */
+#define HPF_Fs88200_Gain7_A0                          1.958078f
+#define HPF_Fs88200_Gain7_A1                          (-1.504960f)
+#define HPF_Fs88200_Gain7_A2                          0.000000f
+#define HPF_Fs88200_Gain7_B1                          (-0.546882f)
+#define HPF_Fs88200_Gain7_B2                          0.000000f
+/* Gain = 8.000000 dB */
+#define HPF_Fs88200_Gain8_A0                          2.169355f
+#define HPF_Fs88200_Gain8_A1                          (-1.716238f)
+#define HPF_Fs88200_Gain8_A2                          0.000000f
+#define HPF_Fs88200_Gain8_B1                          (-0.546882f)
+#define HPF_Fs88200_Gain8_B2                          0.000000f
+/* Gain = 9.000000 dB */
+#define HPF_Fs88200_Gain9_A0                          2.406412f
+#define HPF_Fs88200_Gain9_A1                          (-1.953295f)
+#define HPF_Fs88200_Gain9_A2                          0.000000f
+#define HPF_Fs88200_Gain9_B1                          (-0.546882f)
+#define HPF_Fs88200_Gain9_B2                          0.000000f
+/* Gain = 10.000000 dB */
+#define HPF_Fs88200_Gain10_A0                          2.672395f
+#define HPF_Fs88200_Gain10_A1                          (-2.219277f)
+#define HPF_Fs88200_Gain10_A2                          0.000000f
+#define HPF_Fs88200_Gain10_B1                          (-0.546882f)
+#define HPF_Fs88200_Gain10_B2                          0.000000f
+/* Gain = 11.000000 dB */
+#define HPF_Fs88200_Gain11_A0                          2.970832f
+#define HPF_Fs88200_Gain11_A1                          (-2.517714f)
+#define HPF_Fs88200_Gain11_A2                          0.000000f
+#define HPF_Fs88200_Gain11_B1                          (-0.546882f)
+#define HPF_Fs88200_Gain11_B2                          0.000000f
+/* Gain = 12.000000 dB */
+#define HPF_Fs88200_Gain12_A0                          3.305684f
+#define HPF_Fs88200_Gain12_A1                          (-2.852566f)
+#define HPF_Fs88200_Gain12_A2                          0.000000f
+#define HPF_Fs88200_Gain12_B1                          (-0.546882f)
+#define HPF_Fs88200_Gain12_B2                          0.000000f
+/* Gain = 13.000000 dB */
+#define HPF_Fs88200_Gain13_A0                          3.681394f
+#define HPF_Fs88200_Gain13_A1                          (-3.228276f)
+#define HPF_Fs88200_Gain13_A2                          0.000000f
+#define HPF_Fs88200_Gain13_B1                          (-0.546882f)
+#define HPF_Fs88200_Gain13_B2                          0.000000f
+/* Gain = 14.000000 dB */
+#define HPF_Fs88200_Gain14_A0                          4.102947f
+#define HPF_Fs88200_Gain14_A1                          (-3.649830f)
+#define HPF_Fs88200_Gain14_A2                          0.000000f
+#define HPF_Fs88200_Gain14_B1                          (-0.546882f)
+#define HPF_Fs88200_Gain14_B2                          0.000000f
+/* Gain = 15.000000 dB */
+#define HPF_Fs88200_Gain15_A0                          4.575938f
+#define HPF_Fs88200_Gain15_A1                          (-4.122820f)
+#define HPF_Fs88200_Gain15_A2                          0.000000f
+#define HPF_Fs88200_Gain15_B1                          (-0.546882f)
+#define HPF_Fs88200_Gain15_B2                          0.000000f
 
 /* Coefficients for sample rate 96000Hz */
                                                                  /* Gain =  1.000000 dB */
@@ -579,6 +670,98 @@
 #define HPF_Fs96000_Gain15_A2                         0.000000
 #define HPF_Fs96000_Gain15_B1                         (-0.577350)
 #define HPF_Fs96000_Gain15_B2                         0.000000
+
+/* Coefficients for sample rate 176400 */
+/* Gain = 1.000000 dB */
+#define HPF_Fs176400_Gain1_A0                          1.106711f
+#define HPF_Fs176400_Gain1_A1                          (-0.855807f)
+#define HPF_Fs176400_Gain1_A2                          0.000000f
+#define HPF_Fs176400_Gain1_B1                          (-0.749096f)
+#define HPF_Fs176400_Gain1_B2                          0.000000f
+/* Gain = 2.000000 dB */
+#define HPF_Fs176400_Gain2_A0                          1.226443f
+#define HPF_Fs176400_Gain2_A1                          (-0.975539f)
+#define HPF_Fs176400_Gain2_A2                          0.000000f
+#define HPF_Fs176400_Gain2_B1                          (-0.749096f)
+#define HPF_Fs176400_Gain2_B2                          0.000000f
+/* Gain = 3.000000 dB */
+#define HPF_Fs176400_Gain3_A0                          1.360784f
+#define HPF_Fs176400_Gain3_A1                          (-1.109880f)
+#define HPF_Fs176400_Gain3_A2                          0.000000f
+#define HPF_Fs176400_Gain3_B1                          (-0.749096f)
+#define HPF_Fs176400_Gain3_B2                          0.000000f
+/* Gain = 4.000000 dB */
+#define HPF_Fs176400_Gain4_A0                          1.511517f
+#define HPF_Fs176400_Gain4_A1                          (-1.260613f)
+#define HPF_Fs176400_Gain4_A2                          0.000000f
+#define HPF_Fs176400_Gain4_B1                          (-0.749096f)
+#define HPF_Fs176400_Gain4_B2                          0.000000f
+/* Gain = 5.000000 dB */
+#define HPF_Fs176400_Gain5_A0                          1.680643f
+#define HPF_Fs176400_Gain5_A1                          (-1.429739f)
+#define HPF_Fs176400_Gain5_A2                          0.000000f
+#define HPF_Fs176400_Gain5_B1                          (-0.749096f)
+#define HPF_Fs176400_Gain5_B2                          0.000000f
+/* Gain = 6.000000 dB */
+#define HPF_Fs176400_Gain6_A0                          1.870405f
+#define HPF_Fs176400_Gain6_A1                          (-1.619501f)
+#define HPF_Fs176400_Gain6_A2                          0.000000f
+#define HPF_Fs176400_Gain6_B1                          (-0.749096f)
+#define HPF_Fs176400_Gain6_B2                          0.000000f
+/* Gain = 7.000000 dB */
+#define HPF_Fs176400_Gain7_A0                          2.083321f
+#define HPF_Fs176400_Gain7_A1                          (-1.832417f)
+#define HPF_Fs176400_Gain7_A2                          0.000000f
+#define HPF_Fs176400_Gain7_B1                          (-0.749096f)
+#define HPF_Fs176400_Gain7_B2                          0.000000f
+/* Gain = 8.000000 dB */
+#define HPF_Fs176400_Gain8_A0                          2.322217f
+#define HPF_Fs176400_Gain8_A1                          (-2.071313f)
+#define HPF_Fs176400_Gain8_A2                          0.000000f
+#define HPF_Fs176400_Gain8_B1                          (-0.749096f)
+#define HPF_Fs176400_Gain8_B2                          0.000000f
+/* Gain = 9.000000 dB */
+#define HPF_Fs176400_Gain9_A0                          2.590263f
+#define HPF_Fs176400_Gain9_A1                          (-2.339359f)
+#define HPF_Fs176400_Gain9_A2                          0.000000f
+#define HPF_Fs176400_Gain9_B1                          (-0.749096f)
+#define HPF_Fs176400_Gain9_B2                          0.000000f
+/* Gain = 10.000000 dB */
+#define HPF_Fs176400_Gain10_A0                          2.891016f
+#define HPF_Fs176400_Gain10_A1                          (-2.640112f)
+#define HPF_Fs176400_Gain10_A2                          0.000000f
+#define HPF_Fs176400_Gain10_B1                          (-0.749096f)
+#define HPF_Fs176400_Gain10_B2                          0.000000f
+/* Gain = 11.000000 dB */
+#define HPF_Fs176400_Gain11_A0                          3.228465f
+#define HPF_Fs176400_Gain11_A1                          (-2.977561f)
+#define HPF_Fs176400_Gain11_A2                          0.000000f
+#define HPF_Fs176400_Gain11_B1                          (-0.749096f)
+#define HPF_Fs176400_Gain11_B2                          0.000000f
+/* Gain = 12.000000 dB */
+#define HPF_Fs176400_Gain12_A0                          3.607090f
+#define HPF_Fs176400_Gain12_A1                          (-3.356186f)
+#define HPF_Fs176400_Gain12_A2                          0.000000f
+#define HPF_Fs176400_Gain12_B1                          (-0.749096f)
+#define HPF_Fs176400_Gain12_B2                          0.000000f
+/* Gain = 13.000000 dB */
+#define HPF_Fs176400_Gain13_A0                          4.031914f
+#define HPF_Fs176400_Gain13_A1                          (-3.781010f)
+#define HPF_Fs176400_Gain13_A2                          0.000000f
+#define HPF_Fs176400_Gain13_B1                          (-0.749096f)
+#define HPF_Fs176400_Gain13_B2                          0.000000f
+/* Gain = 14.000000 dB */
+#define HPF_Fs176400_Gain14_A0                          4.508575f
+#define HPF_Fs176400_Gain14_A1                          (-4.257671f)
+#define HPF_Fs176400_Gain14_A2                          0.000000f
+#define HPF_Fs176400_Gain14_B1                          (-0.749096f)
+#define HPF_Fs176400_Gain14_B2                          0.000000f
+/* Gain = 15.000000 dB */
+#define HPF_Fs176400_Gain15_A0                          5.043397f
+#define HPF_Fs176400_Gain15_A1                          (-4.792493f)
+#define HPF_Fs176400_Gain15_A2                          0.000000f
+#define HPF_Fs176400_Gain15_B1                          (-0.749096f)
+#define HPF_Fs176400_Gain15_B2                          0.000000f
 
 /* Coefficients for sample rate 192000Hz */
                                                                   /* Gain =  1.000000 dB */

@@ -27,23 +27,11 @@
 #include <media/NdkMediaFormat.h>
 #include <media/NdkMediaExtractor.h>
 #include <media/stagefright/MetaData.h>
-#include <media/stagefright/NuMediaExtractor.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <utils/Errors.h>
-#include <utils/StrongPointer.h>
 
-// Temporarily keeping AMediaExtractor_disconnect() where it is used.
-// Will be removed soon in favor of official public APIs.
-struct AMediaExtractor {
-    android::sp<android::NuMediaExtractor> mImpl;
-    android::sp<android::ABuffer> mPsshBuf;
-};
-
-media_status_t AMediaExtractor_disconnect(AMediaExtractor * ex) {
-    ex->mImpl->disconnect();
-    return AMEDIA_OK;
-}
+#include "NdkMediaDataSourceCallbacksPriv.h"
 
 namespace android {
 
@@ -69,9 +57,15 @@ static const char *AMediaFormatKeyGroupInt32[] = {
     AMEDIAFORMAT_KEY_COLOR_STANDARD,
     AMEDIAFORMAT_KEY_COLOR_TRANSFER,
     AMEDIAFORMAT_KEY_COMPLEXITY,
+    AMEDIAFORMAT_KEY_CREATE_INPUT_SURFACE_SUSPENDED,
+    AMEDIAFORMAT_KEY_CRYPTO_DEFAULT_IV_SIZE,
+    AMEDIAFORMAT_KEY_CRYPTO_ENCRYPTED_BYTE_BLOCK,
+    AMEDIAFORMAT_KEY_CRYPTO_MODE,
+    AMEDIAFORMAT_KEY_CRYPTO_SKIP_BYTE_BLOCK,
     AMEDIAFORMAT_KEY_FLAC_COMPRESSION_LEVEL,
     AMEDIAFORMAT_KEY_GRID_COLUMNS,
     AMEDIAFORMAT_KEY_GRID_ROWS,
+    AMEDIAFORMAT_KEY_HAPTIC_CHANNEL_COUNT,
     AMEDIAFORMAT_KEY_HEIGHT,
     AMEDIAFORMAT_KEY_INTRA_REFRESH_PERIOD,
     AMEDIAFORMAT_KEY_IS_ADTS,
@@ -103,6 +97,7 @@ static const char *AMediaFormatKeyGroupInt32[] = {
 
 static const char *AMediaFormatKeyGroupInt64[] = {
     AMEDIAFORMAT_KEY_DURATION,
+    AMEDIAFORMAT_KEY_MAX_PTS_GAP_TO_ENCODER,
     AMEDIAFORMAT_KEY_REPEAT_PREVIOUS_FRAME_AFTER,
     AMEDIAFORMAT_KEY_TIME_US,
 };
@@ -114,6 +109,8 @@ static const char *AMediaFormatKeyGroupString[] = {
 };
 
 static const char *AMediaFormatKeyGroupBuffer[] = {
+    AMEDIAFORMAT_KEY_CRYPTO_IV,
+    AMEDIAFORMAT_KEY_CRYPTO_KEY,
     AMEDIAFORMAT_KEY_HDR_STATIC_INFO,
     AMEDIAFORMAT_KEY_SEI,
     AMEDIAFORMAT_KEY_MPEG_USER_DATA,
@@ -132,6 +129,7 @@ static const char *AMediaFormatKeyGroupRect[] = {
 static const char *AMediaFormatKeyGroupFloatInt32[] = {
     AMEDIAFORMAT_KEY_FRAME_RATE,
     AMEDIAFORMAT_KEY_I_FRAME_INTERVAL,
+    AMEDIAFORMAT_KEY_MAX_FPS_TO_ENCODER,
     AMEDIAFORMAT_KEY_OPERATING_RATE,
 };
 
@@ -1082,14 +1080,6 @@ status_t AMediaExtractorWrapper::release() {
     return OK;
 }
 
-status_t AMediaExtractorWrapper::disconnect() {
-    if (mAMediaExtractor != NULL) {
-        media_status_t err = AMediaExtractor_disconnect(mAMediaExtractor);
-        return translateErrorCode(err);
-    }
-    return DEAD_OBJECT;
-}
-
 AMediaExtractor *AMediaExtractorWrapper::getAMediaExtractor() const {
     return mAMediaExtractor;
 }
@@ -1263,46 +1253,38 @@ sp<AMediaCodecCryptoInfoWrapper> AMediaExtractorWrapper::getSampleCryptoInfo() {
     if (mAMediaExtractor == NULL) {
         return NULL;
     }
-    return new AMediaCodecCryptoInfoWrapper(AMediaExtractor_getSampleCryptoInfo(mAMediaExtractor));
-}
-
-ssize_t AMediaDataSourceWrapper::AMediaDataSourceWrapper_getSize(void *userdata) {
-    DataSource *source = static_cast<DataSource *>(userdata);
-    off64_t size = -1;
-    source->getSize(&size);
-    return size;
-}
-
-ssize_t AMediaDataSourceWrapper::AMediaDataSourceWrapper_readAt(void *userdata, off64_t offset, void * buf, size_t size) {
-    DataSource *source = static_cast<DataSource *>(userdata);
-    return source->readAt(offset, buf, size);
-}
-
-void AMediaDataSourceWrapper::AMediaDataSourceWrapper_close(void *userdata) {
-    DataSource *source = static_cast<DataSource *>(userdata);
-    source->close();
+    AMediaCodecCryptoInfo *cryptoInfo = AMediaExtractor_getSampleCryptoInfo(mAMediaExtractor);
+    if (cryptoInfo == NULL) {
+        return NULL;
+    }
+    return new AMediaCodecCryptoInfoWrapper(cryptoInfo);
 }
 
 AMediaDataSourceWrapper::AMediaDataSourceWrapper(const sp<DataSource> &dataSource)
     : mDataSource(dataSource),
-      mAMediaDataSource(AMediaDataSource_new()) {
-    ALOGV("setDataSource (source: %p)", dataSource.get());
-    AMediaDataSource_setUserdata(mAMediaDataSource, dataSource.get());
-    AMediaDataSource_setReadAt(mAMediaDataSource, AMediaDataSourceWrapper_readAt);
-    AMediaDataSource_setGetSize(mAMediaDataSource, AMediaDataSourceWrapper_getSize);
-    AMediaDataSource_setClose(mAMediaDataSource, AMediaDataSourceWrapper_close);
+      mAMediaDataSource(convertDataSourceToAMediaDataSource(dataSource)) {
+}
+
+AMediaDataSourceWrapper::AMediaDataSourceWrapper(AMediaDataSource *aDataSource)
+    : mDataSource(NULL),
+      mAMediaDataSource(aDataSource) {
 }
 
 AMediaDataSourceWrapper::~AMediaDataSourceWrapper() {
     if (mAMediaDataSource == NULL) {
         return;
     }
+    AMediaDataSource_close(mAMediaDataSource);
     AMediaDataSource_delete(mAMediaDataSource);
     mAMediaDataSource = NULL;
 }
 
 AMediaDataSource* AMediaDataSourceWrapper::getAMediaDataSource() {
     return mAMediaDataSource;
+}
+
+void AMediaDataSourceWrapper::close() {
+    AMediaDataSource_close(mAMediaDataSource);
 }
 
 }  // namespace android

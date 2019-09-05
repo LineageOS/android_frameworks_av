@@ -35,6 +35,7 @@
 
 #define NUM_SECONDS             1
 #define NUM_LOOPS               4
+#define MAX_TESTS               20
 
 typedef struct TimestampInfo {
     int64_t         framesTotal;
@@ -52,6 +53,49 @@ typedef struct TimestampCallbackData_s {
     int32_t        timestampCount = 0; // in timestamps
     bool           forceUnderruns = false;
 } TimestampCallbackData_t;
+
+struct TimeStampTestLog {
+    aaudio_policy_t           isMmap;
+    aaudio_sharing_mode_t     sharingMode;
+    aaudio_performance_mode_t performanceMode;
+    aaudio_direction_t        direction;
+    aaudio_result_t           result;
+};
+
+static int s_numTests = 0;
+// Use a plain old array because we reference this from the callback and do not want any
+// automatic memory allocation.
+static TimeStampTestLog s_testLogs[MAX_TESTS]{};
+
+static void logTestResult(bool isMmap,
+                          aaudio_sharing_mode_t sharingMode,
+                          aaudio_performance_mode_t performanceMode,
+                          aaudio_direction_t direction,
+                          aaudio_result_t result) {
+    if(s_numTests >= MAX_TESTS) {
+        printf("ERROR - MAX_TESTS too small = %d\n", MAX_TESTS);
+        return;
+    }
+    s_testLogs[s_numTests].isMmap = isMmap;
+    s_testLogs[s_numTests].sharingMode = sharingMode;
+    s_testLogs[s_numTests].performanceMode = performanceMode;
+    s_testLogs[s_numTests].direction = direction;
+    s_testLogs[s_numTests].result = result;
+    s_numTests++;
+}
+
+static void printTestResults() {
+    for (int i = 0; i < s_numTests; i++) {
+        TimeStampTestLog *log = &s_testLogs[i];
+        printf("%2d: mmap = %3s, sharing = %9s, perf = %11s, dir = %6s ---- %4s\n",
+               i,
+               log->isMmap ? "yes" : "no",
+               getSharingModeText(log->sharingMode),
+               getPerformanceModeText(log->performanceMode),
+               getDirectionText(log->direction),
+               log->result ? "FAIL" : "pass");
+    }
+}
 
 // Callback function that fills the audio output buffer.
 aaudio_data_callback_result_t timestampDataCallbackProc(
@@ -115,6 +159,7 @@ static aaudio_result_t testTimeStamps(aaudio_policy_t mmapPolicy,
     int32_t originalBufferSize = 0;
     int32_t requestedBufferSize = 0;
     int32_t finalBufferSize = 0;
+    bool    isMmap = false;
     aaudio_format_t actualDataFormat = AAUDIO_FORMAT_PCM_FLOAT;
     aaudio_sharing_mode_t actualSharingMode = AAUDIO_SHARING_MODE_SHARED;
     aaudio_sharing_mode_t actualPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
@@ -124,7 +169,8 @@ static aaudio_result_t testTimeStamps(aaudio_policy_t mmapPolicy,
 
     memset(&sTimestampData, 0, sizeof(sTimestampData));
 
-    printf("------------ testTimeStamps(policy = %d, sharing = %s, perf = %s, dir = %s) -----------\n",
+    printf("\n=================================================================================\n");
+    printf("--------- testTimeStamps(policy = %d, sharing = %s, perf = %s, dir = %s) --------\n",
            mmapPolicy,
            getSharingModeText(sharingMode),
            getPerformanceModeText(performanceMode),
@@ -177,8 +223,8 @@ static aaudio_result_t testTimeStamps(aaudio_policy_t mmapPolicy,
 
     printf("    chans = %3d, rate = %6d format = %d\n",
            actualChannelCount, actualSampleRate, actualDataFormat);
-    printf("    Is MMAP used? %s\n", AAudioStream_isMMapUsed(aaudioStream)
-                                     ? "yes" : "no");
+    isMmap = AAudioStream_isMMapUsed(aaudioStream);
+    printf("    Is MMAP used? %s\n", isMmap ? "yes" : "no");
 
     // This is the number of frames that are read in one chunk by a DMA controller
     // or a DSP or a mixer.
@@ -218,7 +264,7 @@ static aaudio_result_t testTimeStamps(aaudio_policy_t mmapPolicy,
 
         for (int second = 0; second < NUM_SECONDS; second++) {
             // Give AAudio callback time to run in the background.
-            sleep(1);
+            usleep(200 * 1000);
 
             // Periodically print the progress so we know it hasn't died.
             printf("framesWritten = %d, XRuns = %d\n",
@@ -234,18 +280,25 @@ static aaudio_result_t testTimeStamps(aaudio_policy_t mmapPolicy,
         }
 
         printf("timestampCount = %d\n", sTimestampData.timestampCount);
-        int printed = 0;
-        for (int i = 0; i < sTimestampData.timestampCount; i++) {
+        int printedGood = 0;
+        int printedBad = 0;
+        for (int i = 1; i < sTimestampData.timestampCount; i++) {
             TimestampInfo *timestamp = &sTimestampData.timestamps[i];
-            bool posChanged = (timestamp->timestampPosition != (timestamp - 1)->timestampPosition);
-            bool timeChanged = (timestamp->timestampNanos != (timestamp - 1)->timestampNanos);
-            if ((printed < 20) && ((i < 10) || posChanged || timeChanged)) {
-                printf("  %3d : frames %8lld, xferd %8lld", i,
-                       (long long) timestamp->framesTotal,
-                       (long long) timestamp->appPosition);
-                if (timestamp->result != AAUDIO_OK) {
-                    printf(", result = %s\n", AAudio_convertResultToText(timestamp->result));
-                } else {
+            if (timestamp->result != AAUDIO_OK) {
+                if (printedBad < 5) {
+                    printf("  %3d : frames %8lld, xferd %8lld, result = %s\n",
+                           i,
+                           (long long) timestamp->framesTotal,
+                           (long long) timestamp->appPosition,
+                           AAudio_convertResultToText(timestamp->result));
+                    printedBad++;
+                }
+            } else {
+                const bool posChanged = (timestamp->timestampPosition !=
+                                   (timestamp - 1)->timestampPosition);
+                const bool timeChanged = (timestamp->timestampNanos
+                        != (timestamp - 1)->timestampNanos);
+                if ((printedGood < 20) && (posChanged || timeChanged)) {
                     bool negative = timestamp->timestampPosition < 0;
                     bool retro = (i > 0 && (timestamp->timestampPosition <
                                             (timestamp - 1)->timestampPosition));
@@ -253,17 +306,39 @@ static aaudio_result_t testTimeStamps(aaudio_policy_t mmapPolicy,
                                                    : (retro ? "  <= RETROGRADE!" : "");
 
                     double latency = calculateLatencyMillis(timestamp->timestampPosition,
-                                             timestamp->timestampNanos,
-                                             timestamp->appPosition,
-                                             timestamp->appNanoseconds,
-                                             actualSampleRate);
-                    printf(", STAMP: pos = %8lld, nanos = %8lld, lat = %7.1f msec %s\n",
+                                                            timestamp->timestampNanos,
+                                                            timestamp->appPosition,
+                                                            timestamp->appNanoseconds,
+                                                            actualSampleRate);
+                    printf("  %3d : frames %8lld, xferd %8lld",
+                           i,
+                           (long long) timestamp->framesTotal,
+                           (long long) timestamp->appPosition);
+                    printf(" STAMP: pos = %8lld, nanos = %8lld, lat = %7.1f msec %s\n",
                            (long long) timestamp->timestampPosition,
                            (long long) timestamp->timestampNanos,
                            latency,
                            message);
+                    printedGood++;
                 }
-                printed++;
+            }
+        }
+
+        if (printedGood == 0) {
+            printf("ERROR - AAudioStream_getTimestamp() never gave us a valid timestamp\n");
+            result = AAUDIO_ERROR_INTERNAL;
+        } else {
+            // Make sure we do not get timestamps when stopped.
+            int64_t position;
+            int64_t time;
+            aaudio_result_t tempResult = AAudioStream_getTimestamp(aaudioStream,
+                                                                   CLOCK_MONOTONIC,
+                                                                   &position, &time);
+            if (tempResult != AAUDIO_ERROR_INVALID_STATE) {
+                printf("ERROR - AAudioStream_getTimestamp() should return"
+                       " INVALID_STATE when stopped! %s\n",
+                       AAudio_convertResultToText(tempResult));
+                result = AAUDIO_ERROR_INTERNAL;
             }
         }
 
@@ -273,12 +348,14 @@ static aaudio_result_t testTimeStamps(aaudio_policy_t mmapPolicy,
     }
 
 finish:
+
+    logTestResult(isMmap, sharingMode, performanceMode, direction, result);
+
     if (aaudioStream != nullptr) {
         AAudioStream_close(aaudioStream);
     }
     AAudioStreamBuilder_delete(aaudioBuilder);
     printf("result = %d = %s\n", result, AAudio_convertResultToText(result));
-
     return result;
 }
 
@@ -292,7 +369,7 @@ int main(int argc, char **argv) {
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
 
-    printf("Test Timestamps V0.1.3\n");
+    printf("Test Timestamps V0.1.4\n");
 
     // Legacy
     aaudio_policy_t policy = AAUDIO_POLICY_NEVER;
@@ -331,6 +408,8 @@ int main(int argc, char **argv) {
                             AAUDIO_SHARING_MODE_SHARED,
                             AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
                             AAUDIO_DIRECTION_OUTPUT);
+
+    printTestResults();
 
     return (result == AAUDIO_OK) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

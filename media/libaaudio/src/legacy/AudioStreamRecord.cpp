@@ -57,32 +57,41 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
 
     // Try to create an AudioRecord
 
+    const aaudio_session_id_t requestedSessionId = builder.getSessionId();
+    const audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
+
     // TODO Support UNSPECIFIED in AudioRecord. For now, use stereo if unspecified.
     int32_t samplesPerFrame = (getSamplesPerFrame() == AAUDIO_UNSPECIFIED)
                               ? 2 : getSamplesPerFrame();
-    audio_channel_mask_t channelMask = audio_channel_in_mask_from_count(samplesPerFrame);
+    audio_channel_mask_t channelMask = samplesPerFrame <= 2 ?
+                               audio_channel_in_mask_from_count(samplesPerFrame) :
+                               audio_channel_mask_for_index_assignment_from_count(samplesPerFrame);
 
     size_t frameCount = (builder.getBufferCapacity() == AAUDIO_UNSPECIFIED) ? 0
                         : builder.getBufferCapacity();
 
 
-    audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE;
+    audio_input_flags_t flags;
     aaudio_performance_mode_t perfMode = getPerformanceMode();
     switch (perfMode) {
         case AAUDIO_PERFORMANCE_MODE_LOW_LATENCY:
-            flags = (audio_input_flags_t) (AUDIO_INPUT_FLAG_FAST | AUDIO_INPUT_FLAG_RAW);
+            // If the app asks for a sessionId then it means they want to use effects.
+            // So don't use RAW flag.
+            flags = (audio_input_flags_t) ((requestedSessionId == AAUDIO_SESSION_ID_NONE)
+                    ? (AUDIO_INPUT_FLAG_FAST | AUDIO_INPUT_FLAG_RAW)
+                    : (AUDIO_INPUT_FLAG_FAST));
             break;
 
         case AAUDIO_PERFORMANCE_MODE_POWER_SAVING:
         case AAUDIO_PERFORMANCE_MODE_NONE:
         default:
-            // No flags.
+            flags = AUDIO_INPUT_FLAG_NONE;
             break;
     }
 
     // Preserve behavior of API 26
-    if (getFormat() == AAUDIO_FORMAT_UNSPECIFIED) {
-        setFormat(AAUDIO_FORMAT_PCM_FLOAT);
+    if (getFormat() == AUDIO_FORMAT_DEFAULT) {
+        setFormat(AUDIO_FORMAT_PCM_FLOAT);
     }
 
     // Maybe change device format to get a FAST path.
@@ -99,12 +108,12 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     // We just may not get a FAST track.
     // But we wouldn't have anyway without this hack.
     constexpr int32_t kMostLikelySampleRateForFast = 48000;
-    if (getFormat() == AAUDIO_FORMAT_PCM_FLOAT
+    if (getFormat() == AUDIO_FORMAT_PCM_FLOAT
             && perfMode == AAUDIO_PERFORMANCE_MODE_LOW_LATENCY
             && (samplesPerFrame <= 2) // FAST only for mono and stereo
             && (getSampleRate() == kMostLikelySampleRateForFast
                 || getSampleRate() == AAUDIO_UNSPECIFIED)) {
-        setDeviceFormat(AAUDIO_FORMAT_PCM_I16);
+        setDeviceFormat(AUDIO_FORMAT_PCM_16_BIT);
     } else {
         setDeviceFormat(getFormat());
     }
@@ -141,14 +150,10 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             .tags = ""
     };
 
-    aaudio_session_id_t requestedSessionId = builder.getSessionId();
-    audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
-
     // ----------- open the AudioRecord ---------------------
     // Might retry, but never more than once.
     for (int i = 0; i < 2; i ++) {
-        audio_format_t requestedInternalFormat =
-                AAudioConvert_aaudioToAndroidDataFormat(getDeviceFormat());
+        const audio_format_t requestedInternalFormat = getDeviceFormat();
 
         mAudioRecord = new AudioRecord(
                 mOpPackageName // const String16& opPackageName TODO does not compile
@@ -214,8 +219,8 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     }
 
     // Allocate format conversion buffer if needed.
-    if (getDeviceFormat() == AAUDIO_FORMAT_PCM_I16
-        && getFormat() == AAUDIO_FORMAT_PCM_FLOAT) {
+    if (getDeviceFormat() == AUDIO_FORMAT_PCM_16_BIT
+        && getFormat() == AUDIO_FORMAT_PCM_FLOAT) {
 
         if (builder.getDataCallbackProc() != nullptr) {
             // If we have a callback then we need to convert the data into an internal float
@@ -323,16 +328,13 @@ aaudio_result_t AudioStreamRecord::requestStart()
     if (mAudioRecord.get() == nullptr) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
-    // Get current position so we can detect when the track is recording.
-    status_t err = mAudioRecord->getPosition(&mPositionWhenStarting);
-    if (err != OK) {
-        return AAudioConvert_androidToAAudioResult(err);
-    }
 
-    // Enable callback before starting AudioTrack to avoid shutting
+    // Enable callback before starting AudioRecord to avoid shutting
     // down because of a race condition.
     mCallbackEnabled.store(true);
-    err = mAudioRecord->start();
+    mFramesWritten.reset32(); // service writes frames
+    mTimestampPosition.reset32();
+    status_t err = mAudioRecord->start(); // resets position to zero
     if (err != OK) {
         return AAudioConvert_androidToAAudioResult(err);
     } else {
@@ -346,12 +348,10 @@ aaudio_result_t AudioStreamRecord::requestStop() {
         return AAUDIO_ERROR_INVALID_STATE;
     }
     setState(AAUDIO_STREAM_STATE_STOPPING);
-    incrementFramesWritten(getFramesRead() - getFramesWritten()); // TODO review
-    mTimestampPosition.set(getFramesRead());
+    mFramesWritten.catchUpTo(getFramesRead());
+    mTimestampPosition.catchUpTo(getFramesRead());
     mAudioRecord->stop();
     mCallbackEnabled.store(false);
-    mFramesWritten.reset32(); // service writes frames, service position reset on flush
-    mTimestampPosition.reset32();
     // Pass false to prevent errorCallback from being called after disconnect
     // when app has already requested a stop().
     return checkForDisconnectRequest(false);
@@ -365,10 +365,12 @@ aaudio_result_t AudioStreamRecord::updateStateMachine()
     switch (getState()) {
     // TODO add better state visibility to AudioRecord
     case AAUDIO_STREAM_STATE_STARTING:
+        // When starting, the position will begin at zero and then go positive.
+        // The position can wrap but by that time the state will not be STARTING.
         err = mAudioRecord->getPosition(&position);
         if (err != OK) {
             result = AAudioConvert_androidToAAudioResult(err);
-        } else if (position != mPositionWhenStarting) {
+        } else if (position > 0) {
             setState(AAUDIO_STREAM_STATE_STARTED);
         }
         break;
@@ -483,6 +485,9 @@ aaudio_result_t AudioStreamRecord::getTimestamp(clockid_t clockId,
                                                int64_t *framePosition,
                                                int64_t *timeNanoseconds) {
     ExtendedTimestamp extendedTimestamp;
+    if (getState() != AAUDIO_STREAM_STATE_STARTED) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
     status_t status = mAudioRecord->getTimestamp(&extendedTimestamp);
     if (status == WOULD_BLOCK) {
         return AAUDIO_ERROR_INVALID_STATE;
@@ -498,12 +503,12 @@ int64_t AudioStreamRecord::getFramesWritten() {
     switch (getState()) {
         case AAUDIO_STREAM_STATE_STARTING:
         case AAUDIO_STREAM_STATE_STARTED:
-        case AAUDIO_STREAM_STATE_STOPPING:
             result = mAudioRecord->getPosition(&position);
             if (result == OK) {
                 mFramesWritten.update32(position);
             }
             break;
+        case AAUDIO_STREAM_STATE_STOPPING:
         default:
             break;
     }

@@ -18,14 +18,10 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MediaPlayer2Native"
 
-#include <binder/IServiceManager.h>
-#include <binder/IPCThreadState.h>
-
+#include <android/binder_ibinder.h>
 #include <media/AudioSystem.h>
 #include <media/DataSourceDesc.h>
-#include <media/MediaAnalyticsItem.h>
 #include <media/MemoryLeakTrackUtil.h>
-#include <media/Metadata.h>
 #include <media/NdkWrapper.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooperRoster.h>
@@ -53,169 +49,6 @@ namespace {
 const int kDumpLockRetries = 50;
 const int kDumpLockSleepUs = 20000;
 
-// Max number of entries in the filter.
-const int kMaxFilterSize = 64;  // I pulled that out of thin air.
-
-// FIXME: Move all the metadata related function in the Metadata.cpp
-
-// Unmarshall a filter from a Parcel.
-// Filter format in a parcel:
-//
-//  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       number of entries (n)                   |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       metadata type 1                         |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       metadata type 2                         |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//  ....
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       metadata type n                         |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//
-// @param p Parcel that should start with a filter.
-// @param[out] filter On exit contains the list of metadata type to be
-//                    filtered.
-// @param[out] status On exit contains the status code to be returned.
-// @return true if the parcel starts with a valid filter.
-bool unmarshallFilter(const Parcel& p,
-                      media::Metadata::Filter *filter,
-                      status_t *status) {
-    int32_t val;
-    if (p.readInt32(&val) != OK) {
-        ALOGE("Failed to read filter's length");
-        *status = NOT_ENOUGH_DATA;
-        return false;
-    }
-
-    if (val > kMaxFilterSize || val < 0) {
-        ALOGE("Invalid filter len %d", val);
-        *status = BAD_VALUE;
-        return false;
-    }
-
-    const size_t num = val;
-
-    filter->clear();
-    filter->setCapacity(num);
-
-    size_t size = num * sizeof(media::Metadata::Type);
-
-
-    if (p.dataAvail() < size) {
-        ALOGE("Filter too short expected %zu but got %zu", size, p.dataAvail());
-        *status = NOT_ENOUGH_DATA;
-        return false;
-    }
-
-    const media::Metadata::Type *data =
-        static_cast<const media::Metadata::Type*>(p.readInplace(size));
-
-    if (NULL == data) {
-        ALOGE("Filter had no data");
-        *status = BAD_VALUE;
-        return false;
-    }
-
-    // TODO: The stl impl of vector would be more efficient here
-    // because it degenerates into a memcpy on pod types. Try to
-    // replace later or use stl::set.
-    for (size_t i = 0; i < num; ++i) {
-        filter->add(*data);
-        ++data;
-    }
-    *status = OK;
-    return true;
-}
-
-// @param filter Of metadata type.
-// @param val To be searched.
-// @return true if a match was found.
-bool findMetadata(const media::Metadata::Filter& filter, const int32_t val) {
-    // Deal with empty and ANY right away
-    if (filter.isEmpty()) {
-        return false;
-    }
-    if (filter[0] == media::Metadata::kAny) {
-        return true;
-    }
-
-    return filter.indexOf(val) >= 0;
-}
-
-// marshalling tag indicating flattened utf16 tags
-// keep in sync with frameworks/base/media/java/android/media/AudioAttributes.java
-const int32_t kAudioAttributesMarshallTagFlattenTags = 1;
-
-// Audio attributes format in a parcel:
-//
-//  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       usage                                   |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       content_type                            |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       source                                  |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       flags                                   |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       kAudioAttributesMarshallTagFlattenTags  | // ignore tags if not found
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// |                       flattened tags in UTF16                 |
-// |                         ...                                   |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//
-// @param p Parcel that contains audio attributes.
-// @param[out] attributes On exit points to an initialized audio_attributes_t structure
-// @param[out] status On exit contains the status code to be returned.
-void unmarshallAudioAttributes(const Parcel& parcel, audio_attributes_t *attributes) {
-    attributes->usage = (audio_usage_t) parcel.readInt32();
-    attributes->content_type = (audio_content_type_t) parcel.readInt32();
-    attributes->source = (audio_source_t) parcel.readInt32();
-    attributes->flags = (audio_flags_mask_t) parcel.readInt32();
-    const bool hasFlattenedTag = (parcel.readInt32() == kAudioAttributesMarshallTagFlattenTags);
-    if (hasFlattenedTag) {
-        // the tags are UTF16, convert to UTF8
-        String16 tags = parcel.readString16();
-        ssize_t realTagSize = utf16_to_utf8_length(tags.string(), tags.size());
-        if (realTagSize <= 0) {
-            strcpy(attributes->tags, "");
-        } else {
-            // copy the flattened string into the attributes as the destination for the conversion:
-            // copying array size -1, array for tags was calloc'd, no need to NULL-terminate it
-            size_t tagSize = realTagSize > AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - 1 ?
-                    AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - 1 : realTagSize;
-            utf16_to_utf8(tags.string(), tagSize, attributes->tags,
-                    sizeof(attributes->tags) / sizeof(attributes->tags[0]));
-        }
-    } else {
-        ALOGE("unmarshallAudioAttributes() received unflattened tags, ignoring tag values");
-        strcpy(attributes->tags, "");
-    }
-}
-
-class AudioDeviceUpdatedNotifier: public AudioSystem::AudioDeviceCallback {
-public:
-    AudioDeviceUpdatedNotifier(const sp<MediaPlayer2Interface>& listener)
-        : mListener(listener) { }
-
-    ~AudioDeviceUpdatedNotifier() { }
-
-    virtual void onAudioDeviceUpdate(audio_io_handle_t audioIo,
-                                     audio_port_handle_t deviceId) override {
-        sp<MediaPlayer2Interface> listener = mListener.promote();
-        if (listener != NULL) {
-            listener->sendEvent(0, MEDIA2_AUDIO_ROUTING_CHANGED, audioIo, deviceId);
-        } else {
-            ALOGW("listener for process %d death is gone", MEDIA2_AUDIO_ROUTING_CHANGED);
-        }
-    }
-
-private:
-    wp<MediaPlayer2Interface> mListener;
-};
-
 class proxyListener : public MediaPlayer2InterfaceListener {
 public:
     proxyListener(const wp<MediaPlayer2> &player)
@@ -223,7 +56,8 @@ public:
 
     ~proxyListener() { };
 
-    virtual void notify(int64_t srcId, int msg, int ext1, int ext2, const Parcel *obj) override {
+    virtual void notify(int64_t srcId, int msg, int ext1, int ext2,
+            const PlayerMessage *obj) override {
         sp<MediaPlayer2> player = mPlayer.promote();
         if (player != NULL) {
             player->notify(srcId, msg, ext1, ext2, obj);
@@ -265,114 +99,110 @@ status_t dumpPlayers(int fd, const Vector<String16>& args) {
     String8 result;
     SortedVector< sp<MediaPlayer2> > players; //to serialise the mutex unlock & client destruction.
 
-    if (checkCallingPermission(String16("android.permission.DUMP")) == false) {
-        snprintf(buffer, SIZE, "Permission Denial: can't dump MediaPlayer2\n");
-        result.append(buffer);
+    {
+        Mutex::Autolock lock(sRecordLock);
+        ensureInit_l();
+        for (int i = 0, n = sPlayers->size(); i < n; ++i) {
+            sp<MediaPlayer2> p = (*sPlayers)[i].promote();
+            if (p != 0) {
+                p->dump(fd, args);
+            }
+            players.add(p);
+        }
+    }
+
+    result.append(" Files opened and/or mapped:\n");
+    snprintf(buffer, SIZE, "/proc/%d/maps", getpid());
+    FILE *f = fopen(buffer, "r");
+    if (f) {
+        while (!feof(f)) {
+            fgets(buffer, SIZE, f);
+            if (strstr(buffer, " /storage/") ||
+                strstr(buffer, " /system/sounds/") ||
+                strstr(buffer, " /data/") ||
+                strstr(buffer, " /system/media/")) {
+                result.append("  ");
+                result.append(buffer);
+            }
+        }
+        fclose(f);
     } else {
-        {
-            Mutex::Autolock lock(sRecordLock);
-            ensureInit_l();
-            for (int i = 0, n = sPlayers->size(); i < n; ++i) {
-                sp<MediaPlayer2> p = (*sPlayers)[i].promote();
-                if (p != 0) {
-                    p->dump(fd, args);
-                }
-                players.add(p);
-            }
-        }
+        result.append("couldn't open ");
+        result.append(buffer);
+        result.append("\n");
+    }
 
-        result.append(" Files opened and/or mapped:\n");
-        snprintf(buffer, SIZE, "/proc/%d/maps", getpid());
-        FILE *f = fopen(buffer, "r");
-        if (f) {
-            while (!feof(f)) {
-                fgets(buffer, SIZE, f);
-                if (strstr(buffer, " /storage/") ||
-                    strstr(buffer, " /system/sounds/") ||
-                    strstr(buffer, " /data/") ||
-                    strstr(buffer, " /system/media/")) {
-                    result.append("  ");
-                    result.append(buffer);
-                }
-            }
-            fclose(f);
-        } else {
-            result.append("couldn't open ");
-            result.append(buffer);
-            result.append("\n");
-        }
-
-        snprintf(buffer, SIZE, "/proc/%d/fd", getpid());
-        DIR *d = opendir(buffer);
-        if (d) {
-            struct dirent *ent;
-            while((ent = readdir(d)) != NULL) {
-                if (strcmp(ent->d_name,".") && strcmp(ent->d_name,"..")) {
-                    snprintf(buffer, SIZE, "/proc/%d/fd/%s", getpid(), ent->d_name);
-                    struct stat s;
-                    if (lstat(buffer, &s) == 0) {
-                        if ((s.st_mode & S_IFMT) == S_IFLNK) {
-                            char linkto[256];
-                            int len = readlink(buffer, linkto, sizeof(linkto));
-                            if(len > 0) {
-                                if(len > 255) {
-                                    linkto[252] = '.';
-                                    linkto[253] = '.';
-                                    linkto[254] = '.';
-                                    linkto[255] = 0;
-                                } else {
-                                    linkto[len] = 0;
-                                }
-                                if (strstr(linkto, "/storage/") == linkto ||
-                                    strstr(linkto, "/system/sounds/") == linkto ||
-                                    strstr(linkto, "/data/") == linkto ||
-                                    strstr(linkto, "/system/media/") == linkto) {
-                                    result.append("  ");
-                                    result.append(buffer);
-                                    result.append(" -> ");
-                                    result.append(linkto);
-                                    result.append("\n");
-                                }
+    snprintf(buffer, SIZE, "/proc/%d/fd", getpid());
+    DIR *d = opendir(buffer);
+    if (d) {
+        struct dirent *ent;
+        while((ent = readdir(d)) != NULL) {
+            if (strcmp(ent->d_name,".") && strcmp(ent->d_name,"..")) {
+                snprintf(buffer, SIZE, "/proc/%d/fd/%s", getpid(), ent->d_name);
+                struct stat s;
+                if (lstat(buffer, &s) == 0) {
+                    if ((s.st_mode & S_IFMT) == S_IFLNK) {
+                        char linkto[256];
+                        int len = readlink(buffer, linkto, sizeof(linkto));
+                        if(len > 0) {
+                            if(len > 255) {
+                                linkto[252] = '.';
+                                linkto[253] = '.';
+                                linkto[254] = '.';
+                                linkto[255] = 0;
+                            } else {
+                                linkto[len] = 0;
                             }
-                        } else {
-                            result.append("  unexpected type for ");
-                            result.append(buffer);
-                            result.append("\n");
+                            if (strstr(linkto, "/storage/") == linkto ||
+                                strstr(linkto, "/system/sounds/") == linkto ||
+                                strstr(linkto, "/data/") == linkto ||
+                                strstr(linkto, "/system/media/") == linkto) {
+                                result.append("  ");
+                                result.append(buffer);
+                                result.append(" -> ");
+                                result.append(linkto);
+                                result.append("\n");
+                            }
                         }
+                    } else {
+                        result.append("  unexpected type for ");
+                        result.append(buffer);
+                        result.append("\n");
                     }
                 }
             }
-            closedir(d);
-        } else {
-            result.append("couldn't open ");
-            result.append(buffer);
-            result.append("\n");
         }
+        closedir(d);
+    } else {
+        result.append("couldn't open ");
+        result.append(buffer);
+        result.append("\n");
+    }
 
-        gLooperRoster.dump(fd, args);
+    gLooperRoster.dump(fd, args);
 
-        bool dumpMem = false;
-        bool unreachableMemory = false;
-        for (size_t i = 0; i < args.size(); i++) {
-            if (args[i] == String16("-m")) {
-                dumpMem = true;
-            } else if (args[i] == String16("--unreachable")) {
-                unreachableMemory = true;
-            }
-        }
-        if (dumpMem) {
-            result.append("\nDumping memory:\n");
-            std::string s = dumpMemoryAddresses(100 /* limit */);
-            result.append(s.c_str(), s.size());
-        }
-        if (unreachableMemory) {
-            result.append("\nDumping unreachable memory:\n");
-            // TODO - should limit be an argument parameter?
-            // TODO: enable GetUnreachableMemoryString if it's part of stable API
-            //std::string s = GetUnreachableMemoryString(true /* contents */, 10000 /* limit */);
-            //result.append(s.c_str(), s.size());
+    bool dumpMem = false;
+    bool unreachableMemory = false;
+    for (size_t i = 0; i < args.size(); i++) {
+        if (args[i] == String16("-m")) {
+            dumpMem = true;
+        } else if (args[i] == String16("--unreachable")) {
+            unreachableMemory = true;
         }
     }
+    if (dumpMem) {
+        result.append("\nDumping memory:\n");
+        std::string s = dumpMemoryAddresses(100 /* limit */);
+        result.append(s.c_str(), s.size());
+    }
+    if (unreachableMemory) {
+        result.append("\nDumping unreachable memory:\n");
+        // TODO - should limit be an argument parameter?
+        // TODO: enable GetUnreachableMemoryString if it's part of stable API
+        //std::string s = GetUnreachableMemoryString(true /* contents */, 10000 /* limit */);
+        //result.append(s.c_str(), s.size());
+    }
+
     write(fd, result.string(), result.size());
     return NO_ERROR;
 }
@@ -380,8 +210,8 @@ status_t dumpPlayers(int fd, const Vector<String16>& args) {
 }  // anonymous namespace
 
 //static
-sp<MediaPlayer2> MediaPlayer2::Create() {
-    sp<MediaPlayer2> player = new MediaPlayer2();
+sp<MediaPlayer2> MediaPlayer2::Create(int32_t sessionId, jobject context) {
+    sp<MediaPlayer2> player = new MediaPlayer2(sessionId, context);
 
     if (!player->init()) {
         return NULL;
@@ -398,44 +228,35 @@ status_t MediaPlayer2::DumpAll(int fd, const Vector<String16>& args) {
     return dumpPlayers(fd, args);
 }
 
-MediaPlayer2::MediaPlayer2() {
+MediaPlayer2::MediaPlayer2(int32_t sessionId, jobject context) {
     ALOGV("constructor");
     mSrcId = 0;
     mLockThreadId = 0;
     mListener = NULL;
     mStreamType = AUDIO_STREAM_MUSIC;
-    mAudioAttributesParcel = NULL;
+    mAudioAttributes = NULL;
+    mContext = new JObjectHolder(context);
     mCurrentPosition = -1;
     mCurrentSeekMode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC;
     mSeekPosition = -1;
     mSeekMode = MediaPlayer2SeekMode::SEEK_PREVIOUS_SYNC;
     mCurrentState = MEDIA_PLAYER2_IDLE;
+    mTransitionToNext = false;
     mLoop = false;
-    mLeftVolume = mRightVolume = 1.0;
+    mVolume = 1.0;
     mVideoWidth = mVideoHeight = 0;
-    mAudioSessionId = (audio_session_t) AudioSystem::newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
-    AudioSystem::acquireAudioSessionId(mAudioSessionId, -1);
     mSendLevel = 0;
 
-    // TODO: get pid and uid from JAVA
-    mPid = IPCThreadState::self()->getCallingPid();
-    mUid = IPCThreadState::self()->getCallingUid();
+    mPid = AIBinder_getCallingPid();
+    mUid = AIBinder_getCallingUid();
 
-    mAudioAttributes = NULL;
+    mAudioOutput = new MediaPlayer2AudioOutput(sessionId, mUid, mPid, NULL /*attributes*/);
 }
 
 MediaPlayer2::~MediaPlayer2() {
     ALOGV("destructor");
-    if (mAudioAttributesParcel != NULL) {
-        delete mAudioAttributesParcel;
-        mAudioAttributesParcel = NULL;
-    }
-    AudioSystem::releaseAudioSessionId(mAudioSessionId, -1);
     disconnect();
     removePlayer(this);
-    if (mAudioAttributes != NULL) {
-        free(mAudioAttributes);
-    }
 }
 
 bool MediaPlayer2::init() {
@@ -493,19 +314,28 @@ status_t MediaPlayer2::setDataSource(const sp<DataSourceDesc> &dsd) {
     if (dsd == NULL) {
         return BAD_VALUE;
     }
+    // Microsecond is used in NuPlayer2.
+    if (dsd->mStartPositionMs > DataSourceDesc::kMaxTimeMs) {
+        dsd->mStartPositionMs = DataSourceDesc::kMaxTimeMs;
+        ALOGW("setDataSource, start poistion clamped to %lld ms", (long long)dsd->mStartPositionMs);
+    }
+    if (dsd->mEndPositionMs > DataSourceDesc::kMaxTimeMs) {
+        dsd->mEndPositionMs = DataSourceDesc::kMaxTimeMs;
+        ALOGW("setDataSource, end poistion clamped to %lld ms", (long long)dsd->mStartPositionMs);
+    }
     ALOGV("setDataSource type(%d), srcId(%lld)", dsd->mType, (long long)dsd->mId);
 
     sp<MediaPlayer2Interface> oldPlayer;
 
-    Mutex::Autolock _l(mLock);
     {
+        Mutex::Autolock _l(mLock);
         if (!((mCurrentState & MEDIA_PLAYER2_IDLE)
               || mCurrentState == MEDIA_PLAYER2_STATE_ERROR)) {
             ALOGE("setDataSource called in wrong state %d", mCurrentState);
             return INVALID_OPERATION;
         }
 
-        sp<MediaPlayer2Interface> player = new NuPlayer2Driver(mPid, mUid);
+        sp<MediaPlayer2Interface> player = new NuPlayer2Driver(mPid, mUid, mContext);
         status_t err = player->initCheck();
         if (err != NO_ERROR) {
             ALOGE("Failed to create player object, initCheck failed(%d)", err);
@@ -515,8 +345,6 @@ status_t MediaPlayer2::setDataSource(const sp<DataSourceDesc> &dsd) {
         clear_l();
 
         player->setListener(new proxyListener(this));
-        mAudioOutput = new MediaPlayer2AudioOutput(mAudioSessionId, mUid,
-                mPid, mAudioAttributes, new AudioDeviceUpdatedNotifier(player));
         player->setAudioSink(mAudioOutput);
 
         err = player->setDataSource(dsd);
@@ -562,80 +390,20 @@ status_t MediaPlayer2::playNextDataSource(int64_t srcId) {
         return INVALID_OPERATION;
     }
     mSrcId = srcId;
+    mTransitionToNext = true;
     return mPlayer->playNextDataSource(srcId);
 }
 
-status_t MediaPlayer2::invoke(const Parcel& request, Parcel *reply) {
+status_t MediaPlayer2::invoke(const PlayerMessage &request, PlayerMessage *reply) {
     Mutex::Autolock _l(mLock);
     const bool hasBeenInitialized =
             (mCurrentState != MEDIA_PLAYER2_STATE_ERROR) &&
             ((mCurrentState & MEDIA_PLAYER2_IDLE) != MEDIA_PLAYER2_IDLE);
     if ((mPlayer == NULL) || !hasBeenInitialized) {
-        ALOGE("invoke failed: wrong state %X, mPlayer(%p)", mCurrentState, mPlayer.get());
+        ALOGE("invoke() failed: wrong state %X, mPlayer(%p)", mCurrentState, mPlayer.get());
         return INVALID_OPERATION;
     }
-    ALOGV("invoke %zu", request.dataSize());
     return mPlayer->invoke(request, reply);
-}
-
-// This call doesn't need to access the native player.
-status_t MediaPlayer2::setMetadataFilter(const Parcel& filter) {
-    ALOGD("setMetadataFilter");
-
-    status_t status;
-    media::Metadata::Filter allow, drop;
-
-    if (unmarshallFilter(filter, &allow, &status) &&
-        unmarshallFilter(filter, &drop, &status)) {
-        Mutex::Autolock lock(mLock);
-
-        mMetadataAllow = allow;
-        mMetadataDrop = drop;
-    }
-    return status;
-}
-
-status_t MediaPlayer2::getMetadata(bool update_only, bool /* apply_filter */, Parcel *reply) {
-    ALOGD("getMetadata");
-    sp<MediaPlayer2Interface> player;
-    media::Metadata::Filter ids;
-    Mutex::Autolock lock(mLock);
-    {
-        if (mPlayer == NULL) {
-            return NO_INIT;
-        }
-
-        player = mPlayer;
-        // Placeholder for the return code, updated by the caller.
-        reply->writeInt32(-1);
-
-        // We don't block notifications while we fetch the data. We clear
-        // mMetadataUpdated first so we don't lose notifications happening
-        // during the rest of this call.
-        if (update_only) {
-            ids = mMetadataUpdated;
-        }
-        mMetadataUpdated.clear();
-    }
-
-    media::Metadata metadata(reply);
-
-    metadata.appendHeader();
-    status_t status = player->getMetadata(ids, reply);
-
-    if (status != OK) {
-        metadata.resetParcel();
-        ALOGE("getMetadata failed %d", status);
-        return status;
-    }
-
-    // FIXME: ement filtering on the result. Not critical since
-    // filtering takes place on the update notifications already. This
-    // would be when all the metadata are fetch and a filter is set.
-
-    // Everything is fine, update the metadata length.
-    metadata.updateLength();
-    return OK;
 }
 
 void MediaPlayer2::disconnectNativeWindow_l() {
@@ -727,22 +495,9 @@ status_t MediaPlayer2::setBufferingSettings(const BufferingSettings& buffering) 
     return mPlayer->setBufferingSettings(buffering);
 }
 
-status_t MediaPlayer2::setAudioAttributes_l(const Parcel &parcel) {
-    if (mAudioAttributes != NULL) {
-        free(mAudioAttributes);
-    }
-    mAudioAttributes = (audio_attributes_t *) calloc(1, sizeof(audio_attributes_t));
-    if (mAudioAttributes == NULL) {
-        return NO_MEMORY;
-    }
-    unmarshallAudioAttributes(parcel, mAudioAttributes);
-
-    ALOGV("setAudioAttributes_l() usage=%d content=%d flags=0x%x tags=%s",
-            mAudioAttributes->usage, mAudioAttributes->content_type, mAudioAttributes->flags,
-            mAudioAttributes->tags);
-
-    if (mAudioOutput != 0) {
-        mAudioOutput->setAudioAttributes(mAudioAttributes);
+status_t MediaPlayer2::setAudioAttributes_l(const jobject attributes) {
+    if (mAudioOutput != NULL) {
+        mAudioOutput->setAudioAttributes(attributes);
     }
     return NO_ERROR;
 }
@@ -750,14 +505,12 @@ status_t MediaPlayer2::setAudioAttributes_l(const Parcel &parcel) {
 status_t MediaPlayer2::prepareAsync() {
     ALOGV("prepareAsync");
     Mutex::Autolock _l(mLock);
-    if ((mPlayer != 0) && (mCurrentState & (MEDIA_PLAYER2_INITIALIZED | MEDIA_PLAYER2_STOPPED))) {
-        if (mAudioAttributesParcel != NULL) {
-            status_t err = setAudioAttributes_l(*mAudioAttributesParcel);
+    if ((mPlayer != 0) && (mCurrentState & MEDIA_PLAYER2_INITIALIZED)) {
+        if (mAudioAttributes != NULL) {
+            status_t err = setAudioAttributes_l(mAudioAttributes->getJObject());
             if (err != OK) {
                 return err;
             }
-        } else if (mAudioOutput != 0) {
-            mAudioOutput->setAudioStreamType(mStreamType);
         }
         mCurrentState = MEDIA_PLAYER2_PREPARING;
         return mPlayer->prepareAsync();
@@ -781,7 +534,7 @@ status_t MediaPlayer2::start() {
         mPlayer->setLooping(mLoop);
 
         if (mAudioOutput != 0) {
-            mAudioOutput->setVolume(mLeftVolume, mRightVolume);
+            mAudioOutput->setVolume(mVolume);
         }
 
         if (mAudioOutput != 0) {
@@ -806,35 +559,18 @@ status_t MediaPlayer2::start() {
     return ret;
 }
 
-status_t MediaPlayer2::stop() {
-    ALOGV("stop");
-    Mutex::Autolock _l(mLock);
-    if (mCurrentState & MEDIA_PLAYER2_STOPPED) return NO_ERROR;
-    if ( (mPlayer != 0) && ( mCurrentState & ( MEDIA_PLAYER2_STARTED | MEDIA_PLAYER2_PREPARED |
-                    MEDIA_PLAYER2_PAUSED | MEDIA_PLAYER2_PLAYBACK_COMPLETE ) ) ) {
-        status_t ret = mPlayer->stop();
-        if (ret != NO_ERROR) {
-            mCurrentState = MEDIA_PLAYER2_STATE_ERROR;
-        } else {
-            mCurrentState = MEDIA_PLAYER2_STOPPED;
-        }
-        return ret;
-    }
-    ALOGE("stop called in state %d, mPlayer(%p)", mCurrentState, mPlayer.get());
-    return INVALID_OPERATION;
-}
-
 status_t MediaPlayer2::pause() {
     ALOGV("pause");
     Mutex::Autolock _l(mLock);
     if (mCurrentState & (MEDIA_PLAYER2_PAUSED|MEDIA_PLAYER2_PLAYBACK_COMPLETE))
         return NO_ERROR;
-    if ((mPlayer != 0) && (mCurrentState & MEDIA_PLAYER2_STARTED)) {
+    if ((mPlayer != 0) && (mCurrentState & (MEDIA_PLAYER2_STARTED | MEDIA_PLAYER2_PREPARED))) {
         status_t ret = mPlayer->pause();
         if (ret != NO_ERROR) {
             mCurrentState = MEDIA_PLAYER2_STATE_ERROR;
         } else {
             mCurrentState = MEDIA_PLAYER2_PAUSED;
+            mTransitionToNext = false;
         }
         return ret;
     }
@@ -860,7 +596,7 @@ bool MediaPlayer2::isPlaying() {
     return false;
 }
 
-mediaplayer2_states MediaPlayer2::getMediaPlayer2State() {
+mediaplayer2_states MediaPlayer2::getState() {
     Mutex::Autolock _l(mLock);
     if (mCurrentState & MEDIA_PLAYER2_STATE_ERROR) {
         return MEDIAPLAYER2_STATE_ERROR;
@@ -873,8 +609,7 @@ mediaplayer2_states MediaPlayer2::getMediaPlayer2State() {
     if (mCurrentState & MEDIA_PLAYER2_STARTED) {
         return MEDIAPLAYER2_STATE_PLAYING;
     }
-    if (mCurrentState
-        & (MEDIA_PLAYER2_PAUSED | MEDIA_PLAYER2_STOPPED | MEDIA_PLAYER2_PLAYBACK_COMPLETE)) {
+    if (mCurrentState & (MEDIA_PLAYER2_PAUSED | MEDIA_PLAYER2_PLAYBACK_COMPLETE)) {
         return MEDIAPLAYER2_STATE_PAUSED;
     }
     // now only mCurrentState & MEDIA_PLAYER2_PREPARED is true
@@ -890,7 +625,7 @@ status_t MediaPlayer2::setPlaybackSettings(const AudioPlaybackRate& rate) {
         return BAD_VALUE;
     }
     Mutex::Autolock _l(mLock);
-    if (mPlayer == 0 || (mCurrentState & MEDIA_PLAYER2_STOPPED)) {
+    if (mPlayer == 0) {
         return INVALID_OPERATION;
     }
 
@@ -978,11 +713,18 @@ status_t MediaPlayer2::getCurrentPosition(int64_t *msec) {
     return ret;
 }
 
-status_t MediaPlayer2::getDuration(int64_t *msec) {
+status_t MediaPlayer2::getDuration(int64_t srcId, int64_t *msec) {
     Mutex::Autolock _l(mLock);
+    // TODO: cache duration for currentSrcId and nextSrcId, and return correct
+    // value for nextSrcId.
+    if (srcId != mSrcId) {
+        *msec = -1;
+        return OK;
+    }
+
     ALOGV("getDuration_l");
     bool isValidState = (mCurrentState & (MEDIA_PLAYER2_PREPARED | MEDIA_PLAYER2_STARTED |
-            MEDIA_PLAYER2_PAUSED | MEDIA_PLAYER2_STOPPED | MEDIA_PLAYER2_PLAYBACK_COMPLETE));
+            MEDIA_PLAYER2_PAUSED | MEDIA_PLAYER2_PLAYBACK_COMPLETE));
     if (mPlayer == 0 || !isValidState) {
         ALOGE("Attempt to call getDuration in wrong state: mPlayer=%p, mCurrentState=%u",
                 mPlayer.get(), mCurrentState);
@@ -1076,6 +818,7 @@ status_t MediaPlayer2::reset_l() {
         } else {
             mPlayer->setListener(NULL);
             mCurrentState = MEDIA_PLAYER2_IDLE;
+            mTransitionToNext = false;
         }
         // setDataSource has to be called again to create a
         // new mediaplayer.
@@ -1138,18 +881,17 @@ bool MediaPlayer2::isLooping() {
     return false;
 }
 
-status_t MediaPlayer2::setVolume(float leftVolume, float rightVolume) {
-    ALOGV("MediaPlayer2::setVolume(%f, %f)", leftVolume, rightVolume);
+status_t MediaPlayer2::setVolume(float volume) {
+    ALOGV("MediaPlayer2::setVolume(%f)", volume);
     Mutex::Autolock _l(mLock);
-    mLeftVolume = leftVolume;
-    mRightVolume = rightVolume;
+    mVolume = volume;
     if (mAudioOutput != 0) {
-        mAudioOutput->setVolume(leftVolume, rightVolume);
+        mAudioOutput->setVolume(volume);
     }
     return OK;
 }
 
-status_t MediaPlayer2::setAudioSessionId(audio_session_t sessionId) {
+status_t MediaPlayer2::setAudioSessionId(int32_t sessionId) {
     ALOGV("MediaPlayer2::setAudioSessionId(%d)", sessionId);
     Mutex::Autolock _l(mLock);
     if (!(mCurrentState & MEDIA_PLAYER2_IDLE)) {
@@ -1159,17 +901,18 @@ status_t MediaPlayer2::setAudioSessionId(audio_session_t sessionId) {
     if (sessionId < 0) {
         return BAD_VALUE;
     }
-    if (sessionId != mAudioSessionId) {
-        AudioSystem::acquireAudioSessionId(sessionId, -1);
-        AudioSystem::releaseAudioSessionId(mAudioSessionId, -1);
-        mAudioSessionId = sessionId;
+    if (mAudioOutput != NULL && sessionId != mAudioOutput->getSessionId()) {
+        mAudioOutput->setSessionId(sessionId);
     }
     return NO_ERROR;
 }
 
-audio_session_t MediaPlayer2::getAudioSessionId() {
+int32_t MediaPlayer2::getAudioSessionId() {
     Mutex::Autolock _l(mLock);
-    return mAudioSessionId;
+    if (mAudioOutput != NULL) {
+        return mAudioOutput->getSessionId();
+    }
+    return 0;
 }
 
 status_t MediaPlayer2::setAuxEffectSendLevel(float level) {
@@ -1196,67 +939,37 @@ status_t MediaPlayer2::attachAuxEffect(int effectId) {
 }
 
 // always call with lock held
-status_t MediaPlayer2::checkStateForKeySet_l(int key) {
-    switch(key) {
-    case MEDIA2_KEY_PARAMETER_AUDIO_ATTRIBUTES:
-        if (mCurrentState & ( MEDIA_PLAYER2_PREPARED | MEDIA_PLAYER2_STARTED |
-                MEDIA_PLAYER2_PAUSED | MEDIA_PLAYER2_PLAYBACK_COMPLETE) ) {
-            // Can't change the audio attributes after prepare
-            ALOGE("trying to set audio attributes called in state %d", mCurrentState);
-            return INVALID_OPERATION;
-        }
-        break;
-    default:
-        // parameter doesn't require player state check
-        break;
+status_t MediaPlayer2::checkState_l() {
+    if (mCurrentState & ( MEDIA_PLAYER2_PREPARED | MEDIA_PLAYER2_STARTED |
+            MEDIA_PLAYER2_PAUSED | MEDIA_PLAYER2_PLAYBACK_COMPLETE) ) {
+        // Can't change the audio attributes after prepare
+        ALOGE("trying to set audio attributes called in state %d", mCurrentState);
+        return INVALID_OPERATION;
     }
     return OK;
 }
 
-status_t MediaPlayer2::setParameter(int key, const Parcel& request) {
-    ALOGV("MediaPlayer2::setParameter(%d)", key);
+status_t MediaPlayer2::setAudioAttributes(const jobject attributes) {
+    ALOGV("MediaPlayer2::setAudioAttributes");
     status_t status = INVALID_OPERATION;
     Mutex::Autolock _l(mLock);
-    if (checkStateForKeySet_l(key) != OK) {
+    if (checkState_l() != OK) {
         return status;
     }
-    switch (key) {
-    case MEDIA2_KEY_PARAMETER_AUDIO_ATTRIBUTES:
-        // save the marshalled audio attributes
-        if (mAudioAttributesParcel != NULL) {
-            delete mAudioAttributesParcel;
-        }
-        mAudioAttributesParcel = new Parcel();
-        mAudioAttributesParcel->appendFrom(&request, 0, request.dataSize());
-        status = setAudioAttributes_l(request);
-        if (status != OK) {
-            return status;
-        }
-        break;
-    default:
-        ALOGV_IF(mPlayer == NULL, "setParameter: no active player");
-        break;
-    }
-
-    if (mPlayer != NULL) {
-        status = mPlayer->setParameter(key, request);
-    }
+    mAudioAttributes = new JObjectHolder(attributes);
+    status = setAudioAttributes_l(attributes);
     return status;
+}
+
+jobject MediaPlayer2::getAudioAttributes() {
+    ALOGV("MediaPlayer2::getAudioAttributes)");
+    Mutex::Autolock _l(mLock);
+    return mAudioAttributes != NULL ? mAudioAttributes->getJObject() : NULL;
 }
 
 status_t MediaPlayer2::getParameter(int key, Parcel *reply) {
     ALOGV("MediaPlayer2::getParameter(%d)", key);
     Mutex::Autolock _l(mLock);
-    if (key == MEDIA2_KEY_PARAMETER_AUDIO_ATTRIBUTES) {
-        if (reply == NULL) {
-            return BAD_VALUE;
-        }
-        if (mAudioAttributesParcel != NULL) {
-            reply->appendFrom(mAudioAttributesParcel, 0, mAudioAttributesParcel->dataSize());
-        }
-        return OK;
-    }
-
     if (mPlayer == NULL) {
         ALOGV("getParameter: no active player");
         return INVALID_OPERATION;
@@ -1269,43 +982,25 @@ status_t MediaPlayer2::getParameter(int key, Parcel *reply) {
     return status;
 }
 
-bool MediaPlayer2::shouldDropMetadata(media::Metadata::Type code) const {
-    Mutex::Autolock lock(mLock);
-
-    if (findMetadata(mMetadataDrop, code)) {
-        return true;
+// for mediametrics
+status_t MediaPlayer2::getMetrics(char **buffer, size_t *length) {
+    ALOGD("MediaPlayer2::getMetrics()");
+    Mutex::Autolock _l(mLock);
+    if (mPlayer == NULL) {
+        ALOGV("getMetrics: no active player");
+        return INVALID_OPERATION;
     }
 
-    if (mMetadataAllow.isEmpty() || findMetadata(mMetadataAllow, code)) {
-        return false;
-    } else {
-        return true;
+    status_t status =  mPlayer->getMetrics(buffer, length);
+    if (status != OK) {
+        ALOGD("getMetrics returns %d", status);
     }
+    return status;
 }
 
-
-void MediaPlayer2::addNewMetadataUpdate(media::Metadata::Type metadata_type) {
-    Mutex::Autolock lock(mLock);
-    if (mMetadataUpdated.indexOf(metadata_type) < 0) {
-        mMetadataUpdated.add(metadata_type);
-    }
-}
-
-void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const Parcel *obj) {
+void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const PlayerMessage *obj) {
     ALOGV("message received srcId=%lld, msg=%d, ext1=%d, ext2=%d",
           (long long)srcId, msg, ext1, ext2);
-
-    if (MEDIA2_INFO == msg && MEDIA2_INFO_METADATA_UPDATE == ext1) {
-        const media::Metadata::Type metadata_type = ext2;
-
-        if(shouldDropMetadata(metadata_type)) {
-            return;
-        }
-
-        // Update the list of metadata that have changed. getMetadata
-        // also access mMetadataUpdated and clears it.
-        addNewMetadataUpdate(metadata_type);
-    }
 
     bool send = true;
     bool locked = false;
@@ -1335,8 +1030,10 @@ void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const Parc
     case MEDIA2_NOP: // interface test message
         break;
     case MEDIA2_PREPARED:
-        ALOGV("MediaPlayer2::notify() prepared");
-        mCurrentState = MEDIA_PLAYER2_PREPARED;
+        ALOGV("MediaPlayer2::notify() prepared, srcId=%lld", (long long)srcId);
+        if (srcId == mSrcId) {
+            mCurrentState = MEDIA_PLAYER2_PREPARED;
+        }
         break;
     case MEDIA2_DRM_INFO:
         ALOGV("MediaPlayer2::notify() MEDIA2_DRM_INFO(%lld, %d, %d, %d, %p)",
@@ -1347,7 +1044,7 @@ void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const Parc
         if (mCurrentState == MEDIA_PLAYER2_IDLE) {
             ALOGE("playback complete in idle state");
         }
-        if (!mLoop) {
+        if (!mLoop && srcId == mSrcId) {
             mCurrentState = MEDIA_PLAYER2_PLAYBACK_COMPLETE;
         }
         break;
@@ -1363,6 +1060,11 @@ void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const Parc
         // ext2: Implementation dependant error code.
         if (ext1 != MEDIA2_INFO_VIDEO_TRACK_LAGGING) {
             ALOGW("info/warning (%d, %d)", ext1, ext2);
+
+            if (ext1 == MEDIA2_INFO_DATA_SOURCE_START && srcId == mSrcId && mTransitionToNext) {
+                mCurrentState = MEDIA_PLAYER2_STARTED;
+                mTransitionToNext = false;
+            }
         }
         break;
     case MEDIA2_SEEK_COMPLETE:
@@ -1418,7 +1120,8 @@ void MediaPlayer2::notify(int64_t srcId, int msg, int ext1, int ext2, const Parc
 }
 
 // Modular DRM
-status_t MediaPlayer2::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>& drmSessionId) {
+status_t MediaPlayer2::prepareDrm(
+        int64_t srcId, const uint8_t uuid[16], const Vector<uint8_t>& drmSessionId) {
     // TODO change to ALOGV
     ALOGD("prepareDrm: uuid: %p  drmSessionId: %p(%zu)", uuid,
             drmSessionId.array(), drmSessionId.size());
@@ -1432,8 +1135,10 @@ status_t MediaPlayer2::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>&
     // completed) so the state change to "prepared" might not have happened yet (e.g., buffering).
     // Still, we can allow prepareDrm for the use case of being called in OnDrmInfoListener.
     if (!(mCurrentState & (MEDIA_PLAYER2_PREPARING | MEDIA_PLAYER2_PREPARED))) {
-        ALOGE("prepareDrm is called in the wrong state (%d).", mCurrentState);
-        return INVALID_OPERATION;
+        ALOGW("prepareDrm(%lld) called in non-prepare state(%d)", (long long)srcId, mCurrentState);
+        if (srcId == mSrcId) {
+            return INVALID_OPERATION;
+        }
     }
 
     if (drmSessionId.isEmpty()) {
@@ -1442,7 +1147,7 @@ status_t MediaPlayer2::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>&
     }
 
     // Passing down to mediaserver mainly for creating the crypto
-    status_t status = mPlayer->prepareDrm(uuid, drmSessionId);
+    status_t status = mPlayer->prepareDrm(srcId, uuid, drmSessionId);
     ALOGE_IF(status != OK, "prepareDrm: Failed at mediaserver with ret: %d", status);
 
     // TODO change to ALOGV
@@ -1451,7 +1156,7 @@ status_t MediaPlayer2::prepareDrm(const uint8_t uuid[16], const Vector<uint8_t>&
     return status;
 }
 
-status_t MediaPlayer2::releaseDrm() {
+status_t MediaPlayer2::releaseDrm(int64_t srcId) {
     Mutex::Autolock _l(mLock);
     if (mPlayer == NULL) {
         return NO_INIT;
@@ -1466,7 +1171,7 @@ status_t MediaPlayer2::releaseDrm() {
         return INVALID_OPERATION;
     }
 
-    status_t status = mPlayer->releaseDrm();
+    status_t status = mPlayer->releaseDrm(srcId);
     // TODO change to ALOGV
     ALOGD("releaseDrm: mediaserver::releaseDrm ret: %d", status);
     if (status != OK) {
@@ -1479,36 +1184,40 @@ status_t MediaPlayer2::releaseDrm() {
     return status;
 }
 
-status_t MediaPlayer2::setOutputDevice(audio_port_handle_t deviceId) {
+status_t MediaPlayer2::setPreferredDevice(jobject device) {
     Mutex::Autolock _l(mLock);
     if (mAudioOutput == NULL) {
-        ALOGV("setOutputDevice: audio sink not init");
+        ALOGV("setPreferredDevice: audio sink not init");
         return NO_INIT;
     }
-    return mAudioOutput->setOutputDevice(deviceId);
+    return mAudioOutput->setPreferredDevice(device);
 }
 
-audio_port_handle_t MediaPlayer2::getRoutedDeviceId() {
+jobject MediaPlayer2::getRoutedDevice() {
     Mutex::Autolock _l(mLock);
     if (mAudioOutput == NULL) {
-        ALOGV("getRoutedDeviceId: audio sink not init");
-        return AUDIO_PORT_HANDLE_NONE;
+        ALOGV("getRoutedDevice: audio sink not init");
+        return nullptr;
     }
-    audio_port_handle_t deviceId;
-    status_t status = mAudioOutput->getRoutedDeviceId(&deviceId);
-    if (status != NO_ERROR) {
-        return AUDIO_PORT_HANDLE_NONE;
-    }
-    return deviceId;
+    return mAudioOutput->getRoutedDevice();
 }
 
-status_t MediaPlayer2::enableAudioDeviceCallback(bool enabled) {
+status_t MediaPlayer2::addAudioDeviceCallback(jobject routingDelegate) {
     Mutex::Autolock _l(mLock);
     if (mAudioOutput == NULL) {
         ALOGV("addAudioDeviceCallback: player not init");
         return NO_INIT;
     }
-    return mAudioOutput->enableAudioDeviceCallback(enabled);
+    return mAudioOutput->addAudioDeviceCallback(routingDelegate);
+}
+
+status_t MediaPlayer2::removeAudioDeviceCallback(jobject listener) {
+    Mutex::Autolock _l(mLock);
+    if (mAudioOutput == NULL) {
+        ALOGV("addAudioDeviceCallback: player not init");
+        return NO_INIT;
+    }
+    return mAudioOutput->removeAudioDeviceCallback(listener);
 }
 
 status_t MediaPlayer2::dump(int fd, const Vector<String16>& args) {

@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-subdirs = ["ndk"]
-
 cc_library_shared {
     name: "libcamera_client",
 
@@ -43,6 +41,7 @@ cc_library_shared {
         "ICameraRecordingProxyListener.cpp",
         "camera2/CaptureRequest.cpp",
         "camera2/OutputConfiguration.cpp",
+        "camera2/SessionConfiguration.cpp",
         "camera2/SubmitInfo.cpp",
         "CameraBase.cpp",
         "CameraUtils.cpp",

@@ -36,6 +36,7 @@
 namespace aaudio {
 
 typedef void *(*aaudio_audio_thread_proc_t)(void *);
+typedef uint32_t aaudio_stream_id_t;
 
 class AudioStreamBuilder;
 
@@ -51,21 +52,6 @@ public:
 
     virtual ~AudioStream();
 
-    /**
-     * Lock a mutex and make sure we are not calling from a callback function.
-     * @return result of requestStart();
-     */
-    aaudio_result_t safeStart();
-
-    aaudio_result_t safePause();
-
-    aaudio_result_t safeFlush();
-
-    aaudio_result_t safeStop();
-
-    aaudio_result_t safeClose();
-
-    // =========== Begin ABSTRACT methods ===========================
 protected:
 
     /* Asynchronous requests.
@@ -74,7 +60,7 @@ protected:
     virtual aaudio_result_t requestStart() = 0;
 
     /**
-     * Check the state to see if Pause if currently legal.
+     * Check the state to see if Pause is currently legal.
      *
      * @param result pointer to return code
      * @return true if OK to continue, if false then return result
@@ -136,6 +122,12 @@ public:
         return AAUDIO_OK;
     }
 
+    // This is only used to identify a stream in the logs without
+    // revealing any pointers.
+    aaudio_stream_id_t getId() {
+        return mStreamId;
+    }
+
     virtual aaudio_result_t setBufferSize(int32_t requestedFrames) = 0;
 
     virtual aaudio_result_t createThread(int64_t periodNanoseconds,
@@ -192,7 +184,7 @@ public:
         return mSampleRate;
     }
 
-    aaudio_format_t getFormat()  const {
+    audio_format_t getFormat()  const {
         return mFormat;
     }
 
@@ -234,6 +226,10 @@ public:
         return mInputPreset;
     }
 
+    aaudio_allowed_capture_policy_t getAllowedCapturePolicy() const {
+        return mAllowedCapturePolicy;
+    }
+
     int32_t getSessionId() const {
         return mSessionId;
     }
@@ -249,21 +245,14 @@ public:
      * This is only valid after setFormat() has been called.
      */
     int32_t getBytesPerSample() const {
-        return AAudioConvert_formatToSizeInBytes(mFormat);
+        return audio_bytes_per_sample(mFormat);
     }
 
     /**
      * This is only valid after setSamplesPerFrame() and setDeviceFormat() have been called.
      */
     int32_t getBytesPerDeviceFrame() const {
-        return mSamplesPerFrame * getBytesPerDeviceSample();
-    }
-
-    /**
-     * This is only valid after setDeviceFormat() has been called.
-     */
-    int32_t getBytesPerDeviceSample() const {
-        return AAudioConvert_formatToSizeInBytes(getDeviceFormat());
+        return getSamplesPerFrame() * audio_bytes_per_sample(getDeviceFormat());
     }
 
     virtual int64_t getFramesWritten() = 0;
@@ -363,33 +352,28 @@ public:
         mPlayerBase->unregisterWithAudioManager();
     }
 
-    // Pass start request through PlayerBase for tracking.
-    aaudio_result_t systemStart() {
-        mPlayerBase->start();
-        // Pass aaudio_result_t around the PlayerBase interface, which uses status__t.
-        return mPlayerBase->getResult();
-    }
+    aaudio_result_t systemStart();
 
-    // Pass pause request through PlayerBase for tracking.
-    aaudio_result_t systemPause() {
-        mPlayerBase->pause();
-        return mPlayerBase->getResult();
-    }
+    aaudio_result_t systemPause();
 
-    // Pass stop request through PlayerBase for tracking.
-    aaudio_result_t systemStop() {
-        mPlayerBase->stop();
-        return mPlayerBase->getResult();
-    }
+    aaudio_result_t safeFlush();
+
+    /**
+     * This is called when an app calls AAudioStream_requestStop();
+     * It prevents calls from a callback.
+     */
+    aaudio_result_t systemStopFromApp();
+
+    /**
+     * This is called internally when an app callback returns AAUDIO_CALLBACK_RESULT_STOP.
+     */
+    aaudio_result_t systemStopFromCallback();
+
+    aaudio_result_t safeClose();
 
 protected:
 
-    // PlayerBase allows the system to control the stream.
-    // Calling through PlayerBase->start() notifies the AudioManager of the player state.
-    // The AudioManager also can start/stop a stream by calling mPlayerBase->playerStart().
-    // systemStart() ==> mPlayerBase->start()   mPlayerBase->playerStart() ==> requestStart()
-    //                        \                           /
-    //                         ------ AudioManager -------
+    // PlayerBase allows the system to control the stream volume.
     class MyPlayerBase : public android::PlayerBase {
     public:
         explicit MyPlayerBase(AudioStream *parent);
@@ -413,20 +397,19 @@ protected:
 
         void clearParentReference() { mParent = nullptr; }
 
+        // Just a stub. The ability to start audio through PlayerBase is being deprecated.
         android::status_t playerStart() override {
-            // mParent should NOT be null. So go ahead and crash if it is.
-            mResult = mParent->safeStart();
-            return AAudioConvert_aaudioToAndroidStatus(mResult);
+            return android::NO_ERROR;
         }
 
+        // Just a stub. The ability to pause audio through PlayerBase is being deprecated.
         android::status_t playerPause() override {
-            mResult = mParent->safePause();
-            return AAudioConvert_aaudioToAndroidStatus(mResult);
+            return android::NO_ERROR;
         }
 
+        // Just a stub. The ability to stop audio through PlayerBase is being deprecated.
         android::status_t playerStop() override {
-            mResult = mParent->safeStop();
-            return AAudioConvert_aaudioToAndroidStatus(mResult);
+            return android::NO_ERROR;
         }
 
         android::status_t playerSetVolume() override {
@@ -478,18 +461,18 @@ protected:
     /**
      * This should not be called after the open() call.
      */
-    void setFormat(aaudio_format_t format) {
+    void setFormat(audio_format_t format) {
         mFormat = format;
     }
 
     /**
      * This should not be called after the open() call.
      */
-    void setDeviceFormat(aaudio_format_t format) {
+    void setDeviceFormat(audio_format_t format) {
         mDeviceFormat = format;
     }
 
-    aaudio_format_t getDeviceFormat() const {
+    audio_format_t getDeviceFormat() const {
         return mDeviceFormat;
     }
 
@@ -553,7 +536,16 @@ protected:
         mInputPreset = inputPreset;
     }
 
+    /**
+     * This should not be called after the open() call.
+     */
+    void setAllowedCapturePolicy(aaudio_allowed_capture_policy_t policy) {
+        mAllowedCapturePolicy = policy;
+    }
+
 private:
+
+    aaudio_result_t safeStop();
 
     std::mutex                 mStreamLock;
 
@@ -565,19 +557,20 @@ private:
     int32_t                     mDeviceId = AAUDIO_UNSPECIFIED;
     aaudio_sharing_mode_t       mSharingMode = AAUDIO_SHARING_MODE_SHARED;
     bool                        mSharingModeMatchRequired = false; // must match sharing mode requested
-    aaudio_format_t             mFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    audio_format_t              mFormat = AUDIO_FORMAT_DEFAULT;
     aaudio_stream_state_t       mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
     aaudio_performance_mode_t   mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
 
     aaudio_usage_t              mUsage           = AAUDIO_UNSPECIFIED;
     aaudio_content_type_t       mContentType     = AAUDIO_UNSPECIFIED;
     aaudio_input_preset_t       mInputPreset     = AAUDIO_UNSPECIFIED;
+    aaudio_allowed_capture_policy_t mAllowedCapturePolicy = AAUDIO_ALLOW_CAPTURE_BY_ALL;
 
     int32_t                     mSessionId = AAUDIO_UNSPECIFIED;
 
     // Sometimes the hardware is operating with a different format from the app.
     // Then we require conversion in AAudio.
-    aaudio_format_t             mDeviceFormat = AAUDIO_FORMAT_UNSPECIFIED;
+    audio_format_t              mDeviceFormat = AUDIO_FORMAT_INVALID;
 
     // callback ----------------------------------
 
@@ -600,6 +593,8 @@ private:
     aaudio_audio_thread_proc_t  mThreadProc = nullptr;
     void                       *mThreadArg = nullptr;
     aaudio_result_t             mThreadRegistrationResult = AAUDIO_OK;
+
+    const aaudio_stream_id_t    mStreamId;
 
 };
 

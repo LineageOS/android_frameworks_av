@@ -20,6 +20,7 @@ LIBAAUDIO {
     AAudioStreamBuilder_setUsage;       # introduced=28
     AAudioStreamBuilder_setContentType; # introduced=28
     AAudioStreamBuilder_setInputPreset; # introduced=28
+    AAudioStreamBuilder_setAllowedCapturePolicy; # introduced=29
     AAudioStreamBuilder_setSessionId;   # introduced=28
     AAudioStreamBuilder_openStream;
     AAudioStreamBuilder_delete;
@@ -49,6 +50,7 @@ LIBAAUDIO {
     AAudioStream_getUsage;       # introduced=28
     AAudioStream_getContentType; # introduced=28
     AAudioStream_getInputPreset; # introduced=28
+    AAudioStream_getAllowedCapturePolicy; # introduced=29
     AAudioStream_getFramesWritten;
     AAudioStream_getFramesRead;
     AAudioStream_getSessionId;   # introduced=28

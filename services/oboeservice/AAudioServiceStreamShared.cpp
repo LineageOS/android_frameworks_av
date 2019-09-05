@@ -111,7 +111,7 @@ int32_t AAudioServiceStreamShared::calculateBufferCapacity(int32_t requestedCapa
               capacityInFrames, MAX_FRAMES_PER_BUFFER);
         return AAUDIO_ERROR_OUT_OF_RANGE;
     }
-    ALOGD("calculateBufferCapacity() requested %d frames, actual = %d",
+    ALOGV("calculateBufferCapacity() requested %d frames, actual = %d",
           requestedCapacityFrames, capacityInFrames);
     return capacityInFrames;
 }
@@ -120,9 +120,14 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
 
     sp<AAudioServiceStreamShared> keep(this);
 
-    aaudio_result_t result = AAudioServiceStreamBase::open(request, AAUDIO_SHARING_MODE_SHARED);
+    if (request.getConstantConfiguration().getSharingMode() != AAUDIO_SHARING_MODE_SHARED) {
+        ALOGE("%s() sharingMode mismatch %d", __func__,
+              request.getConstantConfiguration().getSharingMode());
+        return AAUDIO_ERROR_INTERNAL;
+    }
+
+    aaudio_result_t result = AAudioServiceStreamBase::open(request);
     if (result != AAUDIO_OK) {
-        ALOGE("%s() returned %d", __func__, result);
         return result;
     }
 
@@ -136,10 +141,10 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
 
     // Is the request compatible with the shared endpoint?
     setFormat(configurationInput.getFormat());
-    if (getFormat() == AAUDIO_FORMAT_UNSPECIFIED) {
-        setFormat(AAUDIO_FORMAT_PCM_FLOAT);
-    } else if (getFormat() != AAUDIO_FORMAT_PCM_FLOAT) {
-        ALOGD("%s() mAudioFormat = %d, need FLOAT", __func__, getFormat());
+    if (getFormat() == AUDIO_FORMAT_DEFAULT) {
+        setFormat(AUDIO_FORMAT_PCM_FLOAT);
+    } else if (getFormat() != AUDIO_FORMAT_PCM_FLOAT) {
+        ALOGD("%s() audio_format_t mAudioFormat = %d, need FLOAT", __func__, getFormat());
         result = AAUDIO_ERROR_INVALID_FORMAT;
         goto error;
     }
@@ -185,9 +190,6 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
         }
     }
 
-    ALOGD("AAudioServiceStreamShared::open() actual rate = %d, channels = %d, deviceId = %d",
-          getSampleRate(), getSamplesPerFrame(), endpoint->getDeviceId());
-
     result = endpoint->registerStream(keep);
     if (result != AAUDIO_OK) {
         goto error;
@@ -222,7 +224,7 @@ aaudio_result_t AAudioServiceStreamShared::getAudioDataDescription(
 {
     std::lock_guard<std::mutex> lock(mAudioDataQueueLock);
     if (mAudioDataQueue == nullptr) {
-        ALOGE("%s(): mUpMessageQueue null! - stream not open", __func__);
+        ALOGW("%s(): mUpMessageQueue null! - stream not open", __func__);
         return AAUDIO_ERROR_NULL;
     }
     // Gather information on the data queue.
@@ -233,15 +235,15 @@ aaudio_result_t AAudioServiceStreamShared::getAudioDataDescription(
 }
 
 void AAudioServiceStreamShared::markTransferTime(Timestamp &timestamp) {
-    mAtomicTimestamp.write(timestamp);
+    mAtomicStreamTimestamp.write(timestamp);
 }
 
 // Get timestamp that was written by mixer or distributor.
 aaudio_result_t AAudioServiceStreamShared::getFreeRunningPosition(int64_t *positionFrames,
                                                                   int64_t *timeNanos) {
     // TODO Get presentation timestamp from the HAL
-    if (mAtomicTimestamp.isValid()) {
-        Timestamp timestamp = mAtomicTimestamp.read();
+    if (mAtomicStreamTimestamp.isValid()) {
+        Timestamp timestamp = mAtomicStreamTimestamp.read();
         *positionFrames = timestamp.getPosition();
         *timeNanos = timestamp.getNanoseconds();
         return AAUDIO_OK;
@@ -257,7 +259,7 @@ aaudio_result_t AAudioServiceStreamShared::getHardwareTimestamp(int64_t *positio
     int64_t position = 0;
     sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
     if (endpoint == nullptr) {
-        ALOGE("%s() has no endpoint", __func__);
+        ALOGW("%s() has no endpoint", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
 

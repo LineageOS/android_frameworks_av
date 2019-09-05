@@ -18,8 +18,9 @@
 
 #define AAC_EXTRACTOR_H_
 
-#include <media/MediaExtractor.h>
-#include <media/stagefright/MetaDataBase.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
+#include <media/NdkMediaFormat.h>
 
 #include <utils/Vector.h>
 
@@ -28,23 +29,23 @@ namespace android {
 struct AMessage;
 class String8;
 
-class AACExtractor : public MediaExtractor {
+class AACExtractor : public MediaExtractorPluginHelper {
 public:
-    AACExtractor(DataSourceBase *source, off64_t offset);
+    AACExtractor(DataSourceHelper *source, off64_t offset);
 
     virtual size_t countTracks();
-    virtual MediaTrack *getTrack(size_t index);
-    virtual status_t getTrackMetaData(MetaDataBase& meta, size_t index, uint32_t flags);
+    virtual MediaTrackHelper *getTrack(size_t index);
+    virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
-    virtual status_t getMetaData(MetaDataBase& meta);
+    virtual media_status_t getMetaData(AMediaFormat *meta);
     virtual const char * name() { return "AACExtractor"; }
 
 protected:
     virtual ~AACExtractor();
 
 private:
-    DataSourceBase *mDataSource;
-    MetaDataBase mMeta;
+    DataSourceHelper *mDataSource;
+    AMediaFormat *mMeta;
     status_t mInitCheck;
 
     Vector<uint64_t> mOffsetVector;
@@ -55,7 +56,7 @@ private:
 };
 
 bool SniffAAC(
-        DataSourceBase *source, String8 *mimeType, float *confidence, off64_t *offset);
+        DataSourceHelper *source, String8 *mimeType, float *confidence, off64_t *offset);
 
 }  // namespace android
 

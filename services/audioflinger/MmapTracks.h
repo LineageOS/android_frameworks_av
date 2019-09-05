@@ -28,8 +28,10 @@ public:
                             audio_format_t format,
                             audio_channel_mask_t channelMask,
                             audio_session_t sessionId,
+                            bool isOut,
                             uid_t uid,
                             pid_t pid,
+                            pid_t creatorPid,
                             audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE);
     virtual             ~MmapTrack();
 
@@ -39,8 +41,9 @@ public:
                               audio_session_t triggerSession);
     virtual void        stop();
     virtual bool        isFastTrack() const { return false; }
+            bool        isDirect() const override { return true; }
 
-     static void        appendDumpHeader(String8& result);
+            void        appendDumpHeader(String8& result);
             void        appendDump(String8& result, bool active);
 
                         // protected by MMapThread::mLock

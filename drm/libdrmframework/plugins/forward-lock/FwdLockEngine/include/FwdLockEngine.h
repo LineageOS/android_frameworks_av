@@ -198,7 +198,7 @@ int onCheckRightsStatus(int uniqueId,
  *     Returns DRM_NO_ERROR for success, DRM_ERROR_UNKNOWN for failure
  */
 status_t onConsumeRights(int uniqueId,
-                         DecryptHandle* decryptHandle,
+                         sp<DecryptHandle>& decryptHandle,
                          int action,
                          bool reserve);
 
@@ -215,12 +215,12 @@ status_t onConsumeRights(int uniqueId,
  */
 #ifdef USE_64BIT_DRM_API
 status_t onSetPlaybackStatus(int uniqueId,
-                             DecryptHandle* decryptHandle,
+                             sp<DecryptHandle>& decryptHandle,
                              int playbackStatus,
                              int64_t position);
 #else
 status_t onSetPlaybackStatus(int uniqueId,
-                             DecryptHandle* decryptHandle,
+                             sp<DecryptHandle>& decryptHandle,
                              int playbackStatus,
                              int position);
 #endif
@@ -330,11 +330,11 @@ DrmSupportInfo* onGetSupportInfo(int uniqueId);
  */
 #ifdef USE_64BIT_DRM_API
 status_t onOpenDecryptSession(int uniqueId,
-                              DecryptHandle* decryptHandle,
+                              sp<DecryptHandle>& decryptHandle,
                               int fd, off64_t offset, off64_t length);
 #else
 status_t onOpenDecryptSession(int uniqueId,
-                              DecryptHandle* decryptHandle,
+                              sp<DecryptHandle>& decryptHandle,
                               int fd, int offset, int length);
 #endif
 
@@ -348,7 +348,7 @@ status_t onOpenDecryptSession(int uniqueId,
  *     DRM_ERROR_CANNOT_HANDLE for failure and DRM_NO_ERROR for success
  */
 status_t onOpenDecryptSession(int uniqueId,
-                              DecryptHandle* decryptHandle,
+                              sp<DecryptHandle>& decryptHandle,
                               const char* uri);
 
 /**
@@ -360,7 +360,7 @@ status_t onOpenDecryptSession(int uniqueId,
  *     Returns DRM_NO_ERROR for success, DRM_ERROR_UNKNOWN for failure
  */
 status_t onCloseDecryptSession(int uniqueId,
-                               DecryptHandle* decryptHandle);
+                               sp<DecryptHandle>& decryptHandle);
 
 /**
  * Initialize decryption for the given unit of the protected content.
@@ -373,7 +373,7 @@ status_t onCloseDecryptSession(int uniqueId,
  *     DRM_ERROR_CANNOT_HANDLE for failure and DRM_NO_ERROR for success
  */
 status_t onInitializeDecryptUnit(int uniqueId,
-                                 DecryptHandle* decryptHandle,
+                                 sp<DecryptHandle>& decryptHandle,
                                  int decryptUnitId,
                                  const DrmBuffer* headerInfo);
 
@@ -394,7 +394,7 @@ status_t onInitializeDecryptUnit(int uniqueId,
  *     DRM_ERROR_DECRYPT for failure.
  */
 status_t onDecrypt(int uniqueId,
-                   DecryptHandle* decryptHandle,
+                   sp<DecryptHandle>& decryptHandle,
                    int decryptUnitId,
                    const DrmBuffer* encBuffer,
                    DrmBuffer** decBuffer);
@@ -416,7 +416,7 @@ status_t onDecrypt(int uniqueId,
  *     DRM_ERROR_SESSION_NOT_OPENED, DRM_ERROR_DECRYPT_UNIT_NOT_INITIALIZED,
  *     DRM_ERROR_DECRYPT for failure.
  */
-status_t onDecrypt(int uniqueId, DecryptHandle* decryptHandle,
+status_t onDecrypt(int uniqueId, sp<DecryptHandle>& decryptHandle,
                    int decryptUnitId, const DrmBuffer* encBuffer,
                    DrmBuffer** decBuffer, DrmBuffer* IV);
 
@@ -430,7 +430,7 @@ status_t onDecrypt(int uniqueId, DecryptHandle* decryptHandle,
  *     DRM_ERROR_CANNOT_HANDLE for failure and DRM_NO_ERROR for success
  */
 status_t onFinalizeDecryptUnit(int uniqueId,
-                               DecryptHandle* decryptHandle,
+                               sp<DecryptHandle>& decryptHandle,
                                int decryptUnitId);
 
 /**
@@ -445,7 +445,7 @@ status_t onFinalizeDecryptUnit(int uniqueId,
  * @retval -1 Failure.
  */
 ssize_t onRead(int uniqueId,
-               DecryptHandle* decryptHandle,
+               sp<DecryptHandle>& decryptHandle,
                void* pBuffer,
                int numBytes);
 
@@ -463,12 +463,12 @@ ssize_t onRead(int uniqueId,
  */
 #ifdef USE_64BIT_DRM_API
 off64_t onLseek(int uniqueId,
-                DecryptHandle* decryptHandle,
+                sp<DecryptHandle>& decryptHandle,
                 off64_t offset,
                 int whence);
 #else
 off_t onLseek(int uniqueId,
-              DecryptHandle* decryptHandle,
+              sp<DecryptHandle>& decryptHandle,
               off_t offset,
               int whence);
 #endif
@@ -486,13 +486,13 @@ off_t onLseek(int uniqueId,
  */
 #ifdef USE_64BIT_DRM_API
 ssize_t onPread(int uniqueId,
-                DecryptHandle* decryptHandle,
+                sp<DecryptHandle>& decryptHandle,
                 void* buffer,
                 ssize_t numBytes,
                 off64_t offset);
 #else
 ssize_t onPread(int uniqueId,
-                DecryptHandle* decryptHandle,
+                sp<DecryptHandle>& decryptHandle,
                 void* buffer,
                 ssize_t numBytes,
                 off_t offset);

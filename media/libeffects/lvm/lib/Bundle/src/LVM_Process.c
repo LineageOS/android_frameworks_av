@@ -21,6 +21,7 @@
 /*  Includes                                                                            */
 /*                                                                                      */
 /****************************************************************************************/
+#include <system/audio.h>
 
 #include "LVM_Private.h"
 #include "VectorArithmetic.h"
@@ -65,6 +66,11 @@ LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
     LVM_FLOAT           *pToProcess = (LVM_FLOAT *)pInData;
     LVM_FLOAT           *pProcessed = pOutData;
     LVM_ReturnStatus_en  Status;
+#ifdef SUPPORT_MC
+    LVM_INT32           NrChannels  = pInstance->NrChannels;
+    LVM_INT32           ChMask      = pInstance->ChMask;
+#define NrFrames SampleCount  // alias for clarity
+#endif
 
     /*
      * Check if the number of samples is zero
@@ -112,6 +118,11 @@ LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
     if (pInstance->ControlPending == LVM_TRUE)
     {
         Status = LVM_ApplyNewSettings(hInstance);
+#ifdef SUPPORT_MC
+        /* Update the local variable NrChannels from pInstance->NrChannels value */
+        NrChannels = pInstance->NrChannels;
+        ChMask     = pInstance->ChMask;
+#endif
 
         if(Status != LVM_SUCCESS)
         {
@@ -130,6 +141,10 @@ LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
                        (LVM_INT16)NumSamples);                 /* Number of input samples */
         pInput     = pOutData;
         pToProcess = pOutData;
+#ifdef SUPPORT_MC
+        NrChannels = 2;
+        ChMask     = AUDIO_CHANNEL_OUT_STEREO;
+#endif
     }
 
 
@@ -153,7 +168,6 @@ LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
          */
         if (SampleCount != 0)
         {
-
             /*
              * Apply ConcertSound if required
              */
@@ -171,10 +185,18 @@ LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
              */
             if (pInstance->VC_Active!=0)
             {
+#ifdef SUPPORT_MC
+                LVC_MixSoft_Mc_D16C31_SAT(&pInstance->VC_Volume,
+                                       pToProcess,
+                                       pProcessed,
+                                       (LVM_INT16)(NrFrames),
+                                       NrChannels);
+#else
                 LVC_MixSoft_1St_D16C31_SAT(&pInstance->VC_Volume,
                                        pToProcess,
                                        pProcessed,
                                        (LVM_INT16)(2 * SampleCount));     /* Left and right*/
+#endif
                 pToProcess = pProcessed;
             }
 
@@ -208,9 +230,15 @@ LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
              */
             if (pToProcess != pProcessed)
             {
+#ifdef SUPPORT_MC
+                Copy_Float(pToProcess,                             /* Source */
+                           pProcessed,                             /* Destination */
+                           (LVM_INT16)(NrChannels * NrFrames));    /* Copy all samples */
+#else
                 Copy_Float(pToProcess,                             /* Source */
                            pProcessed,                             /* Destination */
                            (LVM_INT16)(2 * SampleCount));          /* Left and right */
+#endif
             }
 
             /*
@@ -221,20 +249,39 @@ LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
                 /*
                  * Apply the filter
                  */
+#ifdef SUPPORT_MC
+                FO_Mc_D16F32C15_LShx_TRC_WRA_01(&pInstance->pTE_State->TrebleBoost_State,
+                                           pProcessed,
+                                           pProcessed,
+                                           (LVM_INT16)NrFrames,
+                                           (LVM_INT16)NrChannels);
+#else
                 FO_2I_D16F32C15_LShx_TRC_WRA_01(&pInstance->pTE_State->TrebleBoost_State,
                                            pProcessed,
                                            pProcessed,
                                            (LVM_INT16)SampleCount);
+#endif
 
             }
-
+#ifdef SUPPORT_MC
+            /*
+             * Volume balance
+             */
+            LVC_MixSoft_1St_MC_float_SAT(&pInstance->VC_BalanceMix,
+                                          pProcessed,
+                                          pProcessed,
+                                          NrFrames,
+                                          NrChannels,
+                                          ChMask);
+#else
             /*
              * Volume balance
              */
             LVC_MixSoft_1St_2i_D16C31_SAT(&pInstance->VC_BalanceMix,
-                                            pProcessed,
-                                            pProcessed,
-                                            SampleCount);
+                                          pProcessed,
+                                          pProcessed,
+                                          SampleCount);
+#endif
 
             /*
              * Perform Parametric Spectum Analysis
@@ -242,28 +289,39 @@ LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
             if ((pInstance->Params.PSA_Enable == LVM_PSA_ON) &&
                                             (pInstance->InstParams.PSA_Included == LVM_PSA_ON))
             {
-                    From2iToMono_Float(pProcessed,
-                                       pInstance->pPSAInput,
-                                       (LVM_INT16)(SampleCount));
+#ifdef SUPPORT_MC
+                FromMcToMono_Float(pProcessed,
+                                   pInstance->pPSAInput,
+                                   (LVM_INT16)(NrFrames),
+                                   NrChannels);
+#else
+                From2iToMono_Float(pProcessed,
+                                   pInstance->pPSAInput,
+                                   (LVM_INT16)(SampleCount));
+#endif
 
-                    LVPSA_Process(pInstance->hPSAInstance,
-                            pInstance->pPSAInput,
-                            (LVM_UINT16)(SampleCount),
-                            AudioTime);
+                LVPSA_Process(pInstance->hPSAInstance,
+                        pInstance->pPSAInput,
+                        (LVM_UINT16)(SampleCount),
+                        AudioTime);
             }
-
 
             /*
              * DC removal
              */
+#ifdef SUPPORT_MC
+            DC_Mc_D16_TRC_WRA_01(&pInstance->DC_RemovalInstance,
+                                 pProcessed,
+                                 pProcessed,
+                                 (LVM_INT16)NrFrames,
+                                 NrChannels);
+#else
             DC_2I_D16_TRC_WRA_01(&pInstance->DC_RemovalInstance,
                                  pProcessed,
                                  pProcessed,
                                  (LVM_INT16)SampleCount);
-
-
+#endif
         }
-
         /*
          * Manage the output buffer
          */

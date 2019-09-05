@@ -82,8 +82,9 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
 
             std::lock_guard <std::mutex> lock(mLockStreams);
             for (const auto& clientStream : mRegisteredStreams) {
-                if (clientStream->isRunning()) {
+                if (clientStream->isRunning() && !clientStream->isSuspended()) {
                     int64_t clientFramesWritten = 0;
+
                     sp<AAudioServiceStreamShared> streamShared =
                             static_cast<AAudioServiceStreamShared *>(clientStream.get());
 
@@ -102,7 +103,7 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
                             streamShared->setTimestampPositionOffset(positionOffset);
 
                             // Is the buffer too full to write a burst?
-                            if (fifo->getFifoControllerBase()->getEmptyFramesAvailable() <
+                            if (fifo->getEmptyFramesAvailable() <
                                     getFramesPerBurst()) {
                                 streamShared->incrementXRunCount();
                             } else {

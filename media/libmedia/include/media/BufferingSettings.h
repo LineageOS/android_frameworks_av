@@ -17,11 +17,11 @@
 #ifndef ANDROID_BUFFERING_SETTINGS_H
 #define ANDROID_BUFFERING_SETTINGS_H
 
-#include <binder/Parcelable.h>
+#include <utils/String8.h>
 
 namespace android {
 
-struct BufferingSettings : public Parcelable {
+struct BufferingSettings {
     static const int kNoMark = -1;
 
     int mInitialMarkMs;
@@ -31,9 +31,6 @@ struct BufferingSettings : public Parcelable {
     int mResumePlaybackMarkMs;
 
     BufferingSettings();
-
-    status_t writeToParcel(Parcel* parcel) const override;
-    status_t readFromParcel(const Parcel* parcel) override;
 
     String8 toString() const;
 };

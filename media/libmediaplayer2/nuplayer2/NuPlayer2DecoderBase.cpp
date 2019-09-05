@@ -38,7 +38,7 @@ NuPlayer2::DecoderBase::DecoderBase(const sp<AMessage> &notify)
     // Every decoder has its own looper because MediaCodec operations
     // are blocking, but NuPlayer2 needs asynchronous operations.
     mDecoderLooper = new ALooper;
-    mDecoderLooper->setName("NPDecoder");
+    mDecoderLooper->setName("NP2Decoder");
     mDecoderLooper->start(false, /* runOnCallingThread */
                           true,  /* canCallJava */
                           ANDROID_PRIORITY_AUDIO);

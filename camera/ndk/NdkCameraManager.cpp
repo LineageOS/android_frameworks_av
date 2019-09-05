@@ -22,9 +22,15 @@
 #include <utils/Trace.h>
 
 #include <camera/NdkCameraManager.h>
-#include "impl/ACameraManager.h"
 
-using namespace android;
+#ifdef __ANDROID_VNDK__
+#include "ndk_vendor/impl/ACameraManager.h"
+#else
+#include "impl/ACameraManager.h"
+#endif
+#include "impl/ACameraMetadata.h"
+
+using namespace android::acam;
 
 EXPORT
 ACameraManager* ACameraManager_create() {
@@ -99,6 +105,60 @@ camera_status_t ACameraManager_unregisterAvailabilityCallback(
 }
 
 EXPORT
+camera_status_t ACameraManager_registerExtendedAvailabilityCallback(
+        ACameraManager* /*manager*/, const ACameraManager_ExtendedAvailabilityCallbacks *callback) {
+    ATRACE_CALL();
+    if (callback == nullptr) {
+        ALOGE("%s: invalid argument! callback is null!", __FUNCTION__);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    if ((callback->availabilityCallbacks.onCameraAvailable == nullptr) ||
+            (callback->availabilityCallbacks.onCameraUnavailable == nullptr) ||
+            (callback->onCameraAccessPrioritiesChanged == nullptr)) {
+        ALOGE("%s: invalid argument! callback %p, "
+                "onCameraAvailable %p, onCameraUnavailable %p onCameraAccessPrioritiesChanged %p",
+               __FUNCTION__, callback,
+               callback->availabilityCallbacks.onCameraAvailable,
+               callback->availabilityCallbacks.onCameraUnavailable,
+               callback->onCameraAccessPrioritiesChanged);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    auto reservedEntriesCount = sizeof(callback->reserved) / sizeof(callback->reserved[0]);
+    for (size_t i = 0; i < reservedEntriesCount; i++) {
+        if (callback->reserved[i] != nullptr) {
+            ALOGE("%s: invalid argument! callback reserved entries must be set to NULL",
+                    __FUNCTION__);
+            return ACAMERA_ERROR_INVALID_PARAMETER;
+        }
+    }
+    CameraManagerGlobal::getInstance().registerExtendedAvailabilityCallback(callback);
+    return ACAMERA_OK;
+}
+
+EXPORT
+camera_status_t ACameraManager_unregisterExtendedAvailabilityCallback(
+        ACameraManager* /*manager*/, const ACameraManager_ExtendedAvailabilityCallbacks *callback) {
+    ATRACE_CALL();
+    if (callback == nullptr) {
+        ALOGE("%s: invalid argument! callback is null!", __FUNCTION__);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    if ((callback->availabilityCallbacks.onCameraAvailable == nullptr) ||
+            (callback->availabilityCallbacks.onCameraUnavailable == nullptr) ||
+            (callback->onCameraAccessPrioritiesChanged == nullptr)) {
+        ALOGE("%s: invalid argument! callback %p, "
+                "onCameraAvailable %p, onCameraUnavailable %p onCameraAccessPrioritiesChanged %p",
+               __FUNCTION__, callback,
+               callback->availabilityCallbacks.onCameraAvailable,
+               callback->availabilityCallbacks.onCameraUnavailable,
+               callback->onCameraAccessPrioritiesChanged);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    CameraManagerGlobal::getInstance().unregisterExtendedAvailabilityCallback(callback);
+    return ACAMERA_OK;
+}
+
+EXPORT
 camera_status_t ACameraManager_getCameraCharacteristics(
         ACameraManager* mgr, const char* cameraId, ACameraMetadata** chars){
     ATRACE_CALL();
@@ -107,7 +167,14 @@ camera_status_t ACameraManager_getCameraCharacteristics(
                 __FUNCTION__, mgr, cameraId, chars);
         return ACAMERA_ERROR_INVALID_PARAMETER;
     }
-    return mgr->getCameraCharacteristics(cameraId, chars);
+    sp<ACameraMetadata> spChars;
+    camera_status_t status = mgr->getCameraCharacteristics(cameraId, &spChars);
+    if (status != ACAMERA_OK) {
+        return status;
+    }
+    spChars->incStrong((void*) ACameraManager_getCameraCharacteristics);
+    *chars = spChars.get();
+    return ACAMERA_OK;
 }
 
 EXPORT
@@ -123,3 +190,17 @@ camera_status_t ACameraManager_openCamera(
     }
     return mgr->openCamera(cameraId, callback, device);
 }
+
+#ifdef __ANDROID_VNDK__
+EXPORT
+camera_status_t ACameraManager_getTagFromName(ACameraManager *mgr, const char* cameraId,
+        const char *name, /*out*/uint32_t *tag) {
+    ATRACE_CALL();
+    if (mgr == nullptr || cameraId == nullptr || name == nullptr) {
+        ALOGE("%s: invalid argument! mgr %p cameraId %p name %p",
+                __FUNCTION__, mgr, cameraId, name);
+        return ACAMERA_ERROR_INVALID_PARAMETER;
+    }
+    return mgr->getTagFromName(cameraId, name, tag);
+}
+#endif

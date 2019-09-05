@@ -179,7 +179,8 @@ public:
     {
         Parcel data, reply;
         data.writeInterfaceToken(IMediaPlayer::getInterfaceDescriptor());
-        buffering.writeToParcel(&data);
+        data.writeInt32(buffering.mInitialMarkMs);
+        data.writeInt32(buffering.mResumePlaybackMarkMs);
         remote()->transact(SET_BUFFERING_SETTINGS, data, &reply);
         return reply.readInt32();
     }
@@ -194,7 +195,8 @@ public:
         remote()->transact(GET_BUFFERING_SETTINGS, data, &reply);
         status_t err = reply.readInt32();
         if (err == OK) {
-            err = buffering->readFromParcel(&reply);
+            buffering->mInitialMarkMs = reply.readInt32();
+            buffering->mResumePlaybackMarkMs = reply.readInt32();
         }
         return err;
     }
@@ -696,7 +698,8 @@ status_t BnMediaPlayer::onTransact(
         case SET_BUFFERING_SETTINGS: {
             CHECK_INTERFACE(IMediaPlayer, data, reply);
             BufferingSettings buffering;
-            buffering.readFromParcel(&data);
+            buffering.mInitialMarkMs = data.readInt32();
+            buffering.mResumePlaybackMarkMs = data.readInt32();
             reply->writeInt32(setBufferingSettings(buffering));
             return NO_ERROR;
         } break;
@@ -706,7 +709,8 @@ status_t BnMediaPlayer::onTransact(
             status_t err = getBufferingSettings(&buffering);
             reply->writeInt32(err);
             if (err == OK) {
-                buffering.writeToParcel(reply);
+                reply->writeInt32(buffering.mInitialMarkMs);
+                reply->writeInt32(buffering.mResumePlaybackMarkMs);
             }
             return NO_ERROR;
         } break;

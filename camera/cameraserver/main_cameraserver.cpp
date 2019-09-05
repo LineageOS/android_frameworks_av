@@ -26,8 +26,9 @@ int main(int argc __unused, char** argv __unused)
 {
     signal(SIGPIPE, SIG_IGN);
 
-    // Set 3 threads for HIDL calls
-    hardware::configureRpcThreadpool(3, /*willjoin*/ false);
+    // Set 5 threads for HIDL calls. Now cameraserver will serve HIDL calls in
+    // addition to consuming them from the Camera HAL as well.
+    hardware::configureRpcThreadpool(5, /*willjoin*/ false);
 
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm = defaultServiceManager();

@@ -33,6 +33,7 @@
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
+#include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
@@ -281,12 +282,6 @@ status_t StagefrightMetadataRetriever::getFrameInternal(
         return NO_INIT;
     }
 
-    int32_t drm = 0;
-    if (fileMeta->findInt32(kKeyIsDRM, &drm) && drm != 0) {
-        ALOGE("frame grab not allowed.");
-        return ERROR_DRM_UNKNOWN;
-    }
-
     size_t n = mExtractor->countTracks();
     size_t i;
     for (i = 0; i < n; ++i) {
@@ -354,15 +349,15 @@ status_t StagefrightMetadataRetriever::getFrameInternal(
 
     for (size_t i = 0; i < matchingCodecs.size(); ++i) {
         const AString &componentName = matchingCodecs[i];
-        VideoFrameDecoder decoder(componentName, trackMeta, source);
-        if (decoder.init(timeUs, numFrames, option, colorFormat) == OK) {
+        sp<VideoFrameDecoder> decoder = new VideoFrameDecoder(componentName, trackMeta, source);
+        if (decoder->init(timeUs, numFrames, option, colorFormat) == OK) {
             if (outFrame != NULL) {
-                *outFrame = decoder.extractFrame();
+                *outFrame = decoder->extractFrame();
                 if (*outFrame != NULL) {
                     return OK;
                 }
             } else if (outFrames != NULL) {
-                status_t err = decoder.extractFrames(outFrames);
+                status_t err = decoder->extractFrames(outFrames);
                 if (err == OK) {
                     return OK;
                 }

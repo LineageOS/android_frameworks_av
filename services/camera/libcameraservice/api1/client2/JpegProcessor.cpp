@@ -62,26 +62,6 @@ void JpegProcessor::onFrameAvailable(const BufferItem& /*item*/) {
     }
 }
 
-void JpegProcessor::onBufferAcquired(const BufferInfo& /*bufferInfo*/) {
-    // Intentionally left empty
-}
-
-void JpegProcessor::onBufferReleased(const BufferInfo& bufferInfo) {
-    ALOGV("%s", __FUNCTION__);
-    if (bufferInfo.mError) {
-        // Only lock in case of error, since we get one of these for each
-        // onFrameAvailable as well, and scheduling may delay this call late
-        // enough to run into later preview restart operations, for non-error
-        // cases.
-        // b/29524651
-        ALOGV("%s: JPEG buffer lost", __FUNCTION__);
-        Mutex::Autolock l(mInputMutex);
-        mCaptureDone = true;
-        mCaptureSuccess = false;
-        mCaptureDoneSignal.signal();
-    }
-}
-
 status_t JpegProcessor::updateStream(const Parameters &params) {
     ATRACE_CALL();
     ALOGV("%s", __FUNCTION__);
@@ -175,13 +155,6 @@ status_t JpegProcessor::updateStream(const Parameters &params) {
                     "%s (%d)", __FUNCTION__, mId,
                     strerror(-res), res);
             return res;
-        }
-
-        res = device->addBufferListenerForStream(mCaptureStreamId, this);
-        if (res != OK) {
-              ALOGE("%s: Camera %d: Can't add buffer listeneri: %s (%d)",
-                    __FUNCTION__, mId, strerror(-res), res);
-              return res;
         }
     }
     return OK;

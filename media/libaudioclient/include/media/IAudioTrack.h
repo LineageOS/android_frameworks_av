@@ -70,6 +70,9 @@ public:
     /* Send parameters to the audio hardware */
     virtual status_t    setParameters(const String8& keyValuePairs) = 0;
 
+    /* Selects the presentation (if available) */
+    virtual status_t    selectPresentation(int presentationId, int programId) = 0;
+
     /* Return NO_ERROR if timestamp is valid.  timestamp is undefined otherwise. */
     virtual status_t    getTimestamp(AudioTimestamp& timestamp) = 0;
 

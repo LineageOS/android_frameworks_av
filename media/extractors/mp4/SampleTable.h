@@ -21,18 +21,19 @@
 #include <sys/types.h>
 #include <stdint.h>
 
+#include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/MediaErrors.h>
 #include <utils/RefBase.h>
 #include <utils/threads.h>
 
 namespace android {
 
-class DataSourceBase;
+class DataSourceHelper;
 struct SampleIterator;
 
 class SampleTable : public RefBase {
 public:
-    explicit SampleTable(DataSourceBase *source);
+    explicit SampleTable(DataSourceHelper *source);
 
     bool isValid() const;
 
@@ -65,9 +66,9 @@ public:
             uint32_t sampleIndex,
             off64_t *offset,
             size_t *size,
-            uint32_t *compositionTime,
+            uint64_t *compositionTime,
             bool *isSyncSample = NULL,
-            uint32_t *sampleDuration = NULL);
+            uint64_t *sampleDuration = NULL);
 
     // call only after getMetaDataForSample has been called successfully.
     uint32_t getLastSampleIndexInChunk();
@@ -88,6 +89,10 @@ public:
 
     status_t findThumbnailSample(uint32_t *sample_index);
 
+    void setPredictSampleSize(uint32_t sampleSize) {
+        mDefaultSampleSize = sampleSize;
+    }
+
 protected:
     ~SampleTable();
 
@@ -102,7 +107,7 @@ private:
     // Limit the total size of all internal tables to 200MiB.
     static const size_t kMaxTotalSize = 200 * (1 << 20);
 
-    DataSourceBase *mDataSource;
+    DataSourceHelper *mDataSource;
     Mutex mLock;
 
     off64_t mChunkOffsetOffset;
@@ -123,7 +128,7 @@ private:
 
     struct SampleTimeEntry {
         uint32_t mSampleIndex;
-        uint32_t mCompositionTime;
+        uint64_t mCompositionTime;
     };
     SampleTimeEntry *mSampleTimeEntries;
 

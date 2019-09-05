@@ -23,6 +23,10 @@
 #include <utils/String8.h>
 #include <utils/Vector.h>
 
+#include "mediaplayer2.pb.h"
+
+using android::media::MediaPlayer2Proto::PlayerMessage;
+
 namespace android {
 
     struct DrmUUID {
@@ -80,7 +84,7 @@ namespace android {
 
     public:
         static sp<ABuffer> retrieveDrmInfo(const void *pssh, uint32_t psshsize);
-        static sp<ABuffer> retrieveDrmInfo(PsshInfo *);
+        static status_t retrieveDrmInfo(PsshInfo *, PlayerMessage *);
 
     };  // NuPlayer2Drm
 

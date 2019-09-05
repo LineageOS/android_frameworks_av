@@ -14,8 +14,8 @@
 // limitations under the License.
 //
 
-cc_binary {
-    name: "android.hardware.drm@1.1-service.clearkey",
+cc_defaults {
+    name: "clearkey_service_defaults",
     vendor: true,
 
     srcs: [
@@ -25,23 +25,24 @@ cc_binary {
         "CreatePluginFactories.cpp",
         "CryptoFactory.cpp",
         "CryptoPlugin.cpp",
+        "DeviceFiles.cpp",
         "DrmFactory.cpp",
         "DrmPlugin.cpp",
         "InitDataParser.cpp",
         "JsonWebKey.cpp",
+        "MemoryFileSystem.cpp",
         "Session.cpp",
         "SessionLibrary.cpp",
-        "service.cpp",
     ],
 
     relative_install_path: "hw",
 
     cflags: ["-Wall", "-Werror"],
-    init_rc: ["android.hardware.drm@1.1-service.clearkey.rc"],
 
     shared_libs: [
         "android.hardware.drm@1.0",
         "android.hardware.drm@1.1",
+        "android.hardware.drm@1.2",
         "libbase",
         "libbinder",
         "libcrypto",
@@ -49,11 +50,13 @@ cc_binary {
         "libhidlmemory",
         "libhidltransport",
         "liblog",
+        "libprotobuf-cpp-lite",
         "libutils",
     ],
 
     static_libs: [
         "libclearkeycommon",
+        "libclearkeydevicefiles-protos",
         "libjsmn",
     ],
 
@@ -65,4 +68,26 @@ cc_binary {
         integer_overflow: true,
     },
 }
+cc_library_static {
+    name: "libclearkeydevicefiles-protos",
+    vendor: true,
 
+    proto: {
+        export_proto_headers: true,
+        type: "lite",
+    },
+    srcs: ["protos/DeviceFiles.proto"],
+}
+cc_binary {
+    name: "android.hardware.drm@1.2-service.clearkey",
+    defaults: ["clearkey_service_defaults"],
+    srcs: ["service.cpp"],
+    init_rc: ["android.hardware.drm@1.2-service.clearkey.rc"],
+}
+cc_binary {
+    name: "android.hardware.drm@1.2-service-lazy.clearkey",
+    overrides: ["android.hardware.drm@1.2-service.clearkey"],
+    defaults: ["clearkey_service_defaults"],
+    srcs: ["serviceLazy.cpp"],
+    init_rc: ["android.hardware.drm@1.2-service-lazy.clearkey.rc"],
+}

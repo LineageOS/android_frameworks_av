@@ -26,6 +26,8 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/MediaClock.h>
+#include <media/stagefright/MediaCodecConstants.h>
+#include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
@@ -75,6 +77,10 @@ static const int64_t kMaxAllowedAudioSinkDelayUs = 1500000LL;
 
 static const int64_t kMinimumAudioClockUpdatePeriodUs = 20 /* msec */ * 1000;
 
+// Default video frame display duration when only video exists.
+// Used to set max media time in MediaClock.
+static const int64_t kDefaultVideoFrameIntervalUs = 100000LL;
+
 // static
 const NuPlayer::Renderer::PcmInfo NuPlayer::Renderer::AUDIO_PCMINFO_INITIALIZER = {
         AUDIO_CHANNEL_NONE,
@@ -86,6 +92,20 @@ const NuPlayer::Renderer::PcmInfo NuPlayer::Renderer::AUDIO_PCMINFO_INITIALIZER 
 
 // static
 const int64_t NuPlayer::Renderer::kMinPositionUpdateDelayUs = 100000ll;
+
+static audio_format_t constexpr audioFormatFromEncoding(int32_t pcmEncoding) {
+    switch (pcmEncoding) {
+    case kAudioEncodingPcmFloat:
+        return AUDIO_FORMAT_PCM_FLOAT;
+    case kAudioEncodingPcm16bit:
+        return AUDIO_FORMAT_PCM_16_BIT;
+    case kAudioEncodingPcm8bit:
+        return AUDIO_FORMAT_PCM_8_BIT; // TODO: do we want to support this?
+    default:
+        ALOGE("%s: Invalid encoding: %d", __func__, pcmEncoding);
+        return AUDIO_FORMAT_INVALID;
+    }
+}
 
 NuPlayer::Renderer::Renderer(
         const sp<MediaPlayerBase::AudioSink> &sink,
@@ -298,11 +318,11 @@ void NuPlayer::Renderer::flush(bool audio, bool notifyComplete) {
             mNotifyCompleteVideo |= notifyComplete;
             ++mVideoQueueGeneration;
             ++mVideoDrainGeneration;
+            mNextVideoTimeMediaUs = -1;
         }
 
         mMediaClock->clearAnchor();
         mVideoLateByUs = 0;
-        mNextVideoTimeMediaUs = -1;
         mSyncQueues = false;
     }
 
@@ -1286,7 +1306,7 @@ void NuPlayer::Renderer::postDrainVideoQueue() {
     mNextVideoTimeMediaUs = mediaTimeUs;
     if (!mHasAudio) {
         // smooth out videos >= 10fps
-        mMediaClock->updateMaxTimeMedia(mediaTimeUs + 100000);
+        mMediaClock->updateMaxTimeMedia(mediaTimeUs + kDefaultVideoFrameIntervalUs);
     }
 
     if (!mVideoSampleReceived || mediaTimeUs < mAudioFirstAnchorTimeMediaUs) {
@@ -1353,7 +1373,7 @@ void NuPlayer::Renderer::onDrainVideoQueue() {
                     && mediaTimeUs > mLastAudioMediaTimeUs) {
                 // If audio ends before video, video continues to drive media clock.
                 // Also smooth out videos >= 10fps.
-                mMediaClock->updateMaxTimeMedia(mediaTimeUs + 100000);
+                mMediaClock->updateMaxTimeMedia(mediaTimeUs + kDefaultVideoFrameIntervalUs);
             }
         }
     } else {
@@ -1428,7 +1448,8 @@ void NuPlayer::Renderer::notifyEOS_l(bool audio, status_t finalResult, int64_t d
                 }
             } else {
                 mMediaClock->updateAnchor(
-                        mNextVideoTimeMediaUs, nowUs, mNextVideoTimeMediaUs + 100000);
+                        mNextVideoTimeMediaUs, nowUs,
+                        mNextVideoTimeMediaUs + kDefaultVideoFrameIntervalUs);
             }
         }
     }
@@ -1581,6 +1602,14 @@ void NuPlayer::Renderer::onFlush(const sp<AMessage> &msg) {
             notifyComplete = mNotifyCompleteAudio;
             mNotifyCompleteAudio = false;
             mLastAudioMediaTimeUs = -1;
+
+            mHasAudio = false;
+            if (mNextVideoTimeMediaUs >= 0) {
+                int64_t nowUs = ALooper::GetNowUs();
+                mMediaClock->updateAnchor(
+                        mNextVideoTimeMediaUs, nowUs,
+                        mNextVideoTimeMediaUs + kDefaultVideoFrameIntervalUs);
+            }
         } else {
             notifyComplete = mNotifyCompleteVideo;
             mNotifyCompleteVideo = false;
@@ -1883,8 +1912,13 @@ status_t NuPlayer::Renderer::onOpenAudioSink(
     int32_t sampleRate;
     CHECK(format->findInt32("sample-rate", &sampleRate));
 
+    // read pcm encoding from MediaCodec output format, if available
+    int32_t pcmEncoding;
+    audio_format_t audioFormat =
+            format->findInt32(KEY_PCM_ENCODING, &pcmEncoding) ?
+                    audioFormatFromEncoding(pcmEncoding) : AUDIO_FORMAT_PCM_16_BIT;
+
     if (offloadingAudio()) {
-        audio_format_t audioFormat = AUDIO_FORMAT_PCM_16_BIT;
         AString mime;
         CHECK(format->findString("mime", &mime));
         status_t err = mapMimeToAudioFormat(audioFormat, mime.c_str());
@@ -1986,7 +2020,7 @@ status_t NuPlayer::Renderer::onOpenAudioSink(
         const PcmInfo info = {
                 (audio_channel_mask_t)channelMask,
                 (audio_output_flags_t)pcmFlags,
-                AUDIO_FORMAT_PCM_16_BIT, // TODO: change to audioFormat
+                audioFormat,
                 numChannels,
                 sampleRate
         };
@@ -2025,7 +2059,7 @@ status_t NuPlayer::Renderer::onOpenAudioSink(
                     sampleRate,
                     numChannels,
                     (audio_channel_mask_t)channelMask,
-                    AUDIO_FORMAT_PCM_16_BIT,
+                    audioFormat,
                     0 /* bufferCount - unused */,
                     mUseAudioCallback ? &NuPlayer::Renderer::AudioSinkCallback : NULL,
                     mUseAudioCallback ? this : NULL,
@@ -2083,4 +2117,3 @@ void NuPlayer::Renderer::onChangeAudioFormat(
 }
 
 }  // namespace android
-
