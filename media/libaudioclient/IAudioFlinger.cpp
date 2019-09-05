@@ -340,11 +340,11 @@ public:
         return reply.readInt32();
     }
 
-    virtual void setRecordSilenced(uid_t uid, bool silenced)
+    virtual void setRecordSilenced(audio_port_handle_t portId, bool silenced)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
-        data.writeInt32(uid);
+        data.writeInt32(portId);
         data.writeInt32(silenced ? 1 : 0);
         remote()->transact(SET_RECORD_SILENCED, data, &reply);
     }
@@ -1156,11 +1156,9 @@ status_t BnAudioFlinger::onTransact(
         } break;
         case SET_RECORD_SILENCED: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
-            uid_t uid = data.readInt32();
-            audio_source_t source;
-            data.read(&source, sizeof(audio_source_t));
+            audio_port_handle_t portId = data.readInt32();
             bool silenced = data.readInt32() == 1;
-            setRecordSilenced(uid, silenced);
+            setRecordSilenced(portId, silenced);
             return NO_ERROR;
         } break;
         case SET_PARAMETERS: {

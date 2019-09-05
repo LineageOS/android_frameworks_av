@@ -94,6 +94,7 @@ class FrameProcessor : public FrameProcessorBase {
     };
 
     AlgState m3aState;
+    int32_t mCurrentRequestId = -1;
 
     // frame number -> pending 3A states that not all data are received yet.
     KeyedVector<int32_t, AlgState> mPending3AStates;

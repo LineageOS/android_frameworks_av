@@ -38,7 +38,7 @@
 #include <AudioPolicyConfig.h>
 #include <AudioPort.h>
 #include <AudioPatch.h>
-#include <AudioProfile.h>
+#include <AudioProfileVector.h>
 #include <DeviceDescriptor.h>
 #include <IOProfile.h>
 #include <HwModule.h>
@@ -278,7 +278,7 @@ public:
         virtual status_t getHwOffloadEncodingFormatsSupportedForA2DP(
                     std::vector<audio_format_t> *formats);
 
-        virtual void setAppState(uid_t uid, app_state_t state);
+        virtual void setAppState(audio_port_handle_t portId, app_state_t state);
 
         virtual bool isHapticPlaybackSupported();
 

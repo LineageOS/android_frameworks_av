@@ -41,7 +41,7 @@ HwModule::~HwModule()
     }
 }
 
-status_t HwModule::addOutputProfile(const String8& name, const audio_config_t *config,
+status_t HwModule::addOutputProfile(const std::string& name, const audio_config_t *config,
                                     audio_devices_t device, const String8& address)
 {
     sp<IOProfile> profile = new OutputProfile(name);
@@ -95,7 +95,7 @@ void HwModule::setProfiles(const IOProfileCollection &profiles)
     }
 }
 
-status_t HwModule::removeOutputProfile(const String8& name)
+status_t HwModule::removeOutputProfile(const std::string& name)
 {
     for (size_t i = 0; i < mOutputProfiles.size(); i++) {
         if (mOutputProfiles[i]->getName() == name) {
@@ -110,7 +110,7 @@ status_t HwModule::removeOutputProfile(const String8& name)
     return NO_ERROR;
 }
 
-status_t HwModule::addInputProfile(const String8& name, const audio_config_t *config,
+status_t HwModule::addInputProfile(const std::string& name, const audio_config_t *config,
                                    audio_devices_t device, const String8& address)
 {
     sp<IOProfile> profile = new InputProfile(name);
@@ -125,12 +125,12 @@ status_t HwModule::addInputProfile(const String8& name, const audio_config_t *co
     profile->addSupportedDevice(devDesc);
 
     ALOGV("addInputProfile() name %s rate %d mask 0x%08x",
-          name.string(), config->sample_rate, config->channel_mask);
+          name.c_str(), config->sample_rate, config->channel_mask);
 
     return addInputProfile(profile);
 }
 
-status_t HwModule::removeInputProfile(const String8& name)
+status_t HwModule::removeInputProfile(const std::string& name)
 {
     for (size_t i = 0; i < mInputProfiles.size(); i++) {
         if (mInputProfiles[i]->getName() == name) {
@@ -193,13 +193,13 @@ void HwModule::refreshSupportedDevices()
             }
             DeviceVector sourceDevicesForRoute = getRouteSourceDevices(route);
             if (sourceDevicesForRoute.isEmpty()) {
-                ALOGE("%s: invalid source devices for %s", __FUNCTION__, stream->getName().string());
+                ALOGE("%s: invalid source devices for %s", __FUNCTION__, stream->getName().c_str());
                 continue;
             }
             sourceDevices.add(sourceDevicesForRoute);
         }
         if (sourceDevices.isEmpty()) {
-            ALOGE("%s: invalid source devices for %s", __FUNCTION__, stream->getName().string());
+            ALOGE("%s: invalid source devices for %s", __FUNCTION__, stream->getName().c_str());
             continue;
         }
         stream->setSupportedDevices(sourceDevices);
@@ -214,7 +214,7 @@ void HwModule::refreshSupportedDevices()
             }
             sp<DeviceDescriptor> sinkDevice = getRouteSinkDevice(route);
             if (sinkDevice == 0) {
-                ALOGE("%s: invalid sink device for %s", __FUNCTION__, stream->getName().string());
+                ALOGE("%s: invalid sink device for %s", __FUNCTION__, stream->getName().c_str());
                 continue;
             }
             sinkDevices.add(sinkDevice);
@@ -335,7 +335,7 @@ sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices
             if (allowToCreate) {
                 moduleDevice->attach(hwModule);
                 moduleDevice->setAddress(devAddress);
-                moduleDevice->setName(String8(name));
+                moduleDevice->setName(name);
             }
             return moduleDevice;
         }
@@ -359,8 +359,8 @@ sp<DeviceDescriptor> HwModuleCollection::createDevice(const audio_devices_t type
               address);
         return nullptr;
     }
-    sp<DeviceDescriptor> device = new DeviceDescriptor(type, String8(name));
-    device->setName(String8(name));
+    sp<DeviceDescriptor> device = new DeviceDescriptor(type, name);
+    device->setName(name);
     device->setAddress(String8(address));
     device->setEncodedFormat(encodedFormat);
 
