@@ -56,7 +56,11 @@ Writer::Writer(void *shared, size_t size)
 }
 
 Writer::Writer(const sp<IMemory>& iMemory, size_t size)
-    : Writer(iMemory != 0 ? (Shared *) iMemory->pointer() : NULL, size)
+    // TODO: Using unsecurePointer() has some associated security pitfalls
+    //       (see declaration for details).
+    //       Either document why it is safe in this case or address the
+    //       issue (e.g. by copying).
+    : Writer(iMemory != 0 ? (Shared *) iMemory->unsecurePointer() : NULL, size)
 {
     mIMemory = iMemory;
 }

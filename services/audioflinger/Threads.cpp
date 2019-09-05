@@ -2079,9 +2079,9 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
             // More than 2 channels does not require stronger alignment than stereo
             alignment <<= 1;
         }
-        if (((uintptr_t)sharedBuffer->pointer() & (alignment - 1)) != 0) {
+        if (((uintptr_t)sharedBuffer->unsecurePointer() & (alignment - 1)) != 0) {
             ALOGE("Invalid buffer alignment: address %p, channel count %u",
-                  sharedBuffer->pointer(), channelCount);
+                  sharedBuffer->unsecurePointer(), channelCount);
             lStatus = BAD_VALUE;
             goto Exit;
         }
@@ -6756,7 +6756,7 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
         sp<IMemory> pipeMemory;
         if ((roHeap == 0) ||
                 (pipeMemory = roHeap->allocate(pipeSize)) == 0 ||
-                (pipeBuffer = pipeMemory->pointer()) == nullptr) {
+                (pipeBuffer = pipeMemory->unsecurePointer()) == nullptr) {
             ALOGE("not enough memory for pipe buffer size=%zu; "
                     "roHeap=%p, pipeMemory=%p, pipeBuffer=%p; roHeapSize: %lld",
                     pipeSize, roHeap.get(), pipeMemory.get(), pipeBuffer,

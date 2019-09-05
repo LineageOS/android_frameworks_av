@@ -116,7 +116,7 @@ void MyStreamSource::onBufferAvailable(size_t index) {
 
     sp<IMemory> mem = mBuffers.itemAt(index);
 
-    ssize_t n = read(mFd, mem->pointer(), mem->size());
+    ssize_t n = read(mFd, mem->unsecurePointer(), mem->size());
     if (n <= 0) {
         mListener->issueCommand(IStreamListener::EOS, false /* synchronous */);
     } else {
@@ -238,7 +238,7 @@ ssize_t MyConvertingStreamSource::writeData(const void *data, size_t size) {
             copy = mem->size() - mCurrentBufferOffset;
         }
 
-        memcpy((uint8_t *)mem->pointer() + mCurrentBufferOffset, data, copy);
+        memcpy((uint8_t *)mem->unsecurePointer() + mCurrentBufferOffset, data, copy);
         mCurrentBufferOffset += copy;
 
         if (mCurrentBufferOffset == mem->size()) {

@@ -150,7 +150,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
     if (client != 0) {
         mCblkMemory = client->heap()->allocate(size);
         if (mCblkMemory == 0 ||
-                (mCblk = static_cast<audio_track_cblk_t *>(mCblkMemory->pointer())) == NULL) {
+                (mCblk = static_cast<audio_track_cblk_t *>(mCblkMemory->unsecurePointer())) == NULL) {
             ALOGE("%s(%d): not enough memory for AudioTrack size=%zu", __func__, mId, size);
             client->heap()->dump("AudioTrack");
             mCblkMemory.clear();
@@ -172,7 +172,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
             const sp<MemoryDealer> roHeap(thread->readOnlyHeap());
             if (roHeap == 0 ||
                     (mBufferMemory = roHeap->allocate(bufferSize)) == 0 ||
-                    (mBuffer = mBufferMemory->pointer()) == NULL) {
+                    (mBuffer = mBufferMemory->unsecurePointer()) == NULL) {
                 ALOGE("%s(%d): not enough memory for read-only buffer size=%zu",
                         __func__, mId, bufferSize);
                 if (roHeap != 0) {
@@ -187,7 +187,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
         case ALLOC_PIPE:
             mBufferMemory = thread->pipeMemory();
             // mBuffer is the virtual address as seen from current process (mediaserver),
-            // and should normally be coming from mBufferMemory->pointer().
+            // and should normally be coming from mBufferMemory->unsecurePointer().
             // However in this case the TrackBase does not reference the buffer directly.
             // It should references the buffer via the pipe.
             // Therefore, to detect incorrect usage of the buffer, we set mBuffer to NULL.
@@ -510,7 +510,11 @@ AudioFlinger::PlaybackThread::Track::Track(
             track_type type,
             audio_port_handle_t portId)
     :   TrackBase(thread, client, attr, sampleRate, format, channelMask, frameCount,
-                  (sharedBuffer != 0) ? sharedBuffer->pointer() : buffer,
+                  // TODO: Using unsecurePointer() has some associated security pitfalls
+                  //       (see declaration for details).
+                  //       Either document why it is safe in this case or address the
+                  //       issue (e.g. by copying).
+                  (sharedBuffer != 0) ? sharedBuffer->unsecurePointer() : buffer,
                   (sharedBuffer != 0) ? sharedBuffer->size() : bufferSize,
                   sessionId, creatorPid, uid, true /*isOut*/,
                   (type == TYPE_PATCH) ? ( buffer == NULL ? ALLOC_LOCAL : ALLOC_NONE) : ALLOC_CBLK,
@@ -540,7 +544,7 @@ AudioFlinger::PlaybackThread::Track::Track(
     ALOG_ASSERT(!(client == 0 && sharedBuffer != 0));
 
     ALOGV_IF(sharedBuffer != 0, "%s(%d): sharedBuffer: %p, size: %zu",
-            __func__, mId, sharedBuffer->pointer(), sharedBuffer->size());
+            __func__, mId, sharedBuffer->unsecurePointer(), sharedBuffer->size());
 
     if (mCblk == NULL) {
         return;

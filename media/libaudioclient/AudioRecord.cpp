@@ -759,7 +759,11 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
         status = NO_INIT;
         goto exit;
     }
-    iMemPointer = output.cblk ->pointer();
+    // TODO: Using unsecurePointer() has some associated security pitfalls
+    //       (see declaration for details).
+    //       Either document why it is safe in this case or address the
+    //       issue (e.g. by copying).
+    iMemPointer = output.cblk ->unsecurePointer();
     if (iMemPointer == NULL) {
         ALOGE("%s(%d): Could not get control block pointer", __func__, mPortId);
         status = NO_INIT;
@@ -774,7 +778,11 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
     if (output.buffers == 0) {
         buffers = cblk + 1;
     } else {
-        buffers = output.buffers->pointer();
+        // TODO: Using unsecurePointer() has some associated security pitfalls
+        //       (see declaration for details).
+        //       Either document why it is safe in this case or address the
+        //       issue (e.g. by copying).
+        buffers = output.buffers->unsecurePointer();
         if (buffers == NULL) {
             ALOGE("%s(%d): Could not get buffer pointer", __func__, mPortId);
             status = NO_INIT;

@@ -89,7 +89,7 @@ void CameraSourceListener::notify(int32_t msgType, int32_t ext1, int32_t ext2) {
 void CameraSourceListener::postData(int32_t msgType, const sp<IMemory> &dataPtr,
                                     camera_frame_metadata_t * /* metadata */) {
     ALOGV("postData(%d, ptr:%p, size:%zu)",
-         msgType, dataPtr->pointer(), dataPtr->size());
+         msgType, dataPtr->unsecurePointer(), dataPtr->size());
 
     sp<CameraSource> source = mSource.promote();
     if (source.get() != NULL) {
@@ -966,8 +966,12 @@ void CameraSource::releaseRecordingFrame(const sp<IMemory>& frame) {
 
         // Check if frame contains a VideoNativeHandleMetadata.
         if (frame->size() == sizeof(VideoNativeHandleMetadata)) {
-            VideoNativeHandleMetadata *metadata =
-                (VideoNativeHandleMetadata*)(frame->pointer());
+          // TODO: Using unsecurePointer() has some associated security pitfalls
+          //       (see declaration for details).
+          //       Either document why it is safe in this case or address the
+          //       issue (e.g. by copying).
+           VideoNativeHandleMetadata *metadata =
+                (VideoNativeHandleMetadata*)(frame->unsecurePointer());
             if (metadata->eType == kMetadataBufferTypeNativeHandleSource) {
                 handle = metadata->pHandle;
             }
@@ -1047,7 +1051,7 @@ void CameraSource::signalBufferReturned(MediaBufferBase *buffer) {
     Mutex::Autolock autoLock(mLock);
     for (List<sp<IMemory> >::iterator it = mFramesBeingEncoded.begin();
          it != mFramesBeingEncoded.end(); ++it) {
-        if ((*it)->pointer() ==  buffer->data()) {
+        if ((*it)->unsecurePointer() ==  buffer->data()) {
             releaseOneRecordingFrame((*it));
             mFramesBeingEncoded.erase(it);
             ++mNumFramesEncoded;
@@ -1102,7 +1106,11 @@ status_t CameraSource::read(
         frameTime = *mFrameTimes.begin();
         mFrameTimes.erase(mFrameTimes.begin());
         mFramesBeingEncoded.push_back(frame);
-        *buffer = new MediaBuffer(frame->pointer(), frame->size());
+        // TODO: Using unsecurePointer() has some associated security pitfalls
+        //       (see declaration for details).
+        //       Either document why it is safe in this case or address the
+        //       issue (e.g. by copying).
+        *buffer = new MediaBuffer(frame->unsecurePointer(), frame->size());
         (*buffer)->setObserver(this);
         (*buffer)->add_ref();
         (*buffer)->meta_data().setInt64(kKeyTime, frameTime);
@@ -1248,7 +1256,7 @@ void CameraSource::recordingFrameHandleCallbackTimestamp(int64_t timestampUs,
     mMemoryBases.erase(mMemoryBases.begin());
 
     // Wrap native handle in sp<IMemory> so it can be pushed to mFramesReceived.
-    VideoNativeHandleMetadata *metadata = (VideoNativeHandleMetadata*)(data->pointer());
+    VideoNativeHandleMetadata *metadata = (VideoNativeHandleMetadata*)(data->unsecurePointer());
     metadata->eType = kMetadataBufferTypeNativeHandleSource;
     metadata->pHandle = handle;
 
@@ -1296,7 +1304,11 @@ void CameraSource::recordingFrameHandleCallbackTimestampBatch(
         mMemoryBases.erase(mMemoryBases.begin());
 
         // Wrap native handle in sp<IMemory> so it can be pushed to mFramesReceived.
-        VideoNativeHandleMetadata *metadata = (VideoNativeHandleMetadata*)(data->pointer());
+        // TODO: Using unsecurePointer() has some associated security pitfalls
+        //       (see declaration for details).
+        //       Either document why it is safe in this case or address the
+        //       issue (e.g. by copying).
+        VideoNativeHandleMetadata *metadata = (VideoNativeHandleMetadata*)(data->unsecurePointer());
         metadata->eType = kMetadataBufferTypeNativeHandleSource;
         metadata->pHandle = handle;
 
