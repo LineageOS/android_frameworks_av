@@ -167,14 +167,15 @@ class AudioPolicyManagerTest : public testing::Test {
     virtual void SetUpManagerConfig();
 
     void dumpToLog();
-    // When explicitly routing is needed, selectedDeviceId need to be set as the wanted port
-    // id. Otherwise, selectedDeviceId need to be initialized as AUDIO_PORT_HANDLE_NONE.
+    // When explicit routing is needed, selectedDeviceId needs to be set as the wanted port
+    // id. Otherwise, selectedDeviceId needs to be initialized as AUDIO_PORT_HANDLE_NONE.
     void getOutputForAttr(
             audio_port_handle_t *selectedDeviceId,
             audio_format_t format,
             int channelMask,
             int sampleRate,
             audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE,
+            audio_io_handle_t *output = nullptr,
             audio_port_handle_t *portId = nullptr,
             audio_attributes_t attr = {});
     void getInputForAttr(
@@ -249,9 +250,12 @@ void AudioPolicyManagerTest::getOutputForAttr(
         int channelMask,
         int sampleRate,
         audio_output_flags_t flags,
+        audio_io_handle_t *output,
         audio_port_handle_t *portId,
         audio_attributes_t attr) {
-    audio_io_handle_t output = AUDIO_PORT_HANDLE_NONE;
+    audio_io_handle_t localOutput;
+    if (!output) output = &localOutput;
+    *output = AUDIO_IO_HANDLE_NONE;
     audio_stream_type_t stream = AUDIO_STREAM_DEFAULT;
     audio_config_t config = AUDIO_CONFIG_INITIALIZER;
     config.sample_rate = sampleRate;
@@ -261,9 +265,10 @@ void AudioPolicyManagerTest::getOutputForAttr(
     if (!portId) portId = &localPortId;
     *portId = AUDIO_PORT_HANDLE_NONE;
     ASSERT_EQ(OK, mManager->getOutputForAttr(
-                    &attr, &output, AUDIO_SESSION_NONE, &stream, 0 /*uid*/, &config, &flags,
+                    &attr, output, AUDIO_SESSION_NONE, &stream, 0 /*uid*/, &config, &flags,
                     selectedDeviceId, portId, {}));
     ASSERT_NE(AUDIO_PORT_HANDLE_NONE, *portId);
+    ASSERT_NE(AUDIO_IO_HANDLE_NONE, *output);
 }
 
 void AudioPolicyManagerTest::getInputForAttr(
@@ -313,7 +318,7 @@ void AudioPolicyManagerTest::findDevicePort(audio_port_role_t role,
             return;
         }
     }
-    GTEST_FAIL();
+    GTEST_FAIL() << "Device port with role " << role << " and address " << address << "not found";
 }
 
 audio_port_handle_t AudioPolicyManagerTest::getDeviceIdFromPatch(
@@ -523,7 +528,7 @@ TEST_F(AudioPolicyManagerTestMsd, GetOutputForAttrFormatSwitching) {
         audio_port_handle_t portId;
         getOutputForAttr(&selectedDeviceId,
                 AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT,
-                &portId);
+                nullptr /*output*/, &portId);
         ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
         ASSERT_EQ(1, patchCount.deltaFromSnapshot());
         mManager->releaseOutput(portId);
@@ -535,7 +540,7 @@ TEST_F(AudioPolicyManagerTestMsd, GetOutputForAttrFormatSwitching) {
         audio_port_handle_t portId;
         getOutputForAttr(&selectedDeviceId,
                 AUDIO_FORMAT_DTS, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT,
-                &portId);
+                nullptr /*output*/, &portId);
         ASSERT_NE(selectedDeviceId, mMsdOutputDevice->getId());
         ASSERT_EQ(-1, patchCount.deltaFromSnapshot());
         mManager->releaseOutput(portId);
@@ -810,9 +815,9 @@ TEST_P(AudioPolicyManagerTestDPPlaybackReRouting, PlaybackReRouting) {
     const audio_usage_t usage = attr.usage;
 
     audio_port_handle_t playbackRoutedPortId = AUDIO_PORT_HANDLE_NONE;
-    audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
     getOutputForAttr(&playbackRoutedPortId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
-            48000 /*sampleRate*/, AUDIO_OUTPUT_FLAG_NONE, &portId, attr);
+            48000 /*sampleRate*/, AUDIO_OUTPUT_FLAG_NONE,
+            nullptr /*output*/, nullptr /*portId*/, attr);
     if (std::find_if(begin(mUsageRules), end(mUsageRules), [&usage](const auto &usageRule) {
             return (std::get<0>(usageRule) == usage) &&
             (std::get<2>(usageRule) == RULE_MATCH_ATTRIBUTE_USAGE);}) != end(mUsageRules) ||
@@ -965,7 +970,7 @@ void AudioPolicyManagerTestDPMixRecordInjection::SetUp() {
     std::string tags = std::string("addr=") + mMixAddress;
     strncpy(attr.tags, tags.c_str(), AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - 1);
     getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
-            48000 /*sampleRate*/, AUDIO_OUTPUT_FLAG_NONE, &mPortId, attr);
+            48000 /*sampleRate*/, AUDIO_OUTPUT_FLAG_NONE, nullptr /*output*/, &mPortId, attr);
     ASSERT_EQ(NO_ERROR, mManager->startOutput(mPortId));
     ASSERT_EQ(injectionPort.id, getDeviceIdFromPatch(mClient->getLastAddedPatch()));
 
@@ -1108,15 +1113,14 @@ TEST_P(AudioPolicyManagerTestDeviceConnection, ExplicitlyRoutingAfterConnection)
     findDevicePort(role, type, address, devicePort);
 
     audio_port_handle_t routedPortId = devicePort.id;
-    audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
     // Try start input or output according to the device type
     if (audio_is_output_devices(type)) {
         getOutputForAttr(&routedPortId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
-                48000 /*sampleRate*/, AUDIO_OUTPUT_FLAG_NONE, &portId);
+                48000 /*sampleRate*/, AUDIO_OUTPUT_FLAG_NONE);
     } else if (audio_is_input_device(type)) {
         RecordingActivityTracker tracker;
         getInputForAttr({}, tracker.getRiid(), &routedPortId, AUDIO_FORMAT_PCM_16_BIT,
-                AUDIO_CHANNEL_IN_STEREO, 48000 /*sampleRate*/, AUDIO_INPUT_FLAG_NONE, &portId);
+                AUDIO_CHANNEL_IN_STEREO, 48000 /*sampleRate*/, AUDIO_INPUT_FLAG_NONE);
     }
     ASSERT_EQ(devicePort.id, routedPortId);
 
@@ -1139,3 +1143,57 @@ INSTANTIATE_TEST_CASE_P(
                                             "hfp_client_out"})
                 )
         );
+
+class AudioPolicyManagerTVTest : public AudioPolicyManagerTestWithConfigurationFile {
+protected:
+    std::string getConfigFile() override { return sTvConfig; }
+    void testHDMIPortSelection(audio_output_flags_t flags, const char* expectedMixPortName);
+
+    static const std::string sTvConfig;
+};
+
+const std::string AudioPolicyManagerTVTest::sTvConfig =
+        AudioPolicyManagerTVTest::sExecutableDir + "test_tv_apm_configuration.xml";
+
+// SwAudioOutputDescriptor doesn't populate flags so check against the port name.
+void AudioPolicyManagerTVTest::testHDMIPortSelection(
+        audio_output_flags_t flags, const char* expectedMixPortName) {
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_OUT_AUX_DIGITAL, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+            "" /*address*/, "" /*name*/, AUDIO_FORMAT_DEFAULT));
+    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+    audio_io_handle_t output;
+    audio_port_handle_t portId;
+    getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_STEREO, 48000,
+            flags, &output, &portId);
+    sp<SwAudioOutputDescriptor> outDesc = mManager->getOutputs().valueFor(output);
+    ASSERT_NE(nullptr, outDesc.get());
+    audio_port port = {};
+    outDesc->toAudioPort(&port);
+    mManager->releaseOutput(portId);
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_OUT_AUX_DIGITAL, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+            "" /*address*/, "" /*name*/, AUDIO_FORMAT_DEFAULT));
+    ASSERT_EQ(AUDIO_PORT_TYPE_MIX, port.type);
+    ASSERT_EQ(AUDIO_PORT_ROLE_SOURCE, port.role);
+    ASSERT_STREQ(expectedMixPortName, port.name);
+}
+
+TEST_F(AudioPolicyManagerTVTest, InitSuccess) {
+    // SetUp must finish with no assertions.
+}
+
+TEST_F(AudioPolicyManagerTVTest, Dump) {
+    dumpToLog();
+}
+
+TEST_F(AudioPolicyManagerTVTest, MatchOutputNoHwAvSync) {
+    // b/140447125: The selected port must not have HW AV Sync flag (see the config file).
+    testHDMIPortSelection(AUDIO_OUTPUT_FLAG_DIRECT, "direct");
+}
+
+TEST_F(AudioPolicyManagerTVTest, MatchOutputHwAvSync) {
+    testHDMIPortSelection(static_cast<audio_output_flags_t>(
+                    AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_HW_AV_SYNC),
+            "tunnel");
+}

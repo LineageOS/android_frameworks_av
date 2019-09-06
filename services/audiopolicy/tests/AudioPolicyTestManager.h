@@ -25,6 +25,7 @@ class AudioPolicyTestManager : public AudioPolicyManager {
             : AudioPolicyManager(clientInterface, true /*forTesting*/) { }
     using AudioPolicyManager::getConfig;
     using AudioPolicyManager::initialize;
+    using AudioPolicyManager::getOutputs;
 };
 
 }  // namespace android
