@@ -31,10 +31,8 @@ cc_library_shared {
         "libaudioutils",
         "libmediautils",
 
-        "libhwbinder",
         "libhidlbase",
         "libhidlmemory",
-        "libhidltransport",
         "libbase",
         "libaudiohal",
         "libaudiohal_deathhandler",

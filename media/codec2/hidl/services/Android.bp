@@ -17,8 +17,6 @@ cc_binary {
         "libcodec2_hidl@1.0",
         "libcodec2_vndk",
         "libhidlbase",
-        "libhidltransport",
-        "libhwbinder",
         "liblog",
         "libstagefright_omx",
         "libstagefright_xmlparser",
