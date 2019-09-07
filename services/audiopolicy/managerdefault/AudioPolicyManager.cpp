@@ -5098,12 +5098,29 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
             if (invalidate) continue;
 
             for (auto client : desc->clientsList(false /*activeOnly*/)) {
-                const audio_io_handle_t newOutput = selectOutput(dstOutputs,
-                        client->flags(), client->config().format,
-                        client->config().channel_mask, client->config().sample_rate);
-                if (newOutput != srcOut) {
-                    invalidate = true;
-                    break;
+                if (!desc->mProfile->isDirectOutput()) {
+                    // a client on a non direct outputs has necessarily a linear PCM format
+                    // so we can call selectOutput() safely
+                    const audio_io_handle_t newOutput = selectOutput(dstOutputs,
+                                                                     client->flags(),
+                                                                     client->config().format,
+                                                                     client->config().channel_mask,
+                                                                     client->config().sample_rate);
+                    if (newOutput != srcOut) {
+                        invalidate = true;
+                        break;
+                    }
+                } else {
+                    sp<IOProfile> profile = getProfileForOutput(newDevices,
+                                   client->config().sample_rate,
+                                   client->config().format,
+                                   client->config().channel_mask,
+                                   client->flags(),
+                                   true /* directOnly */);
+                    if (profile != desc->mProfile) {
+                        invalidate = true;
+                        break;
+                    }
                 }
             }
         }
