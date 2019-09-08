@@ -375,7 +375,11 @@ public:
 
         // consumer usage is queried earlier.
 
-        ALOGD("ISConfig%s", status.str().c_str());
+        if (status.str().empty()) {
+            ALOGD("ISConfig not changed");
+        } else {
+            ALOGD("ISConfig%s", status.str().c_str());
+        }
         return err;
     }
 
