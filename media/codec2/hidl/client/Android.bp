@@ -17,7 +17,6 @@ cc_library {
         "libcutils",
         "libgui",
         "libhidlbase",
-        "libhidltransport",
         "liblog",
         "libstagefright_bufferpool@2.0",
         "libui",

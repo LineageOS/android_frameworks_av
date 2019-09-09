@@ -27,7 +27,6 @@ LOCAL_SHARED_LIBRARIES:= \
     libutils \
     libhidlbase \
     libhidlmemory \
-    libhidltransport \
     android.hardware.drm@1.0 \
     android.hardware.drm@1.1 \
     android.hardware.drm@1.2

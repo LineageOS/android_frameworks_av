@@ -34,7 +34,6 @@ cc_library {
         "android.hardware.drm@1.2",
         "libhidlallocatorutils",
         "libhidlbase",
-        "libhidltransport",
     ],
 
     cflags: [
