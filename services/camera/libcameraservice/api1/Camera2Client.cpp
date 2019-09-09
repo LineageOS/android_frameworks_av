@@ -2258,8 +2258,14 @@ status_t Camera2Client::setVideoTarget(const sp<IGraphicBufferProducer>& bufferP
     return OK;
 }
 
-int32_t Camera2Client::setAudioRestriction(int /*mode*/) {
+status_t Camera2Client::setAudioRestriction(int /*mode*/) {
     // Empty implementation. setAudioRestriction is hidden interface and not
+    // supported by android.hardware.Camera API
+    return INVALID_OPERATION;
+}
+
+int32_t Camera2Client::getGlobalAudioRestriction() {
+    // Empty implementation. getAudioRestriction is hidden interface and not
     // supported by android.hardware.Camera API
     return INVALID_OPERATION;
 }

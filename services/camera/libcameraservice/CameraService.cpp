@@ -2507,11 +2507,16 @@ bool CameraService::BasicClient::canCastToApiClient(apiLevel level) const {
     return level == API_2;
 }
 
-int32_t CameraService::BasicClient::setAudioRestriction(int32_t mode) {
+status_t CameraService::BasicClient::setAudioRestriction(int32_t mode) {
     {
         Mutex::Autolock l(mAudioRestrictionLock);
         mAudioRestriction = mode;
     }
+    sCameraService->updateAudioRestriction();
+    return OK;
+}
+
+int32_t CameraService::BasicClient::getServiceAudioRestriction() const {
     return sCameraService->updateAudioRestriction();
 }
 
