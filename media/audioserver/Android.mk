@@ -14,8 +14,6 @@ LOCAL_SHARED_LIBRARIES := \
 	libcutils \
 	liblog \
 	libhidlbase \
-	libhidltransport \
-	libhwbinder \
 	libmedia \
 	libmedialogservice \
 	libmediautils \
