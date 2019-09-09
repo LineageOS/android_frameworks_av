@@ -36,8 +36,6 @@ cc_defaults {
         "libhardware",
         "libhidlbase",
         "libhidlmemory",
-        "libhidltransport",
-        "libhwbinder",
         "liblog",
         "libmedia_helper",
         "libmediautils",
