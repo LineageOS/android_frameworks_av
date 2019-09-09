@@ -79,7 +79,9 @@ bool IOProfile::isCompatibleProfile(const DeviceVector &devices,
         }
     }
 
-    if (isPlaybackThread && (getFlags() & flags) != flags) {
+    const uint32_t mustMatchOutputFlags = AUDIO_OUTPUT_FLAG_HW_AV_SYNC;
+    if (isPlaybackThread && (((getFlags() ^ flags) & mustMatchOutputFlags)
+                    || (getFlags() & flags) != flags)) {
         return false;
     }
     // The only input flag that is allowed to be different is the fast flag.
