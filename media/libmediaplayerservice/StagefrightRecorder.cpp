@@ -1029,6 +1029,13 @@ status_t StagefrightRecorder::setParameter(
             selfID = static_cast<int32_t>(temp);
             return setParamSelfID(selfID);
         }
+    } else if (key == "rtp-param-opponent-id") {
+        int32_t opnId;
+        int64_t temp;
+        if (safe_strtoi64(value.string(), &temp)) {
+            opnId = static_cast<int32_t>(temp);
+            return setParamVideoOpponentID(opnId);
+        }
     } else if (key == "rtp-param-payload-type") {
         int32_t payloadType;
         if (safe_strtoi32(value.string(), &payloadType)) {
