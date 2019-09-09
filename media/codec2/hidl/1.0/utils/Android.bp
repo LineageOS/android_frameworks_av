@@ -80,8 +80,6 @@ cc_library {
         "libcodec2_vndk",
         "libcutils",
         "libhidlbase",
-        "libhidltransport",
-        "libhwbinder",
         "liblog",
         "libstagefright_bufferpool@2.0",
         "libstagefright_bufferqueue_helper",

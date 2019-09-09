@@ -48,7 +48,6 @@ cc_defaults {
         "libcrypto",
         "libhidlbase",
         "libhidlmemory",
-        "libhidltransport",
         "liblog",
         "libprotobuf-cpp-lite",
         "libutils",
