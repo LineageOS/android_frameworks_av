@@ -1359,19 +1359,19 @@ status_t AudioPolicyManager::getBestMsdAudioProfileFor(const sp<DeviceDescriptor
     // Each IOProfile represents a MixPort from audio_policy_configuration.xml
     for (const auto &inProfile : inputProfiles) {
         if (hwAvSync == ((inProfile->getFlags() & AUDIO_INPUT_FLAG_HW_AV_SYNC) != 0)) {
-            msdProfiles.appendProfiles(inProfile->getAudioProfiles());
+            appendAudioProfiles(msdProfiles, inProfile->getAudioProfiles());
         }
     }
     AudioProfileVector deviceProfiles;
     for (const auto &outProfile : outputProfiles) {
         if (hwAvSync == ((outProfile->getFlags() & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) != 0)) {
-            deviceProfiles.appendProfiles(outProfile->getAudioProfiles());
+            appendAudioProfiles(deviceProfiles, outProfile->getAudioProfiles());
         }
     }
     struct audio_config_base bestSinkConfig;
-    status_t result = msdProfiles.findBestMatchingOutputConfig(deviceProfiles,
+    status_t result = findBestMatchingOutputConfig(msdProfiles, deviceProfiles,
             compressedFormatsOrder, surroundChannelMasksOrder, true /*preferHigherSamplingRates*/,
-            &bestSinkConfig);
+            bestSinkConfig);
     if (result != NO_ERROR) {
         ALOGD("%s() no matching profiles found for device: %s, hwAvSync: %d",
                 __func__, outputDevice->toString().c_str(), hwAvSync);
@@ -6207,7 +6207,7 @@ void AudioPolicyManager::updateAudioProfiles(const sp<DeviceDescriptor>& devDesc
                 || isDeviceOfModule(devDesc, AUDIO_HARDWARE_MODULE_ID_MSD)) {
             modifySurroundFormats(devDesc, &formats);
         }
-        profiles.setFormats(formats);
+        addProfilesForFormats(profiles, formats);
     }
 
     for (audio_format_t format : profiles.getSupportedFormats()) {
@@ -6243,7 +6243,8 @@ void AudioPolicyManager::updateAudioProfiles(const sp<DeviceDescriptor>& devDesc
                 }
             }
         }
-        profiles.addProfileFromHal(new AudioProfile(format, channelMasks, samplingRates));
+        addDynamicAudioProfileAndSort(
+                profiles, new AudioProfile(format, channelMasks, samplingRates));
     }
 }
 

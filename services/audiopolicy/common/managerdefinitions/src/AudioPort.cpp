@@ -94,9 +94,8 @@ status_t AudioPort::checkExactAudioProfile(const struct audio_port_config *confi
     }
     if (config_mask != 0) {
         // TODO should we check sample_rate / channel_mask / format separately?
-        status = mProfiles.checkExactProfile(config->sample_rate,
-                                             config->channel_mask,
-                                             config->format);
+        status = checkExactProfile(mProfiles, config->sample_rate,
+                config->channel_mask, config->format);
     }
     return status;
 }
