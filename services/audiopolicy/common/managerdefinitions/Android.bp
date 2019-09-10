@@ -8,7 +8,7 @@ cc_library_static {
         "src/AudioPatch.cpp",
         "src/AudioPolicyMix.cpp",
         "src/AudioPort.cpp",
-        "src/AudioProfileVector.cpp",
+        "src/AudioProfileVectorHelper.cpp",
         "src/AudioRoute.cpp",
         "src/ClientDescriptor.cpp",
         "src/DeviceDescriptor.cpp",
