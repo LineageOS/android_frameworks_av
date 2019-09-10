@@ -34,14 +34,14 @@
 
 namespace android {
 
-AudioOutputDescriptor::AudioOutputDescriptor(const sp<AudioPort>& port,
+AudioOutputDescriptor::AudioOutputDescriptor(const sp<PolicyAudioPort>& policyAudioPort,
                                              AudioPolicyClientInterface *clientInterface)
-    : mPort(port), mClientInterface(clientInterface)
+    : mPolicyAudioPort(policyAudioPort), mClientInterface(clientInterface)
 {
-    if (mPort.get() != nullptr) {
-        mPort->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
-        if (mPort->getGains().size() > 0) {
-            mPort->getGains()[0]->getDefaultConfig(&mGain);
+    if (mPolicyAudioPort.get() != nullptr) {
+        mPolicyAudioPort->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
+        if (mPolicyAudioPort->asAudioPort()->getGains().size() > 0) {
+            mPolicyAudioPort->asAudioPort()->getGains()[0]->getDefaultConfig(&mGain);
         }
     }
 }
@@ -55,7 +55,8 @@ audio_config_base_t AudioOutputDescriptor::getConfig() const
 
 audio_module_handle_t AudioOutputDescriptor::getModuleHandle() const
 {
-    return mPort.get() != nullptr ? mPort->getModuleHandle() : AUDIO_MODULE_HANDLE_NONE;
+    return mPolicyAudioPort.get() != nullptr ?
+            mPolicyAudioPort->getModuleHandle() : AUDIO_MODULE_HANDLE_NONE;
 }
 
 audio_patch_handle_t AudioOutputDescriptor::getPatchHandle() const
@@ -66,11 +67,6 @@ audio_patch_handle_t AudioOutputDescriptor::getPatchHandle() const
 void AudioOutputDescriptor::setPatchHandle(audio_patch_handle_t handle)
 {
     mPatchHandle = handle;
-}
-
-audio_port_handle_t AudioOutputDescriptor::getId() const
-{
-    return mId;
 }
 
 bool AudioOutputDescriptor::sharesHwModuleWith(
@@ -167,9 +163,27 @@ bool AudioOutputDescriptor::setVolume(float volumeDb,
     return false;
 }
 
-void AudioOutputDescriptor::toAudioPortConfig(
-                                                 struct audio_port_config *dstConfig,
-                                                 const struct audio_port_config *srcConfig) const
+status_t AudioOutputDescriptor::applyAudioPortConfig(const struct audio_port_config *config,
+                                                     audio_port_config *backupConfig)
+{
+    struct audio_port_config localBackupConfig = { .config_mask = config->config_mask };
+    status_t status = NO_ERROR;
+
+    toAudioPortConfig(&localBackupConfig);
+    if ((status = validationBeforeApplyConfig(config)) == NO_ERROR) {
+        AudioPortConfig::applyAudioPortConfig(config, backupConfig);
+        applyPolicyAudioPortConfig(config);
+    }
+
+    if (backupConfig != NULL) {
+        *backupConfig = localBackupConfig;
+    }
+    return status;
+}
+
+
+void AudioOutputDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
+                                              const struct audio_port_config *srcConfig) const
 {
     dstConfig->config_mask = AUDIO_PORT_CONFIG_SAMPLE_RATE|AUDIO_PORT_CONFIG_CHANNEL_MASK|
                             AUDIO_PORT_CONFIG_FORMAT|AUDIO_PORT_CONFIG_GAIN;
@@ -177,8 +191,8 @@ void AudioOutputDescriptor::toAudioPortConfig(
         dstConfig->config_mask |= srcConfig->config_mask;
     }
     AudioPortConfig::toAudioPortConfig(dstConfig, srcConfig);
+    toPolicyAudioPortConfig(dstConfig, srcConfig);
 
-    dstConfig->id = mId;
     dstConfig->role = AUDIO_PORT_ROLE_SOURCE;
     dstConfig->type = AUDIO_PORT_TYPE_MIX;
     dstConfig->ext.mix.hw_module = getModuleHandle();
@@ -188,7 +202,7 @@ void AudioOutputDescriptor::toAudioPortConfig(
 void AudioOutputDescriptor::toAudioPort(struct audio_port *port) const
 {
     // Should not be called for duplicated ports, see SwAudioOutputDescriptor::toAudioPortConfig.
-    mPort->toAudioPort(port);
+    mPolicyAudioPort->asAudioPort()->toAudioPort(port);
     port->id = mId;
     port->ext.mix.hw_module = getModuleHandle();
 }
@@ -503,7 +517,7 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
         mSamplingRate = lConfig.sample_rate;
         mChannelMask = lConfig.channel_mask;
         mFormat = lConfig.format;
-        mId = AudioPort::getNextUniqueId();
+        mId = PolicyAudioPort::getNextUniqueId();
         mIoHandle = *output;
         mProfile->curOpenCount++;
     }
@@ -589,7 +603,7 @@ status_t SwAudioOutputDescriptor::openDuplicating(const sp<SwAudioOutputDescript
         return INVALID_OPERATION;
     }
 
-    mId = AudioPort::getNextUniqueId();
+    mId = PolicyAudioPort::getNextUniqueId();
     mIoHandle = *ioHandle;
     mOutput1 = output1;
     mOutput2 = output2;

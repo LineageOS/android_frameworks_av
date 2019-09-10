@@ -27,80 +27,61 @@
 
 namespace android {
 
-// --- AudioPort class implementation
-void AudioPort::attach(const sp<HwModule>& module)
+// --- PolicyAudioPort class implementation
+void PolicyAudioPort::attach(const sp<HwModule>& module)
 {
-    ALOGV("%s: attaching module %s to port %s", __FUNCTION__, getModuleName(), mName.c_str());
+    ALOGV("%s: attaching module %s to port %s",
+            __FUNCTION__, getModuleName(), asAudioPort()->getName().c_str());
     mModule = module;
 }
 
-void AudioPort::detach()
+void PolicyAudioPort::detach()
 {
     mModule = nullptr;
 }
 
 // Note that is a different namespace than AudioFlinger unique IDs
-audio_port_handle_t AudioPort::getNextUniqueId()
+audio_port_handle_t PolicyAudioPort::getNextUniqueId()
 {
     return getNextHandle();
 }
 
-audio_module_handle_t AudioPort::getModuleHandle() const
+audio_module_handle_t PolicyAudioPort::getModuleHandle() const
 {
     return mModule != 0 ? mModule->getHandle() : AUDIO_MODULE_HANDLE_NONE;
 }
 
-uint32_t AudioPort::getModuleVersionMajor() const
+uint32_t PolicyAudioPort::getModuleVersionMajor() const
 {
     return mModule != 0 ? mModule->getHalVersionMajor() : 0;
 }
 
-const char *AudioPort::getModuleName() const
+const char *PolicyAudioPort::getModuleName() const
 {
     return mModule != 0 ? mModule->getName() : "invalid module";
 }
 
-void AudioPort::importAudioPort(const sp<AudioPort>& port, bool force __unused)
-{
-    for (const auto& profileToImport : port->mProfiles) {
-        if (profileToImport->isValid()) {
-            // Import only valid port, i.e. valid format, non empty rates and channels masks
-            bool hasSameProfile = false;
-            for (const auto& profile : mProfiles) {
-                if (*profile == *profileToImport) {
-                    // never import a profile twice
-                    hasSameProfile = true;
-                    break;
-                }
-            }
-            if (hasSameProfile) { // never import a same profile twice
-                continue;
-            }
-            addAudioProfile(profileToImport);
-        }
-    }
-}
-
-status_t AudioPort::checkExactAudioProfile(const struct audio_port_config *config) const
+status_t PolicyAudioPort::checkExactAudioProfile(const struct audio_port_config *config) const
 {
     status_t status = NO_ERROR;
     auto config_mask = config->config_mask;
     if (config_mask & AUDIO_PORT_CONFIG_GAIN) {
         config_mask &= ~AUDIO_PORT_CONFIG_GAIN;
-        status = checkGain(&config->gain, config->gain.index);
+        status = asAudioPort()->checkGain(&config->gain, config->gain.index);
         if (status != NO_ERROR) {
             return status;
         }
     }
     if (config_mask != 0) {
         // TODO should we check sample_rate / channel_mask / format separately?
-        status = checkExactProfile(mProfiles, config->sample_rate,
+        status = checkExactProfile(asAudioPort()->getAudioProfiles(), config->sample_rate,
                 config->channel_mask, config->format);
     }
     return status;
 }
 
-void AudioPort::pickSamplingRate(uint32_t &pickedRate,const SampleRateSet &samplingRates) const
+void PolicyAudioPort::pickSamplingRate(uint32_t &pickedRate,
+                                       const SampleRateSet &samplingRates) const
 {
     pickedRate = 0;
     // For direct outputs, pick minimum sampling rate: this helps ensuring that the
@@ -120,7 +101,7 @@ void AudioPort::pickSamplingRate(uint32_t &pickedRate,const SampleRateSet &sampl
         // For mixed output and inputs, use max mixer sampling rates. Do not
         // limit sampling rate otherwise
         // For inputs, also see checkCompatibleSamplingRate().
-        if (mType != AUDIO_PORT_TYPE_MIX) {
+        if (asAudioPort()->getType() == AUDIO_PORT_TYPE_MIX) {
             maxRate = UINT_MAX;
         }
         // TODO: should mSamplingRates[] be ordered in terms of our preference
@@ -134,8 +115,8 @@ void AudioPort::pickSamplingRate(uint32_t &pickedRate,const SampleRateSet &sampl
     }
 }
 
-void AudioPort::pickChannelMask(audio_channel_mask_t &pickedChannelMask,
-                                const ChannelMaskSet &channelMasks) const
+void PolicyAudioPort::pickChannelMask(audio_channel_mask_t &pickedChannelMask,
+                                      const ChannelMaskSet &channelMasks) const
 {
     pickedChannelMask = AUDIO_CHANNEL_NONE;
     // For direct outputs, pick minimum channel count: this helps ensuring that the
@@ -145,7 +126,7 @@ void AudioPort::pickChannelMask(audio_channel_mask_t &pickedChannelMask,
         uint32_t channelCount = UINT_MAX;
         for (const auto channelMask : channelMasks) {
             uint32_t cnlCount;
-            if (useInputChannelMask()) {
+            if (asAudioPort()->useInputChannelMask()) {
                 cnlCount = audio_channel_count_from_in_mask(channelMask);
             } else {
                 cnlCount = audio_channel_count_from_out_mask(channelMask);
@@ -161,12 +142,12 @@ void AudioPort::pickChannelMask(audio_channel_mask_t &pickedChannelMask,
 
         // For mixed output and inputs, use max mixer channel count. Do not
         // limit channel count otherwise
-        if (mType != AUDIO_PORT_TYPE_MIX) {
+        if (asAudioPort()->getType() != AUDIO_PORT_TYPE_MIX) {
             maxCount = UINT_MAX;
         }
         for (const auto channelMask : channelMasks) {
             uint32_t cnlCount;
-            if (useInputChannelMask()) {
+            if (asAudioPort()->useInputChannelMask()) {
                 cnlCount = audio_channel_count_from_in_mask(channelMask);
             } else {
                 cnlCount = audio_channel_count_from_out_mask(channelMask);
@@ -180,7 +161,7 @@ void AudioPort::pickChannelMask(audio_channel_mask_t &pickedChannelMask,
 }
 
 /* format in order of increasing preference */
-const audio_format_t AudioPort::sPcmFormatCompareTable[] = {
+const audio_format_t PolicyAudioPort::sPcmFormatCompareTable[] = {
         AUDIO_FORMAT_DEFAULT,
         AUDIO_FORMAT_PCM_16_BIT,
         AUDIO_FORMAT_PCM_8_24_BIT,
@@ -189,7 +170,7 @@ const audio_format_t AudioPort::sPcmFormatCompareTable[] = {
         AUDIO_FORMAT_PCM_FLOAT,
 };
 
-int AudioPort::compareFormats(audio_format_t format1, audio_format_t format2)
+int PolicyAudioPort::compareFormats(audio_format_t format1, audio_format_t format2)
 {
     // NOTE: AUDIO_FORMAT_INVALID is also considered not PCM and will be compared equal to any
     // compressed format and better than any PCM format. This is by design of pickFormat()
@@ -219,7 +200,7 @@ int AudioPort::compareFormats(audio_format_t format1, audio_format_t format2)
     return index1 - index2;
 }
 
-uint32_t AudioPort::formatDistance(audio_format_t format1, audio_format_t format2)
+uint32_t PolicyAudioPort::formatDistance(audio_format_t format1, audio_format_t format2)
 {
     if (format1 == format2) {
         return 0;
@@ -233,43 +214,44 @@ uint32_t AudioPort::formatDistance(audio_format_t format1, audio_format_t format
     return abs(diffBytes);
 }
 
-bool AudioPort::isBetterFormatMatch(audio_format_t newFormat,
-                                    audio_format_t currentFormat,
-                                    audio_format_t targetFormat)
+bool PolicyAudioPort::isBetterFormatMatch(audio_format_t newFormat,
+                                          audio_format_t currentFormat,
+                                          audio_format_t targetFormat)
 {
     return formatDistance(newFormat, targetFormat) < formatDistance(currentFormat, targetFormat);
 }
 
-void AudioPort::pickAudioProfile(uint32_t &samplingRate,
-                                 audio_channel_mask_t &channelMask,
-                                 audio_format_t &format) const
+void PolicyAudioPort::pickAudioProfile(uint32_t &samplingRate,
+                                       audio_channel_mask_t &channelMask,
+                                       audio_format_t &format) const
 {
     format = AUDIO_FORMAT_DEFAULT;
     samplingRate = 0;
     channelMask = AUDIO_CHANNEL_NONE;
 
     // special case for uninitialized dynamic profile
-    if (!mProfiles.hasValidProfile()) {
+    if (!asAudioPort()->hasValidAudioProfile()) {
         return;
     }
     audio_format_t bestFormat = sPcmFormatCompareTable[ARRAY_SIZE(sPcmFormatCompareTable) - 1];
     // For mixed output and inputs, use best mixer output format.
     // Do not limit format otherwise
-    if ((mType != AUDIO_PORT_TYPE_MIX) || isDirectOutput()) {
+    if ((asAudioPort()->getType() != AUDIO_PORT_TYPE_MIX) || isDirectOutput()) {
         bestFormat = AUDIO_FORMAT_INVALID;
     }
 
-    for (size_t i = 0; i < mProfiles.size(); i ++) {
-        if (!mProfiles[i]->isValid()) {
+    const AudioProfileVector& audioProfiles = asAudioPort()->getAudioProfiles();
+    for (size_t i = 0; i < audioProfiles.size(); i ++) {
+        if (!audioProfiles[i]->isValid()) {
             continue;
         }
-        audio_format_t formatToCompare = mProfiles[i]->getFormat();
+        audio_format_t formatToCompare = audioProfiles[i]->getFormat();
         if ((compareFormats(formatToCompare, format) > 0) &&
                 (compareFormats(formatToCompare, bestFormat) <= 0)) {
             uint32_t pickedSamplingRate = 0;
             audio_channel_mask_t pickedChannelMask = AUDIO_CHANNEL_NONE;
-            pickChannelMask(pickedChannelMask, mProfiles[i]->getChannels());
-            pickSamplingRate(pickedSamplingRate, mProfiles[i]->getSampleRates());
+            pickChannelMask(pickedChannelMask, audioProfiles[i]->getChannels());
+            pickSamplingRate(pickedSamplingRate, audioProfiles[i]->getSampleRates());
 
             if (formatToCompare != AUDIO_FORMAT_DEFAULT && pickedChannelMask != AUDIO_CHANNEL_NONE
                     && pickedSamplingRate != 0) {
@@ -280,120 +262,33 @@ void AudioPort::pickAudioProfile(uint32_t &samplingRate,
             }
         }
     }
-    ALOGV("%s Port[nm:%s] profile rate=%d, format=%d, channels=%d", __FUNCTION__, mName.c_str(),
-          samplingRate, channelMask, format);
+    ALOGV("%s Port[nm:%s] profile rate=%d, format=%d, channels=%d", __FUNCTION__,
+            asAudioPort()->getName().c_str(), samplingRate, channelMask, format);
 }
 
-void AudioPort::log(const char* indent) const
+// --- PolicyAudioPortConfig class implementation
+
+status_t PolicyAudioPortConfig::validationBeforeApplyConfig(
+        const struct audio_port_config *config) const
 {
-    ALOGI("%s Port[nm:%s, type:%d, role:%d]", indent, mName.c_str(), mType, mRole);
+    sp<PolicyAudioPort> policyAudioPort = getPolicyAudioPort();
+    return policyAudioPort ? policyAudioPort->checkExactAudioProfile(config) : NO_INIT;
 }
 
-// --- AudioPortConfig class implementation
-
-status_t AudioPortConfig::applyAudioPortConfig(const struct audio_port_config *config,
-                                               struct audio_port_config *backupConfig)
+void PolicyAudioPortConfig::toPolicyAudioPortConfig(struct audio_port_config *dstConfig,
+                                                    const struct audio_port_config *srcConfig) const
 {
-    struct audio_port_config localBackupConfig = { .config_mask = config->config_mask };
-    status_t status = NO_ERROR;
-
-    toAudioPortConfig(&localBackupConfig);
-
-    sp<AudioPort> audioport = getAudioPort();
-    if (audioport == 0) {
-        status = NO_INIT;
-        goto exit;
-    }
-    status = audioport->checkExactAudioProfile(config);
-    if (status != NO_ERROR) {
-        goto exit;
-    }
-    if (config->config_mask & AUDIO_PORT_CONFIG_SAMPLE_RATE) {
-        mSamplingRate = config->sample_rate;
-    }
-    if (config->config_mask & AUDIO_PORT_CONFIG_CHANNEL_MASK) {
-        mChannelMask = config->channel_mask;
-    }
-    if (config->config_mask & AUDIO_PORT_CONFIG_FORMAT) {
-        mFormat = config->format;
-    }
-    if (config->config_mask & AUDIO_PORT_CONFIG_GAIN) {
-        mGain = config->gain;
-    }
-    if (config->config_mask & AUDIO_PORT_CONFIG_FLAGS) {
-        mFlags = config->flags;
-    }
-
-exit:
-    if (status != NO_ERROR) {
-        applyAudioPortConfig(&localBackupConfig);
-    }
-    if (backupConfig != NULL) {
-        *backupConfig = localBackupConfig;
-    }
-    return status;
-}
-
-namespace {
-
-template<typename T>
-void updateField(
-        const T& portConfigField, T audio_port_config::*port_config_field,
-        struct audio_port_config *dstConfig, const struct audio_port_config *srcConfig,
-        unsigned int configMask, T defaultValue)
-{
-    if (dstConfig->config_mask & configMask) {
-        if ((srcConfig != nullptr) && (srcConfig->config_mask & configMask)) {
-            dstConfig->*port_config_field = srcConfig->*port_config_field;
+    if (dstConfig->config_mask & AUDIO_PORT_CONFIG_FLAGS) {
+        if ((srcConfig != nullptr) && (srcConfig->config_mask & AUDIO_PORT_CONFIG_FLAGS)) {
+            dstConfig->flags = srcConfig->flags;
         } else {
-            dstConfig->*port_config_field = portConfigField;
+            dstConfig->flags = mFlags;
         }
     } else {
-        dstConfig->*port_config_field = defaultValue;
+        dstConfig->flags = { AUDIO_INPUT_FLAG_NONE };
     }
 }
 
-} // namespace
 
-void AudioPortConfig::toAudioPortConfig(struct audio_port_config *dstConfig,
-                                        const struct audio_port_config *srcConfig) const
-{
-    updateField(mSamplingRate, &audio_port_config::sample_rate,
-            dstConfig, srcConfig, AUDIO_PORT_CONFIG_SAMPLE_RATE, 0u);
-    updateField(mChannelMask, &audio_port_config::channel_mask,
-            dstConfig, srcConfig, AUDIO_PORT_CONFIG_CHANNEL_MASK,
-            (audio_channel_mask_t)AUDIO_CHANNEL_NONE);
-    updateField(mFormat, &audio_port_config::format,
-            dstConfig, srcConfig, AUDIO_PORT_CONFIG_FORMAT, AUDIO_FORMAT_INVALID);
-
-    sp<AudioPort> audioport = getAudioPort();
-    if ((dstConfig->config_mask & AUDIO_PORT_CONFIG_GAIN) && audioport != NULL) {
-        dstConfig->gain = mGain;
-        if ((srcConfig != NULL) && (srcConfig->config_mask & AUDIO_PORT_CONFIG_GAIN)
-                && audioport->checkGain(&srcConfig->gain, srcConfig->gain.index) == OK) {
-            dstConfig->gain = srcConfig->gain;
-        }
-    } else {
-        dstConfig->gain.index = -1;
-    }
-    if (dstConfig->gain.index != -1) {
-        dstConfig->config_mask |= AUDIO_PORT_CONFIG_GAIN;
-    } else {
-        dstConfig->config_mask &= ~AUDIO_PORT_CONFIG_GAIN;
-    }
-
-    updateField(mFlags, &audio_port_config::flags,
-            dstConfig, srcConfig, AUDIO_PORT_CONFIG_FLAGS, { AUDIO_INPUT_FLAG_NONE });
-}
-
-bool AudioPortConfig::hasGainController(bool canUseForVolume) const
-{
-    sp<AudioPort> audioport = getAudioPort();
-    if (audioport == nullptr) {
-        return false;
-    }
-    return canUseForVolume ? audioport->getGains().canUseForVolume()
-                           : audioport->getGains().size() > 0;
-}
 
 } // namespace android

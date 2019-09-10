@@ -36,7 +36,7 @@ void sortAudioProfiles(AudioProfileVector &audioProfileVector) {
     std::sort(audioProfileVector.begin(), audioProfileVector.end(),
             [](const sp<AudioProfile> & a, const sp<AudioProfile> & b)
             {
-                return AudioPort::compareFormats(a->getFormat(), b->getFormat()) < 0;
+                return PolicyAudioPort::compareFormats(a->getFormat(), b->getFormat()) < 0;
             });
 }
 

@@ -1109,7 +1109,7 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
         .channel_mask = config->channel_mask,
         .format = config->format,
     };
-    *portId = AudioPort::getNextUniqueId();
+    *portId = PolicyAudioPort::getNextUniqueId();
 
     sp<TrackClientDescriptor> clientDesc =
         new TrackClientDescriptor(*portId, uid, session, resultAttr, clientConfig,
@@ -1563,8 +1563,8 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
         // format match
         if (format != AUDIO_FORMAT_INVALID) {
             currentMatchCriteria[6] =
-                AudioPort::kFormatDistanceMax -
-                AudioPort::formatDistance(format, outputDesc->getFormat());
+                PolicyAudioPort::kFormatDistanceMax -
+                PolicyAudioPort::formatDistance(format, outputDesc->getFormat());
         }
 
         // primary output match
@@ -2088,7 +2088,7 @@ exit:
 
     isSoundTrigger = attributes.source == AUDIO_SOURCE_HOTWORD &&
         mSoundTriggerSessions.indexOfKey(session) >= 0;
-    *portId = AudioPort::getNextUniqueId();
+    *portId = PolicyAudioPort::getNextUniqueId();
 
     clientDesc = new RecordClientDescriptor(*portId, riid, uid, session, attributes, *config,
                                             requestedDeviceId, attributes.source, flags,
@@ -2431,7 +2431,8 @@ void AudioPolicyManager::checkCloseInputs() {
         const sp<AudioInputDescriptor> input = mInputs.valueAt(i);
         if (input->clientsList().size() == 0
                 || !mAvailableInputDevices.containsAtLeastOne(input->supportedDevices())
-                || (input->getAudioPort()->getFlags() & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0) {
+                || (input->getPolicyAudioPort()->getFlags()
+                        & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0) {
             inputsToClose.push_back(mInputs.keyAt(i));
         } else {
             bool close = false;
@@ -3857,7 +3858,7 @@ status_t AudioPolicyManager::startAudioSource(const struct audio_port_config *so
         return BAD_VALUE;
     }
 
-    *portId = AudioPort::getNextUniqueId();
+    *portId = PolicyAudioPort::getNextUniqueId();
 
     struct audio_patch dummyPatch = {};
     sp<AudioPatch> patchDesc = new AudioPatch(&dummyPatch, uid);
@@ -4471,7 +4472,7 @@ status_t AudioPolicyManager::initialize() {
                 // give a valid ID to an attached device once confirmed it is reachable
                 if (!device->isAttached()) {
                     device->attach(hwModule);
-                    device->importAudioPort(inProfile, true);
+                    device->importAudioPortAndPickAudioProfile(inProfile, true);
                 }
             }
             inputDesc->close();
@@ -4627,7 +4628,7 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                     // matching profile: save the sample rates, format and channel masks supported
                     // by the profile in our device descriptor
                     if (audio_device_is_digital(deviceType)) {
-                        device->importAudioPort(profile);
+                        device->importAudioPortAndPickAudioProfile(profile);
                     }
                     break;
                 }
@@ -4729,7 +4730,7 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                 outputs.add(output);
                 // Load digital format info only for digital devices
                 if (audio_device_is_digital(deviceType)) {
-                    device->importAudioPort(profile);
+                    device->importAudioPortAndPickAudioProfile(profile);
                 }
 
                 if (device_distinguishes_on_address(deviceType)) {
@@ -4823,7 +4824,7 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
                 desc = mInputs.valueAt(input_index);
                 if (desc->mProfile == profile) {
                     if (audio_device_is_digital(device->type())) {
-                        device->importAudioPort(profile);
+                        device->importAudioPortAndPickAudioProfile(profile);
                     }
                     break;
                 }
@@ -4872,7 +4873,7 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
                 profile_index--;
             } else {
                 if (audio_device_is_digital(device->type())) {
-                    device->importAudioPort(profile);
+                    device->importAudioPortAndPickAudioProfile(profile);
                 }
                 ALOGV("checkInputsForDevice(): adding input %d", input);
             }

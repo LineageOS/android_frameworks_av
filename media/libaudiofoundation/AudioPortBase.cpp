@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#define LOG_TAG "AudioPortBase"
 
 #include <algorithm>
 
@@ -22,7 +23,22 @@
 
 namespace android {
 
-void AudioPortBase::toAudioPort(struct audio_port *port) const {
+void AudioPort::importAudioPort(const sp<AudioPort>& port, bool force __unused)
+{
+    for (const auto& profileToImport : port->mProfiles) {
+        // Import only valid port, i.e. valid format, non empty rates and channels masks
+        if (!profileToImport->isValid()) {
+            continue;
+        }
+        if (std::find_if(mProfiles.begin(), mProfiles.end(),
+                [profileToImport](const auto &profile) {
+                        return *profile == *profileToImport; }) == mProfiles.end()) {
+            addAudioProfile(profileToImport);
+        }
+    }
+}
+
+void AudioPort::toAudioPort(struct audio_port *port) const {
     // TODO: update this function once audio_port structure reflects the new profile definition.
     // For compatibility reason: flatening the AudioProfile into audio_port structure.
     FormatSet flatenedFormats;
@@ -64,7 +80,7 @@ void AudioPortBase::toAudioPort(struct audio_port *port) const {
     }
 }
 
-void AudioPortBase::dump(std::string *dst, int spaces, bool verbose) const {
+void AudioPort::dump(std::string *dst, int spaces, bool verbose) const {
     if (!mName.empty()) {
         dst->append(base::StringPrintf("%*s- name: %s\n", spaces, "", mName.c_str()));
     }
@@ -82,6 +98,94 @@ void AudioPortBase::dump(std::string *dst, int spaces, bool verbose) const {
             }
         }
     }
+}
+
+void AudioPort::log(const char* indent) const
+{
+    ALOGI("%s Port[nm:%s, type:%d, role:%d]", indent, mName.c_str(), mType, mRole);
+}
+
+// --- AudioPortConfig class implementation
+
+status_t AudioPortConfig::applyAudioPortConfig(
+        const struct audio_port_config *config,
+        struct audio_port_config *backupConfig __unused)
+{
+    if (config->config_mask & AUDIO_PORT_CONFIG_SAMPLE_RATE) {
+        mSamplingRate = config->sample_rate;
+    }
+    if (config->config_mask & AUDIO_PORT_CONFIG_CHANNEL_MASK) {
+        mChannelMask = config->channel_mask;
+    }
+    if (config->config_mask & AUDIO_PORT_CONFIG_FORMAT) {
+        mFormat = config->format;
+    }
+    if (config->config_mask & AUDIO_PORT_CONFIG_GAIN) {
+        mGain = config->gain;
+    }
+
+    return NO_ERROR;
+}
+
+namespace {
+
+template<typename T>
+void updateField(
+        const T& portConfigField, T audio_port_config::*port_config_field,
+        struct audio_port_config *dstConfig, const struct audio_port_config *srcConfig,
+        unsigned int configMask, T defaultValue)
+{
+    if (dstConfig->config_mask & configMask) {
+        if ((srcConfig != nullptr) && (srcConfig->config_mask & configMask)) {
+            dstConfig->*port_config_field = srcConfig->*port_config_field;
+        } else {
+            dstConfig->*port_config_field = portConfigField;
+        }
+    } else {
+        dstConfig->*port_config_field = defaultValue;
+    }
+}
+
+} // namespace
+
+void AudioPortConfig::toAudioPortConfig(
+        struct audio_port_config *dstConfig,
+        const struct audio_port_config *srcConfig) const
+{
+    updateField(mSamplingRate, &audio_port_config::sample_rate,
+            dstConfig, srcConfig, AUDIO_PORT_CONFIG_SAMPLE_RATE, 0u);
+    updateField(mChannelMask, &audio_port_config::channel_mask,
+            dstConfig, srcConfig, AUDIO_PORT_CONFIG_CHANNEL_MASK,
+            (audio_channel_mask_t)AUDIO_CHANNEL_NONE);
+    updateField(mFormat, &audio_port_config::format,
+            dstConfig, srcConfig, AUDIO_PORT_CONFIG_FORMAT, AUDIO_FORMAT_INVALID);
+    dstConfig->id = mId;
+
+    sp<AudioPort> audioport = getAudioPort();
+    if ((dstConfig->config_mask & AUDIO_PORT_CONFIG_GAIN) && audioport != NULL) {
+        dstConfig->gain = mGain;
+        if ((srcConfig != NULL) && (srcConfig->config_mask & AUDIO_PORT_CONFIG_GAIN)
+                && audioport->checkGain(&srcConfig->gain, srcConfig->gain.index) == OK) {
+            dstConfig->gain = srcConfig->gain;
+        }
+    } else {
+        dstConfig->gain.index = -1;
+    }
+    if (dstConfig->gain.index != -1) {
+        dstConfig->config_mask |= AUDIO_PORT_CONFIG_GAIN;
+    } else {
+        dstConfig->config_mask &= ~AUDIO_PORT_CONFIG_GAIN;
+    }
+}
+
+bool AudioPortConfig::hasGainController(bool canUseForVolume) const
+{
+    sp<AudioPort> audioport = getAudioPort();
+    if (!audioport) {
+        return false;
+    }
+    return canUseForVolume ? audioport->getGains().canUseForVolume()
+                           : audioport->getGains().size() > 0;
 }
 
 }

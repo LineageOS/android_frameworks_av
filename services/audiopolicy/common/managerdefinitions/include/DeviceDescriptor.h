@@ -26,7 +26,8 @@
 
 namespace android {
 
-class DeviceDescriptor : public AudioPort, public AudioPortConfig
+class DeviceDescriptor : public AudioPort, public AudioPortConfig,
+                         public PolicyAudioPort, public PolicyAudioPortConfig
 {
 public:
      // Note that empty name refers by convention to a generic device.
@@ -35,6 +36,10 @@ public:
             const std::string &tagName = "");
 
     virtual ~DeviceDescriptor() {}
+
+    virtual void addAudioProfile(const sp<AudioProfile> &profile) {
+        addAudioProfileAndSort(mProfiles, profile);
+    }
 
     virtual const std::string getTagName() const { return mTagName; }
 
@@ -56,19 +61,33 @@ public:
 
     bool supportsFormat(audio_format_t format);
 
+    // PolicyAudioPortConfig
+    virtual sp<PolicyAudioPort> getPolicyAudioPort() const {
+        return static_cast<PolicyAudioPort*>(const_cast<DeviceDescriptor*>(this));
+    }
+
     // AudioPortConfig
-    virtual sp<AudioPort> getAudioPort() const { return (AudioPort*) this; }
+    virtual sp<AudioPort> getAudioPort() const {
+        return static_cast<AudioPort*>(const_cast<DeviceDescriptor*>(this));
+    }
+    virtual status_t applyAudioPortConfig(const struct audio_port_config *config,
+                                          struct audio_port_config *backupConfig = NULL);
     virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
             const struct audio_port_config *srcConfig = NULL) const;
 
-    // AudioPort
+    // PolicyAudioPort
+    virtual sp<AudioPort> asAudioPort() const {
+        return static_cast<AudioPort*>(const_cast<DeviceDescriptor*>(this));
+    }
     virtual void attach(const sp<HwModule>& module);
     virtual void detach();
 
+    // AudioPort
     virtual void toAudioPort(struct audio_port *port) const;
-    virtual void importAudioPort(const sp<AudioPort>& port, bool force = false);
 
-    audio_port_handle_t getId() const;
+    void importAudioPortAndPickAudioProfile(const sp<PolicyAudioPort>& policyPort,
+                                            bool force = false);
+
     void dump(String8 *dst, int spaces, int index, bool verbose = true) const;
     void log() const;
     std::string toString() const;
@@ -78,7 +97,6 @@ private:
     std::string mTagName; // Unique human readable identifier for a device port found in conf file.
     audio_devices_t     mDeviceType;
     FormatVector        mEncodedFormats;
-    audio_port_handle_t mId = AUDIO_PORT_HANDLE_NONE;
     audio_format_t      mCurrentEncodedFormat;
 };
 
