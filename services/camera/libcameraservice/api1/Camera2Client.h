@@ -83,7 +83,8 @@ public:
     virtual void            notifyError(int32_t errorCode,
                                         const CaptureResultExtras& resultExtras);
     virtual status_t        setVideoTarget(const sp<IGraphicBufferProducer>& bufferProducer);
-    virtual int32_t         setAudioRestriction(int mode);
+    virtual status_t        setAudioRestriction(int mode);
+    virtual int32_t         getGlobalAudioRestriction();
 
     /**
      * Interface used by CameraService

@@ -261,8 +261,13 @@ public:
 
         // set audio restriction from client
         // Will call into camera service and hold mServiceLock
-        virtual int32_t setAudioRestriction(int32_t mode);
+        virtual status_t setAudioRestriction(int32_t mode);
 
+        // Get current global audio restriction setting
+        // Will call into camera service and hold mServiceLock
+        virtual int32_t getServiceAudioRestriction() const;
+
+        // Get current audio restriction setting for this client
         virtual int32_t getAudioRestriction() const;
 
         static bool isValidAudioRestriction(int32_t mode);
