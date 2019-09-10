@@ -53,20 +53,15 @@ DeviceDescriptor::DeviceDescriptor(audio_devices_t type, const FormatVector &enc
     }
 }
 
-audio_port_handle_t DeviceDescriptor::getId() const
-{
-    return mId;
-}
-
 void DeviceDescriptor::attach(const sp<HwModule>& module)
 {
-    AudioPort::attach(module);
+    PolicyAudioPort::attach(module);
     mId = getNextUniqueId();
 }
 
 void DeviceDescriptor::detach() {
     mId = AUDIO_PORT_HANDLE_NONE;
-    AudioPort::detach();
+    PolicyAudioPort::detach();
 }
 
 template<typename T>
@@ -315,6 +310,24 @@ void DeviceVector::dump(String8 *dst, const String8 &tag, int spaces, bool verbo
     }
 }
 
+status_t DeviceDescriptor::applyAudioPortConfig(const struct audio_port_config *config,
+                                                audio_port_config *backupConfig)
+{
+    struct audio_port_config localBackupConfig = { .config_mask = config->config_mask };
+    status_t status = NO_ERROR;
+
+    toAudioPortConfig(&localBackupConfig);
+    if ((status = validationBeforeApplyConfig(config)) == NO_ERROR) {
+        AudioPortConfig::applyAudioPortConfig(config, backupConfig);
+        applyPolicyAudioPortConfig(config);
+    }
+
+    if (backupConfig != NULL) {
+        *backupConfig = localBackupConfig;
+    }
+    return status;
+}
+
 void DeviceDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
                                          const struct audio_port_config *srcConfig) const
 {
@@ -334,8 +347,8 @@ void DeviceDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
     }
 
     AudioPortConfig::toAudioPortConfig(dstConfig, srcConfig);
+    toPolicyAudioPortConfig(dstConfig, srcConfig);
 
-    dstConfig->id = mId;
     dstConfig->role = audio_is_output_device(mDeviceType) ?
                         AUDIO_PORT_ROLE_SINK : AUDIO_PORT_ROLE_SOURCE;
     dstConfig->type = AUDIO_PORT_TYPE_DEVICE;
@@ -360,12 +373,13 @@ void DeviceDescriptor::toAudioPort(struct audio_port *port) const
     (void)audio_utils_strlcpy_zerofill(port->ext.device.address, mAddress.string());
 }
 
-void DeviceDescriptor::importAudioPort(const sp<AudioPort>& port, bool force) {
-    if (!force && !port->hasDynamicAudioProfile()) {
+void DeviceDescriptor::importAudioPortAndPickAudioProfile(
+        const sp<PolicyAudioPort>& policyPort, bool force) {
+    if (!force && !policyPort->asAudioPort()->hasDynamicAudioProfile()) {
         return;
     }
-    AudioPort::importAudioPort(port);
-    port->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
+    AudioPort::importAudioPort(policyPort->asAudioPort());
+    policyPort->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
 }
 
 void DeviceDescriptor::dump(String8 *dst, int spaces, int index, bool verbose) const
