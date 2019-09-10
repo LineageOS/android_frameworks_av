@@ -77,10 +77,10 @@ private:
     bool mIsDynamicRate = false;
 };
 
-class AudioProfileVectorBase : public std::vector<sp<AudioProfile> >
+class AudioProfileVector : public std::vector<sp<AudioProfile>>
 {
 public:
-    virtual ~AudioProfileVectorBase() = default;
+    virtual ~AudioProfileVector() = default;
 
     virtual ssize_t add(const sp<AudioProfile> &profile);
 

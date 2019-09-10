@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -118,14 +118,14 @@ void AudioProfile::dump(std::string *dst, int spaces) const
     }
 }
 
-ssize_t AudioProfileVectorBase::add(const sp<AudioProfile> &profile)
+ssize_t AudioProfileVector::add(const sp<AudioProfile> &profile)
 {
     ssize_t index = size();
     push_back(profile);
     return index;
 }
 
-void AudioProfileVectorBase::clearProfiles()
+void AudioProfileVector::clearProfiles()
 {
     for (auto it = begin(); it != end();) {
         if ((*it)->isDynamicFormat() && (*it)->hasValidFormat()) {
@@ -137,7 +137,7 @@ void AudioProfileVectorBase::clearProfiles()
     }
 }
 
-sp<AudioProfile> AudioProfileVectorBase::getFirstValidProfile() const
+sp<AudioProfile> AudioProfileVector::getFirstValidProfile() const
 {
     for (const auto &profile : *this) {
         if (profile->isValid()) {
@@ -147,7 +147,7 @@ sp<AudioProfile> AudioProfileVectorBase::getFirstValidProfile() const
     return nullptr;
 }
 
-sp<AudioProfile> AudioProfileVectorBase::getFirstValidProfileFor(audio_format_t format) const
+sp<AudioProfile> AudioProfileVector::getFirstValidProfileFor(audio_format_t format) const
 {
     for (const auto &profile : *this) {
         if (profile->isValid() && profile->getFormat() == format) {
@@ -157,7 +157,7 @@ sp<AudioProfile> AudioProfileVectorBase::getFirstValidProfileFor(audio_format_t 
     return nullptr;
 }
 
-FormatVector AudioProfileVectorBase::getSupportedFormats() const
+FormatVector AudioProfileVector::getSupportedFormats() const
 {
     FormatVector supportedFormats;
     for (const auto &profile : *this) {
@@ -168,7 +168,7 @@ FormatVector AudioProfileVectorBase::getSupportedFormats() const
     return supportedFormats;
 }
 
-bool AudioProfileVectorBase::hasDynamicChannelsFor(audio_format_t format) const
+bool AudioProfileVector::hasDynamicChannelsFor(audio_format_t format) const
 {
     for (const auto &profile : *this) {
         if (profile->getFormat() == format && profile->isDynamicChannels()) {
@@ -178,7 +178,7 @@ bool AudioProfileVectorBase::hasDynamicChannelsFor(audio_format_t format) const
     return false;
 }
 
-bool AudioProfileVectorBase::hasDynamicFormat() const
+bool AudioProfileVector::hasDynamicFormat() const
 {
     for (const auto &profile : *this) {
         if (profile->isDynamicFormat()) {
@@ -188,7 +188,7 @@ bool AudioProfileVectorBase::hasDynamicFormat() const
     return false;
 }
 
-bool AudioProfileVectorBase::hasDynamicProfile() const
+bool AudioProfileVector::hasDynamicProfile() const
 {
     for (const auto &profile : *this) {
         if (profile->isDynamic()) {
@@ -198,7 +198,7 @@ bool AudioProfileVectorBase::hasDynamicProfile() const
     return false;
 }
 
-bool AudioProfileVectorBase::hasDynamicRateFor(audio_format_t format) const
+bool AudioProfileVector::hasDynamicRateFor(audio_format_t format) const
 {
     for (const auto &profile : *this) {
         if (profile->getFormat() == format && profile->isDynamicRate()) {
@@ -208,7 +208,7 @@ bool AudioProfileVectorBase::hasDynamicRateFor(audio_format_t format) const
     return false;
 }
 
-void AudioProfileVectorBase::dump(std::string *dst, int spaces) const
+void AudioProfileVector::dump(std::string *dst, int spaces) const
 {
     dst->append(base::StringPrintf("%*s- Profiles:\n", spaces, ""));
     for (size_t i = 0; i < size(); i++) {

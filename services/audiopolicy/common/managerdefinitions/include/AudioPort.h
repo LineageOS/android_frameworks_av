@@ -33,14 +33,17 @@ namespace android {
 class HwModule;
 class AudioRoute;
 
-class AudioPort : public virtual RefBase, public AudioPortBase<AudioProfileVector>,
-                  private HandleGenerator<audio_port_handle_t>
+class AudioPort : public AudioPortBase, private HandleGenerator<audio_port_handle_t>
 {
 public:
     AudioPort(const std::string& name, audio_port_type_t type,  audio_port_role_t role) :
             AudioPortBase(name, type, role), mFlags(AUDIO_OUTPUT_FLAG_NONE) {}
 
     virtual ~AudioPort() {}
+
+    void addAudioProfile(const sp<AudioProfile> &profile) {
+        addAudioProfileAndSort(mProfiles, profile);
+    }
 
     virtual void setFlags(uint32_t flags)
     {
@@ -63,7 +66,7 @@ public:
 
     virtual void importAudioPort(const sp<AudioPort>& port, bool force = false);
 
-    bool hasDynamicAudioProfile() const { return getAudioProfileVectorBase()->hasDynamicProfile(); }
+    bool hasDynamicAudioProfile() const { return mProfiles.hasDynamicProfile(); }
 
     // searches for an exact match
     virtual status_t checkExactAudioProfile(const struct audio_port_config *config) const;
@@ -74,7 +77,8 @@ public:
                                          audio_channel_mask_t &channelMask,
                                          audio_format_t &format) const
     {
-        return mProfiles.checkCompatibleProfile(samplingRate, channelMask, format, mType, mRole);
+        return checkCompatibleProfile(
+                mProfiles, samplingRate, channelMask, format, mType, mRole);
     }
 
     void pickAudioProfile(uint32_t &samplingRate,

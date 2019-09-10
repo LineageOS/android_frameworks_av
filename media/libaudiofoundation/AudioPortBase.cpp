@@ -22,13 +22,13 @@
 
 namespace android {
 
-void AudioPortFoundation::toAudioPort(struct audio_port *port) const {
+void AudioPortBase::toAudioPort(struct audio_port *port) const {
     // TODO: update this function once audio_port structure reflects the new profile definition.
     // For compatibility reason: flatening the AudioProfile into audio_port structure.
     FormatSet flatenedFormats;
     SampleRateSet flatenedRates;
     ChannelMaskSet flatenedChannels;
-    for (const auto& profile : *getAudioProfileVectorBase()) {
+    for (const auto& profile : mProfiles) {
         if (profile->isValid()) {
             audio_format_t formatToExport = profile->getFormat();
             const SampleRateSet &ratesToExport = profile->getSampleRates();
@@ -64,13 +64,13 @@ void AudioPortFoundation::toAudioPort(struct audio_port *port) const {
     }
 }
 
-void AudioPortFoundation::dump(std::string *dst, int spaces, bool verbose) const {
+void AudioPortBase::dump(std::string *dst, int spaces, bool verbose) const {
     if (!mName.empty()) {
         dst->append(base::StringPrintf("%*s- name: %s\n", spaces, "", mName.c_str()));
     }
     if (verbose) {
         std::string profilesStr;
-        getAudioProfileVectorBase()->dump(&profilesStr, spaces);
+        mProfiles.dump(&profilesStr, spaces);
         dst->append(profilesStr);
 
         if (mGains.size() != 0) {

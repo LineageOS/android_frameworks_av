@@ -27,13 +27,13 @@
 
 namespace android {
 
-class AudioPortFoundation : public virtual RefBase
+class AudioPortBase : public virtual RefBase
 {
 public:
-    AudioPortFoundation(const std::string& name, audio_port_type_t type,  audio_port_role_t role) :
+    AudioPortBase(const std::string& name, audio_port_type_t type,  audio_port_role_t role) :
             mName(name), mType(type), mRole(role) {}
 
-    virtual ~AudioPortFoundation() = default;
+    virtual ~AudioPortBase() = default;
 
     void setName(const std::string &name) { mName = name; }
     const std::string &getName() const { return mName; }
@@ -48,15 +48,17 @@ public:
 
     virtual void toAudioPort(struct audio_port *port) const;
 
-    virtual AudioProfileVectorBase* getAudioProfileVectorBase() const = 0;
     virtual void addAudioProfile(const sp<AudioProfile> &profile) {
-        getAudioProfileVectorBase()->add(profile);
+        mProfiles.add(profile);
     }
     virtual void clearAudioProfiles() {
-        getAudioProfileVectorBase()->clearProfiles();
+        mProfiles.clearProfiles();
     }
 
-    bool hasValidAudioProfile() const { return getAudioProfileVectorBase()->hasValidProfile(); }
+    bool hasValidAudioProfile() const { return mProfiles.hasValidProfile(); }
+
+    void setAudioProfiles(const AudioProfileVector &profiles) { mProfiles = profiles; }
+    AudioProfileVector &getAudioProfiles() { return mProfiles; }
 
     status_t checkGain(const struct audio_gain_config *gainConfig, int index) const {
         if (index < 0 || (size_t)index >= mGains.size()) {
@@ -78,31 +80,7 @@ protected:
     std::string  mName;
     audio_port_type_t mType;
     audio_port_role_t mRole;
-};
-
-template <typename ProfileVector,
-          typename = typename std::enable_if<std::is_base_of<
-                  AudioProfileVectorBase, ProfileVector>::value>::type>
-class AudioPortBase : public AudioPortFoundation
-{
-public:
-    AudioPortBase(const std::string& name, audio_port_type_t type,  audio_port_role_t role) :
-            AudioPortFoundation(name, type, role) {}
-
-    virtual ~AudioPortBase() {}
-
-    AudioProfileVectorBase* getAudioProfileVectorBase() const override {
-        return static_cast<AudioProfileVectorBase*>(const_cast<ProfileVector*>(&mProfiles));
-    }
-
-    void addAudioProfile(const sp<AudioProfile> &profile) override { mProfiles.add(profile); }
-    void clearAudioProfiles() override { return mProfiles.clearProfiles(); }
-
-    void setAudioProfiles(const ProfileVector &profiles) { mProfiles = profiles; }
-    ProfileVector &getAudioProfiles() { return mProfiles; }
-
-protected:
-    ProfileVector mProfiles; // AudioProfiles supported by this port (format, Rates, Channels)
+    AudioProfileVector mProfiles; // AudioProfiles supported by this port (format, Rates, Channels)
 };
 
 

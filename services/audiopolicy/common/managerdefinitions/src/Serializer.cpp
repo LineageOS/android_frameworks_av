@@ -440,6 +440,9 @@ Return<MixPortTraits::Element> MixPortTraits::deserialize(const xmlNode *child,
     if (profiles.empty()) {
         profiles.add(AudioProfile::createFullDynamic(gDynamicFormat));
     }
+    // The audio profiles are in order of listed in audio policy configuration file.
+    // Sort audio profiles accroding to the format.
+    sortAudioProfiles(profiles);
     mixPort->setAudioProfiles(profiles);
 
     std::string flags = getXmlAttribute(child, Attributes::flags);
@@ -524,6 +527,9 @@ Return<DevicePortTraits::Element> DevicePortTraits::deserialize(const xmlNode *c
     if (profiles.empty()) {
         profiles.add(AudioProfile::createFullDynamic(gDynamicFormat));
     }
+    // The audio profiles are in order of listed in audio policy configuration file.
+    // Sort audio profiles accroding to the format.
+    sortAudioProfiles(profiles);
     deviceDesc->setAudioProfiles(profiles);
 
     // Deserialize AudioGain children
