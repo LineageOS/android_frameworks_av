@@ -31,6 +31,7 @@
 #include <utils/SortedVector.h>
 #include <media/AudioParameter.h>
 #include <media/AudioPolicy.h>
+#include <media/AudioProfile.h>
 #include <media/PatchBuilder.h>
 #include "AudioPolicyInterface.h"
 
@@ -38,7 +39,6 @@
 #include <AudioPolicyConfig.h>
 #include <AudioPort.h>
 #include <AudioPatch.h>
-#include <AudioProfileVector.h>
 #include <DeviceDescriptor.h>
 #include <IOProfile.h>
 #include <HwModule.h>

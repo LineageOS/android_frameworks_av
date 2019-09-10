@@ -18,7 +18,7 @@
 #include <set>
 #include <string>
 
-#define LOG_TAG "APM::AudioProfile"
+#define LOG_TAG "APM::AudioProfileVectorHelper"
 //#define LOG_NDEBUG 0
 
 #include <media/AudioContainers.h>
@@ -26,7 +26,7 @@
 #include <utils/Errors.h>
 
 #include "AudioPort.h"
-#include "AudioProfileVector.h"
+#include "AudioProfileVectorHelper.h"
 #include "HwModule.h"
 #include "policy.h"
 

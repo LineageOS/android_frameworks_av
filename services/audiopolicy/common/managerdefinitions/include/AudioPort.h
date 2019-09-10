@@ -17,7 +17,7 @@
 #pragma once
 
 #include "AudioCollections.h"
-#include "AudioProfileVector.h"
+#include "AudioProfileVectorHelper.h"
 #include "HandleGenerator.h"
 #include <media/AudioGain.h>
 #include <media/AudioPortBase.h>
