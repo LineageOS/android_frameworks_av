@@ -225,7 +225,7 @@ CCodecBufferChannel::CCodecBufferChannel(
       mFirstValidFrameIndex(0u),
       mMetaMode(MODE_NONE),
       mInputMetEos(false) {
-    mOutputSurface.lock()->maxDequeueBuffers = 2 * kSmoothnessFactor + kRenderingDepth;
+    mOutputSurface.lock()->maxDequeueBuffers = kSmoothnessFactor + kRenderingDepth;
     {
         Mutexed<Input>::Locked input(mInput);
         input->buffers.reset(new DummyInputBuffers(""));
@@ -949,8 +949,11 @@ status_t CCodecBufferChannel::start(
         uint32_t outputGeneration;
         {
             Mutexed<OutputSurface>::Locked output(mOutputSurface);
-            output->maxDequeueBuffers = numOutputSlots + numInputSlots +
+            output->maxDequeueBuffers = numOutputSlots +
                     reorderDepth.value + kRenderingDepth;
+            if (!secure) {
+                output->maxDequeueBuffers += numInputSlots;
+            }
             outputSurface = output->surface ?
                     output->surface->getIGraphicBufferProducer() : nullptr;
             if (outputSurface) {
@@ -1330,14 +1333,18 @@ bool CCodecBufferChannel::handleWork(
             case C2PortReorderBufferDepthTuning::CORE_INDEX: {
                 C2PortReorderBufferDepthTuning::output reorderDepth;
                 if (reorderDepth.updateFrom(*param)) {
+                    bool secure = mComponent->getName().find(".secure") != std::string::npos;
                     mReorderStash.lock()->setDepth(reorderDepth.value);
                     ALOGV("[%s] onWorkDone: updated reorder depth to %u",
                           mName, reorderDepth.value);
                     size_t numOutputSlots = mOutput.lock()->numSlots;
                     size_t numInputSlots = mInput.lock()->numSlots;
                     Mutexed<OutputSurface>::Locked output(mOutputSurface);
-                    output->maxDequeueBuffers = numOutputSlots + numInputSlots +
+                    output->maxDequeueBuffers = numOutputSlots +
                             reorderDepth.value + kRenderingDepth;
+                    if (!secure) {
+                        output->maxDequeueBuffers += numInputSlots;
+                    }
                     if (output->surface) {
                         output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
                     }
@@ -1381,6 +1388,7 @@ bool CCodecBufferChannel::handleWork(
                     if (outputDelay.updateFrom(*param)) {
                         ALOGV("[%s] onWorkDone: updating output delay %u",
                               mName, outputDelay.value);
+                        bool secure = mComponent->getName().find(".secure") != std::string::npos;
                         (void)mPipelineWatcher.lock()->outputDelay(outputDelay.value);
 
                         bool outputBuffersChanged = false;
@@ -1410,8 +1418,10 @@ bool CCodecBufferChannel::handleWork(
 
                         uint32_t depth = mReorderStash.lock()->depth();
                         Mutexed<OutputSurface>::Locked output(mOutputSurface);
-                        output->maxDequeueBuffers = numOutputSlots + numInputSlots +
-                                depth + kRenderingDepth;
+                        output->maxDequeueBuffers = numOutputSlots + depth + kRenderingDepth;
+                        if (!secure) {
+                            output->maxDequeueBuffers += numInputSlots;
+                        }
                         if (output->surface) {
                             output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
                         }
