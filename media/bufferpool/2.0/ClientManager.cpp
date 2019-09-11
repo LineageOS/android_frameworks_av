@@ -351,6 +351,7 @@ ResultStatus ClientManager::Impl::allocate(
         }
         client = it->second;
     }
+#ifdef BUFFERPOOL_CLONE_HANDLES
     native_handle_t *origHandle;
     ResultStatus res = client->allocate(params, &origHandle, buffer);
     if (res != ResultStatus::OK) {
@@ -362,6 +363,9 @@ ResultStatus ClientManager::Impl::allocate(
         return ResultStatus::NO_MEMORY;
     }
     return ResultStatus::OK;
+#else
+    return client->allocate(params, handle, buffer);
+#endif
 }
 
 ResultStatus ClientManager::Impl::receive(
@@ -377,6 +381,7 @@ ResultStatus ClientManager::Impl::receive(
         }
         client = it->second;
     }
+#ifdef BUFFERPOOL_CLONE_HANDLES
     native_handle_t *origHandle;
     ResultStatus res = client->receive(
             transactionId, bufferId, timestampUs, &origHandle, buffer);
@@ -389,6 +394,9 @@ ResultStatus ClientManager::Impl::receive(
         return ResultStatus::NO_MEMORY;
     }
     return ResultStatus::OK;
+#else
+    return client->receive(transactionId, bufferId, timestampUs, handle, buffer);
+#endif
 }
 
 ResultStatus ClientManager::Impl::postSend(
