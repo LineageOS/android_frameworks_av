@@ -168,7 +168,13 @@ interface ICameraDeviceUser
       *
       * @param mode the audio restriction mode ID as above
       *
-      * @return the resulting system-wide audio restriction mode
       */
-    int setCameraAudioRestriction(int mode);
+    void setCameraAudioRestriction(int mode);
+
+    /**
+      * Get global audio restriction mode for all camera clients.
+      *
+      * @return the currently applied system-wide audio restriction mode
+      */
+    int getGlobalAudioRestriction();
 }

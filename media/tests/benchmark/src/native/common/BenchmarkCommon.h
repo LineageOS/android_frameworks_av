@@ -20,6 +20,7 @@
 #include <utils/Log.h>
 
 #include <media/NdkMediaCodec.h>
+#include <media/NdkMediaError.h>
 
 constexpr uint32_t kQueueDequeueTimeoutUs = 1000;
 constexpr uint32_t kMaxCSDStrlen = 16;

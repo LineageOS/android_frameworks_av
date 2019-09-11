@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,19 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#pragma once
 
-#include "managerdefault/AudioPolicyManager.h"
+cc_test {
+    name: "extractorTest",
+    gtest: true,
+    defaults: [
+        "libbenchmark_common-defaults",
+        "libbenchmark_soft_sanitize_all-defaults",
+    ],
 
-namespace android {
+    srcs: ["ExtractorTest.cpp"],
 
-class AudioPolicyTestManager : public AudioPolicyManager {
-  public:
-    explicit AudioPolicyTestManager(AudioPolicyClientInterface *clientInterface)
-            : AudioPolicyManager(clientInterface, true /*forTesting*/) { }
-    using AudioPolicyManager::getConfig;
-    using AudioPolicyManager::initialize;
-    using AudioPolicyManager::getOutputs;
-};
-
-}  // namespace android
+    static_libs: ["libbenchmark_extractor"]
+}

@@ -59,7 +59,8 @@ public:
     virtual String8         getParameters() const;
     virtual status_t        sendCommand(int32_t cmd, int32_t arg1, int32_t arg2);
     virtual status_t        setVideoTarget(const sp<IGraphicBufferProducer>& bufferProducer);
-    virtual int32_t         setAudioRestriction(int mode);
+    virtual status_t        setAudioRestriction(int mode);
+    virtual int32_t         getGlobalAudioRestriction();
 
     // Interface used by CameraService
     CameraClient(const sp<CameraService>& cameraService,

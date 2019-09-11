@@ -1870,8 +1870,7 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
     return res;
 }
 
-binder::Status CameraDeviceClient::setCameraAudioRestriction(int32_t mode,
-        /*out*/ int32_t* outMode) {
+binder::Status CameraDeviceClient::setCameraAudioRestriction(int32_t mode) {
     ATRACE_CALL();
     binder::Status res;
     if (!(res = checkPidStatus(__FUNCTION__)).isOk()) return res;
@@ -1884,8 +1883,17 @@ binder::Status CameraDeviceClient::setCameraAudioRestriction(int32_t mode,
     }
 
     Mutex::Autolock icl(mBinderSerializationLock);
+    BasicClient::setAudioRestriction(mode);
+    return binder::Status::ok();
+}
+
+binder::Status CameraDeviceClient::getGlobalAudioRestriction(/*out*/ int32_t* outMode) {
+    ATRACE_CALL();
+    binder::Status res;
+    if (!(res = checkPidStatus(__FUNCTION__)).isOk()) return res;
+    Mutex::Autolock icl(mBinderSerializationLock);
     if (outMode != nullptr) {
-        *outMode = BasicClient::setAudioRestriction(mode);
+        *outMode = BasicClient::getServiceAudioRestriction();
     }
     return binder::Status::ok();
 }
