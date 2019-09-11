@@ -18,9 +18,9 @@
 //#define LOG_NDEBUG 0
 
 #include "AudioCollections.h"
-#include "AudioPort.h"
 #include "AudioRoute.h"
 #include "HwModule.h"
+#include "PolicyAudioPort.h"
 
 namespace android {
 

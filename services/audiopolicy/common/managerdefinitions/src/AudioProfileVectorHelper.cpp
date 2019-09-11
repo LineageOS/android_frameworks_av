@@ -25,9 +25,9 @@
 #include <media/AudioResamplerPublic.h>
 #include <utils/Errors.h>
 
-#include "AudioPort.h"
 #include "AudioProfileVectorHelper.h"
 #include "HwModule.h"
+#include "PolicyAudioPort.h"
 #include "policy.h"
 
 namespace android {

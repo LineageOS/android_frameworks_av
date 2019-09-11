@@ -37,7 +37,7 @@
 
 #include <AudioPolicyManagerObserver.h>
 #include <AudioPolicyConfig.h>
-#include <AudioPort.h>
+#include <PolicyAudioPort.h>
 #include <AudioPatch.h>
 #include <DeviceDescriptor.h>
 #include <IOProfile.h>

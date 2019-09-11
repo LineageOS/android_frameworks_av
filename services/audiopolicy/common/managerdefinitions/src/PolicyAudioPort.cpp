@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "APM::AudioPort"
+#define LOG_TAG "APM::PolicyAudioPort"
 //#define LOG_NDEBUG 0
 #include "TypeConverter.h"
-#include "AudioPort.h"
+#include "PolicyAudioPort.h"
 #include "HwModule.h"
 #include <policy.h>
 

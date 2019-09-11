@@ -20,7 +20,7 @@
 #include "AudioProfileVectorHelper.h"
 #include "HandleGenerator.h"
 #include <media/AudioGain.h>
-#include <media/AudioPortBase.h>
+#include <media/AudioPort.h>
 #include <utils/String8.h>
 #include <utils/Vector.h>
 #include <utils/RefBase.h>
