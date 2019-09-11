@@ -27,7 +27,7 @@
 #include "Engine.h"
 #include <android-base/macros.h>
 #include <AudioPolicyManagerObserver.h>
-#include <AudioPort.h>
+#include <PolicyAudioPort.h>
 #include <IOProfile.h>
 #include <AudioIODescriptorInterface.h>
 #include <policy.h>

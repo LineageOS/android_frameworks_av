@@ -21,11 +21,11 @@
 #include <utils/SortedVector.h>
 #include <utils/KeyedVector.h>
 #include "AudioIODescriptorInterface.h"
-#include "AudioPort.h"
 #include "ClientDescriptor.h"
 #include "DeviceDescriptor.h"
 #include "EffectDescriptor.h"
 #include "IOProfile.h"
+#include "PolicyAudioPort.h"
 
 namespace android {
 

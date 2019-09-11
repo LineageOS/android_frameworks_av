@@ -26,9 +26,9 @@
 #include <utils/KeyedVector.h>
 #include <system/audio.h>
 #include "AudioIODescriptorInterface.h"
-#include "AudioPort.h"
 #include "ClientDescriptor.h"
 #include "DeviceDescriptor.h"
+#include "PolicyAudioPort.h"
 #include <vector>
 
 namespace android {

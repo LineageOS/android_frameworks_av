@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#define LOG_TAG "AudioPortBase"
+#define LOG_TAG "AudioPort"
 
 #include <algorithm>
 
 #include <android-base/stringprintf.h>
-#include <media/AudioPortBase.h>
+#include <media/AudioPort.h>
 #include <utils/Log.h>
 
 namespace android {
