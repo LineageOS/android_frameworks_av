@@ -14,16 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef __BENCHMARK_COMMON_H__
-#define __BENCHMARK_COMMON_H__
-
-#include <utils/Log.h>
-
-#include <media/NdkMediaCodec.h>
-#include <media/NdkMediaError.h>
-
-constexpr uint32_t kQueueDequeueTimeoutUs = 1000;
-constexpr uint32_t kMaxCSDStrlen = 16;
-constexpr uint32_t kMaxBufferSize = 1024 * 1024 * 16;
-
-#endif  // __BENCHMARK_COMMON_H__
+subdirs = [
+    "src",
+    "tests",
+]
