@@ -89,7 +89,7 @@ status_t ClearKeyFetcher::ObtainKey(const sp<ABuffer>& buffer,
     // asset_id change. If it sends an EcmContainer with 2 Ecms with different
     // asset_ids (old and new) then it might be best to prefetch the Emm.
     if ((asset_.id() != 0) && (*asset_id != asset_.id())) {
-        ALOGW("Asset_id change from %llu to %" PRIu64, asset_.id(), *asset_id);
+        ALOGW("Asset_id change from %" PRIu64 " to %" PRIu64, asset_.id(), *asset_id);
         asset_.Clear();
     }
 
