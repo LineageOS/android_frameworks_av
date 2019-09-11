@@ -14,6 +14,9 @@
 
 LOCAL_PATH:= $(call my-dir)
 
+ifeq ($(TARGET_HAS_LEGACY_CAMERA_HAL1),true)
+$(warning Target has integrated cameraserver into mediaserver. This is weakening security measures introduced in 7.0)
+else
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= \
@@ -44,3 +47,4 @@ LOCAL_INIT_RC := cameraserver.rc
 LOCAL_VINTF_FRAGMENTS := manifest_android.frameworks.cameraservice.service@2.0.xml
 
 include $(BUILD_EXECUTABLE)
+endif
