@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-#ifndef __BENCHMARK_COMMON_H__
-#define __BENCHMARK_COMMON_H__
+cc_library_static {
+    name: "libbenchmark_extractor",
+    defaults: [
+        "libbenchmark_common-defaults",
+        "libbenchmark_soft_sanitize_all-defaults",
+    ],
 
-#include <utils/Log.h>
+    srcs: ["Extractor.cpp"],
 
-#include <media/NdkMediaCodec.h>
-#include <media/NdkMediaError.h>
+    export_include_dirs: ["."],
 
-constexpr uint32_t kQueueDequeueTimeoutUs = 1000;
-constexpr uint32_t kMaxCSDStrlen = 16;
-constexpr uint32_t kMaxBufferSize = 1024 * 1024 * 16;
-
-#endif  // __BENCHMARK_COMMON_H__
+    ldflags: ["-Wl,-Bsymbolic"]
+}
