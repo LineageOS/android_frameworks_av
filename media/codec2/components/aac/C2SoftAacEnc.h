@@ -56,7 +56,7 @@ private:
     bool mSentCodecSpecificData;
     bool mInputTimeSet;
     size_t mInputSize;
-    c2_cntr64_t mInputTimeUs;
+    c2_cntr64_t mNextFrameTimestampUs;
 
     bool mSignalledError;
     std::atomic_uint64_t mOutIndex;

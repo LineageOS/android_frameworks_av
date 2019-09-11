@@ -5690,8 +5690,9 @@ float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
     const auto ringVolumeSrc = toVolumeSource(AUDIO_STREAM_RING);
     const auto musicVolumeSrc = toVolumeSource(AUDIO_STREAM_MUSIC);
     const auto alarmVolumeSrc = toVolumeSource(AUDIO_STREAM_ALARM);
+    const auto a11yVolumeSrc = toVolumeSource(AUDIO_STREAM_ACCESSIBILITY);
 
-    if (volumeSource == toVolumeSource(AUDIO_STREAM_ACCESSIBILITY)
+    if (volumeSource == a11yVolumeSrc
             && (AUDIO_MODE_RINGTONE == mEngine->getPhoneState()) &&
             mOutputs.isActive(ringVolumeSrc, 0)) {
         auto &ringCurves = getVolumeCurves(AUDIO_STREAM_RING);
@@ -5708,7 +5709,7 @@ float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
              volumeSource == toVolumeSource(AUDIO_STREAM_NOTIFICATION) ||
              volumeSource == toVolumeSource(AUDIO_STREAM_ENFORCED_AUDIBLE) ||
              volumeSource == toVolumeSource(AUDIO_STREAM_DTMF) ||
-             volumeSource == toVolumeSource(AUDIO_STREAM_ACCESSIBILITY))) {
+             volumeSource == a11yVolumeSrc)) {
         auto &voiceCurves = getVolumeCurves(callVolumeSrc);
         int voiceVolumeIndex = voiceCurves.getVolumeIndex(device);
         const float maxVoiceVolDb =
@@ -5720,7 +5721,9 @@ float AudioPolicyManager::computeVolume(IVolumeCurves &curves,
         // VOICE_CALL stream has minVolumeIndex > 0 : Users cannot set the volume of voice calls to
         // 0. We don't want to cap volume when the system has programmatically muted the voice call
         // stream. See setVolumeCurveIndex() for more information.
-        bool exemptFromCapping = (volumeSource == ringVolumeSrc) && (voiceVolumeIndex == 0);
+        bool exemptFromCapping =
+                ((volumeSource == ringVolumeSrc) || (volumeSource == a11yVolumeSrc))
+                && (voiceVolumeIndex == 0);
         ALOGV_IF(exemptFromCapping, "%s volume source %d at vol=%f not capped", __func__,
                  volumeSource, volumeDb);
         if ((volumeDb > maxVoiceVolDb) && !exemptFromCapping) {

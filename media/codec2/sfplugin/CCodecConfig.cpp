@@ -235,7 +235,10 @@ struct StandardParams {
     const std::vector<ConfigMapper> &getConfigMappersForSdkKey(std::string key) const {
         auto it = mConfigMappers.find(key);
         if (it == mConfigMappers.end()) {
-            ALOGD("no c2 equivalents for %s", key.c_str());
+            if (mComplained.count(key) == 0) {
+                ALOGD("no c2 equivalents for %s", key.c_str());
+                mComplained.insert(key);
+            }
             return NO_MAPPERS;
         }
         ALOGV("found %zu eqs for %s", it->second.size(), key.c_str());
@@ -304,6 +307,7 @@ struct StandardParams {
 
 private:
     std::map<SdkKey, std::vector<ConfigMapper>> mConfigMappers;
+    mutable std::set<std::string> mComplained;
 };
 
 const std::vector<ConfigMapper> StandardParams::NO_MAPPERS;
@@ -508,7 +512,8 @@ void CCodecConfig::initializeStandardParams() {
                .limitTo(D::ENCODER & D::VIDEO));
     // convert to timestamp base
     add(ConfigMapper(KEY_I_FRAME_INTERVAL, C2_PARAMKEY_SYNC_FRAME_INTERVAL, "value")
-        .withMappers([](C2Value v) -> C2Value {
+        .limitTo(D::VIDEO & D::ENCODER & D::CONFIG)
+        .withMapper([](C2Value v) -> C2Value {
             // convert from i32 to float
             int32_t i32Value;
             float fpValue;
@@ -516,12 +521,6 @@ void CCodecConfig::initializeStandardParams() {
                 return int64_t(1000000) * i32Value;
             } else if (v.get(&fpValue)) {
                 return int64_t(c2_min(1000000 * fpValue + 0.5, (double)INT64_MAX));
-            }
-            return C2Value();
-        }, [](C2Value v) -> C2Value {
-            int64_t i64;
-            if (v.get(&i64)) {
-                return float(i64) / 1000000;
             }
             return C2Value();
         }));
@@ -1033,7 +1032,25 @@ bool CCodecConfig::updateFormats(Domain domain) {
     }
 
     ReflectedParamUpdater::Dict reflected = mParamUpdater->getParams(paramPointers);
-    ALOGD("c2 config is %s", reflected.debugString().c_str());
+    std::string config = reflected.debugString();
+    std::set<std::string> configLines;
+    std::string diff;
+    for (size_t start = 0; start != std::string::npos; ) {
+        size_t end = config.find('\n', start);
+        size_t count = (end == std::string::npos)
+                ? std::string::npos
+                : end - start + 1;
+        std::string line = config.substr(start, count);
+        configLines.insert(line);
+        if (mLastConfig.count(line) == 0) {
+            diff.append(line);
+        }
+        start = (end == std::string::npos) ? std::string::npos : end + 1;
+    }
+    if (!diff.empty()) {
+        ALOGD("c2 config diff is %s", diff.c_str());
+    }
+    mLastConfig.swap(configLines);
 
     bool changed = false;
     if (domain & mInputDomain) {
