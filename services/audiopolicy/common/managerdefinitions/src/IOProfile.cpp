@@ -79,7 +79,8 @@ bool IOProfile::isCompatibleProfile(const DeviceVector &devices,
         }
     }
 
-    const uint32_t mustMatchOutputFlags = AUDIO_OUTPUT_FLAG_HW_AV_SYNC;
+    const uint32_t mustMatchOutputFlags =
+            AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_HW_AV_SYNC|AUDIO_OUTPUT_FLAG_MMAP_NOIRQ;
     if (isPlaybackThread && (((getFlags() ^ flags) & mustMatchOutputFlags)
                     || (getFlags() & flags) != flags)) {
         return false;
