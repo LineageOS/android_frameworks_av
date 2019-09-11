@@ -29,6 +29,7 @@
 #include <media/stagefright/foundation/ColorUtils.h>
 #include <media/stagefright/foundation/FileDescriptor.h>
 
+#include <android-base/properties.h>
 #include <media/hardware/MetadataBufferType.h>
 #include <ui/GraphicBuffer.h>
 #include <gui/BufferItem.h>
@@ -800,6 +801,9 @@ void GraphicBufferSource::queueFrameRepeat_l() {
     }
 }
 
+#ifdef __clang__
+__attribute__((no_sanitize("integer")))
+#endif
 bool GraphicBufferSource::calculateCodecTimestamp_l(
         nsecs_t bufferTimeNs, int64_t *codecTimeUs) {
     int64_t timeUs = bufferTimeNs / 1000;
@@ -816,14 +820,15 @@ bool GraphicBufferSource::calculateCodecTimestamp_l(
             mPrevFrameUs = mBaseFrameUs =
                     std::llround((timeUs * mCaptureFps) / mFps);
             mFrameCount = 0;
-        } else {
-            // snap to nearest capture point
+        } else if (mSnapTimestamps) {
             double nFrames = (timeUs - mPrevCaptureUs) * mCaptureFps / 1000000;
             if (nFrames < 0.5 - kTimestampFluctuation) {
                 // skip this frame as it's too close to previous capture
-                ALOGD("skipping frame, timeUs %lld", static_cast<long long>(timeUs));
+                ALOGD("skipping frame, timeUs %lld",
+                      static_cast<long long>(timeUs));
                 return false;
             }
+            // snap to nearest capture point
             if (nFrames <= 1.0) {
                 nFrames = 1.0;
             }
@@ -832,6 +837,22 @@ bool GraphicBufferSource::calculateCodecTimestamp_l(
                     mFrameCount * 1000000 / mCaptureFps);
             mPrevFrameUs = mBaseFrameUs + std::llround(
                     mFrameCount * 1000000 / mFps);
+        } else {
+            if (timeUs <= mPrevCaptureUs) {
+                if (mFrameDropper != NULL && mFrameDropper->disabled()) {
+                    // Warn only, client has disabled frame drop logic possibly for image
+                    // encoding cases where camera's ZSL mode could send out of order frames.
+                    ALOGW("Received frame that's going backward in time");
+                } else {
+                    // Drop the frame if it's going backward in time. Bad timestamp
+                    // could disrupt encoder's rate control completely.
+                    ALOGW("Dropping frame that's going backward in time");
+                    return false;
+                }
+            }
+            mPrevCaptureUs = timeUs;
+            mPrevFrameUs = mBaseFrameUs + std::llround(
+                    (timeUs - mBaseCaptureUs) * (mCaptureFps / mFps));
         }
 
         ALOGV("timeUs %lld, captureUs %lld, frameUs %lld",
@@ -1359,6 +1380,12 @@ status_t GraphicBufferSource::setTimeLapseConfig(double fps, double captureFps) 
 
     mFps = fps;
     mCaptureFps = captureFps;
+    if (captureFps > fps) {
+        mSnapTimestamps = 1 == base::GetIntProperty(
+                "debug.stagefright.snap_timestamps", int64_t(1));
+    } else {
+        mSnapTimestamps = false;
+    }
 
     return OK;
 }
