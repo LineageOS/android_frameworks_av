@@ -1,9 +1,5 @@
-cc_library {
-    name: "libstagefright_bufferpool@2.0",
-    vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
+cc_defaults {
+    name: "libstagefright_bufferpool@2.0-default",
     srcs: [
         "Accessor.cpp",
         "AccessorImpl.cpp",
@@ -31,3 +27,23 @@ cc_library {
         "android.hardware.media.bufferpool@2.0",
     ],
 }
+
+cc_library {
+    name: "libstagefright_bufferpool@2.0.1",
+    defaults: ["libstagefright_bufferpool@2.0-default"],
+    vendor_available: true,
+    cflags: [
+        "-DBUFFERPOOL_CLONE_HANDLES",
+    ],
+}
+
+// Deprecated. Do not use. Use libstagefright_bufferpool@2.0.1 instead.
+cc_library {
+    name: "libstagefright_bufferpool@2.0",
+    defaults: ["libstagefright_bufferpool@2.0-default"],
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
+}
+
