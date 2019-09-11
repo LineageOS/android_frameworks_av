@@ -81,6 +81,7 @@ void Decoder::onInputAvailable(AMediaCodec *mediaCodec, int32_t bufIdx) {
             mDecoderDoneCondition.notify_one();
             return;
         }
+        mStats->addFrameSize(bytesRead);
         mNumInputFrame++;
     }
 }
@@ -128,7 +129,6 @@ void Decoder::onFormatChanged(AMediaCodec *mediaCodec, AMediaFormat *format) {
 
 void Decoder::setupDecoder() {
     if (!mFormat) mFormat = mExtractor->getFormat();
-    if (!mTimer) mTimer = new Timer();
 }
 
 int32_t Decoder::decode(uint8_t *inputBuffer, vector<AMediaCodecBufferInfo> &frameInfo,
@@ -143,7 +143,7 @@ int32_t Decoder::decode(uint8_t *inputBuffer, vector<AMediaCodecBufferInfo> &fra
     AMediaFormat_getString(mFormat, AMEDIAFORMAT_KEY_MIME, &mime);
     if (!mime) return AMEDIA_ERROR_INVALID_OBJECT;
 
-    int64_t sTime = mTimer->getCurTime();
+    int64_t sTime = mStats->getCurTime();
     mCodec = createMediaCodec(mFormat, mime, codecName, false /*isEncoder*/);
     if (!mCodec) return AMEDIA_ERROR_INVALID_OBJECT;
 
@@ -152,16 +152,15 @@ int32_t Decoder::decode(uint8_t *inputBuffer, vector<AMediaCodecBufferInfo> &fra
                                                 OnFormatChangedCB, OnErrorCB};
         AMediaCodec_setAsyncNotifyCallback(mCodec, aCB, this);
 
-        CallBackHandle *callbackHandle = new CallBackHandle();
-        callbackHandle->mIOThread = thread(&CallBackHandle::ioThread, this);
+        mIOThread = thread(&CallBackHandle::ioThread, this);
     }
 
     AMediaCodec_start(mCodec);
-    int64_t eTime = mTimer->getCurTime();
-    int64_t timeTaken = mTimer->getTimeDiff(sTime, eTime);
-    mTimer->setInitTime(timeTaken);
+    int64_t eTime = mStats->getCurTime();
+    int64_t timeTaken = mStats->getTimeDiff(sTime, eTime);
+    mStats->setInitTime(timeTaken);
 
-    mTimer->setStartTime();
+    mStats->setStartTime();
     if (!asyncMode) {
         while (!mSawOutputEOS && !mSignalledError) {
             /* Queue input data */
@@ -171,7 +170,7 @@ int32_t Decoder::decode(uint8_t *inputBuffer, vector<AMediaCodecBufferInfo> &fra
                     ALOGE("AMediaCodec_dequeueInputBuffer returned invalid index %zd\n", inIdx);
                     return AMEDIA_ERROR_IO;
                 } else if (inIdx >= 0) {
-                    mTimer->addInputTime();
+                    mStats->addInputTime();
                     onInputAvailable(mCodec, inIdx);
                 }
             }
@@ -184,7 +183,7 @@ int32_t Decoder::decode(uint8_t *inputBuffer, vector<AMediaCodecBufferInfo> &fra
                 const char *s = AMediaFormat_toString(mFormat);
                 ALOGI("Output format: %s\n", s);
             } else if (outIdx >= 0) {
-                mTimer->addOutputTime();
+                mStats->addOutputTime();
                 onOutputAvailable(mCodec, outIdx, &info);
             } else if (!(outIdx == AMEDIACODEC_INFO_TRY_AGAIN_LATER ||
                          outIdx == AMEDIACODEC_INFO_OUTPUT_BUFFERS_CHANGED)) {
@@ -207,7 +206,7 @@ int32_t Decoder::decode(uint8_t *inputBuffer, vector<AMediaCodecBufferInfo> &fra
 }
 
 void Decoder::deInitCodec() {
-    int64_t sTime = mTimer->getCurTime();
+    int64_t sTime = mStats->getCurTime();
     if (mFormat) {
         AMediaFormat_delete(mFormat);
         mFormat = nullptr;
@@ -215,19 +214,19 @@ void Decoder::deInitCodec() {
     if (!mCodec) return;
     AMediaCodec_stop(mCodec);
     AMediaCodec_delete(mCodec);
-    int64_t eTime = mTimer->getCurTime();
-    int64_t timeTaken = mTimer->getTimeDiff(sTime, eTime);
-    mTimer->setDeInitTime(timeTaken);
+    int64_t eTime = mStats->getCurTime();
+    int64_t timeTaken = mStats->getTimeDiff(sTime, eTime);
+    mStats->setDeInitTime(timeTaken);
 }
 
 void Decoder::dumpStatistics(string inputReference) {
     int64_t durationUs = mExtractor->getClipDuration();
     string operation = "decode";
-    mTimer->dumpStatistics(operation, inputReference, durationUs);
+    mStats->dumpStatistics(operation, inputReference, durationUs);
 }
 
 void Decoder::resetDecoder() {
-    if (mTimer) mTimer->resetTimers();
+    if (mStats) mStats->reset();
     if (mInputBuffer) mInputBuffer = nullptr;
     if (!mFrameMetaData.empty()) mFrameMetaData.clear();
 }

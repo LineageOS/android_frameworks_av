@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef __TIMER_H__
-#define __TIMER_H__
+#ifndef __STATS_H__
+#define __STATS_H__
 
 #include <sys/time.h>
 #include <algorithm>
@@ -25,22 +25,22 @@
 
 using namespace std;
 
-class Timer {
+class Stats {
   public:
-    Timer() {
+    Stats() {
         mInitTimeNs = 0;
         mDeInitTimeNs = 0;
     }
 
-    ~Timer() {
-        if (!mInputTimer.empty()) mInputTimer.clear();
-        if (!mOutputTimer.empty()) mOutputTimer.clear();
+    ~Stats() {
+        reset();
     }
 
   private:
     nsecs_t mInitTimeNs;
     nsecs_t mDeInitTimeNs;
     nsecs_t mStartTimeNs;
+    std::vector<int32_t> mFrameSizes;
     std::vector<nsecs_t> mInputTimer;
     std::vector<nsecs_t> mOutputTimer;
 
@@ -53,11 +53,14 @@ class Timer {
 
     void setStartTime() { mStartTimeNs = systemTime(CLOCK_MONOTONIC); }
 
+    void addFrameSize(int32_t size) { mFrameSizes.push_back(size); }
+
     void addInputTime() { mInputTimer.push_back(systemTime(CLOCK_MONOTONIC)); }
 
     void addOutputTime() { mOutputTimer.push_back(systemTime(CLOCK_MONOTONIC)); }
 
-    void resetTimers() {
+    void reset() {
+        if (!mFrameSizes.empty()) mFrameSizes.clear();
         if (!mInputTimer.empty()) mInputTimer.clear();
         if (!mOutputTimer.empty()) mOutputTimer.clear();
     }
@@ -78,4 +81,4 @@ class Timer {
     void dumpStatistics(std::string operation, std::string inputReference, int64_t duarationUs);
 };
 
-#endif  // __TIMER_H__
+#endif  // __STATS_H__
