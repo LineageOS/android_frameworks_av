@@ -23,30 +23,35 @@
             </attachedDevices>
             <defaultOutputDevice>Speaker</defaultOutputDevice>
             <mixPorts>
-                <mixPort name="primary output" role="source" flags="AUDIO_OUTPUT_FLAG_PRIMARY">
+                <!-- Profiles on the HDMI port are explicit for simplicity. In reality they are dynamic -->
+                <!-- Note: ports are intentionally arranged from more specific to less
+                     specific in order to test b/140447125 for HW AV Sync, and similar "explicit matches" -->
+                <mixPort name="tunnel" role="source"
+                         flags="AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_HW_AV_SYNC">
                     <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
                              samplingRates="48000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
                 </mixPort>
-                <!-- Profiles on the HDMI port are explicit for simplicity. In reality they are dynamic -->
-                <!-- Note: a HW AV Sync port is declared before non-Sync port to test b/140447125 -->
-                <mixPort name="tunnel" role="source"
-                         flags="AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_HW_AV_SYNC">
-                    <profile name="" format="AUDIO_FORMAT_AC3"
+                <mixPort name="low latency" role="source"
+                         flags="AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_MMAP_NOIRQ">
+                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
                              samplingRates="48000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
                 </mixPort>
                 <mixPort name="direct" role="source" flags="AUDIO_OUTPUT_FLAG_DIRECT">
-                    <profile name="" format="AUDIO_FORMAT_AC3"
+                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+                             samplingRates="48000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
+                </mixPort>
+                <mixPort name="primary output" role="source" flags="AUDIO_OUTPUT_FLAG_PRIMARY">
+                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
                              samplingRates="48000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
                 </mixPort>
            </mixPorts>
            <devicePorts>
                 <devicePort tagName="Speaker" type="AUDIO_DEVICE_OUT_SPEAKER" role="sink" />
-                <devicePort tagName="Out Aux Digital" type="AUDIO_DEVICE_OUT_AUX_DIGITAL" role="sink"
-                            encodedFormats="AUDIO_FORMAT_AC3 AUDIO_FORMAT_IEC61937" />
+                <devicePort tagName="Out Aux Digital" type="AUDIO_DEVICE_OUT_AUX_DIGITAL" role="sink" />
             </devicePorts>
             <routes>
                 <route type="mix" sink="Speaker" sources="primary output"/>
-                <route type="mix" sink="Out Aux Digital" sources="primary output,tunnel,direct"/>
+                <route type="mix" sink="Out Aux Digital" sources="primary output,tunnel,direct,low latency"/>
             </routes>
         </module>
     </modules>
