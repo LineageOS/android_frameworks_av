@@ -22,7 +22,7 @@
 #include "media/MemoryLeakTrackUtil.h"
 #include <sstream>
 
-#include <bionic_malloc.h>
+#include <bionic/malloc.h>
 
 /*
  * The code here originally resided in MediaPlayerService.cpp
