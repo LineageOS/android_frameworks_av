@@ -11,6 +11,9 @@ cc_library_static {
 
 cc_binary {
     name: "mediaserver",
+    defaults: [
+        "has_legacy_camera_hal1",
+    ],
 
     srcs: ["main_mediaserver.cpp"],
 

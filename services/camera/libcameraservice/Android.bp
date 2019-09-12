@@ -18,6 +18,10 @@
 
 cc_library_shared {
     name: "libcameraservice",
+    defaults: [
+        "has_legacy_camera_hal1",
+        "uses_qti_camera_device",
+    ],
 
     // Camera service source
 
@@ -157,15 +161,4 @@ cc_library_shared {
         "-Werror",
         "-Wno-ignored-qualifiers",
     ],
-
-    product_variables: {
-        lineage: {
-            uses_qti_camera_device: {
-                cppflags: ["-DQTI_CAMERA_DEVICE"],
-                shared_libs: ["vendor.qti.hardware.camera.device@1.0"],
-            },
-        },
-    },
-
 }
-
