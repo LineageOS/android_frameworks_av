@@ -12,9 +12,11 @@ cc_library_shared {
         "AudioGain.cpp",
         "AudioPort.cpp",
         "AudioProfile.cpp",
+        "DeviceDescriptorBase.cpp",
     ],
 
     shared_libs: [
+        "libaudioutils",
         "libbase",
         "libbinder",
         "liblog",

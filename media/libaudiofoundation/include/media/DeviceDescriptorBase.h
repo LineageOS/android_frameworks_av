@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,224 +16,44 @@
 
 #pragma once
 
-#include "PolicyAudioPort.h"
+#include <media/AudioPort.h>
 #include <utils/Errors.h>
-#include <utils/String8.h>
-#include <utils/SortedVector.h>
 #include <cutils/config_utils.h>
 #include <system/audio.h>
 #include <system/audio_policy.h>
 
 namespace android {
 
-class DeviceDescriptor : public AudioPort, public AudioPortConfig,
-                         public PolicyAudioPort, public PolicyAudioPortConfig
+class DeviceDescriptorBase : public AudioPort, public AudioPortConfig
 {
 public:
      // Note that empty name refers by convention to a generic device.
-    explicit DeviceDescriptor(audio_devices_t type, const std::string &tagName = "");
-    DeviceDescriptor(audio_devices_t type, const FormatVector &encodedFormats,
-            const std::string &tagName = "");
+    explicit DeviceDescriptorBase(audio_devices_t type);
 
-    virtual ~DeviceDescriptor() {}
-
-    virtual void addAudioProfile(const sp<AudioProfile> &profile) {
-        addAudioProfileAndSort(mProfiles, profile);
-    }
-
-    virtual const std::string getTagName() const { return mTagName; }
+    virtual ~DeviceDescriptorBase() {}
 
     audio_devices_t type() const { return mDeviceType; }
-    String8 address() const { return mAddress; }
-    void setAddress(const String8 &address) { mAddress = address; }
-
-    const FormatVector& encodedFormats() const { return mEncodedFormats; }
-
-    audio_format_t getEncodedFormat() { return mCurrentEncodedFormat; }
-
-    void setEncodedFormat(audio_format_t format) {
-        mCurrentEncodedFormat = format;
-    }
-
-    bool equals(const sp<DeviceDescriptor>& other) const;
-
-    bool hasCurrentEncodedFormat() const;
-
-    bool supportsFormat(audio_format_t format);
-
-    // PolicyAudioPortConfig
-    virtual sp<PolicyAudioPort> getPolicyAudioPort() const {
-        return static_cast<PolicyAudioPort*>(const_cast<DeviceDescriptor*>(this));
-    }
+    std::string address() const { return mAddress; }
+    void setAddress(const std::string &address) { mAddress = address; }
 
     // AudioPortConfig
     virtual sp<AudioPort> getAudioPort() const {
-        return static_cast<AudioPort*>(const_cast<DeviceDescriptor*>(this));
+        return static_cast<AudioPort*>(const_cast<DeviceDescriptorBase*>(this));
     }
-    virtual status_t applyAudioPortConfig(const struct audio_port_config *config,
-                                          struct audio_port_config *backupConfig = NULL);
     virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
             const struct audio_port_config *srcConfig = NULL) const;
-
-    // PolicyAudioPort
-    virtual sp<AudioPort> asAudioPort() const {
-        return static_cast<AudioPort*>(const_cast<DeviceDescriptor*>(this));
-    }
-    virtual void attach(const sp<HwModule>& module);
-    virtual void detach();
 
     // AudioPort
     virtual void toAudioPort(struct audio_port *port) const;
 
-    void importAudioPortAndPickAudioProfile(const sp<PolicyAudioPort>& policyPort,
-                                            bool force = false);
-
-    void dump(String8 *dst, int spaces, int index, bool verbose = true) const;
+    void dump(std::string *dst, int spaces, int index,
+              const char* extraInfo = nullptr, bool verbose = true) const;
     void log() const;
     std::string toString() const;
 
-private:
-    String8 mAddress{""};
-    std::string mTagName; // Unique human readable identifier for a device port found in conf file.
+protected:
+    std::string mAddress{""};
     audio_devices_t     mDeviceType;
-    FormatVector        mEncodedFormats;
-    audio_format_t      mCurrentEncodedFormat;
-};
-
-class DeviceVector : public SortedVector<sp<DeviceDescriptor> >
-{
-public:
-    DeviceVector() : SortedVector(), mDeviceTypes(AUDIO_DEVICE_NONE) {}
-    explicit DeviceVector(const sp<DeviceDescriptor>& item) : DeviceVector()
-    {
-        add(item);
-    }
-
-    ssize_t add(const sp<DeviceDescriptor>& item);
-    void add(const DeviceVector &devices);
-    ssize_t remove(const sp<DeviceDescriptor>& item);
-    void remove(const DeviceVector &devices);
-    ssize_t indexOf(const sp<DeviceDescriptor>& item) const;
-
-    audio_devices_t types() const { return mDeviceTypes; }
-
-    // If 'address' is empty and 'codec' is AUDIO_FORMAT_DEFAULT, a device with a non-empty
-    // address may be returned if there is no device with the specified 'type' and empty address.
-    sp<DeviceDescriptor> getDevice(audio_devices_t type, const String8 &address,
-                                   audio_format_t codec) const;
-    DeviceVector getDevicesFromTypeMask(audio_devices_t types) const;
-
-    /**
-     * @brief getDeviceFromId
-     * @param id of the DeviceDescriptor to seach (aka Port handle).
-     * @return DeviceDescriptor associated to port id if found, nullptr otherwise. If the id is
-     * equal to AUDIO_PORT_HANDLE_NONE, it also returns a nullptr.
-     */
-    sp<DeviceDescriptor> getDeviceFromId(audio_port_handle_t id) const;
-    sp<DeviceDescriptor> getDeviceFromTagName(const std::string &tagName) const;
-    DeviceVector getDevicesFromHwModule(audio_module_handle_t moduleHandle) const;
-    audio_devices_t getDeviceTypesFromHwModule(audio_module_handle_t moduleHandle) const;
-
-    DeviceVector getFirstDevicesFromTypes(std::vector<audio_devices_t> orderedTypes) const;
-    sp<DeviceDescriptor> getFirstExistingDevice(std::vector<audio_devices_t> orderedTypes) const;
-
-    // If there are devices with the given type and the devices to add is not empty,
-    // remove all the devices with the given type and add all the devices to add.
-    void replaceDevicesByType(audio_devices_t typeToRemove, const DeviceVector &devicesToAdd);
-
-    bool contains(const sp<DeviceDescriptor>& item) const { return indexOf(item) >= 0; }
-
-    /**
-     * @brief containsAtLeastOne
-     * @param devices vector of devices to check against.
-     * @return true if the DeviceVector contains at list one of the devices from the given vector.
-     */
-    bool containsAtLeastOne(const DeviceVector &devices) const;
-
-    /**
-     * @brief containsAllDevices
-     * @param devices vector of devices to check against.
-     * @return true if the DeviceVector contains all the devices from the given vector
-     */
-    bool containsAllDevices(const DeviceVector &devices) const;
-
-    /**
-     * @brief filter the devices supported by this collection against another collection
-     * @param devices to filter against
-     * @return a filtered DeviceVector
-     */
-    DeviceVector filter(const DeviceVector &devices) const;
-
-    /**
-     * @brief filter the devices supported by this collection before sending
-     * then to the Engine via AudioPolicyManagerObserver interface
-     * @return a filtered DeviceVector
-     */
-    DeviceVector filterForEngine() const;
-
-    /**
-     * @brief merge two vectors. As SortedVector Implementation is buggy (it does not check the size
-     * of the destination vector, only of the source, it provides a safe implementation
-     * @param devices source device vector to merge with
-     * @return size of the merged vector.
-     */
-    ssize_t merge(const DeviceVector &devices)
-    {
-        if (isEmpty()) {
-            add(devices);
-            return size();
-        }
-        return SortedVector::merge(devices);
-    }
-
-    /**
-     * @brief operator == DeviceVector are equals if all the DeviceDescriptor can be found (aka
-     * DeviceDescriptor with same type and address) and the vector has same size.
-     * @param right DeviceVector to compare to.
-     * @return true if right contains the same device and has the same size.
-     */
-    bool operator==(const DeviceVector &right) const
-    {
-        if (size() != right.size()) {
-            return false;
-        }
-        for (const auto &device : *this) {
-            if (right.indexOf(device) < 0) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    bool operator!=(const DeviceVector &right) const
-    {
-        return !operator==(right);
-    }
-
-    /**
-     * @brief getFirstValidAddress
-     * @return the first valid address of a list of device, "" if no device with valid address
-     * found.
-     * This helper function helps maintaining compatibility with legacy where we used to have a
-     * devices mask and an address.
-     */
-    String8 getFirstValidAddress() const
-    {
-        for (const auto &device : *this) {
-            if (device->address() != "") {
-                return device->address();
-            }
-        }
-        return String8("");
-    }
-
-    std::string toString() const;
-
-    void dump(String8 *dst, const String8 &tag, int spaces = 0, bool verbose = true) const;
-
-private:
-    void refreshTypes();
-    audio_devices_t mDeviceTypes;
 };
 
 } // namespace android

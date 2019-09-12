@@ -233,7 +233,7 @@ status_t AudioInputDescriptor::open(const audio_config_t *config,
                                                   input,
                                                   &lConfig,
                                                   &deviceType,
-                                                  mDevice->address(),
+                                                  String8(mDevice->address().c_str()),
                                                   source,
                                                   flags);
     LOG_ALWAYS_FATAL_IF(mDevice->type() != deviceType,

@@ -17,6 +17,7 @@
 #pragma once
 
 #include "PolicyAudioPort.h"
+#include <media/DeviceDescriptorBase.h>
 #include <utils/Errors.h>
 #include <utils/String8.h>
 #include <utils/SortedVector.h>
@@ -26,7 +27,7 @@
 
 namespace android {
 
-class DeviceDescriptor : public AudioPort, public AudioPortConfig,
+class DeviceDescriptor : public DeviceDescriptorBase,
                          public PolicyAudioPort, public PolicyAudioPortConfig
 {
 public:
@@ -42,10 +43,6 @@ public:
     }
 
     virtual const std::string getTagName() const { return mTagName; }
-
-    audio_devices_t type() const { return mDeviceType; }
-    String8 address() const { return mAddress; }
-    void setAddress(const String8 &address) { mAddress = address; }
 
     const FormatVector& encodedFormats() const { return mEncodedFormats; }
 
@@ -67,9 +64,6 @@ public:
     }
 
     // AudioPortConfig
-    virtual sp<AudioPort> getAudioPort() const {
-        return static_cast<AudioPort*>(const_cast<DeviceDescriptor*>(this));
-    }
     virtual status_t applyAudioPortConfig(const struct audio_port_config *config,
                                           struct audio_port_config *backupConfig = NULL);
     virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
@@ -89,13 +83,9 @@ public:
                                             bool force = false);
 
     void dump(String8 *dst, int spaces, int index, bool verbose = true) const;
-    void log() const;
-    std::string toString() const;
 
 private:
-    String8 mAddress{""};
     std::string mTagName; // Unique human readable identifier for a device port found in conf file.
-    audio_devices_t     mDeviceType;
     FormatVector        mEncodedFormats;
     audio_format_t      mCurrentEncodedFormat;
 };
@@ -221,7 +211,7 @@ public:
     {
         for (const auto &device : *this) {
             if (device->address() != "") {
-                return device->address();
+                return String8(device->address().c_str());
             }
         }
         return String8("");
