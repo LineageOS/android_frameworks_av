@@ -1164,7 +1164,7 @@ void AudioPolicyManagerTVTest::testHDMIPortSelection(
     audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
     audio_io_handle_t output;
     audio_port_handle_t portId;
-    getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_STEREO, 48000,
+    getOutputForAttr(&selectedDeviceId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, 48000,
             flags, &output, &portId);
     sp<SwAudioOutputDescriptor> outDesc = mManager->getOutputs().valueFor(output);
     ASSERT_NE(nullptr, outDesc.get());
@@ -1187,13 +1187,23 @@ TEST_F(AudioPolicyManagerTVTest, Dump) {
     dumpToLog();
 }
 
-TEST_F(AudioPolicyManagerTVTest, MatchOutputNoHwAvSync) {
+TEST_F(AudioPolicyManagerTVTest, MatchNoFlags) {
+    testHDMIPortSelection(AUDIO_OUTPUT_FLAG_NONE, "primary output");
+}
+
+TEST_F(AudioPolicyManagerTVTest, MatchOutputDirectNoHwAvSync) {
     // b/140447125: The selected port must not have HW AV Sync flag (see the config file).
     testHDMIPortSelection(AUDIO_OUTPUT_FLAG_DIRECT, "direct");
 }
 
-TEST_F(AudioPolicyManagerTVTest, MatchOutputHwAvSync) {
+TEST_F(AudioPolicyManagerTVTest, MatchOutputDirectHwAvSync) {
     testHDMIPortSelection(static_cast<audio_output_flags_t>(
                     AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_HW_AV_SYNC),
             "tunnel");
+}
+
+TEST_F(AudioPolicyManagerTVTest, MatchOutputDirectMMapNoIrq) {
+    testHDMIPortSelection(static_cast<audio_output_flags_t>(
+                    AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_MMAP_NOIRQ),
+            "low latency");
 }
