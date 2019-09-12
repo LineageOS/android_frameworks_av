@@ -143,6 +143,9 @@ private:
 
     bool canHandle(int uniqueId, const String8& path);
 
+    void reportEngineMetrics(const char func[],
+            const String8& plugInId, const String8& mimeType = String8(""));
+
 private:
     enum {
         kMaxNumUniqueIds = 0x1000,
