@@ -516,7 +516,7 @@ Return<DevicePortTraits::Element> DevicePortTraits::deserialize(const xmlNode *c
     std::string address = getXmlAttribute(cur, Attributes::address);
     if (!address.empty()) {
         ALOGV("%s: address=%s for %s", __func__, address.c_str(), name.c_str());
-        deviceDesc->setAddress(String8(address.c_str()));
+        deviceDesc->setAddress(address);
     }
 
     AudioProfileTraits::Collection profiles;
@@ -538,7 +538,7 @@ Return<DevicePortTraits::Element> DevicePortTraits::deserialize(const xmlNode *c
         return Status::fromStatusT(status);
     }
     ALOGV("%s: adding device tag %s type %08x address %s", __func__,
-          deviceDesc->getName().c_str(), type, deviceDesc->address().string());
+          deviceDesc->getName().c_str(), type, deviceDesc->address().c_str());
     return deviceDesc;
 }
 
