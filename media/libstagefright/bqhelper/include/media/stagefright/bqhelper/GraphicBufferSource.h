@@ -461,12 +461,33 @@ private:
     // Slow motion mode is enabled if both encoding and capture frame rates are
     // defined and the encoding frame rate is less than half the capture frame
     // rate. In this mode, the source is expected to produce frames with an even
-    // timestamp interval (after rounding) with the configured capture fps. The
-    // first source timestamp is used as the source base time. Afterwards, the
-    // timestamp of each source frame is snapped to the nearest expected capture
-    // timestamp and scaled to match the configured encoding frame rate.
+    // timestamp interval (after rounding) with the configured capture fps.
+    //
+    // These modes must be configured by calling setTimeLapseConfig() before
+    // using this source.
+    //
+    // Timestamp snapping for slow motion recording
+    // ============================================
+    //
+    // When the slow motion mode is configured with setTimeLapseConfig(), the
+    // property "debug.stagefright.snap_timestamps" will be checked. If the
+    // value of the property is set to any value other than 1, mSnapTimestamps
+    // will be set to false. Otherwise, mSnapTimestamps will be set to true.
+    // (mSnapTimestamps will be false for time lapse recording regardless of the
+    // value of the property.)
+    //
+    // If mSnapTimestamps is true, i.e., timestamp snapping is enabled, the
+    // first source timestamp will be used as the source base time; afterwards,
+    // the timestamp of each source frame will be snapped to the nearest
+    // expected capture timestamp and scaled to match the configured encoding
+    // frame rate.
+    //
+    // If timestamp snapping is disabled, the timestamp of source frames will
+    // be scaled to match the ratio between the configured encoding frame rate
+    // and the configured capture frame rate.
 
-    // These modes must be enabled before using this source.
+    // whether timestamps will be snapped
+    bool mSnapTimestamps{true};
 
     // adjusted capture timestamp of the base frame
     int64_t mBaseCaptureUs;
