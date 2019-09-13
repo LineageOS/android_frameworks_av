@@ -2802,6 +2802,27 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
         mOperatingMode = operatingMode;
     }
 
+    // In case called from configureStreams, abort queued input buffers not belonging to
+    // any pending requests.
+    if (mInputStream != NULL && notifyRequestThread) {
+        while (true) {
+            camera3_stream_buffer_t inputBuffer;
+            status_t res = mInputStream->getInputBuffer(&inputBuffer,
+                    /*respectHalLimit*/ false);
+            if (res != OK) {
+                // Exhausted acquiring all input buffers.
+                break;
+            }
+
+            inputBuffer.status = CAMERA3_BUFFER_STATUS_ERROR;
+            res = mInputStream->returnInputBuffer(inputBuffer);
+            if (res != OK) {
+                ALOGE("%s: %d: couldn't return input buffer while clearing input queue: "
+                        "%s (%d)", __FUNCTION__, __LINE__, strerror(-res), res);
+            }
+        }
+    }
+
     if (!mNeedConfig) {
         ALOGV("%s: Skipping config, no stream changes", __FUNCTION__);
         return OK;
@@ -5084,6 +5105,7 @@ status_t Camera3Device::RequestThread::clear(
                     ALOGW("%s: %d: couldn't get input buffer while clearing the request "
                             "list: %s (%d)", __FUNCTION__, __LINE__, strerror(-res), res);
                 } else {
+                    inputBuffer.status = CAMERA3_BUFFER_STATUS_ERROR;
                     res = (*it)->mInputStream->returnInputBuffer(inputBuffer);
                     if (res != OK) {
                         ALOGE("%s: %d: couldn't return input buffer while clearing the request "
