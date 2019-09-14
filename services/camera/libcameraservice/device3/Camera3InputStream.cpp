@@ -71,7 +71,8 @@ status_t Camera3InputStream::getInputBufferLocked(
 
     res = mConsumer->acquireBuffer(&bufferItem, /*waitForFence*/false);
     if (res != OK) {
-        ALOGE("%s: Stream %d: Can't acquire next output buffer: %s (%d)",
+        // This may or may not be an error condition depending on caller.
+        ALOGV("%s: Stream %d: Can't acquire next output buffer: %s (%d)",
                 __FUNCTION__, mId, strerror(-res), res);
         return res;
     }
