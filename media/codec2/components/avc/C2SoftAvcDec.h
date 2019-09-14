@@ -157,7 +157,7 @@ private:
 
     size_t mNumCores;
     IV_COLOR_FORMAT_T mIvColorFormat;
-
+    uint32_t mOutputDelay;
     uint32_t mWidth;
     uint32_t mHeight;
     uint32_t mStride;

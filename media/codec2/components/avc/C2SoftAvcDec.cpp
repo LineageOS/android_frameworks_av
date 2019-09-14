@@ -33,7 +33,8 @@ namespace android {
 namespace {
 
 constexpr char COMPONENT_NAME[] = "c2.android.avc.decoder";
-
+constexpr uint32_t kDefaultOutputDelay = 8;
+constexpr uint32_t kMaxOutputDelay = 16;
 }  // namespace
 
 class C2SoftAvcDec::IntfImpl : public SimpleInterface<void>::BaseParams {
@@ -54,7 +55,9 @@ public:
         // TODO: Proper support for reorder depth.
         addParameter(
                 DefineParam(mActualOutputDelay, C2_PARAMKEY_OUTPUT_DELAY)
-                .withConstValue(new C2PortActualDelayTuning::output(8u))
+                .withDefault(new C2PortActualDelayTuning::output(kDefaultOutputDelay))
+                .withFields({C2F(mActualOutputDelay, value).inRange(0, kMaxOutputDelay)})
+                .withSetter(Setter<decltype(*mActualOutputDelay)>::StrictValueWithNoDeps)
                 .build());
 
         // TODO: output latency and reordering
@@ -196,7 +199,6 @@ public:
                                      0u, HAL_PIXEL_FORMAT_YCBCR_420_888))
                 .build());
     }
-
     static C2R SizeSetter(bool mayBlock, const C2P<C2StreamPictureSizeInfo::output> &oldMe,
                           C2P<C2StreamPictureSizeInfo::output> &me) {
         (void)mayBlock;
@@ -333,6 +335,7 @@ C2SoftAvcDec::C2SoftAvcDec(
       mDecHandle(nullptr),
       mOutBufferFlush(nullptr),
       mIvColorFormat(IV_YUV_420P),
+      mOutputDelay(kDefaultOutputDelay),
       mWidth(320),
       mHeight(240),
       mHeaderDecoded(false),
@@ -881,6 +884,26 @@ void C2SoftAvcDec::process(
             work->workletsProcessed = 1u;
             work->result = C2_CORRUPTED;
             return;
+        }
+        if (s_decode_op.i4_reorder_depth >= 0 && mOutputDelay != s_decode_op.i4_reorder_depth) {
+            mOutputDelay = s_decode_op.i4_reorder_depth;
+            ALOGV("New Output delay %d ", mOutputDelay);
+
+            C2PortActualDelayTuning::output outputDelay(mOutputDelay);
+            std::vector<std::unique_ptr<C2SettingResult>> failures;
+            c2_status_t err =
+                mIntf->config({&outputDelay}, C2_MAY_BLOCK, &failures);
+            if (err == OK) {
+                work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(outputDelay));
+            } else {
+                ALOGE("Cannot set output delay");
+                mSignalledError = true;
+                work->workletsProcessed = 1u;
+                work->result = C2_CORRUPTED;
+                return;
+            }
+            continue;
         }
         if (0 < s_decode_op.u4_pic_wd && 0 < s_decode_op.u4_pic_ht) {
             if (mHeaderDecoded == false) {
