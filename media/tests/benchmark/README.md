@@ -28,3 +28,13 @@ The path to these files on the device is required to be given for the test.
 ```
 adb shell /data/local/tmp/extractorTest -P /sdcard/res/
 ```
+
+## Decoder
+
+The test decodes input stream and benchmarks the decoders available in NDK.
+
+Setup steps are same as extractor.
+
+```
+adb shell /data/local/tmp/decoderTest -P /sdcard/res/
+```
