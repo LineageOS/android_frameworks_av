@@ -48,6 +48,7 @@ ARTPSource::ARTPSource(
       mClockRate(0),
       mJbTime(300), // default jitter buffer time is 300ms.
       mFirstSsrc(0),
+      mHighestNackNumber(0),
       mID(id),
       mHighestSeqNumber(0),
       mPrevExpected(0),
@@ -222,7 +223,7 @@ void ARTPSource::addFIR(const sp<ABuffer> &buffer) {
     mLastFIRRequestUs = nowUs;
 
     if (buffer->size() + 20 > buffer->capacity()) {
-        ALOGW("RTCP buffer too small to accomodate FIR.");
+        ALOGW("RTCP buffer too small to accommodate FIR.");
         return;
     }
 
@@ -253,14 +254,14 @@ void ARTPSource::addFIR(const sp<ABuffer> &buffer) {
     data[18] = 0x00;
     data[19] = 0x00;
 
-    buffer->setRange(buffer->offset(), buffer->size() + 20);
+    buffer->setRange(buffer->offset(), buffer->size() + (data[3] + 1) * sizeof(int32_t));
 
     ALOGV("Added FIR request.");
 }
 
 void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
     if (buffer->size() + 32 > buffer->capacity()) {
-        ALOGW("RTCP buffer too small to accomodate RR.");
+        ALOGW("RTCP buffer too small to accommodate RR.");
         return;
     }
 
@@ -331,7 +332,7 @@ void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
     data[30] = (DLSR >> 8) & 0xff;
     data[31] = DLSR & 0xff;
 
-    buffer->setRange(buffer->offset(), buffer->size() + 32);
+    buffer->setRange(buffer->offset(), buffer->size() + (data[3] + 1) * sizeof(int32_t));
 }
 
 void ARTPSource::addTMMBR(const sp<ABuffer> &buffer, int32_t targetBitrate) {
@@ -375,7 +376,107 @@ void ARTPSource::addTMMBR(const sp<ABuffer> &buffer, int32_t targetBitrate) {
     data[18] =                        (mantissa & 0x0007f) << 1;
     data[19] = 40;              // 40 bytes overhead;
 
-    buffer->setRange(buffer->offset(), buffer->size() + 20);
+    buffer->setRange(buffer->offset(), buffer->size() + (data[3] + 1) * sizeof(int32_t));
+}
+
+int ARTPSource::addNACK(const sp<ABuffer> &buffer) {
+    if (buffer->size() + 52 > buffer->capacity()) {
+        ALOGW("RTCP buffer too small to accomodate NACK.");
+        return -1;
+    }
+
+    uint8_t *data = buffer->data() + buffer->size();
+
+    data[0] = 0x80 | 1; // Generic NACK
+    data[1] = 205;      // TSFB
+    data[2] = 0;
+    data[3] = 0;        // will be decided later
+    data[4] = kSourceID >> 24;
+    data[5] = (kSourceID >> 16) & 0xff;
+    data[6] = (kSourceID >> 8) & 0xff;
+    data[7] = kSourceID & 0xff;
+
+    data[8] = mID >> 24;
+    data[9] = (mID >> 16) & 0xff;
+    data[10] = (mID >> 8) & 0xff;
+    data[11] = mID & 0xff;
+
+    List<int> list;
+    List<int>::iterator it;
+    getSeqNumToNACK(list, 10);
+    int cnt = 0;
+
+    int* FCI = (int*)(data + 12);
+    for (it = list.begin() ; it != list.end() ; it++) {
+        *(FCI + cnt) = *it;
+        cnt++;
+    }
+
+    data[3] = (3 + cnt) - 1;  // total (3 + #ofFCI) * sizeof(int32_t) byte
+
+    buffer->setRange(buffer->offset(), buffer->size() + (data[3] + 1) * sizeof(int32_t));
+
+    return cnt;
+}
+
+int ARTPSource::getSeqNumToNACK(List<int>& list, int size) {
+    AutoMutex _l(mMapLock);
+    int cnt = 0;
+
+    std::map<uint16_t, infoNACK>::iterator it;
+    for(it = mNACKMap.begin() ; it != mNACKMap.end() ; it++) {
+        infoNACK& info_it = it->second;
+        // list full
+        if (cnt == size)
+            break;
+        if (info_it.needToNACK) {
+            info_it.needToNACK = false;
+            // switch LSB to MSB for sending N/W
+            uint32_t FCI;
+            uint8_t* temp = (uint8_t*)&FCI;
+            temp[0] = (info_it.seqNum >> 8) & 0xff;
+            temp[1] = (info_it.seqNum)      & 0xff;
+            temp[2] = (info_it.mask >> 8)   & 0xff;
+            temp[3] = (info_it.mask)        & 0xff;
+
+            list.push_back(FCI);
+            cnt++;
+        }
+    }
+
+    return cnt;
+}
+
+void ARTPSource::setSeqNumToNACK(uint16_t seqNum, uint16_t mask, uint16_t nowJitterHeadSeqNum) {
+    AutoMutex _l(mMapLock);
+    infoNACK info = {seqNum, mask, nowJitterHeadSeqNum, true};
+    std::map<uint16_t, infoNACK>::iterator it;
+
+    it = mNACKMap.find(seqNum);
+    if (it != mNACKMap.end()) {
+        infoNACK& info_it = it->second;
+        // renew if (mask or head seq) is changed
+        if((info_it.mask != mask) || (info_it.nowJitterHeadSeqNum != nowJitterHeadSeqNum)) {
+            info_it = info;
+        }
+    } else {
+        mNACKMap[seqNum] = info;
+    }
+
+    // delete all NACK far from current Jitter's first sequence number
+    it = mNACKMap.begin();
+    while(it != mNACKMap.end()) {
+        infoNACK& info_it = it->second;
+
+        int diff = nowJitterHeadSeqNum - info_it.nowJitterHeadSeqNum;
+        if (diff > 100) {
+            ALOGV("Delete %d pkt from NACK map ", info_it.seqNum);
+            it = mNACKMap.erase(it);
+        }
+        else
+            it++;
+    }
+
 }
 
 uint32_t ARTPSource::getSelfID() {

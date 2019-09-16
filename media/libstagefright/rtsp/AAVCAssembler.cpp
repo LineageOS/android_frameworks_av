@@ -43,6 +43,63 @@ AAVCAssembler::AAVCAssembler(const sp<AMessage> &notify)
 AAVCAssembler::~AAVCAssembler() {
 }
 
+int32_t AAVCAssembler::addNack(
+        const sp<ARTPSource> &source) {
+    List<sp<ABuffer>> *queue = source->queue();
+    int32_t nackCount = 0;
+
+    List<sp<ABuffer> >::iterator it = queue->begin();
+
+    uint16_t queueHeadSeqNum;
+    if (it != queue->end())
+        queueHeadSeqNum = (*it)->int32Data();
+
+    // move to the packet after that RTCP:NACK sent.
+    while (it != queue->end()) {
+        int32_t seqNum = (*it)->int32Data();
+        if (seqNum < source->mHighestNackNumber)
+            it++;
+        else
+            break;
+    }
+
+    int32_t nackStartAt = -1;
+
+    while (it != queue->end()) {
+        int32_t seqBeforeLast = (*it)->int32Data();
+        // increase iterator.
+        if ((++it) == queue->end())
+            break;
+        int32_t seqLast = (*it)->int32Data();
+
+        if ((seqLast - seqBeforeLast) < 0) {
+            ALOGD("addNack : found end of seqNum from(%d) to(%d)", seqBeforeLast, seqLast);
+            source->mHighestNackNumber = 0;
+        }
+
+        // missed packet found
+        if (seqLast > (seqBeforeLast + 1) &&
+            // we didn't send RTCP:NACK for this packet yet.
+            (seqLast - 1) > source->mHighestNackNumber) {
+            source->mHighestNackNumber = seqLast -1;
+            nackStartAt = seqBeforeLast + 1;
+            break;
+        }
+
+    }
+
+    if (nackStartAt != -1) {
+        nackCount = source->mHighestNackNumber - nackStartAt + 1;
+        ALOGD("addNack : nackCount=%d, nackFrom=%d, nackTo=%d", nackCount,
+            nackStartAt, source->mHighestNackNumber);
+
+        uint16_t mask = (uint16_t)(0xffff) >> (16-nackCount+1);
+        source->setSeqNumToNACK(nackStartAt, mask, queueHeadSeqNum);
+    }
+
+    return nackCount;
+}
+
 ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
         const sp<ARTPSource> &source) {
     List<sp<ABuffer> > *queue = source->queue();
@@ -73,6 +130,8 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
                 rtpTime, playedTimeRtp, expiredTimeInJb, isExpired);
         mShowQueueCnt++;
     }
+
+    AAVCAssembler::addNack(source);
 
     ALOGV("start=%lld, now=%lld, played=%lld", (long long)startTime,
             (long long)nowTime, (long long)playedTime);

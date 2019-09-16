@@ -441,6 +441,17 @@ void ARTPConnection::onPollStreams() {
                 continue;
             }
 
+            // addNACK
+            sp<ABuffer> buffer = new ABuffer(kMaxUDPSize);
+            for (size_t i = 0; i < it->mSources.size(); ++i) {
+                buffer->setRange(0, 0);
+                int cnt = it->mSources.valueAt(i)->addNACK(buffer);
+                if (cnt > 0) {
+                    ALOGV("Send NACK for lost %d Packets", cnt);
+                    send(&*it, buffer);
+                }
+            }
+
             ++it;
         }
     }

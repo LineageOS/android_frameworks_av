@@ -47,6 +47,7 @@ private:
     bool mAccessUnitDamaged;
     List<sp<ABuffer> > mNALUnits;
 
+    int32_t addNack(const sp<ARTPSource> &source);
     AssemblyStatus addNALUnit(const sp<ARTPSource> &source);
     void addSingleNALUnit(const sp<ABuffer> &buffer);
     AssemblyStatus addFragmentedNALUnit(List<sp<ABuffer> > *queue);

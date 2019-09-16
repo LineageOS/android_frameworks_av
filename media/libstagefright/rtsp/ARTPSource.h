@@ -23,6 +23,9 @@
 #include <media/stagefright/foundation/ABase.h>
 #include <utils/List.h>
 #include <utils/RefBase.h>
+#include <utils/Thread.h>
+
+#include <map>
 
 namespace android {
 
@@ -46,6 +49,8 @@ struct ARTPSource : public RefBase {
     void addReceiverReport(const sp<ABuffer> &buffer);
     void addFIR(const sp<ABuffer> &buffer);
     void addTMMBR(const sp<ABuffer> &buffer, int32_t targetBitrate);
+    int addNACK(const sp<ABuffer> &buffer);
+    void setSeqNumToNACK(uint16_t seqNum, uint16_t mask, uint16_t nowJitterHeadSeqNum);
     uint32_t getSelfID();
     void setSelfID(const uint32_t selfID);
     void setJbTime(const uint32_t jbTime);
@@ -60,6 +65,7 @@ struct ARTPSource : public RefBase {
 
     uint32_t mJbTime;
     int32_t mFirstSsrc;
+    int32_t mHighestNackNumber;
 
 private:
 
@@ -74,6 +80,17 @@ private:
 
     List<sp<ABuffer> > mQueue;
     sp<ARTPAssembler> mAssembler;
+
+    typedef struct infoNACK {
+        uint16_t seqNum;
+        uint16_t mask;
+        uint16_t nowJitterHeadSeqNum;
+        bool    needToNACK;
+    } infoNACK;
+
+    Mutex mMapLock;
+    std::map<uint16_t, infoNACK> mNACKMap;
+    int getSeqNumToNACK(List<int>& list, int size);
 
     uint64_t mLastNTPTime;
     int64_t mLastNTPTimeUpdateUs;
