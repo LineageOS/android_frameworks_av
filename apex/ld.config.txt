@@ -89,6 +89,7 @@ namespace.sphal.asan.permitted.paths +=           /vendor/${LIB}
 namespace.sphal.search.paths += /odm/${LIB}/vndk-sp
 namespace.sphal.search.paths += /vendor/${LIB}/vndk-sp
 namespace.sphal.search.paths += /system/${LIB}/vndk-sp${VNDK_VER}
+namespace.sphal.search.paths += /system/${LIB}
 
 namespace.sphal.permitted.paths += /odm/${LIB}/hw
 namespace.sphal.permitted.paths += /odm/${LIB}/egl
