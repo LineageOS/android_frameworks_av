@@ -22,6 +22,7 @@ cc_library_static {
     ],
 
     srcs: [
+        "BenchmarkCommon.cpp",
         "Timer.cpp",
     ],
 
