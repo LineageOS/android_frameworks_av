@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <unordered_set>
+
 #include <gtest/gtest.h>
 
 #define LOG_TAG "SysAudio_Test"
@@ -114,4 +116,59 @@ TEST(SystemAudioTest, PatchEqual) {
     ASSERT_TRUE(audio_patches_are_equal(
                     (PatchBuilder{}).addSource(src).addSink(sink_hw_av_sync).patch(),
                     (PatchBuilder{}).addSource(src).addSink(sink_hw_av_sync).patch()));
+}
+
+void runAudioDeviceTypeHelperFunction(const std::unordered_set<audio_devices_t>& allDevices,
+                                      const audio_devices_t targetDevices[],
+                                      unsigned int targetDeviceCount,
+                                      const std::string& deviceTag,
+                                      bool (*device_type_helper_function)(audio_devices_t))
+{
+    std::unordered_set<audio_devices_t> devices(targetDevices, targetDevices + targetDeviceCount);
+    for (auto device : allDevices) {
+        if (devices.find(device) == devices.end()) {
+            ASSERT_FALSE(device_type_helper_function(device))
+                    << std::hex << device << " should not be " << deviceTag << " device";
+        } else {
+            ASSERT_TRUE(device_type_helper_function(device))
+                    << std::hex << device << " should be " << deviceTag << " device";
+        }
+    }
+}
+
+TEST(SystemAudioTest, AudioDeviceTypeHelperFunction) {
+    std::unordered_set<audio_devices_t> allDeviceTypes;
+    allDeviceTypes.insert(std::begin(AUDIO_DEVICE_OUT_ALL_ARRAY),
+            std::end(AUDIO_DEVICE_OUT_ALL_ARRAY));
+    allDeviceTypes.insert(std::begin(AUDIO_DEVICE_IN_ALL_ARRAY),
+            std::end(AUDIO_DEVICE_IN_ALL_ARRAY));
+
+    runAudioDeviceTypeHelperFunction(allDeviceTypes, AUDIO_DEVICE_OUT_ALL_ARRAY,
+            AUDIO_DEVICE_OUT_CNT, "output", audio_is_output_device);
+    runAudioDeviceTypeHelperFunction(allDeviceTypes, AUDIO_DEVICE_IN_ALL_ARRAY,
+            AUDIO_DEVICE_IN_CNT, "input", audio_is_input_device);
+    runAudioDeviceTypeHelperFunction(allDeviceTypes, AUDIO_DEVICE_OUT_ALL_A2DP_ARRAY,
+            AUDIO_DEVICE_OUT_A2DP_CNT, "a2dp out", audio_is_a2dp_out_device);
+    const audio_devices_t bluetoothInA2dpDevices[] = { AUDIO_DEVICE_IN_BLUETOOTH_A2DP };
+    runAudioDeviceTypeHelperFunction(allDeviceTypes, bluetoothInA2dpDevices,
+            1 /*targetDeviceCount*/, "a2dp in", audio_is_a2dp_in_device);
+    runAudioDeviceTypeHelperFunction(allDeviceTypes, AUDIO_DEVICE_OUT_ALL_SCO_ARRAY,
+            AUDIO_DEVICE_OUT_SCO_CNT, "bluetooth out sco", audio_is_bluetooth_out_sco_device);
+    runAudioDeviceTypeHelperFunction(allDeviceTypes, AUDIO_DEVICE_IN_ALL_SCO_ARRAY,
+            AUDIO_DEVICE_IN_SCO_CNT, "bluetooth in sco", audio_is_bluetooth_in_sco_device);
+    const unsigned int scoDeviceCount = AUDIO_DEVICE_OUT_SCO_CNT + AUDIO_DEVICE_IN_SCO_CNT;
+    audio_devices_t scoDevices[scoDeviceCount];
+    std::copy(std::begin(AUDIO_DEVICE_OUT_ALL_SCO_ARRAY), std::end(AUDIO_DEVICE_OUT_ALL_SCO_ARRAY),
+              std::begin(scoDevices));
+    std::copy(std::begin(AUDIO_DEVICE_IN_ALL_SCO_ARRAY), std::end(AUDIO_DEVICE_IN_ALL_SCO_ARRAY),
+              std::begin(scoDevices) + AUDIO_DEVICE_OUT_SCO_CNT);
+    runAudioDeviceTypeHelperFunction(allDeviceTypes, scoDevices,
+            scoDeviceCount, "bluetooth sco", audio_is_bluetooth_sco_device);
+    const audio_devices_t hearingAidOutDevices[] = { AUDIO_DEVICE_OUT_HEARING_AID };
+    runAudioDeviceTypeHelperFunction(allDeviceTypes, hearingAidOutDevices,
+            1 /*targetDeviceCount*/, "hearing aid out", audio_is_hearing_aid_out_device);
+    runAudioDeviceTypeHelperFunction(allDeviceTypes, AUDIO_DEVICE_OUT_ALL_USB_ARRAY,
+            AUDIO_DEVICE_OUT_USB_CNT, "usb out", audio_is_usb_out_device);
+    runAudioDeviceTypeHelperFunction(allDeviceTypes, AUDIO_DEVICE_IN_ALL_USB_ARRAY,
+            AUDIO_DEVICE_IN_USB_CNT, "usb in", audio_is_usb_in_device);
 }
