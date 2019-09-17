@@ -22,7 +22,7 @@
 #include <sys/resource.h>
 #include <unistd.h>
 
-#include <bionic_malloc.h>
+#include <bionic/malloc.h>
 
 #include "MediaUtils.h"
 
