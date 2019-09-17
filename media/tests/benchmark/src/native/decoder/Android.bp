@@ -14,47 +14,18 @@
  * limitations under the License.
  */
 
-cc_test {
-    name: "extractorTest",
-    gtest: true,
+cc_library_static {
+    name: "libbenchmark_decoder",
     defaults: [
         "libbenchmark_common-defaults",
         "libbenchmark_soft_sanitize_all-defaults",
     ],
 
-    srcs: ["ExtractorTest.cpp"],
+    srcs: ["Decoder.cpp"],
 
-    static_libs: ["libbenchmark_extractor"]
-}
+    static_libs: ["libbenchmark_extractor"],
 
-cc_test {
-    name: "decoderTest",
-    gtest: true,
-    defaults: [
-        "libbenchmark_common-defaults",
-        "libbenchmark_soft_sanitize_all-defaults",
-    ],
+    export_include_dirs: ["."],
 
-    srcs: ["DecoderTest.cpp"],
-
-    static_libs: [
-        "libbenchmark_extractor",
-        "libbenchmark_decoder",
-    ],
-}
-
-cc_test {
-    name: "muxerTest",
-    gtest: true,
-    defaults: [
-        "libbenchmark_common-defaults",
-        "libbenchmark_soft_sanitize_all-defaults",
-    ],
-
-    srcs: ["MuxerTest.cpp"],
-
-    static_libs: [
-        "libbenchmark_extractor",
-        "libbenchmark_muxer",
-    ],
+    ldflags: ["-Wl,-Bsymbolic"]
 }
