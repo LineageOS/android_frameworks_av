@@ -45,10 +45,10 @@ cc_library {
         "-Werror",
     ],
 
-    include_dirs: [
-        // For android_mallopt definitions.
-        "bionic/libc/private"
+    header_libs: [
+        "bionic_libc_platform_headers",
     ],
+
     local_include_dirs: ["include"],
     export_include_dirs: ["include"],
 }
