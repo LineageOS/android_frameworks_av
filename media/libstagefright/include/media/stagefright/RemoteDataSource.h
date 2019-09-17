@@ -48,7 +48,7 @@ public:
         if (size > kBufferSize) {
             size = kBufferSize;
         }
-        return mSource->readAt(offset, mMemory->pointer(), size);
+        return mSource->readAt(offset, mMemory->unsecurePointer(), size);
     }
     virtual status_t getSize(off64_t *size) {
         return mSource->getSize(size);

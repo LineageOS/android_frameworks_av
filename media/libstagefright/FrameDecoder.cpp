@@ -99,7 +99,7 @@ sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
         ALOGE("not enough memory for VideoFrame size=%zu", size);
         return NULL;
     }
-    VideoFrame* frameCopy = static_cast<VideoFrame*>(frameMem->pointer());
+    VideoFrame* frameCopy = static_cast<VideoFrame*>(frameMem->unsecurePointer());
     frameCopy->init(frame, iccData, iccSize);
 
     return frameMem;
@@ -206,7 +206,7 @@ sp<IMemory> FrameDecoder::getMetadataOnly(
     // try to fill sequence meta's duration based on average frame rate,
     // default to 33ms if frame rate is unavailable.
     int32_t frameRate;
-    VideoFrame* meta = static_cast<VideoFrame*>(metaMem->pointer());
+    VideoFrame* meta = static_cast<VideoFrame*>(metaMem->unsecurePointer());
     if (trackMeta->findInt32(kKeyFrameRate, &frameRate) && frameRate > 0) {
         meta->mDurationUs = 1000000LL / frameRate;
     } else {
@@ -614,7 +614,7 @@ status_t VideoFrameDecoder::onOutputReceived(
                 0,
                 dstBpp(),
                 mSurfaceControl != nullptr /*allocRotated*/);
-        mFrame = static_cast<VideoFrame*>(frameMem->pointer());
+        mFrame = static_cast<VideoFrame*>(frameMem->unsecurePointer());
 
         setFrame(frameMem);
     }
@@ -895,7 +895,7 @@ status_t ImageDecoder::onOutputReceived(
     if (mFrame == NULL) {
         sp<IMemory> frameMem = allocVideoFrame(
                 trackMeta(), mWidth, mHeight, mTileWidth, mTileHeight, dstBpp());
-        mFrame = static_cast<VideoFrame*>(frameMem->pointer());
+        mFrame = static_cast<VideoFrame*>(frameMem->unsecurePointer());
 
         setFrame(frameMem);
     }

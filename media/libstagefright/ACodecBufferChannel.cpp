@@ -153,7 +153,8 @@ status_t ACodecBufferChannel::queueSecureInputBuffer(
         }
 
         if (destination.mType == ICrypto::kDestinationTypeSharedMemory) {
-            memcpy(it->mCodecBuffer->base(), destination.mSharedMemory->pointer(), result);
+            memcpy(it->mCodecBuffer->base(),
+                destination.mSharedMemory->unsecurePointer(), result);
         }
     } else {
         // Here we cast CryptoPlugin::SubSample to hardware::cas::native::V1_0::SubSample
@@ -219,7 +220,8 @@ status_t ACodecBufferChannel::queueSecureInputBuffer(
 
         if (dstBuffer.type == BufferType::SHARED_MEMORY) {
             memcpy(it->mCodecBuffer->base(),
-                    (uint8_t*)it->mSharedEncryptedBuffer->pointer(), result);
+                    (uint8_t*)it->mSharedEncryptedBuffer->unsecurePointer(),
+                    result);
         }
     }
 

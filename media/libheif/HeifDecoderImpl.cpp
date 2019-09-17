@@ -173,7 +173,7 @@ ssize_t HeifDataSource::readAt(off64_t offset, size_t size) {
 
     // copy from cache if the request falls entirely in cache
     if (offset + size <= mCachedOffset + mCachedSize) {
-        memcpy(mMemory->pointer(), mCache.get() + offset - mCachedOffset, size);
+        memcpy(mMemory->unsecurePointer(), mCache.get() + offset - mCachedOffset, size);
         return size;
     }
 
@@ -271,7 +271,7 @@ ssize_t HeifDataSource::readAt(off64_t offset, size_t size) {
     if (bytesAvailable < (int64_t)size) {
         size = bytesAvailable;
     }
-    memcpy(mMemory->pointer(), mCache.get() + offset - mCachedOffset, size);
+    memcpy(mMemory->unsecurePointer(), mCache.get() + offset - mCachedOffset, size);
     return size;
 }
 
@@ -360,12 +360,16 @@ bool HeifDecoderImpl::init(HeifStream* stream, HeifFrameInfo* frameInfo) {
         sp<IMemory> sharedMem = mRetriever->getImageAtIndex(
                 -1, mOutputColor, true /*metaOnly*/);
 
-        if (sharedMem == nullptr || sharedMem->pointer() == nullptr) {
+        if (sharedMem == nullptr || sharedMem->unsecurePointer() == nullptr) {
             ALOGE("init: videoFrame is a nullptr");
             return false;
         }
 
-        VideoFrame* videoFrame = static_cast<VideoFrame*>(sharedMem->pointer());
+        // TODO: Using unsecurePointer() has some associated security pitfalls
+        //       (see declaration for details).
+        //       Either document why it is safe in this case or address the
+        //       issue (e.g. by copying).
+        VideoFrame* videoFrame = static_cast<VideoFrame*>(sharedMem->unsecurePointer());
 
         ALOGV("Image dimension %dx%d, display %dx%d, angle %d, iccSize %d",
                 videoFrame->mWidth,
@@ -391,12 +395,17 @@ bool HeifDecoderImpl::init(HeifStream* stream, HeifFrameInfo* frameInfo) {
                 MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC,
                 mOutputColor, true /*metaOnly*/);
 
-        if (sharedMem == nullptr || sharedMem->pointer() == nullptr) {
+        if (sharedMem == nullptr || sharedMem->unsecurePointer() == nullptr) {
             ALOGE("init: videoFrame is a nullptr");
             return false;
         }
 
-        VideoFrame* videoFrame = static_cast<VideoFrame*>(sharedMem->pointer());
+        // TODO: Using unsecurePointer() has some associated security pitfalls
+        //       (see declaration for details).
+        //       Either document why it is safe in this case or address the
+        //       issue (e.g. by copying).
+        VideoFrame* videoFrame = static_cast<VideoFrame*>(
+            sharedMem->unsecurePointer());
 
         ALOGV("Sequence dimension %dx%d, display %dx%d, angle %d, iccSize %d",
                 videoFrame->mWidth,
@@ -487,7 +496,7 @@ bool HeifDecoderImpl::decodeAsync() {
         {
             Mutex::Autolock autolock(mLock);
 
-            if (frameMemory == nullptr || frameMemory->pointer() == nullptr) {
+            if (frameMemory == nullptr || frameMemory->unsecurePointer() == nullptr) {
                 mAsyncDecodeDone = true;
                 mScanlineReady.signal();
                 break;
@@ -529,12 +538,16 @@ bool HeifDecoderImpl::decode(HeifFrameInfo* frameInfo) {
             sp<IMemory> frameMemory = mRetriever->getImageRectAtIndex(
                     -1, mOutputColor, 0, 0, mImageInfo.mWidth, mSliceHeight);
 
-            if (frameMemory == nullptr || frameMemory->pointer() == nullptr) {
+            if (frameMemory == nullptr || frameMemory->unsecurePointer() == nullptr) {
                 ALOGE("decode: metadata is a nullptr");
                 return false;
             }
 
-            VideoFrame* videoFrame = static_cast<VideoFrame*>(frameMemory->pointer());
+            // TODO: Using unsecurePointer() has some associated security pitfalls
+            //       (see declaration for details).
+            //       Either document why it is safe in this case or address the
+            //       issue (e.g. by copying).
+            VideoFrame* videoFrame = static_cast<VideoFrame*>(frameMemory->unsecurePointer());
 
             if (frameInfo != nullptr) {
                 initFrameInfo(frameInfo, videoFrame);
@@ -563,12 +576,16 @@ bool HeifDecoderImpl::decode(HeifFrameInfo* frameInfo) {
                 MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC, mOutputColor);
     }
 
-    if (mFrameMemory == nullptr || mFrameMemory->pointer() == nullptr) {
+    if (mFrameMemory == nullptr || mFrameMemory->unsecurePointer() == nullptr) {
         ALOGE("decode: videoFrame is a nullptr");
         return false;
     }
 
-    VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->pointer());
+    // TODO: Using unsecurePointer() has some associated security pitfalls
+    //       (see declaration for details).
+    //       Either document why it is safe in this case or address the
+    //       issue (e.g. by copying).
+    VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->unsecurePointer());
     if (videoFrame->mSize == 0 ||
             mFrameMemory->size() < videoFrame->getFlattenedSize()) {
         ALOGE("decode: videoFrame size is invalid");
@@ -613,12 +630,16 @@ bool HeifDecoderImpl::decodeSequence(int frameIndex, HeifFrameInfo* frameInfo) {
     mTotalScanline = mSequenceInfo.mHeight;
 
     mFrameMemory = mRetriever->getFrameAtIndex(frameIndex, mOutputColor);
-    if (mFrameMemory == nullptr || mFrameMemory->pointer() == nullptr) {
+    if (mFrameMemory == nullptr || mFrameMemory->unsecurePointer() == nullptr) {
         ALOGE("decode: videoFrame is a nullptr");
         return false;
     }
 
-    VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->pointer());
+    // TODO: Using unsecurePointer() has some associated security pitfalls
+    //       (see declaration for details).
+    //       Either document why it is safe in this case or address the
+    //       issue (e.g. by copying).
+    VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->unsecurePointer());
     if (videoFrame->mSize == 0 ||
             mFrameMemory->size() < videoFrame->getFlattenedSize()) {
         ALOGE("decode: videoFrame size is invalid");
@@ -641,10 +662,14 @@ bool HeifDecoderImpl::decodeSequence(int frameIndex, HeifFrameInfo* frameInfo) {
 }
 
 bool HeifDecoderImpl::getScanlineInner(uint8_t* dst) {
-    if (mFrameMemory == nullptr || mFrameMemory->pointer() == nullptr) {
+    if (mFrameMemory == nullptr || mFrameMemory->unsecurePointer() == nullptr) {
         return false;
     }
-    VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->pointer());
+    // TODO: Using unsecurePointer() has some associated security pitfalls
+    //       (see declaration for details).
+    //       Either document why it is safe in this case or address the
+    //       issue (e.g. by copying).
+    VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->unsecurePointer());
     uint8_t* src = videoFrame->getFlattenedData() + videoFrame->mRowBytes * mCurScanline++;
     memcpy(dst, src, videoFrame->mBytesPerPixel * videoFrame->mWidth);
     return true;

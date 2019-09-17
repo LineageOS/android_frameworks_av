@@ -165,8 +165,12 @@ hardware::Return<void> CameraHardwareInterface::handleCallbackTimestamp(
         mem = mHidlMemPoolMap.at(data);
     }
     sp<CameraHeapMemory> heapMem(static_cast<CameraHeapMemory *>(mem->handle));
+    // TODO: Using unsecurePointer() has some associated security pitfalls
+    //       (see declaration for details).
+    //       Either document why it is safe in this case or address the
+    //       issue (e.g. by copying).
     VideoNativeHandleMetadata* md = (VideoNativeHandleMetadata*)
-            heapMem->mBuffers[bufferIndex]->pointer();
+            heapMem->mBuffers[bufferIndex]->unsecurePointer();
     md->pHandle = const_cast<native_handle_t*>(frameData.getNativeHandle());
     sDataCbTimestamp(timestamp, (int32_t) msgType, mem, bufferIndex, this);
     return hardware::Void();
@@ -192,8 +196,12 @@ hardware::Return<void> CameraHardwareInterface::handleCallbackTimestampBatch(
                      hidl_msg.bufferIndex, mem->mNumBufs);
                 return hardware::Void();
             }
+            // TODO: Using unsecurePointer() has some associated security pitfalls
+            //       (see declaration for details).
+            //       Either document why it is safe in this case or address the
+            //       issue (e.g. by copying).
             VideoNativeHandleMetadata* md = (VideoNativeHandleMetadata*)
-                    mem->mBuffers[hidl_msg.bufferIndex]->pointer();
+                    mem->mBuffers[hidl_msg.bufferIndex]->unsecurePointer();
             md->pHandle = const_cast<native_handle_t*>(hidl_msg.frameData.getNativeHandle());
 
             msgs.push_back({hidl_msg.timestamp, mem->mBuffers[hidl_msg.bufferIndex]});
@@ -578,7 +586,11 @@ void CameraHardwareInterface::releaseRecordingFrame(const sp<IMemory>& mem)
     int bufferIndex = offset / size;
     if (CC_LIKELY(mHidlDevice != nullptr)) {
         if (size == sizeof(VideoNativeHandleMetadata)) {
-            VideoNativeHandleMetadata* md = (VideoNativeHandleMetadata*) mem->pointer();
+            // TODO: Using unsecurePointer() has some associated security pitfalls
+            //       (see declaration for details).
+            //       Either document why it is safe in this case or address the
+            //       issue (e.g. by copying).
+            VideoNativeHandleMetadata* md = (VideoNativeHandleMetadata*) mem->unsecurePointer();
             // Caching the handle here because md->pHandle will be subject to HAL's edit
             native_handle_t* nh = md->pHandle;
             hidl_handle frame = nh;
@@ -605,7 +617,11 @@ void CameraHardwareInterface::releaseRecordingFrameBatch(const std::vector<sp<IM
             if (size == sizeof(VideoNativeHandleMetadata)) {
                 uint32_t heapId = heap->getHeapID();
                 uint32_t bufferIndex = offset / size;
-                VideoNativeHandleMetadata* md = (VideoNativeHandleMetadata*) mem->pointer();
+                // TODO: Using unsecurePointer() has some associated security pitfalls
+                //       (see declaration for details).
+                //       Either document why it is safe in this case or address the
+                //       issue (e.g. by copying).
+                VideoNativeHandleMetadata* md = (VideoNativeHandleMetadata*) mem->unsecurePointer();
                 // Caching the handle here because md->pHandle will be subject to HAL's edit
                 native_handle_t* nh = md->pHandle;
                 VideoFrameMessage msg;

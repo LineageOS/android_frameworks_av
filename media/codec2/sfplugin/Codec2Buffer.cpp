@@ -764,7 +764,11 @@ EncryptedLinearBlockBuffer::EncryptedLinearBlockBuffer(
         const std::shared_ptr<C2LinearBlock> &block,
         const sp<IMemory> &memory,
         int32_t heapSeqNum)
-    : Codec2Buffer(format, new ABuffer(memory->pointer(), memory->size())),
+    // TODO: Using unsecurePointer() has some associated security pitfalls
+    //       (see declaration for details).
+    //       Either document why it is safe in this case or address the
+    //       issue (e.g. by copying).
+    : Codec2Buffer(format, new ABuffer(memory->unsecurePointer(), memory->size())),
       mBlock(block),
       mMemory(memory),
       mHeapSeqNum(heapSeqNum) {
@@ -800,7 +804,7 @@ bool EncryptedLinearBlockBuffer::copyDecryptedContent(
     if (view.size() < length) {
         return false;
     }
-    memcpy(view.data(), decrypted->pointer(), length);
+    memcpy(view.data(), decrypted->unsecurePointer(), length);
     return true;
 }
 

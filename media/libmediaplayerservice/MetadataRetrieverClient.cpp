@@ -292,7 +292,7 @@ sp<IMemory> MetadataRetrieverClient::extractAlbumArt()
         delete albumArt;
         return NULL;
     }
-    MediaAlbumArt::init((MediaAlbumArt *) mAlbumArt->pointer(),
+    MediaAlbumArt::init((MediaAlbumArt *) mAlbumArt->unsecurePointer(),
                         albumArt->size(), albumArt->data());
     delete albumArt;  // We've taken our copy.
     return mAlbumArt;
