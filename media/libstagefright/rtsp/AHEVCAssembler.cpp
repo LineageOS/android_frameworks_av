@@ -63,19 +63,19 @@ ARTPAssembler::AssemblyStatus AHEVCAssembler::addNALUnit(
     }
 
     sp<ABuffer> buffer = *queue->begin();
-    int32_t rtpTime;
-    CHECK(buffer->meta()->findInt32("rtp-time", &rtpTime));
+    uint32_t rtpTime;
+    CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
     int64_t startTime = source->mFirstSysTime / 1000;
     int64_t nowTime = ALooper::GetNowUs() / 1000;
     int64_t playedTime = nowTime - startTime;
-    int32_t playedTimeRtp = source->mFirstRtpTime +
+    int64_t playedTimeRtp = source->mFirstRtpTime +
         (((uint32_t)playedTime) * (source->mClockRate / 1000));
-    int32_t expiredTimeInJb = rtpTime + (source->mClockRate / 5);
+    const uint32_t expiredTimeInJb = rtpTime + (source->mClockRate / 5);
     bool isExpired = expiredTimeInJb <= (playedTimeRtp);
     ALOGV("start=%lld, now=%lld, played=%lld", (long long)startTime,
             (long long)nowTime, (long long)playedTime);
-    ALOGV("rtp-time(JB)=%d, played-rtp-time(JB)=%d, expired-rtp-time(JB)=%d isExpired=%d",
-            rtpTime, playedTimeRtp, expiredTimeInJb, isExpired);
+    ALOGV("rtp-time(JB)=%u, played-rtp-time(JB)=%lld, expired-rtp-time(JB)=%u isExpired=%d",
+            rtpTime, (long long)playedTimeRtp, expiredTimeInJb, isExpired);
 
     if (!isExpired) {
         ALOGV("buffering in jitter buffer.");

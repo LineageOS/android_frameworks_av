@@ -25,6 +25,8 @@
 
 namespace android {
 
+using Q = List<sp<ABuffer> >;
+
 struct ABuffer;
 struct AMessage;
 
@@ -54,6 +56,12 @@ private:
     bool addSingleTimeAggregationPacket(const sp<ABuffer> &buffer);
 
     void submitAccessUnit();
+
+    int32_t pickProperSeq(const Q *q, uint32_t jit, int64_t play);
+    bool recycleUnit(uint32_t start, uint32_t end, size_t avail, float goodRatio);
+    int32_t deleteUnitUnderSeq(Q *q, uint32_t seq);
+    void printNowTimeUs(int64_t start, int64_t now, int64_t play);
+    void printRTPTime(uint32_t rtp, int64_t play, uint32_t exp, bool isExp);
 
     DISALLOW_EVIL_CONSTRUCTORS(AAVCAssembler);
 };

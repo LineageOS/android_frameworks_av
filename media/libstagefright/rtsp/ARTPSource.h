@@ -59,7 +59,7 @@ struct ARTPSource : public RefBase {
     void noticeAbandonBuffer(int cnt=1);
 
     int32_t mFirstSeqNumber;
-    int32_t mFirstRtpTime;
+    uint32_t mFirstRtpTime;
     int64_t mFirstSysTime;
     int32_t mClockRate;
 
