@@ -43,14 +43,6 @@ static const uint32_t SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY = 5000;
 #define MAX_MIXER_CHANNEL_COUNT FCC_8
 
 /**
- * A device mask for all audio input and output devices where matching inputs/outputs on device
- * type alone is not enough: the address must match too
- */
-#define APM_AUDIO_DEVICE_OUT_MATCH_ADDRESS_ALL (AUDIO_DEVICE_OUT_REMOTE_SUBMIX|AUDIO_DEVICE_OUT_BUS)
-
-#define APM_AUDIO_DEVICE_IN_MATCH_ADDRESS_ALL (AUDIO_DEVICE_IN_REMOTE_SUBMIX|AUDIO_DEVICE_IN_BUS)
-
-/**
  * Alias to AUDIO_DEVICE_OUT_DEFAULT defined for clarification when this value is used by volume
  * control APIs (e.g setStreamVolumeIndex().
  */
@@ -71,6 +63,34 @@ static inline bool is_state_in_call(int state)
 }
 
 /**
+ * Check whether the output device type is one
+ * where addresses are used to distinguish between one connected device and another
+ *
+ * @param[in] device to consider
+ *
+ * @return true if the device needs distinguish on address, false otherwise..
+ */
+static inline bool apm_audio_out_device_distinguishes_on_address(audio_devices_t device)
+{
+    return device == AUDIO_DEVICE_OUT_REMOTE_SUBMIX ||
+           device == AUDIO_DEVICE_OUT_BUS;
+}
+
+/**
+ * Check whether the input device type is one
+ * where addresses are used to distinguish between one connected device and another
+ *
+ * @param[in] device to consider
+ *
+ * @return true if the device needs distinguish on address, false otherwise..
+ */
+static inline bool apm_audio_in_device_distinguishes_on_address(audio_devices_t device)
+{
+    return device == AUDIO_DEVICE_IN_REMOTE_SUBMIX ||
+           device == AUDIO_DEVICE_IN_BUS;
+}
+
+/**
  * Check whether the device type is one
  * where addresses are used to distinguish between one connected device and another
  *
@@ -80,10 +100,8 @@ static inline bool is_state_in_call(int state)
  */
 static inline bool device_distinguishes_on_address(audio_devices_t device)
 {
-    return (((device & AUDIO_DEVICE_BIT_IN) != 0) &&
-            ((~AUDIO_DEVICE_BIT_IN & device & APM_AUDIO_DEVICE_IN_MATCH_ADDRESS_ALL) != 0)) ||
-           (((device & AUDIO_DEVICE_BIT_IN) == 0) &&
-            ((device & APM_AUDIO_DEVICE_OUT_MATCH_ADDRESS_ALL) != 0));
+    return apm_audio_in_device_distinguishes_on_address(device) ||
+           apm_audio_out_device_distinguishes_on_address(device);
 }
 
 /**
@@ -95,10 +113,7 @@ static inline bool device_distinguishes_on_address(audio_devices_t device)
  */
 static inline bool device_has_encoding_capability(audio_devices_t device)
 {
-    if (device & AUDIO_DEVICE_OUT_ALL_A2DP) {
-        return true;
-    }
-    return false;
+    return audio_is_a2dp_out_device(device);
 }
 
 /**
