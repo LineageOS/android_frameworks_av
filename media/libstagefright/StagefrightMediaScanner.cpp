@@ -158,7 +158,11 @@ MediaAlbumArt *StagefrightMediaScanner::extractAlbumArt(int fd) {
     if (mRetriever->setDataSource(fd, 0, size) == OK) {
         sp<IMemory> mem = mRetriever->extractAlbumArt();
         if (mem != NULL) {
-            MediaAlbumArt *art = static_cast<MediaAlbumArt *>(mem->pointer());
+            // TODO: Using unsecurePointer() has some associated security pitfalls
+            //       (see declaration for details).
+            //       Either document why it is safe in this case or address the
+            //       issue (e.g. by copying).
+            MediaAlbumArt *art = static_cast<MediaAlbumArt *>(mem->unsecurePointer());
             return art->clone();
         }
     }

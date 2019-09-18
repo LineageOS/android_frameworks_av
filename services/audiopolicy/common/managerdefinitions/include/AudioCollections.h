@@ -25,20 +25,15 @@
 
 namespace android {
 
-class AudioPort;
+class PolicyAudioPort;
 class AudioRoute;
 
-class AudioPortVector : public Vector<sp<AudioPort> >
-{
-public:
-    sp<AudioPort> findByTagName(const std::string &tagName) const;
-};
+using PolicyAudioPortVector = Vector<sp<PolicyAudioPort>>;
+using AudioRouteVector = Vector<sp<AudioRoute>>;
 
+sp<PolicyAudioPort> findByTagName(const PolicyAudioPortVector& policyAudioPortVector,
+                                  const std::string &tagName);
 
-class AudioRouteVector : public Vector<sp<AudioRoute> >
-{
-public:
-    void dump(String8 *dst, int spaces) const;
-};
+void dumpAudioRouteVector(const AudioRouteVector& audioRouteVector, String8 *dst, int spaces);
 
 } // namespace android

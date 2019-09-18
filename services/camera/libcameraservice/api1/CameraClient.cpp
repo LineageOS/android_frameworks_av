@@ -534,7 +534,7 @@ void CameraClient::releaseRecordingFrameHandle(native_handle_t *handle) {
     }
 
     if (mHardware != nullptr) {
-        VideoNativeHandleMetadata *metadata = (VideoNativeHandleMetadata*)(dataPtr->pointer());
+        VideoNativeHandleMetadata *metadata = (VideoNativeHandleMetadata*)(dataPtr->unsecurePointer());
         metadata->eType = kMetadataBufferTypeNativeHandleSource;
         metadata->pHandle = handle;
         mHardware->releaseRecordingFrame(dataPtr);
@@ -573,7 +573,7 @@ void CameraClient::releaseRecordingFrameHandleBatch(const std::vector<native_han
         }
 
         if (!disconnected) {
-            VideoNativeHandleMetadata *metadata = (VideoNativeHandleMetadata*)(dataPtr->pointer());
+            VideoNativeHandleMetadata *metadata = (VideoNativeHandleMetadata*)(dataPtr->unsecurePointer());
             metadata->eType = kMetadataBufferTypeNativeHandleSource;
             metadata->pHandle = handle;
             frames.push_back(dataPtr);
@@ -916,8 +916,12 @@ void CameraClient::handleCallbackTimestampBatch(
                 ALOGE("%s: dataPtr does not contain VideoNativeHandleMetadata!", __FUNCTION__);
                 return;
             }
+            // TODO: Using unsecurePointer() has some associated security pitfalls
+            //       (see declaration for details).
+            //       Either document why it is safe in this case or address the
+            //       issue (e.g. by copying).
             VideoNativeHandleMetadata *metadata =
-                (VideoNativeHandleMetadata*)(msg.dataPtr->pointer());
+                (VideoNativeHandleMetadata*)(msg.dataPtr->unsecurePointer());
             if (metadata->eType == kMetadataBufferTypeNativeHandleSource) {
                 handle = metadata->pHandle;
             }
@@ -1073,8 +1077,12 @@ void CameraClient::handleGenericDataTimestamp(nsecs_t timestamp,
 
         // Check if dataPtr contains a VideoNativeHandleMetadata.
         if (dataPtr->size() == sizeof(VideoNativeHandleMetadata)) {
+            // TODO: Using unsecurePointer() has some associated security pitfalls
+            //       (see declaration for details).
+            //       Either document why it is safe in this case or address the
+            //       issue (e.g. by copying).
             VideoNativeHandleMetadata *metadata =
-                (VideoNativeHandleMetadata*)(dataPtr->pointer());
+                (VideoNativeHandleMetadata*)(dataPtr->unsecurePointer());
             if (metadata->eType == kMetadataBufferTypeNativeHandleSource) {
                 handle = metadata->pHandle;
             }

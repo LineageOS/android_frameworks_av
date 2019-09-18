@@ -81,7 +81,8 @@ ssize_t CallbackDataSource::readAt(off64_t offset, void* data, size_t size) {
             return ERROR_OUT_OF_RANGE;
         }
         CHECK(numRead >= 0 && (size_t)numRead <= bufferSize);
-        memcpy(((uint8_t*)data) + totalNumRead, mMemory->pointer(), numRead);
+        memcpy(((uint8_t*)data) + totalNumRead, mMemory->unsecurePointer(),
+            numRead);
         numLeft -= numRead;
         totalNumRead += numRead;
     }

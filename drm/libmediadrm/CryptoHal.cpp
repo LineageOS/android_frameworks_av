@@ -321,7 +321,11 @@ status_t CryptoHal::toSharedBuffer(const sp<IMemory>& memory, int32_t seqNum, ::
      }
 
     // memory must be within the address space of the heap
-    if (memory->pointer() != static_cast<uint8_t *>(heap->getBase()) + memory->offset()  ||
+    // TODO: Using unsecurePointer() has some associated security pitfalls
+    //       (see declaration for details).
+    //       Either document why it is safe in this case or address the
+    //       issue (e.g. by copying).
+    if (memory->unsecurePointer() != static_cast<uint8_t *>(heap->getBase()) + memory->offset()  ||
             heap->getSize() < memory->offset() + memory->size() ||
             SIZE_MAX - memory->offset() < memory->size()) {
         android_errorWriteLog(0x534e4554, "76221123");

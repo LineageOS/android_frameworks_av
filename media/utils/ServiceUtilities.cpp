@@ -222,9 +222,9 @@ status_t checkIMemory(const sp<IMemory>& iMemory)
     off_t size = lseek(heap->getHeapID(), 0, SEEK_END);
     lseek(heap->getHeapID(), 0, SEEK_SET);
 
-    if (iMemory->pointer() == NULL || size < (off_t)iMemory->size()) {
+    if (iMemory->unsecurePointer() == NULL || size < (off_t)iMemory->size()) {
         ALOGE("%s check failed: pointer %p size %zu fd size %u",
-              __FUNCTION__, iMemory->pointer(), iMemory->size(), (uint32_t)size);
+              __FUNCTION__, iMemory->unsecurePointer(), iMemory->size(), (uint32_t)size);
         return BAD_VALUE;
     }
 

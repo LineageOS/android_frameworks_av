@@ -234,11 +234,11 @@ sp<IMemory> SoundTriggerHwService::prepareRecognitionEvent(
 
     size_t size = event->data_offset + event->data_size;
     eventMemory = mMemoryDealer->allocate(size);
-    if (eventMemory == 0 || eventMemory->pointer() == NULL) {
+    if (eventMemory == 0 || eventMemory->unsecurePointer() == NULL) {
         eventMemory.clear();
         return eventMemory;
     }
-    memcpy(eventMemory->pointer(), event, size);
+    memcpy(eventMemory->unsecurePointer(), event, size);
 
     return eventMemory;
 }
@@ -283,11 +283,11 @@ sp<IMemory> SoundTriggerHwService::prepareSoundModelEvent(struct sound_trigger_m
 
     size_t size = event->data_offset + event->data_size;
     eventMemory = mMemoryDealer->allocate(size);
-    if (eventMemory == 0 || eventMemory->pointer() == NULL) {
+    if (eventMemory == 0 || eventMemory->unsecurePointer() == NULL) {
         eventMemory.clear();
         return eventMemory;
     }
-    memcpy(eventMemory->pointer(), event, size);
+    memcpy(eventMemory->unsecurePointer(), event, size);
 
     return eventMemory;
 }
@@ -313,11 +313,11 @@ sp<IMemory> SoundTriggerHwService::prepareServiceStateEvent(sound_trigger_servic
 
     size_t size = sizeof(sound_trigger_service_state_t);
     eventMemory = mMemoryDealer->allocate(size);
-    if (eventMemory == 0 || eventMemory->pointer() == NULL) {
+    if (eventMemory == 0 || eventMemory->unsecurePointer() == NULL) {
         eventMemory.clear();
         return eventMemory;
     }
-    *((sound_trigger_service_state_t *)eventMemory->pointer()) = state;
+    *((sound_trigger_service_state_t *)eventMemory->unsecurePointer()) = state;
     return eventMemory;
 }
 
@@ -557,8 +557,12 @@ status_t SoundTriggerHwService::Module::loadSoundModel(const sp<IMemory>& modelM
         return NO_INIT;
     }
 
+    // TODO: Using unsecurePointer() has some associated security pitfalls
+    //       (see declaration for details).
+    //       Either document why it is safe in this case or address the
+    //       issue (e.g. by copying).
     struct sound_trigger_sound_model *sound_model =
-            (struct sound_trigger_sound_model *)modelMemory->pointer();
+            (struct sound_trigger_sound_model *)modelMemory->unsecurePointer();
 
     size_t structSize;
     if (sound_model->type == SOUND_MODEL_TYPE_KEYPHRASE) {
@@ -651,8 +655,12 @@ status_t SoundTriggerHwService::Module::startRecognition(sound_model_handle_t ha
         return NO_INIT;
     }
 
+    // TODO: Using unsecurePointer() has some associated security pitfalls
+    //       (see declaration for details).
+    //       Either document why it is safe in this case or address the
+    //       issue (e.g. by copying).
     struct sound_trigger_recognition_config *config =
-            (struct sound_trigger_recognition_config *)dataMemory->pointer();
+            (struct sound_trigger_recognition_config *)dataMemory->unsecurePointer();
 
     if (config->data_offset < sizeof(struct sound_trigger_recognition_config) ||
             config->data_size > (UINT_MAX - config->data_offset) ||
@@ -734,9 +742,10 @@ void SoundTriggerHwService::Module::onCallbackEvent(const sp<CallbackEvent>& eve
 {
     ALOGV("onCallbackEvent type %d", event->mType);
 
+    // Memory is coming from a trusted process.
     sp<IMemory> eventMemory = event->mMemory;
 
-    if (eventMemory == 0 || eventMemory->pointer() == NULL) {
+    if (eventMemory == 0 || eventMemory->unsecurePointer() == NULL) {
         return;
     }
     if (mModuleClients.isEmpty()) {
@@ -749,7 +758,7 @@ void SoundTriggerHwService::Module::onCallbackEvent(const sp<CallbackEvent>& eve
     switch (event->mType) {
     case CallbackEvent::TYPE_RECOGNITION: {
         struct sound_trigger_recognition_event *recognitionEvent =
-                (struct sound_trigger_recognition_event *)eventMemory->pointer();
+                (struct sound_trigger_recognition_event *)eventMemory->unsecurePointer();
         {
             AutoMutex lock(mLock);
             sp<Model> model = getModel(recognitionEvent->model);
@@ -769,7 +778,7 @@ void SoundTriggerHwService::Module::onCallbackEvent(const sp<CallbackEvent>& eve
     } break;
     case CallbackEvent::TYPE_SOUNDMODEL: {
         struct sound_trigger_model_event *soundmodelEvent =
-                (struct sound_trigger_model_event *)eventMemory->pointer();
+                (struct sound_trigger_model_event *)eventMemory->unsecurePointer();
         {
             AutoMutex lock(mLock);
             sp<Model> model = getModel(soundmodelEvent->model);
@@ -1082,7 +1091,8 @@ void SoundTriggerHwService::ModuleClient::onCallbackEvent(const sp<CallbackEvent
 
     sp<IMemory> eventMemory = event->mMemory;
 
-    if (eventMemory == 0 || eventMemory->pointer() == NULL) {
+    // Memory is coming from a trusted process.
+    if (eventMemory == 0 || eventMemory->unsecurePointer() == NULL) {
         return;
     }
 

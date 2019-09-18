@@ -89,7 +89,7 @@ struct AMediaDrm {
 };
 
 void DrmListener::notify(DrmPlugin::EventType eventType, int extra, const Parcel *obj) {
-    if (!mEventListener && !mExpirationUpdateListener && !mKeysChangeListener) {
+    if (!mEventListener || !mExpirationUpdateListener || !mKeysChangeListener) {
         ALOGE("No listeners are specified");
         return;
     }

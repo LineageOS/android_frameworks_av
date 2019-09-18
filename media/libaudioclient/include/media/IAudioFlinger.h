@@ -70,8 +70,12 @@ public:
                 return DEAD_OBJECT;
             }
             if (parcel->readInt32() != 0) {
+                // TODO: Using unsecurePointer() has some associated security
+                //       pitfalls (see declaration for details).
+                //       Either document why it is safe in this case or address
+                //       the issue (e.g. by copying).
                 sharedBuffer = interface_cast<IMemory>(parcel->readStrongBinder());
-                if (sharedBuffer == 0 || sharedBuffer->pointer() == NULL) {
+                if (sharedBuffer == 0 || sharedBuffer->unsecurePointer() == NULL) {
                     return BAD_VALUE;
                 }
             }
@@ -269,13 +273,21 @@ public:
             (void)parcel->read(&inputId, sizeof(audio_io_handle_t));
             if (parcel->readInt32() != 0) {
                 cblk = interface_cast<IMemory>(parcel->readStrongBinder());
-                if (cblk == 0 || cblk->pointer() == NULL) {
+                // TODO: Using unsecurePointer() has some associated security
+                //       pitfalls (see declaration for details).
+                //       Either document why it is safe in this case or address
+                //       the issue (e.g. by copying).
+                if (cblk == 0 || cblk->unsecurePointer() == NULL) {
                     return BAD_VALUE;
                 }
             }
             if (parcel->readInt32() != 0) {
                 buffers = interface_cast<IMemory>(parcel->readStrongBinder());
-                if (buffers == 0 || buffers->pointer() == NULL) {
+                // TODO: Using unsecurePointer() has some associated security
+                //       pitfalls (see declaration for details).
+                //       Either document why it is safe in this case or address
+                //       the issue (e.g. by copying).
+                if (buffers == 0 || buffers->unsecurePointer() == NULL) {
                     return BAD_VALUE;
                 }
             }

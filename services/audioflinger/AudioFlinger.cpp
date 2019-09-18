@@ -652,7 +652,7 @@ sp<NBLog::Writer> AudioFlinger::newWriter_l(size_t size, const char *name)
         return new NBLog::Writer();
     }
 success:
-    NBLog::Shared *sharedRawPtr = (NBLog::Shared *) shared->pointer();
+    NBLog::Shared *sharedRawPtr = (NBLog::Shared *) shared->unsecurePointer();
     new((void *) sharedRawPtr) NBLog::Shared(); // placement new here, but the corresponding
                                                 // explicit destructor not needed since it is POD
     sMediaLogService->registerWriter(shared, size, name);

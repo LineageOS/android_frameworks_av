@@ -27,13 +27,13 @@
 
 namespace android {
 
-class AudioPortFoundation : public virtual RefBase
+class AudioPort : public virtual RefBase
 {
 public:
-    AudioPortFoundation(const std::string& name, audio_port_type_t type,  audio_port_role_t role) :
+    AudioPort(const std::string& name, audio_port_type_t type,  audio_port_role_t role) :
             mName(name), mType(type), mRole(role) {}
 
-    virtual ~AudioPortFoundation() = default;
+    virtual ~AudioPort() = default;
 
     void setName(const std::string &name) { mName = name; }
     const std::string &getName() const { return mName; }
@@ -41,22 +41,26 @@ public:
     audio_port_type_t getType() const { return mType; }
     audio_port_role_t getRole() const { return mRole; }
 
-    virtual const std::string getTagName() const = 0;
-
     void setGains(const AudioGains &gains) { mGains = gains; }
     const AudioGains &getGains() const { return mGains; }
 
     virtual void toAudioPort(struct audio_port *port) const;
 
-    virtual AudioProfileVectorBase* getAudioProfileVectorBase() const = 0;
     virtual void addAudioProfile(const sp<AudioProfile> &profile) {
-        getAudioProfileVectorBase()->add(profile);
+        mProfiles.add(profile);
     }
     virtual void clearAudioProfiles() {
-        getAudioProfileVectorBase()->clearProfiles();
+        mProfiles.clearProfiles();
     }
 
-    bool hasValidAudioProfile() const { return getAudioProfileVectorBase()->hasValidProfile(); }
+    bool hasValidAudioProfile() const { return mProfiles.hasValidProfile(); }
+
+    bool hasDynamicAudioProfile() const { return mProfiles.hasDynamicProfile(); }
+
+    void setAudioProfiles(const AudioProfileVector &profiles) { mProfiles = profiles; }
+    AudioProfileVector &getAudioProfiles() { return mProfiles; }
+
+    virtual void importAudioPort(const sp<AudioPort>& port, bool force = false);
 
     status_t checkGain(const struct audio_gain_config *gainConfig, int index) const {
         if (index < 0 || (size_t)index >= mGains.size()) {
@@ -73,57 +77,42 @@ public:
 
     void dump(std::string *dst, int spaces, bool verbose = true) const;
 
+    void log(const char* indent) const;
+
     AudioGains mGains; // gain controllers
 protected:
     std::string  mName;
     audio_port_type_t mType;
     audio_port_role_t mRole;
-};
-
-template <typename ProfileVector,
-          typename = typename std::enable_if<std::is_base_of<
-                  AudioProfileVectorBase, ProfileVector>::value>::type>
-class AudioPortBase : public AudioPortFoundation
-{
-public:
-    AudioPortBase(const std::string& name, audio_port_type_t type,  audio_port_role_t role) :
-            AudioPortFoundation(name, type, role) {}
-
-    virtual ~AudioPortBase() {}
-
-    AudioProfileVectorBase* getAudioProfileVectorBase() const override {
-        return static_cast<AudioProfileVectorBase*>(const_cast<ProfileVector*>(&mProfiles));
-    }
-
-    void addAudioProfile(const sp<AudioProfile> &profile) override { mProfiles.add(profile); }
-    void clearAudioProfiles() override { return mProfiles.clearProfiles(); }
-
-    void setAudioProfiles(const ProfileVector &profiles) { mProfiles = profiles; }
-    ProfileVector &getAudioProfiles() { return mProfiles; }
-
-protected:
-    ProfileVector mProfiles; // AudioProfiles supported by this port (format, Rates, Channels)
+    AudioProfileVector mProfiles; // AudioProfiles supported by this port (format, Rates, Channels)
 };
 
 
-class AudioPortConfigBase : public virtual RefBase
+class AudioPortConfig : public virtual RefBase
 {
 public:
-    virtual ~AudioPortConfigBase() = default;
+    virtual ~AudioPortConfig() = default;
+
+    virtual sp<AudioPort> getAudioPort() const = 0;
 
     virtual status_t applyAudioPortConfig(const struct audio_port_config *config,
-                                          struct audio_port_config *backupConfig = NULL) = 0;
+                                          struct audio_port_config *backupConfig = NULL);
+
     virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
-                                   const struct audio_port_config *srcConfig = NULL) const = 0;
+                                   const struct audio_port_config *srcConfig = NULL) const;
 
     unsigned int getSamplingRate() const { return mSamplingRate; }
     audio_format_t getFormat() const { return mFormat; }
     audio_channel_mask_t getChannelMask() const { return mChannelMask; }
+    audio_port_handle_t getId() const { return mId; }
+
+    bool hasGainController(bool canUseForVolume = false) const;
 
 protected:
     unsigned int mSamplingRate = 0u;
     audio_format_t mFormat = AUDIO_FORMAT_INVALID;
     audio_channel_mask_t mChannelMask = AUDIO_CHANNEL_NONE;
+    audio_port_handle_t mId = AUDIO_PORT_HANDLE_NONE;
     struct audio_gain_config mGain = { .index = -1 };
 };
 

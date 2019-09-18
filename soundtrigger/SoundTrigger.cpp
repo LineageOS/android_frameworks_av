@@ -204,39 +204,42 @@ status_t SoundTrigger::getModelState(sound_model_handle_t handle)
 void SoundTrigger::onRecognitionEvent(const sp<IMemory>& eventMemory)
 {
     Mutex::Autolock _l(mLock);
-    if (eventMemory == 0 || eventMemory->pointer() == NULL) {
+    if (eventMemory == 0 || eventMemory->unsecurePointer() == NULL) {
         return;
     }
 
     if (mCallback != 0) {
+        // Memory is coming from a trusted process.
         mCallback->onRecognitionEvent(
-                (struct sound_trigger_recognition_event *)eventMemory->pointer());
+                (struct sound_trigger_recognition_event *)eventMemory->unsecurePointer());
     }
 }
 
 void SoundTrigger::onSoundModelEvent(const sp<IMemory>& eventMemory)
 {
     Mutex::Autolock _l(mLock);
-    if (eventMemory == 0 || eventMemory->pointer() == NULL) {
+    if (eventMemory == 0 || eventMemory->unsecurePointer() == NULL) {
         return;
     }
 
     if (mCallback != 0) {
+        // Memory is coming from a trusted process.
         mCallback->onSoundModelEvent(
-                (struct sound_trigger_model_event *)eventMemory->pointer());
+                (struct sound_trigger_model_event *)eventMemory->unsecurePointer());
     }
 }
 
 void SoundTrigger::onServiceStateChange(const sp<IMemory>& eventMemory)
 {
     Mutex::Autolock _l(mLock);
-    if (eventMemory == 0 || eventMemory->pointer() == NULL) {
+    if (eventMemory == 0 || eventMemory->unsecurePointer() == NULL) {
         return;
     }
 
     if (mCallback != 0) {
+        // Memory is coming from a trusted process.
         mCallback->onServiceStateChange(
-                *((sound_trigger_service_state_t *)eventMemory->pointer()));
+                *((sound_trigger_service_state_t *)eventMemory->unsecurePointer()));
     }
 }
 

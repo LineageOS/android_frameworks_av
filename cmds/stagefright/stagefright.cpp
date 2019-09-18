@@ -989,7 +989,7 @@ int main(int argc, char **argv) {
                 failed = false;
                 printf("getFrameAtTime(%s) => OK\n", filename);
 
-                VideoFrame *frame = (VideoFrame *)mem->pointer();
+                VideoFrame *frame = (VideoFrame *)mem->unsecurePointer();
 
                 CHECK_EQ(writeJpegFile("/sdcard/out.jpg",
                             frame->getFlattenedData(),

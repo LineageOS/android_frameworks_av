@@ -128,7 +128,7 @@ struct BufferMeta {
     }
 
     OMX_U8 *getPointer() {
-        return mMem.get() ? static_cast<OMX_U8*>(mMem->pointer()) :
+        return mMem.get() ? static_cast<OMX_U8*>(mMem->unsecurePointer()) :
                 mHidlMemory.get() ? static_cast<OMX_U8*>(
                 static_cast<void*>(mHidlMemory->getPointer())) : nullptr;
     }
@@ -1173,7 +1173,11 @@ status_t OMXNodeInstance::useBuffer_l(
         return BAD_VALUE;
     }
     if (params != NULL) {
-        paramsPointer = params->pointer();
+        // TODO: Using unsecurePointer() has some associated security pitfalls
+        //       (see declaration for details).
+        //       Either document why it is safe in this case or address the
+        //       issue (e.g. by copying).
+        paramsPointer = params->unsecurePointer();
         paramsSize = params->size();
     } else if (hParams != NULL) {
         paramsPointer = hParams->getPointer();
