@@ -63,7 +63,10 @@ static bool checkRecordingInternal(const String16& opPackageName, pid_t pid,
         uid_t uid, bool start) {
     // Okay to not track in app ops as audio server is us and if
     // device is rooted security model is considered compromised.
-    if (isAudioServerOrRootUid(uid)) return true;
+    // system_server loses its RECORD_AUDIO permission when a secondary
+    // user is active, but it is a core system service so let it through.
+    // TODO(b/141210120): UserManager.DISALLOW_RECORD_AUDIO should not affect system user 0
+    if (isAudioServerOrSystemServerOrRootUid(uid)) return true;
 
     // We specify a pid and uid here as mediaserver (aka MediaRecorder or StageFrightRecorder)
     // may open a record track on behalf of a client.  Note that pid may be a tid.
