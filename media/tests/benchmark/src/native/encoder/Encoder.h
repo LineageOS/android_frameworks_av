@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef __DECODER_H__
-#define __DECODER_H__
+#ifndef __ENCODER_H__
+#define __ENCODER_H__
 
 #include <chrono>
 #include <condition_variable>
@@ -24,41 +24,46 @@
 #include <thread>
 
 #include "BenchmarkCommon.h"
-#include "Extractor.h"
 #include "Timer.h"
 
-class Decoder : public CallBackHandle {
+struct encParameter {
+    int32_t bitrate = -1;
+    int32_t numFrames = -1;
+    int32_t frameSize = -1;
+    int32_t sampleRate = 0;
+    int32_t numChannels = 0;
+    int32_t maxFrameSize = -1;
+    int32_t width = 0;
+    int32_t height = 0;
+    int32_t frameRate = -1;
+    int32_t profile = 0;
+    int32_t level = 0;
+};
+
+class Encoder : public CallBackHandle {
   public:
-    Decoder()
+    Encoder()
         : mCodec(nullptr),
           mFormat(nullptr),
-          mExtractor(nullptr),
           mTimer(nullptr),
           mNumInputFrame(0),
           mNumOutputFrame(0),
           mSawInputEOS(false),
           mSawOutputEOS(false),
-          mSignalledError(false),
-          mInputBuffer(nullptr),
-          mOutFp(nullptr) {
-        mExtractor = new Extractor();
-    }
+          mSignalledError(false) {}
 
-    virtual ~Decoder() {
+    virtual ~Encoder() {
         if (mTimer) delete mTimer;
-        if (mExtractor) delete mExtractor;
     }
 
     Timer *getTimer() override { return mTimer; }
 
-    Extractor *getExtractor() { return mExtractor; }
-
-    // Decoder related utilities
-    void setupDecoder();
+    // Encoder related utilities
+    void setupEncoder();
 
     void deInitCodec();
 
-    void resetDecoder();
+    void resetEncoder();
 
     // Async callback APIs
     void onInputAvailable(AMediaCodec *codec, int32_t index) override;
@@ -68,40 +73,32 @@ class Decoder : public CallBackHandle {
     void onOutputAvailable(AMediaCodec *codec, int32_t index,
                            AMediaCodecBufferInfo *bufferInfo) override;
 
-    // Process the frames and give decoded output
-    int32_t decode(uint8_t *inputBuffer, vector<AMediaCodecBufferInfo> &frameInfo,
-                   string &codecName, bool asyncMode, FILE *outFp = nullptr);
+    // Process the frames and give encoded output
+    int32_t encode(std::string &codecName, std::ifstream &eleStream, size_t eleSize, bool asyncMode,
+                   encParameter encParams, char *mime);
 
-    void dumpStatistics(string inputReference);
+    void dumpStatistics(string inputReference, int64_t durationUs);
 
   private:
     AMediaCodec *mCodec;
     AMediaFormat *mFormat;
 
-    Extractor *mExtractor;
-
     Timer *mTimer;
 
     int32_t mNumInputFrame;
     int32_t mNumOutputFrame;
-
     bool mSawInputEOS;
     bool mSawOutputEOS;
     bool mSignalledError;
 
+    char *mMime;
     int32_t mOffset;
-    uint8_t *mInputBuffer;
-    vector<AMediaCodecBufferInfo> mFrameMetaData;
-    FILE *mOutFp;
+    std::ifstream *mEleStream;
+    size_t mInputBufferSize;
+    encParameter mParams;
 
-    /* Asynchronous locks */
-    mutex mMutex;
-    condition_variable mDecoderDoneCondition;
+    // Asynchronous locks
+    std::mutex mMutex;
+    std::condition_variable mEncoderDoneCondition;
 };
-
-// Read input samples
-tuple<ssize_t, uint32_t, int64_t> readSampleData(uint8_t *inputBuffer, int32_t &offset,
-                                                 vector<AMediaCodecBufferInfo> &frameSizes,
-                                                 uint8_t *buf, int32_t frameID, size_t bufSize);
-
-#endif  // __DECODER_H__
+#endif  // __ENCODER_H__
