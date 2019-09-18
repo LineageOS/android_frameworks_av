@@ -96,6 +96,15 @@ void Decoder::onOutputAvailable(AMediaCodec *mediaCodec, int32_t bufIdx,
             return;
         }
 
+        if (mOutFp != nullptr) {
+            size_t bufSize;
+            uint8_t *buf = AMediaCodec_getOutputBuffer(mCodec, bufIdx, &bufSize);
+            if (buf) {
+                fwrite(buf, sizeof(char), bufferInfo->size, mOutFp);
+                ALOGV("bytes written into file  %d\n", bufferInfo->size);
+            }
+        }
+
         AMediaCodec_releaseOutputBuffer(mCodec, bufIdx, false);
         mSawOutputEOS = (0 != (bufferInfo->flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM));
         mNumOutputFrame++;
@@ -123,11 +132,12 @@ void Decoder::setupDecoder() {
 }
 
 int32_t Decoder::decode(uint8_t *inputBuffer, vector<AMediaCodecBufferInfo> &frameInfo,
-                        string &codecName, bool asyncMode) {
+                        string &codecName, bool asyncMode, FILE *outFp) {
     ALOGV("In %s", __func__);
     mInputBuffer = inputBuffer;
     mFrameMetaData = frameInfo;
     mOffset = 0;
+    mOutFp = outFp;
 
     const char *mime = nullptr;
     AMediaFormat_getString(mFormat, AMEDIAFORMAT_KEY_MIME, &mime);

@@ -58,3 +58,20 @@ cc_test {
         "libbenchmark_muxer",
     ],
 }
+
+cc_test {
+    name: "encoderTest",
+    gtest: true,
+    defaults: [
+        "libbenchmark_common-defaults",
+        "libbenchmark_soft_sanitize_all-defaults",
+    ],
+
+    srcs: ["EncoderTest.cpp"],
+
+    static_libs: [
+        "libbenchmark_extractor",
+        "libbenchmark_decoder",
+        "libbenchmark_encoder",
+    ],
+}
