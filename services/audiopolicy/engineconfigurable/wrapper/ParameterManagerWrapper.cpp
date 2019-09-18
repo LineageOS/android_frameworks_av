@@ -259,7 +259,7 @@ status_t ParameterManagerWrapper::setDeviceConnectionState(const sp<DeviceDescri
     std::string criterionName = audio_is_output_device(devDesc->type()) ?
                 gOutputDeviceAddressCriterionName : gInputDeviceAddressCriterionName;
 
-    ALOGV("%s: device with address %s %s", __FUNCTION__, devDesc->address().string(),
+    ALOGV("%s: device with address %s %s", __FUNCTION__, devDesc->address().c_str(),
           state != AUDIO_POLICY_DEVICE_STATE_AVAILABLE? "disconnected" : "connected");
     ISelectionCriterionInterface *criterion =
             getElement<ISelectionCriterionInterface>(criterionName, mPolicyCriteria);
@@ -271,7 +271,7 @@ status_t ParameterManagerWrapper::setDeviceConnectionState(const sp<DeviceDescri
 
     auto criterionType = criterion->getCriterionType();
     int deviceAddressId;
-    if (not criterionType->getNumericalValue(devDesc->address().string(), deviceAddressId)) {
+    if (not criterionType->getNumericalValue(devDesc->address().c_str(), deviceAddressId)) {
         ALOGW("%s: unknown device address reported (%s)", __FUNCTION__, devDesc->address().c_str());
         return BAD_TYPE;
     }
