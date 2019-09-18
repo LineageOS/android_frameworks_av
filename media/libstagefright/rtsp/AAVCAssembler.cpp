@@ -109,34 +109,27 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
     }
 
     sp<ABuffer> buffer = *queue->begin();
-    int32_t rtpTime;
-    CHECK(buffer->meta()->findInt32("rtp-time", &rtpTime));
+    uint32_t rtpTime;
+    CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
     int64_t startTime = source->mFirstSysTime / 1000;
     int64_t nowTime = ALooper::GetNowUs() / 1000;
     int64_t playedTime = nowTime - startTime;
-    int32_t playedTimeRtp = source->mFirstRtpTime +
+    int64_t playedTimeRtp = source->mFirstRtpTime +
         (((uint32_t)playedTime) * (source->mClockRate / 1000));
-    const int32_t jitterTime = (int32_t)(source->mClockRate / ((float)1000 / (source->mJbTime)));
-    int32_t expiredTimeInJb = rtpTime + jitterTime;
+    const uint32_t jitterTime = (uint32_t)(source->mClockRate / ((float)1000 / (source->mJbTime)));
+    uint32_t expiredTimeInJb = rtpTime + jitterTime;
     bool isExpired = expiredTimeInJb <= (playedTimeRtp);
     bool isTooLate200 = expiredTimeInJb < (playedTimeRtp - jitterTime);
     bool isTooLate300 = expiredTimeInJb < (playedTimeRtp - (jitterTime * 3 / 2));
 
     if (mShowQueue && mShowQueueCnt < 20) {
         showCurrentQueue(queue);
-        ALOGD("start=%lld, now=%lld, played=%lld", (long long)startTime,
-                (long long)nowTime, (long long)playedTime);
-        ALOGD("rtp-time(JB)=%d, played-rtp-time(JB)=%d, expired-rtp-time(JB)=%d isExpired=%d",
-                rtpTime, playedTimeRtp, expiredTimeInJb, isExpired);
+        printNowTimeUs(startTime, nowTime, playedTime);
+        printRTPTime(rtpTime, playedTimeRtp, expiredTimeInJb, isExpired);
         mShowQueueCnt++;
     }
 
     AAVCAssembler::addNack(source);
-
-    ALOGV("start=%lld, now=%lld, played=%lld", (long long)startTime,
-            (long long)nowTime, (long long)playedTime);
-    ALOGV("rtp-time(JB)=%d, played-rtp-time(JB)=%d, expired-rtp-time(JB)=%d isExpired=%d",
-            rtpTime, playedTimeRtp, expiredTimeInJb, isExpired);
 
     if (!isExpired) {
         ALOGV("buffering in jitter buffer.");
@@ -147,42 +140,21 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
         ALOGW("=== WARNING === buffer arrived 200ms late. === WARNING === ");
 
     if (isTooLate300) {
-        ALOGW("buffer arrived too late. 300ms..");
-        ALOGW("start=%lld, now=%lld, played=%lld", (long long)startTime,
-                (long long)nowTime, (long long)playedTime);
-        ALOGW("rtp-time(JB)=%d, plyed-rtp-time(JB)=%d, exp-rtp-time(JB)=%d diff=%lld isExpired=%d",
-                rtpTime, playedTimeRtp, expiredTimeInJb,
-                ((long long)playedTimeRtp) - expiredTimeInJb, isExpired);
-        ALOGW("expected Seq. NO =%d", buffer->int32Data());
+        ALOGW("buffer arrived after 300ms ... \t Diff in Jb=%lld \t Seq# %d",
+              ((long long)playedTimeRtp) - expiredTimeInJb, buffer->int32Data());
+        printNowTimeUs(startTime, nowTime, playedTime);
+        printRTPTime(rtpTime, playedTimeRtp, expiredTimeInJb, isExpired);
 
-        List<sp<ABuffer> >::iterator it = queue->begin();
-        while (it != queue->end()) {
-            CHECK((*it)->meta()->findInt32("rtp-time", &rtpTime));
-            if (rtpTime + jitterTime >= playedTimeRtp) {
-                mNextExpectedSeqNo = (*it)->int32Data();
-                break;
-            }
-            it++;
-        }
-        source->noticeAbandonBuffer();
+        mNextExpectedSeqNo = pickProperSeq(queue, jitterTime, playedTimeRtp);
     }
 
     if (mNextExpectedSeqNoValid) {
         int32_t size = queue->size();
-        int32_t cnt = 0;
-        List<sp<ABuffer> >::iterator it = queue->begin();
-        while (it != queue->end()) {
-            if ((uint32_t)(*it)->int32Data() >= mNextExpectedSeqNo) {
-                break;
-            }
+        int32_t cntRemove = deleteUnitUnderSeq(queue, mNextExpectedSeqNo);
 
-            it = queue->erase(it);
-            cnt++;
-        }
-
-        if (cnt > 0) {
-            source->noticeAbandonBuffer(cnt);
-            ALOGW("delete %d of %d buffers", cnt, size);
+        if (cntRemove > 0) {
+            source->noticeAbandonBuffer(cntRemove);
+            ALOGW("delete %d of %d buffers", cntRemove, size);
         }
         if (queue->empty()) {
             return NOT_ENOUGH_DATA;
@@ -339,8 +311,8 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
     size_t totalCount = 1;
     bool complete = false;
 
-    int32_t rtpTimeStartAt;
-    CHECK(buffer->meta()->findInt32("rtp-time", &rtpTimeStartAt));
+    uint32_t rtpTimeStartAt;
+    CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTimeStartAt));
     uint32_t startSeqNo = buffer->int32Data();
     bool pFrame = nalType == 0x1;
 
@@ -368,8 +340,8 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
                     return WRONG_SEQUENCE_NUMBER;
             }
 
-            int32_t rtpTime;
-            CHECK(buffer->meta()->findInt32("rtp-time", &rtpTime));
+            uint32_t rtpTime;
+            CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
             if (size < 2
                     || data[0] != indicator
                     || (data[1] & 0x1f) != nalType
@@ -379,12 +351,8 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
 
                 // Delete the whole start of the FU.
 
-                it = queue->begin();
-                for (size_t i = 0; i <= totalCount; ++i) {
-                    it = queue->erase(it);
-                }
-
                 mNextExpectedSeqNo = expectedSeqNo + 1;
+                deleteUnitUnderSeq(queue, mNextExpectedSeqNo);
 
                 return MALFORMED_PACKET;
             }
@@ -395,22 +363,11 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
             expectedSeqNo = buffer->int32Data() + 1;
 
             if (data[1] & 0x40) {
-                if (pFrame) {
-                    ALOGV("checking p-frame losses.. recvBufs %d diff %d drop? %d",
-                            (uint32_t)totalCount, expectedSeqNo - startSeqNo,
-                            totalCount < ((expectedSeqNo - startSeqNo) / 2));
-                    if (totalCount < ((expectedSeqNo - startSeqNo) / 2)) {
-                        ALOGI("drop p-frame. recvBufs %d lastSeq %d startSeq %d",
-                                (uint32_t)totalCount, expectedSeqNo - 1, startSeqNo);
-
-                        it = queue->begin();
-                        for (size_t i = 0; i <= totalCount; ++i) {
-                            it = queue->erase(it);
-                        }
+                if (pFrame && !recycleUnit(startSeqNo, expectedSeqNo, totalCount, 0.5f)) {
                         mNextExpectedSeqNo = expectedSeqNo;
+                        deleteUnitUnderSeq(queue, mNextExpectedSeqNo);
 
                         return MALFORMED_PACKET;
-                    }
                 }
                 // This is the last fragment.
                 complete = true;
@@ -516,6 +473,58 @@ void AAVCAssembler::submitAccessUnit() {
     sp<AMessage> msg = mNotifyMsg->dup();
     msg->setBuffer("access-unit", accessUnit);
     msg->post();
+}
+
+int32_t AAVCAssembler::pickProperSeq(const Q *q, uint32_t jit, int64_t play) {
+    sp<ABuffer> buffer = *(q->begin());
+    uint32_t rtpTime;
+    int32_t nextSeqNo = buffer->int32Data();
+
+    Q::const_iterator it = q->begin();
+    while (it != q->end()) {
+        CHECK((*it)->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
+        // if pkt in time exists, that should be the next pivot
+        if (rtpTime + jit >= play) {
+            nextSeqNo = (*it)->int32Data();
+            break;
+        }
+        it++;
+    }
+    return nextSeqNo;
+}
+
+bool AAVCAssembler::recycleUnit(uint32_t start, uint32_t end, size_t avail, float goodRatio) {
+    float total = end - start;
+    float exist = avail;
+    bool isRecycle = (exist / total) >= goodRatio;
+
+    ALOGV("checking p-frame losses.. recvBufs %f diff %f recycle? %d",
+            exist, total, isRecycle);
+
+    return isRecycle;
+}
+
+int32_t AAVCAssembler::deleteUnitUnderSeq(Q *q, uint32_t seq) {
+    int32_t initSize = q->size();
+    Q::iterator it = q->begin();
+    while (it != q->end()) {
+        if ((uint32_t)(*it)->int32Data() >= seq) {
+            break;
+        }
+        it++;
+    }
+    q->erase(q->begin(), it);
+    return initSize - q->size();
+}
+
+inline void AAVCAssembler::printNowTimeUs(int64_t start, int64_t now, int64_t play) {
+    ALOGD("start=%lld, now=%lld, played=%lld",
+            (long long)start, (long long)now, (long long)play);
+}
+
+inline void AAVCAssembler::printRTPTime(uint32_t rtp, int64_t play, uint32_t exp, bool isExp) {
+    ALOGD("rtp-time(JB)=%u, played-rtp-time(JB)=%lld, expired-rtp-time(JB)=%u isExpired=%d",
+            rtp, (long long)play, exp, isExp);
 }
 
 ARTPAssembler::AssemblyStatus AAVCAssembler::assembleMore(

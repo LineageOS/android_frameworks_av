@@ -129,8 +129,8 @@ bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
     buffer->meta()->findInt32("ssrc", &ssrc);
 
     if (mNumBuffersReceived++ == 0 && mFirstSysTime == 0) {
-        int32_t firstRtpTime;
-        CHECK(buffer->meta()->findInt32("rtp-time", &firstRtpTime));
+        uint32_t firstRtpTime;
+        CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&firstRtpTime));
         mFirstSysTime = ALooper::GetNowUs();
         mHighestSeqNumber = seqNum;
         mBaseSeqNumber = seqNum;
