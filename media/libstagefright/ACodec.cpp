@@ -1827,7 +1827,12 @@ status_t ACodec::configureCodec(
         }
 
         if (!msg->findDouble("time-lapse-fps", &mCaptureFps)) {
-            mCaptureFps = -1.0;
+            float captureRate;
+            if (msg->findAsFloat(KEY_CAPTURE_RATE, &captureRate)) {
+                mCaptureFps = captureRate;
+            } else {
+                mCaptureFps = -1.0;
+            }
         }
 
         if (!msg->findInt32(
