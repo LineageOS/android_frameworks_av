@@ -93,7 +93,7 @@ TEST_P(DecoderTest, Decode) {
         decoder->setupDecoder();
         status = decoder->decode(inputBuffer, frameInfo, codecName, asyncMode);
         if (status != AMEDIA_OK) {
-            cout << "[   WARN   ] Test Skipped. Decode returned error \n";
+            cout << "[   WARN   ] Test Failed. Decode returned error " << status << endl;
             free(inputBuffer);
             return;
         }
