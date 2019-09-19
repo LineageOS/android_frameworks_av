@@ -108,7 +108,13 @@ int CameraProviderManager::getCameraCount() const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     int count = 0;
     for (auto& provider : mProviders) {
-        count += provider->mUniqueCameraIds.size();
+        for (auto& id : provider->mUniqueCameraIds) {
+            // Hidden secure camera ids are not to be exposed to camera1 api.
+            if (isPublicallyHiddenSecureCameraLocked(id)) {
+                continue;
+            }
+            count++;
+        }
     }
     return count;
 }
@@ -134,7 +140,11 @@ std::vector<std::string> CameraProviderManager::getAPI1CompatibleCameraDeviceIds
         // for each camera facing, only take the first id advertised by HAL in
         // all [logical, physical1, physical2, ...] id combos, and filter out the rest.
         filterLogicalCameraIdsLocked(providerDeviceIds);
-
+        // Hidden secure camera ids are not to be exposed to camera1 api.
+        providerDeviceIds.erase(std::remove_if(providerDeviceIds.begin(), providerDeviceIds.end(),
+                [this](const std::string& s) {
+                    return this->isPublicallyHiddenSecureCameraLocked(s);}),
+                providerDeviceIds.end());
         deviceIds.insert(deviceIds.end(), providerDeviceIds.begin(), providerDeviceIds.end());
     }
 
@@ -1046,9 +1056,12 @@ bool CameraProviderManager::isLogicalCamera(const std::string& id,
     return deviceInfo->mIsLogicalCamera;
 }
 
-bool CameraProviderManager::isPublicallyHiddenSecureCamera(const std::string& id) {
+bool CameraProviderManager::isPublicallyHiddenSecureCamera(const std::string& id) const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    return isPublicallyHiddenSecureCameraLocked(id);
+}
 
+bool CameraProviderManager::isPublicallyHiddenSecureCameraLocked(const std::string& id) const {
     auto deviceInfo = findDeviceInfoLocked(id);
     if (deviceInfo == nullptr) {
         return false;
