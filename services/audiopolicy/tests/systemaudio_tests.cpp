@@ -144,18 +144,20 @@ TEST(SystemAudioTest, AudioDeviceTypeHelperFunction) {
             std::end(AUDIO_DEVICE_IN_ALL_ARRAY));
 
     runAudioDeviceTypeHelperFunction(allDeviceTypes, AUDIO_DEVICE_OUT_ALL_ARRAY,
-            AUDIO_DEVICE_OUT_CNT, "output", audio_is_output_device);
+            std::size(AUDIO_DEVICE_OUT_ALL_ARRAY), "output", audio_is_output_device);
     runAudioDeviceTypeHelperFunction(allDeviceTypes, AUDIO_DEVICE_IN_ALL_ARRAY,
-            AUDIO_DEVICE_IN_CNT, "input", audio_is_input_device);
+            std::size(AUDIO_DEVICE_IN_ALL_ARRAY), "input", audio_is_input_device);
     runAudioDeviceTypeHelperFunction(allDeviceTypes, AUDIO_DEVICE_OUT_ALL_A2DP_ARRAY,
-            AUDIO_DEVICE_OUT_A2DP_CNT, "a2dp out", audio_is_a2dp_out_device);
+            std::size(AUDIO_DEVICE_OUT_ALL_A2DP_ARRAY), "a2dp out", audio_is_a2dp_out_device);
     const audio_devices_t bluetoothInA2dpDevices[] = { AUDIO_DEVICE_IN_BLUETOOTH_A2DP };
     runAudioDeviceTypeHelperFunction(allDeviceTypes, bluetoothInA2dpDevices,
-            1 /*targetDeviceCount*/, "a2dp in", audio_is_a2dp_in_device);
+            std::size(bluetoothInA2dpDevices), "a2dp in", audio_is_a2dp_in_device);
     runAudioDeviceTypeHelperFunction(allDeviceTypes, AUDIO_DEVICE_OUT_ALL_SCO_ARRAY,
-            AUDIO_DEVICE_OUT_SCO_CNT, "bluetooth out sco", audio_is_bluetooth_out_sco_device);
+            std::size(AUDIO_DEVICE_OUT_ALL_SCO_ARRAY), "bluetooth out sco",
+            audio_is_bluetooth_out_sco_device);
     runAudioDeviceTypeHelperFunction(allDeviceTypes, AUDIO_DEVICE_IN_ALL_SCO_ARRAY,
-            AUDIO_DEVICE_IN_SCO_CNT, "bluetooth in sco", audio_is_bluetooth_in_sco_device);
+            std::size(AUDIO_DEVICE_IN_ALL_SCO_ARRAY), "bluetooth in sco",
+            audio_is_bluetooth_in_sco_device);
     const unsigned int scoDeviceCount = AUDIO_DEVICE_OUT_SCO_CNT + AUDIO_DEVICE_IN_SCO_CNT;
     audio_devices_t scoDevices[scoDeviceCount];
     std::copy(std::begin(AUDIO_DEVICE_OUT_ALL_SCO_ARRAY), std::end(AUDIO_DEVICE_OUT_ALL_SCO_ARRAY),
@@ -163,12 +165,33 @@ TEST(SystemAudioTest, AudioDeviceTypeHelperFunction) {
     std::copy(std::begin(AUDIO_DEVICE_IN_ALL_SCO_ARRAY), std::end(AUDIO_DEVICE_IN_ALL_SCO_ARRAY),
               std::begin(scoDevices) + AUDIO_DEVICE_OUT_SCO_CNT);
     runAudioDeviceTypeHelperFunction(allDeviceTypes, scoDevices,
-            scoDeviceCount, "bluetooth sco", audio_is_bluetooth_sco_device);
+            std::size(scoDevices), "bluetooth sco", audio_is_bluetooth_sco_device);
     const audio_devices_t hearingAidOutDevices[] = { AUDIO_DEVICE_OUT_HEARING_AID };
     runAudioDeviceTypeHelperFunction(allDeviceTypes, hearingAidOutDevices,
-            1 /*targetDeviceCount*/, "hearing aid out", audio_is_hearing_aid_out_device);
+            std::size(hearingAidOutDevices), "hearing aid out", audio_is_hearing_aid_out_device);
     runAudioDeviceTypeHelperFunction(allDeviceTypes, AUDIO_DEVICE_OUT_ALL_USB_ARRAY,
-            AUDIO_DEVICE_OUT_USB_CNT, "usb out", audio_is_usb_out_device);
+            std::size(AUDIO_DEVICE_OUT_ALL_USB_ARRAY), "usb out", audio_is_usb_out_device);
     runAudioDeviceTypeHelperFunction(allDeviceTypes, AUDIO_DEVICE_IN_ALL_USB_ARRAY,
-            AUDIO_DEVICE_IN_USB_CNT, "usb in", audio_is_usb_in_device);
+            std::size(AUDIO_DEVICE_IN_ALL_USB_ARRAY), "usb in", audio_is_usb_in_device);
+    const audio_devices_t remoteSubmixDevices[] = {
+            AUDIO_DEVICE_IN_REMOTE_SUBMIX, AUDIO_DEVICE_OUT_REMOTE_SUBMIX };
+    runAudioDeviceTypeHelperFunction(allDeviceTypes, remoteSubmixDevices,
+            std::size(remoteSubmixDevices), "remote submix", audio_is_remote_submix_device);
+    runAudioDeviceTypeHelperFunction(allDeviceTypes, AUDIO_DEVICE_OUT_ALL_DIGITAL_ARRAY,
+            std::size(AUDIO_DEVICE_OUT_ALL_DIGITAL_ARRAY), "digital out",
+            audio_is_digital_out_device);
+    runAudioDeviceTypeHelperFunction(allDeviceTypes, AUDIO_DEVICE_IN_ALL_DIGITAL_ARRAY,
+            std::size(AUDIO_DEVICE_IN_ALL_DIGITAL_ARRAY), "digital in",
+            audio_is_digital_in_device);
+    const unsigned int digitalDeviceCount
+            = AUDIO_DEVICE_OUT_DIGITAL_CNT + AUDIO_DEVICE_IN_DIGITAL_CNT;
+    audio_devices_t digitalDevices[digitalDeviceCount];
+    std::copy(std::begin(AUDIO_DEVICE_OUT_ALL_DIGITAL_ARRAY),
+              std::end(AUDIO_DEVICE_OUT_ALL_DIGITAL_ARRAY),
+              std::begin(digitalDevices));
+    std::copy(std::begin(AUDIO_DEVICE_IN_ALL_DIGITAL_ARRAY),
+              std::end(AUDIO_DEVICE_IN_ALL_DIGITAL_ARRAY),
+              std::begin(digitalDevices) + AUDIO_DEVICE_OUT_DIGITAL_CNT);
+    runAudioDeviceTypeHelperFunction(allDeviceTypes, digitalDevices,
+              std::size(digitalDevices), "digital", audio_device_is_digital);
 }
