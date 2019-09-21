@@ -34,6 +34,7 @@ int main(int argc __unused, char** argv __unused)
     sp<IServiceManager> sm = defaultServiceManager();
     ALOGI("ServiceManager: %p", sm.get());
     CameraService::instantiate();
+    ALOGI("ServiceManager: %p done instantiate", sm.get());
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();
 }
