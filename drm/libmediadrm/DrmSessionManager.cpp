@@ -21,11 +21,16 @@
 #include <binder/IPCThreadState.h>
 #include <binder/IProcessInfoService.h>
 #include <binder/IServiceManager.h>
-#include <media/stagefright/ProcessInfo.h>
-#include <mediadrm/DrmSessionClientInterface.h>
+#include <cutils/properties.h>
+#include <media/IResourceManagerClient.h>
+#include <media/MediaResource.h>
 #include <mediadrm/DrmSessionManager.h>
 #include <unistd.h>
 #include <utils/String8.h>
+
+#include <vector>
+
+#include "ResourceManagerService.h"
 
 namespace android {
 
@@ -35,6 +40,35 @@ static String8 GetSessionIdString(const Vector<uint8_t> &sessionId) {
         sessionIdStr.appendFormat("%u ", sessionId[i]);
     }
     return sessionIdStr;
+}
+
+static std::vector<uint8_t> toStdVec(const Vector<uint8_t> &vector) {
+    const uint8_t *v = vector.array();
+    std::vector<uint8_t> vec(v, v + vector.size());
+    return vec;
+}
+
+static uint64_t toClientId(const sp<IResourceManagerClient>& drm) {
+    return reinterpret_cast<int64_t>(drm.get());
+}
+
+static Vector<MediaResource> toResourceVec(const Vector<uint8_t> &sessionId) {
+    Vector<MediaResource> resources;
+    // use UINT64_MAX to decrement through addition overflow
+    resources.push_back(MediaResource(MediaResource::kDrmSession, toStdVec(sessionId), UINT64_MAX));
+    return resources;
+}
+
+static sp<IResourceManagerService> getResourceManagerService() {
+    if (property_get_bool("persist.device_config.media_native.mediadrmserver", 1)) {
+        return new ResourceManagerService();
+    }
+    sp<IServiceManager> sm = defaultServiceManager();
+    if (sm == NULL) {
+        return NULL;
+    }
+    sp<IBinder> binder = sm->getService(String16("media.resource_manager"));
+    return interface_cast<IResourceManagerService>(binder);
 }
 
 bool isEqualSessionId(const Vector<uint8_t> &sessionId1, const Vector<uint8_t> &sessionId2) {
@@ -51,189 +85,114 @@ bool isEqualSessionId(const Vector<uint8_t> &sessionId1, const Vector<uint8_t> &
 
 sp<DrmSessionManager> DrmSessionManager::Instance() {
     static sp<DrmSessionManager> drmSessionManager = new DrmSessionManager();
+    drmSessionManager->init();
     return drmSessionManager;
 }
 
 DrmSessionManager::DrmSessionManager()
-    : mProcessInfo(new ProcessInfo()),
-      mTime(0) {}
+    : DrmSessionManager(getResourceManagerService()) {
+}
 
-DrmSessionManager::DrmSessionManager(sp<ProcessInfoInterface> processInfo)
-    : mProcessInfo(processInfo),
-      mTime(0) {}
+DrmSessionManager::DrmSessionManager(const sp<IResourceManagerService> &service)
+    : mService(service),
+      mInitialized(false) {
+    if (mService == NULL) {
+        ALOGE("Failed to init ResourceManagerService");
+    }
+}
 
-DrmSessionManager::~DrmSessionManager() {}
+DrmSessionManager::~DrmSessionManager() {
+    if (mService != NULL) {
+        IInterface::asBinder(mService)->unlinkToDeath(this);
+    }
+}
 
-void DrmSessionManager::addSession(
-        int pid, const sp<DrmSessionClientInterface>& drm, const Vector<uint8_t> &sessionId) {
-    ALOGV("addSession(pid %d, drm %p, sessionId %s)", pid, drm.get(),
+void DrmSessionManager::init() {
+    Mutex::Autolock lock(mLock);
+    if (mInitialized) {
+        return;
+    }
+    mInitialized = true;
+    if (mService != NULL) {
+        IInterface::asBinder(mService)->linkToDeath(this);
+    }
+}
+
+void DrmSessionManager::addSession(int pid,
+        const sp<IResourceManagerClient>& drm, const Vector<uint8_t> &sessionId) {
+    uid_t uid = IPCThreadState::self()->getCallingUid();
+    ALOGV("addSession(pid %d, uid %d, drm %p, sessionId %s)", pid, uid, drm.get(),
             GetSessionIdString(sessionId).string());
 
     Mutex::Autolock lock(mLock);
-    SessionInfo info;
-    info.drm = drm;
-    info.sessionId = sessionId;
-    info.timeStamp = getTime_l();
-    ssize_t index = mSessionMap.indexOfKey(pid);
-    if (index < 0) {
-        // new pid
-        SessionInfos infosForPid;
-        infosForPid.push_back(info);
-        mSessionMap.add(pid, infosForPid);
-    } else {
-        mSessionMap.editValueAt(index).push_back(info);
+    if (mService == NULL) {
+        return;
     }
+
+    int64_t clientId = toClientId(drm);
+    mSessionMap[toStdVec(sessionId)] = (SessionInfo){pid, uid, clientId};
+    mService->addResource(pid, uid, clientId, drm, toResourceVec(sessionId));
 }
 
 void DrmSessionManager::useSession(const Vector<uint8_t> &sessionId) {
     ALOGV("useSession(%s)", GetSessionIdString(sessionId).string());
 
     Mutex::Autolock lock(mLock);
-    for (size_t i = 0; i < mSessionMap.size(); ++i) {
-        SessionInfos& infos = mSessionMap.editValueAt(i);
-        for (size_t j = 0; j < infos.size(); ++j) {
-            SessionInfo& info = infos.editItemAt(j);
-            if (isEqualSessionId(sessionId, info.sessionId)) {
-                info.timeStamp = getTime_l();
-                return;
-            }
-        }
+    auto it = mSessionMap.find(toStdVec(sessionId));
+    if (mService == NULL || it == mSessionMap.end()) {
+        return;
     }
+
+    auto info = it->second;
+    mService->addResource(info.pid, info.uid, info.clientId, NULL, toResourceVec(sessionId));
 }
 
 void DrmSessionManager::removeSession(const Vector<uint8_t> &sessionId) {
     ALOGV("removeSession(%s)", GetSessionIdString(sessionId).string());
 
     Mutex::Autolock lock(mLock);
-    for (size_t i = 0; i < mSessionMap.size(); ++i) {
-        SessionInfos& infos = mSessionMap.editValueAt(i);
-        for (size_t j = 0; j < infos.size(); ++j) {
-            if (isEqualSessionId(sessionId, infos[j].sessionId)) {
-                infos.removeAt(j);
-                return;
-            }
-        }
+    auto it = mSessionMap.find(toStdVec(sessionId));
+    if (mService == NULL || it == mSessionMap.end()) {
+        return;
     }
-}
 
-void DrmSessionManager::removeDrm(const sp<DrmSessionClientInterface>& drm) {
-    ALOGV("removeDrm(%p)", drm.get());
-
-    Mutex::Autolock lock(mLock);
-    bool found = false;
-    for (size_t i = 0; i < mSessionMap.size(); ++i) {
-        SessionInfos& infos = mSessionMap.editValueAt(i);
-        for (size_t j = 0; j < infos.size();) {
-            if (infos[j].drm == drm) {
-                ALOGV("removed session (%s)", GetSessionIdString(infos[j].sessionId).string());
-                j = infos.removeAt(j);
-                found = true;
-            } else {
-                ++j;
-            }
-        }
-        if (found) {
-            break;
-        }
-    }
+    auto info = it->second;
+    mService->removeResource(info.pid, info.clientId, toResourceVec(sessionId));
+    mSessionMap.erase(it);
 }
 
 bool DrmSessionManager::reclaimSession(int callingPid) {
     ALOGV("reclaimSession(%d)", callingPid);
 
-    sp<DrmSessionClientInterface> drm;
-    Vector<uint8_t> sessionId;
-    int lowestPriorityPid;
-    int lowestPriority;
-    {
-        Mutex::Autolock lock(mLock);
-        int callingPriority;
-        if (!mProcessInfo->getPriority(callingPid, &callingPriority)) {
-            return false;
-        }
-        if (!getLowestPriority_l(&lowestPriorityPid, &lowestPriority)) {
-            return false;
-        }
-        if (lowestPriority <= callingPriority) {
-            return false;
-        }
+    // unlock early because reclaimResource might callback into removeSession
+    mLock.lock();
+    sp<IResourceManagerService> service(mService);
+    mLock.unlock();
 
-        if (!getLeastUsedSession_l(lowestPriorityPid, &drm, &sessionId)) {
-            return false;
-        }
-    }
-
-    if (drm == NULL) {
+    if (service == NULL) {
         return false;
     }
 
-    ALOGV("reclaim session(%s) opened by pid %d",
-            GetSessionIdString(sessionId).string(), lowestPriorityPid);
-
-    return drm->reclaimSession(sessionId);
+    // cannot update mSessionMap because we do not know which sessionId is reclaimed;
+    // we rely on IResourceManagerClient to removeSession in reclaimResource
+    Vector<uint8_t> dummy;
+    return service->reclaimResource(callingPid, toResourceVec(dummy));
 }
 
-int64_t DrmSessionManager::getTime_l() {
-    return mTime++;
+size_t DrmSessionManager::getSessionCount() const {
+    Mutex::Autolock lock(mLock);
+    return mSessionMap.size();
 }
 
-bool DrmSessionManager::getLowestPriority_l(int* lowestPriorityPid, int* lowestPriority) {
-    int pid = -1;
-    int priority = -1;
-    for (size_t i = 0; i < mSessionMap.size(); ++i) {
-        if (mSessionMap.valueAt(i).size() == 0) {
-            // no opened session by this process.
-            continue;
-        }
-        int tempPid = mSessionMap.keyAt(i);
-        int tempPriority;
-        if (!mProcessInfo->getPriority(tempPid, &tempPriority)) {
-            // shouldn't happen.
-            return false;
-        }
-        if (pid == -1) {
-            pid = tempPid;
-            priority = tempPriority;
-        } else {
-            if (tempPriority > priority) {
-                pid = tempPid;
-                priority = tempPriority;
-            }
-        }
-    }
-    if (pid != -1) {
-        *lowestPriorityPid = pid;
-        *lowestPriority = priority;
-    }
-    return (pid != -1);
+bool DrmSessionManager::containsSession(const Vector<uint8_t>& sessionId) const {
+    Mutex::Autolock lock(mLock);
+    return mSessionMap.count(toStdVec(sessionId));
 }
 
-bool DrmSessionManager::getLeastUsedSession_l(
-        int pid, sp<DrmSessionClientInterface>* drm, Vector<uint8_t>* sessionId) {
-    ssize_t index = mSessionMap.indexOfKey(pid);
-    if (index < 0) {
-        return false;
-    }
-
-    int leastUsedIndex = -1;
-    int64_t minTs = LLONG_MAX;
-    const SessionInfos& infos = mSessionMap.valueAt(index);
-    for (size_t j = 0; j < infos.size(); ++j) {
-        if (leastUsedIndex == -1) {
-            leastUsedIndex = j;
-            minTs = infos[j].timeStamp;
-        } else {
-            if (infos[j].timeStamp < minTs) {
-                leastUsedIndex = j;
-                minTs = infos[j].timeStamp;
-            }
-        }
-    }
-    if (leastUsedIndex != -1) {
-        *drm = infos[leastUsedIndex].drm;
-        *sessionId = infos[leastUsedIndex].sessionId;
-    }
-    return (leastUsedIndex != -1);
+void DrmSessionManager::binderDied(const wp<IBinder>& /*who*/) {
+    ALOGW("ResourceManagerService died.");
+    Mutex::Autolock lock(mLock);
+    mService.clear();
 }
 
 }  // namespace android

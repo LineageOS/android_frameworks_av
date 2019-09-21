@@ -290,6 +290,18 @@ void ResourceManagerService::onLastRemoved(
     }
 }
 
+void ResourceManagerService::mergeResources(
+        MediaResource& r1, const MediaResource& r2) {
+    if (r1.mType == MediaResource::kDrmSession) {
+        // This means we are using a session. Each session's mValue is initialized to UINT64_MAX.
+        // The oftener a session is used the lower it's mValue. During reclaim the session with
+        // the highest mValue/lowest usage would be closed.
+        r1.mValue -= (r1.mValue == 0 ? 0 : 1);
+    } else {
+        r1.mValue += r2.mValue;
+    }
+}
+
 void ResourceManagerService::addResource(
         int pid,
         int uid,
@@ -309,15 +321,16 @@ void ResourceManagerService::addResource(
     ResourceInfo& info = getResourceInfoForEdit(uid, clientId, client, infos);
 
     for (size_t i = 0; i < resources.size(); ++i) {
-        const auto resType = std::make_pair(resources[i].mType, resources[i].mSubType);
+        const auto &res = resources[i];
+        const auto resType = std::tuple(res.mType, res.mSubType, res.mId);
         if (info.resources.find(resType) == info.resources.end()) {
-            onFirstAdded(resources[i], info);
-            info.resources[resType] = resources[i];
+            onFirstAdded(res, info);
+            info.resources[resType] = res;
         } else {
-            info.resources[resType].mValue += resources[i].mValue;
+            mergeResources(info.resources[resType], res);
         }
     }
-    if (info.deathNotifier == nullptr) {
+    if (info.deathNotifier == nullptr && client != nullptr) {
         info.deathNotifier = new DeathNotifier(this, pid, clientId);
         IInterface::asBinder(client)->linkToDeath(info.deathNotifier);
     }
@@ -351,14 +364,17 @@ void ResourceManagerService::removeResource(int pid, int64_t clientId,
     ResourceInfo &info = infos.editValueAt(index);
 
     for (size_t i = 0; i < resources.size(); ++i) {
-        const auto resType = std::make_pair(resources[i].mType, resources[i].mSubType);
+        const auto &res = resources[i];
+        const auto resType = std::tuple(res.mType, res.mSubType, res.mId);
         // ignore if we don't have it
         if (info.resources.find(resType) != info.resources.end()) {
             MediaResource &resource = info.resources[resType];
-            if (resource.mValue > resources[i].mValue) {
-                resource.mValue -= resources[i].mValue;
+            if (resource.mValue > res.mValue) {
+                resource.mValue -= res.mValue;
             } else {
-                onLastRemoved(resources[i], info);
+                // drm sessions always take this branch because res.mValue is set
+                // to UINT64_MAX
+                onLastRemoved(res, info);
                 info.resources.erase(resType);
             }
         }
@@ -430,6 +446,7 @@ bool ResourceManagerService::reclaimResource(
         const MediaResource *secureCodec = NULL;
         const MediaResource *nonSecureCodec = NULL;
         const MediaResource *graphicMemory = NULL;
+        const MediaResource *drmSession = NULL;
         for (size_t i = 0; i < resources.size(); ++i) {
             MediaResource::Type type = resources[i].mType;
             if (resources[i].mType == MediaResource::kSecureCodec) {
@@ -438,6 +455,8 @@ bool ResourceManagerService::reclaimResource(
                 nonSecureCodec = &resources[i];
             } else if (type == MediaResource::kGraphicMemory) {
                 graphicMemory = &resources[i];
+            } else if (type == MediaResource::kDrmSession) {
+                drmSession = &resources[i];
             }
         }
 
@@ -459,6 +478,12 @@ bool ResourceManagerService::reclaimResource(
                 if (!getAllClients_l(callingPid, MediaResource::kSecureCodec, &clients)) {
                     return false;
                 }
+            }
+        }
+        if (drmSession != NULL) {
+            getClientForResource_l(callingPid, drmSession, &clients);
+            if (clients.size() == 0) {
+                return false;
             }
         }
 
