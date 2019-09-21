@@ -18,56 +18,61 @@
 
 #define DRM_SESSION_MANAGER_H_
 
+#include <binder/IBinder.h>
+#include <media/IResourceManagerService.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <utils/RefBase.h>
 #include <utils/KeyedVector.h>
 #include <utils/threads.h>
 #include <utils/Vector.h>
 
+#include <map>
+#include <utility>
+#include <vector>
+
 namespace android {
 
 class DrmSessionManagerTest;
-struct DrmSessionClientInterface;
-struct ProcessInfoInterface;
+class IResourceManagerClient;
 
 bool isEqualSessionId(const Vector<uint8_t> &sessionId1, const Vector<uint8_t> &sessionId2);
 
 struct SessionInfo {
-    sp<DrmSessionClientInterface> drm;
-    Vector<uint8_t> sessionId;
-    int64_t timeStamp;
+    pid_t pid;
+    uid_t uid;
+    int64_t clientId;
 };
 
-typedef Vector<SessionInfo > SessionInfos;
-typedef KeyedVector<int, SessionInfos > PidSessionInfosMap;
+typedef std::map<std::vector<uint8_t>, SessionInfo> SessionInfoMap;
 
-struct DrmSessionManager : public RefBase {
+struct DrmSessionManager : public IBinder::DeathRecipient {
     static sp<DrmSessionManager> Instance();
 
     DrmSessionManager();
-    explicit DrmSessionManager(sp<ProcessInfoInterface> processInfo);
+    explicit DrmSessionManager(const sp<IResourceManagerService> &service);
 
-    void addSession(int pid, const sp<DrmSessionClientInterface>& drm, const Vector<uint8_t>& sessionId);
+    void addSession(int pid, const sp<IResourceManagerClient>& drm, const Vector<uint8_t>& sessionId);
     void useSession(const Vector<uint8_t>& sessionId);
     void removeSession(const Vector<uint8_t>& sessionId);
-    void removeDrm(const sp<DrmSessionClientInterface>& drm);
     bool reclaimSession(int callingPid);
+
+    // sanity check APIs
+    size_t getSessionCount() const;
+    bool containsSession(const Vector<uint8_t>& sessionId) const;
+
+    // implements DeathRecipient
+    virtual void binderDied(const wp<IBinder>& /*who*/);
 
 protected:
     virtual ~DrmSessionManager();
 
 private:
-    friend class DrmSessionManagerTest;
+    void init();
 
-    int64_t getTime_l();
-    bool getLowestPriority_l(int* lowestPriorityPid, int* lowestPriority);
-    bool getLeastUsedSession_l(
-            int pid, sp<DrmSessionClientInterface>* drm, Vector<uint8_t>* sessionId);
-
-    sp<ProcessInfoInterface> mProcessInfo;
+    sp<IResourceManagerService> mService;
     mutable Mutex mLock;
-    PidSessionInfosMap mSessionMap;
-    int64_t mTime;
+    SessionInfoMap mSessionMap;
+    bool mInitialized;
 
     DISALLOW_EVIL_CONSTRUCTORS(DrmSessionManager);
 };

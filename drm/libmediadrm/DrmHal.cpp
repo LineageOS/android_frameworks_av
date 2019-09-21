@@ -295,38 +295,45 @@ static status_t toStatusT_1_2(Status_V1_2 status) {
     }
 }
 
-
 Mutex DrmHal::mLock;
 
-struct DrmSessionClient : public DrmSessionClientInterface {
-    explicit DrmSessionClient(DrmHal* drm) : mDrm(drm) {}
-
-    virtual bool reclaimSession(const Vector<uint8_t>& sessionId) {
-        sp<DrmHal> drm = mDrm.promote();
-        if (drm == NULL) {
-            return true;
-        }
-        status_t err = drm->closeSession(sessionId);
-        if (err != OK) {
-            return false;
-        }
-        drm->sendEvent(EventType::SESSION_RECLAIMED,
-                toHidlVec(sessionId), hidl_vec<uint8_t>());
+bool DrmHal::DrmSessionClient::reclaimResource() {
+    sp<DrmHal> drm = mDrm.promote();
+    if (drm == NULL) {
         return true;
     }
+    status_t err = drm->closeSession(mSessionId);
+    if (err != OK) {
+        return false;
+    }
+    drm->sendEvent(EventType::SESSION_RECLAIMED,
+            toHidlVec(mSessionId), hidl_vec<uint8_t>());
+    return true;
+}
 
-protected:
-    virtual ~DrmSessionClient() {}
+String8 DrmHal::DrmSessionClient::getName() {
+    String8 name;
+    sp<DrmHal> drm = mDrm.promote();
+    if (drm == NULL) {
+        name.append("<deleted>");
+    } else if (drm->getPropertyStringInternal(String8("vendor"), name) != OK
+        || name.isEmpty()) {
+      name.append("<Get vendor failed or is empty>");
+    }
+    name.append("[");
+    for (size_t i = 0; i < mSessionId.size(); ++i) {
+        name.appendFormat("%02x", mSessionId[i]);
+    }
+    name.append("]");
+    return name;
+}
 
-private:
-    wp<DrmHal> mDrm;
-
-    DISALLOW_EVIL_CONSTRUCTORS(DrmSessionClient);
-};
+DrmHal::DrmSessionClient::~DrmSessionClient() {
+    DrmSessionManager::Instance()->removeSession(mSessionId);
+}
 
 DrmHal::DrmHal()
-   : mDrmSessionClient(new DrmSessionClient(this)),
-     mFactories(makeDrmFactories()),
+   : mFactories(makeDrmFactories()),
      mInitCheck((mFactories.size() == 0) ? ERROR_UNSUPPORTED : NO_INIT) {
 }
 
@@ -335,14 +342,13 @@ void DrmHal::closeOpenSessions() {
     auto openSessions = mOpenSessions;
     for (size_t i = 0; i < openSessions.size(); i++) {
         mLock.unlock();
-        closeSession(openSessions[i]);
+        closeSession(openSessions[i]->mSessionId);
         mLock.lock();
     }
     mOpenSessions.clear();
 }
 
 DrmHal::~DrmHal() {
-    DrmSessionManager::Instance()->removeDrm(mDrmSessionClient);
 }
 
 void DrmHal::cleanup() {
@@ -748,9 +754,9 @@ status_t DrmHal::openSession(DrmPlugin::SecurityLevel level,
     } while (retry);
 
     if (err == OK) {
-        DrmSessionManager::Instance()->addSession(getCallingPid(),
-                mDrmSessionClient, sessionId);
-        mOpenSessions.push(sessionId);
+        sp<DrmSessionClient> client(new DrmSessionClient(this, sessionId));
+        DrmSessionManager::Instance()->addSession(getCallingPid(), client, sessionId);
+        mOpenSessions.push(client);
         mMetrics.SetSessionStart(sessionId);
     }
 
@@ -767,7 +773,7 @@ status_t DrmHal::closeSession(Vector<uint8_t> const &sessionId) {
         if (status == Status::OK) {
             DrmSessionManager::Instance()->removeSession(sessionId);
             for (size_t i = 0; i < mOpenSessions.size(); i++) {
-                if (mOpenSessions[i] == sessionId) {
+                if (isEqualSessionId(mOpenSessions[i]->mSessionId, sessionId)) {
                     mOpenSessions.removeAt(i);
                     break;
                 }

@@ -33,7 +33,7 @@ namespace android {
 class ServiceLog;
 struct ProcessInfoInterface;
 
-typedef std::map<std::pair<MediaResource::Type, MediaResource::SubType>, MediaResource> ResourceList;
+typedef std::map<std::tuple<MediaResource::Type, MediaResource::SubType, std::vector<uint8_t>>, MediaResource> ResourceList;
 struct ResourceInfo {
     int64_t clientId;
     uid_t uid;
@@ -125,6 +125,9 @@ private:
 
     void onFirstAdded(const MediaResource& res, const ResourceInfo& clientInfo);
     void onLastRemoved(const MediaResource& res, const ResourceInfo& clientInfo);
+
+    // Merge r2 into r1
+    void mergeResources(MediaResource& r1, const MediaResource& r2);
 
     mutable Mutex mLock;
     sp<ProcessInfoInterface> mProcessInfo;
