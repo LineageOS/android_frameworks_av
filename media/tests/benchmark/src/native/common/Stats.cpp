@@ -15,13 +15,13 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "Timer"
+#define LOG_TAG "Stats"
 
 #include <iostream>
 #include <stdint.h>
 #include <utils/Log.h>
 
-#include "Timer.h"
+#include "Stats.h"
 
 /**
  * Dumps the stats of the operation for a given input media.
@@ -31,7 +31,7 @@
  * \param inputReference input media
  * \param duarationUs    is a duration of the input media in microseconds.
  */
-void Timer::dumpStatistics(std::string operation, std::string inputReference, int64_t duarationUs) {
+void Stats::dumpStatistics(std::string operation, std::string inputReference, int64_t duarationUs) {
     ALOGV("In %s", __func__);
     if (!mOutputTimer.size()) {
         ALOGE("No output produced");
@@ -40,6 +40,7 @@ void Timer::dumpStatistics(std::string operation, std::string inputReference, in
     nsecs_t totalTimeTakenNs = getTotalTime();
     nsecs_t timeTakenPerSec = (totalTimeTakenNs * 1000000) / duarationUs;
     nsecs_t timeToFirstFrameNs = *mOutputTimer.begin() - mStartTimeNs;
+    int32_t size = std::accumulate(mFrameSizes.begin(), mFrameSizes.end(), 0);
     // get min and max output intervals.
     nsecs_t intervalNs;
     nsecs_t minTimeTakenNs = INT64_MAX;
@@ -59,6 +60,7 @@ void Timer::dumpStatistics(std::string operation, std::string inputReference, in
     std::cout << "Time to first frame in nano sec : " << timeToFirstFrameNs << endl;
     std::cout << "Time taken (in nano sec) to " << operation
               << " 1 sec of content : " << timeTakenPerSec << endl;
+    std::cout << "Total bytes " << operation << "ed : " << size << endl;
     std::cout << "Minimum Time in nano sec : " << minTimeTakenNs << endl;
     std::cout << "Maximum Time in nano sec : " << maxTimeTakenNs << endl;
     std::cout << "Destroy Time in nano sec : " << mDeInitTimeNs << endl;
