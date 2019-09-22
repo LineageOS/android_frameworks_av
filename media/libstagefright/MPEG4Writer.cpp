@@ -352,6 +352,8 @@ private:
     int64_t mStartTimestampUs;
     int64_t mStartTimeRealUs;
     int64_t mFirstSampleTimeRealUs;
+    // Captures negative start offset of a track(track starttime < 0).
+    int64_t mFirstSampleStartOffsetUs;
     int64_t mPreviousTrackTimeUs;
     int64_t mTrackEveryTimeDurationUs;
 
@@ -410,10 +412,8 @@ private:
     void updateTrackSizeEstimate();
     void addOneStscTableEntry(size_t chunkId, size_t sampleId);
     void addOneStssTableEntry(size_t sampleId);
-
-    // Duration is time scale based
-    void addOneSttsTableEntry(size_t sampleCount, int32_t timescaledDur);
-    void addOneCttsTableEntry(size_t sampleCount, int32_t timescaledDur);
+    void addOneSttsTableEntry(size_t sampleCount, int32_t delta /* media time scale based */);
+    void addOneCttsTableEntry(size_t sampleCount, int32_t sampleOffset);
     void addOneElstTableEntry(uint32_t segmentDuration, int32_t mediaTime,
         int16_t mediaRate, int16_t mediaRateFraction);
 
@@ -850,7 +850,8 @@ status_t MPEG4Writer::start(MetaData *param) {
 
     if (!param ||
         !param->findInt32(kKeyTimeScale, &mTimeScale)) {
-        mTimeScale = 1000;
+        // Increased by a factor of 10 to improve precision of segment duration in edit list entry.
+        mTimeScale = 10000;
     }
     CHECK_GT(mTimeScale, 0);
     ALOGV("movie time scale: %d", mTimeScale);
@@ -1272,13 +1273,12 @@ void MPEG4Writer::writeMoovBox(int64_t durationUs) {
                 std::min(minCttsOffsetTimeUs, (*it)->getMinCttsOffsetTimeUs());
         }
     }
-    ALOGI("Ajust the moov start time from %lld us -> %lld us",
-            (long long)mStartTimestampUs,
-            (long long)(mStartTimestampUs + minCttsOffsetTimeUs - kMaxCttsOffsetTimeUs));
-    // Adjust the global start time.
+    ALOGI("Adjust the moov start time from %lld us -> %lld us", (long long)mStartTimestampUs,
+          (long long)(mStartTimestampUs + minCttsOffsetTimeUs - kMaxCttsOffsetTimeUs));
+    // Adjust movie start time.
     mStartTimestampUs += minCttsOffsetTimeUs - kMaxCttsOffsetTimeUs;
 
-    // Add mStartTimeOffsetBFramesUs(-ve or zero) to the duration of first entry in STTS.
+    // Add mStartTimeOffsetBFramesUs(-ve or zero) to the start offset of tracks.
     mStartTimeOffsetBFramesUs = minCttsOffsetTimeUs - kMaxCttsOffsetTimeUs;
     ALOGV("mStartTimeOffsetBFramesUs :%" PRId32, mStartTimeOffsetBFramesUs);
 
@@ -1764,6 +1764,9 @@ int64_t MPEG4Writer::getStartTimestampUs() {
     return mStartTimestampUs;
 }
 
+/* Returns negative when reordering is needed because of BFrames or zero otherwise.
+ * CTTS values for tracks with BFrames offsets this negative value.
+ */
 int32_t MPEG4Writer::getStartTimeOffsetBFramesUs() {
     Mutex::Autolock autoLock(mLock);
     return mStartTimeOffsetBFramesUs;
@@ -1807,6 +1810,8 @@ MPEG4Writer::Track::Track(
       mGotAllCodecSpecificData(false),
       mReachedEOS(false),
       mStartTimestampUs(-1),
+      mFirstSampleTimeRealUs(0),
+      mFirstSampleStartOffsetUs(0),
       mRotation(0),
       mDimgRefs("dimg"),
       mImageItemId(0),
@@ -1941,24 +1946,20 @@ void MPEG4Writer::Track::addOneStssTableEntry(size_t sampleId) {
     mStssTableEntries->add(htonl(sampleId));
 }
 
-void MPEG4Writer::Track::addOneSttsTableEntry(
-        size_t sampleCount, int32_t duration) {
-
-    if (duration == 0) {
+void MPEG4Writer::Track::addOneSttsTableEntry(size_t sampleCount, int32_t delta) {
+    if (delta == 0) {
         ALOGW("0-duration samples found: %zu", sampleCount);
     }
     mSttsTableEntries->add(htonl(sampleCount));
-    mSttsTableEntries->add(htonl(duration));
+    mSttsTableEntries->add(htonl(delta));
 }
 
-void MPEG4Writer::Track::addOneCttsTableEntry(
-        size_t sampleCount, int32_t duration) {
-
+void MPEG4Writer::Track::addOneCttsTableEntry(size_t sampleCount, int32_t sampleOffset) {
     if (!mIsVideo) {
         return;
     }
     mCttsTableEntries->add(htonl(sampleCount));
-    mCttsTableEntries->add(htonl(duration));
+    mCttsTableEntries->add(htonl(sampleOffset));
 }
 
 void MPEG4Writer::Track::addOneElstTableEntry(
@@ -3123,6 +3124,7 @@ status_t MPEG4Writer::Track::threadEntry() {
         int32_t isSync = false;
         meta_data->findInt32(kKeyIsSyncFrame, &isSync);
         CHECK(meta_data->findInt64(kKeyTime, &timestampUs));
+        timestampUs += mFirstSampleStartOffsetUs;
 
         // For video, skip the first several non-key frames until getting the first key frame.
         if (mIsVideo && !mGotStartKeyFrame && !isSync) {
@@ -3138,6 +3140,10 @@ status_t MPEG4Writer::Track::threadEntry() {
         if (!mIsHeic) {
             if (mStszTableEntries->count() == 0) {
                 mFirstSampleTimeRealUs = systemTime() / 1000;
+                if (timestampUs < 0 && mFirstSampleStartOffsetUs == 0) {
+                    mFirstSampleStartOffsetUs = -timestampUs;
+                    timestampUs = 0;
+                }
                 mOwner->setStartTimestampUs(timestampUs);
                 mStartTimestampUs = timestampUs;
                 previousPausedDurationUs = mStartTimestampUs;
@@ -3309,17 +3315,17 @@ status_t MPEG4Writer::Track::threadEntry() {
                 }
             }
             mStszTableEntries->add(htonl(sampleSize));
+
             if (mStszTableEntries->count() > 2) {
 
                 // Force the first sample to have its own stts entry so that
                 // we can adjust its value later to maintain the A/V sync.
-                if (mStszTableEntries->count() == 3 || currDurationTicks != lastDurationTicks) {
+                if (lastDurationTicks && currDurationTicks != lastDurationTicks) {
                     addOneSttsTableEntry(sampleCount, lastDurationTicks);
                     sampleCount = 1;
                 } else {
                     ++sampleCount;
                 }
-
             }
             if (mSamplesHaveSameSize) {
                 if (mStszTableEntries->count() >= 2 && previousSampleSize != sampleSize) {
@@ -3426,17 +3432,10 @@ status_t MPEG4Writer::Track::threadEntry() {
             ++sampleCount;  // Count for the last sample
         }
 
-        if (mStszTableEntries->count() <= 2) {
-            addOneSttsTableEntry(1, lastDurationTicks);
-            if (sampleCount - 1 > 0) {
-                addOneSttsTableEntry(sampleCount - 1, lastDurationTicks);
-            }
-        } else {
-            addOneSttsTableEntry(sampleCount, lastDurationTicks);
-        }
+        addOneSttsTableEntry(sampleCount, lastDurationTicks);
 
-        // The last ctts box may not have been written yet, and this
-        // is to make sure that we write out the last ctts box.
+        // The last ctts box entry may not have been written yet, and this
+        // is to make sure that we write out the last ctts box entry.
         if (currCttsOffsetTimeTicks == lastCttsOffsetTimeTicks) {
             if (cttsSampleCount > 0) {
                 addOneCttsTableEntry(cttsSampleCount, lastCttsOffsetTimeTicks);
@@ -4099,19 +4098,122 @@ void MPEG4Writer::Track::writeHdlrBox() {
     mOwner->endBox();
 }
 
-void MPEG4Writer::Track::writeEdtsBox(){
+void MPEG4Writer::Track::writeEdtsBox() {
     ALOGV("%s : getStartTimeOffsetTimeUs of track:%" PRId64 " us", getTrackType(),
         getStartTimeOffsetTimeUs());
 
-    // Prepone video playback.
-    if (mMinCttsOffsetTicks != mMaxCttsOffsetTicks) {
-        int32_t mvhdTimeScale = mOwner->getTimeScale();
-        uint32_t tkhdDuration = (getDurationUs() * mvhdTimeScale + 5E5) / 1E6;
-        int64_t mediaTime = ((kMaxCttsOffsetTimeUs - getMinCttsOffsetTimeUs())
-            * mTimeScale + 5E5) / 1E6;
-        if (tkhdDuration > 0 && mediaTime > 0) {
-            addOneElstTableEntry(tkhdDuration, mediaTime, 1, 0);
+    int32_t mvhdTimeScale = mOwner->getTimeScale();
+    ALOGV("mvhdTimeScale:%" PRId32, mvhdTimeScale);
+    /* trackStartOffsetUs of this track is the sum of longest offset needed by a track among all
+     * tracks with B frames in this movie and the start offset of this track.
+     */
+    int64_t trackStartOffsetUs = getStartTimeOffsetTimeUs();
+    ALOGV("trackStartOffsetUs:%" PRIu64, trackStartOffsetUs);
+
+    // Longest offset needed by a track among all tracks with B frames.
+    int32_t movieStartOffsetBFramesUs = mOwner->getStartTimeOffsetBFramesUs();
+    ALOGV("movieStartOffsetBFramesUs:%" PRId32, movieStartOffsetBFramesUs);
+
+    // This media/track's real duration (sum of duration of all samples in this track).
+    uint32_t tkhdDurationTicks = (mTrackDurationUs * mvhdTimeScale + 5E5) / 1E6;
+    ALOGV("mTrackDurationUs:%" PRId64 "us", mTrackDurationUs);
+
+    int64_t movieStartTimeUs = mOwner->getStartTimestampUs();
+    ALOGV("movieStartTimeUs:%" PRId64, movieStartTimeUs);
+
+    int64_t trackStartTimeUs = movieStartTimeUs + trackStartOffsetUs;
+    ALOGV("trackStartTimeUs:%" PRId64, trackStartTimeUs);
+
+    if (movieStartOffsetBFramesUs == 0) {
+        // No B frames in any tracks.
+        if (trackStartOffsetUs > 0) {
+            // Track with positive start offset.
+            uint32_t segDuration = (trackStartOffsetUs * mvhdTimeScale + 5E5) / 1E6;
+            ALOGV("segDuration:%" PRIu64 "us", trackStartOffsetUs);
+            /* The first entry is an empty edit (indicated by media_time equal to -1), and its
+             * duration (segment_duration) is equal to the difference of the presentation times of
+             * the earliest media sample among all tracks and the earliest media sample of the track.
+             */
+            ALOGV("Empty edit list entry");
+            addOneElstTableEntry(segDuration, -1, 1, 0);
+            addOneElstTableEntry(tkhdDurationTicks, 0, 1, 0);
+        } else if (mFirstSampleStartOffsetUs > 0) {
+            // Track with start time < 0 / negative start offset.
+            ALOGV("Normal edit list entry");
+            int32_t mediaTime = (mFirstSampleStartOffsetUs * mTimeScale + 5E5) / 1E6;
+            int32_t firstSampleOffsetTicks =
+                    (mFirstSampleStartOffsetUs * mvhdTimeScale + 5E5) / 1E6;
+            // samples before 0 don't count in for duration, hence subtract firstSampleOffsetTicks.
+            addOneElstTableEntry(tkhdDurationTicks - firstSampleOffsetTicks, mediaTime, 1, 0);
+        } else {
+            // Track starting at zero.
+            ALOGV("No edit list entry required for this track");
         }
+    } else if (movieStartOffsetBFramesUs < 0) {
+        // B frames present in at least one of the tracks.
+        ALOGV("writeEdtsBox - Reordered frames(B frames) present");
+        if (trackStartOffsetUs == std::abs(movieStartOffsetBFramesUs)) {
+            // Track starting at 0, no start offset.
+            // TODO : need to take care of mFirstSampleStartOffsetUs > 0 and trackStartOffsetUs > 0
+            // separately
+            if (mMinCttsOffsetTicks == mMaxCttsOffsetTicks) {
+                // Video with no B frame or non-video track.
+                if (mFirstSampleStartOffsetUs > 0) {
+                    // Track with start time < 0 / negative start offset.
+                    ALOGV("Normal edit list entry");
+                    ALOGV("mFirstSampleStartOffsetUs:%" PRId64 "us", mFirstSampleStartOffsetUs);
+                    int32_t mediaTimeTicks = (mFirstSampleStartOffsetUs * mTimeScale + 5E5) / 1E6;
+                    int32_t firstSampleOffsetTicks =
+                            (mFirstSampleStartOffsetUs * mvhdTimeScale + 5E5) / 1E6;
+                    // Samples before 0 don't count for duration, subtract firstSampleOffsetTicks.
+                    addOneElstTableEntry(tkhdDurationTicks - firstSampleOffsetTicks, mediaTimeTicks,
+                                         1, 0);
+                }
+            } else {
+                // Track with B Frames.
+                int32_t mediaTimeTicks = (trackStartOffsetUs * mTimeScale + 5E5) / 1E6;
+                ALOGV("mediaTime:%" PRId64 "us", trackStartOffsetUs);
+                ALOGV("Normal edit list entry to negate start offset by B Frames in others tracks");
+                addOneElstTableEntry(tkhdDurationTicks, mediaTimeTicks, 1, 0);
+            }
+        } else if (trackStartOffsetUs > std::abs(movieStartOffsetBFramesUs)) {
+            // Track with start offset.
+            ALOGV("Tracks starting > 0");
+            int32_t editDurationTicks = 0;
+            if (mMinCttsOffsetTicks == mMaxCttsOffsetTicks) {
+                // Video with no B frame or non-video track.
+                editDurationTicks =
+                        ((trackStartOffsetUs + movieStartOffsetBFramesUs) * mvhdTimeScale + 5E5) /
+                        1E6;
+                ALOGV("editDuration:%" PRId64 "us", (trackStartOffsetUs + movieStartOffsetBFramesUs));
+            } else {
+                // Track with B frame.
+                int32_t trackStartOffsetBFramesUs = getMinCttsOffsetTimeUs() - kMaxCttsOffsetTimeUs;
+                ALOGV("trackStartOffsetBFramesUs:%" PRId32, trackStartOffsetBFramesUs);
+                editDurationTicks =
+                        ((trackStartOffsetUs + movieStartOffsetBFramesUs +
+                          trackStartOffsetBFramesUs) * mvhdTimeScale + 5E5) / 1E6;
+                ALOGV("editDuration:%" PRId64 "us", (trackStartOffsetUs + movieStartOffsetBFramesUs + trackStartOffsetBFramesUs));
+            }
+            ALOGV("editDurationTicks:%" PRIu32, editDurationTicks);
+            if (editDurationTicks > 0) {
+                ALOGV("Empty edit list entry");
+                addOneElstTableEntry(editDurationTicks, -1, 1, 0);
+                addOneElstTableEntry(tkhdDurationTicks, 0, 1, 0);
+            } else if (editDurationTicks < 0) {
+                // Only video tracks with B Frames would hit this case.
+                ALOGV("Edit list entry to negate start offset by B frames in other tracks");
+                addOneElstTableEntry(tkhdDurationTicks, std::abs(editDurationTicks), 1, 0);
+            } else {
+                ALOGV("No edit list entry needed for this track");
+            }
+        } else {
+            // Not expecting this case as we adjust negative start timestamps to zero.
+            ALOGW("trackStartOffsetUs < std::abs(movieStartOffsetBFramesUs)");
+        }
+    } else {
+        // Neither B frames present nor absent! or any other case?.
+        ALOGW("movieStartOffsetBFramesUs > 0");
     }
 
     if (mElstTableEntries->count() == 0) {
@@ -4253,19 +4355,6 @@ int32_t MPEG4Writer::Track::getStartTimeOffsetScaledTime() const {
 void MPEG4Writer::Track::writeSttsBox() {
     mOwner->beginBox("stts");
     mOwner->writeInt32(0);  // version=0, flags=0
-    if (mMinCttsOffsetTicks == mMaxCttsOffsetTicks) {
-        // For non-vdeio tracks or video tracks without ctts table,
-        // adjust duration of first sample for tracks to account for
-        // first sample not starting at the media start time.
-        // TODO: consider signaling this using some offset
-        // as this is not quite correct.
-        uint32_t duration;
-        CHECK(mSttsTableEntries->get(duration, 1));
-        duration = htonl(duration);  // Back to host byte order
-        int32_t startTimeOffsetScaled = (((getStartTimeOffsetTimeUs() +
-            mOwner->getStartTimeOffsetBFramesUs()) * mTimeScale) + 500000LL) / 1000000LL;
-        mSttsTableEntries->set(htonl((int32_t)duration + startTimeOffsetScaled), 1);
-    }
     mSttsTableEntries->write(mOwner);
     mOwner->endBox();  // stts
 }
@@ -4286,7 +4375,9 @@ void MPEG4Writer::Track::writeCttsBox() {
 
     mOwner->beginBox("ctts");
     mOwner->writeInt32(0);  // version=0, flags=0
-    int64_t deltaTimeUs = kMaxCttsOffsetTimeUs - getStartTimeOffsetTimeUs();
+    // Adjust ctts entries to have only offset needed for reordering frames.
+    int64_t deltaTimeUs = mMinCttsOffsetTimeUs;
+    ALOGV("ctts deltaTimeUs:%" PRId64, deltaTimeUs);
     int64_t delta = (deltaTimeUs * mTimeScale + 500000LL) / 1000000LL;
     mCttsTableEntries->adjustEntries([delta](size_t /* ix */, uint32_t (&value)[2]) {
         // entries are <count, ctts> pairs; adjust only ctts

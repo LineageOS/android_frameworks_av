@@ -106,7 +106,7 @@ private:
     uint32_t mInterleaveDurationUs;
     int32_t mTimeScale;
     int64_t mStartTimestampUs;
-    int32_t mStartTimeOffsetBFramesUs; // Start time offset when B Frames are present
+    int32_t mStartTimeOffsetBFramesUs;  // Longest offset needed for reordering tracks with B Frames
     int mLatitudex10000;
     int mLongitudex10000;
     bool mAreGeoTagsAvailable;
