@@ -20,19 +20,19 @@
 #include <media/NdkMediaExtractor.h>
 
 #include "BenchmarkCommon.h"
-#include "Timer.h"
+#include "Stats.h"
 
 class Extractor {
   public:
     Extractor()
         : mFormat(nullptr),
           mExtractor(nullptr),
-          mTimer(nullptr),
+          mStats(nullptr),
           mFrameBuf{nullptr},
           mDurationUs{0} {}
 
     ~Extractor() {
-        if (mTimer) delete mTimer;
+        if (mStats) delete mStats;
     }
 
     int32_t initExtractor(int32_t fd, size_t fileSize);
@@ -58,7 +58,7 @@ class Extractor {
   private:
     AMediaFormat *mFormat;
     AMediaExtractor *mExtractor;
-    Timer *mTimer;
+    Stats *mStats;
     uint8_t *mFrameBuf;
     int64_t mDurationUs;
 };

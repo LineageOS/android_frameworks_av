@@ -112,6 +112,7 @@ void Encoder::onOutputAvailable(AMediaCodec *mediaCodec, int32_t bufIdx,
             return;
         }
 
+        mStats->addFrameSize(bufferInfo->size);
         AMediaCodec_releaseOutputBuffer(mCodec, bufIdx, false);
         mSawOutputEOS = (0 != (bufferInfo->flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM));
         mNumOutputFrame++;
@@ -134,24 +135,23 @@ void Encoder::onFormatChanged(AMediaCodec *mediaCodec, AMediaFormat *format) {
 
 void Encoder::setupEncoder() {
     if (!mFormat) mFormat = AMediaFormat_new();
-    if (!mTimer) mTimer = new Timer();
 }
 
 void Encoder::deInitCodec() {
-    int64_t sTime = mTimer->getCurTime();
+    int64_t sTime = mStats->getCurTime();
     if (mFormat) {
         AMediaFormat_delete(mFormat);
         mFormat = nullptr;
     }
     AMediaCodec_stop(mCodec);
     AMediaCodec_delete(mCodec);
-    int64_t eTime = mTimer->getCurTime();
-    int64_t timeTaken = mTimer->getTimeDiff(sTime, eTime);
-    mTimer->setDeInitTime(timeTaken);
+    int64_t eTime = mStats->getCurTime();
+    int64_t timeTaken = mStats->getTimeDiff(sTime, eTime);
+    mStats->setDeInitTime(timeTaken);
 }
 
 void Encoder::resetEncoder() {
-    if (mTimer) mTimer->resetTimers();
+    if (mStats) mStats->reset();
     if (mEleStream) mEleStream = nullptr;
     if (mMime) mMime = nullptr;
     mInputBufferSize = 0;
@@ -160,7 +160,7 @@ void Encoder::resetEncoder() {
 
 void Encoder::dumpStatistics(string inputReference, int64_t durationUs) {
     string operation = "encode";
-    mTimer->dumpStatistics(operation, inputReference, durationUs);
+    mStats->dumpStatistics(operation, inputReference, durationUs);
 }
 
 int32_t Encoder::encode(string &codecName, ifstream &eleStream, size_t eleSize,
@@ -192,11 +192,11 @@ int32_t Encoder::encode(string &codecName, ifstream &eleStream, size_t eleSize,
     const char *s = AMediaFormat_toString(mFormat);
     ALOGV("Input format: %s\n", s);
 
-    int64_t sTime = mTimer->getCurTime();
+    int64_t sTime = mStats->getCurTime();
     mCodec = createMediaCodec(mFormat, mMime, codecName, true /*isEncoder*/);
     if (!mCodec) return AMEDIA_ERROR_INVALID_OBJECT;
-    int64_t eTime = mTimer->getCurTime();
-    int64_t timeTaken = mTimer->getTimeDiff(sTime, eTime);
+    int64_t eTime = mStats->getCurTime();
+    int64_t timeTaken = mStats->getTimeDiff(sTime, eTime);
 
     if (!strncmp(mMime, "video/", 6)) {
         mParams.frameSize = mParams.width * mParams.height * 3 / 2;
@@ -215,20 +215,19 @@ int32_t Encoder::encode(string &codecName, ifstream &eleStream, size_t eleSize,
     }
     mParams.numFrames = (mInputBufferSize + mParams.frameSize - 1) / mParams.frameSize;
 
-    sTime = mTimer->getCurTime();
+    sTime = mStats->getCurTime();
     if (asyncMode) {
         AMediaCodecOnAsyncNotifyCallback aCB = {OnInputAvailableCB, OnOutputAvailableCB,
                                                 OnFormatChangedCB, OnErrorCB};
         AMediaCodec_setAsyncNotifyCallback(mCodec, aCB, this);
-        CallBackHandle *callbackHandle = new CallBackHandle();
-        callbackHandle->mIOThread = thread(&CallBackHandle::ioThread, this);
+        mIOThread = thread(&CallBackHandle::ioThread, this);
     }
     AMediaCodec_start(mCodec);
-    eTime = mTimer->getCurTime();
-    timeTaken += mTimer->getTimeDiff(sTime, eTime);
-    mTimer->setInitTime(timeTaken);
+    eTime = mStats->getCurTime();
+    timeTaken += mStats->getTimeDiff(sTime, eTime);
+    mStats->setInitTime(timeTaken);
 
-    mTimer->setStartTime();
+    mStats->setStartTime();
     if (!asyncMode) {
         while (!mSawOutputEOS && !mSignalledError) {
             // Queue input data
@@ -238,7 +237,7 @@ int32_t Encoder::encode(string &codecName, ifstream &eleStream, size_t eleSize,
                     ALOGE("AMediaCodec_dequeueInputBuffer returned invalid index %zd\n", inIdx);
                     return AMEDIA_ERROR_IO;
                 } else if (inIdx >= 0) {
-                    mTimer->addInputTime();
+                    mStats->addInputTime();
                     onInputAvailable(mCodec, inIdx);
                 }
             }
@@ -251,7 +250,7 @@ int32_t Encoder::encode(string &codecName, ifstream &eleStream, size_t eleSize,
                 const char *s = AMediaFormat_toString(mFormat);
                 ALOGI("Output format: %s\n", s);
             } else if (outIdx >= 0) {
-                mTimer->addOutputTime();
+                mStats->addOutputTime();
                 onOutputAvailable(mCodec, outIdx, &info);
             } else if (!(outIdx == AMEDIACODEC_INFO_TRY_AGAIN_LATER ||
                          outIdx == AMEDIACODEC_INFO_OUTPUT_BUFFERS_CHANGED)) {
