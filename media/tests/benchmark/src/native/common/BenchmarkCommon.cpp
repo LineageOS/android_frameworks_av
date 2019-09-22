@@ -31,7 +31,7 @@ void CallBackHandle::ioThread() {
 void OnInputAvailableCB(AMediaCodec *codec, void *userdata, int32_t index) {
     ALOGV("OnInputAvailableCB: index(%d)", index);
     CallBackHandle *self = (CallBackHandle *)userdata;
-    self->getTimer()->addInputTime();
+    self->getStats()->addInputTime();
     self->mIOQueue.push([self, codec, index]() { self->onInputAvailable(codec, index); });
 }
 
@@ -40,7 +40,7 @@ void OnOutputAvailableCB(AMediaCodec *codec, void *userdata, int32_t index,
     ALOGV("OnOutputAvailableCB: index(%d), (%d, %d, %lld, 0x%x)", index, bufferInfo->offset,
           bufferInfo->size, (long long)bufferInfo->presentationTimeUs, bufferInfo->flags);
     CallBackHandle *self = (CallBackHandle *)userdata;
-    self->getTimer()->addOutputTime();
+    self->getStats()->addOutputTime();
     AMediaCodecBufferInfo bufferInfoCopy = *bufferInfo;
     self->mIOQueue.push([self, codec, index, bufferInfoCopy]() {
         AMediaCodecBufferInfo bc = bufferInfoCopy;
