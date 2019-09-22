@@ -1671,8 +1671,13 @@ void HeicCompositeStream::CodecCallbackHandler::onMessageReceived(const sp<AMess
                          ALOGE("CB_OUTPUT_FORMAT_CHANGED: format is expected.");
                          break;
                      }
-
-                     parent->onHeicFormatChanged(format);
+                     // Here format is MediaCodec's internal copy of output format.
+                     // Make a copy since onHeicFormatChanged() might modify it.
+                     sp<AMessage> formatCopy;
+                     if (format != nullptr) {
+                         formatCopy = format->dup();
+                     }
+                     parent->onHeicFormatChanged(formatCopy);
                      break;
                  }
 
