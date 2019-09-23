@@ -21,12 +21,14 @@
 #include "ARTSPConnection.h"
 #include "NetworkUtils.h"
 
+#include <datasource/HTTPBase.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/base64.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/Utils.h>
+#include <media/stagefright/FoundationUtils.h>
 
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -34,7 +36,6 @@
 #include <openssl/md5.h>
 #include <sys/socket.h>
 
-#include "include/HTTPBase.h"
 
 namespace android {
 

@@ -20,7 +20,7 @@
 
 #include <stdio.h>
 
-#include <media/stagefright/ClearFileSource.h>
+#include <datasource/ClearFileSource.h>
 #include <media/stagefright/MediaErrors.h>
 #include <utils/threads.h>
 #include <drm/DrmManagerClient.h>

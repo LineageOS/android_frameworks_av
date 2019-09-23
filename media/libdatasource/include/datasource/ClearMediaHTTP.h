@@ -20,7 +20,7 @@
 
 #include <media/stagefright/foundation/AString.h>
 
-#include "include/HTTPBase.h"
+#include "HTTPBase.h"
 
 namespace android {
 

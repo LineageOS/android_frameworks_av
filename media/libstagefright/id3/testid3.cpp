@@ -22,7 +22,7 @@
 #include <dirent.h>
 
 #include <binder/ProcessState.h>
-#include <media/stagefright/FileSource.h>
+#include <datasource/FileSource.h>
 #include <media/stagefright/foundation/ADebug.h>
 
 #define MAXPATHLEN 256

@@ -18,7 +18,9 @@
 
 #define DATA_SOURCE_FACTORY_H_
 
+#include <media/DataSource.h>
 #include <sys/types.h>
+#include <utils/KeyedVector.h>
 #include <utils/RefBase.h>
 
 namespace android {
