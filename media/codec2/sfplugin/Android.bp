@@ -22,16 +22,15 @@ cc_library_shared {
 
     header_libs: [
         "libcodec2_internal",
+        "media_ndk_headers",
     ],
 
     shared_libs: [
         "android.hardware.cas.native@1.0",
-        "android.hardware.graphics.bufferqueue@1.0",
         "android.hardware.media.c2@1.0",
         "android.hardware.media.omx@1.0",
         "libbase",
         "libbinder",
-        "libcodec2",
         "libcodec2_client",
         "libcodec2_vndk",
         "libcutils",
@@ -39,14 +38,12 @@ cc_library_shared {
         "libhidlallocatorutils",
         "libhidlbase",
         "liblog",
-        "libmedia",
         "libmedia_omx",
         "libsfplugin_ccodec_utils",
         "libstagefright_bufferqueue_helper",
         "libstagefright_codecbase",
         "libstagefright_foundation",
         "libstagefright_omx",
-        "libstagefright_omx_utils",
         "libstagefright_xmlparser",
         "libui",
         "libutils",
