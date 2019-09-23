@@ -189,7 +189,6 @@ cc_library {
         "libmedia_omx_client",
         "libaudioclient",
         "libmediametrics",
-        "libmediautils",
         "libui",
         "libutils",
         "libmedia_helper",
