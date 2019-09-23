@@ -19,6 +19,9 @@
 #define LOG_TAG "AudioFlinger"
 //#define LOG_NDEBUG 0
 
+// Define AUDIO_ARRAYS_STATIC_CHECK to check all audio arrays are correct
+#define AUDIO_ARRAYS_STATIC_CHECK 1
+
 #include "Configuration.h"
 #include <dirent.h>
 #include <math.h>
