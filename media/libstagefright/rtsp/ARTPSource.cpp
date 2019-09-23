@@ -46,6 +46,7 @@ ARTPSource::ARTPSource(
       mFirstRtpTime(0),
       mFirstSysTime(0),
       mClockRate(0),
+      mJbTime(300), // default jitter buffer time is 300ms.
       mID(id),
       mHighestSeqNumber(0),
       mPrevExpected(0),
@@ -371,6 +372,10 @@ uint32_t ARTPSource::getSelfID() {
 }
 void ARTPSource::setSelfID(const uint32_t selfID) {
     kSourceID = selfID;
+}
+
+void ARTPSource::setJbTime(const uint32_t jbTime) {
+    mJbTime = jbTime;
 }
 
 void ARTPSource::setMinMaxBitrate(int32_t min, int32_t max) {

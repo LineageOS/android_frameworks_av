@@ -59,7 +59,7 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
     int64_t playedTime = nowTime - startTime;
     int32_t playedTimeRtp = source->mFirstRtpTime +
         (((uint32_t)playedTime) * (source->mClockRate / 1000));
-    const int32_t jitterTime = source->mClockRate / 5;  // 200ms
+    const int32_t jitterTime = (int32_t)(source->mClockRate / ((float)1000 / (source->mJbTime)));
     int32_t expiredTimeInJb = rtpTime + jitterTime;
     bool isExpired = expiredTimeInJb <= (playedTimeRtp);
     bool isTooLate200 = expiredTimeInJb < (playedTimeRtp - jitterTime);

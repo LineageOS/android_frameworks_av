@@ -78,7 +78,8 @@ ARTPConnection::ARTPConnection(uint32_t flags)
     : mFlags(flags),
       mPollEventPending(false),
       mLastReceiverReportTimeUs(-1),
-      mLastBitrateReportTimeUs(-1) {
+      mLastBitrateReportTimeUs(-1),
+      mJbTime(300) {
 }
 
 ARTPConnection::~ARTPConnection() {
@@ -1020,6 +1021,7 @@ sp<ARTPSource> ARTPConnection::findSource(StreamInfo *info, uint32_t srcId) {
                 srcId, info->mSessionDesc, info->mIndex, info->mNotifyMsg);
 
         source->setSelfID(mSelfID);
+        source->setJbTime(mJbTime > 0 ? mJbTime : 300);
         source->setMinMaxBitrate(mMinBitrate, mMaxBitrate);
         info->mSources.add(srcId, source);
     } else {
@@ -1038,6 +1040,10 @@ void ARTPConnection::injectPacket(int index, const sp<ABuffer> &buffer) {
 
 void ARTPConnection::setSelfID(const uint32_t selfID) {
     mSelfID = selfID;
+}
+
+void ARTPConnection::setJbTime(const uint32_t jbTime) {
+    mJbTime = jbTime;
 }
 
 void ARTPConnection::setMinMaxBitrate(int32_t min, int32_t max) {
