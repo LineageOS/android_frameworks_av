@@ -21,13 +21,13 @@
 #include "HTTPDownloader.h"
 #include "M3UParser.h"
 
+#include <datasource/ClearMediaHTTP.h>
+#include <datasource/ClearFileSource.h>
 #include <media/DataSource.h>
 #include <media/MediaHTTPConnection.h>
 #include <media/MediaHTTPService.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include <media/stagefright/ClearMediaHTTP.h>
-#include <media/stagefright/ClearFileSource.h>
 #include <openssl/aes.h>
 #include <openssl/md5.h>
 #include <utils/Mutex.h>

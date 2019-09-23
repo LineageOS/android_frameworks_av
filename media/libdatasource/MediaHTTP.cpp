@@ -18,12 +18,12 @@
 #define LOG_TAG "MediaHTTP"
 #include <utils/Log.h>
 
-#include <media/stagefright/MediaHTTP.h>
+#include <datasource/MediaHTTP.h>
 
 #include <binder/IServiceManager.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
-#include <media/stagefright/Utils.h>
+#include <media/stagefright/FoundationUtils.h>
 
 #include <media/MediaHTTPConnection.h>
 

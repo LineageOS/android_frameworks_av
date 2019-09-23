@@ -8,6 +8,7 @@ cc_library_shared {
     srcs: ["MediaExtractorService.cpp"],
 
     shared_libs: [
+        "libdatasource",
         "libmedia",
         "libstagefright",
         "libbinder",
