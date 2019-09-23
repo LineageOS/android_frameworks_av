@@ -797,7 +797,8 @@ Return<void> DrmPlugin::getSecureStopIds(getSecureStopIds_cb _hidl_cb) {
 }
 
 Return<Status> DrmPlugin::releaseSecureStops(const SecureStopRelease& ssRelease) {
-    if (ssRelease.opaqueData.size() == 0) {
+    // minimum opaqueData contains the uint32_t count, see comment below
+    if (ssRelease.opaqueData.size() < sizeof(uint32_t)) {
         return Status::BAD_VALUE;
     }
 
