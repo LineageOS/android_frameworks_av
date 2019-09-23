@@ -2,9 +2,6 @@
   "presubmit": [
     {
        "name": "audiopolicy_tests"
-    },
-    {
-       "name": "systemaudio_tests"
     }
   ]
 }
