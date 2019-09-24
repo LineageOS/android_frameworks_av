@@ -24,9 +24,9 @@
 
 int32_t Muxer::initMuxer(int32_t fd, MUXER_OUTPUT_T outputFormat) {
     if (!mFormat) mFormat = mExtractor->getFormat();
-    if (!mTimer) mTimer = new Timer();
+    if (!mStats) mStats = new Stats();
 
-    int64_t sTime = mTimer->getCurTime();
+    int64_t sTime = mStats->getCurTime();
     mMuxer = AMediaMuxer_new(fd, (OutputFormat)outputFormat);
     if (!mMuxer) {
         cout << "[   WARN   ] Test Skipped. Unable to create muxer \n";
@@ -42,14 +42,14 @@ int32_t Muxer::initMuxer(int32_t fd, MUXER_OUTPUT_T outputFormat) {
         return index;
     }
     AMediaMuxer_start(mMuxer);
-    int64_t eTime = mTimer->getCurTime();
-    int64_t timeTaken = mTimer->getTimeDiff(sTime, eTime);
-    mTimer->setInitTime(timeTaken);
+    int64_t eTime = mStats->getCurTime();
+    int64_t timeTaken = mStats->getTimeDiff(sTime, eTime);
+    mStats->setInitTime(timeTaken);
     return AMEDIA_OK;
 }
 
 void Muxer::deInitMuxer() {
-    int64_t sTime = mTimer->getCurTime();
+    int64_t sTime = mStats->getCurTime();
     if (mFormat) {
         AMediaFormat_delete(mFormat);
         mFormat = nullptr;
@@ -57,24 +57,24 @@ void Muxer::deInitMuxer() {
     if (!mMuxer) return;
     AMediaMuxer_stop(mMuxer);
     AMediaMuxer_delete(mMuxer);
-    int64_t eTime = mTimer->getCurTime();
-    int64_t timeTaken = mTimer->getTimeDiff(sTime, eTime);
-    mTimer->setDeInitTime(timeTaken);
+    int64_t eTime = mStats->getCurTime();
+    int64_t timeTaken = mStats->getTimeDiff(sTime, eTime);
+    mStats->setDeInitTime(timeTaken);
 }
 
 void Muxer::resetMuxer() {
-    if (mTimer) mTimer->resetTimers();
+    if (mStats) mStats->reset();
 }
 
 void Muxer::dumpStatistics(string inputReference) {
     string operation = "mux";
-    mTimer->dumpStatistics(operation, inputReference, mExtractor->getClipDuration());
+    mStats->dumpStatistics(operation, inputReference, mExtractor->getClipDuration());
 }
 
 int32_t Muxer::mux(uint8_t *inputBuffer, vector<AMediaCodecBufferInfo> &frameInfos) {
     // Mux frame data
     size_t frameIdx = 0;
-    mTimer->setStartTime();
+    mStats->setStartTime();
     while (frameIdx < frameInfos.size()) {
         AMediaCodecBufferInfo info = frameInfos.at(frameIdx);
         media_status_t status = AMediaMuxer_writeSampleData(mMuxer, 0, inputBuffer, &info);
@@ -82,7 +82,8 @@ int32_t Muxer::mux(uint8_t *inputBuffer, vector<AMediaCodecBufferInfo> &frameInf
             ALOGE("Error in AMediaMuxer_writeSampleData");
             return status;
         }
-        mTimer->addOutputTime();
+        mStats->addOutputTime();
+        mStats->addFrameSize(info.size);
         frameIdx++;
     }
     return AMEDIA_OK;

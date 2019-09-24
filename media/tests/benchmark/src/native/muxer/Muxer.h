@@ -20,7 +20,7 @@
 #include <media/NdkMediaMuxer.h>
 
 #include "BenchmarkCommon.h"
-#include "Timer.h"
+#include "Stats.h"
 #include "Extractor.h"
 
 typedef enum {
@@ -33,14 +33,14 @@ typedef enum {
 
 class Muxer {
   public:
-    Muxer() : mFormat(nullptr), mMuxer(nullptr), mTimer(nullptr) { mExtractor = new Extractor(); }
+    Muxer() : mFormat(nullptr), mMuxer(nullptr), mStats(nullptr) { mExtractor = new Extractor(); }
 
     virtual ~Muxer() {
-        if (mTimer) delete mTimer;
+        if (mStats) delete mStats;
         if (mExtractor) delete mExtractor;
     }
 
-    Timer *getTimer() { return mTimer; }
+    Stats *getStats() { return mStats; }
     Extractor *getExtractor() { return mExtractor; }
 
     /* Muxer related utilities */
@@ -57,7 +57,7 @@ class Muxer {
     AMediaFormat *mFormat;
     AMediaMuxer *mMuxer;
     Extractor *mExtractor;
-    Timer *mTimer;
+    Stats *mStats;
 };
 
 #endif  // __MUXER_H__
