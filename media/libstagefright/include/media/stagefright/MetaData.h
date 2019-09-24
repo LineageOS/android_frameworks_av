@@ -41,7 +41,9 @@ private:
     friend class BnMediaSource;
     friend class BpMediaSource;
     friend class BpMediaExtractor;
+#ifndef __ANDROID_VNDK__
     static sp<MetaData> createFromParcel(const Parcel &parcel);
+#endif
 };
 
 }  // namespace android
