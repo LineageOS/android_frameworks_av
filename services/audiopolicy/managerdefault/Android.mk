@@ -15,10 +15,6 @@ LOCAL_SHARED_LIBRARIES := \
 
 ifeq ($(USE_CONFIGURABLE_AUDIO_POLICY), 1)
 
-ifneq ($(USE_XML_AUDIO_POLICY_CONF), 1)
-$(error Configurable policy does not support legacy conf file)
-endif #ifneq ($(USE_XML_AUDIO_POLICY_CONF), 1)
-
 LOCAL_SHARED_LIBRARIES += libaudiopolicyengineconfigurable
 
 else
@@ -42,10 +38,6 @@ LOCAL_SHARED_LIBRARIES += libmedia_helper
 LOCAL_SHARED_LIBRARIES += libmediametrics
 
 LOCAL_SHARED_LIBRARIES += libbinder libhidlbase libxml2
-
-ifeq ($(USE_XML_AUDIO_POLICY_CONF), 1)
-LOCAL_CFLAGS += -DUSE_XML_AUDIO_POLICY_CONF
-endif #ifeq ($(USE_XML_AUDIO_POLICY_CONF), 1)
 
 LOCAL_CFLAGS += -Wall -Werror
 
