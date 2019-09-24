@@ -92,6 +92,7 @@ cc_library_shared {
         "libhardware",
         "libhidlbase",
         "libjpeg",
+        "libmedia_codeclist",
         "libmedia_omx",
         "libmemunreachable",
         "libsensorprivacy",
