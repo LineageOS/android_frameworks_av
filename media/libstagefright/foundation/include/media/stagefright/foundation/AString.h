@@ -89,8 +89,10 @@ struct AString {
 
     void tolower();
 
+#ifndef __ANDROID_VNDK__
     static AString FromParcel(const Parcel &parcel);
     status_t writeToParcel(Parcel *parcel) const;
+#endif
 
 private:
     constexpr static const char *kEmptyString = "";

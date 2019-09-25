@@ -17,7 +17,6 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MetaData"
 #include <inttypes.h>
-#include <binder/Parcel.h>
 #include <utils/KeyedVector.h>
 #include <utils/Log.h>
 
@@ -28,6 +27,10 @@
 #include <media/stagefright/foundation/AString.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MetaData.h>
+
+#ifndef __ANDROID_VNDK__
+#include <binder/Parcel.h>
+#endif
 
 namespace android {
 
@@ -45,6 +48,7 @@ MetaData::MetaData(const MetaDataBase &from)
 MetaData::~MetaData() {
 }
 
+#ifndef __ANDROID_VNDK__
 /* static */
 sp<MetaData> MetaData::createFromParcel(const Parcel &parcel) {
 
@@ -52,6 +56,7 @@ sp<MetaData> MetaData::createFromParcel(const Parcel &parcel) {
     meta->updateFromParcel(parcel);
     return meta;
 }
+#endif
 
 }  // namespace android
 
