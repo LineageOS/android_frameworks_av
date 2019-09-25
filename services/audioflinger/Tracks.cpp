@@ -823,16 +823,9 @@ void AudioFlinger::PlaybackThread::Track::interceptBuffer(
     }
     for (auto& teePatch : mTeePatches) {
         RecordThread::PatchRecord* patchRecord = teePatch.patchRecord.get();
-
-        size_t framesWritten = writeFrames(patchRecord, sourceBuffer.i8, frameCount);
-        // On buffer wrap, the buffer frame count will be less than requested,
-        // when this happens a second buffer needs to be used to write the leftover audio
-        size_t framesLeft = frameCount - framesWritten;
-        if (framesWritten != 0 && framesLeft != 0) {
-            framesWritten +=
-                writeFrames(patchRecord, sourceBuffer.i8 + framesWritten * mFrameSize, framesLeft);
-            framesLeft = frameCount - framesWritten;
-        }
+        const size_t framesWritten = patchRecord->writeFrames(
+                sourceBuffer.i8, frameCount, mFrameSize);
+        const size_t framesLeft = frameCount - framesWritten;
         ALOGW_IF(framesLeft != 0, "%s(%d) PatchRecord %d can not provide big enough "
                  "buffer %zu/%zu, dropping %zu frames", __func__, mId, patchRecord->mId,
                  framesWritten, frameCount, framesLeft);
@@ -843,26 +836,6 @@ void AudioFlinger::PlaybackThread::Track::interceptBuffer(
     ALOGD_IF(spent > 200us, "%s: took %lldus to intercept %zu tracks", __func__,
              spent.count(), mTeePatches.size());
 }
-
-size_t AudioFlinger::PlaybackThread::Track::writeFrames(AudioBufferProvider* dest,
-                                                        const void* src,
-                                                        size_t frameCount) {
-    AudioBufferProvider::Buffer patchBuffer;
-    patchBuffer.frameCount = frameCount;
-    auto status = dest->getNextBuffer(&patchBuffer);
-    if (status != NO_ERROR) {
-       ALOGW("%s PathRecord getNextBuffer failed with error %d: %s",
-             __func__, status, strerror(-status));
-       return 0;
-    }
-    ALOG_ASSERT(patchBuffer.frameCount <= frameCount);
-    memcpy(patchBuffer.raw, src, patchBuffer.frameCount * mFrameSize);
-    auto framesWritten = patchBuffer.frameCount;
-    dest->releaseBuffer(&patchBuffer);
-    return framesWritten;
-}
-
-// releaseBuffer() is not overridden
 
 // ExtendedAudioBufferProvider interface
 
@@ -2403,6 +2376,39 @@ AudioFlinger::RecordThread::PatchRecord::PatchRecord(RecordThread *recordThread,
 AudioFlinger::RecordThread::PatchRecord::~PatchRecord()
 {
     ALOGV("%s(%d)", __func__, mId);
+}
+
+static size_t writeFramesHelper(
+        AudioBufferProvider* dest, const void* src, size_t frameCount, size_t frameSize)
+{
+    AudioBufferProvider::Buffer patchBuffer;
+    patchBuffer.frameCount = frameCount;
+    auto status = dest->getNextBuffer(&patchBuffer);
+    if (status != NO_ERROR) {
+       ALOGW("%s PathRecord getNextBuffer failed with error %d: %s",
+             __func__, status, strerror(-status));
+       return 0;
+    }
+    ALOG_ASSERT(patchBuffer.frameCount <= frameCount);
+    memcpy(patchBuffer.raw, src, patchBuffer.frameCount * frameSize);
+    size_t framesWritten = patchBuffer.frameCount;
+    dest->releaseBuffer(&patchBuffer);
+    return framesWritten;
+}
+
+// static
+size_t AudioFlinger::RecordThread::PatchRecord::writeFrames(
+        AudioBufferProvider* dest, const void* src, size_t frameCount, size_t frameSize)
+{
+    size_t framesWritten = writeFramesHelper(dest, src, frameCount, frameSize);
+    // On buffer wrap, the buffer frame count will be less than requested,
+    // when this happens a second buffer needs to be used to write the leftover audio
+    const size_t framesLeft = frameCount - framesWritten;
+    if (framesWritten != 0 && framesLeft != 0) {
+        framesWritten += writeFramesHelper(dest, (const char*)src + framesWritten * frameSize,
+                        framesLeft, frameSize);
+    }
+    return framesWritten;
 }
 
 // AudioBufferProvider interface
