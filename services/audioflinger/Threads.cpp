@@ -6658,6 +6658,7 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
                                          ) :
     ThreadBase(audioFlinger, id, outDevice, inDevice, RECORD, systemReady),
     mInput(input),
+    mSource(mInput),
     mActiveTracks(&this->mLocalLog),
     mRsmpInBuffer(NULL),
     // mRsmpInFrames, mRsmpInFramesP2, and mRsmpInFramesOA are set by readInputParameters_l()
@@ -7110,7 +7111,7 @@ reacquire_wakelock:
         } else {
             ATRACE_BEGIN("read");
             size_t bytesRead;
-            status_t result = mInput->stream->read(
+            status_t result = mSource->read(
                     (uint8_t*)mRsmpInBuffer + rear * mFrameSize, mBufferSize, &bytesRead);
             ATRACE_END();
             if (result < 0) {
@@ -7132,7 +7133,7 @@ reacquire_wakelock:
             int64_t position, time;
             if (mStandby) {
                 mTimestampVerifier.discontinuity();
-            } else if (mInput->stream->getCapturePosition(&position, &time) == NO_ERROR
+            } else if (mSource->getCapturePosition(&position, &time) == NO_ERROR
                     && time > mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL]) {
 
                 mTimestampVerifier.add(position, time, mSampleRate);
@@ -7413,7 +7414,7 @@ void AudioFlinger::RecordThread::inputStandBy()
             sq->end(false /*didModify*/);
         }
     }
-    status_t result = mInput->stream->standby();
+    status_t result = mSource->standby();
     ALOGE_IF(result != OK, "Error when putting input stream into standby: %d", result);
 
     // If going into standby, flush the pipe source.
@@ -8398,11 +8399,17 @@ void AudioFlinger::RecordThread::addPatchTrack(const sp<PatchRecord>& record)
 {
     Mutex::Autolock _l(mLock);
     mTracks.add(record);
+    if (record->getSource()) {
+        mSource = record->getSource();
+    }
 }
 
 void AudioFlinger::RecordThread::deletePatchTrack(const sp<PatchRecord>& record)
 {
     Mutex::Autolock _l(mLock);
+    if (mSource == record->getSource()) {
+        mSource = mInput;
+    }
     destroyTrack_l(record);
 }
 

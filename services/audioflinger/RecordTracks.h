@@ -128,6 +128,8 @@ public:
                 const Timeout& timeout = {});
     virtual             ~PatchRecord();
 
+    virtual Source* getSource() { return nullptr; }
+
     // AudioBufferProvider interface
     virtual status_t getNextBuffer(AudioBufferProvider::Buffer* buffer);
     virtual void releaseBuffer(AudioBufferProvider::Buffer* buffer);
