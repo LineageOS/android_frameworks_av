@@ -90,7 +90,6 @@ cc_library_shared {
         "libhidlbase",
         "libgui",
         "libui",
-        "libmedia2_jni_core",
         "libmediandk_utils",
     ],
 
