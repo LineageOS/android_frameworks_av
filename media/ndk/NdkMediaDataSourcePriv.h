@@ -62,7 +62,7 @@ private:
 
 };
 
-sp<MediaHTTPService> createMediaHttpService(const char *uri, int version);
+sp<MediaHTTPService> createMediaHttpService(const char *uri);
 
 #endif // _NDK_MEDIA_DATASOURCE_PRIV_H
 

@@ -2,9 +2,7 @@
 // libmediadrm
 //
 
-// TODO: change it back to cc_library_shared when MediaPlayer2 switches to
-// using NdkMediaDrm, instead of MediaDrm.java.
-cc_library {
+cc_library_shared {
     name: "libmediadrm",
 
     srcs: [
