@@ -136,4 +136,14 @@ public:
     virtual status_t    obtainBuffer(Proxy::Buffer *buffer,
                                      const struct timespec *timeOut = NULL);
     virtual void        releaseBuffer(Proxy::Buffer *buffer);
+
+    size_t writeFrames(const void* src, size_t frameCount, size_t frameSize) {
+        return writeFrames(this, src, frameCount, frameSize);
+    }
+
+private:
+    /** Write the source data into the buffer provider. @return written frame count. */
+    static size_t writeFrames(AudioBufferProvider* dest, const void* src,
+            size_t frameCount, size_t frameSize);
+
 };  // end of PatchRecord
