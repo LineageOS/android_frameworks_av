@@ -385,6 +385,8 @@ public:
                                    const Timeout& timeout = {});
     virtual             ~PatchTrack();
 
+            size_t      framesReady() const override;
+
     virtual status_t    start(AudioSystem::sync_event_t event =
                                     AudioSystem::SYNC_EVENT_NONE,
                              audio_session_t triggerSession = AUDIO_SESSION_NONE);
