@@ -359,6 +359,10 @@ int32_t AAudioProperty_getOutputMMapOffsetMicros() {
     return AAudioProperty_getMMapOffsetMicros(__func__, AAUDIO_PROP_OUTPUT_MMAP_OFFSET_USEC);
 }
 
+int32_t AAudioProperty_getLogMask() {
+    return property_get_int32(AAUDIO_PROP_LOG_MASK, 0);
+}
+
 aaudio_result_t AAudio_isFlushAllowed(aaudio_stream_state_t state) {
     aaudio_result_t result = AAUDIO_OK;
     switch (state) {
