@@ -26,8 +26,8 @@
 #include <binder/Parcel.h>
 #include <media/AudioEffect.h>
 #include <media/IAudioPolicyService.h>
-#include <media/TimeCheck.h>
 #include <mediautils/ServiceUtilities.h>
+#include <mediautils/TimeCheck.h>
 #include <system/audio.h>
 
 namespace android {

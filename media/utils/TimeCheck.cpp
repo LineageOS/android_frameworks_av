@@ -16,8 +16,8 @@
 
 
 #include <utils/Log.h>
-#include <media/TimeCheck.h>
-#include <media/EventLog.h>
+#include <mediautils/TimeCheck.h>
+#include <mediautils/EventLog.h>
 
 namespace android {
 
