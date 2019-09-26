@@ -17,18 +17,18 @@
 #pragma once
 
 #include <EngineConfig.h>
-#include <AudioPolicyManagerInterface.h>
+#include <EngineInterface.h>
 #include <ProductStrategy.h>
 #include <VolumeGroup.h>
 
 namespace android {
 namespace audio_policy {
 
-class EngineBase : public AudioPolicyManagerInterface
+class EngineBase : public EngineInterface
 {
 public:
     ///
-    /// from AudioPolicyManagerInterface
+    /// from EngineInterface
     ///
     android::status_t initCheck() override;
 
