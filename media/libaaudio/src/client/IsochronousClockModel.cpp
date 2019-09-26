@@ -26,12 +26,17 @@
 
 using namespace aaudio;
 
+#ifndef ICM_LOG_DRIFT
+#define ICM_LOG_DRIFT   0
+#endif // ICM_LOG_DRIFT
+
 IsochronousClockModel::IsochronousClockModel()
         : mMarkerFramePosition(0)
         , mMarkerNanoTime(0)
         , mSampleRate(48000)
-        , mFramesPerBurst(64)
+        , mFramesPerBurst(48)
         , mMaxMeasuredLatenessNanos(0)
+        , mLatenessForDriftNanos(kInitialLatenessForDriftNanos)
         , mState(STATE_STOPPED)
 {
 }
@@ -90,6 +95,7 @@ void IsochronousClockModel::processTimestamp(int64_t framePosition, int64_t nano
 
 //    ALOGD("processTimestamp() - mSampleRate = %d", mSampleRate);
 //    ALOGD("processTimestamp() - mState = %d", mState);
+    int64_t latenessNanos = nanosDelta - expectedNanosDelta;
     switch (mState) {
     case STATE_STOPPED:
         break;
@@ -99,7 +105,7 @@ void IsochronousClockModel::processTimestamp(int64_t framePosition, int64_t nano
         break;
     case STATE_SYNCING:
         // This will handle a burst of rapid transfer at the beginning.
-        if (nanosDelta < expectedNanosDelta) {
+        if (latenessNanos < 0) {
             setPositionAndTime(framePosition, nanoTime);
         } else {
 //            ALOGD("processTimestamp() - advance to STATE_RUNNING");
@@ -107,65 +113,65 @@ void IsochronousClockModel::processTimestamp(int64_t framePosition, int64_t nano
         }
         break;
     case STATE_RUNNING:
-        if (nanosDelta < expectedNanosDelta) {
+        // Modify estimated position based on lateness.
+        // This affects the "early" side of the window, which controls output glitches.
+        if (latenessNanos < 0) {
             // Earlier than expected timestamp.
             // This data is probably more accurate, so use it.
             // Or we may be drifting due to a fast HW clock.
-            //int microsDelta = (int) (nanosDelta / 1000);
-            //int expectedMicrosDelta = (int) (expectedNanosDelta / 1000);
-            //ALOGD("%s() - STATE_RUNNING - #%d, %4d micros EARLY",
-                //__func__, mTimestampCount, expectedMicrosDelta - microsDelta);
-
             setPositionAndTime(framePosition, nanoTime);
-        } else if (nanosDelta > (expectedNanosDelta + (2 * mBurstPeriodNanos))) {
-            // In this case we do not update mMaxMeasuredLatenessNanos because it
-            // would force it too high.
-            // mMaxMeasuredLatenessNanos should range from 1 to 2 * mBurstPeriodNanos
-            //int32_t measuredLatenessNanos = (int32_t)(nanosDelta - expectedNanosDelta);
-            //ALOGD("%s() - STATE_RUNNING - #%d, lateness %d - max %d = %4d micros VERY LATE",
-                  //__func__,
-                  //mTimestampCount,
-                  //measuredLatenessNanos / 1000,
-                  //mMaxMeasuredLatenessNanos / 1000,
-                  //(measuredLatenessNanos - mMaxMeasuredLatenessNanos) / 1000
-                  //);
-
-            // This typically happens when we are modelling a service instead of a DSP.
-            setPositionAndTime(framePosition,  nanoTime - (2 * mBurstPeriodNanos));
-        } else if (nanosDelta > (expectedNanosDelta + mMaxMeasuredLatenessNanos)) {
-            //int32_t previousLatenessNanos = mMaxMeasuredLatenessNanos;
-            mMaxMeasuredLatenessNanos = (int32_t)(nanosDelta - expectedNanosDelta);
-
-            //ALOGD("%s() - STATE_RUNNING - #%d, newmax %d - oldmax %d = %4d micros LATE",
-                  //__func__,
-                  //mTimestampCount,
-                  //mMaxMeasuredLatenessNanos / 1000,
-                  //previousLatenessNanos / 1000,
-                  //(mMaxMeasuredLatenessNanos - previousLatenessNanos) / 1000
-                  //);
-
-            // When we are late, it may be because of preemption in the kernel,
+#if ICM_LOG_DRIFT
+            int microsDelta = (int) (nanosDelta / 1000);
+            int expectedMicrosDelta = (int) (expectedNanosDelta / 1000);
+            ALOGD("%s() - STATE_RUNNING - #%d, %4d micros EARLY",
+                __func__, mTimestampCount, expectedMicrosDelta - microsDelta);
+#endif
+        } else if (latenessNanos > mLatenessForDriftNanos) {
+            // When we are on the late side, it may be because of preemption in the kernel,
             // or timing jitter caused by resampling in the DSP,
             // or we may be drifting due to a slow HW clock.
             // We add slight drift value just in case there is actual long term drift
             // forward caused by a slower clock.
             // If the clock is faster than the model will get pushed earlier
-            // by the code in the preceding branch.
+            // by the code in the earlier branch.
             // The two opposing forces should allow the model to track the real clock
             // over a long time.
             int64_t driftingTime = mMarkerNanoTime + expectedNanosDelta + kDriftNanos;
             setPositionAndTime(framePosition,  driftingTime);
-            //ALOGD("%s() - #%d, max lateness = %d micros",
-                  //__func__,
-                  //mTimestampCount,
-                  //(int) (mMaxMeasuredLatenessNanos / 1000));
+#if ICM_LOG_DRIFT
+            ALOGD("%s() - STATE_RUNNING - #%d, DRIFT, lateness = %d micros",
+                  __func__,
+                  mTimestampCount,
+                  (int) (latenessNanos / 1000));
+#endif
+        }
+
+        // Modify mMaxMeasuredLatenessNanos.
+        // This affects the "late" side of the window, which controls input glitches.
+        if (latenessNanos > mMaxMeasuredLatenessNanos) { // increase
+#if ICM_LOG_DRIFT
+            ALOGD("%s() - STATE_RUNNING - #%d, newmax %d - oldmax %d = %4d micros LATE",
+                    __func__,
+                    mTimestampCount,
+                    (int) (latenessNanos / 1000),
+                    mMaxMeasuredLatenessNanos / 1000,
+                    (int) ((latenessNanos - mMaxMeasuredLatenessNanos) / 1000)
+                    );
+#endif
+            mMaxMeasuredLatenessNanos = (int32_t) latenessNanos;
+            // Calculate upper region that will trigger a drift forwards.
+            mLatenessForDriftNanos = mMaxMeasuredLatenessNanos - (mMaxMeasuredLatenessNanos >> 4);
+        } else { // decrease
+            // If these is an outlier in lateness then mMaxMeasuredLatenessNanos can go high
+            // and stay there. So we slowly reduce mMaxMeasuredLatenessNanos for better
+            // long term stability. The two opposing forces will keep mMaxMeasuredLatenessNanos
+            // within a reasonable range.
+            mMaxMeasuredLatenessNanos -= kDriftNanos;
         }
         break;
     default:
         break;
     }
-
-//    ALOGD("processTimestamp() - mState = %d", mState);
 }
 
 void IsochronousClockModel::setSampleRate(int32_t sampleRate) {
@@ -181,9 +187,6 @@ void IsochronousClockModel::setFramesPerBurst(int32_t framesPerBurst) {
 // Update expected lateness based on sampleRate and framesPerBurst
 void IsochronousClockModel::update() {
     mBurstPeriodNanos = convertDeltaPositionToTime(mFramesPerBurst); // uses mSampleRate
-    // Timestamps may be late by up to a burst because we are randomly sampling the time period
-    // after the DSP position is actually updated.
-    mMaxMeasuredLatenessNanos = mBurstPeriodNanos;
 }
 
 int64_t IsochronousClockModel::convertDeltaPositionToTime(int64_t framesDelta) const {
@@ -227,9 +230,7 @@ int64_t IsochronousClockModel::convertTimeToPosition(int64_t nanoTime) const {
 }
 
 int32_t IsochronousClockModel::getLateTimeOffsetNanos() const {
-    // This will never be < 0 because mMaxLatenessNanos starts at
-    // mBurstPeriodNanos and only gets bigger.
-    return (mMaxMeasuredLatenessNanos - mBurstPeriodNanos) + kExtraLatenessNanos;
+    return mMaxMeasuredLatenessNanos + kExtraLatenessNanos;
 }
 
 int64_t IsochronousClockModel::convertPositionToLatestTime(int64_t framePosition) const {
@@ -241,10 +242,10 @@ int64_t IsochronousClockModel::convertLatestTimeToPosition(int64_t nanoTime) con
 }
 
 void IsochronousClockModel::dump() const {
-    ALOGD("mMarkerFramePosition = %lld", (long long) mMarkerFramePosition);
-    ALOGD("mMarkerNanoTime      = %lld", (long long) mMarkerNanoTime);
-    ALOGD("mSampleRate          = %6d", mSampleRate);
-    ALOGD("mFramesPerBurst      = %6d", mFramesPerBurst);
-    ALOGD("mMaxMeasuredLatenessNanos = %6d", mMaxMeasuredLatenessNanos);
-    ALOGD("mState               = %6d", mState);
+    ALOGD("mMarkerFramePosition = %16lld", (long long) mMarkerFramePosition);
+    ALOGD("mMarkerNanoTime      = %16lld", (long long) mMarkerNanoTime);
+    ALOGD("mSampleRate          = %8d", mSampleRate);
+    ALOGD("mFramesPerBurst      = %8d", mFramesPerBurst);
+    ALOGD("mState               = %8d", mState);
+    ALOGD("max lateness nanos   = %8d", mMaxMeasuredLatenessNanos);
 }
