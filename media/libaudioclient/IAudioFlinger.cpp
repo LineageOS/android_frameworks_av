@@ -24,8 +24,8 @@
 
 #include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
-#include <media/TimeCheck.h>
 #include <mediautils/ServiceUtilities.h>
+#include <mediautils/TimeCheck.h>
 #include "IAudioFlinger.h"
 
 namespace android {
