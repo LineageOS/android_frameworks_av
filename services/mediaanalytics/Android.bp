@@ -50,7 +50,7 @@ cc_binary {
         "frameworks/av/media/libstagefright/rtsp",
         "frameworks/av/media/libstagefright/webm",
         "frameworks/av/include/media",
-        "frameworks/av/include/camera",
+        "frameworks/av/camera/include/camera",
         "frameworks/native/include/media/openmax",
         "frameworks/native/include/media/hardware",
         "external/tremolo/Tremolo",
