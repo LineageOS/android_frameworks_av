@@ -18,7 +18,7 @@
 
 #define SECURE_BUFFER_H_
 
-#include <media/ICrypto.h>
+#include <mediadrm/ICrypto.h>
 #include <media/MediaCodecBuffer.h>
 
 namespace android {
