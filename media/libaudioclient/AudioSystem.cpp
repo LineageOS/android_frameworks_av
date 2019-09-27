@@ -1404,6 +1404,12 @@ status_t AudioSystem::getMicrophones(std::vector<media::MicrophoneInfo> *microph
     return af->getMicrophones(microphones);
 }
 
+status_t AudioSystem::setAudioHalPids(const std::vector<pid_t>& pids) {
+  const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+  if (af == nullptr) return PERMISSION_DENIED;
+  return af->setAudioHalPids(pids);
+}
+
 status_t AudioSystem::getSurroundFormats(unsigned int *numSurroundFormats,
                                          audio_format_t *surroundFormats,
                                          bool *surroundFormatsEnabled,

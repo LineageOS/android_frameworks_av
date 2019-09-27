@@ -37,5 +37,12 @@ status_t DevicesFactoryHalHybrid::openDevice(const char *name, sp<DeviceHalInter
     return mLocalFactory->openDevice(name, device);
 }
 
+status_t DevicesFactoryHalHybrid::getHalPids(std::vector<pid_t> *pids) {
+    if (mHidlFactory != 0) {
+        return mHidlFactory->getHalPids(pids);
+    }
+    return INVALID_OPERATION;
+}
+
 } // namespace CPP_VERSION
 } // namespace android

@@ -52,7 +52,9 @@ cc_library {
 
     include_dirs: [
         // For android_mallopt definitions.
-        "bionic/libc/private"
+        "bionic/libc/private",
+        // For DEBUGGER_SIGNAL
+        "system/core/debuggerd/include",
     ],
     local_include_dirs: ["include"],
     export_include_dirs: ["include"],
