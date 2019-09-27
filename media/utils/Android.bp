@@ -51,6 +51,10 @@ cc_library {
         "libmedia_headers",
     ],
 
+    include_dirs: [
+        // For DEBUGGER_SIGNAL
+        "system/core/debuggerd/include",
+    ],
     local_include_dirs: ["include"],
     export_include_dirs: ["include"],
 }
