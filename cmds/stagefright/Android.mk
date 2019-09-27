@@ -39,6 +39,7 @@ LOCAL_SHARED_LIBRARIES := \
         libstagefright_foundation
 
 LOCAL_C_INCLUDES:= \
+		frameworks/av/camera/include \
         frameworks/av/media/libstagefright \
         frameworks/native/include/media/openmax \
         frameworks/native/include/media/hardware
