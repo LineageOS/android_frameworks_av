@@ -36,6 +36,8 @@ class DevicesFactoryHalHidl : public DevicesFactoryHalInterface
     // necessary to release references to the returned object.
     virtual status_t openDevice(const char *name, sp<DeviceHalInterface> *device);
 
+            status_t getHalPids(std::vector<pid_t> *pids) override;
+
   private:
     friend class DevicesFactoryHalHybrid;
 
