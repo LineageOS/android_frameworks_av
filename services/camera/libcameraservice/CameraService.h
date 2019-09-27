@@ -490,7 +490,8 @@ private:
          * Make a new CameraState and set the ID, cost, and conflicting devices using the values
          * returned in the HAL's camera_info struct for each device.
          */
-        CameraState(const String8& id, int cost, const std::set<String8>& conflicting);
+        CameraState(const String8& id, int cost, const std::set<String8>& conflicting,
+                SystemCameraKind deviceKind);
         virtual ~CameraState();
 
         /**
@@ -542,6 +543,11 @@ private:
          */
         String8 getId() const;
 
+        /**
+         * Return the kind (SystemCameraKind) of this camera device.
+         */
+        SystemCameraKind getSystemCameraKind() const;
+
     private:
         const String8 mId;
         StatusInternal mStatus; // protected by mStatusLock
@@ -549,6 +555,7 @@ private:
         std::set<String8> mConflicting;
         mutable Mutex mStatusLock;
         CameraParameters mShimParams;
+        const SystemCameraKind mSystemCameraKind;
     }; // class CameraState
 
     // Observer for UID lifecycle enforcing that UIDs in idle
@@ -660,12 +667,14 @@ private:
     // Should a device status update be skipped for a particular camera device ? (this can happen
     // under various conditions. For example if a camera device is advertised as
     // system only or hidden secure camera, amongst possible others.
-    bool shouldSkipStatusUpdates(const String8& cameraId, bool isVendorListener, int clientPid,
-            int clientUid) const;
+    static bool shouldSkipStatusUpdates(SystemCameraKind systemCameraKind, bool isVendorListener,
+            int clientPid, int clientUid);
 
-    inline SystemCameraKind getSystemCameraKind(const String8& cameraId) const {
-        return mCameraProviderManager->getSystemCameraKind(cameraId.c_str());
-    }
+    // Gets the kind of camera device (i.e public, hidden secure or system only)
+    // getSystemCameraKind() needs mInterfaceMutex which might lead to deadlocks
+    // if held along with mStatusListenerLock (depending on lock ordering, b/141756275), it is
+    // recommended that we don't call this function with mStatusListenerLock held.
+    status_t getSystemCameraKind(const String8& cameraId, SystemCameraKind *kind) const;
 
     // Update the set of API1Compatible camera devices without including system
     // cameras and secure cameras. This is used for hiding system only cameras
