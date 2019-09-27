@@ -401,6 +401,11 @@ public:
 
     static status_t listAudioSessions(audio_stream_type_t streams,
                                       Vector< sp<AudioSessionInfo>> &sessions);
+     /**
+     * Send audio HAL server process pids to native audioserver process for use
+     * when generating audio HAL servers tombstones
+     */
+    static status_t setAudioHalPids(const std::vector<pid_t>& pids);
 
     // ----------------------------------------------------------------------------
 

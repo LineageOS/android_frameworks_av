@@ -90,9 +90,11 @@ enum {
     SET_MASTER_BALANCE,
     GET_MASTER_BALANCE,
     SET_EFFECT_SUSPENDED,
+    SET_AUDIO_HAL_PIDS
 };
 
 #define MAX_ITEMS_PER_LIST 1024
+
 
 class BpAudioFlinger : public BpInterface<IAudioFlinger>
 {
@@ -903,6 +905,20 @@ public:
         status = reply.readParcelableVector(microphones);
         return status;
     }
+    virtual status_t setAudioHalPids(const std::vector<pid_t>& pids)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
+        data.writeInt32(pids.size());
+        for (auto pid : pids) {
+            data.writeInt32(pid);
+        }
+        status_t status = remote()->transact(SET_AUDIO_HAL_PIDS, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        return static_cast <status_t> (reply.readInt32());
+    }
 };
 
 IMPLEMENT_META_INTERFACE(AudioFlinger, "android.media.IAudioFlinger");
@@ -958,7 +974,8 @@ status_t BnAudioFlinger::onTransact(
         case SET_MODE:
         case SET_MIC_MUTE:
         case SET_LOW_RAM_DEVICE:
-        case SYSTEM_READY: {
+        case SYSTEM_READY:
+        case SET_AUDIO_HAL_PIDS: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
@@ -1545,6 +1562,31 @@ status_t BnAudioFlinger::onTransact(
             if (status == NO_ERROR) {
                 reply->writeParcelableVector(microphones);
             }
+            return NO_ERROR;
+        }
+        case SET_AUDIO_HAL_PIDS: {
+            CHECK_INTERFACE(IAudioFlinger, data, reply);
+            std::vector<pid_t> pids;
+            int32_t size;
+            status_t status = data.readInt32(&size);
+            if (status != NO_ERROR) {
+                return status;
+            }
+            if (size < 0) {
+                return BAD_VALUE;
+            }
+            if (size > MAX_ITEMS_PER_LIST) {
+                size = MAX_ITEMS_PER_LIST;
+            }
+            for (int32_t i = 0; i < size; i++) {
+                int32_t pid;
+                status =  data.readInt32(&pid);
+                if (status != NO_ERROR) {
+                    return status;
+                }
+                pids.push_back(pid);
+            }
+            reply->writeInt32(setAudioHalPids(pids));
             return NO_ERROR;
         }
         default:
