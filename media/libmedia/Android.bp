@@ -75,7 +75,7 @@ cc_library_shared {
         local_include_dirs: ["aidl"],
         export_aidl_headers: true,
     },
-    
+
     local_include_dirs: [
         "include",
     ],
