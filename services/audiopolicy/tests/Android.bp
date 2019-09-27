@@ -38,3 +38,34 @@ cc_test {
     test_suites: ["device-tests"],
 
 }
+
+
+cc_test {
+    name: "audio_health_tests",
+
+    shared_libs: [
+        "libaudiofoundation",
+        "libaudioclient",
+        "libaudiopolicymanagerdefault",
+        "liblog",
+        "libmedia_helper",
+        "libutils",
+    ],
+
+    static_libs: ["libaudiopolicycomponents"],
+
+    header_libs: [
+        "libaudiopolicyengine_interface_headers",
+        "libaudiopolicymanager_interface_headers",
+    ],
+
+    srcs: ["audio_health_tests.cpp"],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+    test_suites: ["device-tests"],
+
+}
