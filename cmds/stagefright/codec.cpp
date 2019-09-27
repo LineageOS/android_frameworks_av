@@ -23,7 +23,7 @@
 
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
-#include <media/ICrypto.h>
+#include <mediadrm/ICrypto.h>
 #include <media/IMediaHTTPService.h>
 #include <media/IMediaPlayerService.h>
 #include <media/MediaCodecBuffer.h>

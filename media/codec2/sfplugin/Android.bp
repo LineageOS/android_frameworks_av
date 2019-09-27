@@ -22,6 +22,7 @@ cc_library_shared {
 
     header_libs: [
         "libcodec2_internal",
+        "libmediadrm_headers",
         "media_ndk_headers",
     ],
 

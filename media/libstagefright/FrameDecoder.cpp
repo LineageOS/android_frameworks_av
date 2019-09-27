@@ -23,7 +23,7 @@
 #include <gui/Surface.h>
 #include <gui/SurfaceComposerClient.h>
 #include <inttypes.h>
-#include <media/ICrypto.h>
+#include <mediadrm/ICrypto.h>
 #include <media/IMediaSource.h>
 #include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/avc_utils.h>

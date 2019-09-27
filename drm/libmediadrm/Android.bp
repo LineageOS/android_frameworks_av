@@ -2,6 +2,15 @@
 // libmediadrm
 //
 
+cc_library_headers {
+    name: "libmediadrm_headers",
+
+    export_include_dirs: [
+        "interface"
+    ],
+
+}
+
 cc_library_shared {
     name: "libmediadrm",
 
@@ -15,6 +24,15 @@ cc_library_shared {
         "SharedLibrary.cpp",
         "DrmHal.cpp",
         "CryptoHal.cpp",
+    ],
+
+    local_include_dirs: [
+        "include",
+        "interface"
+    ],
+
+    export_include_dirs: [
+        "include"
     ],
 
     shared_libs: [
@@ -49,6 +67,10 @@ cc_library_shared {
         "protos/metrics.proto",
     ],
 
+    local_include_dirs: [
+        "include"
+    ],
+
     proto: {
         export_proto_headers: true,
         type: "lite",
@@ -78,6 +100,10 @@ cc_library_shared {
         "DrmMetrics.cpp",
         "PluginMetricsReporting.cpp",
         "protos/metrics.proto",
+    ],
+
+    local_include_dirs: [
+        "include"
     ],
 
     proto: {

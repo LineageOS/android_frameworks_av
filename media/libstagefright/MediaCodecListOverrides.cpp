@@ -22,7 +22,7 @@
 
 #include <cutils/properties.h>
 #include <gui/Surface.h>
-#include <media/ICrypto.h>
+#include <mediadrm/ICrypto.h>
 #include <media/IMediaCodecList.h>
 #include <media/MediaCodecInfo.h>
 #include <media/MediaResourcePolicy.h>

@@ -24,9 +24,9 @@
 #include <gui/ISurfaceComposer.h>
 #include <gui/SurfaceComposerClient.h>
 #include <gui/Surface.h>
-#include <media/ICrypto.h>
 #include <media/IMediaHTTPService.h>
 #include <media/MediaCodecBuffer.h>
+#include <mediadrm/ICrypto.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>

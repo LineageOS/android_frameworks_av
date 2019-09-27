@@ -18,7 +18,7 @@
 #define LOG_TAG "CodecBase"
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
-#include <media/ICrypto.h>
+#include <mediadrm/ICrypto.h>
 #include <media/stagefright/CodecBase.h>
 #include <utils/Log.h>
 
