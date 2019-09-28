@@ -196,6 +196,7 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
             audio_devices_t txDevice = getDeviceForInputSource(
                     AUDIO_SOURCE_VOICE_COMMUNICATION)->type();
             sp<AudioOutputDescriptor> primaryOutput = outputs.getPrimaryOutput();
+            LOG_ALWAYS_FATAL_IF(primaryOutput == nullptr, "Primary output not found");
             DeviceVector availPrimaryInputDevices =
                     availableInputDevices.getDevicesFromHwModule(primaryOutput->getModuleHandle());
 
@@ -471,8 +472,8 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
     const SwAudioOutputCollection &outputs = getApmObserver()->getOutputs();
     DeviceVector availableDevices = availableInputDevices;
     sp<AudioOutputDescriptor> primaryOutput = outputs.getPrimaryOutput();
-    DeviceVector availablePrimaryDevices = availableInputDevices.getDevicesFromHwModule(
-            primaryOutput->getModuleHandle());
+    DeviceVector availablePrimaryDevices = primaryOutput == nullptr ? DeviceVector()
+            : availableInputDevices.getDevicesFromHwModule(primaryOutput->getModuleHandle());
     sp<DeviceDescriptor> device;
 
     // when a call is active, force device selection to match source VOICE_COMMUNICATION
@@ -515,6 +516,7 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
         if ((getPhoneState() == AUDIO_MODE_IN_CALL) &&
                 (availableOutputDevices.getDevice(AUDIO_DEVICE_OUT_TELEPHONY_TX,
                         String8(""), AUDIO_FORMAT_DEFAULT)) == nullptr) {
+            LOG_ALWAYS_FATAL_IF(availablePrimaryDevices.isEmpty(), "Primary devices not found");
             availableDevices = availablePrimaryDevices;
         }
 
@@ -545,6 +547,9 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
     case AUDIO_SOURCE_UNPROCESSED:
     case AUDIO_SOURCE_HOTWORD:
         if (inputSource == AUDIO_SOURCE_HOTWORD) {
+            // We should not use primary output criteria for Hotword but rather limit
+            // to devices attached to the same HW module as the build in mic
+            LOG_ALWAYS_FATAL_IF(availablePrimaryDevices.isEmpty(), "Primary devices not found");
             availableDevices = availablePrimaryDevices;
         }
         if (getForceUse(AUDIO_POLICY_FORCE_FOR_RECORD) == AUDIO_POLICY_FORCE_BT_SCO) {
