@@ -73,7 +73,7 @@ cc_library_shared {
         local_include_dirs: ["aidl"],
         export_aidl_headers: true,
     },
-    
+
     local_include_dirs: [
         "include",
     ],
@@ -215,6 +215,49 @@ cc_library_static {
     },
 }
 
+cc_library_shared {
+    name: "libmedia_codeclist",
+
+    srcs: [
+        "IMediaCodecList.cpp",
+        "MediaCodecInfo.cpp",
+    ],
+
+    local_include_dirs: [
+        "include",
+    ],
+
+    shared_libs: [
+        "android.hardware.media.omx@1.0",
+        "libbinder",
+        "liblog",
+        "libstagefright_foundation",
+        "libutils",
+    ],
+
+    include_dirs: [
+        "system/libhidl/transport/token/1.0/utils/include",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wno-error=deprecated-declarations",
+        "-Wall",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+    },
+}
+
 cc_library {
     name: "libmedia",
 
@@ -222,7 +265,6 @@ cc_library {
         "IDataSource.cpp",
         "BufferingSettings.cpp",
         "mediaplayer.cpp",
-        "IMediaCodecList.cpp",
         "IMediaHTTPConnection.cpp",
         "IMediaHTTPService.cpp",
         "IMediaExtractor.cpp",
@@ -238,7 +280,6 @@ cc_library {
         "IResourceManagerClient.cpp",
         "IResourceManagerService.cpp",
         "IStreamSource.cpp",
-        "MediaCodecInfo.cpp",
         "MediaUtils.cpp",
         "Metadata.cpp",
         "mediarecorder.cpp",
@@ -291,6 +332,7 @@ cc_library {
         "libdl",
         "libaudioutils",
         "libaudioclient",
+        "libmedia_codeclist",
         "libmedia_omx",
     ],
 

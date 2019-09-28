@@ -8,7 +8,7 @@ LOCAL_SRC_FILES:=       \
         SineSource.cpp
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright libmedia libmedia_omx libutils libbinder \
+        libstagefright libmedia libmedia_codeclist libutils libbinder \
         libstagefright_foundation libjpeg libui libgui libcutils liblog \
         libhidlbase \
         android.hardware.media.omx@1.0 \
@@ -39,6 +39,7 @@ LOCAL_SHARED_LIBRARIES := \
         libstagefright_foundation
 
 LOCAL_C_INCLUDES:= \
+		frameworks/av/camera/include \
         frameworks/av/media/libstagefright \
         frameworks/native/include/media/openmax \
         frameworks/native/include/media/hardware

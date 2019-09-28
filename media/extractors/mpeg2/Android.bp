@@ -16,6 +16,7 @@ cc_library_shared {
         "android.hardware.cas.native@1.0",
         "android.hidl.token@1.0-utils",
         "android.hidl.allocator@1.0",
+        "libcrypto",
         "libhidlmemory",
         "libhidlbase",
         "liblog",
@@ -29,7 +30,6 @@ cc_library_shared {
     ],
 
     static_libs: [
-        "libcrypto",
         "libstagefright_foundation_without_imemory",
         "libstagefright_mpeg2support",
         "libutils",
