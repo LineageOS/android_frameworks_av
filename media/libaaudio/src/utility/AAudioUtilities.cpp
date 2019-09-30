@@ -335,6 +335,30 @@ int32_t AAudioProperty_getHardwareBurstMinMicros() {
     return prop;
 }
 
+static int32_t AAudioProperty_getMMapOffsetMicros(const char *functionName,
+        const char *propertyName) {
+    const int32_t minMicros = -20000; // arbitrary
+    const int32_t defaultMicros = 0;  // arbitrary
+    const int32_t maxMicros =  20000; // arbitrary
+    int32_t prop = property_get_int32(propertyName, defaultMicros);
+    if (prop < minMicros) {
+        ALOGW("%s: clipped %d to %d", functionName, prop, minMicros);
+        prop = minMicros;
+    } else if (prop > maxMicros) {
+        ALOGW("%s: clipped %d to %d", functionName, prop, minMicros);
+        prop = maxMicros;
+    }
+    return prop;
+}
+
+int32_t AAudioProperty_getInputMMapOffsetMicros() {
+    return AAudioProperty_getMMapOffsetMicros(__func__, AAUDIO_PROP_INPUT_MMAP_OFFSET_USEC);
+}
+
+int32_t AAudioProperty_getOutputMMapOffsetMicros() {
+    return AAudioProperty_getMMapOffsetMicros(__func__, AAUDIO_PROP_OUTPUT_MMAP_OFFSET_USEC);
+}
+
 aaudio_result_t AAudio_isFlushAllowed(aaudio_stream_state_t state) {
     aaudio_result_t result = AAUDIO_OK;
     switch (state) {
