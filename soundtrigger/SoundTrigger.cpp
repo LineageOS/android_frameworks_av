@@ -200,6 +200,37 @@ status_t SoundTrigger::getModelState(sound_model_handle_t handle)
     return mISoundTrigger->getModelState(handle);
 }
 
+status_t SoundTrigger::setParameter(sound_model_handle_t handle,
+        sound_trigger_model_parameter_t param, int32_t value)
+{
+    Mutex::Autolock _l(mLock);
+    if (mISoundTrigger == 0) {
+        return NO_INIT;
+    }
+    return mISoundTrigger->setParameter(handle, param, value);
+}
+
+status_t SoundTrigger::getParameter(sound_model_handle_t handle,
+        sound_trigger_model_parameter_t param, int32_t* value)
+{
+    Mutex::Autolock _l(mLock);
+    if (mISoundTrigger == 0) {
+        return NO_INIT;
+    }
+    return mISoundTrigger->getParameter(handle, param, value);
+}
+
+status_t SoundTrigger::queryParameter(sound_model_handle_t handle,
+        sound_trigger_model_parameter_t param,
+        sound_trigger_model_parameter_range_t* param_range)
+{
+    Mutex::Autolock _l(mLock);
+    if (mISoundTrigger == 0) {
+        return NO_INIT;
+    }
+    return mISoundTrigger->queryParameter(handle, param, param_range);
+}
+
 // BpSoundTriggerClient
 void SoundTrigger::onRecognitionEvent(const sp<IMemory>& eventMemory)
 {

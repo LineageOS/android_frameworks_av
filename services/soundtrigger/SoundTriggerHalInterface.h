@@ -79,6 +79,34 @@ public:
          */
         virtual int getModelState(sound_model_handle_t handle) = 0;
 
+        /* Set a model specific ModelParameter with the given value. This parameter
+         * will keep its value for the duration the model is loaded regardless of starting and stopping
+         * recognition. Once the model is unloaded, the value will be lost.
+         * Returns 0 or an error code.
+         * Only supported for device api versions SOUND_TRIGGER_DEVICE_API_VERSION_1_3 or above.
+         */
+        virtual int setParameter(sound_model_handle_t handle,
+                                 sound_trigger_model_parameter_t model_param, int32_t value) = 0;
+
+        /* Get a model specific ModelParameter. This parameter will keep its value
+         * for the duration the model is loaded regardless of starting and stopping recognition.
+         * Once the model is unloaded, the value will be lost. If the value is not set, a default
+         * value is returned. See sound_trigger_model_parameter_t for parameter default values.
+         * Returns 0 or an error code. On return 0, value pointer will be set.
+         * Only supported for device api versions SOUND_TRIGGER_DEVICE_API_VERSION_1_3 or above.
+         */
+        virtual int getParameter(sound_model_handle_t sound_model_handle,
+                                 sound_trigger_model_parameter_t model_param, int32_t* value) = 0;
+
+        /* Get supported parameter attributes with respect to the provided model
+         * handle. Along with determining the valid range, this API is also used
+         * to determine if a given parameter ID is supported at all by the
+         * modelHandle for use with getParameter and setParameter APIs.
+         */
+        virtual int queryParameter(sound_model_handle_t sound_model_handle,
+                                 sound_trigger_model_parameter_t model_param,
+                                 sound_trigger_model_parameter_range_t* param_range) = 0;
+
 protected:
         SoundTriggerHalInterface() {}
 };

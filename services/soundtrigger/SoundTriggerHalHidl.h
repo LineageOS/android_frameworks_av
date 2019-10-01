@@ -26,8 +26,10 @@
 #include <utils/threads.h>
 #include "SoundTriggerHalInterface.h"
 #include <android/hardware/soundtrigger/2.0/types.h>
+#include <android/hardware/soundtrigger/2.3/types.h>
 #include <android/hardware/soundtrigger/2.1/ISoundTriggerHw.h>
 #include <android/hardware/soundtrigger/2.2/ISoundTriggerHw.h>
+#include <android/hardware/soundtrigger/2.3/ISoundTriggerHw.h>
 #include <android/hardware/soundtrigger/2.0/ISoundTriggerHwCallback.h>
 #include <android/hardware/soundtrigger/2.1/ISoundTriggerHwCallback.h>
 
@@ -49,6 +51,12 @@ using V2_1_ISoundTriggerHwCallback =
 using ::android::hidl::memory::V1_0::IMemory;
 using V2_2_ISoundTriggerHw =
         ::android::hardware::soundtrigger::V2_2::ISoundTriggerHw;
+using V2_3_ISoundTriggerHw =
+        ::android::hardware::soundtrigger::V2_3::ISoundTriggerHw;
+using V2_3_ModelParameter =
+        ::android::hardware::soundtrigger::V2_3::ModelParameter;
+using V2_3_OptionalModelParameterRange =
+        ::android::hardware::soundtrigger::V2_3::OptionalModelParameterRange;
 
 class SoundTriggerHalHidl : public SoundTriggerHalInterface,
                             public virtual V2_1_ISoundTriggerHwCallback
@@ -103,6 +111,34 @@ public:
          */
         virtual int getModelState(sound_model_handle_t handle);
 
+        /* Set a model specific ModelParameter with the given value. This parameter
+         * will keep its value for the duration the model is loaded regardless of starting and
+         * stopping recognition. Once the model is unloaded, the value will be lost.
+         * Returns 0 or an error code.
+         * Only supported for device api versions SOUND_TRIGGER_DEVICE_API_VERSION_1_3 or above.
+         */
+        int setParameter(sound_model_handle_t handle,
+                         sound_trigger_model_parameter_t model_param, int32_t value);
+
+        /* Get a model specific ModelParameter. This parameter will keep its value
+         * for the duration the model is loaded regardless of starting and stopping recognition.
+         * Once the model is unloaded, the value will be lost. If the value is not set, a default
+         * value is returned. See sound_trigger_model_parameter_t for parameter default values.
+         * Returns 0 or an error code.  On return 0, value pointer will be set.
+         * Only supported for device api versions SOUND_TRIGGER_DEVICE_API_VERSION_1_3 or above.
+         */
+        int getParameter(sound_model_handle_t handle,
+                         sound_trigger_model_parameter_t model_param, int32_t* value);
+
+        /* Get supported parameter attributes with respect to the provided model
+         * handle. Along with determining the valid range, this API is also used
+         * to determine if a given parameter ID is supported at all by the
+         * modelHandle for use with getParameter and setParameter APIs.
+         */
+        int queryParameter(sound_model_handle_t handle,
+                            sound_trigger_model_parameter_t model_param,
+                            sound_trigger_model_parameter_range_t* param_range);
+
         // ISoundTriggerHwCallback
         virtual ::android::hardware::Return<void> recognitionCallback(
                 const V2_0_ISoundTriggerHwCallback::RecognitionEvent& event, CallbackCookie cookie);
@@ -147,6 +183,8 @@ private:
         void convertPropertiesFromHal(
                 struct sound_trigger_properties *properties,
                 const ISoundTriggerHw::Properties *halProperties);
+        static void convertModelParameterToHal(V2_3_ModelParameter* halParam,
+                sound_trigger_model_parameter_t param);
 
         void convertTriggerPhraseToHal(
                 ISoundTriggerHw::Phrase *halTriggerPhrase,
@@ -194,6 +232,7 @@ private:
         sp<ISoundTriggerHw> getService();
         sp<V2_1_ISoundTriggerHw> toService2_1(const sp<ISoundTriggerHw>& s);
         sp<V2_2_ISoundTriggerHw> toService2_2(const sp<ISoundTriggerHw>& s);
+        sp<V2_3_ISoundTriggerHw> toService2_3(const sp<ISoundTriggerHw>& s);
         sp<SoundModel> getModel(sound_model_handle_t handle);
         sp<SoundModel> removeModel(sound_model_handle_t handle);
 
