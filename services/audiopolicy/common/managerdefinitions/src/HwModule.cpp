@@ -273,14 +273,14 @@ sp <HwModule> HwModuleCollection::getModuleFromName(const char *name) const
     return nullptr;
 }
 
-sp <HwModule> HwModuleCollection::getModuleForDeviceTypes(audio_devices_t type,
-                                                          audio_format_t encodedFormat) const
+sp <HwModule> HwModuleCollection::getModuleForDeviceType(audio_devices_t type,
+                                                         audio_format_t encodedFormat) const
 {
     for (const auto& module : *this) {
         const auto& profiles = audio_is_output_device(type) ?
                 module->getOutputProfiles() : module->getInputProfiles();
         for (const auto& profile : profiles) {
-            if (profile->supportsDeviceTypes(type)) {
+            if (profile->supportsDeviceTypes({type})) {
                 if (encodedFormat != AUDIO_FORMAT_DEFAULT) {
                     DeviceVector declaredDevices = module->getDeclaredDevices();
                     sp <DeviceDescriptor> deviceDesc =
@@ -300,7 +300,7 @@ sp <HwModule> HwModuleCollection::getModuleForDeviceTypes(audio_devices_t type,
 sp<HwModule> HwModuleCollection::getModuleForDevice(const sp<DeviceDescriptor> &device,
                                                      audio_format_t encodedFormat) const
 {
-    return getModuleForDeviceTypes(device->type(), encodedFormat);
+    return getModuleForDeviceType(device->type(), encodedFormat);
 }
 
 DeviceVector HwModuleCollection::getAvailableDevicesFromModuleName(
@@ -354,7 +354,7 @@ sp<DeviceDescriptor> HwModuleCollection::createDevice(const audio_devices_t type
                                                       const char *name,
                                                       const audio_format_t encodedFormat) const
 {
-    sp<HwModule> hwModule = getModuleForDeviceTypes(type, encodedFormat);
+    sp<HwModule> hwModule = getModuleForDeviceType(type, encodedFormat);
     if (hwModule == 0) {
         ALOGE("%s: could not find HW module for device %04x address %s", __FUNCTION__, type,
               address);

@@ -91,9 +91,9 @@ public:
         return valueFor(device);
     }
 
-    virtual int getVolumeIndex(audio_devices_t device) const
+    virtual int getVolumeIndex(const DeviceTypeSet& deviceTypes) const
     {
-        device = Volume::getDeviceForVolume(device);
+        audio_devices_t device = Volume::getDeviceForVolume(deviceTypes);
         // there is always a valid entry for AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME
         if (mIndexCur.find(device) == end(mIndexCur)) {
             device = AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME;
@@ -114,7 +114,7 @@ public:
 
     bool hasVolumeIndexForDevice(audio_devices_t device) const
     {
-        device = Volume::getDeviceForVolume(device);
+        device = Volume::getDeviceForVolume({device});
         return mIndexCur.find(device) != end(mIndexCur);
     }
 

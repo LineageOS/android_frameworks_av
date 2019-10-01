@@ -143,8 +143,9 @@ void ProductStrategy::dump(String8 *dst, int spaces) const
 {
     dst->appendFormat("\n%*s-%s (id: %d)\n", spaces, "", mName.c_str(), mId);
     std::string deviceLiteral;
-    if (!OutputDeviceConverter::toString(mApplicableDevices, deviceLiteral)) {
-        ALOGE("%s: failed to convert device %d", __FUNCTION__, mApplicableDevices);
+    if (!deviceTypesToString(mApplicableDevices, deviceLiteral)) {
+        ALOGE("%s: failed to convert device %s",
+              __FUNCTION__, dumpDeviceTypes(mApplicableDevices).c_str());
     }
     dst->appendFormat("%*sSelected Device: {type:%s, @:%s}\n", spaces + 2, "",
                        deviceLiteral.c_str(), mDeviceAddress.c_str());
@@ -236,14 +237,14 @@ product_strategy_t ProductStrategyMap::getProductStrategyForStream(audio_stream_
 }
 
 
-audio_devices_t ProductStrategyMap::getDeviceTypesForProductStrategy(
+DeviceTypeSet ProductStrategyMap::getDeviceTypesForProductStrategy(
         product_strategy_t strategy) const
 {
     if (find(strategy) == end()) {
         ALOGE("Invalid %d strategy requested, returning device for default strategy", strategy);
         product_strategy_t defaultStrategy = getDefault();
         if (defaultStrategy == PRODUCT_STRATEGY_NONE) {
-            return AUDIO_DEVICE_NONE;
+            return {AUDIO_DEVICE_NONE};
         }
         return at(getDefault())->getDeviceTypes();
     }

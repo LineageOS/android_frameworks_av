@@ -17,6 +17,7 @@
 #pragma once
 
 #include "PolicyAudioPort.h"
+#include <media/AudioContainers.h>
 #include <media/DeviceDescriptorBase.h>
 #include <utils/Errors.h>
 #include <utils/String8.h>
@@ -93,7 +94,7 @@ private:
 class DeviceVector : public SortedVector<sp<DeviceDescriptor> >
 {
 public:
-    DeviceVector() : SortedVector(), mDeviceTypes(AUDIO_DEVICE_NONE) {}
+    DeviceVector() : SortedVector() {}
     explicit DeviceVector(const sp<DeviceDescriptor>& item) : DeviceVector()
     {
         add(item);
@@ -105,13 +106,16 @@ public:
     void remove(const DeviceVector &devices);
     ssize_t indexOf(const sp<DeviceDescriptor>& item) const;
 
-    audio_devices_t types() const { return mDeviceTypes; }
+    DeviceTypeSet types() const { return mDeviceTypes; }
 
     // If 'address' is empty and 'codec' is AUDIO_FORMAT_DEFAULT, a device with a non-empty
     // address may be returned if there is no device with the specified 'type' and empty address.
     sp<DeviceDescriptor> getDevice(audio_devices_t type, const String8 &address,
                                    audio_format_t codec) const;
-    DeviceVector getDevicesFromTypeMask(audio_devices_t types) const;
+    DeviceVector getDevicesFromTypes(const DeviceTypeSet& types) const;
+    DeviceVector getDevicesFromType(audio_devices_t type) const {
+        return getDevicesFromTypes({type});
+    }
 
     /**
      * @brief getDeviceFromId
@@ -122,7 +126,6 @@ public:
     sp<DeviceDescriptor> getDeviceFromId(audio_port_handle_t id) const;
     sp<DeviceDescriptor> getDeviceFromTagName(const std::string &tagName) const;
     DeviceVector getDevicesFromHwModule(audio_module_handle_t moduleHandle) const;
-    audio_devices_t getDeviceTypesFromHwModule(audio_module_handle_t moduleHandle) const;
 
     DeviceVector getFirstDevicesFromTypes(std::vector<audio_devices_t> orderedTypes) const;
     sp<DeviceDescriptor> getFirstExistingDevice(std::vector<audio_devices_t> orderedTypes) const;
@@ -130,6 +133,18 @@ public:
     // If there are devices with the given type and the devices to add is not empty,
     // remove all the devices with the given type and add all the devices to add.
     void replaceDevicesByType(audio_devices_t typeToRemove, const DeviceVector &devicesToAdd);
+
+    bool containsDeviceAmongTypes(const DeviceTypeSet& deviceTypes) const {
+        return !Intersection(mDeviceTypes, deviceTypes).empty();
+    }
+
+    bool containsDeviceWithType(audio_devices_t deviceType) const {
+        return containsDeviceAmongTypes({deviceType});
+    }
+
+    bool onlyContainsDevicesWithType(audio_devices_t deviceType) const {
+        return isSingleDeviceType(mDeviceTypes, deviceType);
+    }
 
     bool contains(const sp<DeviceDescriptor>& item) const { return indexOf(item) >= 0; }
 
@@ -223,7 +238,7 @@ public:
 
 private:
     void refreshTypes();
-    audio_devices_t mDeviceTypes;
+    DeviceTypeSet mDeviceTypes;
 };
 
 } // namespace android
