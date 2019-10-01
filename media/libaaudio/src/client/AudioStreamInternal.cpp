@@ -232,6 +232,24 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         mCallbackBuffer = new uint8_t[callbackBufferSize];
     }
 
+    // For debugging and analyzing the distribution of MMAP timestamps.
+    // For OUTPUT, use a NEGATIVE offset to move the CPU writes further BEFORE the HW reads.
+    // For INPUT, use a POSITIVE offset to move the CPU reads further AFTER the HW writes.
+    // You can use this offset to reduce glitching.
+    // You can also use this offset to force glitching. By iterating over multiple
+    // values you can reveal the distribution of the hardware timing jitter.
+    if (mAudioEndpoint.isFreeRunning()) { // MMAP?
+        int32_t offsetMicros = (getDirection() == AAUDIO_DIRECTION_OUTPUT)
+                ? AAudioProperty_getOutputMMapOffsetMicros()
+                : AAudioProperty_getInputMMapOffsetMicros();
+        // This log is used to debug some tricky glitch issues. Please leave.
+        ALOGD_IF(offsetMicros, "%s() - %s mmap offset = %d micros",
+                __func__,
+                (getDirection() == AAUDIO_DIRECTION_OUTPUT) ? "output" : "input",
+                offsetMicros);
+        mTimeOffsetNanos = offsetMicros * AAUDIO_NANOS_PER_MICROSECOND;
+    }
+
     setState(AAUDIO_STREAM_STATE_OPEN);
 
     return result;
@@ -478,7 +496,8 @@ aaudio_result_t AudioStreamInternal::onTimestampService(AAudioServiceMessage *me
 #if LOG_TIMESTAMPS
     logTimestamp(*message);
 #endif
-    processTimestamp(message->timestamp.position, message->timestamp.timestamp);
+    processTimestamp(message->timestamp.position,
+            message->timestamp.timestamp + mTimeOffsetNanos);
     return AAUDIO_OK;
 }
 
