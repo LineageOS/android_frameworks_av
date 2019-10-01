@@ -164,11 +164,11 @@ void DeviceDescriptor::dump(String8 *dst, int spaces, int index, bool verbose) c
 
 void DeviceVector::refreshTypes()
 {
-    mDeviceTypes = AUDIO_DEVICE_NONE;
+    mDeviceTypes.clear();
     for (size_t i = 0; i < size(); i++) {
-        mDeviceTypes |= itemAt(i)->type();
+        mDeviceTypes.insert(itemAt(i)->type());
     }
-    ALOGV("DeviceVector::refreshTypes() mDeviceTypes %08x", mDeviceTypes);
+    ALOGV("DeviceVector::refreshTypes() mDeviceTypes %s", dumpDeviceTypes(mDeviceTypes).c_str());
 }
 
 ssize_t DeviceVector::indexOf(const sp<DeviceDescriptor>& item) const
@@ -243,17 +243,6 @@ DeviceVector DeviceVector::getDevicesFromHwModule(audio_module_handle_t moduleHa
     return devices;
 }
 
-audio_devices_t DeviceVector::getDeviceTypesFromHwModule(audio_module_handle_t moduleHandle) const
-{
-    audio_devices_t deviceTypes = AUDIO_DEVICE_NONE;
-    for (const auto& device : *this) {
-        if (device->getModuleHandle() == moduleHandle) {
-            deviceTypes |= device->type();
-        }
-    }
-    return deviceTypes;
-}
-
 sp<DeviceDescriptor> DeviceVector::getDevice(audio_devices_t type, const String8& address,
                                              audio_format_t format) const
 {
@@ -290,15 +279,14 @@ sp<DeviceDescriptor> DeviceVector::getDeviceFromId(audio_port_handle_t id) const
     return nullptr;
 }
 
-DeviceVector DeviceVector::getDevicesFromTypeMask(audio_devices_t type) const
+DeviceVector DeviceVector::getDevicesFromTypes(const DeviceTypeSet& types) const
 {
     DeviceVector devices;
-    bool isOutput = audio_is_output_devices(type);
-    type &= ~AUDIO_DEVICE_BIT_IN;
-    for (size_t i = 0; (i < size()) && (type != AUDIO_DEVICE_NONE); i++) {
-        bool curIsOutput = audio_is_output_devices(itemAt(i)->type());
-        audio_devices_t curType = itemAt(i)->type() & ~AUDIO_DEVICE_BIT_IN;
-        if ((isOutput == curIsOutput) && ((type & curType) != 0)) {
+    if (types.empty()) {
+        return devices;
+    }
+    for (size_t i = 0; i < size(); i++) {
+        if (types.count(itemAt(i)->type()) != 0) {
             devices.add(itemAt(i));
             ALOGV("DeviceVector::%s() for type %08x found %p",
                     __func__, itemAt(i)->type(), itemAt(i).get());
@@ -322,7 +310,7 @@ DeviceVector DeviceVector::getFirstDevicesFromTypes(
 {
     DeviceVector devices;
     for (auto deviceType : orderedTypes) {
-        if (!(devices = getDevicesFromTypeMask(deviceType)).isEmpty()) {
+        if (!(devices = getDevicesFromType(deviceType)).isEmpty()) {
             break;
         }
     }
@@ -342,7 +330,7 @@ sp<DeviceDescriptor> DeviceVector::getFirstExistingDevice(
 
 void DeviceVector::replaceDevicesByType(
         audio_devices_t typeToRemove, const DeviceVector &devicesToAdd) {
-    DeviceVector devicesToRemove = getDevicesFromTypeMask(typeToRemove);
+    DeviceVector devicesToRemove = getDevicesFromType(typeToRemove);
     if (!devicesToRemove.isEmpty() && !devicesToAdd.isEmpty()) {
         remove(devicesToRemove);
         add(devicesToAdd);

@@ -19,6 +19,7 @@
 #include "DeviceDescriptor.h"
 #include "PolicyAudioPort.h"
 #include "policy.h"
+#include <media/AudioContainers.h>
 #include <utils/String8.h>
 #include <system/audio.h>
 
@@ -102,15 +103,12 @@ public:
 
     bool hasSupportedDevices() const { return !mSupportedDevices.isEmpty(); }
 
-    bool supportsDeviceTypes(audio_devices_t device) const
+    bool supportsDeviceTypes(const DeviceTypeSet& deviceTypes) const
     {
-        if (audio_is_output_devices(device)) {
-            if (deviceSupportsEncodedFormats(device)) {
-                return mSupportedDevices.types() & device;
-            }
-            return false;
-        }
-        return mSupportedDevices.types() & (device & ~AUDIO_DEVICE_BIT_IN);
+        const bool areOutputDevices = Intersection(deviceTypes, getAudioDeviceInAllSet()).empty();
+        const bool devicesSupported = !mSupportedDevices.getDevicesFromTypes(deviceTypes).empty();
+        return devicesSupported &&
+               (!areOutputDevices || devicesSupportEncodedFormats(deviceTypes));
     }
 
     /**
@@ -125,18 +123,18 @@ public:
     bool supportsDevice(const sp<DeviceDescriptor> &device, bool forceCheckOnAddress = false) const
     {
         if (!device_distinguishes_on_address(device->type()) && !forceCheckOnAddress) {
-            return supportsDeviceTypes(device->type());
+            return supportsDeviceTypes(DeviceTypeSet({device->type()}));
         }
         return mSupportedDevices.contains(device);
     }
 
-    bool deviceSupportsEncodedFormats(audio_devices_t device) const
+    bool devicesSupportEncodedFormats(DeviceTypeSet deviceTypes) const
     {
-        if (device == AUDIO_DEVICE_NONE) {
+        if (deviceTypes.empty()) {
             return true; // required for isOffloadSupported() check
         }
         DeviceVector deviceList =
-            mSupportedDevices.getDevicesFromTypeMask(device);
+            mSupportedDevices.getDevicesFromTypes(deviceTypes);
         if (!deviceList.empty()) {
             return deviceList.itemAt(0)->hasCurrentEncodedFormat();
         }
