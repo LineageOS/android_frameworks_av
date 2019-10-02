@@ -472,6 +472,10 @@ status_t AudioPolicyManager::getHwOffloadEncodingFormatsSupportedForA2DP(
     std::unordered_set<audio_format_t> formatSet;
     sp<HwModule> primaryModule =
             mHwModules.getModuleFromName(AUDIO_HARDWARE_MODULE_ID_PRIMARY);
+    if (primaryModule == nullptr) {
+        ALOGE("%s() unable to get primary module", __func__);
+        return NO_INIT;
+    }
     DeviceVector declaredDevices = primaryModule->getDeclaredDevices().getDevicesFromTypeMask(
             AUDIO_DEVICE_OUT_ALL_A2DP);
     for (const auto& device : declaredDevices) {
