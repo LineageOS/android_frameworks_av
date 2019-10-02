@@ -39,6 +39,7 @@ cc_library_shared {
         "libpowermanager",
         "libstagefright",
         "libstagefright_foundation",
+        "libstagefright_framecapture_utils",
         "libstagefright_httplive",
         "libutils",
     ],
