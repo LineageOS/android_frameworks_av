@@ -27,8 +27,8 @@
 #include <utils/Log.h>
 #include <utils/StrongPointer.h>
 #include <binder/IServiceManager.h>
-#include <media/ICrypto.h>
-#include <media/IMediaDrmService.h>
+#include <mediadrm/ICrypto.h>
+#include <mediadrm/IMediaDrmService.h>
 #include <android_util_Binder.h>
 
 #include <jni.h>

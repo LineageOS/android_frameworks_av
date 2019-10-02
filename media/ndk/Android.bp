@@ -69,6 +69,10 @@ cc_library_shared {
         "libgrallocusage",
     ],
 
+    header_libs: [
+        "libmediadrm_headers",
+    ],
+
     shared_libs: [
         "android.hardware.graphics.bufferqueue@1.0",
         "android.hidl.token@1.0-utils",
@@ -76,9 +80,9 @@ cc_library_shared {
         "libbase",
         "libbinder",
         "libmedia",
+        "libmediadrm",
         "libmedia_omx",
         "libmedia_jni_utils",
-        "libmediadrm",
         "libstagefright",
         "libstagefright_foundation",
         "liblog",
