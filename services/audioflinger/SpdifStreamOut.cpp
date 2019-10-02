@@ -59,6 +59,7 @@ status_t SpdifStreamOut::open(
     // TODO Move this into the audio_utils as a static method.
     switch(config->format) {
         case AUDIO_FORMAT_E_AC3:
+        case AUDIO_FORMAT_E_AC3_JOC:
             mRateMultiplier = 4;
             break;
         case AUDIO_FORMAT_AC3:
