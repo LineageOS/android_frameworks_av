@@ -194,6 +194,7 @@ private:
     // By delaying slightly we can avoid waking up before other side is ready.
     const int32_t            mWakeupDelayNanos; // delay past typical wakeup jitter
     const int32_t            mMinimumSleepNanos; // minimum sleep while polling
+    int32_t                  mTimeOffsetNanos = 0; // add to time part of an MMAP timestamp
 
     AudioEndpointParcelable  mEndPointParcelable; // description of the buffers filled by service
     EndpointDescriptor       mEndpointDescriptor; // buffer description with resolved addresses
