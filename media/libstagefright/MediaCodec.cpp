@@ -35,7 +35,7 @@
 #include <cutils/properties.h>
 #include <gui/BufferQueue.h>
 #include <gui/Surface.h>
-#include <media/ICrypto.h>
+#include <mediadrm/ICrypto.h>
 #include <media/IOMX.h>
 #include <media/IResourceManagerService.h>
 #include <media/MediaCodecBuffer.h>

@@ -69,6 +69,10 @@ cc_library_shared {
         "utils/LatencyHistogram.cpp",
     ],
 
+    header_libs: [
+        "libmediadrm_headers"
+    ],
+
     shared_libs: [
         "libbase",
         "libdl",

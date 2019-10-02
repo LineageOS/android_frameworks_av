@@ -52,7 +52,7 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaMuxer.h>
 #include <media/stagefright/PersistentSurface.h>
-#include <media/ICrypto.h>
+#include <mediadrm/ICrypto.h>
 #include <media/MediaCodecBuffer.h>
 
 #include "screenrecord.h"

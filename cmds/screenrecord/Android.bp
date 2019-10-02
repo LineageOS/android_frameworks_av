@@ -24,6 +24,10 @@ cc_binary {
         "Program.cpp",
     ],
 
+    header_libs: [
+        "libmediadrm_headers",
+    ],
+
     shared_libs: [
         "libstagefright",
         "libmedia",

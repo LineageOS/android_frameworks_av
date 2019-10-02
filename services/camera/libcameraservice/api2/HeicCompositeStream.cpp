@@ -28,7 +28,7 @@
 #include <utils/Log.h>
 #include <utils/Trace.h>
 
-#include <media/ICrypto.h>
+#include <mediadrm/ICrypto.h>
 #include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
