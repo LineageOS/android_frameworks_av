@@ -58,6 +58,10 @@ cc_library_shared {
         "-Wall",
     ],
 
+    header_libs: [
+        "libmediadrm_headers",
+    ],
+
     shared_libs: [
         "libgui",
         "liblog",
@@ -220,6 +224,7 @@ cc_library {
     ],
 
     header_libs:[
+        "libmediadrm_headers",
         "libnativeloader-headers",
         "libstagefright_xmlparser_headers",
         "media_ndk_headers",
