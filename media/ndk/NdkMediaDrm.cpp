@@ -29,12 +29,12 @@
 
 #include <android-base/properties.h>
 #include <binder/PermissionController.h>
-#include <media/IDrm.h>
-#include <media/IDrmClient.h>
+#include <mediadrm/IDrm.h>
+#include <mediadrm/IDrmClient.h>
 #include <media/stagefright/MediaErrors.h>
 #include <binder/IServiceManager.h>
-#include <media/IMediaDrmService.h>
 #include <media/NdkMediaCrypto.h>
+#include <mediadrm/IMediaDrmService.h>
 
 
 using namespace android;

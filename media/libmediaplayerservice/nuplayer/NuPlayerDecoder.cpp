@@ -28,7 +28,7 @@
 #include "NuPlayerSource.h"
 
 #include <cutils/properties.h>
-#include <media/ICrypto.h>
+#include <mediadrm/ICrypto.h>
 #include <media/MediaBufferHolder.h>
 #include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ABuffer.h>

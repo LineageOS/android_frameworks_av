@@ -42,6 +42,7 @@
 #include "MtpServer.h"
 #include "MtpStorage.h"
 #include "MtpStringBuffer.h"
+#include "android-base/strings.h"
 
 namespace android {
 static const int SN_EVENT_LOG_ID = 0x534e4554;
@@ -956,6 +957,11 @@ MtpResponseCode MtpServer::doSendObjectInfo() {
     if (!mData.getString(modified)) return MTP_RESPONSE_INVALID_PARAMETER;     // date modified
     // keywords follow
 
+    int type = storage->getType();
+    if (type == MTP_STORAGE_REMOVABLE_RAM) {
+        std::string str = android::base::Trim((const char*)name);
+        name.set(str.c_str());
+    }
     ALOGV("name: %s format: 0x%04X (%s)\n", (const char*)name, format,
           MtpDebug::getFormatCodeName(format));
     time_t modifiedTime;

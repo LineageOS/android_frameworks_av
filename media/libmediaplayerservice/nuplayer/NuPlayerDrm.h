@@ -18,8 +18,8 @@
 #define NUPLAYER_DRM_H_
 
 #include <binder/Parcel.h>
-#include <media/ICrypto.h>
-#include <media/IDrm.h>
+#include <mediadrm/ICrypto.h>
+#include <mediadrm/IDrm.h>
 #include <media/stagefright/MetaData.h> // for CryptInfo
 
 

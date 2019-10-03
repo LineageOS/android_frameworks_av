@@ -28,6 +28,7 @@ cc_test {
     ],
     static_libs: ["libgmock"],
     include_dirs: [
+      "frameworks/av/drm/libmediadrm/include",
       "frameworks/av/include/media",
     ],
     cflags: [
