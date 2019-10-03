@@ -1553,7 +1553,8 @@ public:
                     audio_input_flags_t *flags,
                     pid_t tid,
                     status_t *status /*non-NULL*/,
-                    audio_port_handle_t portId);
+                    audio_port_handle_t portId,
+                    const String16& opPackageName);
 
             status_t    start(RecordTrack* recordTrack,
                               AudioSystem::sync_event_t event,
