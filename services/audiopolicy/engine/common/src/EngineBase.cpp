@@ -39,7 +39,7 @@ status_t EngineBase::setPhoneState(audio_mode_t state)
 {
     ALOGV("setPhoneState() state %d", state);
 
-    if (state < 0 || state >= AUDIO_MODE_CNT) {
+    if (state < 0 || uint32_t(state) >= AUDIO_MODE_CNT) {
         ALOGW("setPhoneState() invalid state %d", state);
         return BAD_VALUE;
     }
