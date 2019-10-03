@@ -653,7 +653,7 @@ aaudio_result_t AudioStreamInternal::processData(void *buffer, int32_t numFrames
         // Should we block?
         if (timeoutNanoseconds == 0) {
             break; // don't block
-        } else if (framesLeft > 0) {
+        } else if (wakeTimeNanos != 0) {
             if (!mAudioEndpoint.isFreeRunning()) {
                 // If there is software on the other end of the FIFO then it may get delayed.
                 // So wake up just a little after we expect it to be ready.
@@ -712,37 +712,38 @@ void AudioStreamInternal::processTimestamp(uint64_t position, int64_t time) {
 
 aaudio_result_t AudioStreamInternal::setBufferSize(int32_t requestedFrames) {
     int32_t adjustedFrames = requestedFrames;
-    int32_t actualFrames = 0;
-    int32_t maximumSize = getBufferCapacity();
+    const int32_t maximumSize = getBufferCapacity() - mFramesPerBurst;
+    // The buffer size can be set to zero.
+    // This means that the callback may be called when the internal buffer becomes empty.
+    // This will be fine on some devices in ideal circumstances and will result in the
+    // lowest possible latency.
+    // If there are glitches then they should be detected as XRuns and the size can be increased.
+    static const int32_t minimumSize = 0;
 
     // Clip to minimum size so that rounding up will work better.
-    if (adjustedFrames < 1) {
-        adjustedFrames = 1;
-    }
+    adjustedFrames = std::max(minimumSize, adjustedFrames);
 
-    if (adjustedFrames > maximumSize) {
-        // Clip to maximum size.
+    // Prevent arithmetic overflow by clipping before we round.
+    if (adjustedFrames >= maximumSize) {
         adjustedFrames = maximumSize;
     } else {
         // Round to the next highest burst size.
         int32_t numBursts = (adjustedFrames + mFramesPerBurst - 1) / mFramesPerBurst;
         adjustedFrames = numBursts * mFramesPerBurst;
-        // Rounding may have gone above maximum.
-        if (adjustedFrames > maximumSize) {
-            adjustedFrames = maximumSize;
-        }
     }
 
-    aaudio_result_t result = mAudioEndpoint.setBufferSizeInFrames(adjustedFrames, &actualFrames);
-    if (result < 0) {
-        return result;
-    } else {
-        return (aaudio_result_t) actualFrames;
-    }
+    // Clip against the actual size from the endpoint.
+    int32_t actualFrames = 0;
+    mAudioEndpoint.setBufferSizeInFrames(maximumSize, &actualFrames);
+    // actualFrames should be <= maximumSize
+    adjustedFrames = std::min(actualFrames, adjustedFrames);
+
+    mBufferSizeInFrames = adjustedFrames;
+    return (aaudio_result_t) adjustedFrames;
 }
 
 int32_t AudioStreamInternal::getBufferSize() const {
-    return mAudioEndpoint.getBufferSizeInFrames();
+    return mBufferSizeInFrames;
 }
 
 int32_t AudioStreamInternal::getBufferCapacity() const {

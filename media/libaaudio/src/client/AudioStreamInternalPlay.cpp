@@ -167,8 +167,10 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
         ATRACE_INT("aaWrote", framesWritten);
     }
 
+    // Sleep if there is too much data in the buffer.
     // Calculate an ideal time to wake up.
-    if (wakeTimePtr != nullptr && framesWritten >= 0) {
+    if (wakeTimePtr != nullptr
+            && (mAudioEndpoint.getFullFramesAvailable() >= getBufferSize())) {
         // By default wake up a few milliseconds from now.  // TODO review
         int64_t wakeTime = currentNanoTime + (1 * AAUDIO_NANOS_PER_MILLISECOND);
         aaudio_stream_state_t state = getState();
@@ -184,14 +186,10 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
                 break;
             case AAUDIO_STREAM_STATE_STARTED:
             {
-                // When do we expect the next read burst to occur?
-
-                // Calculate frame position based off of the writeCounter because
-                // the readCounter might have just advanced in the background,
-                // causing us to sleep until a later burst.
-                int64_t nextPosition = mAudioEndpoint.getDataWriteCounter() + mFramesPerBurst
-                        - mAudioEndpoint.getBufferSizeInFrames();
-                wakeTime = mClockModel.convertPositionToTime(nextPosition);
+                // Sleep until the readCounter catches up and we only have
+                // the getBufferSize() frames of data sitting in the buffer.
+                int64_t nextReadPosition = mAudioEndpoint.getDataWriteCounter() - getBufferSize();
+                wakeTime = mClockModel.convertPositionToTime(nextReadPosition);
             }
                 break;
             default:

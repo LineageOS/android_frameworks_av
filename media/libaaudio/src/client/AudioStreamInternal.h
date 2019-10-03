@@ -204,6 +204,9 @@ private:
     // Sometimes the hardware is operating with a different channel count from the app.
     // Then we require conversion in AAudio.
     int32_t                  mDeviceChannelCount = 0;
+
+    int32_t                  mBufferSizeInFrames = 0; // local threshold to control latency
+
 };
 
 } /* namespace aaudio */
