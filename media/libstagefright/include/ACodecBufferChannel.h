@@ -25,7 +25,7 @@
 
 #include <media/openmax/OMX_Types.h>
 #include <media/stagefright/CodecBase.h>
-#include <media/ICrypto.h>
+#include <mediadrm/ICrypto.h>
 #include <media/IOMX.h>
 
 namespace android {

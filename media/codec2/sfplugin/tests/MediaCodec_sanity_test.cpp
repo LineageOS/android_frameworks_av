@@ -21,7 +21,7 @@
 #include <binder/ProcessState.h>
 #include <gtest/gtest.h>
 #include <gui/Surface.h>
-#include <media/ICrypto.h>
+#include <mediadrm/ICrypto.h>
 #include <media/MediaCodecBuffer.h>
 #include <media/hardware/VideoAPI.h>
 #include <media/stagefright/MediaCodec.h>

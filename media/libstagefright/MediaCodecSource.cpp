@@ -22,7 +22,7 @@
 
 #include <gui/IGraphicBufferProducer.h>
 #include <gui/Surface.h>
-#include <media/ICrypto.h>
+#include <mediadrm/ICrypto.h>
 #include <media/MediaBufferHolder.h>
 #include <media/MediaCodecBuffer.h>
 #include <media/MediaSource.h>

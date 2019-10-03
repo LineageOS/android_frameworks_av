@@ -21,7 +21,7 @@
 #include <binder/IMemory.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/ICrypto.h>
+#include <mediadrm/ICrypto.h>
 #include <utils/NativeHandle.h>
 
 #include "include/SecureBuffer.h"

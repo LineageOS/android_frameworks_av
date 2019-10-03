@@ -20,7 +20,7 @@
 
 #include "NuPlayer.h"
 
-#include <media/ICrypto.h>
+#include <mediadrm/ICrypto.h>
 #include <media/mediaplayer.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MetaData.h>
