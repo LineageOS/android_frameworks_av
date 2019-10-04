@@ -547,6 +547,16 @@ private:
         bool        mute;
     };
 
+    // Abstraction for the Audio Source for the RecordThread (HAL or PassthruPatchRecord).
+    struct Source
+    {
+        virtual ~Source() = default;
+        // The following methods have the same signatures as in StreamHalInterface.
+        virtual status_t read(void *buffer, size_t bytes, size_t *read) = 0;
+        virtual status_t getCapturePosition(int64_t *frames, int64_t *time) = 0;
+        virtual status_t standby() = 0;
+    };
+
     // --- PlaybackThread ---
 #ifdef FLOAT_EFFECT_CHAIN
 #define EFFECT_BUFFER_FORMAT AUDIO_FORMAT_PCM_FLOAT
@@ -749,7 +759,7 @@ using effect_buffer_t = int16_t;
     // For emphasis, we could also make all pointers to them be "const *",
     // but that would clutter the code unnecessarily.
 
-    struct AudioStreamIn {
+    struct AudioStreamIn : public Source {
         AudioHwDevice* const audioHwDev;
         sp<StreamInHalInterface> stream;
         audio_input_flags_t flags;
@@ -758,6 +768,13 @@ using effect_buffer_t = int16_t;
 
         AudioStreamIn(AudioHwDevice *dev, sp<StreamInHalInterface> in, audio_input_flags_t flags) :
             audioHwDev(dev), stream(in), flags(flags) {}
+        status_t read(void *buffer, size_t bytes, size_t *read) override {
+            return stream->read(buffer, bytes, read);
+        }
+        status_t getCapturePosition(int64_t *frames, int64_t *time) override {
+            return stream->getCapturePosition(frames, time);
+        }
+        status_t standby() override { return stream->standby(); }
     };
 
     struct TeePatch {

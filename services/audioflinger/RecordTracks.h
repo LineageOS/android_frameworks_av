@@ -167,6 +167,8 @@ public:
                 const Timeout& timeout = {});
     virtual             ~PatchRecord();
 
+    virtual Source* getSource() { return nullptr; }
+
     // AudioBufferProvider interface
     virtual status_t getNextBuffer(AudioBufferProvider::Buffer* buffer);
     virtual void releaseBuffer(AudioBufferProvider::Buffer* buffer);
@@ -175,4 +177,71 @@ public:
     virtual status_t    obtainBuffer(Proxy::Buffer *buffer,
                                      const struct timespec *timeOut = NULL);
     virtual void        releaseBuffer(Proxy::Buffer *buffer);
+
+    size_t writeFrames(const void* src, size_t frameCount, size_t frameSize) {
+        return writeFrames(this, src, frameCount, frameSize);
+    }
+
+protected:
+    /** Write the source data into the buffer provider. @return written frame count. */
+    static size_t writeFrames(AudioBufferProvider* dest, const void* src,
+            size_t frameCount, size_t frameSize);
+
 };  // end of PatchRecord
+
+class PassthruPatchRecord : public PatchRecord, public Source {
+public:
+    PassthruPatchRecord(RecordThread *recordThread,
+                        uint32_t sampleRate,
+                        audio_channel_mask_t channelMask,
+                        audio_format_t format,
+                        size_t frameCount,
+                        audio_input_flags_t flags);
+
+    Source* getSource() override { return static_cast<Source*>(this); }
+
+    // Source interface
+    status_t read(void *buffer, size_t bytes, size_t *read) override;
+    status_t getCapturePosition(int64_t *frames, int64_t *time) override;
+    status_t standby() override;
+
+    // AudioBufferProvider interface
+    // This interface is used by RecordThread to pass the data obtained
+    // from HAL or other source to the client. PassthruPatchRecord receives
+    // the data in 'obtainBuffer' so these calls are stubbed out.
+    status_t getNextBuffer(AudioBufferProvider::Buffer* buffer) override;
+    void releaseBuffer(AudioBufferProvider::Buffer* buffer) override;
+
+    // PatchProxyBufferProvider interface
+    // This interface is used from DirectOutputThread to acquire data from HAL.
+    bool producesBufferOnDemand() const override { return true; }
+    status_t obtainBuffer(Proxy::Buffer *buffer, const struct timespec *timeOut = nullptr) override;
+    void releaseBuffer(Proxy::Buffer *buffer) override;
+
+private:
+    // This is to use with PatchRecord::writeFrames
+    struct PatchRecordAudioBufferProvider : public AudioBufferProvider {
+        explicit PatchRecordAudioBufferProvider(PassthruPatchRecord& passthru) :
+                mPassthru(passthru) {}
+        status_t getNextBuffer(AudioBufferProvider::Buffer* buffer) override {
+            return mPassthru.PatchRecord::getNextBuffer(buffer);
+        }
+        void releaseBuffer(AudioBufferProvider::Buffer* buffer) override {
+            return mPassthru.PatchRecord::releaseBuffer(buffer);
+        }
+    private:
+        PassthruPatchRecord& mPassthru;
+    };
+
+    sp<StreamInHalInterface> obtainStream(sp<ThreadBase>* thread);
+
+    PatchRecordAudioBufferProvider mPatchRecordAudioBufferProvider;
+    std::unique_ptr<void, decltype(free)*> mSinkBuffer;  // frame size aligned continuous buffer
+    std::unique_ptr<void, decltype(free)*> mStubBuffer;  // buffer used for AudioBufferProvider
+    size_t mUnconsumedFrames = 0;
+    std::mutex mReadLock;
+    std::condition_variable mReadCV;
+    size_t mReadBytes = 0; // GUARDED_BY(mReadLock)
+    status_t mReadError = NO_ERROR; // GUARDED_BY(mReadLock)
+    int64_t mLastReadFrames = 0;  // accessed on RecordThread only
+};
