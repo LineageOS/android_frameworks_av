@@ -483,19 +483,6 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
         // Fast mode is not available in this case.
         inputFlags = (audio_input_flags_t) (inputFlags & ~AUDIO_INPUT_FLAG_FAST);
     }
-    sp<RecordThread::PatchRecord> tempRecordTrack = new (std::nothrow) RecordThread::PatchRecord(
-                                             mRecord.thread().get(),
-                                             sampleRate,
-                                             inChannelMask,
-                                             format,
-                                             frameCount,
-                                             NULL,
-                                             (size_t)0 /* bufferSize */,
-                                             inputFlags);
-    status = mRecord.checkTrack(tempRecordTrack.get());
-    if (status != NO_ERROR) {
-        return status;
-    }
 
     audio_output_flags_t outputFlags = mAudioPatch.sinks[0].config_mask & AUDIO_PORT_CONFIG_FLAGS ?
             mAudioPatch.sinks[0].flags.output : AUDIO_OUTPUT_FLAG_NONE;
@@ -512,9 +499,34 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
         outputFlags = (audio_output_flags_t) (outputFlags & ~AUDIO_OUTPUT_FLAG_FAST);
     }
 
+    sp<RecordThread::PatchRecord> tempRecordTrack;
+    if ((inputFlags & AUDIO_INPUT_FLAG_DIRECT) && (outputFlags & AUDIO_OUTPUT_FLAG_DIRECT)) {
+        tempRecordTrack = new RecordThread::PassthruPatchRecord(
+                                                 mRecord.thread().get(),
+                                                 sampleRate,
+                                                 inChannelMask,
+                                                 format,
+                                                 frameCount,
+                                                 inputFlags);
+    } else {
+        tempRecordTrack = new RecordThread::PatchRecord(
+                                                 mRecord.thread().get(),
+                                                 sampleRate,
+                                                 inChannelMask,
+                                                 format,
+                                                 frameCount,
+                                                 nullptr,
+                                                 (size_t)0 /* bufferSize */,
+                                                 inputFlags);
+    }
+    status = mRecord.checkTrack(tempRecordTrack.get());
+    if (status != NO_ERROR) {
+        return status;
+    }
+
     // create a special playback track to render to playback thread.
     // this track is given the same buffer as the PatchRecord buffer
-    sp<PlaybackThread::PatchTrack> tempPatchTrack = new (std::nothrow) PlaybackThread::PatchTrack(
+    sp<PlaybackThread::PatchTrack> tempPatchTrack = new PlaybackThread::PatchTrack(
                                            mPlayback.thread().get(),
                                            streamType,
                                            sampleRate,

@@ -337,6 +337,7 @@ public:
 
     virtual ~PatchProxyBufferProvider() {}
 
+    virtual bool        producesBufferOnDemand() const = 0;
     virtual status_t    obtainBuffer(Proxy::Buffer* buffer,
                                      const struct timespec *requested = NULL) = 0;
     virtual void        releaseBuffer(Proxy::Buffer* buffer) = 0;
@@ -358,6 +359,8 @@ public:
                             mPeerReferenceHold.clear();
                             mPeerProxy = nullptr;
                         }
+
+            bool        producesBufferOnDemand() const override { return false; }
 
 protected:
     const sp<ClientProxy>       mProxy;
