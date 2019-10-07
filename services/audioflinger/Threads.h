@@ -1646,6 +1646,7 @@ private:
             void    checkBtNrec_l();
 
             AudioStreamIn                       *mInput;
+            Source                              *mSource;
             SortedVector < sp<RecordTrack> >    mTracks;
             // mActiveTracks has dual roles:  it indicates the current active track(s), and
             // is used together with mStartStopCond to indicate start()/stop() progress
