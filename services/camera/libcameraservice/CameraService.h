@@ -471,7 +471,8 @@ private:
          * Make a new CameraState and set the ID, cost, and conflicting devices using the values
          * returned in the HAL's camera_info struct for each device.
          */
-        CameraState(const String8& id, int cost, const std::set<String8>& conflicting);
+        CameraState(const String8& id, int cost, const std::set<String8>& conflicting,
+                bool isHidden);
         virtual ~CameraState();
 
         /**
@@ -523,6 +524,11 @@ private:
          */
         String8 getId() const;
 
+        /**
+         * Return if the camera device is a publically hidden secure camera
+         */
+        bool isPublicallyHiddenSecureCamera() const;
+
     private:
         const String8 mId;
         StatusInternal mStatus; // protected by mStatusLock
@@ -530,6 +536,7 @@ private:
         std::set<String8> mConflicting;
         mutable Mutex mStatusLock;
         CameraParameters mShimParams;
+        const bool mIsPublicallyHiddenSecureCamera;
     }; // class CameraState
 
     // Observer for UID lifecycle enforcing that UIDs in idle
@@ -635,7 +642,9 @@ private:
 
     // Should an operation attempt on a cameraId be rejected, if the camera id is
     // advertised as a publically hidden secure camera, by the camera HAL ?
-    bool shouldRejectHiddenCameraConnection(const String8 & cameraId);
+    bool shouldRejectHiddenCameraConnection(const String8& cameraId);
+
+    bool isPublicallyHiddenSecureCamera(const String8& cameraId);
 
     // Single implementation shared between the various connect calls
     template<class CALLBACK, class CLIENT>
