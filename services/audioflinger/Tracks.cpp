@@ -18,12 +18,14 @@
 
 #define LOG_TAG "AudioFlinger"
 //#define LOG_NDEBUG 0
+#define ATRACE_TAG ATRACE_TAG_AUDIO
 
 #include "Configuration.h"
 #include <linux/futex.h>
 #include <math.h>
 #include <sys/syscall.h>
 #include <utils/Log.h>
+#include <utils/Trace.h>
 
 #include <private/media/AudioTrackShared.h>
 
@@ -820,16 +822,9 @@ void AudioFlinger::PlaybackThread::Track::interceptBuffer(
     }
     for (auto& teePatch : mTeePatches) {
         RecordThread::PatchRecord* patchRecord = teePatch.patchRecord.get();
-
-        size_t framesWritten = writeFrames(patchRecord, sourceBuffer.i8, frameCount);
-        // On buffer wrap, the buffer frame count will be less than requested,
-        // when this happens a second buffer needs to be used to write the leftover audio
-        size_t framesLeft = frameCount - framesWritten;
-        if (framesWritten != 0 && framesLeft != 0) {
-            framesWritten +=
-                writeFrames(patchRecord, sourceBuffer.i8 + framesWritten * mFrameSize, framesLeft);
-            framesLeft = frameCount - framesWritten;
-        }
+        const size_t framesWritten = patchRecord->writeFrames(
+                sourceBuffer.i8, frameCount, mFrameSize);
+        const size_t framesLeft = frameCount - framesWritten;
         ALOGW_IF(framesLeft != 0, "%s(%d) PatchRecord %d can not provide big enough "
                  "buffer %zu/%zu, dropping %zu frames", __func__, mId, patchRecord->mId,
                  framesWritten, frameCount, framesLeft);
@@ -840,26 +835,6 @@ void AudioFlinger::PlaybackThread::Track::interceptBuffer(
     ALOGD_IF(spent > 200us, "%s: took %lldus to intercept %zu tracks", __func__,
              spent.count(), mTeePatches.size());
 }
-
-size_t AudioFlinger::PlaybackThread::Track::writeFrames(AudioBufferProvider* dest,
-                                                        const void* src,
-                                                        size_t frameCount) {
-    AudioBufferProvider::Buffer patchBuffer;
-    patchBuffer.frameCount = frameCount;
-    auto status = dest->getNextBuffer(&patchBuffer);
-    if (status != NO_ERROR) {
-       ALOGW("%s PathRecord getNextBuffer failed with error %d: %s",
-             __func__, status, strerror(-status));
-       return 0;
-    }
-    ALOG_ASSERT(patchBuffer.frameCount <= frameCount);
-    memcpy(patchBuffer.raw, src, patchBuffer.frameCount * mFrameSize);
-    auto framesWritten = patchBuffer.frameCount;
-    dest->releaseBuffer(&patchBuffer);
-    return framesWritten;
-}
-
-// releaseBuffer() is not overridden
 
 // ExtendedAudioBufferProvider interface
 
@@ -1810,6 +1785,15 @@ AudioFlinger::PlaybackThread::PatchTrack::~PatchTrack()
     ALOGV("%s(%d)", __func__, mId);
 }
 
+size_t AudioFlinger::PlaybackThread::PatchTrack::framesReady() const
+{
+    if (mPeerProxy && mPeerProxy->producesBufferOnDemand()) {
+        return std::numeric_limits<size_t>::max();
+    } else {
+        return Track::framesReady();
+    }
+}
+
 status_t AudioFlinger::PlaybackThread::PatchTrack::start(AudioSystem::sync_event_t event,
                                                          audio_session_t triggerSession)
 {
@@ -1828,9 +1812,19 @@ status_t AudioFlinger::PlaybackThread::PatchTrack::getNextBuffer(
     ALOG_ASSERT(mPeerProxy != 0, "%s(%d): called without peer proxy", __func__, mId);
     Proxy::Buffer buf;
     buf.mFrameCount = buffer->frameCount;
+    if (ATRACE_ENABLED()) {
+        std::string traceName("PTnReq");
+        traceName += std::to_string(id());
+        ATRACE_INT(traceName.c_str(), buf.mFrameCount);
+    }
     status_t status = mPeerProxy->obtainBuffer(&buf, &mPeerTimeout);
     ALOGV_IF(status != NO_ERROR, "%s(%d): getNextBuffer status %d", __func__, mId, status);
     buffer->frameCount = buf.mFrameCount;
+    if (ATRACE_ENABLED()) {
+        std::string traceName("PTnObt");
+        traceName += std::to_string(id());
+        ATRACE_INT(traceName.c_str(), buf.mFrameCount);
+    }
     if (buf.mFrameCount == 0) {
         return WOULD_BLOCK;
     }
@@ -2283,6 +2277,39 @@ AudioFlinger::RecordThread::PatchRecord::~PatchRecord()
     ALOGV("%s(%d)", __func__, mId);
 }
 
+static size_t writeFramesHelper(
+        AudioBufferProvider* dest, const void* src, size_t frameCount, size_t frameSize)
+{
+    AudioBufferProvider::Buffer patchBuffer;
+    patchBuffer.frameCount = frameCount;
+    auto status = dest->getNextBuffer(&patchBuffer);
+    if (status != NO_ERROR) {
+       ALOGW("%s PathRecord getNextBuffer failed with error %d: %s",
+             __func__, status, strerror(-status));
+       return 0;
+    }
+    ALOG_ASSERT(patchBuffer.frameCount <= frameCount);
+    memcpy(patchBuffer.raw, src, patchBuffer.frameCount * frameSize);
+    size_t framesWritten = patchBuffer.frameCount;
+    dest->releaseBuffer(&patchBuffer);
+    return framesWritten;
+}
+
+// static
+size_t AudioFlinger::RecordThread::PatchRecord::writeFrames(
+        AudioBufferProvider* dest, const void* src, size_t frameCount, size_t frameSize)
+{
+    size_t framesWritten = writeFramesHelper(dest, src, frameCount, frameSize);
+    // On buffer wrap, the buffer frame count will be less than requested,
+    // when this happens a second buffer needs to be used to write the leftover audio
+    const size_t framesLeft = frameCount - framesWritten;
+    if (framesWritten != 0 && framesLeft != 0) {
+        framesWritten += writeFramesHelper(dest, (const char*)src + framesWritten * frameSize,
+                        framesLeft, frameSize);
+    }
+    return framesWritten;
+}
+
 // AudioBufferProvider interface
 status_t AudioFlinger::RecordThread::PatchRecord::getNextBuffer(
                                                   AudioBufferProvider::Buffer* buffer)
@@ -2294,6 +2321,11 @@ status_t AudioFlinger::RecordThread::PatchRecord::getNextBuffer(
     ALOGV_IF(status != NO_ERROR,
              "%s(%d): mPeerProxy->obtainBuffer status %d", __func__, mId, status);
     buffer->frameCount = buf.mFrameCount;
+    if (ATRACE_ENABLED()) {
+        std::string traceName("PRnObt");
+        traceName += std::to_string(id());
+        ATRACE_INT(traceName.c_str(), buf.mFrameCount);
+    }
     if (buf.mFrameCount == 0) {
         return WOULD_BLOCK;
     }
@@ -2320,6 +2352,180 @@ status_t AudioFlinger::RecordThread::PatchRecord::obtainBuffer(Proxy::Buffer* bu
 void AudioFlinger::RecordThread::PatchRecord::releaseBuffer(Proxy::Buffer* buffer)
 {
     mProxy->releaseBuffer(buffer);
+}
+
+#undef LOG_TAG
+#define LOG_TAG "AF::PthrPatchRecord"
+
+static std::unique_ptr<void, decltype(free)*> allocAligned(size_t alignment, size_t size)
+{
+    void *ptr = nullptr;
+    (void)posix_memalign(&ptr, alignment, size);
+    return std::unique_ptr<void, decltype(free)*>(ptr, free);
+}
+
+AudioFlinger::RecordThread::PassthruPatchRecord::PassthruPatchRecord(
+        RecordThread *recordThread,
+        uint32_t sampleRate,
+        audio_channel_mask_t channelMask,
+        audio_format_t format,
+        size_t frameCount,
+        audio_input_flags_t flags)
+        : PatchRecord(recordThread, sampleRate, channelMask, format, frameCount,
+                nullptr /*buffer*/, 0 /*bufferSize*/, flags),
+          mPatchRecordAudioBufferProvider(*this),
+          mSinkBuffer(allocAligned(32, mFrameCount * mFrameSize)),
+          mStubBuffer(allocAligned(32, mFrameCount * mFrameSize))
+{
+    memset(mStubBuffer.get(), 0, mFrameCount * mFrameSize);
+}
+
+sp<StreamInHalInterface> AudioFlinger::RecordThread::PassthruPatchRecord::obtainStream(
+        sp<ThreadBase>* thread)
+{
+    *thread = mThread.promote();
+    if (!*thread) return nullptr;
+    RecordThread *recordThread = static_cast<RecordThread*>((*thread).get());
+    Mutex::Autolock _l(recordThread->mLock);
+    return recordThread->mInput ? recordThread->mInput->stream : nullptr;
+}
+
+// PatchProxyBufferProvider methods are called on DirectOutputThread
+status_t AudioFlinger::RecordThread::PassthruPatchRecord::obtainBuffer(
+        Proxy::Buffer* buffer, const struct timespec* timeOut)
+{
+    if (mUnconsumedFrames) {
+        buffer->mFrameCount = std::min(buffer->mFrameCount, mUnconsumedFrames);
+        // mUnconsumedFrames is decreased in releaseBuffer to use actual frame consumption figure.
+        return PatchRecord::obtainBuffer(buffer, timeOut);
+    }
+
+    // Otherwise, execute a read from HAL and write into the buffer.
+    nsecs_t startTimeNs = 0;
+    if (timeOut && (timeOut->tv_sec != 0 || timeOut->tv_nsec != 0) && timeOut->tv_sec != INT_MAX) {
+        // Will need to correct timeOut by elapsed time.
+        startTimeNs = systemTime();
+    }
+    const size_t framesToRead = std::min(buffer->mFrameCount, mFrameCount);
+    buffer->mFrameCount = 0;
+    buffer->mRaw = nullptr;
+    sp<ThreadBase> thread;
+    sp<StreamInHalInterface> stream = obtainStream(&thread);
+    if (!stream) return NO_INIT;  // If there is no stream, RecordThread is not reading.
+
+    status_t result = NO_ERROR;
+    struct timespec newTimeOut = *timeOut;
+    size_t bytesRead = 0;
+    {
+        ATRACE_NAME("read");
+        result = stream->read(mSinkBuffer.get(), framesToRead * mFrameSize, &bytesRead);
+        if (result != NO_ERROR) goto stream_error;
+        if (bytesRead == 0) return NO_ERROR;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(mReadLock);
+        mReadBytes += bytesRead;
+        mReadError = NO_ERROR;
+    }
+    mReadCV.notify_one();
+    // writeFrames handles wraparound and should write all the provided frames.
+    // If it couldn't, there is something wrong with the client/server buffer of the software patch.
+    buffer->mFrameCount = writeFrames(
+            &mPatchRecordAudioBufferProvider,
+            mSinkBuffer.get(), bytesRead / mFrameSize, mFrameSize);
+    ALOGW_IF(buffer->mFrameCount < bytesRead / mFrameSize,
+            "Lost %zu frames obtained from HAL", bytesRead / mFrameSize - buffer->mFrameCount);
+    mUnconsumedFrames = buffer->mFrameCount;
+    // Correct newTimeOut by elapsed time.
+    if (startTimeNs) {
+        nsecs_t newTimeOutNs =
+                audio_utils_ns_from_timespec(&newTimeOut) - (systemTime() - startTimeNs);
+        if (newTimeOutNs < 0) newTimeOutNs = 0;
+        newTimeOut.tv_sec = newTimeOutNs / NANOS_PER_SECOND;
+        newTimeOut.tv_nsec = newTimeOutNs - newTimeOut.tv_sec * NANOS_PER_SECOND;
+    }
+    return PatchRecord::obtainBuffer(buffer, &newTimeOut);
+
+stream_error:
+    stream->standby();
+    {
+        std::lock_guard<std::mutex> lock(mReadLock);
+        mReadError = result;
+    }
+    mReadCV.notify_one();
+    return result;
+}
+
+void AudioFlinger::RecordThread::PassthruPatchRecord::releaseBuffer(Proxy::Buffer* buffer)
+{
+    if (buffer->mFrameCount <= mUnconsumedFrames) {
+        mUnconsumedFrames -= buffer->mFrameCount;
+    } else {
+        ALOGW("Write side has consumed more frames than we had: %zu > %zu",
+                buffer->mFrameCount, mUnconsumedFrames);
+        mUnconsumedFrames = 0;
+    }
+    PatchRecord::releaseBuffer(buffer);
+}
+
+// AudioBufferProvider and Source methods are called on RecordThread
+// 'read' emulates actual audio data with 0's. This is OK as 'getNextBuffer'
+// and 'releaseBuffer' are stubbed out and ignore their input.
+// It's not possible to retrieve actual data here w/o blocking 'obtainBuffer'
+// until we copy it.
+status_t AudioFlinger::RecordThread::PassthruPatchRecord::read(
+        void* buffer, size_t bytes, size_t* read)
+{
+    bytes = std::min(bytes, mFrameCount * mFrameSize);
+    {
+        std::unique_lock<std::mutex> lock(mReadLock);
+        mReadCV.wait(lock, [&]{ return mReadError != NO_ERROR || mReadBytes != 0; });
+        if (mReadError != NO_ERROR) {
+            mLastReadFrames = 0;
+            return mReadError;
+        }
+        *read = std::min(bytes, mReadBytes);
+        mReadBytes -= *read;
+    }
+    mLastReadFrames = *read / mFrameSize;
+    memset(buffer, 0, *read);
+    return 0;
+}
+
+status_t AudioFlinger::RecordThread::PassthruPatchRecord::getCapturePosition(
+        int64_t* frames, int64_t* time)
+{
+    sp<ThreadBase> thread;
+    sp<StreamInHalInterface> stream = obtainStream(&thread);
+    return stream ? stream->getCapturePosition(frames, time) : NO_INIT;
+}
+
+status_t AudioFlinger::RecordThread::PassthruPatchRecord::standby()
+{
+    // RecordThread issues 'standby' command in two major cases:
+    // 1. Error on read--this case is handled in 'obtainBuffer'.
+    // 2. Track is stopping--as PassthruPatchRecord assumes continuous
+    //    output, this can only happen when the software patch
+    //    is being torn down. In this case, the RecordThread
+    //    will terminate and close the HAL stream.
+    return 0;
+}
+
+// As the buffer gets filled in obtainBuffer, here we only simulate data consumption.
+status_t AudioFlinger::RecordThread::PassthruPatchRecord::getNextBuffer(
+        AudioBufferProvider::Buffer* buffer)
+{
+    buffer->frameCount = mLastReadFrames;
+    buffer->raw = buffer->frameCount != 0 ? mStubBuffer.get() : nullptr;
+    return NO_ERROR;
+}
+
+void AudioFlinger::RecordThread::PassthruPatchRecord::releaseBuffer(
+        AudioBufferProvider::Buffer* buffer)
+{
+    buffer->frameCount = 0;
+    buffer->raw = nullptr;
 }
 
 // ----------------------------------------------------------------------------
