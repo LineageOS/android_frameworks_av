@@ -878,9 +878,10 @@ void OutputBuffersArray::realloc(const std::shared_ptr<C2Buffer> &c2buffer) {
     switch (c2buffer->data().type()) {
         case C2BufferData::LINEAR: {
             uint32_t size = kLinearBufferSize;
-            const C2ConstLinearBlock &block = c2buffer->data().linearBlocks().front();
-            if (block.size() < kMaxLinearBufferSize / 2) {
-                size = block.size() * 2;
+            const std::vector<C2ConstLinearBlock> &linear_blocks = c2buffer->data().linearBlocks();
+            const uint32_t block_size = linear_blocks.front().size();
+            if (block_size < kMaxLinearBufferSize / 2) {
+                size = block_size * 2;
             } else {
                 size = kMaxLinearBufferSize;
             }
