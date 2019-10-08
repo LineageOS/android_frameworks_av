@@ -20,8 +20,8 @@
 #define LOG_TAG "NuCachedSource2"
 #include <utils/Log.h>
 
-#include "include/NuCachedSource2.h"
-#include "include/HTTPBase.h"
+#include <datasource/NuCachedSource2.h>
+#include <datasource/HTTPBase.h>
 
 #include <cutils/properties.h>
 #include <media/stagefright/foundation/ADebug.h>

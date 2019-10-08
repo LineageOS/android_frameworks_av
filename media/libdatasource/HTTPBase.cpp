@@ -18,7 +18,7 @@
 #define LOG_TAG "HTTPBase"
 #include <utils/Log.h>
 
-#include "include/HTTPBase.h"
+#include <datasource/HTTPBase.h>
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>

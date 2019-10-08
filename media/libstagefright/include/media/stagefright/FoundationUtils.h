@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,34 +14,19 @@
  * limitations under the License.
  */
 
-#ifndef MEDIA_HTTP_H_
+#ifndef FOUNDATION_UTILS_H_
 
-#define MEDIA_HTTP_H_
+#define FOUNDATION_UTILS_H_
 
 #include <media/stagefright/foundation/AString.h>
-#include <media/stagefright/ClearMediaHTTP.h>
 
 namespace android {
 
-struct MediaHTTPConnection;
+AString MakeUserAgent();
 
-struct MediaHTTP : public ClearMediaHTTP {
-    MediaHTTP(const sp<MediaHTTPConnection> &conn);
+AString uriDebugString(const AString &uri, bool incognito = false);
 
-protected:
-    virtual ~MediaHTTP();
-
-    virtual sp<DecryptHandle> DrmInitialization(const char* mime);
-
-private:
-    sp<DecryptHandle> mDecryptHandle;
-    DrmManagerClient *mDrmManagerClient;
-
-    void clearDRMState_l();
-
-    DISALLOW_EVIL_CONSTRUCTORS(MediaHTTP);
-};
-
+AString nameForFd(int fd);
 }  // namespace android
 
-#endif  // MEDIA_HTTP_H_
+#endif  // FOUNDATION_UTILS_H_
