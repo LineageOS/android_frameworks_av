@@ -21,7 +21,13 @@ namespace android {
 extern "C" AudioPolicyInterface* createAudioPolicyManager(
         AudioPolicyClientInterface *clientInterface)
 {
-    return new AudioPolicyManager(clientInterface);
+    AudioPolicyManager *apm = new AudioPolicyManager(clientInterface);
+    status_t status = apm->initialize();
+    if (status != NO_ERROR) {
+        delete apm;
+        apm = nullptr;
+    }
+    return apm;
 }
 
 extern "C" void destroyAudioPolicyManager(AudioPolicyInterface *interface)
