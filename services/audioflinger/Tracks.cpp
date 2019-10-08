@@ -2523,7 +2523,6 @@ status_t AudioFlinger::RecordThread::PassthruPatchRecord::obtainBuffer(
     if (!stream) return NO_INIT;  // If there is no stream, RecordThread is not reading.
 
     status_t result = NO_ERROR;
-    struct timespec newTimeOut = *timeOut;
     size_t bytesRead = 0;
     {
         ATRACE_NAME("read");
@@ -2546,15 +2545,16 @@ status_t AudioFlinger::RecordThread::PassthruPatchRecord::obtainBuffer(
     ALOGW_IF(buffer->mFrameCount < bytesRead / mFrameSize,
             "Lost %zu frames obtained from HAL", bytesRead / mFrameSize - buffer->mFrameCount);
     mUnconsumedFrames = buffer->mFrameCount;
-    // Correct newTimeOut by elapsed time.
+    struct timespec newTimeOut;
     if (startTimeNs) {
-        nsecs_t newTimeOutNs =
-                audio_utils_ns_from_timespec(&newTimeOut) - (systemTime() - startTimeNs);
+        // Correct the timeout by elapsed time.
+        nsecs_t newTimeOutNs = audio_utils_ns_from_timespec(timeOut) - (systemTime() - startTimeNs);
         if (newTimeOutNs < 0) newTimeOutNs = 0;
         newTimeOut.tv_sec = newTimeOutNs / NANOS_PER_SECOND;
         newTimeOut.tv_nsec = newTimeOutNs - newTimeOut.tv_sec * NANOS_PER_SECOND;
+        timeOut = &newTimeOut;
     }
-    return PatchRecord::obtainBuffer(buffer, &newTimeOut);
+    return PatchRecord::obtainBuffer(buffer, timeOut);
 
 stream_error:
     stream->standby();
