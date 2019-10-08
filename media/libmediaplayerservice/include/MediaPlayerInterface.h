@@ -27,7 +27,6 @@
 
 #include <media/mediaplayer.h>
 #include <media/AudioResamplerPublic.h>
-#include <media/AudioSystem.h>
 #include <media/AudioTimestamp.h>
 #include <media/AVSyncSettings.h>
 #include <media/BufferingSettings.h>
