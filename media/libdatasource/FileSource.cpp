@@ -18,9 +18,8 @@
 #define LOG_TAG "FileSource"
 #include <utils/Log.h>
 
+#include <datasource/FileSource.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include <media/stagefright/FileSource.h>
-#include <media/stagefright/Utils.h>
 #include <private/android_filesystem_config.h>
 
 namespace android {

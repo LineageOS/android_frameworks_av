@@ -33,6 +33,7 @@
 #include <media/stagefright/MediaClock.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
+#include <media/stagefright/FoundationUtils.h>
 
 #include <media/IMediaAnalyticsService.h>
 
