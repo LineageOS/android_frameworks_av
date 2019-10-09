@@ -133,7 +133,6 @@ cc_library {
         "CameraSource.cpp",
         "CameraSourceTimeLapse.cpp",
         "DataConverter.cpp",
-        "DataSourceBase.cpp",
         "DataSourceFactory.cpp",
         "DataURISource.cpp",
         "ClearFileSource.cpp",
