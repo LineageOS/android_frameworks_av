@@ -20,8 +20,8 @@
 
 #include <gtest/gtest.h>
 
-#include <media/IResourceManagerService.h>
-#include <media/IResourceManagerClient.h>
+#include <android/media/BnResourceManagerClient.h>
+#include <android/media/IResourceManagerService.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/ProcessInfoInterface.h>
 #include <mediadrm/DrmHal.h>
@@ -34,6 +34,10 @@
 #include "ResourceManagerService.h"
 
 namespace android {
+
+using ::android::binder::Status;
+using ::android::media::BnResourceManagerClient;
+using ::android::media::ResourceManagerService;
 
 static Vector<uint8_t> toAndroidVector(const std::vector<uint8_t> &vec) {
     Vector<uint8_t> aVec;
@@ -70,19 +74,21 @@ struct FakeDrm : public BnResourceManagerClient {
 
     virtual ~FakeDrm() {}
 
-    virtual bool reclaimResource() {
+    Status reclaimResource(bool* _aidl_return) {
         mReclaimed = true;
         mDrmSessionManager->removeSession(mSessionId);
-        return true;
+        *_aidl_return = true;
+        return Status::ok();
     }
 
-    virtual String8 getName() {
+    Status getName(::std::string* _aidl_return) {
         String8 name("FakeDrm[");
         for (size_t i = 0; i < mSessionId.size(); ++i) {
             name.appendFormat("%02x", mSessionId[i]);
         }
         name.append("]");
-        return name;
+        *_aidl_return = name;
+        return Status::ok();
     }
 
     bool isReclaimed() const {

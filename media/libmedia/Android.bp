@@ -2,7 +2,7 @@ cc_library_headers {
     name: "libmedia_headers",
     vendor_available: true,
     export_include_dirs: ["include"],
-    header_libs:[
+    header_libs: [
         "libbase_headers",
         "libgui_headers",
         "libstagefright_headers",
@@ -22,13 +22,19 @@ cc_library {
         enabled: true,
     },
     double_loadable: true,
-    srcs: ["AudioParameter.cpp", "TypeConverter.cpp"],
+    srcs: [
+        "AudioParameter.cpp",
+        "TypeConverter.cpp",
+    ],
     cflags: [
         "-Werror",
         "-Wno-error=deprecated-declarations",
         "-Wall",
     ],
-    shared_libs: ["libutils", "liblog"],
+    shared_libs: [
+        "libutils",
+        "liblog",
+    ],
     header_libs: [
         "libmedia_headers",
         "libaudioclient_headers",
@@ -47,6 +53,21 @@ filegroup {
         "aidl/android/IOMXBufferSource.aidl",
     ],
     path: "aidl",
+}
+
+aidl_interface {
+    name: "resourcemanager_aidl_interface",
+    local_include_dir: "aidl",
+    srcs: [
+        "aidl/android/media/IResourceManagerClient.aidl",
+        "aidl/android/media/IResourceManagerService.aidl",
+        "aidl/android/media/MediaResourceType.aidl",
+        "aidl/android/media/MediaResourceSubType.aidl",
+        "aidl/android/media/MediaResourceParcel.aidl",
+        "aidl/android/media/MediaResourcePolicyParcel.aidl",
+    ],
+    api_dir: "api/resourcemanager",
+    versions: ["1"],
 }
 
 cc_library_shared {
@@ -126,7 +147,6 @@ cc_library_shared {
         cfi: true,
     },
 }
-
 
 cc_library_shared {
     name: "libmedia_omx_client",
@@ -277,8 +297,6 @@ cc_library {
         "IMediaSource.cpp",
         "IRemoteDisplay.cpp",
         "IRemoteDisplayClient.cpp",
-        "IResourceManagerClient.cpp",
-        "IResourceManagerService.cpp",
         "IStreamSource.cpp",
         "MediaUtils.cpp",
         "Metadata.cpp",
@@ -344,7 +362,12 @@ cc_library {
     ],
 
     static_libs: [
-        "libc_malloc_debug_backtrace",  // for memory heap analysis
+        "libc_malloc_debug_backtrace", // for memory heap analysis
+        "resourcemanager_aidl_interface-cpp",
+    ],
+
+    export_static_lib_headers: [
+        "resourcemanager_aidl_interface-cpp",
     ],
 
     export_include_dirs: [

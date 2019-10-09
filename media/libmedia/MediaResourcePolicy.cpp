@@ -18,31 +18,29 @@
 #define LOG_TAG "MediaResourcePolicy"
 #include <utils/Log.h>
 #include <media/MediaResourcePolicy.h>
+#include <android/media/IResourceManagerService.h>
 
 namespace android {
 
-const char kPolicySupportsMultipleSecureCodecs[] = "supports-multiple-secure-codecs";
-const char kPolicySupportsSecureWithNonSecureCodec[] = "supports-secure-with-non-secure-codec";
-
-MediaResourcePolicy::MediaResourcePolicy() {}
-
-MediaResourcePolicy::MediaResourcePolicy(String8 type, String8 value)
-        : mType(type),
-          mValue(value) {}
-
-void MediaResourcePolicy::readFromParcel(const Parcel &parcel) {
-    mType = parcel.readString8();
-    mValue = parcel.readString8();
+using android::media::IResourceManagerService;
+//static
+const ::std::string& MediaResourcePolicy::kPolicySupportsMultipleSecureCodecs() {
+    return IResourceManagerService::kPolicySupportsMultipleSecureCodecs();
+}
+//static
+const ::std::string& MediaResourcePolicy::kPolicySupportsSecureWithNonSecureCodec() {
+    return IResourceManagerService::kPolicySupportsSecureWithNonSecureCodec();
 }
 
-void MediaResourcePolicy::writeToParcel(Parcel *parcel) const {
-    parcel->writeString8(mType);
-    parcel->writeString8(mValue);
+MediaResourcePolicy::MediaResourcePolicy(
+        const std::string& type, const std::string& value) {
+    this->type = type;
+    this->value = value;
 }
 
-String8 MediaResourcePolicy::toString() const {
+String8 toString(const MediaResourcePolicyParcel &policy) {
     String8 str;
-    str.appendFormat("%s:%s", mType.string(), mValue.string());
+    str.appendFormat("%s:%s", policy.type.c_str(), policy.value.c_str());
     return str;
 }
 

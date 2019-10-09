@@ -18,27 +18,22 @@
 #ifndef ANDROID_MEDIA_RESOURCE_POLICY_H
 #define ANDROID_MEDIA_RESOURCE_POLICY_H
 
-#include <binder/Parcel.h>
-#include <utils/String8.h>
+#include <android/media/MediaResourcePolicyParcel.h>
 
 namespace android {
 
-extern const char kPolicySupportsMultipleSecureCodecs[];
-extern const char kPolicySupportsSecureWithNonSecureCodec[];
+using media::MediaResourcePolicyParcel;
 
-class MediaResourcePolicy {
+class MediaResourcePolicy : public MediaResourcePolicyParcel {
 public:
-    MediaResourcePolicy();
-    MediaResourcePolicy(String8 type, String8 value);
+    MediaResourcePolicy() = delete;
+    MediaResourcePolicy(const std::string& type, const std::string& value);
 
-    void readFromParcel(const Parcel &parcel);
-    void writeToParcel(Parcel *parcel) const;
-
-    String8 toString() const;
-
-    String8 mType;
-    String8 mValue;
+    static const ::std::string& kPolicySupportsMultipleSecureCodecs();
+    static const ::std::string& kPolicySupportsSecureWithNonSecureCodec();
 };
+
+String8 toString(const MediaResourcePolicyParcel &policy);
 
 }; // namespace android
 
