@@ -65,6 +65,7 @@ cc_defaults {
         "AudioPresentationInfo.cpp",
         "ByteUtils.cpp",
         "ColorUtils.cpp",
+        "FoundationUtils.cpp",
         "MediaBuffer.cpp",
         "MediaBufferBase.cpp",
         "MediaBufferGroup.cpp",

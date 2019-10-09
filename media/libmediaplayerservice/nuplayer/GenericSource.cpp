@@ -23,6 +23,10 @@
 #include "AnotherPacketSource.h"
 #include <binder/IServiceManager.h>
 #include <cutils/properties.h>
+#include <datasource/DataSourceFactory.h>
+#include <datasource/FileSource.h>
+#include <datasource/HTTPBase.h>
+#include <datasource/NuCachedSource2.h>
 #include <media/DataSource.h>
 #include <media/MediaBufferHolder.h>
 #include <media/MediaSource.h>
@@ -31,8 +35,6 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/DataSourceFactory.h>
-#include <media/stagefright/FileSource.h>
 #include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaClock.h>
@@ -41,8 +43,6 @@
 #include <media/stagefright/MediaExtractorFactory.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
-#include "../../libstagefright/include/NuCachedSource2.h"
-#include "../../libstagefright/include/HTTPBase.h"
 
 namespace android {
 

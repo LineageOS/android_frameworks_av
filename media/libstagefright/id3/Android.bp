@@ -33,6 +33,7 @@ cc_test {
     ],
 
     shared_libs: [
+        "libdatasource",
         "libstagefright",
         "libutils",
         "liblog",

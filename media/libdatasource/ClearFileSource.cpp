@@ -18,9 +18,9 @@
 #define LOG_TAG "ClearFileSource"
 #include <utils/Log.h>
 
+#include <datasource/ClearFileSource.h>
 #include <media/stagefright/foundation/ADebug.h>
-#include <media/stagefright/ClearFileSource.h>
-#include <media/stagefright/Utils.h>
+#include <media/stagefright/FoundationUtils.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/types.h>

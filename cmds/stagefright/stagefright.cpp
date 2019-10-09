@@ -31,6 +31,7 @@
 
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
+#include <datasource/DataSourceFactory.h>
 #include <media/DataSource.h>
 #include <media/MediaSource.h>
 #include <media/IMediaHTTPService.h>
@@ -39,9 +40,7 @@
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
-#include "include/NuCachedSource2.h"
 #include <media/stagefright/AudioPlayer.h>
-#include <media/stagefright/DataSourceFactory.h>
 #include <media/stagefright/JPEGSource.h>
 #include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaCodec.h>

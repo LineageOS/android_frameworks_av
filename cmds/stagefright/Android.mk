@@ -10,7 +10,7 @@ LOCAL_SRC_FILES:=       \
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia libmedia_omx libutils libbinder \
         libstagefright_foundation libjpeg libui libgui libcutils liblog \
-        libhidlbase \
+        libhidlbase libdatasource \
         android.hardware.media.omx@1.0 \
 
 LOCAL_C_INCLUDES:= \
@@ -36,7 +36,7 @@ LOCAL_SRC_FILES:=         \
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia liblog libutils libbinder \
-        libstagefright_foundation
+        libstagefright_foundation libdatasource
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/camera/include \
@@ -111,7 +111,7 @@ LOCAL_SRC_FILES:=         \
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright liblog libutils libbinder libui libgui \
-        libstagefright_foundation libmedia libcutils
+        libstagefright_foundation libmedia libcutils libdatasource
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \
