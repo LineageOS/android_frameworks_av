@@ -30,6 +30,8 @@ cc_library {
     name: "libstagefright_bufferpool@2.0.1",
     defaults: ["libstagefright_bufferpool@2.0-default"],
     vendor_available: true,
+    // TODO: b/147147992
+    double_loadable: true,
     cflags: [
         "-DBUFFERPOOL_CLONE_HANDLES",
     ],
@@ -40,6 +42,8 @@ cc_library {
     name: "libstagefright_bufferpool@2.0",
     defaults: ["libstagefright_bufferpool@2.0-default"],
     vendor_available: true,
+    // TODO: b/147147992
+    double_loadable: true,
     vndk: {
         enabled: true,
     },

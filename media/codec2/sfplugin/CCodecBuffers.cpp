@@ -22,6 +22,7 @@
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaCodecConstants.h>
+#include <media/stagefright/SkipCutBuffer.h>
 
 #include "CCodecBuffers.h"
 

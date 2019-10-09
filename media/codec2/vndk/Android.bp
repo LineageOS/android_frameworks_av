@@ -14,6 +14,8 @@ cc_library_headers {
 cc_library_shared {
     name: "libcodec2_vndk",
     vendor_available: true,
+    // TODO: b/147147883
+    double_loadable: true,
 
     srcs: [
         "C2AllocatorBlob.cpp",

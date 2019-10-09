@@ -40,13 +40,14 @@
 #include <media/openmax/OMX_IndexExt.h>
 #include <media/stagefright/omx/1.0/WGraphicBufferSource.h>
 #include <media/stagefright/omx/OmxGraphicBufferSource.h>
+#include <media/stagefright/CCodec.h>
 #include <media/stagefright/BufferProducerWrapper.h>
 #include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/PersistentSurface.h>
 
 #include "C2OMXNode.h"
-#include "CCodec.h"
 #include "CCodecBufferChannel.h"
+#include "CCodecConfig.h"
 #include "InputSurfaceWrapper.h"
 
 extern "C" android::PersistentSurface *CreateInputSurface();
@@ -59,6 +60,7 @@ using android::base::StringPrintf;
 using ::android::hardware::media::c2::V1_0::IInputSurface;
 
 typedef hardware::media::omx::V1_0::IGraphicBufferSource HGraphicBufferSource;
+typedef CCodecConfig Config;
 
 namespace {
 
@@ -571,7 +573,8 @@ private:
 // CCodec
 
 CCodec::CCodec()
-    : mChannel(new CCodecBufferChannel(std::make_shared<CCodecCallbackImpl>(this))) {
+    : mChannel(new CCodecBufferChannel(std::make_shared<CCodecCallbackImpl>(this))),
+      mConfig(new CCodecConfig) {
 }
 
 CCodec::~CCodec() {
@@ -662,7 +665,8 @@ void CCodec::allocate(const sp<MediaCodecInfo> &codecInfo) {
     }
 
     // initialize config here in case setParameters is called prior to configure
-    Mutexed<Config>::Locked config(mConfig);
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
     status_t err = config->initialize(mClient, comp);
     if (err != OK) {
         ALOGW("Failed to initialize configuration support");
@@ -736,7 +740,8 @@ void CCodec::configure(const sp<AMessage> &msg) {
             setSurface(surface);
         }
 
-        Mutexed<Config>::Locked config(mConfig);
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
         config->mUsingSurface = surface != nullptr;
 
         // Enforce required parameters
@@ -1052,7 +1057,8 @@ void CCodec::configure(const sp<AMessage> &msg) {
         return;
     }
 
-    Mutexed<Config>::Locked config(mConfig);
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
 
     mCallback->onComponentConfigured(config->mInputFormat, config->mOutputFormat);
 }
@@ -1126,7 +1132,8 @@ void CCodec::createInputSurface() {
     sp<AMessage> outputFormat;
     uint64_t usage = 0;
     {
-        Mutexed<Config>::Locked config(mConfig);
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
         inputFormat = config->mInputFormat;
         outputFormat = config->mOutputFormat;
         usage = config->mISConfig ? config->mISConfig->mUsage : 0;
@@ -1170,7 +1177,8 @@ void CCodec::createInputSurface() {
 }
 
 status_t CCodec::setupInputSurface(const std::shared_ptr<InputSurfaceWrapper> &surface) {
-    Mutexed<Config>::Locked config(mConfig);
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
     config->mUsingSurface = true;
 
     // we are now using surface - apply default color aspects to input format - as well as
@@ -1215,7 +1223,8 @@ void CCodec::setInputSurface(const sp<PersistentSurface> &surface) {
     sp<AMessage> outputFormat;
     uint64_t usage = 0;
     {
-        Mutexed<Config>::Locked config(mConfig);
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
         inputFormat = config->mInputFormat;
         outputFormat = config->mOutputFormat;
         usage = config->mISConfig ? config->mISConfig->mUsage : 0;
@@ -1291,7 +1300,8 @@ void CCodec::start() {
     sp<AMessage> outputFormat;
     status_t err2 = OK;
     {
-        Mutexed<Config>::Locked config(mConfig);
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
         inputFormat = config->mInputFormat;
         outputFormat = config->mOutputFormat;
         if (config->mInputSurface) {
@@ -1377,7 +1387,8 @@ void CCodec::stop() {
     }
 
     {
-        Mutexed<Config>::Locked config(mConfig);
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
         if (config->mInputSurface) {
             config->mInputSurface->disconnect();
             config->mInputSurface = nullptr;
@@ -1425,7 +1436,8 @@ void CCodec::initiateRelease(bool sendCallback /* = true */) {
     }
 
     if (clearInputSurfaceIfNeeded) {
-        Mutexed<Config>::Locked config(mConfig);
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
         if (config->mInputSurface) {
             config->mInputSurface->disconnect();
             config->mInputSurface = nullptr;
@@ -1583,7 +1595,8 @@ void CCodec::signalSetParameters(const sp<AMessage> &msg) {
         params->removeEntryAt(params->findEntryByName(KEY_BIT_RATE));
     }
 
-    Mutexed<Config>::Locked config(mConfig);
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
 
     /**
      * Handle input surface parameters
@@ -1642,7 +1655,8 @@ void CCodec::signalRequestIDRFrame() {
         comp = state->comp;
     }
     ALOGV("request IDR");
-    Mutexed<Config>::Locked config(mConfig);
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
     std::vector<std::unique_ptr<C2Param>> params;
     params.push_back(
             std::make_unique<C2StreamRequestSyncFrameTuning::output>(0u, true));
@@ -1661,7 +1675,8 @@ void CCodec::onInputBufferDone(uint64_t frameIndex, size_t arrayIndex) {
     mChannel->onInputBufferDone(frameIndex, arrayIndex);
     if (arrayIndex == 0) {
         // We always put no more than one buffer per work, if we use an input surface.
-        Mutexed<Config>::Locked config(mConfig);
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
         if (config->mInputSurface) {
             config->mInputSurface->onInputBufferDone(frameIndex);
         }
@@ -1738,7 +1753,8 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
             }
 
             // handle configuration changes in work done
-            Mutexed<Config>::Locked config(mConfig);
+            Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+            const std::unique_ptr<Config> &config = *configLocked;
             bool changed = false;
             Config::Watcher<C2StreamInitDataInfo::output> initData =
                 config->watch<C2StreamInitDataInfo::output>();
@@ -1867,14 +1883,8 @@ void CCodec::initiateReleaseIfStuck() {
     mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
 }
 
-}  // namespace android
-
-extern "C" android::CodecBase *CreateCodec() {
-    return new android::CCodec;
-}
-
-// Create Codec 2.0 input surface
-extern "C" android::PersistentSurface *CreateInputSurface() {
+// static
+PersistentSurface *CCodec::CreateInputSurface() {
     using namespace android;
     using ::android::hardware::media::omx::V1_0::implementation::TWGraphicBufferSource;
     // Attempt to create a Codec2's input surface.
@@ -1900,4 +1910,6 @@ extern "C" android::PersistentSurface *CreateInputSurface() {
             static_cast<sp<android::hidl::base::V1_0::IBase>>(
             inputSurface->getHalInterface()));
 }
+
+}  // namespace android
 

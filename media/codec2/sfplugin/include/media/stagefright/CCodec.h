@@ -36,12 +36,11 @@
 #include <hardware/gralloc.h>
 #include <nativebase/nativebase.h>
 
-#include "CCodecConfig.h"
-
 namespace android {
 
 class CCodecBufferChannel;
 class InputSurfaceWrapper;
+struct CCodecConfig;
 struct MediaCodecInfo;
 
 class CCodec : public CodecBase {
@@ -68,6 +67,8 @@ public:
     void initiateReleaseIfStuck();
     void onWorkDone(std::list<std::unique_ptr<C2Work>> &workItems);
     void onInputBufferDone(uint64_t frameIndex, size_t arrayIndex);
+
+    static PersistentSurface *CreateInputSurface();
 
 protected:
     virtual ~CCodec();
@@ -173,7 +174,7 @@ private:
 
     Mutexed<NamedTimePoint> mDeadline;
     typedef CCodecConfig Config;
-    Mutexed<Config> mConfig;
+    Mutexed<std::unique_ptr<CCodecConfig>> mConfig;
     Mutexed<std::list<std::unique_ptr<C2Work>>> mWorkDoneQueue;
 
     friend class CCodecCallbackImpl;

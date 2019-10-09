@@ -22,7 +22,6 @@
 #include <stdlib.h>
 
 #include "include/SoftwareRenderer.h"
-#include "StagefrightPluginLoader.h"
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
 #include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
@@ -51,6 +50,7 @@
 #include <media/stagefright/ACodec.h>
 #include <media/stagefright/BatteryChecker.h>
 #include <media/stagefright/BufferProducerWrapper.h>
+#include <media/stagefright/CCodec.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaDefs.h>
@@ -538,9 +538,7 @@ sp<MediaCodec> MediaCodec::CreateByComponentName(
 
 // static
 sp<PersistentSurface> MediaCodec::CreatePersistentInputSurface() {
-    // allow plugin to create surface
-    sp<PersistentSurface> pluginSurface =
-        StagefrightPluginLoader::GetCCodecInstance()->createInputSurface();
+    sp<PersistentSurface> pluginSurface = CCodec::CreateInputSurface();
     if (pluginSurface != nullptr) {
         return pluginSurface;
     }
@@ -969,7 +967,7 @@ void MediaCodec::PostReplyWithError(const sp<AReplyToken> &replyID, int32_t err)
 }
 
 static CodecBase *CreateCCodec() {
-    return StagefrightPluginLoader::GetCCodecInstance()->createCodec();
+    return new CCodec;
 }
 
 //static
