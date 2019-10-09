@@ -19,8 +19,10 @@ cc_library_static {
         ],
         cfi: true,
     },
-
-    shared_libs: ["libmedia"],
+    shared_libs: [
+        "libstagefright_foundation",
+        "libutils"
+    ],
 }
 
 cc_library_static {
@@ -133,12 +135,7 @@ cc_library {
         "CameraSource.cpp",
         "CameraSourceTimeLapse.cpp",
         "DataConverter.cpp",
-        "DataSourceFactory.cpp",
-        "DataURISource.cpp",
-        "ClearFileSource.cpp",
-        "FileSource.cpp",
         "FrameDecoder.cpp",
-        "HTTPBase.cpp",
         "HevcUtils.cpp",
         "InterfaceUtils.cpp",
         "JPEGSource.cpp",
@@ -155,10 +152,7 @@ cc_library {
         "MediaSource.cpp",
         "MediaSync.cpp",
         "MediaTrack.cpp",
-        "http/ClearMediaHTTP.cpp",
-        "http/MediaHTTP.cpp",
         "MediaMuxer.cpp",
-        "NuCachedSource2.cpp",
         "NuMediaExtractor.cpp",
         "OggWriter.cpp",
         "OMXClient.cpp",
@@ -171,8 +165,8 @@ cc_library {
         "StagefrightMetadataRetriever.cpp",
         "StagefrightPluginLoader.cpp",
         "SurfaceUtils.cpp",
-        "Utils.cpp",
         "ThrottledSource.cpp",
+        "Utils.cpp",
         "VideoFrameSchedulerBase.cpp",
         "VideoFrameScheduler.cpp",
     ],
@@ -183,9 +177,9 @@ cc_library {
         "libbinder",
         "libcamera_client",
         "libcutils",
+        "libdatasource",
         "libdl",
         "libdl_android",
-        "libdrmframework",
         "libgui",
         "liblog",
         "libmedia",
@@ -210,6 +204,7 @@ cc_library {
     ],
 
     static_libs: [
+        "libstagefright_esds",
         "libstagefright_color_conversion",
         "libyuv_static",
         "libstagefright_mediafilter",
@@ -217,7 +212,6 @@ cc_library {
         "libstagefright_timedtext",
         "libogg",
         "libwebm",
-        "libstagefright_esds",
         "libstagefright_id3",
         "libFLAC",
     ],
@@ -264,4 +258,3 @@ cc_library {
         ],
     },
 }
-

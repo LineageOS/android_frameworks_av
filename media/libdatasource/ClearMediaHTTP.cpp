@@ -18,11 +18,11 @@
 #define LOG_TAG "ClearMediaHTTP"
 #include <utils/Log.h>
 
-#include <media/stagefright/ClearMediaHTTP.h>
+#include <datasource/ClearMediaHTTP.h>
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
-#include <media/stagefright/Utils.h>
+#include <media/stagefright/FoundationUtils.h>
 
 #include <media/MediaHTTPConnection.h>
 

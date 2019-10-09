@@ -26,16 +26,16 @@
 #include <android_runtime/AndroidRuntime.h>
 #include <android_util_Binder.h>
 #include <cutils/properties.h>
-#include <utils/Log.h>
-#include <utils/StrongPointer.h>
+#include <datasource/DataSourceFactory.h>
+#include <datasource/HTTPBase.h>
+#include <datasource/NuCachedSource2.h>
 #include <media/IMediaHTTPService.h>
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaDataSource.h>
-#include <media/stagefright/DataSourceFactory.h>
 #include <media/stagefright/InterfaceUtils.h>
+#include <utils/Log.h>
+#include <utils/StrongPointer.h>
 
-#include "../../libstagefright/include/HTTPBase.h"
-#include "../../libstagefright/include/NuCachedSource2.h"
 #include "NdkMediaDataSourceCallbacksPriv.h"
 
 
