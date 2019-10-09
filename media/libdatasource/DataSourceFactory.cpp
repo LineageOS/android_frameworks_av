@@ -16,15 +16,15 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "DataSource"
 
-#include "include/HTTPBase.h"
-#include "include/NuCachedSource2.h"
 
+#include <datasource/DataSourceFactory.h>
+#include <datasource/DataURISource.h>
+#include <datasource/HTTPBase.h>
+#include <datasource/FileSource.h>
+#include <datasource/MediaHTTP.h>
+#include <datasource/NuCachedSource2.h>
 #include <media/MediaHTTPConnection.h>
 #include <media/MediaHTTPService.h>
-#include <media/stagefright/DataSourceFactory.h>
-#include <media/stagefright/DataURISource.h>
-#include <media/stagefright/FileSource.h>
-#include <media/stagefright/MediaHTTP.h>
 #include <utils/String8.h>
 
 namespace android {

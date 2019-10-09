@@ -28,17 +28,18 @@
 #include "mpeg2ts/AnotherPacketSource.h"
 #include "mpeg2ts/HlsSampleDecryptor.h"
 
+#include <datasource/DataURISource.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/foundation/MediaKeys.h>
 #include <media/stagefright/foundation/avc_utils.h>
-#include <media/stagefright/DataURISource.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MetaDataUtils.h>
 #include <media/stagefright/Utils.h>
+#include <media/stagefright/FoundationUtils.h>
 
 #include <ctype.h>
 #include <inttypes.h>

@@ -37,6 +37,7 @@
 #include <media/MediaPlayerInterface.h>
 #include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/Utils.h>
+#include <media/stagefright/FoundationUtils.h>
 #include <private/media/VideoFrame.h>
 #include "MetadataRetrieverClient.h"
 #include "StagefrightMetadataRetriever.h"
