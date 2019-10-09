@@ -22,12 +22,13 @@
 
 #include "ASessionDescription.h"
 
+#include <datasource/ClearMediaHTTP.h>
 #include <media/MediaHTTPConnection.h>
 #include <media/MediaHTTPService.h>
-#include <media/stagefright/ClearMediaHTTP.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/Utils.h>
+#include <media/stagefright/FoundationUtils.h>
 
 #define DEFAULT_SDP_SIZE 100000
 

@@ -21,6 +21,7 @@ cc_library_shared {
         "libcodec2_client",
         "libcrypto",
         "libcutils",
+        "libdatasource",
         "libdl",
         "libgui",
         "libhidlbase",

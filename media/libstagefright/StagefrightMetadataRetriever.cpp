@@ -25,11 +25,11 @@
 #include "include/FrameDecoder.h"
 #include "include/StagefrightMetadataRetriever.h"
 
+#include <datasource/DataSourceFactory.h>
+#include <datasource/FileSource.h>
 #include <media/IMediaHTTPService.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/DataSourceFactory.h>
-#include <media/stagefright/FileSource.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
