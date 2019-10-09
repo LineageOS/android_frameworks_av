@@ -14,8 +14,33 @@
  * limitations under the License.
  */
 
-subdirs = [
-    "src",
-    "tests",
-    "MediaBenchmarkTest",
-]
+android_test {
+    name: "MediaBenchmarkTest",
+
+    // Include all the test code
+    srcs: ["src/androidTest/**/*.java"],
+
+    sdk_version: "system_current",
+
+    resource_dirs: ["res"],
+
+    libs: [
+        "android.test.runner",
+        "android.test.base",
+    ],
+
+    static_libs: [
+        "libMediaBenchmark",
+        "junit",
+        "androidx.test.runner",
+    ],
+}
+
+android_library {
+    name: "libMediaBenchmark",
+
+    // Include all the libraries
+    srcs: ["src/main/**/*.java"],
+
+    sdk_version: "system_current",
+}
