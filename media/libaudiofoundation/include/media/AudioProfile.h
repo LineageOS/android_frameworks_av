@@ -19,13 +19,15 @@
 #include <string>
 #include <vector>
 
+#include <binder/Parcel.h>
+#include <binder/Parcelable.h>
 #include <media/AudioContainers.h>
 #include <system/audio.h>
 #include <utils/RefBase.h>
 
 namespace android {
 
-class AudioProfile final : public RefBase
+class AudioProfile final : public RefBase, public Parcelable
 {
 public:
     static sp<AudioProfile> createFullDynamic(audio_format_t dynamicFormat = AUDIO_FORMAT_DEFAULT);
@@ -66,6 +68,9 @@ public:
 
     void dump(std::string *dst, int spaces) const;
 
+    status_t writeToParcel(Parcel* parcel) const override;
+    status_t readFromParcel(const Parcel* parcel) override;
+
 private:
     std::string  mName;
     audio_format_t mFormat; // The format for an audio profile should only be set when initialized.
@@ -77,7 +82,7 @@ private:
     bool mIsDynamicRate = false;
 };
 
-class AudioProfileVector : public std::vector<sp<AudioProfile>>
+class AudioProfileVector : public std::vector<sp<AudioProfile>>, public Parcelable
 {
 public:
     virtual ~AudioProfileVector() = default;
@@ -99,6 +104,9 @@ public:
     bool hasDynamicRateFor(audio_format_t format) const;
 
     virtual void dump(std::string *dst, int spaces) const;
+
+    status_t writeToParcel(Parcel* parcel) const override;
+    status_t readFromParcel(const Parcel* parcel) override;
 };
 
 bool operator == (const AudioProfile &left, const AudioProfile &right);

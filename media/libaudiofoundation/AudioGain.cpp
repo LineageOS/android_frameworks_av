@@ -147,7 +147,7 @@ status_t AudioGain::readFromParcel(const android::Parcel *parcel)
 
 status_t AudioGains::writeToParcel(android::Parcel *parcel) const {
     status_t status = NO_ERROR;
-    if ((status = parcel->writeUint64(this->size())) != NO_ERROR) return status;
+    if ((status = parcel->writeVectorSize(*this)) != NO_ERROR) return status;
     for (const auto &audioGain : *this) {
         if ((status = parcel->writeParcelable(*audioGain)) != NO_ERROR) {
             break;
@@ -158,15 +158,14 @@ status_t AudioGains::writeToParcel(android::Parcel *parcel) const {
 
 status_t AudioGains::readFromParcel(const android::Parcel *parcel) {
     status_t status = NO_ERROR;
-    uint64_t count;
-    if ((status = parcel->readUint64(&count)) != NO_ERROR) return status;
-    for (uint64_t i = 0; i < count; i++) {
-        sp<AudioGain> audioGain = new AudioGain(0, false);
-        if ((status = parcel->readParcelable(audioGain.get())) != NO_ERROR) {
+    this->clear();
+    if ((status = parcel->resizeOutVector(this)) != NO_ERROR) return status;
+    for (size_t i = 0; i < this->size(); i++) {
+        this->at(i) = new AudioGain(0, false);
+        if ((status = parcel->readParcelable(this->at(i).get())) != NO_ERROR) {
             this->clear();
             break;
         }
-        this->push_back(audioGain);
     }
     return status;
 }
