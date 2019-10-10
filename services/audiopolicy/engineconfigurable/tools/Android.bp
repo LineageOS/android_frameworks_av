@@ -16,10 +16,10 @@ python_defaults {
     name: "tools_default",
     version: {
         py2: {
-            enabled: true,
+            enabled: false,
         },
         py3: {
-            enabled: false,
+            enabled: true,
         },
     },
 }
