@@ -152,8 +152,9 @@ PFW_CRITERIA_FILE := $(TARGET_OUT_VENDOR_ETC)/audio_policy_engine_criteria.xml
 PFW_EDD_FILES := \
         $(LOCAL_PATH)/SettingsNoOutput/device_for_strategies.pfw \
         $(LOCAL_PATH)/Settings/device_for_input_source.pfw \
-        $(LOCAL_PATH)/Settings/volumes.pfw        
+        $(LOCAL_PATH)/Settings/volumes.pfw
 LOCAL_REQUIRED_MODULES := libpolicy-subsystem
+PFW_DOMAIN_GENERATOR_TOOL := $(HOST_OUT_EXECUTABLES)/domainGeneratorConnector
 include $(BUILD_PFW_SETTINGS)
 
 endif # ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),no-output_configurable)
@@ -174,6 +175,7 @@ PFW_EDD_FILES := \
         $(LOCAL_PATH)/SettingsNoInput/device_for_input_source.pfw \
         $(LOCAL_PATH)/Settings/volumes.pfw
 LOCAL_REQUIRED_MODULES := libpolicy-subsystem
+PFW_DOMAIN_GENERATOR_TOOL := $(HOST_OUT_EXECUTABLES)/domainGeneratorConnector
 include $(BUILD_PFW_SETTINGS)
 
 endif #ifeq ($(BUILD_AUDIO_POLICY_EXAMPLE_CONFIGURATION),no-input_configurable)
