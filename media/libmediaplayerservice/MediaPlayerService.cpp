@@ -422,9 +422,9 @@ static void dumpCodecDetails(int fd, const sp<IMediaCodecList> &codecList, bool 
                 printList("colors", list);
             }
 
-            snprintf(buffer, SIZE - 1, "    details: %s\n",
-                     caps->getDetails()->debugString(6).c_str());
-            result.append(buffer);
+            result.append("    details: ");
+            result.append(caps->getDetails()->debugString(6).c_str());
+            result.append("\n");
         }
     }
     result.append("\n");
@@ -689,6 +689,10 @@ status_t MediaPlayerService::dump(int fd, const Vector<String16>& args)
 
         gLooperRoster.dump(fd, args);
 
+        sp<IMediaCodecList> codecList = getCodecList();
+        dumpCodecDetails(fd, codecList, true /* decoders */);
+        dumpCodecDetails(fd, codecList, false /* !decoders */);
+
         bool dumpMem = false;
         bool unreachableMemory = false;
         for (size_t i = 0; i < args.size(); i++) {
@@ -711,10 +715,6 @@ status_t MediaPlayerService::dump(int fd, const Vector<String16>& args)
         }
     }
     write(fd, result.string(), result.size());
-
-    sp<IMediaCodecList> codecList = getCodecList();
-    dumpCodecDetails(fd, codecList, true /* decoders */);
-    dumpCodecDetails(fd, codecList, false /* !decoders */);
 
     return NO_ERROR;
 }
