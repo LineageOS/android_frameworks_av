@@ -41,6 +41,7 @@ PFW_CRITERION_TYPES_FILE := $(TARGET_OUT_VENDOR_ETC)/audio_policy_engine_criteri
 PFW_CRITERIA_FILE := $(TARGET_OUT_VENDOR_ETC)/audio_policy_engine_criteria.xml
 PFW_TOPLEVEL_FILE := $(TARGET_OUT_VENDOR_ETC)/parameter-framework/ParameterFrameworkConfigurationPolicy.xml
 PFW_SCHEMAS_DIR := $(PFW_DEFAULT_SCHEMAS_DIR)
+PFW_DOMAIN_GENERATOR_TOOL := $(HOST_OUT_EXECUTABLES)/domainGeneratorConnector
 
 include $(BUILD_PFW_SETTINGS)
 
