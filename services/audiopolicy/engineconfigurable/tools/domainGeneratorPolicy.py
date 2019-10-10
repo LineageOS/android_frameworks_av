@@ -41,6 +41,10 @@ def parseArgs():
     argparser = argparse.ArgumentParser(description="Parameter-Framework XML \
         Settings file generator.\n\
         Exit with the number of (recoverable or not) error that occured.")
+    argparser.add_argument('--domain-generator-tool',
+            help="ParameterFramework domain generator tool. Mandatory.",
+            metavar="PFW_DOMAIN_GENERATOR_TOOL",
+            required=True)
     argparser.add_argument('--toplevel-config',
             help="Top-level parameter-framework configuration file. Mandatory.",
             metavar="TOPLEVEL_CONFIG_FILE",
@@ -241,7 +245,7 @@ def main():
     # Create the connector. Pipe its input to us in order to write commands;
     # connect its output to stdout in order to have it dump the domains
     # there; connect its error output to stderr.
-    connector = subprocess.Popen(["domainGeneratorConnector",
+    connector = subprocess.Popen([args.domain_generator_tool,
                             fake_toplevel_config.name,
                             'verbose' if args.verbose else 'no-verbose',
                             'validate' if args.validate else 'no-validate',
