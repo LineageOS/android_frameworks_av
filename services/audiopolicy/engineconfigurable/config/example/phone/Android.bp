@@ -1,0 +1,104 @@
+/*
+ * Copyright (C) 2019 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// Import this namespace in order to use AOSP Phone configuration example
+
+soong_namespace {
+    imports: [
+        "frameworks/av/services/audiopolicy/config",
+    ],
+}
+
+prebuilt_etc {
+    name: "audio_policy_engine_configuration.xml",
+    vendor: true,
+    src: ":audio_policy_engine_configuration",
+    required: [
+        ":audio_policy_engine_criterion_types.xml",
+        ":audio_policy_engine_criteria.xml",
+        ":audio_policy_engine_product_strategies.xml",
+        ":audio_policy_engine_volumes.xml",
+    ],
+}
+prebuilt_etc {
+    name: "audio_policy_engine_product_strategies.xml",
+    vendor: true,
+    src: "audio_policy_engine_product_strategies.xml",
+}
+prebuilt_etc {
+    name: "audio_policy_engine_stream_volumes.xml",
+    vendor: true,
+    src: ":audio_policy_engine_stream_volumes",
+}
+prebuilt_etc {
+    name: "audio_policy_engine_default_stream_volumes.xml",
+    vendor: true,
+    src: ":audio_policy_engine_default_stream_volumes",
+}
+prebuilt_etc {
+    name: "audio_policy_engine_criterion_types.xml",
+    vendor: true,
+    src: ":audio_policy_engine_criterion_types",
+}
+
+//
+// Generate audio_policy_engine criterion type file => provides device addresses criterion type
+//
+genrule {
+    name: "audio_policy_engine_criterion_types",
+    defaults: ["buildpolicycriteriontypesrule"],
+    srcs: [
+        ":audio_policy_configuration_top_file",
+        ":audio_policy_configuration_files",
+    ],
+}
+filegroup {
+    name: "audio_policy_configuration_files",
+    srcs: [
+        ":r_submix_audio_policy_configuration",
+        ":default_volume_tables",
+        ":audio_policy_volumes",
+        ":surround_sound_configuration_5_0",
+        ":primary_audio_policy_configuration",
+    ],
+}
+filegroup {
+    name : "audio_policy_configuration_top_file",
+    srcs: [":audio_policy_configuration_generic"],
+}
+filegroup {
+    name: "audio_policy_engine_configuration",
+    srcs: ["audio_policy_engine_configuration.xml"],
+}
+filegroup {
+    name: "audio_policy_engine_stream_volumes",
+    srcs: ["audio_policy_engine_stream_volumes.xml"],
+}
+filegroup {
+    name: "audio_policy_engine_default_stream_volumes",
+    srcs: ["audio_policy_engine_default_stream_volumes.xml"],
+}
+filegroup {
+    name: "audio_policy_engine_configuration_files",
+    srcs: [
+        ":audio_policy_engine_configuration",
+        "audio_policy_engine_product_strategies.xml",
+        ":audio_policy_engine_stream_volumes",
+        ":audio_policy_engine_default_stream_volumes",
+        ":audio_policy_engine_criterion_types",
+        ":audio_policy_engine_criteria",
+    ],
+}
