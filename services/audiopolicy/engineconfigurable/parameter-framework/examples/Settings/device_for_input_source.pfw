@@ -18,7 +18,6 @@ supDomain: DeviceForInputSource
 				loopback = 0
 				ip = 0
 				bus = 0
-				stub = 0
 			component: /Policy/policy/input_sources/mic/applicable_input_device/mask
 				communication = 0
 				ambient = 0
@@ -36,7 +35,6 @@ supDomain: DeviceForInputSource
 				loopback = 0
 				ip = 0
 				bus = 0
-				stub = 0
 			component: /Policy/policy/input_sources/voice_downlink/applicable_input_device/mask
 				communication = 0
 				ambient = 0
@@ -58,7 +56,6 @@ supDomain: DeviceForInputSource
 				loopback = 0
 				ip = 0
 				bus = 0
-				stub = 0
 			component: /Policy/policy/input_sources/voice_call/applicable_input_device/mask
 				communication = 0
 				ambient = 0
@@ -80,7 +77,6 @@ supDomain: DeviceForInputSource
 				loopback = 0
 				ip = 0
 				bus = 0
-				stub = 0
 			component: /Policy/policy/input_sources/voice_uplink/applicable_input_device/mask
 				communication = 0
 				ambient = 0
@@ -102,7 +98,6 @@ supDomain: DeviceForInputSource
 				loopback = 0
 				ip = 0
 				bus = 0
-				stub = 0
 			component: /Policy/policy/input_sources/camcorder/applicable_input_device/mask
 				communication = 0
 				ambient = 0
@@ -123,7 +118,6 @@ supDomain: DeviceForInputSource
 				loopback = 0
 				ip = 0
 				bus = 0
-				stub = 0
 			component: /Policy/policy/input_sources/voice_recognition/applicable_input_device/mask
 				communication = 0
 				ambient = 0
@@ -142,7 +136,6 @@ supDomain: DeviceForInputSource
 				loopback = 0
 				ip = 0
 				bus = 0
-				stub = 0
 			component: /Policy/policy/input_sources/voice_communication/applicable_input_device/mask
 				communication = 0
 				ambient = 0
@@ -160,7 +153,6 @@ supDomain: DeviceForInputSource
 				loopback = 0
 				ip = 0
 				bus = 0
-				stub = 0
 			component: /Policy/policy/input_sources/remote_submix/applicable_input_device/mask
 				communication = 0
 				ambient = 0
@@ -182,7 +174,6 @@ supDomain: DeviceForInputSource
 				loopback = 0
 				ip = 0
 				bus = 0
-				stub = 0
 			component: /Policy/policy/input_sources/hotword/applicable_input_device/mask
 				communication = 0
 				ambient = 0
@@ -201,7 +192,6 @@ supDomain: DeviceForInputSource
 				loopback = 0
 				ip = 0
 				bus = 0
-				stub = 0
 			component: /Policy/policy/input_sources/unprocessed/applicable_input_device/mask
 				communication = 0
 				ambient = 0
@@ -220,7 +210,6 @@ supDomain: DeviceForInputSource
 				loopback = 0
 				ip = 0
 				bus = 0
-				stub = 0
 			component: /Policy/policy/input_sources/fm_tuner/applicable_input_device/mask
 				communication = 0
 				ambient = 0
@@ -242,7 +231,6 @@ supDomain: DeviceForInputSource
 				loopback = 0
 				ip = 0
 				bus = 0
-				stub = 0
 
 	domain: DefaultAndMic
 		conf: A2dp
@@ -255,12 +243,14 @@ supDomain: DeviceForInputSource
 					usb_device = 0
 					builtin_mic = 0
 					bluetooth_sco_headset = 0
+					stub = 0
 				component: mic/applicable_input_device/mask/
 					bluetooth_a2dp = 1
 					wired_headset = 0
 					usb_device = 0
 					builtin_mic = 0
 					bluetooth_sco_headset = 0
+					stub = 0
 
 		conf: Sco
 			AvailableInputDevices Includes BluetoothScoHeadset
@@ -273,12 +263,14 @@ supDomain: DeviceForInputSource
 					usb_device = 0
 					builtin_mic = 0
 					bluetooth_sco_headset = 1
+					stub = 0
 				component: mic/applicable_input_device/mask/
 					bluetooth_a2dp = 0
 					wired_headset = 0
 					usb_device = 0
 					builtin_mic = 0
 					bluetooth_sco_headset = 1
+					stub = 0
 
 		conf: WiredHeadset
 			AvailableInputDevices Includes WiredHeadset
@@ -290,12 +282,14 @@ supDomain: DeviceForInputSource
 					usb_device = 0
 					builtin_mic = 0
 					bluetooth_sco_headset = 0
+					stub = 0
 				component: mic/applicable_input_device/mask/
 					bluetooth_a2dp = 0
 					wired_headset = 1
 					usb_device = 0
 					builtin_mic = 0
 					bluetooth_sco_headset = 0
+					stub = 0
 
 		conf: UsbDevice
 			AvailableInputDevices Includes UsbDevice
@@ -307,12 +301,14 @@ supDomain: DeviceForInputSource
 					usb_device = 1
 					builtin_mic = 0
 					bluetooth_sco_headset = 0
+					stub = 0
 				component: mic/applicable_input_device/mask/
 					bluetooth_a2dp = 0
 					wired_headset = 0
 					usb_device = 1
 					builtin_mic = 0
 					bluetooth_sco_headset = 0
+					stub = 0
 
 		conf: BuiltinMic
 			AvailableInputDevices Includes BuiltinMic
@@ -324,12 +320,33 @@ supDomain: DeviceForInputSource
 					usb_device = 0
 					builtin_mic = 1
 					bluetooth_sco_headset = 0
+					stub = 0
 				component: mic/applicable_input_device/mask/
 					bluetooth_a2dp = 0
 					wired_headset = 0
 					usb_device = 0
 					builtin_mic = 1
 					bluetooth_sco_headset = 0
+					stub = 0
+
+		conf: Stub
+			AvailableInputDevices Includes Default
+
+			component: /Policy/policy/input_sources
+				component: default/applicable_input_device/mask/
+					bluetooth_a2dp = 0
+					wired_headset = 0
+					usb_device = 0
+					builtin_mic = 0
+					bluetooth_sco_headset = 0
+					stub = 1
+				component: mic/applicable_input_device/mask/
+					bluetooth_a2dp = 0
+					wired_headset = 0
+					usb_device = 0
+					builtin_mic = 0
+					bluetooth_sco_headset = 0
+					stub = 1
 
 		conf: Default
 			component: /Policy/policy/input_sources
@@ -339,12 +356,14 @@ supDomain: DeviceForInputSource
 					usb_device = 0
 					builtin_mic = 0
 					bluetooth_sco_headset = 0
+					stub = 0
 				component: mic/applicable_input_device/mask/
 					bluetooth_a2dp = 0
 					wired_headset = 0
 					usb_device = 0
 					builtin_mic = 0
 					bluetooth_sco_headset = 0
+					stub = 0
 
 	domain: VoiceUplinkAndVoiceDownlinkAndVoiceCall
 		conf: VoiceCall
@@ -354,12 +373,29 @@ supDomain: DeviceForInputSource
 				voice_downlink/applicable_input_device/mask/telephony_rx = 1
 				voice_call/applicable_input_device/mask/telephony_rx = 1
 				voice_uplink/applicable_input_device/mask/telephony_rx = 1
+				voice_downlink/applicable_input_device/mask/stub = 0
+				voice_call/applicable_input_device/mask/stub = 0
+				voice_uplink/applicable_input_device/mask/stub = 0
+
+		conf: Stub
+			AvailableInputDevices Includes Default
+
+			component: /Policy/policy/input_sources
+				voice_downlink/applicable_input_device/mask/telephony_rx = 0
+				voice_call/applicable_input_device/mask/telephony_rx = 0
+				voice_uplink/applicable_input_device/mask/telephony_rx = 0
+				voice_downlink/applicable_input_device/mask/stub = 1
+				voice_call/applicable_input_device/mask/stub = 1
+				voice_uplink/applicable_input_device/mask/stub = 1
 
 		conf: Default
 			component: /Policy/policy/input_sources
 				voice_downlink/applicable_input_device/mask/telephony_rx = 0
 				voice_call/applicable_input_device/mask/telephony_rx = 0
 				voice_uplink/applicable_input_device/mask/telephony_rx = 0
+				voice_downlink/applicable_input_device/mask/stub = 0
+				voice_call/applicable_input_device/mask/stub = 0
+				voice_uplink/applicable_input_device/mask/stub = 0
 
 	domain: Camcorder
 		conf: BackMic
@@ -368,6 +404,7 @@ supDomain: DeviceForInputSource
 			component: /Policy/policy/input_sources/camcorder/applicable_input_device/mask
 				back_mic = 1
 				builtin_mic = 0
+				stub = 0
 
 		conf: BuiltinMic
 			AvailableInputDevices Includes BuiltinMic
@@ -375,11 +412,21 @@ supDomain: DeviceForInputSource
 			component: /Policy/policy/input_sources/camcorder/applicable_input_device/mask
 				back_mic = 0
 				builtin_mic = 1
+				stub = 0
+
+		conf: Stub
+			AvailableInputDevices Includes Default
+
+			component: /Policy/policy/input_sources/camcorder/applicable_input_device/mask
+				back_mic = 0
+				builtin_mic = 0
+				stub = 1
 
 		conf: Default
 			component: /Policy/policy/input_sources/camcorder/applicable_input_device/mask
 				back_mic = 0
 				builtin_mic = 0
+				stub = 0
 
 	domain: VoiceRecognitionAndUnprocessedAndHotword
 		conf: ScoHeadset
@@ -392,16 +439,19 @@ supDomain: DeviceForInputSource
 					wired_headset = 0
 					usb_device = 0
 					builtin_mic = 0
+					stub = 0
 				component: unprocessed/applicable_input_device/mask
 					bluetooth_sco_headset = 1
 					wired_headset = 0
 					usb_device = 0
 					builtin_mic = 0
+					stub = 0
 				component: hotword/applicable_input_device/mask
 					bluetooth_sco_headset = 1
 					wired_headset = 0
 					usb_device = 0
 					builtin_mic = 0
+					stub = 0
 
 		conf: WiredHeadset
 			AvailableInputDevices Includes WiredHeadset
@@ -411,17 +461,20 @@ supDomain: DeviceForInputSource
 					bluetooth_sco_headset = 0
 					wired_headset = 1
 					usb_device = 0
+					stub = 0
 					builtin_mic = 0
 				component: unprocessed/applicable_input_device/mask
 					bluetooth_sco_headset = 0
 					wired_headset = 1
 					usb_device = 0
 					builtin_mic = 0
+					stub = 0
 				component: hotword/applicable_input_device/mask
 					bluetooth_sco_headset = 0
 					wired_headset = 1
 					usb_device = 0
 					builtin_mic = 0
+					stub = 0
 
 		conf: UsbDevice
 			AvailableInputDevices Includes UsbDevice
@@ -432,16 +485,19 @@ supDomain: DeviceForInputSource
 					wired_headset = 0
 					usb_device = 1
 					builtin_mic = 0
+					stub = 0
 				component: unprocessed/applicable_input_device/mask
 					bluetooth_sco_headset = 0
 					wired_headset = 0
 					usb_device = 1
 					builtin_mic = 0
+					stub = 0
 				component: hotword/applicable_input_device/mask
 					bluetooth_sco_headset = 0
 					wired_headset = 0
 					usb_device = 1
 					builtin_mic = 0
+					stub = 0
 
 		conf: BuiltinMic
 			AvailableInputDevices Includes BuiltinMic
@@ -452,17 +508,42 @@ supDomain: DeviceForInputSource
 					wired_headset = 0
 					usb_device = 0
 					builtin_mic = 1
+					stub = 0
 				component: unprocessed/applicable_input_device/mask
 					bluetooth_sco_headset = 0
 					wired_headset = 0
 					usb_device = 0
 					builtin_mic = 1
+					stub = 0
 				component: hotword/applicable_input_device/mask
 					bluetooth_sco_headset = 0
 					wired_headset = 0
 					usb_device = 0
 					builtin_mic = 1
+					stub = 0
 
+		conf: Stub
+			AvailableInputDevices Includes Default
+
+			component: /Policy/policy/input_sources
+				component: voice_recognition/applicable_input_device/mask
+					bluetooth_sco_headset = 0
+					wired_headset = 0
+					usb_device = 0
+					builtin_mic = 0
+					stub = 1
+				component: unprocessed/applicable_input_device/mask
+					bluetooth_sco_headset = 0
+					wired_headset = 0
+					usb_device = 0
+					builtin_mic = 0
+					stub = 1
+				component: hotword/applicable_input_device/mask
+					bluetooth_sco_headset = 0
+					wired_headset = 0
+					usb_device = 0
+					builtin_mic = 0
+					stub = 1
 		conf: Default
 			component: /Policy/policy/input_sources
 				component: voice_recognition/applicable_input_device/mask
@@ -470,16 +551,19 @@ supDomain: DeviceForInputSource
 					wired_headset = 0
 					usb_device = 0
 					builtin_mic = 0
+					stub = 0
 				component: unprocessed/applicable_input_device/mask
 					bluetooth_sco_headset = 0
 					wired_headset = 0
 					usb_device = 0
 					builtin_mic = 0
+					stub = 0
 				component: hotword/applicable_input_device/mask
 					bluetooth_sco_headset = 0
 					wired_headset = 0
 					usb_device = 0
 					builtin_mic = 0
+					stub = 0
 
 	domain: VoiceCommunication
 		conf: ScoHeadset
@@ -495,6 +579,7 @@ supDomain: DeviceForInputSource
 				usb_device = 0
 				builtin_mic = 0
 				back_mic = 0
+				stub = 0
 
 		conf: WiredHeadset
 			ForceUseForCommunication Is ForceNone
@@ -506,6 +591,7 @@ supDomain: DeviceForInputSource
 				usb_device = 0
 				builtin_mic = 0
 				back_mic = 0
+				stub = 0
 
 		conf: UsbDevice
 			ForceUseForCommunication Is ForceNone
@@ -517,6 +603,7 @@ supDomain: DeviceForInputSource
 				usb_device = 1
 				builtin_mic = 0
 				back_mic = 0
+				stub = 0
 
 		conf: BuiltinMic
 			AvailableInputDevices Includes BuiltinMic
@@ -532,6 +619,7 @@ supDomain: DeviceForInputSource
 				usb_device = 0
 				builtin_mic = 1
 				back_mic = 0
+				stub = 0
 
 		conf: BackMic
 			ForceUseForCommunication Is ForceSpeaker
@@ -543,6 +631,7 @@ supDomain: DeviceForInputSource
 				usb_device = 0
 				builtin_mic = 0
 				back_mic = 1
+				stub = 0
 
 		conf: Default
 			#
@@ -554,6 +643,7 @@ supDomain: DeviceForInputSource
 				usb_device = 0
 				builtin_mic = 1
 				back_mic = 0
+				stub = 0
 
 	domain: RemoteSubmix
 		conf: RemoteSubmix
@@ -561,10 +651,19 @@ supDomain: DeviceForInputSource
 
 			component: /Policy/policy/input_sources/remote_submix/applicable_input_device/mask
 				remote_submix = 1
+				stub = 0
+
+		conf: Stub
+			AvailableInputDevices Includes Default
+
+			component: /Policy/policy/input_sources/remote_submix/applicable_input_device/mask
+				remote_submix = 0
+				stub = 1
 
 		conf: Default
 			component: /Policy/policy/input_sources/remote_submix/applicable_input_device/mask
 				remote_submix = 0
+				stub = 0
 
 	domain: FmTuner
 		conf: FmTuner
@@ -572,8 +671,29 @@ supDomain: DeviceForInputSource
 
 			component: /Policy/policy/input_sources/fm_tuner/applicable_input_device/mask
 				fm_tuner = 1
+				stub = 0
+
+		conf: Stub
+			AvailableInputDevices Includes Default
+
+			component: /Policy/policy/input_sources/fm_tuner/applicable_input_device/mask
+				fm_tuner = 0
+				stub = 1
 
 		conf: Default
 			component: /Policy/policy/input_sources/fm_tuner/applicable_input_device/mask
 				fm_tuner = 0
+				stub = 0
+
+	domain: Voice
+		conf: Stub
+			AvailableInputDevices Includes Default
+
+			/Policy/policy/input_sources/echo_reference/applicable_input_device/mask/stub = 1
+			/Policy/policy/input_sources/voice_performance/applicable_input_device/mask/stub = 1
+
+		conf: Default
+			/Policy/policy/input_sources/echo_reference/applicable_input_device/mask/stub = 0
+			/Policy/policy/input_sources/voice_performance/applicable_input_device/mask/stub = 0
+
 
