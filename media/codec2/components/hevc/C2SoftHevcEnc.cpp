@@ -42,6 +42,36 @@ namespace {
 
 constexpr char COMPONENT_NAME[] = "c2.android.hevc.encoder";
 
+void ParseGop(
+        const C2StreamGopTuning::output &gop,
+        uint32_t *syncInterval, uint32_t *iInterval, uint32_t *maxBframes) {
+    uint32_t syncInt = 1;
+    uint32_t iInt = 1;
+    for (size_t i = 0; i < gop.flexCount(); ++i) {
+        const C2GopLayerStruct &layer = gop.m.values[i];
+        if (layer.count == UINT32_MAX) {
+            syncInt = 0;
+        } else if (syncInt <= UINT32_MAX / (layer.count + 1)) {
+            syncInt *= (layer.count + 1);
+        }
+        if ((layer.type_ & I_FRAME) == 0) {
+            if (layer.count == UINT32_MAX) {
+                iInt = 0;
+            } else if (iInt <= UINT32_MAX / (layer.count + 1)) {
+                iInt *= (layer.count + 1);
+            }
+        }
+        if (layer.type_ == C2Config::picture_type_t(P_FRAME | B_FRAME) && maxBframes) {
+            *maxBframes = layer.count;
+        }
+    }
+    if (syncInterval) {
+        *syncInterval = syncInt;
+    }
+    if (iInterval) {
+        *iInterval = iInt;
+    }
+}
 } // namepsace
 
 class C2SoftHevcEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
@@ -60,13 +90,21 @@ class C2SoftHevcEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
         setDerivedInstance(this);
 
         addParameter(
+                DefineParam(mGop, C2_PARAMKEY_GOP)
+                .withDefault(C2StreamGopTuning::output::AllocShared(
+                        0 /* flexCount */, 0u /* stream */))
+                .withFields({C2F(mGop, m.values[0].type_).any(),
+                             C2F(mGop, m.values[0].count).any()})
+                .withSetter(GopSetter)
+                .build());
+
+        addParameter(
                 DefineParam(mActualInputDelay, C2_PARAMKEY_INPUT_DELAY)
                 .withDefault(new C2PortActualDelayTuning::input(
                     DEFAULT_B_FRAMES + DEFAULT_RC_LOOKAHEAD))
                 .withFields({C2F(mActualInputDelay, value).inRange(
                     0, MAX_B_FRAMES + MAX_RC_LOOKAHEAD)})
-                .withSetter(
-                    Setter<decltype(*mActualInputDelay)>::StrictValueWithNoDeps)
+                .calculatedAs(InputDelaySetter, mGop)
                 .build());
 
         addParameter(
@@ -172,6 +210,17 @@ class C2SoftHevcEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
                 .build());
     }
 
+    static C2R InputDelaySetter(
+            bool mayBlock,
+            C2P<C2PortActualDelayTuning::input> &me,
+            const C2P<C2StreamGopTuning::output> &gop) {
+        (void)mayBlock;
+        uint32_t maxBframes = 0;
+        ParseGop(gop.v, nullptr, nullptr, &maxBframes);
+        me.set().value = maxBframes + DEFAULT_RC_LOOKAHEAD;
+        return C2R::Ok();
+    }
+
     static C2R BitrateSetter(bool mayBlock,
                              C2P<C2StreamBitrateInfo::output>& me) {
         (void)mayBlock;
@@ -270,6 +319,18 @@ class C2SoftHevcEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
         return C2R::Ok();
     }
 
+    static C2R GopSetter(bool mayBlock, C2P<C2StreamGopTuning::output> &me) {
+        (void)mayBlock;
+        for (size_t i = 0; i < me.v.flexCount(); ++i) {
+            const C2GopLayerStruct &layer = me.v.m.values[0];
+            if (layer.type_ == C2Config::picture_type_t(P_FRAME | B_FRAME)
+                    && layer.count > MAX_B_FRAMES) {
+                me.set().m.values[i].count = MAX_B_FRAMES;
+            }
+        }
+        return C2R::Ok();
+    }
+
     UWORD32 getProfile_l() const {
         switch (mProfileLevel->profile) {
         case PROFILE_HEVC_MAIN:  [[fallthrough]];
@@ -338,6 +399,9 @@ class C2SoftHevcEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     std::shared_ptr<C2StreamQualityTuning::output> getQuality_l() const {
         return mQuality;
     }
+    std::shared_ptr<C2StreamGopTuning::output> getGop_l() const {
+        return mGop;
+    }
 
    private:
     std::shared_ptr<C2StreamUsageTuning::input> mUsage;
@@ -350,6 +414,7 @@ class C2SoftHevcEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     std::shared_ptr<C2StreamQualityTuning::output> mQuality;
     std::shared_ptr<C2StreamProfileLevelInfo::output> mProfileLevel;
     std::shared_ptr<C2StreamSyncFrameIntervalTuning::output> mSyncFramePeriod;
+    std::shared_ptr<C2StreamGopTuning::output> mGop;
 };
 
 static size_t GetCPUCoreCount() {
@@ -449,7 +514,25 @@ c2_status_t C2SoftHevcEnc::initEncParams() {
         ALOGE("HEVC default init failed : 0x%x", err);
         return C2_CORRUPTED;
     }
-
+    mBframes = 0;
+    if (mGop && mGop->flexCount() > 0) {
+        uint32_t syncInterval = 1;
+        uint32_t iInterval = 1;
+        uint32_t maxBframes = 0;
+        ParseGop(*mGop, &syncInterval, &iInterval, &maxBframes);
+        if (syncInterval > 0) {
+            ALOGD("Updating IDR interval from GOP: old %u new %u", mIDRInterval, syncInterval);
+            mIDRInterval = syncInterval;
+        }
+        if (iInterval > 0) {
+            ALOGD("Updating I interval from GOP: old %u new %u", mIInterval, iInterval);
+            mIInterval = iInterval;
+        }
+        if (mBframes != maxBframes) {
+            ALOGD("Updating max B frames from GOP: old %u new %u", mBframes, maxBframes);
+            mBframes = maxBframes;
+        }
+    }
     // update configuration
     mEncParams.s_src_prms.i4_width = mSize->width;
     mEncParams.s_src_prms.i4_height = mSize->height;
@@ -463,12 +546,20 @@ c2_status_t C2SoftHevcEnc::initEncParams() {
         mBitrate->value << 1;
     mEncParams.s_tgt_lyr_prms.as_tgt_params[0].i4_codec_level = mHevcEncLevel;
     mEncParams.s_coding_tools_prms.i4_max_i_open_gop_period = mIDRInterval;
-    mEncParams.s_coding_tools_prms.i4_max_cra_open_gop_period = mIDRInterval;
+    mEncParams.s_coding_tools_prms.i4_max_cra_open_gop_period = mIInterval;
     mIvVideoColorFormat = IV_YUV_420P;
     mEncParams.s_multi_thrd_prms.i4_max_num_cores = mNumCores;
     mEncParams.s_out_strm_prms.i4_codec_profile = mHevcEncProfile;
     mEncParams.s_lap_prms.i4_rc_look_ahead_pics = DEFAULT_RC_LOOKAHEAD;
-    mEncParams.s_coding_tools_prms.i4_max_temporal_layers = DEFAULT_B_FRAMES;
+    if (mBframes == 0) {
+        mEncParams.s_coding_tools_prms.i4_max_temporal_layers = 0;
+    } else if (mBframes <= 2) {
+        mEncParams.s_coding_tools_prms.i4_max_temporal_layers = 1;
+    } else if (mBframes <= 6) {
+        mEncParams.s_coding_tools_prms.i4_max_temporal_layers = 2;
+    } else {
+        mEncParams.s_coding_tools_prms.i4_max_temporal_layers = 3;
+    }
 
     switch (mBitrateMode->value) {
         case C2Config::BITRATE_IGNORE:
@@ -523,6 +614,7 @@ c2_status_t C2SoftHevcEnc::drain(uint32_t drainMode,
 
 c2_status_t C2SoftHevcEnc::initEncoder() {
     CHECK(!mCodecCtx);
+
     {
         IntfImpl::Lock lock = mIntf->lock();
         mSize = mIntf->getSize_l();
@@ -532,8 +624,10 @@ c2_status_t C2SoftHevcEnc::initEncoder() {
         mHevcEncProfile = mIntf->getProfile_l();
         mHevcEncLevel = mIntf->getLevel_l();
         mIDRInterval = mIntf->getSyncFramePeriod_l();
+        mIInterval = mIntf->getSyncFramePeriod_l();
         mComplexity = mIntf->getComplexity_l();
         mQuality = mIntf->getQuality_l();
+        mGop = mIntf->getGop_l();
     }
 
     c2_status_t status = initEncParams();

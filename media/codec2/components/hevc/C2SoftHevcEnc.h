@@ -67,6 +67,8 @@ struct C2SoftHevcEnc : public SimpleC2Component {
     ihevce_static_cfg_params_t mEncParams;
     size_t mNumCores;
     UWORD32 mIDRInterval;
+    UWORD32 mIInterval;
+    UWORD32 mBframes;
     IV_COLOR_FORMAT_T mIvVideoColorFormat;
     UWORD32 mHevcEncProfile;
     UWORD32 mHevcEncLevel;
@@ -85,7 +87,7 @@ struct C2SoftHevcEnc : public SimpleC2Component {
     std::shared_ptr<C2StreamBitrateModeTuning::output> mBitrateMode;
     std::shared_ptr<C2StreamComplexityTuning::output> mComplexity;
     std::shared_ptr<C2StreamQualityTuning::output> mQuality;
-
+    std::shared_ptr<C2StreamGopTuning::output> mGop;
 #ifdef FILE_DUMP_ENABLE
     char mInFile[200];
     char mOutFile[200];
