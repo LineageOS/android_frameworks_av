@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 #
 # Copyright 2018, The Android Open Source Project
@@ -19,10 +19,8 @@
 import argparse
 import re
 import sys
-import tempfile
 import os
 import logging
-import subprocess
 import xml.etree.ElementTree as ET
 import xml.etree.ElementInclude as EI
 import xml.dom.minidom as MINIDOM
@@ -49,33 +47,35 @@ from collections import OrderedDict
 
 def parseArgs():
     argparser = argparse.ArgumentParser(description="Parameter-Framework XML \
-        audio criterion type file generator.\n\
-        Exit with the number of (recoverable or not) error that occured.")
+                                        audio criterion type file generator.\n\
+                                        Exit with the number of (recoverable or not) \
+                                        error that occured.")
     argparser.add_argument('--androidaudiobaseheader',
-            help="Android Audio Base C header file, Mandatory.",
-            metavar="ANDROID_AUDIO_BASE_HEADER",
-            type=argparse.FileType('r'),
-            required=True)
+                           help="Android Audio Base C header file, Mandatory.",
+                           metavar="ANDROID_AUDIO_BASE_HEADER",
+                           type=argparse.FileType('r'),
+                           required=True)
     argparser.add_argument('--audiopolicyconfigurationfile',
-            help="Android Audio Policy Configuration file, Mandatory.",
-            metavar="(AUDIO_POLICY_CONFIGURATION_FILE)",
-            type=argparse.FileType('r'),
-            required=True)
+                           help="Android Audio Policy Configuration file, Mandatory.",
+                           metavar="(AUDIO_POLICY_CONFIGURATION_FILE)",
+                           type=argparse.FileType('r'),
+                           required=True)
     argparser.add_argument('--criteriontypes',
-            help="Criterion types XML base file, in \
-            '<criterion_types> \
-                <criterion_type name="" type=<inclusive|exclusive> values=<value1,value2,...>/>' \
-        format. Mandatory.",
-            metavar="CRITERION_TYPE_FILE",
-            type=argparse.FileType('r'),
-            required=True)
+                           help="Criterion types XML base file, in \
+                           '<criterion_types> \
+                               <criterion_type name="" type=<inclusive|exclusive> \
+                               values=<value1,value2,...>/>' \
+                           format. Mandatory.",
+                           metavar="CRITERION_TYPE_FILE",
+                           type=argparse.FileType('r'),
+                           required=True)
     argparser.add_argument('--outputfile',
-            help="Criterion types outputfile file. Mandatory.",
-            metavar="CRITERION_TYPE_OUTPUT_FILE",
-            type=argparse.FileType('w'),
-            required=True)
+                           help="Criterion types outputfile file. Mandatory.",
+                           metavar="CRITERION_TYPE_OUTPUT_FILE",
+                           type=argparse.FileType('w'),
+                           required=True)
     argparser.add_argument('--verbose',
-            action='store_true')
+                           action='store_true')
 
     return argparser.parse_args()
 
@@ -120,7 +120,7 @@ def generateXmlCriterionTypesFile(criterionTypes, addressCriteria, criterionType
     reparsed = MINIDOM.parseString(xmlstr)
     prettyXmlStr = reparsed.toprettyxml(newl='\r\n')
     prettyXmlStr = os.linesep.join([s for s in prettyXmlStr.splitlines() if s.strip()])
-    outputFile.write(prettyXmlStr.encode('utf-8'))
+    outputFile.write(prettyXmlStr)
 
 def capitalizeLine(line):
     return ' '.join((w.capitalize() for w in line.split(' ')))
@@ -137,30 +137,30 @@ def parseAndroidAudioPolicyConfigurationFile(audiopolicyconfigurationfile):
     #
     address_criteria_mapping_table = {
         'sink' : "OutputDevicesAddressesType",
-        'source' : "InputDevicesAddressesType" }
+        'source' : "InputDevicesAddressesType"}
 
     address_criteria = {
         'OutputDevicesAddressesType' : [],
-        'InputDevicesAddressesType' : [] }
+        'InputDevicesAddressesType' : []}
 
-    oldWorkingDir = os.getcwd()
-    print "Current working directory %s" % oldWorkingDir
+    old_working_dir = os.getcwd()
+    print("Current working directory %s" % old_working_dir)
 
-    newDir = os.path.join(oldWorkingDir , audiopolicyconfigurationfile.name)
+    new_dir = os.path.join(old_working_dir, audiopolicyconfigurationfile.name)
 
     policy_in_tree = ET.parse(audiopolicyconfigurationfile)
-    os.chdir(os.path.dirname(os.path.normpath(newDir)))
+    os.chdir(os.path.dirname(os.path.normpath(new_dir)))
 
-    print "new working directory %s" % os.getcwd()
+    print("new working directory %s" % os.getcwd())
 
     policy_root = policy_in_tree.getroot()
     EI.include(policy_root)
 
-    os.chdir(oldWorkingDir)
+    os.chdir(old_working_dir)
 
     for device in policy_root.iter('devicePort'):
         for key in address_criteria_mapping_table.keys():
-            if device.get('role') == key and device.get('address') :
+            if device.get('role') == key and device.get('address'):
                 logging.info("{}: <{}>".format(key, device.get('address')))
                 address_criteria[address_criteria_mapping_table[key]].append(device.get('address'))
 
@@ -188,15 +188,15 @@ def parseAndroidAudioFile(androidaudiobaseheaderFile):
     all_criteria = {
         'AndroidModeType' : {},
         'OutputDevicesMaskType' : {},
-        'InputDevicesMaskType' : {} }
+        'InputDevicesMaskType' : {}}
 
     #
     # _CNT, _MAX, _ALL and _NONE are prohibited values as ther are just helpers for enum users.
     #
-    ignored_values = [ 'CNT', 'MAX', 'ALL', 'NONE' ]
+    ignored_values = ['CNT', 'MAX', 'ALL', 'NONE']
 
     criteria_pattern = re.compile(
-        r"\s*(?P<type>(?:"+'|'.join(criterion_mapping_table.keys()) + "))\_" \
+        r"\s*(?P<type>(?:"+'|'.join(criterion_mapping_table.keys()) + "))_" \
         r"(?P<literal>(?!" + '|'.join(ignored_values) + ")\w*)\s*=\s*" \
         r"(?P<values>(?:0[xX])?[0-9a-fA-F]+)")
 
@@ -221,7 +221,7 @@ def parseAndroidAudioFile(androidaudiobaseheaderFile):
                 logging.info("criterion {} duplicated values:".format(criterion_name))
                 logging.info("{}:{}".format(numerical_value, literal))
                 logging.info("KEEPING LATEST")
-                for key in all_criteria[criterion_name].keys():
+                for key in list(all_criteria[criterion_name]):
                     if all_criteria[criterion_name][key] == int(numerical_value, 0):
                         del all_criteria[criterion_name][key]
 
