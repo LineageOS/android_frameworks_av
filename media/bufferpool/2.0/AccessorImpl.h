@@ -75,7 +75,6 @@ private:
     // ConnectionId = pid : (timestamp_created + seqId)
     // in order to guarantee uniqueness for each connection
     static uint32_t sSeqId;
-    static int32_t sPid;
 
     const std::shared_ptr<BufferPoolAllocator> mAllocator;
 
