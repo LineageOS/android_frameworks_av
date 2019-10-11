@@ -17,7 +17,6 @@
 #ifndef MIDI_EXTRACTOR_H_
 #define MIDI_EXTRACTOR_H_
 
-#include <media/DataSourceBase.h>
 #include <media/MediaExtractorPluginApi.h>
 #include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/MediaBufferBase.h>
