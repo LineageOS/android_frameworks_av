@@ -23,7 +23,6 @@
 #include "mpeg2ts/AnotherPacketSource.h"
 #include "mpeg2ts/ESQueue.h"
 
-#include <media/DataSourceBase.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
