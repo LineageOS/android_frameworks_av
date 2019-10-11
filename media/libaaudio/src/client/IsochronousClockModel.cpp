@@ -18,17 +18,29 @@
 //#define LOG_NDEBUG 0
 #include <log/log.h>
 
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include <stdint.h>
 #include <algorithm>
 
 #include "utility/AudioClock.h"
+#include "utility/AAudioUtilities.h"
 #include "IsochronousClockModel.h"
 
 using namespace aaudio;
 
+using namespace android::audio_utils;
+
 #ifndef ICM_LOG_DRIFT
 #define ICM_LOG_DRIFT   0
 #endif // ICM_LOG_DRIFT
+
+// To enable the timestamp histogram, enter this before opening the stream:
+//    adb root
+//    adb shell setprop aaudio.log_mask 1
+// A histogram of the lateness of the timestamps will be cleared when the stream is started.
+// It will be updated when the model is stable and receives a timestamp,
+// and dumped to the log when the stream is stopped.
 
 IsochronousClockModel::IsochronousClockModel()
         : mMarkerFramePosition(0)
@@ -39,6 +51,10 @@ IsochronousClockModel::IsochronousClockModel()
         , mLatenessForDriftNanos(kInitialLatenessForDriftNanos)
         , mState(STATE_STOPPED)
 {
+    if ((AAudioProperty_getLogMask() & AAUDIO_LOG_CLOCK_MODEL_HISTOGRAM) != 0) {
+        mHistogramMicros = std::make_unique<Histogram>(kHistogramBinCount,
+                kHistogramBinWidthMicros);
+    }
 }
 
 IsochronousClockModel::~IsochronousClockModel() {
@@ -54,6 +70,9 @@ void IsochronousClockModel::start(int64_t nanoTime) {
     ALOGV("start(nanos = %lld)\n", (long long) nanoTime);
     mMarkerNanoTime = nanoTime;
     mState = STATE_STARTING;
+    if (mHistogramMicros) {
+        mHistogramMicros->clear();
+    }
 }
 
 void IsochronousClockModel::stop(int64_t nanoTime) {
@@ -63,6 +82,9 @@ void IsochronousClockModel::stop(int64_t nanoTime) {
     setPositionAndTime(convertTimeToPosition(nanoTime), nanoTime);
     // TODO should we set position?
     mState = STATE_STOPPED;
+    if (mHistogramMicros) {
+        dumpHistogram();
+    }
 }
 
 bool IsochronousClockModel::isStarting() const {
@@ -113,6 +135,9 @@ void IsochronousClockModel::processTimestamp(int64_t framePosition, int64_t nano
         }
         break;
     case STATE_RUNNING:
+        if (mHistogramMicros) {
+            mHistogramMicros->add(latenessNanos / AAUDIO_NANOS_PER_MICROSECOND);
+        }
         // Modify estimated position based on lateness.
         // This affects the "early" side of the window, which controls output glitches.
         if (latenessNanos < 0) {
@@ -121,10 +146,9 @@ void IsochronousClockModel::processTimestamp(int64_t framePosition, int64_t nano
             // Or we may be drifting due to a fast HW clock.
             setPositionAndTime(framePosition, nanoTime);
 #if ICM_LOG_DRIFT
-            int microsDelta = (int) (nanosDelta / 1000);
-            int expectedMicrosDelta = (int) (expectedNanosDelta / 1000);
+            int earlyDeltaMicros = (int) ((expectedNanosDelta - nanosDelta)/ 1000);
             ALOGD("%s() - STATE_RUNNING - #%d, %4d micros EARLY",
-                __func__, mTimestampCount, expectedMicrosDelta - microsDelta);
+                __func__, mTimestampCount, earlyDeltaMicros);
 #endif
         } else if (latenessNanos > mLatenessForDriftNanos) {
             // When we are on the late side, it may be because of preemption in the kernel,
@@ -242,10 +266,19 @@ int64_t IsochronousClockModel::convertLatestTimeToPosition(int64_t nanoTime) con
 }
 
 void IsochronousClockModel::dump() const {
-    ALOGD("mMarkerFramePosition = %16lld", (long long) mMarkerFramePosition);
-    ALOGD("mMarkerNanoTime      = %16lld", (long long) mMarkerNanoTime);
-    ALOGD("mSampleRate          = %8d", mSampleRate);
-    ALOGD("mFramesPerBurst      = %8d", mFramesPerBurst);
-    ALOGD("mState               = %8d", mState);
-    ALOGD("max lateness nanos   = %8d", mMaxMeasuredLatenessNanos);
+    ALOGD("mMarkerFramePosition = %" PRIu64, mMarkerFramePosition);
+    ALOGD("mMarkerNanoTime      = %" PRIu64, mMarkerNanoTime);
+    ALOGD("mSampleRate          = %6d", mSampleRate);
+    ALOGD("mFramesPerBurst      = %6d", mFramesPerBurst);
+    ALOGD("mMaxMeasuredLatenessNanos = %6d", mMaxMeasuredLatenessNanos);
+    ALOGD("mState               = %6d", mState);
+}
+
+void IsochronousClockModel::dumpHistogram() const {
+    if (!mHistogramMicros) return;
+    std::istringstream istr(mHistogramMicros->dump());
+    std::string line;
+    while (std::getline(istr, line)) {
+        ALOGD("lateness, %s", line.c_str());
+    }
 }

@@ -18,6 +18,9 @@
 #define ANDROID_AAUDIO_ISOCHRONOUS_CLOCK_MODEL_H
 
 #include <stdint.h>
+
+#include <audio_utils/Histogram.h>
+
 #include "utility/AudioClock.h"
 
 namespace aaudio {
@@ -122,6 +125,8 @@ public:
 
     void dump() const;
 
+    void dumpHistogram() const;
+
 private:
 
     int32_t getLateTimeOffsetNanos() const;
@@ -140,6 +145,9 @@ private:
     // Initial small threshold for causing a drift later in time.
     static constexpr int32_t   kInitialLatenessForDriftNanos = 10 * 1000;
 
+    static constexpr int32_t   kHistogramBinWidthMicros = 50;
+    static constexpr int32_t   kHistogramBinCount = 128;
+
     int64_t             mMarkerFramePosition; // Estimated HW position.
     int64_t             mMarkerNanoTime;      // Estimated HW time.
     int32_t             mSampleRate;
@@ -152,6 +160,9 @@ private:
     clock_model_state_t mState;               // State machine handles startup sequence.
 
     int32_t             mTimestampCount = 0;  // For logging.
+
+    // distribution of timestamps relative to earliest
+    std::unique_ptr<android::audio_utils::Histogram>   mHistogramMicros;
 
     void update();
 };
