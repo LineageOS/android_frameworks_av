@@ -14,109 +14,99 @@
  * limitations under the License.
  */
 
+#pragma once
 
-#ifndef ANDROID_MEDIAANALYTICSSERVICE_H
-#define ANDROID_MEDIAANALYTICSSERVICE_H
-
-#include <arpa/inet.h>
-
-#include <utils/threads.h>
-#include <utils/Errors.h>
-#include <utils/KeyedVector.h>
-#include <utils/String8.h>
-#include <utils/List.h>
-
+#include <atomic>
+#include <deque>
 #include <future>
+#include <mutex>
+#include <unordered_map>
 
+// IMediaAnalyticsService must include Vector, String16, Errors
 #include <media/IMediaAnalyticsService.h>
+#include <utils/String8.h>
 
 namespace android {
 
 class MediaAnalyticsService : public BnMediaAnalyticsService
 {
+public:
+    MediaAnalyticsService();
+    ~MediaAnalyticsService() override;
 
- public:
+    // caller surrenders ownership of item, MediaAnalyticsService will delete.
+    int64_t submit(MediaAnalyticsItem *item, bool forcenew) override;
 
-    // on this side, caller surrenders ownership
-    virtual int64_t submit(MediaAnalyticsItem *item, bool forcenew);
+    status_t dump(int fd, const Vector<String16>& args) override;
 
-    static  void            instantiate();
-    virtual status_t        dump(int fd, const Vector<String16>& args);
+    static constexpr const char * const kServiceName = "media.metrics";
 
-                            MediaAnalyticsService();
-    virtual                 ~MediaAnalyticsService();
-
-    bool processExpirations();
-
- private:
+private:
+    void processExpirations();
     MediaAnalyticsItem::SessionID_t generateUniqueSessionID();
+    // input validation after arrival from client
+    static bool isContentValid(const MediaAnalyticsItem *item, bool isTrusted);
+    bool isRateLimited(MediaAnalyticsItem *) const;
+    void saveItem(MediaAnalyticsItem *);
 
-    // statistics about our analytics
-    int64_t mItemsSubmitted;
-    int64_t mItemsFinalized;
-    int64_t mItemsDiscarded;
-    int64_t mItemsDiscardedExpire;
-    int64_t mItemsDiscardedCount;
-    MediaAnalyticsItem::SessionID_t mLastSessionID;
+    // The following methods are GUARDED_BY(mLock)
+    bool expirations_l(MediaAnalyticsItem *);
 
-    // partitioned a bit so we don't over serialize
-    mutable Mutex           mLock;
-    mutable Mutex           mLock_ids;
-    mutable Mutex           mLock_mappings;
+    // support for generating output
+    void dumpQueue_l(String8 &result, int dumpProto);
+    void dumpQueue_l(String8 &result, int dumpProto, nsecs_t, const char *only);
+    void dumpHeaders_l(String8 &result, int dumpProto, nsecs_t ts_since);
+    void dumpSummaries_l(String8 &result, int dumpProto, nsecs_t ts_since, const char * only);
+    void dumpRecent_l(String8 &result, int dumpProto, nsecs_t ts_since, const char * only);
+
+    // The following variables accessed without mLock
 
     // limit how many records we'll retain
     // by count (in each queue (open, finalized))
-    int32_t mMaxRecords;
-    // by time (none older than this long agan
-    nsecs_t mMaxRecordAgeNs;
+    const size_t mMaxRecords;
+    // by time (none older than this)
+    const nsecs_t mMaxRecordAgeNs;
     // max to expire per expirations_l() invocation
-    int32_t mMaxRecordsExpiredAtOnce;
-    //
-    // # of sets of summaries
-    int32_t mMaxRecordSets;
-    // nsecs until we start a new record set
-    nsecs_t mNewSetInterval;
+    const size_t mMaxRecordsExpiredAtOnce;
+    const int mDumpProtoDefault;
 
-    // input validation after arrival from client
-    bool contentValid(MediaAnalyticsItem *item, bool isTrusted);
-    bool rateLimited(MediaAnalyticsItem *);
+    std::atomic<MediaAnalyticsItem::SessionID_t> mLastSessionID{};
 
-    // (oldest at front) so it prints nicely for dumpsys
-    List<MediaAnalyticsItem *> mItems;
-    void saveItem(MediaAnalyticsItem *);
+    class UidInfo {
+    public:
+        void setPkgInfo(MediaAnalyticsItem *item, uid_t uid, bool setName, bool setVersion);
 
-    bool expirations_l(MediaAnalyticsItem *);
-    std::future<bool> mExpireFuture;
+    private:
+        std::mutex mUidInfoLock;
 
-    // support for generating output
-    int mDumpProto;
-    int mDumpProtoDefault;
-    String8 dumpQueue();
-    String8 dumpQueue(nsecs_t, const char *only);
+        struct UidToPkgInfo {
+            uid_t uid = -1;
+            std::string pkg;
+            std::string installer;
+            int64_t versionCode = 0;
+            nsecs_t expiration = 0;  // TODO: remove expiration.
+        };
 
-    void dumpHeaders(String8 &result, nsecs_t ts_since);
-    void dumpSummaries(String8 &result, nsecs_t ts_since, const char * only);
-    void dumpRecent(String8 &result, nsecs_t ts_since, const char * only);
+        // TODO: use concurrent hashmap with striped lock.
+        std::unordered_map<uid_t, struct UidToPkgInfo> mPkgMappings; // GUARDED_BY(mUidInfoLock)
+    } mUidInfo;  // mUidInfo can be accessed without lock (locked internally)
 
-    // mapping uids to package names
-    struct UidToPkgMap {
-        uid_t uid;
-        std::string pkg;
-        std::string installer;
-        int64_t versionCode;
-        nsecs_t expiration;
-    };
+    std::atomic<int64_t> mItemsSubmitted{}; // accessed outside of lock.
 
-    KeyedVector<uid_t,struct UidToPkgMap>  mPkgMappings;
-    void setPkgInfo(MediaAnalyticsItem *item, uid_t uid, bool setName, bool setVersion);
+    std::mutex mLock;
+    // statistics about our analytics
+    int64_t mItemsFinalized = 0;        // GUARDED_BY(mLock)
+    int64_t mItemsDiscarded = 0;        // GUARDED_BY(mLock)
+    int64_t mItemsDiscardedExpire = 0;  // GUARDED_BY(mLock)
+    int64_t mItemsDiscardedCount = 0;   // GUARDED_BY(mLock)
 
+    // If we have a worker thread to garbage collect
+    std::future<void> mExpireFuture;    // GUARDED_BY(mLock)
+
+    // Our item queue, generally (oldest at front)
+    // TODO: Make separate class, use segmented queue, write lock only end.
+    // Note: Another analytics module might have ownership of an item longer than the log.
+    std::deque<std::shared_ptr<const MediaAnalyticsItem>> mItems; // GUARDED_BY(mLock)
 };
 
-// hook to send things off to the statsd subsystem
-extern bool dump2Statsd(MediaAnalyticsItem *item);
-
-// ----------------------------------------------------------------------------
-
-}; // namespace android
-
-#endif // ANDROID_MEDIAANALYTICSSERVICE_H
+} // namespace android
