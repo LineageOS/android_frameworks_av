@@ -7,6 +7,8 @@ cc_test_library {
     ],
 
     srcs: [
+        "NativeExtractor.cpp",
+        "NativeMuxer.cpp",
         "NativeEncoder.cpp",
         "NativeDecoder.cpp",
     ],
@@ -20,6 +22,7 @@ cc_test_library {
     static_libs: [
         "libmediabenchmark_common",
         "libmediabenchmark_extractor",
+        "libmediabenchmark_muxer",
         "libmediabenchmark_decoder",
         "libmediabenchmark_encoder",
     ],

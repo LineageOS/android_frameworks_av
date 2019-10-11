@@ -19,6 +19,11 @@ package com.android.media.benchmark.library;
 public class Native {
     static { System.loadLibrary("mediabenchmark_jni"); }
 
+    public native int Extract(String inputFilePath, String inputFileName);
+
+    public native int Mux(String inputFilePath, String inputFileName, String outputFilePath,
+            String format);
+
     public native int Decode(String inputFilePath, String inputFileName, String codecName,
             boolean asyncMode);
 

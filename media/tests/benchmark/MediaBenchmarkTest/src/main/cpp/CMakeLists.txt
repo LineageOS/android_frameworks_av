@@ -21,17 +21,21 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror")
 
 add_library(
   mediabenchmark_jni SHARED
+  NativeExtractor.cpp
+  NativeMuxer.cpp
   NativeDecoder.cpp
   NativeEncoder.cpp
   ${native_source_path}/common/BenchmarkCommon.cpp
   ${native_source_path}/common/Stats.cpp
   ${native_source_path}/common/utils/Timers.cpp
   ${native_source_path}/extractor/Extractor.cpp
+  ${native_source_path}/muxer/Muxer.cpp
   ${native_source_path}/decoder/Decoder.cpp
   ${native_source_path}/encoder/Encoder.cpp)
 
 include_directories(${native_source_path}/common)
 include_directories(${native_source_path}/extractor)
+include_directories(${native_source_path}/muxer)
 include_directories(${native_source_path}/decoder)
 include_directories(${native_source_path}/encoder)
 
