@@ -247,7 +247,7 @@ int64_t DepthCompositeStream::getNextFailingInputLocked(int64_t *currentTs /*ino
     return ret;
 }
 
-status_t DepthCompositeStream::processInputFrame(const InputFrame &inputFrame) {
+status_t DepthCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &inputFrame) {
     status_t res;
     sp<ANativeWindow> outputANW = mOutputSurface;
     ANativeWindowBuffer *anb;
@@ -370,6 +370,13 @@ status_t DepthCompositeStream::processInputFrame(const InputFrame &inputFrame) {
         return NO_MEMORY;
     }
 
+    res = native_window_set_buffers_timestamp(mOutputSurface.get(), ts);
+    if (res != OK) {
+        ALOGE("%s: Stream %d: Error setting timestamp: %s (%d)", __FUNCTION__,
+                getStreamId(), strerror(-res), res);
+        return res;
+    }
+
     ALOGV("%s: Final jpeg size: %zu", __func__, finalJpegSize);
     uint8_t* header = static_cast<uint8_t *> (dstBuffer) +
         (gb->getWidth() - sizeof(struct camera3_jpeg_blob));
@@ -459,7 +466,7 @@ bool DepthCompositeStream::threadLoop() {
         }
     }
 
-    auto res = processInputFrame(mPendingInputFrames[currentTs]);
+    auto res = processInputFrame(currentTs, mPendingInputFrames[currentTs]);
     Mutex::Autolock l(mMutex);
     if (res != OK) {
         ALOGE("%s: Failed processing frame with timestamp: %" PRIu64 ": %s (%d)", __FUNCTION__,
