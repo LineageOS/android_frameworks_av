@@ -215,3 +215,14 @@ cc_test {
     srcs: ["test_full_queue.cpp"],
     shared_libs: ["libaaudio"],
 }
+
+cc_test {
+    name: "test_histogram",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_histogram.cpp"],
+    shared_libs: [
+        "libaudioutils",
+        "libcutils",
+        "libutils",
+    ],
+}

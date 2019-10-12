@@ -496,6 +496,7 @@ private:
             AudioEncoding encoding = kAudioEncodingPcm16bit);
 
     status_t setPriority(int32_t priority);
+    status_t setLowLatency(int32_t lowLatency);
     status_t setLatency(uint32_t latency);
     status_t getLatency(uint32_t *latency);
     status_t setAudioPresentation(int32_t presentationId, int32_t programId);

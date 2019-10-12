@@ -1780,6 +1780,14 @@ status_t ACodec::configureCodec(
         }
     }
 
+    int32_t lowLatency = 0;
+    if (msg->findInt32("low-latency", &lowLatency)) {
+        err = setLowLatency(lowLatency);
+        if (err != OK) {
+            return err;
+        }
+    }
+
     int32_t prependSPSPPS = 0;
     if (encoder && mIsVideo
             && msg->findInt32("prepend-sps-pps-to-idr-frames", &prependSPSPPS)
@@ -2345,6 +2353,24 @@ status_t ACodec::configureCodec(
         }
     }
 
+    return err;
+}
+
+status_t ACodec::setLowLatency(int32_t lowLatency) {
+    if (mIsEncoder) {
+        ALOGE("encoder does not support low-latency");
+        return BAD_VALUE;
+    }
+
+    OMX_CONFIG_BOOLEANTYPE config;
+    InitOMXParams(&config);
+    config.bEnabled = (OMX_BOOL)(lowLatency != 0);
+    status_t err = mOMXNode->setConfig(
+            (OMX_INDEXTYPE)OMX_IndexConfigLowLatency,
+            &config, sizeof(config));
+    if (err != OK) {
+        ALOGE("decoder can not set low-latency to %d (err %d)", lowLatency, err);
+    }
     return err;
 }
 
@@ -7579,6 +7605,14 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
             ALOGI("[%s] failed setIntraRefreshPeriod. Failure is fine since this key is optional",
                     mComponentName.c_str());
             err = OK;
+        }
+    }
+
+    int32_t lowLatency = 0;
+    if (params->findInt32("low-latency", &lowLatency)) {
+        status_t err = setLowLatency(lowLatency);
+        if (err != OK) {
+            return err;
         }
     }
 

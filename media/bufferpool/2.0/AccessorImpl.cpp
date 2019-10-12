@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "BufferPoolAccessor"
+#define LOG_TAG "BufferPoolAccessor2.0"
 //#define LOG_NDEBUG 0
 
 #include <sys/types.h>
+#include <stdint.h>
 #include <time.h>
 #include <unistd.h>
 #include <utils/Log.h>
@@ -134,7 +135,6 @@ bool contains(std::map<T, std::set<U>> *mapOfSet, T key, U value) {
     return false;
 }
 
-int32_t Accessor::Impl::sPid = getpid();
 uint32_t Accessor::Impl::sSeqId = time(nullptr);
 
 Accessor::Impl::Impl(
@@ -156,7 +156,8 @@ ResultStatus Accessor::Impl::connect(
     {
         std::lock_guard<std::mutex> lock(mBufferPool.mMutex);
         if (newConnection) {
-            ConnectionId id = (int64_t)sPid << 32 | sSeqId;
+            int32_t pid = getpid();
+            ConnectionId id = (int64_t)pid << 32 | sSeqId;
             status = mBufferPool.mObserver.open(id, statusDescPtr);
             if (status == ResultStatus::OK) {
                 newConnection->initialize(accessor, id);
@@ -166,7 +167,11 @@ ResultStatus Accessor::Impl::connect(
                 mBufferPool.mConnectionIds.insert(id);
                 mBufferPool.mInvalidationChannel.getDesc(invDescPtr);
                 mBufferPool.mInvalidation.onConnect(id, observer);
-                ++sSeqId;
+                if (sSeqId == UINT32_MAX) {
+                   sSeqId = 0;
+                } else {
+                    ++sSeqId;
+                }
             }
 
         }

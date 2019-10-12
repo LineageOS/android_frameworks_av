@@ -1,0 +1,92 @@
+/*
+ * Copyright (C) 2019 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// Import this namespace in order to use AOSP Car Emulator configuration example
+
+soong_namespace {
+    imports: [
+        "frameworks/av/services/audiopolicy/engineconfigurable/config/example/caremu",
+        "frameworks/av/services/audiopolicy/engineconfigurable/parameter-framework/examples/Car",
+        "frameworks/av/services/audiopolicy/config",
+    ],
+}
+
+//
+// Generate Audio Policy Parameter Framework Product Strategies Structure file from template
+//
+prebuilt_etc {
+    name: "ProductStrategies.xml",
+    vendor: true,
+    src: ":buildstrategiesstructure_gen",
+    sub_dir: "parameter-framework/Structure/Policy",
+    required: ["libpolicy-subsystem"],
+}
+genrule {
+    name: "buildstrategiesstructure_gen",
+    defaults: ["buildstrategiesstructurerule"],
+    srcs: [
+        ":audio_policy_engine_configuration_files",
+    ],
+}
+
+//
+// Generate Audio Policy Parameter Framework Configurable Domains
+//
+prebuilt_etc {
+    name: "parameter-framework.policy",
+    filename_from_src: true,
+    vendor: true,
+    src: ":domaingeneratorpolicyrule_gen",
+    sub_dir: "parameter-framework/Settings/Policy",
+    required: [
+        "ProductStrategies.xml",
+        "PolicyClass.xml",
+        "PolicySubsystem.xml",
+        "PolicySubsystem-CommonTypes.xml",
+    ],
+}
+genrule {
+    name: "domaingeneratorpolicyrule_gen",
+    defaults: ["domaingeneratorpolicyrule"],
+    srcs: [
+        ":audio_policy_pfw_toplevel",
+        ":audio_policy_pfw_structure_files",
+        ":audio_policy_engine_criterion_types",
+        ":edd_files",
+    ],
+}
+filegroup {
+    name: "edd_files",
+    srcs: [
+        ":device_for_input_source.pfw",
+        ":volumes.pfw",
+        "Settings/device_for_product_strategies.pfw",
+    ],
+}
+// This is for Settings generation, must use socket port, so userdebug version is required
+filegroup {
+    name: "audio_policy_pfw_toplevel",
+    srcs: [":ParameterFrameworkConfigurationPolicy.userdebug.xml"],
+}
+filegroup {
+    name: "audio_policy_pfw_structure_files",
+    srcs: [
+        ":PolicyClass",
+        ":PolicySubsystem",
+        ":PolicySubsystem-CommonTypes",
+        ":buildstrategiesstructure_gen",
+    ],
+}

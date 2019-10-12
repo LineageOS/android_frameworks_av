@@ -162,6 +162,20 @@ int32_t AAudioProperty_getInputMMapOffsetMicros();
 int32_t AAudioProperty_getOutputMMapOffsetMicros();
 #define AAUDIO_PROP_OUTPUT_MMAP_OFFSET_USEC   "aaudio.out_mmap_offset_usec"
 
+// These are powers of two that can be combined as a bit mask.
+// AAUDIO_LOG_CLOCK_MODEL_HISTOGRAM must be enabled before the stream is opened.
+#define AAUDIO_LOG_CLOCK_MODEL_HISTOGRAM   1
+#define AAUDIO_LOG_RESERVED_2              2
+#define AAUDIO_LOG_RESERVED_4              4
+#define AAUDIO_LOG_RESERVED_8              8
+
+/**
+ * Use a mask to enable various logs in AAudio.
+ * @return mask that enables various AAudio logs, such as AAUDIO_LOG_CLOCK_MODEL_HISTOGRAM
+ */
+int32_t AAudioProperty_getLogMask();
+#define AAUDIO_PROP_LOG_MASK   "aaudio.log_mask"
+
 /**
  * Is flush allowed for the given state?
  * @param state
