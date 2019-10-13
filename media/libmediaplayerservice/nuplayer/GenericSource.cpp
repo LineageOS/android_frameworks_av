@@ -385,7 +385,7 @@ void NuPlayer::GenericSource::onPrepareAsync() {
             if (!strncasecmp("http://", uri, 7) || !strncasecmp("https://", uri, 8)) {
                 sp<DataSource> httpSource;
                 mDisconnectLock.unlock();
-                httpSource = DataSourceFactory::CreateMediaHTTP(mHTTPService);
+                httpSource = DataSourceFactory::getInstance()->CreateMediaHTTP(mHTTPService);
                 if (httpSource == NULL) {
                     ALOGE("Failed to create http source!");
                     notifyPreparedAndCleanup(UNKNOWN_ERROR);
@@ -401,7 +401,7 @@ void NuPlayer::GenericSource::onPrepareAsync() {
             mLock.unlock();
             mDisconnectLock.unlock();
             // This might take long time if connection has some issue.
-            sp<DataSource> dataSource = DataSourceFactory::CreateFromURI(
+            sp<DataSource> dataSource = DataSourceFactory::getInstance()->CreateFromURI(
                    mHTTPService, uri, &mUriHeaders, &contentType,
                    static_cast<HTTPBase *>(mHttpSource.get()));
             mDisconnectLock.lock();

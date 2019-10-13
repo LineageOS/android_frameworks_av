@@ -63,7 +63,7 @@ status_t StagefrightMetadataRetriever::setDataSource(
     ALOGV("setDataSource(%s)", uri);
 
     clearMetadata();
-    mSource = DataSourceFactory::CreateFromURI(httpService, uri, headers);
+    mSource = DataSourceFactory::getInstance()->CreateFromURI(httpService, uri, headers);
 
     if (mSource == NULL) {
         ALOGE("Unable to create data source for '%s'.", uri);
