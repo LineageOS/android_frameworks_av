@@ -162,7 +162,6 @@ cc_library {
         "SimpleDecodingSource.cpp",
         "SkipCutBuffer.cpp",
         "StagefrightMediaScanner.cpp",
-        "StagefrightMetadataRetriever.cpp",
         "StagefrightPluginLoader.cpp",
         "SurfaceUtils.cpp",
         "ThrottledSource.cpp",
