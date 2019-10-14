@@ -183,6 +183,11 @@ status_t MediaTrackCUnwrapper::read(MediaBufferBase **buffer, const ReadOptions 
             meta.setData(kKeyAudioPresentationInfo,
                     MetaDataBase::Type::TYPE_NONE, valbuf->data(), valbuf->size());
         }
+        if (format->mFormat->findBuffer("csd-0", &valbuf)) {
+            meta.setData(kKeyOpaqueCSD0,
+                    MetaDataBase::Type::TYPE_NONE, valbuf->data(), valbuf->size());
+        }
+
     } else {
         *buffer = nullptr;
     }
