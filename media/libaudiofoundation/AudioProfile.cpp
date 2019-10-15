@@ -118,6 +118,18 @@ void AudioProfile::dump(std::string *dst, int spaces) const
     }
 }
 
+bool AudioProfile::equals(const sp<AudioProfile>& other) const
+{
+    return other != nullptr &&
+           mName.compare(other->mName) == 0 &&
+           mFormat == other->getFormat() &&
+           mChannelMasks == other->getChannels() &&
+           mSamplingRates == other->getSampleRates() &&
+           mIsDynamicFormat == other->isDynamicFormat() &&
+           mIsDynamicChannels == other->isDynamicChannels() &&
+           mIsDynamicRate == other->isDynamicRate();
+}
+
 status_t AudioProfile::writeToParcel(Parcel *parcel) const
 {
     status_t status = NO_ERROR;
@@ -282,6 +294,14 @@ status_t AudioProfileVector::readFromParcel(const Parcel *parcel)
         }
     }
     return status;
+}
+
+bool AudioProfileVector::equals(const AudioProfileVector& other) const
+{
+    return std::equal(begin(), end(), other.begin(), other.end(),
+                      [](const sp<AudioProfile>& left, const sp<AudioProfile>& right) {
+                          return left->equals(right);
+                      });
 }
 
 } // namespace android
