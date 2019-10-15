@@ -292,8 +292,8 @@ public:
      */
     bool isLogicalCamera(const std::string& id, std::vector<std::string>* physicalCameraIds);
 
-    SystemCameraKind getSystemCameraKind(const std::string& id) const;
-    bool isHiddenPhysicalCamera(const std::string& cameraId);
+    status_t getSystemCameraKind(const std::string& id, SystemCameraKind *kind) const;
+    bool isHiddenPhysicalCamera(const std::string& cameraId) const;
 
     static const float kDepthARTolerance;
 private:
@@ -616,7 +616,8 @@ private:
             CameraMetadata* characteristics) const;
     void filterLogicalCameraIdsLocked(std::vector<std::string>& deviceIds) const;
 
-    SystemCameraKind getSystemCameraKindLocked(const std::string& id) const;
+    status_t getSystemCameraKindLocked(const std::string& id, SystemCameraKind *kind) const;
+    std::pair<bool, ProviderInfo::DeviceInfo *> isHiddenPhysicalCameraInternal(const std::string& cameraId) const;
 
     void collectDeviceIdsLocked(const std::vector<std::string> deviceIds,
             std::vector<std::string>& normalDeviceIds,
