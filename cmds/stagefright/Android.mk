@@ -8,7 +8,7 @@ LOCAL_SRC_FILES:=       \
         SineSource.cpp
 
 LOCAL_SHARED_LIBRARIES := \
-        libstagefright libmedia libmedia_omx libutils libbinder \
+        libstagefright libmedia libmedia_codeclist libutils libbinder \
         libstagefright_foundation libjpeg libui libgui libcutils liblog \
         libhidlbase libdatasource \
         android.hardware.media.omx@1.0 \
