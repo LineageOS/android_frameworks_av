@@ -59,6 +59,7 @@ enum {
     kKeyAACProfile        = 'aacp',  // int32_t
     kKeyAVCC              = 'avcc',  // raw data
     kKeyHVCC              = 'hvcc',  // raw data
+    kKeyDVCC              = 'dvcc',  // raw data
     kKeyAV1C              = 'av1c',  // raw data
     kKeyThumbnailHVCC     = 'thvc',  // raw data
     kKeyD263              = 'd263',  // raw data
@@ -245,6 +246,7 @@ enum {
     kTypeAVCC        = 'avcc',
     kTypeHVCC        = 'hvcc',
     kTypeAV1C        = 'av1c',
+    kTypeDVCC        = 'dvcc',
     kTypeD263        = 'd263',
 };
 
