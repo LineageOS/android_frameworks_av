@@ -243,6 +243,9 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexTimestampGapAdjustment, // input-surface, struct
 
     kParamIndexSurfaceAllocator, // u32
+
+    // low latency mode for decoders
+    kParamIndexLowLatencyMode, // bool
 };
 
 }
@@ -803,6 +806,15 @@ constexpr char C2_PARAMKEY_OUTPUT_DELAY[] = "output.delay";
 typedef C2GlobalParam<C2Tuning, C2Uint32Value, kParamIndexDelay> C2PipelineDelayTuning;
 typedef C2PipelineDelayTuning C2ActualPipelineDelayTuning; // deprecated
 constexpr char C2_PARAMKEY_PIPELINE_DELAY[] = "algo.delay";
+
+/**
+ * Enable/disable low latency decoding mode.
+ * If true, low latency decoding mode is enabled, and the decoder doesn't hold input and output
+ * data more than required by the codec standards.
+ */
+typedef C2GlobalParam<C2Tuning, C2EasyBoolValue, kParamIndexLowLatencyMode>
+        C2GlobalLowLatencyModeTuning;
+constexpr char C2_PARAMKEY_LOW_LATENCY_MODE[] = "algo.low-latency";
 
 /**
  * Reference characteristics.
