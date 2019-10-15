@@ -199,6 +199,11 @@ struct TestInteractionProxy : public CameraProviderManager::ServiceInteractionPr
         return true;
     }
 
+    virtual sp<hardware::camera::provider::V2_4::ICameraProvider> tryGetService(
+            const std::string &serviceName) override {
+        return getService(serviceName);
+    }
+
     virtual sp<hardware::camera::provider::V2_4::ICameraProvider> getService(
             const std::string &serviceName) override {
         mLastRequestedServiceNames.push_back(serviceName);

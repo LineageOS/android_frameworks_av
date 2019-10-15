@@ -96,6 +96,10 @@ public:
                 const std::string &serviceName,
                 const sp<hidl::manager::V1_0::IServiceNotification>
                 &notification) = 0;
+        // Will not wait for service to start if it's not already running
+        virtual sp<hardware::camera::provider::V2_4::ICameraProvider> tryGetService(
+                const std::string &serviceName) = 0;
+        // Will block for service if it exists but isn't running
         virtual sp<hardware::camera::provider::V2_4::ICameraProvider> getService(
                 const std::string &serviceName) = 0;
         virtual hardware::hidl_vec<hardware::hidl_string> listServices() = 0;
@@ -111,6 +115,10 @@ public:
                 &notification) override {
             return hardware::camera::provider::V2_4::ICameraProvider::registerForNotifications(
                     serviceName, notification);
+        }
+        virtual sp<hardware::camera::provider::V2_4::ICameraProvider> tryGetService(
+                const std::string &serviceName) override {
+            return hardware::camera::provider::V2_4::ICameraProvider::tryGetService(serviceName);
         }
         virtual sp<hardware::camera::provider::V2_4::ICameraProvider> getService(
                 const std::string &serviceName) override {
