@@ -67,7 +67,7 @@ cc_library_shared {
     shared_libs: [
         "libgui",
         "liblog",
-        "libmedia_omx",
+        "libmedia_codeclist",
         "libstagefright_foundation",
         "libui",
         "libutils",
@@ -183,6 +183,7 @@ cc_library {
         "libgui",
         "liblog",
         "libmedia",
+        "libmedia_codeclist",
         "libmedia_omx",
         "libmedia_omx_client",
         "libaudioclient",
