@@ -81,6 +81,8 @@ public:
 
     void log(const char* indent) const;
 
+    bool equals(const sp<AudioPort>& other) const;
+
     status_t writeToParcel(Parcel* parcel) const override;
     status_t readFromParcel(const Parcel* parcel) override;
 
@@ -112,6 +114,8 @@ public:
     audio_port_handle_t getId() const { return mId; }
 
     bool hasGainController(bool canUseForVolume = false) const;
+
+    bool equals(const sp<AudioPortConfig>& other) const;
 
     status_t writeToParcel(Parcel* parcel) const override;
     status_t readFromParcel(const Parcel* parcel) override;

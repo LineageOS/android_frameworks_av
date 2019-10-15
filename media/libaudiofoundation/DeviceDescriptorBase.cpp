@@ -110,6 +110,15 @@ void DeviceDescriptorBase::log() const
     AudioPort::log("  ");
 }
 
+bool DeviceDescriptorBase::equals(const sp<DeviceDescriptorBase> &other) const
+{
+    return other != nullptr &&
+           static_cast<const AudioPort*>(this)->equals(other) &&
+           static_cast<const AudioPortConfig*>(this)->equals(other) &&
+           mAddress.compare(other->address()) == 0 &&
+           mDeviceType == other->type();
+}
+
 status_t DeviceDescriptorBase::writeToParcel(Parcel *parcel) const
 {
     status_t status = NO_ERROR;

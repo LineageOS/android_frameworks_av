@@ -68,6 +68,8 @@ public:
 
     void dump(std::string *dst, int spaces) const;
 
+    bool equals(const sp<AudioProfile>& other) const;
+
     status_t writeToParcel(Parcel* parcel) const override;
     status_t readFromParcel(const Parcel* parcel) override;
 
@@ -104,6 +106,8 @@ public:
     bool hasDynamicRateFor(audio_format_t format) const;
 
     virtual void dump(std::string *dst, int spaces) const;
+
+    bool equals(const AudioProfileVector& other) const;
 
     status_t writeToParcel(Parcel* parcel) const override;
     status_t readFromParcel(const Parcel* parcel) override;

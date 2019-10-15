@@ -53,6 +53,8 @@ public:
     void log() const;
     std::string toString() const;
 
+    bool equals(const sp<DeviceDescriptorBase>& other) const;
+
     status_t writeToParcel(Parcel* parcel) const override;
     status_t readFromParcel(const Parcel* parcel) override;
 

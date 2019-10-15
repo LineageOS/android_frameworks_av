@@ -67,6 +67,8 @@ public:
 
     const struct audio_gain &getGain() const { return mGain; }
 
+    bool equals(const sp<AudioGain>& other) const;
+
     status_t writeToParcel(Parcel* parcel) const override;
     status_t readFromParcel(const Parcel* parcel) override;
 
@@ -95,6 +97,8 @@ public:
         push_back(gain);
         return 0;
     }
+
+    bool equals(const AudioGains& other) const;
 
     status_t writeToParcel(Parcel* parcel) const override;
     status_t readFromParcel(const Parcel* parcel) override;

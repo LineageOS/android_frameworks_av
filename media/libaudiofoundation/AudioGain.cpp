@@ -24,6 +24,8 @@
 #define ALOGVV(a...) do { } while(0)
 #endif
 
+#include <algorithm>
+
 #include <android-base/stringprintf.h>
 #include <media/AudioGain.h>
 #include <utils/Log.h>
@@ -111,6 +113,22 @@ void AudioGain::dump(std::string *dst, int spaces, int index) const
     dst->append(base::StringPrintf("%*s- max_ramp_ms: %d ms\n", spaces, "", mGain.max_ramp_ms));
 }
 
+bool AudioGain::equals(const sp<AudioGain>& other) const
+{
+    return other != nullptr &&
+           mUseInChannelMask == other->mUseInChannelMask &&
+           mUseForVolume == other->mUseForVolume &&
+           // Compare audio gain
+           mGain.mode == other->mGain.mode &&
+           mGain.channel_mask == other->mGain.channel_mask &&
+           mGain.min_value == other->mGain.min_value &&
+           mGain.max_value == other->mGain.max_value &&
+           mGain.default_value == other->mGain.default_value &&
+           mGain.step_value == other->mGain.step_value &&
+           mGain.min_ramp_ms == other->mGain.min_ramp_ms &&
+           mGain.max_ramp_ms == other->mGain.max_ramp_ms;
+}
+
 status_t AudioGain::writeToParcel(android::Parcel *parcel) const
 {
     status_t status = NO_ERROR;
@@ -143,6 +161,14 @@ status_t AudioGain::readFromParcel(const android::Parcel *parcel)
     if ((status = parcel->readUint32(&mGain.min_ramp_ms)) != NO_ERROR) return status;
     status = parcel->readUint32(&mGain.max_ramp_ms);
     return status;
+}
+
+bool AudioGains::equals(const AudioGains &other) const
+{
+    return std::equal(begin(), end(), other.begin(), other.end(),
+                      [](const sp<AudioGain>& left, const sp<AudioGain>& right) {
+                          return left->equals(right);
+                      });
 }
 
 status_t AudioGains::writeToParcel(android::Parcel *parcel) const {

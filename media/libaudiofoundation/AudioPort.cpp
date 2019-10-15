@@ -105,6 +105,16 @@ void AudioPort::log(const char* indent) const
     ALOGI("%s Port[nm:%s, type:%d, role:%d]", indent, mName.c_str(), mType, mRole);
 }
 
+bool AudioPort::equals(const sp<AudioPort> &other) const
+{
+    return other != nullptr &&
+           mGains.equals(other->getGains()) &&
+           mName.compare(other->getName()) == 0 &&
+           mType == other->getType() &&
+           mRole == other->getRole() &&
+           mProfiles.equals(other->getAudioProfiles());
+}
+
 status_t AudioPort::writeToParcel(Parcel *parcel) const
 {
     status_t status = NO_ERROR;
@@ -216,6 +226,21 @@ bool AudioPortConfig::hasGainController(bool canUseForVolume) const
     }
     return canUseForVolume ? audioport->getGains().canUseForVolume()
                            : audioport->getGains().size() > 0;
+}
+
+bool AudioPortConfig::equals(const sp<AudioPortConfig> &other) const
+{
+    return other != nullptr &&
+           mSamplingRate == other->getSamplingRate() &&
+           mFormat == other->getFormat() &&
+           mChannelMask == other->getChannelMask() &&
+           // Compare audio gain config
+           mGain.index == other->mGain.index &&
+           mGain.mode == other->mGain.mode &&
+           mGain.channel_mask == other->mGain.channel_mask &&
+           std::equal(std::begin(mGain.values), std::end(mGain.values),
+                      std::begin(other->mGain.values)) &&
+           mGain.ramp_duration_ms == other->mGain.ramp_duration_ms;
 }
 
 status_t AudioPortConfig::writeToParcel(Parcel *parcel) const
