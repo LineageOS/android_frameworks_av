@@ -23,6 +23,7 @@
 #include <binder/IPCThreadState.h>
 #include <binder/IProcessInfoService.h>
 #include <binder/IServiceManager.h>
+#include <private/android_filesystem_config.h>
 
 namespace android {
 
@@ -55,8 +56,9 @@ bool ProcessInfo::getPriority(int pid, int* priority) {
 
 bool ProcessInfo::isValidPid(int pid) {
     int callingPid = IPCThreadState::self()->getCallingPid();
+    int callingUid = IPCThreadState::self()->getCallingUid();
     // Trust it if this is called from the same process otherwise pid has to match the calling pid.
-    return (callingPid == getpid()) || (callingPid == pid);
+    return (callingPid == getpid()) || (callingPid == pid) || (callingUid == AID_MEDIA);
 }
 
 ProcessInfo::~ProcessInfo() {}

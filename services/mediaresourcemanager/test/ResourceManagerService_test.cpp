@@ -173,8 +173,9 @@ protected:
         // convert resource1 to ResourceList
         ResourceList r1;
         for (size_t i = 0; i < resources1.size(); ++i) {
-            const auto resType = std::make_pair(resources1[i].mType, resources1[i].mSubType);
-            r1[resType] = resources1[i];
+            const auto &res = resources1[i];
+            const auto resType = std::tuple(res.mType, res.mSubType, res.mId);
+            r1[resType] = res;
         }
         return r1 == resources2;
     }

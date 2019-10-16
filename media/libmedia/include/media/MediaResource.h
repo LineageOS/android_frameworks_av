@@ -20,6 +20,7 @@
 
 #include <binder/Parcel.h>
 #include <utils/String8.h>
+#include <vector>
 
 namespace android {
 
@@ -32,6 +33,7 @@ public:
         kGraphicMemory,
         kCpuBoost,
         kBattery,
+        kDrmSession,
     };
 
     enum SubType {
@@ -43,6 +45,7 @@ public:
     MediaResource();
     MediaResource(Type type, uint64_t value);
     MediaResource(Type type, SubType subType, uint64_t value);
+    MediaResource(Type type, const std::vector<uint8_t> &id, uint64_t value);
 
     void readFromParcel(const Parcel &parcel);
     void writeToParcel(Parcel *parcel) const;
@@ -55,6 +58,8 @@ public:
     Type mType;
     SubType mSubType;
     uint64_t mValue;
+    // for kDrmSession-type mId is the unique session id obtained via MediaDrm#openSession
+    std::vector<uint8_t> mId;
 };
 
 inline static const char *asString(MediaResource::Type i, const char *def = "??") {
@@ -65,6 +70,7 @@ inline static const char *asString(MediaResource::Type i, const char *def = "??"
         case MediaResource::kGraphicMemory:  return "graphic-memory";
         case MediaResource::kCpuBoost:       return "cpu-boost";
         case MediaResource::kBattery:        return "battery";
+        case MediaResource::kDrmSession:     return "drm-session";
         default:                             return def;
     }
 }
