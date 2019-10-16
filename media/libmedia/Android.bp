@@ -60,10 +60,8 @@ cc_library_shared {
     srcs: [
         ":libmedia_omx_aidl",
 
-        "IMediaCodecList.cpp",
         "IOMX.cpp",
         "MediaCodecBuffer.cpp",
-        "MediaCodecInfo.cpp",
         "OMXBuffer.cpp",
         "omx/1.0/WGraphicBufferSource.cpp",
         "omx/1.0/WOmxBufferSource.cpp",
