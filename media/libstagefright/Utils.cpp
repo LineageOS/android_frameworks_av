@@ -1806,7 +1806,7 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
     if (msg->findInt32("frame-rate", &fps) && fps > 0) {
         meta->setInt32(kKeyFrameRate, fps);
     } else if (msg->findFloat("frame-rate", &fpsFloat)
-            && fpsFloat >= 1 && fpsFloat <= INT32_MAX) {
+            && fpsFloat >= 1 && static_cast<int32_t>(fpsFloat) <= INT32_MAX) {
         // truncate values to distinguish between e.g. 24 vs 23.976 fps
         meta->setInt32(kKeyFrameRate, (int32_t)fpsFloat);
     }
