@@ -47,9 +47,12 @@ private:
     bool mNextExpectedSeqNoValid;
     uint32_t mNextExpectedSeqNo;
     bool mAccessUnitDamaged;
+    bool mFirstIFrameProvided;
+    uint64_t mLastIFrameProvidedAt;
     List<sp<ABuffer> > mNALUnits;
 
     int32_t addNack(const sp<ARTPSource> &source);
+    void checkIFrameProvided(const sp<ABuffer> &buffer);
     AssemblyStatus addNALUnit(const sp<ARTPSource> &source);
     void addSingleNALUnit(const sp<ABuffer> &buffer);
     AssemblyStatus addFragmentedNALUnit(List<sp<ABuffer> > *queue);
@@ -58,7 +61,8 @@ private:
     void submitAccessUnit();
 
     int32_t pickProperSeq(const Q *q, uint32_t jit, int64_t play);
-    bool recycleUnit(uint32_t start, uint32_t end, size_t avail, float goodRatio);
+    bool recycleUnit(uint32_t start, uint32_t end, uint32_t conneceted,
+            size_t avail, float goodRatio);
     int32_t deleteUnitUnderSeq(Q *q, uint32_t seq);
     void printNowTimeUs(int64_t start, int64_t now, int64_t play);
     void printRTPTime(uint32_t rtp, int64_t play, uint32_t exp, bool isExp);
