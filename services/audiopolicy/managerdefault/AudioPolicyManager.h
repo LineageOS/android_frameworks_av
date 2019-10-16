@@ -176,7 +176,7 @@ public:
                                      IVolumeCurves &volumeCurves);
 
         status_t getVolumeIndex(const IVolumeCurves &curves, int &index,
-                                audio_devices_t device) const;
+                                const DeviceTypeSet& deviceTypes) const;
 
         // return the strategy corresponding to a given stream type
         virtual uint32_t getStrategyForStream(audio_stream_type_t stream)
@@ -422,7 +422,7 @@ protected:
         virtual float computeVolume(IVolumeCurves &curves,
                                     VolumeSource volumeSource,
                                     int index,
-                                    audio_devices_t device);
+                                    const DeviceTypeSet& deviceTypes);
 
         // rescale volume index from srcStream within range of dstStream
         int rescaleVolumeIndex(int srcIndex,
@@ -432,12 +432,13 @@ protected:
         virtual status_t checkAndSetVolume(IVolumeCurves &curves,
                                            VolumeSource volumeSource, int index,
                                            const sp<AudioOutputDescriptor>& outputDesc,
-                                           audio_devices_t device,
+                                           DeviceTypeSet deviceTypes,
                                            int delayMs = 0, bool force = false);
 
         // apply all stream volumes to the specified output and device
         void applyStreamVolumes(const sp<AudioOutputDescriptor>& outputDesc,
-                                audio_devices_t device, int delayMs = 0, bool force = false);
+                                const DeviceTypeSet& deviceTypes,
+                                int delayMs = 0, bool force = false);
 
         /**
          * @brief setStrategyMute Mute or unmute all active clients on the considered output
@@ -452,7 +453,7 @@ protected:
                              bool on,
                              const sp<AudioOutputDescriptor>& outputDesc,
                              int delayMs = 0,
-                             audio_devices_t device = AUDIO_DEVICE_NONE);
+                             DeviceTypeSet deviceTypes = DeviceTypeSet());
 
         /**
          * @brief setVolumeSourceMute Mute or unmute the volume source on the specified output
@@ -467,7 +468,7 @@ protected:
                                  bool on,
                                  const sp<AudioOutputDescriptor>& outputDesc,
                                  int delayMs = 0,
-                                 audio_devices_t device = AUDIO_DEVICE_NONE);
+                                 DeviceTypeSet deviceTypes = DeviceTypeSet());
 
         audio_mode_t getPhoneState();
 
@@ -653,10 +654,6 @@ protected:
         uint32_t updateCallRouting(const DeviceVector &rxDevices, uint32_t delayMs = 0);
         sp<AudioPatch> createTelephonyPatch(bool isRx, const sp<DeviceDescriptor> &device,
                                             uint32_t delayMs);
-        sp<DeviceDescriptor> findDevice(
-                const DeviceVector& devices, audio_devices_t device) const;
-        audio_devices_t getModuleDeviceTypes(
-                const DeviceVector& devices, const char *moduleId) const;
         bool isDeviceOfModule(const sp<DeviceDescriptor>& devDesc, const char *moduleId) const;
 
         status_t startSource(const sp<SwAudioOutputDescriptor>& outputDesc,

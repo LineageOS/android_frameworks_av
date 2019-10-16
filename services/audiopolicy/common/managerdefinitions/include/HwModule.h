@@ -131,8 +131,8 @@ class HwModuleCollection : public Vector<sp<HwModule> >
 public:
     sp<HwModule> getModuleFromName(const char *name) const;
 
-    sp<HwModule> getModuleForDeviceTypes(audio_devices_t device,
-                                         audio_format_t encodedFormat) const;
+    sp<HwModule> getModuleForDeviceType(audio_devices_t device,
+                                        audio_format_t encodedFormat) const;
 
     sp<HwModule> getModuleForDevice(const sp<DeviceDescriptor> &device,
                                     audio_format_t encodedFormat) const;
