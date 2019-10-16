@@ -243,6 +243,9 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexTimestampGapAdjustment, // input-surface, struct
 
     kParamIndexSurfaceAllocator, // u32
+
+    // low latency mode for decoders
+    kParamIndexLowLatencyMode, // bool
 };
 
 }
@@ -521,6 +524,7 @@ enum C2Config::profile_t : uint32_t {
     PROFILE_DV_HE_07 = _C2_PL_DV_BASE + 7,      ///< Dolby Vision dvhe.07 profile
     PROFILE_DV_HE_08 = _C2_PL_DV_BASE + 8,      ///< Dolby Vision dvhe.08 profile
     PROFILE_DV_AV_09 = _C2_PL_DV_BASE + 9,      ///< Dolby Vision dvav.09 profile
+    PROFILE_DV_AV1_10 = _C2_PL_DV_BASE + 10,    ///< Dolby Vision dav1.10 profile
 
     // AV1 profiles
     PROFILE_AV1_0 = _C2_PL_AV1_BASE,            ///< AV1 Profile 0 (4:2:0, 8 to 10 bit)
@@ -802,6 +806,15 @@ constexpr char C2_PARAMKEY_OUTPUT_DELAY[] = "output.delay";
 typedef C2GlobalParam<C2Tuning, C2Uint32Value, kParamIndexDelay> C2PipelineDelayTuning;
 typedef C2PipelineDelayTuning C2ActualPipelineDelayTuning; // deprecated
 constexpr char C2_PARAMKEY_PIPELINE_DELAY[] = "algo.delay";
+
+/**
+ * Enable/disable low latency decoding mode.
+ * If true, low latency decoding mode is enabled, and the decoder doesn't hold input and output
+ * data more than required by the codec standards.
+ */
+typedef C2GlobalParam<C2Tuning, C2EasyBoolValue, kParamIndexLowLatencyMode>
+        C2GlobalLowLatencyModeTuning;
+constexpr char C2_PARAMKEY_LOW_LATENCY_MODE[] = "algo.low-latency";
 
 /**
  * Reference characteristics.

@@ -823,6 +823,14 @@ void CCodecConfig::initializeStandardParams() {
 
     add(ConfigMapper(C2_PARAMKEY_INPUT_TIME_STRETCH, C2_PARAMKEY_INPUT_TIME_STRETCH, "value"));
 
+    add(ConfigMapper(KEY_LOW_LATENCY, C2_PARAMKEY_LOW_LATENCY_MODE, "value")
+        .limitTo(D::DECODER & (D::CONFIG | D::PARAM))
+        .withMapper([](C2Value v) -> C2Value {
+            int32_t value = 0;
+            (void)v.get(&value);
+            return value == 0 ? C2_FALSE : C2_TRUE;
+        }));
+
     /* still to do
     constexpr char KEY_PUSH_BLANK_BUFFERS_ON_STOP[] = "push-blank-buffers-on-shutdown";
 

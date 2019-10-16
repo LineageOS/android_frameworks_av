@@ -110,7 +110,12 @@ std::pair<int, int> CameraProviderManager::getCameraCount() const {
     int publicCameraCount = 0;
     for (auto& provider : mProviders) {
         for (auto &id : provider->mUniqueCameraIds) {
-            switch(getSystemCameraKindLocked(id)) {
+            SystemCameraKind deviceKind = SystemCameraKind::PUBLIC;
+            if (getSystemCameraKindLocked(id, &deviceKind) != OK) {
+                ALOGE("%s: Invalid camera id %s, skipping", __FUNCTION__, id.c_str());
+                continue;
+            }
+            switch(deviceKind) {
                 case SystemCameraKind::PUBLIC:
                     publicCameraCount++;
                     break;
@@ -140,7 +145,12 @@ void CameraProviderManager::collectDeviceIdsLocked(const std::vector<std::string
         std::vector<std::string>& publicDeviceIds,
         std::vector<std::string>& systemDeviceIds) const {
     for (auto &deviceId : deviceIds) {
-        if (getSystemCameraKindLocked(deviceId) == SystemCameraKind::SYSTEM_ONLY_CAMERA) {
+        SystemCameraKind deviceKind = SystemCameraKind::PUBLIC;
+        if (getSystemCameraKindLocked(deviceId, &deviceKind) != OK) {
+            ALOGE("%s: Invalid camera id %s, skipping", __FUNCTION__, deviceId.c_str());
+            continue;
+        }
+        if (deviceKind == SystemCameraKind::SYSTEM_ONLY_CAMERA) {
             systemDeviceIds.push_back(deviceId);
         } else {
             publicDeviceIds.push_back(deviceId);
@@ -158,9 +168,13 @@ std::vector<std::string> CameraProviderManager::getAPI1CompatibleCameraDeviceIds
         // Secure cameras should not be exposed through camera 1 api
         providerDeviceIds.erase(std::remove_if(providerDeviceIds.begin(), providerDeviceIds.end(),
                 [this](const std::string& s) {
-                bool rem = this->getSystemCameraKindLocked(s) ==
-                        SystemCameraKind::HIDDEN_SECURE_CAMERA;
-                return rem;}), providerDeviceIds.end());
+                SystemCameraKind deviceKind = SystemCameraKind::PUBLIC;
+                if (getSystemCameraKindLocked(s, &deviceKind) != OK) {
+                    ALOGE("%s: Invalid camera id %s, skipping", __FUNCTION__, s.c_str());
+                    return true;
+                }
+                return deviceKind == SystemCameraKind::HIDDEN_SECURE_CAMERA;}),
+                providerDeviceIds.end());
         // API1 app doesn't handle logical and physical camera devices well. So
         // for each camera facing, only take the first id advertised by HAL in
         // all [logical, physical1, physical2, ...] id combos, and filter out the rest.
@@ -1089,26 +1103,45 @@ bool CameraProviderManager::isLogicalCamera(const std::string& id,
     return deviceInfo->mIsLogicalCamera;
 }
 
-SystemCameraKind CameraProviderManager::getSystemCameraKind(const std::string& id) const {
+status_t CameraProviderManager::getSystemCameraKind(const std::string& id,
+        SystemCameraKind *kind) const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
-    return getSystemCameraKindLocked(id);
+    return getSystemCameraKindLocked(id, kind);
 }
 
-SystemCameraKind CameraProviderManager::getSystemCameraKindLocked(const std::string& id) const {
+status_t CameraProviderManager::getSystemCameraKindLocked(const std::string& id,
+        SystemCameraKind *kind) const {
     auto deviceInfo = findDeviceInfoLocked(id);
-    if (deviceInfo == nullptr) {
-        return SystemCameraKind::PUBLIC;
+    if (deviceInfo != nullptr) {
+        *kind = deviceInfo->mSystemCameraKind;
+        return OK;
     }
-    return deviceInfo->mSystemCameraKind;
+    // If this is a hidden physical camera, we should return what kind of
+    // camera the enclosing logical camera is.
+    auto isHiddenAndParent = isHiddenPhysicalCameraInternal(id);
+    if (isHiddenAndParent.first) {
+        LOG_ALWAYS_FATAL_IF(id == isHiddenAndParent.second->mId,
+                "%s: hidden physical camera id %s and enclosing logical camera id %s are the same",
+                __FUNCTION__, id.c_str(), isHiddenAndParent.second->mId.c_str());
+        return getSystemCameraKindLocked(isHiddenAndParent.second->mId, kind);
+    }
+    // Neither a hidden physical camera nor a logical camera
+    return NAME_NOT_FOUND;
 }
 
-bool CameraProviderManager::isHiddenPhysicalCamera(const std::string& cameraId) {
+bool CameraProviderManager::isHiddenPhysicalCamera(const std::string& cameraId) const {
+    return isHiddenPhysicalCameraInternal(cameraId).first;
+}
+
+std::pair<bool, CameraProviderManager::ProviderInfo::DeviceInfo *>
+CameraProviderManager::isHiddenPhysicalCameraInternal(const std::string& cameraId) const {
+    auto falseRet = std::make_pair(false, nullptr);
     for (auto& provider : mProviders) {
         for (auto& deviceInfo : provider->mDevices) {
             if (deviceInfo->mId == cameraId) {
                 // cameraId is found in public camera IDs advertised by the
                 // provider.
-                return false;
+                return falseRet;
             }
         }
     }
@@ -1120,7 +1153,7 @@ bool CameraProviderManager::isHiddenPhysicalCamera(const std::string& cameraId) 
             if (res != OK) {
                 ALOGE("%s: Failed to getCameraCharacteristics for id %s", __FUNCTION__,
                         deviceInfo->mId.c_str());
-                return false;
+                return falseRet;
             }
 
             std::vector<std::string> physicalIds;
@@ -1132,16 +1165,16 @@ bool CameraProviderManager::isHiddenPhysicalCamera(const std::string& cameraId) 
                     if (deviceVersion < CAMERA_DEVICE_API_VERSION_3_5) {
                         ALOGE("%s: Wrong deviceVersion %x for hiddenPhysicalCameraId %s",
                                 __FUNCTION__, deviceVersion, cameraId.c_str());
-                        return false;
+                        return falseRet;
                     } else {
-                        return true;
+                        return std::make_pair(true, deviceInfo.get());
                     }
                 }
             }
         }
     }
 
-    return false;
+    return falseRet;
 }
 
 status_t CameraProviderManager::addProviderLocked(const std::string& newProvider) {

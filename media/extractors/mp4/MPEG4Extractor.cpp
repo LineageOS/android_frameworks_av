@@ -133,6 +133,7 @@ private:
 
     bool mIsAVC;
     bool mIsHEVC;
+    bool mIsDolbyVision;
     bool mIsAC4;
     bool mIsPcm;
     size_t mNALLengthSize;
@@ -337,6 +338,14 @@ static const char *FourCC2MIME(uint32_t fourcc) {
         case FOURCC("hvc1"):
         case FOURCC("hev1"):
             return MEDIA_MIMETYPE_VIDEO_HEVC;
+
+        case FOURCC("dvav"):
+        case FOURCC("dva1"):
+        case FOURCC("dvhe"):
+        case FOURCC("dvh1"):
+        case FOURCC("dav1"):
+            return MEDIA_MIMETYPE_VIDEO_DOLBY_VISION;
+
         case FOURCC("ac-4"):
             return MEDIA_MIMETYPE_AUDIO_AC4;
         case FOURCC("Opus"):
@@ -1062,6 +1071,62 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     mLastTrack->mTx3gBuffer = NULL;
                 }
 
+                const char *mime;
+                AMediaFormat_getString(mLastTrack->meta, AMEDIAFORMAT_KEY_MIME, &mime);
+
+                if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_DOLBY_VISION)) {
+                    void *data;
+                    size_t size;
+
+                    if (AMediaFormat_getBuffer(mLastTrack->meta, AMEDIAFORMAT_KEY_CSD_2, &data, &size)) {
+                        const uint8_t *ptr = (const uint8_t *)data;
+                        const uint8_t profile = ptr[2] >> 1;
+                        const uint8_t bl_compatibility_id = (ptr[4]) >> 4;
+
+                        if (4 == profile || 7 == profile ||
+                                (profile >= 8 && profile < 11 && bl_compatibility_id)) {
+                            // we need a backward compatible track
+                            ALOGV("Adding new backward compatible track");
+                            Track *track_b = new Track;
+
+                            track_b->timescale = mLastTrack->timescale;
+                            track_b->sampleTable = mLastTrack->sampleTable;
+                            track_b->includes_expensive_metadata = mLastTrack->includes_expensive_metadata;
+                            track_b->skipTrack = mLastTrack->skipTrack;
+                            track_b->has_elst = mLastTrack->has_elst;
+                            track_b->elst_media_time = mLastTrack->elst_media_time;
+                            track_b->elst_segment_duration = mLastTrack->elst_segment_duration;
+                            track_b->elstShiftStartTicks = mLastTrack->elstShiftStartTicks;
+                            track_b->subsample_encryption = mLastTrack->subsample_encryption;
+
+                            track_b->mTx3gBuffer = mLastTrack->mTx3gBuffer;
+                            track_b->mTx3gSize = mLastTrack->mTx3gSize;
+                            track_b->mTx3gFilled = mLastTrack->mTx3gFilled;
+
+                            track_b->meta = AMediaFormat_new();
+                            AMediaFormat_copy(track_b->meta, mLastTrack->meta);
+
+                            mLastTrack->next = track_b;
+                            track_b->next = NULL;
+
+                            auto id = track_b->meta->mFormat->findEntryByName(AMEDIAFORMAT_KEY_CSD_2);
+                            track_b->meta->mFormat->removeEntryAt(id);
+
+                            if (4 == profile || 7 == profile || 8 == profile ) {
+                                AMediaFormat_setString(track_b->meta,
+                                        AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_HEVC);
+                            } else if (9 == profile) {
+                                AMediaFormat_setString(track_b->meta,
+                                        AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_AVC);
+                            } else if (10 == profile) {
+                                AMediaFormat_setString(track_b->meta,
+                                        AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_AV1);
+                            } // Should never get to else part
+
+                            mLastTrack = track_b;
+                        }
+                    }
+                }
             } else if (chunk_type == FOURCC("moov")) {
                 mInitCheck = OK;
 
@@ -1830,6 +1895,11 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC("avc1"):
         case FOURCC("hvc1"):
         case FOURCC("hev1"):
+        case FOURCC("dvav"):
+        case FOURCC("dva1"):
+        case FOURCC("dvhe"):
+        case FOURCC("dvh1"):
+        case FOURCC("dav1"):
         case FOURCC("av01"):
         {
             uint8_t buffer[78];
@@ -1984,7 +2054,8 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     // for audio, use 128KB
                     max_size = 1024 * 128;
                 } else if (!strcmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)
-                        || !strcmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)) {
+                        || !strcmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)
+                        || !strcmp(mime, MEDIA_MIMETYPE_VIDEO_DOLBY_VISION)) {
                     // AVC & HEVC requires compression ratio of at least 2, and uses
                     // macroblocks
                     max_size = ((width + 15) / 16) * ((height + 15) / 16) * 192;
@@ -2311,6 +2382,30 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
 
             AMediaFormat_setBuffer(mLastTrack->meta,
                    AMEDIAFORMAT_KEY_CSD_0, buffer.get(), chunk_data_size);
+
+            *offset += chunk_size;
+            break;
+        }
+        case FOURCC("dvcC"):
+        case FOURCC("dvvC"): {
+            auto buffer = heapbuffer<uint8_t>(chunk_data_size);
+
+            if (buffer.get() == NULL) {
+                ALOGE("b/28471206");
+                return NO_MEMORY;
+            }
+
+            if (mDataSource->readAt(data_offset, buffer.get(), chunk_data_size) < chunk_data_size) {
+                return ERROR_IO;
+            }
+
+            if (mLastTrack == NULL)
+                return ERROR_MALFORMED;
+
+            AMediaFormat_setBuffer(mLastTrack->meta, AMEDIAFORMAT_KEY_CSD_2,
+                                   buffer.get(), chunk_data_size);
+            AMediaFormat_setString(mLastTrack->meta, AMEDIAFORMAT_KEY_MIME,
+                                   MEDIA_MIMETYPE_VIDEO_DOLBY_VISION);
 
             *offset += chunk_size;
             break;
@@ -4127,7 +4222,20 @@ MediaTrackHelper *MPEG4Extractor::getTrack(size_t index) {
         if (!strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC)) {
             itemTable = mItemTable;
         }
-    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AV1)) {
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_DOLBY_VISION)) {
+        void *data;
+        size_t size;
+        if (!AMediaFormat_getBuffer(track->meta, AMEDIAFORMAT_KEY_CSD_2, &data, &size)) {
+            return NULL;
+        }
+
+        const uint8_t *ptr = (const uint8_t *)data;
+
+        // dv_major.dv_minor Should be 1.0 or 2.1
+        if (size != 24 || ((ptr[0] != 1 || ptr[1] != 0) && (ptr[0] != 2 || ptr[1] != 1))) {
+            return NULL;
+        }
+   } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AV1)) {
         void *data;
         size_t size;
         if (!AMediaFormat_getBuffer(track->meta, AMEDIAFORMAT_KEY_CSD_0, &data, &size)) {
@@ -4170,6 +4278,10 @@ status_t MPEG4Extractor::verifyTrack(Track *track) {
         }
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)) {
         if (!AMediaFormat_getBuffer(track->meta, AMEDIAFORMAT_KEY_CSD_HEVC, &data, &size)) {
+            return ERROR_MALFORMED;
+        }
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_DOLBY_VISION)) {
+        if (!AMediaFormat_getBuffer(track->meta, AMEDIAFORMAT_KEY_CSD_2, &data, &size)) {
             return ERROR_MALFORMED;
         }
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AV1)) {
@@ -4659,6 +4771,7 @@ MPEG4Source::MPEG4Source(
       mCurrentSampleInfoOffsets(NULL),
       mIsAVC(false),
       mIsHEVC(false),
+      mIsDolbyVision(false),
       mIsAC4(false),
       mIsPcm(false),
       mNALLengthSize(0),
@@ -4698,6 +4811,7 @@ MPEG4Source::MPEG4Source(
     mIsHEVC = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC) ||
               !strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC);
     mIsAC4 = !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AC4);
+    mIsDolbyVision = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_DOLBY_VISION);
 
     if (mIsAVC) {
         void *data;
@@ -4722,6 +4836,42 @@ MPEG4Source::MPEG4Source(
         CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
 
         mNALLengthSize = 1 + (ptr[14 + 7] & 3);
+    } else if (mIsDolbyVision) {
+        ALOGV("%s DolbyVision stream detected", __FUNCTION__);
+        void *data;
+        size_t size;
+        CHECK(AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_2, &data, &size));
+
+        const uint8_t *ptr = (const uint8_t *)data;
+
+        CHECK(size == 24);
+
+        // dv_major.dv_minor Should be 1.0 or 2.1
+        CHECK(!((ptr[0] != 1 || ptr[1] != 0) && (ptr[0] != 2 || ptr[1] != 1)));
+
+        const uint8_t profile = ptr[2] >> 1;
+        // profile == (unknown,1,9) --> AVC; profile = (2,3,4,5,6,7,8) --> HEVC;
+        // profile == (10) --> AV1
+        if (profile > 1 && profile < 9) {
+            CHECK(AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_HEVC, &data, &size));
+
+            const uint8_t *ptr = (const uint8_t *)data;
+
+            CHECK(size >= 22);
+            CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
+
+            mNALLengthSize = 1 + (ptr[14 + 7] & 3);
+        } else if (10 == profile) {
+            /* AV1 profile nothing to do */
+        } else {
+            CHECK(AMediaFormat_getBuffer(format, AMEDIAFORMAT_KEY_CSD_AVC, &data, &size));
+            const uint8_t *ptr = (const uint8_t *)data;
+
+            CHECK(size >= 7);
+            CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
+            // The number of bytes used to encode the length of a NAL unit.
+            mNALLengthSize = 1 + (ptr[4] & 3);
+        }
     }
 
     mIsPcm = !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_RAW);
@@ -5789,7 +5939,7 @@ media_status_t MPEG4Source::read(
         }
     }
 
-    if (!mIsAVC && !mIsHEVC && !mIsAC4) {
+    if (!mIsAVC && !mIsHEVC && !(mIsDolbyVision && mNALLengthSize) && !mIsAC4) {
         if (newBuffer) {
             if (mIsPcm) {
                 // The twos' PCM block reader assumes that all samples has the same size.
@@ -6179,7 +6329,7 @@ media_status_t MPEG4Source::fragmentedRead(
         AMediaFormat_setBuffer(bufmeta, AMEDIAFORMAT_KEY_CRYPTO_IV, iv, ivlength);
     }
 
-    if (!mIsAVC && !mIsHEVC) {
+    if (!mIsAVC && !mIsHEVC && !(mIsDolbyVision && mNALLengthSize)) {
         if (newBuffer) {
             if (!isInRange((size_t)0u, mBuffer->size(), size)) {
                 mBuffer->release();
