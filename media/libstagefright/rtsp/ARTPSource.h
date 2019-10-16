@@ -54,7 +54,10 @@ struct ARTPSource : public RefBase {
     uint32_t getSelfID();
     void setSelfID(const uint32_t selfID);
     void setJbTime(const uint32_t jbTime);
+    void setPeriodicFIR(bool enable);
     void notifyPktInfo(int32_t bitrate, int64_t time);
+    // FIR needs to be sent by missing packet or broken video image.
+    void onIssueFIRByAssembler();
 
     void noticeAbandonBuffer(int cnt=1);
 
@@ -96,6 +99,7 @@ private:
     int64_t mLastNTPTimeUpdateUs;
 
     bool mIssueFIRRequests;
+    bool mIssueFIRByAssembler;
     int64_t mLastFIRRequestUs;
     uint8_t mNextFIRSeqNo;
 

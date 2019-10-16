@@ -448,13 +448,20 @@ void ARTPConnection::onPollStreams() {
                 continue;
             }
 
-            // addNACK
+            // add NACK and FIR that needs to be sent immediately.
             sp<ABuffer> buffer = new ABuffer(kMaxUDPSize);
             for (size_t i = 0; i < it->mSources.size(); ++i) {
                 buffer->setRange(0, 0);
                 int cnt = it->mSources.valueAt(i)->addNACK(buffer);
                 if (cnt > 0) {
                     ALOGV("Send NACK for lost %d Packets", cnt);
+                    send(&*it, buffer);
+                }
+
+                buffer->setRange(0, 0);
+                it->mSources.valueAt(i)->addFIR(buffer);
+                if (buffer->size() > 0) {
+                    ALOGD("Send FIR immediately for lost Packets");
                     send(&*it, buffer);
                 }
             }
@@ -1031,6 +1038,9 @@ sp<ARTPSource> ARTPConnection::findSource(StreamInfo *info, uint32_t srcId) {
 
         source = new ARTPSource(
                 srcId, info->mSessionDesc, info->mIndex, info->mNotifyMsg);
+
+        if (mFlags & kViLTEConnection)
+            source->setPeriodicFIR(false);
 
         source->setSelfID(mSelfID);
         source->setJbTime(mJbTime > 0 ? mJbTime : 300);

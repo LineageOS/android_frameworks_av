@@ -80,6 +80,8 @@ struct NuPlayer::RTPSource : public NuPlayer::Source {
             int64_t seekTimeUs,
             MediaPlayerSeekMode mode = MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC) override;
 
+    virtual bool isRealTime() const;
+
     void onMessageReceived(const sp<AMessage> &msg);
 
     virtual void setTargetBitrate(int32_t bitrate) override;

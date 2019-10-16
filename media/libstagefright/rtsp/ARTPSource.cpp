@@ -60,6 +60,7 @@ ARTPSource::ARTPSource(
       mLastNTPTime(0),
       mLastNTPTimeUpdateUs(0),
       mIssueFIRRequests(false),
+      mIssueFIRByAssembler(false),
       mLastFIRRequestUs(-1),
       mNextFIRSeqNo((rand() * 256.0) / RAND_MAX),
       mNotify(notify) {
@@ -210,15 +211,28 @@ void ARTPSource::byeReceived() {
 }
 
 void ARTPSource::addFIR(const sp<ABuffer> &buffer) {
-    if (!mIssueFIRRequests) {
+    if (!mIssueFIRRequests && !mIssueFIRByAssembler) {
         return;
     }
 
+    bool send = false;
     int64_t nowUs = ALooper::GetNowUs();
-    if (mLastFIRRequestUs >= 0 && mLastFIRRequestUs + 5000000LL > nowUs) {
-        // Send FIR requests at most every 5 secs.
-        return;
+    int64_t timeAfterLastFIR = nowUs - mLastFIRRequestUs;
+    if (mLastFIRRequestUs < 0) {
+        // A first FIR, just send it.
+        send = true;
+    }  else if (mIssueFIRByAssembler && (timeAfterLastFIR > 1000000)) {
+        // A FIR issued by Assembler.
+        // Send it if last FIR is not sent within a sec.
+        send = true;
+    } else if (mIssueFIRRequests && (timeAfterLastFIR > 5000000)) {
+        // A FIR issued periodically reagardless packet loss.
+        // Send it if last FIR is not sent within 5 secs.
+        send = true;
     }
+
+    if (!send)
+        return;
 
     mLastFIRRequestUs = nowUs;
 
@@ -255,6 +269,9 @@ void ARTPSource::addFIR(const sp<ABuffer> &buffer) {
     data[19] = 0x00;
 
     buffer->setRange(buffer->offset(), buffer->size() + (data[3] + 1) * sizeof(int32_t));
+
+    if (mIssueFIRByAssembler)
+        mIssueFIRByAssembler = false;
 
     ALOGV("Added FIR request.");
 }
@@ -490,6 +507,11 @@ void ARTPSource::setJbTime(const uint32_t jbTime) {
     mJbTime = jbTime;
 }
 
+void ARTPSource::setPeriodicFIR(bool enable) {
+    ALOGD("setPeriodicFIR %d", enable);
+    mIssueFIRRequests = enable;
+}
+
 void ARTPSource::notifyPktInfo(int32_t bitrate, int64_t /*time*/) {
     sp<AMessage> notify = mNotify->dup();
     notify->setInt32("rtcp-event", 1);
@@ -507,6 +529,10 @@ void ARTPSource::notifyPktInfo(int32_t bitrate, int64_t /*time*/) {
     uint32_t expected = mHighestSeqNumber - mBaseSeqNumber + 1;
     mPrevExpected = expected;
     mPrevNumBuffersReceived = mNumBuffersReceived;
+}
+
+void ARTPSource::onIssueFIRByAssembler() {
+    mIssueFIRByAssembler = true;
 }
 
 void ARTPSource::noticeAbandonBuffer(int cnt) {
