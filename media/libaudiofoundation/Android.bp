@@ -12,7 +12,7 @@ cc_library_headers {
     ],
 }
 
-cc_library_shared {
+cc_library {
     name: "libaudiofoundation",
     vendor_available: true,
     double_loadable: true,
