@@ -288,7 +288,6 @@ cc_library {
         "IMediaMetadataRetriever.cpp",
         "mediametadataretriever.cpp",
         "MidiDeviceInfo.cpp",
-        "JetPlayer.cpp",
         "MediaScanner.cpp",
         "MediaScannerClient.cpp",
         "CharacterEncodingDetector.cpp",
@@ -348,7 +347,6 @@ cc_library {
 
     static_libs: [
         "libc_malloc_debug_backtrace",  // for memory heap analysis
-        "libmedia_midiiowrapper",
     ],
 
     export_include_dirs: [
