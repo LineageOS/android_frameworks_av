@@ -563,7 +563,7 @@ AudioFlinger::PlaybackThread::Track::Track(
                 mFrameSize, !isExternalTrack(), sampleRate);
     } else {
         mAudioTrackServerProxy = new StaticAudioTrackServerProxy(mCblk, mBuffer, frameCount,
-                mFrameSize);
+                mFrameSize, sampleRate);
     }
     mServerProxy = mAudioTrackServerProxy;
 

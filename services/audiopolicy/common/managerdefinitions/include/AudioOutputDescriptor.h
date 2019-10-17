@@ -21,6 +21,7 @@
 
 #include <sys/types.h>
 
+#include <media/AudioContainers.h>
 #include <utils/Errors.h>
 #include <utils/Timers.h>
 #include <utils/KeyedVector.h>
@@ -156,10 +157,10 @@ public:
     virtual DeviceVector supportedDevices() const  { return mDevices; }
     virtual bool isDuplicated() const { return false; }
     virtual uint32_t latency() { return 0; }
-    virtual bool isFixedVolume(audio_devices_t device);
+    virtual bool isFixedVolume(const DeviceTypeSet& deviceTypes);
     virtual bool setVolume(float volumeDb,
                            VolumeSource volumeSource, const StreamTypeVector &streams,
-                           audio_devices_t device,
+                           const DeviceTypeSet& deviceTypes,
                            uint32_t delayMs,
                            bool force);
 
@@ -329,10 +330,10 @@ public:
     void setDevices(const DeviceVector &devices) { mDevices = devices; }
     bool sharesHwModuleWith(const sp<SwAudioOutputDescriptor>& outputDesc);
     virtual DeviceVector supportedDevices() const;
-    virtual bool deviceSupportsEncodedFormats(audio_devices_t device);
+    virtual bool devicesSupportEncodedFormats(const DeviceTypeSet& deviceTypes);
     virtual uint32_t latency();
     virtual bool isDuplicated() const { return (mOutput1 != NULL && mOutput2 != NULL); }
-    virtual bool isFixedVolume(audio_devices_t device);
+    virtual bool isFixedVolume(const DeviceTypeSet& deviceTypes);
     sp<SwAudioOutputDescriptor> subOutput1() { return mOutput1; }
     sp<SwAudioOutputDescriptor> subOutput2() { return mOutput2; }
     void setClientActive(const sp<TrackClientDescriptor>& client, bool active) override;
@@ -344,7 +345,7 @@ public:
     }
     virtual bool setVolume(float volumeDb,
                            VolumeSource volumeSource, const StreamTypeVector &streams,
-                           audio_devices_t device,
+                           const DeviceTypeSet& device,
                            uint32_t delayMs,
                            bool force);
 
@@ -418,7 +419,7 @@ public:
 
     virtual bool setVolume(float volumeDb,
                            VolumeSource volumeSource, const StreamTypeVector &streams,
-                           audio_devices_t device,
+                           const DeviceTypeSet& deviceTypes,
                            uint32_t delayMs,
                            bool force);
 

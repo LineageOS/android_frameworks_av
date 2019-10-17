@@ -9,6 +9,7 @@ cc_library_shared {
     vendor_available: true,
 
     srcs: [
+        "AudioContainers.cpp",
         "AudioGain.cpp",
         "AudioPort.cpp",
         "AudioProfile.cpp",
