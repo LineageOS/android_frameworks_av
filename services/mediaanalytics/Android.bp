@@ -5,8 +5,32 @@ cc_binary {
     name: "mediametrics",
 
     srcs: [
-        "iface_statsd.cpp",
         "main_mediametrics.cpp",
+    ],
+
+    shared_libs: [
+        "libbinder",
+        "liblog",
+        "libmediaanalyticsservice",
+        "libutils",
+    ],
+
+    init_rc: [
+        "mediametrics.rc",
+    ],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+}
+
+cc_library_shared {
+    name: "libmediaanalyticsservice",
+
+    srcs: [
+        "iface_statsd.cpp",
         "MediaAnalyticsService.cpp",
         "statsd_audiopolicy.cpp",
         "statsd_audiorecord.cpp",
@@ -37,16 +61,12 @@ cc_binary {
     ],
 
     include_dirs: [
-        "system/media/audio_utils/include"
+        "system/media/audio_utils/include",
     ],
-
-    init_rc: ["mediametrics.rc"],
 
     cflags: [
         "-Wall",
         "-Werror",
         "-Wextra",
     ],
-    clang: true,
-
 }

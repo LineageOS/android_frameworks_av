@@ -34,8 +34,24 @@ public:
     MediaAnalyticsService();
     ~MediaAnalyticsService() override;
 
-    // caller surrenders ownership of item, MediaAnalyticsService will delete.
-    int64_t submit(MediaAnalyticsItem *item, bool forcenew) override;
+    /**
+     * Submits the indicated record to the mediaanalytics service, where
+     * it will be merged (if appropriate) with incomplete records that
+     * share the same key and sessionid.
+     *
+     * \param item the item to submit.
+     * \param forcenew marks any matching incomplete record as complete before
+     *                 inserting this new record.
+     *
+     * \return the sessionID associated with that item or
+     *         MediaAnalyticsItem::SessionIDInvalid on failure.
+     *
+     * BEWARE: When called directly on the service (not from the binder interface),
+     * the caller surrenders ownership of item, MediaAnalyticsService will delete
+     * even on error.  The binder interface does not take ownership.
+     * TODO: fix this inconsistency with the binder RPC interface.
+     */
+    MediaAnalyticsItem::SessionID_t submit(MediaAnalyticsItem *item, bool forcenew) override;
 
     status_t dump(int fd, const Vector<String16>& args) override;
 
