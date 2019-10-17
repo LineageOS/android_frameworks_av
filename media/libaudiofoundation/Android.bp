@@ -4,7 +4,7 @@ cc_library_headers {
     export_include_dirs: ["include"],
 }
 
-cc_library_shared {
+cc_library {
     name: "libaudiofoundation",
     vendor_available: true,
 
