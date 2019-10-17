@@ -52,7 +52,7 @@ struct statsd_hooks {
 };
 
 // keep this sorted, so we can do binary searches
-struct statsd_hooks  statsd_handlers[] =
+static constexpr struct statsd_hooks statsd_handlers[] =
 {
     { "audiopolicy", statsd_audiopolicy },
     { "audiorecord", statsd_audiorecord },
@@ -68,7 +68,6 @@ struct statsd_hooks  statsd_handlers[] =
     { "recorder", statsd_recorder },
 };
 
-
 // give me a record, i'll look at the type and upload appropriately
 bool dump2Statsd(MediaAnalyticsItem *item) {
     if (item == NULL) return false;
@@ -81,10 +80,9 @@ bool dump2Statsd(MediaAnalyticsItem *item) {
         return false;
     }
 
-    int i;
-    for(i = 0;i < sizeof(statsd_handlers) / sizeof(statsd_handlers[0]) ; i++) {
-        if (key == statsd_handlers[i].key) {
-            return (*statsd_handlers[i].handler)(item);
+    for (const auto &statsd_handler : statsd_handlers) {
+        if (key == statsd_handler.key) {
+            return statsd_handler.handler(item);
         }
     }
     return false;

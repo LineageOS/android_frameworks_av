@@ -16,33 +16,33 @@
 
 #define LOG_TAG "mediametrics"
 //#define LOG_NDEBUG 0
-
-#include <binder/IPCThreadState.h>
-#include <binder/ProcessState.h>
-#include <binder/IServiceManager.h>
 #include <utils/Log.h>
-//#include "RegisterExtensions.h"
 
-// from LOCAL_C_INCLUDES
 #include "MediaAnalyticsService.h"
 
-using namespace android;
+#include <binder/IPCThreadState.h>
+#include <binder/IServiceManager.h>
+#include <binder/ProcessState.h>
+
 
 int main(int argc __unused, char **argv __unused)
 {
+    using namespace android;
+
     signal(SIGPIPE, SIG_IGN);
 
     // to match the service name
     // we're replacing "/system/bin/mediametrics" with "media.metrics"
     // we add a ".", but discard the path components: we finish with a shorter string
-    strcpy(argv[0], "media.metrics");
+    strcpy(argv[0], MediaAnalyticsService::kServiceName);
 
-    sp<ProcessState> proc(ProcessState::self());
-    sp<IServiceManager> sm(defaultServiceManager());
-    ALOGI("ServiceManager: %p", sm.get());
+    defaultServiceManager()->addService(
+            String16(MediaAnalyticsService::kServiceName), new MediaAnalyticsService());
 
-    MediaAnalyticsService::instantiate();
-
-    ProcessState::self()->startThreadPool();
+    sp<ProcessState> processState(ProcessState::self());
+    // processState->setThreadPoolMaxThreadCount(8);
+    processState->startThreadPool();
     IPCThreadState::self()->joinThreadPool();
+
+    return EXIT_SUCCESS;
 }

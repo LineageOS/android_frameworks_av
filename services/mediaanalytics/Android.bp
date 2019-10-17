@@ -6,8 +6,32 @@ cc_binary {
 
     srcs: [
         "main_mediametrics.cpp",
-        "MediaAnalyticsService.cpp",
+    ],
+
+    shared_libs: [
+        "libbinder",
+        "liblog",
+        "libmediaanalyticsservice",
+        "libutils",
+    ],
+
+    init_rc: [
+        "mediametrics.rc",
+    ],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+}
+
+cc_library_shared {
+    name: "libmediaanalyticsservice",
+
+    srcs: [
         "iface_statsd.cpp",
+        "MediaAnalyticsService.cpp",
         "statsd_audiopolicy.cpp",
         "statsd_audiorecord.cpp",
         "statsd_audiothread.cpp",
@@ -24,45 +48,25 @@ cc_binary {
     },
 
     shared_libs: [
-        "libcutils",
-        "liblog",
-        "libmedia",
-        "libutils",
         "libbinder",
-        "libdl",
-        "libgui",
-        "libmedia",
-        "libmediautils",
+        "liblog",
         "libmediametrics",
-        "libstagefright_foundation",
+        "libprotobuf-cpp-lite",
         "libstatslog",
         "libutils",
-        "libprotobuf-cpp-lite",
     ],
 
     static_libs: [
         "libplatformprotos",
-        "libregistermsext",
     ],
 
     include_dirs: [
-        "frameworks/av/media/libstagefright/include",
-        "frameworks/av/media/libstagefright/rtsp",
-        "frameworks/av/media/libstagefright/webm",
-        "frameworks/av/include/media",
-        "frameworks/av/camera/include/camera",
-        "frameworks/native/include/media/openmax",
-        "frameworks/native/include/media/hardware",
-        "external/tremolo/Tremolo",
+        "system/media/audio_utils/include",
     ],
-
-    init_rc: ["mediametrics.rc"],
 
     cflags: [
-        "-Werror",
         "-Wall",
-        "-Wno-error=deprecated-declarations",
+        "-Werror",
+        "-Wextra",
     ],
-    clang: true,
-
 }

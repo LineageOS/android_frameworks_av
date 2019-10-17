@@ -1,0 +1,25 @@
+cc_test {
+    name: "mediametrics_tests",
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+
+    include_dirs: [
+        "frameworks/av/services/mediaanalytics",
+    ],
+
+    shared_libs: [
+        "libbinder",
+        "liblog",
+        "libmediaanalyticsservice",
+        "libmediametrics",
+        "libutils",
+    ],
+
+    srcs: [
+        "mediametrics_tests.cpp",
+    ],
+}
