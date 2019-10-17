@@ -1,0 +1,33 @@
+cc_test_library {
+    name: "libmediabenchmark_jni",
+
+    defaults: [
+        "libmediabenchmark_common-defaults",
+        "libmediabenchmark_soft_sanitize_all-defaults",
+    ],
+
+    srcs: [
+        "NativeEncoder.cpp",
+        "NativeDecoder.cpp",
+    ],
+
+    shared_libs: [
+        "liblog",
+    ],
+
+    sdk_version: "current",
+
+    static_libs: [
+        "libmediabenchmark_common",
+        "libmediabenchmark_extractor",
+        "libmediabenchmark_decoder",
+        "libmediabenchmark_encoder",
+    ],
+
+    stl: "c++_static",
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+}

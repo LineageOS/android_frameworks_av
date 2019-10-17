@@ -53,14 +53,14 @@ void Stats::dumpStatistics(std::string operation, std::string inputReference, in
     }
 
     // Print the Stats
-    std::cout << "Input Reference : " << inputReference << endl;
-    std::cout << "Setup Time in nano sec : " << mInitTimeNs << endl;
-    std::cout << "Average Time in nano sec : " << totalTimeTakenNs / mOutputTimer.size() << endl;
-    std::cout << "Time to first frame in nano sec : " << timeToFirstFrameNs << endl;
-    std::cout << "Time taken (in nano sec) to " << operation
-              << " 1 sec of content : " << timeTakenPerSec << endl;
-    std::cout << "Total bytes " << operation << "ed : " << size << endl;
-    std::cout << "Minimum Time in nano sec : " << minTimeTakenNs << endl;
-    std::cout << "Maximum Time in nano sec : " << maxTimeTakenNs << endl;
-    std::cout << "Destroy Time in nano sec : " << mDeInitTimeNs << endl;
+    ALOGI("Input Reference : %s \n", inputReference.c_str());
+    ALOGI("Setup Time in nano sec : %" PRId64 "\n", mInitTimeNs);
+    ALOGI("Average Time in nano sec : %" PRId64 "\n", totalTimeTakenNs / mOutputTimer.size());
+    ALOGI("Time to first frame in nano sec : %" PRId64 "\n", timeToFirstFrameNs);
+    ALOGI("Time taken (in nano sec) to %s 1 sec of content : %" PRId64 "\n", operation.c_str(),
+          timeTakenPerSec);
+    ALOGI("Total bytes %sed : %d\n", operation.c_str(), size);
+    ALOGI("Minimum Time in nano sec : %" PRId64 "\n", minTimeTakenNs);
+    ALOGI("Maximum Time in nano sec : %" PRId64 "\n", maxTimeTakenNs);
+    ALOGI("Destroy Time in nano sec : %" PRId64 "\n", mDeInitTimeNs);
 }
