@@ -782,7 +782,7 @@ void NuPlayer::GenericSource::sendTextData(
         return;
     }
 
-    int64_t nextSubTimeUs;
+    int64_t nextSubTimeUs = 0;
     readBuffer(type, -1, MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC /* mode */, &nextSubTimeUs);
 
     sp<ABuffer> buffer;
