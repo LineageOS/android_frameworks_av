@@ -895,9 +895,8 @@ status_t DrmHal::getKeyRequest(Vector<uint8_t> const &sessionId,
 status_t DrmHal::provideKeyResponse(Vector<uint8_t> const &sessionId,
         Vector<uint8_t> const &response, Vector<uint8_t> &keySetId) {
     Mutex::Autolock autoLock(mLock);
-    EventTimer<status_t> keyResponseTimer(&mMetrics.mProvideKeyResponseTimeUs);
-
     INIT_CHECK();
+    EventTimer<status_t> keyResponseTimer(&mMetrics.mProvideKeyResponseTimeUs);
 
     DrmSessionManager::Instance()->useSession(sessionId);
 
