@@ -40,24 +40,15 @@ public:
     DECLARE_META_INTERFACE(MediaAnalyticsService);
 
     /**
-     * Returns a unique sessionID to use across multiple requests;
-     * 'unique' is within this device, since last reboot.
-     */
-    virtual MediaAnalyticsItem::SessionID_t generateUniqueSessionID() = 0;
-
-    /**
      * Submits the indicated record to the mediaanalytics service, where
      * it will be merged (if appropriate) with incomplete records that
      * share the same key and sessionID.
      *
      * \param item the item to submit.
-     * \param forcenew marks any matching incomplete record as complete before
-     *                 inserting this new record.
-     *
-     * \return the sessionID associated with that item or
-     *         MediaAnalyticsItem::SessionIDInvalid on failure.
+     * \return status which is negative if an error is detected (some errors
+               may be silent and return 0 - success).
      */
-    virtual MediaAnalyticsItem::SessionID_t submit(MediaAnalyticsItem *item, bool forcenew) = 0;
+    virtual status_t submit(MediaAnalyticsItem *item) = 0;
 };
 
 // ----------------------------------------------------------------------------
@@ -69,6 +60,11 @@ public:
                         const Parcel& data,
                         Parcel* reply,
                         uint32_t flags = 0) override;
+
+protected:
+    // Internal call where release is true if the service is to delete the item.
+    virtual status_t submitInternal(
+            MediaAnalyticsItem *item, bool release) = 0;
 };
 
 }; // namespace android

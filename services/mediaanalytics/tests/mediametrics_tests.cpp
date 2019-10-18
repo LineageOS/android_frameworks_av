@@ -30,26 +30,25 @@ TEST(mediametrics_tests, instantiate) {
   sp mediaMetrics = new MediaAnalyticsService();
   status_t status;
 
-  // NOTE: submission of items to MediaMetrics releases ownership, even on error.
-
   // random keys ignored when empty
-  status = mediaMetrics->submit(MediaAnalyticsItem::create("random_key"), false);
-  ASSERT_EQ(MediaAnalyticsItem::SessionIDInvalid, status);
+  std::unique_ptr<MediaAnalyticsItem> random_key(MediaAnalyticsItem::create("random_key"));
+  status = mediaMetrics->submit(random_key.get());
+  ASSERT_EQ(PERMISSION_DENIED, status);
 
   // random keys ignored with data
-  auto random_key = MediaAnalyticsItem::create("random_key");
   random_key->setInt32("foo", 10);
-  status = mediaMetrics->submit(random_key, false);
-  ASSERT_EQ(MediaAnalyticsItem::SessionIDInvalid, status);
+  status = mediaMetrics->submit(random_key.get());
+  ASSERT_EQ(PERMISSION_DENIED, status);
 
   // known keys ignored if empty
-  status = mediaMetrics->submit(MediaAnalyticsItem::create("audiotrack"), false);
-  ASSERT_EQ(MediaAnalyticsItem::SessionIDInvalid, status);
+  std::unique_ptr<MediaAnalyticsItem> audiotrack_key(MediaAnalyticsItem::create("audiotrack"));
+  status = mediaMetrics->submit(audiotrack_key.get());
+  ASSERT_EQ(BAD_VALUE, status);
 
-  auto audiotrack = MediaAnalyticsItem::create("audiotrack");
-  audiotrack->addInt32("foo", 10);
-  status = mediaMetrics->submit(audiotrack, false);
-  ASSERT_GT(status, MediaAnalyticsItem::SessionIDNone);
+  // known keys not ignored if not empty
+  audiotrack_key->addInt32("foo", 10);
+  status = mediaMetrics->submit(audiotrack_key.get());
+  ASSERT_EQ(NO_ERROR, status);
 
   mediaMetrics->dump(fileno(stdout), {} /* args */);
 }

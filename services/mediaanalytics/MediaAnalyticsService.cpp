@@ -66,19 +66,8 @@ MediaAnalyticsService::~MediaAnalyticsService()
     mItems.clear();
 }
 
-MediaAnalyticsItem::SessionID_t MediaAnalyticsService::generateUniqueSessionID() {
-    return ++mLastSessionID;
-}
-
-// TODO: consider removing forcenew.
-MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(
-        MediaAnalyticsItem *item, bool forcenew __unused)
+status_t MediaAnalyticsService::submitInternal(MediaAnalyticsItem *item, bool release)
 {
-    // fill in a sessionID if we do not yet have one
-    if (item->getSessionID() <= MediaAnalyticsItem::SessionIDNone) {
-        item->setSessionID(generateUniqueSessionID());
-    }
-
     // we control these, generally not trusting user input
     nsecs_t now = systemTime(SYSTEM_TIME_REALTIME);
     // round nsecs to seconds
@@ -136,8 +125,8 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(
 
     // validate the record; we discard if we don't like it
     if (isContentValid(item, isTrusted) == false) {
-        delete item;
-        return MediaAnalyticsItem::SessionIDInvalid;
+        if (release) delete item;
+        return PERMISSION_DENIED;
     }
 
     // XXX: if we have a sessionid in the new record, look to make
@@ -145,18 +134,17 @@ MediaAnalyticsItem::SessionID_t MediaAnalyticsService::submit(
 
     if (item->count() == 0) {
         ALOGV("%s: dropping empty record...", __func__);
-        delete item;
-        return MediaAnalyticsItem::SessionIDInvalid;
+        if (release) delete item;
+        return BAD_VALUE;
     }
 
     // send to statsd
     extern bool dump2Statsd(MediaAnalyticsItem *item);  // extern hook
     (void)dump2Statsd(item);  // failure should be logged in function.
 
-    // keep our copy
-    const MediaAnalyticsItem::SessionID_t id = item->getSessionID();
+    if (!release) item = item->dup();
     saveItem(item);
-    return id;
+    return NO_ERROR;
 }
 
 status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)

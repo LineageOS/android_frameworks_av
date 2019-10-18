@@ -22,10 +22,11 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include <mutex>
+
 #include <binder/Parcel.h>
 #include <utils/Errors.h>
 #include <utils/Log.h>
-#include <utils/Mutex.h>
 #include <utils/SortedVector.h>
 #include <utils/threads.h>
 
@@ -79,9 +80,7 @@ MediaAnalyticsItem::MediaAnalyticsItem()
     : mPid(-1),
       mUid(-1),
       mPkgVersionCode(0),
-      mSessionID(MediaAnalyticsItem::SessionIDNone),
       mTimestamp(0),
-      mFinalized(1),
       mPropCount(0), mPropSize(0), mProps(NULL)
 {
     mKey = MediaAnalyticsItem::kKeyNone;
@@ -91,9 +90,7 @@ MediaAnalyticsItem::MediaAnalyticsItem(MediaAnalyticsItem::Key key)
     : mPid(-1),
       mUid(-1),
       mPkgVersionCode(0),
-      mSessionID(MediaAnalyticsItem::SessionIDNone),
       mTimestamp(0),
-      mFinalized(1),
       mPropCount(0), mPropSize(0), mProps(NULL)
 {
     if (DEBUG_ALLOCATIONS) {
@@ -113,9 +110,6 @@ void MediaAnalyticsItem::clear() {
 
     // clean allocated storage from key
     mKey.clear();
-
-    // clean various major parameters
-    mSessionID = MediaAnalyticsItem::SessionIDNone;
 
     // clean attributes
     // contents of the attributes
@@ -143,9 +137,7 @@ MediaAnalyticsItem *MediaAnalyticsItem::dup() {
         dst->mUid = this->mUid;
         dst->mPkgName = this->mPkgName;
         dst->mPkgVersionCode = this->mPkgVersionCode;
-        dst->mSessionID = this->mSessionID;
         dst->mTimestamp = this->mTimestamp;
-        dst->mFinalized = this->mFinalized;
 
         // properties aka attributes
         dst->growProps(this->mPropCount);
@@ -156,35 +148,6 @@ MediaAnalyticsItem *MediaAnalyticsItem::dup() {
     }
 
     return dst;
-}
-
-MediaAnalyticsItem &MediaAnalyticsItem::setSessionID(MediaAnalyticsItem::SessionID_t id) {
-    mSessionID = id;
-    return *this;
-}
-
-MediaAnalyticsItem::SessionID_t MediaAnalyticsItem::getSessionID() const {
-    return mSessionID;
-}
-
-MediaAnalyticsItem::SessionID_t MediaAnalyticsItem::generateSessionID() {
-
-    if (mSessionID == SessionIDNone) {
-        // get one from the server
-        MediaAnalyticsItem::SessionID_t newid = SessionIDNone;
-        sp<IMediaAnalyticsService> svc = getInstance();
-        if (svc != NULL) {
-            newid = svc->generateUniqueSessionID();
-        }
-        mSessionID = newid;
-    }
-
-    return mSessionID;
-}
-
-MediaAnalyticsItem &MediaAnalyticsItem::clearSessionID() {
-    mSessionID = MediaAnalyticsItem::SessionIDNone;
-    return *this;
 }
 
 MediaAnalyticsItem &MediaAnalyticsItem::setTimestamp(nsecs_t ts) {
@@ -679,11 +642,8 @@ int32_t MediaAnalyticsItem::readFromParcel0(const Parcel& data) {
     mUid = data.readInt32();
     mPkgName = data.readCString();
     mPkgVersionCode = data.readInt64();
-    mSessionID = data.readInt64();
     // We no longer pay attention to user setting of finalized, BUT it's
     // still part of the wire packet -- so read & discard.
-    mFinalized = data.readInt32();
-    mFinalized = 1;
     mTimestamp = data.readInt64();
 
     int count = data.readInt32();
@@ -744,8 +704,6 @@ int32_t MediaAnalyticsItem::writeToParcel0(Parcel *data) {
     data->writeInt32(mUid);
     data->writeCString(mPkgName.c_str());
     data->writeInt64(mPkgVersionCode);
-    data->writeInt64(mSessionID);
-    data->writeInt32(mFinalized);
     data->writeInt64(mTimestamp);
 
     // set of items
@@ -821,9 +779,7 @@ std::string MediaAnalyticsItem::toString(int version) const {
     // same order as we spill into the parcel, although not required
     // key+session are our primary matching criteria
     result.append(mKey.c_str());
-    result.append(":");
-    snprintf(buffer, sizeof(buffer), "%" PRId64 ":", mSessionID);
-    result.append(buffer);
+    result.append(":0:"); // sessionID
 
     snprintf(buffer, sizeof(buffer), "%d:", mUid);
     result.append(buffer);
@@ -842,7 +798,7 @@ std::string MediaAnalyticsItem::toString(int version) const {
     }
     result.append(buffer);
 
-    snprintf(buffer, sizeof(buffer), "%d:", mFinalized);
+    snprintf(buffer, sizeof(buffer), "%d:", 0 /* finalized */); // TODO: remove this.
     result.append(buffer);
     snprintf(buffer, sizeof(buffer), "%" PRId64 ":", mTimestamp);
     result.append(buffer);
@@ -899,23 +855,12 @@ std::string MediaAnalyticsItem::toString(int version) const {
 // for the lazy, we offer methods that finds the service and
 // calls the appropriate daemon
 bool MediaAnalyticsItem::selfrecord() {
-    return selfrecord(false);
-}
-
-bool MediaAnalyticsItem::selfrecord(bool forcenew) {
-
-    if (DEBUG_API) {
-        std::string p = this->toString();
-        ALOGD("selfrecord of: %s [forcenew=%d]", p.c_str(), forcenew);
-    }
-
+    ALOGD_IF(DEBUG_API, "%s: delivering %s", __func__, this->toString().c_str());
     sp<IMediaAnalyticsService> svc = getInstance();
-
     if (svc != NULL) {
-        MediaAnalyticsItem::SessionID_t newid = svc->submit(this, forcenew);
-        if (newid == SessionIDInvalid) {
-            std::string p = this->toString();
-            ALOGW("Failed to record: %s [forcenew=%d]", p.c_str(), forcenew);
+        status_t status = svc->submit(this);
+        if (status != NO_ERROR) {
+            ALOGW("%s: failed to record: %s", __func__, this->toString().c_str());
             return false;
         }
         return true;
@@ -924,28 +869,32 @@ bool MediaAnalyticsItem::selfrecord(bool forcenew) {
     }
 }
 
-// get a connection we can reuse for most of our lifetime
-// static
-sp<IMediaAnalyticsService> MediaAnalyticsItem::sAnalyticsService;
-static Mutex sInitMutex;
-static int remainingBindAttempts = SVC_TRIES;
 
 //static
 bool MediaAnalyticsItem::isEnabled() {
-    int enabled = property_get_int32(MediaAnalyticsItem::EnabledProperty, -1);
+    // completely skip logging from certain UIDs. We do this here
+    // to avoid the multi-second timeouts while we learn that
+    // sepolicy will not let us find the service.
+    // We do this only for a select set of UIDs
+    // The sepolicy protection is still in place, we just want a faster
+    // response from this specific, small set of uids.
 
+    // This is checked only once in the lifetime of the process.
+    const uid_t uid = getuid();
+    switch (uid) {
+    case AID_RADIO:     // telephony subsystem, RIL
+        return false;
+    }
+
+    int enabled = property_get_int32(MediaAnalyticsItem::EnabledProperty, -1);
     if (enabled == -1) {
         enabled = property_get_int32(MediaAnalyticsItem::EnabledPropertyPersist, -1);
     }
     if (enabled == -1) {
         enabled = MediaAnalyticsItem::EnabledProperty_default;
     }
-    if (enabled <= 0) {
-        return false;
-    }
-    return true;
+    return enabled > 0;
 }
-
 
 // monitor health of our connection to the metrics service
 class MediaMetricsDeathNotifier : public IBinder::DeathRecipient {
@@ -955,83 +904,56 @@ class MediaMetricsDeathNotifier : public IBinder::DeathRecipient {
         }
 };
 
-static sp<MediaMetricsDeathNotifier> sNotifier = NULL;
+static sp<MediaMetricsDeathNotifier> sNotifier;
+// static
+sp<IMediaAnalyticsService> MediaAnalyticsItem::sAnalyticsService;
+static std::mutex sServiceMutex;
+static int sRemainingBindAttempts = SVC_TRIES;
 
 // static
 void MediaAnalyticsItem::dropInstance() {
-    Mutex::Autolock _l(sInitMutex);
-    remainingBindAttempts = SVC_TRIES;
-    sAnalyticsService = NULL;
+    std::lock_guard  _l(sServiceMutex);
+    sRemainingBindAttempts = SVC_TRIES;
+    sAnalyticsService = nullptr;
 }
 
 //static
 sp<IMediaAnalyticsService> MediaAnalyticsItem::getInstance() {
-
     static const char *servicename = "media.metrics";
-    int enabled = isEnabled();
+    static const bool enabled = isEnabled(); // singleton initialized
 
     if (enabled == false) {
-        if (DEBUG_SERVICEACCESS) {
-                ALOGD("disabled");
-        }
-        return NULL;
+        ALOGD_IF(DEBUG_SERVICEACCESS, "disabled");
+        return nullptr;
     }
-
-    // completely skip logging from certain UIDs. We do this here
-    // to avoid the multi-second timeouts while we learn that
-    // sepolicy will not let us find the service.
-    // We do this only for a select set of UIDs
-    // The sepolicy protection is still in place, we just want a faster
-    // response from this specific, small set of uids.
-    {
-        uid_t uid = getuid();
-        switch (uid) {
-            case AID_RADIO:     // telephony subsystem, RIL
-                return NULL;
-                break;
-            default:
-                // let sepolicy deny access if appropriate
-                break;
-        }
-    }
-
-    {
-        Mutex::Autolock _l(sInitMutex);
+    std::lock_guard _l(sServiceMutex);
+    // think of remainingBindAttempts as telling us whether service == nullptr because
+    // (1) we haven't tried to initialize it yet
+    // (2) we've tried to initialize it, but failed.
+    if (sAnalyticsService == nullptr && sRemainingBindAttempts > 0) {
         const char *badness = "";
-
-        // think of remainingBindAttempts as telling us whether service==NULL because
-        // (1) we haven't tried to initialize it yet
-        // (2) we've tried to initialize it, but failed.
-        if (sAnalyticsService == NULL && remainingBindAttempts > 0) {
-            sp<IServiceManager> sm = defaultServiceManager();
-            if (sm != NULL) {
-                sp<IBinder> binder = sm->getService(String16(servicename));
-                if (binder != NULL) {
-                    sAnalyticsService = interface_cast<IMediaAnalyticsService>(binder);
-                    if (sNotifier != NULL) {
-                        sNotifier = NULL;
-                    }
-                    sNotifier = new MediaMetricsDeathNotifier();
-                    binder->linkToDeath(sNotifier);
-                } else {
-                    badness = "did not find service";
-                }
+        sp<IServiceManager> sm = defaultServiceManager();
+        if (sm != nullptr) {
+            sp<IBinder> binder = sm->getService(String16(servicename));
+            if (binder != nullptr) {
+                sAnalyticsService = interface_cast<IMediaAnalyticsService>(binder);
+                sNotifier = new MediaMetricsDeathNotifier();
+                binder->linkToDeath(sNotifier);
             } else {
-                badness = "No Service Manager access";
+                badness = "did not find service";
             }
-
-            if (sAnalyticsService == NULL) {
-                if (remainingBindAttempts > 0) {
-                    remainingBindAttempts--;
-                }
-                if (DEBUG_SERVICEACCESS) {
-                    ALOGD("Unable to bind to service %s: %s", servicename, badness);
-                }
-            }
+        } else {
+            badness = "No Service Manager access";
         }
-
-        return sAnalyticsService;
+        if (sAnalyticsService == nullptr) {
+            if (sRemainingBindAttempts > 0) {
+                sRemainingBindAttempts--;
+            }
+            ALOGD_IF(DEBUG_SERVICEACCESS, "%s: unable to bind to service %s: %s",
+                    __func__, servicename, badness);
+        }
     }
+    return sAnalyticsService;
 }
 
 // merge the info from 'incoming' into this record.
@@ -1042,8 +964,6 @@ bool MediaAnalyticsItem::merge(MediaAnalyticsItem *incoming) {
     // 'this' should never be missing both of them...
     if (mKey.empty()) {
         mKey = incoming->mKey;
-    } else if (mSessionID == 0) {
-        mSessionID = incoming->mSessionID;
     }
 
     // for each attribute from 'incoming', resolve appropriately

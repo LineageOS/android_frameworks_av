@@ -56,12 +56,6 @@ class MediaAnalyticsItem {
                 kTypeRate = 5,
             };
 
-        // sessionid
-        // unique within device, within boot,
-        typedef int64_t SessionID_t;
-        static constexpr SessionID_t SessionIDInvalid = -1;
-        static constexpr SessionID_t SessionIDNone = 0;
-
         // Key: the record descriminator
         // values for the record discriminator
         // values can be "component/component"
@@ -102,16 +96,6 @@ class MediaAnalyticsItem {
         // access functions for the class
         ~MediaAnalyticsItem();
 
-        // SessionID ties multiple submissions for same key together
-        // so that if video "height" and "width" are known at one point
-        // and "framerate" is only known later, they can be be brought
-        // together.
-        MediaAnalyticsItem &setSessionID(SessionID_t);
-        MediaAnalyticsItem &clearSessionID();
-        SessionID_t getSessionID() const;
-        // generates and stores a new ID iff mSessionID == SessionIDNone
-        SessionID_t generateSessionID();
-
         // reset all contents, discarding any extra data
         void clear();
         MediaAnalyticsItem *dup();
@@ -149,10 +133,7 @@ class MediaAnalyticsItem {
         bool getCString(Attr, char **value);
         bool getString(Attr, std::string *value);
 
-        // parameter indicates whether to close any existing open
-        // record with same key before establishing a new record
-        // caller retains ownership of 'this'.
-        bool selfrecord(bool);
+        // Deliver the item to MediaMetrics
         bool selfrecord();
 
         // remove indicated attributes and their values
@@ -231,11 +212,7 @@ class MediaAnalyticsItem {
         static void dropInstance();
 
         // tracking information
-        SessionID_t mSessionID;         // grouping similar records
         nsecs_t mTimestamp;             // ns, system_time_monotonic
-
-        // will this record accept further updates
-        bool mFinalized;
 
         Key mKey;
 
