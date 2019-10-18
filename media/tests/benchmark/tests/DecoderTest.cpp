@@ -72,24 +72,7 @@ TEST_P(DecoderTest, Decode) {
         vector<AMediaCodecBufferInfo> frameInfo;
         AMediaCodecBufferInfo info;
         uint32_t inputBufferOffset = 0;
-        int32_t idx = 0;
 
-        // Get CSD data
-        while (1) {
-            void *csdBuffer = extractor->getCSDSample(info, idx);
-            if (!csdBuffer || !info.size) break;
-
-            // copy the meta data and buffer to be passed to decoder
-            if (inputBufferOffset + info.size > kMaxBufferSize) {
-                cout << "[   WARN   ] Test Skipped. Memory allocated not sufficient\n";
-                free(inputBuffer);
-                return;
-            }
-            memcpy(inputBuffer + inputBufferOffset, csdBuffer, info.size);
-            frameInfo.push_back(info);
-            inputBufferOffset += info.size;
-            idx++;
-        }
         // Get frame data
         while (1) {
             status = extractor->getFrameSample(info);
@@ -135,6 +118,7 @@ INSTANTIATE_TEST_SUITE_P(
                           make_tuple("bbb_8000hz_1ch_8kbps_amrnb_30sec.3gp", "", false),
                           make_tuple("bbb_16000hz_1ch_9kbps_amrwb_30sec.3gp", "", false),
                           make_tuple("bbb_44100hz_2ch_80kbps_vorbis_30sec.mp4", "", false),
+                          make_tuple("bbb_44100hz_2ch_600kbps_flac_30sec.mp4", "", false),
                           make_tuple("bbb_48000hz_2ch_100kbps_opus_30sec.webm", "", false)));
 
 INSTANTIATE_TEST_SUITE_P(
@@ -144,6 +128,7 @@ INSTANTIATE_TEST_SUITE_P(
                           make_tuple("bbb_8000hz_1ch_8kbps_amrnb_30sec.3gp", "", true),
                           make_tuple("bbb_16000hz_1ch_9kbps_amrwb_30sec.3gp", "", true),
                           make_tuple("bbb_44100hz_2ch_80kbps_vorbis_30sec.mp4", "", true),
+                          make_tuple("bbb_44100hz_2ch_600kbps_flac_30sec.mp4", "", true),
                           make_tuple("bbb_48000hz_2ch_100kbps_opus_30sec.webm", "", true)));
 
 INSTANTIATE_TEST_SUITE_P(VideDecoderSyncTest, DecoderTest,
