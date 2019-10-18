@@ -1,0 +1,7 @@
+{
+  "presubmit": [
+    {
+       "name": "audiofoundation_parcelable_test"
+    }
+  ]
+}
