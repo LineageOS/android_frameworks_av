@@ -1,3 +1,4 @@
 <resources>
     <string name="input_file_path">/data/local/tmp/MediaBenchmark/res/</string>
+    <string name="output_file_path">/data/local/tmp/MediaBenchmark/output/</string>
 </resources>
