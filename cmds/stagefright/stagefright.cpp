@@ -40,7 +40,6 @@
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
-#include <media/stagefright/AudioPlayer.h>
 #include <media/stagefright/JPEGSource.h>
 #include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaCodec.h>
@@ -66,6 +65,8 @@
 #include <gui/SurfaceComposerClient.h>
 
 #include <android/hardware/media/omx/1.0/IOmx.h>
+
+#include "AudioPlayer.h"
 
 using namespace android;
 
