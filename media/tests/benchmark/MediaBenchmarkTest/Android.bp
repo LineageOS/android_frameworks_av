@@ -43,4 +43,8 @@ android_library {
     srcs: ["src/main/**/*.java"],
 
     sdk_version: "system_current",
+
+    static_libs: [
+        "androidx.test.core",
+    ],
 }
