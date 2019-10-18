@@ -567,7 +567,7 @@ void MediaAnalyticsService::UidInfo::setPkgInfo(
         mapping.versionCode = versionCode;
         mapping.expiration = now + PKG_EXPIRATION_NS;
         ALOGV("%s: adding uid %d pkg '%s' expiration: %lld",
-                __func__, uid, pkg.c_str(), (long long)mapping.expiration);
+                __func__, uid, mapping.pkg.c_str(), (long long)mapping.expiration);
         mPkgMappings[uid] = mapping;
     }
 
