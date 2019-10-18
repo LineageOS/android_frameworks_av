@@ -752,8 +752,8 @@ c2_status_t C2SoftHevcDec::ensureDecoderState(const std::shared_ptr<C2BlockPool>
         ALOGE("not supposed to be here, invalid decoder context");
         return C2_CORRUPTED;
     }
-    if (mStride != ALIGN64(mWidth)) {
-        mStride = ALIGN64(mWidth);
+    if (mStride != ALIGN128(mWidth)) {
+        mStride = ALIGN128(mWidth);
         if (OK != setParams(mStride, IVD_DECODE_FRAME)) return C2_CORRUPTED;
     }
     if (mOutBlock &&
