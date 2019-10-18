@@ -1093,8 +1093,9 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
     }
 
     audio_config_base_t clientConfig = {.sample_rate = config->sample_rate,
+        .channel_mask = config->channel_mask,
         .format = config->format,
-        .channel_mask = config->channel_mask };
+    };
     *portId = PolicyAudioPort::getNextUniqueId();
 
     sp<TrackClientDescriptor> clientDesc =
