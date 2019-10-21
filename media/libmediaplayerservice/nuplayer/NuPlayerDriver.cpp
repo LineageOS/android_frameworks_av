@@ -641,7 +641,7 @@ void NuPlayerDriver::logMetrics(const char *where) {
             mAnalyticsItem->setUid(mClientUid);
         }
     } else {
-        ALOGV("nothing to record (only %d fields)", mAnalyticsItem->count());
+        ALOGV("nothing to record (only %zu fields)", mAnalyticsItem->count());
     }
 }
 
