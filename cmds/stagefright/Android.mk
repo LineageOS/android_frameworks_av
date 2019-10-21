@@ -3,6 +3,7 @@ LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:=       \
+        AudioPlayer.cpp \
         stagefright.cpp \
         jpeg.cpp        \
         SineSource.cpp
@@ -10,7 +11,7 @@ LOCAL_SRC_FILES:=       \
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia libmedia_codeclist libutils libbinder \
         libstagefright_foundation libjpeg libui libgui libcutils liblog \
-        libhidlbase libdatasource \
+        libhidlbase libdatasource libaudioclient \
         android.hardware.media.omx@1.0 \
 
 LOCAL_C_INCLUDES:= \
@@ -31,12 +32,13 @@ include $(BUILD_EXECUTABLE)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:=         \
+        AudioPlayer.cpp \
         SineSource.cpp    \
         record.cpp
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia liblog libutils libbinder \
-        libstagefright_foundation libdatasource
+        libstagefright_foundation libdatasource libaudioclient
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/camera/include \
@@ -57,12 +59,12 @@ include $(BUILD_EXECUTABLE)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:=         \
-        SineSource.cpp    \
+        AudioPlayer.cpp \
         recordvideo.cpp
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia liblog libutils libbinder \
-        libstagefright_foundation
+        libstagefright_foundation libaudioclient
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \
@@ -83,12 +85,13 @@ include $(BUILD_EXECUTABLE)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:=         \
+        AudioPlayer.cpp \
         SineSource.cpp    \
         audioloop.cpp
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia liblog libutils libbinder \
-        libstagefright_foundation
+        libstagefright_foundation libaudioclient
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \
