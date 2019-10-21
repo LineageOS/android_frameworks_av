@@ -46,10 +46,6 @@ cc_defaults {
 cc_defaults {
     name: "libbenchmark-defaults",
 
-    header_libs: [
-        "media_ndk_headers",
-    ],
-
     shared_libs: [
         "libmediandk",
         "liblog",
@@ -73,6 +69,5 @@ cc_defaults {
             "signed-integer-overflow",
         ],
         cfi: true,
-        address: true,
     }
 }
