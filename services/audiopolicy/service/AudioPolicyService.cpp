@@ -422,11 +422,17 @@ void AudioPolicyService::updateUidStates_l()
 //        AND is on TOP
 //        AND the source is VOICE_RECOGNITION or HOTWORD
 //    OR the client source is virtual (remote submix, call audio TX or RX...)
+//    OR the client source is HOTWORD
+//        AND is on TOP
+//            OR all active clients are using HOTWORD source
+//        AND no call is active
+//            OR client has CAPTURE_AUDIO_OUTPUT privileged permission
 //    OR Any client
 //        AND The assistant is not on TOP
 //        AND is on TOP or latest started
 //        AND there is no active privacy sensitive capture or call
 //            OR client has CAPTURE_AUDIO_OUTPUT privileged permission
+
 
     sp<AudioRecordClient> topActive;
     sp<AudioRecordClient> latestActive;
@@ -442,6 +448,7 @@ void AudioPolicyService::updateUidStates_l()
     bool rttCallActive =
             (mPhoneState == AUDIO_MODE_IN_CALL || mPhoneState == AUDIO_MODE_IN_COMMUNICATION)
             && mUidPolicy->isRttEnabled();
+    bool onlyHotwordActive = true;
 
     // if Sensor Privacy is enabled then all recordings should be silenced.
     if (mSensorPrivacyPolicy->isSensorPrivacyEnabled()) {
@@ -473,12 +480,11 @@ void AudioPolicyService::updateUidStates_l()
                 isAssistantOnTop = true;
             }
         }
-        // Assistant capturing for HOTWORD or Accessibility services not considered
+        // Client capturing for HOTWORD or Accessibility services not considered
         // for latest active to avoid masking regular clients started before
         if (current->startTimeNs > latestStartNs
-                && !((current->attributes.source == AUDIO_SOURCE_HOTWORD
-                        || isA11yOnTop || rttCallActive)
-                    && isAssistant)
+                && !(current->attributes.source == AUDIO_SOURCE_HOTWORD
+                        || ((isA11yOnTop || rttCallActive) && isAssistant))
                 && !isAccessibility) {
             latestActive = current;
             latestStartNs = current->startTimeNs;
@@ -489,6 +495,9 @@ void AudioPolicyService::updateUidStates_l()
                 latestSensitiveStartNs = current->startTimeNs;
             }
             isSensitiveActive = true;
+        }
+        if (current->attributes.source != AUDIO_SOURCE_HOTWORD) {
+            onlyHotwordActive = false;
         }
     }
 
@@ -555,6 +564,14 @@ void AudioPolicyService::updateUidStates_l()
                 if (source == AUDIO_SOURCE_VOICE_RECOGNITION || source == AUDIO_SOURCE_HOTWORD) {
                     allowCapture = true;
                 }
+            }
+        } else if (source == AUDIO_SOURCE_HOTWORD) {
+            // For HOTWORD source allow capture when not on TOP if:
+            //     All active clients are using HOTWORD source
+            //     AND no call is active
+            //         OR client has CAPTURE_AUDIO_OUTPUT privileged permission
+            if (onlyHotwordActive && !(isInCall && !current->canCaptureOutput)) {
+                allowCapture = true;
             }
         }
         setAppState_l(current->portId,

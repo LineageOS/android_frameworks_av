@@ -34,6 +34,7 @@ namespace android {
  * the preferred available impl.
  */
 enum class AudioHALVersion {
+    V6_0,
     V5_0,
     V4_0,
     V2_0,

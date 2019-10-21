@@ -119,7 +119,7 @@ class MediaAnalyticsItem {
         // set the key discriminator for the record.
         // most often initialized as part of the constructor
         MediaAnalyticsItem &setKey(MediaAnalyticsItem::Key);
-        MediaAnalyticsItem::Key getKey();
+        const MediaAnalyticsItem::Key& getKey() const { return mKey; }
 
         // # of attributes in the record
         int32_t count() const;
@@ -191,8 +191,8 @@ class MediaAnalyticsItem {
         // supports the stable interface
         bool dumpAttributes(char **pbuffer, size_t *plength);
 
-        std::string toString();
-        std::string toString(int version);
+        std::string toString() const;
+        std::string toString(int version) const;
         const char *toCString();
         const char *toCString(int version);
 

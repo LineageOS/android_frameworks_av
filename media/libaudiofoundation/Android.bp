@@ -2,9 +2,19 @@ cc_library_headers {
     name: "libaudiofoundation_headers",
     vendor_available: true,
     export_include_dirs: ["include"],
+    header_libs: [
+        "libaudio_system_headers",
+        "libaudioclient_headers",
+        "libmedia_headers",
+    ],
+    export_header_lib_headers: [
+        "libaudio_system_headers",
+        "libaudioclient_headers",
+        "libmedia_headers",
+    ],
 }
 
-cc_library_shared {
+cc_library {
     name: "libaudiofoundation",
     vendor_available: true,
 
@@ -26,12 +36,12 @@ cc_library_shared {
     ],
 
     header_libs: [
-        "libaudio_system_headers",
-        "libaudioclient_headers",
         "libaudiofoundation_headers",
     ],
 
-    export_header_lib_headers: ["libaudiofoundation_headers"],
+    export_header_lib_headers: [
+        "libaudiofoundation_headers",
+    ],
 
     cflags: [
         "-Werror",

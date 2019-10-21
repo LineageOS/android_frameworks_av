@@ -118,6 +118,56 @@ void AudioProfile::dump(std::string *dst, int spaces) const
     }
 }
 
+bool AudioProfile::equals(const sp<AudioProfile>& other) const
+{
+    return other != nullptr &&
+           mName.compare(other->mName) == 0 &&
+           mFormat == other->getFormat() &&
+           mChannelMasks == other->getChannels() &&
+           mSamplingRates == other->getSampleRates() &&
+           mIsDynamicFormat == other->isDynamicFormat() &&
+           mIsDynamicChannels == other->isDynamicChannels() &&
+           mIsDynamicRate == other->isDynamicRate();
+}
+
+status_t AudioProfile::writeToParcel(Parcel *parcel) const
+{
+    status_t status = NO_ERROR;
+    if ((status = parcel->writeUtf8AsUtf16(mName)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mFormat)) != NO_ERROR) return status;
+    std::vector<int> values(mChannelMasks.begin(), mChannelMasks.end());
+    if ((status = parcel->writeInt32Vector(values)) != NO_ERROR) return status;
+    values.clear();
+    values.assign(mSamplingRates.begin(), mSamplingRates.end());
+    if ((status = parcel->writeInt32Vector(values)) != NO_ERROR) return status;
+    if ((status = parcel->writeBool(mIsDynamicFormat)) != NO_ERROR) return status;
+    if ((status = parcel->writeBool(mIsDynamicChannels)) != NO_ERROR) return status;
+    if ((status = parcel->writeBool(mIsDynamicRate)) != NO_ERROR) return status;
+    return status;
+}
+
+status_t AudioProfile::readFromParcel(const Parcel *parcel)
+{
+    status_t status = NO_ERROR;
+    if ((status = parcel->readUtf8FromUtf16(&mName)) != NO_ERROR) return status;
+    static_assert(sizeof(mFormat) == sizeof(uint32_t));
+    if ((status = parcel->readUint32(reinterpret_cast<uint32_t*>(&mFormat))) != NO_ERROR) {
+        return status;
+    }
+    std::vector<int> values;
+    if ((status = parcel->readInt32Vector(&values)) != NO_ERROR) return status;
+    mChannelMasks.clear();
+    mChannelMasks.insert(values.begin(), values.end());
+    values.clear();
+    if ((status = parcel->readInt32Vector(&values)) != NO_ERROR) return status;
+    mSamplingRates.clear();
+    mSamplingRates.insert(values.begin(), values.end());
+    if ((status = parcel->readBool(&mIsDynamicFormat)) != NO_ERROR) return status;
+    if ((status = parcel->readBool(&mIsDynamicChannels)) != NO_ERROR) return status;
+    if ((status = parcel->readBool(&mIsDynamicRate)) != NO_ERROR) return status;
+    return status;
+}
+
 ssize_t AudioProfileVector::add(const sp<AudioProfile> &profile)
 {
     ssize_t index = size();
@@ -217,6 +267,41 @@ void AudioProfileVector::dump(std::string *dst, int spaces) const
         at(i)->dump(&profileStr, spaces + 8);
         dst->append(profileStr);
     }
+}
+
+status_t AudioProfileVector::writeToParcel(Parcel *parcel) const
+{
+    status_t status = NO_ERROR;
+    if ((status = parcel->writeVectorSize(*this)) != NO_ERROR) return status;
+    for (const auto &audioProfile : *this) {
+        if ((status = parcel->writeParcelable(*audioProfile)) != NO_ERROR) {
+            break;
+        }
+    }
+    return status;
+}
+
+status_t AudioProfileVector::readFromParcel(const Parcel *parcel)
+{
+    status_t status = NO_ERROR;
+    this->clear();
+    if ((status = parcel->resizeOutVector(this)) != NO_ERROR) return status;
+    for (size_t i = 0; i < this->size(); ++i) {
+        this->at(i) = new AudioProfile(AUDIO_FORMAT_DEFAULT, AUDIO_CHANNEL_NONE, 0 /*sampleRate*/);
+        if ((status = parcel->readParcelable(this->at(i).get())) != NO_ERROR) {
+            this->clear();
+            break;
+        }
+    }
+    return status;
+}
+
+bool AudioProfileVector::equals(const AudioProfileVector& other) const
+{
+    return std::equal(begin(), end(), other.begin(), other.end(),
+                      [](const sp<AudioProfile>& left, const sp<AudioProfile>& right) {
+                          return left->equals(right);
+                      });
 }
 
 } // namespace android

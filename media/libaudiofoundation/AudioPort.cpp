@@ -105,6 +105,46 @@ void AudioPort::log(const char* indent) const
     ALOGI("%s Port[nm:%s, type:%d, role:%d]", indent, mName.c_str(), mType, mRole);
 }
 
+bool AudioPort::equals(const sp<AudioPort> &other) const
+{
+    return other != nullptr &&
+           mGains.equals(other->getGains()) &&
+           mName.compare(other->getName()) == 0 &&
+           mType == other->getType() &&
+           mRole == other->getRole() &&
+           mProfiles.equals(other->getAudioProfiles());
+}
+
+status_t AudioPort::writeToParcel(Parcel *parcel) const
+{
+    status_t status = NO_ERROR;
+    if ((status = parcel->writeUtf8AsUtf16(mName)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mType)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mRole)) != NO_ERROR) return status;
+    if ((status = parcel->writeParcelable(mProfiles)) != NO_ERROR) return status;
+    if ((status = parcel->writeParcelable(mGains)) != NO_ERROR) return status;
+    return status;
+}
+
+status_t AudioPort::readFromParcel(const Parcel *parcel)
+{
+    status_t status = NO_ERROR;
+    if ((status = parcel->readUtf8FromUtf16(&mName)) != NO_ERROR) return status;
+    static_assert(sizeof(mType) == sizeof(uint32_t));
+    if ((status = parcel->readUint32(reinterpret_cast<uint32_t*>(&mType))) != NO_ERROR) {
+        return status;
+    }
+    static_assert(sizeof(mRole) == sizeof(uint32_t));
+    if ((status = parcel->readUint32(reinterpret_cast<uint32_t*>(&mRole))) != NO_ERROR) {
+        return status;
+    }
+    mProfiles.clear();
+    if ((status = parcel->readParcelable(&mProfiles)) != NO_ERROR) return status;
+    mGains.clear();
+    if ((status = parcel->readParcelable(&mGains)) != NO_ERROR) return status;
+    return status;
+}
+
 // --- AudioPortConfig class implementation
 
 status_t AudioPortConfig::applyAudioPortConfig(
@@ -188,4 +228,60 @@ bool AudioPortConfig::hasGainController(bool canUseForVolume) const
                            : audioport->getGains().size() > 0;
 }
 
+bool AudioPortConfig::equals(const sp<AudioPortConfig> &other) const
+{
+    return other != nullptr &&
+           mSamplingRate == other->getSamplingRate() &&
+           mFormat == other->getFormat() &&
+           mChannelMask == other->getChannelMask() &&
+           // Compare audio gain config
+           mGain.index == other->mGain.index &&
+           mGain.mode == other->mGain.mode &&
+           mGain.channel_mask == other->mGain.channel_mask &&
+           std::equal(std::begin(mGain.values), std::end(mGain.values),
+                      std::begin(other->mGain.values)) &&
+           mGain.ramp_duration_ms == other->mGain.ramp_duration_ms;
 }
+
+status_t AudioPortConfig::writeToParcel(Parcel *parcel) const
+{
+    status_t status = NO_ERROR;
+    if ((status = parcel->writeUint32(mSamplingRate)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mFormat)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mChannelMask)) != NO_ERROR) return status;
+    if ((status = parcel->writeInt32(mId)) != NO_ERROR) return status;
+    // Write mGain to parcel.
+    if ((status = parcel->writeInt32(mGain.index)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mGain.mode)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mGain.channel_mask)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mGain.ramp_duration_ms)) != NO_ERROR) return status;
+    std::vector<int> values(std::begin(mGain.values), std::end(mGain.values));
+    if ((status = parcel->writeInt32Vector(values)) != NO_ERROR) return status;
+    return status;
+}
+
+status_t AudioPortConfig::readFromParcel(const Parcel *parcel)
+{
+    status_t status = NO_ERROR;
+    if ((status = parcel->readUint32(&mSamplingRate)) != NO_ERROR) return status;
+    static_assert(sizeof(mFormat) == sizeof(uint32_t));
+    if ((status = parcel->readUint32(reinterpret_cast<uint32_t*>(&mFormat))) != NO_ERROR) {
+        return status;
+    }
+    if ((status = parcel->readUint32(&mChannelMask)) != NO_ERROR) return status;
+    if ((status = parcel->readInt32(&mId)) != NO_ERROR) return status;
+    // Read mGain from parcel.
+    if ((status = parcel->readInt32(&mGain.index)) != NO_ERROR) return status;
+    if ((status = parcel->readUint32(&mGain.mode)) != NO_ERROR) return status;
+    if ((status = parcel->readUint32(&mGain.channel_mask)) != NO_ERROR) return status;
+    if ((status = parcel->readUint32(&mGain.ramp_duration_ms)) != NO_ERROR) return status;
+    std::vector<int> values;
+    if ((status = parcel->readInt32Vector(&values)) != NO_ERROR) return status;
+    if (values.size() != std::size(mGain.values)) {
+        return BAD_VALUE;
+    }
+    std::copy(values.begin(), values.end(), mGain.values);
+    return status;
+}
+
+} // namespace android

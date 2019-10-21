@@ -213,7 +213,6 @@ cc_library {
         "libogg",
         "libwebm",
         "libstagefright_id3",
-        "libFLAC",
     ],
 
     header_libs:[

@@ -234,10 +234,6 @@ MediaAnalyticsItem &MediaAnalyticsItem::setKey(MediaAnalyticsItem::Key key) {
     return *this;
 }
 
-MediaAnalyticsItem::Key MediaAnalyticsItem::getKey() {
-    return mKey;
-}
-
 // number of attributes we have in this record
 int32_t MediaAnalyticsItem::count() const {
     return mPropCount;
@@ -795,11 +791,11 @@ const char * MediaAnalyticsItem::toCString(int version) {
     return strdup(val.c_str());
 }
 
-std::string MediaAnalyticsItem::toString() {
+std::string MediaAnalyticsItem::toString() const {
    return toString(PROTO_LAST);
 }
 
-std::string MediaAnalyticsItem::toString(int version) {
+std::string MediaAnalyticsItem::toString(int version) const {
 
     // v0 : released with 'o'
     // v1 : bug fix (missing pid/finalized separator),
