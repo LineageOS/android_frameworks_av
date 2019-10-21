@@ -26,7 +26,6 @@
 #include <android/hardware/drm/1.2/IDrmPlugin.h>
 #include <android/hardware/drm/1.2/IDrmPluginListener.h>
 
-#include <media/IResourceManagerService.h>
 #include <media/MediaAnalyticsItem.h>
 #include <mediadrm/DrmMetrics.h>
 #include <mediadrm/DrmSessionManager.h>
@@ -62,24 +61,7 @@ struct DrmHal : public BnDrm,
                 public IBinder::DeathRecipient,
                 public IDrmPluginListener_V1_2 {
 
-    struct DrmSessionClient : public BnResourceManagerClient {
-        explicit DrmSessionClient(DrmHal* drm, const Vector<uint8_t>& sessionId)
-          : mSessionId(sessionId),
-            mDrm(drm) {}
-
-        virtual bool reclaimResource();
-        virtual String8 getName();
-
-        const Vector<uint8_t> mSessionId;
-
-    protected:
-        virtual ~DrmSessionClient();
-
-    private:
-        wp<DrmHal> mDrm;
-
-        DISALLOW_EVIL_CONSTRUCTORS(DrmSessionClient);
-    };
+    struct DrmSessionClient;
 
     DrmHal();
     virtual ~DrmHal();

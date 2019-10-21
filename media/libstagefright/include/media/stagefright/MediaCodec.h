@@ -24,7 +24,6 @@
 #include <gui/IGraphicBufferProducer.h>
 #include <media/hardware/CryptoAPI.h>
 #include <media/MediaCodecInfo.h>
-#include <media/MediaResource.h>
 #include <media/MediaMetrics.h>
 #include <media/stagefright/foundation/AHandler.h>
 #include <media/stagefright/FrameRenderTracker.h>
@@ -43,8 +42,6 @@ class IBatteryStats;
 struct ICrypto;
 class MediaCodecBuffer;
 class IMemory;
-class IResourceManagerClient;
-class IResourceManagerService;
 struct PersistentSurface;
 class SoftwareRenderer;
 class Surface;
@@ -54,7 +51,13 @@ namespace native {
 namespace V1_0 {
 struct IDescrambler;
 }}}}
+namespace media {
+class IResourceManagerClient;
+class MediaResourceParcel;
+}
 using hardware::cas::native::V1_0::IDescrambler;
+using media::IResourceManagerClient;
+using media::MediaResourceParcel;
 
 struct MediaCodec : public AHandler {
     enum ConfigureFlags {
@@ -284,34 +287,7 @@ private:
         bool mOwnedByClient;
     };
 
-    struct ResourceManagerServiceProxy : public IBinder::DeathRecipient {
-        ResourceManagerServiceProxy(pid_t pid, uid_t uid);
-        ~ResourceManagerServiceProxy();
-
-        void init();
-
-        // implements DeathRecipient
-        virtual void binderDied(const wp<IBinder>& /*who*/);
-
-        void addResource(
-                int64_t clientId,
-                const sp<IResourceManagerClient> &client,
-                const Vector<MediaResource> &resources);
-
-        void removeResource(
-                int64_t clientId,
-                const Vector<MediaResource> &resources);
-
-        void removeClient(int64_t clientId);
-
-        bool reclaimResource(const Vector<MediaResource> &resources);
-
-    private:
-        Mutex mLock;
-        sp<IResourceManagerService> mService;
-        pid_t mPid;
-        uid_t mUid;
-    };
+    struct ResourceManagerServiceProxy;
 
     State mState;
     uid_t mUid;
@@ -434,8 +410,8 @@ private:
     bool isExecuting() const;
 
     uint64_t getGraphicBufferSize();
-    void addResource(MediaResource::Type type, MediaResource::SubType subtype, uint64_t value);
-    void removeResource(MediaResource::Type type, MediaResource::SubType subtype, uint64_t value);
+    void addResource(const MediaResourceParcel &resource);
+    void removeResource(const MediaResourceParcel &resource);
     void requestCpuBoostIfNeeded();
 
     bool hasPendingBuffer(int portIndex);

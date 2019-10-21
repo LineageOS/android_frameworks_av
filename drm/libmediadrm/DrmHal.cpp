@@ -25,6 +25,7 @@
 
 #include <android/hardware/drm/1.2/types.h>
 #include <android/hidl/manager/1.2/IServiceManager.h>
+#include <android/media/BnResourceManagerClient.h>
 #include <hidl/ServiceManagement.h>
 #include <media/EventMetric.h>
 #include <media/PluginMetricsReporting.h>
@@ -295,21 +296,43 @@ static status_t toStatusT_1_2(Status_V1_2 status) {
 
 Mutex DrmHal::mLock;
 
-bool DrmHal::DrmSessionClient::reclaimResource() {
+struct DrmHal::DrmSessionClient : public android::media::BnResourceManagerClient {
+    explicit DrmSessionClient(DrmHal* drm, const Vector<uint8_t>& sessionId)
+      : mSessionId(sessionId),
+        mDrm(drm) {}
+
+    ::android::binder::Status reclaimResource(bool* _aidl_return) override;
+    ::android::binder::Status getName(::std::string* _aidl_return) override;
+
+    const Vector<uint8_t> mSessionId;
+
+protected:
+    virtual ~DrmSessionClient();
+
+private:
+    wp<DrmHal> mDrm;
+
+    DISALLOW_EVIL_CONSTRUCTORS(DrmSessionClient);
+};
+
+::android::binder::Status DrmHal::DrmSessionClient::reclaimResource(bool* _aidl_return) {
     sp<DrmHal> drm = mDrm.promote();
     if (drm == NULL) {
-        return true;
+        *_aidl_return = true;
+        return ::android::binder::Status::ok();
     }
     status_t err = drm->closeSession(mSessionId);
     if (err != OK) {
-        return false;
+        *_aidl_return = false;
+        return ::android::binder::Status::ok();
     }
     drm->sendEvent(EventType::SESSION_RECLAIMED,
             toHidlVec(mSessionId), hidl_vec<uint8_t>());
-    return true;
+    *_aidl_return = true;
+    return ::android::binder::Status::ok();
 }
 
-String8 DrmHal::DrmSessionClient::getName() {
+::android::binder::Status DrmHal::DrmSessionClient::getName(::std::string* _aidl_return) {
     String8 name;
     sp<DrmHal> drm = mDrm.promote();
     if (drm == NULL) {
@@ -323,7 +346,8 @@ String8 DrmHal::DrmSessionClient::getName() {
         name.appendFormat("%02x", mSessionId[i]);
     }
     name.append("]");
-    return name;
+    *_aidl_return = name;
+    return ::android::binder::Status::ok();
 }
 
 DrmHal::DrmSessionClient::~DrmSessionClient() {

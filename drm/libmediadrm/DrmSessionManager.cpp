@@ -18,11 +18,12 @@
 #define LOG_TAG "DrmSessionManager"
 #include <utils/Log.h>
 
+#include <android/media/IResourceManagerClient.h>
+#include <android/media/IResourceManagerService.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IProcessInfoService.h>
 #include <binder/IServiceManager.h>
 #include <cutils/properties.h>
-#include <media/IResourceManagerClient.h>
 #include <media/MediaResource.h>
 #include <mediadrm/DrmSessionManager.h>
 #include <unistd.h>
@@ -33,6 +34,7 @@
 #include "ResourceManagerService.h"
 
 namespace android {
+using android::binder::Status;
 
 static String8 GetSessionIdString(const Vector<uint8_t> &sessionId) {
     String8 sessionIdStr;
@@ -52,16 +54,16 @@ static uint64_t toClientId(const sp<IResourceManagerClient>& drm) {
     return reinterpret_cast<int64_t>(drm.get());
 }
 
-static Vector<MediaResource> toResourceVec(const Vector<uint8_t> &sessionId) {
-    Vector<MediaResource> resources;
-    // use UINT64_MAX to decrement through addition overflow
-    resources.push_back(MediaResource(MediaResource::kDrmSession, toStdVec(sessionId), UINT64_MAX));
+static std::vector<MediaResourceParcel> toResourceVec(
+        const Vector<uint8_t> &sessionId, int64_t value) {
+    std::vector<MediaResourceParcel> resources;
+    resources.push_back(MediaResource::DrmSessionResource(toStdVec(sessionId), value));
     return resources;
 }
 
 static sp<IResourceManagerService> getResourceManagerService() {
     if (property_get_bool("persist.device_config.media_native.mediadrmserver", 1)) {
-        return new ResourceManagerService();
+        return new android::media::ResourceManagerService();
     }
     sp<IServiceManager> sm = defaultServiceManager();
     if (sm == NULL) {
@@ -131,7 +133,7 @@ void DrmSessionManager::addSession(int pid,
 
     int64_t clientId = toClientId(drm);
     mSessionMap[toStdVec(sessionId)] = (SessionInfo){pid, uid, clientId};
-    mService->addResource(pid, uid, clientId, drm, toResourceVec(sessionId));
+    mService->addResource(pid, uid, clientId, drm, toResourceVec(sessionId, INT64_MAX));
 }
 
 void DrmSessionManager::useSession(const Vector<uint8_t> &sessionId) {
@@ -144,7 +146,7 @@ void DrmSessionManager::useSession(const Vector<uint8_t> &sessionId) {
     }
 
     auto info = it->second;
-    mService->addResource(info.pid, info.uid, info.clientId, NULL, toResourceVec(sessionId));
+    mService->addResource(info.pid, info.uid, info.clientId, NULL, toResourceVec(sessionId, -1));
 }
 
 void DrmSessionManager::removeSession(const Vector<uint8_t> &sessionId) {
@@ -157,7 +159,7 @@ void DrmSessionManager::removeSession(const Vector<uint8_t> &sessionId) {
     }
 
     auto info = it->second;
-    mService->removeResource(info.pid, info.clientId, toResourceVec(sessionId));
+    mService->removeResource(info.pid, info.clientId, toResourceVec(sessionId, INT64_MAX));
     mSessionMap.erase(it);
 }
 
@@ -176,7 +178,9 @@ bool DrmSessionManager::reclaimSession(int callingPid) {
     // cannot update mSessionMap because we do not know which sessionId is reclaimed;
     // we rely on IResourceManagerClient to removeSession in reclaimResource
     Vector<uint8_t> dummy;
-    return service->reclaimResource(callingPid, toResourceVec(dummy));
+    bool success;
+    Status status = service->reclaimResource(callingPid, toResourceVec(dummy, INT64_MAX), &success);
+    return status.isOk() && success;
 }
 
 size_t DrmSessionManager::getSessionCount() const {
