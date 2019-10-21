@@ -45,7 +45,7 @@
 using namespace android;
 
 ACameraDevice::~ACameraDevice() {
-    mDevice->stopLooper();
+    mDevice->stopLooperAndDisconnect();
 }
 
 namespace android {
@@ -125,19 +125,7 @@ CameraDevice::CameraDevice(
     }
 }
 
-// Device close implementaiton
-CameraDevice::~CameraDevice() {
-    sp<ACameraCaptureSession> session = mCurrentSession.promote();
-    {
-        Mutex::Autolock _l(mDeviceLock);
-        if (!isClosed()) {
-            disconnectLocked(session);
-        }
-        mCurrentSession = nullptr;
-        LOG_ALWAYS_FATAL_IF(mCbLooper != nullptr,
-            "CameraDevice looper should've been stopped before ~CameraDevice");
-    }
-}
+CameraDevice::~CameraDevice() { }
 
 void
 CameraDevice::postSessionMsgAndCleanup(sp<AMessage>& msg) {
@@ -1388,6 +1376,7 @@ CameraDevice::checkAndFireSequenceCompleteLocked() {
             // before cbh goes out of scope and causing we call the session
             // destructor while holding device lock
             cbh.mSession.clear();
+
             postSessionMsgAndCleanup(msg);
         }
 
@@ -1400,8 +1389,13 @@ CameraDevice::checkAndFireSequenceCompleteLocked() {
     }
 }
 
-void CameraDevice::stopLooper() {
+void CameraDevice::stopLooperAndDisconnect() {
     Mutex::Autolock _l(mDeviceLock);
+    sp<ACameraCaptureSession> session = mCurrentSession.promote();
+    if (!isClosed()) {
+        disconnectLocked(session);
+    }
+    mCurrentSession = nullptr;
     if (mCbLooper != nullptr) {
       mCbLooper->unregisterHandler(mHandler->id());
       mCbLooper->stop();
