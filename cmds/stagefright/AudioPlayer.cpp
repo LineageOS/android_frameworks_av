@@ -28,11 +28,12 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALookup.h>
 #include <media/stagefright/foundation/ALooper.h>
-#include <media/stagefright/AudioPlayer.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
+
+#include "AudioPlayer.h"
 
 namespace android {
 

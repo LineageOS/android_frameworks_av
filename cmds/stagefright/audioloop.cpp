@@ -29,11 +29,11 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/AMRWriter.h>
-#include <media/stagefright/AudioPlayer.h>
 #include <media/stagefright/AudioSource.h>
 #include <media/stagefright/MediaCodecSource.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/SimpleDecodingSource.h>
+#include "AudioPlayer.h"
 #include "SineSource.h"
 
 using namespace android;
