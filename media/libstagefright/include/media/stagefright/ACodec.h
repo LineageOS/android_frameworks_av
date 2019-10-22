@@ -37,6 +37,15 @@
 #define TRACK_BUFFER_TIMING     0
 
 namespace android {
+namespace hardware {
+namespace media {
+namespace omx {
+namespace V1_0 {
+struct IGraphicBufferSource;
+}  // namespace V1_0
+}  // namespace omx
+}  // namespace media
+}  // namespace hardware
 
 struct ABuffer;
 class ACodecBufferChannel;
@@ -279,7 +288,7 @@ private:
     size_t mNumUndequeuedBuffers;
     sp<DataConverter> mConverter[2];
 
-    sp<IGraphicBufferSource> mGraphicBufferSource;
+    sp<hardware::media::omx::V1_0::IGraphicBufferSource> mGraphicBufferSource;
     int64_t mRepeatFrameDelayUs;
     int64_t mMaxPtsGapUs;
     float mMaxFps;

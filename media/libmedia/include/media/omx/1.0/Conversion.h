@@ -45,7 +45,6 @@
 #include <android/hardware/media/omx/1.0/IOmxObserver.h>
 #include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
 
-#include <android/IGraphicBufferSource.h>
 #include <android/IOMXBufferSource.h>
 
 namespace android {

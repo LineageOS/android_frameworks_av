@@ -43,7 +43,6 @@ cc_library {
 filegroup {
     name: "libmedia_omx_aidl",
     srcs: [
-        "aidl/android/IGraphicBufferSource.aidl",
         "aidl/android/IOMXBufferSource.aidl",
     ],
     path: "aidl",
@@ -63,7 +62,6 @@ cc_library_shared {
         "IOMX.cpp",
         "MediaCodecBuffer.cpp",
         "OMXBuffer.cpp",
-        "omx/1.0/WGraphicBufferSource.cpp",
         "omx/1.0/WOmxBufferSource.cpp",
         "omx/1.0/WOmxNode.cpp",
         "omx/1.0/WOmxObserver.cpp",
