@@ -15,25 +15,32 @@
 ** limitations under the License.
 */
 
-#ifndef ANDROID_RESOURCEMANAGERSERVICE_H
-#define ANDROID_RESOURCEMANAGERSERVICE_H
+#ifndef ANDROID_MEDIA_RESOURCEMANAGERSERVICE_H
+#define ANDROID_MEDIA_RESOURCEMANAGERSERVICE_H
 
+#include <android/media/BnResourceManagerService.h>
 #include <arpa/inet.h>
 #include <binder/BinderService.h>
+#include <media/MediaResource.h>
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>
 #include <utils/String8.h>
 #include <utils/threads.h>
 #include <utils/Vector.h>
 
-#include <media/IResourceManagerService.h>
-
 namespace android {
 
 class ServiceLog;
 struct ProcessInfoInterface;
 
-typedef std::map<std::tuple<MediaResource::Type, MediaResource::SubType, std::vector<uint8_t>>, MediaResource> ResourceList;
+namespace media {
+
+using android::binder::Status;
+
+typedef std::map<std::tuple<
+        MediaResource::Type, MediaResource::SubType, std::vector<uint8_t>>,
+        MediaResourceParcel> ResourceList;
+
 struct ResourceInfo {
     int64_t clientId;
     uid_t uid;
@@ -69,26 +76,31 @@ public:
             const sp<SystemCallbackInterface> &systemResource);
 
     // IResourceManagerService interface
-    virtual void config(const Vector<MediaResourcePolicy> &policies);
+    Status config(const std::vector<MediaResourcePolicyParcel>& policies) override;
 
-    virtual void addResource(
-            int pid,
-            int uid,
+    Status addResource(
+            int32_t pid,
+            int32_t uid,
             int64_t clientId,
-            const sp<IResourceManagerClient> client,
-            const Vector<MediaResource> &resources);
+            const sp<IResourceManagerClient>& client,
+            const std::vector<MediaResourceParcel>& resources) override;
 
-    virtual void removeResource(int pid, int64_t clientId,
-            const Vector<MediaResource> &resources);
+    Status removeResource(
+            int32_t pid,
+            int64_t clientId,
+            const std::vector<MediaResourceParcel>& resources) override;
 
-    virtual void removeClient(int pid, int64_t clientId);
+    Status removeClient(int32_t pid, int64_t clientId) override;
 
     // Tries to reclaim resource from processes with lower priority than the calling process
     // according to the requested resources.
     // Returns true if any resource has been reclaimed, otherwise returns false.
-    virtual bool reclaimResource(int callingPid, const Vector<MediaResource> &resources);
+    Status reclaimResource(
+            int32_t callingPid,
+            const std::vector<MediaResourceParcel>& resources,
+            bool* _aidl_return) override;
 
-    void removeResource(int pid, int64_t clientId, bool checkValid);
+    Status removeResource(int pid, int64_t clientId, bool checkValid);
 
 protected:
     virtual ~ResourceManagerService();
@@ -120,14 +132,14 @@ private:
 
     // A helper function basically calls getLowestPriorityBiggestClient_l and add the result client
     // to the given Vector.
-    void getClientForResource_l(
-        int callingPid, const MediaResource *res, Vector<sp<IResourceManagerClient>> *clients);
+    void getClientForResource_l(int callingPid,
+            const MediaResourceParcel *res, Vector<sp<IResourceManagerClient>> *clients);
 
-    void onFirstAdded(const MediaResource& res, const ResourceInfo& clientInfo);
-    void onLastRemoved(const MediaResource& res, const ResourceInfo& clientInfo);
+    void onFirstAdded(const MediaResourceParcel& res, const ResourceInfo& clientInfo);
+    void onLastRemoved(const MediaResourceParcel& res, const ResourceInfo& clientInfo);
 
     // Merge r2 into r1
-    void mergeResources(MediaResource& r1, const MediaResource& r2);
+    void mergeResources(MediaResourceParcel& r1, const MediaResourceParcel& r2);
 
     mutable Mutex mLock;
     sp<ProcessInfoInterface> mProcessInfo;
@@ -140,7 +152,7 @@ private:
 };
 
 // ----------------------------------------------------------------------------
+} // namespace media
+} // namespace android
 
-}; // namespace android
-
-#endif // ANDROID_RESOURCEMANAGERSERVICE_H
+#endif // ANDROID_MEDIA_RESOURCEMANAGERSERVICE_H

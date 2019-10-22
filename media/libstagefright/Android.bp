@@ -127,7 +127,6 @@ cc_library {
         "ACodecBufferChannel.cpp",
         "AHierarchicalStateMachine.cpp",
         "AMRWriter.cpp",
-        "AudioPlayer.cpp",
         "AudioSource.cpp",
         "BufferImpl.cpp",
         "CallbackDataSource.cpp",

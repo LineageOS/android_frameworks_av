@@ -19,7 +19,6 @@
 #define DRM_SESSION_MANAGER_H_
 
 #include <binder/IBinder.h>
-#include <media/IResourceManagerService.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <utils/RefBase.h>
 #include <utils/KeyedVector.h>
@@ -33,7 +32,13 @@
 namespace android {
 
 class DrmSessionManagerTest;
+
+namespace media {
 class IResourceManagerClient;
+class IResourceManagerService;
+}
+using android::media::IResourceManagerClient;
+using android::media::IResourceManagerService;
 
 bool isEqualSessionId(const Vector<uint8_t> &sessionId1, const Vector<uint8_t> &sessionId2);
 

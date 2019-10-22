@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "SineSource.h"
-
 #include <inttypes.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -25,8 +23,8 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/AudioPlayer.h>
 #include <media/stagefright/MediaBufferGroup.h>
+#include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaCodecSource.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
