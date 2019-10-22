@@ -1598,7 +1598,6 @@ void DrmHal::writeByteArray(Parcel &obj, hidl_vec<uint8_t> const &vec)
 void DrmHal::reportFrameworkMetrics() const
 {
     std::unique_ptr<MediaAnalyticsItem> item(MediaAnalyticsItem::create("mediadrm"));
-    item->generateSessionID();
     item->setPkgName(mMetrics.GetAppPackageName().c_str());
     String8 vendor;
     String8 description;

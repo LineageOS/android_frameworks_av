@@ -35,8 +35,6 @@ status_t reportVendorMetrics(const std::string& metrics,
                              const String8& name,
                              const String8& appPackageName) {
     std::unique_ptr<MediaAnalyticsItem> analyticsItem(MediaAnalyticsItem::create(name.c_str()));
-    analyticsItem->generateSessionID();
-
     std::string app_package_name(appPackageName.c_str(), appPackageName.size());
     analyticsItem->setPkgName(app_package_name);
     if (metrics.size() > 0) {
@@ -44,7 +42,7 @@ status_t reportVendorMetrics(const std::string& metrics,
     }
 
     if (!analyticsItem->selfrecord()) {
-      ALOGE("selfrecord() returned false. sessioId %" PRId64, analyticsItem->getSessionID());
+      ALOGE("%s: selfrecord() returned false", __func__);
     }
 
     return OK;
