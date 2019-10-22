@@ -1082,9 +1082,14 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                         const uint8_t *ptr = (const uint8_t *)data;
                         const uint8_t profile = ptr[2] >> 1;
                         const uint8_t bl_compatibility_id = (ptr[4]) >> 4;
+                        bool create_two_tracks = false;
+
+                        if (bl_compatibility_id && bl_compatibility_id != 15) {
+                            create_two_tracks = true;
+                        }
 
                         if (4 == profile || 7 == profile ||
-                                (profile >= 8 && profile < 11 && bl_compatibility_id)) {
+                                (profile >= 8 && profile < 11 && create_two_tracks)) {
                             // we need a backward compatible track
                             ALOGV("Adding new backward compatible track");
                             Track *track_b = new Track;
@@ -2388,6 +2393,9 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         }
         case FOURCC("dvcC"):
         case FOURCC("dvvC"): {
+
+            CHECK_EQ(chunk_data_size, 24);
+
             auto buffer = heapbuffer<uint8_t>(chunk_data_size);
 
             if (buffer.get() == NULL) {
