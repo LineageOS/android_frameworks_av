@@ -99,7 +99,6 @@ The test extracts elementary stream and benchmarks the extractors available in S
 adb shell am instrument -w -r -e class 'com.android.media.benchmark.tests.ExtractorTest' com.android.media.benchmark/androidx.test.runner.AndroidJUnitRunner
 ```
 
-
 ## Decoder
 
 The test decodes input stream and benchmarks the decoders available in SDK.
@@ -107,11 +106,17 @@ The test decodes input stream and benchmarks the decoders available in SDK.
 adb shell am instrument -w -r -e class 'com.android.media.benchmark.tests.DecoderTest' com.android.media.benchmark/androidx.test.runner.AndroidJUnitRunner
 ```
 
-
 ## Muxer
 
 The test muxes elementary stream and benchmarks different writers available in SDK.
 ```
 adb shell am instrument -w -r -e class 'com.android.media.benchmark.tests.MuxerTest' com.android.media.benchmark/androidx.test.runner.AndroidJUnitRunner
+```
+
+## Encoder
+
+The test encodes input stream and benchmarks the encoders available in SDK.
+```
+adb shell am instrument -w -r -e class 'com.android.media.benchmark.tests.EncoderTest' com.android.media.benchmark/androidx.test.runner.AndroidJUnitRunner
 
 ```
