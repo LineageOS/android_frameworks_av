@@ -1269,7 +1269,7 @@ status_t MediaCodecsXmlParser::Impl::Parser::addLimit(const char **attrs) {
 void MediaCodecsXmlParser::Impl::State::addDetail(
         const std::string &key, const std::string &value) {
     CHECK(inType());
-    ALOGI("limit: %s = %s", key.c_str(), value.c_str());
+    ALOGV("limit: %s = %s", key.c_str(), value.c_str());
     const StringSet &variants = mVariantsStack.back();
     if (variants.empty()) {
         type()[key] = value;
