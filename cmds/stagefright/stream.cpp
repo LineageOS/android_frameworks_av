@@ -164,7 +164,7 @@ MyConvertingStreamSource::MyConvertingStreamSource(const char *filename)
     : mCurrentBufferIndex(-1),
       mCurrentBufferOffset(0) {
     sp<DataSource> dataSource =
-        DataSourceFactory::CreateFromURI(NULL /* httpService */, filename);
+        DataSourceFactory::getInstance()->CreateFromURI(NULL /* httpService */, filename);
 
     CHECK(dataSource != NULL);
 
