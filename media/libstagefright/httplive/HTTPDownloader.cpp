@@ -21,8 +21,8 @@
 #include "HTTPDownloader.h"
 #include "M3UParser.h"
 
-#include <datasource/ClearMediaHTTP.h>
-#include <datasource/ClearFileSource.h>
+#include <datasource/MediaHTTP.h>
+#include <datasource/FileSource.h>
 #include <media/DataSource.h>
 #include <media/MediaHTTPConnection.h>
 #include <media/MediaHTTPService.h>
@@ -38,7 +38,7 @@ namespace android {
 HTTPDownloader::HTTPDownloader(
         const sp<MediaHTTPService> &httpService,
         const KeyedVector<String8, String8> &headers) :
-    mHTTPDataSource(new ClearMediaHTTP(httpService->makeHTTPConnection())),
+    mHTTPDataSource(new MediaHTTP(httpService->makeHTTPConnection())),
     mExtraHeaders(headers),
     mDisconnecting(false) {
 }
@@ -91,7 +91,7 @@ ssize_t HTTPDownloader::fetchBlock(
 
     if (reconnect) {
         if (!strncasecmp(url, "file://", 7)) {
-            mDataSource = new ClearFileSource(url + 7);
+            mDataSource = new FileSource(url + 7);
         } else if (strncasecmp(url, "http://", 7)
                 && strncasecmp(url, "https://", 8)) {
             return ERROR_UNSUPPORTED;
