@@ -54,6 +54,10 @@ cc_library_static {
         "libpowermanager",
     ],
 
+    static_libs: [
+        "libplayerservice_datasource",
+    ],
+
     name: "libstagefright_nuplayer",
 
     sanitize: {
