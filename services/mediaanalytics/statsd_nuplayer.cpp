@@ -62,13 +62,13 @@ bool statsd_nuplayer(MediaAnalyticsItem *item)
     // differentiate between nuplayer and nuplayer2
     metrics_proto.set_whichplayer(item->getKey().c_str());
 
-    char *video_mime = NULL;
-    if (item->getCString("android.media.mediaplayer.video.mime", &video_mime)) {
-        metrics_proto.set_video_mime(video_mime);
+    std::string video_mime;
+    if (item->getString("android.media.mediaplayer.video.mime", &video_mime)) {
+        metrics_proto.set_video_mime(std::move(video_mime));
     }
-    char *video_codec = NULL;
-    if (item->getCString("android.media.mediaplayer.video.codec", &video_codec)) {
-        metrics_proto.set_video_codec(video_codec);
+    std::string video_codec;
+    if (item->getString("android.media.mediaplayer.video.codec", &video_codec)) {
+        metrics_proto.set_video_codec(std::move(video_codec));
     }
 
     int32_t width = -1;
@@ -97,13 +97,13 @@ bool statsd_nuplayer(MediaAnalyticsItem *item)
         metrics_proto.set_framerate(fps);
     }
 
-    char *audio_mime = NULL;
-    if (item->getCString("android.media.mediaplayer.audio.mime", &audio_mime)) {
-        metrics_proto.set_audio_mime(audio_mime);
+    std::string audio_mime;
+    if (item->getString("android.media.mediaplayer.audio.mime", &audio_mime)) {
+        metrics_proto.set_audio_mime(std::move(audio_mime));
     }
-    char *audio_codec = NULL;
-    if (item->getCString("android.media.mediaplayer.audio.codec", &audio_codec)) {
-        metrics_proto.set_audio_codec(audio_codec);
+    std::string audio_codec;
+    if (item->getString("android.media.mediaplayer.audio.codec", &audio_codec)) {
+        metrics_proto.set_audio_codec(std::move(audio_codec));
     }
 
     int64_t duration_ms = -1;
@@ -123,14 +123,14 @@ bool statsd_nuplayer(MediaAnalyticsItem *item)
     if (item->getInt32("android.media.mediaplayer.errcode", &error_code)) {
         metrics_proto.set_error_code(error_code);
     }
-    char *error_state = NULL;
-    if (item->getCString("android.media.mediaplayer.errstate", &error_state)) {
-        metrics_proto.set_error_state(error_state);
+    std::string error_state;
+    if (item->getString("android.media.mediaplayer.errstate", &error_state)) {
+        metrics_proto.set_error_state(std::move(error_state));
     }
 
-    char *data_source_type = NULL;
-    if (item->getCString("android.media.mediaplayer.dataSource", &data_source_type)) {
-        metrics_proto.set_data_source_type(data_source_type);
+    std::string data_source_type;
+    if (item->getString("android.media.mediaplayer.dataSource", &data_source_type)) {
+        metrics_proto.set_data_source_type(std::move(data_source_type));
     }
 
     int64_t rebufferingMs = -1;
@@ -163,14 +163,6 @@ bool statsd_nuplayer(MediaAnalyticsItem *item)
     } else {
         ALOGV("NOT sending: private data (len=%zu)", strlen(serialized.c_str()));
     }
-
-    // must free the strings that we were given
-    free(video_mime);
-    free(video_codec);
-    free(audio_mime);
-    free(audio_codec);
-    free(error_state);
-    free(data_source_type);
 
     return true;
 }

@@ -56,9 +56,9 @@ bool statsd_audiothread(MediaAnalyticsItem *item)
 
     // flesh out the protobuf we'll hand off with our data
     //
-    char *mytype = NULL;
-    if (item->getCString(MM_PREFIX "type", &mytype)) {
-        metrics_proto.set_type(mytype);
+    std::string mytype;
+    if (item->getString(MM_PREFIX "type", &mytype)) {
+        metrics_proto.set_type(std::move(mytype));
     }
     int32_t framecount = -1;
     if (item->getInt32(MM_PREFIX "framecount", &framecount)) {
@@ -68,17 +68,17 @@ bool statsd_audiothread(MediaAnalyticsItem *item)
     if (item->getInt32(MM_PREFIX "samplerate", &samplerate)) {
         metrics_proto.set_samplerate(samplerate);
     }
-    char *workhist = NULL;
-    if (item->getCString(MM_PREFIX "workMs.hist", &workhist)) {
-        metrics_proto.set_work_millis_hist(workhist);
+    std::string workhist;
+    if (item->getString(MM_PREFIX "workMs.hist", &workhist)) {
+        metrics_proto.set_work_millis_hist(std::move(workhist));
     }
-    char *latencyhist = NULL;
-    if (item->getCString(MM_PREFIX "latencyMs.hist", &latencyhist)) {
-        metrics_proto.set_latency_millis_hist(latencyhist);
+    std::string latencyhist;
+    if (item->getString(MM_PREFIX "latencyMs.hist", &latencyhist)) {
+        metrics_proto.set_latency_millis_hist(std::move(latencyhist));
     }
-    char *warmuphist = NULL;
-    if (item->getCString(MM_PREFIX "warmupMs.hist", &warmuphist)) {
-        metrics_proto.set_warmup_millis_hist(warmuphist);
+    std::string warmuphist;
+    if (item->getString(MM_PREFIX "warmupMs.hist", &warmuphist)) {
+        metrics_proto.set_warmup_millis_hist(std::move(warmuphist));
     }
     int64_t underruns = -1;
     if (item->getInt64(MM_PREFIX "underruns", &underruns)) {
@@ -108,9 +108,9 @@ bool statsd_audiothread(MediaAnalyticsItem *item)
         metrics_proto.set_port_id(port_id);
     }
     // item->setCString(MM_PREFIX "type", threadTypeToString(mType));
-    char *type = NULL;
-    if (item->getCString(MM_PREFIX "type", &type)) {
-        metrics_proto.set_type(type);
+    std::string type;
+    if (item->getString(MM_PREFIX "type", &type)) {
+        metrics_proto.set_type(std::move(type));
     }
     // item->setInt32(MM_PREFIX "sampleRate", (int32_t)mSampleRate);
     int32_t sample_rate = -1;
@@ -123,9 +123,9 @@ bool statsd_audiothread(MediaAnalyticsItem *item)
         metrics_proto.set_channel_mask(channel_mask);
     }
     // item->setCString(MM_PREFIX "encoding", toString(mFormat).c_str());
-    char *encoding = NULL;
-    if (item->getCString(MM_PREFIX "encoding", &encoding)) {
-        metrics_proto.set_encoding(encoding);
+    std::string encoding;
+    if (item->getString(MM_PREFIX "encoding", &encoding)) {
+        metrics_proto.set_encoding(std::move(encoding));
     }
     // item->setInt32(MM_PREFIX "frameCount", (int32_t)mFrameCount);
     int32_t frame_count = -1;
@@ -133,14 +133,14 @@ bool statsd_audiothread(MediaAnalyticsItem *item)
         metrics_proto.set_frame_count(frame_count);
     }
     // item->setCString(MM_PREFIX "outDevice", toString(mOutDevice).c_str());
-    char *outDevice = NULL;
-    if (item->getCString(MM_PREFIX "outDevice", &outDevice)) {
-        metrics_proto.set_output_device(outDevice);
+    std::string outDevice;
+    if (item->getString(MM_PREFIX "outDevice", &outDevice)) {
+        metrics_proto.set_output_device(std::move(outDevice));
     }
     // item->setCString(MM_PREFIX "inDevice", toString(mInDevice).c_str());
-    char *inDevice = NULL;
-    if (item->getCString(MM_PREFIX "inDevice", &inDevice)) {
-        metrics_proto.set_input_device(inDevice);
+    std::string inDevice;
+    if (item->getString(MM_PREFIX "inDevice", &inDevice)) {
+        metrics_proto.set_input_device(std::move(inDevice));
     }
     // item->setDouble(MM_PREFIX "ioJitterMs.mean", mIoJitterMs.getMean());
     double iojitters_ms_mean = -1;
@@ -200,16 +200,6 @@ bool statsd_audiothread(MediaAnalyticsItem *item)
     } else {
         ALOGV("NOT sending: private data (len=%zu)", strlen(serialized.c_str()));
     }
-
-    // must free the strings that we were given
-    free(mytype);
-    free(workhist);
-    free(latencyhist);
-    free(warmuphist);
-    free(type);
-    free(encoding);
-    free(inDevice);
-    free(outDevice);
 
     return true;
 }
