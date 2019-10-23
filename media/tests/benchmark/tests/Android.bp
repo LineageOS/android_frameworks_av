@@ -18,28 +18,28 @@ cc_test {
     name: "extractorTest",
     gtest: true,
     defaults: [
-        "libbenchmark_common-defaults",
-        "libbenchmark_soft_sanitize_all-defaults",
+        "libmediabenchmark_common-defaults",
+        "libmediabenchmark_soft_sanitize_all-defaults",
     ],
 
     srcs: ["ExtractorTest.cpp"],
 
-    static_libs: ["libbenchmark_extractor"]
+    static_libs: ["libmediabenchmark_extractor"]
 }
 
 cc_test {
     name: "decoderTest",
     gtest: true,
     defaults: [
-        "libbenchmark_common-defaults",
-        "libbenchmark_soft_sanitize_all-defaults",
+        "libmediabenchmark_common-defaults",
+        "libmediabenchmark_soft_sanitize_all-defaults",
     ],
 
     srcs: ["DecoderTest.cpp"],
 
     static_libs: [
-        "libbenchmark_extractor",
-        "libbenchmark_decoder",
+        "libmediabenchmark_extractor",
+        "libmediabenchmark_decoder",
     ],
 }
 
@@ -47,15 +47,15 @@ cc_test {
     name: "muxerTest",
     gtest: true,
     defaults: [
-        "libbenchmark_common-defaults",
-        "libbenchmark_soft_sanitize_all-defaults",
+        "libmediabenchmark_common-defaults",
+        "libmediabenchmark_soft_sanitize_all-defaults",
     ],
 
     srcs: ["MuxerTest.cpp"],
 
     static_libs: [
-        "libbenchmark_extractor",
-        "libbenchmark_muxer",
+        "libmediabenchmark_extractor",
+        "libmediabenchmark_muxer",
     ],
 }
 
@@ -63,15 +63,15 @@ cc_test {
     name: "encoderTest",
     gtest: true,
     defaults: [
-        "libbenchmark_common-defaults",
-        "libbenchmark_soft_sanitize_all-defaults",
+        "libmediabenchmark_common-defaults",
+        "libmediabenchmark_soft_sanitize_all-defaults",
     ],
 
     srcs: ["EncoderTest.cpp"],
 
     static_libs: [
-        "libbenchmark_extractor",
-        "libbenchmark_decoder",
-        "libbenchmark_encoder",
+        "libmediabenchmark_extractor",
+        "libmediabenchmark_decoder",
+        "libmediabenchmark_encoder",
     ],
 }
