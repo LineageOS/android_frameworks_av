@@ -272,7 +272,6 @@ cc_library {
         "mediarecorder.cpp",
         "IMediaMetadataRetriever.cpp",
         "mediametadataretriever.cpp",
-        "MidiDeviceInfo.cpp",
         "MediaScanner.cpp",
         "MediaScannerClient.cpp",
         "CharacterEncodingDetector.cpp",
