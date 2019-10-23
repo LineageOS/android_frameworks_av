@@ -60,10 +60,6 @@ cc_library_shared {
         "libsndfile",
     ],
 
-    header_libs: [
-        "libmedia_headers",
-    ],
-
     cflags: [
         "-DSTATE_QUEUE_INSTANTIATIONS=\"StateQueueInstantiations.cpp\"",
         "-fvisibility=hidden",
