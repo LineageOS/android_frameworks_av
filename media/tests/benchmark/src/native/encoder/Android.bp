@@ -15,16 +15,16 @@
  */
 
 cc_library_static {
-    name: "libbenchmark_encoder",
+    name: "libmediabenchmark_encoder",
     defaults: [
-        "libbenchmark_common-defaults",
-        "libbenchmark_soft_sanitize_all-defaults",
+        "libmediabenchmark_common-defaults",
+        "libmediabenchmark_soft_sanitize_all-defaults",
     ],
 
     srcs: ["Encoder.cpp"],
 
-    static_libs: ["libbenchmark_extractor",
-                  "libbenchmark_decoder",
+    static_libs: ["libmediabenchmark_extractor",
+                  "libmediabenchmark_decoder",
     ],
 
     export_include_dirs: ["."],
