@@ -202,7 +202,7 @@ AMediaDataSource* AMediaDataSource_newUri(
         headers.add(key8, value8);
     }
 
-    sp<DataSource> source = DataSourceFactory::CreateFromURI(service, uri, &headers);
+    sp<DataSource> source = DataSourceFactory::getInstance()->CreateFromURI(service, uri, &headers);
     if (source == NULL) {
         ALOGE("AMediaDataSource_newUri source is null");
         return NULL;

@@ -1,0 +1,43 @@
+cc_library_static {
+    name: "libplayerservice_datasource",
+
+    srcs: [
+        "PlayerServiceDataSourceFactory.cpp",
+        "PlayerServiceFileSource.cpp",
+        "PlayerServiceMediaHTTP.cpp",
+    ],
+
+    header_libs: [
+        "media_ndk_headers",
+        "libmedia_headers",
+    ],
+
+    shared_libs: [
+        "libdatasource",
+        "libdrmframework",
+        "liblog",
+        "libutils",
+    ],
+
+    local_include_dirs: [
+        "include",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wno-error=deprecated-declarations",
+        "-Wall",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+    },
+}
