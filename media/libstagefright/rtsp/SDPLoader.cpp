@@ -22,7 +22,7 @@
 
 #include "ASessionDescription.h"
 
-#include <datasource/ClearMediaHTTP.h>
+#include <datasource/MediaHTTP.h>
 #include <media/MediaHTTPConnection.h>
 #include <media/MediaHTTPService.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -42,7 +42,7 @@ SDPLoader::SDPLoader(
       mFlags(flags),
       mNetLooper(new ALooper),
       mCancelled(false),
-      mHTTPDataSource(new ClearMediaHTTP(httpService->makeHTTPConnection())) {
+      mHTTPDataSource(new MediaHTTP(httpService->makeHTTPConnection())) {
     mNetLooper->setName("sdp net");
     mNetLooper->start(false /* runOnCallingThread */,
                       false /* canCallJava */,

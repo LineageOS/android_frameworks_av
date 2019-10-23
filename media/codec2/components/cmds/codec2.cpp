@@ -418,7 +418,7 @@ int main(int argc, char **argv) {
         const char *filename = argv[k];
 
         sp<DataSource> dataSource =
-            DataSourceFactory::CreateFromURI(nullptr /* httpService */, filename);
+            DataSourceFactory::getInstance()->CreateFromURI(nullptr /* httpService */, filename);
 
         if (strncasecmp(filename, "sine:", 5) && dataSource == nullptr) {
             fprintf(stderr, "Unable to create data source.\n");
