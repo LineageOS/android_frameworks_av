@@ -59,7 +59,6 @@ void DrmManager::reportEngineMetrics(
     IDrmEngine& engine = mPlugInManager.getPlugIn(plugInId);
 
     std::unique_ptr<MediaAnalyticsItem> item(MediaAnalyticsItem::create("drmmanager"));
-    item->generateSessionID();
     item->setUid(IPCThreadState::self()->getCallingUid());
     item->setCString("function_name", func);
     item->setCString("plugin_id", plugInId.getPathLeaf().getBasePath().c_str());

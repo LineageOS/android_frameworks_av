@@ -35,31 +35,28 @@ public:
     ~MediaAnalyticsService() override;
 
     /**
-     * Submits the indicated record to the mediaanalytics service, where
-     * it will be merged (if appropriate) with incomplete records that
-     * share the same key and sessionid.
+     * Submits the indicated record to the mediaanalytics service.
      *
      * \param item the item to submit.
-     * \param forcenew marks any matching incomplete record as complete before
-     *                 inserting this new record.
-     *
-     * \return the sessionID associated with that item or
-     *         MediaAnalyticsItem::SessionIDInvalid on failure.
-     *
-     * BEWARE: When called directly on the service (not from the binder interface),
-     * the caller surrenders ownership of item, MediaAnalyticsService will delete
-     * even on error.  The binder interface does not take ownership.
-     * TODO: fix this inconsistency with the binder RPC interface.
+     * \return status failure, which is negative on binder transaction failure.
+     *         As the transaction is one-way, remote failures will not be reported.
      */
-    MediaAnalyticsItem::SessionID_t submit(MediaAnalyticsItem *item, bool forcenew) override;
+    status_t submit(MediaAnalyticsItem *item) override {
+        return submitInternal(item, false /* release */);
+    }
 
     status_t dump(int fd, const Vector<String16>& args) override;
 
     static constexpr const char * const kServiceName = "media.metrics";
 
+protected:
+
+    // Internal call where release is true if ownership of item is transferred
+    // to the service (that is, the service will eventually delete the item).
+    status_t submitInternal(MediaAnalyticsItem *item, bool release) override;
+
 private:
     void processExpirations();
-    MediaAnalyticsItem::SessionID_t generateUniqueSessionID();
     // input validation after arrival from client
     static bool isContentValid(const MediaAnalyticsItem *item, bool isTrusted);
     bool isRateLimited(MediaAnalyticsItem *) const;
@@ -85,8 +82,6 @@ private:
     // max to expire per expirations_l() invocation
     const size_t mMaxRecordsExpiredAtOnce;
     const int mDumpProtoDefault;
-
-    std::atomic<MediaAnalyticsItem::SessionID_t> mLastSessionID{};
 
     class UidInfo {
     public:

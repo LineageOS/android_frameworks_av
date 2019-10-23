@@ -32,15 +32,10 @@
 #include <media/MediaAnalyticsItem.h>
 #include <media/IMediaAnalyticsService.h>
 
-#define DEBUGGING               0
-#define DEBUGGING_FLOW          0
-#define DEBUGGING_RETURNS       0
-
 namespace android {
 
 enum {
-    GENERATE_UNIQUE_SESSIONID = IBinder::FIRST_CALL_TRANSACTION,
-    SUBMIT_ITEM,
+    SUBMIT_ITEM_ONEWAY = IBinder::FIRST_CALL_TRANSACTION,
 };
 
 class BpMediaAnalyticsService: public BpInterface<IMediaAnalyticsService>
@@ -51,61 +46,23 @@ public:
     {
     }
 
-    virtual MediaAnalyticsItem::SessionID_t generateUniqueSessionID() {
-        Parcel data, reply;
-        status_t err;
-        MediaAnalyticsItem::SessionID_t sessionid =
-                        MediaAnalyticsItem::SessionIDInvalid;
-
-        data.writeInterfaceToken(IMediaAnalyticsService::getInterfaceDescriptor());
-        err = remote()->transact(GENERATE_UNIQUE_SESSIONID, data, &reply);
-        if (err != NO_ERROR) {
-            ALOGW("bad response from service for generateSessionId, err=%d", err);
-            return MediaAnalyticsItem::SessionIDInvalid;
-        }
-        sessionid = reply.readInt64();
-        if (DEBUGGING_RETURNS) {
-            ALOGD("the caller gets a sessionid of %" PRId64 " back", sessionid);
-        }
-        return sessionid;
-    }
-
-    virtual MediaAnalyticsItem::SessionID_t submit(MediaAnalyticsItem *item, bool forcenew)
+    status_t submit(MediaAnalyticsItem *item) override
     {
-        // have this record submit itself
-        // this will be a binder call with appropriate timing
-        // return value is the uuid that the system generated for it.
-        // the return value 0 and -1 are reserved.
-        // -1 to indicate that there was a problem recording...
-
-        Parcel data, reply;
-        status_t err;
-
-        if (item == NULL) {
-                return MediaAnalyticsItem::SessionIDInvalid;
+        if (item == nullptr) {
+            return BAD_VALUE;
         }
+        ALOGV("%s: (ONEWAY) item=%s", __func__, item->toString().c_str());
 
+        Parcel data;
         data.writeInterfaceToken(IMediaAnalyticsService::getInterfaceDescriptor());
-        if(DEBUGGING_FLOW) {
-            ALOGD("client offers record: %s", item->toString().c_str());
-        }
-        data.writeBool(forcenew);
         item->writeToParcel(&data);
 
-        err = remote()->transact(SUBMIT_ITEM, data, &reply);
-        if (err != NO_ERROR) {
-            ALOGW("bad response from service for submit, err=%d", err);
-            return MediaAnalyticsItem::SessionIDInvalid;
-        }
-
-        // get an answer out of 'reply'
-        int64_t sessionid = reply.readInt64();
-        if (DEBUGGING_RETURNS) {
-            ALOGD("the caller gets sessionid=%" PRId64 "", sessionid);
-        }
-        return sessionid;
+        status_t err = remote()->transact(
+                SUBMIT_ITEM_ONEWAY, data, nullptr /* reply */, IBinder::FLAG_ONEWAY);
+        ALOGW_IF(err != NO_ERROR, "%s: bad response from service for submit, err=%d",
+                __func__, err);
+        return err;
     }
-
 };
 
 IMPLEMENT_META_INTERFACE(MediaAnalyticsService, "android.media.IMediaAnalyticsService");
@@ -115,49 +72,23 @@ IMPLEMENT_META_INTERFACE(MediaAnalyticsService, "android.media.IMediaAnalyticsSe
 status_t BnMediaAnalyticsService::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
-
-
-    // get calling pid/tid
-    IPCThreadState *ipc = IPCThreadState::self();
-    int clientPid = ipc->getCallingPid();
-    // permission checking
-
-    if(DEBUGGING_FLOW) {
-        ALOGD("running in service, code %d, pid %d; called from pid %d",
-            code, getpid(), clientPid);
-    }
+    const int clientPid = IPCThreadState::self()->getCallingPid();
 
     switch (code) {
+    case SUBMIT_ITEM_ONEWAY: {
+        CHECK_INTERFACE(IMediaAnalyticsService, data, reply);
 
-        case GENERATE_UNIQUE_SESSIONID: {
-            CHECK_INTERFACE(IMediaAnalyticsService, data, reply);
+        MediaAnalyticsItem * const item = MediaAnalyticsItem::create();
+        if (item->readFromParcel(data) < 0) {
+            return BAD_VALUE;
+        }
+        item->setPid(clientPid);
+        const status_t status __unused = submitInternal(item, true /* release */);
+        return NO_ERROR;
+    } break;
 
-            MediaAnalyticsItem::SessionID_t sessionid = generateUniqueSessionID();
-            reply->writeInt64(sessionid);
-
-            return NO_ERROR;
-        } break;
-
-        case SUBMIT_ITEM: {
-            CHECK_INTERFACE(IMediaAnalyticsService, data, reply);
-
-            bool forcenew;
-            MediaAnalyticsItem *item = MediaAnalyticsItem::create();
-
-            data.readBool(&forcenew);
-            item->readFromParcel(data);
-
-            item->setPid(clientPid);
-
-            // submit() takes over ownership of 'item'
-            MediaAnalyticsItem::SessionID_t sessionid = submit(item, forcenew);
-            reply->writeInt64(sessionid);
-
-            return NO_ERROR;
-        } break;
-
-        default:
-            return BBinder::onTransact(code, data, reply, flags);
+    default:
+        return BBinder::onTransact(code, data, reply, flags);
     }
 }
 
