@@ -2004,6 +2004,15 @@ void CameraDeviceClient::detachDevice() {
         }
     }
 
+    for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
+        auto ret = mCompositeStreamMap.valueAt(i)->deleteInternalStreams();
+        if (ret != OK) {
+            ALOGE("%s: Failed removing composite stream  %s (%d)", __FUNCTION__,
+                    strerror(-ret), ret);
+        }
+    }
+    mCompositeStreamMap.clear();
+
     Camera2ClientBase::detachDevice();
 }
 
