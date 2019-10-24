@@ -18,21 +18,31 @@
 
 #define PERSISTENT_SURFACE_H_
 
+#include <android/IGraphicBufferSource.h>
 #include <binder/Parcel.h>
 #include <hidl/HidlSupport.h>
 #include <hidl/HybridInterface.h>
 #include <gui/IGraphicBufferProducer.h>
 #include <media/stagefright/foundation/ABase.h>
 
+using android::hidl::base::V1_0::IBase;
+
 namespace android {
 
 struct PersistentSurface : public RefBase {
     PersistentSurface() {}
 
-    // create a persistent surface
+    // create an OMX persistent surface
     PersistentSurface(
             const sp<IGraphicBufferProducer>& bufferProducer,
-            const sp<hidl::base::V1_0::IBase>& hidlTarget) :
+            const sp<IGraphicBufferSource>& bufferSource) :
+        mBufferProducer(bufferProducer),
+        mBufferSource(bufferSource) { }
+
+    // create a HIDL persistent surface
+    PersistentSurface(
+            const sp<IGraphicBufferProducer>& bufferProducer,
+            const sp<IBase>& hidlTarget) :
         mBufferProducer(bufferProducer),
         mHidlTarget(hidlTarget) { }
 
@@ -40,12 +50,18 @@ struct PersistentSurface : public RefBase {
         return mBufferProducer;
     }
 
-    sp<hidl::base::V1_0::IBase> getHidlTarget() const {
+    sp<IGraphicBufferSource> getBufferSource() const {
+        return mBufferSource;
+    }
+
+    sp<IBase> getHidlTarget() const {
         return mHidlTarget;
     }
 
     status_t writeToParcel(Parcel *parcel) const {
         parcel->writeStrongBinder(IInterface::asBinder(mBufferProducer));
+        // this can handle null
+        parcel->writeStrongBinder(IInterface::asBinder(mBufferSource));
         // write hidl target
         if (mHidlTarget != nullptr) {
             HalToken token;
@@ -63,6 +79,8 @@ struct PersistentSurface : public RefBase {
     status_t readFromParcel(const Parcel *parcel) {
         mBufferProducer = interface_cast<IGraphicBufferProducer>(
                 parcel->readStrongBinder());
+        mBufferSource = interface_cast<IGraphicBufferSource>(
+                parcel->readStrongBinder());
         // read hidl target
         bool haveHidlTarget = parcel->readBool();
         if (haveHidlTarget) {
@@ -79,7 +97,8 @@ struct PersistentSurface : public RefBase {
 
 private:
     sp<IGraphicBufferProducer> mBufferProducer;
-    sp<hidl::base::V1_0::IBase> mHidlTarget;
+    sp<IGraphicBufferSource> mBufferSource;
+    sp<IBase> mHidlTarget;
 
     DISALLOW_EVIL_CONSTRUCTORS(PersistentSurface);
 };

@@ -24,8 +24,6 @@
 #include <inttypes.h>
 #include <utils/Trace.h>
 
-#include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
-
 #include <gui/Surface.h>
 
 #include <media/stagefright/ACodec.h>
@@ -47,7 +45,6 @@
 #include <media/hardware/HardwareAPI.h>
 #include <media/MediaBufferHolder.h>
 #include <media/OMXBuffer.h>
-#include <media/omx/1.0/Conversion.h>
 #include <media/omx/1.0/WOmxNode.h>
 
 #include <hidlmemory/mapping.h>
@@ -66,9 +63,7 @@
 
 namespace android {
 
-typedef hardware::media::omx::V1_0::IGraphicBufferSource HGraphicBufferSource;
-
-using hardware::media::omx::V1_0::Status;
+using binder::Status;
 
 enum {
     kMaxIndicesToCheck = 32, // used when enumerating supported formats and profiles
@@ -103,11 +98,16 @@ static inline status_t statusFromOMXError(int32_t omxError) {
     }
 }
 
-static inline status_t statusFromBinderStatus(hardware::Return<Status> &&status) {
+static inline status_t statusFromBinderStatus(const Status &status) {
     if (status.isOk()) {
-        return static_cast<status_t>(status.withDefault(Status::UNKNOWN_ERROR));
-    } else if (status.isDeadObject()) {
-        return DEAD_OBJECT;
+        return OK;
+    }
+    status_t err;
+    if ((err = status.serviceSpecificErrorCode()) != OK) {
+        return err;
+    }
+    if ((err = status.transactionError()) != OK) {
+        return err;
     }
     // Other exception
     return UNKNOWN_ERROR;
@@ -6880,11 +6880,8 @@ status_t ACodec::LoadedState::setupInputSurface() {
         return err;
     }
 
-    using hardware::media::omx::V1_0::utils::TWOmxNode;
     err = statusFromBinderStatus(
-            mCodec->mGraphicBufferSource->configure(
-                    new TWOmxNode(mCodec->mOMXNode),
-                    static_cast<hardware::graphics::common::V1_0::Dataspace>(dataSpace)));
+            mCodec->mGraphicBufferSource->configure(mCodec->mOMXNode, dataSpace));
     if (err != OK) {
         ALOGE("[%s] Unable to configure for node (err %d)",
               mCodec->mComponentName.c_str(), err);
@@ -6970,9 +6967,8 @@ status_t ACodec::LoadedState::setupInputSurface() {
         }
 
         err = statusFromBinderStatus(
-                mCodec->mGraphicBufferSource->setColorAspects(
-                        hardware::media::omx::V1_0::utils::toHardwareColorAspects(
-                                *(ColorAspects *)colorAspectsBuffer->base())));
+                mCodec->mGraphicBufferSource->setColorAspects(ColorUtils::packToU32(
+                        *(ColorAspects *)colorAspectsBuffer->base())));
 
         if (err != OK) {
             ALOGE("[%s] Unable to configure color aspects (err %d)",
@@ -6988,10 +6984,8 @@ void ACodec::LoadedState::onCreateInputSurface(
     ALOGV("onCreateInputSurface");
 
     sp<IGraphicBufferProducer> bufferProducer;
-    sp<HGraphicBufferSource> bufferSource;
     status_t err = mCodec->mOMX->createInputSurface(
-            &bufferProducer, &bufferSource);
-    mCodec->mGraphicBufferSource = bufferSource;
+            &bufferProducer, &mCodec->mGraphicBufferSource);
 
     if (err == OK) {
         err = setupInputSurface();
@@ -7024,12 +7018,8 @@ void ACodec::LoadedState::onSetInputSurface(const sp<AMessage> &msg) {
     }
 
     sp<PersistentSurface> surface = static_cast<PersistentSurface *>(obj.get());
-    sp<HGraphicBufferSource> hgbs = HGraphicBufferSource::castFrom(surface->getHidlTarget());
-    status_t err = BAD_VALUE;
-    if (hgbs) {
-        mCodec->mGraphicBufferSource = hgbs;
-        err = setupInputSurface();
-    }
+    mCodec->mGraphicBufferSource = surface->getBufferSource();
+    status_t err = setupInputSurface();
 
     if (err == OK) {
         mCodec->mCallback->onInputSurfaceAccepted(
@@ -7548,14 +7538,8 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
         }
 
         int64_t stopTimeOffsetUs;
-        hardware::Return<void> trans = mGraphicBufferSource->getStopTimeOffsetUs(
-                [&err, &stopTimeOffsetUs](auto status, auto result) {
-                    err = static_cast<status_t>(status);
-                    stopTimeOffsetUs = result;
-                });
-        if (!trans.isOk()) {
-            err = trans.isDeadObject() ? DEAD_OBJECT : UNKNOWN_ERROR;
-        }
+        err = statusFromBinderStatus(
+                mGraphicBufferSource->getStopTimeOffsetUs(&stopTimeOffsetUs));
 
         if (err != OK) {
             ALOGE("Failed to get stop time offset (err %d)", err);

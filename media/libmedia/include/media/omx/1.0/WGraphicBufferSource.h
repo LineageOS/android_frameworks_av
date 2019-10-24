@@ -20,29 +20,26 @@
 #include <hidl/MQDescriptor.h>
 #include <hidl/Status.h>
 
-#include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
-#include <android/hardware/media/omx/1.0/IOmxNode.h>
+#include <binder/Binder.h>
+#include <media/IOMX.h>
+
 #include <android/hardware/graphics/common/1.0/types.h>
 #include <android/hardware/media/omx/1.0/IOmxNode.h>
 #include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
 
 #include <android/BnGraphicBufferSource.h>
 
-#include <media/stagefright/omx/OmxGraphicBufferSource.h>
-
 namespace android {
 namespace hardware {
 namespace media {
 namespace omx {
 namespace V1_0 {
-namespace implementation {
+namespace utils {
 
-using ::android::OmxGraphicBufferSource;
 using ::android::hardware::graphics::common::V1_0::Dataspace;
 using ::android::hardware::media::omx::V1_0::ColorAspects;
 using ::android::hardware::media::omx::V1_0::IGraphicBufferSource;
 using ::android::hardware::media::omx::V1_0::IOmxNode;
-using ::android::hardware::media::omx::V1_0::Status;
 using ::android::hidl::base::V1_0::IBase;
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_memory;
@@ -51,7 +48,6 @@ using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::sp;
-
 using ::android::IOMXNode;
 
 /**
@@ -63,31 +59,28 @@ using ::android::IOMXNode;
  * - TW = Treble Wrapper --- It wraps a legacy object inside a Treble object.
  */
 
+typedef ::android::binder::Status BnStatus;
+typedef ::android::BnGraphicBufferSource BnGraphicBufferSource;
 typedef ::android::hardware::media::omx::V1_0::IGraphicBufferSource
         TGraphicBufferSource;
 
-struct TWGraphicBufferSource : public TGraphicBufferSource {
-    struct TWOmxNodeWrapper;
-    struct TWOmxBufferSource;
-    sp<OmxGraphicBufferSource> mBase;
-    sp<IOmxBufferSource> mOmxBufferSource;
-
-    TWGraphicBufferSource(sp<OmxGraphicBufferSource> const& base);
-    Return<Status> configure(
-            const sp<IOmxNode>& omxNode, Dataspace dataspace) override;
-    Return<Status> setSuspend(bool suspend, int64_t timeUs) override;
-    Return<Status> setRepeatPreviousFrameDelayUs(int64_t repeatAfterUs) override;
-    Return<Status> setMaxFps(float maxFps) override;
-    Return<Status> setTimeLapseConfig(double fps, double captureFps) override;
-    Return<Status> setStartTimeUs(int64_t startTimeUs) override;
-    Return<Status> setStopTimeUs(int64_t stopTimeUs) override;
-    Return<void> getStopTimeOffsetUs(getStopTimeOffsetUs_cb _hidl_cb) override;
-    Return<Status> setColorAspects(const ColorAspects& aspects) override;
-    Return<Status> setTimeOffsetUs(int64_t timeOffsetUs) override;
-    Return<Status> signalEndOfInputStream() override;
+struct LWGraphicBufferSource : public BnGraphicBufferSource {
+    sp<TGraphicBufferSource> mBase;
+    LWGraphicBufferSource(sp<TGraphicBufferSource> const& base);
+    BnStatus configure(const sp<IOMXNode>& omxNode, int32_t dataSpace) override;
+    BnStatus setSuspend(bool suspend, int64_t timeUs) override;
+    BnStatus setRepeatPreviousFrameDelayUs(int64_t repeatAfterUs) override;
+    BnStatus setMaxFps(float maxFps) override;
+    BnStatus setTimeLapseConfig(double fps, double captureFps) override;
+    BnStatus setStartTimeUs(int64_t startTimeUs) override;
+    BnStatus setStopTimeUs(int64_t stopTimeUs) override;
+    BnStatus getStopTimeOffsetUs(int64_t *stopTimeOffsetUs) override;
+    BnStatus setColorAspects(int32_t aspects) override;
+    BnStatus setTimeOffsetUs(int64_t timeOffsetsUs) override;
+    BnStatus signalEndOfInputStream() override;
 };
 
-}  // namespace implementation
+}  // namespace utils
 }  // namespace V1_0
 }  // namespace omx
 }  // namespace media
