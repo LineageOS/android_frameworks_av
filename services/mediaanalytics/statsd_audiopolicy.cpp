@@ -60,14 +60,14 @@ bool statsd_audiopolicy(MediaAnalyticsItem *item)
         metrics_proto.set_status(status);
     }
     //string char kAudioPolicyRqstSrc[] = "android.media.audiopolicy.rqst.src";
-    char *rqst_src = NULL;
-    if (item->getCString("android.media.audiopolicy.rqst.src", &rqst_src)) {
-        metrics_proto.set_request_source(rqst_src);
+    std::string rqst_src;
+    if (item->getString("android.media.audiopolicy.rqst.src", &rqst_src)) {
+        metrics_proto.set_request_source(std::move(rqst_src));
     }
     //string char kAudioPolicyRqstPkg[] = "android.media.audiopolicy.rqst.pkg";
-    char *rqst_pkg = NULL;
-    if (item->getCString("android.media.audiopolicy.rqst.pkg", &rqst_pkg)) {
-        metrics_proto.set_request_package(rqst_pkg);
+    std::string rqst_pkg;
+    if (item->getString("android.media.audiopolicy.rqst.pkg", &rqst_pkg)) {
+        metrics_proto.set_request_package(std::move(rqst_pkg));
     }
     //int32 char kAudioPolicyRqstSession[] = "android.media.audiopolicy.rqst.session";
     int32_t rqst_session = -1;
@@ -75,20 +75,20 @@ bool statsd_audiopolicy(MediaAnalyticsItem *item)
         metrics_proto.set_request_session(rqst_session);
     }
     //string char kAudioPolicyRqstDevice[] = "android.media.audiopolicy.rqst.device";
-    char *rqst_device = NULL;
-    if (item->getCString("android.media.audiopolicy.rqst.device", &rqst_device)) {
-        metrics_proto.set_request_device(rqst_device);
+    std::string rqst_device;
+    if (item->getString("android.media.audiopolicy.rqst.device", &rqst_device)) {
+        metrics_proto.set_request_device(std::move(rqst_device));
     }
 
     //string char kAudioPolicyActiveSrc[] = "android.media.audiopolicy.active.src";
-    char *active_src = NULL;
-    if (item->getCString("android.media.audiopolicy.active.src", &active_src)) {
-        metrics_proto.set_active_source(active_src);
+    std::string active_src;
+    if (item->getString("android.media.audiopolicy.active.src", &active_src)) {
+        metrics_proto.set_active_source(std::move(active_src));
     }
     //string char kAudioPolicyActivePkg[] = "android.media.audiopolicy.active.pkg";
-    char *active_pkg = NULL;
-    if (item->getCString("android.media.audiopolicy.active.pkg", &active_pkg)) {
-        metrics_proto.set_active_package(active_pkg);
+    std::string active_pkg;
+    if (item->getString("android.media.audiopolicy.active.pkg", &active_pkg)) {
+        metrics_proto.set_active_package(std::move(active_pkg));
     }
     //int32 char kAudioPolicyActiveSession[] = "android.media.audiopolicy.active.session";
     int32_t active_session = -1;
@@ -96,9 +96,9 @@ bool statsd_audiopolicy(MediaAnalyticsItem *item)
         metrics_proto.set_active_session(active_session);
     }
     //string char kAudioPolicyActiveDevice[] = "android.media.audiopolicy.active.device";
-    char *active_device = NULL;
-    if (item->getCString("android.media.audiopolicy.active.device", &active_device)) {
-        metrics_proto.set_active_device(active_device);
+    std::string active_device;
+    if (item->getString("android.media.audiopolicy.active.device", &active_device)) {
+        metrics_proto.set_active_device(std::move(active_device));
     }
 
 
@@ -118,14 +118,6 @@ bool statsd_audiopolicy(MediaAnalyticsItem *item)
     } else {
         ALOGV("NOT sending: private data (len=%zu)", strlen(serialized.c_str()));
     }
-
-    // must free the strings that we were given
-    free(rqst_src);
-    free(rqst_pkg);
-    free(rqst_device);
-    free(active_src);
-    free(active_pkg);
-    free(active_device);
 
     return true;
 }

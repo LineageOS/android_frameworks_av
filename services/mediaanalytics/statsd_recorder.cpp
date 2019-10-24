@@ -56,14 +56,14 @@ bool statsd_recorder(MediaAnalyticsItem *item)
     //
 
     // string kRecorderAudioMime = "android.media.mediarecorder.audio.mime";
-    char *audio_mime = NULL;
-    if (item->getCString("android.media.mediarecorder.audio.mime", &audio_mime)) {
-        metrics_proto.set_audio_mime(audio_mime);
+    std::string audio_mime;
+    if (item->getString("android.media.mediarecorder.audio.mime", &audio_mime)) {
+        metrics_proto.set_audio_mime(std::move(audio_mime));
     }
     // string kRecorderVideoMime = "android.media.mediarecorder.video.mime";
-    char *video_mime = NULL;
-    if (item->getCString("android.media.mediarecorder.video.mime", &video_mime)) {
-        metrics_proto.set_video_mime(video_mime);
+    std::string video_mime;
+    if (item->getString("android.media.mediarecorder.video.mime", &video_mime)) {
+        metrics_proto.set_video_mime(std::move(video_mime));
     }
     // int32 kRecorderVideoProfile = "android.media.mediarecorder.video-encoder-profile";
     int32_t videoProfile = -1;
@@ -182,10 +182,6 @@ bool statsd_recorder(MediaAnalyticsItem *item)
     } else {
         ALOGV("NOT sending: private data (len=%zu)", strlen(serialized.c_str()));
     }
-
-    // must free the strings that we were given
-    free(audio_mime);
-    free(video_mime);
 
     return true;
 }

@@ -56,14 +56,14 @@ bool statsd_extractor(MediaAnalyticsItem *item)
     //
 
     // android.media.mediaextractor.fmt         string
-    char *fmt = NULL;
-    if (item->getCString("android.media.mediaextractor.fmt", &fmt)) {
-        metrics_proto.set_format(fmt);
+    std::string fmt;
+    if (item->getString("android.media.mediaextractor.fmt", &fmt)) {
+        metrics_proto.set_format(std::move(fmt));
     }
     // android.media.mediaextractor.mime        string
-    char *mime = NULL;
-    if (item->getCString("android.media.mediaextractor.mime", &mime)) {
-        metrics_proto.set_mime(mime);
+    std::string mime;
+    if (item->getString("android.media.mediaextractor.mime", &mime)) {
+        metrics_proto.set_mime(std::move(mime));
     }
     // android.media.mediaextractor.ntrk        int32
     int32_t ntrk = -1;
@@ -87,10 +87,6 @@ bool statsd_extractor(MediaAnalyticsItem *item)
     } else {
         ALOGV("NOT sending: private data (len=%zu)", strlen(serialized.c_str()));
     }
-
-    // must free the strings that we were given
-    free(fmt);
-    free(mime);
 
     return true;
 }
