@@ -175,8 +175,7 @@ public:
     virtual status_t openOutput(audio_module_handle_t module,
                                 audio_io_handle_t *output,
                                 audio_config_t *config,
-                                audio_devices_t *devices,
-                                const String8& address,
+                                const sp<DeviceDescriptorBase>& device,
                                 uint32_t *latencyMs,
                                 audio_output_flags_t flags);
 
@@ -372,7 +371,7 @@ private:
     virtual     void        onFirstRef();
 
     AudioHwDevice*          findSuitableHwDev_l(audio_module_handle_t module,
-                                                audio_devices_t devices);
+                                                audio_devices_t deviceType);
 
     // Set kEnableExtendedChannels to true to enable greater than stereo output
     // for the MixerThread and device sink.  Number of channels allowed is
@@ -678,11 +677,11 @@ using effect_buffer_t = int16_t;
                                            audio_devices_t outputDevice,
                                            const String8& outputDeviceAddress);
               sp<ThreadBase> openOutput_l(audio_module_handle_t module,
-                                              audio_io_handle_t *output,
-                                              audio_config_t *config,
-                                              audio_devices_t devices,
-                                              const String8& address,
-                                              audio_output_flags_t flags);
+                                          audio_io_handle_t *output,
+                                          audio_config_t *config,
+                                          audio_devices_t deviceType,
+                                          const String8& address,
+                                          audio_output_flags_t flags);
 
               void closeOutputFinish(const sp<PlaybackThread>& thread);
               void closeInputFinish(const sp<RecordThread>& thread);

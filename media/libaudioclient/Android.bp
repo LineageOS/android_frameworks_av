@@ -1,7 +1,15 @@
 cc_library_headers {
     name: "libaudioclient_headers",
     vendor_available: true,
-    export_include_dirs: ["include"],
+    header_libs: [
+        "libaudiofoundation_headers",
+    ],
+    export_include_dirs: [
+        "include",
+    ],
+    export_header_lib_headers: [
+        "libaudiofoundation_headers",
+    ],
 }
 
 cc_library_shared {
@@ -64,6 +72,7 @@ cc_library_shared {
         "TrackPlayerBase.cpp",
     ],
     shared_libs: [
+        "libaudiofoundation",
         "libaudioutils",
         "libaudiopolicy",
         "libaudiomanager",

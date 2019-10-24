@@ -34,8 +34,7 @@ public:
     status_t openOutput(audio_module_handle_t module,
                         audio_io_handle_t *output,
                         audio_config_t * /*config*/,
-                        audio_devices_t * /*devices*/,
-                        const String8 & /*address*/,
+                        const sp<DeviceDescriptorBase>& /*device*/,
                         uint32_t * /*latencyMs*/,
                         audio_output_flags_t /*flags*/) override {
         if (module >= mNextModuleHandle) {

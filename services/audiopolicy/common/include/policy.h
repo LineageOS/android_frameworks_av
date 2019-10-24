@@ -19,6 +19,8 @@
 #include <system/audio.h>
 #include <vector>
 
+#include <media/AudioContainers.h>
+
 namespace android {
 
 using StreamTypeVector = std::vector<audio_stream_type_t>;
@@ -198,4 +200,44 @@ static inline bool hasStream(const android::StreamTypeVector &streams,
 static inline bool hasVoiceStream(const android::StreamTypeVector &streams)
 {
     return hasStream(streams, AUDIO_STREAM_VOICE_CALL);
+}
+
+/**
+ * @brief extract one device relevant from multiple device selection
+ * @param deviceTypes collection of audio device type
+ * @return the device type that is selected
+ */
+static inline audio_devices_t apm_extract_one_audio_device(
+        const android::DeviceTypeSet& deviceTypes) {
+    if (deviceTypes.empty()) {
+        return AUDIO_DEVICE_NONE;
+    } else if (deviceTypes.size() == 1) {
+        return *(deviceTypes.begin());
+    } else {
+        // Multiple device selection is either:
+        //  - speaker + one other device: give priority to speaker in this case.
+        //  - one A2DP device + another device: happens with duplicated output. In this case
+        // retain the device on the A2DP output as the other must not correspond to an active
+        // selection if not the speaker.
+        //  - HDMI-CEC system audio mode only output: give priority to available item in order.
+        if (deviceTypes.count(AUDIO_DEVICE_OUT_SPEAKER) != 0) {
+            return AUDIO_DEVICE_OUT_SPEAKER;
+        } else if (deviceTypes.count(AUDIO_DEVICE_OUT_SPEAKER_SAFE) != 0) {
+            return AUDIO_DEVICE_OUT_SPEAKER_SAFE;
+        } else if (deviceTypes.count(AUDIO_DEVICE_OUT_HDMI_ARC) != 0) {
+            return AUDIO_DEVICE_OUT_HDMI_ARC;
+        } else if (deviceTypes.count(AUDIO_DEVICE_OUT_AUX_LINE) != 0) {
+            return AUDIO_DEVICE_OUT_AUX_LINE;
+        } else if (deviceTypes.count(AUDIO_DEVICE_OUT_SPDIF) != 0) {
+            return AUDIO_DEVICE_OUT_SPDIF;
+        } else {
+            std::vector<audio_devices_t> a2dpDevices = android::Intersection(
+                    deviceTypes, android::getAudioDeviceOutAllA2dpSet());
+            if (a2dpDevices.empty() || a2dpDevices.size() > 1) {
+                ALOGW("%s invalid device combination: %s",
+                      __func__, android::dumpDeviceTypes(deviceTypes).c_str());
+            }
+            return a2dpDevices.empty() ? AUDIO_DEVICE_NONE : a2dpDevices[0];
+        }
+    }
 }
