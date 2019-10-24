@@ -30,6 +30,19 @@
 namespace android {
 
 // static
+sp<DataSourceFactory> DataSourceFactory::sInstance;
+// static
+Mutex DataSourceFactory::sInstanceLock;
+
+// static
+sp<DataSourceFactory> DataSourceFactory::getInstance() {
+    Mutex::Autolock l(sInstanceLock);
+    if (!sInstance) {
+        sInstance = new DataSourceFactory();
+    }
+    return sInstance;
+}
+
 sp<DataSource> DataSourceFactory::CreateFromURI(
         const sp<MediaHTTPService> &httpService,
         const char *uri,
@@ -42,20 +55,16 @@ sp<DataSource> DataSourceFactory::CreateFromURI(
 
     sp<DataSource> source;
     if (!strncasecmp("file://", uri, 7)) {
-        source = new FileSource(uri + 7);
+        source = CreateFileSource(uri + 7);
     } else if (!strncasecmp("http://", uri, 7) || !strncasecmp("https://", uri, 8)) {
         if (httpService == NULL) {
             ALOGE("Invalid http service!");
             return NULL;
         }
 
-        if (httpSource == NULL) {
-            sp<MediaHTTPConnection> conn = httpService->makeHTTPConnection();
-            if (conn == NULL) {
-                ALOGE("Failed to make http connection from http service!");
-                return NULL;
-            }
-            httpSource = new MediaHTTP(conn);
+        sp<HTTPBase> mediaHTTP = httpSource;
+        if (mediaHTTP == NULL) {
+            mediaHTTP = static_cast<HTTPBase *>(CreateMediaHTTP(httpService).get());
         }
 
         String8 cacheConfig;
@@ -69,24 +78,24 @@ sp<DataSource> DataSourceFactory::CreateFromURI(
                     &disconnectAtHighwatermark);
         }
 
-        if (httpSource->connect(uri, &nonCacheSpecificHeaders) != OK) {
+        if (mediaHTTP->connect(uri, &nonCacheSpecificHeaders) != OK) {
             ALOGE("Failed to connect http source!");
             return NULL;
         }
 
         if (contentType != NULL) {
-            *contentType = httpSource->getMIMEType();
+            *contentType = mediaHTTP->getMIMEType();
         }
 
         source = NuCachedSource2::Create(
-                httpSource,
+                mediaHTTP,
                 cacheConfig.isEmpty() ? NULL : cacheConfig.string(),
                 disconnectAtHighwatermark);
     } else if (!strncasecmp("data:", uri, 5)) {
         source = DataURISource::Create(uri);
     } else {
         // Assume it's a filename.
-        source = new FileSource(uri);
+        source = CreateFileSource(uri);
     }
 
     if (source == NULL || source->initCheck() != OK) {
@@ -108,10 +117,15 @@ sp<DataSource> DataSourceFactory::CreateMediaHTTP(const sp<MediaHTTPService> &ht
 
     sp<MediaHTTPConnection> conn = httpService->makeHTTPConnection();
     if (conn == NULL) {
+        ALOGE("Failed to make http connection from http service!");
         return NULL;
     } else {
         return new MediaHTTP(conn);
     }
+}
+
+sp<DataSource> DataSourceFactory::CreateFileSource(const char *uri) {
+    return new FileSource(uri);
 }
 
 }  // namespace android

@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-#ifndef DATA_SOURCE_FACTORY_H_
+#ifndef PLAYER_SERVICE_DATA_SOURCE_FACTORY_H_
 
-#define DATA_SOURCE_FACTORY_H_
+#define PLAYER_SERVICE_DATA_SOURCE_FACTORY_H_
 
+#include <datasource/DataSourceFactory.h>
 #include <media/DataSource.h>
 #include <sys/types.h>
-#include <utils/KeyedVector.h>
 #include <utils/RefBase.h>
 
 namespace android {
@@ -29,29 +29,20 @@ struct MediaHTTPService;
 class String8;
 struct HTTPBase;
 
-class DataSourceFactory : public RefBase {
+class PlayerServiceDataSourceFactory : public DataSourceFactory {
 public:
-    static sp<DataSourceFactory> getInstance();
-    sp<DataSource> CreateFromURI(
-            const sp<MediaHTTPService> &httpService,
-            const char *uri,
-            const KeyedVector<String8, String8> *headers = NULL,
-            String8 *contentType = NULL,
-            HTTPBase *httpSource = NULL);
-
+    static sp<PlayerServiceDataSourceFactory> getInstance();
     virtual sp<DataSource> CreateMediaHTTP(const sp<MediaHTTPService> &httpService);
-    sp<DataSource> CreateFromFd(int fd, int64_t offset, int64_t length);
 
 protected:
     virtual sp<DataSource> CreateFileSource(const char *uri);
-    DataSourceFactory() {};
-    virtual ~DataSourceFactory() {};
 
 private:
-    static sp<DataSourceFactory> sInstance;
+    static sp<PlayerServiceDataSourceFactory> sInstance;
     static Mutex sInstanceLock;
+    PlayerServiceDataSourceFactory() {};
 };
 
 }  // namespace android
 
-#endif  // DATA_SOURCE_FACTORY_H_
+#endif  // PLAYER_SERVICE_DATA_SOURCE_FACTORY_H_

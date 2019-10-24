@@ -9,8 +9,10 @@ Run the following steps to build the test suite:
 ```
 mmm frameworks/av/media/tests/benchmark/
 ```
-To run the test suite for measuring performance of the native layer, follow the following steps:
+
 # NDK
+
+To run the test suite for measuring performance of the native layer, follow the following steps:
 
 The binaries will be created in the following path : ${OUT}/data/nativetest64/
 
@@ -102,4 +104,19 @@ adb shell am instrument -w -r -e class 'com.android.media.benchmark.tests.Extrac
 The test decodes input stream and benchmarks the decoders available in SDK.
 ```
 adb shell am instrument -w -r -e class 'com.android.media.benchmark.tests.DecoderTest' com.android.media.benchmark/androidx.test.runner.AndroidJUnitRunner
+```
+
+## Muxer
+
+The test muxes elementary stream and benchmarks different writers available in SDK.
+```
+adb shell am instrument -w -r -e class 'com.android.media.benchmark.tests.MuxerTest' com.android.media.benchmark/androidx.test.runner.AndroidJUnitRunner
+```
+
+## Encoder
+
+The test encodes input stream and benchmarks the encoders available in SDK.
+```
+adb shell am instrument -w -r -e class 'com.android.media.benchmark.tests.EncoderTest' com.android.media.benchmark/androidx.test.runner.AndroidJUnitRunner
+
 ```

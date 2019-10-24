@@ -67,11 +67,11 @@
 #include <media/AudioBufferProvider.h>
 #include <media/AudioMixer.h>
 #include <media/ExtendedAudioBufferProvider.h>
-#include <media/LinearMap.h>
 #include <media/VolumeShaper.h>
 
 #include <audio_utils/clock.h>
 #include <audio_utils/FdToString.h>
+#include <audio_utils/LinearMap.h>
 #include <audio_utils/SimpleLog.h>
 #include <audio_utils/TimestampVerifier.h>
 
