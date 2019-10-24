@@ -232,11 +232,6 @@ sp<IGraphicBufferProducer> StagefrightRecorder::querySurfaceMediaSource() const 
 
 status_t StagefrightRecorder::setAudioSource(audio_source_t as) {
     ALOGV("setAudioSource: %d", as);
-    if (as < AUDIO_SOURCE_DEFAULT ||
-        (as >= AUDIO_SOURCE_CNT && as != AUDIO_SOURCE_FM_TUNER)) {
-        ALOGE("Invalid audio source: %d", as);
-        return BAD_VALUE;
-    }
 
     if (as == AUDIO_SOURCE_DEFAULT) {
         mAudioSource = AUDIO_SOURCE_MIC;
