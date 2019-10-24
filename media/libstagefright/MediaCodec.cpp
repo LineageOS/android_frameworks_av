@@ -21,11 +21,12 @@
 #include <inttypes.h>
 #include <stdlib.h>
 
+#include "include/SecureBuffer.h"
+#include "include/SharedMemoryBuffer.h"
 #include "include/SoftwareRenderer.h"
 #include "StagefrightPluginLoader.h"
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
-#include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
 
 #include <android/media/BnResourceManagerClient.h>
 #include <android/media/IResourceManagerService.h>
@@ -544,7 +545,7 @@ sp<PersistentSurface> MediaCodec::CreatePersistentInputSurface() {
     sp<IOMX> omx = client.interface();
 
     sp<IGraphicBufferProducer> bufferProducer;
-    sp<hardware::media::omx::V1_0::IGraphicBufferSource> bufferSource;
+    sp<IGraphicBufferSource> bufferSource;
 
     status_t err = omx->createInputSurface(&bufferProducer, &bufferSource);
 

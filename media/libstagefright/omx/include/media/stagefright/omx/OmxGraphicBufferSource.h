@@ -21,6 +21,7 @@
 #include <media/stagefright/bqhelper/GraphicBufferSource.h>
 #include <media/stagefright/foundation/ABase.h>
 
+#include <android/BnGraphicBufferSource.h>
 #include <android/BnOMXBufferSource.h>
 
 #include "IOmxNodeWrapper.h"
