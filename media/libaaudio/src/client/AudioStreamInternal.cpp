@@ -116,6 +116,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     request.getConfiguration().setUsage(getUsage());
     request.getConfiguration().setContentType(getContentType());
     request.getConfiguration().setInputPreset(getInputPreset());
+    request.getConfiguration().setPrivacySensitive(isPrivacySensitive());
 
     request.getConfiguration().setBufferCapacity(builder.getBufferCapacity());
 

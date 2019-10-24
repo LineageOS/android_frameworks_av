@@ -234,6 +234,10 @@ public:
         return mSessionId;
     }
 
+    bool isPrivacySensitive() const {
+        return mIsPrivacySensitive;
+    }
+
     /**
      * This is only valid after setSamplesPerFrame() and setFormat() have been called.
      */
@@ -543,6 +547,13 @@ protected:
         mAllowedCapturePolicy = policy;
     }
 
+    /**
+     * This should not be called after the open() call.
+     */
+    void setPrivacySensitive(bool privacySensitive) {
+        mIsPrivacySensitive = privacySensitive;
+    }
+
 private:
 
     aaudio_result_t safeStop();
@@ -565,6 +576,7 @@ private:
     aaudio_content_type_t       mContentType     = AAUDIO_UNSPECIFIED;
     aaudio_input_preset_t       mInputPreset     = AAUDIO_UNSPECIFIED;
     aaudio_allowed_capture_policy_t mAllowedCapturePolicy = AAUDIO_ALLOW_CAPTURE_BY_ALL;
+    bool                        mIsPrivacySensitive = false;
 
     int32_t                     mSessionId = AAUDIO_UNSPECIFIED;
 

@@ -489,7 +489,7 @@ void AudioPolicyService::updateUidStates_l()
             latestActive = current;
             latestStartNs = current->startTimeNs;
         }
-        if (isPrivacySensitiveSource(current->attributes.source)) {
+        if ((current->attributes.flags & AUDIO_FLAG_CAPTURE_PRIVATE) != 0) {
             if (current->startTimeNs > latestSensitiveStartNs) {
                 latestSensitiveActive = current;
                 latestSensitiveStartNs = current->startTimeNs;
@@ -599,19 +599,6 @@ app_state_t AudioPolicyService::apmStatFromAmState(int amState) {
       return APP_STATE_TOP;
     }
     return APP_STATE_FOREGROUND;
-}
-
-/* static */
-bool AudioPolicyService::isPrivacySensitiveSource(audio_source_t source)
-{
-    switch (source) {
-        case AUDIO_SOURCE_CAMCORDER:
-        case AUDIO_SOURCE_VOICE_COMMUNICATION:
-            return true;
-        default:
-            break;
-    }
-    return false;
 }
 
 /* static */

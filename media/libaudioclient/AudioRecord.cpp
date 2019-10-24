@@ -262,8 +262,12 @@ status_t AudioRecord::set(
     }
 
     if (pAttributes == NULL) {
-        memset(&mAttributes, 0, sizeof(audio_attributes_t));
+        mAttributes = AUDIO_ATTRIBUTES_INITIALIZER;
         mAttributes.source = inputSource;
+        if (inputSource == AUDIO_SOURCE_VOICE_COMMUNICATION
+                || inputSource == AUDIO_SOURCE_CAMCORDER) {
+            mAttributes.flags |= AUDIO_FLAG_CAPTURE_PRIVATE;
+        }
     } else {
         // stream type shouldn't be looked at, this track has audio attributes
         memcpy(&mAttributes, pAttributes, sizeof(audio_attributes_t));

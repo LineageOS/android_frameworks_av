@@ -178,6 +178,47 @@ status_t MediaRecorder::setAudioSource(int as)
     return ret;
 }
 
+status_t MediaRecorder::setPrivacySensitive(bool privacySensitive)
+{
+    ALOGV("%s(%s)", __func__, privacySensitive ? "true" : "false");
+    if (mMediaRecorder == NULL) {
+        ALOGE("%s: media recorder is not initialized yet", __func__);
+        return INVALID_OPERATION;
+    }
+
+    if (!(mCurrentState & MEDIA_RECORDER_INITIALIZED) || !mIsAudioSourceSet) {
+        ALOGE("%s called in an invalid state(%d) or audio source not (%d)",
+            __func__, mCurrentState, mIsAudioSourceSet);
+        return INVALID_OPERATION;
+    }
+
+    status_t ret = mMediaRecorder->setPrivacySensitive(privacySensitive);
+    if (OK != ret) {
+        ALOGV("%s failed: %d", __func__, ret);
+        mCurrentState = MEDIA_RECORDER_ERROR;
+        return ret;
+    }
+    return ret;
+}
+
+status_t MediaRecorder::isPrivacySensitive(bool *privacySensitive) const
+{
+    if (mMediaRecorder == NULL) {
+        ALOGE("%s: media recorder is not initialized yet", __func__);
+        return INVALID_OPERATION;
+    }
+
+    if (!(mCurrentState & MEDIA_RECORDER_INITIALIZED) || !mIsAudioSourceSet) {
+        ALOGE("%s called in an invalid state(%d) or audio source not (%d)",
+            __func__, mCurrentState, mIsAudioSourceSet);
+        return INVALID_OPERATION;
+    }
+
+    status_t ret = mMediaRecorder->isPrivacySensitive(privacySensitive);
+    ALOGV("%s status: %d eanbled %s", __func__, ret, *privacySensitive ? "enabled" : "disabled");
+    return ret;
+}
+
 status_t MediaRecorder::setOutputFormat(int of)
 {
     ALOGV("setOutputFormat(%d)", of);

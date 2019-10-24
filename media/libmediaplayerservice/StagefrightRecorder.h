@@ -46,6 +46,8 @@ struct StagefrightRecorder : public MediaRecorderBase {
     virtual ~StagefrightRecorder();
     virtual status_t init();
     virtual status_t setAudioSource(audio_source_t as);
+            status_t setPrivacySensitive(bool privacySensitive) override;
+            status_t isPrivacySensitive(bool *privacySensitive) const override;
     virtual status_t setVideoSource(video_source vs);
     virtual status_t setOutputFormat(output_format of);
     virtual status_t setAudioEncoder(audio_encoder ae);
@@ -82,6 +84,13 @@ struct StagefrightRecorder : public MediaRecorderBase {
             status_t getPortId(audio_port_handle_t *portId) const override;
 
 private:
+
+    enum privacy_sensitive_t {
+        PRIVACY_SENSITIVE_DEFAULT = -1,
+        PRIVACY_SENSITIVE_DISABLED = 0,
+        PRIVACY_SENSITIVE_ENABLED = 1,
+    };
+
     mutable Mutex mLock;
     sp<hardware::ICamera> mCamera;
     sp<ICameraRecordingProxy> mCameraProxy;
@@ -101,6 +110,7 @@ private:
     void updateMetrics();
 
     audio_source_t mAudioSource;
+    privacy_sensitive_t mPrivacySensitive;
     video_source mVideoSource;
     output_format mOutputFormat;
     audio_encoder mAudioEncoder;
