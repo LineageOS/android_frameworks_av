@@ -1,0 +1,10 @@
+cc_fuzz {
+  name: "libaudioprocessing_resampler_fuzzer",
+  srcs: [
+    "libaudioprocessing_resampler_fuzzer.cpp",
+  ],
+  defaults: ["libaudioprocessing_test_defaults"],
+  static_libs: [
+    "libsndfile",
+  ],
+}
