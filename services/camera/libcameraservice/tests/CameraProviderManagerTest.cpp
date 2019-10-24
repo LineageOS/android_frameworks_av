@@ -183,6 +183,7 @@ struct TestInteractionProxy : public CameraProviderManager::ServiceInteractionPr
     sp<TestICameraProvider> mTestCameraProvider;
 
     TestInteractionProxy() {}
+
     void setProvider(sp<TestICameraProvider> provider) {
         mTestCameraProvider = provider;
     }
@@ -199,13 +200,31 @@ struct TestInteractionProxy : public CameraProviderManager::ServiceInteractionPr
         return true;
     }
 
+    virtual sp<hardware::camera::provider::V2_4::ICameraProvider> tryGetService(
+            const std::string &serviceName) override {
+        // If no provider has been given, act like the HAL isn't available and return null.
+        if (mTestCameraProvider == nullptr) return nullptr;
+        return getService(serviceName);
+    }
+
     virtual sp<hardware::camera::provider::V2_4::ICameraProvider> getService(
             const std::string &serviceName) override {
+        // If no provider has been given, fail; in reality, getService would
+        // block for HALs that don't start correctly, so we should never use
+        // getService when we don't have a valid HAL running
+        if (mTestCameraProvider == nullptr) {
+            ADD_FAILURE() << "getService called with no valid provider; would block indefinitely";
+            // Real getService would block, but that's bad in unit tests. So
+            // just record an error and return nullptr
+            return nullptr;
+        }
         mLastRequestedServiceNames.push_back(serviceName);
         return mTestCameraProvider;
     }
 
     virtual hardware::hidl_vec<hardware::hidl_string> listServices() override {
+        // Always provide a list even if there's no actual provider yet, to
+        // simulate stuck HAL situations as well
         hardware::hidl_vec<hardware::hidl_string> ret = {"test/0"};
         return ret;
     }
@@ -437,4 +456,53 @@ TEST(CameraProviderManagerTest, NotifyStateChangeTest) {
             static_cast<hardware::hidl_bitfield<DeviceState>>(DeviceState::FOLDED))
             << "Unable to change device state";
 
+}
+
+// Test that CameraProviderManager doesn't get stuck when the camera HAL isn't really working
+TEST(CameraProviderManagerTest, BadHalStartupTest) {
+
+    std::vector<hardware::hidl_string> deviceNames;
+    deviceNames.push_back("device@3.2/test/0");
+    deviceNames.push_back("device@1.0/test/0");
+    deviceNames.push_back("device@3.2/test/1");
+    hardware::hidl_vec<common::V1_0::VendorTagSection> vendorSection;
+    status_t res;
+
+    sp<CameraProviderManager> providerManager = new CameraProviderManager();
+    sp<TestStatusListener> statusListener = new TestStatusListener();
+    TestInteractionProxy serviceProxy;
+    sp<TestICameraProvider> provider =  new TestICameraProvider(deviceNames,
+            vendorSection);
+
+    // Not setting up provider in the service proxy yet, to test cases where a
+    // HAL isn't starting right
+    res = providerManager->initialize(statusListener, &serviceProxy);
+    ASSERT_EQ(res, OK) << "Unable to initialize provider manager";
+
+    // Now set up provider and trigger a registration
+    serviceProxy.setProvider(provider);
+    int numProviders = static_cast<int>(serviceProxy.listServices().size());
+
+    hardware::hidl_string testProviderFqInterfaceName =
+            "android.hardware.camera.provider@2.4::ICameraProvider";
+    hardware::hidl_string testProviderInstanceName = "test/0";
+    serviceProxy.mManagerNotificationInterface->onRegistration(
+            testProviderFqInterfaceName,
+            testProviderInstanceName, false);
+
+    // Check that new provider is called once for all the init methods
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::SET_CALLBACK], numProviders) <<
+            "Only one call to setCallback per provider expected during register";
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::GET_VENDOR_TAGS], numProviders) <<
+            "Only one call to getVendorTags per provider expected during register";
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::IS_SET_TORCH_MODE_SUPPORTED],
+            numProviders) <<
+            "Only one call to isSetTorchModeSupported per provider expected during init";
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::GET_CAMERA_ID_LIST], numProviders) <<
+            "Only one call to getCameraIdList per provider expected during init";
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::NOTIFY_DEVICE_STATE], numProviders) <<
+            "Only one call to notifyDeviceState per provider expected during init";
+
+    ASSERT_EQ(serviceProxy.mLastRequestedServiceNames.back(), testProviderInstanceName) <<
+            "Incorrect instance requested from service manager";
 }

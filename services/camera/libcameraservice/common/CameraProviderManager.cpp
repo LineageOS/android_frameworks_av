@@ -1187,7 +1187,7 @@ status_t CameraProviderManager::addProviderLocked(const std::string& newProvider
     }
 
     sp<provider::V2_4::ICameraProvider> interface;
-    interface = mServiceProxy->getService(newProvider);
+    interface = mServiceProxy->tryGetService(newProvider);
 
     if (interface == nullptr) {
         ALOGE("%s: Camera provider HAL '%s' is not actually available", __FUNCTION__,
