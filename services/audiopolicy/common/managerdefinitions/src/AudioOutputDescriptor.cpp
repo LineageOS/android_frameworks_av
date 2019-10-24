@@ -467,8 +467,11 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
                                        audio_io_handle_t *output)
 {
     mDevices = devices;
-    const String8& address = devices.getFirstValidAddress();
-    DeviceTypeSet deviceTypes = devices.types();
+    sp<DeviceDescriptor> device = devices.getDeviceForOpening();
+    LOG_ALWAYS_FATAL_IF(device == nullptr,
+                        "%s failed to get device descriptor for opening "
+                        "with the requested devices, all device types: %s",
+                        __func__, dumpDeviceTypes(devices.types()).c_str());
 
     audio_config_t lConfig;
     if (config == nullptr) {
@@ -500,25 +503,19 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
     ALOGV("opening output for device %s profile %p name %s",
           mDevices.toString().c_str(), mProfile.get(), mProfile->getName().c_str());
 
-    // FIXME: Stop using device types as bit mask when the interface updated.
-    audio_devices_t deviceType = deviceTypesToBitMask(deviceTypes);
     status_t status = mClientInterface->openOutput(mProfile->getModuleHandle(),
                                                    output,
                                                    &lConfig,
-                                                   &deviceType,
-                                                   address,
+                                                   device,
                                                    &mLatency,
                                                    mFlags);
-    deviceTypes = deviceTypesFromBitMask(deviceType);
-    LOG_ALWAYS_FATAL_IF(mDevices.types() != deviceTypes,
-                        "%s openOutput returned device %s when given device %s",
-                        __FUNCTION__, dumpDeviceTypes(mDevices.types()).c_str(),
-                        dumpDeviceTypes(deviceTypes).c_str());
 
     if (status == NO_ERROR) {
         LOG_ALWAYS_FATAL_IF(*output == AUDIO_IO_HANDLE_NONE,
-                            "%s openOutput returned output handle %d for device %s",
-                            __FUNCTION__, *output, dumpDeviceTypes(deviceTypes).c_str());
+                            "%s openOutput returned output handle %d for device %s, "
+                            "selected device %s for opening",
+                            __FUNCTION__, *output, devices.toString().c_str(),
+                            device->toString().c_str());
         mSamplingRate = lConfig.sample_rate;
         mChannelMask = lConfig.channel_mask;
         mFormat = lConfig.format;

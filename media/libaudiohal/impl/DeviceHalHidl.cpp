@@ -229,14 +229,14 @@ status_t DeviceHalHidl::getInputBufferSize(
 
 status_t DeviceHalHidl::openOutputStream(
         audio_io_handle_t handle,
-        audio_devices_t devices,
+        audio_devices_t deviceType,
         audio_output_flags_t flags,
         struct audio_config *config,
         const char *address,
         sp<StreamOutHalInterface> *outStream) {
     if (mDevice == 0) return NO_INIT;
     DeviceAddress hidlDevice;
-    status_t status = deviceAddressFromHal(devices, address, &hidlDevice);
+    status_t status = deviceAddressFromHal(deviceType, address, &hidlDevice);
     if (status != OK) return status;
     AudioConfig hidlConfig;
     HidlUtils::audioConfigFromHal(*config, &hidlConfig);

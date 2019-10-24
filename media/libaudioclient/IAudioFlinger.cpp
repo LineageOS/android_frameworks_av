@@ -392,20 +392,18 @@ public:
     virtual status_t openOutput(audio_module_handle_t module,
                                 audio_io_handle_t *output,
                                 audio_config_t *config,
-                                audio_devices_t *devices,
-                                const String8& address,
+                                const sp<DeviceDescriptorBase>& device,
                                 uint32_t *latencyMs,
                                 audio_output_flags_t flags)
     {
-        if (output == NULL || config == NULL || devices == NULL || latencyMs == NULL) {
+        if (output == nullptr || config == nullptr || device == nullptr || latencyMs == nullptr) {
             return BAD_VALUE;
         }
         Parcel data, reply;
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
         data.writeInt32(module);
         data.write(config, sizeof(audio_config_t));
-        data.writeInt32(*devices);
-        data.writeString8(address);
+        data.writeParcelable(*device);
         data.writeInt32((int32_t) flags);
         status_t status = remote()->transact(OPEN_OUTPUT, data, &reply);
         if (status != NO_ERROR) {
@@ -420,7 +418,6 @@ public:
         *output = (audio_io_handle_t)reply.readInt32();
         ALOGV("openOutput() returned output, %d", *output);
         reply.read(config, sizeof(audio_config_t));
-        *devices = (audio_devices_t)reply.readInt32();
         *latencyMs = reply.readInt32();
         return NO_ERROR;
     }
@@ -1198,19 +1195,21 @@ status_t BnAudioFlinger::onTransact(
             if (data.read(&config, sizeof(audio_config_t)) != NO_ERROR) {
                 ALOGE("b/23905951");
             }
-            audio_devices_t devices = (audio_devices_t)data.readInt32();
-            String8 address(data.readString8());
+            sp<DeviceDescriptorBase> device = new DeviceDescriptorBase(AUDIO_DEVICE_NONE);
+            status_t status = NO_ERROR;
+            if ((status = data.readParcelable(device.get())) != NO_ERROR) {
+                reply->writeInt32((int32_t)status);
+                return NO_ERROR;
+            }
             audio_output_flags_t flags = (audio_output_flags_t) data.readInt32();
             uint32_t latencyMs = 0;
             audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-            status_t status = openOutput(module, &output, &config,
-                                         &devices, address, &latencyMs, flags);
+            status = openOutput(module, &output, &config, device, &latencyMs, flags);
             ALOGV("OPEN_OUTPUT output, %d", output);
             reply->writeInt32((int32_t)status);
             if (status == NO_ERROR) {
                 reply->writeInt32((int32_t)output);
                 reply->write(&config, sizeof(audio_config_t));
-                reply->writeInt32(devices);
                 reply->writeInt32(latencyMs);
             }
             return NO_ERROR;

@@ -130,6 +130,14 @@ public:
     DeviceVector getFirstDevicesFromTypes(std::vector<audio_devices_t> orderedTypes) const;
     sp<DeviceDescriptor> getFirstExistingDevice(std::vector<audio_devices_t> orderedTypes) const;
 
+    // Return device descriptor that is used to open an input/output stream.
+    // Null pointer will be returned if
+    //     1) this collection is empty
+    //     2) the device descriptors are not the same category(input or output)
+    //     3) there are more than one device type for input case
+    //     4) the combination of all devices is invalid for selection
+    sp<DeviceDescriptor> getDeviceForOpening() const;
+
     // If there are devices with the given type and the devices to add is not empty,
     // remove all the devices with the given type and add all the devices to add.
     void replaceDevicesByType(audio_devices_t typeToRemove, const DeviceVector &devicesToAdd);
