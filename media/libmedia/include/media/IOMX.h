@@ -34,9 +34,17 @@
 #include <media/openmax/OMX_VideoExt.h>
 
 namespace android {
+namespace hardware {
+namespace media {
+namespace omx {
+namespace V1_0 {
+struct IGraphicBufferSource;
+}  // namespace V1_0
+}  // namespace omx
+}  // namespace media
+}  // namespace hardware
 
 class IGraphicBufferProducer;
-class IGraphicBufferSource;
 class IMemory;
 class IOMXBufferSource;
 class IOMXNode;
@@ -82,7 +90,7 @@ public:
 
     virtual status_t createInputSurface(
             sp<IGraphicBufferProducer> *bufferProducer,
-            sp<IGraphicBufferSource> *bufferSource) = 0;
+            sp<hardware::media::omx::V1_0::IGraphicBufferSource> *bufferSource) = 0;
 };
 
 class IOMXNode : public IInterface {
