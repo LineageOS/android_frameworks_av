@@ -35,6 +35,10 @@ cc_library_shared {
         "include"
     ],
 
+    header_libs: [
+        "libmedia_headers",
+    ],
+
     shared_libs: [
         "libbinder",
         "libcutils",
@@ -75,6 +79,9 @@ cc_library_shared {
         export_proto_headers: true,
         type: "lite",
     },
+    header_libs: [
+        "libmedia_headers",
+    ],
     shared_libs: [
         "android.hardware.drm@1.0",
         "android.hardware.drm@1.1",
@@ -110,6 +117,9 @@ cc_library_shared {
         export_proto_headers: true,
         type: "full",
     },
+    header_libs: [
+        "libmedia_headers",
+    ],
     shared_libs: [
         "android.hardware.drm@1.0",
         "android.hardware.drm@1.1",

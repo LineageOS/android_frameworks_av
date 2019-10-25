@@ -11,6 +11,9 @@ cc_test {
     defaults: ["libaudioclient_tests_defaults"],
     srcs: ["test_create_audiotrack.cpp",
            "test_create_utils.cpp"],
+    header_libs: [
+        "libmedia_headers",
+    ],
     shared_libs: [
         "libaudioclient",
         "libbinder",
@@ -25,6 +28,9 @@ cc_test {
     defaults: ["libaudioclient_tests_defaults"],
     srcs: ["test_create_audiorecord.cpp",
            "test_create_utils.cpp"],
+    header_libs: [
+        "libmedia_headers",
+    ],
     shared_libs: [
         "libaudioclient",
         "libbinder",

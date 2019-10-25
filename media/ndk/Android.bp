@@ -149,6 +149,10 @@ cc_library {
         "-Wall",
     ],
 
+    header_libs: [
+        "libmedia_headers",
+    ],
+
     shared_libs: [
     ],
 
