@@ -10,7 +10,9 @@ cc_library {
         "legacy",
         "utility",
     ],
-    header_libs: ["libaaudio_headers"],
+    header_libs: [
+        "libaaudio_headers",
+    ],
     export_header_lib_headers: ["libaaudio_headers"],
     version_script: "libaaudio.map.txt",
 
@@ -53,7 +55,10 @@ cc_library {
     ],
 
     export_include_dirs: ["."],
-    header_libs: ["libaaudio_headers"],
+    header_libs: [
+        "libaaudio_headers",
+        "libmedia_headers"
+    ],
     export_header_lib_headers: ["libaaudio_headers"],
 
     shared_libs: [
