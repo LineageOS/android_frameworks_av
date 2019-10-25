@@ -31,7 +31,8 @@ LOCAL_SHARED_LIBRARIES := \
     libmediametrics \
     libmediautils \
     libeffectsconfig \
-    libsensorprivacy
+    libsensorprivacy \
+    soundtrigger_middleware-aidl-cpp
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := \
     libsensorprivacy

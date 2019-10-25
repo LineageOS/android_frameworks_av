@@ -717,6 +717,8 @@ private:
 
         virtual audio_unique_id_t newAudioUniqueId(audio_unique_id_use_t use);
 
+        void setSoundTriggerCaptureState(bool active) override;
+
      private:
         AudioPolicyService *mAudioPolicyService;
     };
