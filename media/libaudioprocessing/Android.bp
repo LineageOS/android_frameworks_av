@@ -33,6 +33,7 @@ cc_library_shared {
 
     header_libs: [
         "libbase_headers",
+        "libmedia_headers"
     ],
 
     shared_libs: [

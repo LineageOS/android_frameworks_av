@@ -3,8 +3,8 @@
 cc_test {
     name: "CounterMetric_test",
     srcs: ["CounterMetric_test.cpp"],
+    header_libs: ["libmedia_headers"],
     shared_libs: ["libmediadrm"],
-    include_dirs: ["frameworks/av/include/media"],
     cflags: [
       "-Werror",
       "-Wall",
@@ -14,6 +14,9 @@ cc_test {
 cc_test {
     name: "DrmMetrics_test",
     srcs: ["DrmMetrics_test.cpp"],
+    header_libs: [
+        "libmedia_headers"
+    ],
     shared_libs: [
       "android.hardware.drm@1.0",
       "android.hardware.drm@1.1",
@@ -29,7 +32,6 @@ cc_test {
     static_libs: ["libgmock"],
     include_dirs: [
       "frameworks/av/drm/libmediadrm/include",
-      "frameworks/av/include/media",
     ],
     cflags: [
         // Suppress unused parameter and no error options. These cause problems
@@ -41,12 +43,14 @@ cc_test {
 cc_test {
     name: "EventMetric_test",
     srcs: ["EventMetric_test.cpp"],
+    header_libs: [
+        "libmedia_headers"
+    ],
     shared_libs: [
       "liblog",
       "libmediadrm",
       "libutils",
     ],
-    include_dirs: ["frameworks/av/include/media"],
     cflags: [
       "-Werror",
       "-Wall",

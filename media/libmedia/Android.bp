@@ -197,6 +197,7 @@ cc_library_static {
     ],
 
     header_libs: [
+        "libmedia_headers",
         "media_ndk_headers",
     ],
 

@@ -16,7 +16,7 @@
 
 #include <gtest/gtest.h>
 
-#include "EventMetric.h"
+#include <media/EventMetric.h>
 
 namespace android {
 
