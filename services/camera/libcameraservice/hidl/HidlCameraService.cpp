@@ -191,6 +191,14 @@ Return<void> HidlCameraService::addListener(const sp<HCameraServiceListener>& hC
       _hidl_cb(status, {});
       return Void();
     }
+    cameraStatusAndIds.erase(std::remove_if(cameraStatusAndIds.begin(), cameraStatusAndIds.end(),
+            [this](const hardware::CameraStatus& s) {
+              bool supportsHAL3 = false;
+              binder::Status sRet =
+                            mAidlICameraService->supportsCameraApi(String16(s.cameraId),
+                                    hardware::ICameraService::API_VERSION_2, &supportsHAL3);
+              return !sRet.isOk() || !supportsHAL3;
+            }), cameraStatusAndIds.end());
     hidl_vec<HCameraStatusAndId> hCameraStatusAndIds;
     //Convert cameraStatusAndIds to HIDL and call callback
     convertToHidl(cameraStatusAndIds, &hCameraStatusAndIds);
