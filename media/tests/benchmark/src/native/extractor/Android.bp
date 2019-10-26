@@ -15,10 +15,10 @@
  */
 
 cc_library_static {
-    name: "libbenchmark_extractor",
+    name: "libmediabenchmark_extractor",
     defaults: [
-        "libbenchmark_common-defaults",
-        "libbenchmark_soft_sanitize_all-defaults",
+        "libmediabenchmark_common-defaults",
+        "libmediabenchmark_soft_sanitize_all-defaults",
     ],
 
     srcs: ["Extractor.cpp"],

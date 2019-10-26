@@ -700,7 +700,7 @@ AAUDIO_API void AAudioStreamBuilder_setInputPreset(AAudioStreamBuilder* builder,
  * Added in API level 29.
  *
  * @param builder reference provided by AAudio_createStreamBuilder()
- * @param inputPreset the desired level of opt-out from being captured.
+ * @param capturePolicy the desired level of opt-out from being captured.
  */
 AAUDIO_API void AAudioStreamBuilder_setAllowedCapturePolicy(AAudioStreamBuilder* builder,
         aaudio_allowed_capture_policy_t capturePolicy) __INTRODUCED_IN(29);

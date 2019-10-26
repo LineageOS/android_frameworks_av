@@ -15,15 +15,15 @@
  */
 
 cc_library_static {
-    name: "libbenchmark_muxer",
+    name: "libmediabenchmark_muxer",
     defaults: [
-        "libbenchmark_common-defaults",
-        "libbenchmark_soft_sanitize_all-defaults",
+        "libmediabenchmark_common-defaults",
+        "libmediabenchmark_soft_sanitize_all-defaults",
     ],
 
     srcs: ["Muxer.cpp"],
 
-    static_libs: ["libbenchmark_extractor"],
+    static_libs: ["libmediabenchmark_extractor"],
 
     export_include_dirs: ["."],
 

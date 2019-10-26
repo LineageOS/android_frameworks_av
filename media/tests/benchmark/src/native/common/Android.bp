@@ -15,10 +15,10 @@
  */
 
 cc_library_static {
-    name: "libbenchmark_common",
+    name: "libmediabenchmark_common",
     defaults: [
-        "libbenchmark-defaults",
-        "libbenchmark_soft_sanitize_all-defaults",
+        "libmediabenchmark-defaults",
+        "libmediabenchmark_soft_sanitize_all-defaults",
     ],
 
     srcs: [
@@ -32,19 +32,19 @@ cc_library_static {
 }
 
 cc_defaults {
-    name: "libbenchmark_common-defaults",
+    name: "libmediabenchmark_common-defaults",
 
     defaults: [
-        "libbenchmark-defaults",
+        "libmediabenchmark-defaults",
     ],
 
     static_libs: [
-        "libbenchmark_common",
+        "libmediabenchmark_common",
     ],
 }
 
 cc_defaults {
-    name: "libbenchmark-defaults",
+    name: "libmediabenchmark-defaults",
 
     shared_libs: [
         "libmediandk",
@@ -61,7 +61,7 @@ cc_defaults {
 // public dependency for native implementation
 // to be used by code under media/benchmark/* only
 cc_defaults {
-    name: "libbenchmark_soft_sanitize_all-defaults",
+    name: "libmediabenchmark_soft_sanitize_all-defaults",
 
     sanitize: {
         misc_undefined: [

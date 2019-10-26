@@ -102,6 +102,10 @@ cc_library_static {
         "include",
     ],
 
+    header_libs: [
+        "libmedia_helper_headers",
+    ],
+
     cflags: [
         "-Wno-multichar",
         "-Werror",

@@ -6,6 +6,10 @@ cc_library_shared {
         "frameworks/av/media/libstagefright/include",
     ],
 
+    header_libs: [
+        "libmedia_headers",
+    ],
+
     shared_libs: [
         "liblog",
         "libmediandk",

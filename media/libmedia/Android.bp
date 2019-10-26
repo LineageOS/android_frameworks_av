@@ -15,41 +15,9 @@ cc_library_headers {
     ],
 }
 
-cc_library {
-    name: "libmedia_helper",
-    vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
-    double_loadable: true,
-    srcs: [
-        "AudioParameter.cpp",
-        "TypeConverter.cpp",
-    ],
-    cflags: [
-        "-Werror",
-        "-Wno-error=deprecated-declarations",
-        "-Wall",
-    ],
-    shared_libs: [
-        "libutils",
-        "liblog",
-    ],
-    header_libs: [
-        "libmedia_headers",
-        "libaudioclient_headers",
-        "libaudio_system_headers",
-    ],
-    export_header_lib_headers: [
-        "libmedia_headers",
-    ],
-    clang: true,
-}
-
 filegroup {
     name: "libmedia_omx_aidl",
     srcs: [
-        "aidl/android/IGraphicBufferSource.aidl",
         "aidl/android/IOMXBufferSource.aidl",
     ],
     path: "aidl",
@@ -84,7 +52,6 @@ cc_library_shared {
         "IOMX.cpp",
         "MediaCodecBuffer.cpp",
         "OMXBuffer.cpp",
-        "omx/1.0/WGraphicBufferSource.cpp",
         "omx/1.0/WOmxBufferSource.cpp",
         "omx/1.0/WOmxNode.cpp",
         "omx/1.0/WOmxObserver.cpp",
@@ -217,6 +184,7 @@ cc_library_static {
     ],
 
     header_libs: [
+        "libmedia_headers",
         "media_ndk_headers",
     ],
 
@@ -310,7 +278,6 @@ cc_library {
         "MediaProfiles.cpp",
         "MediaResource.cpp",
         "MediaResourcePolicy.cpp",
-        "Visualizer.cpp",
         "StringArray.cpp",
         "NdkMediaFormatPriv.cpp",
         "NdkMediaErrorPriv.cpp",
@@ -346,7 +313,6 @@ cc_library {
         "libstagefright_foundation",
         "libgui",
         "libdl",
-        "libaudioutils",
         "libaudioclient",
         "libmedia_codeclist",
         "libmedia_omx",

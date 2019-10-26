@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#ifdef __LP64__
+#define OMX_ANDROID_COMPILE_AS_32BIT_ON_64BIT_PLATFORMS
+#endif
+
 //#define LOG_NDEBUG 0
 #define LOG_TAG "TWGraphicBufferSource"
 
@@ -21,6 +25,7 @@
 #include <media/stagefright/omx/1.0/WOmxNode.h>
 #include <media/stagefright/omx/1.0/Conversion.h>
 #include <media/stagefright/omx/OMXUtils.h>
+#include <media/stagefright/omx/OmxGraphicBufferSource.h>
 #include <android/hardware/media/omx/1.0/IOmxBufferSource.h>
 #include <android/hardware/media/omx/1.0/IOmxNode.h>
 #include <media/openmax/OMX_Component.h>

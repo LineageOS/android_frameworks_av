@@ -17,6 +17,10 @@ cc_binary {
 
     srcs: ["main_cameraserver.cpp"],
 
+    header_libs: [
+        "libmedia_headers",
+    ],
+
     shared_libs: [
         "libcameraservice",
         "liblog",
