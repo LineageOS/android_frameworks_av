@@ -19,11 +19,10 @@
 #include <log/log.h>
 
 #include <stdint.h>
+#include <algorithm>
 
 #include "utility/AudioClock.h"
 #include "IsochronousClockModel.h"
-
-#define MIN_LATENESS_NANOS (10 * AAUDIO_NANOS_PER_MICROSECOND)
 
 using namespace aaudio;
 
@@ -32,7 +31,7 @@ IsochronousClockModel::IsochronousClockModel()
         , mMarkerNanoTime(0)
         , mSampleRate(48000)
         , mFramesPerBurst(64)
-        , mMaxLatenessInNanos(0)
+        , mMaxMeasuredLatenessNanos(0)
         , mState(STATE_STOPPED)
 {
 }
@@ -41,8 +40,7 @@ IsochronousClockModel::~IsochronousClockModel() {
 }
 
 void IsochronousClockModel::setPositionAndTime(int64_t framePosition, int64_t nanoTime) {
-    ALOGV("setPositionAndTime(%lld, %lld)",
-          (long long) framePosition, (long long) nanoTime);
+    ALOGV("setPositionAndTime, %lld, %lld", (long long) framePosition, (long long) nanoTime);
     mMarkerFramePosition = framePosition;
     mMarkerNanoTime = nanoTime;
 }
@@ -54,7 +52,9 @@ void IsochronousClockModel::start(int64_t nanoTime) {
 }
 
 void IsochronousClockModel::stop(int64_t nanoTime) {
-    ALOGV("stop(nanos = %lld)\n", (long long) nanoTime);
+    ALOGD("stop(nanos = %lld) max lateness = %d micros\n",
+        (long long) nanoTime,
+        (int) (mMaxMeasuredLatenessNanos / 1000));
     setPositionAndTime(convertTimeToPosition(nanoTime), nanoTime);
     // TODO should we set position?
     mState = STATE_STOPPED;
@@ -69,9 +69,10 @@ bool IsochronousClockModel::isRunning() const {
 }
 
 void IsochronousClockModel::processTimestamp(int64_t framePosition, int64_t nanoTime) {
-//    ALOGD("processTimestamp() - framePosition = %lld at nanoTime %llu",
-//         (long long)framePosition,
-//         (long long)nanoTime);
+    mTimestampCount++;
+// Log position and time in CSV format so we can import it easily into spreadsheets.
+    //ALOGD("%s() CSV, %d, %lld, %lld", __func__,
+          //mTimestampCount, (long long)framePosition, (long long)nanoTime);
     int64_t framesDelta = framePosition - mMarkerFramePosition;
     int64_t nanosDelta = nanoTime - mMarkerNanoTime;
     if (nanosDelta < 1000) {
@@ -108,17 +109,56 @@ void IsochronousClockModel::processTimestamp(int64_t framePosition, int64_t nano
     case STATE_RUNNING:
         if (nanosDelta < expectedNanosDelta) {
             // Earlier than expected timestamp.
-            // This data is probably more accurate so use it.
-            // or we may be drifting due to a slow HW clock.
-//            ALOGD("processTimestamp() - STATE_RUNNING - %d < %d micros - EARLY",
-//                 (int) (nanosDelta / 1000), (int)(expectedNanosDelta / 1000));
+            // This data is probably more accurate, so use it.
+            // Or we may be drifting due to a fast HW clock.
+            //int microsDelta = (int) (nanosDelta / 1000);
+            //int expectedMicrosDelta = (int) (expectedNanosDelta / 1000);
+            //ALOGD("%s() - STATE_RUNNING - #%d, %4d micros EARLY",
+                //__func__, mTimestampCount, expectedMicrosDelta - microsDelta);
+
             setPositionAndTime(framePosition, nanoTime);
-        } else if (nanosDelta > (expectedNanosDelta + mMaxLatenessInNanos)) {
-            // Later than expected timestamp.
-//            ALOGD("processTimestamp() - STATE_RUNNING - %d > %d + %d micros - LATE",
-//                 (int) (nanosDelta / 1000), (int)(expectedNanosDelta / 1000),
-//                 (int) (mMaxLatenessInNanos / 1000));
-            setPositionAndTime(framePosition - mFramesPerBurst,  nanoTime - mMaxLatenessInNanos);
+        } else if (nanosDelta > (expectedNanosDelta + (2 * mBurstPeriodNanos))) {
+            // In this case we do not update mMaxMeasuredLatenessNanos because it
+            // would force it too high.
+            // mMaxMeasuredLatenessNanos should range from 1 to 2 * mBurstPeriodNanos
+            //int32_t measuredLatenessNanos = (int32_t)(nanosDelta - expectedNanosDelta);
+            //ALOGD("%s() - STATE_RUNNING - #%d, lateness %d - max %d = %4d micros VERY LATE",
+                  //__func__,
+                  //mTimestampCount,
+                  //measuredLatenessNanos / 1000,
+                  //mMaxMeasuredLatenessNanos / 1000,
+                  //(measuredLatenessNanos - mMaxMeasuredLatenessNanos) / 1000
+                  //);
+
+            // This typically happens when we are modelling a service instead of a DSP.
+            setPositionAndTime(framePosition,  nanoTime - (2 * mBurstPeriodNanos));
+        } else if (nanosDelta > (expectedNanosDelta + mMaxMeasuredLatenessNanos)) {
+            //int32_t previousLatenessNanos = mMaxMeasuredLatenessNanos;
+            mMaxMeasuredLatenessNanos = (int32_t)(nanosDelta - expectedNanosDelta);
+
+            //ALOGD("%s() - STATE_RUNNING - #%d, newmax %d - oldmax %d = %4d micros LATE",
+                  //__func__,
+                  //mTimestampCount,
+                  //mMaxMeasuredLatenessNanos / 1000,
+                  //previousLatenessNanos / 1000,
+                  //(mMaxMeasuredLatenessNanos - previousLatenessNanos) / 1000
+                  //);
+
+            // When we are late, it may be because of preemption in the kernel,
+            // or timing jitter caused by resampling in the DSP,
+            // or we may be drifting due to a slow HW clock.
+            // We add slight drift value just in case there is actual long term drift
+            // forward caused by a slower clock.
+            // If the clock is faster than the model will get pushed earlier
+            // by the code in the preceding branch.
+            // The two opposing forces should allow the model to track the real clock
+            // over a long time.
+            int64_t driftingTime = mMarkerNanoTime + expectedNanosDelta + kDriftNanos;
+            setPositionAndTime(framePosition,  driftingTime);
+            //ALOGD("%s() - #%d, max lateness = %d micros",
+                  //__func__,
+                  //mTimestampCount,
+                  //(int) (mMaxMeasuredLatenessNanos / 1000));
         }
         break;
     default:
@@ -138,9 +178,12 @@ void IsochronousClockModel::setFramesPerBurst(int32_t framesPerBurst) {
     update();
 }
 
+// Update expected lateness based on sampleRate and framesPerBurst
 void IsochronousClockModel::update() {
-    int64_t nanosLate = convertDeltaPositionToTime(mFramesPerBurst); // uses mSampleRate
-    mMaxLatenessInNanos = (nanosLate > MIN_LATENESS_NANOS) ? nanosLate : MIN_LATENESS_NANOS;
+    mBurstPeriodNanos = convertDeltaPositionToTime(mFramesPerBurst); // uses mSampleRate
+    // Timestamps may be late by up to a burst because we are randomly sampling the time period
+    // after the DSP position is actually updated.
+    mMaxMeasuredLatenessNanos = mBurstPeriodNanos;
 }
 
 int64_t IsochronousClockModel::convertDeltaPositionToTime(int64_t framesDelta) const {
@@ -183,11 +226,25 @@ int64_t IsochronousClockModel::convertTimeToPosition(int64_t nanoTime) const {
     return position;
 }
 
+int32_t IsochronousClockModel::getLateTimeOffsetNanos() const {
+    // This will never be < 0 because mMaxLatenessNanos starts at
+    // mBurstPeriodNanos and only gets bigger.
+    return (mMaxMeasuredLatenessNanos - mBurstPeriodNanos) + kExtraLatenessNanos;
+}
+
+int64_t IsochronousClockModel::convertPositionToLatestTime(int64_t framePosition) const {
+    return convertPositionToTime(framePosition) + getLateTimeOffsetNanos();
+}
+
+int64_t IsochronousClockModel::convertLatestTimeToPosition(int64_t nanoTime) const {
+    return convertTimeToPosition(nanoTime - getLateTimeOffsetNanos());
+}
+
 void IsochronousClockModel::dump() const {
     ALOGD("mMarkerFramePosition = %lld", (long long) mMarkerFramePosition);
     ALOGD("mMarkerNanoTime      = %lld", (long long) mMarkerNanoTime);
     ALOGD("mSampleRate          = %6d", mSampleRate);
     ALOGD("mFramesPerBurst      = %6d", mFramesPerBurst);
-    ALOGD("mMaxLatenessInNanos  = %6d", mMaxLatenessInNanos);
+    ALOGD("mMaxMeasuredLatenessNanos = %6d", mMaxMeasuredLatenessNanos);
     ALOGD("mState               = %6d", mState);
 }
