@@ -139,6 +139,7 @@ class CameraDevice final : public RefBase {
 
   private:
     friend ACameraCaptureSession;
+    friend ACameraDevice;
 
     camera_status_t checkCameraClosedOrErrorLocked() const;
 
@@ -388,7 +389,6 @@ struct ACameraDevice {
             mDevice(new android::acam::CameraDevice(id, cb, std::move(chars), this)) {}
 
     ~ACameraDevice();
-
     /*******************
      * NDK public APIs *
      *******************/

@@ -111,6 +111,7 @@ private:
 
         std::map<BufferId, std::unique_ptr<InternalBuffer>> mBuffers;
         std::set<BufferId> mFreeBuffers;
+        std::set<ConnectionId> mConnectionIds;
 
         struct Invalidation {
             static std::atomic<std::uint32_t> sInvSeqId;
