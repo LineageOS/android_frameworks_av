@@ -273,7 +273,7 @@ public:
     bool isLogicalCamera(const std::string& id, std::vector<std::string>* physicalCameraIds);
 
     bool isPublicallyHiddenSecureCamera(const std::string& id) const;
-    bool isHiddenPhysicalCamera(const std::string& cameraId);
+    bool isHiddenPhysicalCamera(const std::string& cameraId) const;
 
     static const float kDepthARTolerance;
 private:
@@ -598,6 +598,11 @@ private:
     bool isPublicallyHiddenSecureCameraLocked(const std::string& id) const;
 
     void filterLogicalCameraIdsLocked(std::vector<std::string>& deviceIds) const;
+
+    bool isPublicallyHiddenSecureCameraLocked(const std::string& id);
+
+    std::pair<bool, CameraProviderManager::ProviderInfo::DeviceInfo *>
+            isHiddenPhysicalCameraInternal(const std::string& cameraId) const;
 };
 
 } // namespace android
