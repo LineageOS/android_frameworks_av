@@ -725,12 +725,6 @@ status_t ImageDecoder::onOutputReceived(
     }
     converter.setSrcColorSpace(standard, range, transfer);
 
-    int32_t dstLeft, dstTop, dstRight, dstBottom;
-    dstLeft = mTilesDecoded % mGridCols * width;
-    dstTop = mTilesDecoded / mGridCols * height;
-    dstRight = dstLeft + width - 1;
-    dstBottom = dstTop + height - 1;
-
     int32_t crop_left, crop_top, crop_right, crop_bottom;
     if (!outputFormat->findRect("crop", &crop_left, &crop_top, &crop_right, &crop_bottom)) {
         crop_left = crop_top = 0;
@@ -738,15 +732,25 @@ status_t ImageDecoder::onOutputReceived(
         crop_bottom = height - 1;
     }
 
+    int32_t crop_width, crop_height;
+    crop_width = crop_right - crop_left + 1;
+    crop_height = crop_bottom - crop_top + 1;
+
+    int32_t dstLeft, dstTop, dstRight, dstBottom;
+    dstLeft = mTilesDecoded % mGridCols * crop_width;
+    dstTop = mTilesDecoded / mGridCols * crop_height;
+    dstRight = dstLeft + crop_width - 1;
+    dstBottom = dstTop + crop_height - 1;
+
     // apply crop on bottom-right
     // TODO: need to move this into the color converter itself.
     if (dstRight >= mWidth) {
-        crop_right = mWidth - dstLeft - 1;
-        dstRight = dstLeft + crop_right;
+        crop_right = crop_left + mWidth - dstLeft - 1;
+        dstRight = mWidth - 1;
     }
     if (dstBottom >= mHeight) {
-        crop_bottom = mHeight - dstTop - 1;
-        dstBottom = dstTop + crop_bottom;
+        crop_bottom = crop_top + mHeight - dstTop - 1;
+        dstBottom = mHeight - 1;
     }
 
     *done = (++mTilesDecoded >= mTargetTiles);
