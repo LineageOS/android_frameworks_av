@@ -34,7 +34,7 @@ namespace android {
 status_t AudioHwDevice::openOutputStream(
         AudioStreamOut **ppStreamOut,
         audio_io_handle_t handle,
-        audio_devices_t devices,
+        audio_devices_t deviceType,
         audio_output_flags_t flags,
         struct audio_config *config,
         const char *address)
@@ -50,7 +50,7 @@ status_t AudioHwDevice::openOutputStream(
             config->sample_rate,
             config->format,
             config->channel_mask);
-    status_t status = outputStream->open(handle, devices, config, address);
+    status_t status = outputStream->open(handle, deviceType, config, address);
 
     if (status != NO_ERROR) {
         delete outputStream;
@@ -75,7 +75,7 @@ status_t AudioHwDevice::openOutputStream(
         if (wrapperNeeded) {
             if (SPDIFEncoder::isFormatSupported(originalConfig.format)) {
                 outputStream = new SpdifStreamOut(this, flags, originalConfig.format);
-                status = outputStream->open(handle, devices, &originalConfig, address);
+                status = outputStream->open(handle, deviceType, &originalConfig, address);
                 if (status != NO_ERROR) {
                     ALOGE("ERROR - openOutputStream(), SPDIF open returned %d",
                         status);

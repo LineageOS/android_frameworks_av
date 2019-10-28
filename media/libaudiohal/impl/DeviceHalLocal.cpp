@@ -104,7 +104,7 @@ status_t DeviceHalLocal::getInputBufferSize(
 
 status_t DeviceHalLocal::openOutputStream(
         audio_io_handle_t handle,
-        audio_devices_t devices,
+        audio_devices_t deviceType,
         audio_output_flags_t flags,
         struct audio_config *config,
         const char *address,
@@ -112,11 +112,11 @@ status_t DeviceHalLocal::openOutputStream(
     audio_stream_out_t *halStream;
     ALOGV("open_output_stream handle: %d devices: %x flags: %#x"
             "srate: %d format %#x channels %x address %s",
-            handle, devices, flags,
+            handle, deviceType, flags,
             config->sample_rate, config->format, config->channel_mask,
             address);
     int openResut = mDev->open_output_stream(
-            mDev, handle, devices, flags, config, &halStream, address);
+            mDev, handle, deviceType, flags, config, &halStream, address);
     if (openResut == OK) {
         *outStream = new StreamOutHalLocal(halStream, this);
     }
