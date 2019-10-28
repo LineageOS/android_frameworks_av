@@ -250,6 +250,8 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         mTimeOffsetNanos = offsetMicros * AAUDIO_NANOS_PER_MICROSECOND;
     }
 
+    setBufferSize(capacity / 2); // Default buffer size to match Q
+
     setState(AAUDIO_STREAM_STATE_OPEN);
 
     return result;
@@ -739,6 +741,7 @@ aaudio_result_t AudioStreamInternal::setBufferSize(int32_t requestedFrames) {
     adjustedFrames = std::min(actualFrames, adjustedFrames);
 
     mBufferSizeInFrames = adjustedFrames;
+    ALOGV("%s(%d) returns %d", __func__, requestedFrames, adjustedFrames);
     return (aaudio_result_t) adjustedFrames;
 }
 
