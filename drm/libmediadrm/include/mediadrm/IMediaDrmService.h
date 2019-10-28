@@ -33,8 +33,12 @@ class IMediaDrmService: public IInterface
 public:
     DECLARE_META_INTERFACE(MediaDrmService);
 
+
     virtual sp<ICrypto>         makeCrypto() = 0;
     virtual sp<IDrm>            makeDrm() = 0;
+
+    template<typename I> sp<I>  makeObject();
+
 };
 
 // ----------------------------------------------------------------------------

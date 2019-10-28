@@ -25,6 +25,7 @@
 #include <binder/IServiceManager.h>
 #include <cutils/properties.h>
 #include <media/MediaResource.h>
+#include <mediadrm/DrmUtils.h>
 #include <mediadrm/DrmSessionManager.h>
 #include <unistd.h>
 #include <utils/String8.h>
@@ -62,7 +63,8 @@ static std::vector<MediaResourceParcel> toResourceVec(
 }
 
 static sp<IResourceManagerService> getResourceManagerService() {
-    if (property_get_bool("persist.device_config.media_native.mediadrmserver", 1)) {
+    if (DrmUtils::UseDrmService()) {
+        // Create ResourceManagerService object in mediadrmserver process
         return new android::media::ResourceManagerService();
     }
     sp<IServiceManager> sm = defaultServiceManager();
