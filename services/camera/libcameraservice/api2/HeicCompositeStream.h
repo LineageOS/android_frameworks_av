@@ -25,6 +25,7 @@
 #include <media/hardware/VideoAPI.h>
 #include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ALooper.h>
+#include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaMuxer.h>
 
@@ -157,6 +158,7 @@ private:
         bool                      errorNotified;
         int64_t                   frameNumber;
 
+        sp<AMessage>              format;
         sp<MediaMuxer>            muxer;
         int                       fenceFd;
         int                       fileFd;
@@ -218,9 +220,10 @@ private:
     sp<CpuConsumer>   mMainImageConsumer; // Only applicable for HEVC codec.
     bool              mYuvBufferAcquired; // Only applicable to HEVC codec
 
+    static const int32_t kMaxOutputSurfaceProducerCount = 1;
     sp<Surface>       mOutputSurface;
     sp<ProducerListener> mProducerListener;
-
+    int32_t           mDequeuedOutputBufferCnt;
 
     // Map from frame number to JPEG setting of orientation+quality
     std::map<int64_t, std::pair<int32_t, int32_t>> mSettingsByFrameNumber;
@@ -233,7 +236,7 @@ private:
     // Keep all incoming HEIC blob buffer pending further processing.
     std::vector<CodecOutputBufferInfo> mCodecOutputBuffers;
     std::queue<int64_t> mCodecOutputBufferTimestamps;
-    size_t mOutputBufferCounter;
+    size_t mCodecOutputCounter;
 
     // Keep all incoming Yuv buffer pending tiling and encoding (for HEVC YUV tiling only)
     std::vector<int64_t> mInputYuvBuffers;
