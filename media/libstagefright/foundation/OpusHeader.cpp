@@ -292,6 +292,10 @@ bool GetOpusHeaderBuffers(const uint8_t *data, size_t data_size,
         *opusHeadSize = data_size;
         return true;
     } else if (memcmp(AOPUS_CSD_MARKER_PREFIX, data, AOPUS_CSD_MARKER_PREFIX_SIZE) == 0) {
+        if (data_size < AOPUS_UNIFIED_CSD_MINSIZE || data_size > AOPUS_UNIFIED_CSD_MAXSIZE) {
+            ALOGD("Unexpected size for unified opus csd %zu", data_size);
+            return false;
+        }
         size_t i = 0;
         bool found = false;
         while (i <= data_size - AOPUS_MARKER_SIZE - AOPUS_LENGTH_SIZE) {
