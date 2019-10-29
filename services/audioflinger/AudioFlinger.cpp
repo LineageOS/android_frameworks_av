@@ -381,7 +381,7 @@ static const char * const audio_interfaces[] = {
 
 AudioHwDevice* AudioFlinger::findSuitableHwDev_l(
         audio_module_handle_t module,
-        audio_devices_t devices)
+        audio_devices_t deviceType)
 {
     // if module is 0, the request comes from an old policy manager and we should load
     // well known modules
@@ -396,7 +396,7 @@ AudioHwDevice* AudioFlinger::findSuitableHwDev_l(
             sp<DeviceHalInterface> dev = audioHwDevice->hwDevice();
             uint32_t supportedDevices;
             if (dev->getSupportedDevices(&supportedDevices) == OK &&
-                    (supportedDevices & devices) == devices) {
+                    (supportedDevices & deviceType) == deviceType) {
                 return audioHwDevice;
             }
         }
@@ -2304,13 +2304,13 @@ void AudioFlinger::setAudioHwSyncForSession_l(PlaybackThread *thread, audio_sess
 
 
 sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t module,
-                                                            audio_io_handle_t *output,
-                                                            audio_config_t *config,
-                                                            audio_devices_t devices,
-                                                            const String8& address,
-                                                            audio_output_flags_t flags)
+                                                        audio_io_handle_t *output,
+                                                        audio_config_t *config,
+                                                        audio_devices_t deviceType,
+                                                        const String8& address,
+                                                        audio_output_flags_t flags)
 {
-    AudioHwDevice *outHwDev = findSuitableHwDev_l(module, devices);
+    AudioHwDevice *outHwDev = findSuitableHwDev_l(module, deviceType);
     if (outHwDev == NULL) {
         return 0;
     }
@@ -2351,7 +2351,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
     status_t status = outHwDev->openOutputStream(
             &outputStream,
             *output,
-            devices,
+            deviceType,
             flags,
             config,
             address.string());
@@ -2362,7 +2362,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
         if (flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
             sp<MmapPlaybackThread> thread =
                     new MmapPlaybackThread(this, *output, outHwDev, outputStream,
-                                          devices, AUDIO_DEVICE_NONE, mSystemReady);
+                                           deviceType, AUDIO_DEVICE_NONE, mSystemReady);
             mMmapThreads.add(*output, thread);
             ALOGV("openOutput_l() created mmap playback thread: ID %d thread %p",
                   *output, thread.get());
@@ -2370,17 +2370,18 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
         } else {
             sp<PlaybackThread> thread;
             if (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) {
-                thread = new OffloadThread(this, outputStream, *output, devices, mSystemReady);
+                thread = new OffloadThread(this, outputStream, *output, deviceType, mSystemReady);
                 ALOGV("openOutput_l() created offload output: ID %d thread %p",
                       *output, thread.get());
             } else if ((flags & AUDIO_OUTPUT_FLAG_DIRECT)
                     || !isValidPcmSinkFormat(config->format)
                     || !isValidPcmSinkChannelMask(config->channel_mask)) {
-                thread = new DirectOutputThread(this, outputStream, *output, devices, mSystemReady);
+                thread = new DirectOutputThread(
+                        this, outputStream, *output, deviceType, mSystemReady);
                 ALOGV("openOutput_l() created direct output: ID %d thread %p",
                       *output, thread.get());
             } else {
-                thread = new MixerThread(this, outputStream, *output, devices, mSystemReady);
+                thread = new MixerThread(this, outputStream, *output, deviceType, mSystemReady);
                 ALOGV("openOutput_l() created mixer output: ID %d thread %p",
                       *output, thread.get());
             }
@@ -2396,27 +2397,29 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
 status_t AudioFlinger::openOutput(audio_module_handle_t module,
                                   audio_io_handle_t *output,
                                   audio_config_t *config,
-                                  audio_devices_t *devices,
-                                  const String8& address,
+                                  const sp<DeviceDescriptorBase>& device,
                                   uint32_t *latencyMs,
                                   audio_output_flags_t flags)
 {
-    ALOGI("openOutput() this %p, module %d Device %#x, SamplingRate %d, Format %#08x, "
+    ALOGI("openOutput() this %p, module %d Device %s, SamplingRate %d, Format %#08x, "
               "Channels %#x, flags %#x",
               this, module,
-              (devices != NULL) ? *devices : 0,
+              device->toString().c_str(),
               config->sample_rate,
               config->format,
               config->channel_mask,
               flags);
 
-    if (devices == NULL || *devices == AUDIO_DEVICE_NONE) {
+    audio_devices_t deviceType = device->type();
+    const String8 address = String8(device->address().c_str());
+
+    if (deviceType == AUDIO_DEVICE_NONE) {
         return BAD_VALUE;
     }
 
     Mutex::Autolock _l(mLock);
 
-    sp<ThreadBase> thread = openOutput_l(module, output, config, *devices, address, flags);
+    sp<ThreadBase> thread = openOutput_l(module, output, config, deviceType, address, flags);
     if (thread != 0) {
         if ((flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) == 0) {
             PlaybackThread *playbackThread = (PlaybackThread *)thread.get();

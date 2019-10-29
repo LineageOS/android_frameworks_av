@@ -19,6 +19,7 @@
 
 #include <media/AudioSystem.h>
 #include <media/AudioPolicy.h>
+#include <media/DeviceDescriptorBase.h>
 #include <utils/String8.h>
 
 namespace android {
@@ -296,8 +297,7 @@ public:
     virtual status_t openOutput(audio_module_handle_t module,
                                 audio_io_handle_t *output,
                                 audio_config_t *config,
-                                audio_devices_t *devices,
-                                const String8& address,
+                                const sp<DeviceDescriptorBase>& device,
                                 uint32_t *latencyMs,
                                 audio_output_flags_t flags) = 0;
     // creates a special output that is duplicated to the two outputs passed as arguments. The duplication is performed by

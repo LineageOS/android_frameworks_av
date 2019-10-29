@@ -17,6 +17,7 @@
 #pragma once
 
 #include <algorithm>
+#include <functional>
 #include <iterator>
 #include <set>
 #include <vector>
@@ -76,6 +77,11 @@ typedef bool (*DeviceTypeUnaryPredicate)(audio_devices_t);
 static inline bool isSingleDeviceType(const DeviceTypeSet& deviceTypes,
                                       DeviceTypeUnaryPredicate p) {
     return deviceTypes.size() == 1 && p(*(deviceTypes.begin()));
+}
+
+static inline bool areAllOfSameDeviceType(const DeviceTypeSet& deviceTypes,
+                                          std::function<bool(audio_devices_t)> p) {
+    return std::all_of(deviceTypes.begin(), deviceTypes.end(), p);
 }
 
 static inline void resetDeviceTypes(DeviceTypeSet& deviceTypes, audio_devices_t typeToAdd) {
