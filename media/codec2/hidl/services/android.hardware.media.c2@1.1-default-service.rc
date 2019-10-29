@@ -1,4 +1,4 @@
-service android-hardware-media-c2-hal-1-0 /vendor/bin/hw/android.hardware.media.c2@1.0-service
+service android-hardware-media-c2-hal-1-1 /vendor/bin/hw/android.hardware.media.c2@1.1-default-service
     class hal
     user mediacodec
     group camera mediadrm drmrpc

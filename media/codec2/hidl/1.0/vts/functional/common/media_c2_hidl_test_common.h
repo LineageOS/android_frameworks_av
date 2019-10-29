@@ -17,31 +17,22 @@
 #ifndef MEDIA_C2_HIDL_TEST_COMMON_H
 #define MEDIA_C2_HIDL_TEST_COMMON_H
 
-#include <codec2/hidl/client.h>
-
-#include <android/hardware/media/c2/1.0/types.h>
-
 #include <C2Component.h>
 #include <C2Config.h>
+
+#include <codec2/hidl/client.h>
 #include <getopt.h>
 #include <hidl/HidlSupport.h>
-#include <media/stagefright/foundation/ALooper.h>
-#include <media/stagefright/foundation/Mutexed.h>
-
-using namespace ::android::hardware::media::c2::V1_0;
-using namespace ::android::hardware::media::c2::V1_0::utils;
-
-using ::android::Mutexed;
-using ::android::hardware::Void;
-using ::android::hardware::Return;
-using ::android::hardware::hidl_vec;
-using ::android::hardware::hidl_string;
-
 #include <VtsHalHidlTargetTestEnvBase.h>
 
 #define MAX_RETRY 20
 #define TIME_OUT 400ms
 #define MAX_INPUT_BUFFERS 8
+
+using ::android::hardware::Void;
+using ::android::hardware::Return;
+using ::android::hardware::hidl_vec;
+using ::android::hardware::hidl_string;
 
 /*
  * Handle Callback functions onWorkDone(), onTripped(),
@@ -114,9 +105,7 @@ class ComponentTestEnvironment : public ::testing::VtsHalHidlTargetTestEnvBase {
     typedef ::testing::VtsHalHidlTargetTestEnvBase Super;
 
    public:
-    virtual void registerTestServices() override {
-        registerTestService<IComponentStore>();
-    }
+    virtual void registerTestServices() override;
 
     ComponentTestEnvironment() : res("/data/local/tmp/media/") {}
 
