@@ -1898,11 +1898,18 @@ void AudioFlinger::PlaybackThread::PatchTrack::restartIfDisabled()
 // static
 sp<AudioFlinger::RecordThread::OpRecordAudioMonitor>
 AudioFlinger::RecordThread::OpRecordAudioMonitor::createIfNeeded(
-            uid_t uid, const String16& opPackageName)
+            uid_t uid, const audio_attributes_t& attr, const String16& opPackageName)
 {
     if (isServiceUid(uid)) {
         ALOGV("not silencing record for service uid:%d pack:%s",
                 uid, String8(opPackageName).string());
+        return nullptr;
+    }
+
+    // Capturing from FM TUNER output is not controlled by OP_RECORD_AUDIO
+    // because it does not affect users privacy as does capturing from an actual microphone.
+    if (attr.source == AUDIO_SOURCE_FM_TUNER) {
+        ALOGV("not muting FM TUNER capture for uid %d", uid);
         return nullptr;
     }
 
@@ -2071,7 +2078,7 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
         mRecordBufferConverter(NULL),
         mFlags(flags),
         mSilenced(false),
-        mOpRecordAudioMonitor(OpRecordAudioMonitor::createIfNeeded(uid, opPackageName))
+        mOpRecordAudioMonitor(OpRecordAudioMonitor::createIfNeeded(uid, attr, opPackageName))
 {
     if (mCblk == NULL) {
         return;

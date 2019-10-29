@@ -58,10 +58,11 @@ static inline bool isAudioServerOrSystemServerUid(uid_t uid) {
     return multiuser_get_app_id(uid) == AID_SYSTEM || uid == AID_AUDIOSERVER;
 }
 
-// used for calls that should come from system_server or audio_server and
+// used for calls that should come from system_server or audio_server or media server and
 // include AID_ROOT for command-line tests.
-static inline bool isAudioServerOrSystemServerOrRootUid(uid_t uid) {
-    return multiuser_get_app_id(uid) == AID_SYSTEM || uid == AID_AUDIOSERVER || uid == AID_ROOT;
+static inline bool isAudioServerOrMediaServerOrSystemServerOrRootUid(uid_t uid) {
+    return multiuser_get_app_id(uid) == AID_SYSTEM || uid == AID_AUDIOSERVER
+              || uid == AID_MEDIA || uid == AID_ROOT;
 }
 
 // Mediaserver may forward the client PID and UID as part of a binder interface call;
