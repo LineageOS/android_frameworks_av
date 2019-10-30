@@ -56,12 +56,16 @@ typedef enum {
 #if __ANDROID_API__ >= 21
 
 /**
- * Create new media muxer
+ * Create new media muxer.
+ *
+ * Available since API level 21.
  */
 AMediaMuxer* AMediaMuxer_new(int fd, OutputFormat format) __INTRODUCED_IN(21);
 
 /**
- * Delete a previously created media muxer
+ * Delete a previously created media muxer.
+ *
+ * Available since API level 21.
  */
 media_status_t AMediaMuxer_delete(AMediaMuxer*) __INTRODUCED_IN(21);
 
@@ -75,6 +79,8 @@ media_status_t AMediaMuxer_delete(AMediaMuxer*) __INTRODUCED_IN(21);
  * Both values are specified in degrees.
  * Latitude must be in the range [-90, 90].
  * Longitude must be in the range [-180, 180].
+ *
+ * Available since API level 21.
  */
 media_status_t AMediaMuxer_setLocation(AMediaMuxer*,
         float latitude, float longitude) __INTRODUCED_IN(21);
@@ -90,6 +96,8 @@ media_status_t AMediaMuxer_setLocation(AMediaMuxer*,
  * during playback.
  * The angle is specified in degrees, clockwise.
  * The supported angles are 0, 90, 180, and 270 degrees.
+ *
+ * Available since API level 21.
  */
 media_status_t AMediaMuxer_setOrientationHint(AMediaMuxer*, int degrees) __INTRODUCED_IN(21);
 
@@ -97,18 +105,24 @@ media_status_t AMediaMuxer_setOrientationHint(AMediaMuxer*, int degrees) __INTRO
  * Adds a track with the specified format.
  * Returns the index of the new track or a negative value in case of failure,
  * which can be interpreted as a media_status_t.
+ *
+ * Available since API level 21.
  */
 ssize_t AMediaMuxer_addTrack(AMediaMuxer*, const AMediaFormat* format) __INTRODUCED_IN(21);
 
 /**
  * Start the muxer. Should be called after AMediaMuxer_addTrack and
  * before AMediaMuxer_writeSampleData.
+ *
+ * Available since API level 21.
  */
 media_status_t AMediaMuxer_start(AMediaMuxer*) __INTRODUCED_IN(21);
 
 /**
  * Stops the muxer.
  * Once the muxer stops, it can not be restarted.
+ *
+ * Available since API level 21.
  */
 media_status_t AMediaMuxer_stop(AMediaMuxer*) __INTRODUCED_IN(21);
 
@@ -118,6 +132,8 @@ media_status_t AMediaMuxer_stop(AMediaMuxer*) __INTRODUCED_IN(21);
  * the right tracks. Also, it needs to make sure the samples for each track
  * are written in chronological order (e.g. in the order they are provided
  * by the encoder.)
+ *
+ * Available since API level 21.
  */
 media_status_t AMediaMuxer_writeSampleData(AMediaMuxer *muxer,
         size_t trackIdx, const uint8_t *data,
