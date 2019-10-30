@@ -52,23 +52,31 @@ typedef struct AMediaExtractor AMediaExtractor;
 #if __ANDROID_API__ >= 21
 
 /**
- * Create new media extractor
+ * Create new media extractor.
+ *
+ * Available since API level 21.
  */
 AMediaExtractor* AMediaExtractor_new() __INTRODUCED_IN(21);
 
 /**
- * Delete a previously created media extractor
+ * Delete a previously created media extractor.
+ *
+ * Available since API level 21.
  */
 media_status_t AMediaExtractor_delete(AMediaExtractor*) __INTRODUCED_IN(21);
 
 /**
- *  Set the file descriptor from which the extractor will read.
+ * Set the file descriptor from which the extractor will read.
+ *
+ * Available since API level 21.
  */
 media_status_t AMediaExtractor_setDataSourceFd(AMediaExtractor*, int fd, off64_t offset,
         off64_t length) __INTRODUCED_IN(21);
 
 /**
  * Set the URI from which the extractor will read.
+ *
+ * Available since API level 21.
  */
 media_status_t AMediaExtractor_setDataSource(AMediaExtractor*,
         const char *location) __INTRODUCED_IN(21);
@@ -77,6 +85,8 @@ media_status_t AMediaExtractor_setDataSource(AMediaExtractor*,
 
 /**
  * Set the custom data source implementation from which the extractor will read.
+ *
+ * Available since API level 28.
  */
 media_status_t AMediaExtractor_setDataSourceCustom(AMediaExtractor*,
         AMediaDataSource *src) __INTRODUCED_IN(28);
@@ -85,11 +95,15 @@ media_status_t AMediaExtractor_setDataSourceCustom(AMediaExtractor*,
 
 /**
  * Return the number of tracks in the previously specified media file
+ *
+ * Available since API level 21.
  */
 size_t AMediaExtractor_getTrackCount(AMediaExtractor*) __INTRODUCED_IN(21);
 
 /**
  * Return the format of the specified track. The caller must free the returned format
+ *
+ * Available since API level 21.
  */
 AMediaFormat* AMediaExtractor_getTrackFormat(AMediaExtractor*, size_t idx) __INTRODUCED_IN(21);
 
@@ -98,41 +112,55 @@ AMediaFormat* AMediaExtractor_getTrackFormat(AMediaExtractor*, size_t idx) __INT
  * getSampleTime only retrieve information for the subset of tracks selected.
  * Selecting the same track multiple times has no effect, the track is
  * only selected once.
+ *
+ * Available since API level 21.
  */
 media_status_t AMediaExtractor_selectTrack(AMediaExtractor*, size_t idx) __INTRODUCED_IN(21);
 
 /**
  * Unselect the specified track. Subsequent calls to readSampleData, getSampleTrackIndex and
- * getSampleTime only retrieve information for the subset of tracks selected..
+ * getSampleTime only retrieve information for the subset of tracks selected.
+ *
+ * Available since API level 21.
  */
 media_status_t AMediaExtractor_unselectTrack(AMediaExtractor*, size_t idx) __INTRODUCED_IN(21);
 
 /**
  * Read the current sample.
+ *
+ * Available since API level 21.
  */
 ssize_t AMediaExtractor_readSampleData(AMediaExtractor*,
         uint8_t *buffer, size_t capacity) __INTRODUCED_IN(21);
 
 /**
  * Read the current sample's flags.
+ *
+ * Available since API level 21.
  */
 uint32_t AMediaExtractor_getSampleFlags(AMediaExtractor*) __INTRODUCED_IN(21);
 
 /**
  * Returns the track index the current sample originates from (or -1
  * if no more samples are available)
+ *
+ * Available since API level 21.
  */
 int AMediaExtractor_getSampleTrackIndex(AMediaExtractor*) __INTRODUCED_IN(21);
 
 /**
  * Returns the current sample's presentation time in microseconds.
  * or -1 if no more samples are available.
+ *
+ * Available since API level 21.
  */
 int64_t AMediaExtractor_getSampleTime(AMediaExtractor*) __INTRODUCED_IN(21);
 
 /**
  * Advance to the next sample. Returns false if no more sample data
  * is available (end of stream).
+ *
+ * Available since API level 21.
  */
 bool AMediaExtractor_advance(AMediaExtractor*) __INTRODUCED_IN(21);
 
@@ -143,7 +171,7 @@ typedef enum {
 } SeekMode;
 
 /**
- *
+ * Available since API level 21.
  */
 media_status_t AMediaExtractor_seekTo(AMediaExtractor*,
         int64_t seekPosUs, SeekMode mode) __INTRODUCED_IN(21);
@@ -167,10 +195,14 @@ typedef struct PsshInfo {
 
 /**
  * Get the PSSH info if present.
+ *
+ * Available since API level 21.
  */
 PsshInfo* AMediaExtractor_getPsshInfo(AMediaExtractor*) __INTRODUCED_IN(21);
 
-
+/**
+ * Available since API level 21.
+ */
 AMediaCodecCryptoInfo *AMediaExtractor_getSampleCryptoInfo(AMediaExtractor *) __INTRODUCED_IN(21);
 
 enum {
@@ -186,6 +218,8 @@ enum {
  *
  * This function will always return a format; however, the format could be empty
  * (no key-value pairs) if the media container does not provide format information.
+ *
+ * Available since API level 28.
  */
 AMediaFormat* AMediaExtractor_getFileFormat(AMediaExtractor*) __INTRODUCED_IN(28);
 
@@ -198,6 +232,7 @@ AMediaFormat* AMediaExtractor_getFileFormat(AMediaExtractor*) __INTRODUCED_IN(28
  * uint8_t *buf = new uint8_t[sampleSize];
  * AMediaExtractor_readSampleData(ex, buf, sampleSize);
  *
+ * Available since API level 28.
  */
 ssize_t AMediaExtractor_getSampleSize(AMediaExtractor*) __INTRODUCED_IN(28);
 
@@ -211,6 +246,8 @@ ssize_t AMediaExtractor_getSampleSize(AMediaExtractor*) __INTRODUCED_IN(28);
  * Returns -1 when the extractor is not reading from a network data source, or when the
  * cached duration cannot be calculated (bitrate, duration, and file size information
  * not available).
+ *
+ * Available since API level 28.
  */
 int64_t AMediaExtractor_getCachedDuration(AMediaExtractor *) __INTRODUCED_IN(28);
 
@@ -222,6 +259,8 @@ int64_t AMediaExtractor_getCachedDuration(AMediaExtractor *) __INTRODUCED_IN(28)
  * Returns AMEDIA_OK on success or AMEDIA_ERROR_* to indicate failure reason.
  * Existing key-value pairs in |fmt| would be removed if this API returns AMEDIA_OK.
  * The contents of |fmt| is undefined if this API returns AMEDIA_ERROR_*.
+ *
+ * Available since API level 28.
  */
 media_status_t AMediaExtractor_getSampleFormat(AMediaExtractor *ex,
         AMediaFormat *fmt) __INTRODUCED_IN(28);
