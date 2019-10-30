@@ -49,12 +49,24 @@ typedef uint8_t AMediaUUID[16];
 
 #if __ANDROID_API__ >= 21
 
+/**
+ * Available since API level 21.
+ */
 bool AMediaCrypto_isCryptoSchemeSupported(const AMediaUUID uuid) __INTRODUCED_IN(21);
 
+/**
+ * Available since API level 21.
+ */
 bool AMediaCrypto_requiresSecureDecoderComponent(const char *mime) __INTRODUCED_IN(21);
 
+/**
+ * Available since API level 21.
+ */
 AMediaCrypto* AMediaCrypto_new(const AMediaUUID uuid, const void *initData, size_t initDataSize) __INTRODUCED_IN(21);
 
+/**
+ * Available since API level 21.
+ */
 void AMediaCrypto_delete(AMediaCrypto* crypto) __INTRODUCED_IN(21);
 
 #endif /* __ANDROID_API__ >= 21 */

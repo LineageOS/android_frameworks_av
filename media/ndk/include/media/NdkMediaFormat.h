@@ -48,40 +48,78 @@ typedef struct AMediaFormat AMediaFormat;
 
 #if __ANDROID_API__ >= 21
 
+/**
+ * Available since API level 21.
+ */
 AMediaFormat *AMediaFormat_new() __INTRODUCED_IN(21);
+
+/**
+ * Available since API level 21.
+ */
 media_status_t AMediaFormat_delete(AMediaFormat*) __INTRODUCED_IN(21);
 
 /**
  * Human readable representation of the format. The returned string is owned by the format,
  * and remains valid until the next call to toString, or until the format is deleted.
+ *
+ * Available since API level 21.
  */
 const char* AMediaFormat_toString(AMediaFormat*) __INTRODUCED_IN(21);
 
+/**
+ * Available since API level 21.
+ */
 bool AMediaFormat_getInt32(AMediaFormat*, const char *name, int32_t *out) __INTRODUCED_IN(21);
+/**
+ * Available since API level 21.
+ */
 bool AMediaFormat_getInt64(AMediaFormat*, const char *name, int64_t *out) __INTRODUCED_IN(21);
+/**
+ * Available since API level 21.
+ */
 bool AMediaFormat_getFloat(AMediaFormat*, const char *name, float *out) __INTRODUCED_IN(21);
+/**
+ * Available since API level 21.
+ */
 bool AMediaFormat_getSize(AMediaFormat*, const char *name, size_t *out) __INTRODUCED_IN(21);
 /**
  * The returned data is owned by the format and remains valid as long as the named entry
  * is part of the format.
+ *
+ * Available since API level 21.
  */
 bool AMediaFormat_getBuffer(AMediaFormat*, const char *name, void** data, size_t *size) __INTRODUCED_IN(21);
 /**
  * The returned string is owned by the format, and remains valid until the next call to getString,
  * or until the format is deleted.
+ *
+ * Available since API level 21.
  */
 bool AMediaFormat_getString(AMediaFormat*, const char *name, const char **out) __INTRODUCED_IN(21);
 
 
+/**
+ * Available since API level 21.
+ */
 void AMediaFormat_setInt32(AMediaFormat*, const char* name, int32_t value) __INTRODUCED_IN(21);
+/**
+ * Available since API level 21.
+ */
 void AMediaFormat_setInt64(AMediaFormat*, const char* name, int64_t value) __INTRODUCED_IN(21);
+/**
+ * Available since API level 21.
+ */
 void AMediaFormat_setFloat(AMediaFormat*, const char* name, float value) __INTRODUCED_IN(21);
 /**
  * The provided string is copied into the format.
+ *
+ * Available since API level 21.
  */
 void AMediaFormat_setString(AMediaFormat*, const char* name, const char* value) __INTRODUCED_IN(21);
 /**
  * The provided data is copied into the format.
+ *
+ * Available since API level 21.
  */
 void AMediaFormat_setBuffer(AMediaFormat*, const char* name, const void* data, size_t size) __INTRODUCED_IN(21);
 
@@ -155,24 +193,43 @@ extern const char* AMEDIAFORMAT_KEY_WIDTH __INTRODUCED_IN(21);
 #endif /* __ANDROID_API__ >= 21 */
 
 #if __ANDROID_API__ >= 28
+/**
+ * Available since API level 28.
+ */
 bool AMediaFormat_getDouble(AMediaFormat*, const char *name, double *out) __INTRODUCED_IN(28);
+/**
+ * Available since API level 28.
+ */
 bool AMediaFormat_getRect(AMediaFormat*, const char *name,
         int32_t *left, int32_t *top, int32_t *right, int32_t *bottom) __INTRODUCED_IN(28);
 
+/**
+ * Available since API level 28.
+ */
 void AMediaFormat_setDouble(AMediaFormat*, const char* name, double value) __INTRODUCED_IN(28);
+/**
+ * Available since API level 28.
+ */
 void AMediaFormat_setSize(AMediaFormat*, const char* name, size_t value) __INTRODUCED_IN(28);
+/**
+ * Available since API level 28.
+ */
 void AMediaFormat_setRect(AMediaFormat*, const char* name,
         int32_t left, int32_t top, int32_t right, int32_t bottom) __INTRODUCED_IN(28);
 #endif /* __ANDROID_API__ >= 28 */
 
 #if __ANDROID_API__ >= 29
 /**
- * remove all key/value pairs from the given AMediaFormat
+ * Remove all key/value pairs from the given AMediaFormat.
+ *
+ * Available since API level 29.
  */
 void AMediaFormat_clear(AMediaFormat*) __INTRODUCED_IN(29);
 
 /**
- * copy one AMediaFormat to another
+ * Copy one AMediaFormat to another.
+ *
+ * Available since API level 29.
  */
 media_status_t AMediaFormat_copy(AMediaFormat *to, AMediaFormat *from) __INTRODUCED_IN(29);
 
