@@ -31,12 +31,13 @@ public:
         kNonSecureCodec,
         kGraphicMemory,
         kCpuBoost,
+        kBattery,
     };
 
     enum SubType {
         kUnspecifiedSubType = 0,
         kAudioCodec,
-        kVideoCodec
+        kVideoCodec,
     };
 
     MediaResource();
@@ -62,6 +63,8 @@ inline static const char *asString(MediaResource::Type i, const char *def = "??"
         case MediaResource::kSecureCodec:    return "secure-codec";
         case MediaResource::kNonSecureCodec: return "non-secure-codec";
         case MediaResource::kGraphicMemory:  return "graphic-memory";
+        case MediaResource::kCpuBoost:       return "cpu-boost";
+        case MediaResource::kBattery:        return "battery";
         default:                             return def;
     }
 }

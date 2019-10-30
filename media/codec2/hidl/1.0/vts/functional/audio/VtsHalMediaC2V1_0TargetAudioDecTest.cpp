@@ -547,6 +547,10 @@ TEST_P(Codec2AudioDecDecodeTest, DecodeTest) {
     if (mCompName == raw) {
         bitStreamInfo[0] = 8000;
         bitStreamInfo[1] = 1;
+    } else if (mCompName == g711alaw || mCompName == g711mlaw) {
+        // g711 test data is all 1-channel and has no embedded config info.
+        bitStreamInfo[0] = 8000;
+        bitStreamInfo[1] = 1;
     } else {
         ASSERT_NO_FATAL_FAILURE(
             getInputChannelInfo(mComponent, mCompName, bitStreamInfo));

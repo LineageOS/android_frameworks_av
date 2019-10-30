@@ -36,6 +36,7 @@ struct ABuffer;
 struct AMessage;
 struct AReplyToken;
 struct AString;
+struct BatteryChecker;
 class BufferChannelBase;
 struct CodecBase;
 class IBatteryStats;
@@ -257,6 +258,7 @@ private:
         kWhatSetCallback                    = 'setC',
         kWhatSetNotification                = 'setN',
         kWhatDrmReleaseCrypto               = 'rDrm',
+        kWhatCheckBatteryStats              = 'chkB',
     };
 
     enum {
@@ -283,7 +285,7 @@ private:
     };
 
     struct ResourceManagerServiceProxy : public IBinder::DeathRecipient {
-        ResourceManagerServiceProxy(pid_t pid);
+        ResourceManagerServiceProxy(pid_t pid, uid_t uid);
         ~ResourceManagerServiceProxy();
 
         void init();
@@ -296,7 +298,11 @@ private:
                 const sp<IResourceManagerClient> &client,
                 const Vector<MediaResource> &resources);
 
-        void removeResource(int64_t clientId);
+        void removeResource(
+                int64_t clientId,
+                const Vector<MediaResource> &resources);
+
+        void removeClient(int64_t clientId);
 
         bool reclaimResource(const Vector<MediaResource> &resources);
 
@@ -304,6 +310,7 @@ private:
         Mutex mLock;
         sp<IResourceManagerService> mService;
         pid_t mPid;
+        uid_t mUid;
     };
 
     State mState;
@@ -335,7 +342,6 @@ private:
     sp<IResourceManagerClient> mResourceManagerClient;
     sp<ResourceManagerServiceProxy> mResourceManagerService;
 
-    bool mBatteryStatNotified;
     bool mIsVideo;
     int32_t mVideoWidth;
     int32_t mVideoHeight;
@@ -425,11 +431,11 @@ private:
     status_t onSetParameters(const sp<AMessage> &params);
 
     status_t amendOutputFormatWithCodecSpecificData(const sp<MediaCodecBuffer> &buffer);
-    void updateBatteryStat();
     bool isExecuting() const;
 
     uint64_t getGraphicBufferSize();
     void addResource(MediaResource::Type type, MediaResource::SubType subtype, uint64_t value);
+    void removeResource(MediaResource::Type type, MediaResource::SubType subtype, uint64_t value);
     void requestCpuBoostIfNeeded();
 
     bool hasPendingBuffer(int portIndex);
@@ -457,6 +463,8 @@ private:
     std::deque<BufferFlightTiming_t> mBuffersInFlight;
     Mutex mLatencyLock;
     int64_t mLatencyUnknown;    // buffers for which we couldn't calculate latency
+
+    sp<BatteryChecker> mBatteryChecker;
 
     void statsBufferSent(int64_t presentationUs);
     void statsBufferReceived(int64_t presentationUs);

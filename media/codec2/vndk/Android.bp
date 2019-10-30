@@ -66,7 +66,7 @@ cc_library_shared {
         "liblog",
         "libnativewindow",
         "libstagefright_foundation",
-        "libstagefright_bufferpool@2.0",
+        "libstagefright_bufferpool@2.0.1",
         "libui",
         "libutils",
     ],

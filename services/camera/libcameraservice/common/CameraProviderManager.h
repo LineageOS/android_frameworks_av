@@ -78,6 +78,7 @@ public:
                 &notification) = 0;
         virtual sp<hardware::camera::provider::V2_4::ICameraProvider> getService(
                 const std::string &serviceName) = 0;
+        virtual hardware::hidl_vec<hardware::hidl_string> listServices() = 0;
         virtual ~ServiceInteractionProxy() {}
     };
 
@@ -95,6 +96,8 @@ public:
                 const std::string &serviceName) override {
             return hardware::camera::provider::V2_4::ICameraProvider::getService(serviceName);
         }
+
+        virtual hardware::hidl_vec<hardware::hidl_string> listServices() override;
     };
 
     /**
@@ -270,6 +273,7 @@ public:
     bool isLogicalCamera(const std::string& id, std::vector<std::string>* physicalCameraIds);
 
     bool isPublicallyHiddenSecureCamera(const std::string& id) const;
+
     bool isHiddenPhysicalCamera(const std::string& cameraId) const;
 
     static const float kDepthARTolerance;
@@ -567,7 +571,7 @@ private:
             hardware::hidl_version minVersion = hardware::hidl_version{0,0},
             hardware::hidl_version maxVersion = hardware::hidl_version{1000,0}) const;
 
-    status_t addProviderLocked(const std::string& newProvider, bool expected = true);
+    status_t addProviderLocked(const std::string& newProvider);
 
     status_t removeProvider(const std::string& provider);
     sp<StatusListener> getStatusListener() const;

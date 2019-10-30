@@ -179,17 +179,21 @@ struct Codec2Client : public Codec2ConfigurableClient {
     static std::vector<std::shared_ptr<Codec2Client>> CreateFromAllServices();
 
     // Try to create a component with a given name from all known
-    // IComponentStore services.
+    // IComponentStore services. numberOfAttempts determines the number of times
+    // to retry the HIDL call if the transaction fails.
     static std::shared_ptr<Component> CreateComponentByName(
             char const* componentName,
             std::shared_ptr<Listener> const& listener,
-            std::shared_ptr<Codec2Client>* owner = nullptr);
+            std::shared_ptr<Codec2Client>* owner = nullptr,
+            size_t numberOfAttempts = 10);
 
     // Try to create a component interface with a given name from all known
-    // IComponentStore services.
+    // IComponentStore services. numberOfAttempts determines the number of times
+    // to retry the HIDL call if the transaction fails.
     static std::shared_ptr<Interface> CreateInterfaceByName(
             char const* interfaceName,
-            std::shared_ptr<Codec2Client>* owner = nullptr);
+            std::shared_ptr<Codec2Client>* owner = nullptr,
+            size_t numberOfAttempts = 10);
 
     // List traits from all known IComponentStore services.
     static std::vector<C2Component::Traits> const& ListComponents();
