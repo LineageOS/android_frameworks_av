@@ -2776,6 +2776,20 @@ void CameraService::BasicClient::block() {
 
 // ----------------------------------------------------------------------------
 
+sp<CameraService> CameraService::OfflineClient::sCameraService;
+
+status_t CameraService::OfflineClient::startCameraOps() {
+    // TODO
+    return OK;
+}
+
+status_t CameraService::OfflineClient::finishCameraOps() {
+    // TODO
+    return OK;
+}
+
+// ----------------------------------------------------------------------------
+
 void CameraService::Client::notifyError(int32_t errorCode,
         const CaptureResultExtras& resultExtras) {
     (void) resultExtras;

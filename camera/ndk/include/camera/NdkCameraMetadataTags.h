@@ -1311,7 +1311,7 @@ typedef enum acamera_metadata_tag {
     /**
      * <p>List of the maximum number of regions that can be used for metering in
      * auto-exposure (AE), auto-white balance (AWB), and auto-focus (AF);
-     * this corresponds to the the maximum number of elements in
+     * this corresponds to the maximum number of elements in
      * ACAMERA_CONTROL_AE_REGIONS, ACAMERA_CONTROL_AWB_REGIONS,
      * and ACAMERA_CONTROL_AF_REGIONS.</p>
      *

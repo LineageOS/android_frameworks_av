@@ -34,6 +34,7 @@
 #include <android/hardware/camera/device/3.3/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.5/ICameraDeviceSession.h>
+#include <android/hardware/camera/device/3.6/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.2/ICameraDeviceCallback.h>
 #include <android/hardware/camera/device/3.4/ICameraDeviceCallback.h>
 #include <android/hardware/camera/device/3.5/ICameraDeviceCallback.h>
@@ -196,6 +197,9 @@ class Camera3Device :
 
     nsecs_t getExpectedInFlightDuration() override;
 
+    status_t switchToOffline(const std::vector<int32_t>& streamsToKeep,
+            /*out*/ sp<CameraOfflineSessionBase>* session) override;
+
     /**
      * Helper functions to map between framework and HIDL values
      */
@@ -282,7 +286,7 @@ class Camera3Device :
       public:
         HalInterface(sp<hardware::camera::device::V3_2::ICameraDeviceSession> &session,
                      std::shared_ptr<RequestMetadataQueue> queue,
-                     bool useHalBufManager);
+                     bool useHalBufManager, bool supportOfflineProcessing);
         HalInterface(const HalInterface &other);
         HalInterface();
 
@@ -315,6 +319,11 @@ class Camera3Device :
         void signalPipelineDrain(const std::vector<int>& streamIds);
         bool isReconfigurationRequired(CameraMetadata& oldSessionParams,
                 CameraMetadata& newSessionParams);
+
+        status_t switchToOffline(
+                const std::vector<int32_t>& streamsToKeep,
+                /*out*/hardware::camera::device::V3_6::CameraOfflineSessionInfo* offlineSessionInfo,
+                /*out*/sp<hardware::camera::device::V3_6::ICameraOfflineSession>* offlineSession);
 
         // method to extract buffer's unique ID
         // return pair of (newlySeenBuffer?, bufferId)
@@ -352,6 +361,8 @@ class Camera3Device :
         sp<hardware::camera::device::V3_4::ICameraDeviceSession> mHidlSession_3_4;
         // Valid if ICameraDeviceSession is @3.5 or newer
         sp<hardware::camera::device::V3_5::ICameraDeviceSession> mHidlSession_3_5;
+        // Valid if ICameraDeviceSession is @3.6 or newer
+        sp<hardware::camera::device::V3_6::ICameraDeviceSession> mHidlSession_3_6;
 
         std::shared_ptr<RequestMetadataQueue> mRequestMetadataQueue;
 
@@ -424,6 +435,8 @@ class Camera3Device :
 
         const bool mUseHalBufManager;
         bool mIsReconfigurationQuerySupported;
+
+        const bool mSupportOfflineProcessing;
     };
 
     sp<HalInterface> mInterface;
@@ -842,6 +855,11 @@ class Camera3Device :
 
         void signalPipelineDrain(const std::vector<int>& streamIds);
 
+        status_t switchToOffline(
+                const std::vector<int32_t>& streamsToKeep,
+                /*out*/hardware::camera::device::V3_6::CameraOfflineSessionInfo* offlineSessionInfo,
+                /*out*/sp<hardware::camera::device::V3_6::ICameraOfflineSession>* offlineSession);
+
       protected:
 
         virtual bool threadLoop();
@@ -861,6 +879,9 @@ class Camera3Device :
         status_t          addDummyTriggerIds(const sp<CaptureRequest> &request);
 
         static const nsecs_t kRequestTimeout = 50e6; // 50 ms
+
+        // TODO: does this need to be adjusted for long exposure requests?
+        static const nsecs_t kRequestSubmitTimeout = 200e6; // 200 ms
 
         // Used to prepare a batch of requests.
         struct NextRequest {
@@ -936,6 +957,7 @@ class Camera3Device :
 
         Mutex              mRequestLock;
         Condition          mRequestSignal;
+        Condition          mRequestSubmittedSignal;
         RequestList        mRequestQueue;
         RequestList        mRepeatingRequests;
         // The next batch of requests being prepped for submission to the HAL, no longer
@@ -1364,6 +1386,9 @@ class Camera3Device :
     // Fix up result metadata for monochrome camera.
     bool mNeedFixupMonochromeTags;
     status_t fixupMonochromeTags(const CameraMetadata& deviceInfo, CameraMetadata& resultMetadata);
+
+    // Whether HAL supports offline processing capability.
+    bool mSupportOfflineProcessing = false;
 }; // class Camera3Device
 
 }; // namespace android
