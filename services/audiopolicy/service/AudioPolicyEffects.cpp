@@ -562,7 +562,8 @@ const char *AudioPolicyEffects::kStreamNames[AUDIO_STREAM_PUBLIC_CNT+1] = {
     AUDIO_STREAM_BLUETOOTH_SCO_TAG,
     AUDIO_STREAM_ENFORCED_AUDIBLE_TAG,
     AUDIO_STREAM_DTMF_TAG,
-    AUDIO_STREAM_TTS_TAG
+    AUDIO_STREAM_TTS_TAG,
+    AUDIO_STREAM_ASSISTANT_TAG
 };
 
 // returns the audio_stream_t enum corresponding to the output stream name or
