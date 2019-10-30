@@ -18,10 +18,10 @@
 #define LOG_TAG "FrameDecoder"
 
 #include "include/FrameDecoder.h"
+#include "include/FrameCaptureLayer.h"
 #include <binder/MemoryBase.h>
 #include <binder/MemoryHeapBase.h>
 #include <gui/Surface.h>
-#include <gui/SurfaceComposerClient.h>
 #include <inttypes.h>
 #include <mediadrm/ICrypto.h>
 #include <media/IMediaSource.h>
@@ -31,6 +31,7 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/ColorUtils.h>
 #include <media/stagefright/ColorConverter.h>
+#include <media/stagefright/FrameCaptureProcessor.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaDefs.h>
@@ -512,7 +513,7 @@ sp<AMessage> VideoFrameDecoder::onGetFormatAndSeekOptions(
     }
 
     if (isHDR(videoFormat)) {
-        *window = initSurfaceControl();
+        *window = initSurface();
         if (*window == NULL) {
             ALOGE("Failed to init surface control for HDR, fallback to non-hdr");
         } else {
@@ -589,7 +590,7 @@ status_t VideoFrameDecoder::onOutputReceived(
     }
 
     if (!outputFormat->findInt32("stride", &stride)) {
-        if (mSurfaceControl == NULL) {
+        if (mCaptureLayer == NULL) {
             ALOGE("format must have stride for byte buffer mode: %s",
                     outputFormat->debugString().c_str());
             return ERROR_MALFORMED;
@@ -613,7 +614,7 @@ status_t VideoFrameDecoder::onOutputReceived(
                 0,
                 0,
                 dstBpp(),
-                mSurfaceControl != nullptr /*allocRotated*/);
+                mCaptureLayer != nullptr /*allocRotated*/);
         mFrame = static_cast<VideoFrame*>(frameMem->unsecurePointer());
 
         setFrame(frameMem);
@@ -621,8 +622,8 @@ status_t VideoFrameDecoder::onOutputReceived(
 
     mFrame->mDurationUs = durationUs;
 
-    if (mSurfaceControl != nullptr) {
-        return captureSurfaceControl();
+    if (mCaptureLayer != nullptr) {
+        return captureSurface();
     }
 
     ColorConverter converter((OMX_COLOR_FORMATTYPE)srcFormat, dstFormat());
@@ -655,70 +656,26 @@ status_t VideoFrameDecoder::onOutputReceived(
     return ERROR_UNSUPPORTED;
 }
 
-sp<Surface> VideoFrameDecoder::initSurfaceControl() {
-    sp<SurfaceComposerClient> client = new SurfaceComposerClient();
-    if (client->initCheck() != NO_ERROR) {
-        ALOGE("failed to get SurfaceComposerClient");
-        return NULL;
+sp<Surface> VideoFrameDecoder::initSurface() {
+    // create the consumer listener interface, and hold sp so that this
+    // interface lives as long as the GraphicBufferSource.
+    sp<FrameCaptureLayer> captureLayer = new FrameCaptureLayer();
+    if (captureLayer->init() != OK) {
+        ALOGE("failed to init capture layer");
+        return nullptr;
     }
+    mCaptureLayer = captureLayer;
 
-    // create a container layer to hold the capture layer, so that we can
-    // use full frame drop. If without the container, the crop will be set
-    // to display size.
-    sp<SurfaceControl> parent = client->createSurface(
-            String8("parent"),
-            0 /* width */, 0 /* height */,
-            PIXEL_FORMAT_RGBA_8888,
-            ISurfaceComposerClient::eFXSurfaceContainer );
-
-    if (!parent) {
-        ALOGE("failed to get surface control parent");
-        return NULL;
-    }
-
-    // create the surface with unknown size 1x1 for now, real size will
-    // be set before the capture when we have output format info.
-    sp<SurfaceControl> surfaceControl = client->createSurface(
-            String8("thumbnail"),
-            1 /* width */, 1 /* height */,
-            PIXEL_FORMAT_RGBA_8888,
-            ISurfaceComposerClient::eFXSurfaceBufferQueue,
-            parent.get());
-
-    if (!surfaceControl) {
-        ALOGE("failed to get surface control");
-        return NULL;
-    }
-
-    SurfaceComposerClient::Transaction t;
-    t.hide(parent)
-            .show(surfaceControl)
-            .apply(true);
-
-    mSurfaceControl = surfaceControl;
-    mParent = parent;
-
-    return surfaceControl->getSurface();
+    return captureLayer->getSurface();
 }
 
-status_t VideoFrameDecoder::captureSurfaceControl() {
-    // set the layer size to the output size before the capture
-    SurfaceComposerClient::Transaction()
-        .setSize(mSurfaceControl, mFrame->mWidth, mFrame->mHeight)
-        .apply(true);
-
+status_t VideoFrameDecoder::captureSurface() {
     sp<GraphicBuffer> outBuffer;
-    status_t err = ScreenshotClient::captureChildLayers(
-            mParent->getHandle(),
-            ui::Dataspace::V0_SRGB,
-            captureFormat(),
-            Rect(0, 0, mFrame->mWidth, mFrame->mHeight),
-            {},
-            1.0f /*frameScale*/,
-            &outBuffer);
+    status_t err = mCaptureLayer->capture(
+            captureFormat(), Rect(0, 0, mFrame->mWidth, mFrame->mHeight), &outBuffer);
 
     if (err != OK) {
-        ALOGE("failed to captureLayers: err %d", err);
+        ALOGE("failed to capture layer (err %d)", err);
         return err;
     }
 
