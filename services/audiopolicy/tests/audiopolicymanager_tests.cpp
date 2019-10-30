@@ -800,6 +800,8 @@ INSTANTIATE_TEST_CASE_P(
                 (audio_attributes_t){AUDIO_CONTENT_TYPE_MUSIC, AUDIO_USAGE_VIRTUAL_SOURCE,
                                      AUDIO_SOURCE_DEFAULT, 0, "addr=remote_submix_media"},
                 (audio_attributes_t){AUDIO_CONTENT_TYPE_MUSIC, AUDIO_USAGE_ASSISTANT,
+                                     AUDIO_SOURCE_DEFAULT, 0, "addr=remote_submix_media"},
+                (audio_attributes_t){AUDIO_CONTENT_TYPE_SPEECH, AUDIO_USAGE_ASSISTANT,
                                      AUDIO_SOURCE_DEFAULT, 0, "addr=remote_submix_media"}
                 )
         );
@@ -841,6 +843,8 @@ INSTANTIATE_TEST_CASE_P(
                 (audio_attributes_t){AUDIO_CONTENT_TYPE_MUSIC, AUDIO_USAGE_GAME,
                                      AUDIO_SOURCE_DEFAULT, 0, ""},
                 (audio_attributes_t){AUDIO_CONTENT_TYPE_MUSIC, AUDIO_USAGE_ASSISTANT,
+                                     AUDIO_SOURCE_DEFAULT, 0, ""},
+                (audio_attributes_t){AUDIO_CONTENT_TYPE_SPEECH, AUDIO_USAGE_ASSISTANT,
                                      AUDIO_SOURCE_DEFAULT, 0, ""}
                 )
         );

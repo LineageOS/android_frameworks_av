@@ -100,6 +100,7 @@ constexpr std::pair<audio_stream_type_t, const char*> STREAM_NAME_MAP<audio_stre
         {AUDIO_STREAM_ENFORCED_AUDIBLE, "enforced_audible"},
         {AUDIO_STREAM_DTMF, "dtmf"},
         {AUDIO_STREAM_TTS, "tts"},
+        {AUDIO_STREAM_ASSISTANT, "assistant"},
 };
 
 /** All input stream types which support effects.
