@@ -139,7 +139,9 @@ void Camera3StreamSplitter::disconnect() {
     mOutputSlots.clear();
     mConsumerBufferCount.clear();
 
-    mConsumer->consumerDisconnect();
+    if (mConsumer.get() != nullptr) {
+        mConsumer->consumerDisconnect();
+    }
 
     if (mBuffers.size() > 0) {
         SP_LOGW("%zu buffers still being tracked", mBuffers.size());
