@@ -118,7 +118,6 @@ static String8 toString8(hidl_string hString) {
 CryptoHal::CryptoHal()
     : mFactories(makeCryptoFactories()),
       mInitCheck((mFactories.size() == 0) ? ERROR_UNSUPPORTED : NO_INIT),
-      mNextBufferId(0),
       mHeapSeqNum(0) {
 }
 
@@ -260,17 +259,18 @@ int32_t CryptoHal::setHeapBase(const sp<IMemoryHeap>& heap) {
     using ::android::hardware::fromHeap;
     using ::android::hardware::HidlMemory;
 
-    if (heap == NULL) {
-        ALOGE("setHeapBase(): heap is NULL");
+    if (heap == NULL || mHeapSeqNum < 0) {
+        ALOGE("setHeapBase(): heap %p mHeapSeqNum %d", heap.get(), mHeapSeqNum);
         return -1;
     }
 
     Mutex::Autolock autoLock(mLock);
 
     int32_t seqNum = mHeapSeqNum++;
+    uint32_t bufferId = static_cast<uint32_t>(seqNum);
     sp<HidlMemory> hidlMemory = fromHeap(heap);
-    mHeapBases.add(seqNum, HeapBase(mNextBufferId, heap->getSize()));
-    Return<void> hResult = mPlugin->setSharedBufferBase(*hidlMemory, mNextBufferId++);
+    mHeapBases.add(seqNum, HeapBase(bufferId, heap->getSize()));
+    Return<void> hResult = mPlugin->setSharedBufferBase(*hidlMemory, bufferId);
     ALOGE_IF(!hResult.isOk(), "setSharedBufferBase(): remote call failed");
     return seqNum;
 }
