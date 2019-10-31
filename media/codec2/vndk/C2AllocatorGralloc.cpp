@@ -633,7 +633,7 @@ c2_status_t C2AllocationGralloc::map(
             int32_t stride;
             if (mMapper2) {
                 stride = int32_t(mInfo2.stride);
-            } if (mMapper3) {
+            } else if (mMapper3) {
                 stride = int32_t(mInfo3.stride);
             } else {
                 stride = int32_t(mInfo4.stride);
@@ -769,7 +769,7 @@ c2_status_t C2AllocationGralloc::map(
             int32_t stride;
             if (mMapper2) {
                 stride = int32_t(mInfo2.stride);
-            } if (mMapper3) {
+            } else if (mMapper3) {
                 stride = int32_t(mInfo3.stride);
             } else {
                 stride = int32_t(mInfo4.stride);

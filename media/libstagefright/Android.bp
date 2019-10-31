@@ -122,6 +122,53 @@ cc_library_static {
     },
 }
 
+cc_library_shared {
+    name: "libstagefright_framecapture_utils",
+
+    srcs: [
+        "FrameCaptureLayer.cpp",
+        "FrameCaptureProcessor.cpp",
+    ],
+
+    shared_libs: [
+        "libbase",
+        "libcutils",
+        "libEGL",
+        "libGLESv1_CM",
+        "libGLESv2",
+        "libgui",
+        "liblog",
+        "libprocessgroup",
+        "libstagefright_foundation",
+        "libsync",
+        "libui",
+        "libutils",
+    ],
+
+    static_libs: [
+        "librenderengine",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    cflags: [
+        "-Wno-multichar",
+        "-Werror",
+        "-Wno-error=deprecated-declarations",
+        "-Wall",
+    ],
+
+    sanitize: {
+        // TODO: re-enabled cfi for this lib after b/139945549 fixed
+        cfi: false,
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+    },
+}
 cc_library {
     name: "libstagefright",
 
@@ -174,6 +221,7 @@ cc_library {
     ],
 
     shared_libs: [
+        "libstagefright_framecapture_utils",
         "libaudioutils",
         "libbase",
         "libbinder",

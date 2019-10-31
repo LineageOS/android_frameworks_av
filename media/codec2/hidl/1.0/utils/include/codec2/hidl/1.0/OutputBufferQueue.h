@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-#ifndef CLIENT_BLOCK_HELPER_H
-#define CLIENT_BLOCK_HELPER_H
+#ifndef CODEC2_HIDL_V1_0_UTILS_OUTPUT_BUFFER_QUEUE
+#define CODEC2_HIDL_V1_0_UTILS_OUTPUT_BUFFER_QUEUE
 
 #include <gui/IGraphicBufferProducer.h>
 #include <codec2/hidl/1.0/types.h>
 #include <C2Work.h>
+
+struct C2_HIDE _C2BlockPoolData;
 
 namespace android {
 namespace hardware {
@@ -61,8 +63,16 @@ struct OutputBufferQueue {
 
 private:
 
-    class Impl;
-    std::unique_ptr<Impl> mImpl;
+    std::mutex mMutex;
+    sp<IGraphicBufferProducer> mIgbp;
+    uint32_t mGeneration;
+    uint64_t mBqId;
+    std::shared_ptr<int> mOwner;
+    // To migrate existing buffers
+    sp<GraphicBuffer> mBuffers[BufferQueueDefs::NUM_BUFFER_SLOTS]; // find a better way
+    std::weak_ptr<_C2BlockPoolData> mPoolDatas[BufferQueueDefs::NUM_BUFFER_SLOTS];
+
+    bool registerBuffer(const C2ConstGraphicBlock& block);
 };
 
 }  // namespace utils
@@ -72,4 +82,4 @@ private:
 }  // namespace hardware
 }  // namespace android
 
-#endif  // CLIENT_BLOCK_HELPER_H
+#endif  // CODEC2_HIDL_V1_0_UTILS_OUTPUT_BUFFER_QUEUE
