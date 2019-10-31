@@ -153,8 +153,6 @@ void CameraService::onFirstRef()
         mInitialized = true;
     }
 
-    CameraService::pingCameraServiceProxy();
-
     mUidPolicy = new UidPolicy(this);
     mUidPolicy->registerSelf();
     mSensorPrivacyPolicy = new SensorPrivacyPolicy(this);
@@ -164,6 +162,11 @@ void CameraService::onFirstRef()
         ALOGE("%s: Failed to register default android.frameworks.cameraservice.service@1.0",
               __FUNCTION__);
     }
+
+    // This needs to be last call in this function, so that it's as close to
+    // ServiceManager::addService() as possible.
+    CameraService::pingCameraServiceProxy();
+    ALOGI("CameraService pinged cameraservice proxy");
 }
 
 status_t CameraService::enumerateProviders() {
