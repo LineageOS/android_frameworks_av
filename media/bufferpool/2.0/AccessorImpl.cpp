@@ -38,7 +38,7 @@ namespace {
     static constexpr int64_t kLogDurationUs = 5000000; // 5 secs
 
     static constexpr size_t kMinAllocBytesForEviction = 1024*1024*15;
-    static constexpr size_t kMinBufferCountForEviction = 40;
+    static constexpr size_t kMinBufferCountForEviction = 25;
 }
 
 // Buffer structure in bufferpool process
@@ -723,8 +723,8 @@ void Accessor::Impl::BufferPool::cleanUp(bool clearCache) {
                   mStats.mTotalFetches, mStats.mTotalTransfers);
         }
         for (auto freeIt = mFreeBuffers.begin(); freeIt != mFreeBuffers.end();) {
-            if (!clearCache && mStats.mSizeCached < kMinAllocBytesForEviction
-                    && mBuffers.size() < kMinBufferCountForEviction) {
+            if (!clearCache && (mStats.mSizeCached < kMinAllocBytesForEviction
+                    || mBuffers.size() < kMinBufferCountForEviction)) {
                 break;
             }
             auto it = mBuffers.find(*freeIt);
