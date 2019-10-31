@@ -2855,7 +2855,7 @@ void CameraService::UidPolicy::onUidIdle(uid_t uid, bool /* disabled */) {
 }
 
 void CameraService::UidPolicy::onUidStateChanged(uid_t uid, int32_t procState,
-        int64_t /*procStateSeq*/) {
+        int64_t procStateSeq __unused, int32_t capability __unused) {
     bool procStateChange = false;
     {
         Mutex::Autolock _l(mUidLock);

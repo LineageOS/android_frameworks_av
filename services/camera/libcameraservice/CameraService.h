@@ -574,7 +574,8 @@ private:
         void onUidGone(uid_t uid, bool disabled);
         void onUidActive(uid_t uid);
         void onUidIdle(uid_t uid, bool disabled);
-        void onUidStateChanged(uid_t uid, int32_t procState, int64_t procStateSeq);
+        void onUidStateChanged(uid_t uid, int32_t procState, int64_t procStateSeq,
+                int32_t capability);
 
         void addOverrideUid(uid_t uid, String16 callingPackage, bool active);
         void removeOverrideUid(uid_t uid, String16 callingPackage);
