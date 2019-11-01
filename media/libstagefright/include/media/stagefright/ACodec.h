@@ -22,7 +22,7 @@
 #include <media/hardware/MetadataBufferType.h>
 #include <media/MediaCodecInfo.h>
 #include <media/IOMX.h>
-#include <media/stagefright/AHierarchicalStateMachine.h>
+#include <media/stagefright/foundation/AHierarchicalStateMachine.h>
 #include <media/stagefright/CodecBase.h>
 #include <media/stagefright/FrameRenderTracker.h>
 #include <media/stagefright/MediaDefs.h>
