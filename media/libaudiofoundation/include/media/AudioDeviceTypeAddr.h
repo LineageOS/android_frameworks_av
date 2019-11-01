@@ -17,9 +17,11 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include <binder/Parcelable.h>
 #include <binder/Parcel.h>
+#include <media/AudioContainers.h>
 #include <system/audio.h>
 #include <utils/Errors.h>
 
@@ -35,6 +37,8 @@ struct AudioDeviceTypeAddr : public Parcelable {
 
     bool equals(const AudioDeviceTypeAddr& other) const;
 
+    void reset();
+
     status_t readFromParcel(const Parcel *parcel) override;
 
     status_t writeToParcel(Parcel *parcel) const override;
@@ -42,5 +46,12 @@ struct AudioDeviceTypeAddr : public Parcelable {
     audio_devices_t mType = AUDIO_DEVICE_NONE;
     std::string mAddress;
 };
+
+using AudioDeviceTypeAddrVector = std::vector<AudioDeviceTypeAddr>;
+
+/**
+ * Return a collection of audio device types from a collection of AudioDeviceTypeAddr
+ */
+DeviceTypeSet getAudioDeviceTypes(const AudioDeviceTypeAddrVector& deviceTypeAddrs);
 
 }

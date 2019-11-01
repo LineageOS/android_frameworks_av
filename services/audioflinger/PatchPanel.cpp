@@ -25,6 +25,7 @@
 
 #include "AudioFlinger.h"
 #include <media/AudioParameter.h>
+#include <media/DeviceDescriptorBase.h>
 #include <media/PatchBuilder.h>
 #include <mediautils/ServiceUtilities.h>
 
@@ -351,7 +352,7 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                 goto exit;
             }
             // limit to connections between devices and output streams
-            audio_devices_t type = AUDIO_DEVICE_NONE;
+            DeviceDescriptorBaseVector devices;
             for (unsigned int i = 0; i < patch->num_sinks; i++) {
                 if (patch->sinks[i].type != AUDIO_PORT_TYPE_DEVICE) {
                     ALOGW("%s() invalid sink type %d for mix source",
@@ -364,7 +365,11 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                     status = BAD_VALUE;
                     goto exit;
                 }
-                type |= patch->sinks[i].ext.device.type;
+                sp<DeviceDescriptorBase> device = new DeviceDescriptorBase(
+                        patch->sinks[i].ext.device.type);
+                device->setAddress(patch->sinks[i].ext.device.address);
+                device->applyAudioPortConfig(&patch->sinks[i]);
+                devices.push_back(device);
             }
             sp<ThreadBase> thread =
                             mAudioFlinger.checkPlaybackThread_l(patch->sources[0].ext.mix.handle);
@@ -378,10 +383,7 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                 }
             }
             if (thread == mAudioFlinger.primaryPlaybackThread_l()) {
-                AudioParameter param = AudioParameter();
-                param.addInt(String8(AudioParameter::keyRouting), (int)type);
-
-                mAudioFlinger.broacastParametersToRecordThreads_l(param.toString());
+                mAudioFlinger.updateOutDevicesForRecordThreads_l(devices);
             }
 
             status = thread->sendCreateAudioPatchConfigEvent(patch, &halHandle);
