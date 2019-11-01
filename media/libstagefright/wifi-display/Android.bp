@@ -27,7 +27,6 @@ cc_library_shared {
         "liblog",
         "libmedia",
         "libmedia_omx",
-        "libmediaextractor",
         "libstagefright",
         "libstagefright_foundation",
         "libui",
