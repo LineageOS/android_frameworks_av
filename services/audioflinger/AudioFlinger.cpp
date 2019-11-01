@@ -1357,6 +1357,13 @@ void AudioFlinger::broacastParametersToRecordThreads_l(const String8& keyValuePa
     }
 }
 
+void AudioFlinger::updateOutDevicesForRecordThreads_l(const DeviceDescriptorBaseVector& devices)
+{
+    for (size_t i = 0; i < mRecordThreads.size(); i++) {
+        mRecordThreads.valueAt(i)->updateOutDevices(devices);
+    }
+}
+
 // forwardAudioHwSyncToDownstreamPatches_l() must be called with AudioFlinger::mLock held
 void AudioFlinger::forwardParametersToDownstreamPatches_l(
         audio_io_handle_t upStream, const String8& keyValuePairs,
@@ -2361,8 +2368,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
     if (status == NO_ERROR) {
         if (flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) {
             sp<MmapPlaybackThread> thread =
-                    new MmapPlaybackThread(this, *output, outHwDev, outputStream,
-                                           deviceType, AUDIO_DEVICE_NONE, mSystemReady);
+                    new MmapPlaybackThread(this, *output, outHwDev, outputStream, mSystemReady);
             mMmapThreads.add(*output, thread);
             ALOGV("openOutput_l() created mmap playback thread: ID %d thread %p",
                   *output, thread.get());
@@ -2370,18 +2376,17 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
         } else {
             sp<PlaybackThread> thread;
             if (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) {
-                thread = new OffloadThread(this, outputStream, *output, deviceType, mSystemReady);
+                thread = new OffloadThread(this, outputStream, *output, mSystemReady);
                 ALOGV("openOutput_l() created offload output: ID %d thread %p",
                       *output, thread.get());
             } else if ((flags & AUDIO_OUTPUT_FLAG_DIRECT)
                     || !isValidPcmSinkFormat(config->format)
                     || !isValidPcmSinkChannelMask(config->channel_mask)) {
-                thread = new DirectOutputThread(
-                        this, outputStream, *output, deviceType, mSystemReady);
+                thread = new DirectOutputThread(this, outputStream, *output, mSystemReady);
                 ALOGV("openOutput_l() created direct output: ID %d thread %p",
                       *output, thread.get());
             } else {
-                thread = new MixerThread(this, outputStream, *output, deviceType, mSystemReady);
+                thread = new MixerThread(this, outputStream, *output, mSystemReady);
                 ALOGV("openOutput_l() created mixer output: ID %d thread %p",
                       *output, thread.get());
             }
@@ -2689,9 +2694,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
         AudioStreamIn *inputStream = new AudioStreamIn(inHwDev, inStream, flags);
         if ((flags & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0) {
             sp<MmapCaptureThread> thread =
-                    new MmapCaptureThread(this, *input,
-                                          inHwDev, inputStream,
-                                          primaryOutputDevice_l(), devices, mSystemReady);
+                    new MmapCaptureThread(this, *input, inHwDev, inputStream, mSystemReady);
             mMmapThreads.add(*input, thread);
             ALOGV("openInput_l() created mmap capture thread: ID %d thread %p", *input,
                     thread.get());
@@ -2700,13 +2703,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
             // Start record thread
             // RecordThread requires both input and output device indication to forward to audio
             // pre processing modules
-            sp<RecordThread> thread = new RecordThread(this,
-                                      inputStream,
-                                      *input,
-                                      primaryOutputDevice_l(),
-                                      devices,
-                                      mSystemReady
-                                      );
+            sp<RecordThread> thread = new RecordThread(this, inputStream, *input, mSystemReady);
             mRecordThreads.add(*input, thread);
             ALOGV("openInput_l() created record thread: ID %d thread %p", *input, thread.get());
             return thread;
@@ -3122,15 +3119,15 @@ AudioFlinger::PlaybackThread *AudioFlinger::primaryPlaybackThread_l() const
     return NULL;
 }
 
-audio_devices_t AudioFlinger::primaryOutputDevice_l() const
+DeviceTypeSet AudioFlinger::primaryOutputDevice_l() const
 {
     PlaybackThread *thread = primaryPlaybackThread_l();
 
     if (thread == NULL) {
-        return 0;
+        return DeviceTypeSet();
     }
 
-    return thread->outDevice();
+    return thread->outDeviceTypes();
 }
 
 AudioFlinger::PlaybackThread *AudioFlinger::fastPlaybackThread_l() const

@@ -137,4 +137,25 @@ status_t DeviceDescriptorBase::readFromParcel(const Parcel *parcel)
     return status;
 }
 
+std::string toString(const DeviceDescriptorBaseVector& devices)
+{
+    std::string ret;
+    for (const auto& device : devices) {
+        if (device != *devices.begin()) {
+            ret += ";";
+        }
+        ret += device->toString();
+    }
+    return ret;
+}
+
+AudioDeviceTypeAddrVector deviceTypeAddrsFromDescriptors(const DeviceDescriptorBaseVector& devices)
+{
+    AudioDeviceTypeAddrVector deviceTypeAddrs;
+    for (const auto& device : devices) {
+        deviceTypeAddrs.push_back(device->getDeviceTypeAddr());
+    }
+    return deviceTypeAddrs;
+}
+
 } // namespace android

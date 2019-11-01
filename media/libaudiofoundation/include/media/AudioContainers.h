@@ -123,5 +123,10 @@ bool deviceTypesToString(const DeviceTypeSet& deviceTypes, std::string &str);
 
 std::string dumpDeviceTypes(const DeviceTypeSet& deviceTypes);
 
+/**
+ * Return human readable string for device types.
+ */
+std::string toString(const DeviceTypeSet& deviceTypes);
+
 
 } // namespace android

@@ -16,8 +16,11 @@
 
 #pragma once
 
+#include <vector>
+
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
+#include <media/AudioContainers.h>
 #include <media/AudioPort.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <utils/Errors.h>
@@ -63,5 +66,18 @@ public:
 protected:
     AudioDeviceTypeAddr mDeviceTypeAddr;
 };
+
+using DeviceDescriptorBaseVector = std::vector<sp<DeviceDescriptorBase>>;
+
+/**
+ * Return human readable string for collection of DeviceDescriptorBase.
+ * For a DeviceDescriptorBase, it contains port id, audio device type and address.
+ */
+std::string toString(const DeviceDescriptorBaseVector& devices);
+
+/**
+ * Return a set of device types and addresses from collection of DeviceDescriptorBase.
+ */
+AudioDeviceTypeAddrVector deviceTypeAddrsFromDescriptors(const DeviceDescriptorBaseVector& devices);
 
 } // namespace android

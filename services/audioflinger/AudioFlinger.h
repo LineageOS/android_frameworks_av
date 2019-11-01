@@ -65,7 +65,10 @@
 #include <media/audiohal/EffectBufferHalInterface.h>
 #include <media/audiohal/StreamHalInterface.h>
 #include <media/AudioBufferProvider.h>
+#include <media/AudioContainers.h>
+#include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioMixer.h>
+#include <media/DeviceDescriptorBase.h>
 #include <media/ExtendedAudioBufferProvider.h>
 #include <media/LinearMap.h>
 #include <media/VolumeShaper.h>
@@ -716,7 +719,7 @@ using effect_buffer_t = int16_t;
 
               // return thread associated with primary hardware device, or NULL
               PlaybackThread *primaryPlaybackThread_l() const;
-              audio_devices_t primaryOutputDevice_l() const;
+              DeviceTypeSet primaryOutputDevice_l() const;
 
               // return the playback thread with smallest HAL buffer size, and prefer fast
               PlaybackThread *fastPlaybackThread_l() const;
@@ -750,6 +753,7 @@ using effect_buffer_t = int16_t;
                 std::vector< sp<EffectModule> > purgeStaleEffects_l();
 
                 void broacastParametersToRecordThreads_l(const String8& keyValuePairs);
+                void updateOutDevicesForRecordThreads_l(const DeviceDescriptorBaseVector& devices);
                 void forwardParametersToDownstreamPatches_l(
                         audio_io_handle_t upStream, const String8& keyValuePairs,
                         std::function<bool(const sp<PlaybackThread>&)> useThread = nullptr);

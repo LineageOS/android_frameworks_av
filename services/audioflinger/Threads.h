@@ -37,8 +37,7 @@ public:
     static const char *threadTypeToString(type_t type);
 
     ThreadBase(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
-                audio_devices_t outDevice, audio_devices_t inDevice, type_t type,
-                bool systemReady);
+               type_t type, bool systemReady);
     virtual             ~ThreadBase();
 
     virtual status_t    readyToRun();
@@ -52,6 +51,7 @@ public:
         CFG_EVENT_SET_PARAMETER,
         CFG_EVENT_CREATE_AUDIO_PATCH,
         CFG_EVENT_RELEASE_AUDIO_PATCH,
+        CFG_EVENT_UPDATE_OUT_DEVICE,
     };
 
     class ConfigEventData: public RefBase {
@@ -219,6 +219,28 @@ public:
         virtual ~ReleaseAudioPatchConfigEvent() {}
     };
 
+    class UpdateOutDevicesConfigEventData : public ConfigEventData {
+    public:
+        explicit UpdateOutDevicesConfigEventData(const DeviceDescriptorBaseVector& outDevices) :
+            mOutDevices(outDevices) {}
+
+        virtual void dump(char *buffer, size_t size) {
+            snprintf(buffer, size, "Devices: %s", android::toString(mOutDevices).c_str());
+        }
+
+        DeviceDescriptorBaseVector mOutDevices;
+    };
+
+    class UpdateOutDevicesConfigEvent : public ConfigEvent {
+    public:
+        explicit UpdateOutDevicesConfigEvent(const DeviceDescriptorBaseVector& outDevices) :
+            ConfigEvent(CFG_EVENT_UPDATE_OUT_DEVICE) {
+            mData = new UpdateOutDevicesConfigEventData(outDevices);
+        }
+
+        virtual ~UpdateOutDevicesConfigEvent();
+    };
+
     class PMDeathRecipient : public IBinder::DeathRecipient {
     public:
         explicit    PMDeathRecipient(const wp<ThreadBase>& thread) : mThread(thread) {}
@@ -278,19 +300,26 @@ public:
                 status_t    sendCreateAudioPatchConfigEvent(const struct audio_patch *patch,
                                                             audio_patch_handle_t *handle);
                 status_t    sendReleaseAudioPatchConfigEvent(audio_patch_handle_t handle);
+                status_t    sendUpdateOutDeviceConfigEvent(
+                                    const DeviceDescriptorBaseVector& outDevices);
                 void        processConfigEvents_l();
     virtual     void        cacheParameters_l() = 0;
     virtual     status_t    createAudioPatch_l(const struct audio_patch *patch,
                                                audio_patch_handle_t *handle) = 0;
     virtual     status_t    releaseAudioPatch_l(const audio_patch_handle_t handle) = 0;
+    virtual     void        updateOutDevices(const DeviceDescriptorBaseVector& outDevices);
     virtual     void        toAudioPortConfig(struct audio_port_config *config) = 0;
 
 
                 // see note at declaration of mStandby, mOutDevice and mInDevice
                 bool        standby() const { return mStandby; }
-                audio_devices_t outDevice() const { return mOutDevice; }
-                audio_devices_t inDevice() const { return mInDevice; }
-                audio_devices_t getDevice() const { return isOutput() ? mOutDevice : mInDevice; }
+                const DeviceTypeSet outDeviceTypes() const {
+                    return getAudioDeviceTypes(mOutDeviceTypeAddrs);
+                }
+                audio_devices_t inDeviceType() const { return mInDeviceTypeAddr.mType; }
+                DeviceTypeSet getDeviceTypes() const {
+                    return isOutput() ? outDeviceTypes() : DeviceTypeSet({inDeviceType()});
+                }
 
     virtual     bool        isOutput() const = 0;
 
@@ -502,26 +531,21 @@ protected:
                                                            // HAL format if Fastmixer is used.
                 audio_format_t          mHALFormat;
                 size_t                  mBufferSize;       // HAL buffer size for read() or write()
-
+                AudioDeviceTypeAddrVector mOutDeviceTypeAddrs; // output device types and addresses
+                AudioDeviceTypeAddr       mInDeviceTypeAddr;   // input device type and address
                 Vector< sp<ConfigEvent> >     mConfigEvents;
                 Vector< sp<ConfigEvent> >     mPendingConfigEvents; // events awaiting system ready
 
                 // These fields are written and read by thread itself without lock or barrier,
-                // and read by other threads without lock or barrier via standby(), outDevice()
-                // and inDevice().
+                // and read by other threads without lock or barrier via standby(), outDeviceTypes()
+                // and inDeviceType().
                 // Because of the absence of a lock or barrier, any other thread that reads
                 // these fields must use the information in isolation, or be prepared to deal
                 // with possibility that it might be inconsistent with other information.
                 bool                    mStandby;     // Whether thread is currently in standby.
-                audio_devices_t         mOutDevice;   // output device
-                audio_devices_t         mInDevice;    // input device
-                audio_devices_t         mPrevOutDevice;   // previous output device
-                audio_devices_t         mPrevInDevice;    // previous input device
+
                 struct audio_patch      mPatch;
-                /**
-                 * @brief mDeviceId  current device port unique identifier
-                 */
-                audio_port_handle_t     mDeviceId = AUDIO_PORT_HANDLE_NONE;
+
                 audio_source_t          mAudioSource;
 
                 const audio_io_handle_t mId;
@@ -544,7 +568,8 @@ protected:
                 ExtendedTimestamp       mTimestamp;
                 TimestampVerifier< // For timestamp statistics.
                         int64_t /* frame count */, int64_t /* time ns */> mTimestampVerifier;
-                audio_devices_t         mTimestampCorrectedDevices = AUDIO_DEVICE_NONE;
+                // Timestamp corrected device should be a single device.
+                audio_devices_t         mTimestampCorrectedDevice = AUDIO_DEVICE_NONE;
 
                 // ThreadLoop statistics per iteration.
                 int64_t                 mLastIoBeginNs = -1;
@@ -719,7 +744,7 @@ public:
     static const nsecs_t kMaxNextBufferDelayNs = 100000000;
 
     PlaybackThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
-                   audio_io_handle_t id, audio_devices_t device, type_t type, bool systemReady);
+                   audio_io_handle_t id, type_t type, bool systemReady);
     virtual             ~PlaybackThread();
 
     // Thread virtuals
@@ -886,10 +911,10 @@ public:
                             }
 
                 bool        isTimestampCorrectionEnabled() const override {
-                                const audio_devices_t device =
-                                        mOutDevice & mTimestampCorrectedDevices;
-                                return audio_is_output_devices(device) && popcount(device) > 0;
+                                return audio_is_output_devices(mTimestampCorrectedDevice)
+                                        && outDeviceTypes().count(mTimestampCorrectedDevice) != 0;
                             }
+
 protected:
     // updated by readOutputParameters_l()
     size_t                          mNormalFrameCount;  // normal mixer and effects
@@ -1171,7 +1196,6 @@ public:
     MixerThread(const sp<AudioFlinger>& audioFlinger,
                 AudioStreamOut* output,
                 audio_io_handle_t id,
-                audio_devices_t device,
                 bool systemReady,
                 type_t type = MIXER);
     virtual             ~MixerThread();
@@ -1269,8 +1293,8 @@ class DirectOutputThread : public PlaybackThread {
 public:
 
     DirectOutputThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
-                       audio_io_handle_t id, audio_devices_t device, bool systemReady)
-        : DirectOutputThread(audioFlinger, output, id, device, DIRECT, systemReady) { }
+                       audio_io_handle_t id, bool systemReady)
+        : DirectOutputThread(audioFlinger, output, id, DIRECT, systemReady) { }
 
     virtual                 ~DirectOutputThread();
 
@@ -1305,8 +1329,7 @@ protected:
     bool mVolumeShaperActive = false;
 
     DirectOutputThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
-                        audio_io_handle_t id, audio_devices_t device, ThreadBase::type_t type,
-                        bool systemReady);
+                       audio_io_handle_t id, ThreadBase::type_t type, bool systemReady);
     void processVolume_l(Track *track, bool lastTrack);
 
     // prepareTracks_l() tells threadLoop_mix() the name of the single active track
@@ -1345,7 +1368,7 @@ class OffloadThread : public DirectOutputThread {
 public:
 
     OffloadThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
-                        audio_io_handle_t id, uint32_t device, bool systemReady);
+                  audio_io_handle_t id, bool systemReady);
     virtual                 ~OffloadThread() {};
     virtual     void        flushHw_l();
 
@@ -1516,8 +1539,6 @@ public:
             RecordThread(const sp<AudioFlinger>& audioFlinger,
                     AudioStreamIn *input,
                     audio_io_handle_t id,
-                    audio_devices_t outDevice,
-                    audio_devices_t inDevice,
                     bool systemReady
                     );
             virtual     ~RecordThread();
@@ -1577,6 +1598,7 @@ public:
     virtual status_t    createAudioPatch_l(const struct audio_patch *patch,
                                            audio_patch_handle_t *handle);
     virtual status_t    releaseAudioPatch_l(const audio_patch_handle_t handle);
+            void        updateOutDevices(const DeviceDescriptorBaseVector& outDevices) override;
 
             void        addPatchTrack(const sp<PatchRecord>& record);
             void        deletePatchTrack(const sp<PatchRecord>& record);
@@ -1629,8 +1651,8 @@ public:
 
             bool        isTimestampCorrectionEnabled() const override {
                             // checks popcount for exactly one device.
-                            return audio_is_input_device(
-                                    mInDevice & mTimestampCorrectedDevices);
+                            return audio_is_input_device(mTimestampCorrectedDevice)
+                                    && inDeviceType() == mTimestampCorrectedDevice;
                         }
 
 protected:
@@ -1709,6 +1731,8 @@ private:
             std::atomic_bool                    mBtNrecSuspended;
 
             int64_t                             mFramesRead = 0;    // continuous running counter.
+
+            DeviceDescriptorBaseVector          mOutDevices;
 };
 
 class MmapThread : public ThreadBase
@@ -1718,8 +1742,7 @@ class MmapThread : public ThreadBase
 #include "MmapTracks.h"
 
     MmapThread(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
-                      AudioHwDevice *hwDev, sp<StreamHalInterface> stream,
-                      audio_devices_t outDevice, audio_devices_t inDevice, bool systemReady);
+               AudioHwDevice *hwDev, sp<StreamHalInterface> stream, bool systemReady);
     virtual     ~MmapThread();
 
     virtual     void        configure(const audio_attributes_t *attr,
@@ -1792,6 +1815,11 @@ class MmapThread : public ThreadBase
                 void        dumpInternals_l(int fd, const Vector<String16>& args) override;
                 void        dumpTracks_l(int fd, const Vector<String16>& args) override;
 
+                /**
+                 * @brief mDeviceId  current device port unique identifier
+                 */
+                audio_port_handle_t     mDeviceId = AUDIO_PORT_HANDLE_NONE;
+
                 audio_attributes_t      mAttr;
                 audio_session_t         mSessionId;
                 audio_port_handle_t     mPortId;
@@ -1812,8 +1840,7 @@ class MmapPlaybackThread : public MmapThread, public VolumeInterface
 
 public:
     MmapPlaybackThread(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
-                      AudioHwDevice *hwDev, AudioStreamOut *output,
-                      audio_devices_t outDevice, audio_devices_t inDevice, bool systemReady);
+                       AudioHwDevice *hwDev, AudioStreamOut *output, bool systemReady);
     virtual     ~MmapPlaybackThread() {}
 
     virtual     void        configure(const audio_attributes_t *attr,
@@ -1862,8 +1889,7 @@ class MmapCaptureThread : public MmapThread
 
 public:
     MmapCaptureThread(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
-                      AudioHwDevice *hwDev, AudioStreamIn *input,
-                      audio_devices_t outDevice, audio_devices_t inDevice, bool systemReady);
+                      AudioHwDevice *hwDev, AudioStreamIn *input, bool systemReady);
     virtual     ~MmapCaptureThread() {}
 
                 AudioStreamIn* clearInput();
