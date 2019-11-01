@@ -116,10 +116,9 @@ cc_library {
     name: "libstagefright",
 
     srcs: [
-        "AACWriter.cpp",
         "ACodec.cpp",
         "ACodecBufferChannel.cpp",
-        "AHierarchicalStateMachine.cpp",
+        "AACWriter.cpp",
         "AMRWriter.cpp",
         "AudioPlayer.cpp",
         "AudioSource.cpp",

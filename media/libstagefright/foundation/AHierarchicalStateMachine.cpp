@@ -18,7 +18,7 @@
 #define LOG_TAG "AHierarchicalStateMachine"
 #include <utils/Log.h>
 
-#include <media/stagefright/AHierarchicalStateMachine.h>
+#include <media/stagefright/foundation/AHierarchicalStateMachine.h>
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
