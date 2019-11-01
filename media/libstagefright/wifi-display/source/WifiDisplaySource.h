@@ -21,7 +21,7 @@
 #include "VideoFormats.h"
 
 #include <media/stagefright/foundation/AHandler.h>
-#include <media/stagefright/foundation/ANetworkSession.h>
+#include <media/stagefright/ANetworkSession.h>
 
 #include <netinet/in.h>
 
