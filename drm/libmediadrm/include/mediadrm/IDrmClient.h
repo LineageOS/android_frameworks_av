@@ -22,14 +22,41 @@
 #include <binder/Parcel.h>
 #include <media/drm/DrmAPI.h>
 
+#include <android/hardware/drm/1.2/types.h>
+#include <hidl/HidlSupport.h>
+
+#include <cstdint>
+#include <vector>
+
 namespace android {
+
+struct DrmKeyStatus {
+    const uint32_t type;
+    const hardware::hidl_vec<uint8_t> keyId;
+};
 
 class IDrmClient: public IInterface
 {
 public:
     DECLARE_META_INTERFACE(DrmClient);
 
-    virtual void notify(DrmPlugin::EventType eventType, int extra, const Parcel *obj) = 0;
+    virtual void sendEvent(
+            DrmPlugin::EventType eventType,
+            const hardware::hidl_vec<uint8_t> &sessionId,
+            const hardware::hidl_vec<uint8_t> &data) = 0;
+
+    virtual void sendExpirationUpdate(
+            const hardware::hidl_vec<uint8_t> &sessionId,
+            int64_t expiryTimeInMS) = 0;
+
+    virtual void sendKeysChange(
+            const hardware::hidl_vec<uint8_t> &sessionId,
+            const std::vector<DrmKeyStatus> &keyStatusList,
+            bool hasNewUsableKey) = 0;
+
+    virtual void sendSessionLostState(
+            const hardware::hidl_vec<uint8_t> &sessionId) = 0;
+
 };
 
 // ----------------------------------------------------------------------------

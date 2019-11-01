@@ -19,6 +19,7 @@
 
 #include <utils/Errors.h>  // for status_t
 #include <utils/StrongPointer.h>
+#include <binder/Parcel.h>
 
 namespace android {
 
@@ -32,6 +33,49 @@ bool UseDrmService();
 sp<IDrm> MakeDrm(status_t *pstatus = nullptr);
 
 sp<ICrypto> MakeCrypto(status_t *pstatus = nullptr);
+
+template<typename BA>
+void WriteByteArray(Parcel &obj, const BA &vec) {
+    obj.writeInt32(vec.size());
+    if (vec.size()) {
+        obj.write(vec.data(), vec.size());
+    }
+}
+
+template<typename ET, typename BA>
+void WriteEventToParcel(
+        Parcel &obj,
+        ET eventType,
+        const BA &sessionId,
+        const BA &data) {
+    WriteByteArray(obj, sessionId);
+    WriteByteArray(obj, data);
+    obj.writeInt32(eventType);
+}
+
+template<typename BA>
+void WriteExpirationUpdateToParcel(
+        Parcel &obj,
+        const BA &sessionId,
+        int64_t expiryTimeInMS) {
+    WriteByteArray(obj, sessionId);
+    obj.writeInt64(expiryTimeInMS);
+}
+
+template<typename BA, typename KSL>
+void WriteKeysChange(
+        Parcel &obj,
+        const BA &sessionId,
+        const KSL &keyStatusList,
+        bool hasNewUsableKey) {
+    WriteByteArray(obj, sessionId);
+    obj.writeInt32(keyStatusList.size());
+    for (const auto &keyStatus : keyStatusList) {
+        WriteByteArray(obj, keyStatus.keyId);
+        obj.writeInt32(keyStatus.type);
+    }
+    obj.writeInt32(hasNewUsableKey);
+}
 
 } // namespace DrmUtils
 
