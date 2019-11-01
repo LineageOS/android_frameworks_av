@@ -611,7 +611,7 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
 void Engine::updateDeviceSelectionCache()
 {
     for (const auto &iter : getProductStrategies()) {
-        const auto &strategy = iter.second;
+        const auto& strategy = iter.second;
         auto devices = getDevicesForProductStrategy(strategy->getId());
         mDevicesForStrategies[strategy->getId()] = devices;
         strategy->setDeviceTypes(devices.types());
@@ -619,14 +619,30 @@ void Engine::updateDeviceSelectionCache()
     }
 }
 
-DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t strategy) const
-{
+DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t strategy) const {
     DeviceVector availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
-    DeviceVector availableInputDevices = getApmObserver()->getAvailableInputDevices();
-    const SwAudioOutputCollection &outputs = getApmObserver()->getOutputs();
 
+    // check if this strategy has a preferred device that is available,
+    // if yes, give priority to it
+    AudioDeviceTypeAddr preferredStrategyDevice;
+    const status_t status = getPreferredDeviceForStrategy(strategy, preferredStrategyDevice);
+    if (status == NO_ERROR) {
+        // there is a preferred device, is it available?
+        sp<DeviceDescriptor> preferredAvailableDevDescr = availableOutputDevices.getDevice(
+                preferredStrategyDevice.mType,
+                String8(preferredStrategyDevice.mAddress.c_str()),
+                AUDIO_FORMAT_DEFAULT);
+        if (preferredAvailableDevDescr != nullptr) {
+            ALOGVV("%s using pref device 0x%08x/%s for strategy %u", __FUNCTION__,
+                   preferredStrategyDevice.mType, preferredStrategyDevice.mAddress, strategy);
+            return DeviceVector(preferredAvailableDevDescr);
+        }
+    }
+
+    DeviceVector availableInputDevices = getApmObserver()->getAvailableInputDevices();
+    const SwAudioOutputCollection& outputs = getApmObserver()->getOutputs();
     auto legacyStrategy = mLegacyStrategyMap.find(strategy) != end(mLegacyStrategyMap) ?
-                mLegacyStrategyMap.at(strategy) : STRATEGY_NONE;
+                          mLegacyStrategyMap.at(strategy) : STRATEGY_NONE;
     return getDevicesForStrategyInt(legacyStrategy,
                                     availableOutputDevices,
                                     availableInputDevices, outputs);

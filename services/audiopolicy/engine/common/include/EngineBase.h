@@ -88,6 +88,13 @@ public:
 
     void dump(String8 *dst) const override;
 
+    status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
+            const AudioDeviceTypeAddr &device) override;
+
+    status_t removePreferredDeviceForStrategy(product_strategy_t strategy) override;
+
+    status_t getPreferredDeviceForStrategy(product_strategy_t strategy,
+            AudioDeviceTypeAddr &device) const override;
 
     engineConfig::ParsingResult loadAudioPolicyEngineConfig();
 
@@ -119,6 +126,7 @@ public:
     AudioPolicyManagerObserver *mApmObserver = nullptr;
 
     ProductStrategyMap mProductStrategies;
+    ProductStrategyPreferredRoutingMap mProductStrategyPreferredDevices;
     VolumeGroupMap mVolumeGroups;
     audio_mode_t mPhoneState = AUDIO_MODE_NORMAL;  /**< current phone state. */
 

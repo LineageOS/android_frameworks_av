@@ -272,9 +272,57 @@ status_t EngineBase::listAudioVolumeGroups(AudioVolumeGroupVector &groups) const
     return NO_ERROR;
 }
 
+status_t EngineBase::setPreferredDeviceForStrategy(product_strategy_t strategy,
+            const AudioDeviceTypeAddr &device)
+{
+    // verify strategy exists
+    if (mProductStrategies.find(strategy) == mProductStrategies.end()) {
+        ALOGE("%s invalid strategy %u", __func__, strategy);
+        return BAD_VALUE;
+    }
+
+    mProductStrategyPreferredDevices[strategy] = device;
+    return NO_ERROR;
+}
+
+status_t EngineBase::removePreferredDeviceForStrategy(product_strategy_t strategy)
+{
+    // verify strategy exists
+    if (mProductStrategies.find(strategy) == mProductStrategies.end()) {
+        ALOGE("%s invalid strategy %u", __func__, strategy);
+        return BAD_VALUE;
+    }
+
+    if (mProductStrategyPreferredDevices.erase(strategy) == 0) {
+        // no preferred device was set
+        return NAME_NOT_FOUND;
+    }
+    return NO_ERROR;
+}
+
+status_t EngineBase::getPreferredDeviceForStrategy(product_strategy_t strategy,
+            AudioDeviceTypeAddr &device) const
+{
+    // verify strategy exists
+    if (mProductStrategies.find(strategy) == mProductStrategies.end()) {
+        ALOGE("%s unknown strategy %u", __func__, strategy);
+        return BAD_VALUE;
+    }
+    // preferred device for this strategy?
+    auto devIt = mProductStrategyPreferredDevices.find(strategy);
+    if (devIt == mProductStrategyPreferredDevices.end()) {
+        ALOGV("%s no preferred device for strategy %u", __func__, strategy);
+        return NAME_NOT_FOUND;
+    }
+
+    device = devIt->second;
+    return NO_ERROR;
+}
+
 void EngineBase::dump(String8 *dst) const
 {
     mProductStrategies.dump(dst, 2);
+    mProductStrategyPreferredDevices.dump(dst, 2);
     mVolumeGroups.dump(dst, 2);
 }
 
