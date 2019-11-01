@@ -195,6 +195,6 @@ bool mediametrics_isEnabled() {
 bool mediametrics_getAttributes(mediametrics_handle_t handle, char **buffer, size_t *length) {
     android::MediaAnalyticsItem *item = (android::MediaAnalyticsItem *) handle;
     if (item == NULL) return false;
-    return item->dumpAttributes(buffer, length);
+    return item->writeToByteString(buffer, length) == android::NO_ERROR;
 
 }

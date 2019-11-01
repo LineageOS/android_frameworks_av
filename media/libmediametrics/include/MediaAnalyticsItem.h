@@ -19,6 +19,7 @@
 
 #include "MediaMetrics.h"
 
+#include <algorithm>
 #include <string>
 #include <sys/types.h>
 
@@ -34,8 +35,44 @@ namespace android {
 class IMediaAnalyticsService;
 class Parcel;
 
-// the class interface
-//
+/*
+ * Media Metrics
+ * Byte String format for communication of MediaAnalyticsItem.
+ *
+ * .... begin of item
+ * .... begin of header
+ * (uint32) length: including the length field itself
+ * (uint32) header length, including header_length and length fields.
+ * (uint16) version: 0
+ * (uint16) key length, including zero termination
+ * (int8)+ key string, including 0 termination
+ * (int32) pid
+ * (int32) uid
+ * (int64) timestamp
+ * .... end of header
+ * .... begin body
+ * (uint32) properties
+ * #properties of the following:
+ *     (uint16) property_length, including property_length field itself
+ *     (uint8) type of property
+ *     (int8)+ key string, including 0 termination
+ *      based on type of property (above), one of:
+ *       (int32)
+ *       (int64)
+ *       (double)
+ *       (int8)+ for cstring, including 0 termination
+ *       (int64, int64) for rate
+ * .... end body
+ * .... end of item
+ */
+
+/**
+ * Media Metrics MediaAnalyticsItem
+ *
+ * A mutable item representing an event or record that will be
+ * logged with the Media Metrics service.
+ *
+ */
 
 class MediaAnalyticsItem {
     friend class MediaMetricsJNI;           // TODO: remove this access
@@ -52,20 +89,8 @@ public:
                 kTypeRate = 5,
             };
 
-    // Key: the record descriminator
-    // values for the record discriminator
-    // values can be "component/component"
-    // basic values: "video", "audio", "drm"
-    // XXX: need to better define the format
-    using Key = std::string;
     static constexpr const char * const kKeyNone = "none";
     static constexpr const char * const kKeyAny = "any";
-
-        // Attr: names for attributes within a record
-        // format "prop1" or "prop/subprop"
-        // XXX: need to better define the format
-        typedef const char *Attr;
-
 
         enum {
             PROTO_V0 = 0,
@@ -78,11 +103,36 @@ public:
     template <typename T>
     explicit MediaAnalyticsItem(T key)
         : mKey(key) { }
+    MediaAnalyticsItem() = default;
+
     MediaAnalyticsItem(const MediaAnalyticsItem&) = delete;
     MediaAnalyticsItem &operator=(const MediaAnalyticsItem&) = delete;
 
-        static MediaAnalyticsItem* create(Key key);
-        static MediaAnalyticsItem* create();
+    bool operator==(const MediaAnalyticsItem& other) const {
+        if (mPropCount != other.mPropCount
+            || mPid != other.mPid
+            || mUid != other.mUid
+            || mPkgName != other.mPkgName
+            || mPkgVersionCode != other.mPkgVersionCode
+            || mKey != other.mKey
+            || mTimestamp != other.mTimestamp) return false;
+         for (size_t i = 0; i < mPropCount; ++i) {
+             Prop *p = other.findProp(mProps[i].getName());
+             if (p == nullptr || mProps[i] != *p) return false;
+         }
+         return true;
+    }
+    bool operator!=(const MediaAnalyticsItem& other) const {
+        return !(*this == other);
+    }
+
+    template <typename T>
+    static MediaAnalyticsItem* create(T key) {
+        return new MediaAnalyticsItem(key);
+    }
+    static MediaAnalyticsItem* create() {
+        return new MediaAnalyticsItem();
+    }
 
         static MediaAnalyticsItem* convert(mediametrics_handle_t);
         static mediametrics_handle_t convert(MediaAnalyticsItem *);
@@ -94,13 +144,14 @@ public:
         void clear();
         MediaAnalyticsItem *dup();
 
-        // set the key discriminator for the record.
-        // most often initialized as part of the constructor
-        MediaAnalyticsItem &setKey(MediaAnalyticsItem::Key);
-        const MediaAnalyticsItem::Key& getKey() const { return mKey; }
+    MediaAnalyticsItem &setKey(const char *key) {
+        mKey = key;
+        return *this;
+    }
+    const std::string& getKey() const { return mKey; }
 
-        // # of attributes in the record
-        int32_t count() const;
+    // # of properties in the record
+    size_t count() const { return mPropCount; }
 
     template<typename S, typename T>
     MediaAnalyticsItem &set(S key, T value) {
@@ -109,19 +160,19 @@ public:
     }
 
     // set values appropriately
-    MediaAnalyticsItem &setInt32(Attr key, int32_t value) {
+    MediaAnalyticsItem &setInt32(const char *key, int32_t value) {
         return set(key, value);
     }
-    MediaAnalyticsItem &setInt64(Attr key, int64_t value) {
+    MediaAnalyticsItem &setInt64(const char *key, int64_t value) {
         return set(key, value);
     }
-    MediaAnalyticsItem &setDouble(Attr key, double value) {
+    MediaAnalyticsItem &setDouble(const char *key, double value) {
         return set(key, value);
     }
-    MediaAnalyticsItem &setRate(Attr key, int64_t count, int64_t duration) {
+    MediaAnalyticsItem &setRate(const char *key, int64_t count, int64_t duration) {
         return set(key, std::make_pair(count, duration));
     }
-    MediaAnalyticsItem &setCString(Attr key, const char *value) {
+    MediaAnalyticsItem &setCString(const char *key, const char *value) {
         return set(key, value);
     }
 
@@ -133,16 +184,16 @@ public:
         return *this;
     }
 
-    MediaAnalyticsItem &addInt32(Attr key, int32_t value) {
+    MediaAnalyticsItem &addInt32(const char *key, int32_t value) {
         return add(key, value);
     }
-    MediaAnalyticsItem &addInt64(Attr key, int64_t value) {
+    MediaAnalyticsItem &addInt64(const char *key, int64_t value) {
         return add(key, value);
     }
-    MediaAnalyticsItem &addDouble(Attr key, double value) {
+    MediaAnalyticsItem &addDouble(const char *key, double value) {
         return add(key, value);
     }
-    MediaAnalyticsItem &addRate(Attr key, int64_t count, int64_t duration) {
+    MediaAnalyticsItem &addRate(const char *key, int64_t count, int64_t duration) {
         return add(key, std::make_pair(count, duration));
     }
 
@@ -155,16 +206,16 @@ public:
         return prop != nullptr && prop->get(value);
     }
 
-    bool getInt32(Attr key, int32_t *value) const {
+    bool getInt32(const char *key, int32_t *value) const {
         return get(key, value);
     }
-    bool getInt64(Attr key, int64_t *value) const {
+    bool getInt64(const char *key, int64_t *value) const {
         return get(key, value);
     }
-    bool getDouble(Attr key, double *value) const {
+    bool getDouble(const char *key, double *value) const {
         return get(key, value);
     }
-    bool getRate(Attr key, int64_t *count, int64_t *duration, double *rate) const {
+    bool getRate(const char *key, int64_t *count, int64_t *duration, double *rate) const {
         std::pair<int64_t, int64_t> value;
         if (!get(key, &value)) return false;
         if (count != nullptr) *count = value.first;
@@ -179,24 +230,29 @@ public:
         return true;
     }
     // Caller owns the returned string
-    bool getCString(Attr key, char **value) const {
-        return get(key, value);
+    bool getCString(const char *key, char **value) const {
+        const char *cs;
+        if (get(key, &cs)) {
+            *value = cs != nullptr ? strdup(cs) : nullptr;
+            return true;
+        }
+        return false;
     }
-    bool getString(Attr key, std::string *value) const {
+    bool getString(const char *key, std::string *value) const {
         return get(key, value);
     }
 
         // Deliver the item to MediaMetrics
         bool selfrecord();
 
-        // remove indicated attributes and their values
-        // filterNot() could also be called keepOnly()
-        // return value is # attributes removed
-        // XXX: perhaps 'remove' instead of 'filter'
-        // XXX: filterNot would become 'keep'
-        int32_t filter(int count, Attr attrs[]);
-        int32_t filterNot(int count, Attr attrs[]);
-        int32_t filter(Attr attr);
+    // remove indicated attributes and their values
+    // filterNot() could also be called keepOnly()
+    // return value is # attributes removed
+    // XXX: perhaps 'remove' instead of 'filter'
+    // XXX: filterNot would become 'keep'
+    size_t filter(size_t count, const char *attrs[]);
+    size_t filterNot(size_t count, const char *attrs[]);
+    size_t filter(const char *attr) { return filter(1, &attr); }
 
         // below here are used on server side or to talk to server
         // clients need not worry about these.
@@ -218,12 +274,26 @@ public:
         MediaAnalyticsItem &setPkgVersionCode(int64_t);
         int64_t getPkgVersionCode() const;
 
-        // our serialization code for binder calls
-        int32_t writeToParcel(Parcel *);
-        int32_t readFromParcel(const Parcel&);
+    // our serialization code for binder calls
+    status_t writeToParcel(Parcel *) const;
+    status_t readFromParcel(const Parcel&);
 
-        // supports the stable interface
-        bool dumpAttributes(char **pbuffer, size_t *plength);
+    status_t writeToByteString(char **bufferptr, size_t *length) const;
+    status_t readFromByteString(const char *bufferptr, size_t length);
+
+    static status_t writeToByteString(
+            const char *name, int32_t value, char **bufferpptr, char *bufferptrmax);
+    static status_t writeToByteString(
+            const char *name, int64_t value, char **bufferpptr, char *bufferptrmax);
+    static status_t writeToByteString(
+            const char *name, double value, char **bufferpptr, char *bufferptrmax);
+    static status_t writeToByteString(
+            const char *name, const std::pair<int64_t, int64_t> &value, char **bufferpptr, char *bufferptrmax);
+    static status_t writeToByteString(
+            const char *name, char * const &value, char **bufferpptr, char *bufferptrmax);
+    struct none_t {}; // for kTypeNone
+    static status_t writeToByteString(
+            const char *name, const none_t &, char **bufferpptr, char *bufferptrmax);
 
         std::string toString() const;
         std::string toString(int version) const;
@@ -233,11 +303,6 @@ public:
         // are we collecting analytics data
         static bool isEnabled();
 
-    private:
-        // handle Parcel version 0
-        int32_t writeToParcel0(Parcel *);
-        int32_t readFromParcel0(const Parcel&);
-
     protected:
 
         // merge fields from arg into this
@@ -246,17 +311,31 @@ public:
         // caller continues to own 'incoming'
         bool merge(MediaAnalyticsItem *incoming);
 
+private:
+    // handle Parcel version 0
+    int32_t writeToParcel0(Parcel *) const;
+    int32_t readFromParcel0(const Parcel&);
+
     // enabled 1, disabled 0
     static constexpr const char * const EnabledProperty = "media.metrics.enabled";
     static constexpr const char * const EnabledPropertyPersist = "persist.media.metrics.enabled";
     static const int EnabledProperty_default = 1;
 
-    private:
-
     // let's reuse a binder connection
     static sp<IMediaAnalyticsService> sAnalyticsService;
     static sp<IMediaAnalyticsService> getInstance();
     static void dropInstance();
+
+    // checks equality even with nullptr.
+    static bool stringEquals(const char *a, const char *b) {
+        if (a == nullptr) {
+            return b == nullptr;
+        } else {
+            return b != nullptr && strcmp(a, b) == 0;
+        }
+    }
+
+public:
 
     class Prop {
     friend class MediaMetricsJNI;           // TODO: remove this access
@@ -271,7 +350,6 @@ public:
             } else {
                 mName = nullptr;
             }
-            mNameLen = other.mNameLen;
             mType = other.mType;
             switch (mType) {
             case kTypeInt32:
@@ -287,7 +365,7 @@ public:
                 u.CStringValue = strdup(other.u.CStringValue);
                 break;
             case kTypeRate:
-                u.rate = {other.u.rate.count, other.u.rate.duration};
+                u.rate = other.u.rate;
                 break;
             case kTypeNone:
                 break;
@@ -297,11 +375,32 @@ public:
             }
             return *this;
         }
+        bool operator==(const Prop& other) const {
+            if (!stringEquals(mName, other.mName)
+                    || mType != other.mType) return false;
+            switch (mType) {
+            case kTypeInt32:
+                return u.int32Value == other.u.int32Value;
+            case kTypeInt64:
+                return u.int64Value == other.u.int64Value;
+            case kTypeDouble:
+                return u.doubleValue == other.u.doubleValue;
+            case kTypeCString:
+                return stringEquals(u.CStringValue, other.u.CStringValue);
+            case kTypeRate:
+                return u.rate == other.u.rate;
+            case kTypeNone:
+            default:
+                return true;
+            }
+        }
+        bool operator!=(const Prop& other) const {
+            return !(*this == other);
+        }
 
         void clear() {
             free(mName);
             mName = nullptr;
-            mNameLen = 0;
             clearValue();
         }
         void clearValue() {
@@ -322,29 +421,19 @@ public:
 
         void swap(Prop& other) {
             std::swap(mName, other.mName);
-            std::swap(mNameLen, other.mNameLen);
             std::swap(mType, other.mType);
             std::swap(u, other.u);
         }
 
-        void setName(const char *name, size_t len) {
+        void setName(const char *name) {
             free(mName);
             if (name != nullptr) {
-                mName = (char *)malloc(len + 1);
-                mNameLen = len;
-                strncpy(mName, name, len);
-                mName[len] = 0;
+                mName = strdup(name);
             } else {
                 mName = nullptr;
-                mNameLen = 0;
             }
         }
 
-        bool isNamed(const char *name, size_t len) const {
-            return len == mNameLen && memcmp(name, mName, len) == 0;
-        }
-
-        // TODO: remove duplicate but different definition
         bool isNamed(const char *name) const {
             return strcmp(name, mName) == 0;
         }
@@ -369,9 +458,9 @@ public:
            return true;
         }
         template <>
-        bool get(char** value) const {
+        bool get(const char** value) const {
             if (mType != kTypeCString) return false;
-            if (value != nullptr) *value = strdup(u.CStringValue);
+            if (value != nullptr) *value = u.CStringValue;
             return true;
         }
         template <>
@@ -384,8 +473,7 @@ public:
         bool get(std::pair<int64_t, int64_t> *value) const {
            if (mType != kTypeRate) return false;
            if (value != nullptr) {
-               value->first = u.rate.count;
-               value->second = u.rate.duration;
+               *value = u.rate;
            }
            return true;
         }
@@ -416,7 +504,13 @@ public:
             if (value == nullptr) {
                 u.CStringValue = nullptr;
             } else {
-                u.CStringValue = strdup(value);
+                size_t len = strlen(value);
+                if (len > UINT16_MAX - 1) {
+                    len = UINT16_MAX - 1;
+                }
+                u.CStringValue = (char *)malloc(len + 1);
+                strncpy(u.CStringValue, value, len);
+                u.CStringValue[len] = 0;
             }
         }
         template <>
@@ -456,33 +550,79 @@ public:
         template <>
         void add(const std::pair<int64_t, int64_t>& value) {
             if (mType == kTypeRate) {
-                u.rate.count += value.first;
-                u.rate.duration += value.second;
+                u.rate.first += value.first;
+                u.rate.second += value.second;
             } else {
                 mType = kTypeRate;
-                u.rate = {value.first, value.second};
+                u.rate = value;
             }
         }
 
-        void writeToParcel(Parcel *data) const;
+        status_t writeToParcel(Parcel *data) const;
+        status_t readFromParcel(const Parcel& data);
         void toString(char *buffer, size_t length) const;
+        size_t getByteStringSize() const;
+        status_t writeToByteString(char **bufferpptr, char *bufferptrmax) const;
+        status_t readFromByteString(const char **bufferpptr, const char *bufferptrmax);
 
-    // TODO: make private
+    // TODO: make private (and consider converting to std::variant)
     // private:
         char *mName = nullptr;
-        size_t mNameLen = 0;    // the strlen(), doesn't include the null
         Type mType = kTypeNone;
-        union {
+        union u__ {
+            u__() { zero(); }
+            u__(u__ &&other) {
+                *this = std::move(other);
+            }
+            u__& operator=(u__ &&other) {
+                memcpy(this, &other, sizeof(*this));
+                other.zero();
+                return *this;
+            }
+            void zero() { memset(this, 0, sizeof(*this)); }
+
             int32_t int32Value;
             int64_t int64Value;
             double doubleValue;
             char *CStringValue;
-            struct { int64_t count, duration; } rate;
+            std::pair<int64_t, int64_t> rate;
         } u;
     };
 
-    size_t findPropIndex(const char *name, size_t len) const;
+    class iterator {
+    public:
+       iterator(size_t pos, const MediaAnalyticsItem &_item)
+           : i(std::min(pos, _item.count()))
+           , item(_item) { }
+       iterator &operator++() {
+           i = std::min(i + 1, item.count());
+           return *this;
+       }
+       bool operator!=(iterator &other) const {
+           return i != other.i;
+       }
+       Prop &operator*() const {
+           return item.mProps[i];
+       }
+
+    private:
+      size_t i;
+      const MediaAnalyticsItem &item;
+    };
+
+    iterator begin() const {
+        return iterator(0, *this);
+    }
+    iterator end() const {
+        return iterator(SIZE_MAX, *this);
+    }
+
+private:
+
+    // TODO: make prop management class
+    size_t findPropIndex(const char *name) const;
     Prop *findProp(const char *name) const;
+    Prop *allocateProp();
 
         enum {
             kGrowProps = 10
@@ -490,6 +630,7 @@ public:
         bool growProps(int increment = kGrowProps);
         Prop *allocateProp(const char *name);
         bool removeProp(const char *name);
+    Prop *allocateProp(const std::string& name) { return allocateProp(name.c_str()); }
 
         size_t mPropCount = 0;
         size_t mPropSize = 0;
@@ -499,7 +640,7 @@ public:
     uid_t         mUid = -1;
     std::string   mPkgName;
     int64_t       mPkgVersionCode = 0;
-    Key           mKey{kKeyNone};
+    std::string   mKey{kKeyNone};
     nsecs_t       mTimestamp = 0;
 };
 
