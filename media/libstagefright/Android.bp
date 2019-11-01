@@ -206,7 +206,6 @@ cc_library {
         "AACWriter.cpp",
         "ACodec.cpp",
         "ACodecBufferChannel.cpp",
-        "AHierarchicalStateMachine.cpp",
         "AMRWriter.cpp",
         "AudioSource.cpp",
         "BufferImpl.cpp",
