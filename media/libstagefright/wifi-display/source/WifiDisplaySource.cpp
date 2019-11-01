@@ -32,7 +32,7 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/foundation/ParsedMessage.h>
+#include <media/stagefright/ParsedMessage.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/Utils.h>
 
