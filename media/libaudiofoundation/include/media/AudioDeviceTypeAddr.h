@@ -37,6 +37,8 @@ struct AudioDeviceTypeAddr : public Parcelable {
 
     bool equals(const AudioDeviceTypeAddr& other) const;
 
+    AudioDeviceTypeAddr& operator= (const AudioDeviceTypeAddr&) = default;
+
     void reset();
 
     status_t readFromParcel(const Parcel *parcel) override;
