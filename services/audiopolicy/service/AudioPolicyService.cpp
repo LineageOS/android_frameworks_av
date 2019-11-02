@@ -977,7 +977,8 @@ void AudioPolicyService::UidPolicy::onUidIdle(uid_t uid, __unused bool disabled)
 
 void AudioPolicyService::UidPolicy::onUidStateChanged(uid_t uid,
                                                       int32_t procState,
-                                                      int64_t procStateSeq __unused) {
+                                                      int64_t procStateSeq __unused,
+                                                      int32_t capability __unused) {
     if (procState != ActivityManager::PROCESS_STATE_UNKNOWN) {
         updateUid(&mCachedUids, uid, true, procState, true);
     }

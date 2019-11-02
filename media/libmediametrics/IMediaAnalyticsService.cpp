@@ -55,13 +55,17 @@ public:
 
         Parcel data;
         data.writeInterfaceToken(IMediaAnalyticsService::getInterfaceDescriptor());
-        item->writeToParcel(&data);
 
-        status_t err = remote()->transact(
+        status_t status = item->writeToParcel(&data);
+        if (status != NO_ERROR) { // assume failure logged in item
+            return status;
+        }
+
+        status = remote()->transact(
                 SUBMIT_ITEM_ONEWAY, data, nullptr /* reply */, IBinder::FLAG_ONEWAY);
-        ALOGW_IF(err != NO_ERROR, "%s: bad response from service for submit, err=%d",
-                __func__, err);
-        return err;
+        ALOGW_IF(status != NO_ERROR, "%s: bad response from service for submit, status=%d",
+                __func__, status);
+        return status;
     }
 };
 
@@ -79,11 +83,14 @@ status_t BnMediaAnalyticsService::onTransact(
         CHECK_INTERFACE(IMediaAnalyticsService, data, reply);
 
         MediaAnalyticsItem * const item = MediaAnalyticsItem::create();
-        if (item->readFromParcel(data) < 0) {
-            return BAD_VALUE;
+        status_t status = item->readFromParcel(data);
+        if (status != NO_ERROR) { // assume failure logged in item
+            return status;
         }
+        // TODO: remove this setPid.
         item->setPid(clientPid);
-        const status_t status __unused = submitInternal(item, true /* release */);
+        status = submitInternal(item, true /* release */);
+        // assume failure logged by submitInternal
         return NO_ERROR;
     } break;
 

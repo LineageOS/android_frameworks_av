@@ -2855,7 +2855,7 @@ void CameraService::UidPolicy::onUidIdle(uid_t uid, bool /* disabled */) {
 }
 
 void CameraService::UidPolicy::onUidStateChanged(uid_t uid, int32_t procState,
-        int64_t /*procStateSeq*/) {
+        int64_t procStateSeq __unused, int32_t capability __unused) {
     bool procStateChange = false;
     {
         Mutex::Autolock _l(mUidLock);
@@ -3448,10 +3448,21 @@ void CameraService::updateStatus(StatusInternal status, const String8& cameraId,
         ALOGE("%s: Invalid camera id %s, skipping", __FUNCTION__, cameraId.string());
         return;
     }
-
+    bool supportsHAL3 = false;
+    // supportsCameraApi also holds mInterfaceMutex, we can't call it in the
+    // HIDL onStatusChanged wrapper call (we'll hold mStatusListenerLock and
+    // mInterfaceMutex together, which can lead to deadlocks)
+    binder::Status sRet =
+            supportsCameraApi(String16(cameraId), hardware::ICameraService::API_VERSION_2,
+                    &supportsHAL3);
+    if (!sRet.isOk()) {
+        ALOGW("%s: Failed to determine if device supports HAL3 %s, supportsCameraApi call failed",
+                __FUNCTION__, cameraId.string());
+        return;
+    }
     // Update the status for this camera state, then send the onStatusChangedCallbacks to each
     // of the listeners with both the mStatusStatus and mStatusListenerLock held
-    state->updateStatus(status, cameraId, rejectSourceStates, [this, &deviceKind]
+    state->updateStatus(status, cameraId, rejectSourceStates, [this, &deviceKind, &supportsHAL3]
             (const String8& cameraId, StatusInternal status) {
 
             if (status != StatusInternal::ENUMERATING) {
@@ -3473,9 +3484,11 @@ void CameraService::updateStatus(StatusInternal status, const String8& cameraId,
             Mutex::Autolock lock(mStatusListenerLock);
 
             for (auto& listener : mListenerList) {
-                if (shouldSkipStatusUpdates(deviceKind, listener->isVendorListener(),
-                        listener->getListenerPid(), listener->getListenerUid())) {
-                    ALOGV("Skipping camera discovery callback for system-only camera %s",
+                bool isVendorListener = listener->isVendorListener();
+                if (shouldSkipStatusUpdates(deviceKind, isVendorListener,
+                        listener->getListenerPid(), listener->getListenerUid()) ||
+                    (isVendorListener && !supportsHAL3)) {
+                    ALOGV("Skipping discovery callback for system-only camera/HAL1 device %s",
                             cameraId.c_str());
                     continue;
                 }
