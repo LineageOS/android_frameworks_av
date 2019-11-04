@@ -341,6 +341,7 @@ sp<IHDCP> MediaPlayerService::makeHDCP(bool createEncryptionModule) {
     return new HDCP(createEncryptionModule);
 }
 
+#ifdef AOSP_WFD
 sp<IRemoteDisplay> MediaPlayerService::listenForRemoteDisplay(
         const String16 &opPackageName,
         const sp<IRemoteDisplayClient>& client, const String8& iface) {
@@ -350,6 +351,16 @@ sp<IRemoteDisplay> MediaPlayerService::listenForRemoteDisplay(
 
     return new RemoteDisplay(opPackageName, client, iface.string());
 }
+#else
+sp<IRemoteDisplay> MediaPlayerService::listenForRemoteDisplay(
+        const String16 &/*opPackageName*/,
+        const sp<IRemoteDisplayClient>& /*client*/,
+        const String8& /*iface*/) {
+    ALOGE("listenForRemoteDisplay is no longer supported!");
+
+    return NULL;
+}
+#endif
 
 status_t MediaPlayerService::AudioOutput::dump(int fd, const Vector<String16>& args) const
 {
