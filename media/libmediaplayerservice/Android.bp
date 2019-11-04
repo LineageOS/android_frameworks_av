@@ -65,6 +65,14 @@ cc_library_shared {
         "-Wall",
     ],
 
+    product_variables: {
+        lineage: {
+            uses_aosp_wfd: {
+                cppflags: ["-DAOSP_WFD"],
+            },
+        },
+    },
+
     name: "libmediaplayerservice",
 
     compile_multilib: "32",
