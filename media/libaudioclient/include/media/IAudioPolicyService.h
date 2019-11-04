@@ -23,6 +23,7 @@
 #include <utils/RefBase.h>
 #include <utils/Errors.h>
 #include <binder/IInterface.h>
+#include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioSystem.h>
 #include <media/AudioPolicy.h>
 #include <media/IAudioPolicyServiceClient.h>

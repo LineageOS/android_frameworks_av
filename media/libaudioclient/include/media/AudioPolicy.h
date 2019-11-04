@@ -18,9 +18,10 @@
 #ifndef ANDROID_AUDIO_POLICY_H
 #define ANDROID_AUDIO_POLICY_H
 
+#include <binder/Parcel.h>
+#include <media/AudioDeviceTypeAddr.h>
 #include <system/audio.h>
 #include <system/audio_policy.h>
-#include <binder/Parcel.h>
 #include <utils/String8.h>
 #include <utils/Vector.h>
 
@@ -59,19 +60,6 @@ namespace android {
 
 #define MAX_MIXES_PER_POLICY 10
 #define MAX_CRITERIA_PER_MIX 20
-
-class AudioDeviceTypeAddr {
-public:
-    AudioDeviceTypeAddr() {}
-    AudioDeviceTypeAddr(audio_devices_t type, String8 address) :
-        mType(type), mAddress(address) {}
-
-    status_t readFromParcel(Parcel *parcel);
-    status_t writeToParcel(Parcel *parcel) const;
-
-    audio_devices_t mType;
-    String8 mAddress;
-};
 
 class AudioMixMatchCriterion {
 public:
