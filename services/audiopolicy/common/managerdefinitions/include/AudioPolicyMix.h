@@ -18,6 +18,7 @@
 
 #include "DeviceDescriptor.h"
 #include <utils/RefBase.h>
+#include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioPolicy.h>
 #include <utils/Vector.h>
 #include <system/audio.h>

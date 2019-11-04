@@ -20,6 +20,7 @@ cc_library_shared {
 
     srcs: [
         "AudioContainers.cpp",
+        "AudioDeviceTypeAddr.cpp",
         "AudioGain.cpp",
         "AudioPort.cpp",
         "AudioProfile.cpp",
