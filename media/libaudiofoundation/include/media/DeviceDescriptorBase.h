@@ -19,6 +19,7 @@
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
 #include <media/AudioPort.h>
+#include <media/AudioDeviceTypeAddr.h>
 #include <utils/Errors.h>
 #include <cutils/config_utils.h>
 #include <system/audio.h>
@@ -34,9 +35,10 @@ public:
 
     virtual ~DeviceDescriptorBase() {}
 
-    audio_devices_t type() const { return mDeviceType; }
-    std::string address() const { return mAddress; }
-    void setAddress(const std::string &address) { mAddress = address; }
+    audio_devices_t type() const { return mDeviceTypeAddr.mType; }
+    std::string address() const { return mDeviceTypeAddr.mAddress; }
+    void setAddress(const std::string &address) { mDeviceTypeAddr.mAddress = address; }
+    const AudioDeviceTypeAddr& getDeviceTypeAddr() const { return mDeviceTypeAddr; }
 
     // AudioPortConfig
     virtual sp<AudioPort> getAudioPort() const {
@@ -59,8 +61,7 @@ public:
     status_t readFromParcel(const Parcel* parcel) override;
 
 protected:
-    std::string mAddress{""};
-    audio_devices_t     mDeviceType;
+    AudioDeviceTypeAddr mDeviceTypeAddr;
 };
 
 } // namespace android

@@ -76,7 +76,7 @@ bool DeviceDescriptor::equals(const sp<DeviceDescriptor>& other) const
         return false;
     }
 
-    return (mDeviceType == other->mDeviceType) && (mAddress == other->mAddress) &&
+    return mDeviceTypeAddr.equals(other->mDeviceTypeAddr) &&
            checkEqual(mEncodedFormats, other->mEncodedFormats);
 }
 
@@ -135,7 +135,7 @@ void DeviceDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
 
 void DeviceDescriptor::toAudioPort(struct audio_port *port) const
 {
-    ALOGV("DeviceDescriptor::toAudioPort() handle %d type %08x", mId, mDeviceType);
+    ALOGV("DeviceDescriptor::toAudioPort() handle %d type %08x", mId, mDeviceTypeAddr.mType);
     DeviceDescriptorBase::toAudioPort(port);
     port->ext.device.hw_module = getModuleHandle();
 }
