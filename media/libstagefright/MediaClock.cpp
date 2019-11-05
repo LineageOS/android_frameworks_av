@@ -281,7 +281,7 @@ void MediaClock::processTimers_l() {
             it = mTimers.erase(it);
         } else {
             if (mPlaybackRate != 0.0
-                && (double)diffMediaUs < INT64_MAX * (double)mPlaybackRate) {
+                && (double)diffMediaUs < (double)INT64_MAX * (double)mPlaybackRate) {
                 int64_t targetRealUs = diffMediaUs / (double)mPlaybackRate;
                 if (targetRealUs < nextLapseRealUs) {
                     nextLapseRealUs = targetRealUs;
