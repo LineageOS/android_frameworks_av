@@ -5775,11 +5775,11 @@ media_status_t MPEG4Source::read(
                       meta, AMEDIAFORMAT_KEY_TIME_US, ((long double)cts * 1000000) / mTimescale);
                 AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, 1);
 
-                int32_t byteOrder;
-                AMediaFormat_getInt32(mFormat,
+                int32_t byteOrder = 0;
+                bool isGetBigEndian = AMediaFormat_getInt32(mFormat,
                         AMEDIAFORMAT_KEY_PCM_BIG_ENDIAN, &byteOrder);
 
-                if (byteOrder == 1) {
+                if (isGetBigEndian && byteOrder == 1) {
                     // Big-endian -> little-endian
                     uint16_t *dstData = (uint16_t *)buf;
                     uint16_t *srcData = (uint16_t *)buf;
