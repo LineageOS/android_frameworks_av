@@ -1570,7 +1570,7 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
     proposed.format = format;
 
     sp<DeviceHalInterface> dev = mPrimaryHardwareDev->hwDevice();
-    size_t frames;
+    size_t frames = 0;
     for (;;) {
         // Note: config is currently a const parameter for get_input_buffer_size()
         // but we use a copy from proposed in case config changes from the call.
