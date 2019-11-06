@@ -259,6 +259,8 @@ public:
 
     virtual status_t setRttEnabled(bool enabled);
 
+            bool isCallScreenModeSupported() override;
+
             status_t doStopOutput(audio_port_handle_t portId);
             void doReleaseOutput(audio_port_handle_t portId);
 

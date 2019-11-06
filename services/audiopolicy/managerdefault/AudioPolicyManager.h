@@ -306,6 +306,8 @@ public:
             return volumeGroup != VOLUME_GROUP_NONE ? NO_ERROR : BAD_VALUE;
         }
 
+        bool isCallScreenModeSupported() override;
+
         status_t initialize();
 
 protected:

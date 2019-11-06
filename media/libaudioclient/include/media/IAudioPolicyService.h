@@ -222,6 +222,8 @@ public:
                                                        volume_group_t &volumeGroup) = 0;
 
     virtual status_t setRttEnabled(bool enabled) = 0;
+
+    virtual bool     isCallScreenModeSupported() = 0;
 };
 
 

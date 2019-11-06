@@ -396,6 +396,8 @@ public:
 
     static status_t setRttEnabled(bool enabled);
 
+    static bool     isCallScreenModeSupported();
+
     // ----------------------------------------------------------------------------
 
     class AudioVolumeGroupCallback : public RefBase
