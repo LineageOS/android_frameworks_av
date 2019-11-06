@@ -1232,6 +1232,7 @@ c2_status_t C2AllocatorGralloc::Impl::newGraphicAllocation(
     } else {
         BufferDescriptorInfo4 info = {
             {
+                "C2GrallocAllocation",
                 width,
                 height,
                 1u,  // layerCount
