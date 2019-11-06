@@ -304,7 +304,7 @@ static void playSource(sp<MediaSource> &source) {
             seekTimeUs = -1;
 
             if (shouldSeek) {
-                seekTimeUs = (rand() * (float)durationUs) / RAND_MAX;
+                seekTimeUs = (rand() * (float)durationUs) / (float)RAND_MAX;
                 options.setSeekTo(seekTimeUs);
 
                 printf("seeking to %" PRId64 " us (%.2f secs)\n",
