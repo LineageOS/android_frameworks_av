@@ -29,6 +29,7 @@
 
 #include <android-base/properties.h>
 #include <binder/PermissionController.h>
+#include <mediadrm/DrmUtils.h>
 #include <mediadrm/IDrm.h>
 #include <mediadrm/IDrmClient.h>
 #include <media/stagefright/MediaErrors.h>
@@ -268,19 +269,7 @@ static status_t GetAppPackageName(String8 *packageName) {
 }
 
 static sp<IDrm> CreateDrm() {
-    sp<IServiceManager> sm = defaultServiceManager();
-    sp<IBinder> binder = sm->getService(String16("media.drm"));
-
-    sp<IMediaDrmService> service = interface_cast<IMediaDrmService>(binder);
-    if (service == NULL) {
-        return NULL;
-    }
-
-    sp<IDrm> drm = service->makeDrm();
-    if (drm == NULL || (drm->initCheck() != OK && drm->initCheck() != NO_INIT)) {
-        return NULL;
-    }
-    return drm;
+    return DrmUtils::MakeDrm();
 }
 
 
