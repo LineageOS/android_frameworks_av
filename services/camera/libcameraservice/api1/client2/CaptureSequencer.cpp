@@ -265,7 +265,7 @@ CaptureSequencer::CaptureState CaptureSequencer::manageIdle(
     Mutex::Autolock l(mInputMutex);
     while (!mStartCapture) {
         res = mStartCaptureSignal.waitRelative(mInputMutex,
-                kWaitDuration);
+                kIdleWaitDuration);
         if (res == TIMED_OUT) break;
     }
     if (mStartCapture) {
