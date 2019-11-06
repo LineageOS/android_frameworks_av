@@ -154,7 +154,6 @@ cc_library {
     srcs: [
         ":mediaupdateservice_aidl",
         "IDataSource.cpp",
-        "IHDCP.cpp",
         "BufferingSettings.cpp",
         "mediaplayer.cpp",
         "IMediaHTTPConnection.cpp",
@@ -217,7 +216,6 @@ cc_library {
         "libstagefright_foundation",
         "libmediaextractor",
         "libgui",
-        "libui",
         "libdl",
         "libaudioutils",
         "libaudioclient",
