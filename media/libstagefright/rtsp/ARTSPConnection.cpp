@@ -329,6 +329,7 @@ void ARTSPConnection::performDisconnect() {
     mPass.clear();
     mAuthType = NONE;
     mNonce.clear();
+    mRealm.clear();
 
     mState = DISCONNECTED;
 }
@@ -911,6 +912,14 @@ bool ARTSPConnection::parseAuthMethod(const sp<ARTSPResponse> &response) {
         CHECK_GE(j, 0);
 
         mNonce.setTo(value, i + 7, j - i - 7);
+
+        i = value.find("realm=");
+        CHECK_GE(i, 0);
+        CHECK_EQ(value.c_str()[i + 6], '\"');
+        j = value.find("\"", i + 7);
+        CHECK_GE(j, 0);
+
+        mRealm.setTo(value, i + 7, j - i - 7);
     }
 
     return true;
@@ -993,7 +1002,7 @@ void ARTSPConnection::addAuthentication(AString *request) {
     AString A1;
     A1.append(mUser);
     A1.append(":");
-    A1.append("Streaming Server");
+    A1.append(mRealm);
     A1.append(":");
     A1.append(mPass);
 
@@ -1029,6 +1038,9 @@ void ARTSPConnection::addAuthentication(AString *request) {
     fragment.append("\", ");
     fragment.append("response=\"");
     fragment.append(digest);
+    fragment.append("\", ");
+    fragment.append("realm=\"");
+    fragment.append(mRealm);
     fragment.append("\"");
     fragment.append("\r\n");
 
