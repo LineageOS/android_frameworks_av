@@ -514,7 +514,7 @@ void C2SoftVpxEnc::process(
                         return;
                     }
                     vpx_img_wrap(&raw_frame, VPX_IMG_FMT_I420, stride, vstride,
-                                 mStrideAlign, (uint8_t*)rView->data()[0]);
+                                 mStrideAlign, mConversionBuffer.data());
                     vpx_img_set_rect(&raw_frame, 0, 0, width, height);
                 } else {
                     ALOGE("Conversion buffer is too small: %u x %u for %zu",
