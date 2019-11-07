@@ -17,6 +17,7 @@
 #ifndef ANDROID_AUDIOPOLICY_INTERFACE_H
 #define ANDROID_AUDIOPOLICY_INTERFACE_H
 
+#include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioSystem.h>
 #include <media/AudioPolicy.h>
 #include <media/DeviceDescriptorBase.h>
