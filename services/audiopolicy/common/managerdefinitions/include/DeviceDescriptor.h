@@ -33,9 +33,13 @@ class DeviceDescriptor : public DeviceDescriptorBase,
 {
 public:
      // Note that empty name refers by convention to a generic device.
-    explicit DeviceDescriptor(audio_devices_t type, const std::string &tagName = "");
-    DeviceDescriptor(audio_devices_t type, const FormatVector &encodedFormats,
-            const std::string &tagName = "");
+    explicit DeviceDescriptor(audio_devices_t type);
+    DeviceDescriptor(audio_devices_t type, const std::string &tagName,
+            const FormatVector &encodedFormats = FormatVector{});
+    DeviceDescriptor(audio_devices_t type, const std::string &tagName,
+            const std::string &address, const FormatVector &encodedFormats = FormatVector{});
+    DeviceDescriptor(const AudioDeviceTypeAddr &deviceTypeAddr, const std::string &tagName = "",
+            const FormatVector &encodedFormats = FormatVector{});
 
     virtual ~DeviceDescriptor() {}
 
