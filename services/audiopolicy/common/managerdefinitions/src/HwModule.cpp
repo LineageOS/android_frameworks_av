@@ -49,8 +49,7 @@ status_t HwModule::addOutputProfile(const std::string& name, const audio_config_
     profile->addAudioProfile(new AudioProfile(config->format, config->channel_mask,
                                               config->sample_rate));
 
-    sp<DeviceDescriptor> devDesc = new DeviceDescriptor(device);
-    devDesc->setAddress(address.string());
+    sp<DeviceDescriptor> devDesc = new DeviceDescriptor(device, "" /*tagName*/, address.string());
     addDynamicDevice(devDesc);
     // Reciprocally attach the device to the module
     devDesc->attach(this);
@@ -117,8 +116,7 @@ status_t HwModule::addInputProfile(const std::string& name, const audio_config_t
     profile->addAudioProfile(new AudioProfile(config->format, config->channel_mask,
                                               config->sample_rate));
 
-    sp<DeviceDescriptor> devDesc = new DeviceDescriptor(device);
-    devDesc->setAddress(address.string());
+    sp<DeviceDescriptor> devDesc = new DeviceDescriptor(device, "" /*tagName*/, address.string());
     addDynamicDevice(devDesc);
     // Reciprocally attach the device to the module
     devDesc->attach(this);
@@ -360,9 +358,9 @@ sp<DeviceDescriptor> HwModuleCollection::createDevice(const audio_devices_t type
               address);
         return nullptr;
     }
-    sp<DeviceDescriptor> device = new DeviceDescriptor(type, name);
+
+    sp<DeviceDescriptor> device = new DeviceDescriptor(type, name, address);
     device->setName(name);
-    device->setAddress(address);
     device->setEncodedFormat(encodedFormat);
 
   // Add the device to the list of dynamic devices
