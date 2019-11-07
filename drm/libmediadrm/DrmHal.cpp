@@ -39,6 +39,8 @@
 #include <mediadrm/DrmSessionClientInterface.h>
 #include <mediadrm/DrmSessionManager.h>
 
+#include <vector>
+
 using drm::V1_0::KeyedVector;
 using drm::V1_0::KeyRequestType;
 using drm::V1_0::KeyType;
@@ -496,10 +498,6 @@ Return<void> DrmHal::sendEvent(EventType hEventType,
     mEventLock.unlock();
 
     if (listener != NULL) {
-        Parcel obj;
-        writeByteArray(obj, sessionId);
-        writeByteArray(obj, data);
-
         Mutex::Autolock lock(mNotifyLock);
         DrmPlugin::EventType eventType;
         switch(hEventType) {
@@ -521,7 +519,7 @@ Return<void> DrmHal::sendEvent(EventType hEventType,
         default:
             return Void();
         }
-        listener->notify(eventType, 0, &obj);
+        listener->sendEvent(eventType, sessionId, data);
     }
     return Void();
 }
@@ -534,12 +532,8 @@ Return<void> DrmHal::sendExpirationUpdate(const hidl_vec<uint8_t>& sessionId,
     mEventLock.unlock();
 
     if (listener != NULL) {
-        Parcel obj;
-        writeByteArray(obj, sessionId);
-        obj.writeInt64(expiryTimeInMS);
-
         Mutex::Autolock lock(mNotifyLock);
-        listener->notify(DrmPlugin::kDrmPluginEventExpirationUpdate, 0, &obj);
+        listener->sendExpirationUpdate(sessionId, expiryTimeInMS);
     }
     return Void();
 }
@@ -556,21 +550,17 @@ Return<void> DrmHal::sendKeysChange(const hidl_vec<uint8_t>& sessionId,
 }
 
 Return<void> DrmHal::sendKeysChange_1_2(const hidl_vec<uint8_t>& sessionId,
-        const hidl_vec<KeyStatus>& keyStatusList, bool hasNewUsableKey) {
+        const hidl_vec<KeyStatus>& hKeyStatusList, bool hasNewUsableKey) {
 
     mEventLock.lock();
     sp<IDrmClient> listener = mListener;
     mEventLock.unlock();
 
     if (listener != NULL) {
-        Parcel obj;
-        writeByteArray(obj, sessionId);
-
-        size_t nKeys = keyStatusList.size();
-        obj.writeInt32(nKeys);
+        std::vector<DrmKeyStatus> keyStatusList;
+        size_t nKeys = hKeyStatusList.size();
         for (size_t i = 0; i < nKeys; ++i) {
-            const KeyStatus &keyStatus = keyStatusList[i];
-            writeByteArray(obj, keyStatus.keyId);
+            const KeyStatus &keyStatus = hKeyStatusList[i];
             uint32_t type;
             switch(keyStatus.type) {
             case KeyStatusType::USABLE:
@@ -593,19 +583,18 @@ Return<void> DrmHal::sendKeysChange_1_2(const hidl_vec<uint8_t>& sessionId,
                 type = DrmPlugin::kKeyStatusType_InternalError;
                 break;
             }
-            obj.writeInt32(type);
+            keyStatusList.push_back({type, keyStatus.keyId});
             mMetrics.mKeyStatusChangeCounter.Increment(keyStatus.type);
         }
-        obj.writeInt32(hasNewUsableKey);
 
         Mutex::Autolock lock(mNotifyLock);
-        listener->notify(DrmPlugin::kDrmPluginEventKeysChange, 0, &obj);
+        listener->sendKeysChange(sessionId, keyStatusList, hasNewUsableKey);
     } else {
         // There's no listener. But we still want to count the key change
         // events.
-        size_t nKeys = keyStatusList.size();
+        size_t nKeys = hKeyStatusList.size();
         for (size_t i = 0; i < nKeys; i++) {
-            mMetrics.mKeyStatusChangeCounter.Increment(keyStatusList[i].type);
+            mMetrics.mKeyStatusChangeCounter.Increment(hKeyStatusList[i].type);
         }
     }
 
@@ -620,10 +609,8 @@ Return<void> DrmHal::sendSessionLostState(
     mEventLock.unlock();
 
     if (listener != NULL) {
-        Parcel obj;
-        writeByteArray(obj, sessionId);
         Mutex::Autolock lock(mNotifyLock);
-        listener->notify(DrmPlugin::kDrmPluginEventSessionLostState, 0, &obj);
+        listener->sendSessionLostState(sessionId);
     }
     return Void();
 }
@@ -1583,16 +1570,6 @@ status_t DrmHal::signRSA(Vector<uint8_t> const &sessionId,
 void DrmHal::binderDied(const wp<IBinder> &the_late_who __unused)
 {
     cleanup();
-}
-
-void DrmHal::writeByteArray(Parcel &obj, hidl_vec<uint8_t> const &vec)
-{
-    if (vec.size()) {
-        obj.writeInt32(vec.size());
-        obj.write(vec.data(), vec.size());
-    } else {
-        obj.writeInt32(0);
-    }
 }
 
 void DrmHal::reportFrameworkMetrics() const

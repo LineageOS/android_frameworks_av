@@ -24,6 +24,7 @@ cc_library_shared {
         "SharedLibrary.cpp",
         "DrmHal.cpp",
         "CryptoHal.cpp",
+        "DrmUtils.cpp",
     ],
 
     local_include_dirs: [
@@ -56,6 +57,12 @@ cc_library_shared {
         "android.hardware.drm@1.2",
         "libhidlallocatorutils",
         "libhidlbase",
+    ],
+
+    export_shared_lib_headers: [
+        "android.hardware.drm@1.0",
+        "android.hardware.drm@1.1",
+        "android.hardware.drm@1.2",
     ],
 
     cflags: [

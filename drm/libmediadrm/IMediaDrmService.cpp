@@ -85,4 +85,14 @@ status_t BnMediaDrmService::onTransact(
 
 // ----------------------------------------------------------------------------
 
+template<>
+sp<IDrm> IMediaDrmService::makeObject<IDrm>() {
+    return makeDrm();
+}
+
+template<>
+sp<ICrypto> IMediaDrmService::makeObject<ICrypto>() {
+    return makeCrypto();
+}
+
 } // namespace android

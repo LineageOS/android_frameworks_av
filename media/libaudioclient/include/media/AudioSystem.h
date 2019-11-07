@@ -19,6 +19,7 @@
 
 #include <sys/types.h>
 
+#include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioPolicy.h>
 #include <media/AudioProductStrategy.h>
 #include <media/AudioVolumeGroup.h>
