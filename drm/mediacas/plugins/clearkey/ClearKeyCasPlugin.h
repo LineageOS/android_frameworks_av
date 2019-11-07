@@ -71,10 +71,16 @@ public:
     ClearKeyCasPlugin(void *appData, CasPluginCallbackExt callback);
     virtual ~ClearKeyCasPlugin();
 
+    virtual status_t setStatusCallback(
+            CasPluginStatusCallback callback) override;
+
     virtual status_t setPrivateData(
             const CasData &data) override;
 
     virtual status_t openSession(CasSessionId *sessionId) override;
+
+    virtual status_t openSession(uint32_t intent, uint32_t mode,
+                                     CasSessionId *sessionId) override;
 
     virtual status_t closeSession(
             const CasSessionId &sessionId) override;
@@ -105,6 +111,7 @@ private:
     std::unique_ptr<KeyFetcher> mKeyFetcher;
     CasPluginCallback mCallback;
     CasPluginCallbackExt mCallbackExt;
+    CasPluginStatusCallback mStatusCallback;
     void* mAppData;
 };
 
