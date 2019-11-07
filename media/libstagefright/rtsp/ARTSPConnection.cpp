@@ -954,7 +954,7 @@ static void GetMethodAndURL(
     CHECK_GE(space2, 0);
 
     method->setTo(request, 0, space1);
-    url->setTo(request, space1 + 1, space2 - space1);
+    url->setTo(request, space1 + 1, space2 - space1 - 1);
 }
 
 void ARTSPConnection::addAuthentication(AString *request) {
