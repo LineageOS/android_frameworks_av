@@ -4207,6 +4207,12 @@ bool AudioPolicyManager::isHapticPlaybackSupported()
     return false;
 }
 
+bool AudioPolicyManager::isCallScreenModeSupported()
+{
+    return getConfig().isCallScreenModeSupported();
+}
+
+
 status_t AudioPolicyManager::disconnectAudioSource(const sp<SourceClientDescriptor>& sourceDesc)
 {
     ALOGV("%s port Id %d", __FUNCTION__, sourceDesc->portId());

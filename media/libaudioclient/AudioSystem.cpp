@@ -1519,6 +1519,13 @@ status_t AudioSystem::setRttEnabled(bool enabled)
     return aps->setRttEnabled(enabled);
 }
 
+bool AudioSystem::isCallScreenModeSupported()
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return false;
+    return aps->isCallScreenModeSupported();
+}
+
 // ---------------------------------------------------------------------------
 
 int AudioSystem::AudioPolicyServiceClient::addAudioPortCallback(

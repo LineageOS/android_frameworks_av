@@ -104,7 +104,8 @@ enum {
     GET_VOLUME_GROUP_FOR_ATTRIBUTES,
     SET_ALLOWED_CAPTURE_POLICY,
     MOVE_EFFECTS_TO_IO,
-    SET_RTT_ENABLED
+    SET_RTT_ENABLED,
+    IS_CALL_SCREEN_MODE_SUPPORTED
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -1284,6 +1285,17 @@ public:
         }
         return static_cast<status_t>(reply.readInt32());
     }
+
+    virtual bool isCallScreenModeSupported()
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        status_t status = remote()->transact(IS_CALL_SCREEN_MODE_SUPPORTED, data, &reply);
+        if (status != NO_ERROR) {
+            return false;
+        }
+        return reply.readBool();
+    }
 };
 
 IMPLEMENT_META_INTERFACE(AudioPolicyService, "android.media.IAudioPolicyService");
@@ -1346,7 +1358,8 @@ status_t BnAudioPolicyService::onTransact(
         case GET_OFFLOAD_FORMATS_A2DP:
         case LIST_AUDIO_VOLUME_GROUPS:
         case GET_VOLUME_GROUP_FOR_ATTRIBUTES:
-        case SET_RTT_ENABLED: {
+        case SET_RTT_ENABLED:
+        case IS_CALL_SCREEN_MODE_SUPPORTED: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
@@ -2237,7 +2250,6 @@ status_t BnAudioPolicyService::onTransact(
             reply->writeBool(isSupported);
             return NO_ERROR;
         }
-
         case SET_UID_DEVICE_AFFINITY: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             const uid_t uid = (uid_t) data.readInt32();
@@ -2366,6 +2378,13 @@ status_t BnAudioPolicyService::onTransact(
             bool enabled = static_cast<bool>(data.readInt32());
             status_t status = setRttEnabled(enabled);
             reply->writeInt32(status);
+            return NO_ERROR;
+        }
+
+        case IS_CALL_SCREEN_MODE_SUPPORTED: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            bool isAvailable = isCallScreenModeSupported();
+            reply->writeBool(isAvailable);
             return NO_ERROR;
         }
 
