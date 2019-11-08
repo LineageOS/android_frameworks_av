@@ -30,6 +30,7 @@
 #include <datasource/HTTPBase.h>
 #include <datasource/NuCachedSource2.h>
 #include <media/IMediaHTTPService.h>
+#include <media/NdkJavaVMHelper.h>
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaDataSource.h>
 #include <media/stagefright/InterfaceUtils.h>
@@ -167,7 +168,8 @@ sp<MediaHTTPService> createMediaHttpService(const char *uri) {
     JNIEnv *env;
     const char *clazz, *method, *signature;
 
-    env = AndroidRuntime::getJNIEnv();
+    env = NdkJavaVMHelper::getJNIEnv();
+
     clazz = "android/media/MediaHTTPService";
     method = "createHttpServiceBinderIfNecessary";
     signature = "(Ljava/lang/String;)Landroid/os/IBinder;";
