@@ -445,21 +445,21 @@ private:
 InputSurfaceConnection::InputSurfaceConnection(
         const sp<GraphicBufferSource>& source,
         const std::shared_ptr<C2Component>& comp,
-        const sp<ComponentStore>& store)
+        const std::shared_ptr<ParameterCache>& cache)
       : mImpl{new Impl(source, comp)},
         mConfigurable{new CachedConfigurable(
             std::make_unique<Impl::ConfigurableIntf>(mImpl))} {
-    mConfigurable->init(store.get());
+    mConfigurable->init(cache);
 }
 
 InputSurfaceConnection::InputSurfaceConnection(
         const sp<GraphicBufferSource>& source,
         const sp<IInputSink>& sink,
-        const sp<ComponentStore>& store)
+        const std::shared_ptr<ParameterCache>& cache)
       : mImpl{new Impl(source, sink)},
         mConfigurable{new CachedConfigurable(
             std::make_unique<Impl::ConfigurableIntf>(mImpl))} {
-    mConfigurable->init(store.get());
+    mConfigurable->init(cache);
 }
 
 Return<Status> InputSurfaceConnection::disconnect() {

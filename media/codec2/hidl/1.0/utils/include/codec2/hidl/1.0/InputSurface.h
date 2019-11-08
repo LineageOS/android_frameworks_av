@@ -62,14 +62,14 @@ protected:
     class Interface;
     class ConfigurableIntf;
 
-    sp<ComponentStore> mStore;
+    std::shared_ptr<ParameterCache> mParameterCache;
     sp<HGraphicBufferProducer> mProducer;
     sp<GraphicBufferSource> mSource;
     std::shared_ptr<Interface> mIntf;
     sp<CachedConfigurable> mConfigurable;
 
     InputSurface(
-            const sp<ComponentStore>& store,
+            const std::shared_ptr<ParameterCache>& cache,
             const std::shared_ptr<C2ReflectorHelper>& reflector,
             const sp<HGraphicBufferProducer>& base,
             const sp<GraphicBufferSource>& source);
