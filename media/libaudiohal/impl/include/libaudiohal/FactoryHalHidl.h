@@ -23,33 +23,43 @@
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <utils/StrongPointer.h>
 
+#include <array>
+#include <utility>
+
 namespace android {
 
-namespace effect {
-namespace V2_0 {
-sp<EffectsFactoryHalInterface> createEffectsFactoryHal();
-} // namespace V2_0
+/** Supported HAL versions, in order of preference.
+ * Implementation should use specialize the `create*FactoryHal` for their version.
+ * Client should use `createPreferedImpl<*FactoryHal>()` to instantiate
+ * the preferred available impl.
+ */
+enum class AudioHALVersion {
+    V6_0,
+    V5_0,
+    V4_0,
+    V2_0,
+    end, // used for iterating over supported versions
+};
 
-namespace V4_0 {
-sp<EffectsFactoryHalInterface> createEffectsFactoryHal();
-} // namespace V4_0
+/** Template function to fully specialized for each version and each Interface. */
+template <AudioHALVersion, class Interface>
+sp<Interface> createFactoryHal();
 
-namespace V5_0 {
-sp<EffectsFactoryHalInterface> createEffectsFactoryHal();
-} // namespace V5_0
-} // namespace effect
+/** @Return the preferred available implementation or nullptr if none are available. */
+template <class Interface, AudioHALVersion version = AudioHALVersion{}>
+static sp<Interface> createPreferedImpl() {
+    if constexpr (version == AudioHALVersion::end) {
+        return nullptr; // tried all version, all returned nullptr
+    } else {
+        if (auto created = createFactoryHal<version, Interface>(); created != nullptr) {
+           return created;
+        }
 
-namespace V2_0 {
-sp<DevicesFactoryHalInterface> createDevicesFactoryHal();
-} // namespace V2_0
+        using Raw = std::underlying_type_t<AudioHALVersion>; // cast as enum class do not support ++
+        return createPreferedImpl<Interface, AudioHALVersion(Raw(version) + 1)>();
+    }
+}
 
-namespace V4_0 {
-sp<DevicesFactoryHalInterface> createDevicesFactoryHal();
-} // namespace V4_0
-
-namespace V5_0 {
-sp<DevicesFactoryHalInterface> createDevicesFactoryHal();
-} // namespace V5_0
 
 } // namespace android
 

@@ -6,10 +6,10 @@ service audioserver /system/bin/audioserver
     capabilities BLOCK_SUSPEND
     ioprio rt 4
     writepid /dev/cpuset/foreground/tasks /dev/stune/foreground/tasks
-    onrestart restart vendor.audio-hal-2-0
+    onrestart restart vendor.audio-hal
     onrestart restart vendor.audio-hal-4-0-msd
-    # Keep the original service name for backward compatibility when upgrading
-    # O-MR1 devices with framework-only.
+    # Keep the original service names for backward compatibility
+    onrestart restart vendor.audio-hal-2-0
     onrestart restart audio-hal-2-0
 
 on property:vts.native_server.on=1
