@@ -99,3 +99,20 @@ cc_library_shared {
         "-include common/all-versions/VersionMacro.h",
     ]
 }
+
+cc_library_shared {
+    name: "libaudiohal@6.0",
+    defaults: ["libaudiohal_default"],
+    shared_libs: [
+        "android.hardware.audio.common@6.0",
+        "android.hardware.audio.common@6.0-util",
+        "android.hardware.audio.effect@6.0",
+        "android.hardware.audio@6.0",
+    ],
+    cflags: [
+        "-DMAJOR_VERSION=6",
+        "-DMINOR_VERSION=0",
+        "-include common/all-versions/VersionMacro.h",
+    ]
+}
+
