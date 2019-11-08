@@ -18,7 +18,6 @@
 #include <binder/PersistableBundle.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <media/drm/DrmAPI.h>
-#include <media/MediaAnalyticsItem.h>
 #include <mediadrm/IDrmClient.h>
 
 #ifndef ANDROID_IDRM_H_

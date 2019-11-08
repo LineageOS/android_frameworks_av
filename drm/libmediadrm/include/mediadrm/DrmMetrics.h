@@ -25,6 +25,7 @@
 #include <binder/PersistableBundle.h>
 #include <media/CounterMetric.h>
 #include <media/EventMetric.h>
+#include <sys/types.h>
 
 namespace android {
 
@@ -70,6 +71,9 @@ class MediaDrmMetrics {
   // serialized or exported with the metrics.
   void SetAppPackageName(const String8& appPackageName) { mAppPackageName = appPackageName; }
   const String8& GetAppPackageName() { return mAppPackageName; }
+
+  void SetAppUid(uid_t appUid) { mAppUid = appUid; }
+  uid_t GetAppUid() const { return mAppUid; }
 
   // Export the metrics to a PersistableBundle.
   void Export(os::PersistableBundle* metricsBundle);
@@ -131,6 +135,7 @@ class MediaDrmMetrics {
   std::map<std::string, std::pair<int64_t, int64_t>> mSessionLifespans;
 
   String8 mAppPackageName;
+  uid_t mAppUid{~0u};
 };
 
 }  // namespace android
