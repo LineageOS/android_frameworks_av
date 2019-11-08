@@ -65,11 +65,6 @@ class EffectsFactoryHalHidl : public EffectsFactoryHalInterface, public Conversi
     status_t queryAllDescriptors();
 };
 
-sp<EffectsFactoryHalInterface> createEffectsFactoryHal() {
-    auto service = IEffectsFactory::getService();
-    return service ? new EffectsFactoryHalHidl(service) : nullptr;
-}
-
 } // namespace CPP_VERSION
 } // namespace effect
 } // namespace android
