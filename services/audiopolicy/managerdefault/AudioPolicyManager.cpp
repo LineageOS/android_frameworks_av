@@ -945,7 +945,8 @@ status_t AudioPolicyManager::getOutputForAttrInt(
         audio_output_flags_t *flags,
         audio_port_handle_t *selectedDeviceId,
         bool *isRequestedDeviceForExclusiveUse,
-        std::vector<sp<SwAudioOutputDescriptor>> *secondaryDescs)
+        std::vector<sp<SwAudioOutputDescriptor>> *secondaryDescs,
+        output_type_t *outputType)
 {
     DeviceVector outputDevices;
     const audio_port_handle_t requestedPortId = *selectedDeviceId;
@@ -953,6 +954,7 @@ status_t AudioPolicyManager::getOutputForAttrInt(
     const sp<DeviceDescriptor> requestedDevice =
         mAvailableOutputDevices.getDeviceFromId(requestedPortId);
 
+    *outputType = API_OUTPUT_INVALID;
     status_t status = getAudioAttributes(resultAttr, attr, *stream);
     if (status != NO_ERROR) {
         return status;
@@ -991,7 +993,13 @@ status_t AudioPolicyManager::getOutputForAttrInt(
                                                   mix->mDeviceAddress,
                                                   AUDIO_FORMAT_DEFAULT);
         *selectedDeviceId = deviceDesc != 0 ? deviceDesc->getId() : AUDIO_PORT_HANDLE_NONE;
+
         ALOGV("getOutputForAttr() returns output %d", *output);
+        if (resultAttr->usage == AUDIO_USAGE_VIRTUAL_SOURCE) {
+            *outputType = API_OUT_MIX_PLAYBACK;
+        } else {
+            *outputType = API_OUTPUT_LEGACY;
+        }
         return NO_ERROR;
     }
     // Virtual sources must always be dynamicaly or explicitly routed
@@ -1048,6 +1056,12 @@ status_t AudioPolicyManager::getOutputForAttrInt(
 
     *selectedDeviceId = getFirstDeviceId(outputDevices);
 
+    if (outputDevices.onlyContainsDevicesWithType(AUDIO_DEVICE_OUT_TELEPHONY_TX)) {
+        *outputType = API_OUTPUT_TELEPHONY_TX;
+    } else {
+        *outputType = API_OUTPUT_LEGACY;
+    }
+
     ALOGV("%s returns output %d selectedDeviceId %d", __func__, *output, *selectedDeviceId);
 
     return NO_ERROR;
@@ -1062,7 +1076,8 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
                                               audio_output_flags_t *flags,
                                               audio_port_handle_t *selectedDeviceId,
                                               audio_port_handle_t *portId,
-                                              std::vector<audio_io_handle_t> *secondaryOutputs)
+                                              std::vector<audio_io_handle_t> *secondaryOutputs,
+                                              output_type_t *outputType)
 {
     // The supplied portId must be AUDIO_PORT_HANDLE_NONE
     if (*portId != AUDIO_PORT_HANDLE_NONE) {
@@ -1082,7 +1097,7 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
 
     status_t status = getOutputForAttrInt(&resultAttr, output, session, attr, stream, uid,
             config, flags, selectedDeviceId, &isRequestedDeviceForExclusiveUse,
-            &secondaryOutputDescs);
+            &secondaryOutputDescs, outputType);
     if (status != NO_ERROR) {
         return status;
     }
@@ -3909,10 +3924,11 @@ status_t AudioPolicyManager::connectAudioSource(const sp<SourceClientDescriptor>
         audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
         bool isRequestedDeviceForExclusiveUse = false;
         std::vector<sp<SwAudioOutputDescriptor>> secondaryOutputs;
+        output_type_t outputType;
         getOutputForAttrInt(&resultAttr, &output, AUDIO_SESSION_NONE,
                 &attributes, &stream, sourceDesc->uid(), &config, &flags,
                 &selectedDeviceId, &isRequestedDeviceForExclusiveUse,
-                &secondaryOutputs);
+                &secondaryOutputs, &outputType);
         if (output == AUDIO_IO_HANDLE_NONE) {
             ALOGV("%s no output for device %s",
                   __FUNCTION__, dumpDeviceTypes(sinkDevices.types()).c_str());

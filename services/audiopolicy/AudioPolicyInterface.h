@@ -69,6 +69,14 @@ public:
         API_INPUT_TELEPHONY_RX, // used for capture from telephony RX path
     } input_type_t;
 
+    typedef enum {
+        API_OUTPUT_INVALID = -1,
+        API_OUTPUT_LEGACY  = 0,// e.g. audio playing to speaker
+        API_OUT_MIX_PLAYBACK,  // used for "remote submix" playback of audio from remote source
+                               // to local capture
+        API_OUTPUT_TELEPHONY_TX, // used for playback to telephony TX path
+    } output_type_t;
+
 public:
     virtual ~AudioPolicyInterface() {}
     //
@@ -115,7 +123,8 @@ public:
                                         audio_output_flags_t *flags,
                                         audio_port_handle_t *selectedDeviceId,
                                         audio_port_handle_t *portId,
-                                        std::vector<audio_io_handle_t> *secondaryOutputs) = 0;
+                                        std::vector<audio_io_handle_t> *secondaryOutputs,
+                                        output_type_t *outputType) = 0;
     // indicates to the audio policy manager that the output starts being used by corresponding stream.
     virtual status_t startOutput(audio_port_handle_t portId) = 0;
     // indicates to the audio policy manager that the output stops being used by corresponding stream.

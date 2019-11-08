@@ -167,9 +167,16 @@ bool settingsAllowed() {
 }
 
 bool modifyAudioRoutingAllowed() {
+    return modifyAudioRoutingAllowed(
+        IPCThreadState::self()->getCallingPid(), IPCThreadState::self()->getCallingUid());
+}
+
+bool modifyAudioRoutingAllowed(pid_t pid, uid_t uid) {
+    if (isAudioServerUid(IPCThreadState::self()->getCallingUid())) return true;
     // IMPORTANT: Use PermissionCache - not a runtime permission and may not change.
-    bool ok = PermissionCache::checkCallingPermission(sModifyAudioRouting);
-    if (!ok) ALOGE("android.permission.MODIFY_AUDIO_ROUTING");
+    bool ok = PermissionCache::checkPermission(sModifyAudioRouting, pid, uid);
+    if (!ok) ALOGE("%s(): android.permission.MODIFY_AUDIO_ROUTING denied for uid %d",
+        __func__, uid);
     return ok;
 }
 

@@ -85,6 +85,7 @@ bool captureMediaOutputAllowed(pid_t pid, uid_t uid);
 bool captureHotwordAllowed(const String16& opPackageName, pid_t pid, uid_t uid);
 bool settingsAllowed();
 bool modifyAudioRoutingAllowed();
+bool modifyAudioRoutingAllowed(pid_t pid, uid_t uid);
 bool modifyDefaultAudioEffectsAllowed();
 bool dumpAllowed();
 bool modifyPhoneStateAllowed(pid_t pid, uid_t uid);

@@ -181,13 +181,13 @@ status_t AudioPolicyService::getOutputForAttr(audio_attributes_t *attr,
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
     }
-    ALOGV("getOutputForAttr()");
+    ALOGV("%s()", __func__);
     Mutex::Autolock _l(mLock);
 
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
     if (!isAudioServerOrMediaServerUid(callingUid) || uid == (uid_t)-1) {
         ALOGW_IF(uid != (uid_t)-1 && uid != callingUid,
-                "%s uid %d tried to pass itself off as %d", __FUNCTION__, callingUid, uid);
+                "%s uid %d tried to pass itself off as %d", __func__, callingUid, uid);
         uid = callingUid;
     }
     if (!mPackageManager.allowPlaybackCapture(uid)) {
@@ -197,27 +197,39 @@ status_t AudioPolicyService::getOutputForAttr(audio_attributes_t *attr,
             && !bypassInterruptionPolicyAllowed(pid, uid)) {
         attr->flags &= ~(AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY|AUDIO_FLAG_BYPASS_MUTE);
     }
-    audio_output_flags_t originalFlags = flags;
     AutoCallerClear acc;
+    AudioPolicyInterface::output_type_t outputType;
     status_t result = mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid,
                                                  config,
                                                  &flags, selectedDeviceId, portId,
-                                                 secondaryOutputs);
+                                                 secondaryOutputs,
+                                                 &outputType);
 
     // FIXME: Introduce a way to check for the the telephony device before opening the output
-    if ((result == NO_ERROR) &&
-        (flags & AUDIO_OUTPUT_FLAG_INCALL_MUSIC) &&
-        !modifyPhoneStateAllowed(pid, uid)) {
-        // If the app tries to play music through the telephony device and doesn't have permission
-        // the fallback to the default output device.
-        mAudioPolicyManager->releaseOutput(*portId);
-        flags = originalFlags;
-        *selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
-        *portId = AUDIO_PORT_HANDLE_NONE;
-        secondaryOutputs->clear();
-        result = mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid, config,
-                                                       &flags, selectedDeviceId, portId,
-                                                       secondaryOutputs);
+    if (result == NO_ERROR) {
+        // enforce permission (if any) required for each type of input
+        switch (outputType) {
+        case AudioPolicyInterface::API_OUTPUT_LEGACY:
+            break;
+        case AudioPolicyInterface::API_OUTPUT_TELEPHONY_TX:
+            if (!modifyPhoneStateAllowed(pid, uid)) {
+                ALOGE("%s() permission denied: modify phone state not allowed for uid %d",
+                    __func__, uid);
+                result = PERMISSION_DENIED;
+            }
+            break;
+        case AudioPolicyInterface::API_OUT_MIX_PLAYBACK:
+            if (!modifyAudioRoutingAllowed(pid, uid)) {
+                ALOGE("%s() permission denied: modify audio routing not allowed for uid %d",
+                    __func__, uid);
+                result = PERMISSION_DENIED;
+            }
+            break;
+        case AudioPolicyInterface::API_OUTPUT_INVALID:
+        default:
+            LOG_ALWAYS_FATAL("%s() encountered an invalid output type %d",
+                __func__, (int)outputType);
+        }
     }
 
     if (result == NO_ERROR) {
@@ -434,7 +446,7 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
                 }
                 break;
             case AudioPolicyInterface::API_INPUT_MIX_EXT_POLICY_REROUTE:
-                if (!modifyAudioRoutingAllowed()) {
+                if (!modifyAudioRoutingAllowed(pid, uid)) {
                     ALOGE("getInputForAttr() permission denied: modify audio routing not allowed");
                     status = PERMISSION_DENIED;
                 }
