@@ -751,6 +751,7 @@ static std::vector<std::pair<const char *, uint32_t>> int32Mappings {
         { "temporal-layer-id", kKeyTemporalLayerId },
         { "thumbnail-width", kKeyThumbnailWidth },
         { "thumbnail-height", kKeyThumbnailHeight },
+        { "track-id", kKeyTrackID },
         { "valid-samples", kKeyValidSamples },
     }
 };
@@ -956,12 +957,6 @@ status_t convertMetaDataToMessage(
     int32_t isSync;
     if (meta->findInt32(kKeyIsSyncFrame, &isSync) && isSync != 0) {
         msg->setInt32("is-sync-frame", 1);
-    }
-
-    // this only needs to be translated from meta to message as it is an extractor key
-    int32_t trackID;
-    if (meta->findInt32(kKeyTrackID, &trackID)) {
-        msg->setInt32("track-id", trackID);
     }
 
     const char *lang;
