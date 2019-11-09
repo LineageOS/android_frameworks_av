@@ -19,8 +19,12 @@
 
 #include <android/hardware/drm/1.0/ICryptoFactory.h>
 #include <android/hardware/drm/1.0/ICryptoPlugin.h>
+#include <android/hardware/drm/1.0/IDrmFactory.h>
+#include <android/hardware/drm/1.0/IDrmPlugin.h>
 #include <android/hardware/drm/1.1/ICryptoFactory.h>
+#include <android/hardware/drm/1.1/IDrmFactory.h>
 #include <android/hardware/drm/1.2/ICryptoFactory.h>
+#include <android/hardware/drm/1.2/IDrmFactory.h>
 #include <android/hidl/manager/1.0/IServiceManager.h>
 #include <hidl/HidlSupport.h>
 
@@ -59,7 +63,7 @@ Hal *MakeObject(status_t *pstatus) {
 }
 
 template <typename Hal, typename V>
-void MakeCryptoFactories(const uint8_t uuid[16], V &cryptoFactories) {
+void MakeHidlFactories(const uint8_t uuid[16], V &factories) {
     sp<HServiceManager> serviceManager = HServiceManager::getService();
     if (serviceManager == nullptr) {
         ALOGE("Failed to get service manager");
@@ -72,7 +76,7 @@ void MakeCryptoFactories(const uint8_t uuid[16], V &cryptoFactories) {
             if (factory != nullptr) {
                 ALOGI("found %s %s", Hal::descriptor, instance.c_str());
                 if (factory->isCryptoSchemeSupported(uuid)) {
-                    cryptoFactories.push_back(factory);
+                    factories.push_back(factory);
                 }
             }
         }
@@ -92,6 +96,19 @@ hidl_array<uint8_t, 16> toHidlArray16(const uint8_t *ptr) {
         return hidl_array<uint8_t, 16>();
     }
     return hidl_array<uint8_t, 16>(ptr);
+}
+
+sp<::V1_0::IDrmPlugin> MakeDrmPlugin(const sp<::V1_0::IDrmFactory> &factory,
+                                     const uint8_t uuid[16], const char *appPackageName) {
+    sp<::V1_0::IDrmPlugin> plugin;
+    factory->createPlugin(toHidlArray16(uuid), hidl_string(appPackageName),
+                          [&](::V1_0::Status status, const sp<::V1_0::IDrmPlugin> &hPlugin) {
+                              if (status != ::V1_0::Status::OK) {
+                                  return;
+                              }
+                              plugin = hPlugin;
+                          });
+    return plugin;
 }
 
 sp<::V1_0::ICryptoPlugin> MakeCryptoPlugin(const sp<::V1_0::ICryptoFactory> &factory,
@@ -122,11 +139,28 @@ sp<ICrypto> MakeCrypto(status_t *pstatus) {
     return MakeObject<CryptoHal>(pstatus);
 }
 
+std::vector<sp<::V1_0::IDrmFactory>> MakeDrmFactories(const uint8_t uuid[16]) {
+    std::vector<sp<::V1_0::IDrmFactory>> drmFactories;
+    MakeHidlFactories<::V1_0::IDrmFactory>(uuid, drmFactories);
+    MakeHidlFactories<::V1_1::IDrmFactory>(uuid, drmFactories);
+    MakeHidlFactories<::V1_2::IDrmFactory>(uuid, drmFactories);
+    return drmFactories;
+}
+
+std::vector<sp<::V1_0::IDrmPlugin>> MakeDrmPlugins(const uint8_t uuid[16],
+                                              const char *appPackageName) {
+    std::vector<sp<::V1_0::IDrmPlugin>> plugins;
+    for (const auto &factory : MakeDrmFactories(uuid)) {
+        plugins.push_back(MakeDrmPlugin(factory, uuid, appPackageName));
+    }
+    return plugins;
+}
+
 std::vector<sp<::V1_0::ICryptoFactory>> MakeCryptoFactories(const uint8_t uuid[16]) {
     std::vector<sp<::V1_0::ICryptoFactory>> cryptoFactories;
-    MakeCryptoFactories<::V1_0::ICryptoFactory>(uuid, cryptoFactories);
-    MakeCryptoFactories<::V1_1::ICryptoFactory>(uuid, cryptoFactories);
-    MakeCryptoFactories<::V1_2::ICryptoFactory>(uuid, cryptoFactories);
+    MakeHidlFactories<::V1_0::ICryptoFactory>(uuid, cryptoFactories);
+    MakeHidlFactories<::V1_1::ICryptoFactory>(uuid, cryptoFactories);
+    MakeHidlFactories<::V1_2::ICryptoFactory>(uuid, cryptoFactories);
     return cryptoFactories;
 }
 
