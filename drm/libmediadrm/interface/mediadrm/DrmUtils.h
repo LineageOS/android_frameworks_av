@@ -17,9 +17,13 @@
 #ifndef ANDROID_DRMUTILS_H
 #define ANDROID_DRMUTILS_H
 
+#include <android/hardware/drm/1.0/ICryptoFactory.h>
 #include <utils/Errors.h>  // for status_t
 #include <utils/StrongPointer.h>
 #include <binder/Parcel.h>
+#include <vector>
+
+using namespace ::android::hardware::drm;
 
 namespace android {
 
@@ -76,6 +80,11 @@ void WriteKeysChange(
     }
     obj.writeInt32(hasNewUsableKey);
 }
+
+std::vector<sp<::V1_0::ICryptoFactory>> MakeCryptoFactories(const uint8_t uuid[16]);
+
+std::vector<sp<::V1_0::ICryptoPlugin>> MakeCryptoPlugins(const uint8_t uuid[16],
+                                                         const void *initData, size_t initDataSize);
 
 } // namespace DrmUtils
 
