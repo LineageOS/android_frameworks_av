@@ -306,6 +306,8 @@ public:
             return volumeGroup != VOLUME_GROUP_NONE ? NO_ERROR : BAD_VALUE;
         }
 
+        bool isCallScreenModeSupported() override;
+
         status_t initialize();
 
 protected:
@@ -476,6 +478,8 @@ protected:
         virtual bool isInCall();
         // true if given state represents a device in a telephony or VoIP call
         virtual bool isStateInCall(int state);
+        // true if playback to call TX or capture from call RX is possible
+        bool isCallAudioAccessible();
 
         // when a device is connected, checks if an open output can be routed
         // to this device. If none is open, tries to open one of the available outputs.

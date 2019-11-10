@@ -70,7 +70,7 @@ sp<Iface> MakeObject(status_t *pstatus) {
 } // namespace
 
 bool UseDrmService() {
-    return property_get_bool("persist.device_config.media_native.mediadrmserver", true);
+    return property_get_bool("mediadrm.use_mediadrmserver", true);
 }
 
 sp<IDrm> MakeDrm(status_t *pstatus) {

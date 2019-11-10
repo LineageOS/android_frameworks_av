@@ -751,6 +751,7 @@ static std::vector<std::pair<const char *, uint32_t>> int32Mappings {
         { "temporal-layer-id", kKeyTemporalLayerId },
         { "thumbnail-width", kKeyThumbnailWidth },
         { "thumbnail-height", kKeyThumbnailHeight },
+        { "track-id", kKeyTrackID },
         { "valid-samples", kKeyValidSamples },
     }
 };
@@ -956,12 +957,6 @@ status_t convertMetaDataToMessage(
     int32_t isSync;
     if (meta->findInt32(kKeyIsSyncFrame, &isSync) && isSync != 0) {
         msg->setInt32("is-sync-frame", 1);
-    }
-
-    // this only needs to be translated from meta to message as it is an extractor key
-    int32_t trackID;
-    if (meta->findInt32(kKeyTrackID, &trackID)) {
-        msg->setInt32("track-id", trackID);
     }
 
     const char *lang;
@@ -1909,25 +1904,24 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             meta->setData(kKeyAV1C, 0, csd0->data(), csd0->size());
         } else if (mime == MEDIA_MIMETYPE_VIDEO_DOLBY_VISION) {
             if (msg->findBuffer("csd-2", &csd2)) {
-                meta->setData(kKeyDVCC, kTypeDVCC, csd2->data(), csd2->size());
-
-                size_t dvcc_size = 1024;
-                uint8_t dvcc[dvcc_size];
-                memcpy(dvcc, csd2->data(), dvcc_size);
-                const uint8_t profile = dvcc[2] >> 1;
-
-                if (profile > 1 && profile < 9) {
-                    std::vector<uint8_t> hvcc(csd0size + 1024);
-                    size_t outsize = reassembleHVCC(csd0, hvcc.data(), hvcc.size(), 4);
-                    meta->setData(kKeyHVCC, kTypeHVCC, hvcc.data(), outsize);
-                } else if (DolbyVisionProfileDvav110 == profile) {
-                    meta->setData(kKeyAV1C, 0, csd0->data(), csd0->size());
-                } else {
-                    sp<ABuffer> csd1;
-                    if (msg->findBuffer("csd-1", &csd1)) {
-                        std::vector<char> avcc(csd0size + csd1->size() + 1024);
-                        size_t outsize = reassembleAVCC(csd0, csd1, avcc.data());
-                        meta->setData(kKeyAVCC, kTypeAVCC, avcc.data(), outsize);
+                //dvcc should be 24
+                if (csd2->size() == 24) {
+                    meta->setData(kKeyDVCC, kTypeDVCC, csd2->data(), csd2->size());
+                    uint8_t *dvcc = csd2->data();
+                    const uint8_t profile = dvcc[2] >> 1;
+                    if (profile > 1 && profile < 9) {
+                        std::vector<uint8_t> hvcc(csd0size + 1024);
+                        size_t outsize = reassembleHVCC(csd0, hvcc.data(), hvcc.size(), 4);
+                        meta->setData(kKeyHVCC, kTypeHVCC, hvcc.data(), outsize);
+                    } else if (DolbyVisionProfileDvav110 == profile) {
+                        meta->setData(kKeyAV1C, 0, csd0->data(), csd0->size());
+                    } else {
+                        sp<ABuffer> csd1;
+                        if (msg->findBuffer("csd-1", &csd1)) {
+                            std::vector<char> avcc(csd0size + csd1->size() + 1024);
+                            size_t outsize = reassembleAVCC(csd0, csd1, avcc.data());
+                            meta->setData(kKeyAVCC, kTypeAVCC, avcc.data(), outsize);
+                        }
                     }
                 }
             } else {

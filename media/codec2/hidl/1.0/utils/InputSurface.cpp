@@ -137,9 +137,9 @@ Return<void> InputSurface::connect(
     }
     std::shared_ptr<C2Component> comp = Component::findLocalComponent(sink);
     if (comp) {
-        connection = new InputSurfaceConnection(mSource, comp, mStore);
+        connection = new InputSurfaceConnection(mSource, comp, mParameterCache);
     } else {
-        connection = new InputSurfaceConnection(mSource, sink, mStore);
+        connection = new InputSurfaceConnection(mSource, sink, mParameterCache);
     }
     if (!connection->init()) {
         connection = nullptr;
@@ -153,11 +153,11 @@ Return<void> InputSurface::connect(
 
 // Constructor is exclusive to ComponentStore.
 InputSurface::InputSurface(
-        const sp<ComponentStore>& store,
+        const std::shared_ptr<ParameterCache>& cache,
         const std::shared_ptr<C2ReflectorHelper>& reflector,
         const sp<HGraphicBufferProducer>& producer,
         const sp<GraphicBufferSource>& source)
-      : mStore{store},
+      : mParameterCache{cache},
         mProducer{producer},
         mSource{source},
         mIntf{std::make_shared<Interface>(reflector)},
@@ -165,7 +165,7 @@ InputSurface::InputSurface(
                 std::make_unique<ConfigurableIntf>(
                     mIntf, source))} {
 
-    mConfigurable->init(store.get());
+    mConfigurable->init(mParameterCache);
 }
 
 }  // namespace utils

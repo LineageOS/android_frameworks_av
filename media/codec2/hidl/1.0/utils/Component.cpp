@@ -204,7 +204,8 @@ Component::Component(
         const sp<::android::hardware::media::bufferpool::V2_0::
         IClientManager>& clientPoolManager)
       : mComponent{component},
-        mInterface{new ComponentInterface(component->intf(), store.get())},
+        mInterface{new ComponentInterface(component->intf(),
+                                          store->getParameterCache())},
         mListener{listener},
         mStore{store},
         mBufferPoolSender{clientPoolManager} {

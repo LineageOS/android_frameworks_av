@@ -271,6 +271,8 @@ public:
 
     virtual status_t getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
                                                        volume_group_t &volumeGroup) = 0;
+
+    virtual bool     isCallScreenModeSupported() = 0;
 };
 
 

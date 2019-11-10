@@ -26,6 +26,11 @@ bool AudioDeviceTypeAddr::equals(const AudioDeviceTypeAddr& other) const {
     return mType == other.mType && mAddress == other.mAddress;
 }
 
+void AudioDeviceTypeAddr::reset() {
+    mType = AUDIO_DEVICE_NONE;
+    mAddress = "";
+}
+
 status_t AudioDeviceTypeAddr::readFromParcel(const Parcel *parcel) {
     status_t status;
     if ((status = parcel->readUint32(&mType)) != NO_ERROR) return status;
@@ -38,6 +43,15 @@ status_t AudioDeviceTypeAddr::writeToParcel(Parcel *parcel) const {
     if ((status = parcel->writeUint32(mType)) != NO_ERROR) return status;
     status = parcel->writeUtf8AsUtf16(mAddress);
     return status;
+}
+
+
+DeviceTypeSet getAudioDeviceTypes(const AudioDeviceTypeAddrVector& deviceTypeAddrs) {
+    DeviceTypeSet deviceTypes;
+    for (const auto& deviceTypeAddr : deviceTypeAddrs) {
+        deviceTypes.insert(deviceTypeAddr.mType);
+    }
+    return deviceTypes;
 }
 
 }

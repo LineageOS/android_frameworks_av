@@ -682,8 +682,8 @@ void AudioPolicyManager::setPhoneState(audio_mode_t state)
      * Switching to or from incall state or switching between telephony and VoIP lead to force
      * routing command.
      */
-    bool force = ((is_state_in_call(oldState) != is_state_in_call(state))
-                  || (is_state_in_call(state) && (state != oldState)));
+    bool force = ((isStateInCall(oldState) != isStateInCall(state))
+                  || (isStateInCall(state) && (state != oldState)));
 
     // check for device and output changes triggered by new phone state
     checkForDeviceAndOutputChanges();
@@ -1015,7 +1015,7 @@ status_t AudioPolicyManager::getOutputForAttrInt(
     if (outputDevices.onlyContainsDevicesWithType(AUDIO_DEVICE_OUT_TELEPHONY_TX) &&
         (*stream == AUDIO_STREAM_MUSIC  || resultAttr->usage == AUDIO_USAGE_VOICE_COMMUNICATION) &&
         audio_is_linear_pcm(config->format) &&
-        isInCall()) {
+        isCallAudioAccessible()) {
         if (requestedPortId != AUDIO_PORT_HANDLE_NONE) {
             *flags = (audio_output_flags_t)AUDIO_OUTPUT_FLAG_INCALL_MUSIC;
             *isRequestedDeviceForExclusiveUse = true;
@@ -4207,6 +4207,12 @@ bool AudioPolicyManager::isHapticPlaybackSupported()
     return false;
 }
 
+bool AudioPolicyManager::isCallScreenModeSupported()
+{
+    return getConfig().isCallScreenModeSupported();
+}
+
+
 status_t AudioPolicyManager::disconnectAudioSource(const sp<SourceClientDescriptor>& sourceDesc)
 {
     ALOGV("%s port Id %d", __FUNCTION__, sourceDesc->portId());
@@ -6060,6 +6066,14 @@ bool AudioPolicyManager::isInCall()
 bool AudioPolicyManager::isStateInCall(int state)
 {
     return is_state_in_call(state);
+}
+
+bool AudioPolicyManager::isCallAudioAccessible()
+{
+    audio_mode_t mode = mEngine->getPhoneState();
+    return (mode == AUDIO_MODE_IN_CALL)
+            || (mode == AUDIO_MODE_IN_COMMUNICATION)
+            || (mode == AUDIO_MODE_CALL_SCREEN);
 }
 
 void AudioPolicyManager::cleanUpForDevice(const sp<DeviceDescriptor>& deviceDesc)

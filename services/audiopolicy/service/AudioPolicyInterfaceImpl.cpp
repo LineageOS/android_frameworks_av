@@ -1329,4 +1329,15 @@ status_t AudioPolicyService::setRttEnabled(bool enabled)
     return NO_ERROR;
 }
 
+bool AudioPolicyService::isCallScreenModeSupported()
+{
+    if (mAudioPolicyManager == NULL) {
+        ALOGW("%s, mAudioPolicyManager == NULL", __func__);
+        return false;
+    }
+    Mutex::Autolock _l(mLock);
+    AutoCallerClear acc;
+    return mAudioPolicyManager->isCallScreenModeSupported();
+}
+
 } // namespace android
