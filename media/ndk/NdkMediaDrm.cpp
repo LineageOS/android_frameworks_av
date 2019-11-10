@@ -35,7 +35,6 @@
 #include <media/stagefright/MediaErrors.h>
 #include <binder/IServiceManager.h>
 #include <media/NdkMediaCrypto.h>
-#include <mediadrm/IMediaDrmService.h>
 
 
 using namespace android;
