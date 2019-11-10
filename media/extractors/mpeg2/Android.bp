@@ -16,7 +16,6 @@ cc_library_shared {
         "liblog#10000",
         "libmediandk#29",
         "libvndksupport#29",
-        "libcrypto",
     ],
 
     header_libs: [
