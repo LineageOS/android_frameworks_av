@@ -179,9 +179,10 @@ void AudioPolicyManagerTest::getOutputForAttr(
     audio_port_handle_t localPortId;
     if (!portId) portId = &localPortId;
     *portId = AUDIO_PORT_HANDLE_NONE;
+    AudioPolicyInterface::output_type_t outputType;
     ASSERT_EQ(OK, mManager->getOutputForAttr(
                     &attr, output, AUDIO_SESSION_NONE, &stream, 0 /*uid*/, &config, &flags,
-                    selectedDeviceId, portId, {}));
+                    selectedDeviceId, portId, {}, &outputType));
     ASSERT_NE(AUDIO_PORT_HANDLE_NONE, *portId);
     ASSERT_NE(AUDIO_IO_HANDLE_NONE, *output);
 }
