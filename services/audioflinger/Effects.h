@@ -109,7 +109,8 @@ public:
     const effect_descriptor_t& desc() const { return mDescriptor; }
     wp<EffectChain>&     chain() { return mChain; }
 
-    status_t         setDevice(audio_devices_t device);
+    status_t         setDevices(const AudioDeviceTypeAddrVector &devices);
+    status_t         setInputDevice(const AudioDeviceTypeAddr &device);
     status_t         setVolume(uint32_t *left, uint32_t *right, bool controller);
     status_t         setMode(audio_mode_t mode);
     status_t         setAudioSource(audio_source_t source);
@@ -158,6 +159,7 @@ private:
     status_t start_l();
     status_t stop_l();
     status_t remove_effect_from_hal_l();
+    status_t sendSetAudioDevicesCommand(const AudioDeviceTypeAddrVector &devices, uint32_t cmdCode);
 
 mutable Mutex               mLock;      // mutex for process, commands and handles list protection
     wp<ThreadBase>      mThread;    // parent thread
@@ -350,7 +352,8 @@ public:
     // FIXME use float to improve the dynamic range
     bool setVolume_l(uint32_t *left, uint32_t *right, bool force = false);
     void resetVolume_l();
-    void setDevice_l(audio_devices_t device);
+    void setDevices_l(const AudioDeviceTypeAddrVector &devices);
+    void setInputDevice_l(const AudioDeviceTypeAddr &device);
     void setMode_l(audio_mode_t mode);
     void setAudioSource_l(audio_source_t source);
 

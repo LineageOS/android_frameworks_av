@@ -1378,8 +1378,8 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::ThreadBase::createEffect_l(
             effectCreated = true;
 
             // FIXME: use vector of device and address when effect interface is ready.
-            effect->setDevice(deviceTypesToBitMask(outDeviceTypes()));
-            effect->setDevice(inDeviceType());
+            effect->setDevices(outDeviceTypeAddrs());
+            effect->setInputDevice(inDeviceTypeAddr());
             effect->setMode(mAudioFlinger->getMode());
             effect->setAudioSource(mAudioSource);
         }
@@ -1495,8 +1495,8 @@ status_t AudioFlinger::ThreadBase::addEffect_l(const sp<EffectModule>& effect)
         return status;
     }
 
-    effect->setDevice(deviceTypesToBitMask(outDeviceTypes()));
-    effect->setDevice(inDeviceType());
+    effect->setDevices(outDeviceTypeAddrs());
+    effect->setInputDevice(inDeviceTypeAddr());
     effect->setMode(mAudioFlinger->getMode());
     effect->setAudioSource(mAudioSource);
 
@@ -4070,7 +4070,7 @@ status_t AudioFlinger::PlaybackThread::createAudioPatch_l(const struct audio_pat
 #endif
 
     for (size_t i = 0; i < mEffectChains.size(); i++) {
-        mEffectChains[i]->setDevice_l(type);
+        mEffectChains[i]->setDevices_l(deviceTypeAddrs);
     }
 
     // mPatch.num_sinks is not set when the thread is created so that
@@ -8321,7 +8321,7 @@ status_t AudioFlinger::RecordThread::createAudioPatch_l(const struct audio_patch
     mInDeviceTypeAddr.mAddress = patch->sources[0].ext.device.address;
     audio_port_handle_t deviceId = patch->sources[0].id;
     for (size_t i = 0; i < mEffectChains.size(); i++) {
-        mEffectChains[i]->setDevice_l(mInDeviceTypeAddr.mType);
+        mEffectChains[i]->setInputDevice_l(inDeviceTypeAddr());
     }
 
     checkBtNrec_l();
@@ -8391,7 +8391,7 @@ void AudioFlinger::RecordThread::updateOutDevices(const DeviceDescriptorBaseVect
     mOutDevices = outDevices;
     mOutDeviceTypeAddrs = deviceTypeAddrsFromDescriptors(mOutDevices);
     for (size_t i = 0; i < mEffectChains.size(); i++) {
-        mEffectChains[i]->setDevice_l(deviceTypesToBitMask(outDeviceTypes()));
+        mEffectChains[i]->setDevices_l(outDeviceTypeAddrs());
     }
 }
 
@@ -8922,7 +8922,11 @@ status_t AudioFlinger::MmapThread::createAudioPatch_l(const struct audio_patch *
     }
 
     for (size_t i = 0; i < mEffectChains.size(); i++) {
-        mEffectChains[i]->setDevice_l(type);
+        if (isOutput()) {
+            mEffectChains[i]->setDevices_l(sinkDeviceTypeAddrs);
+        } else {
+            mEffectChains[i]->setInputDevice_l(sourceDeviceTypeAddr);
+        }
     }
 
     if (!isOutput()) {
