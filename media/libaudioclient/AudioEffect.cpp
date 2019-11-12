@@ -167,7 +167,7 @@ status_t AudioEffect::set(const effect_uuid_t *type,
     ALOGV("set() %p OK effect: %s id: %d status %d enabled %d pid %d", this, mDescriptor.name, mId,
             mStatus, mEnabled, mClientPid);
 
-    if (mSessionId > AUDIO_SESSION_OUTPUT_MIX) {
+    if (!audio_is_global_session(mSessionId)) {
         AudioSystem::acquireAudioSessionId(mSessionId, mClientPid);
     }
 
@@ -180,7 +180,7 @@ AudioEffect::~AudioEffect()
     ALOGV("Destructor %p", this);
 
     if (mStatus == NO_ERROR || mStatus == ALREADY_EXISTS) {
-        if (mSessionId > AUDIO_SESSION_OUTPUT_MIX) {
+        if (!audio_is_global_session(mSessionId)) {
             AudioSystem::releaseAudioSessionId(mSessionId, mClientPid);
         }
         if (mIEffect != NULL) {

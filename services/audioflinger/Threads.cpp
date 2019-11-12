@@ -1164,7 +1164,7 @@ void AudioFlinger::ThreadBase::checkSuspendOnEffectEnabled_l(const sp<EffectModu
         // and applications not using global effects.
         // Enabling post processing in AUDIO_SESSION_OUTPUT_STAGE session does not affect
         // global effects
-        if ((sessionId != AUDIO_SESSION_OUTPUT_MIX) && (sessionId != AUDIO_SESSION_OUTPUT_STAGE)) {
+        if (!audio_is_global_session(sessionId)) {
             setEffectSuspended_l(NULL, enabled, AUDIO_SESSION_OUTPUT_MIX);
         }
     }
@@ -1179,8 +1179,9 @@ void AudioFlinger::ThreadBase::checkSuspendOnEffectEnabled_l(const sp<EffectModu
 status_t AudioFlinger::RecordThread::checkEffectCompatibility_l(
         const effect_descriptor_t *desc, audio_session_t sessionId)
 {
-    // No global effect sessions on record threads
-    if (sessionId == AUDIO_SESSION_OUTPUT_MIX || sessionId == AUDIO_SESSION_OUTPUT_STAGE) {
+    // No global output effect sessions on record threads
+    if (sessionId == AUDIO_SESSION_OUTPUT_MIX
+            || sessionId == AUDIO_SESSION_OUTPUT_STAGE) {
         ALOGW("checkEffectCompatibility_l(): global effect %s on record thread %s",
                 desc->name, mThreadName);
         return BAD_VALUE;
@@ -1254,6 +1255,13 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
                             " on output stage session", desc->name);
                     return BAD_VALUE;
                 }
+            } else if (sessionId == AUDIO_SESSION_DEVICE) {
+                // only post processing on output stage session
+                if ((desc->flags & EFFECT_FLAG_TYPE_MASK) != EFFECT_FLAG_TYPE_POST_PROC) {
+                    ALOGW("checkEffectCompatibility_l(): non post processing effect %s not allowed"
+                            " on device session", desc->name);
+                    return BAD_VALUE;
+                }
             } else {
                 // no restriction on effects applied on non fast tracks
                 if ((hasAudioSession_l(sessionId) & ThreadBase::FAST_SESSION) == 0) {
@@ -1295,7 +1303,7 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
             return BAD_VALUE;
         }
 #endif
-        if ((sessionId == AUDIO_SESSION_OUTPUT_STAGE) || (sessionId == AUDIO_SESSION_OUTPUT_MIX)) {
+        if (audio_is_global_session(sessionId)) {
             ALOGW("checkEffectCompatibility_l(): global effect %s on DUPLICATING"
                     " thread %s", desc->name, mThreadName);
             return BAD_VALUE;
@@ -2051,6 +2059,7 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         { // scope for mLock
             Mutex::Autolock _l(mLock);
             for (audio_session_t session : {
+                    AUDIO_SESSION_DEVICE,
                     AUDIO_SESSION_OUTPUT_STAGE,
                     AUDIO_SESSION_OUTPUT_MIX,
                     sessionId,
@@ -3103,7 +3112,7 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
     halOutBuffer = halInBuffer;
     effect_buffer_t *buffer = reinterpret_cast<effect_buffer_t*>(halInBuffer->externalData());
     ALOGV("addEffectChain_l() %p on thread %p for session %d", chain.get(), this, session);
-    if (session > AUDIO_SESSION_OUTPUT_MIX) {
+    if (!audio_is_global_session(session)) {
         // Only one effect chain can be present in direct output thread and it uses
         // the sink buffer as input
         if (mType != DIRECT) {
@@ -3143,8 +3152,11 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
     chain->setThread(this);
     chain->setInBuffer(halInBuffer);
     chain->setOutBuffer(halOutBuffer);
-    // Effect chain for session AUDIO_SESSION_OUTPUT_STAGE is inserted at end of effect
-    // chains list in order to be processed last as it contains output stage effects.
+    // Effect chain for session AUDIO_SESSION_DEVICE is inserted at end of effect
+    // chains list in order to be processed last as it contains output device effects.
+    // Effect chain for session AUDIO_SESSION_OUTPUT_STAGE is inserted just before to apply post
+    // processing effects specific to an output stream before effects applied to all streams
+    // routed to a given device.
     // Effect chain for session AUDIO_SESSION_OUTPUT_MIX is inserted before
     // session AUDIO_SESSION_OUTPUT_STAGE to be processed
     // after track specific effects and before output stage.
@@ -3154,7 +3166,8 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
     // chains list to be processed before output mix effects. Relative order between other
     // sessions is not important.
     static_assert(AUDIO_SESSION_OUTPUT_MIX == 0 &&
-            AUDIO_SESSION_OUTPUT_STAGE < AUDIO_SESSION_OUTPUT_MIX,
+            AUDIO_SESSION_OUTPUT_STAGE < AUDIO_SESSION_OUTPUT_MIX &&
+            AUDIO_SESSION_DEVICE < AUDIO_SESSION_OUTPUT_STAGE,
             "audio_session_t constants misdefined");
     size_t size = mEffectChains.size();
     size_t i = 0;
@@ -9093,8 +9106,8 @@ status_t AudioFlinger::MmapThread::checkEffectCompatibility_l(
         const effect_descriptor_t *desc, audio_session_t sessionId)
 {
     // No global effect sessions on mmap threads
-    if (sessionId == AUDIO_SESSION_OUTPUT_MIX || sessionId == AUDIO_SESSION_OUTPUT_STAGE) {
-        ALOGW("checkEffectCompatibility_l(): global effect %s on record thread %s",
+    if (audio_is_global_session(sessionId)) {
+        ALOGW("checkEffectCompatibility_l(): global effect %s on MMAP thread %s",
                 desc->name, mThreadName);
         return BAD_VALUE;
     }
@@ -9116,7 +9129,6 @@ status_t AudioFlinger::MmapThread::checkEffectCompatibility_l(
     }
 
     return NO_ERROR;
-
 }
 
 void AudioFlinger::MmapThread::checkInvalidTracks_l()

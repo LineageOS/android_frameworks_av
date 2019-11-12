@@ -174,12 +174,19 @@ bool modifyAudioRoutingAllowed() {
 }
 
 bool modifyDefaultAudioEffectsAllowed() {
+    return modifyDefaultAudioEffectsAllowed(
+        IPCThreadState::self()->getCallingPid(), IPCThreadState::self()->getCallingUid());
+}
+
+bool modifyDefaultAudioEffectsAllowed(pid_t pid, uid_t uid) {
+    if (isAudioServerUid(IPCThreadState::self()->getCallingUid())) return true;
+
     static const String16 sModifyDefaultAudioEffectsAllowed(
             "android.permission.MODIFY_DEFAULT_AUDIO_EFFECTS");
     // IMPORTANT: Use PermissionCache - not a runtime permission and may not change.
-    bool ok = PermissionCache::checkCallingPermission(sModifyDefaultAudioEffectsAllowed);
-
-    if (!ok) ALOGE("android.permission.MODIFY_DEFAULT_AUDIO_EFFECTS");
+    bool ok = PermissionCache::checkPermission(sModifyDefaultAudioEffectsAllowed, pid, uid);
+    ALOGE_IF(!ok, "%s(): android.permission.MODIFY_DEFAULT_AUDIO_EFFECTS denied for uid %d",
+            __func__, uid);
     return ok;
 }
 
