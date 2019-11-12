@@ -36,7 +36,7 @@ class IMemoryHeap;
 
 namespace android {
 
-struct CryptoHal : public BnCrypto {
+struct CryptoHal : public ICrypto {
     CryptoHal();
     virtual ~CryptoHal();
 

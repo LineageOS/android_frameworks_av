@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-#include <binder/IInterface.h>
 #include <cutils/native_handle.h>
 #include <media/hardware/CryptoAPI.h>
 #include <media/stagefright/foundation/ABase.h>
+#include <utils/RefBase.h>
+#include <utils/StrongPointer.h>
 
 #ifndef ANDROID_ICRYPTO_H_
 
@@ -29,8 +30,9 @@ struct AString;
 class IMemory;
 class IMemoryHeap;
 
-struct ICrypto : public IInterface {
-    DECLARE_META_INTERFACE(Crypto);
+struct ICrypto : public RefBase {
+
+    virtual ~ICrypto() {}
 
     virtual status_t initCheck() const = 0;
 
@@ -79,17 +81,11 @@ struct ICrypto : public IInterface {
     virtual int32_t setHeap(const sp<IMemoryHeap>& heap) = 0;
     virtual void unsetHeap(int32_t seqNum) = 0;
 
+protected:
+    ICrypto() {}
+
 private:
     DISALLOW_EVIL_CONSTRUCTORS(ICrypto);
-};
-
-struct BnCrypto : public BnInterface<ICrypto> {
-    virtual status_t onTransact(
-            uint32_t code, const Parcel &data, Parcel *reply,
-            uint32_t flags = 0);
-private:
-    void readVector(const Parcel &data, Vector<uint8_t> &vector) const;
-    void writeVector(Parcel *reply, Vector<uint8_t> const &vector) const;
 };
 
 }  // namespace android
