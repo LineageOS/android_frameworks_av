@@ -321,6 +321,13 @@ public:
                     return isOutput() ? outDeviceTypes() : DeviceTypeSet({inDeviceType()});
                 }
 
+                const AudioDeviceTypeAddrVector& outDeviceTypeAddrs() const {
+                    return mOutDeviceTypeAddrs;
+                }
+                const AudioDeviceTypeAddr& inDeviceTypeAddr() const {
+                    return mInDeviceTypeAddr;
+                }
+
     virtual     bool        isOutput() const = 0;
 
     virtual     sp<StreamHalInterface> stream() const = 0;
