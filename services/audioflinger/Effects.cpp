@@ -637,7 +637,7 @@ status_t AudioFlinger::EffectModule::configure()
     mConfig.outputCfg.bufferProvider.releaseBuffer = NULL;
     mConfig.inputCfg.accessMode = EFFECT_BUFFER_ACCESS_READ;
     // Insert effect:
-    // - in session AUDIO_SESSION_OUTPUT_MIX or AUDIO_SESSION_OUTPUT_STAGE,
+    // - in global sessions (e.g AUDIO_SESSION_OUTPUT_MIX),
     // always overwrites output buffer: input buffer == output buffer
     // - in other sessions:
     //      last effect in the chain accumulates in output buffer: input buffer != output buffer
@@ -2062,14 +2062,12 @@ void AudioFlinger::EffectChain::process_l()
         ALOGW("process_l(): cannot promote mixer thread");
         return;
     }
-    bool isGlobalSession = (mSessionId == AUDIO_SESSION_OUTPUT_MIX) ||
-            (mSessionId == AUDIO_SESSION_OUTPUT_STAGE);
     // never process effects when:
     // - on an OFFLOAD thread
     // - no more tracks are on the session and the effect tail has been rendered
     bool doProcess = (thread->type() != ThreadBase::OFFLOAD)
                   && (thread->type() != ThreadBase::MMAP);
-    if (!isGlobalSession) {
+    if (!audio_is_global_session(mSessionId)) {
         bool tracksOnSession = (trackCnt() != 0);
 
         if (!tracksOnSession && mTailBufferCount == 0) {
