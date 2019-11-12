@@ -78,7 +78,10 @@ sp<IDrm> MakeDrm(status_t *pstatus) {
 }
 
 sp<ICrypto> MakeCrypto(status_t *pstatus) {
-    return MakeObject<ICrypto, CryptoHal>(pstatus);
+    if (pstatus) {
+        *pstatus = OK;
+    }
+    return new CryptoHal();
 }
 
 }  // namespace DrmUtils
