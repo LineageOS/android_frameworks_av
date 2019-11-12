@@ -30,6 +30,7 @@
 #include <mediadrm/DrmSessionManager.h>
 #include <mediadrm/IDrm.h>
 #include <mediadrm/IDrmClient.h>
+#include <mediadrm/IDrmMetricsConsumer.h>
 #include <utils/threads.h>
 
 namespace drm = ::android::hardware::drm;
@@ -136,7 +137,7 @@ struct DrmHal : public IDrm,
     virtual status_t setPropertyString(String8 const &name, String8 const &value ) const;
     virtual status_t setPropertyByteArray(String8 const &name,
                                           Vector<uint8_t> const &value ) const;
-    virtual status_t getMetrics(os::PersistableBundle *metrics);
+    virtual status_t getMetrics(const sp<IDrmMetricsConsumer> &consumer);
 
     virtual status_t setCipherAlgorithm(Vector<uint8_t> const &sessionId,
                                         String8 const &algorithm);

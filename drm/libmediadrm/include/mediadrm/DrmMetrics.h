@@ -75,55 +75,14 @@ class MediaDrmMetrics {
   void SetAppUid(uid_t appUid) { mAppUid = appUid; }
   uid_t GetAppUid() const { return mAppUid; }
 
-  // Export the metrics to a PersistableBundle.
-  void Export(os::PersistableBundle* metricsBundle);
-
   // Get the serialized metrics. Metrics are formatted as a serialized
   // DrmFrameworkMetrics proto. If there is a failure serializing the metrics,
   // this returns an error. The parameter |serlializedMetrics| is owned by the
   // caller and must not be null.
   status_t GetSerializedMetrics(std::string* serializedMetrics);
 
-  // Converts the DRM plugin metrics to a PersistableBundle. All of the metrics
-  // found in |pluginMetrics| are added to the |metricsBundle| parameter.
-  // |pluginBundle| is owned by the caller and must not be null.
-  //
-  // Each item in the pluginMetrics vector is added as a new PersistableBundle. E.g.
-  // DrmMetricGroup {
-  //   metrics[0] {
-  //     name: "buf_copy"
-  //     attributes[0] {
-  //       name: "size"
-  //       type: INT64_TYPE
-  //       int64Value: 1024
-  //     }
-  //     values[0] {
-  //       componentName: "operation_count"
-  //       type: INT64_TYPE
-  //       int64Value: 75
-  //     }
-  //     values[1] {
-  //       component_name: "average_time_seconds"
-  //       type: DOUBLE_TYPE
-  //       doubleValue: 0.00000042
-  //     }
-  //   }
-  // }
-  //
-  // becomes
-  //
-  // metricsBundle {
-  //   "0": (PersistableBundle) {
-  //     "attributes" : (PersistableBundle) {
-  //       "size" : (int64) 1024
-  //     }
-  //     "operation_count" : (int64) 75
-  //     "average_time_seconds" : (double) 0.00000042
-  //   }
-  //
-  static status_t HidlMetricsToBundle(
-          const hardware::hidl_vec<hardware::drm::V1_1::DrmMetricGroup>& pluginMetrics,
-          os::PersistableBundle* metricsBundle);
+  // Get copy of session lifetimes.
+  std::map<std::string, std::pair<int64_t, int64_t>> GetSessionLifespans() const;
 
  protected:
   // This is visible for testing only.
