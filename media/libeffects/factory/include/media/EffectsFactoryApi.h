@@ -119,6 +119,36 @@ int EffectCreate(const effect_uuid_t *pEffectUuid, int32_t sessionId, int32_t io
 
 ////////////////////////////////////////////////////////////////////////////////
 //
+//    Function:       EffectCreateOnDevice
+//
+//    Description:    Same as EffectCreate but uesed when creating an effect attached to a
+//                 particular audio device instance
+//
+//    Input:
+//          pEffectUuid:    pointer to the effect uuid.
+//          deviceId:  identifies the sink or source device this effect is directed to in
+//              audio HAL. Must be specified if sessionId is AUDIO_SESSION_DEVICE.
+//              deviceId is the audio_port_handle_t used for the device when the audio
+//              patch is created at the audio HAL.//
+//          ioId:   identifies the output or input stream this effect is directed to at audio HAL.
+//              For future use especially with tunneled HW accelerated effects
+//    Input/Output:
+//          pHandle:        address where to return the effect handle.
+//
+//    Output:
+//        returned value:    0          successful operation.
+//                          -ENODEV     factory failed to initialize
+//                          -EINVAL     invalid pEffectUuid or pHandle
+//                          -ENOENT     no effect with this uuid found
+//        *pHandle:         updated with the effect handle.
+//
+////////////////////////////////////////////////////////////////////////////////
+ANDROID_API
+int EffectCreateOnDevice(const effect_uuid_t *pEffectUuid, int32_t deviceId, int32_t ioId,
+        effect_handle_t *pHandle);
+
+////////////////////////////////////////////////////////////////////////////////
+//
 //    Function:       EffectRelease
 //
 //    Description:    Releases the effect engine whose handle is given as argument.

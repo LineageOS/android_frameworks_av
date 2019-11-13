@@ -164,6 +164,7 @@ DownmixerBufferProvider::DownmixerBufferProvider(
     if (mEffectsFactory->createEffect(&sDwnmFxDesc.uuid,
                                       sessionId,
                                       SESSION_ID_INVALID_AND_IGNORED,
+                                      AUDIO_PORT_HANDLE_NONE,
                                       &mDownmixInterface) != 0) {
          ALOGE("DownmixerBufferProvider() error creating downmixer effect");
          mDownmixInterface.clear();
