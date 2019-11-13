@@ -187,6 +187,11 @@ public:
     bool hasFlashUnit(const std::string &id) const;
 
     /**
+     * Return true if the camera device has native zoom ratio support.
+     */
+    bool supportNativeZoomRatio(const std::string &id) const;
+
+    /**
      * Return the resource cost of this camera device
      */
     status_t getResourceCost(const std::string &id,
@@ -416,6 +421,7 @@ private:
             sp<ProviderInfo> mParentProvider;
 
             bool hasFlashUnit() const { return mHasFlashUnit; }
+            bool supportNativeZoomRatio() const { return mSupportNativeZoomRatio; }
             virtual status_t setTorchMode(bool enabled) = 0;
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const = 0;
             virtual bool isAPI1Compatible() const = 0;
@@ -449,10 +455,11 @@ private:
                     mIsLogicalCamera(false), mResourceCost(resourceCost),
                     mStatus(hardware::camera::common::V1_0::CameraDeviceStatus::PRESENT),
                     mParentProvider(parentProvider), mHasFlashUnit(false),
-                    mPublicCameraIds(publicCameraIds) {}
+                    mSupportNativeZoomRatio(false), mPublicCameraIds(publicCameraIds) {}
             virtual ~DeviceInfo();
         protected:
-            bool mHasFlashUnit;
+            bool mHasFlashUnit; // const after constructor
+            bool mSupportNativeZoomRatio; // const after constructor
             const std::vector<std::string>& mPublicCameraIds;
 
             template<class InterfaceT>

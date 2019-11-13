@@ -518,11 +518,22 @@ typedef enum acamera_metadata_tag {
      * region and output only the intersection rectangle as the metering region in the result
      * metadata.  If the region is entirely outside the crop region, it will be ignored and
      * not reported in the result metadata.</p>
+     * <p>Starting from API level 30, the coordinate system of activeArraySize or
+     * preCorrectionActiveArraySize is used to represent post-zoomRatio field of view, not
+     * pre-zoom field of view. This means that the same aeRegions values at different
+     * ACAMERA_CONTROL_ZOOM_RATIO represent different parts of the scene. The aeRegions
+     * coordinates are relative to the activeArray/preCorrectionActiveArray representing the
+     * zoomed field of view. If ACAMERA_CONTROL_ZOOM_RATIO is set to 1.0 (default), the same
+     * aeRegions at different ACAMERA_SCALER_CROP_REGION still represent the same parts of the
+     * scene as they do before. See ACAMERA_CONTROL_ZOOM_RATIO for details. Whether to use
+     * activeArraySize or preCorrectionActiveArraySize still depends on distortion correction
+     * mode.</p>
      * <p>The data representation is <code>int[5 * area_count]</code>.
      * Every five elements represent a metering region of <code>(xmin, ymin, xmax, ymax, weight)</code>.
      * The rectangle is defined to be inclusive on xmin and ymin, but exclusive on xmax and
      * ymax.</p>
      *
+     * @see ACAMERA_CONTROL_ZOOM_RATIO
      * @see ACAMERA_DISTORTION_CORRECTION_MODE
      * @see ACAMERA_SCALER_CROP_REGION
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
@@ -698,11 +709,22 @@ typedef enum acamera_metadata_tag {
      * region and output only the intersection rectangle as the metering region in the result
      * metadata. If the region is entirely outside the crop region, it will be ignored and
      * not reported in the result metadata.</p>
+     * <p>Starting from API level 30, the coordinate system of activeArraySize or
+     * preCorrectionActiveArraySize is used to represent post-zoomRatio field of view, not
+     * pre-zoom field of view. This means that the same afRegions values at different
+     * ACAMERA_CONTROL_ZOOM_RATIO represent different parts of the scene. The afRegions
+     * coordinates are relative to the activeArray/preCorrectionActiveArray representing the
+     * zoomed field of view. If ACAMERA_CONTROL_ZOOM_RATIO is set to 1.0 (default), the same
+     * afRegions at different ACAMERA_SCALER_CROP_REGION still represent the same parts of the
+     * scene as they do before. See ACAMERA_CONTROL_ZOOM_RATIO for details. Whether to use
+     * activeArraySize or preCorrectionActiveArraySize still depends on distortion correction
+     * mode.</p>
      * <p>The data representation is <code>int[5 * area_count]</code>.
      * Every five elements represent a metering region of <code>(xmin, ymin, xmax, ymax, weight)</code>.
      * The rectangle is defined to be inclusive on xmin and ymin, but exclusive on xmax and
      * ymax.</p>
      *
+     * @see ACAMERA_CONTROL_ZOOM_RATIO
      * @see ACAMERA_DISTORTION_CORRECTION_MODE
      * @see ACAMERA_SCALER_CROP_REGION
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
@@ -873,11 +895,22 @@ typedef enum acamera_metadata_tag {
      * region and output only the intersection rectangle as the metering region in the result
      * metadata.  If the region is entirely outside the crop region, it will be ignored and
      * not reported in the result metadata.</p>
+     * <p>Starting from API level 30, the coordinate system of activeArraySize or
+     * preCorrectionActiveArraySize is used to represent post-zoomRatio field of view, not
+     * pre-zoom field of view. This means that the same awbRegions values at different
+     * ACAMERA_CONTROL_ZOOM_RATIO represent different parts of the scene. The awbRegions
+     * coordinates are relative to the activeArray/preCorrectionActiveArray representing the
+     * zoomed field of view. If ACAMERA_CONTROL_ZOOM_RATIO is set to 1.0 (default), the same
+     * awbRegions at different ACAMERA_SCALER_CROP_REGION still represent the same parts of
+     * the scene as they do before. See ACAMERA_CONTROL_ZOOM_RATIO for details. Whether to use
+     * activeArraySize or preCorrectionActiveArraySize still depends on distortion correction
+     * mode.</p>
      * <p>The data representation is <code>int[5 * area_count]</code>.
      * Every five elements represent a metering region of <code>(xmin, ymin, xmax, ymax, weight)</code>.
      * The rectangle is defined to be inclusive on xmin and ymin, but exclusive on xmax and
      * ymax.</p>
      *
+     * @see ACAMERA_CONTROL_ZOOM_RATIO
      * @see ACAMERA_DISTORTION_CORRECTION_MODE
      * @see ACAMERA_SCALER_CROP_REGION
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
@@ -1735,8 +1768,10 @@ typedef enum acamera_metadata_tag {
     ACAMERA_CONTROL_AF_SCENE_CHANGE =                           // byte (acamera_metadata_enum_android_control_af_scene_change_t)
             ACAMERA_CONTROL_START + 42,
     /**
-     * <p>The list of bokeh modes that are supported by this camera device, and each bokeh mode's
-     * maximum streaming (non-stall) size with bokeh effect.</p>
+     * <p>The list of bokeh modes for ACAMERA_CONTROL_BOKEH_MODE that are supported by this camera
+     * device, and each bokeh mode's maximum streaming (non-stall) size with bokeh effect.</p>
+     *
+     * @see ACAMERA_CONTROL_BOKEH_MODE
      *
      * <p>Type: int32[3*n]</p>
      *
@@ -1761,8 +1796,30 @@ typedef enum acamera_metadata_tag {
      * application configures a stream with larger dimension, the stream may not have bokeh
      * effect applied.</p>
      */
-    ACAMERA_CONTROL_AVAILABLE_BOKEH_CAPABILITIES =              // int32[3*n]
+    ACAMERA_CONTROL_AVAILABLE_BOKEH_MAX_SIZES =                 // int32[3*n]
             ACAMERA_CONTROL_START + 43,
+    /**
+     * <p>The ranges of supported zoom ratio for non-OFF ACAMERA_CONTROL_BOKEH_MODE.</p>
+     *
+     * @see ACAMERA_CONTROL_BOKEH_MODE
+     *
+     * <p>Type: float[2*n]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>When bokeh mode is enabled, the camera device may have limited range of zoom ratios
+     * compared to when bokeh mode is disabled. This tag lists the zoom ratio ranges for all
+     * supported non-OFF bokeh modes, in the same order as in
+     * ACAMERA_CONTROL_AVAILABLE_BOKEH_CAPABILITIES.</p>
+     * <p>Range [1.0, 1.0] means that no zoom (optical or digital) is supported.</p>
+     *
+     * @see ACAMERA_CONTROL_AVAILABLE_BOKEH_CAPABILITIES
+     */
+    ACAMERA_CONTROL_AVAILABLE_BOKEH_ZOOM_RATIO_RANGES =         // float[2*n]
+            ACAMERA_CONTROL_START + 44,
     /**
      * <p>Whether bokeh mode is enabled for a particular capture request.</p>
      *
@@ -1804,7 +1861,71 @@ typedef enum acamera_metadata_tag {
      * bokeh mode is off.</p>
      */
     ACAMERA_CONTROL_BOKEH_MODE =                                // byte (acamera_metadata_enum_android_control_bokeh_mode_t)
-            ACAMERA_CONTROL_START + 44,
+            ACAMERA_CONTROL_START + 45,
+    /**
+     * <p>Minimum and maximum zoom ratios supported by this camera device.</p>
+     *
+     * <p>Type: float[2]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>If the camera device supports zoom-out from 1x zoom, minZoom will be less than 1.0, and
+     * setting android.control.zoomRation to values less than 1.0 increases the camera's field
+     * of view.</p>
+     */
+    ACAMERA_CONTROL_ZOOM_RATIO_RANGE =                          // float[2]
+            ACAMERA_CONTROL_START + 46,
+    /**
+     * <p>The desired zoom ratio</p>
+     *
+     * <p>Type: float</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraCaptureSession_captureCallback_result callbacks</li>
+     *   <li>ACaptureRequest</li>
+     * </ul></p>
+     *
+     * <p>Instead of using ACAMERA_SCALER_CROP_REGION with dual purposes of crop and zoom, the
+     * application can now choose to use this tag to specify the desired zoom level. The
+     * ACAMERA_SCALER_CROP_REGION can still be used to specify the horizontal or vertical
+     * crop to achieve aspect ratios different than the native camera sensor.</p>
+     * <p>By using this control, the application gains a simpler way to control zoom, which can
+     * be a combination of optical and digital zoom. More specifically, for a logical
+     * multi-camera with more than one focal length, using a floating point zoom ratio offers
+     * more zoom precision when a telephoto lens is used, as well as allowing zoom ratio of
+     * less than 1.0 to zoom out to a wide field of view.</p>
+     * <p>Note that the coordinate system of cropRegion, AE/AWB/AF regions, and faces now changes
+     * to the effective after-zoom field-of-view represented by rectangle of (0, 0,
+     * activeArrayWidth, activeArrayHeight).</p>
+     * <p>For example, if ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE is 4032*3024, and the preview stream
+     * is configured to the same 4:3 aspect ratio, the application can achieve 2.0x zoom in
+     * one of two ways:</p>
+     * <ul>
+     * <li>zoomRatio = 2.0, scaler.cropRegion = (0, 0, 4032, 3024)</li>
+     * <li>zoomRatio = 1.0 (default), scaler.cropRegion = (1008, 756, 3024, 2268)</li>
+     * </ul>
+     * <p>If the application intends to set aeRegions to be top-left quarter of the preview
+     * field-of-view, the ACAMERA_CONTROL_AE_REGIONS should be set to (0, 0, 2016, 1512) with
+     * zoomRatio set to 2.0. Alternatively, the application can set aeRegions to the equivalent
+     * region of (1008, 756, 2016, 1512) for zoomRatio of 1.0. If the application doesn't
+     * explicitly set ACAMERA_CONTROL_ZOOM_RATIO, its value defaults to 1.0.</p>
+     * <p>This coordinate system change isn't applicable to RAW capture and its related metadata
+     * such as intrinsicCalibration and lensShadingMap.</p>
+     * <p>One limitation of controlling zoom using zoomRatio is that the ACAMERA_SCALER_CROP_REGION
+     * must only be used for letterboxing or pillarboxing of the sensor active array, and no
+     * FREEFORM cropping can be used with ACAMERA_CONTROL_ZOOM_RATIO other than 1.0.</p>
+     *
+     * @see ACAMERA_CONTROL_AE_REGIONS
+     * @see ACAMERA_CONTROL_ZOOM_RATIO
+     * @see ACAMERA_SCALER_CROP_REGION
+     * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
+     */
+    ACAMERA_CONTROL_ZOOM_RATIO =                                // float
+            ACAMERA_CONTROL_START + 47,
     ACAMERA_CONTROL_END,
 
     /**
@@ -3203,8 +3324,17 @@ typedef enum acamera_metadata_tag {
      * for rounding and other hardware requirements; the final
      * crop region used will be included in the output capture
      * result.</p>
+     * <p>Starting from API level 30, it's strongly recommended to use ACAMERA_CONTROL_ZOOM_RATIO
+     * to take advantage of better support for zoom with logical multi-camera. The benefits
+     * include better precision with optical-digital zoom combination, and ability to do
+     * zoom-out from 1.0x. When using ACAMERA_CONTROL_ZOOM_RATIO for zoom, the crop region in
+     * the capture request must be either letterboxing or pillarboxing (but not both). The
+     * coordinate system is post-zoom, meaning that the activeArraySize or
+     * preCorrectionActiveArraySize covers the camera device's field of view "after" zoom.
+     * See ACAMERA_CONTROL_ZOOM_RATIO for details.</p>
      * <p>The data representation is int[4], which maps to (left, top, width, height).</p>
      *
+     * @see ACAMERA_CONTROL_ZOOM_RATIO
      * @see ACAMERA_DISTORTION_CORRECTION_MODE
      * @see ACAMERA_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
@@ -3232,6 +3362,12 @@ typedef enum acamera_metadata_tag {
      * <p>Crop regions that have a width or height that is smaller
      * than this ratio allows will be rounded up to the minimum
      * allowed size by the camera device.</p>
+     * <p>Starting from API level 30, when using ACAMERA_CONTROL_ZOOM_RATIO to zoom in or out,
+     * the application must use ACAMERA_CONTROL_ZOOM_RATIO_RANGE to query both the minimum and
+     * maximum zoom ratio.</p>
+     *
+     * @see ACAMERA_CONTROL_ZOOM_RATIO
+     * @see ACAMERA_CONTROL_ZOOM_RATIO_RANGE
      */
     ACAMERA_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM =                 // float
             ACAMERA_SCALER_START + 4,
@@ -3406,8 +3542,24 @@ typedef enum acamera_metadata_tag {
      * <p>Camera devices that support FREEFORM cropping will support any crop region that
      * is inside of the active array. The camera device will apply the same crop region and
      * return the final used crop region in capture result metadata ACAMERA_SCALER_CROP_REGION.</p>
+     * <p>Starting from API level 30,</p>
+     * <ul>
+     * <li>If the camera device supports FREEFORM cropping, in order to do FREEFORM cropping, the
+     * application must set ACAMERA_CONTROL_ZOOM_RATIO to 1.0, and use ACAMERA_SCALER_CROP_REGION
+     * for zoom.</li>
+     * <li>To do CENTER_ONLY zoom, the application has below 2 options:<ol>
+     * <li>Set ACAMERA_CONTROL_ZOOM_RATIO to 1.0; adjust zoom by ACAMERA_SCALER_CROP_REGION.</li>
+     * <li>Adjust zoom by ACAMERA_CONTROL_ZOOM_RATIO; use ACAMERA_SCALER_CROP_REGION to crop
+     * the field of view vertically (letterboxing) or horizontally (pillarboxing), but not
+     * windowboxing.</li>
+     * </ol>
+     * </li>
+     * <li>Setting ACAMERA_CONTROL_ZOOM_RATIO to values different than 1.0 and
+     * ACAMERA_SCALER_CROP_REGION to be windowboxing at the same time is undefined behavior.</li>
+     * </ul>
      * <p>LEGACY capability devices will only support CENTER_ONLY cropping.</p>
      *
+     * @see ACAMERA_CONTROL_ZOOM_RATIO
      * @see ACAMERA_SCALER_CROP_REGION
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
      */
@@ -4707,9 +4859,20 @@ typedef enum acamera_metadata_tag {
      * When the distortion correction mode is not OFF, the coordinate system follows
      * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with
      * <code>(0, 0)</code> being the top-left pixel of the active array.</p>
-     * <p>Only available if ACAMERA_STATISTICS_FACE_DETECT_MODE == FULL</p>
+     * <p>Only available if ACAMERA_STATISTICS_FACE_DETECT_MODE == FULL.</p>
+     * <p>Starting from API level 30, the coordinate system of activeArraySize or
+     * preCorrectionActiveArraySize is used to represent post-zoomRatio field of view, not
+     * pre-zoomRatio field of view. This means that if the relative position of faces and
+     * the camera device doesn't change, when zooming in by increasing
+     * ACAMERA_CONTROL_ZOOM_RATIO, the face landmarks move farther away from the center of the
+     * activeArray or preCorrectionActiveArray. If ACAMERA_CONTROL_ZOOM_RATIO is set to 1.0
+     * (default), the face landmarks coordinates won't change as ACAMERA_SCALER_CROP_REGION
+     * changes. See ACAMERA_CONTROL_ZOOM_RATIO for details. Whether to use activeArraySize or
+     * preCorrectionActiveArraySize still depends on distortion correction mode.</p>
      *
+     * @see ACAMERA_CONTROL_ZOOM_RATIO
      * @see ACAMERA_DISTORTION_CORRECTION_MODE
+     * @see ACAMERA_SCALER_CROP_REGION
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
      * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE
      * @see ACAMERA_STATISTICS_FACE_DETECT_MODE
@@ -4738,10 +4901,21 @@ typedef enum acamera_metadata_tag {
      * When the distortion correction mode is not OFF, the coordinate system follows
      * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE, with
      * <code>(0, 0)</code> being the top-left pixel of the active array.</p>
-     * <p>Only available if ACAMERA_STATISTICS_FACE_DETECT_MODE != OFF
-     * The data representation is <code>int[4]</code>, which maps to <code>(left, top, right, bottom)</code>.</p>
+     * <p>Only available if ACAMERA_STATISTICS_FACE_DETECT_MODE != OFF.</p>
+     * <p>Starting from API level 30, the coordinate system of activeArraySize or
+     * preCorrectionActiveArraySize is used to represent post-zoomRatio field of view, not
+     * pre-zoomRatio field of view. This means that if the relative position of faces and
+     * the camera device doesn't change, when zooming in by increasing
+     * ACAMERA_CONTROL_ZOOM_RATIO, the face rectangles grow larger and move farther away from
+     * the center of the activeArray or preCorrectionActiveArray. If ACAMERA_CONTROL_ZOOM_RATIO
+     * is set to 1.0 (default), the face rectangles won't change as ACAMERA_SCALER_CROP_REGION
+     * changes. See ACAMERA_CONTROL_ZOOM_RATIO for details. Whether to use activeArraySize or
+     * preCorrectionActiveArraySize still depends on distortion correction mode.</p>
+     * <p>The data representation is <code>int[4]</code>, which maps to <code>(left, top, right, bottom)</code>.</p>
      *
+     * @see ACAMERA_CONTROL_ZOOM_RATIO
      * @see ACAMERA_DISTORTION_CORRECTION_MODE
+     * @see ACAMERA_SCALER_CROP_REGION
      * @see ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE
      * @see ACAMERA_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE
      * @see ACAMERA_STATISTICS_FACE_DETECT_MODE

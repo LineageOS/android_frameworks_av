@@ -133,6 +133,7 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager, const Stri
         session->close();
         return res;
     }
+    mSupportNativeZoomRatio = manager->supportNativeZoomRatio(mId.string());
 
     std::vector<std::string> physicalCameraIds;
     bool isLogical = manager->isLogicalCamera(mId.string(), &physicalCameraIds);
@@ -147,14 +148,26 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager, const Stri
                 return res;
             }
 
-            if (DistortionMapper::isDistortionSupported(mPhysicalDeviceInfoMap[physicalId])) {
-                mDistortionMappers[physicalId].setupStaticInfo(mPhysicalDeviceInfoMap[physicalId]);
+            bool usePrecorrectArray =
+                    DistortionMapper::isDistortionSupported(mPhysicalDeviceInfoMap[physicalId]);
+            if (usePrecorrectArray) {
+                res = mDistortionMappers[physicalId].setupStaticInfo(
+                        mPhysicalDeviceInfoMap[physicalId]);
                 if (res != OK) {
                     SET_ERR_L("Unable to read camera %s's calibration fields for distortion "
                             "correction", physicalId.c_str());
                     session->close();
                     return res;
                 }
+            }
+
+            res = mZoomRatioMappers[physicalId].initZoomRatioTags(
+                    &mPhysicalDeviceInfoMap[physicalId],
+                    mSupportNativeZoomRatio, usePrecorrectArray);
+            if (res != OK) {
+                SET_ERR_L("Failed to initialize camera %s's zoomRatio tags: %s (%d)",
+                        physicalId.c_str(), strerror(-res), res);
+                return res;
             }
         }
     }
@@ -331,13 +344,23 @@ status_t Camera3Device::initializeCommonLocked() {
         }
     }
 
-    if (DistortionMapper::isDistortionSupported(mDeviceInfo)) {
+    bool usePrecorrectArray = DistortionMapper::isDistortionSupported(mDeviceInfo);
+    if (usePrecorrectArray) {
         res = mDistortionMappers[mId.c_str()].setupStaticInfo(mDeviceInfo);
         if (res != OK) {
             SET_ERR_L("Unable to read necessary calibration fields for distortion correction");
             return res;
         }
     }
+
+    res = mZoomRatioMappers[mId.c_str()].initZoomRatioTags(&mDeviceInfo,
+            mSupportNativeZoomRatio, usePrecorrectArray);
+    if (res != OK) {
+        SET_ERR_L("Failed to initialize zoomRatio tags: %s (%d)",
+                strerror(-res), res);
+        return res;
+    }
+
     return OK;
 }
 
@@ -2124,6 +2147,15 @@ status_t Camera3Device::createDefaultRequest(int templateId,
         set_camera_metadata_vendor_id(rawRequest, mVendorTagId);
         mRequestTemplateCache[templateId].acquire(rawRequest);
 
+        // Override the template request with zoomRatioMapper
+        res = mZoomRatioMappers[mId.c_str()].initZoomRatioInTemplate(
+                &mRequestTemplateCache[templateId]);
+        if (res != OK) {
+            CLOGE("Failed to update zoom ratio for template %d: %s (%d)",
+                    templateId, strerror(-res), res);
+            return res;
+        }
+
         *request = mRequestTemplateCache[templateId];
         mLastTemplateId = templateId;
     }
@@ -3146,14 +3178,15 @@ status_t Camera3Device::registerInFlight(uint32_t frameNumber,
         int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
         bool hasAppCallback, nsecs_t maxExpectedDuration,
         std::set<String8>& physicalCameraIds, bool isStillCapture,
-        bool isZslCapture, const SurfaceMap& outputSurfaces) {
+        bool isZslCapture, const std::set<std::string>& cameraIdsWithZoom,
+        const SurfaceMap& outputSurfaces) {
     ATRACE_CALL();
     Mutex::Autolock l(mInFlightLock);
 
     ssize_t res;
     res = mInFlightMap.add(frameNumber, InFlightRequest(numBuffers, resultExtras, hasInput,
             hasAppCallback, maxExpectedDuration, physicalCameraIds, isStillCapture, isZslCapture,
-            outputSurfaces));
+            cameraIdsWithZoom, outputSurfaces));
     if (res < 0) return res;
 
     if (mInFlightMap.size() == 1) {
@@ -3504,7 +3537,7 @@ void Camera3Device::sendCaptureResult(CameraMetadata &pendingMetadata,
         CaptureResultExtras &resultExtras,
         CameraMetadata &collectedPartialResult,
         uint32_t frameNumber,
-        bool reprocess, bool zslStillCapture,
+        bool reprocess, bool zslStillCapture, const std::set<std::string>& cameraIdsWithZoom,
         const std::vector<PhysicalCaptureResultInfo>& physicalMetadatas) {
     ATRACE_CALL();
     if (pendingMetadata.isEmpty())
@@ -3573,19 +3606,39 @@ void Camera3Device::sendCaptureResult(CameraMetadata &pendingMetadata,
             mDistortionMappers[mId.c_str()].correctCaptureResult(&captureResult.mMetadata);
     if (res != OK) {
         SET_ERR("Unable to correct capture result metadata for frame %d: %s (%d)",
-                frameNumber, strerror(res), res);
+                frameNumber, strerror(-res), res);
         return;
     }
+
+    // Fix up result metadata to account for zoom ratio availabilities between
+    // HAL and app.
+    bool zoomRatioIs1 = cameraIdsWithZoom.find(mId.c_str()) == cameraIdsWithZoom.end();
+    res = mZoomRatioMappers[mId.c_str()].updateCaptureResult(
+            &captureResult.mMetadata, zoomRatioIs1);
+    if (res != OK) {
+        SET_ERR("Failed to update capture result zoom ratio metadata for frame %d: %s (%d)",
+                frameNumber, strerror(-res), res);
+        return;
+    }
+
     for (auto& physicalMetadata : captureResult.mPhysicalMetadatas) {
         String8 cameraId8(physicalMetadata.mPhysicalCameraId);
-        if (mDistortionMappers.find(cameraId8.c_str()) == mDistortionMappers.end()) {
-            continue;
+        if (mDistortionMappers.find(cameraId8.c_str()) != mDistortionMappers.end()) {
+            res = mDistortionMappers[cameraId8.c_str()].correctCaptureResult(
+                    &physicalMetadata.mPhysicalCameraMetadata);
+            if (res != OK) {
+                SET_ERR("Unable to correct physical capture result metadata for frame %d: %s (%d)",
+                        frameNumber, strerror(-res), res);
+                return;
+            }
         }
-        res = mDistortionMappers[cameraId8.c_str()].correctCaptureResult(
-                &physicalMetadata.mPhysicalCameraMetadata);
+
+        zoomRatioIs1 = cameraIdsWithZoom.find(cameraId8.c_str()) == cameraIdsWithZoom.end();
+        res = mZoomRatioMappers[cameraId8.c_str()].updateCaptureResult(
+                &physicalMetadata.mPhysicalCameraMetadata, zoomRatioIs1);
         if (res != OK) {
-            SET_ERR("Unable to correct physical capture result metadata for frame %d: %s (%d)",
-                    frameNumber, strerror(res), res);
+            SET_ERR("Failed to update camera %s's physical zoom ratio metadata for "
+                    "frame %d: %s(%d)", cameraId8.c_str(), frameNumber, strerror(-res), res);
             return;
         }
     }
@@ -3790,7 +3843,7 @@ void Camera3Device::processCaptureResult(const camera3_capture_result *result) {
                 sendCaptureResult(metadata, request.resultExtras,
                     collectedPartialResult, frameNumber,
                     hasInputBufferInRequest, request.zslCapture && request.stillCapture,
-                    request.physicalMetadatas);
+                    request.cameraIdsWithZoom, request.physicalMetadatas);
             }
         }
 
@@ -4008,7 +4061,7 @@ void Camera3Device::notifyShutter(const camera3_shutter_msg_t &msg,
                 sendCaptureResult(r.pendingMetadata, r.resultExtras,
                     r.collectedPartialResult, msg.frame_number,
                     r.hasInputBuffer, r.zslCapture && r.stillCapture,
-                    r.physicalMetadatas);
+                    r.cameraIdsWithZoom, r.physicalMetadatas);
             }
             bool timestampIncreasing = !(r.zslCapture || r.hasInputBuffer);
             returnOutputBuffers(r.pendingOutputBuffers.array(),
@@ -5610,6 +5663,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 // request in a batch as new
                 !(batchedRequest && i > 0);
         if (newRequest) {
+            std::set<std::string> cameraIdsWithZoom;
             /**
              * HAL workaround:
              * Insert a dummy trigger ID if a trigger is set but no trigger ID is
@@ -5642,6 +5696,28 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                             return INVALID_OPERATION;
                         }
                     }
+
+                    for (it = captureRequest->mSettingsList.begin();
+                            it != captureRequest->mSettingsList.end(); it++) {
+                        if (parent->mZoomRatioMappers.find(it->cameraId) ==
+                                parent->mZoomRatioMappers.end()) {
+                            continue;
+                        }
+
+                        camera_metadata_entry_t e = it->metadata.find(ANDROID_CONTROL_ZOOM_RATIO);
+                        if (e.count > 0 && e.data.f[0] != 1.0f) {
+                            cameraIdsWithZoom.insert(it->cameraId);
+                        }
+
+                        res = parent->mZoomRatioMappers[it->cameraId].updateCaptureRequest(
+                            &(it->metadata));
+                        if (res != OK) {
+                            SET_ERR("RequestThread: Unable to correct capture requests "
+                                    "for zoom ratio for request %d: %s (%d)",
+                                    halRequest->frame_number, strerror(-res), res);
+                            return INVALID_OPERATION;
+                        }
+                    }
                 }
             }
 
@@ -5652,6 +5728,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
             captureRequest->mSettingsList.begin()->metadata.sort();
             halRequest->settings = captureRequest->mSettingsList.begin()->metadata.getAndLock();
             mPrevRequest = captureRequest;
+            mPrevCameraIdsWithZoom = cameraIdsWithZoom;
             ALOGVV("%s: Request settings are NEW", __FUNCTION__);
 
             IF_ALOGV() {
@@ -5839,7 +5916,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 /*hasInput*/halRequest->input_buffer != NULL,
                 hasCallback,
                 calculateMaxExpectedDuration(halRequest->settings),
-                requestedPhysicalCameras, isStillCapture, isZslCapture,
+                requestedPhysicalCameras, isStillCapture, isZslCapture, mPrevCameraIdsWithZoom,
                 (mUseHalBufManager) ? uniqueSurfaceIdMap :
                                       SurfaceMap{});
         ALOGVV("%s: registered in flight requestId = %" PRId32 ", frameNumber = %" PRId64

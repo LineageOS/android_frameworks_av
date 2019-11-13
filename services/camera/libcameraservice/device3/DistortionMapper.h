@@ -22,6 +22,7 @@
 #include <mutex>
 
 #include "camera/CameraMetadata.h"
+#include "device3/CoordinateMapper.h"
 
 namespace android {
 
@@ -31,7 +32,7 @@ namespace camera3 {
  * Utilities to transform between raw (distorted) and warped (corrected) coordinate systems
  * for cameras that support geometric distortion
  */
-class DistortionMapper {
+class DistortionMapper : private CoordinateMapper {
   public:
     DistortionMapper();
 
@@ -149,20 +150,6 @@ class DistortionMapper {
     constexpr static float kGridMargin = 0.05f;
     // Fuzziness for float inequality tests
     constexpr static float kFloatFuzz = 1e-4;
-
-    // Metadata key lists to correct
-
-    // Both capture request and result
-    static const std::array<uint32_t, 3> kMeteringRegionsToCorrect;
-
-    // Only capture request
-    static const std::array<uint32_t, 1> kRequestRectsToCorrect;
-
-    // Only capture result
-    static const std::array<uint32_t, 1> kResultRectsToCorrect;
-
-    // Only for capture results; don't clamp
-    static const std::array<uint32_t, 2> kResultPointsToCorrectNoClamp;
 
     // Single implementation for various mapCorrectedToRaw methods
     template<typename T>

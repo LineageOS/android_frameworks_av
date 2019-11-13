@@ -46,6 +46,7 @@
 #include "device3/StatusTracker.h"
 #include "device3/Camera3BufferManager.h"
 #include "device3/DistortionMapper.h"
+#include "device3/ZoomRatioMapper.h"
 #include "utils/TagMonitor.h"
 #include "utils/LatencyHistogram.h"
 #include <camera_metadata_hidden.h>
@@ -442,6 +443,7 @@ class Camera3Device :
     sp<HalInterface> mInterface;
 
     CameraMetadata             mDeviceInfo;
+    bool                       mSupportNativeZoomRatio;
     std::unordered_map<std::string, CameraMetadata> mPhysicalDeviceInfoMap;
 
     CameraMetadata             mRequestTemplateCache[CAMERA3_TEMPLATE_COUNT];
@@ -980,6 +982,7 @@ class Camera3Device :
 
         sp<CaptureRequest> mPrevRequest;
         int32_t            mPrevTriggers;
+        std::set<std::string> mPrevCameraIdsWithZoom;
 
         uint32_t           mFrameNumber;
 
@@ -1078,6 +1081,9 @@ class Camera3Device :
         // Indicates a ZSL capture request
         bool zslCapture;
 
+        // Requested camera ids (both logical and physical) with zoomRatio != 1.0f
+        std::set<std::string> cameraIdsWithZoom;
+
         // What shared surfaces an output should go to
         SurfaceMap outputSurfaces;
 
@@ -1099,7 +1105,7 @@ class Camera3Device :
         InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
                 bool hasAppCallback, nsecs_t maxDuration,
                 const std::set<String8>& physicalCameraIdSet, bool isStillCapture,
-                bool isZslCapture,
+                bool isZslCapture, const std::set<std::string>& idsWithZoom,
                 const SurfaceMap& outSurfaces = SurfaceMap{}) :
                 shutterTimestamp(0),
                 sensorTimestamp(0),
@@ -1114,6 +1120,7 @@ class Camera3Device :
                 physicalCameraIds(physicalCameraIdSet),
                 stillCapture(isStillCapture),
                 zslCapture(isZslCapture),
+                cameraIdsWithZoom(idsWithZoom),
                 outputSurfaces(outSurfaces) {
         }
     };
@@ -1131,7 +1138,7 @@ class Camera3Device :
     status_t registerInFlight(uint32_t frameNumber,
             int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
             bool callback, nsecs_t maxExpectedDuration, std::set<String8>& physicalCameraIds,
-            bool isStillCapture, bool isZslCapture,
+            bool isStillCapture, bool isZslCapture, const std::set<std::string>& cameraIdsWithZoom,
             const SurfaceMap& outputSurfaces);
 
     /**
@@ -1256,6 +1263,7 @@ class Camera3Device :
             CaptureResultExtras &resultExtras,
             CameraMetadata &collectedPartialResult, uint32_t frameNumber,
             bool reprocess, bool zslStillCapture,
+            const std::set<std::string>& cameraIdsWithZoom,
             const std::vector<PhysicalCaptureResultInfo>& physicalMetadatas);
 
     bool isLastFullResult(const InFlightRequest& inFlightRequest);
@@ -1287,6 +1295,11 @@ class Camera3Device :
     // 1 ID if the device isn't a logical multi-camera. Otherwise contains both
     // logical camera and its physical subcameras.
     std::unordered_map<std::string, camera3::DistortionMapper> mDistortionMappers;
+
+    /**
+     * Zoom ratio mapper support
+     */
+    std::unordered_map<std::string, camera3::ZoomRatioMapper> mZoomRatioMappers;
 
     // Debug tracker for metadata tag value changes
     // - Enabled with the -m <taglist> option to dumpsys, such as
