@@ -27,8 +27,6 @@
 #include <utils/Errors.h>
 #include <utils/Log.h>
 #include <utils/String16.h>
-#include <binder/IInterface.h>
-#include <binder/IServiceManager.h>
 #include <cutils/properties.h>
 
 #include <mediadrm/CryptoHal.h>
@@ -36,7 +34,6 @@
 #include <mediadrm/DrmUtils.h>
 #include <mediadrm/ICrypto.h>
 #include <mediadrm/IDrm.h>
-#include <mediadrm/IMediaDrmService.h>
 
 using HServiceManager = ::android::hidl::manager::V1_0::IServiceManager;
 using ::android::hardware::hidl_array;
@@ -48,39 +45,17 @@ namespace android {
 namespace DrmUtils {
 
 namespace {
-template<typename Iface>
-sp<Iface> MakeObjectWithService(status_t *pstatus) {
+
+template<typename Hal>
+Hal *MakeObject(status_t *pstatus) {
     status_t err = OK;
     status_t &status = pstatus ? *pstatus : err;
-    sp<IServiceManager> sm = defaultServiceManager();
-    sp<IBinder> binder = sm->getService(String16("media.drm"));
-
-    sp<IMediaDrmService> service = interface_cast<IMediaDrmService>(binder);
-    if (service == NULL) {
-        status = UNKNOWN_ERROR;
-        return NULL;
-    }
-
-    auto obj = service->makeObject<Iface>();
-    if (obj == NULL) {
-        status = UNKNOWN_ERROR;
-        return NULL;
-    }
-
+    auto obj = new Hal();
     status = obj->initCheck();
     if (status != OK && status != NO_INIT) {
         return NULL;
     }
     return obj;
-}
-
-template<typename Iface, typename Hal>
-sp<Iface> MakeObject(status_t *pstatus) {
-    if (UseDrmService()) {
-        return MakeObjectWithService<Iface>(pstatus);
-    } else {
-        return new Hal();
-    }
 }
 
 template <typename Hal, typename V>
@@ -140,14 +115,11 @@ bool UseDrmService() {
 }
 
 sp<IDrm> MakeDrm(status_t *pstatus) {
-    return MakeObject<IDrm, DrmHal>(pstatus);
+    return MakeObject<DrmHal>(pstatus);
 }
 
 sp<ICrypto> MakeCrypto(status_t *pstatus) {
-    if (pstatus) {
-        *pstatus = OK;
-    }
-    return new CryptoHal();
+    return MakeObject<CryptoHal>(pstatus);
 }
 
 std::vector<sp<::V1_0::ICryptoFactory>> MakeCryptoFactories(const uint8_t uuid[16]) {
