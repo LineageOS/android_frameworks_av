@@ -317,14 +317,6 @@ public:
     ~DecryptHandle() {
         delete decryptInfo; decryptInfo = NULL;
     }
-
-    bool operator<(const DecryptHandle& handle) const {
-        return (decryptId < handle.decryptId);
-    }
-
-    bool operator==(const DecryptHandle& handle) const {
-        return (decryptId == handle.decryptId);
-    }
 };
 
 };
