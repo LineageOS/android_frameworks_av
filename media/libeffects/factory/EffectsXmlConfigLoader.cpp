@@ -94,7 +94,7 @@ bool loadLibrary(const char* relativePath, lib_entry_t* libEntry) noexcept {
     }
 
     uint32_t majorVersion = EFFECT_API_VERSION_MAJOR(description->version);
-    uint32_t expectedMajorVersion = EFFECT_API_VERSION_MAJOR(EFFECT_LIBRARY_API_VERSION);
+    uint32_t expectedMajorVersion = EFFECT_API_VERSION_MAJOR(EFFECT_LIBRARY_API_VERSION_CURRENT);
     if (majorVersion != expectedMajorVersion) {
         ALOGE("Unsupported major version %#08x, expected %#08x for library %s",
               majorVersion, expectedMajorVersion, path);
