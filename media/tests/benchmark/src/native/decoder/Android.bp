@@ -29,3 +29,22 @@ cc_library_static {
 
     ldflags: ["-Wl,-Bsymbolic"]
 }
+
+cc_library_static {
+    name: "libmediabenchmark_codec2_decoder",
+    defaults: [
+        "libmediabenchmark_common-defaults",
+        "libmediabenchmark_codec2_common-defaults",
+    ],
+
+    srcs: ["C2Decoder.cpp"],
+
+    static_libs: [
+        "libmediabenchmark_codec2_common",
+        "libmediabenchmark_extractor",
+    ],
+
+    export_include_dirs: ["."],
+
+    ldflags: ["-Wl,-Bsymbolic"]
+}
