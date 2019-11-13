@@ -48,12 +48,13 @@ AudioEffect::AudioEffect(const effect_uuid_t *type,
                 effect_callback_t cbf,
                 void* user,
                 audio_session_t sessionId,
-                audio_io_handle_t io
+                audio_io_handle_t io,
+                const AudioDeviceTypeAddr& device
                 )
     : mStatus(NO_INIT), mOpPackageName(opPackageName)
 {
     AutoMutex lock(mConstructLock);
-    mStatus = set(type, uuid, priority, cbf, user, sessionId, io);
+    mStatus = set(type, uuid, priority, cbf, user, sessionId, io, device);
 }
 
 AudioEffect::AudioEffect(const char *typeStr,
@@ -63,7 +64,8 @@ AudioEffect::AudioEffect(const char *typeStr,
                 effect_callback_t cbf,
                 void* user,
                 audio_session_t sessionId,
-                audio_io_handle_t io
+                audio_io_handle_t io,
+                const AudioDeviceTypeAddr& device
                 )
     : mStatus(NO_INIT), mOpPackageName(opPackageName)
 {
@@ -87,7 +89,7 @@ AudioEffect::AudioEffect(const char *typeStr,
     }
 
     AutoMutex lock(mConstructLock);
-    mStatus = set(pType, pUuid, priority, cbf, user, sessionId, io);
+    mStatus = set(pType, pUuid, priority, cbf, user, sessionId, io, device);
 }
 
 status_t AudioEffect::set(const effect_uuid_t *type,
@@ -96,7 +98,8 @@ status_t AudioEffect::set(const effect_uuid_t *type,
                 effect_callback_t cbf,
                 void* user,
                 audio_session_t sessionId,
-                audio_io_handle_t io)
+                audio_io_handle_t io,
+                const AudioDeviceTypeAddr& device)
 {
     sp<IEffect> iEffect;
     sp<IMemory> cblk;
@@ -109,6 +112,10 @@ status_t AudioEffect::set(const effect_uuid_t *type,
         return INVALID_OPERATION;
     }
 
+    if (sessionId == AUDIO_SESSION_DEVICE && io != AUDIO_IO_HANDLE_NONE) {
+        ALOGW("IO handle should not be specified for device effect");
+        return BAD_VALUE;
+    }
     const sp<IAudioFlinger>& audioFlinger = AudioSystem::get_audio_flinger();
     if (audioFlinger == 0) {
         ALOGE("set(): Could not get audioflinger");
@@ -133,7 +140,7 @@ status_t AudioEffect::set(const effect_uuid_t *type,
     mClientPid = IPCThreadState::self()->getCallingPid();
 
     iEffect = audioFlinger->createEffect((effect_descriptor_t *)&mDescriptor,
-            mIEffectClient, priority, io, mSessionId, mOpPackageName, mClientPid,
+            mIEffectClient, priority, io, mSessionId, device, mOpPackageName, mClientPid,
             &mStatus, &mId, &enabled);
 
     if (iEffect == 0 || (mStatus != NO_ERROR && mStatus != ALREADY_EXISTS)) {
