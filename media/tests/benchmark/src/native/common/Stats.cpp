@@ -19,7 +19,6 @@
 
 #include <iostream>
 #include <stdint.h>
-#include <utils/Log.h>
 
 #include "Stats.h"
 
