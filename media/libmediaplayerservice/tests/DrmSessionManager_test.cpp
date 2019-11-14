@@ -16,19 +16,21 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "DrmSessionManager_test"
+#include <android/binder_auto_utils.h>
 #include <utils/Log.h>
 
 #include <gtest/gtest.h>
 
+#include <aidl/android/media/BnResourceManagerClient.h>
+#include <aidl/android/media/BnResourceManagerService.h>
 #include <android/media/BnResourceManagerClient.h>
-#include <android/media/IResourceManagerService.h>
+
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/ProcessInfoInterface.h>
-#include <mediadrm/DrmHal.h>
-#include <mediadrm/DrmSessionClientInterface.h>
 #include <mediadrm/DrmSessionManager.h>
 
 #include <algorithm>
+#include <iostream>
 #include <vector>
 
 #include "ResourceManagerService.h"
@@ -36,8 +38,109 @@
 namespace android {
 
 using ::android::binder::Status;
-using ::android::media::BnResourceManagerClient;
 using ::android::media::ResourceManagerService;
+using ::ndk::ScopedAStatus;
+
+using NdkBnResourceManagerClient = ::aidl::android::media::BnResourceManagerClient;
+using NdkBnResourceManagerService = ::aidl::android::media::BnResourceManagerService;
+using NdkMediaResource = ::aidl::android::media::MediaResourceParcel;
+using NdkResourceManagerClient = ::aidl::android::media::IResourceManagerClient;
+
+using FwkBnResourceManagerClient = ::android::media::BnResourceManagerClient;
+using FwkMediaResource = ::android::media::MediaResourceParcel;
+
+namespace {
+
+struct FwkResourceManagerClientImpl : public FwkBnResourceManagerClient {
+    FwkResourceManagerClientImpl(const std::shared_ptr<NdkResourceManagerClient> &client)
+        : mClient(client) {
+    }
+
+    Status reclaimResource(bool* _aidl_return) override {
+        mClient->reclaimResource(_aidl_return);
+        return Status::ok();
+    }
+
+    Status getName(std::string* _aidl_return) override {
+        mClient->getName(_aidl_return);
+        return Status::ok();
+    }
+
+private:
+    std::shared_ptr<NdkResourceManagerClient> mClient;
+};
+
+FwkMediaResource NdkToFwkMediaResource(const NdkMediaResource &in) {
+    FwkMediaResource out{};
+    out.type = static_cast<decltype(out.type)>(in.type);
+    out.subType = static_cast<decltype(out.subType)>(in.subType);
+    auto v(reinterpret_cast<const uint8_t *>(in.id.data()));
+    out.id.assign(v, v + in.id.size());
+    out.value = in.value;
+    return out;
+}
+
+std::vector<FwkMediaResource> NdkToFwkMediaResourceVec(const std::vector<NdkMediaResource> &in) {
+    std::vector<FwkMediaResource> out;
+    for (auto e : in) {
+        out.push_back(NdkToFwkMediaResource(e));
+    }
+    return out;
+}
+
+ScopedAStatus FwkToNdkStatus(Status err) {
+    return ScopedAStatus(AStatus_fromExceptionCode(err.serviceSpecificErrorCode()));
+}
+
+struct NdkResourceManagerServiceImpl : public NdkBnResourceManagerService {
+    using NdkMediaResourcePolicy = ::aidl::android::media::MediaResourcePolicyParcel;
+
+    NdkResourceManagerServiceImpl(const sp<ResourceManagerService> &service)
+        : mService(service) {}
+
+    ScopedAStatus config(const std::vector<NdkMediaResourcePolicy>& in_policies) override {
+        (void)in_policies;
+        return ScopedAStatus::ok();
+    }
+
+    ScopedAStatus addResource(int32_t in_pid, int32_t in_uid, int64_t in_clientId,
+            const std::shared_ptr<NdkResourceManagerClient>& in_client,
+            const std::vector<NdkMediaResource>& in_resources) override {
+        sp<FwkBnResourceManagerClient> client(new FwkResourceManagerClientImpl(in_client));
+        std::vector<FwkMediaResource> resources(NdkToFwkMediaResourceVec(in_resources));
+        auto err = mService->addResource(in_pid, in_uid, in_clientId, client, resources);
+        return FwkToNdkStatus(err);
+    }
+
+    ScopedAStatus removeResource(int32_t in_pid, int64_t in_clientId,
+            const std::vector<NdkMediaResource>& in_resources) override {
+        std::vector<FwkMediaResource> resources(NdkToFwkMediaResourceVec(in_resources));
+        auto err = mService->removeResource(in_pid, in_clientId, resources);
+        return FwkToNdkStatus(err);
+    }
+
+    ScopedAStatus removeClient(int32_t in_pid, int64_t in_clientId) override{
+        auto err = mService->removeClient(in_pid, in_clientId);
+        return FwkToNdkStatus(err);
+    }
+
+    ScopedAStatus reclaimResource(int32_t in_callingPid,
+            const std::vector<NdkMediaResource>& in_resources, bool* _aidl_return) override {
+        std::vector<FwkMediaResource> resources(NdkToFwkMediaResourceVec(in_resources));
+        auto err = mService->reclaimResource(in_callingPid, resources, _aidl_return);
+        return FwkToNdkStatus(err);
+    }
+
+private:
+    sp<ResourceManagerService> mService;
+};
+
+template <typename Impl>
+std::shared_ptr<NdkResourceManagerClient> NdkImplToIface(const Impl &impl) {
+    return std::static_pointer_cast<NdkResourceManagerClient>(impl);
+}
+
+}
 
 static Vector<uint8_t> toAndroidVector(const std::vector<uint8_t> &vec) {
     Vector<uint8_t> aVec;
@@ -66,29 +169,27 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(FakeProcessInfo);
 };
 
-struct FakeDrm : public BnResourceManagerClient {
+struct FakeDrm : public NdkBnResourceManagerClient {
     FakeDrm(const std::vector<uint8_t>& sessionId, const sp<DrmSessionManager>& manager)
         : mSessionId(toAndroidVector(sessionId)),
           mReclaimed(false),
           mDrmSessionManager(manager) {}
 
-    virtual ~FakeDrm() {}
-
-    Status reclaimResource(bool* _aidl_return) {
+    ScopedAStatus reclaimResource(bool* _aidl_return) {
         mReclaimed = true;
         mDrmSessionManager->removeSession(mSessionId);
         *_aidl_return = true;
-        return Status::ok();
+        return ScopedAStatus::ok();
     }
 
-    Status getName(::std::string* _aidl_return) {
+    ScopedAStatus getName(::std::string* _aidl_return) {
         String8 name("FakeDrm[");
         for (size_t i = 0; i < mSessionId.size(); ++i) {
             name.appendFormat("%02x", mSessionId[i]);
         }
         name.append("]");
         *_aidl_return = name;
-        return Status::ok();
+        return ScopedAStatus::ok();
     }
 
     bool isReclaimed() const {
@@ -137,27 +238,24 @@ class DrmSessionManagerTest : public ::testing::Test {
 public:
     DrmSessionManagerTest()
         : mService(new ResourceManagerService(new FakeProcessInfo(), new FakeSystemCallback())),
-          mDrmSessionManager(new DrmSessionManager(mService)),
+          mDrmSessionManager(new DrmSessionManager(std::shared_ptr<NdkBnResourceManagerService>(new NdkResourceManagerServiceImpl(mService)))),
           mTestDrm1(new FakeDrm(kTestSessionId1, mDrmSessionManager)),
           mTestDrm2(new FakeDrm(kTestSessionId2, mDrmSessionManager)),
           mTestDrm3(new FakeDrm(kTestSessionId3, mDrmSessionManager)) {
-        DrmSessionManager *ptr = new DrmSessionManager(mService);
-        EXPECT_NE(ptr, nullptr);
-        /* mDrmSessionManager = ptr; */
     }
 
 protected:
     void addSession() {
-        mDrmSessionManager->addSession(kTestPid1, mTestDrm1, mTestDrm1->mSessionId);
-        mDrmSessionManager->addSession(kTestPid2, mTestDrm2, mTestDrm2->mSessionId);
-        mDrmSessionManager->addSession(kTestPid2, mTestDrm3, mTestDrm3->mSessionId);
+        mDrmSessionManager->addSession(kTestPid1, NdkImplToIface(mTestDrm1), mTestDrm1->mSessionId);
+        mDrmSessionManager->addSession(kTestPid2, NdkImplToIface(mTestDrm2), mTestDrm2->mSessionId);
+        mDrmSessionManager->addSession(kTestPid2, NdkImplToIface(mTestDrm3), mTestDrm3->mSessionId);
     }
 
-    sp<IResourceManagerService> mService;
+    sp<ResourceManagerService> mService;
     sp<DrmSessionManager> mDrmSessionManager;
-    sp<FakeDrm> mTestDrm1;
-    sp<FakeDrm> mTestDrm2;
-    sp<FakeDrm> mTestDrm3;
+    std::shared_ptr<FakeDrm> mTestDrm1;
+    std::shared_ptr<FakeDrm> mTestDrm2;
+    std::shared_ptr<FakeDrm> mTestDrm3;
 };
 
 TEST_F(DrmSessionManagerTest, addSession) {
@@ -204,8 +302,8 @@ TEST_F(DrmSessionManagerTest, reclaimSession) {
 
     // add a session from a higher priority process.
     const std::vector<uint8_t> sid{1, 3, 5};
-    sp<FakeDrm> drm = new FakeDrm(sid, mDrmSessionManager);
-    mDrmSessionManager->addSession(15, drm, drm->mSessionId);
+    std::shared_ptr<FakeDrm> drm(new FakeDrm(sid, mDrmSessionManager));
+    mDrmSessionManager->addSession(15, NdkImplToIface(drm), drm->mSessionId);
 
     // make sure mTestDrm2 is reclaimed next instead of mTestDrm3
     mDrmSessionManager->useSession(mTestDrm3->mSessionId);
@@ -225,9 +323,9 @@ TEST_F(DrmSessionManagerTest, reclaimAfterUse) {
     EXPECT_FALSE(mDrmSessionManager->reclaimSession(kTestPid2));
 
     // add sessions from same pid
-    mDrmSessionManager->addSession(kTestPid2, mTestDrm1, mTestDrm1->mSessionId);
-    mDrmSessionManager->addSession(kTestPid2, mTestDrm2, mTestDrm2->mSessionId);
-    mDrmSessionManager->addSession(kTestPid2, mTestDrm3, mTestDrm3->mSessionId);
+    mDrmSessionManager->addSession(kTestPid2, NdkImplToIface(mTestDrm1), mTestDrm1->mSessionId);
+    mDrmSessionManager->addSession(kTestPid2, NdkImplToIface(mTestDrm2), mTestDrm2->mSessionId);
+    mDrmSessionManager->addSession(kTestPid2, NdkImplToIface(mTestDrm3), mTestDrm3->mSessionId);
 
     // use some but not all sessions
     mDrmSessionManager->useSession(mTestDrm1->mSessionId);
