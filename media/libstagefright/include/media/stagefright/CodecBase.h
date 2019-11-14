@@ -42,12 +42,20 @@ struct PersistentSurface;
 struct RenderedFrameInfo;
 class Surface;
 struct ICrypto;
+class IMemory;
+
 namespace hardware {
 namespace cas {
 namespace native {
 namespace V1_0 {
 struct IDescrambler;
-}}}}
+}}}
+namespace drm {
+namespace V1_0 {
+struct SharedBuffer;
+}}
+}
+
 using hardware::cas::native::V1_0::IDescrambler;
 
 struct CodecBase : public AHandler, /* static */ ColorUtils {
@@ -313,6 +321,18 @@ public:
      * Clear and fill array with output buffers.
      */
     virtual void getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *array) = 0;
+
+    /**
+     * Convert binder IMemory to drm SharedBuffer
+     *
+     * \param   memory      IMemory object to store encrypted content.
+     * \param   heapSeqNum  Heap sequence number from ICrypto; -1 if N/A
+     * \param   buf         SharedBuffer structure to fill.
+     */
+    static void IMemoryToSharedBuffer(
+            const sp<IMemory> &memory,
+            int32_t heapSeqNum,
+            hardware::drm::V1_0::SharedBuffer *buf);
 
 protected:
     std::unique_ptr<CodecBase::BufferCallback> mCallback;

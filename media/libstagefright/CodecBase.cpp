@@ -18,6 +18,8 @@
 #define LOG_TAG "CodecBase"
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
+#include <android/hardware/drm/1.0/types.h>
+#include <hidlmemory/FrameworkUtils.h>
 #include <mediadrm/ICrypto.h>
 #include <media/stagefright/CodecBase.h>
 #include <utils/Log.h>
@@ -30,6 +32,20 @@ void BufferChannelBase::setCrypto(const sp<ICrypto> &crypto) {
 
 void BufferChannelBase::setDescrambler(const sp<IDescrambler> &descrambler) {
     mDescrambler = descrambler;
+}
+
+void BufferChannelBase::IMemoryToSharedBuffer(
+        const sp<IMemory> &memory,
+        int32_t heapSeqNum,
+        hardware::drm::V1_0::SharedBuffer *buf) {
+    ssize_t offset;
+    size_t size;
+
+    sp<hardware::HidlMemory> hidlMemory;
+    hidlMemory = hardware::fromHeap(memory->getMemory(&offset, &size));
+    buf->bufferId = static_cast<uint32_t>(heapSeqNum);
+    buf->offset = offset >= 0 ? offset : 0;
+    buf->size = size;
 }
 
 } // namespace android
