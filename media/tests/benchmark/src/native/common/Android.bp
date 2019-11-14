@@ -24,6 +24,7 @@ cc_library_static {
     srcs: [
         "BenchmarkCommon.cpp",
         "Stats.cpp",
+        "utils/Timers.cpp",
     ],
 
     export_include_dirs: ["."],
@@ -49,7 +50,6 @@ cc_defaults {
     shared_libs: [
         "libmediandk",
         "liblog",
-        "libutils",
     ],
 
     cflags: [
