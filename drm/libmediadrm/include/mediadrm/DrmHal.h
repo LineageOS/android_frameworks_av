@@ -57,7 +57,7 @@ inline bool operator==(const Vector<uint8_t> &l, const Vector<uint8_t> &r) {
     return memcmp(l.array(), r.array(), l.size()) == 0;
 }
 
-struct DrmHal : public BnDrm,
+struct DrmHal : public IDrm,
                 public IBinder::DeathRecipient,
                 public IDrmPluginListener_V1_2 {
 

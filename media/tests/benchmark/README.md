@@ -118,5 +118,30 @@ adb shell am instrument -w -r -e class 'com.android.media.benchmark.tests.MuxerT
 The test encodes input stream and benchmarks the encoders available in SDK.
 ```
 adb shell am instrument -w -r -e class 'com.android.media.benchmark.tests.EncoderTest' com.android.media.benchmark/androidx.test.runner.AndroidJUnitRunner
+```
 
+# Codec2
+To run the test suite for measuring performance of the codec2 layer, follow the following steps:
+
+The 32-bit binaries will be created in the following path : ${OUT}/data/nativetest/
+The 64-bit binaries will be created in the following path : ${OUT}/data/nativetest64/
+
+To test 64-bit binary push binaries from nativetest64.
+adb push $(OUT)/data/nativetest64/* /data/local/tmp/
+Eg. adb push $(OUT)/data/nativetest64/C2DecoderTest/C2DecoderTest /data/local/tmp/
+
+To test 32-bit binary push binaries from nativetest.
+adb push $(OUT)/data/nativetest/* /data/local/tmp/
+Eg. adb push $(OUT)/data/nativetest/C2DecoderTest/C2DecoderTest /data/local/tmp/
+
+To get the resource files for the test follow instructions given in [NDK](#NDK)
+
+## C2 Decoder
+
+The test decodes input stream and benchmarks the codec2 decoders available in device.
+
+Setup steps are same as [extractor](#extractor).
+
+```
+adb shell /data/local/tmp/C2DecoderTest -P /data/local/tmp/MediaBenchmark/res/
 ```

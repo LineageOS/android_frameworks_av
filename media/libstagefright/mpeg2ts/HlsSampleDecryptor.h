@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#ifndef SAMPLE_AES_PROCESSOR_H_
+#ifndef HLS_SAMPLE_AES_PROCESSOR_H_
 
-#define SAMPLE_AES_PROCESSOR_H_
+#define HLS_SAMPLE_AES_PROCESSOR_H_
 
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AString.h>
@@ -28,18 +28,20 @@
 #include <utils/RefBase.h>
 #include <utils/Vector.h>
 
+#include "SampleDecryptor.h"
+
 namespace android {
 
-struct HlsSampleDecryptor : RefBase {
+struct HlsSampleDecryptor : SampleDecryptor {
 
     HlsSampleDecryptor();
     explicit HlsSampleDecryptor(const sp<AMessage> &sampleAesKeyItem);
 
-    void signalNewSampleAesKey(const sp<AMessage> &sampleAesKeyItem);
+    virtual void signalNewSampleAesKey(const sp<AMessage> &sampleAesKeyItem);
 
-    size_t processNal(uint8_t *nalData, size_t nalSize);
-    void processAAC(size_t adtsHdrSize, uint8_t *data, size_t size);
-    void processAC3(uint8_t *data, size_t size);
+    virtual size_t processNal(uint8_t *nalData, size_t nalSize);
+    virtual void processAAC(size_t adtsHdrSize, uint8_t *data, size_t size);
+    virtual void processAC3(uint8_t *data, size_t size);
 
     static AString aesBlockToStr(uint8_t block[AES_BLOCK_SIZE]);
 
@@ -60,4 +62,4 @@ private:
 
 }  // namespace android
 
-#endif // SAMPLE_AES_PROCESSOR_H_
+#endif // HLS_SAMPLE_AES_PROCESSOR_H_

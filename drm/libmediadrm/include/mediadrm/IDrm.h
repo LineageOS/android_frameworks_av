@@ -29,8 +29,9 @@ namespace android {
 
 struct AString;
 
-struct IDrm : public IInterface {
-    DECLARE_META_INTERFACE(Drm);
+struct IDrm : public virtual RefBase {
+
+    virtual ~IDrm() {}
 
     virtual status_t initCheck() const = 0;
 
@@ -146,17 +147,11 @@ struct IDrm : public IInterface {
 
     virtual status_t setListener(const sp<IDrmClient>& listener) = 0;
 
+protected:
+    IDrm() {}
+
 private:
     DISALLOW_EVIL_CONSTRUCTORS(IDrm);
-};
-
-struct BnDrm : public BnInterface<IDrm> {
-    virtual status_t onTransact(
-            uint32_t code, const Parcel &data, Parcel *reply,
-            uint32_t flags = 0);
-private:
-    void readVector(const Parcel &data, Vector<uint8_t> &vector) const;
-    void writeVector(Parcel *reply, Vector<uint8_t> const &vector) const;
 };
 
 }  // namespace android

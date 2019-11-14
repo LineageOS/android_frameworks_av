@@ -12,15 +12,10 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "android.hardware.cas@1.0",
-        "android.hardware.cas.native@1.0",
-        "android.hidl.token@1.0-utils",
-        "android.hidl.allocator@1.0",
-        "libcrypto",
-        "libhidlmemory",
-        "libhidlbase",
-        "liblog",
-        "libmediandk",
+        "libcgrouprc#29",
+        "liblog#10000",
+        "libmediandk#29",
+        "libvndksupport#29",
     ],
 
     header_libs: [
@@ -31,11 +26,24 @@ cc_library_shared {
     ],
 
     static_libs: [
+        "android.hardware.cas@1.0",
+        "android.hardware.cas.native@1.0",
+        "android.hidl.allocator@1.0",
+        "android.hidl.memory@1.0",
+        "android.hidl.token@1.0",
+        "android.hidl.token@1.0-utils",
+        "libbase",
+        "libbinderthreadstate",
+        "libcutils",
+        "libhidlbase",
+        "libhidlmemory",
+        "libjsoncpp",
+        "libprocessgroup",
+        "libstagefright_esds",
         "libstagefright_foundation_without_imemory",
+        "libstagefright_mpeg2extractor",
         "libstagefright_mpeg2support",
         "libutils",
-        "libstagefright_mpeg2extractor",
-        "libstagefright_esds",
     ],
 
     name: "libmpeg2extractor",
@@ -51,11 +59,16 @@ cc_library_shared {
     version_script: "exports.lds",
 
     sanitize: {
-        cfi: true,
+        // STOPSHIP: turn on cfi once b/139945549 is resolved.
+        cfi: false,
         misc_undefined: [
             "unsigned-integer-overflow",
             "signed-integer-overflow",
         ],
     },
 
+    apex_available: [
+        "com.android.media",
+        "test_com.android.media",
+    ],
 }
