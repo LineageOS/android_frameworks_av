@@ -87,6 +87,10 @@ class CallBackHandle {
         (void)codec;
         (void)format;
     }
+    virtual void onError(AMediaCodec *codec, media_status_t err) {
+        (void)codec;
+        (void)err;
+    }
     virtual void onOutputAvailable(AMediaCodec *codec, int32_t index,
                                    AMediaCodecBufferInfo *bufferInfo) {
         (void)codec;

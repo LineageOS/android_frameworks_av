@@ -32,8 +32,8 @@ tuple<ssize_t, uint32_t, int64_t> readSampleData(uint8_t *inputBuffer, int32_t &
     int64_t timestamp = frameInfo[frameID].presentationTimeUs;
     ssize_t bytesCount = frameInfo[frameID].size;
     if (bufSize < bytesCount) {
-        ALOGE("Error : insufficient resource");
-        return make_tuple(0, AMEDIACODEC_ERROR_INSUFFICIENT_RESOURCE, 0);
+        ALOGE("Error : Buffer size is insufficient to read sample");
+        return make_tuple(0, AMEDIA_ERROR_MALFORMED, 0);
     }
 
     memcpy(buf, inputBuffer + offset, bytesCount);
@@ -54,6 +54,7 @@ void Decoder::onInputAvailable(AMediaCodec *mediaCodec, int32_t bufIdx) {
         size_t bufSize;
         uint8_t *buf = AMediaCodec_getInputBuffer(mCodec, bufIdx, &bufSize);
         if (!buf) {
+            mErrorCode = AMEDIA_ERROR_IO;
             mSignalledError = true;
             mDecoderDoneCondition.notify_one();
             return;
@@ -64,7 +65,8 @@ void Decoder::onInputAvailable(AMediaCodec *mediaCodec, int32_t bufIdx) {
         int64_t presentationTimeUs = 0;
         tie(bytesRead, flag, presentationTimeUs) = readSampleData(
                 mInputBuffer, mOffset, mFrameMetaData, buf, mNumInputFrame, bufSize);
-        if (flag == AMEDIACODEC_ERROR_INSUFFICIENT_RESOURCE) {
+        if (flag == AMEDIA_ERROR_MALFORMED) {
+            mErrorCode = (media_status_t)flag;
             mSignalledError = true;
             mDecoderDoneCondition.notify_one();
             return;
@@ -74,9 +76,10 @@ void Decoder::onInputAvailable(AMediaCodec *mediaCodec, int32_t bufIdx) {
         ALOGV("%s bytesRead : %zd presentationTimeUs : %" PRId64 " mSawInputEOS : %s", __FUNCTION__,
               bytesRead, presentationTimeUs, mSawInputEOS ? "TRUE" : "FALSE");
 
-        int status = AMediaCodec_queueInputBuffer(mCodec, bufIdx, 0 /* offset */, bytesRead,
-                                                  presentationTimeUs, flag);
+        media_status_t status = AMediaCodec_queueInputBuffer(mCodec, bufIdx, 0 /* offset */,
+                                                             bytesRead, presentationTimeUs, flag);
         if (AMEDIA_OK != status) {
+            mErrorCode = status;
             mSignalledError = true;
             mDecoderDoneCondition.notify_one();
             return;
@@ -127,6 +130,16 @@ void Decoder::onFormatChanged(AMediaCodec *mediaCodec, AMediaFormat *format) {
     }
 }
 
+void Decoder::onError(AMediaCodec *mediaCodec, media_status_t err) {
+    ALOGV("In %s", __func__);
+    if (mediaCodec == mCodec && mediaCodec) {
+        ALOGE("Received Error %d", err);
+        mErrorCode = err;
+        mSignalledError = true;
+        mDecoderDoneCondition.notify_one();
+    }
+}
+
 void Decoder::setupDecoder() {
     if (!mFormat) mFormat = mExtractor->getFormat();
 }
@@ -168,7 +181,8 @@ int32_t Decoder::decode(uint8_t *inputBuffer, vector<AMediaCodecBufferInfo> &fra
                 ssize_t inIdx = AMediaCodec_dequeueInputBuffer(mCodec, kQueueDequeueTimeoutUs);
                 if (inIdx < 0 && inIdx != AMEDIACODEC_INFO_TRY_AGAIN_LATER) {
                     ALOGE("AMediaCodec_dequeueInputBuffer returned invalid index %zd\n", inIdx);
-                    return AMEDIA_ERROR_IO;
+                    mErrorCode = (media_status_t)inIdx;
+                    return mErrorCode;
                 } else if (inIdx >= 0) {
                     mStats->addInputTime();
                     onInputAvailable(mCodec, inIdx);
@@ -188,12 +202,17 @@ int32_t Decoder::decode(uint8_t *inputBuffer, vector<AMediaCodecBufferInfo> &fra
             } else if (!(outIdx == AMEDIACODEC_INFO_TRY_AGAIN_LATER ||
                          outIdx == AMEDIACODEC_INFO_OUTPUT_BUFFERS_CHANGED)) {
                 ALOGE("AMediaCodec_dequeueOutputBuffer returned invalid index %zd\n", outIdx);
-                return AMEDIA_ERROR_IO;
+                mErrorCode = (media_status_t)outIdx;
+                return mErrorCode;
             }
         }
     } else {
         unique_lock<mutex> lock(mMutex);
         mDecoderDoneCondition.wait(lock, [this]() { return (mSawOutputEOS || mSignalledError); });
+    }
+    if (mSignalledError) {
+        ALOGE("Received Error while Decoding");
+        return mErrorCode;
     }
 
     if (codecName.empty()) {
