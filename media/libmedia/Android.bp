@@ -34,7 +34,6 @@ aidl_interface {
         "aidl/android/media/MediaResourceParcel.aidl",
         "aidl/android/media/MediaResourcePolicyParcel.aidl",
     ],
-    api_dir: "api/resourcemanager",
     versions: ["1"],
 }
 
