@@ -34,11 +34,11 @@ namespace android {
 
 CameraClient::CameraClient(const sp<CameraService>& cameraService,
         const sp<hardware::ICameraClient>& cameraClient,
-        const String16& clientPackageName,
+        const String16& clientPackageName, const std::unique_ptr<String16>& clientFeatureId,
         int cameraId, int cameraFacing,
         int clientPid, int clientUid,
         int servicePid):
-        Client(cameraService, cameraClient, clientPackageName,
+        Client(cameraService, cameraClient, clientPackageName, clientFeatureId,
                 String8::format("%d", cameraId), cameraId, cameraFacing, clientPid,
                 clientUid, servicePid)
 {

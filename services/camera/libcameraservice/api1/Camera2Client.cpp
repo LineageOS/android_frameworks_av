@@ -50,13 +50,14 @@ using namespace camera2;
 Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
         const sp<hardware::ICameraClient>& cameraClient,
         const String16& clientPackageName,
+        const std::unique_ptr<String16>& clientFeatureId,
         const String8& cameraDeviceId,
         int api1CameraId,
         int cameraFacing,
         int clientPid,
         uid_t clientUid,
         int servicePid):
-        Camera2ClientBase(cameraService, cameraClient, clientPackageName,
+        Camera2ClientBase(cameraService, cameraClient, clientPackageName, clientFeatureId,
                 cameraDeviceId, api1CameraId, cameraFacing,
                 clientPid, clientUid, servicePid),
         mParameters(api1CameraId, cameraFacing)

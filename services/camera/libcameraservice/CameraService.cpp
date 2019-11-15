@@ -732,9 +732,10 @@ Status CameraService::filterGetInfoErrorCode(status_t err) {
 }
 
 Status CameraService::makeClient(const sp<CameraService>& cameraService,
-        const sp<IInterface>& cameraCb, const String16& packageName, const String8& cameraId,
-        int api1CameraId, int facing, int clientPid, uid_t clientUid, int servicePid,
-        int halVersion, int deviceVersion, apiLevel effectiveApiLevel,
+        const sp<IInterface>& cameraCb, const String16& packageName,
+        const std::unique_ptr<String16>& featureId, const String8& cameraId, int api1CameraId,
+        int facing, int clientPid, uid_t clientUid, int servicePid, int halVersion,
+        int deviceVersion, apiLevel effectiveApiLevel,
         /*out*/sp<BasicClient>* client) {
 
     if (halVersion < 0 || halVersion == deviceVersion) {
@@ -744,7 +745,7 @@ Status CameraService::makeClient(const sp<CameraService>& cameraService,
           case CAMERA_DEVICE_API_VERSION_1_0:
             if (effectiveApiLevel == API_1) {  // Camera1 API route
                 sp<ICameraClient> tmp = static_cast<ICameraClient*>(cameraCb.get());
-                *client = new CameraClient(cameraService, tmp, packageName,
+                *client = new CameraClient(cameraService, tmp, packageName, featureId,
                         api1CameraId, facing, clientPid, clientUid,
                         getpid());
             } else { // Camera2 API route
@@ -762,15 +763,15 @@ Status CameraService::makeClient(const sp<CameraService>& cameraService,
           case CAMERA_DEVICE_API_VERSION_3_5:
             if (effectiveApiLevel == API_1) { // Camera1 API route
                 sp<ICameraClient> tmp = static_cast<ICameraClient*>(cameraCb.get());
-                *client = new Camera2Client(cameraService, tmp, packageName,
+                *client = new Camera2Client(cameraService, tmp, packageName, featureId,
                         cameraId, api1CameraId,
                         facing, clientPid, clientUid,
                         servicePid);
             } else { // Camera2 API route
                 sp<hardware::camera2::ICameraDeviceCallbacks> tmp =
                         static_cast<hardware::camera2::ICameraDeviceCallbacks*>(cameraCb.get());
-                *client = new CameraDeviceClient(cameraService, tmp, packageName, cameraId,
-                        facing, clientPid, clientUid, servicePid);
+                *client = new CameraDeviceClient(cameraService, tmp, packageName, featureId,
+                        cameraId, facing, clientPid, clientUid, servicePid);
             }
             break;
           default:
@@ -787,7 +788,7 @@ Status CameraService::makeClient(const sp<CameraService>& cameraService,
             halVersion == CAMERA_DEVICE_API_VERSION_1_0) {
             // Only support higher HAL version device opened as HAL1.0 device.
             sp<ICameraClient> tmp = static_cast<ICameraClient*>(cameraCb.get());
-            *client = new CameraClient(cameraService, tmp, packageName,
+            *client = new CameraClient(cameraService, tmp, packageName, featureId,
                     api1CameraId, facing, clientPid, clientUid,
                     servicePid);
         } else {
@@ -887,7 +888,7 @@ Status CameraService::initializeShimMetadata(int cameraId) {
     if (!(ret = connectHelper<ICameraClient,Client>(
             sp<ICameraClient>{nullptr}, id, cameraId,
             static_cast<int>(CAMERA_HAL_API_VERSION_UNSPECIFIED),
-            internalPackageName, uid, USE_CALLING_PID,
+            internalPackageName, std::unique_ptr<String16>(), uid, USE_CALLING_PID,
             API_1, /*shimUpdateOnly*/ true, /*out*/ tmp)
             ).isOk()) {
         ALOGE("%s: Error initializing shim metadata: %s", __FUNCTION__, ret.toString8().string());
@@ -1400,8 +1401,8 @@ Status CameraService::connect(
     String8 id = cameraIdIntToStr(api1CameraId);
     sp<Client> client = nullptr;
     ret = connectHelper<ICameraClient,Client>(cameraClient, id, api1CameraId,
-            CAMERA_HAL_API_VERSION_UNSPECIFIED, clientPackageName, clientUid, clientPid, API_1,
-            /*shimUpdateOnly*/ false, /*out*/client);
+            CAMERA_HAL_API_VERSION_UNSPECIFIED, clientPackageName, std::unique_ptr<String16>(),
+            clientUid, clientPid, API_1, /*shimUpdateOnly*/ false, /*out*/client);
 
     if(!ret.isOk()) {
         logRejected(id, CameraThreadState::getCallingPid(), String8(clientPackageName),
@@ -1427,8 +1428,8 @@ Status CameraService::connectLegacy(
     Status ret = Status::ok();
     sp<Client> client = nullptr;
     ret = connectHelper<ICameraClient,Client>(cameraClient, id, api1CameraId, halVersion,
-            clientPackageName, clientUid, USE_CALLING_PID, API_1, /*shimUpdateOnly*/ false,
-            /*out*/client);
+            clientPackageName, std::unique_ptr<String16>(), clientUid, USE_CALLING_PID, API_1,
+            /*shimUpdateOnly*/ false, /*out*/client);
 
     if(!ret.isOk()) {
         logRejected(id, CameraThreadState::getCallingPid(), String8(clientPackageName),
@@ -1502,6 +1503,7 @@ Status CameraService::connectDevice(
         const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb,
         const String16& cameraId,
         const String16& clientPackageName,
+        const std::unique_ptr<String16>& clientFeatureId,
         int clientUid,
         /*out*/
         sp<hardware::camera2::ICameraDeviceUser>* device) {
@@ -1511,6 +1513,7 @@ Status CameraService::connectDevice(
     String8 id = String8(cameraId);
     sp<CameraDeviceClient> client = nullptr;
     String16 clientPackageNameAdj = clientPackageName;
+
     if (hardware::IPCThreadState::self()->isServingCall()) {
         std::string vendorClient =
                 StringPrintf("vendor.client.pid<%d>", CameraThreadState::getCallingPid());
@@ -1518,7 +1521,7 @@ Status CameraService::connectDevice(
     }
     ret = connectHelper<hardware::camera2::ICameraDeviceCallbacks,CameraDeviceClient>(cameraCb, id,
             /*api1CameraId*/-1,
-            CAMERA_HAL_API_VERSION_UNSPECIFIED, clientPackageNameAdj,
+            CAMERA_HAL_API_VERSION_UNSPECIFIED, clientPackageNameAdj, clientFeatureId,
             clientUid, USE_CALLING_PID, API_2, /*shimUpdateOnly*/ false, /*out*/client);
 
     if(!ret.isOk()) {
@@ -1533,8 +1536,9 @@ Status CameraService::connectDevice(
 
 template<class CALLBACK, class CLIENT>
 Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
-        int api1CameraId, int halVersion, const String16& clientPackageName, int clientUid,
-        int clientPid, apiLevel effectiveApiLevel, bool shimUpdateOnly,
+        int api1CameraId, int halVersion, const String16& clientPackageName,
+        const std::unique_ptr<String16>& clientFeatureId, int clientUid, int clientPid,
+        apiLevel effectiveApiLevel, bool shimUpdateOnly,
         /*out*/sp<CLIENT>& device) {
     binder::Status ret = binder::Status::ok();
 
@@ -1617,7 +1621,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         }
 
         sp<BasicClient> tmp = nullptr;
-        if(!(ret = makeClient(this, cameraCb, clientPackageName,
+        if(!(ret = makeClient(this, cameraCb, clientPackageName, clientFeatureId,
                 cameraId, api1CameraId, facing,
                 clientPid, clientUid, getpid(),
                 halVersion, deviceVersion, effectiveApiLevel,
@@ -2459,13 +2463,14 @@ void CameraService::playSound(sound_kind kind) {
 CameraService::Client::Client(const sp<CameraService>& cameraService,
         const sp<ICameraClient>& cameraClient,
         const String16& clientPackageName,
+        const std::unique_ptr<String16>& clientFeatureId,
         const String8& cameraIdStr,
         int api1CameraId, int cameraFacing,
         int clientPid, uid_t clientUid,
         int servicePid) :
         CameraService::BasicClient(cameraService,
                 IInterface::asBinder(cameraClient),
-                clientPackageName,
+                clientPackageName, clientFeatureId,
                 cameraIdStr, cameraFacing,
                 clientPid, clientUid,
                 servicePid),
@@ -2495,17 +2500,24 @@ sp<CameraService> CameraService::BasicClient::BasicClient::sCameraService;
 
 CameraService::BasicClient::BasicClient(const sp<CameraService>& cameraService,
         const sp<IBinder>& remoteCallback,
-        const String16& clientPackageName,
+        const String16& clientPackageName, const std::unique_ptr<String16>& clientFeatureId,
         const String8& cameraIdStr, int cameraFacing,
         int clientPid, uid_t clientUid,
         int servicePid):
         mCameraIdStr(cameraIdStr), mCameraFacing(cameraFacing),
-        mClientPackageName(clientPackageName), mClientPid(clientPid), mClientUid(clientUid),
+        mClientPackageName(clientPackageName),
+        mClientPid(clientPid), mClientUid(clientUid),
         mServicePid(servicePid),
         mDisconnected(false),
         mAudioRestriction(hardware::camera2::ICameraDeviceUser::AUDIO_RESTRICTION_NONE),
         mRemoteBinder(remoteCallback)
 {
+    if (clientFeatureId) {
+        mClientFeatureId = std::unique_ptr<String16>(new String16(*clientFeatureId));
+    } else {
+        mClientFeatureId = std::unique_ptr<String16>();
+    }
+
     if (sCameraService == nullptr) {
         sCameraService = cameraService;
     }
@@ -2649,8 +2661,9 @@ status_t CameraService::BasicClient::startCameraOps() {
         int32_t res;
         mAppOpsManager->startWatchingMode(AppOpsManager::OP_CAMERA,
                 mClientPackageName, mOpsCallback);
-        res = mAppOpsManager->startOpNoThrow(AppOpsManager::OP_CAMERA,
-                mClientUid, mClientPackageName, /*startIfModeDefault*/ false);
+        res = mAppOpsManager->startOpNoThrow(AppOpsManager::OP_CAMERA, mClientUid,
+                mClientPackageName, /*startIfModeDefault*/ false, mClientFeatureId,
+                String16("start camera ") + String16(mCameraIdStr));
 
         if (res == AppOpsManager::MODE_ERRORED) {
             ALOGI("Camera %s: Access for \"%s\" has been revoked",
@@ -2692,7 +2705,7 @@ status_t CameraService::BasicClient::finishCameraOps() {
         // Notify app ops that the camera is available again
         if (mAppOpsManager != nullptr) {
             mAppOpsManager->finishOp(AppOpsManager::OP_CAMERA, mClientUid,
-                    mClientPackageName);
+                    mClientPackageName, mClientFeatureId);
             mOpsActive = false;
         }
         // This function is called when a client disconnects. This should
