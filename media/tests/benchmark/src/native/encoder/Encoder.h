@@ -49,7 +49,8 @@ class Encoder : public CallBackHandle {
           mNumOutputFrame(0),
           mSawInputEOS(false),
           mSawOutputEOS(false),
-          mSignalledError(false) {}
+          mSignalledError(false),
+          mErrorCode(AMEDIA_OK) {}
 
     virtual ~Encoder() {}
 
@@ -64,6 +65,8 @@ class Encoder : public CallBackHandle {
     void onInputAvailable(AMediaCodec *codec, int32_t index) override;
 
     void onFormatChanged(AMediaCodec *codec, AMediaFormat *format) override;
+
+    void onError(AMediaCodec *mediaCodec, media_status_t err) override;
 
     void onOutputAvailable(AMediaCodec *codec, int32_t index,
                            AMediaCodecBufferInfo *bufferInfo) override;
@@ -83,6 +86,7 @@ class Encoder : public CallBackHandle {
     bool mSawInputEOS;
     bool mSawOutputEOS;
     bool mSignalledError;
+    media_status_t mErrorCode;
 
     char *mMime;
     int32_t mOffset;
