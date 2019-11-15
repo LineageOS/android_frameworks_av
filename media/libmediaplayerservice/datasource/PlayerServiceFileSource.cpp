@@ -31,6 +31,7 @@ PlayerServiceFileSource::PlayerServiceFileSource(const char *filename)
       mDrmBufOffset(0),
       mDrmBufSize(0),
       mDrmBuf(NULL){
+    (void) DrmInitialization(nullptr);
 }
 
 PlayerServiceFileSource::PlayerServiceFileSource(int fd, int64_t offset, int64_t length)
@@ -40,6 +41,7 @@ PlayerServiceFileSource::PlayerServiceFileSource(int fd, int64_t offset, int64_t
       mDrmBufOffset(0),
       mDrmBufSize(0),
       mDrmBuf(NULL) {
+    (void) DrmInitialization(nullptr);
 }
 
 PlayerServiceFileSource::~PlayerServiceFileSource() {
@@ -87,7 +89,9 @@ ssize_t PlayerServiceFileSource::readAt(off64_t offset, void *data, size_t size)
 }
 
 sp<DecryptHandle> PlayerServiceFileSource::DrmInitialization(const char *mime) {
-    if (getuid() == AID_MEDIA_EX) return nullptr; // no DRM in media extractor
+    if (getuid() == AID_MEDIA_EX) {
+       return NULL; // no DRM in media extractor
+    }
     if (mDrmManagerClient == NULL) {
         mDrmManagerClient = new DrmManagerClient();
     }
