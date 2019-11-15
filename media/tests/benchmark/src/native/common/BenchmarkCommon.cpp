@@ -56,10 +56,10 @@ void OnFormatChangedCB(AMediaCodec *codec, void *userdata, AMediaFormat *format)
 
 void OnErrorCB(AMediaCodec *codec, void *userdata, media_status_t err, int32_t actionCode,
                const char *detail) {
-    (void)codec;
-    ALOGV("OnErrorCB: err(%d), actionCode(%d), detail(%s)", err, actionCode, detail);
+    ALOGE("OnErrorCB: err(%d), actionCode(%d), detail(%s)", err, actionCode, detail);
     CallBackHandle *self = (CallBackHandle *)userdata;
     self->mSawError = true;
+    self->mIOQueue.push([self, codec, err]() { self->onError(codec, err); });
 }
 
 AMediaCodec *createMediaCodec(AMediaFormat *format, const char *mime, string codecName,
