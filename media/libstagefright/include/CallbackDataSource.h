@@ -41,7 +41,6 @@ public:
     virtual String8 toString() {
         return mName;
     }
-    virtual sp<DecryptHandle> DrmInitialization(const char *mime = NULL);
     virtual sp<IDataSource> getIDataSource() const;
 
 private:
@@ -70,7 +69,6 @@ public:
     virtual String8 toString() {
         return mName;
     }
-    virtual sp<DecryptHandle> DrmInitialization(const char *mime = NULL);
     virtual sp<IDataSource> getIDataSource() const;
 
 private:

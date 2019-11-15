@@ -32,6 +32,7 @@ namespace android {
 PlayerServiceMediaHTTP::PlayerServiceMediaHTTP(const sp<MediaHTTPConnection> &conn)
     : MediaHTTP(conn),
       mDrmManagerClient(NULL) {
+    (void) DrmInitialization(nullptr);
 }
 
 PlayerServiceMediaHTTP::~PlayerServiceMediaHTTP() {
@@ -40,7 +41,7 @@ PlayerServiceMediaHTTP::~PlayerServiceMediaHTTP() {
 
 // DRM...
 
-sp<DecryptHandle> PlayerServiceMediaHTTP::DrmInitialization(const char* mime) {
+sp<DecryptHandle> PlayerServiceMediaHTTP::DrmInitialization(const char *mime) {
     if (mDrmManagerClient == NULL) {
         mDrmManagerClient = new DrmManagerClient();
     }
