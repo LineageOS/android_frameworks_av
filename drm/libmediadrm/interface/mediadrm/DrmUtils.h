@@ -18,6 +18,7 @@
 #define ANDROID_DRMUTILS_H
 
 #include <android/hardware/drm/1.0/ICryptoFactory.h>
+#include <android/hardware/drm/1.0/IDrmFactory.h>
 #include <utils/Errors.h>  // for status_t
 #include <utils/StrongPointer.h>
 #include <binder/Parcel.h>
@@ -80,6 +81,11 @@ void WriteKeysChange(
     }
     obj.writeInt32(hasNewUsableKey);
 }
+
+std::vector<sp<::V1_0::IDrmFactory>> MakeDrmFactories(const uint8_t uuid[16]);
+
+std::vector<sp<::V1_0::IDrmPlugin>> MakeDrmPlugins(const uint8_t uuid[16],
+                                                   const char *appPackageName);
 
 std::vector<sp<::V1_0::ICryptoFactory>> MakeCryptoFactories(const uint8_t uuid[16]);
 

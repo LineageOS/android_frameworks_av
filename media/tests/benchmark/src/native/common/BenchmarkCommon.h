@@ -17,8 +17,6 @@
 #ifndef __BENCHMARK_COMMON_H__
 #define __BENCHMARK_COMMON_H__
 
-#include <utils/Log.h>
-
 #include <inttypes.h>
 #include <mutex>
 #include <queue>
@@ -88,6 +86,10 @@ class CallBackHandle {
     virtual void onFormatChanged(AMediaCodec *codec, AMediaFormat *format) {
         (void)codec;
         (void)format;
+    }
+    virtual void onError(AMediaCodec *codec, media_status_t err) {
+        (void)codec;
+        (void)err;
     }
     virtual void onOutputAvailable(AMediaCodec *codec, int32_t index,
                                    AMediaCodecBufferInfo *bufferInfo) {

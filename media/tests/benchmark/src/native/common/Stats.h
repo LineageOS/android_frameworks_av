@@ -17,11 +17,28 @@
 #ifndef __STATS_H__
 #define __STATS_H__
 
+#include <android/log.h>
+
+#ifndef ALOG
+#define ALOG(priority, tag, ...) ((void)__android_log_print(ANDROID_##priority, tag, __VA_ARGS__))
+
+#define ALOGI(...) ALOG(LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define ALOGE(...) ALOG(LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#define ALOGD(...) ALOG(LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#if LOG_NDEBUG
+#define ALOGV(cond, ...)   ((void)0)
+#else
+#define ALOGV(...) ALOG(LOG_VERBOSE, LOG_TAG, __VA_ARGS__)
+#endif
+#endif  // ALOG
+
 #include <sys/time.h>
 #include <algorithm>
 #include <numeric>
 #include <vector>
-#include <utils/Timers.h>
+
+// Include local copy of Timers taken from system/core/libutils
+#include "utils/Timers.h"
 
 using namespace std;
 

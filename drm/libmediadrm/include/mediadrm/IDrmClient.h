@@ -18,12 +18,8 @@
 #define ANDROID_IDRMCLIENT_H
 
 #include <utils/RefBase.h>
-#include <binder/IInterface.h>
-#include <binder/Parcel.h>
-#include <media/drm/DrmAPI.h>
-
-#include <android/hardware/drm/1.2/types.h>
 #include <hidl/HidlSupport.h>
+#include <media/drm/DrmAPI.h>
 
 #include <cstdint>
 #include <vector>
@@ -35,10 +31,10 @@ struct DrmKeyStatus {
     const hardware::hidl_vec<uint8_t> keyId;
 };
 
-class IDrmClient: public IInterface
+class IDrmClient: public virtual RefBase
 {
 public:
-    DECLARE_META_INTERFACE(DrmClient);
+    ~IDrmClient() {}
 
     virtual void sendEvent(
             DrmPlugin::EventType eventType,
@@ -57,17 +53,11 @@ public:
     virtual void sendSessionLostState(
             const hardware::hidl_vec<uint8_t> &sessionId) = 0;
 
-};
+protected:
+    IDrmClient() {}
 
-// ----------------------------------------------------------------------------
-
-class BnDrmClient: public BnInterface<IDrmClient>
-{
-public:
-    virtual status_t onTransact(uint32_t code,
-                                const Parcel& data,
-                                Parcel* reply,
-                                uint32_t flags = 0);
+private:
+    DISALLOW_EVIL_CONSTRUCTORS(IDrmClient);
 };
 
 }; // namespace android

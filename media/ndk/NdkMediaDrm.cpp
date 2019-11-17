@@ -41,7 +41,7 @@ using namespace android;
 
 typedef Vector<uint8_t> idvec_t;
 
-struct DrmListener: virtual public BnDrmClient
+struct DrmListener: virtual public IDrmClient
 {
 private:
     AMediaDrm *mObj;

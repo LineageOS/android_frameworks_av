@@ -87,6 +87,7 @@ interface ICameraService
     ICameraDeviceUser connectDevice(ICameraDeviceCallbacks callbacks,
             String cameraId,
             String opPackageName,
+            @nullable String featureId,
             int clientUid);
 
     /**
