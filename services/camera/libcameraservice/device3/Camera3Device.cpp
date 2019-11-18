@@ -2165,7 +2165,9 @@ void Camera3Device::internalUpdateStatusLocked(Status status) {
 }
 
 void Camera3Device::pauseStateNotify(bool enable) {
-    Mutex::Autolock il(mInterfaceLock);
+    // We must not hold mInterfaceLock here since this function is called from
+    // RequestThread::threadLoop and holding mInterfaceLock could lead to
+    // deadlocks (http://b/143513518)
     Mutex::Autolock l(mLock);
 
     mPauseStateNotify = enable;
@@ -2742,7 +2744,9 @@ bool Camera3Device::reconfigureCamera(const CameraMetadata& sessionParams) {
     ATRACE_CALL();
     bool ret = false;
 
-    Mutex::Autolock il(mInterfaceLock);
+    // We must not hold mInterfaceLock here since this function is called from
+    // RequestThread::threadLoop and holding mInterfaceLock could lead to
+    // deadlocks (http://b/143513518)
     nsecs_t maxExpectedDuration = getExpectedInFlightDuration();
 
     Mutex::Autolock l(mLock);
@@ -5371,6 +5375,9 @@ bool Camera3Device::RequestThread::updateSessionParameters(const CameraMetadata&
 bool Camera3Device::RequestThread::threadLoop() {
     ATRACE_CALL();
     status_t res;
+    // Any function called from threadLoop() must not hold mInterfaceLock since
+    // it could lead to deadlocks (disconnect() -> hold mInterfaceMutex -> wait for request thread
+    // to finish -> request thread waits on mInterfaceMutex) http://b/143513518
 
     // Handle paused state.
     if (waitIfPaused()) {
