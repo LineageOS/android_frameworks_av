@@ -18,7 +18,7 @@
 
 #define STAGEFRIGHT_METADATA_RETRIEVER_H_
 
-#include <media/IMediaExtractor.h>
+#include <android/IMediaExtractor.h>
 #include <media/MediaMetadataRetrieverInterface.h>
 
 #include <utils/KeyedVector.h>

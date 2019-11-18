@@ -17,7 +17,7 @@
 #ifndef REMOTE_MEDIA_EXTRACTOR_H_
 #define REMOTE_MEDIA_EXTRACTOR_H_
 
-#include <media/IMediaExtractor.h>
+#include <android/IMediaExtractor.h>
 #include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/foundation/ABase.h>
 

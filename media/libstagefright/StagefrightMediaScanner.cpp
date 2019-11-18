@@ -35,7 +35,7 @@ StagefrightMediaScanner::StagefrightMediaScanner() {}
 
 StagefrightMediaScanner::~StagefrightMediaScanner() {}
 
-static std::unordered_set<std::string> gSupportedExtensions;
+static std::vector<std::string> gSupportedExtensions;
 
 static bool FileHasAcceptableExtension(const char *extension) {
 
@@ -44,7 +44,12 @@ static bool FileHasAcceptableExtension(const char *extension) {
         gSupportedExtensions = MediaExtractorFactory::getSupportedTypes();
     }
 
-    return  gSupportedExtensions.count(std::string(extension + 1)) != 0;
+    for (auto ext: gSupportedExtensions) {
+        if (ext == (extension + 1)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 MediaScanResult StagefrightMediaScanner::processFile(

@@ -25,7 +25,7 @@
 #include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
 #include <binder/PermissionCache.h>
-#include <media/IMediaExtractor.h>
+#include <android/IMediaExtractor.h>
 #include <media/stagefright/MetaData.h>
 
 namespace android {

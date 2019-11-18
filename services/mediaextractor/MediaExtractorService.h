@@ -18,31 +18,33 @@
 #define ANDROID_MEDIA_EXTRACTOR_SERVICE_H
 
 #include <binder/BinderService.h>
-#include <media/IMediaExtractorService.h>
-#include <media/IMediaExtractor.h>
+#include <android/BnMediaExtractorService.h>
+#include <android/IMediaExtractor.h>
 
 namespace android {
 
 class MediaExtractorService : public BinderService<MediaExtractorService>, public BnMediaExtractorService
 {
-    friend class BinderService<MediaExtractorService>;    // for MediaExtractorService()
 public:
     MediaExtractorService();
-    virtual ~MediaExtractorService() { }
-    virtual void onFirstRef() { }
+    virtual ~MediaExtractorService();
 
     static const char*  getServiceName() { return "media.extractor"; }
 
-    virtual sp<IMediaExtractor> makeExtractor(const sp<IDataSource> &source, const char *mime);
+    virtual ::android::binder::Status makeExtractor(
+            const ::android::sp<::android::IDataSource>& source,
+            const ::std::unique_ptr< ::std::string> &mime,
+            ::android::sp<::android::IMediaExtractor>* _aidl_return);
 
-    virtual sp<IDataSource> makeIDataSource(int fd, int64_t offset, int64_t length);
+    virtual ::android::binder::Status makeIDataSource(
+            const base::unique_fd &fd,
+            int64_t offset,
+            int64_t length,
+            ::android::sp<::android::IDataSource>* _aidl_return);
 
-    virtual std::unordered_set<std::string> getSupportedTypes();
+    virtual ::android::binder::Status getSupportedTypes(::std::vector<::std::string>* _aidl_return);
 
-    virtual status_t    dump(int fd, const Vector<String16>& args);
-
-    virtual status_t    onTransact(uint32_t code, const Parcel& data, Parcel* reply,
-                                uint32_t flags);
+    virtual status_t dump(int fd, const Vector<String16>& args);
 
 private:
     Mutex               mLock;

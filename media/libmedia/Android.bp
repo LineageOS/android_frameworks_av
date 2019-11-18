@@ -23,6 +23,14 @@ filegroup {
     path: "aidl",
 }
 
+filegroup {
+    name: "mediaextractorservice_aidl",
+    srcs: [
+        "aidl/android/IMediaExtractorService.aidl",
+    ],
+    path: "aidl",
+}
+
 aidl_interface {
     name: "resourcemanager_aidl_interface",
     local_include_dir: "aidl",
@@ -249,13 +257,13 @@ cc_library {
     name: "libmedia",
 
     srcs: [
+        ":mediaextractorservice_aidl",
         "IDataSource.cpp",
         "BufferingSettings.cpp",
         "mediaplayer.cpp",
         "IMediaHTTPConnection.cpp",
         "IMediaHTTPService.cpp",
         "IMediaExtractor.cpp",
-        "IMediaExtractorService.cpp",
         "IMediaPlayerService.cpp",
         "IMediaPlayerClient.cpp",
         "IMediaRecorderClient.cpp",
