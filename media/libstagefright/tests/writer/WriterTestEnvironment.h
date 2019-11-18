@@ -25,7 +25,7 @@ using namespace std;
 
 class WriterTestEnvironment : public ::testing::Environment {
   public:
-    WriterTestEnvironment() : res("/sdcard/media/") {}
+    WriterTestEnvironment() : res("/data/local/tmp/") {}
 
     // Parses the command line arguments
     int initFromOptions(int argc, char **argv);
