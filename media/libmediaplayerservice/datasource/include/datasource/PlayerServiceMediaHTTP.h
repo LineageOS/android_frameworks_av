@@ -33,12 +33,11 @@ struct PlayerServiceMediaHTTP : public MediaHTTP {
 protected:
     virtual ~PlayerServiceMediaHTTP();
 
-    virtual sp<DecryptHandle> DrmInitialization(const char* mime);
-
 private:
     sp<DecryptHandle> mDecryptHandle;
     DrmManagerClient *mDrmManagerClient;
 
+    sp<DecryptHandle> DrmInitialization(const char *mime);
     void clearDRMState_l();
 
     DISALLOW_EVIL_CONSTRUCTORS(PlayerServiceMediaHTTP);

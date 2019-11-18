@@ -114,10 +114,6 @@ void CallbackDataSource::close() {
     }
 }
 
-sp<DecryptHandle> CallbackDataSource::DrmInitialization(const char *mime) {
-    return mIDataSource->DrmInitialization(mime);
-}
-
 sp<IDataSource> CallbackDataSource::getIDataSource() const {
     return mIDataSource;
 }
@@ -189,14 +185,6 @@ status_t TinyCacheSource::getSize(off64_t *size) {
 
 uint32_t TinyCacheSource::flags() {
     return mSource->flags();
-}
-
-sp<DecryptHandle> TinyCacheSource::DrmInitialization(const char *mime) {
-    // flush cache when DrmInitialization occurs since decrypted
-    // data may differ from what is in cache.
-    mCachedOffset = 0;
-    mCachedSize = 0;
-    return mSource->DrmInitialization(mime);
 }
 
 sp<IDataSource> TinyCacheSource::getIDataSource() const {
