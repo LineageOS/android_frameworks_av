@@ -66,9 +66,6 @@ public:
     virtual String8 toString()  {
         return mName;
     }
-    virtual sp<DecryptHandle> DrmInitialization(const char *mime) {
-        return mSource->DrmInitialization(mime);
-    }
 
 private:
     enum {

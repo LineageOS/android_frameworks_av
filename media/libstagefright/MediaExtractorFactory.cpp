@@ -71,9 +71,6 @@ sp<IMediaExtractor> MediaExtractorFactory::CreateFromService(
 
     ALOGV("MediaExtractorFactory::CreateFromService %s", mime);
 
-    // initialize source decryption if needed
-    source->DrmInitialization(nullptr /* mime */);
-
     void *meta = nullptr;
     void *creator = NULL;
     FreeMetaFunc freeMeta = nullptr;

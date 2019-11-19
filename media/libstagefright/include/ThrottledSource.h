@@ -54,10 +54,6 @@ struct ThrottledSource : public DataSource {
         return mSource->reconnectAtOffset(offset);
     }
 
-    virtual sp<DecryptHandle> DrmInitialization(const char *mime = NULL) {
-        return mSource->DrmInitialization(mime);
-    }
-
     virtual String8 getMIMEType() const {
         return mSource->getMIMEType();
     }
