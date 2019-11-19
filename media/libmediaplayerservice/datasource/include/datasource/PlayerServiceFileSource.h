@@ -37,8 +37,6 @@ public:
 
     virtual ssize_t readAt(off64_t offset, void *data, size_t size);
 
-    virtual sp<DecryptHandle> DrmInitialization(const char *mime);
-
     static bool requiresDrm(int fd, int64_t offset, int64_t length, const char *mime);
 
 protected:
@@ -52,6 +50,7 @@ private:
     ssize_t mDrmBufSize;
     unsigned char *mDrmBuf;
 
+    sp<DecryptHandle> DrmInitialization(const char *mime);
     ssize_t readAtDRM_l(off64_t offset, void *data, size_t size);
 
     PlayerServiceFileSource(const PlayerServiceFileSource &);
