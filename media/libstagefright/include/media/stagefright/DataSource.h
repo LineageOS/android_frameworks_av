@@ -52,11 +52,6 @@ public:
 
     ////////////////////////////////////////////////////////////////////////////
 
-    // for DRM
-    virtual sp<DecryptHandle> DrmInitialization(const char * /*mime*/ = NULL) {
-        return NULL;
-    }
-
     virtual String8 getUri() {
         return String8();
     }
