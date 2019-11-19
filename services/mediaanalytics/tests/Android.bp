@@ -1,5 +1,6 @@
 cc_test {
     name: "mediametrics_tests",
+    test_suites: ["device-tests"],
 
     cflags: [
         "-Wall",
