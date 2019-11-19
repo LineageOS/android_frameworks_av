@@ -1,0 +1,27 @@
+cc_test {
+    name: "sf_foundation_test",
+    test_suites: ["device-tests"],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+    include_dirs: [
+        "frameworks/av/include",
+    ],
+
+    shared_libs: [
+        "liblog",
+        "libstagefright_foundation",
+        "libutils",
+    ],
+
+    srcs: [
+        "AData_test.cpp",
+        "Base64_test.cpp",
+        "Flagged_test.cpp",
+        "TypeTraits_test.cpp",
+        "Utils_test.cpp",
+    ],
+}
