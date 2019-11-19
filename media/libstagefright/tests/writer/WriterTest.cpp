@@ -234,7 +234,7 @@ int32_t WriterTest::addWriterSource(bool isAudio, configFormat params) {
 
 void getFileDetails(string &inputFilePath, string &info, configFormat &params, bool &isAudio,
                     int32_t streamIndex = 0) {
-    if (streamIndex > sizeof(kInputData) / sizeof(kInputData[0])) {
+    if (streamIndex >= sizeof(kInputData) / sizeof(kInputData[0])) {
         return;
     }
     inputFilePath += kInputData[streamIndex].inputFile;
