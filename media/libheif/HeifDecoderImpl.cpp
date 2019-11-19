@@ -83,9 +83,6 @@ public:
     void close() {}
     uint32_t getFlags() override { return 0; }
     String8 toString() override { return String8("HeifDataSource"); }
-    sp<DecryptHandle> DrmInitialization(const char*) override {
-        return nullptr;
-    }
 
 private:
     enum {
