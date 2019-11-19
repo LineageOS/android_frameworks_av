@@ -16,6 +16,7 @@ cc_library_shared {
     vendor_available: true,
 
     srcs: [
+        "C2AllocatorBlob.cpp",
         "C2AllocatorIon.cpp",
         "C2AllocatorGralloc.cpp",
         "C2Buffer.cpp",
