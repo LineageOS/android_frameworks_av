@@ -92,6 +92,10 @@ filegroup {
     srcs: ["audio_policy_configuration_generic.xml"],
 }
 filegroup {
+    name: "audio_policy_configuration_generic_configurable",
+    srcs: ["audio_policy_configuration_generic_configurable.xml"],
+}
+filegroup {
     name: "usb_audio_policy_configuration",
     srcs: ["usb_audio_policy_configuration.xml"],
 }
