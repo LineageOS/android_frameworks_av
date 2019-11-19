@@ -20,6 +20,10 @@
 #include <inttypes.h>
 #include <unistd.h>
 
+#include <iostream>
+#include <fstream>
+#include <string>
+
 #include <media/NdkMediaDrm.h>
 
 #include <cutils/properties.h>
@@ -28,12 +32,10 @@
 #include <gui/Surface.h>
 
 #include <android-base/properties.h>
-#include <binder/PermissionController.h>
 #include <mediadrm/DrmUtils.h>
 #include <mediadrm/IDrm.h>
 #include <mediadrm/IDrmClient.h>
 #include <media/stagefright/MediaErrors.h>
-#include <binder/IServiceManager.h>
 #include <media/NdkMediaCrypto.h>
 
 
@@ -236,24 +238,15 @@ static bool ShouldGetAppPackageName(void) {
 }
 
 static status_t GetAppPackageName(String8 *packageName) {
-    sp<IServiceManager> serviceManager = defaultServiceManager();
-    sp<IBinder> binder = serviceManager->getService(String16("permission"));
-
-    sp<IPermissionController> permissionContol = interface_cast<IPermissionController>(binder);
-    if (permissionContol == NULL) {
-        ALOGE("Failed to get permission service");
+    // todo(robertshih): use refactored/renamed libneuralnetworks_packageinfo which is stable
+    std::string appName;
+    std::ifstream cmdline("/proc/self/cmdline");
+    std::getline(cmdline, appName);
+    cmdline.close();
+    if (appName.empty()) {
         return UNKNOWN_ERROR;
     }
-
-    Vector<String16> packages;
-    permissionContol->getPackagesForUid(getuid(), packages);
-
-    if (packages.isEmpty()) {
-        ALOGE("Unable to get package name for current UID");
-        return UNKNOWN_ERROR;
-    }
-
-    *packageName = String8(packages[0]);
+    *packageName = String8(appName.c_str());
     return OK;
 }
 

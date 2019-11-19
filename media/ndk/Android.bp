@@ -79,7 +79,6 @@ cc_library_shared {
         "android.hidl.token@1.0-utils",
         "libandroid_runtime_lazy",
         "libbase",
-        "libbinder",
         "libdatasource",
         "libmedia",
         "libmediadrm",
