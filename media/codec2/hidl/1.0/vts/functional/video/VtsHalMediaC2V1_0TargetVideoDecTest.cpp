@@ -28,6 +28,10 @@
 #include <C2Debug.h>
 #include <C2Buffer.h>
 #include <C2BufferPriv.h>
+#include <gui/BufferQueue.h>
+#include <gui/IConsumerListener.h>
+#include <gui/IProducerListener.h>
+#include <system/window.h>
 
 using android::C2AllocatorIon;
 
@@ -424,6 +428,48 @@ TEST_F(Codec2VideoDecHidlTest, validateCompName) {
     ALOGV("Checks if the given component is a valid video component");
     validateComponent(mComponent, mCompName, mDisableTest);
     ASSERT_EQ(mDisableTest, false);
+}
+
+TEST_F(Codec2VideoDecHidlTest, configureTunnel) {
+    description("Attempts to configure tunneling");
+    if (mDisableTest) return;
+    ALOGV("Checks if the component can be configured for tunneling");
+    native_handle_t* sidebandStream{};
+    c2_status_t err = mComponent->configureVideoTunnel(0, &sidebandStream);
+    if (err == C2_OMITTED) {
+        return;
+    }
+
+    using namespace android;
+    sp<NativeHandle> nativeHandle = NativeHandle::create(sidebandStream, true);
+
+    sp<IGraphicBufferProducer> producer;
+    sp<IGraphicBufferConsumer> consumer;
+    BufferQueue::createBufferQueue(&producer, &consumer);
+
+    class DummyConsumerListener : public BnConsumerListener {
+    public:
+        DummyConsumerListener() : BnConsumerListener() {}
+        void onFrameAvailable(const BufferItem&) override {}
+        void onBuffersReleased() override {}
+        void onSidebandStreamChanged() override {}
+    };
+    consumer->consumerConnect(new DummyConsumerListener(), false);
+
+    class DummyProducerListener : public BnProducerListener {
+    public:
+        DummyProducerListener() : BnProducerListener() {}
+        virtual void onBufferReleased() override {}
+        virtual bool needsReleaseNotify() override { return false; }
+        virtual void onBuffersDiscarded(const std::vector<int32_t>&) override {}
+    };
+    IGraphicBufferProducer::QueueBufferOutput qbo{};
+    producer->connect(new DummyProducerListener(),
+                      NATIVE_WINDOW_API_MEDIA,
+                      false,
+                      &qbo);
+
+    ASSERT_EQ(producer->setSidebandStream(nativeHandle), NO_ERROR);
 }
 
 class Codec2VideoDecDecodeTest

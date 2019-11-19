@@ -15,25 +15,27 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "android.hardware.media.c2@1.0-service"
+#define LOG_TAG "android.hardware.media.c2@1.1-service"
 
-#include <codec2/hidl/1.0/ComponentStore.h>
-#include <hidl/HidlTransportSupport.h>
+#include <android-base/logging.h>
 #include <binder/ProcessState.h>
+#include <codec2/hidl/1.1/ComponentStore.h>
+#include <hidl/HidlTransportSupport.h>
 #include <minijail.h>
 
 #include <C2Component.h>
 
-// OmxStore is added for visibility by dumpstate.
-#include <media/stagefright/omx/1.0/OmxStore.h>
-
-// This is created by module "codec2.vendor.base.policy". This can be modified.
+// This is the absolute on-device path of the prebuild_etc module
+// "android.hardware.media.c2@1.1-default-seccomp_policy" in Android.bp.
 static constexpr char kBaseSeccompPolicyPath[] =
-        "/vendor/etc/seccomp_policy/codec2.vendor.base.policy";
+        "/vendor/etc/seccomp_policy/"
+        "android.hardware.media.c2@1.1-default-seccomp-policy";
 
-// Additional device-specific seccomp permissions can be added in this file.
+// Additional seccomp permissions can be added in this file.
+// This file does not exist by default.
 static constexpr char kExtSeccompPolicyPath[] =
-        "/vendor/etc/seccomp_policy/codec2.vendor.ext.policy";
+        "/vendor/etc/seccomp_policy/"
+        "android.hardware.media.c2@1.1-extended-seccomp-policy";
 
 class DummyC2Store : public C2ComponentStore {
 public:
@@ -97,54 +99,48 @@ public:
 };
 
 int main(int /* argc */, char** /* argv */) {
-    ALOGD("android.hardware.media.c2@1.0-service starting...");
+    using namespace ::android;
+    LOG(DEBUG) << "android.hardware.media.c2@1.1-service starting...";
 
+    // Set up minijail to limit system calls.
     signal(SIGPIPE, SIG_IGN);
-    android::SetUpMinijail(kBaseSeccompPolicyPath, kExtSeccompPolicyPath);
+    SetUpMinijail(kBaseSeccompPolicyPath, kExtSeccompPolicyPath);
 
-    // vndbinder is needed by BufferQueue.
-    android::ProcessState::initWithDriver("/dev/vndbinder");
-    android::ProcessState::self()->startThreadPool();
+    // Enable vndbinder to allow vendor-to-vendor binder calls.
+    ProcessState::initWithDriver("/dev/vndbinder");
 
+    ProcessState::self()->startThreadPool();
     // Extra threads may be needed to handle a stacked IPC sequence that
     // contains alternating binder and hwbinder calls. (See b/35283480.)
-    android::hardware::configureRpcThreadpool(8, true /* callerWillJoin */);
+    hardware::configureRpcThreadpool(8, true /* callerWillJoin */);
 
     // Create IComponentStore service.
     {
-        using namespace ::android::hardware::media::c2::V1_0;
-        android::sp<IComponentStore> store;
+        using namespace ::android::hardware::media::c2::V1_1;
+        sp<IComponentStore> store;
 
-        // Vendor's TODO: Replace this with
+        // TODO: Replace this with
         // store = new utils::ComponentStore(
         //         /* implementation of C2ComponentStore */);
-        ALOGD("Instantiating Codec2's dummy IComponentStore service...");
+        LOG(DEBUG) << "Instantiating Codec2's IComponentStore service...";
         store = new utils::ComponentStore(
                 std::make_shared<DummyC2Store>());
 
         if (store == nullptr) {
-            ALOGE("Cannot create Codec2's IComponentStore service.");
+            LOG(ERROR) << "Cannot create Codec2's IComponentStore service.";
         } else {
-            if (store->registerAsService("default") != android::OK) {
-                ALOGE("Cannot register Codec2's "
-                        "IComponentStore service.");
+            constexpr char const* serviceName = "default";
+            if (store->registerAsService(serviceName) != OK) {
+                LOG(ERROR) << "Cannot register Codec2's IComponentStore service"
+                              " with instance name << \""
+                           << serviceName << "\".";
             } else {
-                ALOGI("Codec2's IComponentStore service created.");
+                LOG(DEBUG) << "Codec2's IComponentStore service registered. "
+                              "Instance name: \"" << serviceName << "\".";
             }
         }
     }
 
-    // Register IOmxStore service.
-    {
-        using namespace ::android::hardware::media::omx::V1_0;
-        android::sp<IOmxStore> omxStore = new implementation::OmxStore();
-        if (omxStore == nullptr) {
-            ALOGE("Cannot create IOmxStore HAL service.");
-        } else if (omxStore->registerAsService() != android::OK) {
-            ALOGE("Cannot register IOmxStore HAL service.");
-        }
-    }
-
-    android::hardware::joinRpcThreadpool();
+    hardware::joinRpcThreadpool();
     return 0;
 }
