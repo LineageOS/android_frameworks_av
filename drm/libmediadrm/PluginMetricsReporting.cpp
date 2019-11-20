@@ -21,7 +21,7 @@
 
 #include <inttypes.h>
 
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetrics.h>
 #include <utils/Log.h>
 
 
@@ -33,18 +33,18 @@ constexpr char kSerializedMetricsField[] = "serialized_metrics";
 
 status_t reportVendorMetrics(const std::string& metrics,
                              const String8& name,
-                             const String8& appPackageName) {
-    std::unique_ptr<MediaAnalyticsItem> analyticsItem(MediaAnalyticsItem::create(name.c_str()));
-    std::string app_package_name(appPackageName.c_str(), appPackageName.size());
-    analyticsItem->setPkgName(app_package_name);
+                             uid_t appUid) {
+    mediametrics_handle_t analyticsItem(mediametrics_create(name.c_str()));
+    mediametrics_setUid(analyticsItem, appUid);
     if (metrics.size() > 0) {
-        analyticsItem->setCString(kSerializedMetricsField, metrics.c_str());
+        mediametrics_setCString(analyticsItem, kSerializedMetricsField, metrics.c_str());
     }
 
-    if (!analyticsItem->selfrecord()) {
+    if (!mediametrics_selfRecord(analyticsItem)) {
       ALOGE("%s: selfrecord() returned false", __func__);
     }
 
+    mediametrics_delete(analyticsItem);
     return OK;
 }
 
@@ -67,13 +67,13 @@ String8 sanitize(const String8& input) {
 status_t reportDrmPluginMetrics(const std::string& b64EncodedMetrics,
                                 const String8& vendor,
                                 const String8& description,
-                                const String8& appPackageName) {
+                                uid_t appUid) {
 
     String8 name = String8::format("drm.vendor.%s.%s",
                                    sanitize(vendor).c_str(),
                                    sanitize(description).c_str());
 
-    return reportVendorMetrics(b64EncodedMetrics, name, appPackageName);
+    return reportVendorMetrics(b64EncodedMetrics, name, appUid);
 }
 
 }  // namespace android

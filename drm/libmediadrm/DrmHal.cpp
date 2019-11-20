@@ -28,6 +28,7 @@
 #include <android/hidl/manager/1.2/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
 #include <media/EventMetric.h>
+#include <media/MediaMetrics.h>
 #include <media/PluginMetricsReporting.h>
 #include <media/drm/DrmAPI.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -453,6 +454,7 @@ sp<IDrmPlugin> DrmHal::makeDrmPlugin(const sp<IDrmFactory>& factory,
         const uint8_t uuid[16], const String8& appPackageName) {
     mAppPackageName = appPackageName;
     mMetrics.SetAppPackageName(appPackageName);
+    mMetrics.SetAppUid(IPCThreadState::self()->getCallingUid());
 
     sp<IDrmPlugin> plugin;
     Return<void> hResult = factory->createPlugin(uuid, appPackageName.string(),
@@ -1564,21 +1566,21 @@ status_t DrmHal::signRSA(Vector<uint8_t> const &sessionId,
 
 void DrmHal::reportFrameworkMetrics() const
 {
-    std::unique_ptr<MediaAnalyticsItem> item(MediaAnalyticsItem::create("mediadrm"));
-    item->setPkgName(mMetrics.GetAppPackageName().c_str());
+    mediametrics_handle_t item(mediametrics_create("mediadrm"));
+    mediametrics_setUid(item, mMetrics.GetAppUid());
     String8 vendor;
     String8 description;
     status_t result = getPropertyStringInternal(String8("vendor"), vendor);
     if (result != OK) {
         ALOGE("Failed to get vendor from drm plugin: %d", result);
     } else {
-        item->setCString("vendor", vendor.c_str());
+        mediametrics_setCString(item, "vendor", vendor.c_str());
     }
     result = getPropertyStringInternal(String8("description"), description);
     if (result != OK) {
         ALOGE("Failed to get description from drm plugin: %d", result);
     } else {
-        item->setCString("description", description.c_str());
+        mediametrics_setCString(item, "description", description.c_str());
     }
 
     std::string serializedMetrics;
@@ -1589,11 +1591,12 @@ void DrmHal::reportFrameworkMetrics() const
     std::string b64EncodedMetrics = toBase64StringNoPad(serializedMetrics.data(),
                                                         serializedMetrics.size());
     if (!b64EncodedMetrics.empty()) {
-        item->setCString("serialized_metrics", b64EncodedMetrics.c_str());
+        mediametrics_setCString(item, "serialized_metrics", b64EncodedMetrics.c_str());
     }
-    if (!item->selfrecord()) {
+    if (!mediametrics_selfRecord(item)) {
         ALOGE("Failed to self record framework metrics");
     }
+    mediametrics_delete(item);
 }
 
 void DrmHal::reportPluginMetrics() const
@@ -1607,7 +1610,7 @@ void DrmHal::reportPluginMetrics() const
         std::string metricsString = toBase64StringNoPad(metricsVector.array(),
                                                         metricsVector.size());
         status_t res = android::reportDrmPluginMetrics(metricsString, vendor,
-                                                       description, mAppPackageName);
+                                                       description, mMetrics.GetAppUid());
         if (res != OK) {
             ALOGE("Metrics were retrieved but could not be reported: %d", res);
         }

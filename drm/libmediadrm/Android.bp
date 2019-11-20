@@ -44,7 +44,7 @@ cc_library_shared {
         "liblog",
         "libmedia",
         "libmediadrmmetrics_lite",
-        "libmediametrics",
+        "libmediametrics#1",
         "libmediautils",
         "libstagefright_foundation",
         "libutils",
