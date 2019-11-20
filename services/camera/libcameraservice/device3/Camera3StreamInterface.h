@@ -23,6 +23,7 @@
 #include "Camera3StreamBufferListener.h"
 #include "Camera3StreamBufferFreedListener.h"
 
+struct camera3_stream;
 struct camera3_stream_buffer;
 
 namespace android {
@@ -97,6 +98,12 @@ class Camera3StreamInterface : public virtual RefBase {
     virtual void setDataSpaceOverride(bool dataSpaceOverriden) = 0;
     virtual bool isDataSpaceOverridden() const = 0;
     virtual android_dataspace getOriginalDataSpace() const = 0;
+
+    /**
+     * Offline processing
+     */
+    virtual void setOfflineProcessingSupport(bool support) = 0;
+    virtual bool getOfflineProcessingSupport() const = 0;
 
     /**
      * Get a HAL3 handle for the stream, without starting stream configuration.

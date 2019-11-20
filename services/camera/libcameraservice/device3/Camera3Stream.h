@@ -167,6 +167,9 @@ class Camera3Stream :
     android_dataspace getOriginalDataSpace() const;
     const String8&    physicalCameraId() const;
 
+    void              setOfflineProcessingSupport(bool) override;
+    bool              getOfflineProcessingSupport() const override;
+
     camera3_stream*   asHalStream() override {
         return this;
     }
@@ -592,6 +595,8 @@ class Camera3Stream :
 
     String8 mPhysicalCameraId;
     nsecs_t mLastTimestamp;
+
+    bool mSupportOfflineProcessing = false;
 }; // class Camera3Stream
 
 }; // namespace camera3

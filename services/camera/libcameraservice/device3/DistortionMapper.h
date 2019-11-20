@@ -36,6 +36,15 @@ class DistortionMapper : private CoordinateMapper {
   public:
     DistortionMapper();
 
+    DistortionMapper(const DistortionMapper& other) :
+            mValidMapping(other.mValidMapping), mValidGrids(other.mValidGrids),
+            mFx(other.mFx), mFy(other.mFy), mCx(other.mCx), mCy(other.mCy), mS(other.mS),
+            mInvFx(other.mInvFx), mInvFy(other.mInvFy), mK(other.mK),
+            mArrayWidth(other.mArrayWidth), mArrayHeight(other.mArrayHeight),
+            mActiveWidth(other.mActiveWidth), mActiveHeight(other.mActiveHeight),
+            mArrayDiffX(other.mArrayDiffX), mArrayDiffY(other.mArrayDiffY),
+            mCorrectedGrid(other.mCorrectedGrid), mDistortedGrid(other.mDistortedGrid) {}
+
     /**
      * Check whether distortion correction is supported by the camera HAL
      */
@@ -173,7 +182,7 @@ class DistortionMapper : private CoordinateMapper {
     // pre-calculated inverses for speed
     float mInvFx, mInvFy;
     // radial/tangential distortion parameters
-    float mK[5];
+    std::array<float, 5> mK;
 
     // pre-correction active array dimensions
     float mArrayWidth, mArrayHeight;
