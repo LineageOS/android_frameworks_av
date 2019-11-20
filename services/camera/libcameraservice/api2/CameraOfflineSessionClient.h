@@ -20,10 +20,12 @@
 #include <android/hardware/camera2/BnCameraOfflineSession.h>
 #include <android/hardware/camera2/ICameraDeviceCallbacks.h>
 #include "CameraService.h"
+#include "CompositeStream.h"
 
 namespace android {
 
 using android::hardware::camera2::ICameraDeviceCallbacks;
+using camera3::CompositeStream;
 
 // Client for offline session. Note that offline session client does not affect camera service's
 // client arbitration logic. It is camera HAL's decision to decide whether a normal camera
@@ -40,6 +42,7 @@ public:
     CameraOfflineSessionClient(
             const sp<CameraService>& cameraService,
             sp<CameraOfflineSessionBase> session,
+            const KeyedVector<sp<IBinder>, sp<CompositeStream>>& offlineCompositeStreamMap,
             const sp<ICameraDeviceCallbacks>& remoteCallback,
             const String16& clientPackageName,
             const std::unique_ptr<String16>& clientFeatureId,
@@ -50,7 +53,8 @@ public:
                     IInterface::asBinder(remoteCallback),
                     clientPackageName, clientFeatureId,
                     cameraIdStr, cameraFacing, clientPid, clientUid, servicePid),
-            mRemoteCallback(remoteCallback), mOfflineSession(session) {}
+            mRemoteCallback(remoteCallback), mOfflineSession(session),
+            mCompositeStreamMap(offlineCompositeStreamMap) {}
 
     virtual ~CameraOfflineSessionClient() {}
 
@@ -74,6 +78,11 @@ public:
     virtual status_t startCameraOps() override;
     virtual status_t finishCameraOps() override;
 
+    // TODO: Those will be introduced when we implement FilteredListener and the device
+    // callbacks respectively. Just adding for now.
+    void onResultAvailable(const CaptureResult& result);
+    void notifyShutter(const CaptureResultExtras& resultExtras, nsecs_t timestamp);
+
 private:
 
     const sp<hardware::camera2::ICameraDeviceCallbacks>& getRemoteCallback() {
@@ -83,6 +92,9 @@ private:
     sp<hardware::camera2::ICameraDeviceCallbacks> mRemoteCallback;
 
     sp<CameraOfflineSessionBase> mOfflineSession;
+
+    // Offline composite streams
+    KeyedVector<sp<IBinder>, sp<CompositeStream>> mCompositeStreamMap;
 };
 
 } // namespace android

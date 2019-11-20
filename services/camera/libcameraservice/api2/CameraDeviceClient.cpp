@@ -1930,6 +1930,7 @@ binder::Status CameraDeviceClient::switchToOffline(
     }
 
     std::vector<int32_t> offlineStreamIds(offlineOutputIds.size());
+    KeyedVector<sp<IBinder>, sp<CompositeStream>> offlineCompositeStreamMap;
     for (const auto& streamId : offlineOutputIds) {
         ssize_t index = mConfiguredOutputs.indexOfKey(streamId);
         if (index == NAME_NOT_FOUND) {
@@ -1944,11 +1945,23 @@ binder::Status CameraDeviceClient::switchToOffline(
             sp<Surface> s = new Surface(gbp, false /*controlledByApp*/);
             isCompositeStream = camera3::DepthCompositeStream::isDepthCompositeStream(s) |
                 camera3::HeicCompositeStream::isHeicCompositeStream(s);
+            if (isCompositeStream) {
+                auto compositeIdx = mCompositeStreamMap.indexOfKey(IInterface::asBinder(gbp));
+                if (compositeIdx == NAME_NOT_FOUND) {
+                    ALOGE("%s: Unknown composite stream", __FUNCTION__);
+                    return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                            "Unknown composite stream");
+                }
+
+                mCompositeStreamMap.valueAt(compositeIdx)->insertCompositeStreamIds(
+                        &offlineStreamIds);
+                offlineCompositeStreamMap.add(mCompositeStreamMap.keyAt(compositeIdx),
+                        mCompositeStreamMap.valueAt(compositeIdx));
+                break;
+            }
         }
 
-        if (isCompositeStream) {
-            // TODO: Add composite specific handling
-        } else {
+        if (!isCompositeStream) {
             offlineStreamIds.push_back(streamId);
         }
     }
@@ -1962,11 +1975,11 @@ binder::Status CameraDeviceClient::switchToOffline(
     }
 
     sp<CameraOfflineSessionClient> offlineClient = new CameraOfflineSessionClient(sCameraService,
-            offlineSession, cameraCb, mClientPackageName, mClientFeatureId, mCameraIdStr,
-            mCameraFacing, mClientPid, mClientUid, mServicePid);
+            offlineSession, offlineCompositeStreamMap, cameraCb, mClientPackageName,
+            mClientFeatureId, mCameraIdStr, mCameraFacing, mClientPid, mClientUid, mServicePid);
     ret = sCameraService->addOfflineClient(mCameraIdStr, offlineClient);
     if (ret == OK) {
-        // TODO: We need to update mStreamMap, mConfiguredOutputs
+        // TODO: We need to update mStreamMap, mConfiguredOutputs, mCompositeStreams
     } else {
         switch(ret) {
             case BAD_VALUE:

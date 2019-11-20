@@ -59,6 +59,15 @@ binder::Status CameraOfflineSessionClient::disconnect() {
     // client shouldn't be able to call into us anymore
     mClientPid = 0;
 
+    for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
+        auto ret = mCompositeStreamMap.valueAt(i)->deleteInternalStreams();
+        if (ret != OK) {
+            ALOGE("%s: Failed removing composite stream  %s (%d)", __FUNCTION__,
+                    strerror(-ret), ret);
+        }
+    }
+    mCompositeStreamMap.clear();
+
     return res;
 }
 
@@ -66,8 +75,15 @@ void CameraOfflineSessionClient::notifyError(int32_t errorCode,
         const CaptureResultExtras& resultExtras) {
     // Thread safe. Don't bother locking.
     sp<hardware::camera2::ICameraDeviceCallbacks> remoteCb = getRemoteCallback();
-    // TODO: handle composite streams
-    if ((remoteCb != 0)) {
+    //
+    // Composites can have multiple internal streams. Error notifications coming from such internal
+    // streams may need to remain within camera service.
+    bool skipClientNotification = false;
+    for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
+        skipClientNotification |= mCompositeStreamMap.valueAt(i)->onError(errorCode, resultExtras);
+    }
+
+    if ((remoteCb != 0) && (!skipClientNotification)) {
         remoteCb->onDeviceError(errorCode, resultExtras);
     }
 }
@@ -134,6 +150,35 @@ status_t CameraOfflineSessionClient::finishCameraOps() {
     sCameraService->mUidPolicy->unregisterMonitorUid(mClientUid);
 
     return OK;
+}
+
+void CameraOfflineSessionClient::onResultAvailable(const CaptureResult& result) {
+    ATRACE_CALL();
+    ALOGV("%s", __FUNCTION__);
+
+    // Thread-safe. No lock necessary.
+    sp<hardware::camera2::ICameraDeviceCallbacks> remoteCb = mRemoteCallback;
+    if (remoteCb != NULL) {
+        remoteCb->onResultReceived(result.mMetadata, result.mResultExtras,
+                result.mPhysicalMetadatas);
+    }
+
+    for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
+        mCompositeStreamMap.valueAt(i)->onResultAvailable(result);
+    }
+}
+
+void CameraOfflineSessionClient::notifyShutter(const CaptureResultExtras& resultExtras,
+        nsecs_t timestamp) {
+    // Thread safe. Don't bother locking.
+    sp<hardware::camera2::ICameraDeviceCallbacks> remoteCb = getRemoteCallback();
+    if (remoteCb != 0) {
+        remoteCb->onCaptureStarted(resultExtras, timestamp);
+    }
+
+    for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
+        mCompositeStreamMap.valueAt(i)->onShutter(resultExtras, timestamp);
+    }
 }
 
 // ----------------------------------------------------------------------------
