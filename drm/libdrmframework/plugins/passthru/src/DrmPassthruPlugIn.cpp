@@ -244,7 +244,6 @@ status_t DrmPassthruPlugIn::onOpenDecryptSession(
     decryptHandle->mimeType = String8("video/passthru");
     decryptHandle->decryptApiType = DecryptApiType::ELEMENTARY_STREAM_BASED;
     decryptHandle->status = DRM_NO_ERROR;
-    decryptHandle->decryptInfo = NULL;
     return DRM_NO_ERROR;
 #else
     (void)(decryptHandle.get()); // unused
@@ -261,9 +260,6 @@ status_t DrmPassthruPlugIn::onOpenDecryptSession(
 status_t DrmPassthruPlugIn::onCloseDecryptSession(int uniqueId, sp<DecryptHandle>& decryptHandle) {
     ALOGV("DrmPassthruPlugIn::onCloseDecryptSession() : %d", uniqueId);
     if (NULL != decryptHandle.get()) {
-        if (NULL != decryptHandle->decryptInfo) {
-            delete decryptHandle->decryptInfo; decryptHandle->decryptInfo = NULL;
-        }
         decryptHandle.clear();
     }
     return DRM_NO_ERROR;
