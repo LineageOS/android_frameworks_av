@@ -23,9 +23,9 @@
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 
+#include <aidl/android/media/BnResourceManagerClient.h>
 #include <android/hardware/drm/1.2/types.h>
 #include <android/hidl/manager/1.2/IServiceManager.h>
-#include <android/media/BnResourceManagerClient.h>
 #include <hidl/ServiceManagement.h>
 #include <media/EventMetric.h>
 #include <media/PluginMetricsReporting.h>
@@ -298,17 +298,16 @@ static status_t toStatusT_1_2(Status_V1_2 status) {
 
 Mutex DrmHal::mLock;
 
-struct DrmHal::DrmSessionClient : public android::media::BnResourceManagerClient {
+struct DrmHal::DrmSessionClient : public aidl::android::media::BnResourceManagerClient {
     explicit DrmSessionClient(DrmHal* drm, const Vector<uint8_t>& sessionId)
       : mSessionId(sessionId),
         mDrm(drm) {}
 
-    ::android::binder::Status reclaimResource(bool* _aidl_return) override;
-    ::android::binder::Status getName(::std::string* _aidl_return) override;
+    ::ndk::ScopedAStatus reclaimResource(bool* _aidl_return) override;
+    ::ndk::ScopedAStatus getName(::std::string* _aidl_return) override;
 
     const Vector<uint8_t> mSessionId;
 
-protected:
     virtual ~DrmSessionClient();
 
 private:
@@ -317,24 +316,25 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(DrmSessionClient);
 };
 
-::android::binder::Status DrmHal::DrmSessionClient::reclaimResource(bool* _aidl_return) {
+::ndk::ScopedAStatus DrmHal::DrmSessionClient::reclaimResource(bool* _aidl_return) {
+    auto sessionId = mSessionId;
     sp<DrmHal> drm = mDrm.promote();
     if (drm == NULL) {
         *_aidl_return = true;
-        return ::android::binder::Status::ok();
+        return ::ndk::ScopedAStatus::ok();
     }
-    status_t err = drm->closeSession(mSessionId);
+    status_t err = drm->closeSession(sessionId);
     if (err != OK) {
         *_aidl_return = false;
-        return ::android::binder::Status::ok();
+        return ::ndk::ScopedAStatus::ok();
     }
     drm->sendEvent(EventType::SESSION_RECLAIMED,
-            toHidlVec(mSessionId), hidl_vec<uint8_t>());
+            toHidlVec(sessionId), hidl_vec<uint8_t>());
     *_aidl_return = true;
-    return ::android::binder::Status::ok();
+    return ::ndk::ScopedAStatus::ok();
 }
 
-::android::binder::Status DrmHal::DrmSessionClient::getName(::std::string* _aidl_return) {
+::ndk::ScopedAStatus DrmHal::DrmSessionClient::getName(::std::string* _aidl_return) {
     String8 name;
     sp<DrmHal> drm = mDrm.promote();
     if (drm == NULL) {
@@ -349,7 +349,7 @@ private:
     }
     name.append("]");
     *_aidl_return = name;
-    return ::android::binder::Status::ok();
+    return ::ndk::ScopedAStatus::ok();
 }
 
 DrmHal::DrmSessionClient::~DrmSessionClient() {
@@ -757,9 +757,10 @@ status_t DrmHal::openSession(DrmPlugin::SecurityLevel level,
     } while (retry);
 
     if (err == OK) {
-        sp<DrmSessionClient> client(new DrmSessionClient(this, sessionId));
-        DrmSessionManager::Instance()->addSession(getCallingPid(), client, sessionId);
-        mOpenSessions.push(client);
+        std::shared_ptr<DrmSessionClient> client(new DrmSessionClient(this, sessionId));
+        DrmSessionManager::Instance()->addSession(getCallingPid(),
+                std::static_pointer_cast<IResourceManagerClient>(client), sessionId);
+        mOpenSessions.push_back(client);
         mMetrics.SetSessionStart(sessionId);
     }
 
@@ -775,9 +776,9 @@ status_t DrmHal::closeSession(Vector<uint8_t> const &sessionId) {
     if (status.isOk()) {
         if (status == Status::OK) {
             DrmSessionManager::Instance()->removeSession(sessionId);
-            for (size_t i = 0; i < mOpenSessions.size(); i++) {
-                if (isEqualSessionId(mOpenSessions[i]->mSessionId, sessionId)) {
-                    mOpenSessions.removeAt(i);
+            for (auto i = mOpenSessions.begin(); i != mOpenSessions.end(); i++) {
+                if (isEqualSessionId((*i)->mSessionId, sessionId)) {
+                    mOpenSessions.erase(i);
                     break;
                 }
             }

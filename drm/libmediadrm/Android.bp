@@ -39,6 +39,7 @@ cc_library_shared {
 
     shared_libs: [
         "libbinder",
+        "libbinder_ndk",
         "libcutils",
         "libdl",
         "liblog",
@@ -46,7 +47,6 @@ cc_library_shared {
         "libmediadrmmetrics_lite",
         "libmediametrics",
         "libmediautils",
-        "libresourcemanagerservice",
         "libstagefright_foundation",
         "libutils",
         "android.hardware.drm@1.0",
@@ -54,6 +54,10 @@ cc_library_shared {
         "android.hardware.drm@1.2",
         "libhidlallocatorutils",
         "libhidlbase",
+    ],
+
+    static_libs: [
+        "resourcemanager_aidl_interface-ndk_platform",
     ],
 
     export_shared_lib_headers: [
