@@ -512,7 +512,6 @@ status_t FwdLockEngine::onOpenDecryptSession(int /* uniqueId */,
             decryptHandle->mimeType = MimeTypeUtil::convertMimeType(contentType);
             decryptHandle->decryptApiType = DecryptApiType::CONTAINER_BASED;
             decryptHandle->status = RightsStatus::RIGHTS_VALID;
-            decryptHandle->decryptInfo = NULL;
             result = DRM_NO_ERROR;
         } else {
             if (retVal && NULL != decodeSession) {
@@ -579,13 +578,6 @@ status_t FwdLockEngine::onCloseDecryptSession(int /* uniqueId */,
     }
 
     if (NULL != decryptHandle.get()) {
-        if (NULL != decryptHandle->decryptInfo) {
-            delete decryptHandle->decryptInfo;
-            decryptHandle->decryptInfo = NULL;
-        }
-
-        decryptHandle->copyControlVector.clear();
-        decryptHandle->extendedData.clear();
         decryptHandle.clear();
     }
 

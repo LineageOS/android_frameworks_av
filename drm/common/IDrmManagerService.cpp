@@ -33,7 +33,6 @@
 
 #include "IDrmManagerService.h"
 
-#define INVALID_BUFFER_LENGTH (-1)
 #define MAX_BINDER_TRANSACTION_SIZE ((1*1024*1024)-(4096*2))
 
 using namespace android;
@@ -44,26 +43,6 @@ static void writeDecryptHandleToParcelData(
     data->writeString8(handle->mimeType);
     data->writeInt32(handle->decryptApiType);
     data->writeInt32(handle->status);
-
-    int size = handle->copyControlVector.size();
-    data->writeInt32(size);
-    for (int i = 0; i < size; i++) {
-        data->writeInt32(handle->copyControlVector.keyAt(i));
-        data->writeInt32(handle->copyControlVector.valueAt(i));
-    }
-
-    size = handle->extendedData.size();
-    data->writeInt32(size);
-    for (int i = 0; i < size; i++) {
-        data->writeString8(handle->extendedData.keyAt(i));
-        data->writeString8(handle->extendedData.valueAt(i));
-    }
-
-    if (NULL != handle->decryptInfo) {
-        data->writeInt32(handle->decryptInfo->decryptBufferLength);
-    } else {
-        data->writeInt32(INVALID_BUFFER_LENGTH);
-    }
 }
 
 static void readDecryptHandleFromParcelData(
@@ -76,39 +55,12 @@ static void readDecryptHandleFromParcelData(
     handle->mimeType = data.readString8();
     handle->decryptApiType = data.readInt32();
     handle->status = data.readInt32();
-
-    int size = data.readInt32();
-    for (int i = 0; i < size; i++) {
-        DrmCopyControl key = (DrmCopyControl)data.readInt32();
-        int value = data.readInt32();
-        handle->copyControlVector.add(key, value);
-    }
-
-    size = data.readInt32();
-    for (int i = 0; i < size; i++) {
-        String8 key = data.readString8();
-        String8 value = data.readString8();
-        handle->extendedData.add(key, value);
-    }
-
-    handle->decryptInfo = NULL;
-    const int bufferLen = data.readInt32();
-    if (INVALID_BUFFER_LENGTH != bufferLen) {
-        handle->decryptInfo = new DecryptInfo();
-        handle->decryptInfo->decryptBufferLength = bufferLen;
-    }
 }
 
 static void clearDecryptHandle(sp<DecryptHandle> &handle) {
     if (handle == NULL) {
         return;
     }
-    if (handle->decryptInfo) {
-        delete handle->decryptInfo;
-        handle->decryptInfo = NULL;
-    }
-    handle->copyControlVector.clear();
-    handle->extendedData.clear();
 }
 
 int BpDrmManagerService::addUniqueId(bool isNative) {
