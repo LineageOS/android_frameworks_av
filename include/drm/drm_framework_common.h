@@ -49,17 +49,6 @@ enum {
 };
 
 /**
- * copy control settings used in DecryptHandle::copyControlVector
- */
-enum DrmCopyControl {
-    DRM_COPY_CONTROL_BASE = 1000,
-    // the key used to set the value for HDCP
-    // if the associated value is 1, then HDCP is required
-    // otherwise, HDCP is not required
-    DRM_COPY_CONTROL_HDCP = DRM_COPY_CONTROL_BASE
-};
-
-/**
  * Defines DRM Buffer
  */
 class DrmBuffer {
@@ -237,20 +226,6 @@ public:
 };
 
 /**
- * Defines decryption information
- */
-class DecryptInfo {
-public:
-    /**
-     * size of memory to be allocated to get the decrypted content.
-     */
-    int decryptBufferLength;
-    /**
-     * reserved for future purpose
-     */
-};
-
-/**
  * Defines decryption handle
  */
 class DecryptHandle : public RefBase {
@@ -287,35 +262,16 @@ public:
      *     RIGHTS_VALID, RIGHTS_INVALID, RIGHTS_EXPIRED or RIGHTS_NOT_ACQUIRED
      */
     int status;
-    /**
-     * Information required to decrypt content
-     * e.g. size of memory to be allocated to get the decrypted content.
-     */
-    DecryptInfo* decryptInfo;
-    /**
-     * Defines a vector for the copy control settings sent from the DRM plugin
-     * to the player
-     */
-    KeyedVector<DrmCopyControl, int> copyControlVector;
-
-    /**
-     * Defines a vector for any extra data the DRM plugin wants to send
-     * to the native code
-     */
-    KeyedVector<String8, String8> extendedData;
 
 public:
     DecryptHandle():
             decryptId(INVALID_VALUE),
             mimeType(""),
             decryptApiType(INVALID_VALUE),
-            status(INVALID_VALUE),
-            decryptInfo(NULL) {
-
+            status(INVALID_VALUE) {
     }
 
     ~DecryptHandle() {
-        delete decryptInfo; decryptInfo = NULL;
     }
 };
 
