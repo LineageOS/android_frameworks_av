@@ -203,7 +203,7 @@ class Codec2AudioDecHidlTest : public ::testing::VtsHalHidlTargetTestBase {
     uint32_t mFramesReceived;
     std::list<uint64_t> mFlushedIndices;
     std::list<uint64_t> mTimestampUslist;
-    ::android::List<outputMetaData> oBufferMetaData;
+    std::list<outputMetaData> oBufferMetaData;
 
     C2BlockPool::local_id_t mBlockPoolId;
     std::shared_ptr<C2BlockPool> mLinearPool;
@@ -594,7 +594,7 @@ TEST_P(Codec2AudioDecDecodeTest, DecodeTest) {
         int nSampleRate = bitStreamInfo[0];
         int nChannels = bitStreamInfo[1];
         std::list<uint64_t>::iterator itIn = mTimestampUslist.begin();
-        android::List<outputMetaData>::iterator itOut = oBufferMetaData.begin();
+        auto itOut = oBufferMetaData.begin();
         EXPECT_EQ(*itIn, itOut->timestampUs);
         expTs = *itIn;
         while (itOut != oBufferMetaData.end()) {

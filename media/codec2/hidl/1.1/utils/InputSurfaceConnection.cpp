@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,23 +14,4 @@
  * limitations under the License.
  */
 
-cc_test {
-    name: "VtsHalMediaC2V1_0TargetVideoDecTest",
-    defaults: ["VtsHalMediaC2V1_0Defaults"],
-    srcs: ["VtsHalMediaC2V1_0TargetVideoDecTest.cpp"],
-    header_libs: [
-        "libnativewindow_headers",
-    ],
-    shared_libs: [
-        "libbinder",
-        "libgui",
-        "libutils",
-    ],
-}
-
-cc_test {
-    name: "VtsHalMediaC2V1_0TargetVideoEncTest",
-    defaults: ["VtsHalMediaC2V1_0Defaults"],
-    srcs: ["VtsHalMediaC2V1_0TargetVideoEncTest.cpp"],
-}
-
+#include <codec2/hidl/1.1/InputSurfaceConnection.h>

@@ -27,6 +27,7 @@
 #include <C2PlatformSupport.h>
 
 #include <android/IOMXBufferSource.h>
+#include <android/hardware/media/c2/1.0/IInputSurface.h>
 #include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
 #include <android/hardware/media/omx/1.0/IOmx.h>
 #include <android-base/stringprintf.h>

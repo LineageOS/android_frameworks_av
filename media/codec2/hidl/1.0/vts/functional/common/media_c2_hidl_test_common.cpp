@@ -20,6 +20,13 @@
 
 #include "media_c2_hidl_test_common.h"
 
+#include <android/hardware/media/c2/1.0/IComponentStore.h>
+
+void ComponentTestEnvironment::registerTestServices() {
+    registerTestService<::android::hardware::media::c2::V1_0::
+                        IComponentStore>();
+}
+
 // Test the codecs for NullBuffer, Empty Input Buffer with(out) flags set
 void testInputBuffer(
     const std::shared_ptr<android::Codec2Client::Component>& component,
