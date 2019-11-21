@@ -21,7 +21,6 @@
 #include <android/hardware/drm/1.0/IDrmFactory.h>
 #include <utils/Errors.h>  // for status_t
 #include <utils/StrongPointer.h>
-#include <binder/Parcel.h>
 #include <vector>
 
 using namespace ::android::hardware::drm;
@@ -39,17 +38,17 @@ sp<IDrm> MakeDrm(status_t *pstatus = nullptr);
 
 sp<ICrypto> MakeCrypto(status_t *pstatus = nullptr);
 
-template<typename BA>
-void WriteByteArray(Parcel &obj, const BA &vec) {
+template<typename BA, typename PARCEL>
+void WriteByteArray(PARCEL &obj, const BA &vec) {
     obj.writeInt32(vec.size());
     if (vec.size()) {
         obj.write(vec.data(), vec.size());
     }
 }
 
-template<typename ET, typename BA>
+template<typename ET, typename BA, typename PARCEL>
 void WriteEventToParcel(
-        Parcel &obj,
+        PARCEL &obj,
         ET eventType,
         const BA &sessionId,
         const BA &data) {
@@ -58,18 +57,18 @@ void WriteEventToParcel(
     obj.writeInt32(eventType);
 }
 
-template<typename BA>
+template<typename BA, typename PARCEL>
 void WriteExpirationUpdateToParcel(
-        Parcel &obj,
+        PARCEL &obj,
         const BA &sessionId,
         int64_t expiryTimeInMS) {
     WriteByteArray(obj, sessionId);
     obj.writeInt64(expiryTimeInMS);
 }
 
-template<typename BA, typename KSL>
+template<typename BA, typename KSL, typename PARCEL>
 void WriteKeysChange(
-        Parcel &obj,
+        PARCEL &obj,
         const BA &sessionId,
         const KSL &keyStatusList,
         bool hasNewUsableKey) {
