@@ -41,6 +41,7 @@ cc_library_shared {
         "api1/client2/CaptureSequencer.cpp",
         "api1/client2/ZslProcessor.cpp",
         "api2/CameraDeviceClient.cpp",
+        "api2/CameraOfflineSessionClient.cpp",
         "api2/CompositeStream.cpp",
         "api2/DepthCompositeStream.cpp",
         "api2/HeicEncoderInfoManager.cpp",

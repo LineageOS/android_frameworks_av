@@ -68,6 +68,7 @@ class CameraService :
 {
     friend class BinderService<CameraService>;
     friend class CameraClient;
+    friend class CameraOfflineSessionClient;
 public:
     class Client;
     class BasicClient;
@@ -184,6 +185,9 @@ public:
 
     // Monitored UIDs availability notification
     void                notifyMonitoredUids();
+
+    // Register an offline client for a given active camera id
+    status_t addOfflineClient(String8 cameraId, sp<BasicClient> offlineClient);
 
     /////////////////////////////////////////////////////////////////////
     // Client functionality
@@ -310,10 +314,9 @@ public:
         sp<IBinder>                     mRemoteBinder;   // immutable after constructor
 
         // permissions management
-        status_t                        startCameraOps();
-        status_t                        finishCameraOps();
+        virtual status_t                startCameraOps();
+        virtual status_t                finishCameraOps();
 
-    private:
         std::unique_ptr<AppOpsManager>  mAppOpsManager = nullptr;
 
         class OpsCallback : public BnAppOpsCallback {
@@ -401,87 +404,6 @@ public:
 
         int mCameraId;  // All API1 clients use integer camera IDs
     }; // class Client
-
-
-    // Client for offline session. Note that offline session client does not affect camera service's
-    // client arbitration logic. It is camera HAL's decision to decide whether a normal camera
-    // client is conflicting with existing offline client(s).
-    // The other distinctive difference between offline clients and normal clients is that normal
-    // clients are created through ICameraService binder calls, while the offline session client
-    // is created through ICameraDeviceUser::switchToOffline call.
-    class OfflineClient : public virtual RefBase {
-
-        virtual status_t dump(int fd, const Vector<String16>& args) = 0;
-
-        // Block the client form using the camera
-        virtual void block() = 0;
-
-        // Return the package name for this client
-        virtual String16 getPackageName() const = 0;
-
-        // Notify client about a fatal error
-        // TODO: maybe let impl notify within block?
-        virtual void notifyError(int32_t errorCode,
-                const CaptureResultExtras& resultExtras) = 0;
-
-        // Get the UID of the application client using this
-        virtual uid_t getClientUid() const = 0;
-
-        // Get the PID of the application client using this
-        virtual int getClientPid() const = 0;
-
-        protected:
-            OfflineClient(const sp<CameraService>& cameraService,
-                    const String16& clientPackageName,
-                    const String8& cameraIdStr,
-                    int clientPid,
-                    uid_t clientUid,
-                    int servicePid): mCameraIdStr(cameraIdStr),
-                            mClientPackageName(clientPackageName), mClientPid(clientPid),
-                            mClientUid(clientUid), mServicePid(servicePid) {
-                if (sCameraService == nullptr) {
-                    sCameraService = cameraService;
-                }
-            }
-
-            virtual ~OfflineClient() { /*TODO*/ }
-
-            // these are initialized in the constructor.
-            static sp<CameraService>        sCameraService;
-            const String8                   mCameraIdStr;
-            String16                        mClientPackageName;
-            pid_t                           mClientPid;
-            const uid_t                     mClientUid;
-            const pid_t                     mServicePid;
-            bool                            mDisconnected;
-
-            // - The app-side Binder interface to receive callbacks from us
-            sp<IBinder>                     mRemoteBinder;   // immutable after constructor
-
-            // permissions management
-            status_t                        startCameraOps();
-            status_t                        finishCameraOps();
-
-        private:
-            std::unique_ptr<AppOpsManager>  mAppOpsManager = nullptr;
-
-            class OpsCallback : public BnAppOpsCallback {
-            public:
-                explicit OpsCallback(wp<OfflineClient> client) : mClient(client) {}
-                virtual void opChanged(int32_t /*op*/, const String16& /*packageName*/) {
-                    //TODO
-                }
-
-            private:
-                wp<OfflineClient> mClient;
-
-            }; // class OpsCallback
-
-            sp<OpsCallback> mOpsCallback;
-
-            // IAppOpsCallback interface, indirected through opListener
-            // virtual void opChanged(int32_t op, const String16& packageName);
-    }; // class OfflineClient
 
     /**
      * A listener class that implements the LISTENER interface for use with a ClientManager, and
@@ -872,6 +794,17 @@ private:
     void logDisconnected(const char* cameraId, int clientPid, const char* clientPackage);
 
     /**
+     * Add an event log message that a client has been disconnected from offline device.
+     */
+    void logDisconnectedOffline(const char* cameraId, int clientPid, const char* clientPackage);
+
+    /**
+     * Add an event log message that an offline client has been connected.
+     */
+    void logConnectedOffline(const char* cameraId, int clientPid,
+            const char* clientPackage);
+
+    /**
      * Add an event log message that a client has been connected.
      */
     void logConnected(const char* cameraId, int clientPid, const char* clientPackage);
@@ -1094,6 +1027,12 @@ private:
 
     void broadcastTorchModeStatus(const String8& cameraId,
             hardware::camera::common::V1_0::TorchModeStatus status);
+
+    void disconnectClient(const String8& id, sp<BasicClient> clientToDisconnect);
+
+    // Regular online and offline devices must not be in conflict at camera service layer.
+    // Use separate keys for offline devices.
+    static const String8 kOfflineDevice;
 
     // TODO: right now each BasicClient holds one AppOpsManager instance.
     // We can refactor the code so all of clients share this instance

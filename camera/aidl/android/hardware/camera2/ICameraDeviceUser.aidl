@@ -189,5 +189,5 @@ interface ICameraDeviceUser
      * @return Offline session object.
      */
     ICameraOfflineSession switchToOffline(in ICameraDeviceCallbacks callbacks,
-            in Surface[] offlineOutputs);
+            in int[] offlineOutputIds);
 }

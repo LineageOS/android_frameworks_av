@@ -25,8 +25,14 @@ namespace android {
 
 using android::hardware::camera2::ICameraDeviceCallbacks;
 
+// Client for offline session. Note that offline session client does not affect camera service's
+// client arbitration logic. It is camera HAL's decision to decide whether a normal camera
+// client is conflicting with existing offline client(s).
+// The other distinctive difference between offline clients and normal clients is that normal
+// clients are created through ICameraService binder calls, while the offline session client
+// is created through ICameraDeviceUser::switchToOffline call.
 class CameraOfflineSessionClient :
-        public CameraService::OfflineClient,
+        public CameraService::BasicClient,
         public hardware::camera2::BnCameraOfflineSession
         // public camera2::FrameProcessorBase::FilteredListener?
 {
@@ -36,46 +42,45 @@ public:
             sp<CameraOfflineSessionBase> session,
             const sp<ICameraDeviceCallbacks>& remoteCallback,
             const String16& clientPackageName,
-            const String8& cameraIdStr,
+            const std::unique_ptr<String16>& clientFeatureId,
+            const String8& cameraIdStr, int cameraFacing,
             int clientPid, uid_t clientUid, int servicePid) :
-                    CameraService::OfflineClient(cameraService, clientPackageName,
-                            cameraIdStr, clientPid, clientUid, servicePid),
-                            mRemoteCallback(remoteCallback), mOfflineSession(session) {}
+            CameraService::BasicClient(
+                    cameraService,
+                    IInterface::asBinder(remoteCallback),
+                    clientPackageName, clientFeatureId,
+                    cameraIdStr, cameraFacing, clientPid, clientUid, servicePid),
+            mRemoteCallback(remoteCallback), mOfflineSession(session) {}
 
-    ~CameraOfflineSessionClient() {}
+    virtual ~CameraOfflineSessionClient() {}
 
-    virtual binder::Status disconnect() override { return binder::Status::ok(); }
-
-    virtual status_t dump(int /*fd*/, const Vector<String16>& /*args*/) override {
-        return OK;
+    virtual sp<IBinder> asBinderWrapper() override {
+        return IInterface::asBinder(this);
     }
 
-    // Block the client form using the camera
-    virtual void block() override {};
+    virtual binder::Status disconnect() override;
 
-    // Return the package name for this client
-    virtual String16 getPackageName() const override { String16 ret; return ret; };
+    virtual status_t dump(int /*fd*/, const Vector<String16>& /*args*/) override;
 
-    // Notify client about a fatal error
-    // TODO: maybe let impl notify within block?
+    virtual status_t dumpClient(int /*fd*/, const Vector<String16>& /*args*/) override;
+
     virtual void notifyError(int32_t /*errorCode*/,
-            const CaptureResultExtras& /*resultExtras*/) override {}
+            const CaptureResultExtras& /*resultExtras*/) override;
 
-    // Get the UID of the application client using this
-    virtual uid_t getClientUid() const override { return 0; }
+    virtual status_t initialize(sp<CameraProviderManager> /*manager*/,
+            const String8& /*monitorTags*/) override;
 
-    // Get the PID of the application client using this
-    virtual int getClientPid() const override { return 0; }
+    // permissions management
+    virtual status_t startCameraOps() override;
+    virtual status_t finishCameraOps() override;
 
-    status_t initialize() {
-        // TODO: Talk to camera service to add the offline session client book keeping
-        return OK;
-    }
 private:
-    sp<CameraOfflineSessionBase> mSession;
+
+    const sp<hardware::camera2::ICameraDeviceCallbacks>& getRemoteCallback() {
+        return mRemoteCallback;
+    }
 
     sp<hardware::camera2::ICameraDeviceCallbacks> mRemoteCallback;
-    // This class is responsible to convert HAL callbacks to AIDL callbacks
 
     sp<CameraOfflineSessionBase> mOfflineSession;
 };

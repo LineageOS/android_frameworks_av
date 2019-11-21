@@ -160,7 +160,7 @@ public:
 
     virtual binder::Status switchToOffline(
             const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb,
-            const std::vector<view::Surface>& offlineOutputs,
+            const std::vector<int>& offlineOutputIds,
             /*out*/
             sp<hardware::camera2::ICameraOfflineSession>* session) override;
 
