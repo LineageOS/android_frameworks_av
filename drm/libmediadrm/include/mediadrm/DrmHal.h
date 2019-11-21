@@ -26,7 +26,6 @@
 #include <android/hardware/drm/1.2/IDrmPlugin.h>
 #include <android/hardware/drm/1.2/IDrmPluginListener.h>
 
-#include <media/MediaAnalyticsItem.h>
 #include <mediadrm/DrmMetrics.h>
 #include <mediadrm/DrmSessionManager.h>
 #include <mediadrm/IDrm.h>
@@ -207,7 +206,7 @@ private:
     // Mutable to allow modification within GetPropertyByteArray.
     mutable MediaDrmMetrics mMetrics;
 
-    Vector<sp<DrmSessionClient>> mOpenSessions;
+    std::vector<std::shared_ptr<DrmSessionClient>> mOpenSessions;
     void closeOpenSessions();
     void cleanup();
 

@@ -15,29 +15,22 @@
 ** limitations under the License.
 */
 
-#define LOG_TAG "mediaserver"
+#define LOG_TAG "mediadrmserver"
 //#define LOG_NDEBUG 0
 
-#include <fcntl.h>
-#include <sys/prctl.h>
-#include <sys/wait.h>
+#include <signal.h>
 #include <binder/IPCThreadState.h>
 #include <binder/ProcessState.h>
-#include <binder/IServiceManager.h>
-#include <cutils/properties.h>
-#include <utils/Log.h>
-#include "MediaDrmService.h"
 
 using namespace android;
 
+/*
+ * Keep mediadrmserver in case it is referenced by build files we don't know of.
+ * todo(robertshih): remove after verifying with `build_test.bash --dist --incremental`
+ */
 int main()
 {
     signal(SIGPIPE, SIG_IGN);
-
-    sp<ProcessState> proc(ProcessState::self());
-    sp<IServiceManager> sm = defaultServiceManager();
-    ALOGI("ServiceManager: %p", sm.get());
-    MediaDrmService::instantiate();
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();
 }
