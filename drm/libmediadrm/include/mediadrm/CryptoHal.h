@@ -31,6 +31,9 @@ namespace drm = ::android::hardware::drm;
 using drm::V1_0::ICryptoFactory;
 using drm::V1_0::ICryptoPlugin;
 using drm::V1_0::SharedBuffer;
+using drm::V1_0::DestinationBuffer;
+
+using ::android::hardware::HidlMemory;
 
 class IMemoryHeap;
 
@@ -58,12 +61,12 @@ struct CryptoHal : public ICrypto {
 
     virtual ssize_t decrypt(const uint8_t key[16], const uint8_t iv[16],
             CryptoPlugin::Mode mode, const CryptoPlugin::Pattern &pattern,
-            const ICrypto::SourceBuffer &source, size_t offset,
+            const ::SharedBuffer &source, size_t offset,
             const CryptoPlugin::SubSample *subSamples, size_t numSubSamples,
-            const ICrypto::DestinationBuffer &destination,
+            const ::DestinationBuffer &destination,
             AString *errorDetailMsg);
 
-    virtual int32_t setHeap(const sp<IMemoryHeap>& heap) {
+    virtual int32_t setHeap(const sp<HidlMemory>& heap) {
         return setHeapBase(heap);
     }
     virtual void unsetHeap(int32_t seqNum) { clearHeapBase(seqNum); }
@@ -83,30 +86,17 @@ private:
      */
     status_t mInitCheck;
 
-    struct HeapBase {
-        HeapBase() : mBufferId(0), mSize(0) {}
-        HeapBase(uint32_t bufferId, size_t size) :
-            mBufferId(bufferId), mSize(size) {}
-
-        uint32_t getBufferId() const {return mBufferId;}
-        size_t getSize() const {return mSize;}
-
-    private:
-        uint32_t mBufferId;
-        size_t mSize;
-    };
-
-    KeyedVector<int32_t, HeapBase> mHeapBases;
+    KeyedVector<int32_t, size_t> mHeapSizes;
     int32_t mHeapSeqNum;
 
     Vector<sp<ICryptoFactory>> makeCryptoFactories();
     sp<ICryptoPlugin> makeCryptoPlugin(const sp<ICryptoFactory>& factory,
             const uint8_t uuid[16], const void *initData, size_t size);
 
-    int32_t setHeapBase(const sp<IMemoryHeap>& heap);
+    int32_t setHeapBase(const sp<HidlMemory>& heap);
     void clearHeapBase(int32_t seqNum);
 
-    status_t toSharedBuffer(const sp<IMemory>& memory, int32_t seqNum, ::SharedBuffer* buffer);
+    status_t checkSharedBuffer(const ::SharedBuffer& buffer);
 
     DISALLOW_EVIL_CONSTRUCTORS(CryptoHal);
 };

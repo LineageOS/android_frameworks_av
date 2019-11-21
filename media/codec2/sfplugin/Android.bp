@@ -27,6 +27,7 @@ cc_library_shared {
 
     shared_libs: [
         "android.hardware.cas.native@1.0",
+        "android.hardware.drm@1.0",
         "android.hardware.media.c2@1.0",
         "android.hardware.media.omx@1.0",
         "libbase",
