@@ -22,6 +22,7 @@
 #include PATH(android/hardware/audio/FILE_VERSION/IPrimaryDevice.h)
 #include <cutils/native_handle.h>
 #include <hwbinder/IPCThreadState.h>
+#include <media/AudioContainers.h>
 #include <utils/Log.h>
 
 #include <common/all-versions/VersionUtils.h>
@@ -51,42 +52,32 @@ status_t deviceAddressFromHal(
     if (halAddress == nullptr || strnlen(halAddress, AUDIO_DEVICE_MAX_ADDRESS_LEN) == 0) {
         return OK;
     }
-    const bool isInput = (device & AUDIO_DEVICE_BIT_IN) != 0;
-    if (isInput) device &= ~AUDIO_DEVICE_BIT_IN;
-    if ((!isInput && (device & AUDIO_DEVICE_OUT_ALL_A2DP) != 0)
-            || (isInput && (device & AUDIO_DEVICE_IN_BLUETOOTH_A2DP) != 0)) {
+    if (getAudioDeviceOutAllA2dpSet().count(device) > 0
+            || device == AUDIO_DEVICE_IN_BLUETOOTH_A2DP) {
         int status = sscanf(halAddress,
                 "%hhX:%hhX:%hhX:%hhX:%hhX:%hhX",
                 &address->address.mac[0], &address->address.mac[1], &address->address.mac[2],
                 &address->address.mac[3], &address->address.mac[4], &address->address.mac[5]);
         return status == 6 ? OK : BAD_VALUE;
-    } else if ((!isInput && (device & AUDIO_DEVICE_OUT_IP) != 0)
-            || (isInput && (device & AUDIO_DEVICE_IN_IP) != 0)) {
+    } else if (device == AUDIO_DEVICE_OUT_IP || device == AUDIO_DEVICE_IN_IP) {
         int status = sscanf(halAddress,
                 "%hhu.%hhu.%hhu.%hhu",
                 &address->address.ipv4[0], &address->address.ipv4[1],
                 &address->address.ipv4[2], &address->address.ipv4[3]);
         return status == 4 ? OK : BAD_VALUE;
-    } else if ((!isInput && (device & AUDIO_DEVICE_OUT_ALL_USB)) != 0
-            || (isInput && (device & AUDIO_DEVICE_IN_ALL_USB)) != 0) {
+    } else if (getAudioDeviceOutAllUsbSet().count(device) > 0
+            || getAudioDeviceInAllUsbSet().count(device) > 0) {
         int status = sscanf(halAddress,
                 "card=%d;device=%d",
                 &address->address.alsa.card, &address->address.alsa.device);
         return status == 2 ? OK : BAD_VALUE;
-    } else if ((!isInput && (device & AUDIO_DEVICE_OUT_BUS) != 0)
-            || (isInput && (device & AUDIO_DEVICE_IN_BUS) != 0)) {
-        if (halAddress != NULL) {
-            address->busAddress = halAddress;
-            return OK;
-        }
-        return BAD_VALUE;
-    } else if ((!isInput && (device & AUDIO_DEVICE_OUT_REMOTE_SUBMIX)) != 0
-            || (isInput && (device & AUDIO_DEVICE_IN_REMOTE_SUBMIX) != 0)) {
-        if (halAddress != NULL) {
-            address->rSubmixAddress = halAddress;
-            return OK;
-        }
-        return BAD_VALUE;
+    } else if (device == AUDIO_DEVICE_OUT_BUS || device == AUDIO_DEVICE_IN_BUS) {
+        address->busAddress = halAddress;
+        return OK;
+    } else if (device == AUDIO_DEVICE_OUT_REMOTE_SUBMIX
+            || device == AUDIO_DEVICE_IN_REMOTE_SUBMIX) {
+        address->rSubmixAddress = halAddress;
+        return OK;
     }
     return OK;
 }

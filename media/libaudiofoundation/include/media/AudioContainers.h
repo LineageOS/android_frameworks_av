@@ -37,7 +37,9 @@ using FormatVector = std::vector<audio_format_t>;
 const DeviceTypeSet& getAudioDeviceOutAllSet();
 const DeviceTypeSet& getAudioDeviceOutAllA2dpSet();
 const DeviceTypeSet& getAudioDeviceOutAllScoSet();
+const DeviceTypeSet& getAudioDeviceOutAllUsbSet();
 const DeviceTypeSet& getAudioDeviceInAllSet();
+const DeviceTypeSet& getAudioDeviceInAllUsbSet();
 
 template<typename T>
 static std::vector<T> Intersection(const std::set<T>& a, const std::set<T>& b) {
