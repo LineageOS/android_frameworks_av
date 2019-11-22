@@ -35,6 +35,10 @@
 #include <memory>
 #include <mutex>
 
+#ifdef __ANDROID_APEX__
+#include <android-base/properties.h>
+#endif
+
 namespace android {
 
 /**
@@ -599,9 +603,33 @@ private:
 
             struct Setter {
                 static C2R setIonUsage(bool /* mayBlock */, C2P<C2StoreIonUsageInfo> &me) {
+#ifdef __ANDROID_APEX__
+                    static int32_t defaultHeapMask = [] {
+                        int32_t heapmask = base::GetIntProperty(
+                                "ro.com.android.media.swcodec.ion.heapmask", int32_t(0xFFFFFFFF));
+                        ALOGD("Default ION heapmask = %d", heapmask);
+                        return heapmask;
+                    }();
+                    static int32_t defaultFlags = [] {
+                        int32_t flags = base::GetIntProperty(
+                                "ro.com.android.media.swcodec.ion.flags", 0);
+                        ALOGD("Default ION flags = %d", flags);
+                        return flags;
+                    }();
+                    static uint32_t defaultAlign = [] {
+                        uint32_t align = base::GetUintProperty(
+                                "ro.com.android.media.swcodec.ion.align", 0u);
+                        ALOGD("Default ION align = %d", align);
+                        return align;
+                    }();
+                    me.set().heapMask = defaultHeapMask;
+                    me.set().allocFlags = defaultFlags;
+                    me.set().minAlignment = defaultAlign;
+#else
                     me.set().heapMask = ~0;
                     me.set().allocFlags = 0;
                     me.set().minAlignment = 0;
+#endif
                     return C2R::Ok();
                 }
             };
