@@ -27,11 +27,11 @@
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
 #include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
 
-#include <android/media/BnResourceManagerClient.h>
-#include <android/media/IResourceManagerService.h>
+#include <aidl/android/media/BnResourceManagerClient.h>
+#include <aidl/android/media/IResourceManagerService.h>
+#include <android/binder_ibinder.h>
+#include <android/binder_manager.h>
 #include <binder/IMemory.h>
-#include <binder/IPCThreadState.h>
-#include <binder/IServiceManager.h>
 #include <binder/MemoryDealer.h>
 #include <cutils/properties.h>
 #include <gui/BufferQueue.h>
@@ -64,9 +64,10 @@
 
 namespace android {
 
-using ::android::binder::Status;
-using ::android::media::BnResourceManagerClient;
-using ::android::media::IResourceManagerService;
+using Status = ::ndk::ScopedAStatus;
+using aidl::android::media::BnResourceManagerClient;
+using aidl::android::media::IResourceManagerClient;
+using aidl::android::media::IResourceManagerService;
 
 // key for media statistics
 static const char *kCodecKeyName = "codec";
@@ -111,7 +112,7 @@ static const char *kCodecRecentLatencyHist = "android.media.mediacodec.recent.hi
 static bool kEmitHistogram = false;
 
 
-static int64_t getId(const sp<IResourceManagerClient> &client) {
+static int64_t getId(const std::shared_ptr<IResourceManagerClient> &client) {
     return (int64_t) client.get();
 }
 
@@ -164,7 +165,6 @@ struct ResourceManagerClient : public BnResourceManagerClient {
         return Status::ok();
     }
 
-protected:
     virtual ~ResourceManagerClient() {}
 
 private:
@@ -173,93 +173,99 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(ResourceManagerClient);
 };
 
-struct MediaCodec::ResourceManagerServiceProxy : public IBinder::DeathRecipient {
-    ResourceManagerServiceProxy(pid_t pid, uid_t uid);
-    ~ResourceManagerServiceProxy();
+struct MediaCodec::ResourceManagerServiceProxy : public RefBase {
+    ResourceManagerServiceProxy(pid_t pid, uid_t uid,
+            const std::shared_ptr<IResourceManagerClient> &client);
+    virtual ~ResourceManagerServiceProxy();
 
     void init();
 
     // implements DeathRecipient
-    virtual void binderDied(const wp<IBinder>& /*who*/);
+    static void BinderDiedCallback(void* cookie);
+    void binderDied();
 
-    void addResource(
-            int64_t clientId,
-            const sp<IResourceManagerClient> &client,
-            const std::vector<MediaResourceParcel> &resources);
-
-    void removeResource(
-            int64_t clientId,
-            const std::vector<MediaResourceParcel> &resources);
-
-    void removeClient(int64_t clientId);
-
+    void addResource(const MediaResourceParcel &resource);
+    void removeResource(const MediaResourceParcel &resource);
+    void removeClient();
     bool reclaimResource(const std::vector<MediaResourceParcel> &resources);
 
 private:
     Mutex mLock;
-    sp<android::media::IResourceManagerService> mService;
     pid_t mPid;
     uid_t mUid;
+    std::shared_ptr<IResourceManagerService> mService;
+    std::shared_ptr<IResourceManagerClient> mClient;
+    ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
 };
 
 MediaCodec::ResourceManagerServiceProxy::ResourceManagerServiceProxy(
-        pid_t pid, uid_t uid)
-        : mPid(pid), mUid(uid) {
+        pid_t pid, uid_t uid, const std::shared_ptr<IResourceManagerClient> &client)
+        : mPid(pid), mUid(uid), mClient(client),
+          mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)) {
     if (mPid == MediaCodec::kNoPid) {
-        mPid = IPCThreadState::self()->getCallingPid();
+        mPid = AIBinder_getCallingPid();
     }
 }
 
 MediaCodec::ResourceManagerServiceProxy::~ResourceManagerServiceProxy() {
-    if (mService != NULL) {
-        IInterface::asBinder(mService)->unlinkToDeath(this);
+    if (mService != nullptr) {
+        AIBinder_unlinkToDeath(mService->asBinder().get(), mDeathRecipient.get(), this);
     }
 }
 
 void MediaCodec::ResourceManagerServiceProxy::init() {
-    sp<IServiceManager> sm = defaultServiceManager();
-    sp<IBinder> binder = sm->getService(String16("media.resource_manager"));
-    mService = interface_cast<IResourceManagerService>(binder);
-    if (mService == NULL) {
+    ::ndk::SpAIBinder binder(AServiceManager_getService("media.resource_manager"));
+    mService = IResourceManagerService::fromBinder(binder);
+    if (mService == nullptr) {
         ALOGE("Failed to get ResourceManagerService");
         return;
     }
-    IInterface::asBinder(mService)->linkToDeath(this);
+
+    AIBinder_linkToDeath(mService->asBinder().get(), mDeathRecipient.get(), this);
 }
 
-void MediaCodec::ResourceManagerServiceProxy::binderDied(const wp<IBinder>& /*who*/) {
+//static
+void MediaCodec::ResourceManagerServiceProxy::BinderDiedCallback(void* cookie) {
+    auto thiz = static_cast<ResourceManagerServiceProxy*>(cookie);
+    thiz->binderDied();
+}
+
+void MediaCodec::ResourceManagerServiceProxy::binderDied() {
     ALOGW("ResourceManagerService died.");
     Mutex::Autolock _l(mLock);
-    mService.clear();
+    mService = nullptr;
 }
 
 void MediaCodec::ResourceManagerServiceProxy::addResource(
-        int64_t clientId,
-        const sp<IResourceManagerClient> &client,
-        const std::vector<MediaResourceParcel> &resources) {
+        const MediaResourceParcel &resource) {
+    std::vector<MediaResourceParcel> resources;
+    resources.push_back(resource);
+
     Mutex::Autolock _l(mLock);
-    if (mService == NULL) {
+    if (mService == nullptr) {
         return;
     }
-    mService->addResource(mPid, mUid, clientId, client, resources);
+    mService->addResource(mPid, mUid, getId(mClient), mClient, resources);
 }
 
 void MediaCodec::ResourceManagerServiceProxy::removeResource(
-        int64_t clientId,
-        const std::vector<MediaResourceParcel> &resources) {
+        const MediaResourceParcel &resource) {
+    std::vector<MediaResourceParcel> resources;
+    resources.push_back(resource);
+
     Mutex::Autolock _l(mLock);
-    if (mService == NULL) {
+    if (mService == nullptr) {
         return;
     }
-    mService->removeResource(mPid, clientId, resources);
+    mService->removeResource(mPid, getId(mClient), resources);
 }
 
-void MediaCodec::ResourceManagerServiceProxy::removeClient(int64_t clientId) {
+void MediaCodec::ResourceManagerServiceProxy::removeClient() {
     Mutex::Autolock _l(mLock);
-    if (mService == NULL) {
+    if (mService == nullptr) {
         return;
     }
-    mService->removeClient(mPid, clientId);
+    mService->removeClient(mPid, getId(mClient));
 }
 
 bool MediaCodec::ResourceManagerServiceProxy::reclaimResource(
@@ -579,19 +585,19 @@ MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
       mCpuBoostRequested(false),
       mLatencyUnknown(0) {
     if (uid == kNoUid) {
-        mUid = IPCThreadState::self()->getCallingUid();
+        mUid = AIBinder_getCallingUid();
     } else {
         mUid = uid;
     }
-    mResourceManagerClient = new ResourceManagerClient(this);
-    mResourceManagerService = new ResourceManagerServiceProxy(pid, mUid);
+    mResourceManagerProxy = new ResourceManagerServiceProxy(pid, mUid,
+            ::ndk::SharedRefBase::make<ResourceManagerClient>(this));
 
     initMediametrics();
 }
 
 MediaCodec::~MediaCodec() {
     CHECK_EQ(mState, UNINITIALIZED);
-    mResourceManagerService->removeClient(getId(mResourceManagerClient));
+    mResourceManagerProxy->removeClient();
 
     flushMediametrics();
 }
@@ -792,7 +798,7 @@ void MediaCodec::statsBufferSent(int64_t presentationUs) {
 
     if (mBatteryChecker != nullptr) {
         mBatteryChecker->onCodecActivity([this] () {
-            addResource(MediaResource::VideoBatteryResource());
+            mResourceManagerProxy->addResource(MediaResource::VideoBatteryResource());
         });
     }
 
@@ -832,7 +838,7 @@ void MediaCodec::statsBufferReceived(int64_t presentationUs) {
 
     if (mBatteryChecker != nullptr) {
         mBatteryChecker->onCodecActivity([this] () {
-            addResource(MediaResource::VideoBatteryResource());
+            mResourceManagerProxy->addResource(MediaResource::VideoBatteryResource());
         });
     }
 
@@ -942,7 +948,7 @@ sp<CodecBase> MediaCodec::GetCodecBase(const AString &name, const char *owner) {
 }
 
 status_t MediaCodec::init(const AString &name) {
-    mResourceManagerService->init();
+    mResourceManagerProxy->init();
 
     // save init parameters for reset
     mInitName = name;
@@ -1035,7 +1041,7 @@ status_t MediaCodec::init(const AString &name) {
     for (int i = 0; i <= kMaxRetry; ++i) {
         if (i > 0) {
             // Don't try to reclaim resource for the first time.
-            if (!mResourceManagerService->reclaimResource(resources)) {
+            if (!mResourceManagerProxy->reclaimResource(resources)) {
                 break;
             }
         }
@@ -1150,7 +1156,7 @@ status_t MediaCodec::configure(
     for (int i = 0; i <= kMaxRetry; ++i) {
         if (i > 0) {
             // Don't try to reclaim resource for the first time.
-            if (!mResourceManagerService->reclaimResource(resources)) {
+            if (!mResourceManagerProxy->reclaimResource(resources)) {
                 break;
             }
         }
@@ -1271,19 +1277,6 @@ uint64_t MediaCodec::getGraphicBufferSize() {
     return size;
 }
 
-void MediaCodec::addResource(const MediaResourceParcel &resource) {
-    std::vector<MediaResourceParcel> resources;
-    resources.push_back(resource);
-    mResourceManagerService->addResource(
-            getId(mResourceManagerClient), mResourceManagerClient, resources);
-}
-
-void MediaCodec::removeResource(const MediaResourceParcel &resource) {
-    std::vector<MediaResourceParcel> resources;
-    resources.push_back(resource);
-    mResourceManagerService->removeResource(getId(mResourceManagerClient), resources);
-}
-
 status_t MediaCodec::start() {
     sp<AMessage> msg = new AMessage(kWhatStart, this);
 
@@ -1296,7 +1289,7 @@ status_t MediaCodec::start() {
     for (int i = 0; i <= kMaxRetry; ++i) {
         if (i > 0) {
             // Don't try to reclaim resource for the first time.
-            if (!mResourceManagerService->reclaimResource(resources)) {
+            if (!mResourceManagerProxy->reclaimResource(resources)) {
                 break;
             }
             // Recover codec from previous error before retry start.
@@ -1734,7 +1727,7 @@ void MediaCodec::requestCpuBoostIfNeeded() {
             totalPixel = width * height;
         }
         if (totalPixel >= 1920 * 1080) {
-            addResource(MediaResource::CpuBoostResource());
+            mResourceManagerProxy->addResource(MediaResource::CpuBoostResource());
             mCpuBoostRequested = true;
         }
     }
@@ -2089,7 +2082,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                     if (mIsVideo) {
                         // audio codec is currently ignored.
-                        addResource(MediaResource::CodecResource(mFlags & kFlagIsSecure, mIsVideo));
+                        mResourceManagerProxy->addResource(
+                                MediaResource::CodecResource(mFlags & kFlagIsSecure, mIsVideo));
                     }
 
                     (new AMessage)->postReply(mReplyID);
@@ -2210,8 +2204,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                     CHECK_EQ(mState, STARTING);
                     if (mIsVideo) {
-                        addResource(MediaResource::GraphicMemoryResource(
-                                getGraphicBufferSize()));
+                        mResourceManagerProxy->addResource(
+                                MediaResource::GraphicMemoryResource(getGraphicBufferSize()));
                     }
                     setState(STARTED);
                     (new AMessage)->postReply(mReplyID);
@@ -2435,7 +2429,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         mBatteryChecker->onClientRemoved();
                     }
 
-                    mResourceManagerService->removeClient(getId(mResourceManagerClient));
+                    mResourceManagerProxy->removeClient();
 
                     (new AMessage)->postReply(mReplyID);
                     break;
@@ -3150,7 +3144,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
         {
             if (mBatteryChecker != nullptr) {
                 mBatteryChecker->onCheckBatteryTimer(msg, [this] () {
-                    removeResource(MediaResource::VideoBatteryResource());
+                    mResourceManagerProxy->removeResource(
+                            MediaResource::VideoBatteryResource());
                 });
             }
             break;

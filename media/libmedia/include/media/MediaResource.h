@@ -18,13 +18,14 @@
 #ifndef ANDROID_MEDIA_RESOURCE_H
 #define ANDROID_MEDIA_RESOURCE_H
 
-#include <android/media/MediaResourceParcel.h>
+#include <aidl/android/media/MediaResourceParcel.h>
+#include <utils/String8.h>
 
 namespace android {
 
-using android::media::MediaResourceParcel;
-using android::media::MediaResourceSubType;
-using android::media::MediaResourceType;
+using aidl::android::media::MediaResourceParcel;
+using aidl::android::media::MediaResourceSubType;
+using aidl::android::media::MediaResourceType;
 
 class MediaResource : public MediaResourceParcel {
 public:
@@ -34,13 +35,13 @@ public:
     MediaResource() = delete;
     MediaResource(Type type, int64_t value);
     MediaResource(Type type, SubType subType, int64_t value);
-    MediaResource(Type type, const std::vector<uint8_t> &id, int64_t value);
+    MediaResource(Type type, const std::vector<int8_t> &id, int64_t value);
 
     static MediaResource CodecResource(bool secure, bool video);
     static MediaResource GraphicMemoryResource(int64_t value);
     static MediaResource CpuBoostResource();
     static MediaResource VideoBatteryResource();
-    static MediaResource DrmSessionResource(const std::vector<uint8_t> &id, int64_t value);
+    static MediaResource DrmSessionResource(const std::vector<int8_t> &id, int64_t value);
 };
 
 inline static const char *asString(MediaResource::Type i, const char *def = "??") {

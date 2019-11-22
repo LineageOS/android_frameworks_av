@@ -265,7 +265,7 @@ void profileCodecs(
         }
     }
     global_results->add(
-            MediaResourcePolicy::kPolicySupportsMultipleSecureCodecs().c_str(),
+            MediaResourcePolicy::kPolicySupportsMultipleSecureCodecs(),
             supportMultipleSecureCodecs);
 }
 

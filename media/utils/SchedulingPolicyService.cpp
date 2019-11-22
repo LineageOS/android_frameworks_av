@@ -59,7 +59,7 @@ int requestPriority(pid_t pid, pid_t tid, int32_t prio, bool isForApp, bool asyn
     return ret;
 }
 
-int requestCpusetBoost(bool enable, const sp<IInterface> &client)
+int requestCpusetBoost(bool enable, const sp<IBinder> &client)
 {
     int ret;
     sMutex.lock();

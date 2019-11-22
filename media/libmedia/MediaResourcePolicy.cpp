@@ -16,20 +16,21 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MediaResourcePolicy"
-#include <utils/Log.h>
+
+#include <aidl/android/media/IResourceManagerService.h>
 #include <media/MediaResourcePolicy.h>
-#include <android/media/IResourceManagerService.h>
+#include <utils/Log.h>
 
 namespace android {
 
-using android::media::IResourceManagerService;
+using aidl::android::media::IResourceManagerService;
 //static
-const ::std::string& MediaResourcePolicy::kPolicySupportsMultipleSecureCodecs() {
-    return IResourceManagerService::kPolicySupportsMultipleSecureCodecs();
+const char* MediaResourcePolicy::kPolicySupportsMultipleSecureCodecs() {
+    return IResourceManagerService::kPolicySupportsMultipleSecureCodecs;
 }
 //static
-const ::std::string& MediaResourcePolicy::kPolicySupportsSecureWithNonSecureCodec() {
-    return IResourceManagerService::kPolicySupportsSecureWithNonSecureCodec();
+const char* MediaResourcePolicy::kPolicySupportsSecureWithNonSecureCodec() {
+    return IResourceManagerService::kPolicySupportsSecureWithNonSecureCodec;
 }
 
 MediaResourcePolicy::MediaResourcePolicy(

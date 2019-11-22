@@ -21,18 +21,28 @@
 #include <gtest/gtest.h>
 
 #include "ResourceManagerService.h"
-#include <android/media/BnResourceManagerClient.h>
+#include <aidl/android/media/BnResourceManagerClient.h>
 #include <media/MediaResource.h>
 #include <media/MediaResourcePolicy.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/ProcessInfoInterface.h>
 
+namespace aidl {
 namespace android {
 namespace media {
+bool operator== (const MediaResourceParcel& lhs, const MediaResourceParcel& rhs) {
+    return lhs.type == rhs.type && lhs.subType == rhs.subType &&
+            lhs.id == rhs.id && lhs.value == rhs.value;
+}}}}
 
-using ::android::binder::Status;
+namespace android {
 
-static int64_t getId(const sp<IResourceManagerClient>& client) {
+using Status = ::ndk::ScopedAStatus;
+using ::aidl::android::media::BnResourceManagerClient;
+using ::aidl::android::media::IResourceManagerService;
+using ::aidl::android::media::IResourceManagerClient;
+
+static int64_t getId(const std::shared_ptr<IResourceManagerClient>& client) {
     return (int64_t) client.get();
 }
 
@@ -89,8 +99,7 @@ struct TestSystemCallback :
         mEventCount++;
     }
 
-    virtual bool requestCpusetBoost(
-            bool enable, const sp<IInterface> &/*client*/) override {
+    virtual bool requestCpusetBoost(bool enable) override {
         mLastEvent = {enable ? EventType::CPUSET_ENABLE : EventType::CPUSET_DISABLE, 0};
         mEventCount++;
         return true;
@@ -112,12 +121,11 @@ private:
 
 
 struct TestClient : public BnResourceManagerClient {
-    TestClient(int pid, sp<ResourceManagerService> service)
+    TestClient(int pid, const std::shared_ptr<ResourceManagerService> &service)
         : mReclaimed(false), mPid(pid), mService(service) {}
 
     Status reclaimResource(bool* _aidl_return) override {
-        sp<IResourceManagerClient> client(this);
-        mService->removeClient(mPid, (int64_t) client.get());
+        mService->removeClient(mPid, getId(ref<TestClient>()));
         mReclaimed = true;
         *_aidl_return = true;
         return Status::ok();
@@ -136,13 +144,12 @@ struct TestClient : public BnResourceManagerClient {
         mReclaimed = false;
     }
 
-protected:
     virtual ~TestClient() {}
 
 private:
     bool mReclaimed;
     int mPid;
-    sp<ResourceManagerService> mService;
+    std::shared_ptr<ResourceManagerService> mService;
     DISALLOW_EVIL_CONSTRUCTORS(TestClient);
 };
 
@@ -172,10 +179,11 @@ class ResourceManagerServiceTest : public ::testing::Test {
 public:
     ResourceManagerServiceTest()
         : mSystemCB(new TestSystemCallback()),
-          mService(new ResourceManagerService(new TestProcessInfo, mSystemCB)),
-          mTestClient1(new TestClient(kTestPid1, mService)),
-          mTestClient2(new TestClient(kTestPid2, mService)),
-          mTestClient3(new TestClient(kTestPid2, mService)) {
+          mService(::ndk::SharedRefBase::make<ResourceManagerService>(
+                  new TestProcessInfo, mSystemCB)),
+          mTestClient1(::ndk::SharedRefBase::make<TestClient>(kTestPid1, mService)),
+          mTestClient2(::ndk::SharedRefBase::make<TestClient>(kTestPid2, mService)),
+          mTestClient3(::ndk::SharedRefBase::make<TestClient>(kTestPid2, mService)) {
     }
 
 protected:
@@ -193,7 +201,7 @@ protected:
 
     static void expectEqResourceInfo(const ResourceInfo &info,
             int uid,
-            sp<IResourceManagerClient> client,
+            std::shared_ptr<IResourceManagerClient> client,
             const std::vector<MediaResourceParcel> &resources) {
         EXPECT_EQ(uid, info.uid);
         EXPECT_EQ(client, info.client);
@@ -334,11 +342,11 @@ protected:
         std::vector<MediaResourcePolicyParcel> policies1;
         policies1.push_back(
                 MediaResourcePolicy(
-                        IResourceManagerService::kPolicySupportsMultipleSecureCodecs(),
+                        IResourceManagerService::kPolicySupportsMultipleSecureCodecs,
                         "true"));
         policies1.push_back(
                 MediaResourcePolicy(
-                        IResourceManagerService::kPolicySupportsSecureWithNonSecureCodec(),
+                        IResourceManagerService::kPolicySupportsSecureWithNonSecureCodec,
                         "false"));
         mService->config(policies1);
         EXPECT_TRUE(mService->mSupportsMultipleSecureCodecs);
@@ -347,11 +355,11 @@ protected:
         std::vector<MediaResourcePolicyParcel> policies2;
         policies2.push_back(
                 MediaResourcePolicy(
-                        IResourceManagerService::kPolicySupportsMultipleSecureCodecs(),
+                        IResourceManagerService::kPolicySupportsMultipleSecureCodecs,
                         "false"));
         policies2.push_back(
                 MediaResourcePolicy(
-                        IResourceManagerService::kPolicySupportsSecureWithNonSecureCodec(),
+                        IResourceManagerService::kPolicySupportsSecureWithNonSecureCodec,
                         "true"));
         mService->config(policies2);
         EXPECT_FALSE(mService->mSupportsMultipleSecureCodecs);
@@ -458,7 +466,7 @@ protected:
         addResource();
 
         MediaResource::Type type = MediaResource::Type::kSecureCodec;
-        Vector<sp<IResourceManagerClient> > clients;
+        Vector<std::shared_ptr<IResourceManagerClient> > clients;
         EXPECT_FALSE(mService->getAllClients_l(kLowPriorityPid, type, &clients));
         // some higher priority process (e.g. kTestPid2) owns the resource, so getAllClients_l
         // will fail.
@@ -667,7 +675,7 @@ protected:
 
     void testGetLowestPriorityBiggestClient() {
         MediaResource::Type type = MediaResource::Type::kGraphicMemory;
-        sp<IResourceManagerClient> client;
+        std::shared_ptr<IResourceManagerClient> client;
         EXPECT_FALSE(mService->getLowestPriorityBiggestClient_l(kHighPriorityPid, type, &client));
 
         addResource();
@@ -706,7 +714,7 @@ protected:
 
     void testGetBiggestClient() {
         MediaResource::Type type = MediaResource::Type::kGraphicMemory;
-        sp<IResourceManagerClient> client;
+        std::shared_ptr<IResourceManagerClient> client;
         EXPECT_FALSE(mService->getBiggestClient_l(kTestPid2, type, &client));
 
         addResource();
@@ -799,10 +807,10 @@ protected:
     }
 
     sp<TestSystemCallback> mSystemCB;
-    sp<ResourceManagerService> mService;
-    sp<IResourceManagerClient> mTestClient1;
-    sp<IResourceManagerClient> mTestClient2;
-    sp<IResourceManagerClient> mTestClient3;
+    std::shared_ptr<ResourceManagerService> mService;
+    std::shared_ptr<IResourceManagerClient> mTestClient1;
+    std::shared_ptr<IResourceManagerClient> mTestClient2;
+    std::shared_ptr<IResourceManagerClient> mTestClient3;
 };
 
 TEST_F(ResourceManagerServiceTest, config) {
@@ -862,5 +870,4 @@ TEST_F(ResourceManagerServiceTest, testCpusetBoost) {
     testCpusetBoost();
 }
 
-} // namespace media
 } // namespace android

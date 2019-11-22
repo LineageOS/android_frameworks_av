@@ -305,6 +305,7 @@ cc_library {
         "libprocessgroup",
         "libutils",
         "libbinder",
+        "libbinder_ndk",
         "libsonivox",
         "libandroidicu",
         "libexpat",
@@ -327,11 +328,11 @@ cc_library {
 
     static_libs: [
         "libc_malloc_debug_backtrace", // for memory heap analysis
-        "resourcemanager_aidl_interface-unstable-cpp",
+        "resourcemanager_aidl_interface-ndk_platform",
     ],
 
     export_static_lib_headers: [
-        "resourcemanager_aidl_interface-unstable-cpp",
+        "resourcemanager_aidl_interface-ndk_platform",
     ],
 
     export_include_dirs: [
