@@ -100,8 +100,12 @@ DeviceHalHidl::DeviceHalHidl(const sp<IDevice>& device)
 
 DeviceHalHidl::~DeviceHalHidl() {
     if (mDevice != 0) {
+#if MAJOR_VERSION <= 5
         mDevice.clear();
         hardware::IPCThreadState::self()->flushCommands();
+#elif MAJOR_VERSION >= 6
+        mDevice->close();
+#endif
     }
 }
 
