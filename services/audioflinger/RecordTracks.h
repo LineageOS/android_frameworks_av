@@ -19,6 +19,39 @@
     #error This header file should only be included from AudioFlinger.h
 #endif
 
+// Checks and monitors OP_RECORD_AUDIO
+class OpRecordAudioMonitor : public RefBase {
+public:
+    ~OpRecordAudioMonitor() override;
+    bool hasOpRecordAudio() const;
+
+    static sp<OpRecordAudioMonitor> createIfNeeded(uid_t uid, const String16& opPackageName);
+
+private:
+    OpRecordAudioMonitor(uid_t uid, const String16& opPackageName);
+    void onFirstRef() override;
+
+    AppOpsManager mAppOpsManager;
+
+    class RecordAudioOpCallback : public BnAppOpsCallback {
+    public:
+        explicit RecordAudioOpCallback(const wp<OpRecordAudioMonitor>& monitor);
+        void opChanged(int32_t op, const String16& packageName) override;
+
+    private:
+        const wp<OpRecordAudioMonitor> mMonitor;
+    };
+
+    sp<RecordAudioOpCallback> mOpCallback;
+    // called by RecordAudioOpCallback when OP_RECORD_AUDIO is updated in AppOp callback
+    // and in onFirstRef()
+    void checkRecordAudio();
+
+    std::atomic_bool mHasOpRecordAudio;
+    const uid_t mUid;
+    const String16 mPackage;
+};
+
 // record track
 class RecordTrack : public TrackBase {
 public:
@@ -36,6 +69,7 @@ public:
                                 uid_t uid,
                                 audio_input_flags_t flags,
                                 track_type type,
+                                const String16& opPackageName,
                                 audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE);
     virtual             ~RecordTrack();
     virtual status_t    initCheck() const;
@@ -68,7 +102,7 @@ public:
                                 { return (mFlags & AUDIO_INPUT_FLAG_DIRECT) != 0; }
 
             void        setSilenced(bool silenced) { if (!isPatchTrack()) mSilenced = silenced; }
-            bool        isSilenced() const { return mSilenced; }
+            bool        isSilenced() const;
 
             status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
 
@@ -111,6 +145,11 @@ private:
             audio_input_flags_t                mFlags;
 
             bool                               mSilenced;
+
+            // used to enforce OP_RECORD_AUDIO
+            uid_t                              mUid;
+            String16                           mOpPackageName;
+            sp<OpRecordAudioMonitor>           mOpRecordAudioMonitor;
 };
 
 // playback track, used by PatchPanel
