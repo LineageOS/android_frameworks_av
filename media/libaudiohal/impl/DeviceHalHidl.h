@@ -113,6 +113,9 @@ class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
     // List microphones
     virtual status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones);
 
+    status_t addDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
+    status_t removeDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
+
     virtual status_t dump(int fd);
 
   private:
