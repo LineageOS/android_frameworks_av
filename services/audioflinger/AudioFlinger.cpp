@@ -170,6 +170,7 @@ AudioFlinger::AudioFlinger()
       mClientSharedHeapSize(kMinimumClientSharedHeapSizeBytes),
       mGlobalEffectEnableTime(0),
       mPatchPanel(this),
+      mDeviceEffectManager(this),
       mSystemReady(false)
 {
     // unsigned instead of audio_unique_id_use_t, because ++ operator is unavailable for enum
@@ -382,6 +383,24 @@ void AudioFlinger::onExternalVibrationStop(const sp<os::ExternalVibration>& exte
     }
 }
 
+status_t AudioFlinger::addEffectToHal(audio_port_handle_t deviceId,
+        audio_module_handle_t hwModuleId, sp<EffectHalInterface> effect) {
+    AudioHwDevice *audioHwDevice = mAudioHwDevs.valueFor(hwModuleId);
+    if (audioHwDevice == nullptr) {
+        return NO_INIT;
+    }
+    return audioHwDevice->hwDevice()->addDeviceEffect(deviceId, effect);
+}
+
+status_t AudioFlinger::removeEffectFromHal(audio_port_handle_t deviceId,
+        audio_module_handle_t hwModuleId, sp<EffectHalInterface> effect) {
+    AudioHwDevice *audioHwDevice = mAudioHwDevs.valueFor(hwModuleId);
+    if (audioHwDevice == nullptr) {
+        return NO_INIT;
+    }
+    return audioHwDevice->hwDevice()->removeDeviceEffect(deviceId, effect);
+}
+
 static const char * const audio_interfaces[] = {
     AUDIO_HARDWARE_MODULE_ID_PRIMARY,
     AUDIO_HARDWARE_MODULE_ID_A2DP,
@@ -557,6 +576,8 @@ status_t AudioFlinger::dump(int fd, const Vector<String16>& args)
         }
 
         mPatchPanel.dump(fd);
+
+        mDeviceEffectManager.dump(fd);
 
         // dump external setParameters
         auto dumpLogger = [fd](SimpleLog& logger, const char* name) {
@@ -3315,7 +3336,7 @@ sp<IEffect> AudioFlinger::createEffect(
         int32_t priority,
         audio_io_handle_t io,
         audio_session_t sessionId,
-        const AudioDeviceTypeAddr& device __unused,
+        const AudioDeviceTypeAddr& device,
         const String16& opPackageName,
         pid_t pid,
         status_t *status,
@@ -3379,7 +3400,6 @@ sp<IEffect> AudioFlinger::createEffect(
             lStatus = BAD_VALUE;
             goto Exit;
         }
-        //TODO: add check on device ID when added to arguments
     } else {
         // general sessionId.
 
@@ -3431,6 +3451,23 @@ sp<IEffect> AudioFlinger::createEffect(
         }
 
         Mutex::Autolock _l(mLock);
+
+        if (sessionId == AUDIO_SESSION_DEVICE) {
+            sp<Client> client = registerPid(pid);
+            ALOGV("%s device type %d address %s", __func__, device.mType, device.getAddress());
+            handle = mDeviceEffectManager.createEffect_l(
+                    &desc, device, client, effectClient, mPatchPanel.patches_l(),
+                    enabled, &lStatus);
+            if (lStatus != NO_ERROR && lStatus != ALREADY_EXISTS) {
+                // remove local strong reference to Client with mClientLock held
+                Mutex::Autolock _cl(mClientLock);
+                client.clear();
+            } else {
+                // handle must be valid here, but check again to be safe.
+                if (handle.get() != nullptr && id != nullptr) *id = handle->id();
+            }
+            goto Register;
+        }
 
         // If output is not specified try to find a matching audio session ID in one of the
         // output threads.
@@ -3526,6 +3563,7 @@ sp<IEffect> AudioFlinger::createEffect(
         }
     }
 
+Register:
     if (lStatus == NO_ERROR || lStatus == ALREADY_EXISTS) {
         // Check CPU and memory usage
         sp<EffectBase> effect = handle->effect().promote();

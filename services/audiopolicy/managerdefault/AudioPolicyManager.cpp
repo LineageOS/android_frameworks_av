@@ -2770,12 +2770,14 @@ status_t AudioPolicyManager::registerEffect(const effect_descriptor_t *desc,
                                 int session,
                                 int id)
 {
-    ssize_t index = mOutputs.indexOfKey(io);
-    if (index < 0) {
-        index = mInputs.indexOfKey(io);
+    if (session != AUDIO_SESSION_DEVICE) {
+        ssize_t index = mOutputs.indexOfKey(io);
         if (index < 0) {
-            ALOGW("registerEffect() unknown io %d", io);
-            return INVALID_OPERATION;
+            index = mInputs.indexOfKey(io);
+            if (index < 0) {
+                ALOGW("registerEffect() unknown io %d", io);
+                return INVALID_OPERATION;
+            }
         }
     }
     return mEffects.registerEffect(desc, io, session, id,

@@ -206,6 +206,17 @@ status_t DeviceHalLocal::getMicrophones(std::vector<media::MicrophoneInfo> *micr
 }
 #endif
 
+// Local HAL implementation does not support effects
+status_t DeviceHalLocal::addDeviceEffect(
+        audio_port_handle_t device __unused, sp<EffectHalInterface> effect __unused) {
+    return INVALID_OPERATION;
+}
+
+status_t DeviceHalLocal::removeDeviceEffect(
+        audio_port_handle_t device __unused, sp<EffectHalInterface> effect __unused) {
+    return INVALID_OPERATION;
+}
+
 status_t DeviceHalLocal::dump(int fd) {
     return mDev->dump(mDev, fd);
 }

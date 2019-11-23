@@ -512,7 +512,8 @@ AudioFlinger::EffectModule::EffectModule(const sp<AudioFlinger::EffectCallbackIn
                                          effect_descriptor_t *desc,
                                          int id,
                                          audio_session_t sessionId,
-                                         bool pinned)
+                                         bool pinned,
+                                         audio_port_handle_t deviceId)
     : EffectBase(callback, desc, id, sessionId, pinned),
       // clear mConfig to ensure consistent initial value of buffer framecount
       // in case buffers are associated by setInBuffer() or setOutBuffer()
@@ -531,7 +532,7 @@ AudioFlinger::EffectModule::EffectModule(const sp<AudioFlinger::EffectCallbackIn
 
     // create effect engine from effect factory
     mStatus = callback->createEffectHal(
-            &desc->uuid, sessionId, AUDIO_PORT_HANDLE_NONE, &mEffectInterface);
+            &desc->uuid, sessionId, deviceId, &mEffectInterface);
     if (mStatus != NO_ERROR) {
         return;
     }
@@ -1602,7 +1603,7 @@ AudioFlinger::EffectHandle::EffectHandle(const sp<EffectBase>& effect,
     mEffect(effect), mEffectClient(effectClient), mClient(client), mCblk(NULL),
     mPriority(priority), mHasControl(false), mEnabled(false), mDisconnected(false)
 {
-    ALOGV("constructor %p", this);
+    ALOGV("constructor %p client %p", this, client.get());
 
     if (client == 0) {
         return;
@@ -1790,12 +1791,13 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
     if (!mHasControl && cmdCode != EFFECT_CMD_GET_PARAM) {
         return INVALID_OPERATION;
     }
-    if (mClient == 0) {
-        return INVALID_OPERATION;
-    }
 
     // handle commands that are not forwarded transparently to effect engine
     if (cmdCode == EFFECT_CMD_SET_PARAM_COMMIT) {
+        if (mClient == 0) {
+            return INVALID_OPERATION;
+        }
+
         if (*replySize < sizeof(int)) {
             android_errorWriteLog(0x534e4554, "32095713");
             return BAD_VALUE;
@@ -2084,7 +2086,7 @@ status_t AudioFlinger::EffectChain::createEffect_l(sp<EffectModule>& effect,
                                                    bool pinned)
 {
     Mutex::Autolock _l(mLock);
-    effect = new EffectModule(mEffectCallback, desc, id, sessionId, pinned);
+    effect = new EffectModule(mEffectCallback, desc, id, sessionId, pinned, AUDIO_PORT_HANDLE_NONE);
     status_t lStatus = effect->status();
     if (lStatus == NO_ERROR) {
         lStatus = addEffect_ll(effect);
@@ -2916,6 +2918,328 @@ int32_t AudioFlinger::EffectChain::EffectCallback::activeTrackCnt() const {
         return 0;
     }
     return c->activeTrackCnt();
+}
+
+
+#undef LOG_TAG
+#define LOG_TAG "AudioFlinger::DeviceEffectProxy"
+
+status_t AudioFlinger::DeviceEffectProxy::setEnabled(bool enabled, bool fromHandle)
+{
+    status_t status = EffectBase::setEnabled(enabled, fromHandle);
+    Mutex::Autolock _l(mProxyLock);
+    if (status == NO_ERROR) {
+        for (auto& handle : mEffectHandles) {
+            if (enabled) {
+                status = handle.second->enable();
+            } else {
+                status = handle.second->disable();
+            }
+        }
+    }
+    ALOGV("%s enable %d status %d", __func__, enabled, status);
+    return status;
+}
+
+status_t AudioFlinger::DeviceEffectProxy::init(
+        const std::map <audio_patch_handle_t, PatchPanel::Patch>& patches) {
+//For all audio patches
+//If src or sink device match
+//If the effect is HW accelerated
+//	if no corresponding effect module
+//		Create EffectModule: mHalEffect
+//Create and attach EffectHandle
+//If the effect is not HW accelerated and the patch sink or src is a mixer port
+//	Create Effect on patch input or output thread on session -1
+//Add EffectHandle to EffectHandle map of Effect Proxy:
+    ALOGV("%s device type %d address %s", __func__,  mDevice.mType, mDevice.getAddress());
+    status_t status = NO_ERROR;
+    for (auto &patch : patches) {
+        status = onCreatePatch(patch.first, patch.second);
+        ALOGV("%s onCreatePatch status %d", __func__, status);
+        if (status == BAD_VALUE) {
+            return status;
+        }
+    }
+    return status;
+}
+
+status_t AudioFlinger::DeviceEffectProxy::onCreatePatch(
+        audio_patch_handle_t patchHandle, const AudioFlinger::PatchPanel::Patch& patch) {
+    status_t status = NAME_NOT_FOUND;
+    sp<EffectHandle> handle;
+    // only consider source[0] as this is the only "true" source of a patch
+    status = checkPort(patch, &patch.mAudioPatch.sources[0], &handle);
+    ALOGV("%s source checkPort status %d", __func__, status);
+    for (uint32_t i = 0; i < patch.mAudioPatch.num_sinks && status == NAME_NOT_FOUND; i++) {
+        status = checkPort(patch, &patch.mAudioPatch.sinks[i], &handle);
+        ALOGV("%s sink %d checkPort status %d", __func__, i, status);
+    }
+    if (status == NO_ERROR || status == ALREADY_EXISTS) {
+        Mutex::Autolock _l(mProxyLock);
+        mEffectHandles.emplace(patchHandle, handle);
+    }
+    ALOGW_IF(status == BAD_VALUE,
+            "%s cannot attach effect %s on patch %d", __func__, mDescriptor.name, patchHandle);
+
+    return status;
+}
+
+status_t AudioFlinger::DeviceEffectProxy::checkPort(const PatchPanel::Patch& patch,
+        const struct audio_port_config *port, sp <EffectHandle> *handle) {
+
+    ALOGV("%s type %d device type %d address %s device ID %d patch.isSoftware() %d",
+            __func__, port->type, port->ext.device.type,
+            port->ext.device.address, port->id, patch.isSoftware());
+    if (port->type != AUDIO_PORT_TYPE_DEVICE || port->ext.device.type != mDevice.mType
+        || port->ext.device.address != mDevice.mAddress) {
+        return NAME_NOT_FOUND;
+    }
+    status_t status = NAME_NOT_FOUND;
+
+    if (mDescriptor.flags & EFFECT_FLAG_HW_ACC_TUNNEL) {
+        Mutex::Autolock _l(mProxyLock);
+        mDevicePort = *port;
+        mHalEffect = new EffectModule(mMyCallback,
+                                      const_cast<effect_descriptor_t *>(&mDescriptor),
+                                      mMyCallback->newEffectId(), AUDIO_SESSION_DEVICE,
+                                      false /* pinned */, port->id);
+        if (audio_is_input_device(mDevice.mType)) {
+            mHalEffect->setInputDevice(mDevice);
+        } else {
+            mHalEffect->setDevices({mDevice});
+        }
+        *handle = new EffectHandle(mHalEffect, nullptr, nullptr, 0 /*priority*/);
+        status = (*handle)->initCheck();
+        if (status == OK) {
+            status = mHalEffect->addHandle((*handle).get());
+        } else {
+            mHalEffect.clear();
+            mDevicePort.id = AUDIO_PORT_HANDLE_NONE;
+        }
+    } else if (patch.isSoftware() || patch.thread().promote() != nullptr) {
+        sp <ThreadBase> thread;
+        if (audio_port_config_has_input_direction(port)) {
+            if (patch.isSoftware()) {
+                thread = patch.mRecord.thread();
+            } else {
+                thread = patch.thread().promote();
+            }
+        } else {
+            if (patch.isSoftware()) {
+                thread = patch.mPlayback.thread();
+            } else {
+                thread = patch.thread().promote();
+            }
+        }
+        int enabled;
+        *handle = thread->createEffect_l(nullptr, nullptr, 0, AUDIO_SESSION_DEVICE,
+                                         const_cast<effect_descriptor_t *>(&mDescriptor),
+                                         &enabled, &status, false);
+        ALOGV("%s thread->createEffect_l status %d", __func__, status);
+    } else {
+        status = BAD_VALUE;
+    }
+    if (status == NO_ERROR || status == ALREADY_EXISTS) {
+        if (isEnabled()) {
+            (*handle)->enable();
+        } else {
+            (*handle)->disable();
+        }
+    }
+    return status;
+}
+
+void AudioFlinger::DeviceEffectProxy::onReleasePatch(audio_patch_handle_t patchHandle) {
+    Mutex::Autolock _l(mProxyLock);
+    mEffectHandles.erase(patchHandle);
+}
+
+
+size_t AudioFlinger::DeviceEffectProxy::removeEffect(const sp<EffectModule>& effect)
+{
+    Mutex::Autolock _l(mProxyLock);
+    if (effect == mHalEffect) {
+        mHalEffect.clear();
+        mDevicePort.id = AUDIO_PORT_HANDLE_NONE;
+    }
+    return mHalEffect == nullptr ? 0 : 1;
+}
+
+status_t AudioFlinger::DeviceEffectProxy::addEffectToHal(
+    sp<EffectHalInterface> effect) {
+    if (mHalEffect == nullptr) {
+        return NO_INIT;
+    }
+    return mManagerCallback->addEffectToHal(
+            mDevicePort.id, mDevicePort.ext.device.hw_module, effect);
+}
+
+status_t AudioFlinger::DeviceEffectProxy::removeEffectFromHal(
+    sp<EffectHalInterface> effect) {
+    if (mHalEffect == nullptr) {
+        return NO_INIT;
+    }
+    return mManagerCallback->removeEffectFromHal(
+            mDevicePort.id, mDevicePort.ext.device.hw_module, effect);
+}
+
+bool AudioFlinger::DeviceEffectProxy::isOutput() const {
+    if (mDevicePort.id != AUDIO_PORT_HANDLE_NONE) {
+        return mDevicePort.role == AUDIO_PORT_ROLE_SINK;
+    }
+    return true;
+}
+
+uint32_t AudioFlinger::DeviceEffectProxy::sampleRate() const {
+    if (mDevicePort.id != AUDIO_PORT_HANDLE_NONE &&
+            (mDevicePort.config_mask & AUDIO_PORT_CONFIG_SAMPLE_RATE) != 0) {
+        return mDevicePort.sample_rate;
+    }
+    return DEFAULT_OUTPUT_SAMPLE_RATE;
+}
+
+audio_channel_mask_t AudioFlinger::DeviceEffectProxy::channelMask() const {
+    if (mDevicePort.id != AUDIO_PORT_HANDLE_NONE &&
+            (mDevicePort.config_mask & AUDIO_PORT_CONFIG_CHANNEL_MASK) != 0) {
+        return mDevicePort.channel_mask;
+    }
+    return AUDIO_CHANNEL_OUT_STEREO;
+}
+
+uint32_t AudioFlinger::DeviceEffectProxy::channelCount() const {
+    if (isOutput()) {
+        return audio_channel_count_from_out_mask(channelMask());
+    }
+    return audio_channel_count_from_in_mask(channelMask());
+}
+
+void AudioFlinger::DeviceEffectProxy::dump(int fd, int spaces) {
+    const Vector<String16> args;
+    EffectBase::dump(fd, args);
+
+    const bool locked = dumpTryLock(mProxyLock);
+    if (!locked) {
+        String8 result("DeviceEffectProxy may be deadlocked\n");
+        write(fd, result.string(), result.size());
+    }
+
+    String8 outStr;
+    if (mHalEffect != nullptr) {
+        outStr.appendFormat("%*sHAL Effect Id: %d\n", spaces, "", mHalEffect->id());
+    } else {
+        outStr.appendFormat("%*sNO HAL Effect\n", spaces, "");
+    }
+    write(fd, outStr.string(), outStr.size());
+    outStr.clear();
+
+    outStr.appendFormat("%*sSub Effects:\n", spaces, "");
+    write(fd, outStr.string(), outStr.size());
+    outStr.clear();
+
+    for (const auto& iter : mEffectHandles) {
+        outStr.appendFormat("%*sEffect for patch handle %d:\n", spaces + 2, "", iter.first);
+        write(fd, outStr.string(), outStr.size());
+        outStr.clear();
+        sp<EffectBase> effect = iter.second->effect().promote();
+        if (effect != nullptr) {
+            effect->dump(fd, args);
+        }
+    }
+
+    if (locked) {
+        mLock.unlock();
+    }
+}
+
+#undef LOG_TAG
+#define LOG_TAG "AudioFlinger::DeviceEffectProxy::ProxyCallback"
+
+int AudioFlinger::DeviceEffectProxy::ProxyCallback::newEffectId() {
+    return mManagerCallback->newEffectId();
+}
+
+
+bool AudioFlinger::DeviceEffectProxy::ProxyCallback::disconnectEffectHandle(
+        EffectHandle *handle, bool unpinIfLast) {
+    sp<EffectBase> effectBase = handle->effect().promote();
+    if (effectBase == nullptr) {
+        return false;
+    }
+
+    sp<EffectModule> effect = effectBase->asEffectModule();
+    if (effect == nullptr) {
+        return false;
+    }
+
+    // restore suspended effects if the disconnected handle was enabled and the last one.
+    bool remove = (effect->removeHandle(handle) == 0) && (!effect->isPinned() || unpinIfLast);
+    if (remove) {
+        sp<DeviceEffectProxy> proxy = mProxy.promote();
+        if (proxy != nullptr) {
+            proxy->removeEffect(effect);
+        }
+        if (handle->enabled()) {
+            effectBase->checkSuspendOnEffectEnabled(false, false /*threadLocked*/);
+        }
+    }
+    return true;
+}
+
+status_t AudioFlinger::DeviceEffectProxy::ProxyCallback::createEffectHal(
+        const effect_uuid_t *pEffectUuid, int32_t sessionId, int32_t deviceId,
+        sp<EffectHalInterface> *effect) {
+    return mManagerCallback->createEffectHal(pEffectUuid, sessionId, deviceId, effect);
+}
+
+status_t AudioFlinger::DeviceEffectProxy::ProxyCallback::addEffectToHal(
+        sp<EffectHalInterface> effect) {
+    sp<DeviceEffectProxy> proxy = mProxy.promote();
+    if (proxy == nullptr) {
+        return NO_INIT;
+    }
+    return proxy->addEffectToHal(effect);
+}
+
+status_t AudioFlinger::DeviceEffectProxy::ProxyCallback::removeEffectFromHal(
+        sp<EffectHalInterface> effect) {
+    sp<DeviceEffectProxy> proxy = mProxy.promote();
+    if (proxy == nullptr) {
+        return NO_INIT;
+    }
+    return proxy->addEffectToHal(effect);
+}
+
+bool AudioFlinger::DeviceEffectProxy::ProxyCallback::isOutput() const {
+    sp<DeviceEffectProxy> proxy = mProxy.promote();
+    if (proxy == nullptr) {
+        return true;
+    }
+    return proxy->isOutput();
+}
+
+uint32_t AudioFlinger::DeviceEffectProxy::ProxyCallback::sampleRate() const {
+    sp<DeviceEffectProxy> proxy = mProxy.promote();
+    if (proxy == nullptr) {
+        return DEFAULT_OUTPUT_SAMPLE_RATE;
+    }
+    return proxy->sampleRate();
+}
+
+audio_channel_mask_t AudioFlinger::DeviceEffectProxy::ProxyCallback::channelMask() const {
+    sp<DeviceEffectProxy> proxy = mProxy.promote();
+    if (proxy == nullptr) {
+        return AUDIO_CHANNEL_OUT_STEREO;
+    }
+    return proxy->channelMask();
+}
+
+uint32_t AudioFlinger::DeviceEffectProxy::ProxyCallback::channelCount() const {
+    sp<DeviceEffectProxy> proxy = mProxy.promote();
+    if (proxy == nullptr) {
+        return 2;
+    }
+    return proxy->channelCount();
 }
 
 } // namespace android
