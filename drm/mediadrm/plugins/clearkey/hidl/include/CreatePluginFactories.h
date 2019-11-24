@@ -17,17 +17,17 @@
 #ifndef CLEARKEY_CREATE_PLUGIN_FACTORIES_H_
 #define CLEARKEY_CREATE_PLUGIN_FACTORIES_H_
 
-#include <android/hardware/drm/1.2/ICryptoFactory.h>
-#include <android/hardware/drm/1.2/IDrmFactory.h>
+#include <android/hardware/drm/1.3/ICryptoFactory.h>
+#include <android/hardware/drm/1.3/IDrmFactory.h>
 
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_2 {
+namespace V1_3 {
 namespace clearkey {
 
-using ::android::hardware::drm::V1_2::ICryptoFactory;
-using ::android::hardware::drm::V1_2::IDrmFactory;
+using ::android::hardware::drm::V1_3::ICryptoFactory;
+using ::android::hardware::drm::V1_3::IDrmFactory;
 
 extern "C" {
     IDrmFactory* createDrmFactory();
@@ -35,7 +35,7 @@ extern "C" {
 }
 
 }  // namespace clearkey
-}  // namespace V1_2
+}  // namespace V1_3
 }  // namespace drm
 }  // namespace hardware
 }  // namespace android

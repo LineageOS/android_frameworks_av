@@ -18,16 +18,17 @@
 #define CLEARKEY_DRM_FACTORY_H_
 
 #include <android/hardware/drm/1.2/IDrmPlugin.h>
-#include <android/hardware/drm/1.2/IDrmFactory.h>
+#include <android/hardware/drm/1.3/IDrmFactory.h>
 
 #include "ClearKeyTypes.h"
 
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_2 {
+namespace V1_3 {
 namespace clearkey {
 
+using ::android::hardware::drm::V1_1::SecurityLevel;
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_string;
 using ::android::hardware::Return;
@@ -51,12 +52,15 @@ struct DrmFactory : public IDrmFactory {
             const hidl_string& appPackageName,
             createPlugin_cb _hidl_cb) override;
 
+    Return<void> getSupportedCryptoSchemes(
+            getSupportedCryptoSchemes_cb _hidl_cb) override;
+
 private:
     CLEARKEY_DISALLOW_COPY_AND_ASSIGN(DrmFactory);
 };
 
 } // namespace clearkey
-} // namespace V1_2
+} // namespace V1_3
 } // namespace drm
 } // namespace hardware
 } // namespace android
