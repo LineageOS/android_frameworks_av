@@ -20,8 +20,7 @@
 
 #include <utils/Log.h>
 
-#include <binder/IPCThreadState.h>
-#include <binder/IServiceManager.h>
+#include <android/binder_manager.h>
 
 #include <aidl/android/media/BnResourceManagerClient.h>
 #include <android/hardware/drm/1.2/types.h>
@@ -98,17 +97,6 @@ std::string toBase64StringNoPad(const T* data, size_t size) {
 namespace android {
 
 #define INIT_CHECK() {if (mInitCheck != OK) return mInitCheck;}
-
-static inline int getCallingPid() {
-    return IPCThreadState::self()->getCallingPid();
-}
-
-static bool checkPermission(const char* permissionString) {
-    if (getpid() == IPCThreadState::self()->getCallingPid()) return true;
-    bool ok = checkCallingPermission(String16(permissionString));
-    if (!ok) ALOGE("Request requires %s", permissionString);
-    return ok;
-}
 
 static const Vector<uint8_t> toVector(const hidl_vec<uint8_t> &vec) {
     Vector<uint8_t> vector;
@@ -454,7 +442,7 @@ sp<IDrmPlugin> DrmHal::makeDrmPlugin(const sp<IDrmFactory>& factory,
         const uint8_t uuid[16], const String8& appPackageName) {
     mAppPackageName = appPackageName;
     mMetrics.SetAppPackageName(appPackageName);
-    mMetrics.SetAppUid(IPCThreadState::self()->getCallingUid());
+    mMetrics.SetAppUid(AIBinder_getCallingUid());
 
     sp<IDrmPlugin> plugin;
     Return<void> hResult = factory->createPlugin(uuid, appPackageName.string(),
@@ -751,7 +739,7 @@ status_t DrmHal::openSession(DrmPlugin::SecurityLevel level,
             // reclaimSession may call back to closeSession, since mLock is
             // shared between Drm instances, we should unlock here to avoid
             // deadlock.
-            retry = DrmSessionManager::Instance()->reclaimSession(getCallingPid());
+            retry = DrmSessionManager::Instance()->reclaimSession(AIBinder_getCallingPid());
             mLock.lock();
         } else {
             retry = false;
@@ -760,7 +748,7 @@ status_t DrmHal::openSession(DrmPlugin::SecurityLevel level,
 
     if (err == OK) {
         std::shared_ptr<DrmSessionClient> client(new DrmSessionClient(this, sessionId));
-        DrmSessionManager::Instance()->addSession(getCallingPid(),
+        DrmSessionManager::Instance()->addSession(AIBinder_getCallingPid(),
                 std::static_pointer_cast<IResourceManagerClient>(client), sessionId);
         mOpenSessions.push_back(client);
         mMetrics.SetSessionStart(sessionId);
@@ -1542,10 +1530,6 @@ status_t DrmHal::signRSA(Vector<uint8_t> const &sessionId,
         Vector<uint8_t> const &wrappedKey, Vector<uint8_t> &signature) {
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
-
-    if (!checkPermission("android.permission.ACCESS_DRM_CERTIFICATES")) {
-        return -EPERM;
-    }
 
     DrmSessionManager::Instance()->useSession(sessionId);
 

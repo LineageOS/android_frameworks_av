@@ -20,6 +20,7 @@
 
 #include <hidlmemory/FrameworkUtils.h>
 #include <media/hardware/HardwareAPI.h>
+#include <media/stagefright/CodecBase.h>
 #include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -779,9 +780,8 @@ std::shared_ptr<C2Buffer> EncryptedLinearBlockBuffer::asC2Buffer() {
 }
 
 void EncryptedLinearBlockBuffer::fillSourceBuffer(
-        ICrypto::SourceBuffer *source) {
-    source->mSharedMemory = mMemory;
-    source->mHeapSeqNum = mHeapSeqNum;
+        hardware::drm::V1_0::SharedBuffer *source) {
+    BufferChannelBase::IMemoryToSharedBuffer(mMemory, mHeapSeqNum, source);
 }
 
 void EncryptedLinearBlockBuffer::fillSourceBuffer(
