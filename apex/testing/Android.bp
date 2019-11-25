@@ -15,7 +15,7 @@
 apex {
     name: "test_com.android.media",
     manifest: "test_manifest.json",
-    file_contexts: "com.android.media",
+    file_contexts: ":com.android.media-file_contexts",
     defaults: ["com.android.media-defaults"],
     installable: false,
 }
@@ -23,7 +23,7 @@ apex {
 apex {
     name: "test_com.android.media.swcodec",
     manifest: "test_manifest_codec.json",
-    file_contexts: "com.android.media.swcodec",
+    file_contexts: ":com.android.media.swcodec-file_contexts",
     defaults: ["com.android.media.swcodec-defaults"],
     installable: false,
 }
