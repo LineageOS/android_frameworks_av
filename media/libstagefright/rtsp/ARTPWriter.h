@@ -49,6 +49,7 @@ struct ARTPWriter : public MediaWriter {
     virtual status_t pause();
     void updateCVODegrees(int32_t cvoDegrees);
     void updatePayloadType(int32_t payloadType);
+    void updateSocketDscp(int32_t dscp);
     void updateSocketNetwork(int64_t socketNetwork);
     uint32_t getSequenceNum();
 
@@ -94,6 +95,7 @@ private:
     struct sockaddr_in6 mLocalAddr6;
     struct sockaddr_in6 mRTPAddr6;
     struct sockaddr_in6 mRTCPAddr6;
+    int32_t mRtpLayer3Dscp;
     net_handle_t mRTPSockNetwork;
 
     AString mProfileLevel;
