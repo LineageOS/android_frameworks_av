@@ -227,6 +227,10 @@ status_t ARTPWriter::start(MetaData * params) {
     if(params->findInt32(kKeyRtpCvoDegrees, &rtpCVODegrees))
         mRTPCVODegrees = rtpCVODegrees;
 
+    int32_t dscp = 0;
+    if(params->findInt32(kKeyRtpDscp, &dscp))
+        updateSocketDscp(dscp);
+
     int64_t sockNetwork = 0;
     if(params->findInt64(kKeySocketNetwork, &sockNetwork))
         updateSocketNetwork(sockNetwork);
@@ -1180,6 +1184,21 @@ void ARTPWriter::updateCVODegrees(int32_t cvoDegrees) {
 void ARTPWriter::updatePayloadType(int32_t payloadType) {
     Mutex::Autolock autoLock(mLock);
     mPayloadType = payloadType;
+}
+
+void ARTPWriter::updateSocketDscp(int32_t dscp) {
+    mRtpLayer3Dscp = dscp << 2;
+
+    /* mRtpLayer3Dscp will be mapped to WMM(Wifi) as per operator's requirement */
+    if (setsockopt(mRTPSocket, IPPROTO_IP, IP_TOS,
+                (int *)&mRtpLayer3Dscp, sizeof(mRtpLayer3Dscp)) < 0) {
+        ALOGE("failed to set dscp on rtpsock. err=%s", strerror(errno));
+    } else {
+        ALOGD("succees to set dscp on rtpsock. opt=%d", mRtpLayer3Dscp);
+        setsockopt(mRTCPSocket, IPPROTO_IP, IP_TOS,
+                (int *)&mRtpLayer3Dscp, sizeof(mRtpLayer3Dscp));
+        ALOGD("succees to set dscp on rtcpsock. opt=%d", mRtpLayer3Dscp);
+    }
 }
 
 void ARTPWriter::updateSocketNetwork(int64_t socketNetwork) {
