@@ -21,7 +21,6 @@
 #include <utils/Log.h>
 #include <utils/String8.h>
 #include <TypeConverter.h>
-#include "AudioGain.h"
 #include "AudioOutputDescriptor.h"
 #include "AudioPatch.h"
 #include "ClientDescriptor.h"

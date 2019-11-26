@@ -16,54 +16,14 @@
 
 #pragma once
 
-#include <vector>
-
+#include <media/AudioContainers.h>
 #include <system/audio.h>
 #include <utils/RefBase.h>
-#include <utils/SortedVector.h>
 #include <utils/String8.h>
 
 #include "policy.h"
 
 namespace android {
-
-typedef SortedVector<uint32_t> SampleRateVector;
-typedef Vector<audio_format_t> FormatVector;
-
-template <typename T>
-bool operator== (const SortedVector<T> &left, const SortedVector<T> &right)
-{
-    if (left.size() != right.size()) {
-        return false;
-    }
-    for (size_t index = 0; index < right.size(); index++) {
-        if (left[index] != right[index]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-template <typename T>
-bool operator!= (const SortedVector<T> &left, const SortedVector<T> &right)
-{
-    return !(left == right);
-}
-
-class ChannelsVector : public SortedVector<audio_channel_mask_t>
-{
-public:
-    ChannelsVector() = default;
-    ChannelsVector(const ChannelsVector&) = default;
-    ChannelsVector(const SortedVector<audio_channel_mask_t>& sv) :
-            SortedVector<audio_channel_mask_t>(sv) {}
-    ChannelsVector& operator=(const ChannelsVector&) = default;
-
-    // Applies audio_channel_mask_out_to_in to all elements and returns the result.
-    ChannelsVector asInMask() const;
-    // Applies audio_channel_mask_in_to_out to all elements and returns the result.
-    ChannelsVector asOutMask() const;
-};
 
 class AudioProfile : public virtual RefBase
 {
@@ -72,22 +32,22 @@ public:
 
     AudioProfile(audio_format_t format, audio_channel_mask_t channelMasks, uint32_t samplingRate);
     AudioProfile(audio_format_t format,
-                 const ChannelsVector &channelMasks,
-                 const SampleRateVector &samplingRateCollection);
+                 const ChannelMaskSet &channelMasks,
+                 const SampleRateSet &samplingRateCollection);
 
     audio_format_t getFormat() const { return mFormat; }
-    const ChannelsVector &getChannels() const { return mChannelMasks; }
-    const SampleRateVector &getSampleRates() const { return mSamplingRates; }
-    void setChannels(const ChannelsVector &channelMasks);
-    void setSampleRates(const SampleRateVector &sampleRates);
+    const ChannelMaskSet &getChannels() const { return mChannelMasks; }
+    const SampleRateSet &getSampleRates() const { return mSamplingRates; }
+    void setChannels(const ChannelMaskSet &channelMasks);
+    void setSampleRates(const SampleRateSet &sampleRates);
 
     void clear();
     bool isValid() const { return hasValidFormat() && hasValidRates() && hasValidChannels(); }
     bool supportsChannels(audio_channel_mask_t channels) const
     {
-        return mChannelMasks.indexOf(channels) >= 0;
+        return mChannelMasks.count(channels) != 0;
     }
-    bool supportsRate(uint32_t rate) const { return mSamplingRates.indexOf(rate) >= 0; }
+    bool supportsRate(uint32_t rate) const { return mSamplingRates.count(rate) != 0; }
 
     status_t checkExact(uint32_t rate, audio_channel_mask_t channels, audio_format_t format) const;
     status_t checkCompatibleChannelMask(audio_channel_mask_t channelMask,
@@ -98,8 +58,8 @@ public:
                                          uint32_t &updatedSamplingRate) const;
 
     bool hasValidFormat() const { return mFormat != AUDIO_FORMAT_DEFAULT; }
-    bool hasValidRates() const { return !mSamplingRates.isEmpty(); }
-    bool hasValidChannels() const { return !mChannelMasks.isEmpty(); }
+    bool hasValidRates() const { return !mSamplingRates.empty(); }
+    bool hasValidChannels() const { return !mChannelMasks.empty(); }
 
     void setDynamicChannels(bool dynamic) { mIsDynamicChannels = dynamic; }
     bool isDynamicChannels() const { return mIsDynamicChannels; }
@@ -117,8 +77,8 @@ public:
 private:
     String8  mName;
     audio_format_t mFormat;
-    ChannelsVector mChannelMasks;
-    SampleRateVector mSamplingRates;
+    ChannelMaskSet mChannelMasks;
+    SampleRateSet mSamplingRates;
 
     bool mIsDynamicFormat = false;
     bool mIsDynamicChannels = false;
@@ -126,13 +86,16 @@ private:
 };
 
 
-class AudioProfileVector : public Vector<sp<AudioProfile> >
+class AudioProfileVector : public std::vector<sp<AudioProfile> >
 {
 public:
     ssize_t add(const sp<AudioProfile> &profile);
     // This API is intended to be used by the policy manager once retrieving capabilities
     // for a profile with dynamic format, rate and channels attributes
     ssize_t addProfileFromHal(const sp<AudioProfile> &profileToAdd);
+    void appendProfiles(const AudioProfileVector& audioProfiles) {
+        insert(end(), audioProfiles.begin(), audioProfiles.end());
+    }
 
     status_t checkExactProfile(uint32_t samplingRate, audio_channel_mask_t channelMask,
                                audio_format_t format) const;
@@ -169,10 +132,8 @@ public:
 
 private:
     sp<AudioProfile> getProfileFor(audio_format_t format) const;
-    void setSampleRatesFor(const SampleRateVector &sampleRates, audio_format_t format);
-    void setChannelsFor(const ChannelsVector &channelMasks, audio_format_t format);
-
-    static int compareFormats(const sp<AudioProfile> *profile1, const sp<AudioProfile> *profile2);
+    void setSampleRatesFor(const SampleRateSet &sampleRates, audio_format_t format);
+    void setChannelsFor(const ChannelMaskSet &channelMasks, audio_format_t format);
 };
 
 bool operator == (const AudioProfile &left, const AudioProfile &right);

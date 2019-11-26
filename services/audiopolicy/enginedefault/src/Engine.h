@@ -18,7 +18,6 @@
 
 #include "EngineBase.h"
 #include "EngineInterface.h"
-#include <AudioGain.h>
 #include <policy.h>
 
 namespace android

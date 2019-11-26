@@ -19,7 +19,6 @@
 
 #include "AudioRoute.h"
 #include "HwModule.h"
-#include "AudioGain.h"
 
 namespace android
 {
