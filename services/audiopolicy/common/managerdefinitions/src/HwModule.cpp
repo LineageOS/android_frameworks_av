@@ -19,7 +19,6 @@
 
 #include "HwModule.h"
 #include "IOProfile.h"
-#include "AudioGain.h"
 #include <policy.h>
 #include <system/audio.h>
 

@@ -35,7 +35,6 @@
 #include "AudioPolicyInterface.h"
 
 #include <AudioPolicyManagerObserver.h>
-#include <AudioGain.h>
 #include <AudioPolicyConfig.h>
 #include <AudioPort.h>
 #include <AudioPatch.h>
@@ -763,7 +762,7 @@ protected:
 private:
         // Add or remove AC3 DTS encodings based on user preferences.
         void modifySurroundFormats(const sp<DeviceDescriptor>& devDesc, FormatVector *formatsPtr);
-        void modifySurroundChannelMasks(ChannelsVector *channelMasksPtr);
+        void modifySurroundChannelMasks(ChannelMaskSet *channelMasksPtr);
 
         // Support for Multi-Stream Decoder (MSD) module
         sp<DeviceDescriptor> getMsdAudioInDevice() const;

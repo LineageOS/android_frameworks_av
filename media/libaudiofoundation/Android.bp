@@ -1,0 +1,33 @@
+cc_library_headers {
+    name: "libaudiofoundation_headers",
+    vendor_available: true,
+    export_include_dirs: ["include"],
+}
+
+cc_library_shared {
+    name: "libaudiofoundation",
+    vendor_available: true,
+
+    srcs: [
+        "AudioGain.cpp",
+    ],
+
+    shared_libs: [
+        "libbase",
+        "libbinder",
+        "liblog",
+        "libutils",
+    ],
+
+    header_libs: [
+        "libaudio_system_headers",
+        "libaudiofoundation_headers",
+    ],
+
+    export_header_lib_headers: ["libaudiofoundation_headers"],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+}

@@ -17,10 +17,11 @@
 #ifndef ANDROID_TYPE_CONVERTER_H_
 #define ANDROID_TYPE_CONVERTER_H_
 
+#include <set>
 #include <string>
 #include <string.h>
-
 #include <vector>
+
 #include <system/audio.h>
 #include <utils/Log.h>
 #include <utils/Vector.h>
@@ -42,16 +43,6 @@ struct DefaultTraits
     }
 };
 template <typename T>
-struct VectorTraits
-{
-    typedef T Type;
-    typedef Vector<Type> Collection;
-    static void add(Collection &collection, Type value)
-    {
-        collection.add(value);
-    }
-};
-template <typename T>
 struct SortedVectorTraits
 {
     typedef T Type;
@@ -61,18 +52,28 @@ struct SortedVectorTraits
         collection.add(value);
     }
 };
+template <typename T>
+struct SetTraits
+{
+    typedef T Type;
+    typedef std::set<Type> Collection;
+    static void add(Collection &collection, Type value)
+    {
+        collection.insert(value);
+    }
+};
 
-using SampleRateTraits = SortedVectorTraits<uint32_t>;
+using SampleRateTraits = SetTraits<uint32_t>;
 using DeviceTraits = DefaultTraits<audio_devices_t>;
 struct OutputDeviceTraits : public DeviceTraits {};
 struct InputDeviceTraits : public DeviceTraits {};
-using ChannelTraits = SortedVectorTraits<audio_channel_mask_t>;
+using ChannelTraits = SetTraits<audio_channel_mask_t>;
 struct OutputChannelTraits : public ChannelTraits {};
 struct InputChannelTraits : public ChannelTraits {};
 struct ChannelIndexTraits : public ChannelTraits {};
 using InputFlagTraits = DefaultTraits<audio_input_flags_t>;
 using OutputFlagTraits = DefaultTraits<audio_output_flags_t>;
-using FormatTraits = VectorTraits<audio_format_t>;
+using FormatTraits = DefaultTraits<audio_format_t>;
 using GainModeTraits = DefaultTraits<audio_gain_mode_t>;
 using StreamTraits = DefaultTraits<audio_stream_type_t>;
 using AudioModeTraits = DefaultTraits<audio_mode_t>;
@@ -259,6 +260,7 @@ template <typename T, std::enable_if_t<std::is_same<T, audio_content_type_t>::va
                                     || std::is_same<T, audio_source_t>::value
                                     || std::is_same<T, audio_stream_type_t>::value
                                     || std::is_same<T, audio_usage_t>::value
+                                    || std::is_same<T, audio_format_t>::value
                                     , int> = 0>
 static inline std::string toString(const T& value)
 {
@@ -289,14 +291,6 @@ static inline std::string toString(const audio_devices_t& devices)
         OutputDeviceConverter::maskToString(devices, result);
     }
     return result;
-}
-
-// TODO: Remove when FormatTraits uses DefaultTraits.
-static inline std::string toString(const audio_format_t& format)
-{
-    std::string result;
-    return TypeConverter<VectorTraits<audio_format_t>>::toString(format, result)
-            ? result : std::to_string(static_cast<int>(format));
 }
 
 static inline std::string toString(const audio_attributes_t& attributes)

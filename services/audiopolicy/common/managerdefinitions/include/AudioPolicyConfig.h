@@ -19,7 +19,6 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include <AudioGain.h>
 #include <AudioPort.h>
 #include <AudioPatch.h>
 #include <DeviceDescriptor.h>
