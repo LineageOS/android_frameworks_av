@@ -22,7 +22,9 @@
 #include <binder/ProcessState.h>
 #include <minijail.h>
 
+#include <util/C2InterfaceHelper.h>
 #include <C2Component.h>
+#include <C2Config.h>
 
 // OmxStore is added for visibility by dumpstate.
 #include <media/stagefright/omx/1.0/OmxStore.h>
@@ -35,11 +37,14 @@ static constexpr char kBaseSeccompPolicyPath[] =
 static constexpr char kExtSeccompPolicyPath[] =
         "/vendor/etc/seccomp_policy/codec2.vendor.ext.policy";
 
-class DummyC2Store : public C2ComponentStore {
+class StoreImpl : public C2ComponentStore {
 public:
-    DummyC2Store() = default;
+    StoreImpl()
+        : mReflectorHelper(std::make_shared<C2ReflectorHelper>()),
+          mInterface(mReflectorHelper) {
+    }
 
-    virtual ~DummyC2Store() override = default;
+    virtual ~StoreImpl() override = default;
 
     virtual C2String getName() const override {
         return "default";
@@ -69,31 +74,69 @@ public:
     }
 
     virtual c2_status_t query_sm(
-        const std::vector<C2Param*>& /* stackParams */,
-        const std::vector<C2Param::Index>& /* heapParamIndices */,
-        std::vector<std::unique_ptr<C2Param>>* const /* heapParams */) const override {
-        return C2_OMITTED;
+        const std::vector<C2Param*>& stackParams,
+        const std::vector<C2Param::Index>& heapParamIndices,
+        std::vector<std::unique_ptr<C2Param>>* const heapParams) const override {
+        return mInterface.query(stackParams, heapParamIndices, C2_MAY_BLOCK, heapParams);
     }
 
     virtual c2_status_t config_sm(
-            const std::vector<C2Param*>& /* params */,
-            std::vector<std::unique_ptr<C2SettingResult>>* const /* failures */) override {
-        return C2_OMITTED;
+            const std::vector<C2Param*>& params,
+            std::vector<std::unique_ptr<C2SettingResult>>* const failures) override {
+        return mInterface.config(params, C2_MAY_BLOCK, failures);
     }
 
     virtual std::shared_ptr<C2ParamReflector> getParamReflector() const override {
-        return nullptr;
+        return mReflectorHelper;
     }
 
     virtual c2_status_t querySupportedParams_nb(
-            std::vector<std::shared_ptr<C2ParamDescriptor>>* const /* params */) const override {
-        return C2_OMITTED;
+            std::vector<std::shared_ptr<C2ParamDescriptor>>* const params) const override {
+        return mInterface.querySupportedParams(params);
     }
 
     virtual c2_status_t querySupportedValues_sm(
-            std::vector<C2FieldSupportedValuesQuery>& /* fields */) const override {
-        return C2_OMITTED;
+            std::vector<C2FieldSupportedValuesQuery>& fields) const override {
+        return mInterface.querySupportedValues(fields, C2_MAY_BLOCK);
     }
+
+private:
+    class Interface : public C2InterfaceHelper {
+    public:
+        Interface(const std::shared_ptr<C2ReflectorHelper> &helper)
+            : C2InterfaceHelper(helper) {
+            setDerivedInstance(this);
+
+            addParameter(
+                DefineParam(mIonUsageInfo, "ion-usage")
+                .withDefault(new C2StoreIonUsageInfo())
+                .withFields({
+                    C2F(mIonUsageInfo, usage).flags(
+                            {C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE}),
+                    C2F(mIonUsageInfo, capacity).inRange(0, UINT32_MAX, 1024),
+                    C2F(mIonUsageInfo, heapMask).any(),
+                    C2F(mIonUsageInfo, allocFlags).flags({}),
+                    C2F(mIonUsageInfo, minAlignment).equalTo(0)
+                })
+                .withSetter(SetIonUsage)
+                .build());
+        }
+
+        virtual ~Interface() = default;
+
+    private:
+        static C2R SetIonUsage(bool /* mayBlock */, C2P<C2StoreIonUsageInfo> &me) {
+            // Vendor's TODO: put appropriate mapping logic
+            me.set().heapMask = ~0;
+            me.set().allocFlags = 0;
+            me.set().minAlignment = 0;
+            return C2R::Ok();
+        }
+
+        std::shared_ptr<C2StoreIonUsageInfo> mIonUsageInfo;
+    };
+    std::shared_ptr<C2ReflectorHelper> mReflectorHelper;
+    Interface mInterface;
 };
 
 int main(int /* argc */, char** /* argv */) {
@@ -120,7 +163,7 @@ int main(int /* argc */, char** /* argv */) {
         //         /* implementation of C2ComponentStore */);
         ALOGD("Instantiating Codec2's dummy IComponentStore service...");
         store = new utils::ComponentStore(
-                std::make_shared<DummyC2Store>());
+                std::make_shared<StoreImpl>());
 
         if (store == nullptr) {
             ALOGE("Cannot create Codec2's IComponentStore service.");
