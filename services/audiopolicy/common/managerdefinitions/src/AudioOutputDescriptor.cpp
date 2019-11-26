@@ -21,10 +21,10 @@
 #include "AudioOutputDescriptor.h"
 #include "AudioPolicyMix.h"
 #include "IOProfile.h"
-#include "AudioGain.h"
 #include "Volume.h"
 #include "HwModule.h"
 #include "TypeConverter.h"
+#include <media/AudioGain.h>
 #include <media/AudioParameter.h>
 #include <media/AudioPolicy.h>
 

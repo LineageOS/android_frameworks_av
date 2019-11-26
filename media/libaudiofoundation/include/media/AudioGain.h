@@ -18,8 +18,8 @@
 
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
-#include <utils/String8.h>
 #include <system/audio.h>
+#include <string>
 #include <vector>
 
 namespace android {
@@ -55,7 +55,7 @@ public:
     int getMaxRampInMs() const { return mGain.max_ramp_ms; }
 
     // TODO: remove dump from here (split serialization)
-    void dump(String8 *dst, int spaces, int index) const;
+    void dump(std::string *dst, int spaces, int index) const;
 
     void getDefaultConfig(struct audio_gain_config *config);
     status_t checkConfig(const struct audio_gain_config *config);

@@ -18,8 +18,8 @@
 
 #include "AudioCollections.h"
 #include "AudioProfile.h"
-#include "AudioGain.h"
 #include "HandleGenerator.h"
+#include <media/AudioGain.h>
 #include <utils/String8.h>
 #include <utils/Vector.h>
 #include <utils/RefBase.h>
@@ -110,8 +110,8 @@ public:
     // Used to select an audio HAL output stream with a sample format providing the
     // less degradation for a given AudioTrack sample format.
     static bool isBetterFormatMatch(audio_format_t newFormat,
-                                        audio_format_t currentFormat,
-                                        audio_format_t targetFormat);
+                                    audio_format_t currentFormat,
+                                    audio_format_t targetFormat);
     static uint32_t formatDistance(audio_format_t format1,
                                    audio_format_t format2);
     static const uint32_t kFormatDistanceMax = 4;
@@ -143,8 +143,9 @@ public:
     AudioGains mGains; // gain controllers
 
 private:
-    void pickChannelMask(audio_channel_mask_t &channelMask, const ChannelsVector &channelMasks) const;
-    void pickSamplingRate(uint32_t &rate,const SampleRateVector &samplingRates) const;
+    void pickChannelMask(audio_channel_mask_t &channelMask,
+                         const ChannelMaskSet &channelMasks) const;
+    void pickSamplingRate(uint32_t &rate, const SampleRateSet &samplingRates) const;
 
     sp<HwModule> mModule;                 // audio HW module exposing this I/O stream
     String8  mName;
