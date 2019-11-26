@@ -1979,7 +1979,14 @@ binder::Status CameraDeviceClient::switchToOffline(
             mClientFeatureId, mCameraIdStr, mCameraFacing, mClientPid, mClientUid, mServicePid);
     ret = sCameraService->addOfflineClient(mCameraIdStr, offlineClient);
     if (ret == OK) {
-        // TODO: We need to update mStreamMap, mConfiguredOutputs, mCompositeStreams
+        // A successful offline session switch must reset the current camera client
+        // and release any resources occupied by previously configured streams.
+        mStreamMap.clear();
+        mConfiguredOutputs.clear();
+        mDeferredStreams.clear();
+        mStreamInfoMap.clear();
+        mCompositeStreamMap.clear();
+        mInputStream = {false, 0, 0, 0, 0};
     } else {
         switch(ret) {
             case BAD_VALUE:

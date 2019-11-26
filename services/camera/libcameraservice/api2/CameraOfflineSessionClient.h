@@ -19,6 +19,8 @@
 
 #include <android/hardware/camera2/BnCameraOfflineSession.h>
 #include <android/hardware/camera2/ICameraDeviceCallbacks.h>
+#include "common/FrameProcessorBase.h"
+#include "common/CameraDeviceBase.h"
 #include "CameraService.h"
 #include "CompositeStream.h"
 
@@ -35,8 +37,9 @@ using camera3::CompositeStream;
 // is created through ICameraDeviceUser::switchToOffline call.
 class CameraOfflineSessionClient :
         public CameraService::BasicClient,
-        public hardware::camera2::BnCameraOfflineSession
-        // public camera2::FrameProcessorBase::FilteredListener?
+        public hardware::camera2::BnCameraOfflineSession,
+        public camera2::FrameProcessorBase::FilteredListener,
+        public NotificationListener
 {
 public:
     CameraOfflineSessionClient(
@@ -58,42 +61,45 @@ public:
 
     virtual ~CameraOfflineSessionClient() {}
 
-    virtual sp<IBinder> asBinderWrapper() override {
+    sp<IBinder> asBinderWrapper() override {
         return IInterface::asBinder(this);
     }
 
-    virtual binder::Status disconnect() override;
+    binder::Status disconnect() override;
 
-    virtual status_t dump(int /*fd*/, const Vector<String16>& /*args*/) override;
+    status_t dump(int /*fd*/, const Vector<String16>& /*args*/) override;
 
-    virtual status_t dumpClient(int /*fd*/, const Vector<String16>& /*args*/) override;
+    status_t dumpClient(int /*fd*/, const Vector<String16>& /*args*/) override;
 
-    virtual void notifyError(int32_t /*errorCode*/,
-            const CaptureResultExtras& /*resultExtras*/) override;
-
-    virtual status_t initialize(sp<CameraProviderManager> /*manager*/,
+    status_t initialize(sp<CameraProviderManager> /*manager*/,
             const String8& /*monitorTags*/) override;
 
     // permissions management
-    virtual status_t startCameraOps() override;
-    virtual status_t finishCameraOps() override;
+    status_t startCameraOps() override;
+    status_t finishCameraOps() override;
 
-    // TODO: Those will be introduced when we implement FilteredListener and the device
-    // callbacks respectively. Just adding for now.
-    void onResultAvailable(const CaptureResult& result);
-    void notifyShutter(const CaptureResultExtras& resultExtras, nsecs_t timestamp);
+    // FilteredResultListener API
+    void onResultAvailable(const CaptureResult& result) override;
+
+    // NotificationListener API
+    void notifyError(int32_t errorCode, const CaptureResultExtras& resultExtras) override;
+    void notifyShutter(const CaptureResultExtras& resultExtras, nsecs_t timestamp) override;
+    void notifyIdle() override;
+    void notifyAutoFocus(uint8_t newState, int triggerId) override;
+    void notifyAutoExposure(uint8_t newState, int triggerId) override;
+    void notifyAutoWhitebalance(uint8_t newState, int triggerId) override;
+    void notifyPrepared(int streamId) override;
+    void notifyRequestQueueEmpty() override;
+    void notifyRepeatingRequestError(long lastFrameNumber) override;
 
 private:
-
-    const sp<hardware::camera2::ICameraDeviceCallbacks>& getRemoteCallback() {
-        return mRemoteCallback;
-    }
+    mutable Mutex mBinderSerializationLock;
 
     sp<hardware::camera2::ICameraDeviceCallbacks> mRemoteCallback;
 
     sp<CameraOfflineSessionBase> mOfflineSession;
 
-    // Offline composite streams
+    // Offline composite stream map, output surface -> composite stream
     KeyedVector<sp<IBinder>, sp<CompositeStream>> mCompositeStreamMap;
 };
 

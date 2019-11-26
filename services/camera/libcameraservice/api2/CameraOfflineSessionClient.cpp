@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@
 //#define LOG_NDEBUG 0
 
 #include "CameraOfflineSessionClient.h"
+#include "utils/CameraThreadState.h"
 #include <utils/Trace.h>
 
 namespace android {
@@ -26,22 +27,71 @@ namespace android {
 using binder::Status;
 
 status_t CameraOfflineSessionClient::initialize(sp<CameraProviderManager>, const String8&) {
+    ATRACE_CALL();
+
+    // Verify ops permissions
+    auto res = startCameraOps();
+    if (res != OK) {
+        return res;
+    }
+
+    if (mOfflineSession.get() == nullptr) {
+        ALOGE("%s: Camera %s: No valid offline session",
+                __FUNCTION__, mCameraIdStr.string());
+        return NO_INIT;
+    }
+
+    wp<NotificationListener> weakThis(this);
+    res = mOfflineSession->initialize(weakThis);
+    if (res != OK) {
+        ALOGE("%s: Camera %s: unable to initialize device: %s (%d)",
+                __FUNCTION__, mCameraIdStr.string(), strerror(-res), res);
+        return res;
+    }
+
     return OK;
 }
 
-status_t CameraOfflineSessionClient::dump(int /*fd*/, const Vector<String16>& /*args*/) {
-    return OK;
+status_t CameraOfflineSessionClient::dump(int fd, const Vector<String16>& args) {
+    return BasicClient::dump(fd, args);
 }
 
-status_t CameraOfflineSessionClient::dumpClient(int /*fd*/, const Vector<String16>& /*args*/) {
+status_t CameraOfflineSessionClient::dumpClient(int fd, const Vector<String16>& /*args*/) {
+    String8 result;
+
+    result = "  Offline session dump:\n";
+    write(fd, result.string(), result.size());
+
+    if (mOfflineSession.get() == nullptr) {
+        result = "  *** Offline session is detached\n";
+        write(fd, result.string(), result.size());
+        return NO_ERROR;
+    }
+
+    auto res = mOfflineSession->dump(fd);
+    if (res != OK) {
+        result = String8::format("   Error dumping offline session: %s (%d)",
+                strerror(-res), res);
+        write(fd, result.string(), result.size());
+    }
+
     return OK;
 }
 
 binder::Status CameraOfflineSessionClient::disconnect() {
+    Mutex::Autolock icl(mBinderSerializationLock);
+
     binder::Status res = Status::ok();
     if (mDisconnected) {
         return res;
     }
+    // Allow both client and the media server to disconnect at all times
+    int callingPid = CameraThreadState::getCallingPid();
+    if (callingPid != mClientPid &&
+            callingPid != mServicePid) {
+        return res;
+    }
+
     mDisconnected = true;
 
     sCameraService->removeByClient(this);
@@ -59,6 +109,15 @@ binder::Status CameraOfflineSessionClient::disconnect() {
     // client shouldn't be able to call into us anymore
     mClientPid = 0;
 
+    if (mOfflineSession.get() != nullptr) {
+        auto ret = mOfflineSession->disconnect();
+        if (ret != OK) {
+            ALOGE("%s: Failed disconnecting from offline session %s (%d)", __FUNCTION__,
+                    strerror(-ret), ret);
+        }
+        mOfflineSession = nullptr;
+    }
+
     for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
         auto ret = mCompositeStreamMap.valueAt(i)->deleteInternalStreams();
         if (ret != OK) {
@@ -74,8 +133,6 @@ binder::Status CameraOfflineSessionClient::disconnect() {
 void CameraOfflineSessionClient::notifyError(int32_t errorCode,
         const CaptureResultExtras& resultExtras) {
     // Thread safe. Don't bother locking.
-    sp<hardware::camera2::ICameraDeviceCallbacks> remoteCb = getRemoteCallback();
-    //
     // Composites can have multiple internal streams. Error notifications coming from such internal
     // streams may need to remain within camera service.
     bool skipClientNotification = false;
@@ -83,8 +140,8 @@ void CameraOfflineSessionClient::notifyError(int32_t errorCode,
         skipClientNotification |= mCompositeStreamMap.valueAt(i)->onError(errorCode, resultExtras);
     }
 
-    if ((remoteCb != 0) && (!skipClientNotification)) {
-        remoteCb->onDeviceError(errorCode, resultExtras);
+    if ((mRemoteCallback.get() != nullptr) && (!skipClientNotification)) {
+        mRemoteCallback->onDeviceError(errorCode, resultExtras);
     }
 }
 
@@ -156,10 +213,8 @@ void CameraOfflineSessionClient::onResultAvailable(const CaptureResult& result) 
     ATRACE_CALL();
     ALOGV("%s", __FUNCTION__);
 
-    // Thread-safe. No lock necessary.
-    sp<hardware::camera2::ICameraDeviceCallbacks> remoteCb = mRemoteCallback;
-    if (remoteCb != NULL) {
-        remoteCb->onResultReceived(result.mMetadata, result.mResultExtras,
+    if (mRemoteCallback.get() != NULL) {
+        mRemoteCallback->onResultReceived(result.mMetadata, result.mResultExtras,
                 result.mPhysicalMetadatas);
     }
 
@@ -170,15 +225,62 @@ void CameraOfflineSessionClient::onResultAvailable(const CaptureResult& result) 
 
 void CameraOfflineSessionClient::notifyShutter(const CaptureResultExtras& resultExtras,
         nsecs_t timestamp) {
-    // Thread safe. Don't bother locking.
-    sp<hardware::camera2::ICameraDeviceCallbacks> remoteCb = getRemoteCallback();
-    if (remoteCb != 0) {
-        remoteCb->onCaptureStarted(resultExtras, timestamp);
+
+    if (mRemoteCallback.get() != nullptr) {
+        mRemoteCallback->onCaptureStarted(resultExtras, timestamp);
     }
 
     for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
         mCompositeStreamMap.valueAt(i)->onShutter(resultExtras, timestamp);
     }
+}
+
+void CameraOfflineSessionClient::notifyIdle() {
+    if (mRemoteCallback.get() != nullptr) {
+        mRemoteCallback->onDeviceIdle();
+    }
+}
+
+void CameraOfflineSessionClient::notifyAutoFocus(uint8_t newState, int triggerId) {
+    (void)newState;
+    (void)triggerId;
+
+    ALOGV("%s: Autofocus state now %d, last trigger %d",
+          __FUNCTION__, newState, triggerId);
+}
+
+void CameraOfflineSessionClient::notifyAutoExposure(uint8_t newState, int triggerId) {
+    (void)newState;
+    (void)triggerId;
+
+    ALOGV("%s: Autoexposure state now %d, last trigger %d",
+            __FUNCTION__, newState, triggerId);
+}
+
+void CameraOfflineSessionClient::notifyAutoWhitebalance(uint8_t newState, int triggerId) {
+    (void)newState;
+    (void)triggerId;
+
+    ALOGV("%s: Auto-whitebalance state now %d, last trigger %d", __FUNCTION__, newState,
+            triggerId);
+}
+
+void CameraOfflineSessionClient::notifyPrepared(int /*streamId*/) {
+    ALOGE("%s: Unexpected stream prepare notification in offline mode!", __FUNCTION__);
+    notifyError(hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DEVICE,
+                CaptureResultExtras());
+}
+
+void CameraOfflineSessionClient::notifyRequestQueueEmpty() {
+    if (mRemoteCallback.get() != nullptr) {
+        mRemoteCallback->onRequestQueueEmpty();
+    }
+}
+
+void CameraOfflineSessionClient::notifyRepeatingRequestError(long /*lastFrameNumber*/) {
+    ALOGE("%s: Unexpected repeating request error in offline mode!", __FUNCTION__);
+    notifyError(hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DEVICE,
+                CaptureResultExtras());
 }
 
 // ----------------------------------------------------------------------------
