@@ -18,6 +18,7 @@
 
 #include "AudioPort.h"
 #include "DeviceDescriptor.h"
+#include "policy.h"
 #include <utils/String8.h>
 #include <system/audio.h>
 
@@ -33,7 +34,7 @@ class HwModule;
 class IOProfile : public AudioPort
 {
 public:
-    IOProfile(const String8 &name, audio_port_role_t role)
+    IOProfile(const std::string &name, audio_port_role_t role)
         : AudioPort(name, AUDIO_PORT_TYPE_MIX, role),
           maxOpenCount(1),
           curOpenCount(0),
@@ -41,7 +42,7 @@ public:
           curActiveCount(0) {}
 
     // For a Profile aka MixPort, tag name and name are equivalent.
-    virtual const String8 getTagName() const { return getName(); }
+    virtual const std::string getTagName() const { return getName(); }
 
     // FIXME: this is needed because shared MMAP stream clients use the same audio session.
     // Once capture clients are tracked individually and not per session this can be removed
@@ -183,13 +184,13 @@ private:
 class InputProfile : public IOProfile
 {
 public:
-    explicit InputProfile(const String8 &name) : IOProfile(name, AUDIO_PORT_ROLE_SINK) {}
+    explicit InputProfile(const std::string &name) : IOProfile(name, AUDIO_PORT_ROLE_SINK) {}
 };
 
 class OutputProfile : public IOProfile
 {
 public:
-    explicit OutputProfile(const String8 &name) : IOProfile(name, AUDIO_PORT_ROLE_SOURCE) {}
+    explicit OutputProfile(const std::string &name) : IOProfile(name, AUDIO_PORT_ROLE_SOURCE) {}
 };
 
 } // namespace android

@@ -10,17 +10,21 @@ cc_library_shared {
 
     srcs: [
         "AudioGain.cpp",
+        "AudioPortBase.cpp",
+        "AudioProfile.cpp",
     ],
 
     shared_libs: [
         "libbase",
         "libbinder",
         "liblog",
+        "libmedia_helper",
         "libutils",
     ],
 
     header_libs: [
         "libaudio_system_headers",
+        "libaudioclient_headers",
         "libaudiofoundation_headers",
     ],
 
