@@ -55,8 +55,8 @@ class String8;
  * ----------------------------------------
  *
  * For an example implementation of IDrmMetricsConsumer, please
- * see BundleDrmMetricsConsumer. BundleDrmMetricsConsumer consumes
- * IDrm/ICrypto metrics and saves the metrics to a PersistableBundle.
+ * see DrmMetricsConsumer. DrmMetricsConsumer consumes IDrm/ICrypto
+ * metrics and saves the metrics to a PersistableBundle.
  *
  */
 struct IDrmMetricsConsumer : public RefBase {
