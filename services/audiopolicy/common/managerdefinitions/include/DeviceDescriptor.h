@@ -30,13 +30,13 @@ class DeviceDescriptor : public AudioPort, public AudioPortConfig
 {
 public:
      // Note that empty name refers by convention to a generic device.
-    explicit DeviceDescriptor(audio_devices_t type, const String8 &tagName = String8(""));
+    explicit DeviceDescriptor(audio_devices_t type, const std::string &tagName = "");
     DeviceDescriptor(audio_devices_t type, const FormatVector &encodedFormats,
-            const String8 &tagName = String8(""));
+            const std::string &tagName = "");
 
     virtual ~DeviceDescriptor() {}
 
-    virtual const String8 getTagName() const { return mTagName; }
+    virtual const std::string getTagName() const { return mTagName; }
 
     audio_devices_t type() const { return mDeviceType; }
     String8 address() const { return mAddress; }
@@ -75,7 +75,7 @@ public:
 
 private:
     String8 mAddress{""};
-    String8 mTagName; // Unique human readable identifier for a device port found in conf file.
+    std::string mTagName; // Unique human readable identifier for a device port found in conf file.
     audio_devices_t     mDeviceType;
     FormatVector        mEncodedFormats;
     audio_port_handle_t mId = AUDIO_PORT_HANDLE_NONE;
@@ -112,9 +112,16 @@ public:
      * equal to AUDIO_PORT_HANDLE_NONE, it also returns a nullptr.
      */
     sp<DeviceDescriptor> getDeviceFromId(audio_port_handle_t id) const;
-    sp<DeviceDescriptor> getDeviceFromTagName(const String8 &tagName) const;
+    sp<DeviceDescriptor> getDeviceFromTagName(const std::string &tagName) const;
     DeviceVector getDevicesFromHwModule(audio_module_handle_t moduleHandle) const;
     audio_devices_t getDeviceTypesFromHwModule(audio_module_handle_t moduleHandle) const;
+
+    DeviceVector getFirstDevicesFromTypes(std::vector<audio_devices_t> orderedTypes) const;
+    sp<DeviceDescriptor> getFirstExistingDevice(std::vector<audio_devices_t> orderedTypes) const;
+
+    // If there are devices with the given type and the devices to add is not empty,
+    // remove all the devices with the given type and add all the devices to add.
+    void replaceDevicesByType(audio_devices_t typeToRemove, const DeviceVector &devicesToAdd);
 
     bool contains(const sp<DeviceDescriptor>& item) const { return indexOf(item) >= 0; }
 
