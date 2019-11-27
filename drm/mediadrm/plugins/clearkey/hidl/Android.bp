@@ -78,18 +78,37 @@ cc_library_static {
     },
     srcs: ["protos/DeviceFiles.proto"],
 }
+
 cc_binary {
     name: "android.hardware.drm@1.2-service.clearkey",
     defaults: ["clearkey_service_defaults"],
     srcs: ["service.cpp"],
     init_rc: ["android.hardware.drm@1.2-service.clearkey.rc"],
-    vintf_fragments: ["manifest_android.hardware.drm@1.3-service.clearkey.xml"],
+    vintf_fragments: ["manifest_android.hardware.drm@1.2-service.clearkey.xml"],
 }
+
 cc_binary {
     name: "android.hardware.drm@1.2-service-lazy.clearkey",
     overrides: ["android.hardware.drm@1.2-service.clearkey"],
     defaults: ["clearkey_service_defaults"],
     srcs: ["serviceLazy.cpp"],
     init_rc: ["android.hardware.drm@1.2-service-lazy.clearkey.rc"],
+    vintf_fragments: ["manifest_android.hardware.drm@1.2-service.clearkey.xml"],
+}
+
+cc_binary {
+    name: "android.hardware.drm@1.3-service.clearkey",
+    defaults: ["clearkey_service_defaults"],
+    srcs: ["service.cpp"],
+    init_rc: ["android.hardware.drm@1.3-service.clearkey.rc"],
+    vintf_fragments: ["manifest_android.hardware.drm@1.3-service.clearkey.xml"],
+}
+
+cc_binary {
+    name: "android.hardware.drm@1.3-service-lazy.clearkey",
+    overrides: ["android.hardware.drm@1.3-service.clearkey"],
+    defaults: ["clearkey_service_defaults"],
+    srcs: ["serviceLazy.cpp"],
+    init_rc: ["android.hardware.drm@1.3-service-lazy.clearkey.rc"],
     vintf_fragments: ["manifest_android.hardware.drm@1.3-service.clearkey.xml"],
 }
