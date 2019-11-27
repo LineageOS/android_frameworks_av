@@ -605,14 +605,11 @@ c2_status_t C2AllocationGralloc::map(
                           (int32_t)rect.width, (int32_t)rect.height },
                         // TODO: fence
                         hidl_handle(),
-                        [&err, &pointer](const auto &maperr, const auto &mapPointer,
-                                         int32_t bytesPerPixel, int32_t bytesPerStride) {
+                        [&err, &pointer](const auto &maperr, const auto &mapPointer) {
                             err = maperr2error(maperr);
                             if (err == C2_OK) {
                                 pointer = mapPointer;
                             }
-                            (void)bytesPerPixel;
-                            (void)bytesPerStride;
                         }).isOk()) {
                     ALOGE("failed transaction: lock(RGBA_1010102) (@4.0)");
                     return C2_CORRUPTED;
@@ -743,14 +740,11 @@ c2_status_t C2AllocationGralloc::map(
                           (int32_t)rect.width, (int32_t)rect.height },
                         // TODO: fence
                         hidl_handle(),
-                        [&err, &pointer](const auto &maperr, const auto &mapPointer,
-                                         int32_t bytesPerPixel, int32_t bytesPerStride) {
+                        [&err, &pointer](const auto &maperr, const auto &mapPointer) {
                             err = maperr2error(maperr);
                             if (err == C2_OK) {
                                 pointer = mapPointer;
                             }
-                            (void)bytesPerPixel;
-                            (void)bytesPerStride;
                         }).isOk()) {
                     ALOGE("failed transaction: lock(RGBA_8888) (@4.0)");
                     return C2_CORRUPTED;
@@ -816,6 +810,70 @@ c2_status_t C2AllocationGralloc::map(
             break;
         }
 
+        case PixelFormat4::BLOB: {
+            void* pointer = nullptr;
+            if (mMapper2) {
+                if (!mMapper2->lock(const_cast<native_handle_t*>(mBuffer), grallocUsage,
+                                    {(int32_t)rect.left, (int32_t)rect.top, (int32_t)rect.width,
+                                     (int32_t)rect.height},
+                                    // TODO: fence
+                                    hidl_handle(),
+                                    [&err, &pointer](const auto& maperr, const auto& mapPointer) {
+                                        err = maperr2error(maperr);
+                                        if (err == C2_OK) {
+                                            pointer = mapPointer;
+                                        }
+                                    }).isOk()) {
+                    ALOGE("failed transaction: lock(BLOB)");
+                    return C2_CORRUPTED;
+                }
+            } else if (mMapper3) {
+                if (!mMapper3->lock(
+                        const_cast<native_handle_t*>(mBuffer),
+                        grallocUsage,
+                        { (int32_t)rect.left, (int32_t)rect.top,
+                          (int32_t)rect.width, (int32_t)rect.height },
+                        // TODO: fence
+                        hidl_handle(),
+                        [&err, &pointer](const auto &maperr, const auto &mapPointer,
+                                         int32_t bytesPerPixel, int32_t bytesPerStride) {
+                            err = maperr2error(maperr);
+                            if (err == C2_OK) {
+                                pointer = mapPointer;
+                            }
+                            (void)bytesPerPixel;
+                            (void)bytesPerStride;
+                        }).isOk()) {
+                    ALOGE("failed transaction: lock(BLOB) (@3.0)");
+                    return C2_CORRUPTED;
+                }
+            } else {
+                if (!mMapper4->lock(
+                        const_cast<native_handle_t *>(mBuffer),
+                        grallocUsage,
+                        { (int32_t)rect.left, (int32_t)rect.top,
+                          (int32_t)rect.width, (int32_t)rect.height },
+                        // TODO: fence
+                        hidl_handle(),
+                        [&err, &pointer](const auto &maperr, const auto &mapPointer) {
+                            err = maperr2error(maperr);
+                            if (err == C2_OK) {
+                                pointer = mapPointer;
+                            }
+                        }).isOk()) {
+                    ALOGE("failed transaction: lock(BLOB) (@4.0)");
+                    return C2_CORRUPTED;
+                }
+            }
+            if (err != C2_OK) {
+                ALOGD("lock failed: %d", err);
+                return err;
+            }
+
+            *addr = static_cast<uint8_t*>(pointer);
+            break;
+        }
+
         case PixelFormat4::YCBCR_420_888:
             // fall-through
         case PixelFormat4::YV12:
@@ -875,27 +933,14 @@ c2_status_t C2AllocationGralloc::map(
                     return C2_CORRUPTED;
                 }
             } else {
-                if (!mMapper4->lockYCbCr(
-                        const_cast<native_handle_t *>(mBuffer), grallocUsage,
-                        { (int32_t)rect.left, (int32_t)rect.top,
-                          (int32_t)rect.width, (int32_t)rect.height },
-                        // TODO: fence
-                        hidl_handle(),
-                        [&err, &ycbcrLayout](const auto &maperr, const auto &mapLayout) {
-                            err = maperr2error(maperr);
-                            if (err == C2_OK) {
-                                ycbcrLayout = YCbCrLayout{
-                                        mapLayout.y,
-                                        mapLayout.cb,
-                                        mapLayout.cr,
-                                        mapLayout.yStride,
-                                        mapLayout.cStride,
-                                        mapLayout.chromaStep};
-                            }
-                        }).isOk()) {
-                    ALOGE("failed transaction: lockYCbCr (@4.0)");
-                    return C2_CORRUPTED;
-                }
+                // No device currently supports IMapper 4.0 so it is safe to just return an error
+                // code here.
+                //
+                // This will be supported by a combination of lock and BufferMetadata getters.
+                // We are going to refactor all the IAllocator/IMapper versioning code into a
+                // shared library. We will then add the IMapper 4.0 lockYCbCr support then.
+                ALOGE("failed transaction: lockYCbCr (@4.0)");
+                return C2_CORRUPTED;
             }
             if (err != C2_OK) {
                 ALOGD("lockYCbCr failed: %d", err);

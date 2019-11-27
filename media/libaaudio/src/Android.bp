@@ -40,6 +40,20 @@ cc_library {
         "libutils",
         "libbinder",
     ],
+
+    sanitize: {
+        integer_overflow: true,
+        misc_undefined: ["bounds"],
+        diag: {
+            integer_overflow: true,
+            misc_undefined: ["bounds"],
+            no_recover: [
+                "bounds",
+                "integer",
+            ],
+        },
+    },
+
 }
 
 cc_library {
@@ -57,7 +71,7 @@ cc_library {
     export_include_dirs: ["."],
     header_libs: [
         "libaaudio_headers",
-        "libmedia_headers"
+        "libmedia_headers",
     ],
     export_header_lib_headers: ["libaaudio_headers"],
 
@@ -116,4 +130,17 @@ cc_library {
         "flowgraph/SourceI16.cpp",
         "flowgraph/SourceI24.cpp",
     ],
+    sanitize: {
+        integer_overflow: true,
+        misc_undefined: ["bounds"],
+        diag: {
+            integer_overflow: true,
+            misc_undefined: ["bounds"],
+            no_recover: [
+                "bounds",
+                "integer",
+            ],
+        },
+    },
+
 }
