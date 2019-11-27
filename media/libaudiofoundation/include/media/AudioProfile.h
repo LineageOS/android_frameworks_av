@@ -16,19 +16,19 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include <media/AudioContainers.h>
 #include <system/audio.h>
 #include <utils/RefBase.h>
-#include <utils/String8.h>
-
-#include "policy.h"
 
 namespace android {
 
-class AudioProfile : public virtual RefBase
+class AudioProfile final : public RefBase
 {
 public:
-    static sp<AudioProfile> createFullDynamic();
+    static sp<AudioProfile> createFullDynamic(audio_format_t dynamicFormat = AUDIO_FORMAT_DEFAULT);
 
     AudioProfile(audio_format_t format, audio_channel_mask_t channelMasks, uint32_t samplingRate);
     AudioProfile(audio_format_t format,
@@ -49,14 +49,6 @@ public:
     }
     bool supportsRate(uint32_t rate) const { return mSamplingRates.count(rate) != 0; }
 
-    status_t checkExact(uint32_t rate, audio_channel_mask_t channels, audio_format_t format) const;
-    status_t checkCompatibleChannelMask(audio_channel_mask_t channelMask,
-                                        audio_channel_mask_t &updatedChannelMask,
-                                        audio_port_type_t portType,
-                                        audio_port_role_t portRole) const;
-    status_t checkCompatibleSamplingRate(uint32_t samplingRate,
-                                         uint32_t &updatedSamplingRate) const;
-
     bool hasValidFormat() const { return mFormat != AUDIO_FORMAT_DEFAULT; }
     bool hasValidRates() const { return !mSamplingRates.empty(); }
     bool hasValidChannels() const { return !mChannelMasks.empty(); }
@@ -72,11 +64,11 @@ public:
 
     bool isDynamic() { return mIsDynamicFormat || mIsDynamicChannels || mIsDynamicRate; }
 
-    void dump(String8 *dst, int spaces) const;
+    void dump(std::string *dst, int spaces) const;
 
 private:
-    String8  mName;
-    audio_format_t mFormat;
+    std::string  mName;
+    audio_format_t mFormat; // The format for an audio profile should only be set when initialized.
     ChannelMaskSet mChannelMasks;
     SampleRateSet mSamplingRates;
 
@@ -85,35 +77,16 @@ private:
     bool mIsDynamicRate = false;
 };
 
-
-class AudioProfileVector : public std::vector<sp<AudioProfile> >
+class AudioProfileVectorBase : public std::vector<sp<AudioProfile> >
 {
 public:
-    ssize_t add(const sp<AudioProfile> &profile);
-    // This API is intended to be used by the policy manager once retrieving capabilities
-    // for a profile with dynamic format, rate and channels attributes
-    ssize_t addProfileFromHal(const sp<AudioProfile> &profileToAdd);
-    void appendProfiles(const AudioProfileVector& audioProfiles) {
-        insert(end(), audioProfiles.begin(), audioProfiles.end());
-    }
+    virtual ~AudioProfileVectorBase() = default;
 
-    status_t checkExactProfile(uint32_t samplingRate, audio_channel_mask_t channelMask,
-                               audio_format_t format) const;
-    status_t checkCompatibleProfile(uint32_t &samplingRate, audio_channel_mask_t &channelMask,
-                                    audio_format_t &format,
-                                    audio_port_type_t portType,
-                                    audio_port_role_t portRole) const;
-    void clearProfiles();
-    // Assuming that this profile vector contains input profiles,
-    // find the best matching config from 'outputProfiles', according to
-    // the given preferences for audio formats and channel masks.
-    // Note: std::vectors are used because specialized containers for formats
-    //       and channels can be sorted and use their own ordering.
-    status_t findBestMatchingOutputConfig(const AudioProfileVector& outputProfiles,
-            const std::vector<audio_format_t>& preferredFormats, // order: most pref -> least pref
-            const std::vector<audio_channel_mask_t>& preferredOutputChannels,
-            bool preferHigherSamplingRates,
-            audio_config_base *bestOutputConfig) const;
+    virtual ssize_t add(const sp<AudioProfile> &profile);
+
+    // If the profile is dynamic format and has valid format, it will be removed when doing
+    // clearProfiles(). Otherwise, AudioProfile::clear() will be called.
+    virtual void clearProfiles();
 
     sp<AudioProfile> getFirstValidProfile() const;
     sp<AudioProfile> getFirstValidProfileFor(audio_format_t format) const;
@@ -121,19 +94,11 @@ public:
 
     FormatVector getSupportedFormats() const;
     bool hasDynamicChannelsFor(audio_format_t format) const;
-    bool hasDynamicFormat() const { return getProfileFor(gDynamicFormat) != 0; }
+    bool hasDynamicFormat() const;
     bool hasDynamicProfile() const;
     bool hasDynamicRateFor(audio_format_t format) const;
 
-    // One audio profile will be added for each format supported by Audio HAL
-    void setFormats(const FormatVector &formats);
-
-    void dump(String8 *dst, int spaces) const;
-
-private:
-    sp<AudioProfile> getProfileFor(audio_format_t format) const;
-    void setSampleRatesFor(const SampleRateSet &sampleRates, audio_format_t format);
-    void setChannelsFor(const ChannelMaskSet &channelMasks, audio_format_t format);
+    virtual void dump(std::string *dst, int spaces) const;
 };
 
 bool operator == (const AudioProfile &left, const AudioProfile &right);

@@ -31,7 +31,7 @@ class AudioRoute;
 class AudioPortVector : public Vector<sp<AudioPort> >
 {
 public:
-    sp<AudioPort> findByTagName(const String8 &tagName) const;
+    sp<AudioPort> findByTagName(const std::string &tagName) const;
 };
 
 
