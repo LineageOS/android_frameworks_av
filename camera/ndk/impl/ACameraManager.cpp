@@ -76,6 +76,10 @@ static bool isCameraServiceDisabled() {
 
 sp<hardware::ICameraService> CameraManagerGlobal::getCameraService() {
     Mutex::Autolock _l(mLock);
+    return getCameraServiceLocked();
+}
+
+sp<hardware::ICameraService> CameraManagerGlobal::getCameraServiceLocked() {
     if (mCameraService.get() == nullptr) {
         if (isCameraServiceDisabled()) {
             return mCameraService;
@@ -216,8 +220,12 @@ void CameraManagerGlobal::registerAvailabilityCallback(
     if (pair.second) {
         for (auto& pair : mDeviceStatusMap) {
             const String8& cameraId = pair.first;
-            int32_t status = pair.second;
-
+            int32_t status = pair.second.status;
+            // Don't send initial callbacks for camera ids which don't support
+            // camera2
+            if (!pair.second.supportsHAL3) {
+                continue;
+            }
             sp<AMessage> msg = new AMessage(kWhatSendSingleCallback, mHandler);
             ACameraManager_AvailabilityCallback cb = isStatusAvailable(status) ?
                     callback->onCameraAvailable : callback->onCameraUnavailable;
@@ -236,20 +244,32 @@ void CameraManagerGlobal::unregisterAvailabilityCallback(
     mCallbacks.erase(cb);
 }
 
+bool CameraManagerGlobal::supportsCamera2ApiLocked(const String8 &cameraId) {
+    bool camera2Support = false;
+    auto cs = getCameraServiceLocked();
+    binder::Status serviceRet =
+        cs->supportsCameraApi(String16(cameraId),
+                hardware::ICameraService::API_VERSION_2, &camera2Support);
+    if (!serviceRet.isOk()) {
+        ALOGE("%s: supportsCameraApi2Locked() call failed for cameraId  %s",
+                __FUNCTION__, cameraId.c_str());
+        return false;
+    }
+    return camera2Support;
+}
+
 void CameraManagerGlobal::getCameraIdList(std::vector<String8>* cameraIds) {
     // Ensure that we have initialized/refreshed the list of available devices
-    auto cs = getCameraService();
     Mutex::Autolock _l(mLock);
-
+    // Needed to make sure we're connected to cameraservice
+    getCameraServiceLocked();
     for(auto& deviceStatus : mDeviceStatusMap) {
-        if (deviceStatus.second == hardware::ICameraServiceListener::STATUS_NOT_PRESENT ||
-                deviceStatus.second == hardware::ICameraServiceListener::STATUS_ENUMERATING) {
+        if (deviceStatus.second.status == hardware::ICameraServiceListener::STATUS_NOT_PRESENT ||
+                deviceStatus.second.status ==
+                        hardware::ICameraServiceListener::STATUS_ENUMERATING) {
             continue;
         }
-        bool camera2Support = false;
-        binder::Status serviceRet = cs->supportsCameraApi(String16(deviceStatus.first),
-                hardware::ICameraService::API_VERSION_2, &camera2Support);
-        if (!serviceRet.isOk() || !camera2Support) {
+        if (!deviceStatus.second.supportsHAL3) {
             continue;
         }
         cameraIds->push_back(deviceStatus.first);
@@ -377,7 +397,7 @@ void CameraManagerGlobal::onStatusChangedLocked(
     bool firstStatus = (mDeviceStatusMap.count(cameraId) == 0);
     int32_t oldStatus = firstStatus ?
             status : // first status
-            mDeviceStatusMap[cameraId];
+            mDeviceStatusMap[cameraId].status;
 
     if (!firstStatus &&
             isStatusAvailable(status) == isStatusAvailable(oldStatus)) {
@@ -385,16 +405,19 @@ void CameraManagerGlobal::onStatusChangedLocked(
         return;
     }
 
+    bool supportsHAL3 = supportsCamera2ApiLocked(cameraId);
     // Iterate through all registered callbacks
-    mDeviceStatusMap[cameraId] = status;
-    for (auto cb : mCallbacks) {
-        sp<AMessage> msg = new AMessage(kWhatSendSingleCallback, mHandler);
-        ACameraManager_AvailabilityCallback cbFp = isStatusAvailable(status) ?
-                cb.mAvailable : cb.mUnavailable;
-        msg->setPointer(kCallbackFpKey, (void *) cbFp);
-        msg->setPointer(kContextKey, cb.mContext);
-        msg->setString(kCameraIdKey, AString(cameraId));
-        msg->post();
+    mDeviceStatusMap[cameraId] = StatusAndHAL3Support(status, supportsHAL3);
+    if (supportsHAL3) {
+        for (auto cb : mCallbacks) {
+            sp<AMessage> msg = new AMessage(kWhatSendSingleCallback, mHandler);
+            ACameraManager_AvailabilityCallback cbFp = isStatusAvailable(status) ?
+                    cb.mAvailable : cb.mUnavailable;
+            msg->setPointer(kCallbackFpKey, (void *) cbFp);
+            msg->setPointer(kContextKey, cb.mContext);
+            msg->setString(kCameraIdKey, AString(cameraId));
+            msg->post();
+        }
     }
     if (status == hardware::ICameraServiceListener::STATUS_NOT_PRESENT) {
         mDeviceStatusMap.erase(cameraId);
