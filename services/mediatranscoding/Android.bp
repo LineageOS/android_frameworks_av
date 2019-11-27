@@ -1,0 +1,60 @@
+// service library
+cc_library_shared {
+    name: "libmediatranscodingservice",
+
+    srcs: ["MediaTranscodingService.cpp"],
+
+    shared_libs: [
+        "libbinder_ndk",
+        "liblog",
+    ],
+
+    static_libs: [
+        "mediatranscoding_aidl_interface-ndk_platform",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+}
+
+cc_binary {
+    name: "mediatranscoding",
+
+    srcs: [
+        "main_mediatranscodingservice.cpp",
+    ],
+
+    shared_libs: [
+        // TODO(hkuang): Use libbinder_ndk
+        "libbinder",
+        "libutils",
+        "liblog",
+        "libbase",
+        "libmediatranscodingservice",
+    ],
+
+    static_libs: [
+        "mediatranscoding_aidl_interface-ndk_platform",
+    ],
+
+    target: {
+        android: {
+            product_variables: {
+                malloc_not_svelte: {
+                    // Scudo increases memory footprint, so only enable on
+                    // non-svelte devices.
+                    shared_libs: ["libc_scudo"],
+                },
+            },
+        },
+    },
+
+    init_rc: ["mediatranscoding.rc"],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+}
