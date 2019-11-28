@@ -433,4 +433,12 @@ void ACodecBufferChannel::drainThisBuffer(
             it->mClientBuffer);
 }
 
+void ACodecBufferChannel::setCrypto(const sp<ICrypto> &crypto) {
+    mCrypto = crypto;
+}
+
+void ACodecBufferChannel::setDescrambler(const sp<IDescrambler> &descrambler) {
+    mDescrambler = descrambler;
+}
+
 }  // namespace android

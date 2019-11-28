@@ -26,14 +26,6 @@
 
 namespace android {
 
-void BufferChannelBase::setCrypto(const sp<ICrypto> &crypto) {
-    mCrypto = crypto;
-}
-
-void BufferChannelBase::setDescrambler(const sp<IDescrambler> &descrambler) {
-    mDescrambler = descrambler;
-}
-
 void BufferChannelBase::IMemoryToSharedBuffer(
         const sp<IMemory> &memory,
         int32_t heapSeqNum,

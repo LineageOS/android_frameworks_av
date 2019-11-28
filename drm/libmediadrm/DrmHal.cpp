@@ -38,6 +38,7 @@
 #include <mediadrm/DrmHal.h>
 #include <mediadrm/DrmSessionClientInterface.h>
 #include <mediadrm/DrmSessionManager.h>
+#include <mediadrm/IDrmMetricsConsumer.h>
 
 #include <vector>
 
@@ -1362,11 +1363,11 @@ status_t DrmHal::setPropertyByteArray(String8 const &name,
     return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
 }
 
-status_t DrmHal::getMetrics(PersistableBundle* metrics) {
-    if (metrics == nullptr) {
+status_t DrmHal::getMetrics(const sp<IDrmMetricsConsumer> &consumer) {
+    if (consumer == nullptr) {
         return UNEXPECTED_NULL;
     }
-    mMetrics.Export(metrics);
+    consumer->consumeFrameworkMetrics(mMetrics);
 
     // Append vendor metrics if they are supported.
     if (mPluginV1_1 != NULL) {
@@ -1393,11 +1394,7 @@ status_t DrmHal::getMetrics(PersistableBundle* metrics) {
                     if (status != Status::OK) {
                       ALOGV("Error getting plugin metrics: %d", status);
                     } else {
-                        PersistableBundle pluginBundle;
-                        if (MediaDrmMetrics::HidlMetricsToBundle(
-                                pluginMetrics, &pluginBundle) == OK) {
-                            metrics->putPersistableBundle(String16(vendor), pluginBundle);
-                        }
+                      consumer->consumeHidlMetrics(vendor, pluginMetrics);
                     }
                     err = toStatusT(status);
                 });

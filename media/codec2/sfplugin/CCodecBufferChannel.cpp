@@ -1670,6 +1670,14 @@ void CCodecBufferChannel::setMetaMode(MetaMode mode) {
     mMetaMode = mode;
 }
 
+void CCodecBufferChannel::setCrypto(const sp<ICrypto> &crypto) {
+    mCrypto = crypto;
+}
+
+void CCodecBufferChannel::setDescrambler(const sp<IDescrambler> &descrambler) {
+    mDescrambler = descrambler;
+}
+
 status_t toStatusT(c2_status_t c2s, c2_operation_t c2op) {
     // C2_OK is always translated to OK.
     if (c2s == C2_OK) {

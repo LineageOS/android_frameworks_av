@@ -24,6 +24,8 @@ cc_test {
       "libbinder",
       "libhidlbase",
       "liblog",
+      "libmediadrm",
+      "libmediadrmmetrics_consumer",
       "libmediadrmmetrics_full",
       "libmediametrics",
       "libprotobuf-cpp-full",

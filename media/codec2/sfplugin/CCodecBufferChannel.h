@@ -56,6 +56,9 @@ public:
     virtual ~CCodecBufferChannel();
 
     // BufferChannelBase interface
+    void setCrypto(const sp<ICrypto> &crypto) override;
+    void setDescrambler(const sp<IDescrambler> &descrambler) override;
+
     virtual status_t queueInputBuffer(const sp<MediaCodecBuffer> &buffer) override;
     virtual status_t queueSecureInputBuffer(
             const sp<MediaCodecBuffer> &buffer,
@@ -317,6 +320,9 @@ private:
 
     std::atomic_bool mInputMetEos;
     std::once_flag mRenderWarningFlag;
+
+    sp<ICrypto> mCrypto;
+    sp<IDescrambler> mDescrambler;
 
     inline bool hasCryptoOrDescrambler() {
         return mCrypto != nullptr || mDescrambler != nullptr;

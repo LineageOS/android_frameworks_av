@@ -20,13 +20,12 @@
 #include <inttypes.h>
 #include <utils/Trace.h>
 
-#include <binder/MemoryDealer.h>
-
-#include <media/stagefright/BufferProducerWrapper.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 
+#include <media/stagefright/BufferProducerWrapper.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaFilter.h>
@@ -42,10 +41,120 @@
 #include "SaturationFilter.h"
 #include "ZeroFilter.h"
 
-#include "../include/ACodecBufferChannel.h"
-#include "../include/SharedMemoryBuffer.h"
-
 namespace android {
+
+class MediaFilter::BufferChannel : public BufferChannelBase {
+public:
+    BufferChannel(const sp<AMessage> &in, const sp<AMessage> &out)
+        : mInputBufferFilled(in), mOutputBufferDrained(out) {
+    }
+
+    ~BufferChannel() override = default;
+
+    // BufferChannelBase
+
+    status_t queueInputBuffer(const sp<MediaCodecBuffer> &buffer) override {
+        sp<AMessage> msg = mInputBufferFilled->dup();
+        msg->setObject("buffer", buffer);
+        msg->post();
+        return OK;
+    }
+
+    status_t queueSecureInputBuffer(
+            const sp<MediaCodecBuffer> &,
+            bool,
+            const uint8_t *,
+            const uint8_t *,
+            CryptoPlugin::Mode,
+            CryptoPlugin::Pattern,
+            const CryptoPlugin::SubSample *,
+            size_t,
+            AString *) override {
+        return INVALID_OPERATION;
+    }
+
+    status_t renderOutputBuffer(
+            const sp<MediaCodecBuffer> &buffer, int64_t /* timestampNs */) override {
+        sp<AMessage> msg = mOutputBufferDrained->dup();
+        msg->setObject("buffer", buffer);
+        msg->post();
+        return OK;
+    }
+
+    status_t discardBuffer(const sp<MediaCodecBuffer> &buffer) override {
+        if (FindBufferIndex(&mInputBuffers, buffer) >= 0) {
+            sp<AMessage> msg = mInputBufferFilled->dup();
+            msg->setObject("buffer", buffer);
+            msg->post();
+            return OK;
+        }
+        sp<AMessage> msg = mOutputBufferDrained->dup();
+        msg->setObject("buffer", buffer);
+        msg->post();
+        return OK;
+    }
+
+    void getInputBufferArray(Vector<sp<MediaCodecBuffer>> *array) {
+        if (!array) {
+            return;
+        }
+        array->clear();
+        array->appendVector(mInputBuffers);
+    }
+
+    void getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *array) {
+        if (!array) {
+            return;
+        }
+        array->clear();
+        array->appendVector(mOutputBuffers);
+    }
+
+    // For MediaFilter
+
+    void fillThisBuffer(const sp<MediaCodecBuffer> &buffer) {
+        ssize_t index = FindBufferIndex(&mInputBuffers, buffer);
+        mCallback->onInputBufferAvailable(index, buffer);
+    }
+
+    void drainThisBuffer(const sp<MediaCodecBuffer> &buffer, int flags) {
+        ssize_t index = FindBufferIndex(&mOutputBuffers, buffer);
+        buffer->meta()->setInt32("flags", flags);
+        mCallback->onOutputBufferAvailable(index, buffer);
+    }
+
+    template <class T>
+    void setInputBuffers(T begin, T end) {
+        mInputBuffers.clear();
+        for (T it = begin; it != end; ++it) {
+            mInputBuffers.push_back(it->mData);
+        }
+    }
+
+    template <class T>
+    void setOutputBuffers(T begin, T end) {
+        mOutputBuffers.clear();
+        for (T it = begin; it != end; ++it) {
+            mOutputBuffers.push_back(it->mData);
+        }
+    }
+
+private:
+    sp<AMessage> mInputBufferFilled;
+    sp<AMessage> mOutputBufferDrained;
+    Vector<sp<MediaCodecBuffer>> mInputBuffers;
+    Vector<sp<MediaCodecBuffer>> mOutputBuffers;
+
+    static ssize_t FindBufferIndex(
+            Vector<sp<MediaCodecBuffer>> *array, const sp<MediaCodecBuffer> &buffer) {
+        for (size_t i = 0; i < array->size(); ++i) {
+            if (array->itemAt(i) == buffer) {
+                return i;
+            }
+        }
+        return -1;
+    }
+};
 
 // parameter: number of input and output buffers
 static const size_t kBufferCountActual = 4;
@@ -54,9 +163,6 @@ MediaFilter::MediaFilter()
     : mState(UNINITIALIZED),
       mGeneration(0),
       mGraphicBufferListener(NULL) {
-    mBufferChannel = std::make_shared<ACodecBufferChannel>(
-            new AMessage(kWhatInputBufferFilled, this),
-            new AMessage(kWhatOutputBufferDrained, this));
 }
 
 MediaFilter::~MediaFilter() {
@@ -65,6 +171,11 @@ MediaFilter::~MediaFilter() {
 //////////////////// PUBLIC FUNCTIONS //////////////////////////////////////////
 
 std::shared_ptr<BufferChannelBase> MediaFilter::getBufferChannel() {
+    if (!mBufferChannel) {
+        mBufferChannel = std::make_shared<BufferChannel>(
+                new AMessage(kWhatInputBufferFilled, this),
+                new AMessage(kWhatOutputBufferDrained, this));
+    }
     return mBufferChannel;
 }
 
@@ -212,28 +323,23 @@ status_t MediaFilter::allocateBuffersOnPort(OMX_U32 portIndex) {
     const bool isInput = portIndex == kPortIndexInput;
     const size_t bufferSize = isInput ? mMaxInputSize : mMaxOutputSize;
 
-    CHECK(mDealer[portIndex] == NULL);
     CHECK(mBuffers[portIndex].isEmpty());
 
     ALOGV("Allocating %zu buffers of size %zu on %s port",
             kBufferCountActual, bufferSize,
             isInput ? "input" : "output");
 
-    size_t totalSize = kBufferCountActual * bufferSize;
-
-    mDealer[portIndex] = new MemoryDealer(totalSize, "MediaFilter");
-
+    // trigger output format change
+    sp<AMessage> outputFormat = mOutputFormat->dup();
     for (size_t i = 0; i < kBufferCountActual; ++i) {
-        sp<IMemory> mem = mDealer[portIndex]->allocate(bufferSize);
-        CHECK(mem.get() != NULL);
-
         BufferInfo info;
         info.mStatus = BufferInfo::OWNED_BY_US;
         info.mBufferID = i;
         info.mGeneration = mGeneration;
         info.mOutputFlags = 0;
-        info.mData = new SharedMemoryBuffer(
-                isInput ? mInputFormat : mOutputFormat, mem);
+        info.mData = new MediaCodecBuffer(
+                isInput ? mInputFormat : outputFormat,
+                new ABuffer(bufferSize));
         info.mData->meta()->setInt64("timeUs", 0);
 
         mBuffers[portIndex].push_back(info);
@@ -243,27 +349,24 @@ status_t MediaFilter::allocateBuffersOnPort(OMX_U32 portIndex) {
                     &mBuffers[portIndex].editItemAt(i));
         }
     }
-
-    std::vector<ACodecBufferChannel::BufferAndId> array(mBuffers[portIndex].size());
-    for (size_t i = 0; i < mBuffers[portIndex].size(); ++i) {
-        array[i] = {mBuffers[portIndex][i].mData, mBuffers[portIndex][i].mBufferID};
-    }
-    if (portIndex == kPortIndexInput) {
-        mBufferChannel->setInputBufferArray(array);
+    if (isInput) {
+        mBufferChannel->setInputBuffers(
+                mBuffers[portIndex].begin(), mBuffers[portIndex].end());
     } else {
-        mBufferChannel->setOutputBufferArray(array);
+        mBufferChannel->setOutputBuffers(
+                mBuffers[portIndex].begin(), mBuffers[portIndex].end());
     }
 
     return OK;
 }
 
-MediaFilter::BufferInfo* MediaFilter::findBufferByID(
-        uint32_t portIndex, IOMX::buffer_id bufferID,
+MediaFilter::BufferInfo* MediaFilter::findBuffer(
+        uint32_t portIndex, const sp<MediaCodecBuffer> &buffer,
         ssize_t *index) {
     for (size_t i = 0; i < mBuffers[portIndex].size(); ++i) {
         BufferInfo *info = &mBuffers[portIndex].editItemAt(i);
 
-        if (info->mBufferID == bufferID) {
+        if (info->mData == buffer) {
             if (index != NULL) {
                 *index = i;
             }
@@ -293,7 +396,7 @@ void MediaFilter::postFillThisBuffer(BufferInfo *info) {
 
     info->mStatus = BufferInfo::OWNED_BY_UPSTREAM;
 
-    mBufferChannel->fillThisBuffer(info->mBufferID);
+    mBufferChannel->fillThisBuffer(info->mData);
 }
 
 void MediaFilter::postDrainThisBuffer(BufferInfo *info) {
@@ -304,7 +407,7 @@ void MediaFilter::postDrainThisBuffer(BufferInfo *info) {
     sp<AMessage> reply = new AMessage(kWhatOutputBufferDrained, this);
     reply->setInt32("buffer-id", info->mBufferID);
 
-    mBufferChannel->drainThisBuffer(info->mBufferID, info->mOutputFlags);
+    mBufferChannel->drainThisBuffer(info->mData, info->mOutputFlags);
 
     info->mStatus = BufferInfo::OWNED_BY_UPSTREAM;
 }
@@ -359,7 +462,7 @@ void MediaFilter::processBuffers() {
     outputInfo->mOutputFlags = 0;
     int32_t eos = 0;
     if (inputInfo->mData->meta()->findInt32("eos", &eos) && eos != 0) {
-        outputInfo->mOutputFlags |= OMX_BUFFERFLAG_EOS;
+        outputInfo->mOutputFlags |= BUFFER_FLAG_END_OF_STREAM;
         mPortEOS[kPortIndexOutput] = true;
         outputInfo->mData->meta()->setInt32("eos", eos);
         postEOS();
@@ -400,8 +503,7 @@ void MediaFilter::onAllocateComponent(const sp<AMessage> &msg) {
         return;
     }
 
-    // HACK - need "OMX.google" to use MediaCodec's software renderer
-    mCallback->onComponentAllocated("OMX.google.MediaFilter");
+    mCallback->onComponentAllocated(mComponentName.c_str());
     mState = INITIALIZED;
     ALOGV("Handled kWhatAllocateComponent.");
 }
@@ -477,6 +579,7 @@ void MediaFilter::onConfigureComponent(const sp<AMessage> &msg) {
     mOutputFormat->setRect("crop", 0, 0, mStride, mSliceHeight);
     mOutputFormat->setInt32("width", mWidth);
     mOutputFormat->setInt32("height", mHeight);
+    mOutputFormat->setInt32("using-sw-renderer", 1);
 
     mCallback->onComponentConfigured(mInputFormat, mOutputFormat);
     mState = CONFIGURED;
@@ -509,9 +612,11 @@ void MediaFilter::onStart() {
 }
 
 void MediaFilter::onInputBufferFilled(const sp<AMessage> &msg) {
-    IOMX::buffer_id bufferID;
-    CHECK(msg->findInt32("buffer-id", (int32_t*)&bufferID));
-    BufferInfo *info = findBufferByID(kPortIndexInput, bufferID);
+    sp<RefBase> obj;
+    CHECK(msg->findObject("buffer", &obj));
+    sp<MediaCodecBuffer> buffer = static_cast<MediaCodecBuffer *>(obj.get());
+    ssize_t index = -1;
+    BufferInfo *info = findBuffer(kPortIndexInput, buffer, &index);
 
     if (mState != STARTED) {
         // we're not running, so we'll just keep that buffer...
@@ -520,7 +625,7 @@ void MediaFilter::onInputBufferFilled(const sp<AMessage> &msg) {
     }
 
     if (info->mGeneration != mGeneration) {
-        ALOGV("Caught a stale input buffer [ID %d]", bufferID);
+        ALOGV("Caught a stale input buffer [index %zd]", index);
         // buffer is stale (taken before a flush/shutdown) - repost it
         CHECK_EQ(info->mStatus, BufferInfo::OWNED_BY_US);
         postFillThisBuffer(info);
@@ -530,29 +635,8 @@ void MediaFilter::onInputBufferFilled(const sp<AMessage> &msg) {
     CHECK_EQ(info->mStatus, BufferInfo::OWNED_BY_UPSTREAM);
     info->mStatus = BufferInfo::OWNED_BY_US;
 
-    sp<MediaCodecBuffer> buffer;
     int32_t err = OK;
     bool eos = false;
-
-    sp<RefBase> obj;
-    if (!msg->findObject("buffer", &obj)) {
-        // these are unfilled buffers returned by client
-        CHECK(msg->findInt32("err", &err));
-
-        if (err == OK) {
-            // buffers with no errors are returned on MediaCodec.flush
-            ALOGV("saw unfilled buffer (MediaCodec.flush)");
-            postFillThisBuffer(info);
-            return;
-        } else {
-            ALOGV("saw error %d instead of an input buffer", err);
-            eos = true;
-        }
-
-        buffer.clear();
-    } else {
-        buffer = static_cast<MediaCodecBuffer *>(obj.get());
-    }
 
     int32_t isCSD;
     if (buffer != NULL && buffer->meta()->findInt32("csd", &isCSD)
@@ -577,13 +661,15 @@ void MediaFilter::onInputBufferFilled(const sp<AMessage> &msg) {
         mInputEOSResult = err;
     }
 
-    ALOGV("Handled kWhatInputBufferFilled. [ID %u]", bufferID);
+    ALOGV("Handled kWhatInputBufferFilled. [index %zd]", index);
 }
 
 void MediaFilter::onOutputBufferDrained(const sp<AMessage> &msg) {
-    IOMX::buffer_id bufferID;
-    CHECK(msg->findInt32("buffer-id", (int32_t*)&bufferID));
-    BufferInfo *info = findBufferByID(kPortIndexOutput, bufferID);
+    sp<RefBase> obj;
+    CHECK(msg->findObject("buffer", &obj));
+    sp<MediaCodecBuffer> buffer = static_cast<MediaCodecBuffer *>(obj.get());
+    ssize_t index = -1;
+    BufferInfo *info = findBuffer(kPortIndexOutput, buffer, &index);
 
     if (mState != STARTED) {
         // we're not running, so we'll just keep that buffer...
@@ -592,7 +678,7 @@ void MediaFilter::onOutputBufferDrained(const sp<AMessage> &msg) {
     }
 
     if (info->mGeneration != mGeneration) {
-        ALOGV("Caught a stale output buffer [ID %d]", bufferID);
+        ALOGV("Caught a stale output buffer [index %zd]", index);
         // buffer is stale (taken before a flush/shutdown) - keep it
         CHECK_EQ(info->mStatus, BufferInfo::OWNED_BY_US);
         return;
@@ -605,8 +691,7 @@ void MediaFilter::onOutputBufferDrained(const sp<AMessage> &msg) {
 
     processBuffers();
 
-    ALOGV("Handled kWhatOutputBufferDrained. [ID %u]",
-            bufferID);
+    ALOGV("Handled kWhatOutputBufferDrained. [index %zd]", index);
 }
 
 void MediaFilter::onShutdown(const sp<AMessage> &msg) {
@@ -739,7 +824,7 @@ void MediaFilter::onSignalEndOfInputStream() {
             return;
         }
 
-        eosBuf->mOutputFlags = OMX_BUFFERFLAG_EOS;
+        eosBuf->mOutputFlags = BUFFER_FLAG_END_OF_STREAM;
         eosBuf->mGeneration = mGeneration;
         eosBuf->mData->setRange(0, 0);
         postDrainThisBuffer(eosBuf);

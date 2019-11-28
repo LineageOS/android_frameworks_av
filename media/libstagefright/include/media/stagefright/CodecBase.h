@@ -257,15 +257,15 @@ private:
  */
 class BufferChannelBase {
 public:
+    BufferChannelBase() = default;
     virtual ~BufferChannelBase() = default;
 
     inline void setCallback(std::unique_ptr<CodecBase::BufferCallback> &&callback) {
         mCallback = std::move(callback);
     }
 
-    void setCrypto(const sp<ICrypto> &crypto);
-
-    void setDescrambler(const sp<IDescrambler> &descrambler);
+    virtual void setCrypto(const sp<ICrypto> &) {}
+    virtual void setDescrambler(const sp<IDescrambler> &) {}
 
     /**
      * Queue an input buffer into the buffer channel.
@@ -336,8 +336,6 @@ public:
 
 protected:
     std::unique_ptr<CodecBase::BufferCallback> mCallback;
-    sp<ICrypto> mCrypto;
-    sp<IDescrambler> mDescrambler;
 };
 
 }  // namespace android

@@ -95,8 +95,6 @@ cc_library_shared {
         "android.hardware.drm@1.0",
         "android.hardware.drm@1.1",
         "android.hardware.drm@1.2",
-        "libbinder",
-        "libhidlbase",
         "liblog",
         "libmediametrics",
         "libprotobuf-cpp-lite",
@@ -134,8 +132,6 @@ cc_library_shared {
         "android.hardware.drm@1.1",
         "android.hardware.drm@1.2",
         "libbase",
-        "libbinder",
-        "libhidlbase",
         "liblog",
         "libmediametrics",
         "libprotobuf-cpp-full",
@@ -149,3 +145,25 @@ cc_library_shared {
     ],
 }
 
+cc_library_shared {
+    name: "libmediadrmmetrics_consumer",
+    srcs: [
+        "DrmMetricsConsumer.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/libmedia/include"
+    ],
+
+    shared_libs: [
+        "android.hardware.drm@1.0",
+        "android.hardware.drm@1.1",
+        "android.hardware.drm@1.2",
+        "libbinder",
+        "libhidlbase",
+        "liblog",
+        "libmediadrm",
+        "libmediadrmmetrics_full",
+        "libutils",
+    ],
+}
