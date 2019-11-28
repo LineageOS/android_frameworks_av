@@ -3150,6 +3150,49 @@ status_t AudioPolicyManager::getPreferredDeviceForStrategy(product_strategy_t st
     return mEngine->getPreferredDeviceForStrategy(strategy, device);
 }
 
+status_t AudioPolicyManager::setUserIdDeviceAffinities(int userId,
+        const Vector<AudioDeviceTypeAddr>& devices) {
+    ALOGI("%s() userId=%d num devices %zu", __FUNCTION__, userId, devices.size());
+    // userId/device affinity is only for output devices
+    for (size_t i = 0; i < devices.size(); i++) {
+        if (!audio_is_output_device(devices[i].mType)) {
+            ALOGE("%s() device=%08x is NOT an output device",
+                    __FUNCTION__,
+                    devices[i].mType);
+            return BAD_VALUE;
+        }
+    }
+
+    status_t status =  mPolicyMixes.setUserIdDeviceAffinities(userId, devices);
+    if (status != NO_ERROR) {
+        ALOGE("%s() could not set device affinity for userId %d",
+            __FUNCTION__, userId);
+        return status;
+    }
+
+    // reevaluate outputs for all devices
+    checkForDeviceAndOutputChanges();
+    updateCallAndOutputRouting();
+
+    return NO_ERROR;
+}
+
+status_t AudioPolicyManager::removeUserIdDeviceAffinities(int userId) {
+    ALOGI("%s() userId=%d", __FUNCTION__, userId);
+    status_t status = mPolicyMixes.removeUserIdDeviceAffinities(userId);
+    if (status != NO_ERROR) {
+        ALOGE("%s() Could not remove all device affinities fo userId = %d",
+            __FUNCTION__, userId);
+        return status;
+    }
+
+    // reevaluate outputs for all devices
+    checkForDeviceAndOutputChanges();
+    updateCallAndOutputRouting();
+
+    return NO_ERROR;
+}
+
 void AudioPolicyManager::dump(String8 *dst) const
 {
     dst->appendFormat("\nAudioPolicyManager Dump: %p\n", this);

@@ -235,6 +235,9 @@ public:
 
     virtual status_t getPreferredDeviceForStrategy(product_strategy_t strategy,
                                                    AudioDeviceTypeAddr &device);
+    virtual status_t setUserIdDeviceAffinities(int userId, const Vector<AudioDeviceTypeAddr>& devices);
+
+    virtual status_t removeUserIdDeviceAffinities(int userId);
 
     virtual status_t startAudioSource(const struct audio_port_config *source,
                                       const audio_attributes_t *attributes,

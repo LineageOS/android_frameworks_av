@@ -1264,6 +1264,31 @@ status_t AudioPolicyService::removeUidDeviceAffinities(uid_t uid) {
     return mAudioPolicyManager->removeUidDeviceAffinities(uid);
 }
 
+status_t AudioPolicyService::setUserIdDeviceAffinities(int userId,
+        const Vector<AudioDeviceTypeAddr>& devices) {
+    Mutex::Autolock _l(mLock);
+    if(!modifyAudioRoutingAllowed()) {
+        return PERMISSION_DENIED;
+    }
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    AutoCallerClear acc;
+    return mAudioPolicyManager->setUserIdDeviceAffinities(userId, devices);
+}
+
+status_t AudioPolicyService::removeUserIdDeviceAffinities(int userId) {
+    Mutex::Autolock _l(mLock);
+    if(!modifyAudioRoutingAllowed()) {
+        return PERMISSION_DENIED;
+    }
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    AutoCallerClear acc;
+    return mAudioPolicyManager->removeUserIdDeviceAffinities(userId);
+}
+
 status_t AudioPolicyService::startAudioSource(const struct audio_port_config *source,
                                               const audio_attributes_t *attributes,
                                               audio_port_handle_t *portId)
