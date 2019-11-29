@@ -75,7 +75,7 @@ void MakeHidlFactories(const uint8_t uuid[16], V &factories) {
             auto factory = Hal::getService(instance);
             if (factory != nullptr) {
                 ALOGI("found %s %s", Hal::descriptor, instance.c_str());
-                if (factory->isCryptoSchemeSupported(uuid)) {
+                if (!uuid || factory->isCryptoSchemeSupported(uuid)) {
                     factories.push_back(factory);
                 }
             }

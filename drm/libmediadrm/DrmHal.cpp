@@ -39,6 +39,7 @@
 #include <mediadrm/DrmSessionClientInterface.h>
 #include <mediadrm/DrmSessionManager.h>
 #include <mediadrm/IDrmMetricsConsumer.h>
+#include <mediadrm/DrmUtils.h>
 
 #include <vector>
 
@@ -388,44 +389,8 @@ void DrmHal::cleanup() {
     mPluginV1_2.clear();
 }
 
-Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
-    Vector<sp<IDrmFactory>> factories;
-
-    auto manager = hardware::defaultServiceManager1_2();
-
-    if (manager != NULL) {
-        manager->listManifestByInterface(drm::V1_0::IDrmFactory::descriptor,
-                [&factories](const hidl_vec<hidl_string> &registered) {
-                    for (const auto &instance : registered) {
-                        auto factory = drm::V1_0::IDrmFactory::getService(instance);
-                        if (factory != NULL) {
-                            factories.push_back(factory);
-                        }
-                    }
-                }
-            );
-        manager->listManifestByInterface(drm::V1_1::IDrmFactory::descriptor,
-                [&factories](const hidl_vec<hidl_string> &registered) {
-                    for (const auto &instance : registered) {
-                        auto factory = drm::V1_1::IDrmFactory::getService(instance);
-                        if (factory != NULL) {
-                            factories.push_back(factory);
-                        }
-                    }
-                }
-            );
-        manager->listManifestByInterface(drm::V1_2::IDrmFactory::descriptor,
-                [&factories](const hidl_vec<hidl_string> &registered) {
-                    for (const auto &instance : registered) {
-                        auto factory = drm::V1_2::IDrmFactory::getService(instance);
-                        if (factory != NULL) {
-                            factories.push_back(factory);
-                        }
-                    }
-                }
-            );
-    }
-
+std::vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
+    std::vector<sp<IDrmFactory>> factories(DrmUtils::MakeDrmFactories());
     if (factories.size() == 0) {
         // must be in passthrough mode, load the default passthrough service
         auto passthrough = IDrmFactory::getService();

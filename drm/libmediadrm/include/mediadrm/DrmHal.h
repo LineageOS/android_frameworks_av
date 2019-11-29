@@ -198,7 +198,7 @@ private:
     mutable Mutex mEventLock;
     mutable Mutex mNotifyLock;
 
-    const Vector<sp<IDrmFactory>> mFactories;
+    const std::vector<sp<IDrmFactory>> mFactories;
     sp<IDrmPlugin> mPlugin;
     sp<drm::V1_1::IDrmPlugin> mPluginV1_1;
     sp<drm::V1_2::IDrmPlugin> mPluginV1_2;
@@ -219,7 +219,7 @@ private:
      */
     status_t mInitCheck;
 
-    Vector<sp<IDrmFactory>> makeDrmFactories();
+    std::vector<sp<IDrmFactory>> makeDrmFactories();
     sp<IDrmPlugin> makeDrmPlugin(const sp<IDrmFactory>& factory,
             const uint8_t uuid[16], const String8& appPackageName);
 
