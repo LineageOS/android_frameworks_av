@@ -82,7 +82,7 @@ void WriteKeysChange(
     obj.writeInt32(hasNewUsableKey);
 }
 
-std::vector<sp<::V1_0::IDrmFactory>> MakeDrmFactories(const uint8_t uuid[16]);
+std::vector<sp<::V1_0::IDrmFactory>> MakeDrmFactories(const uint8_t uuid[16] = nullptr);
 
 std::vector<sp<::V1_0::IDrmPlugin>> MakeDrmPlugins(const uint8_t uuid[16],
                                                    const char *appPackageName);
