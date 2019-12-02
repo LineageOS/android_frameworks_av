@@ -25,7 +25,7 @@
 namespace android
 {
 
-class AudioPort;
+class PolicyAudioPort;
 class DeviceDescriptor;
 
 typedef enum {
@@ -38,11 +38,11 @@ class AudioRoute  : public virtual RefBase
 public:
     explicit AudioRoute(audio_route_type_t type) : mType(type) {}
 
-    void setSources(const AudioPortVector &sources) { mSources = sources; }
-    const AudioPortVector &getSources() const { return mSources; }
+    void setSources(const PolicyAudioPortVector &sources) { mSources = sources; }
+    const PolicyAudioPortVector &getSources() const { return mSources; }
 
-    void setSink(const sp<AudioPort> &sink) { mSink = sink; }
-    const sp<AudioPort> &getSink() const { return mSink; }
+    void setSink(const sp<PolicyAudioPort> &sink) { mSink = sink; }
+    const sp<PolicyAudioPort> &getSink() const { return mSink; }
 
     audio_route_type_t getType() const { return mType; }
 
@@ -57,13 +57,14 @@ public:
      * @return true if the audio route supports the connection between the sink and the source,
      * false otherwise
      */
-    bool supportsPatch(const sp<AudioPort> &srcPort, const sp<AudioPort> &dstPort) const;
+    bool supportsPatch(const sp<PolicyAudioPort> &srcPort,
+                       const sp<PolicyAudioPort> &dstPort) const;
 
     void dump(String8 *dst, int spaces) const;
 
 private:
-    AudioPortVector mSources;
-    sp<AudioPort> mSink;
+    PolicyAudioPortVector mSources;
+    sp<PolicyAudioPort> mSink;
     audio_route_type_t mType;
 
 };

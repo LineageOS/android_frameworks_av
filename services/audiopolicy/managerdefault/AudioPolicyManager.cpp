@@ -112,7 +112,7 @@ status_t AudioPolicyManager::setDeviceConnectionState(audio_devices_t device,
 void AudioPolicyManager::broadcastDeviceConnectionState(const sp<DeviceDescriptor> &device,
                                                         audio_policy_dev_state_t state)
 {
-    AudioParameter param(device->address());
+    AudioParameter param(String8(device->address().c_str()));
     const String8 key(state == AUDIO_POLICY_DEVICE_STATE_AVAILABLE ?
                 AudioParameter::keyDeviceConnect : AudioParameter::keyDeviceDisconnect);
     param.addInt(key, device->type());
@@ -1109,7 +1109,7 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
         .channel_mask = config->channel_mask,
         .format = config->format,
     };
-    *portId = AudioPort::getNextUniqueId();
+    *portId = PolicyAudioPort::getNextUniqueId();
 
     sp<TrackClientDescriptor> clientDesc =
         new TrackClientDescriptor(*portId, uid, session, resultAttr, clientConfig,
@@ -1360,19 +1360,19 @@ status_t AudioPolicyManager::getBestMsdAudioProfileFor(const sp<DeviceDescriptor
     // Each IOProfile represents a MixPort from audio_policy_configuration.xml
     for (const auto &inProfile : inputProfiles) {
         if (hwAvSync == ((inProfile->getFlags() & AUDIO_INPUT_FLAG_HW_AV_SYNC) != 0)) {
-            msdProfiles.appendProfiles(inProfile->getAudioProfiles());
+            appendAudioProfiles(msdProfiles, inProfile->getAudioProfiles());
         }
     }
     AudioProfileVector deviceProfiles;
     for (const auto &outProfile : outputProfiles) {
         if (hwAvSync == ((outProfile->getFlags() & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) != 0)) {
-            deviceProfiles.appendProfiles(outProfile->getAudioProfiles());
+            appendAudioProfiles(deviceProfiles, outProfile->getAudioProfiles());
         }
     }
     struct audio_config_base bestSinkConfig;
-    status_t result = msdProfiles.findBestMatchingOutputConfig(deviceProfiles,
+    status_t result = findBestMatchingOutputConfig(msdProfiles, deviceProfiles,
             compressedFormatsOrder, surroundChannelMasksOrder, true /*preferHigherSamplingRates*/,
-            &bestSinkConfig);
+            bestSinkConfig);
     if (result != NO_ERROR) {
         ALOGD("%s() no matching profiles found for device: %s, hwAvSync: %d",
                 __func__, outputDevice->toString().c_str(), hwAvSync);
@@ -1563,8 +1563,8 @@ audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_h
         // format match
         if (format != AUDIO_FORMAT_INVALID) {
             currentMatchCriteria[6] =
-                AudioPort::kFormatDistanceMax -
-                AudioPort::formatDistance(format, outputDesc->getFormat());
+                PolicyAudioPort::kFormatDistanceMax -
+                PolicyAudioPort::formatDistance(format, outputDesc->getFormat());
         }
 
         // primary output match
@@ -2088,7 +2088,7 @@ exit:
 
     isSoundTrigger = attributes.source == AUDIO_SOURCE_HOTWORD &&
         mSoundTriggerSessions.indexOfKey(session) >= 0;
-    *portId = AudioPort::getNextUniqueId();
+    *portId = PolicyAudioPort::getNextUniqueId();
 
     clientDesc = new RecordClientDescriptor(*portId, riid, uid, session, attributes, *config,
                                             requestedDeviceId, attributes.source, flags,
@@ -2431,7 +2431,8 @@ void AudioPolicyManager::checkCloseInputs() {
         const sp<AudioInputDescriptor> input = mInputs.valueAt(i);
         if (input->clientsList().size() == 0
                 || !mAvailableInputDevices.containsAtLeastOne(input->supportedDevices())
-                || (input->getAudioPort()->getFlags() & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0) {
+                || (input->getPolicyAudioPort()->getFlags()
+                        & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0) {
             inputsToClose.push_back(mInputs.keyAt(i));
         } else {
             bool close = false;
@@ -3857,7 +3858,7 @@ status_t AudioPolicyManager::startAudioSource(const struct audio_port_config *so
         return BAD_VALUE;
     }
 
-    *portId = AudioPort::getNextUniqueId();
+    *portId = PolicyAudioPort::getNextUniqueId();
 
     struct audio_patch dummyPatch = {};
     sp<AudioPatch> patchDesc = new AudioPatch(&dummyPatch, uid);
@@ -4137,7 +4138,7 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
             AUDIO_DEVICE_OUT_HDMI);
     for (size_t i = 0; i < hdmiOutputDevices.size(); i++) {
         // Simulate reconnection to update enabled surround sound formats.
-        String8 address = hdmiOutputDevices[i]->address();
+        String8 address = String8(hdmiOutputDevices[i]->address().c_str());
         std::string name = hdmiOutputDevices[i]->getName();
         status_t status = setDeviceConnectionStateInt(AUDIO_DEVICE_OUT_HDMI,
                                                       AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
@@ -4159,7 +4160,7 @@ status_t AudioPolicyManager::setSurroundFormatEnabled(audio_format_t audioFormat
                 AUDIO_DEVICE_IN_HDMI);
     for (size_t i = 0; i < hdmiInputDevices.size(); i++) {
         // Simulate reconnection to update enabled surround sound formats.
-        String8 address = hdmiInputDevices[i]->address();
+        String8 address = String8(hdmiInputDevices[i]->address().c_str());
         std::string name = hdmiInputDevices[i]->getName();
         status_t status = setDeviceConnectionStateInt(AUDIO_DEVICE_IN_HDMI,
                                                       AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
@@ -4471,7 +4472,7 @@ status_t AudioPolicyManager::initialize() {
                 // give a valid ID to an attached device once confirmed it is reachable
                 if (!device->isAttached()) {
                     device->attach(hwModule);
-                    device->importAudioPort(inProfile, true);
+                    device->importAudioPortAndPickAudioProfile(inProfile, true);
                 }
             }
             inputDesc->close();
@@ -4502,11 +4503,11 @@ status_t AudioPolicyManager::initialize() {
     }
     // If microphones address is empty, set it according to device type
     for (size_t i = 0; i < mAvailableInputDevices.size(); i++) {
-        if (mAvailableInputDevices[i]->address().isEmpty()) {
+        if (mAvailableInputDevices[i]->address().empty()) {
             if (mAvailableInputDevices[i]->type() == AUDIO_DEVICE_IN_BUILTIN_MIC) {
-                mAvailableInputDevices[i]->setAddress(String8(AUDIO_BOTTOM_MICROPHONE_ADDRESS));
+                mAvailableInputDevices[i]->setAddress(AUDIO_BOTTOM_MICROPHONE_ADDRESS);
             } else if (mAvailableInputDevices[i]->type() == AUDIO_DEVICE_IN_BACK_MIC) {
-                mAvailableInputDevices[i]->setAddress(String8(AUDIO_BACK_MICROPHONE_ADDRESS));
+                mAvailableInputDevices[i]->setAddress(AUDIO_BACK_MICROPHONE_ADDRESS);
             }
         }
     }
@@ -4575,7 +4576,7 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                                                    SortedVector<audio_io_handle_t>& outputs)
 {
     audio_devices_t deviceType = device->type();
-    const String8 &address = device->address();
+    const String8 &address = String8(device->address().c_str());
     sp<SwAudioOutputDescriptor> desc;
 
     if (audio_device_is_digital(deviceType)) {
@@ -4627,7 +4628,7 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                     // matching profile: save the sample rates, format and channel masks supported
                     // by the profile in our device descriptor
                     if (audio_device_is_digital(deviceType)) {
-                        device->importAudioPort(profile);
+                        device->importAudioPortAndPickAudioProfile(profile);
                     }
                     break;
                 }
@@ -4729,7 +4730,7 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                 outputs.add(output);
                 // Load digital format info only for digital devices
                 if (audio_device_is_digital(deviceType)) {
-                    device->importAudioPort(profile);
+                    device->importAudioPortAndPickAudioProfile(profile);
                 }
 
                 if (device_distinguishes_on_address(deviceType)) {
@@ -4823,7 +4824,7 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
                 desc = mInputs.valueAt(input_index);
                 if (desc->mProfile == profile) {
                     if (audio_device_is_digital(device->type())) {
-                        device->importAudioPort(profile);
+                        device->importAudioPortAndPickAudioProfile(profile);
                     }
                     break;
                 }
@@ -4847,7 +4848,7 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
                                          &input);
 
             if (status == NO_ERROR) {
-                const String8& address = device->address();
+                const String8& address = String8(device->address().c_str());
                 if (!address.isEmpty()) {
                     char *param = audio_device_address_to_parameter(device->type(), address);
                     mpClientInterface->setParameters(input, String8(param));
@@ -4872,7 +4873,7 @@ status_t AudioPolicyManager::checkInputsForDevice(const sp<DeviceDescriptor>& de
                 profile_index--;
             } else {
                 if (audio_device_is_digital(device->type())) {
-                    device->importAudioPort(profile);
+                    device->importAudioPortAndPickAudioProfile(profile);
                 }
                 ALOGV("checkInputsForDevice(): adding input %d", input);
             }
@@ -6168,7 +6169,7 @@ void AudioPolicyManager::updateAudioProfiles(const sp<DeviceDescriptor>& devDesc
                 || isDeviceOfModule(devDesc, AUDIO_HARDWARE_MODULE_ID_MSD)) {
             modifySurroundFormats(devDesc, &formats);
         }
-        profiles.setFormats(formats);
+        addProfilesForFormats(profiles, formats);
     }
 
     for (audio_format_t format : profiles.getSupportedFormats()) {
@@ -6204,7 +6205,8 @@ void AudioPolicyManager::updateAudioProfiles(const sp<DeviceDescriptor>& devDesc
                 }
             }
         }
-        profiles.addProfileFromHal(new AudioProfile(format, channelMasks, samplingRates));
+        addDynamicAudioProfileAndSort(
+                profiles, new AudioProfile(format, channelMasks, samplingRates));
     }
 }
 

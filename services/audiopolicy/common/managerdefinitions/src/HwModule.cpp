@@ -50,7 +50,7 @@ status_t HwModule::addOutputProfile(const std::string& name, const audio_config_
                                               config->sample_rate));
 
     sp<DeviceDescriptor> devDesc = new DeviceDescriptor(device);
-    devDesc->setAddress(address);
+    devDesc->setAddress(address.string());
     addDynamicDevice(devDesc);
     // Reciprocally attach the device to the module
     devDesc->attach(this);
@@ -118,7 +118,7 @@ status_t HwModule::addInputProfile(const std::string& name, const audio_config_t
                                               config->sample_rate));
 
     sp<DeviceDescriptor> devDesc = new DeviceDescriptor(device);
-    devDesc->setAddress(address);
+    devDesc->setAddress(address.string());
     addDynamicDevice(devDesc);
     // Reciprocally attach the device to the module
     devDesc->attach(this);
@@ -156,7 +156,7 @@ void HwModule::setDeclaredDevices(const DeviceVector &devices)
 sp<DeviceDescriptor> HwModule::getRouteSinkDevice(const sp<AudioRoute> &route) const
 {
     sp<DeviceDescriptor> sinkDevice = 0;
-    if (route->getSink()->getType() == AUDIO_PORT_TYPE_DEVICE) {
+    if (route->getSink()->asAudioPort()->getType() == AUDIO_PORT_TYPE_DEVICE) {
         sinkDevice = mDeclaredDevices.getDeviceFromTagName(route->getSink()->getTagName());
     }
     return sinkDevice;
@@ -166,7 +166,7 @@ DeviceVector HwModule::getRouteSourceDevices(const sp<AudioRoute> &route) const
 {
     DeviceVector sourceDevices;
     for (const auto& source : route->getSources()) {
-        if (source->getType() == AUDIO_PORT_TYPE_DEVICE) {
+        if (source->asAudioPort()->getType() == AUDIO_PORT_TYPE_DEVICE) {
             sourceDevices.add(mDeclaredDevices.getDeviceFromTagName(source->getTagName()));
         }
     }
@@ -186,7 +186,7 @@ void HwModule::refreshSupportedDevices()
     for (const auto& stream : mInputProfiles) {
         DeviceVector sourceDevices;
         for (const auto& route : stream->getRoutes()) {
-            sp<AudioPort> sink = route->getSink();
+            sp<PolicyAudioPort> sink = route->getSink();
             if (sink == 0 || stream != sink) {
                 ALOGE("%s: Invalid route attached to input stream", __FUNCTION__);
                 continue;
@@ -207,7 +207,7 @@ void HwModule::refreshSupportedDevices()
     for (const auto& stream : mOutputProfiles) {
         DeviceVector sinkDevices;
         for (const auto& route : stream->getRoutes()) {
-            sp<AudioPort> source = route->getSources().findByTagName(stream->getTagName());
+            sp<PolicyAudioPort> source = findByTagName(route->getSources(), stream->getTagName());
             if (source == 0 || stream != source) {
                 ALOGE("%s: Invalid route attached to output stream", __FUNCTION__);
                 continue;
@@ -229,7 +229,8 @@ void HwModule::setHandle(audio_module_handle_t handle) {
     mHandle = handle;
 }
 
-bool HwModule::supportsPatch(const sp<AudioPort> &srcPort, const sp<AudioPort> &dstPort) const {
+bool HwModule::supportsPatch(const sp<PolicyAudioPort> &srcPort,
+                             const sp<PolicyAudioPort> &dstPort) const {
     for (const auto &route : mRoutes) {
         if (route->supportsPatch(srcPort, dstPort)) {
             return true;
@@ -259,7 +260,7 @@ void HwModule::dump(String8 *dst) const
     }
     mDeclaredDevices.dump(dst, String8("Declared"), 2, true);
     mDynamicDevices.dump(dst, String8("Dynamic"),  2, true);
-    mRoutes.dump(dst, 2);
+    dumpAudioRouteVector(mRoutes, dst, 2);
 }
 
 sp <HwModule> HwModuleCollection::getModuleFromName(const char *name) const
@@ -334,7 +335,7 @@ sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices
             }
             if (allowToCreate) {
                 moduleDevice->attach(hwModule);
-                moduleDevice->setAddress(devAddress);
+                moduleDevice->setAddress(devAddress.string());
                 moduleDevice->setName(name);
             }
             return moduleDevice;
@@ -361,7 +362,7 @@ sp<DeviceDescriptor> HwModuleCollection::createDevice(const audio_devices_t type
     }
     sp<DeviceDescriptor> device = new DeviceDescriptor(type, name);
     device->setName(name);
-    device->setAddress(String8(address));
+    device->setAddress(address);
     device->setEncodedFormat(encodedFormat);
 
   // Add the device to the list of dynamic devices
@@ -381,7 +382,7 @@ sp<DeviceDescriptor> HwModuleCollection::createDevice(const audio_devices_t type
             // @todo quid of audio profile? import the profile from device of the same type?
             const auto &isoTypeDeviceForProfile =
                 profile->getSupportedDevices().getDevice(type, String8(), AUDIO_FORMAT_DEFAULT);
-            device->importAudioPort(isoTypeDeviceForProfile, true /* force */);
+            device->importAudioPortAndPickAudioProfile(isoTypeDeviceForProfile, true /* force */);
 
             ALOGV("%s: adding device %s to profile %s", __FUNCTION__,
                   device->toString().c_str(), profile->getTagName().c_str());

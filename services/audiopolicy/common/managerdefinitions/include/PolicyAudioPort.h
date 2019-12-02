@@ -17,10 +17,10 @@
 #pragma once
 
 #include "AudioCollections.h"
-#include "AudioProfileVector.h"
+#include "AudioProfileVectorHelper.h"
 #include "HandleGenerator.h"
 #include <media/AudioGain.h>
-#include <media/AudioPortBase.h>
+#include <media/AudioPort.h>
 #include <utils/String8.h>
 #include <utils/Vector.h>
 #include <utils/RefBase.h>
@@ -33,21 +33,24 @@ namespace android {
 class HwModule;
 class AudioRoute;
 
-class AudioPort : public virtual RefBase, public AudioPortBase<AudioProfileVector>,
-                  private HandleGenerator<audio_port_handle_t>
+class PolicyAudioPort : public virtual RefBase, private HandleGenerator<audio_port_handle_t>
 {
 public:
-    AudioPort(const std::string& name, audio_port_type_t type,  audio_port_role_t role) :
-            AudioPortBase(name, type, role), mFlags(AUDIO_OUTPUT_FLAG_NONE) {}
+    PolicyAudioPort() : mFlags(AUDIO_OUTPUT_FLAG_NONE) {}
 
-    virtual ~AudioPort() {}
+    virtual ~PolicyAudioPort() = default;
+
+    virtual const std::string getTagName() const = 0;
+
+    virtual sp<AudioPort> asAudioPort() const = 0;
 
     virtual void setFlags(uint32_t flags)
     {
         //force direct flag if offload flag is set: offloading implies a direct output stream
         // and all common behaviors are driven by checking only the direct flag
         // this should normally be set appropriately in the policy configuration file
-        if (mRole == AUDIO_PORT_ROLE_SOURCE && (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) != 0) {
+        if (asAudioPort()->getRole() == AUDIO_PORT_ROLE_SOURCE &&
+                (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) != 0) {
             flags |= AUDIO_OUTPUT_FLAG_DIRECT;
         }
         mFlags = flags;
@@ -61,10 +64,6 @@ public:
     // Audio port IDs are in a different namespace than AudioFlinger unique IDs
     static audio_port_handle_t getNextUniqueId();
 
-    virtual void importAudioPort(const sp<AudioPort>& port, bool force = false);
-
-    bool hasDynamicAudioProfile() const { return getAudioProfileVectorBase()->hasDynamicProfile(); }
-
     // searches for an exact match
     virtual status_t checkExactAudioProfile(const struct audio_port_config *config) const;
 
@@ -74,7 +73,9 @@ public:
                                          audio_channel_mask_t &channelMask,
                                          audio_format_t &format) const
     {
-        return mProfiles.checkCompatibleProfile(samplingRate, channelMask, format, mType, mRole);
+        return checkCompatibleProfile(
+                asAudioPort()->getAudioProfiles(), samplingRate, channelMask, format,
+                asAudioPort()->getType(), asAudioPort()->getRole());
     }
 
     void pickAudioProfile(uint32_t &samplingRate,
@@ -101,14 +102,13 @@ public:
 
     inline bool isDirectOutput() const
     {
-        return (mType == AUDIO_PORT_TYPE_MIX) && (mRole == AUDIO_PORT_ROLE_SOURCE) &&
+        return (asAudioPort()->getType() == AUDIO_PORT_TYPE_MIX) &&
+                (asAudioPort()->getRole() == AUDIO_PORT_ROLE_SOURCE) &&
                 (mFlags & (AUDIO_OUTPUT_FLAG_DIRECT | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD));
     }
 
     void addRoute(const sp<AudioRoute> &route) { mRoutes.add(route); }
     const AudioRouteVector &getRoutes() const { return mRoutes; }
-
-    void log(const char* indent) const;
 
 private:
     void pickChannelMask(audio_channel_mask_t &channelMask,
@@ -120,23 +120,32 @@ private:
     AudioRouteVector mRoutes; // Routes involving this port
 };
 
-class AudioPortConfig : public AudioPortConfigBase
+class PolicyAudioPortConfig : public virtual RefBase
 {
 public:
-    status_t applyAudioPortConfig(const struct audio_port_config *config,
-                                  struct audio_port_config *backupConfig = NULL) override;
+    virtual ~PolicyAudioPortConfig() = default;
 
-    virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
-            const struct audio_port_config *srcConfig = NULL) const override;
+    virtual sp<PolicyAudioPort> getPolicyAudioPort() const = 0;
 
-    virtual sp<AudioPort> getAudioPort() const = 0;
+    status_t validationBeforeApplyConfig(const struct audio_port_config *config) const;
 
-    virtual bool hasSameHwModuleAs(const sp<AudioPortConfig>& other) const {
-        return (other != 0) && (other->getAudioPort() != 0) && (getAudioPort() != 0) &&
-                (other->getAudioPort()->getModuleHandle() == getAudioPort()->getModuleHandle());
+    void applyPolicyAudioPortConfig(const struct audio_port_config *config) {
+        if (config->config_mask & AUDIO_PORT_CONFIG_FLAGS) {
+            mFlags = config->flags;
+        }
     }
 
-    bool hasGainController(bool canUseForVolume = false) const;
+    void toPolicyAudioPortConfig(
+            struct audio_port_config *dstConfig,
+            const struct audio_port_config *srcConfig = NULL) const;
+
+
+    virtual bool hasSameHwModuleAs(const sp<PolicyAudioPortConfig>& other) const {
+        return (other.get() != nullptr) && (other->getPolicyAudioPort().get() != nullptr) &&
+                (getPolicyAudioPort().get() != nullptr) &&
+                (other->getPolicyAudioPort()->getModuleHandle() ==
+                        getPolicyAudioPort()->getModuleHandle());
+    }
 
     union audio_io_flags mFlags = { AUDIO_INPUT_FLAG_NONE };
 };
