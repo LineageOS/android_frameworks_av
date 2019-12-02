@@ -80,6 +80,12 @@ class AudioPolicyManagerTestClient : public AudioPolicyTestClient {
         return NO_ERROR;
     }
 
+    audio_io_handle_t openDuplicateOutput(audio_io_handle_t /*output1*/,
+                                 audio_io_handle_t /*output2*/) override {
+        audio_io_handle_t id = mNextIoHandle++;
+        return id;
+    }
+
     status_t openInput(audio_module_handle_t module,
                        audio_io_handle_t* input,
                        audio_config_t* /*config*/,
@@ -1033,5 +1039,103 @@ INSTANTIATE_TEST_CASE_P(
                                      "addr=remote_submix_media"},
                 (audio_attributes_t){AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN,
                                      AUDIO_SOURCE_HOTWORD, 0, "addr=remote_submix_media"}
+                )
+        );
+
+using DeviceConnectionTestParams =
+        std::tuple<audio_devices_t /*type*/, std::string /*name*/, std::string /*address*/>;
+
+class AudioPolicyManagerTestDeviceConnection : public AudioPolicyManagerTestWithConfigurationFile,
+        public testing::WithParamInterface<DeviceConnectionTestParams> {
+};
+
+TEST_F(AudioPolicyManagerTestDeviceConnection, InitSuccess) {
+    // SetUp must finish with no assertions.
+}
+
+TEST_F(AudioPolicyManagerTestDeviceConnection, Dump) {
+    dumpToLog();
+}
+
+TEST_P(AudioPolicyManagerTestDeviceConnection, SetDeviceConnectionState) {
+    const audio_devices_t type = std::get<0>(GetParam());
+    const std::string name = std::get<1>(GetParam());
+    const std::string address = std::get<2>(GetParam());
+
+    if (type == AUDIO_DEVICE_OUT_HDMI) {
+        // Set device connection state failed due to no device descriptor found
+        // For HDMI case, it is easier to simulate device descriptor not found error
+        // by using a undeclared encoded format.
+        ASSERT_EQ(INVALID_OPERATION, mManager->setDeviceConnectionState(
+                type, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                address.c_str(), name.c_str(), AUDIO_FORMAT_MAT_2_1));
+    }
+    // Connect with valid parameters should succeed
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            type, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+            address.c_str(), name.c_str(), AUDIO_FORMAT_DEFAULT));
+    // Try to connect with the same device again should fail
+    ASSERT_EQ(INVALID_OPERATION, mManager->setDeviceConnectionState(
+            type, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+            address.c_str(), name.c_str(), AUDIO_FORMAT_DEFAULT));
+    // Disconnect the connected device should succeed
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            type, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+            address.c_str(), name.c_str(), AUDIO_FORMAT_DEFAULT));
+    // Disconnect device that is not connected should fail
+    ASSERT_EQ(INVALID_OPERATION, mManager->setDeviceConnectionState(
+            type, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+            address.c_str(), name.c_str(), AUDIO_FORMAT_DEFAULT));
+    // Try to set device connection state  with a invalid connection state should fail
+    ASSERT_EQ(BAD_VALUE, mManager->setDeviceConnectionState(
+            type, AUDIO_POLICY_DEVICE_STATE_CNT,
+            "", "", AUDIO_FORMAT_DEFAULT));
+}
+
+TEST_P(AudioPolicyManagerTestDeviceConnection, ExplicitlyRoutingAfterConnection) {
+    const audio_devices_t type = std::get<0>(GetParam());
+    const std::string name = std::get<1>(GetParam());
+    const std::string address = std::get<2>(GetParam());
+
+    // Connect device to do explicitly routing test
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            type, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+            address.c_str(), name.c_str(), AUDIO_FORMAT_DEFAULT));
+
+    audio_port devicePort;
+    const audio_port_role_t role = audio_is_output_device(type)
+            ? AUDIO_PORT_ROLE_SINK : AUDIO_PORT_ROLE_SOURCE;
+    findDevicePort(role, type, address, devicePort);
+
+    audio_port_handle_t routedPortId = devicePort.id;
+    audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
+    // Try start input or output according to the device type
+    if (audio_is_output_devices(type)) {
+        getOutputForAttr(&routedPortId, AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO,
+                48000 /*sampleRate*/, AUDIO_OUTPUT_FLAG_NONE, &portId);
+    } else if (audio_is_input_device(type)) {
+        RecordingActivityTracker tracker;
+        getInputForAttr({}, tracker.getRiid(), &routedPortId, AUDIO_FORMAT_PCM_16_BIT,
+                AUDIO_CHANNEL_IN_STEREO, 48000 /*sampleRate*/, AUDIO_INPUT_FLAG_NONE, &portId);
+    }
+    ASSERT_EQ(devicePort.id, routedPortId);
+
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            type, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+            address.c_str(), name.c_str(), AUDIO_FORMAT_DEFAULT));
+}
+
+INSTANTIATE_TEST_CASE_P(
+        DeviceConnectionState,
+        AudioPolicyManagerTestDeviceConnection,
+        testing::Values(
+                DeviceConnectionTestParams({AUDIO_DEVICE_IN_HDMI, "test_in_hdmi",
+                                            "audio_policy_test_in_hdmi"}),
+                DeviceConnectionTestParams({AUDIO_DEVICE_OUT_HDMI, "test_out_hdmi",
+                                            "audio_policy_test_out_hdmi"}),
+                DeviceConnectionTestParams({AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET, "bt_hfp_in",
+                                            "hfp_client_in"}),
+                DeviceConnectionTestParams({AUDIO_DEVICE_OUT_BLUETOOTH_SCO, "bt_hfp_out",
+                                            "hfp_client_out"})
                 )
         );

@@ -35,18 +35,43 @@
                              samplingRates="48000"
                              channelMasks="AUDIO_CHANNEL_IN_STEREO"/>
                 </mixPort>
+                <mixPort name="mixport_bt_hfp_output" role="source">
+                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+                             samplingRates="48000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
+                </mixPort>
+                <mixPort name="mixport_bt_hfp_input" role="sink">
+                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+                             samplingRates="8000,11025,16000,44100,48000"
+                             channelMasks="AUDIO_CHANNEL_IN_STEREO,AUDIO_CHANNEL_IN_MONO"/>
+                </mixPort>
             </mixPorts>
             <devicePorts>
                 <devicePort tagName="Speaker" type="AUDIO_DEVICE_OUT_SPEAKER" role="sink">
                 </devicePort>
                 <devicePort tagName="Built-In Mic" type="AUDIO_DEVICE_IN_BUILTIN_MIC" role="source">
                 </devicePort>
+                <devicePort tagName="Hdmi" type="AUDIO_DEVICE_OUT_HDMI" role="sink">
+                </devicePort>
+                <devicePort tagName="Hdmi-In Mic" type="AUDIO_DEVICE_IN_HDMI" role="source">
+                </devicePort>
+                <devicePort tagName="BT SCO" type="AUDIO_DEVICE_OUT_BLUETOOTH_SCO"
+                            role="sink" address="hfp_client_out">
+                </devicePort>
+                <devicePort tagName="BT SCO Headset Mic" type="AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET"
+                            role="source" address="hfp_client_in">
+                </devicePort>
             </devicePorts>
             <routes>
                 <route type="mix" sink="Speaker"
                        sources="primary output"/>
                 <route type="mix" sink="primary input"
-                       sources="Built-In Mic"/>
+                       sources="Built-In Mic,Hdmi-In Mic"/>
+                <route type="mix" sink="Hdmi"
+                       sources="primary output"/>
+                <route type="mix" sink="BT SCO"
+                       sources="mixport_bt_hfp_output"/>
+                <route type="mix" sink="mixport_bt_hfp_input"
+                       sources="BT SCO Headset Mic"/>
             </routes>
         </module>
 
