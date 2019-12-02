@@ -19,6 +19,7 @@
 #define PLAYER_SERVICE_MEDIA_HTTP_H_
 
 #include <datasource/MediaHTTP.h>
+#include <drm/DrmManagerClient.h>
 #include <media/stagefright/foundation/AString.h>
 
 namespace android {
