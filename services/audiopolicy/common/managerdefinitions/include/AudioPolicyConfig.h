@@ -19,11 +19,11 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include <AudioPort.h>
 #include <AudioPatch.h>
 #include <DeviceDescriptor.h>
 #include <IOProfile.h>
 #include <HwModule.h>
+#include <PolicyAudioPort.h>
 #include <AudioInputDescriptor.h>
 #include <AudioOutputDescriptor.h>
 #include <AudioPolicyMix.h>

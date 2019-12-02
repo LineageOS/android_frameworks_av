@@ -26,9 +26,9 @@
 #include <utils/KeyedVector.h>
 #include <system/audio.h>
 #include "AudioIODescriptorInterface.h"
-#include "AudioPort.h"
 #include "ClientDescriptor.h"
 #include "DeviceDescriptor.h"
+#include "PolicyAudioPort.h"
 #include <vector>
 
 namespace android {
@@ -138,18 +138,19 @@ using RoutingActivities = std::map<product_strategy_t, RoutingActivity>;
 
 // descriptor for audio outputs. Used to maintain current configuration of each opened audio output
 // and keep track of the usage of this output by each audio stream type.
-class AudioOutputDescriptor: public AudioPortConfig, public AudioIODescriptorInterface
-    , public ClientMapHandler<TrackClientDescriptor>
+class AudioOutputDescriptor: public AudioPortConfig,
+        public PolicyAudioPortConfig,
+        public AudioIODescriptorInterface,
+        public ClientMapHandler<TrackClientDescriptor>
 {
 public:
-    AudioOutputDescriptor(const sp<AudioPort>& port,
+    AudioOutputDescriptor(const sp<PolicyAudioPort>& policyAudioPort,
                           AudioPolicyClientInterface *clientInterface);
     virtual ~AudioOutputDescriptor() {}
 
     void dump(String8 *dst) const override;
     void        log(const char* indent);
 
-    audio_port_handle_t getId() const;
     virtual DeviceVector devices() const { return mDevices; }
     bool sharesHwModuleWith(const sp<AudioOutputDescriptor>& outputDesc);
     virtual DeviceVector supportedDevices() const  { return mDevices; }
@@ -245,9 +246,19 @@ public:
         mRoutingActivities[ps].setMutedByDevice(isMuted);
     }
 
+    // PolicyAudioPortConfig
+    virtual sp<PolicyAudioPort> getPolicyAudioPort() const
+    {
+        return mPolicyAudioPort;
+    }
+
+    // AudioPortConfig
+    virtual status_t applyAudioPortConfig(const struct audio_port_config *config,
+                                          struct audio_port_config *backupConfig = NULL);
     virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
                            const struct audio_port_config *srcConfig = NULL) const;
-    virtual sp<AudioPort> getAudioPort() const { return mPort; }
+    virtual sp<AudioPort> getAudioPort() const { return mPolicyAudioPort->asAudioPort(); }
+
     virtual void toAudioPort(struct audio_port *port) const;
 
     audio_module_handle_t getModuleHandle() const;
@@ -289,11 +300,10 @@ public:
     wp<AudioPolicyMix> mPolicyMix;  // non NULL when used by a dynamic policy
 
 protected:
-    const sp<AudioPort> mPort;
+    const sp<PolicyAudioPort> mPolicyAudioPort;
     AudioPolicyClientInterface * const mClientInterface;
     uint32_t mGlobalActiveCount = 0;  // non-client-specific active count
     audio_patch_handle_t mPatchHandle = AUDIO_PATCH_HANDLE_NONE;
-    audio_port_handle_t mId = AUDIO_PORT_HANDLE_NONE;
 
     // The ActiveClients shows the clients that contribute to the @VolumeSource counts
     // and may include upstream clients from a duplicating thread.

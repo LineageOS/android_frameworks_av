@@ -440,6 +440,9 @@ Return<MixPortTraits::Element> MixPortTraits::deserialize(const xmlNode *child,
     if (profiles.empty()) {
         profiles.add(AudioProfile::createFullDynamic(gDynamicFormat));
     }
+    // The audio profiles are in order of listed in audio policy configuration file.
+    // Sort audio profiles accroding to the format.
+    sortAudioProfiles(profiles);
     mixPort->setAudioProfiles(profiles);
 
     std::string flags = getXmlAttribute(child, Attributes::flags);
@@ -513,7 +516,7 @@ Return<DevicePortTraits::Element> DevicePortTraits::deserialize(const xmlNode *c
     std::string address = getXmlAttribute(cur, Attributes::address);
     if (!address.empty()) {
         ALOGV("%s: address=%s for %s", __func__, address.c_str(), name.c_str());
-        deviceDesc->setAddress(String8(address.c_str()));
+        deviceDesc->setAddress(address);
     }
 
     AudioProfileTraits::Collection profiles;
@@ -524,6 +527,9 @@ Return<DevicePortTraits::Element> DevicePortTraits::deserialize(const xmlNode *c
     if (profiles.empty()) {
         profiles.add(AudioProfile::createFullDynamic(gDynamicFormat));
     }
+    // The audio profiles are in order of listed in audio policy configuration file.
+    // Sort audio profiles accroding to the format.
+    sortAudioProfiles(profiles);
     deviceDesc->setAudioProfiles(profiles);
 
     // Deserialize AudioGain children
@@ -532,7 +538,7 @@ Return<DevicePortTraits::Element> DevicePortTraits::deserialize(const xmlNode *c
         return Status::fromStatusT(status);
     }
     ALOGV("%s: adding device tag %s type %08x address %s", __func__,
-          deviceDesc->getName().c_str(), type, deviceDesc->address().string());
+          deviceDesc->getName().c_str(), type, deviceDesc->address().c_str());
     return deviceDesc;
 }
 
@@ -555,7 +561,7 @@ Return<RouteTraits::Element> RouteTraits::deserialize(const xmlNode *cur, PtrSer
         return Status::fromStatusT(BAD_VALUE);
     }
     // Convert Sink name to port pointer
-    sp<AudioPort> sink = ctx->findPortByTagName(sinkAttr);
+    sp<PolicyAudioPort> sink = ctx->findPortByTagName(sinkAttr);
     if (sink == NULL) {
         ALOGE("%s: no sink found with name=%s", __func__, sinkAttr.c_str());
         return Status::fromStatusT(BAD_VALUE);
@@ -568,13 +574,13 @@ Return<RouteTraits::Element> RouteTraits::deserialize(const xmlNode *cur, PtrSer
         return Status::fromStatusT(BAD_VALUE);
     }
     // Tokenize and Convert Sources name to port pointer
-    AudioPortVector sources;
+    PolicyAudioPortVector sources;
     std::unique_ptr<char[]> sourcesLiteral{strndup(
                 sourcesAttr.c_str(), strlen(sourcesAttr.c_str()))};
     char *devTag = strtok(sourcesLiteral.get(), ",");
     while (devTag != NULL) {
         if (strlen(devTag) != 0) {
-            sp<AudioPort> source = ctx->findPortByTagName(devTag);
+            sp<PolicyAudioPort> source = ctx->findPortByTagName(devTag);
             if (source == NULL) {
                 ALOGE("%s: no source found with name=%s", __func__, devTag);
                 return Status::fromStatusT(BAD_VALUE);
@@ -586,7 +592,7 @@ Return<RouteTraits::Element> RouteTraits::deserialize(const xmlNode *cur, PtrSer
 
     sink->addRoute(route);
     for (size_t i = 0; i < sources.size(); i++) {
-        sp<AudioPort> source = sources.itemAt(i);
+        sp<PolicyAudioPort> source = sources.itemAt(i);
         source->addRoute(route);
     }
     route->setSources(sources);

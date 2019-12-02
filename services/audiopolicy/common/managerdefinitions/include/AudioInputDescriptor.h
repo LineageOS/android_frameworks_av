@@ -21,11 +21,11 @@
 #include <utils/SortedVector.h>
 #include <utils/KeyedVector.h>
 #include "AudioIODescriptorInterface.h"
-#include "AudioPort.h"
 #include "ClientDescriptor.h"
 #include "DeviceDescriptor.h"
 #include "EffectDescriptor.h"
 #include "IOProfile.h"
+#include "PolicyAudioPort.h"
 
 namespace android {
 
@@ -34,13 +34,17 @@ class AudioPolicyClientInterface;
 
 // descriptor for audio inputs. Used to maintain current configuration of each opened audio input
 // and keep track of the usage of this input.
-class AudioInputDescriptor: public AudioPortConfig, public AudioIODescriptorInterface
-    , public ClientMapHandler<RecordClientDescriptor>
+class AudioInputDescriptor: public AudioPortConfig,
+        public PolicyAudioPortConfig,
+        public AudioIODescriptorInterface,
+        public ClientMapHandler<RecordClientDescriptor>
 {
 public:
-    explicit AudioInputDescriptor(const sp<IOProfile>& profile,
-                                  AudioPolicyClientInterface *clientInterface);
-    audio_port_handle_t getId() const;
+    AudioInputDescriptor(const sp<IOProfile>& profile,
+                         AudioPolicyClientInterface *clientInterface);
+
+    virtual ~AudioInputDescriptor() = default;
+
     audio_module_handle_t getModuleHandle() const;
 
     audio_devices_t getDeviceType() const { return (mDevice != nullptr) ?
@@ -56,9 +60,18 @@ public:
     wp<AudioPolicyMix>  mPolicyMix;                   // non NULL when used by a dynamic policy
     const sp<IOProfile> mProfile;                     // I/O profile this output derives from
 
+    // PolicyAudioPortConfig
+    virtual sp<PolicyAudioPort> getPolicyAudioPort() const {
+        return mProfile;
+    }
+
+    // AudioPortConfig
+    virtual status_t applyAudioPortConfig(const struct audio_port_config *config,
+                                          struct audio_port_config *backupConfig = NULL);
     virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
             const struct audio_port_config *srcConfig = NULL) const;
     virtual sp<AudioPort> getAudioPort() const { return mProfile; }
+
     void toAudioPort(struct audio_port *port) const;
     void setPreemptedSessions(const SortedVector<audio_session_t>& sessions);
     SortedVector<audio_session_t> getPreemptedSessions() const;
@@ -111,7 +124,6 @@ public:
     void updateClientRecordingConfiguration(int event, const sp<RecordClientDescriptor>& client);
 
     audio_patch_handle_t mPatchHandle = AUDIO_PATCH_HANDLE_NONE;
-    audio_port_handle_t  mId = AUDIO_PORT_HANDLE_NONE;
     sp<DeviceDescriptor> mDevice = nullptr; /**< current device this input is routed to */
 
     // Because a preemptible capture session can preempt another one, we end up in an endless loop
