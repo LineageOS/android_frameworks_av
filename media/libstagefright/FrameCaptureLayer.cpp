@@ -32,6 +32,8 @@
 namespace android {
 
 static const int64_t kAcquireBufferTimeoutNs = 100000000LL;
+static constexpr float kDefaultMaxMasteringLuminance = 1000.0;
+static constexpr float kDefaultMaxContentLuminance = 1000.0;
 
 ui::Dataspace translateDataspace(ui::Dataspace dataspace) {
     ui::Dataspace updatedDataspace = dataspace;
@@ -93,6 +95,14 @@ void FrameCaptureLayer::BufferLayer::getLayerSettings(
     layerSettings->source.buffer.textureName = textureName;
     layerSettings->source.buffer.usePremultipliedAlpha = false;
     layerSettings->source.buffer.isY410BT2020 = isHdrY410(mBufferItem);
+    bool hasSmpte2086 = mBufferItem.mHdrMetadata.validTypes & HdrMetadata::SMPTE2086;
+    bool hasCta861_3 = mBufferItem.mHdrMetadata.validTypes & HdrMetadata::CTA861_3;
+    layerSettings->source.buffer.maxMasteringLuminance = hasSmpte2086
+            ? mBufferItem.mHdrMetadata.smpte2086.maxLuminance
+                    : kDefaultMaxMasteringLuminance;
+    layerSettings->source.buffer.maxContentLuminance = hasCta861_3
+            ? mBufferItem.mHdrMetadata.cta8613.maxContentLightLevel
+                    : kDefaultMaxContentLuminance;
 
     // Set filtering to false since the capture itself doesn't involve
     // any scaling, metadata retriever JNI is scaling the bitmap if
