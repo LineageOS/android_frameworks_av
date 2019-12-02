@@ -19,6 +19,8 @@
 #define LOG_TAG "ResourceManagerService"
 #include <utils/Log.h>
 
+#include <android/binder_manager.h>
+#include <android/binder_process.h>
 #include <binder/IMediaResourceMonitor.h>
 #include <binder/IServiceManager.h>
 #include <cutils/sched_policy.h>
@@ -38,28 +40,25 @@
 
 namespace android {
 
-namespace media {
+DeathNotifier::DeathNotifier(const std::shared_ptr<ResourceManagerService> &service,
+        int pid, int64_t clientId)
+    : mService(service), mPid(pid), mClientId(clientId) {}
 
-class DeathNotifier : public IBinder::DeathRecipient {
-public:
-    DeathNotifier(const wp<ResourceManagerService> &service, int pid, int64_t clientId)
-        : mService(service), mPid(pid), mClientId(clientId) {}
+//static
+void DeathNotifier::BinderDiedCallback(void* cookie) {
+    auto thiz = static_cast<DeathNotifier*>(cookie);
+    thiz->binderDied();
+}
 
-    virtual void binderDied(const wp<IBinder> & /* who */) override {
-        // Don't check for pid validity since we know it's already dead.
-        sp<ResourceManagerService> service = mService.promote();
-        if (service == nullptr) {
-            ALOGW("ResourceManagerService is dead as well.");
-            return;
-        }
-        service->removeResource(mPid, mClientId, false);
+void DeathNotifier::binderDied() {
+    // Don't check for pid validity since we know it's already dead.
+    std::shared_ptr<ResourceManagerService> service = mService.lock();
+    if (service == nullptr) {
+        ALOGW("ResourceManagerService is dead as well.");
+        return;
     }
-
-private:
-    wp<ResourceManagerService> mService;
-    int mPid;
-    int64_t mClientId;
-};
+    service->removeResource(mPid, mClientId, false);
+}
 
 template <typename T>
 static String8 getString(const std::vector<T> &items) {
@@ -104,7 +103,7 @@ static ResourceInfos& getResourceInfosForEdit(
 static ResourceInfo& getResourceInfoForEdit(
         uid_t uid,
         int64_t clientId,
-        const sp<IResourceManagerClient>& client,
+        const std::shared_ptr<IResourceManagerClient>& client,
         ResourceInfos& infos) {
     ssize_t index = infos.indexOfKey(clientId);
 
@@ -135,14 +134,15 @@ static void notifyResourceGranted(int pid, const std::vector<MediaResourceParcel
     }
 }
 
-status_t ResourceManagerService::dump(int fd, const Vector<String16>& /* args */) {
+binder_status_t ResourceManagerService::dump(
+        int fd, const char** /*args*/, uint32_t /*numArgs*/) {
     String8 result;
 
     if (checkCallingPermission(String16("android.permission.DUMP")) == false) {
         result.format("Permission Denial: "
                 "can't dump ResourceManagerService from pid=%d, uid=%d\n",
-                IPCThreadState::self()->getCallingPid(),
-                IPCThreadState::self()->getCallingUid());
+                AIBinder_getCallingPid(),
+                AIBinder_getCallingUid());
         write(fd, result.string(), result.size());
         return PERMISSION_DENIED;
     }
@@ -206,7 +206,7 @@ status_t ResourceManagerService::dump(int fd, const Vector<String16>& /* args */
 
 struct SystemCallbackImpl :
         public ResourceManagerService::SystemCallbackInterface {
-    SystemCallbackImpl() {}
+    SystemCallbackImpl() : mClientToken(new BBinder()) {}
 
     virtual void noteStartVideo(int uid) override {
         BatteryNotifier::getInstance().noteStartVideo(uid);
@@ -217,9 +217,8 @@ struct SystemCallbackImpl :
     virtual void noteResetVideo() override {
         BatteryNotifier::getInstance().noteResetVideo();
     }
-    virtual bool requestCpusetBoost(
-            bool enable, const sp<IInterface> &client) override {
-        return android::requestCpusetBoost(enable, client);
+    virtual bool requestCpusetBoost(bool enable) override {
+        return android::requestCpusetBoost(enable, mClientToken);
     }
 
 protected:
@@ -227,6 +226,7 @@ protected:
 
 private:
     DISALLOW_EVIL_CONSTRUCTORS(SystemCallbackImpl);
+    sp<IBinder> mClientToken;
 };
 
 ResourceManagerService::ResourceManagerService()
@@ -240,8 +240,24 @@ ResourceManagerService::ResourceManagerService(
       mServiceLog(new ServiceLog()),
       mSupportsMultipleSecureCodecs(true),
       mSupportsSecureWithNonSecureCodec(true),
-      mCpuBoostCount(0) {
+      mCpuBoostCount(0),
+      mDeathRecipient(AIBinder_DeathRecipient_new(DeathNotifier::BinderDiedCallback)) {
     mSystemCB->noteResetVideo();
+}
+
+//static
+void ResourceManagerService::instantiate() {
+    std::shared_ptr<ResourceManagerService> service =
+            ::ndk::SharedRefBase::make<ResourceManagerService>();
+    binder_status_t status =
+            AServiceManager_addService(service->asBinder().get(), getServiceName());
+    if (status != STATUS_OK) {
+        return;
+    }
+    // TODO: mediaserver main() is already starting the thread pool,
+    // move this to mediaserver main() when other services in mediaserver
+    // are converted to ndk-platform aidl.
+    //ABinderProcess_startThreadPool();
 }
 
 ResourceManagerService::~ResourceManagerService() {}
@@ -271,7 +287,7 @@ void ResourceManagerService::onFirstAdded(
         // Request it on every new instance of kCpuBoost, as the media.codec
         // could have died, if we only do it the first time subsequent instances
         // never gets the boost.
-        if (mSystemCB->requestCpusetBoost(true, this) != OK) {
+        if (mSystemCB->requestCpusetBoost(true) != OK) {
             ALOGW("couldn't request cpuset boost");
         }
         mCpuBoostCount++;
@@ -287,7 +303,7 @@ void ResourceManagerService::onLastRemoved(
             && resource.subType == MediaResource::SubType::kUnspecifiedSubType
             && mCpuBoostCount > 0) {
         if (--mCpuBoostCount == 0) {
-            mSystemCB->requestCpusetBoost(false, this);
+            mSystemCB->requestCpusetBoost(false);
         }
     } else if (resource.type == MediaResource::Type::kBattery
             && resource.subType == MediaResource::SubType::kVideoCodec) {
@@ -316,7 +332,7 @@ Status ResourceManagerService::addResource(
         int32_t pid,
         int32_t uid,
         int64_t clientId,
-        const sp<IResourceManagerClient>& client,
+        const std::shared_ptr<IResourceManagerClient>& client,
         const std::vector<MediaResourceParcel>& resources) {
     String8 log = String8::format("addResource(pid %d, clientId %lld, resources %s)",
             pid, (long long) clientId, getString(resources).string());
@@ -352,8 +368,9 @@ Status ResourceManagerService::addResource(
         }
     }
     if (info.deathNotifier == nullptr && client != nullptr) {
-        info.deathNotifier = new DeathNotifier(this, pid, clientId);
-        IInterface::asBinder(client)->linkToDeath(info.deathNotifier);
+        info.deathNotifier = new DeathNotifier(ref<ResourceManagerService>(), pid, clientId);
+        AIBinder_linkToDeath(client->asBinder().get(),
+                mDeathRecipient.get(), info.deathNotifier.get());
     }
     notifyResourceGranted(pid, resources);
     return Status::ok();
@@ -442,18 +459,20 @@ Status ResourceManagerService::removeResource(int pid, int64_t clientId, bool ch
         onLastRemoved(it->second, info);
     }
 
-    IInterface::asBinder(info.client)->unlinkToDeath(info.deathNotifier);
+    AIBinder_unlinkToDeath(info.client->asBinder().get(),
+            mDeathRecipient.get(), info.deathNotifier.get());
 
     infos.removeItemsAt(index);
     return Status::ok();
 }
 
 void ResourceManagerService::getClientForResource_l(
-        int callingPid, const MediaResourceParcel *res, Vector<sp<IResourceManagerClient>> *clients) {
+        int callingPid, const MediaResourceParcel *res,
+        Vector<std::shared_ptr<IResourceManagerClient>> *clients) {
     if (res == NULL) {
         return;
     }
-    sp<IResourceManagerClient> client;
+    std::shared_ptr<IResourceManagerClient> client;
     if (getLowestPriorityBiggestClient_l(callingPid, res->type, &client)) {
         clients->push_back(client);
     }
@@ -468,7 +487,7 @@ Status ResourceManagerService::reclaimResource(
     mServiceLog->add(log);
     *_aidl_return = false;
 
-    Vector<sp<IResourceManagerClient>> clients;
+    Vector<std::shared_ptr<IResourceManagerClient>> clients;
     {
         Mutex::Autolock lock(mLock);
         if (!mProcessInfo->isValidPid(callingPid)) {
@@ -547,7 +566,7 @@ Status ResourceManagerService::reclaimResource(
         return Status::ok();
     }
 
-    sp<IResourceManagerClient> failedClient;
+    std::shared_ptr<IResourceManagerClient> failedClient;
     for (size_t i = 0; i < clients.size(); ++i) {
         log = String8::format("reclaimResource from client %p", clients[i].get());
         mServiceLog->add(log);
@@ -590,8 +609,9 @@ Status ResourceManagerService::reclaimResource(
 }
 
 bool ResourceManagerService::getAllClients_l(
-        int callingPid, MediaResource::Type type, Vector<sp<IResourceManagerClient>> *clients) {
-    Vector<sp<IResourceManagerClient>> temp;
+        int callingPid, MediaResource::Type type,
+        Vector<std::shared_ptr<IResourceManagerClient>> *clients) {
+    Vector<std::shared_ptr<IResourceManagerClient>> temp;
     for (size_t i = 0; i < mMap.size(); ++i) {
         ResourceInfos &infos = mMap.editValueAt(i);
         for (size_t j = 0; j < infos.size(); ++j) {
@@ -616,7 +636,8 @@ bool ResourceManagerService::getAllClients_l(
 }
 
 bool ResourceManagerService::getLowestPriorityBiggestClient_l(
-        int callingPid, MediaResource::Type type, sp<IResourceManagerClient> *client) {
+        int callingPid, MediaResource::Type type,
+        std::shared_ptr<IResourceManagerClient> *client) {
     int lowestPriorityPid;
     int lowestPriority;
     int callingPriority;
@@ -688,14 +709,14 @@ bool ResourceManagerService::isCallingPriorityHigher_l(int callingPid, int pid) 
 }
 
 bool ResourceManagerService::getBiggestClient_l(
-        int pid, MediaResource::Type type, sp<IResourceManagerClient> *client) {
+        int pid, MediaResource::Type type, std::shared_ptr<IResourceManagerClient> *client) {
     ssize_t index = mMap.indexOfKey(pid);
     if (index < 0) {
         ALOGE("getBiggestClient_l: can't find resource info for pid %d", pid);
         return false;
     }
 
-    sp<IResourceManagerClient> clientTemp;
+    std::shared_ptr<IResourceManagerClient> clientTemp;
     uint64_t largestValue = 0;
     const ResourceInfos &infos = mMap.valueAt(index);
     for (size_t i = 0; i < infos.size(); ++i) {
@@ -720,5 +741,4 @@ bool ResourceManagerService::getBiggestClient_l(
     return true;
 }
 
-} // namespace media
 } // namespace android

@@ -40,7 +40,7 @@ int main(int argc __unused, char **argv __unused)
     ALOGI("ServiceManager: %p", sm.get());
     AIcu_initializeIcuOrDie();
     MediaPlayerService::instantiate();
-    media::ResourceManagerService::instantiate();
+    ResourceManagerService::instantiate();
     registerExtensions();
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();

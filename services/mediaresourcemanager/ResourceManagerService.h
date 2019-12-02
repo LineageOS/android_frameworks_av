@@ -18,9 +18,8 @@
 #ifndef ANDROID_MEDIA_RESOURCEMANAGERSERVICE_H
 #define ANDROID_MEDIA_RESOURCEMANAGERSERVICE_H
 
-#include <android/media/BnResourceManagerService.h>
+#include <aidl/android/media/BnResourceManagerService.h>
 #include <arpa/inet.h>
-#include <binder/BinderService.h>
 #include <media/MediaResource.h>
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>
@@ -30,22 +29,26 @@
 
 namespace android {
 
+class DeathNotifier;
+class ResourceManagerService;
 class ServiceLog;
 struct ProcessInfoInterface;
 
-namespace media {
-
-using android::binder::Status;
+using Status = ::ndk::ScopedAStatus;
+using ::aidl::android::media::IResourceManagerClient;
+using ::aidl::android::media::BnResourceManagerService;
+using ::aidl::android::media::MediaResourceParcel;
+using ::aidl::android::media::MediaResourcePolicyParcel;
 
 typedef std::map<std::tuple<
-        MediaResource::Type, MediaResource::SubType, std::vector<uint8_t>>,
+        MediaResource::Type, MediaResource::SubType, std::vector<int8_t>>,
         MediaResourceParcel> ResourceList;
 
 struct ResourceInfo {
     int64_t clientId;
     uid_t uid;
-    sp<IResourceManagerClient> client;
-    sp<IBinder::DeathRecipient> deathNotifier;
+    std::shared_ptr<IResourceManagerClient> client;
+    sp<DeathNotifier> deathNotifier;
     ResourceList resources;
 };
 
@@ -53,27 +56,42 @@ struct ResourceInfo {
 typedef KeyedVector<int64_t, ResourceInfo> ResourceInfos;
 typedef KeyedVector<int, ResourceInfos> PidResourceInfosMap;
 
-class ResourceManagerService
-    : public BinderService<ResourceManagerService>,
-      public BnResourceManagerService
-{
+class DeathNotifier : public RefBase {
+public:
+    DeathNotifier(const std::shared_ptr<ResourceManagerService> &service,
+            int pid, int64_t clientId);
+
+    ~DeathNotifier() {}
+
+    // Implement death recipient
+    static void BinderDiedCallback(void* cookie);
+    void binderDied();
+
+private:
+    std::weak_ptr<ResourceManagerService> mService;
+    int mPid;
+    int64_t mClientId;
+};
+class ResourceManagerService : public BnResourceManagerService {
 public:
     struct SystemCallbackInterface : public RefBase {
         virtual void noteStartVideo(int uid) = 0;
         virtual void noteStopVideo(int uid) = 0;
         virtual void noteResetVideo() = 0;
-        virtual bool requestCpusetBoost(
-                bool enable, const sp<IInterface> &client) = 0;
+        virtual bool requestCpusetBoost(bool enable) = 0;
     };
 
     static char const *getServiceName() { return "media.resource_manager"; }
+    static void instantiate();
 
-    virtual status_t dump(int fd, const Vector<String16>& args);
+    virtual inline binder_status_t dump(
+            int /*fd*/, const char** /*args*/, uint32_t /*numArgs*/);
 
     ResourceManagerService();
     explicit ResourceManagerService(
             const sp<ProcessInfoInterface> &processInfo,
             const sp<SystemCallbackInterface> &systemResource);
+    virtual ~ResourceManagerService();
 
     // IResourceManagerService interface
     Status config(const std::vector<MediaResourcePolicyParcel>& policies) override;
@@ -82,7 +100,7 @@ public:
             int32_t pid,
             int32_t uid,
             int64_t clientId,
-            const sp<IResourceManagerClient>& client,
+            const std::shared_ptr<IResourceManagerClient>& client,
             const std::vector<MediaResourceParcel>& resources) override;
 
     Status removeResource(
@@ -102,9 +120,6 @@ public:
 
     Status removeResource(int pid, int64_t clientId, bool checkValid);
 
-protected:
-    virtual ~ResourceManagerService();
-
 private:
     friend class ResourceManagerServiceTest;
 
@@ -112,13 +127,13 @@ private:
     // Returns false if any client belongs to a process with higher priority than the
     // calling process. The clients will remain unchanged if returns false.
     bool getAllClients_l(int callingPid, MediaResource::Type type,
-            Vector<sp<IResourceManagerClient>> *clients);
+            Vector<std::shared_ptr<IResourceManagerClient>> *clients);
 
     // Gets the client who owns specified resource type from lowest possible priority process.
     // Returns false if the calling process priority is not higher than the lowest process
     // priority. The client will remain unchanged if returns false.
     bool getLowestPriorityBiggestClient_l(int callingPid, MediaResource::Type type,
-            sp<IResourceManagerClient> *client);
+            std::shared_ptr<IResourceManagerClient> *client);
 
     // Gets lowest priority process that has the specified resource type.
     // Returns false if failed. The output parameters will remain unchanged if failed.
@@ -126,14 +141,15 @@ private:
 
     // Gets the client who owns biggest piece of specified resource type from pid.
     // Returns false if failed. The client will remain unchanged if failed.
-    bool getBiggestClient_l(int pid, MediaResource::Type type, sp<IResourceManagerClient> *client);
+    bool getBiggestClient_l(int pid, MediaResource::Type type,
+            std::shared_ptr<IResourceManagerClient> *client);
 
     bool isCallingPriorityHigher_l(int callingPid, int pid);
 
-    // A helper function basically calls getLowestPriorityBiggestClient_l and add the result client
-    // to the given Vector.
-    void getClientForResource_l(int callingPid,
-            const MediaResourceParcel *res, Vector<sp<IResourceManagerClient>> *clients);
+    // A helper function basically calls getLowestPriorityBiggestClient_l and add
+    // the result client to the given Vector.
+    void getClientForResource_l(int callingPid, const MediaResourceParcel *res,
+            Vector<std::shared_ptr<IResourceManagerClient>> *clients);
 
     void onFirstAdded(const MediaResourceParcel& res, const ResourceInfo& clientInfo);
     void onLastRemoved(const MediaResourceParcel& res, const ResourceInfo& clientInfo);
@@ -149,10 +165,10 @@ private:
     bool mSupportsMultipleSecureCodecs;
     bool mSupportsSecureWithNonSecureCodec;
     int32_t mCpuBoostCount;
+    ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
 };
 
 // ----------------------------------------------------------------------------
-} // namespace media
 } // namespace android
 
 #endif // ANDROID_MEDIA_RESOURCEMANAGERSERVICE_H
