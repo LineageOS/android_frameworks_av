@@ -36,7 +36,8 @@ void AudioRoute::dump(String8 *dst, int spaces) const
     dst->append("\n");
 }
 
-bool AudioRoute::supportsPatch(const sp<AudioPort> &srcPort, const sp<AudioPort> &dstPort) const
+bool AudioRoute::supportsPatch(const sp<PolicyAudioPort> &srcPort,
+                               const sp<PolicyAudioPort> &dstPort) const
 {
     if (mSink == 0 || dstPort == 0 || dstPort != mSink) {
         return false;

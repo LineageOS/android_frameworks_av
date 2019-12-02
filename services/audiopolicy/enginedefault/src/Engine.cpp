@@ -27,7 +27,7 @@
 #include "Engine.h"
 #include <android-base/macros.h>
 #include <AudioPolicyManagerObserver.h>
-#include <AudioPort.h>
+#include <PolicyAudioPort.h>
 #include <IOProfile.h>
 #include <AudioIODescriptorInterface.h>
 #include <policy.h>
@@ -212,7 +212,7 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                     String8(""), AUDIO_FORMAT_DEFAULT) == nullptr) ||
                     ((availPrimaryInputDevices.getDevice(
                             txDevice, String8(""), AUDIO_FORMAT_DEFAULT) != nullptr) &&
-                            (primaryOutput->getAudioPort()->getModuleVersionMajor() < 3))) {
+                            (primaryOutput->getPolicyAudioPort()->getModuleVersionMajor() < 3))) {
                 availableOutputDevices = availPrimaryOutputDevices;
             }
         }

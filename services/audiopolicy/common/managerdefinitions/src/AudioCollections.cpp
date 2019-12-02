@@ -18,15 +18,16 @@
 //#define LOG_NDEBUG 0
 
 #include "AudioCollections.h"
-#include "AudioPort.h"
 #include "AudioRoute.h"
 #include "HwModule.h"
+#include "PolicyAudioPort.h"
 
 namespace android {
 
-sp<AudioPort> AudioPortVector::findByTagName(const std::string &tagName) const
+sp<PolicyAudioPort> findByTagName(const PolicyAudioPortVector& policyAudioPortVector,
+                                  const std::string &tagName)
 {
-    for (const auto& port : *this) {
+    for (const auto& port : policyAudioPortVector) {
         if (port->getTagName() == tagName) {
             return port;
         }
@@ -34,15 +35,15 @@ sp<AudioPort> AudioPortVector::findByTagName(const std::string &tagName) const
     return nullptr;
 }
 
-void AudioRouteVector::dump(String8 *dst, int spaces) const
+void dumpAudioRouteVector(const AudioRouteVector& audioRouteVector, String8 *dst, int spaces)
 {
-    if (isEmpty()) {
+    if (audioRouteVector.isEmpty()) {
         return;
     }
-    dst->appendFormat("\n%*sAudio Routes (%zu):\n", spaces, "", size());
-    for (size_t i = 0; i < size(); i++) {
+    dst->appendFormat("\n%*sAudio Routes (%zu):\n", spaces, "", audioRouteVector.size());
+    for (size_t i = 0; i < audioRouteVector.size(); i++) {
         dst->appendFormat("%*s- Route %zu:\n", spaces, "", i + 1);
-        itemAt(i)->dump(dst, 4);
+        audioRouteVector.itemAt(i)->dump(dst, 4);
     }
 }
 

@@ -20,7 +20,7 @@
 #include "AudioPolicyMix.h"
 #include "TypeConverter.h"
 #include "HwModule.h"
-#include "AudioPort.h"
+#include "PolicyAudioPort.h"
 #include "IOProfile.h"
 #include <AudioOutputDescriptor.h>
 
