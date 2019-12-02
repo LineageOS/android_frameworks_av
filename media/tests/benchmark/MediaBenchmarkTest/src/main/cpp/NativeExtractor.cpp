@@ -18,16 +18,15 @@
 #define LOG_TAG "NativeExtractor"
 
 #include <jni.h>
+#include <fstream>
 #include <string>
 #include <sys/stat.h>
 
 #include "Extractor.h"
 
-extern "C"
-JNIEXPORT int32_t JNICALL
-Java_com_android_media_benchmark_library_Native_Extract(JNIEnv *env, jobject thiz,
-                                                        jstring jInputFilePath,
-                                                        jstring jInputFileName) {
+extern "C" JNIEXPORT int32_t JNICALL Java_com_android_media_benchmark_library_Native_Extract(
+        JNIEnv *env, jobject thiz, jstring jInputFilePath, jstring jInputFileName,
+        jstring jStatsFile) {
     UNUSED(thiz);
     const char *inputFilePath = env->GetStringUTFChars(jInputFilePath, nullptr);
     const char *inputFileName = env->GetStringUTFChars(jInputFileName, nullptr);
@@ -41,25 +40,39 @@ Java_com_android_media_benchmark_library_Native_Extract(JNIEnv *env, jobject thi
     int32_t fd = fileno(inputFp);
 
     Extractor *extractObj = new Extractor();
-    int32_t trackCount = extractObj->initExtractor((long)fd, fileSize);
+    int32_t trackCount = extractObj->initExtractor((long) fd, fileSize);
     if (trackCount <= 0) {
         ALOGE("initExtractor failed");
         return -1;
     }
 
     int32_t trackID = 0;
+    const char *mime = nullptr;
     int32_t status = extractObj->extract(trackID);
     if (status != AMEDIA_OK) {
         ALOGE("Extraction failed");
         return -1;
     }
+
     if (inputFp) {
         fclose(inputFp);
         inputFp = nullptr;
     }
+    status = extractObj->setupTrackFormat(trackID);
+    AMediaFormat *format = extractObj->getFormat();
+    if (!format) {
+        ALOGE("format is null!");
+        return -1;
+    }
+    AMediaFormat_getString(format, AMEDIAFORMAT_KEY_MIME, &mime);
+    if (!mime) {
+        ALOGE("mime is null!");
+        return -1;
+    }
     extractObj->deInitExtractor();
-    extractObj->dumpStatistics(inputFileName);
-
+    const char *statsFile = env->GetStringUTFChars(jStatsFile, nullptr);
+    extractObj->dumpStatistics(string(inputFileName), string(mime), statsFile);
+    env->ReleaseStringUTFChars(jStatsFile, statsFile);
     env->ReleaseStringUTFChars(jInputFilePath, inputFilePath);
     env->ReleaseStringUTFChars(jInputFileName, inputFileName);
 

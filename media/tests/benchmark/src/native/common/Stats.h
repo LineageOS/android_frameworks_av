@@ -102,7 +102,8 @@ class Stats {
         return (*(mOutputTimer.end() - 1) - mStartTimeNs);
     }
 
-    void dumpStatistics(std::string operation, std::string inputReference, int64_t duarationUs);
+    void dumpStatistics(string operation, string inputReference, int64_t duarationUs,
+                        string codecName = "", string mode = "", string statsFile = "");
 };
 
 #endif  // __STATS_H__

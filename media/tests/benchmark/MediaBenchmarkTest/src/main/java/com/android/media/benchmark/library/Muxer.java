@@ -101,10 +101,13 @@ public class Muxer {
      * Write the benchmark logs for the given input file
      *
      * @param inputReference Name of the input file
+     * @param muxFormat      Format of the muxed output
      * @param clipDuration   Duration of the given inputReference file
+     * @param statsFile      The output file where the stats data is written
      */
-    public void dumpStatistics(String inputReference, long clipDuration) {
+    public void dumpStatistics(String inputReference, String muxFormat, long clipDuration,
+                               String statsFile) throws IOException {
         String operation = "mux";
-        mStats.dumpStatistics(operation, inputReference, clipDuration);
+        mStats.dumpStatistics(inputReference, operation, muxFormat, "", clipDuration, statsFile);
     }
 }

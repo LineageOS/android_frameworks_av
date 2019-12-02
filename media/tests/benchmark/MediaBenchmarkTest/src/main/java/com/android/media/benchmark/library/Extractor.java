@@ -167,9 +167,12 @@ public class Extractor {
      * Write the benchmark logs for the given input file
      *
      * @param inputReference Name of the input file
+     * @param mimeType       Mime type of the muxed file
+     * @param statsFile      The output file where the stats data is written
      */
-    public void dumpStatistics(String inputReference) {
+    public void dumpStatistics(String inputReference, String mimeType, String statsFile)
+            throws IOException {
         String operation = "extract";
-        mStats.dumpStatistics(operation, inputReference, mDurationUs);
+        mStats.dumpStatistics(inputReference, operation, mimeType, "", mDurationUs, statsFile);
     }
 }

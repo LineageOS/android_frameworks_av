@@ -66,9 +66,10 @@ void Muxer::resetMuxer() {
     if (mStats) mStats->reset();
 }
 
-void Muxer::dumpStatistics(string inputReference) {
+void Muxer::dumpStatistics(string inputReference, string componentName, string statsFile) {
     string operation = "mux";
-    mStats->dumpStatistics(operation, inputReference, mExtractor->getClipDuration());
+    mStats->dumpStatistics(operation, inputReference, mExtractor->getClipDuration(), componentName,
+                           "", statsFile);
 }
 
 int32_t Muxer::mux(uint8_t *inputBuffer, vector<AMediaCodecBufferInfo> &frameInfos) {
