@@ -5130,6 +5130,7 @@ status_t Camera3Device::RequestThread::clear(
         *lastFrameNumber = mRepeatingLastFrameNumber;
     }
     mRepeatingLastFrameNumber = hardware::camera2::ICameraDeviceUser::NO_IN_FLIGHT_REPEATING_FRAMES;
+    mRequestSignal.signal();
     return OK;
 }
 
