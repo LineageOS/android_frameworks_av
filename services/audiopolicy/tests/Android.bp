@@ -39,22 +39,27 @@ cc_test {
 
 }
 
-// system/audio.h utilities test
 
 cc_test {
-    name: "systemaudio_tests",
+    name: "audio_health_tests",
 
     shared_libs: [
         "libaudiofoundation",
-        "libbase",
+        "libaudioclient",
+        "libaudiopolicymanagerdefault",
         "liblog",
         "libmedia_helper",
         "libutils",
     ],
 
-    header_libs: ["libmedia_headers"],
+    static_libs: ["libaudiopolicycomponents"],
 
-    srcs: ["systemaudio_tests.cpp"],
+    header_libs: [
+        "libaudiopolicyengine_interface_headers",
+        "libaudiopolicymanager_interface_headers",
+    ],
+
+    srcs: ["audio_health_tests.cpp"],
 
     cflags: [
         "-Werror",
