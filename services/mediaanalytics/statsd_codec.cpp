@@ -37,7 +37,7 @@
 
 namespace android {
 
-bool statsd_codec(MediaAnalyticsItem *item)
+bool statsd_codec(const MediaAnalyticsItem *item)
 {
     if (item == NULL) return false;
 

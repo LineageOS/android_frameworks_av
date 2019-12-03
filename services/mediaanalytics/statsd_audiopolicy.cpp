@@ -37,7 +37,7 @@
 
 namespace android {
 
-bool statsd_audiopolicy(MediaAnalyticsItem *item)
+bool statsd_audiopolicy(const MediaAnalyticsItem *item)
 {
     if (item == NULL) return false;
 

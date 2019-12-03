@@ -19,17 +19,17 @@ namespace android {
 extern bool enabled_statsd;
 
 // component specific dumpers
-extern bool statsd_audiopolicy(MediaAnalyticsItem *);
-extern bool statsd_audiorecord(MediaAnalyticsItem *);
-extern bool statsd_audiothread(MediaAnalyticsItem *);
-extern bool statsd_audiotrack(MediaAnalyticsItem *);
-extern bool statsd_codec(MediaAnalyticsItem *);
-extern bool statsd_extractor(MediaAnalyticsItem *);
-extern bool statsd_nuplayer(MediaAnalyticsItem *);
-extern bool statsd_recorder(MediaAnalyticsItem *);
+extern bool statsd_audiopolicy(const MediaAnalyticsItem *);
+extern bool statsd_audiorecord(const MediaAnalyticsItem *);
+extern bool statsd_audiothread(const MediaAnalyticsItem *);
+extern bool statsd_audiotrack(const MediaAnalyticsItem *);
+extern bool statsd_codec(const MediaAnalyticsItem *);
+extern bool statsd_extractor(const MediaAnalyticsItem *);
+extern bool statsd_nuplayer(const MediaAnalyticsItem *);
+extern bool statsd_recorder(const MediaAnalyticsItem *);
 
-extern bool statsd_mediadrm(MediaAnalyticsItem *);
-extern bool statsd_widevineCDM(MediaAnalyticsItem *);
-extern bool statsd_drmmanager(MediaAnalyticsItem *);
+extern bool statsd_mediadrm(const MediaAnalyticsItem *);
+extern bool statsd_widevineCDM(const MediaAnalyticsItem *);
+extern bool statsd_drmmanager(const MediaAnalyticsItem *);
 
 } // namespace android

@@ -37,7 +37,7 @@
 
 namespace android {
 
-bool statsd_extractor(MediaAnalyticsItem *item)
+bool statsd_extractor(const MediaAnalyticsItem *item)
 {
     if (item == NULL) return false;
 

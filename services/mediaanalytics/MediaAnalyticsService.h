@@ -66,10 +66,10 @@ private:
     // input validation after arrival from client
     static bool isContentValid(const MediaAnalyticsItem *item, bool isTrusted);
     bool isRateLimited(MediaAnalyticsItem *) const;
-    void saveItem(MediaAnalyticsItem *);
+    void saveItem(const std::shared_ptr<const MediaAnalyticsItem>& item);
 
     // The following methods are GUARDED_BY(mLock)
-    bool expirations_l(MediaAnalyticsItem *);
+    bool expirations_l(const std::shared_ptr<const MediaAnalyticsItem>& item);
 
     // support for generating output
     void dumpQueue_l(String8 &result, int dumpProto);

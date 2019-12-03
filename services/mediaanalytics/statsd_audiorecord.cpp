@@ -37,7 +37,7 @@
 
 namespace android {
 
-bool statsd_audiorecord(MediaAnalyticsItem *item)
+bool statsd_audiorecord(const MediaAnalyticsItem *item)
 {
     if (item == NULL) return false;
 
