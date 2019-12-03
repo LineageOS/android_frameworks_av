@@ -45,6 +45,12 @@ public:
         return submitInternal(item, false /* release */);
     }
 
+    status_t submitBuffer(const char *buffer, size_t length) override {
+        MediaAnalyticsItem *item = new MediaAnalyticsItem();
+        return item->readFromByteString(buffer, length)
+                ?: submitInternal(item, true /* release */);
+    }
+
     status_t dump(int fd, const Vector<String16>& args) override;
 
     static constexpr const char * const kServiceName = "media.metrics";

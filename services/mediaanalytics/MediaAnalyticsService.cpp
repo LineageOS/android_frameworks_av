@@ -30,6 +30,8 @@
 
 namespace android {
 
+using namespace mediametrics;
+
 // individual records kept in memory: age or count
 // age: <= 28 hours (1 1/6 days)
 // count: hard limit of # records
