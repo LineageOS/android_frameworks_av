@@ -1589,33 +1589,58 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
     proposed.format = format;
 
     sp<DeviceHalInterface> dev = mPrimaryHardwareDev->hwDevice();
-    size_t frames = 0;
-    for (;;) {
-        // Note: config is currently a const parameter for get_input_buffer_size()
-        // but we use a copy from proposed in case config changes from the call.
-        config = proposed;
-        status_t result = dev->getInputBufferSize(&config, &frames);
-        if (result == OK && frames != 0) {
-            break; // hal success, config is the result
-        }
-        // change one parameter of the configuration each iteration to a more "common" value
-        // to see if the device will support it.
-        if (proposed.format != AUDIO_FORMAT_PCM_16_BIT) {
-            proposed.format = AUDIO_FORMAT_PCM_16_BIT;
-        } else if (proposed.sample_rate != 44100) { // 44.1 is claimed as must in CDD as well as
-            proposed.sample_rate = 44100;           // legacy AudioRecord.java. TODO: Query hw?
-        } else {
-            ALOGW("getInputBufferSize failed with minimum buffer size sampleRate %u, "
-                    "format %#x, channelMask 0x%X",
-                    sampleRate, format, channelMask);
-            break; // retries failed, break out of loop with frames == 0.
-        }
-    }
+    std::vector<audio_channel_mask_t> channelMasks = {channelMask};
+    if (channelMask != AUDIO_CHANNEL_IN_MONO)
+        channelMasks.push_back(AUDIO_CHANNEL_IN_MONO);
+    if (channelMask != AUDIO_CHANNEL_IN_STEREO)
+        channelMasks.push_back(AUDIO_CHANNEL_IN_STEREO);
+
+    std::vector<audio_format_t> formats = {format};
+    if (format != AUDIO_FORMAT_PCM_16_BIT)
+        formats.push_back(AUDIO_FORMAT_PCM_16_BIT);
+
+    std::vector<uint32_t> sampleRates = {sampleRate};
+    static const uint32_t SR_44100 = 44100;
+    static const uint32_t SR_48000 = 48000;
+
+    if (sampleRate != SR_48000)
+        sampleRates.push_back(SR_48000);
+    if (sampleRate != SR_44100)
+        sampleRates.push_back(SR_44100);
+
     mHardwareStatus = AUDIO_HW_IDLE;
-    if (frames > 0 && config.sample_rate != sampleRate) {
-        frames = destinationFramesPossible(frames, sampleRate, config.sample_rate);
+
+    for (auto testChannelMask : channelMasks) {
+        config.channel_mask = testChannelMask;
+        for (auto testFormat : formats) {
+            config.format = testFormat;
+            for (auto testSampleRate : sampleRates) {
+                config.sample_rate = testSampleRate;
+                size_t bytes = 0;
+                status_t result = dev->getInputBufferSize(&config, &bytes);
+                if (result != OK || bytes == 0) {
+                    continue;
+                }
+
+                if (config.sample_rate != sampleRate || config.channel_mask != channelMask ||
+                    config.format != format) {
+                    uint32_t dstChannelCount = audio_channel_count_from_in_mask(channelMask);
+                    uint32_t srcChannelCount =
+                        audio_channel_count_from_in_mask(config.channel_mask);
+                    size_t srcFrames =
+                        bytes / audio_bytes_per_frame(srcChannelCount, config.format);
+                    size_t dstFrames = destinationFramesPossible(
+                        srcFrames, config.sample_rate, sampleRate);
+                    bytes = dstFrames * audio_bytes_per_frame(dstChannelCount, format);
+                }
+                return bytes;
+            }
+        }
     }
-    return frames; // may be converted to bytes at the Java level.
+
+    ALOGW("getInputBufferSize failed with minimum buffer size sampleRate %u, "
+              "format %#x, channelMask %#x",sampleRate, format, channelMask);
+    return 0;
 }
 
 uint32_t AudioFlinger::getInputFramesLost(audio_io_handle_t ioHandle) const
