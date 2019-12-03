@@ -39,11 +39,15 @@ public:
 
     virtual void addResource(
             int pid,
+            int uid,
             int64_t clientId,
             const sp<IResourceManagerClient> client,
             const Vector<MediaResource> &resources) = 0;
 
-    virtual void removeResource(int pid, int64_t clientId) = 0;
+    virtual void removeResource(int pid, int64_t clientId,
+            const Vector<MediaResource> &resources) = 0;
+
+    virtual void removeClient(int pid, int64_t clientId) = 0;
 
     virtual bool reclaimResource(
             int callingPid,

@@ -18,7 +18,7 @@ cc_library {
         "libgui",
         "libhidlbase",
         "liblog",
-        "libstagefright_bufferpool@2.0",
+        "libstagefright_bufferpool@2.0.1",
         "libui",
         "libutils",
     ],

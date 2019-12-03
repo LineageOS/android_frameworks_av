@@ -413,17 +413,14 @@ std::shared_ptr<C2LinearBlock> _C2BlockFactory::CreateLinearBlock(
 
     std::shared_ptr<C2LinearAllocation> alloc;
     if (C2AllocatorIon::isValid(cHandle)) {
-        native_handle_t *handle = native_handle_clone(cHandle);
-        if (handle) {
-            c2_status_t err = sAllocator->priorLinearAllocation(handle, &alloc);
-            const std::shared_ptr<C2PooledBlockPoolData> poolData =
-                    std::make_shared<C2PooledBlockPoolData>(data);
-            if (err == C2_OK && poolData) {
-                // TODO: config params?
-                std::shared_ptr<C2LinearBlock> block =
-                        _C2BlockFactory::CreateLinearBlock(alloc, poolData);
-                return block;
-            }
+        c2_status_t err = sAllocator->priorLinearAllocation(cHandle, &alloc);
+        const std::shared_ptr<C2PooledBlockPoolData> poolData =
+                std::make_shared<C2PooledBlockPoolData>(data);
+        if (err == C2_OK && poolData) {
+            // TODO: config params?
+            std::shared_ptr<C2LinearBlock> block =
+                    _C2BlockFactory::CreateLinearBlock(alloc, poolData);
+            return block;
         }
     }
     return nullptr;
@@ -674,17 +671,14 @@ public:
         ResultStatus status = mBufferPoolManager->allocate(
                 mConnectionId, params, &cHandle, &bufferPoolData);
         if (status == ResultStatus::OK) {
-            native_handle_t *handle = native_handle_clone(cHandle);
-            if (handle) {
-                std::shared_ptr<C2LinearAllocation> alloc;
-                std::shared_ptr<C2PooledBlockPoolData> poolData =
-                        std::make_shared<C2PooledBlockPoolData>(bufferPoolData);
-                c2_status_t err = mAllocator->priorLinearAllocation(handle, &alloc);
-                if (err == C2_OK && poolData && alloc) {
-                    *block = _C2BlockFactory::CreateLinearBlock(alloc, poolData, 0, capacity);
-                    if (*block) {
-                        return C2_OK;
-                    }
+            std::shared_ptr<C2LinearAllocation> alloc;
+            std::shared_ptr<C2PooledBlockPoolData> poolData =
+                    std::make_shared<C2PooledBlockPoolData>(bufferPoolData);
+            c2_status_t err = mAllocator->priorLinearAllocation(cHandle, &alloc);
+            if (err == C2_OK && poolData && alloc) {
+                *block = _C2BlockFactory::CreateLinearBlock(alloc, poolData, 0, capacity);
+                if (*block) {
+                    return C2_OK;
                 }
             }
             return C2_NO_MEMORY;
@@ -710,19 +704,16 @@ public:
         ResultStatus status = mBufferPoolManager->allocate(
                 mConnectionId, params, &cHandle, &bufferPoolData);
         if (status == ResultStatus::OK) {
-            native_handle_t *handle = native_handle_clone(cHandle);
-            if (handle) {
-                std::shared_ptr<C2GraphicAllocation> alloc;
-                std::shared_ptr<C2PooledBlockPoolData> poolData =
-                    std::make_shared<C2PooledBlockPoolData>(bufferPoolData);
-                c2_status_t err = mAllocator->priorGraphicAllocation(
-                        handle, &alloc);
-                if (err == C2_OK && poolData && alloc) {
-                    *block = _C2BlockFactory::CreateGraphicBlock(
-                            alloc, poolData, C2Rect(width, height));
-                    if (*block) {
-                        return C2_OK;
-                    }
+            std::shared_ptr<C2GraphicAllocation> alloc;
+            std::shared_ptr<C2PooledBlockPoolData> poolData =
+                std::make_shared<C2PooledBlockPoolData>(bufferPoolData);
+            c2_status_t err = mAllocator->priorGraphicAllocation(
+                    cHandle, &alloc);
+            if (err == C2_OK && poolData && alloc) {
+                *block = _C2BlockFactory::CreateGraphicBlock(
+                        alloc, poolData, C2Rect(width, height));
+                if (*block) {
+                    return C2_OK;
                 }
             }
             return C2_NO_MEMORY;
@@ -1117,17 +1108,14 @@ std::shared_ptr<C2GraphicBlock> _C2BlockFactory::CreateGraphicBlock(
 
     std::shared_ptr<C2GraphicAllocation> alloc;
     if (C2AllocatorGralloc::isValid(cHandle)) {
-        native_handle_t *handle = native_handle_clone(cHandle);
-        if (handle) {
-            c2_status_t err = sAllocator->priorGraphicAllocation(handle, &alloc);
-            const std::shared_ptr<C2PooledBlockPoolData> poolData =
-                    std::make_shared<C2PooledBlockPoolData>(data);
-            if (err == C2_OK && poolData) {
-                // TODO: config setup?
-                std::shared_ptr<C2GraphicBlock> block =
-                        _C2BlockFactory::CreateGraphicBlock(alloc, poolData);
-                return block;
-            }
+        c2_status_t err = sAllocator->priorGraphicAllocation(cHandle, &alloc);
+        const std::shared_ptr<C2PooledBlockPoolData> poolData =
+                std::make_shared<C2PooledBlockPoolData>(data);
+        if (err == C2_OK && poolData) {
+            // TODO: config setup?
+            std::shared_ptr<C2GraphicBlock> block =
+                    _C2BlockFactory::CreateGraphicBlock(alloc, poolData);
+            return block;
         }
     }
     return nullptr;

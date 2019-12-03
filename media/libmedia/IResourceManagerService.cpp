@@ -32,6 +32,7 @@ enum {
     CONFIG = IBinder::FIRST_CALL_TRANSACTION,
     ADD_RESOURCE,
     REMOVE_RESOURCE,
+    REMOVE_CLIENT,
     RECLAIM_RESOURCE,
 };
 
@@ -72,12 +73,14 @@ public:
 
     virtual void addResource(
             int pid,
+            int uid,
             int64_t clientId,
             const sp<IResourceManagerClient> client,
             const Vector<MediaResource> &resources) {
         Parcel data, reply;
         data.writeInterfaceToken(IResourceManagerService::getInterfaceDescriptor());
         data.writeInt32(pid);
+        data.writeInt32(uid);
         data.writeInt64(clientId);
         data.writeStrongBinder(IInterface::asBinder(client));
         writeToParcel(&data, resources);
@@ -85,13 +88,23 @@ public:
         remote()->transact(ADD_RESOURCE, data, &reply);
     }
 
-    virtual void removeResource(int pid, int64_t clientId) {
+    virtual void removeResource(int pid, int64_t clientId, const Vector<MediaResource> &resources) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IResourceManagerService::getInterfaceDescriptor());
+        data.writeInt32(pid);
+        data.writeInt64(clientId);
+        writeToParcel(&data, resources);
+
+        remote()->transact(REMOVE_RESOURCE, data, &reply);
+    }
+
+    virtual void removeClient(int pid, int64_t clientId) {
         Parcel data, reply;
         data.writeInterfaceToken(IResourceManagerService::getInterfaceDescriptor());
         data.writeInt32(pid);
         data.writeInt64(clientId);
 
-        remote()->transact(REMOVE_RESOURCE, data, &reply);
+        remote()->transact(REMOVE_CLIENT, data, &reply);
     }
 
     virtual bool reclaimResource(int callingPid, const Vector<MediaResource> &resources) {
@@ -129,6 +142,7 @@ status_t BnResourceManagerService::onTransact(
         case ADD_RESOURCE: {
             CHECK_INTERFACE(IResourceManagerService, data, reply);
             int pid = data.readInt32();
+            int uid = data.readInt32();
             int64_t clientId = data.readInt64();
             sp<IResourceManagerClient> client(
                     interface_cast<IResourceManagerClient>(data.readStrongBinder()));
@@ -137,7 +151,7 @@ status_t BnResourceManagerService::onTransact(
             }
             Vector<MediaResource> resources;
             readFromParcel(data, &resources);
-            addResource(pid, clientId, client, resources);
+            addResource(pid, uid, clientId, client, resources);
             return NO_ERROR;
         } break;
 
@@ -145,7 +159,17 @@ status_t BnResourceManagerService::onTransact(
             CHECK_INTERFACE(IResourceManagerService, data, reply);
             int pid = data.readInt32();
             int64_t clientId = data.readInt64();
-            removeResource(pid, clientId);
+            Vector<MediaResource> resources;
+            readFromParcel(data, &resources);
+            removeResource(pid, clientId, resources);
+            return NO_ERROR;
+        } break;
+
+        case REMOVE_CLIENT: {
+            CHECK_INTERFACE(IResourceManagerService, data, reply);
+            int pid = data.readInt32();
+            int64_t clientId = data.readInt64();
+            removeClient(pid, clientId);
             return NO_ERROR;
         } break;
 
