@@ -46,7 +46,7 @@ bool statsd_nuplayer(const MediaAnalyticsItem *item)
     if (item == NULL) return false;
 
     // these go into the statsd wrapper
-    nsecs_t timestamp = item->getTimestamp();
+    const nsecs_t timestamp = MediaAnalyticsService::roundTime(item->getTimestamp());
     std::string pkgName = item->getPkgName();
     int64_t pkgVersionCode = item->getPkgVersionCode();
     int64_t mediaApexVersion = 0;

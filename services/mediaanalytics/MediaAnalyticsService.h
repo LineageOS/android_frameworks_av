@@ -55,6 +55,11 @@ public:
 
     static constexpr const char * const kServiceName = "media.metrics";
 
+    /**
+     * Rounds time to the nearest second.
+     */
+    static nsecs_t roundTime(nsecs_t timeNs);
+
 protected:
 
     // Internal call where release is true if ownership of item is transferred

@@ -42,7 +42,7 @@ bool statsd_mediadrm(const MediaAnalyticsItem *item)
 {
     if (item == NULL) return false;
 
-    nsecs_t timestamp = item->getTimestamp();
+    const nsecs_t timestamp = MediaAnalyticsService::roundTime(item->getTimestamp());
     std::string pkgName = item->getPkgName();
     int64_t pkgVersionCode = item->getPkgVersionCode();
     int64_t mediaApexVersion = 0;
@@ -79,7 +79,7 @@ bool statsd_widevineCDM(const MediaAnalyticsItem *item)
 {
     if (item == NULL) return false;
 
-    nsecs_t timestamp = item->getTimestamp();
+    const nsecs_t timestamp = MediaAnalyticsService::roundTime(item->getTimestamp());
     std::string pkgName = item->getPkgName();
     int64_t pkgVersionCode = item->getPkgVersionCode();
     int64_t mediaApexVersion = 0;
@@ -109,7 +109,7 @@ bool statsd_drmmanager(const MediaAnalyticsItem *item)
 {
     if (item == NULL) return false;
 
-    nsecs_t timestamp = item->getTimestamp();
+    const nsecs_t timestamp = MediaAnalyticsService::roundTime(item->getTimestamp());
     std::string pkgName = item->getPkgName();
     int64_t pkgVersionCode = item->getPkgVersionCode();
     int64_t mediaApexVersion = 0;
