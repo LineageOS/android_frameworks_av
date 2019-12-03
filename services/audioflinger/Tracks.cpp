@@ -1601,6 +1601,99 @@ void AudioFlinger::PlaybackThread::PatchTrack::restartIfDisabled()
 //      Record
 // ----------------------------------------------------------------------------
 
+// ----------------------------------------------------------------------------
+//      AppOp for audio recording
+// -------------------------------
+
+// static
+sp<AudioFlinger::RecordThread::OpRecordAudioMonitor>
+AudioFlinger::RecordThread::OpRecordAudioMonitor::createIfNeeded(
+            uid_t uid, const String16& opPackageName)
+{
+    if (isServiceUid(uid)) {
+        ALOGV("not silencing record for service uid:%d pack:%s",
+                uid, String8(opPackageName).string());
+        return nullptr;
+    }
+
+    if (opPackageName.size() == 0) {
+        Vector<String16> packages;
+        // no package name, happens with SL ES clients
+        // query package manager to find one
+        PermissionController permissionController;
+        permissionController.getPackagesForUid(uid, packages);
+        if (packages.isEmpty()) {
+            return nullptr;
+        } else {
+            ALOGV("using pack:%s for uid:%d", String8(packages[0]).string(), uid);
+            return new OpRecordAudioMonitor(uid, packages[0]);
+        }
+    }
+
+    return new OpRecordAudioMonitor(uid, opPackageName);
+}
+
+AudioFlinger::RecordThread::OpRecordAudioMonitor::OpRecordAudioMonitor(
+        uid_t uid, const String16& opPackageName)
+        : mHasOpRecordAudio(true), mUid(uid), mPackage(opPackageName)
+{
+}
+
+AudioFlinger::RecordThread::OpRecordAudioMonitor::~OpRecordAudioMonitor()
+{
+    if (mOpCallback != 0) {
+        mAppOpsManager.stopWatchingMode(mOpCallback);
+    }
+    mOpCallback.clear();
+}
+
+void AudioFlinger::RecordThread::OpRecordAudioMonitor::onFirstRef()
+{
+    checkRecordAudio();
+    mOpCallback = new RecordAudioOpCallback(this);
+    ALOGV("start watching OP_RECORD_AUDIO for pack:%s", String8(mPackage).string());
+    mAppOpsManager.startWatchingMode(AppOpsManager::OP_RECORD_AUDIO, mPackage, mOpCallback);
+}
+
+bool AudioFlinger::RecordThread::OpRecordAudioMonitor::hasOpRecordAudio() const {
+    return mHasOpRecordAudio.load();
+}
+
+// Called by RecordAudioOpCallback when OP_RECORD_AUDIO is updated in AppOp callback
+// and in onFirstRef()
+// Note this method is never called (and never to be) for audio server / patch record track
+// due to the UID in createIfNeeded(). As a result for those record track, it's:
+// - not called from constructor,
+// - not called from RecordAudioOpCallback because the callback is not installed in this case
+void AudioFlinger::RecordThread::OpRecordAudioMonitor::checkRecordAudio()
+{
+    const int32_t mode = mAppOpsManager.checkOp(AppOpsManager::OP_RECORD_AUDIO,
+            mUid, mPackage);
+    const bool hasIt =  (mode == AppOpsManager::MODE_ALLOWED);
+    // verbose logging only log when appOp changed
+    ALOGI_IF(hasIt != mHasOpRecordAudio.load(),
+            "OP_RECORD_AUDIO missing, %ssilencing record uid%d pack:%s",
+            hasIt ? "un" : "", mUid, String8(mPackage).string());
+    mHasOpRecordAudio.store(hasIt);
+}
+
+AudioFlinger::RecordThread::OpRecordAudioMonitor::RecordAudioOpCallback::RecordAudioOpCallback(
+        const wp<OpRecordAudioMonitor>& monitor) : mMonitor(monitor)
+{ }
+
+void AudioFlinger::RecordThread::OpRecordAudioMonitor::RecordAudioOpCallback::opChanged(int32_t op,
+            const String16& packageName) {
+    UNUSED(packageName);
+    if (op != AppOpsManager::OP_RECORD_AUDIO) {
+        return;
+    }
+    sp<OpRecordAudioMonitor> monitor = mMonitor.promote();
+    if (monitor != NULL) {
+        monitor->checkRecordAudio();
+    }
+}
+
+//----------------------------------------
 AudioFlinger::RecordHandle::RecordHandle(
         const sp<AudioFlinger::RecordThread::RecordTrack>& recordTrack)
     : BnAudioRecord(),
@@ -1654,6 +1747,7 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
             uid_t uid,
             audio_input_flags_t flags,
             track_type type,
+            const String16& opPackageName,
             audio_port_handle_t portId)
     :   TrackBase(thread, client, attr, sampleRate, format,
                   channelMask, frameCount, buffer, bufferSize, sessionId, uid, false /*isOut*/,
@@ -1666,7 +1760,8 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
         mResamplerBufferProvider(NULL), // initialize in case of early constructor exit
         mRecordBufferConverter(NULL),
         mFlags(flags),
-        mSilenced(false)
+        mSilenced(false),
+        mOpRecordAudioMonitor(OpRecordAudioMonitor::createIfNeeded(uid, opPackageName))
 {
     if (mCblk == NULL) {
         return;
@@ -1852,6 +1947,14 @@ void AudioFlinger::RecordThread::RecordTrack::updateTrackFrameInfo(
     mServerProxy->setTimestamp(local);
 }
 
+bool AudioFlinger::RecordThread::RecordTrack::isSilenced() const {
+    if (mSilenced) {
+        return true;
+    }
+    // The monitor is only created for record tracks that can be silenced.
+    return mOpRecordAudioMonitor ? !mOpRecordAudioMonitor->hasOpRecordAudio() : false;
+}
+
 status_t AudioFlinger::RecordThread::RecordTrack::getActiveMicrophones(
         std::vector<media::MicrophoneInfo>* activeMicrophones)
 {
@@ -1875,7 +1978,7 @@ AudioFlinger::RecordThread::PatchRecord::PatchRecord(RecordThread *recordThread,
     :   RecordTrack(recordThread, NULL,
                 audio_attributes_t{} /* currently unused for patch track */,
                 sampleRate, format, channelMask, frameCount,
-                buffer, bufferSize, AUDIO_SESSION_NONE, getuid(), flags, TYPE_PATCH),
+                buffer, bufferSize, AUDIO_SESSION_NONE, getuid(), flags, TYPE_PATCH, String16()),
                 mProxy(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, false, true))
 {
     uint64_t mixBufferNs = ((uint64_t)2 * recordThread->frameCount() * 1000000000) /

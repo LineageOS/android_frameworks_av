@@ -6778,7 +6778,7 @@ reacquire_wakelock:
                         // Sanitize before releasing if the track has no access to the source data
                         // An idle UID receives silence from non virtual devices until active
                         if (activeTrack->isSilenced()) {
-                            memset(activeTrack->mSink.raw, 0, framesOut * mFrameSize);
+                            memset(activeTrack->mSink.raw, 0, framesOut * activeTrack->frameSize());
                         }
                         activeTrack->releaseBuffer(&activeTrack->mSink);
                     }
@@ -6921,7 +6921,8 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
         audio_input_flags_t *flags,
         pid_t tid,
         status_t *status,
-        audio_port_handle_t portId)
+        audio_port_handle_t portId,
+        const String16& opPackageName)
 {
     size_t frameCount = *pFrameCount;
     size_t notificationFrameCount = *pNotificationFrameCount;
@@ -7047,7 +7048,7 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
         track = new RecordTrack(this, client, attr, sampleRate,
                       format, channelMask, frameCount,
                       nullptr /* buffer */, (size_t)0 /* bufferSize */, sessionId, uid,
-                      *flags, TrackBase::TYPE_DEFAULT, portId);
+                      *flags, TrackBase::TYPE_DEFAULT, opPackageName, portId);
 
         lStatus = track->initCheck();
         if (lStatus != NO_ERROR) {
