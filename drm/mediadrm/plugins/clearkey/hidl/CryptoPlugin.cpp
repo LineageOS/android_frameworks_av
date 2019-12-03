@@ -62,10 +62,8 @@ Return<void> CryptoPlugin::decrypt(
       secure, keyId, iv, mode, pattern, subSamples, source, offset, destination,
       [&](Status_V1_2 hStatus, uint32_t hBytesWritten, hidl_string hDetailedError) {
         status = toStatus_1_0(hStatus);
-        if (status == Status::OK) {
-          bytesWritten = hBytesWritten;
-          detailedError = hDetailedError;
-        }
+        bytesWritten = hBytesWritten;
+        detailedError = hDetailedError;
       }
     );
 
@@ -109,6 +107,10 @@ Return<void> CryptoPlugin::decrypt_1_2(
                  "destination decrypt buffer base not set");
         return Void();
       }
+    } else {
+        _hidl_cb(Status_V1_2::ERROR_DRM_CANNOT_HANDLE, 0,
+                 "destination type not supported");
+        return Void();
     }
 
     sp<IMemory> sourceBase = mSharedBufferMap[source.bufferId];
@@ -126,24 +128,20 @@ Return<void> CryptoPlugin::decrypt_1_2(
             (static_cast<void *>(sourceBase->getPointer()));
     uint8_t* srcPtr = static_cast<uint8_t *>(base + source.offset + offset);
     void* destPtr = NULL;
-    if (destination.type == BufferType::SHARED_MEMORY) {
-        const SharedBuffer& destBuffer = destination.nonsecureMemory;
-        sp<IMemory> destBase = mSharedBufferMap[destBuffer.bufferId];
-        if (destBase == nullptr) {
-            _hidl_cb(Status_V1_2::ERROR_DRM_CANNOT_HANDLE, 0, "destination is a nullptr");
-            return Void();
-        }
-
-        if (destBuffer.offset + destBuffer.size > destBase->getSize()) {
-            _hidl_cb(Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE, 0, "invalid buffer size");
-            return Void();
-        }
-        destPtr = static_cast<void *>(base + destination.nonsecureMemory.offset);
-    } else if (destination.type == BufferType::NATIVE_HANDLE) {
-        native_handle_t *handle = const_cast<native_handle_t *>(
-        destination.secureMemory.getNativeHandle());
-        destPtr = static_cast<void *>(handle);
+    // destination.type == BufferType::SHARED_MEMORY
+    const SharedBuffer& destBuffer = destination.nonsecureMemory;
+    sp<IMemory> destBase = mSharedBufferMap[destBuffer.bufferId];
+    if (destBase == nullptr) {
+        _hidl_cb(Status_V1_2::ERROR_DRM_CANNOT_HANDLE, 0, "destination is a nullptr");
+        return Void();
     }
+
+    if (destBuffer.offset + destBuffer.size > destBase->getSize()) {
+        _hidl_cb(Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE, 0, "invalid buffer size");
+        return Void();
+    }
+    destPtr = static_cast<void *>(base + destination.nonsecureMemory.offset);
+
 
     // Calculate the output buffer size and determine if any subsamples are
     // encrypted.
@@ -151,11 +149,22 @@ Return<void> CryptoPlugin::decrypt_1_2(
     bool haveEncryptedSubsamples = false;
     for (size_t i = 0; i < subSamples.size(); i++) {
         const SubSample &subSample = subSamples[i];
-        destSize += subSample.numBytesOfClearData;
-        destSize += subSample.numBytesOfEncryptedData;
+        if (__builtin_add_overflow(destSize, subSample.numBytesOfClearData, &destSize)) {
+            _hidl_cb(Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE, 0, "subsample clear size overflow");
+            return Void();
+        }
+        if (__builtin_add_overflow(destSize, subSample.numBytesOfEncryptedData, &destSize)) {
+            _hidl_cb(Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE, 0, "subsample encrypted size overflow");
+            return Void();
+        }
         if (subSample.numBytesOfEncryptedData > 0) {
         haveEncryptedSubsamples = true;
         }
+    }
+
+    if (destSize > destBuffer.size) {
+        _hidl_cb(Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE, 0, "subsample sum too large");
+        return Void();
     }
 
     if (mode == Mode::UNENCRYPTED) {

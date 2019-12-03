@@ -205,6 +205,11 @@ struct TestInteractionProxy : public CameraProviderManager::ServiceInteractionPr
         return mTestCameraProvider;
     }
 
+    virtual hardware::hidl_vec<hardware::hidl_string> listServices() override {
+        hardware::hidl_vec<hardware::hidl_string> ret = {"test/0"};
+        return ret;
+    }
+
 };
 
 struct TestStatusListener : public CameraProviderManager::StatusListener {
@@ -231,36 +236,23 @@ TEST(CameraProviderManagerTest, InitializeTest) {
             vendorSection);
     serviceProxy.setProvider(provider);
 
+    int numProviders = static_cast<int>(serviceProxy.listServices().size());
+
     res = providerManager->initialize(statusListener, &serviceProxy);
     ASSERT_EQ(res, OK) << "Unable to initialize provider manager";
     // Check that both "legacy" and "external" providers (really the same object) are called
     // once for all the init methods
-    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::SET_CALLBACK], 2) <<
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::SET_CALLBACK], numProviders) <<
             "Only one call to setCallback per provider expected during init";
-    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::GET_VENDOR_TAGS], 2) <<
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::GET_VENDOR_TAGS], numProviders) <<
             "Only one call to getVendorTags per provider expected during init";
-    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::IS_SET_TORCH_MODE_SUPPORTED], 2) <<
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::IS_SET_TORCH_MODE_SUPPORTED],
+            numProviders) <<
             "Only one call to isSetTorchModeSupported per provider expected during init";
-    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::GET_CAMERA_ID_LIST], 2) <<
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::GET_CAMERA_ID_LIST], numProviders) <<
             "Only one call to getCameraIdList per provider expected during init";
-    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::NOTIFY_DEVICE_STATE], 2) <<
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::NOTIFY_DEVICE_STATE], numProviders) <<
             "Only one call to notifyDeviceState per provider expected during init";
-
-    std::string legacyInstanceName = "legacy/0";
-    std::string externalInstanceName = "external/0";
-    bool gotLegacy = false;
-    bool gotExternal = false;
-    EXPECT_EQ(2u, serviceProxy.mLastRequestedServiceNames.size()) <<
-            "Only two service queries expected to be seen by hardware service manager";
-
-    for (auto& serviceName : serviceProxy.mLastRequestedServiceNames) {
-        if (serviceName == legacyInstanceName) gotLegacy = true;
-        if (serviceName == externalInstanceName) gotExternal = true;
-    }
-    ASSERT_TRUE(gotLegacy) <<
-            "Legacy instance not requested from service manager";
-    ASSERT_TRUE(gotExternal) <<
-            "External instance not requested from service manager";
 
     hardware::hidl_string testProviderFqInterfaceName =
             "android.hardware.camera.provider@2.4::ICameraProvider";

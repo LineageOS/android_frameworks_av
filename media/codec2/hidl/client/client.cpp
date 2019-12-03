@@ -883,66 +883,72 @@ std::shared_ptr<Codec2Client::Component>
         Codec2Client::CreateComponentByName(
         const char* componentName,
         const std::shared_ptr<Listener>& listener,
-        std::shared_ptr<Codec2Client>* owner) {
-    std::shared_ptr<Component> component;
-    c2_status_t status = ForAllServices(
-            componentName,
-            [owner, &component, componentName, &listener](
-                    const std::shared_ptr<Codec2Client> &client)
-                        -> c2_status_t {
-                c2_status_t status = client->createComponent(componentName,
-                                                             listener,
-                                                             &component);
-                if (status == C2_OK) {
-                    if (owner) {
-                        *owner = client;
+        std::shared_ptr<Codec2Client>* owner,
+        size_t numberOfAttempts) {
+    while (true) {
+        std::shared_ptr<Component> component;
+        c2_status_t status = ForAllServices(
+                componentName,
+                [owner, &component, componentName, &listener](
+                        const std::shared_ptr<Codec2Client> &client)
+                            -> c2_status_t {
+                    c2_status_t status = client->createComponent(componentName,
+                                                                 listener,
+                                                                 &component);
+                    if (status == C2_OK) {
+                        if (owner) {
+                            *owner = client;
+                        }
+                    } else if (status != C2_NOT_FOUND) {
+                        LOG(DEBUG) << "IComponentStore("
+                                       << client->getServiceName()
+                                   << ")::createComponent(\"" << componentName
+                                   << "\") returned status = "
+                                   << status << ".";
                     }
-                } else if (status != C2_NOT_FOUND) {
-                    LOG(DEBUG) << "IComponentStore("
-                                   << client->getServiceName()
-                               << ")::createComponent(\"" << componentName
-                               << "\") returned status = "
-                               << status << ".";
-                }
-                return status;
-            });
-    if (status != C2_OK) {
-        LOG(DEBUG) << "Could not create component \"" << componentName << "\". "
-                      "Status = " << status << ".";
+                    return status;
+                });
+        if (numberOfAttempts > 0 && status == C2_TRANSACTION_FAILED) {
+            --numberOfAttempts;
+            continue;
+        }
+        return component;
     }
-    return component;
 }
 
 std::shared_ptr<Codec2Client::Interface>
         Codec2Client::CreateInterfaceByName(
         const char* interfaceName,
-        std::shared_ptr<Codec2Client>* owner) {
-    std::shared_ptr<Interface> interface;
-    c2_status_t status = ForAllServices(
-            interfaceName,
-            [owner, &interface, interfaceName](
-                    const std::shared_ptr<Codec2Client> &client)
-                        -> c2_status_t {
-                c2_status_t status = client->createInterface(interfaceName,
-                                                             &interface);
-                if (status == C2_OK) {
-                    if (owner) {
-                        *owner = client;
+        std::shared_ptr<Codec2Client>* owner,
+        size_t numberOfAttempts) {
+    while (true) {
+        std::shared_ptr<Interface> interface;
+        c2_status_t status = ForAllServices(
+                interfaceName,
+                [owner, &interface, interfaceName](
+                        const std::shared_ptr<Codec2Client> &client)
+                            -> c2_status_t {
+                    c2_status_t status = client->createInterface(interfaceName,
+                                                                 &interface);
+                    if (status == C2_OK) {
+                        if (owner) {
+                            *owner = client;
+                        }
+                    } else if (status != C2_NOT_FOUND) {
+                        LOG(DEBUG) << "IComponentStore("
+                                       << client->getServiceName()
+                                   << ")::createInterface(\"" << interfaceName
+                                   << "\") returned status = "
+                                   << status << ".";
                     }
-                } else if (status != C2_NOT_FOUND) {
-                    LOG(DEBUG) << "IComponentStore("
-                                   << client->getServiceName()
-                               << ")::createInterface(\"" << interfaceName
-                               << "\") returned status = "
-                               << status << ".";
-                }
-                return status;
-            });
-    if (status != C2_OK) {
-        LOG(DEBUG) << "Could not create interface \"" << interfaceName << "\". "
-                      "Status = " << status << ".";
+                    return status;
+                });
+        if (numberOfAttempts > 0 && status == C2_TRANSACTION_FAILED) {
+            --numberOfAttempts;
+            continue;
+        }
+        return interface;
     }
-    return interface;
 }
 
 std::vector<C2Component::Traits> const& Codec2Client::ListComponents() {

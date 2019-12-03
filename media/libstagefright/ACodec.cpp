@@ -1826,6 +1826,23 @@ status_t ACodec::configureCodec(
             mRepeatFrameDelayUs = -1LL;
         }
 
+        if (!msg->findDouble("time-lapse-fps", &mCaptureFps)) {
+            float captureRate;
+            if (msg->findAsFloat(KEY_CAPTURE_RATE, &captureRate)) {
+                mCaptureFps = captureRate;
+            } else {
+                mCaptureFps = -1.0;
+            }
+        }
+
+        if (!msg->findInt32(
+                KEY_CREATE_INPUT_SURFACE_SUSPENDED,
+                (int32_t*)&mCreateInputBuffersSuspended)) {
+            mCreateInputBuffersSuspended = false;
+        }
+    }
+
+    if (encoder && (mIsVideo || mIsImage)) {
         // only allow 32-bit value, since we pass it as U32 to OMX.
         if (!msg->findInt64(KEY_MAX_PTS_GAP_TO_ENCODER, &mMaxPtsGapUs)) {
             mMaxPtsGapUs = 0LL;
@@ -1841,16 +1858,6 @@ status_t ACodec::configureCodec(
         // notify GraphicBufferSource to allow backward frames
         if (mMaxPtsGapUs < 0LL) {
             mMaxFps = -1;
-        }
-
-        if (!msg->findDouble("time-lapse-fps", &mCaptureFps)) {
-            mCaptureFps = -1.0;
-        }
-
-        if (!msg->findInt32(
-                KEY_CREATE_INPUT_SURFACE_SUSPENDED,
-                (int32_t*)&mCreateInputBuffersSuspended)) {
-            mCreateInputBuffersSuspended = false;
         }
     }
 
