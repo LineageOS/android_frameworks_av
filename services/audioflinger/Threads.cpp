@@ -3616,7 +3616,13 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
                     // Tally underrun frames as we are inserting 0s here.
                     for (const auto& track : activeTracks) {
-                        if (track->mFillingUpStatus == Track::FS_ACTIVE) {
+                        if (track->mFillingUpStatus == Track::FS_ACTIVE
+                                && !track->isStopped()
+                                && !track->isPaused()
+                                && !track->isTerminated()) {
+                            ALOGV("%s: track(%d) %s underrun due to thread sleep of %zu frames",
+                                    __func__, track->id(), track->getTrackStateAsString(),
+                                    mNormalFrameCount);
                             track->mAudioTrackServerProxy->tallyUnderrunFrames(mNormalFrameCount);
                         }
                     }

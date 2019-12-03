@@ -743,7 +743,7 @@ void AudioFlinger::PlaybackThread::Track::appendDump(String8& result, bool activ
             (mClient == 0) ? getpid() : mClient->pid(),
             mSessionId,
             mPortId,
-            getTrackStateString(),
+            getTrackStateAsCodedString(),
             mCblk->mFlags,
 
             mFormat,
@@ -2241,7 +2241,7 @@ void AudioFlinger::RecordThread::RecordTrack::appendDump(String8& result, bool a
             (mClient == 0) ? getpid() : mClient->pid(),
             mSessionId,
             mPortId,
-            getTrackStateString(),
+            getTrackStateAsCodedString(),
             mCblk->mFlags,
 
             mFormat,
