@@ -418,7 +418,7 @@ void NuPlayer::GenericSource::onPrepareAsync() {
                     sp<IMediaExtractorService> mediaExService(
                             interface_cast<IMediaExtractorService>(binder));
                     sp<IDataSource> source;
-                    mediaExService->makeIDataSource(mFd, mOffset, mLength, &source);
+                    mediaExService->makeIDataSource(base::unique_fd(dup(mFd.get())), mOffset, mLength, &source);
                     ALOGV("IDataSource(FileSource): %p %d %lld %lld",
                             source.get(), mFd.get(), (long long)mOffset, (long long)mLength);
                     if (source.get() != nullptr) {
