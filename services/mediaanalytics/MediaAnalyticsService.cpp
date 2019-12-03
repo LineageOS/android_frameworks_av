@@ -489,9 +489,10 @@ void MediaAnalyticsService::UidInfo::setPkgInfo(
             if (!status.isOk()) {
                 ALOGE("%s: getNamesForUids failed: %s",
                         __func__, status.exceptionMessage().c_str());
-            }
-            if (!names[0].empty()) {
-                pkg = names[0].c_str();
+            } else {
+                if (!names[0].empty()) {
+                    pkg = names[0].c_str();
+                }
             }
         }
 
