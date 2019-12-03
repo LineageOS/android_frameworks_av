@@ -24,6 +24,7 @@ class AudioPolicyTestManager : public AudioPolicyManager {
     explicit AudioPolicyTestManager(AudioPolicyClientInterface *clientInterface)
             : AudioPolicyManager(clientInterface, true /*forTesting*/) { }
     using AudioPolicyManager::getConfig;
+    using AudioPolicyManager::loadConfig;
     using AudioPolicyManager::initialize;
 };
 
