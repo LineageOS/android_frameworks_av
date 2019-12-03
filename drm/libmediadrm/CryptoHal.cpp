@@ -20,7 +20,6 @@
 
 #include <android/hardware/drm/1.0/types.h>
 #include <android/hidl/manager/1.2/IServiceManager.h>
-#include <binder/IMemory.h>
 #include <hidl/ServiceManagement.h>
 #include <hidlmemory/FrameworkUtils.h>
 #include <media/hardware/CryptoAPI.h>
@@ -251,7 +250,7 @@ bool CryptoHal::requiresSecureDecoderComponent(const char *mime) const {
 
 
 /**
- * If the heap base isn't set, get the heap base from the IMemory
+ * If the heap base isn't set, get the heap base from the HidlMemory
  * and send it to the HAL so it can map a remote heap of the same
  * size.  Once the heap base is established, shared memory buffers
  * are sent by providing an offset into the heap and a buffer size.

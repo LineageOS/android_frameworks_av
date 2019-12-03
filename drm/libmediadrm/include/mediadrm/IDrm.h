@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include <binder/IInterface.h>
-#include <binder/PersistableBundle.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <media/drm/DrmAPI.h>
 #include <mediadrm/IDrmClient.h>
