@@ -66,6 +66,15 @@ public:
         BUFFERQUEUE,
 
         /**
+         * ID of the gralloc backed platform allocator for linear blob buffer.
+         *
+         * C2Handle layout is not public. Use C2AllocatorGralloc::UnwrapNativeCodec2GrallocHandle
+         * to get the underlying gralloc handle from a C2Handle, and WrapNativeCodec2GrallocHandle
+         * to create a C2Handle from a gralloc handle - for C2Allocator::priorAllocation.
+         */
+        BLOB,
+
+        /**
          * ID of indicating the end of platform allocator definition.
          *
          * \note always put this macro in the last place.
@@ -130,6 +139,20 @@ std::shared_ptr<C2ComponentStore> GetCodec2PlatformComponentStore();
  * component store is used.
  */
 void SetPreferredCodec2ComponentStore(std::shared_ptr<C2ComponentStore> store);
+
+/**
+ * Returns the pool mask.
+ * \retval the default pool mask should be adopted if it could not be obtained from property
+ *         "debug.stagefright.c2-poolmask"
+ */
+int GetCodec2PoolMask();
+
+/**
+ * Returns the preferred linear buffer allocator id from param poolMask.
+ * C2PlatformAllocatorStore::ION should be chosen as fallback allocator if BLOB is not enabled from
+ * param poolMask.
+ */
+C2PlatformAllocatorStore::id_t GetPreferredLinearAllocatorId(int poolMask);
 
 } // namespace android
 

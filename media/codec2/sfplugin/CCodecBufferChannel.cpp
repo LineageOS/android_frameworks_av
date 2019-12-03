@@ -826,10 +826,8 @@ status_t CCodecBufferChannel::start(
     bool secure = mComponent->getName().find(".secure") != std::string::npos;
 
     std::shared_ptr<C2AllocatorStore> allocatorStore = GetCodec2PlatformAllocatorStore();
-    int poolMask = property_get_int32(
-            "debug.stagefright.c2-poolmask",
-            1 << C2PlatformAllocatorStore::ION |
-            1 << C2PlatformAllocatorStore::BUFFERQUEUE);
+    int poolMask = GetCodec2PoolMask();
+    C2PlatformAllocatorStore::id_t preferredLinearId = GetPreferredLinearAllocatorId(poolMask);
 
     if (inputFormat != nullptr) {
         bool graphic = (iStreamFormat.value == C2BufferData::GRAPHIC);
@@ -839,7 +837,7 @@ status_t CCodecBufferChannel::start(
 
             // set default allocator ID.
             pools->inputAllocatorId = (graphic) ? C2PlatformAllocatorStore::GRALLOC
-                                                : C2PlatformAllocatorStore::ION;
+                                                : preferredLinearId;
 
             // query C2PortAllocatorsTuning::input from component. If an allocator ID is obtained
             // from component, create the input block pool with given ID. Otherwise, use default IDs.
@@ -978,7 +976,7 @@ status_t CCodecBufferChannel::start(
 
             // set default allocator ID.
             pools->outputAllocatorId = (graphic) ? C2PlatformAllocatorStore::GRALLOC
-                                                 : C2PlatformAllocatorStore::ION;
+                                                 : preferredLinearId;
 
             // query C2PortAllocatorsTuning::output from component, or use default allocator if
             // unsuccessful.
