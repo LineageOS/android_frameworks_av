@@ -37,7 +37,6 @@ cc_library_shared {
     ],
 
     shared_libs: [
-        "libbinder",
         "libbinder_ndk",
         "libcutils",
         "libdl",

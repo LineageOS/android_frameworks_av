@@ -21,7 +21,7 @@
 #include <media/mediaplayer.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AudioPresentationInfo.h>
-#include <media/IMediaExtractor.h>
+#include <android/IMediaExtractor.h>
 #include <media/MediaSource.h>
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>

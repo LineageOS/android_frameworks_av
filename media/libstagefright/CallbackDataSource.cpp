@@ -20,9 +20,9 @@
 
 #include "include/CallbackDataSource.h"
 
+#include <android/IDataSource.h>
 #include <binder/IMemory.h>
 #include <binder/IPCThreadState.h>
-#include <media/IDataSource.h>
 #include <media/stagefright/foundation/ADebug.h>
 
 #include <algorithm>

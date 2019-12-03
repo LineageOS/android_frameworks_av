@@ -17,10 +17,10 @@
 #ifndef REMOTE_DATA_SOURCE_H_
 #define REMOTE_DATA_SOURCE_H_
 
+#include <android/IDataSource.h>
 #include <binder/IMemory.h>
 #include <binder/MemoryDealer.h>
 #include <media/DataSource.h>
-#include <media/IDataSource.h>
 
 namespace android {
 

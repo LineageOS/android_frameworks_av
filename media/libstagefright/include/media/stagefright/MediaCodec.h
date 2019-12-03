@@ -29,6 +29,14 @@
 #include <media/stagefright/FrameRenderTracker.h>
 #include <utils/Vector.h>
 
+namespace aidl {
+namespace android {
+namespace media {
+class MediaResourceParcel;
+} // media
+} // android
+} // aidl
+
 namespace android {
 
 struct ABuffer;
@@ -51,13 +59,9 @@ namespace native {
 namespace V1_0 {
 struct IDescrambler;
 }}}}
-namespace media {
-class IResourceManagerClient;
-class MediaResourceParcel;
-}
+
 using hardware::cas::native::V1_0::IDescrambler;
-using media::IResourceManagerClient;
-using media::MediaResourceParcel;
+using aidl::android::media::MediaResourceParcel;
 
 struct MediaCodec : public AHandler {
     enum ConfigureFlags {
@@ -315,8 +319,7 @@ private:
     sp<AMessage> mCallback;
     sp<AMessage> mOnFrameRenderedNotification;
 
-    sp<IResourceManagerClient> mResourceManagerClient;
-    sp<ResourceManagerServiceProxy> mResourceManagerService;
+    sp<ResourceManagerServiceProxy> mResourceManagerProxy;
 
     bool mIsVideo;
     int32_t mVideoWidth;
@@ -410,8 +413,6 @@ private:
     bool isExecuting() const;
 
     uint64_t getGraphicBufferSize();
-    void addResource(const MediaResourceParcel &resource);
-    void removeResource(const MediaResourceParcel &resource);
     void requestCpuBoostIfNeeded();
 
     bool hasPendingBuffer(int portIndex);

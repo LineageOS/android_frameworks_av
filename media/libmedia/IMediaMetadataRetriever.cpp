@@ -19,8 +19,8 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#include <android/IDataSource.h>
 #include <binder/Parcel.h>
-#include <media/IDataSource.h>
 #include <media/IMediaHTTPService.h>
 #include <media/IMediaMetadataRetriever.h>
 #include <processgroup/sched_policy.h>

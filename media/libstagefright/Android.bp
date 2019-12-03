@@ -227,6 +227,7 @@ cc_library {
         "libaudioutils",
         "libbase",
         "libbinder",
+        "libbinder_ndk",
         "libcamera_client",
         "libcutils",
         "libdatasource",

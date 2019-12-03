@@ -21,10 +21,10 @@
 
 #include <stdio.h>
 
+#include <android/IDataSource.h>
 #include <binder/IMemory.h>
 #include <binder/MemoryDealer.h>
 #include <drm/drm_framework_common.h>
-#include <media/IDataSource.h>
 #include <media/mediametadataretriever.h>
 #include <media/MediaSource.h>
 #include <media/stagefright/foundation/ADebug.h>

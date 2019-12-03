@@ -17,6 +17,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MediaPlayerNative"
+#include <utils/Log.h>
 
 #include <fcntl.h>
 #include <inttypes.h>
@@ -24,25 +25,15 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <utils/Log.h>
 
-#include <binder/IServiceManager.h>
+#include <android/IDataSource.h>
 #include <binder/IPCThreadState.h>
-
-#include <gui/Surface.h>
-
 #include <media/mediaplayer.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
 #include <media/AVSyncSettings.h>
-#include <media/IDataSource.h>
-#include <media/MediaAnalyticsItem.h>
-
-#include <binder/MemoryBase.h>
-
 #include <utils/KeyedVector.h>
 #include <utils/String8.h>
-
 #include <system/audio.h>
 #include <system/window.h>
 
