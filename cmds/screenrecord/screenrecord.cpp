@@ -45,13 +45,15 @@
 #include <gui/SurfaceComposerClient.h>
 #include <gui/ISurfaceComposer.h>
 #include <ui/DisplayInfo.h>
+#include <media/NdkMediaCodec.h>
+#include <media/NdkMediaFormatPriv.h>
+#include <media/NdkMediaMuxer.h>
 #include <media/openmax/OMX_IVCommon.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaMuxer.h>
 #include <media/stagefright/PersistentSurface.h>
 #include <mediadrm/ICrypto.h>
 #include <media/MediaCodecBuffer.h>
@@ -71,7 +73,6 @@ using android::IGraphicBufferProducer;
 using android::ISurfaceComposer;
 using android::MediaCodec;
 using android::MediaCodecBuffer;
-using android::MediaMuxer;
 using android::Overlay;
 using android::PersistentSurface;
 using android::PhysicalDisplayId;
@@ -377,7 +378,7 @@ static void writeValueLE(UINT value, uint8_t* buffer) {
  *   (as little endian uint64).
  */
 static status_t writeWinscopeMetadata(const Vector<int64_t>& timestamps,
-        const ssize_t metaTrackIdx, const sp<MediaMuxer>& muxer) {
+        const ssize_t metaTrackIdx, AMediaMuxer *muxer) {
     ALOGV("Writing metadata");
     int64_t systemTimeToElapsedTimeOffsetMicros = (android::elapsedRealtimeNano()
         - systemTime(SYSTEM_TIME_MONOTONIC)) / 1000;
@@ -393,7 +394,13 @@ static status_t writeWinscopeMetadata(const Vector<int64_t>& timestamps,
             + systemTimeToElapsedTimeOffsetMicros), pos);
         pos += sizeof(uint64_t);
     }
-    return muxer->writeSampleData(buffer, metaTrackIdx, timestamps[0], 0);
+    AMediaCodecBufferInfo bufferInfo = {
+        0,
+        static_cast<int32_t>(buffer->size()),
+        timestamps[0],
+        0
+    };
+    return AMediaMuxer_writeSampleData(muxer, metaTrackIdx, buffer->data(), &bufferInfo);
 }
 
 /*
@@ -406,7 +413,7 @@ static status_t writeWinscopeMetadata(const Vector<int64_t>& timestamps,
  * The muxer must *not* have been started before calling.
  */
 static status_t runEncoder(const sp<MediaCodec>& encoder,
-        const sp<MediaMuxer>& muxer, FILE* rawFp, const sp<IBinder>& display,
+        AMediaMuxer *muxer, FILE* rawFp, const sp<IBinder>& display,
         const sp<IBinder>& virtualDpy, uint8_t orientation) {
     static int kTimeout = 250000;   // be responsive on signal
     status_t err;
@@ -513,8 +520,13 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                     // TODO
                     sp<ABuffer> buffer = new ABuffer(
                             buffers[bufIndex]->data(), buffers[bufIndex]->size());
-                    err = muxer->writeSampleData(buffer, trackIdx,
-                            ptsUsec, flags);
+                    AMediaCodecBufferInfo bufferInfo = {
+                        0,
+                        static_cast<int32_t>(buffer->size()),
+                        ptsUsec,
+                        flags
+                    };
+                    err = AMediaMuxer_writeSampleData(muxer, trackIdx, buffer->data(), &bufferInfo);
                     if (err != NO_ERROR) {
                         fprintf(stderr,
                             "Failed writing data to muxer (err=%d)\n", err);
@@ -547,15 +559,18 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                 ALOGV("Encoder format changed");
                 sp<AMessage> newFormat;
                 encoder->getOutputFormat(&newFormat);
+                // TODO remove when MediaCodec has been replaced with AMediaCodec
+                AMediaFormat *ndkFormat = AMediaFormat_fromMsg(&newFormat);
                 if (muxer != NULL) {
-                    trackIdx = muxer->addTrack(newFormat);
+                    trackIdx = AMediaMuxer_addTrack(muxer, ndkFormat);
                     if (gOutputFormat == FORMAT_MP4) {
-                        sp<AMessage> metaFormat = new AMessage;
-                        metaFormat->setString(KEY_MIME, kMimeTypeApplicationOctetstream);
-                        metaTrackIdx = muxer->addTrack(metaFormat);
+                        AMediaFormat *metaFormat = AMediaFormat_new();
+                        AMediaFormat_setString(metaFormat, AMEDIAFORMAT_KEY_MIME, kMimeTypeApplicationOctetstream);
+                        metaTrackIdx = AMediaMuxer_addTrack(muxer, metaFormat);
+                        AMediaFormat_delete(metaFormat);
                     }
                     ALOGV("Starting muxer");
-                    err = muxer->start();
+                    err = AMediaMuxer_start(muxer);
                     if (err != NO_ERROR) {
                         fprintf(stderr, "Unable to start muxer (err=%d)\n", err);
                         return err;
@@ -762,7 +777,7 @@ static status_t recordScreen(const char* fileName) {
         return err;
     }
 
-    sp<MediaMuxer> muxer = NULL;
+    AMediaMuxer *muxer = nullptr;
     FILE* rawFp = NULL;
     switch (gOutputFormat) {
         case FORMAT_MP4:
@@ -781,15 +796,15 @@ static status_t recordScreen(const char* fileName) {
                 abort();
             }
             if (gOutputFormat == FORMAT_MP4) {
-                muxer = new MediaMuxer(fd, MediaMuxer::OUTPUT_FORMAT_MPEG_4);
+                muxer = AMediaMuxer_new(fd, AMEDIAMUXER_OUTPUT_FORMAT_MPEG_4);
             } else if (gOutputFormat == FORMAT_WEBM) {
-                muxer = new MediaMuxer(fd, MediaMuxer::OUTPUT_FORMAT_WEBM);
+                muxer = AMediaMuxer_new(fd, AMEDIAMUXER_OUTPUT_FORMAT_WEBM);
             } else {
-                muxer = new MediaMuxer(fd, MediaMuxer::OUTPUT_FORMAT_THREE_GPP);
+                muxer = AMediaMuxer_new(fd, AMEDIAMUXER_OUTPUT_FORMAT_THREE_GPP);
             }
             close(fd);
             if (gRotate) {
-                muxer->setOrientationHint(90);  // TODO: does this do anything?
+                AMediaMuxer_setOrientationHint(muxer, 90); // TODO: does this do anything?
             }
             break;
         }
@@ -860,7 +875,7 @@ static status_t recordScreen(const char* fileName) {
     if (muxer != NULL) {
         // If we don't stop muxer explicitly, i.e. let the destructor run,
         // it may hang (b/11050628).
-        err = muxer->stop();
+        err = AMediaMuxer_stop(muxer);
     } else if (rawFp != stdout) {
         fclose(rawFp);
     }
