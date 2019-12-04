@@ -17,6 +17,7 @@
 #pragma once
 
 #include <media/AudioCommonTypes.h>
+#include <media/AudioContainers.h>
 #include <system/audio.h>
 #include <utils/Log.h>
 #include <math.h>
@@ -82,43 +83,55 @@ public:
      *
      * @return subset of device required to limit the number of volume category per device
      */
-    static audio_devices_t getDeviceForVolume(audio_devices_t device)
+    static audio_devices_t getDeviceForVolume(const android::DeviceTypeSet& deviceTypes)
     {
-        if (device == AUDIO_DEVICE_NONE) {
+        audio_devices_t deviceType = AUDIO_DEVICE_NONE;
+        if (deviceTypes.empty()) {
             // this happens when forcing a route update and no track is active on an output.
             // In this case the returned category is not important.
-            device =  AUDIO_DEVICE_OUT_SPEAKER;
-        } else if (popcount(device) > 1) {
+            deviceType = AUDIO_DEVICE_OUT_SPEAKER;
+        } else if (deviceTypes.size() > 1) {
             // Multiple device selection is either:
             //  - speaker + one other device: give priority to speaker in this case.
             //  - one A2DP device + another device: happens with duplicated output. In this case
             // retain the device on the A2DP output as the other must not correspond to an active
             // selection if not the speaker.
             //  - HDMI-CEC system audio mode only output: give priority to available item in order.
-            if (device & AUDIO_DEVICE_OUT_SPEAKER) {
-                device = AUDIO_DEVICE_OUT_SPEAKER;
-            } else if (device & AUDIO_DEVICE_OUT_SPEAKER_SAFE) {
-                device = AUDIO_DEVICE_OUT_SPEAKER_SAFE;
-            } else if (device & AUDIO_DEVICE_OUT_HDMI_ARC) {
-                device = AUDIO_DEVICE_OUT_HDMI_ARC;
-            } else if (device & AUDIO_DEVICE_OUT_AUX_LINE) {
-                device = AUDIO_DEVICE_OUT_AUX_LINE;
-            } else if (device & AUDIO_DEVICE_OUT_SPDIF) {
-                device = AUDIO_DEVICE_OUT_SPDIF;
+            if (deviceTypes.count(AUDIO_DEVICE_OUT_SPEAKER) != 0) {
+                deviceType = AUDIO_DEVICE_OUT_SPEAKER;
+            } else if (deviceTypes.count(AUDIO_DEVICE_OUT_SPEAKER_SAFE) != 0) {
+                deviceType = AUDIO_DEVICE_OUT_SPEAKER_SAFE;
+            } else if (deviceTypes.count(AUDIO_DEVICE_OUT_HDMI_ARC) != 0) {
+                deviceType = AUDIO_DEVICE_OUT_HDMI_ARC;
+            } else if (deviceTypes.count(AUDIO_DEVICE_OUT_AUX_LINE) != 0) {
+                deviceType = AUDIO_DEVICE_OUT_AUX_LINE;
+            } else if (deviceTypes.count(AUDIO_DEVICE_OUT_SPDIF) != 0) {
+                deviceType = AUDIO_DEVICE_OUT_SPDIF;
             } else {
-                device = (audio_devices_t)(device & AUDIO_DEVICE_OUT_ALL_A2DP);
+                std::vector<audio_devices_t> a2dpDevices = android::Intersection(
+                        deviceTypes, android::getAudioDeviceOutAllA2dpSet());
+                if (a2dpDevices.size() > 1) {
+                    ALOGW("getDeviceForVolume() invalid device combination: %s",
+                          android::dumpDeviceTypes(deviceTypes).c_str());
+                }
+                if (!a2dpDevices.empty()) {
+                    deviceType = a2dpDevices[0];
+                }
             }
+        } else {
+            deviceType = *(deviceTypes.begin());
         }
 
         /*SPEAKER_SAFE is an alias of SPEAKER for purposes of volume control*/
-        if (device == AUDIO_DEVICE_OUT_SPEAKER_SAFE)
-            device = AUDIO_DEVICE_OUT_SPEAKER;
+        if (deviceType == AUDIO_DEVICE_OUT_SPEAKER_SAFE) {
+            deviceType = AUDIO_DEVICE_OUT_SPEAKER;
+        }
 
-        ALOGW_IF(popcount(device) != 1,
-                 "getDeviceForVolume() invalid device combination: %08x",
-                 device);
+        ALOGW_IF(deviceType == AUDIO_DEVICE_NONE,
+                 "getDeviceForVolume() invalid device combination: %s, returning AUDIO_DEVICE_NONE",
+                 android::dumpDeviceTypes(deviceTypes).c_str());
 
-        return device;
+        return deviceType;
     }
 
     /**
@@ -128,9 +141,9 @@ public:
      *
      * @return device category.
      */
-    static device_category getDeviceCategory(audio_devices_t device)
+    static device_category getDeviceCategory(const android::DeviceTypeSet& deviceTypes)
     {
-        switch(getDeviceForVolume(device)) {
+        switch(getDeviceForVolume(deviceTypes)) {
         case AUDIO_DEVICE_OUT_EARPIECE:
             return DEVICE_CATEGORY_EARPIECE;
         case AUDIO_DEVICE_OUT_WIRED_HEADSET:

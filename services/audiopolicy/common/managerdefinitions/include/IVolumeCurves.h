@@ -16,8 +16,9 @@
 
 #pragma once
 
-#include <system/audio.h>
 #include <Volume.h>
+#include <media/AudioContainers.h>
+#include <system/audio.h>
 #include <utils/Errors.h>
 #include <utils/String8.h>
 #include <vector>
@@ -33,7 +34,7 @@ public:
     virtual void addCurrentVolumeIndex(audio_devices_t device, int index) = 0;
     virtual bool canBeMuted() const = 0;
     virtual int getVolumeIndexMin() const = 0;
-    virtual int getVolumeIndex(audio_devices_t device) const = 0;
+    virtual int getVolumeIndex(const DeviceTypeSet& device) const = 0;
     virtual int getVolumeIndexMax() const = 0;
     virtual float volIndexToDb(device_category device, int indexInUi) const = 0;
     virtual bool hasVolumeIndexForDevice(audio_devices_t device) const = 0;
