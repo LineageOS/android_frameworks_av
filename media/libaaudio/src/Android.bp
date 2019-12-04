@@ -40,6 +40,11 @@ cc_library {
         "libutils",
         "libbinder",
     ],
+
+    stubs: {
+        symbol_file: "libaaudio.map.txt",
+        versions: ["28"],
+    },
 }
 
 cc_library {
