@@ -54,6 +54,10 @@ cc_library {
         },
     },
 
+    stubs: {
+        symbol_file: "libaaudio.map.txt",
+        versions: ["28"],
+    },
 }
 
 cc_library {

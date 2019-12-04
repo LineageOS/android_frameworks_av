@@ -202,6 +202,38 @@ public:
            audio_format_t format() const { return mFormat; }
            int id() const { return mId; }
 
+    const char *getTrackStateAsString() const {
+        if (isTerminated()) {
+            return "TERMINATED";
+        }
+        switch (mState) {
+        case IDLE:
+            return "IDLE";
+        case STOPPING_1: // for Fast and Offload
+            return "STOPPING_1";
+        case STOPPING_2: // for Fast and Offload
+            return "STOPPING_2";
+        case STOPPED:
+            return "STOPPED";
+        case RESUMING:
+            return "RESUMING";
+        case ACTIVE:
+            return "ACTIVE";
+        case PAUSING:
+            return "PAUSING";
+        case PAUSED:
+            return "PAUSED";
+        case FLUSHED:
+            return "FLUSHED";
+        case STARTING_1: // for RecordTrack
+            return "STARTING_1";
+        case STARTING_2: // for RecordTrack
+            return "STARTING_2";
+        default:
+            return "UNKNOWN";
+        }
+    }
+
 protected:
     DISALLOW_COPY_AND_ASSIGN(TrackBase);
 
@@ -248,7 +280,7 @@ protected:
 
     // Upper case characters are final states.
     // Lower case characters are transitory.
-    const char *getTrackStateString() const {
+    const char *getTrackStateAsCodedString() const {
         if (isTerminated()) {
             return "T ";
         }

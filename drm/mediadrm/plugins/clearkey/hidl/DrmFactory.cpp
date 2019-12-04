@@ -15,6 +15,7 @@
  */
 
 //#define LOG_NDEBUG 0
+#include <vector>
 #define LOG_TAG "hidl_ClearKeyDrmFactory"
 #include <utils/Log.h>
 
@@ -30,11 +31,13 @@
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_2 {
+namespace V1_3 {
 namespace clearkey {
 
 using ::android::hardware::drm::V1_0::Status;
 using ::android::hardware::drm::V1_1::SecurityLevel;
+using ::android::hardware::drm::V1_2::clearkey::DrmPlugin;
+using ::android::hardware::drm::V1_2::clearkey::SessionLibrary;
 using ::android::hardware::Void;
 
 Return<bool> DrmFactory::isCryptoSchemeSupported(
@@ -78,8 +81,18 @@ Return<void> DrmFactory::createPlugin(
     return Void();
 }
 
+Return<void> DrmFactory::getSupportedCryptoSchemes(
+        getSupportedCryptoSchemes_cb _hidl_cb) {
+    std::vector<hidl_array<uint8_t, 16>> schemes;
+    for (const auto &scheme : clearkeydrm::getSupportedCryptoSchemes()) {
+        schemes.push_back(scheme);
+    }
+    _hidl_cb(schemes);
+    return Void();
+}
+
 } // namespace clearkey
-} // namespace V1_2
+} // namespace V1_3
 } // namespace drm
 } // namespace hardware
 } // namespace android
