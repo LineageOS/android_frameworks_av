@@ -635,7 +635,8 @@ media_status_t MyOpusExtractor::readNextPacket(MediaBufferHelper **out) {
             currentPageSamples -= mStartGranulePosition;
             AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_VALID_SAMPLES, currentPageSamples);
         }
-        mCurGranulePosition = mCurrentPage.mGranulePosition - currentPageSamples;
+        (void) __builtin_sub_overflow(mCurrentPage.mGranulePosition, currentPageSamples,
+                                      &mCurGranulePosition);
     }
 
     int64_t timeUs = getTimeUsOfGranule(mCurGranulePosition);
