@@ -3058,13 +3058,13 @@ status_t AudioPolicyManager::setUidDeviceAffinities(uid_t uid,
         // reevaluate outputs for all given devices
         for (size_t i = 0; i < devices.size(); i++) {
             sp<DeviceDescriptor> devDesc = mHwModules.getDeviceDescriptor(
-                            devices[i].mType, devices[i].mAddress, String8(),
+                            devices[i].mType, devices[i].mAddress.c_str(), String8(),
                             AUDIO_FORMAT_DEFAULT);
             SortedVector<audio_io_handle_t> outputs;
             if (checkOutputsForDevice(devDesc, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
                     outputs) != NO_ERROR) {
                 ALOGE("setUidDeviceAffinities() error in checkOutputsForDevice for device=%08x"
-                        " addr=%s", devices[i].mType, devices[i].mAddress.string());
+                        " addr=%s", devices[i].mType, devices[i].mAddress.c_str());
                 return INVALID_OPERATION;
             }
         }

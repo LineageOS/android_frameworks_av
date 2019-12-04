@@ -455,9 +455,9 @@ status_t AudioPolicyMixCollection::setUidDeviceAffinities(uid_t uid,
         }
         // check if this mix goes to a device in the list of devices
         bool deviceMatch = false;
+        const AudioDeviceTypeAddr mixDevice(mix->mDeviceType, mix->mDeviceAddress.string());
         for (size_t j = 0; j < devices.size(); j++) {
-            if (devices[j].mType == mix->mDeviceType
-                    && devices[j].mAddress == mix->mDeviceAddress) {
+            if (mixDevice.equals(devices[j])) {
                 deviceMatch = true;
                 break;
             }
@@ -522,7 +522,7 @@ status_t AudioPolicyMixCollection::getDevicesForUid(uid_t uid,
             }
         }
         if (ruleAllowsUid) {
-            devices.add(AudioDeviceTypeAddr(mix->mDeviceType, mix->mDeviceAddress));
+            devices.add(AudioDeviceTypeAddr(mix->mDeviceType, mix->mDeviceAddress.string()));
         }
     }
     return NO_ERROR;

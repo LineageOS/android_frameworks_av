@@ -50,6 +50,10 @@ const DeviceTypeSet& getAudioDeviceInAllSet() {
 }
 
 bool deviceTypesToString(const DeviceTypeSet &deviceTypes, std::string &str) {
+    if (deviceTypes.empty()) {
+        str = "Empty device types";
+        return true;
+    }
     bool ret = true;
     for (auto it = deviceTypes.begin(); it != deviceTypes.end();) {
         std::string deviceTypeStr;
@@ -80,6 +84,12 @@ std::string dumpDeviceTypes(const DeviceTypeSet &deviceTypes) {
             ret.append(" , ");
         }
     }
+    return ret;
+}
+
+std::string toString(const DeviceTypeSet& deviceTypes) {
+    std::string ret;
+    deviceTypesToString(deviceTypes, ret);
     return ret;
 }
 

@@ -27,11 +27,11 @@ namespace android {
 DeviceDescriptorBase::DeviceDescriptorBase(audio_devices_t type) :
     AudioPort("", AUDIO_PORT_TYPE_DEVICE,
               audio_is_output_device(type) ? AUDIO_PORT_ROLE_SINK :
-                                             AUDIO_PORT_ROLE_SOURCE),
-    mDeviceType(type)
+                                             AUDIO_PORT_ROLE_SOURCE)
 {
+    mDeviceTypeAddr.mType = type;
     if (audio_is_remote_submix_device(type)) {
-        mAddress = "0";
+        mDeviceTypeAddr.mAddress = "0";
     }
 }
 
@@ -55,22 +55,22 @@ void DeviceDescriptorBase::toAudioPortConfig(struct audio_port_config *dstConfig
 
     AudioPortConfig::toAudioPortConfig(dstConfig, srcConfig);
 
-    dstConfig->role = audio_is_output_device(mDeviceType) ?
+    dstConfig->role = audio_is_output_device(mDeviceTypeAddr.mType) ?
                         AUDIO_PORT_ROLE_SINK : AUDIO_PORT_ROLE_SOURCE;
     dstConfig->type = AUDIO_PORT_TYPE_DEVICE;
-    dstConfig->ext.device.type = mDeviceType;
+    dstConfig->ext.device.type = mDeviceTypeAddr.mType;
 
-    (void)audio_utils_strlcpy_zerofill(dstConfig->ext.device.address, mAddress.c_str());
+    (void)audio_utils_strlcpy_zerofill(dstConfig->ext.device.address, mDeviceTypeAddr.getAddress());
 }
 
 void DeviceDescriptorBase::toAudioPort(struct audio_port *port) const
 {
-    ALOGV("DeviceDescriptorBase::toAudioPort() handle %d type %08x", mId, mDeviceType);
+    ALOGV("DeviceDescriptorBase::toAudioPort() handle %d type %08x", mId, mDeviceTypeAddr.mType);
     AudioPort::toAudioPort(port);
     toAudioPortConfig(&port->active_config);
     port->id = mId;
-    port->ext.device.type = mDeviceType;
-    (void)audio_utils_strlcpy_zerofill(port->ext.device.address, mAddress.c_str());
+    port->ext.device.type = mDeviceTypeAddr.mType;
+    (void)audio_utils_strlcpy_zerofill(port->ext.device.address, mDeviceTypeAddr.getAddress());
 }
 
 void DeviceDescriptorBase::dump(std::string *dst, int spaces, int index,
@@ -86,10 +86,11 @@ void DeviceDescriptorBase::dump(std::string *dst, int spaces, int index,
     }
 
     dst->append(base::StringPrintf("%*s- type: %-48s\n",
-            spaces, "", ::android::toString(mDeviceType).c_str()));
+            spaces, "", ::android::toString(mDeviceTypeAddr.mType).c_str()));
 
-    if (mAddress.size() != 0) {
-        dst->append(base::StringPrintf("%*s- address: %-32s\n", spaces, "", mAddress.c_str()));
+    if (mDeviceTypeAddr.mAddress.size() != 0) {
+        dst->append(base::StringPrintf(
+                "%*s- address: %-32s\n", spaces, "", mDeviceTypeAddr.getAddress()));
     }
     AudioPort::dump(dst, spaces, verbose);
 }
@@ -97,15 +98,15 @@ void DeviceDescriptorBase::dump(std::string *dst, int spaces, int index,
 std::string DeviceDescriptorBase::toString() const
 {
     std::stringstream sstream;
-    sstream << "type:0x" << std::hex << type() << ",@:" << mAddress;
+    sstream << "type:0x" << std::hex << type() << ",@:" << mDeviceTypeAddr.mAddress;
     return sstream.str();
 }
 
 void DeviceDescriptorBase::log() const
 {
-    ALOGI("Device id:%d type:0x%08X:%s, addr:%s", mId,  mDeviceType,
-          ::android::toString(mDeviceType).c_str(),
-          mAddress.c_str());
+    ALOGI("Device id:%d type:0x%08X:%s, addr:%s", mId,  mDeviceTypeAddr.mType,
+          ::android::toString(mDeviceTypeAddr.mType).c_str(),
+          mDeviceTypeAddr.getAddress());
 
     AudioPort::log("  ");
 }
@@ -115,8 +116,7 @@ bool DeviceDescriptorBase::equals(const sp<DeviceDescriptorBase> &other) const
     return other != nullptr &&
            static_cast<const AudioPort*>(this)->equals(other) &&
            static_cast<const AudioPortConfig*>(this)->equals(other) &&
-           mAddress.compare(other->address()) == 0 &&
-           mDeviceType == other->type();
+           mDeviceTypeAddr.equals(other->mDeviceTypeAddr);
 }
 
 status_t DeviceDescriptorBase::writeToParcel(Parcel *parcel) const
@@ -124,8 +124,7 @@ status_t DeviceDescriptorBase::writeToParcel(Parcel *parcel) const
     status_t status = NO_ERROR;
     if ((status = AudioPort::writeToParcel(parcel)) != NO_ERROR) return status;
     if ((status = AudioPortConfig::writeToParcel(parcel)) != NO_ERROR) return status;
-    if ((status = parcel->writeUtf8AsUtf16(mAddress)) != NO_ERROR) return status;
-    if ((status = parcel->writeUint32(mDeviceType)) != NO_ERROR) return status;
+    if ((status = parcel->writeParcelable(mDeviceTypeAddr)) != NO_ERROR) return status;
     return status;
 }
 
@@ -134,9 +133,29 @@ status_t DeviceDescriptorBase::readFromParcel(const Parcel *parcel)
     status_t status = NO_ERROR;
     if ((status = AudioPort::readFromParcel(parcel)) != NO_ERROR) return status;
     if ((status = AudioPortConfig::readFromParcel(parcel)) != NO_ERROR) return status;
-    if ((status = parcel->readUtf8FromUtf16(&mAddress)) != NO_ERROR) return status;
-    if ((status = parcel->readUint32(&mDeviceType)) != NO_ERROR) return status;
+    if ((status = parcel->readParcelable(&mDeviceTypeAddr)) != NO_ERROR) return status;
     return status;
+}
+
+std::string toString(const DeviceDescriptorBaseVector& devices)
+{
+    std::string ret;
+    for (const auto& device : devices) {
+        if (device != *devices.begin()) {
+            ret += ";";
+        }
+        ret += device->toString();
+    }
+    return ret;
+}
+
+AudioDeviceTypeAddrVector deviceTypeAddrsFromDescriptors(const DeviceDescriptorBaseVector& devices)
+{
+    AudioDeviceTypeAddrVector deviceTypeAddrs;
+    for (const auto& device : devices) {
+        deviceTypeAddrs.push_back(device->getDeviceTypeAddr());
+    }
+    return deviceTypeAddrs;
 }
 
 } // namespace android

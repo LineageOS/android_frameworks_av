@@ -118,7 +118,7 @@ status_t AudioStreamOut::getPresentationPosition(uint64_t *frames, struct timesp
 
 status_t AudioStreamOut::open(
         audio_io_handle_t handle,
-        audio_devices_t devices,
+        audio_devices_t deviceType,
         struct audio_config *config,
         const char *address)
 {
@@ -130,7 +130,7 @@ status_t AudioStreamOut::open(
 
     int status = hwDev()->openOutputStream(
             handle,
-            devices,
+            deviceType,
             customFlags,
             config,
             address,
@@ -152,7 +152,7 @@ status_t AudioStreamOut::open(
 
         status = hwDev()->openOutputStream(
                 handle,
-                devices,
+                deviceType,
                 customFlags,
                 &customConfig,
                 address,

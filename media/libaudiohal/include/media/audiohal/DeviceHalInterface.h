@@ -69,7 +69,7 @@ class DeviceHalInterface : public RefBase
     // by releasing all references to the returned object.
     virtual status_t openOutputStream(
             audio_io_handle_t handle,
-            audio_devices_t devices,
+            audio_devices_t deviceType,
             audio_output_flags_t flags,
             struct audio_config *config,
             const char *address,
