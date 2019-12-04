@@ -47,7 +47,7 @@ public:
 
     virtual status_t open(
             audio_io_handle_t handle,
-            audio_devices_t devices,
+            audio_devices_t deviceType,
             struct audio_config *config,
             const char *address);
 

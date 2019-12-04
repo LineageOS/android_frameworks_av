@@ -22,6 +22,8 @@
 #include <utils/Log.h>
 #include <math.h>
 
+#include "policy.h"
+
 namespace android {
 
 /**
@@ -85,42 +87,13 @@ public:
      */
     static audio_devices_t getDeviceForVolume(const android::DeviceTypeSet& deviceTypes)
     {
-        audio_devices_t deviceType = AUDIO_DEVICE_NONE;
         if (deviceTypes.empty()) {
             // this happens when forcing a route update and no track is active on an output.
             // In this case the returned category is not important.
-            deviceType = AUDIO_DEVICE_OUT_SPEAKER;
-        } else if (deviceTypes.size() > 1) {
-            // Multiple device selection is either:
-            //  - speaker + one other device: give priority to speaker in this case.
-            //  - one A2DP device + another device: happens with duplicated output. In this case
-            // retain the device on the A2DP output as the other must not correspond to an active
-            // selection if not the speaker.
-            //  - HDMI-CEC system audio mode only output: give priority to available item in order.
-            if (deviceTypes.count(AUDIO_DEVICE_OUT_SPEAKER) != 0) {
-                deviceType = AUDIO_DEVICE_OUT_SPEAKER;
-            } else if (deviceTypes.count(AUDIO_DEVICE_OUT_SPEAKER_SAFE) != 0) {
-                deviceType = AUDIO_DEVICE_OUT_SPEAKER_SAFE;
-            } else if (deviceTypes.count(AUDIO_DEVICE_OUT_HDMI_ARC) != 0) {
-                deviceType = AUDIO_DEVICE_OUT_HDMI_ARC;
-            } else if (deviceTypes.count(AUDIO_DEVICE_OUT_AUX_LINE) != 0) {
-                deviceType = AUDIO_DEVICE_OUT_AUX_LINE;
-            } else if (deviceTypes.count(AUDIO_DEVICE_OUT_SPDIF) != 0) {
-                deviceType = AUDIO_DEVICE_OUT_SPDIF;
-            } else {
-                std::vector<audio_devices_t> a2dpDevices = android::Intersection(
-                        deviceTypes, android::getAudioDeviceOutAllA2dpSet());
-                if (a2dpDevices.size() > 1) {
-                    ALOGW("getDeviceForVolume() invalid device combination: %s",
-                          android::dumpDeviceTypes(deviceTypes).c_str());
-                }
-                if (!a2dpDevices.empty()) {
-                    deviceType = a2dpDevices[0];
-                }
-            }
-        } else {
-            deviceType = *(deviceTypes.begin());
+            return AUDIO_DEVICE_OUT_SPEAKER;
         }
+
+        audio_devices_t deviceType = apm_extract_one_audio_device(deviceTypes);
 
         /*SPEAKER_SAFE is an alias of SPEAKER for purposes of volume control*/
         if (deviceType == AUDIO_DEVICE_OUT_SPEAKER_SAFE) {
