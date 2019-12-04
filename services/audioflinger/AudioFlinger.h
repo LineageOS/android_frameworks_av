@@ -952,6 +952,8 @@ private:
     SimpleLog  mRejectedSetParameterLog;
     SimpleLog  mAppSetParameterLog;
     SimpleLog  mSystemSetParameterLog;
+
+    static inline constexpr const char *mMetricsId = AMEDIAMETRICS_KEY_AUDIO_FLINGER;
 };
 
 #undef INCLUDING_FROM_AUDIOFLINGER_H

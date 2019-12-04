@@ -1245,6 +1245,7 @@ private:
         std::unique_ptr<mediametrics::Item> mMetricsItem;
     };
     MediaMetrics mMediaMetrics;
+    std::string mMetricsId;  // GUARDED_BY(mLock), could change in createTrack_l().
 };
 
 }; // namespace android

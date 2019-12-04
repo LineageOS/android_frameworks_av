@@ -24,6 +24,7 @@
 #include <math.h>
 #include <fcntl.h>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <linux/futex.h>
 #include <sys/stat.h>
@@ -211,6 +212,28 @@ static int sFastTrackMultiplier = kFastTrackMultiplier;
 static const size_t kRecordThreadReadOnlyHeapSize = 0xD000;
 
 // ----------------------------------------------------------------------------
+
+// TODO: move all toString helpers to audio.h
+// under  #ifdef __cplusplus #endif
+static std::string patchSinksToString(const struct audio_patch *patch)
+{
+    std::stringstream ss;
+    for (size_t i = 0; i < patch->num_sinks; ++i) {
+        ss << "(" << toString(patch->sinks[i].ext.device.type)
+            << ", " << patch->sinks[i].ext.device.address << ")";
+    }
+    return ss.str();
+}
+
+static std::string patchSourcesToString(const struct audio_patch *patch)
+{
+    std::stringstream ss;
+    for (size_t i = 0; i < patch->num_sources; ++i) {
+        ss << "(" << toString(patch->sources[i].ext.device.type)
+            << ", " << patch->sources[i].ext.device.address << ")";
+    }
+    return ss.str();
+}
 
 static pthread_once_t sFastTrackMultiplierOnce = PTHREAD_ONCE_INIT;
 
@@ -466,6 +489,7 @@ AudioFlinger::ThreadBase::ThreadBase(const sp<AudioFlinger>& audioFlinger, audio
     :   Thread(false /*canCallJava*/),
         mType(type),
         mAudioFlinger(audioFlinger),
+        mMetricsId(std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_THREAD) + std::to_string(id)),
         // mSampleRate, mFrameCount, mChannelMask, mChannelCount, mFrameSize, mFormat, mBufferSize
         // are set by PlaybackThread::readOutputParameters_l() or
         // RecordThread::readInputParameters_l()
@@ -477,6 +501,13 @@ AudioFlinger::ThreadBase::ThreadBase(const sp<AudioFlinger>& audioFlinger, audio
         mSystemReady(systemReady),
         mSignalPending(false)
 {
+    mediametrics::LogItem(mMetricsId)
+        .setPid(getpid())
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR)
+        .set(AMEDIAMETRICS_PROP_TYPE, threadTypeToString(type))
+        .set(AMEDIAMETRICS_PROP_THREADID, id)
+        .record();
+
     memset(&mPatch, 0, sizeof(struct audio_patch));
 }
 
@@ -493,6 +524,10 @@ AudioFlinger::ThreadBase::~ThreadBase()
     }
 
     sendStatistics(true /* force */);
+
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_DTOR)
+        .record();
 }
 
 status_t AudioFlinger::ThreadBase::readyToRun()
@@ -2794,6 +2829,30 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
         mAudioFlinger->moveEffectChain_l(effectChains[i]->sessionId(),
             this/* srcThread */, this/* dstThread */);
     }
+
+    audio_output_flags_t flags = mOutput != nullptr ? mOutput->flags : AUDIO_OUTPUT_FLAG_NONE;
+    mediametrics::LogItem item(mMetricsId);
+    item.set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_READPARAMETERS)
+        .set(AMEDIAMETRICS_PROP_ENCODING, formatToString(mFormat).c_str())
+        .set(AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)mSampleRate)
+        .set(AMEDIAMETRICS_PROP_CHANNELMASK, (int32_t)mChannelMask)
+        .set(AMEDIAMETRICS_PROP_CHANNELCOUNT, (int32_t)mChannelCount)
+        .set(AMEDIAMETRICS_PROP_FRAMECOUNT, (int32_t)mNormalFrameCount)
+        .set(AMEDIAMETRICS_PROP_FLAGS, toString(flags).c_str())
+        .set(AMEDIAMETRICS_PROP_PREFIX_HAPTIC AMEDIAMETRICS_PROP_CHANNELMASK,
+                (int32_t)mHapticChannelMask)
+        .set(AMEDIAMETRICS_PROP_PREFIX_HAPTIC AMEDIAMETRICS_PROP_CHANNELCOUNT,
+                (int32_t)mHapticChannelCount)
+        .set(AMEDIAMETRICS_PROP_PREFIX_HAL    AMEDIAMETRICS_PROP_ENCODING,
+                formatToString(mHALFormat).c_str())
+        .set(AMEDIAMETRICS_PROP_PREFIX_HAL    AMEDIAMETRICS_PROP_FRAMECOUNT,
+                (int32_t)mFrameCount) // sic - added HAL
+        ;
+    uint32_t latencyMs;
+    if (mOutput->stream->getLatency(&latencyMs) == NO_ERROR) {
+        item.set(AMEDIAMETRICS_PROP_PREFIX_HAL AMEDIAMETRICS_PROP_LATENCYMS, (double)latencyMs);
+    }
+    item.record();
 }
 
 void AudioFlinger::PlaybackThread::updateMetadata_l()
@@ -3870,6 +3929,11 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
                         const int32_t throttleMs = (int32_t)mHalfBufferMs - deltaMs;
                         if ((signed)mHalfBufferMs >= throttleMs && throttleMs > 0) {
+                            mediametrics::LogItem(mMetricsId)
+                                // ms units always double
+                                .set(AMEDIAMETRICS_PROP_THROTTLEMS, (double)throttleMs)
+                                .record();
+
                             usleep(throttleMs * 1000);
                             // notify of throttle start on verbose log
                             ALOGV_IF(mThreadThrottleEndMs == mThreadThrottleTimeMs,
@@ -4142,6 +4206,11 @@ status_t AudioFlinger::PlaybackThread::createAudioPatch_l(const struct audio_pat
         status = mOutput->stream->setParameters(param.toString());
         *handle = AUDIO_PATCH_HANDLE_NONE;
     }
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CREATEAUDIOPATCH)
+        .set(AMEDIAMETRICS_PROP_OUTPUTDEVICES, patchSinksToString(patch).c_str())
+        .record();
+
     if (configChanged) {
         sendIoConfigEvent_l(AUDIO_OUTPUT_CONFIG_CHANGED);
     }
@@ -4683,19 +4752,29 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
     // DeferredOperations handles statistics after setting mixerStatus.
     class DeferredOperations {
     public:
-        DeferredOperations(mixer_state *mixerStatus)
-            : mMixerStatus(mixerStatus) { }
+        DeferredOperations(mixer_state *mixerStatus, const std::string &metricsId)
+            : mMixerStatus(mixerStatus)
+            , mMetricsId(metricsId) {}
 
         // when leaving scope, tally frames properly.
         ~DeferredOperations() {
             // Tally underrun frames only if we are actually mixing (MIXER_TRACKS_READY)
             // because that is when the underrun occurs.
             // We do not distinguish between FastTracks and NormalTracks here.
-            if (*mMixerStatus == MIXER_TRACKS_READY) {
+            if (*mMixerStatus == MIXER_TRACKS_READY && mUnderrunFrames.size() > 0) {
+                mediametrics::LogItem item(mMetricsId);
+
+                item.set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_UNDERRUN);
                 for (const auto &underrun : mUnderrunFrames) {
                     underrun.first->mAudioTrackServerProxy->tallyUnderrunFrames(
                             underrun.second);
+
+                    item.set(std::string("[" AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK)
+                            + std::to_string(underrun.first->portId())
+                            + "]" AMEDIAMETRICS_PROP_UNDERRUN,
+                            (int32_t)underrun.second);
                 }
+                item.record();
             }
         }
 
@@ -4708,8 +4787,10 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
 
     private:
         const mixer_state * const mMixerStatus;
+        const std::string& mMetricsId;
         std::vector<std::pair<sp<Track>, size_t>> mUnderrunFrames;
-    } deferredOperations(&mixerStatus); // implicit nested scope for variable capture
+    } deferredOperations(&mixerStatus, mMetricsId);
+    // implicit nested scope for variable capture
 
     bool noFastHapticTrack = true;
     for (size_t i=0 ; i<count ; i++) {
@@ -5187,11 +5268,20 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     mixerStatus != MIXER_TRACKS_ENABLED) {
                 mixerStatus = MIXER_TRACKS_READY;
             }
+
+            // Enable the next few lines to instrument a test for underrun log handling.
+            // TODO: Remove when we have a better way of testing the underrun log.
+#if 0
+            static int i;
+            if ((++i & 0xf) == 0) {
+                deferredOperations.tallyUnderrunFrames(track, 10 /* underrunFrames */);
+            }
+#endif
         } else {
             size_t underrunFrames = 0;
             if (framesReady < desiredFrames && !track->isStopped() && !track->isPaused()) {
-                ALOGV("track(%d) underrun,  framesReady(%zu) < framesDesired(%zd)",
-                        trackId, framesReady, desiredFrames);
+                ALOGV("track(%d) underrun, track state %s  framesReady(%zu) < framesDesired(%zd)",
+                        trackId, track->getTrackStateAsString(), framesReady, desiredFrames);
                 underrunFrames = desiredFrames;
             }
             deferredOperations.tallyUnderrunFrames(track, underrunFrames);
@@ -8403,6 +8493,12 @@ status_t AudioFlinger::RecordThread::createAudioPatch_l(const struct audio_patch
         sendIoConfigEvent_l(AUDIO_INPUT_CONFIG_CHANGED);
         mPatch = *patch;
     }
+
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CREATEAUDIOPATCH)
+        .set(AMEDIAMETRICS_PROP_INPUTDEVICES, patchSourcesToString(patch).c_str())
+        .set(AMEDIAMETRICS_PROP_SOURCE, toString(mAudioSource).c_str())
+        .record();
 
     return status;
 }

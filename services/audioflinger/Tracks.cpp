@@ -80,7 +80,8 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
             bool isOut,
             alloc_type alloc,
             track_type type,
-            audio_port_handle_t portId)
+            audio_port_handle_t portId,
+            std::string metricsId)
     :   RefBase(),
         mThread(thread),
         mClient(client),
@@ -105,6 +106,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
         mThreadIoHandle(thread ? thread->id() : AUDIO_IO_HANDLE_NONE),
         mPortId(portId),
         mIsInvalid(false),
+        mMetricsId(std::move(metricsId)),
         mCreatorPid(creatorPid)
 {
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
@@ -519,7 +521,9 @@ AudioFlinger::PlaybackThread::Track::Track(
                   (sharedBuffer != 0) ? sharedBuffer->size() : bufferSize,
                   sessionId, creatorPid, uid, true /*isOut*/,
                   (type == TYPE_PATCH) ? ( buffer == NULL ? ALLOC_LOCAL : ALLOC_NONE) : ALLOC_CBLK,
-                  type, portId),
+                  type,
+                  portId,
+                  std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK) + std::to_string(portId)),
     mFillingUpStatus(FS_INVALID),
     // mRetryCount initialized later when needed
     mSharedBuffer(sharedBuffer),
@@ -596,6 +600,14 @@ AudioFlinger::PlaybackThread::Track::Track(
         mExternalVibration = new os::ExternalVibration(
                 mUid, "" /* pkg */, mAttr, mAudioVibrationController);
     }
+
+    // Once this item is logged by the server, the client can add properties.
+    mediametrics::LogItem(mMetricsId)
+        .setPid(creatorPid)
+        .setUid(uid)
+        .set(AMEDIAMETRICS_PROP_EVENT,
+                AMEDIAMETRICS_PROP_PREFIX_SERVER AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR)
+        .record();
 }
 
 AudioFlinger::PlaybackThread::Track::~Track()
@@ -964,6 +976,14 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
             if (status == PERMISSION_DENIED) {
                 mState = state;
             }
+        }
+
+        // Audio timing metrics are computed a few mix cycles after starting.
+        {
+            mLogStartCountdown = LOG_START_COUNTDOWN;
+            mLogStartTimeNs = systemTime();
+            mLogStartFrames = mAudioTrackServerProxy->getTimestamp()
+                    .mPosition[ExtendedTimestamp::LOCATION_SERVER];
         }
 
         if (status == NO_ERROR || status == ALREADY_EXISTS) {
@@ -1497,6 +1517,28 @@ void AudioFlinger::PlaybackThread::Track::updateTrackFrameInfo(
 
     mServerLatencyFromTrack.store(useTrackTimestamp);
     mServerLatencyMs.store(latencyMs);
+
+    if (mLogStartCountdown > 0) {
+        if (--mLogStartCountdown == 0) {
+            // startup is the difference in times for the current timestamp and our start
+            double startUpMs =
+                    (local.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] - mLogStartTimeNs) * 1e-6;
+            // adjust for frames played.
+            startUpMs -= (local.mPosition[ExtendedTimestamp::LOCATION_SERVER] - mLogStartFrames)
+                      * 1e3 / mSampleRate;
+            ALOGV("%s: logging localTime:%lld, startTime:%lld"
+                  "  localPosition:%lld, startPosition:%lld",
+                    __func__,
+                    (long long)local.mTimeNs[ExtendedTimestamp::LOCATION_SERVER],
+                    (long long)mLogStartTimeNs,
+                    (long long)local.mPosition[ExtendedTimestamp::LOCATION_SERVER],
+                    (long long)mLogStartFrames);
+            mediametrics::LogItem(mMetricsId)
+                .set(AMEDIAMETRICS_PROP_LATENCYMS, latencyMs)
+                .set(AMEDIAMETRICS_PROP_STARTUPMS, startUpMs)
+                .record();
+        }
+    }
 }
 
 binder::Status AudioFlinger::PlaybackThread::Track::AudioVibrationController::mute(
@@ -2071,7 +2113,8 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
                   (type == TYPE_DEFAULT) ?
                           ((flags & AUDIO_INPUT_FLAG_FAST) ? ALLOC_PIPE : ALLOC_CBLK) :
                           ((buffer == NULL) ? ALLOC_LOCAL : ALLOC_NONE),
-                  type, portId),
+                  type, portId,
+                  std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD) + std::to_string(portId)),
         mOverflow(false),
         mFramesToDrop(0),
         mResamplerBufferProvider(NULL), // initialize in case of early constructor exit
@@ -2117,6 +2160,13 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
             + "_" + std::to_string(mId)
             + "_R");
 #endif
+
+    // Once this item is logged by the server, the client can add properties.
+    mediametrics::LogItem(mMetricsId)
+        .setPid(creatorPid)
+        .setUid(uid)
+        .set(AMEDIAMETRICS_PROP_EVENT, "server." AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR)
+        .record();
 }
 
 AudioFlinger::RecordThread::RecordTrack::~RecordTrack()

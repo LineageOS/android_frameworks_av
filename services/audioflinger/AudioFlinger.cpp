@@ -40,6 +40,7 @@
 #include <media/audiohal/DevicesFactoryHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <media/AudioParameter.h>
+#include <media/MediaMetricsItem.h>
 #include <media/TypeConverter.h>
 #include <memunreachable/memunreachable.h>
 #include <utils/String16.h>
@@ -198,6 +199,11 @@ AudioFlinger::AudioFlinger()
     std::vector<pid_t> halPids;
     mDevicesFactoryHal->getHalPids(&halPids);
     TimeCheck::setAudioHalPids(halPids);
+
+    // Notify that we have started (also called when audioserver service restarts)
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR)
+        .record();
 }
 
 void AudioFlinger::onFirstRef()
