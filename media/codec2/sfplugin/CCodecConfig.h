@@ -23,8 +23,10 @@
 #include <vector>
 
 #include <C2Component.h>
-#include <codec2/hidl/client.h>
+#include <C2Config.h>
+#include <C2Debug.h>
 
+#include <codec2/hidl/client.h>
 #include <utils/RefBase.h>
 
 #include "InputSurfaceWrapper.h"
@@ -39,7 +41,6 @@ struct StandardParams;
  * Struct managing the codec configuration for CCodec.
  */
 struct CCodecConfig {
-
     /**
      * Domain consists of a bitmask divided into fields, and specifiers work by excluding other
      * values in those domains.
@@ -135,6 +136,9 @@ struct CCodecConfig {
     /// For now support a validation function.
     std::map<C2Param::Index, LocalParamValidator> mLocalParams;
 
+    /// Vendor field name -> index map.
+    std::map<std::string, C2Param::Index> mVendorParamIndices;
+
     std::set<std::string> mLastConfig;
 
     CCodecConfig();
@@ -143,9 +147,8 @@ struct CCodecConfig {
     /// reflected param helper, domain, standard params, and subscribes to standard
     /// indices.
     status_t initialize(
-            const std::shared_ptr<Codec2Client> &client,
-            const std::shared_ptr<Codec2Client::Component> &component);
-
+            const std::shared_ptr<C2ParamReflector> &client,
+            const std::shared_ptr<Codec2Client::Configurable> &configurable);
 
     /**
      * Adds a locally maintained parameter. This is used for output configuration that can be
@@ -238,7 +241,7 @@ struct CCodecConfig {
      * \param blocking blocking mode to use with the component
      */
     status_t getConfigUpdateFromSdkParams(
-            std::shared_ptr<Codec2Client::Component> component,
+            std::shared_ptr<Codec2Client::Configurable> configurable,
             const sp<AMessage> &sdkParams, Domain domain,
             c2_blocking_t blocking,
             std::vector<std::unique_ptr<C2Param>> *configUpdate) const;
@@ -250,18 +253,23 @@ struct CCodecConfig {
      * \param blocking blocking mode to use with the component
      */
     status_t setParameters(
-            std::shared_ptr<Codec2Client::Component> component,
+            std::shared_ptr<Codec2Client::Configurable> configurable,
             std::vector<std::unique_ptr<C2Param>> &configUpdate,
             c2_blocking_t blocking);
 
     /// Queries subscribed indices (which contains all SDK-exposed values) and updates
     /// input/output formats.
     status_t queryConfiguration(
-            const std::shared_ptr<Codec2Client::Component> &component);
+            const std::shared_ptr<Codec2Client::Configurable> &configurable);
 
     /// Queries a configuration parameter value. Returns nullptr if the parameter is not
     /// part of the current configuration
     const C2Param *getConfigParameterValue(C2Param::Index index) const;
+
+    /// Subscribe to all vendor parameters.
+    status_t subscribeToAllVendorParams(
+            const std::shared_ptr<Codec2Client::Configurable> &configurable,
+            c2_blocking_t blocking);
 
     /**
      * Object that can be used to access configuration parameters and if they change.
@@ -321,14 +329,15 @@ private:
     /// Adds indices to the subscribed indices, and updated subscription to component
     /// \param blocking blocking mode to use with the component
     status_t subscribeToConfigUpdate(
-            const std::shared_ptr<Codec2Client::Component> &component,
+            const std::shared_ptr<Codec2Client::Configurable> &configurable,
             const std::vector<C2Param::Index> &indices,
             c2_blocking_t blocking = C2_DONT_BLOCK);
 
     /// Gets SDK format from codec 2.0 reflected configuration
     /// \param domain input/output bitmask
-    sp<AMessage> getSdkFormatForDomain(
-            const ReflectedParamUpdater::Dict &reflected, Domain domain) const;
+    sp<AMessage> getFormatForDomain(
+            const ReflectedParamUpdater::Dict &reflected,
+            Domain domain) const;
 
     /**
      * Converts a set of configuration parameters in an AMessage to a list of path-based Codec

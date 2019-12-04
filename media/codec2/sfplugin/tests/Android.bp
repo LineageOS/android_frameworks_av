@@ -2,7 +2,13 @@ cc_test {
     name: "ccodec_unit_test",
 
     srcs: [
+        "CCodecConfig_test.cpp",
         "ReflectedParamUpdater_test.cpp",
+    ],
+
+    defaults: [
+        "libcodec2-hidl-defaults@1.0",
+        "libcodec2-internal-defaults",
     ],
 
     include_dirs: [
@@ -11,7 +17,9 @@ cc_test {
 
     shared_libs: [
         "libcodec2",
+        "libcodec2_client",
         "libsfplugin_ccodec",
+        "libsfplugin_ccodec_utils",
         "libstagefright_foundation",
         "libutils",
     ],

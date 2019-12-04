@@ -189,7 +189,7 @@ private:
     struct ClientListener;
 
     Mutexed<NamedTimePoint> mDeadline;
-    typedef CCodecConfig Config;
+
     Mutexed<std::unique_ptr<CCodecConfig>> mConfig;
     Mutexed<std::list<std::unique_ptr<C2Work>>> mWorkDoneQueue;
 
