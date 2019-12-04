@@ -17,6 +17,7 @@
 #pragma once
 
 #include <algorithm>
+#include <functional>
 #include <iterator>
 #include <set>
 #include <vector>
@@ -78,6 +79,11 @@ static inline bool isSingleDeviceType(const DeviceTypeSet& deviceTypes,
     return deviceTypes.size() == 1 && p(*(deviceTypes.begin()));
 }
 
+static inline bool areAllOfSameDeviceType(const DeviceTypeSet& deviceTypes,
+                                          std::function<bool(audio_devices_t)> p) {
+    return std::all_of(deviceTypes.begin(), deviceTypes.end(), p);
+}
+
 static inline void resetDeviceTypes(DeviceTypeSet& deviceTypes, audio_devices_t typeToAdd) {
     deviceTypes.clear();
     deviceTypes.insert(typeToAdd);
@@ -116,6 +122,11 @@ static inline DeviceTypeSet deviceTypesFromBitMask(audio_devices_t types) {
 bool deviceTypesToString(const DeviceTypeSet& deviceTypes, std::string &str);
 
 std::string dumpDeviceTypes(const DeviceTypeSet& deviceTypes);
+
+/**
+ * Return human readable string for device types.
+ */
+std::string toString(const DeviceTypeSet& deviceTypes);
 
 
 } // namespace android

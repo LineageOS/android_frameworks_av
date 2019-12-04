@@ -65,7 +65,10 @@
 #include <media/audiohal/EffectBufferHalInterface.h>
 #include <media/audiohal/StreamHalInterface.h>
 #include <media/AudioBufferProvider.h>
+#include <media/AudioContainers.h>
+#include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioMixer.h>
+#include <media/DeviceDescriptorBase.h>
 #include <media/ExtendedAudioBufferProvider.h>
 #include <media/LinearMap.h>
 #include <media/VolumeShaper.h>
@@ -175,8 +178,7 @@ public:
     virtual status_t openOutput(audio_module_handle_t module,
                                 audio_io_handle_t *output,
                                 audio_config_t *config,
-                                audio_devices_t *devices,
-                                const String8& address,
+                                const sp<DeviceDescriptorBase>& device,
                                 uint32_t *latencyMs,
                                 audio_output_flags_t flags);
 
@@ -372,7 +374,7 @@ private:
     virtual     void        onFirstRef();
 
     AudioHwDevice*          findSuitableHwDev_l(audio_module_handle_t module,
-                                                audio_devices_t devices);
+                                                audio_devices_t deviceType);
 
     // Set kEnableExtendedChannels to true to enable greater than stereo output
     // for the MixerThread and device sink.  Number of channels allowed is
@@ -678,11 +680,11 @@ using effect_buffer_t = int16_t;
                                            audio_devices_t outputDevice,
                                            const String8& outputDeviceAddress);
               sp<ThreadBase> openOutput_l(audio_module_handle_t module,
-                                              audio_io_handle_t *output,
-                                              audio_config_t *config,
-                                              audio_devices_t devices,
-                                              const String8& address,
-                                              audio_output_flags_t flags);
+                                          audio_io_handle_t *output,
+                                          audio_config_t *config,
+                                          audio_devices_t deviceType,
+                                          const String8& address,
+                                          audio_output_flags_t flags);
 
               void closeOutputFinish(const sp<PlaybackThread>& thread);
               void closeInputFinish(const sp<RecordThread>& thread);
@@ -717,7 +719,7 @@ using effect_buffer_t = int16_t;
 
               // return thread associated with primary hardware device, or NULL
               PlaybackThread *primaryPlaybackThread_l() const;
-              audio_devices_t primaryOutputDevice_l() const;
+              DeviceTypeSet primaryOutputDevice_l() const;
 
               // return the playback thread with smallest HAL buffer size, and prefer fast
               PlaybackThread *fastPlaybackThread_l() const;
@@ -751,6 +753,7 @@ using effect_buffer_t = int16_t;
                 std::vector< sp<EffectModule> > purgeStaleEffects_l();
 
                 void broacastParametersToRecordThreads_l(const String8& keyValuePairs);
+                void updateOutDevicesForRecordThreads_l(const DeviceDescriptorBaseVector& devices);
                 void forwardParametersToDownstreamPatches_l(
                         audio_io_handle_t upStream, const String8& keyValuePairs,
                         std::function<bool(const sp<PlaybackThread>&)> useThread = nullptr);

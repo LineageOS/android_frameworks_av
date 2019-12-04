@@ -22,22 +22,6 @@
 namespace android {
 
 //
-//  AudioDeviceTypeAddr implementation
-//
-status_t AudioDeviceTypeAddr::readFromParcel(Parcel *parcel) {
-    mType = (audio_devices_t) parcel->readInt32();
-    mAddress = parcel->readString8();
-    return NO_ERROR;
-}
-
-status_t AudioDeviceTypeAddr::writeToParcel(Parcel *parcel) const {
-    parcel->writeInt32((int32_t) mType);
-    parcel->writeString8(mAddress);
-    return NO_ERROR;
-}
-
-
-//
 //  AudioMixMatchCriterion implementation
 //
 AudioMixMatchCriterion::AudioMixMatchCriterion(audio_usage_t usage,

@@ -76,7 +76,7 @@ bool DeviceDescriptor::equals(const sp<DeviceDescriptor>& other) const
         return false;
     }
 
-    return (mDeviceType == other->mDeviceType) && (mAddress == other->mAddress) &&
+    return mDeviceTypeAddr.equals(other->mDeviceTypeAddr) &&
            checkEqual(mEncodedFormats, other->mEncodedFormats);
 }
 
@@ -135,7 +135,7 @@ void DeviceDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
 
 void DeviceDescriptor::toAudioPort(struct audio_port *port) const
 {
-    ALOGV("DeviceDescriptor::toAudioPort() handle %d type %08x", mId, mDeviceType);
+    ALOGV("DeviceDescriptor::toAudioPort() handle %d type %08x", mId, mDeviceTypeAddr.mType);
     DeviceDescriptorBase::toAudioPort(port);
     port->ext.device.hw_module = getModuleHandle();
 }
@@ -326,6 +326,24 @@ sp<DeviceDescriptor> DeviceVector::getFirstExistingDevice(
         }
     }
     return device;
+}
+
+sp<DeviceDescriptor> DeviceVector::getDeviceForOpening() const
+{
+    if (isEmpty()) {
+        // Return nullptr if this collection is empty.
+        return nullptr;
+    } else if (areAllOfSameDeviceType(types(), audio_is_input_device)) {
+        // For input case, return the first one when there is only one device.
+        return size() > 1 ? nullptr : *begin();
+    } else if (areAllOfSameDeviceType(types(), audio_is_output_device)) {
+        // For output case, return the device descriptor according to apm strategy.
+        audio_devices_t deviceType = apm_extract_one_audio_device(types());
+        return deviceType == AUDIO_DEVICE_NONE ? nullptr :
+                getDevice(deviceType, String8(""), AUDIO_FORMAT_DEFAULT);
+    }
+    // Return null pointer if the devices are not all input/output device.
+    return nullptr;
 }
 
 void DeviceVector::replaceDevicesByType(
