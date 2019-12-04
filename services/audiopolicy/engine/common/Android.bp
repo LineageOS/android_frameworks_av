@@ -44,4 +44,7 @@ cc_library_static {
         "libaudiopolicycomponents",
         "libaudiopolicyengine_config",
     ],
+    shared_libs: [
+        "libaudiofoundation",
+    ],
 }

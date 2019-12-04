@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <binder/Parcel.h>
+#include <binder/Parcelable.h>
 #include <media/AudioPort.h>
 #include <utils/Errors.h>
 #include <cutils/config_utils.h>
@@ -50,6 +52,11 @@ public:
               const char* extraInfo = nullptr, bool verbose = true) const;
     void log() const;
     std::string toString() const;
+
+    bool equals(const sp<DeviceDescriptorBase>& other) const;
+
+    status_t writeToParcel(Parcel* parcel) const override;
+    status_t readFromParcel(const Parcel* parcel) override;
 
 protected:
     std::string mAddress{""};

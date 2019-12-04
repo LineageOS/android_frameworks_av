@@ -24,6 +24,8 @@
 #define ALOGVV(a...) do { } while(0)
 #endif
 
+#include <algorithm>
+
 #include <android-base/stringprintf.h>
 #include <media/AudioGain.h>
 #include <utils/Log.h>
@@ -109,6 +111,89 @@ void AudioGain::dump(std::string *dst, int spaces, int index) const
     dst->append(base::StringPrintf("%*s- step_value: %d mB\n", spaces, "", mGain.step_value));
     dst->append(base::StringPrintf("%*s- min_ramp_ms: %d ms\n", spaces, "", mGain.min_ramp_ms));
     dst->append(base::StringPrintf("%*s- max_ramp_ms: %d ms\n", spaces, "", mGain.max_ramp_ms));
+}
+
+bool AudioGain::equals(const sp<AudioGain>& other) const
+{
+    return other != nullptr &&
+           mUseInChannelMask == other->mUseInChannelMask &&
+           mUseForVolume == other->mUseForVolume &&
+           // Compare audio gain
+           mGain.mode == other->mGain.mode &&
+           mGain.channel_mask == other->mGain.channel_mask &&
+           mGain.min_value == other->mGain.min_value &&
+           mGain.max_value == other->mGain.max_value &&
+           mGain.default_value == other->mGain.default_value &&
+           mGain.step_value == other->mGain.step_value &&
+           mGain.min_ramp_ms == other->mGain.min_ramp_ms &&
+           mGain.max_ramp_ms == other->mGain.max_ramp_ms;
+}
+
+status_t AudioGain::writeToParcel(android::Parcel *parcel) const
+{
+    status_t status = NO_ERROR;
+    if ((status = parcel->writeInt32(mIndex)) != NO_ERROR) return status;
+    if ((status = parcel->writeBool(mUseInChannelMask)) != NO_ERROR) return status;
+    if ((status = parcel->writeBool(mUseForVolume)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mGain.mode)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mGain.channel_mask)) != NO_ERROR) return status;
+    if ((status = parcel->writeInt32(mGain.min_value)) != NO_ERROR) return status;
+    if ((status = parcel->writeInt32(mGain.max_value)) != NO_ERROR) return status;
+    if ((status = parcel->writeInt32(mGain.default_value)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mGain.step_value)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mGain.min_ramp_ms)) != NO_ERROR) return status;
+    status = parcel->writeUint32(mGain.max_ramp_ms);
+    return status;
+}
+
+status_t AudioGain::readFromParcel(const android::Parcel *parcel)
+{
+    status_t status = NO_ERROR;
+    if ((status = parcel->readInt32(&mIndex)) != NO_ERROR) return status;
+    if ((status = parcel->readBool(&mUseInChannelMask)) != NO_ERROR) return status;
+    if ((status = parcel->readBool(&mUseForVolume)) != NO_ERROR) return status;
+    if ((status = parcel->readUint32(&mGain.mode)) != NO_ERROR) return status;
+    if ((status = parcel->readUint32(&mGain.channel_mask)) != NO_ERROR) return status;
+    if ((status = parcel->readInt32(&mGain.min_value)) != NO_ERROR) return status;
+    if ((status = parcel->readInt32(&mGain.max_value)) != NO_ERROR) return status;
+    if ((status = parcel->readInt32(&mGain.default_value)) != NO_ERROR) return status;
+    if ((status = parcel->readUint32(&mGain.step_value)) != NO_ERROR) return status;
+    if ((status = parcel->readUint32(&mGain.min_ramp_ms)) != NO_ERROR) return status;
+    status = parcel->readUint32(&mGain.max_ramp_ms);
+    return status;
+}
+
+bool AudioGains::equals(const AudioGains &other) const
+{
+    return std::equal(begin(), end(), other.begin(), other.end(),
+                      [](const sp<AudioGain>& left, const sp<AudioGain>& right) {
+                          return left->equals(right);
+                      });
+}
+
+status_t AudioGains::writeToParcel(android::Parcel *parcel) const {
+    status_t status = NO_ERROR;
+    if ((status = parcel->writeVectorSize(*this)) != NO_ERROR) return status;
+    for (const auto &audioGain : *this) {
+        if ((status = parcel->writeParcelable(*audioGain)) != NO_ERROR) {
+            break;
+        }
+    }
+    return status;
+}
+
+status_t AudioGains::readFromParcel(const android::Parcel *parcel) {
+    status_t status = NO_ERROR;
+    this->clear();
+    if ((status = parcel->resizeOutVector(this)) != NO_ERROR) return status;
+    for (size_t i = 0; i < this->size(); i++) {
+        this->at(i) = new AudioGain(0, false);
+        if ((status = parcel->readParcelable(this->at(i).get())) != NO_ERROR) {
+            this->clear();
+            break;
+        }
+    }
+    return status;
 }
 
 } // namespace android

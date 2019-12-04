@@ -18,6 +18,8 @@
 
 #include <string>
 
+#include <binder/Parcel.h>
+#include <binder/Parcelable.h>
 #include <media/AudioGain.h>
 #include <media/AudioProfile.h>
 #include <utils/Errors.h>
@@ -27,7 +29,7 @@
 
 namespace android {
 
-class AudioPort : public virtual RefBase
+class AudioPort : public virtual RefBase, public virtual Parcelable
 {
 public:
     AudioPort(const std::string& name, audio_port_type_t type,  audio_port_role_t role) :
@@ -79,6 +81,11 @@ public:
 
     void log(const char* indent) const;
 
+    bool equals(const sp<AudioPort>& other) const;
+
+    status_t writeToParcel(Parcel* parcel) const override;
+    status_t readFromParcel(const Parcel* parcel) override;
+
     AudioGains mGains; // gain controllers
 protected:
     std::string  mName;
@@ -88,7 +95,7 @@ protected:
 };
 
 
-class AudioPortConfig : public virtual RefBase
+class AudioPortConfig : public virtual RefBase, public virtual Parcelable
 {
 public:
     virtual ~AudioPortConfig() = default;
@@ -107,6 +114,11 @@ public:
     audio_port_handle_t getId() const { return mId; }
 
     bool hasGainController(bool canUseForVolume = false) const;
+
+    bool equals(const sp<AudioPortConfig>& other) const;
+
+    status_t writeToParcel(Parcel* parcel) const override;
+    status_t readFromParcel(const Parcel* parcel) override;
 
 protected:
     unsigned int mSamplingRate = 0u;

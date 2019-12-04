@@ -110,4 +110,33 @@ void DeviceDescriptorBase::log() const
     AudioPort::log("  ");
 }
 
+bool DeviceDescriptorBase::equals(const sp<DeviceDescriptorBase> &other) const
+{
+    return other != nullptr &&
+           static_cast<const AudioPort*>(this)->equals(other) &&
+           static_cast<const AudioPortConfig*>(this)->equals(other) &&
+           mAddress.compare(other->address()) == 0 &&
+           mDeviceType == other->type();
+}
+
+status_t DeviceDescriptorBase::writeToParcel(Parcel *parcel) const
+{
+    status_t status = NO_ERROR;
+    if ((status = AudioPort::writeToParcel(parcel)) != NO_ERROR) return status;
+    if ((status = AudioPortConfig::writeToParcel(parcel)) != NO_ERROR) return status;
+    if ((status = parcel->writeUtf8AsUtf16(mAddress)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mDeviceType)) != NO_ERROR) return status;
+    return status;
+}
+
+status_t DeviceDescriptorBase::readFromParcel(const Parcel *parcel)
+{
+    status_t status = NO_ERROR;
+    if ((status = AudioPort::readFromParcel(parcel)) != NO_ERROR) return status;
+    if ((status = AudioPortConfig::readFromParcel(parcel)) != NO_ERROR) return status;
+    if ((status = parcel->readUtf8FromUtf16(&mAddress)) != NO_ERROR) return status;
+    if ((status = parcel->readUint32(&mDeviceType)) != NO_ERROR) return status;
+    return status;
+}
+
 } // namespace android
