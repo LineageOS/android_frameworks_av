@@ -159,6 +159,8 @@ status_t MediaAnalyticsService::submitInternal(MediaAnalyticsItem *item, bool re
     // now attach either the item or its dup to a const shared pointer
     std::shared_ptr<const MediaAnalyticsItem> sitem(release ? item : item->dup());
 
+    (void)mAudioAnalytics.submit(sitem, isTrusted);
+
     extern bool dump2Statsd(const std::shared_ptr<const MediaAnalyticsItem>& item);
     (void)dump2Statsd(sitem);  // failure should be logged in function.
     saveItem(sitem);
@@ -263,6 +265,9 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
             mItems.clear();
             // shall we clear the summary data too?
         }
+        // TODO: maybe consider a better way of dumping audio analytics info.
+        constexpr int32_t linesToDump = 1000;
+        result.append(mAudioAnalytics.dump(linesToDump).first.c_str());
     }
 
     write(fd, result.string(), result.size());
@@ -419,11 +424,14 @@ bool MediaAnalyticsService::isContentValid(const MediaAnalyticsItem *item, bool 
     if (isTrusted) return true;
     // untrusted uids can only send us a limited set of keys
     const std::string &key = item->getKey();
+    if (startsWith(key, "audio.")) return true;
     for (const char *allowedKey : {
+                                     // legacy audio
                                      "audiopolicy",
                                      "audiorecord",
                                      "audiothread",
                                      "audiotrack",
+                                     // other media
                                      "codec",
                                      "extractor",
                                      "nuplayer",

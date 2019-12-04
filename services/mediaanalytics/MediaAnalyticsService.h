@@ -26,6 +26,8 @@
 #include <media/IMediaAnalyticsService.h>
 #include <utils/String8.h>
 
+#include "AudioAnalytics.h"
+
 namespace android {
 
 class MediaAnalyticsService : public BnMediaAnalyticsService
@@ -114,6 +116,8 @@ private:
     } mUidInfo;  // mUidInfo can be accessed without lock (locked internally)
 
     std::atomic<int64_t> mItemsSubmitted{}; // accessed outside of lock.
+
+    mediametrics::AudioAnalytics mAudioAnalytics;
 
     std::mutex mLock;
     // statistics about our analytics
