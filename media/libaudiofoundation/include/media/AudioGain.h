@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <binder/Parcel.h>
+#include <binder/Parcelable.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 #include <system/audio.h>
@@ -24,7 +26,7 @@
 
 namespace android {
 
-class AudioGain: public RefBase
+class AudioGain: public RefBase, public Parcelable
 {
 public:
     AudioGain(int index, bool useInChannelMask);
@@ -65,6 +67,11 @@ public:
 
     const struct audio_gain &getGain() const { return mGain; }
 
+    bool equals(const sp<AudioGain>& other) const;
+
+    status_t writeToParcel(Parcel* parcel) const override;
+    status_t readFromParcel(const Parcel* parcel) override;
+
 private:
     int               mIndex;
     struct audio_gain mGain;
@@ -72,7 +79,7 @@ private:
     bool              mUseForVolume = false;
 };
 
-class AudioGains : public std::vector<sp<AudioGain> >
+class AudioGains : public std::vector<sp<AudioGain> >, public Parcelable
 {
 public:
     bool canUseForVolume() const
@@ -90,6 +97,11 @@ public:
         push_back(gain);
         return 0;
     }
+
+    bool equals(const AudioGains& other) const;
+
+    status_t writeToParcel(Parcel* parcel) const override;
+    status_t readFromParcel(const Parcel* parcel) override;
 };
 
 } // namespace android
