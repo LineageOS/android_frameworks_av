@@ -37,7 +37,7 @@ namespace camera3 {
 class HeicCompositeStream : public CompositeStream, public Thread,
         public CpuConsumer::FrameAvailableListener {
 public:
-    HeicCompositeStream(wp<CameraDeviceBase> device,
+    HeicCompositeStream(sp<CameraDeviceBase> device,
             wp<hardware::camera2::ICameraDeviceCallbacks> cb);
     ~HeicCompositeStream() override;
 
@@ -81,6 +81,7 @@ protected:
     bool threadLoop() override;
     bool onStreamBufferError(const CaptureResultExtras& resultExtras) override;
     void onResultError(const CaptureResultExtras& resultExtras) override;
+    void onRequestError(const CaptureResultExtras& resultExtras) override;
 
 private:
     //
@@ -156,9 +157,10 @@ private:
         CpuConsumer::LockedBuffer          yuvBuffer;
         std::vector<CodecInputBufferInfo>  codecInputBuffers;
 
-        bool                      error;
-        bool                      errorNotified;
-        int64_t                   frameNumber;
+        bool                      error;     // Main input image buffer error
+        bool                      exifError; // Exif/APP_SEGMENT buffer error
+        int64_t                   timestamp;
+        int32_t                   requestId;
 
         sp<AMessage>              format;
         sp<MediaMuxer>            muxer;
@@ -172,30 +174,29 @@ private:
         size_t                    codecInputCounter;
 
         InputFrame() : orientation(0), quality(kDefaultJpegQuality), error(false),
-                       errorNotified(false), frameNumber(-1), fenceFd(-1), fileFd(-1),
-                       trackIndex(-1), anb(nullptr), appSegmentWritten(false),
+                       exifError(false), timestamp(-1), requestId(-1), fenceFd(-1),
+                       fileFd(-1), trackIndex(-1), anb(nullptr), appSegmentWritten(false),
                        pendingOutputTiles(0), codecInputCounter(0) { }
     };
 
     void compilePendingInputLocked();
-    // Find first complete and valid frame with smallest timestamp
-    bool getNextReadyInputLocked(int64_t *currentTs /*out*/);
-    // Find next failing frame number with smallest timestamp and return respective frame number
-    int64_t getNextFailingInputLocked(int64_t *currentTs /*out*/);
+    // Find first complete and valid frame with smallest frame number
+    bool getNextReadyInputLocked(int64_t *frameNumber /*out*/);
+    // Find next failing frame number with smallest frame number and return respective frame number
+    int64_t getNextFailingInputLocked();
 
-    status_t processInputFrame(nsecs_t timestamp, InputFrame &inputFrame);
+    status_t processInputFrame(int64_t frameNumber, InputFrame &inputFrame);
     status_t processCodecInputFrame(InputFrame &inputFrame);
-    status_t startMuxerForInputFrame(nsecs_t timestamp, InputFrame &inputFrame);
-    status_t processAppSegment(nsecs_t timestamp, InputFrame &inputFrame);
-    status_t processOneCodecOutputFrame(nsecs_t timestamp, InputFrame &inputFrame);
-    status_t processCompletedInputFrame(nsecs_t timestamp, InputFrame &inputFrame);
+    status_t startMuxerForInputFrame(int64_t frameNumber, InputFrame &inputFrame);
+    status_t processAppSegment(int64_t frameNumber, InputFrame &inputFrame);
+    status_t processOneCodecOutputFrame(int64_t frameNumber, InputFrame &inputFrame);
+    status_t processCompletedInputFrame(int64_t frameNumber, InputFrame &inputFrame);
 
-    void releaseInputFrameLocked(InputFrame *inputFrame /*out*/);
+    void releaseInputFrameLocked(int64_t frameNumber, InputFrame *inputFrame /*out*/);
     void releaseInputFramesLocked();
 
     size_t findAppSegmentsSize(const uint8_t* appSegmentBuffer, size_t maxSize,
             size_t* app1SegmentSize);
-    int64_t findTimestampInNsLocked(int64_t timeInUs);
     status_t copyOneYuvTile(sp<MediaCodecBuffer>& codecBuffer,
             const CpuConsumer::LockedBuffer& yuvBuffer,
             size_t top, size_t left, size_t width, size_t height);
@@ -218,12 +219,14 @@ private:
     sp<CpuConsumer>   mAppSegmentConsumer;
     sp<Surface>       mAppSegmentSurface;
     size_t            mAppSegmentMaxSize;
+    std::queue<int64_t> mAppSegmentFrameNumbers;
     CameraMetadata    mStaticInfo;
 
     int               mMainImageStreamId, mMainImageSurfaceId;
     sp<Surface>       mMainImageSurface;
     sp<CpuConsumer>   mMainImageConsumer; // Only applicable for HEVC codec.
     bool              mYuvBufferAcquired; // Only applicable to HEVC codec
+    std::queue<int64_t> mMainImageFrameNumbers;
 
     static const int32_t kMaxOutputSurfaceProducerCount = 1;
     sp<Surface>       mOutputSurface;
@@ -231,9 +234,22 @@ private:
     int32_t           mDequeuedOutputBufferCnt;
 
     // Map from frame number to JPEG setting of orientation+quality
-    std::map<int64_t, std::pair<int32_t, int32_t>> mSettingsByFrameNumber;
-    // Map from timestamp to JPEG setting of orientation+quality
-    std::map<int64_t, std::pair<int32_t, int32_t>> mSettingsByTimestamp;
+    struct HeicSettings {
+        int32_t orientation;
+        int32_t quality;
+        int64_t timestamp;
+        int32_t requestId;
+        bool shutterNotified;
+
+        HeicSettings() : orientation(0), quality(95), timestamp(0),
+                requestId(-1), shutterNotified(false) {}
+        HeicSettings(int32_t _orientation, int32_t _quality) :
+                orientation(_orientation),
+                quality(_quality), timestamp(0),
+                requestId(-1), shutterNotified(false) {}
+
+    };
+    std::map<int64_t, HeicSettings> mSettingsByFrameNumber;
 
     // Keep all incoming APP segment Blob buffer pending further processing.
     std::vector<int64_t> mInputAppSegmentBuffers;
@@ -241,7 +257,7 @@ private:
 
     // Keep all incoming HEIC blob buffer pending further processing.
     std::vector<CodecOutputBufferInfo> mCodecOutputBuffers;
-    std::queue<int64_t> mCodecOutputBufferTimestamps;
+    std::queue<int64_t> mCodecOutputBufferFrameNumbers;
     size_t mCodecOutputCounter;
     int32_t mQuality;
 
@@ -253,11 +269,19 @@ private:
     // Artificial strictly incremental YUV grid timestamp to make encoder happy.
     int64_t mGridTimestampUs;
 
-    // In most common use case, entries are accessed in order.
+    // Indexed by frame number. In most common use case, entries are accessed in order.
     std::map<int64_t, InputFrame> mPendingInputFrames;
 
     // Function pointer of libyuv row copy.
     void (*mFnCopyRow)(const uint8_t* src, uint8_t* dst, int width);
+
+    // A set of APP_SEGMENT error frame numbers
+    std::set<int64_t> mExifErrorFrameNumbers;
+    void flagAnExifErrorFrameNumber(int64_t frameNumber);
+
+    // The status id for tracking the active/idle status of this composite stream
+    int mStatusId;
+    void markTrackerIdle();
 };
 
 }; // namespace camera3
