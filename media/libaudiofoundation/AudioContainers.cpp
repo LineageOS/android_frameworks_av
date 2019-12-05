@@ -42,11 +42,25 @@ const DeviceTypeSet& getAudioDeviceOutAllScoSet() {
     return audioDeviceOutAllScoSet;
 }
 
+const DeviceTypeSet& getAudioDeviceOutAllUsbSet() {
+    static const DeviceTypeSet audioDeviceOutAllUsbSet = DeviceTypeSet(
+            std::begin(AUDIO_DEVICE_OUT_ALL_USB_ARRAY),
+            std::end(AUDIO_DEVICE_OUT_ALL_USB_ARRAY));
+    return audioDeviceOutAllUsbSet;
+}
+
 const DeviceTypeSet& getAudioDeviceInAllSet() {
     static const DeviceTypeSet audioDeviceInAllSet = DeviceTypeSet(
             std::begin(AUDIO_DEVICE_IN_ALL_ARRAY),
             std::end(AUDIO_DEVICE_IN_ALL_ARRAY));
     return audioDeviceInAllSet;
+}
+
+const DeviceTypeSet& getAudioDeviceInAllUsbSet() {
+    static const DeviceTypeSet audioDeviceInAllUsbSet = DeviceTypeSet(
+            std::begin(AUDIO_DEVICE_IN_ALL_USB_ARRAY),
+            std::end(AUDIO_DEVICE_IN_ALL_USB_ARRAY));
+    return audioDeviceInAllUsbSet;
 }
 
 bool deviceTypesToString(const DeviceTypeSet &deviceTypes, std::string &str) {

@@ -27,6 +27,7 @@ cc_defaults {
         "android.hardware.audio.common-util",
         "android.hidl.allocator@1.0",
         "android.hidl.memory@1.0",
+        "libaudiofoundation",
         "libaudiohal_deathhandler",
         "libaudioutils",
         "libbase",
