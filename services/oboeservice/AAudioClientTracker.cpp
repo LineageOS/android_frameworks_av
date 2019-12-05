@@ -75,10 +75,10 @@ aaudio_result_t AAudioClientTracker::registerClient(pid_t pid,
 
     std::lock_guard<std::mutex> lock(mLock);
     if (mNotificationClients.count(pid) == 0) {
-        sp<NotificationClient> notificationClient = new NotificationClient(pid);
+        sp<IBinder> binder = IInterface::asBinder(client);
+        sp<NotificationClient> notificationClient = new NotificationClient(pid, binder);
         mNotificationClients[pid] = notificationClient;
 
-        sp<IBinder> binder = IInterface::asBinder(client);
         status_t status = binder->linkToDeath(notificationClient);
         ALOGW_IF(status != NO_ERROR, "registerClient() linkToDeath = %d\n", status);
         return AAudioConvert_androidToAAudioResult(status);
@@ -113,7 +113,7 @@ AAudioClientTracker::registerClientStream(pid_t pid, sp<AAudioServiceStreamBase>
     if (notificationClient == 0) {
         // This will get called the first time the audio server registers an internal stream.
         ALOGV("registerClientStream(%d,) unrecognized pid\n", pid);
-        notificationClient = new NotificationClient(pid);
+        notificationClient = new NotificationClient(pid, nullptr);
         mNotificationClients[pid] = notificationClient;
     }
     notificationClient->registerClientStream(serviceStream);
@@ -136,8 +136,8 @@ AAudioClientTracker::unregisterClientStream(pid_t pid,
     return AAUDIO_OK;
 }
 
-AAudioClientTracker::NotificationClient::NotificationClient(pid_t pid)
-        : mProcessId(pid) {
+AAudioClientTracker::NotificationClient::NotificationClient(pid_t pid, const sp<IBinder>& binder)
+        : mProcessId(pid), mBinder(binder) {
 }
 
 AAudioClientTracker::NotificationClient::~NotificationClient() {
