@@ -511,13 +511,8 @@ Return<DevicePortTraits::Element> DevicePortTraits::deserialize(const xmlNode *c
     if (!encodedFormatsLiteral.empty()) {
         encodedFormats = formatsFromString(encodedFormatsLiteral, " ");
     }
-    Element deviceDesc = new DeviceDescriptor(type, encodedFormats, name);
-
     std::string address = getXmlAttribute(cur, Attributes::address);
-    if (!address.empty()) {
-        ALOGV("%s: address=%s for %s", __func__, address.c_str(), name.c_str());
-        deviceDesc->setAddress(address);
-    }
+    Element deviceDesc = new DeviceDescriptor(type, name, address, encodedFormats);
 
     AudioProfileTraits::Collection profiles;
     status_t status = deserializeCollection<AudioProfileTraits>(cur, &profiles, NULL);
