@@ -511,6 +511,8 @@ public:
 
     /* List available microphones and their characteristics */
     virtual status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones) = 0;
+
+    virtual status_t setAudioHalPids(const std::vector<pid_t>& pids) = 0;
 };
 
 

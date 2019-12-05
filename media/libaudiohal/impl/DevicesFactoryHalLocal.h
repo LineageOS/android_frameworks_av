@@ -33,6 +33,10 @@ class DevicesFactoryHalLocal : public DevicesFactoryHalInterface
     // necessary to release references to the returned object.
     virtual status_t openDevice(const char *name, sp<DeviceHalInterface> *device);
 
+            status_t getHalPids(std::vector<pid_t> *pids __unused) override {
+                return INVALID_OPERATION;
+            }
+
   private:
     friend class DevicesFactoryHalHybrid;
 
