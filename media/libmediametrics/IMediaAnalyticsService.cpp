@@ -34,8 +34,11 @@
 
 namespace android {
 
+// TODO: Currently ONE_WAY transactions, make both ONE_WAY and synchronous options.
+
 enum {
-    SUBMIT_ITEM_ONEWAY = IBinder::FIRST_CALL_TRANSACTION,
+    SUBMIT_ITEM = IBinder::FIRST_CALL_TRANSACTION,
+    SUBMIT_BUFFER,
 };
 
 class BpMediaAnalyticsService: public BpInterface<IMediaAnalyticsService>
@@ -62,7 +65,30 @@ public:
         }
 
         status = remote()->transact(
-                SUBMIT_ITEM_ONEWAY, data, nullptr /* reply */, IBinder::FLAG_ONEWAY);
+                SUBMIT_ITEM, data, nullptr /* reply */, IBinder::FLAG_ONEWAY);
+        ALOGW_IF(status != NO_ERROR, "%s: bad response from service for submit, status=%d",
+                __func__, status);
+        return status;
+    }
+
+    status_t submitBuffer(const char *buffer, size_t length) override
+    {
+        if (buffer == nullptr || length > INT32_MAX) {
+            return BAD_VALUE;
+        }
+        ALOGV("%s: (ONEWAY) length:%zu", __func__, length);
+
+        Parcel data;
+        data.writeInterfaceToken(IMediaAnalyticsService::getInterfaceDescriptor());
+
+        status_t status = data.writeInt32(length)
+                ?: data.write((uint8_t*)buffer, length);
+        if (status != NO_ERROR) {
+            return status;
+        }
+
+        status = remote()->transact(
+                SUBMIT_BUFFER, data, nullptr /* reply */, IBinder::FLAG_ONEWAY);
         ALOGW_IF(status != NO_ERROR, "%s: bad response from service for submit, status=%d",
                 __func__, status);
         return status;
@@ -76,10 +102,8 @@ IMPLEMENT_META_INTERFACE(MediaAnalyticsService, "android.media.IMediaAnalyticsSe
 status_t BnMediaAnalyticsService::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
-    const int clientPid = IPCThreadState::self()->getCallingPid();
-
     switch (code) {
-    case SUBMIT_ITEM_ONEWAY: {
+    case SUBMIT_ITEM: {
         CHECK_INTERFACE(IMediaAnalyticsService, data, reply);
 
         MediaAnalyticsItem * const item = MediaAnalyticsItem::create();
@@ -87,12 +111,25 @@ status_t BnMediaAnalyticsService::onTransact(
         if (status != NO_ERROR) { // assume failure logged in item
             return status;
         }
-        // TODO: remove this setPid.
-        item->setPid(clientPid);
         status = submitInternal(item, true /* release */);
         // assume failure logged by submitInternal
         return NO_ERROR;
-    } break;
+    }
+    case SUBMIT_BUFFER: {
+        CHECK_INTERFACE(IMediaAnalyticsService, data, reply);
+        int32_t length;
+        status_t status = data.readInt32(&length);
+        if (status != NO_ERROR || length <= 0) {
+            return BAD_VALUE;
+        }
+        const void *ptr = data.readInplace(length);
+        if (ptr == nullptr) {
+            return BAD_VALUE;
+        }
+        status = submitBuffer(static_cast<const char *>(ptr), length);
+        // assume failure logged by submitBuffer
+        return NO_ERROR;
+    }
 
     default:
         return BBinder::onTransact(code, data, reply, flags);

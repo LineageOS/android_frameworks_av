@@ -49,6 +49,8 @@ public:
                may be silent and return 0 - success).
      */
     virtual status_t submit(MediaAnalyticsItem *item) = 0;
+
+    virtual status_t submitBuffer(const char *buffer, size_t length) = 0;
 };
 
 // ----------------------------------------------------------------------------

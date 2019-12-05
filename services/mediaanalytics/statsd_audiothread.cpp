@@ -37,7 +37,7 @@
 
 namespace android {
 
-bool statsd_audiothread(MediaAnalyticsItem *item)
+bool statsd_audiothread(const MediaAnalyticsItem *item)
 {
     if (item == NULL) return false;
 

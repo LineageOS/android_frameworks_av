@@ -36,50 +36,346 @@ class IMediaAnalyticsService;
 class Parcel;
 
 /*
- * Media Metrics
- * Byte String format for communication of MediaAnalyticsItem.
+ * MediaMetrics Item
  *
- * .... begin of item
- * .... begin of header
- * (uint32) length: including the length field itself
- * (uint32) header length, including header_length and length fields.
- * (uint16) version: 0
- * (uint16) key length, including zero termination
- * (int8)+ key string, including 0 termination
+ * Byte string format.
+ *
+ * For Java
+ *  int64 corresponds to long
+ *  int32, uint32 corresponds to int
+ *  uint16 corresponds to char
+ *  uint8, int8 corresponds to byte
+ *
+ * Hence uint8 and uint32 values are limited to INT8_MAX and INT32_MAX.
+ *
+ * Physical layout of integers and doubles within the MediaMetrics byte string
+ * is in Native / host order, which is nearly always little endian.
+ *
+ * -- begin of item
+ * -- begin of header
+ * (uint32) item size: including the item size field
+ * (uint32) header size, including the item size and header size fields.
+ * (uint16) version: exactly 0
+ * (uint16) key size, that is key strlen + 1 for zero termination.
+ * (int8)+ key string which is 0 terminated
  * (int32) pid
  * (int32) uid
  * (int64) timestamp
- * .... end of header
- * .... begin body
- * (uint32) properties
- * #properties of the following:
- *     (uint16) property_length, including property_length field itself
+ * -- end of header
+ * -- begin body
+ * (uint32) number of properties
+ * -- repeat for number of properties
+ *     (uint16) property size, including property size field itself
  *     (uint8) type of property
  *     (int8)+ key string, including 0 termination
- *      based on type of property (above), one of:
+ *      based on type of property (given above), one of:
  *       (int32)
  *       (int64)
  *       (double)
  *       (int8)+ for cstring, including 0 termination
  *       (int64, int64) for rate
- * .... end body
- * .... end of item
+ * -- end body
+ * -- end of item
  */
+
+namespace mediametrics {
+
+// Type must match MediaMetrics.java
+enum Type {
+    kTypeNone = 0,
+    kTypeInt32 = 1,
+    kTypeInt64 = 2,
+    kTypeDouble = 3,
+    kTypeCString = 4,
+    kTypeRate = 5,
+};
+
+template<size_t N>
+static inline bool startsWith(const std::string &s, const char (&comp)[N]) {
+    return !strncmp(s.c_str(), comp, N-1);
+}
+
+/**
+ * Media Metrics BaseItem
+ *
+ * A base class which contains utility static functions to write to a byte stream
+ * and access the Media Metrics service.
+ */
+
+class BaseItem {
+    friend class MediaMetricsDeathNotifier; // for dropInstance
+    // enabled 1, disabled 0
+public:
+    // are we collecting analytics data
+    static bool isEnabled();
+
+protected:
+    static constexpr const char * const EnabledProperty = "media.metrics.enabled";
+    static constexpr const char * const EnabledPropertyPersist = "persist.media.metrics.enabled";
+    static const int EnabledProperty_default = 1;
+
+    // let's reuse a binder connection
+    static sp<IMediaAnalyticsService> sAnalyticsService;
+    static sp<IMediaAnalyticsService> getInstance();
+    static void dropInstance();
+    static bool submitBuffer(const char *buffer, size_t len);
+
+    static status_t writeToByteString(
+            const char *name, int32_t value, char **bufferpptr, char *bufferptrmax);
+    static status_t writeToByteString(
+            const char *name, int64_t value, char **bufferpptr, char *bufferptrmax);
+    static status_t writeToByteString(
+            const char *name, double value, char **bufferpptr, char *bufferptrmax);
+    static status_t writeToByteString(
+            const char *name, const std::pair<int64_t, int64_t> &value,
+            char **bufferpptr, char *bufferptrmax);
+    static status_t writeToByteString(
+            const char *name, char * const &value, char **bufferpptr, char *bufferptrmax);
+    static status_t writeToByteString(
+            const char *name, const char * const &value, char **bufferpptr, char *bufferptrmax);
+    struct none_t {}; // for kTypeNone
+    static status_t writeToByteString(
+            const char *name, const none_t &, char **bufferpptr, char *bufferptrmax);
+
+    template<typename T>
+    static status_t sizeOfByteString(const char *name, const T& value) {
+        return 2 + 1 + strlen(name) + 1 + sizeof(value);
+    }
+    template<> // static
+    status_t sizeOfByteString(const char *name, char * const &value) {
+        return 2 + 1 + strlen(name) + 1 + strlen(value) + 1;
+    }
+    template<> // static
+    status_t sizeOfByteString(const char *name, const char * const &value) {
+        return 2 + 1 + strlen(name) + 1 + strlen(value) + 1;
+    }
+    template<> // static
+    status_t sizeOfByteString(const char *name, const none_t &) {
+         return 2 + 1 + strlen(name) + 1;
+    }
+};
+
+/**
+ * Media Metrics BufferedItem
+ *
+ * A base class which represents a put-only Media Metrics item, storing
+ * the Media Metrics data in a buffer with begin and end pointers.
+ *
+ * If a property key is entered twice, it will be stored in the buffer twice,
+ * and (implementation defined) the last value for that key will be used
+ * by the Media Metrics service.
+ *
+ * For realloc, a baseRealloc pointer must be passed in either explicitly
+ * or implicitly in the constructor. This will be updated with the value used on realloc.
+ */
+class BufferedItem : public BaseItem {
+public:
+    static inline constexpr uint16_t kVersion = 0;
+
+    virtual ~BufferedItem() = default;
+    BufferedItem(const BufferedItem&) = delete;
+    BufferedItem& operator=(const BufferedItem&) = delete;
+
+    BufferedItem(const std::string key, char *begin, char *end)
+        : BufferedItem(key.c_str(), begin, end) { }
+
+    BufferedItem(const char *key, char *begin, char *end)
+        : BufferedItem(key, begin, end, nullptr) { }
+
+    BufferedItem(const char *key, char **begin, char *end)
+        : BufferedItem(key, *begin, end, begin) { }
+
+    BufferedItem(const char *key, char *begin, char *end, char **baseRealloc)
+        : mBegin(begin)
+        , mEnd(end)
+        , mBaseRealloc(baseRealloc)
+    {
+        init(key);
+    }
+
+    template<typename T>
+    BufferedItem &set(const char *key, const T& value) {
+        reallocFor(sizeOfByteString(key, value));
+        if (mStatus == NO_ERROR) {
+            mStatus = BaseItem::writeToByteString(key, value, &mBptr, mEnd);
+            ++mPropCount;
+        }
+        return *this;
+    }
+
+    template<typename T>
+    BufferedItem &set(const std::string& key, const T& value) {
+        return set(key.c_str(), value);
+    }
+
+    BufferedItem &setPid(pid_t pid) {
+        if (mStatus == NO_ERROR) {
+            copyTo(mBegin + mHeaderLen - 16, (int32_t)pid);
+        }
+        return *this;
+    }
+
+    BufferedItem &setUid(uid_t uid) {
+        if (mStatus == NO_ERROR) {
+            copyTo(mBegin + mHeaderLen - 12, (int32_t)uid);
+        }
+        return *this;
+    }
+
+    BufferedItem &setTimestamp(nsecs_t timestamp) {
+        if (mStatus == NO_ERROR) {
+            copyTo(mBegin + mHeaderLen - 8, (int64_t)timestamp);
+        }
+        return *this;
+    }
+
+    bool record() {
+        return updateHeader()
+                && BaseItem::submitBuffer(getBuffer(), getLength());
+    }
+
+    bool isValid () const {
+        return mStatus == NO_ERROR;
+    }
+
+    char *getBuffer() const { return mBegin; }
+    size_t getLength() const { return mBptr - mBegin; }
+    size_t getRemaining() const { return mEnd - mBptr; }
+    size_t getCapacity() const { return mEnd - mBegin; }
+
+    bool updateHeader() {
+        if (mStatus != NO_ERROR) return false;
+        copyTo(mBegin + 0, (uint32_t)getLength());
+        copyTo(mBegin + 4, (uint32_t)mHeaderLen);
+        copyTo(mBegin + mHeaderLen, (uint32_t)mPropCount);
+        return true;
+    }
+
+protected:
+    BufferedItem() = default;
+
+    void reallocFor(size_t required) {
+        if (mStatus != NO_ERROR) return;
+        const size_t remaining = getRemaining();
+        if (required <= remaining) return;
+        if (mBaseRealloc == nullptr) {
+            mStatus = NO_MEMORY;
+            return;
+        }
+
+        const size_t current = getLength();
+        size_t minimum = current + required;
+        if (minimum > SSIZE_MAX >> 1) {
+            mStatus = NO_MEMORY;
+            return;
+        }
+        minimum <<= 1;
+        void *newptr = realloc(*mBaseRealloc, minimum);
+        if (newptr == nullptr) {
+            mStatus = NO_MEMORY;
+            return;
+        }
+        if (newptr != *mBaseRealloc) {
+            // ALOGD("base changed! current:%zu new size %zu", current, minimum);
+            if (*mBaseRealloc == nullptr) {
+                memcpy(newptr, mBegin, current);
+            }
+            mBegin = (char *)newptr;
+            *mBaseRealloc = mBegin;
+            mEnd = mBegin + minimum;
+            mBptr = mBegin + current;
+        } else {
+            // ALOGD("base kept! current:%zu new size %zu", current, minimum);
+            mEnd = mBegin + minimum;
+        }
+    }
+    template<typename T>
+    void copyTo(char *ptr, const T& value) {
+        memcpy(ptr, &value, sizeof(value));
+    }
+
+    void init(const char *key) {
+        mBptr = mBegin;
+        const size_t keylen = strlen(key) + 1;
+        mHeaderLen = 4 + 4 + 2 + 2 + keylen + 4 + 4 + 8;
+        reallocFor(mHeaderLen);
+        if (mStatus != NO_ERROR) return;
+        mBptr = mBegin + mHeaderLen + 4; // this includes propcount.
+
+        if (mEnd < mBptr || keylen > UINT16_MAX) {
+           mStatus = NO_MEMORY;
+           mBptr = mEnd;
+           return;
+        }
+        copyTo(mBegin + 8, kVersion);
+        copyTo(mBegin + 10, (uint16_t)keylen);
+        strcpy(mBegin + 12, key);
+
+        // initialize some parameters (that could be overridden)
+        setPid(-1);
+        setUid(-1);
+        setTimestamp(0);
+    }
+
+    char *mBegin = nullptr;
+    char *mEnd = nullptr;
+    char **mBaseRealloc = nullptr;  // set to an address if realloc should be done.
+                                    // upon return, that pointer is updated with
+                                    // whatever needs to be freed.
+    char *mBptr = nullptr;
+    status_t mStatus = NO_ERROR;
+    uint32_t mPropCount = 0;
+    uint32_t mHeaderLen = 0;
+};
+
+/**
+ * MediaMetrics Item is a stack allocated media analytics item used for
+ * fast logging.  It falls over to a malloc if needed.
+ *
+ * This is templated with a buffer size to allocate on the stack.
+ */
+template <size_t N = 4096>
+class Item : public BufferedItem {
+public:
+    explicit Item(const std::string key) : Item(key.c_str()) { }
+
+    // Since this class will not be defined before the base class, we initialize variables
+    // in our own order.
+    explicit Item(const char *key) {
+         mBegin = mBuffer;
+         mEnd = mBuffer + N;
+         mBaseRealloc = &mReallocPtr;
+         init(key);
+    }
+
+    ~Item() override {
+        if (mReallocPtr != nullptr) { // do the check before calling free to avoid overhead.
+            free(mReallocPtr);
+        }
+    }
+
+private:
+    char *mReallocPtr = nullptr;  // set non-null by base class if realloc happened.
+    char mBuffer[N];
+};
+
+} // mediametrics
 
 /**
  * Media Metrics MediaAnalyticsItem
  *
  * A mutable item representing an event or record that will be
- * logged with the Media Metrics service.
+ * logged with the Media Metrics service.  For client logging, one should
+ * use the mediametrics::Item.
  *
+ * The MediaAnalyticsItem is designed for the service as it has getters.
  */
-
-class MediaAnalyticsItem {
+class MediaAnalyticsItem : public mediametrics::BaseItem {
     friend class MediaMetricsJNI;           // TODO: remove this access
-    friend class MediaMetricsDeathNotifier; // for dropInstance
 
 public:
 
+     // TODO: remove this duplicate definition when frameworks base is updated.
             enum Type {
                 kTypeNone = 0,
                 kTypeInt32 = 1,
@@ -281,27 +577,11 @@ public:
     status_t writeToByteString(char **bufferptr, size_t *length) const;
     status_t readFromByteString(const char *bufferptr, size_t length);
 
-    static status_t writeToByteString(
-            const char *name, int32_t value, char **bufferpptr, char *bufferptrmax);
-    static status_t writeToByteString(
-            const char *name, int64_t value, char **bufferpptr, char *bufferptrmax);
-    static status_t writeToByteString(
-            const char *name, double value, char **bufferpptr, char *bufferptrmax);
-    static status_t writeToByteString(
-            const char *name, const std::pair<int64_t, int64_t> &value, char **bufferpptr, char *bufferptrmax);
-    static status_t writeToByteString(
-            const char *name, char * const &value, char **bufferpptr, char *bufferptrmax);
-    struct none_t {}; // for kTypeNone
-    static status_t writeToByteString(
-            const char *name, const none_t &, char **bufferpptr, char *bufferptrmax);
 
         std::string toString() const;
         std::string toString(int version) const;
         const char *toCString();
         const char *toCString(int version);
-
-        // are we collecting analytics data
-        static bool isEnabled();
 
     protected:
 
@@ -316,15 +596,7 @@ private:
     int32_t writeToParcel0(Parcel *) const;
     int32_t readFromParcel0(const Parcel&);
 
-    // enabled 1, disabled 0
-    static constexpr const char * const EnabledProperty = "media.metrics.enabled";
-    static constexpr const char * const EnabledPropertyPersist = "persist.media.metrics.enabled";
-    static const int EnabledProperty_default = 1;
 
-    // let's reuse a binder connection
-    static sp<IMediaAnalyticsService> sAnalyticsService;
-    static sp<IMediaAnalyticsService> getInstance();
-    static void dropInstance();
 
     // checks equality even with nullptr.
     static bool stringEquals(const char *a, const char *b) {
@@ -435,7 +707,29 @@ public:
         }
 
         bool isNamed(const char *name) const {
-            return strcmp(name, mName) == 0;
+            return stringEquals(name, mName);
+        }
+
+        template <typename T> void visit(T f) const {
+            switch (mType) {
+            case MediaAnalyticsItem::kTypeInt32:
+                f(u.int32Value);
+                return;
+            case MediaAnalyticsItem::kTypeInt64:
+                f(u.int64Value);
+                return;
+            case MediaAnalyticsItem::kTypeDouble:
+                f(u.doubleValue);
+                return;
+            case MediaAnalyticsItem::kTypeRate:
+                f(u.rate);
+                return;
+            case MediaAnalyticsItem::kTypeCString:
+                f(u.CStringValue);
+                return;
+            default:
+                return;
+            }
         }
 
         template <typename T> bool get(T *value) const = delete;

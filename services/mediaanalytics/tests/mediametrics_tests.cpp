@@ -281,3 +281,78 @@ TEST(mediametrics_tests, item_iteration) {
   }
   ASSERT_EQ(31, mask);
 }
+
+TEST(mediametrics_tests, item_expansion) {
+  mediametrics::Item<1> item("I");
+  item.set("i32", (int32_t)1)
+      .set("i64", (int64_t)2)
+      .set("double", (double)3.125)
+      .set("string", "abcdefghijklmnopqrstuvwxyz")
+      .set("rate", std::pair<int64_t, int64_t>(11, 12));
+  ASSERT_TRUE(item.updateHeader());
+
+  MediaAnalyticsItem item2;
+  item2.readFromByteString(item.getBuffer(), item.getLength());
+  ASSERT_EQ((pid_t)-1, item2.getPid());
+  ASSERT_EQ((uid_t)-1, item2.getUid());
+  int mask = 0;
+  for (auto &prop : item2) {
+      const char *name = prop.getName();
+      if (!strcmp(name, "i32")) {
+          int32_t i32;
+          ASSERT_TRUE(prop.get(&i32));
+          ASSERT_EQ(1, i32);
+          mask |= 1;
+      } else if (!strcmp(name, "i64")) {
+          int64_t i64;
+          ASSERT_TRUE(prop.get(&i64));
+          ASSERT_EQ(2, i64);
+          mask |= 2;
+      } else if (!strcmp(name, "double")) {
+          double d;
+          ASSERT_TRUE(prop.get(&d));
+          ASSERT_EQ(3.125, d);
+          mask |= 4;
+      } else if (!strcmp(name, "string")) {
+          const char *s;
+          ASSERT_TRUE(prop.get(&s));
+          ASSERT_EQ(0, strcmp(s, "abcdefghijklmnopqrstuvwxyz"));
+          mask |= 8;
+      } else if (!strcmp(name, "rate")) {
+          std::pair<int64_t, int64_t> r;
+          ASSERT_TRUE(prop.get(&r));
+          ASSERT_EQ(11, r.first);
+          ASSERT_EQ(12, r.second);
+          mask |= 16;
+      } else {
+          FAIL();
+      }
+  }
+  ASSERT_EQ(31, mask);
+}
+
+TEST(mediametrics_tests, item_expansion2) {
+  mediametrics::Item<1> item("Bigly");
+  item.setPid(123)
+      .setUid(456);
+  constexpr size_t count = 10000;
+
+  for (size_t i = 0; i < count; ++i) {
+    // printf("recording %zu, %p, len:%zu of %zu  remaining:%zu \n", i, item.getBuffer(), item.getLength(), item.getCapacity(), item.getRemaining());
+    item.set(std::to_string(i).c_str(), (int32_t)i);
+  }
+  ASSERT_TRUE(item.updateHeader());
+
+  MediaAnalyticsItem item2;
+  printf("begin buffer:%p  length:%zu\n", item.getBuffer(), item.getLength());
+  fflush(stdout);
+  item2.readFromByteString(item.getBuffer(), item.getLength());
+
+  ASSERT_EQ((pid_t)123, item2.getPid());
+  ASSERT_EQ((uid_t)456, item2.getUid());
+  for (size_t i = 0; i < count; ++i) {
+    int32_t i32;
+    ASSERT_TRUE(item2.getInt32(std::to_string(i).c_str(), &i32));
+    ASSERT_EQ((int32_t)i, i32);
+  }
+}
