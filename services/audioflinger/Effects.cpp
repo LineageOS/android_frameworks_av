@@ -29,7 +29,9 @@
 #include <system/audio_effects/effect_visualizer.h>
 #include <audio_utils/channels.h>
 #include <audio_utils/primitives.h>
+#include <media/AudioContainers.h>
 #include <media/AudioEffect.h>
+#include <media/AudioDeviceTypeAddr.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <mediautils/ServiceUtilities.h>
@@ -1229,9 +1231,11 @@ void AudioFlinger::EffectChain::setVolumeForOutput_l(uint32_t left, uint32_t rig
     }
 }
 
-status_t AudioFlinger::EffectModule::setDevice(audio_devices_t device)
+status_t AudioFlinger::EffectModule::sendSetAudioDevicesCommand(
+        const AudioDeviceTypeAddrVector &devices, uint32_t cmdCode)
 {
-    if (device == AUDIO_DEVICE_NONE) {
+    audio_devices_t deviceType = deviceTypesToBitMask(getAudioDeviceTypes(devices));
+    if (deviceType == AUDIO_DEVICE_NONE) {
         return NO_ERROR;
     }
 
@@ -1243,15 +1247,24 @@ status_t AudioFlinger::EffectModule::setDevice(audio_devices_t device)
     if ((mDescriptor.flags & EFFECT_FLAG_DEVICE_MASK) == EFFECT_FLAG_DEVICE_IND) {
         status_t cmdStatus;
         uint32_t size = sizeof(status_t);
-        uint32_t cmd = audio_is_output_devices(device) ? EFFECT_CMD_SET_DEVICE :
-                            EFFECT_CMD_SET_INPUT_DEVICE;
-        status = mEffectInterface->command(cmd,
+        // FIXME: use audio device types and addresses when the hal interface is ready.
+        status = mEffectInterface->command(cmdCode,
                                            sizeof(uint32_t),
-                                           &device,
+                                           &deviceType,
                                            &size,
                                            &cmdStatus);
     }
     return status;
+}
+
+status_t AudioFlinger::EffectModule::setDevices(const AudioDeviceTypeAddrVector &devices)
+{
+    return sendSetAudioDevicesCommand(devices, EFFECT_CMD_SET_DEVICE);
+}
+
+status_t AudioFlinger::EffectModule::setInputDevice(const AudioDeviceTypeAddr &device)
+{
+    return sendSetAudioDevicesCommand({device}, EFFECT_CMD_SET_INPUT_DEVICE);
 }
 
 status_t AudioFlinger::EffectModule::setMode(audio_mode_t mode)
@@ -2288,12 +2301,21 @@ size_t AudioFlinger::EffectChain::removeEffect_l(const sp<EffectModule>& effect,
     return mEffects.size();
 }
 
-// setDevice_l() must be called with ThreadBase::mLock held
-void AudioFlinger::EffectChain::setDevice_l(audio_devices_t device)
+// setDevices_l() must be called with ThreadBase::mLock held
+void AudioFlinger::EffectChain::setDevices_l(const AudioDeviceTypeAddrVector &devices)
 {
     size_t size = mEffects.size();
     for (size_t i = 0; i < size; i++) {
-        mEffects[i]->setDevice(device);
+        mEffects[i]->setDevices(devices);
+    }
+}
+
+// setInputDevice_l() must be called with ThreadBase::mLock held
+void AudioFlinger::EffectChain::setInputDevice_l(const AudioDeviceTypeAddr &device)
+{
+    size_t size = mEffects.size();
+    for (size_t i = 0; i < size; i++) {
+        mEffects[i]->setInputDevice(device);
     }
 }
 
