@@ -35,6 +35,8 @@ class DeviceDescriptorBase : public AudioPort, public AudioPortConfig
 public:
      // Note that empty name refers by convention to a generic device.
     explicit DeviceDescriptorBase(audio_devices_t type);
+    DeviceDescriptorBase(audio_devices_t type, const std::string& address);
+    explicit DeviceDescriptorBase(const AudioDeviceTypeAddr& deviceTypeAddr);
 
     virtual ~DeviceDescriptorBase() {}
 
