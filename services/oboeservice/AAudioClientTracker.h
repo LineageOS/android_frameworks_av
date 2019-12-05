@@ -73,7 +73,7 @@ private:
      */
     class NotificationClient : public IBinder::DeathRecipient {
     public:
-        NotificationClient(pid_t pid);
+        NotificationClient(pid_t pid, const android::sp<IBinder>& binder);
         virtual ~NotificationClient();
 
         int32_t getStreamCount();
@@ -91,6 +91,8 @@ private:
         mutable std::mutex                              mLock;
         const pid_t                                     mProcessId;
         std::set<android::sp<AAudioServiceStreamBase>>  mStreams;
+        // hold onto binder to receive death notifications
+        android::sp<IBinder>                            mBinder;
     };
 
     mutable std::mutex                               mLock;
