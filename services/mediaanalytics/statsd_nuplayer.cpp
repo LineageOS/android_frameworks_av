@@ -41,7 +41,7 @@ namespace android {
  *  handles nuplayer AND nuplayer2
  *  checks for the union of what the two players generate
  */
-bool statsd_nuplayer(MediaAnalyticsItem *item)
+bool statsd_nuplayer(const MediaAnalyticsItem *item)
 {
     if (item == NULL) return false;
 

@@ -38,7 +38,7 @@
 namespace android {
 
 // mediadrm
-bool statsd_mediadrm(MediaAnalyticsItem *item)
+bool statsd_mediadrm(const MediaAnalyticsItem *item)
 {
     if (item == NULL) return false;
 
@@ -75,7 +75,7 @@ bool statsd_mediadrm(MediaAnalyticsItem *item)
 }
 
 // widevineCDM
-bool statsd_widevineCDM(MediaAnalyticsItem *item)
+bool statsd_widevineCDM(const MediaAnalyticsItem *item)
 {
     if (item == NULL) return false;
 
@@ -105,7 +105,7 @@ bool statsd_widevineCDM(MediaAnalyticsItem *item)
 }
 
 // drmmanager
-bool statsd_drmmanager(MediaAnalyticsItem *item)
+bool statsd_drmmanager(const MediaAnalyticsItem *item)
 {
     if (item == NULL) return false;
 

@@ -45,6 +45,12 @@ public:
         return submitInternal(item, false /* release */);
     }
 
+    status_t submitBuffer(const char *buffer, size_t length) override {
+        MediaAnalyticsItem *item = new MediaAnalyticsItem();
+        return item->readFromByteString(buffer, length)
+                ?: submitInternal(item, true /* release */);
+    }
+
     status_t dump(int fd, const Vector<String16>& args) override;
 
     static constexpr const char * const kServiceName = "media.metrics";
@@ -60,10 +66,10 @@ private:
     // input validation after arrival from client
     static bool isContentValid(const MediaAnalyticsItem *item, bool isTrusted);
     bool isRateLimited(MediaAnalyticsItem *) const;
-    void saveItem(MediaAnalyticsItem *);
+    void saveItem(const std::shared_ptr<const MediaAnalyticsItem>& item);
 
     // The following methods are GUARDED_BY(mLock)
-    bool expirations_l(MediaAnalyticsItem *);
+    bool expirations_l(const std::shared_ptr<const MediaAnalyticsItem>& item);
 
     // support for generating output
     void dumpQueue_l(String8 &result, int dumpProto);

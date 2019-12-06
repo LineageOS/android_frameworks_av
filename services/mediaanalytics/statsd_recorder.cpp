@@ -37,7 +37,7 @@
 
 namespace android {
 
-bool statsd_recorder(MediaAnalyticsItem *item)
+bool statsd_recorder(const MediaAnalyticsItem *item)
 {
     if (item == NULL) return false;
 

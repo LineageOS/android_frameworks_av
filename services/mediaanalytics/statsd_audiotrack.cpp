@@ -37,7 +37,7 @@
 
 namespace android {
 
-bool statsd_audiotrack(MediaAnalyticsItem *item)
+bool statsd_audiotrack(const MediaAnalyticsItem *item)
 {
     if (item == NULL) return false;
 

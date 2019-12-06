@@ -35,6 +35,10 @@
 #include <media/MediaAnalyticsItem.h>
 #include <private/android_filesystem_config.h>
 
+// Max per-property string size before truncation in toString().
+// Do not make too large, as this is used for dumpsys purposes.
+static constexpr size_t kMaxPropertyStringSize = 4096;
+
 namespace android {
 
 #define DEBUG_SERVICEACCESS     0
@@ -367,70 +371,18 @@ std::string MediaAnalyticsItem::toString() const {
 }
 
 std::string MediaAnalyticsItem::toString(int version) const {
-
-    // v0 : released with 'o'
-    // v1 : bug fix (missing pid/finalized separator),
-    //      adds apk name, apk version code
-
-    if (version <= PROTO_FIRST) {
-        // default to original v0 format, until proper parsers are in place
-        version = PROTO_V0;
-    } else if (version > PROTO_LAST) {
-        version = PROTO_LAST;
-    }
-
     std::string result;
-    char buffer[512];
+    char buffer[kMaxPropertyStringSize];
 
-    if (version == PROTO_V0) {
-        result = "(";
-    } else {
-        snprintf(buffer, sizeof(buffer), "[%d:", version);
-        result.append(buffer);
-    }
-
-    // same order as we spill into the parcel, although not required
-    // key+session are our primary matching criteria
-    result.append(mKey.c_str());
-    result.append(":0:"); // sessionID
-
-    snprintf(buffer, sizeof(buffer), "%d:", mUid);
+    snprintf(buffer, sizeof(buffer), "[%d:%s:%d:%d:%lld:%s:%zu:",
+            version, mKey.c_str(), mPid, mUid, (long long)mTimestamp,
+            mPkgName.c_str(), mPropCount);
     result.append(buffer);
-
-    if (version >= PROTO_V1) {
-        result.append(mPkgName);
-        snprintf(buffer, sizeof(buffer), ":%"  PRId64 ":", mPkgVersionCode);
-        result.append(buffer);
-    }
-
-    // in 'o' (v1) , the separator between pid and finalized was omitted
-    if (version <= PROTO_V0) {
-        snprintf(buffer, sizeof(buffer), "%d", mPid);
-    } else {
-        snprintf(buffer, sizeof(buffer), "%d:", mPid);
-    }
-    result.append(buffer);
-
-    snprintf(buffer, sizeof(buffer), "%d:", 0 /* finalized */); // TODO: remove this.
-    result.append(buffer);
-    snprintf(buffer, sizeof(buffer), "%" PRId64 ":", mTimestamp);
-    result.append(buffer);
-
-    // set of items
-    int count = mPropCount;
-    snprintf(buffer, sizeof(buffer), "%d:", count);
-    result.append(buffer);
-    for (int i = 0 ; i < count; i++ ) {
+    for (size_t i = 0 ; i < mPropCount; ++i) {
         mProps[i].toString(buffer, sizeof(buffer));
         result.append(buffer);
     }
-
-    if (version == PROTO_V0) {
-        result.append(")");
-    } else {
-        result.append("]");
-    }
-
+    result.append("]");
     return result;
 }
 
@@ -451,8 +403,9 @@ bool MediaAnalyticsItem::selfrecord() {
     }
 }
 
+namespace mediametrics {
 //static
-bool MediaAnalyticsItem::isEnabled() {
+bool BaseItem::isEnabled() {
     // completely skip logging from certain UIDs. We do this here
     // to avoid the multi-second timeouts while we learn that
     // sepolicy will not let us find the service.
@@ -481,25 +434,47 @@ bool MediaAnalyticsItem::isEnabled() {
 class MediaMetricsDeathNotifier : public IBinder::DeathRecipient {
         virtual void binderDied(const wp<IBinder> &) {
             ALOGW("Reacquire service connection on next request");
-            MediaAnalyticsItem::dropInstance();
+            BaseItem::dropInstance();
         }
 };
 
 static sp<MediaMetricsDeathNotifier> sNotifier;
 // static
-sp<IMediaAnalyticsService> MediaAnalyticsItem::sAnalyticsService;
+sp<IMediaAnalyticsService> BaseItem::sAnalyticsService;
 static std::mutex sServiceMutex;
 static int sRemainingBindAttempts = SVC_TRIES;
 
 // static
-void MediaAnalyticsItem::dropInstance() {
+void BaseItem::dropInstance() {
     std::lock_guard  _l(sServiceMutex);
     sRemainingBindAttempts = SVC_TRIES;
     sAnalyticsService = nullptr;
 }
 
+// static
+bool BaseItem::submitBuffer(const char *buffer, size_t size) {
+/*
+    MediaAnalyticsItem item;
+    status_t status = item.readFromByteString(buffer, size);
+    ALOGD("%s: status:%d, size:%zu, item:%s", __func__, status, size, item.toString().c_str());
+    return item.selfrecord();
+    */
+
+    ALOGD_IF(DEBUG_API, "%s: delivering %zu bytes", __func__, size);
+    sp<IMediaAnalyticsService> svc = getInstance();
+    if (svc != nullptr) {
+        const status_t status = svc->submitBuffer(buffer, size);
+        if (status != NO_ERROR) {
+            ALOGW("%s: failed(%d) to record: %zu bytes", __func__, status, size);
+            return false;
+        }
+        return true;
+    }
+    return false;
+}
+
 //static
-sp<IMediaAnalyticsService> MediaAnalyticsItem::getInstance() {
+sp<IMediaAnalyticsService> BaseItem::getInstance() {
     static const char *servicename = "media.metrics";
     static const bool enabled = isEnabled(); // singleton initialized
 
@@ -536,6 +511,8 @@ sp<IMediaAnalyticsService> MediaAnalyticsItem::getInstance() {
     }
     return sAnalyticsService;
 }
+
+} // namespace mediametrics
 
 // merge the info from 'incoming' into this record.
 // we finish with a union of this+incoming and special handling for collisions
@@ -633,6 +610,7 @@ status_t extract(char **val, const char **bufferpptr, const char *bufferptrmax)
     while (*ptr != 0) {
         if (ptr >= bufferptrmax) {
             ALOGE("%s: buffer exceeded", __func__);
+            return BAD_VALUE;
         }
         ++ptr;
     }
@@ -657,39 +635,41 @@ status_t MediaAnalyticsItem::writeToByteString(char **pbuffer, size_t *plength) 
         return INVALID_OPERATION;
     }
     const uint16_t version = 0;
-    const uint32_t header_len =
-        sizeof(uint32_t)     // overall length
-        + sizeof(header_len) // header length
-        + sizeof(version)    // encoding version
-        + sizeof(uint16_t)   // key length
+    const uint32_t header_size =
+        sizeof(uint32_t)      // total size
+        + sizeof(header_size) // header size
+        + sizeof(version)     // encoding version
+        + sizeof(uint16_t)    // key size
         + keySizeZeroTerminated // key, zero terminated
-        + sizeof(int32_t)    // pid
-        + sizeof(int32_t)    // uid
-        + sizeof(int64_t)    // timestamp
+        + sizeof(int32_t)     // pid
+        + sizeof(int32_t)     // uid
+        + sizeof(int64_t)     // timestamp
         ;
 
-    uint32_t len = header_len
+    uint32_t size = header_size
         + sizeof(uint32_t) // # properties
         ;
     for (size_t i = 0 ; i < mPropCount; ++i) {
-        const size_t size = mProps[i].getByteStringSize();
-        if (size > UINT_MAX - 1) {
-            ALOGW("%s: prop %zu has size %zu", __func__, i, size);
+        const size_t propSize = mProps[i].getByteStringSize();
+        if (propSize > UINT16_MAX) {
+            ALOGW("%s: prop %zu size %zu too large", __func__, i, propSize);
             return INVALID_OPERATION;
         }
-        len += size;
+        if (__builtin_add_overflow(size, propSize, &size)) {
+            ALOGW("%s: item size overflow at property %zu", __func__, i);
+            return INVALID_OPERATION;
+        }
     }
 
-    // TODO: consider package information and timestamp.
-
-    // now that we have a size... let's allocate and fill
-    char *build = (char *)calloc(1 /* nmemb */, len);
+    // since we fill every byte in the buffer (there is no padding),
+    // malloc is used here instead of calloc.
+    char * const build = (char *)malloc(size);
     if (build == nullptr) return NO_MEMORY;
 
     char *filling = build;
-    char *buildmax = build + len;
-    if (insert(len, &filling, buildmax) != NO_ERROR
-            || insert(header_len, &filling, buildmax) != NO_ERROR
+    char *buildmax = build + size;
+    if (insert((uint32_t)size, &filling, buildmax) != NO_ERROR
+            || insert(header_size, &filling, buildmax) != NO_ERROR
             || insert(version, &filling, buildmax) != NO_ERROR
             || insert((uint16_t)keySizeZeroTerminated, &filling, buildmax) != NO_ERROR
             || insert(mKey.c_str(), &filling, buildmax) != NO_ERROR
@@ -697,26 +677,27 @@ status_t MediaAnalyticsItem::writeToByteString(char **pbuffer, size_t *plength) 
             || insert((int32_t)mUid, &filling, buildmax) != NO_ERROR
             || insert((int64_t)mTimestamp, &filling, buildmax) != NO_ERROR
             || insert((uint32_t)mPropCount, &filling, buildmax) != NO_ERROR) {
-        ALOGD("%s:could not write header", __func__);
+        ALOGE("%s:could not write header", __func__);  // shouldn't happen
         free(build);
         return INVALID_OPERATION;
     }
     for (size_t i = 0 ; i < mPropCount; ++i) {
         if (mProps[i].writeToByteString(&filling, buildmax) != NO_ERROR) {
             free(build);
-            ALOGD("%s:could not write prop %zu of %zu", __func__, i, mPropCount);
+            // shouldn't happen
+            ALOGE("%s:could not write prop %zu of %zu", __func__, i, mPropCount);
             return INVALID_OPERATION;
         }
     }
 
     if (filling != buildmax) {
-        ALOGE("problems populating; wrote=%d planned=%d",
-              (int)(filling - build), len);
+        ALOGE("%s: problems populating; wrote=%d planned=%d",
+                __func__, (int)(filling - build), (int)size);
         free(build);
         return INVALID_OPERATION;
     }
     *pbuffer = build;
-    *plength = len;
+    *plength = size;
     return NO_ERROR;
 }
 
@@ -727,40 +708,41 @@ status_t MediaAnalyticsItem::readFromByteString(const char *bufferptr, size_t le
     const char *read = bufferptr;
     const char *readend = bufferptr + length;
 
-    uint32_t len;
-    uint32_t header_len;
-    int16_t version;
-    int16_t key_len;
+    uint32_t size;
+    uint32_t header_size;
+    uint16_t version;
+    uint16_t key_size;
     char *key = nullptr;
     int32_t pid;
     int32_t uid;
     int64_t timestamp;
     uint32_t propCount;
-    if (extract(&len, &read, readend) != NO_ERROR
-            || extract(&header_len, &read, readend) != NO_ERROR
+    if (extract(&size, &read, readend) != NO_ERROR
+            || extract(&header_size, &read, readend) != NO_ERROR
             || extract(&version, &read, readend) != NO_ERROR
-            || extract(&key_len, &read, readend) != NO_ERROR
+            || extract(&key_size, &read, readend) != NO_ERROR
             || extract(&key, &read, readend) != NO_ERROR
             || extract(&pid, &read, readend) != NO_ERROR
             || extract(&uid, &read, readend) != NO_ERROR
             || extract(&timestamp, &read, readend) != NO_ERROR
-            || len > length
-            || header_len > len) {
+            || size > length
+            || strlen(key) + 1 != key_size
+            || header_size > size) {
         free(key);
-        ALOGD("%s: invalid header", __func__);
+        ALOGW("%s: invalid header", __func__);
         return INVALID_OPERATION;
     }
     mKey = key;
     free(key);
     const size_t pos = read - bufferptr;
-    if (pos > header_len) {
-        ALOGD("%s: invalid header pos:%zu > header_len:%u",
-                __func__, pos, header_len);
+    if (pos > header_size) {
+        ALOGW("%s: invalid header pos:%zu > header_size:%u",
+                __func__, pos, header_size);
         return INVALID_OPERATION;
-    } else if (pos < header_len) {
-        ALOGD("%s: mismatched header pos:%zu < header_len:%u, advancing",
-                __func__, pos, header_len);
-        read += (header_len - pos);
+    } else if (pos < header_size) {
+        ALOGW("%s: mismatched header pos:%zu < header_size:%u, advancing",
+                __func__, pos, header_size);
+        read += (header_size - pos);
     }
     if (extract(&propCount, &read, readend) != NO_ERROR) {
         ALOGD("%s: cannot read prop count", __func__);
@@ -772,7 +754,7 @@ status_t MediaAnalyticsItem::readFromByteString(const char *bufferptr, size_t le
     for (size_t i = 0; i < propCount; ++i) {
         Prop *prop = allocateProp();
         if (prop->readFromByteString(&read, readend) != NO_ERROR) {
-            ALOGD("%s: cannot read prop %zu", __func__, i);
+            ALOGW("%s: cannot read prop %zu", __func__, i);
             return INVALID_OPERATION;
         }
     }
@@ -910,8 +892,10 @@ size_t MediaAnalyticsItem::Prop::getByteStringSize() const
     return header + payload;
 }
 
+namespace mediametrics {
+
 // TODO: fold into a template later.
-status_t MediaAnalyticsItem::writeToByteString(
+status_t BaseItem::writeToByteString(
         const char *name, int32_t value, char **bufferpptr, char *bufferptrmax)
 {
     const size_t len = 2 + 1 + strlen(name) + 1 + sizeof(value);
@@ -922,7 +906,7 @@ status_t MediaAnalyticsItem::writeToByteString(
             ?: insert(value, bufferpptr, bufferptrmax);
 }
 
-status_t MediaAnalyticsItem::writeToByteString(
+status_t BaseItem::writeToByteString(
         const char *name, int64_t value, char **bufferpptr, char *bufferptrmax)
 {
     const size_t len = 2 + 1 + strlen(name) + 1 + sizeof(value);
@@ -933,7 +917,7 @@ status_t MediaAnalyticsItem::writeToByteString(
             ?: insert(value, bufferpptr, bufferptrmax);
 }
 
-status_t MediaAnalyticsItem::writeToByteString(
+status_t BaseItem::writeToByteString(
         const char *name, double value, char **bufferpptr, char *bufferptrmax)
 {
     const size_t len = 2 + 1 + strlen(name) + 1 + sizeof(value);
@@ -944,7 +928,7 @@ status_t MediaAnalyticsItem::writeToByteString(
             ?: insert(value, bufferpptr, bufferptrmax);
 }
 
-status_t MediaAnalyticsItem::writeToByteString(
+status_t BaseItem::writeToByteString(
         const char *name, const std::pair<int64_t, int64_t> &value, char **bufferpptr, char *bufferptrmax)
 {
     const size_t len = 2 + 1 + strlen(name) + 1 + 8 + 8;
@@ -956,8 +940,14 @@ status_t MediaAnalyticsItem::writeToByteString(
             ?: insert(value.second, bufferpptr, bufferptrmax);
 }
 
-status_t MediaAnalyticsItem::writeToByteString(
+status_t BaseItem::writeToByteString(
         const char *name, char * const &value, char **bufferpptr, char *bufferptrmax)
+{
+    return writeToByteString(name, (const char *)value, bufferpptr, bufferptrmax);
+}
+
+status_t BaseItem::writeToByteString(
+        const char *name, const char * const &value, char **bufferpptr, char *bufferptrmax)
 {
     const size_t len = 2 + 1 + strlen(name) + 1 + strlen(value) + 1;
     if (len > UINT16_MAX) return BAD_VALUE;
@@ -967,7 +957,8 @@ status_t MediaAnalyticsItem::writeToByteString(
             ?: insert(value, bufferpptr, bufferptrmax);
 }
 
-status_t MediaAnalyticsItem::writeToByteString(
+
+status_t BaseItem::writeToByteString(
         const char *name, const none_t &, char **bufferpptr, char *bufferptrmax)
 {
     const size_t len = 2 + 1 + strlen(name) + 1;
@@ -977,22 +968,24 @@ status_t MediaAnalyticsItem::writeToByteString(
             ?: insert(name, bufferpptr, bufferptrmax);
 }
 
+} // namespace mediametrics
+
 status_t MediaAnalyticsItem::Prop::writeToByteString(
         char **bufferpptr, char *bufferptrmax) const
 {
     switch (mType) {
     case kTypeInt32:
-        return MediaAnalyticsItem::writeToByteString(mName, u.int32Value, bufferpptr, bufferptrmax);
+        return BaseItem::writeToByteString(mName, u.int32Value, bufferpptr, bufferptrmax);
     case kTypeInt64:
-        return MediaAnalyticsItem::writeToByteString(mName, u.int64Value, bufferpptr, bufferptrmax);
+        return BaseItem::writeToByteString(mName, u.int64Value, bufferpptr, bufferptrmax);
     case kTypeDouble:
-        return MediaAnalyticsItem::writeToByteString(mName, u.doubleValue, bufferpptr, bufferptrmax);
+        return BaseItem::writeToByteString(mName, u.doubleValue, bufferpptr, bufferptrmax);
     case kTypeRate:
-        return MediaAnalyticsItem::writeToByteString(mName, u.rate, bufferpptr, bufferptrmax);
+        return BaseItem::writeToByteString(mName, u.rate, bufferpptr, bufferptrmax);
     case kTypeCString:
-        return MediaAnalyticsItem::writeToByteString(mName, u.CStringValue, bufferpptr, bufferptrmax);
+        return BaseItem::writeToByteString(mName, u.CStringValue, bufferpptr, bufferptrmax);
     case kTypeNone:
-        return MediaAnalyticsItem::writeToByteString(mName, none_t{}, bufferpptr, bufferptrmax);
+        return BaseItem::writeToByteString(mName, none_t{}, bufferpptr, bufferptrmax);
     default:
         ALOGE("%s: found bad prop type: %d, name %s",
                 __func__, mType, mName);  // no payload sent

@@ -30,6 +30,8 @@
 
 namespace android {
 
+using namespace mediametrics;
+
 // individual records kept in memory: age or count
 // age: <= 28 hours (1 1/6 days)
 // count: hard limit of # records
@@ -138,12 +140,12 @@ status_t MediaAnalyticsService::submitInternal(MediaAnalyticsItem *item, bool re
         return BAD_VALUE;
     }
 
-    // send to statsd
-    extern bool dump2Statsd(MediaAnalyticsItem *item);  // extern hook
-    (void)dump2Statsd(item);  // failure should be logged in function.
+    // now attach either the item or its dup to a const shared pointer
+    std::shared_ptr<const MediaAnalyticsItem> sitem(release ? item : item->dup());
 
-    if (!release) item = item->dup();
-    saveItem(item);
+    extern bool dump2Statsd(const std::shared_ptr<const MediaAnalyticsItem>& item);
+    (void)dump2Statsd(sitem);  // failure should be logged in function.
+    saveItem(sitem);
     return NO_ERROR;
 }
 
@@ -323,7 +325,7 @@ void MediaAnalyticsService::dumpQueue_l(
 
 // if item != NULL, it's the item we just inserted
 // true == more items eligible to be recovered
-bool MediaAnalyticsService::expirations_l(MediaAnalyticsItem *item)
+bool MediaAnalyticsService::expirations_l(const std::shared_ptr<const MediaAnalyticsItem>& item)
 {
     bool more = false;
 
@@ -346,7 +348,7 @@ bool MediaAnalyticsService::expirations_l(MediaAnalyticsItem *item)
         for (; i < mItems.size(); ++i) {
             auto &oitem = mItems[i];
             nsecs_t when = oitem->getTimestamp();
-            if (oitem.get() == item) {
+            if (oitem.get() == item.get()) {
                 break;
             }
             if (now > when && (now - when) <= mMaxRecordAgeNs) {
@@ -382,7 +384,7 @@ void MediaAnalyticsService::processExpirations()
     } while (more);
 }
 
-void MediaAnalyticsService::saveItem(MediaAnalyticsItem *item)
+void MediaAnalyticsService::saveItem(const std::shared_ptr<const MediaAnalyticsItem>& item)
 {
     std::lock_guard _l(mLock);
     // we assume the items are roughly in time order.

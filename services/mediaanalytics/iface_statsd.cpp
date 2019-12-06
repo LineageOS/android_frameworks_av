@@ -27,6 +27,7 @@
 #include <pthread.h>
 #include <unistd.h>
 
+#include <memory>
 #include <string.h>
 #include <pwd.h>
 
@@ -48,7 +49,7 @@ bool enabled_statsd = true;
 
 struct statsd_hooks {
     const char *key;
-    bool (*handler)(MediaAnalyticsItem *);
+    bool (*handler)(const MediaAnalyticsItem *);
 };
 
 // keep this sorted, so we can do binary searches
@@ -69,7 +70,7 @@ static constexpr struct statsd_hooks statsd_handlers[] =
 };
 
 // give me a record, i'll look at the type and upload appropriately
-bool dump2Statsd(MediaAnalyticsItem *item) {
+bool dump2Statsd(const std::shared_ptr<const MediaAnalyticsItem>& item) {
     if (item == NULL) return false;
 
     // get the key
@@ -82,7 +83,7 @@ bool dump2Statsd(MediaAnalyticsItem *item) {
 
     for (const auto &statsd_handler : statsd_handlers) {
         if (key == statsd_handler.key) {
-            return statsd_handler.handler(item);
+            return statsd_handler.handler(item.get());
         }
     }
     return false;
