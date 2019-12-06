@@ -18,7 +18,7 @@
 #define LOG_TAG "MediaAnalyticsService"
 #include <utils/Log.h>
 
-#include "MediaAnalyticsService.h"
+#include "MediaMetricsService.h"
 
 #include <pwd.h> //getpwuid
 

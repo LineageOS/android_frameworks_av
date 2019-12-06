@@ -17,7 +17,7 @@
 #define LOG_TAG "mediametrics_tests"
 #include <utils/Log.h>
 
-#include "MediaAnalyticsService.h"
+#include "MediaMetricsService.h"
 
 #include <stdio.h>
 
