@@ -1825,7 +1825,7 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
 
     // TODO: We may also match on address as well as device type for
     // AUDIO_DEVICE_OUT_BUS, AUDIO_DEVICE_OUT_ALL_A2DP, AUDIO_DEVICE_OUT_REMOTE_SUBMIX
-    if (type == MIXER || type == DIRECT) {
+    if (type == MIXER || type == DIRECT || type == OFFLOAD) {
         // TODO: This property should be ensure that only contains one single device type.
         mTimestampCorrectedDevice = (audio_devices_t)property_get_int64(
                 "audio.timestamp.corrected_output_device",
