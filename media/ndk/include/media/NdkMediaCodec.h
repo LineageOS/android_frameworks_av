@@ -268,6 +268,9 @@ ssize_t AMediaCodec_dequeueOutputBuffer(AMediaCodec*, AMediaCodecBufferInfo *inf
         int64_t timeoutUs) __INTRODUCED_IN(21);
 
 /**
+ * Returns the format of the codec's output.
+ * The caller must free the returned format.
+ *
  * Available since API level 21.
  */
 AMediaFormat* AMediaCodec_getOutputFormat(AMediaCodec*) __INTRODUCED_IN(21);
@@ -397,6 +400,7 @@ media_status_t AMediaCodec_signalEndOfInputStream(AMediaCodec *mData) __INTRODUC
 /**
  * Get format of the buffer. The specified buffer index must have been previously obtained from
  * dequeueOutputBuffer.
+ * The caller must free the returned format.
  *
  * Available since API level 28.
  */
@@ -455,6 +459,7 @@ media_status_t AMediaCodec_releaseCrypto(AMediaCodec*) __INTRODUCED_IN(28);
  * Call this after AMediaCodec_configure() returns successfully to get the input
  * format accepted by the codec. Do this to determine what optional configuration
  * parameters were supported by the codec.
+ * The caller must free the returned format.
  *
  * Available since API level 28.
  */
