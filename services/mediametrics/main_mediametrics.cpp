@@ -18,7 +18,7 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
-#include "MediaAnalyticsService.h"
+#include "MediaMetricsService.h"
 
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>

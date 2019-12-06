@@ -31,7 +31,7 @@
 
 #include <statslog.h>
 
-#include "MediaAnalyticsService.h"
+#include "MediaMetricsService.h"
 #include "frameworks/base/core/proto/android/stats/mediametrics/mediametrics.pb.h"
 #include "iface_statsd.h"
 

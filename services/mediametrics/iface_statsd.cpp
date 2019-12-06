@@ -31,7 +31,7 @@
 #include <string.h>
 #include <pwd.h>
 
-#include "MediaAnalyticsService.h"
+#include "MediaMetricsService.h"
 #include "iface_statsd.h"
 
 #include <statslog.h>
