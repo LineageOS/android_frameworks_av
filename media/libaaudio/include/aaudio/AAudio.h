@@ -759,6 +759,28 @@ AAUDIO_API void AAudioStreamBuilder_setAllowedCapturePolicy(AAudioStreamBuilder*
 AAUDIO_API void AAudioStreamBuilder_setSessionId(AAudioStreamBuilder* builder,
         aaudio_session_id_t sessionId) __INTRODUCED_IN(28);
 
+
+/** Indicates whether this input stream must be marked as privacy sensitive or not.
+ *
+ * When true, this input stream is privacy sensitive and any concurrent capture
+ * is not permitted.
+ *
+ * This is off (false) by default except when the input preset is {@link #AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION}
+ * or {@link #AAUDIO_INPUT_PRESET_CAMCORDER}.
+ *
+ * Always takes precedence over default from input preset when set explicitly.
+ *
+ * Only relevant if the stream direction is {@link #AAUDIO_DIRECTION_INPUT}.
+ *
+ * Added in API level 30.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param privacySensitive true if capture from this stream must be marked as privacy sensitive,
+ * false otherwise.
+ */
+AAUDIO_API void AAudioStreamBuilder_setPrivacySensitive(AAudioStreamBuilder* builder,
+        bool privacySensitive) __INTRODUCED_IN(30);
+
 /**
  * Return one of these values from the data callback function.
  */
@@ -1443,6 +1465,20 @@ AAUDIO_API aaudio_input_preset_t AAudioStream_getInputPreset(AAudioStream* strea
  */
 AAUDIO_API aaudio_allowed_capture_policy_t AAudioStream_getAllowedCapturePolicy(
         AAudioStream* stream) __INTRODUCED_IN(29);
+
+
+/**
+ * Return whether this input stream is marked as privacy sensitive or not.
+ *
+ * See {@link #AAudioStreamBuilder_setPrivacySensitive()}.
+ *
+ * Added in API level 30.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return true if privacy sensitive, false otherwise
+ */
+AAUDIO_API bool AAudioStream_isPrivacySensitive(AAudioStream* stream)
+        __INTRODUCED_IN(30);
 
 #ifdef __cplusplus
 }

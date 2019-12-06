@@ -128,6 +128,14 @@ public:
         mSessionId = sessionId;
     }
 
+    bool isPrivacySensitive() const {
+        return mIsPrivacySensitive;
+    }
+
+    void setPrivacySensitive(bool privacySensitive) {
+        mIsPrivacySensitive = privacySensitive;
+    }
+
     /**
      * @return bytes per frame of getFormat()
      */
@@ -158,6 +166,7 @@ private:
     int32_t                         mBufferCapacity       = AAUDIO_UNSPECIFIED;
     aaudio_allowed_capture_policy_t mAllowedCapturePolicy = AAUDIO_UNSPECIFIED;
     aaudio_session_id_t             mSessionId            = AAUDIO_SESSION_ID_NONE;
+    bool                            mIsPrivacySensitive   = false;
 };
 
 } /* namespace aaudio */

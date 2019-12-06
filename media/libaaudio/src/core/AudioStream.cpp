@@ -91,6 +91,7 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     if (mAllowedCapturePolicy == AAUDIO_UNSPECIFIED) {
         mAllowedCapturePolicy = AAUDIO_ALLOW_CAPTURE_BY_ALL;
     }
+    mIsPrivacySensitive = builder.isPrivacySensitive();
 
     // callbacks
     mFramesPerDataCallback = builder.getFramesPerDataCallback();

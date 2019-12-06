@@ -92,6 +92,9 @@ audio_source_t AAudioConvert_inputPresetToAudioSource(aaudio_input_preset_t pres
 audio_flags_mask_t AAudioConvert_allowCapturePolicyToAudioFlagsMask(
         aaudio_allowed_capture_policy_t policy);
 
+audio_flags_mask_t AAudioConvert_privacySensitiveToAudioFlagsMask(
+        bool privacySensitive);
+
 // Note that this code may be replaced by Settings or by some other system configuration tool.
 
 /**

@@ -115,6 +115,7 @@ StagefrightRecorder::StagefrightRecorder(const String16 &opPackageName)
       mWriter(NULL),
       mOutputFd(-1),
       mAudioSource((audio_source_t)AUDIO_SOURCE_CNT), // initialize with invalid value
+      mPrivacySensitive(PRIVACY_SENSITIVE_DEFAULT),
       mVideoSource(VIDEO_SOURCE_LIST_END),
       mStarted(false),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
@@ -238,7 +239,31 @@ status_t StagefrightRecorder::setAudioSource(audio_source_t as) {
     } else {
         mAudioSource = as;
     }
+    // Reset privacy sensitive in case this is the second time audio source is set
+    mPrivacySensitive = PRIVACY_SENSITIVE_DEFAULT;
+    return OK;
+}
 
+status_t StagefrightRecorder::setPrivacySensitive(bool privacySensitive) {
+    // privacy sensitive cannot be set before audio source is set
+    if (mAudioSource == AUDIO_SOURCE_CNT) {
+        return INVALID_OPERATION;
+    }
+    mPrivacySensitive = privacySensitive ? PRIVACY_SENSITIVE_ENABLED : PRIVACY_SENSITIVE_DISABLED;
+    return OK;
+}
+
+status_t StagefrightRecorder::isPrivacySensitive(bool *privacySensitive) const {
+    *privacySensitive = false;
+    if (mAudioSource == AUDIO_SOURCE_CNT) {
+        return INVALID_OPERATION;
+    }
+    if (mPrivacySensitive == PRIVACY_SENSITIVE_DEFAULT) {
+         *privacySensitive = mAudioSource == AUDIO_SOURCE_VOICE_COMMUNICATION
+                || mAudioSource == AUDIO_SOURCE_CAMCORDER;
+    } else {
+        *privacySensitive = mPrivacySensitive == PRIVACY_SENSITIVE_ENABLED;
+    }
     return OK;
 }
 
@@ -1082,9 +1107,35 @@ sp<MediaCodecSource> StagefrightRecorder::createAudioSource() {
         }
     }
 
+    audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+    attr.source = mAudioSource;
+    // attr.flags AUDIO_FLAG_CAPTURE_PRIVATE is cleared by default
+    if (mPrivacySensitive == PRIVACY_SENSITIVE_DEFAULT) {
+        if (attr.source == AUDIO_SOURCE_VOICE_COMMUNICATION
+                || attr.source == AUDIO_SOURCE_CAMCORDER) {
+            attr.flags |= AUDIO_FLAG_CAPTURE_PRIVATE;
+            mPrivacySensitive = PRIVACY_SENSITIVE_ENABLED;
+        } else {
+            mPrivacySensitive = PRIVACY_SENSITIVE_DISABLED;
+        }
+    } else {
+        if (mAudioSource == AUDIO_SOURCE_REMOTE_SUBMIX
+                || mAudioSource == AUDIO_SOURCE_FM_TUNER
+                || mAudioSource == AUDIO_SOURCE_VOICE_DOWNLINK
+                || mAudioSource == AUDIO_SOURCE_VOICE_UPLINK
+                || mAudioSource == AUDIO_SOURCE_VOICE_CALL
+                || mAudioSource == AUDIO_SOURCE_ECHO_REFERENCE) {
+            ALOGE("Cannot request private capture with source: %d", mAudioSource);
+            return NULL;
+        }
+        if (mPrivacySensitive == PRIVACY_SENSITIVE_ENABLED) {
+            attr.flags |= AUDIO_FLAG_CAPTURE_PRIVATE;
+        }
+    }
+
     sp<AudioSource> audioSource =
         new AudioSource(
-                mAudioSource,
+                &attr,
                 mOpPackageName,
                 sourceSampleRate,
                 mAudioChannels,
