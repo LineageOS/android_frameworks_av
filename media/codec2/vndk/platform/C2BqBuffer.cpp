@@ -576,10 +576,11 @@ public:
             }
         }
         int migrated = 0;
+        // poolDatas dtor should not be called during lock is held.
+        std::shared_ptr<C2BufferQueueBlockPoolData>
+                poolDatas[NUM_BUFFER_SLOTS];
         {
             sp<GraphicBuffer> buffers[NUM_BUFFER_SLOTS];
-            std::weak_ptr<C2BufferQueueBlockPoolData>
-                    poolDatas[NUM_BUFFER_SLOTS];
             std::scoped_lock<std::mutex> lock(mMutex);
             bool noInit = false;
             for (int i = 0; i < NUM_BUFFER_SLOTS; ++i) {
