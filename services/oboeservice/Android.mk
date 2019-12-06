@@ -39,8 +39,6 @@ LOCAL_SRC_FILES += \
     TimestampScheduler.cpp \
     AAudioThread.cpp
 
-LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
-
 # LOCAL_CFLAGS += -fvisibility=hidden
 LOCAL_CFLAGS += -Wno-unused-parameter
 LOCAL_CFLAGS += -Wall -Werror

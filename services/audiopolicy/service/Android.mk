@@ -38,8 +38,6 @@ LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := \
 LOCAL_STATIC_LIBRARIES := \
     libaudiopolicycomponents
 
-LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
-
 LOCAL_MODULE:= libaudiopolicyservice
 
 LOCAL_CFLAGS += -fvisibility=hidden
