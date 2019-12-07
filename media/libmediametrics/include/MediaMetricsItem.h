@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_MEDIA_MEDIAANALYTICSITEM_H
-#define ANDROID_MEDIA_MEDIAANALYTICSITEM_H
+#ifndef ANDROID_MEDIA_MEDIAMETRICSITEM_H
+#define ANDROID_MEDIA_MEDIAMETRICSITEM_H
 
 #include "MediaMetrics.h"
 
 #include <algorithm>
+#include <map>
 #include <string>
 #include <sys/types.h>
 
@@ -106,8 +107,9 @@ class BaseItem {
     friend class MediaMetricsDeathNotifier; // for dropInstance
     // enabled 1, disabled 0
 public:
-    // are we collecting analytics data
+    // are we collecting metrics data
     static bool isEnabled();
+    static sp<IMediaMetricsService> getService();
 
 protected:
     static constexpr const char * const EnabledProperty = "media.metrics.enabled";
@@ -116,7 +118,7 @@ protected:
 
     // let's reuse a binder connection
     static sp<IMediaMetricsService> sMediaMetricsService;
-    static sp<IMediaMetricsService> getInstance();
+
     static void dropInstance();
     static bool submitBuffer(const char *buffer, size_t len);
 
@@ -133,7 +135,7 @@ protected:
             const char *name, char * const &value, char **bufferpptr, char *bufferptrmax);
     static status_t writeToByteString(
             const char *name, const char * const &value, char **bufferpptr, char *bufferptrmax);
-    struct none_t {}; // for kTypeNone
+    struct none_t {}; // for mediametrics::kTypeNone
     static status_t writeToByteString(
             const char *name, const none_t &, char **bufferpptr, char *bufferptrmax);
 
@@ -329,7 +331,7 @@ protected:
 };
 
 /**
- * MediaMetrics LogItem is a stack allocated media analytics item used for
+ * MediaMetrics LogItem is a stack allocated mediametrics item used for
  * fast logging.  It falls over to a malloc if needed.
  *
  * This is templated with a buffer size to allocate on the stack.
@@ -370,22 +372,7 @@ private:
  * The Item is designed for the service as it has getters.
  */
 class Item : public mediametrics::BaseItem {
-    friend class MediaMetricsJNI;           // TODO: remove this access
-
 public:
-
-     // TODO: remove this duplicate definition when frameworks base is updated.
-            enum Type {
-                kTypeNone = 0,
-                kTypeInt32 = 1,
-                kTypeInt64 = 2,
-                kTypeDouble = 3,
-                kTypeCString = 4,
-                kTypeRate = 5,
-            };
-
-    static constexpr const char * const kKeyNone = "none";
-    static constexpr const char * const kKeyAny = "any";
 
         enum {
             PROTO_V0 = 0,
@@ -400,21 +387,14 @@ public:
         : mKey(key) { }
     Item() = default;
 
-    Item(const Item&) = delete;
-    Item &operator=(const Item&) = delete;
-
     bool operator==(const Item& other) const {
-        if (mPropCount != other.mPropCount
-            || mPid != other.mPid
+        if (mPid != other.mPid
             || mUid != other.mUid
             || mPkgName != other.mPkgName
             || mPkgVersionCode != other.mPkgVersionCode
             || mKey != other.mKey
-            || mTimestamp != other.mTimestamp) return false;
-         for (size_t i = 0; i < mPropCount; ++i) {
-             Prop *p = other.findProp(mProps[i].getName());
-             if (p == nullptr || mProps[i] != *p) return false;
-         }
+            || mTimestamp != other.mTimestamp
+            || mProps != other.mProps) return false;
          return true;
     }
     bool operator!=(const Item& other) const {
@@ -435,9 +415,17 @@ public:
         // access functions for the class
         ~Item();
 
-        // reset all contents, discarding any extra data
-        void clear();
-        Item *dup();
+    void clear() {
+        mPid = -1;
+        mUid = -1;
+        mPkgName.clear();
+        mPkgVersionCode = 0;
+        mTimestamp = 0;
+        mKey.clear();
+        mProps.clear();
+    }
+
+    Item *dup() const { return new Item(*this); }
 
     Item &setKey(const char *key) {
         mKey = key;
@@ -446,11 +434,11 @@ public:
     const std::string& getKey() const { return mKey; }
 
     // # of properties in the record
-    size_t count() const { return mPropCount; }
+    size_t count() const { return mProps.size(); }
 
     template<typename S, typename T>
     Item &set(S key, T value) {
-        allocateProp(key)->set(value);
+        findOrAllocateProp(key).set(value);
         return *this;
     }
 
@@ -475,7 +463,7 @@ public:
     // type-mismatch counts as "wasn't there".
     template<typename S, typename T>
     Item &add(S key, T value) {
-        allocateProp(key)->add(value);
+        findOrAllocateProp(key).add(value);
         return *this;
     }
 
@@ -497,7 +485,7 @@ public:
     // NULL parameter value suppresses storage of value.
     template<typename S, typename T>
     bool get(S key, T *value) const {
-        Prop *prop = findProp(key);
+        const Prop *prop = findProp(key);
         return prop != nullptr && prop->get(value);
     }
 
@@ -582,20 +570,10 @@ public:
         const char *toCString();
         const char *toCString(int version);
 
-    protected:
-
-        // merge fields from arg into this
-        // with rules for first/last/add, etc
-        // XXX: document semantics and how they are indicated
-        // caller continues to own 'incoming'
-        bool merge(Item *incoming);
-
 private:
     // handle Parcel version 0
     int32_t writeToParcel0(Parcel *) const;
     int32_t readFromParcel0(const Parcel&);
-
-
 
     // checks equality even with nullptr.
     static bool stringEquals(const char *a, const char *b) {
@@ -607,38 +585,32 @@ private:
     }
 
 public:
-
     class Prop {
-    friend class MediaMetricsJNI;           // TODO: remove this access
     public:
         Prop() = default;
         Prop(const Prop& other) {
            *this = other;
         }
         Prop& operator=(const Prop& other) {
-            if (other.mName != nullptr) {
-                mName = strdup(other.mName);
-            } else {
-                mName = nullptr;
-            }
+            mName = other.mName;
             mType = other.mType;
             switch (mType) {
-            case kTypeInt32:
+            case mediametrics::kTypeInt32:
                 u.int32Value = other.u.int32Value;
                 break;
-            case kTypeInt64:
+            case mediametrics::kTypeInt64:
                 u.int64Value = other.u.int64Value;
                 break;
-            case kTypeDouble:
+            case mediametrics::kTypeDouble:
                 u.doubleValue = other.u.doubleValue;
                 break;
-            case kTypeCString:
+            case mediametrics::kTypeCString:
                 u.CStringValue = strdup(other.u.CStringValue);
                 break;
-            case kTypeRate:
+            case mediametrics::kTypeRate:
                 u.rate = other.u.rate;
                 break;
-            case kTypeNone:
+            case mediametrics::kTypeNone:
                 break;
             default:
                 // abort?
@@ -646,21 +618,53 @@ public:
             }
             return *this;
         }
+        Prop(Prop&& other) {
+            *this = std::move(other);
+        }
+        Prop& operator=(Prop&& other) {
+            mName = std::move(other.mName);
+            mType = other.mType;
+            switch (mType) {
+            case mediametrics::kTypeInt32:
+                u.int32Value = other.u.int32Value;
+                break;
+            case mediametrics::kTypeInt64:
+                u.int64Value = other.u.int64Value;
+                break;
+            case mediametrics::kTypeDouble:
+                u.doubleValue = other.u.doubleValue;
+                break;
+            case mediametrics::kTypeCString:
+                u.CStringValue = other.u.CStringValue;
+                break;
+            case mediametrics::kTypeRate:
+                u.rate = other.u.rate;
+                break;
+            case mediametrics::kTypeNone:
+                break;
+            default:
+                // abort?
+                break;
+            }
+            other.mType = mediametrics::kTypeNone;
+            return *this;
+        }
+
         bool operator==(const Prop& other) const {
-            if (!stringEquals(mName, other.mName)
+            if (mName != other.mName
                     || mType != other.mType) return false;
             switch (mType) {
-            case kTypeInt32:
+            case mediametrics::kTypeInt32:
                 return u.int32Value == other.u.int32Value;
-            case kTypeInt64:
+            case mediametrics::kTypeInt64:
                 return u.int64Value == other.u.int64Value;
-            case kTypeDouble:
+            case mediametrics::kTypeDouble:
                 return u.doubleValue == other.u.doubleValue;
-            case kTypeCString:
+            case mediametrics::kTypeCString:
                 return stringEquals(u.CStringValue, other.u.CStringValue);
-            case kTypeRate:
+            case mediametrics::kTypeRate:
                 return u.rate == other.u.rate;
-            case kTypeNone:
+            case mediametrics::kTypeNone:
             default:
                 return true;
             }
@@ -670,24 +674,23 @@ public:
         }
 
         void clear() {
-            free(mName);
-            mName = nullptr;
+            mName.clear();
             clearValue();
         }
         void clearValue() {
-            if (mType == kTypeCString) {
+            if (mType == mediametrics::kTypeCString) {
                 free(u.CStringValue);
                 u.CStringValue = nullptr;
             }
-            mType = kTypeNone;
+            mType = mediametrics::kTypeNone;
         }
 
-        Type getType() const {
+        mediametrics::Type getType() const {
             return mType;
         }
 
         const char *getName() const {
-            return mName;
+            return mName.c_str();
         }
 
         void swap(Prop& other) {
@@ -697,33 +700,28 @@ public:
         }
 
         void setName(const char *name) {
-            free(mName);
-            if (name != nullptr) {
-                mName = strdup(name);
-            } else {
-                mName = nullptr;
-            }
+            mName = name;
         }
 
         bool isNamed(const char *name) const {
-            return stringEquals(name, mName);
+            return mName == name;
         }
 
         template <typename T> void visit(T f) const {
             switch (mType) {
-            case Item::kTypeInt32:
+            case mediametrics::kTypeInt32:
                 f(u.int32Value);
                 return;
-            case Item::kTypeInt64:
+            case mediametrics::kTypeInt64:
                 f(u.int64Value);
                 return;
-            case Item::kTypeDouble:
+            case mediametrics::kTypeDouble:
                 f(u.doubleValue);
                 return;
-            case Item::kTypeRate:
+            case mediametrics::kTypeRate:
                 f(u.rate);
                 return;
-            case Item::kTypeCString:
+            case mediametrics::kTypeCString:
                 f(u.CStringValue);
                 return;
             default:
@@ -734,37 +732,37 @@ public:
         template <typename T> bool get(T *value) const = delete;
         template <>
         bool get(int32_t *value) const {
-           if (mType != kTypeInt32) return false;
+           if (mType != mediametrics::kTypeInt32) return false;
            if (value != nullptr) *value = u.int32Value;
            return true;
         }
         template <>
         bool get(int64_t *value) const {
-           if (mType != kTypeInt64) return false;
+           if (mType != mediametrics::kTypeInt64) return false;
            if (value != nullptr) *value = u.int64Value;
            return true;
         }
         template <>
         bool get(double *value) const {
-           if (mType != kTypeDouble) return false;
+           if (mType != mediametrics::kTypeDouble) return false;
            if (value != nullptr) *value = u.doubleValue;
            return true;
         }
         template <>
         bool get(const char** value) const {
-            if (mType != kTypeCString) return false;
+            if (mType != mediametrics::kTypeCString) return false;
             if (value != nullptr) *value = u.CStringValue;
             return true;
         }
         template <>
         bool get(std::string* value) const {
-            if (mType != kTypeCString) return false;
+            if (mType != mediametrics::kTypeCString) return false;
             if (value != nullptr) *value = u.CStringValue;
             return true;
         }
         template <>
         bool get(std::pair<int64_t, int64_t> *value) const {
-           if (mType != kTypeRate) return false;
+           if (mType != mediametrics::kTypeRate) return false;
            if (value != nullptr) {
                *value = u.rate;
            }
@@ -774,25 +772,25 @@ public:
         template <typename T> void set(const T& value) = delete;
         template <>
         void set(const int32_t& value) {
-            mType = kTypeInt32;
+            mType = mediametrics::kTypeInt32;
             u.int32Value = value;
         }
         template <>
         void set(const int64_t& value) {
-            mType = kTypeInt64;
+            mType = mediametrics::kTypeInt64;
             u.int64Value = value;
         }
         template <>
         void set(const double& value) {
-            mType = kTypeDouble;
+            mType = mediametrics::kTypeDouble;
             u.doubleValue = value;
         }
         template <>
         void set(const char* const& value) {
-            if (mType == kTypeCString) {
+            if (mType == mediametrics::kTypeCString) {
                 free(u.CStringValue);
             } else {
-                mType = kTypeCString;
+                mType = mediametrics::kTypeCString;
             }
             if (value == nullptr) {
                 u.CStringValue = nullptr;
@@ -808,45 +806,45 @@ public:
         }
         template <>
         void set(const std::pair<int64_t, int64_t> &value) {
-            mType = kTypeRate;
+            mType = mediametrics::kTypeRate;
             u.rate = {value.first, value.second};
         }
 
         template <typename T> void add(const T& value) = delete;
         template <>
         void add(const int32_t& value) {
-            if (mType == kTypeInt32) {
+            if (mType == mediametrics::kTypeInt32) {
                 u.int32Value += value;
             } else {
-                mType = kTypeInt32;
+                mType = mediametrics::kTypeInt32;
                 u.int32Value = value;
             }
         }
         template <>
         void add(const int64_t& value) {
-            if (mType == kTypeInt64) {
+            if (mType == mediametrics::kTypeInt64) {
                 u.int64Value += value;
             } else {
-                mType = kTypeInt64;
+                mType = mediametrics::kTypeInt64;
                 u.int64Value = value;
             }
         }
         template <>
         void add(const double& value) {
-            if (mType == kTypeDouble) {
+            if (mType == mediametrics::kTypeDouble) {
                 u.doubleValue += value;
             } else {
-                mType = kTypeDouble;
+                mType = mediametrics::kTypeDouble;
                 u.doubleValue = value;
             }
         }
         template <>
         void add(const std::pair<int64_t, int64_t>& value) {
-            if (mType == kTypeRate) {
+            if (mType == mediametrics::kTypeRate) {
                 u.rate.first += value.first;
                 u.rate.second += value.second;
             } else {
-                mType = kTypeRate;
+                mType = mediametrics::kTypeRate;
                 u.rate = value;
             }
         }
@@ -858,10 +856,10 @@ public:
         status_t writeToByteString(char **bufferpptr, char *bufferptrmax) const;
         status_t readFromByteString(const char **bufferpptr, const char *bufferptrmax);
 
-    // TODO: make private (and consider converting to std::variant)
-    // private:
-        char *mName = nullptr;
-        Type mType = kTypeNone;
+    // TODO: consider converting to std::variant
+    private:
+        std::string mName;
+        mediametrics::Type mType = mediametrics::kTypeNone;
         union u__ {
             u__() { zero(); }
             u__(u__ &&other) {
@@ -882,62 +880,58 @@ public:
         } u;
     };
 
+    // Iteration of props within item
     class iterator {
     public:
-       iterator(size_t pos, const Item &_item)
-           : i(std::min(pos, _item.count()))
-           , item(_item) { }
-       iterator &operator++() {
-           i = std::min(i + 1, item.count());
-           return *this;
-       }
-       bool operator!=(iterator &other) const {
-           return i != other.i;
-       }
-       Prop &operator*() const {
-           return item.mProps[i];
-       }
+        iterator(const std::map<std::string, Prop>::const_iterator &_it) : it(_it) { }
+        iterator &operator++() {
+            ++it;
+            return *this;
+        }
+        bool operator!=(iterator &other) const {
+            return it != other.it;
+        }
+        const Prop &operator*() const {
+            return it->second;
+        }
 
     private:
-      size_t i;
-      const Item &item;
+        std::map<std::string, Prop>::const_iterator it;
     };
 
     iterator begin() const {
-        return iterator(0, *this);
+        return iterator(mProps.cbegin());
     }
+
     iterator end() const {
-        return iterator(SIZE_MAX, *this);
+        return iterator(mProps.cend());
     }
 
 private:
 
-    // TODO: make prop management class
-    size_t findPropIndex(const char *name) const;
-    Prop *findProp(const char *name) const;
-    Prop *allocateProp();
+    const Prop *findProp(const char *key) const {
+        auto it = mProps.find(key);
+        return it != mProps.end() ? &it->second : nullptr;
+    }
 
-        enum {
-            kGrowProps = 10
-        };
-        bool growProps(int increment = kGrowProps);
-        Prop *allocateProp(const char *name);
-        bool removeProp(const char *name);
-    Prop *allocateProp(const std::string& name) { return allocateProp(name.c_str()); }
-
-        size_t mPropCount = 0;
-        size_t mPropSize = 0;
-        Prop *mProps = nullptr;
+    Prop &findOrAllocateProp(const char *key) {
+        auto it = mProps.find(key);
+        if (it != mProps.end()) return it->second;
+        Prop &prop = mProps[key];
+        prop.setName(key);
+        return prop;
+    }
 
     pid_t         mPid = -1;
     uid_t         mUid = -1;
     std::string   mPkgName;
     int64_t       mPkgVersionCode = 0;
-    std::string   mKey{kKeyNone};
+    std::string   mKey;
     nsecs_t       mTimestamp = 0;
+    std::map<std::string, Prop> mProps;
 };
 
 } // namespace mediametrics
 } // namespace android
 
-#endif
+#endif // ANDROID_MEDIA_MEDIAMETRICSITEM_H
