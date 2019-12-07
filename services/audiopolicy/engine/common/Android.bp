@@ -25,6 +25,7 @@ cc_library_static {
         "src/ProductStrategy.cpp",
         "src/VolumeCurve.cpp",
         "src/VolumeGroup.cpp",
+        "src/LastRemovableMediaDevices.cpp",
     ],
     cflags: [
         "-Wall",
