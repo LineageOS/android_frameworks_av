@@ -20,6 +20,7 @@
 #include <EngineInterface.h>
 #include <ProductStrategy.h>
 #include <VolumeGroup.h>
+#include <LastRemovableMediaDevices.h>
 
 namespace android {
 namespace audio_policy {
@@ -49,10 +50,8 @@ public:
         return mForceUse[usage];
     }
     android::status_t setDeviceConnectionState(const sp<DeviceDescriptor> /*devDesc*/,
-                                               audio_policy_dev_state_t /*state*/) override
-    {
-        return NO_ERROR;
-    }
+                                               audio_policy_dev_state_t /*state*/) override;
+
     product_strategy_t getProductStrategyForAttributes(
             const audio_attributes_t &attr) const override;
 
@@ -86,6 +85,12 @@ public:
 
     status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups) const override;
 
+    std::vector<audio_devices_t> getLastRemovableMediaDevices(
+            device_out_group_t group = GROUP_NONE) const
+    {
+        return mLastRemovableMediaDevices.getLastRemovableMediaDevices(group);
+    }
+
     void dump(String8 *dst) const override;
 
 
@@ -115,11 +120,12 @@ public:
 
     status_t restoreOriginVolumeCurve(audio_stream_type_t stream);
 
- private:
+private:
     AudioPolicyManagerObserver *mApmObserver = nullptr;
 
     ProductStrategyMap mProductStrategies;
     VolumeGroupMap mVolumeGroups;
+    LastRemovableMediaDevices mLastRemovableMediaDevices;
     audio_mode_t mPhoneState = AUDIO_MODE_NORMAL;  /**< current phone state. */
 
     /** current forced use configuration. */
