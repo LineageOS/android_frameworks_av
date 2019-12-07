@@ -18,12 +18,12 @@
 #define LOG_TAG "MediaAnalyticsService"
 #include <utils/Log.h>
 
-#include "MediaAnalyticsService.h"
+#include "MediaMetricsService.h"
 
 #include <pwd.h> //getpwuid
 
-#include <audio_utils/clock.h>                 // clock conversions
 #include <android/content/pm/IPackageManagerNative.h>  // package info
+#include <audio_utils/clock.h>                 // clock conversions
 #include <binder/IPCThreadState.h>             // get calling uid
 #include <cutils/properties.h>                 // for property_get
 #include <private/android_filesystem_config.h> // UID
@@ -51,6 +51,12 @@ static constexpr size_t kMaxExpiredAtOnce = 50;
 
 // TODO: need to look at tuning kMaxRecords and friends for low-memory devices
 
+/* static */
+nsecs_t MediaAnalyticsService::roundTime(nsecs_t timeNs)
+{
+    return (timeNs + NANOS_PER_SECOND / 2) / NANOS_PER_SECOND * NANOS_PER_SECOND;
+}
+
 MediaAnalyticsService::MediaAnalyticsService()
         : mMaxRecords(kMaxRecords),
           mMaxRecordAgeNs(kMaxRecordAgeNs),
@@ -70,38 +76,38 @@ MediaAnalyticsService::~MediaAnalyticsService()
 
 status_t MediaAnalyticsService::submitInternal(MediaAnalyticsItem *item, bool release)
 {
-    // we control these, generally not trusting user input
-    nsecs_t now = systemTime(SYSTEM_TIME_REALTIME);
-    // round nsecs to seconds
-    now = (now + NANOS_PER_SECOND / 2) / NANOS_PER_SECOND * NANOS_PER_SECOND;
-    // TODO: if we convert to boot time, do we need to round timestamp?
-    item->setTimestamp(now);
+    // calling PID is 0 for one-way calls.
+    const pid_t pid = IPCThreadState::self()->getCallingPid();
+    const pid_t pid_given = item->getPid();
+    const uid_t uid = IPCThreadState::self()->getCallingUid();
+    const uid_t uid_given = item->getUid();
 
-    const int pid = IPCThreadState::self()->getCallingPid();
-    const int uid = IPCThreadState::self()->getCallingUid();
-    const int uid_given = item->getUid();
-    const int pid_given = item->getPid();
+    //ALOGD("%s: caller pid=%d uid=%d,  item pid=%d uid=%d", __func__,
+    //        (int)pid, (int)uid, (int) pid_given, (int)uid_given);
 
-    ALOGV("%s: caller has uid=%d, embedded uid=%d", __func__, uid, uid_given);
     bool isTrusted;
     switch (uid) {
+    case AID_AUDIOSERVER:
+    case AID_BLUETOOTH:
+    case AID_CAMERA:
     case AID_DRM:
     case AID_MEDIA:
     case AID_MEDIA_CODEC:
     case AID_MEDIA_EX:
     case AID_MEDIA_DRM:
+    case AID_SYSTEM:
         // trusted source, only override default values
         isTrusted = true;
-        if (uid_given == -1) {
+        if (uid_given == (uid_t)-1) {
             item->setUid(uid);
         }
-        if (pid_given == -1) {
-            item->setPid(pid);
+        if (pid_given == (pid_t)-1) {
+            item->setPid(pid); // if one-way then this is 0.
         }
         break;
     default:
         isTrusted = false;
-        item->setPid(pid);
+        item->setPid(pid); // always use calling pid, if one-way then this is 0.
         item->setUid(uid);
         break;
     }
@@ -140,8 +146,20 @@ status_t MediaAnalyticsService::submitInternal(MediaAnalyticsItem *item, bool re
         return BAD_VALUE;
     }
 
+    if (!isTrusted || item->getTimestamp() == 0) {
+        // WestWorld logs two times for events: ElapsedRealTimeNs (BOOTTIME) and
+        // WallClockTimeNs (REALTIME).  The new audio keys use BOOTTIME.
+        //
+        // TODO: Reevaluate time base with other teams.
+        const bool useBootTime = startsWith(item->getKey(), "audio.");
+        const int64_t now = systemTime(useBootTime ? SYSTEM_TIME_BOOTTIME : SYSTEM_TIME_REALTIME);
+        item->setTimestamp(now);
+    }
+
     // now attach either the item or its dup to a const shared pointer
     std::shared_ptr<const MediaAnalyticsItem> sitem(release ? item : item->dup());
+
+    (void)mAudioAnalytics.submit(sitem, isTrusted);
 
     extern bool dump2Statsd(const std::shared_ptr<const MediaAnalyticsItem>& item);
     (void)dump2Statsd(sitem);  // failure should be logged in function.
@@ -247,6 +265,9 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
             mItems.clear();
             // shall we clear the summary data too?
         }
+        // TODO: maybe consider a better way of dumping audio analytics info.
+        constexpr int32_t linesToDump = 1000;
+        result.append(mAudioAnalytics.dump(linesToDump).first.c_str());
     }
 
     write(fd, result.string(), result.size());
@@ -403,11 +424,14 @@ bool MediaAnalyticsService::isContentValid(const MediaAnalyticsItem *item, bool 
     if (isTrusted) return true;
     // untrusted uids can only send us a limited set of keys
     const std::string &key = item->getKey();
+    if (startsWith(key, "audio.")) return true;
     for (const char *allowedKey : {
+                                     // legacy audio
                                      "audiopolicy",
                                      "audiorecord",
                                      "audiothread",
                                      "audiotrack",
+                                     // other media
                                      "codec",
                                      "extractor",
                                      "nuplayer",

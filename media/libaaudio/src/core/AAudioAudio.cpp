@@ -149,6 +149,12 @@ AAUDIO_API void AAudioStreamBuilder_setInputPreset(AAudioStreamBuilder* builder,
     streamBuilder->setInputPreset(inputPreset);
 }
 
+AAUDIO_API void AAudioStreamBuilder_setPrivacySensitive(AAudioStreamBuilder* builder,
+                                                   bool privacySensitive) {
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setPrivacySensitiveRequest(privacySensitive);
+}
+
 AAUDIO_API void AAudioStreamBuilder_setBufferCapacityInFrames(AAudioStreamBuilder* builder,
                                                               int32_t frames)
 {
@@ -506,4 +512,10 @@ AAUDIO_API bool AAudioStream_isMMapUsed(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->isMMap();
+}
+
+AAUDIO_API bool AAudioStream_isPrivacySensitive(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    return audioStream->isPrivacySensitive();
 }

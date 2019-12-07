@@ -50,7 +50,7 @@ static void AudioRecordCallbackFunction(int event, void *user, void *info) {
 }
 
 AudioSource::AudioSource(
-        audio_source_t inputSource, const String16 &opPackageName,
+        const audio_attributes_t *attr, const String16 &opPackageName,
         uint32_t sampleRate, uint32_t channelCount, uint32_t outSampleRate,
         uid_t uid, pid_t pid, audio_port_handle_t selectedDeviceId,
         audio_microphone_direction_t selectedMicDirection,
@@ -92,7 +92,7 @@ AudioSource::AudioSource(
         }
 
         mRecord = new AudioRecord(
-                    inputSource, sampleRate, AUDIO_FORMAT_PCM_16_BIT,
+                    AUDIO_SOURCE_DEFAULT, sampleRate, AUDIO_FORMAT_PCM_16_BIT,
                     audio_channel_in_mask_from_count(channelCount),
                     opPackageName,
                     (size_t) (bufCount * frameCount),
@@ -104,7 +104,7 @@ AudioSource::AudioSource(
                     AUDIO_INPUT_FLAG_NONE,
                     uid,
                     pid,
-                    NULL /*pAttributes*/,
+                    attr,
                     selectedDeviceId,
                     selectedMicDirection,
                     selectedMicFieldDimension);

@@ -234,6 +234,11 @@ audio_flags_mask_t AAudioConvert_allowCapturePolicyToAudioFlagsMask(
     }
 }
 
+audio_flags_mask_t AAudioConvert_privacySensitiveToAudioFlagsMask(
+        bool privacySensitive) {
+    return privacySensitive ? AUDIO_FLAG_CAPTURE_PRIVATE : AUDIO_FLAG_NONE;
+}
+
 int32_t AAudioConvert_framesToBytes(int32_t numFrames,
                                     int32_t bytesPerFrame,
                                     int32_t *sizeInBytes) {

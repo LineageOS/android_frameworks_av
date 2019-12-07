@@ -338,7 +338,6 @@ private:
 
     void silenceAllRecordings_l();
 
-    static bool isPrivacySensitiveSource(audio_source_t source);
     static bool isVirtualSource(audio_source_t source);
 
     // If recording we need to make sure the UID is allowed to do that. If the UID is idle

@@ -38,12 +38,15 @@ static void (*s_setInputPreset)(AAudioStreamBuilder* builder,
                                 aaudio_input_preset_t inputPreset) = nullptr;
 static void (*s_setAllowedCapturePolicy)(AAudioStreamBuilder* builder,
                                           aaudio_allowed_capture_policy_t usage) = nullptr;
+static void (*s_setPrivacySensitive)(AAudioStreamBuilder* builder,
+                                          bool privacySensitive) = nullptr;
 
 static bool s_loadAttempted = false;
 static aaudio_usage_t (*s_getUsage)(AAudioStream *stream) = nullptr;
 static aaudio_content_type_t (*s_getContentType)(AAudioStream *stream) = nullptr;
 static aaudio_input_preset_t (*s_getInputPreset)(AAudioStream *stream) = nullptr;
 static aaudio_allowed_capture_policy_t (*s_getAllowedCapturePolicy)(AAudioStream *stream) = nullptr;
+static bool (*s_isPrivacySensitive)(AAudioStream *stream) = nullptr;
 
 // Link to test functions in shared library.
 static void loadFutureFunctions() {
@@ -68,6 +71,10 @@ static void loadFutureFunctions() {
                 dlsym(handle, "AAudioStreamBuilder_setAllowedCapturePolicy");
         if (s_setAllowedCapturePolicy == nullptr) goto error;
 
+        s_setPrivacySensitive = (void (*)(AAudioStreamBuilder *, bool))
+                dlsym(handle, "AAudioStreamBuilder_setPrivacySensitive");
+        if (s_setPrivacySensitive == nullptr) goto error;
+
         s_getUsage = (aaudio_usage_t (*)(AAudioStream *))
                 dlsym(handle, "AAudioStream_getUsage");
         if (s_getUsage == nullptr) goto error;
@@ -83,6 +90,10 @@ static void loadFutureFunctions() {
         s_getAllowedCapturePolicy = (aaudio_input_preset_t (*)(AAudioStream *))
                 dlsym(handle, "AAudioStream_getAllowedCapturePolicy");
         if (s_getAllowedCapturePolicy == nullptr) goto error;
+
+        s_isPrivacySensitive = (bool (*)(AAudioStream *))
+                dlsym(handle, "AAudioStream_isPrivacySensitive");
+        if (s_isPrivacySensitive == nullptr) goto error;
     }
     return;
 
@@ -91,9 +102,11 @@ error:
     s_setUsage = nullptr;
     s_setContentType = nullptr;
     s_setInputPreset = nullptr;
+    s_setPrivacySensitive = nullptr;
     s_getUsage = nullptr;
     s_getContentType = nullptr;
     s_getInputPreset = nullptr;
+    s_isPrivacySensitive = nullptr;
     dlclose(handle);
     return;
 }
@@ -211,6 +224,14 @@ public:
         mFramesPerCallback = size;
     }
 
+    int32_t isPrivacySensitive() const {
+        return mPrivacySensitive;
+    }
+
+    void setPrivacySensitive(int32_t privacySensitive) {
+        mPrivacySensitive = privacySensitive;
+    }
+
     /**
      * Apply these parameters to a stream builder.
      * @param builder
@@ -234,12 +255,12 @@ public:
         }
         if (s_setContentType != nullptr) {
             s_setContentType(builder, mContentType);
-        } else if (mUsage != AAUDIO_UNSPECIFIED){
+        } else if (mContentType != AAUDIO_UNSPECIFIED){
             printf("WARNING: setContentType not supported");
         }
         if (s_setInputPreset != nullptr) {
             s_setInputPreset(builder, mInputPreset);
-        } else if (mUsage != AAUDIO_UNSPECIFIED){
+        } else if (mInputPreset != AAUDIO_UNSPECIFIED){
             printf("WARNING: setInputPreset not supported");
         }
 
@@ -248,6 +269,15 @@ public:
             s_setAllowedCapturePolicy(builder, mAllowedCapturePolicy);
         } else if (mAllowedCapturePolicy != AAUDIO_UNSPECIFIED){
             printf("WARNING: setAllowedCapturePolicy not supported");
+        }
+
+        if (mPrivacySensitive != PRIVACY_SENSITIVE_DEFAULT) {
+            if (s_setPrivacySensitive != nullptr) {
+                s_setPrivacySensitive(builder,
+                    mPrivacySensitive == PRIVACY_SENSITIVE_ENABLED);
+            } else {
+                printf("WARNING: setPrivacySensitive not supported");
+            }
         }
     }
 
@@ -270,6 +300,13 @@ private:
 
     int32_t                    mNumberOfBursts  = kDefaultNumberOfBursts;
     int32_t                    mFramesPerCallback = AAUDIO_UNSPECIFIED;
+
+    enum {
+        PRIVACY_SENSITIVE_DEFAULT = -1,
+        PRIVACY_SENSITIVE_DISABLED = 0,
+        PRIVACY_SENSITIVE_ENABLED = 1,
+    };
+    int32_t                    mPrivacySensitive = PRIVACY_SENSITIVE_DEFAULT;
 };
 
 class AAudioArgsParser : public AAudioParameters {
@@ -341,6 +378,9 @@ public:
                 case 'z':
                     setFramesPerCallback(atoi(&arg[2]));
                     break;
+                case 'S':
+                    setPrivacySensitive(atoi(&arg[2]));
+                    break;
                 default:
                     unrecognized = true;
                     break;
@@ -399,6 +439,9 @@ public:
         printf("      -x to use EXCLUSIVE mode\n");
         printf("      -y{contentType} eg. 1 for AAUDIO_CONTENT_TYPE_SPEECH\n");
         printf("      -z{callbackSize} or block size, in frames, default = 0\n");
+        printf("      -S{0|1} set privacy Sensitive enabled or disabled\n");
+        printf("          0 = disabled\n");
+        printf("          1 = enabled\n");
     }
 
     static aaudio_performance_mode_t parseAllowedCapturePolicy(char c) {
@@ -506,10 +549,15 @@ public:
                    getContentType(), s_getContentType(stream));
         }
 
-        if (AAudioStream_getDirection(stream) == AAUDIO_DIRECTION_INPUT
-            && s_getInputPreset != nullptr) {
+        if (AAudioStream_getDirection(stream) == AAUDIO_DIRECTION_INPUT) {
+            if (s_getInputPreset != nullptr) {
                 printf("  InputPreset:  requested = %d, actual = %d\n",
                        getInputPreset(), s_getInputPreset(stream));
+            }
+            if (s_isPrivacySensitive != nullptr) {
+                printf("  Privacy Sensitive:  requested = %d, actual = %d\n",
+                       isPrivacySensitive(), s_isPrivacySensitive(stream));
+            }
         }
 
         printf("  Is MMAP used? %s\n", AAudioStream_isMMapUsed(stream)

@@ -11,7 +11,7 @@ cc_binary {
     shared_libs: [
         "libbinder",
         "liblog",
-        "libmediaanalyticsservice",
+        "libmediametricsservice",
         "libutils",
     ],
 
@@ -27,11 +27,12 @@ cc_binary {
 }
 
 cc_library_shared {
-    name: "libmediaanalyticsservice",
+    name: "libmediametricsservice",
 
     srcs: [
+        "AudioAnalytics.cpp",
         "iface_statsd.cpp",
-        "MediaAnalyticsService.cpp",
+        "MediaMetricsService.cpp",
         "statsd_audiopolicy.cpp",
         "statsd_audiorecord.cpp",
         "statsd_audiothread.cpp",

@@ -158,6 +158,19 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
         return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
     }
 
+    setPrivacySensitive(false);
+    if (mPrivacySensitiveReq == PRIVACY_SENSITIVE_DEFAULT) {
+        // When not explicitly requested, set privacy sensitive mode according to input preset:
+        // communication and camcorder captures are considered privacy sensitive by default.
+        aaudio_input_preset_t preset = getInputPreset();
+        if (preset == AAUDIO_INPUT_PRESET_CAMCORDER
+                || preset == AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION) {
+            setPrivacySensitive(true);
+        }
+    } else if (mPrivacySensitiveReq == PRIVACY_SENSITIVE_ENABLED) {
+        setPrivacySensitive(true);
+    }
+
     result = builder_createStream(getDirection(), sharingMode, allowMMap, &audioStream);
     if (result == AAUDIO_OK) {
         // Open the stream using the parameters from the builder.
@@ -257,4 +270,5 @@ void AudioStreamBuilder::logParameters() const {
           mFramesPerDataCallback);
     ALOGI("usage  = %6d, contentType = %d, inputPreset = %d, allowedCapturePolicy = %d",
           getUsage(), getContentType(), getInputPreset(), getAllowedCapturePolicy());
+    ALOGI("privacy sensitive = %s", isPrivacySensitive() ? "true" : "false");
 }

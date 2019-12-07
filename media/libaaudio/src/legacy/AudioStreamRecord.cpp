@@ -142,11 +142,13 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     const audio_source_t source =
             AAudioConvert_inputPresetToAudioSource(builder.getInputPreset());
 
+    const audio_flags_mask_t attrFlags =
+            AAudioConvert_privacySensitiveToAudioFlagsMask(builder.isPrivacySensitive());
     const audio_attributes_t attributes = {
             .content_type = contentType,
             .usage = AUDIO_USAGE_UNKNOWN, // only used for output
             .source = source,
-            .flags = AUDIO_FLAG_NONE, // Different than the AUDIO_INPUT_FLAGS
+            .flags = attrFlags, // Different than the AUDIO_INPUT_FLAGS
             .tags = ""
     };
 

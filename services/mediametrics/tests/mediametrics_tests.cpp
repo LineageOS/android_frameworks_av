@@ -17,7 +17,7 @@
 #define LOG_TAG "mediametrics_tests"
 #include <utils/Log.h>
 
-#include "MediaAnalyticsService.h"
+#include "MediaMetricsService.h"
 
 #include <stdio.h>
 
@@ -25,6 +25,15 @@
 #include <media/MediaAnalyticsItem.h>
 
 using namespace android;
+
+static size_t countNewlines(const char *s) {
+    size_t count = 0;
+    while ((s = strchr(s, '\n')) != nullptr) {
+        ++s;
+        ++count;
+    }
+    return count;
+}
 
 TEST(mediametrics_tests, instantiate) {
   sp mediaMetrics = new MediaAnalyticsService();
@@ -354,5 +363,249 @@ TEST(mediametrics_tests, item_expansion2) {
     int32_t i32;
     ASSERT_TRUE(item2.getInt32(std::to_string(i).c_str(), &i32));
     ASSERT_EQ((int32_t)i, i32);
+  }
+}
+
+TEST(mediametrics_tests, time_machine_storage) {
+  auto item = std::make_shared<MediaAnalyticsItem>("Key");
+  (*item).set("i32", (int32_t)1)
+      .set("i64", (int64_t)2)
+      .set("double", (double)3.125)
+      .set("string", "abcdefghijklmnopqrstuvwxyz")
+      .set("rate", std::pair<int64_t, int64_t>(11, 12));
+
+  // Let's put the item in
+  android::mediametrics::TimeMachine timeMachine;
+  ASSERT_EQ(NO_ERROR, timeMachine.put(item, true));
+
+  // Can we read the values?
+  int32_t i32;
+  ASSERT_EQ(NO_ERROR, timeMachine.get("Key", "i32", &i32, -1));
+  ASSERT_EQ(1, i32);
+
+  int64_t i64;
+  ASSERT_EQ(NO_ERROR, timeMachine.get("Key", "i64", &i64, -1));
+  ASSERT_EQ(2, i64);
+
+  double d;
+  ASSERT_EQ(NO_ERROR, timeMachine.get("Key", "double", &d, -1));
+  ASSERT_EQ(3.125, d);
+
+  std::string s;
+  ASSERT_EQ(NO_ERROR, timeMachine.get("Key", "string", &s, -1));
+  ASSERT_EQ("abcdefghijklmnopqrstuvwxyz", s);
+
+  // Using fully qualified name?
+  i32 = 0;
+  ASSERT_EQ(NO_ERROR, timeMachine.get("Key.i32", &i32, -1));
+  ASSERT_EQ(1, i32);
+
+  i64 = 0;
+  ASSERT_EQ(NO_ERROR, timeMachine.get("Key.i64", &i64, -1));
+  ASSERT_EQ(2, i64);
+
+  d = 0.;
+  ASSERT_EQ(NO_ERROR, timeMachine.get("Key.double", &d, -1));
+  ASSERT_EQ(3.125, d);
+
+  s.clear();
+  ASSERT_EQ(NO_ERROR, timeMachine.get("Key.string", &s, -1));
+  ASSERT_EQ("abcdefghijklmnopqrstuvwxyz", s);
+}
+
+TEST(mediametrics_tests, time_machine_remote_key) {
+  auto item = std::make_shared<MediaAnalyticsItem>("Key1");
+  (*item).set("one", (int32_t)1)
+         .set("two", (int32_t)2);
+
+  android::mediametrics::TimeMachine timeMachine;
+  ASSERT_EQ(NO_ERROR, timeMachine.put(item, true));
+
+  auto item2 = std::make_shared<MediaAnalyticsItem>("Key2");
+  (*item2).set("three", (int32_t)3)
+         .set("[Key1]four", (int32_t)4)   // affects Key1
+         .set("[Key1]five", (int32_t)5);  // affects key1
+
+  ASSERT_EQ(NO_ERROR, timeMachine.put(item2, true));
+
+  auto item3 = std::make_shared<MediaAnalyticsItem>("Key2");
+  (*item3).set("six", (int32_t)6)
+         .set("[Key1]seven", (int32_t)7);   // affects Key1
+
+  ASSERT_EQ(NO_ERROR, timeMachine.put(item3, false)); // remote keys not allowed.
+
+  // Can we read the values?
+  int32_t i32;
+  ASSERT_EQ(NO_ERROR, timeMachine.get("Key1.one", &i32, -1));
+  ASSERT_EQ(1, i32);
+
+  ASSERT_EQ(NO_ERROR, timeMachine.get("Key1.two", &i32, -1));
+  ASSERT_EQ(2, i32);
+
+  ASSERT_EQ(BAD_VALUE, timeMachine.get("Key1.three", &i32, -1));
+
+  ASSERT_EQ(NO_ERROR, timeMachine.get("Key2.three", &i32, -1));
+  ASSERT_EQ(3, i32);
+
+  ASSERT_EQ(NO_ERROR, timeMachine.get("Key1.four", &i32, -1));
+  ASSERT_EQ(4, i32);
+
+  ASSERT_EQ(BAD_VALUE, timeMachine.get("Key2.four", &i32, -1));
+
+  ASSERT_EQ(NO_ERROR, timeMachine.get("Key1.five", &i32, -1));
+  ASSERT_EQ(5, i32);
+
+  ASSERT_EQ(BAD_VALUE, timeMachine.get("Key2.five", &i32, -1));
+
+  ASSERT_EQ(NO_ERROR, timeMachine.get("Key2.six", &i32, -1));
+  ASSERT_EQ(6, i32);
+
+  ASSERT_EQ(BAD_VALUE, timeMachine.get("Key2.seven", &i32, -1));
+}
+
+TEST(mediametrics_tests, time_machine_gc) {
+  auto item = std::make_shared<MediaAnalyticsItem>("Key1");
+  (*item).set("one", (int32_t)1)
+         .set("two", (int32_t)2)
+         .setTimestamp(10);
+
+  android::mediametrics::TimeMachine timeMachine(1, 2); // keep at most 2 keys.
+
+  ASSERT_EQ((size_t)0, timeMachine.size());
+
+  ASSERT_EQ(NO_ERROR, timeMachine.put(item, true));
+
+  ASSERT_EQ((size_t)1, timeMachine.size());
+
+  auto item2 = std::make_shared<MediaAnalyticsItem>("Key2");
+  (*item2).set("three", (int32_t)3)
+         .set("[Key1]three", (int32_t)3)
+         .setTimestamp(11);
+
+  ASSERT_EQ(NO_ERROR, timeMachine.put(item2, true));
+  ASSERT_EQ((size_t)2, timeMachine.size());
+
+  //printf("Before\n%s\n\n", timeMachine.dump().c_str());
+
+  auto item3 = std::make_shared<MediaAnalyticsItem>("Key3");
+  (*item3).set("six", (int32_t)6)
+          .set("[Key1]four", (int32_t)4)   // affects Key1
+          .set("[Key1]five", (int32_t)5)   // affects key1
+          .setTimestamp(12);
+
+  ASSERT_EQ(NO_ERROR, timeMachine.put(item3, true));
+
+  ASSERT_EQ((size_t)2, timeMachine.size());
+
+  // Can we read the values?
+  int32_t i32;
+  ASSERT_EQ(BAD_VALUE, timeMachine.get("Key1.one", &i32, -1));
+  ASSERT_EQ(BAD_VALUE, timeMachine.get("Key1.two", &i32, -1));
+  ASSERT_EQ(BAD_VALUE, timeMachine.get("Key1.three", &i32, -1));
+  ASSERT_EQ(BAD_VALUE, timeMachine.get("Key1.four", &i32, -1));
+  ASSERT_EQ(BAD_VALUE, timeMachine.get("Key1.five", &i32, -1));
+
+  ASSERT_EQ(NO_ERROR, timeMachine.get("Key2.three", &i32, -1));
+  ASSERT_EQ(3, i32);
+
+  ASSERT_EQ(NO_ERROR, timeMachine.get("Key3.six", &i32, -1));
+  ASSERT_EQ(6, i32);
+
+  printf("After\n%s\n", timeMachine.dump().first.c_str());
+}
+
+TEST(mediametrics_tests, transaction_log_gc) {
+  auto item = std::make_shared<MediaAnalyticsItem>("Key1");
+  (*item).set("one", (int32_t)1)
+         .set("two", (int32_t)2)
+         .setTimestamp(10);
+
+  android::mediametrics::TransactionLog transactionLog(1, 2); // keep at most 2 items
+  ASSERT_EQ((size_t)0, transactionLog.size());
+
+  ASSERT_EQ(NO_ERROR, transactionLog.put(item));
+  ASSERT_EQ((size_t)1, transactionLog.size());
+
+  auto item2 = std::make_shared<MediaAnalyticsItem>("Key2");
+  (*item2).set("three", (int32_t)3)
+         .set("[Key1]three", (int32_t)3)
+         .setTimestamp(11);
+
+  ASSERT_EQ(NO_ERROR, transactionLog.put(item2));
+  ASSERT_EQ((size_t)2, transactionLog.size());
+
+  auto item3 = std::make_shared<MediaAnalyticsItem>("Key3");
+  (*item3).set("six", (int32_t)6)
+          .set("[Key1]four", (int32_t)4)   // affects Key1
+          .set("[Key1]five", (int32_t)5)   // affects key1
+          .setTimestamp(12);
+
+  ASSERT_EQ(NO_ERROR, transactionLog.put(item3));
+  ASSERT_EQ((size_t)2, transactionLog.size());
+}
+
+TEST(mediametrics_tests, audio_analytics_permission) {
+  auto item = std::make_shared<MediaAnalyticsItem>("audio.1");
+  (*item).set("one", (int32_t)1)
+         .set("two", (int32_t)2)
+         .setTimestamp(10);
+
+  auto item2 = std::make_shared<MediaAnalyticsItem>("audio.1");
+  (*item2).set("three", (int32_t)3)
+         .setTimestamp(11);
+
+  auto item3 = std::make_shared<MediaAnalyticsItem>("audio.2");
+  (*item3).set("four", (int32_t)4)
+          .setTimestamp(12);
+
+  android::mediametrics::AudioAnalytics audioAnalytics;
+
+  // untrusted entities cannot create a new key.
+  ASSERT_EQ(PERMISSION_DENIED, audioAnalytics.submit(item, false /* isTrusted */));
+  ASSERT_EQ(PERMISSION_DENIED, audioAnalytics.submit(item2, false /* isTrusted */));
+
+  // TODO: Verify contents of AudioAnalytics.
+  // Currently there is no getter API in AudioAnalytics besides dump.
+  ASSERT_EQ(4, audioAnalytics.dump(1000).second /* lines */);
+
+  ASSERT_EQ(NO_ERROR, audioAnalytics.submit(item, true /* isTrusted */));
+  // untrusted entities can add to an existing key
+  ASSERT_EQ(NO_ERROR, audioAnalytics.submit(item2, false /* isTrusted */));
+
+  // Check that we have some info in the dump.
+  ASSERT_LT(4, audioAnalytics.dump(1000).second /* lines */);
+}
+
+TEST(mediametrics_tests, audio_analytics_dump) {
+  auto item = std::make_shared<MediaAnalyticsItem>("audio.1");
+  (*item).set("one", (int32_t)1)
+         .set("two", (int32_t)2)
+         .setTimestamp(10);
+
+  auto item2 = std::make_shared<MediaAnalyticsItem>("audio.1");
+  (*item2).set("three", (int32_t)3)
+         .setTimestamp(11);
+
+  auto item3 = std::make_shared<MediaAnalyticsItem>("audio.2");
+  (*item3).set("four", (int32_t)4)
+          .setTimestamp(12);
+
+  android::mediametrics::AudioAnalytics audioAnalytics;
+
+  ASSERT_EQ(NO_ERROR, audioAnalytics.submit(item, true /* isTrusted */));
+  // untrusted entities can add to an existing key
+  ASSERT_EQ(NO_ERROR, audioAnalytics.submit(item2, false /* isTrusted */));
+  ASSERT_EQ(NO_ERROR, audioAnalytics.submit(item3, true /* isTrusted */));
+
+  // find out how many lines we have.
+  auto [string, lines] = audioAnalytics.dump(1000);
+  ASSERT_EQ(lines, (int32_t) countNewlines(string.c_str()));
+
+  printf("AudioAnalytics: %s", string.c_str());
+  // ensure that dump operates over those lines.
+  for (int32_t ll = 0; ll < lines; ++ll) {
+      auto [s, l] = audioAnalytics.dump(ll);
+      ASSERT_EQ(ll, l);
+      ASSERT_EQ(ll, (int32_t) countNewlines(s.c_str()));
   }
 }

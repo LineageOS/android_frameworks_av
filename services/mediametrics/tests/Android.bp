@@ -9,14 +9,14 @@ cc_test {
     ],
 
     include_dirs: [
-        "frameworks/av/services/mediaanalytics",
+        "frameworks/av/services/mediametrics",
     ],
 
     shared_libs: [
         "libbinder",
         "liblog",
-        "libmediaanalyticsservice",
         "libmediametrics",
+        "libmediametricsservice",
         "libutils",
     ],
 

@@ -51,6 +51,8 @@ public:
     virtual     status_t   setPreviewSurface(const sp<IGraphicBufferProducer>& surface);
     virtual     status_t   setVideoSource(int vs);
     virtual     status_t   setAudioSource(int as);
+                status_t   setPrivacySensitive(bool privacySensitive) override;
+                status_t   isPrivacySensitive(bool *privacySensitive) const override;
     virtual     status_t   setOutputFormat(int of);
     virtual     status_t   setVideoEncoder(int ve);
     virtual     status_t   setAudioEncoder(int ae);
@@ -98,7 +100,7 @@ private:
     sp<AudioDeviceUpdatedNotifier> mAudioDeviceUpdatedNotifier;
 
     pid_t                  mPid;
-    Mutex                  mLock;
+    mutable Mutex          mLock;
     MediaRecorderBase      *mRecorder;
     sp<MediaPlayerService> mMediaPlayerService;
 };

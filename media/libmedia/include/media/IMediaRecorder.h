@@ -44,6 +44,8 @@ public:
     virtual status_t setPreviewSurface(const sp<IGraphicBufferProducer>& surface) = 0;
     virtual status_t setVideoSource(int vs) = 0;
     virtual status_t setAudioSource(int as) = 0;
+    virtual status_t setPrivacySensitive(bool privacySensitive) = 0;
+    virtual status_t isPrivacySensitive(bool *privacySensitive) const = 0;
     virtual status_t setOutputFormat(int of) = 0;
     virtual status_t setVideoEncoder(int ve) = 0;
     virtual status_t setAudioEncoder(int ae) = 0;

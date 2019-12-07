@@ -47,6 +47,7 @@ void AAudioStreamParameters::copyFrom(const AAudioStreamParameters &other) {
     mContentType          = other.mContentType;
     mInputPreset          = other.mInputPreset;
     mAllowedCapturePolicy = other.mAllowedCapturePolicy;
+    mIsPrivacySensitive   = other.mIsPrivacySensitive;
 }
 
 static aaudio_result_t isFormatValid(audio_format_t format) {
@@ -195,4 +196,5 @@ void AAudioStreamParameters::dump() const {
     ALOGD("mContentType          = %6d", mContentType);
     ALOGD("mInputPreset          = %6d", mInputPreset);
     ALOGD("mAllowedCapturePolicy = %6d", mAllowedCapturePolicy);
+    ALOGD("mIsPrivacySensitive   = %s", mIsPrivacySensitive ? "true" : "false");
 }

@@ -31,7 +31,7 @@
 
 #include <statslog.h>
 
-#include "MediaAnalyticsService.h"
+#include "MediaMetricsService.h"
 #include "frameworks/base/core/proto/android/stats/mediametrics/mediametrics.pb.h"
 #include "iface_statsd.h"
 
@@ -42,7 +42,7 @@ bool statsd_extractor(const MediaAnalyticsItem *item)
     if (item == NULL) return false;
 
     // these go into the statsd wrapper
-    nsecs_t timestamp = item->getTimestamp();
+    const nsecs_t timestamp = MediaAnalyticsService::roundTime(item->getTimestamp());
     std::string pkgName = item->getPkgName();
     int64_t pkgVersionCode = item->getPkgVersionCode();
     int64_t mediaApexVersion = 0;

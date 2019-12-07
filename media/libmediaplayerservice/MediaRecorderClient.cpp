@@ -138,6 +138,29 @@ status_t MediaRecorderClient::setAudioSource(int as)
     return mRecorder->setAudioSource((audio_source_t)as);
 }
 
+status_t MediaRecorderClient::setPrivacySensitive(bool privacySensitive)
+{
+    ALOGV("%s(%s)", __func__, privacySensitive ? "true" : "false");
+    Mutex::Autolock lock(mLock);
+    if (mRecorder == NULL)  {
+        ALOGE("%s: recorder is not initialized", __func__);
+        return NO_INIT;
+    }
+    return mRecorder->setPrivacySensitive(privacySensitive);
+}
+
+status_t MediaRecorderClient::isPrivacySensitive(bool *privacySensitive) const
+{
+    Mutex::Autolock lock(mLock);
+    if (mRecorder == NULL)  {
+        ALOGE("%s: recorder is not initialized", __func__);
+        return NO_INIT;
+    }
+    status_t status = mRecorder->isPrivacySensitive(privacySensitive);
+    ALOGV("%s: status: %d enabled: %s", __func__, status, *privacySensitive ? "true" : "false");
+    return status;
+}
+
 status_t MediaRecorderClient::setOutputFormat(int of)
 {
     ALOGV("setOutputFormat(%d)", of);

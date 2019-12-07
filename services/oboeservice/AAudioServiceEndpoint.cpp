@@ -62,6 +62,7 @@ std::string AAudioServiceEndpoint::dump() const {
     result << "    InputPreset:          " << getInputPreset() << "\n";
     result << "    Reference Count:      " << mOpenCount << "\n";
     result << "    Session Id:           " << getSessionId() << "\n";
+    result << "    Privacy Sensitive:    " << isPrivacySensitive() << "\n";
     result << "    Connected:            " << mConnected.load() << "\n";
     result << "    Registered Streams:" << "\n";
     result << AAudioServiceStreamShared::dumpHeader() << "\n";

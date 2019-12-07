@@ -26,6 +26,8 @@
 #include <media/IMediaAnalyticsService.h>
 #include <utils/String8.h>
 
+#include "AudioAnalytics.h"
+
 namespace android {
 
 class MediaAnalyticsService : public BnMediaAnalyticsService
@@ -54,6 +56,11 @@ public:
     status_t dump(int fd, const Vector<String16>& args) override;
 
     static constexpr const char * const kServiceName = "media.metrics";
+
+    /**
+     * Rounds time to the nearest second.
+     */
+    static nsecs_t roundTime(nsecs_t timeNs);
 
 protected:
 
@@ -109,6 +116,8 @@ private:
     } mUidInfo;  // mUidInfo can be accessed without lock (locked internally)
 
     std::atomic<int64_t> mItemsSubmitted{}; // accessed outside of lock.
+
+    mediametrics::AudioAnalytics mAudioAnalytics;
 
     std::mutex mLock;
     // statistics about our analytics

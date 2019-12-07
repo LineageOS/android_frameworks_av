@@ -37,7 +37,7 @@ struct AudioSource : public MediaSource, public MediaBufferObserver {
     // Note that the "channels" parameter _is_ the number of channels,
     // _not_ a bitmask of audio_channels_t constants.
     AudioSource(
-            audio_source_t inputSource,
+            const audio_attributes_t *attr,
             const String16 &opPackageName,
             uint32_t sampleRate,
             uint32_t channels,
