@@ -387,22 +387,20 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
             devices2 = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_HEARING_AID);
         }
         if ((devices2.isEmpty()) &&
-                (getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) != AUDIO_POLICY_FORCE_NO_BT_A2DP) &&
-                 outputs.isA2dpSupported()) {
-            devices2 = availableOutputDevices.getFirstDevicesFromTypes({
-                    AUDIO_DEVICE_OUT_BLUETOOTH_A2DP, AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES,
-                    AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER});
-        }
-        if ((devices2.isEmpty()) &&
             (getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) == AUDIO_POLICY_FORCE_SPEAKER)) {
             devices2 = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_SPEAKER);
         }
-        if (devices2.isEmpty()) {
-            devices2 = availableOutputDevices.getFirstDevicesFromTypes({
-                    AUDIO_DEVICE_OUT_WIRED_HEADPHONE, AUDIO_DEVICE_OUT_LINE,
-                    AUDIO_DEVICE_OUT_WIRED_HEADSET, AUDIO_DEVICE_OUT_USB_HEADSET,
-                    AUDIO_DEVICE_OUT_USB_ACCESSORY, AUDIO_DEVICE_OUT_USB_DEVICE,
-                    AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET});
+        if (devices2.isEmpty() && (getLastRemovableMediaDevices().size() > 0)) {
+            if ((getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) != AUDIO_POLICY_FORCE_NO_BT_A2DP) &&
+                    outputs.isA2dpSupported()) {
+                // Get the last connected device of wired and bluetooth a2dp
+                devices2 = availableOutputDevices.getFirstDevicesFromTypes(
+                        getLastRemovableMediaDevices());
+            } else {
+                // Get the last connected device of wired except bluetooth a2dp
+                devices2 = availableOutputDevices.getFirstDevicesFromTypes(
+                        getLastRemovableMediaDevices(GROUP_WIRED));
+            }
         }
         if ((devices2.isEmpty()) && (strategy != STRATEGY_SONIFICATION)) {
             // no sonification on aux digital (e.g. HDMI)
