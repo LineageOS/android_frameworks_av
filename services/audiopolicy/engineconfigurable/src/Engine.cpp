@@ -176,7 +176,7 @@ status_t Engine::setDeviceConnectionState(const sp<DeviceDescriptor> devDesc,
         return mPolicyParameterMgr->setAvailableInputDevices(
                     deviceTypesToBitMask(getApmObserver()->getAvailableInputDevices().types()));
     }
-    return BAD_TYPE;
+    return EngineBase::setDeviceConnectionState(devDesc, state);
 }
 
 status_t Engine::loadAudioPolicyEngineConfig()

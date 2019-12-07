@@ -63,6 +63,17 @@ status_t EngineBase::setPhoneState(audio_mode_t state)
     return NO_ERROR;
 }
 
+status_t EngineBase::setDeviceConnectionState(const sp<DeviceDescriptor> devDesc,
+                                              audio_policy_dev_state_t state)
+{
+    audio_devices_t deviceType = devDesc->type();
+    if ((deviceType != AUDIO_DEVICE_NONE) && audio_is_output_device(deviceType)) {
+        mLastRemovableMediaDevices.setRemovableMediaDevices(devDesc, state);
+    }
+
+    return NO_ERROR;
+}
+
 product_strategy_t EngineBase::getProductStrategyForAttributes(const audio_attributes_t &attr) const
 {
     return mProductStrategies.getProductStrategyForAttributes(attr);
