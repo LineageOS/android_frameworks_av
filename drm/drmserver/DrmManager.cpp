@@ -31,7 +31,7 @@
 #include <drm/DrmInfoRequest.h>
 #include <drm/DrmSupportInfo.h>
 #include <drm/DrmConvertedStatus.h>
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetricsItem.h>
 #include <IDrmEngine.h>
 
 #include "DrmManager.h"
@@ -58,7 +58,7 @@ void DrmManager::reportEngineMetrics(
         const char func[], const String8& plugInId, const String8& mimeType) {
     IDrmEngine& engine = mPlugInManager.getPlugIn(plugInId);
 
-    std::unique_ptr<MediaAnalyticsItem> item(MediaAnalyticsItem::create("drmmanager"));
+    std::unique_ptr<mediametrics::Item> item(mediametrics::Item::create("drmmanager"));
     item->setUid(IPCThreadState::self()->getCallingUid());
     item->setCString("function_name", func);
     item->setCString("plugin_id", plugInId.getPathLeaf().getBasePath().c_str());

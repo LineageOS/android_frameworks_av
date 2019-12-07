@@ -22,7 +22,7 @@
 #include <stdio.h>
 
 #include <gtest/gtest.h>
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetricsItem.h>
 
 using namespace android;
 
@@ -36,11 +36,11 @@ static size_t countNewlines(const char *s) {
 }
 
 TEST(mediametrics_tests, instantiate) {
-  sp mediaMetrics = new MediaAnalyticsService();
+  sp mediaMetrics = new MediaMetricsService();
   status_t status;
 
   // random keys ignored when empty
-  std::unique_ptr<MediaAnalyticsItem> random_key(MediaAnalyticsItem::create("random_key"));
+  std::unique_ptr<mediametrics::Item> random_key(mediametrics::Item::create("random_key"));
   status = mediaMetrics->submit(random_key.get());
   ASSERT_EQ(PERMISSION_DENIED, status);
 
@@ -50,7 +50,7 @@ TEST(mediametrics_tests, instantiate) {
   ASSERT_EQ(PERMISSION_DENIED, status);
 
   // known keys ignored if empty
-  std::unique_ptr<MediaAnalyticsItem> audiotrack_key(MediaAnalyticsItem::create("audiotrack"));
+  std::unique_ptr<mediametrics::Item> audiotrack_key(mediametrics::Item::create("audiotrack"));
   status = mediaMetrics->submit(audiotrack_key.get());
   ASSERT_EQ(BAD_VALUE, status);
 
@@ -62,7 +62,7 @@ TEST(mediametrics_tests, instantiate) {
 
   /*
   // fluent style that goes directly to mediametrics
-  ASSERT_EQ(true, MediaAnalyticsItem("audiorecord")
+  ASSERT_EQ(true, mediametrics::Item("audiorecord")
                      .setInt32("value", 2)
                      .addInt32("bar", 1)
                      .addInt32("value", 3)
@@ -73,7 +73,7 @@ TEST(mediametrics_tests, instantiate) {
 }
 
 TEST(mediametrics_tests, item_manipulation) {
-  MediaAnalyticsItem item("audiorecord");
+  mediametrics::Item item("audiorecord");
 
   item.setInt32("value", 2).addInt32("bar", 3).addInt32("value", 4);
 
@@ -128,14 +128,14 @@ TEST(mediametrics_tests, item_manipulation) {
   printf("item: %s\n", item.toString().c_str());
   fflush(stdout);
 
-  sp mediaMetrics = new MediaAnalyticsService();
+  sp mediaMetrics = new MediaMetricsService();
   status_t status = mediaMetrics->submit(&item);
   ASSERT_EQ(NO_ERROR, status);
   mediaMetrics->dump(fileno(stdout), {} /* args */);
 }
 
 TEST(mediametrics_tests, superbig_item) {
-  MediaAnalyticsItem item("TheBigOne");
+  mediametrics::Item item("TheBigOne");
   constexpr size_t count = 10000;
 
   for (size_t i = 0; i < count; ++i) {
@@ -149,7 +149,7 @@ TEST(mediametrics_tests, superbig_item) {
 }
 
 TEST(mediametrics_tests, superbig_item_removal) {
-  MediaAnalyticsItem item("TheOddBigOne");
+  mediametrics::Item item("TheOddBigOne");
   constexpr size_t count = 10000;
 
   for (size_t i = 0; i < count; ++i) {
@@ -170,7 +170,7 @@ TEST(mediametrics_tests, superbig_item_removal) {
 }
 
 TEST(mediametrics_tests, superbig_item_removal2) {
-  MediaAnalyticsItem item("TheOne");
+  mediametrics::Item item("TheOne");
   constexpr size_t count = 10000;
 
   for (size_t i = 0; i < count; ++i) {
@@ -191,7 +191,7 @@ TEST(mediametrics_tests, superbig_item_removal2) {
 }
 
 TEST(mediametrics_tests, item_transmutation) {
-  MediaAnalyticsItem item("Alchemist's Stone");
+  mediametrics::Item item("Alchemist's Stone");
 
   item.setInt64("convert", 123);
   int64_t i64;
@@ -207,7 +207,7 @@ TEST(mediametrics_tests, item_transmutation) {
 }
 
 TEST(mediametrics_tests, item_binderization) {
-  MediaAnalyticsItem item;
+  mediametrics::Item item;
   item.setInt32("i32", 1)
       .setInt64("i64", 2)
       .setDouble("double", 3.1)
@@ -218,14 +218,14 @@ TEST(mediametrics_tests, item_binderization) {
   item.writeToParcel(&p);
 
   p.setDataPosition(0); // rewind for reading
-  MediaAnalyticsItem item2;
+  mediametrics::Item item2;
   item2.readFromParcel(p);
 
   ASSERT_EQ(item, item2);
 }
 
 TEST(mediametrics_tests, item_byteserialization) {
-  MediaAnalyticsItem item;
+  mediametrics::Item item;
   item.setInt32("i32", 1)
       .setInt64("i64", 2)
       .setDouble("double", 3.1)
@@ -237,7 +237,7 @@ TEST(mediametrics_tests, item_byteserialization) {
   ASSERT_EQ(0, item.writeToByteString(&data, &length));
   ASSERT_GT(length, (size_t)0);
 
-  MediaAnalyticsItem item2;
+  mediametrics::Item item2;
   item2.readFromByteString(data, length);
 
   printf("item: %s\n", item.toString().c_str());
@@ -248,7 +248,7 @@ TEST(mediametrics_tests, item_byteserialization) {
 }
 
 TEST(mediametrics_tests, item_iteration) {
-  MediaAnalyticsItem item;
+  mediametrics::Item item;
   item.setInt32("i32", 1)
       .setInt64("i64", 2)
       .setDouble("double", 3.125)
@@ -292,7 +292,7 @@ TEST(mediametrics_tests, item_iteration) {
 }
 
 TEST(mediametrics_tests, item_expansion) {
-  mediametrics::Item<1> item("I");
+  mediametrics::LogItem<1> item("I");
   item.set("i32", (int32_t)1)
       .set("i64", (int64_t)2)
       .set("double", (double)3.125)
@@ -300,7 +300,7 @@ TEST(mediametrics_tests, item_expansion) {
       .set("rate", std::pair<int64_t, int64_t>(11, 12));
   ASSERT_TRUE(item.updateHeader());
 
-  MediaAnalyticsItem item2;
+  mediametrics::Item item2;
   item2.readFromByteString(item.getBuffer(), item.getLength());
   ASSERT_EQ((pid_t)-1, item2.getPid());
   ASSERT_EQ((uid_t)-1, item2.getUid());
@@ -341,7 +341,7 @@ TEST(mediametrics_tests, item_expansion) {
 }
 
 TEST(mediametrics_tests, item_expansion2) {
-  mediametrics::Item<1> item("Bigly");
+  mediametrics::LogItem<1> item("Bigly");
   item.setPid(123)
       .setUid(456);
   constexpr size_t count = 10000;
@@ -352,7 +352,7 @@ TEST(mediametrics_tests, item_expansion2) {
   }
   ASSERT_TRUE(item.updateHeader());
 
-  MediaAnalyticsItem item2;
+  mediametrics::Item item2;
   printf("begin buffer:%p  length:%zu\n", item.getBuffer(), item.getLength());
   fflush(stdout);
   item2.readFromByteString(item.getBuffer(), item.getLength());
@@ -367,7 +367,7 @@ TEST(mediametrics_tests, item_expansion2) {
 }
 
 TEST(mediametrics_tests, time_machine_storage) {
-  auto item = std::make_shared<MediaAnalyticsItem>("Key");
+  auto item = std::make_shared<mediametrics::Item>("Key");
   (*item).set("i32", (int32_t)1)
       .set("i64", (int64_t)2)
       .set("double", (double)3.125)
@@ -414,21 +414,21 @@ TEST(mediametrics_tests, time_machine_storage) {
 }
 
 TEST(mediametrics_tests, time_machine_remote_key) {
-  auto item = std::make_shared<MediaAnalyticsItem>("Key1");
+  auto item = std::make_shared<mediametrics::Item>("Key1");
   (*item).set("one", (int32_t)1)
          .set("two", (int32_t)2);
 
   android::mediametrics::TimeMachine timeMachine;
   ASSERT_EQ(NO_ERROR, timeMachine.put(item, true));
 
-  auto item2 = std::make_shared<MediaAnalyticsItem>("Key2");
+  auto item2 = std::make_shared<mediametrics::Item>("Key2");
   (*item2).set("three", (int32_t)3)
          .set("[Key1]four", (int32_t)4)   // affects Key1
          .set("[Key1]five", (int32_t)5);  // affects key1
 
   ASSERT_EQ(NO_ERROR, timeMachine.put(item2, true));
 
-  auto item3 = std::make_shared<MediaAnalyticsItem>("Key2");
+  auto item3 = std::make_shared<mediametrics::Item>("Key2");
   (*item3).set("six", (int32_t)6)
          .set("[Key1]seven", (int32_t)7);   // affects Key1
 
@@ -464,7 +464,7 @@ TEST(mediametrics_tests, time_machine_remote_key) {
 }
 
 TEST(mediametrics_tests, time_machine_gc) {
-  auto item = std::make_shared<MediaAnalyticsItem>("Key1");
+  auto item = std::make_shared<mediametrics::Item>("Key1");
   (*item).set("one", (int32_t)1)
          .set("two", (int32_t)2)
          .setTimestamp(10);
@@ -477,7 +477,7 @@ TEST(mediametrics_tests, time_machine_gc) {
 
   ASSERT_EQ((size_t)1, timeMachine.size());
 
-  auto item2 = std::make_shared<MediaAnalyticsItem>("Key2");
+  auto item2 = std::make_shared<mediametrics::Item>("Key2");
   (*item2).set("three", (int32_t)3)
          .set("[Key1]three", (int32_t)3)
          .setTimestamp(11);
@@ -487,7 +487,7 @@ TEST(mediametrics_tests, time_machine_gc) {
 
   //printf("Before\n%s\n\n", timeMachine.dump().c_str());
 
-  auto item3 = std::make_shared<MediaAnalyticsItem>("Key3");
+  auto item3 = std::make_shared<mediametrics::Item>("Key3");
   (*item3).set("six", (int32_t)6)
           .set("[Key1]four", (int32_t)4)   // affects Key1
           .set("[Key1]five", (int32_t)5)   // affects key1
@@ -515,7 +515,7 @@ TEST(mediametrics_tests, time_machine_gc) {
 }
 
 TEST(mediametrics_tests, transaction_log_gc) {
-  auto item = std::make_shared<MediaAnalyticsItem>("Key1");
+  auto item = std::make_shared<mediametrics::Item>("Key1");
   (*item).set("one", (int32_t)1)
          .set("two", (int32_t)2)
          .setTimestamp(10);
@@ -526,7 +526,7 @@ TEST(mediametrics_tests, transaction_log_gc) {
   ASSERT_EQ(NO_ERROR, transactionLog.put(item));
   ASSERT_EQ((size_t)1, transactionLog.size());
 
-  auto item2 = std::make_shared<MediaAnalyticsItem>("Key2");
+  auto item2 = std::make_shared<mediametrics::Item>("Key2");
   (*item2).set("three", (int32_t)3)
          .set("[Key1]three", (int32_t)3)
          .setTimestamp(11);
@@ -534,7 +534,7 @@ TEST(mediametrics_tests, transaction_log_gc) {
   ASSERT_EQ(NO_ERROR, transactionLog.put(item2));
   ASSERT_EQ((size_t)2, transactionLog.size());
 
-  auto item3 = std::make_shared<MediaAnalyticsItem>("Key3");
+  auto item3 = std::make_shared<mediametrics::Item>("Key3");
   (*item3).set("six", (int32_t)6)
           .set("[Key1]four", (int32_t)4)   // affects Key1
           .set("[Key1]five", (int32_t)5)   // affects key1
@@ -545,16 +545,16 @@ TEST(mediametrics_tests, transaction_log_gc) {
 }
 
 TEST(mediametrics_tests, audio_analytics_permission) {
-  auto item = std::make_shared<MediaAnalyticsItem>("audio.1");
+  auto item = std::make_shared<mediametrics::Item>("audio.1");
   (*item).set("one", (int32_t)1)
          .set("two", (int32_t)2)
          .setTimestamp(10);
 
-  auto item2 = std::make_shared<MediaAnalyticsItem>("audio.1");
+  auto item2 = std::make_shared<mediametrics::Item>("audio.1");
   (*item2).set("three", (int32_t)3)
          .setTimestamp(11);
 
-  auto item3 = std::make_shared<MediaAnalyticsItem>("audio.2");
+  auto item3 = std::make_shared<mediametrics::Item>("audio.2");
   (*item3).set("four", (int32_t)4)
           .setTimestamp(12);
 
@@ -577,16 +577,16 @@ TEST(mediametrics_tests, audio_analytics_permission) {
 }
 
 TEST(mediametrics_tests, audio_analytics_dump) {
-  auto item = std::make_shared<MediaAnalyticsItem>("audio.1");
+  auto item = std::make_shared<mediametrics::Item>("audio.1");
   (*item).set("one", (int32_t)1)
          .set("two", (int32_t)2)
          .setTimestamp(10);
 
-  auto item2 = std::make_shared<MediaAnalyticsItem>("audio.1");
+  auto item2 = std::make_shared<mediametrics::Item>("audio.1");
   (*item2).set("three", (int32_t)3)
          .setTimestamp(11);
 
-  auto item3 = std::make_shared<MediaAnalyticsItem>("audio.2");
+  auto item3 = std::make_shared<mediametrics::Item>("audio.2");
   (*item3).set("four", (int32_t)4)
           .setTimestamp(12);
 

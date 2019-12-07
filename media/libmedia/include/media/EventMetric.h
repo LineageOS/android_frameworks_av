@@ -16,7 +16,7 @@
 #ifndef ANDROID_EVENT_METRIC_H_
 #define ANDROID_EVENT_METRIC_H_
 
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetricsItem.h>
 #include <utils/Timers.h>
 
 namespace android {

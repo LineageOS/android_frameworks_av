@@ -23,7 +23,7 @@
 #include <variant>
 #include <vector>
 
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetricsItem.h>
 #include <utils/Timers.h>
 
 namespace android::mediametrics {
@@ -101,7 +101,7 @@ class TimeMachine {
         }
 
         void putProp(
-                const std::string &name, const MediaAnalyticsItem::Prop &prop, int64_t time = 0) {
+                const std::string &name, const mediametrics::Item::Prop &prop, int64_t time = 0) {
             prop.visit([&](auto value) { putValue(name, value, time); });
         }
 
@@ -188,7 +188,7 @@ public:
     /**
      * Put all the properties from an item into the Time Machine log.
      */
-    status_t put(const std::shared_ptr<const MediaAnalyticsItem>& item, bool isTrusted = false) {
+    status_t put(const std::shared_ptr<const mediametrics::Item>& item, bool isTrusted = false) {
         const int64_t time = item->getTimestamp();
         const std::string &key = item->getKey();
 
@@ -214,7 +214,7 @@ public:
         }
 
         // deferred contains remote properties (for other keys) to do later.
-        std::vector<const MediaAnalyticsItem::Prop *> deferred;
+        std::vector<const mediametrics::Item::Prop *> deferred;
         {
             // handle local properties
             std::lock_guard lock(getLockForKey(key));

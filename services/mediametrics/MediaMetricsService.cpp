@@ -15,7 +15,7 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "MediaAnalyticsService"
+#define LOG_TAG "MediaMetricsService"
 #include <utils/Log.h>
 
 #include "MediaMetricsService.h"
@@ -52,21 +52,21 @@ static constexpr size_t kMaxExpiredAtOnce = 50;
 // TODO: need to look at tuning kMaxRecords and friends for low-memory devices
 
 /* static */
-nsecs_t MediaAnalyticsService::roundTime(nsecs_t timeNs)
+nsecs_t MediaMetricsService::roundTime(nsecs_t timeNs)
 {
     return (timeNs + NANOS_PER_SECOND / 2) / NANOS_PER_SECOND * NANOS_PER_SECOND;
 }
 
-MediaAnalyticsService::MediaAnalyticsService()
+MediaMetricsService::MediaMetricsService()
         : mMaxRecords(kMaxRecords),
           mMaxRecordAgeNs(kMaxRecordAgeNs),
           mMaxRecordsExpiredAtOnce(kMaxExpiredAtOnce),
-          mDumpProtoDefault(MediaAnalyticsItem::PROTO_V1)
+          mDumpProtoDefault(mediametrics::Item::PROTO_V1)
 {
     ALOGD("%s", __func__);
 }
 
-MediaAnalyticsService::~MediaAnalyticsService()
+MediaMetricsService::~MediaMetricsService()
 {
     ALOGD("%s", __func__);
     // the class destructor clears anyhow, but we enforce clearing items first.
@@ -74,7 +74,7 @@ MediaAnalyticsService::~MediaAnalyticsService()
     mItems.clear();
 }
 
-status_t MediaAnalyticsService::submitInternal(MediaAnalyticsItem *item, bool release)
+status_t MediaMetricsService::submitInternal(mediametrics::Item *item, bool release)
 {
     // calling PID is 0 for one-way calls.
     const pid_t pid = IPCThreadState::self()->getCallingPid();
@@ -157,23 +157,23 @@ status_t MediaAnalyticsService::submitInternal(MediaAnalyticsItem *item, bool re
     }
 
     // now attach either the item or its dup to a const shared pointer
-    std::shared_ptr<const MediaAnalyticsItem> sitem(release ? item : item->dup());
+    std::shared_ptr<const mediametrics::Item> sitem(release ? item : item->dup());
 
     (void)mAudioAnalytics.submit(sitem, isTrusted);
 
-    extern bool dump2Statsd(const std::shared_ptr<const MediaAnalyticsItem>& item);
+    extern bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item);
     (void)dump2Statsd(sitem);  // failure should be logged in function.
     saveItem(sitem);
     return NO_ERROR;
 }
 
-status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
+status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
 {
     String8 result;
 
     if (checkCallingPermission(String16("android.permission.DUMP")) == false) {
         result.appendFormat("Permission Denial: "
-                "can't dump MediaAnalyticsService from pid=%d, uid=%d\n",
+                "can't dump MediaMetricsService from pid=%d, uid=%d\n",
                 IPCThreadState::self()->getCallingPid(),
                 IPCThreadState::self()->getCallingUid());
         write(fd, result.string(), result.size());
@@ -198,15 +198,15 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
             i++;
             if (i < n) {
                 String8 value(args[i]);
-                int proto = MediaAnalyticsItem::PROTO_V0;
+                int proto = mediametrics::Item::PROTO_V0;
                 char *endp;
                 const char *p = value.string();
                 proto = strtol(p, &endp, 10);
                 if (endp != p || *endp == '\0') {
-                    if (proto < MediaAnalyticsItem::PROTO_FIRST) {
-                        proto = MediaAnalyticsItem::PROTO_FIRST;
-                    } else if (proto > MediaAnalyticsItem::PROTO_LAST) {
-                        proto = MediaAnalyticsItem::PROTO_LAST;
+                    if (proto < mediametrics::Item::PROTO_FIRST) {
+                        proto = mediametrics::Item::PROTO_FIRST;
+                    } else if (proto > mediametrics::Item::PROTO_LAST) {
+                        proto = mediametrics::Item::PROTO_LAST;
                     }
                     chosenProto = proto;
                 } else {
@@ -275,10 +275,10 @@ status_t MediaAnalyticsService::dump(int fd, const Vector<String16>& args)
 }
 
 // dump headers
-void MediaAnalyticsService::dumpHeaders_l(String8 &result, int dumpProto, nsecs_t ts_since)
+void MediaMetricsService::dumpHeaders_l(String8 &result, int dumpProto, nsecs_t ts_since)
 {
     result.appendFormat("Protocol Version: %d\n", dumpProto);
-    if (MediaAnalyticsItem::isEnabled()) {
+    if (mediametrics::Item::isEnabled()) {
         result.append("Metrics gathering: enabled\n");
     } else {
         result.append("Metrics gathering: DISABLED via property\n");
@@ -297,7 +297,7 @@ void MediaAnalyticsService::dumpHeaders_l(String8 &result, int dumpProto, nsecs_
     }
 }
 
-void MediaAnalyticsService::dumpRecent_l(
+void MediaMetricsService::dumpRecent_l(
         String8 &result, int dumpProto, nsecs_t ts_since, const char * only)
 {
     if (only != nullptr && *only == '\0') {
@@ -311,11 +311,11 @@ void MediaAnalyticsService::dumpRecent_l(
     // talk about # records we discarded, perhaps "discarded w/o reading" too
 }
 
-void MediaAnalyticsService::dumpQueue_l(String8 &result, int dumpProto) {
+void MediaMetricsService::dumpQueue_l(String8 &result, int dumpProto) {
     dumpQueue_l(result, dumpProto, (nsecs_t) 0, nullptr /* only */);
 }
 
-void MediaAnalyticsService::dumpQueue_l(
+void MediaMetricsService::dumpQueue_l(
         String8 &result, int dumpProto, nsecs_t ts_since, const char * only) {
     int slot = 0;
 
@@ -346,7 +346,7 @@ void MediaAnalyticsService::dumpQueue_l(
 
 // if item != NULL, it's the item we just inserted
 // true == more items eligible to be recovered
-bool MediaAnalyticsService::expirations_l(const std::shared_ptr<const MediaAnalyticsItem>& item)
+bool MediaMetricsService::expirations_l(const std::shared_ptr<const mediametrics::Item>& item)
 {
     bool more = false;
 
@@ -395,7 +395,7 @@ bool MediaAnalyticsService::expirations_l(const std::shared_ptr<const MediaAnaly
     return more;
 }
 
-void MediaAnalyticsService::processExpirations()
+void MediaMetricsService::processExpirations()
 {
     bool more;
     do {
@@ -405,7 +405,7 @@ void MediaAnalyticsService::processExpirations()
     } while (more);
 }
 
-void MediaAnalyticsService::saveItem(const std::shared_ptr<const MediaAnalyticsItem>& item)
+void MediaMetricsService::saveItem(const std::shared_ptr<const mediametrics::Item>& item)
 {
     std::lock_guard _l(mLock);
     // we assume the items are roughly in time order.
@@ -419,7 +419,7 @@ void MediaAnalyticsService::saveItem(const std::shared_ptr<const MediaAnalyticsI
 }
 
 /* static */
-bool MediaAnalyticsService::isContentValid(const MediaAnalyticsItem *item, bool isTrusted)
+bool MediaMetricsService::isContentValid(const mediametrics::Item *item, bool isTrusted)
 {
     if (isTrusted) return true;
     // untrusted uids can only send us a limited set of keys
@@ -445,7 +445,7 @@ bool MediaAnalyticsService::isContentValid(const MediaAnalyticsItem *item, bool 
 }
 
 // are we rate limited, normally false
-bool MediaAnalyticsService::isRateLimited(MediaAnalyticsItem *) const
+bool MediaMetricsService::isRateLimited(mediametrics::Item *) const
 {
     return false;
 }
@@ -455,8 +455,8 @@ constexpr nsecs_t PKG_EXPIRATION_NS = 30 * 60 * NANOS_PER_SECOND; // 30 minutes
 
 // give me the package name, perhaps going to find it
 // manages its own mutex operations internally
-void MediaAnalyticsService::UidInfo::setPkgInfo(
-        MediaAnalyticsItem *item, uid_t uid, bool setName, bool setVersion)
+void MediaMetricsService::UidInfo::setPkgInfo(
+        mediametrics::Item *item, uid_t uid, bool setName, bool setVersion)
 {
     ALOGV("%s: uid=%d", __func__, uid);
 

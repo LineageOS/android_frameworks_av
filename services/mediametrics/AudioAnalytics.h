@@ -43,7 +43,7 @@ public:
      *        UID to be a system service by MediaMetrics service.
      *        Do not use true if you haven't really checked!
      */
-    status_t submit(const std::shared_ptr<const MediaAnalyticsItem>& item, bool isTrusted);
+    status_t submit(const std::shared_ptr<const mediametrics::Item>& item, bool isTrusted);
 
     /**
      * Returns a pair consisting of the dump string, and the number of lines in the string.

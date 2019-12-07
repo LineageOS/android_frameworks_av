@@ -18,7 +18,7 @@
 
 #define STAGEFRIGHT_RECORDER_H_
 
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetricsItem.h>
 #include <media/MediaRecorderBase.h>
 #include <camera/CameraParameters.h>
 #include <utils/String8.h>
@@ -104,7 +104,7 @@ private:
     int mOutputFd;
     sp<AudioSource> mAudioSourceNode;
 
-    MediaAnalyticsItem *mAnalyticsItem;
+    mediametrics::Item *mMetricsItem;
     bool mAnalyticsDirty;
     void flushAndResetMetrics(bool reinitialize);
     void updateMetrics();

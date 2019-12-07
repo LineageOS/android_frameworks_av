@@ -39,7 +39,7 @@
 #include <mediadrm/ICrypto.h>
 #include <media/IOMX.h>
 #include <media/MediaCodecBuffer.h>
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetricsItem.h>
 #include <media/MediaResource.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>

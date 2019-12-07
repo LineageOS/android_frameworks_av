@@ -22,7 +22,7 @@
 #include <media/AudioTimestamp.h>
 #include <media/IAudioTrack.h>
 #include <media/AudioResamplerPublic.h>
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetricsItem.h>
 #include <media/Modulo.h>
 #include <utils/threads.h>
 
@@ -400,7 +400,7 @@ public:
     /*
      * return metrics information for the current track.
      */
-            status_t getMetrics(MediaAnalyticsItem * &item);
+            status_t getMetrics(mediametrics::Item * &item);
 
     /* After it's created the track is not active. Call start() to
      * make it active. If set, the callback will start being called.
@@ -1230,19 +1230,19 @@ private:
 private:
     class MediaMetrics {
       public:
-        MediaMetrics() : mAnalyticsItem(MediaAnalyticsItem::create("audiotrack")) {
+        MediaMetrics() : mMetricsItem(mediametrics::Item::create("audiotrack")) {
         }
         ~MediaMetrics() {
-            // mAnalyticsItem alloc failure will be flagged in the constructor
+            // mMetricsItem alloc failure will be flagged in the constructor
             // don't log empty records
-            if (mAnalyticsItem->count() > 0) {
-                mAnalyticsItem->selfrecord();
+            if (mMetricsItem->count() > 0) {
+                mMetricsItem->selfrecord();
             }
         }
         void gather(const AudioTrack *track);
-        MediaAnalyticsItem *dup() { return mAnalyticsItem->dup(); }
+        mediametrics::Item *dup() { return mMetricsItem->dup(); }
       private:
-        std::unique_ptr<MediaAnalyticsItem> mAnalyticsItem;
+        std::unique_ptr<mediametrics::Item> mMetricsItem;
     };
     MediaMetrics mMediaMetrics;
 };

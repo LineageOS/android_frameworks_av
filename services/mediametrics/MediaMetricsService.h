@@ -22,19 +22,19 @@
 #include <mutex>
 #include <unordered_map>
 
-// IMediaAnalyticsService must include Vector, String16, Errors
-#include <media/IMediaAnalyticsService.h>
+// IMediaMetricsService must include Vector, String16, Errors
+#include <media/IMediaMetricsService.h>
 #include <utils/String8.h>
 
 #include "AudioAnalytics.h"
 
 namespace android {
 
-class MediaAnalyticsService : public BnMediaAnalyticsService
+class MediaMetricsService : public BnMediaMetricsService
 {
 public:
-    MediaAnalyticsService();
-    ~MediaAnalyticsService() override;
+    MediaMetricsService();
+    ~MediaMetricsService() override;
 
     /**
      * Submits the indicated record to the mediaanalytics service.
@@ -43,12 +43,12 @@ public:
      * \return status failure, which is negative on binder transaction failure.
      *         As the transaction is one-way, remote failures will not be reported.
      */
-    status_t submit(MediaAnalyticsItem *item) override {
+    status_t submit(mediametrics::Item *item) override {
         return submitInternal(item, false /* release */);
     }
 
     status_t submitBuffer(const char *buffer, size_t length) override {
-        MediaAnalyticsItem *item = new MediaAnalyticsItem();
+        mediametrics::Item *item = new mediametrics::Item();
         return item->readFromByteString(buffer, length)
                 ?: submitInternal(item, true /* release */);
     }
@@ -66,17 +66,17 @@ protected:
 
     // Internal call where release is true if ownership of item is transferred
     // to the service (that is, the service will eventually delete the item).
-    status_t submitInternal(MediaAnalyticsItem *item, bool release) override;
+    status_t submitInternal(mediametrics::Item *item, bool release) override;
 
 private:
     void processExpirations();
     // input validation after arrival from client
-    static bool isContentValid(const MediaAnalyticsItem *item, bool isTrusted);
-    bool isRateLimited(MediaAnalyticsItem *) const;
-    void saveItem(const std::shared_ptr<const MediaAnalyticsItem>& item);
+    static bool isContentValid(const mediametrics::Item *item, bool isTrusted);
+    bool isRateLimited(mediametrics::Item *) const;
+    void saveItem(const std::shared_ptr<const mediametrics::Item>& item);
 
     // The following methods are GUARDED_BY(mLock)
-    bool expirations_l(const std::shared_ptr<const MediaAnalyticsItem>& item);
+    bool expirations_l(const std::shared_ptr<const mediametrics::Item>& item);
 
     // support for generating output
     void dumpQueue_l(String8 &result, int dumpProto);
@@ -98,7 +98,7 @@ private:
 
     class UidInfo {
     public:
-        void setPkgInfo(MediaAnalyticsItem *item, uid_t uid, bool setName, bool setVersion);
+        void setPkgInfo(mediametrics::Item *item, uid_t uid, bool setName, bool setVersion);
 
     private:
         std::mutex mUidInfoLock;
@@ -132,7 +132,7 @@ private:
     // Our item queue, generally (oldest at front)
     // TODO: Make separate class, use segmented queue, write lock only end.
     // Note: Another analytics module might have ownership of an item longer than the log.
-    std::deque<std::shared_ptr<const MediaAnalyticsItem>> mItems; // GUARDED_BY(mLock)
+    std::deque<std::shared_ptr<const mediametrics::Item>> mItems; // GUARDED_BY(mLock)
 };
 
 } // namespace android

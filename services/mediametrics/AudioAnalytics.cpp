@@ -35,7 +35,7 @@ AudioAnalytics::~AudioAnalytics()
 }
 
 status_t AudioAnalytics::submit(
-        const std::shared_ptr<const MediaAnalyticsItem>& item, bool isTrusted)
+        const std::shared_ptr<const mediametrics::Item>& item, bool isTrusted)
 {
     if (startsWith(item->getKey(), "audio.")) {
         return mTimeMachine.put(item, isTrusted)

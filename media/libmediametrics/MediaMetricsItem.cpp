@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "MediaAnalyticsItem"
+#define LOG_TAG "mediametrics::Item"
 
 #include <inttypes.h>
 #include <stdlib.h>
@@ -31,15 +31,15 @@
 #include <utils/threads.h>
 
 #include <binder/IServiceManager.h>
-#include <media/IMediaAnalyticsService.h>
-#include <media/MediaAnalyticsItem.h>
+#include <media/IMediaMetricsService.h>
+#include <media/MediaMetricsItem.h>
 #include <private/android_filesystem_config.h>
 
 // Max per-property string size before truncation in toString().
 // Do not make too large, as this is used for dumpsys purposes.
 static constexpr size_t kMaxPropertyStringSize = 4096;
 
-namespace android {
+namespace android::mediametrics {
 
 #define DEBUG_SERVICEACCESS     0
 #define DEBUG_API               0
@@ -49,24 +49,24 @@ namespace android {
 // the service is off.
 #define SVC_TRIES               2
 
-MediaAnalyticsItem* MediaAnalyticsItem::convert(mediametrics_handle_t handle) {
-    MediaAnalyticsItem *item = (android::MediaAnalyticsItem *) handle;
+mediametrics::Item* mediametrics::Item::convert(mediametrics_handle_t handle) {
+    mediametrics::Item *item = (android::mediametrics::Item *) handle;
     return item;
 }
 
-mediametrics_handle_t MediaAnalyticsItem::convert(MediaAnalyticsItem *item ) {
+mediametrics_handle_t mediametrics::Item::convert(mediametrics::Item *item ) {
     mediametrics_handle_t handle = (mediametrics_handle_t) item;
     return handle;
 }
 
-MediaAnalyticsItem::~MediaAnalyticsItem() {
+mediametrics::Item::~Item() {
     if (DEBUG_ALLOCATIONS) {
-        ALOGD("Destroy  MediaAnalyticsItem @ %p", this);
+        ALOGD("Destroy  mediametrics::Item @ %p", this);
     }
     clear();
 }
 
-void MediaAnalyticsItem::clear() {
+void mediametrics::Item::clear() {
 
     // clean allocated storage from key
     mKey.clear();
@@ -88,8 +88,8 @@ void MediaAnalyticsItem::clear() {
 }
 
 // make a deep copy of myself
-MediaAnalyticsItem *MediaAnalyticsItem::dup() {
-    MediaAnalyticsItem *dst = new MediaAnalyticsItem(this->mKey);
+mediametrics::Item *mediametrics::Item::dup() {
+    mediametrics::Item *dst = new mediametrics::Item(this->mKey);
 
     if (dst != NULL) {
         // key as part of constructor
@@ -110,50 +110,50 @@ MediaAnalyticsItem *MediaAnalyticsItem::dup() {
     return dst;
 }
 
-MediaAnalyticsItem &MediaAnalyticsItem::setTimestamp(nsecs_t ts) {
+mediametrics::Item &mediametrics::Item::setTimestamp(nsecs_t ts) {
     mTimestamp = ts;
     return *this;
 }
 
-nsecs_t MediaAnalyticsItem::getTimestamp() const {
+nsecs_t mediametrics::Item::getTimestamp() const {
     return mTimestamp;
 }
 
-MediaAnalyticsItem &MediaAnalyticsItem::setPid(pid_t pid) {
+mediametrics::Item &mediametrics::Item::setPid(pid_t pid) {
     mPid = pid;
     return *this;
 }
 
-pid_t MediaAnalyticsItem::getPid() const {
+pid_t mediametrics::Item::getPid() const {
     return mPid;
 }
 
-MediaAnalyticsItem &MediaAnalyticsItem::setUid(uid_t uid) {
+mediametrics::Item &mediametrics::Item::setUid(uid_t uid) {
     mUid = uid;
     return *this;
 }
 
-uid_t MediaAnalyticsItem::getUid() const {
+uid_t mediametrics::Item::getUid() const {
     return mUid;
 }
 
-MediaAnalyticsItem &MediaAnalyticsItem::setPkgName(const std::string &pkgName) {
+mediametrics::Item &mediametrics::Item::setPkgName(const std::string &pkgName) {
     mPkgName = pkgName;
     return *this;
 }
 
-MediaAnalyticsItem &MediaAnalyticsItem::setPkgVersionCode(int64_t pkgVersionCode) {
+mediametrics::Item &mediametrics::Item::setPkgVersionCode(int64_t pkgVersionCode) {
     mPkgVersionCode = pkgVersionCode;
     return *this;
 }
 
-int64_t MediaAnalyticsItem::getPkgVersionCode() const {
+int64_t mediametrics::Item::getPkgVersionCode() const {
     return mPkgVersionCode;
 }
 
 
 // find the proper entry in the list
-size_t MediaAnalyticsItem::findPropIndex(const char *name) const
+size_t mediametrics::Item::findPropIndex(const char *name) const
 {
     size_t i = 0;
     for (; i < mPropCount; i++) {
@@ -162,7 +162,7 @@ size_t MediaAnalyticsItem::findPropIndex(const char *name) const
     return i;
 }
 
-MediaAnalyticsItem::Prop *MediaAnalyticsItem::findProp(const char *name) const {
+mediametrics::Item::Prop *mediametrics::Item::findProp(const char *name) const {
     const size_t i = findPropIndex(name);
     if (i < mPropCount) {
         return &mProps[i];
@@ -172,7 +172,7 @@ MediaAnalyticsItem::Prop *MediaAnalyticsItem::findProp(const char *name) const {
 
 // consider this "find-or-allocate".
 // caller validates type and uses clearPropValue() accordingly
-MediaAnalyticsItem::Prop *MediaAnalyticsItem::allocateProp(const char *name) {
+mediametrics::Item::Prop *mediametrics::Item::allocateProp(const char *name) {
     const size_t i = findPropIndex(name);
     if (i < mPropCount) {
         return &mProps[i]; // already have it, return
@@ -184,7 +184,7 @@ MediaAnalyticsItem::Prop *MediaAnalyticsItem::allocateProp(const char *name) {
     return prop;
 }
 
-MediaAnalyticsItem::Prop *MediaAnalyticsItem::allocateProp() {
+mediametrics::Item::Prop *mediametrics::Item::allocateProp() {
     if (mPropCount == mPropSize && growProps() == false) {
         ALOGE("%s: failed allocation for new properties", __func__);
         return nullptr;
@@ -193,7 +193,7 @@ MediaAnalyticsItem::Prop *MediaAnalyticsItem::allocateProp() {
 }
 
 // used within the summarizers; return whether property existed
-bool MediaAnalyticsItem::removeProp(const char *name) {
+bool mediametrics::Item::removeProp(const char *name) {
     const size_t i = findPropIndex(name);
     if (i < mPropCount) {
         mProps[i].clear();
@@ -209,7 +209,7 @@ bool MediaAnalyticsItem::removeProp(const char *name) {
 
 // remove indicated keys and their values
 // return value is # keys removed
-size_t MediaAnalyticsItem::filter(size_t n, const char *attrs[]) {
+size_t mediametrics::Item::filter(size_t n, const char *attrs[]) {
     size_t zapped = 0;
     for (size_t i = 0; i < n; ++i) {
         const char *name = attrs[i];
@@ -235,7 +235,7 @@ size_t MediaAnalyticsItem::filter(size_t n, const char *attrs[]) {
 
 // remove any keys NOT in the provided list
 // return value is # keys removed
-size_t MediaAnalyticsItem::filterNot(size_t n, const char *attrs[]) {
+size_t mediametrics::Item::filterNot(size_t n, const char *attrs[]) {
     std::set<std::string> check(attrs, attrs + n);
     size_t zapped = 0;
     for (size_t j = 0; j < mPropCount;) {
@@ -260,7 +260,7 @@ size_t MediaAnalyticsItem::filterNot(size_t n, const char *attrs[]) {
     return zapped;
 }
 
-bool MediaAnalyticsItem::growProps(int increment)
+bool mediametrics::Item::growProps(int increment)
 {
     if (increment <= 0) {
         increment = kGrowProps;
@@ -276,7 +276,7 @@ bool MediaAnalyticsItem::growProps(int increment)
         mPropSize = nsize;
         return true;
     } else {
-        ALOGW("MediaAnalyticsItem::growProps fails");
+        ALOGW("mediametrics::Item::growProps fails");
         return false;
     }
 }
@@ -284,7 +284,7 @@ bool MediaAnalyticsItem::growProps(int increment)
 // Parcel / serialize things for binder calls
 //
 
-status_t MediaAnalyticsItem::readFromParcel(const Parcel& data) {
+status_t mediametrics::Item::readFromParcel(const Parcel& data) {
     int32_t version;
     status_t status = data.readInt32(&version);
     if (status != NO_ERROR) return status;
@@ -298,7 +298,7 @@ status_t MediaAnalyticsItem::readFromParcel(const Parcel& data) {
     }
 }
 
-status_t MediaAnalyticsItem::readFromParcel0(const Parcel& data) {
+status_t mediametrics::Item::readFromParcel0(const Parcel& data) {
     const char *s = data.readCString();
     mKey = s == nullptr ? "" : s;
     int32_t pid, uid;
@@ -323,7 +323,7 @@ status_t MediaAnalyticsItem::readFromParcel0(const Parcel& data) {
     return NO_ERROR;
 }
 
-status_t MediaAnalyticsItem::writeToParcel(Parcel *data) const {
+status_t mediametrics::Item::writeToParcel(Parcel *data) const {
     if (data == nullptr) return BAD_VALUE;
 
     const int32_t version = 0;
@@ -339,7 +339,7 @@ status_t MediaAnalyticsItem::writeToParcel(Parcel *data) const {
     }
 }
 
-status_t MediaAnalyticsItem::writeToParcel0(Parcel *data) const {
+status_t mediametrics::Item::writeToParcel0(Parcel *data) const {
     status_t status =
         data->writeCString(mKey.c_str())
         ?: data->writeInt32(mPid)
@@ -357,20 +357,20 @@ status_t MediaAnalyticsItem::writeToParcel0(Parcel *data) const {
     return NO_ERROR;
 }
 
-const char *MediaAnalyticsItem::toCString() {
+const char *mediametrics::Item::toCString() {
    return toCString(PROTO_LAST);
 }
 
-const char * MediaAnalyticsItem::toCString(int version) {
+const char * mediametrics::Item::toCString(int version) {
     std::string val = toString(version);
     return strdup(val.c_str());
 }
 
-std::string MediaAnalyticsItem::toString() const {
+std::string mediametrics::Item::toString() const {
    return toString(PROTO_LAST);
 }
 
-std::string MediaAnalyticsItem::toString(int version) const {
+std::string mediametrics::Item::toString(int version) const {
     std::string result;
     char buffer[kMaxPropertyStringSize];
 
@@ -388,9 +388,9 @@ std::string MediaAnalyticsItem::toString(int version) const {
 
 // for the lazy, we offer methods that finds the service and
 // calls the appropriate daemon
-bool MediaAnalyticsItem::selfrecord() {
+bool mediametrics::Item::selfrecord() {
     ALOGD_IF(DEBUG_API, "%s: delivering %s", __func__, this->toString().c_str());
-    sp<IMediaAnalyticsService> svc = getInstance();
+    sp<IMediaMetricsService> svc = getInstance();
     if (svc != NULL) {
         status_t status = svc->submit(this);
         if (status != NO_ERROR) {
@@ -403,7 +403,6 @@ bool MediaAnalyticsItem::selfrecord() {
     }
 }
 
-namespace mediametrics {
 //static
 bool BaseItem::isEnabled() {
     // completely skip logging from certain UIDs. We do this here
@@ -420,12 +419,12 @@ bool BaseItem::isEnabled() {
         return false;
     }
 
-    int enabled = property_get_int32(MediaAnalyticsItem::EnabledProperty, -1);
+    int enabled = property_get_int32(Item::EnabledProperty, -1);
     if (enabled == -1) {
-        enabled = property_get_int32(MediaAnalyticsItem::EnabledPropertyPersist, -1);
+        enabled = property_get_int32(Item::EnabledPropertyPersist, -1);
     }
     if (enabled == -1) {
-        enabled = MediaAnalyticsItem::EnabledProperty_default;
+        enabled = Item::EnabledProperty_default;
     }
     return enabled > 0;
 }
@@ -440,7 +439,7 @@ class MediaMetricsDeathNotifier : public IBinder::DeathRecipient {
 
 static sp<MediaMetricsDeathNotifier> sNotifier;
 // static
-sp<IMediaAnalyticsService> BaseItem::sAnalyticsService;
+sp<IMediaMetricsService> BaseItem::sMediaMetricsService;
 static std::mutex sServiceMutex;
 static int sRemainingBindAttempts = SVC_TRIES;
 
@@ -448,20 +447,20 @@ static int sRemainingBindAttempts = SVC_TRIES;
 void BaseItem::dropInstance() {
     std::lock_guard  _l(sServiceMutex);
     sRemainingBindAttempts = SVC_TRIES;
-    sAnalyticsService = nullptr;
+    sMediaMetricsService = nullptr;
 }
 
 // static
 bool BaseItem::submitBuffer(const char *buffer, size_t size) {
 /*
-    MediaAnalyticsItem item;
+    mediametrics::Item item;
     status_t status = item.readFromByteString(buffer, size);
     ALOGD("%s: status:%d, size:%zu, item:%s", __func__, status, size, item.toString().c_str());
     return item.selfrecord();
     */
 
     ALOGD_IF(DEBUG_API, "%s: delivering %zu bytes", __func__, size);
-    sp<IMediaAnalyticsService> svc = getInstance();
+    sp<IMediaMetricsService> svc = getInstance();
     if (svc != nullptr) {
         const status_t status = svc->submitBuffer(buffer, size);
         if (status != NO_ERROR) {
@@ -474,7 +473,7 @@ bool BaseItem::submitBuffer(const char *buffer, size_t size) {
 }
 
 //static
-sp<IMediaAnalyticsService> BaseItem::getInstance() {
+sp<IMediaMetricsService> BaseItem::getInstance() {
     static const char *servicename = "media.metrics";
     static const bool enabled = isEnabled(); // singleton initialized
 
@@ -486,13 +485,13 @@ sp<IMediaAnalyticsService> BaseItem::getInstance() {
     // think of remainingBindAttempts as telling us whether service == nullptr because
     // (1) we haven't tried to initialize it yet
     // (2) we've tried to initialize it, but failed.
-    if (sAnalyticsService == nullptr && sRemainingBindAttempts > 0) {
+    if (sMediaMetricsService == nullptr && sRemainingBindAttempts > 0) {
         const char *badness = "";
         sp<IServiceManager> sm = defaultServiceManager();
         if (sm != nullptr) {
             sp<IBinder> binder = sm->getService(String16(servicename));
             if (binder != nullptr) {
-                sAnalyticsService = interface_cast<IMediaAnalyticsService>(binder);
+                sMediaMetricsService = interface_cast<IMediaMetricsService>(binder);
                 sNotifier = new MediaMetricsDeathNotifier();
                 binder->linkToDeath(sNotifier);
             } else {
@@ -501,7 +500,7 @@ sp<IMediaAnalyticsService> BaseItem::getInstance() {
         } else {
             badness = "No Service Manager access";
         }
-        if (sAnalyticsService == nullptr) {
+        if (sMediaMetricsService == nullptr) {
             if (sRemainingBindAttempts > 0) {
                 sRemainingBindAttempts--;
             }
@@ -509,14 +508,13 @@ sp<IMediaAnalyticsService> BaseItem::getInstance() {
                     __func__, servicename, badness);
         }
     }
-    return sAnalyticsService;
+    return sMediaMetricsService;
 }
 
-} // namespace mediametrics
 
 // merge the info from 'incoming' into this record.
 // we finish with a union of this+incoming and special handling for collisions
-bool MediaAnalyticsItem::merge(MediaAnalyticsItem *incoming) {
+bool mediametrics::Item::merge(mediametrics::Item *incoming) {
 
     // if I don't have key or session id, take them from incoming
     // 'this' should never be missing both of them...
@@ -623,7 +621,7 @@ status_t extract(char **val, const char **bufferpptr, const char *bufferptrmax)
 
 } // namespace
 
-status_t MediaAnalyticsItem::writeToByteString(char **pbuffer, size_t *plength) const
+status_t mediametrics::Item::writeToByteString(char **pbuffer, size_t *plength) const
 {
     if (pbuffer == nullptr || plength == nullptr)
         return BAD_VALUE;
@@ -701,7 +699,7 @@ status_t MediaAnalyticsItem::writeToByteString(char **pbuffer, size_t *plength) 
     return NO_ERROR;
 }
 
-status_t MediaAnalyticsItem::readFromByteString(const char *bufferptr, size_t length)
+status_t mediametrics::Item::readFromByteString(const char *bufferptr, size_t length)
 {
     if (bufferptr == nullptr) return BAD_VALUE;
 
@@ -761,7 +759,7 @@ status_t MediaAnalyticsItem::readFromByteString(const char *bufferptr, size_t le
     return NO_ERROR;
 }
 
-status_t MediaAnalyticsItem::Prop::writeToParcel(Parcel *data) const
+status_t mediametrics::Item::Prop::writeToParcel(Parcel *data) const
 {
    switch (mType) {
    case kTypeInt32:
@@ -791,7 +789,7 @@ status_t MediaAnalyticsItem::Prop::writeToParcel(Parcel *data) const
    }
 }
 
-status_t MediaAnalyticsItem::Prop::readFromParcel(const Parcel& data)
+status_t mediametrics::Item::Prop::readFromParcel(const Parcel& data)
 {
     const char *key = data.readCString();
     if (key == nullptr) return BAD_VALUE;
@@ -834,23 +832,23 @@ status_t MediaAnalyticsItem::Prop::readFromParcel(const Parcel& data)
     return status;
 }
 
-void MediaAnalyticsItem::Prop::toString(char *buffer, size_t length) const
+void mediametrics::Item::Prop::toString(char *buffer, size_t length) const
 {
     switch (mType) {
     case kTypeInt32:
         snprintf(buffer, length, "%s=%d:", mName, u.int32Value);
         break;
-    case MediaAnalyticsItem::kTypeInt64:
+    case mediametrics::Item::kTypeInt64:
         snprintf(buffer, length, "%s=%lld:", mName, (long long)u.int64Value);
         break;
-    case MediaAnalyticsItem::kTypeDouble:
+    case mediametrics::Item::kTypeDouble:
         snprintf(buffer, length, "%s=%e:", mName, u.doubleValue);
         break;
-    case MediaAnalyticsItem::kTypeRate:
+    case mediametrics::Item::kTypeRate:
         snprintf(buffer, length, "%s=%lld/%lld:",
                 mName, (long long)u.rate.first, (long long)u.rate.second);
         break;
-    case MediaAnalyticsItem::kTypeCString:
+    case mediametrics::Item::kTypeCString:
         // TODO sanitize string for ':' '='
         snprintf(buffer, length, "%s=%s:", mName, u.CStringValue);
         break;
@@ -861,7 +859,7 @@ void MediaAnalyticsItem::Prop::toString(char *buffer, size_t length) const
     }
 }
 
-size_t MediaAnalyticsItem::Prop::getByteStringSize() const
+size_t mediametrics::Item::Prop::getByteStringSize() const
 {
     const size_t header =
         sizeof(uint16_t)      // length
@@ -869,19 +867,19 @@ size_t MediaAnalyticsItem::Prop::getByteStringSize() const
         + strlen(mName) + 1;  // mName + 0 termination
     size_t payload = 0;
     switch (mType) {
-    case MediaAnalyticsItem::kTypeInt32:
+    case mediametrics::Item::kTypeInt32:
         payload = sizeof(u.int32Value);
         break;
-    case MediaAnalyticsItem::kTypeInt64:
+    case mediametrics::Item::kTypeInt64:
         payload = sizeof(u.int64Value);
         break;
-    case MediaAnalyticsItem::kTypeDouble:
+    case mediametrics::Item::kTypeDouble:
         payload = sizeof(u.doubleValue);
         break;
-    case MediaAnalyticsItem::kTypeRate:
+    case mediametrics::Item::kTypeRate:
         payload = sizeof(u.rate.first) + sizeof(u.rate.second);
         break;
-    case MediaAnalyticsItem::kTypeCString:
+    case mediametrics::Item::kTypeCString:
         payload = strlen(u.CStringValue) + 1;
         break;
     default:
@@ -892,7 +890,6 @@ size_t MediaAnalyticsItem::Prop::getByteStringSize() const
     return header + payload;
 }
 
-namespace mediametrics {
 
 // TODO: fold into a template later.
 status_t BaseItem::writeToByteString(
@@ -968,9 +965,8 @@ status_t BaseItem::writeToByteString(
             ?: insert(name, bufferpptr, bufferptrmax);
 }
 
-} // namespace mediametrics
 
-status_t MediaAnalyticsItem::Prop::writeToByteString(
+status_t mediametrics::Item::Prop::writeToByteString(
         char **bufferpptr, char *bufferptrmax) const
 {
     switch (mType) {
@@ -993,7 +989,7 @@ status_t MediaAnalyticsItem::Prop::writeToByteString(
     }
 }
 
-status_t MediaAnalyticsItem::Prop::readFromByteString(
+status_t mediametrics::Item::Prop::readFromByteString(
         const char **bufferpptr, const char *bufferptrmax)
 {
     uint16_t len;
@@ -1036,4 +1032,4 @@ status_t MediaAnalyticsItem::Prop::readFromByteString(
     }
 }
 
-} // namespace android
+} // namespace android::mediametrics

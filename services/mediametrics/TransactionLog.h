@@ -21,12 +21,12 @@
 #include <sstream>
 #include <string>
 
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetricsItem.h>
 
 namespace android::mediametrics {
 
 /**
- * The TransactionLog is used to record MediaAnalyticsItems to present
+ * The TransactionLog is used to record mediametrics::Items to present
  * different views on the time information (selected by audio, and sorted by key).
  *
  * The TransactionLog will always present data in timestamp order. (Perhaps we
@@ -61,7 +61,7 @@ public:
     /**
      * Put an item in the TransactionLog.
      */
-    status_t put(const std::shared_ptr<const MediaAnalyticsItem>& item) {
+    status_t put(const std::shared_ptr<const mediametrics::Item>& item) {
         const std::string& key = item->getKey();
         const int64_t time = item->getTimestamp();
 
@@ -77,7 +77,7 @@ public:
     /**
      * Returns all records within [startTime, endTime]
      */
-    std::vector<std::shared_ptr<const MediaAnalyticsItem>> get(
+    std::vector<std::shared_ptr<const mediametrics::Item>> get(
             int64_t startTime = 0, int64_t endTime = INT64_MAX) const {
         std::lock_guard lock(mLock);
         return getItemsInRange_l(mLog, startTime, endTime);
@@ -86,7 +86,7 @@ public:
     /**
      * Returns all records for a key within [startTime, endTime]
      */
-    std::vector<std::shared_ptr<const MediaAnalyticsItem>> get(
+    std::vector<std::shared_ptr<const mediametrics::Item>> get(
             const std::string& key,
             int64_t startTime = 0, int64_t endTime = INT64_MAX) const {
         std::lock_guard lock(mLock);
@@ -158,7 +158,7 @@ public:
 
 private:
     using MapTimeItem =
-            std::multimap<int64_t /* time */, std::shared_ptr<const MediaAnalyticsItem>>;
+            std::multimap<int64_t /* time */, std::shared_ptr<const mediametrics::Item>>;
 
     // GUARDED_BY mLock
     /**
@@ -179,7 +179,7 @@ private:
         // remove at least those elements.
 
         // use a stale vector with precise type to avoid type erasure overhead in garbage
-        std::vector<std::shared_ptr<const MediaAnalyticsItem>> stale;
+        std::vector<std::shared_ptr<const mediametrics::Item>> stale;
 
         for (size_t i = 0; i < toRemove; ++i) {
             stale.emplace_back(std::move(eraseEnd->second));
@@ -224,7 +224,7 @@ private:
         return true;
     }
 
-    static std::vector<std::shared_ptr<const MediaAnalyticsItem>> getItemsInRange_l(
+    static std::vector<std::shared_ptr<const mediametrics::Item>> getItemsInRange_l(
             const MapTimeItem& map,
             int64_t startTime = 0, int64_t endTime = INT64_MAX) {
         auto it = map.lower_bound(startTime);
@@ -232,7 +232,7 @@ private:
 
         auto it2 = map.upper_bound(endTime);
 
-        std::vector<std::shared_ptr<const MediaAnalyticsItem>> ret;
+        std::vector<std::shared_ptr<const mediametrics::Item>> ret;
         while (it != it2) {
             ret.push_back(it->second);
             ++it;
