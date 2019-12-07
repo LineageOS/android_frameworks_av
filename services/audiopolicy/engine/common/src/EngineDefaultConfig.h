@@ -107,6 +107,13 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
          }
      },
     },
+    {"STRATEGY_CALL_ASSISTANT",
+     {
+         {"", AUDIO_STREAM_PATCH, "AUDIO_STREAM_PATCH",
+          {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_CALL_ASSISTANT, AUDIO_SOURCE_DEFAULT, 0, ""}}
+         }
+     },
+    },
     {"STRATEGY_TRANSMITTED_THROUGH_SPEAKER",
      {
          {"", AUDIO_STREAM_TTS, "AUDIO_STREAM_TTS",

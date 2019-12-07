@@ -6113,6 +6113,7 @@ bool AudioPolicyManager::isValidAttributes(const audio_attributes_t *paa)
     case AUDIO_USAGE_GAME:
     case AUDIO_USAGE_VIRTUAL_SOURCE:
     case AUDIO_USAGE_ASSISTANT:
+    case AUDIO_USAGE_CALL_ASSISTANT:
         break;
     default:
         return false;
