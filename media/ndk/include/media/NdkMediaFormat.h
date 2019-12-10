@@ -294,6 +294,13 @@ extern const char* AMEDIAFORMAT_KEY_YEAR __INTRODUCED_IN(29);
 
 #endif /* __ANDROID_API__ >= 29 */
 
+#if __ANDROID_API__ >= 30
+/**
+ * Available since API level 30.
+ */
+extern const char* AMEDIAFORMAT_KEY_LOW_LATENCY __INTRODUCED_IN(30);
+#endif /* __ANDROID_API__ >= 30 */
+
 __END_DECLS
 
 #endif // _NDK_MEDIA_FORMAT_H
