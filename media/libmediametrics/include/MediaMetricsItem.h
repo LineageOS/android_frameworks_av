@@ -23,7 +23,9 @@
 #include <map>
 #include <string>
 #include <sys/types.h>
+#include <variant>
 
+#include <binder/Parcel.h>
 #include <cutils/properties.h>
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>
@@ -122,38 +124,248 @@ protected:
     static void dropInstance();
     static bool submitBuffer(const char *buffer, size_t len);
 
-    static status_t writeToByteString(
-            const char *name, int32_t value, char **bufferpptr, char *bufferptrmax);
-    static status_t writeToByteString(
-            const char *name, int64_t value, char **bufferpptr, char *bufferptrmax);
-    static status_t writeToByteString(
-            const char *name, double value, char **bufferpptr, char *bufferptrmax);
-    static status_t writeToByteString(
-            const char *name, const std::pair<int64_t, int64_t> &value,
-            char **bufferpptr, char *bufferptrmax);
-    static status_t writeToByteString(
-            const char *name, char * const &value, char **bufferpptr, char *bufferptrmax);
-    static status_t writeToByteString(
-            const char *name, const char * const &value, char **bufferpptr, char *bufferptrmax);
-    struct none_t {}; // for mediametrics::kTypeNone
-    static status_t writeToByteString(
-            const char *name, const none_t &, char **bufferpptr, char *bufferptrmax);
+    template <typename T>
+    struct is_item_type {
+        static constexpr inline bool value =
+             std::is_same<T, int32_t>::value
+             || std::is_same<T, int64_t>::value
+             || std::is_same<T, double>::value
+             || std::is_same<T, std::pair<int64_t, int64_t>>:: value
+             || std::is_same<T, std::string>::value
+             || std::is_same<T, std::monostate>::value;
+    };
 
-    template<typename T>
-    static status_t sizeOfByteString(const char *name, const T& value) {
+    template <typename T>
+    struct get_type_of {
+        static_assert(is_item_type<T>::value);
+        static constexpr inline Type value =
+             std::is_same<T, int32_t>::value ? kTypeInt32
+             : std::is_same<T, int64_t>::value ? kTypeInt64
+             : std::is_same<T, double>::value ? kTypeDouble
+             : std::is_same<T, std::pair<int64_t, int64_t>>:: value ? kTypeRate
+             : std::is_same<T, std::string>::value ? kTypeCString
+             : std::is_same<T, std::monostate>::value ? kTypeNone
+         : kTypeNone;
+    };
+
+    template <typename T>
+    static size_t sizeOfByteString(const char *name, const T& value) {
+        static_assert(is_item_type<T>::value);
         return 2 + 1 + strlen(name) + 1 + sizeof(value);
     }
-    template<> // static
-    status_t sizeOfByteString(const char *name, char * const &value) {
-        return 2 + 1 + strlen(name) + 1 + strlen(value) + 1;
+    template <> // static
+    size_t sizeOfByteString(const char *name, const std::string& value) {
+        return 2 + 1 + strlen(name) + 1 + value.size() + 1;
     }
-    template<> // static
-    status_t sizeOfByteString(const char *name, const char * const &value) {
-        return 2 + 1 + strlen(name) + 1 + strlen(value) + 1;
-    }
-    template<> // static
-    status_t sizeOfByteString(const char *name, const none_t &) {
+    template <> // static
+    size_t sizeOfByteString(const char *name, const std::monostate&) {
          return 2 + 1 + strlen(name) + 1;
+    }
+    // for speed
+    static size_t sizeOfByteString(const char *name, const char *value) {
+        return 2 + 1 + strlen(name) + 1 + strlen(value) + 1;
+    }
+
+    template <typename T>
+    static status_t insert(const T& val, char **bufferpptr, char *bufferptrmax) {
+        static_assert(std::is_trivially_constructible<T>::value);
+        const size_t size = sizeof(val);
+        if (*bufferpptr + size > bufferptrmax) {
+            ALOGE("%s: buffer exceeded with size %zu", __func__, size);
+            return BAD_VALUE;
+        }
+        memcpy(*bufferpptr, &val, size);
+        *bufferpptr += size;
+        return NO_ERROR;
+    }
+    template <> // static
+    status_t insert(const std::string& val, char **bufferpptr, char *bufferptrmax) {
+        const size_t size = val.size() + 1;
+        if (size > UINT16_MAX || *bufferpptr + size > bufferptrmax) {
+            ALOGE("%s: buffer exceeded with size %zu", __func__, size);
+            return BAD_VALUE;
+        }
+        memcpy(*bufferpptr, val.c_str(), size);
+        *bufferpptr += size;
+        return NO_ERROR;
+    }
+    template <> // static
+    status_t insert(const std::pair<int64_t, int64_t>& val,
+            char **bufferpptr, char *bufferptrmax) {
+        const size_t size = sizeof(val.first) + sizeof(val.second);
+        if (*bufferpptr + size > bufferptrmax) {
+            ALOGE("%s: buffer exceeded with size %zu", __func__, size);
+            return BAD_VALUE;
+        }
+        memcpy(*bufferpptr, &val.first, sizeof(val.first));
+        memcpy(*bufferpptr + sizeof(val.first), &val.second, sizeof(val.second));
+        *bufferpptr += size;
+        return NO_ERROR;
+    }
+    template <> // static
+    status_t insert(const std::monostate&, char **, char *) {
+        return NO_ERROR;
+    }
+    // for speed
+    static status_t insert(const char *val, char **bufferpptr, char *bufferptrmax) {
+        const size_t size = strlen(val) + 1;
+        if (size > UINT16_MAX || *bufferpptr + size > bufferptrmax) {
+            ALOGE("%s: buffer exceeded with size %zu", __func__, size);
+            return BAD_VALUE;
+        }
+        memcpy(*bufferpptr, val, size);
+        *bufferpptr += size;
+        return NO_ERROR;
+    }
+
+    template <typename T>
+    static status_t writeToByteString(
+            const char *name, const T& value, char **bufferpptr, char *bufferptrmax) {
+        static_assert(is_item_type<T>::value);
+        const size_t len = sizeOfByteString(name, value);
+        if (len > UINT16_MAX) return BAD_VALUE;
+        return insert((uint16_t)len, bufferpptr, bufferptrmax)
+                ?: insert((uint8_t)get_type_of<T>::value, bufferpptr, bufferptrmax)
+                ?: insert(name, bufferpptr, bufferptrmax)
+                ?: insert(value, bufferpptr, bufferptrmax);
+    }
+    // for speed
+    static status_t writeToByteString(
+            const char *name, const char *value, char **bufferpptr, char *bufferptrmax) {
+        const size_t len = sizeOfByteString(name, value);
+        if (len > UINT16_MAX) return BAD_VALUE;
+        return insert((uint16_t)len, bufferpptr, bufferptrmax)
+                ?: insert((uint8_t)kTypeCString, bufferpptr, bufferptrmax)
+                ?: insert(name, bufferpptr, bufferptrmax)
+                ?: insert(value, bufferpptr, bufferptrmax);
+    }
+
+    template <typename T>
+    static void toStringBuffer(
+            const char *name, const T& value, char *buffer, size_t length) = delete;
+    template <> // static
+    void toStringBuffer(
+            const char *name, const int32_t& value, char *buffer, size_t length) {
+        snprintf(buffer, length, "%s=%d:", name, value);
+    }
+    template <> // static
+    void toStringBuffer(
+            const char *name, const int64_t& value, char *buffer, size_t length) {
+        snprintf(buffer, length, "%s=%lld:", name, (long long)value);
+    }
+    template <> // static
+    void toStringBuffer(
+            const char *name, const double& value, char *buffer, size_t length) {
+        snprintf(buffer, length, "%s=%e:", name, value);
+    }
+    template <> // static
+    void toStringBuffer(
+            const char *name, const std::pair<int64_t, int64_t>& value,
+            char *buffer, size_t length) {
+        snprintf(buffer, length, "%s=%lld/%lld:",
+                name, (long long)value.first, (long long)value.second);
+    }
+    template <> // static
+    void toStringBuffer(
+            const char *name, const std::string& value, char *buffer, size_t length) {
+        // TODO sanitize string for ':' '='
+        snprintf(buffer, length, "%s=%s:", name, value.c_str());
+    }
+    template <> // static
+    void toStringBuffer(
+            const char *name, const std::monostate&, char *buffer, size_t length) {
+        snprintf(buffer, length, "%s=():", name);
+    }
+
+    template <typename T>
+    static status_t writeToParcel(
+            const char *name, const T& value, Parcel *parcel) = delete;
+    template <> // static
+    status_t writeToParcel(
+            const char *name, const int32_t& value, Parcel *parcel) {
+        return parcel->writeCString(name)
+               ?: parcel->writeInt32(get_type_of<int32_t>::value)
+               ?: parcel->writeInt32(value);
+    }
+    template <> // static
+    status_t writeToParcel(
+            const char *name, const int64_t& value, Parcel *parcel) {
+        return parcel->writeCString(name)
+               ?: parcel->writeInt32(get_type_of<int64_t>::value)
+               ?: parcel->writeInt64(value);
+    }
+    template <> // static
+    status_t writeToParcel(
+            const char *name, const double& value, Parcel *parcel) {
+        return parcel->writeCString(name)
+               ?: parcel->writeInt32(get_type_of<double>::value)
+               ?: parcel->writeDouble(value);
+    }
+    template <> // static
+    status_t writeToParcel(
+            const char *name, const std::pair<int64_t, int64_t>& value, Parcel *parcel) {
+        return parcel->writeCString(name)
+               ?: parcel->writeInt32(get_type_of< std::pair<int64_t, int64_t>>::value)
+               ?: parcel->writeInt64(value.first)
+               ?: parcel->writeInt64(value.second);
+    }
+    template <> // static
+    status_t writeToParcel(
+            const char *name, const std::string& value, Parcel *parcel) {
+        return parcel->writeCString(name)
+               ?: parcel->writeInt32(get_type_of<std::string>::value)
+               ?: parcel->writeCString(value.c_str());
+    }
+    template <> // static
+    status_t writeToParcel(
+            const char *name, const std::monostate&, Parcel *parcel) {
+        return parcel->writeCString(name)
+               ?: parcel->writeInt32(get_type_of<std::monostate>::value);
+    }
+
+    template <typename T>
+    static status_t extract(T *val, const char **bufferpptr, const char *bufferptrmax) {
+        static_assert(std::is_trivially_constructible<T>::value);
+        const size_t size = sizeof(*val);
+        if (*bufferpptr + size > bufferptrmax) {
+            ALOGE("%s: buffer exceeded with size %zu", __func__, size);
+            return BAD_VALUE;
+        }
+        memcpy(val, *bufferpptr, size);
+        *bufferpptr += size;
+        return NO_ERROR;
+    }
+    template <> // static
+    status_t extract(std::string *val, const char **bufferpptr, const char *bufferptrmax) {
+        const char *ptr = *bufferpptr;
+        while (*ptr != 0) {
+            if (ptr >= bufferptrmax) {
+                ALOGE("%s: buffer exceeded", __func__);
+                return BAD_VALUE;
+            }
+            ++ptr;
+        }
+        const size_t size = (ptr - *bufferpptr) + 1;
+        *val = *bufferpptr;
+        *bufferpptr += size;
+        return NO_ERROR;
+    }
+    template <> // static
+    status_t extract(std::pair<int64_t, int64_t> *val,
+            const char **bufferpptr, const char *bufferptrmax) {
+        const size_t size = sizeof(val->first) + sizeof(val->second);
+        if (*bufferpptr + size > bufferptrmax) {
+            ALOGE("%s: buffer exceeded with size %zu", __func__, size);
+            return BAD_VALUE;
+        }
+        memcpy(&val->first, *bufferpptr, sizeof(val->first));
+        memcpy(&val->second, *bufferpptr + sizeof(val->first), sizeof(val->second));
+        *bufferpptr += size;
+        return NO_ERROR;
+    }
+    template <> // static
+    status_t extract(std::monostate *, const char **, const char *) {
+        return NO_ERROR;
     }
 };
 
@@ -514,9 +726,9 @@ public:
     }
     // Caller owns the returned string
     bool getCString(const char *key, char **value) const {
-        const char *cs;
-        if (get(key, &cs)) {
-            *value = cs != nullptr ? strdup(cs) : nullptr;
+        std::string s;
+        if (get(key, &s)) {
+            *value = strdup(s.c_str());
             return true;
         }
         return false;
@@ -575,47 +787,26 @@ private:
     int32_t writeToParcel0(Parcel *) const;
     int32_t readFromParcel0(const Parcel&);
 
-    // checks equality even with nullptr.
-    static bool stringEquals(const char *a, const char *b) {
-        if (a == nullptr) {
-            return b == nullptr;
-        } else {
-            return b != nullptr && strcmp(a, b) == 0;
-        }
-    }
-
 public:
+
     class Prop {
     public:
+        using Elem = std::variant<
+                std::monostate,               // kTypeNone
+                int32_t,                      // kTypeInt32
+                int64_t,                      // kTypeInt64
+                double,                       // kTypeDouble
+                std::string,                  // kTypeCString
+                std::pair<int64_t, int64_t>   // kTypeRate
+                >;
+
         Prop() = default;
         Prop(const Prop& other) {
            *this = other;
         }
         Prop& operator=(const Prop& other) {
             mName = other.mName;
-            mType = other.mType;
-            switch (mType) {
-            case mediametrics::kTypeInt32:
-                u.int32Value = other.u.int32Value;
-                break;
-            case mediametrics::kTypeInt64:
-                u.int64Value = other.u.int64Value;
-                break;
-            case mediametrics::kTypeDouble:
-                u.doubleValue = other.u.doubleValue;
-                break;
-            case mediametrics::kTypeCString:
-                u.CStringValue = strdup(other.u.CStringValue);
-                break;
-            case mediametrics::kTypeRate:
-                u.rate = other.u.rate;
-                break;
-            case mediametrics::kTypeNone:
-                break;
-            default:
-                // abort?
-                break;
-            }
+            mElem = other.mElem;
             return *this;
         }
         Prop(Prop&& other) {
@@ -623,51 +814,12 @@ public:
         }
         Prop& operator=(Prop&& other) {
             mName = std::move(other.mName);
-            mType = other.mType;
-            switch (mType) {
-            case mediametrics::kTypeInt32:
-                u.int32Value = other.u.int32Value;
-                break;
-            case mediametrics::kTypeInt64:
-                u.int64Value = other.u.int64Value;
-                break;
-            case mediametrics::kTypeDouble:
-                u.doubleValue = other.u.doubleValue;
-                break;
-            case mediametrics::kTypeCString:
-                u.CStringValue = other.u.CStringValue;
-                break;
-            case mediametrics::kTypeRate:
-                u.rate = other.u.rate;
-                break;
-            case mediametrics::kTypeNone:
-                break;
-            default:
-                // abort?
-                break;
-            }
-            other.mType = mediametrics::kTypeNone;
+            mElem = std::move(other.mElem);
             return *this;
         }
 
         bool operator==(const Prop& other) const {
-            if (mName != other.mName
-                    || mType != other.mType) return false;
-            switch (mType) {
-            case mediametrics::kTypeInt32:
-                return u.int32Value == other.u.int32Value;
-            case mediametrics::kTypeInt64:
-                return u.int64Value == other.u.int64Value;
-            case mediametrics::kTypeDouble:
-                return u.doubleValue == other.u.doubleValue;
-            case mediametrics::kTypeCString:
-                return stringEquals(u.CStringValue, other.u.CStringValue);
-            case mediametrics::kTypeRate:
-                return u.rate == other.u.rate;
-            case mediametrics::kTypeNone:
-            default:
-                return true;
-            }
+            return mName == other.mName && mElem == other.mElem;
         }
         bool operator!=(const Prop& other) const {
             return !(*this == other);
@@ -675,18 +827,10 @@ public:
 
         void clear() {
             mName.clear();
-            clearValue();
+            mElem = std::monostate{};
         }
         void clearValue() {
-            if (mType == mediametrics::kTypeCString) {
-                free(u.CStringValue);
-                u.CStringValue = nullptr;
-            }
-            mType = mediametrics::kTypeNone;
-        }
-
-        mediametrics::Type getType() const {
-            return mType;
+            mElem = std::monostate{};
         }
 
         const char *getName() const {
@@ -695,8 +839,7 @@ public:
 
         void swap(Prop& other) {
             std::swap(mName, other.mName);
-            std::swap(mType, other.mType);
-            std::swap(u, other.u);
+            std::swap(mElem, other.mElem);
         }
 
         void setName(const char *name) {
@@ -708,176 +851,69 @@ public:
         }
 
         template <typename T> void visit(T f) const {
-            switch (mType) {
-            case mediametrics::kTypeInt32:
-                f(u.int32Value);
-                return;
-            case mediametrics::kTypeInt64:
-                f(u.int64Value);
-                return;
-            case mediametrics::kTypeDouble:
-                f(u.doubleValue);
-                return;
-            case mediametrics::kTypeRate:
-                f(u.rate);
-                return;
-            case mediametrics::kTypeCString:
-                f(u.CStringValue);
-                return;
-            default:
-                return;
+            std::visit(f, mElem);
+        }
+
+        template <typename T> bool get(T *value) const {
+            auto pval = std::get_if<T>(&mElem);
+            if (pval != nullptr) {
+                *value = *pval;
+                return true;
+            }
+            return false;
+        }
+
+        template <typename T> void set(const T& value) {
+            mElem = value;
+        }
+
+        template <typename T> void add(const T& value) {
+            auto pval = std::get_if<T>(&mElem);
+            if (pval != nullptr) {
+                *pval += value;
+            } else {
+                mElem = value;
             }
         }
 
-        template <typename T> bool get(T *value) const = delete;
-        template <>
-        bool get(int32_t *value) const {
-           if (mType != mediametrics::kTypeInt32) return false;
-           if (value != nullptr) *value = u.int32Value;
-           return true;
-        }
-        template <>
-        bool get(int64_t *value) const {
-           if (mType != mediametrics::kTypeInt64) return false;
-           if (value != nullptr) *value = u.int64Value;
-           return true;
-        }
-        template <>
-        bool get(double *value) const {
-           if (mType != mediametrics::kTypeDouble) return false;
-           if (value != nullptr) *value = u.doubleValue;
-           return true;
-        }
-        template <>
-        bool get(const char** value) const {
-            if (mType != mediametrics::kTypeCString) return false;
-            if (value != nullptr) *value = u.CStringValue;
-            return true;
-        }
-        template <>
-        bool get(std::string* value) const {
-            if (mType != mediametrics::kTypeCString) return false;
-            if (value != nullptr) *value = u.CStringValue;
-            return true;
-        }
-        template <>
-        bool get(std::pair<int64_t, int64_t> *value) const {
-           if (mType != mediametrics::kTypeRate) return false;
-           if (value != nullptr) {
-               *value = u.rate;
-           }
-           return true;
-        }
-
-        template <typename T> void set(const T& value) = delete;
-        template <>
-        void set(const int32_t& value) {
-            mType = mediametrics::kTypeInt32;
-            u.int32Value = value;
-        }
-        template <>
-        void set(const int64_t& value) {
-            mType = mediametrics::kTypeInt64;
-            u.int64Value = value;
-        }
-        template <>
-        void set(const double& value) {
-            mType = mediametrics::kTypeDouble;
-            u.doubleValue = value;
-        }
-        template <>
-        void set(const char* const& value) {
-            if (mType == mediametrics::kTypeCString) {
-                free(u.CStringValue);
+        template <> void add(const std::pair<int64_t, int64_t>& value) {
+            auto pval = std::get_if<std::pair<int64_t, int64_t>>(&mElem);
+            if (pval != nullptr) {
+                pval->first += value.first;
+                pval->second += value.second;
             } else {
-                mType = mediametrics::kTypeCString;
-            }
-            if (value == nullptr) {
-                u.CStringValue = nullptr;
-            } else {
-                size_t len = strlen(value);
-                if (len > UINT16_MAX - 1) {
-                    len = UINT16_MAX - 1;
-                }
-                u.CStringValue = (char *)malloc(len + 1);
-                strncpy(u.CStringValue, value, len);
-                u.CStringValue[len] = 0;
-            }
-        }
-        template <>
-        void set(const std::pair<int64_t, int64_t> &value) {
-            mType = mediametrics::kTypeRate;
-            u.rate = {value.first, value.second};
-        }
-
-        template <typename T> void add(const T& value) = delete;
-        template <>
-        void add(const int32_t& value) {
-            if (mType == mediametrics::kTypeInt32) {
-                u.int32Value += value;
-            } else {
-                mType = mediametrics::kTypeInt32;
-                u.int32Value = value;
-            }
-        }
-        template <>
-        void add(const int64_t& value) {
-            if (mType == mediametrics::kTypeInt64) {
-                u.int64Value += value;
-            } else {
-                mType = mediametrics::kTypeInt64;
-                u.int64Value = value;
-            }
-        }
-        template <>
-        void add(const double& value) {
-            if (mType == mediametrics::kTypeDouble) {
-                u.doubleValue += value;
-            } else {
-                mType = mediametrics::kTypeDouble;
-                u.doubleValue = value;
-            }
-        }
-        template <>
-        void add(const std::pair<int64_t, int64_t>& value) {
-            if (mType == mediametrics::kTypeRate) {
-                u.rate.first += value.first;
-                u.rate.second += value.second;
-            } else {
-                mType = mediametrics::kTypeRate;
-                u.rate = value;
+                mElem = value;
             }
         }
 
-        status_t writeToParcel(Parcel *data) const;
+        status_t writeToParcel(Parcel *parcel) const {
+            return std::visit([this, parcel](auto &value) {
+                    return BaseItem::writeToParcel(mName.c_str(), value, parcel);}, mElem);
+        }
+
+        void toStringBuffer(char *buffer, size_t length) const {
+            return std::visit([this, buffer, length](auto &value) {
+                BaseItem::toStringBuffer(mName.c_str(), value, buffer, length);}, mElem);
+        }
+
+        size_t getByteStringSize() const {
+            return std::visit([this](auto &value) {
+                return BaseItem::sizeOfByteString(mName.c_str(), value);}, mElem);
+        }
+
+        status_t writeToByteString(char **bufferpptr, char *bufferptrmax) const {
+            return std::visit([this, bufferpptr, bufferptrmax](auto &value) {
+                return BaseItem::writeToByteString(mName.c_str(), value, bufferpptr, bufferptrmax);
+            }, mElem);
+        }
+
         status_t readFromParcel(const Parcel& data);
-        void toString(char *buffer, size_t length) const;
-        size_t getByteStringSize() const;
-        status_t writeToByteString(char **bufferpptr, char *bufferptrmax) const;
+
         status_t readFromByteString(const char **bufferpptr, const char *bufferptrmax);
 
-    // TODO: consider converting to std::variant
     private:
         std::string mName;
-        mediametrics::Type mType = mediametrics::kTypeNone;
-        union u__ {
-            u__() { zero(); }
-            u__(u__ &&other) {
-                *this = std::move(other);
-            }
-            u__& operator=(u__ &&other) {
-                memcpy(this, &other, sizeof(*this));
-                other.zero();
-                return *this;
-            }
-            void zero() { memset(this, 0, sizeof(*this)); }
-
-            int32_t int32Value;
-            int64_t int64Value;
-            double doubleValue;
-            char *CStringValue;
-            std::pair<int64_t, int64_t> rate;
-        } u;
+        Elem mElem;
     };
 
     // Iteration of props within item
