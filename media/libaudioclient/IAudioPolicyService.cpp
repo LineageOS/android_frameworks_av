@@ -105,7 +105,10 @@ enum {
     SET_ALLOWED_CAPTURE_POLICY,
     MOVE_EFFECTS_TO_IO,
     SET_RTT_ENABLED,
-    IS_CALL_SCREEN_MODE_SUPPORTED
+    IS_CALL_SCREEN_MODE_SUPPORTED,
+    SET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
+    REMOVE_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
+    GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -1296,6 +1299,55 @@ public:
         }
         return reply.readBool();
     }
+
+    virtual status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
+            const AudioDeviceTypeAddr &device)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeUint32(static_cast<uint32_t>(strategy));
+        status_t status = device.writeToParcel(&data);
+        if (status != NO_ERROR) {
+            return BAD_VALUE;
+        }
+        status = remote()->transact(SET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
+                data, &reply);
+        if (status != NO_ERROR) {
+           return status;
+        }
+        return static_cast<status_t>(reply.readInt32());
+    }
+
+    virtual status_t removePreferredDeviceForStrategy(product_strategy_t strategy)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeUint32(static_cast<uint32_t>(strategy));
+        status_t status = remote()->transact(REMOVE_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
+                data, &reply);
+        if (status != NO_ERROR) {
+           return status;
+        }
+        return static_cast<status_t>(reply.readInt32());
+    }
+
+    virtual status_t getPreferredDeviceForStrategy(product_strategy_t strategy,
+            AudioDeviceTypeAddr &device)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeUint32(static_cast<uint32_t>(strategy));
+        status_t status = remote()->transact(GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
+                data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = device.readFromParcel(&reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        return static_cast<status_t>(reply.readInt32());
+    }
 };
 
 IMPLEMENT_META_INTERFACE(AudioPolicyService, "android.media.IAudioPolicyService");
@@ -1359,7 +1411,10 @@ status_t BnAudioPolicyService::onTransact(
         case LIST_AUDIO_VOLUME_GROUPS:
         case GET_VOLUME_GROUP_FOR_ATTRIBUTES:
         case SET_RTT_ENABLED:
-        case IS_CALL_SCREEN_MODE_SUPPORTED: {
+        case IS_CALL_SCREEN_MODE_SUPPORTED:
+        case SET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
+        case REMOVE_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
+        case GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
@@ -2385,6 +2440,40 @@ status_t BnAudioPolicyService::onTransact(
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             bool isAvailable = isCallScreenModeSupported();
             reply->writeBool(isAvailable);
+            return NO_ERROR;
+        }
+
+        case SET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            product_strategy_t strategy = (product_strategy_t) data.readUint32();
+            AudioDeviceTypeAddr device;
+            status_t status = device.readFromParcel((Parcel*)&data);
+            if (status != NO_ERROR) {
+                return status;
+            }
+            status = setPreferredDeviceForStrategy(strategy, device);
+            reply->writeInt32(status);
+            return NO_ERROR;
+        }
+
+        case REMOVE_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            product_strategy_t strategy = (product_strategy_t) data.readUint32();
+            status_t status = removePreferredDeviceForStrategy(strategy);
+            reply->writeInt32(status);
+            return NO_ERROR;
+        }
+
+        case GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            product_strategy_t strategy = (product_strategy_t) data.readUint32();
+            AudioDeviceTypeAddr device;
+            status_t status = getPreferredDeviceForStrategy(strategy, device);
+            status_t marshall_status = device.writeToParcel(reply);
+            if (marshall_status != NO_ERROR) {
+                return marshall_status;
+            }
+            reply->writeInt32(status);
             return NO_ERROR;
         }
 
