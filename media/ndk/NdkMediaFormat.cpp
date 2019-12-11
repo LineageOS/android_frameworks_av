@@ -341,6 +341,7 @@ EXPORT const char* AMEDIAFORMAT_KEY_LATENCY = "latency";
 EXPORT const char* AMEDIAFORMAT_KEY_LEVEL = "level";
 EXPORT const char* AMEDIAFORMAT_KEY_LOCATION = "location";
 EXPORT const char* AMEDIAFORMAT_KEY_LOOP = "loop";
+EXPORT const char* AMEDIAFORMAT_KEY_LOW_LATENCY = "low-latency";
 EXPORT const char* AMEDIAFORMAT_KEY_LYRICIST = "lyricist";
 EXPORT const char* AMEDIAFORMAT_KEY_MANUFACTURER = "manufacturer";
 EXPORT const char* AMEDIAFORMAT_KEY_MAX_BIT_RATE = "max-bitrate";

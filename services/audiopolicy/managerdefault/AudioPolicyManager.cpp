@@ -794,27 +794,11 @@ void AudioPolicyManager::setForceUse(audio_policy_force_use_t usage,
     //FIXME: workaround for truncated touch sounds
     // to be removed when the problem is handled by system UI
     uint32_t delayMs = 0;
-    uint32_t waitMs = 0;
     if (usage == AUDIO_POLICY_FORCE_FOR_COMMUNICATION) {
         delayMs = TOUCH_SOUND_FIXED_DELAY_MS;
     }
-    if (mEngine->getPhoneState() == AUDIO_MODE_IN_CALL && hasPrimaryOutput()) {
-        DeviceVector newDevices = getNewOutputDevices(mPrimaryOutput, true /*fromCache*/);
-        waitMs = updateCallRouting(newDevices, delayMs);
-    }
-    for (size_t i = 0; i < mOutputs.size(); i++) {
-        sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueAt(i);
-        DeviceVector newDevices = getNewOutputDevices(outputDesc, true /*fromCache*/);
-        if ((mEngine->getPhoneState() != AUDIO_MODE_IN_CALL) || (outputDesc != mPrimaryOutput)) {
-            // As done in setDeviceConnectionState, we could also fix default device issue by
-            // preventing the force re-routing in case of default dev that distinguishes on address.
-            // Let's give back to engine full device choice decision however.
-            waitMs = setOutputDevices(outputDesc, newDevices, !newDevices.isEmpty(), delayMs);
-        }
-        if (forceVolumeReeval && !newDevices.isEmpty()) {
-            applyStreamVolumes(outputDesc, newDevices.types(), waitMs, true);
-        }
-    }
+
+    updateCallAndOutputRouting(forceVolumeReeval, delayMs);
 
     for (const auto& activeDesc : mInputs.getActiveInputs()) {
         auto newDevice = getNewInputDevice(activeDesc);
@@ -3099,6 +3083,72 @@ status_t AudioPolicyManager::removeUidDeviceAffinities(uid_t uid) {
     return res;
 }
 
+status_t AudioPolicyManager::setPreferredDeviceForStrategy(product_strategy_t strategy,
+                                                   const AudioDeviceTypeAddr &device) {
+    ALOGI("%s() strategy=%d device=%08x addr=%s", __FUNCTION__,
+            strategy, device.mType, device.mAddress.c_str());
+    // strategy preferred device is only for output devices
+    if (!audio_is_output_device(device.mType)) {
+        ALOGE("%s() device=%08x is NOT an output device", __FUNCTION__, device.mType);
+        return BAD_VALUE;
+    }
+
+    status_t status = mEngine->setPreferredDeviceForStrategy(strategy, device);
+    if (status != NO_ERROR) {
+        ALOGW("Engine could not set preferred device %08x %s for strategy %d",
+                device.mType, device.mAddress.c_str(), strategy);
+        return status;
+    }
+
+    checkForDeviceAndOutputChanges();
+    updateCallAndOutputRouting();
+
+    return NO_ERROR;
+}
+
+void AudioPolicyManager::updateCallAndOutputRouting(bool forceVolumeReeval, uint32_t delayMs)
+{
+    uint32_t waitMs = 0;
+    if (mEngine->getPhoneState() == AUDIO_MODE_IN_CALL && hasPrimaryOutput()) {
+        DeviceVector newDevices = getNewOutputDevices(mPrimaryOutput, true /*fromCache*/);
+        waitMs = updateCallRouting(newDevices, delayMs);
+    }
+    for (size_t i = 0; i < mOutputs.size(); i++) {
+        sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueAt(i);
+        DeviceVector newDevices = getNewOutputDevices(outputDesc, true /*fromCache*/);
+        if ((mEngine->getPhoneState() != AUDIO_MODE_IN_CALL) || (outputDesc != mPrimaryOutput)) {
+            // As done in setDeviceConnectionState, we could also fix default device issue by
+            // preventing the force re-routing in case of default dev that distinguishes on address.
+            // Let's give back to engine full device choice decision however.
+            waitMs = setOutputDevices(outputDesc, newDevices, !newDevices.isEmpty(), delayMs);
+        }
+        if (forceVolumeReeval && !newDevices.isEmpty()) {
+            applyStreamVolumes(outputDesc, newDevices.types(), waitMs, true);
+        }
+    }
+}
+
+status_t AudioPolicyManager::removePreferredDeviceForStrategy(product_strategy_t strategy)
+{
+    ALOGI("%s() strategy=%d", __FUNCTION__, strategy);
+
+    status_t status = mEngine->removePreferredDeviceForStrategy(strategy);
+    if (status != NO_ERROR) {
+        ALOGW("Engine could not remove preferred device for strategy %d", strategy);
+        return status;
+    }
+
+    checkForDeviceAndOutputChanges();
+    updateCallAndOutputRouting();
+
+    return NO_ERROR;
+}
+
+status_t AudioPolicyManager::getPreferredDeviceForStrategy(product_strategy_t strategy,
+                                                   AudioDeviceTypeAddr &device) {
+    return mEngine->getPreferredDeviceForStrategy(strategy, device);
+}
+
 void AudioPolicyManager::dump(String8 *dst) const
 {
     dst->appendFormat("\nAudioPolicyManager Dump: %p\n", this);
@@ -5078,6 +5128,7 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
 
     DeviceVector oldDevices = mEngine->getOutputDevicesForAttributes(attr, 0, true /*fromCache*/);
     DeviceVector newDevices = mEngine->getOutputDevicesForAttributes(attr, 0, false /*fromCache*/);
+
     SortedVector<audio_io_handle_t> srcOutputs = getOutputsForDevices(oldDevices, mPreviousOutputs);
     SortedVector<audio_io_handle_t> dstOutputs = getOutputsForDevices(newDevices, mOutputs);
 

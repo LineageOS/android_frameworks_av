@@ -405,6 +405,17 @@ public:
      */
     static status_t setAudioHalPids(const std::vector<pid_t>& pids);
 
+    static status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
+            const AudioDeviceTypeAddr &device);
+
+    static status_t removePreferredDeviceForStrategy(product_strategy_t strategy);
+
+    static status_t getPreferredDeviceForStrategy(product_strategy_t strategy,
+            AudioDeviceTypeAddr &device);
+
+    static status_t getDeviceForStrategy(product_strategy_t strategy,
+            AudioDeviceTypeAddr &device);
+
     // ----------------------------------------------------------------------------
 
     class AudioVolumeGroupCallback : public RefBase

@@ -259,6 +259,12 @@ public:
                 const Vector<AudioDeviceTypeAddr>& devices);
         virtual status_t removeUidDeviceAffinities(uid_t uid);
 
+        virtual status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
+                                                   const AudioDeviceTypeAddr &device);
+        virtual status_t removePreferredDeviceForStrategy(product_strategy_t strategy);
+        virtual status_t getPreferredDeviceForStrategy(product_strategy_t strategy,
+                                                   AudioDeviceTypeAddr &device);
+
         virtual status_t startAudioSource(const struct audio_port_config *source,
                                           const audio_attributes_t *attributes,
                                           audio_port_handle_t *portId,
@@ -501,11 +507,17 @@ protected:
         // close an input.
         void closeInput(audio_io_handle_t input);
 
-        // runs all the checks required for accomodating changes in devices and outputs
+        // runs all the checks required for accommodating changes in devices and outputs
         // if 'onOutputsChecked' callback is provided, it is executed after the outputs
         // check via 'checkOutputForAllStrategies'. If the callback returns 'true',
         // A2DP suspend status is rechecked.
         void checkForDeviceAndOutputChanges(std::function<bool()> onOutputsChecked = nullptr);
+
+        /**
+         * @brief updates routing for all outputs (including call if call in progress).
+         * @param delayMs delay for unmuting if required
+         */
+        void updateCallAndOutputRouting(bool forceVolumeReeval = true, uint32_t delayMs = 0);
 
         /**
          * @brief checkOutputForAttributes checks and if necessary changes outputs used for the
