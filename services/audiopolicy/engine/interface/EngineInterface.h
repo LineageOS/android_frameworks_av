@@ -292,6 +292,39 @@ public:
      */
     virtual status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups) const = 0;
 
+    /**
+     * @brief setPreferredDeviceForStrategy sets the default device to be used for a
+     * strategy when available
+     * @param strategy the audio strategy whose routing will be affected
+     * @param device the audio device to route to when available
+     * @return BAD_VALUE if the strategy is invalid,
+     *     or NO_ERROR if the preferred device was set
+     */
+    virtual status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
+            const AudioDeviceTypeAddr &device) = 0;
+
+    /**
+     * @brief removePreferredDeviceForStrategy removes the preferred device previously set
+     * for the given strategy
+     * @param strategy the audio strategy whose routing will be affected
+     * @return BAD_VALUE if the strategy is invalid,
+     *     or NO_ERROR if the preferred device was removed
+     */
+    virtual status_t removePreferredDeviceForStrategy(product_strategy_t strategy) = 0;
+
+    /**
+     * @brief getPreferredDeviceForStrategy queries which device is set as the
+     * preferred device for the given strategy
+     * @param strategy the strategy to query
+     * @param device returns configured as the preferred device if one was set
+     * @return BAD_VALUE if the strategy is invalid,
+     *     or NAME_NOT_FOUND if no preferred device was set
+     *     or NO_ERROR if the device parameter was initialized to the preferred device
+     */
+    virtual status_t getPreferredDeviceForStrategy(product_strategy_t strategy,
+            AudioDeviceTypeAddr &device) const = 0;
+
+
     virtual void dump(String8 *dst) const = 0;
 
 protected:
