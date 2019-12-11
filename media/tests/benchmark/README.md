@@ -14,11 +14,11 @@ mmm frameworks/av/media/tests/benchmark/
 
 To run the test suite for measuring performance of the native layer, follow the following steps:
 
-The binaries will be created in the following path : ${OUT}/data/nativetest64/
+The binaries will be created in the following path : $OUT/data/nativetest64/
 
-adb push $(OUT)/data/nativetest64/* /data/local/tmp/
+adb push $OUT/data/nativetest64/* /data/local/tmp/
 
-Eg. adb push $(OUT)/data/nativetest64/extractorTest/extractorTest /data/local/tmp/
+Eg. adb push $OUT/data/nativetest64/extractorTest/extractorTest /data/local/tmp/
 
 To run the binary, follow the commands mentioned below under each module.
 
@@ -78,13 +78,13 @@ adb shell /data/local/tmp/encoderTest -P /data/local/tmp/MediaBenchmark/res/
 To run the test suite for measuring performance of the SDK APIs, follow the following steps:
 
 The apk will be created at the following path:
-${OUT}/testcases/MediaBenchmarkApp/arm64/
+$OUT/testcases/MediaBenchmarkTest/arm64/
 
 To get the resorce files for the test follow instructions given in [NDK](#NDK)
 
 For installing the apk, run the command:
 ```
-adb install -f -r ${OUT}/testcases/MediaBenchmarkApp/arm64/MediaBenchmarkApp.apk
+adb install -f -r $OUT/testcases/MediaBenchmarkTest/arm64/MediaBenchmarkTest.apk
 ```
 
 For running all the tests, run the command:
