@@ -1525,6 +1525,35 @@ status_t AudioSystem::setRttEnabled(bool enabled)
     return aps->setRttEnabled(enabled);
 }
 
+status_t AudioSystem::setPreferredDeviceForStrategy(product_strategy_t strategy,
+                                                    const AudioDeviceTypeAddr &device)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+    return aps->setPreferredDeviceForStrategy(strategy, device);
+}
+
+status_t AudioSystem::removePreferredDeviceForStrategy(product_strategy_t strategy)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+    return aps->removePreferredDeviceForStrategy(strategy);
+}
+
+status_t AudioSystem::getPreferredDeviceForStrategy(product_strategy_t strategy,
+        AudioDeviceTypeAddr &device)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+    return aps->getPreferredDeviceForStrategy(strategy, device);
+}
+
 // ---------------------------------------------------------------------------
 
 int AudioSystem::AudioPolicyServiceClient::addAudioPortCallback(
