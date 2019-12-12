@@ -2674,9 +2674,6 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
         return 0;
     }
 
-    // Some flags are specific to framework and must not leak to the HAL.
-    flags = static_cast<audio_input_flags_t>(flags & ~AUDIO_INPUT_FRAMEWORK_FLAGS);
-
     // Audio Policy can request a specific handle for hardware hotword.
     // The goal here is not to re-open an already opened input.
     // It is to use a pre-assigned I/O handle.
@@ -3319,6 +3316,7 @@ sp<IEffect> AudioFlinger::createEffect(
         int32_t priority,
         audio_io_handle_t io,
         audio_session_t sessionId,
+        const AudioDeviceTypeAddr& device __unused,
         const String16& opPackageName,
         pid_t pid,
         status_t *status,
@@ -3375,6 +3373,11 @@ sp<IEffect> AudioFlinger::createEffect(
         if (!modifyDefaultAudioEffectsAllowed(pid, callingUid)) {
             ALOGE("%s: device effect permission denied for uid %d", __func__, callingUid);
             lStatus = PERMISSION_DENIED;
+            goto Exit;
+        }
+        if (io != AUDIO_IO_HANDLE_NONE) {
+            ALOGE("%s: io handle should not be specified for device effect", __func__);
+            lStatus = BAD_VALUE;
             goto Exit;
         }
         //TODO: add check on device ID when added to arguments
