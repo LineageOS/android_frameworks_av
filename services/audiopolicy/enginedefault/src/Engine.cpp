@@ -53,6 +53,7 @@ static const std::vector<legacy_strategy_map> gLegacyStrategy = {
     { "STRATEGY_ACCESSIBILITY", STRATEGY_ACCESSIBILITY },
     { "STRATEGY_REROUTING", STRATEGY_REROUTING },
     { "STRATEGY_PATCH", STRATEGY_REROUTING }, // boiler to manage stream patch volume
+    { "STRATEGY_CALL_ASSISTANT", STRATEGY_CALL_ASSISTANT },
 };
 
 Engine::Engine()
@@ -442,6 +443,10 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                             AUDIO_DEVICE_OUT_SPEAKER_SAFE));
         }
         } break;
+
+    case STRATEGY_CALL_ASSISTANT:
+        devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_TELEPHONY_TX);
+        break;
 
     default:
         ALOGW("getDevicesForStrategy() unknown strategy: %d", strategy);

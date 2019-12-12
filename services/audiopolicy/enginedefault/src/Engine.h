@@ -39,6 +39,7 @@ enum legacy_strategy {
     STRATEGY_TRANSMITTED_THROUGH_SPEAKER,
     STRATEGY_ACCESSIBILITY,
     STRATEGY_REROUTING,
+    STRATEGY_CALL_ASSISTANT,
 };
 
 class Engine : public EngineBase
