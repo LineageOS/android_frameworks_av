@@ -41,7 +41,13 @@ public:
                                       const sp<IMemory>& dataMemory) = 0;
     virtual status_t stopRecognition(sound_model_handle_t handle) = 0;
     virtual status_t getModelState(sound_model_handle_t handle) = 0;
-
+    virtual status_t setParameter(sound_model_handle_t handle,
+            sound_trigger_model_parameter_t param, int32_t value) = 0;
+    virtual status_t getParameter(sound_model_handle_t handle,
+            sound_trigger_model_parameter_t param, int32_t* value) = 0;
+    virtual status_t queryParameter(sound_model_handle_t handle,
+            sound_trigger_model_parameter_t param,
+            sound_trigger_model_parameter_range_t* param_range) = 0;
 };
 
 // ----------------------------------------------------------------------------

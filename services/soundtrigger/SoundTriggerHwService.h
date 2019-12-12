@@ -125,6 +125,15 @@ public:
                                          const sp<IMemory>& dataMemory);
        virtual status_t stopRecognition(sound_model_handle_t handle);
        virtual status_t getModelState(sound_model_handle_t handle);
+       virtual status_t setParameter(sound_model_handle_t handle,
+                                     sound_trigger_model_parameter_t param,
+                                     int32_t value);
+       virtual status_t getParameter(sound_model_handle_t handle,
+                                     sound_trigger_model_parameter_t param,
+                                     int32_t* value);
+       virtual status_t queryParameter(sound_model_handle_t handle,
+                                       sound_trigger_model_parameter_t param,
+                                       sound_trigger_model_parameter_range_t* param_range);
 
        sp<SoundTriggerHalInterface> halInterface() const { return mHalInterface; }
        struct sound_trigger_module_descriptor descriptor() { return mDescriptor; }
@@ -175,6 +184,15 @@ public:
                                          const sp<IMemory>& dataMemory);
        virtual status_t stopRecognition(sound_model_handle_t handle);
        virtual status_t getModelState(sound_model_handle_t handle);
+       virtual status_t setParameter(sound_model_handle_t handle,
+                                     sound_trigger_model_parameter_t param,
+                                     int32_t value);
+       virtual status_t getParameter(sound_model_handle_t handle,
+                                     sound_trigger_model_parameter_t param,
+                                     int32_t* value);
+       virtual status_t queryParameter(sound_model_handle_t handle,
+                                sound_trigger_model_parameter_t param,
+                                sound_trigger_model_parameter_range_t* param_range);
 
        virtual status_t dump(int fd, const Vector<String16>& args);
 
