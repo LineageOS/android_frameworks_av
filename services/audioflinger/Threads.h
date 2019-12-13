@@ -271,8 +271,6 @@ public:
                 // Called by AudioFlinger::frameCount(audio_io_handle_t output) and effects,
                 // and returns the [normal mix] buffer's frame count.
     virtual     size_t      frameCount() const = 0;
-    virtual     uint32_t    latency_l() const { return 0; }
-    virtual     void        setVolumeForOutput_l(float left __unused, float right __unused) const {}
 
                 // Return's the HAL's frame count i.e. fast mixer buffer size.
                 size_t      frameCountHAL() const { return mFrameCount; }
@@ -426,9 +424,14 @@ public:
 
                 // check if some effects must be suspended/restored when an effect is enabled
                 // or disabled
-                void checkSuspendOnEffectEnabled(bool enabled,
-                                                 audio_session_t sessionId,
-                                                 bool threadLocked);
+                void checkSuspendOnEffectEnabled(const sp<EffectModule>& effect,
+                                                 bool enabled,
+                                                 audio_session_t sessionId =
+                                                        AUDIO_SESSION_OUTPUT_MIX);
+                void checkSuspendOnEffectEnabled_l(const sp<EffectModule>& effect,
+                                                   bool enabled,
+                                                   audio_session_t sessionId =
+                                                        AUDIO_SESSION_OUTPUT_MIX);
 
                 virtual status_t    setSyncEvent(const sp<SyncEvent>& event) = 0;
                 virtual bool        isValidSyncEvent(const sp<SyncEvent>& event) const = 0;
@@ -461,9 +464,6 @@ public:
                 void                sendStatistics(bool force);
 
     mutable     Mutex                   mLock;
-
-                void onEffectEnable(const sp<EffectModule>& effect);
-                void onEffectDisable();
 
 protected:
 
@@ -814,7 +814,7 @@ public:
                 // return estimated latency in milliseconds, as reported by HAL
                 uint32_t    latency() const;
                 // same, but lock must already be held
-                uint32_t    latency_l() const override;
+                uint32_t    latency_l() const;
 
                 // VolumeInterface
     virtual     void        setMasterVolume(float value);
@@ -824,7 +824,7 @@ public:
     virtual     void        setStreamMute(audio_stream_type_t stream, bool muted);
     virtual     float       streamVolume(audio_stream_type_t stream) const;
 
-                void        setVolumeForOutput_l(float left, float right) const override;
+                void        setVolumeForOutput_l(float left, float right) const;
 
                 sp<Track>   createTrack_l(
                                 const sp<AudioFlinger::Client>& client,
