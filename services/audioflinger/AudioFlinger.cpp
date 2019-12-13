@@ -2993,7 +2993,7 @@ std::vector<sp<AudioFlinger::EffectModule>> AudioFlinger::purgeStaleEffects_l() 
     for (size_t i = 0; i < chains.size(); i++) {
         sp<EffectChain> ec = chains[i];
         int sessionid = ec->sessionId();
-        sp<ThreadBase> t = ec->mThread.promote();
+        sp<ThreadBase> t = ec->thread().promote();
         if (t == 0) {
             continue;
         }
@@ -3016,7 +3016,7 @@ std::vector<sp<AudioFlinger::EffectModule>> AudioFlinger::purgeStaleEffects_l() 
                 effect->unPin();
                 t->removeEffect_l(effect, /*release*/ true);
                 if (effect->purgeHandles()) {
-                    t->checkSuspendOnEffectEnabled_l(effect, false, effect->sessionId());
+                    effect->checkSuspendOnEffectEnabled(false, true /*threadLocked*/);
                 }
                 removedEffects.push_back(effect);
             }
@@ -3639,7 +3639,7 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
         // if the move request is not received from audio policy manager, the effect must be
         // re-registered with the new strategy and output
         if (dstChain == 0) {
-            dstChain = effect->chain().promote();
+            dstChain = effect->callback()->chain().promote();
             if (dstChain == 0) {
                 ALOGW("moveEffectChain_l() cannot get chain from effect %p", effect.get());
                 status = NO_INIT;
@@ -3689,7 +3689,7 @@ status_t AudioFlinger::moveAuxEffectToIo(int EffectId,
             goto Exit;
         }
 
-        dstChain = effect->chain().promote();
+        dstChain = effect->callback()->chain().promote();
         if (dstChain == 0) {
             thread->addEffect_l(effect);
             status = INVALID_OPERATION;
