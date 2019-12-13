@@ -313,6 +313,7 @@ private:
     void updateMediametrics();
     void flushMediametrics();
     void updateEphemeralMediametrics(mediametrics_handle_t item);
+    void updateLowLatency(const sp<AMessage> &msg);
 
     sp<AMessage> mOutputFormat;
     sp<AMessage> mInputFormat;
@@ -440,6 +441,12 @@ private:
     std::deque<BufferFlightTiming_t> mBuffersInFlight;
     Mutex mLatencyLock;
     int64_t mLatencyUnknown;    // buffers for which we couldn't calculate latency
+    int64_t mNumLowLatencyEnables;  // how many times low latency mode is enabled
+    int64_t mNumLowLatencyDisables;  // how many times low latency mode is disabled
+    bool mIsLowLatencyModeOn;  // is low latency mode on currently
+    int64_t mIndexOfFirstFrameWhenLowLatencyOn;  // index of the first frame queued
+                                                 // when low latency is on
+    int64_t mInputBufferCounter;  // number of input buffers queued since last reset/flush
 
     sp<BatteryChecker> mBatteryChecker;
 

@@ -101,6 +101,10 @@ static const char *kCodecLatencyCount = "android.media.mediacodec.latency.n";
 static const char *kCodecLatencyHist = "android.media.mediacodec.latency.hist"; /* in us */
 static const char *kCodecLatencyUnknown = "android.media.mediacodec.latency.unknown";
 
+static const char *kCodecNumLowLatencyModeOn = "android.media.mediacodec.low-latency.on";  /* 0..n */
+static const char *kCodecNumLowLatencyModeOff = "android.media.mediacodec.low-latency.off";  /* 0..n */
+static const char *kCodecFirstFrameIndexLowLatencyModeOn = "android.media.mediacodec.low-latency.first-frame";  /* 0..n */
+
 // the kCodecRecent* fields appear only in getMetrics() results
 static const char *kCodecRecentLatencyMax = "android.media.mediacodec.recent.max";      /* in us */
 static const char *kCodecRecentLatencyMin = "android.media.mediacodec.recent.min";      /* in us */
@@ -583,7 +587,12 @@ MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
       mHaveInputSurface(false),
       mHavePendingInputBuffers(false),
       mCpuBoostRequested(false),
-      mLatencyUnknown(0) {
+      mLatencyUnknown(0),
+      mNumLowLatencyEnables(0),
+      mNumLowLatencyDisables(0),
+      mIsLowLatencyModeOn(false),
+      mIndexOfFirstFrameWhenLowLatencyOn(-1),
+      mInputBufferCounter(0) {
     if (uid == kNoUid) {
         mUid = AIBinder_getCallingUid();
     } else {
@@ -616,6 +625,16 @@ void MediaCodec::initMediametrics() {
         }
         mRecentHead = 0;
     }
+
+    {
+        Mutex::Autolock al(mLatencyLock);
+        mBuffersInFlight.clear();
+        mNumLowLatencyEnables = 0;
+        mNumLowLatencyDisables = 0;
+        mIsLowLatencyModeOn = false;
+        mIndexOfFirstFrameWhenLowLatencyOn = -1;
+        mInputBufferCounter = 0;
+    }
 }
 
 void MediaCodec::updateMediametrics() {
@@ -641,6 +660,13 @@ void MediaCodec::updateMediametrics() {
         mediametrics_setInt64(mMetricsHandle, kCodecLatencyUnknown, mLatencyUnknown);
     }
 
+    {
+        Mutex::Autolock al(mLatencyLock);
+        mediametrics_setInt64(mMetricsHandle, kCodecNumLowLatencyModeOn, mNumLowLatencyEnables);
+        mediametrics_setInt64(mMetricsHandle, kCodecNumLowLatencyModeOff, mNumLowLatencyDisables);
+        mediametrics_setInt64(mMetricsHandle, kCodecFirstFrameIndexLowLatencyModeOn,
+                              mIndexOfFirstFrameWhenLowLatencyOn);
+    }
 #if 0
     // enable for short term, only while debugging
     updateEphemeralMediametrics(mMetricsHandle);
@@ -694,6 +720,22 @@ void MediaCodec::flushMediametrics() {
         }
         mediametrics_delete(mMetricsHandle);
         mMetricsHandle = 0;
+    }
+}
+
+void MediaCodec::updateLowLatency(const sp<AMessage> &msg) {
+    int32_t lowLatency = 0;
+    if (msg->findInt32("low-latency", &lowLatency)) {
+        Mutex::Autolock al(mLatencyLock);
+        if (lowLatency > 0) {
+            ++mNumLowLatencyEnables;
+            // This is just an estimate since low latency mode change happens ONLY at key frame
+            mIsLowLatencyModeOn = true;
+        } else if (lowLatency == 0) {
+            ++mNumLowLatencyDisables;
+            // This is just an estimate since low latency mode change happens ONLY at key frame
+            mIsLowLatencyModeOn = false;
+        }
     }
 }
 
@@ -813,6 +855,11 @@ void MediaCodec::statsBufferSent(int64_t presentationUs) {
         // XXX: we *could* make sure that the time is later than the end of queue
         // as part of a consistency check...
         mBuffersInFlight.push_back(startdata);
+
+        if (mIsLowLatencyModeOn && mIndexOfFirstFrameWhenLowLatencyOn < 0) {
+            mIndexOfFirstFrameWhenLowLatencyOn = mInputBufferCounter;
+        }
+        ++mInputBufferCounter;
     }
 }
 
@@ -1132,6 +1179,8 @@ status_t MediaCodec::configure(
             return BAD_VALUE;
         }
     }
+
+    updateLowLatency(format);
 
     msg->setMessage("format", format);
     msg->setInt32("flags", flags);
@@ -3714,6 +3763,7 @@ status_t MediaCodec::setParameters(const sp<AMessage> &params) {
 }
 
 status_t MediaCodec::onSetParameters(const sp<AMessage> &params) {
+    updateLowLatency(params);
     mCodec->signalSetParameters(params);
 
     return OK;
