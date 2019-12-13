@@ -1146,13 +1146,18 @@ void AudioFlinger::ThreadBase::updateSuspendedSessions_l(const effect_uuid_t *ty
     }
 }
 
-void AudioFlinger::ThreadBase::checkSuspendOnEffectEnabled(bool enabled,
-                                                           audio_session_t sessionId,
-                                                           bool threadLocked) {
-    if (!threadLocked) {
-        mLock.lock();
-    }
+void AudioFlinger::ThreadBase::checkSuspendOnEffectEnabled(const sp<EffectModule>& effect,
+                                                            bool enabled,
+                                                            audio_session_t sessionId)
+{
+    Mutex::Autolock _l(mLock);
+    checkSuspendOnEffectEnabled_l(effect, enabled, sessionId);
+}
 
+void AudioFlinger::ThreadBase::checkSuspendOnEffectEnabled_l(const sp<EffectModule>& effect,
+                                                            bool enabled,
+                                                            audio_session_t sessionId)
+{
     if (mType != RECORD) {
         // suspend all effects in AUDIO_SESSION_OUTPUT_MIX when enabling any effect on
         // another session. This gives the priority to well behaved effect control panels
@@ -1164,8 +1169,9 @@ void AudioFlinger::ThreadBase::checkSuspendOnEffectEnabled(bool enabled,
         }
     }
 
-    if (!threadLocked) {
-        mLock.unlock();
+    sp<EffectChain> chain = getEffectChain_l(sessionId);
+    if (chain != 0) {
+        chain->checkSuspendOnEffectEnabled(effect, enabled);
     }
 }
 
@@ -1373,7 +1379,7 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::ThreadBase::createEffect_l(
         if (effect == 0) {
             effectId = mAudioFlinger->nextUniqueId(AUDIO_UNIQUE_ID_USE_EFFECT);
             // create a new effect module if none present in the chain
-            lStatus = chain->createEffect_l(effect, desc, effectId, sessionId, pinned);
+            lStatus = chain->createEffect_l(effect, this, desc, effectId, sessionId, pinned);
             if (lStatus != NO_ERROR) {
                 goto Exit;
             }
@@ -1421,7 +1427,7 @@ void AudioFlinger::ThreadBase::disconnectEffectHandle(EffectHandle *handle,
         Mutex::Autolock _l(mLock);
 
         effect = handle->effect().promote();
-        if (effect == nullptr) {
+        if (effect == 0) {
             return;
         }
         // restore suspended effects if the disconnected handle was enabled and the last one.
@@ -1433,31 +1439,8 @@ void AudioFlinger::ThreadBase::disconnectEffectHandle(EffectHandle *handle,
     if (remove) {
         mAudioFlinger->updateOrphanEffectChains(effect);
         if (handle->enabled()) {
-            effect->checkSuspendOnEffectEnabled(false, false /*threadLocked*/);
+            checkSuspendOnEffectEnabled(effect, false, effect->sessionId());
         }
-    }
-}
-
-void AudioFlinger::ThreadBase::onEffectEnable(const sp<EffectModule>& effect) {
-    if (mType == OFFLOAD || mType == MMAP) {
-        Mutex::Autolock _l(mLock);
-        broadcast_l();
-    }
-    if (!effect->isOffloadable()) {
-        if (mType == ThreadBase::OFFLOAD) {
-            PlaybackThread *t = (PlaybackThread *)this;
-            t->invalidateTracks(AUDIO_STREAM_MUSIC);
-        }
-        if (effect->sessionId() == AUDIO_SESSION_OUTPUT_MIX) {
-            mAudioFlinger->onNonOffloadableGlobalEffectEnable();
-        }
-    }
-}
-
-void AudioFlinger::ThreadBase::onEffectDisable() {
-    if (mType == OFFLOAD || mType == MMAP) {
-        Mutex::Autolock _l(mLock);
-        broadcast_l();
     }
 }
 
@@ -1536,7 +1519,7 @@ void AudioFlinger::ThreadBase::removeEffect_l(const sp<EffectModule>& effect, bo
         detachAuxEffect_l(effect->id());
     }
 
-    sp<EffectChain> chain = effect->callback()->chain().promote();
+    sp<EffectChain> chain = effect->chain().promote();
     if (chain != 0) {
         // remove effect chain if removing last effect
         if (chain->removeEffect_l(effect, release) == 0) {
