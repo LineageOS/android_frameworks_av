@@ -427,6 +427,146 @@ int SoundTriggerHalHidl::getModelState(sound_model_handle_t handle)
     return ret;
 }
 
+int SoundTriggerHalHidl::setParameter(sound_model_handle_t handle,
+                                sound_trigger_model_parameter_t model_param, int32_t value)
+{
+    sp<ISoundTriggerHw> soundtrigger = getService();
+    if (!soundtrigger) {
+        return -ENODEV;
+    }
+
+    sp<V2_3_ISoundTriggerHw> soundtrigger_2_3 = toService2_3(soundtrigger);
+    if (!soundtrigger_2_3) {
+        ALOGE("setParameter not supported");
+        return -ENOSYS;
+    }
+
+    sp<SoundModel> model = getModel(handle);
+    if (!model) {
+        ALOGE("setParameter model not found for handle %u", handle);
+        return -EINVAL;
+    }
+
+    V2_3_ModelParameter halParam;
+    convertModelParameterToHal(&halParam, model_param);
+
+    Return<int32_t> hidlReturn(0);
+    {
+        AutoMutex lock(mHalLock);
+        hidlReturn = soundtrigger_2_3->setParameter(model->mHalHandle, halParam, value);
+    }
+    if (!hidlReturn.isOk()) {
+        ALOGE("getModelState error %s", hidlReturn.description().c_str());
+        return FAILED_TRANSACTION;
+    }
+
+    return hidlReturn;
+}
+
+int SoundTriggerHalHidl::getParameter(sound_model_handle_t handle,
+                                sound_trigger_model_parameter_t model_param, int32_t* value)
+{
+    sp<ISoundTriggerHw> soundtrigger = getService();
+    if (!soundtrigger) {
+        return -ENODEV;
+    }
+
+    sp<V2_3_ISoundTriggerHw> soundtrigger_2_3 = toService2_3(soundtrigger);
+    if (!soundtrigger_2_3) {
+        ALOGE("getParameter not supported");
+        return -ENOSYS;
+    }
+
+    if (value == NULL) {
+        ALOGE("getParameter invalid value pointer");
+        return -EINVAL;
+    }
+
+    sp<SoundModel> model = getModel(handle);
+    if (!model) {
+        ALOGE("getParameter model not found for handle %u", handle);
+        return -EINVAL;
+    }
+
+    V2_3_ModelParameter halParam;
+    convertModelParameterToHal(&halParam, model_param);
+
+    Return<void> hidlReturn;
+    int32_t hidlStatus;
+    int32_t hidlValue;
+    {
+        AutoMutex lock(mHalLock);
+        hidlReturn = soundtrigger_2_3->getParameter(model->mHalHandle, halParam,
+            [&](int32_t retStatus, int32_t retValue) {
+                hidlStatus = retStatus;
+                hidlValue = retValue;
+            });
+    }
+    if (!hidlReturn.isOk()) {
+        ALOGE("getModelState error %s", hidlReturn.description().c_str());
+        return FAILED_TRANSACTION;
+    }
+
+    *value = hidlValue;
+    return hidlStatus;
+}
+
+int SoundTriggerHalHidl::queryParameter(sound_model_handle_t handle,
+                    sound_trigger_model_parameter_t model_param,
+                    sound_trigger_model_parameter_range_t* param_range)
+{
+    sp<ISoundTriggerHw> soundtrigger = getService();
+    if (!soundtrigger) {
+        return -ENODEV;
+    }
+
+    sp<V2_3_ISoundTriggerHw> soundtrigger_2_3 = toService2_3(soundtrigger);
+    if (!soundtrigger_2_3) {
+        ALOGE("queryParameter not supported");
+        return -ENOSYS;
+    }
+
+    sp<SoundModel> model = getModel(handle);
+    if (!model) {
+        ALOGE("queryParameter model not found for handle %u", handle);
+        return -EINVAL;
+    }
+
+    V2_3_ModelParameter halParam;
+    convertModelParameterToHal(&halParam, model_param);
+
+    Return<void> hidlReturn;
+    int32_t hidlStatus;
+    V2_3_OptionalModelParameterRange hidlValue;
+    {
+        AutoMutex lock(mHalLock);
+        hidlReturn = soundtrigger_2_3->queryParameter(model->mHalHandle, halParam,
+            [&](int32_t retStatus, V2_3_OptionalModelParameterRange retValue) {
+                hidlStatus = retStatus;
+                hidlValue = retValue;
+            });
+    }
+    if (!hidlReturn.isOk()) {
+        ALOGE("queryParameter error %s", hidlReturn.description().c_str());
+        return FAILED_TRANSACTION;
+    }
+
+    if (hidlStatus != 0) {
+        ALOGE("queryParameter error code: %d", hidlStatus);
+        return hidlStatus;
+    }
+
+    if (hidlValue.getDiscriminator() ==
+            V2_3_OptionalModelParameterRange::hidl_discriminator::noinit) {
+        return -1;
+    }
+
+    param_range->start = hidlValue.range().start;
+    param_range->end = hidlValue.range().end;
+
+    return 0;
+}
+
 SoundTriggerHalHidl::SoundTriggerHalHidl(const char *moduleName)
     : mModuleName(moduleName), mNextUniqueId(1)
 {
@@ -463,6 +603,12 @@ sp<V2_2_ISoundTriggerHw> SoundTriggerHalHidl::toService2_2(const sp<ISoundTrigge
 {
     auto castResult_2_2 = V2_2_ISoundTriggerHw::castFrom(s);
     return castResult_2_2.isOk() ? static_cast<sp<V2_2_ISoundTriggerHw>>(castResult_2_2) : nullptr;
+}
+
+sp<V2_3_ISoundTriggerHw> SoundTriggerHalHidl::toService2_3(const sp<ISoundTriggerHw>& s)
+{
+    auto castResult_3_0 = V2_3_ISoundTriggerHw::castFrom(s);
+    return castResult_3_0.isOk() ? static_cast<sp<V2_3_ISoundTriggerHw>>(castResult_3_0) : nullptr;
 }
 
 sp<SoundTriggerHalHidl::SoundModel> SoundTriggerHalHidl::getModel(sound_model_handle_t handle)
@@ -524,6 +670,20 @@ void SoundTriggerHalHidl::convertPropertiesFromHal(
     properties->concurrent_capture = (bool)halProperties->concurrentCapture;
     properties->trigger_in_event = (bool)halProperties->triggerInEvent;
     properties->power_consumption_mw = halProperties->powerConsumptionMw;
+}
+
+// static
+void SoundTriggerHalHidl::convertModelParameterToHal(V2_3_ModelParameter* halParam,
+    sound_trigger_model_parameter_t param)
+{
+    switch (param) {
+        case MODEL_PARAMETER_THRESHOLD_FACTOR:
+            *halParam = V2_3_ModelParameter::THRESHOLD_FACTOR;
+            return;
+        case MODEL_PARAMETER_INVALID:
+        default:
+            *halParam = V2_3_ModelParameter::INVALID;
+    }
 }
 
 void SoundTriggerHalHidl::convertTriggerPhraseToHal(

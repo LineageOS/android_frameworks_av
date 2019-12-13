@@ -768,6 +768,45 @@ status_t SoundTriggerHwService::Module::getModelState(sound_model_handle_t handl
     return mHalInterface->getModelState(handle);
 }
 
+status_t SoundTriggerHwService::Module::setParameter(sound_model_handle_t handle,
+                                sound_trigger_model_parameter_t param,
+                                int32_t value)
+{
+    ALOGV("setParameter() handle=%d, param=%d, value=%d", handle, param, value);
+    if (mHalInterface == 0) {
+        return NO_INIT;
+    }
+
+    AutoMutex lock(mLock);
+    return mHalInterface->setParameter(handle, param, value);
+}
+
+status_t SoundTriggerHwService::Module::getParameter(sound_model_handle_t handle,
+                                sound_trigger_model_parameter_t param,
+                                int32_t* value)
+{
+    ALOGV("getParameter() handle=%d, param=%d", handle, param);
+    if (mHalInterface == 0) {
+        return NO_INIT;
+    }
+
+    AutoMutex lock(mLock);
+    return mHalInterface->getParameter(handle, param, value);
+}
+
+status_t SoundTriggerHwService::Module::queryParameter(sound_model_handle_t handle,
+                                sound_trigger_model_parameter_t param,
+                                sound_trigger_model_parameter_range_t* param_range)
+{
+    ALOGV("queryParameter() handle=%d, param=%d", handle, param);
+    if (mHalInterface == 0) {
+        return NO_INIT;
+    }
+
+    AutoMutex lock(mLock);
+    return mHalInterface->queryParameter(handle, param, param_range);
+}
+
 void SoundTriggerHwService::Module::onCallbackEvent(const sp<CallbackEvent>& event)
 {
     ALOGV("onCallbackEvent type %d", event->mType);
@@ -1090,6 +1129,58 @@ status_t SoundTriggerHwService::ModuleClient::getModelState(sound_model_handle_t
         return NO_INIT;
     }
     return module->getModelState(handle);
+}
+
+status_t SoundTriggerHwService::ModuleClient::setParameter(sound_model_handle_t handle,
+        sound_trigger_model_parameter_t param, int32_t value)
+{
+    ALOGV("setParameter() handle=%d, param=%d, value=%d", handle, param, value);
+    if (!captureHotwordAllowed(mOpPackageName,
+                               IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
+        return PERMISSION_DENIED;
+    }
+
+    sp<Module> module = mModule.promote();
+    if (module == 0) {
+        return NO_INIT;
+    }
+    return module->setParameter(handle, param, value);
+}
+
+status_t SoundTriggerHwService::ModuleClient::getParameter(sound_model_handle_t handle,
+        sound_trigger_model_parameter_t param, int32_t* value)
+{
+    ALOGV("getParameter() handle=%d, param=%d", handle, param);
+    if (!captureHotwordAllowed(mOpPackageName,
+                               IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
+        return PERMISSION_DENIED;
+    }
+
+    sp<Module> module = mModule.promote();
+    if (module == 0) {
+        return NO_INIT;
+    }
+    return module->getParameter(handle, param, value);
+}
+
+status_t SoundTriggerHwService::ModuleClient::queryParameter(sound_model_handle_t handle,
+        sound_trigger_model_parameter_t param,
+        sound_trigger_model_parameter_range_t* param_range)
+{
+    ALOGV("isParameterSupported() handle=%d, param=%d", handle, param);
+    if (!captureHotwordAllowed(mOpPackageName,
+                               IPCThreadState::self()->getCallingPid(),
+                               IPCThreadState::self()->getCallingUid())) {
+        return PERMISSION_DENIED;
+    }
+
+    sp<Module> module = mModule.promote();
+    if (module == 0) {
+        return NO_INIT;
+    }
+    return module->queryParameter(handle, param, param_range);
 }
 
 void SoundTriggerHwService::ModuleClient::setCaptureState_l(bool active)

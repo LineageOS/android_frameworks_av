@@ -33,6 +33,9 @@ enum {
     START_RECOGNITION,
     STOP_RECOGNITION,
     GET_MODEL_STATE,
+    SET_PARAMETER,
+    GET_PARAMETER,
+    QUERY_PARAMETER,
 };
 
 class BpSoundTrigger: public BpInterface<ISoundTrigger>
@@ -126,6 +129,55 @@ public:
         return status;
     }
 
+    virtual status_t setParameter(sound_model_handle_t handle,
+                                     sound_trigger_model_parameter_t param,
+                                     int32_t value)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(ISoundTrigger::getInterfaceDescriptor());
+        data.write(&handle, sizeof(sound_model_handle_t));
+        data.write(&param, sizeof(sound_trigger_model_parameter_t));
+        data.writeInt32(value);
+        status_t status = remote()->transact(SET_PARAMETER, data, &reply);
+        if (status == NO_ERROR) {
+            status = (status_t)reply.readInt32();
+        }
+        return status;
+    }
+
+    virtual status_t getParameter(sound_model_handle_t handle,
+                                     sound_trigger_model_parameter_t param,
+                                     int32_t* value)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(ISoundTrigger::getInterfaceDescriptor());
+        data.write(&handle, sizeof(sound_model_handle_t));
+        data.write(&param, sizeof(sound_trigger_model_parameter_t));
+        status_t status = remote()->transact(GET_PARAMETER, data, &reply);
+        if (status == NO_ERROR) {
+            status = (status_t)reply.readInt32();
+            *value = reply.readInt32();
+        }
+        return status;
+    }
+
+    virtual status_t queryParameter(sound_model_handle_t handle,
+            sound_trigger_model_parameter_t param,
+            sound_trigger_model_parameter_range_t* param_range)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(ISoundTrigger::getInterfaceDescriptor());
+        data.write(&handle, sizeof(sound_model_handle_t));
+        data.write(&param, sizeof(sound_trigger_model_parameter_t));
+        status_t status = remote()->transact(QUERY_PARAMETER, data, &reply);
+        if (status == NO_ERROR) {
+            status = (status_t)reply.readInt32();
+            param_range->start = reply.readInt32();
+            param_range->end = reply.readInt32();
+        }
+        return status;
+    }
+
 };
 
 IMPLEMENT_META_INTERFACE(SoundTrigger, "android.hardware.ISoundTrigger");
@@ -192,6 +244,70 @@ status_t BnSoundTrigger::onTransact(
             }
             reply->writeInt32(status);
             return ret;
+        }
+        case SET_PARAMETER: {
+            CHECK_INTERFACE(ISoundTrigger, data, reply);
+            sound_model_handle_t handle;
+            sound_trigger_model_parameter_t param;
+            int32_t value;
+            status_t status = UNKNOWN_ERROR;
+            status_t ret;
+            ret = data.read(&handle, sizeof(sound_model_handle_t));
+            if (ret != NO_ERROR) {
+                return ret;
+            }
+            ret = data.read(&param, sizeof(sound_trigger_model_parameter_t));
+            if (ret != NO_ERROR) {
+                return ret;
+            }
+            ret = data.read(&value, sizeof(int32_t));
+            if (ret != NO_ERROR) {
+                return ret;
+            }
+            status = setParameter(handle, param, value);
+            reply->writeInt32(status);
+            return NO_ERROR;
+        }
+        case GET_PARAMETER: {
+            CHECK_INTERFACE(ISoundTrigger, data, reply);
+            sound_model_handle_t handle;
+            sound_trigger_model_parameter_t param;
+            int32_t value;
+            status_t status = UNKNOWN_ERROR;
+            status_t ret;
+            ret = data.read(&handle, sizeof(sound_model_handle_t));
+            if (ret != NO_ERROR) {
+                return ret;
+            }
+            ret = data.read(&param, sizeof(sound_trigger_model_parameter_t));
+            if (ret != NO_ERROR) {
+                return ret;
+            }
+            status = getParameter(handle, param, &value);
+            reply->writeInt32(status);
+            reply->writeInt32(value);
+            return NO_ERROR;
+        }
+        case QUERY_PARAMETER: {
+            CHECK_INTERFACE(ISoundTrigger, data, reply);
+            sound_model_handle_t handle;
+            sound_trigger_model_parameter_t param;
+            status_t ret;
+            status_t status = UNKNOWN_ERROR;
+            sound_trigger_model_parameter_range_t retValue;
+            ret = data.read(&handle, sizeof(sound_model_handle_t));
+            if (ret != NO_ERROR) {
+                return ret;
+            }
+            ret = data.read(&param, sizeof(sound_trigger_model_parameter_t));
+            if (ret != NO_ERROR) {
+                return ret;
+            }
+            status = queryParameter(handle, param, &retValue);
+            reply->writeInt32(status);
+            reply->writeInt32(retValue.start);
+            reply->writeInt32(retValue.end);
+            return NO_ERROR;
         }
         default:
             return BBinder::onTransact(code, data, reply, flags);
