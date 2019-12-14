@@ -323,25 +323,45 @@ status_t DeviceHalHidl::createAudioPatch(
     if (mDevice == 0) return NO_INIT;
     if (patch == nullptr) return BAD_VALUE;
 
+#if MAJOR_VERSION < 6
     if (*patch != AUDIO_PATCH_HANDLE_NONE) {
         status_t status = releaseAudioPatch(*patch);
         ALOGW_IF(status != NO_ERROR, "%s error %d releasing patch handle %d",
             __func__, status, *patch);
+        *patch = AUDIO_PATCH_HANDLE_NONE;
     }
+#endif
 
     hidl_vec<AudioPortConfig> hidlSources, hidlSinks;
     HidlUtils::audioPortConfigsFromHal(num_sources, sources, &hidlSources);
     HidlUtils::audioPortConfigsFromHal(num_sinks, sinks, &hidlSinks);
-    Result retval;
-    Return<void> ret = mDevice->createAudioPatch(
-            hidlSources, hidlSinks,
-            [&](Result r, AudioPatchHandle hidlPatch) {
-                retval = r;
-                if (retval == Result::OK) {
-                    *patch = static_cast<audio_patch_handle_t>(hidlPatch);
-                }
-            });
-    return processReturn("createAudioPatch", ret, retval);
+    Result retval = Result::OK;
+    Return<void> ret;
+    std::string methodName = "createAudioPatch";
+    if (*patch == AUDIO_PATCH_HANDLE_NONE) {  // always true for MAJOR_VERSION < 6
+        ret = mDevice->createAudioPatch(
+                hidlSources, hidlSinks,
+                [&](Result r, AudioPatchHandle hidlPatch) {
+                    retval = r;
+                    if (retval == Result::OK) {
+                        *patch = static_cast<audio_patch_handle_t>(hidlPatch);
+                    }
+                });
+    } else {
+#if MAJOR_VERSION >= 6
+        ret = mDevice->updateAudioPatch(
+                *patch,
+                hidlSources, hidlSinks,
+                [&](Result r, AudioPatchHandle hidlPatch) {
+                    retval = r;
+                    if (retval == Result::OK) {
+                        *patch = static_cast<audio_patch_handle_t>(hidlPatch);
+                    }
+                });
+        methodName = "updateAudioPatch";
+#endif
+    }
+    return processReturn(methodName.c_str(), ret, retval);
 }
 
 status_t DeviceHalHidl::releaseAudioPatch(audio_patch_handle_t patch) {
