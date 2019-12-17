@@ -17,6 +17,8 @@
 package android.hardware.camera2;
 
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.ICameraDeviceCallbacks;
+import android.hardware.camera2.ICameraOfflineSession;
 import android.hardware.camera2.impl.CameraMetadataNative;
 import android.hardware.camera2.params.OutputConfiguration;
 import android.hardware.camera2.params.SessionConfiguration;
@@ -177,4 +179,15 @@ interface ICameraDeviceUser
       * @return the currently applied system-wide audio restriction mode
       */
     int getGlobalAudioRestriction();
+
+    /**
+     * Offline processing main entry point
+     *
+     * @param callbacks Object that will receive callbacks from offline session
+     * @param offlineOutputIds The ID of streams that needs to be preserved in offline session
+     *
+     * @return Offline session object.
+     */
+    ICameraOfflineSession switchToOffline(in ICameraDeviceCallbacks callbacks,
+            in Surface[] offlineOutputs);
 }

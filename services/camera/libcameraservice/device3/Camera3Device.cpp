@@ -58,6 +58,7 @@
 #include "device3/Camera3InputStream.h"
 #include "device3/Camera3DummyStream.h"
 #include "device3/Camera3SharedOutputStream.h"
+#include "device3/Camera3OfflineSession.h"
 #include "CameraService.h"
 #include "utils/CameraThreadState.h"
 
@@ -206,7 +207,15 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager, const Stri
             ANDROID_INFO_SUPPORTED_BUFFER_MANAGEMENT_VERSION_HIDL_DEVICE_3_5);
     }
 
-    mInterface = new HalInterface(session, queue, mUseHalBufManager);
+    camera_metadata_entry_t capabilities = mDeviceInfo.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    for (size_t i = 0; i < capabilities.count; i++) {
+        uint8_t capability = capabilities.data.u8[i];
+        if (capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_OFFLINE_PROCESSING) {
+            mSupportOfflineProcessing = true;
+        }
+    }
+
+    mInterface = new HalInterface(session, queue, mUseHalBufManager, mSupportOfflineProcessing);
     std::string providerType;
     mVendorTagId = manager->getProviderTagIdLocked(mId.string());
     mTagMonitor.initialize(mVendorTagId);
@@ -227,9 +236,8 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager, const Stri
             maxVersion.get_major(), maxVersion.get_minor());
 
     bool isMonochrome = false;
-    camera_metadata_entry_t entry = mDeviceInfo.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
-    for (size_t i = 0; i < entry.count; i++) {
-        uint8_t capability = entry.data.u8[i];
+    for (size_t i = 0; i < capabilities.count; i++) {
+        uint8_t capability = capabilities.data.u8[i];
         if (capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_MONOCHROME) {
             isMonochrome = true;
         }
@@ -4045,13 +4053,18 @@ void Camera3Device::monitorMetadata(TagMonitor::eventSource source,
 Camera3Device::HalInterface::HalInterface(
             sp<ICameraDeviceSession> &session,
             std::shared_ptr<RequestMetadataQueue> queue,
-            bool useHalBufManager) :
+            bool useHalBufManager, bool supportOfflineProcessing) :
         mHidlSession(session),
         mRequestMetadataQueue(queue),
         mUseHalBufManager(useHalBufManager),
-        mIsReconfigurationQuerySupported(true) {
+        mIsReconfigurationQuerySupported(true),
+        mSupportOfflineProcessing(supportOfflineProcessing) {
     // Check with hardware service manager if we can downcast these interfaces
     // Somewhat expensive, so cache the results at startup
+    auto castResult_3_6 = device::V3_6::ICameraDeviceSession::castFrom(mHidlSession);
+    if (castResult_3_6.isOk()) {
+        mHidlSession_3_6 = castResult_3_6;
+    }
     auto castResult_3_5 = device::V3_5::ICameraDeviceSession::castFrom(mHidlSession);
     if (castResult_3_5.isOk()) {
         mHidlSession_3_5 = castResult_3_5;
@@ -4066,18 +4079,22 @@ Camera3Device::HalInterface::HalInterface(
     }
 }
 
-Camera3Device::HalInterface::HalInterface() : mUseHalBufManager(false) {}
+Camera3Device::HalInterface::HalInterface() :
+        mUseHalBufManager(false),
+        mSupportOfflineProcessing(false) {}
 
 Camera3Device::HalInterface::HalInterface(const HalInterface& other) :
         mHidlSession(other.mHidlSession),
         mRequestMetadataQueue(other.mRequestMetadataQueue),
-        mUseHalBufManager(other.mUseHalBufManager) {}
+        mUseHalBufManager(other.mUseHalBufManager),
+        mSupportOfflineProcessing(other.mSupportOfflineProcessing) {}
 
 bool Camera3Device::HalInterface::valid() {
     return (mHidlSession != nullptr);
 }
 
 void Camera3Device::HalInterface::clear() {
+    mHidlSession_3_6.clear();
     mHidlSession_3_5.clear();
     mHidlSession_3_4.clear();
     mHidlSession_3_3.clear();
@@ -4751,6 +4768,38 @@ void Camera3Device::HalInterface::signalPipelineDrain(const std::vector<int>& st
         ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
         return;
     }
+}
+
+status_t Camera3Device::HalInterface::switchToOffline(
+        const std::vector<int32_t>& streamsToKeep,
+        /*out*/hardware::camera::device::V3_6::CameraOfflineSessionInfo* offlineSessionInfo,
+        /*out*/sp<hardware::camera::device::V3_6::ICameraOfflineSession>* offlineSession) {
+    ATRACE_NAME("CameraHal::switchToOffline");
+    if (!valid() || mHidlSession_3_6 == nullptr) {
+        ALOGE("%s called on invalid camera!", __FUNCTION__);
+        return INVALID_OPERATION;
+    }
+
+    if (offlineSessionInfo == nullptr || offlineSession == nullptr) {
+        ALOGE("%s: offlineSessionInfo and offlineSession must not be null!", __FUNCTION__);
+        return INVALID_OPERATION;
+    }
+
+    common::V1_0::Status status = common::V1_0::Status::INTERNAL_ERROR;
+
+    auto resultCallback =
+        [&status, &offlineSessionInfo, &offlineSession] (auto s, auto info, auto session) {
+                status = s;
+                *offlineSessionInfo = info;
+                *offlineSession = session;
+        };
+    auto err = mHidlSession_3_6->switchToOffline(streamsToKeep, resultCallback);
+
+    if (!err.isOk()) {
+        ALOGE("%s: Transaction error: %s", __FUNCTION__, err.description().c_str());
+        return DEAD_OBJECT;
+    }
+    return CameraProviderManager::mapToStatusT(status);
 }
 
 void Camera3Device::HalInterface::getInflightBufferKeys(
@@ -5524,6 +5573,7 @@ bool Camera3Device::RequestThread::threadLoop() {
         Mutex::Autolock l(mRequestLock);
         mNextRequests.clear();
     }
+    mRequestSubmittedSignal.signal();
 
     return submitRequestSuccess;
 }
@@ -5901,6 +5951,32 @@ void Camera3Device::RequestThread::signalPipelineDrain(const std::vector<int>& s
     // If request thread is still busy, wait until paused then notify HAL
     mNotifyPipelineDrain = true;
     mStreamIdsToBeDrained = streamIds;
+}
+
+status_t Camera3Device::RequestThread::switchToOffline(
+        const std::vector<int32_t>& streamsToKeep,
+        /*out*/hardware::camera::device::V3_6::CameraOfflineSessionInfo* offlineSessionInfo,
+        /*out*/sp<hardware::camera::device::V3_6::ICameraOfflineSession>* offlineSession) {
+    Mutex::Autolock l(mRequestLock);
+    clearRepeatingRequestsLocked(/*lastFrameNumber*/nullptr);
+
+    // Theoretically we should also check for mRepeatingRequests.empty(), but the API interface
+    // is serialized by mInterfaceLock so skip that check.
+    bool queueEmpty = mNextRequests.empty() && mRequestQueue.empty();
+    while (!queueEmpty) {
+        status_t res = mRequestSubmittedSignal.waitRelative(mRequestLock, kRequestSubmitTimeout);
+        if (res == TIMED_OUT) {
+            ALOGE("%s: request thread failed to submit a request within timeout!", __FUNCTION__);
+            return res;
+        } else if (res != OK) {
+            ALOGE("%s: request thread failed to submit a request: %s (%d)!",
+                    __FUNCTION__, strerror(-res), res);
+            return res;
+        }
+        queueEmpty = mNextRequests.empty() && mRequestQueue.empty();
+    }
+    return mInterface->switchToOffline(
+            streamsToKeep, offlineSessionInfo, offlineSession);
 }
 
 nsecs_t Camera3Device::getExpectedInFlightDuration() {
@@ -6810,6 +6886,36 @@ status_t Camera3Device::fixupMonochromeTags(const CameraMetadata& deviceInfo,
     }
 
     return res;
+}
+
+status_t Camera3Device::switchToOffline(
+        const std::vector<int32_t>& streamsToKeep,
+        /*out*/ sp<CameraOfflineSessionBase>* session) {
+    ATRACE_CALL();
+    if (session == nullptr) {
+        ALOGE("%s: session must not be null", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+
+    // 1. Stop repeating request, wait until request thread submitted all requests, then
+    //    call HAL switchToOffline
+    hardware::camera::device::V3_6::CameraOfflineSessionInfo offlineSessionInfo;
+    sp<hardware::camera::device::V3_6::ICameraOfflineSession> offlineSession;
+
+    mRequestThread->switchToOffline(streamsToKeep, &offlineSessionInfo, &offlineSession);
+
+
+    // 2. Verify offlineSessionInfo
+    // 3. create Camera3OfflineSession and transfer object ownership
+    //   (streams, inflight requests, buffer caches)
+    *session = new Camera3OfflineSession(mId);
+
+    // 4. Delete unneeded streams
+    // 5. Verify Camera3Device is in unconfigured state
+    return OK;
 }
 
 }; // namespace android

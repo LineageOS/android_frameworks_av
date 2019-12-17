@@ -23,6 +23,7 @@
 #include <camera/camera2/SessionConfiguration.h>
 #include <camera/camera2/SubmitInfo.h>
 
+#include "CameraOfflineSessionClient.h"
 #include "CameraService.h"
 #include "common/FrameProcessorBase.h"
 #include "common/Camera2ClientBase.h"
@@ -156,6 +157,12 @@ public:
     virtual binder::Status setCameraAudioRestriction(int32_t mode) override;
 
     virtual binder::Status getGlobalAudioRestriction(/*out*/int32_t* outMode) override;
+
+    virtual binder::Status switchToOffline(
+            const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb,
+            const std::vector<view::Surface>& offlineOutputs,
+            /*out*/
+            sp<hardware::camera2::ICameraOfflineSession>* session) override;
 
     /**
      * Interface used by CameraService

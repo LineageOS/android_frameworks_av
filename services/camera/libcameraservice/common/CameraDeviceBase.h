@@ -35,6 +35,8 @@
 #include "device3/Camera3StreamInterface.h"
 #include "binder/Status.h"
 
+#include "CameraOfflineSessionBase.h"
+
 namespace android {
 
 class CameraProviderManager;
@@ -389,6 +391,13 @@ class CameraDeviceBase : public virtual RefBase {
      * requests to complete, based on their settings
      */
     virtual nsecs_t getExpectedInFlightDuration() = 0;
+
+    /**
+     * switch to offline session
+     */
+    virtual status_t switchToOffline(
+            const std::vector<int32_t>& streamsToKeep,
+            /*out*/ sp<CameraOfflineSessionBase>* session) = 0;
 };
 
 }; // namespace android
