@@ -29,15 +29,14 @@
 
 #include <binder/IServiceManager.h>
 
-#include <media/MediaAnalyticsItem.h>
-// nope...#include <media/MediaAnalytics.h>
+#include <media/MediaMetricsItem.h>
 
 namespace android {
 
-class IMediaAnalyticsService: public IInterface
+class IMediaMetricsService: public IInterface
 {
 public:
-    DECLARE_META_INTERFACE(MediaAnalyticsService);
+    DECLARE_META_INTERFACE(MediaMetricsService);
 
     /**
      * Submits the indicated record to the mediaanalytics service, where
@@ -48,14 +47,14 @@ public:
      * \return status which is negative if an error is detected (some errors
                may be silent and return 0 - success).
      */
-    virtual status_t submit(MediaAnalyticsItem *item) = 0;
+    virtual status_t submit(mediametrics::Item *item) = 0;
 
     virtual status_t submitBuffer(const char *buffer, size_t length) = 0;
 };
 
 // ----------------------------------------------------------------------------
 
-class BnMediaAnalyticsService: public BnInterface<IMediaAnalyticsService>
+class BnMediaMetricsService: public BnInterface<IMediaMetricsService>
 {
 public:
     status_t onTransact(uint32_t code,
@@ -66,7 +65,7 @@ public:
 protected:
     // Internal call where release is true if the service is to delete the item.
     virtual status_t submitInternal(
-            MediaAnalyticsItem *item, bool release) = 0;
+            mediametrics::Item *item, bool release) = 0;
 };
 
 }; // namespace android

@@ -20,7 +20,7 @@
 
 #include <binder/IPCThreadState.h>
 #include <media/stagefright/InterfaceUtils.h>
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetricsItem.h>
 #include <media/MediaSource.h>
 #include <media/stagefright/RemoteMediaExtractor.h>
 
@@ -48,20 +48,20 @@ RemoteMediaExtractor::RemoteMediaExtractor(
      mSource(source),
      mExtractorPlugin(plugin) {
 
-    mAnalyticsItem = nullptr;
+    mMetricsItem = nullptr;
     if (MEDIA_LOG) {
-        mAnalyticsItem = MediaAnalyticsItem::create(kKeyExtractor);
+        mMetricsItem = mediametrics::Item::create(kKeyExtractor);
 
         // we're in the extractor service, we want to attribute to the app
         // that invoked us.
         int uid = IPCThreadState::self()->getCallingUid();
-        mAnalyticsItem->setUid(uid);
+        mMetricsItem->setUid(uid);
 
         // track the container format (mpeg, aac, wvm, etc)
         size_t ntracks = extractor->countTracks();
-        mAnalyticsItem->setCString(kExtractorFormat, extractor->name());
+        mMetricsItem->setCString(kExtractorFormat, extractor->name());
         // tracks (size_t)
-        mAnalyticsItem->setInt32(kExtractorTracks, ntracks);
+        mMetricsItem->setInt32(kExtractorTracks, ntracks);
         // metadata
         MetaDataBase pMetaData;
         if (extractor->getMetaData(pMetaData) == OK) {
@@ -70,7 +70,7 @@ RemoteMediaExtractor::RemoteMediaExtractor(
             // 'mime'
             const char *mime = nullptr;
             if (pMetaData.findCString(kKeyMIMEType, &mime)) {
-                mAnalyticsItem->setCString(kExtractorMime,  mime);
+                mMetricsItem->setCString(kExtractorMime,  mime);
             }
             // what else is interesting and not already available?
         }
@@ -84,15 +84,15 @@ RemoteMediaExtractor::~RemoteMediaExtractor() {
     mExtractorPlugin = nullptr;
     // log the current record, provided it has some information worth recording
     if (MEDIA_LOG) {
-        if (mAnalyticsItem != nullptr) {
-            if (mAnalyticsItem->count() > 0) {
-                mAnalyticsItem->selfrecord();
+        if (mMetricsItem != nullptr) {
+            if (mMetricsItem->count() > 0) {
+                mMetricsItem->selfrecord();
             }
         }
     }
-    if (mAnalyticsItem != nullptr) {
-        delete mAnalyticsItem;
-        mAnalyticsItem = nullptr;
+    if (mMetricsItem != nullptr) {
+        delete mMetricsItem;
+        mMetricsItem = nullptr;
     }
 }
 
@@ -123,11 +123,11 @@ sp<MetaData> RemoteMediaExtractor::getMetaData() {
 }
 
 status_t RemoteMediaExtractor::getMetrics(Parcel *reply) {
-    if (mAnalyticsItem == nullptr || reply == nullptr) {
+    if (mMetricsItem == nullptr || reply == nullptr) {
         return UNKNOWN_ERROR;
     }
 
-    mAnalyticsItem->writeToParcel(reply);
+    mMetricsItem->writeToParcel(reply);
     return OK;
 }
 

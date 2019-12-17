@@ -41,12 +41,12 @@ namespace android {
  *  handles nuplayer AND nuplayer2
  *  checks for the union of what the two players generate
  */
-bool statsd_nuplayer(const MediaAnalyticsItem *item)
+bool statsd_nuplayer(const mediametrics::Item *item)
 {
     if (item == NULL) return false;
 
     // these go into the statsd wrapper
-    const nsecs_t timestamp = MediaAnalyticsService::roundTime(item->getTimestamp());
+    const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
     std::string pkgName = item->getPkgName();
     int64_t pkgVersionCode = item->getPkgVersionCode();
     int64_t mediaApexVersion = 0;

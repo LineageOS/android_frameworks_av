@@ -19,17 +19,17 @@ namespace android {
 extern bool enabled_statsd;
 
 // component specific dumpers
-extern bool statsd_audiopolicy(const MediaAnalyticsItem *);
-extern bool statsd_audiorecord(const MediaAnalyticsItem *);
-extern bool statsd_audiothread(const MediaAnalyticsItem *);
-extern bool statsd_audiotrack(const MediaAnalyticsItem *);
-extern bool statsd_codec(const MediaAnalyticsItem *);
-extern bool statsd_extractor(const MediaAnalyticsItem *);
-extern bool statsd_nuplayer(const MediaAnalyticsItem *);
-extern bool statsd_recorder(const MediaAnalyticsItem *);
+extern bool statsd_audiopolicy(const mediametrics::Item *);
+extern bool statsd_audiorecord(const mediametrics::Item *);
+extern bool statsd_audiothread(const mediametrics::Item *);
+extern bool statsd_audiotrack(const mediametrics::Item *);
+extern bool statsd_codec(const mediametrics::Item *);
+extern bool statsd_extractor(const mediametrics::Item *);
+extern bool statsd_nuplayer(const mediametrics::Item *);
+extern bool statsd_recorder(const mediametrics::Item *);
 
-extern bool statsd_mediadrm(const MediaAnalyticsItem *);
-extern bool statsd_widevineCDM(const MediaAnalyticsItem *);
-extern bool statsd_drmmanager(const MediaAnalyticsItem *);
+extern bool statsd_mediadrm(const mediametrics::Item *);
+extern bool statsd_widevineCDM(const mediametrics::Item *);
+extern bool statsd_drmmanager(const mediametrics::Item *);
 
 } // namespace android

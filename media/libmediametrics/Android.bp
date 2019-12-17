@@ -2,8 +2,8 @@ cc_library_shared {
     name: "libmediametrics",
 
     srcs: [
-        "IMediaAnalyticsService.cpp",
-        "MediaAnalyticsItem.cpp",
+        "IMediaMetricsService.cpp",
+        "MediaMetricsItem.cpp",
         "MediaMetrics.cpp",
     ],
 

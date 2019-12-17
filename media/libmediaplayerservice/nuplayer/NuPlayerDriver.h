@@ -16,7 +16,7 @@
 
 #include <media/MediaPlayerInterface.h>
 
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetricsItem.h>
 #include <media/stagefright/foundation/ABase.h>
 
 namespace android {
@@ -141,7 +141,7 @@ private:
     sp<AudioSink> mAudioSink;
     uint32_t mPlayerFlags;
 
-    MediaAnalyticsItem *mAnalyticsItem;
+    mediametrics::Item *mMetricsItem;
     uid_t mClientUid;
 
     bool mAtEOS;

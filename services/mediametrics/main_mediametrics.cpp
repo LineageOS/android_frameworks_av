@@ -34,10 +34,10 @@ int main(int argc __unused, char **argv __unused)
     // to match the service name
     // we're replacing "/system/bin/mediametrics" with "media.metrics"
     // we add a ".", but discard the path components: we finish with a shorter string
-    strcpy(argv[0], MediaAnalyticsService::kServiceName);
+    strcpy(argv[0], MediaMetricsService::kServiceName);
 
     defaultServiceManager()->addService(
-            String16(MediaAnalyticsService::kServiceName), new MediaAnalyticsService());
+            String16(MediaMetricsService::kServiceName), new MediaMetricsService());
 
     sp<ProcessState> processState(ProcessState::self());
     // processState->setThreadPoolMaxThreadCount(8);
