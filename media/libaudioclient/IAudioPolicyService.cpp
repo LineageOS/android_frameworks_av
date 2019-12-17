@@ -1371,8 +1371,6 @@ status_t BnAudioPolicyService::onTransact(
         case UNREGISTER_EFFECT:
         case SET_EFFECT_ENABLED:
         case GET_OUTPUT_FOR_ATTR:
-        case ACQUIRE_SOUNDTRIGGER_SESSION:
-        case RELEASE_SOUNDTRIGGER_SESSION:
         case MOVE_EFFECTS_TO_IO:
             ALOGW("%s: transaction %d received from PID %d",
                   __func__, code, IPCThreadState::self()->getCallingPid());
@@ -1410,6 +1408,8 @@ status_t BnAudioPolicyService::onTransact(
         case GET_OFFLOAD_FORMATS_A2DP:
         case LIST_AUDIO_VOLUME_GROUPS:
         case GET_VOLUME_GROUP_FOR_ATTRIBUTES:
+        case ACQUIRE_SOUNDTRIGGER_SESSION:
+        case RELEASE_SOUNDTRIGGER_SESSION:
         case SET_RTT_ENABLED:
         case IS_CALL_SCREEN_MODE_SUPPORTED:
         case SET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
@@ -2027,8 +2027,6 @@ status_t BnAudioPolicyService::onTransact(
 
         case ACQUIRE_SOUNDTRIGGER_SESSION: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            sp<IAudioPolicyServiceClient> client = interface_cast<IAudioPolicyServiceClient>(
-                    data.readStrongBinder());
             audio_session_t session = AUDIO_SESSION_NONE;
             audio_io_handle_t ioHandle = AUDIO_IO_HANDLE_NONE;
             audio_devices_t device = AUDIO_DEVICE_NONE;
@@ -2044,8 +2042,6 @@ status_t BnAudioPolicyService::onTransact(
 
         case RELEASE_SOUNDTRIGGER_SESSION: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            sp<IAudioPolicyServiceClient> client = interface_cast<IAudioPolicyServiceClient>(
-                    data.readStrongBinder());
             audio_session_t session = (audio_session_t)data.readInt32();
             status_t status = releaseSoundTriggerSession(session);
             reply->writeInt32(status);

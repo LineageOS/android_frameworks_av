@@ -36,7 +36,6 @@
 #include "utility/AAudioUtilities.h"
 #include "MediaLogService.h"
 #include "MediaUtils.h"
-#include "SoundTriggerHwService.h"
 
 using namespace android;
 
@@ -148,7 +147,6 @@ int main(int argc __unused, char **argv)
             AAudioService::instantiate();
         }
 
-        SoundTriggerHwService::instantiate();
         ProcessState::self()->startThreadPool();
         IPCThreadState::self()->joinThreadPool();
     }

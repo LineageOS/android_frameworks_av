@@ -17,9 +17,12 @@
 #define LOG_TAG "AudioPolicyClientImpl"
 //#define LOG_NDEBUG 0
 
-#include <soundtrigger/SoundTrigger.h>
-#include <utils/Log.h>
 #include "AudioPolicyService.h"
+
+#include <android/media/soundtrigger_middleware/ISoundTriggerMiddlewareService.h>
+#include <utils/Log.h>
+
+#include "BinderProxy.h"
 
 namespace android {
 
@@ -237,6 +240,14 @@ void AudioPolicyService::AudioPolicyClient::onAudioVolumeGroupChanged(volume_gro
 audio_unique_id_t AudioPolicyService::AudioPolicyClient::newAudioUniqueId(audio_unique_id_use_t use)
 {
     return AudioSystem::newAudioUniqueId(use);
+}
+
+void AudioPolicyService::AudioPolicyClient::setSoundTriggerCaptureState(bool active) {
+    using media::soundtrigger_middleware::ISoundTriggerMiddlewareService;
+
+    static BinderProxy<ISoundTriggerMiddlewareService>
+        proxy("soundtrigger_middleware");
+    proxy.waitServiceOrDie()->setExternalCaptureState(active);
 }
 
 } // namespace android
