@@ -37,7 +37,7 @@ public:
             ::android::sp<::android::IMediaExtractor>* _aidl_return);
 
     virtual ::android::binder::Status makeIDataSource(
-            const base::unique_fd &fd,
+            base::unique_fd fd,
             int64_t offset,
             int64_t length,
             ::android::sp<::android::IDataSource>* _aidl_return);
