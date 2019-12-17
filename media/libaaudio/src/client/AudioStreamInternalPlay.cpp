@@ -49,7 +49,7 @@ aaudio_result_t AudioStreamInternalPlay::open(const AudioStreamBuilder &builder)
                              getDeviceChannelCount());
 
         if (result != AAUDIO_OK) {
-            close();
+            releaseCloseFinal();
         }
         // Sample rate is constrained to common values by now and should not overflow.
         int32_t numFrames = kRampMSec * getSampleRate() / AAUDIO_MILLIS_PER_SECOND;

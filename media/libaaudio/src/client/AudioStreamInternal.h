@@ -58,7 +58,7 @@ public:
 
     aaudio_result_t open(const AudioStreamBuilder &builder) override;
 
-    aaudio_result_t close() override;
+    aaudio_result_t release_l() override;
 
     aaudio_result_t setBufferSize(int32_t requestedFrames) override;
 

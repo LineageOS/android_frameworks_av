@@ -85,7 +85,7 @@ aaudio_result_t AAudioServiceEndpointShared::open(const aaudio::AAudioStreamRequ
 }
 
 aaudio_result_t AAudioServiceEndpointShared::close() {
-    return getStreamInternal()->close();
+    return getStreamInternal()->releaseCloseFinal();
 }
 
 // Glue between C and C++ callbacks.

@@ -176,7 +176,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     // Did we get a valid track?
     status_t status = mAudioTrack->initCheck();
     if (status != NO_ERROR) {
-        close();
+        releaseCloseFinal();
         ALOGE("open(), initCheck() returned %d", status);
         return AAudioConvert_androidToAAudioResult(status);
     }
@@ -239,14 +239,18 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     return AAUDIO_OK;
 }
 
-aaudio_result_t AudioStreamTrack::close()
-{
-    if (getState() != AAUDIO_STREAM_STATE_CLOSED) {
+aaudio_result_t AudioStreamTrack::release_l() {
+    if (getState() != AAUDIO_STREAM_STATE_CLOSING) {
         mAudioTrack->removeAudioDeviceCallback(mDeviceCallback);
-        setState(AAUDIO_STREAM_STATE_CLOSED);
+        // TODO Investigate why clear() causes a hang in test_various.cpp
+        // if I call close() from a data callback.
+        // But the same thing in AudioRecord is OK!
+        // mAudioTrack.clear();
+        mFixedBlockReader.close();
+        return AudioStream::release_l();
+    } else {
+        return AAUDIO_OK; // already released
     }
-    mFixedBlockReader.close();
-    return AAUDIO_OK;
 }
 
 void AudioStreamTrack::processCallback(int event, void *info) {

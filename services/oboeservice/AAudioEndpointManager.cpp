@@ -284,7 +284,7 @@ void AAudioEndpointManager::closeSharedEndpoint(sp<AAudioServiceEndpoint> servic
 
         serviceEndpoint->close();
         mSharedCloseCount++;
-        ALOGV("%s() %p for device %d",
+        ALOGV("%s(%p) closed for device %d",
               __func__, serviceEndpoint.get(), serviceEndpoint->getDeviceId());
     }
 }

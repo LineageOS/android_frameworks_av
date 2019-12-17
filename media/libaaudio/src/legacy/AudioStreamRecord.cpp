@@ -182,7 +182,7 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
         // Did we get a valid track?
         status_t status = mAudioRecord->initCheck();
         if (status != OK) {
-            close();
+            releaseCloseFinal();
             ALOGE("open(), initCheck() returned %d", status);
             return AAudioConvert_androidToAAudioResult(status);
         }
@@ -278,16 +278,17 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     return AAUDIO_OK;
 }
 
-aaudio_result_t AudioStreamRecord::close()
-{
-    // TODO add close() or release() to AudioRecord API then call it from here
-    if (getState() != AAUDIO_STREAM_STATE_CLOSED) {
+aaudio_result_t AudioStreamRecord::release_l() {
+    // TODO add close() or release() to AudioFlinger's AudioRecord API.
+    //  Then call it from here
+    if (getState() != AAUDIO_STREAM_STATE_CLOSING) {
         mAudioRecord->removeAudioDeviceCallback(mDeviceCallback);
         mAudioRecord.clear();
-        setState(AAUDIO_STREAM_STATE_CLOSED);
+        mFixedBlockWriter.close();
+        return AudioStream::release_l();
+    } else {
+        return AAUDIO_OK; // already released
     }
-    mFixedBlockWriter.close();
-    return AudioStream::close();
 }
 
 const void * AudioStreamRecord::maybeConvertDeviceData(const void *audioData, int32_t numFrames) {

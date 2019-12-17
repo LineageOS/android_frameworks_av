@@ -249,25 +249,29 @@ aaudio_result_t AudioStream::safeStop() {
     return requestStop();
 }
 
-aaudio_result_t AudioStream::safeClose() {
-    // This get temporarily unlocked in the close when joining callback threads.
+aaudio_result_t AudioStream::safeRelease() {
+    // This get temporarily unlocked in the release() when joining callback threads.
     std::lock_guard<std::mutex> lock(mStreamLock);
     if (collidesWithCallback()) {
         ALOGE("%s cannot be called from a callback!", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
-    return close();
+    if (getState() == AAUDIO_STREAM_STATE_CLOSING) {
+        return AAUDIO_OK;
+    }
+    return release_l();
 }
 
 void AudioStream::setState(aaudio_stream_state_t state) {
-    ALOGV("%s(%d) from %d to %d", __func__, getId(), mState, state);
+    ALOGD("%s(s#%d) from %d to %d", __func__, getId(), mState, state);
     // CLOSED is a final state
     if (mState == AAUDIO_STREAM_STATE_CLOSED) {
         ALOGE("%s(%d) tried to set to %d but already CLOSED", __func__, getId(), state);
 
-    // Once DISCONNECTED, we can only move to CLOSED state.
+    // Once DISCONNECTED, we can only move to CLOSING or CLOSED state.
     } else if (mState == AAUDIO_STREAM_STATE_DISCONNECTED
-               && state != AAUDIO_STREAM_STATE_CLOSED) {
+               && !(state == AAUDIO_STREAM_STATE_CLOSING
+                   || state == AAUDIO_STREAM_STATE_CLOSED)) {
         ALOGE("%s(%d) tried to set to %d but already DISCONNECTED", __func__, getId(), state);
 
     } else {

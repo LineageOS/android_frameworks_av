@@ -58,6 +58,7 @@ LIBAAUDIO {
     AAudioStream_getTimestamp;
     AAudioStream_isMMapUsed;
     AAudioStream_isPrivacySensitive;   # introduced=30
+    AAudioStream_release;        # introduced=30
   local:
     *;
 };
