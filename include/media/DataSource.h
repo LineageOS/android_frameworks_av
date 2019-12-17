@@ -22,7 +22,7 @@
 
 #include <android/IDataSource.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/DataSourceBase.h>
+#include <media/stagefright/DataSourceBase.h>
 #include <media/MediaExtractorPluginApi.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>

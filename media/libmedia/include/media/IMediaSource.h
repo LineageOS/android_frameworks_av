@@ -22,7 +22,7 @@
 
 #include <binder/IInterface.h>
 #include <binder/IMemory.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaErrors.h>
 

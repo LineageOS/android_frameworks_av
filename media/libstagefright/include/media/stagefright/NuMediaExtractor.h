@@ -22,7 +22,7 @@
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AudioPresentationInfo.h>
 #include <android/IMediaExtractor.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>
 #include <utils/RefBase.h>

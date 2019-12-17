@@ -23,7 +23,7 @@
 
 #include <binder/IPCThreadState.h>
 #include <media/AudioTrack.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/openmax/OMX_Audio.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALookup.h>

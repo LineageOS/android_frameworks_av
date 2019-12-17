@@ -19,7 +19,7 @@
 #define NDK_WRAPPER_H_
 
 #include <media/DataSource.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/NdkMediaDataSource.h>
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaExtractor.h>

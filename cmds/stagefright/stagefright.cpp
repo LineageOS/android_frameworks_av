@@ -33,7 +33,7 @@
 #include <binder/ProcessState.h>
 #include <datasource/DataSourceFactory.h>
 #include <media/DataSource.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/IMediaHTTPService.h>
 #include <media/IMediaPlayerService.h>
 #include <media/stagefright/foundation/ABuffer.h>

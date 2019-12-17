@@ -17,7 +17,7 @@
 #ifndef SIMPLE_DECODING_SOURCE_H_
 #define SIMPLE_DECODING_SOURCE_H_
 
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/AString.h>
 #include <media/stagefright/foundation/Mutexed.h>
 
