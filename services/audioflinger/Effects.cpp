@@ -58,71 +58,115 @@
 namespace android {
 
 // ----------------------------------------------------------------------------
-//  EffectModule implementation
+//  EffectBase implementation
 // ----------------------------------------------------------------------------
 
 #undef LOG_TAG
-#define LOG_TAG "AudioFlinger::EffectModule"
+#define LOG_TAG "AudioFlinger::EffectBase"
 
-AudioFlinger::EffectModule::EffectModule(const sp<AudioFlinger::EffectCallbackInterface>& callback,
+AudioFlinger::EffectBase::EffectBase(const sp<AudioFlinger::EffectCallbackInterface>& callback,
                                         effect_descriptor_t *desc,
                                         int id,
                                         audio_session_t sessionId,
                                         bool pinned)
     : mPinned(pinned),
       mCallback(callback), mId(id), mSessionId(sessionId),
-      mDescriptor(*desc),
-      // clear mConfig to ensure consistent initial value of buffer framecount
-      // in case buffers are associated by setInBuffer() or setOutBuffer()
-      // prior to configure().
-      mConfig{{}, {}},
-      mStatus(NO_INIT), mState(IDLE),
-      mMaxDisableWaitCnt(1), // set by configure(), should be >= 1
-      mDisableWaitCnt(0),    // set by process() and updateState()
-      mSuspended(false),
-      mOffloaded(false)
-#ifdef FLOAT_EFFECT_CHAIN
-      , mSupportsFloat(false)
-#endif
+      mDescriptor(*desc)
 {
-    ALOGV("Constructor %p pinned %d", this, pinned);
-    int lStatus;
-
-    // create effect engine from effect factory
-    mStatus = callback->createEffectHal(
-            &desc->uuid, sessionId, AUDIO_PORT_HANDLE_NONE, &mEffectInterface);
-    if (mStatus != NO_ERROR) {
-        return;
-    }
-    lStatus = init();
-    if (lStatus < 0) {
-        mStatus = lStatus;
-        goto Error;
-    }
-
-    setOffloaded(callback->isOffload(), callback->io());
-    ALOGV("Constructor success name %s, Interface %p", mDescriptor.name, mEffectInterface.get());
-
-    return;
-Error:
-    mEffectInterface.clear();
-    ALOGV("Constructor Error %d", mStatus);
 }
 
-AudioFlinger::EffectModule::~EffectModule()
+// must be called with EffectModule::mLock held
+status_t AudioFlinger::EffectBase::setEnabled_l(bool enabled)
 {
-    ALOGV("Destructor %p", this);
-    if (mEffectInterface != 0) {
-        char uuidStr[64];
-        AudioEffect::guidToString(&mDescriptor.uuid, uuidStr, sizeof(uuidStr));
-        ALOGW("EffectModule %p destructor called with unreleased interface, effect %s",
-                this, uuidStr);
-        release_l();
-    }
 
+    ALOGV("setEnabled %p enabled %d", this, enabled);
+
+    if (enabled != isEnabled()) {
+        switch (mState) {
+        // going from disabled to enabled
+        case IDLE:
+            mState = STARTING;
+            break;
+        case STOPPED:
+            mState = RESTART;
+            break;
+        case STOPPING:
+            mState = ACTIVE;
+            break;
+
+        // going from enabled to disabled
+        case RESTART:
+            mState = STOPPED;
+            break;
+        case STARTING:
+            mState = IDLE;
+            break;
+        case ACTIVE:
+            mState = STOPPING;
+            break;
+        case DESTROYED:
+            return NO_ERROR; // simply ignore as we are being destroyed
+        }
+        for (size_t i = 1; i < mHandles.size(); i++) {
+            EffectHandle *h = mHandles[i];
+            if (h != NULL && !h->disconnected()) {
+                h->setEnabled(enabled);
+            }
+        }
+    }
+    return NO_ERROR;
 }
 
-status_t AudioFlinger::EffectModule::addHandle(EffectHandle *handle)
+status_t AudioFlinger::EffectBase::setEnabled(bool enabled, bool fromHandle)
+{
+    status_t status;
+    {
+        Mutex::Autolock _l(mLock);
+        status = setEnabled_l(enabled);
+    }
+    if (fromHandle) {
+        if (enabled) {
+            if (status != NO_ERROR) {
+                mCallback->checkSuspendOnEffectEnabled(this, false, false /*threadLocked*/);
+            } else {
+                mCallback->onEffectEnable(this);
+            }
+        } else {
+            mCallback->onEffectDisable(this);
+        }
+    }
+    return status;
+}
+
+bool AudioFlinger::EffectBase::isEnabled() const
+{
+    switch (mState) {
+    case RESTART:
+    case STARTING:
+    case ACTIVE:
+        return true;
+    case IDLE:
+    case STOPPING:
+    case STOPPED:
+    case DESTROYED:
+    default:
+        return false;
+    }
+}
+
+void AudioFlinger::EffectBase::setSuspended(bool suspended)
+{
+    Mutex::Autolock _l(mLock);
+    mSuspended = suspended;
+}
+
+bool AudioFlinger::EffectBase::suspended() const
+{
+    Mutex::Autolock _l(mLock);
+    return mSuspended;
+}
+
+status_t AudioFlinger::EffectBase::addHandle(EffectHandle *handle)
 {
     status_t status;
 
@@ -161,7 +205,7 @@ status_t AudioFlinger::EffectModule::addHandle(EffectHandle *handle)
     return status;
 }
 
-status_t AudioFlinger::EffectModule::updatePolicyState()
+status_t AudioFlinger::EffectBase::updatePolicyState()
 {
     status_t status = NO_ERROR;
     bool doRegister = false;
@@ -217,13 +261,13 @@ status_t AudioFlinger::EffectModule::updatePolicyState()
 }
 
 
-ssize_t AudioFlinger::EffectModule::removeHandle(EffectHandle *handle)
+ssize_t AudioFlinger::EffectBase::removeHandle(EffectHandle *handle)
 {
     Mutex::Autolock _l(mLock);
     return removeHandle_l(handle);
 }
 
-ssize_t AudioFlinger::EffectModule::removeHandle_l(EffectHandle *handle)
+ssize_t AudioFlinger::EffectBase::removeHandle_l(EffectHandle *handle)
 {
     size_t size = mHandles.size();
     size_t i;
@@ -247,19 +291,15 @@ ssize_t AudioFlinger::EffectModule::removeHandle_l(EffectHandle *handle)
         }
     }
 
-    // Prevent calls to process() and other functions on effect interface from now on.
-    // The effect engine will be released by the destructor when the last strong reference on
-    // this object is released which can happen after next process is called.
     if (mHandles.size() == 0 && !mPinned) {
         mState = DESTROYED;
-        mEffectInterface->close();
     }
 
     return mHandles.size();
 }
 
 // must be called with EffectModule::mLock held
-AudioFlinger::EffectHandle *AudioFlinger::EffectModule::controlHandle_l()
+AudioFlinger::EffectHandle *AudioFlinger::EffectBase::controlHandle_l()
 {
     // the first valid handle in the list has control over the module
     for (size_t i = 0; i < mHandles.size(); i++) {
@@ -273,7 +313,7 @@ AudioFlinger::EffectHandle *AudioFlinger::EffectModule::controlHandle_l()
 }
 
 // unsafe method called when the effect parent thread has been destroyed
-ssize_t AudioFlinger::EffectModule::disconnectHandle(EffectHandle *handle, bool unpinIfLast)
+ssize_t AudioFlinger::EffectBase::disconnectHandle(EffectHandle *handle, bool unpinIfLast)
 {
     ALOGV("disconnect() %p handle %p", this, handle);
     if (mCallback->disconnectEffectHandle(handle, unpinIfLast)) {
@@ -288,6 +328,253 @@ ssize_t AudioFlinger::EffectModule::disconnectHandle(EffectHandle *handle, bool 
         mLock.lock();
     }
     return numHandles;
+}
+
+bool AudioFlinger::EffectBase::purgeHandles()
+{
+    bool enabled = false;
+    Mutex::Autolock _l(mLock);
+    EffectHandle *handle = controlHandle_l();
+    if (handle != NULL) {
+        enabled = handle->enabled();
+    }
+    mHandles.clear();
+    return enabled;
+}
+
+void AudioFlinger::EffectBase::checkSuspendOnEffectEnabled(bool enabled, bool threadLocked) {
+    mCallback->checkSuspendOnEffectEnabled(this, enabled, threadLocked);
+}
+
+static String8 effectFlagsToString(uint32_t flags) {
+    String8 s;
+
+    s.append("conn. mode: ");
+    switch (flags & EFFECT_FLAG_TYPE_MASK) {
+    case EFFECT_FLAG_TYPE_INSERT: s.append("insert"); break;
+    case EFFECT_FLAG_TYPE_AUXILIARY: s.append("auxiliary"); break;
+    case EFFECT_FLAG_TYPE_REPLACE: s.append("replace"); break;
+    case EFFECT_FLAG_TYPE_PRE_PROC: s.append("preproc"); break;
+    case EFFECT_FLAG_TYPE_POST_PROC: s.append("postproc"); break;
+    default: s.append("unknown/reserved"); break;
+    }
+    s.append(", ");
+
+    s.append("insert pref: ");
+    switch (flags & EFFECT_FLAG_INSERT_MASK) {
+    case EFFECT_FLAG_INSERT_ANY: s.append("any"); break;
+    case EFFECT_FLAG_INSERT_FIRST: s.append("first"); break;
+    case EFFECT_FLAG_INSERT_LAST: s.append("last"); break;
+    case EFFECT_FLAG_INSERT_EXCLUSIVE: s.append("exclusive"); break;
+    default: s.append("unknown/reserved"); break;
+    }
+    s.append(", ");
+
+    s.append("volume mgmt: ");
+    switch (flags & EFFECT_FLAG_VOLUME_MASK) {
+    case EFFECT_FLAG_VOLUME_NONE: s.append("none"); break;
+    case EFFECT_FLAG_VOLUME_CTRL: s.append("implements control"); break;
+    case EFFECT_FLAG_VOLUME_IND: s.append("requires indication"); break;
+    case EFFECT_FLAG_VOLUME_MONITOR: s.append("monitors volume"); break;
+    default: s.append("unknown/reserved"); break;
+    }
+    s.append(", ");
+
+    uint32_t devind = flags & EFFECT_FLAG_DEVICE_MASK;
+    if (devind) {
+        s.append("device indication: ");
+        switch (devind) {
+        case EFFECT_FLAG_DEVICE_IND: s.append("requires updates"); break;
+        default: s.append("unknown/reserved"); break;
+        }
+        s.append(", ");
+    }
+
+    s.append("input mode: ");
+    switch (flags & EFFECT_FLAG_INPUT_MASK) {
+    case EFFECT_FLAG_INPUT_DIRECT: s.append("direct"); break;
+    case EFFECT_FLAG_INPUT_PROVIDER: s.append("provider"); break;
+    case EFFECT_FLAG_INPUT_BOTH: s.append("direct+provider"); break;
+    default: s.append("not set"); break;
+    }
+    s.append(", ");
+
+    s.append("output mode: ");
+    switch (flags & EFFECT_FLAG_OUTPUT_MASK) {
+    case EFFECT_FLAG_OUTPUT_DIRECT: s.append("direct"); break;
+    case EFFECT_FLAG_OUTPUT_PROVIDER: s.append("provider"); break;
+    case EFFECT_FLAG_OUTPUT_BOTH: s.append("direct+provider"); break;
+    default: s.append("not set"); break;
+    }
+    s.append(", ");
+
+    uint32_t accel = flags & EFFECT_FLAG_HW_ACC_MASK;
+    if (accel) {
+        s.append("hardware acceleration: ");
+        switch (accel) {
+        case EFFECT_FLAG_HW_ACC_SIMPLE: s.append("non-tunneled"); break;
+        case EFFECT_FLAG_HW_ACC_TUNNEL: s.append("tunneled"); break;
+        default: s.append("unknown/reserved"); break;
+        }
+        s.append(", ");
+    }
+
+    uint32_t modeind = flags & EFFECT_FLAG_AUDIO_MODE_MASK;
+    if (modeind) {
+        s.append("mode indication: ");
+        switch (modeind) {
+        case EFFECT_FLAG_AUDIO_MODE_IND: s.append("required"); break;
+        default: s.append("unknown/reserved"); break;
+        }
+        s.append(", ");
+    }
+
+    uint32_t srcind = flags & EFFECT_FLAG_AUDIO_SOURCE_MASK;
+    if (srcind) {
+        s.append("source indication: ");
+        switch (srcind) {
+        case EFFECT_FLAG_AUDIO_SOURCE_IND: s.append("required"); break;
+        default: s.append("unknown/reserved"); break;
+        }
+        s.append(", ");
+    }
+
+    if (flags & EFFECT_FLAG_OFFLOAD_MASK) {
+        s.append("offloadable, ");
+    }
+
+    int len = s.length();
+    if (s.length() > 2) {
+        (void) s.lockBuffer(len);
+        s.unlockBuffer(len - 2);
+    }
+    return s;
+}
+
+void AudioFlinger::EffectBase::dump(int fd, const Vector<String16>& args __unused)
+{
+    String8 result;
+
+    result.appendFormat("\tEffect ID %d:\n", mId);
+
+    bool locked = AudioFlinger::dumpTryLock(mLock);
+    // failed to lock - AudioFlinger is probably deadlocked
+    if (!locked) {
+        result.append("\t\tCould not lock Fx mutex:\n");
+    }
+
+    result.append("\t\tSession State Registered Enabled Suspended:\n");
+    result.appendFormat("\t\t%05d   %03d   %s          %s       %s\n",
+            mSessionId, mState, mPolicyRegistered ? "y" : "n",
+            mPolicyEnabled ? "y" : "n", mSuspended ? "y" : "n");
+
+    result.append("\t\tDescriptor:\n");
+    char uuidStr[64];
+    AudioEffect::guidToString(&mDescriptor.uuid, uuidStr, sizeof(uuidStr));
+    result.appendFormat("\t\t- UUID: %s\n", uuidStr);
+    AudioEffect::guidToString(&mDescriptor.type, uuidStr, sizeof(uuidStr));
+    result.appendFormat("\t\t- TYPE: %s\n", uuidStr);
+    result.appendFormat("\t\t- apiVersion: %08X\n\t\t- flags: %08X (%s)\n",
+            mDescriptor.apiVersion,
+            mDescriptor.flags,
+            effectFlagsToString(mDescriptor.flags).string());
+    result.appendFormat("\t\t- name: %s\n",
+            mDescriptor.name);
+
+    result.appendFormat("\t\t- implementor: %s\n",
+            mDescriptor.implementor);
+
+    result.appendFormat("\t\t%zu Clients:\n", mHandles.size());
+    result.append("\t\t\t  Pid Priority Ctrl Locked client server\n");
+    char buffer[256];
+    for (size_t i = 0; i < mHandles.size(); ++i) {
+        EffectHandle *handle = mHandles[i];
+        if (handle != NULL && !handle->disconnected()) {
+            handle->dumpToBuffer(buffer, sizeof(buffer));
+            result.append(buffer);
+        }
+    }
+    if (locked) {
+        mLock.unlock();
+    }
+
+    write(fd, result.string(), result.length());
+}
+
+// ----------------------------------------------------------------------------
+//  EffectModule implementation
+// ----------------------------------------------------------------------------
+
+#undef LOG_TAG
+#define LOG_TAG "AudioFlinger::EffectModule"
+
+AudioFlinger::EffectModule::EffectModule(const sp<AudioFlinger::EffectCallbackInterface>& callback,
+                                         effect_descriptor_t *desc,
+                                         int id,
+                                         audio_session_t sessionId,
+                                         bool pinned)
+    : EffectBase(callback, desc, id, sessionId, pinned),
+      // clear mConfig to ensure consistent initial value of buffer framecount
+      // in case buffers are associated by setInBuffer() or setOutBuffer()
+      // prior to configure().
+      mConfig{{}, {}},
+      mStatus(NO_INIT),
+      mMaxDisableWaitCnt(1), // set by configure(), should be >= 1
+      mDisableWaitCnt(0),    // set by process() and updateState()
+      mOffloaded(false)
+#ifdef FLOAT_EFFECT_CHAIN
+      , mSupportsFloat(false)
+#endif
+{
+    ALOGV("Constructor %p pinned %d", this, pinned);
+    int lStatus;
+
+    // create effect engine from effect factory
+    mStatus = callback->createEffectHal(
+            &desc->uuid, sessionId, AUDIO_PORT_HANDLE_NONE, &mEffectInterface);
+    if (mStatus != NO_ERROR) {
+        return;
+    }
+    lStatus = init();
+    if (lStatus < 0) {
+        mStatus = lStatus;
+        goto Error;
+    }
+
+    setOffloaded(callback->isOffload(), callback->io());
+    ALOGV("Constructor success name %s, Interface %p", mDescriptor.name, mEffectInterface.get());
+
+    return;
+Error:
+    mEffectInterface.clear();
+    ALOGV("Constructor Error %d", mStatus);
+}
+
+AudioFlinger::EffectModule::~EffectModule()
+{
+    ALOGV("Destructor %p", this);
+    if (mEffectInterface != 0) {
+        char uuidStr[64];
+        AudioEffect::guidToString(&mDescriptor.uuid, uuidStr, sizeof(uuidStr));
+        ALOGW("EffectModule %p destructor called with unreleased interface, effect %s",
+                this, uuidStr);
+        release_l();
+    }
+
+}
+
+ssize_t AudioFlinger::EffectModule::removeHandle_l(EffectHandle *handle)
+{
+    ssize_t status = EffectBase::removeHandle_l(handle);
+
+    // Prevent calls to process() and other functions on effect interface from now on.
+    // The effect engine will be released by the destructor when the last strong reference on
+    // this object is released which can happen after next process is called.
+    if (status == 0 && !mPinned) {
+        mEffectInterface->close();
+    }
+
+    return status;
 }
 
 bool AudioFlinger::EffectModule::updateState() {
@@ -950,89 +1237,6 @@ status_t AudioFlinger::EffectModule::command(uint32_t cmdCode,
     return status;
 }
 
-void AudioFlinger::EffectModule::checkSuspendOnEffectEnabled(bool enabled, bool threadLocked) {
-    mCallback->checkSuspendOnEffectEnabled(this, enabled, threadLocked);
-}
-
-status_t AudioFlinger::EffectModule::setEnabled(bool enabled, bool fromHandle)
-{
-    status_t status;
-    {
-        Mutex::Autolock _l(mLock);
-        status = setEnabled_l(enabled);
-    }
-    if (fromHandle) {
-        if (enabled) {
-            if (status != NO_ERROR) {
-                mCallback->checkSuspendOnEffectEnabled(this, false, false /*threadLocked*/);
-            } else {
-                mCallback->onEffectEnable(this);
-            }
-        } else {
-            mCallback->onEffectDisable(this);
-        }
-    }
-    return status;
-}
-
-// must be called with EffectModule::mLock held
-status_t AudioFlinger::EffectModule::setEnabled_l(bool enabled)
-{
-
-    ALOGV("setEnabled %p enabled %d", this, enabled);
-
-    if (enabled != isEnabled()) {
-        switch (mState) {
-        // going from disabled to enabled
-        case IDLE:
-            mState = STARTING;
-            break;
-        case STOPPED:
-            mState = RESTART;
-            break;
-        case STOPPING:
-            mState = ACTIVE;
-            break;
-
-        // going from enabled to disabled
-        case RESTART:
-            mState = STOPPED;
-            break;
-        case STARTING:
-            mState = IDLE;
-            break;
-        case ACTIVE:
-            mState = STOPPING;
-            break;
-        case DESTROYED:
-            return NO_ERROR; // simply ignore as we are being destroyed
-        }
-        for (size_t i = 1; i < mHandles.size(); i++) {
-            EffectHandle *h = mHandles[i];
-            if (h != NULL && !h->disconnected()) {
-                h->setEnabled(enabled);
-            }
-        }
-    }
-    return NO_ERROR;
-}
-
-bool AudioFlinger::EffectModule::isEnabled() const
-{
-    switch (mState) {
-    case RESTART:
-    case STARTING:
-    case ACTIVE:
-        return true;
-    case IDLE:
-    case STOPPING:
-    case STOPPED:
-    case DESTROYED:
-    default:
-        return false;
-    }
-}
-
 bool AudioFlinger::EffectModule::isProcessEnabled() const
 {
     if (mStatus != NO_ERROR) {
@@ -1274,30 +1478,6 @@ status_t AudioFlinger::EffectModule::setAudioSource(audio_source_t source)
     return status;
 }
 
-void AudioFlinger::EffectModule::setSuspended(bool suspended)
-{
-    Mutex::Autolock _l(mLock);
-    mSuspended = suspended;
-}
-
-bool AudioFlinger::EffectModule::suspended() const
-{
-    Mutex::Autolock _l(mLock);
-    return mSuspended;
-}
-
-bool AudioFlinger::EffectModule::purgeHandles()
-{
-    bool enabled = false;
-    Mutex::Autolock _l(mLock);
-    EffectHandle *handle = controlHandle_l();
-    if (handle != NULL) {
-        enabled = handle->enabled();
-    }
-    mHandles.clear();
-    return enabled;
-}
-
 status_t AudioFlinger::EffectModule::setOffloaded(bool offloaded, audio_io_handle_t io)
 {
     Mutex::Autolock _l(mLock);
@@ -1337,111 +1517,6 @@ bool AudioFlinger::EffectModule::isOffloaded() const
     return mOffloaded;
 }
 
-String8 effectFlagsToString(uint32_t flags) {
-    String8 s;
-
-    s.append("conn. mode: ");
-    switch (flags & EFFECT_FLAG_TYPE_MASK) {
-    case EFFECT_FLAG_TYPE_INSERT: s.append("insert"); break;
-    case EFFECT_FLAG_TYPE_AUXILIARY: s.append("auxiliary"); break;
-    case EFFECT_FLAG_TYPE_REPLACE: s.append("replace"); break;
-    case EFFECT_FLAG_TYPE_PRE_PROC: s.append("preproc"); break;
-    case EFFECT_FLAG_TYPE_POST_PROC: s.append("postproc"); break;
-    default: s.append("unknown/reserved"); break;
-    }
-    s.append(", ");
-
-    s.append("insert pref: ");
-    switch (flags & EFFECT_FLAG_INSERT_MASK) {
-    case EFFECT_FLAG_INSERT_ANY: s.append("any"); break;
-    case EFFECT_FLAG_INSERT_FIRST: s.append("first"); break;
-    case EFFECT_FLAG_INSERT_LAST: s.append("last"); break;
-    case EFFECT_FLAG_INSERT_EXCLUSIVE: s.append("exclusive"); break;
-    default: s.append("unknown/reserved"); break;
-    }
-    s.append(", ");
-
-    s.append("volume mgmt: ");
-    switch (flags & EFFECT_FLAG_VOLUME_MASK) {
-    case EFFECT_FLAG_VOLUME_NONE: s.append("none"); break;
-    case EFFECT_FLAG_VOLUME_CTRL: s.append("implements control"); break;
-    case EFFECT_FLAG_VOLUME_IND: s.append("requires indication"); break;
-    case EFFECT_FLAG_VOLUME_MONITOR: s.append("monitors volume"); break;
-    default: s.append("unknown/reserved"); break;
-    }
-    s.append(", ");
-
-    uint32_t devind = flags & EFFECT_FLAG_DEVICE_MASK;
-    if (devind) {
-        s.append("device indication: ");
-        switch (devind) {
-        case EFFECT_FLAG_DEVICE_IND: s.append("requires updates"); break;
-        default: s.append("unknown/reserved"); break;
-        }
-        s.append(", ");
-    }
-
-    s.append("input mode: ");
-    switch (flags & EFFECT_FLAG_INPUT_MASK) {
-    case EFFECT_FLAG_INPUT_DIRECT: s.append("direct"); break;
-    case EFFECT_FLAG_INPUT_PROVIDER: s.append("provider"); break;
-    case EFFECT_FLAG_INPUT_BOTH: s.append("direct+provider"); break;
-    default: s.append("not set"); break;
-    }
-    s.append(", ");
-
-    s.append("output mode: ");
-    switch (flags & EFFECT_FLAG_OUTPUT_MASK) {
-    case EFFECT_FLAG_OUTPUT_DIRECT: s.append("direct"); break;
-    case EFFECT_FLAG_OUTPUT_PROVIDER: s.append("provider"); break;
-    case EFFECT_FLAG_OUTPUT_BOTH: s.append("direct+provider"); break;
-    default: s.append("not set"); break;
-    }
-    s.append(", ");
-
-    uint32_t accel = flags & EFFECT_FLAG_HW_ACC_MASK;
-    if (accel) {
-        s.append("hardware acceleration: ");
-        switch (accel) {
-        case EFFECT_FLAG_HW_ACC_SIMPLE: s.append("non-tunneled"); break;
-        case EFFECT_FLAG_HW_ACC_TUNNEL: s.append("tunneled"); break;
-        default: s.append("unknown/reserved"); break;
-        }
-        s.append(", ");
-    }
-
-    uint32_t modeind = flags & EFFECT_FLAG_AUDIO_MODE_MASK;
-    if (modeind) {
-        s.append("mode indication: ");
-        switch (modeind) {
-        case EFFECT_FLAG_AUDIO_MODE_IND: s.append("required"); break;
-        default: s.append("unknown/reserved"); break;
-        }
-        s.append(", ");
-    }
-
-    uint32_t srcind = flags & EFFECT_FLAG_AUDIO_SOURCE_MASK;
-    if (srcind) {
-        s.append("source indication: ");
-        switch (srcind) {
-        case EFFECT_FLAG_AUDIO_SOURCE_IND: s.append("required"); break;
-        default: s.append("unknown/reserved"); break;
-        }
-        s.append(", ");
-    }
-
-    if (flags & EFFECT_FLAG_OFFLOAD_MASK) {
-        s.append("offloadable, ");
-    }
-
-    int len = s.length();
-    if (s.length() > 2) {
-        (void) s.lockBuffer(len);
-        s.unlockBuffer(len - 2);
-    }
-    return s;
-}
-
 static std::string dumpInOutBuffer(bool isInput, const sp<EffectBufferHalInterface> &buffer) {
     std::stringstream ss;
 
@@ -1457,38 +1532,16 @@ static std::string dumpInOutBuffer(bool isInput, const sp<EffectBufferHalInterfa
     return ss.str();
 }
 
-void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args __unused)
+void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args)
 {
+    EffectBase::dump(fd, args);
+
     String8 result;
-
-    result.appendFormat("\tEffect ID %d:\n", mId);
-
     bool locked = AudioFlinger::dumpTryLock(mLock);
-    // failed to lock - AudioFlinger is probably deadlocked
-    if (!locked) {
-        result.append("\t\tCould not lock Fx mutex:\n");
-    }
 
-    result.append("\t\tSession Status State Registered Enabled Suspended Engine:\n");
-    result.appendFormat("\t\t%05d   %03d    %03d   %s          %s       %s         %p\n",
-            mSessionId, mStatus, mState, mPolicyRegistered ? "y" : "n", mPolicyEnabled ? "y" : "n",
-            mSuspended ? "y" : "n", mEffectInterface.get());
-
-    result.append("\t\tDescriptor:\n");
-    char uuidStr[64];
-    AudioEffect::guidToString(&mDescriptor.uuid, uuidStr, sizeof(uuidStr));
-    result.appendFormat("\t\t- UUID: %s\n", uuidStr);
-    AudioEffect::guidToString(&mDescriptor.type, uuidStr, sizeof(uuidStr));
-    result.appendFormat("\t\t- TYPE: %s\n", uuidStr);
-    result.appendFormat("\t\t- apiVersion: %08X\n\t\t- flags: %08X (%s)\n",
-            mDescriptor.apiVersion,
-            mDescriptor.flags,
-            effectFlagsToString(mDescriptor.flags).string());
-    result.appendFormat("\t\t- name: %s\n",
-            mDescriptor.name);
-
-    result.appendFormat("\t\t- implementor: %s\n",
-            mDescriptor.implementor);
+    result.append("\t\tStatus Engine:\n");
+    result.appendFormat("\t\t%03d    %p\n",
+            mStatus, mEffectInterface.get());
 
     result.appendFormat("\t\t- data: %s\n", mSupportsFloat ? "float" : "int16");
 
@@ -1522,17 +1575,6 @@ void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args __unu
             dumpInOutBuffer(false /* isInput */, mOutConversionBuffer).c_str());
 #endif
 
-    result.appendFormat("\t\t%zu Clients:\n", mHandles.size());
-    result.append("\t\t\t  Pid Priority Ctrl Locked client server\n");
-    char buffer[256];
-    for (size_t i = 0; i < mHandles.size(); ++i) {
-        EffectHandle *handle = mHandles[i];
-        if (handle != NULL && !handle->disconnected()) {
-            handle->dumpToBuffer(buffer, sizeof(buffer));
-            result.append(buffer);
-        }
-    }
-
     write(fd, result.string(), result.length());
 
     if (mEffectInterface != 0) {
@@ -1552,7 +1594,7 @@ void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args __unu
 #undef LOG_TAG
 #define LOG_TAG "AudioFlinger::EffectHandle"
 
-AudioFlinger::EffectHandle::EffectHandle(const sp<EffectModule>& effect,
+AudioFlinger::EffectHandle::EffectHandle(const sp<EffectBase>& effect,
                                         const sp<AudioFlinger::Client>& client,
                                         const sp<IEffectClient>& effectClient,
                                         int32_t priority)
@@ -1593,7 +1635,7 @@ status_t AudioFlinger::EffectHandle::enable()
 {
     AutoMutex _l(mLock);
     ALOGV("enable %p", this);
-    sp<EffectModule> effect = mEffect.promote();
+    sp<EffectBase> effect = mEffect.promote();
     if (effect == 0 || mDisconnected) {
         return DEAD_OBJECT;
     }
@@ -1631,7 +1673,7 @@ status_t AudioFlinger::EffectHandle::disable()
 {
     ALOGV("disable %p", this);
     AutoMutex _l(mLock);
-    sp<EffectModule> effect = mEffect.promote();
+    sp<EffectBase> effect = mEffect.promote();
     if (effect == 0 || mDisconnected) {
         return DEAD_OBJECT;
     }
@@ -1672,7 +1714,7 @@ void AudioFlinger::EffectHandle::disconnect(bool unpinIfLast)
     }
     mDisconnected = true;
     {
-        sp<EffectModule> effect = mEffect.promote();
+        sp<EffectBase> effect = mEffect.promote();
         if (effect != 0) {
             if (effect->disconnectHandle(this, unpinIfLast) > 0) {
                 ALOGW("%s Effect handle %p disconnected after thread destruction",
@@ -1740,7 +1782,7 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
     }
 
     AutoMutex _l(mLock);
-    sp<EffectModule> effect = mEffect.promote();
+    sp<EffectBase> effect = mEffect.promote();
     if (effect == 0 || mDisconnected) {
         return DEAD_OBJECT;
     }
@@ -2671,12 +2713,13 @@ status_t AudioFlinger::EffectChain::EffectCallback::createEffectHal(
 }
 
 bool AudioFlinger::EffectChain::EffectCallback::updateOrphanEffectChains(
-        const sp<AudioFlinger::EffectModule>& effect) {
+        const sp<AudioFlinger::EffectBase>& effect) {
     sp<AudioFlinger> af = mAudioFlinger.promote();
     if (af == nullptr) {
         return false;
     }
-    return af->updateOrphanEffectChains(effect);
+    // in EffectChain context, an EffectBase is always from an EffectModule so static cast is safe
+    return af->updateOrphanEffectChains(effect->asEffectModule());
 }
 
 status_t AudioFlinger::EffectChain::EffectCallback::allocateHalBuffer(
@@ -2807,7 +2850,7 @@ void AudioFlinger::EffectChain::EffectCallback::setVolumeForOutput(float left, f
 }
 
 void AudioFlinger::EffectChain::EffectCallback::checkSuspendOnEffectEnabled(
-        const sp<EffectModule>& effect, bool enabled, bool threadLocked) {
+        const sp<EffectBase>& effect, bool enabled, bool threadLocked) {
     sp<ThreadBase> t = mThread.promote();
     if (t == nullptr) {
         return;
@@ -2818,18 +2861,20 @@ void AudioFlinger::EffectChain::EffectCallback::checkSuspendOnEffectEnabled(
     if (c == nullptr) {
         return;
     }
-    c->checkSuspendOnEffectEnabled(effect, enabled);
+    // in EffectChain context, an EffectBase is always from an EffectModule so static cast is safe
+    c->checkSuspendOnEffectEnabled(effect->asEffectModule(), enabled);
 }
 
-void AudioFlinger::EffectChain::EffectCallback::onEffectEnable(const sp<EffectModule>& effect) {
+void AudioFlinger::EffectChain::EffectCallback::onEffectEnable(const sp<EffectBase>& effect) {
     sp<ThreadBase> t = mThread.promote();
     if (t == nullptr) {
         return;
     }
-    t->onEffectEnable(effect);
+    // in EffectChain context, an EffectBase is always from an EffectModule so static cast is safe
+    t->onEffectEnable(effect->asEffectModule());
 }
 
-void AudioFlinger::EffectChain::EffectCallback::onEffectDisable(const sp<EffectModule>& effect) {
+void AudioFlinger::EffectChain::EffectCallback::onEffectDisable(const sp<EffectBase>& effect) {
     checkSuspendOnEffectEnabled(effect, false, false /*threadLocked*/);
 
     sp<ThreadBase> t = mThread.promote();
