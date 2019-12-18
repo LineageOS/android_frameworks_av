@@ -2112,6 +2112,13 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
                         CameraProviderManager::statusToString(status), status);
                 return;
             }
+
+            res = camera3::ZoomRatioMapper::overrideZoomRatioTags(
+                    &mPhysicalCameraCharacteristics[id], &mSupportNativeZoomRatio);
+            if (OK != res) {
+                ALOGE("%s: Unable to override zoomRatio related tags: %s (%d)",
+                        __FUNCTION__, strerror(-res), res);
+            }
         }
     }
 
