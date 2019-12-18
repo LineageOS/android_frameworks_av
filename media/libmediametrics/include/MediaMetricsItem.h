@@ -32,7 +32,7 @@
 
 namespace android {
 
-class IMediaAnalyticsService;
+class IMediaMetricsService;
 class Parcel;
 
 /*
@@ -115,8 +115,8 @@ protected:
     static const int EnabledProperty_default = 1;
 
     // let's reuse a binder connection
-    static sp<IMediaAnalyticsService> sAnalyticsService;
-    static sp<IMediaAnalyticsService> getInstance();
+    static sp<IMediaMetricsService> sMediaMetricsService;
+    static sp<IMediaMetricsService> getInstance();
     static void dropInstance();
     static bool submitBuffer(const char *buffer, size_t len);
 
@@ -329,26 +329,26 @@ protected:
 };
 
 /**
- * MediaMetrics Item is a stack allocated media analytics item used for
+ * MediaMetrics LogItem is a stack allocated media analytics item used for
  * fast logging.  It falls over to a malloc if needed.
  *
  * This is templated with a buffer size to allocate on the stack.
  */
 template <size_t N = 4096>
-class Item : public BufferedItem {
+class LogItem : public BufferedItem {
 public:
-    explicit Item(const std::string key) : Item(key.c_str()) { }
+    explicit LogItem(const std::string key) : LogItem(key.c_str()) { }
 
     // Since this class will not be defined before the base class, we initialize variables
     // in our own order.
-    explicit Item(const char *key) {
+    explicit LogItem(const char *key) {
          mBegin = mBuffer;
          mEnd = mBuffer + N;
          mBaseRealloc = &mReallocPtr;
          init(key);
     }
 
-    ~Item() override {
+    ~LogItem() override {
         if (mReallocPtr != nullptr) { // do the check before calling free to avoid overhead.
             free(mReallocPtr);
         }
@@ -359,18 +359,17 @@ private:
     char mBuffer[N];
 };
 
-} // mediametrics
 
 /**
- * Media Metrics MediaAnalyticsItem
+ * Media Metrics Item
  *
  * A mutable item representing an event or record that will be
  * logged with the Media Metrics service.  For client logging, one should
  * use the mediametrics::Item.
  *
- * The MediaAnalyticsItem is designed for the service as it has getters.
+ * The Item is designed for the service as it has getters.
  */
-class MediaAnalyticsItem : public mediametrics::BaseItem {
+class Item : public mediametrics::BaseItem {
     friend class MediaMetricsJNI;           // TODO: remove this access
 
 public:
@@ -397,14 +396,14 @@ public:
 
     // T must be convertible to mKey
     template <typename T>
-    explicit MediaAnalyticsItem(T key)
+    explicit Item(T key)
         : mKey(key) { }
-    MediaAnalyticsItem() = default;
+    Item() = default;
 
-    MediaAnalyticsItem(const MediaAnalyticsItem&) = delete;
-    MediaAnalyticsItem &operator=(const MediaAnalyticsItem&) = delete;
+    Item(const Item&) = delete;
+    Item &operator=(const Item&) = delete;
 
-    bool operator==(const MediaAnalyticsItem& other) const {
+    bool operator==(const Item& other) const {
         if (mPropCount != other.mPropCount
             || mPid != other.mPid
             || mUid != other.mUid
@@ -418,29 +417,29 @@ public:
          }
          return true;
     }
-    bool operator!=(const MediaAnalyticsItem& other) const {
+    bool operator!=(const Item& other) const {
         return !(*this == other);
     }
 
     template <typename T>
-    static MediaAnalyticsItem* create(T key) {
-        return new MediaAnalyticsItem(key);
+    static Item* create(T key) {
+        return new Item(key);
     }
-    static MediaAnalyticsItem* create() {
-        return new MediaAnalyticsItem();
+    static Item* create() {
+        return new Item();
     }
 
-        static MediaAnalyticsItem* convert(mediametrics_handle_t);
-        static mediametrics_handle_t convert(MediaAnalyticsItem *);
+        static Item* convert(mediametrics_handle_t);
+        static mediametrics_handle_t convert(Item *);
 
         // access functions for the class
-        ~MediaAnalyticsItem();
+        ~Item();
 
         // reset all contents, discarding any extra data
         void clear();
-        MediaAnalyticsItem *dup();
+        Item *dup();
 
-    MediaAnalyticsItem &setKey(const char *key) {
+    Item &setKey(const char *key) {
         mKey = key;
         return *this;
     }
@@ -450,46 +449,46 @@ public:
     size_t count() const { return mPropCount; }
 
     template<typename S, typename T>
-    MediaAnalyticsItem &set(S key, T value) {
+    Item &set(S key, T value) {
         allocateProp(key)->set(value);
         return *this;
     }
 
     // set values appropriately
-    MediaAnalyticsItem &setInt32(const char *key, int32_t value) {
+    Item &setInt32(const char *key, int32_t value) {
         return set(key, value);
     }
-    MediaAnalyticsItem &setInt64(const char *key, int64_t value) {
+    Item &setInt64(const char *key, int64_t value) {
         return set(key, value);
     }
-    MediaAnalyticsItem &setDouble(const char *key, double value) {
+    Item &setDouble(const char *key, double value) {
         return set(key, value);
     }
-    MediaAnalyticsItem &setRate(const char *key, int64_t count, int64_t duration) {
+    Item &setRate(const char *key, int64_t count, int64_t duration) {
         return set(key, std::make_pair(count, duration));
     }
-    MediaAnalyticsItem &setCString(const char *key, const char *value) {
+    Item &setCString(const char *key, const char *value) {
         return set(key, value);
     }
 
     // fused get/add/set; if attr wasn't there, it's a simple set.
     // type-mismatch counts as "wasn't there".
     template<typename S, typename T>
-    MediaAnalyticsItem &add(S key, T value) {
+    Item &add(S key, T value) {
         allocateProp(key)->add(value);
         return *this;
     }
 
-    MediaAnalyticsItem &addInt32(const char *key, int32_t value) {
+    Item &addInt32(const char *key, int32_t value) {
         return add(key, value);
     }
-    MediaAnalyticsItem &addInt64(const char *key, int64_t value) {
+    Item &addInt64(const char *key, int64_t value) {
         return add(key, value);
     }
-    MediaAnalyticsItem &addDouble(const char *key, double value) {
+    Item &addDouble(const char *key, double value) {
         return add(key, value);
     }
-    MediaAnalyticsItem &addRate(const char *key, int64_t count, int64_t duration) {
+    Item &addRate(const char *key, int64_t count, int64_t duration) {
         return add(key, std::make_pair(count, duration));
     }
 
@@ -555,19 +554,19 @@ public:
 
         // timestamp, pid, and uid only used on server side
         // timestamp is in 'nanoseconds, unix time'
-        MediaAnalyticsItem &setTimestamp(nsecs_t);
+        Item &setTimestamp(nsecs_t);
         nsecs_t getTimestamp() const;
 
-        MediaAnalyticsItem &setPid(pid_t);
+        Item &setPid(pid_t);
         pid_t getPid() const;
 
-        MediaAnalyticsItem &setUid(uid_t);
+        Item &setUid(uid_t);
         uid_t getUid() const;
 
-        MediaAnalyticsItem &setPkgName(const std::string &pkgName);
+        Item &setPkgName(const std::string &pkgName);
         std::string getPkgName() const { return mPkgName; }
 
-        MediaAnalyticsItem &setPkgVersionCode(int64_t);
+        Item &setPkgVersionCode(int64_t);
         int64_t getPkgVersionCode() const;
 
     // our serialization code for binder calls
@@ -589,7 +588,7 @@ public:
         // with rules for first/last/add, etc
         // XXX: document semantics and how they are indicated
         // caller continues to own 'incoming'
-        bool merge(MediaAnalyticsItem *incoming);
+        bool merge(Item *incoming);
 
 private:
     // handle Parcel version 0
@@ -712,19 +711,19 @@ public:
 
         template <typename T> void visit(T f) const {
             switch (mType) {
-            case MediaAnalyticsItem::kTypeInt32:
+            case Item::kTypeInt32:
                 f(u.int32Value);
                 return;
-            case MediaAnalyticsItem::kTypeInt64:
+            case Item::kTypeInt64:
                 f(u.int64Value);
                 return;
-            case MediaAnalyticsItem::kTypeDouble:
+            case Item::kTypeDouble:
                 f(u.doubleValue);
                 return;
-            case MediaAnalyticsItem::kTypeRate:
+            case Item::kTypeRate:
                 f(u.rate);
                 return;
-            case MediaAnalyticsItem::kTypeCString:
+            case Item::kTypeCString:
                 f(u.CStringValue);
                 return;
             default:
@@ -885,7 +884,7 @@ public:
 
     class iterator {
     public:
-       iterator(size_t pos, const MediaAnalyticsItem &_item)
+       iterator(size_t pos, const Item &_item)
            : i(std::min(pos, _item.count()))
            , item(_item) { }
        iterator &operator++() {
@@ -901,7 +900,7 @@ public:
 
     private:
       size_t i;
-      const MediaAnalyticsItem &item;
+      const Item &item;
     };
 
     iterator begin() const {
@@ -938,6 +937,7 @@ private:
     nsecs_t       mTimestamp = 0;
 };
 
+} // namespace mediametrics
 } // namespace android
 
 #endif

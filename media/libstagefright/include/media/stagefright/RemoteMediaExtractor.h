@@ -18,12 +18,12 @@
 #define REMOTE_MEDIA_EXTRACTOR_H_
 
 #include <android/IMediaExtractor.h>
+#include <media/MediaMetricsItem.h>
 #include <media/stagefright/MediaExtractor.h>
 #include <media/stagefright/foundation/ABase.h>
 
 namespace android {
 
-class MediaAnalyticsItem;
 
 // IMediaExtractor wrapper to the MediaExtractor.
 class RemoteMediaExtractor : public BnMediaExtractor {
@@ -48,7 +48,7 @@ private:
     sp<DataSource> mSource;
     sp<RefBase> mExtractorPlugin;
 
-    MediaAnalyticsItem *mAnalyticsItem;
+    mediametrics::Item *mMetricsItem;
 
     explicit RemoteMediaExtractor(
             MediaExtractor *extractor,

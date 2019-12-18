@@ -85,6 +85,7 @@ filegroup {
         "aidl/android/hardware/ICameraServiceProxy.aidl",
         "aidl/android/hardware/camera2/ICameraDeviceCallbacks.aidl",
         "aidl/android/hardware/camera2/ICameraDeviceUser.aidl",
+        "aidl/android/hardware/camera2/ICameraOfflineSession.aidl",
     ],
     path: "aidl",
 }

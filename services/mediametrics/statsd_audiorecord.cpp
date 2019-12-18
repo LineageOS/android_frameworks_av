@@ -37,12 +37,12 @@
 
 namespace android {
 
-bool statsd_audiorecord(const MediaAnalyticsItem *item)
+bool statsd_audiorecord(const mediametrics::Item *item)
 {
     if (item == NULL) return false;
 
     // these go into the statsd wrapper
-    const nsecs_t timestamp = MediaAnalyticsService::roundTime(item->getTimestamp());
+    const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
     std::string pkgName = item->getPkgName();
     int64_t pkgVersionCode = item->getPkgVersionCode();
     int64_t mediaApexVersion = 0;

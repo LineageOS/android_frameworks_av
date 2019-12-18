@@ -32,7 +32,7 @@
 #include <private/media/AudioTrackShared.h>
 #include <processgroup/sched_policy.h>
 #include <media/IAudioFlinger.h>
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetricsItem.h>
 #include <media/TypeConverter.h>
 
 #define WAIT_PERIOD_MS          10
@@ -79,37 +79,37 @@ void AudioRecord::MediaMetrics::gather(const AudioRecord *record)
 #define MM_PREFIX "android.media.audiorecord." // avoid cut-n-paste errors.
 
     // Java API 28 entries, do not change.
-    mAnalyticsItem->setCString(MM_PREFIX "encoding", toString(record->mFormat).c_str());
-    mAnalyticsItem->setCString(MM_PREFIX "source", toString(record->mAttributes.source).c_str());
-    mAnalyticsItem->setInt32(MM_PREFIX "latency", (int32_t)record->mLatency); // bad estimate.
-    mAnalyticsItem->setInt32(MM_PREFIX "samplerate", (int32_t)record->mSampleRate);
-    mAnalyticsItem->setInt32(MM_PREFIX "channels", (int32_t)record->mChannelCount);
+    mMetricsItem->setCString(MM_PREFIX "encoding", toString(record->mFormat).c_str());
+    mMetricsItem->setCString(MM_PREFIX "source", toString(record->mAttributes.source).c_str());
+    mMetricsItem->setInt32(MM_PREFIX "latency", (int32_t)record->mLatency); // bad estimate.
+    mMetricsItem->setInt32(MM_PREFIX "samplerate", (int32_t)record->mSampleRate);
+    mMetricsItem->setInt32(MM_PREFIX "channels", (int32_t)record->mChannelCount);
 
     // Non-API entries, these can change.
-    mAnalyticsItem->setInt32(MM_PREFIX "portId", (int32_t)record->mPortId);
-    mAnalyticsItem->setInt32(MM_PREFIX "frameCount", (int32_t)record->mFrameCount);
-    mAnalyticsItem->setCString(MM_PREFIX "attributes", toString(record->mAttributes).c_str());
-    mAnalyticsItem->setInt64(MM_PREFIX "channelMask", (int64_t)record->mChannelMask);
+    mMetricsItem->setInt32(MM_PREFIX "portId", (int32_t)record->mPortId);
+    mMetricsItem->setInt32(MM_PREFIX "frameCount", (int32_t)record->mFrameCount);
+    mMetricsItem->setCString(MM_PREFIX "attributes", toString(record->mAttributes).c_str());
+    mMetricsItem->setInt64(MM_PREFIX "channelMask", (int64_t)record->mChannelMask);
 
     // log total duration recording, including anything currently running.
     int64_t activeNs = 0;
     if (mStartedNs != 0) {
         activeNs = systemTime() - mStartedNs;
     }
-    mAnalyticsItem->setDouble(MM_PREFIX "durationMs", (mDurationNs + activeNs) * 1e-6);
-    mAnalyticsItem->setInt64(MM_PREFIX "startCount", (int64_t)mCount);
+    mMetricsItem->setDouble(MM_PREFIX "durationMs", (mDurationNs + activeNs) * 1e-6);
+    mMetricsItem->setInt64(MM_PREFIX "startCount", (int64_t)mCount);
 
     if (mLastError != NO_ERROR) {
-        mAnalyticsItem->setInt32(MM_PREFIX "lastError.code", (int32_t)mLastError);
-        mAnalyticsItem->setCString(MM_PREFIX "lastError.at", mLastErrorFunc.c_str());
+        mMetricsItem->setInt32(MM_PREFIX "lastError.code", (int32_t)mLastError);
+        mMetricsItem->setCString(MM_PREFIX "lastError.at", mLastErrorFunc.c_str());
     }
 }
 
 // hand the user a snapshot of the metrics.
-status_t AudioRecord::getMetrics(MediaAnalyticsItem * &item)
+status_t AudioRecord::getMetrics(mediametrics::Item * &item)
 {
     mMediaMetrics.gather(this);
-    MediaAnalyticsItem *tmp = mMediaMetrics.dup();
+    mediametrics::Item *tmp = mMediaMetrics.dup();
     if (tmp == nullptr) {
         return BAD_VALUE;
     }

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "MediaAnalytics"
+#define LOG_TAG "MediaMetrics"
 
 #include <stdint.h>
 #include <inttypes.h>
@@ -29,8 +29,8 @@
 #include <utils/Log.h>
 #include <utils/String8.h>
 
-#include <media/MediaAnalyticsItem.h>
-#include <media/IMediaAnalyticsService.h>
+#include <media/MediaMetricsItem.h>
+#include <media/IMediaMetricsService.h>
 
 namespace android {
 
@@ -41,15 +41,15 @@ enum {
     SUBMIT_BUFFER,
 };
 
-class BpMediaAnalyticsService: public BpInterface<IMediaAnalyticsService>
+class BpMediaMetricsService: public BpInterface<IMediaMetricsService>
 {
 public:
-    explicit BpMediaAnalyticsService(const sp<IBinder>& impl)
-        : BpInterface<IMediaAnalyticsService>(impl)
+    explicit BpMediaMetricsService(const sp<IBinder>& impl)
+        : BpInterface<IMediaMetricsService>(impl)
     {
     }
 
-    status_t submit(MediaAnalyticsItem *item) override
+    status_t submit(mediametrics::Item *item) override
     {
         if (item == nullptr) {
             return BAD_VALUE;
@@ -57,7 +57,7 @@ public:
         ALOGV("%s: (ONEWAY) item=%s", __func__, item->toString().c_str());
 
         Parcel data;
-        data.writeInterfaceToken(IMediaAnalyticsService::getInterfaceDescriptor());
+        data.writeInterfaceToken(IMediaMetricsService::getInterfaceDescriptor());
 
         status_t status = item->writeToParcel(&data);
         if (status != NO_ERROR) { // assume failure logged in item
@@ -79,7 +79,7 @@ public:
         ALOGV("%s: (ONEWAY) length:%zu", __func__, length);
 
         Parcel data;
-        data.writeInterfaceToken(IMediaAnalyticsService::getInterfaceDescriptor());
+        data.writeInterfaceToken(IMediaMetricsService::getInterfaceDescriptor());
 
         status_t status = data.writeInt32(length)
                 ?: data.write((uint8_t*)buffer, length);
@@ -95,18 +95,18 @@ public:
     }
 };
 
-IMPLEMENT_META_INTERFACE(MediaAnalyticsService, "android.media.IMediaAnalyticsService");
+IMPLEMENT_META_INTERFACE(MediaMetricsService, "android.media.IMediaMetricsService");
 
 // ----------------------------------------------------------------------
 
-status_t BnMediaAnalyticsService::onTransact(
+status_t BnMediaMetricsService::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
     switch (code) {
     case SUBMIT_ITEM: {
-        CHECK_INTERFACE(IMediaAnalyticsService, data, reply);
+        CHECK_INTERFACE(IMediaMetricsService, data, reply);
 
-        MediaAnalyticsItem * const item = MediaAnalyticsItem::create();
+        mediametrics::Item * const item = mediametrics::Item::create();
         status_t status = item->readFromParcel(data);
         if (status != NO_ERROR) { // assume failure logged in item
             return status;
@@ -116,7 +116,7 @@ status_t BnMediaAnalyticsService::onTransact(
         return NO_ERROR;
     }
     case SUBMIT_BUFFER: {
-        CHECK_INTERFACE(IMediaAnalyticsService, data, reply);
+        CHECK_INTERFACE(IMediaMetricsService, data, reply);
         int32_t length;
         status_t status = data.readInt32(&length);
         if (status != NO_ERROR || length <= 0) {

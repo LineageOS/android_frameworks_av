@@ -24,7 +24,7 @@
 #include <cutils/sched_policy.h>
 #include <media/AudioSystem.h>
 #include <media/AudioTimestamp.h>
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetricsItem.h>
 #include <media/Modulo.h>
 #include <media/MicrophoneInfo.h>
 #include <media/RecordingActivityTracker.h>
@@ -270,7 +270,7 @@ public:
     /*
      * return metrics information for the current instance.
      */
-            status_t getMetrics(MediaAnalyticsItem * &item);
+            status_t getMetrics(mediametrics::Item * &item);
 
     /* After it's created the track is not active. Call start() to
      * make it active. If set, the callback will start being called.
@@ -733,27 +733,27 @@ private:
 private:
     class MediaMetrics {
       public:
-        MediaMetrics() : mAnalyticsItem(MediaAnalyticsItem::create("audiorecord")),
+        MediaMetrics() : mMetricsItem(mediametrics::Item::create("audiorecord")),
                          mCreatedNs(systemTime(SYSTEM_TIME_REALTIME)),
                          mStartedNs(0), mDurationNs(0), mCount(0),
                          mLastError(NO_ERROR) {
         }
         ~MediaMetrics() {
-            // mAnalyticsItem alloc failure will be flagged in the constructor
+            // mMetricsItem alloc failure will be flagged in the constructor
             // don't log empty records
-            if (mAnalyticsItem->count() > 0) {
-                mAnalyticsItem->selfrecord();
+            if (mMetricsItem->count() > 0) {
+                mMetricsItem->selfrecord();
             }
         }
         void gather(const AudioRecord *record);
-        MediaAnalyticsItem *dup() { return mAnalyticsItem->dup(); }
+        mediametrics::Item *dup() { return mMetricsItem->dup(); }
 
         void logStart(nsecs_t when) { mStartedNs = when; mCount++; }
         void logStop(nsecs_t when) { mDurationNs += (when-mStartedNs); mStartedNs = 0;}
         void markError(status_t errcode, const char *func)
                  { mLastError = errcode; mLastErrorFunc = func;}
       private:
-        std::unique_ptr<MediaAnalyticsItem> mAnalyticsItem;
+        std::unique_ptr<mediametrics::Item> mMetricsItem;
         nsecs_t mCreatedNs;     // XXX: perhaps not worth it in production
         nsecs_t mStartedNs;
         nsecs_t mDurationNs;

@@ -19,7 +19,6 @@ LOCAL_SHARED_LIBRARIES := \
 	libmediautils \
 	libnbaio \
 	libnblog \
-	libsoundtriggerservice \
 	libutils \
 	libvibrator
 
@@ -33,7 +32,6 @@ LOCAL_C_INCLUDES := \
 	frameworks/av/services/audiopolicy/service \
 	frameworks/av/services/medialog \
 	frameworks/av/services/oboeservice \
-	frameworks/av/services/soundtrigger \
 	frameworks/av/media/libaaudio/include \
 	frameworks/av/media/libaaudio/src \
 	frameworks/av/media/libaaudio/src/binding \

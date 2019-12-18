@@ -38,11 +38,11 @@
 namespace android {
 
 // mediadrm
-bool statsd_mediadrm(const MediaAnalyticsItem *item)
+bool statsd_mediadrm(const mediametrics::Item *item)
 {
     if (item == NULL) return false;
 
-    const nsecs_t timestamp = MediaAnalyticsService::roundTime(item->getTimestamp());
+    const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
     std::string pkgName = item->getPkgName();
     int64_t pkgVersionCode = item->getPkgVersionCode();
     int64_t mediaApexVersion = 0;
@@ -75,11 +75,11 @@ bool statsd_mediadrm(const MediaAnalyticsItem *item)
 }
 
 // widevineCDM
-bool statsd_widevineCDM(const MediaAnalyticsItem *item)
+bool statsd_widevineCDM(const mediametrics::Item *item)
 {
     if (item == NULL) return false;
 
-    const nsecs_t timestamp = MediaAnalyticsService::roundTime(item->getTimestamp());
+    const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
     std::string pkgName = item->getPkgName();
     int64_t pkgVersionCode = item->getPkgVersionCode();
     int64_t mediaApexVersion = 0;
@@ -105,11 +105,11 @@ bool statsd_widevineCDM(const MediaAnalyticsItem *item)
 }
 
 // drmmanager
-bool statsd_drmmanager(const MediaAnalyticsItem *item)
+bool statsd_drmmanager(const mediametrics::Item *item)
 {
     if (item == NULL) return false;
 
-    const nsecs_t timestamp = MediaAnalyticsService::roundTime(item->getTimestamp());
+    const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
     std::string pkgName = item->getPkgName();
     int64_t pkgVersionCode = item->getPkgVersionCode();
     int64_t mediaApexVersion = 0;

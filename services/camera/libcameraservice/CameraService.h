@@ -71,6 +71,7 @@ class CameraService :
 public:
     class Client;
     class BasicClient;
+    class OfflineClient;
 
     // The effective API level.  The Camera2 API running in LEGACY mode counts as API_1.
     enum apiLevel {
@@ -400,6 +401,87 @@ public:
 
         int mCameraId;  // All API1 clients use integer camera IDs
     }; // class Client
+
+
+    // Client for offline session. Note that offline session client does not affect camera service's
+    // client arbitration logic. It is camera HAL's decision to decide whether a normal camera
+    // client is conflicting with existing offline client(s).
+    // The other distinctive difference between offline clients and normal clients is that normal
+    // clients are created through ICameraService binder calls, while the offline session client
+    // is created through ICameraDeviceUser::switchToOffline call.
+    class OfflineClient : public virtual RefBase {
+
+        virtual status_t dump(int fd, const Vector<String16>& args) = 0;
+
+        // Block the client form using the camera
+        virtual void block() = 0;
+
+        // Return the package name for this client
+        virtual String16 getPackageName() const = 0;
+
+        // Notify client about a fatal error
+        // TODO: maybe let impl notify within block?
+        virtual void notifyError(int32_t errorCode,
+                const CaptureResultExtras& resultExtras) = 0;
+
+        // Get the UID of the application client using this
+        virtual uid_t getClientUid() const = 0;
+
+        // Get the PID of the application client using this
+        virtual int getClientPid() const = 0;
+
+        protected:
+            OfflineClient(const sp<CameraService>& cameraService,
+                    const String16& clientPackageName,
+                    const String8& cameraIdStr,
+                    int clientPid,
+                    uid_t clientUid,
+                    int servicePid): mCameraIdStr(cameraIdStr),
+                            mClientPackageName(clientPackageName), mClientPid(clientPid),
+                            mClientUid(clientUid), mServicePid(servicePid) {
+                if (sCameraService == nullptr) {
+                    sCameraService = cameraService;
+                }
+            }
+
+            virtual ~OfflineClient() { /*TODO*/ }
+
+            // these are initialized in the constructor.
+            static sp<CameraService>        sCameraService;
+            const String8                   mCameraIdStr;
+            String16                        mClientPackageName;
+            pid_t                           mClientPid;
+            const uid_t                     mClientUid;
+            const pid_t                     mServicePid;
+            bool                            mDisconnected;
+
+            // - The app-side Binder interface to receive callbacks from us
+            sp<IBinder>                     mRemoteBinder;   // immutable after constructor
+
+            // permissions management
+            status_t                        startCameraOps();
+            status_t                        finishCameraOps();
+
+        private:
+            std::unique_ptr<AppOpsManager>  mAppOpsManager = nullptr;
+
+            class OpsCallback : public BnAppOpsCallback {
+            public:
+                explicit OpsCallback(wp<OfflineClient> client) : mClient(client) {}
+                virtual void opChanged(int32_t /*op*/, const String16& /*packageName*/) {
+                    //TODO
+                }
+
+            private:
+                wp<OfflineClient> mClient;
+
+            }; // class OpsCallback
+
+            sp<OpsCallback> mOpsCallback;
+
+            // IAppOpsCallback interface, indirected through opListener
+            // virtual void opChanged(int32_t op, const String16& packageName);
+    }; // class OfflineClient
 
     /**
      * A listener class that implements the LISTENER interface for use with a ClientManager, and

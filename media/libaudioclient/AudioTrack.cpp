@@ -35,7 +35,7 @@
 #include <media/AudioParameter.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetricsItem.h>
 #include <media/TypeConverter.h>
 
 #define WAIT_PERIOD_MS                  10
@@ -183,26 +183,26 @@ void AudioTrack::MediaMetrics::gather(const AudioTrack *track)
 #define MM_PREFIX "android.media.audiotrack." // avoid cut-n-paste errors.
 
     // Java API 28 entries, do not change.
-    mAnalyticsItem->setCString(MM_PREFIX "streamtype", toString(track->streamType()).c_str());
-    mAnalyticsItem->setCString(MM_PREFIX "type",
+    mMetricsItem->setCString(MM_PREFIX "streamtype", toString(track->streamType()).c_str());
+    mMetricsItem->setCString(MM_PREFIX "type",
             toString(track->mAttributes.content_type).c_str());
-    mAnalyticsItem->setCString(MM_PREFIX "usage", toString(track->mAttributes.usage).c_str());
+    mMetricsItem->setCString(MM_PREFIX "usage", toString(track->mAttributes.usage).c_str());
 
     // Non-API entries, these can change due to a Java string mistake.
-    mAnalyticsItem->setInt32(MM_PREFIX "sampleRate", (int32_t)track->mSampleRate);
-    mAnalyticsItem->setInt64(MM_PREFIX "channelMask", (int64_t)track->mChannelMask);
+    mMetricsItem->setInt32(MM_PREFIX "sampleRate", (int32_t)track->mSampleRate);
+    mMetricsItem->setInt64(MM_PREFIX "channelMask", (int64_t)track->mChannelMask);
     // Non-API entries, these can change.
-    mAnalyticsItem->setInt32(MM_PREFIX "portId", (int32_t)track->mPortId);
-    mAnalyticsItem->setCString(MM_PREFIX "encoding", toString(track->mFormat).c_str());
-    mAnalyticsItem->setInt32(MM_PREFIX "frameCount", (int32_t)track->mFrameCount);
-    mAnalyticsItem->setCString(MM_PREFIX "attributes", toString(track->mAttributes).c_str());
+    mMetricsItem->setInt32(MM_PREFIX "portId", (int32_t)track->mPortId);
+    mMetricsItem->setCString(MM_PREFIX "encoding", toString(track->mFormat).c_str());
+    mMetricsItem->setInt32(MM_PREFIX "frameCount", (int32_t)track->mFrameCount);
+    mMetricsItem->setCString(MM_PREFIX "attributes", toString(track->mAttributes).c_str());
 }
 
 // hand the user a snapshot of the metrics.
-status_t AudioTrack::getMetrics(MediaAnalyticsItem * &item)
+status_t AudioTrack::getMetrics(mediametrics::Item * &item)
 {
     mMediaMetrics.gather(this);
-    MediaAnalyticsItem *tmp = mMediaMetrics.dup();
+    mediametrics::Item *tmp = mMediaMetrics.dup();
     if (tmp == nullptr) {
         return BAD_VALUE;
     }

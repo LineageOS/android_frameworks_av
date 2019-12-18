@@ -46,7 +46,6 @@
 #include <utils/Log.h>
 #include <media/AudioParameter.h>
 #include <private/android_filesystem_config.h>
-#include <soundtrigger/SoundTrigger.h>
 #include <system/audio.h>
 #include "AudioPolicyManager.h"
 #include <Serializer.h>
@@ -2277,7 +2276,7 @@ status_t AudioPolicyManager::startInput(audio_port_handle_t portId)
         DeviceVector primaryInputDevices = availablePrimaryModuleInputDevices();
         if (primaryInputDevices.contains(device) &&
                 mInputs.activeInputsCountOnDevices(primaryInputDevices) == 1) {
-            SoundTrigger::setCaptureState(true);
+            mpClientInterface->setSoundTriggerCaptureState(true);
         }
 
         // automatically enable the remote submix output when input is started if not
@@ -2360,7 +2359,7 @@ status_t AudioPolicyManager::stopInput(audio_port_handle_t portId)
         DeviceVector primaryInputDevices = availablePrimaryModuleInputDevices();
         if (primaryInputDevices.contains(inputDesc->getDevice()) &&
                 mInputs.activeInputsCountOnDevices(primaryInputDevices) == 0) {
-            SoundTrigger::setCaptureState(false);
+            mpClientInterface->setSoundTriggerCaptureState(false);
         }
         inputDesc->clearPreemptedSessions();
     }
@@ -5075,7 +5074,7 @@ void AudioPolicyManager::closeInput(audio_io_handle_t input)
     DeviceVector primaryInputDevices = availablePrimaryModuleInputDevices();
     if (primaryInputDevices.contains(device) &&
             mInputs.activeInputsCountOnDevices(primaryInputDevices) == 0) {
-        SoundTrigger::setCaptureState(false);
+        mpClientInterface->setSoundTriggerCaptureState(false);
     }
 
     cleanUpEffectsForIo(input);

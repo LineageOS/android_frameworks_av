@@ -1742,7 +1742,7 @@ void AudioFlinger::ThreadBase::sendStatistics(bool force)
     mLastRecordedTimestampVerifierN = mTimestampVerifier.getN();
     mLastRecordedTimeNs = timeNs;
 
-    std::unique_ptr<MediaAnalyticsItem> item(MediaAnalyticsItem::create("audiothread"));
+    std::unique_ptr<mediametrics::Item> item(mediametrics::Item::create("audiothread"));
 
 #define MM_PREFIX "android.media.audiothread." // avoid cut-n-paste errors.
 

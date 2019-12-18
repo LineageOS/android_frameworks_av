@@ -31,7 +31,7 @@
 #include <binder/IServiceManager.h>
 
 #include <media/IMediaPlayerService.h>
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetricsItem.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -138,7 +138,7 @@ StagefrightRecorder::~StagefrightRecorder() {
     }
 
     // log the current record, provided it has some information worth recording
-    // NB: this also reclaims & clears mAnalyticsItem.
+    // NB: this also reclaims & clears mMetricsItem.
     flushAndResetMetrics(false);
 }
 
@@ -147,69 +147,69 @@ void StagefrightRecorder::updateMetrics() {
 
     // we run as part of the media player service; what we really want to
     // know is the app which requested the recording.
-    mAnalyticsItem->setUid(mClientUid);
+    mMetricsItem->setUid(mClientUid);
 
     // populate the values from the raw fields.
 
     // TBD mOutputFormat  = OUTPUT_FORMAT_THREE_GPP;
     // TBD mAudioEncoder  = AUDIO_ENCODER_AMR_NB;
     // TBD mVideoEncoder  = VIDEO_ENCODER_DEFAULT;
-    mAnalyticsItem->setInt32(kRecorderHeight, mVideoHeight);
-    mAnalyticsItem->setInt32(kRecorderWidth, mVideoWidth);
-    mAnalyticsItem->setInt32(kRecorderFrameRate, mFrameRate);
-    mAnalyticsItem->setInt32(kRecorderVideoBitrate, mVideoBitRate);
-    mAnalyticsItem->setInt32(kRecorderAudioSampleRate, mSampleRate);
-    mAnalyticsItem->setInt32(kRecorderAudioChannels, mAudioChannels);
-    mAnalyticsItem->setInt32(kRecorderAudioBitrate, mAudioBitRate);
+    mMetricsItem->setInt32(kRecorderHeight, mVideoHeight);
+    mMetricsItem->setInt32(kRecorderWidth, mVideoWidth);
+    mMetricsItem->setInt32(kRecorderFrameRate, mFrameRate);
+    mMetricsItem->setInt32(kRecorderVideoBitrate, mVideoBitRate);
+    mMetricsItem->setInt32(kRecorderAudioSampleRate, mSampleRate);
+    mMetricsItem->setInt32(kRecorderAudioChannels, mAudioChannels);
+    mMetricsItem->setInt32(kRecorderAudioBitrate, mAudioBitRate);
     // TBD mInterleaveDurationUs = 0;
-    mAnalyticsItem->setInt32(kRecorderVideoIframeInterval, mIFramesIntervalSec);
+    mMetricsItem->setInt32(kRecorderVideoIframeInterval, mIFramesIntervalSec);
     // TBD mAudioSourceNode = 0;
     // TBD mUse64BitFileOffset = false;
     if (mMovieTimeScale != -1)
-        mAnalyticsItem->setInt32(kRecorderMovieTimescale, mMovieTimeScale);
+        mMetricsItem->setInt32(kRecorderMovieTimescale, mMovieTimeScale);
     if (mAudioTimeScale != -1)
-        mAnalyticsItem->setInt32(kRecorderAudioTimescale, mAudioTimeScale);
+        mMetricsItem->setInt32(kRecorderAudioTimescale, mAudioTimeScale);
     if (mVideoTimeScale != -1)
-        mAnalyticsItem->setInt32(kRecorderVideoTimescale, mVideoTimeScale);
+        mMetricsItem->setInt32(kRecorderVideoTimescale, mVideoTimeScale);
     // TBD mCameraId        = 0;
     // TBD mStartTimeOffsetMs = -1;
-    mAnalyticsItem->setInt32(kRecorderVideoProfile, mVideoEncoderProfile);
-    mAnalyticsItem->setInt32(kRecorderVideoLevel, mVideoEncoderLevel);
+    mMetricsItem->setInt32(kRecorderVideoProfile, mVideoEncoderProfile);
+    mMetricsItem->setInt32(kRecorderVideoLevel, mVideoEncoderLevel);
     // TBD mMaxFileDurationUs = 0;
     // TBD mMaxFileSizeBytes = 0;
     // TBD mTrackEveryTimeDurationUs = 0;
-    mAnalyticsItem->setInt32(kRecorderCaptureFpsEnable, mCaptureFpsEnable);
-    mAnalyticsItem->setDouble(kRecorderCaptureFps, mCaptureFps);
+    mMetricsItem->setInt32(kRecorderCaptureFpsEnable, mCaptureFpsEnable);
+    mMetricsItem->setDouble(kRecorderCaptureFps, mCaptureFps);
     // TBD mCameraSourceTimeLapse = NULL;
     // TBD mMetaDataStoredInVideoBuffers = kMetadataBufferTypeInvalid;
     // TBD mEncoderProfiles = MediaProfiles::getInstance();
-    mAnalyticsItem->setInt32(kRecorderRotation, mRotationDegrees);
+    mMetricsItem->setInt32(kRecorderRotation, mRotationDegrees);
     // PII mLatitudex10000 = -3600000;
     // PII mLongitudex10000 = -3600000;
     // TBD mTotalBitRate = 0;
 
     // duration information (recorded, paused, # of pauses)
-    mAnalyticsItem->setInt64(kRecorderDurationMs, (mDurationRecordedUs+500)/1000 );
+    mMetricsItem->setInt64(kRecorderDurationMs, (mDurationRecordedUs+500)/1000 );
     if (mNPauses != 0) {
-        mAnalyticsItem->setInt64(kRecorderPaused, (mDurationPausedUs+500)/1000 );
-        mAnalyticsItem->setInt32(kRecorderNumPauses, mNPauses);
+        mMetricsItem->setInt64(kRecorderPaused, (mDurationPausedUs+500)/1000 );
+        mMetricsItem->setInt32(kRecorderNumPauses, mNPauses);
     }
 }
 
 void StagefrightRecorder::flushAndResetMetrics(bool reinitialize) {
     ALOGV("flushAndResetMetrics");
     // flush anything we have, maybe setup a new record
-    if (mAnalyticsDirty && mAnalyticsItem != NULL) {
+    if (mAnalyticsDirty && mMetricsItem != NULL) {
         updateMetrics();
-        if (mAnalyticsItem->count() > 0) {
-            mAnalyticsItem->selfrecord();
+        if (mMetricsItem->count() > 0) {
+            mMetricsItem->selfrecord();
         }
-        delete mAnalyticsItem;
-        mAnalyticsItem = NULL;
+        delete mMetricsItem;
+        mMetricsItem = NULL;
     }
     mAnalyticsDirty = false;
     if (reinitialize) {
-        mAnalyticsItem = MediaAnalyticsItem::create(kKeyRecorder);
+        mMetricsItem = mediametrics::Item::create(kKeyRecorder);
     }
 }
 
@@ -1184,10 +1184,10 @@ sp<MediaCodecSource> StagefrightRecorder::createAudioSource() {
     }
 
     // log audio mime type for media metrics
-    if (mAnalyticsItem != NULL) {
+    if (mMetricsItem != NULL) {
         AString audiomime;
         if (format->findString("mime", &audiomime)) {
-            mAnalyticsItem->setCString(kRecorderAudioMime, audiomime.c_str());
+            mMetricsItem->setCString(kRecorderAudioMime, audiomime.c_str());
         }
     }
 
@@ -1745,10 +1745,10 @@ status_t StagefrightRecorder::setupVideoEncoder(
     }
 
     // log video mime type for media metrics
-    if (mAnalyticsItem != NULL) {
+    if (mMetricsItem != NULL) {
         AString videomime;
         if (format->findString("mime", &videomime)) {
-            mAnalyticsItem->setCString(kRecorderVideoMime, videomime.c_str());
+            mMetricsItem->setCString(kRecorderVideoMime, videomime.c_str());
         }
     }
 
@@ -2266,12 +2266,12 @@ status_t StagefrightRecorder::getMetrics(Parcel *reply) {
         return BAD_VALUE;
     }
 
-    if (mAnalyticsItem == NULL) {
+    if (mMetricsItem == NULL) {
         return UNKNOWN_ERROR;
     }
 
     updateMetrics();
-    mAnalyticsItem->writeToParcel(reply);
+    mMetricsItem->writeToParcel(reply);
     return OK;
 }
 

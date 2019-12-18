@@ -61,13 +61,11 @@ MediaExtractorService::~MediaExtractorService() {
 }
 
 ::android::binder::Status MediaExtractorService::makeIDataSource(
-        const base::unique_fd &fd,
+        base::unique_fd fd,
         int64_t offset,
         int64_t length,
         ::android::sp<::android::IDataSource>* _aidl_return) {
-    // the caller will close the fd owned by the unique_fd upon return of this function,
-    // so we need to dup() it to retain it.
-    sp<DataSource> source = DataSourceFactory::getInstance()->CreateFromFd(dup(fd.get()), offset, length);
+    sp<DataSource> source = DataSourceFactory::getInstance()->CreateFromFd(fd.release(), offset, length);
     *_aidl_return = CreateIDataSourceFromDataSource(source);
     return binder::Status::ok();
 }

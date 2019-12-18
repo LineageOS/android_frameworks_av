@@ -1901,6 +1901,80 @@ binder::Status CameraDeviceClient::getGlobalAudioRestriction(/*out*/ int32_t* ou
     return binder::Status::ok();
 }
 
+binder::Status CameraDeviceClient::switchToOffline(
+        const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb,
+        const std::vector<view::Surface>& offlineOutputs,
+        /*out*/
+        sp<hardware::camera2::ICameraOfflineSession>* session) {
+    ATRACE_CALL();
+
+    binder::Status res;
+    if (!(res = checkPidStatus(__FUNCTION__)).isOk()) return res;
+
+    Mutex::Autolock icl(mBinderSerializationLock);
+
+    if (!mDevice.get()) {
+        return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
+    }
+
+    if (offlineOutputs.empty()) {
+        String8 msg = String8::format("Offline outputs must not be empty");
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
+
+    if (session == nullptr) {
+        String8 msg = String8::format("Invalid offline session");
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
+
+    std::vector<int32_t> offlineStreamIds(offlineOutputs.size());
+    for (auto& surface : offlineOutputs) {
+        sp<IBinder> binder = IInterface::asBinder(surface.graphicBufferProducer);
+        ssize_t index = mStreamMap.indexOfKey(binder);
+        if (index == NAME_NOT_FOUND) {
+            String8 msg = String8::format("Offline output is invalid");
+            ALOGE("%s: %s", __FUNCTION__, msg.string());
+            return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
+        }
+        // TODO: Also check whether the offline output is supported by Hal for offline mode.
+
+        sp<Surface> s = new Surface(surface.graphicBufferProducer);
+        bool isCompositeStream = camera3::DepthCompositeStream::isDepthCompositeStream(s);
+        isCompositeStream |= camera3::HeicCompositeStream::isHeicCompositeStream(s);
+        if (isCompositeStream) {
+            // TODO: Add composite specific handling
+        } else {
+            offlineStreamIds.push_back(mStreamMap.valueAt(index).streamId());
+        }
+    }
+
+    sp<CameraOfflineSessionBase> offlineSession;
+    auto ret = mDevice->switchToOffline(offlineStreamIds, &offlineSession);
+    if (ret != OK) {
+        return STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                "Camera %s: Error switching to offline mode: %s (%d)",
+                mCameraIdStr.string(), strerror(ret), ret);
+    }
+
+    sp<CameraOfflineSessionClient> offlineClient = new CameraOfflineSessionClient(sCameraService,
+            offlineSession, cameraCb, mClientPackageName, mCameraIdStr, mClientPid, mClientUid,
+            mServicePid);
+    ret = offlineClient->initialize();
+    if (ret == OK) {
+        // TODO: We need to update mStreamMap, mConfiguredOutputs
+    } else {
+        return STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                "Camera %s: Failed to initilize offline session: %s (%d)",
+                mCameraIdStr.string(), strerror(ret), ret);
+    }
+
+    *session = offlineClient;
+
+    return binder::Status::ok();
+}
+
 status_t CameraDeviceClient::dump(int fd, const Vector<String16>& args) {
     return BasicClient::dump(fd, args);
 }

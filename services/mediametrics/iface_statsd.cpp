@@ -38,10 +38,10 @@
 
 namespace android {
 
-// set of routines that crack a MediaAnalyticsItem
+// set of routines that crack a mediametrics::Item
 // and send it off to statsd with the appropriate hooks
 //
-// each MediaAnalyticsItem type (extractor, codec, nuplayer, etc)
+// each mediametrics::Item type (extractor, codec, nuplayer, etc)
 // has its own routine to handle this.
 //
 
@@ -49,7 +49,7 @@ bool enabled_statsd = true;
 
 struct statsd_hooks {
     const char *key;
-    bool (*handler)(const MediaAnalyticsItem *);
+    bool (*handler)(const mediametrics::Item *);
 };
 
 // keep this sorted, so we can do binary searches
@@ -70,7 +70,7 @@ static constexpr struct statsd_hooks statsd_handlers[] =
 };
 
 // give me a record, i'll look at the type and upload appropriately
-bool dump2Statsd(const std::shared_ptr<const MediaAnalyticsItem>& item) {
+bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item) {
     if (item == NULL) return false;
 
     // get the key
