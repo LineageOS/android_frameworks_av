@@ -448,18 +448,6 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
         *mPlayback.handlePtr() = AUDIO_PATCH_HANDLE_NONE;
     }
 
-    // use a pseudo LCM between input and output framecount
-    size_t playbackFrameCount = mPlayback.thread()->frameCount();
-    int playbackShift = __builtin_ctz(playbackFrameCount);
-    size_t recordFrameCount = mRecord.thread()->frameCount();
-    int shift = __builtin_ctz(recordFrameCount);
-    if (playbackShift < shift) {
-        shift = playbackShift;
-    }
-    size_t frameCount = (playbackFrameCount * recordFrameCount) >> shift;
-    ALOGV("%s() playframeCount %zu recordFrameCount %zu frameCount %zu",
-            __func__, playbackFrameCount, recordFrameCount, frameCount);
-
     // create a special record track to capture from record thread
     uint32_t channelCount = mPlayback.thread()->channelCount();
     audio_channel_mask_t inChannelMask = audio_channel_in_mask_from_count(channelCount);
@@ -503,7 +491,15 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
     }
 
     sp<RecordThread::PatchRecord> tempRecordTrack;
+    const size_t playbackFrameCount = mPlayback.thread()->frameCount();
+    const size_t recordFrameCount = mRecord.thread()->frameCount();
+    size_t frameCount = 0;
     if ((inputFlags & AUDIO_INPUT_FLAG_DIRECT) && (outputFlags & AUDIO_OUTPUT_FLAG_DIRECT)) {
+        // PassthruPatchRecord producesBufferOnDemand, so use
+        // maximum of playback and record thread framecounts
+        frameCount = std::max(playbackFrameCount, recordFrameCount);
+        ALOGV("%s() playframeCount %zu recordFrameCount %zu frameCount %zu",
+            __func__, playbackFrameCount, recordFrameCount, frameCount);
         tempRecordTrack = new RecordThread::PassthruPatchRecord(
                                                  mRecord.thread().get(),
                                                  sampleRate,
@@ -512,6 +508,16 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
                                                  frameCount,
                                                  inputFlags);
     } else {
+        // use a pseudo LCM between input and output framecount
+        int playbackShift = __builtin_ctz(playbackFrameCount);
+        int shift = __builtin_ctz(recordFrameCount);
+        if (playbackShift < shift) {
+            shift = playbackShift;
+        }
+        frameCount = (playbackFrameCount * recordFrameCount) >> shift;
+        ALOGV("%s() playframeCount %zu recordFrameCount %zu frameCount %zu",
+            __func__, playbackFrameCount, recordFrameCount, frameCount);
+
         tempRecordTrack = new RecordThread::PatchRecord(
                                                  mRecord.thread().get(),
                                                  sampleRate,
