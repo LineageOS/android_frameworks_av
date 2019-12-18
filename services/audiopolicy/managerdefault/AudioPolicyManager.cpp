@@ -2787,16 +2787,6 @@ status_t AudioPolicyManager::unregisterEffect(int id)
     return mEffects.unregisterEffect(id);
 }
 
-void AudioPolicyManager::cleanUpEffectsForIo(audio_io_handle_t io)
-{
-    EffectDescriptorCollection effects = mEffects.getEffectsForIo(io);
-    for (size_t i = 0; i < effects.size(); i++) {
-        ALOGW("%s removing stale effect %s, id %d on closed IO %d",
-              __func__, effects.valueAt(i)->mDesc.name, effects.keyAt(i), io);
-        unregisterEffect(effects.keyAt(i));
-    }
-}
-
 status_t AudioPolicyManager::setEffectEnabled(int id, bool enabled)
 {
     sp<EffectDescriptor> effect = mEffects.getEffect(id);
@@ -5043,8 +5033,6 @@ void AudioPolicyManager::closeOutput(audio_io_handle_t output)
             setMsdPatch();
         }
     }
-
-    cleanUpEffectsForIo(output);
 }
 
 void AudioPolicyManager::closeInput(audio_io_handle_t input)
@@ -5076,8 +5064,6 @@ void AudioPolicyManager::closeInput(audio_io_handle_t input)
             mInputs.activeInputsCountOnDevices(primaryInputDevices) == 0) {
         mpClientInterface->setSoundTriggerCaptureState(false);
     }
-
-    cleanUpEffectsForIo(input);
 }
 
 SortedVector<audio_io_handle_t> AudioPolicyManager::getOutputsForDevices(
