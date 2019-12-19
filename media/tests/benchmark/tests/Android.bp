@@ -92,3 +92,20 @@ cc_test {
         "libmediabenchmark_codec2_decoder",
     ],
 }
+
+cc_test {
+    name: "C2EncoderTest",
+    gtest: true,
+    defaults: [
+        "libmediabenchmark_codec2_common-defaults",
+    ],
+
+    srcs: ["C2EncoderTest.cpp"],
+
+    static_libs: [
+        "libmediabenchmark_extractor",
+        "libmediabenchmark_decoder",
+        "libmediabenchmark_codec2_common",
+        "libmediabenchmark_codec2_encoder",
+    ],
+}
