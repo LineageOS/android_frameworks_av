@@ -1419,11 +1419,11 @@ void AudioFlinger::ThreadBase::disconnectEffectHandle(EffectHandle *handle,
     sp<EffectModule> effect;
     {
         Mutex::Autolock _l(mLock);
-
-        effect = handle->effect().promote();
-        if (effect == nullptr) {
+        sp<EffectBase> effectBase = handle->effect().promote();
+        if (effectBase == nullptr) {
             return;
         }
+        effect = static_cast<EffectModule *>(effectBase.get());
         // restore suspended effects if the disconnected handle was enabled and the last one.
         remove = (effect->removeHandle(handle) == 0) && (!effect->isPinned() || unpinIfLast);
         if (remove) {
