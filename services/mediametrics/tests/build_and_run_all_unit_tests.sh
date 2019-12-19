@@ -20,5 +20,5 @@ adb root && adb wait-for-device remount
 echo "========================================"
 
 echo "testing mediametrics"
-adb push $OUT/data/nativetest/mediametrics_tests/mediametrics_tests /system/bin
+adb push $OUT/data/nativetest64/mediametrics_tests/mediametrics_tests /system/bin
 adb shell /system/bin/mediametrics_tests
