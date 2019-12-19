@@ -231,7 +231,7 @@ std::string mediametrics::Item::toString(int version) const {
             mPkgName.c_str(), mProps.size());
     result.append(buffer);
     for (auto &prop : *this) {
-        prop.toString(buffer, sizeof(buffer));
+        prop.toStringBuffer(buffer, sizeof(buffer));
         result.append(buffer);
     }
     result.append("]");
@@ -364,74 +364,6 @@ sp<IMediaMetricsService> BaseItem::getService() {
 }
 
 
-namespace {
-
-template <typename T>
-status_t insert(const T& val, char **bufferpptr, char *bufferptrmax)
-{
-    const size_t size = sizeof(val);
-    if (*bufferpptr + size > bufferptrmax) {
-        ALOGE("%s: buffer exceeded with size %zu", __func__, size);
-        return BAD_VALUE;
-    }
-    memcpy(*bufferpptr, &val, size);
-    *bufferpptr += size;
-    return NO_ERROR;
-}
-
-template <>
-status_t insert(const char * const& val, char **bufferpptr, char *bufferptrmax)
-{
-    const size_t size = strlen(val) + 1;
-    if (size > UINT16_MAX || *bufferpptr + size > bufferptrmax) {
-        ALOGE("%s: buffer exceeded with size %zu", __func__, size);
-        return BAD_VALUE;
-    }
-    memcpy(*bufferpptr, val, size);
-    *bufferpptr += size;
-    return NO_ERROR;
-}
-
-template <>
- __unused
-status_t insert(char * const& val, char **bufferpptr, char *bufferptrmax)
-{
-    return insert((const char *)val, bufferpptr, bufferptrmax);
-}
-
-template <typename T>
-status_t extract(T *val, const char **bufferpptr, const char *bufferptrmax)
-{
-    const size_t size = sizeof(*val);
-    if (*bufferpptr + size > bufferptrmax) {
-        ALOGE("%s: buffer exceeded with size %zu", __func__, size);
-        return BAD_VALUE;
-    }
-    memcpy(val, *bufferpptr, size);
-    *bufferpptr += size;
-    return NO_ERROR;
-}
-
-template <>
-status_t extract(char **val, const char **bufferpptr, const char *bufferptrmax)
-{
-    const char *ptr = *bufferpptr;
-    while (*ptr != 0) {
-        if (ptr >= bufferptrmax) {
-            ALOGE("%s: buffer exceeded", __func__);
-            return BAD_VALUE;
-        }
-        ++ptr;
-    }
-    const size_t size = (ptr - *bufferpptr) + 1;
-    *val = (char *)malloc(size);
-    memcpy(*val, *bufferpptr, size);
-    *bufferpptr += size;
-    return NO_ERROR;
-}
-
-} // namespace
-
 status_t mediametrics::Item::writeToByteString(char **pbuffer, size_t *plength) const
 {
     if (pbuffer == nullptr || plength == nullptr)
@@ -521,7 +453,7 @@ status_t mediametrics::Item::readFromByteString(const char *bufferptr, size_t le
     uint32_t header_size;
     uint16_t version;
     uint16_t key_size;
-    char *key = nullptr;
+    std::string key;
     int32_t pid;
     int32_t uid;
     int64_t timestamp;
@@ -535,14 +467,12 @@ status_t mediametrics::Item::readFromByteString(const char *bufferptr, size_t le
             || extract(&uid, &read, readend) != NO_ERROR
             || extract(&timestamp, &read, readend) != NO_ERROR
             || size > length
-            || strlen(key) + 1 != key_size
+            || key.size() + 1 != key_size
             || header_size > size) {
-        free(key);
         ALOGW("%s: invalid header", __func__);
         return INVALID_OPERATION;
     }
-    mKey = key;
-    free(key);
+    mKey = std::move(key);
     const size_t pos = read - bufferptr;
     if (pos > header_size) {
         ALOGW("%s: invalid header pos:%zu > header_size:%u",
@@ -571,36 +501,6 @@ status_t mediametrics::Item::readFromByteString(const char *bufferptr, size_t le
     return NO_ERROR;
 }
 
-status_t mediametrics::Item::Prop::writeToParcel(Parcel *data) const
-{
-   switch (mType) {
-   case mediametrics::kTypeInt32:
-       return data->writeCString(mName.c_str())
-               ?: data->writeInt32(mType)
-               ?: data->writeInt32(u.int32Value);
-   case mediametrics::kTypeInt64:
-       return data->writeCString(mName.c_str())
-               ?: data->writeInt32(mType)
-               ?: data->writeInt64(u.int64Value);
-   case mediametrics::kTypeDouble:
-       return data->writeCString(mName.c_str())
-               ?: data->writeInt32(mType)
-               ?: data->writeDouble(u.doubleValue);
-   case mediametrics::kTypeRate:
-       return data->writeCString(mName.c_str())
-               ?: data->writeInt32(mType)
-               ?: data->writeInt64(u.rate.first)
-               ?: data->writeInt64(u.rate.second);
-   case mediametrics::kTypeCString:
-       return data->writeCString(mName.c_str())
-               ?: data->writeInt32(mType)
-               ?: data->writeCString(u.CStringValue);
-   default:
-       ALOGE("%s: found bad type: %d, name %s", __func__, mType, mName.c_str());
-       return BAD_VALUE;
-   }
-}
-
 status_t mediametrics::Item::Prop::readFromParcel(const Parcel& data)
 {
     const char *key = data.readCString();
@@ -609,237 +509,99 @@ status_t mediametrics::Item::Prop::readFromParcel(const Parcel& data)
     status_t status = data.readInt32(&type);
     if (status != NO_ERROR) return status;
     switch (type) {
-    case mediametrics::kTypeInt32:
-        status = data.readInt32(&u.int32Value);
-        break;
-    case mediametrics::kTypeInt64:
-        status = data.readInt64(&u.int64Value);
-        break;
-    case mediametrics::kTypeDouble:
-        status = data.readDouble(&u.doubleValue);
-        break;
+    case mediametrics::kTypeInt32: {
+        int32_t value;
+        status = data.readInt32(&value);
+        if (status != NO_ERROR) return status;
+        mElem = value;
+    } break;
+    case mediametrics::kTypeInt64: {
+        int64_t value;
+        status = data.readInt64(&value);
+        if (status != NO_ERROR) return status;
+        mElem = value;
+    } break;
+    case mediametrics::kTypeDouble: {
+        double value;
+        status = data.readDouble(&value);
+        if (status != NO_ERROR) return status;
+        mElem = value;
+    } break;
     case mediametrics::kTypeCString: {
         const char *s = data.readCString();
         if (s == nullptr) return BAD_VALUE;
-        set(s);
-        break;
-        }
+        mElem = s;
+    } break;
     case mediametrics::kTypeRate: {
         std::pair<int64_t, int64_t> rate;
         status = data.readInt64(&rate.first)
                 ?: data.readInt64(&rate.second);
-        if (status == NO_ERROR) {
-            set(rate);
-        }
-        break;
-        }
+        if (status != NO_ERROR) return status;
+        mElem = rate;
+    } break;
+    case mediametrics::kTypeNone: {
+        mElem = std::monostate{};
+    } break;
     default:
-        ALOGE("%s: reading bad item type: %d", __func__, mType);
+        ALOGE("%s: reading bad item type: %d", __func__, type);
         return BAD_VALUE;
     }
-    if (status == NO_ERROR) {
-        setName(key);
-        mType = (mediametrics::Type)type;
-    }
-    return status;
-}
-
-void mediametrics::Item::Prop::toString(char *buffer, size_t length) const
-{
-    switch (mType) {
-    case mediametrics::kTypeInt32:
-        snprintf(buffer, length, "%s=%d:", mName.c_str(), u.int32Value);
-        break;
-    case mediametrics::kTypeInt64:
-        snprintf(buffer, length, "%s=%lld:", mName.c_str(), (long long)u.int64Value);
-        break;
-    case mediametrics::kTypeDouble:
-        snprintf(buffer, length, "%s=%e:", mName.c_str(), u.doubleValue);
-        break;
-    case mediametrics::kTypeRate:
-        snprintf(buffer, length, "%s=%lld/%lld:",
-                mName.c_str(), (long long)u.rate.first, (long long)u.rate.second);
-        break;
-    case mediametrics::kTypeCString:
-        // TODO sanitize string for ':' '='
-        snprintf(buffer, length, "%s=%s:", mName.c_str(), u.CStringValue);
-        break;
-    default:
-        ALOGE("%s: bad item type: %d for %s", __func__, mType, mName.c_str());
-        if (length > 0) buffer[0] = 0;
-        break;
-    }
-}
-
-size_t mediametrics::Item::Prop::getByteStringSize() const
-{
-    const size_t header =
-        sizeof(uint16_t)      // length
-        + sizeof(uint8_t)     // type
-        + mName.size() + 1;  // mName + 0 termination
-    size_t payload = 0;
-    switch (mType) {
-    case mediametrics::kTypeInt32:
-        payload = sizeof(u.int32Value);
-        break;
-    case mediametrics::kTypeInt64:
-        payload = sizeof(u.int64Value);
-        break;
-    case mediametrics::kTypeDouble:
-        payload = sizeof(u.doubleValue);
-        break;
-    case mediametrics::kTypeRate:
-        payload = sizeof(u.rate.first) + sizeof(u.rate.second);
-        break;
-    case mediametrics::kTypeCString:
-        payload = strlen(u.CStringValue) + 1;
-        break;
-    default:
-        ALOGE("%s: found bad prop type: %d, name %s",
-                __func__, mType, mName.c_str()); // no payload computed
-        break;
-    }
-    return header + payload;
-}
-
-
-// TODO: fold into a template later.
-status_t BaseItem::writeToByteString(
-        const char *name, int32_t value, char **bufferpptr, char *bufferptrmax)
-{
-    const size_t len = 2 + 1 + strlen(name) + 1 + sizeof(value);
-    if (len > UINT16_MAX) return BAD_VALUE;
-    return insert((uint16_t)len, bufferpptr, bufferptrmax)
-            ?: insert((uint8_t)mediametrics::kTypeInt32, bufferpptr, bufferptrmax)
-            ?: insert(name, bufferpptr, bufferptrmax)
-            ?: insert(value, bufferpptr, bufferptrmax);
-}
-
-status_t BaseItem::writeToByteString(
-        const char *name, int64_t value, char **bufferpptr, char *bufferptrmax)
-{
-    const size_t len = 2 + 1 + strlen(name) + 1 + sizeof(value);
-    if (len > UINT16_MAX) return BAD_VALUE;
-    return insert((uint16_t)len, bufferpptr, bufferptrmax)
-            ?: insert((uint8_t)mediametrics::kTypeInt64, bufferpptr, bufferptrmax)
-            ?: insert(name, bufferpptr, bufferptrmax)
-            ?: insert(value, bufferpptr, bufferptrmax);
-}
-
-status_t BaseItem::writeToByteString(
-        const char *name, double value, char **bufferpptr, char *bufferptrmax)
-{
-    const size_t len = 2 + 1 + strlen(name) + 1 + sizeof(value);
-    if (len > UINT16_MAX) return BAD_VALUE;
-    return insert((uint16_t)len, bufferpptr, bufferptrmax)
-            ?: insert((uint8_t)mediametrics::kTypeDouble, bufferpptr, bufferptrmax)
-            ?: insert(name, bufferpptr, bufferptrmax)
-            ?: insert(value, bufferpptr, bufferptrmax);
-}
-
-status_t BaseItem::writeToByteString(
-        const char *name, const std::pair<int64_t, int64_t> &value, char **bufferpptr, char *bufferptrmax)
-{
-    const size_t len = 2 + 1 + strlen(name) + 1 + 8 + 8;
-    if (len > UINT16_MAX) return BAD_VALUE;
-    return insert((uint16_t)len, bufferpptr, bufferptrmax)
-            ?: insert((uint8_t)mediametrics::kTypeRate, bufferpptr, bufferptrmax)
-            ?: insert(name, bufferpptr, bufferptrmax)
-            ?: insert(value.first, bufferpptr, bufferptrmax)
-            ?: insert(value.second, bufferpptr, bufferptrmax);
-}
-
-status_t BaseItem::writeToByteString(
-        const char *name, char * const &value, char **bufferpptr, char *bufferptrmax)
-{
-    return writeToByteString(name, (const char *)value, bufferpptr, bufferptrmax);
-}
-
-status_t BaseItem::writeToByteString(
-        const char *name, const char * const &value, char **bufferpptr, char *bufferptrmax)
-{
-    const size_t len = 2 + 1 + strlen(name) + 1 + strlen(value) + 1;
-    if (len > UINT16_MAX) return BAD_VALUE;
-    return insert((uint16_t)len, bufferpptr, bufferptrmax)
-            ?: insert((uint8_t)mediametrics::kTypeCString, bufferpptr, bufferptrmax)
-            ?: insert(name, bufferpptr, bufferptrmax)
-            ?: insert(value, bufferpptr, bufferptrmax);
-}
-
-
-status_t BaseItem::writeToByteString(
-        const char *name, const none_t &, char **bufferpptr, char *bufferptrmax)
-{
-    const size_t len = 2 + 1 + strlen(name) + 1;
-    if (len > UINT16_MAX) return BAD_VALUE;
-    return insert((uint16_t)len, bufferpptr, bufferptrmax)
-            ?: insert((uint8_t)mediametrics::kTypeCString, bufferpptr, bufferptrmax)
-            ?: insert(name, bufferpptr, bufferptrmax);
-}
-
-
-status_t mediametrics::Item::Prop::writeToByteString(
-        char **bufferpptr, char *bufferptrmax) const
-{
-    switch (mType) {
-    case mediametrics::kTypeInt32:
-        return BaseItem::writeToByteString(mName.c_str(), u.int32Value, bufferpptr, bufferptrmax);
-    case mediametrics::kTypeInt64:
-        return BaseItem::writeToByteString(mName.c_str(), u.int64Value, bufferpptr, bufferptrmax);
-    case mediametrics::kTypeDouble:
-        return BaseItem::writeToByteString(mName.c_str(), u.doubleValue, bufferpptr, bufferptrmax);
-    case mediametrics::kTypeRate:
-        return BaseItem::writeToByteString(mName.c_str(), u.rate, bufferpptr, bufferptrmax);
-    case mediametrics::kTypeCString:
-        return BaseItem::writeToByteString(
-                mName.c_str(), u.CStringValue, bufferpptr, bufferptrmax);
-    case mediametrics::kTypeNone:
-        return BaseItem::writeToByteString(mName.c_str(), none_t{}, bufferpptr, bufferptrmax);
-    default:
-        ALOGE("%s: found bad prop type: %d, name %s",
-                __func__, mType, mName.c_str());  // no payload sent
-        return BAD_VALUE;
-    }
+    setName(key);
+    return NO_ERROR;
 }
 
 status_t mediametrics::Item::Prop::readFromByteString(
         const char **bufferpptr, const char *bufferptrmax)
 {
     uint16_t len;
-    char *name;
+    std::string name;
     uint8_t type;
     status_t status = extract(&len, bufferpptr, bufferptrmax)
             ?: extract(&type, bufferpptr, bufferptrmax)
             ?: extract(&name, bufferpptr, bufferptrmax);
     if (status != NO_ERROR) return status;
-    mName = name;
-    if (mType == mediametrics::kTypeCString) {
-        free(u.CStringValue);
-        u.CStringValue = nullptr;
-    }
-    mType = (mediametrics::Type)type;
-    switch (mType) {
-    case mediametrics::kTypeInt32:
-        return extract(&u.int32Value, bufferpptr, bufferptrmax);
-    case mediametrics::kTypeInt64:
-        return extract(&u.int64Value, bufferpptr, bufferptrmax);
-    case mediametrics::kTypeDouble:
-        return extract(&u.doubleValue, bufferpptr, bufferptrmax);
-    case mediametrics::kTypeRate:
-        return extract(&u.rate.first, bufferpptr, bufferptrmax)
-                ?: extract(&u.rate.second, bufferpptr, bufferptrmax);
-    case mediametrics::kTypeCString:
-        status = extract(&u.CStringValue, bufferpptr, bufferptrmax);
-        if (status != NO_ERROR) mType = mediametrics::kTypeNone;
-        return status;
-    case mediametrics::kTypeNone:
-        return NO_ERROR;
+    switch (type) {
+    case mediametrics::kTypeInt32: {
+        int32_t value;
+        status = extract(&value, bufferpptr, bufferptrmax);
+        if (status != NO_ERROR) return status;
+        mElem = value;
+    } break;
+    case mediametrics::kTypeInt64: {
+        int64_t value;
+        status = extract(&value, bufferpptr, bufferptrmax);
+        if (status != NO_ERROR) return status;
+        mElem = value;
+    } break;
+    case mediametrics::kTypeDouble: {
+        double value;
+        status = extract(&value, bufferpptr, bufferptrmax);
+        if (status != NO_ERROR) return status;
+        mElem = value;
+    } break;
+    case mediametrics::kTypeRate: {
+        std::pair<int64_t, int64_t> value;
+        status = extract(&value.first, bufferpptr, bufferptrmax)
+                ?: extract(&value.second, bufferpptr, bufferptrmax);
+        if (status != NO_ERROR) return status;
+        mElem = value;
+    } break;
+    case mediametrics::kTypeCString: {
+        std::string value;
+        status = extract(&value, bufferpptr, bufferptrmax);
+        if (status != NO_ERROR) return status;
+        mElem = std::move(value);
+    } break;
+    case mediametrics::kTypeNone: {
+        mElem = std::monostate{};
+    } break;
     default:
-        mType = mediametrics::kTypeNone;
         ALOGE("%s: found bad prop type: %d, name %s",
-                __func__, mType, mName.c_str());  // no payload sent
+                __func__, (int)type, mName.c_str());  // no payload sent
         return BAD_VALUE;
     }
+    mName = name;
+    return NO_ERROR;
 }
 
 } // namespace android::mediametrics
