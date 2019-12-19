@@ -145,3 +145,12 @@ Setup steps are same as [extractor](#extractor).
 ```
 adb shell /data/local/tmp/C2DecoderTest -P /data/local/tmp/MediaBenchmark/res/
 ```
+## C2 Encoder
+
+The test encodes input stream and benchmarks the codec2 encoders available in device.
+
+Setup steps are same as [extractor](#extractor).
+
+```
+adb shell /data/local/tmp/C2EncoderTest -P /data/local/tmp/MediaBenchmark/res/
+```

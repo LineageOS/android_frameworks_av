@@ -21,6 +21,7 @@
 #include <mutex>
 #include <queue>
 #include <thread>
+#include <iostream>
 
 #include <media/NdkMediaCodec.h>
 #include <media/NdkMediaError.h>
