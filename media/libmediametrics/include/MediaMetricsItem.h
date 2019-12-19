@@ -41,7 +41,12 @@ class Parcel;
 /*
  * MediaMetrics Item
  *
- * Byte string format.
+ * The MediaMetrics Item allows get/set operations and recording to the service.
+ *
+ * The MediaMetrics LogItem is a faster logging variant. It allows set operations only,
+ * and then recording to the service.
+ *
+ * The Byte String format is as follows:
  *
  * For Java
  *  int64 corresponds to long
@@ -49,10 +54,16 @@ class Parcel;
  *  uint16 corresponds to char
  *  uint8, int8 corresponds to byte
  *
- * Hence uint8 and uint32 values are limited to INT8_MAX and INT32_MAX.
+ * For items transmitted from Java, uint8 and uint32 values are limited
+ * to INT8_MAX and INT32_MAX.  This constrains the size of large items
+ * to 2GB, which is consistent with ByteBuffer max size. A native item
+ * can conceivably have size of 4GB.
  *
  * Physical layout of integers and doubles within the MediaMetrics byte string
- * is in Native / host order, which is nearly always little endian.
+ * is in Native / host order, which is usually little endian.
+ *
+ * Note that primitive data (ints, doubles) within a Byte String has
+ * no extra padding or alignment requirements, like ByteBuffer.
  *
  * -- begin of item
  * -- begin of header
@@ -60,7 +71,7 @@ class Parcel;
  * (uint32) header size, including the item size and header size fields.
  * (uint16) version: exactly 0
  * (uint16) key size, that is key strlen + 1 for zero termination.
- * (int8)+ key string which is 0 terminated
+ * (int8)+ key, a string which is 0 terminated (UTF-8).
  * (int32) pid
  * (int32) uid
  * (int64) timestamp
@@ -75,10 +86,12 @@ class Parcel;
  *       (int32)
  *       (int64)
  *       (double)
- *       (int8)+ for cstring, including 0 termination
+ *       (int8)+ for TYPE_CSTRING, including 0 termination
  *       (int64, int64) for rate
  * -- end body
  * -- end of item
+ *
+ * The Byte String format must match MediaMetrics.java.
  */
 
 namespace mediametrics {
@@ -92,6 +105,26 @@ enum Type {
     kTypeCString = 4,
     kTypeRate = 5,
 };
+
+/**
+ * The MediaMetrics Item has special Item properties,
+ * derived internally or through dedicated setters.
+ *
+ * For consistency we use the following keys to represent
+ * these special Item properties when in a generic Bundle
+ * or in a std::map.
+ *
+ * These values must match MediaMetrics.java
+ */
+static inline constexpr const char *BUNDLE_TOTAL_SIZE = "_totalSize";
+static inline constexpr const char *BUNDLE_HEADER_SIZE = "_headerSize";
+static inline constexpr const char *BUNDLE_VERSION = "_version";
+static inline constexpr const char *BUNDLE_KEY_SIZE = "_keySize";
+static inline constexpr const char *BUNDLE_KEY = "_key";
+static inline constexpr const char *BUNDLE_PID = "_pid";
+static inline constexpr const char *BUNDLE_UID = "_uid";
+static inline constexpr const char *BUNDLE_TIMESTAMP = "_timestamp";
+static inline constexpr const char *BUNDLE_PROPERTY_COUNT = "_propertyCount";
 
 template<size_t N>
 static inline bool startsWith(const std::string &s, const char (&comp)[N]) {
