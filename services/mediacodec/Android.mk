@@ -37,7 +37,7 @@ LOCAL_SHARED_LIBRARIES := \
     libutils \
     liblog \
     libbase \
-    libavservices_minijail_vendor \
+    libavservices_minijail \
     libcutils \
     libhidlbase \
     libstagefright_omx \
