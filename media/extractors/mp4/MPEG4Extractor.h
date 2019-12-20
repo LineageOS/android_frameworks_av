@@ -82,14 +82,16 @@ private:
         sp<SampleTable> sampleTable;
         bool includes_expensive_metadata;
         bool skipTrack;
-        bool has_elst;
+        bool elst_needs_processing;
         /* signed int, ISO Spec allows media_time = -1 for other use cases.
          * but we don't support empty edits for now.
          */
         int64_t elst_media_time;
         uint64_t elst_segment_duration;
-        // unsigned int, shift start offset only when media_time > 0.
-        uint64_t elstShiftStartTicks;
+        // Shift start offset only when media_time > 0.
+        uint64_t elst_shift_start_ticks;
+        // Initial start offset, empty edit list entry.
+        uint64_t elst_initial_empty_edit_ticks;
         bool subsample_encryption;
 
         uint8_t *mTx3gBuffer;
@@ -102,9 +104,11 @@ private:
             timescale = 0;
             includes_expensive_metadata = false;
             skipTrack = false;
-            has_elst = false;
+            elst_needs_processing = false;
             elst_media_time = 0;
-            elstShiftStartTicks = 0;
+            elst_segment_duration = 0;
+            elst_shift_start_ticks = 0;
+            elst_initial_empty_edit_ticks = 0;
             subsample_encryption = false;
             mTx3gBuffer = NULL;
             mTx3gSize = mTx3gFilled = 0;
