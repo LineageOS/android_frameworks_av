@@ -70,8 +70,8 @@ class TimeMachine {
             , mCreationTime(time)
             , mLastModificationTime(time)
         {
-            putValue("_pid", (int32_t)pid, time);
-            putValue("_uid", (int32_t)uid, time);
+            putValue(BUNDLE_PID, (int32_t)pid, time);
+            putValue(BUNDLE_UID, (int32_t)uid, time);
         }
 
         status_t checkPermission(uid_t uidCheck) const {
