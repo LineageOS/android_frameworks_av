@@ -27,6 +27,7 @@ LOCAL_HEADER_LIBRARIES:= \
 LOCAL_SHARED_LIBRARIES:= \
     libbinder \
     liblog \
+    libmedia \
     libmediadrm \
     libutils \
     libhidlbase \
