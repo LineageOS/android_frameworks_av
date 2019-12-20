@@ -30,7 +30,7 @@
 #include <datasource/DataSourceFactory.h>
 #include <media/DataSource.h>
 #include <media/IMediaHTTPService.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/OMXBuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>

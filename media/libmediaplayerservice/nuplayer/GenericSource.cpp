@@ -29,7 +29,7 @@
 #include <datasource/NuCachedSource2.h>
 #include <media/DataSource.h>
 #include <media/MediaBufferHolder.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <android/IMediaExtractorService.h>
 #include <media/IMediaHTTPService.h>
 #include <media/stagefright/foundation/ABuffer.h>

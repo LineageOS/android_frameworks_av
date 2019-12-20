@@ -26,7 +26,7 @@
 #include <binder/MemoryDealer.h>
 #include <drm/drm_framework_common.h>
 #include <media/mediametadataretriever.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <private/media/VideoFrame.h>
 #include <utils/Log.h>

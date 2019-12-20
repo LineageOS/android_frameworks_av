@@ -21,7 +21,7 @@
 #include "LinkedBlockingQueue.h"
 
 #include <datasource/FileSource.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 
 #include <utils/List.h>
 #include <utils/Errors.h>

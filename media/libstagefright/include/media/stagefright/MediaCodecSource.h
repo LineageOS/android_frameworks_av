@@ -17,7 +17,7 @@
 #ifndef MediaCodecSource_H_
 #define MediaCodecSource_H_
 
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AHandlerReflector.h>
 #include <media/stagefright/foundation/Mutexed.h>

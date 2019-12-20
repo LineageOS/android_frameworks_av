@@ -26,7 +26,7 @@
 #include <media/IMediaSource.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaBufferGroup.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
 
 namespace android {

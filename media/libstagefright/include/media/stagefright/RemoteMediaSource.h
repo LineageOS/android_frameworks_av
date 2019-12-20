@@ -18,7 +18,7 @@
 #define REMOTE_MEDIA_SOURCE_H_
 
 #include <media/IMediaSource.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ABase.h>
 
 namespace android {

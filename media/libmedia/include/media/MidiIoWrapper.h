@@ -19,8 +19,6 @@
 
 #include <libsonivox/eas_types.h>
 
-#include <media/DataSourceBase.h>
-
 namespace android {
 
 struct CDataSource;

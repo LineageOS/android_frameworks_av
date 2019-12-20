@@ -22,7 +22,7 @@
 #include "MatroskaExtractor.h"
 #include "common/webmids.h"
 
-#include <media/DataSourceBase.h>
+#include <media/stagefright/DataSourceBase.h>
 #include <media/ExtractorUtils.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AUtils.h>

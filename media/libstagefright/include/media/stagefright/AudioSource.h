@@ -20,7 +20,7 @@
 
 #include <media/AudioRecord.h>
 #include <media/AudioSystem.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/MicrophoneInfo.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <utils/List.h>

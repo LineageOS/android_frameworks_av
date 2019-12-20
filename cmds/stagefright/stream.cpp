@@ -26,7 +26,7 @@
 #include <media/IMediaHTTPService.h>
 #include <media/IStreamSource.h>
 #include <media/mediaplayer.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/InterfaceUtils.h>

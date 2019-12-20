@@ -20,7 +20,7 @@
 
 #include <sys/types.h>
 
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AudioPresentationInfo.h>

@@ -21,7 +21,7 @@
 #include <binder/IPCThreadState.h>
 #include <media/stagefright/InterfaceUtils.h>
 #include <media/MediaMetricsItem.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/RemoteMediaExtractor.h>
 
 // still doing some on/off toggling here.
