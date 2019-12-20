@@ -81,6 +81,10 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
     },
     {"STRATEGY_MEDIA",
      {
+         {"assistant", AUDIO_STREAM_ASSISTANT, "AUDIO_STREAM_ASSISTANT",
+          {{AUDIO_CONTENT_TYPE_SPEECH, AUDIO_USAGE_ASSISTANT,
+            AUDIO_SOURCE_DEFAULT, 0, ""}}
+         },
          {"music", AUDIO_STREAM_MUSIC, "AUDIO_STREAM_MUSIC",
           {
               {AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_MEDIA, AUDIO_SOURCE_DEFAULT, 0, ""},
