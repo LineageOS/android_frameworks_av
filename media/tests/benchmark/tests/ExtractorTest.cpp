@@ -19,8 +19,8 @@
 
 #include <gtest/gtest.h>
 
-#include "Extractor.h"
 #include "BenchmarkTestEnvironment.h"
+#include "Extractor.h"
 
 static BenchmarkTestEnvironment *gEnv = nullptr;
 
@@ -28,33 +28,24 @@ class ExtractorTest : public ::testing::TestWithParam<pair<string, int32_t>> {};
 
 TEST_P(ExtractorTest, Extract) {
     Extractor *extractObj = new Extractor();
+    ASSERT_NE(extractObj, nullptr) << "Extractor creation failed";
 
     string inputFile = gEnv->getRes() + GetParam().first;
     FILE *inputFp = fopen(inputFile.c_str(), "rb");
-    if (!inputFp) {
-        cout << "[   WARN   ] Test Skipped. Unable to open input file for reading \n";
-        return;
-    }
+    ASSERT_NE(inputFp, nullptr) << "Unable to open " << inputFile << " file for reading";
 
     // Read file properties
-    size_t fileSize = 0;
-    fseek(inputFp, 0, SEEK_END);
-    fileSize = ftell(inputFp);
-    fseek(inputFp, 0, SEEK_SET);
+    struct stat buf;
+    stat(inputFile.c_str(), &buf);
+    size_t fileSize = buf.st_size;
     int32_t fd = fileno(inputFp);
 
     int32_t trackCount = extractObj->initExtractor(fd, fileSize);
-    if (trackCount <= 0) {
-        cout << "[   WARN   ] Test Skipped. initExtractor failed\n";
-        return;
-    }
+    ASSERT_GT(trackCount, 0) << "initExtractor failed";
 
     int32_t trackID = GetParam().second;
     int32_t status = extractObj->extract(trackID);
-    if (status != AMEDIA_OK) {
-        cout << "[   WARN   ] Test Skipped. Extraction failed \n";
-        return;
-    }
+    ASSERT_EQ(status, AMEDIA_OK) << "Extraction failed \n";
 
     extractObj->deInitExtractor();
 
@@ -79,7 +70,8 @@ INSTANTIATE_TEST_SUITE_P(ExtractorTestAll, ExtractorTest,
                                            make_pair("bbb_8000hz_1ch_8kbps_amrnb_5mins.3gp", 0),
                                            make_pair("bbb_16000hz_1ch_9kbps_amrwb_5mins.3gp", 0),
                                            make_pair("bbb_44100hz_2ch_80kbps_vorbis_5mins.mp4", 0),
-                                           make_pair("bbb_48000hz_2ch_100kbps_opus_5mins.webm", 0)));
+                                           make_pair("bbb_48000hz_2ch_100kbps_opus_5mins.webm",
+                                                     0)));
 
 int main(int argc, char **argv) {
     gEnv = new BenchmarkTestEnvironment();
