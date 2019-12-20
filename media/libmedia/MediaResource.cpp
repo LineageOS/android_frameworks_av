@@ -19,6 +19,8 @@
 #include <utils/Log.h>
 #include <media/MediaResource.h>
 
+#include <vector>
+
 namespace android {
 
 MediaResource::MediaResource()
@@ -36,26 +38,48 @@ MediaResource::MediaResource(Type type, SubType subType, uint64_t value)
           mSubType(subType),
           mValue(value) {}
 
+MediaResource::MediaResource(Type type, const std::vector<uint8_t> &id, uint64_t value)
+        : mType(type),
+          mSubType(kUnspecifiedSubType),
+          mValue(value),
+          mId(id) {}
+
 void MediaResource::readFromParcel(const Parcel &parcel) {
     mType = static_cast<Type>(parcel.readInt32());
     mSubType = static_cast<SubType>(parcel.readInt32());
     mValue = parcel.readUint64();
+    parcel.readByteVector(&mId);
 }
 
 void MediaResource::writeToParcel(Parcel *parcel) const {
     parcel->writeInt32(static_cast<int32_t>(mType));
     parcel->writeInt32(static_cast<int32_t>(mSubType));
     parcel->writeUint64(mValue);
+    parcel->writeByteVector(mId);
+}
+
+static String8 bytesToHexString(const std::vector<uint8_t> &bytes) {
+    String8 str;
+    for (auto &b : bytes) {
+        str.appendFormat("%02x", b);
+    }
+    return str;
 }
 
 String8 MediaResource::toString() const {
     String8 str;
-    str.appendFormat("%s/%s:%llu", asString(mType), asString(mSubType), (unsigned long long)mValue);
+    str.appendFormat("%s/%s:[%s]:%llu",
+        asString(mType), asString(mSubType),
+        bytesToHexString(mId).c_str(),
+        (unsigned long long)mValue);
     return str;
 }
 
 bool MediaResource::operator==(const MediaResource &other) const {
-    return (other.mType == mType) && (other.mSubType == mSubType) && (other.mValue == mValue);
+    return (other.mType == mType)
+      && (other.mSubType == mSubType)
+      && (other.mValue == mValue)
+      && (other.mId == mId);
 }
 
 bool MediaResource::operator!=(const MediaResource &other) const {

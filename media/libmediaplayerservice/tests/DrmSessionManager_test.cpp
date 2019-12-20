@@ -20,13 +20,28 @@
 
 #include <gtest/gtest.h>
 
+#include <media/IResourceManagerService.h>
+#include <media/IResourceManagerClient.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/ProcessInfoInterface.h>
 #include <mediadrm/DrmHal.h>
 #include <mediadrm/DrmSessionClientInterface.h>
 #include <mediadrm/DrmSessionManager.h>
 
+#include <algorithm>
+#include <vector>
+
+#include "ResourceManagerService.h"
+
 namespace android {
+
+static Vector<uint8_t> toAndroidVector(const std::vector<uint8_t> &vec) {
+    Vector<uint8_t> aVec;
+    for (auto b : vec) {
+        aVec.push_back(b);
+    }
+    return aVec;
+}
 
 struct FakeProcessInfo : public ProcessInfoInterface {
     FakeProcessInfo() {}
@@ -47,173 +62,128 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(FakeProcessInfo);
 };
 
-struct FakeDrm : public DrmSessionClientInterface {
-    FakeDrm() {}
+struct FakeDrm : public BnResourceManagerClient {
+    FakeDrm(const std::vector<uint8_t>& sessionId, const sp<DrmSessionManager>& manager)
+        : mSessionId(toAndroidVector(sessionId)),
+          mReclaimed(false),
+          mDrmSessionManager(manager) {}
+
     virtual ~FakeDrm() {}
 
-    virtual bool reclaimSession(const Vector<uint8_t>& sessionId) {
-        mReclaimedSessions.push_back(sessionId);
+    virtual bool reclaimResource() {
+        mReclaimed = true;
+        mDrmSessionManager->removeSession(mSessionId);
         return true;
     }
 
-    const Vector<Vector<uint8_t> >& reclaimedSessions() const {
-        return mReclaimedSessions;
+    virtual String8 getName() {
+        String8 name("FakeDrm[");
+        for (size_t i = 0; i < mSessionId.size(); ++i) {
+            name.appendFormat("%02x", mSessionId[i]);
+        }
+        name.append("]");
+        return name;
     }
 
+    bool isReclaimed() const {
+        return mReclaimed;
+    }
+
+    const Vector<uint8_t> mSessionId;
+
 private:
-    Vector<Vector<uint8_t> > mReclaimedSessions;
+    bool mReclaimed;
+    const sp<DrmSessionManager> mDrmSessionManager;
 
     DISALLOW_EVIL_CONSTRUCTORS(FakeDrm);
 };
 
+struct FakeSystemCallback :
+        public ResourceManagerService::SystemCallbackInterface {
+    FakeSystemCallback() {}
+
+    virtual void noteStartVideo(int /*uid*/) override {}
+
+    virtual void noteStopVideo(int /*uid*/) override {}
+
+    virtual void noteResetVideo() override {}
+
+    virtual bool requestCpusetBoost(
+            bool /*enable*/, const sp<IInterface> &/*client*/) override {
+        return true;
+    }
+
+protected:
+    virtual ~FakeSystemCallback() {}
+
+private:
+
+    DISALLOW_EVIL_CONSTRUCTORS(FakeSystemCallback);
+};
+
 static const int kTestPid1 = 30;
 static const int kTestPid2 = 20;
-static const uint8_t kTestSessionId1[] = {1, 2, 3};
-static const uint8_t kTestSessionId2[] = {4, 5, 6, 7, 8};
-static const uint8_t kTestSessionId3[] = {9, 0};
+static const std::vector<uint8_t> kTestSessionId1{1, 2, 3};
+static const std::vector<uint8_t> kTestSessionId2{4, 5, 6, 7, 8};
+static const std::vector<uint8_t> kTestSessionId3{9, 0};
 
 class DrmSessionManagerTest : public ::testing::Test {
 public:
     DrmSessionManagerTest()
-        : mDrmSessionManager(new DrmSessionManager(new FakeProcessInfo())),
-          mTestDrm1(new FakeDrm()),
-          mTestDrm2(new FakeDrm()) {
-        GetSessionId(kTestSessionId1, ARRAY_SIZE(kTestSessionId1), &mSessionId1);
-        GetSessionId(kTestSessionId2, ARRAY_SIZE(kTestSessionId2), &mSessionId2);
-        GetSessionId(kTestSessionId3, ARRAY_SIZE(kTestSessionId3), &mSessionId3);
+        : mService(new ResourceManagerService(new FakeProcessInfo(), new FakeSystemCallback())),
+          mDrmSessionManager(new DrmSessionManager(mService)),
+          mTestDrm1(new FakeDrm(kTestSessionId1, mDrmSessionManager)),
+          mTestDrm2(new FakeDrm(kTestSessionId2, mDrmSessionManager)),
+          mTestDrm3(new FakeDrm(kTestSessionId3, mDrmSessionManager)) {
+        DrmSessionManager *ptr = new DrmSessionManager(mService);
+        EXPECT_NE(ptr, nullptr);
+        /* mDrmSessionManager = ptr; */
     }
 
 protected:
-    static void GetSessionId(const uint8_t* ids, size_t num, Vector<uint8_t>* sessionId) {
-        for (size_t i = 0; i < num; ++i) {
-            sessionId->push_back(ids[i]);
-        }
-    }
-
-    static void ExpectEqSessionInfo(const SessionInfo& info, sp<DrmSessionClientInterface> drm,
-            const Vector<uint8_t>& sessionId, int64_t timeStamp) {
-        EXPECT_EQ(drm, info.drm);
-        EXPECT_TRUE(isEqualSessionId(sessionId, info.sessionId));
-        EXPECT_EQ(timeStamp, info.timeStamp);
-    }
-
     void addSession() {
-        mDrmSessionManager->addSession(kTestPid1, mTestDrm1, mSessionId1);
-        mDrmSessionManager->addSession(kTestPid2, mTestDrm2, mSessionId2);
-        mDrmSessionManager->addSession(kTestPid2, mTestDrm2, mSessionId3);
-        const PidSessionInfosMap& map = sessionMap();
-        EXPECT_EQ(2u, map.size());
-        ssize_t index1 = map.indexOfKey(kTestPid1);
-        ASSERT_GE(index1, 0);
-        const SessionInfos& infos1 = map[index1];
-        EXPECT_EQ(1u, infos1.size());
-        ExpectEqSessionInfo(infos1[0], mTestDrm1, mSessionId1, 0);
-
-        ssize_t index2 = map.indexOfKey(kTestPid2);
-        ASSERT_GE(index2, 0);
-        const SessionInfos& infos2 = map[index2];
-        EXPECT_EQ(2u, infos2.size());
-        ExpectEqSessionInfo(infos2[0], mTestDrm2, mSessionId2, 1);
-        ExpectEqSessionInfo(infos2[1], mTestDrm2, mSessionId3, 2);
+        mDrmSessionManager->addSession(kTestPid1, mTestDrm1, mTestDrm1->mSessionId);
+        mDrmSessionManager->addSession(kTestPid2, mTestDrm2, mTestDrm2->mSessionId);
+        mDrmSessionManager->addSession(kTestPid2, mTestDrm3, mTestDrm3->mSessionId);
     }
 
-    const PidSessionInfosMap& sessionMap() {
-        return mDrmSessionManager->mSessionMap;
-    }
-
-    void testGetLowestPriority() {
-        int pid;
-        int priority;
-        EXPECT_FALSE(mDrmSessionManager->getLowestPriority_l(&pid, &priority));
-
-        addSession();
-        EXPECT_TRUE(mDrmSessionManager->getLowestPriority_l(&pid, &priority));
-
-        EXPECT_EQ(kTestPid1, pid);
-        FakeProcessInfo processInfo;
-        int priority1;
-        processInfo.getPriority(kTestPid1, &priority1);
-        EXPECT_EQ(priority1, priority);
-    }
-
-    void testGetLeastUsedSession() {
-        sp<DrmSessionClientInterface> drm;
-        Vector<uint8_t> sessionId;
-        EXPECT_FALSE(mDrmSessionManager->getLeastUsedSession_l(kTestPid1, &drm, &sessionId));
-
-        addSession();
-
-        EXPECT_TRUE(mDrmSessionManager->getLeastUsedSession_l(kTestPid1, &drm, &sessionId));
-        EXPECT_EQ(mTestDrm1, drm);
-        EXPECT_TRUE(isEqualSessionId(mSessionId1, sessionId));
-
-        EXPECT_TRUE(mDrmSessionManager->getLeastUsedSession_l(kTestPid2, &drm, &sessionId));
-        EXPECT_EQ(mTestDrm2, drm);
-        EXPECT_TRUE(isEqualSessionId(mSessionId2, sessionId));
-
-        // mSessionId2 is no longer the least used session.
-        mDrmSessionManager->useSession(mSessionId2);
-        EXPECT_TRUE(mDrmSessionManager->getLeastUsedSession_l(kTestPid2, &drm, &sessionId));
-        EXPECT_EQ(mTestDrm2, drm);
-        EXPECT_TRUE(isEqualSessionId(mSessionId3, sessionId));
-    }
-
+    sp<IResourceManagerService> mService;
     sp<DrmSessionManager> mDrmSessionManager;
     sp<FakeDrm> mTestDrm1;
     sp<FakeDrm> mTestDrm2;
-    Vector<uint8_t> mSessionId1;
-    Vector<uint8_t> mSessionId2;
-    Vector<uint8_t> mSessionId3;
+    sp<FakeDrm> mTestDrm3;
 };
 
 TEST_F(DrmSessionManagerTest, addSession) {
     addSession();
+
+    EXPECT_EQ(3u, mDrmSessionManager->getSessionCount());
+    EXPECT_TRUE(mDrmSessionManager->containsSession(mTestDrm1->mSessionId));
+    EXPECT_TRUE(mDrmSessionManager->containsSession(mTestDrm2->mSessionId));
+    EXPECT_TRUE(mDrmSessionManager->containsSession(mTestDrm3->mSessionId));
 }
 
 TEST_F(DrmSessionManagerTest, useSession) {
     addSession();
 
-    mDrmSessionManager->useSession(mSessionId1);
-    mDrmSessionManager->useSession(mSessionId3);
+    mDrmSessionManager->useSession(mTestDrm1->mSessionId);
+    mDrmSessionManager->useSession(mTestDrm3->mSessionId);
 
-    const PidSessionInfosMap& map = sessionMap();
-    const SessionInfos& infos1 = map.valueFor(kTestPid1);
-    const SessionInfos& infos2 = map.valueFor(kTestPid2);
-    ExpectEqSessionInfo(infos1[0], mTestDrm1, mSessionId1, 3);
-    ExpectEqSessionInfo(infos2[1], mTestDrm2, mSessionId3, 4);
+    EXPECT_EQ(3u, mDrmSessionManager->getSessionCount());
+    EXPECT_TRUE(mDrmSessionManager->containsSession(mTestDrm1->mSessionId));
+    EXPECT_TRUE(mDrmSessionManager->containsSession(mTestDrm2->mSessionId));
+    EXPECT_TRUE(mDrmSessionManager->containsSession(mTestDrm3->mSessionId));
 }
 
 TEST_F(DrmSessionManagerTest, removeSession) {
     addSession();
 
-    mDrmSessionManager->removeSession(mSessionId2);
+    mDrmSessionManager->removeSession(mTestDrm2->mSessionId);
 
-    const PidSessionInfosMap& map = sessionMap();
-    EXPECT_EQ(2u, map.size());
-    const SessionInfos& infos1 = map.valueFor(kTestPid1);
-    const SessionInfos& infos2 = map.valueFor(kTestPid2);
-    EXPECT_EQ(1u, infos1.size());
-    EXPECT_EQ(1u, infos2.size());
-    // mSessionId2 has been removed.
-    ExpectEqSessionInfo(infos2[0], mTestDrm2, mSessionId3, 2);
-}
-
-TEST_F(DrmSessionManagerTest, removeDrm) {
-    addSession();
-
-    sp<FakeDrm> drm = new FakeDrm;
-    const uint8_t ids[] = {123};
-    Vector<uint8_t> sessionId;
-    GetSessionId(ids, ARRAY_SIZE(ids), &sessionId);
-    mDrmSessionManager->addSession(kTestPid2, drm, sessionId);
-
-    mDrmSessionManager->removeDrm(mTestDrm2);
-
-    const PidSessionInfosMap& map = sessionMap();
-    const SessionInfos& infos2 = map.valueFor(kTestPid2);
-    EXPECT_EQ(1u, infos2.size());
-    // mTestDrm2 has been removed.
-    ExpectEqSessionInfo(infos2[0], drm, sessionId, 3);
+    EXPECT_EQ(2u, mDrmSessionManager->getSessionCount());
+    EXPECT_TRUE(mDrmSessionManager->containsSession(mTestDrm1->mSessionId));
+    EXPECT_FALSE(mDrmSessionManager->containsSession(mTestDrm2->mSessionId));
+    EXPECT_TRUE(mDrmSessionManager->containsSession(mTestDrm3->mSessionId));
 }
 
 TEST_F(DrmSessionManagerTest, reclaimSession) {
@@ -224,30 +194,63 @@ TEST_F(DrmSessionManagerTest, reclaimSession) {
     EXPECT_FALSE(mDrmSessionManager->reclaimSession(50));
 
     EXPECT_TRUE(mDrmSessionManager->reclaimSession(10));
-    EXPECT_EQ(1u, mTestDrm1->reclaimedSessions().size());
-    EXPECT_TRUE(isEqualSessionId(mSessionId1, mTestDrm1->reclaimedSessions()[0]));
-
-    mDrmSessionManager->removeSession(mSessionId1);
+    EXPECT_TRUE(mTestDrm1->isReclaimed());
 
     // add a session from a higher priority process.
-    sp<FakeDrm> drm = new FakeDrm;
-    const uint8_t ids[] = {1, 3, 5};
-    Vector<uint8_t> sessionId;
-    GetSessionId(ids, ARRAY_SIZE(ids), &sessionId);
-    mDrmSessionManager->addSession(15, drm, sessionId);
+    const std::vector<uint8_t> sid{1, 3, 5};
+    sp<FakeDrm> drm = new FakeDrm(sid, mDrmSessionManager);
+    mDrmSessionManager->addSession(15, drm, drm->mSessionId);
 
+    // make sure mTestDrm2 is reclaimed next instead of mTestDrm3
+    mDrmSessionManager->useSession(mTestDrm3->mSessionId);
     EXPECT_TRUE(mDrmSessionManager->reclaimSession(18));
-    EXPECT_EQ(1u, mTestDrm2->reclaimedSessions().size());
-    // mSessionId2 is reclaimed.
-    EXPECT_TRUE(isEqualSessionId(mSessionId2, mTestDrm2->reclaimedSessions()[0]));
+    EXPECT_TRUE(mTestDrm2->isReclaimed());
+
+    EXPECT_EQ(2u, mDrmSessionManager->getSessionCount());
+    EXPECT_FALSE(mDrmSessionManager->containsSession(mTestDrm1->mSessionId));
+    EXPECT_FALSE(mDrmSessionManager->containsSession(mTestDrm2->mSessionId));
+    EXPECT_TRUE(mDrmSessionManager->containsSession(mTestDrm3->mSessionId));
+    EXPECT_TRUE(mDrmSessionManager->containsSession(drm->mSessionId));
 }
 
-TEST_F(DrmSessionManagerTest, getLowestPriority) {
-    testGetLowestPriority();
-}
+TEST_F(DrmSessionManagerTest, reclaimAfterUse) {
+    // nothing to reclaim yet
+    EXPECT_FALSE(mDrmSessionManager->reclaimSession(kTestPid1));
+    EXPECT_FALSE(mDrmSessionManager->reclaimSession(kTestPid2));
 
-TEST_F(DrmSessionManagerTest, getLeastUsedSession_l) {
-    testGetLeastUsedSession();
+    // add sessions from same pid
+    mDrmSessionManager->addSession(kTestPid2, mTestDrm1, mTestDrm1->mSessionId);
+    mDrmSessionManager->addSession(kTestPid2, mTestDrm2, mTestDrm2->mSessionId);
+    mDrmSessionManager->addSession(kTestPid2, mTestDrm3, mTestDrm3->mSessionId);
+
+    // use some but not all sessions
+    mDrmSessionManager->useSession(mTestDrm1->mSessionId);
+    mDrmSessionManager->useSession(mTestDrm1->mSessionId);
+    mDrmSessionManager->useSession(mTestDrm2->mSessionId);
+
+    // calling pid priority is too low
+    int lowPriorityPid = kTestPid2 + 1;
+    EXPECT_FALSE(mDrmSessionManager->reclaimSession(lowPriorityPid));
+
+    // unused session is reclaimed first
+    int highPriorityPid = kTestPid2 - 1;
+    EXPECT_TRUE(mDrmSessionManager->reclaimSession(highPriorityPid));
+    EXPECT_FALSE(mTestDrm1->isReclaimed());
+    EXPECT_FALSE(mTestDrm2->isReclaimed());
+    EXPECT_TRUE(mTestDrm3->isReclaimed());
+    mDrmSessionManager->removeSession(mTestDrm3->mSessionId);
+
+    // less-used session is reclaimed next
+    EXPECT_TRUE(mDrmSessionManager->reclaimSession(highPriorityPid));
+    EXPECT_FALSE(mTestDrm1->isReclaimed());
+    EXPECT_TRUE(mTestDrm2->isReclaimed());
+    EXPECT_TRUE(mTestDrm3->isReclaimed());
+
+    // most-used session still open
+    EXPECT_EQ(1u, mDrmSessionManager->getSessionCount());
+    EXPECT_TRUE(mDrmSessionManager->containsSession(mTestDrm1->mSessionId));
+    EXPECT_FALSE(mDrmSessionManager->containsSession(mTestDrm2->mSessionId));
+    EXPECT_FALSE(mDrmSessionManager->containsSession(mTestDrm3->mSessionId));
 }
 
 } // namespace android
