@@ -117,21 +117,24 @@ public:
     status_t writeSampleData(const sp<ABuffer> &buffer, size_t trackIndex,
                              int64_t timeUs, uint32_t flags) ;
 
+    void notify(int msg, int ext1, int ext2);
+
 private:
     const OutputFormat mFormat;
     sp<MediaWriter> mWriter;
     Vector< sp<MediaAdapter> > mTrackList;  // Each track has its MediaAdapter.
     sp<MetaData> mFileMeta;  // Metadata for the whole file.
-
     Mutex mMuxerLock;
 
     enum State {
         UNINITIALIZED,
         INITIALIZED,
         STARTED,
-        STOPPED
+        STOPPED,
+        ERROR
     };
     State mState;
+    status_t mError;
 
     DISALLOW_EVIL_CONSTRUCTORS(MediaMuxer);
 };

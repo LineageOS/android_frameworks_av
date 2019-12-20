@@ -113,8 +113,6 @@ enum {
     kKeyVideoProfile      = 'vprf',  // int32_t
     kKeyVideoLevel        = 'vlev',  // int32_t
 
-    // Set this key to enable authoring files in 64-bit offset
-    kKey64BitFileOffset   = 'fobt',  // int32_t (bool)
     kKey2ByteNalLength    = '2NAL',  // int32_t (bool)
 
     // Identify the file output format for authoring
