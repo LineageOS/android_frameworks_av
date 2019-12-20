@@ -63,51 +63,6 @@ mediametrics::Item::~Item() {
     if (DEBUG_ALLOCATIONS) {
         ALOGD("Destroy  mediametrics::Item @ %p", this);
     }
-    clear();
-}
-
-void mediametrics::Item::clear() {
-
-    // clean allocated storage from key
-    mKey.clear();
-
-    // clean attributes
-    // contents of the attributes
-    for (size_t i = 0 ; i < mPropCount; i++ ) {
-        mProps[i].clear();
-    }
-    // the attribute records themselves
-    if (mProps != NULL) {
-        free(mProps);
-        mProps = NULL;
-    }
-    mPropSize = 0;
-    mPropCount = 0;
-
-    return;
-}
-
-// make a deep copy of myself
-mediametrics::Item *mediametrics::Item::dup() {
-    mediametrics::Item *dst = new mediametrics::Item(this->mKey);
-
-    if (dst != NULL) {
-        // key as part of constructor
-        dst->mPid = this->mPid;
-        dst->mUid = this->mUid;
-        dst->mPkgName = this->mPkgName;
-        dst->mPkgVersionCode = this->mPkgVersionCode;
-        dst->mTimestamp = this->mTimestamp;
-
-        // properties aka attributes
-        dst->growProps(this->mPropCount);
-        for(size_t i=0;i<mPropCount;i++) {
-            dst->mProps[i] = this->mProps[i];
-        }
-        dst->mPropCount = this->mPropCount;
-    }
-
-    return dst;
 }
 
 mediametrics::Item &mediametrics::Item::setTimestamp(nsecs_t ts) {
@@ -151,84 +106,12 @@ int64_t mediametrics::Item::getPkgVersionCode() const {
     return mPkgVersionCode;
 }
 
-
-// find the proper entry in the list
-size_t mediametrics::Item::findPropIndex(const char *name) const
-{
-    size_t i = 0;
-    for (; i < mPropCount; i++) {
-        if (mProps[i].isNamed(name)) break;
-    }
-    return i;
-}
-
-mediametrics::Item::Prop *mediametrics::Item::findProp(const char *name) const {
-    const size_t i = findPropIndex(name);
-    if (i < mPropCount) {
-        return &mProps[i];
-    }
-    return nullptr;
-}
-
-// consider this "find-or-allocate".
-// caller validates type and uses clearPropValue() accordingly
-mediametrics::Item::Prop *mediametrics::Item::allocateProp(const char *name) {
-    const size_t i = findPropIndex(name);
-    if (i < mPropCount) {
-        return &mProps[i]; // already have it, return
-    }
-
-    Prop *prop = allocateProp(); // get a new prop
-    if (prop == nullptr) return nullptr;
-    prop->setName(name);
-    return prop;
-}
-
-mediametrics::Item::Prop *mediametrics::Item::allocateProp() {
-    if (mPropCount == mPropSize && growProps() == false) {
-        ALOGE("%s: failed allocation for new properties", __func__);
-        return nullptr;
-    }
-    return &mProps[mPropCount++];
-}
-
-// used within the summarizers; return whether property existed
-bool mediametrics::Item::removeProp(const char *name) {
-    const size_t i = findPropIndex(name);
-    if (i < mPropCount) {
-        mProps[i].clear();
-        if (i != mPropCount-1) {
-            // in the middle, bring last one down to fill gap
-            mProps[i].swap(mProps[mPropCount-1]);
-        }
-        mPropCount--;
-        return true;
-    }
-    return false;
-}
-
 // remove indicated keys and their values
 // return value is # keys removed
 size_t mediametrics::Item::filter(size_t n, const char *attrs[]) {
     size_t zapped = 0;
     for (size_t i = 0; i < n; ++i) {
-        const char *name = attrs[i];
-        size_t j = findPropIndex(name);
-        if (j >= mPropCount) {
-            // not there
-            continue;
-        } else if (j + 1 == mPropCount) {
-            // last one, shorten
-            zapped++;
-            mProps[j].clear();
-            mPropCount--;
-        } else {
-            // in the middle, bring last one down and shorten
-            zapped++;
-            mProps[j].clear();
-            mProps[j] = mProps[mPropCount-1];
-            mPropCount--;
-        }
+        zapped += mProps.erase(attrs[i]);
     }
     return zapped;
 }
@@ -238,47 +121,15 @@ size_t mediametrics::Item::filter(size_t n, const char *attrs[]) {
 size_t mediametrics::Item::filterNot(size_t n, const char *attrs[]) {
     std::set<std::string> check(attrs, attrs + n);
     size_t zapped = 0;
-    for (size_t j = 0; j < mPropCount;) {
-        if (check.find(mProps[j].getName()) != check.end()) {
-            ++j;
-            continue;
-        }
-        if (j + 1 == mPropCount) {
-            // last one, shorten
-            zapped++;
-            mProps[j].clear();
-            mPropCount--;
-            break;
+    for (auto it = mProps.begin(); it != mProps.end();) {
+        if (check.find(it->first) != check.end()) {
+            ++it;
         } else {
-            // in the middle, bring last one down and shorten
-            zapped++;
-            mProps[j].clear();
-            mProps[j] = mProps[mPropCount-1];
-            mPropCount--;
+           it = mProps.erase(it);
+           ++zapped;
         }
     }
     return zapped;
-}
-
-bool mediametrics::Item::growProps(int increment)
-{
-    if (increment <= 0) {
-        increment = kGrowProps;
-    }
-    int nsize = mPropSize + increment;
-    Prop *ni = (Prop *)realloc(mProps, sizeof(Prop) * nsize);
-
-    if (ni != NULL) {
-        for (int i = mPropSize; i < nsize; i++) {
-            new (&ni[i]) Prop(); // placement new
-        }
-        mProps = ni;
-        mPropSize = nsize;
-        return true;
-    } else {
-        ALOGW("mediametrics::Item::growProps fails");
-        return false;
-    }
 }
 
 // Parcel / serialize things for binder calls
@@ -315,10 +166,11 @@ status_t mediametrics::Item::readFromParcel0(const Parcel& data) {
     if (count < 0) return BAD_VALUE;
     mPkgVersionCode = version;
     mTimestamp = timestamp;
-    for (int i = 0; i < count ; i++) {
-        Prop *prop = allocateProp();
-        status_t status = prop->readFromParcel(data);
+    for (int i = 0; i < count; i++) {
+        Prop prop;
+        status_t status = prop.readFromParcel(data);
         if (status != NO_ERROR) return status;
+        mProps[prop.getName()] = std::move(prop);
     }
     return NO_ERROR;
 }
@@ -349,9 +201,9 @@ status_t mediametrics::Item::writeToParcel0(Parcel *data) const {
         ?: data->writeInt64(mTimestamp);
     if (status != NO_ERROR) return status;
 
-    data->writeInt32((int32_t)mPropCount);
-    for (size_t i = 0 ; i < mPropCount; ++i) {
-        status = mProps[i].writeToParcel(data);
+    data->writeInt32((int32_t)mProps.size());
+    for (auto &prop : *this) {
+        status = prop.writeToParcel(data);
         if (status != NO_ERROR) return status;
     }
     return NO_ERROR;
@@ -376,10 +228,10 @@ std::string mediametrics::Item::toString(int version) const {
 
     snprintf(buffer, sizeof(buffer), "[%d:%s:%d:%d:%lld:%s:%zu:",
             version, mKey.c_str(), mPid, mUid, (long long)mTimestamp,
-            mPkgName.c_str(), mPropCount);
+            mPkgName.c_str(), mProps.size());
     result.append(buffer);
-    for (size_t i = 0 ; i < mPropCount; ++i) {
-        mProps[i].toString(buffer, sizeof(buffer));
+    for (auto &prop : *this) {
+        prop.toStringBuffer(buffer, sizeof(buffer));
         result.append(buffer);
     }
     result.append("]");
@@ -390,7 +242,7 @@ std::string mediametrics::Item::toString(int version) const {
 // calls the appropriate daemon
 bool mediametrics::Item::selfrecord() {
     ALOGD_IF(DEBUG_API, "%s: delivering %s", __func__, this->toString().c_str());
-    sp<IMediaMetricsService> svc = getInstance();
+    sp<IMediaMetricsService> svc = getService();
     if (svc != NULL) {
         status_t status = svc->submit(this);
         if (status != NO_ERROR) {
@@ -460,7 +312,7 @@ bool BaseItem::submitBuffer(const char *buffer, size_t size) {
     */
 
     ALOGD_IF(DEBUG_API, "%s: delivering %zu bytes", __func__, size);
-    sp<IMediaMetricsService> svc = getInstance();
+    sp<IMediaMetricsService> svc = getService();
     if (svc != nullptr) {
         const status_t status = svc->submitBuffer(buffer, size);
         if (status != NO_ERROR) {
@@ -473,7 +325,7 @@ bool BaseItem::submitBuffer(const char *buffer, size_t size) {
 }
 
 //static
-sp<IMediaMetricsService> BaseItem::getInstance() {
+sp<IMediaMetricsService> BaseItem::getService() {
     static const char *servicename = "media.metrics";
     static const bool enabled = isEnabled(); // singleton initialized
 
@@ -512,115 +364,6 @@ sp<IMediaMetricsService> BaseItem::getInstance() {
 }
 
 
-// merge the info from 'incoming' into this record.
-// we finish with a union of this+incoming and special handling for collisions
-bool mediametrics::Item::merge(mediametrics::Item *incoming) {
-
-    // if I don't have key or session id, take them from incoming
-    // 'this' should never be missing both of them...
-    if (mKey.empty()) {
-        mKey = incoming->mKey;
-    }
-
-    // for each attribute from 'incoming', resolve appropriately
-    int nattr = incoming->mPropCount;
-    for (int i = 0 ; i < nattr; i++ ) {
-        Prop *iprop = &incoming->mProps[i];
-        const char *p = iprop->mName;
-        size_t len = strlen(p);
-
-        // should ignore a zero length name...
-        if (len == 0) {
-            continue;
-        }
-
-        Prop *oprop = findProp(iprop->mName);
-
-        if (oprop == NULL) {
-            // no oprop, so we insert the new one
-            oprop = allocateProp(p);
-            if (oprop != NULL) {
-                *oprop = *iprop;
-            } else {
-                ALOGW("dropped property '%s'", iprop->mName);
-            }
-        } else {
-            *oprop = *iprop;
-        }
-    }
-
-    // not sure when we'd return false...
-    return true;
-}
-
-namespace {
-
-template <typename T>
-status_t insert(const T& val, char **bufferpptr, char *bufferptrmax)
-{
-    const size_t size = sizeof(val);
-    if (*bufferpptr + size > bufferptrmax) {
-        ALOGE("%s: buffer exceeded with size %zu", __func__, size);
-        return BAD_VALUE;
-    }
-    memcpy(*bufferpptr, &val, size);
-    *bufferpptr += size;
-    return NO_ERROR;
-}
-
-template <>
-status_t insert(const char * const& val, char **bufferpptr, char *bufferptrmax)
-{
-    const size_t size = strlen(val) + 1;
-    if (size > UINT16_MAX || *bufferpptr + size > bufferptrmax) {
-        ALOGE("%s: buffer exceeded with size %zu", __func__, size);
-        return BAD_VALUE;
-    }
-    memcpy(*bufferpptr, val, size);
-    *bufferpptr += size;
-    return NO_ERROR;
-}
-
-template <>
- __unused
-status_t insert(char * const& val, char **bufferpptr, char *bufferptrmax)
-{
-    return insert((const char *)val, bufferpptr, bufferptrmax);
-}
-
-template <typename T>
-status_t extract(T *val, const char **bufferpptr, const char *bufferptrmax)
-{
-    const size_t size = sizeof(*val);
-    if (*bufferpptr + size > bufferptrmax) {
-        ALOGE("%s: buffer exceeded with size %zu", __func__, size);
-        return BAD_VALUE;
-    }
-    memcpy(val, *bufferpptr, size);
-    *bufferpptr += size;
-    return NO_ERROR;
-}
-
-template <>
-status_t extract(char **val, const char **bufferpptr, const char *bufferptrmax)
-{
-    const char *ptr = *bufferpptr;
-    while (*ptr != 0) {
-        if (ptr >= bufferptrmax) {
-            ALOGE("%s: buffer exceeded", __func__);
-            return BAD_VALUE;
-        }
-        ++ptr;
-    }
-    const size_t size = (ptr - *bufferpptr) + 1;
-    *val = (char *)malloc(size);
-    memcpy(*val, *bufferpptr, size);
-    *bufferpptr += size;
-    return NO_ERROR;
-}
-
-} // namespace
-
 status_t mediametrics::Item::writeToByteString(char **pbuffer, size_t *plength) const
 {
     if (pbuffer == nullptr || plength == nullptr)
@@ -647,14 +390,14 @@ status_t mediametrics::Item::writeToByteString(char **pbuffer, size_t *plength) 
     uint32_t size = header_size
         + sizeof(uint32_t) // # properties
         ;
-    for (size_t i = 0 ; i < mPropCount; ++i) {
-        const size_t propSize = mProps[i].getByteStringSize();
+    for (auto &prop : *this) {
+        const size_t propSize = prop.getByteStringSize();
         if (propSize > UINT16_MAX) {
-            ALOGW("%s: prop %zu size %zu too large", __func__, i, propSize);
+            ALOGW("%s: prop %s size %zu too large", __func__, prop.getName(), propSize);
             return INVALID_OPERATION;
         }
         if (__builtin_add_overflow(size, propSize, &size)) {
-            ALOGW("%s: item size overflow at property %zu", __func__, i);
+            ALOGW("%s: item size overflow at property %s", __func__, prop.getName());
             return INVALID_OPERATION;
         }
     }
@@ -674,16 +417,16 @@ status_t mediametrics::Item::writeToByteString(char **pbuffer, size_t *plength) 
             || insert((int32_t)mPid, &filling, buildmax) != NO_ERROR
             || insert((int32_t)mUid, &filling, buildmax) != NO_ERROR
             || insert((int64_t)mTimestamp, &filling, buildmax) != NO_ERROR
-            || insert((uint32_t)mPropCount, &filling, buildmax) != NO_ERROR) {
+            || insert((uint32_t)mProps.size(), &filling, buildmax) != NO_ERROR) {
         ALOGE("%s:could not write header", __func__);  // shouldn't happen
         free(build);
         return INVALID_OPERATION;
     }
-    for (size_t i = 0 ; i < mPropCount; ++i) {
-        if (mProps[i].writeToByteString(&filling, buildmax) != NO_ERROR) {
+    for (auto &prop : *this) {
+        if (prop.writeToByteString(&filling, buildmax) != NO_ERROR) {
             free(build);
             // shouldn't happen
-            ALOGE("%s:could not write prop %zu of %zu", __func__, i, mPropCount);
+            ALOGE("%s:could not write prop %s", __func__, prop.getName());
             return INVALID_OPERATION;
         }
     }
@@ -710,7 +453,7 @@ status_t mediametrics::Item::readFromByteString(const char *bufferptr, size_t le
     uint32_t header_size;
     uint16_t version;
     uint16_t key_size;
-    char *key = nullptr;
+    std::string key;
     int32_t pid;
     int32_t uid;
     int64_t timestamp;
@@ -724,14 +467,12 @@ status_t mediametrics::Item::readFromByteString(const char *bufferptr, size_t le
             || extract(&uid, &read, readend) != NO_ERROR
             || extract(&timestamp, &read, readend) != NO_ERROR
             || size > length
-            || strlen(key) + 1 != key_size
+            || key.size() + 1 != key_size
             || header_size > size) {
-        free(key);
         ALOGW("%s: invalid header", __func__);
         return INVALID_OPERATION;
     }
-    mKey = key;
-    free(key);
+    mKey = std::move(key);
     const size_t pos = read - bufferptr;
     if (pos > header_size) {
         ALOGW("%s: invalid header pos:%zu > header_size:%u",
@@ -750,43 +491,14 @@ status_t mediametrics::Item::readFromByteString(const char *bufferptr, size_t le
     mUid = uid;
     mTimestamp = timestamp;
     for (size_t i = 0; i < propCount; ++i) {
-        Prop *prop = allocateProp();
-        if (prop->readFromByteString(&read, readend) != NO_ERROR) {
+        Prop prop;
+        if (prop.readFromByteString(&read, readend) != NO_ERROR) {
             ALOGW("%s: cannot read prop %zu", __func__, i);
             return INVALID_OPERATION;
         }
+        mProps[prop.getName()] = std::move(prop);
     }
     return NO_ERROR;
-}
-
-status_t mediametrics::Item::Prop::writeToParcel(Parcel *data) const
-{
-   switch (mType) {
-   case kTypeInt32:
-       return data->writeCString(mName)
-               ?: data->writeInt32(mType)
-               ?: data->writeInt32(u.int32Value);
-   case kTypeInt64:
-       return data->writeCString(mName)
-               ?: data->writeInt32(mType)
-               ?: data->writeInt64(u.int64Value);
-   case kTypeDouble:
-       return data->writeCString(mName)
-               ?: data->writeInt32(mType)
-               ?: data->writeDouble(u.doubleValue);
-   case kTypeRate:
-       return data->writeCString(mName)
-               ?: data->writeInt32(mType)
-               ?: data->writeInt64(u.rate.first)
-               ?: data->writeInt64(u.rate.second);
-   case kTypeCString:
-       return data->writeCString(mName)
-               ?: data->writeInt32(mType)
-               ?: data->writeCString(u.CStringValue);
-   default:
-       ALOGE("%s: found bad type: %d, name %s", __func__, mType, mName);
-       return BAD_VALUE;
-   }
 }
 
 status_t mediametrics::Item::Prop::readFromParcel(const Parcel& data)
@@ -797,239 +509,99 @@ status_t mediametrics::Item::Prop::readFromParcel(const Parcel& data)
     status_t status = data.readInt32(&type);
     if (status != NO_ERROR) return status;
     switch (type) {
-    case kTypeInt32:
-        status = data.readInt32(&u.int32Value);
-        break;
-    case kTypeInt64:
-        status = data.readInt64(&u.int64Value);
-        break;
-    case kTypeDouble:
-        status = data.readDouble(&u.doubleValue);
-        break;
-    case kTypeCString: {
+    case mediametrics::kTypeInt32: {
+        int32_t value;
+        status = data.readInt32(&value);
+        if (status != NO_ERROR) return status;
+        mElem = value;
+    } break;
+    case mediametrics::kTypeInt64: {
+        int64_t value;
+        status = data.readInt64(&value);
+        if (status != NO_ERROR) return status;
+        mElem = value;
+    } break;
+    case mediametrics::kTypeDouble: {
+        double value;
+        status = data.readDouble(&value);
+        if (status != NO_ERROR) return status;
+        mElem = value;
+    } break;
+    case mediametrics::kTypeCString: {
         const char *s = data.readCString();
         if (s == nullptr) return BAD_VALUE;
-        set(s);
-        break;
-        }
-    case kTypeRate: {
+        mElem = s;
+    } break;
+    case mediametrics::kTypeRate: {
         std::pair<int64_t, int64_t> rate;
         status = data.readInt64(&rate.first)
                 ?: data.readInt64(&rate.second);
-        if (status == NO_ERROR) {
-            set(rate);
-        }
-        break;
-        }
+        if (status != NO_ERROR) return status;
+        mElem = rate;
+    } break;
+    case mediametrics::kTypeNone: {
+        mElem = std::monostate{};
+    } break;
     default:
-        ALOGE("%s: reading bad item type: %d", __func__, mType);
+        ALOGE("%s: reading bad item type: %d", __func__, type);
         return BAD_VALUE;
     }
-    if (status == NO_ERROR) {
-        setName(key);
-        mType = (Type)type;
-    }
-    return status;
-}
-
-void mediametrics::Item::Prop::toString(char *buffer, size_t length) const
-{
-    switch (mType) {
-    case kTypeInt32:
-        snprintf(buffer, length, "%s=%d:", mName, u.int32Value);
-        break;
-    case mediametrics::Item::kTypeInt64:
-        snprintf(buffer, length, "%s=%lld:", mName, (long long)u.int64Value);
-        break;
-    case mediametrics::Item::kTypeDouble:
-        snprintf(buffer, length, "%s=%e:", mName, u.doubleValue);
-        break;
-    case mediametrics::Item::kTypeRate:
-        snprintf(buffer, length, "%s=%lld/%lld:",
-                mName, (long long)u.rate.first, (long long)u.rate.second);
-        break;
-    case mediametrics::Item::kTypeCString:
-        // TODO sanitize string for ':' '='
-        snprintf(buffer, length, "%s=%s:", mName, u.CStringValue);
-        break;
-    default:
-        ALOGE("%s: bad item type: %d for %s", __func__, mType, mName);
-        if (length > 0) buffer[0] = 0;
-        break;
-    }
-}
-
-size_t mediametrics::Item::Prop::getByteStringSize() const
-{
-    const size_t header =
-        sizeof(uint16_t)      // length
-        + sizeof(uint8_t)     // type
-        + strlen(mName) + 1;  // mName + 0 termination
-    size_t payload = 0;
-    switch (mType) {
-    case mediametrics::Item::kTypeInt32:
-        payload = sizeof(u.int32Value);
-        break;
-    case mediametrics::Item::kTypeInt64:
-        payload = sizeof(u.int64Value);
-        break;
-    case mediametrics::Item::kTypeDouble:
-        payload = sizeof(u.doubleValue);
-        break;
-    case mediametrics::Item::kTypeRate:
-        payload = sizeof(u.rate.first) + sizeof(u.rate.second);
-        break;
-    case mediametrics::Item::kTypeCString:
-        payload = strlen(u.CStringValue) + 1;
-        break;
-    default:
-        ALOGE("%s: found bad prop type: %d, name %s",
-                __func__, mType, mName); // no payload computed
-        break;
-    }
-    return header + payload;
-}
-
-
-// TODO: fold into a template later.
-status_t BaseItem::writeToByteString(
-        const char *name, int32_t value, char **bufferpptr, char *bufferptrmax)
-{
-    const size_t len = 2 + 1 + strlen(name) + 1 + sizeof(value);
-    if (len > UINT16_MAX) return BAD_VALUE;
-    return insert((uint16_t)len, bufferpptr, bufferptrmax)
-            ?: insert((uint8_t)kTypeInt32, bufferpptr, bufferptrmax)
-            ?: insert(name, bufferpptr, bufferptrmax)
-            ?: insert(value, bufferpptr, bufferptrmax);
-}
-
-status_t BaseItem::writeToByteString(
-        const char *name, int64_t value, char **bufferpptr, char *bufferptrmax)
-{
-    const size_t len = 2 + 1 + strlen(name) + 1 + sizeof(value);
-    if (len > UINT16_MAX) return BAD_VALUE;
-    return insert((uint16_t)len, bufferpptr, bufferptrmax)
-            ?: insert((uint8_t)kTypeInt64, bufferpptr, bufferptrmax)
-            ?: insert(name, bufferpptr, bufferptrmax)
-            ?: insert(value, bufferpptr, bufferptrmax);
-}
-
-status_t BaseItem::writeToByteString(
-        const char *name, double value, char **bufferpptr, char *bufferptrmax)
-{
-    const size_t len = 2 + 1 + strlen(name) + 1 + sizeof(value);
-    if (len > UINT16_MAX) return BAD_VALUE;
-    return insert((uint16_t)len, bufferpptr, bufferptrmax)
-            ?: insert((uint8_t)kTypeDouble, bufferpptr, bufferptrmax)
-            ?: insert(name, bufferpptr, bufferptrmax)
-            ?: insert(value, bufferpptr, bufferptrmax);
-}
-
-status_t BaseItem::writeToByteString(
-        const char *name, const std::pair<int64_t, int64_t> &value, char **bufferpptr, char *bufferptrmax)
-{
-    const size_t len = 2 + 1 + strlen(name) + 1 + 8 + 8;
-    if (len > UINT16_MAX) return BAD_VALUE;
-    return insert((uint16_t)len, bufferpptr, bufferptrmax)
-            ?: insert((uint8_t)kTypeRate, bufferpptr, bufferptrmax)
-            ?: insert(name, bufferpptr, bufferptrmax)
-            ?: insert(value.first, bufferpptr, bufferptrmax)
-            ?: insert(value.second, bufferpptr, bufferptrmax);
-}
-
-status_t BaseItem::writeToByteString(
-        const char *name, char * const &value, char **bufferpptr, char *bufferptrmax)
-{
-    return writeToByteString(name, (const char *)value, bufferpptr, bufferptrmax);
-}
-
-status_t BaseItem::writeToByteString(
-        const char *name, const char * const &value, char **bufferpptr, char *bufferptrmax)
-{
-    const size_t len = 2 + 1 + strlen(name) + 1 + strlen(value) + 1;
-    if (len > UINT16_MAX) return BAD_VALUE;
-    return insert((uint16_t)len, bufferpptr, bufferptrmax)
-            ?: insert((uint8_t)kTypeCString, bufferpptr, bufferptrmax)
-            ?: insert(name, bufferpptr, bufferptrmax)
-            ?: insert(value, bufferpptr, bufferptrmax);
-}
-
-
-status_t BaseItem::writeToByteString(
-        const char *name, const none_t &, char **bufferpptr, char *bufferptrmax)
-{
-    const size_t len = 2 + 1 + strlen(name) + 1;
-    if (len > UINT16_MAX) return BAD_VALUE;
-    return insert((uint16_t)len, bufferpptr, bufferptrmax)
-            ?: insert((uint8_t)kTypeCString, bufferpptr, bufferptrmax)
-            ?: insert(name, bufferpptr, bufferptrmax);
-}
-
-
-status_t mediametrics::Item::Prop::writeToByteString(
-        char **bufferpptr, char *bufferptrmax) const
-{
-    switch (mType) {
-    case kTypeInt32:
-        return BaseItem::writeToByteString(mName, u.int32Value, bufferpptr, bufferptrmax);
-    case kTypeInt64:
-        return BaseItem::writeToByteString(mName, u.int64Value, bufferpptr, bufferptrmax);
-    case kTypeDouble:
-        return BaseItem::writeToByteString(mName, u.doubleValue, bufferpptr, bufferptrmax);
-    case kTypeRate:
-        return BaseItem::writeToByteString(mName, u.rate, bufferpptr, bufferptrmax);
-    case kTypeCString:
-        return BaseItem::writeToByteString(mName, u.CStringValue, bufferpptr, bufferptrmax);
-    case kTypeNone:
-        return BaseItem::writeToByteString(mName, none_t{}, bufferpptr, bufferptrmax);
-    default:
-        ALOGE("%s: found bad prop type: %d, name %s",
-                __func__, mType, mName);  // no payload sent
-        return BAD_VALUE;
-    }
+    setName(key);
+    return NO_ERROR;
 }
 
 status_t mediametrics::Item::Prop::readFromByteString(
         const char **bufferpptr, const char *bufferptrmax)
 {
     uint16_t len;
-    char *name;
+    std::string name;
     uint8_t type;
     status_t status = extract(&len, bufferpptr, bufferptrmax)
             ?: extract(&type, bufferpptr, bufferptrmax)
             ?: extract(&name, bufferpptr, bufferptrmax);
     if (status != NO_ERROR) return status;
-    if (mName != nullptr) {
-        free(mName);
-    }
-    mName = name;
-    if (mType == kTypeCString) {
-        free(u.CStringValue);
-        u.CStringValue = nullptr;
-    }
-    mType = (Type)type;
-    switch (mType) {
-    case kTypeInt32:
-        return extract(&u.int32Value, bufferpptr, bufferptrmax);
-    case kTypeInt64:
-        return extract(&u.int64Value, bufferpptr, bufferptrmax);
-    case kTypeDouble:
-        return extract(&u.doubleValue, bufferpptr, bufferptrmax);
-    case kTypeRate:
-        return extract(&u.rate.first, bufferpptr, bufferptrmax)
-                ?: extract(&u.rate.second, bufferpptr, bufferptrmax);
-    case kTypeCString:
-        status = extract(&u.CStringValue, bufferpptr, bufferptrmax);
-        if (status != NO_ERROR) mType = kTypeNone;
-        return status;
-    case kTypeNone:
-        return NO_ERROR;
+    switch (type) {
+    case mediametrics::kTypeInt32: {
+        int32_t value;
+        status = extract(&value, bufferpptr, bufferptrmax);
+        if (status != NO_ERROR) return status;
+        mElem = value;
+    } break;
+    case mediametrics::kTypeInt64: {
+        int64_t value;
+        status = extract(&value, bufferpptr, bufferptrmax);
+        if (status != NO_ERROR) return status;
+        mElem = value;
+    } break;
+    case mediametrics::kTypeDouble: {
+        double value;
+        status = extract(&value, bufferpptr, bufferptrmax);
+        if (status != NO_ERROR) return status;
+        mElem = value;
+    } break;
+    case mediametrics::kTypeRate: {
+        std::pair<int64_t, int64_t> value;
+        status = extract(&value.first, bufferpptr, bufferptrmax)
+                ?: extract(&value.second, bufferpptr, bufferptrmax);
+        if (status != NO_ERROR) return status;
+        mElem = value;
+    } break;
+    case mediametrics::kTypeCString: {
+        std::string value;
+        status = extract(&value, bufferpptr, bufferptrmax);
+        if (status != NO_ERROR) return status;
+        mElem = std::move(value);
+    } break;
+    case mediametrics::kTypeNone: {
+        mElem = std::monostate{};
+    } break;
     default:
-        mType = kTypeNone;
         ALOGE("%s: found bad prop type: %d, name %s",
-                __func__, mType, mName);  // no payload sent
+                __func__, (int)type, mName.c_str());  // no payload sent
         return BAD_VALUE;
     }
+    mName = name;
+    return NO_ERROR;
 }
 
 } // namespace android::mediametrics

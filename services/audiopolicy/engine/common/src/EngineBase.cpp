@@ -106,48 +106,33 @@ product_strategy_t EngineBase::getProductStrategyByName(const std::string &name)
 
 engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
 {
-    auto loadProductStrategies =
-            [](auto& strategyConfigs, auto& productStrategies, auto& volumeGroups) {
-        for (auto& strategyConfig : strategyConfigs) {
-            sp<ProductStrategy> strategy = new ProductStrategy(strategyConfig.name);
-            for (const auto &group : strategyConfig.attributesGroups) {
-                const auto &iter = std::find_if(begin(volumeGroups), end(volumeGroups),
-                                         [&group](const auto &volumeGroup) {
-                        return group.volumeGroup == volumeGroup.second->getName(); });
-                ALOG_ASSERT(iter != end(volumeGroups), "Invalid Volume Group Name %s",
-                            group.volumeGroup.c_str());
-                if (group.stream != AUDIO_STREAM_DEFAULT) {
-                    iter->second->addSupportedStream(group.stream);
-                }
-                for (const auto &attr : group.attributesVect) {
-                    strategy->addAttributes({group.stream, iter->second->getId(), attr});
-                    iter->second->addSupportedAttributes(attr);
-                }
-            }
-            product_strategy_t strategyId = strategy->getId();
-            productStrategies[strategyId] = strategy;
-        }
-    };
-    auto loadVolumeGroups = [](auto &volumeConfigs, auto &volumeGroups) {
-        for (auto &volumeConfig : volumeConfigs) {
-            sp<VolumeGroup> volumeGroup = new VolumeGroup(volumeConfig.name, volumeConfig.indexMin,
-                                                          volumeConfig.indexMax);
-            volumeGroups[volumeGroup->getId()] = volumeGroup;
+    auto loadVolumeConfig = [](auto &volumeGroups, auto &volumeConfig) {
+        sp<VolumeGroup> volumeGroup = new VolumeGroup(volumeConfig.name, volumeConfig.indexMin,
+                                                      volumeConfig.indexMax);
+        volumeGroups[volumeGroup->getId()] = volumeGroup;
 
-            for (auto &configCurve : volumeConfig.volumeCurves) {
-                device_category deviceCat = DEVICE_CATEGORY_SPEAKER;
-                if (!DeviceCategoryConverter::fromString(configCurve.deviceCategory, deviceCat)) {
-                    ALOGE("%s: Invalid %s", __FUNCTION__, configCurve.deviceCategory.c_str());
-                    continue;
-                }
-                sp<VolumeCurve> curve = new VolumeCurve(deviceCat);
-                for (auto &point : configCurve.curvePoints) {
-                    curve->add({point.index, point.attenuationInMb});
-                }
-                volumeGroup->add(curve);
+        for (auto &configCurve : volumeConfig.volumeCurves) {
+            device_category deviceCat = DEVICE_CATEGORY_SPEAKER;
+            if (!DeviceCategoryConverter::fromString(configCurve.deviceCategory, deviceCat)) {
+                ALOGE("%s: Invalid %s", __FUNCTION__, configCurve.deviceCategory.c_str());
+                continue;
             }
+            sp<VolumeCurve> curve = new VolumeCurve(deviceCat);
+            for (auto &point : configCurve.curvePoints) {
+                curve->add({point.index, point.attenuationInMb});
+            }
+            volumeGroup->add(curve);
+        }
+        return volumeGroup;
+    };
+    auto addSupportedStreamAttributes = [](auto &group, auto &volumeGroup, auto &strategy) {
+        volumeGroup->addSupportedStream(group.stream);
+        for (const auto &attr : group.attributesVect) {
+            strategy->addAttributes({group.stream, volumeGroup->getId(), attr});
+            volumeGroup->addSupportedAttributes(attr);
         }
     };
+
     auto result = engineConfig::parse();
     if (result.parsedConfig == nullptr) {
         ALOGW("%s: No configuration found, using default matching phone experience.", __FUNCTION__);
@@ -157,9 +142,37 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
                   static_cast<size_t>(ret == NO_ERROR ? 0 : 1)};
     }
     ALOGE_IF(result.nbSkippedElement != 0, "skipped %zu elements", result.nbSkippedElement);
-    loadVolumeGroups(result.parsedConfig->volumeGroups, mVolumeGroups);
-    loadProductStrategies(result.parsedConfig->productStrategies, mProductStrategies,
-                          mVolumeGroups);
+
+    engineConfig::VolumeGroup defaultVolumeConfig;
+    for (auto &volumeConfig : result.parsedConfig->volumeGroups) {
+        // save default volume config for streams not defined in configuration
+        if (volumeConfig.name.compare("AUDIO_STREAM_MUSIC") == 0) {
+            defaultVolumeConfig = volumeConfig;
+        }
+        loadVolumeConfig(mVolumeGroups, volumeConfig);
+    }
+    for (auto& strategyConfig : result.parsedConfig->productStrategies) {
+        sp<ProductStrategy> strategy = new ProductStrategy(strategyConfig.name);
+        for (const auto &group : strategyConfig.attributesGroups) {
+            const auto &iter = std::find_if(begin(mVolumeGroups), end(mVolumeGroups),
+                                         [&group](const auto &volumeGroup) {
+                    return group.volumeGroup == volumeGroup.second->getName(); });
+            if (group.stream != AUDIO_STREAM_DEFAULT) {
+                if (iter == end(mVolumeGroups)) {
+                    ALOGW("%s: No configuration of %s found, using default volume configuration"
+                            , __FUNCTION__, group.volumeGroup.c_str());
+                    defaultVolumeConfig.name = group.volumeGroup;
+                    sp<VolumeGroup> volumeGroup =
+                            loadVolumeConfig(mVolumeGroups, defaultVolumeConfig);
+                    addSupportedStreamAttributes(group, volumeGroup, strategy);
+                } else {
+                    addSupportedStreamAttributes(group, iter->second, strategy);
+                }
+            }
+        }
+        product_strategy_t strategyId = strategy->getId();
+        mProductStrategies[strategyId] = strategy;
+    }
     mProductStrategies.initialize();
     return result;
 }

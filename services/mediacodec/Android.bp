@@ -15,10 +15,6 @@ cc_binary {
     ],
 
     target: {
-        vendor: {
-            exclude_shared_libs: ["libavservices_minijail"],
-            shared_libs: ["libavservices_minijail_vendor"],
-        },
         android: {
             product_variables: {
                 malloc_not_svelte: {

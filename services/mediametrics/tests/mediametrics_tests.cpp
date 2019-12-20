@@ -274,9 +274,9 @@ TEST(mediametrics_tests, item_iteration) {
           ASSERT_EQ(3.125, d);
           mask |= 4;
       } else if (!strcmp(name, "string")) {
-          const char *s;
+          std::string s;
           ASSERT_TRUE(prop.get(&s));
-          ASSERT_EQ(0, strcmp(s, "abc"));
+          ASSERT_EQ("abc", s);
           mask |= 8;
       } else if (!strcmp(name, "rate")) {
           std::pair<int64_t, int64_t> r;
@@ -323,9 +323,9 @@ TEST(mediametrics_tests, item_expansion) {
           ASSERT_EQ(3.125, d);
           mask |= 4;
       } else if (!strcmp(name, "string")) {
-          const char *s;
+          std::string s;
           ASSERT_TRUE(prop.get(&s));
-          ASSERT_EQ(0, strcmp(s, "abcdefghijklmnopqrstuvwxyz"));
+          ASSERT_EQ("abcdefghijklmnopqrstuvwxyz", s);
           mask |= 8;
       } else if (!strcmp(name, "rate")) {
           std::pair<int64_t, int64_t> r;

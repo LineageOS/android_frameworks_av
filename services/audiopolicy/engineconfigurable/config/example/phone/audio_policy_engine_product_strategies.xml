@@ -72,6 +72,12 @@
             <Attributes> <Usage value="AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE"/> </Attributes>
             <Attributes></Attributes>
         </AttributesGroup>
+        <AttributesGroup streamType="AUDIO_STREAM_ASSISTANT" volumeGroup="assistant">
+            <Attributes>
+                <ContentType value="AUDIO_CONTENT_TYPE_SPEECH"/>
+                <Usage value="AUDIO_USAGE_ASSISTANT"/>
+            </Attributes>
+        </AttributesGroup>
         <AttributesGroup streamType="AUDIO_STREAM_SYSTEM" volumeGroup="system">
             <Attributes> <Usage value="AUDIO_USAGE_ASSISTANCE_SONIFICATION"/> </Attributes>
         </AttributesGroup>
