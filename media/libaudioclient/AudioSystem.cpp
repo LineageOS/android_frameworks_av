@@ -1491,7 +1491,14 @@ audio_stream_type_t AudioSystem::attributesToStreamType(const audio_attributes_t
             }
         }
     }
-    ALOGE("invalid attributes %s when converting to stream",  toString(attr).c_str());
+    switch (attr.usage) {
+        case AUDIO_USAGE_VIRTUAL_SOURCE:
+            // virtual source is not expected to have an associated product strategy
+            break;
+        default:
+            ALOGE("invalid attributes %s when converting to stream",  toString(attr).c_str());
+            break;
+    }
     return AUDIO_STREAM_MUSIC;
 }
 
