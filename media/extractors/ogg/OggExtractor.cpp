@@ -22,7 +22,7 @@
 
 #include <cutils/properties.h>
 #include <utils/Vector.h>
-#include <media/DataSourceBase.h>
+#include <media/stagefright/DataSourceBase.h>
 #include <media/ExtractorUtils.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>

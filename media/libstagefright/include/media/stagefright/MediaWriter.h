@@ -19,8 +19,9 @@
 #define MEDIA_WRITER_H_
 
 #include <utils/RefBase.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/IMediaRecorderClient.h>
+#include <media/stagefright/MediaMuxer.h>
 
 namespace android {
 
@@ -36,7 +37,7 @@ struct MediaWriter : public RefBase {
     virtual status_t stop() = 0;
     virtual status_t pause() = 0;
     virtual status_t setCaptureRate(float /* captureFps */) {
-        ALOGW("setCaptureRate unsupported");
+        ALOG(LOG_WARN, "MediaWriter", "setCaptureRate unsupported");
         return ERROR_UNSUPPORTED;
     }
 
@@ -45,6 +46,7 @@ struct MediaWriter : public RefBase {
     virtual void setListener(const sp<IMediaRecorderClient>& listener) {
         mListener = listener;
     }
+    virtual void setMuxerListener(const wp<MediaMuxer>& muxer) { mMuxer = muxer; }
 
     virtual status_t dump(int /*fd*/, const Vector<String16>& /*args*/) {
         return OK;
@@ -59,10 +61,16 @@ protected:
     int64_t mMaxFileSizeLimitBytes;
     int64_t mMaxFileDurationLimitUs;
     sp<IMediaRecorderClient> mListener;
+    wp<MediaMuxer> mMuxer;
 
     void notify(int msg, int ext1, int ext2) {
-        if (mListener != NULL) {
+        ALOG(LOG_VERBOSE, "MediaWriter", "notify msg:%d, ext1:%d, ext2:%d", msg, ext1, ext2);
+        if (mListener != nullptr) {
             mListener->notify(msg, ext1, ext2);
+        }
+        sp<MediaMuxer> muxer = mMuxer.promote();
+        if (muxer != nullptr) {
+            muxer->notify(msg, ext1, ext2);
         }
     }
 private:

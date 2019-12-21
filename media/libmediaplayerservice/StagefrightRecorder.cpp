@@ -2002,7 +2002,6 @@ void StagefrightRecorder::setupMPEG4orWEBMMetaData(sp<MetaData> *meta) {
         (*meta)->setInt32(kKeyTimeScale, mMovieTimeScale);
     }
     if (mOutputFormat != OUTPUT_FORMAT_WEBM) {
-        (*meta)->setInt32(kKey64BitFileOffset, mUse64BitFileOffset);
         if (mTrackEveryTimeDurationUs > 0) {
             (*meta)->setInt64(kKeyTrackTimeStatus, mTrackEveryTimeDurationUs);
         }

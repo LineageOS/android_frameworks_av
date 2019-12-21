@@ -24,7 +24,7 @@
 #include "AnotherPacketSource.h"
 #include "NuPlayerStreamListener.h"
 
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>

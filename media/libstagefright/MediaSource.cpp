@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/IMediaSource.h>
 
 namespace android {

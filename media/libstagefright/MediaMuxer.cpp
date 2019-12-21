@@ -24,7 +24,7 @@
 #include <media/stagefright/MediaMuxer.h>
 
 #include <media/mediarecorder.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -48,7 +48,8 @@ static bool isMp4Format(MediaMuxer::OutputFormat format) {
 
 MediaMuxer::MediaMuxer(int fd, OutputFormat format)
     : mFormat(format),
-      mState(UNINITIALIZED) {
+      mState(UNINITIALIZED),
+      mError(OK) {
     if (isMp4Format(format)) {
         mWriter = new MPEG4Writer(fd);
     } else if (format == OUTPUT_FORMAT_WEBM) {
@@ -58,6 +59,7 @@ MediaMuxer::MediaMuxer(int fd, OutputFormat format)
     }
 
     if (mWriter != NULL) {
+        mWriter->setMuxerListener(this);
         mFileMeta = new MetaData;
         if (format == OUTPUT_FORMAT_HEIF) {
             // Note that the key uses recorder file types.
@@ -156,14 +158,22 @@ status_t MediaMuxer::start() {
 status_t MediaMuxer::stop() {
     Mutex::Autolock autoLock(mMuxerLock);
 
-    if (mState == STARTED) {
+    if (mState == STARTED || mState == ERROR) {
         mState = STOPPED;
         for (size_t i = 0; i < mTrackList.size(); i++) {
             if (mTrackList[i]->stop() != OK) {
                 return INVALID_OPERATION;
             }
         }
-        return mWriter->stop();
+        status_t err = mWriter->stop();
+        if (err != OK || mError != OK) {
+            ALOGE("stop err: %d, mError:%d", err, mError);
+        }
+        // Prioritize mError over err.
+        if (mError != OK) {
+            err = mError;
+        }
+        return err;
     } else {
         ALOGE("stop() is called in invalid state %d", mState);
         return INVALID_OPERATION;
@@ -210,6 +220,31 @@ status_t MediaMuxer::writeSampleData(const sp<ABuffer> &buffer, size_t trackInde
     sp<MediaAdapter> currentTrack = mTrackList[trackIndex];
     // This pushBuffer will wait until the mediaBuffer is consumed.
     return currentTrack->pushBuffer(mediaBuffer);
+}
+
+void MediaMuxer::notify(int msg, int ext1, int ext2) {
+    switch (msg) {
+        case MEDIA_RECORDER_EVENT_ERROR:
+        case MEDIA_RECORDER_TRACK_EVENT_ERROR: {
+            Mutex::Autolock autoLock(mMuxerLock);
+            mState = ERROR;
+            mError = ext2;
+            ALOGW("message received msg=%d, ext1=%d, ext2=%d", msg, ext1, ext2);
+            break;
+        }
+        case MEDIA_RECORDER_EVENT_INFO: {
+            if (ext1 == MEDIA_RECORDER_INFO_UNKNOWN) {
+                Mutex::Autolock autoLock(mMuxerLock);
+                mState = ERROR;
+                mError = ext2;
+                ALOGW("message received msg=%d, ext1=%d, ext2=%d", msg, ext1, ext2);
+            }
+            break;
+        }
+        default:
+            // Ignore INFO and other notifications for now.
+            break;
+    }
 }
 
 }  // namespace android

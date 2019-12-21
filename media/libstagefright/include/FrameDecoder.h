@@ -22,7 +22,7 @@
 
 #include <media/stagefright/foundation/AString.h>
 #include <media/stagefright/foundation/ABase.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/openmax/OMX_Video.h>
 #include <ui/GraphicTypes.h>
 

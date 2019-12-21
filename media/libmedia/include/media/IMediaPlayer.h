@@ -23,7 +23,7 @@
 #include <utils/KeyedVector.h>
 #include <system/audio.h>
 
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/VolumeShaper.h>
 
 // Fwd decl to make sure everyone agrees that the scope of struct sockaddr_in is
