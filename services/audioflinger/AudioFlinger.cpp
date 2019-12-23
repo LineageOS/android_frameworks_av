@@ -422,31 +422,30 @@ AudioHwDevice* AudioFlinger::findSuitableHwDev_l(
 
 void AudioFlinger::dumpClients(int fd, const Vector<String16>& args __unused)
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
     String8 result;
 
     result.append("Clients:\n");
     for (size_t i = 0; i < mClients.size(); ++i) {
         sp<Client> client = mClients.valueAt(i).promote();
         if (client != 0) {
-            snprintf(buffer, SIZE, "  pid: %d\n", client->pid());
-            result.append(buffer);
+            result.appendFormat("  pid: %d\n", client->pid());
         }
     }
 
     result.append("Notification Clients:\n");
+    result.append("   pid    uid  name\n");
     for (size_t i = 0; i < mNotificationClients.size(); ++i) {
-        snprintf(buffer, SIZE, "  pid: %d\n", mNotificationClients.keyAt(i));
-        result.append(buffer);
+        const pid_t pid = mNotificationClients[i]->getPid();
+        const uid_t uid = mNotificationClients[i]->getUid();
+        const mediautils::UidInfo::Info info = mUidInfo.getInfo(uid);
+        result.appendFormat("%6d %6u  %s\n", pid, uid, info.package.c_str());
     }
 
     result.append("Global session refs:\n");
-    result.append("  session   pid count\n");
+    result.append("  session  cnt     pid\n");
     for (size_t i = 0; i < mAudioSessionRefs.size(); i++) {
         AudioSessionRef *r = mAudioSessionRefs[i];
-        snprintf(buffer, SIZE, "  %7d %5d %5d\n", r->mSessionid, r->mPid, r->mCnt);
-        result.append(buffer);
+        result.appendFormat("  %7d %4d %7d\n", r->mSessionid, r->mCnt, r->mPid);
     }
     write(fd, result.string(), result.size());
 }
@@ -1694,13 +1693,16 @@ void AudioFlinger::registerClient(const sp<IAudioFlingerClient>& client)
         return;
     }
     pid_t pid = IPCThreadState::self()->getCallingPid();
+    const uid_t uid = IPCThreadState::self()->getCallingUid();
     {
         Mutex::Autolock _cl(mClientLock);
         if (mNotificationClients.indexOfKey(pid) < 0) {
             sp<NotificationClient> notificationClient = new NotificationClient(this,
                                                                                 client,
-                                                                                pid);
-            ALOGV("registerClient() client %p, pid %d", notificationClient.get(), pid);
+                                                                                pid,
+                                                                                uid);
+            ALOGV("registerClient() client %p, pid %d, uid %u",
+                    notificationClient.get(), pid, uid);
 
             mNotificationClients.add(pid, notificationClient);
 
@@ -1840,8 +1842,9 @@ sp<MemoryDealer> AudioFlinger::Client::heap() const
 
 AudioFlinger::NotificationClient::NotificationClient(const sp<AudioFlinger>& audioFlinger,
                                                      const sp<IAudioFlingerClient>& client,
-                                                     pid_t pid)
-    : mAudioFlinger(audioFlinger), mPid(pid), mAudioFlingerClient(client)
+                                                     pid_t pid,
+                                                     uid_t uid)
+    : mAudioFlinger(audioFlinger), mPid(pid), mUid(uid), mAudioFlingerClient(client)
 {
 }
 
