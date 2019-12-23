@@ -214,7 +214,7 @@ public:
     // This is the binder API.  For the internal API see nextUniqueId().
     virtual audio_unique_id_t newAudioUniqueId(audio_unique_id_use_t use);
 
-    virtual void acquireAudioSessionId(audio_session_t audioSession, pid_t pid);
+    void acquireAudioSessionId(audio_session_t audioSession, pid_t pid, uid_t uid) override;
 
     virtual void releaseAudioSessionId(audio_session_t audioSession, pid_t pid);
 
@@ -808,10 +808,11 @@ using effect_buffer_t = int16_t;
 
     // for mAudioSessionRefs only
     struct AudioSessionRef {
-        AudioSessionRef(audio_session_t sessionid, pid_t pid) :
-            mSessionid(sessionid), mPid(pid), mCnt(1) {}
+        AudioSessionRef(audio_session_t sessionid, pid_t pid, uid_t uid) :
+            mSessionid(sessionid), mPid(pid), mUid(uid), mCnt(1) {}
         const audio_session_t mSessionid;
         const pid_t mPid;
+        const uid_t mUid;
         int         mCnt;
     };
 

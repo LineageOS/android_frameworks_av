@@ -599,7 +599,7 @@ status_t AudioTrack::set(
     mReleased = 0;
     mStartNs = 0;
     mStartFromZeroUs = 0;
-    AudioSystem::acquireAudioSessionId(mSessionId, mClientPid);
+    AudioSystem::acquireAudioSessionId(mSessionId, mClientPid, mClientUid);
     mSequence = 1;
     mObservedSequence = mSequence;
     mInUnderrun = false;
