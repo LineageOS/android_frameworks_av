@@ -29,6 +29,7 @@ cc_library {
         "libc_malloc_debug_backtrace",
     ],
     shared_libs: [
+        "libaudioutils", // for clock.h
         "libbinder",
         "libcutils",
         "liblog",
