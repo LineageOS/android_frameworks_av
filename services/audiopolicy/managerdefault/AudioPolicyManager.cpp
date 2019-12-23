@@ -6141,6 +6141,10 @@ bool AudioPolicyManager::isValidAttributes(const audio_attributes_t *paa)
     case AUDIO_USAGE_VIRTUAL_SOURCE:
     case AUDIO_USAGE_ASSISTANT:
     case AUDIO_USAGE_CALL_ASSISTANT:
+    case AUDIO_USAGE_EMERGENCY:
+    case AUDIO_USAGE_SAFETY:
+    case AUDIO_USAGE_VEHICLE_STATUS:
+    case AUDIO_USAGE_ANNOUNCEMENT:
         break;
     default:
         return false;
