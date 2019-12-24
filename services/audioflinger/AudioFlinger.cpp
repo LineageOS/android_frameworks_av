@@ -1582,11 +1582,6 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
 
     AutoMutex lock(mHardwareLock);
     mHardwareStatus = AUDIO_HW_GET_INPUT_BUFFER_SIZE;
-    audio_config_t config, proposed;
-    memset(&proposed, 0, sizeof(proposed));
-    proposed.sample_rate = sampleRate;
-    proposed.channel_mask = channelMask;
-    proposed.format = format;
 
     sp<DeviceHalInterface> dev = mPrimaryHardwareDev->hwDevice();
     std::vector<audio_channel_mask_t> channelMasks = {channelMask};
@@ -1610,12 +1605,16 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
 
     mHardwareStatus = AUDIO_HW_IDLE;
 
+    // Change parameters of the configuration each iteration until we find a
+    // configuration that the device will support.
+    audio_config_t config = AUDIO_CONFIG_INITIALIZER;
     for (auto testChannelMask : channelMasks) {
         config.channel_mask = testChannelMask;
         for (auto testFormat : formats) {
             config.format = testFormat;
             for (auto testSampleRate : sampleRates) {
                 config.sample_rate = testSampleRate;
+
                 size_t bytes = 0;
                 status_t result = dev->getInputBufferSize(&config, &bytes);
                 if (result != OK || bytes == 0) {
