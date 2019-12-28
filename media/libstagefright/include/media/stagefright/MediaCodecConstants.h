@@ -830,6 +830,7 @@ constexpr int32_t BUFFER_FLAG_KEY_FRAME = 1;
 constexpr int32_t BUFFER_FLAG_PARTIAL_FRAME = 8;
 constexpr int32_t BUFFER_FLAG_SYNC_FRAME = 1;
 constexpr int32_t CONFIGURE_FLAG_ENCODE = 1;
+constexpr int32_t CONFIGURE_FLAG_USE_BLOCK_MODEL = 2;
 constexpr int32_t CRYPTO_MODE_AES_CBC     = 2;
 constexpr int32_t CRYPTO_MODE_AES_CTR     = 1;
 constexpr int32_t CRYPTO_MODE_UNENCRYPTED = 0;

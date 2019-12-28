@@ -48,6 +48,7 @@
 #include "C2OMXNode.h"
 #include "CCodecBufferChannel.h"
 #include "CCodecConfig.h"
+#include "Codec2Mapper.h"
 #include "InputSurfaceWrapper.h"
 
 extern "C" android::PersistentSurface *CreateInputSurface();
@@ -717,6 +718,11 @@ void CCodec::configure(const sp<AMessage> &msg) {
             encoder = false;
         }
 
+        int32_t flags;
+        if (!msg->findInt32("flags", &flags)) {
+            return BAD_VALUE;
+        }
+
         // TODO: read from intf()
         if ((!encoder) != (comp->getName().find("encoder") == std::string::npos)) {
             return UNKNOWN_ERROR;
@@ -743,6 +749,9 @@ void CCodec::configure(const sp<AMessage> &msg) {
         Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
         const std::unique_ptr<Config> &config = *configLocked;
         config->mUsingSurface = surface != nullptr;
+        config->mBuffersBoundToCodec = ((flags & CONFIGURE_FLAG_USE_BLOCK_MODEL) == 0);
+        ALOGD("[%s] buffers are %sbound to CCodec for this session",
+              comp->getName().c_str(), config->mBuffersBoundToCodec ? "" : "not ");
 
         // Enforce required parameters
         int32_t i32;
@@ -1299,6 +1308,7 @@ void CCodec::start() {
     sp<AMessage> inputFormat;
     sp<AMessage> outputFormat;
     status_t err2 = OK;
+    bool buffersBoundToCodec = false;
     {
         Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
         const std::unique_ptr<Config> &config = *configLocked;
@@ -1307,12 +1317,13 @@ void CCodec::start() {
         if (config->mInputSurface) {
             err2 = config->mInputSurface->start();
         }
+        buffersBoundToCodec = config->mBuffersBoundToCodec;
     }
     if (err2 != OK) {
         mCallback->onError(err2, ACTION_CODE_FATAL);
         return;
     }
-    err2 = mChannel->start(inputFormat, outputFormat);
+    err2 = mChannel->start(inputFormat, outputFormat, buffersBoundToCodec);
     if (err2 != OK) {
         mCallback->onError(err2, ACTION_CODE_FATAL);
         return;
@@ -1556,7 +1567,11 @@ void CCodec::signalResume() {
         return;
     }
 
-    (void)mChannel->start(nullptr, nullptr);
+    (void)mChannel->start(nullptr, nullptr, [&]{
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
+        return config->mBuffersBoundToCodec;
+    }());
 
     {
         Mutexed<State>::Locked state(mState);
@@ -1909,6 +1924,244 @@ PersistentSurface *CCodec::CreateInputSurface() {
             inputSurface->getGraphicBufferProducer(),
             static_cast<sp<android::hidl::base::V1_0::IBase>>(
             inputSurface->getHalInterface()));
+}
+
+static status_t GetCommonAllocatorIds(
+        const std::vector<std::string> &names,
+        C2Allocator::type_t type,
+        std::set<C2Allocator::id_t> *ids) {
+    int poolMask = GetCodec2PoolMask();
+    C2PlatformAllocatorStore::id_t preferredLinearId = GetPreferredLinearAllocatorId(poolMask);
+    C2Allocator::id_t defaultAllocatorId =
+        (type == C2Allocator::LINEAR) ? preferredLinearId : C2PlatformAllocatorStore::GRALLOC;
+
+    ids->clear();
+    if (names.empty()) {
+        return OK;
+    }
+    std::shared_ptr<Codec2Client::Interface> intf{
+        Codec2Client::CreateInterfaceByName(names[0].c_str())};
+    std::vector<std::unique_ptr<C2Param>> params;
+    c2_status_t err = intf->query(
+            {}, {C2PortAllocatorsTuning::input::PARAM_TYPE}, C2_MAY_BLOCK, &params);
+    if (err == C2_OK && params.size() == 1u) {
+        C2PortAllocatorsTuning::input *allocators =
+            C2PortAllocatorsTuning::input::From(params[0].get());
+        if (allocators && allocators->flexCount() > 0) {
+            ids->insert(allocators->m.values, allocators->m.values + allocators->flexCount());
+        }
+    }
+    if (ids->empty()) {
+        // The component does not advertise allocators. Use default.
+        ids->insert(defaultAllocatorId);
+    }
+    for (size_t i = 1; i < names.size(); ++i) {
+        intf = Codec2Client::CreateInterfaceByName(names[i].c_str());
+        err = intf->query(
+                {}, {C2PortAllocatorsTuning::input::PARAM_TYPE}, C2_MAY_BLOCK, &params);
+        bool filtered = false;
+        if (err == C2_OK && params.size() == 1u) {
+            C2PortAllocatorsTuning::input *allocators =
+                C2PortAllocatorsTuning::input::From(params[0].get());
+            if (allocators && allocators->flexCount() > 0) {
+                filtered = true;
+                for (auto it = ids->begin(); it != ids->end(); ) {
+                    bool found = false;
+                    for (size_t j = 0; j < allocators->flexCount(); ++j) {
+                        if (allocators->m.values[j] == *it) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) {
+                        ++it;
+                    } else {
+                        it = ids->erase(it);
+                    }
+                }
+            }
+        }
+        if (!filtered) {
+            // The component does not advertise supported allocators. Use default.
+            bool containsDefault = (ids->count(defaultAllocatorId) > 0u);
+            if (ids->size() != (containsDefault ? 1 : 0)) {
+                ids->clear();
+                if (containsDefault) {
+                    ids->insert(defaultAllocatorId);
+                }
+            }
+        }
+    }
+    // Finally, filter with pool masks
+    for (auto it = ids->begin(); it != ids->end(); ) {
+        if ((poolMask >> *it) & 1) {
+            ++it;
+        } else {
+            it = ids->erase(it);
+        }
+    }
+    return OK;
+}
+
+static status_t CalculateMinMaxUsage(
+        const std::vector<std::string> &names, uint64_t *minUsage, uint64_t *maxUsage) {
+    static C2StreamUsageTuning::input sUsage{0u /* stream id */};
+    *minUsage = 0;
+    *maxUsage = ~0ull;
+    for (const std::string &name : names) {
+        std::shared_ptr<Codec2Client::Interface> intf{
+            Codec2Client::CreateInterfaceByName(name.c_str())};
+        std::vector<C2FieldSupportedValuesQuery> fields;
+        fields.push_back(C2FieldSupportedValuesQuery::Possible(
+                C2ParamField{&sUsage, &sUsage.value}));
+        c2_status_t err = intf->querySupportedValues(fields, C2_MAY_BLOCK);
+        if (err != C2_OK) {
+            continue;
+        }
+        if (fields[0].status != C2_OK) {
+            continue;
+        }
+        const C2FieldSupportedValues &supported = fields[0].values;
+        if (supported.type != C2FieldSupportedValues::FLAGS) {
+            continue;
+        }
+        if (supported.values.empty()) {
+            *maxUsage = 0;
+            continue;
+        }
+        *minUsage |= supported.values[0].u64;
+        int64_t currentMaxUsage = 0;
+        for (const C2Value::Primitive &flags : supported.values) {
+            currentMaxUsage |= flags.u64;
+        }
+        *maxUsage &= currentMaxUsage;
+    }
+    return OK;
+}
+
+// static
+status_t CCodec::CanFetchLinearBlock(
+        const std::vector<std::string> &names, const C2MemoryUsage &usage, bool *isCompatible) {
+    uint64_t minUsage = usage.expected;
+    uint64_t maxUsage = ~0ull;
+    std::set<C2Allocator::id_t> allocators;
+    GetCommonAllocatorIds(names, C2Allocator::LINEAR, &allocators);
+    if (allocators.empty()) {
+        *isCompatible = false;
+        return OK;
+    }
+    CalculateMinMaxUsage(names, &minUsage, &maxUsage);
+    *isCompatible = ((maxUsage & minUsage) == minUsage);
+    return OK;
+}
+
+static std::shared_ptr<C2BlockPool> GetPool(C2Allocator::id_t allocId) {
+    static std::mutex sMutex{};
+    static std::map<C2Allocator::id_t, std::shared_ptr<C2BlockPool>> sPools;
+    std::unique_lock<std::mutex> lock{sMutex};
+    std::shared_ptr<C2BlockPool> pool;
+    auto it = sPools.find(allocId);
+    if (it == sPools.end()) {
+        c2_status_t err = CreateCodec2BlockPool(allocId, nullptr, &pool);
+        if (err == OK) {
+            sPools.emplace(allocId, pool);
+        } else {
+            pool.reset();
+        }
+    } else {
+        pool = it->second;
+    }
+    return pool;
+}
+
+// static
+std::shared_ptr<C2LinearBlock> CCodec::FetchLinearBlock(
+        size_t capacity, const C2MemoryUsage &usage, const std::vector<std::string> &names) {
+    uint64_t minUsage = usage.expected;
+    uint64_t maxUsage = ~0ull;
+    std::set<C2Allocator::id_t> allocators;
+    GetCommonAllocatorIds(names, C2Allocator::LINEAR, &allocators);
+    if (allocators.empty()) {
+        allocators.insert(C2PlatformAllocatorStore::DEFAULT_LINEAR);
+    }
+    CalculateMinMaxUsage(names, &minUsage, &maxUsage);
+    if ((maxUsage & minUsage) != minUsage) {
+        allocators.clear();
+        allocators.insert(C2PlatformAllocatorStore::DEFAULT_LINEAR);
+    }
+    std::shared_ptr<C2LinearBlock> block;
+    for (C2Allocator::id_t allocId : allocators) {
+        std::shared_ptr<C2BlockPool> pool = GetPool(allocId);
+        if (!pool) {
+            continue;
+        }
+        c2_status_t err = pool->fetchLinearBlock(capacity, C2MemoryUsage{minUsage}, &block);
+        if (err != C2_OK || !block) {
+            block.reset();
+            continue;
+        }
+        break;
+    }
+    return block;
+}
+
+// static
+status_t CCodec::CanFetchGraphicBlock(
+        const std::vector<std::string> &names, bool *isCompatible) {
+    uint64_t minUsage = 0;
+    uint64_t maxUsage = ~0ull;
+    std::set<C2Allocator::id_t> allocators;
+    GetCommonAllocatorIds(names, C2Allocator::GRAPHIC, &allocators);
+    if (allocators.empty()) {
+        *isCompatible = false;
+        return OK;
+    }
+    CalculateMinMaxUsage(names, &minUsage, &maxUsage);
+    *isCompatible = ((maxUsage & minUsage) == minUsage);
+    return OK;
+}
+
+// static
+std::shared_ptr<C2GraphicBlock> CCodec::FetchGraphicBlock(
+        int32_t width,
+        int32_t height,
+        int32_t format,
+        uint64_t usage,
+        const std::vector<std::string> &names) {
+    uint32_t halPixelFormat = HAL_PIXEL_FORMAT_YCBCR_420_888;
+    if (!C2Mapper::mapPixelFormatFrameworkToCodec(format, &halPixelFormat)) {
+        ALOGD("Unrecognized pixel format: %d", format);
+        return nullptr;
+    }
+    uint64_t minUsage = 0;
+    uint64_t maxUsage = ~0ull;
+    std::set<C2Allocator::id_t> allocators;
+    GetCommonAllocatorIds(names, C2Allocator::GRAPHIC, &allocators);
+    if (allocators.empty()) {
+        allocators.insert(C2PlatformAllocatorStore::DEFAULT_GRAPHIC);
+    }
+    CalculateMinMaxUsage(names, &minUsage, &maxUsage);
+    minUsage |= usage;
+    if ((maxUsage & minUsage) != minUsage) {
+        allocators.clear();
+        allocators.insert(C2PlatformAllocatorStore::DEFAULT_GRAPHIC);
+    }
+    std::shared_ptr<C2GraphicBlock> block;
+    for (C2Allocator::id_t allocId : allocators) {
+        std::shared_ptr<C2BlockPool> pool;
+        c2_status_t err = CreateCodec2BlockPool(allocId, nullptr, &pool);
+        if (err != C2_OK || !pool) {
+            continue;
+        }
+        err = pool->fetchGraphicBlock(
+                width, height, halPixelFormat, C2MemoryUsage{minUsage}, &block);
+        if (err != C2_OK || !block) {
+            block.reset();
+            continue;
+        }
+        break;
+    }
+    return block;
 }
 
 }  // namespace android

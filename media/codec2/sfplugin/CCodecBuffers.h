@@ -547,6 +547,36 @@ private:
     std::function<sp<Codec2Buffer>()> mAllocate;
 };
 
+class SlotInputBuffers : public InputBuffers {
+public:
+    SlotInputBuffers(const char *componentName, const char *name = "Slot-Input")
+        : InputBuffers(componentName, name),
+          mImpl(mName) { }
+    ~SlotInputBuffers() override = default;
+
+    bool requestNewBuffer(size_t *index, sp<MediaCodecBuffer> *buffer) final;
+
+    bool releaseBuffer(
+            const sp<MediaCodecBuffer> &buffer,
+            std::shared_ptr<C2Buffer> *c2buffer,
+            bool release) final;
+
+    bool expireComponentBuffer(
+            const std::shared_ptr<C2Buffer> &c2buffer) final;
+
+    void flush() final;
+
+    std::unique_ptr<InputBuffers> toArrayMode(size_t size) final;
+
+    size_t numClientBuffers() const final;
+
+protected:
+    sp<Codec2Buffer> createNewBuffer() final;
+
+private:
+    FlexBuffersImpl mImpl;
+};
+
 class LinearInputBuffers : public InputBuffers {
 public:
     LinearInputBuffers(const char *componentName, const char *name = "1D-Input")
