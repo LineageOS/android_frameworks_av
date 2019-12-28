@@ -67,6 +67,7 @@ HeicCompositeStream::HeicCompositeStream(wp<CameraDeviceBase> device,
         mDequeuedOutputBufferCnt(0),
         mLockedAppSegmentBufferCnt(0),
         mCodecOutputCounter(0),
+        mQuality(-1),
         mGridTimestampUs(0) {
 }
 
@@ -525,6 +526,12 @@ void HeicCompositeStream::compilePendingInputLocked() {
         mPendingInputFrames[it->first].orientation = it->second.first;
         mPendingInputFrames[it->first].quality = it->second.second;
         mSettingsByTimestamp.erase(it);
+
+        // Set encoder quality if no inflight encoding
+        if (mPendingInputFrames.size() == 1) {
+            int32_t newQuality = mPendingInputFrames.begin()->second.quality;
+            updateCodecQualityLocked(newQuality);
+        }
     }
 
     while (!mInputAppSegmentBuffers.empty()) {
@@ -851,17 +858,6 @@ status_t HeicCompositeStream::startMuxerForInputFrame(nsecs_t timestamp, InputFr
                 strerror(-res), res);
         return res;
     }
-    // Set encoder quality
-    {
-        sp<AMessage> qualityParams = new AMessage;
-        qualityParams->setInt32(PARAMETER_KEY_VIDEO_BITRATE, inputFrame.quality);
-        res = mCodec->setParameters(qualityParams);
-        if (res != OK) {
-            ALOGE("%s: Failed to set codec quality: %s (%d)",
-                    __FUNCTION__, strerror(-res), res);
-            return res;
-        }
-    }
 
     ssize_t trackId = inputFrame.muxer->addTrack(inputFrame.format);
     if (trackId < 0) {
@@ -1148,14 +1144,28 @@ void HeicCompositeStream::releaseInputFrameLocked(InputFrame *inputFrame /*out*/
 
 void HeicCompositeStream::releaseInputFramesLocked() {
     auto it = mPendingInputFrames.begin();
+    bool inputFrameDone = false;
     while (it != mPendingInputFrames.end()) {
         auto& inputFrame = it->second;
         if (inputFrame.error ||
             (inputFrame.appSegmentWritten && inputFrame.pendingOutputTiles == 0)) {
             releaseInputFrameLocked(&inputFrame);
             it = mPendingInputFrames.erase(it);
+            inputFrameDone = true;
         } else {
             it++;
+        }
+    }
+
+    // Update codec quality based on first upcoming input frame.
+    // Note that when encoding is in surface mode, currently there is  no
+    // way for camera service to synchronize quality setting on a per-frame
+    // basis: we don't get notification when codec is ready to consume a new
+    // input frame. So we update codec quality on a best-effort basis.
+    if (inputFrameDone) {
+        auto firstPendingFrame = mPendingInputFrames.begin();
+        if (firstPendingFrame != mPendingInputFrames.end()) {
+            updateCodecQualityLocked(firstPendingFrame->second.quality);
         }
     }
 }
@@ -1544,6 +1554,20 @@ size_t HeicCompositeStream::calcAppSegmentMaxSize(const CameraMetadata& info) {
                 entry.data.u8[0] > 16 ? 16 : entry.data.u8[0];
     }
     return maxAppsSegment * (2 + 0xFFFF) + sizeof(struct CameraBlob);
+}
+
+void HeicCompositeStream::updateCodecQualityLocked(int32_t quality) {
+    if (quality != mQuality) {
+        sp<AMessage> qualityParams = new AMessage;
+        qualityParams->setInt32(PARAMETER_KEY_VIDEO_BITRATE, quality);
+        status_t res = mCodec->setParameters(qualityParams);
+        if (res != OK) {
+            ALOGE("%s: Failed to set codec quality: %s (%d)",
+                    __FUNCTION__, strerror(-res), res);
+        } else {
+            mQuality = quality;
+        }
+    }
 }
 
 bool HeicCompositeStream::threadLoop() {
