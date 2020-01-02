@@ -126,8 +126,6 @@ private:
     std::vector<std::tuple<size_t, size_t>> mSupportedDepthSizes;
     std::vector<float>   mIntrinsicCalibration, mLensDistortion;
     bool                 mIsLogicalCamera;
-    void*                mDepthPhotoLibHandle;
-    process_depth_photo_frame mDepthPhotoProcess;
 
     // Keep all incoming Depth buffer timestamps pending further processing.
     std::vector<int64_t> mInputDepthBuffers;
