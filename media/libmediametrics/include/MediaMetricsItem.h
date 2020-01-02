@@ -616,7 +616,7 @@ private:
  *
  * The Item is designed for the service as it has getters.
  */
-class Item : public mediametrics::BaseItem {
+class Item final : public mediametrics::BaseItem {
 public:
 
     class Prop {
@@ -789,6 +789,13 @@ public:
     explicit Item(T key)
         : mKey(key) { }
     Item() = default;
+
+    // We enable default copy and move constructors and make this class final
+    // to prevent a derived class; this avoids possible data slicing.
+    Item(const Item& other) = default;
+    Item(Item&& other) = default;
+    Item& operator=(const Item& other) = default;
+    Item& operator=(Item&& other) = default;
 
     bool operator==(const Item& other) const {
         if (mPid != other.mPid
@@ -991,6 +998,7 @@ private:
         return prop;
     }
 
+    // Changes to member variables below require changes to clear().
     pid_t         mPid = -1;
     uid_t         mUid = -1;
     std::string   mPkgName;
