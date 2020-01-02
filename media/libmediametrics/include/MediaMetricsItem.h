@@ -131,6 +131,25 @@ static inline bool startsWith(const std::string &s, const char (&comp)[N]) {
     return !strncmp(s.c_str(), comp, N - 1);
 }
 
+static inline bool startsWith(const std::string& s, const std::string& comp) {
+    return !strncmp(s.c_str(), comp.c_str(), comp.size() - 1);
+}
+
+/**
+ * Defers a function to run in the destructor.
+ *
+ * This helper class is used to log results on exit of a method.
+ */
+class Defer {
+public:
+    template <typename U>
+    Defer(U &&f) : mThunk(std::forward<U>(f)) {}
+    ~Defer() { mThunk(); }
+
+private:
+    const std::function<void()> mThunk;
+};
+
 /**
  * Media Metrics BaseItem
  *

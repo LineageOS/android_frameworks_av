@@ -35,6 +35,23 @@ static size_t countNewlines(const char *s) {
     return count;
 }
 
+TEST(mediametrics_tests, startsWith) {
+  std::string s("test");
+  ASSERT_EQ(true, android::mediametrics::startsWith(s, "te"));
+  ASSERT_EQ(true, android::mediametrics::startsWith(s, std::string("tes")));
+  ASSERT_EQ(false, android::mediametrics::startsWith(s, "ts"));
+  ASSERT_EQ(false, android::mediametrics::startsWith(s, std::string("est")));
+}
+
+TEST(mediametrics_tests, defer) {
+  bool check = false;
+  {
+      android::mediametrics::Defer defer([&] { check = true; });
+      ASSERT_EQ(false, check);
+  }
+  ASSERT_EQ(true, check);
+}
+
 TEST(mediametrics_tests, instantiate) {
   sp mediaMetrics = new MediaMetricsService();
   status_t status;
