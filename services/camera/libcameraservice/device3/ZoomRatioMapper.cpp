@@ -25,8 +25,6 @@ namespace android {
 
 namespace camera3 {
 
-ZoomRatioMapper::ZoomRatioMapper() : mHalSupportsZoomRatio(false) {
-}
 
 status_t ZoomRatioMapper::initZoomRatioInTemplate(CameraMetadata *request) {
     camera_metadata_entry_t entry;
@@ -117,19 +115,17 @@ status_t ZoomRatioMapper::overrideZoomRatioTags(
     return OK;
 }
 
-status_t ZoomRatioMapper::initZoomRatioTags(const CameraMetadata* deviceInfo,
+ZoomRatioMapper::ZoomRatioMapper(const CameraMetadata* deviceInfo,
         bool supportNativeZoomRatio, bool usePrecorrectArray) {
-    std::lock_guard<std::mutex> lock(mMutex);
-
     camera_metadata_ro_entry_t entry;
 
     entry = deviceInfo->find(ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE);
-    if (entry.count != 4) return BAD_VALUE;
+    if (entry.count != 4) return;
     int32_t arrayW = entry.data.i32[2];
     int32_t arrayH = entry.data.i32[3];
 
     entry = deviceInfo->find(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE);
-    if (entry.count != 4) return BAD_VALUE;
+    if (entry.count != 4) return;
     int32_t activeW = entry.data.i32[2];
     int32_t activeH = entry.data.i32[3];
 
@@ -144,11 +140,12 @@ status_t ZoomRatioMapper::initZoomRatioTags(const CameraMetadata* deviceInfo,
 
     ALOGV("%s: array size: %d x %d, mHalSupportsZoomRatio %d",
             __FUNCTION__, mArrayWidth, mArrayHeight, mHalSupportsZoomRatio);
-    return OK;
+    mIsValid = true;
 }
 
 status_t ZoomRatioMapper::updateCaptureRequest(CameraMetadata* request) {
-    std::lock_guard<std::mutex> lock(mMutex);
+    if (!mIsValid) return INVALID_OPERATION;
+
     status_t res = OK;
     bool zoomRatioIs1 = true;
     camera_metadata_entry_t entry;
@@ -174,7 +171,8 @@ status_t ZoomRatioMapper::updateCaptureRequest(CameraMetadata* request) {
 }
 
 status_t ZoomRatioMapper::updateCaptureResult(CameraMetadata* result, bool requestedZoomRatioIs1) {
-    std::lock_guard<std::mutex> lock(mMutex);
+    if (!mIsValid) return INVALID_OPERATION;
+
     status_t res = OK;
 
     if (mHalSupportsZoomRatio && requestedZoomRatioIs1) {

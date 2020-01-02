@@ -66,7 +66,8 @@ status_t setupTestMapper(ZoomRatioMapper *m, float maxDigitalZoom,
         return res;
     }
 
-    return m->initZoomRatioTags(&deviceInfo, hasZoomRatioRange, usePreCorrectArray);
+    *m = ZoomRatioMapper(&deviceInfo, hasZoomRatioRange, usePreCorrectArray);
+    return OK;
 }
 
 TEST(ZoomRatioTest, Initialization) {
@@ -86,12 +87,12 @@ TEST(ZoomRatioTest, Initialization) {
     res = ZoomRatioMapper::overrideZoomRatioTags(&deviceInfo, &supportNativeZoomRatio);
     ASSERT_EQ(res, OK);
     ASSERT_EQ(supportNativeZoomRatio, false);
-    res = mapperNoZoomRange.initZoomRatioTags(&deviceInfo,
+    mapperNoZoomRange = ZoomRatioMapper(&deviceInfo,
             supportNativeZoomRatio, true/*usePreCorrectArray*/);
-    ASSERT_EQ(res, OK);
-    res = mapperNoZoomRange.initZoomRatioTags(&deviceInfo,
+    ASSERT_TRUE(mapperNoZoomRange.isValid());
+    mapperNoZoomRange = ZoomRatioMapper(&deviceInfo,
             supportNativeZoomRatio, false/*usePreCorrectArray*/);
-    ASSERT_EQ(res, OK);
+    ASSERT_TRUE(mapperNoZoomRange.isValid());
 
     entry = deviceInfo.find(ANDROID_CONTROL_ZOOM_RATIO_RANGE);
     ASSERT_EQ(entry.count, 2U);
@@ -120,12 +121,12 @@ TEST(ZoomRatioTest, Initialization) {
     ASSERT_EQ(res, OK);
     ASSERT_EQ(supportNativeZoomRatio, true);
     ZoomRatioMapper mapperWithZoomRange;
-    res = mapperWithZoomRange.initZoomRatioTags(&deviceInfo,
+    mapperWithZoomRange = ZoomRatioMapper(&deviceInfo,
             supportNativeZoomRatio, true/*usePreCorrectArray*/);
-    ASSERT_EQ(res, OK);
-    res = mapperWithZoomRange.initZoomRatioTags(&deviceInfo,
+    ASSERT_TRUE(mapperWithZoomRange.isValid());
+    mapperWithZoomRange = ZoomRatioMapper(&deviceInfo,
             supportNativeZoomRatio, false/*usePreCorrectArray*/);
-    ASSERT_EQ(res, OK);
+    ASSERT_TRUE(mapperWithZoomRange.isValid());
 
     entry = deviceInfo.find(ANDROID_CONTROL_ZOOM_RATIO_RANGE);
     ASSERT_EQ(entry.count, 2U);
