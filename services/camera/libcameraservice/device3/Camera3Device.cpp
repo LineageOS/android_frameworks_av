@@ -161,14 +161,9 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager, const Stri
                 }
             }
 
-            res = mZoomRatioMappers[physicalId].initZoomRatioTags(
+            mZoomRatioMappers[physicalId] = ZoomRatioMapper(
                     &mPhysicalDeviceInfoMap[physicalId],
                     mSupportNativeZoomRatio, usePrecorrectArray);
-            if (res != OK) {
-                SET_ERR_L("Failed to initialize camera %s's zoomRatio tags: %s (%d)",
-                        physicalId.c_str(), strerror(-res), res);
-                return res;
-            }
         }
     }
 
@@ -353,13 +348,8 @@ status_t Camera3Device::initializeCommonLocked() {
         }
     }
 
-    res = mZoomRatioMappers[mId.c_str()].initZoomRatioTags(&mDeviceInfo,
+    mZoomRatioMappers[mId.c_str()] = ZoomRatioMapper(&mDeviceInfo,
             mSupportNativeZoomRatio, usePrecorrectArray);
-    if (res != OK) {
-        SET_ERR_L("Failed to initialize zoomRatio tags: %s (%d)",
-                strerror(-res), res);
-        return res;
-    }
 
     return OK;
 }

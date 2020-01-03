@@ -19,7 +19,6 @@
 
 #include <utils/Errors.h>
 #include <array>
-#include <mutex>
 
 #include "camera/CameraMetadata.h"
 #include "device3/CoordinateMapper.h"
@@ -36,7 +35,9 @@ namespace camera3 {
  */
 class ZoomRatioMapper : private CoordinateMapper {
   public:
-    ZoomRatioMapper();
+    ZoomRatioMapper() = default;
+    ZoomRatioMapper(const CameraMetadata *deviceInfo,
+            bool supportNativeZoomRatio, bool usePrecorrectArray);
     ZoomRatioMapper(const ZoomRatioMapper& other) :
             mHalSupportsZoomRatio(other.mHalSupportsZoomRatio),
             mArrayWidth(other.mArrayWidth), mArrayHeight(other.mArrayHeight) {}
@@ -51,16 +52,6 @@ class ZoomRatioMapper : private CoordinateMapper {
      */
     static status_t overrideZoomRatioTags(
             CameraMetadata* deviceInfo, bool* supportNativeZoomRatio);
-
-    /**
-     * Initialize zoom ratio mapper with static metadata.
-     *
-     * Note:
-     * This function may modify the static metadata with zoomRatio related
-     * tags.
-     */
-    status_t initZoomRatioTags(const CameraMetadata *deviceInfo,
-            bool supportNativeZoomRatio, bool usePrecorrectArray);
 
     /**
      * Update capture request to handle both cropRegion and zoomRatio.
@@ -82,16 +73,16 @@ class ZoomRatioMapper : private CoordinateMapper {
     void scaleCoordinates(int32_t* coordPairs, int coordCount,
             float scaleRatio, ClampMode clamp);
 
+    bool isValid() { return mIsValid; }
   private:
+    // const after construction
     bool mHalSupportsZoomRatio;
-
     // active array / pre-correction array dimension
     int32_t mArrayWidth, mArrayHeight;
 
-    mutable std::mutex mMutex;
+    bool mIsValid = false;
 
     float deriveZoomRatio(const CameraMetadata* metadata);
-
     void scaleRects(int32_t* rects, int rectCount, float scaleRatio);
 
     status_t separateZoomFromCropLocked(CameraMetadata* metadata, bool isResult);
