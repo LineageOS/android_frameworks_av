@@ -29,6 +29,10 @@ android_test {
         "android.test.base",
     ],
 
+    jni_libs: [
+        "libmediabenchmark_jni",
+    ],
+
     static_libs: [
         "libMediaBenchmark",
         "junit",

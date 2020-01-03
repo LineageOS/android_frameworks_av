@@ -18,6 +18,7 @@ package com.android.media.benchmark.tests;
 import com.android.media.benchmark.R;
 import com.android.media.benchmark.library.Extractor;
 import com.android.media.benchmark.library.Muxer;
+import com.android.media.benchmark.library.Native;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 
@@ -145,6 +146,37 @@ public class MuxerTest {
             fileInput.close();
         } else {
             Log.w(TAG, "Warning: Test Skipped. Cannot find " + mInputFileName + " in directory " +
+                    mInputFilePath);
+        }
+        assertThat(status, is(equalTo(0)));
+    }
+
+    @Test
+    public void sampleMuxerNativeTest() {
+        int status = -1;
+        Native nativeMuxer = new Native();
+        File inputFile = new File(mInputFilePath + mInputFileName);
+        if (inputFile.exists()) {
+            int tid = android.os.Process.myTid();
+            String mMuxOutputFile = (mContext.getFilesDir() + "/mux_" + tid + ".out");
+            status = nativeMuxer.Mux(mInputFilePath, mInputFileName, mMuxOutputFile,
+                    mFormat);
+            if (status != 0) {
+                Log.e(TAG, "Mux for " + mInputFileName + " failed.");
+            } else {
+                Log.i(TAG, "Muxed " + mInputFileName + " successfully.");
+            }
+            File muxedFile = new File(mMuxOutputFile);
+            // Cleanup temporary output file
+            if (muxedFile.exists()) {
+                if (muxedFile.delete()) {
+                    Log.i(TAG, "Successfully deleted" + mMuxOutputFile + " file.");
+                } else {
+                    Log.e(TAG, "Unable to delete" + mMuxOutputFile + " file.");
+                }
+            }
+        } else {
+            Log.e(TAG, "Cannot find " + inputFile + " in directory " +
                     mInputFilePath);
         }
         assertThat(status, is(equalTo(0)));

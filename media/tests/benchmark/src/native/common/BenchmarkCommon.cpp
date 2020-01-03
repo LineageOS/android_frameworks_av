@@ -56,6 +56,7 @@ void OnFormatChangedCB(AMediaCodec *codec, void *userdata, AMediaFormat *format)
 
 void OnErrorCB(AMediaCodec *codec, void *userdata, media_status_t err, int32_t actionCode,
                const char *detail) {
+    (void)codec;
     ALOGE("OnErrorCB: err(%d), actionCode(%d), detail(%s)", err, actionCode, detail);
     CallBackHandle *self = (CallBackHandle *)userdata;
     self->mSawError = true;
@@ -91,7 +92,7 @@ AMediaCodec *createMediaCodec(AMediaFormat *format, const char *mime, string cod
 
     /* Configure codec with the given format*/
     const char *s = AMediaFormat_toString(format);
-    ALOGV("Input format: %s\n", s);
+    ALOGI("Input format: %s\n", s);
 
     media_status_t status = AMediaCodec_configure(codec, format, nullptr, nullptr, isEncoder);
     if (status != AMEDIA_OK) {
