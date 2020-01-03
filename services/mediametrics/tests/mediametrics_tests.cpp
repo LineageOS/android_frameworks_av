@@ -52,6 +52,117 @@ TEST(mediametrics_tests, defer) {
   ASSERT_EQ(true, check);
 }
 
+TEST(mediametrics_tests, shared_ptr_wrap) {
+  // Test shared pointer wrap with simple access
+  android::mediametrics::SharedPtrWrap<std::string> s("123");
+  ASSERT_EQ('1', s->at(0));
+  ASSERT_EQ('2', s->at(1));
+  s->push_back('4');
+  ASSERT_EQ('4', s->at(3));
+
+  const android::mediametrics::SharedPtrWrap<std::string> s2("345");
+  ASSERT_EQ('3', s2->operator[](0));  // s2[0] == '3'
+  // we allow modification through a const shared pointer wrap
+  // for compatibility with shared_ptr.
+  s2->push_back('6');
+  ASSERT_EQ('6', s2->operator[](3));  // s2[3] == '6'
+
+  android::mediametrics::SharedPtrWrap<std::string> s3("");
+  s3.set(std::make_shared<std::string>("abc"));
+  ASSERT_EQ('b', s3->operator[](1)); // s2[1] = 'b';
+
+  // Use Thunk to check whether the destructor was called prematurely
+  // when setting the shared ptr wrap in the middle of a method.
+
+  class Thunk {
+    std::function<void(int)> mF;
+    const int mFinal;
+
+    public:
+      Thunk(decltype(mF) f, int final) : mF(f), mFinal(final) {}
+      ~Thunk() { mF(mFinal); }
+      void thunk(int value) { mF(value); }
+  };
+
+  int counter = 0;
+  android::mediametrics::SharedPtrWrap<Thunk> s4(
+    [&](int value) {
+      s4.set(std::make_shared<Thunk>([](int){}, 0)); // recursively set s4 while in s4.
+      ++counter;
+      ASSERT_EQ(value, counter);  // on thunk() value is 1, on destructor this is 2.
+    }, 2);
+
+  // This will fail if the shared ptr wrap doesn't hold a ref count during method access.
+  s4->thunk(1);
+}
+
+TEST(mediametrics_tests, lock_wrap) {
+  // Test lock wrap with simple access
+  android::mediametrics::LockWrap<std::string> s("123");
+  ASSERT_EQ('1', s->at(0));
+  ASSERT_EQ('2', s->at(1));
+  s->push_back('4');
+  ASSERT_EQ('4', s->at(3));
+
+  const android::mediametrics::LockWrap<std::string> s2("345");
+  ASSERT_EQ('3', s2->operator[](0));  // s2[0] == '3'
+  // note: we can't modify s2 due to const, s2->push_back('6');
+
+  android::mediametrics::LockWrap<std::string> s3("");
+  s3->operator=("abc");
+  ASSERT_EQ('b', s3->operator[](1)); // s2[1] = 'b';
+
+  // Use Thunk to check whether we have the lock when calling a method through LockWrap.
+
+  class Thunk {
+    std::function<void()> mF;
+
+    public:
+      Thunk(decltype(mF) f) : mF(f) {}
+      void thunk() { mF(); }
+  };
+
+  android::mediametrics::LockWrap<Thunk> s4([&]{
+    ASSERT_EQ(true, s4.isLocked()); // we must be locked when thunk() is called.
+  });
+
+  // This will fail if we are not locked during method access.
+  s4->thunk();
+}
+
+TEST(mediametrics_tests, lock_wrap_multithread) {
+  class Accumulator {
+    int32_t value_ = 0;
+  public:
+    void add(int32_t incr) {
+      const int32_t temp = value_;
+      sleep(0);  // yield
+      value_ = temp + incr;
+    }
+    int32_t get() { return value_; }
+  };
+
+  android::mediametrics::LockWrap<Accumulator> a{}; // locked accumulator succeeds
+  // auto a = std::make_shared<Accumulator>(); // this fails, only 50% adds atomic.
+
+  constexpr size_t THREADS = 100;
+  constexpr size_t ITERATIONS = 10;
+  constexpr int32_t INCREMENT = 1;
+
+  std::vector<std::future<void>> threads(THREADS);
+  for (size_t i = 0; i < THREADS; ++i) {
+    threads.push_back(std::async(std::launch::async, [&] {
+        for (size_t j = 0; j < ITERATIONS; ++j) {
+          a->add(INCREMENT);
+        }
+      }));
+  }
+  threads.clear();
+
+  // If the add operations are not atomic, value will be smaller than expected.
+  ASSERT_EQ(INCREMENT * THREADS * ITERATIONS, (size_t)a->get());
+}
+
 TEST(mediametrics_tests, instantiate) {
   sp mediaMetrics = new MediaMetricsService();
   status_t status;
@@ -592,6 +703,61 @@ TEST(mediametrics_tests, transaction_log_gc) {
   ASSERT_EQ((size_t)2, transactionLog.size());
 }
 
+TEST(mediametrics_tests, analytics_actions) {
+  mediametrics::AnalyticsActions analyticsActions;
+  bool action1 = false;
+  bool action2 = false;
+  bool action3 = false;
+  bool action4 = false;
+
+  // check to see whether various actions have been matched.
+  analyticsActions.addAction(
+      "audio.flinger.event",
+      std::string("AudioFlinger"),
+      std::make_shared<mediametrics::AnalyticsActions::Function>(
+          [&](const std::shared_ptr<const android::mediametrics::Item> &) {
+            action1 = true;
+          }));
+
+  analyticsActions.addAction(
+      "audio.*.event",
+      std::string("AudioFlinger"),
+      std::make_shared<mediametrics::AnalyticsActions::Function>(
+          [&](const std::shared_ptr<const android::mediametrics::Item> &) {
+            action2 = true;
+          }));
+
+  analyticsActions.addAction("audio.fl*n*g*r.event",
+      std::string("AudioFlinger"),
+      std::make_shared<mediametrics::AnalyticsActions::Function>(
+          [&](const std::shared_ptr<const android::mediametrics::Item> &) {
+            action3 = true;
+          }));
+
+  analyticsActions.addAction("audio.fl*gn*r.event",
+      std::string("AudioFlinger"),
+      std::make_shared<mediametrics::AnalyticsActions::Function>(
+          [&](const std::shared_ptr<const android::mediametrics::Item> &) {
+            action4 = true;
+          }));
+
+  // make a test item
+  auto item = std::make_shared<mediametrics::Item>("audio.flinger");
+  (*item).set("event", "AudioFlinger");
+
+  // get the actions and execute them
+  auto actions = analyticsActions.getActionsForItem(item);
+  for (const auto& action : actions) {
+    action->operator()(item);
+  }
+
+  // The following should match.
+  ASSERT_EQ(true, action1);
+  ASSERT_EQ(true, action2);
+  ASSERT_EQ(true, action3);
+  ASSERT_EQ(false, action4); // audio.fl*gn*r != audio.flinger
+}
+
 TEST(mediametrics_tests, audio_analytics_permission) {
   auto item = std::make_shared<mediametrics::Item>("audio.1");
   (*item).set("one", (int32_t)1)
@@ -614,14 +780,14 @@ TEST(mediametrics_tests, audio_analytics_permission) {
 
   // TODO: Verify contents of AudioAnalytics.
   // Currently there is no getter API in AudioAnalytics besides dump.
-  ASSERT_EQ(4, audioAnalytics.dump(1000).second /* lines */);
+  ASSERT_EQ(9, audioAnalytics.dump(1000).second /* lines */);
 
   ASSERT_EQ(NO_ERROR, audioAnalytics.submit(item, true /* isTrusted */));
   // untrusted entities can add to an existing key
   ASSERT_EQ(NO_ERROR, audioAnalytics.submit(item2, false /* isTrusted */));
 
   // Check that we have some info in the dump.
-  ASSERT_LT(4, audioAnalytics.dump(1000).second /* lines */);
+  ASSERT_LT(9, audioAnalytics.dump(1000).second /* lines */);
 }
 
 TEST(mediametrics_tests, audio_analytics_dump) {
