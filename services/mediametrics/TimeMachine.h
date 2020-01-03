@@ -35,6 +35,14 @@ inline std::ostream & operator<< (std::ostream& s,
     return s;
 }
 
+// define a way of printing a std::pair.
+template <typename T, typename U>
+std::ostream & operator<< (std::ostream& s,
+                           const std::pair<T, U>& v) {
+    s << "{ " << v.first << ", " << v.second << " }";
+    return s;
+}
+
 // define a way of printing a variant
 // see https://en.cppreference.com/w/cpp/utility/variant/visit
 template <typename T0, typename ... Ts>
@@ -53,9 +61,11 @@ std::ostream & operator<< (std::ostream& s,
  * The TimeMachine is NOT thread safe.
  */
 class TimeMachine {
-
-    using Elem = std::variant<std::monostate, int32_t, int64_t, double, std::string>;
+public:
+    using Elem = Item::Prop::Elem;  // use the Item property element.
     using PropertyHistory = std::multimap<int64_t /* time */, Elem>;
+
+private:
 
     // KeyHistory contains no lock.
     // Access is through the TimeMachine, and a hash-striped lock is used
@@ -102,7 +112,8 @@ class TimeMachine {
 
         void putProp(
                 const std::string &name, const mediametrics::Item::Prop &prop, int64_t time = 0) {
-            prop.visit([&](auto value) { putValue(name, value, time); });
+            //alternatively: prop.visit([&](auto value) { putValue(name, value, time); });
+            putValue(name, prop.get(), time);
         }
 
         template <typename T>
@@ -117,13 +128,6 @@ class TimeMachine {
                     || timeSequence.rbegin()->second != el) { // value changed
                 timeSequence.emplace(time, std::move(el));
             }
-        }
-
-        // Explicitly ignore rate properties - we don't expose them for now.
-        void putValue(
-                      const std::string &property __unused,
-                      std::pair<int64_t, int64_t>& e __unused,
-                      int64_t time __unused) {
         }
 
         std::pair<std::string, int32_t> dump(int32_t lines, int64_t time) const {
@@ -358,10 +362,10 @@ public:
 
         std::stringstream ss;
         int32_t ll = lines;
-        for (const auto &keyPair : mHistory) {
-            std::lock_guard lock(getLockForKey(keyPair.first));
+        for (const auto &[lkey, lhist] : mHistory) {
+            std::lock_guard lock(getLockForKey(lkey));
             if (lines <= 0) break;
-            auto [s, l] = keyPair.second->dump(ll, time);
+            auto [s, l] = lhist->dump(ll, time);
             ss << s;
             ll -= l;
         }
