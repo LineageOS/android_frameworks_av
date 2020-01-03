@@ -35,6 +35,23 @@ static size_t countNewlines(const char *s) {
     return count;
 }
 
+TEST(mediametrics_tests, startsWith) {
+  std::string s("test");
+  ASSERT_EQ(true, android::mediametrics::startsWith(s, "te"));
+  ASSERT_EQ(true, android::mediametrics::startsWith(s, std::string("tes")));
+  ASSERT_EQ(false, android::mediametrics::startsWith(s, "ts"));
+  ASSERT_EQ(false, android::mediametrics::startsWith(s, std::string("est")));
+}
+
+TEST(mediametrics_tests, defer) {
+  bool check = false;
+  {
+      android::mediametrics::Defer defer([&] { check = true; });
+      ASSERT_EQ(false, check);
+  }
+  ASSERT_EQ(true, check);
+}
+
 TEST(mediametrics_tests, instantiate) {
   sp mediaMetrics = new MediaMetricsService();
   status_t status;
@@ -262,27 +279,32 @@ TEST(mediametrics_tests, item_iteration) {
           int32_t i32;
           ASSERT_TRUE(prop.get(&i32));
           ASSERT_EQ(1, i32);
+          ASSERT_EQ(1, std::get<int32_t>(prop.get()));
           mask |= 1;
       } else if (!strcmp(name, "i64")) {
           int64_t i64;
           ASSERT_TRUE(prop.get(&i64));
           ASSERT_EQ(2, i64);
+          ASSERT_EQ(2, std::get<int64_t>(prop.get()));
           mask |= 2;
       } else if (!strcmp(name, "double")) {
           double d;
           ASSERT_TRUE(prop.get(&d));
           ASSERT_EQ(3.125, d);
+          ASSERT_EQ(3.125, std::get<double>(prop.get()));
           mask |= 4;
       } else if (!strcmp(name, "string")) {
           std::string s;
           ASSERT_TRUE(prop.get(&s));
           ASSERT_EQ("abc", s);
+          ASSERT_EQ(s, std::get<std::string>(prop.get()));
           mask |= 8;
       } else if (!strcmp(name, "rate")) {
           std::pair<int64_t, int64_t> r;
           ASSERT_TRUE(prop.get(&r));
           ASSERT_EQ(11, r.first);
           ASSERT_EQ(12, r.second);
+          ASSERT_EQ(r, std::get<decltype(r)>(prop.get()));
           mask |= 16;
       } else {
           FAIL();
