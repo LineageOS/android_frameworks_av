@@ -616,8 +616,166 @@ private:
  *
  * The Item is designed for the service as it has getters.
  */
-class Item : public mediametrics::BaseItem {
+class Item final : public mediametrics::BaseItem {
 public:
+
+    class Prop {
+    public:
+        using Elem = std::variant<
+                std::monostate,               // kTypeNone
+                int32_t,                      // kTypeInt32
+                int64_t,                      // kTypeInt64
+                double,                       // kTypeDouble
+                std::string,                  // kTypeCString
+                std::pair<int64_t, int64_t>   // kTypeRate
+                >;
+
+        Prop() = default;
+        Prop(const Prop& other) {
+           *this = other;
+        }
+        Prop& operator=(const Prop& other) {
+            mName = other.mName;
+            mElem = other.mElem;
+            return *this;
+        }
+        Prop(Prop&& other) {
+            *this = std::move(other);
+        }
+        Prop& operator=(Prop&& other) {
+            mName = std::move(other.mName);
+            mElem = std::move(other.mElem);
+            return *this;
+        }
+
+        bool operator==(const Prop& other) const {
+            return mName == other.mName && mElem == other.mElem;
+        }
+        bool operator!=(const Prop& other) const {
+            return !(*this == other);
+        }
+
+        void clear() {
+            mName.clear();
+            mElem = std::monostate{};
+        }
+        void clearValue() {
+            mElem = std::monostate{};
+        }
+
+        const char *getName() const {
+            return mName.c_str();
+        }
+
+        void swap(Prop& other) {
+            std::swap(mName, other.mName);
+            std::swap(mElem, other.mElem);
+        }
+
+        void setName(const char *name) {
+            mName = name;
+        }
+
+        bool isNamed(const char *name) const {
+            return mName == name;
+        }
+
+        template <typename T> void visit(T f) const {
+            std::visit(f, mElem);
+        }
+
+        template <typename T> bool get(T *value) const {
+            auto pval = std::get_if<T>(&mElem);
+            if (pval != nullptr) {
+                *value = *pval;
+                return true;
+            }
+            return false;
+        }
+
+        const Elem& get() const {
+            return mElem;
+        }
+
+        template <typename T> void set(const T& value) {
+            mElem = value;
+        }
+
+        template <typename T> void add(const T& value) {
+            auto pval = std::get_if<T>(&mElem);
+            if (pval != nullptr) {
+                *pval += value;
+            } else {
+                mElem = value;
+            }
+        }
+
+        template <> void add(const std::pair<int64_t, int64_t>& value) {
+            auto pval = std::get_if<std::pair<int64_t, int64_t>>(&mElem);
+            if (pval != nullptr) {
+                pval->first += value.first;
+                pval->second += value.second;
+            } else {
+                mElem = value;
+            }
+        }
+
+        status_t writeToParcel(Parcel *parcel) const {
+            return std::visit([this, parcel](auto &value) {
+                    return BaseItem::writeToParcel(mName.c_str(), value, parcel);}, mElem);
+        }
+
+        void toStringBuffer(char *buffer, size_t length) const {
+            return std::visit([this, buffer, length](auto &value) {
+                BaseItem::toStringBuffer(mName.c_str(), value, buffer, length);}, mElem);
+        }
+
+        size_t getByteStringSize() const {
+            return std::visit([this](auto &value) {
+                return BaseItem::sizeOfByteString(mName.c_str(), value);}, mElem);
+        }
+
+        status_t writeToByteString(char **bufferpptr, char *bufferptrmax) const {
+            return std::visit([this, bufferpptr, bufferptrmax](auto &value) {
+                return BaseItem::writeToByteString(mName.c_str(), value, bufferpptr, bufferptrmax);
+            }, mElem);
+        }
+
+        status_t readFromParcel(const Parcel& data);
+
+        status_t readFromByteString(const char **bufferpptr, const char *bufferptrmax);
+
+    private:
+        std::string mName;
+        Elem mElem;
+    };
+
+    // Iteration of props within item
+    class iterator {
+    public:
+        iterator(const std::map<std::string, Prop>::const_iterator &_it) : it(_it) { }
+        iterator &operator++() {
+            ++it;
+            return *this;
+        }
+        bool operator!=(iterator &other) const {
+            return it != other.it;
+        }
+        const Prop &operator*() const {
+            return it->second;
+        }
+
+    private:
+        std::map<std::string, Prop>::const_iterator it;
+    };
+
+    iterator begin() const {
+        return iterator(mProps.cbegin());
+    }
+
+    iterator end() const {
+        return iterator(mProps.cend());
+    }
 
         enum {
             PROTO_V0 = 0,
@@ -631,6 +789,13 @@ public:
     explicit Item(T key)
         : mKey(key) { }
     Item() = default;
+
+    // We enable default copy and move constructors and make this class final
+    // to prevent a derived class; this avoids possible data slicing.
+    Item(const Item& other) = default;
+    Item(Item&& other) = default;
+    Item& operator=(const Item& other) = default;
+    Item& operator=(Item&& other) = default;
 
     bool operator==(const Item& other) const {
         if (mPid != other.mPid
@@ -820,164 +985,6 @@ private:
     int32_t writeToParcel0(Parcel *) const;
     int32_t readFromParcel0(const Parcel&);
 
-public:
-
-    class Prop {
-    public:
-        using Elem = std::variant<
-                std::monostate,               // kTypeNone
-                int32_t,                      // kTypeInt32
-                int64_t,                      // kTypeInt64
-                double,                       // kTypeDouble
-                std::string,                  // kTypeCString
-                std::pair<int64_t, int64_t>   // kTypeRate
-                >;
-
-        Prop() = default;
-        Prop(const Prop& other) {
-           *this = other;
-        }
-        Prop& operator=(const Prop& other) {
-            mName = other.mName;
-            mElem = other.mElem;
-            return *this;
-        }
-        Prop(Prop&& other) {
-            *this = std::move(other);
-        }
-        Prop& operator=(Prop&& other) {
-            mName = std::move(other.mName);
-            mElem = std::move(other.mElem);
-            return *this;
-        }
-
-        bool operator==(const Prop& other) const {
-            return mName == other.mName && mElem == other.mElem;
-        }
-        bool operator!=(const Prop& other) const {
-            return !(*this == other);
-        }
-
-        void clear() {
-            mName.clear();
-            mElem = std::monostate{};
-        }
-        void clearValue() {
-            mElem = std::monostate{};
-        }
-
-        const char *getName() const {
-            return mName.c_str();
-        }
-
-        void swap(Prop& other) {
-            std::swap(mName, other.mName);
-            std::swap(mElem, other.mElem);
-        }
-
-        void setName(const char *name) {
-            mName = name;
-        }
-
-        bool isNamed(const char *name) const {
-            return mName == name;
-        }
-
-        template <typename T> void visit(T f) const {
-            std::visit(f, mElem);
-        }
-
-        template <typename T> bool get(T *value) const {
-            auto pval = std::get_if<T>(&mElem);
-            if (pval != nullptr) {
-                *value = *pval;
-                return true;
-            }
-            return false;
-        }
-
-        template <typename T> void set(const T& value) {
-            mElem = value;
-        }
-
-        template <typename T> void add(const T& value) {
-            auto pval = std::get_if<T>(&mElem);
-            if (pval != nullptr) {
-                *pval += value;
-            } else {
-                mElem = value;
-            }
-        }
-
-        template <> void add(const std::pair<int64_t, int64_t>& value) {
-            auto pval = std::get_if<std::pair<int64_t, int64_t>>(&mElem);
-            if (pval != nullptr) {
-                pval->first += value.first;
-                pval->second += value.second;
-            } else {
-                mElem = value;
-            }
-        }
-
-        status_t writeToParcel(Parcel *parcel) const {
-            return std::visit([this, parcel](auto &value) {
-                    return BaseItem::writeToParcel(mName.c_str(), value, parcel);}, mElem);
-        }
-
-        void toStringBuffer(char *buffer, size_t length) const {
-            return std::visit([this, buffer, length](auto &value) {
-                BaseItem::toStringBuffer(mName.c_str(), value, buffer, length);}, mElem);
-        }
-
-        size_t getByteStringSize() const {
-            return std::visit([this](auto &value) {
-                return BaseItem::sizeOfByteString(mName.c_str(), value);}, mElem);
-        }
-
-        status_t writeToByteString(char **bufferpptr, char *bufferptrmax) const {
-            return std::visit([this, bufferpptr, bufferptrmax](auto &value) {
-                return BaseItem::writeToByteString(mName.c_str(), value, bufferpptr, bufferptrmax);
-            }, mElem);
-        }
-
-        status_t readFromParcel(const Parcel& data);
-
-        status_t readFromByteString(const char **bufferpptr, const char *bufferptrmax);
-
-    private:
-        std::string mName;
-        Elem mElem;
-    };
-
-    // Iteration of props within item
-    class iterator {
-    public:
-        iterator(const std::map<std::string, Prop>::const_iterator &_it) : it(_it) { }
-        iterator &operator++() {
-            ++it;
-            return *this;
-        }
-        bool operator!=(iterator &other) const {
-            return it != other.it;
-        }
-        const Prop &operator*() const {
-            return it->second;
-        }
-
-    private:
-        std::map<std::string, Prop>::const_iterator it;
-    };
-
-    iterator begin() const {
-        return iterator(mProps.cbegin());
-    }
-
-    iterator end() const {
-        return iterator(mProps.cend());
-    }
-
-private:
-
     const Prop *findProp(const char *key) const {
         auto it = mProps.find(key);
         return it != mProps.end() ? &it->second : nullptr;
@@ -991,6 +998,7 @@ private:
         return prop;
     }
 
+    // Changes to member variables below require changes to clear().
     pid_t         mPid = -1;
     uid_t         mUid = -1;
     std::string   mPkgName;
