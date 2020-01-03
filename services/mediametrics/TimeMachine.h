@@ -60,7 +60,7 @@ std::ostream & operator<< (std::ostream& s,
  *
  * The TimeMachine is NOT thread safe.
  */
-class TimeMachine {
+class TimeMachine final { // made final as we have copy constructor instead of dup() override.
 public:
     using Elem = Item::Prop::Elem;  // use the Item property element.
     using PropertyHistory = std::multimap<int64_t /* time */, Elem>;
@@ -83,6 +83,8 @@ private:
             putValue(BUNDLE_PID, (int32_t)pid, time);
             putValue(BUNDLE_UID, (int32_t)uid, time);
         }
+
+        KeyHistory(const KeyHistory &other) = default;
 
         status_t checkPermission(uid_t uidCheck) const {
             return uidCheck != (uid_t)-1 && uidCheck != mUid ? PERMISSION_DENIED : NO_ERROR;
@@ -187,6 +189,34 @@ public:
         LOG_ALWAYS_FATAL_IF(keyHighWaterMark <= keyLowWaterMark,
               "%s: required that keyHighWaterMark:%zu > keyLowWaterMark:%zu",
                   __func__, keyHighWaterMark, keyLowWaterMark);
+    }
+
+    // The TimeMachine copy constructor/assignment uses a deep copy,
+    // though the snapshot is not instantaneous nor isochronous.
+    //
+    // If there are concurrent operations ongoing in the other TimeMachine
+    // then there may be some history more recent than others (a time shear).
+    // This is expected to be a benign addition in history as small number of
+    // future elements are incorporated.
+    TimeMachine(const TimeMachine& other) {
+        *this = other;
+    }
+    TimeMachine& operator=(const TimeMachine& other) {
+        std::lock_guard lock(mLock);
+        mHistory.clear();
+
+        {
+            std::lock_guard lock2(other.mLock);
+            mHistory = other.mHistory;
+        }
+
+        // Now that we safely have our own shared pointers, let's dup them
+        // to ensure they are decoupled.  We do this by acquiring the other lock.
+        for (const auto &[lkey, lhist] : mHistory) {
+            std::lock_guard lock2(other.getLockForKey(lkey));
+            mHistory[lkey] = std::make_shared<KeyHistory>(*lhist);
+        }
+        return *this;
     }
 
     /**
