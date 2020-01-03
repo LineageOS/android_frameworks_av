@@ -87,7 +87,7 @@ cc_test {
     srcs: ["C2DecoderTest.cpp"],
 
     static_libs: [
-        "libmediabenchmark_extractor",
+        "libmediabenchmark_codec2_extractor",
         "libmediabenchmark_codec2_common",
         "libmediabenchmark_codec2_decoder",
     ],
@@ -103,8 +103,8 @@ cc_test {
     srcs: ["C2EncoderTest.cpp"],
 
     static_libs: [
-        "libmediabenchmark_extractor",
-        "libmediabenchmark_decoder",
+        "libmediabenchmark_codec2_extractor",
+        "libmediabenchmark_codec2_decoder",
         "libmediabenchmark_codec2_common",
         "libmediabenchmark_codec2_encoder",
     ],

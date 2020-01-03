@@ -29,7 +29,7 @@ cc_library_static {
 
     export_include_dirs: ["."],
 
-    ldflags: ["-Wl,-Bsymbolic"]
+    ldflags: ["-Wl,-Bsymbolic"],
 }
 
 cc_defaults {
@@ -52,10 +52,14 @@ cc_defaults {
         "liblog",
     ],
 
+    stl: "libc++_static",
+
+    sdk_version: "current",
+
     cflags: [
         "-Wall",
         "-Werror",
-    ]
+    ],
 }
 
 cc_library_static {
@@ -66,18 +70,20 @@ cc_library_static {
 
     srcs: [
         "BenchmarkC2Common.cpp",
+        "BenchmarkCommon.cpp",
+        "Stats.cpp",
+        "utils/Timers.cpp",
     ],
 
     export_include_dirs: ["."],
 
-    ldflags: ["-Wl,-Bsymbolic"]
+    ldflags: ["-Wl,-Bsymbolic"],
 }
 
 cc_defaults {
     name: "libmediabenchmark_codec2_common-defaults",
 
     defaults: [
-        "libmediabenchmark_common-defaults",
         "libcodec2-hidl-client-defaults",
         "libmediabenchmark_soft_sanitize_all-defaults",
     ],
@@ -88,7 +94,14 @@ cc_defaults {
 
     shared_libs: [
         "libcodec2_client",
-    ]
+        "libmediandk",
+        "liblog",
+    ],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
 }
 
 // public dependency for native implementation
@@ -102,5 +115,5 @@ cc_defaults {
             "signed-integer-overflow",
         ],
         cfi: true,
-    }
+    },
 }
