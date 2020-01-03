@@ -52,10 +52,6 @@ cc_defaults {
         "liblog",
     ],
 
-    stl: "libc++_static",
-
-    sdk_version: "current",
-
     cflags: [
         "-Wall",
         "-Werror",

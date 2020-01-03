@@ -17,8 +17,6 @@ cc_test_library {
         "liblog",
     ],
 
-    sdk_version: "current",
-
     static_libs: [
         "libmediabenchmark_common",
         "libmediabenchmark_extractor",
@@ -26,8 +24,6 @@ cc_test_library {
         "libmediabenchmark_decoder",
         "libmediabenchmark_encoder",
     ],
-
-    stl: "c++_static",
 
     cflags: [
         "-Wall",
