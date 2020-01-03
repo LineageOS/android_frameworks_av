@@ -18,6 +18,7 @@
 #define __STATS_H__
 
 #include <android/log.h>
+#include <inttypes.h>
 
 #ifndef ALOG
 #define ALOG(priority, tag, ...) ((void)__android_log_print(ANDROID_##priority, tag, __VA_ARGS__))
@@ -25,6 +26,12 @@
 #define ALOGI(...) ALOG(LOG_INFO, LOG_TAG, __VA_ARGS__)
 #define ALOGE(...) ALOG(LOG_ERROR, LOG_TAG, __VA_ARGS__)
 #define ALOGD(...) ALOG(LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#define ALOGW(...) ALOG(LOG_WARN, LOG_TAG, __VA_ARGS__)
+
+#ifndef LOG_NDEBUG
+#define LOG_NDEBUG 1
+#endif
+
 #if LOG_NDEBUG
 #define ALOGV(cond, ...)   ((void)0)
 #else

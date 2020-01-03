@@ -23,19 +23,19 @@ cc_library_static {
 
     srcs: ["Encoder.cpp"],
 
-    static_libs: ["libmediabenchmark_extractor",
-                  "libmediabenchmark_decoder",
+    static_libs: [
+        "libmediabenchmark_extractor",
+        "libmediabenchmark_decoder",
     ],
 
     export_include_dirs: ["."],
 
-    ldflags: ["-Wl,-Bsymbolic"]
+    ldflags: ["-Wl,-Bsymbolic"],
 }
 
 cc_library_static {
     name: "libmediabenchmark_codec2_encoder",
     defaults: [
-        "libmediabenchmark_common-defaults",
         "libmediabenchmark_codec2_common-defaults",
     ],
 
@@ -43,11 +43,11 @@ cc_library_static {
 
     static_libs: [
         "libmediabenchmark_codec2_common",
-        "libmediabenchmark_extractor",
-        "libmediabenchmark_decoder",
+        "libmediabenchmark_codec2_extractor",
+        "libmediabenchmark_codec2_decoder",
     ],
 
     export_include_dirs: ["."],
 
-    ldflags: ["-Wl,-Bsymbolic"]
+    ldflags: ["-Wl,-Bsymbolic"],
 }

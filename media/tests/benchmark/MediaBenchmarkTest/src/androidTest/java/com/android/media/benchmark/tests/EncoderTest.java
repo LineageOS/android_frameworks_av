@@ -28,6 +28,7 @@ import com.android.media.benchmark.library.CodecUtils;
 import com.android.media.benchmark.library.Decoder;
 import com.android.media.benchmark.library.Encoder;
 import com.android.media.benchmark.library.Extractor;
+import com.android.media.benchmark.library.Native;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -42,6 +43,8 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+
+import static org.junit.Assert.assertTrue;
 
 @RunWith(Parameterized.class)
 public class EncoderTest {
@@ -85,19 +88,16 @@ public class EncoderTest {
     public void sampleEncoderTest() throws Exception {
         int status;
         int frameSize;
-
         //Parameters for video
         int width = 0;
         int height = 0;
         int profile = 0;
         int level = 0;
         int frameRate = 0;
-
         //Parameters for audio
         int bitRate = 0;
         int sampleRate = 0;
         int numChannels = 0;
-
         File inputFile = new File(mInputFilePath + mInputFile);
         if (inputFile.exists()) {
             FileInputStream fileInput = new FileInputStream(inputFile);
@@ -129,7 +129,6 @@ public class EncoderTest {
                                 bufInfo.presentationTimeUs + " size = " + bufInfo.size);
                     }
                 } while (sampleSize > 0);
-
                 int tid = android.os.Process.myTid();
                 File decodedFile = new File(mContext.getFilesDir() + "/decoder_" + tid + ".out");
                 FileOutputStream decodeOutputStream = new FileOutputStream(decodedFile);
@@ -268,5 +267,44 @@ public class EncoderTest {
             Log.w(TAG, "Warning: Test Skipped. Cannot find " + mInputFile + " in directory " +
                     mInputFilePath);
         }
+    }
+
+    @Test
+    public void testNativeEncoder() throws Exception {
+        File inputFile = new File(mInputFilePath + mInputFile);
+        assertTrue("Cannot find " + mInputFile + " in directory " + mInputFilePath,
+                inputFile.exists());
+        int status = -1;
+        int tid = android.os.Process.myTid();
+        final String mDecodedFile = mContext.getFilesDir() + "/decoder_" + tid + ".out";
+        FileInputStream fileInput = new FileInputStream(inputFile);
+        FileDescriptor fileDescriptor = fileInput.getFD();
+        Extractor extractor = new Extractor();
+        int trackCount = extractor.setUpExtractor(fileDescriptor);
+        assertTrue("Extraction failed. No tracks for file: ", trackCount > 0);
+        for (int currentTrack = 0; currentTrack < trackCount; currentTrack++) {
+            extractor.selectExtractorTrack(currentTrack);
+            MediaFormat format = extractor.getFormat(currentTrack);
+            String mime = format.getString(MediaFormat.KEY_MIME);
+            ArrayList<String> mediaCodecs = CodecUtils.selectCodecs(mime, true);
+            // Encoding the decoder's output
+            for (String codecName : mediaCodecs) {
+                Native nativeEncoder = new Native();
+                status = nativeEncoder.Encode(mInputFilePath, mInputFile, mDecodedFile, codecName);
+                assertTrue(
+                        codecName + " encoder returned error " + status + " for file:" + mInputFile,
+                        status == 0);
+            }
+        }
+        File decodedFile = new File(mDecodedFile);
+        // Cleanup temporary input file
+        if (decodedFile.exists()) {
+            if (decodedFile.delete()) {
+                Log.i(TAG, "Successfully deleted - " + mDecodedFile);
+            } else {
+                Log.e(TAG, "Unable to delete - " + mDecodedFile);
+            }
+        }
+        fileInput.close();
     }
 }

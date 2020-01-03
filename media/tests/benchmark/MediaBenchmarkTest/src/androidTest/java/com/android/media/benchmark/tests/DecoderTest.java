@@ -27,6 +27,7 @@ import com.android.media.benchmark.R;
 import com.android.media.benchmark.library.CodecUtils;
 import com.android.media.benchmark.library.Decoder;
 import com.android.media.benchmark.library.Extractor;
+import com.android.media.benchmark.library.Native;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -43,6 +44,8 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+
+import static org.junit.Assert.assertTrue;
 
 @RunWith(Parameterized.class)
 public class DecoderTest {
@@ -193,5 +196,33 @@ public class DecoderTest {
                     "Warning: Test Skipped. Cannot find " + mInputFile + " in directory "
                             + mInputFilePath);
         }
+    }
+
+    @Test
+    public void testNativeDecoder() throws IOException {
+        File inputFile = new File(mInputFilePath + mInputFile);
+        assertTrue("Cannot find " + mInputFile + " in directory " + mInputFilePath,
+                inputFile.exists());
+        int status = -1;
+        FileInputStream fileInput = new FileInputStream(inputFile);
+        FileDescriptor fileDescriptor = fileInput.getFD();
+        Extractor extractor = new Extractor();
+        int trackCount = extractor.setUpExtractor(fileDescriptor);
+        assertTrue("Extraction failed. No tracks for file: ", trackCount > 0);
+        for (int currentTrack = 0; currentTrack < trackCount; currentTrack++) {
+            extractor.selectExtractorTrack(currentTrack);
+            MediaFormat format = extractor.getFormat(currentTrack);
+            String mime = format.getString(MediaFormat.KEY_MIME);
+            ArrayList<String> mediaCodecs = CodecUtils.selectCodecs(mime, false);
+            for (String codecName : mediaCodecs) {
+                Log.i("Test: %s\n", mInputFile);
+                Native nativeDecoder = new Native();
+                status = nativeDecoder.Decode(mInputFilePath, mInputFile, codecName, mAsyncMode);
+                assertTrue(
+                        codecName + " decoder returned error " + status + " for file:" + mInputFile,
+                        status == 0);
+            }
+        }
+        fileInput.close();
     }
 }
