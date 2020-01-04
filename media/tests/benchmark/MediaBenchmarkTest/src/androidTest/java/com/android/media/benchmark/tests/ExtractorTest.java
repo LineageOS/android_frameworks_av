@@ -18,6 +18,7 @@ package com.android.media.benchmark.tests;
 
 import com.android.media.benchmark.R;
 import com.android.media.benchmark.library.Extractor;
+import com.android.media.benchmark.library.Native;
 
 import android.content.Context;
 import android.util.Log;
@@ -35,9 +36,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 
 @RunWith(Parameterized.class)
 public class ExtractorTest {
@@ -73,20 +73,31 @@ public class ExtractorTest {
 
     @Test
     public void sampleExtractTest() throws IOException {
-        int status = -1;
         File inputFile = new File(mInputFilePath + mInputFileName);
-        if (inputFile.exists()) {
-            FileInputStream fileInput = new FileInputStream(inputFile);
-            FileDescriptor fileDescriptor = fileInput.getFD();
-            Extractor extractor = new Extractor();
-            extractor.setUpExtractor(fileDescriptor);
-            status = extractor.extractSample(mTrackId);
-            extractor.deinitExtractor();
-            extractor.dumpStatistics(mInputFileName);
-            fileInput.close();
-        } else {
-            Log.e(TAG, "Cannot find " + mInputFileName + " in directory " + mInputFilePath);
-        }
-        assertThat(status, is(equalTo(0)));
+        assertTrue("Cannot find " + mInputFileName + " in directory " + mInputFilePath,
+                inputFile.exists());
+        FileInputStream fileInput = new FileInputStream(inputFile);
+        FileDescriptor fileDescriptor = fileInput.getFD();
+        Extractor extractor = new Extractor();
+        extractor.setUpExtractor(fileDescriptor);
+        int status = extractor.extractSample(mTrackId);
+        assertEquals("Extraction failed for " + mInputFileName, 0, status);
+        Log.i(TAG, "Extracted " + mInputFileName + " successfully.");
+        extractor.deinitExtractor();
+        extractor.dumpStatistics(mInputFileName);
+        fileInput.close();
+    }
+
+    @Test
+    public void sampleExtractNativeTest() throws IOException {
+        Native nativeExtractor = new Native();
+        File inputFile = new File(mInputFilePath + mInputFileName);
+        assertTrue("Cannot find " + mInputFileName + " in directory " + mInputFilePath,
+                inputFile.exists());
+        FileInputStream fileInput = new FileInputStream(inputFile);
+        int status = nativeExtractor.Extract(mInputFilePath, mInputFileName);
+        fileInput.close();
+        assertEquals("Extraction failed for " + mInputFileName, 0, status);
+        Log.i(TAG, "Extracted " + mInputFileName + " successfully.");
     }
 }

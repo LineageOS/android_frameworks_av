@@ -18,6 +18,7 @@ package com.android.media.benchmark.tests;
 import com.android.media.benchmark.R;
 import com.android.media.benchmark.library.Extractor;
 import com.android.media.benchmark.library.Muxer;
+import com.android.media.benchmark.library.Native;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 
@@ -42,9 +43,9 @@ import java.util.Collection;
 import java.util.Hashtable;
 import java.util.Map;
 
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 
 @RunWith(Parameterized.class)
 public class MuxerTest {
@@ -95,58 +96,69 @@ public class MuxerTest {
 
     @Test
     public void sampleMuxerTest() throws IOException {
-        int status = -1;
         File inputFile = new File(mInputFilePath + mInputFileName);
-        if (inputFile.exists()) {
-            FileInputStream fileInput = new FileInputStream(inputFile);
-            FileDescriptor fileDescriptor = fileInput.getFD();
-            ArrayList<ByteBuffer> inputBuffer = new ArrayList<>();
-            ArrayList<MediaCodec.BufferInfo> inputBufferInfo = new ArrayList<>();
-            Extractor extractor = new Extractor();
-            int trackCount = extractor.setUpExtractor(fileDescriptor);
-            for (int currentTrack = 0; currentTrack < trackCount; currentTrack++) {
-                extractor.selectExtractorTrack(currentTrack);
-                while (true) {
-                    int sampleSize = extractor.getFrameSample();
-                    MediaCodec.BufferInfo bufferInfo = extractor.getBufferInfo();
-                    MediaCodec.BufferInfo tempBufferInfo = new MediaCodec.BufferInfo();
-                    tempBufferInfo
-                            .set(bufferInfo.offset, bufferInfo.size, bufferInfo.presentationTimeUs,
-                                    bufferInfo.flags);
-                    inputBufferInfo.add(tempBufferInfo);
-                    ByteBuffer tempSampleBuffer = ByteBuffer.allocate(tempBufferInfo.size);
-                    tempSampleBuffer.put(extractor.getFrameBuffer().array(), 0, bufferInfo.size);
-                    inputBuffer.add(tempSampleBuffer);
-                    if (sampleSize < 0) {
-                        break;
-                    }
-                }
-                MediaFormat format = extractor.getFormat(currentTrack);
-                int outputFormat = mMapFormat.getOrDefault(mFormat, -1);
-                if (outputFormat != -1) {
-                    Muxer muxer = new Muxer();
-                    int trackIndex = muxer.setUpMuxer(mContext, outputFormat, format);
-                    status = muxer.mux(trackIndex, inputBuffer, inputBufferInfo);
-                    if (status != 0) {
-                        Log.e(TAG, "Cannot perform write operation for " + mInputFileName);
-                    }
-                    muxer.deInitMuxer();
-                    muxer.dumpStatistics(mInputFileName, extractor.getClipDuration());
-                    muxer.resetMuxer();
-                    extractor.unselectExtractorTrack(currentTrack);
-                    inputBufferInfo.clear();
-                    inputBuffer.clear();
-                } else {
-                    Log.e(TAG, "Test failed for " + mInputFileName + ". Returned invalid " +
-                            "output format for given " + mFormat + " format.");
+        assertTrue("Cannot find " + mInputFileName + " in directory " + mInputFilePath,
+                inputFile.exists());
+        FileInputStream fileInput = new FileInputStream(inputFile);
+        FileDescriptor fileDescriptor = fileInput.getFD();
+        ArrayList<ByteBuffer> inputBuffer = new ArrayList<>();
+        ArrayList<MediaCodec.BufferInfo> inputBufferInfo = new ArrayList<>();
+        Extractor extractor = new Extractor();
+        int trackCount = extractor.setUpExtractor(fileDescriptor);
+        for (int currentTrack = 0; currentTrack < trackCount; currentTrack++) {
+            extractor.selectExtractorTrack(currentTrack);
+            while (true) {
+                int sampleSize = extractor.getFrameSample();
+                MediaCodec.BufferInfo bufferInfo = extractor.getBufferInfo();
+                MediaCodec.BufferInfo tempBufferInfo = new MediaCodec.BufferInfo();
+                tempBufferInfo
+                        .set(bufferInfo.offset, bufferInfo.size, bufferInfo.presentationTimeUs,
+                                bufferInfo.flags);
+                inputBufferInfo.add(tempBufferInfo);
+                ByteBuffer tempSampleBuffer = ByteBuffer.allocate(tempBufferInfo.size);
+                tempSampleBuffer.put(extractor.getFrameBuffer().array(), 0, bufferInfo.size);
+                inputBuffer.add(tempSampleBuffer);
+                if (sampleSize < 0) {
+                    break;
                 }
             }
-            extractor.deinitExtractor();
-            fileInput.close();
-        } else {
-            Log.w(TAG, "Warning: Test Skipped. Cannot find " + mInputFileName + " in directory " +
-                    mInputFilePath);
+            MediaFormat format = extractor.getFormat(currentTrack);
+            int outputFormat = mMapFormat.getOrDefault(mFormat, -1);
+            assertNotEquals("Test failed for " + mInputFileName + ". Returned invalid " +
+                    "output format for given " + mFormat + " format.", -1, outputFormat);
+            Muxer muxer = new Muxer();
+            int trackIndex = muxer.setUpMuxer(mContext, outputFormat, format);
+            int status = muxer.mux(trackIndex, inputBuffer, inputBufferInfo);
+            assertEquals("Cannot perform write operation for " + mInputFileName, 0, status);
+            Log.i(TAG, "Muxed " + mInputFileName + " successfully.");
+            muxer.deInitMuxer();
+            muxer.dumpStatistics(mInputFileName, extractor.getClipDuration());
+            muxer.resetMuxer();
+            extractor.unselectExtractorTrack(currentTrack);
+            inputBufferInfo.clear();
+            inputBuffer.clear();
+
         }
-        assertThat(status, is(equalTo(0)));
+        extractor.deinitExtractor();
+        fileInput.close();
+    }
+
+    @Test
+    public void sampleMuxerNativeTest() {
+        Native nativeMuxer = new Native();
+        File inputFile = new File(mInputFilePath + mInputFileName);
+        assertTrue("Cannot find " + mInputFileName + " in directory " + mInputFilePath,
+                inputFile.exists());
+        int tid = android.os.Process.myTid();
+        String mMuxOutputFile = (mContext.getFilesDir() + "/mux_" + tid + ".out");
+        int status = nativeMuxer.Mux(mInputFilePath, mInputFileName, mMuxOutputFile, mFormat);
+        assertEquals("Cannot perform write operation for " + mInputFileName, 0, status);
+        Log.i(TAG, "Muxed " + mInputFileName + " successfully.");
+        File muxedFile = new File(mMuxOutputFile);
+        // Cleanup temporary output file
+        if (muxedFile.exists()) {
+            assertTrue("Unable to delete" + mMuxOutputFile + " file.",
+                    muxedFile.delete());
+        }
     }
 }
