@@ -29,82 +29,64 @@ static BenchmarkTestEnvironment *gEnv = nullptr;
 
 class C2DecoderTest : public ::testing::TestWithParam<pair<string, string>> {
   public:
-    C2DecoderTest() : mDecoder(nullptr), disableTest(false) { setupC2DecoderTest(); }
+    C2DecoderTest() : mDecoder(nullptr) {}
+
+    ~C2DecoderTest() {
+        if (!mCodecList.empty()) {
+            mCodecList.clear();
+        }
+        if (mDecoder) {
+            delete mDecoder;
+            mDecoder = nullptr;
+        }
+    }
+
+    virtual void SetUp() override { setupC2DecoderTest(); }
 
     void setupC2DecoderTest();
 
     vector<string> mCodecList;
     C2Decoder *mDecoder;
-    bool disableTest;
 };
 
 void C2DecoderTest::setupC2DecoderTest() {
     mDecoder = new C2Decoder();
-    if (!mDecoder) {
-        cout << "[   WARN   ] Test Skipped. C2Decoder creation failed\n";
-        disableTest = true;
-        return;
-    }
+    ASSERT_NE(mDecoder, nullptr) << "C2Decoder creation failed";
+
     int32_t status = mDecoder->setupCodec2();
-    if (status != 0) {
-        cout << "[   WARN   ] Test Skipped. Codec2 setup failed \n";
-        disableTest = true;
-        return;
-    }
+    ASSERT_EQ(status, 0) << "Codec2 setup failed";
+
     mCodecList = mDecoder->getSupportedComponentList(false /* isEncoder*/);
-    if (!mCodecList.size()) {
-        cout << "[   WARN   ] Test Skipped. Codec2 client didn't recognise any component \n";
-        disableTest = true;
-        return;
-    }
+    ASSERT_GT(mCodecList.size(), 0) << "Codec2 client didn't recognise any component";
 }
 
 TEST_P(C2DecoderTest, Codec2Decode) {
-    if (disableTest) return;
-
     ALOGV("Decode the samples given by extractor using codec2");
     string inputFile = gEnv->getRes() + GetParam().first;
     FILE *inputFp = fopen(inputFile.c_str(), "rb");
-    if (!inputFp) {
-        cout << "[   WARN   ] Test Skipped. Unable to open input file" << inputFile
-             << " for reading \n";
-        return;
-    }
+    ASSERT_NE(inputFp, nullptr) << "Unable to open " << inputFile << " file for reading";
 
     Extractor *extractor = new Extractor();
-    if (!extractor) {
-        cout << "[   WARN   ] Test Skipped. Extractor creation failed \n";
-        return;
-    }
+    ASSERT_NE(extractor, nullptr) << "Extractor creation failed";
 
     // Read file properties
-    fseek(inputFp, 0, SEEK_END);
-    size_t fileSize = ftell(inputFp);
-    fseek(inputFp, 0, SEEK_SET);
+    struct stat buf;
+    stat(inputFile.c_str(), &buf);
+    size_t fileSize = buf.st_size;
     int32_t fd = fileno(inputFp);
 
-    if (fileSize > kMaxBufferSize) {
-        cout << "[   WARN   ] Test Skipped. Input file size is greater than the threshold memory "
-                "dedicated to the test \n";
-    }
+    ASSERT_LE(fileSize, kMaxBufferSize)
+            << "Input file size is greater than the threshold memory dedicated to the test";
 
     int32_t trackCount = extractor->initExtractor(fd, fileSize);
-    if (trackCount <= 0) {
-        cout << "[   WARN   ] Test Skipped. initExtractor failed\n";
-        return;
-    }
+    ASSERT_GT(trackCount, 0) << "initExtractor failed";
+
     for (int32_t curTrack = 0; curTrack < trackCount; curTrack++) {
         int32_t status = extractor->setupTrackFormat(curTrack);
-        if (status != 0) {
-            cout << "[   WARN   ] Test Skipped. Track Format invalid \n";
-            return;
-        }
+        ASSERT_EQ(status, 0) << "Track Format invalid";
 
         uint8_t *inputBuffer = (uint8_t *)malloc(fileSize);
-        if (!inputBuffer) {
-            cout << "[   WARN   ] Test Skipped. Insufficient memory \n";
-            return;
-        }
+        ASSERT_NE(inputBuffer, nullptr) << "Insufficient memory";
 
         vector<AMediaCodecBufferInfo> frameInfo;
         AMediaCodecBufferInfo info;
@@ -116,11 +98,8 @@ TEST_P(C2DecoderTest, Codec2Decode) {
             void *csdBuffer = extractor->getCSDSample(info, idx);
             if (!csdBuffer || !info.size) break;
             // copy the meta data and buffer to be passed to decoder
-            if (inputBufferOffset + info.size > fileSize) {
-                cout << "[   WARN   ] Test Skipped. Memory allocated not sufficient\n";
-                free(inputBuffer);
-                return;
-            }
+            ASSERT_LE(inputBufferOffset + info.size, fileSize) << "Memory allocated not sufficient";
+
             memcpy(inputBuffer + inputBufferOffset, csdBuffer, info.size);
             frameInfo.push_back(info);
             inputBufferOffset += info.size;
@@ -132,11 +111,8 @@ TEST_P(C2DecoderTest, Codec2Decode) {
             status = extractor->getFrameSample(info);
             if (status || !info.size) break;
             // copy the meta data and buffer to be passed to decoder
-            if (inputBufferOffset + info.size > fileSize) {
-                cout << "[   WARN   ] Test Skipped. Memory allocated not sufficient\n";
-                free(inputBuffer);
-                return;
-            }
+            ASSERT_LE(inputBufferOffset + info.size, fileSize) << "Memory allocated not sufficient";
+
             memcpy(inputBuffer + inputBufferOffset, extractor->getFrameBuf(), info.size);
             frameInfo.push_back(info);
             inputBufferOffset += info.size;
@@ -148,21 +124,18 @@ TEST_P(C2DecoderTest, Codec2Decode) {
             if (codecName.find(GetParam().second) != string::npos &&
                 codecName.find("secure") == string::npos) {
                 status = mDecoder->createCodec2Component(codecName, format);
-                if (status != 0) {
-                    cout << "[   WARN   ] Test Skipped. Create component failed for " << codecName
-                         << "\n";
-                    continue;
-                }
+                ASSERT_EQ(status, 0) << "Create component failed for " << codecName;
 
                 // Send the inputs to C2 Decoder and wait till all buffers are returned.
-                mDecoder->decodeFrames(inputBuffer, frameInfo);
+                status = mDecoder->decodeFrames(inputBuffer, frameInfo);
+                ASSERT_EQ(status, 0) << "Decoder failed for " << codecName;
+
                 mDecoder->waitOnInputConsumption();
-                if (!mDecoder->mEos) {
-                    cout << "[   WARN   ] Test Failed. Didn't receive EOS \n";
-                }
+                ASSERT_TRUE(mDecoder->mEos) << "Test Failed. Didn't receive EOS \n";
+
                 mDecoder->deInitCodec();
                 int64_t durationUs = extractor->getClipDuration();
-                cout << "codec: " << codecName << endl;
+                ALOGV("codec : %s", codecName.c_str());
                 mDecoder->dumpStatistics(GetParam().first, durationUs);
                 mDecoder->resetDecoder();
             }
@@ -172,6 +145,7 @@ TEST_P(C2DecoderTest, Codec2Decode) {
         extractor->deInitExtractor();
         delete extractor;
         delete mDecoder;
+        mDecoder = nullptr;
     }
 }
 
@@ -179,26 +153,24 @@ TEST_P(C2DecoderTest, Codec2Decode) {
 // Add wav files
 INSTANTIATE_TEST_SUITE_P(
         AudioDecoderTest, C2DecoderTest,
-        ::testing::Values(
-                make_pair("bbb_44100hz_2ch_128kbps_aac_30sec.mp4", "aac"),
-                make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec.mp3", "mp3"),
-                make_pair("bbb_8000hz_1ch_8kbps_amrnb_30sec.3gp", "amrnb"),
-                make_pair("bbb_16000hz_1ch_9kbps_amrwb_30sec.3gp", "amrnb"),
-                make_pair("bbb_44100hz_2ch_80kbps_vorbis_30sec.mp4", "vorbis"),
-                make_pair("bbb_44100hz_2ch_600kbps_flac_30sec.mp4", "flac"),
-                make_pair("bbb_48000hz_2ch_100kbps_opus_30sec.webm", "opus")));
+        ::testing::Values(make_pair("bbb_44100hz_2ch_128kbps_aac_30sec.mp4", "aac"),
+                          make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec.mp3", "mp3"),
+                          make_pair("bbb_8000hz_1ch_8kbps_amrnb_30sec.3gp", "amrnb"),
+                          make_pair("bbb_16000hz_1ch_9kbps_amrwb_30sec.3gp", "amrnb"),
+                          make_pair("bbb_44100hz_2ch_80kbps_vorbis_30sec.mp4", "vorbis"),
+                          make_pair("bbb_44100hz_2ch_600kbps_flac_30sec.mp4", "flac"),
+                          make_pair("bbb_48000hz_2ch_100kbps_opus_30sec.webm", "opus")));
 
 INSTANTIATE_TEST_SUITE_P(
         VideoDecoderTest, C2DecoderTest,
-        ::testing::Values(
-                make_pair("crowd_1920x1080_25fps_4000kbps_vp9.webm", "vp9"),
-                make_pair("crowd_1920x1080_25fps_4000kbps_vp8.webm", "vp8"),
-                make_pair("crowd_1920x1080_25fps_4000kbps_av1.webm", "av1"),
-                make_pair("crowd_1920x1080_25fps_7300kbps_mpeg2.mp4", "mpeg2"),
-                make_pair("crowd_1920x1080_25fps_6000kbps_mpeg4.mp4", "mpeg4"),
-                make_pair("crowd_352x288_25fps_6000kbps_h263.3gp", "h263"),
-                make_pair("crowd_1920x1080_25fps_6700kbps_h264.ts", "avc"),
-                make_pair("crowd_1920x1080_25fps_4000kbps_h265.mkv", "hevc")));
+        ::testing::Values(make_pair("crowd_1920x1080_25fps_4000kbps_vp9.webm", "vp9"),
+                          make_pair("crowd_1920x1080_25fps_4000kbps_vp8.webm", "vp8"),
+                          make_pair("crowd_1920x1080_25fps_4000kbps_av1.webm", "av1"),
+                          make_pair("crowd_1920x1080_25fps_7300kbps_mpeg2.mp4", "mpeg2"),
+                          make_pair("crowd_1920x1080_25fps_6000kbps_mpeg4.mp4", "mpeg4"),
+                          make_pair("crowd_352x288_25fps_6000kbps_h263.3gp", "h263"),
+                          make_pair("crowd_1920x1080_25fps_6700kbps_h264.ts", "avc"),
+                          make_pair("crowd_1920x1080_25fps_4000kbps_h265.mkv", "hevc")));
 
 int main(int argc, char **argv) {
     gEnv = new BenchmarkTestEnvironment();
