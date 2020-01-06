@@ -45,7 +45,7 @@ class Extractor {
 
     int32_t extract(int32_t trackId);
 
-    void dumpStatistics(std::string inputReference);
+    void dumpStatistics(string inputReference, string componentName = "", string statsFile = "");
 
     void deInitExtractor();
 

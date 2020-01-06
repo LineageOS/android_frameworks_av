@@ -29,7 +29,9 @@ import com.android.media.benchmark.library.Decoder;
 import com.android.media.benchmark.library.Encoder;
 import com.android.media.benchmark.library.Extractor;
 import com.android.media.benchmark.library.Native;
+import com.android.media.benchmark.library.Stats;
 
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -38,6 +40,7 @@ import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import java.util.ArrayList;
@@ -53,6 +56,8 @@ public class EncoderTest {
             InstrumentationRegistry.getInstrumentation().getTargetContext();
     private static final String mInputFilePath = mContext.getString(R.string.input_file_path);
     private static final String mOutputFilePath = mContext.getString(R.string.output_file_path);
+    private static final String mStatsFile =
+            mContext.getFilesDir() + "/Encoder." + System.currentTimeMillis() + ".csv";
     private static final String TAG = "EncoderTest";
     private static final long PER_TEST_TIMEOUT_MS = 120000;
     private static final boolean DEBUG = false;
@@ -60,7 +65,6 @@ public class EncoderTest {
     private static final int ENCODE_DEFAULT_FRAME_RATE = 25;
     private static final int ENCODE_DEFAULT_BIT_RATE = 8000000 /* 8 Mbps */;
     private static final int ENCODE_MIN_BIT_RATE = 600000 /* 600 Kbps */;
-
     private String mInputFile;
 
     @Parameterized.Parameters
@@ -83,6 +87,13 @@ public class EncoderTest {
 
     public EncoderTest(String inputFileName) {
         this.mInputFile = inputFileName;
+    }
+
+    @BeforeClass
+    public static void writeStatsHeaderToFile() throws IOException {
+        Stats mStats = new Stats();
+        boolean status = mStats.writeStatsHeader(mStatsFile);
+        assertTrue("Unable to open stats file for writing!", status);
     }
 
     @Test(timeout = PER_TEST_TIMEOUT_MS)
@@ -220,9 +231,8 @@ public class EncoderTest {
                     assertEquals(
                             codecName + " encoder returned error " + status + " for " + "file:" +
                                     " " + mInputFile, 0, status);
-                    encoder.dumpStatistics(
-                            mInputFile + "with " + codecName + " for " + "aSyncMode = " + asyncMode,
-                            extractor.getClipDuration());
+                    encoder.dumpStatistics(mInputFile, codecName, (asyncMode ? "async" : "sync"),
+                            extractor.getClipDuration(), mStatsFile);
                     Log.i(TAG, "Encoding complete for file: " + mInputFile + " with codec: " +
                             codecName + " for aSyncMode = " + asyncMode);
                     encoder.resetEncoder();
@@ -264,8 +274,8 @@ public class EncoderTest {
             // Encoding the decoder's output
             for (String codecName : mediaCodecs) {
                 Native nativeEncoder = new Native();
-                int status =
-                        nativeEncoder.Encode(mInputFilePath, mInputFile, mDecodedFile, codecName);
+                int status = nativeEncoder.Encode(
+                        mInputFilePath, mInputFile, mDecodedFile, mStatsFile, codecName);
                 assertEquals(
                         codecName + " encoder returned error " + status + " for " + "file:" + " " +
                                 mInputFile, 0, status);
