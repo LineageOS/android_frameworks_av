@@ -43,13 +43,12 @@
 #include <codec2/hidl/client.h>
 #include <cutils/native_handle.h>
 #include <media/omx/1.0/WOmxNode.h>
-#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/foundation/ALookup.h>
 #include <media/stagefright/foundation/MediaDefs.h>
 #include <media/stagefright/omx/OMXUtils.h>
 #include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
-
-#include "Codec2InfoBuilder.h"
+#include <media/stagefright/Codec2InfoBuilder.h>
+#include <media/stagefright/MediaCodecConstants.h>
 
 namespace android {
 

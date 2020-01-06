@@ -1,6 +1,8 @@
 cc_library_shared {
     name: "libsfplugin_ccodec",
 
+    export_include_dirs: ["include"],
+
     srcs: [
         "C2OMXNode.cpp",
         "CCodec.cpp",
@@ -11,7 +13,6 @@ cc_library_shared {
         "Codec2InfoBuilder.cpp",
         "PipelineWatcher.cpp",
         "ReflectedParamUpdater.cpp",
-        "SkipCutBuffer.cpp",
     ],
 
     cflags: [
@@ -32,6 +33,7 @@ cc_library_shared {
         "android.hardware.media.omx@1.0",
         "libbase",
         "libbinder",
+        "libcodec2",
         "libcodec2_client",
         "libcodec2_vndk",
         "libcutils",
@@ -49,6 +51,11 @@ cc_library_shared {
         "libstagefright_xmlparser",
         "libui",
         "libutils",
+    ],
+
+    export_shared_lib_headers: [
+        "libcodec2",
+        "libcodec2_client",
     ],
 
     sanitize: {

@@ -53,6 +53,7 @@ cc_library_shared {
         "CodecBase.cpp",
         "FrameRenderTracker.cpp",
         "MediaCodecListWriter.cpp",
+        "SkipCutBuffer.cpp",
     ],
 
     cflags: [
@@ -62,6 +63,7 @@ cc_library_shared {
 
     header_libs: [
         "libmediadrm_headers",
+        "media_ndk_headers",
     ],
 
     shared_libs: [
@@ -69,6 +71,7 @@ cc_library_shared {
         "libhidlallocatorutils",
         "liblog",
         "libmedia_codeclist",
+        "libmedia_omx",
         "libstagefright_foundation",
         "libui",
         "libutils",
@@ -212,9 +215,7 @@ cc_library {
         "RemoteMediaExtractor.cpp",
         "RemoteMediaSource.cpp",
         "SimpleDecodingSource.cpp",
-        "SkipCutBuffer.cpp",
         "StagefrightMediaScanner.cpp",
-        "StagefrightPluginLoader.cpp",
         "SurfaceUtils.cpp",
         "ThrottledSource.cpp",
         "Utils.cpp",
@@ -244,6 +245,7 @@ cc_library {
         "libui",
         "libutils",
         "libmedia_helper",
+        "libsfplugin_ccodec",
         "libstagefright_codecbase",
         "libstagefright_foundation",
         "libstagefright_omx_utils",
