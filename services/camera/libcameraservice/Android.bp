@@ -28,6 +28,7 @@ cc_library_shared {
         "common/CameraDeviceBase.cpp",
         "common/CameraOfflineSessionBase.cpp",
         "common/CameraProviderManager.cpp",
+        "common/DepthPhotoProcessor.cpp",
         "common/FrameProcessorBase.cpp",
         "api1/CameraClient.cpp",
         "api1/Camera2Client.cpp",
@@ -91,10 +92,12 @@ cc_library_shared {
         "libmediautils",
         "libcamera_client",
         "libcamera_metadata",
+        "libdynamic_depth",
         "libfmq",
         "libgui",
         "libhardware",
         "libhidlbase",
+        "libimage_io",
         "libjpeg",
         "libmedia_codeclist",
         "libmedia_omx",
@@ -102,6 +105,7 @@ cc_library_shared {
         "libsensorprivacy",
         "libstagefright",
         "libstagefright_foundation",
+        "libxml2",
         "libyuv",
         "android.frameworks.cameraservice.common@2.0",
         "android.frameworks.cameraservice.service@2.0",
@@ -143,40 +147,3 @@ cc_library_shared {
 
 }
 
-cc_library_shared {
-    name: "libdepthphoto",
-
-    srcs: [
-        "utils/ExifUtils.cpp",
-        "common/DepthPhotoProcessor.cpp",
-    ],
-
-    shared_libs: [
-        "libimage_io",
-        "libdynamic_depth",
-        "libxml2",
-        "liblog",
-        "libutilscallstack",
-        "libutils",
-        "libcutils",
-        "libjpeg",
-        "libmemunreachable",
-        "libexif",
-        "libcamera_client",
-    ],
-
-    include_dirs: [
-        "external/dynamic_depth/includes",
-        "external/dynamic_depth/internal",
-    ],
-
-    export_include_dirs: ["."],
-
-    cflags: [
-        "-Wall",
-        "-Wextra",
-        "-Werror",
-        "-Wno-ignored-qualifiers",
-    ],
-
-}
