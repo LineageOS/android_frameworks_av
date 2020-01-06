@@ -326,12 +326,17 @@ public class Encoder {
     /**
      * Prints out the statistics in the information log
      *
-     * @param inputReference The operation being performed, in this case encode
+     * @param inputReference The operation being performed, in this case decode
+     * @param componentName  Name of the component/codec
+     * @param mode           The operating mode: Sync/Async
      * @param durationUs     Duration of the clip in microseconds
+     * @param statsFile      The output file where the stats data is written
      */
-    public void dumpStatistics(String inputReference, long durationUs) {
+    public void dumpStatistics(String inputReference, String componentName, String mode,
+                               long durationUs, String statsFile) throws IOException {
         String operation = "encode";
-        mStats.dumpStatistics(operation, inputReference, durationUs);
+        mStats.dumpStatistics(
+                inputReference, operation, componentName, mode, durationUs, statsFile);
     }
 
     /**

@@ -28,7 +28,9 @@ import com.android.media.benchmark.library.CodecUtils;
 import com.android.media.benchmark.library.Decoder;
 import com.android.media.benchmark.library.Extractor;
 import com.android.media.benchmark.library.Native;
+import com.android.media.benchmark.library.Stats;
 
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -54,6 +56,8 @@ public class DecoderTest {
             InstrumentationRegistry.getInstrumentation().getTargetContext();
     private static final String mInputFilePath = mContext.getString(R.string.input_file_path);
     private static final String mOutputFilePath = mContext.getString(R.string.output_file_path);
+    private static final String mStatsFile =
+            mContext.getFilesDir() + "/Decoder." + System.currentTimeMillis() + ".csv";
     private static final String TAG = "DecoderTest";
     private static final long PER_TEST_TIMEOUT_MS = 60000;
     private static final boolean DEBUG = false;
@@ -103,6 +107,13 @@ public class DecoderTest {
                 {"crowd_352x288_25fps_6000kbps_h263.3gp", true},
                 {"crowd_1920x1080_25fps_6700kbps_h264.ts", true},
                 {"crowd_1920x1080_25fps_4000kbps_h265.mkv", true}});
+    }
+
+    @BeforeClass
+    public static void writeStatsHeaderToFile() throws IOException {
+        Stats mStats = new Stats();
+        boolean status = mStats.writeStatsHeader(mStatsFile);
+        assertTrue("Unable to open stats file for writing!", status);
     }
 
     @Test(timeout = PER_TEST_TIMEOUT_MS)
@@ -162,7 +173,8 @@ public class DecoderTest {
                 decoder.deInitCodec();
                 assertEquals("Decoder returned error " + status + " for file: " + mInputFile +
                         " with codec: " + codecName, 0, status);
-                decoder.dumpStatistics(mInputFile + " " + codecName, extractor.getClipDuration());
+                decoder.dumpStatistics(mInputFile, codecName, (mAsyncMode ? "async" : "sync"),
+                        extractor.getClipDuration(), mStatsFile);
                 Log.i(TAG, "Decoding Successful for file: " + mInputFile + " with codec: " +
                         codecName);
                 decoder.resetDecoder();
@@ -196,8 +208,8 @@ public class DecoderTest {
             for (String codecName : mediaCodecs) {
                 Log.i("Test: %s\n", mInputFile);
                 Native nativeDecoder = new Native();
-                int status =
-                        nativeDecoder.Decode(mInputFilePath, mInputFile, codecName, mAsyncMode);
+                int status = nativeDecoder.Decode(
+                        mInputFilePath, mInputFile, mStatsFile, codecName, mAsyncMode);
                 assertEquals("Decoder returned error " + status + " for file: " + mInputFile, 0,
                         status);
             }
