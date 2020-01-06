@@ -534,8 +534,8 @@ void AudioPolicyService::updateUidStates_l()
         //             OR client has CAPTURE_AUDIO_OUTPUT privileged permission
         bool allowCapture = !isAssistantOnTop
                 && ((isTopOrLatestActive && !isLatestSensitive) || isLatestSensitive)
-                && !(isSensitiveActive && !(isLatestSensitive || current->canCaptureOutput))
-                && !(isInCall && !current->canCaptureOutput);
+                && !(isSensitiveActive && !(isLatestSensitive || current->canCaptureCallOrOutput))
+                && !(isInCall && !current->canCaptureCallOrOutput);
 
         if (isVirtualSource(source)) {
             // Allow capture for virtual (remote submix, call audio TX or RX...) sources
@@ -555,7 +555,7 @@ void AudioPolicyService::updateUidStates_l()
             } else {
                 if (((isAssistantOnTop && source == AUDIO_SOURCE_VOICE_RECOGNITION) ||
                         source == AUDIO_SOURCE_HOTWORD) &&
-                        (!(isSensitiveActive || isInCall) || current->canCaptureOutput)) {
+                        (!(isSensitiveActive || isInCall) || current->canCaptureCallOrOutput)) {
                     allowCapture = true;
                 }
             }
@@ -567,7 +567,7 @@ void AudioPolicyService::updateUidStates_l()
             //     OR
             //         Is on TOP AND the source is VOICE_RECOGNITION or HOTWORD
             if (!isAssistantOnTop
-                    && (!(isSensitiveActive || isInCall) || current->canCaptureOutput)) {
+                    && (!(isSensitiveActive || isInCall) || current->canCaptureCallOrOutput)) {
                 allowCapture = true;
             }
             if (isA11yOnTop) {
@@ -580,7 +580,7 @@ void AudioPolicyService::updateUidStates_l()
             //     All active clients are using HOTWORD source
             //     AND no call is active
             //         OR client has CAPTURE_AUDIO_OUTPUT privileged permission
-            if (onlyHotwordActive && !(isInCall && !current->canCaptureOutput)) {
+            if (onlyHotwordActive && !(isInCall && !current->canCaptureCallOrOutput)) {
                 allowCapture = true;
             }
         }

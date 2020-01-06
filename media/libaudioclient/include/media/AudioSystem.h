@@ -240,6 +240,7 @@ public:
                                      audio_stream_type_t *stream,
                                      pid_t pid,
                                      uid_t uid,
+                                     const String16& opPackageName,
                                      const audio_config_t *config,
                                      audio_output_flags_t flags,
                                      audio_port_handle_t *selectedDeviceId,
