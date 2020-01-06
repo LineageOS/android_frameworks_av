@@ -36,7 +36,7 @@ namespace android::mediametrics {
  *
  * The TransactionLog is NOT thread safe.
  */
-class TransactionLog {
+class TransactionLog final { // made final as we have copy constructor instead of dup() override.
 public:
     // In long term run, the garbage collector aims to keep the
     // Transaction Log between the Low Water Mark and the High Water Mark.
@@ -56,6 +56,30 @@ public:
         LOG_ALWAYS_FATAL_IF(highWaterMark <= lowWaterMark,
               "%s: required that highWaterMark:%zu > lowWaterMark:%zu",
                   __func__, highWaterMark, lowWaterMark);
+    }
+
+    // The TransactionLog copy constructor/assignment is effectively an
+    // instantaneous, isochronous snapshot of the other TransactionLog.
+    //
+    // The contents of the Transaction Log are shared pointers to immutable instances -
+    // std::shared_ptr<const mediametrics::Item>, so we use a shallow copy,
+    // which is more efficient in space and execution time than a deep copy,
+    // and gives the same results.
+
+    TransactionLog(const TransactionLog &other) {
+        *this = other;
+    }
+
+    TransactionLog& operator=(const TransactionLog &other) {
+        std::lock_guard lock(mLock);
+        mLog.clear();
+        mItemMap.clear();
+
+        std::lock_guard lock2(other.mLock);
+        mLog = other.mLog;
+        mItemMap = other.mItemMap;
+
+        return *this;
     }
 
     /**
