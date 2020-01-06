@@ -356,6 +356,11 @@ Return<void> DrmPlugin::provideKeyResponse(
 
     Status status = Status::OK;
     bool isOfflineLicense = responseString.find(kOfflineLicense) != std::string::npos;
+    if (scopeId.size() < kKeySetIdPrefix.size()) {
+        android_errorWriteLog(0x534e4554, "144507096");
+        _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, hidl_vec<uint8_t>());
+        return Void();
+    }
     bool isRelease = (memcmp(scopeId.data(), kKeySetIdPrefix.data(), kKeySetIdPrefix.size()) == 0);
     if (isRelease) {
         keySetId.assign(scopeId.begin(), scopeId.end());
