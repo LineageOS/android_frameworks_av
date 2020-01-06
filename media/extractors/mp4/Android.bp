@@ -35,7 +35,7 @@ cc_defaults {
     compile_multilib: "first",
 }
 
-cc_library_shared {
+cc_library {
 
 
     name: "libmp4extractor",
