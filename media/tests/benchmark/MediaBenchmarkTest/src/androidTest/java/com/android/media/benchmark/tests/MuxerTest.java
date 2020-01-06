@@ -58,7 +58,7 @@ public class MuxerTest {
             InstrumentationRegistry.getInstrumentation().getTargetContext();
     private static final String mInputFilePath = mContext.getString(R.string.input_file_path);
     private static final String mStatsFile =
-            mContext.getFilesDir() + "/Muxer." + System.currentTimeMillis() + ".csv";
+            mContext.getExternalFilesDir(null) + "/Muxer." + System.currentTimeMillis() + ".csv";
     private static final String TAG = "MuxerTest";
     private static final Map<String, Integer> mMapFormat = new Hashtable<String, Integer>() {
         {
@@ -106,6 +106,7 @@ public class MuxerTest {
         Stats mStats = new Stats();
         boolean status = mStats.writeStatsHeader(mStatsFile);
         assertTrue("Unable to open stats file for writing!", status);
+        Log.d(TAG, "Saving Benchmark results in: " + mStatsFile);
     }
 
     @Test
