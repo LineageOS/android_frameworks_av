@@ -21,8 +21,8 @@
 #include <fstream>
 #include <iostream>
 
-#include "Muxer.h"
 #include "BenchmarkTestEnvironment.h"
+#include "Muxer.h"
 
 #define OUTPUT_FILE_NAME "/data/local/tmp/mux.out"
 
@@ -53,49 +53,34 @@ TEST_P(MuxerTest, Mux) {
     ALOGV("Mux the samples given by extractor");
     string inputFile = gEnv->getRes() + GetParam().first;
     FILE *inputFp = fopen(inputFile.c_str(), "rb");
-    if (!inputFp) {
-        cout << "[   WARN   ] Test Skipped. Unable to open input file for reading \n";
-        return;
-    }
+    ASSERT_NE(inputFp, nullptr) << "Unable to open " << inputFile << " file for reading";
+
     string fmt = GetParam().second;
     MUXER_OUTPUT_T outputFormat = getMuxerOutFormat(fmt);
-    if (outputFormat == MUXER_OUTPUT_FORMAT_INVALID) {
-        ALOGE("output format is MUXER_OUTPUT_FORMAT_INVALID");
-        return;
-    }
+    ASSERT_NE(outputFormat, MUXER_OUTPUT_FORMAT_INVALID) << "Invalid muxer output format";
 
     Muxer *muxerObj = new Muxer();
+    ASSERT_NE(muxerObj, nullptr) << "Muxer creation failed";
+
     Extractor *extractor = muxerObj->getExtractor();
-    if (!extractor) {
-        cout << "[   WARN   ] Test Skipped. Extractor creation failed \n";
-        return;
-    }
+    ASSERT_NE(extractor, nullptr) << "Extractor creation failed";
 
     // Read file properties
-    size_t fileSize = 0;
-    fseek(inputFp, 0, SEEK_END);
-    fileSize = ftell(inputFp);
-    fseek(inputFp, 0, SEEK_SET);
+    struct stat buf;
+    stat(inputFile.c_str(), &buf);
+    size_t fileSize = buf.st_size;
     int32_t fd = fileno(inputFp);
 
     int32_t trackCount = extractor->initExtractor(fd, fileSize);
-    if (trackCount <= 0) {
-        cout << "[   WARN   ] Test Skipped. initExtractor failed\n";
-        return;
-    }
+    ASSERT_GT(trackCount, 0) << "initExtractor failed";
 
     for (int curTrack = 0; curTrack < trackCount; curTrack++) {
         int32_t status = extractor->setupTrackFormat(curTrack);
-        if (status != 0) {
-            cout << "[   WARN   ] Test Skipped. Track Format invalid \n";
-            return;
-        }
+        ASSERT_EQ(status, 0) << "Track Format invalid";
 
         uint8_t *inputBuffer = (uint8_t *)malloc(kMaxBufferSize);
-        if (!inputBuffer) {
-            std::cout << "[   WARN   ] Test Skipped. Insufficient memory \n";
-            return;
-        }
+        ASSERT_NE(inputBuffer, nullptr) << "Insufficient memory";
+
         // AMediaCodecBufferInfo : <size of frame> <flags> <presentationTimeUs> <offset>
         vector<AMediaCodecBufferInfo> frameInfos;
         AMediaCodecBufferInfo info;
@@ -106,11 +91,9 @@ TEST_P(MuxerTest, Mux) {
             status = extractor->getFrameSample(info);
             if (status || !info.size) break;
             // copy the meta data and buffer to be passed to muxer
-            if (inputBufferOffset + info.size > kMaxBufferSize) {
-                cout << "[   WARN   ] Test Skipped. Memory allocated not sufficient\n";
-                free(inputBuffer);
-                return;
-            }
+            ASSERT_LE(inputBufferOffset + info.size, kMaxBufferSize)
+                    << "Memory allocated not sufficient";
+
             memcpy(inputBuffer + inputBufferOffset, extractor->getFrameBuf(), info.size);
             info.offset = inputBufferOffset;
             frameInfos.push_back(info);
@@ -119,22 +102,16 @@ TEST_P(MuxerTest, Mux) {
 
         string outputFileName = OUTPUT_FILE_NAME;
         FILE *outputFp = fopen(outputFileName.c_str(), "w+b");
-        if (!outputFp) {
-            cout << "[   WARN   ] Test Skipped. Unable to open output file for writing \n";
-            return;
-        }
+        ASSERT_NE(outputFp, nullptr)
+                << "Unable to open output file" << outputFileName << " for writing";
+
         int32_t fd = fileno(outputFp);
         status = muxerObj->initMuxer(fd, outputFormat);
-        if (status != 0) {
-            cout << "[   WARN   ] Test Skipped. initMuxer failed\n";
-            return;
-        }
+        ASSERT_EQ(status, 0) << "initMuxer failed";
 
         status = muxerObj->mux(inputBuffer, frameInfos);
-        if (status != 0) {
-            cout << "[   WARN   ] Test Skipped. Mux failed \n";
-            return;
-        }
+        ASSERT_EQ(status, 0) << "Mux failed";
+
         muxerObj->deInitMuxer();
         muxerObj->dumpStatistics(GetParam().first + "." + fmt.c_str());
         free(inputBuffer);
