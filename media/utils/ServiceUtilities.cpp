@@ -16,6 +16,7 @@
 
 #define LOG_TAG "ServiceUtilities"
 
+#include <audio_utils/clock.h>
 #include <binder/AppOpsManager.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
@@ -24,6 +25,7 @@
 
 #include <iterator>
 #include <algorithm>
+#include <pwd.h>
 
 /* When performing permission checks we do not use permission cache for
  * runtime permissions (protection level dangerous) as they may change at
@@ -327,6 +329,130 @@ void MediaPackageManager::dump(int fd, int spaces) const {
                     package.name.c_str());
         }
     }
+}
+
+// How long we hold info before we re-fetch it (24 hours) if we found it previously.
+static constexpr nsecs_t INFO_EXPIRATION_NS = 24 * 60 * 60 * NANOS_PER_SECOND;
+// Maximum info records we retain before clearing everything.
+static constexpr size_t INFO_CACHE_MAX = 1000;
+
+// The original code is from MediaMetricsService.cpp.
+mediautils::UidInfo::Info mediautils::UidInfo::getInfo(uid_t uid)
+{
+    const nsecs_t now = systemTime(SYSTEM_TIME_REALTIME);
+    struct mediautils::UidInfo::Info info;
+    {
+        std::lock_guard _l(mLock);
+        auto it = mInfoMap.find(uid);
+        if (it != mInfoMap.end()) {
+            info = it->second;
+            ALOGV("%s: uid %d expiration %lld now %lld",
+                    __func__, uid, (long long)info.expirationNs, (long long)now);
+            if (info.expirationNs <= now) {
+                // purge the stale entry and fall into re-fetching
+                ALOGV("%s: entry for uid %d expired, now %lld",
+                        __func__, uid, (long long)now);
+                mInfoMap.erase(it);
+                info.uid = (uid_t)-1;  // this is always fully overwritten
+            }
+        }
+    }
+
+    // if we did not find it in our map, look it up
+    if (info.uid == (uid_t)(-1)) {
+        sp<IServiceManager> sm = defaultServiceManager();
+        sp<content::pm::IPackageManagerNative> package_mgr;
+        if (sm.get() == nullptr) {
+            ALOGE("%s: Cannot find service manager", __func__);
+        } else {
+            sp<IBinder> binder = sm->getService(String16("package_native"));
+            if (binder.get() == nullptr) {
+                ALOGE("%s: Cannot find package_native", __func__);
+            } else {
+                package_mgr = interface_cast<content::pm::IPackageManagerNative>(binder);
+            }
+        }
+
+        // find package name
+        std::string pkg;
+        if (package_mgr != nullptr) {
+            std::vector<std::string> names;
+            binder::Status status = package_mgr->getNamesForUids({(int)uid}, &names);
+            if (!status.isOk()) {
+                ALOGE("%s: getNamesForUids failed: %s",
+                        __func__, status.exceptionMessage().c_str());
+            } else {
+                if (!names[0].empty()) {
+                    pkg = names[0].c_str();
+                }
+            }
+        }
+
+        if (pkg.empty()) {
+            struct passwd pw{}, *result;
+            char buf[8192]; // extra buffer space - should exceed what is
+                            // required in struct passwd_pw (tested),
+                            // and even then this is only used in backup
+                            // when the package manager is unavailable.
+            if (getpwuid_r(uid, &pw, buf, sizeof(buf), &result) == 0
+                    && result != nullptr
+                    && result->pw_name != nullptr) {
+                pkg = result->pw_name;
+            }
+        }
+
+        // strip any leading "shared:" strings that came back
+        if (pkg.compare(0, 7, "shared:") == 0) {
+            pkg.erase(0, 7);
+        }
+
+        // determine how pkg was installed and the versionCode
+        std::string installer;
+        int64_t versionCode = 0;
+        bool notFound = false;
+        if (pkg.empty()) {
+            pkg = std::to_string(uid); // not found
+            notFound = true;
+        } else if (strchr(pkg.c_str(), '.') == nullptr) {
+            // not of form 'com.whatever...'; assume internal
+            // so we don't need to look it up in package manager.
+        } else if (package_mgr.get() != nullptr) {
+            String16 pkgName16(pkg.c_str());
+            binder::Status status = package_mgr->getInstallerForPackage(pkgName16, &installer);
+            if (!status.isOk()) {
+                ALOGE("%s: getInstallerForPackage failed: %s",
+                        __func__, status.exceptionMessage().c_str());
+            }
+
+            // skip if we didn't get an installer
+            if (status.isOk()) {
+                status = package_mgr->getVersionCodeForPackage(pkgName16, &versionCode);
+                if (!status.isOk()) {
+                    ALOGE("%s: getVersionCodeForPackage failed: %s",
+                            __func__, status.exceptionMessage().c_str());
+                }
+            }
+
+            ALOGV("%s: package '%s' installed by '%s' versioncode %lld",
+                    __func__, pkg.c_str(), installer.c_str(), (long long)versionCode);
+        }
+
+        // add it to the map, to save a subsequent lookup
+        std::lock_guard _l(mLock);
+        // first clear if we have too many cached elements.  This would be rare.
+        if (mInfoMap.size() >= INFO_CACHE_MAX) mInfoMap.clear();
+
+        // always overwrite
+        info.uid = uid;
+        info.package = std::move(pkg);
+        info.installer = std::move(installer);
+        info.versionCode = versionCode;
+        info.expirationNs = now + (notFound ? 0 : INFO_EXPIRATION_NS);
+        ALOGV("%s: adding uid %d package '%s' expirationNs: %lld",
+                __func__, uid, info.package.c_str(), (long long)info.expirationNs);
+        mInfoMap[uid] = info;
+    }
+    return info;
 }
 
 } // namespace android

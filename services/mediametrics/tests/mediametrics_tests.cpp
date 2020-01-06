@@ -89,6 +89,32 @@ TEST(mediametrics_tests, instantiate) {
   mediaMetrics->dump(fileno(stdout), {} /* args */);
 }
 
+TEST(mediametrics_tests, package_installer_check) {
+  ASSERT_EQ(false, MediaMetricsService::useUidForPackage(
+      "abcd", "installer"));  // ok, package name has no dot.
+  ASSERT_EQ(false, MediaMetricsService::useUidForPackage(
+      "android.com", "installer"));  // ok, package name starts with android
+
+  ASSERT_EQ(false, MediaMetricsService::useUidForPackage(
+      "abc.def", "com.android.foo"));  // ok, installer name starts with com.android
+  ASSERT_EQ(false, MediaMetricsService::useUidForPackage(
+      "123.456", "com.google.bar"));  // ok, installer name starts with com.google
+  ASSERT_EQ(false, MediaMetricsService::useUidForPackage(
+      "r2.d2", "preload"));  // ok, installer name is preload
+
+  ASSERT_EQ(true, MediaMetricsService::useUidForPackage(
+      "abc.def", "installer"));  // unknown installer
+  ASSERT_EQ(true, MediaMetricsService::useUidForPackage(
+      "123.456", "installer")); // unknown installer
+  ASSERT_EQ(true, MediaMetricsService::useUidForPackage(
+      "r2.d2", "preload23"));  // unknown installer
+
+  ASSERT_EQ(true, MediaMetricsService::useUidForPackage(
+      "com.android.foo", "abc.def"));  // unknown installer
+  ASSERT_EQ(true, MediaMetricsService::useUidForPackage(
+      "com.google.bar", "123.456"));  // unknown installer
+}
+
 TEST(mediametrics_tests, item_manipulation) {
   mediametrics::Item item("audiorecord");
 

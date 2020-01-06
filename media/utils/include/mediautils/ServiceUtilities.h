@@ -28,6 +28,7 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace android {
@@ -118,6 +119,40 @@ private:
     using Packages = std::vector<Package>;
     std::map<uid_t, Packages> mDebugLog;
 };
-}
+
+namespace mediautils {
+
+/**
+ * This class is used to retrieve (and cache) package information
+ * for a given uid.
+ */
+class UidInfo {
+public:
+    struct Info {
+        uid_t uid = -1;           // uid used for lookup.
+        std::string package;      // package name.
+        std::string installer;    // installer for the package (e.g. preload, play store).
+        int64_t versionCode = 0;  // reported version code.
+        int64_t expirationNs = 0; // after this time in SYSTEM_TIME_REALTIME we refetch.
+    };
+
+    /**
+     * Returns the package information for a UID.
+     *
+     * The package name will be the uid if we cannot find the associated name.
+     *
+     * \param uid is the uid of the app or service.
+     */
+    Info getInfo(uid_t uid);
+
+private:
+    std::mutex mLock;
+    // TODO: use concurrent hashmap with striped lock.
+    std::unordered_map<uid_t, Info> mInfoMap; // GUARDED_BY(mLock)
+};
+
+} // namespace mediautils
+
+} // namespace android
 
 #endif // ANDROID_MEDIAUTILS_SERVICEUTILITIES_H

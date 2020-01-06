@@ -17,6 +17,7 @@ cc_test {
         "liblog",
         "libmediametrics",
         "libmediametricsservice",
+        "libmediautils",
         "libutils",
     ],
 
