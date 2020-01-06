@@ -19,6 +19,7 @@ import com.android.media.benchmark.R;
 import com.android.media.benchmark.library.Extractor;
 import com.android.media.benchmark.library.Muxer;
 import com.android.media.benchmark.library.Native;
+import com.android.media.benchmark.library.Stats;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 
@@ -28,6 +29,7 @@ import android.media.MediaFormat;
 import android.media.MediaMuxer;
 import android.util.Log;
 
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -35,6 +37,7 @@ import org.junit.runners.Parameterized;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -47,11 +50,15 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 
+import static org.junit.Assert.assertTrue;
+
 @RunWith(Parameterized.class)
 public class MuxerTest {
     private static Context mContext =
             InstrumentationRegistry.getInstrumentation().getTargetContext();
     private static final String mInputFilePath = mContext.getString(R.string.input_file_path);
+    private static final String mStatsFile =
+            mContext.getFilesDir() + "/Muxer." + System.currentTimeMillis() + ".csv";
     private static final String TAG = "MuxerTest";
     private static final Map<String, Integer> mMapFormat = new Hashtable<String, Integer>() {
         {
@@ -94,6 +101,13 @@ public class MuxerTest {
         this.mFormat = outputFormat;
     }
 
+    @BeforeClass
+    public static void writeStatsHeaderToFile() throws IOException {
+        Stats mStats = new Stats();
+        boolean status = mStats.writeStatsHeader(mStatsFile);
+        assertTrue("Unable to open stats file for writing!", status);
+    }
+
     @Test
     public void sampleMuxerTest() throws IOException {
         File inputFile = new File(mInputFilePath + mInputFileName);
@@ -132,7 +146,7 @@ public class MuxerTest {
             assertEquals("Cannot perform write operation for " + mInputFileName, 0, status);
             Log.i(TAG, "Muxed " + mInputFileName + " successfully.");
             muxer.deInitMuxer();
-            muxer.dumpStatistics(mInputFileName, extractor.getClipDuration());
+            muxer.dumpStatistics(mInputFileName, mFormat, extractor.getClipDuration(), mStatsFile);
             muxer.resetMuxer();
             extractor.unselectExtractorTrack(currentTrack);
             inputBufferInfo.clear();
@@ -151,7 +165,8 @@ public class MuxerTest {
                 inputFile.exists());
         int tid = android.os.Process.myTid();
         String mMuxOutputFile = (mContext.getFilesDir() + "/mux_" + tid + ".out");
-        int status = nativeMuxer.Mux(mInputFilePath, mInputFileName, mMuxOutputFile, mFormat);
+        int status = nativeMuxer.Mux(
+                mInputFilePath, mInputFileName, mMuxOutputFile, mStatsFile, mFormat);
         assertEquals("Cannot perform write operation for " + mInputFileName, 0, status);
         Log.i(TAG, "Muxed " + mInputFileName + " successfully.");
         File muxedFile = new File(mMuxOutputFile);
