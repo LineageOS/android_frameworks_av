@@ -174,9 +174,10 @@ void Encoder::resetEncoder() {
     memset(&mParams, 0, sizeof mParams);
 }
 
-void Encoder::dumpStatistics(string inputReference, int64_t durationUs) {
+void Encoder::dumpStatistics(string inputReference, int64_t durationUs, string componentName,
+                             string mode, string statsFile) {
     string operation = "encode";
-    mStats->dumpStatistics(operation, inputReference, durationUs);
+    mStats->dumpStatistics(operation, inputReference, durationUs, componentName, mode, statsFile);
 }
 
 int32_t Encoder::encode(string &codecName, ifstream &eleStream, size_t eleSize,

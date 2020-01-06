@@ -18,6 +18,7 @@
 #define LOG_TAG "NativeMuxer"
 
 #include <jni.h>
+#include <fstream>
 #include <string>
 #include <sys/stat.h>
 
@@ -25,11 +26,9 @@
 
 MUXER_OUTPUT_T getMuxerOutFormat(const char *fmt);
 
-extern "C"
-JNIEXPORT int32_t JNICALL
-Java_com_android_media_benchmark_library_Native_Mux(JNIEnv *env, jobject thiz,
-                                                    jstring jInputFilePath, jstring jInputFileName,
-                                                    jstring jOutputFilePath, jstring jFormat) {
+extern "C" JNIEXPORT int32_t JNICALL Java_com_android_media_benchmark_library_Native_Mux(
+        JNIEnv *env, jobject thiz, jstring jInputFilePath, jstring jInputFileName,
+        jstring jOutputFilePath, jstring jStatsFile, jstring jFormat) {
     UNUSED(thiz);
     ALOGV("Mux the samples given by extractor");
     const char *inputFilePath = env->GetStringUTFChars(jInputFilePath, nullptr);
@@ -43,7 +42,6 @@ Java_com_android_media_benchmark_library_Native_Mux(JNIEnv *env, jobject thiz,
 
     const char *fmt = env->GetStringUTFChars(jFormat, nullptr);
     MUXER_OUTPUT_T outputFormat = getMuxerOutFormat(fmt);
-    env->ReleaseStringUTFChars(jFormat, fmt);
     if (outputFormat == MUXER_OUTPUT_FORMAT_INVALID) {
         ALOGE("output format is MUXER_OUTPUT_FORMAT_INVALID");
         return MUXER_OUTPUT_FORMAT_INVALID;
@@ -75,7 +73,7 @@ Java_com_android_media_benchmark_library_Native_Mux(JNIEnv *env, jobject thiz,
             return -1;
         }
 
-        uint8_t *inputBuffer = (uint8_t *)malloc(fileSize);
+        uint8_t *inputBuffer = (uint8_t *) malloc(fileSize);
         if (!inputBuffer) {
             ALOGE("Allocation Failed");
             return -1;
@@ -105,7 +103,7 @@ Java_com_android_media_benchmark_library_Native_Mux(JNIEnv *env, jobject thiz,
         }
 
         const char *outputFilePath = env->GetStringUTFChars(jOutputFilePath, nullptr);
-        FILE *outputFp = fopen(((string)outputFilePath).c_str(), "w+b");
+        FILE *outputFp = fopen(((string) outputFilePath).c_str(), "w+b");
         env->ReleaseStringUTFChars(jOutputFilePath, outputFilePath);
 
         if (!outputFp) {
@@ -118,7 +116,7 @@ Java_com_android_media_benchmark_library_Native_Mux(JNIEnv *env, jobject thiz,
         }
         int32_t outFd = fileno(outputFp);
 
-        status = muxerObj->initMuxer(outFd, (MUXER_OUTPUT_T)outputFormat);
+        status = muxerObj->initMuxer(outFd, (MUXER_OUTPUT_T) outputFormat);
         if (status != 0) {
             ALOGE("initMuxer failed");
             if (inputBuffer) {
@@ -138,7 +136,10 @@ Java_com_android_media_benchmark_library_Native_Mux(JNIEnv *env, jobject thiz,
             return -1;
         }
         muxerObj->deInitMuxer();
-        muxerObj->dumpStatistics(inputFileName);
+        const char *statsFile = env->GetStringUTFChars(jStatsFile, nullptr);
+        string muxFormat(fmt);
+        muxerObj->dumpStatistics(string(inputFileName), muxFormat, statsFile);
+        env->ReleaseStringUTFChars(jStatsFile, statsFile);
         env->ReleaseStringUTFChars(jInputFilePath, inputFilePath);
         env->ReleaseStringUTFChars(jInputFileName, inputFileName);
 
@@ -156,6 +157,7 @@ Java_com_android_media_benchmark_library_Native_Mux(JNIEnv *env, jobject thiz,
         fclose(inputFp);
         inputFp = nullptr;
     }
+    env->ReleaseStringUTFChars(jFormat, fmt);
     extractor->deInitExtractor();
     delete muxerObj;
 
@@ -166,10 +168,10 @@ MUXER_OUTPUT_T getMuxerOutFormat(const char *fmt) {
     static const struct {
         const char *name;
         int value;
-    } kFormatMaps[] = {{"mp4", MUXER_OUTPUT_FORMAT_MPEG_4},
+    } kFormatMaps[] = {{"mp4",  MUXER_OUTPUT_FORMAT_MPEG_4},
                        {"webm", MUXER_OUTPUT_FORMAT_WEBM},
                        {"3gpp", MUXER_OUTPUT_FORMAT_3GPP},
-                       {"ogg", MUXER_OUTPUT_FORMAT_OGG}};
+                       {"ogg",  MUXER_OUTPUT_FORMAT_OGG}};
 
     int32_t muxOutputFormat = MUXER_OUTPUT_FORMAT_INVALID;
     for (auto kFormatMap : kFormatMaps) {
@@ -178,5 +180,5 @@ MUXER_OUTPUT_T getMuxerOutFormat(const char *fmt) {
             break;
         }
     }
-    return (MUXER_OUTPUT_T)muxOutputFormat;
+    return (MUXER_OUTPUT_T) muxOutputFormat;
 }

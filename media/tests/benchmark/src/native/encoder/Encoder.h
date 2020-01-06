@@ -75,7 +75,8 @@ class Encoder : public CallBackHandle {
     int32_t encode(std::string &codecName, std::ifstream &eleStream, size_t eleSize, bool asyncMode,
                    encParameter encParams, char *mime);
 
-    void dumpStatistics(string inputReference, int64_t durationUs);
+    void dumpStatistics(string inputReference, int64_t durationUs, string codecName = "",
+                        string mode = "", string statsFile = "");
 
   private:
     AMediaCodec *mCodec;

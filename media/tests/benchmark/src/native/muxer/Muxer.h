@@ -51,7 +51,7 @@ class Muxer {
     /* Process the frames and give Muxed output */
     int32_t mux(uint8_t *inputBuffer, vector<AMediaCodecBufferInfo> &frameSizes);
 
-    void dumpStatistics(string inputReference);
+    void dumpStatistics(string inputReference, string codecName = "", string statsFile = "");
 
   private:
     AMediaFormat *mFormat;

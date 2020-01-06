@@ -18,6 +18,7 @@
 #define LOG_TAG "NativeDecoder"
 
 #include <jni.h>
+#include <fstream>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -27,8 +28,8 @@
 #include "Decoder.h"
 
 extern "C" JNIEXPORT int JNICALL Java_com_android_media_benchmark_library_Native_Decode(
-        JNIEnv *env, jobject thiz, jstring jFilePath, jstring jFileName, jstring jCodecName,
-        jboolean asyncMode) {
+        JNIEnv *env, jobject thiz, jstring jFilePath, jstring jFileName, jstring jStatsFile,
+        jstring jCodecName, jboolean asyncMode) {
     const char *filePath = env->GetStringUTFChars(jFilePath, nullptr);
     const char *fileName = env->GetStringUTFChars(jFileName, nullptr);
     string sFilePath = string(filePath) + string(fileName);
@@ -69,7 +70,7 @@ extern "C" JNIEXPORT int JNICALL Java_com_android_media_benchmark_library_Native
             return -1;
         }
 
-        uint8_t *inputBuffer = (uint8_t *)malloc(fileSize);
+        uint8_t *inputBuffer = (uint8_t *) malloc(fileSize);
         if (!inputBuffer) {
             ALOGE("Insufficient memory");
             return -1;
@@ -105,18 +106,21 @@ extern "C" JNIEXPORT int JNICALL Java_com_android_media_benchmark_library_Native
             return -1;
         }
         decoder->deInitCodec();
-        env->ReleaseStringUTFChars(jCodecName, codecName);
         const char *inputReference = env->GetStringUTFChars(jFileName, nullptr);
+        const char *statsFile = env->GetStringUTFChars(jStatsFile, nullptr);
         string sInputReference = string(inputReference);
-        decoder->dumpStatistics(sInputReference);
+        decoder->dumpStatistics(sInputReference, sCodecName, (asyncMode ? "async" : "sync"),
+                                statsFile);
+        env->ReleaseStringUTFChars(jCodecName, codecName);
+        env->ReleaseStringUTFChars(jStatsFile, statsFile);
         env->ReleaseStringUTFChars(jFileName, inputReference);
-        if(inputBuffer) {
+        if (inputBuffer) {
             free(inputBuffer);
             inputBuffer = nullptr;
         }
         decoder->resetDecoder();
     }
-    if(inputFp) {
+    if (inputFp) {
         fclose(inputFp);
         inputFp = nullptr;
     }
