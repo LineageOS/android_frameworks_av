@@ -23,6 +23,7 @@
 #include <media/stagefright/MediaWriter.h>
 #include <utils/List.h>
 #include <utils/threads.h>
+#include <map>
 #include <media/stagefright/foundation/AHandlerReflector.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <mutex>
@@ -220,8 +221,9 @@ private:
     uint32_t mPrimaryItemId;
     uint32_t mAssociationEntryCount;
     uint32_t mNumGrids;
+    uint16_t mNextItemId;
     bool mHasRefs;
-    Vector<ItemInfo> mItems;
+    std::map<uint32_t, ItemInfo> mItems;
     Vector<ItemProperty> mProperties;
 
     // Writer thread handling
@@ -277,6 +279,7 @@ private:
     void addLengthPrefixedSample_l(MediaBuffer *buffer);
     void addMultipleLengthPrefixedSamples_l(MediaBuffer *buffer);
     uint16_t addProperty_l(const ItemProperty &);
+    status_t reserveItemId_l(size_t numItems, uint16_t *itemIdBase);
     uint16_t addItem_l(const ItemInfo &);
     void addRefs_l(uint16_t itemId, const ItemRefs &);
 

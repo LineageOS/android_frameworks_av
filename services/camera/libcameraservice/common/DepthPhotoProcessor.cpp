@@ -410,7 +410,7 @@ std::unique_ptr<dynamic_depth::DepthMap> processDepthMapFrame(DepthPhotoInputFra
     return DepthMap::FromData(depthParams, items);
 }
 
-extern "C" int processDepthPhotoFrame(DepthPhotoInputFrame inputFrame, size_t depthPhotoBufferSize,
+int processDepthPhotoFrame(DepthPhotoInputFrame inputFrame, size_t depthPhotoBufferSize,
         void* depthPhotoBuffer /*out*/, size_t* depthPhotoActualSize /*out*/) {
     if ((inputFrame.mMainJpegBuffer == nullptr) || (inputFrame.mDepthMapBuffer == nullptr) ||
             (depthPhotoBuffer == nullptr) || (depthPhotoActualSize == nullptr)) {

@@ -57,6 +57,25 @@ nsecs_t MediaMetricsService::roundTime(nsecs_t timeNs)
     return (timeNs + NANOS_PER_SECOND / 2) / NANOS_PER_SECOND * NANOS_PER_SECOND;
 }
 
+/* static */
+bool MediaMetricsService::useUidForPackage(
+        const std::string& package, const std::string& installer)
+{
+    if (strchr(package.c_str(), '.') == NULL) {
+        return false;  // not of form 'com.whatever...'; assume internal and ok
+    } else if (strncmp(package.c_str(), "android.", 8) == 0) {
+        return false;  // android.* packages are assumed fine
+    } else if (strncmp(installer.c_str(), "com.android.", 12) == 0) {
+        return false;  // from play store
+    } else if (strncmp(installer.c_str(), "com.google.", 11) == 0) {
+        return false;  // some google source
+    } else if (strcmp(installer.c_str(), "preload") == 0) {
+        return false;  // preloads
+    } else {
+        return true;  // we're not sure where it came from, use uid only.
+    }
+}
+
 MediaMetricsService::MediaMetricsService()
         : mMaxRecords(kMaxRecords),
           mMaxRecordAgeNs(kMaxRecordAgeNs),
@@ -112,14 +131,19 @@ status_t MediaMetricsService::submitInternal(mediametrics::Item *item, bool rele
         break;
     }
 
-    // Overwrite package name and version if the caller was untrusted.
-    if (!isTrusted) {
-        mUidInfo.setPkgInfo(item, item->getUid(), true, true);
-    } else if (item->getPkgName().empty()) {
-        // empty, so fill out both parts
-        mUidInfo.setPkgInfo(item, item->getUid(), true, true);
-    } else {
-        // trusted, provided a package, do nothing
+    // Overwrite package name and version if the caller was untrusted or empty
+    if (!isTrusted || item->getPkgName().empty()) {
+        const uid_t uid = item->getUid();
+        mediautils::UidInfo::Info info = mUidInfo.getInfo(uid);
+        if (useUidForPackage(info.package, info.installer)) {
+            // remove uid information of unknown installed packages.
+            // TODO: perhaps this can be done just before uploading to Westworld.
+            item->setPkgName(std::to_string(uid));
+            item->setPkgVersionCode(0);
+        } else {
+            item->setPkgName(info.package);
+            item->setPkgVersionCode(info.versionCode);
+        }
     }
 
     ALOGV("%s: given uid %d; sanitized uid: %d sanitized pkg: %s "
@@ -448,152 +472,6 @@ bool MediaMetricsService::isContentValid(const mediametrics::Item *item, bool is
 bool MediaMetricsService::isRateLimited(mediametrics::Item *) const
 {
     return false;
-}
-
-// How long we hold package info before we re-fetch it
-constexpr nsecs_t PKG_EXPIRATION_NS = 30 * 60 * NANOS_PER_SECOND; // 30 minutes
-
-// give me the package name, perhaps going to find it
-// manages its own mutex operations internally
-void MediaMetricsService::UidInfo::setPkgInfo(
-        mediametrics::Item *item, uid_t uid, bool setName, bool setVersion)
-{
-    ALOGV("%s: uid=%d", __func__, uid);
-
-    if (!setName && !setVersion) {
-        return;  // setting nothing? strange
-    }
-
-    const nsecs_t now = systemTime(SYSTEM_TIME_REALTIME);
-    struct UidToPkgInfo mapping;
-    {
-        std::lock_guard _l(mUidInfoLock);
-        auto it = mPkgMappings.find(uid);
-        if (it != mPkgMappings.end()) {
-            mapping = it->second;
-            ALOGV("%s: uid %d expiration %lld now %lld",
-                    __func__, uid, (long long)mapping.expiration, (long long)now);
-            if (mapping.expiration <= now) {
-                // purge the stale entry and fall into re-fetching
-                ALOGV("%s: entry for uid %d expired, now %lld",
-                        __func__, uid, (long long)now);
-                mPkgMappings.erase(it);
-                mapping.uid = (uid_t)-1;  // this is always fully overwritten
-            }
-        }
-    }
-
-    // if we did not find it
-    if (mapping.uid == (uid_t)(-1)) {
-        std::string pkg;
-        std::string installer;
-        int64_t versionCode = 0;
-
-        const struct passwd *pw = getpwuid(uid);
-        if (pw) {
-            pkg = pw->pw_name;
-        }
-
-        sp<IServiceManager> sm = defaultServiceManager();
-        sp<content::pm::IPackageManagerNative> package_mgr;
-        if (sm.get() == nullptr) {
-            ALOGE("%s: Cannot find service manager", __func__);
-        } else {
-            sp<IBinder> binder = sm->getService(String16("package_native"));
-            if (binder.get() == nullptr) {
-                ALOGE("%s: Cannot find package_native", __func__);
-            } else {
-                package_mgr = interface_cast<content::pm::IPackageManagerNative>(binder);
-            }
-        }
-
-        if (package_mgr != nullptr) {
-            std::vector<int> uids;
-            std::vector<std::string> names;
-            uids.push_back(uid);
-            binder::Status status = package_mgr->getNamesForUids(uids, &names);
-            if (!status.isOk()) {
-                ALOGE("%s: getNamesForUids failed: %s",
-                        __func__, status.exceptionMessage().c_str());
-            } else {
-                if (!names[0].empty()) {
-                    pkg = names[0].c_str();
-                }
-            }
-        }
-
-        // strip any leading "shared:" strings that came back
-        if (pkg.compare(0, 7, "shared:") == 0) {
-            pkg.erase(0, 7);
-        }
-        // determine how pkg was installed and the versionCode
-        if (pkg.empty()) {
-            pkg = std::to_string(uid); // no name for us to manage
-        } else if (strchr(pkg.c_str(), '.') == NULL) {
-            // not of form 'com.whatever...'; assume internal and ok
-        } else if (strncmp(pkg.c_str(), "android.", 8) == 0) {
-            // android.* packages are assumed fine
-        } else if (package_mgr.get() != nullptr) {
-            String16 pkgName16(pkg.c_str());
-            binder::Status status = package_mgr->getInstallerForPackage(pkgName16, &installer);
-            if (!status.isOk()) {
-                ALOGE("%s: getInstallerForPackage failed: %s",
-                        __func__, status.exceptionMessage().c_str());
-            }
-
-            // skip if we didn't get an installer
-            if (status.isOk()) {
-                status = package_mgr->getVersionCodeForPackage(pkgName16, &versionCode);
-                if (!status.isOk()) {
-                    ALOGE("%s: getVersionCodeForPackage failed: %s",
-                            __func__, status.exceptionMessage().c_str());
-                }
-            }
-
-            ALOGV("%s: package '%s' installed by '%s' versioncode %lld",
-                    __func__, pkg.c_str(), installer.c_str(), (long long)versionCode);
-
-            if (strncmp(installer.c_str(), "com.android.", 12) == 0) {
-                // from play store, we keep info
-            } else if (strncmp(installer.c_str(), "com.google.", 11) == 0) {
-                // some google source, we keep info
-            } else if (strcmp(installer.c_str(), "preload") == 0) {
-                // preloads, we keep the info
-            } else if (installer.c_str()[0] == '\0') {
-                // sideload (no installer); report UID only
-                pkg = std::to_string(uid);
-                versionCode = 0;
-            } else {
-                // unknown installer; report UID only
-                pkg = std::to_string(uid);
-                versionCode = 0;
-            }
-        } else {
-            // unvalidated by package_mgr just send uid.
-            pkg = std::to_string(uid);
-        }
-
-        // add it to the map, to save a subsequent lookup
-        std::lock_guard _l(mUidInfoLock);
-        // always overwrite
-        mapping.uid = uid;
-        mapping.pkg = std::move(pkg);
-        mapping.installer = std::move(installer);
-        mapping.versionCode = versionCode;
-        mapping.expiration = now + PKG_EXPIRATION_NS;
-        ALOGV("%s: adding uid %d pkg '%s' expiration: %lld",
-                __func__, uid, mapping.pkg.c_str(), (long long)mapping.expiration);
-        mPkgMappings[uid] = mapping;
-    }
-
-    if (mapping.uid != (uid_t)(-1)) {
-        if (setName) {
-            item->setPkgName(mapping.pkg);
-        }
-        if (setVersion) {
-            item->setPkgVersionCode(mapping.versionCode);
-        }
-    }
 }
 
 } // namespace android

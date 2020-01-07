@@ -35,6 +35,14 @@ inline std::ostream & operator<< (std::ostream& s,
     return s;
 }
 
+// define a way of printing a std::pair.
+template <typename T, typename U>
+std::ostream & operator<< (std::ostream& s,
+                           const std::pair<T, U>& v) {
+    s << "{ " << v.first << ", " << v.second << " }";
+    return s;
+}
+
 // define a way of printing a variant
 // see https://en.cppreference.com/w/cpp/utility/variant/visit
 template <typename T0, typename ... Ts>
@@ -52,10 +60,12 @@ std::ostream & operator<< (std::ostream& s,
  *
  * The TimeMachine is NOT thread safe.
  */
-class TimeMachine {
-
-    using Elem = std::variant<std::monostate, int32_t, int64_t, double, std::string>;
+class TimeMachine final { // made final as we have copy constructor instead of dup() override.
+public:
+    using Elem = Item::Prop::Elem;  // use the Item property element.
     using PropertyHistory = std::multimap<int64_t /* time */, Elem>;
+
+private:
 
     // KeyHistory contains no lock.
     // Access is through the TimeMachine, and a hash-striped lock is used
@@ -73,6 +83,8 @@ class TimeMachine {
             putValue(BUNDLE_PID, (int32_t)pid, time);
             putValue(BUNDLE_UID, (int32_t)uid, time);
         }
+
+        KeyHistory(const KeyHistory &other) = default;
 
         status_t checkPermission(uid_t uidCheck) const {
             return uidCheck != (uid_t)-1 && uidCheck != mUid ? PERMISSION_DENIED : NO_ERROR;
@@ -102,7 +114,8 @@ class TimeMachine {
 
         void putProp(
                 const std::string &name, const mediametrics::Item::Prop &prop, int64_t time = 0) {
-            prop.visit([&](auto value) { putValue(name, value, time); });
+            //alternatively: prop.visit([&](auto value) { putValue(name, value, time); });
+            putValue(name, prop.get(), time);
         }
 
         template <typename T>
@@ -117,13 +130,6 @@ class TimeMachine {
                     || timeSequence.rbegin()->second != el) { // value changed
                 timeSequence.emplace(time, std::move(el));
             }
-        }
-
-        // Explicitly ignore rate properties - we don't expose them for now.
-        void putValue(
-                      const std::string &property __unused,
-                      std::pair<int64_t, int64_t>& e __unused,
-                      int64_t time __unused) {
         }
 
         std::pair<std::string, int32_t> dump(int32_t lines, int64_t time) const {
@@ -183,6 +189,34 @@ public:
         LOG_ALWAYS_FATAL_IF(keyHighWaterMark <= keyLowWaterMark,
               "%s: required that keyHighWaterMark:%zu > keyLowWaterMark:%zu",
                   __func__, keyHighWaterMark, keyLowWaterMark);
+    }
+
+    // The TimeMachine copy constructor/assignment uses a deep copy,
+    // though the snapshot is not instantaneous nor isochronous.
+    //
+    // If there are concurrent operations ongoing in the other TimeMachine
+    // then there may be some history more recent than others (a time shear).
+    // This is expected to be a benign addition in history as small number of
+    // future elements are incorporated.
+    TimeMachine(const TimeMachine& other) {
+        *this = other;
+    }
+    TimeMachine& operator=(const TimeMachine& other) {
+        std::lock_guard lock(mLock);
+        mHistory.clear();
+
+        {
+            std::lock_guard lock2(other.mLock);
+            mHistory = other.mHistory;
+        }
+
+        // Now that we safely have our own shared pointers, let's dup them
+        // to ensure they are decoupled.  We do this by acquiring the other lock.
+        for (const auto &[lkey, lhist] : mHistory) {
+            std::lock_guard lock2(other.getLockForKey(lkey));
+            mHistory[lkey] = std::make_shared<KeyHistory>(*lhist);
+        }
+        return *this;
     }
 
     /**
@@ -358,10 +392,10 @@ public:
 
         std::stringstream ss;
         int32_t ll = lines;
-        for (const auto &keyPair : mHistory) {
-            std::lock_guard lock(getLockForKey(keyPair.first));
+        for (const auto &[lkey, lhist] : mHistory) {
+            std::lock_guard lock(getLockForKey(lkey));
             if (lines <= 0) break;
-            auto [s, l] = keyPair.second->dump(ll, time);
+            auto [s, l] = lhist->dump(ll, time);
             ss << s;
             ll -= l;
         }

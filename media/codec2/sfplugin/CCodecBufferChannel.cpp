@@ -41,12 +41,12 @@
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecConstants.h>
+#include <media/stagefright/SkipCutBuffer.h>
 #include <media/MediaCodecBuffer.h>
 #include <system/window.h>
 
 #include "CCodecBufferChannel.h"
 #include "Codec2Buffer.h"
-#include "SkipCutBuffer.h"
 
 namespace android {
 

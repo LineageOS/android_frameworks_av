@@ -111,9 +111,9 @@ int32_t Extractor::extract(int32_t trackId) {
     return AMEDIA_OK;
 }
 
-void Extractor::dumpStatistics(string inputReference) {
+void Extractor::dumpStatistics(string inputReference, string componentName, string statsFile) {
     string operation = "extract";
-    mStats->dumpStatistics(operation, inputReference, mDurationUs);
+    mStats->dumpStatistics(operation, inputReference, mDurationUs, componentName, "", statsFile);
 }
 
 void Extractor::deInitExtractor() {

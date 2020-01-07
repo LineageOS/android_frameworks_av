@@ -29,7 +29,7 @@ int32_t Muxer::initMuxer(int32_t fd, MUXER_OUTPUT_T outputFormat) {
     int64_t sTime = mStats->getCurTime();
     mMuxer = AMediaMuxer_new(fd, (OutputFormat)outputFormat);
     if (!mMuxer) {
-        cout << "[   WARN   ] Test Skipped. Unable to create muxer \n";
+        ALOGV("Unable to create muxer");
         return AMEDIA_ERROR_INVALID_OBJECT;
     }
     /*
@@ -38,7 +38,7 @@ int32_t Muxer::initMuxer(int32_t fd, MUXER_OUTPUT_T outputFormat) {
      */
     ssize_t index = AMediaMuxer_addTrack(mMuxer, mFormat);
     if (index < 0) {
-        cout << "[   WARN   ] Test Skipped. Format not supported \n";
+        ALOGV("Format not supported");
         return index;
     }
     AMediaMuxer_start(mMuxer);
@@ -66,9 +66,10 @@ void Muxer::resetMuxer() {
     if (mStats) mStats->reset();
 }
 
-void Muxer::dumpStatistics(string inputReference) {
+void Muxer::dumpStatistics(string inputReference, string componentName, string statsFile) {
     string operation = "mux";
-    mStats->dumpStatistics(operation, inputReference, mExtractor->getClipDuration());
+    mStats->dumpStatistics(operation, inputReference, mExtractor->getClipDuration(), componentName,
+                           "", statsFile);
 }
 
 int32_t Muxer::mux(uint8_t *inputBuffer, vector<AMediaCodecBufferInfo> &frameInfos) {

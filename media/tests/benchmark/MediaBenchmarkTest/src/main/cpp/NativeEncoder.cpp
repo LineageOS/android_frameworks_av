@@ -31,7 +31,7 @@
 
 extern "C" JNIEXPORT int JNICALL Java_com_android_media_benchmark_library_Native_Encode(
         JNIEnv *env, jobject thiz, jstring jFilePath, jstring jFileName, jstring jOutFilePath,
-        jstring jCodecName) {
+        jstring jStatsFile, jstring jCodecName) {
     const char *filePath = env->GetStringUTFChars(jFilePath, nullptr);
     const char *fileName = env->GetStringUTFChars(jFileName, nullptr);
     string sFilePath = string(filePath) + string(fileName);
@@ -72,7 +72,7 @@ extern "C" JNIEXPORT int JNICALL Java_com_android_media_benchmark_library_Native
             ALOGE("Track Format invalid");
             return -1;
         }
-        uint8_t *inputBuffer = (uint8_t *)malloc(fileSize);
+        uint8_t *inputBuffer = (uint8_t *) malloc(fileSize);
         if (!inputBuffer) {
             ALOGE("Insufficient memory");
             return -1;
@@ -111,7 +111,7 @@ extern "C" JNIEXPORT int JNICALL Java_com_android_media_benchmark_library_Native
             return -1;
         }
         AMediaFormat *format = extractor->getFormat();
-        if(inputBuffer) {
+        if (inputBuffer) {
             free(inputBuffer);
             inputBuffer = nullptr;
         }
@@ -165,11 +165,14 @@ extern "C" JNIEXPORT int JNICALL Java_com_android_media_benchmark_library_Native
             Encoder *encoder = new Encoder();
             encoder->setupEncoder();
             status = encoder->encode(sCodecName, eleStream, eleSize, asyncMode[i], encParams,
-                                     (char *)mime);
+                                     (char *) mime);
             encoder->deInitCodec();
             cout << "codec : " << codecName << endl;
             ALOGV(" asyncMode = %d \n", asyncMode[i]);
-            encoder->dumpStatistics(sInputReference, extractor->getClipDuration());
+            const char *statsFile = env->GetStringUTFChars(jStatsFile, nullptr);
+            encoder->dumpStatistics(sInputReference, extractor->getClipDuration(), sCodecName,
+                                    (asyncMode[i] ? "async" : "sync"), statsFile);
+            env->ReleaseStringUTFChars(jStatsFile, statsFile);
             encoder->resetEncoder();
             delete encoder;
             encoder = nullptr;
@@ -189,7 +192,7 @@ extern "C" JNIEXPORT int JNICALL Java_com_android_media_benchmark_library_Native
         decoder->deInitCodec();
         decoder->resetDecoder();
     }
-    if(inputFp) {
+    if (inputFp) {
         fclose(inputFp);
         inputFp = nullptr;
     }

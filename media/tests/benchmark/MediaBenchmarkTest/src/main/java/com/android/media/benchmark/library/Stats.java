@@ -18,6 +18,10 @@ package com.android.media.benchmark.library;
 
 import android.util.Log;
 
+import java.io.File;
+import java.io.FileDescriptor;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 
 /**
@@ -91,14 +95,38 @@ public class Stats {
     }
 
     /**
+     * Writes the stats header to a file
+     * <p>
+     * \param statsFile    file where the stats data is to be written
+     **/
+    public boolean writeStatsHeader(String statsFile) throws IOException {
+        File outputFile = new File(statsFile);
+        FileOutputStream out = new FileOutputStream(outputFile, true);
+        if (!outputFile.exists())
+            return false;
+        String statsHeader =
+                "currentTime, fileName, operation, componentName, NDK/SDK, sync/async, setupTime, "
+                        + "destroyTime, minimumTime, maximumTime, "
+                        + "averageTime, timeToProcess1SecContent, totalBytesProcessedPerSec, "
+                        + "timeToFirstFrame, totalSizeInBytes, totalTime\n";
+        out.write(statsHeader.getBytes());
+        out.close();
+        return true;
+    }
+
+    /**
      * Dumps the stats of the operation for a given input media.
      * <p>
+     * \param inputReference input media
      * \param operation      describes the operation performed on the input media
      * (i.e. extract/mux/decode/encode)
-     * \param inputReference input media
-     * \param durationUs    is a duration of the input media in microseconds.
+     * \param componentName  name of the codec/muxFormat/mime
+     * \param mode           the operating mode: sync/async.
+     * \param durationUs     is a duration of the input media in microseconds.
+     * \param statsFile      the file where the stats data is to be written.
      */
-    public void dumpStatistics(String operation, String inputReference, long durationUs) {
+    public void dumpStatistics(String inputReference, String operation, String componentName,
+            String mode, long durationUs, String statsFile) throws IOException {
         if (mOutputTimer.size() == 0) {
             Log.e(TAG, "No output produced");
             return;
@@ -121,18 +149,30 @@ public class Stats {
                 maxTimeTakenNs = intervalNs;
             }
         }
-        // Print the Stats
-        Log.i(TAG, "Input Reference : " + inputReference);
-        Log.i(TAG, "Setup Time in nano sec : " + mInitTimeNs);
-        Log.i(TAG, "Average Time in nano sec : " + totalTimeTakenNs / mOutputTimer.size());
-        Log.i(TAG, "Time to first frame in nano sec : " + timeToFirstFrameNs);
-        Log.i(TAG, "Time taken (in nano sec) to " + operation + " 1 sec of content : " +
-                timeTakenPerSec);
-        Log.i(TAG, "Total bytes " + operation + "ed : " + size);
-        Log.i(TAG, "Number of bytes " + operation + "ed per second : " +
-                (size * 1000000000) / totalTimeTakenNs);
-        Log.i(TAG, "Minimum Time in nano sec : " + minTimeTakenNs);
-        Log.i(TAG, "Maximum Time in nano sec : " + maxTimeTakenNs);
-        Log.i(TAG, "Destroy Time in nano sec : " + mDeInitTimeNs);
+
+        // Write the stats row data to file
+        String rowData = "";
+        rowData += System.nanoTime() + ", ";
+        rowData += inputReference + ", ";
+        rowData += operation + ", ";
+        rowData += componentName + ", ";
+        rowData += "SDK, ";
+        rowData += mode + ", ";
+        rowData += mInitTimeNs + ", ";
+        rowData += mDeInitTimeNs + ", ";
+        rowData += minTimeTakenNs + ", ";
+        rowData += maxTimeTakenNs + ", ";
+        rowData += totalTimeTakenNs / mOutputTimer.size() + ", ";
+        rowData += timeTakenPerSec + ", ";
+        rowData += (size * 1000000000) / totalTimeTakenNs + ", ";
+        rowData += timeToFirstFrameNs + ", ";
+        rowData += size + ", ";
+        rowData += totalTimeTakenNs + "\n";
+
+        File outputFile = new File(statsFile);
+        FileOutputStream out = new FileOutputStream(outputFile, true);
+        assert outputFile.exists() : "Failed to open the stats file for writing!";
+        out.write(rowData.getBytes());
+        out.close();
     }
 }

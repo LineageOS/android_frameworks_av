@@ -24,6 +24,7 @@
 
 // IMediaMetricsService must include Vector, String16, Errors
 #include <media/IMediaMetricsService.h>
+#include <mediautils/ServiceUtilities.h>
 #include <utils/String8.h>
 
 #include "AudioAnalytics.h"
@@ -62,6 +63,11 @@ public:
      */
     static nsecs_t roundTime(nsecs_t timeNs);
 
+    /**
+     * Returns true if we should use uid for package name when uploading to WestWorld.
+     */
+    static bool useUidForPackage(const std::string& package, const std::string& installer);
+
 protected:
 
     // Internal call where release is true if ownership of item is transferred
@@ -96,26 +102,9 @@ private:
     const size_t mMaxRecordsExpiredAtOnce;
     const int mDumpProtoDefault;
 
-    class UidInfo {
-    public:
-        void setPkgInfo(mediametrics::Item *item, uid_t uid, bool setName, bool setVersion);
-
-    private:
-        std::mutex mUidInfoLock;
-
-        struct UidToPkgInfo {
-            uid_t uid = -1;
-            std::string pkg;
-            std::string installer;
-            int64_t versionCode = 0;
-            nsecs_t expiration = 0;  // TODO: remove expiration.
-        };
-
-        // TODO: use concurrent hashmap with striped lock.
-        std::unordered_map<uid_t, struct UidToPkgInfo> mPkgMappings; // GUARDED_BY(mUidInfoLock)
-    } mUidInfo;  // mUidInfo can be accessed without lock (locked internally)
-
     std::atomic<int64_t> mItemsSubmitted{}; // accessed outside of lock.
+
+    mediautils::UidInfo mUidInfo;  // mUidInfo can be accessed without lock (locked internally)
 
     mediametrics::AudioAnalytics mAudioAnalytics;
 

@@ -17,6 +17,7 @@
 #ifndef __BENCHMARK_COMMON_H__
 #define __BENCHMARK_COMMON_H__
 
+#include <sys/stat.h>
 #include <inttypes.h>
 #include <mutex>
 #include <queue>
