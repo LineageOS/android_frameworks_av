@@ -2271,6 +2271,13 @@ int32_t Camera2Client::getGlobalAudioRestriction() {
     return INVALID_OPERATION;
 }
 
+status_t Camera2Client::setRotateAndCropOverride(uint8_t rotateAndCrop) {
+    if (rotateAndCrop > ANDROID_SCALER_ROTATE_AND_CROP_AUTO) return BAD_VALUE;
+
+    return mDevice->setRotateAndCropAutoBehavior(
+        static_cast<camera_metadata_enum_android_scaler_rotate_and_crop_t>(rotateAndCrop));
+}
+
 status_t Camera2Client::waitUntilCurrentRequestIdLocked() {
     int32_t activeRequestId = mStreamingProcessor->getActiveRequestId();
     if (activeRequestId != 0) {

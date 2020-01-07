@@ -74,6 +74,8 @@ public:
     status_t initialize(sp<CameraProviderManager> /*manager*/,
             const String8& /*monitorTags*/) override;
 
+    status_t setRotateAndCropOverride(uint8_t rotateAndCrop) override;
+
     // permissions management
     status_t startCameraOps() override;
     status_t finishCameraOps() override;

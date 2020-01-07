@@ -1934,6 +1934,13 @@ binder::Status CameraDeviceClient::getGlobalAudioRestriction(/*out*/ int32_t* ou
     return binder::Status::ok();
 }
 
+status_t CameraDeviceClient::setRotateAndCropOverride(uint8_t rotateAndCrop) {
+    if (rotateAndCrop > ANDROID_SCALER_ROTATE_AND_CROP_AUTO) return BAD_VALUE;
+
+    return mDevice->setRotateAndCropAutoBehavior(
+        static_cast<camera_metadata_enum_android_scaler_rotate_and_crop_t>(rotateAndCrop));
+}
+
 binder::Status CameraDeviceClient::switchToOffline(
         const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb,
         const std::vector<int>& offlineOutputIds,
