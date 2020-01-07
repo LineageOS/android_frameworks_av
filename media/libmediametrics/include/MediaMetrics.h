@@ -79,6 +79,7 @@ void mediametrics_freeCString(char *value);
 // # of attributes set within this record.
 int32_t mediametrics_count(mediametrics_handle_t handle);
 
+mediametrics_handle_t mediametrics_dup(mediametrics_handle_t handle);
 bool mediametrics_selfRecord(mediametrics_handle_t handle);
 
 const char *mediametrics_readable(mediametrics_handle_t handle);
