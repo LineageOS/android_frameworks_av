@@ -150,6 +150,8 @@ class Camera3Device :
     status_t getInputBufferProducer(
             sp<IGraphicBufferProducer> *producer) override;
 
+    void getOfflineStreamIds(std::vector<int> *offlineStreamIds) override;
+
     status_t createDefaultRequest(int templateId, CameraMetadata *request) override;
 
     // Transitions to the idle state on success

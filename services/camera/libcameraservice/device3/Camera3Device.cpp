@@ -5863,4 +5863,30 @@ status_t Camera3Device::switchToOffline(
     // Java side to make sure the CameraCaptureSession is properly closed
 }
 
+void Camera3Device::getOfflineStreamIds(std::vector<int> *offlineStreamIds) {
+    ATRACE_CALL();
+
+    if (offlineStreamIds == nullptr) {
+        return;
+    }
+
+    Mutex::Autolock il(mInterfaceLock);
+
+    auto streamIds = mOutputStreams.getStreamIds();
+    bool hasInputStream = mInputStream != nullptr;
+    if (hasInputStream && mInputStream->getOfflineProcessingSupport()) {
+        offlineStreamIds->push_back(mInputStream->getId());
+    }
+
+    for (const auto & streamId : streamIds) {
+        sp<camera3::Camera3OutputStreamInterface> stream = mOutputStreams.get(streamId);
+        // Streams that use the camera buffer manager are currently not supported in
+        // offline mode
+        if (stream->getOfflineProcessingSupport() &&
+                (stream->getStreamSetId() == CAMERA3_STREAM_SET_ID_INVALID)) {
+            offlineStreamIds->push_back(streamId);
+        }
+    }
+}
+
 }; // namespace android

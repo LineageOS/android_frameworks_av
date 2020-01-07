@@ -55,6 +55,7 @@ class OutputStreamInfo {
         android_dataspace dataSpace;
         uint64_t consumerUsage;
         bool finalized = false;
+        bool supportsOffline = false;
         OutputStreamInfo() :
             width(-1), height(-1), format(-1), dataSpace(HAL_DATASPACE_UNKNOWN),
             consumerUsage(0) {}

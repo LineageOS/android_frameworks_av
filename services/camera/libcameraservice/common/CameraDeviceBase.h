@@ -234,6 +234,12 @@ class CameraDeviceBase : public virtual RefBase {
     virtual status_t configureStreams(const CameraMetadata& sessionParams,
             int operatingMode = 0) = 0;
 
+    /**
+     * Retrieve a list of all stream ids that were advertised as capable of
+     * supporting offline processing mode by Hal after the last stream configuration.
+     */
+    virtual void getOfflineStreamIds(std::vector<int> *offlineStreamIds) = 0;
+
     // get the buffer producer of the input stream
     virtual status_t getInputBufferProducer(
             sp<IGraphicBufferProducer> *producer) = 0;
