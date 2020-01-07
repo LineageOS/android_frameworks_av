@@ -109,6 +109,7 @@ enum {
     SET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
     REMOVE_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
     GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
+    GET_DEVICES_FOR_ATTRIBUTES,
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -1348,6 +1349,41 @@ public:
         }
         return static_cast<status_t>(reply.readInt32());
     }
+
+    virtual status_t getDevicesForAttributes(const AudioAttributes &aa,
+            AudioDeviceTypeAddrVector *devices) const
+    {
+        if (devices == nullptr) {
+            return BAD_VALUE;
+        }
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        status_t status = aa.writeToParcel(&data);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = remote()->transact(GET_DEVICES_FOR_ATTRIBUTES, data, &reply);
+        if (status != NO_ERROR) {
+            // transaction failed, return error
+            return status;
+        }
+        status = static_cast<status_t>(reply.readInt32());
+        if (status != NO_ERROR) {
+            // APM method call failed, return error
+            return status;
+        }
+
+        const size_t numberOfDevices = (size_t)reply.readInt32();
+        for (size_t i = 0; i < numberOfDevices; i++) {
+            AudioDeviceTypeAddr device;
+            if (device.readFromParcel((Parcel*)&reply) == NO_ERROR) {
+                devices->push_back(device);
+            } else {
+                return FAILED_TRANSACTION;
+            }
+        }
+        return NO_ERROR;
+    }
 };
 
 IMPLEMENT_META_INTERFACE(AudioPolicyService, "android.media.IAudioPolicyService");
@@ -1414,7 +1450,8 @@ status_t BnAudioPolicyService::onTransact(
         case IS_CALL_SCREEN_MODE_SUPPORTED:
         case SET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
         case REMOVE_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
-        case GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY: {
+        case GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
+        case GET_DEVICES_FOR_ATTRIBUTES: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
@@ -2470,6 +2507,37 @@ status_t BnAudioPolicyService::onTransact(
                 return marshall_status;
             }
             reply->writeInt32(status);
+            return NO_ERROR;
+        }
+
+        case GET_DEVICES_FOR_ATTRIBUTES: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            AudioAttributes attributes;
+            status_t status = attributes.readFromParcel(&data);
+            if (status != NO_ERROR) {
+                return status;
+            }
+            AudioDeviceTypeAddrVector devices;
+            status = getDevicesForAttributes(attributes.getAttributes(), &devices);
+            // reply data formatted as:
+            //  - (int32) method call result from APM
+            //  - (int32) number of devices (n) if method call returned NO_ERROR
+            //  - n AudioDeviceTypeAddr         if method call returned NO_ERROR
+            reply->writeInt32(status);
+            if (status != NO_ERROR) {
+                return NO_ERROR;
+            }
+            status = reply->writeInt32(devices.size());
+            if (status != NO_ERROR) {
+                return status;
+            }
+            for (const auto& device : devices) {
+                status = device.writeToParcel(reply);
+                if (status != NO_ERROR) {
+                    return status;
+                }
+            }
+
             return NO_ERROR;
         }
 
