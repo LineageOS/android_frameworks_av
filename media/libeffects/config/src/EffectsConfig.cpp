@@ -26,6 +26,7 @@
 #include <log/log.h>
 
 #include <media/EffectsConfig.h>
+#include <media/TypeConverter.h>
 
 using namespace tinyxml2;
 
@@ -134,6 +135,11 @@ bool stringToStreamType(const char *streamName, Type* type)
     return false;
 }
 
+template <>
+bool stringToStreamType(const char *streamName, audio_devices_t* type) {
+    return deviceFromString(streamName, *type);
+}
+
 /** Parse a library xml note and push the result in libraries or return false on failure. */
 bool parseLibrary(const XMLElement& xmlLibrary, Libraries* libraries) {
     const char* name = xmlLibrary.Attribute("name");
@@ -221,7 +227,7 @@ bool parseEffect(const XMLElement& xmlEffect, Libraries& libraries, Effects* eff
     return true;
 }
 
-/** Parse an stream from an xml element describing it.
+/** Parse an <Output|Input>stream or a device from an xml element describing it.
  * @return true and pushes the stream in streams on success,
  *         false on failure. */
 template <class Stream>
@@ -233,14 +239,14 @@ bool parseStream(const XMLElement& xmlStream, Effects& effects, std::vector<Stre
     }
     Stream stream;
     if (!stringToStreamType(streamType, &stream.type)) {
-        ALOGE("Invalid stream type %s: %s", streamType, dump(xmlStream));
+        ALOGE("Invalid <stream|device> type %s: %s", streamType, dump(xmlStream));
         return false;
     }
 
     for (auto& xmlApply : getChildren(xmlStream, "apply")) {
         const char* effectName = xmlApply.get().Attribute("effect");
         if (effectName == nullptr) {
-            ALOGE("stream/apply must have reference an effect: %s", dump(xmlApply));
+            ALOGE("<stream|device>/apply must have reference an effect: %s", dump(xmlApply));
             return false;
         }
         auto* effect = findByName(effectName, effects);
@@ -251,6 +257,21 @@ bool parseStream(const XMLElement& xmlStream, Effects& effects, std::vector<Stre
         stream.effects.emplace_back(*effect);
     }
     streams->push_back(std::move(stream));
+    return true;
+}
+
+bool parseDeviceEffects(
+        const XMLElement& xmlDevice, Effects& effects, std::vector<DeviceEffects>* deviceEffects) {
+
+    const char* address = xmlDevice.Attribute("address");
+    if (address == nullptr) {
+        ALOGE("device must have an address: %s", dump(xmlDevice));
+        return false;
+    }
+    if (!parseStream(xmlDevice, effects, deviceEffects)) {
+        return false;
+    }
+    deviceEffects->back().address = address;
     return true;
 }
 
@@ -296,6 +317,14 @@ ParsingResult parseWithPath(std::string&& path) {
         for (auto& xmlPostprocess : getChildren(xmlConfig, "postprocess")) {
             for (auto& xmlStream : getChildren(xmlPostprocess, "stream")) {
                 registerFailure(parseStream(xmlStream, config->effects, &config->postprocess));
+            }
+        }
+
+        // Parse device effect chains
+        for (auto& xmlDeviceEffects : getChildren(xmlConfig, "deviceEffects")) {
+            for (auto& xmlDevice : getChildren(xmlDeviceEffects, "devicePort")) {
+                registerFailure(
+                            parseDeviceEffects(xmlDevice, config->effects, &config->deviceprocess));
             }
         }
     }
