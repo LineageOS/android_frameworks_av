@@ -29,6 +29,7 @@
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
 #include <android-base/stringprintf.h>
 #include <binder/MemoryDealer.h>
+#include <cutils/properties.h>
 #include <gui/Surface.h>
 #include <media/openmax/OMX_Core.h>
 #include <media/stagefright/foundation/ABuffer.h>
