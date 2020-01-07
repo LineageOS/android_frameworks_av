@@ -886,7 +886,7 @@ status_t AudioFlinger::EffectModule::configure()
     mConfig.outputCfg.format = EFFECT_BUFFER_FORMAT;
 
     // Don't use sample rate for thread if effect isn't offloadable.
-    if (mCallback->isOffload() && !isOffloaded()) {
+    if (mCallback->isOffloadOrDirect() && !isOffloaded()) {
         mConfig.inputCfg.samplingRate = DEFAULT_OUTPUT_SAMPLE_RATE;
         ALOGV("Overriding effect input as 48kHz");
     } else {
