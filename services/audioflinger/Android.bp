@@ -62,6 +62,7 @@ cc_library_shared {
     ],
 
     header_libs: [
+        "libaudiohal_headers",
         "libmedia_headers",
     ],
 

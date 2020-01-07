@@ -22,7 +22,7 @@
 #include <utils/Vector.h>
 #include <utils/threads.h>
 
-#include "foundation/ABase.h"
+#include "media/stagefright/foundation/ABase.h"
 
 namespace android {
 

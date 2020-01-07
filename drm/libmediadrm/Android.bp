@@ -165,4 +165,8 @@ cc_library_shared {
         "libmediadrmmetrics_full",
         "libutils",
     ],
+
+    header_libs: [
+        "libstagefright_foundation_headers",
+    ],
 }
