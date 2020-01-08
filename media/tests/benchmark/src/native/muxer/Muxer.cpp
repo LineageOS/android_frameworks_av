@@ -49,12 +49,12 @@ int32_t Muxer::initMuxer(int32_t fd, MUXER_OUTPUT_T outputFormat) {
 }
 
 void Muxer::deInitMuxer() {
-    int64_t sTime = mStats->getCurTime();
     if (mFormat) {
         AMediaFormat_delete(mFormat);
         mFormat = nullptr;
     }
     if (!mMuxer) return;
+    int64_t sTime = mStats->getCurTime();
     AMediaMuxer_stop(mMuxer);
     AMediaMuxer_delete(mMuxer);
     int64_t eTime = mStats->getCurTime();
