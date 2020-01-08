@@ -17,10 +17,12 @@
 android_test {
     name: "MediaBenchmarkTest",
 
+    defaults: [
+        "MediaBenchmark-defaults",
+    ],
+
     // Include all the test code
     srcs: ["src/androidTest/**/*.java"],
-
-    sdk_version: "system_current",
 
     resource_dirs: ["res"],
 
@@ -43,12 +45,22 @@ android_test {
 android_library {
     name: "libMediaBenchmark",
 
+    defaults: [
+        "MediaBenchmark-defaults",
+    ],
+
     // Include all the libraries
     srcs: ["src/main/**/*.java"],
-
-    sdk_version: "system_current",
 
     static_libs: [
         "androidx.test.core",
     ],
+}
+
+java_defaults {
+    name: "MediaBenchmark-defaults",
+
+    sdk_version: "system_current",
+    min_sdk_version: "28",
+    target_sdk_version: "29",
 }
