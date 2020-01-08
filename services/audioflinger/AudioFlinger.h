@@ -71,6 +71,7 @@
 #include <media/DeviceDescriptorBase.h>
 #include <media/ExtendedAudioBufferProvider.h>
 #include <media/VolumeShaper.h>
+#include <mediautils/ServiceUtilities.h>
 
 #include <audio_utils/clock.h>
 #include <audio_utils/FdToString.h>
@@ -474,10 +475,13 @@ private:
     public:
                             NotificationClient(const sp<AudioFlinger>& audioFlinger,
                                                 const sp<IAudioFlingerClient>& client,
-                                                pid_t pid);
+                                                pid_t pid,
+                                                uid_t uid);
         virtual             ~NotificationClient();
 
                 sp<IAudioFlingerClient> audioFlingerClient() const { return mAudioFlingerClient; }
+                pid_t getPid() const { return mPid; }
+                uid_t getUid() const { return mUid; }
 
                 // IBinder::DeathRecipient
                 virtual     void        binderDied(const wp<IBinder>& who);
@@ -487,6 +491,7 @@ private:
 
         const sp<AudioFlinger>  mAudioFlinger;
         const pid_t             mPid;
+        const uid_t             mUid;
         const sp<IAudioFlingerClient> mAudioFlingerClient;
     };
 
@@ -923,6 +928,8 @@ private:
     sp<EffectsFactoryHalInterface> mEffectsFactoryHal;
 
     bool       mSystemReady;
+
+    mediautils::UidInfo mUidInfo;
 
     SimpleLog  mRejectedSetParameterLog;
     SimpleLog  mAppSetParameterLog;
