@@ -886,7 +886,7 @@ status_t AudioFlinger::EffectModule::configure()
     mConfig.outputCfg.format = EFFECT_BUFFER_FORMAT;
 
     // Don't use sample rate for thread if effect isn't offloadable.
-    if (mCallback->isOffload() && !isOffloaded()) {
+    if (mCallback->isOffloadOrDirect() && !isOffloaded()) {
         mConfig.inputCfg.samplingRate = DEFAULT_OUTPUT_SAMPLE_RATE;
         ALOGV("Overriding effect input as 48kHz");
     } else {
@@ -1830,12 +1830,13 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
             }
 
             // copy to local memory in case of client corruption b/32220769
-            param = (effect_param_t *)realloc(param, size);
-            if (param == NULL) {
+            auto *newParam = (effect_param_t *)realloc(param, size);
+            if (newParam == NULL) {
                 ALOGW("command(): out of memory");
                 status = NO_MEMORY;
                 break;
             }
+            param = newParam;
             memcpy(param, p, size);
 
             int reply = 0;
