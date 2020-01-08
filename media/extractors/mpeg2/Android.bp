@@ -71,4 +71,11 @@ cc_library {
         "com.android.media",
         "test_com.android.media",
     ],
+
+    static: {
+        apex_available: [
+            // Needed for unit tests
+            "//apex_available:platform",
+        ],
+    },
 }
