@@ -1102,7 +1102,7 @@ class Camera3Device :
     uint32_t               mNextReprocessShutterFrameNumber;
     // the minimal frame number of the next ZSL still capture shutter
     uint32_t               mNextZslStillShutterFrameNumber;
-    List<CaptureResult>    mResultQueue;
+    std::list<CaptureResult>    mResultQueue;
     std::condition_variable  mResultSignal;
     wp<NotificationListener> mListener;
 

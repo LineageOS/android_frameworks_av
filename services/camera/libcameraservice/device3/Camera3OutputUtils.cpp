@@ -153,9 +153,9 @@ void insertResultLocked(CaptureOutputStates& states, CaptureResult *result, uint
     }
 
     // Valid result, insert into queue
-    List<CaptureResult>::iterator queuedResult =
+    std::list<CaptureResult>::iterator queuedResult =
             states.resultQueue.insert(states.resultQueue.end(), CaptureResult(*result));
-    ALOGVV("%s: result requestId = %" PRId32 ", frameNumber = %" PRId64
+    ALOGV("%s: result requestId = %" PRId32 ", frameNumber = %" PRId64
            ", burstId = %" PRId32, __FUNCTION__,
            queuedResult->mResultExtras.requestId,
            queuedResult->mResultExtras.frameNumber,
