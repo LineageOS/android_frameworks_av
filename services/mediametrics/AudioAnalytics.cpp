@@ -27,6 +27,22 @@ namespace android::mediametrics {
 AudioAnalytics::AudioAnalytics()
 {
     ALOGD("%s", __func__);
+
+    // Add action to save AnalyticsState if audioserver is restarted.
+    // This triggers on an item of "audio.flinger"
+    // with a property "event" set to "AudioFlinger" (the constructor).
+    mActions.addAction(
+        "audio.flinger.event",
+        std::string("AudioFlinger"),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &){
+                ALOGW("Audioflinger() constructor event detected");
+                mPreviousAnalyticsState.set(std::make_shared<AnalyticsState>(
+                        *mAnalyticsState.get()));
+                // Note: get returns shared_ptr temp, whose lifetime is extended
+                // to end of full expression.
+                mAnalyticsState->clear();  // TODO: filter the analytics state.
+            }));
 }
 
 AudioAnalytics::~AudioAnalytics()
@@ -37,11 +53,14 @@ AudioAnalytics::~AudioAnalytics()
 status_t AudioAnalytics::submit(
         const std::shared_ptr<const mediametrics::Item>& item, bool isTrusted)
 {
-    if (startsWith(item->getKey(), "audio.")) {
-        return mTimeMachine.put(item, isTrusted)
-                ?: mTransactionLog.put(item);
-    }
-    return BAD_VALUE;
+    if (!startsWith(item->getKey(), "audio.")) return BAD_VALUE;
+    status_t status = mAnalyticsState->submit(item, isTrusted);
+    if (status != NO_ERROR) return status;  // may not be permitted.
+
+    // Only if the item was successfully submitted (permission)
+    // do we check triggered actions.
+    checkActions(item);
+    return NO_ERROR;
 }
 
 std::pair<std::string, int32_t> AudioAnalytics::dump(int32_t lines) const
@@ -50,24 +69,29 @@ std::pair<std::string, int32_t> AudioAnalytics::dump(int32_t lines) const
     int32_t ll = lines;
 
     if (ll > 0) {
-        ss << "TransactionLog:\n";
-        --ll;
-    }
-    if (ll > 0) {
-        auto [s, l] = mTransactionLog.dump(ll);
+        auto [s, l] = mAnalyticsState->dump(ll);
         ss << s;
         ll -= l;
     }
     if (ll > 0) {
-        ss << "TimeMachine:\n";
+        ss << "Prior audioserver state:\n";
         --ll;
     }
     if (ll > 0) {
-        auto [s, l] = mTimeMachine.dump(ll);
+        auto [s, l] = mPreviousAnalyticsState->dump(ll);
         ss << s;
         ll -= l;
     }
     return { ss.str(), lines - ll };
+}
+
+void AudioAnalytics::checkActions(const std::shared_ptr<const mediametrics::Item>& item)
+{
+    auto actions = mActions.getActionsForItem(item); // internally locked.
+    // Execute actions with no lock held.
+    for (const auto& action : actions) {
+        (*action)(item);
+    }
 }
 
 } // namespace android

@@ -16,8 +16,9 @@
 
 #pragma once
 
-#include "TimeMachine.h"
-#include "TransactionLog.h"
+#include "AnalyticsActions.h"
+#include "AnalyticsState.h"
+#include "Wrap.h"
 
 namespace android::mediametrics {
 
@@ -27,7 +28,6 @@ public:
     AudioAnalytics();
     ~AudioAnalytics();
 
-    // TODO: update with conditions for keys.
     /**
      * Returns success if AudioAnalytics recognizes item.
      *
@@ -42,6 +42,10 @@ public:
      *        In this case, a trusted source is verified by binder
      *        UID to be a system service by MediaMetrics service.
      *        Do not use true if you haven't really checked!
+     *
+     * \return NO_ERROR on success,
+     *         PERMISSION_DENIED if the item cannot be put into the AnalyticsState,
+     *         BAD_VALUE if the item key does not start with "audio.".
      */
     status_t submit(const std::shared_ptr<const mediametrics::Item>& item, bool isTrusted);
 
@@ -60,9 +64,22 @@ public:
     std::pair<std::string, int32_t> dump(int32_t lines = INT32_MAX) const;
 
 private:
-    // The following are locked internally
-    TimeMachine mTimeMachine;
-    TransactionLog mTransactionLog;
+
+    /**
+     * Checks for any pending actions for a particular item.
+     *
+     * \param item to check against the current AnalyticsActions.
+     */
+    void checkActions(const std::shared_ptr<const mediametrics::Item>& item);
+
+    // Actions is individually locked
+    AnalyticsActions mActions;
+
+    // AnalyticsState is individually locked, and we use SharedPtrWrap
+    // to allow safe access even if the shared pointer changes underneath.
+
+    SharedPtrWrap<AnalyticsState> mAnalyticsState;
+    SharedPtrWrap<AnalyticsState> mPreviousAnalyticsState;
 };
 
 } // namespace android::mediametrics
