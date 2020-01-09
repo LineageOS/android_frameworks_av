@@ -291,7 +291,11 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
         }
         // TODO: maybe consider a better way of dumping audio analytics info.
         constexpr int32_t linesToDump = 1000;
-        result.append(mAudioAnalytics.dump(linesToDump).first.c_str());
+        auto [ dumpString, lines ] = mAudioAnalytics.dump(linesToDump);
+        result.append(dumpString.c_str());
+        if (lines == linesToDump) {
+            result.append("-- some lines may be truncated --\n");
+        }
     }
 
     write(fd, result.string(), result.size());
