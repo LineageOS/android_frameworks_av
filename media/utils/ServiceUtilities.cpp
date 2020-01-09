@@ -416,6 +416,8 @@ mediautils::UidInfo::Info mediautils::UidInfo::getInfo(uid_t uid)
         } else if (strchr(pkg.c_str(), '.') == nullptr) {
             // not of form 'com.whatever...'; assume internal
             // so we don't need to look it up in package manager.
+        } else if (strncmp(pkg.c_str(), "android.", 8) == 0) {
+            // android.* packages are assumed fine
         } else if (package_mgr.get() != nullptr) {
             String16 pkgName16(pkg.c_str());
             binder::Status status = package_mgr->getInstallerForPackage(pkgName16, &installer);
