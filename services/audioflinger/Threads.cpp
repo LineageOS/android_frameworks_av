@@ -1423,7 +1423,10 @@ void AudioFlinger::ThreadBase::disconnectEffectHandle(EffectHandle *handle,
         if (effectBase == nullptr) {
             return;
         }
-        effect = static_cast<EffectModule *>(effectBase.get());
+        effect = effectBase->asEffectModule();
+        if (effect == nullptr) {
+            return;
+        }
         // restore suspended effects if the disconnected handle was enabled and the last one.
         remove = (effect->removeHandle(handle) == 0) && (!effect->isPinned() || unpinIfLast);
         if (remove) {

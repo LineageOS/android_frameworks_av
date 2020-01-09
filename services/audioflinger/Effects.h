@@ -33,7 +33,7 @@ public:
     virtual bool isOffload() const = 0;
     virtual bool isOffloadOrDirect() const = 0;
     virtual bool isOffloadOrMmap() const = 0;
-    virtual uint32_t  sampleRate() const = 0;
+    virtual uint32_t sampleRate() const = 0;
     virtual audio_channel_mask_t channelMask() const = 0;
     virtual uint32_t channelCount() const = 0;
     virtual size_t frameCount() const = 0;
@@ -159,6 +159,7 @@ public:
     status_t         updatePolicyState();
 
     virtual          sp<EffectModule> asEffectModule() { return nullptr; }
+    virtual          sp<DeviceEffectProxy> asDeviceEffectProxy() { return nullptr; }
 
     void             dump(int fd, const Vector<String16>& args);
 
@@ -206,7 +207,8 @@ public:
                     effect_descriptor_t *desc,
                     int id,
                     audio_session_t sessionId,
-                    bool pinned);
+                    bool pinned,
+                    audio_port_handle_t deviceId);
     virtual ~EffectModule();
 
     void process();
@@ -612,4 +614,97 @@ private:
              KeyedVector< int, sp<SuspendedEffectDesc> > mSuspendedEffects;
 
              const sp<EffectCallback> mEffectCallback;
+};
+
+class DeviceEffectProxy : public EffectBase {
+public:
+        DeviceEffectProxy (const AudioDeviceTypeAddr& device,
+                const sp<DeviceEffectManagerCallback>& callback,
+                effect_descriptor_t *desc, int id)
+            : EffectBase(callback, desc, id, AUDIO_SESSION_DEVICE, false),
+                mDevice(device), mManagerCallback(callback),
+                mMyCallback(new ProxyCallback(this, callback)) {}
+
+    status_t setEnabled(bool enabled, bool fromHandle) override;
+    sp<DeviceEffectProxy> asDeviceEffectProxy() override { return this; }
+
+    status_t init(const std::map<audio_patch_handle_t, PatchPanel::Patch>& patches);
+    status_t onCreatePatch(audio_patch_handle_t patchHandle, const PatchPanel::Patch& patch);
+    void onReleasePatch(audio_patch_handle_t patchHandle);
+
+    size_t removeEffect(const sp<EffectModule>& effect);
+
+    status_t addEffectToHal(sp<EffectHalInterface> effect);
+    status_t removeEffectFromHal(sp<EffectHalInterface> effect);
+
+    const AudioDeviceTypeAddr& device() { return mDevice; };
+    bool isOutput() const;
+    uint32_t sampleRate() const;
+    audio_channel_mask_t channelMask() const;
+    uint32_t channelCount() const;
+
+    void dump(int fd, int spaces);
+
+private:
+
+    class ProxyCallback :  public EffectCallbackInterface {
+    public:
+                ProxyCallback(DeviceEffectProxy *proxy,
+                        const sp<DeviceEffectManagerCallback>& callback)
+                    : mProxy(proxy), mManagerCallback(callback) {}
+
+        status_t createEffectHal(const effect_uuid_t *pEffectUuid,
+               int32_t sessionId, int32_t deviceId, sp<EffectHalInterface> *effect) override;
+        status_t allocateHalBuffer(size_t size __unused,
+                sp<EffectBufferHalInterface>* buffer __unused) override { return NO_ERROR; }
+        bool updateOrphanEffectChains(const sp<EffectBase>& effect __unused) override {
+                    return false;
+        }
+
+        audio_io_handle_t io() const override { return AUDIO_IO_HANDLE_NONE; }
+        bool isOutput() const override;
+        bool isOffload() const override { return false; }
+        bool isOffloadOrDirect() const override { return false; }
+        bool isOffloadOrMmap() const override { return false; }
+
+        uint32_t sampleRate() const override;
+        audio_channel_mask_t channelMask() const override;
+        uint32_t channelCount() const override;
+        size_t frameCount() const override  { return 0; }
+        uint32_t latency() const override  { return 0; }
+
+        status_t addEffectToHal(sp<EffectHalInterface> effect) override;
+        status_t removeEffectFromHal(sp<EffectHalInterface> effect) override;
+
+        bool disconnectEffectHandle(EffectHandle *handle, bool unpinIfLast) override;
+        void setVolumeForOutput(float left __unused, float right __unused) const override {}
+
+        void checkSuspendOnEffectEnabled(const sp<EffectBase>& effect __unused,
+                              bool enabled __unused, bool threadLocked __unused) override {}
+        void resetVolume() override {}
+        uint32_t strategy() const override  { return 0; }
+        int32_t activeTrackCnt() const override { return 0; }
+        void onEffectEnable(const sp<EffectBase>& effect __unused) override {}
+        void onEffectDisable(const sp<EffectBase>& effect __unused) override {}
+
+        wp<EffectChain> chain() const override { return nullptr; }
+
+        int newEffectId();
+
+    private:
+        const wp<DeviceEffectProxy> mProxy;
+        const sp<DeviceEffectManagerCallback> mManagerCallback;
+    };
+
+    status_t checkPort(const PatchPanel::Patch& patch, const struct audio_port_config *port,
+            sp<EffectHandle> *handle);
+
+    const AudioDeviceTypeAddr mDevice;
+    const sp<DeviceEffectManagerCallback> mManagerCallback;
+    const sp<ProxyCallback> mMyCallback;
+
+    Mutex mProxyLock;
+    std::map<audio_patch_handle_t, sp<EffectHandle>> mEffectHandles; // protected by mProxyLock
+    sp<EffectModule> mHalEffect; // protected by mProxyLock
+    struct audio_port_config mDevicePort = { .id = AUDIO_PORT_HANDLE_NONE };
 };

@@ -309,6 +309,12 @@ public:
 
     static int onExternalVibrationStart(const sp<os::ExternalVibration>& externalVibration);
     static void onExternalVibrationStop(const sp<os::ExternalVibration>& externalVibration);
+
+    status_t addEffectToHal(audio_port_handle_t deviceId,
+            audio_module_handle_t hwModuleId, sp<EffectHalInterface> effect);
+    status_t removeEffectFromHal(audio_port_handle_t deviceId,
+            audio_module_handle_t hwModuleId, sp<EffectHalInterface> effect);
+
 private:
     // FIXME The 400 is temporarily too high until a leak of writers in media.log is fixed.
     static const size_t kLogMemorySize = 400 * 1024;
@@ -542,6 +548,10 @@ private:
     class EffectModule;
     class EffectHandle;
     class EffectChain;
+    class DeviceEffectProxy;
+    class DeviceEffectManager;
+    class PatchPanel;
+    class DeviceEffectManagerCallback;
 
     struct AudioStreamIn;
     struct TeePatch;
@@ -579,9 +589,11 @@ using effect_buffer_t = int16_t;
 
 #include "Threads.h"
 
+#include "PatchPanel.h"
+
 #include "Effects.h"
 
-#include "PatchPanel.h"
+#include "DeviceEffectManager.h"
 
     // Find io handle by session id.
     // Preference is given to an io handle with a matching effect chain to session id.
@@ -926,6 +938,8 @@ private:
     // protected by mLock
     PatchPanel mPatchPanel;
     sp<EffectsFactoryHalInterface> mEffectsFactoryHal;
+
+    DeviceEffectManager mDeviceEffectManager;
 
     bool       mSystemReady;
 
