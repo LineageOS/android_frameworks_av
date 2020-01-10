@@ -26,6 +26,16 @@ bool AudioDeviceTypeAddr::equals(const AudioDeviceTypeAddr& other) const {
     return mType == other.mType && mAddress == other.mAddress;
 }
 
+bool AudioDeviceTypeAddr::operator<(const AudioDeviceTypeAddr& other) const {
+    if (mType < other.mType)  return true;
+    if (mType > other.mType)  return false;
+
+    if (mAddress < other.mAddress)  return true;
+    // if (mAddress > other.mAddress)  return false;
+
+    return false;
+}
+
 void AudioDeviceTypeAddr::reset() {
     mType = AUDIO_DEVICE_NONE;
     mAddress = "";

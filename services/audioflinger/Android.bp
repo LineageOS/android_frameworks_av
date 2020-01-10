@@ -9,6 +9,7 @@ cc_library_shared {
         "AudioStreamOut.cpp",
         "AudioWatchdog.cpp",
         "BufLog.cpp",
+        "DeviceEffectManager.cpp",
         "Effects.cpp",
         "FastCapture.cpp",
         "FastCaptureDumpState.cpp",
