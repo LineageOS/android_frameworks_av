@@ -42,9 +42,9 @@
 #define H264_NALU_PFRAME 0x1
 
 #define H265_NALU_MASK 0x3F
-#define H265_NALU_VPS 0x40
-#define H265_NALU_SPS 0x42
-#define H265_NALU_PPS 0x44
+#define H265_NALU_VPS 0x20
+#define H265_NALU_SPS 0x21
+#define H265_NALU_PPS 0x22
 
 #define UDP_HEADER_SIZE 8
 #define RTP_HEADER_SIZE 12
@@ -126,6 +126,7 @@ ARTPWriter::ARTPWriter(int fd, String8& localIp, int localPort, String8& remoteI
     mLooper->start();
 
     makeSocketPairAndBind(localIp, localPort, remoteIp , remotePort);
+    mVPSBuf = NULL;
     mSPSBuf = NULL;
     mPPSBuf = NULL;
 
@@ -147,6 +148,11 @@ ARTPWriter::ARTPWriter(int fd, String8& localIp, int localPort, String8& remoteI
 }
 
 ARTPWriter::~ARTPWriter() {
+    if (mVPSBuf != NULL) {
+        mVPSBuf->release();
+        mVPSBuf = NULL;
+    }
+
     if (mSPSBuf != NULL) {
         mSPSBuf->release();
         mSPSBuf = NULL;
@@ -349,6 +355,56 @@ static void SpsPpsParser(MediaBufferBase *buffer,
     }
 }
 
+static void VpsSpsPpsParser(MediaBufferBase *buffer,
+    MediaBufferBase **vpsBuffer, MediaBufferBase **spsBuffer, MediaBufferBase **ppsBuffer) {
+
+    while (true) {
+        const uint8_t* NALPtr = (const uint8_t *)buffer->data() + buffer->range_offset();
+        uint8_t nalType = ((*NALPtr) >> 1) & H265_NALU_MASK;
+
+        MediaBufferBase** targetPtr = NULL;
+        if (nalType == H265_NALU_VPS) {
+            targetPtr = vpsBuffer;
+        } else if (nalType == H265_NALU_SPS) {
+            targetPtr = spsBuffer;
+        } else if (nalType == H265_NALU_PPS) {
+            targetPtr = ppsBuffer;
+        } else {
+            return;
+        }
+        ALOGV("VPS(32) SPS(33) or PPS(34) found. Type %d", nalType);
+
+        uint32_t targetSize = buffer->range_length();
+        MediaBufferBase*& target = *targetPtr;
+        uint32_t j;
+        bool isBoundFound = false;
+        for (j = 0; j < targetSize - SPCSize ; j++) {
+            if (!memcmp(NALPtr + j, startPrefixCode, SPCSize)) {
+                isBoundFound = true;
+                break;
+            }
+        }
+
+        if (target != NULL)
+            target->release();
+        if (isBoundFound) {
+            target = MediaBufferBase::Create(j);
+            memcpy(target->data(),
+                   (const uint8_t *)buffer->data() + buffer->range_offset(),
+                   j);
+            buffer->set_range(buffer->range_offset() + j + SPCSize,
+                              buffer->range_length() - j - SPCSize);
+        } else {
+            target = MediaBufferBase::Create(targetSize);
+            memcpy(target->data(),
+                   (const uint8_t *)buffer->data() + buffer->range_offset(),
+                   targetSize);
+            buffer->set_range(buffer->range_offset() + targetSize, 0);
+            return;
+        }
+    }
+}
+
 void ARTPWriter::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatStart:
@@ -462,7 +518,9 @@ void ARTPWriter::onRead(const sp<AMessage> &msg) {
                 sendAVCData(mediaBuf);
         } else if (mMode == H265) {
             StripStartcode(mediaBuf);
-            sendHEVCData(mediaBuf);
+            VpsSpsPpsParser(mediaBuf, &mVPSBuf, &mSPSBuf, &mPPSBuf);
+            if (mediaBuf->range_length() > 0)
+                sendHEVCData(mediaBuf);
         } else if (mMode == H263) {
             sendH263Data(mediaBuf);
         } else if (mMode == AMR_NB || mMode == AMR_WB) {
@@ -830,6 +888,32 @@ void ARTPWriter::sendSPSPPSIfIFrame(MediaBufferBase *mediaBuf, int64_t timeUs) {
     }
 }
 
+void ARTPWriter::sendVPSSPSPPSIfIFrame(MediaBufferBase *mediaBuf, int64_t timeUs) {
+    const uint8_t *mediaData =
+        (const uint8_t *)mediaBuf->data() + mediaBuf->range_offset();
+    int nalType = ((mediaData[0] >> 1) & H265_NALU_MASK);
+    if (!(nalType >= 16 && nalType <= 21)/*H265_NALU_IFRAME*/)
+        return;
+
+    if (mVPSBuf != NULL) {
+        mVPSBuf->meta_data().setInt64(kKeyTime, timeUs);
+        mVPSBuf->meta_data().setInt32(kKeyVps, 1);
+        sendHEVCData(mVPSBuf);
+    }
+
+    if (mSPSBuf != NULL) {
+        mSPSBuf->meta_data().setInt64(kKeyTime, timeUs);
+        mSPSBuf->meta_data().setInt32(kKeySps, 1);
+        sendHEVCData(mSPSBuf);
+    }
+
+    if (mPPSBuf != NULL) {
+        mPPSBuf->meta_data().setInt64(kKeyTime, timeUs);
+        mPPSBuf->meta_data().setInt32(kKeyPps, 1);
+        sendHEVCData(mPPSBuf);
+    }
+}
+
 void ARTPWriter::sendHEVCData(MediaBufferBase *mediaBuf) {
     // 12 bytes RTP header + 2 bytes for the FU-indicator and FU-header.
     CHECK_GE(kMaxPacketSize, 12u + 2u);
@@ -837,12 +921,19 @@ void ARTPWriter::sendHEVCData(MediaBufferBase *mediaBuf) {
     int64_t timeUs;
     CHECK(mediaBuf->meta_data().findInt64(kKeyTime, &timeUs));
 
-    sendSPSPPSIfIFrame(mediaBuf, timeUs);
+    sendVPSSPSPPSIfIFrame(mediaBuf, timeUs);
 
     uint32_t rtpTime = mRTPTimeBase + (timeUs * 9 / 100ll);
 
     const uint8_t *mediaData =
         (const uint8_t *)mediaBuf->data() + mediaBuf->range_offset();
+
+    int32_t isNonVCL = 0;
+    if (mediaBuf->meta_data().findInt32(kKeyVps, &isNonVCL) ||
+            mediaBuf->meta_data().findInt32(kKeySps, &isNonVCL) ||
+            mediaBuf->meta_data().findInt32(kKeyPps, &isNonVCL)) {
+        isNonVCL = 1;
+    }
 
     sp<ABuffer> buffer = new ABuffer(kMaxPacketSize);
 
@@ -851,7 +942,10 @@ void ARTPWriter::sendHEVCData(MediaBufferBase *mediaBuf) {
         // The data fits into a single packet
         uint8_t *data = buffer->data();
         data[0] = 0x80;
-        data[1] = (1 << 7) | mPayloadType;  // M-bit
+        if (isNonVCL)
+            data[1] = mPayloadType;  // Marker bit should not be set in case of Non-VCL
+        else
+            data[1] = (1 << 7) | mPayloadType;  // M-bit
         data[2] = (mSeqNo >> 8) & 0xff;
         data[3] = mSeqNo & 0xff;
         data[4] = rtpTime >> 24;
