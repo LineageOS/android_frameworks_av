@@ -7941,14 +7941,20 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * <p>The camera device is a logical camera backed by two or more physical cameras.</p>
      * <p>In API level 28, the physical cameras must also be exposed to the application via
      * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraManager.html#getCameraIdList">CameraManager#getCameraIdList</a>.</p>
-     * <p>Starting from API level 29, some or all physical cameras may not be independently
-     * exposed to the application, in which case the physical camera IDs will not be
-     * available in <a href="https://developer.android.com/reference/android/hardware/camera2/CameraManager.html#getCameraIdList">CameraManager#getCameraIdList</a>. But the
+     * <p>Starting from API level 29:</p>
+     * <ul>
+     * <li>Some or all physical cameras may not be independently exposed to the application,
+     * in which case the physical camera IDs will not be available in
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraManager.html#getCameraIdList">CameraManager#getCameraIdList</a>. But the
      * application can still query the physical cameras' characteristics by calling
-     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraManager.html#getCameraCharacteristics">CameraManager#getCameraCharacteristics</a>. Additionally,
-     * if a physical camera is hidden from camera ID list, the mandatory stream combinations
-     * for that physical camera must be supported through the logical camera using physical
-     * streams.</p>
+     * <a href="https://developer.android.com/reference/android/hardware/camera2/CameraManager.html#getCameraCharacteristics">CameraManager#getCameraCharacteristics</a>.</li>
+     * <li>If a physical camera is hidden from camera ID list, the mandatory stream
+     * combinations for that physical camera must be supported through the logical camera
+     * using physical streams. One exception is that in API level 30, a physical camera
+     * may become unavailable via
+     * {@link ACameraManager_PhysicalCameraAvailabilityCallback }
+     * callback.</li>
+     * </ul>
      * <p>Combinations of logical and physical streams, or physical streams from different
      * physical cameras are not guaranteed. However, if the camera device supports
      * {@link ACameraDevice_isSessionConfigurationSupported },

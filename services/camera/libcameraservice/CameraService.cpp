@@ -420,7 +420,52 @@ void CameraService::onDeviceStatusChanged(const String8& id,
         }
         updateStatus(newStatus, id);
     }
+}
 
+void CameraService::onDeviceStatusChanged(const String8& id,
+        const String8& physicalId,
+        CameraDeviceStatus newHalStatus) {
+    ALOGI("%s: Status changed for cameraId=%s, physicalCameraId=%s, newStatus=%d",
+            __FUNCTION__, id.string(), physicalId.string(), newHalStatus);
+
+    StatusInternal newStatus = mapToInternal(newHalStatus);
+
+    std::shared_ptr<CameraState> state = getCameraState(id);
+
+    if (state == nullptr) {
+        ALOGE("%s: Physical camera id %s status change on a non-present ID %s",
+                __FUNCTION__, id.string(), physicalId.string());
+        return;
+    }
+
+    StatusInternal logicalCameraStatus = state->getStatus();
+    if (logicalCameraStatus != StatusInternal::PRESENT &&
+            logicalCameraStatus != StatusInternal::NOT_AVAILABLE) {
+        ALOGE("%s: Physical camera id %s status %d change for an invalid logical camera state %d",
+                __FUNCTION__, physicalId.string(), newHalStatus, logicalCameraStatus);
+        return;
+    }
+
+    bool updated = false;
+    if (newStatus == StatusInternal::PRESENT) {
+        updated = state->removeUnavailablePhysicalId(physicalId);
+    } else {
+        updated = state->addUnavailablePhysicalId(physicalId);
+    }
+
+    if (updated) {
+        logDeviceRemoved(id, String8::format("Device %s-%s availability changed from %d to %d",
+                id.string(), physicalId.string(),
+                newStatus != StatusInternal::PRESENT,
+                newStatus == StatusInternal::PRESENT));
+
+        String16 id16(id), physicalId16(physicalId);
+        Mutex::Autolock lock(mStatusListenerLock);
+        for (auto& listener : mListenerList) {
+            listener->getListener()->onPhysicalCameraStatusChanged(mapToInterface(newStatus),
+                    id16, physicalId16);
+        }
+    }
 }
 
 void CameraService::disconnectClient(const String8& id, sp<BasicClient> clientToDisconnect) {
@@ -2045,7 +2090,8 @@ Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listen
     {
         Mutex::Autolock lock(mCameraStatesLock);
         for (auto& i : mCameraStates) {
-            cameraStatuses->emplace_back(i.first, mapToInterface(i.second->getStatus()));
+            cameraStatuses->emplace_back(i.first,
+                    mapToInterface(i.second->getStatus()), i.second->getUnavailablePhysicalIds());
         }
     }
     // Remove the camera statuses that should be hidden from the client, we do
@@ -3188,6 +3234,12 @@ CameraService::StatusInternal CameraService::CameraState::getStatus() const {
     return mStatus;
 }
 
+std::vector<String8> CameraService::CameraState::getUnavailablePhysicalIds() const {
+    Mutex::Autolock lock(mStatusLock);
+    std::vector<String8> res(mUnavailablePhysicalIds.begin(), mUnavailablePhysicalIds.end());
+    return res;
+}
+
 CameraParameters CameraService::CameraState::getShimParams() const {
     return mShimParams;
 }
@@ -3210,6 +3262,18 @@ String8 CameraService::CameraState::getId() const {
 
 SystemCameraKind CameraService::CameraState::getSystemCameraKind() const {
     return mSystemCameraKind;
+}
+
+bool CameraService::CameraState::addUnavailablePhysicalId(const String8& physicalId) {
+    Mutex::Autolock lock(mStatusLock);
+    auto result = mUnavailablePhysicalIds.insert(physicalId);
+    return result.second;
+}
+
+bool CameraService::CameraState::removeUnavailablePhysicalId(const String8& physicalId) {
+    Mutex::Autolock lock(mStatusLock);
+    auto count = mUnavailablePhysicalIds.erase(physicalId);
+    return count > 0;
 }
 
 // ----------------------------------------------------------------------------
@@ -3569,7 +3633,7 @@ void CameraService::updateStatus(StatusInternal status, const String8& cameraId,
         return;
     }
     // Update the status for this camera state, then send the onStatusChangedCallbacks to each
-    // of the listeners with both the mStatusStatus and mStatusListenerLock held
+    // of the listeners with both the mStatusLock and mStatusListenerLock held
     state->updateStatus(status, cameraId, rejectSourceStates, [this, &deviceKind, &supportsHAL3]
             (const String8& cameraId, StatusInternal status) {
 
@@ -3590,6 +3654,8 @@ void CameraService::updateStatus(StatusInternal status, const String8& cameraId,
             }
 
             Mutex::Autolock lock(mStatusListenerLock);
+
+            notifyPhysicalCameraStatusLocked(mapToInterface(status), cameraId);
 
             for (auto& listener : mListenerList) {
                 bool isVendorListener = listener->isVendorListener();
@@ -3682,6 +3748,28 @@ status_t CameraService::setTorchStatusLocked(const String8& cameraId,
     mTorchStatusMap.editValueAt(index) = status;
 
     return OK;
+}
+
+void CameraService::notifyPhysicalCameraStatusLocked(int32_t status, const String8& cameraId) {
+    Mutex::Autolock lock(mCameraStatesLock);
+    for (const auto& state : mCameraStates) {
+        std::vector<std::string> physicalCameraIds;
+        if (!mCameraProviderManager->isLogicalCamera(state.first.c_str(), &physicalCameraIds)) {
+            // This is not a logical multi-camera.
+            continue;
+        }
+        if (std::find(physicalCameraIds.begin(), physicalCameraIds.end(), cameraId.c_str())
+                == physicalCameraIds.end()) {
+            // cameraId is not a physical camera of this logical multi-camera.
+            continue;
+        }
+
+        String16 id16(state.first), physicalId16(cameraId);
+        for (auto& listener : mListenerList) {
+            listener->getListener()->onPhysicalCameraStatusChanged(status,
+                    id16, physicalId16);
+        }
+    }
 }
 
 void CameraService::blockClientsForUid(uid_t uid) {

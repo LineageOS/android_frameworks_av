@@ -29,6 +29,7 @@
 #include <utils/Errors.h>
 #include <android/hardware/camera/common/1.0/types.h>
 #include <android/hardware/camera/provider/2.5/ICameraProvider.h>
+#include <android/hardware/camera/provider/2.6/ICameraProviderCallback.h>
 #include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
 #include <android/hidl/manager/1.0/IServiceNotification.h>
 #include <camera/VendorTagDescriptor.h>
@@ -135,6 +136,9 @@ public:
         ~StatusListener() {}
 
         virtual void onDeviceStatusChanged(const String8 &cameraId,
+                hardware::camera::common::V1_0::CameraDeviceStatus newStatus) = 0;
+        virtual void onDeviceStatusChanged(const String8 &cameraId,
+                const String8 &physicalCameraId,
                 hardware::camera::common::V1_0::CameraDeviceStatus newStatus) = 0;
         virtual void onTorchStatusChanged(const String8 &cameraId,
                 hardware::camera::common::V1_0::TorchModeStatus newStatus) = 0;
@@ -342,7 +346,7 @@ private:
     std::mutex mProviderInterfaceMapLock;
 
     struct ProviderInfo :
-            virtual public hardware::camera::provider::V2_4::ICameraProviderCallback,
+            virtual public hardware::camera::provider::V2_6::ICameraProviderCallback,
             virtual public hardware::hidl_death_recipient
     {
         const std::string mProviderName;
@@ -380,12 +384,16 @@ private:
         status_t dump(int fd, const Vector<String16>& args) const;
 
         // ICameraProviderCallbacks interface - these lock the parent mInterfaceMutex
-        virtual hardware::Return<void> cameraDeviceStatusChange(
+        hardware::Return<void> cameraDeviceStatusChange(
                 const hardware::hidl_string& cameraDeviceName,
                 hardware::camera::common::V1_0::CameraDeviceStatus newStatus) override;
-        virtual hardware::Return<void> torchModeStatusChange(
+        hardware::Return<void> torchModeStatusChange(
                 const hardware::hidl_string& cameraDeviceName,
                 hardware::camera::common::V1_0::TorchModeStatus newStatus) override;
+        hardware::Return<void> physicalCameraDeviceStatusChange(
+                const hardware::hidl_string& cameraDeviceName,
+                const hardware::hidl_string& physicalCameraDeviceName,
+                hardware::camera::common::V1_0::CameraDeviceStatus newStatus) override;
 
         // hidl_death_recipient interface - this locks the parent mInterfaceMutex
         virtual void serviceDied(uint64_t cookie, const wp<hidl::base::V1_0::IBase>& who) override;
@@ -417,6 +425,8 @@ private:
             const hardware::camera::common::V1_0::CameraResourceCost mResourceCost;
 
             hardware::camera::common::V1_0::CameraDeviceStatus mStatus;
+            std::map<std::string, hardware::camera::common::V1_0::CameraDeviceStatus>
+                    mPhysicalStatus;
 
             sp<ProviderInfo> mParentProvider;
 

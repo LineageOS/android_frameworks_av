@@ -83,6 +83,12 @@ public:
         return binder::Status::ok();
     };
 
+    virtual binder::Status onPhysicalCameraStatusChanged(int32_t /*status*/,
+            const String16& /*cameraId*/, const String16& /*physicalCameraId*/) {
+        // No op
+        return binder::Status::ok();
+    };
+
     virtual binder::Status onTorchStatusChanged(int32_t status, const String16& cameraId) {
         Mutex::Autolock l(mLock);
         mCameraTorchStatuses[cameraId] = status;

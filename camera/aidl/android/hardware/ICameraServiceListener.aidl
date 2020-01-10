@@ -54,6 +54,12 @@ interface ICameraServiceListener
     oneway void onStatusChanged(int status, String cameraId);
 
     /**
+     * Notify registered client about status changes for a physical camera backing
+     * a logical camera.
+     */
+    oneway void onPhysicalCameraStatusChanged(int status, String cameraId, String physicalCameraId);
+
+    /**
      * The torch mode status of a camera.
      *
      * Initial status will be transmitted with onTorchStatusChanged immediately
