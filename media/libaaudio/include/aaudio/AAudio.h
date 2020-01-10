@@ -227,6 +227,8 @@ enum {
 };
 typedef int32_t aaudio_performance_mode_t;
 
+#define AAUDIO_SYSTEM_USAGE_OFFSET 1000
+
 /**
  * The USAGE attribute expresses "why" you are playing a sound, what is this sound used for.
  * This information is used by certain platforms or routing policies
@@ -297,7 +299,31 @@ enum {
     /**
      * Use this for audio responses to user queries, audio instructions or help utterances.
      */
-    AAUDIO_USAGE_ASSISTANT = 16
+    AAUDIO_USAGE_ASSISTANT = 16,
+
+    /**
+     * Use this in case of playing sounds in an emergency.
+     * Privileged MODIFY_AUDIO_ROUTING permission required.
+     */
+    AAUDIO_SYSTEM_USAGE_EMERGENCY = AAUDIO_SYSTEM_USAGE_OFFSET,
+
+    /**
+     * Use this for safety sounds and alerts, for example backup camera obstacle detection.
+     * Privileged MODIFY_AUDIO_ROUTING permission required.
+     */
+    AAUDIO_SYSTEM_USAGE_SAFETY = AAUDIO_SYSTEM_USAGE_OFFSET + 1,
+
+    /**
+     * Use this for vehicle status alerts and information, for example the check engine light.
+     * Privileged MODIFY_AUDIO_ROUTING permission required.
+     */
+    AAUDIO_SYSTEM_USAGE_VEHICLE_STATUS = AAUDIO_SYSTEM_USAGE_OFFSET + 2,
+
+    /**
+     * Use this for traffic announcements, etc.
+     * Privileged MODIFY_AUDIO_ROUTING permission required.
+     */
+    AAUDIO_SYSTEM_USAGE_ANNOUNCEMENT = AAUDIO_SYSTEM_USAGE_OFFSET + 3,
 };
 typedef int32_t aaudio_usage_t;
 

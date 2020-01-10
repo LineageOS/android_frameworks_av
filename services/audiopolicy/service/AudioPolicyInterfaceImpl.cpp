@@ -243,7 +243,7 @@ status_t AudioPolicyService::getOutputForAttr(audio_attributes_t *attr,
     }
     AutoCallerClear acc;
     AudioPolicyInterface::output_type_t outputType;
-    status_t result = mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid,
+    result = mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid,
                                                  config,
                                                  &flags, selectedDeviceId, portId,
                                                  secondaryOutputs,
