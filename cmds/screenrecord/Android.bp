@@ -26,6 +26,7 @@ cc_binary {
 
     header_libs: [
         "libmediadrm_headers",
+        "libmediametrics_headers",
     ],
 
     shared_libs: [
