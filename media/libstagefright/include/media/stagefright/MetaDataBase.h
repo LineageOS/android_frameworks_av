@@ -247,8 +247,9 @@ enum {
 
     // Treat empty track as malformed for MediaRecorder.
     kKeyEmptyTrackMalFormed = 'nemt', // bool (int32_t)
-    kKeySps              = 'sSps', // int32_t, indicates that a buffer is sps (value ignored).
-    kKeyPps              = 'sPps', // int32_t, indicates that a buffer is pps (value ignored).
+    kKeyVps              = 'sVps', // int32_t, indicates that a buffer has vps.
+    kKeySps              = 'sSps', // int32_t, indicates that a buffer has sps.
+    kKeyPps              = 'sPps', // int32_t, indicates that a buffer has pps.
     kKeySelfID           = 'sfid', // int32_t, source ID to identify itself on RTP protocol.
     kKeyPayloadType      = 'pTyp', // int32_t, SDP negotiated payload type.
     kKeyRtpExtMap        = 'extm', // int32_t, rtp extension ID for cvo on RTP protocol.

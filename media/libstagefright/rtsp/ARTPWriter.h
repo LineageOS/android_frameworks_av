@@ -102,6 +102,7 @@ private:
     AString mSeqParamSet;
     AString mPicParamSet;
 
+    MediaBufferBase *mVPSBuf;
     MediaBufferBase *mSPSBuf;
     MediaBufferBase *mPPSBuf;
 
@@ -143,6 +144,7 @@ private:
     void dumpSessionDesc();
 
     void sendBye();
+    void sendVPSSPSPPSIfIFrame(MediaBufferBase *mediaBuf, int64_t timeUs);
     void sendSPSPPSIfIFrame(MediaBufferBase *mediaBuf, int64_t timeUs);
     void sendHEVCData(MediaBufferBase *mediaBuf);
     void sendAVCData(MediaBufferBase *mediaBuf);
