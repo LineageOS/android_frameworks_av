@@ -32,16 +32,60 @@ AudioAnalytics::AudioAnalytics()
     // This triggers on an item of "audio.flinger"
     // with a property "event" set to "AudioFlinger" (the constructor).
     mActions.addAction(
-        "audio.flinger.event",
-        std::string("AudioFlinger"),
+        AMEDIAMETRICS_KEY_AUDIO_FLINGER "." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR),
         std::make_shared<AnalyticsActions::Function>(
-            [this](const std::shared_ptr<const android::mediametrics::Item> &){
-                ALOGW("Audioflinger() constructor event detected");
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item){
+                ALOGW("(key=%s) Audioflinger constructor event detected", item->getKey().c_str());
                 mPreviousAnalyticsState.set(std::make_shared<AnalyticsState>(
                         *mAnalyticsState.get()));
                 // Note: get returns shared_ptr temp, whose lifetime is extended
                 // to end of full expression.
                 mAnalyticsState->clear();  // TODO: filter the analytics state.
+                // Perhaps report this.
+            }));
+
+    // Check underruns
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_PREFIX_AUDIO_THREAD "*." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_UNDERRUN),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item){
+                std::string threadId = item->getKey().substr(
+                        sizeof(AMEDIAMETRICS_KEY_PREFIX_AUDIO_THREAD) - 1);
+                std::string outputDevices;
+                mAnalyticsState->timeMachine().get(
+                        item->getKey(), AMEDIAMETRICS_PROP_OUTPUTDEVICES, &outputDevices);
+                ALOGD("(key=%s) Thread underrun event detected on io handle:%s device:%s",
+                        item->getKey().c_str(), threadId.c_str(), outputDevices.c_str());
+                if (outputDevices.find("AUDIO_DEVICE_OUT_BLUETOOTH") != std::string::npos) {
+                    // report this for Bluetooth
+                }
+            }));
+
+    // Check latencies, playback and startup
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK "*." AMEDIAMETRICS_PROP_LATENCYMS,
+        std::monostate{},  // accept any value
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item){
+                double latencyMs{};
+                double startupMs{};
+                if (!item->get(AMEDIAMETRICS_PROP_LATENCYMS, &latencyMs)
+                        || !item->get(AMEDIAMETRICS_PROP_STARTUPMS, &startupMs)) return;
+
+                std::string trackId = item->getKey().substr(
+                        sizeof(AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK) - 1);
+                std::string thread = getThreadFromTrack(item->getKey());
+                std::string outputDevices;
+                mAnalyticsState->timeMachine().get(
+                        thread, AMEDIAMETRICS_PROP_OUTPUTDEVICES, &outputDevices);
+                ALOGD("(key=%s) Track latencyMs:%lf startupMs:%lf detected on port:%s device:%s",
+                        item->getKey().c_str(), latencyMs, startupMs,
+                        trackId.c_str(), outputDevices.c_str());
+                if (outputDevices.find("AUDIO_DEVICE_OUT_BLUETOOTH") != std::string::npos) {
+                    // report this for Bluetooth
+                }
             }));
 }
 
@@ -53,7 +97,7 @@ AudioAnalytics::~AudioAnalytics()
 status_t AudioAnalytics::submit(
         const std::shared_ptr<const mediametrics::Item>& item, bool isTrusted)
 {
-    if (!startsWith(item->getKey(), "audio.")) return BAD_VALUE;
+    if (!startsWith(item->getKey(), AMEDIAMETRICS_KEY_PREFIX_AUDIO)) return BAD_VALUE;
     status_t status = mAnalyticsState->submit(item, isTrusted);
     if (status != NO_ERROR) return status;  // may not be permitted.
 
@@ -92,6 +136,18 @@ void AudioAnalytics::checkActions(const std::shared_ptr<const mediametrics::Item
     for (const auto& action : actions) {
         (*action)(item);
     }
+}
+
+// HELPER METHODS
+
+std::string AudioAnalytics::getThreadFromTrack(const std::string& track) const
+{
+    int32_t threadId_int32{};
+    if (mAnalyticsState->timeMachine().get(
+            track, AMEDIAMETRICS_PROP_THREADID, &threadId_int32) != NO_ERROR) {
+        return {};
+    }
+    return std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_THREAD) + std::to_string(threadId_int32);
 }
 
 } // namespace android

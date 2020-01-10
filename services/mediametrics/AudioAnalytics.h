@@ -72,6 +72,14 @@ private:
      */
     void checkActions(const std::shared_ptr<const mediametrics::Item>& item);
 
+    // HELPER METHODS
+    /**
+     * Return the audio thread associated with an audio track name.
+     * e.g. "audio.track.32" -> "audio.thread.10" if the associated
+     * threadId for the audio track is 10.
+     */
+    std::string getThreadFromTrack(const std::string& track) const;
+
     // Actions is individually locked
     AnalyticsActions mActions;
 
