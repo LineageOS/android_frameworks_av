@@ -90,7 +90,12 @@ cc_library_shared {
     ],
     export_shared_lib_headers: ["libbinder"],
 
-    local_include_dirs: ["include/media", "aidl"],
+    include_dirs: [
+        "frameworks/av/media/libnbaio/include_mono/",
+    ],
+    local_include_dirs: [
+        "include/media", "aidl"
+    ],
     header_libs: [
         "libaudioclient_headers",
         "libbase_headers",

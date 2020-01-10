@@ -179,6 +179,10 @@ cc_test {
         "libcutils",
         "android.hardware.graphics.bufferqueue@1.0",
     ],
+    header_libs: [
+        "libstagefright_foundation_headers",
+    ],
+
     cflags: [
         "-D__ANDROID_VNDK__",
     ],
