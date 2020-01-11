@@ -112,6 +112,27 @@ TEST(mediametrics_tests, lock_wrap) {
   s3->operator=("abc");
   ASSERT_EQ('b', s3->operator[](1)); // s2[1] = 'b';
 
+  // Check that we can recursively hold lock.
+  android::mediametrics::LockWrap<std::vector<int>> v{std::initializer_list<int>{1, 2}};
+  v->push_back(3);
+  v->push_back(4);
+  ASSERT_EQ(1, v->operator[](0));
+  ASSERT_EQ(2, v->operator[](1));
+  ASSERT_EQ(3, v->operator[](2));
+  ASSERT_EQ(4, v->operator[](3));
+  // The end of the full expression here requires recursive depth of 4.
+  ASSERT_EQ(10, v->operator[](0) + v->operator[](1) + v->operator[](2) + v->operator[](3));
+
+  // Mikhail's note: a non-recursive lock implementation could be used if one obtains
+  // the LockedPointer helper object like this and directly hold the lock through RAII,
+  // though it is trickier in use.
+  //
+  // We include an example here for completeness.
+  {
+    auto l = v.operator->();
+    ASSERT_EQ(10, l->operator[](0) + l->operator[](1) + l->operator[](2) + l->operator[](3));
+  }
+
   // Use Thunk to check whether we have the lock when calling a method through LockWrap.
 
   class Thunk {
@@ -123,11 +144,13 @@ TEST(mediametrics_tests, lock_wrap) {
   };
 
   android::mediametrics::LockWrap<Thunk> s4([&]{
-    ASSERT_EQ(true, s4.isLocked()); // we must be locked when thunk() is called.
+    ASSERT_EQ((size_t)1, s4.getRecursionDepth()); // we must be locked when thunk() is called.
   });
 
+  ASSERT_EQ((size_t)0, s4.getRecursionDepth());
   // This will fail if we are not locked during method access.
   s4->thunk();
+  ASSERT_EQ((size_t)0, s4.getRecursionDepth());
 }
 
 TEST(mediametrics_tests, lock_wrap_multithread) {

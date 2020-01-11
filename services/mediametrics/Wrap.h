@@ -150,11 +150,17 @@ class LockWrap {
       */
     class LockedPointer {
         friend LockWrap;
-        LockedPointer(T *t, std::mutex *lock)
-            : mT(t), mLock(*lock) {}
+        LockedPointer(T *t, std::recursive_mutex *lock, std::atomic<size_t> *recursionDepth)
+            : mT(t), mLock(*lock), mRecursionDepth(recursionDepth) { ++*mRecursionDepth; }
+
         T* const mT;
-        std::lock_guard<std::mutex> mLock;
+        std::lock_guard<std::recursive_mutex> mLock;
+        std::atomic<size_t>* mRecursionDepth;
     public:
+        ~LockedPointer() {
+            --*mRecursionDepth; // Used for testing, we do not check underflow.
+        }
+
         const T* operator->() const {
             return mT;
         }
@@ -163,27 +169,36 @@ class LockWrap {
         }
     };
 
-    mutable std::mutex mLock;
+    // We must use a recursive mutex because the end of the full expression may
+    // involve another reference to T->.
+    //
+    // A recursive mutex allows the same thread to recursively acquire,
+    // but different thread would block.
+    //
+    // Example which fails with a normal mutex:
+    //
+    // android::mediametrics::LockWrap<std::vector<int>> v{std::initializer_list<int>{1, 2}};
+    // const int sum = v->operator[](0) + v->operator[](1);
+    //
+    mutable std::recursive_mutex mLock;
     mutable T mT;
+    mutable std::atomic<size_t> mRecursionDepth{};  // Used for testing.
 
 public:
     template <typename... Args>
     explicit LockWrap(Args&&... args) : mT(std::forward<Args>(args)...) {}
 
     const LockedPointer operator->() const {
-        return LockedPointer(&mT, &mLock);
+        return LockedPointer(&mT, &mLock, &mRecursionDepth);
     }
     LockedPointer operator->() {
-        return LockedPointer(&mT, &mLock);
+        return LockedPointer(&mT, &mLock, &mRecursionDepth);
     }
 
+    // Returns the lock depth of the recursive mutex.
     // @TestApi
-    bool isLocked() const {
-        if (mLock.try_lock()) {
-            mLock.unlock();
-            return false; // we were able to get the lock.
-        }
-        return true; // we were NOT able to get the lock.
+    size_t getRecursionDepth() const {
+        return mRecursionDepth;
     }
 };
 
