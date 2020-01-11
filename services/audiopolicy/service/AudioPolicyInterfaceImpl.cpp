@@ -806,6 +806,17 @@ audio_devices_t AudioPolicyService::getDevicesForStream(audio_stream_type_t stre
     return mAudioPolicyManager->getDevicesForStream(stream);
 }
 
+status_t AudioPolicyService::getDevicesForAttributes(const AudioAttributes &aa,
+                                             AudioDeviceTypeAddrVector *devices) const
+{
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    AutoCallerClear acc;
+    return mAudioPolicyManager->getDevicesForAttributes(aa.getAttributes(), devices);
+}
+
 audio_io_handle_t AudioPolicyService::getOutputForEffect(const effect_descriptor_t *desc)
 {
     // FIXME change return type to status_t, and return NO_INIT here

@@ -1017,6 +1017,16 @@ audio_devices_t AudioSystem::getDevicesForStream(audio_stream_type_t stream)
     return aps->getDevicesForStream(stream);
 }
 
+status_t AudioSystem::getDevicesForAttributes(const AudioAttributes &aa,
+                                              AudioDeviceTypeAddrVector *devices) {
+    if (devices == nullptr) {
+        return BAD_VALUE;
+    }
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->getDevicesForAttributes(aa, devices);
+}
+
 audio_io_handle_t AudioSystem::getOutputForEffect(const effect_descriptor_t *desc)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
