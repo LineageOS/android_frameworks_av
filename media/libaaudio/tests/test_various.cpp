@@ -441,7 +441,7 @@ TEST(test_various, aaudio_set_buffer_size) {
            bufferCapacity, bufferCapacity % framesPerBurst);
 
     actualSize = AAudioStream_setBufferSizeInFrames(aaudioStream, 0);
-    EXPECT_GT(actualSize, 0);
+    EXPECT_GE(actualSize, 0); // 0 is legal in R
     EXPECT_LE(actualSize, bufferCapacity);
 
     actualSize = AAudioStream_setBufferSizeInFrames(aaudioStream, 2 * framesPerBurst);
@@ -469,7 +469,7 @@ TEST(test_various, aaudio_set_buffer_size) {
     EXPECT_LE(actualSize, bufferCapacity);
 
     actualSize = AAudioStream_setBufferSizeInFrames(aaudioStream, INT32_MIN);
-    EXPECT_GT(actualSize, 0);
+    EXPECT_GE(actualSize, 0); // 0 is legal in R
     EXPECT_LE(actualSize, bufferCapacity);
 
     AAudioStream_close(aaudioStream);

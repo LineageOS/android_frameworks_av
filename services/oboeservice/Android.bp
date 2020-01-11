@@ -55,4 +55,12 @@ cc_library_shared {
         "libutils",
     ],
 
+    header_libs: [
+        "libaudiohal_headers",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/libnbaio/include_mono",
+        "frameworks/av/media/libnbaio/include",
+    ],
 }
