@@ -50,8 +50,8 @@ public class ExtractorTest {
     private static Context mContext =
             InstrumentationRegistry.getInstrumentation().getTargetContext();
     private static final String mInputFilePath = mContext.getString(R.string.input_file_path);
-    private static final String mStatsFile =
-            mContext.getFilesDir() + "/Extractor." + System.currentTimeMillis() + ".csv";
+    private static final String mStatsFile = mContext.getExternalFilesDir(null) + "/Extractor."
+            + System.currentTimeMillis() + ".csv";
     private static final String TAG = "ExtractorTest";
     private String mInputFileName;
     private int mTrackId;
@@ -84,6 +84,7 @@ public class ExtractorTest {
         Stats mStats = new Stats();
         boolean status = mStats.writeStatsHeader(mStatsFile);
         assertTrue("Unable to open stats file for writing!", status);
+        Log.d(TAG, "Saving Benchmark results in: " + mStatsFile);
     }
 
     @Test

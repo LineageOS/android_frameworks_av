@@ -15,6 +15,7 @@
 -->
 <configuration description="Runs Media Benchmark Tests">
     <target_preparer class="com.android.tradefed.targetprep.TestAppInstallSetup">
+        <option name="cleanup-apks" value="false" />
         <option name="test-file-name" value="MediaBenchmarkTest.apk" />
     </target_preparer>
 
