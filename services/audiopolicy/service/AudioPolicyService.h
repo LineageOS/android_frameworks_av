@@ -127,6 +127,8 @@ public:
 
     virtual uint32_t getStrategyForStream(audio_stream_type_t stream);
     virtual audio_devices_t getDevicesForStream(audio_stream_type_t stream);
+    virtual status_t getDevicesForAttributes(const AudioAttributes &aa,
+                                             AudioDeviceTypeAddrVector *devices) const;
 
     virtual audio_io_handle_t getOutputForEffect(const effect_descriptor_t *desc);
     virtual status_t registerEffect(const effect_descriptor_t *desc,

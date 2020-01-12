@@ -197,7 +197,9 @@ status_t AudioPolicyMixCollection::getOutputForAttr(
                 ALOGV("%s: Mix %zu ignored as secondaryOutput because not opened yet", __func__, i);
             } else {
                 ALOGV("%s: Add a secondary desc %zu", __func__, i);
-                secondaryDescs->push_back(policyDesc);
+                if (secondaryDescs != nullptr) {
+                    secondaryDescs->push_back(policyDesc);
+                }
             }
         }
     }
