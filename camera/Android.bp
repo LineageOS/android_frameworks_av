@@ -40,6 +40,7 @@ cc_library_shared {
         "ICameraRecordingProxy.cpp",
         "ICameraRecordingProxyListener.cpp",
         "camera2/CaptureRequest.cpp",
+        "camera2/ConcurrentCamera.cpp",
         "camera2/OutputConfiguration.cpp",
         "camera2/SessionConfiguration.cpp",
         "camera2/SubmitInfo.cpp",
@@ -66,7 +67,7 @@ cc_library_shared {
          "include",
          "include/camera"
     ],
-    export_shared_lib_headers: ["libcamera_metadata"],
+    export_shared_lib_headers: ["libcamera_metadata", "libnativewindow", "libgui"],
 
     cflags: [
         "-Werror",

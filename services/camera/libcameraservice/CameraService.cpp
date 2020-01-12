@@ -62,6 +62,7 @@
 #include <utils/String16.h>
 #include <utils/SystemClock.h>
 #include <utils/Trace.h>
+#include <utils/CallStack.h>
 #include <private/android_filesystem_config.h>
 #include <system/camera_vendor_tags.h>
 #include <system/camera_metadata.h>
@@ -91,6 +92,8 @@ using hardware::ICameraServiceProxy;
 using hardware::ICameraServiceListener;
 using hardware::camera::common::V1_0::CameraDeviceStatus;
 using hardware::camera::common::V1_0::TorchModeStatus;
+using hardware::camera2::utils::CameraIdAndSessionConfiguration;
+using hardware::camera2::utils::ConcurrentCameraIdCombination;
 
 // ----------------------------------------------------------------------------
 // Logging support -- this is for debugging only
@@ -2037,6 +2040,83 @@ Status CameraService::notifyDeviceStateChange(int64_t newState) {
     Mutex::Autolock l(mServiceLock);
     mCameraProviderManager->notifyDeviceStateChange(newDeviceState);
 
+    return Status::ok();
+}
+
+ Status CameraService::getConcurrentStreamingCameraIds(
+        std::vector<ConcurrentCameraIdCombination>* concurrentCameraIds) {
+    ATRACE_CALL();
+    if (!concurrentCameraIds) {
+        ALOGE("%s: concurrentCameraIds is NULL", __FUNCTION__);
+        return STATUS_ERROR(ERROR_ILLEGAL_ARGUMENT, "concurrentCameraIds is NULL");
+    }
+
+    if (!mInitialized) {
+        ALOGE("%s: Camera HAL couldn't be initialized", __FUNCTION__);
+        return STATUS_ERROR(ERROR_DISCONNECTED,
+                "Camera subsystem is not available");
+    }
+    // First call into the provider and get the set of concurrent camera
+    // combinations
+    std::vector<std::unordered_set<std::string>> concurrentCameraCombinations =
+            mCameraProviderManager->getConcurrentStreamingCameraIds();
+    for (auto &combination : concurrentCameraCombinations) {
+        std::vector<std::string> validCombination;
+        for (auto &cameraId : combination) {
+            // if the camera state is not present, skip
+            String8 cameraIdStr(cameraId.c_str());
+            auto state = getCameraState(cameraIdStr);
+            if (state == nullptr) {
+                ALOGW("%s: camera id %s does not exist", __FUNCTION__, cameraId.c_str());
+                continue;
+            }
+            StatusInternal status = state->getStatus();
+            if (status == StatusInternal::NOT_PRESENT || status == StatusInternal::ENUMERATING) {
+                continue;
+            }
+            if (shouldRejectSystemCameraConnection(cameraIdStr)) {
+                continue;
+            }
+            validCombination.push_back(cameraId);
+        }
+        if (validCombination.size() != 0) {
+            concurrentCameraIds->push_back(std::move(validCombination));
+        }
+    }
+    return Status::ok();
+}
+
+Status CameraService::isConcurrentSessionConfigurationSupported(
+        const std::vector<CameraIdAndSessionConfiguration>& cameraIdsAndSessionConfigurations,
+        /*out*/bool* isSupported) {
+    if (!isSupported) {
+        ALOGE("%s: isSupported is NULL", __FUNCTION__);
+        return STATUS_ERROR(ERROR_ILLEGAL_ARGUMENT, "isSupported is NULL");
+    }
+
+    if (!mInitialized) {
+        ALOGE("%s: Camera HAL couldn't be initialized", __FUNCTION__);
+        return STATUS_ERROR(ERROR_DISCONNECTED,
+                "Camera subsystem is not available");
+    }
+
+    // Check for camera permissions
+    int callingPid = CameraThreadState::getCallingPid();
+    int callingUid = CameraThreadState::getCallingUid();
+    if ((callingPid != getpid()) && !checkPermission(sCameraPermission, callingPid, callingUid)) {
+        ALOGE("%s: pid %d doesn't have camera permissions", __FUNCTION__, callingPid);
+        return STATUS_ERROR(ERROR_PERMISSION_DENIED,
+                "android.permission.CAMERA needed to call"
+                "isConcurrentSessionConfigurationSupported");
+    }
+
+    status_t res =
+            mCameraProviderManager->isConcurrentSessionConfigurationSupported(
+                    cameraIdsAndSessionConfigurations, isSupported);
+    if (res != OK) {
+        return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION, "Unable to query session configuration "
+                "support %s (%d)", strerror(-res), res);
+    }
     return Status::ok();
 }
 

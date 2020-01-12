@@ -37,6 +37,7 @@
 #include <camera/VendorTagDescriptor.h>
 #include <camera/CaptureResult.h>
 #include <camera/CameraParameters.h>
+#include <camera/camera2/ConcurrentCamera.h>
 
 #include "CameraFlashlight.h"
 
@@ -149,6 +150,14 @@ public:
             std::vector<hardware::CameraStatus>* cameraStatuses);
     virtual binder::Status    removeListener(
             const sp<hardware::ICameraServiceListener>& listener);
+
+    virtual binder::Status getConcurrentStreamingCameraIds(
+        /*out*/
+        std::vector<hardware::camera2::utils::ConcurrentCameraIdCombination>* concurrentCameraIds);
+
+    virtual binder::Status isConcurrentSessionConfigurationSupported(
+        const std::vector<hardware::camera2::utils::CameraIdAndSessionConfiguration>& sessions,
+        /*out*/bool* supported);
 
     virtual binder::Status    getLegacyParameters(
             int32_t cameraId,
