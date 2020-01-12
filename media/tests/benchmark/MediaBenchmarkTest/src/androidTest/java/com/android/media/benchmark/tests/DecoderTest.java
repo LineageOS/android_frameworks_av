@@ -57,7 +57,7 @@ public class DecoderTest {
     private static final String mInputFilePath = mContext.getString(R.string.input_file_path);
     private static final String mOutputFilePath = mContext.getString(R.string.output_file_path);
     private static final String mStatsFile =
-            mContext.getFilesDir() + "/Decoder." + System.currentTimeMillis() + ".csv";
+            mContext.getExternalFilesDir(null) + "/Decoder." + System.currentTimeMillis() + ".csv";
     private static final String TAG = "DecoderTest";
     private static final long PER_TEST_TIMEOUT_MS = 60000;
     private static final boolean DEBUG = false;
@@ -114,6 +114,7 @@ public class DecoderTest {
         Stats mStats = new Stats();
         boolean status = mStats.writeStatsHeader(mStatsFile);
         assertTrue("Unable to open stats file for writing!", status);
+        Log.d(TAG, "Saving Benchmark results in: " + mStatsFile);
     }
 
     @Test(timeout = PER_TEST_TIMEOUT_MS)
