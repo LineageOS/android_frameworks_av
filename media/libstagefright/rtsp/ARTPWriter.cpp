@@ -277,7 +277,6 @@ status_t ARTPWriter::pause() {
     return OK;
 }
 
-// return size of SPS if there is more NAL unit found following to SPS.
 static void StripStartcode(MediaBufferBase *buffer) {
     if (buffer->range_length() < 4) {
         return;
@@ -294,6 +293,7 @@ static void StripStartcode(MediaBufferBase *buffer) {
 
 static const uint8_t SPCSize = 4;      // Start Prefix Code Size
 static const uint8_t startPrefixCode[SPCSize] = {0,0,0,1};
+static const uint8_t spcKMPidx[SPCSize] = {0,0,2,0};
 static void SpsPpsParser(MediaBufferBase *buffer,
     MediaBufferBase **spsBuffer, MediaBufferBase **ppsBuffer) {
 
@@ -310,32 +310,40 @@ static void SpsPpsParser(MediaBufferBase *buffer,
         }
         ALOGV("SPS(7) or PPS(8) found. Type %d", *NALPtr & H264_NALU_MASK);
 
-        uint32_t targetSize = buffer->range_length();
+        uint32_t bufferSize = buffer->range_length();
         MediaBufferBase*& target = *targetPtr;
-        uint32_t j;
+        uint32_t i = 0, j = 0;
         bool isBoundFound = false;
-        for (j = 0; j < targetSize - SPCSize ; j++) {
-            if (!memcmp(NALPtr + j, startPrefixCode, SPCSize)) {
-                isBoundFound = true;
-                break;
+        for (i = 0; i < bufferSize ; i++) {
+            while (j > 0 && NALPtr[i] != startPrefixCode[j])
+                j = spcKMPidx[j-1];
+            if (NALPtr[i] == startPrefixCode[j]) {
+                j++;
+                if (j == SPCSize) {
+                    isBoundFound = true;
+                    break;
+                }
             }
         }
 
+        uint32_t targetSize;
         if (target != NULL)
             target->release();
         if (isBoundFound) {
-            target = MediaBufferBase::Create(j);
-            memcpy(target->data(),
-                   (const uint8_t *)buffer->data() + buffer->range_offset(),
-                   j);
-            buffer->set_range(buffer->range_offset() + j + SPCSize,
-                              buffer->range_length() - j - SPCSize);
-        } else {
+            targetSize = i - SPCSize + 1;
             target = MediaBufferBase::Create(targetSize);
             memcpy(target->data(),
                    (const uint8_t *)buffer->data() + buffer->range_offset(),
                    targetSize);
-            buffer->set_range(buffer->range_offset() + targetSize, 0);
+            buffer->set_range(buffer->range_offset() + targetSize + SPCSize,
+                              buffer->range_length() - targetSize - SPCSize);
+        } else {
+            targetSize = bufferSize;
+            target = MediaBufferBase::Create(targetSize);
+            memcpy(target->data(),
+                   (const uint8_t *)buffer->data() + buffer->range_offset(),
+                   targetSize);
+            buffer->set_range(buffer->range_offset() + bufferSize, 0);
             return;
         }
     }
