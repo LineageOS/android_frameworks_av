@@ -3507,7 +3507,7 @@ sp<IEffect> AudioFlinger::createEffect(
 
     if (lStatus == NO_ERROR || lStatus == ALREADY_EXISTS) {
         // Check CPU and memory usage
-        sp<EffectModule> effect = handle->effect().promote();
+        sp<EffectBase> effect = handle->effect().promote();
         if (effect != nullptr) {
             status_t rStatus = effect->updatePolicyState();
             if (rStatus != NO_ERROR) {

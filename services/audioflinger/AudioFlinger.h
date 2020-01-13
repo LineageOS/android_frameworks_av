@@ -533,6 +533,7 @@ private:
     class AsyncCallbackThread;
     class Track;
     class RecordTrack;
+    class EffectBase;
     class EffectModule;
     class EffectHandle;
     class EffectChain;
