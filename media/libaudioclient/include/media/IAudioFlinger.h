@@ -453,6 +453,7 @@ public:
                                     // AudioFlinger doesn't take over handle reference from client
                                     audio_io_handle_t output,
                                     audio_session_t sessionId,
+                                    const AudioDeviceTypeAddr& device,
                                     const String16& callingPackage,
                                     pid_t pid,
                                     status_t *status,

@@ -362,17 +362,21 @@ public:
      *      (AudioTrack or MediaPLayer) within the same audio session.
      * io:  HAL audio output or input stream to which this effect must be attached. Leave at 0 for
      *      automatic output selection by AudioFlinger.
+     * device: An audio device descriptor. Only used when "sessionID" is AUDIO_SESSION_DEVICE.
+     *         Specifies the audio device type and address the effect must be attached to.
+     *         If "sessionID" is AUDIO_SESSION_DEVICE then "io" must be AUDIO_IO_HANDLE_NONE.
      */
 
     AudioEffect(const effect_uuid_t *type,
                 const String16& opPackageName,
                 const effect_uuid_t *uuid = NULL,
-                  int32_t priority = 0,
-                  effect_callback_t cbf = NULL,
-                  void* user = NULL,
-                  audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
-                  audio_io_handle_t io = AUDIO_IO_HANDLE_NONE
-                  );
+                int32_t priority = 0,
+                effect_callback_t cbf = NULL,
+                void* user = NULL,
+                audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
+                audio_io_handle_t io = AUDIO_IO_HANDLE_NONE,
+                const AudioDeviceTypeAddr& device = {}
+                );
 
     /* Constructor.
      *      Same as above but with type and uuid specified by character strings
@@ -384,7 +388,8 @@ public:
                     effect_callback_t cbf = NULL,
                     void* user = NULL,
                     audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
-                    audio_io_handle_t io = AUDIO_IO_HANDLE_NONE
+                    audio_io_handle_t io = AUDIO_IO_HANDLE_NONE,
+                    const AudioDeviceTypeAddr& device = {}
                     );
 
     /* Terminates the AudioEffect and unregisters it from AudioFlinger.
@@ -406,7 +411,8 @@ public:
                             effect_callback_t cbf = NULL,
                             void* user = NULL,
                             audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
-                            audio_io_handle_t io = AUDIO_IO_HANDLE_NONE
+                            audio_io_handle_t io = AUDIO_IO_HANDLE_NONE,
+                            const AudioDeviceTypeAddr& device = {}
                             );
 
     /* Result of constructing the AudioEffect. This must be checked
