@@ -174,7 +174,8 @@ mutable Mutex                 mLock;      // mutex for process, commands and han
     const audio_session_t     mSessionId; // audio session ID
     const effect_descriptor_t mDescriptor;// effect descriptor received from effect engine
     effect_state              mState = IDLE; // current activation state
-    bool                      mSuspended; // effect is suspended: temporarily disabled by framework
+    // effect is suspended: temporarily disabled by framework
+    bool                      mSuspended = false;
 
     Vector<EffectHandle *>    mHandles;   // list of client handles
                 // First handle in mHandles has highest priority and controls the effect module
