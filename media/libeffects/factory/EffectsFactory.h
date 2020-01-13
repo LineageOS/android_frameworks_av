@@ -27,6 +27,8 @@
 extern "C" {
 #endif
 
+#define EFFECT_LIBRARY_API_VERSION_CURRENT EFFECT_LIBRARY_API_VERSION_3_1
+
 #define PROPERTY_IGNORE_EFFECTS "ro.audio.ignore_effects"
 
 typedef struct list_elem_s {

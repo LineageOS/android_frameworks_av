@@ -97,7 +97,7 @@ AudioFlinger::EffectModule::EffectModule(ThreadBase *thread,
         sp<EffectsFactoryHalInterface> effectsFactory = audioFlinger->getEffectsFactory();
         if (effectsFactory != 0) {
             mStatus = effectsFactory->createEffect(
-                    &desc->uuid, sessionId, thread->id(), &mEffectInterface);
+                &desc->uuid, sessionId, thread->id(), AUDIO_PORT_HANDLE_NONE, &mEffectInterface);
         }
     }
 
