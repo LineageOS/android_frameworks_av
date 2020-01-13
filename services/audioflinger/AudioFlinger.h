@@ -232,6 +232,7 @@ public:
                         int32_t priority,
                         audio_io_handle_t io,
                         audio_session_t sessionId,
+                        const AudioDeviceTypeAddr& device,
                         const String16& opPackageName,
                         pid_t pid,
                         status_t *status /*non-NULL*/,
