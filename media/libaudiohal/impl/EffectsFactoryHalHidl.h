@@ -49,7 +49,7 @@ class EffectsFactoryHalHidl : public EffectsFactoryHalInterface, public Conversi
     // To release the effect engine, it is necessary to release references
     // to the returned effect object.
     virtual status_t createEffect(const effect_uuid_t *pEffectUuid,
-            int32_t sessionId, int32_t ioId,
+            int32_t sessionId, int32_t ioId, int32_t deviceId,
             sp<EffectHalInterface> *effect);
 
     virtual status_t dumpEffects(int fd);

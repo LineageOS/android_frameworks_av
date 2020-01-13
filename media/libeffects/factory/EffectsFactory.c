@@ -254,7 +254,8 @@ int EffectGetDescriptor(const effect_uuid_t *uuid, effect_descriptor_t *pDescrip
     return ret;
 }
 
-int EffectCreate(const effect_uuid_t *uuid, int32_t sessionId, int32_t ioId, effect_handle_t *pHandle)
+int doEffectCreate(const effect_uuid_t *uuid, int32_t sessionId, int32_t ioId, int32_t deviceId,
+        effect_handle_t *pHandle)
 {
     list_elem_t *e = gLibraryList;
     lib_entry_t *l = NULL;
@@ -268,9 +269,9 @@ int EffectCreate(const effect_uuid_t *uuid, int32_t sessionId, int32_t ioId, eff
     }
 
     ALOGV("EffectCreate() UUID: %08X-%04X-%04X-%04X-%02X%02X%02X%02X%02X%02X\n",
-            uuid->timeLow, uuid->timeMid, uuid->timeHiAndVersion,
-            uuid->clockSeq, uuid->node[0], uuid->node[1],uuid->node[2],
-            uuid->node[3],uuid->node[4],uuid->node[5]);
+          uuid->timeLow, uuid->timeMid, uuid->timeHiAndVersion,
+          uuid->clockSeq, uuid->node[0], uuid->node[1], uuid->node[2],
+          uuid->node[3], uuid->node[4], uuid->node[5]);
 
     ret = init();
 
@@ -282,17 +283,29 @@ int EffectCreate(const effect_uuid_t *uuid, int32_t sessionId, int32_t ioId, eff
     pthread_mutex_lock(&gLibLock);
 
     ret = findEffect(NULL, uuid, &l, &d);
-    if (ret < 0){
+    if (ret < 0) {
         // Sub effects are not associated with the library->effects,
         // so, findEffect will fail. Search for the effect in gSubEffectList.
         ret = findSubEffect(uuid, &l, &d);
-        if (ret < 0 ) {
+        if (ret < 0) {
             goto exit;
         }
     }
 
     // create effect in library
-    ret = l->desc->create_effect(uuid, sessionId, ioId, &itfe);
+    if (sessionId == AUDIO_SESSION_DEVICE) {
+        if (l->desc->version >= EFFECT_LIBRARY_API_VERSION_3_1) {
+            ALOGI("EffectCreate() create_effect_3_1");
+            ret = l->desc->create_effect_3_1(uuid, sessionId, ioId, deviceId, &itfe);
+        } else {
+            ALOGE("EffectCreate() cannot create device effect on library with API version < 3.1");
+            ret = -ENOSYS;
+        }
+    } else {
+        ALOGI("EffectCreate() create_effect");
+        ret = l->desc->create_effect(uuid, sessionId, ioId, &itfe);
+    }
+
     if (ret != 0) {
         ALOGW("EffectCreate() library %s: could not create fx %s, error %d", l->name, d->name, ret);
         goto exit;
@@ -322,6 +335,16 @@ int EffectCreate(const effect_uuid_t *uuid, int32_t sessionId, int32_t ioId, eff
 exit:
     pthread_mutex_unlock(&gLibLock);
     return ret;
+}
+
+int EffectCreate(const effect_uuid_t *uuid, int32_t sessionId, int32_t ioId,
+        effect_handle_t *pHandle) {
+    return doEffectCreate(uuid, sessionId, ioId, AUDIO_PORT_HANDLE_NONE, pHandle);
+}
+
+int EffectCreateOnDevice(const effect_uuid_t *uuid, int32_t deviceId, int32_t ioId,
+        effect_handle_t *pHandle) {
+    return doEffectCreate(uuid, AUDIO_SESSION_DEVICE, ioId, deviceId, pHandle);
 }
 
 int EffectRelease(effect_handle_t handle)
