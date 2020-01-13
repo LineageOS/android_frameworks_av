@@ -24,6 +24,7 @@ LOCAL_SHARED_LIBRARIES := \
     libbinder \
     libaudioclient \
     libaudioutils \
+    libaudiofoundation \
     libhardware_legacy \
     libaudiopolicymanager \
     libmedia_helper \
