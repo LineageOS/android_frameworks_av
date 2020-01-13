@@ -123,18 +123,20 @@ private:
             mCloseThread = closeThread;
         }
         template <typename T>
-        void setTrackAndPeer(const sp<TrackType>& track, const sp<T> &peer) {
+        void setTrackAndPeer(const sp<TrackType>& track, const sp<T> &peer, bool holdReference) {
             mTrack = track;
             mThread->addPatchTrack(mTrack);
-            mTrack->setPeerProxy(peer, true /* holdReference */);
+            mTrack->setPeerProxy(peer, holdReference);
+            mClearPeerProxy = holdReference;
         }
-        void clearTrackPeer() { if (mTrack) mTrack->clearPeerProxy(); }
+        void clearTrackPeer() { if (mClearPeerProxy && mTrack) mTrack->clearPeerProxy(); }
         void stopTrack() { if (mTrack) mTrack->stop(); }
 
         void swap(Endpoint &other) noexcept {
             using std::swap;
             swap(mThread, other.mThread);
             swap(mCloseThread, other.mCloseThread);
+            swap(mClearPeerProxy, other.mClearPeerProxy);
             swap(mHandle, other.mHandle);
             swap(mTrack, other.mTrack);
         }
@@ -146,6 +148,7 @@ private:
     private:
         sp<ThreadType> mThread;
         bool mCloseThread = true;
+        bool mClearPeerProxy = true;
         audio_patch_handle_t mHandle = AUDIO_PATCH_HANDLE_NONE;
         sp<TrackType> mTrack;
     };
