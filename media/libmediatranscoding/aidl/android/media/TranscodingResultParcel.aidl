@@ -14,23 +14,25 @@
  * limitations under the License.
  */
 
-#include <android-base/logging.h>
-#include <binder/IPCThreadState.h>
-#include <binder/ProcessState.h>
+package android.media;
 
-#include "MediaTranscodingService.h"
+/**
+ * Result of the transcoding.
+ *
+ * {@hide}
+ */
+//TODO(hkuang): Implement the parcelable.
+parcelable TranscodingResultParcel {
+    /**
+     * The jobId associated with the TranscodingResult.
+     */
+    int jobId;
 
-using namespace android;
+    /**
+     * Actual bitrate of the transcoded video in bits per second. This will only present for video
+     * transcoding. -1 means not available.
+     */
+    int actualBitrateBps;
 
-int main(int argc __unused, char** argv) {
-    LOG(INFO) << "media transcoding service starting";
-
-    // TODO(hkuang): Start the service with libbinder_ndk.
-    strcpy(argv[0], "media.transcoding");
-    sp<ProcessState> proc(ProcessState::self());
-    sp<IServiceManager> sm = defaultServiceManager();
-    android::MediaTranscodingService::instantiate();
-
-    ProcessState::self()->startThreadPool();
-    IPCThreadState::self()->joinThreadPool();
+    // TODO(hkuang): Add more fields.
 }

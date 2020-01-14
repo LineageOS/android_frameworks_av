@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,25 +16,22 @@
 
 package android.media;
 
-import android.media.TranscodingJob;
-
 /**
- * Result of the transcoding.
+ * Priority of a transcoding job.
  *
  * {@hide}
  */
-//TODO(hkuang): Implement the parcelable.
-parcelable TranscodingResult {
+@Backing(type="int")
+enum TranscodingJobPriority {
+    // TODO(hkuang): define what each priority level actually mean.
+    kUnspecified = 0,
+    kLow = 1,
     /**
-     * The jobId associated with the TranscodingResult.
+     * 2 ~ 20 is reserved for future use.
      */
-    int jobId;
-
+    kNormal = 21,
     /**
-     * Actual bitrate of the transcoded video in bits per second. This will only present for video
-     * transcoding. -1 means not available.
+     * 22 ~ 30 is reserved for future use.
      */
-    int actualBitrateBps;
-
-    // TODO(hkuang): Add more fields.
+    kHigh = 31,
 }
