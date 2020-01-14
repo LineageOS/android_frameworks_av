@@ -84,13 +84,12 @@ using android::Vector;
 using android::sp;
 using android::status_t;
 
-using android::DISPLAY_ORIENTATION_0;
-using android::DISPLAY_ORIENTATION_180;
-using android::DISPLAY_ORIENTATION_90;
 using android::INVALID_OPERATION;
 using android::NAME_NOT_FOUND;
 using android::NO_ERROR;
 using android::UNKNOWN_ERROR;
+
+namespace ui = android::ui;
 
 static const uint32_t kMinBitRate = 100000;         // 0.1Mbps
 static const uint32_t kMaxBitRate = 200 * 1000000;  // 200Mbps
@@ -328,7 +327,7 @@ static status_t setDisplayProjection(
     }
 
     t.setDisplayProjection(dpy,
-            gRotate ? DISPLAY_ORIENTATION_90 : DISPLAY_ORIENTATION_0,
+            gRotate ? ui::ROTATION_90 : ui::ROTATION_0,
             layerStackRect, displayRect);
     return NO_ERROR;
 }
@@ -414,7 +413,7 @@ static status_t writeWinscopeMetadata(const Vector<int64_t>& timestamps,
  */
 static status_t runEncoder(const sp<MediaCodec>& encoder,
         AMediaMuxer *muxer, FILE* rawFp, const sp<IBinder>& display,
-        const sp<IBinder>& virtualDpy, uint8_t orientation) {
+        const sp<IBinder>& virtualDpy, ui::Rotation orientation) {
     static int kTimeout = 250000;   // be responsive on signal
     status_t err;
     ssize_t trackIdx = -1;
@@ -484,7 +483,7 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                     if (err != NO_ERROR) {
                         ALOGW("getDisplayInfo(main) failed: %d", err);
                     } else if (orientation != displayInfo.orientation) {
-                        ALOGD("orientation changed, now %d", displayInfo.orientation);
+                        ALOGD("orientation changed, now %s", toCString(displayInfo.orientation));
                         SurfaceComposerClient::Transaction t;
                         setDisplayProjection(t, virtualDpy, displayInfo);
                         t.apply();
@@ -691,9 +690,9 @@ static status_t recordScreen(const char* fileName) {
     }
 
     if (gVerbose) {
-        printf("Display is %dx%d @%.2ffps (orientation=%u), layerStack=%u\n",
+        printf("Display is %dx%d @%.2ffps (orientation=%s), layerStack=%u\n",
                 displayInfo.viewportW, displayInfo.viewportH, displayInfo.fps,
-                displayInfo.orientation, displayInfo.layerStack);
+                toCString(displayInfo.orientation), displayInfo.layerStack);
         fflush(stdout);
     }
 
