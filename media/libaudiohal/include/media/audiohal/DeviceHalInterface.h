@@ -17,6 +17,7 @@
 #ifndef ANDROID_HARDWARE_DEVICE_HAL_INTERFACE_H
 #define ANDROID_HARDWARE_DEVICE_HAL_INTERFACE_H
 
+#include <media/audiohal/EffectHalInterface.h>
 #include <media/MicrophoneInfo.h>
 #include <system/audio.h>
 #include <utils/Errors.h>
@@ -110,6 +111,11 @@ class DeviceHalInterface : public RefBase
 
     // List microphones
     virtual status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones) = 0;
+
+    virtual status_t addDeviceEffect(
+            audio_port_handle_t device, sp<EffectHalInterface> effect) = 0;
+    virtual status_t removeDeviceEffect(
+            audio_port_handle_t device, sp<EffectHalInterface> effect) = 0;
 
     virtual status_t dump(int fd) = 0;
 
