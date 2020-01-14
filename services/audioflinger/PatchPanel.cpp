@@ -169,8 +169,7 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                     hwDevice->releaseAudioPatch(removedPatch.mHalHandle);
                 }
             }
-            mPatches.erase(iter);
-            removeSoftwarePatchFromInsertedModules(*handle);
+            erasePatch(*handle);
         }
     }
 
@@ -325,10 +324,14 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                         }
                     }
                     status = thread->sendCreateAudioPatchConfigEvent(patch, &halHandle);
+                    if (status == NO_ERROR) {
+                        newPatch.setThread(thread);
+                    }
+
                     // remove stale audio patch with same input as sink if any
                     for (auto& iter : mPatches) {
                         if (iter.second.mAudioPatch.sinks[0].ext.mix.handle == thread->id()) {
-                            mPatches.erase(iter.first);
+                            erasePatch(iter.first);
                             break;
                         }
                     }
@@ -387,11 +390,14 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
             }
 
             status = thread->sendCreateAudioPatchConfigEvent(patch, &halHandle);
+            if (status == NO_ERROR) {
+                newPatch.setThread(thread);
+            }
 
             // remove stale audio patch with same output as source if any
             for (auto& iter : mPatches) {
                 if (iter.second.mAudioPatch.sources[0].ext.mix.handle == thread->id()) {
-                    mPatches.erase(iter.first);
+                    erasePatch(iter.first);
                     break;
                 }
             }
@@ -405,11 +411,11 @@ exit:
     if (status == NO_ERROR) {
         *handle = (audio_patch_handle_t) mAudioFlinger.nextUniqueId(AUDIO_UNIQUE_ID_USE_PATCH);
         newPatch.mHalHandle = halHandle;
+        mAudioFlinger.mDeviceEffectManager.createAudioPatch(*handle, newPatch);
         mPatches.insert(std::make_pair(*handle, std::move(newPatch)));
         if (insertedModule != AUDIO_MODULE_HANDLE_NONE) {
             addSoftwarePatchToInsertedModules(insertedModule, *handle);
         }
-        ALOGV("%s() added new patch handle %d halHandle %d", __func__, *handle, halHandle);
     } else {
         newPatch.clearConnections(this);
     }
@@ -633,8 +639,21 @@ status_t AudioFlinger::PatchPanel::Patch::getLatencyMs(double *latencyMs) const
 String8 AudioFlinger::PatchPanel::Patch::dump(audio_patch_handle_t myHandle) const
 {
     // TODO: Consider table dump form for patches, just like tracks.
-    String8 result = String8::format("Patch %d: thread %p => thread %p",
-            myHandle, mRecord.const_thread().get(), mPlayback.const_thread().get());
+    String8 result = String8::format("Patch %d: %s (thread %p => thread %p)",
+            myHandle, isSoftware() ? "Software bridge between" : "No software bridge",
+            mRecord.const_thread().get(), mPlayback.const_thread().get());
+
+    bool hasSinkDevice =
+            mAudioPatch.num_sinks > 0 && mAudioPatch.sinks[0].type == AUDIO_PORT_TYPE_DEVICE;
+    bool hasSourceDevice =
+            mAudioPatch.num_sources > 0 && mAudioPatch.sources[0].type == AUDIO_PORT_TYPE_DEVICE;
+    result.appendFormat(" thread %p %s (%d) first device type %08x", mThread.unsafe_get(),
+            hasSinkDevice ? "num sinks" :
+                (hasSourceDevice ? "num sources" : "no devices"),
+            hasSinkDevice ? mAudioPatch.num_sinks :
+                (hasSourceDevice ? mAudioPatch.num_sources : 0),
+            hasSinkDevice ? mAudioPatch.sinks[0].ext.device.type :
+                (hasSourceDevice ? mAudioPatch.sources[0].ext.device.type : 0));
 
     // add latency if it exists
     double latencyMs;
@@ -710,9 +729,14 @@ status_t AudioFlinger::PatchPanel::releaseAudioPatch(audio_patch_handle_t handle
             status = BAD_VALUE;
     }
 
-    mPatches.erase(iter);
-    removeSoftwarePatchFromInsertedModules(handle);
+    erasePatch(handle);
     return status;
+}
+
+void AudioFlinger::PatchPanel::erasePatch(audio_patch_handle_t handle) {
+    mPatches.erase(handle);
+    removeSoftwarePatchFromInsertedModules(handle);
+    mAudioFlinger.mDeviceEffectManager.releaseAudioPatch(handle);
 }
 
 /* List connected audio ports and they attributes */
@@ -798,16 +822,13 @@ void AudioFlinger::PatchPanel::dump(int fd) const
     String8 patchPanelDump;
     const char *indent = "  ";
 
-    // Only dump software patches.
     bool headerPrinted = false;
     for (const auto& iter : mPatches) {
-        if (iter.second.isSoftware()) {
-            if (!headerPrinted) {
-                patchPanelDump += "\nSoftware patches:\n";
-                headerPrinted = true;
-            }
-            patchPanelDump.appendFormat("%s%s\n", indent, iter.second.dump(iter.first).string());
+        if (!headerPrinted) {
+            patchPanelDump += "\nPatches:\n";
+            headerPrinted = true;
         }
+        patchPanelDump.appendFormat("%s%s\n", indent, iter.second.dump(iter.first).string());
     }
 
     headerPrinted = false;

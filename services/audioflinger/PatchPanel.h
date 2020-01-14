@@ -76,13 +76,18 @@ public:
 
     void dump(int fd) const;
 
-private:
     template<typename ThreadType, typename TrackType>
-    class Endpoint {
+    class Endpoint final {
     public:
         Endpoint() = default;
         Endpoint(const Endpoint&) = delete;
-        Endpoint& operator=(const Endpoint&) = delete;
+        Endpoint& operator=(const Endpoint& other) noexcept {
+            mThread = other.mThread;
+            mCloseThread = other.mCloseThread;
+            mHandle = other.mHandle;
+            mTrack = other.mTrack;
+            return *this;
+        }
         Endpoint(Endpoint&& other) noexcept { swap(other); }
         Endpoint& operator=(Endpoint&& other) noexcept {
             swap(other);
@@ -98,8 +103,8 @@ private:
             return trackOrNull->initCheck();
         }
         audio_patch_handle_t handle() const { return mHandle; }
-        sp<ThreadType> thread() { return mThread; }
-        sp<TrackType> track() { return mTrack; }
+        sp<ThreadType> thread() const { return mThread; }
+        sp<TrackType> track() const { return mTrack; }
         sp<const ThreadType> const_thread() const { return mThread; }
         sp<const TrackType> const_track() const { return mTrack; }
 
@@ -150,20 +155,45 @@ private:
         sp<TrackType> mTrack;
     };
 
-    class Patch {
+    class Patch final {
     public:
         explicit Patch(const struct audio_patch &patch) : mAudioPatch(patch) {}
+        Patch() = default;
         ~Patch();
-        Patch(const Patch&) = delete;
-        Patch(Patch&&) = default;
-        Patch& operator=(const Patch&) = delete;
-        Patch& operator=(Patch&&) = default;
+        Patch(const Patch& other) noexcept {
+            mAudioPatch = other.mAudioPatch;
+            mHalHandle = other.mHalHandle;
+            mPlayback = other.mPlayback;
+            mRecord = other.mRecord;
+            mThread = other.mThread;
+        }
+        Patch(Patch&& other) noexcept { swap(other); }
+        Patch& operator=(Patch&& other) noexcept {
+            swap(other);
+            return *this;
+        }
+
+        void swap(Patch &other) noexcept {
+            using std::swap;
+            swap(mAudioPatch, other.mAudioPatch);
+            swap(mHalHandle, other.mHalHandle);
+            swap(mPlayback, other.mPlayback);
+            swap(mRecord, other.mRecord);
+            swap(mThread, other.mThread);
+        }
+
+        friend void swap(Patch &a, Patch &b) noexcept {
+            a.swap(b);
+        }
 
         status_t createConnections(PatchPanel *panel);
         void clearConnections(PatchPanel *panel);
         bool isSoftware() const {
             return mRecord.handle() != AUDIO_PATCH_HANDLE_NONE ||
                     mPlayback.handle() != AUDIO_PATCH_HANDLE_NONE; }
+
+        void setThread(sp<ThreadBase> thread) { mThread = thread; }
+        wp<ThreadBase> thread() const { return mThread; }
 
         // returns the latency of the patch (from record to playback).
         status_t getLatencyMs(double *latencyMs) const;
@@ -182,13 +212,20 @@ private:
         Endpoint<PlaybackThread, PlaybackThread::PatchTrack> mPlayback;
         // connects source device to record thread input
         Endpoint<RecordThread, RecordThread::PatchRecord> mRecord;
+
+        wp<ThreadBase> mThread;
     };
 
+    // Call with AudioFlinger mLock held
+    std::map<audio_patch_handle_t, Patch>& patches_l() { return mPatches; }
+
+private:
     AudioHwDevice* findAudioHwDeviceByModule(audio_module_handle_t module);
     sp<DeviceHalInterface> findHwDeviceByModule(audio_module_handle_t module);
     void addSoftwarePatchToInsertedModules(
             audio_module_handle_t module, audio_patch_handle_t handle);
     void removeSoftwarePatchFromInsertedModules(audio_patch_handle_t handle);
+    void erasePatch(audio_patch_handle_t handle);
 
     AudioFlinger &mAudioFlinger;
     std::map<audio_patch_handle_t, Patch> mPatches;
