@@ -159,6 +159,7 @@ void Encoder::deInitCodec() {
         AMediaFormat_delete(mFormat);
         mFormat = nullptr;
     }
+    if (!mCodec) return;
     AMediaCodec_stop(mCodec);
     AMediaCodec_delete(mCodec);
     int64_t eTime = mStats->getCurTime();
