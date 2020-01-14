@@ -31,8 +31,9 @@
 #include "MPEG4Extractor.h"
 #include "SampleTable.h"
 #include "ItemTable.h"
-#include "include/ESDS.h"
 
+#include <ESDS.h>
+#include <ID3.h>
 #include <media/stagefright/DataSourceBase.h>
 #include <media/ExtractorUtils.h>
 #include <media/stagefright/foundation/ABitReader.h>
@@ -52,7 +53,6 @@
 #include <utils/String8.h>
 
 #include <byteswap.h>
-#include "include/ID3.h"
 
 #ifndef UINT32_MAX
 #define UINT32_MAX       (4294967295U)
