@@ -23,6 +23,7 @@ LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
 
 LOCAL_MODULE_TAGS := optional
 
+LOCAL_SYSTEM_EXT_MODULE:= true
 LOCAL_MODULE:= stagefright
 
 include $(BUILD_EXECUTABLE)
