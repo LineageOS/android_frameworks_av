@@ -28,6 +28,7 @@
 #include <common/all-versions/VersionUtils.h>
 
 #include "DeviceHalHidl.h"
+#include "EffectHalHidl.h"
 #include "HidlUtils.h"
 #include "StreamHalHidl.h"
 #include "VersionUtils.h"
@@ -42,6 +43,8 @@ namespace CPP_VERSION {
 
 using namespace ::android::hardware::audio::common::CPP_VERSION;
 using namespace ::android::hardware::audio::CPP_VERSION;
+
+using EffectHalHidl = ::android::effect::CPP_VERSION::EffectHalHidl;
 
 namespace {
 
@@ -382,6 +385,36 @@ status_t DeviceHalHidl::getMicrophones(std::vector<media::MicrophoneInfo> *micro
         }
     });
     return processReturn("getMicrophones", ret, retval);
+}
+#endif
+
+#if MAJOR_VERSION >= 6
+status_t DeviceHalHidl::addDeviceEffect(
+        audio_port_handle_t device, sp<EffectHalInterface> effect) {
+    if (mDevice == 0) return NO_INIT;
+    return processReturn("addDeviceEffect", mDevice->addDeviceEffect(
+            static_cast<AudioPortHandle>(device),
+            static_cast<EffectHalHidl*>(effect.get())->effectId()));
+}
+#else
+status_t DeviceHalHidl::addDeviceEffect(
+        audio_port_handle_t device __unused, sp<EffectHalInterface> effect __unused) {
+    return INVALID_OPERATION;
+}
+#endif
+
+#if MAJOR_VERSION >= 6
+status_t DeviceHalHidl::removeDeviceEffect(
+        audio_port_handle_t device, sp<EffectHalInterface> effect) {
+    if (mDevice == 0) return NO_INIT;
+    return processReturn("removeDeviceEffect", mDevice->removeDeviceEffect(
+            static_cast<AudioPortHandle>(device),
+            static_cast<EffectHalHidl*>(effect.get())->effectId()));
+}
+#else
+status_t DeviceHalHidl::removeDeviceEffect(
+        audio_port_handle_t device __unused, sp<EffectHalInterface> effect __unused) {
+    return INVALID_OPERATION;
 }
 #endif
 
