@@ -154,12 +154,12 @@ void Encoder::setupEncoder() {
 }
 
 void Encoder::deInitCodec() {
-    int64_t sTime = mStats->getCurTime();
     if (mFormat) {
         AMediaFormat_delete(mFormat);
         mFormat = nullptr;
     }
     if (!mCodec) return;
+    int64_t sTime = mStats->getCurTime();
     AMediaCodec_stop(mCodec);
     AMediaCodec_delete(mCodec);
     int64_t eTime = mStats->getCurTime();
