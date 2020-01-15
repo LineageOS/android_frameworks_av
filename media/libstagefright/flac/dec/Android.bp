@@ -1,4 +1,4 @@
-cc_library_shared {
+cc_library {
     name: "libstagefright_flacdec",
     vendor_available: true,
 
