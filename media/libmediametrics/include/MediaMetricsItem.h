@@ -35,6 +35,49 @@
 
 namespace android {
 
+/*
+ * MediaMetrics Keys and Properties for Audio.
+ *
+ * C/C++ friendly constants that ensure
+ * 1) Compilation error on misspelling
+ * 2) Consistent behavior and documentation.
+ *
+ * TODO: Move to separate header file.
+ */
+
+// Taxonomy of audio keys
+
+// Key Prefixes are used for MediaMetrics Item Keys and ends with a ".".
+// They must be appended with another value to make a key.
+#define AMEDIAMETRICS_KEY_PREFIX_AUDIO "audio."
+
+// The AudioRecord key appends the "trackId" to the prefix.
+#define AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD AMEDIAMETRICS_KEY_PREFIX_AUDIO "record."
+
+// The AudioThread key appends the "threadId" to the prefix.
+#define AMEDIAMETRICS_KEY_PREFIX_AUDIO_THREAD AMEDIAMETRICS_KEY_PREFIX_AUDIO "thread."
+
+// The AudioTrack key appends the "trackId" to the prefix.
+#define AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK  AMEDIAMETRICS_KEY_PREFIX_AUDIO "track."
+
+// Keys are strings used for MediaMetrics Item Keys
+#define AMEDIAMETRICS_KEY_AUDIO_FLINGER       AMEDIAMETRICS_KEY_PREFIX_AUDIO "flinger"
+#define AMEDIAMETRICS_KEY_AUDIO_POLICY        AMEDIAMETRICS_KEY_PREFIX_AUDIO "policy"
+
+// Props are properties allowed for Mediametrics Items.
+#define AMEDIAMETRICS_PROP_EVENT          "event"          // string value (often func name)
+#define AMEDIAMETRICS_PROP_LATENCYMS      "latencyMs"      // double value
+#define AMEDIAMETRICS_PROP_OUTPUTDEVICES  "outputDevices"  // string value
+#define AMEDIAMETRICS_PROP_STARTUPMS      "startupMs"      // double value
+#define AMEDIAMETRICS_PROP_THREADID       "threadId"       // int32 value io handle
+
+// Values are strings accepted for a given property.
+
+// An event is a general description, which often is a function name.
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR       "ctor"
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_DTOR       "dtor"
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_UNDERRUN   "underrun" // from Thread
+
 class IMediaMetricsService;
 class Parcel;
 

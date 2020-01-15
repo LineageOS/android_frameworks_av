@@ -56,6 +56,24 @@ public:
     }
 
     /**
+     * Returns the TimeMachine.
+     *
+     * The TimeMachine object is internally locked, so access is safe and defined,
+     * but multiple threaded access may change results after calling.
+     */
+    TimeMachine& timeMachine() { return mTimeMachine; }
+    const TimeMachine& timeMachine() const { return mTimeMachine; }
+
+    /**
+     * Returns the TransactionLog.
+     *
+     * The TransactionLog object is internally locked, so access is safe and defined,
+     * but multiple threaded access may change results after calling.
+     */
+    TransactionLog& transactionLog() { return mTransactionLog; }
+    const TransactionLog& transactionLog() const { return mTransactionLog; }
+
+    /**
      * Returns a pair consisting of the dump string, and the number of lines in the string.
      *
      * The number of lines in the returned pair is used as an optimization
