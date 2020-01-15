@@ -496,10 +496,12 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
     }
 
     sp<RecordThread::PatchRecord> tempRecordTrack;
+    const bool usePassthruPatchRecord =
+            (inputFlags & AUDIO_INPUT_FLAG_DIRECT) && (outputFlags & AUDIO_OUTPUT_FLAG_DIRECT);
     const size_t playbackFrameCount = mPlayback.thread()->frameCount();
     const size_t recordFrameCount = mRecord.thread()->frameCount();
     size_t frameCount = 0;
-    if ((inputFlags & AUDIO_INPUT_FLAG_DIRECT) && (outputFlags & AUDIO_OUTPUT_FLAG_DIRECT)) {
+    if (usePassthruPatchRecord) {
         // PassthruPatchRecord producesBufferOnDemand, so use
         // maximum of playback and record thread framecounts
         frameCount = std::max(playbackFrameCount, recordFrameCount);
@@ -556,8 +558,14 @@ status_t AudioFlinger::PatchPanel::Patch::createConnections(PatchPanel *panel)
     }
 
     // tie playback and record tracks together
-    mRecord.setTrackAndPeer(tempRecordTrack, tempPatchTrack);
-    mPlayback.setTrackAndPeer(tempPatchTrack, tempRecordTrack);
+    // In the case of PassthruPatchRecord no I/O activity happens on RecordThread,
+    // everything is driven from PlaybackThread. Thus AudioBufferProvider methods
+    // of PassthruPatchRecord can only be called if the corresponding PatchTrack
+    // is alive. There is no need to hold a reference, and there is no need
+    // to clear it. In fact, since playback stopping is asynchronous, there is
+    // no proper time when clearing could be done.
+    mRecord.setTrackAndPeer(tempRecordTrack, tempPatchTrack, !usePassthruPatchRecord);
+    mPlayback.setTrackAndPeer(tempPatchTrack, tempRecordTrack, true /*holdReference*/);
 
     // start capture and playback
     mRecord.track()->start(AudioSystem::SYNC_EVENT_NONE, AUDIO_SESSION_NONE);
