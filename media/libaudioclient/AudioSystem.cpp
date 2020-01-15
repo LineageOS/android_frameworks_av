@@ -433,11 +433,11 @@ audio_unique_id_t AudioSystem::newAudioUniqueId(audio_unique_id_use_t use)
     return af->newAudioUniqueId(use);
 }
 
-void AudioSystem::acquireAudioSessionId(audio_session_t audioSession, pid_t pid)
+void AudioSystem::acquireAudioSessionId(audio_session_t audioSession, pid_t pid, uid_t uid)
 {
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af != 0) {
-        af->acquireAudioSessionId(audioSession, pid);
+        af->acquireAudioSessionId(audioSession, pid, uid);
     }
 }
 

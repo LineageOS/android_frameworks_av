@@ -60,7 +60,7 @@ MediaPlayer::MediaPlayer()
     mVideoWidth = mVideoHeight = 0;
     mLockThreadId = 0;
     mAudioSessionId = (audio_session_t) AudioSystem::newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
-    AudioSystem::acquireAudioSessionId(mAudioSessionId, -1);
+    AudioSystem::acquireAudioSessionId(mAudioSessionId, (pid_t)-1, (uid_t)-1); // always in client.
     mSendLevel = 0;
     mRetransmitEndpointValid = false;
 }
@@ -72,7 +72,7 @@ MediaPlayer::~MediaPlayer()
         delete mAudioAttributesParcel;
         mAudioAttributesParcel = NULL;
     }
-    AudioSystem::releaseAudioSessionId(mAudioSessionId, -1);
+    AudioSystem::releaseAudioSessionId(mAudioSessionId, (pid_t)-1);
     disconnect();
     IPCThreadState::self()->flushCommands();
 }
@@ -709,8 +709,8 @@ status_t MediaPlayer::setAudioSessionId(audio_session_t sessionId)
         return BAD_VALUE;
     }
     if (sessionId != mAudioSessionId) {
-        AudioSystem::acquireAudioSessionId(sessionId, -1);
-        AudioSystem::releaseAudioSessionId(mAudioSessionId, -1);
+        AudioSystem::acquireAudioSessionId(sessionId, (pid_t)-1, (uid_t)-1);
+        AudioSystem::releaseAudioSessionId(mAudioSessionId, (pid_t)-1);
         mAudioSessionId = sessionId;
     }
     return NO_ERROR;

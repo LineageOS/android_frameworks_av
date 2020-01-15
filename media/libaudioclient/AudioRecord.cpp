@@ -186,7 +186,7 @@ AudioRecord::~AudioRecord()
         IPCThreadState::self()->flushCommands();
         ALOGV("%s(%d): releasing session id %d",
                 __func__, mPortId, mSessionId);
-        AudioSystem::releaseAudioSessionId(mSessionId, -1 /*pid*/);
+        AudioSystem::releaseAudioSessionId(mSessionId, mClientPid);
     }
 }
 
@@ -361,7 +361,7 @@ status_t AudioRecord::set(
     mMarkerReached = false;
     mNewPosition = 0;
     mUpdatePeriod = 0;
-    AudioSystem::acquireAudioSessionId(mSessionId, -1);
+    AudioSystem::acquireAudioSessionId(mSessionId, mClientPid, mClientUid);
     mSequence = 1;
     mObservedSequence = mSequence;
     mInOverrun = false;
