@@ -655,6 +655,7 @@ void SampleTable::buildSampleEntriesTable() {
     }
 
     mSampleTimeEntries = new (std::nothrow) SampleTimeEntry[mNumSampleSizes];
+    memset(mSampleTimeEntries, 0, sizeof(SampleTimeEntry) * mNumSampleSizes);
     if (!mSampleTimeEntries) {
         ALOGE("Cannot allocate sample entry table with %llu entries.",
                 (unsigned long long)mNumSampleSizes);

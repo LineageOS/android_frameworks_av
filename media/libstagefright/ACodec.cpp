@@ -6902,7 +6902,7 @@ status_t ACodec::LoadedState::setupInputSurface() {
         }
     }
 
-    if (mCodec->mMaxPtsGapUs != 0LL) {
+    if (mCodec->mIsVideo && mCodec->mMaxPtsGapUs != 0LL) {
         OMX_PARAM_U32TYPE maxPtsGapParams;
         InitOMXParams(&maxPtsGapParams);
         maxPtsGapParams.nPortIndex = kPortIndexInput;
