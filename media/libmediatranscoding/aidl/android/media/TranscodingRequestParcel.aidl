@@ -16,6 +16,7 @@
 
 package android.media;
 
+import android.media.TranscodingJobPriority;
 import android.media.TranscodingType;
 
 /**
@@ -24,7 +25,7 @@ import android.media.TranscodingType;
  * {@hide}
  */
 //TODO(hkuang): Implement the parcelable.
-parcelable TranscodingRequest {
+parcelable TranscodingRequestParcel {
     /**
      * Name of file to be transcoded.
      */
@@ -48,8 +49,7 @@ parcelable TranscodingRequest {
     /**
      * Priority of this transcoding. Service will schedule the transcoding based on the priority.
      */
-    // TODO(hkuang): Define the priority level.
-    int priority;
+    TranscodingJobPriority priority;
 
     /**
      * Whether to receive update on progress and change of awaitNumJobs.
