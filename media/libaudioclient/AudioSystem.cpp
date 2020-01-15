@@ -36,10 +36,11 @@ namespace android {
 
 // client singleton for AudioFlinger binder interface
 Mutex AudioSystem::gLock;
+Mutex AudioSystem::gLockErrorCallbacks;
 Mutex AudioSystem::gLockAPS;
 sp<IAudioFlinger> AudioSystem::gAudioFlinger;
 sp<AudioSystem::AudioFlingerClient> AudioSystem::gAudioFlingerClient;
-audio_error_callback AudioSystem::gAudioErrorCallback = NULL;
+std::set<audio_error_callback> AudioSystem::gAudioErrorCallbacks;
 dynamic_policy_callback AudioSystem::gDynPolicyCallback = NULL;
 record_config_callback AudioSystem::gRecordConfigCallback = NULL;
 
@@ -63,9 +64,7 @@ const sp<IAudioFlinger> AudioSystem::get_audio_flinger()
             if (gAudioFlingerClient == NULL) {
                 gAudioFlingerClient = new AudioFlingerClient();
             } else {
-                if (gAudioErrorCallback) {
-                    gAudioErrorCallback(NO_ERROR);
-                }
+                reportError(NO_ERROR);
             }
             binder->linkToDeath(gAudioFlingerClient);
             gAudioFlinger = interface_cast<IAudioFlinger>(binder);
@@ -500,19 +499,16 @@ void AudioSystem::AudioFlingerClient::clearIoCache()
 
 void AudioSystem::AudioFlingerClient::binderDied(const wp<IBinder>& who __unused)
 {
-    audio_error_callback cb = NULL;
     {
         Mutex::Autolock _l(AudioSystem::gLock);
         AudioSystem::gAudioFlinger.clear();
-        cb = gAudioErrorCallback;
     }
 
     // clear output handles and stream to output map caches
     clearIoCache();
 
-    if (cb) {
-        cb(DEAD_OBJECT);
-    }
+    reportError(DEAD_OBJECT);
+
     ALOGW("AudioFlinger server died!");
 }
 
@@ -717,10 +713,23 @@ status_t AudioSystem::AudioFlingerClient::removeAudioDeviceCallback(
     return NO_ERROR;
 }
 
-/* static */ void AudioSystem::setErrorCallback(audio_error_callback cb)
+/* static */ uintptr_t AudioSystem::addErrorCallback(audio_error_callback cb)
 {
-    Mutex::Autolock _l(gLock);
-    gAudioErrorCallback = cb;
+    Mutex::Autolock _l(gLockErrorCallbacks);
+    gAudioErrorCallbacks.insert(cb);
+    return reinterpret_cast<uintptr_t>(cb);
+}
+
+/* static */ void AudioSystem::removeErrorCallback(uintptr_t cb) {
+    Mutex::Autolock _l(gLockErrorCallbacks);
+    gAudioErrorCallbacks.erase(reinterpret_cast<audio_error_callback>(cb));
+}
+
+/* static */ void AudioSystem::reportError(status_t err) {
+    Mutex::Autolock _l(gLockErrorCallbacks);
+    for (auto callback : gAudioErrorCallbacks) {
+      callback(err);
+    }
 }
 
 /*static*/ void AudioSystem::setDynPolicyCallback(dynamic_policy_callback cb)
