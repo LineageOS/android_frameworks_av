@@ -145,7 +145,7 @@
       <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/speaker"/>
       <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/hdmi"/>
       <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/dgtl_dock_headset"/>
-      <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/angl_dock_headset"/>
+      <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/anlg_dock_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/usb_device"/>
       <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/usb_accessory"/>
       <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/wired_headset"/>
@@ -167,8 +167,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/usb_device">
           <BitParameter Name="usb_device">0</BitParameter>
@@ -208,8 +208,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/usb_device">
           <BitParameter Name="usb_device">0</BitParameter>
@@ -249,8 +249,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/usb_device">
           <BitParameter Name="usb_device">0</BitParameter>
@@ -290,8 +290,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/usb_device">
           <BitParameter Name="usb_device">0</BitParameter>
@@ -331,8 +331,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/usb_device">
           <BitParameter Name="usb_device">0</BitParameter>
@@ -372,8 +372,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/usb_device">
           <BitParameter Name="usb_device">0</BitParameter>
@@ -413,8 +413,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/usb_device">
           <BitParameter Name="usb_device">0</BitParameter>
@@ -454,8 +454,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/usb_device">
           <BitParameter Name="usb_device">0</BitParameter>
@@ -495,8 +495,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/usb_device">
           <BitParameter Name="usb_device">0</BitParameter>
@@ -536,8 +536,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/usb_device">
           <BitParameter Name="usb_device">1</BitParameter>
@@ -577,8 +577,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">1</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/usb_device">
           <BitParameter Name="usb_device">0</BitParameter>
@@ -618,8 +618,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/usb_device">
           <BitParameter Name="usb_device">0</BitParameter>
@@ -659,8 +659,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">1</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">1</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/usb_device">
           <BitParameter Name="usb_device">0</BitParameter>
@@ -700,8 +700,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/usb_device">
           <BitParameter Name="usb_device">0</BitParameter>
@@ -741,8 +741,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/media/selected_output_devices/mask/usb_device">
           <BitParameter Name="usb_device">0</BitParameter>
@@ -1039,7 +1039,7 @@
       <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/bluetooth_a2dp_headphones"/>
       <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/bluetooth_a2dp_speaker"/>
       <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi"/>
-      <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset"/>
+      <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/usb_accessory"/>
       <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/usb_device"/>
@@ -1079,8 +1079,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -1132,8 +1132,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -1185,8 +1185,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -1238,8 +1238,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -1291,8 +1291,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -1344,8 +1344,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -1397,8 +1397,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -1450,8 +1450,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -1503,8 +1503,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -1556,8 +1556,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -1609,8 +1609,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -1662,8 +1662,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">1</BitParameter>
@@ -1715,8 +1715,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">1</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -1768,8 +1768,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">1</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">1</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -1821,8 +1821,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -1874,8 +1874,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -1927,8 +1927,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/phone/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -2228,7 +2228,7 @@
       <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp"/>
       <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp_headphones"/>
       <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp_speaker"/>
-      <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/angl_dock_headset"/>
+      <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/anlg_dock_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/dgtl_dock_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/usb_accessory"/>
       <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/usb_device"/>
@@ -2264,8 +2264,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp_speaker">
           <BitParameter Name="bluetooth_a2dp_speaker">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -2311,8 +2311,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp_speaker">
           <BitParameter Name="bluetooth_a2dp_speaker">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -2358,8 +2358,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp_speaker">
           <BitParameter Name="bluetooth_a2dp_speaker">1</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -2405,8 +2405,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp_speaker">
           <BitParameter Name="bluetooth_a2dp_speaker">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -2452,8 +2452,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp_speaker">
           <BitParameter Name="bluetooth_a2dp_speaker">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -2499,8 +2499,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp_speaker">
           <BitParameter Name="bluetooth_a2dp_speaker">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -2546,8 +2546,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp_speaker">
           <BitParameter Name="bluetooth_a2dp_speaker">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -2593,8 +2593,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp_speaker">
           <BitParameter Name="bluetooth_a2dp_speaker">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -2640,8 +2640,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp_speaker">
           <BitParameter Name="bluetooth_a2dp_speaker">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -2687,8 +2687,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp_speaker">
           <BitParameter Name="bluetooth_a2dp_speaker">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -2734,8 +2734,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp_speaker">
           <BitParameter Name="bluetooth_a2dp_speaker">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -2781,8 +2781,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp_speaker">
           <BitParameter Name="bluetooth_a2dp_speaker">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">1</BitParameter>
@@ -2828,8 +2828,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp_speaker">
           <BitParameter Name="bluetooth_a2dp_speaker">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">1</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">1</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -2875,8 +2875,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp_speaker">
           <BitParameter Name="bluetooth_a2dp_speaker">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -2922,8 +2922,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/bluetooth_a2dp_speaker">
           <BitParameter Name="bluetooth_a2dp_speaker">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -3246,7 +3246,7 @@
       <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/wired_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/wired_headphone"/>
       <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/line"/>
-      <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/angl_dock_headset"/>
+      <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/anlg_dock_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/dgtl_dock_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/usb_accessory"/>
       <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/usb_device"/>
@@ -3284,8 +3284,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -3331,8 +3331,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -3378,8 +3378,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -3425,8 +3425,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -3472,8 +3472,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -3519,8 +3519,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -3566,8 +3566,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -3613,8 +3613,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/line">
           <BitParameter Name="line">1</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -3660,8 +3660,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -3707,8 +3707,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -3754,8 +3754,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -3801,8 +3801,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">1</BitParameter>
@@ -3848,8 +3848,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -3895,8 +3895,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">1</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">1</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -3942,8 +3942,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/sonification_respectful/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -4207,7 +4207,7 @@
       <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/bluetooth_a2dp_headphones"/>
       <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/bluetooth_a2dp_speaker"/>
       <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi"/>
-      <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset"/>
+      <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/usb_accessory"/>
       <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/usb_device"/>
@@ -4247,8 +4247,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -4300,8 +4300,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -4353,8 +4353,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -4406,8 +4406,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -4459,8 +4459,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -4512,8 +4512,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -4565,8 +4565,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -4618,8 +4618,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -4671,8 +4671,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -4724,8 +4724,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -4777,8 +4777,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -4830,8 +4830,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -4883,8 +4883,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">1</BitParameter>
@@ -4936,8 +4936,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">1</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -4989,8 +4989,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">1</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">1</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -5042,8 +5042,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -5095,8 +5095,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -5148,8 +5148,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/dtmf/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -5448,7 +5448,7 @@
       <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/bluetooth_a2dp_headphones"/>
       <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/bluetooth_a2dp_speaker"/>
       <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/hdmi"/>
-      <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/angl_dock_headset"/>
+      <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/anlg_dock_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/dgtl_dock_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/usb_accessory"/>
       <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/usb_device"/>
@@ -5490,8 +5490,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -5543,8 +5543,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -5596,8 +5596,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -5649,8 +5649,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -5702,8 +5702,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -5755,8 +5755,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -5808,8 +5808,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -5861,8 +5861,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -5914,8 +5914,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -5967,8 +5967,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">1</BitParameter>
@@ -6020,8 +6020,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">1</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -6073,8 +6073,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">1</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">1</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -6126,8 +6126,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/enforced_audible/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -6170,7 +6170,7 @@
       <ConfigurableElement Path="/Policy/policy/strategies/transmitted_through_speaker/selected_output_devices/mask/bluetooth_a2dp_headphones"/>
       <ConfigurableElement Path="/Policy/policy/strategies/transmitted_through_speaker/selected_output_devices/mask/bluetooth_a2dp_speaker"/>
       <ConfigurableElement Path="/Policy/policy/strategies/transmitted_through_speaker/selected_output_devices/mask/hdmi"/>
-      <ConfigurableElement Path="/Policy/policy/strategies/transmitted_through_speaker/selected_output_devices/mask/angl_dock_headset"/>
+      <ConfigurableElement Path="/Policy/policy/strategies/transmitted_through_speaker/selected_output_devices/mask/anlg_dock_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/transmitted_through_speaker/selected_output_devices/mask/dgtl_dock_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/transmitted_through_speaker/selected_output_devices/mask/usb_accessory"/>
       <ConfigurableElement Path="/Policy/policy/strategies/transmitted_through_speaker/selected_output_devices/mask/usb_device"/>
@@ -6230,8 +6230,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/transmitted_through_speaker/selected_output_devices/mask/hdmi">
           <BitParameter Name="hdmi">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/transmitted_through_speaker/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/transmitted_through_speaker/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/transmitted_through_speaker/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -6539,7 +6539,7 @@
       <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/wired_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/wired_headphone"/>
       <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line"/>
-      <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset"/>
+      <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/usb_accessory"/>
       <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/usb_device"/>
@@ -6583,8 +6583,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -6636,8 +6636,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -6689,8 +6689,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -6742,8 +6742,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -6795,8 +6795,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -6848,8 +6848,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -6901,8 +6901,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -6954,8 +6954,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -7007,8 +7007,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -7060,8 +7060,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">1</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -7113,8 +7113,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -7166,8 +7166,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -7219,8 +7219,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -7272,8 +7272,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">1</BitParameter>
@@ -7325,8 +7325,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -7378,8 +7378,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">1</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">1</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -7431,8 +7431,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -7484,8 +7484,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -7537,8 +7537,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/accessibility/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -7710,7 +7710,7 @@
       <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/wired_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/wired_headphone"/>
       <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/line"/>
-      <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/angl_dock_headset"/>
+      <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/anlg_dock_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/dgtl_dock_headset"/>
       <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/usb_accessory"/>
       <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/usb_device"/>
@@ -7742,8 +7742,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -7783,8 +7783,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -7824,8 +7824,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -7865,8 +7865,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -7906,8 +7906,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -7947,8 +7947,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -7988,8 +7988,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/line">
           <BitParameter Name="line">1</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -8029,8 +8029,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -8070,8 +8070,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -8111,8 +8111,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -8152,8 +8152,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">1</BitParameter>
@@ -8193,8 +8193,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -8234,8 +8234,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">1</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">1</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -8275,8 +8275,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>
@@ -8316,8 +8316,8 @@
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/line">
           <BitParameter Name="line">0</BitParameter>
         </ConfigurableElement>
-        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/angl_dock_headset">
-          <BitParameter Name="angl_dock_headset">0</BitParameter>
+        <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/anlg_dock_headset">
+          <BitParameter Name="anlg_dock_headset">0</BitParameter>
         </ConfigurableElement>
         <ConfigurableElement Path="/Policy/policy/strategies/rerouting/selected_output_devices/mask/dgtl_dock_headset">
           <BitParameter Name="dgtl_dock_headset">0</BitParameter>

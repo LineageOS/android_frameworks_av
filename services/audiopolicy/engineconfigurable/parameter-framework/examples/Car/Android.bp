@@ -85,7 +85,7 @@ filegroup {
     srcs: [
         ":PolicyClass",
         ":PolicySubsystem",
-        ":PolicySubsystem-CommonTypes",
+        ":buildcommontypesstructure_gen",
         ":buildstrategiesstructure_gen",
     ],
 }
