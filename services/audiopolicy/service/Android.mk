@@ -26,6 +26,7 @@ LOCAL_SHARED_LIBRARIES := \
     libaudioutils \
     libaudiofoundation \
     libhardware_legacy \
+    libaudiopolicy \
     libaudiopolicymanager \
     libmedia_helper \
     libmediametrics \
