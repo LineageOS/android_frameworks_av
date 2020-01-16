@@ -20,8 +20,8 @@
 
 #include "MPEG2PSExtractor.h"
 
-#include "mpeg2ts/AnotherPacketSource.h"
-#include "mpeg2ts/ESQueue.h"
+#include <AnotherPacketSource.h>
+#include <ESQueue.h>
 
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>

@@ -37,8 +37,7 @@
 #include <media/stagefright/Utils.h>
 #include <utils/String8.h>
 
-#include "mpeg2ts/AnotherPacketSource.h"
-#include "mpeg2ts/ATSParser.h"
+#include <AnotherPacketSource.h>
 
 #include <hidl/HybridInterface.h>
 #include <android/hardware/cas/1.0/ICas.h>

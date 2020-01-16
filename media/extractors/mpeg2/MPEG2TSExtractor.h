@@ -27,7 +27,7 @@
 #include <utils/KeyedVector.h>
 #include <utils/Vector.h>
 
-#include "mpeg2ts/ATSParser.h"
+#include <ATSParser.h>
 
 namespace android {
 

@@ -1,4 +1,7 @@
 cc_library {
+    name: "libmpeg2extractor",
+
+    defaults: ["extractor-defaults"],
 
     srcs: [
         "ExtractorBundle.cpp",
@@ -6,15 +9,8 @@ cc_library {
         "MPEG2TSExtractor.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright",
-        "frameworks/av/media/libstagefright/include",
-    ],
-
     shared_libs: [
         "libcgrouprc#29",
-        "liblog#10000",
-        "libmediandk#29",
         "libvndksupport#29",
     ],
 
@@ -45,27 +41,6 @@ cc_library {
         "libstagefright_mpeg2support",
         "libutils",
     ],
-
-    name: "libmpeg2extractor",
-    relative_install_path: "extractors",
-
-    compile_multilib: "first",
-
-    cflags: [
-        "-Werror",
-        "-Wall",
-        "-fvisibility=hidden",
-    ],
-    version_script: "exports.lds",
-
-    sanitize: {
-        // STOPSHIP: turn on cfi once b/139945549 is resolved.
-        cfi: false,
-        misc_undefined: [
-            "unsigned-integer-overflow",
-            "signed-integer-overflow",
-        ],
-    },
 
     apex_available: [
         "com.android.media",

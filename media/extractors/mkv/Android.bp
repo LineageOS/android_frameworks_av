@@ -1,4 +1,6 @@
 cc_library {
+    name: "libmkvextractor",
+    defaults: ["extractor-defaults"],
 
     srcs: ["MatroskaExtractor.cpp"],
 
@@ -6,12 +8,9 @@ cc_library {
         "external/flac/include",
         "external/libvpx/libwebm",
         "frameworks/av/media/libstagefright/flac/dec",
-        "frameworks/av/media/libstagefright/include",
     ],
 
     shared_libs: [
-        "liblog",
-        "libmediandk",
         "libstagefright_flacdec",
     ],
 
@@ -21,25 +20,5 @@ cc_library {
         "libwebm",
         "libutils",
     ],
-
-    name: "libmkvextractor",
-    relative_install_path: "extractors",
-
-    compile_multilib: "first",
-
-    cflags: [
-        "-Werror",
-        "-Wall",
-        "-fvisibility=hidden",
-    ],
-    version_script: "exports.lds",
-
-    sanitize: {
-        cfi: true,
-        misc_undefined: [
-            "unsigned-integer-overflow",
-            "signed-integer-overflow",
-        ],
-    },
 
 }

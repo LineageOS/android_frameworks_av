@@ -40,6 +40,8 @@ cc_library_static {
         "media_ndk_headers",
     ],
 
+    export_include_dirs: ["."],
+
     whole_static_libs: [
         "libstagefright_metadatautils",
     ],
