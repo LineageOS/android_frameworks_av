@@ -22,13 +22,11 @@
 
 namespace android {
 
-namespace media {
-
 using Status = ::ndk::ScopedAStatus;
 using ::aidl::android::media::BnMediaTranscodingService;
 using ::aidl::android::media::ITranscodingServiceClient;
-using ::aidl::android::media::TranscodingJob;
-using ::aidl::android::media::TranscodingRequest;
+using ::aidl::android::media::TranscodingJobParcel;
+using ::aidl::android::media::TranscodingRequestParcel;
 
 class MediaTranscodingService : public BnMediaTranscodingService {
 public:
@@ -40,23 +38,24 @@ public:
     static const char* getServiceName() { return "media.transcoding"; }
 
     Status registerClient(const std::shared_ptr<ITranscodingServiceClient>& in_client,
-                          int32_t* _aidl_return) override;
+                          const std::string& in_opPackageName, int32_t in_clientUid,
+                          int32_t in_clientPid, int32_t* _aidl_return) override;
 
     Status unregisterClient(int32_t clientId, bool* _aidl_return) override;
 
-    Status submitRequest(int32_t in_clientId, const TranscodingRequest& in_request,
-                         TranscodingJob* out_job, int32_t* _aidl_return) override;
+    Status submitRequest(int32_t in_clientId, const TranscodingRequestParcel& in_request,
+                         TranscodingJobParcel* out_job, int32_t* _aidl_return) override;
 
     Status cancelJob(int32_t in_clientId, int32_t in_jobId, bool* _aidl_return) override;
 
-    Status getJobWithId(int32_t in_jobId, TranscodingJob* out_job, bool* _aidl_return) override;
+    Status getJobWithId(int32_t in_jobId, TranscodingJobParcel* out_job,
+                        bool* _aidl_return) override;
 
     virtual inline binder_status_t dump(int /*fd*/, const char** /*args*/, uint32_t /*numArgs*/);
 
 private:
 };
 
-}  // namespace media
 }  // namespace android
 
 #endif  // ANDROID_MEDIA_TRANSCODING_SERVICE_H

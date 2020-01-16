@@ -25,10 +25,6 @@
 
 namespace android {
 
-namespace media {
-
-using android::media::MediaTranscodingService;
-
 MediaTranscodingService::MediaTranscodingService() {
     ALOGV("MediaTranscodingService is created");
 }
@@ -56,7 +52,8 @@ void MediaTranscodingService::instantiate() {
 
 Status MediaTranscodingService::registerClient(
         const std::shared_ptr<ITranscodingServiceClient>& /*in_client*/,
-        int32_t* /*_aidl_return*/) {
+        const std::string& /* in_opPackageName */, int32_t /* in_clientUid */,
+        int32_t /* in_clientPid */, int32_t* /*_aidl_return*/) {
     // TODO(hkuang): Add implementation.
     return Status::ok();
 }
@@ -67,8 +64,9 @@ Status MediaTranscodingService::unregisterClient(int32_t /*clientId*/, bool* /*_
 }
 
 Status MediaTranscodingService::submitRequest(int32_t /*clientId*/,
-                                              const TranscodingRequest& /*request*/,
-                                              TranscodingJob* /*job*/, int32_t* /*_aidl_return*/) {
+                                              const TranscodingRequestParcel& /*request*/,
+                                              TranscodingJobParcel* /*job*/,
+                                              int32_t* /*_aidl_return*/) {
     // TODO(hkuang): Add implementation.
     return Status::ok();
 }
@@ -79,11 +77,11 @@ Status MediaTranscodingService::cancelJob(int32_t /*in_clientId*/, int32_t /*in_
     return Status::ok();
 }
 
-Status MediaTranscodingService::getJobWithId(int32_t /*in_jobId*/, TranscodingJob* /*out_job*/,
+Status MediaTranscodingService::getJobWithId(int32_t /*in_jobId*/,
+                                             TranscodingJobParcel* /*out_job*/,
                                              bool* /*_aidl_return*/) {
     // TODO(hkuang): Add implementation.
     return Status::ok();
 }
 
-}  // namespace media
 }  // namespace android

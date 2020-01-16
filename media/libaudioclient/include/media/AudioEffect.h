@@ -639,7 +639,8 @@ private:
     sp<EffectClient>        mIEffectClient;     // IEffectClient implementation
     sp<IMemory>             mCblkMemory;        // shared memory for deferred parameter setting
     effect_param_cblk_t*    mCblk;              // control block for deferred parameter setting
-    pid_t                   mClientPid;
+    pid_t                   mClientPid = (pid_t)-1;
+    uid_t                   mClientUid = (uid_t)-1;
 };
 
 

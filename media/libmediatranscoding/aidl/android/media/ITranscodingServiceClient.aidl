@@ -17,8 +17,8 @@
 package android.media;
 
 import android.media.TranscodingErrorCode;
-import android.media.TranscodingJob;
-import android.media.TranscodingResult;
+import android.media.TranscodingJobParcel;
+import android.media.TranscodingResultParcel;
 
 /**
  * ITranscodingServiceClient interface for the MediaTranscodingervice to communicate with the
@@ -39,7 +39,7 @@ interface ITranscodingServiceClient {
     * @param jobId jobId assigned by the MediaTranscodingService upon receiving request.
     * @param result contains the transcoded file stats and other transcoding metrics if requested.
     */
-    oneway void onTranscodingFinished(in int jobId, in TranscodingResult result);
+    oneway void onTranscodingFinished(in int jobId, in TranscodingResultParcel result);
 
     /**
     * Called when the transcoding associated with the jobId failed.
@@ -60,7 +60,9 @@ interface ITranscodingServiceClient {
     * @param oldAwaitNumber previous number of jobs ahead of current job.
     * @param newAwaitNumber updated number of jobs ahead of current job.
     */
-    oneway void onAwaitNumberOfJobsChanged(in int jobId, in int oldAwaitNumber, in int newAwaitNumber);
+    oneway void onAwaitNumberOfJobsChanged(in int jobId,
+                                           in int oldAwaitNumber,
+                                           in int newAwaitNumber);
 
     /**
     * Called when there is an update on the progress of the TranscodingJob.

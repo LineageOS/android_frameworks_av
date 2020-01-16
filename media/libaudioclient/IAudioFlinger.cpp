@@ -571,12 +571,13 @@ public:
         return id;
     }
 
-    virtual void acquireAudioSessionId(audio_session_t audioSession, int pid)
+    void acquireAudioSessionId(audio_session_t audioSession, pid_t pid, uid_t uid) override
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
         data.writeInt32(audioSession);
-        data.writeInt32(pid);
+        data.writeInt32((int32_t)pid);
+        data.writeInt32((int32_t)uid);
         remote()->transact(ACQUIRE_AUDIO_SESSION_ID, data, &reply);
     }
 
@@ -1326,8 +1327,9 @@ status_t BnAudioFlinger::onTransact(
         case ACQUIRE_AUDIO_SESSION_ID: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
             audio_session_t audioSession = (audio_session_t) data.readInt32();
-            int pid = data.readInt32();
-            acquireAudioSessionId(audioSession, pid);
+            const pid_t pid = (pid_t)data.readInt32();
+            const uid_t uid = (uid_t)data.readInt32();
+            acquireAudioSessionId(audioSession, pid, uid);
             return NO_ERROR;
         } break;
         case RELEASE_AUDIO_SESSION_ID: {

@@ -138,6 +138,7 @@ status_t AudioEffect::set(const effect_uuid_t *type,
 
     mIEffectClient = new EffectClient(this);
     mClientPid = IPCThreadState::self()->getCallingPid();
+    mClientUid = IPCThreadState::self()->getCallingUid();
 
     iEffect = audioFlinger->createEffect((effect_descriptor_t *)&mDescriptor,
             mIEffectClient, priority, io, mSessionId, device, mOpPackageName, mClientPid,
@@ -179,7 +180,7 @@ status_t AudioEffect::set(const effect_uuid_t *type,
             mStatus, mEnabled, mClientPid);
 
     if (!audio_is_global_session(mSessionId)) {
-        AudioSystem::acquireAudioSessionId(mSessionId, mClientPid);
+        AudioSystem::acquireAudioSessionId(mSessionId, mClientPid, mClientUid);
     }
 
     return mStatus;

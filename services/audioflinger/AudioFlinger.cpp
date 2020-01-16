@@ -464,10 +464,12 @@ void AudioFlinger::dumpClients(int fd, const Vector<String16>& args __unused)
     }
 
     result.append("Global session refs:\n");
-    result.append("  session  cnt     pid\n");
+    result.append("  session  cnt     pid    uid  name\n");
     for (size_t i = 0; i < mAudioSessionRefs.size(); i++) {
         AudioSessionRef *r = mAudioSessionRefs[i];
-        result.appendFormat("  %7d %4d %7d\n", r->mSessionid, r->mCnt, r->mPid);
+        const mediautils::UidInfo::Info info = mUidInfo.getInfo(r->mUid);
+        result.appendFormat("  %7d %4d %7d %6u  %s\n", r->mSessionid, r->mCnt, r->mPid,
+                r->mUid, info.package.c_str());
     }
     write(fd, result.string(), result.size());
 }
@@ -2895,14 +2897,18 @@ audio_unique_id_t AudioFlinger::newAudioUniqueId(audio_unique_id_use_t use)
     return nextUniqueId(use);
 }
 
-void AudioFlinger::acquireAudioSessionId(audio_session_t audioSession, pid_t pid)
+void AudioFlinger::acquireAudioSessionId(
+        audio_session_t audioSession, pid_t pid, uid_t uid)
 {
     Mutex::Autolock _l(mLock);
     pid_t caller = IPCThreadState::self()->getCallingPid();
     ALOGV("acquiring %d from %d, for %d", audioSession, caller, pid);
     const uid_t callerUid = IPCThreadState::self()->getCallingUid();
-    if (pid != -1 && isAudioServerUid(callerUid)) { // check must match releaseAudioSessionId()
-        caller = pid;
+    if (pid != (pid_t)-1 && isAudioServerOrMediaServerUid(callerUid)) {
+        caller = pid;  // check must match releaseAudioSessionId()
+    }
+    if (uid == (uid_t)-1 || !isAudioServerOrMediaServerUid(callerUid)) {
+        uid = callerUid;
     }
 
     {
@@ -2926,7 +2932,7 @@ void AudioFlinger::acquireAudioSessionId(audio_session_t audioSession, pid_t pid
             return;
         }
     }
-    mAudioSessionRefs.push(new AudioSessionRef(audioSession, caller));
+    mAudioSessionRefs.push(new AudioSessionRef(audioSession, caller, uid));
     ALOGV(" added new entry for %d", audioSession);
 }
 
@@ -2938,8 +2944,8 @@ void AudioFlinger::releaseAudioSessionId(audio_session_t audioSession, pid_t pid
         pid_t caller = IPCThreadState::self()->getCallingPid();
         ALOGV("releasing %d from %d for %d", audioSession, caller, pid);
         const uid_t callerUid = IPCThreadState::self()->getCallingUid();
-        if (pid != -1 && isAudioServerUid(callerUid)) { // check must match acquireAudioSessionId()
-            caller = pid;
+        if (pid != (pid_t)-1 && isAudioServerOrMediaServerUid(callerUid)) {
+            caller = pid;  // check must match acquireAudioSessionId()
         }
         size_t num = mAudioSessionRefs.size();
         for (size_t i = 0; i < num; i++) {
