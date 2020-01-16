@@ -1,6 +1,6 @@
-cc_defaults {
-    name: "libmp4extractor_defaults",
-    defaults: ["extractor-defaults_no-sanitizer"],
+cc_library {
+    name: "libmp4extractor",
+    defaults: ["extractor-defaults"],
 
     srcs: [
         "AC4Parser.cpp",
@@ -16,25 +16,4 @@ cc_defaults {
         "libstagefright_id3",
         "libutils",
     ],
-}
-
-cc_library {
-
-    name: "libmp4extractor",
-    defaults: ["libmp4extractor_defaults"],
-
-    sanitize: {
-        cfi: true,
-        misc_undefined: [
-            "unsigned-integer-overflow",
-            "signed-integer-overflow",
-        ],
-    },
-
-}
-
-cc_library_static {
-    name: "libmp4extractor_fuzzing",
-
-    defaults: ["libmp4extractor_defaults"],
 }

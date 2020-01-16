@@ -13,7 +13,7 @@
 // limitations under the License.
 
 cc_defaults {
-    name: "extractor-defaults_no-sanitizer",
+    name: "extractor-defaults",
 
     include_dirs: [
         "frameworks/av/media/libstagefright/include",
@@ -35,12 +35,6 @@ cc_defaults {
     ],
 
     version_script: "exports.lds",
-}
-
-cc_defaults {
-    name: "extractor-defaults",
-
-    defaults: ["extractor-defaults_no-sanitizer"],
 
     sanitize: {
         cfi: true,
