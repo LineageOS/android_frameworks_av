@@ -22,6 +22,9 @@
 int32_t BenchmarkC2Common::setupCodec2() {
     ALOGV("In %s", __func__);
     mClient = android::Codec2Client::CreateFromService("default");
+    if (!mClient) {
+        mClient = android::Codec2Client::CreateFromService("software");
+    }
     if (!mClient) return -1;
 
     std::shared_ptr<C2AllocatorStore> store = android::GetCodec2PlatformAllocatorStore();
