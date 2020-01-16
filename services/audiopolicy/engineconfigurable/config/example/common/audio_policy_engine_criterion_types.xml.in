@@ -22,7 +22,12 @@
             <value literal="0" numerical="1"/>
         </values>
     </criterion_type>
-    <criterion_type name="InputDevicesAddressesType" type="inclusive"/>
+    <criterion_type name="InputDevicesAddressesType" type="inclusive">
+        <values>
+            <!-- legacy remote submix -->
+            <value literal="0" numerical="1"/>
+        </values>
+    </criterion_type>
     <criterion_type name="AndroidModeType" type="exclusive"/>
     <criterion_type name="BooleanType" type="exclusive">
         <values>
