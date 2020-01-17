@@ -20,11 +20,11 @@
 #include <android-base/logging.h>
 
 #include <C2PlatformSupport.h>
-#include <codec2/hidl/1.0/ComponentStore.h>
+#include <codec2/hidl/1.1/ComponentStore.h>
 #include <media/CodecServiceRegistrant.h>
 
 extern "C" void RegisterCodecServices() {
-    using namespace ::android::hardware::media::c2::V1_0;
+    using namespace ::android::hardware::media::c2::V1_1;
     LOG(INFO) << "Creating software Codec2 service...";
     android::sp<IComponentStore> store =
         new utils::ComponentStore(
