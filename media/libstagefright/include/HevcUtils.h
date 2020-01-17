@@ -90,6 +90,8 @@ public:
     // Note that this method does not write the start code.
     bool write(size_t index, uint8_t* dest, size_t size);
     status_t makeHvcc(uint8_t *hvcc, size_t *hvccSize, size_t nalSizeLength);
+    void FindHEVCDimensions(const sp<ABuffer> &SpsBuffer, int32_t *width,
+                                                int32_t *height);
 
     Info getInfo() const { return mInfo; }
 
