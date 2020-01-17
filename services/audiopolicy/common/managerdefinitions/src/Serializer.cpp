@@ -200,6 +200,7 @@ struct GlobalConfigTraits
     {
         static constexpr const char *speakerDrcEnabled = "speaker_drc_enabled";
         static constexpr const char *callScreenModeSupported= "call_screen_mode_supported";
+        static constexpr const char *engineLibrarySuffix = "engine_library";
     };
 
     static status_t deserialize(const xmlNode *root, AudioPolicyConfig *config);
@@ -692,6 +693,11 @@ status_t GlobalConfigTraits::deserialize(const xmlNode *root, AudioPolicyConfig 
                     convertTo<std::string, bool>(attr, value)) {
                 config->setCallScreenModeSupported(value);
             }
+            std::string engineLibrarySuffix = getXmlAttribute(cur, Attributes::engineLibrarySuffix);
+            if (!engineLibrarySuffix.empty()) {
+                config->setEngineLibraryNameSuffix(engineLibrarySuffix);
+            }
+            return NO_ERROR;
         }
     }
     return NO_ERROR;

@@ -16,9 +16,6 @@
 
 #pragma once
 
-#include <PolicyAudioPort.h>
-#include <HwModule.h>
-#include <DeviceDescriptor.h>
 #include <system/audio.h>
 #include <system/audio_policy.h>
 #include <utils/Errors.h>
@@ -47,16 +44,18 @@ private:
     using Criteria = std::map<std::string, ISelectionCriterionInterface *>;
 
 public:
-    ParameterManagerWrapper();
+    ParameterManagerWrapper(bool enableSchemaVerification = false,
+                            const std::string &schemaUri = {});
     ~ParameterManagerWrapper();
 
     /**
      * Starts the platform state service.
      * It starts the parameter framework policy instance.
+     * @param[out] contains human readable error if starts failed
      *
-     * @return NO_ERROR if success, error code otherwise.
+     * @return NO_ERROR if success, error code otherwise, and error is set to human readable string.
      */
-    status_t start();
+    status_t start(std::string &error);
 
     /**
      * The following API wrap policy action to criteria
@@ -117,7 +116,15 @@ public:
      */
     status_t setAvailableOutputDevices(audio_devices_t outputDevices);
 
-    status_t setDeviceConnectionState(const sp<DeviceDescriptor> devDesc,
+    /**
+     * @brief setDeviceConnectionState propagates a state event on a given device(s)
+     * @param type bit mask of the device whose state has changed
+     * @param address of the device whose state has changed
+     * @param state new state of the given device
+     * @return NO_ERROR if new state corretly propagated to Engine Parameter-Framework, error
+     * code otherwise.
+     */
+    status_t setDeviceConnectionState(audio_devices_t type, const std::string address,
                                       audio_policy_dev_state_t state);
 
     /**
