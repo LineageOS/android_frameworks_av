@@ -2509,6 +2509,11 @@ typedef enum acamera_metadata_tag {
      * <p><code>p' = Rp</code></p>
      * <p>where <code>p</code> is in the device sensor coordinate system, and
      *  <code>p'</code> is in the camera-oriented coordinate system.</p>
+     * <p>If ACAMERA_LENS_POSE_REFERENCE is UNDEFINED, the quaternion rotation cannot
+     *  be accurately represented by the camera device, and will be represented by
+     *  default values matching its default facing.</p>
+     *
+     * @see ACAMERA_LENS_POSE_REFERENCE
      */
     ACAMERA_LENS_POSE_ROTATION =                                // float[4]
             ACAMERA_LENS_START + 6,
@@ -2549,6 +2554,8 @@ typedef enum acamera_metadata_tag {
      * <p>When ACAMERA_LENS_POSE_REFERENCE is GYROSCOPE, then this position is relative to
      * the center of the primary gyroscope on the device. The axis definitions are the same as
      * with PRIMARY_CAMERA.</p>
+     * <p>When ACAMERA_LENS_POSE_REFERENCE is UNDEFINED, this position cannot be accurately
+     * represented by the camera device, and will be represented as <code>(0, 0, 0)</code>.</p>
      *
      * @see ACAMERA_LENS_DISTORTION
      * @see ACAMERA_LENS_INTRINSIC_CALIBRATION
@@ -2691,8 +2698,10 @@ typedef enum acamera_metadata_tag {
     ACAMERA_LENS_RADIAL_DISTORTION =                            // Deprecated! DO NOT USE
             ACAMERA_LENS_START + 11,
     /**
-     * <p>The origin for ACAMERA_LENS_POSE_TRANSLATION.</p>
+     * <p>The origin for ACAMERA_LENS_POSE_TRANSLATION, and the accuracy of
+     * ACAMERA_LENS_POSE_TRANSLATION and ACAMERA_LENS_POSE_ROTATION.</p>
      *
+     * @see ACAMERA_LENS_POSE_ROTATION
      * @see ACAMERA_LENS_POSE_TRANSLATION
      *
      * <p>Type: byte (acamera_metadata_enum_android_lens_pose_reference_t)</p>
@@ -7538,6 +7547,19 @@ typedef enum acamera_metadata_enum_acamera_lens_pose_reference {
      * @see ACAMERA_LENS_POSE_TRANSLATION
      */
     ACAMERA_LENS_POSE_REFERENCE_GYROSCOPE                            = 1,
+
+    /**
+     * <p>The camera device cannot represent the values of ACAMERA_LENS_POSE_TRANSLATION
+     * and ACAMERA_LENS_POSE_ROTATION accurately enough. One such example is a camera device
+     * on the cover of a foldable phone: in order to measure the pose translation and rotation,
+     * some kind of hinge position sensor would be needed.</p>
+     * <p>The value of ACAMERA_LENS_POSE_TRANSLATION must be all zeros, and
+     * ACAMERA_LENS_POSE_ROTATION must be values matching its default facing.</p>
+     *
+     * @see ACAMERA_LENS_POSE_ROTATION
+     * @see ACAMERA_LENS_POSE_TRANSLATION
+     */
+    ACAMERA_LENS_POSE_REFERENCE_UNDEFINED                            = 2,
 
 } acamera_metadata_enum_android_lens_pose_reference_t;
 

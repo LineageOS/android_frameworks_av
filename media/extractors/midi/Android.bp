@@ -1,18 +1,11 @@
 cc_library {
+    name: "libmidiextractor",
+    defaults: ["extractor-defaults"],
 
     srcs: ["MidiExtractor.cpp"],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright/include",
-    ],
-
     header_libs: [
         "libmedia_headers",
-    ],
-
-    shared_libs: [
-        "liblog",
-        "libmediandk",
     ],
 
     static_libs: [
@@ -20,24 +13,6 @@ cc_library {
         "libsonivox",
         "libstagefright_foundation"
     ],
-    name: "libmidiextractor",
-    relative_install_path: "extractors",
 
-    compile_multilib: "first",
-
-    cflags: [
-        "-Werror",
-        "-Wall",
-        "-fvisibility=hidden",
-    ],
-    version_script: "exports.lds",
-
-    sanitize: {
-        cfi: true,
-        misc_undefined: [
-            "unsigned-integer-overflow",
-            "signed-integer-overflow",
-        ],
-    },
 
 }
