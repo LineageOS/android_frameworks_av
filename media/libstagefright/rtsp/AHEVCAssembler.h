@@ -25,6 +25,8 @@
 
 namespace android {
 
+using Q = List<sp<ABuffer> >;
+
 struct ABuffer;
 struct AMessage;
 
@@ -45,14 +47,29 @@ private:
     bool mNextExpectedSeqNoValid;
     uint32_t mNextExpectedSeqNo;
     bool mAccessUnitDamaged;
+    bool mFirstIFrameProvided;
+    uint64_t mLastIFrameProvidedAt;
+    int32_t mWidth;
+    int32_t mHeight;
     List<sp<ABuffer> > mNALUnits;
 
+    int32_t addNack(const sp<ARTPSource> &source);
+    void checkSpsUpdated(const sp<ABuffer> &buffer);
+    void checkIFrameProvided(const sp<ABuffer> &buffer);
+    bool dropFramesUntilIframe(const sp<ABuffer> &buffer);
     AssemblyStatus addNALUnit(const sp<ARTPSource> &source);
     void addSingleNALUnit(const sp<ABuffer> &buffer);
     AssemblyStatus addFragmentedNALUnit(List<sp<ABuffer> > *queue);
     bool addSingleTimeAggregationPacket(const sp<ABuffer> &buffer);
 
     void submitAccessUnit();
+
+    int32_t pickProperSeq(const Q *q, uint32_t jit, int64_t play);
+    bool recycleUnit(uint32_t start, uint32_t end, uint32_t conneceted,
+             size_t avail, float goodRatio);
+    int32_t deleteUnitUnderSeq(Q *q, uint32_t seq);
+    void printNowTimeUs(int64_t start, int64_t now, int64_t play);
+    void printRTPTime(uint32_t rtp, int64_t play, uint32_t exp, bool isExp);
 
     DISALLOW_EVIL_CONSTRUCTORS(AHEVCAssembler);
 };
