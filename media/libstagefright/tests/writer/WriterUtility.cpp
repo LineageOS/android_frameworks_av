@@ -26,7 +26,7 @@ int32_t sendBuffersToWriter(ifstream &inputStream, vector<BufferInfo> &bufferInf
                             int32_t &inputFrameId, sp<MediaAdapter> &currentTrack, int32_t offset,
                             int32_t range, bool isPaused) {
     while (1) {
-        if (inputFrameId == (int)bufferInfo.size() || inputFrameId >= (offset + range)) break;
+        if (inputFrameId >= (int)bufferInfo.size() || inputFrameId >= (offset + range)) break;
         int32_t size = bufferInfo[inputFrameId].size;
         char *data = (char *)malloc(size);
         if (!data) {
