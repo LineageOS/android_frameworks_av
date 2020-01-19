@@ -26,5 +26,5 @@ adb push  $ANDROID_BUILD_TOP/frameworks/av/media/codec2/hidl/1.0/vts/functional/
 
 usage: writerTest -P \<path_to_res_folder\>
 ```
-adb shell /data/local/tmp/writerTest -P /sdcard/res/
+adb shell /data/local/tmp/writerTest -P /data/local/tmp/
 ```
