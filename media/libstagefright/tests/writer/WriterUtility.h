@@ -33,6 +33,7 @@ using namespace std;
 #define CODEC_CONFIG_FLAG 32
 
 constexpr uint32_t kMaxCSDStrlen = 16;
+constexpr uint32_t kMaxCount = 20;
 
 struct BufferInfo {
     int32_t size;
