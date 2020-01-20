@@ -29,7 +29,7 @@
 namespace android {
 
 int WritePolicyToPipe(const std::string& base_policy_content,
-                      const std::string& additional_policy_content)
+                      const std::vector<std::string>& additional_policy_contents)
 {
     int pipefd[2];
     if (pipe(pipefd) == -1) {
@@ -40,9 +40,11 @@ int WritePolicyToPipe(const std::string& base_policy_content,
     base::unique_fd write_end(pipefd[1]);
     std::string content = base_policy_content;
 
-    if (additional_policy_content.length() > 0) {
-        content += "\n";
-        content += additional_policy_content;
+    for (auto one_content : additional_policy_contents) {
+        if (one_content.length() > 0) {
+            content += "\n";
+            content += one_content;
+        }
     }
 
     if (!base::WriteStringToFd(content, write_end.get())) {
@@ -53,29 +55,40 @@ int WritePolicyToPipe(const std::string& base_policy_content,
     return pipefd[0];
 }
 
-void SetUpMinijail(const std::string& base_policy_path, const std::string& additional_policy_path)
+void SetUpMinijail(const std::string& base_policy_path,
+                   const std::string& additional_policy_path)
+{
+    SetUpMinijailList(base_policy_path, {additional_policy_path});
+}
+
+void SetUpMinijailList(const std::string& base_policy_path,
+                   const std::vector<std::string>& additional_policy_paths)
 {
     // No seccomp policy defined for this architecture.
     if (access(base_policy_path.c_str(), R_OK) == -1) {
-        LOG(WARNING) << "No seccomp policy defined for this architecture.";
+        // LOG(WARNING) << "No seccomp policy defined for this architecture.";
+        LOG(WARNING) << "missing base seccomp_policy file '" << base_policy_path << "'";
         return;
     }
 
     std::string base_policy_content;
-    std::string additional_policy_content;
+    std::vector<std::string> additional_policy_contents;
     if (!base::ReadFileToString(base_policy_path, &base_policy_content,
                                 false /* follow_symlinks */)) {
         LOG(FATAL) << "Could not read base policy file '" << base_policy_path << "'";
     }
 
-    if (additional_policy_path.length() > 0 &&
-        !base::ReadFileToString(additional_policy_path, &additional_policy_content,
-                                false /* follow_symlinks */)) {
-        LOG(WARNING) << "Could not read additional policy file '" << additional_policy_path << "'";
-        additional_policy_content = std::string();
+    for (auto one_policy_path : additional_policy_paths) {
+        std::string one_policy_content;
+        if (one_policy_path.length() > 0 &&
+                !base::ReadFileToString(one_policy_path, &one_policy_content,
+                    false /* follow_symlinks */)) {
+            LOG(WARNING) << "Could not read additional policy file '" << one_policy_path << "'";
+        }
+        additional_policy_contents.push_back(one_policy_content);
     }
 
-    base::unique_fd policy_fd(WritePolicyToPipe(base_policy_content, additional_policy_content));
+    base::unique_fd policy_fd(WritePolicyToPipe(base_policy_content, additional_policy_contents));
     if (policy_fd.get() == -1) {
         LOG(FATAL) << "Could not write seccomp policy to fd";
     }
