@@ -16,11 +16,15 @@
 #define AV_SERVICES_MINIJAIL_MINIJAIL
 
 #include <string>
+#include <vector>
 
 namespace android {
 int WritePolicyToPipe(const std::string& base_policy_content,
-                      const std::string& additional_policy_content);
-void SetUpMinijail(const std::string& base_policy_path, const std::string& additional_policy_path);
+                      const std::vector<std::string>& additional_policy_contents);
+void SetUpMinijail(const std::string& base_policy_path,
+                   const std::string& additional_policy_path);
+void SetUpMinijailList(const std::string& base_policy_path,
+                       const std::vector<std::string>& additional_policy_paths);
 }
 
 #endif  // AV_SERVICES_MINIJAIL_MINIJAIL

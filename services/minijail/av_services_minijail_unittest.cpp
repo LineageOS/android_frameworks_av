@@ -34,13 +34,32 @@ class WritePolicyTest : public ::testing::Test
         "mmap: 1\n"
         "munmap: 1\n";
 
+    const std::string third_policy_ =
+        "open: 1\n"
+        "close: 1\n";
+
     const std::string full_policy_ = base_policy_ + std::string("\n") + additional_policy_;
+    const std::string triple_policy_ = base_policy_ +
+                                       std::string("\n") + additional_policy_ +
+                                       std::string("\n") + third_policy_;
 };
 
 TEST_F(WritePolicyTest, OneFile)
 {
     std::string final_string;
-    android::base::unique_fd fd(android::WritePolicyToPipe(base_policy_, std::string()));
+    // vector with an empty pathname
+    android::base::unique_fd fd(android::WritePolicyToPipe(base_policy_, {std::string()}));
+    EXPECT_LE(0, fd.get());
+    bool success = android::base::ReadFdToString(fd.get(), &final_string);
+    EXPECT_TRUE(success);
+    EXPECT_EQ(final_string, base_policy_);
+}
+
+TEST_F(WritePolicyTest, OneFileAlternate)
+{
+    std::string final_string;
+    // empty vector
+    android::base::unique_fd fd(android::WritePolicyToPipe(base_policy_, {}));
     EXPECT_LE(0, fd.get());
     bool success = android::base::ReadFdToString(fd.get(), &final_string);
     EXPECT_TRUE(success);
@@ -50,9 +69,19 @@ TEST_F(WritePolicyTest, OneFile)
 TEST_F(WritePolicyTest, TwoFiles)
 {
     std::string final_string;
-    android::base::unique_fd fd(android::WritePolicyToPipe(base_policy_, additional_policy_));
+    android::base::unique_fd fd(android::WritePolicyToPipe(base_policy_, {additional_policy_}));
     EXPECT_LE(0, fd.get());
     bool success = android::base::ReadFdToString(fd.get(), &final_string);
     EXPECT_TRUE(success);
     EXPECT_EQ(final_string, full_policy_);
+}
+
+TEST_F(WritePolicyTest, ThreeFiles)
+{
+    std::string final_string;
+    android::base::unique_fd fd(android::WritePolicyToPipe(base_policy_, {additional_policy_, third_policy_}));
+    EXPECT_LE(0, fd.get());
+    bool success = android::base::ReadFdToString(fd.get(), &final_string);
+    EXPECT_TRUE(success);
+    EXPECT_EQ(final_string, triple_policy_);
 }
