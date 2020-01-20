@@ -19,12 +19,13 @@ To test 32-bit binary push binaries from nativetest.
 
 adb push ${OUT}/data/nativetest/writerTest/writerTest /data/local/tmp/
 
-The resource file for the tests is taken from Codec2 VTS resource folder. Push these files into device for testing.
+The resource file for the tests is taken from [here](https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/tests/writer/writerTestRes.zip).
+Download and extract the folder. Push all the files in this folder to /data/local/tmp/ on the device.
 ```
-adb push  $ANDROID_BUILD_TOP/frameworks/av/media/codec2/hidl/1.0/vts/functional/res /sdcard/
+adb push writerTestRes /data/local/tmp/
 ```
 
 usage: writerTest -P \<path_to_res_folder\>
 ```
-adb shell /data/local/tmp/writerTest -P /sdcard/res/
+adb shell /data/local/tmp/writerTest -P /data/local/tmp/
 ```
