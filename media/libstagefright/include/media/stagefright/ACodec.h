@@ -158,6 +158,7 @@ private:
         kFlagIsSecure                                 = 1,
         kFlagPushBlankBuffersToNativeWindowOnShutdown = 2,
         kFlagIsGrallocUsageProtected                  = 4,
+        kFlagPreregisterMetadataBuffers               = 8,
     };
 
     enum {
