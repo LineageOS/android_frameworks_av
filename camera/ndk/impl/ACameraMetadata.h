@@ -36,8 +36,8 @@ using CameraMetadata = android::hardware::camera::common::V1_0::helper::CameraMe
 using namespace android;
 
 /**
- * ACameraMetadata opaque struct definition
- * Leave outside of android namespace because it's NDK struct
+ * ACameraMetadata is an opaque struct definition.
+ * It is intentionally left outside of the android namespace because it's NDK struct.
  */
 struct ACameraMetadata : public RefBase {
   public:
@@ -47,11 +47,20 @@ struct ACameraMetadata : public RefBase {
         ACM_RESULT,          // Read only
     } ACAMERA_METADATA_TYPE;
 
-    // Takes ownership of pass-in buffer
-    ACameraMetadata(camera_metadata_t *buffer, ACAMERA_METADATA_TYPE type);
-    // Clone
-    ACameraMetadata(const ACameraMetadata& other) :
-            mData(other.mData), mType(other.mType) {};
+    // Constructs a ACameraMetadata that takes ownership of `buffer`.
+    ACameraMetadata(camera_metadata_t* buffer, ACAMERA_METADATA_TYPE type);
+
+    // Constructs a ACameraMetadata that is a view of `cameraMetadata`.
+    // `cameraMetadata` will not be deleted by ~ACameraMetadata().
+    ACameraMetadata(CameraMetadata* cameraMetadata, ACAMERA_METADATA_TYPE type);
+
+    // Copy constructor.
+    //
+    // If `other` owns its CameraMetadata, then makes a deep copy.
+    // Otherwise, the new instance is also a view of the same data.
+    ACameraMetadata(const ACameraMetadata& other);
+
+    ~ACameraMetadata();
 
     camera_status_t getConstEntry(uint32_t tag, ACameraMetadata_const_entry* entry) const;
 
@@ -69,6 +78,9 @@ struct ACameraMetadata : public RefBase {
     bool isLogicalMultiCamera(size_t* count, const char* const** physicalCameraIds) const;
 
   private:
+
+    // Common code called by constructors.
+    void init();
 
     // This function does not check whether the capability passed to it is valid.
     // The caller must make sure that it is.
@@ -95,11 +107,11 @@ struct ACameraMetadata : public RefBase {
 
         status_t ret = OK;
         if (count == 0 && data == nullptr) {
-            ret = mData.erase(tag);
+            ret = mData->erase(tag);
         } else {
             // Here we have to use reinterpret_cast because the NDK data type is
             // exact copy of internal data type but they do not inherit from each other
-            ret = mData.update(tag, reinterpret_cast<const INTERNAL_T*>(data), count);
+            ret = mData->update(tag, reinterpret_cast<const INTERNAL_T*>(data), count);
         }
 
         if (ret == OK) {
@@ -110,10 +122,14 @@ struct ACameraMetadata : public RefBase {
         }
     }
 
-    // guard access of public APIs: get/update/getTags
-    mutable Mutex    mLock;
-    CameraMetadata   mData;
-    mutable Vector<uint32_t> mTags; // updated in getTags, cleared by update
+    // Guard access of public APIs: get/update/getTags.
+    mutable Mutex mLock;
+
+    CameraMetadata* mData;
+    // If true, has ownership of mData. Otherwise, mData is a view of an external instance.
+    bool mOwnsData;
+
+    mutable Vector<uint32_t> mTags; // Updated by `getTags()`, cleared by `update()`.
     const ACAMERA_METADATA_TYPE mType;
 
     static std::unordered_set<uint32_t> sSystemTags;

@@ -57,6 +57,9 @@ cc_library_shared {
         "libmediandk",
         "libnativewindow",
     ],
+    header_libs: [
+        "jni_headers",
+    ],
     cflags: [
         "-fvisibility=hidden",
         "-DEXPORT=__attribute__ ((visibility (\"default\")))",
@@ -121,7 +124,6 @@ cc_library_shared {
         "android.frameworks.cameraservice.common@2.0",
         "android.frameworks.cameraservice.service@2.0",
     ],
-
     static_libs: [
         "android.hardware.camera.common@1.0-helper",
         "libarect",

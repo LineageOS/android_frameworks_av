@@ -26,6 +26,68 @@
 
 using namespace android;
 
+#ifndef __ANDROID_VNDK__
+namespace {
+
+constexpr const char* android_hardware_camera2_CameraMetadata_jniClassName =
+    "android/hardware/camera2/CameraMetadata";
+constexpr const char* android_hardware_camera2_CameraCharacteristics_jniClassName =
+    "android/hardware/camera2/CameraCharacteristics";
+constexpr const char* android_hardware_camera2_CaptureResult_jniClassName =
+    "android/hardware/camera2/CaptureResult";
+
+jclass android_hardware_camera2_CameraCharacteristics_clazz = nullptr;
+jclass android_hardware_camera2_CaptureResult_clazz = nullptr;
+jmethodID android_hardware_camera2_CameraMetadata_getNativeMetadataPtr = nullptr;
+
+// Called at most once to initializes global variables used by JNI.
+bool InitJni(JNIEnv* env) {
+    // From C++11 onward, static initializers are guaranteed to be executed at most once,
+    // even if called from multiple threads.
+    static bool ok = [env]() -> bool {
+        const jclass cameraMetadataClazz = env->FindClass(
+            android_hardware_camera2_CameraMetadata_jniClassName);
+        if (cameraMetadataClazz == nullptr) {
+            return false;
+        }
+        android_hardware_camera2_CameraMetadata_getNativeMetadataPtr =
+            env->GetMethodID(cameraMetadataClazz, "getNativeMetadataPtr", "()J");
+        if (android_hardware_camera2_CameraMetadata_getNativeMetadataPtr == nullptr) {
+            return false;
+        }
+
+        android_hardware_camera2_CameraCharacteristics_clazz = env->FindClass(
+            android_hardware_camera2_CameraCharacteristics_jniClassName);
+        if (android_hardware_camera2_CameraCharacteristics_clazz == nullptr) {
+            return false;
+        }
+
+        android_hardware_camera2_CaptureResult_clazz = env->FindClass(
+            android_hardware_camera2_CaptureResult_jniClassName);
+        if (android_hardware_camera2_CaptureResult_clazz == nullptr) {
+            return false;
+        }
+
+        return true;
+    }();
+    return ok;
+}
+
+// Given cameraMetadata, an instance of android.hardware.camera2.CameraMetadata, invokes
+// cameraMetadata.getNativeMetadataPtr() and returns it as a CameraMetadata*.
+CameraMetadata* CameraMetadata_getNativeMetadataPtr(JNIEnv* env, jobject cameraMetadata) {
+    if (cameraMetadata == nullptr) {
+        ALOGE("%s: Invalid Java CameraMetadata object.", __FUNCTION__);
+        return nullptr;
+    }
+    jlong ret = env->CallLongMethod(cameraMetadata,
+                                    android_hardware_camera2_CameraMetadata_getNativeMetadataPtr);
+    return reinterpret_cast<CameraMetadata *>(ret);
+}
+
+}  // namespace
+#endif  /* __ANDROID_VNDK__ */
+
 EXPORT
 camera_status_t ACameraMetadata_getConstEntry(
         const ACameraMetadata* acm, uint32_t tag, ACameraMetadata_const_entry* entry) {
@@ -58,7 +120,7 @@ ACameraMetadata* ACameraMetadata_copy(const ACameraMetadata* src) {
         return nullptr;
     }
     ACameraMetadata* copy = new ACameraMetadata(*src);
-    copy->incStrong((void*) ACameraMetadata_copy);
+    copy->incStrong(/*id=*/(void*) ACameraMetadata_copy);
     return copy;
 }
 
@@ -86,3 +148,34 @@ bool ACameraMetadata_isLogicalMultiCamera(const ACameraMetadata* staticMetadata,
 
     return staticMetadata->isLogicalMultiCamera(numPhysicalCameras, physicalCameraIds);
 }
+
+#ifndef __ANDROID_VNDK__
+EXPORT
+ACameraMetadata* ACameraMetadata_fromCameraMetadata(JNIEnv* env, jobject cameraMetadata) {
+    ATRACE_CALL();
+
+    const bool ok = InitJni(env);
+    LOG_ALWAYS_FATAL_IF(!ok, "Failed to find CameraMetadata Java classes.");
+
+    if (cameraMetadata == nullptr) {
+        return nullptr;
+    }
+
+    ACameraMetadata::ACAMERA_METADATA_TYPE type;
+    if (env->IsInstanceOf(cameraMetadata,
+        android_hardware_camera2_CameraCharacteristics_clazz)) {
+        type = ACameraMetadata::ACM_CHARACTERISTICS;
+    } else if (env->IsInstanceOf(cameraMetadata,
+        android_hardware_camera2_CaptureResult_clazz)) {
+        type = ACameraMetadata::ACM_RESULT;
+    } else {
+        return nullptr;
+    }
+
+    CameraMetadata* src = CameraMetadata_getNativeMetadataPtr(env,
+                                                              cameraMetadata);
+    ACameraMetadata* output = new ACameraMetadata(src, type);
+    output->incStrong(/*id=*/(void*) ACameraMetadata_fromCameraMetadata);
+    return output;
+}
+#endif  /* __ANDROID_VNDK__ */
