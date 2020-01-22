@@ -22,6 +22,7 @@ LIBAAUDIO {
     AAudioStreamBuilder_setInputPreset; # introduced=28
     AAudioStreamBuilder_setAllowedCapturePolicy; # introduced=29
     AAudioStreamBuilder_setSessionId;   # introduced=28
+    AAudioStreamBuilder_setPrivacySensitive;   # introduced=30
     AAudioStreamBuilder_openStream;
     AAudioStreamBuilder_delete;
     AAudioStream_close;
@@ -56,6 +57,7 @@ LIBAAUDIO {
     AAudioStream_getSessionId;   # introduced=28
     AAudioStream_getTimestamp;
     AAudioStream_isMMapUsed;
+    AAudioStream_isPrivacySensitive;   # introduced=30
   local:
     *;
 };
