@@ -42,7 +42,6 @@ aidl_interface {
         "aidl/android/media/MediaResourceParcel.aidl",
         "aidl/android/media/MediaResourcePolicyParcel.aidl",
     ],
-    versions: ["1"],
 }
 
 cc_library_shared {
