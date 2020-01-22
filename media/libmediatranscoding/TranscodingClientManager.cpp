@@ -17,12 +17,12 @@
 // #define LOG_NDEBUG 0
 #define LOG_TAG "TranscodingClientManager"
 
+#include <inttypes.h>
 #include <media/TranscodingClientManager.h>
 #include <utils/Log.h>
 
 namespace android {
 
-class DeathNotifier;
 using Status = ::ndk::ScopedAStatus;
 
 // static
@@ -31,9 +31,17 @@ sp<TranscodingClientManager> TranscodingClientManager::getInstance() {
     return sInstance;
 }
 
+// static
+void TranscodingClientManager::BinderDiedCallback(void* cookie) {
+    int32_t clientId = static_cast<int32_t>(reinterpret_cast<intptr_t>(cookie));
+    ALOGD("Client %" PRId32 " is dead", clientId);
+    // Don't check for pid validity since we know it's already dead.
+    sp<TranscodingClientManager> manager = TranscodingClientManager::getInstance();
+    manager->removeClient(clientId);
+}
+
 TranscodingClientManager::TranscodingClientManager()
-    : mDeathRecipient(AIBinder_DeathRecipient_new(
-              TranscodingClientManager::DeathNotifier::BinderDiedCallback)) {
+    : mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)) {
     ALOGD("TranscodingClientManager started");
 }
 
@@ -77,14 +85,13 @@ void TranscodingClientManager::dumpAllClients(int fd, const Vector<String16>& ar
 
 status_t TranscodingClientManager::addClient(std::unique_ptr<ClientInfo> client) {
     // Validate the client.
-    if (client == nullptr || client->mClientId <= 0 || client->mClientPid <= 0 ||
-        client->mClientUid <= 0 || client->mClientOpPackageName.empty() ||
+    if (client == nullptr || client->mClientId < 0 || client->mClientPid < 0 ||
+        client->mClientUid < 0 || client->mClientOpPackageName.empty() ||
         client->mClientOpPackageName == "") {
         ALOGE("Invalid client");
         return BAD_VALUE;
     }
 
-    ALOGD("Adding client id %d %s", client->mClientId, client->mClientOpPackageName.c_str());
     std::scoped_lock lock{mLock};
 
     // Check if the client already exists.
@@ -93,10 +100,11 @@ status_t TranscodingClientManager::addClient(std::unique_ptr<ClientInfo> client)
         return ALREADY_EXISTS;
     }
 
-    // Listen to the death of the client.
-    client->mDeathNotifier = new DeathNotifier();
+    ALOGD("Adding client id %d pid: %d uid: %d %s", client->mClientId, client->mClientPid,
+          client->mClientUid, client->mClientOpPackageName.c_str());
+
     AIBinder_linkToDeath(client->mClient->asBinder().get(), mDeathRecipient.get(),
-                         client->mDeathNotifier.get());
+                         reinterpret_cast<void*>(client->mClientId));
 
     // Adds the new client to the map.
     mClientIdToClientInfoMap[client->mClientId] = std::move(client);
@@ -120,7 +128,7 @@ status_t TranscodingClientManager::removeClient(int32_t clientId) {
     // Check if the client still live. If alive, unlink the death.
     if (client) {
         AIBinder_unlinkToDeath(client->asBinder().get(), mDeathRecipient.get(),
-                               it->second->mDeathNotifier.get());
+                               reinterpret_cast<void*>(clientId));
     }
 
     // Erase the entry.
@@ -132,15 +140,6 @@ status_t TranscodingClientManager::removeClient(int32_t clientId) {
 size_t TranscodingClientManager::getNumOfClients() const {
     std::scoped_lock lock{mLock};
     return mClientIdToClientInfoMap.size();
-}
-
-// static
-void TranscodingClientManager::DeathNotifier::BinderDiedCallback(void* cookie) {
-    int32_t* pClientId = static_cast<int32_t*>(cookie);
-    ALOGD("Client %d is dead", *pClientId);
-    // Don't check for pid validity since we know it's already dead.
-    sp<TranscodingClientManager> manager = TranscodingClientManager::getInstance();
-    manager->removeClient(*pClientId);
 }
 
 }  // namespace android
