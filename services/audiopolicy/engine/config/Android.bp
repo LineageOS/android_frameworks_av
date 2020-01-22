@@ -1,4 +1,4 @@
-cc_library_static {
+cc_library {
     name: "libaudiopolicyengine_config",
     export_include_dirs: ["include"],
     include_dirs: [
@@ -14,17 +14,14 @@ cc_library_static {
     ],
     shared_libs: [
         "libmedia_helper",
-        "libandroidicu",
         "libxml2",
         "libutils",
         "liblog",
         "libcutils",
     ],
-    static_libs: [
-        "libaudiopolicycomponents",
-    ],
     header_libs: [
         "libaudio_system_headers",
-        "libaudiopolicycommon",
+        "libmedia_headers",
+        "libaudioclient_headers",
     ],
 }

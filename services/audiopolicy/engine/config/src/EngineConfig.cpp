@@ -18,7 +18,6 @@
 //#define LOG_NDEBUG 0
 
 #include "EngineConfig.h"
-#include <policy.h>
 #include <cutils/properties.h>
 #include <media/TypeConverter.h>
 #include <media/convert.h>
