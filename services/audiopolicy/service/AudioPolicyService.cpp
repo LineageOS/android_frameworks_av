@@ -74,6 +74,8 @@ void AudioPolicyService::onFirstRef()
 
         mAudioPolicyClient = new AudioPolicyClient(this);
         mAudioPolicyManager = createAudioPolicyManager(mAudioPolicyClient);
+
+        mSupportedSystemUsages = std::vector<audio_usage_t> {};
     }
     // load audio processing modules
     sp<AudioPolicyEffects>audioPolicyEffects = new AudioPolicyEffects();
@@ -391,6 +393,14 @@ status_t AudioPolicyService::dumpInternals(int fd)
     result.append(buffer);
     snprintf(buffer, SIZE, "Command Thread: %p\n", mAudioCommandThread.get());
     result.append(buffer);
+
+    snprintf(buffer, SIZE, "Supported System Usages:\n");
+    result.append(buffer);
+    for (std::vector<audio_usage_t>::iterator it = mSupportedSystemUsages.begin();
+        it != mSupportedSystemUsages.end(); ++it) {
+        snprintf(buffer, SIZE, "\t%d\n", *it);
+        result.append(buffer);
+    }
 
     write(fd, result.string(), result.size());
     return NO_ERROR;

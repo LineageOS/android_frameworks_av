@@ -314,6 +314,8 @@ public:
 
     static status_t setLowRamDevice(bool isLowRamDevice, int64_t totalMemory);
 
+    static status_t setSupportedSystemUsages(const std::vector<audio_usage_t>& systemUsages);
+
     static status_t setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t flags);
 
     // Check if hw offload is possible for given format, stream type, sample rate,

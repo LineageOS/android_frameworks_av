@@ -133,6 +133,10 @@ aaudio_result_t AAudioStreamParameters::validate() const {
         case AAUDIO_USAGE_ASSISTANCE_SONIFICATION:
         case AAUDIO_USAGE_GAME:
         case AAUDIO_USAGE_ASSISTANT:
+        case AAUDIO_SYSTEM_USAGE_EMERGENCY:
+        case AAUDIO_SYSTEM_USAGE_SAFETY:
+        case AAUDIO_SYSTEM_USAGE_VEHICLE_STATUS:
+        case AAUDIO_SYSTEM_USAGE_ANNOUNCEMENT:
             break; // valid
         default:
             ALOGD("usage not valid = %d", mUsage);

@@ -102,6 +102,7 @@ enum {
     GET_STRATEGY_FOR_ATTRIBUTES,
     LIST_AUDIO_VOLUME_GROUPS,
     GET_VOLUME_GROUP_FOR_ATTRIBUTES,
+    SET_SUPPORTED_SYSTEM_USAGES,
     SET_ALLOWED_CAPTURE_POLICY,
     MOVE_EFFECTS_TO_IO,
     SET_RTT_ENABLED,
@@ -332,6 +333,7 @@ public:
             ALOGE("getInputForAttr NULL portId - shouldn't happen");
             return BAD_VALUE;
         }
+
         data.write(attr, sizeof(audio_attributes_t));
         data.writeInt32(*input);
         data.writeInt32(riid);
@@ -620,6 +622,20 @@ public:
         }
         *count = retCount;
         return status;
+    }
+
+    status_t setSupportedSystemUsages(const std::vector<audio_usage_t>& systemUsages) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeInt32(systemUsages.size());
+        for (auto systemUsage : systemUsages) {
+            data.writeInt32(systemUsage);
+        }
+        status_t status = remote()->transact(SET_SUPPORTED_SYSTEM_USAGES, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        return static_cast <status_t> (reply.readInt32());
     }
 
     status_t setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t flags) override {
@@ -1449,6 +1465,7 @@ status_t BnAudioPolicyService::onTransact(
         case SET_RTT_ENABLED:
         case IS_CALL_SCREEN_MODE_SUPPORTED:
         case SET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
+        case SET_SUPPORTED_SYSTEM_USAGES:
         case REMOVE_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
         case GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
         case GET_DEVICES_FOR_ATTRIBUTES: {
@@ -2442,14 +2459,44 @@ status_t BnAudioPolicyService::onTransact(
             if (status != NO_ERROR) {
                 return status;
             }
+
             volume_group_t group;
             status = getVolumeGroupFromAudioAttributes(attributes, group);
-            reply->writeInt32(status);
             if (status != NO_ERROR) {
                 return NO_ERROR;
             }
+
+            reply->writeInt32(status);
             reply->writeUint32(static_cast<int>(group));
             return NO_ERROR;
+        }
+
+        case SET_SUPPORTED_SYSTEM_USAGES: {
+             CHECK_INTERFACE(IAudioPolicyService, data, reply);
+             std::vector<audio_usage_t> systemUsages;
+
+             int32_t size;
+             status_t status = data.readInt32(&size);
+             if (status != NO_ERROR) {
+                 return status;
+             }
+             if (size > MAX_ITEMS_PER_LIST) {
+                 size = MAX_ITEMS_PER_LIST;
+             }
+
+             for (int32_t i = 0; i < size; i++) {
+                 int32_t systemUsageInt;
+                 status = data.readInt32(&systemUsageInt);
+                 if (status != NO_ERROR) {
+                     return status;
+                 }
+
+                 audio_usage_t systemUsage = static_cast<audio_usage_t>(systemUsageInt);
+                 systemUsages.push_back(systemUsage);
+             }
+             status = setSupportedSystemUsages(systemUsages);
+             reply->writeInt32(static_cast <int32_t>(status));
+             return NO_ERROR;
         }
 
         case SET_ALLOWED_CAPTURE_POLICY: {
