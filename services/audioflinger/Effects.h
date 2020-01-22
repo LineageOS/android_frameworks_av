@@ -402,7 +402,6 @@ private:
 class EffectChain : public RefBase {
 public:
     EffectChain(const wp<ThreadBase>& wThread, audio_session_t sessionId);
-    EffectChain(ThreadBase *thread, audio_session_t sessionId);
     virtual ~EffectChain();
 
     // special key used for an entry in mSuspendedEffects keyed vector
@@ -513,8 +512,11 @@ private:
 
     class EffectCallback :  public EffectCallbackInterface {
     public:
-        EffectCallback(EffectChain *chain, ThreadBase *thread, AudioFlinger *audioFlinger)
-            : mChain(chain), mThread(thread), mAudioFlinger(audioFlinger) {}
+        EffectCallback(const wp<EffectChain>& chain,
+                       const wp<ThreadBase>& thread)
+            : mChain(chain) {
+            setThread(thread);
+        }
 
         status_t createEffectHal(const effect_uuid_t *pEffectUuid,
                int32_t sessionId, int32_t deviceId, sp<EffectHalInterface> *effect) override;
@@ -550,7 +552,12 @@ private:
         wp<EffectChain> chain() const override { return mChain; }
 
         wp<ThreadBase> thread() { return mThread; }
-        void setThread(ThreadBase *thread) { mThread = thread; };
+
+        void setThread(const wp<ThreadBase>& thread) {
+            mThread = thread;
+            sp<ThreadBase> p = thread.promote();
+            mAudioFlinger = p ? p->mAudioFlinger : nullptr;
+        }
 
     private:
         wp<EffectChain> mChain;
@@ -623,7 +630,8 @@ public:
                 effect_descriptor_t *desc, int id)
             : EffectBase(callback, desc, id, AUDIO_SESSION_DEVICE, false),
                 mDevice(device), mManagerCallback(callback),
-                mMyCallback(new ProxyCallback(this, callback)) {}
+                mMyCallback(new ProxyCallback(wp<DeviceEffectProxy>(this),
+                                              callback)) {}
 
     status_t setEnabled(bool enabled, bool fromHandle) override;
     sp<DeviceEffectProxy> asDeviceEffectProxy() override { return this; }
@@ -649,7 +657,7 @@ private:
 
     class ProxyCallback :  public EffectCallbackInterface {
     public:
-                ProxyCallback(DeviceEffectProxy *proxy,
+                ProxyCallback(const wp<DeviceEffectProxy>& proxy,
                         const sp<DeviceEffectManagerCallback>& callback)
                     : mProxy(proxy), mManagerCallback(callback) {}
 

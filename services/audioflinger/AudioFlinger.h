@@ -343,7 +343,10 @@ public:
 
         virtual ~SyncEvent() {}
 
-        void trigger() { Mutex::Autolock _l(mLock); if (mCallback) mCallback(this); }
+        void trigger() {
+            Mutex::Autolock _l(mLock);
+            if (mCallback) mCallback(wp<SyncEvent>(this));
+        }
         bool isCancelled() const { Mutex::Autolock _l(mLock); return (mCallback == NULL); }
         void cancel() { Mutex::Autolock _l(mLock); mCallback = NULL; }
         AudioSystem::sync_event_t type() const { return mType; }
