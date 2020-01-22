@@ -494,6 +494,44 @@ sp<Codec2Buffer> InputBuffersArray::createNewBuffer() {
     return mAllocate();
 }
 
+// SlotInputBuffers
+
+bool SlotInputBuffers::requestNewBuffer(size_t *index, sp<MediaCodecBuffer> *buffer) {
+    sp<Codec2Buffer> newBuffer = createNewBuffer();
+    *index = mImpl.assignSlot(newBuffer);
+    *buffer = newBuffer;
+    return true;
+}
+
+bool SlotInputBuffers::releaseBuffer(
+        const sp<MediaCodecBuffer> &buffer,
+        std::shared_ptr<C2Buffer> *c2buffer,
+        bool release) {
+    return mImpl.releaseSlot(buffer, c2buffer, release);
+}
+
+bool SlotInputBuffers::expireComponentBuffer(
+        const std::shared_ptr<C2Buffer> &c2buffer) {
+    return mImpl.expireComponentBuffer(c2buffer);
+}
+
+void SlotInputBuffers::flush() {
+    mImpl.flush();
+}
+
+std::unique_ptr<InputBuffers> SlotInputBuffers::toArrayMode(size_t) {
+    TRESPASS("Array mode should not be called at non-legacy mode");
+    return nullptr;
+}
+
+size_t SlotInputBuffers::numClientBuffers() const {
+    return mImpl.numClientBuffers();
+}
+
+sp<Codec2Buffer> SlotInputBuffers::createNewBuffer() {
+    return new DummyContainerBuffer{mFormat, nullptr};
+}
+
 // LinearInputBuffers
 
 bool LinearInputBuffers::requestNewBuffer(size_t *index, sp<MediaCodecBuffer> *buffer) {

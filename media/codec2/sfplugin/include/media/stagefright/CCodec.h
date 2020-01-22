@@ -70,6 +70,22 @@ public:
 
     static PersistentSurface *CreateInputSurface();
 
+    static status_t CanFetchLinearBlock(
+            const std::vector<std::string> &names, const C2MemoryUsage &usage, bool *isCompatible);
+
+    static std::shared_ptr<C2LinearBlock> FetchLinearBlock(
+            size_t capacity, const C2MemoryUsage &usage, const std::vector<std::string> &names);
+
+    static status_t CanFetchGraphicBlock(
+            const std::vector<std::string> &names, bool *isCompatible);
+
+    static std::shared_ptr<C2GraphicBlock> FetchGraphicBlock(
+            int32_t width,
+            int32_t height,
+            int32_t format,
+            uint64_t usage,
+            const std::vector<std::string> &names);
+
 protected:
     virtual ~CCodec();
 

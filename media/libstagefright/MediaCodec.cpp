@@ -21,6 +21,8 @@
 #include <inttypes.h>
 #include <stdlib.h>
 
+#include <C2Buffer.h>
+
 #include "include/SoftwareRenderer.h"
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
@@ -38,6 +40,7 @@
 #include <mediadrm/ICrypto.h>
 #include <media/IOMX.h>
 #include <media/MediaCodecBuffer.h>
+#include <media/MediaCodecInfo.h>
 #include <media/MediaMetricsItem.h>
 #include <media/MediaResource.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -127,6 +130,9 @@ static bool isResourceError(status_t err) {
 static const int kMaxRetry = 2;
 static const int kMaxReclaimWaitTimeInUs = 500000;  // 0.5s
 static const int kNumBuffersAlign = 16;
+
+static const C2MemoryUsage kDefaultReadWriteUsage{
+    C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -992,6 +998,28 @@ sp<CodecBase> MediaCodec::GetCodecBase(const AString &name, const char *owner) {
     }
 }
 
+struct CodecListCache {
+    CodecListCache()
+        : mCodecInfoMap{[] {
+              const sp<IMediaCodecList> mcl = MediaCodecList::getInstance();
+              size_t count = mcl->countCodecs();
+              std::map<std::string, sp<MediaCodecInfo>> codecInfoMap;
+              for (size_t i = 0; i < count; ++i) {
+                  sp<MediaCodecInfo> info = mcl->getCodecInfo(i);
+                  codecInfoMap.emplace(info->getCodecName(), info);
+              }
+              return codecInfoMap;
+          }()} {
+    }
+
+    const std::map<std::string, sp<MediaCodecInfo>> mCodecInfoMap;
+};
+
+static const CodecListCache &GetCodecListCache() {
+    static CodecListCache sCache{};
+    return sCache;
+}
+
 status_t MediaCodec::init(const AString &name) {
     mResourceManagerProxy->init();
 
@@ -1493,6 +1521,75 @@ status_t MediaCodec::queueSecureInputBuffer(
     msg->setInt32("skipBlocks", pattern.mSkipBlocks);
     msg->setInt64("timeUs", presentationTimeUs);
     msg->setInt32("flags", flags);
+    msg->setPointer("errorDetailMsg", errorDetailMsg);
+
+    sp<AMessage> response;
+    status_t err = PostAndAwaitResponse(msg, &response);
+
+    return err;
+}
+
+status_t MediaCodec::queueBuffer(
+        size_t index,
+        const std::shared_ptr<C2Buffer> &buffer,
+        int64_t presentationTimeUs,
+        uint32_t flags,
+        const sp<AMessage> &tunings,
+        AString *errorDetailMsg) {
+    if (errorDetailMsg != NULL) {
+        errorDetailMsg->clear();
+    }
+
+    sp<AMessage> msg = new AMessage(kWhatQueueInputBuffer, this);
+    msg->setSize("index", index);
+    sp<WrapperObject<std::shared_ptr<C2Buffer>>> obj{
+        new WrapperObject<std::shared_ptr<C2Buffer>>{buffer}};
+    msg->setObject("c2buffer", obj);
+    msg->setInt64("timeUs", presentationTimeUs);
+    msg->setInt32("flags", flags);
+    msg->setMessage("tunings", tunings);
+    msg->setPointer("errorDetailMsg", errorDetailMsg);
+
+    sp<AMessage> response;
+    status_t err = PostAndAwaitResponse(msg, &response);
+
+    return err;
+}
+
+status_t MediaCodec::queueEncryptedBuffer(
+        size_t index,
+        const sp<hardware::HidlMemory> &buffer,
+        size_t offset,
+        const CryptoPlugin::SubSample *subSamples,
+        size_t numSubSamples,
+        const uint8_t key[16],
+        const uint8_t iv[16],
+        CryptoPlugin::Mode mode,
+        const CryptoPlugin::Pattern &pattern,
+        int64_t presentationTimeUs,
+        uint32_t flags,
+        const sp<AMessage> &tunings,
+        AString *errorDetailMsg) {
+    if (errorDetailMsg != NULL) {
+        errorDetailMsg->clear();
+    }
+
+    sp<AMessage> msg = new AMessage(kWhatQueueInputBuffer, this);
+    msg->setSize("index", index);
+    sp<WrapperObject<sp<hardware::HidlMemory>>> memory{
+        new WrapperObject<sp<hardware::HidlMemory>>{buffer}};
+    msg->setObject("memory", memory);
+    msg->setSize("offset", offset);
+    msg->setPointer("subSamples", (void *)subSamples);
+    msg->setSize("numSubSamples", numSubSamples);
+    msg->setPointer("key", (void *)key);
+    msg->setPointer("iv", (void *)iv);
+    msg->setInt32("mode", mode);
+    msg->setInt32("encryptBlocks", pattern.mEncryptBlocks);
+    msg->setInt32("skipBlocks", pattern.mSkipBlocks);
+    msg->setInt64("timeUs", presentationTimeUs);
+    msg->setInt32("flags", flags);
+    msg->setMessage("tunings", tunings);
     msg->setPointer("errorDetailMsg", errorDetailMsg);
 
     sp<AMessage> response;
@@ -2355,6 +2452,23 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     sp<MediaCodecBuffer> buffer = static_cast<MediaCodecBuffer *>(obj.get());
 
                     if (mOutputFormat != buffer->format()) {
+                        if (mFlags & kFlagUseBlockModel) {
+                            sp<AMessage> diff1 = mOutputFormat->changesFrom(buffer->format());
+                            sp<AMessage> diff2 = buffer->format()->changesFrom(mOutputFormat);
+                            std::set<std::string> keys;
+                            size_t numEntries = diff1->countEntries();
+                            AMessage::Type type;
+                            for (size_t i = 0; i < numEntries; ++i) {
+                                keys.emplace(diff1->getEntryNameAt(i, &type));
+                            }
+                            numEntries = diff2->countEntries();
+                            for (size_t i = 0; i < numEntries; ++i) {
+                                keys.emplace(diff2->getEntryNameAt(i, &type));
+                            }
+                            sp<WrapperObject<std::set<std::string>>> changedKeys{
+                                new WrapperObject<std::set<std::string>>{std::move(keys)}};
+                            buffer->meta()->setObject("changedKeys", changedKeys);
+                        }
                         mOutputFormat = buffer->format();
                         ALOGV("[%s] output format changed to: %s",
                                 mComponentName.c_str(), mOutputFormat->debugString(4).c_str());
@@ -2622,6 +2736,15 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 handleSetSurface(NULL);
             }
 
+            uint32_t flags;
+            CHECK(msg->findInt32("flags", (int32_t *)&flags));
+            if (flags & CONFIGURE_FLAG_USE_BLOCK_MODEL) {
+                if (!(mFlags & kFlagIsAsync)) {
+                    PostReplyWithError(replyID, INVALID_OPERATION);
+                    break;
+                }
+                mFlags |= kFlagUseBlockModel;
+            }
             mReplyID = replyID;
             setState(CONFIGURING);
 
@@ -2647,9 +2770,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             mDescrambler = static_cast<IDescrambler *>(descrambler);
             mBufferChannel->setDescrambler(mDescrambler);
 
-            uint32_t flags;
-            CHECK(msg->findInt32("flags", (int32_t *)&flags));
-
+            format->setInt32("flags", flags);
             if (flags & CONFIGURE_FLAG_ENCODE) {
                 format->setInt32("encoder", true);
                 mFlags |= kFlagIsEncoder;
@@ -3234,22 +3355,36 @@ void MediaCodec::extractCSD(const sp<AMessage> &format) {
 status_t MediaCodec::queueCSDInputBuffer(size_t bufferIndex) {
     CHECK(!mCSD.empty());
 
-    const BufferInfo &info = mPortBuffers[kPortIndexInput][bufferIndex];
-
     sp<ABuffer> csd = *mCSD.begin();
     mCSD.erase(mCSD.begin());
+    std::shared_ptr<C2Buffer> c2Buffer;
 
-    const sp<MediaCodecBuffer> &codecInputData = info.mData;
+    if ((mFlags & kFlagUseBlockModel) && mOwnerName.startsWith("codec2::")) {
+        std::shared_ptr<C2LinearBlock> block =
+            FetchLinearBlock(csd->size(), {std::string{mComponentName.c_str()}});
+        C2WriteView view{block->map().get()};
+        if (view.error() != C2_OK) {
+            return -EINVAL;
+        }
+        if (csd->size() > view.capacity()) {
+            return -EINVAL;
+        }
+        memcpy(view.base(), csd->data(), csd->size());
+        c2Buffer = C2Buffer::CreateLinearBuffer(block->share(0, csd->size(), C2Fence{}));
+    } else {
+        const BufferInfo &info = mPortBuffers[kPortIndexInput][bufferIndex];
+        const sp<MediaCodecBuffer> &codecInputData = info.mData;
 
-    if (csd->size() > codecInputData->capacity()) {
-        return -EINVAL;
+        if (csd->size() > codecInputData->capacity()) {
+            return -EINVAL;
+        }
+        if (codecInputData->data() == NULL) {
+            ALOGV("Input buffer %zu is not properly allocated", bufferIndex);
+            return -EINVAL;
+        }
+
+        memcpy(codecInputData->data(), csd->data(), csd->size());
     }
-    if (codecInputData->data() == NULL) {
-        ALOGV("Input buffer %zu is not properly allocated", bufferIndex);
-        return -EINVAL;
-    }
-
-    memcpy(codecInputData->data(), csd->data(), csd->size());
 
     AString errorDetailMsg;
 
@@ -3260,6 +3395,12 @@ status_t MediaCodec::queueCSDInputBuffer(size_t bufferIndex) {
     msg->setInt64("timeUs", 0LL);
     msg->setInt32("flags", BUFFER_FLAG_CODECCONFIG);
     msg->setPointer("errorDetailMsg", &errorDetailMsg);
+    if (c2Buffer) {
+        sp<WrapperObject<std::shared_ptr<C2Buffer>>> obj{
+            new WrapperObject<std::shared_ptr<C2Buffer>>{c2Buffer}};
+        msg->setObject("c2buffer", obj);
+        msg->setMessage("tunings", new AMessage);
+    }
 
     return onQueueInputBuffer(msg);
 }
@@ -3365,10 +3506,20 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
     int64_t timeUs;
     uint32_t flags;
     CHECK(msg->findSize("index", &index));
-    CHECK(msg->findSize("offset", &offset));
     CHECK(msg->findInt64("timeUs", &timeUs));
     CHECK(msg->findInt32("flags", (int32_t *)&flags));
-
+    std::shared_ptr<C2Buffer> c2Buffer;
+    sp<hardware::HidlMemory> memory;
+    sp<RefBase> obj;
+    if (msg->findObject("c2buffer", &obj)) {
+        CHECK(obj);
+        c2Buffer = static_cast<WrapperObject<std::shared_ptr<C2Buffer>> *>(obj.get())->value;
+    } else if (msg->findObject("memory", &obj)) {
+        CHECK(obj);
+        memory = static_cast<WrapperObject<sp<hardware::HidlMemory>> *>(obj.get())->value;
+    } else {
+        CHECK(msg->findSize("offset", &offset));
+    }
     const CryptoPlugin::SubSample *subSamples;
     size_t numSubSamples;
     const uint8_t *key;
@@ -3392,7 +3543,7 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
             pattern.mEncryptBlocks = 0;
             pattern.mSkipBlocks = 0;
         }
-    } else {
+    } else if (!c2Buffer) {
         if (!hasCryptoOrDescrambler()) {
             ALOGE("[%s] queuing secure buffer without mCrypto or mDescrambler!",
                     mComponentName.c_str());
@@ -3423,31 +3574,52 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
     }
 
     BufferInfo *info = &mPortBuffers[kPortIndexInput][index];
+    sp<MediaCodecBuffer> buffer = info->mData;
 
-    if (info->mData == nullptr || !info->mOwnedByClient) {
+    if (c2Buffer || memory) {
+        sp<AMessage> tunings;
+        CHECK(msg->findMessage("tunings", &tunings));
+        onSetParameters(tunings);
+
+        status_t err = OK;
+        if (c2Buffer) {
+            err = mBufferChannel->attachBuffer(c2Buffer, buffer);
+        } else if (memory) {
+            err = mBufferChannel->attachEncryptedBuffer(
+                    memory, (mFlags & kFlagIsSecure), key, iv, mode, pattern,
+                    offset, subSamples, numSubSamples, buffer);
+        }
+        offset = buffer->offset();
+        size = buffer->size();
+        if (err != OK) {
+            return err;
+        }
+    }
+
+    if (buffer == nullptr || !info->mOwnedByClient) {
         return -EACCES;
     }
 
-    if (offset + size > info->mData->capacity()) {
+    if (offset + size > buffer->capacity()) {
         return -EINVAL;
     }
 
-    info->mData->setRange(offset, size);
-    info->mData->meta()->setInt64("timeUs", timeUs);
+    buffer->setRange(offset, size);
+    buffer->meta()->setInt64("timeUs", timeUs);
     if (flags & BUFFER_FLAG_EOS) {
-        info->mData->meta()->setInt32("eos", true);
+        buffer->meta()->setInt32("eos", true);
     }
 
     if (flags & BUFFER_FLAG_CODECCONFIG) {
-        info->mData->meta()->setInt32("csd", true);
+        buffer->meta()->setInt32("csd", true);
     }
 
-    sp<MediaCodecBuffer> buffer = info->mData;
     status_t err = OK;
     if (hasCryptoOrDescrambler()) {
         AString *errorDetailMsg;
         CHECK(msg->findPointer("errorDetailMsg", (void **)&errorDetailMsg));
 
+        ALOGI("calling queueSec");
         err = mBufferChannel->queueSecureInputBuffer(
                 buffer,
                 (mFlags & kFlagIsSecure),
@@ -3833,6 +4005,72 @@ std::string MediaCodec::stateString(State state) {
             break;
     }
     return rval;
+}
+
+// static
+status_t MediaCodec::CanFetchLinearBlock(
+        const std::vector<std::string> &names, bool *isCompatible) {
+    *isCompatible = false;
+    if (names.size() == 0) {
+        *isCompatible = true;
+        return OK;
+    }
+    const CodecListCache &cache = GetCodecListCache();
+    for (const std::string &name : names) {
+        auto it = cache.mCodecInfoMap.find(name);
+        if (it == cache.mCodecInfoMap.end()) {
+            return NAME_NOT_FOUND;
+        }
+        const char *owner = it->second->getOwnerName();
+        if (owner == nullptr || strncmp(owner, "default", 8) == 0) {
+            *isCompatible = false;
+            return OK;
+        } else if (strncmp(owner, "codec2::", 8) != 0) {
+            return NAME_NOT_FOUND;
+        }
+    }
+    return CCodec::CanFetchLinearBlock(names, kDefaultReadWriteUsage, isCompatible);
+}
+
+// static
+std::shared_ptr<C2LinearBlock> MediaCodec::FetchLinearBlock(
+        size_t capacity, const std::vector<std::string> &names) {
+    return CCodec::FetchLinearBlock(capacity, kDefaultReadWriteUsage, names);
+}
+
+// static
+status_t MediaCodec::CanFetchGraphicBlock(
+        const std::vector<std::string> &names, bool *isCompatible) {
+    *isCompatible = false;
+    if (names.size() == 0) {
+        *isCompatible = true;
+        return OK;
+    }
+    const CodecListCache &cache = GetCodecListCache();
+    for (const std::string &name : names) {
+        auto it = cache.mCodecInfoMap.find(name);
+        if (it == cache.mCodecInfoMap.end()) {
+            return NAME_NOT_FOUND;
+        }
+        const char *owner = it->second->getOwnerName();
+        if (owner == nullptr || strncmp(owner, "default", 8) == 0) {
+            *isCompatible = false;
+            return OK;
+        } else if (strncmp(owner, "codec2.", 7) != 0) {
+            return NAME_NOT_FOUND;
+        }
+    }
+    return CCodec::CanFetchGraphicBlock(names, isCompatible);
+}
+
+// static
+std::shared_ptr<C2GraphicBlock> MediaCodec::FetchGraphicBlock(
+        int32_t width,
+        int32_t height,
+        int32_t format,
+        uint64_t usage,
+        const std::vector<std::string> &names) {
+    return CCodec::FetchGraphicBlock(width, height, format, usage, names);
 }
 
 }  // namespace android

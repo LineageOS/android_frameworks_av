@@ -262,7 +262,7 @@ public:
                 *fence = C2Fence(); // not using fences
             }
             (void)mMappings.erase(it);
-            ALOGV("successfully unmapped: %d", mHandle.bufferFd());
+            ALOGV("successfully unmapped: addr=%p size=%zu fd=%d", addr, size, mHandle.bufferFd());
             return C2_OK;
         }
         ALOGD("unmap failed to find specified map");

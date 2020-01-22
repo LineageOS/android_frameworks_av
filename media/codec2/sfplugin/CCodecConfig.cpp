@@ -595,34 +595,18 @@ void CCodecConfig::initializeStandardParams() {
         .withMappers([](C2Value v) -> C2Value {
             int32_t value;
             if (v.get(&value)) {
-                switch (value) {
-                    case COLOR_FormatSurface:
-                        return (uint32_t)HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
-                    case COLOR_FormatYUV420Flexible:
-                        return (uint32_t)HAL_PIXEL_FORMAT_YCBCR_420_888;
-                    case COLOR_FormatYUV420Planar:
-                    case COLOR_FormatYUV420SemiPlanar:
-                    case COLOR_FormatYUV420PackedPlanar:
-                    case COLOR_FormatYUV420PackedSemiPlanar:
-                        return (uint32_t)HAL_PIXEL_FORMAT_YV12;
-                    default:
-                        // TODO: support some sort of passthrough
-                        break;
+                uint32_t result;
+                if (C2Mapper::mapPixelFormatFrameworkToCodec(value, &result)) {
+                    return result;
                 }
             }
             return C2Value();
         }, [](C2Value v) -> C2Value {
             uint32_t value;
             if (v.get(&value)) {
-                switch (value) {
-                    case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
-                        return COLOR_FormatSurface;
-                    case HAL_PIXEL_FORMAT_YV12:
-                    case HAL_PIXEL_FORMAT_YCBCR_420_888:
-                        return COLOR_FormatYUV420Flexible;
-                    default:
-                        // TODO: support some sort of passthrough
-                        break;
+                int32_t result;
+                if (C2Mapper::mapPixelFormatCodecToFramework(value, &result)) {
+                    return result;
                 }
             }
             return C2Value();

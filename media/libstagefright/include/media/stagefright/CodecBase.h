@@ -34,6 +34,8 @@
 #include <system/graphics.h>
 #include <utils/NativeHandle.h>
 
+class C2Buffer;
+
 namespace android {
 class BufferChannelBase;
 struct BufferProducerWrapper;
@@ -45,6 +47,7 @@ struct ICrypto;
 class IMemory;
 
 namespace hardware {
+class HidlMemory;
 namespace cas {
 namespace native {
 namespace V1_0 {
@@ -294,6 +297,50 @@ public:
             const CryptoPlugin::SubSample *subSamples,
             size_t numSubSamples,
             AString *errorDetailMsg) = 0;
+    /**
+     * Attach a Codec 2.0 buffer to MediaCodecBuffer.
+     *
+     * @return    OK if successful;
+     *            -ENOENT if index is not recognized
+     *            -ENOSYS if attaching buffer is not possible or not supported
+     */
+    virtual status_t attachBuffer(
+            const std::shared_ptr<C2Buffer> &c2Buffer,
+            const sp<MediaCodecBuffer> &buffer) {
+        (void)c2Buffer;
+        (void)buffer;
+        return -ENOSYS;
+    }
+    /**
+     * Attach an encrypted HidlMemory buffer to an index
+     *
+     * @return    OK if successful;
+     *            -ENOENT if index is not recognized
+     *            -ENOSYS if attaching buffer is not possible or not supported
+     */
+    virtual status_t attachEncryptedBuffer(
+            const sp<hardware::HidlMemory> &memory,
+            bool secure,
+            const uint8_t *key,
+            const uint8_t *iv,
+            CryptoPlugin::Mode mode,
+            CryptoPlugin::Pattern pattern,
+            size_t offset,
+            const CryptoPlugin::SubSample *subSamples,
+            size_t numSubSamples,
+            const sp<MediaCodecBuffer> &buffer) {
+        (void)memory;
+        (void)secure;
+        (void)key;
+        (void)iv;
+        (void)mode;
+        (void)pattern;
+        (void)offset;
+        (void)subSamples;
+        (void)numSubSamples;
+        (void)buffer;
+        return -ENOSYS;
+    }
     /**
      * Request buffer rendering at specified time.
      *
