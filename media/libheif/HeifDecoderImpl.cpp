@@ -334,6 +334,13 @@ bool HeifDecoderImpl::init(HeifStream* stream, HeifFrameInfo* frameInfo) {
     }
     mDataSource = dataSource;
 
+    return reinit(frameInfo);
+}
+
+bool HeifDecoderImpl::reinit(HeifFrameInfo* frameInfo) {
+    mFrameDecoded = false;
+    mFrameMemory.clear();
+
     mRetriever = new MediaMetadataRetriever();
     status_t err = mRetriever->setDataSource(mDataSource, "image/heif");
     if (err != OK) {
@@ -457,27 +464,35 @@ bool HeifDecoderImpl::getEncodedColor(HeifEncodedColor* /*outColor*/) const {
 }
 
 bool HeifDecoderImpl::setOutputColor(HeifColorFormat heifColor) {
+    if (heifColor == mOutputColor) {
+        return true;
+    }
+
     switch(heifColor) {
         case kHeifColorFormat_RGB565:
         {
             mOutputColor = HAL_PIXEL_FORMAT_RGB_565;
-            return true;
+            break;
         }
         case kHeifColorFormat_RGBA_8888:
         {
             mOutputColor = HAL_PIXEL_FORMAT_RGBA_8888;
-            return true;
+            break;
         }
         case kHeifColorFormat_BGRA_8888:
         {
             mOutputColor = HAL_PIXEL_FORMAT_BGRA_8888;
-            return true;
+            break;
         }
         default:
-            break;
+            ALOGE("Unsupported output color format %d", heifColor);
+            return false;
     }
-    ALOGE("Unsupported output color format %d", heifColor);
-    return false;
+
+    if (mFrameDecoded) {
+        return reinit(nullptr);
+    }
+    return true;
 }
 
 bool HeifDecoderImpl::decodeAsync() {
@@ -506,7 +521,8 @@ bool HeifDecoderImpl::decodeAsync() {
     }
     // Aggressive clear to avoid holding on to resources
     mRetriever.clear();
-    mDataSource.clear();
+
+    // Hold on to mDataSource in case the client wants to redecode.
     return false;
 }
 
@@ -606,7 +622,8 @@ bool HeifDecoderImpl::decode(HeifFrameInfo* frameInfo) {
 
     // Aggressively clear to avoid holding on to resources
     mRetriever.clear();
-    mDataSource.clear();
+
+    // Hold on to mDataSource in case the client wants to redecode.
     return true;
 }
 
