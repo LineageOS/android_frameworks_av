@@ -57,6 +57,8 @@ class Decoder : public CallBackHandle {
 
     void resetDecoder();
 
+    AMediaFormat *getFormat();
+
     // Async callback APIs
     void onInputAvailable(AMediaCodec *codec, int32_t index) override;
 
