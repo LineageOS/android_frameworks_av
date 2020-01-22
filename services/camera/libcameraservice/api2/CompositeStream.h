@@ -64,6 +64,10 @@ public:
     virtual status_t insertGbp(SurfaceMap* /*out*/outSurfaceMap,
             Vector<int32_t>* /*out*/outputStreamIds, int32_t* /*out*/currentStreamId) = 0;
 
+    // Attach the internal composite stream ids.
+    virtual status_t insertCompositeStreamIds(
+            std::vector<int32_t>* compositeStreamIds /*out*/) = 0;
+
     // Return composite stream id.
     virtual int getStreamId() = 0;
 

@@ -29,7 +29,7 @@ class CameraService;
 template <typename TClientBase>
 class Camera2ClientBase :
         public TClientBase,
-        public CameraDeviceBase::NotificationListener
+        public NotificationListener
 {
 public:
     typedef typename TClientBase::TCamCallbacks TCamCallbacks;
@@ -61,7 +61,7 @@ public:
     virtual status_t      dumpClient(int fd, const Vector<String16>& args);
 
     /**
-     * CameraDeviceBase::NotificationListener implementation
+     * NotificationListener implementation
      */
 
     virtual void          notifyError(int32_t errorCode,

@@ -19,65 +19,88 @@
 
 #include <android/hardware/camera2/BnCameraOfflineSession.h>
 #include <android/hardware/camera2/ICameraDeviceCallbacks.h>
+#include "common/FrameProcessorBase.h"
+#include "common/CameraDeviceBase.h"
 #include "CameraService.h"
+#include "CompositeStream.h"
 
 namespace android {
 
 using android::hardware::camera2::ICameraDeviceCallbacks;
+using camera3::CompositeStream;
 
+// Client for offline session. Note that offline session client does not affect camera service's
+// client arbitration logic. It is camera HAL's decision to decide whether a normal camera
+// client is conflicting with existing offline client(s).
+// The other distinctive difference between offline clients and normal clients is that normal
+// clients are created through ICameraService binder calls, while the offline session client
+// is created through ICameraDeviceUser::switchToOffline call.
 class CameraOfflineSessionClient :
-        public CameraService::OfflineClient,
-        public hardware::camera2::BnCameraOfflineSession
-        // public camera2::FrameProcessorBase::FilteredListener?
+        public CameraService::BasicClient,
+        public hardware::camera2::BnCameraOfflineSession,
+        public camera2::FrameProcessorBase::FilteredListener,
+        public NotificationListener
 {
 public:
     CameraOfflineSessionClient(
             const sp<CameraService>& cameraService,
             sp<CameraOfflineSessionBase> session,
+            const KeyedVector<sp<IBinder>, sp<CompositeStream>>& offlineCompositeStreamMap,
             const sp<ICameraDeviceCallbacks>& remoteCallback,
             const String16& clientPackageName,
-            const String8& cameraIdStr,
+            const std::unique_ptr<String16>& clientFeatureId,
+            const String8& cameraIdStr, int cameraFacing,
             int clientPid, uid_t clientUid, int servicePid) :
-                    CameraService::OfflineClient(cameraService, clientPackageName,
-                            cameraIdStr, clientPid, clientUid, servicePid),
-                            mRemoteCallback(remoteCallback), mOfflineSession(session) {}
+            CameraService::BasicClient(
+                    cameraService,
+                    IInterface::asBinder(remoteCallback),
+                    clientPackageName, clientFeatureId,
+                    cameraIdStr, cameraFacing, clientPid, clientUid, servicePid),
+            mRemoteCallback(remoteCallback), mOfflineSession(session),
+            mCompositeStreamMap(offlineCompositeStreamMap) {}
 
-    ~CameraOfflineSessionClient() {}
+    virtual ~CameraOfflineSessionClient() {}
 
-    virtual binder::Status disconnect() override { return binder::Status::ok(); }
-
-    virtual status_t dump(int /*fd*/, const Vector<String16>& /*args*/) override {
-        return OK;
+    sp<IBinder> asBinderWrapper() override {
+        return IInterface::asBinder(this);
     }
 
-    // Block the client form using the camera
-    virtual void block() override {};
+    binder::Status disconnect() override;
 
-    // Return the package name for this client
-    virtual String16 getPackageName() const override { String16 ret; return ret; };
+    status_t dump(int /*fd*/, const Vector<String16>& /*args*/) override;
 
-    // Notify client about a fatal error
-    // TODO: maybe let impl notify within block?
-    virtual void notifyError(int32_t /*errorCode*/,
-            const CaptureResultExtras& /*resultExtras*/) override {}
+    status_t dumpClient(int /*fd*/, const Vector<String16>& /*args*/) override;
 
-    // Get the UID of the application client using this
-    virtual uid_t getClientUid() const override { return 0; }
+    status_t initialize(sp<CameraProviderManager> /*manager*/,
+            const String8& /*monitorTags*/) override;
 
-    // Get the PID of the application client using this
-    virtual int getClientPid() const override { return 0; }
+    // permissions management
+    status_t startCameraOps() override;
+    status_t finishCameraOps() override;
 
-    status_t initialize() {
-        // TODO: Talk to camera service to add the offline session client book keeping
-        return OK;
-    }
+    // FilteredResultListener API
+    void onResultAvailable(const CaptureResult& result) override;
+
+    // NotificationListener API
+    void notifyError(int32_t errorCode, const CaptureResultExtras& resultExtras) override;
+    void notifyShutter(const CaptureResultExtras& resultExtras, nsecs_t timestamp) override;
+    void notifyIdle() override;
+    void notifyAutoFocus(uint8_t newState, int triggerId) override;
+    void notifyAutoExposure(uint8_t newState, int triggerId) override;
+    void notifyAutoWhitebalance(uint8_t newState, int triggerId) override;
+    void notifyPrepared(int streamId) override;
+    void notifyRequestQueueEmpty() override;
+    void notifyRepeatingRequestError(long lastFrameNumber) override;
+
 private:
-    sp<CameraOfflineSessionBase> mSession;
+    mutable Mutex mBinderSerializationLock;
 
     sp<hardware::camera2::ICameraDeviceCallbacks> mRemoteCallback;
-    // This class is responsible to convert HAL callbacks to AIDL callbacks
 
     sp<CameraOfflineSessionBase> mOfflineSession;
+
+    // Offline composite stream map, output surface -> composite stream
+    KeyedVector<sp<IBinder>, sp<CompositeStream>> mCompositeStreamMap;
 };
 
 } // namespace android

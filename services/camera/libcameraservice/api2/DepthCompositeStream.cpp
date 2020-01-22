@@ -683,6 +683,18 @@ status_t DepthCompositeStream::insertGbp(SurfaceMap* /*out*/outSurfaceMap,
     return NO_ERROR;
 }
 
+status_t DepthCompositeStream::insertCompositeStreamIds(
+        std::vector<int32_t>* compositeStreamIds /*out*/) {
+    if (compositeStreamIds == nullptr) {
+        return BAD_VALUE;
+    }
+
+    compositeStreamIds->push_back(mDepthStreamId);
+    compositeStreamIds->push_back(mBlobStreamId);
+
+    return OK;
+}
+
 void DepthCompositeStream::onResultError(const CaptureResultExtras& resultExtras) {
     // Processing can continue even in case of result errors.
     // At the moment depth composite stream processing relies mainly on static camera

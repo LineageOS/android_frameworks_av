@@ -234,6 +234,12 @@ class CameraDeviceBase : public virtual RefBase {
     virtual status_t configureStreams(const CameraMetadata& sessionParams,
             int operatingMode = 0) = 0;
 
+    /**
+     * Retrieve a list of all stream ids that were advertised as capable of
+     * supporting offline processing mode by Hal after the last stream configuration.
+     */
+    virtual void getOfflineStreamIds(std::vector<int> *offlineStreamIds) = 0;
+
     // get the buffer producer of the input stream
     virtual status_t getInputBufferProducer(
             sp<IGraphicBufferProducer> *producer) = 0;
@@ -257,35 +263,6 @@ class CameraDeviceBase : public virtual RefBase {
      * Negative values are error codes.
      */
     virtual ssize_t getJpegBufferSize(uint32_t width, uint32_t height) const = 0;
-
-    /**
-     * Abstract class for HAL notification listeners
-     */
-    class NotificationListener : public virtual RefBase {
-      public:
-        // The set of notifications is a merge of the notifications required for
-        // API1 and API2.
-
-        // Required for API 1 and 2
-        virtual void notifyError(int32_t errorCode,
-                                 const CaptureResultExtras &resultExtras) = 0;
-
-        // Required only for API2
-        virtual void notifyIdle() = 0;
-        virtual void notifyShutter(const CaptureResultExtras &resultExtras,
-                nsecs_t timestamp) = 0;
-        virtual void notifyPrepared(int streamId) = 0;
-        virtual void notifyRequestQueueEmpty() = 0;
-
-        // Required only for API1
-        virtual void notifyAutoFocus(uint8_t newState, int triggerId) = 0;
-        virtual void notifyAutoExposure(uint8_t newState, int triggerId) = 0;
-        virtual void notifyAutoWhitebalance(uint8_t newState,
-                int triggerId) = 0;
-        virtual void notifyRepeatingRequestError(long lastFrameNumber) = 0;
-      protected:
-        virtual ~NotificationListener();
-    };
 
     /**
      * Connect HAL notifications to a listener. Overwrites previous

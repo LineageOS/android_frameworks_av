@@ -83,8 +83,9 @@ interface ICameraDeviceUser
      * @param operatingMode The kind of session to create; either NORMAL_MODE or
      *     CONSTRAINED_HIGH_SPEED_MODE. Must be a non-negative value.
      * @param sessionParams Session wide camera parameters
+     * @return a list of stream ids that can be used in offline mode via "switchToOffline"
      */
-    void endConfigure(int operatingMode, in CameraMetadataNative sessionParams);
+    int[] endConfigure(int operatingMode, in CameraMetadataNative sessionParams);
 
     /**
       * Check whether a particular session configuration has camera device
@@ -189,5 +190,5 @@ interface ICameraDeviceUser
      * @return Offline session object.
      */
     ICameraOfflineSession switchToOffline(in ICameraDeviceCallbacks callbacks,
-            in Surface[] offlineOutputs);
+            in int[] offlineOutputIds);
 }

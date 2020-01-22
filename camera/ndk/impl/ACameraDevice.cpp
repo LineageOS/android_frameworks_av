@@ -710,7 +710,8 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
     if ((sessionParameters != nullptr) && (sessionParameters->settings != nullptr)) {
         params.append(sessionParameters->settings->getInternalData());
     }
-    remoteRet = mRemote->endConfigure(/*isConstrainedHighSpeed*/ false, params);
+    std::vector<int> offlineStreamIds;
+    remoteRet = mRemote->endConfigure(/*isConstrainedHighSpeed*/ false, params, &offlineStreamIds);
     if (remoteRet.serviceSpecificErrorCode() == hardware::ICameraService::ERROR_ILLEGAL_ARGUMENT) {
         ALOGE("Camera device %s cannnot support app output configuration: %s", getId(),
                 remoteRet.toString8().string());

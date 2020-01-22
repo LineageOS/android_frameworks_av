@@ -128,6 +128,7 @@ static const String16
 static constexpr int32_t kVendorClientScore = 200;
 // Matches with PROCESS_STATE_PERSISTENT_UI in ActivityManager.java
 static constexpr int32_t kVendorClientState = 1;
+const String8 CameraService::kOfflineDevice("offline-");
 
 Mutex CameraService::sProxyMutex;
 sp<hardware::ICameraServiceProxy> CameraService::sCameraServiceProxy;
@@ -394,7 +395,7 @@ void CameraService::onDeviceStatusChanged(const String8& id,
         // to this device until the status changes
         updateStatus(StatusInternal::NOT_PRESENT, id);
 
-        sp<BasicClient> clientToDisconnect;
+        sp<BasicClient> clientToDisconnectOnline, clientToDisconnectOffline;
         {
             // Don't do this in updateStatus to avoid deadlock over mServiceLock
             Mutex::Autolock lock(mServiceLock);
@@ -402,23 +403,14 @@ void CameraService::onDeviceStatusChanged(const String8& id,
             // Remove cached shim parameters
             state->setShimParams(CameraParameters());
 
-            // Remove the client from the list of active clients, if there is one
-            clientToDisconnect = removeClientLocked(id);
+            // Remove online as well as offline client from the list of active clients,
+            // if they are present
+            clientToDisconnectOnline = removeClientLocked(id);
+            clientToDisconnectOffline = removeClientLocked(kOfflineDevice + id);
         }
 
-        // Disconnect client
-        if (clientToDisconnect.get() != nullptr) {
-            ALOGI("%s: Client for camera ID %s evicted due to device status change from HAL",
-                    __FUNCTION__, id.string());
-            // Notify the client of disconnection
-            clientToDisconnect->notifyError(
-                    hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DISCONNECTED,
-                    CaptureResultExtras{});
-            // Ensure not in binder RPC so client disconnect PID checks work correctly
-            LOG_ALWAYS_FATAL_IF(CameraThreadState::getCallingPid() != getpid(),
-                    "onDeviceStatusChanged must be called from the camera service process!");
-            clientToDisconnect->disconnect();
-        }
+        disconnectClient(id, clientToDisconnectOnline);
+        disconnectClient(kOfflineDevice + id, clientToDisconnectOffline);
 
         removeStates(id);
     } else {
@@ -429,6 +421,21 @@ void CameraService::onDeviceStatusChanged(const String8& id,
         updateStatus(newStatus, id);
     }
 
+}
+
+void CameraService::disconnectClient(const String8& id, sp<BasicClient> clientToDisconnect) {
+    if (clientToDisconnect.get() != nullptr) {
+        ALOGI("%s: Client for camera ID %s evicted due to device status change from HAL",
+                __FUNCTION__, id.string());
+        // Notify the client of disconnection
+        clientToDisconnect->notifyError(
+                hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DISCONNECTED,
+                CaptureResultExtras{});
+        // Ensure not in binder RPC so client disconnect PID checks work correctly
+        LOG_ALWAYS_FATAL_IF(CameraThreadState::getCallingPid() != getpid(),
+                "onDeviceStatusChanged must be called from the camera service process!");
+        clientToDisconnect->disconnect();
+    }
 }
 
 void CameraService::onTorchStatusChanged(const String8& cameraId,
@@ -1696,6 +1703,77 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
     return ret;
 }
 
+status_t CameraService::addOfflineClient(String8 cameraId, sp<BasicClient> offlineClient) {
+    if (offlineClient.get() == nullptr) {
+        return BAD_VALUE;
+    }
+
+    {
+        // Acquire mServiceLock and prevent other clients from connecting
+        std::unique_ptr<AutoConditionLock> lock =
+                AutoConditionLock::waitAndAcquire(mServiceLockWrapper, DEFAULT_CONNECT_TIMEOUT_NS);
+
+        if (lock == nullptr) {
+            ALOGE("%s: (PID %d) rejected (too many other clients connecting)."
+                    , __FUNCTION__, offlineClient->getClientPid());
+            return TIMED_OUT;
+        }
+
+        auto onlineClientDesc = mActiveClientManager.get(cameraId);
+        if (onlineClientDesc.get() == nullptr) {
+            ALOGE("%s: No active online client using camera id: %s", __FUNCTION__,
+                    cameraId.c_str());
+            return BAD_VALUE;
+        }
+
+        // Offline clients do not evict or conflict with other online devices. Resource sharing
+        // conflicts are handled by the camera provider which will either succeed or fail before
+        // reaching this method.
+        const auto& onlinePriority = onlineClientDesc->getPriority();
+        auto offlineClientDesc = CameraClientManager::makeClientDescriptor(
+                kOfflineDevice + onlineClientDesc->getKey(), offlineClient, /*cost*/ 0,
+                /*conflictingKeys*/ std::set<String8>(), onlinePriority.getScore(),
+                onlineClientDesc->getOwnerId(), onlinePriority.getState());
+
+        // Allow only one offline device per camera
+        auto incompatibleClients = mActiveClientManager.getIncompatibleClients(offlineClientDesc);
+        if (!incompatibleClients.empty()) {
+            ALOGE("%s: Incompatible offline clients present!", __FUNCTION__);
+            return BAD_VALUE;
+        }
+
+        auto err = offlineClient->initialize(mCameraProviderManager, mMonitorTags);
+        if (err != OK) {
+            ALOGE("%s: Could not initialize offline client.", __FUNCTION__);
+            return err;
+        }
+
+        auto evicted = mActiveClientManager.addAndEvict(offlineClientDesc);
+        if (evicted.size() > 0) {
+            for (auto& i : evicted) {
+                ALOGE("%s: Invalid state: Offline client for camera %s was not removed ",
+                        __FUNCTION__, i->getKey().string());
+            }
+
+            LOG_ALWAYS_FATAL("%s: Invalid state for CameraService, offline clients not evicted "
+                    "properly", __FUNCTION__);
+
+            return BAD_VALUE;
+        }
+
+        logConnectedOffline(offlineClientDesc->getKey(),
+                static_cast<int>(offlineClientDesc->getOwnerId()),
+                String8(offlineClient->getPackageName()));
+
+        sp<IBinder> remoteCallback = offlineClient->getRemote();
+        if (remoteCallback != nullptr) {
+            remoteCallback->linkToDeath(this);
+        }
+    } // lock is destroyed, allow further connect calls
+
+    return OK;
+}
+
 Status CameraService::setTorchMode(const String16& cameraId, bool enabled,
         const sp<IBinder>& clientBinder) {
     Mutex::Autolock lock(mServiceLock);
@@ -2300,10 +2378,24 @@ void CameraService::logDisconnected(const char* cameraId, int clientPid,
             clientPackage, clientPid));
 }
 
+void CameraService::logDisconnectedOffline(const char* cameraId, int clientPid,
+        const char* clientPackage) {
+    // Log the clients evicted
+    logEvent(String8::format("DISCONNECT offline device %s client for package %s (PID %d)",
+                cameraId, clientPackage, clientPid));
+}
+
 void CameraService::logConnected(const char* cameraId, int clientPid,
         const char* clientPackage) {
     // Log the clients evicted
     logEvent(String8::format("CONNECT device %s client for package %s (PID %d)", cameraId,
+            clientPackage, clientPid));
+}
+
+void CameraService::logConnectedOffline(const char* cameraId, int clientPid,
+        const char* clientPackage) {
+    // Log the clients evicted
+    logEvent(String8::format("CONNECT offline device %s client for package %s (PID %d)", cameraId,
             clientPackage, clientPid));
 }
 
@@ -2744,6 +2836,7 @@ void CameraService::BasicClient::opChanged(int32_t op, const String16&) {
     if (mAppOpsManager == nullptr) {
         return;
     }
+    // TODO : add offline camera session case
     if (op != AppOpsManager::OP_CAMERA) {
         ALOGW("Unexpected app ops notification received: %d", op);
         return;
@@ -2774,20 +2867,6 @@ void CameraService::BasicClient::block() {
     CaptureResultExtras resultExtras; // a dummy result (invalid)
     notifyError(hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DISABLED, resultExtras);
     disconnect();
-}
-
-// ----------------------------------------------------------------------------
-
-sp<CameraService> CameraService::OfflineClient::sCameraService;
-
-status_t CameraService::OfflineClient::startCameraOps() {
-    // TODO
-    return OK;
-}
-
-status_t CameraService::OfflineClient::finishCameraOps() {
-    // TODO
-    return OK;
 }
 
 // ----------------------------------------------------------------------------

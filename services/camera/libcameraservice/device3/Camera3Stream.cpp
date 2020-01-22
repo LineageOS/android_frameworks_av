@@ -151,6 +151,14 @@ const String8& Camera3Stream::physicalCameraId() const {
     return mPhysicalCameraId;
 }
 
+void Camera3Stream::setOfflineProcessingSupport(bool support) {
+    mSupportOfflineProcessing = support;
+}
+
+bool Camera3Stream::getOfflineProcessingSupport() const {
+    return mSupportOfflineProcessing;
+}
+
 status_t Camera3Stream::forceToIdle() {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);

@@ -92,7 +92,9 @@ public:
     virtual binder::Status beginConfigure() override;
 
     virtual binder::Status endConfigure(int operatingMode,
-            const hardware::camera2::impl::CameraMetadataNative& sessionParams) override;
+            const hardware::camera2::impl::CameraMetadataNative& sessionParams,
+            /*out*/
+            std::vector<int>* offlineStreamIds) override;
 
     // Verify specific session configuration.
     virtual binder::Status isSessionConfigurationSupported(
@@ -160,7 +162,7 @@ public:
 
     virtual binder::Status switchToOffline(
             const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb,
-            const std::vector<view::Surface>& offlineOutputs,
+            const std::vector<int>& offlineOutputIds,
             /*out*/
             sp<hardware::camera2::ICameraOfflineSession>* session) override;
 
