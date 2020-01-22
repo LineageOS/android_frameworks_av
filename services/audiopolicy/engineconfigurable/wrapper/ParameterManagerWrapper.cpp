@@ -92,7 +92,8 @@ struct ParameterManagerWrapper::parameterManagerElementSupported<ISelectionCrite
 template <>
 struct ParameterManagerWrapper::parameterManagerElementSupported<ISelectionCriterionTypeInterface> {};
 
-ParameterManagerWrapper::ParameterManagerWrapper()
+ParameterManagerWrapper::ParameterManagerWrapper(bool enableSchemaVerification,
+                                                 const std::string &schemaUri)
     : mPfwConnectorLogger(new ParameterMgrPlatformConnectorLogger)
 {
     // Connector
@@ -104,6 +105,15 @@ ParameterManagerWrapper::ParameterManagerWrapper()
 
     // Logger
     mPfwConnector->setLogger(mPfwConnectorLogger);
+
+    // Schema validation
+    std::string error;
+    bool ret = mPfwConnector->setValidateSchemasOnStart(enableSchemaVerification, error);
+    ALOGE_IF(!ret, "Failed to activate schema validation: %s", error.c_str());
+    if (enableSchemaVerification && ret && !schemaUri.empty()) {
+        ALOGE("Schema verification activated with schema URI: %s", schemaUri.c_str());
+        mPfwConnector->setSchemaUri(schemaUri);
+    }
 }
 
 status_t ParameterManagerWrapper::addCriterion(const std::string &name, bool isInclusive,
@@ -145,11 +155,10 @@ ParameterManagerWrapper::~ParameterManagerWrapper()
     delete mPfwConnector;
 }
 
-status_t ParameterManagerWrapper::start()
+status_t ParameterManagerWrapper::start(std::string &error)
 {
     ALOGD("%s: in", __FUNCTION__);
     /// Start PFW
-    std::string error;
     if (!mPfwConnector->start(error)) {
         ALOGE("%s: Policy PFW start error: %s", __FUNCTION__, error.c_str());
         return NO_INIT;
@@ -253,13 +262,13 @@ bool ParameterManagerWrapper::isValueValidForCriterion(ISelectionCriterionInterf
     return interface->getLiteralValue(valueToCheck, literalValue);
 }
 
-status_t ParameterManagerWrapper::setDeviceConnectionState(const sp<DeviceDescriptor> devDesc,
-                                                           audio_policy_dev_state_t state)
+status_t ParameterManagerWrapper::setDeviceConnectionState(
+        audio_devices_t type, const std::string address, audio_policy_dev_state_t state)
 {
-    std::string criterionName = audio_is_output_device(devDesc->type()) ?
+    std::string criterionName = audio_is_output_device(type) ?
                 gOutputDeviceAddressCriterionName : gInputDeviceAddressCriterionName;
 
-    ALOGV("%s: device with address %s %s", __FUNCTION__, devDesc->address().c_str(),
+    ALOGV("%s: device with address %s %s", __FUNCTION__, address.c_str(),
           state != AUDIO_POLICY_DEVICE_STATE_AVAILABLE? "disconnected" : "connected");
     ISelectionCriterionInterface *criterion =
             getElement<ISelectionCriterionInterface>(criterionName, mPolicyCriteria);
@@ -271,8 +280,8 @@ status_t ParameterManagerWrapper::setDeviceConnectionState(const sp<DeviceDescri
 
     auto criterionType = criterion->getCriterionType();
     int deviceAddressId;
-    if (not criterionType->getNumericalValue(devDesc->address().c_str(), deviceAddressId)) {
-        ALOGW("%s: unknown device address reported (%s)", __FUNCTION__, devDesc->address().c_str());
+    if (not criterionType->getNumericalValue(address.c_str(), deviceAddressId)) {
+        ALOGW("%s: unknown device address reported (%s)", __FUNCTION__, address.c_str());
         return BAD_TYPE;
     }
     int currentValueMask = criterion->getCriterionState();
