@@ -199,6 +199,7 @@ struct GlobalConfigTraits
     struct Attributes
     {
         static constexpr const char *speakerDrcEnabled = "speaker_drc_enabled";
+        static constexpr const char *engineLibrarySuffix = "engine_library";
     };
 
     static status_t deserialize(const xmlNode *root, AudioPolicyConfig *config);
@@ -686,6 +687,10 @@ status_t GlobalConfigTraits::deserialize(const xmlNode *root, AudioPolicyConfig 
             if (!speakerDrcEnabled.empty() &&
                     convertTo<std::string, bool>(speakerDrcEnabled, isSpeakerDrcEnabled)) {
                 config->setSpeakerDrcEnabled(isSpeakerDrcEnabled);
+            }
+            std::string engineLibrarySuffix = getXmlAttribute(cur, Attributes::engineLibrarySuffix);
+            if (!engineLibrarySuffix.empty()) {
+                config->setEngineLibraryNameSuffix(engineLibrarySuffix);
             }
             return NO_ERROR;
         }
