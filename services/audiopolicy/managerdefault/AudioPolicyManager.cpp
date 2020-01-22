@@ -6047,7 +6047,7 @@ void AudioPolicyManager::applyStreamVolumes(const sp<AudioOutputDescriptor>& out
                                             int delayMs,
                                             bool force)
 {
-    ALOGVV("applyStreamVolumes() for device %08x", device);
+    ALOGVV("applyStreamVolumes() for device %s", dumpDeviceTypes(deviceTypes).c_str());
     for (const auto &volumeGroup : mEngine->getVolumeGroups()) {
         auto &curves = getVolumeCurves(toVolumeSource(volumeGroup));
         checkAndSetVolume(curves, toVolumeSource(volumeGroup),

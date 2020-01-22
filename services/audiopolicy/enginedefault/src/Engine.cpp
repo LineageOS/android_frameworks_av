@@ -463,8 +463,8 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                  "getDevicesForStrategy() no default device defined");
     }
 
-    ALOGVV("getDevices"
-           "ForStrategy() strategy %d, device %x", strategy, devices.types());
+    ALOGVV("getDevices ForStrategy() strategy %d, device %s",
+           strategy, dumpDeviceTypes(devices.types()).c_str());
     return devices;
 }
 
@@ -636,8 +636,9 @@ DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t strategy) c
                 String8(preferredStrategyDevice.mAddress.c_str()),
                 AUDIO_FORMAT_DEFAULT);
         if (preferredAvailableDevDescr != nullptr) {
-            ALOGVV("%s using pref device 0x%08x/%s for strategy %u", __FUNCTION__,
-                   preferredStrategyDevice.mType, preferredStrategyDevice.mAddress, strategy);
+            ALOGVV("%s using pref device 0x%08x/%s for strategy %u",
+                   __func__, preferredStrategyDevice.mType,
+                   preferredStrategyDevice.mAddress.c_str(), strategy);
             return DeviceVector(preferredAvailableDevDescr);
         }
     }
