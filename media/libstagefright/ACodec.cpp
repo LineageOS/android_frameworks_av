@@ -1310,7 +1310,7 @@ status_t ACodec::allocateOutputMetadataBuffers() {
     OMX_U32 bufferCount, bufferSize, minUndequeuedBuffers;
     status_t err = configureOutputBuffersFromNativeWindow(
             &bufferCount, &bufferSize, &minUndequeuedBuffers,
-            false /* preregister */);
+            mFlags & kFlagPreregisterMetadataBuffers /* preregister */);
     if (err != OK)
         return err;
     mNumUndequeuedBuffers = minUndequeuedBuffers;
@@ -1895,6 +1895,19 @@ status_t ACodec::configureCodec(
             ALOGI("falling back to non-native_handles");
             setPortMode(kPortIndexInput, IOMX::kPortModePresetByteBuffer);
             err = OK; // ignore error for now
+        }
+
+        OMX_INDEXTYPE index;
+        if (mOMXNode->getExtensionIndex(
+                "OMX.google.android.index.preregisterMetadataBuffers", &index) == OK) {
+            OMX_CONFIG_BOOLEANTYPE param;
+            InitOMXParams(&param);
+            param.bEnabled = OMX_FALSE;
+            if (mOMXNode->getParameter(index, &param, sizeof(param)) == OK) {
+                if (param.bEnabled == OMX_TRUE) {
+                    mFlags |= kFlagPreregisterMetadataBuffers;
+                }
+            }
         }
     }
     if (haveNativeWindow) {

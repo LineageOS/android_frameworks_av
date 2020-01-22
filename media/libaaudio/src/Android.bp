@@ -44,14 +44,6 @@ cc_library {
     sanitize: {
         integer_overflow: true,
         misc_undefined: ["bounds"],
-        diag: {
-            integer_overflow: true,
-            misc_undefined: ["bounds"],
-            no_recover: [
-                "bounds",
-                "integer",
-            ],
-        },
     },
 
     stubs: {
@@ -137,14 +129,5 @@ cc_library {
     sanitize: {
         integer_overflow: true,
         misc_undefined: ["bounds"],
-        diag: {
-            integer_overflow: true,
-            misc_undefined: ["bounds"],
-            no_recover: [
-                "bounds",
-                "integer",
-            ],
-        },
     },
-
 }
