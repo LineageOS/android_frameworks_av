@@ -56,7 +56,8 @@ AAudioServiceStreamBase::~AAudioServiceStreamBase() {
     LOG_ALWAYS_FATAL_IF(!(getState() == AAUDIO_STREAM_STATE_CLOSED
                         || getState() == AAUDIO_STREAM_STATE_UNINITIALIZED
                         || getState() == AAUDIO_STREAM_STATE_DISCONNECTED),
-                        "service stream still open, state = %d", getState());
+                        "service stream %p still open, state = %d",
+                        this, getState());
 }
 
 std::string AAudioServiceStreamBase::dumpHeader() {
@@ -126,13 +127,13 @@ error:
 }
 
 aaudio_result_t AAudioServiceStreamBase::close() {
-    aaudio_result_t result = AAUDIO_OK;
     if (getState() == AAUDIO_STREAM_STATE_CLOSED) {
         return AAUDIO_OK;
     }
 
     stop();
 
+    aaudio_result_t result = AAUDIO_OK;
     sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
     if (endpoint == nullptr) {
         result = AAUDIO_ERROR_INVALID_STATE;
