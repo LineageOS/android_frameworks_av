@@ -97,6 +97,8 @@ enum {
     IS_HAPTIC_PLAYBACK_SUPPORTED,
     SET_UID_DEVICE_AFFINITY,
     REMOVE_UID_DEVICE_AFFINITY,
+    SET_USERID_DEVICE_AFFINITY,
+    REMOVE_USERID_DEVICE_AFFINITY,
     GET_OFFLOAD_FORMATS_A2DP,
     LIST_AUDIO_PRODUCT_STRATEGIES,
     GET_STRATEGY_FOR_ATTRIBUTES,
@@ -1197,6 +1199,52 @@ public:
         return status;
     }
 
+        virtual status_t setUserIdDeviceAffinities(int userId,
+                const Vector<AudioDeviceTypeAddr>& devices)
+        {
+            Parcel data, reply;
+            data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+
+            data.writeInt32((int32_t) userId);
+            size_t size = devices.size();
+            size_t sizePosition = data.dataPosition();
+            data.writeInt32((int32_t) size);
+            size_t finalSize = size;
+            for (size_t i = 0; i < size; i++) {
+                size_t position = data.dataPosition();
+                if (devices[i].writeToParcel(&data) != NO_ERROR) {
+                    data.setDataPosition(position);
+                    finalSize--;
+                }
+            }
+            if (size != finalSize) {
+                size_t position = data.dataPosition();
+                data.setDataPosition(sizePosition);
+                data.writeInt32(finalSize);
+                data.setDataPosition(position);
+            }
+
+            status_t status = remote()->transact(SET_USERID_DEVICE_AFFINITY, data, &reply);
+            if (status == NO_ERROR) {
+                status = (status_t)reply.readInt32();
+            }
+            return status;
+        }
+
+        virtual status_t removeUserIdDeviceAffinities(int userId) {
+            Parcel data, reply;
+            data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+
+            data.writeInt32((int32_t) userId);
+
+            status_t status =
+                remote()->transact(REMOVE_USERID_DEVICE_AFFINITY, data, &reply);
+            if (status == NO_ERROR) {
+                status = (status_t) reply.readInt32();
+            }
+            return status;
+        }
+
     virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies)
     {
         Parcel data, reply;
@@ -1457,6 +1505,8 @@ status_t BnAudioPolicyService::onTransact(
         case SET_A11Y_SERVICES_UIDS:
         case SET_UID_DEVICE_AFFINITY:
         case REMOVE_UID_DEVICE_AFFINITY:
+        case SET_USERID_DEVICE_AFFINITY:
+        case REMOVE_USERID_DEVICE_AFFINITY:
         case GET_OFFLOAD_FORMATS_A2DP:
         case LIST_AUDIO_VOLUME_GROUPS:
         case GET_VOLUME_GROUP_FOR_ATTRIBUTES:
@@ -2375,6 +2425,30 @@ status_t BnAudioPolicyService::onTransact(
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             const uid_t uid = (uid_t) data.readInt32();
             status_t status = removeUidDeviceAffinities(uid);
+            reply->writeInt32(status);
+            return NO_ERROR;
+        }
+
+        case SET_USERID_DEVICE_AFFINITY: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            const int userId = (int) data.readInt32();
+            Vector<AudioDeviceTypeAddr> devices;
+            size_t size = (size_t)data.readInt32();
+            for (size_t i = 0; i < size; i++) {
+                AudioDeviceTypeAddr device;
+                if (device.readFromParcel((Parcel*)&data) == NO_ERROR) {
+                    devices.add(device);
+                }
+            }
+            status_t status = setUserIdDeviceAffinities(userId, devices);
+            reply->writeInt32(status);
+            return NO_ERROR;
+        }
+
+        case REMOVE_USERID_DEVICE_AFFINITY: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            const int userId = (int) data.readInt32();
+            status_t status = removeUserIdDeviceAffinities(userId);
             reply->writeInt32(status);
             return NO_ERROR;
         }
