@@ -39,22 +39,22 @@ MediaExtractorService::~MediaExtractorService() {
 
 ::android::binder::Status MediaExtractorService::makeExtractor(
         const ::android::sp<::android::IDataSource>& remoteSource,
-        const ::std::unique_ptr< ::std::string> &mime,
+        const ::std::optional< ::std::string> &mime,
         ::android::sp<::android::IMediaExtractor>* _aidl_return) {
-    ALOGV("@@@ MediaExtractorService::makeExtractor for %s", mime.get()->c_str());
+    ALOGV("@@@ MediaExtractorService::makeExtractor for %s", mime ? mime->c_str() : nullptr);
 
     sp<DataSource> localSource = CreateDataSourceFromIDataSource(remoteSource);
 
     sp<IMediaExtractor> extractor = MediaExtractorFactory::CreateFromService(
             localSource,
-            mime.get() ? mime.get()->c_str() : nullptr);
+            mime ? mime->c_str() : nullptr);
 
     ALOGV("extractor service created %p (%s)",
             extractor.get(),
             extractor == nullptr ? "" : extractor->name());
 
     if (extractor != nullptr) {
-        registerMediaExtractor(extractor, localSource, mime.get() ? mime.get()->c_str() : nullptr);
+        registerMediaExtractor(extractor, localSource, mime ? mime->c_str() : nullptr);
     }
     *_aidl_return = extractor;
     return binder::Status::ok();

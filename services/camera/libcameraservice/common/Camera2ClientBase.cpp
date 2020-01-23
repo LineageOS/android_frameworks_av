@@ -44,7 +44,7 @@ Camera2ClientBase<TClientBase>::Camera2ClientBase(
         const sp<CameraService>& cameraService,
         const sp<TCamCallbacks>& remoteCallback,
         const String16& clientPackageName,
-        const std::unique_ptr<String16>& clientFeatureId,
+        const std::optional<String16>& clientFeatureId,
         const String8& cameraId,
         int api1CameraId,
         int cameraFacing,
