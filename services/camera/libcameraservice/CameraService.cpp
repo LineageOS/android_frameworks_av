@@ -456,10 +456,14 @@ void CameraService::onDeviceStatusChanged(const String8& id,
     }
 
     if (updated) {
-        logDeviceRemoved(id, String8::format("Device %s-%s availability changed from %d to %d",
-                id.string(), physicalId.string(),
-                newStatus != StatusInternal::PRESENT,
-                newStatus == StatusInternal::PRESENT));
+        String8 idCombo = id + " : " + physicalId;
+        if (newStatus == StatusInternal::PRESENT) {
+            logDeviceAdded(idCombo,
+                    String8::format("Device status changed to %d", newStatus));
+        } else {
+            logDeviceRemoved(idCombo,
+                    String8::format("Device status changed to %d", newStatus));
+        }
 
         String16 id16(id), physicalId16(physicalId);
         Mutex::Autolock lock(mStatusListenerLock);
