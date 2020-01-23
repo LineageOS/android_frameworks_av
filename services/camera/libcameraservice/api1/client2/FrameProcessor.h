@@ -24,6 +24,7 @@
 #include <utils/List.h>
 #include <camera/CameraMetadata.h>
 
+#include "common/CameraDeviceBase.h"
 #include "common/FrameProcessorBase.h"
 
 struct camera_frame_metadata;
@@ -54,7 +55,7 @@ class FrameProcessor : public FrameProcessorBase {
     void processNewFrames(const sp<Camera2Client> &client);
 
     virtual bool processSingleFrame(CaptureResult &frame,
-                                    const sp<CameraDeviceBase> &device);
+                                    const sp<FrameProducer> &device);
 
     status_t processFaceDetect(const CameraMetadata &frame,
             const sp<Camera2Client> &client);

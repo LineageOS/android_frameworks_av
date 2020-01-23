@@ -117,8 +117,8 @@ status_t CameraDeviceClient::initializeImpl(TProviderPtr providerPtr, const Stri
     threadName = String8::format("CDU-%s-FrameProc", mCameraIdStr.string());
     mFrameProcessor->run(threadName.string());
 
-    mFrameProcessor->registerListener(FRAME_PROCESSOR_LISTENER_MIN_ID,
-                                      FRAME_PROCESSOR_LISTENER_MAX_ID,
+    mFrameProcessor->registerListener(camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MIN_ID,
+                                      camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MAX_ID,
                                       /*listener*/this,
                                       /*sendPartials*/true);
 
@@ -526,7 +526,8 @@ binder::Status CameraDeviceClient::endConfigure(int operatingMode,
             // streams are also supported.
             std::vector<int> internalStreams;
             mCompositeStreamMap.valueAt(i)->insertCompositeStreamIds(&internalStreams);
-            std::remove_if(offlineStreamIds->begin(), offlineStreamIds->end(),
+            offlineStreamIds->erase(
+                    std::remove_if(offlineStreamIds->begin(), offlineStreamIds->end(),
                     [&internalStreams] (int streamId) {
                         auto it = std::find(internalStreams.begin(), internalStreams.end(),
                                 streamId);
@@ -535,8 +536,7 @@ binder::Status CameraDeviceClient::endConfigure(int operatingMode,
                             return true;
                         }
 
-                        return false;
-                    });
+                        return false;}), offlineStreamIds->end());
             if (internalStreams.empty()) {
                 offlineStreamIds->push_back(mCompositeStreamMap.valueAt(i)->getStreamId());
             }
@@ -818,7 +818,7 @@ binder::Status CameraDeviceClient::isSessionConfigurationSupported(
     }
     hardware::camera::device::V3_4::StreamConfiguration streamConfiguration;
     bool earlyExit = false;
-    metadataGetter getMetadata = [this](const String8 &id) {return mDevice->info(id);};
+    metadataGetter getMetadata = [this](const String8 &id) {return mDevice->infoPhysical(id);};
     std::vector<std::string> physicalCameraIds;
     mProviderManager->isLogicalCamera(mCameraIdStr.string(), &physicalCameraIds);
     res = convertToHALStreamCombination(sessionConfiguration, mCameraIdStr,
@@ -1010,7 +1010,7 @@ binder::Status CameraDeviceClient::createStream(
 
         sp<Surface> surface;
         res = createSurfaceFromGbp(streamInfo, isStreamInfoValid, surface, bufferProducer,
-                mCameraIdStr, mDevice->info(physicalCameraId));
+                mCameraIdStr, mDevice->infoPhysical(physicalCameraId));
 
         if (!res.isOk())
             return res;
@@ -1314,7 +1314,7 @@ binder::Status CameraDeviceClient::updateOutputConfiguration(int streamId,
         OutputStreamInfo outInfo;
         sp<Surface> surface;
         res = createSurfaceFromGbp(outInfo, /*isStreamInfoValid*/ false, surface,
-                newOutputsMap.valueAt(i), mCameraIdStr, mDevice->info(physicalCameraId));
+                newOutputsMap.valueAt(i), mCameraIdStr, mDevice->infoPhysical(physicalCameraId));
         if (!res.isOk())
             return res;
 
@@ -1897,7 +1897,7 @@ binder::Status CameraDeviceClient::finalizeOutputConfigurations(int32_t streamId
 
         sp<Surface> surface;
         res = createSurfaceFromGbp(mStreamInfoMap[streamId], true /*isStreamInfoValid*/,
-                surface, bufferProducer, mCameraIdStr, mDevice->info(physicalId));
+                surface, bufferProducer, mCameraIdStr, mDevice->infoPhysical(physicalId));
 
         if (!res.isOk())
             return res;
@@ -2207,8 +2207,8 @@ void CameraDeviceClient::detachDevice() {
 
     ALOGV("Camera %s: Stopping processors", mCameraIdStr.string());
 
-    mFrameProcessor->removeListener(FRAME_PROCESSOR_LISTENER_MIN_ID,
-                                    FRAME_PROCESSOR_LISTENER_MAX_ID,
+    mFrameProcessor->removeListener(camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MIN_ID,
+                                    camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MAX_ID,
                                     /*listener*/this);
     mFrameProcessor->requestExit();
     ALOGV("Camera %s: Waiting for threads", mCameraIdStr.string());

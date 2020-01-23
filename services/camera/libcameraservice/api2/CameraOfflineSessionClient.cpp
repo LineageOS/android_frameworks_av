@@ -41,6 +41,16 @@ status_t CameraOfflineSessionClient::initialize(sp<CameraProviderManager>, const
         return NO_INIT;
     }
 
+    String8 threadName;
+    mFrameProcessor = new camera2::FrameProcessorBase(mOfflineSession);
+    threadName = String8::format("Offline-%s-FrameProc", mCameraIdStr.string());
+    mFrameProcessor->run(threadName.string());
+
+    mFrameProcessor->registerListener(camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MIN_ID,
+                                      camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MAX_ID,
+                                      /*listener*/this,
+                                      /*sendPartials*/true);
+
     wp<NotificationListener> weakThis(this);
     res = mOfflineSession->initialize(weakThis);
     if (res != OK) {
@@ -62,7 +72,7 @@ status_t CameraOfflineSessionClient::dump(int fd, const Vector<String16>& args) 
     return BasicClient::dump(fd, args);
 }
 
-status_t CameraOfflineSessionClient::dumpClient(int fd, const Vector<String16>& /*args*/) {
+status_t CameraOfflineSessionClient::dumpClient(int fd, const Vector<String16>& args) {
     String8 result;
 
     result = "  Offline session dump:\n";
@@ -73,6 +83,8 @@ status_t CameraOfflineSessionClient::dumpClient(int fd, const Vector<String16>& 
         write(fd, result.string(), result.size());
         return NO_ERROR;
     }
+
+    mFrameProcessor->dump(fd, args);
 
     auto res = mOfflineSession->dump(fd);
     if (res != OK) {
@@ -107,6 +119,12 @@ binder::Status CameraOfflineSessionClient::disconnect() {
     if (remote != nullptr) {
         remote->unlinkToDeath(sCameraService);
     }
+
+    mFrameProcessor->removeListener(camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MIN_ID,
+                                    camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MAX_ID,
+                                    /*listener*/this);
+    mFrameProcessor->requestExit();
+    mFrameProcessor->join();
 
     finishCameraOps();
     ALOGI("%s: Disconnected client for offline camera %s for PID %d", __FUNCTION__,

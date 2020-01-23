@@ -66,7 +66,7 @@ FrameProcessor::~FrameProcessor() {
 }
 
 bool FrameProcessor::processSingleFrame(CaptureResult &frame,
-                                        const sp<CameraDeviceBase> &device) {
+                                        const sp<FrameProducer> &device) {
 
     sp<Camera2Client> client = mClient.promote();
     if (!client.get()) {

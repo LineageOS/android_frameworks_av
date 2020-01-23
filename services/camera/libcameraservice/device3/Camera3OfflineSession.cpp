@@ -463,4 +463,8 @@ std::vector<sp<Camera3StreamInterface>> Camera3OfflineSession::getAllStreams() {
     return ret;
 }
 
+const CameraMetadata& Camera3OfflineSession::info() const {
+    return mDeviceInfo;
+}
+
 }; // namespace android
