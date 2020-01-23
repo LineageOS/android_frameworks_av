@@ -949,3 +949,41 @@ bool C2Mapper::map(C2Color::transfer_t from, ColorAspects::Transfer *to) {
 bool C2Mapper::map(ColorAspects::Transfer from, C2Color::transfer_t *to) {
     return sColorTransfersSf.map(from, to);
 }
+
+// static
+bool C2Mapper::mapPixelFormatFrameworkToCodec(
+        int32_t frameworkValue, uint32_t *c2Value) {
+    switch (frameworkValue) {
+        case COLOR_FormatSurface:
+            *c2Value = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
+            return true;
+        case COLOR_FormatYUV420Flexible:
+            *c2Value = HAL_PIXEL_FORMAT_YCBCR_420_888;
+            return true;
+        case COLOR_FormatYUV420Planar:
+        case COLOR_FormatYUV420SemiPlanar:
+        case COLOR_FormatYUV420PackedPlanar:
+        case COLOR_FormatYUV420PackedSemiPlanar:
+            *c2Value = HAL_PIXEL_FORMAT_YV12;
+            return true;
+        default:
+            // TODO: support some sort of passthrough
+            return false;
+    }
+}
+
+// static
+bool C2Mapper::mapPixelFormatCodecToFramework(
+        uint32_t c2Value, int32_t *frameworkValue) {
+    switch (c2Value) {
+        case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
+            *frameworkValue = COLOR_FormatSurface;
+            return true;
+        case HAL_PIXEL_FORMAT_YV12:
+        case HAL_PIXEL_FORMAT_YCBCR_420_888:
+            *frameworkValue = COLOR_FormatYUV420Flexible;
+            return true;
+        default:
+            return false;
+    }
+}

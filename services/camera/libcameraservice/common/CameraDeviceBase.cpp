@@ -24,7 +24,4 @@ namespace android {
 CameraDeviceBase::~CameraDeviceBase() {
 }
 
-CameraDeviceBase::NotificationListener::~NotificationListener() {
-}
-
 } // namespace android

@@ -29,6 +29,7 @@
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
 #include <android/hardware/drm/1.0/types.h>
 #include <android-base/stringprintf.h>
+#include <binder/MemoryBase.h>
 #include <binder/MemoryDealer.h>
 #include <cutils/properties.h>
 #include <gui/Surface.h>
@@ -249,7 +250,7 @@ CCodecBufferChannel::CCodecBufferChannel(
 }
 
 CCodecBufferChannel::~CCodecBufferChannel() {
-    if (mCrypto != nullptr && mDealer != nullptr && mHeapSeqNum >= 0) {
+    if (mCrypto != nullptr && mHeapSeqNum >= 0) {
         mCrypto->unsetHeap(mHeapSeqNum);
     }
 }
@@ -406,6 +407,173 @@ status_t CCodecBufferChannel::setParameters(std::vector<std::unique_ptr<C2Param>
                           std::make_move_iterator(params.begin()),
                           std::make_move_iterator(params.end()));
     params.clear();
+    return OK;
+}
+
+status_t CCodecBufferChannel::attachBuffer(
+        const std::shared_ptr<C2Buffer> &c2Buffer,
+        const sp<MediaCodecBuffer> &buffer) {
+    if (!buffer->copy(c2Buffer)) {
+        return -ENOSYS;
+    }
+    return OK;
+}
+
+void CCodecBufferChannel::ensureDecryptDestination(size_t size) {
+    if (!mDecryptDestination || mDecryptDestination->size() < size) {
+        sp<IMemoryHeap> heap{new MemoryHeapBase(size * 2)};
+        if (mDecryptDestination && mCrypto && mHeapSeqNum >= 0) {
+            mCrypto->unsetHeap(mHeapSeqNum);
+        }
+        mDecryptDestination = new MemoryBase(heap, 0, size * 2);
+        if (mCrypto) {
+            mHeapSeqNum = mCrypto->setHeap(hardware::fromHeap(heap));
+        }
+    }
+}
+
+int32_t CCodecBufferChannel::getHeapSeqNum(const sp<HidlMemory> &memory) {
+    CHECK(mCrypto);
+    auto it = mHeapSeqNumMap.find(memory);
+    int32_t heapSeqNum = -1;
+    if (it == mHeapSeqNumMap.end()) {
+        heapSeqNum = mCrypto->setHeap(memory);
+        mHeapSeqNumMap.emplace(memory, heapSeqNum);
+    } else {
+        heapSeqNum = it->second;
+    }
+    return heapSeqNum;
+}
+
+status_t CCodecBufferChannel::attachEncryptedBuffer(
+        const sp<hardware::HidlMemory> &memory,
+        bool secure,
+        const uint8_t *key,
+        const uint8_t *iv,
+        CryptoPlugin::Mode mode,
+        CryptoPlugin::Pattern pattern,
+        size_t offset,
+        const CryptoPlugin::SubSample *subSamples,
+        size_t numSubSamples,
+        const sp<MediaCodecBuffer> &buffer) {
+    static const C2MemoryUsage kSecureUsage{C2MemoryUsage::READ_PROTECTED, 0};
+    static const C2MemoryUsage kDefaultReadWriteUsage{
+        C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
+
+    size_t size = 0;
+    for (size_t i = 0; i < numSubSamples; ++i) {
+        size += subSamples[i].mNumBytesOfClearData + subSamples[i].mNumBytesOfEncryptedData;
+    }
+    std::shared_ptr<C2BlockPool> pool = mBlockPools.lock()->inputPool;
+    std::shared_ptr<C2LinearBlock> block;
+    c2_status_t err = pool->fetchLinearBlock(
+            size,
+            secure ? kSecureUsage : kDefaultReadWriteUsage,
+            &block);
+    if (err != C2_OK) {
+        return NO_MEMORY;
+    }
+    if (!secure) {
+        ensureDecryptDestination(size);
+    }
+    ssize_t result = -1;
+    ssize_t codecDataOffset = 0;
+    if (mCrypto) {
+        AString errorDetailMsg;
+        int32_t heapSeqNum = getHeapSeqNum(memory);
+        hardware::drm::V1_0::SharedBuffer src{(uint32_t)heapSeqNum, offset, size};
+        hardware::drm::V1_0::DestinationBuffer dst;
+        if (secure) {
+            dst.type = DrmBufferType::NATIVE_HANDLE;
+            dst.secureMemory = hardware::hidl_handle(block->handle());
+        } else {
+            dst.type = DrmBufferType::SHARED_MEMORY;
+            IMemoryToSharedBuffer(
+                    mDecryptDestination, mHeapSeqNum, &dst.nonsecureMemory);
+        }
+        result = mCrypto->decrypt(
+                key, iv, mode, pattern, src, 0, subSamples, numSubSamples,
+                dst, &errorDetailMsg);
+        if (result < 0) {
+            return result;
+        }
+        if (dst.type == DrmBufferType::SHARED_MEMORY) {
+            C2WriteView view = block->map().get();
+            if (view.error() != C2_OK) {
+                return false;
+            }
+            if (view.size() < result) {
+                return false;
+            }
+            memcpy(view.data(), mDecryptDestination->unsecurePointer(), result);
+        }
+    } else {
+        // Here we cast CryptoPlugin::SubSample to hardware::cas::native::V1_0::SubSample
+        // directly, the structure definitions should match as checked in DescramblerImpl.cpp.
+        hidl_vec<SubSample> hidlSubSamples;
+        hidlSubSamples.setToExternal((SubSample *)subSamples, numSubSamples, false /*own*/);
+
+        hardware::cas::native::V1_0::SharedBuffer src{*memory, offset, size};
+        hardware::cas::native::V1_0::DestinationBuffer dst;
+        if (secure) {
+            dst.type = BufferType::NATIVE_HANDLE;
+            dst.secureMemory = hardware::hidl_handle(block->handle());
+        } else {
+            dst.type = BufferType::SHARED_MEMORY;
+            dst.nonsecureMemory = src;
+        }
+
+        CasStatus status = CasStatus::OK;
+        hidl_string detailedError;
+        ScramblingControl sctrl = ScramblingControl::UNSCRAMBLED;
+
+        if (key != nullptr) {
+            sctrl = (ScramblingControl)key[0];
+            // Adjust for the PES offset
+            codecDataOffset = key[2] | (key[3] << 8);
+        }
+
+        auto returnVoid = mDescrambler->descramble(
+                sctrl,
+                hidlSubSamples,
+                src,
+                0,
+                dst,
+                0,
+                [&status, &result, &detailedError] (
+                        CasStatus _status, uint32_t _bytesWritten,
+                        const hidl_string& _detailedError) {
+                    status = _status;
+                    result = (ssize_t)_bytesWritten;
+                    detailedError = _detailedError;
+                });
+
+        if (!returnVoid.isOk() || status != CasStatus::OK || result < 0) {
+            ALOGI("[%s] descramble failed, trans=%s, status=%d, result=%zd",
+                    mName, returnVoid.description().c_str(), status, result);
+            return UNKNOWN_ERROR;
+        }
+
+        if (result < codecDataOffset) {
+            ALOGD("invalid codec data offset: %zd, result %zd", codecDataOffset, result);
+            return BAD_VALUE;
+        }
+    }
+    if (!secure) {
+        C2WriteView view = block->map().get();
+        if (view.error() != C2_OK) {
+            return UNKNOWN_ERROR;
+        }
+        if (view.size() < result) {
+            return UNKNOWN_ERROR;
+        }
+        memcpy(view.data(), mDecryptDestination->unsecurePointer(), result);
+    }
+    std::shared_ptr<C2Buffer> c2Buffer{C2Buffer::CreateLinearBuffer(
+            block->share(codecDataOffset, result - codecDataOffset, C2Fence{}))};
+    if (!buffer->copy(c2Buffer)) {
+        return -ENOSYS;
+    }
     return OK;
 }
 
@@ -774,7 +942,9 @@ void CCodecBufferChannel::getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *arr
 }
 
 status_t CCodecBufferChannel::start(
-        const sp<AMessage> &inputFormat, const sp<AMessage> &outputFormat) {
+        const sp<AMessage> &inputFormat,
+        const sp<AMessage> &outputFormat,
+        bool buffersBoundToCodec) {
     C2StreamBufferTypeSetting::input iStreamFormat(0u);
     C2StreamBufferTypeSetting::output oStreamFormat(0u);
     C2PortReorderBufferDepthTuning::output reorderDepth;
@@ -897,7 +1067,9 @@ status_t CCodecBufferChannel::start(
         input->numSlots = numInputSlots;
         input->extraBuffers.flush();
         input->numExtraSlots = 0u;
-        if (graphic) {
+        if (!buffersBoundToCodec) {
+            input->buffers.reset(new SlotInputBuffers(mName));
+        } else if (graphic) {
             if (mInputSurface) {
                 input->buffers.reset(new DummyInputBuffers(mName));
             } else if (mMetaMode == MODE_ANW) {
@@ -1071,7 +1243,7 @@ status_t CCodecBufferChannel::start(
         output->outputDelay = outputDelayValue;
         output->numSlots = numOutputSlots;
         if (graphic) {
-            if (outputSurface) {
+            if (outputSurface || !buffersBoundToCodec) {
                 output->buffers.reset(new GraphicOutputBuffers(mName));
             } else {
                 output->buffers.reset(new RawGraphicOutputBuffers(numOutputSlots, mName));
@@ -1669,6 +1841,16 @@ void CCodecBufferChannel::setMetaMode(MetaMode mode) {
 }
 
 void CCodecBufferChannel::setCrypto(const sp<ICrypto> &crypto) {
+    if (mCrypto != nullptr) {
+        for (std::pair<wp<HidlMemory>, int32_t> entry : mHeapSeqNumMap) {
+            mCrypto->unsetHeap(entry.second);
+        }
+        mHeapSeqNumMap.clear();
+        if (mHeapSeqNum >= 0) {
+            mCrypto->unsetHeap(mHeapSeqNum);
+            mHeapSeqNum = -1;
+        }
+    }
     mCrypto = crypto;
 }
 

@@ -504,6 +504,18 @@ status_t HeicCompositeStream::insertGbp(SurfaceMap* /*out*/outSurfaceMap,
     return NO_ERROR;
 }
 
+status_t HeicCompositeStream::insertCompositeStreamIds(
+        std::vector<int32_t>* compositeStreamIds /*out*/) {
+    if (compositeStreamIds == nullptr) {
+        return BAD_VALUE;
+    }
+
+    compositeStreamIds->push_back(mAppSegmentStreamId);
+    compositeStreamIds->push_back(mMainImageStreamId);
+
+    return OK;
+}
+
 void HeicCompositeStream::onShutter(const CaptureResultExtras& resultExtras, nsecs_t timestamp) {
     Mutex::Autolock l(mMutex);
     if (mErrorState) {

@@ -29,6 +29,10 @@
 #include <media/stagefright/FrameRenderTracker.h>
 #include <utils/Vector.h>
 
+class C2Buffer;
+class C2GraphicBlock;
+class C2LinearBlock;
+
 namespace aidl {
 namespace android {
 namespace media {
@@ -65,7 +69,8 @@ using aidl::android::media::MediaResourceParcel;
 
 struct MediaCodec : public AHandler {
     enum ConfigureFlags {
-        CONFIGURE_FLAG_ENCODE   = 1,
+        CONFIGURE_FLAG_ENCODE           = 1,
+        CONFIGURE_FLAG_USE_BLOCK_MODEL  = 2,
     };
 
     enum BufferFlags {
@@ -157,6 +162,38 @@ struct MediaCodec : public AHandler {
             uint32_t flags,
             AString *errorDetailMsg = NULL);
 
+    status_t queueBuffer(
+            size_t index,
+            const std::shared_ptr<C2Buffer> &buffer,
+            int64_t presentationTimeUs,
+            uint32_t flags,
+            const sp<AMessage> &tunings,
+            AString *errorDetailMsg = NULL);
+
+    status_t queueEncryptedBuffer(
+            size_t index,
+            const sp<hardware::HidlMemory> &memory,
+            size_t offset,
+            const CryptoPlugin::SubSample *subSamples,
+            size_t numSubSamples,
+            const uint8_t key[16],
+            const uint8_t iv[16],
+            CryptoPlugin::Mode mode,
+            const CryptoPlugin::Pattern &pattern,
+            int64_t presentationTimeUs,
+            uint32_t flags,
+            const sp<AMessage> &tunings,
+            AString *errorDetailMsg = NULL);
+
+    std::shared_ptr<C2Buffer> decrypt(
+            const std::shared_ptr<C2Buffer> &buffer,
+            const CryptoPlugin::SubSample *subSamples,
+            size_t numSubSamples,
+            const uint8_t key[16],
+            const uint8_t iv[16],
+            CryptoPlugin::Mode mode,
+            const CryptoPlugin::Pattern &pattern);
+
     status_t dequeueInputBuffer(size_t *index, int64_t timeoutUs = 0ll);
 
     status_t dequeueOutputBuffer(
@@ -205,6 +242,29 @@ struct MediaCodec : public AHandler {
     // of frames that were rendered.
     static size_t CreateFramesRenderedMessage(
             const std::list<FrameRenderTracker::Info> &done, sp<AMessage> &msg);
+
+    static status_t CanFetchLinearBlock(
+            const std::vector<std::string> &names, bool *isCompatible);
+
+    static std::shared_ptr<C2LinearBlock> FetchLinearBlock(
+            size_t capacity, const std::vector<std::string> &names);
+
+    static status_t CanFetchGraphicBlock(
+            const std::vector<std::string> &names, bool *isCompatible);
+
+    static std::shared_ptr<C2GraphicBlock> FetchGraphicBlock(
+            int32_t width,
+            int32_t height,
+            int32_t format,
+            uint64_t usage,
+            const std::vector<std::string> &names);
+
+    template <typename T>
+    struct WrapperObject : public RefBase {
+        WrapperObject(const T& v) : value(v) {}
+        WrapperObject(T&& v) : value(std::move(v)) {}
+        T value;
+    };
 
 protected:
     virtual ~MediaCodec();
@@ -282,6 +342,7 @@ private:
         kFlagIsAsync                    = 1024,
         kFlagIsComponentAllocated       = 2048,
         kFlagPushBlankBuffersOnShutdown = 4096,
+        kFlagUseBlockModel              = 8192,
     };
 
     struct BufferInfo {

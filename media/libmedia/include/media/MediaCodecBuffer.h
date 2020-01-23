@@ -22,6 +22,8 @@
 #include <utils/RefBase.h>
 #include <utils/StrongPointer.h>
 
+class C2Buffer;
+
 namespace android {
 
 struct ABuffer;
@@ -56,6 +58,36 @@ public:
     sp<AMessage> format();
 
     void setFormat(const sp<AMessage> &format);
+
+    /**
+     * \return  C2Buffer object represents this buffer.
+     */
+    virtual std::shared_ptr<C2Buffer> asC2Buffer() { return nullptr; }
+
+    /**
+     * Test if we can copy the content of |buffer| into this object.
+     *
+     * \param   buffer  C2Buffer object to copy.
+     * \return  true    if the content of buffer can be copied over to this buffer
+     *          false   otherwise.
+     */
+    virtual bool canCopy(const std::shared_ptr<C2Buffer> &buffer) const {
+        (void)buffer;
+        return false;
+    }
+
+    /**
+     * Copy the content of |buffer| into this object. This method assumes that
+     * canCopy() check already passed.
+     *
+     * \param   buffer  C2Buffer object to copy.
+     * \return  true    if successful
+     *          false   otherwise.
+     */
+    virtual bool copy(const std::shared_ptr<C2Buffer> &buffer) {
+        (void)buffer;
+        return false;
+    }
 
 private:
     MediaCodecBuffer() = delete;

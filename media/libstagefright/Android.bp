@@ -230,6 +230,8 @@ cc_library {
         "libbinder",
         "libbinder_ndk",
         "libcamera_client",
+        "libcodec2",
+        "libcodec2_vndk",
         "libcutils",
         "libdatasource",
         "libdl",

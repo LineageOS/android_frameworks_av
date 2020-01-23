@@ -737,7 +737,7 @@ void AudioFlinger::EffectModule::process()
             }
             if (!mSupportsFloat) { // convert input to int16_t as effect doesn't support float.
                 if (!auxType) {
-                    if (mInConversionBuffer.get() == nullptr) {
+                    if (mInConversionBuffer == nullptr) {
                         ALOGW("%s: mInConversionBuffer is null, bypassing", __func__);
                         goto data_bypass;
                     }
@@ -748,7 +748,7 @@ void AudioFlinger::EffectModule::process()
                     inBuffer = mInConversionBuffer;
                 }
                 if (mConfig.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
-                    if (mOutConversionBuffer.get() == nullptr) {
+                    if (mOutConversionBuffer == nullptr) {
                         ALOGW("%s: mOutConversionBuffer is null, bypassing", __func__);
                         goto data_bypass;
                     }
@@ -921,9 +921,8 @@ status_t AudioFlinger::EffectModule::configure()
     mConfig.outputCfg.buffer.frameCount = mConfig.inputCfg.buffer.frameCount;
 
     ALOGV("configure() %p chain %p buffer %p framecount %zu",
-            this, mCallback->chain().promote() != nullptr ? mCallback->chain().promote().get() :
-                                                            nullptr,
-              mConfig.inputCfg.buffer.raw, mConfig.inputCfg.buffer.frameCount);
+          this, mCallback->chain().promote().get(),
+          mConfig.inputCfg.buffer.raw, mConfig.inputCfg.buffer.frameCount);
 
     status_t cmdStatus;
     size = sizeof(int);
@@ -1290,7 +1289,7 @@ void AudioFlinger::EffectModule::setInBuffer(const sp<EffectBufferHalInterface>&
     const uint32_t inChannelCount =
             audio_channel_count_from_out_mask(mConfig.inputCfg.channels);
     const bool formatMismatch = !mSupportsFloat || mInChannelCountRequested != inChannelCount;
-    if (!auxType && formatMismatch && mInBuffer.get() != nullptr) {
+    if (!auxType && formatMismatch && mInBuffer != nullptr) {
         // we need to translate - create hidl shared buffer and intercept
         const size_t inFrameCount = mConfig.inputCfg.buffer.frameCount;
         // Use FCC_2 in case mInChannelCountRequested is mono and the effect is stereo.
@@ -1300,13 +1299,13 @@ void AudioFlinger::EffectModule::setInBuffer(const sp<EffectBufferHalInterface>&
         ALOGV("%s: setInBuffer updating for inChannels:%d inFrameCount:%zu total size:%zu",
                 __func__, inChannels, inFrameCount, size);
 
-        if (size > 0 && (mInConversionBuffer.get() == nullptr
+        if (size > 0 && (mInConversionBuffer == nullptr
                 || size > mInConversionBuffer->getSize())) {
             mInConversionBuffer.clear();
             ALOGV("%s: allocating mInConversionBuffer %zu", __func__, size);
             (void)mCallback->allocateHalBuffer(size, &mInConversionBuffer);
         }
-        if (mInConversionBuffer.get() != nullptr) {
+        if (mInConversionBuffer != nullptr) {
             mInConversionBuffer->setFrameCount(inFrameCount);
             mEffectInterface->setInBuffer(mInConversionBuffer);
         } else if (size > 0) {
@@ -1335,7 +1334,7 @@ void AudioFlinger::EffectModule::setOutBuffer(const sp<EffectBufferHalInterface>
     const uint32_t outChannelCount =
             audio_channel_count_from_out_mask(mConfig.outputCfg.channels);
     const bool formatMismatch = !mSupportsFloat || mOutChannelCountRequested != outChannelCount;
-    if (formatMismatch && mOutBuffer.get() != nullptr) {
+    if (formatMismatch && mOutBuffer != nullptr) {
         const size_t outFrameCount = mConfig.outputCfg.buffer.frameCount;
         // Use FCC_2 in case mOutChannelCountRequested is mono and the effect is stereo.
         const uint32_t outChannels = std::max((uint32_t)FCC_2, mOutChannelCountRequested);
@@ -1344,13 +1343,13 @@ void AudioFlinger::EffectModule::setOutBuffer(const sp<EffectBufferHalInterface>
         ALOGV("%s: setOutBuffer updating for outChannels:%d outFrameCount:%zu total size:%zu",
                 __func__, outChannels, outFrameCount, size);
 
-        if (size > 0 && (mOutConversionBuffer.get() == nullptr
+        if (size > 0 && (mOutConversionBuffer == nullptr
                 || size > mOutConversionBuffer->getSize())) {
             mOutConversionBuffer.clear();
             ALOGV("%s: allocating mOutConversionBuffer %zu", __func__, size);
             (void)mCallback->allocateHalBuffer(size, &mOutConversionBuffer);
         }
-        if (mOutConversionBuffer.get() != nullptr) {
+        if (mOutConversionBuffer != nullptr) {
             mOutConversionBuffer->setFrameCount(outFrameCount);
             mEffectInterface->setOutBuffer(mOutConversionBuffer);
         } else if (size > 0) {
@@ -1521,7 +1520,7 @@ bool AudioFlinger::EffectModule::isOffloaded() const
 static std::string dumpInOutBuffer(bool isInput, const sp<EffectBufferHalInterface> &buffer) {
     std::stringstream ss;
 
-    if (buffer.get() == nullptr) {
+    if (buffer == nullptr) {
         return "nullptr"; // make different than below
     } else if (buffer->externalData() != nullptr) {
         ss << (isInput ? buffer->externalData() : buffer->audioBuffer()->raw)
@@ -1937,19 +1936,20 @@ void AudioFlinger::EffectHandle::dumpToBuffer(char* buffer, size_t size)
 #undef LOG_TAG
 #define LOG_TAG "AudioFlinger::EffectChain"
 
-AudioFlinger::EffectChain::EffectChain(ThreadBase *thread,
-                                        audio_session_t sessionId)
+AudioFlinger::EffectChain::EffectChain(const wp<ThreadBase>& thread,
+                                       audio_session_t sessionId)
     : mSessionId(sessionId), mActiveTrackCnt(0), mTrackCnt(0), mTailBufferCount(0),
       mVolumeCtrlIdx(-1), mLeftVolume(UINT_MAX), mRightVolume(UINT_MAX),
       mNewLeftVolume(UINT_MAX), mNewRightVolume(UINT_MAX),
-      mEffectCallback(new EffectCallback(this, thread, thread->mAudioFlinger.get()))
+      mEffectCallback(new EffectCallback(wp<EffectChain>(this), thread))
 {
     mStrategy = AudioSystem::getStrategyForStream(AUDIO_STREAM_MUSIC);
-    if (thread == nullptr) {
+    sp<ThreadBase> p = thread.promote();
+    if (p == nullptr) {
         return;
     }
-    mMaxTailBuffers = ((kProcessTailDurationMs * thread->sampleRate()) / 1000) /
-                                    thread->frameCount();
+    mMaxTailBuffers = ((kProcessTailDurationMs * p->sampleRate()) / 1000) /
+                                    p->frameCount();
 }
 
 AudioFlinger::EffectChain::~EffectChain()
@@ -2638,7 +2638,7 @@ bool AudioFlinger::EffectChain::isNonOffloadableEnabled_l()
 void AudioFlinger::EffectChain::setThread(const sp<ThreadBase>& thread)
 {
     Mutex::Autolock _l(mLock);
-    mEffectCallback->setThread(thread.get());
+    mEffectCallback->setThread(thread);
 }
 
 void AudioFlinger::EffectChain::checkOutputFlagCompatibility(audio_output_flags_t *flags) const

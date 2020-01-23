@@ -55,6 +55,8 @@ public:
     status_t insertGbp(SurfaceMap* /*out*/outSurfaceMap, Vector<int32_t>* /*out*/outputStreamIds,
             int32_t* /*out*/currentStreamId) override;
 
+    status_t insertCompositeStreamIds(std::vector<int32_t>* compositeStreamIds /*out*/) override;
+
     void onShutter(const CaptureResultExtras& resultExtras, nsecs_t timestamp) override;
 
     int getStreamId() override { return mMainImageStreamId; }

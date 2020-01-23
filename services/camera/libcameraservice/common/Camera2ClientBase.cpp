@@ -111,7 +111,7 @@ status_t Camera2ClientBase<TClientBase>::initializeImpl(TProviderPtr providerPtr
         return res;
     }
 
-    wp<CameraDeviceBase::NotificationListener> weakThis(this);
+    wp<NotificationListener> weakThis(this);
     res = mDevice->setNotifyCallback(weakThis);
 
     return OK;

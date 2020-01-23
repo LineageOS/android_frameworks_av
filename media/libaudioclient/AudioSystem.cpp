@@ -1142,6 +1142,12 @@ void AudioSystem::clearAudioConfigCache()
     }
 }
 
+status_t AudioSystem::setSupportedSystemUsages(const std::vector<audio_usage_t>& systemUsages) {
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == nullptr) return PERMISSION_DENIED;
+    return aps->setSupportedSystemUsages(systemUsages);
+}
+
 status_t AudioSystem::setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t flags) {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == nullptr) return PERMISSION_DENIED;

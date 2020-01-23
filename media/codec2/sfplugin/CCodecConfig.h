@@ -118,6 +118,7 @@ struct CCodecConfig {
     sp<AMessage> mOutputFormat;
 
     bool mUsingSurface; ///< using input or output surface
+    bool mBuffersBoundToCodec; ///< whether buffers are bound to codecs or not.
 
     std::shared_ptr<InputSurfaceWrapper> mInputSurface;
     std::unique_ptr<InputSurfaceWrapper::Config> mISConfig;
