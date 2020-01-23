@@ -1220,11 +1220,36 @@ status_t AudioPolicyService::registerPolicyMixes(const Vector<AudioMix>& mixes, 
         return PERMISSION_DENIED;
     }
 
+    // Require CAPTURE_VOICE_COMMUNICATION_OUTPUT if one of the
+    // mixes is a render|loopback mix that aim to capture audio played with
+    // USAGE_VOICE_COMMUNICATION.
+    bool needCaptureVoiceCommunicationOutput =
+        std::any_of(mixes.begin(), mixes.end(), [](auto& mix) {
+            return is_mix_loopback_render(mix.mRouteFlags) &&
+                mix.hasMatchingRuleForUsage([] (auto usage) {
+                    return usage == AUDIO_USAGE_VOICE_COMMUNICATION;});
+            });
+
+    // Require CAPTURE_MEDIA_OUTPUT if there is a mix for priveliged capture
+    // which is trying to capture any usage which is not USAGE_VOICE_COMMUNICATION.
+    // (If USAGE_VOICE_COMMUNICATION should be captured, then CAPTURE_VOICE_COMMUNICATION_OUTPUT
+    //  is required, even if it is not privileged capture).
     bool needCaptureMediaOutput = std::any_of(mixes.begin(), mixes.end(), [](auto& mix) {
-            return mix.mAllowPrivilegedPlaybackCapture; });
+            return mix.mAllowPrivilegedPlaybackCapture &&
+                mix.hasMatchingRuleForUsage([] (auto usage) {
+                    return usage != AUDIO_USAGE_VOICE_COMMUNICATION;
+                });
+            });
+
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
     const pid_t callingPid = IPCThreadState::self()->getCallingPid();
+
     if (needCaptureMediaOutput && !captureMediaOutputAllowed(callingPid, callingUid)) {
+        return PERMISSION_DENIED;
+    }
+
+    if (needCaptureVoiceCommunicationOutput &&
+        !captureVoiceCommunicationOutputAllowed(callingPid, callingUid)) {
         return PERMISSION_DENIED;
     }
 

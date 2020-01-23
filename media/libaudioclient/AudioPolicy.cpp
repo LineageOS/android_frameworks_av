@@ -168,4 +168,11 @@ bool AudioMix::isDeviceAffinityCompatible() const {
             && (mRouteFlags == MIX_ROUTE_FLAG_RENDER));
 }
 
+bool AudioMix::hasMatchingRuleForUsage(std::function<bool (audio_usage_t)>const& func) const {
+    return std::any_of(mCriteria.begin(), mCriteria.end(), [func](auto& criterion) {
+            return criterion.mRule == RULE_MATCH_ATTRIBUTE_USAGE
+              && func(criterion.mValue.mUsage);
+          });
+}
+
 } // namespace android

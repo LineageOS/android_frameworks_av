@@ -223,7 +223,8 @@ AudioPolicyMixCollection::MixMatchStatus AudioPolicyMixCollection::mixMatch(
             }
             if (!(attributes.usage == AUDIO_USAGE_UNKNOWN ||
                   attributes.usage == AUDIO_USAGE_MEDIA ||
-                  attributes.usage == AUDIO_USAGE_GAME)) {
+                  attributes.usage == AUDIO_USAGE_GAME ||
+                  attributes.usage == AUDIO_USAGE_VOICE_COMMUNICATION)) {
                 return MixMatchStatus::NO_MATCH;
             }
         }
