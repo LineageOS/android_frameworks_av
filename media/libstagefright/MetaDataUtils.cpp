@@ -25,7 +25,6 @@
 #include <media/stagefright/foundation/ByteUtils.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaDataUtils.h>
-#include <media/stagefright/Utils.h>
 #include <media/NdkMediaFormat.h>
 
 namespace android {
