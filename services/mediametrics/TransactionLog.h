@@ -155,7 +155,7 @@ public:
             --ll;
             for (const auto &item : itemMap.second) {
                 if (ll <= 0) break;
-                ss << "  { " << item.first << ", " << item.second->toString() << " }\n";
+                ss << "  " << item.second->toString() << "\n";
                 --ll;
             }
         }

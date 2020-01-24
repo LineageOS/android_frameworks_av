@@ -79,8 +79,7 @@ bool MediaMetricsService::useUidForPackage(
 MediaMetricsService::MediaMetricsService()
         : mMaxRecords(kMaxRecords),
           mMaxRecordAgeNs(kMaxRecordAgeNs),
-          mMaxRecordsExpiredAtOnce(kMaxExpiredAtOnce),
-          mDumpProtoDefault(mediametrics::Item::PROTO_V1)
+          mMaxRecordsExpiredAtOnce(kMaxExpiredAtOnce)
 {
     ALOGD("%s", __func__);
 }
@@ -171,12 +170,12 @@ status_t MediaMetricsService::submitInternal(mediametrics::Item *item, bool rele
     }
 
     if (!isTrusted || item->getTimestamp() == 0) {
-        // WestWorld logs two times for events: ElapsedRealTimeNs (BOOTTIME) and
-        // WallClockTimeNs (REALTIME).  The new audio keys use BOOTTIME.
+        // Westworld logs two times for events: ElapsedRealTimeNs (BOOTTIME) and
+        // WallClockTimeNs (REALTIME), but currently logs REALTIME to cloud.
         //
-        // TODO: Reevaluate time base with other teams.
-        const bool useBootTime = startsWith(item->getKey(), "audio.");
-        const int64_t now = systemTime(useBootTime ? SYSTEM_TIME_BOOTTIME : SYSTEM_TIME_REALTIME);
+        // For consistency and correlation with other logging mechanisms
+        // we use REALTIME here.
+        const int64_t now = systemTime(SYSTEM_TIME_REALTIME);
         item->setTimestamp(now);
     }
 
@@ -206,7 +205,6 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
 
     // crack any parameters
     const String16 protoOption("-proto");
-    int chosenProto = mDumpProtoDefault;
     const String16 clearOption("-clear");
     bool clear = false;
     const String16 sinceOption("-since");
@@ -221,21 +219,7 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
         } else if (args[i] == protoOption) {
             i++;
             if (i < n) {
-                String8 value(args[i]);
-                int proto = mediametrics::Item::PROTO_V0;
-                char *endp;
-                const char *p = value.string();
-                proto = strtol(p, &endp, 10);
-                if (endp != p || *endp == '\0') {
-                    if (proto < mediametrics::Item::PROTO_FIRST) {
-                        proto = mediametrics::Item::PROTO_FIRST;
-                    } else if (proto > mediametrics::Item::PROTO_LAST) {
-                        proto = mediametrics::Item::PROTO_LAST;
-                    }
-                    chosenProto = proto;
-                } else {
-                    result.append("unable to parse value for -proto\n\n");
-                }
+                // ignore
             } else {
                 result.append("missing value for -proto\n\n");
             }
@@ -281,8 +265,8 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
         std::lock_guard _l(mLock);
 
         result.appendFormat("Dump of the %s process:\n", kServiceName);
-        dumpHeaders_l(result, chosenProto, ts_since);
-        dumpRecent_l(result, chosenProto, ts_since, only.c_str());
+        dumpHeaders_l(result, ts_since);
+        dumpRecent_l(result, ts_since, only.c_str());
 
         if (clear) {
             mItemsDiscarded += mItems.size();
@@ -303,9 +287,8 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
 }
 
 // dump headers
-void MediaMetricsService::dumpHeaders_l(String8 &result, int dumpProto, nsecs_t ts_since)
+void MediaMetricsService::dumpHeaders_l(String8 &result, nsecs_t ts_since)
 {
-    result.appendFormat("Protocol Version: %d\n", dumpProto);
     if (mediametrics::Item::isEnabled()) {
         result.append("Metrics gathering: enabled\n");
     } else {
@@ -326,25 +309,25 @@ void MediaMetricsService::dumpHeaders_l(String8 &result, int dumpProto, nsecs_t 
 }
 
 void MediaMetricsService::dumpRecent_l(
-        String8 &result, int dumpProto, nsecs_t ts_since, const char * only)
+        String8 &result, nsecs_t ts_since, const char * only)
 {
     if (only != nullptr && *only == '\0') {
         only = nullptr;
     }
     result.append("\nFinalized Metrics (oldest first):\n");
-    dumpQueue_l(result, dumpProto, ts_since, only);
+    dumpQueue_l(result, ts_since, only);
 
     // show who is connected and injecting records?
     // talk about # records fed to the 'readers'
     // talk about # records we discarded, perhaps "discarded w/o reading" too
 }
 
-void MediaMetricsService::dumpQueue_l(String8 &result, int dumpProto) {
-    dumpQueue_l(result, dumpProto, (nsecs_t) 0, nullptr /* only */);
+void MediaMetricsService::dumpQueue_l(String8 &result) {
+    dumpQueue_l(result, (nsecs_t) 0, nullptr /* only */);
 }
 
 void MediaMetricsService::dumpQueue_l(
-        String8 &result, int dumpProto, nsecs_t ts_since, const char * only) {
+        String8 &result, nsecs_t ts_since, const char * only) {
     int slot = 0;
 
     if (mItems.empty()) {
@@ -363,7 +346,7 @@ void MediaMetricsService::dumpQueue_l(
                 continue;
             }
             result.appendFormat("%5d: %s\n",
-                   slot, item->toString(dumpProto).c_str());
+                   slot, item->toString().c_str());
             slot++;
         }
     }
