@@ -26,10 +26,9 @@
 namespace android {
 
 AudioPatch::AudioPatch(const struct audio_patch *patch, uid_t uid) :
-    mHandle(HandleGenerator<audio_patch_handle_t>::getNextHandle()),
     mPatch(*patch),
-    mUid(uid),
-    mAfPatchHandle(AUDIO_PATCH_HANDLE_NONE)
+    mHandle(HandleGenerator<audio_patch_handle_t>::getNextHandle()),
+    mUid(uid)
 {
 }
 
@@ -68,7 +67,7 @@ status_t AudioPatchCollection::addAudioPatch(audio_patch_handle_t handle,
     add(handle, patch);
     ALOGV("addAudioPatch() handle %d af handle %d num_sources %d num_sinks %d source handle %d"
             "sink handle %d",
-          handle, patch->mAfPatchHandle, patch->mPatch.num_sources, patch->mPatch.num_sinks,
+          handle, patch->getAfHandle(), patch->mPatch.num_sources, patch->mPatch.num_sinks,
           patch->mPatch.sources[0].id, patch->mPatch.sinks[0].id);
     return NO_ERROR;
 }
@@ -81,7 +80,7 @@ status_t AudioPatchCollection::removeAudioPatch(audio_patch_handle_t handle)
         ALOGW("removeAudioPatch() patch %d not in", handle);
         return ALREADY_EXISTS;
     }
-    ALOGV("removeAudioPatch() handle %d af handle %d", handle, valueAt(index)->mAfPatchHandle);
+    ALOGV("removeAudioPatch() handle %d af handle %d", handle, valueAt(index)->getAfHandle());
     removeItemsAt(index);
     return NO_ERROR;
 }
@@ -123,7 +122,7 @@ status_t AudioPatchCollection::listAudioPatches(unsigned int *num_patches,
         }
         if (patchesWritten < patchesMax) {
             patches[patchesWritten] = patch->mPatch;
-            patches[patchesWritten++].id = patch->mHandle;
+            patches[patchesWritten++].id = patch->getHandle();
         }
         (*num_patches)++;
         ALOGV("listAudioPatches() patch %zu num_sources %d num_sinks %d",

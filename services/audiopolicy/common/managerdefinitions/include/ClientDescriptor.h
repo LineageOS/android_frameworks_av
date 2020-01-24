@@ -183,13 +183,17 @@ class SourceClientDescriptor: public TrackClientDescriptor
 {
 public:
     SourceClientDescriptor(audio_port_handle_t portId, uid_t uid, audio_attributes_t attributes,
-                           const sp<AudioPatch>& patchDesc, const sp<DeviceDescriptor>& srcDevice,
+                           const struct audio_port_config &config,
+                           const sp<DeviceDescriptor>& srcDevice,
                            audio_stream_type_t stream, product_strategy_t strategy,
                            VolumeSource volumeSource);
+
     ~SourceClientDescriptor() override = default;
 
-    sp<AudioPatch> patchDesc() const { return mPatchDesc; }
-    sp<DeviceDescriptor> srcDevice() const { return mSrcDevice; };
+    audio_patch_handle_t getPatchHandle() const { return mPatchHandle; }
+    void setPatchHandle(audio_patch_handle_t patchHandle) { mPatchHandle = patchHandle; }
+
+    sp<DeviceDescriptor> srcDevice() const { return mSrcDevice; }
     wp<SwAudioOutputDescriptor> swOutput() const { return mSwOutput; }
     void setSwOutput(const sp<SwAudioOutputDescriptor>& swOutput);
     wp<HwAudioOutputDescriptor> hwOutput() const { return mHwOutput; }
@@ -199,7 +203,7 @@ public:
     void dump(String8 *dst, int spaces, int index) const override;
 
  private:
-    const sp<AudioPatch> mPatchDesc;
+    audio_patch_handle_t mPatchHandle = AUDIO_PATCH_HANDLE_NONE;
     const sp<DeviceDescriptor> mSrcDevice;
     wp<SwAudioOutputDescriptor> mSwOutput;
     wp<HwAudioOutputDescriptor> mHwOutput;
