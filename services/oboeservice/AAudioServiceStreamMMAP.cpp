@@ -49,16 +49,6 @@ AAudioServiceStreamMMAP::AAudioServiceStreamMMAP(android::AAudioService &aAudioS
         , mInService(inService) {
 }
 
-aaudio_result_t AAudioServiceStreamMMAP::close() {
-    if (getState() == AAUDIO_STREAM_STATE_CLOSED) {
-        return AAUDIO_OK;
-    }
-
-    stop();
-
-    return AAudioServiceStreamBase::close();
-}
-
 // Open stream on HAL and pass information about the shared memory buffer back to the client.
 aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest &request) {
 

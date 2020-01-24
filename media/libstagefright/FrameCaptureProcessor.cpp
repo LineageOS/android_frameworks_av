@@ -136,7 +136,7 @@ status_t FrameCaptureProcessor::onCreate() {
 status_t FrameCaptureProcessor::onCapture(const sp<Layer> &layer,
         const Rect &sourceCrop, const sp<GraphicBuffer> &buffer) {
     renderengine::DisplaySettings clientCompositionDisplay;
-    std::vector<renderengine::LayerSettings> clientCompositionLayers;
+    std::vector<const renderengine::LayerSettings*> clientCompositionLayers;
 
     clientCompositionDisplay.physicalDisplay = sourceCrop;
     clientCompositionDisplay.clip = sourceCrop;
@@ -150,7 +150,7 @@ status_t FrameCaptureProcessor::onCapture(const sp<Layer> &layer,
 
     layer->getLayerSettings(sourceCrop, mTextureName, &layerSettings);
 
-    clientCompositionLayers.push_back(layerSettings);
+    clientCompositionLayers.push_back(&layerSettings);
 
     // Use an empty fence for the buffer fence, since we just created the buffer so
     // there is no need for synchronization with the GPU.

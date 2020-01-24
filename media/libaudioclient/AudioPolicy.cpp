@@ -53,6 +53,10 @@ status_t AudioMixMatchCriterion::readFromParcel(Parcel *parcel)
     case RULE_EXCLUDE_UID:
         mValue.mUid = (uid_t) parcel->readInt32();
         break;
+    case RULE_MATCH_USERID:
+    case RULE_EXCLUDE_USERID:
+        mValue.mUserId = (int) parcel->readInt32();
+        break;
     default:
         ALOGE("Trying to build AudioMixMatchCriterion from unknown rule %d", mRule);
         return BAD_VALUE;
@@ -163,9 +167,50 @@ bool AudioMix::hasMatchUidRule() const {
     return false;
 }
 
+void AudioMix::setExcludeUserId(int userId) const {
+    AudioMixMatchCriterion crit;
+    crit.mRule = RULE_EXCLUDE_USERID;
+    crit.mValue.mUserId = userId;
+    mCriteria.add(crit);
+}
+
+void AudioMix::setMatchUserId(int userId) const {
+    AudioMixMatchCriterion crit;
+    crit.mRule = RULE_MATCH_USERID;
+    crit.mValue.mUserId = userId;
+    mCriteria.add(crit);
+}
+
+bool AudioMix::hasUserIdRule(bool match, int userId) const {
+    const uint32_t rule = match ? RULE_MATCH_USERID : RULE_EXCLUDE_USERID;
+    for (size_t i = 0; i < mCriteria.size(); i++) {
+        if (mCriteria[i].mRule == rule
+                && mCriteria[i].mValue.mUserId == userId) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AudioMix::hasMatchUserIdRule() const {
+    for (size_t i = 0; i < mCriteria.size(); i++) {
+        if (mCriteria[i].mRule == RULE_MATCH_USERID) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool AudioMix::isDeviceAffinityCompatible() const {
     return ((mMixType == MIX_TYPE_PLAYERS)
             && (mRouteFlags == MIX_ROUTE_FLAG_RENDER));
+}
+
+bool AudioMix::hasMatchingRuleForUsage(std::function<bool (audio_usage_t)>const& func) const {
+    return std::any_of(mCriteria.begin(), mCriteria.end(), [func](auto& criterion) {
+            return criterion.mRule == RULE_MATCH_ATTRIBUTE_USAGE
+              && func(criterion.mValue.mUsage);
+          });
 }
 
 } // namespace android

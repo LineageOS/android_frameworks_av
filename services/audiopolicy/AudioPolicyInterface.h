@@ -250,6 +250,10 @@ public:
             = 0;
     virtual status_t removeUidDeviceAffinities(uid_t uid) = 0;
 
+    virtual status_t setUserIdDeviceAffinities(int userId,
+            const Vector<AudioDeviceTypeAddr>& devices) = 0;
+    virtual status_t removeUserIdDeviceAffinities(int userId) = 0;
+
     virtual status_t startAudioSource(const struct audio_port_config *source,
                                       const audio_attributes_t *attributes,
                                       audio_port_handle_t *portId,

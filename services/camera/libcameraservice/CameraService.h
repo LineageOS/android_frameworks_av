@@ -103,6 +103,9 @@ public:
 
     virtual void        onDeviceStatusChanged(const String8 &cameraId,
             hardware::camera::common::V1_0::CameraDeviceStatus newHalStatus) override;
+    virtual void        onDeviceStatusChanged(const String8 &cameraId,
+            const String8 &physicalCameraId,
+            hardware::camera::common::V1_0::CameraDeviceStatus newHalStatus) override;
     virtual void        onTorchStatusChanged(const String8& cameraId,
             hardware::camera::common::V1_0::TorchModeStatus newStatus) override;
     virtual void        onNewProviderRegistered() override;
@@ -556,11 +559,24 @@ private:
          */
         SystemCameraKind getSystemCameraKind() const;
 
+        /**
+         * Add/Remove the unavailable physical camera ID.
+         */
+        bool addUnavailablePhysicalId(const String8& physicalId);
+        bool removeUnavailablePhysicalId(const String8& physicalId);
+
+        /**
+         * Return the unavailable physical ids for this device.
+         *
+         * This method acquires mStatusLock.
+         */
+        std::vector<String8> getUnavailablePhysicalIds() const;
     private:
         const String8 mId;
         StatusInternal mStatus; // protected by mStatusLock
         const int mCost;
         std::set<String8> mConflicting;
+        std::set<String8> mUnavailablePhysicalIds;
         mutable Mutex mStatusLock;
         CameraParameters mShimParams;
         const SystemCameraKind mSystemCameraKind;
@@ -961,6 +977,9 @@ private:
     // set a camera's torch status. mTorchStatusMutex should be locked.
     status_t setTorchStatusLocked(const String8 &cameraId,
             hardware::camera::common::V1_0::TorchModeStatus status);
+
+    // notify physical camera status when the physical camera is public.
+    void notifyPhysicalCameraStatusLocked(int32_t status, const String8& cameraId);
 
     // IBinder::DeathRecipient implementation
     virtual void        binderDied(const wp<IBinder> &who);

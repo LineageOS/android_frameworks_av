@@ -236,6 +236,8 @@ struct TestStatusListener : public CameraProviderManager::StatusListener {
 
     void onDeviceStatusChanged(const String8 &,
             hardware::camera::common::V1_0::CameraDeviceStatus) override {}
+    void onDeviceStatusChanged(const String8 &, const String8 &,
+            hardware::camera::common::V1_0::CameraDeviceStatus) override {}
     void onTorchStatusChanged(const String8 &,
             hardware::camera::common::V1_0::TorchModeStatus) override {}
     void onNewProviderRegistered() override {}

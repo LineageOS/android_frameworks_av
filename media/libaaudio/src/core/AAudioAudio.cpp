@@ -25,7 +25,6 @@
 
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
-
 #include "AudioClock.h"
 #include "AudioGlobal.h"
 #include "AudioStreamBuilder.h"
@@ -231,21 +230,42 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_delete(AAudioStreamBuilder* buil
     return AAUDIO_ERROR_NULL;
 }
 
-AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream)
-{
+AAUDIO_API aaudio_result_t  AAudioStream_release(AAudioStream* stream) {
     aaudio_result_t result = AAUDIO_ERROR_NULL;
-    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    AudioStream* audioStream = convertAAudioStreamToAudioStream(stream);
     if (audioStream != nullptr) {
         aaudio_stream_id_t id = audioStream->getId();
         ALOGD("%s(s#%u) called ---------------", __func__, id);
-        result = audioStream->safeClose();
-        // Close will only fail if called illegally, for example, from a callback.
+        result = audioStream->safeRelease();
+        // safeRelease() will only fail if called illegally, for example, from a callback.
+        // That would result in the release of an active stream, which would cause a crash.
+        if (result != AAUDIO_OK) {
+            ALOGW("%s(s#%u) failed. Release it from another thread.",
+                  __func__, id);
+        }
+        ALOGD("%s(s#%u) returned %d %s ---------", __func__,
+                id, result, AAudio_convertResultToText(result));
+    }
+    return result;
+}
+
+AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream) {
+    aaudio_result_t result = AAUDIO_ERROR_NULL;
+    AudioStream* audioStream = convertAAudioStreamToAudioStream(stream);
+    if (audioStream != nullptr) {
+        aaudio_stream_id_t id = audioStream->getId();
+        ALOGD("%s(s#%u) called ---------------", __func__, id);
+        result = audioStream->safeRelease();
+        // safeRelease will only fail if called illegally, for example, from a callback.
         // That would result in deleting an active stream, which would cause a crash.
-        if (result == AAUDIO_OK) {
-            audioStream->unregisterPlayerBase();
-            delete audioStream;
+        if (result != AAUDIO_OK) {
+            ALOGW("%s(s#%u) failed. Close it from another thread.",
+                  __func__, id);
         } else {
-            ALOGW("%s attempt to close failed. Close it from another thread.", __func__);
+            audioStream->unregisterPlayerBase();
+             // Mark CLOSED to keep destructors from asserting.
+            audioStream->closeFinal();
+            delete audioStream;
         }
         ALOGD("%s(s#%u) returned %d ---------", __func__, id, result);
     }

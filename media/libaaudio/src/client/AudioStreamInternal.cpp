@@ -258,18 +258,17 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     return result;
 
 error:
-    close();
+    releaseCloseFinal();
     return result;
 }
 
 // This must be called under mStreamLock.
-aaudio_result_t AudioStreamInternal::close() {
+aaudio_result_t AudioStreamInternal::release_l() {
     aaudio_result_t result = AAUDIO_OK;
     ALOGV("%s(): mServiceStreamHandle = 0x%08X", __func__, mServiceStreamHandle);
     if (mServiceStreamHandle != AAUDIO_HANDLE_INVALID) {
-        // Don't close a stream while it is running.
         aaudio_stream_state_t currentState = getState();
-        // Don't close a stream while it is running. Stop it first.
+        // Don't release a stream while it is running. Stop it first.
         // If DISCONNECTED then we should still try to stop in case the
         // error callback is still running.
         if (isActive() || currentState == AAUDIO_STREAM_STATE_DISCONNECTED) {
@@ -282,10 +281,8 @@ aaudio_result_t AudioStreamInternal::close() {
         mServiceInterface.closeStream(serviceStreamHandle);
         delete[] mCallbackBuffer;
         mCallbackBuffer = nullptr;
-
-        setState(AAUDIO_STREAM_STATE_CLOSED);
         result = mEndPointParcelable.close();
-        aaudio_result_t result2 = AudioStream::close();
+        aaudio_result_t result2 = AudioStream::release_l();
         return (result != AAUDIO_OK) ? result : result2;
     } else {
         return AAUDIO_ERROR_INVALID_HANDLE;

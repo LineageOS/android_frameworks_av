@@ -60,6 +60,9 @@ void AudioPolicyMix::dump(String8 *dst, int spaces, int index) const
         case RULE_MATCH_UID:
             ruleValue = std::to_string(criterion.mValue.mUid);
             break;
+        case RULE_MATCH_USERID:
+            ruleValue = std::to_string(criterion.mValue.mUserId);
+            break;
         default:
             unknownRule = true;
         }
@@ -223,10 +226,14 @@ AudioPolicyMixCollection::MixMatchStatus AudioPolicyMixCollection::mixMatch(
             }
             if (!(attributes.usage == AUDIO_USAGE_UNKNOWN ||
                   attributes.usage == AUDIO_USAGE_MEDIA ||
-                  attributes.usage == AUDIO_USAGE_GAME)) {
+                  attributes.usage == AUDIO_USAGE_GAME ||
+                  attributes.usage == AUDIO_USAGE_VOICE_COMMUNICATION)) {
                 return MixMatchStatus::NO_MATCH;
             }
         }
+
+        int userId = (int) multiuser_get_user_id(uid);
+
         // TODO if adding more player rules (currently only 2), make rule handling "generic"
         //      as there is no difference in the treatment of usage- or uid-based rules
         bool hasUsageMatchRules = false;
@@ -238,6 +245,12 @@ AudioPolicyMixCollection::MixMatchStatus AudioPolicyMixCollection::mixMatch(
         bool hasUidExcludeRules = false;
         bool uidMatchFound = false;
         bool uidExclusionFound = false;
+
+        bool hasUserIdExcludeRules = false;
+        bool userIdExclusionFound = false;
+        bool hasUserIdMatchRules = false;
+        bool userIdMatchFound = false;
+
 
         bool hasAddrMatch = false;
 
@@ -290,6 +303,24 @@ AudioPolicyMixCollection::MixMatchStatus AudioPolicyMixCollection::mixMatch(
                     uidExclusionFound = true;
                 }
                 break;
+            case RULE_MATCH_USERID:
+                ALOGV("\tmix has RULE_MATCH_USERID for userId %d",
+                    mix->mCriteria[j].mValue.mUserId);
+                hasUserIdMatchRules = true;
+                if (mix->mCriteria[j].mValue.mUserId == userId) {
+                    // found one userId match against all allowed userIds
+                    userIdMatchFound = true;
+                }
+                break;
+            case RULE_EXCLUDE_USERID:
+                ALOGV("\tmix has RULE_EXCLUDE_USERID for userId %d",
+                    mix->mCriteria[j].mValue.mUserId);
+                hasUserIdExcludeRules = true;
+                if (mix->mCriteria[j].mValue.mUserId == userId) {
+                    // found this userId is to be excluded
+                    userIdExclusionFound = true;
+                }
+                break;
             default:
                 break;
             }
@@ -306,20 +337,27 @@ AudioPolicyMixCollection::MixMatchStatus AudioPolicyMixCollection::mixMatch(
                         " and RULE_EXCLUDE_UID in mix %zu", mixIndex);
                 return MixMatchStatus::INVALID_MIX;
             }
-
-            if ((hasUsageExcludeRules && usageExclusionFound)
-                    || (hasUidExcludeRules && uidExclusionFound)) {
-                break; // stop iterating on criteria because an exclusion was found (will fail)
+            if (hasUserIdMatchRules && hasUserIdExcludeRules) {
+                ALOGE("getOutputForAttr: invalid combination of RULE_MATCH_USERID"
+                        " and RULE_EXCLUDE_USERID in mix %zu", mixIndex);
+                    return MixMatchStatus::INVALID_MIX;
             }
 
+            if ((hasUsageExcludeRules && usageExclusionFound)
+                    || (hasUidExcludeRules && uidExclusionFound)
+                    || (hasUserIdExcludeRules && userIdExclusionFound)) {
+                break; // stop iterating on criteria because an exclusion was found (will fail)
+            }
         }//iterate on mix criteria
 
         // determine if exiting on success (or implicit failure as desc is 0)
         if (hasAddrMatch ||
                 !((hasUsageExcludeRules && usageExclusionFound) ||
+                  (hasUserIdExcludeRules && userIdExclusionFound) ||
                   (hasUsageMatchRules && !usageMatchFound)  ||
                   (hasUidExcludeRules && uidExclusionFound) ||
-                  (hasUidMatchRules && !uidMatchFound))) {
+                  (hasUidMatchRules && !uidMatchFound)) ||
+                  (hasUserIdMatchRules && !userIdMatchFound)) {
             ALOGV("\tgetOutputForAttr will use mix %zu", mixIndex);
             return MixMatchStatus::MATCH;
         }
@@ -524,6 +562,109 @@ status_t AudioPolicyMixCollection::getDevicesForUid(uid_t uid,
             }
         }
         if (ruleAllowsUid) {
+            devices.add(AudioDeviceTypeAddr(mix->mDeviceType, mix->mDeviceAddress.string()));
+        }
+    }
+    return NO_ERROR;
+}
+
+status_t AudioPolicyMixCollection::setUserIdDeviceAffinities(int userId,
+        const Vector<AudioDeviceTypeAddr>& devices) {
+    // verify feasibility: for each player mix: if it already contains a
+    //    "match userId" rule for this userId, return an error
+    //    (adding a userId-device affinity would result in contradictory rules)
+    for (size_t i = 0; i < size(); i++) {
+        const AudioPolicyMix* mix = itemAt(i).get();
+        if (!mix->isDeviceAffinityCompatible()) {
+            continue;
+        }
+        if (mix->hasUserIdRule(true /*match*/, userId)) {
+            return INVALID_OPERATION;
+        }
+    }
+
+    // remove existing rules for this userId
+    removeUserIdDeviceAffinities(userId);
+
+    // for each player mix:
+    //   IF    device is not a target for the mix,
+    //     AND it doesn't have a "match userId" rule
+    //   THEN add a rule to exclude the userId
+    for (size_t i = 0; i < size(); i++) {
+        const AudioPolicyMix *mix = itemAt(i).get();
+        if (!mix->isDeviceAffinityCompatible()) {
+            continue;
+        }
+        // check if this mix goes to a device in the list of devices
+        bool deviceMatch = false;
+        const AudioDeviceTypeAddr mixDevice(mix->mDeviceType, mix->mDeviceAddress.string());
+        for (size_t j = 0; j < devices.size(); j++) {
+            if (mixDevice.equals(devices[j])) {
+                deviceMatch = true;
+                break;
+            }
+        }
+        if (!deviceMatch && !mix->hasMatchUserIdRule()) {
+            // this mix doesn't go to one of the listed devices for the given userId,
+            // and it's not already restricting the mix on a userId,
+            // modify its rules to exclude the userId
+            if (!mix->hasUserIdRule(false /*match*/, userId)) {
+                // no need to do it again if userId is already excluded
+                mix->setExcludeUserId(userId);
+            }
+        }
+    }
+
+    return NO_ERROR;
+}
+
+status_t AudioPolicyMixCollection::removeUserIdDeviceAffinities(int userId) {
+    // for each player mix: remove existing rules that match or exclude this userId
+    for (size_t i = 0; i < size(); i++) {
+        bool foundUserIdRule = false;
+        const AudioPolicyMix *mix = itemAt(i).get();
+        if (!mix->isDeviceAffinityCompatible()) {
+            continue;
+        }
+        std::vector<size_t> criteriaToRemove;
+        for (size_t j = 0; j < mix->mCriteria.size(); j++) {
+            const uint32_t rule = mix->mCriteria[j].mRule;
+            // is this rule excluding the userId? (not considering userId match rules
+            // as those are not used for userId-device affinity)
+            if (rule == RULE_EXCLUDE_USERID
+                    && userId == mix->mCriteria[j].mValue.mUserId) {
+                foundUserIdRule = true;
+                criteriaToRemove.insert(criteriaToRemove.begin(), j);
+            }
+        }
+        if (foundUserIdRule) {
+            for (size_t j = 0; j < criteriaToRemove.size(); j++) {
+                mix->mCriteria.removeAt(criteriaToRemove[j]);
+            }
+        }
+    }
+    return NO_ERROR;
+}
+
+status_t AudioPolicyMixCollection::getDevicesForUserId(int userId,
+        Vector<AudioDeviceTypeAddr>& devices) const {
+    // for each player mix:
+    // find rules that don't exclude this userId, and add the device to the list
+    for (size_t i = 0; i < size(); i++) {
+        bool ruleAllowsUserId = true;
+        const AudioPolicyMix *mix = itemAt(i).get();
+        if (mix->mMixType != MIX_TYPE_PLAYERS) {
+            continue;
+        }
+        for (size_t j = 0; j < mix->mCriteria.size(); j++) {
+            const uint32_t rule = mix->mCriteria[j].mRule;
+            if (rule == RULE_EXCLUDE_USERID
+                    && userId == mix->mCriteria[j].mValue.mUserId) {
+                ruleAllowsUserId = false;
+                break;
+            }
+        }
+        if (ruleAllowsUserId) {
             devices.add(AudioDeviceTypeAddr(mix->mDeviceType, mix->mDeviceAddress.string()));
         }
     }

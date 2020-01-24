@@ -1359,6 +1359,21 @@ status_t AudioSystem::removeUidDeviceAffinities(uid_t uid) {
     return aps->removeUidDeviceAffinities(uid);
 }
 
+status_t AudioSystem::setUserIdDeviceAffinities(int userId,
+                                                const Vector<AudioDeviceTypeAddr>& devices)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->setUserIdDeviceAffinities(userId, devices);
+}
+
+status_t AudioSystem::removeUserIdDeviceAffinities(int userId)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->removeUserIdDeviceAffinities(userId);
+}
+
 status_t AudioSystem::startAudioSource(const struct audio_port_config *source,
                                        const audio_attributes_t *attributes,
                                        audio_port_handle_t *portId)

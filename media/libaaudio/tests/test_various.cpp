@@ -40,9 +40,61 @@ aaudio_data_callback_result_t NoopDataCallbackProc(
     return AAUDIO_CALLBACK_RESULT_CONTINUE;
 }
 
-// Test AAudioStream_setBufferSizeInFrames()
-
 constexpr int64_t NANOS_PER_MILLISECOND = 1000 * 1000;
+
+void checkReleaseThenClose(aaudio_performance_mode_t perfMode,
+        aaudio_sharing_mode_t sharingMode) {
+    AAudioStreamBuilder* aaudioBuilder = nullptr;
+    AAudioStream* aaudioStream = nullptr;
+
+    // Use an AAudioStreamBuilder to contain requested parameters.
+    ASSERT_EQ(AAUDIO_OK, AAudio_createStreamBuilder(&aaudioBuilder));
+
+    // Request stream properties.
+    AAudioStreamBuilder_setDataCallback(aaudioBuilder,
+                                        NoopDataCallbackProc,
+                                        nullptr);
+    AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, perfMode);
+    AAudioStreamBuilder_setSharingMode(aaudioBuilder, sharingMode);
+
+    // Create an AAudioStream using the Builder.
+    ASSERT_EQ(AAUDIO_OK,
+              AAudioStreamBuilder_openStream(aaudioBuilder, &aaudioStream));
+    AAudioStreamBuilder_delete(aaudioBuilder);
+
+    ASSERT_EQ(AAUDIO_OK, AAudioStream_requestStart(aaudioStream));
+
+    sleep(1);
+
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_requestStop(aaudioStream));
+
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_release(aaudioStream));
+    aaudio_stream_state_t state = AAudioStream_getState(aaudioStream);
+    EXPECT_EQ(AAUDIO_STREAM_STATE_CLOSING, state);
+
+    // We should be able to call this again without crashing.
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_release(aaudioStream));
+    state = AAudioStream_getState(aaudioStream);
+    EXPECT_EQ(AAUDIO_STREAM_STATE_CLOSING, state);
+
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_close(aaudioStream));
+}
+
+TEST(test_various, aaudio_release_close_none) {
+    checkReleaseThenClose(AAUDIO_PERFORMANCE_MODE_NONE,
+            AAUDIO_SHARING_MODE_SHARED);
+    // No EXCLUSIVE streams with MODE_NONE.
+}
+
+TEST(test_various, aaudio_release_close_low_shared) {
+    checkReleaseThenClose(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+            AAUDIO_SHARING_MODE_SHARED);
+}
+
+TEST(test_various, aaudio_release_close_low_exclusive) {
+    checkReleaseThenClose(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+            AAUDIO_SHARING_MODE_EXCLUSIVE);
+}
 
 enum FunctionToCall {
     CALL_START, CALL_STOP, CALL_PAUSE, CALL_FLUSH

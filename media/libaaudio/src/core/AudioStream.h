@@ -115,11 +115,30 @@ public:
     virtual aaudio_result_t open(const AudioStreamBuilder& builder);
 
     /**
-     * Close the stream and deallocate any resources from the open() call.
-     * It is safe to call close() multiple times.
+     * Free any hardware or system resources from the open() call.
+     * It is safe to call release_l() multiple times.
      */
-    virtual aaudio_result_t close() {
+    virtual aaudio_result_t release_l() {
+        setState(AAUDIO_STREAM_STATE_CLOSING);
         return AAUDIO_OK;
+    }
+
+    aaudio_result_t closeFinal() {
+        // State is checked by destructor.
+        setState(AAUDIO_STREAM_STATE_CLOSED);
+        return AAUDIO_OK;
+    }
+
+    /**
+     * Release then close the stream.
+     * @return AAUDIO_OK or negative error.
+     */
+    aaudio_result_t releaseCloseFinal() {
+        aaudio_result_t result = release_l(); // TODO review locking
+        if (result == AAUDIO_OK) {
+          result = closeFinal();
+        }
+        return result;
     }
 
     // This is only used to identify a stream in the logs without
@@ -373,7 +392,7 @@ public:
      */
     aaudio_result_t systemStopFromCallback();
 
-    aaudio_result_t safeClose();
+    aaudio_result_t safeRelease();
 
 protected:
 

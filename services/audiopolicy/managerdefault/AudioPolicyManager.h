@@ -262,6 +262,9 @@ public:
         virtual status_t setUidDeviceAffinities(uid_t uid,
                 const Vector<AudioDeviceTypeAddr>& devices);
         virtual status_t removeUidDeviceAffinities(uid_t uid);
+        virtual status_t setUserIdDeviceAffinities(int userId,
+                const Vector<AudioDeviceTypeAddr>& devices);
+        virtual status_t removeUserIdDeviceAffinities(int userId);
 
         virtual status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
                                                    const AudioDeviceTypeAddr &device);
