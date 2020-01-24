@@ -3619,7 +3619,6 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
         AString *errorDetailMsg;
         CHECK(msg->findPointer("errorDetailMsg", (void **)&errorDetailMsg));
 
-        ALOGI("calling queueSec");
         err = mBufferChannel->queueSecureInputBuffer(
                 buffer,
                 (mFlags & kFlagIsSecure),
