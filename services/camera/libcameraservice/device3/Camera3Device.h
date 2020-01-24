@@ -48,6 +48,7 @@
 #include "device3/Camera3BufferManager.h"
 #include "device3/DistortionMapper.h"
 #include "device3/ZoomRatioMapper.h"
+#include "device3/RotateAndCropMapper.h"
 #include "device3/InFlightRequest.h"
 #include "device3/Camera3OutputInterface.h"
 #include "device3/Camera3OfflineSession.h"
@@ -220,6 +221,15 @@ class Camera3Device :
     void getInflightBufferKeys(std::vector<std::pair<int32_t, int32_t>>* out) override;
     void getInflightRequestBufferKeys(std::vector<uint64_t>* out) override;
     std::vector<sp<camera3::Camera3StreamInterface>> getAllStreams() override;
+
+    /**
+     * Set the current behavior for the ROTATE_AND_CROP control when in AUTO.
+     *
+     * The value must be one of the ROTATE_AND_CROP_* values besides AUTO,
+     * and defaults to NONE.
+     */
+    status_t setRotateAndCropAutoBehavior(
+            camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue);
 
     /**
      * Helper functions to map between framework and HIDL values
@@ -501,6 +511,10 @@ class Camera3Device :
         int                                 mBatchSize;
         //  Whether this request is from a repeating or repeating burst.
         bool                                mRepeating;
+        // Whether this request has ROTATE_AND_CROP_AUTO set, so needs both
+        // overriding of ROTATE_AND_CROP value and adjustment of coordinates
+        // in several other controls in both the request and the result
+        bool                                mRotateAndCropAuto;
     };
     typedef List<sp<CaptureRequest> > RequestList;
 
@@ -824,6 +838,9 @@ class Camera3Device :
                 /*out*/sp<hardware::camera::device::V3_6::ICameraOfflineSession>* offlineSession,
                 /*out*/camera3::BufferRecords* bufferRecords);
 
+        status_t setRotateAndCropAutoBehavior(
+                camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue);
+
       protected:
 
         virtual bool threadLoop();
@@ -840,7 +857,10 @@ class Camera3Device :
 
         // HAL workaround: Make sure a trigger ID always exists if
         // a trigger does
-        status_t          addDummyTriggerIds(const sp<CaptureRequest> &request);
+        status_t           addDummyTriggerIds(const sp<CaptureRequest> &request);
+
+        // Override rotate_and_crop control if needed; returns true if the current value was changed
+        bool               overrideAutoRotateAndCrop(const sp<CaptureRequest> &request);
 
         static const nsecs_t kRequestTimeout = 50e6; // 50 ms
 
@@ -962,6 +982,7 @@ class Camera3Device :
         TriggerMap         mTriggerReplacedMap;
         uint32_t           mCurrentAfTriggerId;
         uint32_t           mCurrentPreCaptureTriggerId;
+        camera_metadata_enum_android_scaler_rotate_and_crop_t mRotateAndCropOverride;
 
         int64_t            mRepeatingLastFrameNumber;
 
@@ -993,8 +1014,8 @@ class Camera3Device :
     status_t registerInFlight(uint32_t frameNumber,
             int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
             bool callback, nsecs_t maxExpectedDuration, std::set<String8>& physicalCameraIds,
-            bool isStillCapture, bool isZslCapture, const std::set<std::string>& cameraIdsWithZoom,
-            const SurfaceMap& outputSurfaces);
+            bool isStillCapture, bool isZslCapture, bool rotateAndCropAuto,
+            const std::set<std::string>& cameraIdsWithZoom, const SurfaceMap& outputSurfaces);
 
     /**
      * Tracking for idle detection
@@ -1112,6 +1133,11 @@ class Camera3Device :
      * Zoom ratio mapper support
      */
     std::unordered_map<std::string, camera3::ZoomRatioMapper> mZoomRatioMappers;
+
+    /**
+     * RotateAndCrop mapper support
+     */
+    std::unordered_map<std::string, camera3::RotateAndCropMapper> mRotateAndCropMappers;
 
     // Debug tracker for metadata tag value changes
     // - Enabled with the -m <taglist> option to dumpsys, such as
