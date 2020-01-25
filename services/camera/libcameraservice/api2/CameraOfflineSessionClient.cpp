@@ -52,6 +52,12 @@ status_t CameraOfflineSessionClient::initialize(sp<CameraProviderManager>, const
     return OK;
 }
 
+status_t CameraOfflineSessionClient::setRotateAndCropOverride(uint8_t /*rotateAndCrop*/) {
+    // Since we're not submitting more capture requests, changes to rotateAndCrop override
+    // make no difference.
+    return OK;
+}
+
 status_t CameraOfflineSessionClient::dump(int fd, const Vector<String16>& args) {
     return BasicClient::dump(fd, args);
 }

@@ -1200,4 +1200,9 @@ int32_t CameraClient::getGlobalAudioRestriction() {
     return BasicClient::getServiceAudioRestriction();
 }
 
+// API1->Device1 does not support this feature
+status_t CameraClient::setRotateAndCropOverride(uint8_t /*rotateAndCrop*/) {
+    return OK;
+}
+
 }; // namespace android

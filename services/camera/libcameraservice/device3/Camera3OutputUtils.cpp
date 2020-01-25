@@ -191,7 +191,7 @@ void sendCaptureResult(
         CaptureResultExtras &resultExtras,
         CameraMetadata &collectedPartialResult,
         uint32_t frameNumber,
-        bool reprocess, bool zslStillCapture,
+        bool reprocess, bool zslStillCapture, bool rotateAndCropAuto,
         const std::set<std::string>& cameraIdsWithZoom,
         const std::vector<PhysicalCaptureResultInfo>& physicalMetadatas) {
     ATRACE_CALL();
@@ -277,10 +277,25 @@ void sendCaptureResult(
         return;
     }
 
+    // Fix up result metadata to account for rotateAndCrop in AUTO mode
+    if (rotateAndCropAuto) {
+        auto mapper = states.rotateAndCropMappers.find(states.cameraId.c_str());
+        if (mapper != states.rotateAndCropMappers.end()) {
+            res = mapper->second.updateCaptureResult(
+                    &captureResult.mMetadata);
+            if (res != OK) {
+                SET_ERR("Unable to correct capture result rotate-and-crop for frame %d: %s (%d)",
+                        frameNumber, strerror(-res), res);
+                return;
+            }
+        }
+    }
+
     for (auto& physicalMetadata : captureResult.mPhysicalMetadatas) {
         String8 cameraId8(physicalMetadata.mPhysicalCameraId);
-        if (states.distortionMappers.find(cameraId8.c_str()) != states.distortionMappers.end()) {
-            res = states.distortionMappers[cameraId8.c_str()].correctCaptureResult(
+        auto mapper = states.distortionMappers.find(cameraId8.c_str());
+        if (mapper != states.distortionMappers.end()) {
+            res = mapper->second.correctCaptureResult(
                     &physicalMetadata.mPhysicalCameraMetadata);
             if (res != OK) {
                 SET_ERR("Unable to correct physical capture result metadata for frame %d: %s (%d)",
@@ -592,7 +607,8 @@ void processCaptureResult(CaptureOutputStates& states, const camera3_capture_res
                 sendCaptureResult(states, metadata, request.resultExtras,
                     collectedPartialResult, frameNumber,
                     hasInputBufferInRequest, request.zslCapture && request.stillCapture,
-                    request.cameraIdsWithZoom, request.physicalMetadatas);
+                    request.rotateAndCropAuto, request.cameraIdsWithZoom,
+                    request.physicalMetadatas);
             }
         }
         removeInFlightRequestIfReadyLocked(states, idx);
@@ -886,7 +902,7 @@ void notifyShutter(CaptureOutputStates& states, const camera3_shutter_msg_t &msg
                     r.pendingMetadata, r.resultExtras,
                     r.collectedPartialResult, msg.frame_number,
                     r.hasInputBuffer, r.zslCapture && r.stillCapture,
-                    r.cameraIdsWithZoom, r.physicalMetadatas);
+                    r.rotateAndCropAuto, r.cameraIdsWithZoom, r.physicalMetadatas);
             }
             bool timestampIncreasing = !(r.zslCapture || r.hasInputBuffer);
             returnOutputBuffers(

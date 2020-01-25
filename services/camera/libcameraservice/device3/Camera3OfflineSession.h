@@ -33,6 +33,7 @@
 #include "device3/DistortionMapper.h"
 #include "device3/InFlightRequest.h"
 #include "device3/Camera3OutputUtils.h"
+#include "device3/RotateAndCropMapper.h"
 #include "device3/ZoomRatioMapper.h"
 #include "utils/TagMonitor.h"
 #include "utils/LatencyHistogram.h"
@@ -62,7 +63,9 @@ struct Camera3OfflineStates {
             const CameraMetadata& deviceInfo,
             const std::unordered_map<std::string, CameraMetadata>& physicalDeviceInfoMap,
             const std::unordered_map<std::string, camera3::DistortionMapper>& distortionMappers,
-            const std::unordered_map<std::string, camera3::ZoomRatioMapper>& zoomRatioMappers) :
+            const std::unordered_map<std::string, camera3::ZoomRatioMapper>& zoomRatioMappers,
+            const std::unordered_map<std::string, camera3::RotateAndCropMapper>&
+                rotateAndCropMappers) :
             mTagMonitor(tagMonitor), mVendorTagId(vendorTagId),
             mUseHalBufManager(useHalBufManager), mNeedFixupMonochromeTags(needFixupMonochromeTags),
             mUsePartialResult(usePartialResult), mNumPartialResults(numPartialResults),
@@ -75,7 +78,8 @@ struct Camera3OfflineStates {
             mDeviceInfo(deviceInfo),
             mPhysicalDeviceInfoMap(physicalDeviceInfoMap),
             mDistortionMappers(distortionMappers),
-            mZoomRatioMappers(zoomRatioMappers) {}
+            mZoomRatioMappers(zoomRatioMappers),
+            mRotateAndCropMappers(rotateAndCropMappers) {}
 
     const TagMonitor& mTagMonitor;
     const metadata_vendor_id_t mVendorTagId;
@@ -106,6 +110,8 @@ struct Camera3OfflineStates {
     const std::unordered_map<std::string, camera3::DistortionMapper>& mDistortionMappers;
 
     const std::unordered_map<std::string, camera3::ZoomRatioMapper>& mZoomRatioMappers;
+
+    const std::unordered_map<std::string, camera3::RotateAndCropMapper>& mRotateAndCropMappers;
 };
 
 /**
@@ -227,6 +233,8 @@ class Camera3OfflineSession :
     std::unordered_map<std::string, camera3::DistortionMapper> mDistortionMappers;
 
     std::unordered_map<std::string, camera3::ZoomRatioMapper> mZoomRatioMappers;
+
+    std::unordered_map<std::string, camera3::RotateAndCropMapper> mRotateAndCropMappers;
 
     mutable std::mutex mLock;
 

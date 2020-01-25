@@ -926,6 +926,19 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::fixupMonochromeTags()
     return res;
 }
 
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addRotateCropTags() {
+    status_t res = OK;
+    auto& c = mCameraCharacteristics;
+
+    auto availableRotateCropEntry = c.find(ANDROID_SCALER_AVAILABLE_ROTATE_AND_CROP_MODES);
+    if (availableRotateCropEntry.count == 0) {
+        uint8_t defaultAvailableRotateCropEntry = ANDROID_SCALER_ROTATE_AND_CROP_NONE;
+        res = c.update(ANDROID_SCALER_AVAILABLE_ROTATE_AND_CROP_MODES,
+                &defaultAvailableRotateCropEntry, 1);
+    }
+    return res;
+}
+
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::removeAvailableKeys(
         CameraMetadata& c, const std::vector<uint32_t>& keys, uint32_t keyTag) {
     status_t res = OK;
@@ -2071,6 +2084,11 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
     if (OK != res) {
         ALOGE("%s: Unable to derive HEIC tags based on camera and media capabilities: %s (%d)",
                 __FUNCTION__, strerror(-res), res);
+    }
+    res = addRotateCropTags();
+    if (OK != res) {
+        ALOGE("%s: Unable to add default SCALER_ROTATE_AND_CROP tags: %s (%d)", __FUNCTION__,
+                strerror(-res), res);
     }
 
     res = camera3::ZoomRatioMapper::overrideZoomRatioTags(

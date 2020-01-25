@@ -29,6 +29,7 @@
 #include "device3/BufferUtils.h"
 #include "device3/DistortionMapper.h"
 #include "device3/ZoomRatioMapper.h"
+#include "device3/RotateAndCropMapper.h"
 #include "device3/InFlightRequest.h"
 #include "device3/Camera3Stream.h"
 #include "device3/Camera3OutputStreamInterface.h"
@@ -79,6 +80,7 @@ namespace camera3 {
         std::unique_ptr<ResultMetadataQueue>& fmq;
         std::unordered_map<std::string, camera3::DistortionMapper>& distortionMappers;
         std::unordered_map<std::string, camera3::ZoomRatioMapper>& zoomRatioMappers;
+        std::unordered_map<std::string, camera3::RotateAndCropMapper>& rotateAndCropMappers;
         TagMonitor& tagMonitor;
         sp<Camera3Stream> inputStream;
         StreamSet& outputStreams;

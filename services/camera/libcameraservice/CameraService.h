@@ -280,6 +280,10 @@ public:
         virtual int32_t getAudioRestriction() const;
 
         static bool isValidAudioRestriction(int32_t mode);
+
+        // Override rotate-and-crop AUTO behavior
+        virtual status_t setRotateAndCropOverride(uint8_t rotateAndCrop) = 0;
+
     protected:
         BasicClient(const sp<CameraService>& cameraService,
                 const sp<IBinder>& remoteCallback,
@@ -1014,6 +1018,12 @@ private:
     // Gets the UID state
     status_t handleGetUidState(const Vector<String16>& args, int out, int err);
 
+    // Set the rotate-and-crop AUTO override behavior
+    status_t handleSetRotateAndCrop(const Vector<String16>& args);
+
+    // Get the rotate-and-crop AUTO override behavior
+    status_t handleGetRotateAndCrop(int out);
+
     // Prints the shell command help
     status_t printHelp(int out);
 
@@ -1059,6 +1069,9 @@ private:
 
     // Aggreated audio restriction mode for all camera clients
     int32_t mAudioRestriction;
+
+    // Current override rotate-and-crop mode
+    uint8_t mOverrideRotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_AUTO;
 };
 
 } // namespace android

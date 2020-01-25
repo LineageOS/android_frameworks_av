@@ -545,6 +545,9 @@ private:
             SystemCameraKind getSystemCameraKind();
             status_t fixupMonochromeTags();
             status_t addDynamicDepthTags();
+            status_t deriveHeicTags();
+            status_t addRotateCropTags();
+
             static void getSupportedSizes(const CameraMetadata& ch, uint32_t tag,
                     android_pixel_format_t format,
                     std::vector<std::tuple<size_t, size_t>> *sizes /*out*/);
@@ -567,7 +570,6 @@ private:
                     std::vector<int64_t>* stallDurations,
                     const camera_metadata_entry& halStreamConfigs,
                     const camera_metadata_entry& halStreamDurations);
-            status_t deriveHeicTags();
         };
 
     private:

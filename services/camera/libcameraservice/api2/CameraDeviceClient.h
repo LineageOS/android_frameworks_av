@@ -184,6 +184,8 @@ public:
     virtual status_t      initialize(sp<CameraProviderManager> manager,
             const String8& monitorTags) override;
 
+    virtual status_t      setRotateAndCropOverride(uint8_t rotateAndCrop) override;
+
     virtual status_t      dump(int fd, const Vector<String16>& args);
 
     virtual status_t      dumpClient(int fd, const Vector<String16>& args);

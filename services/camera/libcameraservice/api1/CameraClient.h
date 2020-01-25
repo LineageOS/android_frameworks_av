@@ -62,6 +62,8 @@ public:
     virtual status_t        setAudioRestriction(int mode);
     virtual int32_t         getGlobalAudioRestriction();
 
+    virtual status_t        setRotateAndCropOverride(uint8_t override);
+
     // Interface used by CameraService
     CameraClient(const sp<CameraService>& cameraService,
             const sp<hardware::ICameraClient>& cameraClient,

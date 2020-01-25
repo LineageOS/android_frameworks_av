@@ -1731,6 +1731,11 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
             }
         }
 
+        // Set rotate-and-crop override behavior
+        if (mOverrideRotateAndCropMode != ANDROID_SCALER_ROTATE_AND_CROP_AUTO) {
+            client->setRotateAndCropOverride(mOverrideRotateAndCropMode);
+        }
+
         if (shimUpdateOnly) {
             // If only updating legacy shim parameters, immediately disconnect client
             mServiceLock.unlock();
@@ -3810,6 +3815,10 @@ status_t CameraService::shellCommand(int in, int out, int err, const Vector<Stri
         return handleResetUidState(args, err);
     } else if (args.size() >= 2 && args[0] == String16("get-uid-state")) {
         return handleGetUidState(args, out, err);
+    } else if (args.size() >= 2 && args[0] == String16("set-rotate-and-crop")) {
+        return handleSetRotateAndCrop(args);
+    } else if (args.size() >= 1 && args[0] == String16("get-rotate-and-crop")) {
+        return handleGetRotateAndCrop(out);
     } else if (args.size() == 1 && args[0] == String16("help")) {
         printHelp(out);
         return NO_ERROR;
@@ -3880,11 +3889,43 @@ status_t CameraService::handleGetUidState(const Vector<String16>& args, int out,
     }
 }
 
+status_t CameraService::handleSetRotateAndCrop(const Vector<String16>& args) {
+    int rotateValue = atoi(String8(args[1]));
+    if (rotateValue < ANDROID_SCALER_ROTATE_AND_CROP_NONE ||
+            rotateValue > ANDROID_SCALER_ROTATE_AND_CROP_AUTO) return BAD_VALUE;
+    Mutex::Autolock lock(mServiceLock);
+
+    mOverrideRotateAndCropMode = rotateValue;
+
+    if (rotateValue == ANDROID_SCALER_ROTATE_AND_CROP_AUTO) return OK;
+
+    const auto clients = mActiveClientManager.getAll();
+    for (auto& current : clients) {
+        if (current != nullptr) {
+            const auto basicClient = current->getValue();
+            if (basicClient.get() != nullptr) {
+                basicClient->setRotateAndCropOverride(rotateValue);
+            }
+        }
+    }
+
+    return OK;
+}
+
+status_t CameraService::handleGetRotateAndCrop(int out) {
+    Mutex::Autolock lock(mServiceLock);
+
+    return dprintf(out, "rotateAndCrop override: %d\n", mOverrideRotateAndCropMode);
+}
+
 status_t CameraService::printHelp(int out) {
     return dprintf(out, "Camera service commands:\n"
         "  get-uid-state <PACKAGE> [--user USER_ID] gets the uid state\n"
         "  set-uid-state <PACKAGE> <active|idle> [--user USER_ID] overrides the uid state\n"
         "  reset-uid-state <PACKAGE> [--user USER_ID] clears the uid state override\n"
+        "  set-rotate-and-crop <ROTATION> overrides the rotate-and-crop value for AUTO backcompat\n"
+        "      Valid values 0=0 deg, 1=90 deg, 2=180 deg, 3=270 deg, 4=No override\n"
+        "  get-rotate-and-crop returns the current override rotate-and-crop value\n"
         "  help print this message\n");
 }
 

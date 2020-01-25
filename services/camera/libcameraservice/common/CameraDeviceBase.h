@@ -375,6 +375,16 @@ class CameraDeviceBase : public virtual RefBase {
     virtual status_t switchToOffline(
             const std::vector<int32_t>& streamsToKeep,
             /*out*/ sp<CameraOfflineSessionBase>* session) = 0;
+
+    /**
+     * Set the current behavior for the ROTATE_AND_CROP control when in AUTO.
+     *
+     * The value must be one of the ROTATE_AND_CROP_* values besides AUTO,
+     * and defaults to NONE.
+     */
+    virtual status_t setRotateAndCropAutoBehavior(
+            camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue) = 0;
+
 };
 
 }; // namespace android

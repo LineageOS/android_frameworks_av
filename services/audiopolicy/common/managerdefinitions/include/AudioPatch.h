@@ -31,12 +31,24 @@ class AudioPatch : public RefBase, private HandleGenerator<audio_patch_handle_t>
 public:
     AudioPatch(const struct audio_patch *patch, uid_t uid);
 
+    audio_patch_handle_t getHandle() const { return mHandle; }
+
+    audio_patch_handle_t getAfHandle() const { return mAfPatchHandle; }
+
+    void setAfHandle(audio_patch_handle_t afHandle) { mAfPatchHandle = afHandle; }
+
+    uid_t getUid() const { return mUid; }
+
+    void setUid(uid_t uid) { mUid = uid; }
+
     void dump(String8 *dst, int spaces, int index) const;
 
-    audio_patch_handle_t mHandle;
     struct audio_patch mPatch;
+
+private:
+    const audio_patch_handle_t mHandle;
     uid_t mUid;
-    audio_patch_handle_t mAfPatchHandle;
+    audio_patch_handle_t mAfPatchHandle = AUDIO_PATCH_HANDLE_NONE;
 };
 
 class AudioPatchCollection : public DefaultKeyedVector<audio_patch_handle_t, sp<AudioPatch> >

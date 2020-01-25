@@ -351,6 +351,10 @@ status_t Camera3Device::initializeCommonLocked() {
     mZoomRatioMappers[mId.c_str()] = ZoomRatioMapper(&mDeviceInfo,
             mSupportNativeZoomRatio, usePrecorrectArray);
 
+    if (RotateAndCropMapper::isNeeded(&mDeviceInfo)) {
+        mRotateAndCropMappers.emplace(mId.c_str(), &mDeviceInfo);
+    }
+
     return OK;
 }
 
@@ -881,17 +885,12 @@ status_t Camera3Device::convertMetadataListToRequestListLocked(
 
         // Setup burst Id and request Id
         newRequest->mResultExtras.burstId = burstId++;
-        if (metadataIt->begin()->metadata.exists(ANDROID_REQUEST_ID)) {
-            if (metadataIt->begin()->metadata.find(ANDROID_REQUEST_ID).count == 0) {
-                CLOGE("RequestID entry exists; but must not be empty in metadata");
-                return BAD_VALUE;
-            }
-            newRequest->mResultExtras.requestId = metadataIt->begin()->metadata.find(
-                    ANDROID_REQUEST_ID).data.i32[0];
-        } else {
+        auto requestIdEntry = metadataIt->begin()->metadata.find(ANDROID_REQUEST_ID);
+        if (requestIdEntry.count == 0) {
             CLOGE("RequestID does not exist in metadata");
             return BAD_VALUE;
         }
+        newRequest->mResultExtras.requestId = requestIdEntry.data.i32[0];
 
         requestList->push_back(newRequest);
 
@@ -1049,8 +1048,8 @@ hardware::Return<void> Camera3Device::processCaptureResult_3_4(
         mNextReprocessResultFrameNumber, mNextZslStillResultFrameNumber,
         mUseHalBufManager, mUsePartialResult, mNeedFixupMonochromeTags,
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
-        mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mTagMonitor,
-        mInputStream, mOutputStreams, listener, *this, *this, *mInterface
+        mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
+        mTagMonitor, mInputStream, mOutputStreams, listener, *this, *this, *mInterface
     };
 
     for (const auto& result : results) {
@@ -1106,8 +1105,8 @@ hardware::Return<void> Camera3Device::processCaptureResult(
         mNextReprocessResultFrameNumber, mNextZslStillResultFrameNumber,
         mUseHalBufManager, mUsePartialResult, mNeedFixupMonochromeTags,
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
-        mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mTagMonitor,
-        mInputStream, mOutputStreams, listener, *this, *this, *mInterface
+        mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
+        mTagMonitor, mInputStream, mOutputStreams, listener, *this, *this, *mInterface
     };
 
     for (const auto& result : results) {
@@ -1145,8 +1144,8 @@ hardware::Return<void> Camera3Device::notify(
         mNextReprocessResultFrameNumber, mNextZslStillResultFrameNumber,
         mUseHalBufManager, mUsePartialResult, mNeedFixupMonochromeTags,
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
-        mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mTagMonitor,
-        mInputStream, mOutputStreams, listener, *this, *this, *mInterface
+        mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
+        mTagMonitor, mInputStream, mOutputStreams, listener, *this, *this, *mInterface
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg);
@@ -2222,7 +2221,7 @@ sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
         const PhysicalCameraSettingsList &request, const SurfaceMap &surfaceMap) {
     ATRACE_CALL();
 
-    sp<CaptureRequest> newRequest = new CaptureRequest;
+    sp<CaptureRequest> newRequest = new CaptureRequest();
     newRequest->mSettingsList = request;
 
     camera_metadata_entry_t inputStreams =
@@ -2292,6 +2291,15 @@ sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
     }
     newRequest->mSettingsList.begin()->metadata.erase(ANDROID_REQUEST_OUTPUT_STREAMS);
     newRequest->mBatchSize = 1;
+
+    auto rotateAndCropEntry =
+            newRequest->mSettingsList.begin()->metadata.find(ANDROID_SCALER_ROTATE_AND_CROP);
+    if (rotateAndCropEntry.count > 0 &&
+            rotateAndCropEntry.data.u8[0] == ANDROID_SCALER_ROTATE_AND_CROP_AUTO) {
+        newRequest->mRotateAndCropAuto = true;
+    } else {
+        newRequest->mRotateAndCropAuto = false;
+    }
 
     return newRequest;
 }
@@ -2730,7 +2738,7 @@ status_t Camera3Device::registerInFlight(uint32_t frameNumber,
         int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
         bool hasAppCallback, nsecs_t maxExpectedDuration,
         std::set<String8>& physicalCameraIds, bool isStillCapture,
-        bool isZslCapture, const std::set<std::string>& cameraIdsWithZoom,
+        bool isZslCapture, bool rotateAndCropAuto, const std::set<std::string>& cameraIdsWithZoom,
         const SurfaceMap& outputSurfaces) {
     ATRACE_CALL();
     std::lock_guard<std::mutex> l(mInFlightLock);
@@ -2738,7 +2746,7 @@ status_t Camera3Device::registerInFlight(uint32_t frameNumber,
     ssize_t res;
     res = mInFlightMap.add(frameNumber, InFlightRequest(numBuffers, resultExtras, hasInput,
             hasAppCallback, maxExpectedDuration, physicalCameraIds, isStillCapture, isZslCapture,
-            cameraIdsWithZoom, outputSurfaces));
+            rotateAndCropAuto, cameraIdsWithZoom, outputSurfaces));
     if (res < 0) return res;
 
     if (mInFlightMap.size() == 1) {
@@ -3725,6 +3733,7 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mLatestRequestId(NAME_NOT_FOUND),
         mCurrentAfTriggerId(0),
         mCurrentPreCaptureTriggerId(0),
+        mRotateAndCropOverride(ANDROID_SCALER_ROTATE_AND_CROP_NONE),
         mRepeatingLastFrameNumber(
             hardware::camera2::ICameraDeviceUser::NO_IN_FLIGHT_REPEATING_FRAMES),
         mPrepareVideoStream(false),
@@ -4358,8 +4367,11 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         bool triggersMixedIn = (triggerCount > 0 || mPrevTriggers > 0);
         mPrevTriggers = triggerCount;
 
+        bool rotateAndCropChanged = overrideAutoRotateAndCrop(captureRequest);
+
         // If the request is the same as last, or we had triggers last time
-        bool newRequest = (mPrevRequest != captureRequest || triggersMixedIn) &&
+        bool newRequest =
+                (mPrevRequest != captureRequest || triggersMixedIn || rotateAndCropChanged) &&
                 // Request settings are all the same within one batch, so only treat the first
                 // request in a batch as new
                 !(batchedRequest && i > 0);
@@ -4417,6 +4429,21 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                                     "for zoom ratio for request %d: %s (%d)",
                                     halRequest->frame_number, strerror(-res), res);
                             return INVALID_OPERATION;
+                        }
+                    }
+                    if (captureRequest->mRotateAndCropAuto) {
+                        for (it = captureRequest->mSettingsList.begin();
+                                it != captureRequest->mSettingsList.end(); it++) {
+                            auto mapper = parent->mRotateAndCropMappers.find(it->cameraId);
+                            if (mapper != parent->mRotateAndCropMappers.end()) {
+                                res = mapper->second.updateCaptureRequest(&(it->metadata));
+                                if (res != OK) {
+                                    SET_ERR("RequestThread: Unable to correct capture requests "
+                                            "for rotate-and-crop for request %d: %s (%d)",
+                                            halRequest->frame_number, strerror(-res), res);
+                                    return INVALID_OPERATION;
+                                }
+                            }
                         }
                     }
                 }
@@ -4617,7 +4644,8 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 /*hasInput*/halRequest->input_buffer != NULL,
                 hasCallback,
                 calculateMaxExpectedDuration(halRequest->settings),
-                requestedPhysicalCameras, isStillCapture, isZslCapture, mPrevCameraIdsWithZoom,
+                requestedPhysicalCameras, isStillCapture, isZslCapture,
+                captureRequest->mRotateAndCropAuto, mPrevCameraIdsWithZoom,
                 (mUseHalBufManager) ? uniqueSurfaceIdMap :
                                       SurfaceMap{});
         ALOGVV("%s: registered in flight requestId = %" PRId32 ", frameNumber = %" PRId64
@@ -4761,6 +4789,17 @@ status_t Camera3Device::RequestThread::switchToOffline(
 
     return mInterface->switchToOffline(
             streamsToKeep, offlineSessionInfo, offlineSession, bufferRecords);
+}
+
+status_t Camera3Device::RequestThread::setRotateAndCropAutoBehavior(
+        camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue) {
+    ATRACE_CALL();
+    Mutex::Autolock l(mTriggerMutex);
+    if (rotateAndCropValue == ANDROID_SCALER_ROTATE_AND_CROP_AUTO) {
+        return BAD_VALUE;
+    }
+    mRotateAndCropOverride = rotateAndCropValue;
+    return OK;
 }
 
 nsecs_t Camera3Device::getExpectedInFlightDuration() {
@@ -5276,6 +5315,32 @@ status_t Camera3Device::RequestThread::addDummyTriggerIds(
     }
 
     return OK;
+}
+
+bool Camera3Device::RequestThread::overrideAutoRotateAndCrop(
+        const sp<CaptureRequest> &request) {
+    ATRACE_CALL();
+
+    if (request->mRotateAndCropAuto) {
+        Mutex::Autolock l(mTriggerMutex);
+        CameraMetadata &metadata = request->mSettingsList.begin()->metadata;
+
+        auto rotateAndCropEntry = metadata.find(ANDROID_SCALER_ROTATE_AND_CROP);
+        if (rotateAndCropEntry.count > 0) {
+            if (rotateAndCropEntry.data.u8[0] == mRotateAndCropOverride) {
+                return false;
+            } else {
+                rotateAndCropEntry.data.u8[0] = mRotateAndCropOverride;
+                return true;
+            }
+        } else {
+            uint8_t rotateAndCrop_u8 = mRotateAndCropOverride;
+            metadata.update(ANDROID_SCALER_ROTATE_AND_CROP,
+                    &rotateAndCrop_u8, 1);
+            return true;
+        }
+    }
+    return false;
 }
 
 /**
@@ -5813,7 +5878,7 @@ status_t Camera3Device::switchToOffline(
             mNextReprocessResultFrameNumber, mNextZslStillResultFrameNumber,
             mNextShutterFrameNumber, mNextReprocessShutterFrameNumber,
             mNextZslStillShutterFrameNumber, mDeviceInfo, mPhysicalDeviceInfoMap,
-            mDistortionMappers, mZoomRatioMappers);
+            mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers);
 
     *session = new Camera3OfflineSession(mId, inputStream, offlineStreamSet,
             std::move(bufferRecords), offlineReqs, offlineStates, offlineSession);
@@ -5887,6 +5952,17 @@ void Camera3Device::getOfflineStreamIds(std::vector<int> *offlineStreamIds) {
             offlineStreamIds->push_back(streamId);
         }
     }
+}
+
+status_t Camera3Device::setRotateAndCropAutoBehavior(
+    camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue) {
+    ATRACE_CALL();
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+    if (mRequestThread == nullptr) {
+        return INVALID_OPERATION;
+    }
+    return mRequestThread->setRotateAndCropAutoBehavior(rotateAndCropValue);
 }
 
 }; // namespace android

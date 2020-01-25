@@ -24,6 +24,7 @@ namespace camera3 {
 
 /**
  * Metadata keys to correct when adjusting coordinates for distortion correction
+ * or for crop and rotate
  */
 
 // Both capture request and result
@@ -33,7 +34,7 @@ constexpr std::array<uint32_t, 3> CoordinateMapper::kMeteringRegionsToCorrect = 
     ANDROID_CONTROL_AWB_REGIONS
 };
 
-// Both capture request and result
+// Both capture request and result, not applicable to crop and rotate
 constexpr std::array<uint32_t, 1> CoordinateMapper::kRectsToCorrect = {
     ANDROID_SCALER_CROP_REGION,
 };
