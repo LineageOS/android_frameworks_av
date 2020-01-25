@@ -68,6 +68,7 @@ cc_library {
     header_libs: [
         "libaaudio_headers",
         "libmedia_headers",
+        "libmediametrics_headers",
     ],
     export_header_lib_headers: ["libaaudio_headers"],
 

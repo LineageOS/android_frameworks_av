@@ -72,6 +72,7 @@ cc_library_shared {
 
     header_libs: [
         "libmediadrm_headers",
+        "libmediametrics_headers",
     ],
 
     shared_libs: [
