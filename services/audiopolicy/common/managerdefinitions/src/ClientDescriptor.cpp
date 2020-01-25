@@ -82,14 +82,13 @@ void RecordClientDescriptor::dump(String8 *dst, int spaces, int index) const
 }
 
 SourceClientDescriptor::SourceClientDescriptor(audio_port_handle_t portId, uid_t uid,
-         audio_attributes_t attributes, const sp<AudioPatch>& patchDesc,
+         audio_attributes_t attributes, const struct audio_port_config &config,
          const sp<DeviceDescriptor>& srcDevice, audio_stream_type_t stream,
          product_strategy_t strategy, VolumeSource volumeSource) :
     TrackClientDescriptor::TrackClientDescriptor(portId, uid, AUDIO_SESSION_NONE, attributes,
-        AUDIO_CONFIG_BASE_INITIALIZER, AUDIO_PORT_HANDLE_NONE,
+        {config.sample_rate, config.channel_mask, config.format}, AUDIO_PORT_HANDLE_NONE,
         stream, strategy, volumeSource, AUDIO_OUTPUT_FLAG_NONE, false,
-        {} /* Sources do not support secondary outputs*/),
-        mPatchDesc(patchDesc), mSrcDevice(srcDevice)
+        {} /* Sources do not support secondary outputs*/), mSrcDevice(srcDevice)
 {
 }
 
