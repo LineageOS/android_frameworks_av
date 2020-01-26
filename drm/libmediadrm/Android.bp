@@ -167,6 +167,7 @@ cc_library_shared {
     ],
 
     header_libs: [
+        "libmediametrics_headers",
         "libstagefright_foundation_headers",
     ],
 }

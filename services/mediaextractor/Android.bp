@@ -15,6 +15,9 @@ cc_library_shared {
         "libutils",
         "liblog",
     ],
+    header_libs: [
+        "libmediametrics_headers",
+    ],
 }
 
 // service executable

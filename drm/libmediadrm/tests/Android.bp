@@ -3,7 +3,10 @@
 cc_test {
     name: "CounterMetric_test",
     srcs: ["CounterMetric_test.cpp"],
-    header_libs: ["libmedia_headers"],
+    header_libs: [
+        "libmedia_headers",
+        "libmediametrics_headers",
+    ],
     shared_libs: ["libmediadrm"],
     cflags: [
       "-Werror",
@@ -46,7 +49,8 @@ cc_test {
     name: "EventMetric_test",
     srcs: ["EventMetric_test.cpp"],
     header_libs: [
-        "libmedia_headers"
+        "libmedia_headers",
+        "libmediametrics_headers",
     ],
     shared_libs: [
       "liblog",
