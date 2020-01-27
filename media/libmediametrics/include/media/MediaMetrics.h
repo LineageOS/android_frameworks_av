@@ -24,6 +24,9 @@
 // for that string to the caller. The caller is responsible for calling free()
 // on that pointer when done using the value.
 
+#include <sys/cdefs.h>
+#include <sys/types.h>
+
 __BEGIN_DECLS
 
 // internally re-cast to the behind-the-scenes C++ class instance
