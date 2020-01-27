@@ -22,6 +22,8 @@ import android.hardware.camera2.ICameraDeviceUser;
 import android.hardware.camera2.ICameraDeviceCallbacks;
 import android.hardware.camera2.params.VendorTagDescriptor;
 import android.hardware.camera2.params.VendorTagDescriptorCache;
+import android.hardware.camera2.utils.ConcurrentCameraIdCombination;
+import android.hardware.camera2.utils.CameraIdAndSessionConfiguration;
 import android.hardware.camera2.impl.CameraMetadataNative;
 import android.hardware.ICameraServiceListener;
 import android.hardware.CameraInfo;
@@ -112,6 +114,25 @@ interface ICameraService
      * devices that have a flash unit.
      */
     CameraStatus[] addListener(ICameraServiceListener listener);
+
+    /**
+     * Get a list of combinations of camera ids which support concurrent streaming.
+     *
+     */
+    ConcurrentCameraIdCombination[] getConcurrentStreamingCameraIds();
+
+    /**
+      * Check whether a particular set of session configurations are concurrently supported by the
+      * corresponding camera ids.
+      *
+      * @param sessions the set of camera id and session configuration pairs to be queried.
+      * @return true  - the set of concurrent camera id and stream combinations is supported.
+      *         false - the set of concurrent camera id and stream combinations is not supported
+      *                 OR the method was called with a set of camera ids not returned by
+      *                 getConcurrentMultiStreamingCameraIds().
+      */
+    boolean isConcurrentSessionConfigurationSupported(
+            in CameraIdAndSessionConfiguration[] sessions);
 
     /**
      * Remove listener for changes to camera device and flashlight state.
