@@ -512,9 +512,11 @@ private:
 
     class EffectCallback :  public EffectCallbackInterface {
     public:
-        EffectCallback(const wp<EffectChain>& chain,
+        // Note: ctors taking a weak pointer to their owner must not promote it
+        // during construction (but may keep a reference for later promotion).
+        EffectCallback(const wp<EffectChain>& owner,
                        const wp<ThreadBase>& thread)
-            : mChain(chain) {
+            : mChain(owner) {
             setThread(thread);
         }
 
@@ -657,9 +659,11 @@ private:
 
     class ProxyCallback :  public EffectCallbackInterface {
     public:
-                ProxyCallback(const wp<DeviceEffectProxy>& proxy,
-                        const sp<DeviceEffectManagerCallback>& callback)
-                    : mProxy(proxy), mManagerCallback(callback) {}
+        // Note: ctors taking a weak pointer to their owner must not promote it
+        // during construction (but may keep a reference for later promotion).
+        ProxyCallback(const wp<DeviceEffectProxy>& owner,
+                const sp<DeviceEffectManagerCallback>& callback)
+            : mProxy(owner), mManagerCallback(callback) {}
 
         status_t createEffectHal(const effect_uuid_t *pEffectUuid,
                int32_t sessionId, int32_t deviceId, sp<EffectHalInterface> *effect) override;
