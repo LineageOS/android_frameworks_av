@@ -34,6 +34,8 @@ using android::camera3::CompositeStream;
 
 namespace android {
 
+typedef std::function<CameraMetadata (const String8 &)> metadataGetter;
+
 struct CameraDeviceClientBase :
          public CameraService::BasicClient,
          public hardware::camera2::BnCameraDeviceUser
@@ -202,6 +204,16 @@ public:
     virtual void notifyRequestQueueEmpty();
     virtual void notifyRepeatingRequestError(long lastFrameNumber);
 
+    // utility function to convert AIDL SessionConfiguration to HIDL
+    // streamConfiguration. Also checks for sanity of SessionConfiguration and
+    // returns a non-ok binder::Status if the passed in session configuration
+    // isn't valid.
+    static binder::Status
+    convertToHALStreamCombination(const SessionConfiguration& sessionConfiguration,
+            const String8 &cameraId, const CameraMetadata &deviceInfo,
+            metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
+            hardware::camera::device::V3_4::StreamConfiguration &streamConfiguration,
+            bool *earlyExit);
     /**
      * Interface used by independent components of CameraDeviceClient.
      */
@@ -256,10 +268,10 @@ private:
 
     /** Utility members */
     binder::Status checkPidStatus(const char* checkLocation);
-    binder::Status checkOperatingModeLocked(int operatingMode) const;
-    binder::Status checkPhysicalCameraIdLocked(String8 physicalCameraId);
-    binder::Status checkSurfaceTypeLocked(size_t numBufferProducers, bool deferredConsumer,
-            int surfaceType) const;
+    static binder::Status checkOperatingMode(int operatingMode, const CameraMetadata &staticInfo,
+            const String8 &cameraId);
+    static binder::Status checkSurfaceType(size_t numBufferProducers, bool deferredConsumer,
+            int surfaceType);
     static void mapStreamInfo(const OutputStreamInfo &streamInfo,
             camera3_stream_rotation_t rotation, String8 physicalId,
             hardware::camera::device::V3_4::Stream *stream /*out*/);
@@ -290,9 +302,9 @@ private:
 
     // Create a Surface from an IGraphicBufferProducer. Returns error if
     // IGraphicBufferProducer's property doesn't match with streamInfo
-    binder::Status createSurfaceFromGbp(OutputStreamInfo& streamInfo, bool isStreamInfoValid,
-            sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
-            const String8& physicalCameraId);
+    static binder::Status createSurfaceFromGbp(OutputStreamInfo& streamInfo, bool isStreamInfoValid,
+            sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp, const String8 &cameraId,
+            const CameraMetadata &physicalCameraMetadata);
 
 
     // Utility method to insert the surface into SurfaceMap
@@ -302,7 +314,8 @@ private:
 
     // Check that the physicalCameraId passed in is spported by the camera
     // device.
-    bool checkPhysicalCameraId(const String8& physicalCameraId);
+    static binder::Status checkPhysicalCameraId(const std::vector<std::string> &physicalCameraIds,
+            const String8 &physicalCameraId, const String8 &logicalCameraId);
 
     // IGraphicsBufferProducer binder -> Stream ID + Surface ID for output streams
     KeyedVector<sp<IBinder>, StreamSurfaceId> mStreamMap;

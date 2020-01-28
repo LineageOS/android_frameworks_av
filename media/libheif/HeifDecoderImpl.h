@@ -81,6 +81,7 @@ private:
 
     bool decodeAsync();
     bool getScanlineInner(uint8_t* dst);
+    bool reinit(HeifFrameInfo* frameInfo);
 };
 
 } // namespace android

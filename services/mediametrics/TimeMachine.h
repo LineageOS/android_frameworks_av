@@ -157,9 +157,22 @@ private:
             }
             std::stringstream ss;
             ss << key << "." << tsPair.first << "={";
-            do {
-                ss << eptr->first << ":" << eptr->second << ",";
-            } while (++eptr != timeSequence.end());
+
+            time_string_t last_timestring{}; // last timestring used.
+            while (true) {
+                const time_string_t timestring = mediametrics::timeStringFromNs(eptr->first);
+                // find common prefix offset.
+                const size_t offset = commonTimePrefixPosition(timestring.time,
+                        last_timestring.time);
+                last_timestring = timestring;
+                ss << "(" << (offset == 0 ? "" : "~") << &timestring.time[offset]
+                    << ") " << eptr->second;
+                if (++eptr == timeSequence.end()) {
+                    ss << "}";
+                    break;
+                }
+                ss << ", ";
+            }
             ss << "};\n";
             return ss.str();
         }

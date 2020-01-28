@@ -85,11 +85,11 @@ private:
     bool expirations_l(const std::shared_ptr<const mediametrics::Item>& item);
 
     // support for generating output
-    void dumpQueue_l(String8 &result, int dumpProto);
-    void dumpQueue_l(String8 &result, int dumpProto, nsecs_t, const char *only);
-    void dumpHeaders_l(String8 &result, int dumpProto, nsecs_t ts_since);
-    void dumpSummaries_l(String8 &result, int dumpProto, nsecs_t ts_since, const char * only);
-    void dumpRecent_l(String8 &result, int dumpProto, nsecs_t ts_since, const char * only);
+    void dumpQueue_l(String8 &result);
+    void dumpQueue_l(String8 &result, nsecs_t, const char *only);
+    void dumpHeaders_l(String8 &result, nsecs_t ts_since);
+    void dumpSummaries_l(String8 &result, nsecs_t ts_since, const char * only);
+    void dumpRecent_l(String8 &result, nsecs_t ts_since, const char * only);
 
     // The following variables accessed without mLock
 
@@ -100,7 +100,6 @@ private:
     const nsecs_t mMaxRecordAgeNs;
     // max to expire per expirations_l() invocation
     const size_t mMaxRecordsExpiredAtOnce;
-    const int mDumpProtoDefault;
 
     std::atomic<int64_t> mItemsSubmitted{}; // accessed outside of lock.
 

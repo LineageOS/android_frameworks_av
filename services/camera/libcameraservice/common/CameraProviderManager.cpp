@@ -37,6 +37,7 @@
 #include <android-base/logging.h>
 #include <cutils/properties.h>
 #include <hwbinder/IPCThreadState.h>
+#include <utils/SessionConfigurationUtils.h>
 #include <utils/Trace.h>
 
 #include "api2/HeicCompositeStream.h"
@@ -47,6 +48,8 @@ namespace android {
 using namespace ::android::hardware::camera;
 using namespace ::android::hardware::camera::common::V1_0;
 using std::literals::chrono_literals::operator""s;
+using hardware::camera2::utils::CameraIdAndSessionConfiguration;
+using hardware::camera::provider::V2_6::CameraIdAndStreamCombination;
 
 namespace {
 const bool kEnableLazyHal(property_get_bool("ro.camera.enableLazyHal", false));
@@ -267,7 +270,6 @@ status_t CameraProviderManager::isSessionConfigurationSupported(const std::strin
         const hardware::camera::device::V3_4::StreamConfiguration &configuration,
         bool *status /*out*/) const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
-
     auto deviceInfo = findDeviceInfoLocked(id);
     if (deviceInfo == nullptr) {
         return NAME_NOT_FOUND;
@@ -1083,10 +1085,8 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::deriveHeicTags() {
     return OK;
 }
 
-bool CameraProviderManager::isLogicalCamera(const std::string& id,
+bool CameraProviderManager::isLogicalCameraLocked(const std::string& id,
         std::vector<std::string>* physicalCameraIds) {
-    std::lock_guard<std::mutex> lock(mInterfaceMutex);
-
     auto deviceInfo = findDeviceInfoLocked(id);
     if (deviceInfo == nullptr) return false;
 
@@ -1094,6 +1094,12 @@ bool CameraProviderManager::isLogicalCamera(const std::string& id,
         *physicalCameraIds = deviceInfo->mPhysicalIds;
     }
     return deviceInfo->mIsLogicalCamera;
+}
+
+bool CameraProviderManager::isLogicalCamera(const std::string& id,
+        std::vector<std::string>* physicalCameraIds) {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    return isLogicalCameraLocked(id, physicalCameraIds);
 }
 
 status_t CameraProviderManager::getSystemCameraKind(const std::string& id,
@@ -1261,11 +1267,27 @@ status_t CameraProviderManager::ProviderInfo::initialize(
             mProviderName.c_str(), interface->isRemote());
 
     // Determine minor version
-    auto castResult = provider::V2_5::ICameraProvider::castFrom(interface);
-    if (castResult.isOk()) {
-        mMinorVersion = 5;
-    } else {
-        mMinorVersion = 4;
+    mMinorVersion = 4;
+    auto cast2_6 = provider::V2_6::ICameraProvider::castFrom(interface);
+    sp<provider::V2_6::ICameraProvider> interface2_6 = nullptr;
+    if (cast2_6.isOk()) {
+        interface2_6 = cast2_6;
+        if (interface2_6 != nullptr) {
+            mMinorVersion = 6;
+        }
+    }
+    // We need to check again since cast2_6.isOk() succeeds even if the provider
+    // version isn't actually 2.6.
+    if (interface2_6 == nullptr){
+        auto cast2_5 =
+                provider::V2_5::ICameraProvider::castFrom(interface);
+        sp<provider::V2_5::ICameraProvider> interface2_5 = nullptr;
+        if (cast2_5.isOk()) {
+            interface2_5 = cast2_5;
+            if (interface != nullptr) {
+                mMinorVersion = 5;
+            }
+        }
     }
 
     hardware::Return<bool> linked = interface->linkToDeath(this, /*cookie*/ mId);
@@ -1326,6 +1348,34 @@ status_t CameraProviderManager::ProviderInfo::initialize(
         ALOGE("%s: Unable to query for camera devices from provider '%s'",
                 __FUNCTION__, mProviderName.c_str());
         return mapToStatusT(status);
+    }
+
+    // Get list of concurrent streaming camera device combinations
+    if (mMinorVersion >= 6) {
+        hardware::Return<void> ret = interface2_6->getConcurrentStreamingCameraIds([&status, this](
+                Status concurrentIdStatus, // TODO: Move all instances of hidl_string to 'using'
+                const hardware::hidl_vec<hardware::hidl_vec<hardware::hidl_string>>&
+                        cameraDeviceIdCombinations) {
+            status = concurrentIdStatus;
+            if (status == Status::OK) {
+                for (auto& combination : cameraDeviceIdCombinations) {
+                    std::unordered_set<std::string> deviceIds;
+                    for (auto &cameraDeviceId : combination) {
+                        deviceIds.insert(cameraDeviceId.c_str());
+                    }
+                    mConcurrentCameraIdCombinations.push_back(std::move(deviceIds));
+                }
+            } });
+        if (!ret.isOk()) {
+            ALOGE("%s: Transaction error in getting camera ID list from provider '%s': %s",
+                    __FUNCTION__, mProviderName.c_str(), linked.description().c_str());
+            return DEAD_OBJECT;
+        }
+        if (status != Status::OK) {
+            ALOGE("%s: Unable to query for camera devices from provider '%s'",
+                    __FUNCTION__, mProviderName.c_str());
+            return mapToStatusT(status);
+        }
     }
 
     ret = interface->isSetTorchModeSupported(
@@ -1778,6 +1828,55 @@ status_t CameraProviderManager::ProviderInfo::notifyDeviceStateChange(
         }
     }
     return OK;
+}
+
+status_t CameraProviderManager::ProviderInfo::isConcurrentSessionConfigurationSupported(
+        const hardware::hidl_vec<CameraIdAndStreamCombination> &halCameraIdsAndStreamCombinations,
+        bool *isSupported) {
+    status_t res = OK;
+    if (mMinorVersion >= 6) {
+        // Check if the provider is currently active - not going to start it up for this notification
+        auto interface = mSavedInterface != nullptr ? mSavedInterface : mActiveInterface.promote();
+        if (interface == nullptr) {
+            // TODO: This might be some other problem
+            return INVALID_OPERATION;
+        }
+        auto castResult = provider::V2_6::ICameraProvider::castFrom(interface);
+        if (castResult.isOk()) {
+            sp<provider::V2_6::ICameraProvider> interface_2_6 = castResult;
+            if (interface_2_6 != nullptr) {
+                Status callStatus;
+                auto cb =
+                        [&isSupported, &callStatus](Status s, bool supported) {
+                              callStatus = s;
+                              *isSupported = supported; };
+
+                auto ret =  interface_2_6->isConcurrentStreamCombinationSupported(
+                            halCameraIdsAndStreamCombinations, cb);
+                if (ret.isOk()) {
+                    switch (callStatus) {
+                        case Status::OK:
+                            // Expected case, do nothing.
+                            res = OK;
+                            break;
+                        case Status::METHOD_NOT_SUPPORTED:
+                            res = INVALID_OPERATION;
+                            break;
+                        default:
+                            ALOGE("%s: Session configuration query failed: %d", __FUNCTION__,
+                                      callStatus);
+                            res = UNKNOWN_ERROR;
+                    }
+                } else {
+                    ALOGE("%s: Unexpected binder error: %s", __FUNCTION__, ret.description().c_str());
+                    res = UNKNOWN_ERROR;
+                }
+                return res;
+            }
+        }
+    }
+    // unsupported operation
+    return INVALID_OPERATION;
 }
 
 template<class DeviceInfoT>
@@ -2640,6 +2739,125 @@ status_t HidlVendorTagDescriptor::createDescriptorFromHidl(
 
     descriptor = std::move(desc);
     return OK;
+}
+
+// Expects to have mInterfaceMutex locked
+std::vector<std::unordered_set<std::string>>
+CameraProviderManager::getConcurrentStreamingCameraIds() const {
+    std::vector<std::unordered_set<std::string>> deviceIdCombinations;
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    for (auto &provider : mProviders) {
+        for (auto &combinations : provider->mConcurrentCameraIdCombinations) {
+            deviceIdCombinations.push_back(combinations);
+        }
+    }
+    return deviceIdCombinations;
+}
+
+status_t CameraProviderManager::convertToHALStreamCombinationAndCameraIdsLocked(
+        const std::vector<CameraIdAndSessionConfiguration> &cameraIdsAndSessionConfigs,
+        hardware::hidl_vec<CameraIdAndStreamCombination> *halCameraIdsAndStreamCombinations,
+        bool *earlyExit) {
+    binder::Status bStatus = binder::Status::ok();
+    std::vector<CameraIdAndStreamCombination> halCameraIdsAndStreamsV;
+    bool shouldExit = false;
+    status_t res = OK;
+    for (auto &cameraIdAndSessionConfig : cameraIdsAndSessionConfigs) {
+        hardware::camera::device::V3_4::StreamConfiguration streamConfiguration;
+        CameraMetadata deviceInfo;
+        res = getCameraCharacteristicsLocked(cameraIdAndSessionConfig.mCameraId, &deviceInfo);
+        if (res != OK) {
+            return res;
+        }
+        metadataGetter getMetadata =
+                [this](const String8 &id) {
+                    CameraMetadata physicalDeviceInfo;
+                    getCameraCharacteristicsLocked(id.string(), &physicalDeviceInfo);
+                    return physicalDeviceInfo;
+                };
+        std::vector<std::string> physicalCameraIds;
+        isLogicalCameraLocked(cameraIdAndSessionConfig.mCameraId, &physicalCameraIds);
+        bStatus =
+            SessionConfigurationUtils::convertToHALStreamCombination(
+                    cameraIdAndSessionConfig.mSessionConfiguration,
+                    String8(cameraIdAndSessionConfig.mCameraId.c_str()), deviceInfo, getMetadata,
+                    physicalCameraIds, streamConfiguration, &shouldExit);
+        if (!bStatus.isOk()) {
+            ALOGE("%s: convertToHALStreamCombination failed", __FUNCTION__);
+            return INVALID_OPERATION;
+        }
+        if (shouldExit) {
+            *earlyExit = true;
+            return OK;
+        }
+        CameraIdAndStreamCombination halCameraIdAndStream;
+        halCameraIdAndStream.cameraId = cameraIdAndSessionConfig.mCameraId;
+        halCameraIdAndStream.streamConfiguration = streamConfiguration;
+        halCameraIdsAndStreamsV.push_back(halCameraIdAndStream);
+    }
+    *halCameraIdsAndStreamCombinations = halCameraIdsAndStreamsV;
+    return OK;
+}
+
+// Checks if the containing vector of sets has any set that contains all of the
+// camera ids in cameraIdsAndSessionConfigs.
+static bool checkIfSetContainsAll(
+        const std::vector<CameraIdAndSessionConfiguration> &cameraIdsAndSessionConfigs,
+        const std::vector<std::unordered_set<std::string>> &containingSets) {
+    for (auto &containingSet : containingSets) {
+        bool didHaveAll = true;
+        for (auto &cameraIdAndSessionConfig : cameraIdsAndSessionConfigs) {
+            if (containingSet.find(cameraIdAndSessionConfig.mCameraId) == containingSet.end()) {
+                // a camera id doesn't belong to this set, keep looking in other
+                // sets
+                didHaveAll = false;
+                break;
+            }
+        }
+        if (didHaveAll) {
+            // found a set that has all camera ids, lets return;
+            return true;
+        }
+    }
+    return false;
+}
+
+status_t CameraProviderManager::isConcurrentSessionConfigurationSupported(
+        const std::vector<CameraIdAndSessionConfiguration> &cameraIdsAndSessionConfigs,
+        bool *isSupported) {
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+    // Check if all the devices are a subset of devices advertised by the
+    // same provider through getConcurrentStreamingCameraIds()
+    // TODO: we should also do a findDeviceInfoLocked here ?
+    for (auto &provider : mProviders) {
+        if (checkIfSetContainsAll(cameraIdsAndSessionConfigs,
+                provider->mConcurrentCameraIdCombinations)) {
+            // For each camera device in cameraIdsAndSessionConfigs collect
+            // the streamConfigs and create the HAL
+            // CameraIdAndStreamCombination, exit early if needed
+            hardware::hidl_vec<CameraIdAndStreamCombination> halCameraIdsAndStreamCombinations;
+            bool knowUnsupported = false;
+            status_t res = convertToHALStreamCombinationAndCameraIdsLocked(
+                    cameraIdsAndSessionConfigs, &halCameraIdsAndStreamCombinations,
+                    &knowUnsupported);
+            if (res != OK) {
+                ALOGE("%s unable to convert session configurations provided to HAL stream"
+                      "combinations", __FUNCTION__);
+                return res;
+            }
+            if (knowUnsupported) {
+                // We got to know the streams aren't valid before doing the HAL
+                // call itself.
+                *isSupported = false;
+                return OK;
+            }
+            return provider->isConcurrentSessionConfigurationSupported(
+                    halCameraIdsAndStreamCombinations, isSupported);
+        }
+    }
+    *isSupported = false;
+    //The set of camera devices were not found
+    return INVALID_OPERATION;
 }
 
 status_t CameraProviderManager::getCameraCharacteristicsLocked(const std::string &id,

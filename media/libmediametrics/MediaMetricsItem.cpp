@@ -210,31 +210,66 @@ status_t mediametrics::Item::writeToParcel0(Parcel *data) const {
 }
 
 const char *mediametrics::Item::toCString() {
-   return toCString(PROTO_LAST);
-}
-
-const char * mediametrics::Item::toCString(int version) {
-    std::string val = toString(version);
+    std::string val = toString();
     return strdup(val.c_str());
 }
 
-std::string mediametrics::Item::toString() const {
-   return toString(PROTO_LAST);
+/*
+ * Similar to audio_utils/clock.h but customized for displaying mediametrics time.
+ */
+
+void nsToString(int64_t ns, char *buffer, size_t bufferSize, PrintFormat format)
+{
+    if (bufferSize == 0) return;
+
+    const int one_second = 1000000000;
+    const time_t sec = ns / one_second;
+    struct tm tm;
+
+    // Supported on bionic, glibc, and macOS, but not mingw.
+    if (localtime_r(&sec, &tm) == NULL) {
+        buffer[0] = '\0';
+        return;
+    }
+
+    switch (format) {
+    default:
+    case kPrintFormatLong:
+        if (snprintf(buffer, bufferSize, "%02d-%02d %02d:%02d:%02d.%03d",
+            tm.tm_mon + 1, // localtime_r uses months in 0 - 11 range
+            tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
+            (int)(ns % one_second / 1000000)) < 0) {
+            buffer[0] = '\0'; // null terminate on format error, which should not happen
+        }
+        break;
+    case kPrintFormatShort:
+        if (snprintf(buffer, bufferSize, "%02d:%02d:%02d.%03d",
+            tm.tm_hour, tm.tm_min, tm.tm_sec,
+            (int)(ns % one_second / 1000000)) < 0) {
+            buffer[0] = '\0'; // null terminate on format error, which should not happen
+        }
+        break;
+    }
 }
 
-std::string mediametrics::Item::toString(int version) const {
+std::string mediametrics::Item::toString() const {
     std::string result;
     char buffer[kMaxPropertyStringSize];
 
-    snprintf(buffer, sizeof(buffer), "[%d:%s:%d:%d:%lld:%s:%zu:",
-            version, mKey.c_str(), mPid, mUid, (long long)mTimestamp,
-            mPkgName.c_str(), mProps.size());
+    snprintf(buffer, sizeof(buffer), "{%s, (%s), (%s, %d, %d)",
+            mKey.c_str(),
+            timeStringFromNs(mTimestamp, kPrintFormatLong).time,
+            mPkgName.c_str(), mPid, mUid
+           );
     result.append(buffer);
+    bool first = true;
     for (auto &prop : *this) {
         prop.toStringBuffer(buffer, sizeof(buffer));
-        result.append(buffer);
+        result += first ? ", (" : ", ";
+        result += buffer;
+        first = false;
     }
-    result.append("]");
+    result.append(")}");
     return result;
 }
 

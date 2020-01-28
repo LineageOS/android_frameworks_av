@@ -149,6 +149,85 @@ enum Type {
     kTypeRate = 5,
 };
 
+/*
+ * Time printing
+ *
+ * kPrintFormatLong time string is 19 characters (including null termination).
+ * Example Long Form: "03-27 16:47:06.187"
+ *                     MM DD HH MM SS MS
+ *
+ * kPrintFormatShort time string is 13 characters (including null termination).
+ * Example Short Form: "16:47:06.187"
+ *                      HH MM SS MS
+ */
+
+enum PrintFormat {
+    kPrintFormatLong = 0,
+    kPrintFormatShort = 1,
+};
+
+/**
+ * Converts real time in ns to a time string object, with format similar to logcat.
+ *
+ * \param ns         input real time in nanoseconds to convert.
+ * \param buffer     the buffer location to put the converted string.
+ * \param bufferSize the size of buffer in bytes.
+ * \param format     format, from enum PrintFormat.
+ */
+void nsToString(
+        int64_t ns, char *buffer, size_t bufferSize, PrintFormat format = kPrintFormatLong);
+
+// Contains the time string
+struct time_string_t {
+    char time[19]; /* minimum size buffer */
+};
+
+/**
+ * Converts real time in ns to a time string object, with format similar to logcat.
+ *
+ * \param ns     input real time in nanoseconds to convert.
+ * \param format format, from enum PrintFormat.
+ * \return       a time_string_t object with the time string encoded.
+ */
+static inline time_string_t timeStringFromNs(int64_t ns, PrintFormat format = kPrintFormatLong) {
+    time_string_t ts;
+    nsToString(ns, ts.time, sizeof(ts.time), format);
+    return ts;
+}
+
+/**
+ * Finds the end of the common time prefix.
+ *
+ * This is as an option to remove the common time prefix to avoid
+ * unnecessary duplicated strings.
+ *
+ * \param time1 a time string from timeStringFromNs
+ * \param time2 a time string from timeStringFromNs
+ * \return      the position where the common time prefix ends. For abbreviated
+ *              printing of time2, offset the character pointer by this position.
+ */
+static inline size_t commonTimePrefixPosition(const char *time1, const char *time2) {
+    size_t i;
+
+    // Find location of the first mismatch between strings
+    for (i = 0; ; ++i) {
+        if (time1[i] != time2[i]) {
+            break;
+        }
+        if (time1[i] == 0) {
+            return i; // strings match completely
+        }
+    }
+
+    // Go backwards until we find a delimeter or space.
+    for (; i > 0
+           && isdigit(time1[i]) // still a number
+           && time1[i - 1] != ' '
+         ; --i) {
+    }
+    return i;
+}
+
 /**
  * The MediaMetrics Item has special Item properties,
  * derived internally or through dedicated setters.
@@ -341,35 +420,35 @@ protected:
     template <> // static
     void toStringBuffer(
             const char *name, const int32_t& value, char *buffer, size_t length) {
-        snprintf(buffer, length, "%s=%d:", name, value);
+        snprintf(buffer, length, "%s=%d", name, value);
     }
     template <> // static
     void toStringBuffer(
             const char *name, const int64_t& value, char *buffer, size_t length) {
-        snprintf(buffer, length, "%s=%lld:", name, (long long)value);
+        snprintf(buffer, length, "%s=%lld", name, (long long)value);
     }
     template <> // static
     void toStringBuffer(
             const char *name, const double& value, char *buffer, size_t length) {
-        snprintf(buffer, length, "%s=%e:", name, value);
+        snprintf(buffer, length, "%s=%e", name, value);
     }
     template <> // static
     void toStringBuffer(
             const char *name, const std::pair<int64_t, int64_t>& value,
             char *buffer, size_t length) {
-        snprintf(buffer, length, "%s=%lld/%lld:",
+        snprintf(buffer, length, "%s=%lld/%lld",
                 name, (long long)value.first, (long long)value.second);
     }
     template <> // static
     void toStringBuffer(
             const char *name, const std::string& value, char *buffer, size_t length) {
         // TODO sanitize string for ':' '='
-        snprintf(buffer, length, "%s=%s:", name, value.c_str());
+        snprintf(buffer, length, "%s=%s", name, value.c_str());
     }
     template <> // static
     void toStringBuffer(
             const char *name, const std::monostate&, char *buffer, size_t length) {
-        snprintf(buffer, length, "%s=():", name);
+        snprintf(buffer, length, "%s=()", name);
     }
 
     template <typename T>
@@ -839,13 +918,6 @@ public:
         return iterator(mProps.cend());
     }
 
-        enum {
-            PROTO_V0 = 0,
-            PROTO_FIRST = PROTO_V0,
-            PROTO_V1 = 1,
-            PROTO_LAST = PROTO_V1,
-        };
-
     // T must be convertible to mKey
     template <typename T>
     explicit Item(T key)
@@ -1043,9 +1115,7 @@ public:
 
 
         std::string toString() const;
-        std::string toString(int version) const;
         const char *toCString();
-        const char *toCString(int version);
 
     /**
      * Returns true if the item has a property with a target value.
