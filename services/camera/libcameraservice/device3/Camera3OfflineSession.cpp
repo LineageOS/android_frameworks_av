@@ -167,7 +167,9 @@ status_t Camera3OfflineSession::disconnectImpl() {
         streams.push_back(mInputStream);
     }
 
-    mSession->close();
+    if (mSession != nullptr) {
+        mSession->close();
+    }
 
     FlushInflightReqStates states {
         mId, mOfflineReqsLock, mOfflineReqs, mUseHalBufManager,

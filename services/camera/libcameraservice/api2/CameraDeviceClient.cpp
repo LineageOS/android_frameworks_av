@@ -2005,7 +2005,8 @@ binder::Status CameraDeviceClient::switchToOffline(
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
 
-    std::vector<int32_t> offlineStreamIds(offlineOutputIds.size());
+    std::vector<int32_t> offlineStreamIds;
+    offlineStreamIds.reserve(offlineOutputIds.size());
     KeyedVector<sp<IBinder>, sp<CompositeStream>> offlineCompositeStreamMap;
     for (const auto& streamId : offlineOutputIds) {
         ssize_t index = mConfiguredOutputs.indexOfKey(streamId);

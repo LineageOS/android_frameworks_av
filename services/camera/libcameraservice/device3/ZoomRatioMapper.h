@@ -40,7 +40,8 @@ class ZoomRatioMapper : private CoordinateMapper {
             bool supportNativeZoomRatio, bool usePrecorrectArray);
     ZoomRatioMapper(const ZoomRatioMapper& other) :
             mHalSupportsZoomRatio(other.mHalSupportsZoomRatio),
-            mArrayWidth(other.mArrayWidth), mArrayHeight(other.mArrayHeight) {}
+            mArrayWidth(other.mArrayWidth), mArrayHeight(other.mArrayHeight),
+            mIsValid(other.mIsValid) {}
 
     /**
      * Initialize request template with valid zoomRatio if necessary.
