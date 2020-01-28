@@ -69,7 +69,8 @@ public:
                                 bool isOut,
                                 alloc_type alloc = ALLOC_CBLK,
                                 track_type type = TYPE_DEFAULT,
-                                audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE);
+                                audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,
+                                std::string metricsId = {});
     virtual             ~TrackBase();
     virtual status_t    initCheck() const;
 
@@ -94,7 +95,14 @@ public:
             bool        isPatchTrack() const { return (mType == TYPE_PATCH); }
             bool        isExternalTrack() const { return !isOutputTrack() && !isPatchTrack(); }
 
-    virtual void        invalidate() { mIsInvalid = true; }
+    virtual void        invalidate() {
+                            if (mIsInvalid) return;
+                            mediametrics::LogItem(mMetricsId)
+                                .set(AMEDIAMETRICS_PROP_EVENT,
+                                     AMEDIAMETRICS_PROP_EVENT_VALUE_INVALIDATE)
+                                .record();
+                            mIsInvalid = true;
+                        }
             bool        isInvalid() const { return mIsInvalid; }
 
             void        terminate() { mTerminated = true; }
@@ -352,6 +360,14 @@ protected:
     audio_io_handle_t   mThreadIoHandle; // I/O handle of the thread the track is attached to
     audio_port_handle_t mPortId; // unique ID for this track used by audio policy
     bool                mIsInvalid; // non-resettable latch, set by invalidate()
+
+    // It typically takes 5 threadloop mix iterations for latency to stabilize.
+    static inline constexpr int32_t LOG_START_COUNTDOWN = 8;
+    int32_t             mLogStartCountdown = 0;
+    int64_t             mLogStartTimeNs = 0;
+    int64_t             mLogStartFrames = 0;
+
+    const std::string   mMetricsId;
 
     bool                mServerLatencySupported = false;
     std::atomic<bool>   mServerLatencyFromTrack{}; // latency from track or server timestamp.

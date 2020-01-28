@@ -771,6 +771,7 @@ private:
         std::string mLastErrorFunc;
     };
     MediaMetrics mMediaMetrics;
+    std::string mMetricsId;  // GUARDED_BY(mLock), could change in createRecord_l().
 };
 
 }; // namespace android
