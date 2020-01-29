@@ -99,4 +99,31 @@
         </postprocess>
     -->
 
+     <!-- Device pre/post processor configurations.
+          The device pre/post processor configuration is described in a deviceEffects element and
+          consists in a list of elements each describing pre/post proecessor settings for a given
+          device or "devicePort".
+          Each devicePort element has a "type" attribute corresponding to the device type (e.g.
+          speaker, bus), an "address" attribute corresponding to the device address and contains a
+          list of "apply" elements indicating one effect to apply.
+          If the device is a source, only pre processing effects are expected, if the
+          device is a sink, only post processing effects are expected.
+          The effect to apply is designated by its name in the "effects" elements.
+          The effect will be enabled by default and the audio framework will automatically add
+          and activate the effect if the given port is involved in an audio patch.
+          If the patch is "HW", the effect must be HW accelerated.
+
+        <deviceEffects>
+            <devicePort type="AUDIO_DEVICE_OUT_BUS" address="BUS00_USAGE_MAIN">
+                <apply effect="equalizer"/>
+            </devicePort>
+            <devicePort type="AUDIO_DEVICE_OUT_BUS" address="BUS04_USAGE_VOICE">
+                <apply effect="volume"/>
+            </devicePort>
+            <devicePort type="AUDIO_DEVICE_IN_BUILTIN_MIC" address="bottom">
+                <apply effect="agc"/>
+            </devicePort>
+        </deviceEffects>
+    -->
+
 </audio_effects_conf>
