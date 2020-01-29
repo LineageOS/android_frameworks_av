@@ -189,57 +189,5 @@
         </volume>
     </volumeGroup>
 
-    <volumeGroup>
-        <name>rerouting</name>
-        <indexMin>0</indexMin>
-        <indexMax>1</indexMax>
-        <volume deviceCategory="DEVICE_CATEGORY_SPEAKER">
-            <point>0,0</point>
-            <point>100,0</point>
-        </volume>
-        <volume deviceCategory="DEVICE_CATEGORY_HEADSET">
-            <point>0,0</point>
-            <point>100,0</point>
-        </volume>
-        <volume deviceCategory="DEVICE_CATEGORY_EARPIECE">
-            <point>0,0</point>
-            <point>100,0</point>
-        </volume>
-        <volume deviceCategory="DEVICE_CATEGORY_EXT_MEDIA">
-            <point>0,0</point>
-            <point>100,0</point>
-        </volume>
-        <volume deviceCategory="DEVICE_CATEGORY_HEARING_AID">
-            <point>0,0</point>
-            <point>100,0</point>
-        </volume>
-    </volumeGroup>
-
-    <volumeGroup>
-        <name>patch</name>
-        <indexMin>0</indexMin>
-        <indexMax>1</indexMax>
-        <volume deviceCategory="DEVICE_CATEGORY_SPEAKER">
-            <point>0,0</point>
-            <point>100,0</point>
-        </volume>
-        <volume deviceCategory="DEVICE_CATEGORY_HEADSET">
-            <point>0,0</point>
-            <point>100,0</point>
-        </volume>
-        <volume deviceCategory="DEVICE_CATEGORY_EARPIECE">
-            <point>0,0</point>
-            <point>100,0</point>
-        </volume>
-        <volume deviceCategory="DEVICE_CATEGORY_EXT_MEDIA">
-            <point>0,0</point>
-            <point>100,0</point>
-        </volume>
-        <volume deviceCategory="DEVICE_CATEGORY_HEARING_AID">
-            <point>0,0</point>
-            <point>100,0</point>
-        </volume>
-    </volumeGroup>
-
 </volumeGroups>
 
