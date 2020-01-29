@@ -281,7 +281,8 @@ status_t ParameterManagerWrapper::setDeviceConnectionState(
     auto criterionType = criterion->getCriterionType();
     int deviceAddressId;
     if (not criterionType->getNumericalValue(address.c_str(), deviceAddressId)) {
-        ALOGW("%s: unknown device address reported (%s)", __FUNCTION__, address.c_str());
+        ALOGW("%s: unknown device address reported (%s) for criterion %s", __FUNCTION__,
+              address.c_str(), criterionName.c_str());
         return BAD_TYPE;
     }
     int currentValueMask = criterion->getCriterionState();
