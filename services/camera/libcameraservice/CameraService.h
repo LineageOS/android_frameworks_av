@@ -31,6 +31,7 @@
 #include <binder/IAppOpsCallback.h>
 #include <binder/IUidObserver.h>
 #include <hardware/camera.h>
+#include <sensorprivacy/SensorPrivacyManager.h>
 
 #include <android/hardware/camera/common/1.0/types.h>
 
@@ -599,6 +600,7 @@ private:
             virtual void binderDied(const wp<IBinder> &who);
 
         private:
+            SensorPrivacyManager mSpm;
             wp<CameraService> mService;
             Mutex mSensorPrivacyLock;
             bool mSensorPrivacyEnabled;
