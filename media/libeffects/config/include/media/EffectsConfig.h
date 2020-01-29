@@ -76,6 +76,10 @@ struct Stream {
 using OutputStream = Stream<audio_stream_type_t>;
 using InputStream = Stream<audio_source_t>;
 
+struct DeviceEffects : Stream<audio_devices_t> {
+    std::string address;
+};
+
 /** Parsed configuration.
  * Intended to be a transient structure only used for deserialization.
  * Note: Everything is copied in the configuration from the xml dom.
@@ -89,6 +93,7 @@ struct Config {
     Effects effects;
     std::vector<OutputStream> postprocess;
     std::vector<InputStream> preprocess;
+    std::vector<DeviceEffects> deviceprocess;
 };
 
 /** Result of `parse(const char*)` */
