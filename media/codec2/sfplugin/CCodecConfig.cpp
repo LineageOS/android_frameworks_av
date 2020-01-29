@@ -700,63 +700,101 @@ void CCodecConfig::initializeStandardParams() {
 
     // convert to dBFS and add default
     add(ConfigMapper(KEY_AAC_DRC_TARGET_REFERENCE_LEVEL, C2_PARAMKEY_DRC_TARGET_REFERENCE_LEVEL, "value")
-        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
-        .withMapper([](C2Value v) -> C2Value {
+        .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ))
+        .withMappers([](C2Value v) -> C2Value {
             int32_t value;
-            if (!v.get(&value) || value < 0) {
+            if (!v.get(&value) || value < -1) {
                 value = property_get_int32(PROP_DRC_OVERRIDE_REF_LEVEL, DRC_DEFAULT_MOBILE_REF_LEVEL);
             }
             return float(-0.25 * c2_min(value, 127));
+        },[](C2Value v) -> C2Value {
+            float value;
+            if (v.get(&value)) {
+                return (int32_t) (-4. * value);
+            }
+            return C2Value();
         }));
 
     // convert to 0-1 (%) and add default
     add(ConfigMapper(KEY_AAC_DRC_ATTENUATION_FACTOR, C2_PARAMKEY_DRC_ATTENUATION_FACTOR, "value")
-        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
-        .withMapper([](C2Value v) -> C2Value {
+        .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ))
+        .withMappers([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < 0) {
                 value = property_get_int32(PROP_DRC_OVERRIDE_CUT, DRC_DEFAULT_MOBILE_DRC_CUT);
             }
             return float(c2_min(value, 127) / 127.);
+        },[](C2Value v) -> C2Value {
+            float value;
+            if (v.get(&value)) {
+              return (int32_t) (value * 127. + 0.5);
+            }
+            else {
+              return C2Value();
+            }
         }));
 
     // convert to 0-1 (%) and add default
     add(ConfigMapper(KEY_AAC_DRC_BOOST_FACTOR, C2_PARAMKEY_DRC_BOOST_FACTOR, "value")
-        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
-        .withMapper([](C2Value v) -> C2Value {
+        .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ))
+        .withMappers([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < 0) {
                 value = property_get_int32(PROP_DRC_OVERRIDE_BOOST, DRC_DEFAULT_MOBILE_DRC_BOOST);
             }
             return float(c2_min(value, 127) / 127.);
+        },[](C2Value v) -> C2Value {
+            float value;
+            if (v.get(&value)) {
+              return (int32_t) (value * 127. + 0.5);
+            }
+            else {
+              return C2Value();
+            }
         }));
 
     // convert to compression type and add default
     add(ConfigMapper(KEY_AAC_DRC_HEAVY_COMPRESSION, C2_PARAMKEY_DRC_COMPRESSION_MODE, "value")
-        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
-        .withMapper([](C2Value v) -> C2Value {
+        .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ))
+        .withMappers([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < 0) {
                 value = property_get_int32(PROP_DRC_OVERRIDE_HEAVY, DRC_DEFAULT_MOBILE_DRC_HEAVY);
             }
             return value == 1 ? C2Config::DRC_COMPRESSION_HEAVY : C2Config::DRC_COMPRESSION_LIGHT;
+        },[](C2Value v) -> C2Value {
+            int32_t value;
+            if (v.get(&value)) {
+              return value;
+            }
+            else {
+              return C2Value();
+            }
         }));
 
     // convert to dBFS and add default
     add(ConfigMapper(KEY_AAC_ENCODED_TARGET_LEVEL, C2_PARAMKEY_DRC_ENCODED_TARGET_LEVEL, "value")
-        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
-        .withMapper([](C2Value v) -> C2Value {
+        .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ))
+        .withMappers([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < 0) {
                 value = property_get_int32(PROP_DRC_OVERRIDE_ENC_LEVEL, DRC_DEFAULT_MOBILE_ENC_LEVEL);
             }
             return float(-0.25 * c2_min(value, 127));
+        },[](C2Value v) -> C2Value {
+            float value;
+            if (v.get(&value)) {
+              return (int32_t) (-4. * value);
+            }
+            else {
+              return C2Value();
+            }
         }));
 
     // convert to effect type (these map to SDK values) and add default
     add(ConfigMapper(KEY_AAC_DRC_EFFECT_TYPE, C2_PARAMKEY_DRC_EFFECT_TYPE, "value")
-        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
-        .withMapper([](C2Value v) -> C2Value {
+        .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ))
+        .withMappers([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < -1 || value > 8) {
                 value = property_get_int32(PROP_DRC_OVERRIDE_EFFECT, DRC_DEFAULT_MOBILE_DRC_EFFECT);
@@ -766,13 +804,21 @@ void CCodecConfig::initializeStandardParams() {
                 }
             }
             return value;
+        },[](C2Value v) -> C2Value {
+            int32_t value;
+            if (v.get(&value)) {
+              return  value;
+            }
+            else {
+              return C2Value();
+            }
         }));
 
     add(ConfigMapper(KEY_AAC_MAX_OUTPUT_CHANNEL_COUNT, C2_PARAMKEY_MAX_CHANNEL_COUNT, "value")
-        .limitTo(D::AUDIO));
+        .limitTo(D::AUDIO & (D::CONFIG | D::PARAM | D::READ)));
 
     add(ConfigMapper(KEY_AAC_SBR_MODE, C2_PARAMKEY_AAC_SBR_MODE, "value")
-        .limitTo(D::AUDIO & D::ENCODER & D::CONFIG)
+        .limitTo(D::AUDIO & D::ENCODER & (D::CONFIG | D::PARAM | D::READ))
         .withMapper([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < 0) {

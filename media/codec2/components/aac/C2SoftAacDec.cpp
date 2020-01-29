@@ -324,7 +324,7 @@ status_t C2SoftAacDec::initDecoder() {
 
     //  DRC_PRES_MODE_WRAP_DESIRED_HEAVY
     int32_t compressMode = mIntf->getDrcCompressMode();
-    ALOGV("AAC decoder using desried DRC heavy compression switch of %d", compressMode);
+    ALOGV("AAC decoder using desired DRC heavy compression switch of %d", compressMode);
     mDrcWrap.setParam(DRC_PRES_MODE_WRAP_DESIRED_HEAVY, (unsigned)compressMode);
 
     // DRC_PRES_MODE_WRAP_ENCODER_TARGET
@@ -640,6 +640,38 @@ void C2SoftAacDec::process(
 
         // run DRC check
         mDrcWrap.submitStreamData(mStreamInfo);
+
+        // apply runtime updates
+        //  DRC_PRES_MODE_WRAP_DESIRED_TARGET
+        int32_t targetRefLevel = mIntf->getDrcTargetRefLevel();
+        ALOGV("AAC decoder using desired DRC target reference level of %d", targetRefLevel);
+        mDrcWrap.setParam(DRC_PRES_MODE_WRAP_DESIRED_TARGET, (unsigned)targetRefLevel);
+
+        //  DRC_PRES_MODE_WRAP_DESIRED_ATT_FACTOR
+        int32_t attenuationFactor = mIntf->getDrcAttenuationFactor();
+        ALOGV("AAC decoder using desired DRC attenuation factor of %d", attenuationFactor);
+        mDrcWrap.setParam(DRC_PRES_MODE_WRAP_DESIRED_ATT_FACTOR, (unsigned)attenuationFactor);
+
+        //  DRC_PRES_MODE_WRAP_DESIRED_BOOST_FACTOR
+        int32_t boostFactor = mIntf->getDrcBoostFactor();
+        ALOGV("AAC decoder using desired DRC boost factor of %d", boostFactor);
+        mDrcWrap.setParam(DRC_PRES_MODE_WRAP_DESIRED_BOOST_FACTOR, (unsigned)boostFactor);
+
+        //  DRC_PRES_MODE_WRAP_DESIRED_HEAVY
+        int32_t compressMode = mIntf->getDrcCompressMode();
+        ALOGV("AAC decoder using desried DRC heavy compression switch of %d", compressMode);
+        mDrcWrap.setParam(DRC_PRES_MODE_WRAP_DESIRED_HEAVY, (unsigned)compressMode);
+
+        // DRC_PRES_MODE_WRAP_ENCODER_TARGET
+        int32_t encTargetLevel = mIntf->getDrcEncTargetLevel();
+        ALOGV("AAC decoder using encoder-side DRC reference level of %d", encTargetLevel);
+        mDrcWrap.setParam(DRC_PRES_MODE_WRAP_ENCODER_TARGET, (unsigned)encTargetLevel);
+
+        // AAC_UNIDRC_SET_EFFECT
+        int32_t effectType = mIntf->getDrcEffectType();
+        ALOGV("AAC decoder using MPEG-D DRC effect type %d", effectType);
+        aacDecoder_SetParam(mAACDecoder, AAC_UNIDRC_SET_EFFECT, effectType);
+
         mDrcWrap.update();
 
         UINT inBufferUsedLength = inBufferLength[0] - bytesValid[0];
