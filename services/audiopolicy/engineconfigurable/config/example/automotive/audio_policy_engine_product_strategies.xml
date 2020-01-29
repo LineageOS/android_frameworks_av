@@ -84,7 +84,7 @@ limitations under the License.
         </AttributesGroup>
     </ProductStrategy>
     <ProductStrategy name="voice_command">
-        <AttributesGroup volumeGroup="speech">
+        <AttributesGroup volumeGroup="speech" streamType="AUDIO_STREAM_ASSISTANT">
             <Attributes>
                 <ContentType value="AUDIO_CONTENT_TYPE_SPEECH"/>
                 <Usage value="AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE"/>

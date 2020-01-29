@@ -44,6 +44,8 @@
                              Description="Transmitted Through Speaker. Plays over speaker only, silent on other devices"/>
             <Component Name="accessibility" Type="Stream" Mapping="Name:AUDIO_STREAM_ACCESSIBILITY"
                              Description="For accessibility talk back prompts"/>
+            <Component Name="assistant" Type="Stream" Mapping="Name:AUDIO_STREAM_ASSISTANT"
+                             Description="used by a virtual assistant like Google Assistant, Bixby, etc."/>
             <Component Name="rerouting" Type="Stream" Mapping="Name:AUDIO_STREAM_REROUTING"
                              Description="For dynamic policy output mixes"/>
             <Component Name="patch" Type="Stream" Mapping="Name:AUDIO_STREAM_PATCH"
