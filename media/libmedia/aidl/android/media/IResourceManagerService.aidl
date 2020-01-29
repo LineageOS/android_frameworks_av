@@ -84,4 +84,14 @@ interface IResourceManagerService {
      * @return true if the reclaim was successful and false otherwise.
      */
     boolean reclaimResource(int callingPid, in MediaResourceParcel[] resources);
+
+    /**
+     * Override the pid of original calling process with the pid of the process
+     * who actually use the requested resources.
+     *
+     * @param originalPid pid of the original calling process.
+     * @param newPid pid of the actual process who use the resources.
+     *        remove existing override on originalPid if newPid is -1.
+     */
+    void overridePid(int originalPid, int newPid);
 }
