@@ -73,10 +73,11 @@ private:
     Element(const Element &object);
     Element &operator=(const Element &object);
 
-    std::string mName; /**< Unique literal Identifier of a policy base element*/
-    audio_source_t mIdentifier; /**< Unique numerical Identifier of a policy base element*/
-
-    audio_devices_t mApplicableDevices; /**< Applicable input device for this input source. */
+    const std::string mName; /**< Unique literal Identifier of a policy base element*/
+    /** Unique numerical Identifier of a policy base element */
+    audio_source_t mIdentifier = AUDIO_SOURCE_DEFAULT;
+    /** Applicable input device for this input source. */
+    audio_devices_t mApplicableDevices = AUDIO_DEVICE_NONE;
 };
 
 typedef Element<audio_source_t> InputSource;
