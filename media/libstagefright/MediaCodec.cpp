@@ -2518,7 +2518,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                             // format as necessary.
                             int32_t flags = 0;
                             (void) buffer->meta()->findInt32("flags", &flags);
-                            if (flags & BUFFER_FLAG_CODECCONFIG) {
+                            if ((flags & BUFFER_FLAG_CODECCONFIG) && !(mFlags & kFlagIsSecure)) {
                                 status_t err =
                                     amendOutputFormatWithCodecSpecificData(buffer);
 
