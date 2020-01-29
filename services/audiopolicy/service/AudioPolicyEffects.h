@@ -25,6 +25,9 @@
 #include <system/audio.h>
 #include <utils/Vector.h>
 #include <utils/SortedVector.h>
+#include <android-base/thread_annotations.h>
+
+#include <future>
 
 namespace android {
 
@@ -104,6 +107,7 @@ public:
     status_t removeStreamDefaultEffect(audio_unique_id_t id);
 
 private:
+    void initDefaultDeviceEffects();
 
     // class to store the description of an effects and its parameters
     // as defined in audio_effects.conf
@@ -192,6 +196,28 @@ private:
         Vector< sp<AudioEffect> >mEffects;
     };
 
+    /**
+     * @brief The DeviceEffects class stores the effects associated to a given Device Port.
+     */
+    class DeviceEffects {
+    public:
+        explicit DeviceEffects(std::unique_ptr<EffectDescVector> effectDescriptors,
+                               audio_devices_t device, const std::string& address) :
+            mEffectDescriptors(std::move(effectDescriptors)),
+            mDeviceType(device), mDeviceAddress(address) {}
+        /*virtual*/ ~DeviceEffects() = default;
+
+        std::vector<std::unique_ptr<AudioEffect>> mEffects;
+        audio_devices_t getDeviceType() const { return mDeviceType; }
+        std::string getDeviceAddress() const { return mDeviceAddress; }
+        const std::unique_ptr<EffectDescVector> mEffectDescriptors;
+
+    private:
+        const audio_devices_t mDeviceType;
+        const std::string mDeviceAddress;
+
+    };
+
 
     static const char * const kInputSourceNames[AUDIO_SOURCE_CNT -1];
     static audio_source_t inputSourceNameToEnum(const char *name);
@@ -237,6 +263,19 @@ private:
     KeyedVector< audio_stream_type_t, EffectDescVector* > mOutputStreams;
     // Automatic output effects are unique for audiosession ID
     KeyedVector< audio_session_t, EffectVector* > mOutputSessions;
+
+    /**
+     * @brief mDeviceEffects map of device effects indexed by the device address
+     */
+    std::map<std::string, std::unique_ptr<DeviceEffects>> mDeviceEffects GUARDED_BY(mLock);
+
+    /**
+     * Device Effect initialization must be asynchronous: the audio_policy service parses and init
+     * effect on first reference. AudioFlinger will handle effect creation and register these
+     * effect on audio_policy service.
+     * We must store the reference of the furture garantee real asynchronous operation.
+     */
+    std::future<void> mDefaultDeviceEffectFuture;
 };
 
 } // namespace android
