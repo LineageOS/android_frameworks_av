@@ -26,7 +26,7 @@ supDomain: DeviceForProductStrategy
 					speaker = 0
 					hdmi = 0
 					dgtl_dock_headset = 0
-					angl_dock_headset = 0
+					anlg_dock_headset = 0
 					usb_device = 0
 					usb_accessory = 0
 					wired_headset = 0
@@ -46,7 +46,7 @@ supDomain: DeviceForProductStrategy
 					speaker = 0
 					hdmi = 0
 					dgtl_dock_headset = 0
-					angl_dock_headset = 0
+					anlg_dock_headset = 0
 					usb_device = 0
 					usb_accessory = 0
 					wired_headset = 0
@@ -66,7 +66,7 @@ supDomain: DeviceForProductStrategy
 					speaker = 0
 					hdmi = 0
 					dgtl_dock_headset = 0
-					angl_dock_headset = 0
+					anlg_dock_headset = 0
 					usb_device = 0
 					usb_accessory = 0
 					wired_headset = 0
@@ -86,7 +86,7 @@ supDomain: DeviceForProductStrategy
 					speaker = 0
 					hdmi = 0
 					dgtl_dock_headset = 0
-					angl_dock_headset = 0
+					anlg_dock_headset = 0
 					usb_device = 0
 					usb_accessory = 0
 					wired_headset = 0
@@ -109,7 +109,7 @@ supDomain: DeviceForProductStrategy
 					speaker = 1
 					hdmi = 0
 					dgtl_dock_headset = 0
-					angl_dock_headset = 0
+					anlg_dock_headset = 0
 					usb_device = 0
 					usb_accessory = 0
 					wired_headset = 0
@@ -127,7 +127,7 @@ supDomain: DeviceForProductStrategy
 					speaker = 0
 					hdmi = 0
 					dgtl_dock_headset = 0
-					angl_dock_headset = 0
+					anlg_dock_headset = 0
 					usb_device = 0
 					usb_accessory = 0
 					wired_headset = 0
@@ -145,7 +145,7 @@ supDomain: DeviceForProductStrategy
 					speaker = 0
 					hdmi = 0
 					dgtl_dock_headset = 0
-					angl_dock_headset = 0
+					anlg_dock_headset = 0
 					usb_device = 0
 					usb_accessory = 0
 					wired_headset = 0
@@ -163,7 +163,7 @@ supDomain: DeviceForProductStrategy
 					speaker = 0
 					hdmi = 0
 					dgtl_dock_headset = 0
-					angl_dock_headset = 0
+					anlg_dock_headset = 0
 					usb_device = 0
 					usb_accessory = 0
 					wired_headset = 1
@@ -181,7 +181,7 @@ supDomain: DeviceForProductStrategy
 					speaker = 0
 					hdmi = 0
 					dgtl_dock_headset = 0
-					angl_dock_headset = 0
+					anlg_dock_headset = 0
 					usb_device = 0
 					usb_accessory = 1
 					wired_headset = 0
@@ -199,7 +199,7 @@ supDomain: DeviceForProductStrategy
 					speaker = 0
 					hdmi = 0
 					dgtl_dock_headset = 0
-					angl_dock_headset = 0
+					anlg_dock_headset = 0
 					usb_device = 1
 					usb_accessory = 0
 					wired_headset = 0
@@ -217,7 +217,7 @@ supDomain: DeviceForProductStrategy
 					speaker = 0
 					hdmi = 0
 					dgtl_dock_headset = 1
-					angl_dock_headset = 0
+					anlg_dock_headset = 0
 					usb_device = 0
 					usb_accessory = 0
 					wired_headset = 0
@@ -235,7 +235,7 @@ supDomain: DeviceForProductStrategy
 					speaker = 0
 					hdmi = 1
 					dgtl_dock_headset = 0
-					angl_dock_headset = 0
+					anlg_dock_headset = 0
 					usb_device = 0
 					usb_accessory = 0
 					wired_headset = 0
@@ -254,7 +254,7 @@ supDomain: DeviceForProductStrategy
 					speaker = 0
 					hdmi = 0
 					dgtl_dock_headset = 0
-					angl_dock_headset = 1
+					anlg_dock_headset = 1
 					usb_device = 0
 					usb_accessory = 0
 					wired_headset = 0
@@ -277,7 +277,7 @@ supDomain: DeviceForProductStrategy
 					speaker = 1
 					hdmi = 0
 					dgtl_dock_headset = 0
-					angl_dock_headset = 0
+					anlg_dock_headset = 0
 					usb_device = 0
 					usb_accessory = 0
 					wired_headset = 0
@@ -293,7 +293,7 @@ supDomain: DeviceForProductStrategy
 					speaker = 0
 					hdmi = 0
 					dgtl_dock_headset = 0
-					angl_dock_headset = 0
+					anlg_dock_headset = 0
 					usb_device = 0
 					usb_accessory = 0
 					wired_headset = 0
