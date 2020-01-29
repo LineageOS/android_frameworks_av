@@ -147,10 +147,6 @@ limitations under the License.
     <ProductStrategy name="notification">
         <AttributesGroup streamType="AUDIO_STREAM_NOTIFICATION" volumeGroup="ring">
             <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION"/> </Attributes>
-            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_COMMUNICATION_INSTANT"/> </Attributes>
-            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_COMMUNICATION_DELAYED"/> </Attributes>
-            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_COMMUNICATION_REQUEST"/> </Attributes>
-            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_EVENT"/> </Attributes>
         </AttributesGroup>
     </ProductStrategy>
     <ProductStrategy name="system">
@@ -164,20 +160,6 @@ limitations under the License.
              If it is media, it is annoying... -->
         <AttributesGroup streamType="AUDIO_STREAM_TTS" volumeGroup="tts">
             <Attributes> <Flags value="AUDIO_FLAG_BEACON"/> </Attributes>
-        </AttributesGroup>
-    </ProductStrategy>
-
-    <!-- Routing Strategy rerouting may be removed as following media??? -->
-    <ProductStrategy name="rerouting">
-        <AttributesGroup streamType="AUDIO_STREAM_REROUTING" volumeGroup="rerouting">
-            <Attributes></Attributes>
-        </AttributesGroup>
-    </ProductStrategy>
-
-    <!-- Patch stream needs full scale volume, define it otherwise switch to default... -->
-    <ProductStrategy name="patch">
-        <AttributesGroup streamType="AUDIO_STREAM_PATCH" volumeGroup="patch">
-            <Attributes></Attributes>
         </AttributesGroup>
     </ProductStrategy>
 
