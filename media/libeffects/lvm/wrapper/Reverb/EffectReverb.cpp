@@ -79,7 +79,6 @@ const static t_reverb_settings sReverbPresets[] = {
         {-400, -200, 1300, 900, 0, 2, 0, 10, 1000, 750},
 };
 
-
 // NXP SW auxiliary environmental reverb
 const effect_descriptor_t gAuxEnvReverbDescriptor = {
         { 0xc2e5d5f0, 0x94bd, 0x4763, 0x9cac, { 0x4e, 0x23, 0x4d, 0x06, 0x83, 0x9e } },
@@ -136,11 +135,7 @@ static const effect_descriptor_t * const gDescriptors[] = {
         &gInsertPresetReverbDescriptor
 };
 
-#ifdef BUILD_FLOAT
 typedef     float               process_buffer_t; // process in float
-#else
-typedef     int32_t             process_buffer_t; // process in Q4_27
-#endif // BUILD_FLOAT
 
 struct ReverbContext{
     const struct effect_interface_s *itfe;
@@ -154,10 +149,6 @@ struct ReverbContext{
     int16_t                         SavedDiffusion;
     int16_t                         SavedDensity;
     bool                            bEnabled;
-    #ifdef LVM_PCM
-    FILE                            *PcmInPtr;
-    FILE                            *PcmOutPtr;
-    #endif
     LVM_Fs_en                       SampleRate;
     process_buffer_t                *InFrames;
     process_buffer_t                *OutFrames;
@@ -183,11 +174,7 @@ enum {
 
 #define REVERB_DEFAULT_PRESET REVERB_PRESET_NONE
 
-#ifdef BUILD_FLOAT
 #define REVERB_SEND_LEVEL   0.75f // 0.75 in 4.12 format
-#else
-#define REVERB_SEND_LEVEL   (0x0C00) // 0.75 in 4.12 format
-#endif
 #define REVERB_UNIT_VOLUME  (0x1000) // 1.0 in 4.12 format
 
 //--- local function prototypes
@@ -269,18 +256,6 @@ extern "C" int EffectCreate(const effect_uuid_t *uuid,
 
     *pHandle = (effect_handle_t)pContext;
 
-#ifdef LVM_PCM
-    pContext->PcmInPtr = NULL;
-    pContext->PcmOutPtr = NULL;
-
-    pContext->PcmInPtr  = fopen("/data/tmp/reverb_pcm_in.pcm", "w");
-    pContext->PcmOutPtr = fopen("/data/tmp/reverb_pcm_out.pcm", "w");
-
-    if((pContext->PcmInPtr  == NULL)||
-       (pContext->PcmOutPtr == NULL)){
-       return -EINVAL;
-    }
-#endif
 
     int channels = audio_channel_count_from_out_mask(pContext->config.inputCfg.channels);
 
@@ -304,10 +279,6 @@ extern "C" int EffectRelease(effect_handle_t handle){
         return -EINVAL;
     }
 
-    #ifdef LVM_PCM
-    fclose(pContext->PcmInPtr);
-    fclose(pContext->PcmOutPtr);
-    #endif
     free(pContext->InFrames);
     free(pContext->OutFrames);
     pContext->bufferSizeIn = 0;
@@ -378,7 +349,6 @@ int process( effect_buffer_t   *pIn,
         return -EINVAL;
     }
 
-#ifdef BUILD_FLOAT
     size_t inSize = frameCount * sizeof(process_buffer_t) * channels;
     size_t outSize = frameCount * sizeof(process_buffer_t) * FCC_2;
     if (pContext->InFrames == NULL ||
@@ -394,10 +364,6 @@ int process( effect_buffer_t   *pIn,
         pContext->OutFrames = (process_buffer_t *)calloc(1, pContext->bufferSizeOut);
     }
 
-#ifndef NATIVE_FLOAT_BUFFER
-    effect_buffer_t * const OutFrames16 = (effect_buffer_t *)pContext->OutFrames;
-#endif
-#endif
 
     // Check for NULL pointers
     if ((pContext->InFrames == NULL) || (pContext->OutFrames == NULL)) {
@@ -405,47 +371,20 @@ int process( effect_buffer_t   *pIn,
         return -EINVAL;
     }
 
-#ifdef LVM_PCM
-    fwrite(pIn, frameCount * sizeof(*pIn) * channels, 1 /* nmemb */, pContext->PcmInPtr);
-    fflush(pContext->PcmInPtr);
-#endif
 
     if (pContext->preset && pContext->nextPreset != pContext->curPreset) {
         Reverb_LoadPreset(pContext);
     }
 
     if (pContext->auxiliary) {
-#ifdef BUILD_FLOAT
-#ifdef NATIVE_FLOAT_BUFFER
         static_assert(std::is_same<decltype(*pIn), decltype(*pContext->InFrames)>::value,
                 "pIn and InFrames must be same type");
         memcpy(pContext->InFrames, pIn, frameCount * channels * sizeof(*pIn));
-#else
-        memcpy_to_float_from_i16(
-                pContext->InFrames, pIn, frameCount * channels);
-#endif
-#else //no BUILD_FLOAT
-        for (int i = 0; i < frameCount * channels; i++) {
-            pContext->InFrames[i] = (process_buffer_t)pIn[i]<<8;
-        }
-#endif
         } else {
         // insert reverb input is always stereo
         for (int i = 0; i < frameCount; i++) {
-#ifdef BUILD_FLOAT
-#ifdef NATIVE_FLOAT_BUFFER
             pContext->InFrames[2 * i] = (process_buffer_t)pIn[2 * i] * REVERB_SEND_LEVEL;
             pContext->InFrames[2 * i + 1] = (process_buffer_t)pIn[2 * i + 1] * REVERB_SEND_LEVEL;
-#else
-            pContext->InFrames[2 * i] =
-                    (process_buffer_t)pIn[2 * i] * REVERB_SEND_LEVEL / 32768.0f;
-            pContext->InFrames[2 * i + 1] =
-                    (process_buffer_t)pIn[2 * i + 1] * REVERB_SEND_LEVEL / 32768.0f;
-#endif
-#else
-            pContext->InFrames[2*i] = (pIn[2*i] * REVERB_SEND_LEVEL) >> 4; // <<8 + >>12
-            pContext->InFrames[2*i+1] = (pIn[2*i+1] * REVERB_SEND_LEVEL) >> 4; // <<8 + >>12
-#endif
         }
     }
 
@@ -471,43 +410,16 @@ int process( effect_buffer_t   *pIn,
 
     // Convert to 16 bits
     if (pContext->auxiliary) {
-#ifdef BUILD_FLOAT
         // nothing to do here
-#ifndef NATIVE_FLOAT_BUFFER
-        // pContext->OutFrames and OutFrames16 point to the same buffer
-        // make sure the float to int conversion happens in the right order.
-        memcpy_to_i16_from_float(OutFrames16, pContext->OutFrames,
-                (size_t)frameCount * FCC_2);
-#endif
-#else
-        memcpy_to_i16_from_q4_27(OutFrames16, pContext->OutFrames, (size_t)frameCount * FCC_2);
-#endif
     } else {
-#ifdef BUILD_FLOAT
-#ifdef NATIVE_FLOAT_BUFFER
         for (int i = 0; i < frameCount * FCC_2; i++) { // always stereo here
             // Mix with dry input
             pContext->OutFrames[i] += pIn[i];
         }
-#else
-        for (int i = 0; i < frameCount * FCC_2; i++) { // always stereo here
-            // pOutputBuff and OutFrames16 point to the same buffer
-            // make sure the float to int conversion happens in the right order.
-            pContext->OutFrames[i] += (process_buffer_t)pIn[i] / 32768.0f;
-        }
-        memcpy_to_i16_from_float(OutFrames16, pContext->OutFrames,
-                (size_t)frameCount * FCC_2);
-#endif
-#else
-        for (int i=0; i < frameCount * FCC_2; i++) { // always stereo here
-            OutFrames16[i] = clamp16((pContext->OutFrames[i]>>8) + (process_buffer_t)pIn[i]);
-        }
-#endif
         // apply volume with ramp if needed
         if ((pContext->leftVolume != pContext->prevLeftVolume ||
                 pContext->rightVolume != pContext->prevRightVolume) &&
                 pContext->volumeMode == REVERB_VOLUME_RAMP) {
-#if defined (BUILD_FLOAT) && defined (NATIVE_FLOAT_BUFFER)
             // FIXME: still using int16 volumes.
             // For reference: REVERB_UNIT_VOLUME  (0x1000) // 1.0 in 4.12 format
             float vl = (float)pContext->prevLeftVolume / 4096;
@@ -522,37 +434,14 @@ int process( effect_buffer_t   *pIn,
                 vl += incl;
                 vr += incr;
             }
-#else
-            LVM_INT32 vl = (LVM_INT32)pContext->prevLeftVolume << 16;
-            LVM_INT32 incl = (((LVM_INT32)pContext->leftVolume << 16) - vl) / frameCount;
-            LVM_INT32 vr = (LVM_INT32)pContext->prevRightVolume << 16;
-            LVM_INT32 incr = (((LVM_INT32)pContext->rightVolume << 16) - vr) / frameCount;
-
-            for (int i = 0; i < frameCount; i++) {
-                OutFrames16[FCC_2 * i] =
-                        clamp16((LVM_INT32)((vl >> 16) * OutFrames16[2*i]) >> 12);
-                OutFrames16[FCC_2 * i + 1] =
-                        clamp16((LVM_INT32)((vr >> 16) * OutFrames16[2*i+1]) >> 12);
-
-                vl += incl;
-                vr += incr;
-            }
-#endif
             pContext->prevLeftVolume = pContext->leftVolume;
             pContext->prevRightVolume = pContext->rightVolume;
         } else if (pContext->volumeMode != REVERB_VOLUME_OFF) {
             if (pContext->leftVolume != REVERB_UNIT_VOLUME ||
                 pContext->rightVolume != REVERB_UNIT_VOLUME) {
                 for (int i = 0; i < frameCount; i++) {
-#if defined(BUILD_FLOAT) && defined(NATIVE_FLOAT_BUFFER)
                     pContext->OutFrames[FCC_2 * i] *= ((float)pContext->leftVolume / 4096);
                     pContext->OutFrames[FCC_2 * i + 1] *= ((float)pContext->rightVolume / 4096);
-#else
-                    OutFrames16[FCC_2 * i] =
-                            clamp16((LVM_INT32)(pContext->leftVolume * OutFrames16[2*i]) >> 12);
-                    OutFrames16[FCC_2 * i + 1] =
-                            clamp16((LVM_INT32)(pContext->rightVolume * OutFrames16[2*i+1]) >> 12);
-#endif
                 }
             }
             pContext->prevLeftVolume = pContext->leftVolume;
@@ -561,21 +450,12 @@ int process( effect_buffer_t   *pIn,
         }
     }
 
-#ifdef LVM_PCM
-    fwrite(pContext->OutFrames, frameCount * sizeof(*pContext->OutFrames) * FCC_2,
-            1 /* nmemb */, pContext->PcmOutPtr);
-    fflush(pContext->PcmOutPtr);
-#endif
 
     // Accumulate if required
     if (pContext->config.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE){
         //ALOGV("\tBuffer access is ACCUMULATE");
         for (int i = 0; i < frameCount * FCC_2; i++) { // always stereo here
-#ifndef NATIVE_FLOAT_BUFFER
-            pOut[i] = clamp16((int32_t)pOut[i] + (int32_t)OutFrames16[i]);
-#else
             pOut[i] += pContext->OutFrames[i];
-#endif
         }
     }else{
         //ALOGV("\tBuffer access is WRITE");
@@ -654,7 +534,6 @@ int Reverb_setConfig(ReverbContext *pContext, effect_config_t *pConfig){
     //ALOGV("\tReverb_setConfig calling memcpy");
     pContext->config = *pConfig;
 
-
     switch (pConfig->inputCfg.samplingRate) {
     case 8000:
         SampleRate = LVM_FS_8000;
@@ -674,7 +553,6 @@ int Reverb_setConfig(ReverbContext *pContext, effect_config_t *pConfig){
     case 48000:
         SampleRate = LVM_FS_48000;
         break;
-#if defined(BUILD_FLOAT) && defined(HIGHER_FS)
     case 88200:
         SampleRate = LVM_FS_88200;
         break;
@@ -687,7 +565,6 @@ int Reverb_setConfig(ReverbContext *pContext, effect_config_t *pConfig){
     case 192000:
         SampleRate = LVM_FS_192000;
         break;
-#endif
     default:
         ALOGV("\rReverb_setConfig invalid sampling rate %d", pConfig->inputCfg.samplingRate);
         return -EINVAL;
@@ -1509,7 +1386,6 @@ int32_t ReverbGetDensity(ReverbContext *pContext){
     //ALOGV("\tReverbGetDensity Succesfully returned from LVM_GetControlParameters\n");
     //ALOGV("\tReverbGetDensity() just Got -> %d\n", ActiveParams.RoomSize);
 
-
     Temp = (LVM_INT16)(((pContext->SavedDensity * 99) / 1000) + 1);
 
     if(Temp != ActiveParams.RoomSize){
@@ -1556,7 +1432,6 @@ int Reverb_LoadPreset(ReverbContext   *pContext)
 
     return 0;
 }
-
 
 //----------------------------------------------------------------------------
 // Reverb_getParameter()
@@ -1903,7 +1778,6 @@ int Reverb_setParameter (ReverbContext *pContext, void *pParam, void *pValue, in
     return status;
 } /* end Reverb_setParameter */
 
-
 /**
  * returns the size in bytes of the value of each environmental reverb parameter
  */
@@ -1951,17 +1825,10 @@ int Reverb_process(effect_handle_t   self,
     }
     //ALOGV("\tReverb_process() Calling process with %d frames", outBuffer->frameCount);
     /* Process all the available frames, block processing is handled internalLY by the LVM bundle */
-#if defined (BUILD_FLOAT) && defined (NATIVE_FLOAT_BUFFER)
     status = process(    inBuffer->f32,
                          outBuffer->f32,
                          outBuffer->frameCount,
                          pContext);
-#else
-    status = process(    inBuffer->s16,
-                         outBuffer->s16,
-                         outBuffer->frameCount,
-                         pContext);
-#endif
 
     if (pContext->bEnabled == LVM_FALSE) {
         if (pContext->SamplesToExitCount > 0) {
@@ -1985,7 +1852,6 @@ int Reverb_command(effect_handle_t  self,
     android::ReverbContext * pContext = (android::ReverbContext *) self;
     LVREV_ControlParams_st    ActiveParams;              /* Current control Parameters */
     LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;     /* Function call status */
-
 
     if (pContext == NULL){
         ALOGV("\tLVM_ERROR : Reverb_command ERROR pContext == NULL");
@@ -2160,7 +2026,6 @@ int Reverb_command(effect_handle_t  self,
                         "EFFECT_CMD_SET_VOLUME: ERROR");
                 return -EINVAL;
             }
-
 
             if (pReplyData != NULL) { // we have volume control
                 pContext->leftVolume = (LVM_INT16)((*(uint32_t *)pCmdData + (1 << 11)) >> 12);

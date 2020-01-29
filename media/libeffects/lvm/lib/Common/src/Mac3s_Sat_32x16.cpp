@@ -34,7 +34,6 @@ void Mac3s_Sat_32x16(  const LVM_INT32 *src,
     LVM_INT16 ii;
     LVM_INT32 srcval,temp, dInVal, dOutVal;
 
-
     for (ii = n; ii != 0; ii--)
     {
         srcval=*src;
@@ -44,7 +43,6 @@ void Mac3s_Sat_32x16(  const LVM_INT32 *src,
 
             dInVal  = *dst;
         dOutVal = temp + dInVal;
-
 
         if ((((dOutVal ^ temp) & (dOutVal ^ dInVal)) >> 31)!=0)     /* overflow / underflow */
         {
@@ -64,7 +62,6 @@ void Mac3s_Sat_32x16(  const LVM_INT32 *src,
 
     return;
 }
-#ifdef BUILD_FLOAT
 void Mac3s_Sat_Float(const LVM_FLOAT *src,
                      const LVM_FLOAT val,
                      LVM_FLOAT *dst,
@@ -101,8 +98,5 @@ void Mac3s_Sat_Float(const LVM_FLOAT *src,
 
     return;
 }
-#endif
 /**********************************************************************************/
-
-
 

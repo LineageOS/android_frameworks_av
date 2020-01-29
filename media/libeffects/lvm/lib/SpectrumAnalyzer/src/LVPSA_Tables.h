@@ -27,11 +27,7 @@
  * Sample rate table for converting between the enumerated type and the actual
  * frequency
  */
-#ifndef HIGHER_FS
-extern const LVM_UINT16    LVPSA_SampleRateTab[];
-#else
 extern const LVM_UINT32    LVPSA_SampleRateTab[];
-#endif
 
 /************************************************************************************/
 /*                                                                                  */

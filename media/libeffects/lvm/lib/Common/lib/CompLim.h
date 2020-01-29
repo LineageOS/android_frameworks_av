@@ -18,8 +18,6 @@
 #ifndef _COMP_LIM_H
 #define _COMP_LIM_H
 
-
-
 /************************************************************************************/
 /*                                                                                  */
 /*  Includes                                                                        */
@@ -27,7 +25,6 @@
 /************************************************************************************/
 
 #include "LVM_Types.h"
-
 
 /************************************************************************************/
 /*                                                                                  */
@@ -54,28 +51,17 @@ typedef struct /* Compressor state */
     LVM_INT32   CompIntSlow;        /* Compressor slow integrator current value */
     LVM_INT32   CompIntFast;        /* Compressor fast integrator current value */
 
-
 } CompLim_Instance_t;
-
 
 /************************************************************************************/
 /*                                                                                  */
 /*  Function Prototypes                                                             */
 /*                                                                                  */
 /************************************************************************************/
-#ifdef BUILD_FLOAT
 void NonLinComp_Float(LVM_FLOAT        Gain,
                       LVM_FLOAT        *pDataIn,
                       LVM_FLOAT        *pDataOut,
                       LVM_INT32        BlockLength);
-#else
-void NonLinComp_D16(LVM_INT16        Gain,
-                    LVM_INT16        *pSterBfIn,
-                    LVM_INT16        *pSterBfOut,
-                    LVM_INT32        BlockLength);
-#endif
 
 #endif /* #ifndef _COMP_LIM_H */
-
-
 

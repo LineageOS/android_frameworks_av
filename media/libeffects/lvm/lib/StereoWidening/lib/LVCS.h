@@ -56,8 +56,6 @@
 #ifndef LVCS_H
 #define LVCS_H
 
-
-
 /****************************************************************************************/
 /*                                                                                      */
 /*  Includes                                                                            */
@@ -66,7 +64,6 @@
 
 #include "LVM_Types.h"
 #include "LVM_Common.h"
-
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -90,7 +87,6 @@
 #define LVCS_EVENT_NONE                   0x0000    /* Not a valid event */
 #define LVCS_EVENT_ALGOFF                 0x0001    /* CS has completed switch off */
 
-
 /****************************************************************************************/
 /*                                                                                      */
 /*  Types                                                                               */
@@ -100,7 +96,6 @@
 /* Instance handle */
 typedef void *LVCS_Handle_t;
 
-
 /* Operating modes */
 typedef enum
 {
@@ -108,7 +103,6 @@ typedef enum
     LVCS_ON  = 15,
     LVCS_MAX = LVM_MAXENUM
 } LVCS_Modes_en;
-
 
 /* Memory Types */
 typedef enum
@@ -119,7 +113,6 @@ typedef enum
     LVCS_PERSISTENT     = 3,
     LVCS_MEMORYTYPE_MAX = LVM_MAXENUM
 } LVCS_MemoryTypes_en;
-
 
 /* Function return status */
 typedef enum
@@ -132,7 +125,6 @@ typedef enum
     LVCS_STATUSMAX      = LVM_MAXENUM
 } LVCS_ReturnStatus_en;
 
-
 /*
  * Source data formats
  */
@@ -142,7 +134,6 @@ typedef enum
     LVCS_MONOINSTEREO = 1,
     LVCS_SOURCEMAX    = LVM_MAXENUM
 } LVCS_SourceFormat_en;
-
 
 /*
  * Supported output devices
@@ -169,7 +160,6 @@ typedef struct
     void    *pTable8;
 } LVCS_CSMS_Coef_Tables_t;
 
-
 /****************************************************************************************/
 /*                                                                                      */
 /*  Structures                                                                          */
@@ -184,13 +174,11 @@ typedef struct
     void                    *pBaseAddress;          /* Pointer to the region base address */
 } LVCS_MemoryRegion_t;
 
-
 /* Memory table containing the region definitions */
 typedef struct
 {
     LVCS_MemoryRegion_t Region[LVCS_NR_MEMORY_REGIONS]; /* One definition for each region */
 } LVCS_MemTab_t;
-
 
 /* Concert Sound parameter structure */
 typedef struct
@@ -207,7 +195,6 @@ typedef struct
 #endif
 } LVCS_Params_t;
 
-
 /* Concert Sound Capability structure */
 typedef struct
 {
@@ -219,7 +206,6 @@ typedef struct
     void                    *pBundleInstance;       /* Bundle instance handle */
 
 } LVCS_Capabilities_t;
-
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -267,7 +253,6 @@ LVCS_ReturnStatus_en LVCS_Memory(LVCS_Handle_t          hInstance,
                                  LVCS_MemTab_t          *pMemoryTable,
                                  LVCS_Capabilities_t    *pCapabilities);
 
-
 /****************************************************************************************/
 /*                                                                                      */
 /* FUNCTION:                LVCS_Init                                                   */
@@ -305,7 +290,6 @@ LVCS_ReturnStatus_en LVCS_Init(LVCS_Handle_t            *phInstance,
                                LVCS_MemTab_t            *pMemoryTable,
                                LVCS_Capabilities_t      *pCapabilities);
 
-
 /****************************************************************************************/
 /*                                                                                      */
 /* FUNCTION:                 LVCS_GetParameters                                         */
@@ -329,7 +313,6 @@ LVCS_ReturnStatus_en LVCS_Init(LVCS_Handle_t            *phInstance,
 LVCS_ReturnStatus_en LVCS_GetParameters(LVCS_Handle_t   hInstance,
                                         LVCS_Params_t   *pParams);
 
-
 /****************************************************************************************/
 /*                                                                                      */
 /* FUNCTION:                LVCS_Control                                                */
@@ -352,7 +335,6 @@ LVCS_ReturnStatus_en LVCS_GetParameters(LVCS_Handle_t   hInstance,
 LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t     hInstance,
                                   LVCS_Params_t     *pParams);
 
-
 /****************************************************************************************/
 /*                                                                                      */
 /* FUNCTION:                LVCS_Process                                                */
@@ -374,17 +356,9 @@ LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t     hInstance,
 /* NOTES:                                                                               */
 /*                                                                                      */
 /****************************************************************************************/
-#ifdef BUILD_FLOAT
 LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
                                   const LVM_FLOAT           *pInData,
                                   LVM_FLOAT                 *pOutData,
                                   LVM_UINT16                NumSamples);
-#else
-LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
-                                  const LVM_INT16           *pInData,
-                                  LVM_INT16                 *pOutData,
-                                  LVM_UINT16                NumSamples);
-#endif
-
 
 #endif  /* LVCS_H */
