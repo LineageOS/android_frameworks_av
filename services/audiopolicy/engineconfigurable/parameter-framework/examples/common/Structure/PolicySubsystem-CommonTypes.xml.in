@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ComponentTypeSet xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xmlns:xi="http://www.w3.org/2001/XInclude"
+              xsi:noNamespaceSchemaLocation="Schemas/ComponentTypeSet.xsd">
+    <!-- Output devices definition as a bitfield for the supported devices per output
+    profile. It must match with the output device enum parameter.
+    -->
+     <!--#################### GLOBAL COMPONENTS BEGIN ####################-->
+
+     <!--#################### GLOBAL COMPONENTS END ####################-->
+
+    <!-- Automatically filled from audio-base.h file -->
+    <ComponentType Name="OutputDevicesMask" Description="32th bit is not allowed as dedicated for input devices detection">
+        <BitParameterBlock Name="mask" Size="32">
+        </BitParameterBlock>
+    </ComponentType>
+
+    <!-- Input devices definition as a bitfield for the supported devices per Input
+    profile. It must match with the Input device enum parameter.
+    -->
+    <!-- Automatically filled from audio-base.h file -->
+    <ComponentType Name="InputDevicesMask">
+        <BitParameterBlock Name="mask" Size="32">
+        </BitParameterBlock>
+    </ComponentType>
+
+    <!--#################### STREAM COMMON TYPES BEGIN ####################-->
+    <!-- Automatically filled from audio-base.h file. VolumeProfileType is associated to stream type -->
+    <ComponentType Name="VolumeProfileType">
+        <EnumParameter Name="volume_profile" Size="32">
+        </EnumParameter>
+    </ComponentType>
+
+    <ComponentType Name="Stream"  Mapping="Stream">
+        <Component Name="applicable_volume_profile" Type="VolumeProfileType"
+                   Description="Volume profile followed by a given stream type."/>
+    </ComponentType>
+
+    <!--#################### STREAM COMMON TYPES END ####################-->
+
+    <!--#################### INPUT SOURCE COMMON TYPES BEGIN ####################-->
+
+    <ComponentType Name="InputSource">
+        <Component Name="applicable_input_device" Type="InputDevicesMask"
+                   Mapping="InputSource" Description="Selected Input device"/>
+    </ComponentType>
+
+    <!--#################### INPUT SOURCE COMMON TYPES END ####################-->
+
+    <!--#################### PRODUCT STRATEGY COMMON TYPES BEGIN ####################-->
+
+    <ComponentType Name="ProductStrategy" Mapping="ProductStrategy">
+        <Component Name="selected_output_devices" Type="OutputDevicesMask"/>
+        <StringParameter Name="device_address" MaxLength="256"
+                         Description="if any, device address associated"/>
+    </ComponentType>
+
+    <!--#################### PRODUCT STRATEGY COMMON TYPES END ####################-->
+
+</ComponentTypeSet>
