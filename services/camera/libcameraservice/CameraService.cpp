@@ -56,7 +56,6 @@
 #include <media/IMediaHTTPService.h>
 #include <media/mediaplayer.h>
 #include <mediautils/BatteryNotifier.h>
-#include <sensorprivacy/SensorPrivacyManager.h>
 #include <utils/Errors.h>
 #include <utils/Log.h>
 #include <utils/String16.h>
@@ -2853,10 +2852,9 @@ void CameraService::SensorPrivacyPolicy::registerSelf() {
     if (mRegistered) {
         return;
     }
-    SensorPrivacyManager spm;
-    spm.addSensorPrivacyListener(this);
-    mSensorPrivacyEnabled = spm.isSensorPrivacyEnabled();
-    status_t res = spm.linkToDeath(this);
+    mSpm.addSensorPrivacyListener(this);
+    mSensorPrivacyEnabled = mSpm.isSensorPrivacyEnabled();
+    status_t res = mSpm.linkToDeath(this);
     if (res == OK) {
         mRegistered = true;
         ALOGV("SensorPrivacyPolicy: Registered with SensorPrivacyManager");
@@ -2865,9 +2863,8 @@ void CameraService::SensorPrivacyPolicy::registerSelf() {
 
 void CameraService::SensorPrivacyPolicy::unregisterSelf() {
     Mutex::Autolock _l(mSensorPrivacyLock);
-    SensorPrivacyManager spm;
-    spm.removeSensorPrivacyListener(this);
-    spm.unlinkToDeath(this);
+    mSpm.removeSensorPrivacyListener(this);
+    mSpm.unlinkToDeath(this);
     mRegistered = false;
     ALOGV("SensorPrivacyPolicy: Unregistered with SensorPrivacyManager");
 }
