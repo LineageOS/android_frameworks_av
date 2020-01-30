@@ -142,14 +142,14 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
     // TODO Support other performance settings in MMAP mode.
     // Disable MMAP if low latency not requested.
     if (getPerformanceMode() != AAUDIO_PERFORMANCE_MODE_LOW_LATENCY) {
-        ALOGD("%s() MMAP not available because AAUDIO_PERFORMANCE_MODE_LOW_LATENCY not used.",
+        ALOGD("%s() MMAP not used because AAUDIO_PERFORMANCE_MODE_LOW_LATENCY not requested.",
               __func__);
         allowMMap = false;
     }
 
     // SessionID and Effects are only supported in Legacy mode.
     if (getSessionId() != AAUDIO_SESSION_ID_NONE) {
-        ALOGD("%s() MMAP not available because sessionId used.", __func__);
+        ALOGD("%s() MMAP not used because sessionId specified.", __func__);
         allowMMap = false;
     }
 
