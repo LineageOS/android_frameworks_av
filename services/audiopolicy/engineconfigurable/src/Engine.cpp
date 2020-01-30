@@ -129,7 +129,7 @@ bool Engine::setPropertyForKey(const Property &property, const Key &key)
     Element<Key> *element = getFromCollection<Key>(key);
     if (element == NULL) {
         ALOGE("%s: Element not found within collection", __FUNCTION__);
-        return BAD_VALUE;
+        return false;
     }
     return element->template set<Property>(property) == NO_ERROR;
 }

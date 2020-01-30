@@ -50,23 +50,30 @@ bool InitJni(JNIEnv* env) {
         if (cameraMetadataClazz == nullptr) {
             return false;
         }
-        android_hardware_camera2_CameraMetadata_getNativeMetadataPtr =
+        const jmethodID cameraMetadata_getNativeMetadataPtr =
             env->GetMethodID(cameraMetadataClazz, "getNativeMetadataPtr", "()J");
-        if (android_hardware_camera2_CameraMetadata_getNativeMetadataPtr == nullptr) {
+        if (cameraMetadata_getNativeMetadataPtr == nullptr) {
             return false;
         }
 
-        android_hardware_camera2_CameraCharacteristics_clazz = env->FindClass(
+        const jclass cameraCharacteristics_clazz = env->FindClass(
             android_hardware_camera2_CameraCharacteristics_jniClassName);
-        if (android_hardware_camera2_CameraCharacteristics_clazz == nullptr) {
+        if (cameraCharacteristics_clazz == nullptr) {
             return false;
         }
 
-        android_hardware_camera2_CaptureResult_clazz = env->FindClass(
+        const jclass captureResult_clazz = env->FindClass(
             android_hardware_camera2_CaptureResult_jniClassName);
-        if (android_hardware_camera2_CaptureResult_clazz == nullptr) {
+        if (captureResult_clazz == nullptr) {
             return false;
         }
+
+        android_hardware_camera2_CameraMetadata_getNativeMetadataPtr =
+            cameraMetadata_getNativeMetadataPtr;
+        android_hardware_camera2_CameraCharacteristics_clazz =
+            static_cast<jclass>(env->NewGlobalRef(cameraCharacteristics_clazz));
+        android_hardware_camera2_CaptureResult_clazz =
+            static_cast<jclass>(env->NewGlobalRef(captureResult_clazz));
 
         return true;
     }();

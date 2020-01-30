@@ -31,8 +31,12 @@ prebuilt_etc {
 prebuilt_etc {
     name: "PolicySubsystem-CommonTypes.xml",
     vendor: true,
-    src: ":PolicySubsystem-CommonTypes",
+    src: ":buildcommontypesstructure_gen",
     sub_dir: "parameter-framework/Structure/Policy",
+}
+genrule {
+    name: "buildcommontypesstructure_gen",
+    defaults: ["buildcommontypesstructurerule"],
 }
 
 filegroup {
@@ -48,8 +52,8 @@ filegroup {
     srcs: ["examples/common/Structure/PolicySubsystem-no-strategy.xml"],
 }
 filegroup {
-    name: "PolicySubsystem-CommonTypes",
-    srcs: ["examples/common/Structure/PolicySubsystem-CommonTypes.xml"],
+    name: "common_types_structure_template",
+    srcs: ["examples/common/Structure/PolicySubsystem-CommonTypes.xml.in"],
 }
 filegroup {
     name: "PolicyClass",
