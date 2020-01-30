@@ -72,9 +72,6 @@
 #ifndef __LVEQNB_H__
 #define __LVEQNB_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 
 /****************************************************************************************/
@@ -492,9 +489,6 @@ LVEQNB_ReturnStatus_en LVEQNB_Process(LVEQNB_Handle_t       hInstance,
 
 
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif      /* __LVEQNB__ */
 

@@ -27,9 +27,6 @@
 #ifndef __LVM_COMMON_H__
 #define __LVM_COMMON_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 
 /****************************************************************************************/
@@ -53,9 +50,6 @@ extern "C" {
 #define ALGORITHM_VC_ID        0x0500
 #define ALGORITHM_TE_ID        0x0600
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif      /* __LVM_COMMON_H__ */
 

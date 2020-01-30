@@ -282,9 +282,9 @@ LVEQNB_ReturnStatus_en LVEQNB_Init(LVEQNB_Handle_t          *phInstance,
 
 #ifdef BUILD_FLOAT
     /* Equaliser Biquad Instance */
-    pInstance->pEQNB_FilterState_Float = InstAlloc_AddMember(&AllocMem,
-                                                             pCapabilities->MaxBands * \
-                                                             sizeof(Biquad_FLOAT_Instance_t));
+    pInstance->pEQNB_FilterState_Float = (Biquad_FLOAT_Instance_t *)
+        InstAlloc_AddMember(&AllocMem, pCapabilities->MaxBands * \
+                                                       sizeof(Biquad_FLOAT_Instance_t));
 #else
     pInstance->pEQNB_FilterState = InstAlloc_AddMember(&AllocMem,
                                                        pCapabilities->MaxBands * sizeof(Biquad_Instance_t)); /* Equaliser Biquad Instance */

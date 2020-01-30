@@ -27,9 +27,6 @@
 #ifndef __LVCS_PRIVATE_H__
 #define __LVCS_PRIVATE_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 
 /************************************************************************************/
@@ -193,9 +190,6 @@ void LVCS_TimerCallBack (   void* hInstance,
                             LVM_INT32 CallbackParam);
 
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif      /* PRIVATE_H */
 

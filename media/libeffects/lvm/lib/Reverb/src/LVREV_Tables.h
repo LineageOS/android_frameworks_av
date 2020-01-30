@@ -19,9 +19,6 @@
 #ifndef _LVREV_TABLES_H_
 #define _LVREV_TABLES_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 
 /****************************************************************************************/
@@ -48,10 +45,7 @@ extern          LVM_UINT32  LVM_GetFsFromTable(LVM_Fs_en FsIndex);
 #ifndef BUILD_FLOAT
 extern          LVM_INT32   LVREV_GainPolyTable[24][5];
 #else
-extern          LVM_FLOAT   LVREV_GainPolyTable[24][5];
-#endif
-#ifdef __cplusplus
-}
+extern const    LVM_FLOAT   LVREV_GainPolyTable[24][5];
 #endif
 
 #endif  /** _LVREV_TABLES_H_ **/

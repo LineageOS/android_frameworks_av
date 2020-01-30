@@ -18,9 +18,6 @@
 #ifndef __LVCS_TABLES_H__
 #define __LVCS_TABLES_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 /************************************************************************************/
 /*                                                                                  */
@@ -111,7 +108,7 @@ extern const LVM_INT16 LVCS_VolumeTCTable[];
 /*                                                                                  */
 /************************************************************************************/
 
-extern LVM_INT32                LVCS_SampleRateTable[];
+extern const LVM_INT32          LVCS_SampleRateTable[];
 
 
 /*Speaker coeffient tables*/
@@ -144,9 +141,6 @@ extern LVM_UINT16               LVCS_MS_Large_ReverbGainTable[];
 
 
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif /* __LVCS_TABLES_H__ */
 

@@ -27,9 +27,6 @@
 #ifndef __LVDBE_PRIVATE_H__
 #define __LVDBE_PRIVATE_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 
 /****************************************************************************************/
@@ -164,8 +161,5 @@ void    LVDBE_SetFilters(LVDBE_Instance_t   *pInstance,
                          LVDBE_Params_t     *pParams);
 
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif      /* __LVDBE_PRIVATE_H__ */
