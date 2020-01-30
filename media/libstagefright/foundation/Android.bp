@@ -34,10 +34,6 @@ cc_defaults {
         "media_plugin_headers",
     ],
 
-    export_shared_lib_headers: [
-        "libbinder",
-    ],
-
     cflags: [
         "-Wno-multichar",
         "-Werror",
