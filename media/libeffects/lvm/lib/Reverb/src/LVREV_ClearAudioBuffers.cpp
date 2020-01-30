@@ -63,13 +63,13 @@ LVREV_ReturnStatus_en LVREV_ClearAudioBuffers(LVREV_Handle_t  hInstance)
 
 #ifdef BUILD_FLOAT
     LoadConst_Float(0,
-                    (void *)&pLVREV_Private->pFastData->HPTaps, /* Destination Cast to void: \
-                                                                   no dereferencing in function*/
-                    2);
+        (LVM_FLOAT *)&pLVREV_Private->pFastData->HPTaps, /* Destination Cast to void: \
+                                                         no dereferencing in function*/
+        2);
     LoadConst_Float(0,
-                    (void *)&pLVREV_Private->pFastData->LPTaps, /* Destination Cast to void: \
-                                                                   no dereferencing in function*/
-                    2);
+        (LVM_FLOAT *)&pLVREV_Private->pFastData->LPTaps, /* Destination Cast to void: \
+                                                         no dereferencing in function*/
+        2);
 #else
     LoadConst_32(0,
         (void *)&pLVREV_Private->pFastData->HPTaps, /* Destination Cast to void: no dereferencing in function*/

@@ -23,6 +23,7 @@
 /************************************************************************************/
 
 #include "LVCS_Private.h"
+#include "LVCS_Tables.h"
 #include "Filters.h"                            /* Filter definitions */
 #include "BIQUAD.h"                             /* Biquad definitions */
 #include "LVCS_Headphone_Coeffs.h"              /* Headphone coefficients */

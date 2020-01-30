@@ -21,9 +21,6 @@
 #include "LVM_Types.h"
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 typedef struct
 {
@@ -119,9 +116,6 @@ void LVPSA_QPD_Init_Float (   QPD_FLOAT_State_t       *pInstance,
                               QPD_FLOAT_Taps_t        *pTaps,
                               QPD_FLOAT_Coefs         *pCoef     );
 #endif
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif
 

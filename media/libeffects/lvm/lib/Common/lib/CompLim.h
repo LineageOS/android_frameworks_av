@@ -18,9 +18,6 @@
 #ifndef _COMP_LIM_H
 #define _COMP_LIM_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 
 /************************************************************************************/
@@ -77,9 +74,6 @@ void NonLinComp_D16(LVM_INT16        Gain,
                     LVM_INT16        *pSterBfOut,
                     LVM_INT32        BlockLength);
 #endif
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif /* #ifndef _COMP_LIM_H */
 

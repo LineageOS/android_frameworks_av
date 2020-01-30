@@ -27,9 +27,6 @@
 #ifndef __LVM_PRIVATE_H__
 #define __LVM_PRIVATE_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 
 /************************************************************************************/
@@ -344,9 +341,6 @@ LVM_INT32 LVM_AlgoCallBack(     void          *pBundleHandle,
                                 void          *pData,
                                 LVM_INT16     callbackId);
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif      /* __LVM_PRIVATE_H__ */
 

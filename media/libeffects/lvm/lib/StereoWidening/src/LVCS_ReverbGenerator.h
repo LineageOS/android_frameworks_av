@@ -18,9 +18,6 @@
 #ifndef __LVCS_REVERBGENERATOR_H__
 #define __LVCS_REVERBGENERATOR_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 
 /************************************************************************************/
@@ -94,8 +91,5 @@ LVCS_ReturnStatus_en LVCS_ReverbGenerator(LVCS_Handle_t         hInstance,
                                           LVM_INT16             *pOutput,
                                           LVM_UINT16            NumSamples);
 #endif
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif  /* REVERB_H */

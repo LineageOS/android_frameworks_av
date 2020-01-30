@@ -18,9 +18,6 @@
 #ifndef __LVREV_PRIVATE_H__
 #define __LVREV_PRIVATE_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 
 /****************************************************************************************/
@@ -309,9 +306,6 @@ LVM_INT32               BypassMixer_Callback(void       *pCallbackData,
                                              LVM_INT16  GeneralPurpose );
 
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif  /** __LVREV_PRIVATE_H__ **/
 

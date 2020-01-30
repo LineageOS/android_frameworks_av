@@ -19,9 +19,6 @@
 #define __MIXER_H__
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 
 #include "LVM_Types.h"
@@ -187,9 +184,6 @@ void Core_MixInSoft_D32C31_SAT(     Mix_1St_Cll_t       *pInstance,
                                           LVM_INT32     *dst,
                                           LVM_INT16     n);
 #endif
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 
 /**********************************************************************************/

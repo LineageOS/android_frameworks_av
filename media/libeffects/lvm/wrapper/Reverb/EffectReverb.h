@@ -20,9 +20,6 @@
 #include <audio_effects/effect_environmentalreverb.h>
 #include <audio_effects/effect_presetreverb.h>
 
-#if __cplusplus
-extern "C" {
-#endif
 
 #define MAX_NUM_BANDS           5
 #define MAX_CALL_SIZE           256
@@ -38,9 +35,6 @@ typedef struct _LPFPair_t
     int16_t Room_HF;
     int16_t LPF;
 } LPFPair_t;
-#if __cplusplus
-}  // extern "C"
-#endif
 
 
 #endif /*ANDROID_EFFECTREVERB_H_*/
