@@ -29,7 +29,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 public class Encoder {
-    private static final int ENCODE_DEFAULT_MAX_INPUT_SIZE = 3840;
+    // Change in AUDIO_ENCODE_DEFAULT_MAX_INPUT_SIZE should also be taken to
+    // kDefaultAudioEncodeFrameSize present in BenchmarkCommon.h
+    private static final int AUDIO_ENCODE_DEFAULT_MAX_INPUT_SIZE = 4096;
     private static final String TAG = "Encoder";
     private static final boolean DEBUG = false;
     private static final int kQueueDequeueTimeoutUs = 1000;
@@ -134,7 +136,7 @@ public class Encoder {
         if (mMime.startsWith("video/")) {
             mFrameSize = frameSize;
         } else {
-            int maxInputSize = ENCODE_DEFAULT_MAX_INPUT_SIZE;
+            int maxInputSize = AUDIO_ENCODE_DEFAULT_MAX_INPUT_SIZE;
             MediaFormat format = mCodec.getInputFormat();
             if (format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) {
                 maxInputSize = format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE);
@@ -281,19 +283,27 @@ public class Encoder {
             return;
         }
         int bufSize = inputBuffer.capacity();
-        int bytesRead = mFrameSize;
+        int bytesToRead = mFrameSize;
         if (mInputBufferSize - mOffset < mFrameSize) {
-            bytesRead = (int) (mInputBufferSize - mOffset);
+            bytesToRead = (int) (mInputBufferSize - mOffset);
         }
-        if (bufSize < bytesRead) {
-            mSignalledError = true;
-            return;
+        //b/148655275 - Update Frame size, as Format value may not be valid
+        if (bufSize < bytesToRead) {
+            if(mNumInputFrame == 0) {
+                mFrameSize = bufSize;
+                bytesToRead = bufSize;
+                mNumFrames = (int) ((mInputBufferSize + mFrameSize - 1) / mFrameSize);
+            } else {
+                mSignalledError = true;
+                return;
+            }
         }
-        byte[] inputArray = new byte[bytesRead];
-        mInputStream.read(inputArray, 0, bytesRead);
+
+        byte[] inputArray = new byte[bytesToRead];
+        mInputStream.read(inputArray, 0, bytesToRead);
         inputBuffer.put(inputArray);
         int flag = 0;
-        if (mNumInputFrame >= mNumFrames - 1 || bytesRead == 0) {
+        if (mNumInputFrame >= mNumFrames - 1 || bytesToRead == 0) {
             Log.i(TAG, "Sending EOS on input last frame");
             mSawInputEOS = true;
             flag = MediaCodec.BUFFER_FLAG_END_OF_STREAM;
@@ -304,9 +314,9 @@ public class Encoder {
         } else {
             presentationTimeUs = mNumInputFrame * mFrameSize * 1000000 / mSampleRate;
         }
-        mediaCodec.queueInputBuffer(inputBufferId, 0, bytesRead, presentationTimeUs, flag);
+        mediaCodec.queueInputBuffer(inputBufferId, 0, bytesToRead, presentationTimeUs, flag);
         mNumInputFrame++;
-        mOffset += bytesRead;
+        mOffset += bytesToRead;
     }
 
     /**
