@@ -41,7 +41,7 @@ public:
     virtual status_t getMetrics(Parcel *reply);
     virtual uint32_t flags() const;
     virtual status_t setMediaCas(const HInterfaceToken &casToken);
-    virtual const char * name();
+    virtual String8 name();
 
 private:
     MediaExtractor *mExtractor;

@@ -62,7 +62,7 @@ public:
 
     virtual status_t setMediaCas(const HInterfaceToken &casToken) = 0;
 
-    virtual const char * name() = 0;
+    virtual String8 name() = 0;
 };
 
 

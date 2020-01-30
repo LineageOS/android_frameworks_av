@@ -107,8 +107,15 @@ public:
     }
 
     virtual uint32_t flags() const {
-        ALOGV("flags NOT IMPLEMENTED");
-        return 0;
+        ALOGV("flags");
+        Parcel data, reply;
+        data.writeInterfaceToken(BpMediaExtractor::getInterfaceDescriptor());
+        status_t ret = remote()->transact(FLAGS, data, &reply);
+        int flgs = 0;
+        if (ret == NO_ERROR) {
+            flgs = reply.readUint32();
+        }
+        return flgs;
     }
 
     virtual status_t setMediaCas(const HInterfaceToken &casToken) {
@@ -125,9 +132,15 @@ public:
         return reply.readInt32();
     }
 
-    virtual const char * name() {
-        ALOGV("name NOT IMPLEMENTED");
-        return NULL;
+    virtual String8 name() {
+        Parcel data, reply;
+        data.writeInterfaceToken(BpMediaExtractor::getInterfaceDescriptor());
+        status_t ret = remote()->transact(NAME, data, &reply);
+        String8 nm;
+        if (ret == NO_ERROR) {
+            nm = reply.readString8();
+        }
+        return nm;
     }
 };
 
@@ -192,6 +205,12 @@ status_t BnMediaExtractor::onTransact(
             status_t ret = getMetrics(reply);
             return ret;
         }
+        case FLAGS: {
+            ALOGV("flags");
+            CHECK_INTERFACE(IMediaExtractor, data, reply);
+            reply->writeUint32(this->flags());
+            return NO_ERROR;
+        }
         case SETMEDIACAS: {
             ALOGV("setMediaCas");
             CHECK_INTERFACE(IMediaExtractor, data, reply);
@@ -205,6 +224,13 @@ status_t BnMediaExtractor::onTransact(
 
             reply->writeInt32(setMediaCas(casToken));
             return OK;
+        }
+        case NAME: {
+            ALOGV("name");
+            CHECK_INTERFACE(IMediaExtractor, data, reply);
+            String8 nm = name();
+            reply->writeString8(nm);
+            return NO_ERROR;
         }
         default:
             return BBinder::onTransact(code, data, reply, flags);
