@@ -56,9 +56,6 @@
 #ifndef LVCS_H
 #define LVCS_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 
 /****************************************************************************************/
@@ -389,8 +386,5 @@ LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
                                   LVM_UINT16                NumSamples);
 #endif
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif  /* LVCS_H */

@@ -55,9 +55,6 @@
 #ifndef __LVDBE_H__
 #define __LVDBE_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 
 /****************************************************************************************/
@@ -477,8 +474,5 @@ LVDBE_ReturnStatus_en LVDBE_Process(LVDBE_Handle_t          hInstance,
                                        LVM_UINT16           NumSamples);
 #endif
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif /* __LVDBE_H__ */

@@ -634,7 +634,8 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
         /*
          * Managed buffers required
          */
-        pInstance->pBufferManagement = InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_SLOW_DATA],
+        pInstance->pBufferManagement = (LVM_Buffer_t *)
+            InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_SLOW_DATA],
                                                            sizeof(LVM_Buffer_t));
 #ifdef BUILD_FLOAT
         BundleScratchSize = (LVM_INT32)
@@ -644,8 +645,10 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
 #else
         BundleScratchSize = (LVM_INT32)(6 * (MIN_INTERNAL_BLOCKSIZE + InternalBlockSize) * sizeof(LVM_INT16));
 #endif
-        pInstance->pBufferManagement->pScratch = InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_TEMPORARY_FAST],   /* Scratch 1 buffer */
-                                                                     (LVM_UINT32)BundleScratchSize);
+        pInstance->pBufferManagement->pScratch = (LVM_FLOAT *)
+            InstAlloc_AddMember(
+                         &AllocMem[LVM_MEMREGION_TEMPORARY_FAST], /* Scratch 1 buffer */
+                                                  (LVM_UINT32)BundleScratchSize);
 #ifdef BUILD_FLOAT
         LoadConst_Float(0,                                   /* Clear the input delay buffer */
                         (LVM_FLOAT *)&pInstance->pBufferManagement->InDelayBuffer,
@@ -760,10 +763,12 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
     /*
      * Set the default EQNB pre-gain and pointer to the band definitions
      */
-    pInstance->pEQNB_BandDefs = InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_FAST_DATA],
-                                                    (pInstParams->EQNB_NumBands * sizeof(LVM_EQNB_BandDef_t)));
-    pInstance->pEQNB_UserDefs = InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_FAST_DATA],
-                                                   (pInstParams->EQNB_NumBands * sizeof(LVM_EQNB_BandDef_t)));
+    pInstance->pEQNB_BandDefs =
+        (LVM_EQNB_BandDef_t *)InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_FAST_DATA],
+                                   (pInstParams->EQNB_NumBands * sizeof(LVM_EQNB_BandDef_t)));
+    pInstance->pEQNB_UserDefs =
+        (LVM_EQNB_BandDef_t *)InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_FAST_DATA],
+                                   (pInstParams->EQNB_NumBands * sizeof(LVM_EQNB_BandDef_t)));
 
 
     /*
@@ -954,10 +959,12 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
      * Headroom management memory allocation
      */
     {
-        pInstance->pHeadroom_BandDefs = InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_FAST_DATA],
-                                                        (LVM_HEADROOM_MAX_NBANDS * sizeof(LVM_HeadroomBandDef_t)));
-        pInstance->pHeadroom_UserDefs = InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_FAST_DATA],
-                                                       (LVM_HEADROOM_MAX_NBANDS * sizeof(LVM_HeadroomBandDef_t)));
+        pInstance->pHeadroom_BandDefs = (LVM_HeadroomBandDef_t *)
+              InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_FAST_DATA],
+                                       (LVM_HEADROOM_MAX_NBANDS * sizeof(LVM_HeadroomBandDef_t)));
+        pInstance->pHeadroom_UserDefs = (LVM_HeadroomBandDef_t *)
+              InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_FAST_DATA],
+                                       (LVM_HEADROOM_MAX_NBANDS * sizeof(LVM_HeadroomBandDef_t)));
 
         /* Headroom management parameters initialisation */
         pInstance->NewHeadroomParams.NHeadroomBands = 2;
@@ -1022,7 +1029,7 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
 
             /* Fast Temporary */
 #ifdef BUILD_FLOAT
-            pInstance->pPSAInput = InstAlloc_AddMember(&AllocMem[LVM_TEMPORARY_FAST],
+            pInstance->pPSAInput = (LVM_FLOAT *)InstAlloc_AddMember(&AllocMem[LVM_TEMPORARY_FAST],
                                                        (LVM_UINT32) MAX_INTERNAL_BLOCKSIZE * \
                                                        sizeof(LVM_FLOAT));
 #else

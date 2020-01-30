@@ -19,9 +19,6 @@
 #define _VECTOR_ARITHMETIC_H_
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 #include "LVM_Types.h"
 
@@ -253,9 +250,6 @@ void Int32RShiftToInt16_Sat_32x16(const  LVM_INT32  *src,
                                     LVM_INT16 n,
                                     LVM_INT16 shift );
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 
 /**********************************************************************************/

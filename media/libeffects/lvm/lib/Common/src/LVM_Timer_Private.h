@@ -19,9 +19,6 @@
 #define LVM_TIMER_PRIVATE_H
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 
 #include "LVM_Types.h"
@@ -45,8 +42,5 @@ typedef struct
 /*  END OF HEADER                                                                       */
 /****************************************************************************************/
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif  /* LVM_TIMER_PRIVATE_H */

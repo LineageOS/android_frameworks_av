@@ -148,21 +148,29 @@ LVPSA_RETURN LVPSA_Init              ( pLVPSA_Handle_t             *phInstance,
 #ifndef BUILD_FLOAT
     pLVPSA_Inst->pPostGains                 = InstAlloc_AddMember( &Instance, pInitParams->nBands * sizeof(LVM_UINT16) );
 #else
-    pLVPSA_Inst->pPostGains             = InstAlloc_AddMember( &Instance, pInitParams->nBands * \
-                                                               sizeof(LVM_FLOAT) );
+    pLVPSA_Inst->pPostGains             =
+        (LVM_FLOAT *)InstAlloc_AddMember(&Instance, pInitParams->nBands * sizeof(LVM_FLOAT));
 #endif
-    pLVPSA_Inst->pFiltersParams             = InstAlloc_AddMember( &Instance, pInitParams->nBands * sizeof(LVPSA_FilterParam_t) );
-    pLVPSA_Inst->pSpectralDataBufferStart   = InstAlloc_AddMember( &Instance, pInitParams->nBands * pLVPSA_Inst->SpectralDataBufferLength * sizeof(LVM_UINT8) );
-    pLVPSA_Inst->pPreviousPeaks             = InstAlloc_AddMember( &Instance, pInitParams->nBands * sizeof(LVM_UINT8) );
-    pLVPSA_Inst->pBPFiltersPrecision        = InstAlloc_AddMember( &Instance, pInitParams->nBands * sizeof(LVPSA_BPFilterPrecision_en) );
+    pLVPSA_Inst->pFiltersParams             = (LVPSA_FilterParam_t *)
+        InstAlloc_AddMember(&Instance, pInitParams->nBands * sizeof(LVPSA_FilterParam_t));
+    pLVPSA_Inst->pSpectralDataBufferStart   = (LVM_UINT8 *)
+        InstAlloc_AddMember(&Instance, pInitParams->nBands * \
+                                pLVPSA_Inst->SpectralDataBufferLength * sizeof(LVM_UINT8));
+    pLVPSA_Inst->pPreviousPeaks             = (LVM_UINT8 *)
+                  InstAlloc_AddMember(&Instance, pInitParams->nBands * sizeof(LVM_UINT8));
+    pLVPSA_Inst->pBPFiltersPrecision        = (LVPSA_BPFilterPrecision_en *)
+                  InstAlloc_AddMember(&Instance, pInitParams->nBands * \
+                                                       sizeof(LVPSA_BPFilterPrecision_en));
 #ifndef BUILD_FLOAT
     pLVPSA_Inst->pBP_Instances          = InstAlloc_AddMember( &Coef, pInitParams->nBands * sizeof(Biquad_Instance_t) );
     pLVPSA_Inst->pQPD_States            = InstAlloc_AddMember( &Coef, pInitParams->nBands * sizeof(QPD_State_t) );
 #else
-    pLVPSA_Inst->pBP_Instances          = InstAlloc_AddMember( &Coef, pInitParams->nBands * \
-                                                               sizeof(Biquad_FLOAT_Instance_t) );
-    pLVPSA_Inst->pQPD_States            = InstAlloc_AddMember( &Coef, pInitParams->nBands * \
-                                                               sizeof(QPD_FLOAT_State_t) );
+    pLVPSA_Inst->pBP_Instances          = (Biquad_FLOAT_Instance_t *)
+                  InstAlloc_AddMember(&Coef, pInitParams->nBands * \
+                                                          sizeof(Biquad_FLOAT_Instance_t));
+    pLVPSA_Inst->pQPD_States            = (QPD_FLOAT_State_t *)
+                  InstAlloc_AddMember(&Coef, pInitParams->nBands * \
+                                                                sizeof(QPD_FLOAT_State_t));
 #endif
 
 #ifndef BUILD_FLOAT
@@ -170,11 +178,12 @@ LVPSA_RETURN LVPSA_Init              ( pLVPSA_Handle_t             *phInstance,
     pLVPSA_Inst->pQPD_Taps              = InstAlloc_AddMember( &Data, pInitParams->nBands * sizeof(QPD_Taps_t) );
 
 #else
-    pLVPSA_Inst->pBP_Taps               = InstAlloc_AddMember( &Data,
-                                                               pInitParams->nBands * \
-                                                               sizeof(Biquad_1I_Order2_FLOAT_Taps_t));
-    pLVPSA_Inst->pQPD_Taps              = InstAlloc_AddMember( &Data, pInitParams->nBands * \
-                                                               sizeof(QPD_FLOAT_Taps_t) );
+    pLVPSA_Inst->pBP_Taps               = (Biquad_1I_Order2_FLOAT_Taps_t *)
+        InstAlloc_AddMember(&Data, pInitParams->nBands * \
+                                                     sizeof(Biquad_1I_Order2_FLOAT_Taps_t));
+    pLVPSA_Inst->pQPD_Taps              = (QPD_FLOAT_Taps_t *)
+        InstAlloc_AddMember(&Data, pInitParams->nBands * \
+                                                    sizeof(QPD_FLOAT_Taps_t));
 #endif
 
     /* Copy filters parameters in the private instance */
