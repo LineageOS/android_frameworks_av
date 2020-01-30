@@ -136,7 +136,7 @@ INSTANTIATE_TEST_SUITE_P(
                           make_pair("crowd_1920x1080_25fps_6700kbps_h264.ts", "3gpp"),
                           make_pair("crowd_1920x1080_25fps_4000kbps_h265.mkv", "3gpp"),
                           make_pair("bbb_48000hz_2ch_100kbps_opus_5mins.webm", "ogg"),
-                          make_pair("bbb_44100hz_2ch_80kbps_vorbis_5mins.mp4", "webm"),
+                          make_pair("bbb_44100hz_2ch_80kbps_vorbis_5mins.webm", "webm"),
                           make_pair("bbb_48000hz_2ch_100kbps_opus_5mins.webm", "webm"),
                           make_pair("bbb_44100hz_2ch_128kbps_aac_5mins.mp4", "mp4"),
                           make_pair("bbb_8000hz_1ch_8kbps_amrnb_5mins.3gp", "mp4"),
