@@ -278,7 +278,6 @@ class Camera3Device :
 
     // A lock to enforce serialization on the input/configure side
     // of the public interface.
-    // Only locked by public methods inherited from CameraDeviceBase.
     // Not locked by methods guarded by mOutputLock, since they may act
     // concurrently to the input/configure side of the interface.
     // Must be locked before mLock if both will be locked by a method
