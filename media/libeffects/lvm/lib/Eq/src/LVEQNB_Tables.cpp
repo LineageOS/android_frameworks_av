@@ -24,6 +24,7 @@
 
 #include "LVEQNB.h"
 #include "LVEQNB_Coeffs.h"
+#include "LVEQNB_Tables.h"
 
 
 /************************************************************************************/

@@ -18,9 +18,6 @@
 #ifndef __LVM_TABLES_H__
 #define __LVM_TABLES_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 /************************************************************************************/
 /*                                                                                  */
@@ -57,9 +54,6 @@ extern const LVM_INT16 LVM_VolumeTable[];
 extern const LVM_INT16 LVM_MixerTCTable[];
 
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif /* __LVM_TABLES_H__ */
 

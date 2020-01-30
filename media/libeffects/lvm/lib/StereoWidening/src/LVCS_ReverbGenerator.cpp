@@ -112,7 +112,7 @@ LVCS_ReturnStatus_en LVCS_ReverbGeneratorInit(LVCS_Handle_t     hInstance,
         Coeffs.B2 = (LVM_FLOAT)-pReverbCoefTable[Offset].B2;
 
         LoadConst_Float(0,                                 /* Value */
-                        (void *)&pData->ReverbBiquadTaps,  /* Destination Cast to void:
+                        (LVM_FLOAT *)&pData->ReverbBiquadTaps,  /* Destination Cast to void:
                                                              no dereferencing in function*/
                         /* Number of words */
                         (LVM_UINT16)(sizeof(pData->ReverbBiquadTaps) / sizeof(LVM_FLOAT)));
@@ -306,7 +306,7 @@ LVCS_ReturnStatus_en LVCS_ReverbGenerator(LVCS_Handle_t         hInstance,
      * Check if the reverb is required
      */
     /* Disable when CS4MS in stereo mode */
-    if (((pInstance->Params.SpeakerType == LVCS_HEADPHONE) || \
+    if ((((LVCS_OutputDevice_en)pInstance->Params.SpeakerType == LVCS_HEADPHONE) || \
          (pInstance->Params.SpeakerType == LVCS_EX_HEADPHONES) ||
          (pInstance->Params.SourceFormat != LVCS_STEREO))  &&
                                     /* For validation testing */

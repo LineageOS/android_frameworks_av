@@ -40,7 +40,7 @@ void LVM_Timer_Init (   LVM_Timer_Instance_t       *pInstance,
     pInstancePr = (LVM_Timer_Instance_Private_t *)pInstance;
 
     pInstancePr->CallBackParam     = pParams->CallBackParam;
-    pInstancePr->pCallBackParams   = pParams->pCallBackParams;
+    pInstancePr->pCallBackParams   = (LVM_INT32 *)pParams->pCallBackParams;
     pInstancePr->pCallbackInstance = pParams->pCallbackInstance;
     pInstancePr->pCallBack         = pParams->pCallBack;
     pInstancePr->TimerArmed        = 1;

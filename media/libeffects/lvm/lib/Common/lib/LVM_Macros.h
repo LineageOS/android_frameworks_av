@@ -18,9 +18,6 @@
 #ifndef _LVM_MACROS_H_
 #define _LVM_MACROS_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 /**********************************************************************************
    MUL32x32INTO32(A,B,C,ShiftR)
@@ -113,9 +110,6 @@ extern "C" {
 #endif
 
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif /* _LVM_MACROS_H_ */
 
