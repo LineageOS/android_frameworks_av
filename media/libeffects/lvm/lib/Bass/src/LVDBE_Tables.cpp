@@ -24,6 +24,7 @@
 
 #include "LVDBE.h"
 #include "LVDBE_Coeffs.h"               /* Filter coefficients */
+#include "LVDBE_Tables.h"
 #include "BIQUAD.h"
 
 

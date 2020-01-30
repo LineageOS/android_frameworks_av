@@ -18,9 +18,6 @@
 #ifndef FILTERS_H
 #define FILTERS_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 #include "LVM_Types.h"
 
@@ -76,9 +73,6 @@ typedef struct
     LVM_UINT16  Scale;
 } BiquadA01B1CoefsSP_t;
 #endif
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif      /* FILTERS_H */
 

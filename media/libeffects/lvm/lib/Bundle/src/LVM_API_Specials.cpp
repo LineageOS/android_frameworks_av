@@ -72,7 +72,7 @@ LVM_ReturnStatus_en LVM_GetSpectrum(
         return LVM_SUCCESS;
     }
 
-    hPSAInstance = pInstance->hPSAInstance;
+    hPSAInstance = (pLVPSA_Handle_t *)pInstance->hPSAInstance;
 
     if((pCurrentPeaks == LVM_NULL) ||
         (pPastPeaks == LVM_NULL))

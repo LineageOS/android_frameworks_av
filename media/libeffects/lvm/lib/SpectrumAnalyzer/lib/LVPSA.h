@@ -22,9 +22,6 @@
 #include "LVM_Types.h"
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -289,8 +286,5 @@ LVPSA_RETURN LVPSA_GetInitParams     (    pLVPSA_Handle_t            hInstance,
                                           LVPSA_InitParams_t        *pParams      );
 
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif /* _LVPSA_H */

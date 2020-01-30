@@ -24,6 +24,7 @@
 
 #include "LVPSA.h"
 #include "LVPSA_QPD.h"
+#include "LVPSA_Tables.h"
 /************************************************************************************/
 /*                                                                                  */
 /*  Sample rate table                                                               */
@@ -318,36 +319,38 @@ const LVM_FLOAT    LVPSA_Float_DPCosCoef[] = {1.0f,                        /* Sh
 /*                                                                                  */
 /************************************************************************************/
 const QPD_C32_Coefs     LVPSA_QPD_Coefs[] = {
+                                         /* 8kS/s  */    /* LVPSA_SPEED_LOW   */
+                                         {(LVM_INT32)0x80CEFD2B,0x00CB9B17},
+                                         {(LVM_INT32)0x80D242E7,0x00CED11D},
+                                         {(LVM_INT32)0x80DCBAF5,0x00D91679},
+                                         {(LVM_INT32)0x80CEFD2B,0x00CB9B17},
+                                         {(LVM_INT32)0x80E13739,0x00DD7CD3},
+                                         {(LVM_INT32)0x80DCBAF5,0x00D91679},
+                                         {(LVM_INT32)0x80D94BAF,0x00D5B7E7},
+                                         {(LVM_INT32)0x80E13739,0x00DD7CD3},
+                                         {(LVM_INT32)0x80DCBAF5,0x00D91679},  /* 48kS/s */
 
-                                         {0x80CEFD2B,0x00CB9B17},  /* 8kS/s  */    /* LVPSA_SPEED_LOW   */
-                                         {0x80D242E7,0x00CED11D},
-                                         {0x80DCBAF5,0x00D91679},
-                                         {0x80CEFD2B,0x00CB9B17},
-                                         {0x80E13739,0x00DD7CD3},
-                                         {0x80DCBAF5,0x00D91679},
-                                         {0x80D94BAF,0x00D5B7E7},
-                                         {0x80E13739,0x00DD7CD3},
-                                         {0x80DCBAF5,0x00D91679},  /* 48kS/s */
+                                         /* 8kS/s  */    /* LVPSA_SPEED_MEDIUM */
+                                         {(LVM_INT32)0x8587513D,0x055C22CF},
+                                         {(LVM_INT32)0x859D2967,0x0570F007},
+                                         {(LVM_INT32)0x85E2EFAC,0x05B34D79},
+                                         {(LVM_INT32)0x8587513D,0x055C22CF},
+                                         {(LVM_INT32)0x8600C7B9,0x05CFA6CF},
+                                         {(LVM_INT32)0x85E2EFAC,0x05B34D79},
+                                         {(LVM_INT32)0x85CC1018,0x059D8F69},
+                                         {(LVM_INT32)0x8600C7B9,0x05CFA6CF},
+                                         {(LVM_INT32)0x85E2EFAC,0x05B34D79},  /* 48kS/s */
 
-                                         {0x8587513D,0x055C22CF},  /* 8kS/s  */    /* LVPSA_SPEED_MEDIUM      */
-                                         {0x859D2967,0x0570F007},
-                                         {0x85E2EFAC,0x05B34D79},
-                                         {0x8587513D,0x055C22CF},
-                                         {0x8600C7B9,0x05CFA6CF},
-                                         {0x85E2EFAC,0x05B34D79},
-                                         {0x85CC1018,0x059D8F69},
-                                         {0x8600C7B9,0x05CFA6CF},//{0x8600C7B9,0x05CFA6CF},
-                                         {0x85E2EFAC,0x05B34D79},  /* 48kS/s */
-
-                                         {0xA115EA7A,0x1CDB3F5C},  /* 8kS/s  */   /* LVPSA_SPEED_HIGH      */
-                                         {0xA18475F0,0x1D2C83A2},
-                                         {0xA2E1E950,0x1E2A532E},
-                                         {0xA115EA7A,0x1CDB3F5C},
-                                         {0xA375B2C6,0x1E943BBC},
-                                         {0xA2E1E950,0x1E2A532E},
-                                         {0xA26FF6BD,0x1DD81530},
-                                         {0xA375B2C6,0x1E943BBC},
-                                         {0xA2E1E950,0x1E2A532E}}; /* 48kS/s */
+                                         /* 8kS/s  */   /* LVPSA_SPEED_HIGH    */
+                                         {(LVM_INT32)0xA115EA7A,0x1CDB3F5C},
+                                         {(LVM_INT32)0xA18475F0,0x1D2C83A2},
+                                         {(LVM_INT32)0xA2E1E950,0x1E2A532E},
+                                         {(LVM_INT32)0xA115EA7A,0x1CDB3F5C},
+                                         {(LVM_INT32)0xA375B2C6,0x1E943BBC},
+                                         {(LVM_INT32)0xA2E1E950,0x1E2A532E},
+                                         {(LVM_INT32)0xA26FF6BD,0x1DD81530},
+                                         {(LVM_INT32)0xA375B2C6,0x1E943BBC},
+                                         {(LVM_INT32)0xA2E1E950,0x1E2A532E}}; /* 48kS/s */
 
 #ifdef BUILD_FLOAT
 const QPD_FLOAT_Coefs     LVPSA_QPD_Float_Coefs[] = {

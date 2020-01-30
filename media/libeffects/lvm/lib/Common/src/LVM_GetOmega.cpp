@@ -36,11 +36,11 @@
 const LVM_INT32     LVVDL_2PiOnFsTable[] =  {LVVDL_2PiBy_8000 , /* 8kHz in Q41, 16kHz in Q42, 32kHz in Q43 */
                                             LVVDL_2PiBy_11025,  /* 11025 Hz in Q41, 22050Hz in Q42, 44100 Hz in Q43*/
                                             LVVDL_2PiBy_12000}; /* 12kHz in Q41, 24kHz in Q42, 48kHz in Q43 */
-#endif
 
 const LVM_INT32     LVVDL_2PiOnFsShiftTable[]={LVVDL_2PiByFs_SHIFT1 ,         /* 8kHz, 11025Hz, 12kHz */
                                                LVVDL_2PiByFs_SHIFT2,          /* 16kHz, 22050Hz, 24kHz*/
                                                LVVDL_2PiByFs_SHIFT3};         /* 32kHz, 44100Hz, 48kHz */
+#endif
 #ifdef BUILD_FLOAT
 #define LVVDL_2PiBy_8000_f        0.000785398f
 #define LVVDL_2PiBy_11025_f       0.000569903f
