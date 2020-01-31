@@ -438,9 +438,6 @@ c2_status_t C2SoftFlacEnc::drain(
     }
     FLAC__bool ok = FLAC__stream_encoder_finish(mFlacStreamEncoder);
     if (!ok) return C2_CORRUPTED;
-    mIsFirstFrame = true;
-    mAnchorTimeStamp = 0ull;
-    mProcessedSamples = 0u;
 
     return C2_OK;
 }
