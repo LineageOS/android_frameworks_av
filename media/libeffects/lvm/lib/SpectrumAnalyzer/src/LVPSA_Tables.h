@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2004-2010 NXP Software
- * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (C) 2019 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,115 +14,119 @@
  * limitations under the License.
  */
 
+#ifndef __LVPSA_TABLES_H__
+#define __LVPSA_TABLES_H__
 
 /************************************************************************************/
 /*                                                                                  */
-/*    Includes                                                                      */
-/*                                                                                  */
-/************************************************************************************/
-#ifndef __LVBDE_TABLES_H__
-#define __LVBDE_TABLES_H__
-
-
-#include "BIQUAD.h"
-#include "LVM_Types.h"
-
-#ifndef BUILD_FLOAT
-/************************************************************************************/
-/*                                                                                  */
-/*    Coefficients constant table                                                   */
+/*  Sample rate table                                                               */
 /*                                                                                  */
 /************************************************************************************/
 
 /*
- * High Pass Filter Coefficient table
+ * Sample rate table for converting between the enumerated type and the actual
+ * frequency
  */
-extern const BQ_C32_Coefs_t LVDBE_HPF_Table[];
-
-/*
- * Band Pass Filter coefficient table
- */
-extern const BP_C32_Coefs_t LVDBE_BPF_Table[];
-
-/************************************************************************************/
-/*                                                                                  */
-/*    AGC constant tables                                                           */
-/*                                                                                  */
-/************************************************************************************/
-
-/* Attack time (signal too large) */
-extern const LVM_INT16 LVDBE_AGC_ATTACK_Table[];
-
-/* Decay time (signal too small) */
-extern const LVM_INT16 LVDBE_AGC_DECAY_Table[];
-
-/* Gain for use without the high pass filter */
-extern const LVM_INT32 LVDBE_AGC_GAIN_Table[];
-
-/* Gain for use with the high pass filter */
-extern const LVM_INT32 LVDBE_AGC_HPFGAIN_Table[];
+#ifndef HIGHER_FS
+extern const LVM_UINT16    LVPSA_SampleRateTab[];
+#else
+extern const LVM_UINT32    LVPSA_SampleRateTab[];
+#endif
 
 /************************************************************************************/
 /*                                                                                  */
-/*    Volume control gain and time constant tables                                  */
-/*                                                                                  */
-/************************************************************************************/
-
-/* dB to linear conversion table */
-extern const LVM_INT16 LVDBE_VolumeTable[];
-
-extern const LVM_INT16 LVDBE_VolumeTCTable[];
-
-#else /*BUILD_FLOAT*/
-
-/************************************************************************************/
-/*                                                                                  */
-/*    Coefficients constant table                                                   */
+/*  Sample rate inverse table                                                       */
 /*                                                                                  */
 /************************************************************************************/
 
 /*
- * High Pass Filter Coefficient table
+ * Sample rate table for converting between the enumerated type and the actual
+ * frequency
  */
-extern const BQ_FLOAT_Coefs_t LVDBE_HPF_Table[];
+extern const LVM_UINT32    LVPSA_SampleRateInvTab[];
+
+/************************************************************************************/
+/*                                                                                  */
+/*  Number of samples in 20ms                                                       */
+/*                                                                                  */
+/************************************************************************************/
 
 /*
- * Band Pass Filter coefficient table
+ * Table for converting between the enumerated type and the number of samples
+ * during 20ms
  */
-extern const BP_FLOAT_Coefs_t LVDBE_BPF_Table[];
+extern const LVM_UINT16    LVPSA_nSamplesBufferUpdate[];
 
 /************************************************************************************/
 /*                                                                                  */
-/*    AGC constant tables                                                           */
+/*  Down sampling factors                                                           */
 /*                                                                                  */
 /************************************************************************************/
 
-/* Attack time (signal too large) */
-extern const LVM_FLOAT LVDBE_AGC_ATTACK_Table[];
-
-/* Decay time (signal too small) */
-extern const LVM_FLOAT LVDBE_AGC_DECAY_Table[];
-
-/* Gain for use without the high pass filter */
-extern const LVM_FLOAT LVDBE_AGC_GAIN_Table[];
-
-/* Gain for use with the high pass filter */
-extern const LVM_FLOAT LVDBE_AGC_HPFGAIN_Table[];
+/*
+ * Table for converting between the enumerated type and the down sampling factor
+ */
+extern const LVM_UINT16    LVPSA_DownSamplingFactor[];
 
 /************************************************************************************/
 /*                                                                                  */
-/*    Volume control gain and time constant tables                                  */
+/*  Coefficient calculation tables                                                  */
 /*                                                                                  */
 /************************************************************************************/
 
-/* dB to linear conversion table */
-extern const LVM_FLOAT LVDBE_VolumeTable[];
-extern const LVM_FLOAT LVDBE_VolumeTCTable[];
+/*
+ * Table for 2 * Pi / Fs
+ */
+extern const LVM_INT16     LVPSA_TwoPiOnFsTable[];
+extern const LVM_FLOAT     LVPSA_Float_TwoPiOnFsTable[];
 
-#endif /*BUILD_FLOAT*/
+/*
+ * Gain table
+ */
+extern const LVM_INT16     LVPSA_GainTable[];
+extern const LVM_FLOAT     LVPSA_Float_GainTable[];
 
-extern const LVM_INT16 LVDBE_MixerTCTable[];
+/************************************************************************************/
+/*                                                                                  */
+/*  Cosone polynomial coefficients                                                  */
+/*                                                                                  */
+/************************************************************************************/
 
+/*
+ * Coefficients for calculating the cosine with the equation:
+ *
+ *  Cos(x) = (2^Shifts)*(a0 + a1*x + a2*x^2 + a3*x^3 + a4*x^4 + a5*x^5)
+ *
+ * These coefficients expect the input, x, to be in the range 0 to 32768 respresenting
+ * a range of 0 to Pi. The output is in the range 32767 to -32768 representing the range
+ * +1.0 to -1.0
+ */
+extern const LVM_INT16     LVPSA_CosCoef[];
+extern const LVM_FLOAT     LVPSA_Float_CosCoef[];
 
+/*
+ * Coefficients for calculating the cosine error with the equation:
+ *
+ *  CosErr(x) = (2^Shifts)*(a0 + a1*x + a2*x^2 + a3*x^3)
+ *
+ * These coefficients expect the input, x, to be in the range 0 to 32768 respresenting
+ * a range of 0 to Pi/25. The output is in the range 0 to 32767 representing the range
+ * 0.0 to 0.0078852986
+ *
+ * This is used to give a double precision cosine over the range 0 to Pi/25 using the
+ * the equation:
+ *
+ * Cos(x) = 1.0 - CosErr(x)
+ */
+extern const LVM_INT16     LVPSA_DPCosCoef[];
+extern const LVM_FLOAT    LVPSA_Float_DPCosCoef[];
 
-#endif /* __LVBDE_TABLES_H__ */
+/************************************************************************************/
+/*                                                                                  */
+/*  Quasi peak filter coefficients table                                            */
+/*                                                                                  */
+/************************************************************************************/
+extern const QPD_C32_Coefs     LVPSA_QPD_Coefs[];
+extern const QPD_FLOAT_Coefs     LVPSA_QPD_Float_Coefs[];
+
+#endif /* __LVPSA_TABLES_H__ */

@@ -25,9 +25,6 @@
 #ifndef LVM_TYPES_H
 #define LVM_TYPES_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 #include <stdint.h>
 
@@ -223,8 +220,5 @@ typedef LVM_INT32 (*LVM_Callback)(void          *pCallbackData,     /* Pointer t
 /*                                                                                      */
 /****************************************************************************************/
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif  /* LVM_TYPES_H */

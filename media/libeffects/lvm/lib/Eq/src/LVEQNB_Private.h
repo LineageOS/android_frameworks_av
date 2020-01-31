@@ -18,9 +18,6 @@
 #ifndef __LVEQNB_PRIVATE_H__
 #define __LVEQNB_PRIVATE_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 
 /****************************************************************************************/
@@ -152,9 +149,6 @@ LVEQNB_ReturnStatus_en LVEQNB_DoublePrecCoefs(LVM_UINT16        Fs,
 
 LVM_INT32 LVEQNB_BypassMixerCallBack (void* hInstance, void *pGeneralPurpose, LVM_INT16 CallbackParam);
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif /* __LVEQNB_PRIVATE_H__ */
 

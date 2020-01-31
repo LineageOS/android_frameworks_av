@@ -25,9 +25,6 @@
 
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 /**********************************************************************************
    CONSTANT DEFINITIONS
@@ -162,8 +159,5 @@ typedef struct
 /************************************************************************************/
 LVPSA_RETURN LVPSA_ApplyNewSettings (LVPSA_InstancePr_t     *pInst);
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif /* _LVPSA_PRIVATE_H */

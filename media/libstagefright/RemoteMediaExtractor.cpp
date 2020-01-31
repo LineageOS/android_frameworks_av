@@ -139,8 +139,8 @@ status_t RemoteMediaExtractor::setMediaCas(const HInterfaceToken &casToken) {
     return mExtractor->setMediaCas((uint8_t*)casToken.data(), casToken.size());
 }
 
-const char * RemoteMediaExtractor::name() {
-    return mExtractor->name();
+String8 RemoteMediaExtractor::name() {
+    return String8(mExtractor->name());
 }
 
 ////////////////////////////////////////////////////////////////////////////////

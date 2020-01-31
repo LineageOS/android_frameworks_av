@@ -19,9 +19,6 @@
 #define _BIQUAD_H_
 
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 #include "LVM_Types.h"
 /**********************************************************************************
@@ -604,9 +601,6 @@ void DC_2I_D16_TRC_WRA_01          (        Biquad_Instance_t       *pInstance,
                                             LVM_INT16               *pDataOut,
                                             LVM_INT16               NrSamples);
 #endif
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 
 /**********************************************************************************/

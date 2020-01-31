@@ -1,0 +1,6 @@
+cc_test {
+    name: "mediametrics_benchmarks",
+    srcs: ["mediametrics_benchmarks.cpp"],
+    shared_libs: ["libbinder", "libmediametrics",],
+    static_libs: ["libgoogle-benchmark"],
+}

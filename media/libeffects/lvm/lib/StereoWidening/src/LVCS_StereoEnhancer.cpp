@@ -89,7 +89,7 @@ LVCS_ReturnStatus_en LVCS_SEnhancerInit(LVCS_Handle_t       hInstance,
 
         /* Clear the taps */
         LoadConst_Float(0,                                  /* Value */
-                        (void *)&pData->SEBiquadTapsMid,    /* Destination Cast to void:\
+                        (LVM_FLOAT *)&pData->SEBiquadTapsMid,    /* Destination Cast to void:\
                                                               no dereferencing in function*/
                         /* Number of words */
                         (LVM_UINT16)(sizeof(pData->SEBiquadTapsMid) / sizeof(LVM_FLOAT)));
@@ -117,7 +117,7 @@ LVCS_ReturnStatus_en LVCS_SEnhancerInit(LVCS_Handle_t       hInstance,
 
         /* Clear the taps */
         LoadConst_Float(0,                                /* Value */
-                        (void *)&pData->SEBiquadTapsSide, /* Destination Cast to void:\
+                        (LVM_FLOAT *)&pData->SEBiquadTapsSide, /* Destination Cast to void:\
                                                              no dereferencing in function*/
                         /* Number of words */
                         (LVM_UINT16)(sizeof(pData->SEBiquadTapsSide) / sizeof(LVM_FLOAT)));

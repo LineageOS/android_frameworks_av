@@ -198,7 +198,7 @@ LVM_ReturnStatus_en LVM_SetControlParameters(LVM_Handle_t           hInstance,
     /*
      * PSA parameters
      */
-    if( (pParams->PSA_PeakDecayRate > LVPSA_SPEED_HIGH) ||
+    if (((LVPSA_LevelDetectSpeed_en)pParams->PSA_PeakDecayRate > LVPSA_SPEED_HIGH) ||
         (pParams->PSA_Enable > LVM_PSA_ON))
     {
         return (LVM_OUTOFRANGE);
@@ -333,7 +333,7 @@ void LVM_SetTrebleBoost(LVM_Instance_t         *pInstance,
              * Clear the taps
              */
             LoadConst_Float((LVM_FLOAT)0,                                     /* Value */
-                            (void *)&pInstance->pTE_Taps->TrebleBoost_Taps,  /* Destination.\
+                            (LVM_FLOAT *)&pInstance->pTE_Taps->TrebleBoost_Taps,  /* Destination.\
                                                      Cast to void: no dereferencing in function */
                             (LVM_UINT16)(sizeof(pInstance->pTE_Taps->TrebleBoost_Taps) / \
                                                         sizeof(LVM_FLOAT))); /* Number of words */
@@ -514,7 +514,8 @@ void    LVM_SetHeadroom(LVM_Instance_t         *pInstance,
     LVM_INT16   MaxGain = 0;
 
 
-    if ((pParams->EQNB_OperatingMode == LVEQNB_ON) && (pInstance->HeadroomParams.Headroom_OperatingMode == LVM_HEADROOM_ON))
+    if (((LVEQNB_Mode_en)pParams->EQNB_OperatingMode == LVEQNB_ON)
+           && (pInstance->HeadroomParams.Headroom_OperatingMode == LVM_HEADROOM_ON))
     {
         /* Find typical headroom value */
         for(jj = 0; jj < pInstance->HeadroomParams.NHeadroomBands; jj++)
@@ -717,7 +718,7 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
     {
         LVDBE_ReturnStatus_en       DBE_Status;
         LVDBE_Params_t              DBE_Params;
-        LVDBE_Handle_t              *hDBEInstance = pInstance->hDBEInstance;
+        LVDBE_Handle_t              *hDBEInstance = (LVDBE_Handle_t *)pInstance->hDBEInstance;
 
 
         /*
@@ -770,7 +771,7 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
     {
         LVEQNB_ReturnStatus_en      EQNB_Status;
         LVEQNB_Params_t             EQNB_Params;
-        LVEQNB_Handle_t             *hEQNBInstance = pInstance->hEQNBInstance;
+        LVEQNB_Handle_t             *hEQNBInstance = (LVEQNB_Handle_t *)pInstance->hEQNBInstance;
 
 
         /*
@@ -847,7 +848,7 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
     {
         LVCS_ReturnStatus_en        CS_Status;
         LVCS_Params_t               CS_Params;
-        LVCS_Handle_t               *hCSInstance = pInstance->hCSInstance;
+        LVCS_Handle_t               *hCSInstance = (LVCS_Handle_t *)pInstance->hCSInstance;
         LVM_Mode_en                 CompressorMode=LVM_MODE_ON;
 
         /*
@@ -898,8 +899,8 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
         /*
          * Set the control flag
          */
-        if ((LocalParams.OperatingMode == LVM_MODE_ON) &&
-            (LocalParams.VirtualizerOperatingMode != LVCS_OFF))
+        if (((LVM_Mode_en)LocalParams.OperatingMode == LVM_MODE_ON) &&
+            ((LVCS_Modes_en)LocalParams.VirtualizerOperatingMode != LVCS_OFF))
         {
             pInstance->CS_Active = LVM_TRUE;
         }
@@ -933,7 +934,7 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
     {
         LVPSA_RETURN                PSA_Status;
         LVPSA_ControlParams_t       PSA_Params;
-        pLVPSA_Handle_t             *hPSAInstance = pInstance->hPSAInstance;
+        pLVPSA_Handle_t             *hPSAInstance = (pLVPSA_Handle_t *)pInstance->hPSAInstance;
 
 
         /*

@@ -28,9 +28,6 @@
 #ifndef __LVREV_H__
 #define __LVREV_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 
 
 /****************************************************************************************/
@@ -315,9 +312,6 @@ LVREV_ReturnStatus_en LVREV_Process(LVREV_Handle_t      hInstance,
                                     const LVM_UINT16          NumSamples);
 #endif
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
 
 #endif      /* __LVREV_H__ */
 
