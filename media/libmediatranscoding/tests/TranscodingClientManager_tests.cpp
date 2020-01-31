@@ -87,15 +87,11 @@ struct TestClient : public BnTranscodingServiceClient {
 
 class TranscodingClientManagerTest : public ::testing::Test {
    public:
-    TranscodingClientManagerTest() { ALOGD("TranscodingClientManagerTest created"); }
+    TranscodingClientManagerTest() : mClientManager(TranscodingClientManager::getInstance()) {
+        ALOGD("TranscodingClientManagerTest created");
+    }
 
     void SetUp() override {
-        mClientManager = TranscodingClientManager::getInstance();
-        if (mClientManager == nullptr) {
-            ALOGE("Failed to acquire TranscodingClientManager.");
-            return;
-        }
-
         ::ndk::SpAIBinder binder(AServiceManager_getService("media.transcoding"));
         mService = IMediaTranscodingService::fromBinder(binder);
         if (mService == nullptr) {
@@ -108,13 +104,12 @@ class TranscodingClientManagerTest : public ::testing::Test {
 
     void TearDown() override {
         ALOGI("TranscodingClientManagerTest tear down");
-        mClientManager = nullptr;
         mService = nullptr;
     }
 
     ~TranscodingClientManagerTest() { ALOGD("TranscodingClientManagerTest destroyed"); }
 
-    sp<TranscodingClientManager> mClientManager = nullptr;
+    TranscodingClientManager& mClientManager;
     std::shared_ptr<ITranscodingServiceClient> mTestClient = nullptr;
     std::shared_ptr<IMediaTranscodingService> mService = nullptr;
 };
@@ -129,7 +124,7 @@ TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientId) {
                     client, kInvalidClientId, kClientPid, kClientUid, kClientOpPackageName);
 
     // Add the client to the manager and expect failure.
-    status_t err = mClientManager->addClient(std::move(clientInfo));
+    status_t err = mClientManager.addClient(std::move(clientInfo));
     EXPECT_TRUE(err != OK);
 }
 
@@ -143,7 +138,7 @@ TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientPid) {
                     client, kClientId, kInvalidClientPid, kClientUid, kClientOpPackageName);
 
     // Add the client to the manager and expect failure.
-    status_t err = mClientManager->addClient(std::move(clientInfo));
+    status_t err = mClientManager.addClient(std::move(clientInfo));
     EXPECT_TRUE(err != OK);
 }
 
@@ -157,7 +152,7 @@ TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientUid) {
                     client, kClientId, kClientPid, kInvalidClientUid, kClientOpPackageName);
 
     // Add the client to the manager and expect failure.
-    status_t err = mClientManager->addClient(std::move(clientInfo));
+    status_t err = mClientManager.addClient(std::move(clientInfo));
     EXPECT_TRUE(err != OK);
 }
 
@@ -171,7 +166,7 @@ TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientPackageName) {
                     client, kClientId, kClientPid, kClientUid, kInvalidClientOpPackageName);
 
     // Add the client to the manager and expect failure.
-    status_t err = mClientManager->addClient(std::move(clientInfo));
+    status_t err = mClientManager.addClient(std::move(clientInfo));
     EXPECT_TRUE(err != OK);
 }
 
@@ -183,13 +178,13 @@ TEST_F(TranscodingClientManagerTest, TestAddingValidClient) {
             std::make_unique<TranscodingClientManager::ClientInfo>(
                     client1, kClientId, kClientPid, kClientUid, kClientOpPackageName);
 
-    status_t err = mClientManager->addClient(std::move(clientInfo));
+    status_t err = mClientManager.addClient(std::move(clientInfo));
     EXPECT_TRUE(err == OK);
 
-    size_t numOfClients = mClientManager->getNumOfClients();
+    size_t numOfClients = mClientManager.getNumOfClients();
     EXPECT_EQ(numOfClients, 1);
 
-    err = mClientManager->removeClient(kClientId);
+    err = mClientManager.removeClient(kClientId);
     EXPECT_TRUE(err == OK);
 }
 
@@ -201,13 +196,13 @@ TEST_F(TranscodingClientManagerTest, TestAddingDupliacteClient) {
             std::make_unique<TranscodingClientManager::ClientInfo>(
                     client1, kClientId, kClientPid, kClientUid, kClientOpPackageName);
 
-    status_t err = mClientManager->addClient(std::move(clientInfo));
+    status_t err = mClientManager.addClient(std::move(clientInfo));
     EXPECT_TRUE(err == OK);
 
-    err = mClientManager->addClient(std::move(clientInfo));
+    err = mClientManager.addClient(std::move(clientInfo));
     EXPECT_TRUE(err != OK);
 
-    err = mClientManager->removeClient(kClientId);
+    err = mClientManager.removeClient(kClientId);
     EXPECT_TRUE(err == OK);
 }
 
@@ -219,7 +214,7 @@ TEST_F(TranscodingClientManagerTest, TestAddingMultipleClient) {
             std::make_unique<TranscodingClientManager::ClientInfo>(
                     client1, kClientId, kClientPid, kClientUid, kClientOpPackageName);
 
-    status_t err = mClientManager->addClient(std::move(clientInfo1));
+    status_t err = mClientManager.addClient(std::move(clientInfo1));
     EXPECT_TRUE(err == OK);
 
     std::shared_ptr<ITranscodingServiceClient> client2 =
@@ -229,7 +224,7 @@ TEST_F(TranscodingClientManagerTest, TestAddingMultipleClient) {
             std::make_unique<TranscodingClientManager::ClientInfo>(
                     client2, kClientId + 1, kClientPid, kClientUid, kClientOpPackageName);
 
-    err = mClientManager->addClient(std::move(clientInfo2));
+    err = mClientManager.addClient(std::move(clientInfo2));
     EXPECT_TRUE(err == OK);
 
     std::shared_ptr<ITranscodingServiceClient> client3 =
@@ -240,27 +235,27 @@ TEST_F(TranscodingClientManagerTest, TestAddingMultipleClient) {
             std::make_unique<TranscodingClientManager::ClientInfo>(
                     client3, kClientId + 2, kClientPid, kClientUid, kClientOpPackageName);
 
-    err = mClientManager->addClient(std::move(clientInfo3));
+    err = mClientManager.addClient(std::move(clientInfo3));
     EXPECT_TRUE(err == OK);
 
-    size_t numOfClients = mClientManager->getNumOfClients();
+    size_t numOfClients = mClientManager.getNumOfClients();
     EXPECT_EQ(numOfClients, 3);
 
-    err = mClientManager->removeClient(kClientId);
+    err = mClientManager.removeClient(kClientId);
     EXPECT_TRUE(err == OK);
 
-    err = mClientManager->removeClient(kClientId + 1);
+    err = mClientManager.removeClient(kClientId + 1);
     EXPECT_TRUE(err == OK);
 
-    err = mClientManager->removeClient(kClientId + 2);
+    err = mClientManager.removeClient(kClientId + 2);
     EXPECT_TRUE(err == OK);
 }
 
 TEST_F(TranscodingClientManagerTest, TestRemovingNonExistClient) {
-    status_t err = mClientManager->removeClient(kInvalidClientId);
+    status_t err = mClientManager.removeClient(kInvalidClientId);
     EXPECT_TRUE(err != OK);
 
-    err = mClientManager->removeClient(1000 /* clientId */);
+    err = mClientManager.removeClient(1000 /* clientId */);
     EXPECT_TRUE(err != OK);
 }
 
@@ -272,13 +267,13 @@ TEST_F(TranscodingClientManagerTest, TestCheckClientWithClientId) {
             std::make_unique<TranscodingClientManager::ClientInfo>(
                     client, kClientId, kClientPid, kClientUid, kClientOpPackageName);
 
-    status_t err = mClientManager->addClient(std::move(clientInfo));
+    status_t err = mClientManager.addClient(std::move(clientInfo));
     EXPECT_TRUE(err == OK);
 
-    bool res = mClientManager->isClientIdRegistered(kClientId);
+    bool res = mClientManager.isClientIdRegistered(kClientId);
     EXPECT_TRUE(res);
 
-    res = mClientManager->isClientIdRegistered(kInvalidClientId);
+    res = mClientManager.isClientIdRegistered(kInvalidClientId);
     EXPECT_FALSE(res);
 }
 

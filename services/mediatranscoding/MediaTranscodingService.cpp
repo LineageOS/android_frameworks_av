@@ -45,9 +45,9 @@ static bool isTrustedCallingUid(uid_t uid) {
     }
 }
 
-MediaTranscodingService::MediaTranscodingService() {
+MediaTranscodingService::MediaTranscodingService()
+      : mTranscodingClientManager(TranscodingClientManager::getInstance()) {
     ALOGV("MediaTranscodingService is created");
-    mTranscodingClientManager = TranscodingClientManager::getInstance();
 }
 
 MediaTranscodingService::~MediaTranscodingService() {
@@ -64,7 +64,7 @@ binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uin
     write(fd, result.string(), result.size());
 
     Vector<String16> args;
-    mTranscodingClientManager->dumpAllClients(fd, args);
+    mTranscodingClientManager.dumpAllClients(fd, args);
     return OK;
 }
 
@@ -124,7 +124,7 @@ Status MediaTranscodingService::registerClient(
     int32_t clientId = in_clientPid;
 
     // Checks if the client already registers.
-    if (mTranscodingClientManager->isClientIdRegistered(clientId)) {
+    if (mTranscodingClientManager.isClientIdRegistered(clientId)) {
         return Status::fromServiceSpecificError(ERROR_ALREADY_EXISTS);
     }
 
@@ -132,7 +132,7 @@ Status MediaTranscodingService::registerClient(
     std::unique_ptr<TranscodingClientManager::ClientInfo> newClient =
             std::make_unique<TranscodingClientManager::ClientInfo>(
                     in_client, clientId, in_clientPid, in_clientUid, in_opPackageName);
-    status_t err = mTranscodingClientManager->addClient(std::move(newClient));
+    status_t err = mTranscodingClientManager.addClient(std::move(newClient));
     if (err != OK) {
         *_aidl_return = kInvalidClientId;
         return STATUS_ERROR_FMT(err, "Failed to add client to TranscodingClientManager");
@@ -164,13 +164,13 @@ Status MediaTranscodingService::unregisterClient(int32_t clientId, bool* _aidl_r
         }
     }
 
-    *_aidl_return = (mTranscodingClientManager->removeClient(clientId) == OK);
+    *_aidl_return = (mTranscodingClientManager.removeClient(clientId) == OK);
     return Status::ok();
 }
 
 Status MediaTranscodingService::getNumOfClients(int32_t* _aidl_return) {
     ALOGD("MediaTranscodingService::getNumOfClients");
-    *_aidl_return = mTranscodingClientManager->getNumOfClients();
+    *_aidl_return = mTranscodingClientManager.getNumOfClients();
     return Status::ok();
 }
 

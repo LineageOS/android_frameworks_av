@@ -26,9 +26,9 @@ namespace android {
 using Status = ::ndk::ScopedAStatus;
 
 // static
-sp<TranscodingClientManager> TranscodingClientManager::getInstance() {
-    static sp<TranscodingClientManager> sInstance = new TranscodingClientManager();
-    return sInstance;
+TranscodingClientManager& TranscodingClientManager::getInstance() {
+    static TranscodingClientManager gInstance{};
+    return gInstance;
 }
 
 // static
@@ -36,8 +36,8 @@ void TranscodingClientManager::BinderDiedCallback(void* cookie) {
     int32_t clientId = static_cast<int32_t>(reinterpret_cast<intptr_t>(cookie));
     ALOGD("Client %" PRId32 " is dead", clientId);
     // Don't check for pid validity since we know it's already dead.
-    sp<TranscodingClientManager> manager = TranscodingClientManager::getInstance();
-    manager->removeClient(clientId);
+    TranscodingClientManager& manager = TranscodingClientManager::getInstance();
+    manager.removeClient(clientId);
 }
 
 TranscodingClientManager::TranscodingClientManager()

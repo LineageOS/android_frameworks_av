@@ -64,7 +64,7 @@ private:
 
     mutable std::mutex mServiceLock;
 
-    sp<TranscodingClientManager> mTranscodingClientManager;
+    TranscodingClientManager& mTranscodingClientManager;
 };
 
 }  // namespace android

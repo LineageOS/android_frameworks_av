@@ -45,7 +45,7 @@ class MediaTranscodingService;
  * TODO(hkuang): Hook up with ResourceManager for resource management.
  * TODO(hkuang): Hook up with MediaMetrics to log all the transactions.
  */
-class TranscodingClientManager : public RefBase {
+class TranscodingClientManager {
    public:
     virtual ~TranscodingClientManager();
 
@@ -115,7 +115,7 @@ class TranscodingClientManager : public RefBase {
     friend class TranscodingClientManagerTest;
 
     /** Get the singleton instance of the TranscodingClientManager. */
-    static sp<TranscodingClientManager> getInstance();
+    static TranscodingClientManager& getInstance();
 
     TranscodingClientManager();
 
