@@ -102,7 +102,7 @@ public class EncoderTest {
     }
 
     @Test(timeout = PER_TEST_TIMEOUT_MS)
-    public void sampleEncoderTest() throws Exception {
+    public void testEncoder() throws Exception {
         int status;
         int frameSize;
         //Parameters for video
