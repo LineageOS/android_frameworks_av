@@ -38,21 +38,6 @@ enum : uint32_t {
     SAMPLE_FLAG_PARTIAL_FRAME = 8,
 };
 
-// Check that the sample flags have the expected NDK meaning.
-namespace {
-#include <media/NdkMediaCodec.h>
-#include <media/NdkMediaExtractor.h>
-
-static_assert(SAMPLE_FLAG_SYNC_SAMPLE == AMEDIAEXTRACTOR_SAMPLE_FLAG_SYNC,
-              "Sample flag mismatch: SYNC_SAMPLE");
-static_assert(SAMPLE_FLAG_CODEC_CONFIG == AMEDIACODEC_BUFFER_FLAG_CODEC_CONFIG,
-              "Sample flag mismatch: CODEC_CONFIG");
-static_assert(SAMPLE_FLAG_END_OF_STREAM == AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM,
-              "Sample flag mismatch: END_OF_STREAM");
-static_assert(SAMPLE_FLAG_PARTIAL_FRAME == AMEDIACODEC_BUFFER_FLAG_PARTIAL_FRAME,
-              "Sample flag mismatch: PARTIAL_FRAME");
-}  // anonymous namespace
-
 /**
  * MediaSampleInfo is an object that carries information about a compressed media sample without
  * holding any sample data.
