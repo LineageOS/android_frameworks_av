@@ -5,7 +5,6 @@ cc_test {
     cflags: ["-Wall", "-Werror"],
     shared_libs: ["libaaudio"],
     header_libs: ["libaaudio_example_utils"],
-    pack_relocations: false,
 }
 
 cc_test {
@@ -15,5 +14,4 @@ cc_test {
     cflags: ["-Wall", "-Werror"],
     shared_libs: ["libaaudio"],
     header_libs: ["libaaudio_example_utils"],
-    pack_relocations: false,
 }
