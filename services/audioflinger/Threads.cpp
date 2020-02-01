@@ -6109,6 +6109,7 @@ void AudioFlinger::DirectOutputThread::flushHw_l()
     mHwPaused = false;
     mFlushPending = false;
     mTimestampVerifier.discontinuity(); // DIRECT and OFFLOADED flush resets frame count.
+    mTimestamp.clear();
 }
 
 int64_t AudioFlinger::DirectOutputThread::computeWaitTimeNs_l() const {
