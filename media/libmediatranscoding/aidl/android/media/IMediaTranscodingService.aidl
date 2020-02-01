@@ -75,6 +75,11 @@ interface IMediaTranscodingService {
     boolean unregisterClient(in int clientId);
 
     /**
+    * Returns the number of clients. This is used for debugging.
+    */
+    int getNumOfClients();
+
+    /**
      * Submits a transcoding request to MediaTranscodingService.
      *
      * @param clientId assigned Id of the client.

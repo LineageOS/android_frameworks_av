@@ -5,8 +5,11 @@ cc_library_shared {
     srcs: ["MediaTranscodingService.cpp"],
 
     shared_libs: [
+        "libbase",
         "libbinder_ndk",
         "liblog",
+        "libmediatranscoding",
+        "libutils",
     ],
 
     static_libs: [
@@ -27,11 +30,13 @@ cc_binary {
     ],
 
     shared_libs: [
+        "libbase",
         // TODO(hkuang): Use libbinder_ndk
         "libbinder",
         "libutils",
         "liblog",
         "libbase",
+        "libmediatranscoding",
         "libmediatranscodingservice",
     ],
 
