@@ -6679,6 +6679,12 @@ static bool BetterSniffMPEG4(DataSourceHelper *source, float *confidence) {
                 // The smallest valid chunk is 16 bytes long in this case.
                 return false;
             }
+            if (chunkSize > INT64_MAX) {
+                // reject overly large chunk sizes that could
+                // be interpreted as negative
+                ALOGE("chunk size too large");
+                return false;
+            }
 
         } else if (chunkSize < 8) {
             // The smallest valid chunk is 8 bytes long.
@@ -6734,7 +6740,10 @@ static bool BetterSniffMPEG4(DataSourceHelper *source, float *confidence) {
 
             case FOURCC("moov"):
             {
-                moovAtomEndOffset = offset + chunkSize;
+                if (__builtin_add_overflow(offset, chunkSize, &moovAtomEndOffset)) {
+                    ALOGE("chunk size + offset would overflow");
+                    return false;
+                }
 
                 done = true;
                 break;
@@ -6744,7 +6753,10 @@ static bool BetterSniffMPEG4(DataSourceHelper *source, float *confidence) {
                 break;
         }
 
-        offset += chunkSize;
+        if (__builtin_add_overflow(offset, chunkSize, &offset)) {
+            ALOGE("chunk size + offset would overflow");
+            return false;
+        }
     }
 
     if (!foundGoodFileType) {

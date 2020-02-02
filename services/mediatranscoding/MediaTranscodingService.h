@@ -19,6 +19,7 @@
 
 #include <aidl/android/media/BnMediaTranscodingService.h>
 #include <binder/IServiceManager.h>
+#include <media/TranscodingClientManager.h>
 
 namespace android {
 
@@ -30,6 +31,9 @@ using ::aidl::android::media::TranscodingRequestParcel;
 
 class MediaTranscodingService : public BnMediaTranscodingService {
 public:
+    static constexpr int32_t kInvalidJobId = -1;
+    static constexpr int32_t kInvalidClientId = -1;
+
     MediaTranscodingService();
     virtual ~MediaTranscodingService();
 
@@ -43,6 +47,8 @@ public:
 
     Status unregisterClient(int32_t clientId, bool* _aidl_return) override;
 
+    Status getNumOfClients(int32_t* _aidl_return) override;
+
     Status submitRequest(int32_t in_clientId, const TranscodingRequestParcel& in_request,
                          TranscodingJobParcel* out_job, int32_t* _aidl_return) override;
 
@@ -54,6 +60,11 @@ public:
     virtual inline binder_status_t dump(int /*fd*/, const char** /*args*/, uint32_t /*numArgs*/);
 
 private:
+    friend class MediaTranscodingServiceTest;
+
+    mutable std::mutex mServiceLock;
+
+    TranscodingClientManager& mTranscodingClientManager;
 };
 
 }  // namespace android

@@ -45,11 +45,7 @@ class MediaTranscodingService;
  * TODO(hkuang): Hook up with ResourceManager for resource management.
  * TODO(hkuang): Hook up with MediaMetrics to log all the transactions.
  */
-class TranscodingClientManager : public RefBase {
-   private:
-    // Forward declare it as it will be used in ClientInfo below.
-    class DeathNotifier;
-
+class TranscodingClientManager {
    public:
     virtual ~TranscodingClientManager();
 
@@ -67,8 +63,6 @@ class TranscodingClientManager : public RefBase {
         int32_t mClientUid;
         /* Package name of the client. */
         std::string mClientOpPackageName;
-        /* Listener for the death of the client. */
-        sp<DeathNotifier> mDeathNotifier;
 
         ClientInfo(const std::shared_ptr<ITranscodingServiceClient>& client, int64_t clientId,
                    int32_t pid, int32_t uid, const std::string& opPackageName)
@@ -76,8 +70,7 @@ class TranscodingClientManager : public RefBase {
               mClientId(clientId),
               mClientPid(pid),
               mClientUid(uid),
-              mClientOpPackageName(opPackageName),
-              mDeathNotifier(nullptr) {}
+              mClientOpPackageName(opPackageName) {}
     };
 
     /**
@@ -121,26 +114,17 @@ class TranscodingClientManager : public RefBase {
     friend class MediaTranscodingService;
     friend class TranscodingClientManagerTest;
 
-    class DeathNotifier : public RefBase {
-       public:
-        DeathNotifier() = default;
-
-        ~DeathNotifier() = default;
-
-        // Implement death recipient
-        static void BinderDiedCallback(void* cookie);
-    };
-
     /** Get the singleton instance of the TranscodingClientManager. */
-    static sp<TranscodingClientManager> getInstance();
+    static TranscodingClientManager& getInstance();
 
     TranscodingClientManager();
+
+    static void BinderDiedCallback(void* cookie);
 
     mutable std::mutex mLock;
     std::unordered_map<int32_t, std::unique_ptr<ClientInfo>> mClientIdToClientInfoMap
             GUARDED_BY(mLock);
 
-    std::vector<sp<DeathNotifier>> mDeathNotifiers GUARDED_BY(mLock);
     ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
 };
 
