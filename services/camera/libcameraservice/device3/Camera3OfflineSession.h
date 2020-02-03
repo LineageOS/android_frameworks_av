@@ -142,13 +142,14 @@ class Camera3OfflineSession :
     /**
      * CameraOfflineSessionBase interface
      */
-    const String8& getId() const override;
-
     status_t disconnect() override;
-
     status_t dump(int fd) override;
 
-    // methods for capture result passing
+    /**
+     * FrameProducer interface
+     */
+    const String8& getId() const override;
+    const CameraMetadata& info() const override;
     status_t waitForNextFrame(nsecs_t timeout) override;
     status_t getNextResult(CaptureResult *frame) override;
 

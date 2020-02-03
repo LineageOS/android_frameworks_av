@@ -101,6 +101,8 @@ private:
 
     sp<CameraOfflineSessionBase> mOfflineSession;
 
+    sp<camera2::FrameProcessorBase> mFrameProcessor;
+
     // Offline composite stream map, output surface -> composite stream
     KeyedVector<sp<IBinder>, sp<CompositeStream>> mCompositeStreamMap;
 };
