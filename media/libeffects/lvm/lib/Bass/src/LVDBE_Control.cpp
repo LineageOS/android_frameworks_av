@@ -131,8 +131,7 @@ void    LVDBE_SetFilters(LVDBE_Instance_t     *pInstance,
                  sizeof(pInstance->pData->HPFTaps)/sizeof(LVM_INT16));   /* Number of words */
 #else
     LoadConst_Float(0,                                          /* Clear the history, value 0 */
-                   (LVM_FLOAT *)&pInstance->pData->HPFTaps,     /* Destination Cast to void: \
-                                                                  no dereferencing in function*/
+                   (LVM_FLOAT *)&pInstance->pData->HPFTaps,     /* Destination */
                     sizeof(pInstance->pData->HPFTaps) / sizeof(LVM_FLOAT)); /* Number of words */
 #endif
 #ifndef BUILD_FLOAT
@@ -156,8 +155,7 @@ void    LVDBE_SetFilters(LVDBE_Instance_t     *pInstance,
                  sizeof(pInstance->pData->BPFTaps)/sizeof(LVM_INT16));   /* Number of words */
 #else
     LoadConst_Float(0,                                           /* Clear the history, value 0 */
-                 (LVM_FLOAT *)&pInstance->pData->BPFTaps,        /* Destination Cast to void: \
-                                                                    no dereferencing in function*/
+                 (LVM_FLOAT *)&pInstance->pData->BPFTaps,        /* Destination */
                  sizeof(pInstance->pData->BPFTaps) / sizeof(LVM_FLOAT));   /* Number of words */
 #endif
 #ifndef BUILD_FLOAT
