@@ -32,7 +32,7 @@ namespace android {
 
 static const size_t kMaxMetadataSize = 3 * 1024 * 1024;
 
-struct MemorySource : public DataSourceBase {
+struct ID3::MemorySource : public DataSourceBase {
     MemorySource(const uint8_t *data, size_t size)
         : mData(data),
           mSize(size) {
@@ -58,7 +58,7 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(MemorySource);
 };
 
-class DataSourceUnwrapper : public DataSourceBase {
+class ID3::DataSourceUnwrapper : public DataSourceBase {
 
 public:
     explicit DataSourceUnwrapper(DataSourceHelper *sourcehelper) {

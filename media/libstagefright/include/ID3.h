@@ -77,6 +77,8 @@ struct ID3 {
     size_t rawSize() const { return mRawSize; }
 
 private:
+    class DataSourceUnwrapper;
+    struct MemorySource;
     bool mIsValid;
     uint8_t *mData;
     size_t mSize;
