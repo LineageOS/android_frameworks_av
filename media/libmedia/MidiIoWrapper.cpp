@@ -49,7 +49,7 @@ MidiIoWrapper::MidiIoWrapper(int fd, off64_t offset, int64_t size) {
     mDataSource = nullptr;
 }
 
-class DataSourceUnwrapper {
+class MidiIoWrapper::DataSourceUnwrapper {
 
 public:
     explicit DataSourceUnwrapper(CDataSource *csource) {
