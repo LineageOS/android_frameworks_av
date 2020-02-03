@@ -22,7 +22,6 @@
 namespace android {
 
 struct CDataSource;
-class DataSourceUnwrapper;
 
 class MidiIoWrapper {
 public:
@@ -41,6 +40,7 @@ private:
     int mFd;
     off64_t mBase;
     int64_t  mLength;
+    class DataSourceUnwrapper;
     DataSourceUnwrapper *mDataSource;
     EAS_FILE mEasFile;
 };
