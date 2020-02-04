@@ -21,3 +21,6 @@ echo "========================================"
 
 echo "testing TranscodingClientManager"
 adb shell /data/nativetest64/TranscodingClientManager_tests/TranscodingClientManager_tests
+
+echo "testing AdjustableMaxPriorityQueue"
+adb shell /data/nativetest64/AdjustableMaxPriorityQueue_tests/AdjustableMaxPriorityQueue_tests
