@@ -167,7 +167,9 @@ status_t Camera3OfflineSession::disconnectImpl() {
         streams.push_back(mInputStream);
     }
 
-    mSession->close();
+    if (mSession != nullptr) {
+        mSession->close();
+    }
 
     FlushInflightReqStates states {
         mId, mOfflineReqsLock, mOfflineReqs, mUseHalBufManager,
@@ -459,6 +461,10 @@ std::vector<sp<Camera3StreamInterface>> Camera3OfflineSession::getAllStreams() {
         ret.push_back(mOutputStreams[i]);
     }
     return ret;
+}
+
+const CameraMetadata& Camera3OfflineSession::info() const {
+    return mDeviceInfo;
 }
 
 }; // namespace android

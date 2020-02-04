@@ -814,7 +814,7 @@ status_t Camera3Device::dump(int fd, const Vector<String16> &args) {
     return OK;
 }
 
-const CameraMetadata& Camera3Device::info(const String8& physicalId) const {
+const CameraMetadata& Camera3Device::infoPhysical(const String8& physicalId) const {
     ALOGVV("%s: E", __FUNCTION__);
     if (CC_UNLIKELY(mStatus == STATUS_UNINITIALIZED ||
                     mStatus == STATUS_ERROR)) {
@@ -837,7 +837,7 @@ const CameraMetadata& Camera3Device::info(const String8& physicalId) const {
 
 const CameraMetadata& Camera3Device::info() const {
     String8 emptyId;
-    return info(emptyId);
+    return infoPhysical(emptyId);
 }
 
 status_t Camera3Device::checkStatusOkToCaptureLocked() {

@@ -22,6 +22,7 @@
 #include <utils/Timers.h>
 
 #include "camera/CaptureResult.h"
+#include "FrameProducer.h"
 
 namespace android {
 
@@ -54,26 +55,16 @@ class NotificationListener : public virtual RefBase {
     virtual ~NotificationListener() {}
 };
 
-class CameraOfflineSessionBase : public virtual RefBase {
+class CameraOfflineSessionBase : public virtual FrameProducer {
   public:
     virtual ~CameraOfflineSessionBase();
 
     virtual status_t initialize(
             wp<NotificationListener> listener) = 0;
 
-    // The session's original camera ID
-    virtual const String8& getId() const = 0;
-
     virtual status_t disconnect() = 0;
 
     virtual status_t dump(int fd) = 0;
-
-    /**
-     * Capture result passing
-     */
-    virtual status_t waitForNextFrame(nsecs_t timeout) = 0;
-
-    virtual status_t getNextResult(CaptureResult *frame) = 0;
 
     // TODO: notification passing path
 }; // class CameraOfflineSessionBase
