@@ -125,8 +125,7 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
         }
         return volumeGroup;
     };
-    auto addSupportedStreamAttributes = [](auto &group, auto &volumeGroup, auto &strategy) {
-        volumeGroup->addSupportedStream(group.stream);
+    auto addSupportedAttributesToGroup = [](auto &group, auto &volumeGroup, auto &strategy) {
         for (const auto &attr : group.attributesVect) {
             strategy->addAttributes({group.stream, volumeGroup->getId(), attr});
             volumeGroup->addSupportedAttributes(attr);
@@ -166,18 +165,21 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
             const auto &iter = std::find_if(begin(mVolumeGroups), end(mVolumeGroups),
                                          [&group](const auto &volumeGroup) {
                     return group.volumeGroup == volumeGroup.second->getName(); });
-            if (group.stream != AUDIO_STREAM_DEFAULT) {
-                if (iter == end(mVolumeGroups)) {
-                    ALOGW("%s: No configuration of %s found, using default volume configuration"
-                            , __FUNCTION__, group.volumeGroup.c_str());
-                    defaultVolumeConfig.name = group.volumeGroup;
-                    sp<VolumeGroup> volumeGroup =
-                            loadVolumeConfig(mVolumeGroups, defaultVolumeConfig);
-                    addSupportedStreamAttributes(group, volumeGroup, strategy);
-                } else {
-                    addSupportedStreamAttributes(group, iter->second, strategy);
-                }
+            sp<VolumeGroup> volumeGroup = nullptr;
+            // If no volume group provided for this strategy, creates a new one using
+            // Music Volume Group configuration (considered as the default)
+            if (iter == end(mVolumeGroups)) {
+                ALOGW("%s: No configuration of %s found, using default volume configuration"
+                        , __FUNCTION__, group.volumeGroup.c_str());
+                defaultVolumeConfig.name = group.volumeGroup;
+                volumeGroup = loadVolumeConfig(mVolumeGroups, defaultVolumeConfig);
+            } else {
+                volumeGroup = iter->second;
             }
+            if (group.stream != AUDIO_STREAM_DEFAULT) {
+                volumeGroup->addSupportedStream(group.stream);
+            }
+            addSupportedAttributesToGroup(group, volumeGroup, strategy);
         }
         product_strategy_t strategyId = strategy->getId();
         mProductStrategies[strategyId] = strategy;
