@@ -1030,6 +1030,10 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_delete(AAudioStreamBuilder* buil
  *
  * After this call, the stream will be in {@link #AAUDIO_STREAM_STATE_CLOSING}
  *
+ * This function is useful if you want to release the audio resources immediately,
+ * but still allow queries to the stream to occur from other threads. This often
+ * happens if you are monitoring stream progress from a UI thread.
+ *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return {@link #AAUDIO_OK} or a negative error.
  */
