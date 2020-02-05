@@ -82,10 +82,10 @@ bool TimeCheck::TimeCheckThread::threadLoop()
         if (waitTimeNs > 0) {
             status = mCond.waitRelative(mMutex, waitTimeNs);
         }
-    }
-    if (status != NO_ERROR) {
-        LOG_EVENT_STRING(LOGTAG_AUDIO_BINDER_TIMEOUT, tag);
-        LOG_ALWAYS_FATAL("TimeCheck timeout for %s", tag);
+        if (status != NO_ERROR) {
+            LOG_EVENT_STRING(LOGTAG_AUDIO_BINDER_TIMEOUT, tag);
+            LOG_ALWAYS_FATAL("TimeCheck timeout for %s", tag);
+        }
     }
     return true;
 }
