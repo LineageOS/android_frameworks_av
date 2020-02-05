@@ -23,8 +23,10 @@
 #include <queue>
 #include <thread>
 
+#include "media/NdkImage.h"
 #include "BenchmarkCommon.h"
 #include "Stats.h"
+
 
 struct encParameter {
     int32_t bitrate = -1;
@@ -38,6 +40,7 @@ struct encParameter {
     int32_t frameRate = -1;
     int32_t profile = 0;
     int32_t level = 0;
+    int32_t colorFormat = AIMAGE_FORMAT_YUV_420_888;
 };
 
 class Encoder : public CallBackHandle {
