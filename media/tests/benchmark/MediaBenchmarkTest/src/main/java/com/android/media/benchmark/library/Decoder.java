@@ -134,7 +134,6 @@ public class Decoder {
                     mStats.addOutputTime();
                     onOutputAvailable(mediaCodec, outputBufferId, bufferInfo);
                     if (mSawOutputEOS) {
-                        Log.i(TAG, "Saw output EOS");
                         synchronized (mLock) { mLock.notify(); }
                     }
                 }
@@ -211,9 +210,6 @@ public class Decoder {
                     }
                     onOutputAvailable(mCodec, outputBufferId, outputBufferInfo);
                 }
-                if (outputBufferInfo.flags == MediaCodec.BUFFER_FLAG_END_OF_STREAM) {
-                    Log.i(TAG, "Saw output EOS");
-                }
             }
         }
         mInputBuffer.clear();
@@ -269,8 +265,8 @@ public class Decoder {
             BufferInfo bufInfo = mInputBufferInfo.get(mIndex);
             inputCodecBuffer.put(mInputBuffer.get(mIndex).array());
             mIndex++;
-            if (bufInfo.flags == MediaCodec.BUFFER_FLAG_END_OF_STREAM) {
-                mSawInputEOS = true;
+            mSawInputEOS = (bufInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0;
+            if (mSawInputEOS) {
                 Log.i(TAG, "Saw input EOS");
             }
             mStats.addFrameSize(bufInfo.size);
@@ -308,6 +304,9 @@ public class Decoder {
             }
         }
         mediaCodec.releaseOutputBuffer(outputBufferId, false);
-        mSawOutputEOS = (outputBufferInfo.flags == MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+        mSawOutputEOS = (outputBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0;
+        if (mSawOutputEOS) {
+            Log.i(TAG, "Saw output EOS");
+        }
     }
 }
