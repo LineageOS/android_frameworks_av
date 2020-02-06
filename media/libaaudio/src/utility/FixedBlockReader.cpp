@@ -39,7 +39,7 @@ int32_t FixedBlockReader::readFromStorage(uint8_t *buffer, int32_t numBytes) {
     if (bytesToRead > dataAvailable) {
         bytesToRead = dataAvailable;
     }
-    memcpy(buffer, mStorage + mPosition, bytesToRead);
+    memcpy(buffer, &mStorage[mPosition], bytesToRead);
     mPosition += bytesToRead;
     return bytesToRead;
 }
@@ -60,7 +60,7 @@ int32_t FixedBlockReader::processVariableBlock(uint8_t *buffer, int32_t numBytes
             bytesLeft -= mSize;
         } else {
             // Just need a partial block so we have to use storage.
-            result = mFixedBlockProcessor.onProcessFixedBlock(mStorage, mSize);
+            result = mFixedBlockProcessor.onProcessFixedBlock(mStorage.get(), mSize);
             mPosition = 0;
         }
     }
