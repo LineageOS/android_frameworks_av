@@ -88,7 +88,7 @@ public class ExtractorTest {
     }
 
     @Test
-    public void sampleExtractTest() throws IOException {
+    public void testExtractor() throws IOException {
         File inputFile = new File(mInputFilePath + mInputFileName);
         assertTrue("Cannot find " + mInputFileName + " in directory " + mInputFilePath,
                 inputFile.exists());
@@ -107,7 +107,7 @@ public class ExtractorTest {
     }
 
     @Test
-    public void sampleExtractNativeTest() throws IOException {
+    public void testNativeExtractor() throws IOException {
         Native nativeExtractor = new Native();
         File inputFile = new File(mInputFilePath + mInputFileName);
         assertTrue("Cannot find " + mInputFileName + " in directory " + mInputFilePath,
