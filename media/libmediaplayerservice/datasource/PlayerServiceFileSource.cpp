@@ -71,6 +71,9 @@ ssize_t PlayerServiceFileSource::readAt(off64_t offset, void *data, size_t size)
     Mutex::Autolock autoLock(mLock);
 
     if (mLength >= 0) {
+        if (offset < 0) {
+            return UNKNOWN_ERROR;
+        }
         if (offset >= mLength) {
             return 0;  // read beyond EOF.
         }
