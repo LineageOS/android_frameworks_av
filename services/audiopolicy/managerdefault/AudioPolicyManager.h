@@ -346,7 +346,7 @@ protected:
         }
         virtual const DeviceVector getAvailableOutputDevices() const
         {
-            return mAvailableOutputDevices;
+            return mAvailableOutputDevices.filterForEngine();
         }
         virtual const DeviceVector getAvailableInputDevices() const
         {
