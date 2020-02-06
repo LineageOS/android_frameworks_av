@@ -58,6 +58,8 @@ void DeathNotifier::binderDied() {
         return;
     }
     service->removeResource(mPid, mClientId, false);
+
+    service->overridePid(mPid, -1);
 }
 
 template <typename T>
@@ -150,6 +152,7 @@ binder_status_t ResourceManagerService::dump(
     PidResourceInfosMap mapCopy;
     bool supportsMultipleSecureCodecs;
     bool supportsSecureWithNonSecureCodec;
+    std::map<int, int> overridePidMapCopy;
     String8 serviceLog;
     {
         Mutex::Autolock lock(mLock);
@@ -157,6 +160,7 @@ binder_status_t ResourceManagerService::dump(
         supportsMultipleSecureCodecs = mSupportsMultipleSecureCodecs;
         supportsSecureWithNonSecureCodec = mSupportsSecureWithNonSecureCodec;
         serviceLog = mServiceLog->toString("    " /* linePrefix */);
+        overridePidMapCopy = mOverridePidMap;
     }
 
     const size_t SIZE = 256;
@@ -196,6 +200,12 @@ binder_status_t ResourceManagerService::dump(
                 result.append(buffer);
             }
         }
+    }
+    result.append("  Process Pid override:\n");
+    for (auto it = overridePidMapCopy.begin(); it != overridePidMapCopy.end(); ++it) {
+        snprintf(buffer, SIZE, "    Original Pid: %d,  Override Pid: %d\n",
+            it->first, it->second);
+        result.append(buffer);
     }
     result.append("  Events logs (most recent at top):\n");
     result.append(serviceLog);
@@ -608,6 +618,48 @@ Status ResourceManagerService::reclaimResource(
     return Status::ok();
 }
 
+Status ResourceManagerService::overridePid(
+        int originalPid,
+        int newPid) {
+    String8 log = String8::format("overridePid(originalPid %d, newPid %d)",
+            originalPid, newPid);
+    mServiceLog->add(log);
+
+    // allow if this is called from the same process or the process has
+    // permission.
+    if ((AIBinder_getCallingPid() != getpid()) &&
+        (checkCallingPermission(String16(
+             "android.permission.MEDIA_RESOURCE_OVERRIDE_PID")) == false)) {
+      ALOGE(
+          "Permission Denial: can't access overridePid method from pid=%d, "
+          "self pid=%d\n",
+          AIBinder_getCallingPid(), getpid());
+      return Status::fromServiceSpecificError(PERMISSION_DENIED);
+    }
+
+    {
+        Mutex::Autolock lock(mLock);
+        mOverridePidMap.erase(originalPid);
+        if (newPid != -1) {
+            mOverridePidMap.emplace(originalPid, newPid);
+        }
+    }
+
+    return Status::ok();
+}
+
+bool ResourceManagerService::getPriority_l(int pid, int* priority) {
+    int newPid = pid;
+
+    if (mOverridePidMap.find(pid) != mOverridePidMap.end()) {
+        newPid = mOverridePidMap[pid];
+        ALOGD("getPriority_l: use override pid %d instead original pid %d",
+                newPid, pid);
+    }
+
+    return mProcessInfo->getPriority(newPid, priority);
+}
+
 bool ResourceManagerService::getAllClients_l(
         int callingPid, MediaResource::Type type,
         Vector<std::shared_ptr<IResourceManagerClient>> *clients) {
@@ -641,7 +693,7 @@ bool ResourceManagerService::getLowestPriorityBiggestClient_l(
     int lowestPriorityPid;
     int lowestPriority;
     int callingPriority;
-    if (!mProcessInfo->getPriority(callingPid, &callingPriority)) {
+    if (!getPriority_l(callingPid, &callingPriority)) {
         ALOGE("getLowestPriorityBiggestClient_l: can't get process priority for pid %d",
                 callingPid);
         return false;
@@ -676,7 +728,7 @@ bool ResourceManagerService::getLowestPriorityPid_l(
         }
         int tempPid = mMap.keyAt(i);
         int tempPriority;
-        if (!mProcessInfo->getPriority(tempPid, &tempPriority)) {
+        if (!getPriority_l(tempPid, &tempPriority)) {
             ALOGV("getLowestPriorityPid_l: can't get priority of pid %d, skipped", tempPid);
             // TODO: remove this pid from mMap?
             continue;
@@ -696,12 +748,12 @@ bool ResourceManagerService::getLowestPriorityPid_l(
 
 bool ResourceManagerService::isCallingPriorityHigher_l(int callingPid, int pid) {
     int callingPidPriority;
-    if (!mProcessInfo->getPriority(callingPid, &callingPidPriority)) {
+    if (!getPriority_l(callingPid, &callingPidPriority)) {
         return false;
     }
 
     int priority;
-    if (!mProcessInfo->getPriority(pid, &priority)) {
+    if (!getPriority_l(pid, &priority)) {
         return false;
     }
 
