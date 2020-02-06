@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-apex {
+apex_test {
     name: "test_com.android.media",
     manifest: "test_manifest.json",
     file_contexts: ":com.android.media-file_contexts",
@@ -20,7 +20,7 @@ apex {
     installable: false,
 }
 
-apex {
+apex_test {
     name: "test_com.android.media.swcodec",
     manifest: "test_manifest_codec.json",
     file_contexts: ":com.android.media.swcodec-file_contexts",
