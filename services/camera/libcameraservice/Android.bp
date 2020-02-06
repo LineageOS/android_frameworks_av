@@ -129,6 +129,10 @@ cc_library_shared {
         "android.hardware.camera.device@3.6"
     ],
 
+    static_libs: [
+        "libbinderthreadstateutils",
+    ],
+
     export_shared_lib_headers: [
         "libbinder",
         "libcamera_client",
