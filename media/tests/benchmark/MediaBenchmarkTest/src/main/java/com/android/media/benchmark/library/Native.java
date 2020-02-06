@@ -27,6 +27,7 @@ public class Native {
     public native int Decode(String inputFilePath, String inputFileName, String statsFile,
             String codecName, boolean asyncMode);
 
-    public native int Encode(String inputFilePath, String inputFileName, String outputFilePath,
-            String statsFile, String codecName);
+    public native int Encode(String inputFilePath, String inputFileName, String statsFile,
+            String codecName, String mime, int bitRate, int colorFormat, int frameInterval,
+            int width, int height, int profile, int level, int sampleRate, int numChannel);
 }
