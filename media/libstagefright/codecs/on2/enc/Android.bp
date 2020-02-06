@@ -21,4 +21,5 @@ cc_library_shared {
     },
 
     shared_libs: ["libvpx"],
+    header_libs: ["libbase_headers"],
 }
