@@ -43,6 +43,7 @@
 #include <binder/PermissionController.h>
 #include <binder/ProcessInfoService.h>
 #include <binder/IResultReceiver.h>
+#include <binderthreadstate/CallerUtils.h>
 #include <cutils/atomic.h>
 #include <cutils/properties.h>
 #include <cutils/misc.h>
@@ -1029,7 +1030,7 @@ Status CameraService::validateClientPermissionsLocked(const String8& cameraId,
 
     // Only allow clients who are being used by the current foreground device user, unless calling
     // from our own process OR the caller is using the cameraserver's HIDL interface.
-    if (!hardware::IPCThreadState::self()->isServingCall() && callingPid != getpid() &&
+    if (getCurrentServingCall() != BinderCallType::HWBINDER && callingPid != getpid() &&
             (mAllowedUsers.find(clientUserId) == mAllowedUsers.end())) {
         ALOGE("CameraService::connect X (PID %d) rejected (cannot connect from "
                 "device user %d, currently allowed device users: %s)", callingPid, clientUserId,
@@ -1350,7 +1351,7 @@ bool CameraService::shouldRejectHiddenCameraConnection(const String8 & cameraId)
     // If the thread serving this call is not a hwbinder thread and the caller
     // isn't the cameraserver itself, and the camera id being requested is to be
     // publically hidden, we should reject the connection.
-    if (!hardware::IPCThreadState::self()->isServingCall() &&
+    if (getCurrentServingCall() != BinderCallType::HWBINDER &&
             CameraThreadState::getCallingPid() != getpid() &&
             isPublicallyHiddenSecureCamera(cameraId)) {
         return true;
@@ -1371,7 +1372,8 @@ Status CameraService::connectDevice(
     String8 id = String8(cameraId);
     sp<CameraDeviceClient> client = nullptr;
     String16 clientPackageNameAdj = clientPackageName;
-    if (hardware::IPCThreadState::self()->isServingCall()) {
+
+    if (getCurrentServingCall() == BinderCallType::HWBINDER) {
         std::string vendorClient =
                 StringPrintf("vendor.client.pid<%d>", CameraThreadState::getCallingPid());
         clientPackageNameAdj = String16(vendorClient.c_str());
@@ -2404,7 +2406,7 @@ CameraService::BasicClient::BasicClient(const sp<CameraService>& cameraService,
         }
         mClientPackageName = packages[0];
     }
-    if (!hardware::IPCThreadState::self()->isServingCall()) {
+    if (getCurrentServingCall() != BinderCallType::HWBINDER) {
         mAppOpsManager = std::make_unique<AppOpsManager>();
     }
 }
@@ -3027,7 +3029,7 @@ CameraService::DescriptorPtr CameraService::CameraClientManager::makeClientDescr
         const std::set<String8>& conflictingKeys, int32_t score, int32_t ownerId,
         int32_t state) {
 
-    bool isVendorClient = hardware::IPCThreadState::self()->isServingCall();
+    bool isVendorClient = getCurrentServingCall() == BinderCallType::HWBINDER;
     int32_t score_adj = isVendorClient ? kVendorClientScore : score;
     int32_t state_adj = isVendorClient ? kVendorClientState: state;
 

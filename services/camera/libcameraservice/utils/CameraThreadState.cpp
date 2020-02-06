@@ -17,33 +17,34 @@
 #include "CameraThreadState.h"
 #include <binder/IPCThreadState.h>
 #include <hwbinder/IPCThreadState.h>
+#include <binderthreadstate/CallerUtils.h>
 #include <unistd.h>
 
 namespace android {
 
 int CameraThreadState::getCallingUid() {
-    if (hardware::IPCThreadState::self()->isServingCall()) {
+    if (getCurrentServingCall() == BinderCallType::HWBINDER) {
         return hardware::IPCThreadState::self()->getCallingUid();
     }
     return IPCThreadState::self()->getCallingUid();
 }
 
 int CameraThreadState::getCallingPid() {
-    if (hardware::IPCThreadState::self()->isServingCall()) {
+    if (getCurrentServingCall() == BinderCallType::HWBINDER) {
         return hardware::IPCThreadState::self()->getCallingPid();
     }
     return IPCThreadState::self()->getCallingPid();
 }
 
 int64_t CameraThreadState::clearCallingIdentity() {
-    if (hardware::IPCThreadState::self()->isServingCall()) {
+    if (getCurrentServingCall() == BinderCallType::HWBINDER) {
         return hardware::IPCThreadState::self()->clearCallingIdentity();
     }
     return IPCThreadState::self()->clearCallingIdentity();
 }
 
 void CameraThreadState::restoreCallingIdentity(int64_t token) {
-    if (hardware::IPCThreadState::self()->isServingCall()) {
+    if (getCurrentServingCall() == BinderCallType::HWBINDER) {
         hardware::IPCThreadState::self()->restoreCallingIdentity(token);
     } else {
         IPCThreadState::self()->restoreCallingIdentity(token);
