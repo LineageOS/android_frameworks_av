@@ -625,7 +625,7 @@ status_t MPEG4Writer::addSource(const sp<MediaSource> &source) {
 
     CHECK(source.get() != NULL);
 
-    const char *mime;
+    const char *mime = NULL;
     sp<MetaData> meta = source->getFormat();
     meta->findCString(kKeyMIMEType, &mime);
 
