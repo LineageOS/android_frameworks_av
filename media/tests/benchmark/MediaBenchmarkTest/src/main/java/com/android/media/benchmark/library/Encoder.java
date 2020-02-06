@@ -260,12 +260,12 @@ public class Encoder {
         }
         mStats.addFrameSize(outputBuffer.remaining());
         mediaCodec.releaseOutputBuffer(outputBufferId, false);
-        mSawOutputEOS = (outputBufferInfo.flags == MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+        mSawOutputEOS = (outputBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0;
     }
 
     private void onInputAvailable(MediaCodec mediaCodec, int inputBufferId) throws IOException {
-        if (mSawOutputEOS || inputBufferId < 0) {
-            if (mSawOutputEOS) {
+        if (mSawInputEOS || inputBufferId < 0) {
+            if (mSawInputEOS) {
                 Log.i(TAG, "Saw input EOS");
             }
             return;

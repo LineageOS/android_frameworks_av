@@ -446,6 +446,32 @@ protected:
         expectEqResourceInfo(infos1.valueFor(getId(mTestClient1)), kTestUid1, mTestClient1, expected);
     }
 
+    void testOverridePid() {
+
+        bool result;
+        std::vector<MediaResourceParcel> resources;
+        resources.push_back(MediaResource(MediaResource::Type::kSecureCodec, 1));
+        resources.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 150));
+
+        // ### secure codec can't coexist and secure codec can coexist with non-secure codec ###
+        {
+            addResource();
+            mService->mSupportsMultipleSecureCodecs = false;
+            mService->mSupportsSecureWithNonSecureCodec = true;
+
+            // priority too low to reclaim resource
+            CHECK_STATUS_FALSE(mService->reclaimResource(kLowPriorityPid, resources, &result));
+
+            // override Low Priority Pid with High Priority Pid
+            mService->overridePid(kLowPriorityPid, kHighPriorityPid);
+            CHECK_STATUS_TRUE(mService->reclaimResource(kLowPriorityPid, resources, &result));
+
+            // restore Low Priority Pid
+            mService->overridePid(kLowPriorityPid, -1);
+            CHECK_STATUS_FALSE(mService->reclaimResource(kLowPriorityPid, resources, &result));
+        }
+    }
+
     void testRemoveClient() {
         addResource();
 
@@ -868,6 +894,10 @@ TEST_F(ResourceManagerServiceTest, testBatteryStats) {
 
 TEST_F(ResourceManagerServiceTest, testCpusetBoost) {
     testCpusetBoost();
+}
+
+TEST_F(ResourceManagerServiceTest, overridePid) {
+    testOverridePid();
 }
 
 } // namespace android

@@ -181,8 +181,8 @@ void Encoder::dumpStatistics(string inputReference, int64_t durationUs, string c
     mStats->dumpStatistics(operation, inputReference, durationUs, componentName, mode, statsFile);
 }
 
-int32_t Encoder::encode(string &codecName, ifstream &eleStream, size_t eleSize,
-                        bool asyncMode, encParameter encParams, char *mime) {
+int32_t Encoder::encode(string &codecName, ifstream &eleStream, size_t eleSize, bool asyncMode,
+                        encParameter encParams, char *mime) {
     ALOGV("In %s", __func__);
     mEleStream = &eleStream;
     mInputBufferSize = eleSize;
@@ -202,6 +202,7 @@ int32_t Encoder::encode(string &codecName, ifstream &eleStream, size_t eleSize,
             AMediaFormat_setInt32(mFormat, AMEDIAFORMAT_KEY_PROFILE, mParams.profile);
             AMediaFormat_setInt32(mFormat, AMEDIAFORMAT_KEY_LEVEL, mParams.level);
         }
+        AMediaFormat_setInt32(mFormat, AMEDIAFORMAT_KEY_COLOR_FORMAT, mParams.colorFormat);
     } else {
         AMediaFormat_setInt32(mFormat, AMEDIAFORMAT_KEY_SAMPLE_RATE, mParams.sampleRate);
         AMediaFormat_setInt32(mFormat, AMEDIAFORMAT_KEY_CHANNEL_COUNT, mParams.numChannels);

@@ -18,9 +18,9 @@
 #define LOG_TAG "NativeEncoder"
 
 #include <jni.h>
+#include <sys/stat.h>
 #include <fstream>
 #include <iostream>
-#include <sys/stat.h>
 
 #include <android/log.h>
 
@@ -28,6 +28,11 @@
 #include "Encoder.h"
 
 #include <stdio.h>
+
+constexpr int32_t ENCODE_DEFAULT_FRAME_RATE = 25;
+constexpr int32_t ENCODE_DEFAULT_AUDIO_BIT_RATE = 128000 /* 128 Kbps */;
+constexpr int32_t ENCODE_DEFAULT_BIT_RATE = 8000000 /* 8 Mbps */;
+constexpr int32_t ENCODE_MIN_BIT_RATE = 600000 /* 600 Kbps */;
 
 extern "C" JNIEXPORT int JNICALL Java_com_android_media_benchmark_library_Native_Encode(
         JNIEnv *env, jobject thiz, jstring jFilePath, jstring jFileName, jstring jOutFilePath,
@@ -72,7 +77,7 @@ extern "C" JNIEXPORT int JNICALL Java_com_android_media_benchmark_library_Native
             ALOGE("Track Format invalid");
             return -1;
         }
-        uint8_t *inputBuffer = (uint8_t *) malloc(fileSize);
+        uint8_t *inputBuffer = (uint8_t *)malloc(fileSize);
         if (!inputBuffer) {
             ALOGE("Insufficient memory");
             return -1;
@@ -110,6 +115,8 @@ extern "C" JNIEXPORT int JNICALL Java_com_android_media_benchmark_library_Native
             free(inputBuffer);
             return -1;
         }
+
+        AMediaFormat *decoderFormat = decoder->getFormat();
         AMediaFormat *format = extractor->getFormat();
         if (inputBuffer) {
             free(inputBuffer);
@@ -146,29 +153,34 @@ extern "C" JNIEXPORT int JNICALL Java_com_android_media_benchmark_library_Native
                 AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_FRAME_RATE, &encParams.frameRate);
                 AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_BIT_RATE, &encParams.bitrate);
                 if (encParams.bitrate <= 0 || encParams.frameRate <= 0) {
-                    encParams.frameRate = 25;
+                    encParams.frameRate = ENCODE_DEFAULT_FRAME_RATE;
                     if (!strcmp(mime, "video/3gpp") || !strcmp(mime, "video/mp4v-es")) {
-                        encParams.bitrate = 600000 /* 600 Kbps */;
+                        encParams.bitrate = ENCODE_MIN_BIT_RATE /* 600 Kbps */;
                     } else {
-                        encParams.bitrate = 8000000 /* 8 Mbps */;
+                        encParams.bitrate = ENCODE_DEFAULT_BIT_RATE /* 8 Mbps */;
                     }
                 }
                 AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_PROFILE, &encParams.profile);
                 AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_LEVEL, &encParams.level);
+                AMediaFormat_getInt32(decoderFormat, AMEDIAFORMAT_KEY_COLOR_FORMAT,
+                                      &encParams.colorFormat);
             } else {
                 AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_SAMPLE_RATE, &encParams.sampleRate);
                 AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_CHANNEL_COUNT,
                                       &encParams.numChannels);
-                encParams.bitrate =
-                        encParams.sampleRate * encParams.numChannels * 16 /* bitsPerSample */;
+                encParams.bitrate = ENCODE_DEFAULT_AUDIO_BIT_RATE;
             }
             Encoder *encoder = new Encoder();
             encoder->setupEncoder();
             status = encoder->encode(sCodecName, eleStream, eleSize, asyncMode[i], encParams,
-                                     (char *) mime);
+                                     (char *)mime);
+            if (status != AMEDIA_OK) {
+                ALOGE("Encoder returned error");
+                return -1;
+            }
+            ALOGV("Encoding complete with codec %s for asyncMode = %d", sCodecName.c_str(),
+                  asyncMode[i]);
             encoder->deInitCodec();
-            cout << "codec : " << codecName << endl;
-            ALOGV(" asyncMode = %d \n", asyncMode[i]);
             const char *statsFile = env->GetStringUTFChars(jStatsFile, nullptr);
             encoder->dumpStatistics(sInputReference, extractor->getClipDuration(), sCodecName,
                                     (asyncMode[i] ? "async" : "sync"), statsFile);
@@ -188,6 +200,10 @@ extern "C" JNIEXPORT int JNICALL Java_com_android_media_benchmark_library_Native
         if (format) {
             AMediaFormat_delete(format);
             format = nullptr;
+        }
+        if (decoderFormat) {
+            AMediaFormat_delete(decoderFormat);
+            decoderFormat = nullptr;
         }
         decoder->deInitCodec();
         decoder->resetDecoder();

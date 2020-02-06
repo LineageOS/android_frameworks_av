@@ -118,6 +118,10 @@ public:
             const std::vector<MediaResourceParcel>& resources,
             bool* _aidl_return) override;
 
+    Status overridePid(
+            int originalPid,
+            int newPid) override;
+
     Status removeResource(int pid, int64_t clientId, bool checkValid);
 
 private:
@@ -157,6 +161,9 @@ private:
     // Merge r2 into r1
     void mergeResources(MediaResourceParcel& r1, const MediaResourceParcel& r2);
 
+    // Get priority from process's pid
+    bool getPriority_l(int pid, int* priority);
+
     mutable Mutex mLock;
     sp<ProcessInfoInterface> mProcessInfo;
     sp<SystemCallbackInterface> mSystemCB;
@@ -166,6 +173,7 @@ private:
     bool mSupportsSecureWithNonSecureCodec;
     int32_t mCpuBoostCount;
     ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
+    std::map<int, int> mOverridePidMap;
 };
 
 // ----------------------------------------------------------------------------
