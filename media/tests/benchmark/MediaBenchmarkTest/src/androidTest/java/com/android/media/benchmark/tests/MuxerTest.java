@@ -110,7 +110,7 @@ public class MuxerTest {
     }
 
     @Test
-    public void sampleMuxerTest() throws IOException {
+    public void testMuxer() throws IOException {
         File inputFile = new File(mInputFilePath + mInputFileName);
         assertTrue("Cannot find " + mInputFileName + " in directory " + mInputFilePath,
                 inputFile.exists());
@@ -159,7 +159,7 @@ public class MuxerTest {
     }
 
     @Test
-    public void sampleMuxerNativeTest() {
+    public void testNativeMuxer() {
         Native nativeMuxer = new Native();
         File inputFile = new File(mInputFilePath + mInputFileName);
         assertTrue("Cannot find " + mInputFileName + " in directory " + mInputFilePath,
