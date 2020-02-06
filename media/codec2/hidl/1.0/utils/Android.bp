@@ -63,6 +63,7 @@ cc_library {
     ],
 
     header_libs: [
+        "libbinder_headers",
         "libsystem_headers",
         "libcodec2_internal", // private
     ],
