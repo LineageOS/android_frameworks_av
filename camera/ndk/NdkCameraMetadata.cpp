@@ -81,15 +81,16 @@ bool InitJni(JNIEnv* env) {
 }
 
 // Given cameraMetadata, an instance of android.hardware.camera2.CameraMetadata, invokes
-// cameraMetadata.getNativeMetadataPtr() and returns it as a CameraMetadata*.
-CameraMetadata* CameraMetadata_getNativeMetadataPtr(JNIEnv* env, jobject cameraMetadata) {
+// cameraMetadata.getNativeMetadataPtr() and returns it as a std::shared_ptr<CameraMetadata>*.
+std::shared_ptr<CameraMetadata>* CameraMetadata_getNativeMetadataPtr(JNIEnv* env,
+        jobject cameraMetadata) {
     if (cameraMetadata == nullptr) {
         ALOGE("%s: Invalid Java CameraMetadata object.", __FUNCTION__);
         return nullptr;
     }
     jlong ret = env->CallLongMethod(cameraMetadata,
                                     android_hardware_camera2_CameraMetadata_getNativeMetadataPtr);
-    return reinterpret_cast<CameraMetadata *>(ret);
+    return reinterpret_cast<std::shared_ptr<CameraMetadata>* >(ret);
 }
 
 }  // namespace
@@ -179,9 +180,8 @@ ACameraMetadata* ACameraMetadata_fromCameraMetadata(JNIEnv* env, jobject cameraM
         return nullptr;
     }
 
-    CameraMetadata* src = CameraMetadata_getNativeMetadataPtr(env,
-                                                              cameraMetadata);
-    ACameraMetadata* output = new ACameraMetadata(src, type);
+    auto sharedData = CameraMetadata_getNativeMetadataPtr(env, cameraMetadata);
+    ACameraMetadata* output = new ACameraMetadata(*sharedData, type);
     output->incStrong(/*id=*/(void*) ACameraMetadata_fromCameraMetadata);
     return output;
 }
