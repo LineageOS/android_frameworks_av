@@ -101,7 +101,7 @@ INSTANTIATE_TEST_SUITE_P(
                           make_tuple("bbb_44100hz_2ch_128kbps_mp3_30sec.mp3", "", false),
                           make_tuple("bbb_8000hz_1ch_8kbps_amrnb_30sec.3gp", "", false),
                           make_tuple("bbb_16000hz_1ch_9kbps_amrwb_30sec.3gp", "", false),
-                          make_tuple("bbb_44100hz_2ch_80kbps_vorbis_30sec.mp4", "", false),
+                          make_tuple("bbb_44100hz_2ch_80kbps_vorbis_30sec.webm", "", false),
                           make_tuple("bbb_44100hz_2ch_600kbps_flac_30sec.mp4", "", false),
                           make_tuple("bbb_48000hz_2ch_100kbps_opus_30sec.webm", "", false)));
 
@@ -111,7 +111,7 @@ INSTANTIATE_TEST_SUITE_P(
                           make_tuple("bbb_44100hz_2ch_128kbps_mp3_30sec.mp3", "", true),
                           make_tuple("bbb_8000hz_1ch_8kbps_amrnb_30sec.3gp", "", true),
                           make_tuple("bbb_16000hz_1ch_9kbps_amrwb_30sec.3gp", "", true),
-                          make_tuple("bbb_44100hz_2ch_80kbps_vorbis_30sec.mp4", "", true),
+                          make_tuple("bbb_44100hz_2ch_80kbps_vorbis_30sec.webm", "", true),
                           make_tuple("bbb_44100hz_2ch_600kbps_flac_30sec.mp4", "", true),
                           make_tuple("bbb_48000hz_2ch_100kbps_opus_30sec.webm", "", true)));
 
