@@ -130,13 +130,14 @@ DrmManagerService::DrmManagerService() :
         mDrmManager(NULL) {
     ALOGV("created");
     mDrmManager = new DrmManager();
+    mDrmManager->initMetricsLooper();
     mDrmManager->loadPlugIns();
 }
 
 DrmManagerService::~DrmManagerService() {
     ALOGV("Destroyed");
     mDrmManager->unloadPlugIns();
-    delete mDrmManager; mDrmManager = NULL;
+    mDrmManager = NULL;
 }
 
 int DrmManagerService::addUniqueId(bool isNative) {
