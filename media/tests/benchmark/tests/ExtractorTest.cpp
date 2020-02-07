@@ -69,7 +69,7 @@ INSTANTIATE_TEST_SUITE_P(ExtractorTestAll, ExtractorTest,
                                            make_pair("bbb_44100hz_2ch_600kbps_flac_5mins.flac", 0),
                                            make_pair("bbb_8000hz_1ch_8kbps_amrnb_5mins.3gp", 0),
                                            make_pair("bbb_16000hz_1ch_9kbps_amrwb_5mins.3gp", 0),
-                                           make_pair("bbb_44100hz_2ch_80kbps_vorbis_5mins.mp4", 0),
+                                           make_pair("bbb_44100hz_2ch_80kbps_vorbis_5mins.webm", 0),
                                            make_pair("bbb_48000hz_2ch_100kbps_opus_5mins.webm",
                                                      0)));
 

@@ -1263,10 +1263,12 @@ status_t CCodecBufferChannel::start(
         }
 
         if (oStreamFormat.value == C2BufferData::LINEAR) {
-            // WORKAROUND: if we're using early CSD workaround we convert to
-            //             array mode, to appease apps assuming the output
-            //             buffers to be of the same size.
-            output->buffers = output->buffers->toArrayMode(numOutputSlots);
+            if (buffersBoundToCodec) {
+                // WORKAROUND: if we're using early CSD workaround we convert to
+                //             array mode, to appease apps assuming the output
+                //             buffers to be of the same size.
+                output->buffers = output->buffers->toArrayMode(numOutputSlots);
+            }
 
             int32_t channelCount;
             int32_t sampleRate;

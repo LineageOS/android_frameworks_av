@@ -168,7 +168,6 @@ private:
                 ss << "(" << (offset == 0 ? "" : "~") << &timestring.time[offset]
                     << ") " << eptr->second;
                 if (++eptr == timeSequence.end()) {
-                    ss << "}";
                     break;
                 }
                 ss << ", ";
