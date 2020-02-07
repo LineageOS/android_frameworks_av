@@ -16,12 +16,11 @@ cc_defaults {
         "StreamHalHidl.cpp",
     ],
 
-    export_include_dirs: ["include"],
-
     cflags: [
         "-Wall",
         "-Wextra",
         "-Werror",
+        "-fvisibility=hidden",
     ],
     shared_libs: [
         "android.hardware.audio.common-util",
