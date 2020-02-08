@@ -70,8 +70,6 @@ cc_library_shared {
         "libutils",
     ],
 
-    tidy: false, // b/146435095, clang-tidy segmentation fault
-
     cflags: [
         "-Werror",
         "-Wall",
