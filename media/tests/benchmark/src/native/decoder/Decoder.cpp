@@ -63,8 +63,8 @@ void Decoder::onInputAvailable(AMediaCodec *mediaCodec, int32_t bufIdx) {
         ssize_t bytesRead = 0;
         uint32_t flag = 0;
         int64_t presentationTimeUs = 0;
-        tie(bytesRead, flag, presentationTimeUs) = readSampleData(
-                mInputBuffer, mOffset, mFrameMetaData, buf, mNumInputFrame, bufSize);
+        tie(bytesRead, flag, presentationTimeUs) =
+                readSampleData(mInputBuffer, mOffset, mFrameMetaData, buf, mNumInputFrame, bufSize);
         if (flag == AMEDIA_ERROR_MALFORMED) {
             mErrorCode = (media_status_t)flag;
             mSignalledError = true;
@@ -142,6 +142,11 @@ void Decoder::onError(AMediaCodec *mediaCodec, media_status_t err) {
 
 void Decoder::setupDecoder() {
     if (!mFormat) mFormat = mExtractor->getFormat();
+}
+
+AMediaFormat *Decoder::getFormat() {
+    ALOGV("In %s", __func__);
+    return AMediaCodec_getOutputFormat(mCodec);
 }
 
 int32_t Decoder::decode(uint8_t *inputBuffer, vector<AMediaCodecBufferInfo> &frameInfo,

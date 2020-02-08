@@ -78,7 +78,7 @@ public class DecoderTest {
                 {"bbb_44100hz_2ch_128kbps_mp3_30sec.mp3", false},
                 {"bbb_8000hz_1ch_8kbps_amrnb_30sec.3gp", false},
                 {"bbb_16000hz_1ch_9kbps_amrwb_30sec.3gp", false},
-                {"bbb_44100hz_2ch_80kbps_vorbis_30sec.mp4", false},
+                {"bbb_44100hz_2ch_80kbps_vorbis_30sec.webm", false},
                 {"bbb_44100hz_2ch_600kbps_flac_30sec.mp4", false},
                 {"bbb_48000hz_2ch_100kbps_opus_30sec.webm", false},
                 // Audio Async Test
@@ -86,7 +86,7 @@ public class DecoderTest {
                 {"bbb_44100hz_2ch_128kbps_mp3_30sec.mp3", true},
                 {"bbb_8000hz_1ch_8kbps_amrnb_30sec.3gp", true},
                 {"bbb_16000hz_1ch_9kbps_amrwb_30sec.3gp", true},
-                {"bbb_44100hz_2ch_80kbps_vorbis_30sec.mp4", true},
+                {"bbb_44100hz_2ch_80kbps_vorbis_30sec.webm", true},
                 {"bbb_44100hz_2ch_600kbps_flac_30sec.mp4", true},
                 {"bbb_48000hz_2ch_100kbps_opus_30sec.webm", true},
                 // Video Sync Test

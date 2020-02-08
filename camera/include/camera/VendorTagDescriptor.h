@@ -188,8 +188,8 @@ class VendorTagDescriptorCache : public Parcelable {
             sp<android::VendorTagDescriptor> *desc /*out*/);
 
     // Parcelable interface
-    status_t writeToParcel(Parcel* parcel) const override;
-    status_t readFromParcel(const Parcel* parcel) override;
+    status_t writeToParcel(android::Parcel* parcel) const override;
+    status_t readFromParcel(const android::Parcel* parcel) override;
 
     // Returns the number of vendor tags defined.
     int getTagCount(metadata_vendor_id_t id) const;

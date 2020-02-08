@@ -86,7 +86,7 @@ public class MuxerTest {
                 {"crowd_1920x1080_25fps_6700kbps_h264.ts", "3gpp"},
                 {"crowd_1920x1080_25fps_4000kbps_h265.mkv", "3gpp"},
                 {"bbb_48000hz_2ch_100kbps_opus_5mins.webm", "ogg"},
-                {"bbb_44100hz_2ch_80kbps_vorbis_5mins.mp4", "webm"},
+                {"bbb_44100hz_2ch_80kbps_vorbis_5mins.webm", "webm"},
                 {"bbb_48000hz_2ch_100kbps_opus_5mins.webm", "webm"},
                 {"bbb_44100hz_2ch_128kbps_aac_5mins.mp4", "mp4"},
                 {"bbb_8000hz_1ch_8kbps_amrnb_5mins.3gp", "mp4"},
@@ -110,7 +110,7 @@ public class MuxerTest {
     }
 
     @Test
-    public void sampleMuxerTest() throws IOException {
+    public void testMuxer() throws IOException {
         File inputFile = new File(mInputFilePath + mInputFileName);
         assertTrue("Cannot find " + mInputFileName + " in directory " + mInputFilePath,
                 inputFile.exists());
@@ -159,7 +159,7 @@ public class MuxerTest {
     }
 
     @Test
-    public void sampleMuxerNativeTest() {
+    public void testNativeMuxer() {
         Native nativeMuxer = new Native();
         File inputFile = new File(mInputFilePath + mInputFileName);
         assertTrue("Cannot find " + mInputFileName + " in directory " + mInputFilePath,

@@ -141,15 +141,6 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
         result = {std::make_unique<engineConfig::Config>(config),
                   static_cast<size_t>(ret == NO_ERROR ? 0 : 1)};
     }
-    // Append for internal use only strategies/volume groups (e.g. rerouting/patch)
-    result.parsedConfig->productStrategies.insert(
-                std::end(result.parsedConfig->productStrategies),
-                std::begin(gOrderedSystemStrategies), std::end(gOrderedSystemStrategies));
-
-    result.parsedConfig->volumeGroups.insert(
-                std::end(result.parsedConfig->volumeGroups),
-                std::begin(gSystemVolumeGroups), std::end(gSystemVolumeGroups));
-
     ALOGE_IF(result.nbSkippedElement != 0, "skipped %zu elements", result.nbSkippedElement);
 
     engineConfig::VolumeGroup defaultVolumeConfig;

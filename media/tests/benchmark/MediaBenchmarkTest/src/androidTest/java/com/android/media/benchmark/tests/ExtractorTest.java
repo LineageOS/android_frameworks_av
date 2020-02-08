@@ -70,7 +70,7 @@ public class ExtractorTest {
                 {"bbb_44100hz_2ch_600kbps_flac_5mins.flac", 0},
                 {"bbb_8000hz_1ch_8kbps_amrnb_5mins.3gp", 0},
                 {"bbb_16000hz_1ch_9kbps_amrwb_5mins.3gp", 0},
-                {"bbb_44100hz_2ch_80kbps_vorbis_5mins.mp4", 0},
+                {"bbb_44100hz_2ch_80kbps_vorbis_5mins.webm", 0},
                 {"bbb_48000hz_2ch_100kbps_opus_5mins.webm", 0}});
     }
 
@@ -88,7 +88,7 @@ public class ExtractorTest {
     }
 
     @Test
-    public void sampleExtractTest() throws IOException {
+    public void testExtractor() throws IOException {
         File inputFile = new File(mInputFilePath + mInputFileName);
         assertTrue("Cannot find " + mInputFileName + " in directory " + mInputFilePath,
                 inputFile.exists());
@@ -107,7 +107,7 @@ public class ExtractorTest {
     }
 
     @Test
-    public void sampleExtractNativeTest() throws IOException {
+    public void testNativeExtractor() throws IOException {
         Native nativeExtractor = new Native();
         File inputFile = new File(mInputFilePath + mInputFileName);
         assertTrue("Cannot find " + mInputFileName + " in directory " + mInputFilePath,
