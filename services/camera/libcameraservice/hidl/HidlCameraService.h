@@ -21,7 +21,7 @@
 #include <thread>
 
 #include <android/frameworks/cameraservice/common/2.0/types.h>
-#include <android/frameworks/cameraservice/service/2.0/ICameraService.h>
+#include <android/frameworks/cameraservice/service/2.1/ICameraService.h>
 #include <android/frameworks/cameraservice/service/2.0/types.h>
 #include <android/frameworks/cameraservice/device/2.0/types.h>
 
@@ -42,8 +42,9 @@ using hardware::Return;
 
 using HCameraDeviceCallback = frameworks::cameraservice::device::V2_0::ICameraDeviceCallback;
 using HCameraMetadata = frameworks::cameraservice::service::V2_0::CameraMetadata;
-using HCameraService = frameworks::cameraservice::service::V2_0::ICameraService;
+using HCameraService = frameworks::cameraservice::service::V2_1::ICameraService;
 using HCameraServiceListener = frameworks::cameraservice::service::V2_0::ICameraServiceListener;
+using HCameraServiceListener2_1 = frameworks::cameraservice::service::V2_1::ICameraServiceListener;
 using HStatus = frameworks::cameraservice::common::V2_0::Status;
 using HCameraStatusAndId = frameworks::cameraservice::service::V2_0::CameraStatusAndId;
 
@@ -66,6 +67,9 @@ struct HidlCameraService final : public HCameraService {
 
     Return<void> getCameraVendorTagSections(getCameraVendorTagSections_cb _hidl_cb) override;
 
+    Return<void> addListener_2_1(const sp<HCameraServiceListener2_1>& listener,
+                                 addListener_2_1_cb _hidl_cb) override;
+
     // This method should only be called by the cameraservers main thread to
     // instantiate the hidl cameraserver.
     static sp<HidlCameraService> getInstance(android::CameraService *cs);
@@ -75,6 +79,11 @@ private:
 
     sp<hardware::ICameraServiceListener> searchListenerCacheLocked(
         sp<HCameraServiceListener> listener, /*removeIfFound*/ bool shouldRemove = false);
+
+
+    template<class T>
+    HStatus addListenerInternal(const sp<T>& listener,
+                                std::vector<hardware::CameraStatus>* cameraStatusAndIds);
 
     void addToListenerCacheLocked(sp<HCameraServiceListener> hListener,
                                   sp<hardware::ICameraServiceListener> csListener);

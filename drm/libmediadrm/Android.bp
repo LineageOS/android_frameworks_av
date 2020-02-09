@@ -50,6 +50,7 @@ cc_library_shared {
         "android.hardware.drm@1.0",
         "android.hardware.drm@1.1",
         "android.hardware.drm@1.2",
+        "android.hardware.drm@1.3",
         "libhidlallocatorutils",
         "libhidlbase",
     ],
