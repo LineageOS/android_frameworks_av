@@ -31,8 +31,6 @@
 
 namespace android {
 
-using ::android::binder::Status;
-
 struct FrameDropper;
 class BufferItem;
 class IGraphicBufferProducer;
@@ -99,26 +97,26 @@ public:
     // This is called when component transitions to running state, which means
     // we can start handing it buffers.  If we already have buffers of data
     // sitting in the BufferQueue, this will send them to the codec.
-    Status start();
+    status_t start();
 
     // This is called when component transitions to stopped, indicating that
     // the codec is meant to return all buffers back to the client for them
     // to be freed. Do NOT submit any more buffers to the component.
-    Status stop();
+    status_t stop();
 
     // This is called when component transitions to released, indicating that
     // we are shutting down.
-    Status release();
+    status_t release();
 
     // A "codec buffer", i.e. a buffer that can be used to pass data into
     // the encoder, has been allocated.  (This call does not call back into
     // component.)
-    Status onInputBufferAdded(int32_t bufferId);
+    status_t onInputBufferAdded(int32_t bufferId);
 
     // Called when encoder is no longer using the buffer.  If we have a BQ
     // buffer available, fill it with a new frame of data; otherwise, just mark
     // it as available.
-    Status onInputBufferEmptied(int32_t bufferId, int fenceFd);
+    status_t onInputBufferEmptied(int32_t bufferId, int fenceFd);
 
     // IGraphicBufferSource interface
     // ------------------------------

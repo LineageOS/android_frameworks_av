@@ -160,12 +160,12 @@ struct InputSurfaceConnection::Impl : public ComponentWrapper {
             return false;
         }
         for (int32_t i = 0; i < kBufferCount; ++i) {
-            if (!mSource->onInputBufferAdded(i).isOk()) {
+            if (mSource->onInputBufferAdded(i) != OK) {
                 LOG(WARNING) << "Impl::init: failed to populate GBS slots.";
                 return false;
             }
         }
-        if (!mSource->start().isOk()) {
+        if (mSource->start() != OK) {
             LOG(WARNING) << "Impl::init -- GBS failed to start.";
             return false;
         }

@@ -65,15 +65,18 @@ private:
 }  // namespace
 
 Status OmxGraphicBufferSource::onOmxExecuting() {
-    return start();
+    status_t err = start();
+    return (OK == err) ? Status::ok() : Status::fromServiceSpecificError(err);
 }
 
 Status OmxGraphicBufferSource::onOmxIdle() {
-    return stop();
+    status_t err = stop();
+    return (OK == err) ? Status::ok() : Status::fromServiceSpecificError(err);
 }
 
 Status OmxGraphicBufferSource::onOmxLoaded(){
-    return release();
+    status_t err = release();
+    return (OK == err) ? Status::ok() : Status::fromServiceSpecificError(err);
 }
 
 status_t OmxGraphicBufferSource::configure(
