@@ -24,7 +24,6 @@
 #include "EffectHalHidl.h"
 #include "EffectsFactoryHalHidl.h"
 #include "HidlUtils.h"
-#include <libaudiohal/FactoryHalHidl.h>
 
 using ::android::hardware::audio::common::CPP_VERSION::implementation::HidlUtils;
 using ::android::hardware::Return;
@@ -162,8 +161,7 @@ status_t EffectsFactoryHalHidl::mirrorBuffer(void* external, size_t size,
 } // namespace CPP_VERSION
 } // namespace effect
 
-template<>
-sp<EffectsFactoryHalInterface> createFactoryHal<AudioHALVersion::CPP_VERSION>() {
+extern "C" __attribute__((visibility("default"))) void* createIEffectsFactory() {
     auto service = hardware::audio::effect::CPP_VERSION::IEffectsFactory::getService();
     return service ? new effect::CPP_VERSION::EffectsFactoryHalHidl(service) : nullptr;
 }
