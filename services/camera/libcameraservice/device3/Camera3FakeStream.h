@@ -98,6 +98,8 @@ class Camera3FakeStream :
             const std::vector<size_t> &removedSurfaceIds,
             KeyedVector<sp<Surface>, size_t> *outputMap/*out*/);
 
+    virtual status_t setBatchSize(size_t batchSize) override;
+
   protected:
 
     /**

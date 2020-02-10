@@ -913,6 +913,7 @@ status_t Camera3Device::convertMetadataListToRequestListLocked(
         for (auto& outputStream : (*firstRequest)->mOutputStreams) {
             if (outputStream->isVideoStream()) {
                 (*firstRequest)->mBatchSize = requestList->size();
+                outputStream->setBatchSize(requestList->size());
                 break;
             }
         }
