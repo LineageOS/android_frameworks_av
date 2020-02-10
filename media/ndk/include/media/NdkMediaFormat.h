@@ -296,6 +296,12 @@ extern const char* AMEDIAFORMAT_KEY_YEAR __INTRODUCED_IN(29);
 
 #if __ANDROID_API__ >= 30
 /**
+ * An optional key describing the low latency decoding mode. This is an optional parameter
+ * that applies only to decoders. If enabled, the decoder doesn't hold input and output
+ * data more than required by the codec standards.
+ * The associated value is an integer (0 or 1): 1 when low-latency decoding is enabled,
+ * 0 otherwise. The default value is 0.
+ *
  * Available since API level 30.
  */
 extern const char* AMEDIAFORMAT_KEY_LOW_LATENCY __INTRODUCED_IN(30);
