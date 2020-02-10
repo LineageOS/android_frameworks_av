@@ -29,7 +29,6 @@ cc_library {
         "android.hidl.token@1.0",
         "android.hidl.token@1.0-utils",
         "libbase",
-        "libbinderthreadstate",
         "libcutils",
         "libhidlbase",
         "libhidlmemory",
