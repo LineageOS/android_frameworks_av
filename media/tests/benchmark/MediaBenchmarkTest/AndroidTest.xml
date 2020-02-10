@@ -14,6 +14,12 @@
      limitations under the License.
 -->
 <configuration description="Runs Media Benchmark Tests">
+    <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
+        <option name="cleanup" value="true" />
+        <option name="push-file"
+            key="https://storage.googleapis.com/android_media/frameworks/av/media/tests/benchmark/MediaBenchmark.zip?unzip=true"
+            value="/data/local/tmp/MediaBenchmark/res/" />
+    </target_preparer>
     <target_preparer class="com.android.tradefed.targetprep.TestAppInstallSetup">
         <option name="cleanup-apks" value="false" />
         <option name="test-file-name" value="MediaBenchmarkTest.apk" />
