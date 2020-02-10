@@ -1,10 +1,14 @@
 {
   "postsubmit": [
     {
+      // TODO: move to presubmit once we verify the tests are not flaky
       "name": "CtsMediaTestCases",
       "options": [
         {
-          "include-annotation": "android.platform.test.annotations.RequiresDevice"
+          "include-annotation": "android.platform.test.annotations.Presubmit"
+        },
+        {
+          "exclude-annotation": "android.platform.test.annotations.RequiresDevice"
         }
       ]
     },
