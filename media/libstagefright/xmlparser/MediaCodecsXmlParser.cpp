@@ -493,7 +493,7 @@ MediaCodecsXmlParser::Impl::Parser::Parser(State *state, std::string path)
       mPath(path),
       mStatus(NO_INIT) {
     // determine href_base
-    std::string::size_type end = path.rfind("/");
+    std::string::size_type end = path.rfind('/');
     if (end != std::string::npos) {
         mHrefBase = path.substr(0, end + 1);
     }
