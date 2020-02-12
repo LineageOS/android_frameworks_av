@@ -75,16 +75,21 @@
 // followed by one or more characters in the range [a-zA-Z0-9_.].
 // Special symbols such as !@#$%^&*()[]{}<>,:;'"\/?|+-=~ are reserved.
 //
-// A property that ends with a ! will have duplicate values listed instead
+// Properties within this header should include special suffixes like '#'
+// directly in the string for brevity.  Code outside of this header should
+// use the macro constant for the special symbols for searchability.
+
+// Any property that ends with a # will have duplicate values listed instead
 // of suppressed in the Time Machine.
-//
+#define AMEDIAMETRICS_PROP_SUFFIX_CHAR_DUPLICATES_ALLOWED '#'
+
 #define AMEDIAMETRICS_PROP_AUXEFFECTID    "auxEffectId"    // int32 (AudioTrack)
 #define AMEDIAMETRICS_PROP_CHANNELCOUNT   "channelCount"   // int32
 #define AMEDIAMETRICS_PROP_CHANNELMASK    "channelMask"    // int32
 #define AMEDIAMETRICS_PROP_CONTENTTYPE    "contentType"    // string attributes (AudioTrack)
 #define AMEDIAMETRICS_PROP_DURATIONNS     "durationNs"     // int64 duration time span
 #define AMEDIAMETRICS_PROP_ENCODING       "encoding"       // string value of format
-#define AMEDIAMETRICS_PROP_EVENT          "event!"         // string value (often func name)
+#define AMEDIAMETRICS_PROP_EVENT          "event#"         // string value (often func name)
 
 // TODO: fix inconsistency in flags: AudioRecord / AudioTrack int32,  AudioThread string
 #define AMEDIAMETRICS_PROP_FLAGS          "flags"
