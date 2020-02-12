@@ -107,6 +107,14 @@ product_strategy_t EngineBase::getProductStrategyByName(const std::string &name)
 engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
 {
     auto loadVolumeConfig = [](auto &volumeGroups, auto &volumeConfig) {
+        // Ensure name unicity to prevent duplicate
+        const auto &iter = std::find_if(std::begin(volumeGroups), std::end(volumeGroups),
+                                     [&volumeConfig](const auto &volumeGroup) {
+                return volumeConfig.name == volumeGroup.second->getName(); });
+        LOG_ALWAYS_FATAL_IF(iter != std::end(volumeGroups),
+                            "group name %s defined twice, review the configuration",
+                            volumeConfig.name.c_str());
+
         sp<VolumeGroup> volumeGroup = new VolumeGroup(volumeConfig.name, volumeConfig.indexMin,
                                                       volumeConfig.indexMax);
         volumeGroups[volumeGroup->getId()] = volumeGroup;
@@ -131,6 +139,15 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
             volumeGroup->addSupportedAttributes(attr);
         }
     };
+    auto checkStreamForGroups = [](auto streamType, const auto &volumeGroups) {
+        const auto &iter = std::find_if(std::begin(volumeGroups), std::end(volumeGroups),
+                                     [&streamType](const auto &volumeGroup) {
+            const auto& streams = volumeGroup.second->getStreamTypes();
+            return std::find(std::begin(streams), std::end(streams), streamType) !=
+                    std::end(streams);
+        });
+        return iter != end(volumeGroups);
+    };
 
     auto result = engineConfig::parse();
     if (result.parsedConfig == nullptr) {
@@ -139,15 +156,17 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
         android::status_t ret = engineConfig::parseLegacyVolumes(config.volumeGroups);
         result = {std::make_unique<engineConfig::Config>(config),
                   static_cast<size_t>(ret == NO_ERROR ? 0 : 1)};
+    } else {
+        // Append for internal use only volume groups (e.g. rerouting/patch)
+        result.parsedConfig->volumeGroups.insert(
+                    std::end(result.parsedConfig->volumeGroups),
+                    std::begin(gSystemVolumeGroups), std::end(gSystemVolumeGroups));
     }
-    // Append for internal use only strategies/volume groups (e.g. rerouting/patch)
+    // Append for internal use only strategies (e.g. rerouting/patch)
     result.parsedConfig->productStrategies.insert(
                 std::end(result.parsedConfig->productStrategies),
                 std::begin(gOrderedSystemStrategies), std::end(gOrderedSystemStrategies));
 
-    result.parsedConfig->volumeGroups.insert(
-                std::end(result.parsedConfig->volumeGroups),
-                std::begin(gSystemVolumeGroups), std::end(gSystemVolumeGroups));
 
     ALOGE_IF(result.nbSkippedElement != 0, "skipped %zu elements", result.nbSkippedElement);
 
@@ -177,6 +196,10 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
                 volumeGroup = iter->second;
             }
             if (group.stream != AUDIO_STREAM_DEFAULT) {
+                // A legacy stream can be assigned once to a volume group
+                LOG_ALWAYS_FATAL_IF(checkStreamForGroups(group.stream, mVolumeGroups),
+                                    "stream %s already assigned to a volume group, "
+                                    "review the configuration", toString(group.stream).c_str());
                 volumeGroup->addSupportedStream(group.stream);
             }
             addSupportedAttributesToGroup(group, volumeGroup, strategy);
