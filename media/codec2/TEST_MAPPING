@@ -9,6 +9,10 @@
         },
         {
           "exclude-annotation": "android.platform.test.annotations.RequiresDevice"
+        },
+        // TODO: b/149314419
+        {
+          "exclude-filter": "android.media.cts.AudioPlaybackCaptureTest"
         }
       ]
     }
