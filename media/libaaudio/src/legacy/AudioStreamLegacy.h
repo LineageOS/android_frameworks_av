@@ -133,6 +133,7 @@ protected:
     MonotonicCounter           mTimestampPosition;
 
     FixedBlockAdapter         *mBlockAdapter = nullptr;
+    int32_t                    mBlockAdapterBytesPerFrame = 0;
     aaudio_wrapping_frames_t   mPositionWhenStarting = 0;
     int32_t                    mCallbackBufferSize = 0;
     const android::sp<StreamDeviceCallback>   mDeviceCallback;
