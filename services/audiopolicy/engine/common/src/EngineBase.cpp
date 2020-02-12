@@ -171,10 +171,14 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
     ALOGE_IF(result.nbSkippedElement != 0, "skipped %zu elements", result.nbSkippedElement);
 
     engineConfig::VolumeGroup defaultVolumeConfig;
+    engineConfig::VolumeGroup defaultSystemVolumeConfig;
     for (auto &volumeConfig : result.parsedConfig->volumeGroups) {
         // save default volume config for streams not defined in configuration
         if (volumeConfig.name.compare("AUDIO_STREAM_MUSIC") == 0) {
             defaultVolumeConfig = volumeConfig;
+        }
+        if (volumeConfig.name.compare("AUDIO_STREAM_PATCH") == 0) {
+            defaultSystemVolumeConfig = volumeConfig;
         }
         loadVolumeConfig(mVolumeGroups, volumeConfig);
     }
@@ -188,10 +192,16 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
             // If no volume group provided for this strategy, creates a new one using
             // Music Volume Group configuration (considered as the default)
             if (iter == end(mVolumeGroups)) {
+                engineConfig::VolumeGroup volumeConfig;
+                if (group.stream >= AUDIO_STREAM_PUBLIC_CNT) {
+                    volumeConfig = defaultSystemVolumeConfig;
+                } else {
+                    volumeConfig = defaultVolumeConfig;
+                }
                 ALOGW("%s: No configuration of %s found, using default volume configuration"
                         , __FUNCTION__, group.volumeGroup.c_str());
-                defaultVolumeConfig.name = group.volumeGroup;
-                volumeGroup = loadVolumeConfig(mVolumeGroups, defaultVolumeConfig);
+                volumeConfig.name = group.volumeGroup;
+                volumeGroup = loadVolumeConfig(mVolumeGroups, volumeConfig);
             } else {
                 volumeGroup = iter->second;
             }
