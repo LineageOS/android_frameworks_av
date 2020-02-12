@@ -28,33 +28,24 @@ using namespace android;
  * ACameraMetadata Implementation
  */
 ACameraMetadata::ACameraMetadata(camera_metadata_t* buffer, ACAMERA_METADATA_TYPE type) :
-        mData(new CameraMetadata(buffer)),
-        mOwnsData(true),
+        mData(std::make_shared<CameraMetadata>(buffer)),
         mType(type) {
     init();
 }
 
-ACameraMetadata::ACameraMetadata(CameraMetadata* cameraMetadata, ACAMERA_METADATA_TYPE type) :
+ACameraMetadata::ACameraMetadata(const std::shared_ptr<CameraMetadata>& cameraMetadata,
+        ACAMERA_METADATA_TYPE type) :
         mData(cameraMetadata),
-        mOwnsData(false),
         mType(type) {
     init();
 }
 
 ACameraMetadata::ACameraMetadata(const ACameraMetadata& other) :
-        mOwnsData(other.mOwnsData),
+        mData(std::make_shared<CameraMetadata>(*(other.mData))),
         mType(other.mType) {
-    if (other.mOwnsData) {
-        mData = new CameraMetadata(*(other.mData));
-    } else {
-        mData = other.mData;
-    }
 }
 
 ACameraMetadata::~ACameraMetadata() {
-    if (mOwnsData) {
-        delete mData;
-    }
 }
 
 void
@@ -373,7 +364,7 @@ ACameraMetadata::getConstEntry(uint32_t tag, ACameraMetadata_const_entry* entry)
 
     Mutex::Autolock _l(mLock);
 
-    camera_metadata_ro_entry rawEntry = static_cast<const CameraMetadata*>(mData)->find(tag);
+    camera_metadata_ro_entry rawEntry = static_cast<const CameraMetadata*>(mData.get())->find(tag);
     if (rawEntry.count == 0) {
         ALOGE("%s: cannot find metadata tag %d", __FUNCTION__, tag);
         return ACAMERA_ERROR_METADATA_NOT_FOUND;
