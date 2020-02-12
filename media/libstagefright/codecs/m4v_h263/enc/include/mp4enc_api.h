@@ -39,6 +39,16 @@ typedef uint32_t ULong;
 #define PV_TRUE  1
 #define PV_FALSE 0
 
+#ifndef OSCL_IMPORT_REF
+#define OSCL_IMPORT_REF /* empty */
+#endif
+#ifndef OSCL_EXPORT_REF
+#define OSCL_EXPORT_REF /* empty */
+#endif
+#ifndef OSCL_UNUSED_ARG
+#define OSCL_UNUSED_ARG(x) ((void)(x))
+#endif
+
 typedef enum
 {
     SHORT_HEADER,

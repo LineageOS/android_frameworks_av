@@ -32,7 +32,6 @@ cc_test {
     ],
 
     cflags: [
-        "-DOSCL_IMPORT_REF=",
         "-Werror",
         "-Wall",
     ],
