@@ -20,7 +20,6 @@
 #include "ScalarArithmetic.h"
 #include "Filter.h"
 
-
 /*-------------------------------------------------------------------------*/
 /* FUNCTION:                                                               */
 /*   LVM_Power10                                                           */
@@ -54,7 +53,6 @@
 /* RETURNS:                                                                */
 /*   The result of the 10x expansion in Q8.24 format                       */
 /*-------------------------------------------------------------------------*/
-#ifdef BUILD_FLOAT
 LVM_FLOAT LVM_Power10(LVM_FLOAT     X)
 {
     LVM_FLOAT Y,Coefficients[13]={0.999906f,
@@ -75,25 +73,3 @@ LVM_FLOAT LVM_Power10(LVM_FLOAT     X)
                      X);
     return Y;
 }
-#else
-LVM_INT32 LVM_Power10(LVM_INT32     X)
-{
-    LVM_INT32 Y,Coefficients[13]={  16775636,
-                                        77258249,
-                                       178024032,
-                                       273199333,
-                                       312906284,
-                                       288662365,
-                                       228913700,
-                                       149470921,
-                                        71094558,
-                                        37565524,
-                                        31223618,
-                                        12619311,
-                                     0};
-    Y=LVM_Polynomial((LVM_UINT16)11,
-                        Coefficients,
-                        X);
-    return Y;
-}
-#endif

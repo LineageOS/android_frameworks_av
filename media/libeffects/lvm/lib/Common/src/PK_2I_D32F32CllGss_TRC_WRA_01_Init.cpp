@@ -18,21 +18,3 @@
 #include "BIQUAD.h"
 #include "PK_2I_D32F32CllGss_TRC_WRA_01_Private.h"
 
-#ifndef BUILD_FLOAT
-void  PK_2I_D32F32CllGss_TRC_WRA_01_Init(Biquad_Instance_t         *pInstance,
-                                         Biquad_2I_Order2_Taps_t   *pTaps,
-                                         PK_C32_Coefs_t            *pCoef)
-{
-  PFilter_State pBiquadState = (PFilter_State) pInstance;
-  pBiquadState->pDelays       =(LVM_INT32 *) pTaps;
-
-  pBiquadState->coefs[0]=pCoef->A0;
-
-  pBiquadState->coefs[1]=pCoef->B2;
-
-  pBiquadState->coefs[2]=pCoef->B1;
-
-  pBiquadState->coefs[3]=pCoef->G;
-
-}
-#endif

@@ -25,7 +25,6 @@
 /**********************************************************************************
    FUNCTION LVC_MixSoft_2St_D16C31_SAT.c
 ***********************************************************************************/
-#ifdef BUILD_FLOAT
 void LVC_MixSoft_2St_D16C31_SAT(LVMixer3_2St_FLOAT_st *ptrInstance,
                                 const LVM_FLOAT       *src1,
                                 const LVM_FLOAT       *src2,
@@ -131,46 +130,4 @@ void LVC_MixSoft_2Mc_D16C31_SAT(LVMixer3_2St_FLOAT_st *ptrInstance,
 }
 #endif
 
-#else
-void LVC_MixSoft_2St_D16C31_SAT( LVMixer3_2St_st *ptrInstance,
-                                    const   LVM_INT16       *src1,
-                                            LVM_INT16       *src2,
-                                            LVM_INT16       *dst,
-                                            LVM_INT16       n)
-{
-    Mix_Private_st  *pInstance1=(Mix_Private_st *)(ptrInstance->MixerStream[0].PrivateParams);
-    Mix_Private_st  *pInstance2=(Mix_Private_st *)(ptrInstance->MixerStream[1].PrivateParams);
-
-    if(n<=0)    return;
-
-    /******************************************************************************
-       SOFT MIXING
-    *******************************************************************************/
-    if ((pInstance1->Current == pInstance1->Target)&&(pInstance1->Current == 0)){
-        LVC_MixSoft_1St_D16C31_SAT( (LVMixer3_1St_st *)(&ptrInstance->MixerStream[1]), src2, dst, n);
-    }
-    else if ((pInstance2->Current == pInstance2->Target)&&(pInstance2->Current == 0)){
-        LVC_MixSoft_1St_D16C31_SAT( (LVMixer3_1St_st *)(&ptrInstance->MixerStream[0]), src1, dst, n);
-    }
-    else if ((pInstance1->Current != pInstance1->Target) || (pInstance2->Current != pInstance2->Target))
-    {
-        LVC_MixSoft_1St_D16C31_SAT((LVMixer3_1St_st *)(&ptrInstance->MixerStream[0]), src1, dst, n);
-        LVC_MixInSoft_D16C31_SAT( (LVMixer3_1St_st *)(&ptrInstance->MixerStream[1]), src2, dst, n);
-    }
-    else{
-        /******************************************************************************
-           HARD MIXING
-        *******************************************************************************/
-        if(pInstance2->Shift!=0)
-            Shift_Sat_v16xv16 ((LVM_INT16)pInstance2->Shift,src2,src2,n);
-        if(pInstance1->Shift!=0)
-        {
-            Shift_Sat_v16xv16 ((LVM_INT16)pInstance1->Shift,src1,dst,n);
-            LVC_Core_MixHard_2St_D16C31_SAT( &ptrInstance->MixerStream[0], &ptrInstance->MixerStream[1], dst, src2, dst, n);
-        }
-        else
-            LVC_Core_MixHard_2St_D16C31_SAT( &ptrInstance->MixerStream[0], &ptrInstance->MixerStream[1], src1, src2, dst, n);
-    }
-}
-#endif /*BUILD_FLOAT*/
 /**********************************************************************************/

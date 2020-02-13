@@ -68,7 +68,6 @@ LVCS_ReturnStatus_en LVCS_Memory(LVCS_Handle_t          hInstance,
     LVM_UINT32          ScratchSize;
     LVCS_Instance_t     *pInstance = (LVCS_Instance_t *)hInstance;
 
-
     /*
      * Fill in the memory table
      */
@@ -98,13 +97,9 @@ LVCS_ReturnStatus_en LVCS_Memory(LVCS_Handle_t          hInstance,
         /*
          * Scratch memory
          */
-#ifdef BUILD_FLOAT
         /* Inplace processing */
         ScratchSize = (LVM_UINT32) \
                         (LVCS_SCRATCHBUFFERS * sizeof(LVM_FLOAT) * pCapabilities->MaxBlockSize);
-#else
-        ScratchSize = (LVM_UINT32)(LVCS_SCRATCHBUFFERS*sizeof(LVM_INT16)*pCapabilities->MaxBlockSize);     /* Inplace processing */
-#endif
         pMemoryTable->Region[LVCS_MEMREGION_TEMPORARY_FAST].Size         = ScratchSize;
         pMemoryTable->Region[LVCS_MEMREGION_TEMPORARY_FAST].Type         = LVCS_SCRATCH;
         pMemoryTable->Region[LVCS_MEMREGION_TEMPORARY_FAST].pBaseAddress = LVM_NULL;
@@ -117,7 +112,6 @@ LVCS_ReturnStatus_en LVCS_Memory(LVCS_Handle_t          hInstance,
 
     return(LVCS_SUCCESS);
 }
-
 
 /************************************************************************************/
 /*                                                                                  */
@@ -160,7 +154,6 @@ LVCS_ReturnStatus_en LVCS_Init(LVCS_Handle_t         *phInstance,
     LVCS_Instance_t                 *pInstance;
     LVCS_VolCorrect_t               *pLVCS_VolCorrectTable;
 
-
     /*
      * Set the instance handle if not already initialised
      */
@@ -169,7 +162,6 @@ LVCS_ReturnStatus_en LVCS_Init(LVCS_Handle_t         *phInstance,
         *phInstance = (LVCS_Handle_t)pMemoryTable->Region[LVCS_MEMREGION_PERSISTENT_SLOW_DATA].pBaseAddress;
     }
     pInstance =(LVCS_Instance_t  *)*phInstance;
-
 
     /*
      * Save the capabilities in the instance structure
@@ -180,7 +172,6 @@ LVCS_ReturnStatus_en LVCS_Init(LVCS_Handle_t         *phInstance,
      * Save the memory table in the instance structure
      */
     pInstance->MemoryTable = *pMemoryTable;
-
 
     /*
      * Set all initial parameters to invalid to force a full initialisation

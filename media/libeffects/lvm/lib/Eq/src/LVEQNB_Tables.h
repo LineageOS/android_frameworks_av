@@ -27,11 +27,7 @@
  * Sample rate table for converting between the enumerated type and the actual
  * frequency
  */
-#ifdef HIGHER_FS
 extern const LVM_UINT32    LVEQNB_SampleRateTab[];
-#else
-extern const LVM_UINT16    LVEQNB_SampleRateTab[];
-#endif
 
 /************************************************************************************/
 /*                                                                                  */

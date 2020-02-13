@@ -24,7 +24,6 @@
 /**********************************************************************************
    FUNCTION LoadConst_32
 ***********************************************************************************/
-#ifdef BUILD_FLOAT
 void LoadConst_Float(const LVM_FLOAT   val,
                      LVM_FLOAT  *dst,
                      LVM_INT16 n )
@@ -39,21 +38,5 @@ void LoadConst_Float(const LVM_FLOAT   val,
 
     return;
 }
-#else
-void LoadConst_32(const LVM_INT32   val,
-                        LVM_INT32  *dst,
-                        LVM_INT16 n )
-{
-    LVM_INT16 ii;
-
-    for (ii = n; ii != 0; ii--)
-    {
-        *dst = val;
-        dst++;
-    }
-
-    return;
-}
-#endif
 
 /**********************************************************************************/

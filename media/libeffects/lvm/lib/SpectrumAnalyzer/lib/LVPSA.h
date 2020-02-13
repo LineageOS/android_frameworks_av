@@ -18,10 +18,7 @@
 #ifndef _LVPSA_H_
 #define _LVPSA_H_
 
-
 #include "LVM_Types.h"
-
-
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -112,8 +109,6 @@ typedef enum
     LVPSA_ERROR_NULLADDRESS,                                /* A pointer has a NULL value                                        */
     LVPSA_RETURN_DUMMY = LVM_MAXINT_32                      /* Force 32 bits enum, don't use it!                                 */
 } LVPSA_RETURN;
-
-
 
 /*********************************************************************************************************************************
    FUNCTIONS PROTOTYPE
@@ -213,17 +208,10 @@ LVPSA_RETURN LVPSA_Control           ( pLVPSA_Handle_t             hInstance,
 /*  otherwise           Error due to bad parameters                                                                              */
 /*                                                                                                                               */
 /*********************************************************************************************************************************/
-#ifdef BUILD_FLOAT
 LVPSA_RETURN LVPSA_Process           ( pLVPSA_Handle_t      hInstance,
                                        LVM_FLOAT           *pLVPSA_InputSamples,
                                        LVM_UINT16           InputBlockSize,
                                        LVPSA_Time           AudioTime             );
-#else
-LVPSA_RETURN LVPSA_Process           ( pLVPSA_Handle_t      hInstance,
-                                       LVM_INT16           *pLVPSA_InputSamples,
-                                       LVM_UINT16           InputBlockSize,
-                                       LVPSA_Time           AudioTime             );
-#endif
 /*********************************************************************************************************************************/
 /*                                                                                                                               */
 /* FUNCTION:            LVPSA_GetSpectrum                                                                                        */
@@ -284,7 +272,5 @@ LVPSA_RETURN LVPSA_GetControlParams  (    pLVPSA_Handle_t            hInstance,
 /*********************************************************************************************************************************/
 LVPSA_RETURN LVPSA_GetInitParams     (    pLVPSA_Handle_t            hInstance,
                                           LVPSA_InitParams_t        *pParams      );
-
-
 
 #endif /* _LVPSA_H */

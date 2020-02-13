@@ -28,7 +28,6 @@ LVPSA_RETURN LVPSA_SetBPFiltersType (  LVPSA_InstancePr_t        *pInst,
 LVPSA_RETURN LVPSA_SetQPFCoefficients( LVPSA_InstancePr_t        *pInst,
                                        LVPSA_ControlParams_t      *pParams  );
 
-#ifdef BUILD_FLOAT
 LVPSA_RETURN LVPSA_BPSinglePrecCoefs(  LVM_UINT16             Fs,
                                        LVPSA_FilterParam_t   *pFilterParams,
                                        BP_FLOAT_Coefs_t        *pCoefficients);
@@ -36,26 +35,10 @@ LVPSA_RETURN LVPSA_BPSinglePrecCoefs(  LVM_UINT16             Fs,
 LVPSA_RETURN LVPSA_BPDoublePrecCoefs(  LVM_UINT16            Fs,
                                        LVPSA_FilterParam_t  *pFilterParams,
                                        BP_FLOAT_Coefs_t       *pCoefficients);
-#else
-LVPSA_RETURN LVPSA_BPSinglePrecCoefs(  LVM_UINT16             Fs,
-                                       LVPSA_FilterParam_t   *pFilterParams,
-                                       BP_C16_Coefs_t        *pCoefficients);
-
-LVPSA_RETURN LVPSA_BPDoublePrecCoefs(  LVM_UINT16            Fs,
-                                       LVPSA_FilterParam_t  *pFilterParams,
-                                       BP_C32_Coefs_t       *pCoefficients);
-
-LVPSA_RETURN LVPSA_BPDoublePrecCoefs(  LVM_UINT16              Fs,
-                                       LVPSA_FilterParam_t     *pFilterParams,
-                                       BP_C32_Coefs_t          *pCoefficients);
-#endif
 LVPSA_RETURN LVPSA_SetBPFCoefficients( LVPSA_InstancePr_t        *pInst,
                                        LVPSA_ControlParams_t      *pParams  );
 
 LVPSA_RETURN LVPSA_ClearFilterHistory( LVPSA_InstancePr_t        *pInst);
-
-
-
 
 /************************************************************************************/
 /*                                                                                  */
@@ -129,7 +112,6 @@ LVPSA_RETURN LVPSA_GetControlParams         (    pLVPSA_Handle_t            hIns
     return(LVPSA_OK);
 }
 
-
 /************************************************************************************/
 /*                                                                                  */
 /* FUNCTION:            LVPSA_GetInitParams                                         */
@@ -163,7 +145,6 @@ LVPSA_RETURN LVPSA_GetInitParams         (    pLVPSA_Handle_t            hInstan
     return(LVPSA_OK);
 }
 
-
 /************************************************************************************/
 /*                                                                                  */
 /* FUNCTION:            LVPSA_ApplyNewSettings                                      */
@@ -188,13 +169,8 @@ LVPSA_RETURN LVPSA_ApplyNewSettings (LVPSA_InstancePr_t     *pInst)
     LVM_UINT16 Freq;
     LVPSA_ControlParams_t   Params;
     extern LVM_INT16        LVPSA_nSamplesBufferUpdate[];
-#ifndef HIGHER_FS
-    extern LVM_UINT16       LVPSA_SampleRateTab[];
-#else
     extern LVM_UINT32       LVPSA_SampleRateTab[];
-#endif
     extern LVM_UINT16       LVPSA_DownSamplingFactor[];
-
 
     if(pInst == 0)
     {
@@ -280,11 +256,7 @@ LVPSA_RETURN LVPSA_ApplyNewSettings (LVPSA_InstancePr_t     *pInst)
 LVPSA_RETURN LVPSA_SetBPFiltersType (   LVPSA_InstancePr_t        *pInst,
                                         LVPSA_ControlParams_t      *pParams  )
 {
-#ifndef HIGHER_FS
-    extern LVM_UINT16   LVPSA_SampleRateTab[];                                            /* Sample rate table */
-#else
     extern LVM_UINT32   LVPSA_SampleRateTab[];                 /* Sample rate table */
-#endif
     LVM_UINT16          ii;                                                         /* Filter band index */
     LVM_UINT32          fs = (LVM_UINT32)LVPSA_SampleRateTab[(LVM_UINT16)pParams->Fs];      /* Sample rate */
     LVM_UINT32          fc;                                                         /* Filter centre frequency */
@@ -297,7 +269,6 @@ LVPSA_RETURN LVPSA_SetBPFiltersType (   LVPSA_InstancePr_t        *pInst,
          */
         fc = (LVM_UINT32)pInst->pFiltersParams[ii].CenterFrequency;     /* Get the band centre frequency */
         QFactor =(LVM_INT16) pInst->pFiltersParams[ii].QFactor;                    /* Get the band Q factor */
-
 
         /*
          * For each filter set the type of biquad required
@@ -358,22 +329,6 @@ LVPSA_RETURN LVPSA_SetBPFCoefficients(  LVPSA_InstancePr_t        *pInst,
         {
             case    LVPSA_DoublePrecisionFilter:
             {
-#ifndef BUILD_FLOAT
-                BP_C32_Coefs_t      Coefficients;
-
-                /*
-                 * Calculate the double precision coefficients
-                 */
-                LVPSA_BPDoublePrecCoefs((LVM_UINT16)pParams->Fs,
-                                        &pInst->pFiltersParams[ii],
-                                        &Coefficients);
-                /*
-                 * Set the coefficients
-                 */
-                BP_1I_D16F32Cll_TRC_WRA_01_Init ( &pInst->pBP_Instances[ii],
-                                                  &pInst->pBP_Taps[ii],
-                                                  &Coefficients);
-#else
                 BP_FLOAT_Coefs_t      Coefficients;
                 /*
                  * Calculate the double precision coefficients
@@ -387,29 +342,11 @@ LVPSA_RETURN LVPSA_SetBPFCoefficients(  LVPSA_InstancePr_t        *pInst,
                 BP_1I_D16F32Cll_TRC_WRA_01_Init ( &pInst->pBP_Instances[ii],
                                                   &pInst->pBP_Taps[ii],
                                                   &Coefficients);
-#endif
                 break;
             }
 
             case    LVPSA_SimplePrecisionFilter:
             {
-#ifndef BUILD_FLOAT
-                BP_C16_Coefs_t      Coefficients;
-
-                /*
-                 * Calculate the single precision coefficients
-                 */
-                LVPSA_BPSinglePrecCoefs((LVM_UINT16)pParams->Fs,
-                                       &pInst->pFiltersParams[ii],
-                                       &Coefficients);
-
-                /*
-                 * Set the coefficients
-                 */
-                BP_1I_D16F16Css_TRC_WRA_01_Init (&pInst->pBP_Instances[ii],
-                                                  &pInst->pBP_Taps[ii],
-                                                  &Coefficients);
-#else
                 BP_FLOAT_Coefs_t      Coefficients;
 
                 /*
@@ -425,7 +362,6 @@ LVPSA_RETURN LVPSA_SetBPFCoefficients(  LVPSA_InstancePr_t        *pInst,
                 BP_1I_D16F16Css_TRC_WRA_01_Init (&pInst->pBP_Instances[ii],
                                                   &pInst->pBP_Taps[ii],
                                                   &Coefficients);
-#endif
                 break;
             }
         }
@@ -433,7 +369,6 @@ LVPSA_RETURN LVPSA_SetBPFCoefficients(  LVPSA_InstancePr_t        *pInst,
 
     return(LVPSA_OK);
 }
-
 
 /************************************************************************************/
 /*                                                                                  */
@@ -458,31 +393,17 @@ LVPSA_RETURN LVPSA_SetQPFCoefficients(   LVPSA_InstancePr_t        *pInst,
 {
     LVM_UINT16     ii;
     LVM_Fs_en      Fs = pParams->Fs;
-#ifndef BUILD_FLOAT
-    QPD_C32_Coefs  *pCoefficients;
-    extern         QPD_C32_Coefs     LVPSA_QPD_Coefs[];
-
-    pCoefficients = &LVPSA_QPD_Coefs[(pParams->LevelDetectionSpeed * LVPSA_NR_SUPPORTED_RATE) + Fs];
-#else
     QPD_FLOAT_Coefs  *pCoefficients;
     extern         QPD_FLOAT_Coefs     LVPSA_QPD_Float_Coefs[];
 
     pCoefficients = &LVPSA_QPD_Float_Coefs[(pParams->LevelDetectionSpeed * \
                                     LVPSA_NR_SUPPORTED_RATE) + Fs];
-#endif
-
 
     for (ii = 0; ii < pInst->nRelevantFilters; ii++)
     {
-#ifndef BUILD_FLOAT
-        LVPSA_QPD_Init (&pInst->pQPD_States[ii],
-                        &pInst->pQPD_Taps[ii],
-                        pCoefficients );
-#else
         LVPSA_QPD_Init_Float (&pInst->pQPD_States[ii],
                               &pInst->pQPD_Taps[ii],
                               pCoefficients );
-#endif
     }
 
     return(LVPSA_OK);
@@ -522,7 +443,6 @@ LVPSA_RETURN LVPSA_SetQPFCoefficients(   LVPSA_InstancePr_t        *pInst,
 /*     of the n bands equalizer (LVEQNB                                                 */
 /*                                                                                      */
 /****************************************************************************************/
-#ifdef BUILD_FLOAT
 LVPSA_RETURN LVPSA_BPSinglePrecCoefs(    LVM_UINT16              Fs,
                                          LVPSA_FilterParam_t     *pFilterParams,
                                          BP_FLOAT_Coefs_t        *pCoefficients)
@@ -530,7 +450,6 @@ LVPSA_RETURN LVPSA_BPSinglePrecCoefs(    LVM_UINT16              Fs,
 
     extern LVM_FLOAT    LVPSA_Float_TwoPiOnFsTable[];
     extern LVM_FLOAT    LVPSA_Float_CosCoef[];
-
 
     /*
      * Intermediate variables and temporary values
@@ -548,7 +467,6 @@ LVPSA_RETURN LVPSA_BPSinglePrecCoefs(    LVM_UINT16              Fs,
     LVM_FLOAT           factor;
     LVM_FLOAT           t0;
     LVM_INT16           i;
-
 
     /*
      * Get the filter definition
@@ -589,7 +507,6 @@ LVPSA_RETURN LVPSA_BPSinglePrecCoefs(    LVM_UINT16              Fs,
     }
     COS_T0 = COS_T0 * 8;    /*LVPSA_CosCoef_float[0]*/      /* Correct the scaling */
 
-
     B1 = ((LVM_FLOAT)0.5 - B2) * (COS_T0);    /* B1 = (0.5 - b2) * cos(t0) */
     A0 = ((LVM_FLOAT)0.5 + B2) / 2;                        /* A0 = (0.5 + b2) / 2 */
 
@@ -602,89 +519,6 @@ LVPSA_RETURN LVPSA_BPSinglePrecCoefs(    LVM_UINT16              Fs,
 
     return(LVPSA_OK);
 }
-#else
-LVPSA_RETURN LVPSA_BPSinglePrecCoefs(    LVM_UINT16              Fs,
-                                         LVPSA_FilterParam_t    *pFilterParams,
-                                         BP_C16_Coefs_t         *pCoefficients)
-{
-
-    extern LVM_INT16    LVPSA_TwoPiOnFsTable[];
-    extern LVM_INT16    LVPSA_CosCoef[];
-
-
-    /*
-     * Intermediate variables and temporary values
-     */
-    LVM_INT32           T0;
-    LVM_INT16           D;
-    LVM_INT32           A0;
-    LVM_INT32           B1;
-    LVM_INT32           B2;
-    LVM_INT32           Dt0;
-    LVM_INT32           B2_Den;
-    LVM_INT32           B2_Num;
-    LVM_INT32           COS_T0;
-    LVM_INT16           coef;
-    LVM_INT32           factor;
-    LVM_INT16           t0;
-    LVM_INT16           i;
-
-
-    /*
-     * Get the filter definition
-     */
-    LVM_UINT16          Frequency   = pFilterParams->CenterFrequency;
-    LVM_UINT16          QFactor     = pFilterParams->QFactor;
-
-
-    /*
-     * Calculating the intermediate values
-     */
-    T0 = (LVM_INT32)Frequency * LVPSA_TwoPiOnFsTable[Fs];   /* T0 = 2 * Pi * Fc / Fs */
-    D = 3200;                                               /* Floating point value 1.000000 (1*100*2^5) */
-                                                            /* Force D = 1 : the function was originally used for a peaking filter.
-                                                               The D parameter do not exist for a BandPass filter coefficients */
-
-    /*
-     * Calculate the B2 coefficient
-     */
-    Dt0 = D * (T0 >> 10);
-    B2_Den = (LVM_INT32)(((LVM_UINT32)QFactor << 19) + (LVM_UINT32)(Dt0 >> 2));
-    B2_Num = (LVM_INT32)((LVM_UINT32)(Dt0 >> 3) - ((LVM_UINT32)QFactor << 18));
-    B2 = (B2_Num / (B2_Den >> 16)) << 15;
-
-    /*
-     * Calculate the cosine by a polynomial expansion using the equation:
-     *
-     *  Cos += coef(n) * t0^n                   For n = 0 to 6
-     */
-    T0 = (T0 >> 10) * 20859;                    /* Scale to 1.0 in 16-bit for range 0 to fs/2 */
-    t0 = (LVM_INT16)(T0 >> 16);
-    factor = 0x7fff;                            /* Initialise to 1.0 for the a0 coefficient */
-    COS_T0 = 0;                                 /* Initialise the error to zero */
-    for (i=1; i<7; i++)
-    {
-        coef = LVPSA_CosCoef[i];                /* Get the nth coefficient */
-        COS_T0 += (factor * coef) >> 5;         /* The nth partial sum */
-        factor = (factor * t0) >> 15;           /* Calculate t0^n */
-    }
-    COS_T0 = COS_T0 << (LVPSA_CosCoef[0]+6);          /* Correct the scaling */
-
-
-    B1 = ((0x40000000 - B2) >> 16) * (COS_T0 >> 16);    /* B1 = (0.5 - b2) * cos(t0) */
-    A0 = (0x40000000 + B2) >> 1;                        /* A0 = (0.5 + b2) / 2 */
-
-    /*
-     * Write coeff into the data structure
-     */
-    pCoefficients->A0 = (LVM_INT16)(A0>>16);
-    pCoefficients->B1 = (LVM_INT16)(B1>>15);
-    pCoefficients->B2 = (LVM_INT16)(B2>>16);
-
-
-    return(LVPSA_OK);
-}
-#endif
 /****************************************************************************************/
 /*                                                                                      */
 /* FUNCTION:                 LVPSA_BPDoublePrecCoefs                                    */
@@ -727,7 +561,6 @@ LVPSA_RETURN LVPSA_BPSinglePrecCoefs(    LVM_UINT16              Fs,
 /*     of the n bands equalizer (LVEQNB                                                 */
 /*                                                                                      */
 /****************************************************************************************/
-#ifdef BUILD_FLOAT
 LVPSA_RETURN LVPSA_BPDoublePrecCoefs(   LVM_UINT16            Fs,
                                         LVPSA_FilterParam_t   *pFilterParams,
                                         BP_FLOAT_Coefs_t      *pCoefficients)
@@ -758,7 +591,6 @@ LVPSA_RETURN LVPSA_BPDoublePrecCoefs(   LVM_UINT16            Fs,
      */
     LVM_FLOAT          Frequency   = (LVM_FLOAT)(pFilterParams->CenterFrequency);
     LVM_FLOAT          QFactor     = ((LVM_FLOAT)(pFilterParams->QFactor)) / 100;
-
 
     /*
      * Calculating the intermediate values
@@ -810,90 +642,6 @@ LVPSA_RETURN LVPSA_BPDoublePrecCoefs(   LVM_UINT16            Fs,
 
     return(LVPSA_OK);
 }
-#else
-LVPSA_RETURN LVPSA_BPDoublePrecCoefs(   LVM_UINT16            Fs,
-                                        LVPSA_FilterParam_t  *pFilterParams,
-                                        BP_C32_Coefs_t       *pCoefficients)
-{
-
-    extern LVM_INT16    LVPSA_TwoPiOnFsTable[];
-    extern LVM_INT16    LVPSA_DPCosCoef[];
-
-    /*
-     * Intermediate variables and temporary values
-     */
-    LVM_INT32           T0;
-    LVM_INT16           D;
-    LVM_INT32           A0;
-    LVM_INT32           B1;
-    LVM_INT32           B2;
-    LVM_INT32           Dt0;
-    LVM_INT32           B2_Den;
-    LVM_INT32           B2_Num;
-    LVM_INT32           CosErr;
-    LVM_INT16           coef;
-    LVM_INT32           factor;
-    LVM_INT16           t0;
-    LVM_INT16           i;
-
-    /*
-     * Get the filter definition
-     */
-    LVM_UINT16          Frequency   = pFilterParams->CenterFrequency;
-    LVM_UINT16          QFactor     = pFilterParams->QFactor;
-
-
-    /*
-     * Calculating the intermediate values
-     */
-    T0 = (LVM_INT32)Frequency * LVPSA_TwoPiOnFsTable[Fs];   /* T0 = 2 * Pi * Fc / Fs */
-    D = 3200;                                               /* Floating point value 1.000000 (1*100*2^5) */
-                                                            /* Force D = 1 : the function was originally used for a peaking filter.
-                                                               The D parameter do not exist for a BandPass filter coefficients */
-
-    /*
-     * Calculate the B2 coefficient
-     */
-    Dt0 = D * (T0 >> 10);
-    B2_Den = (LVM_INT32)(((LVM_UINT32)QFactor << 19) + (LVM_UINT32)(Dt0 >> 2));
-    B2_Num = (LVM_INT32)((LVM_UINT32)(Dt0 >> 3) - ((LVM_UINT32)QFactor << 18));
-    B2 = (B2_Num / (B2_Den >> 16)) << 15;
-
-    /*
-     * Calculate the cosine error by a polynomial expansion using the equation:
-     *
-     *  CosErr += coef(n) * t0^n                For n = 0 to 4
-     */
-    T0 = (T0 >> 6) * 0x7f53;                    /* Scale to 1.0 in 16-bit for range 0 to fs/50 */
-    t0 = (LVM_INT16)(T0 >> 16);
-    factor = 0x7fff;                            /* Initialise to 1.0 for the a0 coefficient */
-    CosErr = 0;                                 /* Initialise the error to zero */
-    for (i=1; i<5; i++)
-    {
-        coef = LVPSA_DPCosCoef[i];              /* Get the nth coefficient */
-        CosErr += (factor * coef) >> 5;         /* The nth partial sum */
-        factor = (factor * t0) >> 15;           /* Calculate t0^n */
-    }
-    CosErr = CosErr << (LVPSA_DPCosCoef[0]);          /* Correct the scaling */
-
-    /*
-     * Calculate the B1 and A0 coefficients
-     */
-    B1 = (0x40000000 - B2);                     /* B1 = (0.5 - b2) */
-    A0 = ((B1 >> 16) * (CosErr >> 10)) >> 6;    /* Temporary storage for (0.5 - b2) * coserr(t0) */
-    B1 -= A0;                                   /* B1 = (0.5 - b2) * (1 - coserr(t0))  */
-    A0 = (0x40000000 + B2) >> 1;                /* A0 = (0.5 + b2) / 2 */
-
-    /*
-     * Write coeff into the data structure
-     */
-    pCoefficients->A0 = A0;
-    pCoefficients->B1 = B1;
-    pCoefficients->B2 = B2;
-
-    return(LVPSA_OK);
-}
-#endif
 /************************************************************************************/
 /*                                                                                  */
 /* FUNCTION:            LVPSA_ClearFilterHistory                                    */
@@ -917,17 +665,10 @@ LVPSA_RETURN LVPSA_ClearFilterHistory(LVPSA_InstancePr_t        *pInst)
 
     /* Band Pass filters taps */
     pTapAddress = (LVM_INT8 *)pInst->pBP_Taps;
-#ifdef BUILD_FLOAT
     for(i = 0; i < pInst->nBands * sizeof(Biquad_1I_Order2_FLOAT_Taps_t); i++)
     {
         pTapAddress[i] = 0;
     }
-#else
-    for(i = 0; i < pInst->nBands * sizeof(Biquad_1I_Order2_Taps_t); i++)
-    {
-        pTapAddress[i] = 0;
-    }
-#endif
     /* Quasi-peak filters taps */
     pTapAddress = (LVM_INT8 *)pInst->pQPD_Taps;
     for(i = 0; i < pInst->nBands * sizeof(QPD_Taps_t); i++)

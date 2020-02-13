@@ -18,8 +18,6 @@
 #ifndef __LVCS_STEREOENHANCER_H__
 #define __LVCS_STEREOENHANCER_H__
 
-
-
 /************************************************************************************/
 /*                                                                                  */
 /*    Includes                                                                      */
@@ -29,7 +27,6 @@
 #include "Filters.h"                        /* Filter definitions */
 #include "LVCS_Headphone_Coeffs.h"          /* Headphone coefficients */
 #include "BIQUAD.h"
-
 
 /************************************************************************************/
 /*                                                                                  */
@@ -41,17 +38,6 @@
 typedef struct
 {
 
-#ifndef BUILD_FLOAT
-    /*
-     * Middle filter
-     */
-    void                    (*pBiquadCallBack_Mid)(Biquad_Instance_t*, LVM_INT16*, LVM_INT16*, LVM_INT16);
-    /*
-     * Side filter
-     */
-    void                    (*pBiquadCallBack_Side)(Biquad_Instance_t*, LVM_INT16*, LVM_INT16*, LVM_INT16);
-    LVM_UINT16              MidGain;            /* Middle gain in mobile speaker mode */
-#else
     /*
      * Middle filter
      */
@@ -64,9 +50,7 @@ typedef struct
     void                    (*pBiquadCallBack_Side)(Biquad_FLOAT_Instance_t*,
                                     LVM_FLOAT*, LVM_FLOAT*, LVM_INT16);
     LVM_FLOAT              MidGain;            /* Middle gain in mobile speaker mode */
-#endif
 } LVCS_StereoEnhancer_t;
-
 
 /************************************************************************************/
 /*                                                                                  */
@@ -77,16 +61,9 @@ typedef struct
 LVCS_ReturnStatus_en LVCS_SEnhancerInit(LVCS_Handle_t        hInstance,
                                         LVCS_Params_t        *pParams);
 
-#ifndef BUILD_FLOAT
-LVCS_ReturnStatus_en LVCS_StereoEnhancer(LVCS_Handle_t        hInstance,
-                                         const LVM_INT16    *pInData,
-                                         LVM_INT16            *pOutData,
-                                         LVM_UINT16            NumSamples);
-#else
 LVCS_ReturnStatus_en LVCS_StereoEnhancer(LVCS_Handle_t        hInstance,
                                          const LVM_FLOAT    *pInData,
                                          LVM_FLOAT            *pOutData,
                                          LVM_UINT16            NumSamples);
-#endif
 
 #endif  /* STEREOENHANCE_H */

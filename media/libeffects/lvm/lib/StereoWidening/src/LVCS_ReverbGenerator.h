@@ -18,8 +18,6 @@
 #ifndef __LVCS_REVERBGENERATOR_H__
 #define __LVCS_REVERBGENERATOR_H__
 
-
-
 /************************************************************************************/
 /*                                                                                  */
 /*    Includes                                                                      */
@@ -27,7 +25,6 @@
 /************************************************************************************/
 
 #include "LVC_Mixer.h"
-
 
 /************************************************************************************/
 /*                                                                                  */
@@ -38,13 +35,11 @@
 #define     HEADPHONEGAINPROC           LVCS_HEADPHONE_PROCGAIN
 #define     HEADPHONEGAINUNPROC         LVCS_HEADPHONE_UNPROCGAIN
 
-
 /************************************************************************************/
 /*                                                                                  */
 /*    Structures                                                                    */
 /*                                                                                  */
 /************************************************************************************/
-
 
 /* Reverberation module structure */
 typedef struct
@@ -55,22 +50,13 @@ typedef struct
     LVM_INT16                   DelayOffset;
     LVM_INT16                   ProcGain;
     LVM_INT16                   UnprocGain;
-#ifndef BUILD_FLOAT
-    LVM_INT16                    StereoSamples[2*LVCS_STEREODELAY_CS_48KHZ];
-    /* Reverb Level */
-    LVM_INT16                   ReverbLevel;
-    /* Filter */
-    void                        (*pBiquadCallBack) (Biquad_Instance_t*, LVM_INT16*, LVM_INT16*, LVM_INT16);
-#else
     LVM_FLOAT                   StereoSamples[2 * LVCS_STEREODELAY_CS_MAX_VAL];
     /* Reverb Level */
     LVM_FLOAT                   ReverbLevel;
     /* Filter */
     void                        (*pBiquadCallBack) (Biquad_FLOAT_Instance_t*,
                                                     LVM_FLOAT*, LVM_FLOAT*, LVM_INT16);
-#endif
 } LVCS_ReverbGenerator_t;
-
 
 /************************************************************************************/
 /*                                                                                    */
@@ -80,16 +66,9 @@ typedef struct
 
 LVCS_ReturnStatus_en LVCS_ReverbGeneratorInit(LVCS_Handle_t     hInstance,
                                                  LVCS_Params_t  *pParams);
-#ifdef BUILD_FLOAT
 LVCS_ReturnStatus_en LVCS_ReverbGenerator(LVCS_Handle_t         hInstance,
                                           const LVM_FLOAT       *pInput,
                                           LVM_FLOAT             *pOutput,
                                           LVM_UINT16            NumSamples);
-#else
-LVCS_ReturnStatus_en LVCS_ReverbGenerator(LVCS_Handle_t         hInstance,
-                                          const LVM_INT16       *pInput,
-                                          LVM_INT16             *pOutput,
-                                          LVM_UINT16            NumSamples);
-#endif
 
 #endif  /* REVERB_H */

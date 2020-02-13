@@ -18,16 +18,12 @@
 #ifndef __MIXER_H__
 #define __MIXER_H__
 
-
-
-
 #include "LVM_Types.h"
 
 /**********************************************************************************
    INSTANCE MEMORY TYPE DEFINITION
 ***********************************************************************************/
 
-#ifdef BUILD_FLOAT /* BUILD_FLOAT*/
 typedef struct
 {
     LVM_FLOAT   Alpha;                   /* Time constant. Set by calling application. \
@@ -63,52 +59,11 @@ typedef struct
     void        *pGeneralPurpose2;
     LVM_Callback pCallBack2;
 } Mix_2St_Cll_FLOAT_t;
-#else
-typedef struct
-{
-    LVM_INT32   Alpha;                    /* Time constant. Set by calling application.  Can be changed at any time */
-    LVM_INT32   Target;                   /* Target value.  Set by calling application.  Can be changed at any time */
-    LVM_INT32   Current;                  /* Current value.  Set by the mixer function. */
-    LVM_INT16   CallbackSet;              /* Boolean.  Should be set by calling application each time the target value is updated */
-    LVM_INT16   CallbackParam;            /* Parameter that will be used in the calback function */
-    void        *pCallbackHandle;         /* Pointer to the instance of the callback function */
-    void        *pGeneralPurpose;         /* Pointer for general purpose usage */
-    LVM_Callback pCallBack;               /* Pointer to the callback function */
-} Mix_1St_Cll_t;
-
-typedef struct
-{
-    LVM_INT32   Alpha1;
-    LVM_INT32   Target1;
-    LVM_INT32   Current1;
-    LVM_INT16   CallbackSet1;
-    LVM_INT16   CallbackParam1;
-    void        *pCallbackHandle1;
-    void        *pGeneralPurpose1;
-    LVM_Callback pCallBack1;
-
-    LVM_INT32   Alpha2;                   /* Warning the address of this location is passed as a pointer to Mix_1St_Cll_t in some functions */
-    LVM_INT32   Target2;
-    LVM_INT32   Current2;
-    LVM_INT16   CallbackSet2;
-    LVM_INT16   CallbackParam2;
-    void        *pCallbackHandle2;
-    void        *pGeneralPurpose2;
-    LVM_Callback pCallBack2;
-
-} Mix_2St_Cll_t;
-
-#endif
 
 /*** General functions ************************************************************/
-#ifdef BUILD_FLOAT
 
 LVM_FLOAT LVM_Mixer_TimeConstant(LVM_UINT32   tc,
-#ifdef HIGHER_FS
                                  LVM_UINT32   Fs,
-#else
-                                 LVM_UINT16   Fs,
-#endif
                                  LVM_UINT16   NumChannels);
 
 void MixSoft_1St_D32C31_WRA(    Mix_1St_Cll_FLOAT_t       *pInstance,
@@ -126,34 +81,10 @@ void MixInSoft_D32C31_SAT(      Mix_1St_Cll_FLOAT_t       *pInstance,
                                 const LVM_FLOAT     *src,
                                 LVM_FLOAT     *dst,
                                 LVM_INT16     n);
-#else
-LVM_UINT32 LVM_Mixer_TimeConstant(LVM_UINT32   tc,
-                                  LVM_UINT16   Fs,
-                                  LVM_UINT16   NumChannels);
-
-
-void MixSoft_1St_D32C31_WRA(    Mix_1St_Cll_t       *pInstance,
-                                const LVM_INT32     *src,
-                                      LVM_INT32     *dst,
-                                      LVM_INT16     n);
-
-void MixSoft_2St_D32C31_SAT(    Mix_2St_Cll_t       *pInstance,
-                                const LVM_INT32     *src1,
-                                const LVM_INT32     *src2,
-                                      LVM_INT32     *dst,
-                                      LVM_INT16     n);
-
-void MixInSoft_D32C31_SAT(      Mix_1St_Cll_t       *pInstance,
-                                const LVM_INT32     *src,
-                                      LVM_INT32     *dst,
-                                      LVM_INT16     n);
-
-#endif
 
 /**********************************************************************************
    FUNCTION PROTOTYPES (LOW LEVEL SUBFUNCTIONS)
 ***********************************************************************************/
-#ifdef BUILD_FLOAT
 void Core_MixSoft_1St_D32C31_WRA(   Mix_1St_Cll_FLOAT_t       *pInstance,
                                     const LVM_FLOAT     *src,
                                     LVM_FLOAT     *dst,
@@ -167,24 +98,6 @@ void Core_MixInSoft_D32C31_SAT(     Mix_1St_Cll_FLOAT_t       *pInstance,
                                     const LVM_FLOAT     *src,
                                     LVM_FLOAT     *dst,
                                     LVM_INT16     n);
-#else
-void Core_MixSoft_1St_D32C31_WRA(   Mix_1St_Cll_t       *pInstance,
-                                    const LVM_INT32     *src,
-                                          LVM_INT32     *dst,
-                                          LVM_INT16     n);
-
-void Core_MixHard_2St_D32C31_SAT(   Mix_2St_Cll_t       *pInstance,
-                                    const LVM_INT32     *src1,
-                                    const LVM_INT32     *src2,
-                                          LVM_INT32     *dst,
-                                          LVM_INT16     n);
-
-void Core_MixInSoft_D32C31_SAT(     Mix_1St_Cll_t       *pInstance,
-                                    const LVM_INT32     *src,
-                                          LVM_INT32     *dst,
-                                          LVM_INT16     n);
-#endif
-
 
 /**********************************************************************************/
 
