@@ -713,7 +713,8 @@ status_t DrmHal::openSession(DrmPlugin::SecurityLevel level,
     } while (retry);
 
     if (err == OK) {
-        std::shared_ptr<DrmSessionClient> client(new DrmSessionClient(this, sessionId));
+        std::shared_ptr<DrmSessionClient> client =
+                ndk::SharedRefBase::make<DrmSessionClient>(this, sessionId);
         DrmSessionManager::Instance()->addSession(AIBinder_getCallingPid(),
                 std::static_pointer_cast<IResourceManagerClient>(client), sessionId);
         mOpenSessions.push_back(client);
