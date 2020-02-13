@@ -103,6 +103,8 @@ static const char *kCodecLatencyAvg = "android.media.mediacodec.latency.avg";   
 static const char *kCodecLatencyCount = "android.media.mediacodec.latency.n";
 static const char *kCodecLatencyHist = "android.media.mediacodec.latency.hist"; /* in us */
 static const char *kCodecLatencyUnknown = "android.media.mediacodec.latency.unknown";
+static const char *kCodecQueueSecureInputBufferError = "android.media.mediacodec.queueSecureInputBufferError";
+static const char *kCodecQueueInputBufferError = "android.media.mediacodec.queueInputBufferError";
 
 static const char *kCodecNumLowLatencyModeOn = "android.media.mediacodec.low-latency.on";  /* 0..n */
 static const char *kCodecNumLowLatencyModeOff = "android.media.mediacodec.low-latency.off";  /* 0..n */
@@ -3629,8 +3631,16 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
                 subSamples,
                 numSubSamples,
                 errorDetailMsg);
+        if (err != OK) {
+            mediametrics_setInt32(mMetricsHandle, kCodecQueueSecureInputBufferError, err);
+            ALOGW("Log queueSecureInputBuffer error: %d", err);
+        }
     } else {
         err = mBufferChannel->queueInputBuffer(buffer);
+        if (err != OK) {
+            mediametrics_setInt32(mMetricsHandle, kCodecQueueInputBufferError, err);
+            ALOGW("Log queueInputBuffer error: %d", err);
+        }
     }
 
     if (err == OK) {
