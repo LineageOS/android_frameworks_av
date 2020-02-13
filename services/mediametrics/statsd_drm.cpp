@@ -35,6 +35,9 @@
 
 #include <statslog.h>
 
+#include <array>
+#include <string>
+
 namespace android {
 
 // mediadrm
@@ -107,7 +110,13 @@ bool statsd_widevineCDM(const mediametrics::Item *item)
 // drmmanager
 bool statsd_drmmanager(const mediametrics::Item *item)
 {
+    using namespace std::string_literals;
     if (item == NULL) return false;
+
+    if (!enabled_statsd) {
+        ALOGV("NOT sending: drmmanager data");
+        return true;
+    }
 
     const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
     std::string pkgName = item->getPkgName();
@@ -123,15 +132,21 @@ bool statsd_drmmanager(const mediametrics::Item *item)
     char *mime_types = NULL;
     (void) item->getCString("mime_types", &mime_types);
 
-    if (enabled_statsd) {
-        android::util::stats_write(android::util::MEDIAMETRICS_DRMMANAGER_REPORTED,
-                                   timestamp, pkgName.c_str(), pkgVersionCode,
-                                   mediaApexVersion,
-                                   plugin_id, description,
-                                   method_id, mime_types);
-    } else {
-        ALOGV("NOT sending: drmmanager data");
+    // Corresponds to the 13 APIs tracked in the MediametricsDrmManagerReported statsd proto
+    // Please see also DrmManager::kMethodIdMap
+    std::array<int64_t, 13> methodCounts{};
+    for (size_t i = 0; i < methodCounts.size() ; i++) {
+        item->getInt64(("method"s + std::to_string(i)).c_str(), &methodCounts[i]);
     }
+
+    android::util::stats_write(android::util::MEDIAMETRICS_DRMMANAGER_REPORTED,
+                               timestamp, pkgName.c_str(), pkgVersionCode, mediaApexVersion,
+                               plugin_id, description, method_id, mime_types,
+                               methodCounts[0], methodCounts[1], methodCounts[2],
+                               methodCounts[3], methodCounts[4], methodCounts[5],
+                               methodCounts[6], methodCounts[7], methodCounts[8],
+                               methodCounts[9], methodCounts[10], methodCounts[11],
+                               methodCounts[12]);
 
     free(plugin_id);
     free(description);

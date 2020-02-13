@@ -1902,9 +1902,11 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
         mStreamTypes[stream].volume = 0.0f;
         mStreamTypes[stream].mute = mAudioFlinger->streamMute_l(stream);
     }
-    // Audio patch volume is always max
+    // Audio patch and call assistant volume are always max
     mStreamTypes[AUDIO_STREAM_PATCH].volume = 1.0f;
     mStreamTypes[AUDIO_STREAM_PATCH].mute = false;
+    mStreamTypes[AUDIO_STREAM_CALL_ASSISTANT].volume = 1.0f;
+    mStreamTypes[AUDIO_STREAM_CALL_ASSISTANT].mute = false;
 }
 
 AudioFlinger::PlaybackThread::~PlaybackThread()

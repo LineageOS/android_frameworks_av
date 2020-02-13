@@ -33,6 +33,9 @@ cc_binary {
         "liblog",
         "libavservices_minijail",
     ],
+    header_libs: [
+        "bionic_libc_platform_headers",
+    ],
     target: {
         android: {
             product_variables: {

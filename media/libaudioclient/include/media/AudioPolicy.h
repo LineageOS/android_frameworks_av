@@ -18,7 +18,6 @@
 #ifndef ANDROID_AUDIO_POLICY_H
 #define ANDROID_AUDIO_POLICY_H
 
-#include <functional>
 #include <binder/Parcel.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <system/audio.h>
@@ -113,13 +112,6 @@ public:
     /** returns true if this mix can be used for uid-device affinity routing */
     bool isDeviceAffinityCompatible() const;
 
-    /**
-     * returns true if the mix has a capture rule for a usage that
-     * matches the given predicate
-     */
-    bool hasMatchingRuleForUsage(
-        std::function<bool (audio_usage_t)>const& func) const;
-
     mutable Vector<AudioMixMatchCriterion> mCriteria;
     uint32_t        mMixType;
     audio_config_t  mFormat;
@@ -129,6 +121,8 @@ public:
     uint32_t        mCbFlags; // flags indicating which callbacks to use, see kCbFlag*
     /** Ignore the AUDIO_FLAG_NO_MEDIA_PROJECTION */
     bool            mAllowPrivilegedPlaybackCapture = false;
+    /** Indicates if the caller can capture voice communication output */
+    bool            mVoiceCommunicationCaptureAllowed = false;
 };
 
 
