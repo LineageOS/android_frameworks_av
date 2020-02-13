@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-
 /************************************************************************************/
 /*                                                                                  */
 /*  Includes                                                                        */
@@ -27,7 +26,6 @@
 #include "Filters.h"                            /* Filter definitions */
 #include "BIQUAD.h"                             /* Biquad definitions */
 #include "LVCS_Headphone_Coeffs.h"              /* Headphone coefficients */
-
 
 /************************************************************************************/
 /*                                                                                  */
@@ -73,7 +71,6 @@ const BiquadA01B1CoefsSP_t LVCS_SEMidCoefTable[] = {
      CS_MIDDLE_48000_A1,
      CS_MIDDLE_48000_B1,
      (LVM_UINT16 )CS_MIDDLE_48000_SCALE}
-#ifdef HIGHER_FS
     ,
     {CS_MIDDLE_88200_A0,        /* 88kS/s coefficients */
      CS_MIDDLE_88200_A1,
@@ -91,7 +88,6 @@ const BiquadA01B1CoefsSP_t LVCS_SEMidCoefTable[] = {
      CS_MIDDLE_192000_A1,
      CS_MIDDLE_192000_B1,
      (LVM_UINT16 )CS_MIDDLE_192000_SCALE}
-#endif
     };
 
 /* Coefficient table for the side filter */
@@ -151,7 +147,6 @@ const BiquadA012B12CoefsSP_t LVCS_SESideCoefTable[] = {
      CS_SIDE_48000_B1,
      CS_SIDE_48000_B2,
      (LVM_UINT16 )CS_SIDE_48000_SCALE}
-#ifdef HIGHER_FS
      ,
     {CS_SIDE_88200_A0,          /* 88kS/s coefficients */
      CS_SIDE_88200_A1,
@@ -177,9 +172,7 @@ const BiquadA012B12CoefsSP_t LVCS_SESideCoefTable[] = {
      CS_SIDE_192000_B1,
      CS_SIDE_192000_B2,
      (LVM_UINT16 )CS_SIDE_192000_SCALE}
-#endif
 };
-
 
 /************************************************************************************/
 /*                                                                                  */
@@ -243,7 +236,6 @@ const BiquadA012B12CoefsSP_t LVCS_EqualiserCoefTable[] = {
      CS_EQUALISER_48000_B1,
      CS_EQUALISER_48000_B2,
      (LVM_UINT16 )CS_EQUALISER_48000_SCALE},
-#ifdef HIGHER_FS
     {CS_EQUALISER_88200_A0,     /* 88kS/s coeffieients */
      CS_EQUALISER_88200_A1,
      CS_EQUALISER_88200_A2,
@@ -268,7 +260,6 @@ const BiquadA012B12CoefsSP_t LVCS_EqualiserCoefTable[] = {
      CS_EQUALISER_192000_B1,
      CS_EQUALISER_192000_B2,
      (LVM_UINT16 )CS_EQUALISER_192000_SCALE},
-#endif
 
     /* Concert Sound EX Headphone coefficients */
     {CSEX_EQUALISER_8000_A0,    /* 8kS/s coefficients */
@@ -325,7 +316,6 @@ const BiquadA012B12CoefsSP_t LVCS_EqualiserCoefTable[] = {
      CSEX_EQUALISER_48000_B1,
      CSEX_EQUALISER_48000_B2,
      (LVM_UINT16 )CSEX_EQUALISER_48000_SCALE}
-#ifdef HIGHER_FS
     ,
     {CSEX_EQUALISER_88200_A0,   /* 88kS/s coefficients */
      CSEX_EQUALISER_88200_A1,
@@ -351,9 +341,7 @@ const BiquadA012B12CoefsSP_t LVCS_EqualiserCoefTable[] = {
      CSEX_EQUALISER_192000_B1,
      CSEX_EQUALISER_192000_B2,
      (LVM_UINT16 )CSEX_EQUALISER_192000_SCALE}
-#endif
 };
-
 
 /************************************************************************************/
 /*                                                                                  */
@@ -440,7 +428,6 @@ const BiquadA012B12CoefsSP_t LVCS_ReverbCoefTable[] = {
      CS_REVERB_48000_B1,
      CS_REVERB_48000_B2,
      (LVM_UINT16 )CS_REVERB_48000_SCALE}
-#ifdef HIGHER_FS
     ,
     {CS_REVERB_88200_A0,            /* 88kS/s coefficients */
      CS_REVERB_88200_A1,
@@ -466,9 +453,7 @@ const BiquadA012B12CoefsSP_t LVCS_ReverbCoefTable[] = {
      CS_REVERB_192000_B1,
      CS_REVERB_192000_B2,
      (LVM_UINT16 )CS_REVERB_192000_SCALE}
-#endif
 };
-
 
 /************************************************************************************/
 /*                                                                                  */
@@ -490,7 +475,6 @@ const Gain_t LVCS_OutputGainTable[] = {
      LVCS_EX_HEADPHONE_SHIFTLOSS,
      LVCS_EX_HEADPHONE_GAIN}
 };
-
 
 /************************************************************************************/
 /*                                                                                  */
@@ -518,7 +502,6 @@ const Gain_t LVCS_OutputGainTable[] = {
 /*                                                                                  */
 /************************************************************************************/
 const LVCS_VolCorrect_t LVCS_VolCorrectTable[] = {
-#ifdef BUILD_FLOAT
     {0.433362f,          /* Headphone, stereo mode */
      0.000000f,
      1.000024f,
@@ -535,24 +518,6 @@ const LVCS_VolCorrect_t LVCS_VolCorrectTable[] = {
      0.000000f,
      1.000024f,
      1.412640f}
-#else
-    {14200,          /* Headphone, stereo mode */
-     0,
-     4096,
-     5786},
-    {14200,          /* EX Headphone, stereo mode */
-     0,
-     4096,
-     5786},
-    {32767,         /* Headphone, mono mode */
-     0,
-     4096,
-     5786},
-    {32767,         /* EX Headphone, mono mode */
-     0,
-     4096,
-     5786}
-#endif
 };
 
 /************************************************************************************/
@@ -570,14 +535,11 @@ const LVCS_VolCorrect_t LVCS_VolCorrectTable[] = {
 #define LVCS_VOL_TC_Fs32000     32721       /* Floating point value 0.998565674 */
 #define LVCS_VOL_TC_Fs44100     32734       /* Floating point value 0.998962402 */
 #define LVCS_VOL_TC_Fs48000     32737       /* Floating point value 0.999053955 */
-#if defined(BUILD_FLOAT) && defined(HIGHER_FS)
 #define LVCS_VOL_TC_Fs88200     32751       /* Floating point value 0.999481066 */
 #define LVCS_VOL_TC_Fs96000     32751       /* Floating point value 0.999511703 */   /* Todo @ need to re check this value*/
 #define LVCS_VOL_TC_Fs176400    32759       /* Floating point value 0.999740499 */
 #define LVCS_VOL_TC_Fs192000    32763       /* Floating point value 0.999877925 */  /* Todo @ need to re check this value*/
-#endif
 
-#if defined(BUILD_FLOAT) && defined(HIGHER_FS)
 const LVM_INT16 LVCS_VolumeTCTable[13] = {LVCS_VOL_TC_Fs8000,
                                           LVCS_VOL_TC_Fs11025,
                                           LVCS_VOL_TC_Fs12000,
@@ -592,25 +554,12 @@ const LVM_INT16 LVCS_VolumeTCTable[13] = {LVCS_VOL_TC_Fs8000,
                                           LVCS_VOL_TC_Fs176400,
                                           LVCS_VOL_TC_Fs192000
 };
-#else
-const LVM_INT16 LVCS_VolumeTCTable[9] = {LVCS_VOL_TC_Fs8000,
-                                        LVCS_VOL_TC_Fs11025,
-                                        LVCS_VOL_TC_Fs12000,
-                                        LVCS_VOL_TC_Fs16000,
-                                        LVCS_VOL_TC_Fs22050,
-                                        LVCS_VOL_TC_Fs24000,
-                                        LVCS_VOL_TC_Fs32000,
-                                        LVCS_VOL_TC_Fs44100,
-                                        LVCS_VOL_TC_Fs48000
-};
-#endif
 
 /************************************************************************************/
 /*                                                                                  */
 /*  Sample rate table                                                               */
 /*                                                                                  */
 /************************************************************************************/
-#if defined(BUILD_FLOAT) && defined(HIGHER_FS)
 const LVM_INT32   LVCS_SampleRateTable[13] = {8000,
                                               11025,
                                               12000,
@@ -625,15 +574,3 @@ const LVM_INT32   LVCS_SampleRateTable[13] = {8000,
                                               176400,
                                               192000
 };
-#else
-const LVM_INT16   LVCS_SampleRateTable[9] = {8000,
-                                            11025,
-                                            12000,
-                                            16000,
-                                            22050,
-                                            24000,
-                                            32000,
-                                            44100,
-                                            48000
-};
-#endif

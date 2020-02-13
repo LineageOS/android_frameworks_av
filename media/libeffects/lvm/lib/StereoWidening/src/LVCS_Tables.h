@@ -18,7 +18,6 @@
 #ifndef __LVCS_TABLES_H__
 #define __LVCS_TABLES_H__
 
-
 /************************************************************************************/
 /*                                                                                  */
 /*  Includes                                                                        */
@@ -101,7 +100,6 @@ extern const Gain_t LVCS_OutputGainTable[];
 extern const LVCS_VolCorrect_t LVCS_VolCorrectTable[];
 extern const LVM_INT16 LVCS_VolumeTCTable[];
 
-
 /************************************************************************************/
 /*                                                                                  */
 /*  Sample rates                                                                    */
@@ -109,7 +107,6 @@ extern const LVM_INT16 LVCS_VolumeTCTable[];
 /************************************************************************************/
 
 extern const LVM_INT32          LVCS_SampleRateTable[];
-
 
 /*Speaker coeffient tables*/
 extern LVM_UINT16               LVCS_MS_Small_SEMiddleGainTable[];
@@ -138,9 +135,6 @@ extern LVM_UINT16               LVCS_MS_Large_StereoDelayCS4MS[];
 extern Gain_t                   LVCS_MS_Large_OutputGainTable[];
 extern LVCS_VolCorrect_t        LVCS_MS_Large_VolCorrectTable[];
 extern LVM_UINT16               LVCS_MS_Large_ReverbGainTable[];
-
-
-
 
 #endif /* __LVCS_TABLES_H__ */
 

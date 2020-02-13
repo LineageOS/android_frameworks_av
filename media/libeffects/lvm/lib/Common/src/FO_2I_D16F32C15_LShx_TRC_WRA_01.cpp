@@ -32,7 +32,6 @@ pBiquadState->pDelays[1] is y(n-1)L in Q30 format
 pBiquadState->pDelays[2] is x(n-1)R in Q15 format
 pBiquadState->pDelays[3] is y(n-1)R in Q30 format
 ***************************************************************************/
-#ifdef BUILD_FLOAT
 void FO_2I_D16F32C15_LShx_TRC_WRA_01(Biquad_FLOAT_Instance_t       *pInstance,
                                      LVM_FLOAT               *pDataIn,
                                      LVM_FLOAT               *pDataOut,
@@ -59,12 +58,10 @@ void FO_2I_D16F32C15_LShx_TRC_WRA_01(Biquad_FLOAT_Instance_t       *pInstance,
             // ynR =A1  * x(n-1)R
             ynR = (LVM_FLOAT)pBiquadState->coefs[0] * pBiquadState->pDelays[2];
 
-
             // ynL+=A0  * x(n)L
             ynL += (LVM_FLOAT)pBiquadState->coefs[1] * (*pDataIn);
             // ynR+=A0  * x(n)L
             ynR += (LVM_FLOAT)pBiquadState->coefs[1] * (*(pDataIn+1));
-
 
             // ynL +=  (-B1  * y(n-1)L  )
             Temp = pBiquadState->pDelays[1] * pBiquadState->coefs[2];
@@ -72,7 +69,6 @@ void FO_2I_D16F32C15_LShx_TRC_WRA_01(Biquad_FLOAT_Instance_t       *pInstance,
             // ynR +=  (-B1  * y(n-1)R ) )
             Temp = pBiquadState->pDelays[3] * pBiquadState->coefs[2];
             ynR += Temp;
-
 
             /**************************************************************************
                             UPDATING THE DELAYS
@@ -157,9 +153,6 @@ void FO_Mc_D16F32C15_LShx_TRC_WRA_01(Biquad_FLOAT_Instance_t *pInstance,
         LVM_FLOAT   A1 = pCoefs[0];
         LVM_FLOAT   B1 = pCoefs[2];
 
-
-
-
         for (ii = NrFrames; ii != 0; ii--)
         {
 
@@ -177,7 +170,6 @@ void FO_Mc_D16F32C15_LShx_TRC_WRA_01(Biquad_FLOAT_Instance_t *pInstance,
                 // yn +=  (-B1  * y(n-1))
                 Temp = B1 * pDelays[1];
                 yn += Temp;
-
 
                 /**************************************************************************
                                 UPDATING THE DELAYS
@@ -202,99 +194,5 @@ void FO_Mc_D16F32C15_LShx_TRC_WRA_01(Biquad_FLOAT_Instance_t *pInstance,
             }
             pDelays -= NrChannels * 2;
         }
-    }
-#endif
-#else
-void FO_2I_D16F32C15_LShx_TRC_WRA_01(Biquad_Instance_t       *pInstance,
-                                     LVM_INT16               *pDataIn,
-                                     LVM_INT16               *pDataOut,
-                                     LVM_INT16               NrSamples)
-    {
-        LVM_INT32   ynL,ynR;
-        LVM_INT32   Temp;
-        LVM_INT32   NegSatValue;
-        LVM_INT16   ii;
-        LVM_INT16   Shift;
-        PFilter_State pBiquadState = (PFilter_State) pInstance;
-
-        NegSatValue = LVM_MAXINT_16 +1;
-        NegSatValue = -NegSatValue;
-
-        Shift = pBiquadState->Shift;
-
-
-        for (ii = NrSamples; ii != 0; ii--)
-        {
-
-            /**************************************************************************
-                            PROCESSING OF THE LEFT CHANNEL
-            ***************************************************************************/
-
-            // ynL =A1 (Q15) * x(n-1)L (Q15) in Q30
-            ynL=(LVM_INT32)pBiquadState->coefs[0]* pBiquadState->pDelays[0];
-            // ynR =A1 (Q15) * x(n-1)R (Q15) in Q30
-            ynR=(LVM_INT32)pBiquadState->coefs[0]* pBiquadState->pDelays[2];
-
-
-            // ynL+=A0 (Q15) * x(n)L (Q15) in Q30
-            ynL+=(LVM_INT32)pBiquadState->coefs[1]* (*pDataIn);
-            // ynR+=A0 (Q15) * x(n)L (Q15) in Q30
-            ynR+=(LVM_INT32)pBiquadState->coefs[1]* (*(pDataIn+1));
-
-
-            // ynL +=  (-B1 (Q15) * y(n-1)L (Q30) ) in Q30
-            MUL32x16INTO32(pBiquadState->pDelays[1],pBiquadState->coefs[2],Temp,15);
-            ynL +=Temp;
-            // ynR +=  (-B1 (Q15) * y(n-1)R (Q30) ) in Q30
-            MUL32x16INTO32(pBiquadState->pDelays[3],pBiquadState->coefs[2],Temp,15);
-            ynR +=Temp;
-
-
-            /**************************************************************************
-                            UPDATING THE DELAYS
-            ***************************************************************************/
-            pBiquadState->pDelays[1]=ynL; // Update y(n-1)L in Q30
-            pBiquadState->pDelays[0]=(*pDataIn++); // Update x(n-1)L in Q15
-
-            pBiquadState->pDelays[3]=ynR; // Update y(n-1)R in Q30
-            pBiquadState->pDelays[2]=(*pDataIn++); // Update x(n-1)R in Q15
-
-            /**************************************************************************
-                            WRITING THE OUTPUT
-            ***************************************************************************/
-            /*Apply shift: Instead of left shift on 16-bit result, right shift of (15-shift) is applied
-              for better SNR*/
-            ynL = ynL>>(15-Shift);
-            ynR = ynR>>(15-Shift);
-
-            /*Saturate results*/
-            if(ynL > LVM_MAXINT_16)
-            {
-                ynL = LVM_MAXINT_16;
-            }
-            else
-            {
-                if(ynL < NegSatValue)
-                {
-                    ynL = NegSatValue;
-                }
-            }
-
-            if(ynR > LVM_MAXINT_16)
-            {
-                ynR = LVM_MAXINT_16;
-            }
-            else
-            {
-                if(ynR < NegSatValue)
-                {
-                    ynR = NegSatValue;
-                }
-            }
-
-            *pDataOut++=(LVM_INT16)ynL;
-            *pDataOut++=(LVM_INT16)ynR;
-        }
-
     }
 #endif

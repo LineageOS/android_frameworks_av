@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-
 /****************************************************************************************/
 /*                                                                                      */
 /*    Includes                                                                          */
@@ -60,7 +59,6 @@ LVM_ReturnStatus_en LVM_GetSpectrum(
     pLVPSA_Handle_t        *hPSAInstance;
     LVPSA_RETURN           LVPSA_Status;
 
-
     if(pInstance == LVM_NULL)
     {
         return LVM_NULLADDRESS;
@@ -79,7 +77,6 @@ LVM_ReturnStatus_en LVM_GetSpectrum(
     {
         return LVM_NULLADDRESS;
     }
-
 
     /*
      * Update new parameters if necessary
@@ -114,7 +111,6 @@ LVM_ReturnStatus_en LVM_GetSpectrum(
 
     return(LVM_SUCCESS);
 }
-
 
 /****************************************************************************************/
 /*                                                                                      */
