@@ -54,7 +54,6 @@ void Copy_16( const LVM_INT16 *src,
 
     return;
 }
-#ifdef BUILD_FLOAT
 void Copy_Float( const LVM_FLOAT *src,
                  LVM_FLOAT *dst,
                  LVM_INT16  n )
@@ -143,6 +142,5 @@ void Copy_Float_Stereo_Mc(const LVM_FLOAT *src,
         src_st -= 2;
     }
 }
-#endif
 #endif
 /**********************************************************************************/

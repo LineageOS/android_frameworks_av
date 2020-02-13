@@ -29,10 +29,7 @@
 /*######################################################################################*/
 
 #include "ScalarArithmetic.h"
-#ifdef BUILD_FLOAT
 #include <math.h>
-#endif
-
 
 /****************************************************************************************
  *  Name        : dB_to_Lin32()
@@ -67,7 +64,6 @@
 #define SECOND_COEF      38836
 #define MAX_VALUE        1536                   /* 96 * 16 */
 
-#ifdef BUILD_FLOAT
 LVM_FLOAT   dB_to_LinFloat(LVM_INT16    db_fix)
 {
     LVM_FLOAT    dB_Float;
@@ -78,47 +74,3 @@ LVM_FLOAT   dB_to_LinFloat(LVM_INT16    db_fix)
 
     return LinFloat;
 }
-#else
-LVM_INT32   dB_to_Lin32(LVM_INT16    db_fix)
-{
-    LVM_INT32 Lin_val_32;
-    LVM_INT16 Shift;
-    LVM_INT32 Remain;
-
-
-    /*
-     * Check sign of the input
-     */
-    if (db_fix<0)
-    {
-        if (db_fix > -MAX_VALUE)
-        {
-            Shift  = (LVM_INT16)((((LVM_UINT32)(-db_fix) >> 4) * FOUR_OVER_SIX) >> 17);        /* Number of 6dB steps in Q11.4 format */
-            Remain = -db_fix - (Shift * SIX_DB);
-            Remain = (0x7FFFFFFF - (Remain * FIRST_COEF_NEG)) + (Remain * Remain * SECOND_COEF);
-            Lin_val_32 = (LVM_INT32)((LVM_UINT32)Remain >> (16 + Shift));
-        }
-        else
-        {
-            Lin_val_32 = 0;
-        }
-    }
-    else
-    {
-        if (db_fix < MAX_VALUE)
-        {
-            Shift  = (LVM_INT16)((((LVM_UINT32)db_fix >> 4) * FOUR_OVER_SIX) >> 17);        /* Number of 6dB steps in Q11.4 format */
-            Remain = db_fix - (Shift * SIX_DB);
-            Remain = 0x3FFFFFFF + (Remain * FIRST_COEF_POS) + (Remain * Remain * SECOND_COEF);
-            Lin_val_32 = (LVM_INT32)((LVM_UINT32)Remain >> (15 - Shift));
-        }
-        else
-        {
-            Lin_val_32 = 0x7FFFFFFF;
-        }
-    }
-
-
-    return Lin_val_32;  /* format 1.16.15 */
-}
-#endif
