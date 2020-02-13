@@ -139,7 +139,6 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
     INST_ALLOC          AllocMem[LVM_NR_MEMORY_REGIONS];
     LVM_INT16           i;
 
-
     /*
      * Check parameters
      */
@@ -147,7 +146,6 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
     {
         return LVM_NULLADDRESS;
     }
-
 
     /*
      * Return memory table if the instance has already been created
@@ -227,20 +225,15 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
     InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_SLOW_DATA],
         sizeof(LVM_Instance_t));
 
-
     /*
      * Set the algorithm and bundle scratch requirements
      */
     AlgScratchSize    = 0;
     if (pInstParams->BufferMode == LVM_MANAGED_BUFFERS)
     {
-#ifdef BUILD_FLOAT
         BundleScratchSize = 3 * LVM_MAX_CHANNELS \
                             * (MIN_INTERNAL_BLOCKSIZE + InternalBlockSize) \
                             * sizeof(LVM_FLOAT);
-#else
-        BundleScratchSize = 6 * (MIN_INTERNAL_BLOCKSIZE + InternalBlockSize) * sizeof(LVM_INT16);
-#endif
         InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_TEMPORARY_FAST],        /* Scratch buffer */
                             BundleScratchSize);
         InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_SLOW_DATA],
@@ -293,7 +286,6 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
 
     }
 
-
     /*
      * Dynamic Bass Enhancement requirements
      */
@@ -304,7 +296,6 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
         /*
          * Set the capabilities
          */
-#if defined(BUILD_FLOAT) && defined(HIGHER_FS)
         DBE_Capabilities.SampleRate      = LVDBE_CAP_FS_8000 | LVDBE_CAP_FS_11025 |
                                            LVDBE_CAP_FS_12000 | LVDBE_CAP_FS_16000 |
                                            LVDBE_CAP_FS_22050 | LVDBE_CAP_FS_24000 |
@@ -312,9 +303,6 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
                                            LVDBE_CAP_FS_48000 | LVDBE_CAP_FS_88200 |
                                            LVDBE_CAP_FS_96000 | LVDBE_CAP_FS_176400 |
                                            LVDBE_CAP_FS_192000;
-#else
-        DBE_Capabilities.SampleRate      = LVDBE_CAP_FS_8000 | LVDBE_CAP_FS_11025 | LVDBE_CAP_FS_12000 | LVDBE_CAP_FS_16000 | LVDBE_CAP_FS_22050 | LVDBE_CAP_FS_24000 | LVDBE_CAP_FS_32000 | LVDBE_CAP_FS_44100 | LVDBE_CAP_FS_48000;
-#endif
         DBE_Capabilities.CentreFrequency = LVDBE_CAP_CENTRE_55Hz | LVDBE_CAP_CENTRE_55Hz | LVDBE_CAP_CENTRE_66Hz | LVDBE_CAP_CENTRE_78Hz | LVDBE_CAP_CENTRE_90Hz;
         DBE_Capabilities.MaxBlockSize    = InternalBlockSize;
 
@@ -336,7 +324,6 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
 
     }
 
-
     /*
      * N-Band equaliser requirements
      */
@@ -347,7 +334,6 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
         /*
          * Set the capabilities
          */
-#if defined(BUILD_FLOAT) && defined(HIGHER_FS)
         EQNB_Capabilities.SampleRate   = LVEQNB_CAP_FS_8000 | LVEQNB_CAP_FS_11025 |
                                          LVEQNB_CAP_FS_12000 | LVEQNB_CAP_FS_16000 |
                                          LVEQNB_CAP_FS_22050 | LVEQNB_CAP_FS_24000 |
@@ -355,9 +341,6 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
                                          LVEQNB_CAP_FS_48000 | LVEQNB_CAP_FS_88200 |
                                          LVEQNB_CAP_FS_96000 | LVEQNB_CAP_FS_176400 |
                                          LVEQNB_CAP_FS_192000;
-#else
-        EQNB_Capabilities.SampleRate   = LVEQNB_CAP_FS_8000 | LVEQNB_CAP_FS_11025 | LVEQNB_CAP_FS_12000 | LVEQNB_CAP_FS_16000 | LVEQNB_CAP_FS_22050 | LVEQNB_CAP_FS_24000 | LVEQNB_CAP_FS_32000 | LVEQNB_CAP_FS_44100 | LVEQNB_CAP_FS_48000;
-#endif
         EQNB_Capabilities.SourceFormat = LVEQNB_CAP_STEREO | LVEQNB_CAP_MONOINSTEREO;
         EQNB_Capabilities.MaxBlockSize = InternalBlockSize;
         EQNB_Capabilities.MaxBands     = pInstParams->EQNB_NumBands;
@@ -387,7 +370,6 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
                        (LVM_HEADROOM_MAX_NBANDS * sizeof(LVM_HeadroomBandDef_t)));
     InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_FAST_DATA],
                        (LVM_HEADROOM_MAX_NBANDS * sizeof(LVM_HeadroomBandDef_t)));
-
 
     /*
      * Spectrum Analyzer memory requirements
@@ -441,13 +423,8 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
                 PSA_MemTab.Region[LVM_PERSISTENT_FAST_COEF].Size);
 
             /* Fast Temporary */
-#ifdef BUILD_FLOAT
             InstAlloc_AddMember(&AllocMem[LVM_TEMPORARY_FAST],
                                 MAX_INTERNAL_BLOCKSIZE * sizeof(LVM_FLOAT));
-#else
-            InstAlloc_AddMember(&AllocMem[LVM_TEMPORARY_FAST],
-                                MAX_INTERNAL_BLOCKSIZE * sizeof(LVM_INT16));
-#endif
 
             if (PSA_MemTab.Region[LVM_TEMPORARY_FAST].Size > AlgScratchSize)
             {
@@ -493,7 +470,6 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
 
 }
 
-
 /****************************************************************************************/
 /*                                                                                      */
 /* FUNCTION:                LVM_GetInstanceHandle                                       */
@@ -528,7 +504,6 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
     LVM_INT16               i;
     LVM_UINT16              InternalBlockSize;
     LVM_INT32               BundleScratchSize;
-
 
     /*
      * Check valid points have been given
@@ -592,7 +567,6 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
                        pMemoryTable->Region[i].pBaseAddress);
     }
 
-
     /*
      * Set the instance handle
      */
@@ -600,13 +574,11 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
                                                      sizeof(LVM_Instance_t));
     pInstance =(LVM_Instance_t  *)*phInstance;
 
-
     /*
      * Save the memory table, parameters and capabilities
      */
     pInstance->MemoryTable    = *pMemoryTable;
     pInstance->InstParams     = *pInstParams;
-
 
     /*
      * Set the bundle scratch memory and initialse the buffer management
@@ -624,7 +596,6 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
     }
     pInstance->InternalBlockSize = (LVM_INT16)InternalBlockSize;
 
-
     /*
      * Common settings for managed and unmanaged buffers
      */
@@ -637,32 +608,21 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
         pInstance->pBufferManagement = (LVM_Buffer_t *)
             InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_SLOW_DATA],
                                                            sizeof(LVM_Buffer_t));
-#ifdef BUILD_FLOAT
         BundleScratchSize = (LVM_INT32)
                             (3 * LVM_MAX_CHANNELS \
                              * (MIN_INTERNAL_BLOCKSIZE + InternalBlockSize) \
                              * sizeof(LVM_FLOAT));
-#else
-        BundleScratchSize = (LVM_INT32)(6 * (MIN_INTERNAL_BLOCKSIZE + InternalBlockSize) * sizeof(LVM_INT16));
-#endif
         pInstance->pBufferManagement->pScratch = (LVM_FLOAT *)
             InstAlloc_AddMember(
                          &AllocMem[LVM_MEMREGION_TEMPORARY_FAST], /* Scratch 1 buffer */
                                                   (LVM_UINT32)BundleScratchSize);
-#ifdef BUILD_FLOAT
         LoadConst_Float(0,                                   /* Clear the input delay buffer */
                         (LVM_FLOAT *)&pInstance->pBufferManagement->InDelayBuffer,
                         (LVM_INT16)(LVM_MAX_CHANNELS * MIN_INTERNAL_BLOCKSIZE));
-#else
-        LoadConst_16(0,                                                        /* Clear the input delay buffer */
-                     (LVM_INT16 *)&pInstance->pBufferManagement->InDelayBuffer,
-                     (LVM_INT16)(2 * MIN_INTERNAL_BLOCKSIZE));
-#endif
         pInstance->pBufferManagement->InDelaySamples = MIN_INTERNAL_BLOCKSIZE; /* Set the number of delay samples */
         pInstance->pBufferManagement->OutDelaySamples = 0;                     /* No samples in the output buffer */
         pInstance->pBufferManagement->BufferState = LVM_FIRSTCALL;             /* Set the state ready for the first call */
     }
-
 
     /*
      * Set default parameters
@@ -678,7 +638,6 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
      * Set callback
      */
     pInstance->CallBack = LVM_AlgoCallBack;
-
 
     /*
      * DC removal filter
@@ -701,7 +660,6 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
     pInstance->Params.TE_EffectLevel   = 0;
     pInstance->TE_Active               = LVM_FALSE;
 
-
     /*
      * Set the volume control and initialise Current to Target
      */
@@ -713,26 +671,14 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
     /* In managed buffering, start with low signal level as delay in buffer management causes a click*/
     if (pInstParams->BufferMode == LVM_MANAGED_BUFFERS)
     {
-#ifdef BUILD_FLOAT
         LVC_Mixer_Init(&pInstance->VC_Volume.MixerStream[0], 0, 0);
-#else
-        LVC_Mixer_Init(&pInstance->VC_Volume.MixerStream[0],0,0);
-#endif
     }
     else
     {
-#ifdef BUILD_FLOAT
         LVC_Mixer_Init(&pInstance->VC_Volume.MixerStream[0], LVM_MAXFLOAT, LVM_MAXFLOAT);
-#else
-        LVC_Mixer_Init(&pInstance->VC_Volume.MixerStream[0],LVM_MAXINT_16,LVM_MAXINT_16);
-#endif
     }
 
-#ifdef BUILD_FLOAT
     LVC_Mixer_SetTimeConstant(&pInstance->VC_Volume.MixerStream[0],0,LVM_FS_8000,2);
-#else
-    LVC_Mixer_SetTimeConstant(&pInstance->VC_Volume.MixerStream[0], 0, LVM_FS_8000, 2);
-#endif
 
     pInstance->VC_VolumedB                  = 0;
     pInstance->VC_AVLFixedVolume            = 0;
@@ -742,22 +688,14 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
     pInstance->VC_BalanceMix.MixerStream[0].CallbackSet        = 0;
     pInstance->VC_BalanceMix.MixerStream[0].pCallbackHandle    = pInstance;
     pInstance->VC_BalanceMix.MixerStream[0].pCallBack          = LVM_VCCallBack;
-#ifdef BUILD_FLOAT
     LVC_Mixer_Init(&pInstance->VC_BalanceMix.MixerStream[0], LVM_MAXFLOAT, LVM_MAXFLOAT);
-#else
-    LVC_Mixer_Init(&pInstance->VC_BalanceMix.MixerStream[0],LVM_MAXINT_16,LVM_MAXINT_16);
-#endif
     LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_BalanceMix.MixerStream[0],LVM_VC_MIXER_TIME,LVM_FS_8000,2);
 
     pInstance->VC_BalanceMix.MixerStream[1].CallbackParam      = 0;
     pInstance->VC_BalanceMix.MixerStream[1].CallbackSet        = 0;
     pInstance->VC_BalanceMix.MixerStream[1].pCallbackHandle    = pInstance;
     pInstance->VC_BalanceMix.MixerStream[1].pCallBack          = LVM_VCCallBack;
-#ifdef BUILD_FLOAT
     LVC_Mixer_Init(&pInstance->VC_BalanceMix.MixerStream[1], LVM_MAXFLOAT, LVM_MAXFLOAT);
-#else
-    LVC_Mixer_Init(&pInstance->VC_BalanceMix.MixerStream[1],LVM_MAXINT_16,LVM_MAXINT_16);
-#endif
     LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_BalanceMix.MixerStream[1],LVM_VC_MIXER_TIME,LVM_FS_8000,2);
 
     /*
@@ -769,7 +707,6 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
     pInstance->pEQNB_UserDefs =
         (LVM_EQNB_BandDef_t *)InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_FAST_DATA],
                                    (pInstParams->EQNB_NumBands * sizeof(LVM_EQNB_BandDef_t)));
-
 
     /*
      * Initialise the Concert Sound module
@@ -794,7 +731,6 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
         CS_Capabilities.MaxBlockSize    = (LVM_UINT16)InternalBlockSize;
         CS_Capabilities.CallBack = pInstance->CallBack;
         CS_Capabilities.pBundleInstance = (void*)pInstance;
-
 
         /*
          * Get the memory requirements and then set the address pointers, forcing alignment
@@ -831,7 +767,6 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
         LVDBE_Capabilities_t    DBE_Capabilities;           /* Initial capabilities */
         LVDBE_ReturnStatus_en   LVDBE_Status;               /* Function call status */
 
-
         /*
          * Set the initialisation parameters
          */
@@ -842,12 +777,9 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
 
         pInstance->DBE_Active              = LVM_FALSE;
 
-
-
         /*
          * Set the initialisation capabilities
          */
-#if defined(BUILD_FLOAT) && defined(HIGHER_FS)
         DBE_Capabilities.SampleRate      = LVDBE_CAP_FS_8000 | LVDBE_CAP_FS_11025 |
                                            LVDBE_CAP_FS_12000 | LVDBE_CAP_FS_16000 |
                                            LVDBE_CAP_FS_22050 | LVDBE_CAP_FS_24000 |
@@ -855,12 +787,8 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
                                            LVDBE_CAP_FS_48000 | LVDBE_CAP_FS_88200 |
                                            LVDBE_CAP_FS_96000 | LVDBE_CAP_FS_176400 |
                                            LVDBE_CAP_FS_192000;
-#else
-        DBE_Capabilities.SampleRate      = LVDBE_CAP_FS_8000 | LVDBE_CAP_FS_11025 | LVDBE_CAP_FS_12000 | LVDBE_CAP_FS_16000 | LVDBE_CAP_FS_22050 | LVDBE_CAP_FS_24000 | LVDBE_CAP_FS_32000 | LVDBE_CAP_FS_44100 | LVDBE_CAP_FS_48000;
-#endif
         DBE_Capabilities.CentreFrequency = LVDBE_CAP_CENTRE_55Hz | LVDBE_CAP_CENTRE_55Hz | LVDBE_CAP_CENTRE_66Hz | LVDBE_CAP_CENTRE_78Hz | LVDBE_CAP_CENTRE_90Hz;
         DBE_Capabilities.MaxBlockSize    = (LVM_UINT16)InternalBlockSize;
-
 
         /*
          * Get the memory requirements and then set the address pointers
@@ -876,7 +804,6 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
         DBE_MemTab.Region[LVDBE_MEMREGION_SCRATCH].pBaseAddress         = (void *)InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_TEMPORARY_FAST],
                                                                                                       0);
 
-
         /*
          * Initialise the Dynamic Bass Enhancement instance and save the instance handle
          */
@@ -888,7 +815,6 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
         pInstance->hDBEInstance = hDBEInstance;             /* Save the instance handle */
     }
 
-
     /*
      * Initialise the N-Band Equaliser module
      */
@@ -898,7 +824,6 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
         LVEQNB_Capabilities_t    EQNB_Capabilities;         /* Initial capabilities */
         LVEQNB_ReturnStatus_en   LVEQNB_Status;             /* Function call status */
 
-
         /*
          * Set the initialisation parameters
          */
@@ -907,11 +832,9 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
         pInstance->Params.pEQNB_BandDefinition = LVM_NULL;
         pInstance->EQNB_Active                 = LVM_FALSE;
 
-
         /*
          * Set the initialisation capabilities
          */
-#if defined(BUILD_FLOAT) && defined(HIGHER_FS)
         EQNB_Capabilities.SampleRate      = LVEQNB_CAP_FS_8000 | LVEQNB_CAP_FS_11025 |
                                             LVEQNB_CAP_FS_12000 | LVEQNB_CAP_FS_16000 |
                                             LVEQNB_CAP_FS_22050 | LVEQNB_CAP_FS_24000 |
@@ -919,15 +842,11 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
                                             LVEQNB_CAP_FS_48000 | LVEQNB_CAP_FS_88200 |
                                             LVEQNB_CAP_FS_96000 | LVEQNB_CAP_FS_176400 |
                                             LVEQNB_CAP_FS_192000;
-#else
-        EQNB_Capabilities.SampleRate      = LVEQNB_CAP_FS_8000 | LVEQNB_CAP_FS_11025 | LVEQNB_CAP_FS_12000 | LVEQNB_CAP_FS_16000 | LVEQNB_CAP_FS_22050 | LVEQNB_CAP_FS_24000 | LVEQNB_CAP_FS_32000 | LVEQNB_CAP_FS_44100 | LVEQNB_CAP_FS_48000;
-#endif
         EQNB_Capabilities.MaxBlockSize    = (LVM_UINT16)InternalBlockSize;
         EQNB_Capabilities.MaxBands        = pInstParams->EQNB_NumBands;
         EQNB_Capabilities.SourceFormat    = LVEQNB_CAP_STEREO | LVEQNB_CAP_MONOINSTEREO;
         EQNB_Capabilities.CallBack        = pInstance->CallBack;
         EQNB_Capabilities.pBundleInstance  = (void*)pInstance;
-
 
         /*
          * Get the memory requirements and then set the address pointers, forcing alignment
@@ -942,7 +861,6 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
                                                                                                         EQNB_MemTab.Region[LVEQNB_MEMREGION_PERSISTENT_COEF].Size);
         EQNB_MemTab.Region[LVEQNB_MEMREGION_SCRATCH].pBaseAddress         = (void *)InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_TEMPORARY_FAST],
                                                                                                         0);
-
 
         /*
          * Initialise the Dynamic Bass Enhancement instance and save the instance handle
@@ -980,7 +898,6 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
         pInstance->Headroom =0;
     }
 
-
     /*
      * Initialise the PSA module
      */
@@ -1017,27 +934,19 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
             PSA_MemTab.Region[LVM_PERSISTENT_SLOW_DATA].pBaseAddress = (void *)InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_SLOW_DATA],
                 PSA_MemTab.Region[LVM_PERSISTENT_SLOW_DATA].Size);
 
-
             /* Fast Data */
             PSA_MemTab.Region[LVM_PERSISTENT_FAST_DATA].pBaseAddress = (void *)InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_FAST_DATA],
                 PSA_MemTab.Region[LVM_PERSISTENT_FAST_DATA].Size);
-
 
             /* Fast Coef */
             PSA_MemTab.Region[LVM_PERSISTENT_FAST_COEF].pBaseAddress = (void *)InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_PERSISTENT_FAST_COEF],
                 PSA_MemTab.Region[LVM_PERSISTENT_FAST_COEF].Size);
 
             /* Fast Temporary */
-#ifdef BUILD_FLOAT
             pInstance->pPSAInput = (LVM_FLOAT *)InstAlloc_AddMember(&AllocMem[LVM_TEMPORARY_FAST],
                                                        (LVM_UINT32) MAX_INTERNAL_BLOCKSIZE * \
                                                        sizeof(LVM_FLOAT));
-#else
-            pInstance->pPSAInput = InstAlloc_AddMember(&AllocMem[LVM_TEMPORARY_FAST],
-                                                       (LVM_UINT32) MAX_INTERNAL_BLOCKSIZE * sizeof(LVM_INT16));
-#endif
             PSA_MemTab.Region[LVM_TEMPORARY_FAST].pBaseAddress       = (void *)InstAlloc_AddMember(&AllocMem[LVM_MEMREGION_TEMPORARY_FAST],0);
-
 
             /*Initialise PSA instance and save the instance handle*/
             pInstance->PSA_ControlParams.Fs = LVM_FS_48000;
@@ -1073,7 +982,6 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
      */
     pInstance->NewParams = pInstance->Params;
 
-
     /*
      * Create configuration number
      */
@@ -1099,7 +1007,6 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
 
     return(Status);
 }
-
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -1127,7 +1034,6 @@ LVM_ReturnStatus_en LVM_ClearAudioBuffers(LVM_Handle_t  hInstance)
     LVM_ControlParams_t     Params;                                     /* Control Parameters */
     LVM_Instance_t          *pInstance  = (LVM_Instance_t  *)hInstance; /* Pointer to Instance */
     LVM_HeadroomParams_t    HeadroomParams;
-
 
     if(hInstance == LVM_NULL){
         return LVM_NULLADDRESS;
@@ -1165,6 +1071,4 @@ LVM_ReturnStatus_en LVM_ClearAudioBuffers(LVM_Handle_t  hInstance)
 
     return LVM_SUCCESS;
 }
-
-
 

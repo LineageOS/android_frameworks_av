@@ -22,7 +22,6 @@
 /****************************************************************************************/
 #include "LVREV_Private.h"
 
-
 /****************************************************************************************/
 /*                                                                                      */
 /* FUNCTION:                LVREV_GetControlParameters                                  */
@@ -48,7 +47,6 @@ LVREV_ReturnStatus_en LVREV_GetControlParameters(LVREV_Handle_t           hInsta
 {
 
     LVREV_Instance_st  *pLVREV_Private = (LVREV_Instance_st *)hInstance;
-
 
     /*
      * Check for error conditions

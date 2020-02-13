@@ -18,7 +18,6 @@
 #include "BIQUAD.h"
 #include "DC_2I_D16_TRC_WRA_01_Private.h"
 #include "LVM_Macros.h"
-#ifdef BUILD_FLOAT
 void DC_2I_D16_TRC_WRA_01( Biquad_FLOAT_Instance_t       *pInstance,
                            LVM_FLOAT               *pDataIn,
                            LVM_FLOAT               *pDataOut,
@@ -45,7 +44,6 @@ void DC_2I_D16_TRC_WRA_01( Biquad_FLOAT_Instance_t       *pInstance,
             else {
                 LeftDC += DC_FLOAT_STEP; }
 
-
             /* Subtract DC an saturate */
             Diff =* (pDataIn++) - (RightDC);
             if (Diff > 1.0f) {
@@ -61,7 +59,6 @@ void DC_2I_D16_TRC_WRA_01( Biquad_FLOAT_Instance_t       *pInstance,
         }
         pBiquadState->LeftDC = LeftDC;
         pBiquadState->RightDC = RightDC;
-
 
     }
 #ifdef SUPPORT_MC
@@ -113,53 +110,6 @@ void DC_Mc_D16_TRC_WRA_01(Biquad_FLOAT_Instance_t       *pInstance,
             }
 
         }
-
-    }
-#endif
-#else
-void DC_2I_D16_TRC_WRA_01( Biquad_Instance_t       *pInstance,
-                           LVM_INT16               *pDataIn,
-                           LVM_INT16               *pDataOut,
-                           LVM_INT16               NrSamples)
-    {
-        LVM_INT32 LeftDC,RightDC;
-        LVM_INT32 Diff;
-        LVM_INT32 j;
-        PFilter_State pBiquadState = (PFilter_State) pInstance;
-
-        LeftDC  =   pBiquadState->LeftDC;
-        RightDC =   pBiquadState->RightDC;
-        for(j=NrSamples-1;j>=0;j--)
-        {
-            /* Subtract DC an saturate */
-            Diff=*(pDataIn++)-(LeftDC>>16);
-            if (Diff > 32767) {
-                Diff = 32767; }
-            else if (Diff < -32768) {
-                Diff = -32768; }
-            *(pDataOut++)=(LVM_INT16)Diff;
-            if (Diff < 0) {
-                LeftDC -= DC_D16_STEP; }
-            else {
-                LeftDC += DC_D16_STEP; }
-
-
-            /* Subtract DC an saturate */
-            Diff=*(pDataIn++)-(RightDC>>16);
-            if (Diff > 32767) {
-                Diff = 32767; }
-            else if (Diff < -32768) {
-                Diff = -32768; }
-            *(pDataOut++)=(LVM_INT16)Diff;
-            if (Diff < 0) {
-                RightDC -= DC_D16_STEP; }
-            else {
-                RightDC += DC_D16_STEP; }
-
-        }
-        pBiquadState->LeftDC    =   LeftDC;
-        pBiquadState->RightDC   =   RightDC;
-
 
     }
 #endif
