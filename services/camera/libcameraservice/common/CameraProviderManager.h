@@ -417,6 +417,9 @@ private:
         status_t notifyDeviceStateChange(
                 hardware::hidl_bitfield<hardware::camera::provider::V2_5::DeviceState>
                     newDeviceState);
+
+        std::vector<std::unordered_set<std::string>> getConcurrentCameraIdCombinations();
+
         /**
          * Query the camera provider for concurrent stream configuration support
          */
@@ -510,8 +513,6 @@ private:
         // physical camera IDs.
         std::vector<std::string> mProviderPublicCameraIds;
 
-        std::vector<std::unordered_set<std::string>> mConcurrentCameraIdCombinations;
-
         // HALv1-specific camera fields, including the actual device interface
         struct DeviceInfo1 : public DeviceInfo {
             typedef hardware::camera::device::V1_0::ICameraDevice InterfaceT;
@@ -600,6 +601,8 @@ private:
 
         bool mInitialized = false;
 
+        std::vector<std::unordered_set<std::string>> mConcurrentCameraIdCombinations;
+
         // Templated method to instantiate the right kind of DeviceInfo and call the
         // right CameraProvider getCameraDeviceInterface_* method.
         template<class DeviceInfoT>
@@ -623,6 +626,12 @@ private:
         static metadata_vendor_id_t generateVendorTagId(const std::string &name);
 
         void removeDevice(std::string id);
+
+        // Expects to have mLock locked
+        status_t reCacheConcurrentStreamingCameraIdsLocked();
+        // Expects to have mLock locked
+        status_t getConcurrentStreamingCameraIdsInternalLocked(
+                sp<hardware::camera::provider::V2_6::ICameraProvider> &interface2_6);
     };
 
     // Utility to find a DeviceInfo by ID; pointer is only valid while mInterfaceMutex is held

@@ -1352,29 +1352,9 @@ status_t CameraProviderManager::ProviderInfo::initialize(
 
     // Get list of concurrent streaming camera device combinations
     if (mMinorVersion >= 6) {
-        hardware::Return<void> ret = interface2_6->getConcurrentStreamingCameraIds([&status, this](
-                Status concurrentIdStatus, // TODO: Move all instances of hidl_string to 'using'
-                const hardware::hidl_vec<hardware::hidl_vec<hardware::hidl_string>>&
-                        cameraDeviceIdCombinations) {
-            status = concurrentIdStatus;
-            if (status == Status::OK) {
-                for (auto& combination : cameraDeviceIdCombinations) {
-                    std::unordered_set<std::string> deviceIds;
-                    for (auto &cameraDeviceId : combination) {
-                        deviceIds.insert(cameraDeviceId.c_str());
-                    }
-                    mConcurrentCameraIdCombinations.push_back(std::move(deviceIds));
-                }
-            } });
-        if (!ret.isOk()) {
-            ALOGE("%s: Transaction error in getting camera ID list from provider '%s': %s",
-                    __FUNCTION__, mProviderName.c_str(), linked.description().c_str());
-            return DEAD_OBJECT;
-        }
-        if (status != Status::OK) {
-            ALOGE("%s: Unable to query for camera devices from provider '%s'",
-                    __FUNCTION__, mProviderName.c_str());
-            return mapToStatusT(status);
+        res = getConcurrentStreamingCameraIdsInternalLocked(interface2_6);
+        if (res != OK) {
+            return res;
         }
     }
 
@@ -1626,6 +1606,75 @@ status_t CameraProviderManager::ProviderInfo::dump(int fd, const Vector<String16
     return OK;
 }
 
+status_t CameraProviderManager::ProviderInfo::getConcurrentStreamingCameraIdsInternalLocked(
+        sp<provider::V2_6::ICameraProvider> &interface2_6) {
+    if (interface2_6 == nullptr) {
+        ALOGE("%s: null interface provided", __FUNCTION__);
+        return BAD_VALUE;
+    }
+    Status status = Status::OK;
+    hardware::Return<void> ret =
+            interface2_6->getConcurrentStreamingCameraIds([&status, this](
+            Status concurrentIdStatus, // TODO: Move all instances of hidl_string to 'using'
+            const hardware::hidl_vec<hardware::hidl_vec<hardware::hidl_string>>&
+                        cameraDeviceIdCombinations) {
+            status = concurrentIdStatus;
+            if (status == Status::OK) {
+                mConcurrentCameraIdCombinations.clear();
+                for (auto& combination : cameraDeviceIdCombinations) {
+                    std::unordered_set<std::string> deviceIds;
+                    for (auto &cameraDeviceId : combination) {
+                        deviceIds.insert(cameraDeviceId.c_str());
+                    }
+                    mConcurrentCameraIdCombinations.push_back(std::move(deviceIds));
+                }
+            } });
+    if (!ret.isOk()) {
+        ALOGE("%s: Transaction error in getting concurrent camera ID list from provider '%s'",
+                __FUNCTION__, mProviderName.c_str());
+            return DEAD_OBJECT;
+    }
+    if (status != Status::OK) {
+        ALOGE("%s: Unable to query for camera devices from provider '%s'",
+                    __FUNCTION__, mProviderName.c_str());
+        return mapToStatusT(status);
+    }
+    return OK;
+}
+
+status_t CameraProviderManager::ProviderInfo::reCacheConcurrentStreamingCameraIdsLocked() {
+    if (mMinorVersion < 6) {
+      // Unsupported operation, nothing to do here
+      return OK;
+    }
+    // Check if the provider is currently active - not going to start it up for this notification
+    auto interface = mSavedInterface != nullptr ? mSavedInterface : mActiveInterface.promote();
+    if (interface == nullptr) {
+        ALOGE("%s: camera provider interface for %s is not valid", __FUNCTION__,
+                mProviderName.c_str());
+        return INVALID_OPERATION;
+    }
+    auto castResult = provider::V2_6::ICameraProvider::castFrom(interface);
+
+    if (castResult.isOk()) {
+        sp<provider::V2_6::ICameraProvider> interface2_6 = castResult;
+        if (interface2_6 != nullptr) {
+            return getConcurrentStreamingCameraIdsInternalLocked(interface2_6);
+        } else {
+            // This should not happen since mMinorVersion >= 6
+            ALOGE("%s: mMinorVersion was >= 6, but interface2_6 was nullptr", __FUNCTION__);
+            return UNKNOWN_ERROR;
+        }
+    }
+    return OK;
+}
+
+std::vector<std::unordered_set<std::string>>
+CameraProviderManager::ProviderInfo::getConcurrentCameraIdCombinations() {
+    std::lock_guard<std::mutex> lock(mLock);
+    return mConcurrentCameraIdCombinations;
+}
+
 hardware::Return<void> CameraProviderManager::ProviderInfo::cameraDeviceStatusChange(
         const hardware::hidl_string& cameraDeviceName,
         CameraDeviceStatus newStatus) {
@@ -1659,6 +1708,10 @@ hardware::Return<void> CameraProviderManager::ProviderInfo::cameraDeviceStatusCh
         }
         listener = mManager->getStatusListener();
         initialized = mInitialized;
+        if (reCacheConcurrentStreamingCameraIdsLocked() != OK) {
+            ALOGE("%s: CameraProvider %s could not re-cache concurrent streaming camera id list ",
+                      __FUNCTION__, mProviderName.c_str());
+        }
     }
     // Call without lock held to allow reentrancy into provider manager
     // Don't send the callback if providerInfo hasn't been initialized.
@@ -2747,7 +2800,7 @@ CameraProviderManager::getConcurrentStreamingCameraIds() const {
     std::vector<std::unordered_set<std::string>> deviceIdCombinations;
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     for (auto &provider : mProviders) {
-        for (auto &combinations : provider->mConcurrentCameraIdCombinations) {
+        for (auto &combinations : provider->getConcurrentCameraIdCombinations()) {
             deviceIdCombinations.push_back(combinations);
         }
     }
@@ -2831,7 +2884,7 @@ status_t CameraProviderManager::isConcurrentSessionConfigurationSupported(
     // TODO: we should also do a findDeviceInfoLocked here ?
     for (auto &provider : mProviders) {
         if (checkIfSetContainsAll(cameraIdsAndSessionConfigs,
-                provider->mConcurrentCameraIdCombinations)) {
+                provider->getConcurrentCameraIdCombinations())) {
             // For each camera device in cameraIdsAndSessionConfigs collect
             // the streamConfigs and create the HAL
             // CameraIdAndStreamCombination, exit early if needed
