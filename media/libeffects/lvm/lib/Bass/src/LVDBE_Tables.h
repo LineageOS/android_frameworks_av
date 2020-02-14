@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-
 /************************************************************************************/
 /*                                                                                  */
 /*    Includes                                                                      */
@@ -24,57 +23,8 @@
 #ifndef __LVBDE_TABLES_H__
 #define __LVBDE_TABLES_H__
 
-
 #include "BIQUAD.h"
 #include "LVM_Types.h"
-
-#ifndef BUILD_FLOAT
-/************************************************************************************/
-/*                                                                                  */
-/*    Coefficients constant table                                                   */
-/*                                                                                  */
-/************************************************************************************/
-
-/*
- * High Pass Filter Coefficient table
- */
-extern const BQ_C32_Coefs_t LVDBE_HPF_Table[];
-
-/*
- * Band Pass Filter coefficient table
- */
-extern const BP_C32_Coefs_t LVDBE_BPF_Table[];
-
-/************************************************************************************/
-/*                                                                                  */
-/*    AGC constant tables                                                           */
-/*                                                                                  */
-/************************************************************************************/
-
-/* Attack time (signal too large) */
-extern const LVM_INT16 LVDBE_AGC_ATTACK_Table[];
-
-/* Decay time (signal too small) */
-extern const LVM_INT16 LVDBE_AGC_DECAY_Table[];
-
-/* Gain for use without the high pass filter */
-extern const LVM_INT32 LVDBE_AGC_GAIN_Table[];
-
-/* Gain for use with the high pass filter */
-extern const LVM_INT32 LVDBE_AGC_HPFGAIN_Table[];
-
-/************************************************************************************/
-/*                                                                                  */
-/*    Volume control gain and time constant tables                                  */
-/*                                                                                  */
-/************************************************************************************/
-
-/* dB to linear conversion table */
-extern const LVM_INT16 LVDBE_VolumeTable[];
-
-extern const LVM_INT16 LVDBE_VolumeTCTable[];
-
-#else /*BUILD_FLOAT*/
 
 /************************************************************************************/
 /*                                                                                  */
@@ -120,10 +70,6 @@ extern const LVM_FLOAT LVDBE_AGC_HPFGAIN_Table[];
 extern const LVM_FLOAT LVDBE_VolumeTable[];
 extern const LVM_FLOAT LVDBE_VolumeTCTable[];
 
-#endif /*BUILD_FLOAT*/
-
 extern const LVM_INT16 LVDBE_MixerTCTable[];
-
-
 
 #endif /* __LVBDE_TABLES_H__ */

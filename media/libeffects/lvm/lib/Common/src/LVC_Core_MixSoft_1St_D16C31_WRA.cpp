@@ -26,7 +26,6 @@
 /**********************************************************************************
    FUNCTION LVCore_MIXSOFT_1ST_D16C31_WRA
 ***********************************************************************************/
-#ifdef BUILD_FLOAT
 void LVC_Core_MixSoft_1St_D16C31_WRA(LVMixer3_FLOAT_st *ptrInstance,
                                      const LVM_FLOAT   *src,
                                            LVM_FLOAT   *dst,
@@ -105,7 +104,6 @@ void LVC_Core_MixSoft_1St_D16C31_WRA(LVMixer3_FLOAT_st *ptrInstance,
     }
     pInstance->Current=Current;
 }
-
 
 #ifdef SUPPORT_MC
 /*
@@ -218,80 +216,4 @@ void LVC_Core_MixSoft_Mc_D16C31_WRA(LVMixer3_FLOAT_st *ptrInstance,
 }
 #endif
 
-#else
-void LVC_Core_MixSoft_1St_D16C31_WRA( LVMixer3_st *ptrInstance,
-                                    const LVM_INT16     *src,
-                                          LVM_INT16     *dst,
-                                          LVM_INT16     n)
-{
-    LVM_INT16   OutLoop;
-    LVM_INT16   InLoop;
-    LVM_INT16   CurrentShort;
-    LVM_INT32   ii;
-    Mix_Private_st  *pInstance=(Mix_Private_st *)(ptrInstance->PrivateParams);
-    LVM_INT32   Delta=pInstance->Delta;
-    LVM_INT32   Current=pInstance->Current;
-    LVM_INT32   Target=pInstance->Target;
-    LVM_INT32   Temp;
-
-    InLoop = (LVM_INT16)(n >> 2); /* Process per 4 samples */
-    OutLoop = (LVM_INT16)(n - (InLoop << 2));
-
-    if(Current<Target){
-        if (OutLoop){
-            ADD2_SAT_32x32(Current,Delta,Temp);                                      /* Q31 + Q31 into Q31*/
-            Current=Temp;
-            if (Current > Target)
-                Current = Target;
-
-            CurrentShort = (LVM_INT16)(Current>>16);                                 /* From Q31 to Q15*/
-
-            for (ii = OutLoop; ii != 0; ii--){
-                *(dst++) = (LVM_INT16)(((LVM_INT32)*(src++) * (LVM_INT32)CurrentShort)>>15);    /* Q15*Q15>>15 into Q15 */
-            }
-        }
-
-        for (ii = InLoop; ii != 0; ii--){
-            ADD2_SAT_32x32(Current,Delta,Temp);                                      /* Q31 + Q31 into Q31*/
-            Current=Temp;
-            if (Current > Target)
-                Current = Target;
-
-            CurrentShort = (LVM_INT16)(Current>>16);                                 /* From Q31 to Q15*/
-
-            *(dst++) = (LVM_INT16)(((LVM_INT32)*(src++) * (LVM_INT32)CurrentShort)>>15);    /* Q15*Q15>>15 into Q15 */
-            *(dst++) = (LVM_INT16)(((LVM_INT32)*(src++) * (LVM_INT32)CurrentShort)>>15);
-            *(dst++) = (LVM_INT16)(((LVM_INT32)*(src++) * (LVM_INT32)CurrentShort)>>15);
-            *(dst++) = (LVM_INT16)(((LVM_INT32)*(src++) * (LVM_INT32)CurrentShort)>>15);
-        }
-    }
-    else{
-        if (OutLoop){
-            Current -= Delta;                                                        /* Q31 + Q31 into Q31*/
-            if (Current < Target)
-                Current = Target;
-
-            CurrentShort = (LVM_INT16)(Current>>16);                                 /* From Q31 to Q15*/
-
-            for (ii = OutLoop; ii != 0; ii--){
-                *(dst++) = (LVM_INT16)(((LVM_INT32)*(src++) * (LVM_INT32)CurrentShort)>>15);    /* Q15*Q15>>15 into Q15 */
-            }
-        }
-
-        for (ii = InLoop; ii != 0; ii--){
-            Current -= Delta;                                                        /* Q31 + Q31 into Q31*/
-            if (Current < Target)
-                Current = Target;
-
-            CurrentShort = (LVM_INT16)(Current>>16);                                 /* From Q31 to Q15*/
-
-            *(dst++) = (LVM_INT16)(((LVM_INT32)*(src++) * (LVM_INT32)CurrentShort)>>15);    /* Q15*Q15>>15 into Q15 */
-            *(dst++) = (LVM_INT16)(((LVM_INT32)*(src++) * (LVM_INT32)CurrentShort)>>15);
-            *(dst++) = (LVM_INT16)(((LVM_INT32)*(src++) * (LVM_INT32)CurrentShort)>>15);
-            *(dst++) = (LVM_INT16)(((LVM_INT32)*(src++) * (LVM_INT32)CurrentShort)>>15);
-        }
-    }
-    pInstance->Current=Current;
-}
-#endif
 /**********************************************************************************/

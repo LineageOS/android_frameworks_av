@@ -48,7 +48,6 @@ LVREV_ReturnStatus_en LVREV_SetControlParameters(LVREV_Handle_t           hInsta
 
     LVREV_Instance_st     *pLVREV_Private = (LVREV_Instance_st *)hInstance;
 
-
     /*
      * Check for error conditions
      */
@@ -67,10 +66,8 @@ LVREV_ReturnStatus_en LVREV_SetControlParameters(LVREV_Handle_t           hInsta
         (pNewParams->SampleRate != LVM_FS_32000) &&
         (pNewParams->SampleRate != LVM_FS_44100) &&
         (pNewParams->SampleRate != LVM_FS_48000)
-#ifdef HIGHER_FS
         && (pNewParams->SampleRate != LVM_FS_88200) && (pNewParams->SampleRate != LVM_FS_96000)
         && (pNewParams->SampleRate != LVM_FS_176400) && (pNewParams->SampleRate != LVM_FS_192000)
-#endif
         )
 #ifdef SUPPORT_MC
         || ((pNewParams->SourceFormat != LVM_STEREO)       &&
@@ -83,7 +80,6 @@ LVREV_ReturnStatus_en LVREV_SetControlParameters(LVREV_Handle_t           hInsta
     {
         return (LVREV_OUTOFRANGE);
     }
-
 
     if (pNewParams->Level > LVREV_MAX_LEVEL)
     {
@@ -119,8 +115,6 @@ LVREV_ReturnStatus_en LVREV_SetControlParameters(LVREV_Handle_t           hInsta
     {
         return LVREV_OUTOFRANGE;
     }
-
-
 
     /*
      * Copy the new parameters and set the flag to indicate they are available

@@ -26,7 +26,6 @@
    FUNCTION CORE_MIXSOFT_1ST_D32C31_WRA
 ***********************************************************************************/
 
-#ifdef BUILD_FLOAT /* BUILD_FLOAT */
 void Core_MixInSoft_D32C31_SAT(     Mix_1St_Cll_FLOAT_t       *pInstance,
                                     const LVM_FLOAT     *src,
                                           LVM_FLOAT     *dst,
@@ -38,7 +37,6 @@ void Core_MixInSoft_D32C31_SAT(     Mix_1St_Cll_FLOAT_t       *pInstance,
     LVM_FLOAT    TargetTimesOneMinAlpha;
     LVM_FLOAT    CurrentTimesAlpha;
     LVM_INT16     ii,jj;
-
 
     InLoop = (LVM_INT16)(n >> 2); /* Process per 4 samples */
     OutLoop = (LVM_INT16)(n - (InLoop << 2));
@@ -89,69 +87,4 @@ void Core_MixInSoft_D32C31_SAT(     Mix_1St_Cll_FLOAT_t       *pInstance,
         }
     }
 }
-#else
-void Core_MixInSoft_D32C31_SAT(     Mix_1St_Cll_t       *pInstance,
-                                    const LVM_INT32     *src,
-                                          LVM_INT32     *dst,
-                                          LVM_INT16     n)
-{
-    LVM_INT32    Temp1,Temp2,Temp3;
-    LVM_INT16     OutLoop;
-    LVM_INT16     InLoop;
-    LVM_INT32    TargetTimesOneMinAlpha;
-    LVM_INT32    CurrentTimesAlpha;
-    LVM_INT16     ii,jj;
-    LVM_INT16   CurrentShort;
-
-    InLoop = (LVM_INT16)(n >> 2); /* Process per 4 samples */
-    OutLoop = (LVM_INT16)(n - (InLoop << 2));
-
-    MUL32x32INTO32((0x7FFFFFFF-pInstance->Alpha),pInstance->Target,TargetTimesOneMinAlpha,31); /* Q31 * Q0 in Q0 */
-    if (pInstance->Target >= pInstance->Current){
-         TargetTimesOneMinAlpha +=2; /* Ceil*/
-    }
-
-    if (OutLoop){
-        MUL32x32INTO32(pInstance->Current,pInstance->Alpha,CurrentTimesAlpha,31);       /* Q0 * Q31 in Q0 */
-        pInstance->Current = TargetTimesOneMinAlpha + CurrentTimesAlpha;                /* Q0 + Q0 into Q0*/
-        CurrentShort = (LVM_INT16)(pInstance->Current>>16);                             /* From Q31 to Q15*/
-
-        for (ii = OutLoop; ii != 0; ii--){
-        Temp1=*src++;
-        Temp2=*dst;
-        MUL32x16INTO32(Temp1,CurrentShort,Temp3,15)
-        Temp1=(Temp2>>1)+(Temp3>>1);
-
-        if (Temp1 > 0x3FFFFFFF)
-            Temp1 = 0x7FFFFFFF;
-        else if (Temp1 < - 0x40000000)
-            Temp1 =  0x80000000;
-        else
-            Temp1=(Temp1<<1);
-            *dst++ = Temp1;
-        }
-    }
-
-    for (ii = InLoop; ii != 0; ii--){
-        MUL32x32INTO32(pInstance->Current,pInstance->Alpha,CurrentTimesAlpha,31);       /* Q0 * Q31 in Q0 */
-        pInstance->Current = TargetTimesOneMinAlpha + CurrentTimesAlpha;                /* Q0 + Q0 into Q0*/
-        CurrentShort = (LVM_INT16)(pInstance->Current>>16);                             /* From Q31 to Q15*/
-
-        for (jj = 4; jj!=0 ; jj--){
-        Temp1=*src++;
-        Temp2=*dst;
-        MUL32x16INTO32(Temp1,CurrentShort,Temp3,15)
-        Temp1=(Temp2>>1)+(Temp3>>1);
-
-        if (Temp1 > 0x3FFFFFFF)
-            Temp1 = 0x7FFFFFFF;
-        else if (Temp1 < - 0x40000000)
-            Temp1 =  0x80000000;
-        else
-            Temp1=(Temp1<<1);
-            *dst++ = Temp1;
-        }
-    }
-}
-#endif
 /**********************************************************************************/

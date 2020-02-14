@@ -19,7 +19,6 @@
 #include "BIQUAD.h"
 #include "FO_1I_D16F16Css_TRC_WRA_01_Private.h"
 
-
 /*-------------------------------------------------------------------------*/
 /* FUNCTION:                                                               */
 /*   FO_1I_D16F16Css_TRC_WRA_01_Init                                       */
@@ -38,7 +37,6 @@
 /* RETURNS:                                                                */
 /*   void return code                                                      */
 /*-------------------------------------------------------------------------*/
-#ifdef BUILD_FLOAT
 void FO_1I_D16F16Css_TRC_WRA_01_Init(    Biquad_FLOAT_Instance_t         *pInstance,
                                          Biquad_1I_Order1_FLOAT_Taps_t   *pTaps,
                                          FO_FLOAT_Coefs_t            *pCoef)
@@ -53,23 +51,6 @@ void FO_1I_D16F16Css_TRC_WRA_01_Init(    Biquad_FLOAT_Instance_t         *pInsta
     temp = pCoef->B1;
     pBiquadState->coefs[2] = temp;
 }
-#else
-void FO_1I_D16F16Css_TRC_WRA_01_Init(    Biquad_Instance_t         *pInstance,
-                                         Biquad_1I_Order1_Taps_t   *pTaps,
-                                         FO_C16_Coefs_t            *pCoef)
-{
-  LVM_INT16 temp;
-  PFilter_State pBiquadState = (PFilter_State)  pInstance;
-  pBiquadState->pDelays      =(LVM_INT32 *)     pTaps;
-
-  temp=pCoef->A1;
-  pBiquadState->coefs[0]=temp;
-  temp=pCoef->A0;
-  pBiquadState->coefs[1]=temp;
-  temp=pCoef->B1;
-  pBiquadState->coefs[2]=temp;
-}
-#endif
 /*------------------------------------------------*/
 /* End Of File: FO_1I_D16F16Css_TRC_WRA_01_Init.c */
 
