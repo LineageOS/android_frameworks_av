@@ -72,7 +72,7 @@ public:
                                               const char *device_address,
                                               const char *device_name,
                                               audio_format_t encodedFormat);
-    virtual status_t setPhoneState(audio_mode_t state);
+    virtual status_t setPhoneState(audio_mode_t state, uid_t uid);
     virtual status_t setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config);
     virtual audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage);
     virtual audio_io_handle_t getOutput(audio_stream_type_t stream);
@@ -880,6 +880,7 @@ private:
     // those can call back into AudioPolicyService methods and try to acquire the mutex
     sp<AudioPolicyEffects> mAudioPolicyEffects;
     audio_mode_t mPhoneState;
+    uid_t mPhoneStateOwnerUid;
 
     sp<UidPolicy> mUidPolicy;
     sp<SensorPrivacyPolicy> mSensorPrivacyPolicy;

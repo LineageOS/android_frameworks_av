@@ -170,11 +170,12 @@ public:
         return static_cast <status_t> (reply.readInt32());
     }
 
-    virtual status_t setPhoneState(audio_mode_t state)
+    virtual status_t setPhoneState(audio_mode_t state, uid_t uid)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
         data.writeInt32(state);
+        data.writeInt32(uid);
         remote()->transact(SET_PHONE_STATE, data, &reply);
         return static_cast <status_t> (reply.readInt32());
     }
@@ -1596,7 +1597,8 @@ status_t BnAudioPolicyService::onTransact(
         case SET_PHONE_STATE: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             reply->writeInt32(static_cast <uint32_t>(setPhoneState(
-                    (audio_mode_t) data.readInt32())));
+                    (audio_mode_t) data.readInt32(),
+                    (uid_t) data.readInt32())));
             return NO_ERROR;
         } break;
 
