@@ -22,10 +22,9 @@
 
 #include <C2Component.h>
 #include <C2PlatformSupport.h>
-#include <codec2/hidl/1.0/ComponentStore.h>
 #include <codec2/hidl/1.1/ComponentStore.h>
-#include <codec2/hidl/1.0/Configurable.h>
-#include <codec2/hidl/1.0/types.h>
+#include <codec2/hidl/1.1/Configurable.h>
+#include <codec2/hidl/1.1/types.h>
 #include <hidl/HidlSupport.h>
 #include <media/CodecServiceRegistrant.h>
 
@@ -36,8 +35,8 @@ using ::android::hardware::hidl_string;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::sp;
-using namespace ::android::hardware::media::c2::V1_0;
-using namespace ::android::hardware::media::c2::V1_0::utils;
+using namespace ::android::hardware::media::c2::V1_1;
+using namespace ::android::hardware::media::c2::V1_1::utils;
 
 constexpr c2_status_t C2_TRANSACTION_FAILED = C2_CORRUPTED;
 
@@ -400,11 +399,10 @@ bool ionPropertiesDefined() {
 } // unnamed namespace
 
 extern "C" void RegisterCodecServices() {
-    using ComponentStore_Latest = ::android::hardware::media::c2::V1_1::
-            utils::ComponentStore;
+    using namespace ::android::hardware::media::c2::V1_1;
     LOG(INFO) << "Creating software Codec2 service...";
-    sp<ComponentStore_Latest> store =
-        new ComponentStore_Latest(::android::GetCodec2PlatformComponentStore());
+    sp<ComponentStore> store =
+        new ComponentStore(::android::GetCodec2PlatformComponentStore());
     if (store == nullptr) {
         LOG(ERROR) <<
                 "Cannot create software Codec2 service.";
