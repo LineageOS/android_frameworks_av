@@ -121,7 +121,7 @@ status_t AudioPolicyService::handleDeviceConfigChange(audio_devices_t device,
                                                          device_name, encodedFormat);
 }
 
-status_t AudioPolicyService::setPhoneState(audio_mode_t state)
+status_t AudioPolicyService::setPhoneState(audio_mode_t state, uid_t uid)
 {
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
@@ -145,6 +145,7 @@ status_t AudioPolicyService::setPhoneState(audio_mode_t state)
     AutoCallerClear acc;
     mAudioPolicyManager->setPhoneState(state);
     mPhoneState = state;
+    mPhoneStateOwnerUid = uid;
     return NO_ERROR;
 }
 

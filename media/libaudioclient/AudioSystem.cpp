@@ -842,13 +842,13 @@ status_t AudioSystem::handleDeviceConfigChange(audio_devices_t device,
     return aps->handleDeviceConfigChange(device, address, name, encodedFormat);
 }
 
-status_t AudioSystem::setPhoneState(audio_mode_t state)
+status_t AudioSystem::setPhoneState(audio_mode_t state, uid_t uid)
 {
     if (uint32_t(state) >= AUDIO_MODE_CNT) return BAD_VALUE;
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    return aps->setPhoneState(state);
+    return aps->setPhoneState(state, uid);
 }
 
 status_t AudioSystem::setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config)

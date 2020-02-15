@@ -969,7 +969,7 @@ MtpResponseCode MtpServer::doSendObjectInfo() {
         modifiedTime = 0;
 
     if ((strcmp(name, ".") == 0) || (strcmp(name, "..") == 0) ||
-        (strcmp(name, "/") == 0) || (strcmp(basename(name), name) != 0)) {
+        (strchr(name, '/') != NULL)) {
         char errMsg[80];
 
         snprintf(errMsg, sizeof(errMsg), "Invalid name: %s", (const char *) name);
@@ -981,7 +981,7 @@ MtpResponseCode MtpServer::doSendObjectInfo() {
     }
     if (path[path.size() - 1] != '/')
         path.append("/");
-    path.append(basename(name));
+    path.append(name);
 
     // check space first
     if (mSendObjectFileSize > storage->getFreeSpace())
