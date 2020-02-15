@@ -1323,6 +1323,8 @@ void CCodec::start() {
         mCallback->onError(err2, ACTION_CODE_FATAL);
         return;
     }
+    // We're not starting after flush.
+    (void)mSentConfigAfterResume.test_and_set();
     err2 = mChannel->start(inputFormat, outputFormat, buffersBoundToCodec);
     if (err2 != OK) {
         mCallback->onError(err2, ACTION_CODE_FATAL);
@@ -1555,16 +1557,25 @@ void CCodec::flush() {
 }
 
 void CCodec::signalResume() {
-    auto setResuming = [this] {
+    std::shared_ptr<Codec2Client::Component> comp;
+    auto setResuming = [this, &comp] {
         Mutexed<State>::Locked state(mState);
         if (state->get() != FLUSHED) {
             return UNKNOWN_ERROR;
         }
         state->set(RESUMING);
+        comp = state->comp;
         return OK;
     };
     if (tryAndReportOnError(setResuming) != OK) {
         return;
+    }
+
+    mSentConfigAfterResume.clear();
+    {
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
+        config->queryConfiguration(comp);
     }
 
     (void)mChannel->start(nullptr, nullptr, [&]{
@@ -1770,7 +1781,7 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
             // handle configuration changes in work done
             Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
             const std::unique_ptr<Config> &config = *configLocked;
-            bool changed = false;
+            bool changed = !mSentConfigAfterResume.test_and_set();
             Config::Watcher<C2StreamInitDataInfo::output> initData =
                 config->watch<C2StreamInitDataInfo::output>();
             if (!work->worklets.empty()
@@ -1802,7 +1813,9 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                     ++stream;
                 }
 
-                changed = config->updateConfiguration(updates, config->mOutputDomain);
+                if (config->updateConfiguration(updates, config->mOutputDomain)) {
+                    changed = true;
+                }
 
                 // copy standard infos to graphic buffers if not already present (otherwise, we
                 // may overwrite the actual intermediate value with a final value)
