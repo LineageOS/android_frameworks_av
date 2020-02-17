@@ -2181,7 +2181,7 @@ status_t ACodec::configureCodec(
             }
             if (!msg->findInt32("aac-target-ref-level", &drc.targetRefLevel)) {
                 // value is unknown
-                drc.targetRefLevel = -1;
+                drc.targetRefLevel = -2;
             }
             if (!msg->findInt32("aac-drc-effect-type", &drc.effectType)) {
                 // value is unknown

@@ -477,7 +477,7 @@ OMX_ERRORTYPE SoftAAC2::internalSetParameter(
                         aacPresParams->nHeavyCompression);
                 updateDrcWrapper = true;
             }
-            if (aacPresParams->nTargetReferenceLevel >= 0) {
+            if (aacPresParams->nTargetReferenceLevel >= -1) {
                 ALOGV("set nTargetReferenceLevel=%d", aacPresParams->nTargetReferenceLevel);
                 mDrcWrap.setParam(DRC_PRES_MODE_WRAP_DESIRED_TARGET,
                         aacPresParams->nTargetReferenceLevel);
