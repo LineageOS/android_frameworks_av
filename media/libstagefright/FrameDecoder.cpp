@@ -647,7 +647,9 @@ status_t VideoFrameDecoder::onOutputReceived(
                 crop_left, crop_top, crop_right, crop_bottom,
                 mFrame->getFlattenedData(),
                 mFrame->mWidth, mFrame->mHeight, mFrame->mRowBytes,
-                crop_left, crop_top, crop_right, crop_bottom);
+                // since the frame is allocated with top-left adjusted,
+                // the dst rect should start at {0,0} as well.
+                0, 0, mFrame->mWidth - 1, mFrame->mHeight - 1);
         return OK;
     }
 
