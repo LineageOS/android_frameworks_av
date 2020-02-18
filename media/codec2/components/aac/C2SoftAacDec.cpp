@@ -40,6 +40,7 @@
 #define DRC_DEFAULT_MOBILE_DRC_BOOST 1.0 /* maximum compression of dynamic range for mobile conf */
 #define DRC_DEFAULT_MOBILE_DRC_HEAVY C2Config::DRC_COMPRESSION_HEAVY   /* switch for heavy compression for mobile conf */
 #define DRC_DEFAULT_MOBILE_DRC_EFFECT 3  /* MPEG-D DRC effect type; 3 => Limited playback range */
+#define DRC_DEFAULT_MOBILE_OUTPUT_LOUDNESS (0.25) /* decoder output loudness; -1 => the value is unknown, otherwise dB step value (e.g. 64 for -16 dB) */
 #define DRC_DEFAULT_MOBILE_ENC_LEVEL (0.25) /* encoder target level; -1 => the value is unknown, otherwise dB step value (e.g. 64 for -16 dB) */
 #define MAX_CHANNEL_COUNT            8  /* maximum number of audio channels that can be decoded */
 // names of properties that can be used to override the default DRC settings
@@ -190,6 +191,13 @@ public:
                 })
                 .withSetter(Setter<decltype(*mDrcEffectType)>::StrictValueWithNoDeps)
                 .build());
+
+        addParameter(
+                DefineParam(mDrcOutputLoudness, C2_PARAMKEY_DRC_OUTPUT_LOUDNESS)
+                .withDefault(new C2StreamDrcOutputLoudnessTuning::output(0u, DRC_DEFAULT_MOBILE_OUTPUT_LOUDNESS))
+                .withFields({C2F(mDrcOutputLoudness, value).inRange(-57.75, 0.25)})
+                .withSetter(Setter<decltype(*mDrcOutputLoudness)>::StrictValueWithNoDeps)
+                .build());
     }
 
     bool isAdts() const { return mAacFormat->value == C2Config::AAC_PACKAGING_ADTS; }
@@ -204,6 +212,7 @@ public:
     int32_t getDrcBoostFactor() const { return mDrcBoostFactor->value * 127. + 0.5; }
     int32_t getDrcAttenuationFactor() const { return mDrcAttenuationFactor->value * 127. + 0.5; }
     int32_t getDrcEffectType() const { return mDrcEffectType->value; }
+    int32_t getDrcOutputLoudness() const { return (mDrcOutputLoudness->value <= 0 ? -mDrcOutputLoudness->value * 4. + 0.5 : -1); }
 
 private:
     std::shared_ptr<C2StreamSampleRateInfo::output> mSampleRate;
@@ -218,6 +227,7 @@ private:
     std::shared_ptr<C2StreamDrcBoostFactorTuning::input> mDrcBoostFactor;
     std::shared_ptr<C2StreamDrcAttenuationFactorTuning::input> mDrcAttenuationFactor;
     std::shared_ptr<C2StreamDrcEffectTypeTuning::input> mDrcEffectType;
+    std::shared_ptr<C2StreamDrcOutputLoudnessTuning::output> mDrcOutputLoudness;
     // TODO Add : C2StreamAacSbrModeTuning
 };
 
@@ -632,6 +642,7 @@ void C2SoftAacDec::process(
 
         INT prevSampleRate = mStreamInfo->sampleRate;
         INT prevNumChannels = mStreamInfo->numChannels;
+        INT prevOutLoudness = mStreamInfo->outputLoudness;
 
         aacDecoder_Fill(mAACDecoder,
                         inBuffer,
@@ -795,6 +806,23 @@ void C2SoftAacDec::process(
                 }
             }
             ALOGV("size = %zu", size);
+
+            if (mStreamInfo->outputLoudness != prevOutLoudness) {
+                C2StreamDrcOutputLoudnessTuning::output
+                        drcOutLoudness(0u, (float) (mStreamInfo->outputLoudness*-0.25));
+
+                std::vector<std::unique_ptr<C2SettingResult>> failures;
+                c2_status_t err = mIntf->config(
+                                    { &drcOutLoudness },
+                                    C2_MAY_BLOCK,
+                                    &failures);
+                if (err == OK) {
+                    work->worklets.front()->output.configUpdate.push_back(
+                        C2Param::Copy(drcOutLoudness));
+                } else {
+                    ALOGE("Getting output loudness failed");
+                }
+            }
         } while (decoderErr == AAC_DEC_OK);
     }
 

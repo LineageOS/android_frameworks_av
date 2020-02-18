@@ -2187,6 +2187,10 @@ status_t ACodec::configureCodec(
                 // value is unknown
                 drc.effectType = -2; // valid values are -1 and over
             }
+            if (!msg->findInt32("aac-drc-output-loudness", &drc.outputLoudness)) {
+                // value is unknown
+                drc.outputLoudness = -1;
+            }
 
             err = setupAACCodec(
                     encoder, numChannels, sampleRate, bitrate, aacProfile,
@@ -2876,6 +2880,7 @@ status_t ACodec::setupAACCodec(
     presentation.nEncodedTargetLevel = drc.encodedTargetLevel;
     presentation.nPCMLimiterEnable = pcmLimiterEnable;
     presentation.nDrcEffectType = drc.effectType;
+    presentation.nDrcOutputLoudness = drc.outputLoudness;
 
     status_t res = mOMXNode->setParameter(
             OMX_IndexParamAudioAac, &profile, sizeof(profile));

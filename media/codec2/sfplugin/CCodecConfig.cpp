@@ -34,6 +34,7 @@
 #define DRC_DEFAULT_MOBILE_DRC_BOOST 127 /* maximum compression of dynamic range for mobile conf */
 #define DRC_DEFAULT_MOBILE_DRC_HEAVY 1   /* switch for heavy compression for mobile conf */
 #define DRC_DEFAULT_MOBILE_DRC_EFFECT 3  /* MPEG-D DRC effect type; 3 => Limited playback range */
+#define DRC_DEFAULT_MOBILE_OUTPUT_LOUDNESS -1 /* decoder output loudness; -1 => the value is unknown, otherwise dB step value (e.g. 64 for -16 dB) */
 #define DRC_DEFAULT_MOBILE_ENC_LEVEL (-1) /* encoder target level; -1 => the value is unknown, otherwise dB step value (e.g. 64 for -16 dB) */
 // names of properties that can be used to override the default DRC settings
 #define PROP_DRC_OVERRIDE_REF_LEVEL  "aac_drc_reference_level"
@@ -812,6 +813,22 @@ void CCodecConfig::initializeStandardParams() {
             else {
               return C2Value();
             }
+        }));
+
+    add(ConfigMapper(KEY_AAC_DRC_OUTPUT_LOUDNESS, C2_PARAMKEY_DRC_OUTPUT_LOUDNESS, "value")
+        .limitTo(D::OUTPUT & D::DECODER & D::READ)
+        .withMappers([](C2Value v) -> C2Value {
+            int32_t value;
+            if (!v.get(&value) || value < -1) {
+                value = DRC_DEFAULT_MOBILE_OUTPUT_LOUDNESS;
+            }
+            return float(-0.25 * c2_min(value, 127));
+        },[](C2Value v) -> C2Value {
+            float value;
+            if (v.get(&value)) {
+                return (int32_t) (-4. * value);
+            }
+            return C2Value();
         }));
 
     add(ConfigMapper(KEY_AAC_MAX_OUTPUT_CHANNEL_COUNT, C2_PARAMKEY_MAX_CHANNEL_COUNT, "value")

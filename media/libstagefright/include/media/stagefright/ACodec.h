@@ -476,6 +476,7 @@ private:
         int32_t targetRefLevel;
         int32_t encodedTargetLevel;
         int32_t effectType;
+        int32_t outputLoudness;
     } drcParams_t;
 
     status_t setupAACCodec(

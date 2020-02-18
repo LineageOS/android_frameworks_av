@@ -58,6 +58,7 @@ struct C2Config {
     enum bitrate_mode_t : uint32_t;         ///< bitrate control mode
     enum drc_compression_mode_t : int32_t;  ///< DRC compression mode
     enum drc_effect_type_t : int32_t;       ///< DRC effect type
+    enum drc_output_loudness : int32_t;     ///< DRC output loudness
     enum intra_refresh_mode_t : uint32_t;   ///< intra refresh modes
     enum level_t : uint32_t;                ///< coding level
     enum ordinal_key_t : uint32_t;          ///< work ordering keys
@@ -218,6 +219,7 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexDrcBoostFactor, // drc, float (0-1)
     kParamIndexDrcAttenuationFactor, // drc, float (0-1)
     kParamIndexDrcEffectType, // drc, enum
+    kParamIndexDrcOutputLoudness, // drc, float (dBFS)
 
     /* ============================== platform-defined parameters ============================== */
 
@@ -1940,6 +1942,13 @@ typedef C2StreamParam<C2Info, C2SimpleValueStruct<C2Config::drc_effect_type_t>,
                 kParamIndexDrcEffectType>
         C2StreamDrcEffectTypeTuning;
 constexpr char C2_PARAMKEY_DRC_EFFECT_TYPE[] = "coding.drc.effect-type";
+
+/**
+ * DRC output loudness in dBFS. Retrieved during decoding
+ */
+ typedef C2StreamParam<C2Info, C2FloatValue, kParamIndexDrcOutputLoudness>
+        C2StreamDrcOutputLoudnessTuning;
+ constexpr char C2_PARAMKEY_DRC_OUTPUT_LOUDNESS[] = "output.drc.output-loudness";
 
 /* --------------------------------------- AAC components --------------------------------------- */
 

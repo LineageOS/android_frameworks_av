@@ -737,6 +737,7 @@ constexpr char KEY_AAC_DRC_ATTENUATION_FACTOR[] = "aac-drc-cut-level";
 constexpr char KEY_AAC_DRC_BOOST_FACTOR[] = "aac-drc-boost-level";
 constexpr char KEY_AAC_DRC_EFFECT_TYPE[] = "aac-drc-effect-type";
 constexpr char KEY_AAC_DRC_HEAVY_COMPRESSION[] = "aac-drc-heavy-compression";
+constexpr char KEY_AAC_DRC_OUTPUT_LOUDNESS[] = "aac-drc-output-loudness";
 constexpr char KEY_AAC_DRC_TARGET_REFERENCE_LEVEL[] = "aac-target-ref-level";
 constexpr char KEY_AAC_ENCODED_TARGET_LEVEL[] = "aac-encoded-target-level";
 constexpr char KEY_AAC_MAX_OUTPUT_CHANNEL_COUNT[] = "aac-max-output-channel_count";
