@@ -83,8 +83,7 @@ LVREV_ReturnStatus_en LVREV_ApplyNewSettings (LVREV_Instance_st     *pPrivate)
         FO_1I_D32F32Cll_TRC_WRA_01_Init( &pPrivate->pFastCoef->HPCoefs,
                                          &pPrivate->pFastData->HPTaps, &Coeffs);
         LoadConst_Float(0,
-                (LVM_FLOAT *)&pPrivate->pFastData->HPTaps, /* Destination Cast to void: \
-                                                                 no dereferencing in function*/
+                (LVM_FLOAT *)&pPrivate->pFastData->HPTaps,
                         sizeof(Biquad_1I_Order1_FLOAT_Taps_t) / sizeof(LVM_FLOAT));
     }
 
@@ -116,8 +115,7 @@ LVREV_ReturnStatus_en LVREV_ApplyNewSettings (LVREV_Instance_st     *pPrivate)
         FO_1I_D32F32Cll_TRC_WRA_01_Init( &pPrivate->pFastCoef->LPCoefs,
                                          &pPrivate->pFastData->LPTaps, &Coeffs);
         LoadConst_Float(0,
-                (LVM_FLOAT *)&pPrivate->pFastData->LPTaps, /* Destination Cast to void: \
-                                                                 no dereferencing in function*/
+                (LVM_FLOAT *)&pPrivate->pFastData->LPTaps,
                         sizeof(Biquad_1I_Order1_FLOAT_Taps_t) / sizeof(LVM_FLOAT));
     }
 
