@@ -733,6 +733,7 @@ constexpr int32_t COLOR_TRANSFER_LINEAR = 1;
 constexpr int32_t COLOR_TRANSFER_SDR_VIDEO = 3;
 constexpr int32_t COLOR_TRANSFER_ST2084 = 6;
 
+constexpr char KEY_AAC_DRC_ALBUM_MODE[] = "aac-drc-album-mode";
 constexpr char KEY_AAC_DRC_ATTENUATION_FACTOR[] = "aac-drc-cut-level";
 constexpr char KEY_AAC_DRC_BOOST_FACTOR[] = "aac-drc-boost-level";
 constexpr char KEY_AAC_DRC_EFFECT_TYPE[] = "aac-drc-effect-type";

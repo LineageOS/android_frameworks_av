@@ -34,6 +34,7 @@
 #define DRC_DEFAULT_MOBILE_DRC_BOOST 127 /* maximum compression of dynamic range for mobile conf */
 #define DRC_DEFAULT_MOBILE_DRC_HEAVY 1   /* switch for heavy compression for mobile conf */
 #define DRC_DEFAULT_MOBILE_DRC_EFFECT 3  /* MPEG-D DRC effect type; 3 => Limited playback range */
+#define DRC_DEFAULT_MOBILE_DRC_ALBUM 0   /* MPEG-D DRC album mode; 0 => album mode is disabled, 1 => album mode is enabled */
 #define DRC_DEFAULT_MOBILE_OUTPUT_LOUDNESS -1 /* decoder output loudness; -1 => the value is unknown, otherwise dB step value (e.g. 64 for -16 dB) */
 #define DRC_DEFAULT_MOBILE_ENC_LEVEL (-1) /* encoder target level; -1 => the value is unknown, otherwise dB step value (e.g. 64 for -16 dB) */
 // names of properties that can be used to override the default DRC settings
@@ -809,6 +810,29 @@ void CCodecConfig::initializeStandardParams() {
             int32_t value;
             if (v.get(&value)) {
               return  value;
+            }
+            else {
+              return C2Value();
+            }
+        }));
+
+    // convert to album mode and add default
+    add(ConfigMapper(KEY_AAC_DRC_ALBUM_MODE, C2_PARAMKEY_DRC_ALBUM_MODE, "value")
+        .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ))
+        .withMappers([](C2Value v) -> C2Value {
+            int32_t value;
+            if (!v.get(&value) || value < 0 || value > 1) {
+                value = DRC_DEFAULT_MOBILE_DRC_ALBUM;
+                // ensure value is within range
+                if (value < 0 || value > 1) {
+                    value = DRC_DEFAULT_MOBILE_DRC_ALBUM;
+                }
+            }
+            return value;
+        },[](C2Value v) -> C2Value {
+            int32_t value;
+            if (v.get(&value)) {
+              return value;
             }
             else {
               return C2Value();

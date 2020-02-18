@@ -37,6 +37,7 @@
 #define DRC_DEFAULT_MOBILE_DRC_BOOST 127 /* maximum compression of dynamic range for mobile conf */
 #define DRC_DEFAULT_MOBILE_DRC_HEAVY 1   /* switch for heavy compression for mobile conf */
 #define DRC_DEFAULT_MOBILE_DRC_EFFECT 3  /* MPEG-D DRC effect type; 3 => Limited playback range */
+#define DRC_DEFAULT_MOBILE_DRC_ALBUM 0  /* MPEG-D DRC album mode; 0 => album mode is disabled, 1 => album mode is enabled */
 #define DRC_DEFAULT_MOBILE_ENC_LEVEL (-1) /* encoder target level; -1 => the value is unknown, otherwise dB step value (e.g. 64 for -16 dB) */
 #define MAX_CHANNEL_COUNT            8  /* maximum number of audio channels that can be decoded */
 // names of properties that can be used to override the default DRC settings
@@ -219,6 +220,11 @@ status_t SoftAAC2::initDecoder() {
     ALOGV("AAC decoder using MPEG-D DRC effect type %d (default=%d)",
             effectType, DRC_DEFAULT_MOBILE_DRC_EFFECT);
     aacDecoder_SetParam(mAACDecoder, AAC_UNIDRC_SET_EFFECT, effectType);
+    // AAC_UNIDRC_ALBUM_MODE
+    int32_t albumMode = DRC_DEFAULT_MOBILE_DRC_ALBUM;
+    ALOGV("AAC decoder using MPEG-D Album mode value %d (default=%d)", albumMode,
+            DRC_DEFAULT_MOBILE_DRC_ALBUM);
+    aacDecoder_SetParam(mAACDecoder, AAC_UNIDRC_ALBUM_MODE, albumMode);
 
     // By default, the decoder creates a 5.1 channel downmix signal.
     // For seven and eight channel input streams, enable 6.1 and 7.1 channel output
@@ -458,6 +464,11 @@ OMX_ERRORTYPE SoftAAC2::internalSetParameter(
             if (aacPresParams->nDrcEffectType >= -1) {
                 ALOGV("set nDrcEffectType=%d", aacPresParams->nDrcEffectType);
                 aacDecoder_SetParam(mAACDecoder, AAC_UNIDRC_SET_EFFECT, aacPresParams->nDrcEffectType);
+            }
+            if (aacPresParams->nDrcAlbumMode >= -1) {
+                ALOGV("set nDrcAlbumMode=%d", aacPresParams->nDrcAlbumMode);
+                aacDecoder_SetParam(mAACDecoder, AAC_UNIDRC_ALBUM_MODE,
+                        aacPresParams->nDrcAlbumMode);
             }
             bool updateDrcWrapper = false;
             if (aacPresParams->nDrcBoost >= 0) {

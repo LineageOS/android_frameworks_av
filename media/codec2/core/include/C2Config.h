@@ -58,6 +58,7 @@ struct C2Config {
     enum bitrate_mode_t : uint32_t;         ///< bitrate control mode
     enum drc_compression_mode_t : int32_t;  ///< DRC compression mode
     enum drc_effect_type_t : int32_t;       ///< DRC effect type
+    enum drc_album_mode_t : int32_t;        ///< DRC album mode
     enum drc_output_loudness : int32_t;     ///< DRC output loudness
     enum intra_refresh_mode_t : uint32_t;   ///< intra refresh modes
     enum level_t : uint32_t;                ///< coding level
@@ -220,6 +221,7 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexDrcAttenuationFactor, // drc, float (0-1)
     kParamIndexDrcEffectType, // drc, enum
     kParamIndexDrcOutputLoudness, // drc, float (dBFS)
+    kParamIndexDrcAlbumMode, // drc, enum
 
     /* ============================== platform-defined parameters ============================== */
 
@@ -1942,6 +1944,17 @@ typedef C2StreamParam<C2Info, C2SimpleValueStruct<C2Config::drc_effect_type_t>,
                 kParamIndexDrcEffectType>
         C2StreamDrcEffectTypeTuning;
 constexpr char C2_PARAMKEY_DRC_EFFECT_TYPE[] = "coding.drc.effect-type";
+
+/**
+ * DRC album mode. Used during decoding.
+ */
+C2ENUM(C2Config::drc_album_mode_t, int32_t,
+    DRC_ALBUM_MODE_OFF = 0,
+    DRC_ALBUM_MODE_ON = 1
+)
+typedef C2StreamParam<C2Info, C2SimpleValueStruct<C2Config::drc_album_mode_t>, kParamIndexDrcAlbumMode>
+        C2StreamDrcAlbumModeTuning;
+constexpr char C2_PARAMKEY_DRC_ALBUM_MODE[] = "coding.drc.album-mode";
 
 /**
  * DRC output loudness in dBFS. Retrieved during decoding
