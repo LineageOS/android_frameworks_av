@@ -1872,7 +1872,7 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
     // and the mute set to false).
     mMasterVolume = audioFlinger->masterVolume_l();
     mMasterMute = audioFlinger->masterMute_l();
-    if (mOutput && mOutput->audioHwDev) {
+    if (mOutput->audioHwDev) {
         if (mOutput->audioHwDev->canSetMasterVolume()) {
             mMasterVolume = 1.0;
         }
@@ -2830,7 +2830,7 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
             this/* srcThread */, this/* dstThread */);
     }
 
-    audio_output_flags_t flags = mOutput != nullptr ? mOutput->flags : AUDIO_OUTPUT_FLAG_NONE;
+    audio_output_flags_t flags = mOutput->flags;
     mediametrics::LogItem item(mMetricsId);
     item.set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_READPARAMETERS)
         .set(AMEDIAMETRICS_PROP_ENCODING, formatToString(mFormat).c_str())
