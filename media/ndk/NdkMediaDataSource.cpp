@@ -17,6 +17,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "NdkMediaDataSource"
 
+#include "NdkJavaVMHelperPriv.h"
 #include "NdkMediaDataSourcePriv.h"
 
 #include <inttypes.h>
@@ -30,7 +31,6 @@
 #include <datasource/HTTPBase.h>
 #include <datasource/NuCachedSource2.h>
 #include <media/IMediaHTTPService.h>
-#include <media/NdkJavaVMHelper.h>
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaDataSource.h>
 #include <media/stagefright/InterfaceUtils.h>
