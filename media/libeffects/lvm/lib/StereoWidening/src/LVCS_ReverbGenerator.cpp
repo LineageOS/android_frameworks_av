@@ -109,8 +109,7 @@ LVCS_ReturnStatus_en LVCS_ReverbGeneratorInit(LVCS_Handle_t     hInstance,
         Coeffs.B2 = (LVM_FLOAT)-pReverbCoefTable[Offset].B2;
 
         LoadConst_Float(0,                                 /* Value */
-                        (LVM_FLOAT *)&pData->ReverbBiquadTaps,  /* Destination Cast to void:
-                                                             no dereferencing in function*/
+                        (LVM_FLOAT *)&pData->ReverbBiquadTaps, /* Destination */
                         /* Number of words */
                         (LVM_UINT16)(sizeof(pData->ReverbBiquadTaps) / sizeof(LVM_FLOAT)));
 
