@@ -115,8 +115,7 @@ void    LVDBE_SetFilters(LVDBE_Instance_t     *pInstance,
      * Setup the high pass filter
      */
     LoadConst_Float(0,                                          /* Clear the history, value 0 */
-                   (LVM_FLOAT *)&pInstance->pData->HPFTaps,     /* Destination Cast to void: \
-                                                                  no dereferencing in function*/
+                   (LVM_FLOAT *)&pInstance->pData->HPFTaps,     /* Destination */
                     sizeof(pInstance->pData->HPFTaps) / sizeof(LVM_FLOAT)); /* Number of words */
     BQ_2I_D32F32Cll_TRC_WRA_01_Init(&pInstance->pCoef->HPFInstance,    /* Initialise the filter */
                                     &pInstance->pData->HPFTaps,
@@ -126,8 +125,7 @@ void    LVDBE_SetFilters(LVDBE_Instance_t     *pInstance,
      * Setup the band pass filter
      */
     LoadConst_Float(0,                                           /* Clear the history, value 0 */
-                 (LVM_FLOAT *)&pInstance->pData->BPFTaps,        /* Destination Cast to void: \
-                                                                    no dereferencing in function*/
+                 (LVM_FLOAT *)&pInstance->pData->BPFTaps,        /* Destination */
                  sizeof(pInstance->pData->BPFTaps) / sizeof(LVM_FLOAT));   /* Number of words */
     BP_1I_D32F32Cll_TRC_WRA_02_Init(&pInstance->pCoef->BPFInstance,    /* Initialise the filter */
                                     &pInstance->pData->BPFTaps,
