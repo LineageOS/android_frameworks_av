@@ -91,8 +91,7 @@ LVCS_ReturnStatus_en LVCS_EqualiserInit(LVCS_Handle_t       hInstance,
         Coeffs.B2 = (LVM_FLOAT)-pEqualiserCoefTable[Offset].B2;
 
         LoadConst_Float((LVM_INT16)0,                                         /* Value */
-                        (LVM_FLOAT *)&pData->EqualiserBiquadTaps, /* Destination Cast to void:\
-                                                                  no dereferencing in function*/
+                        (LVM_FLOAT *)&pData->EqualiserBiquadTaps, /* Destination */
                         /* Number of words */
                         (LVM_UINT16)(sizeof(pData->EqualiserBiquadTaps) / sizeof(LVM_FLOAT)));
 

@@ -60,12 +60,10 @@ LVREV_ReturnStatus_en LVREV_ClearAudioBuffers(LVREV_Handle_t  hInstance)
      */
 
     LoadConst_Float(0,
-        (LVM_FLOAT *)&pLVREV_Private->pFastData->HPTaps, /* Destination Cast to void: \
-                                                         no dereferencing in function*/
+        (LVM_FLOAT *)&pLVREV_Private->pFastData->HPTaps,
         2);
     LoadConst_Float(0,
-        (LVM_FLOAT *)&pLVREV_Private->pFastData->LPTaps, /* Destination Cast to void: \
-                                                         no dereferencing in function*/
+        (LVM_FLOAT *)&pLVREV_Private->pFastData->LPTaps,
         2);
     if((LVM_UINT16)pLVREV_Private->InstanceParams.NumDelays == LVREV_DELAYLINES_4)
     {
