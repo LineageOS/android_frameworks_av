@@ -50,6 +50,15 @@ CameraMetadata::CameraMetadata(const CameraMetadata &other) :
     mBuffer = clone_camera_metadata(other.mBuffer);
 }
 
+CameraMetadata::CameraMetadata(CameraMetadata &&other) :mBuffer(NULL),  mLocked(false) {
+    acquire(other);
+}
+
+CameraMetadata &CameraMetadata::operator=(CameraMetadata &&other) {
+    acquire(other);
+    return *this;
+}
+
 CameraMetadata::CameraMetadata(camera_metadata_t *buffer) :
         mBuffer(NULL), mLocked(false) {
     acquire(buffer);
