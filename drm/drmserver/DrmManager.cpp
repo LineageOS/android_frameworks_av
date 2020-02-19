@@ -16,9 +16,10 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "DrmManager(Native)"
-#include "utils/Log.h"
 
+#include <cutils/properties.h>
 #include <utils/String8.h>
+#include <utils/Log.h>
 
 #include <binder/IPCThreadState.h>
 #include <drm/DrmInfo.h>
@@ -37,11 +38,29 @@
 #include "DrmManager.h"
 #include "ReadWriteUtils.h"
 
+#include <algorithm>
+
 #define DECRYPT_FILE_ERROR (-1)
 
 using namespace android;
 
 const String8 DrmManager::EMPTY_STRING("");
+
+const std::map<const char*, size_t> DrmManager::kMethodIdMap {
+    {"getConstraints"     , DrmManagerMethodId::GET_CONSTRAINTS       },
+    {"getMetadata"        , DrmManagerMethodId::GET_METADATA          },
+    {"canHandle"          , DrmManagerMethodId::CAN_HANDLE            },
+    {"processDrmInfo"     , DrmManagerMethodId::PROCESS_DRM_INFO      },
+    {"acquireDrmInfo"     , DrmManagerMethodId::ACQUIRE_DRM_INFO      },
+    {"saveRights"         , DrmManagerMethodId::SAVE_RIGHTS           },
+    {"getOriginalMimeType", DrmManagerMethodId::GET_ORIGINAL_MIME_TYPE},
+    {"getDrmObjectType"   , DrmManagerMethodId::GET_DRM_OBJECT_TYPE   },
+    {"checkRightsStatus"  , DrmManagerMethodId::CHECK_RIGHTS_STATUS   },
+    {"removeRights"       , DrmManagerMethodId::REMOVE_RIGHTS         },
+    {"removeAllRights"    , DrmManagerMethodId::REMOVE_ALL_RIGHTS     },
+    {"openConvertSession" , DrmManagerMethodId::OPEN_CONVERT_SESSION  },
+    {"openDecryptSession" , DrmManagerMethodId::OPEN_DECRYPT_SESSION  }
+};
 
 DrmManager::DrmManager() :
     mDecryptSessionId(0),
@@ -51,40 +70,104 @@ DrmManager::DrmManager() :
 }
 
 DrmManager::~DrmManager() {
-
+    if (mMetricsLooper != NULL) {
+        mMetricsLooper->stop();
+    }
+    flushEngineMetrics();
 }
 
-void DrmManager::reportEngineMetrics(
-        const char func[], const String8& plugInId, const String8& mimeType) {
-    IDrmEngine& engine = mPlugInManager.getPlugIn(plugInId);
+void DrmManager::initMetricsLooper() {
+    if (mMetricsLooper != NULL) {
+        return;
+    }
+    mMetricsLooper = new ALooper;
+    mMetricsLooper->setName("DrmManagerMetricsLooper");
+    mMetricsLooper->start();
+    mMetricsLooper->registerHandler(this);
 
-    std::unique_ptr<mediametrics::Item> item(mediametrics::Item::create("drmmanager"));
-    item->setUid(IPCThreadState::self()->getCallingUid());
-    item->setCString("function_name", func);
-    item->setCString("plugin_id", plugInId.getPathLeaf().getBasePath().c_str());
+    sp<AMessage> msg = new AMessage(kWhatFlushMetrics, this);
+    msg->post(getMetricsFlushPeriodUs());
+}
 
+void DrmManager::onMessageReceived(const sp<AMessage> &msg) {
+    switch (msg->what()) {
+        case kWhatFlushMetrics:
+        {
+            flushEngineMetrics();
+            msg->post(getMetricsFlushPeriodUs());
+            break;
+        }
+        default:
+        {
+            ALOGW("Unrecognized message type: %zd", msg->what());
+        }
+    }
+}
+
+int64_t DrmManager::getMetricsFlushPeriodUs() {
+    return 1000 * 1000 * std::max(1ll, property_get_int64("drmmanager.metrics.period", 86400));
+}
+
+void DrmManager::recordEngineMetrics(
+        const char func[], const String8& plugInId8, const String8& mimeType) {
+    IDrmEngine& engine = mPlugInManager.getPlugIn(plugInId8);
     std::unique_ptr<DrmSupportInfo> info(engine.getSupportInfo(0));
-    if (NULL != info) {
-        item->setCString("description", info->getDescription().c_str());
+
+    uid_t callingUid = IPCThreadState::self()->getCallingUid();
+    std::string plugInId(plugInId8.getPathLeaf().getBasePath().c_str());
+    ALOGV("%d calling %s %s", callingUid, plugInId.c_str(), func);
+
+    Mutex::Autolock _l(mMetricsLock);
+    auto& metrics = mPluginMetrics[std::make_pair(callingUid, plugInId)];
+    if (metrics.mPluginId.empty()) {
+        metrics.mPluginId = plugInId;
+        metrics.mCallingUid = callingUid;
+        if (NULL != info) {
+            metrics.mDescription = info->getDescription().c_str();
+        }
     }
 
     if (!mimeType.isEmpty()) {
-        item->setCString("mime_types", mimeType.c_str());
+        metrics.mMimeTypes.insert(mimeType.c_str());
     } else if (NULL != info) {
         DrmSupportInfo::MimeTypeIterator mimeIter = info->getMimeTypeIterator();
-        String8 mimes;
         while (mimeIter.hasNext()) {
-            mimes += mimeIter.next();
-            if (mimeIter.hasNext()) {
-                mimes += ",";
-            }
+            metrics.mMimeTypes.insert(mimeIter.next().c_str());
         }
-        item->setCString("mime_types", mimes.c_str());
     }
 
-    if (!item->selfrecord()) {
-        ALOGE("Failed to record metrics");
+    size_t methodId = kMethodIdMap.at(func);
+    if (methodId < metrics.mMethodCounts.size()) {
+        metrics.mMethodCounts[methodId]++;
     }
+}
+
+void DrmManager::flushEngineMetrics() {
+    using namespace std::string_literals;
+    Mutex::Autolock _l(mMetricsLock);
+    for (auto kv : mPluginMetrics) {
+        DrmManagerMetrics& metrics = kv.second;
+        std::unique_ptr<mediametrics::Item> item(mediametrics::Item::create("drmmanager"));
+        item->setUid(metrics.mCallingUid);
+        item->setCString("plugin_id", metrics.mPluginId.c_str());
+        item->setCString("description", metrics.mDescription.c_str());
+
+        std::vector<std::string> mimeTypes(metrics.mMimeTypes.begin(), metrics.mMimeTypes.end());
+        std::string mimeTypesStr(mimeTypes.empty() ? "" : mimeTypes[0]);
+        for (size_t i = 1; i < mimeTypes.size() ; i++) {
+            mimeTypesStr.append(",").append(mimeTypes[i]);
+        }
+        item->setCString("mime_types", mimeTypesStr.c_str());
+
+        for (size_t i = 0; i < metrics.mMethodCounts.size() ; i++) {
+            item->setInt64(("method"s + std::to_string(i)).c_str(), metrics.mMethodCounts[i]);
+        }
+
+        if (!item->selfrecord()) {
+            ALOGE("Failed to record metrics");
+        }
+    }
+    mPluginMetrics.clear();
 }
 
 int DrmManager::addUniqueId(bool isNative) {
@@ -184,7 +267,6 @@ void DrmManager::removeClient(int uniqueId) {
     for (size_t index = 0; index < plugInIdList.size(); index++) {
         IDrmEngine& rDrmEngine = mPlugInManager.getPlugIn(plugInIdList.itemAt(index));
         rDrmEngine.terminate(uniqueId);
-        reportEngineMetrics(__func__, plugInIdList[index]);
     }
 }
 
@@ -197,7 +279,7 @@ DrmConstraints* DrmManager::getConstraints(int uniqueId, const String8* path, co
         constraints = rDrmEngine.getConstraints(uniqueId, path, action);
     }
     if (NULL != constraints) {
-        reportEngineMetrics(__func__, plugInId);
+        recordEngineMetrics(__func__, plugInId);
     }
     return constraints;
 }
@@ -211,7 +293,7 @@ DrmMetadata* DrmManager::getMetadata(int uniqueId, const String8* path) {
         meta = rDrmEngine.getMetadata(uniqueId, path);
     }
     if (NULL != meta) {
-        reportEngineMetrics(__func__, plugInId);
+        recordEngineMetrics(__func__, plugInId);
     }
     return meta;
 }
@@ -222,7 +304,7 @@ bool DrmManager::canHandle(int uniqueId, const String8& path, const String8& mim
     bool result = (EMPTY_STRING != plugInId) ? true : false;
 
     if (result) {
-        reportEngineMetrics(__func__, plugInId, mimeType);
+        recordEngineMetrics(__func__, plugInId, mimeType);
     }
 
     if (0 < path.length()) {
@@ -249,7 +331,7 @@ DrmInfoStatus* DrmManager::processDrmInfo(int uniqueId, const DrmInfo* drmInfo) 
         infoStatus = rDrmEngine.processDrmInfo(uniqueId, drmInfo);
     }
     if (NULL != infoStatus) {
-        reportEngineMetrics(__func__, plugInId, mimeType);
+        recordEngineMetrics(__func__, plugInId, mimeType);
     }
     return infoStatus;
 }
@@ -263,7 +345,7 @@ bool DrmManager::canHandle(int uniqueId, const String8& path) {
         result = rDrmEngine.canHandle(uniqueId, path);
 
         if (result) {
-            reportEngineMetrics(__func__, plugInPathList[i]);
+            recordEngineMetrics(__func__, plugInPathList[i]);
             break;
         }
     }
@@ -280,7 +362,7 @@ DrmInfo* DrmManager::acquireDrmInfo(int uniqueId, const DrmInfoRequest* drmInfoR
         info = rDrmEngine.acquireDrmInfo(uniqueId, drmInfoRequest);
     }
     if (NULL != info) {
-        reportEngineMetrics(__func__, plugInId, mimeType);
+        recordEngineMetrics(__func__, plugInId, mimeType);
     }
     return info;
 }
@@ -296,7 +378,7 @@ status_t DrmManager::saveRights(int uniqueId, const DrmRights& drmRights,
         result = rDrmEngine.saveRights(uniqueId, drmRights, rightsPath, contentPath);
     }
     if (DRM_NO_ERROR == result) {
-        reportEngineMetrics(__func__, plugInId, mimeType);
+        recordEngineMetrics(__func__, plugInId, mimeType);
     }
     return result;
 }
@@ -310,7 +392,7 @@ String8 DrmManager::getOriginalMimeType(int uniqueId, const String8& path, int f
         mimeType = rDrmEngine.getOriginalMimeType(uniqueId, path, fd);
     }
     if (!mimeType.isEmpty()) {
-        reportEngineMetrics(__func__, plugInId, mimeType);
+        recordEngineMetrics(__func__, plugInId, mimeType);
     }
     return mimeType;
 }
@@ -324,7 +406,7 @@ int DrmManager::getDrmObjectType(int uniqueId, const String8& path, const String
         type = rDrmEngine.getDrmObjectType(uniqueId, path, mimeType);
     }
     if (DrmObjectType::UNKNOWN != type) {
-        reportEngineMetrics(__func__, plugInId, mimeType);
+        recordEngineMetrics(__func__, plugInId, mimeType);
     }
     return type;
 }
@@ -338,7 +420,7 @@ int DrmManager::checkRightsStatus(int uniqueId, const String8& path, int action)
         rightsStatus = rDrmEngine.checkRightsStatus(uniqueId, path, action);
     }
     if (RightsStatus::RIGHTS_INVALID != rightsStatus) {
-        reportEngineMetrics(__func__, plugInId);
+        recordEngineMetrics(__func__, plugInId);
     }
     return rightsStatus;
 }
@@ -385,7 +467,7 @@ status_t DrmManager::removeRights(int uniqueId, const String8& path) {
         result = rDrmEngine.removeRights(uniqueId, path);
     }
     if (DRM_NO_ERROR == result) {
-        reportEngineMetrics(__func__, plugInId);
+        recordEngineMetrics(__func__, plugInId);
     }
     return result;
 }
@@ -399,7 +481,7 @@ status_t DrmManager::removeAllRights(int uniqueId) {
         if (DRM_NO_ERROR != result) {
             break;
         }
-        reportEngineMetrics(__func__, plugInIdList[index]);
+        recordEngineMetrics(__func__, plugInIdList[index]);
     }
     return result;
 }
@@ -416,7 +498,7 @@ int DrmManager::openConvertSession(int uniqueId, const String8& mimeType) {
             ++mConvertId;
             convertId = mConvertId;
             mConvertSessionMap.add(convertId, &rDrmEngine);
-            reportEngineMetrics(__func__, plugInId, mimeType);
+            recordEngineMetrics(__func__, plugInId, mimeType);
         }
     }
     return convertId;
@@ -497,7 +579,7 @@ sp<DecryptHandle> DrmManager::openDecryptSession(
             if (DRM_NO_ERROR == result) {
                 ++mDecryptSessionId;
                 mDecryptSessionMap.add(mDecryptSessionId, &rDrmEngine);
-                reportEngineMetrics(__func__, plugInId, String8(mime));
+                recordEngineMetrics(__func__, plugInId, String8(mime));
                 break;
             }
         }
@@ -526,7 +608,7 @@ sp<DecryptHandle> DrmManager::openDecryptSession(
             if (DRM_NO_ERROR == result) {
                 ++mDecryptSessionId;
                 mDecryptSessionMap.add(mDecryptSessionId, &rDrmEngine);
-                reportEngineMetrics(__func__, plugInId, String8(mime));
+                recordEngineMetrics(__func__, plugInId, String8(mime));
                 break;
             }
         }
@@ -556,7 +638,7 @@ sp<DecryptHandle> DrmManager::openDecryptSession(
             if (DRM_NO_ERROR == result) {
                 ++mDecryptSessionId;
                 mDecryptSessionMap.add(mDecryptSessionId, &rDrmEngine);
-                reportEngineMetrics(__func__, plugInId, mimeType);
+                recordEngineMetrics(__func__, plugInId, mimeType);
                 break;
             }
         }
