@@ -2181,11 +2181,19 @@ status_t ACodec::configureCodec(
             }
             if (!msg->findInt32("aac-target-ref-level", &drc.targetRefLevel)) {
                 // value is unknown
-                drc.targetRefLevel = -1;
+                drc.targetRefLevel = -2;
             }
             if (!msg->findInt32("aac-drc-effect-type", &drc.effectType)) {
                 // value is unknown
                 drc.effectType = -2; // valid values are -1 and over
+            }
+            if (!msg->findInt32("aac-drc-album-mode", &drc.albumMode)) {
+                // value is unknown
+                drc.albumMode = -1; // valid values are 0 and 1
+            }
+            if (!msg->findInt32("aac-drc-output-loudness", &drc.outputLoudness)) {
+                // value is unknown
+                drc.outputLoudness = -1;
             }
 
             err = setupAACCodec(
@@ -2876,6 +2884,8 @@ status_t ACodec::setupAACCodec(
     presentation.nEncodedTargetLevel = drc.encodedTargetLevel;
     presentation.nPCMLimiterEnable = pcmLimiterEnable;
     presentation.nDrcEffectType = drc.effectType;
+    presentation.nDrcAlbumMode = drc.albumMode;
+    presentation.nDrcOutputLoudness = drc.outputLoudness;
 
     status_t res = mOMXNode->setParameter(
             OMX_IndexParamAudioAac, &profile, sizeof(profile));

@@ -34,6 +34,8 @@
 #define DRC_DEFAULT_MOBILE_DRC_BOOST 127 /* maximum compression of dynamic range for mobile conf */
 #define DRC_DEFAULT_MOBILE_DRC_HEAVY 1   /* switch for heavy compression for mobile conf */
 #define DRC_DEFAULT_MOBILE_DRC_EFFECT 3  /* MPEG-D DRC effect type; 3 => Limited playback range */
+#define DRC_DEFAULT_MOBILE_DRC_ALBUM 0   /* MPEG-D DRC album mode; 0 => album mode is disabled, 1 => album mode is enabled */
+#define DRC_DEFAULT_MOBILE_OUTPUT_LOUDNESS -1 /* decoder output loudness; -1 => the value is unknown, otherwise dB step value (e.g. 64 for -16 dB) */
 #define DRC_DEFAULT_MOBILE_ENC_LEVEL (-1) /* encoder target level; -1 => the value is unknown, otherwise dB step value (e.g. 64 for -16 dB) */
 // names of properties that can be used to override the default DRC settings
 #define PROP_DRC_OVERRIDE_REF_LEVEL  "aac_drc_reference_level"
@@ -700,63 +702,101 @@ void CCodecConfig::initializeStandardParams() {
 
     // convert to dBFS and add default
     add(ConfigMapper(KEY_AAC_DRC_TARGET_REFERENCE_LEVEL, C2_PARAMKEY_DRC_TARGET_REFERENCE_LEVEL, "value")
-        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
-        .withMapper([](C2Value v) -> C2Value {
+        .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ))
+        .withMappers([](C2Value v) -> C2Value {
             int32_t value;
-            if (!v.get(&value) || value < 0) {
+            if (!v.get(&value) || value < -1) {
                 value = property_get_int32(PROP_DRC_OVERRIDE_REF_LEVEL, DRC_DEFAULT_MOBILE_REF_LEVEL);
             }
             return float(-0.25 * c2_min(value, 127));
+        },[](C2Value v) -> C2Value {
+            float value;
+            if (v.get(&value)) {
+                return (int32_t) (-4. * value);
+            }
+            return C2Value();
         }));
 
     // convert to 0-1 (%) and add default
     add(ConfigMapper(KEY_AAC_DRC_ATTENUATION_FACTOR, C2_PARAMKEY_DRC_ATTENUATION_FACTOR, "value")
-        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
-        .withMapper([](C2Value v) -> C2Value {
+        .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ))
+        .withMappers([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < 0) {
                 value = property_get_int32(PROP_DRC_OVERRIDE_CUT, DRC_DEFAULT_MOBILE_DRC_CUT);
             }
             return float(c2_min(value, 127) / 127.);
+        },[](C2Value v) -> C2Value {
+            float value;
+            if (v.get(&value)) {
+              return (int32_t) (value * 127. + 0.5);
+            }
+            else {
+              return C2Value();
+            }
         }));
 
     // convert to 0-1 (%) and add default
     add(ConfigMapper(KEY_AAC_DRC_BOOST_FACTOR, C2_PARAMKEY_DRC_BOOST_FACTOR, "value")
-        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
-        .withMapper([](C2Value v) -> C2Value {
+        .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ))
+        .withMappers([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < 0) {
                 value = property_get_int32(PROP_DRC_OVERRIDE_BOOST, DRC_DEFAULT_MOBILE_DRC_BOOST);
             }
             return float(c2_min(value, 127) / 127.);
+        },[](C2Value v) -> C2Value {
+            float value;
+            if (v.get(&value)) {
+              return (int32_t) (value * 127. + 0.5);
+            }
+            else {
+              return C2Value();
+            }
         }));
 
     // convert to compression type and add default
     add(ConfigMapper(KEY_AAC_DRC_HEAVY_COMPRESSION, C2_PARAMKEY_DRC_COMPRESSION_MODE, "value")
-        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
-        .withMapper([](C2Value v) -> C2Value {
+        .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ))
+        .withMappers([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < 0) {
                 value = property_get_int32(PROP_DRC_OVERRIDE_HEAVY, DRC_DEFAULT_MOBILE_DRC_HEAVY);
             }
             return value == 1 ? C2Config::DRC_COMPRESSION_HEAVY : C2Config::DRC_COMPRESSION_LIGHT;
+        },[](C2Value v) -> C2Value {
+            int32_t value;
+            if (v.get(&value)) {
+              return value;
+            }
+            else {
+              return C2Value();
+            }
         }));
 
     // convert to dBFS and add default
     add(ConfigMapper(KEY_AAC_ENCODED_TARGET_LEVEL, C2_PARAMKEY_DRC_ENCODED_TARGET_LEVEL, "value")
-        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
-        .withMapper([](C2Value v) -> C2Value {
+        .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ))
+        .withMappers([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < 0) {
                 value = property_get_int32(PROP_DRC_OVERRIDE_ENC_LEVEL, DRC_DEFAULT_MOBILE_ENC_LEVEL);
             }
             return float(-0.25 * c2_min(value, 127));
+        },[](C2Value v) -> C2Value {
+            float value;
+            if (v.get(&value)) {
+              return (int32_t) (-4. * value);
+            }
+            else {
+              return C2Value();
+            }
         }));
 
     // convert to effect type (these map to SDK values) and add default
     add(ConfigMapper(KEY_AAC_DRC_EFFECT_TYPE, C2_PARAMKEY_DRC_EFFECT_TYPE, "value")
-        .limitTo(D::AUDIO & D::DECODER & D::CONFIG)
-        .withMapper([](C2Value v) -> C2Value {
+        .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ))
+        .withMappers([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < -1 || value > 8) {
                 value = property_get_int32(PROP_DRC_OVERRIDE_EFFECT, DRC_DEFAULT_MOBILE_DRC_EFFECT);
@@ -766,13 +806,60 @@ void CCodecConfig::initializeStandardParams() {
                 }
             }
             return value;
+        },[](C2Value v) -> C2Value {
+            int32_t value;
+            if (v.get(&value)) {
+              return  value;
+            }
+            else {
+              return C2Value();
+            }
+        }));
+
+    // convert to album mode and add default
+    add(ConfigMapper(KEY_AAC_DRC_ALBUM_MODE, C2_PARAMKEY_DRC_ALBUM_MODE, "value")
+        .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ))
+        .withMappers([](C2Value v) -> C2Value {
+            int32_t value;
+            if (!v.get(&value) || value < 0 || value > 1) {
+                value = DRC_DEFAULT_MOBILE_DRC_ALBUM;
+                // ensure value is within range
+                if (value < 0 || value > 1) {
+                    value = DRC_DEFAULT_MOBILE_DRC_ALBUM;
+                }
+            }
+            return value;
+        },[](C2Value v) -> C2Value {
+            int32_t value;
+            if (v.get(&value)) {
+              return value;
+            }
+            else {
+              return C2Value();
+            }
+        }));
+
+    add(ConfigMapper(KEY_AAC_DRC_OUTPUT_LOUDNESS, C2_PARAMKEY_DRC_OUTPUT_LOUDNESS, "value")
+        .limitTo(D::OUTPUT & D::DECODER & D::READ)
+        .withMappers([](C2Value v) -> C2Value {
+            int32_t value;
+            if (!v.get(&value) || value < -1) {
+                value = DRC_DEFAULT_MOBILE_OUTPUT_LOUDNESS;
+            }
+            return float(-0.25 * c2_min(value, 127));
+        },[](C2Value v) -> C2Value {
+            float value;
+            if (v.get(&value)) {
+                return (int32_t) (-4. * value);
+            }
+            return C2Value();
         }));
 
     add(ConfigMapper(KEY_AAC_MAX_OUTPUT_CHANNEL_COUNT, C2_PARAMKEY_MAX_CHANNEL_COUNT, "value")
-        .limitTo(D::AUDIO));
+        .limitTo(D::AUDIO & (D::CONFIG | D::PARAM | D::READ)));
 
     add(ConfigMapper(KEY_AAC_SBR_MODE, C2_PARAMKEY_AAC_SBR_MODE, "value")
-        .limitTo(D::AUDIO & D::ENCODER & D::CONFIG)
+        .limitTo(D::AUDIO & D::ENCODER & (D::CONFIG | D::PARAM | D::READ))
         .withMapper([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < 0) {
