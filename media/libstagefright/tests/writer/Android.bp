@@ -28,6 +28,7 @@ cc_test {
         "libcutils",
         "liblog",
         "libutils",
+        "libmedia",
     ],
 
     static_libs: [
