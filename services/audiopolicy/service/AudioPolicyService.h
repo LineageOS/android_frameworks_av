@@ -82,6 +82,7 @@ public:
                               audio_stream_type_t *stream,
                               pid_t pid,
                               uid_t uid,
+                              const String16& opPackageName,
                               const audio_config_t *config,
                               audio_output_flags_t flags,
                               audio_port_handle_t *selectedDeviceId,
@@ -807,15 +808,16 @@ private:
                           const audio_io_handle_t io, uid_t uid, pid_t pid,
                           const audio_session_t session, audio_port_handle_t portId,
                           const audio_port_handle_t deviceId, const String16& opPackageName,
-                          bool canCaptureOutput, bool canCaptureHotword) :
+                          bool canCaptureCallOrOutput, bool canCaptureHotword) :
                     AudioClient(attributes, io, uid, pid, session, portId, deviceId),
                     opPackageName(opPackageName), startTimeNs(0),
-                    canCaptureOutput(canCaptureOutput), canCaptureHotword(canCaptureHotword) {}
+                    canCaptureCallOrOutput(canCaptureCallOrOutput),
+                    canCaptureHotword(canCaptureHotword) {}
                 ~AudioRecordClient() override = default;
 
         const String16 opPackageName;        // client package name
         nsecs_t startTimeNs;
-        const bool canCaptureOutput;
+        const bool canCaptureCallOrOutput;
         const bool canCaptureHotword;
     };
 
