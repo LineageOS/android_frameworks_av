@@ -70,6 +70,7 @@ public:
             if (clientInfo.readFromParcel(parcel) != NO_ERROR) {
                 return DEAD_OBJECT;
             }
+            opPackageName = parcel->readString16();
             if (parcel->readInt32() != 0) {
                 // TODO: Using unsecurePointer() has some associated security
                 //       pitfalls (see declaration for details).
@@ -97,6 +98,7 @@ public:
             (void)parcel->write(&attr, sizeof(audio_attributes_t));
             (void)parcel->write(&config, sizeof(audio_config_t));
             (void)clientInfo.writeToParcel(parcel);
+            (void)parcel->writeString16(opPackageName);
             if (sharedBuffer != 0) {
                 (void)parcel->writeInt32(1);
                 (void)parcel->writeStrongBinder(IInterface::asBinder(sharedBuffer));
@@ -119,6 +121,7 @@ public:
         audio_attributes_t attr;
         audio_config_t config;
         AudioClient clientInfo;
+        String16 opPackageName;
         sp<IMemory> sharedBuffer;
         uint32_t notificationsPerBuffer;
         float speed;
