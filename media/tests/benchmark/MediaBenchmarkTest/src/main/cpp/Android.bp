@@ -1,5 +1,6 @@
 cc_test_library {
     name: "libmediabenchmark_jni",
+    sdk_version: "current",
 
     defaults: [
         "libmediabenchmark_common-defaults",
