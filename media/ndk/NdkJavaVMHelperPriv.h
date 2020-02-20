@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#ifndef NDK_JAVA_VM_HELPER_H_
+#ifndef NDK_JAVA_VM_HELPER_PRIV_H_
 
-#define NDK_JAVA_VM_HELPER_H_
+#define NDK_JAVA_VM_HELPER_PRIV_H_
 
 #include "jni.h"
 
@@ -28,4 +28,4 @@ struct NdkJavaVMHelper {
 
 }  // namespace android
 
-#endif  // NDK_JAVA_VM_HELPER_H_
+#endif  // NDK_JAVA_VM_HELPER_PRIV_H_
