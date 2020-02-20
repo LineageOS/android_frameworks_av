@@ -19,6 +19,25 @@ cc_defaults {
         // uncomment to disable NEON on architectures that actually do support NEON, for benchmarking
         // "-DUSE_NEON=false",
     ],
+
+    arch: {
+        x86: {
+            avx2: {
+                cflags: [
+                    "-mavx2",
+                    "-mfma",
+                ],
+            },
+        },
+        x86_64: {
+            avx2: {
+                cflags: [
+                    "-mavx2",
+                    "-mfma",
+                ],
+            },
+        },
+    },
 }
 
 cc_library_shared {
