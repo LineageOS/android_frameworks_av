@@ -67,3 +67,10 @@ cc_test {
     srcs: ["PassthroughTrackTranscoderTests.cpp"],
     shared_libs: ["libcrypto"],
 }
+
+// MediaSampleWriter unit test
+cc_test {
+    name: "MediaSampleWriterTests",
+    defaults: ["testdefaults"],
+    srcs: ["MediaSampleWriterTests.cpp"],
+}
