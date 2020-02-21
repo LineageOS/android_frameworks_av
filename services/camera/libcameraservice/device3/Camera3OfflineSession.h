@@ -212,7 +212,7 @@ class Camera3OfflineSession :
     const uint32_t mNumPartialResults;
 
     std::mutex mOutputLock;
-    List<CaptureResult> mResultQueue;
+    std::list<CaptureResult> mResultQueue;
     std::condition_variable mResultSignal;
     // the minimal frame number of the next non-reprocess result
     uint32_t mNextResultFrameNumber;

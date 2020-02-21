@@ -135,6 +135,8 @@ struct CaptureResult : public virtual LightRefBase<CaptureResult> {
 
     CaptureResult(const CaptureResult& otherResult);
 
+    CaptureResult(CaptureResult &&captureResult);
+
     status_t                readFromParcel(android::Parcel* parcel);
     status_t                writeToParcel(android::Parcel* parcel) const;
 };

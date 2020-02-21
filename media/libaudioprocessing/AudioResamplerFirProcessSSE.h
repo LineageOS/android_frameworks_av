@@ -80,11 +80,16 @@ static inline void ProcessSSEIntrinsic(float* out,
             posCoef1 = _mm_sub_ps(posCoef1, posCoef);
             negCoef = _mm_sub_ps(negCoef, negCoef1);
 
+
+            #if USE_AVX2
+            posCoef = _mm_fmadd_ps(posCoef1, interp, posCoef);
+            negCoef = _mm_fmadd_ps(negCoef, interp, negCoef1);
+            #else
             posCoef1 = _mm_mul_ps(posCoef1, interp);
             negCoef = _mm_mul_ps(negCoef, interp);
-
             posCoef = _mm_add_ps(posCoef1, posCoef);
             negCoef = _mm_add_ps(negCoef, negCoef1);
+            #endif //USE_AVX2
         }
         switch (CHANNELS) {
         case 1: {
@@ -94,11 +99,17 @@ static inline void ProcessSSEIntrinsic(float* out,
             sN += 4;
 
             posSamp = _mm_shuffle_ps(posSamp, posSamp, 0x1B);
+
+            #if USE_AVX2
+            accL = _mm_fmadd_ps(posSamp, posCoef, accL);
+            accL = _mm_fmadd_ps(negSamp, negCoef, accL);
+            #else
             posSamp = _mm_mul_ps(posSamp, posCoef);
             negSamp = _mm_mul_ps(negSamp, negCoef);
-
             accL = _mm_add_ps(accL, posSamp);
             accL = _mm_add_ps(accL, negSamp);
+            #endif
+
         } break;
         case 2: {
             __m128 posSamp0 = _mm_loadu_ps(sP);
@@ -114,15 +125,23 @@ static inline void ProcessSSEIntrinsic(float* out,
             __m128 negSampL = _mm_shuffle_ps(negSamp0, negSamp1, 0x88);
             __m128 negSampR = _mm_shuffle_ps(negSamp0, negSamp1, 0xDD);
 
-            posSampL = _mm_mul_ps(posSampL, posCoef);
-            posSampR = _mm_mul_ps(posSampR, posCoef);
-            negSampL = _mm_mul_ps(negSampL, negCoef);
-            negSampR = _mm_mul_ps(negSampR, negCoef);
+           #if USE_AVX2
+           accL = _mm_fmadd_ps(posSampL, posCoef, accL);
+           accR = _mm_fmadd_ps(posSampR, posCoef, accR);
+           accL = _mm_fmadd_ps(negSampL, negCoef, accL);
+           accR = _mm_fmadd_ps(negSampR, negCoef, accR);
+           #else
+           posSampL = _mm_mul_ps(posSampL, posCoef);
+           posSampR = _mm_mul_ps(posSampR, posCoef);
+           negSampL = _mm_mul_ps(negSampL, negCoef);
+           negSampR = _mm_mul_ps(negSampR, negCoef);
 
-            accL = _mm_add_ps(accL, posSampL);
-            accR = _mm_add_ps(accR, posSampR);
-            accL = _mm_add_ps(accL, negSampL);
-            accR = _mm_add_ps(accR, negSampR);
+           accL = _mm_add_ps(accL, posSampL);
+           accR = _mm_add_ps(accR, posSampR);
+           accL = _mm_add_ps(accL, negSampL);
+           accR = _mm_add_ps(accR, negSampR);
+           #endif
+
         } break;
         }
     } while (count -= 4);
@@ -144,9 +163,13 @@ static inline void ProcessSSEIntrinsic(float* out,
         outAccum = _mm_hadd_ps(accL, accR);
         outAccum = _mm_hadd_ps(outAccum, outAccum);
     }
-
+    #if USE_AVX2
+    outSamp = _mm_fmadd_ps(outAccum, vLR,outSamp);
+    #else
     outAccum = _mm_mul_ps(outAccum, vLR);
     outSamp = _mm_add_ps(outSamp, outAccum);
+    #endif
+
     _mm_storel_pi(reinterpret_cast<__m64*>(out), outSamp);
 }
 
