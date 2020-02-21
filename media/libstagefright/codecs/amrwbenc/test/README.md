@@ -22,13 +22,18 @@ To test 32-bit binary push binaries from nativetest.
 adb push ${OUT}/data/nativetest/AmrwbEncoderTest/AmrwbEncoderTest /data/local/tmp/
 ```
 
-The resource file for the tests is taken from [here](https://drive.google.com/drive/folders/13cM4tAaVFrmr-zGFqaAzFBbKs75pnm9b). Push these files into device for testing.
-Download amr-wb_encoder folder and push all the files in this folder to /data/local/tmp/ on the device.
+The resource file for the tests is taken from [here](https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/codecs/amrwbenc/test/AmrwbEncoderTest.zip). Download, unzip and push these files into device for testing.
+
 ```
-adb push amr-wb_encoder/. /data/local/tmp/
+adb push AmrwbEncoderTestRes/. /data/local/tmp/
 ```
 
 usage: AmrwbEncoderTest -P \<path_to_folder\>
 ```
-adb shell /data/local/tmp/AmrwbEncoderTest -P /data/local/tmp/
+adb shell /data/local/tmp/AmrwbEncoderTest -P /data/local/tmp/AmrwbEncoderTestRes/
+```
+Alternatively, the test can also be run using atest command.
+
+```
+atest AmrwbEncoderTest -- --enable-module-dynamic-download=true
 ```
