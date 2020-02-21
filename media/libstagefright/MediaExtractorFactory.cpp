@@ -280,7 +280,7 @@ void MediaExtractorFactory::LoadExtractors() {
 
     std::shared_ptr<std::list<sp<ExtractorPlugin>>> newList(new std::list<sp<ExtractorPlugin>>());
 
-    android_namespace_t *mediaNs = android_get_exported_namespace("com.android.media");
+    android_namespace_t *mediaNs = android_get_exported_namespace("com_android_media");
     if (mediaNs != NULL) {
         const android_dlextinfo dlextinfo = {
             .flags = ANDROID_DLEXT_USE_NAMESPACE,
