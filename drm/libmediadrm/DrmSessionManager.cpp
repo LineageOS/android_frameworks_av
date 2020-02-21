@@ -66,7 +66,7 @@ static std::vector<MediaResourceParcel> toResourceVec(
     std::vector<MediaResourceParcel> resources;
     MediaResourceParcel resource{
             Type::kDrmSession, SubType::kUnspecifiedSubType,
-            toStdVec<int8_t>(sessionId), value};
+            toStdVec<>(sessionId), value};
     resources.push_back(resource);
     return resources;
 }
