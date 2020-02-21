@@ -1457,6 +1457,24 @@ bool CCodecBufferChannel::handleWork(
         std::unique_ptr<C2Work> work,
         const sp<AMessage> &outputFormat,
         const C2StreamInitDataInfo::output *initData) {
+    if (outputFormat != nullptr) {
+        Mutexed<Output>::Locked output(mOutput);
+        ALOGD("[%s] onWorkDone: output format changed to %s",
+                mName, outputFormat->debugString().c_str());
+        output->buffers->setFormat(outputFormat);
+
+        AString mediaType;
+        if (outputFormat->findString(KEY_MIME, &mediaType)
+                && mediaType == MIMETYPE_AUDIO_RAW) {
+            int32_t channelCount;
+            int32_t sampleRate;
+            if (outputFormat->findInt32(KEY_CHANNEL_COUNT, &channelCount)
+                    && outputFormat->findInt32(KEY_SAMPLE_RATE, &sampleRate)) {
+                output->buffers->updateSkipCutBuffer(sampleRate, channelCount);
+            }
+        }
+    }
+
     if ((work->input.ordinal.frameIndex - mFirstValidFrameIndex.load()).peek() < 0) {
         // Discard frames from previous generation.
         ALOGD("[%s] Discard frames from previous generation.", mName);
@@ -1631,24 +1649,6 @@ bool CCodecBufferChannel::handleWork(
                   mName, input->numExtraSlots);
         } else {
             input->numSlots = newNumSlots;
-        }
-    }
-
-    if (outputFormat != nullptr) {
-        Mutexed<Output>::Locked output(mOutput);
-        ALOGD("[%s] onWorkDone: output format changed to %s",
-                mName, outputFormat->debugString().c_str());
-        output->buffers->setFormat(outputFormat);
-
-        AString mediaType;
-        if (outputFormat->findString(KEY_MIME, &mediaType)
-                && mediaType == MIMETYPE_AUDIO_RAW) {
-            int32_t channelCount;
-            int32_t sampleRate;
-            if (outputFormat->findInt32(KEY_CHANNEL_COUNT, &channelCount)
-                    && outputFormat->findInt32(KEY_SAMPLE_RATE, &sampleRate)) {
-                output->buffers->updateSkipCutBuffer(sampleRate, channelCount);
-            }
         }
     }
 
