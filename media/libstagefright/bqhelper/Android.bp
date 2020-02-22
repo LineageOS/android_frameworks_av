@@ -1,5 +1,10 @@
-cc_defaults {
-    name: "libstagefright_bufferqueue-defaults",
+cc_library_shared {
+    name: "libstagefright_bufferqueue_helper",
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
+
     double_loadable: true,
     srcs: [
         "FrameDropper.cpp",
@@ -21,6 +26,7 @@ cc_defaults {
     shared_libs: [
         "libbase",
         "libcutils",
+        "libgui",
         "libhidlbase",
         "libhidlmemory",
         "liblog",
@@ -29,12 +35,14 @@ cc_defaults {
         "libutils",
 
         "android.hardware.graphics.bufferqueue@1.0",
+        "android.hardware.graphics.bufferqueue@2.0",
     ],
 
     export_shared_lib_headers: [
         "libhidlmemory",
         "libstagefright_foundation",
         "android.hardware.graphics.bufferqueue@1.0",
+        "android.hardware.graphics.bufferqueue@2.0",
     ],
 
     cflags: [
@@ -44,6 +52,26 @@ cc_defaults {
         "-Wno-documentation",
     ],
 
+    target: {
+        vendor: {
+            exclude_shared_libs: [
+                "libgui",
+            ],
+            static_libs: [
+                "libgui_bufferqueue_static",
+            ],
+            shared_libs: [
+                "android.hidl.token@1.0-utils",
+                "libEGL",
+                "libnativewindow",
+                "libvndksupport",
+            ],
+            cflags: [
+                "-DNO_BINDER",
+            ],
+        },
+    },
+
     sanitize: {
         misc_undefined: [
             "signed-integer-overflow",
@@ -52,38 +80,3 @@ cc_defaults {
         cfi: true,
     },
 }
-
-cc_library_shared {
-    name: "libstagefright_bufferqueue_helper",
-    defaults: ["libstagefright_bufferqueue-defaults"],
-    vendor_available: true,
-    vndk: {
-        enabled: true,
-    },
-    static_libs: [
-        "libgui_bufferqueue_static"
-    ],
-    shared_libs: [
-        "android.hardware.graphics.bufferqueue@2.0",
-        "android.hidl.token@1.0-utils",
-        "libEGL",
-        "libnativewindow",
-        "libvndksupport",
-    ],
-    export_shared_lib_headers: [
-        "android.hardware.graphics.bufferqueue@2.0",
-    ],
-    cflags: [
-        "-DNO_BINDER",
-    ],
-}
-
-cc_library_shared {
-    name: "libstagefright_bufferqueue_helper_client",
-    defaults: ["libstagefright_bufferqueue-defaults"],
-    vendor_available: false,
-    shared_libs: [
-        "libgui"
-    ],
-}
-

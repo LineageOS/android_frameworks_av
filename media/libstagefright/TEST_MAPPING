@@ -1,7 +1,6 @@
 {
-  "postsubmit": [
+  "presubmit": [
     {
-      // TODO: move to presubmit once we verify the tests are not flaky
       "name": "CtsMediaTestCases",
       "options": [
         {
@@ -13,9 +12,14 @@
         // TODO: b/149314419
         {
           "exclude-filter": "android.media.cts.AudioPlaybackCaptureTest"
+        },
+        {
+          "exclude-filter": "android.media.cts.AudioRecordTest"
         }
       ]
-    },
+    }
+  ],
+  "postsubmit": [
     {
        "name": "BatteryChecker_test"
     }

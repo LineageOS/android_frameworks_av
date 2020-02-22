@@ -668,7 +668,7 @@ void CCodec::allocate(const sp<MediaCodecInfo> &codecInfo) {
     // initialize config here in case setParameters is called prior to configure
     Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
     const std::unique_ptr<Config> &config = *configLocked;
-    status_t err = config->initialize(mClient, comp);
+    status_t err = config->initialize(mClient->getParamReflector(), comp);
     if (err != OK) {
         ALOGW("Failed to initialize configuration support");
         // TODO: report error once we complete implementation.
@@ -881,6 +881,13 @@ void CCodec::configure(const sp<AMessage> &msg) {
 
             if (format >= 0) {
                 msg->setInt32("android._color-format", format);
+            }
+        }
+
+        int32_t subscribeToAllVendorParams;
+        if (msg->findInt32("x-*", &subscribeToAllVendorParams) && subscribeToAllVendorParams) {
+            if (config->subscribeToAllVendorParams(comp, C2_MAY_BLOCK) != OK) {
+                ALOGD("[%s] Failed to subscribe to all vendor params", comp->getName().c_str());
             }
         }
 
@@ -1192,7 +1199,7 @@ status_t CCodec::setupInputSurface(const std::shared_ptr<InputSurfaceWrapper> &s
 
     // we are now using surface - apply default color aspects to input format - as well as
     // get dataspace
-    bool inputFormatChanged = config->updateFormats(config->IS_INPUT);
+    bool inputFormatChanged = config->updateFormats(Config::IS_INPUT);
     ALOGD("input format %s to %s",
             inputFormatChanged ? "changed" : "unchanged",
             config->mInputFormat->debugString().c_str());
@@ -1207,7 +1214,7 @@ status_t CCodec::setupInputSurface(const std::shared_ptr<InputSurfaceWrapper> &s
     if (err != OK) {
         // undo input format update
         config->mUsingSurface = false;
-        (void)config->updateFormats(config->IS_INPUT);
+        (void)config->updateFormats(Config::IS_INPUT);
         return err;
     }
     config->mInputSurface = surface;
@@ -1323,6 +1330,8 @@ void CCodec::start() {
         mCallback->onError(err2, ACTION_CODE_FATAL);
         return;
     }
+    // We're not starting after flush.
+    (void)mSentConfigAfterResume.test_and_set();
     err2 = mChannel->start(inputFormat, outputFormat, buffersBoundToCodec);
     if (err2 != OK) {
         mCallback->onError(err2, ACTION_CODE_FATAL);
@@ -1555,16 +1564,25 @@ void CCodec::flush() {
 }
 
 void CCodec::signalResume() {
-    auto setResuming = [this] {
+    std::shared_ptr<Codec2Client::Component> comp;
+    auto setResuming = [this, &comp] {
         Mutexed<State>::Locked state(mState);
         if (state->get() != FLUSHED) {
             return UNKNOWN_ERROR;
         }
         state->set(RESUMING);
+        comp = state->comp;
         return OK;
     };
     if (tryAndReportOnError(setResuming) != OK) {
         return;
+    }
+
+    mSentConfigAfterResume.clear();
+    {
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
+        config->queryConfiguration(comp);
     }
 
     (void)mChannel->start(nullptr, nullptr, [&]{
@@ -1617,7 +1635,8 @@ void CCodec::signalSetParameters(const sp<AMessage> &msg) {
      * Handle input surface parameters
      */
     if ((config->mDomain & (Config::IS_VIDEO | Config::IS_IMAGE))
-            && (config->mDomain & Config::IS_ENCODER) && config->mInputSurface && config->mISConfig) {
+            && (config->mDomain & Config::IS_ENCODER)
+            && config->mInputSurface && config->mISConfig) {
         (void)params->findInt64(PARAMETER_KEY_OFFSET_TIME, &config->mISConfig->mTimeOffsetUs);
 
         if (params->findInt64("skip-frames-before", &config->mISConfig->mStartAtUs)) {
@@ -1770,7 +1789,7 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
             // handle configuration changes in work done
             Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
             const std::unique_ptr<Config> &config = *configLocked;
-            bool changed = false;
+            bool changed = !mSentConfigAfterResume.test_and_set();
             Config::Watcher<C2StreamInitDataInfo::output> initData =
                 config->watch<C2StreamInitDataInfo::output>();
             if (!work->worklets.empty()
@@ -1802,7 +1821,9 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                     ++stream;
                 }
 
-                changed = config->updateConfiguration(updates, config->mOutputDomain);
+                if (config->updateConfiguration(updates, config->mOutputDomain)) {
+                    changed = true;
+                }
 
                 // copy standard infos to graphic buffers if not already present (otherwise, we
                 // may overwrite the actual intermediate value with a final value)

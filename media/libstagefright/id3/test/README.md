@@ -22,13 +22,19 @@ To test 32-bit binary push binaries from nativetest.
 adb push ${OUT}/data/nativetest/ID3Test/ID3Test /data/local/tmp/
 ```
 
-The resource file for the tests is taken from [here](https://drive.google.com/drive/folders/1pt5HFVSysbqfyqY1sVJ9MTupZKCdqjYZ). Push these files into device for testing.
-Download ID3 folder and push all the files in this folder to /data/local/tmp/ID3 on the device.
+The resource file for the tests is taken from [here](https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/id3/test/ID3Test.zip ).
+Download, unzip and push these files into device for testing.
+
 ```
-adb push ID3/. /data/local/tmp/ID3
+adb push ID3Test /data/local/tmp/
 ```
 
 usage: ID3Test -P \<path_to_folder\>
 ```
 adb shell /data/local/tmp/ID3Test -P /data/local/tmp/ID3/
+```
+Alternatively, the test can also be run using atest command.
+
+```
+atest ID3Test -- --enable-module-dynamic-download=true
 ```

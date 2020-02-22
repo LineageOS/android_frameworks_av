@@ -20,7 +20,6 @@
 #include <log/log.h>
 
 #include <C2Component.h>
-#include <C2Debug.h>
 #include <C2Param.h>
 #include <util/C2InterfaceHelper.h>
 
@@ -50,6 +49,27 @@ namespace android {
 // CCodecConfig
 
 namespace {
+
+void C2ValueToMessageItem(const C2Value &value, AMessage::ItemData &item) {
+    int32_t int32Value;
+    uint32_t uint32Value;
+    int64_t int64Value;
+    uint64_t uint64Value;
+    float floatValue;
+    if (value.get(&int32Value)) {
+        item.set(int32Value);
+    } else if (value.get(&uint32Value) && uint32Value <= uint32_t(INT32_MAX)) {
+        // SDK does not support unsigned values
+        item.set((int32_t)uint32Value);
+    } else if (value.get(&int64Value)) {
+        item.set(int64Value);
+    } else if (value.get(&uint64Value) && uint64Value <= uint64_t(INT64_MAX)) {
+        // SDK does not support unsigned values
+        item.set((int64_t)uint64Value);
+    } else if (value.get(&floatValue)) {
+        item.set(floatValue);
+    }
+}
 
 /**
  * mapping between SDK and Codec 2.0 configurations.
@@ -140,27 +160,10 @@ struct ConfigMapper {
     /// Maps from a C2Value to an SDK value in an AMessage.
     AMessage::ItemData mapToMessage(C2Value value) const {
         AMessage::ItemData item;
-        int32_t int32Value;
-        uint32_t uint32Value;
-        int64_t int64Value;
-        uint64_t uint64Value;
-        float floatValue;
         if (value.type() != C2Value::NO_INIT && mReverse) {
             value = mReverse(value);
         }
-        if (value.get(&int32Value)) {
-            item.set(int32Value);
-        } else if (value.get(&uint32Value) && uint32Value <= uint32_t(INT32_MAX)) {
-            // SDK does not support unsigned values
-            item.set((int32_t)uint32Value);
-        } else if (value.get(&int64Value)) {
-            item.set(int64Value);
-        } else if (value.get(&uint64Value) && uint64Value <= uint64_t(INT64_MAX)) {
-            // SDK does not support unsigned values
-            item.set((int64_t)uint64Value);
-        } else if (value.get(&floatValue)) {
-            item.set(floatValue);
-        }
+        C2ValueToMessageItem(value, item);
         return item;
     }
 
@@ -181,10 +184,10 @@ private:
 
 template <typename PORT, typename STREAM>
 AString QueryMediaTypeImpl(
-        const std::shared_ptr<Codec2Client::Component> &component) {
+        const std::shared_ptr<Codec2Client::Configurable> &configurable) {
     AString mediaType;
     std::vector<std::unique_ptr<C2Param>> queried;
-    c2_status_t c2err = component->query(
+    c2_status_t c2err = configurable->query(
             {}, { PORT::PARAM_TYPE, STREAM::PARAM_TYPE }, C2_DONT_BLOCK, &queried);
     if (c2err != C2_OK && queried.size() == 0) {
         ALOGD("Query media type failed => %s", asString(c2err));
@@ -209,13 +212,13 @@ AString QueryMediaTypeImpl(
 }
 
 AString QueryMediaType(
-        bool input, const std::shared_ptr<Codec2Client::Component> &component) {
+        bool input, const std::shared_ptr<Codec2Client::Configurable> &configurable) {
     typedef C2PortMediaTypeSetting P;
     typedef C2StreamMediaTypeSetting S;
     if (input) {
-        return QueryMediaTypeImpl<P::input, S::input>(component);
+        return QueryMediaTypeImpl<P::input, S::input>(configurable);
     } else {
-        return QueryMediaTypeImpl<P::output, S::output>(component);
+        return QueryMediaTypeImpl<P::output, S::output>(configurable);
     }
 }
 
@@ -912,27 +915,27 @@ void CCodecConfig::initializeStandardParams() {
 }
 
 status_t CCodecConfig::initialize(
-        const std::shared_ptr<Codec2Client> &client,
-        const std::shared_ptr<Codec2Client::Component> &component) {
+        const std::shared_ptr<C2ParamReflector> &reflector,
+        const std::shared_ptr<Codec2Client::Configurable> &configurable) {
     C2ComponentDomainSetting domain(C2Component::DOMAIN_OTHER);
     C2ComponentKindSetting kind(C2Component::KIND_OTHER);
 
     std::vector<std::unique_ptr<C2Param>> queried;
-    c2_status_t c2err = component->query({ &domain, &kind }, {}, C2_DONT_BLOCK, &queried);
+    c2_status_t c2err = configurable->query({ &domain, &kind }, {}, C2_DONT_BLOCK, &queried);
     if (c2err != C2_OK) {
         ALOGD("Query domain & kind failed => %s", asString(c2err));
         // TEMP: determine kind from component name
         if (kind.value == C2Component::KIND_OTHER) {
-            if (component->getName().find("encoder") != std::string::npos) {
+            if (configurable->getName().find("encoder") != std::string::npos) {
                 kind.value = C2Component::KIND_ENCODER;
-            } else if (component->getName().find("decoder") != std::string::npos) {
+            } else if (configurable->getName().find("decoder") != std::string::npos) {
                 kind.value = C2Component::KIND_DECODER;
             }
         }
 
         // TEMP: determine domain from media type (port (preferred) or stream #0)
         if (domain.value == C2Component::DOMAIN_OTHER) {
-            AString mediaType = QueryMediaType(true /* input */, component);
+            AString mediaType = QueryMediaType(true /* input */, configurable);
             if (mediaType.startsWith("audio/")) {
                 domain.value = C2Component::DOMAIN_AUDIO;
             } else if (mediaType.startsWith("video/")) {
@@ -957,16 +960,16 @@ status_t CCodecConfig::initialize(
     std::vector<C2Param::Index> paramIndices;
     switch (kind.value) {
     case C2Component::KIND_DECODER:
-        mCodingMediaType = QueryMediaType(true /* input */, component).c_str();
+        mCodingMediaType = QueryMediaType(true /* input */, configurable).c_str();
         break;
     case C2Component::KIND_ENCODER:
-        mCodingMediaType = QueryMediaType(false /* input */, component).c_str();
+        mCodingMediaType = QueryMediaType(false /* input */, configurable).c_str();
         break;
     default:
         mCodingMediaType = "";
     }
 
-    c2err = component->querySupportedParams(&mParamDescs);
+    c2err = configurable->querySupportedParams(&mParamDescs);
     if (c2err != C2_OK) {
         ALOGD("Query supported params failed after returning %zu values => %s",
                 mParamDescs.size(), asString(c2err));
@@ -976,9 +979,9 @@ status_t CCodecConfig::initialize(
         mSupportedIndices.emplace(desc->index());
     }
 
-    mReflector = client->getParamReflector();
+    mReflector = reflector;
     if (mReflector == nullptr) {
-        ALOGE("Failed to get param reflector");
+        ALOGE("Null param reflector");
         return UNKNOWN_ERROR;
     }
 
@@ -1032,11 +1035,21 @@ status_t CCodecConfig::initialize(
     // init data (CSD)
     mSubscribedIndices.emplace(C2StreamInitDataInfo::output::PARAM_TYPE);
 
+    for (const std::shared_ptr<C2ParamDescriptor> &desc : mParamDescs) {
+        if (desc->index().isVendor()) {
+            std::vector<std::string> keys;
+            mParamUpdater->getKeysForParamIndex(desc->index(), &keys);
+            for (const std::string &key : keys) {
+                mVendorParamIndices.insert_or_assign(key, desc->index());
+            }
+        }
+    }
+
     return OK;
 }
 
 status_t CCodecConfig::subscribeToConfigUpdate(
-        const std::shared_ptr<Codec2Client::Component> &component,
+        const std::shared_ptr<Codec2Client::Configurable> &configurable,
         const std::vector<C2Param::Index> &indices,
         c2_blocking_t blocking) {
     mSubscribedIndices.insert(indices.begin(), indices.end());
@@ -1049,7 +1062,7 @@ status_t CCodecConfig::subscribeToConfigUpdate(
         std::unique_ptr<C2SubscribedParamIndicesTuning> subscribeTuning =
             C2SubscribedParamIndicesTuning::AllocUnique(indices);
         std::vector<std::unique_ptr<C2SettingResult>> results;
-        c2_status_t c2Err = component->config({ subscribeTuning.get() }, blocking, &results);
+        c2_status_t c2Err = configurable->config({ subscribeTuning.get() }, blocking, &results);
         if (c2Err != C2_OK && c2Err != C2_BAD_INDEX) {
             ALOGD("Failed to subscribe to parameters => %s", asString(c2Err));
             // TODO: error
@@ -1061,11 +1074,11 @@ status_t CCodecConfig::subscribeToConfigUpdate(
 }
 
 status_t CCodecConfig::queryConfiguration(
-        const std::shared_ptr<Codec2Client::Component> &component) {
+        const std::shared_ptr<Codec2Client::Configurable> &configurable) {
     // query all subscribed parameters
     std::vector<C2Param::Index> indices(mSubscribedIndices.begin(), mSubscribedIndices.end());
     std::vector<std::unique_ptr<C2Param>> queried;
-    c2_status_t c2Err = component->query({}, indices, C2_MAY_BLOCK, &queried);
+    c2_status_t c2Err = configurable->query({}, indices, C2_MAY_BLOCK, &queried);
     if (c2Err != OK) {
         ALOGI("query failed after returning %zu values (%s)", queried.size(), asString(c2Err));
         // TODO: error
@@ -1135,7 +1148,7 @@ bool CCodecConfig::updateFormats(Domain domain) {
     if (domain & mInputDomain) {
         sp<AMessage> oldFormat = mInputFormat;
         mInputFormat = mInputFormat->dup(); // trigger format changed
-        mInputFormat->extend(getSdkFormatForDomain(reflected, mInputDomain));
+        mInputFormat->extend(getFormatForDomain(reflected, mInputDomain));
         if (mInputFormat->countEntries() != oldFormat->countEntries()
                 || mInputFormat->changesFrom(oldFormat)->countEntries() > 0) {
             changed = true;
@@ -1146,7 +1159,7 @@ bool CCodecConfig::updateFormats(Domain domain) {
     if (domain & mOutputDomain) {
         sp<AMessage> oldFormat = mOutputFormat;
         mOutputFormat = mOutputFormat->dup(); // trigger output format changed
-        mOutputFormat->extend(getSdkFormatForDomain(reflected, mOutputDomain));
+        mOutputFormat->extend(getFormatForDomain(reflected, mOutputDomain));
         if (mOutputFormat->countEntries() != oldFormat->countEntries()
                 || mOutputFormat->changesFrom(oldFormat)->countEntries() > 0) {
             changed = true;
@@ -1158,8 +1171,9 @@ bool CCodecConfig::updateFormats(Domain domain) {
     return changed;
 }
 
-sp<AMessage> CCodecConfig::getSdkFormatForDomain(
-        const ReflectedParamUpdater::Dict &reflected, Domain portDomain) const {
+sp<AMessage> CCodecConfig::getFormatForDomain(
+        const ReflectedParamUpdater::Dict &reflected,
+        Domain portDomain) const {
     sp<AMessage> msg = new AMessage;
     for (const std::pair<std::string, std::vector<ConfigMapper>> &el : mStandardParams->getKeys()) {
         for (const ConfigMapper &cm : el.second) {
@@ -1188,6 +1202,39 @@ sp<AMessage> CCodecConfig::getSdkFormatForDomain(
             }
             msg->setItem(el.first.c_str(), item);
         }
+    }
+
+    bool input = (portDomain & Domain::IS_INPUT);
+    std::vector<std::string> vendorKeys;
+    for (const std::pair<std::string, ReflectedParamUpdater::Value> &entry : reflected) {
+        auto it = mVendorParamIndices.find(entry.first);
+        if (it == mVendorParamIndices.end()) {
+            continue;
+        }
+        if (mSubscribedIndices.count(it->second) == 0) {
+            continue;
+        }
+        // For vendor parameters, we only care about direction
+        if ((input && !it->second.forInput())
+                || (!input && !it->second.forOutput())) {
+            continue;
+        }
+        const ReflectedParamUpdater::Value &value = entry.second;
+        C2Value c2Value;
+        sp<ABuffer> bufValue;
+        AString strValue;
+        AMessage::ItemData item;
+        if (value.find(&c2Value)) {
+            C2ValueToMessageItem(c2Value, item);
+        } else if (value.find(&bufValue)) {
+            item.set(bufValue);
+        } else if (value.find(&strValue)) {
+            item.set(strValue);
+        } else {
+            ALOGD("unexpected untyped query value for key: %s", entry.first.c_str());
+            continue;
+        }
+        msg->setItem(entry.first.c_str(), item);
     }
 
     { // convert from Codec 2.0 rect to MediaFormat rect and add crop rect if not present
@@ -1597,7 +1644,7 @@ ReflectedParamUpdater::Dict CCodecConfig::getReflectedFormat(
 }
 
 status_t CCodecConfig::getConfigUpdateFromSdkParams(
-        std::shared_ptr<Codec2Client::Component> component,
+        std::shared_ptr<Codec2Client::Configurable> configurable,
         const sp<AMessage> &sdkParams, Domain configDomain,
         c2_blocking_t blocking,
         std::vector<std::unique_ptr<C2Param>> *configUpdate) const {
@@ -1624,7 +1671,7 @@ status_t CCodecConfig::getConfigUpdateFromSdkParams(
         }
     }
 
-    c2_status_t err = component->query({ }, supportedIndices, blocking, configUpdate);
+    c2_status_t err = configurable->query({ }, supportedIndices, blocking, configUpdate);
     if (err != C2_OK) {
         ALOGD("query failed after returning %zu params => %s", configUpdate->size(), asString(err));
     }
@@ -1636,7 +1683,7 @@ status_t CCodecConfig::getConfigUpdateFromSdkParams(
 }
 
 status_t CCodecConfig::setParameters(
-        std::shared_ptr<Codec2Client::Component> component,
+        std::shared_ptr<Codec2Client::Configurable> configurable,
         std::vector<std::unique_ptr<C2Param>> &configUpdate,
         c2_blocking_t blocking) {
     status_t result = OK;
@@ -1672,10 +1719,10 @@ status_t CCodecConfig::setParameters(
         }
     }
     // update subscribed param indices
-    subscribeToConfigUpdate(component, indices, blocking);
+    subscribeToConfigUpdate(configurable, indices, blocking);
 
     std::vector<std::unique_ptr<C2SettingResult>> failures;
-    c2_status_t err = component->config(paramVector, blocking, &failures);
+    c2_status_t err = configurable->config(paramVector, blocking, &failures);
     if (err != C2_OK) {
         ALOGD("config failed => %s", asString(err));
         // This is non-fatal.
@@ -1695,7 +1742,7 @@ status_t CCodecConfig::setParameters(
     // Re-query parameter values in case config could not update them and update the current
     // configuration.
     configUpdate.clear();
-    err = component->query({}, indices, blocking, &configUpdate);
+    err = configurable->query({}, indices, blocking, &configUpdate);
     if (err != C2_OK) {
         ALOGD("query failed after returning %zu params => %s", configUpdate.size(), asString(err));
     }
@@ -1712,6 +1759,15 @@ const C2Param *CCodecConfig::getConfigParameterValue(C2Param::Index index) const
     } else {
         return it->second.get();
     }
+}
+
+status_t CCodecConfig::subscribeToAllVendorParams(
+        const std::shared_ptr<Codec2Client::Configurable> &configurable,
+        c2_blocking_t blocking) {
+    for (const std::pair<std::string, C2Param::Index> &entry : mVendorParamIndices) {
+        mSubscribedIndices.insert(entry.second);
+    }
+    return subscribeToConfigUpdate(configurable, {}, blocking);
 }
 
 }  // namespace android

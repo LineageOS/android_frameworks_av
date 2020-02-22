@@ -17,6 +17,7 @@
 #ifndef C_CODEC_H_
 #define C_CODEC_H_
 
+#include <atomic>
 #include <chrono>
 #include <list>
 #include <memory>
@@ -189,9 +190,10 @@ private:
     struct ClientListener;
 
     Mutexed<NamedTimePoint> mDeadline;
-    typedef CCodecConfig Config;
+
     Mutexed<std::unique_ptr<CCodecConfig>> mConfig;
     Mutexed<std::list<std::unique_ptr<C2Work>>> mWorkDoneQueue;
+    std::atomic_flag mSentConfigAfterResume;
 
     friend class CCodecCallbackImpl;
 

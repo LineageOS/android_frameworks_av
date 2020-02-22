@@ -162,10 +162,10 @@ status_t AudioMixer::Track::prepareForDownmix()
     // discard the previous downmixer if there was one
     unprepareForDownmix();
     // MONO_HACK Only remix (upmix or downmix) if the track and mixer/device channel masks
-    // are not the same and not handled internally, as mono -> stereo currently is.
+    // are not the same and not handled internally, as mono for channel position masks is.
     if (channelMask == mMixerChannelMask
             || (channelMask == AUDIO_CHANNEL_OUT_MONO
-                    && mMixerChannelMask == AUDIO_CHANNEL_OUT_STEREO)) {
+                    && isAudioChannelPositionMask(mMixerChannelMask))) {
         return NO_ERROR;
     }
     // DownmixerBufferProvider is only used for position masks.
