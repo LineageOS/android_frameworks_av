@@ -68,7 +68,7 @@ public:
     CameraClient(const sp<CameraService>& cameraService,
             const sp<hardware::ICameraClient>& cameraClient,
             const String16& clientPackageName,
-            const std::unique_ptr<String16>& clientFeatureId,
+            const std::optional<String16>& clientFeatureId,
             int cameraId,
             int cameraFacing,
             int clientPid,
