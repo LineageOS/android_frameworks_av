@@ -18,7 +18,7 @@
 #ifndef _DC_2I_D16_TRC_WRA_01_PRIVATE_H_
 #define _DC_2I_D16_TRC_WRA_01_PRIVATE_H_
 
-#define DC_FLOAT_STEP   0.0000002384f;
+#define DC_FLOAT_STEP   0.0000002384f
 
 /* The internal state variables are implemented in a (for the user)  hidden structure */
 /* In this (private) file, the internal structure is declared fro private use.*/
