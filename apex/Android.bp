@@ -14,6 +14,7 @@
 
 apex_defaults {
     name: "com.android.media-defaults",
+    updatable: true,
     java_libs: ["updatable-media"],
     multilib: {
         first: {
@@ -63,6 +64,7 @@ filegroup {
 
 apex_defaults {
     name: "com.android.media.swcodec-defaults",
+    updatable: true,
     binaries: [
         "mediaswcodec",
     ],
