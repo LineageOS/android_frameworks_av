@@ -21,7 +21,6 @@
 
 #include "NdkImagePriv.h"
 #include "NdkImageReaderPriv.h"
-#include <private/media/NdkImage.h>
 
 #include <cutils/atomic.h>
 #include <utils/Log.h>
