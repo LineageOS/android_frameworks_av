@@ -157,7 +157,6 @@ status_t MediaMuxer::start() {
 
 status_t MediaMuxer::stop() {
     Mutex::Autolock autoLock(mMuxerLock);
-
     if (mState == STARTED || mState == ERROR) {
         mState = STOPPED;
         for (size_t i = 0; i < mTrackList.size(); i++) {
@@ -165,7 +164,10 @@ status_t MediaMuxer::stop() {
                 return INVALID_OPERATION;
             }
         }
+        // Unlock this mutex to allow notify to be called during stop process.
+        mMuxerLock.unlock();
         status_t err = mWriter->stop();
+        mMuxerLock.lock();
         if (err != OK || mError != OK) {
             ALOGE("stop err: %d, mError:%d", err, mError);
         }
