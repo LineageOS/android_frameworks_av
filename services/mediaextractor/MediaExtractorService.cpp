@@ -45,6 +45,7 @@ MediaExtractorService::~MediaExtractorService() {
 
     sp<DataSource> localSource = CreateDataSourceFromIDataSource(remoteSource);
 
+    MediaBuffer::useSharedMemory();
     sp<IMediaExtractor> extractor = MediaExtractorFactory::CreateFromService(
             localSource,
             mime.get() ? mime.get()->c_str() : nullptr);
