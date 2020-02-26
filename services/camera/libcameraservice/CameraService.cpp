@@ -792,7 +792,7 @@ Status CameraService::filterGetInfoErrorCode(status_t err) {
 
 Status CameraService::makeClient(const sp<CameraService>& cameraService,
         const sp<IInterface>& cameraCb, const String16& packageName,
-        const std::unique_ptr<String16>& featureId, const String8& cameraId, int api1CameraId,
+        const std::optional<String16>& featureId, const String8& cameraId, int api1CameraId,
         int facing, int clientPid, uid_t clientUid, int servicePid, int halVersion,
         int deviceVersion, apiLevel effectiveApiLevel,
         /*out*/sp<BasicClient>* client) {
@@ -948,7 +948,7 @@ Status CameraService::initializeShimMetadata(int cameraId) {
     if (!(ret = connectHelper<ICameraClient,Client>(
             sp<ICameraClient>{nullptr}, id, cameraId,
             static_cast<int>(CAMERA_HAL_API_VERSION_UNSPECIFIED),
-            internalPackageName, std::unique_ptr<String16>(), uid, USE_CALLING_PID,
+            internalPackageName, {}, uid, USE_CALLING_PID,
             API_1, /*shimUpdateOnly*/ true, /*out*/ tmp)
             ).isOk()) {
         ALOGE("%s: Error initializing shim metadata: %s", __FUNCTION__, ret.toString8().string());
@@ -1461,7 +1461,7 @@ Status CameraService::connect(
     String8 id = cameraIdIntToStr(api1CameraId);
     sp<Client> client = nullptr;
     ret = connectHelper<ICameraClient,Client>(cameraClient, id, api1CameraId,
-            CAMERA_HAL_API_VERSION_UNSPECIFIED, clientPackageName, std::unique_ptr<String16>(),
+            CAMERA_HAL_API_VERSION_UNSPECIFIED, clientPackageName, {},
             clientUid, clientPid, API_1, /*shimUpdateOnly*/ false, /*out*/client);
 
     if(!ret.isOk()) {
@@ -1488,7 +1488,7 @@ Status CameraService::connectLegacy(
     Status ret = Status::ok();
     sp<Client> client = nullptr;
     ret = connectHelper<ICameraClient,Client>(cameraClient, id, api1CameraId, halVersion,
-            clientPackageName, std::unique_ptr<String16>(), clientUid, USE_CALLING_PID, API_1,
+            clientPackageName, {}, clientUid, USE_CALLING_PID, API_1,
             /*shimUpdateOnly*/ false, /*out*/client);
 
     if(!ret.isOk()) {
@@ -1563,7 +1563,7 @@ Status CameraService::connectDevice(
         const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb,
         const String16& cameraId,
         const String16& clientPackageName,
-        const std::unique_ptr<String16>& clientFeatureId,
+        const std::optional<String16>& clientFeatureId,
         int clientUid,
         /*out*/
         sp<hardware::camera2::ICameraDeviceUser>* device) {
@@ -1597,7 +1597,7 @@ Status CameraService::connectDevice(
 template<class CALLBACK, class CLIENT>
 Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
         int api1CameraId, int halVersion, const String16& clientPackageName,
-        const std::unique_ptr<String16>& clientFeatureId, int clientUid, int clientPid,
+        const std::optional<String16>& clientFeatureId, int clientUid, int clientPid,
         apiLevel effectiveApiLevel, bool shimUpdateOnly,
         /*out*/sp<CLIENT>& device) {
     binder::Status ret = binder::Status::ok();
@@ -2692,7 +2692,7 @@ void CameraService::playSound(sound_kind kind) {
 CameraService::Client::Client(const sp<CameraService>& cameraService,
         const sp<ICameraClient>& cameraClient,
         const String16& clientPackageName,
-        const std::unique_ptr<String16>& clientFeatureId,
+        const std::optional<String16>& clientFeatureId,
         const String8& cameraIdStr,
         int api1CameraId, int cameraFacing,
         int clientPid, uid_t clientUid,
@@ -2729,24 +2729,18 @@ sp<CameraService> CameraService::BasicClient::BasicClient::sCameraService;
 
 CameraService::BasicClient::BasicClient(const sp<CameraService>& cameraService,
         const sp<IBinder>& remoteCallback,
-        const String16& clientPackageName, const std::unique_ptr<String16>& clientFeatureId,
+        const String16& clientPackageName, const std::optional<String16>& clientFeatureId,
         const String8& cameraIdStr, int cameraFacing,
         int clientPid, uid_t clientUid,
         int servicePid):
         mCameraIdStr(cameraIdStr), mCameraFacing(cameraFacing),
-        mClientPackageName(clientPackageName),
+        mClientPackageName(clientPackageName), mClientFeatureId(clientFeatureId),
         mClientPid(clientPid), mClientUid(clientUid),
         mServicePid(servicePid),
         mDisconnected(false),
         mAudioRestriction(hardware::camera2::ICameraDeviceUser::AUDIO_RESTRICTION_NONE),
         mRemoteBinder(remoteCallback)
 {
-    if (clientFeatureId) {
-        mClientFeatureId = std::unique_ptr<String16>(new String16(*clientFeatureId));
-    } else {
-        mClientFeatureId = std::unique_ptr<String16>();
-    }
-
     if (sCameraService == nullptr) {
         sCameraService = cameraService;
     }

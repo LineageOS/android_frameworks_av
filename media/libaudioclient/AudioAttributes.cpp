@@ -57,7 +57,7 @@ status_t AudioAttributes::writeToParcel(Parcel *parcel) const
         parcel->writeInt32(0);
     } else {
         parcel->writeInt32(1);
-        parcel->writeUtf8AsUtf16(mAttributes.tags);
+        parcel->writeUtf8AsUtf16(std::string(mAttributes.tags));
     }
     parcel->writeInt32(static_cast<int32_t>(mStreamType));
     parcel->writeUint32(static_cast<uint32_t>(mGroupId));
