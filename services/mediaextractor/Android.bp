@@ -56,6 +56,8 @@ cc_binary {
         "-Wall",
         "-Werror",
     ],
+
+    required: ["mediaextractor.policy"],
 }
 
 prebuilt_etc {
