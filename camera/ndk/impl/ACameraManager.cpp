@@ -695,7 +695,7 @@ ACameraManager::openCamera(
     // No way to get package name from native.
     // Send a zero length package name and let camera service figure it out from UID
     binder::Status serviceRet = cs->connectDevice(
-            callbacks, String16(cameraId), String16(""), std::unique_ptr<String16>(),
+            callbacks, String16(cameraId), String16(""), {},
             hardware::ICameraService::USE_CALLING_UID, /*out*/&deviceRemote);
 
     if (!serviceRet.isOk()) {

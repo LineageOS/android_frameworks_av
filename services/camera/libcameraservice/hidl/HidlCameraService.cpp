@@ -103,7 +103,7 @@ Return<void> HidlCameraService::connectDevice(const sp<HCameraDeviceCallback>& h
     }
     sp<hardware::camera2::ICameraDeviceCallbacks> callbacks = hybridCallbacks;
     binder::Status serviceRet = mAidlICameraService->connectDevice(
-            callbacks, String16(cameraId.c_str()), String16(""), std::unique_ptr<String16>(),
+            callbacks, String16(cameraId.c_str()), String16(""), {},
             hardware::ICameraService::USE_CALLING_UID, /*out*/&deviceRemote);
     HStatus status = HStatus::NO_ERROR;
     if (!serviceRet.isOk()) {
