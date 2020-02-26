@@ -51,6 +51,7 @@
 #include <string>
 #include <map>
 #include <memory>
+#include <optional>
 #include <utility>
 #include <unordered_map>
 #include <unordered_set>
@@ -141,7 +142,7 @@ public:
 
     virtual binder::Status     connectDevice(
             const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb, const String16& cameraId,
-            const String16& clientPackageName, const std::unique_ptr<String16>& clientFeatureId,
+            const String16& clientPackageName, const std::optional<String16>& clientFeatureId,
             int32_t clientUid,
             /*out*/
             sp<hardware::camera2::ICameraDeviceUser>* device);
@@ -298,7 +299,7 @@ public:
         BasicClient(const sp<CameraService>& cameraService,
                 const sp<IBinder>& remoteCallback,
                 const String16& clientPackageName,
-                const std::unique_ptr<String16>& clientFeatureId,
+                const std::optional<String16>& clientFeatureId,
                 const String8& cameraIdStr,
                 int cameraFacing,
                 int clientPid,
@@ -318,7 +319,7 @@ public:
         const String8                   mCameraIdStr;
         const int                       mCameraFacing;
         String16                        mClientPackageName;
-        std::unique_ptr<String16>       mClientFeatureId;
+        std::optional<String16>         mClientFeatureId;
         pid_t                           mClientPid;
         const uid_t                     mClientUid;
         const pid_t                     mServicePid;
@@ -389,7 +390,7 @@ public:
         Client(const sp<CameraService>& cameraService,
                 const sp<hardware::ICameraClient>& cameraClient,
                 const String16& clientPackageName,
-                const std::unique_ptr<String16>& clientFeatureId,
+                const std::optional<String16>& clientFeatureId,
                 const String8& cameraIdStr,
                 int api1CameraId,
                 int cameraFacing,
@@ -727,7 +728,7 @@ private:
     template<class CALLBACK, class CLIENT>
     binder::Status connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
             int api1CameraId, int halVersion, const String16& clientPackageName,
-            const std::unique_ptr<String16>& clientFeatureId, int clientUid, int clientPid,
+            const std::optional<String16>& clientFeatureId, int clientUid, int clientPid,
             apiLevel effectiveApiLevel, bool shimUpdateOnly, /*out*/sp<CLIENT>& device);
 
     // Lock guarding camera service state
@@ -1045,7 +1046,7 @@ private:
 
     static binder::Status makeClient(const sp<CameraService>& cameraService,
             const sp<IInterface>& cameraCb, const String16& packageName,
-            const std::unique_ptr<String16>& featureId, const String8& cameraId, int api1CameraId,
+            const std::optional<String16>& featureId, const String8& cameraId, int api1CameraId,
             int facing, int clientPid, uid_t clientUid, int servicePid, int halVersion,
             int deviceVersion, apiLevel effectiveApiLevel,
             /*out*/sp<BasicClient>* client);

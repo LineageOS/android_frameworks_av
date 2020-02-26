@@ -59,7 +59,7 @@ sp<IMediaExtractor> MediaExtractorFactory::Create(
             sp<IMediaExtractor> ex;
             mediaExService->makeExtractor(
                     CreateIDataSourceFromDataSource(source),
-                    mime ? std::make_unique<std::string>(mime) : nullptr,
+                    mime ? std::optional<std::string>(mime) : std::nullopt,
                     &ex);
             return ex;
         } else {

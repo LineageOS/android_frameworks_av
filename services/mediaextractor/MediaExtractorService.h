@@ -33,7 +33,7 @@ public:
 
     virtual ::android::binder::Status makeExtractor(
             const ::android::sp<::android::IDataSource>& source,
-            const ::std::unique_ptr< ::std::string> &mime,
+            const ::std::optional< ::std::string> &mime,
             ::android::sp<::android::IMediaExtractor>* _aidl_return);
 
     virtual ::android::binder::Status makeIDataSource(
