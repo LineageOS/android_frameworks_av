@@ -35,6 +35,8 @@ apex_defaults {
     },
     prebuilts: [
         "mediaextractor.policy",
+        "code_coverage.policy",
+        "crash_dump.policy",
     ],
     key: "com.android.media.key",
     certificate: ":com.android.media.certificate",
@@ -70,6 +72,8 @@ apex_defaults {
         "com.android.media.swcodec-mediaswcodec.rc",
         "com.android.media.swcodec-ld.config.txt",
         "mediaswcodec.policy",
+        "code_coverage.policy",
+        "crash_dump.policy",
         "mediaswcodec.xml",
     ],
     use_vendor: true,
