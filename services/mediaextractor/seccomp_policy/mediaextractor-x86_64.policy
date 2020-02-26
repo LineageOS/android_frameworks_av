@@ -53,5 +53,5 @@ sched_yield: 1
 getpid: 1
 gettid: 1
 
-@include /system/etc/seccomp_policy/crash_dump.x86_64.policy
-@include /system/etc/seccomp_policy/code_coverage.x86_64.policy
+@include /apex/com.android.media/etc/seccomp_policy/crash_dump.x86_64.policy
+@include /apex/com.android.media/etc/seccomp_policy/code_coverage.x86_64.policy
