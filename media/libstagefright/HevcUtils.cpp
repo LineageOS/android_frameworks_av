@@ -32,7 +32,10 @@
 
 namespace android {
 
-static const uint8_t kHevcNalUnitTypes[5] = {
+static const uint8_t kHevcNalUnitTypes[8] = {
+    kHevcNalUnitTypeCodedSliceIdr,
+    kHevcNalUnitTypeCodedSliceIdrNoLP,
+    kHevcNalUnitTypeCodedSliceCra,
     kHevcNalUnitTypeVps,
     kHevcNalUnitTypeSps,
     kHevcNalUnitTypePps,
@@ -488,4 +491,26 @@ status_t HevcParameterSets::makeHvcc(uint8_t *hvcc, size_t *hvccSize,
     return OK;
 }
 
+bool HevcParameterSets::IsHevcIDR(const uint8_t *data, size_t size) {
+    bool foundIDR = false;
+    const uint8_t *nalStart;
+    size_t nalSize;
+    while (!foundIDR && getNextNALUnit(&data, &size, &nalStart, &nalSize, true) == OK) {
+        if (nalSize == 0) {
+            ALOGE("Encountered zero-length HEVC NAL");
+            return false;
+        }
+
+        uint8_t nalType = (nalStart[0] & 0x7E) >> 1;
+        switch(nalType) {
+            case kHevcNalUnitTypeCodedSliceIdr:
+            case kHevcNalUnitTypeCodedSliceIdrNoLP:
+            case kHevcNalUnitTypeCodedSliceCra:
+                foundIDR = true;
+                break;
+        }
+    }
+
+    return foundIDR;
+}
 }  // namespace android
