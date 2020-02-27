@@ -53,7 +53,6 @@ void From2iToMS_16x16( const LVM_INT16  *src,
 
     return;
 }
-#ifdef BUILD_FLOAT
 void From2iToMS_Float( const LVM_FLOAT  *src,
                              LVM_FLOAT  *dstM,
                              LVM_FLOAT  *dstS,
@@ -82,5 +81,4 @@ void From2iToMS_Float( const LVM_FLOAT  *src,
 
     return;
 }
-#endif
 /**********************************************************************************/

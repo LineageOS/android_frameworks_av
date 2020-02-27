@@ -274,10 +274,9 @@ bool ACameraMetadata_isLogicalMultiCamera(const ACameraMetadata* staticMetadata,
  * <p>The returned ACameraMetadata must be freed by the application by {@link ACameraMetadata_free}
  * after application is done using it.</p>
  *
- * <p>This function does not affect the lifetime of {@link cameraMetadata}. Attempting to use the
- * returned ACameraMetadata object after {@link cameraMetadata} has been garbage collected is
- * unsafe. To manage the lifetime beyond the current JNI function call, use
- * {@code env->NewGlobalRef()} and {@code env->DeleteGlobalRef()}.
+ * <p>The ACameraMetadata maintains a reference count to the underlying data, so
+ * it can be used independently of the Java object, and it remains valid even if
+ * the Java metadata is garbage collected.
  *
  * @param env the JNI environment.
  * @param cameraMetadata the source {@link android.hardware.camera2.CameraMetadata} from which the

@@ -23,9 +23,6 @@
 #include "LVPSA_QPD.h"
 #include "LVM_Macros.h"
 
-
-
-
 /**********************************************************************************
    CONSTANT DEFINITIONS
 ***********************************************************************************/
@@ -40,11 +37,7 @@
 #define LVPSA_MEMREGION_PERSISTENT_COEF  1      /* Offset to persistent coefficients  memory region in memory table */
 #define LVPSA_MEMREGION_PERSISTENT_DATA  2      /* Offset to persistent taps  memory region in memory table         */
 #define LVPSA_MEMREGION_SCRATCH          3      /* Offset to scratch  memory region in memory table                 */
-#ifndef HIGHER_FS
-#define LVPSA_NR_SUPPORTED_RATE          9      /* From 8000Hz to 48000Hz*/
-#else
 #define LVPSA_NR_SUPPORTED_RATE          13      /* From 8000Hz to 192000Hz*/
-#endif
 #define LVPSA_NR_SUPPORTED_SPEED         3      /* LOW, MEDIUM, HIGH                                                */
 
 #define LVPSA_MAXBUFFERDURATION          4000   /* Maximum length in ms of the levels buffer                        */
@@ -74,7 +67,6 @@
 #define LVPSA_InternalRefreshTimeInv    0x0666    /* 1/20ms left shifted by 15  */
 #define LVPSA_InternalRefreshTimeShift  15
 
-
 /* Precision of the filter */
 typedef enum
 {
@@ -93,12 +85,6 @@ typedef struct
     LVPSA_MemTab_t              MemoryTable;
 
     LVPSA_BPFilterPrecision_en *pBPFiltersPrecision;                /* Points a nBands elements array that contains the filter precision for each band              */
-#ifndef BUILD_FLOAT
-    Biquad_Instance_t          *pBP_Instances;                      /* Points a nBands elements array that contains the band pass filter instance for each band     */
-    Biquad_1I_Order2_Taps_t    *pBP_Taps;                           /* Points a nBands elements array that contains the band pass filter taps for each band         */
-    QPD_State_t                *pQPD_States;                        /* Points a nBands elements array that contains the QPD filter instance for each band           */
-    QPD_Taps_t                 *pQPD_Taps;                          /* Points a nBands elements array that contains the QPD filter taps for each band               */
-#else
     Biquad_FLOAT_Instance_t          *pBP_Instances;
     /* Points a nBands elements array that contains the band pass filter taps for each band */
     Biquad_1I_Order2_FLOAT_Taps_t    *pBP_Taps;
@@ -106,16 +92,10 @@ typedef struct
     QPD_FLOAT_State_t                *pQPD_States;
     /* Points a nBands elements array that contains the QPD filter taps for each band */
     QPD_FLOAT_Taps_t                 *pQPD_Taps;
-#endif
 
-#ifndef BUILD_FLOAT
-    LVM_UINT16                 *pPostGains;                         /* Points a nBands elements array that contains the post-filter gains for each band             */
-#else
     /* Points a nBands elements array that contains the post-filter gains for each band */
     LVM_FLOAT                  *pPostGains;
-#endif
     LVPSA_FilterParam_t        *pFiltersParams;                     /* Copy of the filters parameters from the input parameters                                     */
-
 
     LVM_UINT16                  nSamplesBufferUpdate;               /* Number of samples to make 20ms                                                               */
     LVM_INT32                   BufferUpdateSamplesCount;           /* Counter used to know when to put a new value in the buffer                                   */
@@ -137,8 +117,6 @@ typedef struct
 
 }LVPSA_InstancePr_t, *pLVPSA_InstancePr_t;
 
-
-
 /**********************************************************************************
    FUNCTIONS PROTOTYPE
 ***********************************************************************************/
@@ -158,6 +136,5 @@ typedef struct
 /*                                                                                  */
 /************************************************************************************/
 LVPSA_RETURN LVPSA_ApplyNewSettings (LVPSA_InstancePr_t     *pInst);
-
 
 #endif /* _LVPSA_PRIVATE_H */

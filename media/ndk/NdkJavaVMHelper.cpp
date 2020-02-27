@@ -16,7 +16,7 @@
 
 #define LOG_TAG "NdkJavaVMHelper"
 
-#include <media/NdkJavaVMHelper.h>
+#include "NdkJavaVMHelperPriv.h"
 #include <utils/Log.h>
 
 namespace android {

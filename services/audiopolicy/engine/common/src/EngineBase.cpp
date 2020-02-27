@@ -107,6 +107,13 @@ product_strategy_t EngineBase::getProductStrategyByName(const std::string &name)
 engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
 {
     auto loadVolumeConfig = [](auto &volumeGroups, auto &volumeConfig) {
+        // Ensure name unicity to prevent duplicate
+        LOG_ALWAYS_FATAL_IF(std::any_of(std::begin(volumeGroups), std::end(volumeGroups),
+                                     [&volumeConfig](const auto &volumeGroup) {
+                return volumeConfig.name == volumeGroup.second->getName(); }),
+                            "group name %s defined twice, review the configuration",
+                            volumeConfig.name.c_str());
+
         sp<VolumeGroup> volumeGroup = new VolumeGroup(volumeConfig.name, volumeConfig.indexMin,
                                                       volumeConfig.indexMax);
         volumeGroups[volumeGroup->getId()] = volumeGroup;
@@ -125,12 +132,20 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
         }
         return volumeGroup;
     };
-    auto addSupportedStreamAttributes = [](auto &group, auto &volumeGroup, auto &strategy) {
-        volumeGroup->addSupportedStream(group.stream);
+    auto addSupportedAttributesToGroup = [](auto &group, auto &volumeGroup, auto &strategy) {
         for (const auto &attr : group.attributesVect) {
             strategy->addAttributes({group.stream, volumeGroup->getId(), attr});
             volumeGroup->addSupportedAttributes(attr);
         }
+    };
+    auto checkStreamForGroups = [](auto streamType, const auto &volumeGroups) {
+        const auto &iter = std::find_if(std::begin(volumeGroups), std::end(volumeGroups),
+                                     [&streamType](const auto &volumeGroup) {
+            const auto& streams = volumeGroup.second->getStreamTypes();
+            return std::find(std::begin(streams), std::end(streams), streamType) !=
+                    std::end(streams);
+        });
+        return iter != end(volumeGroups);
     };
 
     auto result = engineConfig::parse();
@@ -140,14 +155,29 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
         android::status_t ret = engineConfig::parseLegacyVolumes(config.volumeGroups);
         result = {std::make_unique<engineConfig::Config>(config),
                   static_cast<size_t>(ret == NO_ERROR ? 0 : 1)};
+    } else {
+        // Append for internal use only volume groups (e.g. rerouting/patch)
+        result.parsedConfig->volumeGroups.insert(
+                    std::end(result.parsedConfig->volumeGroups),
+                    std::begin(gSystemVolumeGroups), std::end(gSystemVolumeGroups));
     }
+    // Append for internal use only strategies (e.g. rerouting/patch)
+    result.parsedConfig->productStrategies.insert(
+                std::end(result.parsedConfig->productStrategies),
+                std::begin(gOrderedSystemStrategies), std::end(gOrderedSystemStrategies));
+
+
     ALOGE_IF(result.nbSkippedElement != 0, "skipped %zu elements", result.nbSkippedElement);
 
     engineConfig::VolumeGroup defaultVolumeConfig;
+    engineConfig::VolumeGroup defaultSystemVolumeConfig;
     for (auto &volumeConfig : result.parsedConfig->volumeGroups) {
         // save default volume config for streams not defined in configuration
         if (volumeConfig.name.compare("AUDIO_STREAM_MUSIC") == 0) {
             defaultVolumeConfig = volumeConfig;
+        }
+        if (volumeConfig.name.compare("AUDIO_STREAM_PATCH") == 0) {
+            defaultSystemVolumeConfig = volumeConfig;
         }
         loadVolumeConfig(mVolumeGroups, volumeConfig);
     }
@@ -157,18 +187,31 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
             const auto &iter = std::find_if(begin(mVolumeGroups), end(mVolumeGroups),
                                          [&group](const auto &volumeGroup) {
                     return group.volumeGroup == volumeGroup.second->getName(); });
-            if (group.stream != AUDIO_STREAM_DEFAULT) {
-                if (iter == end(mVolumeGroups)) {
-                    ALOGW("%s: No configuration of %s found, using default volume configuration"
-                            , __FUNCTION__, group.volumeGroup.c_str());
-                    defaultVolumeConfig.name = group.volumeGroup;
-                    sp<VolumeGroup> volumeGroup =
-                            loadVolumeConfig(mVolumeGroups, defaultVolumeConfig);
-                    addSupportedStreamAttributes(group, volumeGroup, strategy);
+            sp<VolumeGroup> volumeGroup = nullptr;
+            // If no volume group provided for this strategy, creates a new one using
+            // Music Volume Group configuration (considered as the default)
+            if (iter == end(mVolumeGroups)) {
+                engineConfig::VolumeGroup volumeConfig;
+                if (group.stream >= AUDIO_STREAM_PUBLIC_CNT) {
+                    volumeConfig = defaultSystemVolumeConfig;
                 } else {
-                    addSupportedStreamAttributes(group, iter->second, strategy);
+                    volumeConfig = defaultVolumeConfig;
                 }
+                ALOGW("%s: No configuration of %s found, using default volume configuration"
+                        , __FUNCTION__, group.volumeGroup.c_str());
+                volumeConfig.name = group.volumeGroup;
+                volumeGroup = loadVolumeConfig(mVolumeGroups, volumeConfig);
+            } else {
+                volumeGroup = iter->second;
             }
+            if (group.stream != AUDIO_STREAM_DEFAULT) {
+                // A legacy stream can be assigned once to a volume group
+                LOG_ALWAYS_FATAL_IF(checkStreamForGroups(group.stream, mVolumeGroups),
+                                    "stream %s already assigned to a volume group, "
+                                    "review the configuration", toString(group.stream).c_str());
+                volumeGroup->addSupportedStream(group.stream);
+            }
+            addSupportedAttributesToGroup(group, volumeGroup, strategy);
         }
         product_strategy_t strategyId = strategy->getId();
         mProductStrategies[strategyId] = strategy;

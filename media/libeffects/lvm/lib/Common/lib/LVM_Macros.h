@@ -18,7 +18,6 @@
 #ifndef _LVM_MACROS_H_
 #define _LVM_MACROS_H_
 
-
 /**********************************************************************************
    MUL32x32INTO32(A,B,C,ShiftR)
         C = (A * B) >> ShiftR
@@ -29,7 +28,6 @@
         of overflow is undefined.
 
 ***********************************************************************************/
-#ifndef MUL32x32INTO32
 #define MUL32x32INTO32(A,B,C,ShiftR)   \
         {LVM_INT32 MUL32x32INTO32_temp,MUL32x32INTO32_temp2,MUL32x32INTO32_mask,MUL32x32INTO32_HH,MUL32x32INTO32_HL,MUL32x32INTO32_LH,MUL32x32INTO32_LL;\
          LVM_INT32  shiftValue;\
@@ -55,7 +53,6 @@
        }\
        (C) = MUL32x32INTO32_temp2;\
        }
-#endif
 
 /**********************************************************************************
    MUL32x16INTO32(A,B,C,ShiftR)
@@ -68,7 +65,6 @@
         of overflow is undefined.
 
 ***********************************************************************************/
-#ifndef MUL32x16INTO32
 #define MUL32x16INTO32(A,B,C,ShiftR)   \
         {LVM_INT32 MUL32x16INTO32_mask,MUL32x16INTO32_HH,MUL32x16INTO32_LL;\
          LVM_INT32  shiftValue;\
@@ -88,7 +84,6 @@
         else {\
         (C)=MUL32x16INTO32_HH>>(shiftValue-16);}\
         }
-#endif
 
 /**********************************************************************************
    ADD2_SAT_32x32(A,B,C)
@@ -96,7 +91,6 @@
 
         A,B and C are 32 bit SIGNED numbers.
 ***********************************************************************************/
-#ifndef ADD2_SAT_32x32
 #define ADD2_SAT_32x32(A,B,C)   \
         {(C)=(A)+(B);\
          if ((((C) ^ (A)) & ((C) ^ (B))) >> 31)\
@@ -107,9 +101,6 @@
                     (C)=0x7FFFFFFFl;\
             }\
         }
-#endif
-
-
 
 #endif /* _LVM_MACROS_H_ */
 

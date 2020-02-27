@@ -11,6 +11,7 @@ cc_library_shared {
         "libdatasource",
         "libmedia",
         "libstagefright",
+        "libstagefright_foundation",
         "libbinder",
         "libutils",
         "liblog",
@@ -33,6 +34,9 @@ cc_binary {
         "liblog",
         "libavservices_minijail",
     ],
+    header_libs: [
+        "bionic_libc_platform_headers",
+    ],
     target: {
         android: {
             product_variables: {
@@ -52,6 +56,8 @@ cc_binary {
         "-Wall",
         "-Werror",
     ],
+
+    required: ["mediaextractor.policy"],
 }
 
 prebuilt_etc {

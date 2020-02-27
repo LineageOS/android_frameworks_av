@@ -130,6 +130,11 @@ sp<hardware::ICameraService> CameraManagerGlobal::getCameraServiceLocked() {
         mCameraService->addListener(mCameraServiceListener, &cameraStatuses);
         for (auto& c : cameraStatuses) {
             onStatusChangedLocked(c.status, c.cameraId);
+
+            for (auto& unavailablePhysicalId : c.unavailablePhysicalIds) {
+                onStatusChangedLocked(hardware::ICameraServiceListener::STATUS_NOT_PRESENT,
+                        c.cameraId, unavailablePhysicalId);
+            }
         }
 
         // setup vendor tags
@@ -200,9 +205,7 @@ void CameraManagerGlobal::DeathNotifier::binderDied(const wp<IBinder>&)
 
 void CameraManagerGlobal::registerExtendedAvailabilityCallback(
         const ACameraManager_ExtendedAvailabilityCallbacks *callback) {
-    Mutex::Autolock _l(mLock);
-    Callback cb(callback);
-    mCallbacks.insert(cb);
+    return registerAvailCallback<ACameraManager_ExtendedAvailabilityCallbacks>(callback);
 }
 
 void CameraManagerGlobal::unregisterExtendedAvailabilityCallback(
@@ -214,6 +217,18 @@ void CameraManagerGlobal::unregisterExtendedAvailabilityCallback(
 
 void CameraManagerGlobal::registerAvailabilityCallback(
         const ACameraManager_AvailabilityCallbacks *callback) {
+    return registerAvailCallback<ACameraManager_AvailabilityCallbacks>(callback);
+}
+
+void CameraManagerGlobal::unregisterAvailabilityCallback(
+        const ACameraManager_AvailabilityCallbacks *callback) {
+    Mutex::Autolock _l(mLock);
+    Callback cb(callback);
+    mCallbacks.erase(cb);
+}
+
+template<class T>
+void CameraManagerGlobal::registerAvailCallback(const T *callback) {
     Mutex::Autolock _l(mLock);
     Callback cb(callback);
     auto pair = mCallbacks.insert(cb);
@@ -227,22 +242,31 @@ void CameraManagerGlobal::registerAvailabilityCallback(
             if (!pair.second.supportsHAL3) {
                 continue;
             }
+
+            // Camera available/unavailable callback
             sp<AMessage> msg = new AMessage(kWhatSendSingleCallback, mHandler);
-            ACameraManager_AvailabilityCallback cb = isStatusAvailable(status) ?
-                    callback->onCameraAvailable : callback->onCameraUnavailable;
-            msg->setPointer(kCallbackFpKey, (void *) cb);
-            msg->setPointer(kContextKey, callback->context);
+            ACameraManager_AvailabilityCallback cbFunc = isStatusAvailable(status) ?
+                    cb.mAvailable : cb.mUnavailable;
+            msg->setPointer(kCallbackFpKey, (void *) cbFunc);
+            msg->setPointer(kContextKey, cb.mContext);
             msg->setString(kCameraIdKey, AString(cameraId));
             msg->post();
+
+            // Physical camera unavailable callback
+            std::set<String8> unavailablePhysicalCameras =
+                    pair.second.getUnavailablePhysicalIds();
+            for (const auto& physicalCameraId : unavailablePhysicalCameras) {
+                sp<AMessage> msg = new AMessage(kWhatSendSinglePhysicalCameraCallback, mHandler);
+                ACameraManager_PhysicalCameraAvailabilityCallback cbFunc =
+                        cb.mPhysicalCamUnavailable;
+                msg->setPointer(kCallbackFpKey, (void *) cbFunc);
+                msg->setPointer(kContextKey, cb.mContext);
+                msg->setString(kCameraIdKey, AString(cameraId));
+                msg->setString(kPhysicalCameraIdKey, AString(physicalCameraId));
+                msg->post();
+            }
         }
     }
-}
-
-void CameraManagerGlobal::unregisterAvailabilityCallback(
-        const ACameraManager_AvailabilityCallbacks *callback) {
-    Mutex::Autolock _l(mLock);
-    Callback cb(callback);
-    mCallbacks.erase(cb);
 }
 
 bool CameraManagerGlobal::supportsCamera2ApiLocked(const String8 &cameraId) {
@@ -550,6 +574,11 @@ bool CameraManagerGlobal::StatusAndHAL3Support::removeUnavailablePhysicalId(
     return count > 0;
 }
 
+std::set<String8> CameraManagerGlobal::StatusAndHAL3Support::getUnavailablePhysicalIds() {
+    std::lock_guard<std::mutex> lock(mLock);
+    return unavailablePhysicalIds;
+}
+
 } // namespace acam
 } // namespace android
 
@@ -666,7 +695,7 @@ ACameraManager::openCamera(
     // No way to get package name from native.
     // Send a zero length package name and let camera service figure it out from UID
     binder::Status serviceRet = cs->connectDevice(
-            callbacks, String16(cameraId), String16(""), std::unique_ptr<String16>(),
+            callbacks, String16(cameraId), String16(""), {},
             hardware::ICameraService::USE_CALLING_UID, /*out*/&deviceRemote);
 
     if (!serviceRet.isOk()) {

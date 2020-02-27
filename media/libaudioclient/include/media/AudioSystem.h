@@ -230,7 +230,7 @@ public:
                                              const char *device_address,
                                              const char *device_name,
                                              audio_format_t encodedFormat);
-    static status_t setPhoneState(audio_mode_t state);
+    static status_t setPhoneState(audio_mode_t state, uid_t uid);
     static status_t setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config);
     static audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage);
 
@@ -240,6 +240,7 @@ public:
                                      audio_stream_type_t *stream,
                                      pid_t pid,
                                      uid_t uid,
+                                     const String16& opPackageName,
                                      const audio_config_t *config,
                                      audio_output_flags_t flags,
                                      audio_port_handle_t *selectedDeviceId,

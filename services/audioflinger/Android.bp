@@ -3,8 +3,6 @@
 cc_library_shared {
     name: "libaudioflinger",
 
-    tidy: false, // b/146435095, segmentation fault with Effects.cpp
-
     srcs: [
         "AudioFlinger.cpp",
         "AudioHwDevice.cpp",

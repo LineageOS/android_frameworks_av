@@ -47,29 +47,36 @@ void Encoder::onInputAvailable(AMediaCodec *mediaCodec, int32_t bufIdx) {
             mEncoderDoneCondition.notify_one();
             return;
         }
-        size_t bytesRead = mParams.frameSize;
+        size_t bytesToRead = mParams.frameSize;
         if (mInputBufferSize - mOffset < mParams.frameSize) {
-            bytesRead = mInputBufferSize - mOffset;
+            bytesToRead = mInputBufferSize - mOffset;
         }
-        if (bufSize < bytesRead) {
-            ALOGE("bytes to read %zu bufSize %zu \n", bytesRead, bufSize);
+        //b/148655275 - Update Frame size, as Format value may not be valid
+        if (bufSize < bytesToRead) {
+            if(mNumInputFrame == 0) {
+                mParams.frameSize = bufSize;
+                bytesToRead = bufSize;
+                mParams.numFrames = (mInputBufferSize + mParams.frameSize - 1) / mParams.frameSize;
+            } else {
+                ALOGE("bytes to read %zu bufSize %zu \n", bytesToRead, bufSize);
+                mErrorCode = AMEDIA_ERROR_MALFORMED;
+                mSignalledError = true;
+                mEncoderDoneCondition.notify_one();
+                return;
+            }
+        }
+        if (bytesToRead < mParams.frameSize && mNumInputFrame < mParams.numFrames - 1) {
+            ALOGE("Partial frame at frameID %d bytesToRead %zu frameSize %d total numFrames %d\n",
+                  mNumInputFrame, bytesToRead, mParams.frameSize, mParams.numFrames);
             mErrorCode = AMEDIA_ERROR_MALFORMED;
             mSignalledError = true;
             mEncoderDoneCondition.notify_one();
             return;
         }
-        if (bytesRead < mParams.frameSize && mNumInputFrame < mParams.numFrames - 1) {
-            ALOGE("Partial frame at frameID %d bytesRead %zu frameSize %d total numFrames %d\n",
-                  mNumInputFrame, bytesRead, mParams.frameSize, mParams.numFrames);
-            mErrorCode = AMEDIA_ERROR_MALFORMED;
-            mSignalledError = true;
-            mEncoderDoneCondition.notify_one();
-            return;
-        }
-        mEleStream->read(buf, bytesRead);
+        mEleStream->read(buf, bytesToRead);
         size_t bytesgcount = mEleStream->gcount();
-        if (bytesgcount != bytesRead) {
-            ALOGE("bytes to read %zu actual bytes read %zu \n", bytesRead, bytesgcount);
+        if (bytesgcount != bytesToRead) {
+            ALOGE("bytes to read %zu actual bytes read %zu \n", bytesToRead, bytesgcount);
             mErrorCode = AMEDIA_ERROR_MALFORMED;
             mSignalledError = true;
             mEncoderDoneCondition.notify_one();
@@ -77,7 +84,7 @@ void Encoder::onInputAvailable(AMediaCodec *mediaCodec, int32_t bufIdx) {
         }
 
         uint32_t flag = 0;
-        if (mNumInputFrame == mParams.numFrames - 1 || bytesRead == 0) {
+        if (mNumInputFrame == mParams.numFrames - 1 || bytesToRead == 0) {
             ALOGD("Sending EOS on input Last frame\n");
             flag |= AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM;
         }
@@ -92,10 +99,10 @@ void Encoder::onInputAvailable(AMediaCodec *mediaCodec, int32_t bufIdx) {
 
         if (flag == AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) mSawInputEOS = true;
         ALOGV("%s bytesRead : %zd presentationTimeUs : %" PRIu64 " mSawInputEOS : %s", __FUNCTION__,
-              bytesRead, presentationTimeUs, mSawInputEOS ? "TRUE" : "FALSE");
+              bytesToRead, presentationTimeUs, mSawInputEOS ? "TRUE" : "FALSE");
 
         media_status_t status = AMediaCodec_queueInputBuffer(mCodec, bufIdx, 0 /* offset */,
-                                                             bytesRead, presentationTimeUs, flag);
+                                                             bytesToRead, presentationTimeUs, flag);
         if (AMEDIA_OK != status) {
             mErrorCode = status;
             mSignalledError = true;
@@ -103,7 +110,7 @@ void Encoder::onInputAvailable(AMediaCodec *mediaCodec, int32_t bufIdx) {
             return;
         }
         mNumInputFrame++;
-        mOffset += bytesRead;
+        mOffset += bytesToRead;
     }
 }
 
@@ -220,13 +227,12 @@ int32_t Encoder::encode(string &codecName, ifstream &eleStream, size_t eleSize, 
     if (!strncmp(mMime, "video/", 6)) {
         mParams.frameSize = mParams.width * mParams.height * 3 / 2;
     } else {
-        mParams.frameSize = 4096;
+        mParams.frameSize = kDefaultAudioEncodeFrameSize;
         // Get mInputMaxBufSize
         AMediaFormat *inputFormat = AMediaCodec_getInputFormat(mCodec);
         AMediaFormat_getInt32(inputFormat, AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, &mParams.maxFrameSize);
         if (mParams.maxFrameSize < 0) {
-            ALOGE("Invalid mParams.maxFrameSize %d\n", mParams.maxFrameSize);
-            return AMEDIA_ERROR_INVALID_PARAMETER;
+            mParams.maxFrameSize = kDefaultAudioEncodeFrameSize;
         }
         if (mParams.frameSize > mParams.maxFrameSize) {
             mParams.frameSize = mParams.maxFrameSize;

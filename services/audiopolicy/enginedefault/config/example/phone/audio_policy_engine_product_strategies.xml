@@ -97,20 +97,5 @@
         </AttributesGroup>
     </ProductStrategy>
 
-    <!-- Routing Strategy rerouting may be removed as following media??? -->
-    <ProductStrategy name="STRATEGY_REROUTING">
-        <AttributesGroup streamType="AUDIO_STREAM_REROUTING" volumeGroup="rerouting">
-            <Attributes></Attributes>
-        </AttributesGroup>
-    </ProductStrategy>
-
-    <!-- Default product strategy has empty attributes -->
-    <ProductStrategy name="STRATEGY_PATCH">
-        <AttributesGroup streamType="AUDIO_STREAM_PATCH" volumeGroup="patch">
-            <Attributes></Attributes>
-        </AttributesGroup>
-    </ProductStrategy>
-
-
 </ProductStrategies>
 

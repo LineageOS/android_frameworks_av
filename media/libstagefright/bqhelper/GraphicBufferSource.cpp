@@ -412,7 +412,7 @@ GraphicBufferSource::getHGraphicBufferProducer() const {
                     B2HGraphicBufferProducer(getIGraphicBufferProducer());
 }
 
-Status GraphicBufferSource::start() {
+status_t GraphicBufferSource::start() {
     Mutex::Autolock autoLock(mMutex);
     ALOGV("--> start; available=%zu, submittable=%zd",
             mAvailableBuffers.size(), mFreeCodecBuffers.size());
@@ -459,10 +459,10 @@ Status GraphicBufferSource::start() {
         }
     }
 
-    return Status::ok();
+    return OK;
 }
 
-Status GraphicBufferSource::stop() {
+status_t GraphicBufferSource::stop() {
     ALOGV("stop");
 
     Mutex::Autolock autoLock(mMutex);
@@ -472,10 +472,10 @@ Status GraphicBufferSource::stop() {
         // not loaded->idle.
         mExecuting = false;
     }
-    return Status::ok();
+    return OK;
 }
 
-Status GraphicBufferSource::release(){
+status_t GraphicBufferSource::release(){
     sp<ALooper> looper;
     {
         Mutex::Autolock autoLock(mMutex);
@@ -501,26 +501,26 @@ Status GraphicBufferSource::release(){
     if (looper != NULL) {
         looper->stop();
     }
-    return Status::ok();
+    return OK;
 }
 
-Status GraphicBufferSource::onInputBufferAdded(codec_buffer_id bufferId) {
+status_t GraphicBufferSource::onInputBufferAdded(codec_buffer_id bufferId) {
     Mutex::Autolock autoLock(mMutex);
 
     if (mExecuting) {
         // This should never happen -- buffers can only be allocated when
         // transitioning from "loaded" to "idle".
         ALOGE("addCodecBuffer: buffer added while executing");
-        return Status::fromServiceSpecificError(INVALID_OPERATION);
+        return INVALID_OPERATION;
     }
 
     ALOGV("addCodecBuffer: bufferId=%u", bufferId);
 
     mFreeCodecBuffers.push_back(bufferId);
-    return Status::ok();
+    return OK;
 }
 
-Status GraphicBufferSource::onInputBufferEmptied(codec_buffer_id bufferId, int fenceFd) {
+status_t GraphicBufferSource::onInputBufferEmptied(codec_buffer_id bufferId, int fenceFd) {
     Mutex::Autolock autoLock(mMutex);
     FileDescriptor::Autoclose fence(fenceFd);
 
@@ -528,7 +528,7 @@ Status GraphicBufferSource::onInputBufferEmptied(codec_buffer_id bufferId, int f
     if (cbi < 0) {
         // This should never happen.
         ALOGE("onInputBufferEmptied: buffer not recognized (bufferId=%u)", bufferId);
-        return Status::fromServiceSpecificError(BAD_VALUE);
+        return BAD_VALUE;
     }
 
     std::shared_ptr<AcquiredBuffer> buffer = mSubmittedCodecBuffers.valueAt(cbi);
@@ -548,13 +548,13 @@ Status GraphicBufferSource::onInputBufferEmptied(codec_buffer_id bufferId, int f
             ALOGV("onInputBufferEmptied: EOS null buffer (bufferId=%u@%zd)", bufferId, cbi);
         }
         // No GraphicBuffer to deal with, no additional input or output is expected, so just return.
-        return Status::fromServiceSpecificError(BAD_VALUE);
+        return BAD_VALUE;
     }
 
     if (!mExecuting) {
         // this is fine since this could happen when going from Idle to Loaded
         ALOGV("onInputBufferEmptied: no longer executing (bufferId=%u@%zd)", bufferId, cbi);
-        return Status::fromServiceSpecificError(OK);
+        return OK;
     }
 
     ALOGV("onInputBufferEmptied: bufferId=%d@%zd [slot=%d, useCount=%ld, handle=%p] acquired=%d",
@@ -584,7 +584,7 @@ Status GraphicBufferSource::onInputBufferEmptied(codec_buffer_id bufferId, int f
     }
 
     // releaseReleasableBuffers_l();
-    return Status::ok();
+    return OK;
 }
 
 void GraphicBufferSource::onDataspaceChanged_l(
@@ -1423,7 +1423,7 @@ status_t GraphicBufferSource::signalEndOfInputStream() {
     // stall since no future events are expected.
     mEndOfStream = true;
 
-    if (mStopTimeUs == -1 && mExecuting && !haveAvailableBuffers_l()) {
+    if (mExecuting && !haveAvailableBuffers_l()) {
         submitEndOfInputStream_l();
     }
 

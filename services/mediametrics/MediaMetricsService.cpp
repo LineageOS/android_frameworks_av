@@ -436,6 +436,10 @@ bool MediaMetricsService::isContentValid(const mediametrics::Item *item, bool is
     // untrusted uids can only send us a limited set of keys
     const std::string &key = item->getKey();
     if (startsWith(key, "audio.")) return true;
+    if (startsWith(key, "drm.vendor.")) return true;
+    // the list of allowedKey uses statsd_handlers
+    // in iface_statsd.cpp as reference
+    // drmmanager is from a trusted uid, therefore not needed here
     for (const char *allowedKey : {
                                      // legacy audio
                                      "audiopolicy",
@@ -445,6 +449,7 @@ bool MediaMetricsService::isContentValid(const mediametrics::Item *item, bool is
                                      // other media
                                      "codec",
                                      "extractor",
+                                     "mediadrm",
                                      "nuplayer",
                                  }) {
         if (key == allowedKey) {

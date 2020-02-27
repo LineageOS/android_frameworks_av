@@ -20,7 +20,6 @@
 #include "DevicesFactoryHalHidl.h"
 #include "DevicesFactoryHalHybrid.h"
 #include "DevicesFactoryHalLocal.h"
-#include <libaudiohal/FactoryHalHidl.h>
 
 namespace android {
 namespace CPP_VERSION {
@@ -47,8 +46,7 @@ status_t DevicesFactoryHalHybrid::getHalPids(std::vector<pid_t> *pids) {
 
 } // namespace CPP_VERSION
 
-template <>
-sp<DevicesFactoryHalInterface> createFactoryHal<AudioHALVersion::CPP_VERSION>() {
+extern "C" __attribute__((visibility("default"))) void* createIDevicesFactory() {
     auto service = hardware::audio::CPP_VERSION::IDevicesFactory::getService();
     return service ? new CPP_VERSION::DevicesFactoryHalHybrid(service) : nullptr;
 }

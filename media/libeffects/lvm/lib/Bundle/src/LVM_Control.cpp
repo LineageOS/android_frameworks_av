@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-
 /****************************************************************************************/
 /*                                                                                      */
 /* Includes                                                                             */
@@ -56,7 +55,6 @@ LVM_ReturnStatus_en LVM_SetControlParameters(LVM_Handle_t           hInstance,
 {
     LVM_Instance_t    *pInstance =(LVM_Instance_t  *)hInstance;
 
-
     if ((pParams == LVM_NULL) || (hInstance == LVM_NULL))
     {
         return (LVM_NULLADDRESS);
@@ -67,17 +65,11 @@ LVM_ReturnStatus_en LVM_SetControlParameters(LVM_Handle_t           hInstance,
     if(
         /* General parameters */
         ((pParams->OperatingMode != LVM_MODE_OFF) && (pParams->OperatingMode != LVM_MODE_ON))                                         ||
-#if defined(BUILD_FLOAT) && defined(HIGHER_FS)
     ((pParams->SampleRate != LVM_FS_8000) && (pParams->SampleRate != LVM_FS_11025) && (pParams->SampleRate != LVM_FS_12000)       &&
      (pParams->SampleRate != LVM_FS_16000) && (pParams->SampleRate != LVM_FS_22050) && (pParams->SampleRate != LVM_FS_24000)      &&
      (pParams->SampleRate != LVM_FS_32000) && (pParams->SampleRate != LVM_FS_44100) && (pParams->SampleRate != LVM_FS_48000)      &&
      (pParams->SampleRate != LVM_FS_88200) && (pParams->SampleRate != LVM_FS_96000) &&
      (pParams->SampleRate != LVM_FS_176400) && (pParams->SampleRate != LVM_FS_192000))      ||
-#else
-        ((pParams->SampleRate != LVM_FS_8000) && (pParams->SampleRate != LVM_FS_11025) && (pParams->SampleRate != LVM_FS_12000)       &&
-        (pParams->SampleRate != LVM_FS_16000) && (pParams->SampleRate != LVM_FS_22050) && (pParams->SampleRate != LVM_FS_24000)       &&
-        (pParams->SampleRate != LVM_FS_32000) && (pParams->SampleRate != LVM_FS_44100) && (pParams->SampleRate != LVM_FS_48000))      ||
-#endif
 #ifdef SUPPORT_MC
         ((pParams->SourceFormat != LVM_STEREO) &&
          (pParams->SourceFormat != LVM_MONOINSTEREO) &&
@@ -204,7 +196,6 @@ LVM_ReturnStatus_en LVM_SetControlParameters(LVM_Handle_t           hInstance,
         return (LVM_OUTOFRANGE);
     }
 
-
     /*
     * Set the flag to indicate there are new parameters to use
     *
@@ -217,7 +208,6 @@ LVM_ReturnStatus_en LVM_SetControlParameters(LVM_Handle_t           hInstance,
 
     return(LVM_SUCCESS);
 }
-
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -245,7 +235,6 @@ LVM_ReturnStatus_en LVM_GetControlParameters(LVM_Handle_t           hInstance,
 {
     LVM_Instance_t    *pInstance =(LVM_Instance_t  *)hInstance;
 
-
     /*
      * Check pointer
      */
@@ -272,7 +261,6 @@ LVM_ReturnStatus_en LVM_GetControlParameters(LVM_Handle_t           hInstance,
     return(LVM_SUCCESS);
 }
 
-
 /****************************************************************************************/
 /*                                                                                      */
 /* FUNCTION:                LVM_SetTrebleBoost                                          */
@@ -289,11 +277,7 @@ LVM_ReturnStatus_en LVM_GetControlParameters(LVM_Handle_t           hInstance,
 void LVM_SetTrebleBoost(LVM_Instance_t         *pInstance,
                         LVM_ControlParams_t    *pParams)
 {
-#ifdef BUILD_FLOAT
     extern FO_FLOAT_LShx_Coefs_t  LVM_TrebleBoostCoefs[];
-#else
-    extern FO_C16_LShx_Coefs_t  LVM_TrebleBoostCoefs[];
-#endif
 
     LVM_INT16               Offset;
     LVM_INT16               EffectLevel = 0;
@@ -324,7 +308,6 @@ void LVM_SetTrebleBoost(LVM_Instance_t         *pInstance,
              * Load the coefficients and enabled the treble boost
              */
             Offset = (LVM_INT16)(EffectLevel - 1 + TrebleBoostSteps * (pParams->SampleRate - TrebleBoostMinRate));
-#ifdef BUILD_FLOAT
             FO_2I_D16F32Css_LShx_TRC_WRA_01_Init(&pInstance->pTE_State->TrebleBoost_State,
                                             &pInstance->pTE_Taps->TrebleBoost_Taps,
                                             &LVM_TrebleBoostCoefs[Offset]);
@@ -337,19 +320,6 @@ void LVM_SetTrebleBoost(LVM_Instance_t         *pInstance,
                                                      Cast to void: no dereferencing in function */
                             (LVM_UINT16)(sizeof(pInstance->pTE_Taps->TrebleBoost_Taps) / \
                                                         sizeof(LVM_FLOAT))); /* Number of words */
-#else
-            FO_2I_D16F32Css_LShx_TRC_WRA_01_Init(&pInstance->pTE_State->TrebleBoost_State,
-                                            &pInstance->pTE_Taps->TrebleBoost_Taps,
-                                            &LVM_TrebleBoostCoefs[Offset]);
-
-            /*
-             * Clear the taps
-             */
-            LoadConst_16((LVM_INT16)0,                                     /* Value */
-                         (void *)&pInstance->pTE_Taps->TrebleBoost_Taps,  /* Destination.\
-                                                     Cast to void: no dereferencing in function */
-                         (LVM_UINT16)(sizeof(pInstance->pTE_Taps->TrebleBoost_Taps)/sizeof(LVM_INT16))); /* Number of words */
-#endif
         }
     }
     else
@@ -362,7 +332,6 @@ void LVM_SetTrebleBoost(LVM_Instance_t         *pInstance,
 
     return;
 }
-
 
 /************************************************************************************/
 /*                                                                                  */
@@ -383,9 +352,7 @@ void    LVM_SetVolume(LVM_Instance_t         *pInstance,
     LVM_UINT16      dBShifts;                                   /* 6dB shifts */
     LVM_UINT16      dBOffset;                                   /* Table offset */
     LVM_INT16       Volume = 0;                                 /* Required volume in dBs */
-#ifdef BUILD_FLOAT
     LVM_FLOAT        Temp;
-#endif
 
     /*
      * Limit the gain to the maximum allowed
@@ -439,55 +406,35 @@ void    LVM_SetVolume(LVM_Instance_t         *pInstance,
     dBOffset = (LVM_UINT16)((-Volume) % 6);             /* Get the dBs 0-5 */
     dBShifts = (LVM_UINT16)(Volume / -6);               /* Get the 6dB shifts */
 
-
     /*
      * Set the parameters
      */
     if(dBShifts == 0)
     {
-#ifdef BUILD_FLOAT
         LVC_Mixer_SetTarget(&pInstance->VC_Volume.MixerStream[0],
                                 (LVM_FLOAT)LVM_VolumeTable[dBOffset]);
-#else
-        LVC_Mixer_SetTarget(&pInstance->VC_Volume.MixerStream[0],
-                                (LVM_INT32)LVM_VolumeTable[dBOffset]);
-#endif
         }
     else
     {
-#ifdef BUILD_FLOAT
         Temp = LVM_VolumeTable[dBOffset];
         while(dBShifts) {
             Temp = Temp / 2.0f;
             dBShifts--;
         }
         LVC_Mixer_SetTarget(&pInstance->VC_Volume.MixerStream[0], Temp);
-#else
-        LVC_Mixer_SetTarget(&pInstance->VC_Volume.MixerStream[0],
-                                (((LVM_INT32)LVM_VolumeTable[dBOffset])>>dBShifts));
-#endif
     }
     pInstance->VC_Volume.MixerStream[0].CallbackSet = 1;
     if(pInstance->NoSmoothVolume == LVM_TRUE)
     {
-#ifdef BUILD_FLOAT
         LVC_Mixer_SetTimeConstant(&pInstance->VC_Volume.MixerStream[0], 0,
                                   pInstance->Params.SampleRate, 2);
-#else
-        LVC_Mixer_SetTimeConstant(&pInstance->VC_Volume.MixerStream[0],0,pInstance->Params.SampleRate,2);
-#endif
     }
     else
     {
-#ifdef BUILD_FLOAT
         LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_Volume.MixerStream[0],
                                            LVM_VC_MIXER_TIME, pInstance->Params.SampleRate, 2);
-#else
-        LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_Volume.MixerStream[0],LVM_VC_MIXER_TIME,pInstance->Params.SampleRate,2);
-#endif
     }
 }
-
 
 /************************************************************************************/
 /*                                                                                  */
@@ -512,7 +459,6 @@ void    LVM_SetHeadroom(LVM_Instance_t         *pInstance,
     LVM_INT16   ii, jj;
     LVM_INT16   Headroom = 0;
     LVM_INT16   MaxGain = 0;
-
 
     if (((LVEQNB_Mode_en)pParams->EQNB_OperatingMode == LVEQNB_ON)
            && (pInstance->HeadroomParams.Headroom_OperatingMode == LVM_HEADROOM_ON))
@@ -546,7 +492,6 @@ void    LVM_SetHeadroom(LVM_Instance_t         *pInstance,
 
 }
 
-
 /****************************************************************************************/
 /*                                                                                      */
 /* FUNCTION:                LVM_ApplyNewSettings                                        */
@@ -570,7 +515,6 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
     LVM_Instance_t         *pInstance =(LVM_Instance_t *)hInstance;
     LVM_ControlParams_t    LocalParams;
     LVM_INT16              Count = 5;
-
 
     /*
      * Copy the new parameters but make sure they didn't change while copying
@@ -628,13 +572,8 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
         /* Configure Mixer module for gradual changes to volume*/
         if(LocalParams.VC_Balance < 0)
         {
-#ifdef BUILD_FLOAT
             LVM_FLOAT Target_Float;
-#else
-            LVM_INT32 Target;
-#endif
             /* Drop in right channel volume*/
-#ifdef BUILD_FLOAT
             Target_Float = LVM_MAXFLOAT;
             LVC_Mixer_SetTarget(&pInstance->VC_BalanceMix.MixerStream[0], Target_Float);
             LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_BalanceMix.MixerStream[0],
@@ -644,25 +583,11 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
             LVC_Mixer_SetTarget(&pInstance->VC_BalanceMix.MixerStream[1], Target_Float);
             LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_BalanceMix.MixerStream[1],
                                                LVM_VC_MIXER_TIME, LocalParams.SampleRate, 1);
-#else
-            Target = LVM_MAXINT_16;
-            LVC_Mixer_SetTarget(&pInstance->VC_BalanceMix.MixerStream[0],Target);
-            LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_BalanceMix.MixerStream[0],LVM_VC_MIXER_TIME,LocalParams.SampleRate,1);
-
-            Target = dB_to_Lin32((LVM_INT16)(LocalParams.VC_Balance<<4));
-            LVC_Mixer_SetTarget(&pInstance->VC_BalanceMix.MixerStream[1],Target);
-            LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_BalanceMix.MixerStream[1],LVM_VC_MIXER_TIME,LocalParams.SampleRate,1);
-#endif
         }
         else if(LocalParams.VC_Balance >0)
         {
-#ifdef BUILD_FLOAT
             LVM_FLOAT Target_Float;
-#else
-            LVM_INT32 Target;
-#endif
             /* Drop in left channel volume*/
-#ifdef BUILD_FLOAT
             Target_Float = dB_to_LinFloat((LVM_INT16)((-LocalParams.VC_Balance) << 4));
             LVC_Mixer_SetTarget(&pInstance->VC_BalanceMix.MixerStream[0], Target_Float);
             LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_BalanceMix.MixerStream[0],
@@ -672,30 +597,12 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
             LVC_Mixer_SetTarget(&pInstance->VC_BalanceMix.MixerStream[1], Target_Float);
             LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_BalanceMix.MixerStream[1],
                                                LVM_VC_MIXER_TIME, LocalParams.SampleRate, 1);
-#else
-            Target = dB_to_Lin32((LVM_INT16)((-LocalParams.VC_Balance)<<4));
-            LVC_Mixer_SetTarget(&pInstance->VC_BalanceMix.MixerStream[0],Target);
-            LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_BalanceMix.MixerStream[0],LVM_VC_MIXER_TIME,LocalParams.SampleRate,1);
-
-            Target = LVM_MAXINT_16;
-            LVC_Mixer_SetTarget(&pInstance->VC_BalanceMix.MixerStream[1],Target);
-            LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_BalanceMix.MixerStream[1],LVM_VC_MIXER_TIME,LocalParams.SampleRate,1);
-#endif
         }
         else
         {
-#ifdef BUILD_FLOAT
             LVM_FLOAT Target_Float;
-#else
-            LVM_INT32 Target;
-#endif
             /* No drop*/
-#ifdef BUILD_FLOAT
             Target_Float = LVM_MAXFLOAT;
-#else
-            Target = LVM_MAXINT_16;
-#endif
-#ifdef BUILD_FLOAT
             LVC_Mixer_SetTarget(&pInstance->VC_BalanceMix.MixerStream[0],Target_Float);
             LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_BalanceMix.MixerStream[0],
                                                LVM_VC_MIXER_TIME,LocalParams.SampleRate, 1);
@@ -703,13 +610,6 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
             LVC_Mixer_SetTarget(&pInstance->VC_BalanceMix.MixerStream[1],Target_Float);
             LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_BalanceMix.MixerStream[1],
                                                LVM_VC_MIXER_TIME,LocalParams.SampleRate, 1);
-#else
-            LVC_Mixer_SetTarget(&pInstance->VC_BalanceMix.MixerStream[0],Target);
-            LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_BalanceMix.MixerStream[0],LVM_VC_MIXER_TIME,LocalParams.SampleRate,1);
-
-            LVC_Mixer_SetTarget(&pInstance->VC_BalanceMix.MixerStream[1],Target);
-            LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->VC_BalanceMix.MixerStream[1],LVM_VC_MIXER_TIME,LocalParams.SampleRate,1);
-#endif
         }
     }
     /*
@@ -719,7 +619,6 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
         LVDBE_ReturnStatus_en       DBE_Status;
         LVDBE_Params_t              DBE_Params;
         LVDBE_Handle_t              *hDBEInstance = (LVDBE_Handle_t *)pInstance->hDBEInstance;
-
 
         /*
          * Set the new parameters
@@ -749,7 +648,6 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
         DBE_Status = LVDBE_Control(hDBEInstance,
                                    &DBE_Params);
 
-
         /*
          * Quit if the changes were not accepted
          */
@@ -757,7 +655,6 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
         {
             return((LVM_ReturnStatus_en)DBE_Status);
         }
-
 
         /*
          * Set the control flag
@@ -772,7 +669,6 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
         LVEQNB_ReturnStatus_en      EQNB_Status;
         LVEQNB_Params_t             EQNB_Params;
         LVEQNB_Handle_t             *hEQNBInstance = (LVEQNB_Handle_t *)pInstance->hEQNBInstance;
-
 
         /*
          * Set the new parameters
@@ -830,7 +726,6 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
         EQNB_Status = LVEQNB_Control(hEQNBInstance,
                                      &EQNB_Params);
 
-
         /*
          * Quit if the changes were not accepted
          */
@@ -840,7 +735,6 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
         }
 
     }
-
 
     /*
      * Update concert sound
@@ -917,7 +811,6 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
         CS_Status = LVCS_Control(hCSInstance,
                                  &CS_Params);
 
-
         /*
          * Quit if the changes were not accepted
          */
@@ -935,7 +828,6 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
         LVPSA_RETURN                PSA_Status;
         LVPSA_ControlParams_t       PSA_Params;
         pLVPSA_Handle_t             *hPSAInstance = (pLVPSA_Handle_t *)pInstance->hPSAInstance;
-
 
         /*
          * Set the new parameters
@@ -973,10 +865,8 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
     pInstance->NoSmoothVolume = LVM_FALSE;
     pInstance->Params =  LocalParams;
 
-
     return(LVM_SUCCESS);
 }
-
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -1071,13 +961,11 @@ LVM_ReturnStatus_en LVM_GetHeadroomParams(LVM_Handle_t          hInstance,
 
     pHeadroomParams->NHeadroomBands = pInstance->NewHeadroomParams.NHeadroomBands;
 
-
     /* Copy settings in memory */
     for(ii = 0; ii < pInstance->NewHeadroomParams.NHeadroomBands; ii++)
     {
         pInstance->pHeadroom_UserDefs[ii] = pInstance->pHeadroom_BandDefs[ii];
     }
-
 
     pHeadroomParams->pHeadroomDefinition = pInstance->pHeadroom_UserDefs;
     pHeadroomParams->Headroom_OperatingMode = pInstance->NewHeadroomParams.Headroom_OperatingMode;
@@ -1157,30 +1045,17 @@ LVM_INT32    LVM_VCCallBack(void*   pBundleHandle,
                             short   CallBackParam)
 {
     LVM_Instance_t *pInstance =(LVM_Instance_t  *)pBundleHandle;
-#ifdef BUILD_FLOAT
     LVM_FLOAT    Target;
-#else
-    LVM_INT32    Target;
-#endif
 
     (void) pGeneralPurpose;
     (void) CallBackParam;
 
     /* When volume mixer has reached 0 dB target then stop it to avoid
        unnecessary processing. */
-#ifdef BUILD_FLOAT
     Target = LVC_Mixer_GetTarget(&pInstance->VC_Volume.MixerStream[0]);
     if(Target == 1.0f)
     {
         pInstance->VC_Active = LVM_FALSE;
     }
-#else
-    Target = LVC_Mixer_GetTarget(&pInstance->VC_Volume.MixerStream[0]);
-
-    if(Target == 0x7FFF)
-    {
-        pInstance->VC_Active = LVM_FALSE;
-    }
-#endif
     return 1;
 }

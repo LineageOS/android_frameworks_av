@@ -380,9 +380,11 @@ TEST_P(ExtractorUnitTest, MultipleStartStopTest) {
 }
 
 TEST_P(ExtractorUnitTest, SeekTest) {
-    // Both Flac and Wav extractor can give samples from any pts and mark the given sample as
-    // sync frame. So, this seek test is not applicable to FLAC and WAV extractors
-    if (mDisableTest || mExtractorName == FLAC || mExtractorName == WAV) return;
+    // Flac, Midi and Wav extractor can give samples from any pts and mark the given sample as
+    // sync frame. So, this seek test is not applicable to these extractors
+    if (mDisableTest || mExtractorName == FLAC || mExtractorName == WAV || mExtractorName == MIDI) {
+        return;
+    }
 
     ALOGV("Validates %s Extractor behaviour for different seek modes", GetParam().first.c_str());
     string inputFileName = gEnv->getRes() + GetParam().second;
@@ -496,8 +498,6 @@ TEST_P(ExtractorUnitTest, SeekTest) {
     seekablePoints.clear();
 }
 
-// TODO: (b/145332185)
-// Add MIDI inputs
 INSTANTIATE_TEST_SUITE_P(ExtractorUnitTestAll, ExtractorUnitTest,
                          ::testing::Values(make_pair("aac", "loudsoftaac.aac"),
                                            make_pair("amr", "testamr.amr"),
@@ -507,6 +507,7 @@ INSTANTIATE_TEST_SUITE_P(ExtractorUnitTestAll, ExtractorUnitTest,
                                            make_pair("mpeg2ts", "segment000001.ts"),
                                            make_pair("flac", "sinesweepflac.flac"),
                                            make_pair("ogg", "testopus.opus"),
+                                           make_pair("midi", "midi_a.mid"),
                                            make_pair("mkv", "sinesweepvorbis.mkv"),
                                            make_pair("mpeg4", "sinesweepoggmp4.mp4"),
                                            make_pair("mp3", "sinesweepmp3lame.mp3"),

@@ -123,6 +123,7 @@ cc_library_shared {
         "android.frameworks.cameraservice.device@2.0",
         "android.frameworks.cameraservice.common@2.0",
         "android.frameworks.cameraservice.service@2.0",
+        "android.frameworks.cameraservice.service@2.1",
     ],
     static_libs: [
         "android.hardware.camera.common@1.0-helper",
@@ -140,9 +141,12 @@ cc_library_shared {
 }
 
 cc_test {
-    name: "AImageReaderVendorTest",
+    name: "ACameraNdkVendorTest",
     vendor: true,
-    srcs: ["ndk_vendor/tests/AImageReaderVendorTest.cpp"],
+    srcs: [
+        "ndk_vendor/tests/AImageReaderVendorTest.cpp",
+        "ndk_vendor/tests/ACameraManagerTest.cpp",
+    ],
     shared_libs: [
         "libcamera2ndk_vendor",
         "libcamera_metadata",

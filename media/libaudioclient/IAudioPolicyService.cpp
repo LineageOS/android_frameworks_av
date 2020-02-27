@@ -170,11 +170,12 @@ public:
         return static_cast <status_t> (reply.readInt32());
     }
 
-    virtual status_t setPhoneState(audio_mode_t state)
+    virtual status_t setPhoneState(audio_mode_t state, uid_t uid)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
         data.writeInt32(state);
+        data.writeInt32(uid);
         remote()->transact(SET_PHONE_STATE, data, &reply);
         return static_cast <status_t> (reply.readInt32());
     }
@@ -213,6 +214,7 @@ public:
                               audio_stream_type_t *stream,
                               pid_t pid,
                               uid_t uid,
+                              const String16& opPackageName,
                               const audio_config_t *config,
                               audio_output_flags_t flags,
                               audio_port_handle_t *selectedDeviceId,
@@ -251,6 +253,7 @@ public:
             }
             data.writeInt32(pid);
             data.writeInt32(uid);
+            data.writeString16(opPackageName);
             data.write(config, sizeof(audio_config_t));
             data.writeInt32(static_cast <uint32_t>(flags));
             data.writeInt32(*selectedDeviceId);
@@ -1596,7 +1599,8 @@ status_t BnAudioPolicyService::onTransact(
         case SET_PHONE_STATE: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             reply->writeInt32(static_cast <uint32_t>(setPhoneState(
-                    (audio_mode_t) data.readInt32())));
+                    (audio_mode_t) data.readInt32(),
+                    (uid_t) data.readInt32())));
             return NO_ERROR;
         } break;
 
@@ -1643,6 +1647,11 @@ status_t BnAudioPolicyService::onTransact(
             }
             pid_t pid = (pid_t)data.readInt32();
             uid_t uid = (uid_t)data.readInt32();
+            String16 opPackageName;
+            status = data.readString16(&opPackageName);
+            if (status != NO_ERROR) {
+                return status;
+            }
             audio_config_t config;
             memset(&config, 0, sizeof(audio_config_t));
             data.read(&config, sizeof(audio_config_t));
@@ -1654,7 +1663,7 @@ status_t BnAudioPolicyService::onTransact(
             std::vector<audio_io_handle_t> secondaryOutputs;
             status = getOutputForAttr(&attr,
                     &output, session, &stream, pid, uid,
-                    &config,
+                    opPackageName, &config,
                     flags, &selectedDeviceId, &portId, &secondaryOutputs);
             reply->writeInt32(status);
             status = reply->write(&attr, sizeof(audio_attributes_t));

@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-
 /****************************************************************************************/
 /*                                                                                      */
 /*  Includes                                                                            */
@@ -67,12 +66,10 @@ LVEQNB_ReturnStatus_en LVEQNB_Memory(LVEQNB_Handle_t            hInstance,
     INST_ALLOC          AllocMem;
     LVEQNB_Instance_t   *pInstance = (LVEQNB_Instance_t *)hInstance;
 
-
     if((pMemoryTable == LVM_NULL)|| (pCapabilities == LVM_NULL))
     {
         return LVEQNB_NULLADDRESS;
     }
-
 
     /*
      * Fill in the memory table
@@ -91,13 +88,11 @@ LVEQNB_ReturnStatus_en LVEQNB_Memory(LVEQNB_Handle_t            hInstance,
         pMemoryTable->Region[LVEQNB_MEMREGION_INSTANCE].Type         = LVEQNB_PERSISTENT;
         pMemoryTable->Region[LVEQNB_MEMREGION_INSTANCE].pBaseAddress = LVM_NULL;
 
-
         /*
          * Persistant data memory
          */
         InstAlloc_Init(&AllocMem,
                        LVM_NULL);
-#ifdef BUILD_FLOAT
         InstAlloc_AddMember(&AllocMem,                              /* Low pass filter */
                             sizeof(Biquad_2I_Order2_FLOAT_Taps_t));
         InstAlloc_AddMember(&AllocMem,                              /* High pass filter */
@@ -111,18 +106,6 @@ LVEQNB_ReturnStatus_en LVEQNB_Memory(LVEQNB_Handle_t            hInstance,
         /* Biquad types */
         InstAlloc_AddMember(&AllocMem,
                             (pCapabilities->MaxBands * sizeof(LVEQNB_BiquadType_en)));
-#else
-        InstAlloc_AddMember(&AllocMem,                              /* Low pass filter */
-                            sizeof(Biquad_2I_Order2_Taps_t));
-        InstAlloc_AddMember(&AllocMem,                              /* High pass filter */
-                            sizeof(Biquad_2I_Order2_Taps_t));
-        InstAlloc_AddMember(&AllocMem,
-                            (pCapabilities->MaxBands * sizeof(Biquad_2I_Order2_Taps_t))); /* Equaliser Biquad Taps */
-        InstAlloc_AddMember(&AllocMem,
-                            (pCapabilities->MaxBands * sizeof(LVEQNB_BandDef_t)));        /* Filter definitions */
-        InstAlloc_AddMember(&AllocMem,
-                            (pCapabilities->MaxBands * sizeof(LVEQNB_BiquadType_en)));    /* Biquad types */
-#endif
         pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_DATA].Size         = InstAlloc_GetTotal(&AllocMem);
         pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_DATA].Alignment    = LVEQNB_DATA_ALIGN;
         pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_DATA].Type         = LVEQNB_PERSISTENT_DATA;
@@ -133,7 +116,6 @@ LVEQNB_ReturnStatus_en LVEQNB_Memory(LVEQNB_Handle_t            hInstance,
          */
         InstAlloc_Init(&AllocMem,
                        LVM_NULL);
-#ifdef BUILD_FLOAT
         InstAlloc_AddMember(&AllocMem,                              /* Low pass filter */
                             sizeof(Biquad_FLOAT_Instance_t));
         InstAlloc_AddMember(&AllocMem,                              /* High pass filter */
@@ -141,14 +123,6 @@ LVEQNB_ReturnStatus_en LVEQNB_Memory(LVEQNB_Handle_t            hInstance,
         /* Equaliser Biquad Instance */
         InstAlloc_AddMember(&AllocMem,
                             pCapabilities->MaxBands * sizeof(Biquad_FLOAT_Instance_t));
-#else
-        InstAlloc_AddMember(&AllocMem,                              /* Low pass filter */
-                            sizeof(Biquad_Instance_t));
-        InstAlloc_AddMember(&AllocMem,                              /* High pass filter */
-                            sizeof(Biquad_Instance_t));
-        InstAlloc_AddMember(&AllocMem,
-                            pCapabilities->MaxBands * sizeof(Biquad_Instance_t)); /* Equaliser Biquad Instance */
-#endif
         pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_COEF].Size         = InstAlloc_GetTotal(&AllocMem);
         pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_COEF].Alignment    = LVEQNB_COEF_ALIGN;
         pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_COEF].Type         = LVEQNB_PERSISTENT_COEF;
@@ -159,14 +133,9 @@ LVEQNB_ReturnStatus_en LVEQNB_Memory(LVEQNB_Handle_t            hInstance,
          */
         InstAlloc_Init(&AllocMem,
                        LVM_NULL);
-#ifdef BUILD_FLOAT
         InstAlloc_AddMember(&AllocMem,                              /* Low pass filter */
                             LVEQNB_SCRATCHBUFFERS * sizeof(LVM_FLOAT) * \
                                              pCapabilities->MaxBlockSize);
-#else
-        InstAlloc_AddMember(&AllocMem,                              /* Low pass filter */
-                            LVEQNB_SCRATCHBUFFERS*sizeof(LVM_INT16)*pCapabilities->MaxBlockSize);
-#endif
         pMemoryTable->Region[LVEQNB_MEMREGION_SCRATCH].Size              = InstAlloc_GetTotal(&AllocMem);
         pMemoryTable->Region[LVEQNB_MEMREGION_SCRATCH].Alignment         = LVEQNB_SCRATCH_ALIGN;
         pMemoryTable->Region[LVEQNB_MEMREGION_SCRATCH].Type              = LVEQNB_SCRATCH;
@@ -180,7 +149,6 @@ LVEQNB_ReturnStatus_en LVEQNB_Memory(LVEQNB_Handle_t            hInstance,
 
     return(LVEQNB_SUCCESS);
 }
-
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -260,13 +228,10 @@ LVEQNB_ReturnStatus_en LVEQNB_Init(LVEQNB_Handle_t          *phInstance,
     }
     pInstance =(LVEQNB_Instance_t  *)*phInstance;
 
-
-
     /*
      * Save the memory table in the instance structure
      */
     pInstance->Capabilities = *pCapabilities;
-
 
     /*
      * Save the memory table in the instance structure and
@@ -280,17 +245,10 @@ LVEQNB_ReturnStatus_en LVEQNB_Init(LVEQNB_Handle_t          *phInstance,
     InstAlloc_Init(&AllocMem,
                    pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_COEF].pBaseAddress);
 
-#ifdef BUILD_FLOAT
     /* Equaliser Biquad Instance */
     pInstance->pEQNB_FilterState_Float = (Biquad_FLOAT_Instance_t *)
         InstAlloc_AddMember(&AllocMem, pCapabilities->MaxBands * \
                                                        sizeof(Biquad_FLOAT_Instance_t));
-#else
-    pInstance->pEQNB_FilterState = InstAlloc_AddMember(&AllocMem,
-                                                       pCapabilities->MaxBands * sizeof(Biquad_Instance_t)); /* Equaliser Biquad Instance */
-#endif
-
-
 
     /*
      * Allocate data memory
@@ -298,15 +256,9 @@ LVEQNB_ReturnStatus_en LVEQNB_Init(LVEQNB_Handle_t          *phInstance,
     InstAlloc_Init(&AllocMem,
                    pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_DATA].pBaseAddress);
 
-#ifdef BUILD_FLOAT
     MemSize = (pCapabilities->MaxBands * sizeof(Biquad_2I_Order2_FLOAT_Taps_t));
     pInstance->pEQNB_Taps_Float = (Biquad_2I_Order2_FLOAT_Taps_t *)InstAlloc_AddMember(&AllocMem,
                                                                                        MemSize);
-#else
-    MemSize = (pCapabilities->MaxBands * sizeof(Biquad_2I_Order2_Taps_t));
-    pInstance->pEQNB_Taps = (Biquad_2I_Order2_Taps_t *)InstAlloc_AddMember(&AllocMem,
-                                                                           MemSize);
-#endif
     MemSize = (pCapabilities->MaxBands * sizeof(LVEQNB_BandDef_t));
     pInstance->pBandDefinitions  = (LVEQNB_BandDef_t *)InstAlloc_AddMember(&AllocMem,
                                                                            MemSize);
@@ -317,20 +269,14 @@ LVEQNB_ReturnStatus_en LVEQNB_Init(LVEQNB_Handle_t          *phInstance,
     pInstance->pBiquadType = (LVEQNB_BiquadType_en *)InstAlloc_AddMember(&AllocMem,
                                                                          MemSize);
 
-
     /*
      * Internally map, structure and allign scratch memory
      */
     InstAlloc_Init(&AllocMem,
                    pMemoryTable->Region[LVEQNB_MEMREGION_SCRATCH].pBaseAddress);
 
-#ifdef BUILD_FLOAT
     pInstance->pFastTemporary = (LVM_FLOAT *)InstAlloc_AddMember(&AllocMem,
                                                                  sizeof(LVM_FLOAT));
-#else
-    pInstance->pFastTemporary = (LVM_INT16 *)InstAlloc_AddMember(&AllocMem,
-                                                                 sizeof(LVM_INT16));
-#endif
 
     /*
      * Update the instance parameters
@@ -362,18 +308,12 @@ LVEQNB_ReturnStatus_en LVEQNB_Init(LVEQNB_Handle_t          *phInstance,
     LVC_Mixer_Init(&pInstance->BypassMixer.MixerStream[0],0,0);
     LVC_Mixer_SetTimeConstant(&pInstance->BypassMixer.MixerStream[0],0,LVM_FS_8000,2);
 
-
     pInstance->BypassMixer.MixerStream[1].CallbackSet        = 1;
     pInstance->BypassMixer.MixerStream[1].CallbackParam      = 0;
     pInstance->BypassMixer.MixerStream[1].pCallbackHandle    = LVM_NULL;
     pInstance->BypassMixer.MixerStream[1].pCallBack          = LVM_NULL;
-#ifdef BUILD_FLOAT
     LVC_Mixer_Init(&pInstance->BypassMixer.MixerStream[1], 0, 1.0f);
     LVC_Mixer_SetTimeConstant(&pInstance->BypassMixer.MixerStream[1], 0, LVM_FS_8000, 2);
-#else
-    LVC_Mixer_Init(&pInstance->BypassMixer.MixerStream[1],0,LVM_MAXINT_16);
-    LVC_Mixer_SetTimeConstant(&pInstance->BypassMixer.MixerStream[1],0,LVM_FS_8000,2);
-#endif
 
     pInstance->bInOperatingModeTransition      = LVM_FALSE;
 

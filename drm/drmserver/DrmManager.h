@@ -17,12 +17,25 @@
 #ifndef __DRM_MANAGER_H__
 #define __DRM_MANAGER_H__
 
+#include <drm/drm_framework_common.h>
+#include <media/stagefright/foundation/AHandler.h>
+#include <media/stagefright/foundation/ALooper.h>
+#include <media/stagefright/foundation/AMessage.h>
+#include <sys/types.h>
 #include <utils/Errors.h>
 #include <utils/threads.h>
-#include <drm/drm_framework_common.h>
+
 #include "IDrmEngine.h"
 #include "PlugInManager.h"
 #include "IDrmServiceListener.h"
+
+#include <array>
+#include <cstddef>
+#include <map>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace android {
 
@@ -40,6 +53,31 @@ class DrmInfoRequest;
 class DrmSupportInfo;
 class ActionDescription;
 
+enum DrmManagerMethodId {
+  GET_CONSTRAINTS,
+  GET_METADATA,
+  CAN_HANDLE,
+  PROCESS_DRM_INFO,
+  ACQUIRE_DRM_INFO,
+  SAVE_RIGHTS,
+  GET_ORIGINAL_MIME_TYPE,
+  GET_DRM_OBJECT_TYPE,
+  CHECK_RIGHTS_STATUS,
+  REMOVE_RIGHTS,
+  REMOVE_ALL_RIGHTS,
+  OPEN_CONVERT_SESSION,
+  OPEN_DECRYPT_SESSION,
+  NUM_METHODS,
+};
+
+struct DrmManagerMetrics {
+    std::string mPluginId;
+    std::string mDescription;
+    std::set<std::string> mMimeTypes;
+    std::array<int64_t, DrmManagerMethodId::NUM_METHODS> mMethodCounts{};
+    uid_t mCallingUid;
+};
+
 /**
  * This is implementation class for DRM Manager. This class delegates the
  * functionality to corresponding DRM Engine.
@@ -47,7 +85,7 @@ class ActionDescription;
  * The DrmManagerService class creates an instance of this class.
  *
  */
-class DrmManager : public IDrmEngine::OnInfoListener {
+class DrmManager : public AHandler, public IDrmEngine::OnInfoListener {
 public:
     DrmManager();
     virtual ~DrmManager();
@@ -134,6 +172,8 @@ public:
 
     void onInfo(const DrmInfoEvent& event);
 
+    void initMetricsLooper();
+
 private:
     String8 getSupportedPlugInId(int uniqueId, const String8& path, const String8& mimeType);
 
@@ -143,16 +183,24 @@ private:
 
     bool canHandle(int uniqueId, const String8& path);
 
-    void reportEngineMetrics(const char func[],
+    void onMessageReceived(const sp<AMessage> &msg);
+
+    int64_t getMetricsFlushPeriodUs();
+
+    void recordEngineMetrics(const char func[],
             const String8& plugInId, const String8& mimeType = String8(""));
+
+    void flushEngineMetrics();
 
 private:
     enum {
         kMaxNumUniqueIds = 0x1000,
+        kWhatFlushMetrics = 'metr',
     };
 
     bool mUniqueIdArray[kMaxNumUniqueIds];
     static const String8 EMPTY_STRING;
+    static const std::map<const char*, size_t> kMethodIdMap;
 
     int mDecryptSessionId;
     int mConvertId;
@@ -160,11 +208,15 @@ private:
     Mutex mListenerLock;
     Mutex mDecryptLock;
     Mutex mConvertLock;
+    Mutex mMetricsLock;
     TPlugInManager<IDrmEngine> mPlugInManager;
     KeyedVector< DrmSupportInfo, String8 > mSupportInfoToPlugInIdMap;
     KeyedVector< int, IDrmEngine*> mConvertSessionMap;
     KeyedVector< int, sp<IDrmServiceListener> > mServiceListeners;
     KeyedVector< int, IDrmEngine*> mDecryptSessionMap;
+
+    std::map<std::pair<uid_t, std::string>, DrmManagerMetrics> mPluginMetrics;
+    sp<ALooper> mMetricsLooper;
 };
 
 };

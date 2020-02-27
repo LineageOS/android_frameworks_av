@@ -28,7 +28,6 @@ typedef struct _Filter_State_
 
 typedef Filter_State * PFilter_State ;
 
-#ifdef BUILD_FLOAT
 typedef struct _Filter_State_FLOAT
 {
     LVM_FLOAT *                          pDelays;        /* pointer to the delayed samples \
@@ -37,5 +36,4 @@ typedef struct _Filter_State_FLOAT
 }Filter_State_FLOAT;
 
 typedef Filter_State_FLOAT * PFilter_State_FLOAT ;
-#endif
 #endif /* _FO_1I_D16F16CSS_TRC_WRA_01_PRIVATE_H_ */

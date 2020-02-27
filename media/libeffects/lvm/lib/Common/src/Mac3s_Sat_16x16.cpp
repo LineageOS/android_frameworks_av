@@ -44,7 +44,6 @@ void Mac3s_Sat_16x16( const LVM_INT16 *src,
     LVM_INT16 srcval;
     LVM_INT32 Temp,dInVal;
 
-
     for (ii = n; ii != 0; ii--)
     {
         srcval=*src;
@@ -76,6 +75,4 @@ void Mac3s_Sat_16x16( const LVM_INT16 *src,
 }
 
 /**********************************************************************************/
-
-
 

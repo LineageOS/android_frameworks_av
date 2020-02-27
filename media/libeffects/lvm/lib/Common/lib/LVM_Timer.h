@@ -33,8 +33,6 @@
 /*  The timer currently does not suport changes in sampling rate while timing.          */
 /****************************************************************************************/
 
-
-
 /****************************************************************************************/
 /*  TYPE DEFINITIONS                                                                    */
 /****************************************************************************************/
@@ -71,14 +69,11 @@ typedef struct
 void LVM_Timer_Init (   LVM_Timer_Instance_t       *pInstance,
                         LVM_Timer_Params_t         *pParams     );
 
-
 void LVM_Timer      (   LVM_Timer_Instance_t       *pInstance,
                         LVM_INT16                       BlockSize );
-
 
 /****************************************************************************************/
 /*  END OF HEADER                                                                       */
 /****************************************************************************************/
-
 
 #endif  /* __LVM_TIMER_H__ */

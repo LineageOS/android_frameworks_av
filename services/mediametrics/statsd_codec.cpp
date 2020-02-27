@@ -154,6 +154,18 @@ bool statsd_codec(const mediametrics::Item *item)
     if ( item->getInt64("android.media.mediacodec.latency.unknown", &latency_unknown)) {
         metrics_proto.set_latency_unknown(latency_unknown);
     }
+    // android.media.mediacodec.queueSecureInputBufferError  int32
+    if (int32_t queueSecureInputBufferError = -1;
+        item->getInt32("android.media.mediacodec.queueSecureInputBufferError",
+                &queueSecureInputBufferError)) {
+        metrics_proto.set_queue_secure_input_buffer_error(queueSecureInputBufferError);
+    }
+    // android.media.mediacodec.queueInputBufferError  int32
+    if (int32_t queueInputBufferError = -1;
+        item->getInt32("android.media.mediacodec.queueInputBufferError",
+                &queueInputBufferError)) {
+        metrics_proto.set_queue_input_buffer_error(queueInputBufferError);
+    }
     // android.media.mediacodec.latency.hist    NOT EMITTED
 
     std::string serialized;

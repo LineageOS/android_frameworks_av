@@ -166,6 +166,16 @@ public:
             std::vector<C2Param::Index> *vec /* nonnull */) const;
 
     /**
+     * Get list of field names for the given param index.
+     *
+     * \param index[in]   param index
+     * \param keys[out]   vector to store the field names
+     */
+    void getKeysForParamIndex(
+            const C2Param::Index &index,
+            std::vector<std::string> *keys /* nonnull */) const;
+
+    /**
      * Update C2Param objects from field name and value in AMessage object.
      *
      * \param params[in]    Dict object with field name to value pairs.

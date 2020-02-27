@@ -23,7 +23,6 @@
 #include "LVREV_Private.h"
 #include "VectorArithmetic.h"
 
-
 /****************************************************************************************/
 /*                                                                                      */
 /* FUNCTION:                LVREV_ClearAudioBuffers                                     */
@@ -47,7 +46,6 @@ LVREV_ReturnStatus_en LVREV_ClearAudioBuffers(LVREV_Handle_t  hInstance)
 
    LVREV_Instance_st     *pLVREV_Private = (LVREV_Instance_st *)hInstance;
 
-
     /*
      * Check for error conditions
      */
@@ -61,36 +59,14 @@ LVREV_ReturnStatus_en LVREV_ClearAudioBuffers(LVREV_Handle_t  hInstance)
      * Clear all filter tap data, delay-lines and other signal related data
      */
 
-#ifdef BUILD_FLOAT
     LoadConst_Float(0,
-        (LVM_FLOAT *)&pLVREV_Private->pFastData->HPTaps, /* Destination Cast to void: \
-                                                         no dereferencing in function*/
+        (LVM_FLOAT *)&pLVREV_Private->pFastData->HPTaps,
         2);
     LoadConst_Float(0,
-        (LVM_FLOAT *)&pLVREV_Private->pFastData->LPTaps, /* Destination Cast to void: \
-                                                         no dereferencing in function*/
+        (LVM_FLOAT *)&pLVREV_Private->pFastData->LPTaps,
         2);
-#else
-    LoadConst_32(0,
-        (void *)&pLVREV_Private->pFastData->HPTaps, /* Destination Cast to void: no dereferencing in function*/
-        2);
-    LoadConst_32(0,
-        (void *)&pLVREV_Private->pFastData->LPTaps, /* Destination Cast to void: no dereferencing in function*/
-        2);
-#endif
     if((LVM_UINT16)pLVREV_Private->InstanceParams.NumDelays == LVREV_DELAYLINES_4)
     {
-#ifndef BUILD_FLOAT
-        LoadConst_32(0, (LVM_INT32 *)&pLVREV_Private->pFastData->RevLPTaps[3], 2);
-        LoadConst_32(0, (LVM_INT32 *)&pLVREV_Private->pFastData->RevLPTaps[2], 2);
-        LoadConst_32(0, (LVM_INT32 *)&pLVREV_Private->pFastData->RevLPTaps[1], 2);
-        LoadConst_32(0, (LVM_INT32 *)&pLVREV_Private->pFastData->RevLPTaps[0], 2);
-
-        LoadConst_32(0,pLVREV_Private->pDelay_T[3], (LVM_INT16)LVREV_MAX_T3_DELAY);
-        LoadConst_32(0,pLVREV_Private->pDelay_T[2], (LVM_INT16)LVREV_MAX_T2_DELAY);
-        LoadConst_32(0,pLVREV_Private->pDelay_T[1], (LVM_INT16)LVREV_MAX_T1_DELAY);
-        LoadConst_32(0,pLVREV_Private->pDelay_T[0], (LVM_INT16)LVREV_MAX_T0_DELAY);
-#else
         LoadConst_Float(0, (LVM_FLOAT *)&pLVREV_Private->pFastData->RevLPTaps[3], 2);
         LoadConst_Float(0, (LVM_FLOAT *)&pLVREV_Private->pFastData->RevLPTaps[2], 2);
         LoadConst_Float(0, (LVM_FLOAT *)&pLVREV_Private->pFastData->RevLPTaps[1], 2);
@@ -100,35 +76,21 @@ LVREV_ReturnStatus_en LVREV_ClearAudioBuffers(LVREV_Handle_t  hInstance)
         LoadConst_Float(0, pLVREV_Private->pDelay_T[2], LVREV_MAX_T2_DELAY);
         LoadConst_Float(0, pLVREV_Private->pDelay_T[1], LVREV_MAX_T1_DELAY);
         LoadConst_Float(0, pLVREV_Private->pDelay_T[0], LVREV_MAX_T0_DELAY);
-#endif
     }
 
     if((LVM_UINT16)pLVREV_Private->InstanceParams.NumDelays >= LVREV_DELAYLINES_2)
     {
-#ifndef BUILD_FLOAT
-        LoadConst_32(0, (LVM_INT32 *)&pLVREV_Private->pFastData->RevLPTaps[1], 2);
-        LoadConst_32(0, (LVM_INT32 *)&pLVREV_Private->pFastData->RevLPTaps[0], 2);
-
-        LoadConst_32(0,pLVREV_Private->pDelay_T[1], (LVM_INT16)LVREV_MAX_T1_DELAY);
-        LoadConst_32(0,pLVREV_Private->pDelay_T[0], (LVM_INT16)LVREV_MAX_T0_DELAY);
-#else
         LoadConst_Float(0, (LVM_FLOAT *)&pLVREV_Private->pFastData->RevLPTaps[1], 2);
         LoadConst_Float(0, (LVM_FLOAT *)&pLVREV_Private->pFastData->RevLPTaps[0], 2);
 
         LoadConst_Float(0, pLVREV_Private->pDelay_T[1], LVREV_MAX_T1_DELAY);
         LoadConst_Float(0, pLVREV_Private->pDelay_T[0], LVREV_MAX_T0_DELAY);
-#endif
     }
 
     if((LVM_UINT16)pLVREV_Private->InstanceParams.NumDelays >= LVREV_DELAYLINES_1)
     {
-#ifndef BUILD_FLOAT
-        LoadConst_32(0, (LVM_INT32 *)&pLVREV_Private->pFastData->RevLPTaps[0], 2);
-        LoadConst_32(0,pLVREV_Private->pDelay_T[0], (LVM_INT16)LVREV_MAX_T0_DELAY);
-#else
         LoadConst_Float(0, (LVM_FLOAT *)&pLVREV_Private->pFastData->RevLPTaps[0], 2);
         LoadConst_Float(0, pLVREV_Private->pDelay_T[0], LVREV_MAX_T0_DELAY);
-#endif
     }
     return LVREV_SUCCESS;
 }

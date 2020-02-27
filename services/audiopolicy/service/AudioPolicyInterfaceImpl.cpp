@@ -121,7 +121,7 @@ status_t AudioPolicyService::handleDeviceConfigChange(audio_devices_t device,
                                                          device_name, encodedFormat);
 }
 
-status_t AudioPolicyService::setPhoneState(audio_mode_t state)
+status_t AudioPolicyService::setPhoneState(audio_mode_t state, uid_t uid)
 {
     if (mAudioPolicyManager == NULL) {
         return NO_INIT;
@@ -145,6 +145,7 @@ status_t AudioPolicyService::setPhoneState(audio_mode_t state)
     AutoCallerClear acc;
     mAudioPolicyManager->setPhoneState(state);
     mPhoneState = state;
+    mPhoneStateOwnerUid = uid;
     return NO_ERROR;
 }
 
@@ -210,6 +211,7 @@ status_t AudioPolicyService::getOutputForAttr(audio_attributes_t *attr,
                                               audio_stream_type_t *stream,
                                               pid_t pid,
                                               uid_t uid,
+                                              const String16& opPackageName,
                                               const audio_config_t *config,
                                               audio_output_flags_t flags,
                                               audio_port_handle_t *selectedDeviceId,
@@ -256,7 +258,8 @@ status_t AudioPolicyService::getOutputForAttr(audio_attributes_t *attr,
         case AudioPolicyInterface::API_OUTPUT_LEGACY:
             break;
         case AudioPolicyInterface::API_OUTPUT_TELEPHONY_TX:
-            if (!modifyPhoneStateAllowed(pid, uid)) {
+          if (!modifyPhoneStateAllowed(pid, uid) &&
+              !accessCallAudioAllowed(opPackageName, pid, uid)) {
                 ALOGE("%s() permission denied: modify phone state not allowed for uid %d",
                     __func__, uid);
                 result = PERMISSION_DENIED;
@@ -453,12 +456,19 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
     }
 
     bool canCaptureOutput = captureAudioOutputAllowed(pid, uid);
-    if ((inputSource == AUDIO_SOURCE_VOICE_UPLINK ||
-        inputSource == AUDIO_SOURCE_VOICE_DOWNLINK ||
-        inputSource == AUDIO_SOURCE_VOICE_CALL ||
-        inputSource == AUDIO_SOURCE_ECHO_REFERENCE||
-        inputSource == AUDIO_SOURCE_FM_TUNER) &&
+    bool canCaptureTelephonyOutput = canCaptureOutput
+        || accessCallAudioAllowed(opPackageName, pid, uid);
+
+    if ((attr->source == AUDIO_SOURCE_ECHO_REFERENCE ||
+         attr->source == AUDIO_SOURCE_FM_TUNER) &&
         !canCaptureOutput) {
+        return PERMISSION_DENIED;
+    }
+
+    if ((attr->source == AUDIO_SOURCE_VOICE_UPLINK ||
+        attr->source == AUDIO_SOURCE_VOICE_DOWNLINK ||
+        attr->source == AUDIO_SOURCE_VOICE_CALL) &&
+        !canCaptureTelephonyOutput) {
         return PERMISSION_DENIED;
     }
 
@@ -493,6 +503,11 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
                 break;
             case AudioPolicyInterface::API_INPUT_TELEPHONY_RX:
                 // FIXME: use the same permission as for remote submix for now.
+                if (!canCaptureTelephonyOutput) {
+                    ALOGE("getInputForAttr() permission denied: call capture not allowed");
+                    status = PERMISSION_DENIED;
+                }
+                break;
             case AudioPolicyInterface::API_INPUT_MIX_CAPTURE:
                 if (!canCaptureOutput) {
                     ALOGE("getInputForAttr() permission denied: capture not allowed");
@@ -520,9 +535,13 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
             return status;
         }
 
+        bool allowAudioCapture = canCaptureOutput ||
+            (inputType == AudioPolicyInterface::API_INPUT_TELEPHONY_RX &&
+             canCaptureTelephonyOutput);
+
         sp<AudioRecordClient> client = new AudioRecordClient(*attr, *input, uid, pid, session, *portId,
                                                              *selectedDeviceId, opPackageName,
-                                                             canCaptureOutput, canCaptureHotword);
+                                                             allowAudioCapture, canCaptureHotword);
         mAudioRecordClients.add(*portId, client);
     }
 
@@ -1215,26 +1234,14 @@ status_t AudioPolicyService::registerPolicyMixes(const Vector<AudioMix>& mixes, 
         return PERMISSION_DENIED;
     }
 
-    // Require CAPTURE_VOICE_COMMUNICATION_OUTPUT if one of the
-    // mixes is a render|loopback mix that aim to capture audio played with
-    // USAGE_VOICE_COMMUNICATION.
+    // If one of the mixes has needCaptureVoiceCommunicationOutput set to true, then we
+    // need to verify that the caller still has CAPTURE_VOICE_COMMUNICATION_OUTPUT
     bool needCaptureVoiceCommunicationOutput =
         std::any_of(mixes.begin(), mixes.end(), [](auto& mix) {
-            return is_mix_loopback_render(mix.mRouteFlags) &&
-                mix.hasMatchingRuleForUsage([] (auto usage) {
-                    return usage == AUDIO_USAGE_VOICE_COMMUNICATION;});
-            });
+            return mix.mVoiceCommunicationCaptureAllowed; });
 
-    // Require CAPTURE_MEDIA_OUTPUT if there is a mix for priveliged capture
-    // which is trying to capture any usage which is not USAGE_VOICE_COMMUNICATION.
-    // (If USAGE_VOICE_COMMUNICATION should be captured, then CAPTURE_VOICE_COMMUNICATION_OUTPUT
-    //  is required, even if it is not privileged capture).
     bool needCaptureMediaOutput = std::any_of(mixes.begin(), mixes.end(), [](auto& mix) {
-            return mix.mAllowPrivilegedPlaybackCapture &&
-                mix.hasMatchingRuleForUsage([] (auto usage) {
-                    return usage != AUDIO_USAGE_VOICE_COMMUNICATION;
-                });
-            });
+            return mix.mAllowPrivilegedPlaybackCapture; });
 
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
     const pid_t callingPid = IPCThreadState::self()->getCallingPid();

@@ -23,6 +23,7 @@
 #include <utils/KeyedVector.h>
 #include <system/audio.h>
 
+#include <media/AudioResamplerPublic.h>
 #include <media/stagefright/MediaSource.h>
 #include <media/VolumeShaper.h>
 
@@ -38,7 +39,6 @@ class IDataSource;
 struct IStreamSource;
 class IGraphicBufferProducer;
 struct IMediaHTTPService;
-struct AudioPlaybackRate;
 struct AVSyncSettings;
 struct BufferingSettings;
 

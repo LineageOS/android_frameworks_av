@@ -22,9 +22,7 @@
 /****************************************************************************************/
 
 #include "LVEQNB_Private.h"
-#ifdef BUILD_FLOAT
 #include <math.h>
-#endif
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -78,101 +76,6 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-
-#ifndef BUILD_FLOAT
-LVEQNB_ReturnStatus_en LVEQNB_DoublePrecCoefs(LVM_UINT16        Fs,
-                                              LVEQNB_BandDef_t  *pFilterDefinition,
-                                              PK_C32_Coefs_t    *pCoefficients)
-{
-
-    extern LVM_INT16    LVEQNB_GainTable[];
-    extern LVM_INT16    LVEQNB_TwoPiOnFsTable[];
-    extern LVM_INT16    LVEQNB_DTable[];
-    extern LVM_INT16    LVEQNB_DPCosCoef[];
-
-    /*
-     * Get the filter definition
-     */
-    LVM_INT16           Gain        = pFilterDefinition->Gain;
-    LVM_UINT16          Frequency   = pFilterDefinition->Frequency;
-    LVM_UINT16          QFactor     = pFilterDefinition->QFactor;
-
-    /*
-     * Intermediate variables and temporary values
-     */
-    LVM_INT32           T0;
-    LVM_INT16           D;
-    LVM_INT32           A0;
-    LVM_INT32           B1;
-    LVM_INT32           B2;
-    LVM_INT32           Dt0;
-    LVM_INT32           B2_Den;
-    LVM_INT32           B2_Num;
-    LVM_INT32           CosErr;
-    LVM_INT16           coef;
-    LVM_INT32           factor;
-    LVM_INT16           t0;
-    LVM_INT16           i;
-
-    /*
-     * Calculating the intermediate values
-     */
-    T0 = (LVM_INT32)Frequency * LVEQNB_TwoPiOnFsTable[Fs];        /* T0 = 2 * Pi * Fc / Fs */
-    if (Gain >= 0)
-    {
-        D = LVEQNB_DTable[15];                         /* D = 1            if GaindB >= 0 */
-    }
-    else
-    {
-        D = LVEQNB_DTable[Gain+15];                    /* D = 1 / (1 + G)  if GaindB <  0 */
-    }
-
-    /*
-     * Calculate the B2 coefficient
-     */
-    Dt0 = D * (T0 >> 10);
-    B2_Den = ((LVM_INT32)QFactor << 19) + (Dt0 >> 2);
-    B2_Num = (Dt0 >> 3) - ((LVM_INT32)QFactor << 18);
-    B2 = (B2_Num / (B2_Den >> 16)) << 15;
-
-    /*
-     * Calculate the cosine error by a polynomial expansion using the equation:
-     *
-     *  CosErr += coef(n) * t0^n                For n = 0 to 4
-     */
-    T0 = (T0 >> 6) * 0x7f53;                    /* Scale to 1.0 in 16-bit for range 0 to fs/50 */
-    t0 = (LVM_INT16)(T0 >> 16);
-    factor = 0x7fff;                            /* Initialise to 1.0 for the a0 coefficient */
-    CosErr = 0;                                 /* Initialise the error to zero */
-    for (i=1; i<5; i++)
-    {
-        coef = LVEQNB_DPCosCoef[i];             /* Get the nth coefficient */
-        CosErr += (factor * coef) >> 5;         /* The nth partial sum */
-        factor = (factor * t0) >> 15;           /* Calculate t0^n */
-    }
-    CosErr = CosErr << (LVEQNB_DPCosCoef[0]);   /* Correct the scaling */
-
-    /*
-     * Calculate the B1 and A0 coefficients
-     */
-    B1 = (0x40000000 - B2);                     /* B1 = (0.5 - b2/2) */
-    A0 = ((B1 >> 16) * (CosErr >> 10)) >> 6;    /* Temporary storage for (0.5 - b2/2) * coserr(t0) */
-    B1 -= A0;                                   /* B1 = (0.5 - b2/2) * (1 - coserr(t0))  */
-    A0 = (0x40000000 + B2) >> 1;                /* A0 = (0.5 + b2) */
-
-    /*
-     * Write coeff into the data structure
-     */
-    pCoefficients->A0 = A0;
-    pCoefficients->B1 = B1;
-    pCoefficients->B2 = B2;
-    pCoefficients->G  = LVEQNB_GainTable[Gain+15];
-
-    return(LVEQNB_SUCCESS);
-
-}
-#endif
-
 /****************************************************************************************/
 /*                                                                                      */
 /* FUNCTION:                  LVEQNB_SinglePrecCoefs                                    */
@@ -208,7 +111,6 @@ LVEQNB_ReturnStatus_en LVEQNB_DoublePrecCoefs(LVM_UINT16        Fs,
 /*                                                                                      */
 /****************************************************************************************/
 
-#ifdef BUILD_FLOAT
 LVEQNB_ReturnStatus_en LVEQNB_SinglePrecCoefs(LVM_UINT16        Fs,
                                               LVEQNB_BandDef_t  *pFilterDefinition,
                                               PK_FLOAT_Coefs_t  *pCoefficients)
@@ -218,7 +120,6 @@ LVEQNB_ReturnStatus_en LVEQNB_SinglePrecCoefs(LVM_UINT16        Fs,
     extern LVM_FLOAT    LVEQNB_TwoPiOnFsTable[];
     extern LVM_FLOAT    LVEQNB_DTable[];
 
-
     /*
      * Get the filter definition
      */
@@ -226,7 +127,6 @@ LVEQNB_ReturnStatus_en LVEQNB_SinglePrecCoefs(LVM_UINT16        Fs,
     LVM_UINT16          Frequency   = pFilterDefinition->Frequency;
     /* As mentioned in effectbundle.h */
     LVM_FLOAT           QFactor     = (LVM_FLOAT)pFilterDefinition->QFactor / 100.0f;
-
 
     /*
      * Intermediate variables and temporary values
@@ -268,95 +168,3 @@ LVEQNB_ReturnStatus_en LVEQNB_SinglePrecCoefs(LVM_UINT16        Fs,
 
     return(LVEQNB_SUCCESS);
 }
-#else
-LVEQNB_ReturnStatus_en LVEQNB_SinglePrecCoefs(LVM_UINT16        Fs,
-                                              LVEQNB_BandDef_t  *pFilterDefinition,
-                                              PK_C16_Coefs_t    *pCoefficients)
-{
-
-    extern LVM_INT16    LVEQNB_GainTable[];
-    extern LVM_INT16    LVEQNB_TwoPiOnFsTable[];
-    extern LVM_INT16    LVEQNB_DTable[];
-    extern LVM_INT16    LVEQNB_CosCoef[];
-
-
-    /*
-     * Get the filter definition
-     */
-    LVM_INT16           Gain        = pFilterDefinition->Gain;
-    LVM_UINT16          Frequency   = pFilterDefinition->Frequency;
-    LVM_UINT16          QFactor     = pFilterDefinition->QFactor;
-
-
-    /*
-     * Intermediate variables and temporary values
-     */
-    LVM_INT32           T0;
-    LVM_INT16           D;
-    LVM_INT32           A0;
-    LVM_INT32           B1;
-    LVM_INT32           B2;
-    LVM_INT32           Dt0;
-    LVM_INT32           B2_Den;
-    LVM_INT32           B2_Num;
-    LVM_INT32           COS_T0;
-    LVM_INT16           coef;
-    LVM_INT32           factor;
-    LVM_INT16           t0;
-    LVM_INT16           i;
-
-    /*
-     * Calculating the intermediate values
-     */
-    T0 = (LVM_INT32)Frequency * LVEQNB_TwoPiOnFsTable[Fs];        /* T0 = 2 * Pi * Fc / Fs */
-    if (Gain >= 0)
-    {
-        D = LVEQNB_DTable[15];                         /* D = 1            if GaindB >= 0 */
-    }
-    else
-    {
-        D = LVEQNB_DTable[Gain+15];                    /* D = 1 / (1 + G)  if GaindB <  0 */
-    }
-
-    /*
-     * Calculate the B2 coefficient
-     */
-    Dt0 = D * (T0 >> 10);
-    B2_Den = ((LVM_INT32)QFactor << 19) + (Dt0 >> 2);
-    B2_Num = (Dt0 >> 3) - ((LVM_INT32)QFactor << 18);
-    B2 = (B2_Num / (B2_Den >> 16)) << 15;
-
-    /*
-     * Calculate the cosine by a polynomial expansion using the equation:
-     *
-     *  Cos += coef(n) * t0^n                   For n = 0 to 6
-     */
-    T0 = (T0 >> 10) * 20859;                    /* Scale to 1.0 in 16-bit for range 0 to fs/2 */
-    t0 = (LVM_INT16)(T0 >> 16);
-    factor = 0x7fff;                            /* Initialise to 1.0 for the a0 coefficient */
-    COS_T0 = 0;                                 /* Initialise the error to zero */
-    for (i=1; i<7; i++)
-    {
-        coef = LVEQNB_CosCoef[i];               /* Get the nth coefficient */
-        COS_T0 += (factor * coef) >> 5;         /* The nth partial sum */
-        factor = (factor * t0) >> 15;           /* Calculate t0^n */
-    }
-    COS_T0 = COS_T0 << (LVEQNB_CosCoef[0]+6);          /* Correct the scaling */
-
-
-    B1 = ((0x40000000 - B2) >> 16) * (COS_T0 >> 16);    /* B1 = (0.5 - b2/2) * cos(t0) */
-    A0 = (0x40000000 + B2) >> 1;                        /* A0 = (0.5 + b2/2) */
-
-    /*
-     * Write coeff into the data structure
-     */
-    pCoefficients->A0 = (LVM_INT16)(A0>>16);
-    pCoefficients->B1 = (LVM_INT16)(B1>>15);
-    pCoefficients->B2 = (LVM_INT16)(B2>>16);
-    pCoefficients->G  = LVEQNB_GainTable[Gain+15];
-
-
-    return(LVEQNB_SUCCESS);
-
-}
-#endif

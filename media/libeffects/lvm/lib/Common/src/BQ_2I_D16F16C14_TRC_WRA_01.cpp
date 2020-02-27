@@ -19,7 +19,6 @@
 #include "BQ_2I_D16F16Css_TRC_WRA_01_Private.h"
 #include "LVM_Macros.h"
 
-
 /**************************************************************************
  ASSUMPTIONS:
  COEFS-
@@ -37,7 +36,6 @@
  pBiquadState->pDelays[6] is y(n-2)L in Q0 format
  pBiquadState->pDelays[7] is y(n-2)R in Q0 format
 ***************************************************************************/
-#ifdef BUILD_FLOAT
 void BQ_2I_D16F16C14_TRC_WRA_01 ( Biquad_FLOAT_Instance_t       *pInstance,
                                   LVM_FLOAT               *pDataIn,
                                   LVM_FLOAT               *pDataOut,
@@ -68,8 +66,6 @@ void BQ_2I_D16F16C14_TRC_WRA_01 ( Biquad_FLOAT_Instance_t       *pInstance,
             // ynL+=( -B1  * y(n-1)L )
             ynL += (LVM_FLOAT)pBiquadState->coefs[4] * pBiquadState->pDelays[4];
 
-
-
             /**************************************************************************
                             PROCESSING OF THE RIGHT CHANNEL
             ***************************************************************************/
@@ -87,7 +83,6 @@ void BQ_2I_D16F16C14_TRC_WRA_01 ( Biquad_FLOAT_Instance_t       *pInstance,
 
             // ynR+=( -B1  * y(n-1)R  )
             ynR += (LVM_FLOAT)pBiquadState->coefs[4] * pBiquadState->pDelays[5];
-
 
             /**************************************************************************
                             UPDATING THE DELAYS
@@ -107,83 +102,6 @@ void BQ_2I_D16F16C14_TRC_WRA_01 ( Biquad_FLOAT_Instance_t       *pInstance,
             *pDataOut++ = (LVM_FLOAT)ynL; // Write Left output
             *pDataOut++ = (LVM_FLOAT)ynR; // Write Right ouput
 
-
         }
 
     }
-#else
-void BQ_2I_D16F16C14_TRC_WRA_01 ( Biquad_Instance_t       *pInstance,
-                                  LVM_INT16               *pDataIn,
-                                  LVM_INT16               *pDataOut,
-                                  LVM_INT16               NrSamples)
-    {
-        LVM_INT32  ynL,ynR;
-        LVM_INT16 ii;
-        PFilter_State pBiquadState = (PFilter_State) pInstance;
-
-         for (ii = NrSamples; ii != 0; ii--)
-         {
-
-            /**************************************************************************
-                            PROCESSING OF THE LEFT CHANNEL
-            ***************************************************************************/
-            // ynL=A2 (Q14) * x(n-2)L (Q0) in Q14
-            ynL=(LVM_INT32)pBiquadState->coefs[0]* pBiquadState->pDelays[2];
-
-            // ynL+=A1 (Q14) * x(n-1)L (Q0) in Q14
-            ynL+=(LVM_INT32)pBiquadState->coefs[1]* pBiquadState->pDelays[0];
-
-            // ynL+=A0 (Q14) * x(n)L (Q0) in Q14
-            ynL+=(LVM_INT32)pBiquadState->coefs[2]* (*pDataIn);
-
-            // ynL+= ( -B2 (Q14) * y(n-2)L (Q0) ) in Q14
-            ynL+=(LVM_INT32)pBiquadState->coefs[3]*pBiquadState->pDelays[6];
-
-            // ynL+=( -B1 (Q14) * y(n-1)L (Q0) ) in Q14
-            ynL+=(LVM_INT32)pBiquadState->coefs[4]*pBiquadState->pDelays[4];
-
-            ynL=ynL>>14; // ynL in Q0 format
-
-            /**************************************************************************
-                            PROCESSING OF THE RIGHT CHANNEL
-            ***************************************************************************/
-            // ynR=A2 (Q14) * x(n-2)R (Q0) in Q14
-            ynR=(LVM_INT32)pBiquadState->coefs[0]*pBiquadState->pDelays[3];
-
-            // ynR+=A1 (Q14) * x(n-1)R (Q0) in Q14
-            ynR+=(LVM_INT32)pBiquadState->coefs[1]*pBiquadState->pDelays[1];
-
-            // ynR+=A0 (Q14) * x(n)R (Q0) in Q14
-            ynR+=(LVM_INT32)pBiquadState->coefs[2]*(*(pDataIn+1));
-
-            // ynR+= ( -B2 (Q14) * y(n-2)R (Q0) ) in Q14
-            ynR+=(LVM_INT32)pBiquadState->coefs[3]*pBiquadState->pDelays[7];
-
-            // ynR+=( -B1 (Q14) * y(n-1)R (Q0) ) in Q14
-            ynR+=(LVM_INT32)pBiquadState->coefs[4]*pBiquadState->pDelays[5];
-
-            ynR=ynR>>14; // ynL in Q0 format
-            /**************************************************************************
-                            UPDATING THE DELAYS
-            ***************************************************************************/
-            pBiquadState->pDelays[7]=pBiquadState->pDelays[5];  // y(n-2)R=y(n-1)R
-            pBiquadState->pDelays[6]=pBiquadState->pDelays[4];  // y(n-2)L=y(n-1)L
-            pBiquadState->pDelays[3]=pBiquadState->pDelays[1];  // x(n-2)R=x(n-1)R
-            pBiquadState->pDelays[2]=pBiquadState->pDelays[0];  // x(n-2)L=x(n-1)L
-            pBiquadState->pDelays[5]=ynR;                       // Update y(n-1)R in Q0
-            pBiquadState->pDelays[4]=ynL;                       // Update y(n-1)L in Q0
-            pBiquadState->pDelays[0]=(*pDataIn++);              // Update x(n-1)L in Q0
-            pBiquadState->pDelays[1]=(*pDataIn++);              // Update x(n-1)R in Q0
-
-            /**************************************************************************
-                            WRITING THE OUTPUT
-            ***************************************************************************/
-            *pDataOut++=(LVM_INT16)ynL; // Write Left output in Q0
-            *pDataOut++=(LVM_INT16)ynR; // Write Right ouput in Q0
-
-
-        }
-
-    }
-
-#endif

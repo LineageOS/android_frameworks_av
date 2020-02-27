@@ -113,7 +113,7 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
     },
     {"STRATEGY_CALL_ASSISTANT",
      {
-         {"", AUDIO_STREAM_PATCH, "AUDIO_STREAM_PATCH",
+         {"", AUDIO_STREAM_CALL_ASSISTANT, "AUDIO_STREAM_CALL_ASSISTANT",
           {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_CALL_ASSISTANT, AUDIO_SOURCE_DEFAULT, 0, ""}}
          }
      },
@@ -125,20 +125,49 @@ const engineConfig::ProductStrategies gOrderedStrategies = {
             AUDIO_FLAG_BEACON, ""}}
          }
      },
-    },
-    {"STRATEGY_REROUTING",
+    }
+};
+
+/**
+ * For Internal use of respectively audio policy and audioflinger
+ * For compatibility reason why apm volume config file, volume group name is the stream type.
+ */
+const engineConfig::ProductStrategies gOrderedSystemStrategies = {
+    {"rerouting",
      {
          {"", AUDIO_STREAM_REROUTING, "AUDIO_STREAM_REROUTING",
           {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_DEFAULT, 0, ""}}
          }
      },
     },
-    {"STRATEGY_PATCH",
+    {"patch",
      {
          {"", AUDIO_STREAM_PATCH, "AUDIO_STREAM_PATCH",
           {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_DEFAULT, 0, ""}}
          }
      },
+    }
+};
+const engineConfig::VolumeGroups gSystemVolumeGroups = {
+    {"AUDIO_STREAM_REROUTING", 0, 1,
+     {
+         {"DEVICE_CATEGORY_SPEAKER", {{0,0}, {100, 0}}},
+         {"DEVICE_CATEGORY_HEADSET", {{0,0}, {100, 0}}},
+         {"DEVICE_CATEGORY_EARPIECE", {{0,0}, {100, 0}}},
+         {"DEVICE_CATEGORY_EXT_MEDIA", {{0,0}, {100, 0}}},
+         {"DEVICE_CATEGORY_HEARING_AID", {{0,0}, {100, 0}}},
+
+     }
+    },
+    {"AUDIO_STREAM_PATCH", 0, 1,
+     {
+         {"DEVICE_CATEGORY_SPEAKER", {{0,0}, {100, 0}}},
+         {"DEVICE_CATEGORY_HEADSET", {{0,0}, {100, 0}}},
+         {"DEVICE_CATEGORY_EARPIECE", {{0,0}, {100, 0}}},
+         {"DEVICE_CATEGORY_EXT_MEDIA", {{0,0}, {100, 0}}},
+         {"DEVICE_CATEGORY_HEARING_AID", {{0,0}, {100, 0}}},
+
+     }
     }
 };
 

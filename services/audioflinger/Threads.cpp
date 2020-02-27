@@ -1872,7 +1872,7 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
     // and the mute set to false).
     mMasterVolume = audioFlinger->masterVolume_l();
     mMasterMute = audioFlinger->masterMute_l();
-    if (mOutput && mOutput->audioHwDev) {
+    if (mOutput->audioHwDev) {
         if (mOutput->audioHwDev->canSetMasterVolume()) {
             mMasterVolume = 1.0;
         }
@@ -1902,9 +1902,11 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
         mStreamTypes[stream].volume = 0.0f;
         mStreamTypes[stream].mute = mAudioFlinger->streamMute_l(stream);
     }
-    // Audio patch volume is always max
+    // Audio patch and call assistant volume are always max
     mStreamTypes[AUDIO_STREAM_PATCH].volume = 1.0f;
     mStreamTypes[AUDIO_STREAM_PATCH].mute = false;
+    mStreamTypes[AUDIO_STREAM_CALL_ASSISTANT].volume = 1.0f;
+    mStreamTypes[AUDIO_STREAM_CALL_ASSISTANT].mute = false;
 }
 
 AudioFlinger::PlaybackThread::~PlaybackThread()
@@ -2830,7 +2832,7 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
             this/* srcThread */, this/* dstThread */);
     }
 
-    audio_output_flags_t flags = mOutput != nullptr ? mOutput->flags : AUDIO_OUTPUT_FLAG_NONE;
+    audio_output_flags_t flags = mOutput->flags;
     mediametrics::LogItem item(mMetricsId);
     item.set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_READPARAMETERS)
         .set(AMEDIAMETRICS_PROP_ENCODING, formatToString(mFormat).c_str())
@@ -8729,6 +8731,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
                                             &stream,
                                             client.clientPid,
                                             client.clientUid,
+                                            client.packageName,
                                             &config,
                                             flags,
                                             &deviceId,

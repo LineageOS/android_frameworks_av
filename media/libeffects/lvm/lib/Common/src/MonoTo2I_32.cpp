@@ -45,7 +45,6 @@ void MonoTo2I_32( const LVM_INT32  *src,
 
     return;
 }
-#ifdef BUILD_FLOAT
 void MonoTo2I_Float( const LVM_FLOAT  *src,
                      LVM_FLOAT  *dst,
                      LVM_INT16 n)
@@ -66,5 +65,4 @@ void MonoTo2I_Float( const LVM_FLOAT  *src,
 
     return;
 }
-#endif
 /**********************************************************************************/

@@ -215,26 +215,6 @@ volume index from 0 to 100.
         <volume deviceCategory="DEVICE_CATEGORY_EXT_MEDIA" ref="DEFAULT_MEDIA_VOLUME_CURVE"/>
         <volume deviceCategory="DEVICE_CATEGORY_HEARING_AID"  ref="DEFAULT_HEARING_AID_VOLUME_CURVE"/>
     </volumeGroup>
-    <volumeGroup>
-        <name>rerouting</name>
-        <indexMin>0</indexMin>
-        <indexMax>1</indexMax>
-        <volume deviceCategory="DEVICE_CATEGORY_HEADSET" ref="FULL_SCALE_VOLUME_CURVE"/>
-        <volume deviceCategory="DEVICE_CATEGORY_SPEAKER" ref="FULL_SCALE_VOLUME_CURVE"/>
-        <volume deviceCategory="DEVICE_CATEGORY_EARPIECE" ref="FULL_SCALE_VOLUME_CURVE"/>
-        <volume deviceCategory="DEVICE_CATEGORY_EXT_MEDIA" ref="FULL_SCALE_VOLUME_CURVE"/>
-        <volume deviceCategory="DEVICE_CATEGORY_HEARING_AID" ref="FULL_SCALE_VOLUME_CURVE"/>
-    </volumeGroup>
 
-    <volumeGroup>
-        <name>patch</name>
-        <indexMin>0</indexMin>
-        <indexMax>1</indexMax>
-        <volume deviceCategory="DEVICE_CATEGORY_HEADSET" ref="FULL_SCALE_VOLUME_CURVE"/>
-        <volume deviceCategory="DEVICE_CATEGORY_SPEAKER" ref="FULL_SCALE_VOLUME_CURVE"/>
-        <volume deviceCategory="DEVICE_CATEGORY_EARPIECE" ref="FULL_SCALE_VOLUME_CURVE"/>
-        <volume deviceCategory="DEVICE_CATEGORY_EXT_MEDIA" ref="FULL_SCALE_VOLUME_CURVE"/>
-        <volume deviceCategory="DEVICE_CATEGORY_HEARING_AID" ref="FULL_SCALE_VOLUME_CURVE"/>
-    </volumeGroup>
 </volumeGroups>
 

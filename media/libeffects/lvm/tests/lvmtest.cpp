@@ -482,10 +482,6 @@ int lvmCreate(struct EffectContext *pContext,
   pContext->pBundledContext->SamplesToExitCountVirt = 0;
   pContext->pBundledContext->SamplesToExitCountBb = 0;
   pContext->pBundledContext->SamplesToExitCountEq = 0;
-#if defined(BUILD_FLOAT) && !defined(NATIVE_FLOAT_BUFFER)
-  pContext->pBundledContext->pInputBuffer = NULL;
-  pContext->pBundledContext->pOutputBuffer = NULL;
-#endif
   for (int i = 0; i < FIVEBAND_NUMBANDS; i++) {
     pContext->pBundledContext->bandGaindB[i] = EQNB_5BandSoftPresets[i];
   }

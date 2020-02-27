@@ -18,7 +18,6 @@
 #ifndef _FO_1I_D32F32CLL_TRC_WRA_01_PRIVATE_H_
 #define _FO_1I_D32F32CLL_TRC_WRA_01_PRIVATE_H_
 
-
 /* The internal state variables are implemented in a (for the user)  hidden structure */
 /* In this (private) file, the internal structure is declared fro private use.        */
 typedef struct _Filter_State_
@@ -29,7 +28,6 @@ typedef struct _Filter_State_
 
 typedef Filter_State * PFilter_State ;
 
-#ifdef BUILD_FLOAT
 typedef struct _Filter_State_FLOAT_
 {
     LVM_FLOAT *       pDelays;        /* pointer to the delayed samples (data of 32 bits)   */
@@ -37,5 +35,4 @@ typedef struct _Filter_State_FLOAT_
 }Filter_State_FLOAT;
 
 typedef Filter_State_FLOAT * PFilter_State_FLOAT ;
-#endif
 #endif /* _FO_1I_D32F32CLL_TRC_WRA_01_PRIVATE_H_ */

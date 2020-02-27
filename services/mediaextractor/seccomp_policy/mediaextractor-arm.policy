@@ -41,6 +41,9 @@ getegid32: 1
 getgroups32: 1
 nanosleep: 1
 getrandom: 1
+timer_create: 1
+timer_settime: 1
+timer_delete: 1
 
 # for dynamically loading extractors
 pread64: 1
@@ -49,5 +52,5 @@ pread64: 1
 readlinkat: 1
 _llseek: 1
 
-@include /system/etc/seccomp_policy/crash_dump.arm.policy
-@include /system/etc/seccomp_policy/code_coverage.arm.policy
+@include /apex/com.android.media/etc/seccomp_policy/crash_dump.arm.policy
+@include /apex/com.android.media/etc/seccomp_policy/code_coverage.arm.policy

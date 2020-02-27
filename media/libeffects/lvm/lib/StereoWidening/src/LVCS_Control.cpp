@@ -56,7 +56,6 @@ LVCS_ReturnStatus_en LVCS_GetParameters(LVCS_Handle_t   hInstance,
     return(LVCS_SUCCESS);
 }
 
-
 /************************************************************************************/
 /*                                                                                  */
 /* FUNCTION:                LVCS_Control                                            */
@@ -120,29 +119,8 @@ LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t      hInstance,
         pInstance->VolCorrect = pLVCS_VolCorrectTable[Offset];
 
         pInstance->CompressGain = pInstance->VolCorrect.CompMin;
-#ifdef BUILD_FLOAT
         LVC_Mixer_Init(&pInstance->BypassMix.Mixer_Instance.MixerStream[0], 0, 0);
-#else
-        LVC_Mixer_Init(&pInstance->BypassMix.Mixer_Instance.MixerStream[0],0,0);
-#endif
         {
-#ifndef BUILD_FLOAT
-            LVM_UINT32          Gain;
-            const Gain_t        *pOutputGainTable = (Gain_t*)&LVCS_OutputGainTable[0];
-            Gain = (LVM_UINT32)(pOutputGainTable[Offset].Loss * LVM_MAXINT_16);
-            Gain = (LVM_UINT32)pOutputGainTable[Offset].UnprocLoss * (Gain >> 15);
-            Gain=Gain>>15;
-            /*
-             * Apply the gain correction and shift, note the result is in Q3.13 format
-             */
-            Gain = (Gain * pInstance->VolCorrect.GainMin) >>12;
-
-            LVC_Mixer_Init(&pInstance->BypassMix.Mixer_Instance.MixerStream[1],0,Gain);
-            LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMix.Mixer_Instance.MixerStream[0],
-                    LVCS_BYPASS_MIXER_TC,pParams->SampleRate,2);
-            LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMix.Mixer_Instance.MixerStream[1],
-                    LVCS_BYPASS_MIXER_TC,pParams->SampleRate,2);
-#else
             LVM_FLOAT          Gain;
             const Gain_t        *pOutputGainTable = (Gain_t*)&LVCS_OutputGainTable[0];
             Gain = (LVM_FLOAT)(pOutputGainTable[Offset].Loss);
@@ -158,9 +136,7 @@ LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t      hInstance,
                     LVCS_BYPASS_MIXER_TC, pParams->SampleRate, 2);
             LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMix.Mixer_Instance.MixerStream[1],
                     LVCS_BYPASS_MIXER_TC, pParams->SampleRate, 2);
-#endif
         }
-
 
         err=LVCS_SEnhancerInit(hInstance,
                            pParams);
@@ -175,7 +151,6 @@ LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t      hInstance,
                            pParams);
 
     }
-
 
     /*
      * Check if the effect level or source format has changed
@@ -243,7 +218,6 @@ LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t      hInstance,
             pInstance->MSTarget0=0;
         }
 
-
         /* Set transition flag */
         pInstance->bInOperatingModeTransition = LVM_TRUE;
     }
@@ -271,7 +245,6 @@ void LVCS_TimerCallBack (void* hInstance, void* pCallBackParams, LVM_INT32 Callb
     }
 
     pInstance->bTimerDone = LVM_TRUE;
-
 
     return;
 }

@@ -71,7 +71,6 @@ void NonLinComp_D16(LVM_INT16        Gain,
     LVM_INT32            SampleNo;                /* Sample index */
     LVM_INT16            Temp;
 
-
     /*
      * Process a block of samples
      */
@@ -83,7 +82,6 @@ void NonLinComp_D16(LVM_INT16        Gain,
          */
         Sample = *pDataIn;
         pDataIn++;
-
 
         /*
          * Apply the compander, this compresses the signal at the expense of
@@ -103,18 +101,15 @@ void NonLinComp_D16(LVM_INT16        Gain,
             }
         }
 
-
         /*
          * Save the output
          */
         *pDataOut = Sample;
         pDataOut++;
 
-
     }
 
 }
-#ifdef BUILD_FLOAT
 void NonLinComp_Float(LVM_FLOAT        Gain,
                       LVM_FLOAT        *pDataIn,
                       LVM_FLOAT        *pDataOut,
@@ -124,7 +119,6 @@ void NonLinComp_Float(LVM_FLOAT        Gain,
     LVM_FLOAT            Sample;                    /* Input samples */
     LVM_INT32            SampleNo;                /* Sample index */
     LVM_FLOAT            Temp;
-
 
     /*
      * Process a block of samples
@@ -136,7 +130,6 @@ void NonLinComp_Float(LVM_FLOAT        Gain,
          */
         Sample = *pDataIn;
         pDataIn++;
-
 
         /*
          * Apply the compander, this compresses the signal at the expense of
@@ -156,7 +149,6 @@ void NonLinComp_Float(LVM_FLOAT        Gain,
             }
         }
 
-
         /*
          * Save the output
          */
@@ -164,4 +156,3 @@ void NonLinComp_Float(LVM_FLOAT        Gain,
         pDataOut++;
     }
 }
-#endif

@@ -117,6 +117,12 @@ CaptureResult::CaptureResult() :
         mMetadata(), mResultExtras() {
 }
 
+CaptureResult::CaptureResult(CaptureResult &&otherResult) {
+    mMetadata = std::move(otherResult.mMetadata);
+    mResultExtras = otherResult.mResultExtras;
+    mPhysicalMetadatas = std::move(otherResult.mPhysicalMetadatas);
+}
+
 CaptureResult::CaptureResult(const CaptureResult &otherResult) {
     mResultExtras = otherResult.mResultExtras;
     mMetadata = otherResult.mMetadata;

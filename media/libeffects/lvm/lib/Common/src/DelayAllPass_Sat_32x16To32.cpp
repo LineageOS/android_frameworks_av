@@ -63,7 +63,6 @@ void DelayAllPass_Sat_32x16To32(  LVM_INT32  *delay,                    /* Delay
         *dst = c;
         dst++;
 
-
         MUL32x16INTO32(c, -coeff, temp, 15)
         a = temp;
         b = delay[AllPassOffset];

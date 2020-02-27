@@ -48,6 +48,6 @@ cc_binary {
     init_rc: ["cameraserver.rc"],
 
     vintf_fragments: [
-        "manifest_android.frameworks.cameraservice.service@2.0.xml",
+        "manifest_android.frameworks.cameraservice.service@2.1.xml",
     ],
 }

@@ -25,6 +25,8 @@
 #include <android/hardware/drm/1.1/IDrmFactory.h>
 #include <android/hardware/drm/1.2/ICryptoFactory.h>
 #include <android/hardware/drm/1.2/IDrmFactory.h>
+#include <android/hardware/drm/1.3/ICryptoFactory.h>
+#include <android/hardware/drm/1.3/IDrmFactory.h>
 #include <android/hidl/manager/1.0/IServiceManager.h>
 #include <hidl/HidlSupport.h>
 
@@ -144,6 +146,7 @@ std::vector<sp<::V1_0::IDrmFactory>> MakeDrmFactories(const uint8_t uuid[16]) {
     MakeHidlFactories<::V1_0::IDrmFactory>(uuid, drmFactories);
     MakeHidlFactories<::V1_1::IDrmFactory>(uuid, drmFactories);
     MakeHidlFactories<::V1_2::IDrmFactory>(uuid, drmFactories);
+    MakeHidlFactories<::V1_3::IDrmFactory>(uuid, drmFactories);
     return drmFactories;
 }
 
@@ -161,6 +164,7 @@ std::vector<sp<::V1_0::ICryptoFactory>> MakeCryptoFactories(const uint8_t uuid[1
     MakeHidlFactories<::V1_0::ICryptoFactory>(uuid, cryptoFactories);
     MakeHidlFactories<::V1_1::ICryptoFactory>(uuid, cryptoFactories);
     MakeHidlFactories<::V1_2::ICryptoFactory>(uuid, cryptoFactories);
+    MakeHidlFactories<::V1_3::ICryptoFactory>(uuid, cryptoFactories);
     return cryptoFactories;
 }
 

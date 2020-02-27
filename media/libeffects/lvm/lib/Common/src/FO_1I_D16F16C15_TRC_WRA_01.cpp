@@ -31,7 +31,6 @@
  pBiquadState->pDelays[1] is y(n-1)L in Q0 format
 ***************************************************************************/
 
-#ifdef BUILD_FLOAT
 void FO_1I_D16F16C15_TRC_WRA_01( Biquad_FLOAT_Instance_t       *pInstance,
                                  LVM_FLOAT               *pDataIn,
                                  LVM_FLOAT               *pDataOut,
@@ -70,45 +69,3 @@ void FO_1I_D16F16C15_TRC_WRA_01( Biquad_FLOAT_Instance_t       *pInstance,
         }
 
     }
-#else
-void FO_1I_D16F16C15_TRC_WRA_01( Biquad_Instance_t       *pInstance,
-                                 LVM_INT16               *pDataIn,
-                                 LVM_INT16               *pDataOut,
-                                 LVM_INT16               NrSamples)
-    {
-        LVM_INT32  ynL;
-        LVM_INT16 ii;
-        PFilter_State pBiquadState = (PFilter_State) pInstance;
-
-         for (ii = NrSamples; ii != 0; ii--)
-         {
-
-            /**************************************************************************
-                            PROCESSING OF THE LEFT CHANNEL
-            ***************************************************************************/
-            // ynL=A1 (Q15) * x(n-1)L (Q0) in Q15
-            ynL=(LVM_INT32)pBiquadState->coefs[0]* pBiquadState->pDelays[0];
-
-            // ynL+=A0 (Q15) * x(n)L (Q0) in Q15
-            ynL+=(LVM_INT32)pBiquadState->coefs[1]* (*pDataIn);
-
-            // ynL+=  (-B1 (Q15) * y(n-1)L (Q0) ) in Q15
-            ynL+=(LVM_INT32)pBiquadState->coefs[2]*pBiquadState->pDelays[1];
-
-
-            ynL=(LVM_INT16)(ynL>>15); // ynL in Q0 format
-            /**************************************************************************
-                            UPDATING THE DELAYS
-            ***************************************************************************/
-            pBiquadState->pDelays[1]=ynL; // Update y(n-1)L in Q0
-            pBiquadState->pDelays[0]=(*pDataIn++); // Update x(n-1)L in Q0
-
-            /**************************************************************************
-                            WRITING THE OUTPUT
-            ***************************************************************************/
-            *pDataOut++=(LVM_INT16)ynL; // Write Left output in Q0
-
-        }
-
-    }
-#endif

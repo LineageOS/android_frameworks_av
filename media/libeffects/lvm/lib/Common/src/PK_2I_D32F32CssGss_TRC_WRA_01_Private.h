@@ -18,11 +18,9 @@
 #ifndef _PK_2I_D32F32CSSGSS_TRC_WRA_01_PRIVATE_H_
 #define _PK_2I_D32F32CSSGSS_TRC_WRA_01_PRIVATE_H_
 
-
 /* The internal state variables are implemented in a (for the user)  hidden structure */
 /* In this (private) file, the internal structure is declared fro private use.        */
 
-#ifdef BUILD_FLOAT
 typedef struct _Filter_State_Float_
 {
     LVM_FLOAT *       pDelays;        /* pointer to the delayed samples (data of 32 bits)   */
@@ -30,7 +28,6 @@ typedef struct _Filter_State_Float_
 }Filter_State_Float;
 
 typedef Filter_State_Float * PFilter_State_Float ;
-#endif
 typedef struct _Filter_State_
 {
   LVM_INT32 *       pDelays;        /* pointer to the delayed samples (data of 32 bits)   */

@@ -53,7 +53,6 @@
 /* NOTES:                                                                           */
 /*                                                                                  */
 /************************************************************************************/
-#ifdef BUILD_FLOAT
 LVCS_ReturnStatus_en LVCS_EqualiserInit(LVCS_Handle_t       hInstance,
                                         LVCS_Params_t       *pParams)
 {
@@ -92,8 +91,7 @@ LVCS_ReturnStatus_en LVCS_EqualiserInit(LVCS_Handle_t       hInstance,
         Coeffs.B2 = (LVM_FLOAT)-pEqualiserCoefTable[Offset].B2;
 
         LoadConst_Float((LVM_INT16)0,                                         /* Value */
-                        (LVM_FLOAT *)&pData->EqualiserBiquadTaps, /* Destination Cast to void:\
-                                                                  no dereferencing in function*/
+                        (LVM_FLOAT *)&pData->EqualiserBiquadTaps, /* Destination */
                         /* Number of words */
                         (LVM_UINT16)(sizeof(pData->EqualiserBiquadTaps) / sizeof(LVM_FLOAT)));
 
@@ -118,66 +116,6 @@ LVCS_ReturnStatus_en LVCS_EqualiserInit(LVCS_Handle_t       hInstance,
 
     return(LVCS_SUCCESS);
 }
-#else
-LVCS_ReturnStatus_en LVCS_EqualiserInit(LVCS_Handle_t       hInstance,
-                                        LVCS_Params_t       *pParams)
-{
-
-    LVM_UINT16          Offset;
-    LVCS_Instance_t     *pInstance = (LVCS_Instance_t  *)hInstance;
-    LVCS_Equaliser_t    *pConfig   = (LVCS_Equaliser_t *)&pInstance->Equaliser;
-    LVCS_Data_t         *pData     = (LVCS_Data_t *)pInstance->MemoryTable.Region[LVCS_MEMREGION_PERSISTENT_FAST_DATA].pBaseAddress;
-    LVCS_Coefficient_t  *pCoefficients = (LVCS_Coefficient_t *)pInstance->MemoryTable.Region[LVCS_MEMREGION_PERSISTENT_FAST_COEF].pBaseAddress;
-    BQ_C16_Coefs_t      Coeffs;
-    const BiquadA012B12CoefsSP_t *pEqualiserCoefTable;
-
-    /*
-     * If the sample rate changes re-initialise the filters
-     */
-    if ((pInstance->Params.SampleRate != pParams->SampleRate) ||
-        (pInstance->Params.SpeakerType != pParams->SpeakerType))
-    {
-        /*
-         * Setup the filter coefficients and clear the history
-         */
-        Offset = (LVM_UINT16)(pParams->SampleRate + (pParams->SpeakerType * (1+LVM_FS_48000)));
-        pEqualiserCoefTable = (BiquadA012B12CoefsSP_t*)&LVCS_EqualiserCoefTable[0];
-
-        /* Left and right filters */
-        /* Convert incoming coefficients to the required format/ordering */
-        Coeffs.A0 = (LVM_INT16) pEqualiserCoefTable[Offset].A0;
-        Coeffs.A1 = (LVM_INT16) pEqualiserCoefTable[Offset].A1;
-        Coeffs.A2 = (LVM_INT16) pEqualiserCoefTable[Offset].A2;
-        Coeffs.B1 = (LVM_INT16)-pEqualiserCoefTable[Offset].B1;
-        Coeffs.B2 = (LVM_INT16)-pEqualiserCoefTable[Offset].B2;
-
-        LoadConst_16((LVM_INT16)0,                                                       /* Value */
-                     (void *)&pData->EqualiserBiquadTaps,   /* Destination Cast to void:\
-                                                               no dereferencing in function*/
-                     (LVM_UINT16)(sizeof(pData->EqualiserBiquadTaps)/sizeof(LVM_INT16)));    /* Number of words */
-
-        BQ_2I_D16F32Css_TRC_WRA_01_Init(&pCoefficients->EqualiserBiquadInstance,
-                                        &pData->EqualiserBiquadTaps,
-                                        &Coeffs);
-
-        /* Callbacks */
-        switch(pEqualiserCoefTable[Offset].Scale)
-        {
-            case 13:
-                pConfig->pBiquadCallBack  = BQ_2I_D16F32C13_TRC_WRA_01;
-                break;
-            case 14:
-                pConfig->pBiquadCallBack  = BQ_2I_D16F32C14_TRC_WRA_01;
-                break;
-            case 15:
-                pConfig->pBiquadCallBack  = BQ_2I_D16F32C15_TRC_WRA_01;
-                break;
-        }
-    }
-
-    return(LVCS_SUCCESS);
-}
-#endif
 /************************************************************************************/
 /*                                                                                  */
 /* FUNCTION:                LVCS_Equaliser                                          */
@@ -197,7 +135,6 @@ LVCS_ReturnStatus_en LVCS_EqualiserInit(LVCS_Handle_t       hInstance,
 /*  1.  Always processes in place.                                                  */
 /*                                                                                  */
 /************************************************************************************/
-#ifdef BUILD_FLOAT
 LVCS_ReturnStatus_en LVCS_Equaliser(LVCS_Handle_t       hInstance,
                                     LVM_FLOAT           *pInputOutput,
                                     LVM_UINT16          NumSamples)
@@ -207,10 +144,8 @@ LVCS_ReturnStatus_en LVCS_Equaliser(LVCS_Handle_t       hInstance,
     LVCS_Equaliser_t    *pConfig   = (LVCS_Equaliser_t  *)&pInstance->Equaliser;
     LVCS_Coefficient_t  *pCoefficients;
 
-
     pCoefficients = (LVCS_Coefficient_t *) \
                   pInstance->MemoryTable.Region[LVCS_MEMREGION_PERSISTENT_FAST_COEF].pBaseAddress;
-
 
     /*
      * Check if the equaliser is required
@@ -227,29 +162,3 @@ LVCS_ReturnStatus_en LVCS_Equaliser(LVCS_Handle_t       hInstance,
 
     return(LVCS_SUCCESS);
 }
-#else
-LVCS_ReturnStatus_en LVCS_Equaliser(LVCS_Handle_t       hInstance,
-                                    LVM_INT16           *pInputOutput,
-                                    LVM_UINT16          NumSamples)
-{
-
-    LVCS_Instance_t     *pInstance = (LVCS_Instance_t  *)hInstance;
-    LVCS_Equaliser_t    *pConfig   = (LVCS_Equaliser_t  *)&pInstance->Equaliser;
-    LVCS_Coefficient_t  *pCoefficients = (LVCS_Coefficient_t *)pInstance->MemoryTable.Region[LVCS_MEMREGION_PERSISTENT_FAST_COEF].pBaseAddress;
-
-
-    /*
-     * Check if the equaliser is required
-     */
-    if ((pInstance->Params.OperatingMode & LVCS_EQUALISERSWITCH) != 0)
-    {
-        /* Apply filter to the left and right channels */
-        (pConfig->pBiquadCallBack)((Biquad_Instance_t*)&pCoefficients->EqualiserBiquadInstance,
-                                   (LVM_INT16 *)pInputOutput,
-                                   (LVM_INT16 *)pInputOutput,
-                                   (LVM_INT16)NumSamples);
-    }
-
-    return(LVCS_SUCCESS);
-}
-#endif

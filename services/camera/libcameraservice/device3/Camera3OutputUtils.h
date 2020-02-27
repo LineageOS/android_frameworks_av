@@ -62,7 +62,7 @@ namespace camera3 {
         std::mutex& inflightLock;
         InFlightRequestMap& inflightMap; // end of inflightLock scope
         std::mutex& outputLock;
-        List<CaptureResult>& resultQueue;
+        std::list<CaptureResult>& resultQueue;
         std::condition_variable& resultSignal;
         uint32_t& nextShutterFrameNum;
         uint32_t& nextReprocShutterFrameNum;

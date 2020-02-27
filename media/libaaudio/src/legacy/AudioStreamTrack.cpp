@@ -196,7 +196,10 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     // We may need to pass the data through a block size adapter to guarantee constant size.
     if (mCallbackBufferSize != AAUDIO_UNSPECIFIED) {
-        int callbackSizeBytes = getBytesPerFrame() * mCallbackBufferSize;
+        // This may need to change if we add format conversion before
+        // the block size adaptation.
+        mBlockAdapterBytesPerFrame = getBytesPerFrame();
+        int callbackSizeBytes = mBlockAdapterBytesPerFrame * mCallbackBufferSize;
         mFixedBlockReader.open(callbackSizeBytes);
         mBlockAdapter = &mFixedBlockReader;
     } else {

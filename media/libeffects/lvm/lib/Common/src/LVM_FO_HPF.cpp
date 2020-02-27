@@ -21,7 +21,6 @@
 #include "BIQUAD.h"
 #include "Filter.h"
 
-
 /*-------------------------------------------------------------------------*/
 /* FUNCTION:                                                               */
 /*   void LVM_FO_LPF(   LVM_INT32       w ,                                */
@@ -68,7 +67,6 @@
 /* RETURNS:                                                                */
 /*                                                                         */
 /*-------------------------------------------------------------------------*/
-#ifdef BUILD_FLOAT
 LVM_FLOAT LVM_FO_HPF(   LVM_FLOAT       w,
                         FO_FLOAT_Coefs_t  *pCoeffs)
 {
@@ -97,33 +95,3 @@ LVM_FLOAT LVM_FO_HPF(   LVM_FLOAT       w,
 
     return 1;
 }
-#else
-LVM_INT32 LVM_FO_HPF(   LVM_INT32       w,
-                        FO_C32_Coefs_t  *pCoeffs)
-{
-    LVM_INT32 Y,Coefficients[13]={  -8388571,
-                                    33547744,
-                                    -66816791,
-                                    173375308,
-                                    -388437573,
-                                    752975383,
-                                    -1103016663,
-                                    1121848567,
-                                    -688078159,
-                                    194669577,
-                                    8,
-                                    0,
-                                    0};
-    Y=LVM_Polynomial(           (LVM_UINT16)9,
-                                 Coefficients,
-                                 w);
-    pCoeffs->B1=-Y;         /* Store -B1 in filter structure instead of B1!*/
-                            /* A0=(1-B1)/2= B1/2 - 0.5*/
-    Y=Y>>1;                 /* A0=Y=B1/2*/
-    Y=Y-0x40000000;         /* A0=Y=(B1/2 - 0.5)*/
-    MUL32x16INTO32(Y, FILTER_LOSS ,pCoeffs->A0 ,15)     /* Apply loss to avoid overflow*/
-    pCoeffs->A1=-pCoeffs->A0;                           /* Store A1=-A0*/
-
-    return 1;
-}
-#endif

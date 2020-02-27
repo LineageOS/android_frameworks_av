@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#include <libaudiohal/FactoryHalHidl.h>
-
 #include <media/audiohal/EffectsFactoryHalInterface.h>
+#include <media/audiohal/FactoryHalHidl.h>
 
 namespace android {
 
 // static
 sp<EffectsFactoryHalInterface> EffectsFactoryHalInterface::create() {
-    return createPreferedImpl<EffectsFactoryHalInterface>();
+    return createPreferredImpl<EffectsFactoryHalInterface>(
+            "android.hardware.audio.effect", "IEffectsFactory");
 }
 
 // static

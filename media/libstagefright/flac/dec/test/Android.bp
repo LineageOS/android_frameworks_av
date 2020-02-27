@@ -14,17 +14,37 @@
  * limitations under the License.
  */
 
-#ifndef _PRIVATE_MEDIA_NDKIMAGE_H_
-#define _PRIVATE_MEDIA_NDKIMAGE_H_
-// Formats not listed in the public API, but still available to AImageReader
-enum AIMAGE_PRIVATE_FORMATS {
-    /**
-     * Unprocessed implementation-dependent raw
-     * depth measurements, opaque with 16 bit
-     * samples.
-     *
-     */
+cc_test {
+    name: "FlacDecoderTest",
+    gtest: true,
 
-    AIMAGE_FORMAT_RAW_DEPTH = 0x1002,
-};
-#endif // _PRIVATE_MEDIA_NDKIMAGE
+    srcs: [
+        "FlacDecoderTest.cpp",
+    ],
+
+    shared_libs: [
+        "liblog",
+    ],
+
+    static_libs: [
+        "libstagefright_flacdec",
+        "libFLAC",
+    ],
+
+    header_libs: [
+        "libstagefright_foundation_headers",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+    },
+}

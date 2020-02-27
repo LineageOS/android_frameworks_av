@@ -59,7 +59,7 @@ sp<IMediaExtractor> MediaExtractorFactory::Create(
             sp<IMediaExtractor> ex;
             mediaExService->makeExtractor(
                     CreateIDataSourceFromDataSource(source),
-                    mime ? std::make_unique<std::string>(mime) : nullptr,
+                    mime ? std::optional<std::string>(mime) : std::nullopt,
                     &ex);
             return ex;
         } else {
@@ -280,7 +280,7 @@ void MediaExtractorFactory::LoadExtractors() {
 
     std::shared_ptr<std::list<sp<ExtractorPlugin>>> newList(new std::list<sp<ExtractorPlugin>>());
 
-    android_namespace_t *mediaNs = android_get_exported_namespace("media");
+    android_namespace_t *mediaNs = android_get_exported_namespace("com_android_media");
     if (mediaNs != NULL) {
         const android_dlextinfo dlextinfo = {
             .flags = ANDROID_DLEXT_USE_NAMESPACE,

@@ -29,12 +29,9 @@
 #define TRUE          1
 #define FALSE         0
 
-
-
 /**********************************************************************************
    FUNCTION MIXSOFT_1ST_D32C31_WRA
 ***********************************************************************************/
-#ifdef BUILD_FLOAT
 void MixSoft_1St_D32C31_WRA(    Mix_1St_Cll_FLOAT_t       *pInstance,
                                 const LVM_FLOAT     *src,
                                       LVM_FLOAT     *dst,
@@ -95,62 +92,4 @@ void MixSoft_1St_D32C31_WRA(    Mix_1St_Cll_FLOAT_t       *pInstance,
         }
     }
 }
-#else
-void MixSoft_1St_D32C31_WRA(    Mix_1St_Cll_t       *pInstance,
-                                const LVM_INT32     *src,
-                                      LVM_INT32     *dst,
-                                      LVM_INT16     n)
-{
-    char HardMixing = TRUE;
-
-    if(n<=0)    return;
-
-    /******************************************************************************
-       SOFT MIXING
-    *******************************************************************************/
-    if (pInstance->Current != pInstance->Target)
-    {
-        if(pInstance->Alpha == 0){
-            pInstance->Current = pInstance->Target;
-        }else if ((pInstance->Current-pInstance->Target <POINT_ZERO_ONE_DB)&&
-                 (pInstance->Current-pInstance->Target > -POINT_ZERO_ONE_DB)){
-            pInstance->Current = pInstance->Target; /* Difference is not significant anymore.  Make them equal. */
-        }else{
-            /* Soft mixing has to be applied */
-            HardMixing = FALSE;
-            Core_MixSoft_1St_D32C31_WRA( pInstance, src, dst, n);
-        }
-    }
-
-    /******************************************************************************
-       HARD MIXING
-    *******************************************************************************/
-
-    if (HardMixing){
-        if (pInstance->Target == 0)
-            LoadConst_32(0, dst, n);
-        else if ((pInstance->Target>>16) == 0x7FFF){
-            if (src != dst)
-                Copy_16((LVM_INT16*)src, (LVM_INT16*)dst, (LVM_INT16)(n * 2));
-        }
-        else
-            Mult3s_32x16( src, (LVM_INT16)(pInstance->Current>>16), dst, n );
-    }
-
-    /******************************************************************************
-       CALL BACK
-    *******************************************************************************/
-
-    if (pInstance->CallbackSet){
-        if ((pInstance->Current-pInstance->Target <POINT_ZERO_ONE_DB)&&
-            (pInstance->Current-pInstance->Target > -POINT_ZERO_ONE_DB)){
-            pInstance->Current = pInstance->Target; /* Difference is not significant anymore.  Make them equal. */
-            pInstance->CallbackSet = FALSE;
-            if (pInstance->pCallBack != 0){
-                (*pInstance->pCallBack) ( pInstance->pCallbackHandle, pInstance->pGeneralPurpose,pInstance->CallbackParam );
-            }
-        }
-    }
-}
-#endif
 /**********************************************************************************/

@@ -2528,15 +2528,29 @@ status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_
         if (curDevices.erase(AUDIO_DEVICE_OUT_SPEAKER_SAFE)) {
             curDevices.insert(AUDIO_DEVICE_OUT_SPEAKER);
         }
-
+        if (!(desc->isActive(vs) || isInCall())) {
+            continue;
+        }
+        if (device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME &&
+                curDevices.find(device) == curDevices.end()) {
+            continue;
+        }
+        bool applyVolume = false;
+        if (device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) {
+            curSrcDevices.insert(device);
+            applyVolume = (curSrcDevices.find(
+                    Volume::getDeviceForVolume(curDevices)) != curSrcDevices.end());
+        } else {
+            applyVolume = !curves.hasVolumeIndexForDevice(curSrcDevice);
+        }
+        if (!applyVolume) {
+            continue; // next output
+        }
         // Inter / intra volume group priority management: Loop on strategies arranged by priority
         // If a higher priority strategy is active, and the output is routed to a device with a
         // HW Gain management, do not change the volume
-        bool applyVolume = false;
         if (desc->useHwGain()) {
-            if (!(desc->isActive(toVolumeSource(group)) || isInCall())) {
-                continue;
-            }
+            applyVolume = false;
             for (const auto &productStrategy : mEngine->getOrderedProductStrategies()) {
                 auto activeClients = desc->clientsList(true /*activeOnly*/, productStrategy,
                                                        false /*preferredDevice*/);
@@ -2570,39 +2584,16 @@ status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_
             if (!applyVolume) {
                 continue; // next output
             }
-            status_t volStatus = checkAndSetVolume(curves, vs, index, desc, curDevices,
-                                                   (vs == toVolumeSource(AUDIO_STREAM_SYSTEM)?
-                                                        TOUCH_SOUND_FIXED_DELAY_MS : 0));
-            if (volStatus != NO_ERROR) {
-                status = volStatus;
-            }
-            continue;
         }
-        if (!(desc->isActive(vs) || isInCall())) {
-            continue;
-        }
-        if (device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME &&
-                curDevices.find(device) == curDevices.end()) {
-            continue;
-        }
-        if (device != AUDIO_DEVICE_OUT_DEFAULT_FOR_VOLUME) {
-            curSrcDevices.insert(device);
-            applyVolume = (curSrcDevices.find(
-                    Volume::getDeviceForVolume(curDevices)) != curSrcDevices.end());
-        } else {
-            applyVolume = !curves.hasVolumeIndexForDevice(curSrcDevice);
-        }
-        if (applyVolume) {
-            //FIXME: workaround for truncated touch sounds
-            // delayed volume change for system stream to be removed when the problem is
-            // handled by system UI
-            status_t volStatus = checkAndSetVolume(
-                        curves, vs, index, desc, curDevices,
-                        ((vs == toVolumeSource(AUDIO_STREAM_SYSTEM))?
-                             TOUCH_SOUND_FIXED_DELAY_MS : 0));
-            if (volStatus != NO_ERROR) {
-                status = volStatus;
-            }
+        //FIXME: workaround for truncated touch sounds
+        // delayed volume change for system stream to be removed when the problem is
+        // handled by system UI
+        status_t volStatus = checkAndSetVolume(
+                    curves, vs, index, desc, curDevices,
+                    ((vs == toVolumeSource(AUDIO_STREAM_SYSTEM))?
+                         TOUCH_SOUND_FIXED_DELAY_MS : 0));
+        if (volStatus != NO_ERROR) {
+            status = volStatus;
         }
     }
     mpClientInterface->onAudioVolumeGroupChanged(group, 0 /*flags*/);

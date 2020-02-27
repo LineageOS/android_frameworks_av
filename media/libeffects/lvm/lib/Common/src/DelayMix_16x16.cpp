@@ -47,7 +47,6 @@ void DelayMix_16x16(const LVM_INT16 *src,           /* Source 1, to be delayed *
         Offset++;
         src++;
 
-
         /* Right channel */
         temp = (LVM_INT16)((LVM_UINT32)((LVM_INT32)(*dst) - (LVM_INT32)delay[Offset]) >> 1);
         *dst = temp;
@@ -69,7 +68,6 @@ void DelayMix_16x16(const LVM_INT16 *src,           /* Source 1, to be delayed *
 
     return;
 }
-#ifdef BUILD_FLOAT
 void DelayMix_Float(const LVM_FLOAT *src,           /* Source 1, to be delayed */
                           LVM_FLOAT *delay,         /* Delay buffer */
                           LVM_INT16 size,           /* Delay size */
@@ -92,7 +90,6 @@ void DelayMix_Float(const LVM_FLOAT *src,           /* Source 1, to be delayed *
         Offset++;
         src++;
 
-
         /* Right channel */
         temp            = (LVM_FLOAT)((LVM_FLOAT)(*dst - (LVM_FLOAT)delay[Offset]) / 2.0f);
         *dst            = temp;
@@ -114,5 +111,4 @@ void DelayMix_Float(const LVM_FLOAT *src,           /* Source 1, to be delayed *
 
     return;
 }
-#endif
 /**********************************************************************************/

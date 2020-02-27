@@ -36,3 +36,13 @@ cc_test {
 
     srcs: ["TranscodingClientManager_tests.cpp"],
 }
+
+//
+// AdjustableMaxPriorityQueue unit test
+//
+cc_test {
+    name: "AdjustableMaxPriorityQueue_tests",
+    defaults: ["libmediatranscoding_test_defaults"],
+
+    srcs: ["AdjustableMaxPriorityQueue_tests.cpp"],
+}

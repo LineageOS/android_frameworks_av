@@ -27,7 +27,6 @@
 #ifndef __LVM_MIXER_FILTER_COEFFS_H__
 #define __LVM_MIXER_FILTER_COEFFS_H__
 
-
 /************************************************************************************/
 /*                                                                                  */
 /* Alpha Time Constant table                                                        */
@@ -87,7 +86,6 @@
 #define ALPHA_49                                0      /* Floating point Alpha = 0.000000 */
 #define ALPHA_50                                0      /* Floating point Alpha = 0.000000 */
 
-#ifdef BUILD_FLOAT /* BUILD_FLOAT */
 #define ALPHA_Float_0                        0.999999f
 #define ALPHA_Float_1                        0.999998f
 #define ALPHA_Float_2                        0.999997f
@@ -139,6 +137,5 @@
 #define ALPHA_Float_48                       0.000000f
 #define ALPHA_Float_49                       0.000000f
 #define ALPHA_Float_50                       0.000000f
-#endif
 
 #endif

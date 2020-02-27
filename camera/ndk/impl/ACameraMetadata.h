@@ -18,6 +18,7 @@
 
 #include <unordered_set>
 #include <vector>
+#include <memory>
 
 #include <sys/types.h>
 #include <utils/Mutex.h>
@@ -50,14 +51,13 @@ struct ACameraMetadata : public RefBase {
     // Constructs a ACameraMetadata that takes ownership of `buffer`.
     ACameraMetadata(camera_metadata_t* buffer, ACAMERA_METADATA_TYPE type);
 
-    // Constructs a ACameraMetadata that is a view of `cameraMetadata`.
-    // `cameraMetadata` will not be deleted by ~ACameraMetadata().
-    ACameraMetadata(CameraMetadata* cameraMetadata, ACAMERA_METADATA_TYPE type);
+    // Constructs a ACameraMetadata that shares its data with something else, like a Java object
+    ACameraMetadata(const std::shared_ptr<CameraMetadata>& cameraMetadata,
+            ACAMERA_METADATA_TYPE type);
 
     // Copy constructor.
     //
-    // If `other` owns its CameraMetadata, then makes a deep copy.
-    // Otherwise, the new instance is also a view of the same data.
+    // Always makes a deep copy.
     ACameraMetadata(const ACameraMetadata& other);
 
     ~ACameraMetadata();
@@ -125,9 +125,7 @@ struct ACameraMetadata : public RefBase {
     // Guard access of public APIs: get/update/getTags.
     mutable Mutex mLock;
 
-    CameraMetadata* mData;
-    // If true, has ownership of mData. Otherwise, mData is a view of an external instance.
-    bool mOwnsData;
+    std::shared_ptr<CameraMetadata> mData;
 
     mutable Vector<uint32_t> mTags; // Updated by `getTags()`, cleared by `update()`.
     const ACAMERA_METADATA_TYPE mType;

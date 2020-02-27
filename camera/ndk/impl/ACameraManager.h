@@ -70,6 +70,9 @@ class CameraManagerGlobal final : public RefBase {
     const char*                  kCameraServiceName      = "media.camera";
     Mutex                        mLock;
 
+    template<class T>
+    void registerAvailCallback(const T *callback);
+
     class DeathNotifier : public IBinder::DeathRecipient {
       public:
         explicit DeathNotifier(CameraManagerGlobal* cm) : mCameraManager(cm) {}
@@ -222,6 +225,7 @@ class CameraManagerGlobal final : public RefBase {
         bool removeUnavailablePhysicalId(const String8& physicalCameraId);
         int32_t getStatus();
         void updateStatus(int32_t newStatus);
+        std::set<String8> getUnavailablePhysicalIds();
     };
 
     // Map camera_id -> status

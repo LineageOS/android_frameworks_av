@@ -137,8 +137,6 @@ cc_library_static {
     ],
     cppflags: [
         "-fvisibility=hidden",
-        "-DBUILD_FLOAT",
-        "-DHIGHER_FS",
         "-DSUPPORT_MC",
 
         "-Wall",
@@ -208,8 +206,6 @@ cc_library_static {
 
     cppflags: [
         "-fvisibility=hidden",
-        "-DBUILD_FLOAT",
-        "-DHIGHER_FS",
 
         "-Wall",
         "-Werror",

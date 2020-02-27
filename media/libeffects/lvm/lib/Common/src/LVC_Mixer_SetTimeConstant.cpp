@@ -44,13 +44,11 @@
 /* RETURNS:                                                             */
 /*  void                                                                */
 /************************************************************************/
-#ifdef BUILD_FLOAT
 void LVC_Mixer_SetTimeConstant(LVMixer3_FLOAT_st *pStream,
                                LVM_INT32           Tc_millisec,
                                LVM_Fs_en           Fs,
                                LVM_INT16           NumChannels)
 {
-#ifdef HIGHER_FS
     LVM_FLOAT   DeltaTable[13] = {0.500000f,/*8000*/
                                   0.362812f,/*11025*/
                                   0.333333f,/*12000*/
@@ -64,17 +62,6 @@ void LVC_Mixer_SetTimeConstant(LVMixer3_FLOAT_st *pStream,
                                   0.041667f,/*96000*/
                                   0.022676f,/*176400*/
                                   0.020833f};/*192000*/
-#else
-    LVM_FLOAT   DeltaTable[9] = {0.500000f,/*8000*/
-                                 0.362812f,/*11025*/
-                                 0.333333f,/*12000*/
-                                 0.250000f,/*16000*/
-                                 0.181406f,/*22050*/
-                                 0.166666f,/*24000*/
-                                 0.125000f,/*32000*/
-                                 0.090703f,/*44100*/
-                                 0.083333f};/*48000*/
-#endif
 
     Mix_Private_FLOAT_st *pInstance = (Mix_Private_FLOAT_st *)pStream->PrivateParams;
     LVM_FLOAT Delta = DeltaTable[Fs];
@@ -90,33 +77,3 @@ void LVC_Mixer_SetTimeConstant(LVMixer3_FLOAT_st *pStream,
                                   assign minimum value to Delta */
     pInstance->Delta = Delta;  // Delta=(2147483647*4*1000)/(NumChannels*SampleRate*Tc_millisec)
 }
-#else
-void LVC_Mixer_SetTimeConstant(LVMixer3_st *pStream,
-                            LVM_INT32           Tc_millisec,
-                            LVM_Fs_en           Fs,
-                            LVM_INT16           NumChannels)
-{
-    LVM_INT32   DeltaTable[9]={1073741824,
-                               779132389,
-                               715827882,
-                               536870912,
-                               389566194,
-                               357913941,
-                               268435456,
-                               194783097,
-                               178956971};
-    Mix_Private_st  *pInstance=(Mix_Private_st *)pStream->PrivateParams;
-    LVM_INT32   Delta=DeltaTable[Fs];
-    Delta=Delta>>(NumChannels-1);
-
-    if(Tc_millisec==0)
-        Delta=0x7FFFFFFF;
-    else
-        Delta=Delta/Tc_millisec;
-
-    if(Delta==0)
-        Delta=1;                // If Time Constant is so large that Delta is 0, assign minimum value to Delta
-
-    pInstance->Delta=Delta;     // Delta=(2147483647*4*1000)/(NumChannels*SampleRate*Tc_millisec) in Q 0.31 format
-}
-#endif

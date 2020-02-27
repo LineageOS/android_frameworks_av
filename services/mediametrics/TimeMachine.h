@@ -56,7 +56,8 @@ std::ostream & operator<< (std::ostream& s,
  * The TimeMachine is used to record timing changes of MediaAnalyticItem
  * properties.
  *
- * Any URL that ends with '!' will have a time sequence that keeps duplicates.
+ * Any URL that ends with '#' (AMEDIAMETRICS_PROP_SUFFIX_CHAR_DUPLICATES_ALLOWED)
+ * will have a time sequence that keeps duplicates.
  *
  * The TimeMachine is NOT thread safe.
  */
@@ -126,7 +127,7 @@ private:
             auto& timeSequence = mPropertyMap[property];
             Elem el{std::forward<T>(e)};
             if (timeSequence.empty()           // no elements
-                    || property.back() == '!'  // keep duplicates TODO: remove?
+                    || property.back() == AMEDIAMETRICS_PROP_SUFFIX_CHAR_DUPLICATES_ALLOWED
                     || timeSequence.rbegin()->second != el) { // value changed
                 timeSequence.emplace(time, std::move(el));
             }

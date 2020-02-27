@@ -33,7 +33,6 @@ void    InstAlloc_Init( INST_ALLOC      *pms,
     pms->pNextMember = (((uintptr_t)StartAddr + 3) & (uintptr_t)~3);
 }
 
-
 /****************************************************************************************
  *  Name        : InstAlloc_AddMember()
  *  Input       : pms  - Pointer to the INST_ALLOC instance
@@ -59,7 +58,6 @@ void*   InstAlloc_AddMember( INST_ALLOC         *pms,
     return(NewMemberAddress);
 }
 
-
 /****************************************************************************************
  *  Name        : InstAlloc_GetTotal()
  *  Input       : pms  - Pointer to the INST_ALLOC instance
@@ -80,7 +78,6 @@ LVM_UINT32 InstAlloc_GetTotal( INST_ALLOC *pms)
     }
 }
 
-
 void    InstAlloc_InitAll( INST_ALLOC                      *pms,
                            LVM_MemoryTable_st             *pMemoryTable)
 {
@@ -91,18 +88,15 @@ void    InstAlloc_InitAll( INST_ALLOC                      *pms,
     pms[0].TotalSize = 3;
     pms[0].pNextMember = ((StartAddr + 3) & (uintptr_t)~3);
 
-
     StartAddr = (uintptr_t)pMemoryTable->Region[LVM_PERSISTENT_FAST_DATA].pBaseAddress;
 
     pms[1].TotalSize = 3;
     pms[1].pNextMember = ((StartAddr + 3) & (uintptr_t)~3);
 
-
     StartAddr = (uintptr_t)pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].pBaseAddress;
 
     pms[2].TotalSize = 3;
     pms[2].pNextMember = ((StartAddr + 3) & (uintptr_t)~3);
-
 
     StartAddr = (uintptr_t)pMemoryTable->Region[LVM_TEMPORARY_FAST].pBaseAddress;
 
@@ -125,7 +119,6 @@ void    InstAlloc_InitAll_NULL( INST_ALLOC  *pms)
     pms[0].TotalSize = 3;
     pms[0].pNextMember = 0;
 
-
     pms[1].TotalSize = 3;
     pms[1].pNextMember = 0;
 
@@ -136,7 +129,6 @@ void    InstAlloc_InitAll_NULL( INST_ALLOC  *pms)
     pms[3].pNextMember = 0;
 
 }
-
 
 void*   InstAlloc_AddMemberAll( INST_ALLOC                     *pms,
                                  LVM_UINT32                   Size[],
@@ -171,7 +163,6 @@ void*   InstAlloc_AddMemberAll( INST_ALLOC                     *pms,
 
     return(NewMemberAddress);
 }
-
 
 void*   InstAlloc_AddMemberAllRet(     INST_ALLOC                 *pms,
                                      LVM_UINT32               Size[],

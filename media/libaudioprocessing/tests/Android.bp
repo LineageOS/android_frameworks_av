@@ -55,3 +55,26 @@ cc_binary {
     srcs: ["test-resampler.cpp"],
     static_libs: ["libsndfile"],
 }
+
+//
+// build mixerops objdump
+//
+// This is used to verify proper optimization of the code.
+//
+// For example, use:
+// ./prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin/aarch64-linux-android-objdump
+//      -d --source ./out/target/product/crosshatch/symbols/system/bin/mixerops_objdump
+//
+cc_binary {
+    name: "mixerops_objdump",
+    srcs: ["mixerops_objdump.cpp"],
+}
+
+//
+// build mixerops benchmark
+//
+cc_benchmark {
+    name: "mixerops_benchmark",
+    srcs: ["mixerops_benchmark.cpp"],
+    static_libs: ["libgoogle-benchmark"],
+}

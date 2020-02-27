@@ -41,7 +41,6 @@ void LVPSA_QPD_Init (   pQPD_State_t       pQPD_State,
     pQPD_State->Coefs[1]  = pCoef->KM;
 }
 
-#ifdef BUILD_FLOAT
 void LVPSA_QPD_Init_Float (   pQPD_FLOAT_State_t       pQPD_State,
                               QPD_FLOAT_Taps_t         *pTaps,
                               QPD_FLOAT_Coefs          *pCoef     )
@@ -50,4 +49,3 @@ void LVPSA_QPD_Init_Float (   pQPD_FLOAT_State_t       pQPD_State,
     pQPD_State->Coefs[0]  = ((LVM_FLOAT)pCoef->KP);
     pQPD_State->Coefs[1]  = ((LVM_FLOAT)pCoef->KM);
 }
-#endif

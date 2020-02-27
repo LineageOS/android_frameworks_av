@@ -197,6 +197,23 @@ void convertToHidl(const std::vector<hardware::CameraStatus> &src,
     return;
 }
 
+void convertToHidl(const std::vector<hardware::CameraStatus> &src,
+                   hidl_vec<frameworks::cameraservice::service::V2_1::CameraStatusAndId>* dst) {
+    dst->resize(src.size());
+    size_t i = 0;
+    for (const auto &statusAndId : src) {
+        auto &a = (*dst)[i++];
+        a.v2_0.cameraId = statusAndId.cameraId.c_str();
+        a.v2_0.deviceStatus = convertToHidlCameraDeviceStatus(statusAndId.status);
+        size_t numUnvailPhysicalCameras = statusAndId.unavailablePhysicalIds.size();
+        a.unavailPhysicalCameraIds.resize(numUnvailPhysicalCameras);
+        for (size_t j = 0; j < numUnvailPhysicalCameras; j++) {
+            a.unavailPhysicalCameraIds[j] = statusAndId.unavailablePhysicalIds[j].c_str();
+        }
+    }
+    return;
+}
+
 void convertToHidl(
     const hardware::camera2::utils::SubmitInfo &submitInfo,
     frameworks::cameraservice::device::V2_0::SubmitInfo *hSubmitInfo) {

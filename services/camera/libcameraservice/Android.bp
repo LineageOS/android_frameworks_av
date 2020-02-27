@@ -116,6 +116,7 @@ cc_library_shared {
         "libyuv",
         "android.frameworks.cameraservice.common@2.0",
         "android.frameworks.cameraservice.service@2.0",
+        "android.frameworks.cameraservice.service@2.1",
         "android.frameworks.cameraservice.device@2.0",
         "android.hardware.camera.common@1.0",
         "android.hardware.camera.provider@2.4",

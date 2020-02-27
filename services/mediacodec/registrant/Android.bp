@@ -13,10 +13,11 @@ cc_library_shared {
         "libcodec2-hidl-defaults",
     ],
     shared_libs: [
-        "android.hardware.media.c2@1.0",
-        "android.hardware.media.c2@1.1",
         "libbase",
-        "libcodec2_hidl@1.1",
+        "libcodec2_hidl@1.0",
+        "libcodec2_vndk",
+        "libhidlbase",
+        "libutils",
     ],
 
     // Codecs

@@ -23,6 +23,7 @@
 #include <android/frameworks/cameraservice/device/2.0/ICameraDeviceUser.h>
 #include <android/frameworks/cameraservice/common/2.0/types.h>
 #include <android/frameworks/cameraservice/service/2.0/types.h>
+#include <android/frameworks/cameraservice/service/2.1/types.h>
 #include <android/frameworks/cameraservice/device/2.0/types.h>
 #include <android/hardware/camera/common/1.0/types.h>
 #include <android/hardware/camera2/ICameraDeviceUser.h>
@@ -78,6 +79,9 @@ HCameraDeviceStatus convertToHidlCameraDeviceStatus(int32_t status);
 
 void convertToHidl(const std::vector<hardware::CameraStatus> &src,
                    hidl_vec<HCameraStatusAndId>* dst);
+
+void convertToHidl(const std::vector<hardware::CameraStatus> &src,
+                   hidl_vec<frameworks::cameraservice::service::V2_1::CameraStatusAndId>* dst);
 
 void convertToHidl(const hardware::camera2::utils::SubmitInfo &submitInfo,
                    HSubmitInfo *hSubmitInfo);

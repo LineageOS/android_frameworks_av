@@ -48,7 +48,7 @@ public:
             const KeyedVector<sp<IBinder>, sp<CompositeStream>>& offlineCompositeStreamMap,
             const sp<ICameraDeviceCallbacks>& remoteCallback,
             const String16& clientPackageName,
-            const std::unique_ptr<String16>& clientFeatureId,
+            const std::optional<String16>& clientFeatureId,
             const String8& cameraIdStr, int cameraFacing,
             int clientPid, uid_t clientUid, int servicePid) :
             CameraService::BasicClient(

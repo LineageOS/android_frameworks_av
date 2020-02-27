@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 
-#include <libaudiohal/FactoryHalHidl.h>
-
 #include <media/audiohal/DevicesFactoryHalInterface.h>
+#include <media/audiohal/FactoryHalHidl.h>
 
 namespace android {
 
 // static
 sp<DevicesFactoryHalInterface> DevicesFactoryHalInterface::create() {
-    return createPreferedImpl<DevicesFactoryHalInterface>();
+    return createPreferredImpl<DevicesFactoryHalInterface>(
+            "android.hardware.audio", "IDevicesFactory");
 }
 
 } // namespace android
-

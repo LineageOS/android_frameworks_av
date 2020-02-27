@@ -21,7 +21,6 @@
 
 #include "VectorArithmetic.h"
 
-
 /**********************************************************************************
    FUNCTION ADD2_SAT_32X32
 ***********************************************************************************/
@@ -57,7 +56,6 @@ void Add2_Sat_32x32( const LVM_INT32  *src,
     return;
 }
 
-#ifdef BUILD_FLOAT
 void Add2_Sat_Float( const LVM_FLOAT  *src,
                            LVM_FLOAT  *dst,
                            LVM_INT16  n )
@@ -85,5 +83,4 @@ void Add2_Sat_Float( const LVM_FLOAT  *src,
     }
     return;
 }
-#endif
 /**********************************************************************************/
