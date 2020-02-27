@@ -50,6 +50,7 @@
 #include <string>
 #include <map>
 #include <memory>
+#include <optional>
 #include <utility>
 #include <unordered_map>
 #include <unordered_set>
