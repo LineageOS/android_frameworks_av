@@ -96,6 +96,7 @@ cc_library_shared {
     apex_available: [
         "com.android.media.swcodec",
         "test_com.android.media.swcodec",
+        "//apex_available:platform",
     ],
     vendor_available: false,
     static_libs: [
