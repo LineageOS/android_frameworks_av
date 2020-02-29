@@ -1286,7 +1286,8 @@ void CCodec::start() {
     {
         Mutexed<Config>::Locked config(mConfig);
         inputFormat = config->mInputFormat;
-        outputFormat = config->mOutputFormat;
+        // start triggers format dup
+        outputFormat = config->mOutputFormat = config->mOutputFormat->dup();
         if (config->mInputSurface) {
             err2 = config->mInputSurface->start();
         }

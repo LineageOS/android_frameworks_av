@@ -1073,7 +1073,7 @@ status_t CCodecBufferChannel::start(
         } else {
             output->buffers.reset(new LinearOutputBuffers(mName));
         }
-        output->buffers->setFormat(outputFormat->dup());
+        output->buffers->setFormat(outputFormat);
 
 
         // Try to set output surface to created block pool if given.
