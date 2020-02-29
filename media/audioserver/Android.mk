@@ -19,8 +19,9 @@ LOCAL_SHARED_LIBRARIES := \
 	libmediautils \
 	libnbaio \
 	libnblog \
+	libpowermanager \
 	libutils \
-	libvibrator
+	libvibrator \
 
 LOCAL_HEADER_LIBRARIES := \
 	libaudiohal_headers \

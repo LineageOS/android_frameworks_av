@@ -983,15 +983,16 @@ void AudioFlinger::ThreadBase::acquireWakeLock_l()
     if (mPowerManager != 0) {
         sp<IBinder> binder = new BBinder();
         // Uses AID_AUDIOSERVER for wakelock.  updateWakeLockUids_l() updates with client uids.
-        status_t status = mPowerManager->acquireWakeLock(POWERMANAGER_PARTIAL_WAKE_LOCK,
-                    binder,
+        binder::Status status = mPowerManager->acquireWakeLockAsync(binder,
+                    POWERMANAGER_PARTIAL_WAKE_LOCK,
                     getWakeLockTag(),
                     String16("audioserver"),
-                    true /* FIXME force oneway contrary to .aidl */);
-        if (status == NO_ERROR) {
+                    {} /* workSource */,
+                    {} /* historyTag */);
+        if (status.isOk()) {
             mWakeLockToken = binder;
         }
-        ALOGV("acquireWakeLock_l() %s status %d", mThreadName, status);
+        ALOGV("acquireWakeLock_l() %s status %d", mThreadName, status.exceptionCode());
     }
 
     gBoottime.acquire(mWakeLockToken);
@@ -1011,8 +1012,7 @@ void AudioFlinger::ThreadBase::releaseWakeLock_l()
     if (mWakeLockToken != 0) {
         ALOGV("releaseWakeLock_l() %s", mThreadName);
         if (mPowerManager != 0) {
-            mPowerManager->releaseWakeLock(mWakeLockToken, 0,
-                    true /* FIXME force oneway contrary to .aidl */);
+            mPowerManager->releaseWakeLockAsync(mWakeLockToken, 0);
         }
         mWakeLockToken.clear();
     }
@@ -1026,7 +1026,7 @@ void AudioFlinger::ThreadBase::getPowerManager_l() {
         if (binder == 0) {
             ALOGW("Thread %s cannot connect to the power manager service", mThreadName);
         } else {
-            mPowerManager = interface_cast<IPowerManager>(binder);
+            mPowerManager = interface_cast<os::IPowerManager>(binder);
             binder->linkToDeath(mDeathRecipient);
         }
     }
@@ -1053,10 +1053,9 @@ void AudioFlinger::ThreadBase::updateWakeLockUids_l(const SortedVector<uid_t> &u
     }
     if (mPowerManager != 0) {
         std::vector<int> uidsAsInt(uids.begin(), uids.end()); // powermanager expects uids as ints
-        status_t status = mPowerManager->updateWakeLockUids(
-                mWakeLockToken, uidsAsInt.size(), uidsAsInt.data(),
-                true /* FIXME force oneway contrary to .aidl */);
-        ALOGV("updateWakeLockUids_l() %s status %d", mThreadName, status);
+        binder::Status status = mPowerManager->updateWakeLockUidsAsync(
+                mWakeLockToken, uidsAsInt);
+        ALOGV("updateWakeLockUids_l() %s status %d", mThreadName, status.exceptionCode());
     }
 }
 
