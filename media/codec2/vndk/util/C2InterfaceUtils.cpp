@@ -216,9 +216,14 @@ C2SupportedFlags<T> C2SupportedFlags<T>::limitedTo(const C2SupportedFlags<T> &li
     if (limit.contains(minMask) && contains(minMask)) {
         values[0] = minMask;
         // keep only flags that are covered by limit
-        std::remove_if(values.begin(), values.end(), [&limit, minMask](const C2Value::Primitive &v) -> bool {
-            T value = v.ref<ValueType>() | minMask;
-            return value == minMask || !limit.contains(value); });
+        values.erase(std::remove_if(values.begin(), values.end(),
+                                    [&limit, minMask](
+                                        const C2Value::Primitive &v) -> bool {
+                                      T value = v.ref<ValueType>() | minMask;
+                                      return value == minMask ||
+                                             !limit.contains(value);
+                                    }),
+                     values.end());
         // we also need to do it vice versa
         for (const C2Value::Primitive &v : _mValues) {
             T value = v.ref<ValueType>() | minMask;
@@ -264,24 +269,33 @@ bool C2SupportedValueSet<T>::contains(T value) const {
 template<typename T>
 C2SupportedValueSet<T> C2SupportedValueSet<T>::limitedTo(const C2SupportedValueSet<T> &limit) const {
     std::vector<C2Value::Primitive> values = _mValues; // make a copy
-    std::remove_if(values.begin(), values.end(), [&limit](const C2Value::Primitive &v) -> bool {
-        return !limit.contains(v.ref<ValueType>()); });
+    values.erase(std::remove_if(values.begin(), values.end(),
+                                [&limit](const C2Value::Primitive &v) -> bool {
+                                  return !limit.contains(v.ref<ValueType>());
+                                }),
+                 values.end());
     return C2SupportedValueSet(std::move(values));
 }
 
 template<typename T>
 C2SupportedValueSet<T> C2SupportedValueSet<T>::limitedTo(const C2SupportedRange<T> &limit) const {
     std::vector<C2Value::Primitive> values = _mValues; // make a copy
-    std::remove_if(values.begin(), values.end(), [&limit](const C2Value::Primitive &v) -> bool {
-        return !limit.contains(v.ref<ValueType>()); });
+    values.erase(std::remove_if(values.begin(), values.end(),
+                                [&limit](const C2Value::Primitive &v) -> bool {
+                                  return !limit.contains(v.ref<ValueType>());
+                                }),
+                 values.end());
     return C2SupportedValueSet(std::move(values));
 }
 
 template<typename T>
 C2SupportedValueSet<T> C2SupportedValueSet<T>::limitedTo(const C2SupportedFlags<T> &limit) const {
     std::vector<C2Value::Primitive> values = _mValues; // make a copy
-    std::remove_if(values.begin(), values.end(), [&limit](const C2Value::Primitive &v) -> bool {
-        return !limit.contains(v.ref<ValueType>()); });
+    values.erase(std::remove_if(values.begin(), values.end(),
+                                [&limit](const C2Value::Primitive &v) -> bool {
+                                  return !limit.contains(v.ref<ValueType>());
+                                }),
+                 values.end());
     return C2SupportedValueSet(std::move(values));
 }
 
