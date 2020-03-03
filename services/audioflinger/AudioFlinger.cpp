@@ -810,7 +810,33 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
                     continue;
                 }
 
-                size_t frameCount = std::lcm(thread->frameCount(), secondaryThread->frameCount());
+                size_t sourceFrameCount = thread->frameCount() * output.sampleRate
+                                          / thread->sampleRate();
+                size_t sinkFrameCount = secondaryThread->frameCount() * output.sampleRate
+                                          / secondaryThread->sampleRate();
+                // If the secondary output has just been opened, the first secondaryThread write
+                // will not block as it will fill the empty startup buffer of the HAL,
+                // so a second sink buffer needs to be ready for the immediate next blocking write.
+                // Additionally, have a margin of one main thread buffer as the scheduling jitter
+                // can reorder the writes (eg if thread A&B have the same write intervale,
+                // the scheduler could schedule AB...BA)
+                size_t frameCountToBeReady = 2 * sinkFrameCount + sourceFrameCount;
+                // Total secondary output buffer must be at least as the read frames plus
+                // the margin of a few buffers on both sides in case the
+                // threads scheduling has some jitter.
+                // That value should not impact latency as the secondary track is started before
+                // its buffer is full, see frameCountToBeReady.
+                size_t frameCount = frameCountToBeReady + 2 * (sourceFrameCount + sinkFrameCount);
+                // The frameCount should also not be smaller than the secondary thread min frame
+                // count
+                size_t minFrameCount = AudioSystem::calculateMinFrameCount(
+                            [&] { Mutex::Autolock _l(secondaryThread->mLock);
+                                  return secondaryThread->latency_l(); }(),
+                            secondaryThread->mNormalFrameCount,
+                            secondaryThread->mSampleRate,
+                            output.sampleRate,
+                            input.speed);
+                frameCount = std::max(frameCount, minFrameCount);
 
                 using namespace std::chrono_literals;
                 auto inChannelMask = audio_channel_mask_out_to_in(input.config.channel_mask);
@@ -843,7 +869,8 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
                                                                patchRecord->buffer(),
                                                                patchRecord->bufferSize(),
                                                                outputFlags,
-                                                               0ns /* timeout */);
+                                                               0ns /* timeout */,
+                                                               frameCountToBeReady);
                 status = patchTrack->initCheck();
                 if (status != NO_ERROR) {
                     ALOGE("Secondary output patchTrack init failed: %d", status);

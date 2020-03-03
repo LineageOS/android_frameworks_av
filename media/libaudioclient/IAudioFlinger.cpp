@@ -1339,10 +1339,14 @@ status_t BnAudioFlinger::onTransact(
         }
         case GET_EFFECT_DESCRIPTOR: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
-            effect_uuid_t uuid;
-            data.read(&uuid, sizeof(effect_uuid_t));
-            effect_uuid_t type;
-            data.read(&type, sizeof(effect_uuid_t));
+            effect_uuid_t uuid = {};
+            if (data.read(&uuid, sizeof(effect_uuid_t)) != NO_ERROR) {
+                android_errorWriteLog(0x534e4554, "139417189");
+            }
+            effect_uuid_t type = {};
+            if (data.read(&type, sizeof(effect_uuid_t)) != NO_ERROR) {
+                android_errorWriteLog(0x534e4554, "139417189");
+            }
             uint32_t preferredTypeFlag = data.readUint32();
             effect_descriptor_t desc = {};
             status_t status = getEffectDescriptor(&uuid, &type, preferredTypeFlag, &desc);

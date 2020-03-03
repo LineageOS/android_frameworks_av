@@ -253,21 +253,9 @@ class CameraHelper {
         return true;
     }
 
-    static void onDeviceDisconnected(void* /*obj*/, ACameraDevice* /*device*/) {}
-
-    static void onDeviceError(void* /*obj*/, ACameraDevice* /*device*/, int /*errorCode*/) {}
-
-    static void onSessionClosed(void* /*obj*/, ACameraCaptureSession* /*session*/) {}
-
-    static void onSessionReady(void* /*obj*/, ACameraCaptureSession* /*session*/) {}
-
-    static void onSessionActive(void* /*obj*/, ACameraCaptureSession* /*session*/) {}
-
    private:
-    ACameraDevice_StateCallbacks mDeviceCb{this, onDeviceDisconnected,
-                                           onDeviceError};
-    ACameraCaptureSession_stateCallbacks mSessionCb{
-        this, onSessionClosed, onSessionReady, onSessionActive};
+    ACameraDevice_StateCallbacks mDeviceCb{this, nullptr, nullptr};
+    ACameraCaptureSession_stateCallbacks mSessionCb{ this, nullptr, nullptr, nullptr};
 
     native_handle_t* mImgReaderAnw = nullptr;  // not owned by us.
 

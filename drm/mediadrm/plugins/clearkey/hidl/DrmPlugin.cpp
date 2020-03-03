@@ -797,37 +797,55 @@ Return<void> DrmPlugin::getSecureStopIds(getSecureStopIds_cb _hidl_cb) {
 }
 
 Return<Status> DrmPlugin::releaseSecureStops(const SecureStopRelease& ssRelease) {
-    if (ssRelease.opaqueData.size() == 0) {
+    // OpaqueData starts with 4 byte decimal integer string
+    const size_t kFourBytesOffset = 4;
+    if (ssRelease.opaqueData.size() < kFourBytesOffset) {
+        ALOGE("Invalid secureStopRelease length");
         return Status::BAD_VALUE;
     }
 
     Status status = Status::OK;
     std::vector<uint8_t> input = toVector(ssRelease.opaqueData);
 
+    if (input.size() < kSecureStopIdSize + kFourBytesOffset) {
+        // The minimum size of SecureStopRelease has to contain
+        // a 4 bytes count and one secureStop id
+        ALOGE("Total size of secureStops is too short");
+        return Status::BAD_VALUE;
+    }
+
     // The format of opaqueData is shared between the server
     // and the drm service. The clearkey implementation consists of:
     //    count - number of secure stops
     //    list of fixed length secure stops
-    size_t countBufferSize = sizeof(uint32_t);
     uint32_t count = 0;
     sscanf(reinterpret_cast<char*>(input.data()), "%04" PRIu32, &count);
 
     // Avoid divide by 0 below.
     if (count == 0) {
+        ALOGE("Invalid 0 secureStop count");
         return Status::BAD_VALUE;
     }
 
-    size_t secureStopSize = (input.size() - countBufferSize) / count;
-    uint8_t buffer[secureStopSize];
-    size_t offset = countBufferSize; // skip the count
+    // Computes the fixed length secureStop size
+    size_t secureStopSize = (input.size() - kFourBytesOffset) / count;
+    if (secureStopSize < kSecureStopIdSize) {
+        // A valid secureStop contains the id plus data
+        ALOGE("Invalid secureStop size");
+        return Status::BAD_VALUE;
+    }
+    uint8_t* buffer = new uint8_t[secureStopSize];
+    size_t offset = kFourBytesOffset; // skip the count
     for (size_t i = 0; i < count; ++i, offset += secureStopSize) {
         memcpy(buffer, input.data() + offset, secureStopSize);
-        std::vector<uint8_t> id(buffer, buffer + kSecureStopIdSize);
 
+        // A secureStop contains id+data, we only use the id for removal
+        std::vector<uint8_t> id(buffer, buffer + kSecureStopIdSize);
         status = removeSecureStop(toHidlVec(id));
         if (Status::OK != status) break;
     }
 
+    delete[] buffer;
     return status;
 }
 
