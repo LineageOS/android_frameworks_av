@@ -243,6 +243,10 @@ int32_t WriterTest::addWriterSource(bool isAudio, configFormat params) {
     sp<MetaData> trackMeta = new MetaData;
     convertMessageToMetaData(format, trackMeta);
     mCurrentTrack = new MediaAdapter(trackMeta);
+    if (mCurrentTrack == nullptr) {
+        ALOGE("MediaAdapter returned nullptr");
+        return -1;
+    }
     status_t result = mWriter->addSource(mCurrentTrack);
     return result;
 }
@@ -301,7 +305,7 @@ TEST_P(WriterTest, WriterTest) {
     getFileDetails(inputFile, inputInfo, param, isAudio, inputFileIdx);
     ASSERT_NE(inputFile.compare(gEnv->getRes()), 0) << "No input file specified";
 
-    getInputBufferInfo(inputFile, inputInfo);
+    ASSERT_NO_FATAL_FAILURE(getInputBufferInfo(inputFile, inputInfo));
     status = addWriterSource(isAudio, param);
     ASSERT_EQ((status_t)OK, status) << "Failed to add source for " << writerFormat << "Writer";
 
@@ -338,7 +342,7 @@ TEST_P(WriterTest, PauseWriterTest) {
     getFileDetails(inputFile, inputInfo, param, isAudio, inputFileIdx);
     ASSERT_NE(inputFile.compare(gEnv->getRes()), 0) << "No input file specified";
 
-    getInputBufferInfo(inputFile, inputInfo);
+    ASSERT_NO_FATAL_FAILURE(getInputBufferInfo(inputFile, inputInfo));
     status = addWriterSource(isAudio, param);
     ASSERT_EQ((status_t)OK, status) << "Failed to add source for " << writerFormat << "Writer";
 
@@ -397,7 +401,7 @@ TEST_P(WriterTest, MultiStartStopPauseTest) {
     getFileDetails(inputFile, inputInfo, param, isAudio, inputFileIdx);
     ASSERT_NE(inputFile.compare(gEnv->getRes()), 0) << "No input file specified";
 
-    getInputBufferInfo(inputFile, inputInfo);
+    ASSERT_NO_FATAL_FAILURE(getInputBufferInfo(inputFile, inputInfo));
     status = addWriterSource(isAudio, param);
     ASSERT_EQ((status_t)OK, status) << "Failed to add source for " << writerFormat << "Writer";
 
