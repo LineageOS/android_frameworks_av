@@ -238,6 +238,9 @@ enum {
     kKeyOpaqueCSD2       = 'csd2',
 
     kKeyHapticChannelCount = 'hapC',
+
+    // Treat empty track as malformed for MediaRecorder.
+    kKeyEmptyTrackMalFormed = 'nemt', // bool (int32_t)
 };
 
 enum {
