@@ -3108,6 +3108,7 @@ status_t MPEG4Writer::Track::threadEntry() {
     int32_t nActualFrames = 0;        // frames containing non-CSD data (non-0 length)
     int32_t nZeroLengthFrames = 0;
     int64_t lastTimestampUs = 0;      // Previous sample time stamp
+    int64_t previousSampleTimestampWithoutFudgeUs = 0; // Timestamp received/without fudge for STTS
     int64_t lastDurationUs = 0;       // Between the previous two samples
     int64_t currDurationTicks = 0;    // Timescale based ticks
     int64_t lastDurationTicks = 0;    // Timescale based ticks
@@ -3120,6 +3121,8 @@ status_t MPEG4Writer::Track::threadEntry() {
     int64_t lastCttsOffsetTimeTicks = -1;  // Timescale based ticks
     int32_t cttsSampleCount = 0;           // Sample count in the current ctts table entry
     uint32_t lastSamplesPerChunk = 0;
+    int64_t lastSampleDurationUs = -1;      // Duration calculated from EOS buffer and its timestamp
+    int64_t lastSampleDurationTicks = -1;   // Timescale based ticks
 
     if (mIsAudio) {
         prctl(PR_SET_NAME, (unsigned long)"AudioTrackWriterThread", 0, 0, 0);
@@ -3139,13 +3142,27 @@ status_t MPEG4Writer::Track::threadEntry() {
     MediaBufferBase *buffer;
     const char *trackName = getTrackType();
     while (!mDone && (err = mSource->read(&buffer)) == OK) {
+        int32_t isEOS = false;
         if (buffer->range_length() == 0) {
-            buffer->release();
-            buffer = NULL;
-            ++nZeroLengthFrames;
-            continue;
+            if (buffer->meta_data().findInt32(kKeyIsEndOfStream, &isEOS) && isEOS) {
+                int64_t eosSampleTimestampUs = -1;
+                CHECK(buffer->meta_data().findInt64(kKeyTime, &eosSampleTimestampUs));
+                ALOGV("eosSampleTimestampUs:%" PRId64, eosSampleTimestampUs);
+                lastSampleDurationUs = eosSampleTimestampUs - previousSampleTimestampWithoutFudgeUs
+                                       - previousPausedDurationUs;
+                CHECK(lastSampleDurationUs >= 0);
+                lastSampleDurationTicks = (lastSampleDurationUs * mTimeScale + 500000LL)/1000000LL;
+                buffer->release();
+                buffer = nullptr;
+                mSource->stop();
+                break;
+            } else {
+                buffer->release();
+                buffer = nullptr;
+                ++nZeroLengthFrames;
+                continue;
+            }
         }
-
 
         // If the codec specific data has not been received yet, delay pause.
         // After the codec specific data is received, discard what we received
@@ -3470,6 +3487,8 @@ status_t MPEG4Writer::Track::threadEntry() {
                 break;
             }
 
+            previousSampleTimestampWithoutFudgeUs = timestampUs;
+
             // if the duration is different for this sample, see if it is close enough to the previous
             // duration that we can fudge it and use the same value, to avoid filling the stts table
             // with lots of near-identical entries.
@@ -3591,13 +3610,20 @@ status_t MPEG4Writer::Track::threadEntry() {
         // there is no frame time after it, just repeat the previous
         // frame's duration.
         if (mStszTableEntries->count() == 1) {
-            lastDurationUs = 0;  // A single sample's duration
-            lastDurationTicks = 0;
+            if (lastSampleDurationUs >= 0) {
+                addOneSttsTableEntry(sampleCount, lastSampleDurationTicks);
+            } else {
+                lastDurationUs = 0;  // A single sample's duration
+                lastDurationTicks = 0;
+                addOneSttsTableEntry(sampleCount, lastDurationTicks);
+            }
+        } else if (lastSampleDurationUs >= 0) {
+            addOneSttsTableEntry(sampleCount, lastDurationTicks);
+            addOneSttsTableEntry(1, lastSampleDurationTicks);
         } else {
             ++sampleCount;  // Count for the last sample
+            addOneSttsTableEntry(sampleCount, lastDurationTicks);
         }
-
-        addOneSttsTableEntry(sampleCount, lastDurationTicks);
 
         // The last ctts box entry may not have been written yet, and this
         // is to make sure that we write out the last ctts box entry.
@@ -3606,8 +3632,11 @@ status_t MPEG4Writer::Track::threadEntry() {
                 addOneCttsTableEntry(cttsSampleCount, lastCttsOffsetTimeTicks);
             }
         }
-
-        mTrackDurationUs += lastDurationUs;
+        if (lastSampleDurationUs >= 0) {
+            mTrackDurationUs += lastSampleDurationUs;
+        } else {
+            mTrackDurationUs += lastDurationUs;
+        }
     }
     mReachedEOS = true;
 
