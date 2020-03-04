@@ -333,11 +333,12 @@ status_t BnHDCP::onTransact(
 
             void *outData = (uint8_t *)inData + size;
 
-            data.read(inData, size);
-
-            uint32_t streamCTR = data.readInt32();
-            uint64_t inputCTR = data.readInt64();
-            status_t err = decrypt(inData, size, streamCTR, inputCTR, outData);
+            status_t err = data.read(inData, size);
+            if (err == OK) {
+                uint32_t streamCTR = data.readInt32();
+                uint64_t inputCTR = data.readInt64();
+                err = decrypt(inData, size, streamCTR, inputCTR, outData);
+            }
 
             reply->writeInt32(err);
 
