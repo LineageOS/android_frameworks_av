@@ -445,51 +445,75 @@ status_t TextDescriptions::extract3GPPGlobalDescriptions(
                     | *(tmpData + 10) << 8 | *(tmpData + 11);
                 parcel->writeInt32(rgba);
 
+                // tx3g box contains class FontTableBox() which extends ftab box
+                // This information is part of the 3gpp Timed Text Format
+                // Specification#: 26.245 / Section: 5.16(Sample Description Format)
+                // https://www.3gpp.org/ftp/Specs/archive/26_series/26.245/
+
                 tmpData += 12;
                 remaining -= 12;
 
-                if (remaining < 2) {
+                if (remaining < 8) {
                     return OK;
                 }
 
-                size_t dataPos = parcel->dataPosition();
-
-                parcel->writeInt32(KEY_STRUCT_FONT_LIST);
-                uint16_t count = U16_AT(tmpData);
-                parcel->writeInt32(count);
-
-                tmpData += 2;
-                remaining -= 2;
-
-                for (int i = 0; i < count; i++) {
-                    if (remaining < 3) {
-                        // roll back
-                        parcel->setDataPosition(dataPos);
-                        return OK;
-                    }
-                    // font ID
-                    parcel->writeInt32(U16_AT(tmpData));
-
-                    // font name length
-                    parcel->writeInt32(*(tmpData + 2));
-
-                    size_t len = *(tmpData + 2);
-
-                    tmpData += 3;
-                    remaining -= 3;
-
-                    if (remaining < len) {
-                        // roll back
-                        parcel->setDataPosition(dataPos);
-                        return OK;
-                    }
-
-                    parcel->write(tmpData, len);
-                    tmpData += len;
-                    remaining -= len;
+                size_t subChunkSize = U32_AT(tmpData);
+                if(remaining < subChunkSize) {
+                    return OK;
                 }
 
-                // there is a "DisparityBox" after this according to the spec, but we ignore it
+                uint32_t subChunkType = U32_AT(tmpData + 4);
+
+                if (subChunkType == FOURCC('f', 't', 'a', 'b'))
+                {
+                    tmpData += 8;
+                    size_t subChunkRemaining = subChunkSize - 8;
+
+                    if(subChunkRemaining < 2) {
+                        return OK;
+                    }
+                    size_t dataPos = parcel->dataPosition();
+
+                    parcel->writeInt32(KEY_STRUCT_FONT_LIST);
+                    uint16_t count = U16_AT(tmpData);
+                    parcel->writeInt32(count);
+
+                    tmpData += 2;
+                    subChunkRemaining -= 2;
+
+                    for (int i = 0; i < count; i++) {
+                        if (subChunkRemaining < 3) {
+                            // roll back
+                            parcel->setDataPosition(dataPos);
+                            return OK;
+                        }
+                        // font ID
+                        parcel->writeInt32(U16_AT(tmpData));
+
+                        // font name length
+                        size_t len = *(tmpData + 2);
+
+                        parcel->writeInt32(len);
+
+                        tmpData += 3;
+                        subChunkRemaining -=3;
+
+                        if (subChunkRemaining < len) {
+                            // roll back
+                            parcel->setDataPosition(dataPos);
+                            return OK;
+                        }
+
+                        parcel->write(tmpData, len);
+                        tmpData += len;
+                        subChunkRemaining -= len;
+                    }
+                    tmpData += subChunkRemaining;
+                    remaining -= subChunkSize;
+                } else {
+                    tmpData += subChunkSize;
+                    remaining -= subChunkSize;
+                }
                 break;
             }
             default:
