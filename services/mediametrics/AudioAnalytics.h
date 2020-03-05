@@ -19,6 +19,7 @@
 #include <android-base/thread_annotations.h>
 #include "AnalyticsActions.h"
 #include "AnalyticsState.h"
+#include "AudioPowerUsage.h"
 #include "TimedAction.h"
 #include "Wrap.h"
 
@@ -26,6 +27,9 @@ namespace android::mediametrics {
 
 class AudioAnalytics
 {
+    // AudioAnalytics action / state helper classes
+    friend AudioPowerUsage;
+
 public:
     AudioAnalytics();
     ~AudioAnalytics();
@@ -72,6 +76,9 @@ public:
         // underlying state is locked.
         mPreviousAnalyticsState->clear();
         mAnalyticsState->clear();
+
+        // Clear power usage state.
+        mAudioPowerUsage.clear();
     }
 
 private:
@@ -149,6 +156,8 @@ private:
         int32_t mA2dpConnectedSuccesses GUARDED_BY(mLock) = 0;
         int32_t mA2dpConnectedFailures GUARDED_BY(mLock) = 0;
     } mDeviceConnection{*this};
+
+    AudioPowerUsage mAudioPowerUsage{this};
 };
 
 } // namespace android::mediametrics
