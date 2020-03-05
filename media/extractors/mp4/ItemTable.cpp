@@ -700,8 +700,8 @@ struct IspeBox : public FullBox, public ItemProperty {
     }
 
 private:
-    uint32_t mWidth;
-    uint32_t mHeight;
+    int32_t mWidth;
+    int32_t mHeight;
 };
 
 status_t IspeBox::parse(off64_t offset, size_t size) {
@@ -715,12 +715,19 @@ status_t IspeBox::parse(off64_t offset, size_t size) {
     if (size < 8) {
         return ERROR_MALFORMED;
     }
-    if (!source()->getUInt32(offset, &mWidth)
-            || !source()->getUInt32(offset + 4, &mHeight)) {
+    if (!source()->getUInt32(offset, (uint32_t *)&mWidth)
+            || !source()->getUInt32(offset + 4, (uint32_t *)&mHeight)) {
         return ERROR_IO;
     }
-    ALOGV("property ispe: %dx%d", mWidth, mHeight);
 
+    // Validate that the dimension doesn't cause overflow on calculated max input size.
+    // Max input size is width*height*1.5, restrict width*height to 1<<29 so that
+    // we don't need to cast to int64_t when doing mults.
+    if (mWidth <= 0 || mHeight <= 0 || mWidth > (1 << 29) / mHeight) {
+        return ERROR_MALFORMED;
+    }
+
+    ALOGV("property ispe: %dx%d", mWidth, mHeight);
     return OK;
 }
 
@@ -1524,8 +1531,9 @@ AMediaFormat *ItemTable::getImageMeta(const uint32_t imageIndex) {
             default: break; // don't set if invalid
         }
     }
+    // we validated no overflow in IspeBox::parse()
     AMediaFormat_setInt32(meta,
-            AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, image->width * image->height * 1.5);
+            AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, image->width * image->height * 3 / 2);
 
     if (!image->thumbnails.empty()) {
         ssize_t thumbItemIndex = mItemIdToItemMap.indexOfKey(image->thumbnails[0]);
@@ -1561,8 +1569,9 @@ AMediaFormat *ItemTable::getImageMeta(const uint32_t imageIndex) {
                 AMEDIAFORMAT_KEY_TILE_WIDTH, image->width);
         AMediaFormat_setInt32(meta,
                 AMEDIAFORMAT_KEY_TILE_HEIGHT, image->height);
+        // we validated no overflow in IspeBox::parse()
         AMediaFormat_setInt32(meta,
-                AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, image->width * image->height * 1.5);
+                AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, image->width * image->height * 3 / 2);
     }
 
     if (image->hvcc == NULL) {

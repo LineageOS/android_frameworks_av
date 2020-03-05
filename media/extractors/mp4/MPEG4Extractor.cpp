@@ -1561,8 +1561,12 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         {
             *offset += chunk_size;
 
-            if (mLastTrack == NULL)
+            // the absolute minimum size of a compliant mett box is 11 bytes:
+            // 6 byte reserved, 2 byte index, null byte, one char mime_format, null byte
+            // The resulting mime_format would be invalid at that size though.
+            if (mLastTrack == NULL || chunk_data_size < 11) {
                 return ERROR_MALFORMED;
+            }
 
             auto buffer = heapbuffer<uint8_t>(chunk_data_size);
             if (buffer.get() == NULL) {
@@ -1574,10 +1578,24 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 return ERROR_IO;
             }
 
+            // ISO-14496-12:
+            // int8 reserved[6];               // should be all zeroes
+            // int16_t data_reference_index;
+            // char content_encoding[];        // null terminated, optional (= just the null byte)
+            // char mime_format[];             // null terminated, mandatory
+            // optional other boxes
+            //
+            // API < 29:
+            // char mime_format[];             // null terminated
+            //
+            // API >= 29
+            // char mime_format[];             // null terminated
+            // char mime_format[];             // null terminated
+
             // Prior to API 29, the metadata track was not compliant with ISO/IEC
             // 14496-12-2015. This led to some ISO-compliant parsers failing to read the
             // metatrack. As of API 29 and onwards, a change was made to metadata track to
-            // make it compliant with the standard. The workaround is to write the
+            // make it somewhat compatible with the standard. The workaround is to write the
             // null-terminated mime_format string twice. This allows compliant parsers to
             // read the missing reserved, data_reference_index, and content_encoding fields
             // from the first mime_type string. The actual mime_format field would then be
@@ -1586,27 +1604,27 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             // as it would only read the first null-terminated mime_format string. To enable
             // reading metadata tracks generated from both the non-compliant and compliant
             // formats, a check needs to be done to see which format is used.
-            int null_pos = 0;
-            const unsigned char *str = buffer.get();
-            while (null_pos < chunk_data_size) {
-              if (*(str + null_pos) == '\0') {
-                break;
-              }
-              ++null_pos;
-            }
+            const char *str = (const char*) buffer.get();
+            size_t string_length = strnlen(str, chunk_data_size);
 
-            if (null_pos == chunk_data_size - 1) {
-              // This is not a standard ompliant metadata track.
-              String8 mimeFormat((const char *)(buffer.get()), chunk_data_size);
-              AMediaFormat_setString(mLastTrack->meta,
-                  AMEDIAFORMAT_KEY_MIME, mimeFormat.string());
+            if (string_length == chunk_data_size - 1) {
+                // This is likely a pre API 29 file, since it's a single null terminated
+                // string filling the entire box.
+                AMediaFormat_setString(mLastTrack->meta, AMEDIAFORMAT_KEY_MIME, str);
             } else {
-              // This is a standard compliant metadata track.
-              String8 contentEncoding((const char *)(buffer.get() + 8));
-              String8 mimeFormat((const char *)(buffer.get() + 8 + contentEncoding.size() + 1),
-                  chunk_data_size - 8 - contentEncoding.size() - 1);
-              AMediaFormat_setString(mLastTrack->meta,
-                  AMEDIAFORMAT_KEY_MIME, mimeFormat.string());
+                // This might be a fully compliant metadata track, a "double mime" compatibility
+                // track, or anything else, including a single non-terminated string, so we need
+                // to determine the length of each string we want to parse out of the box.
+                size_t encoding_length = strnlen(str + 8, chunk_data_size - 8);
+                if (encoding_length + 8 >= chunk_data_size - 2) {
+                    // the encoding extends to the end of the box, so there's no mime_format
+                    return ERROR_MALFORMED;
+                }
+                String8 contentEncoding(str + 8, encoding_length);
+                String8 mimeFormat(str + 8 + encoding_length + 1,
+                        chunk_data_size - 8 - encoding_length - 1);
+                AMediaFormat_setString(mLastTrack->meta,
+                        AMEDIAFORMAT_KEY_MIME, mimeFormat.string());
             }
             break;
         }
@@ -5775,11 +5793,11 @@ media_status_t MPEG4Source::read(
                       meta, AMEDIAFORMAT_KEY_TIME_US, ((long double)cts * 1000000) / mTimescale);
                 AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, 1);
 
-                int32_t byteOrder;
-                AMediaFormat_getInt32(mFormat,
+                int32_t byteOrder = 0;
+                bool isGetBigEndian = AMediaFormat_getInt32(mFormat,
                         AMEDIAFORMAT_KEY_PCM_BIG_ENDIAN, &byteOrder);
 
-                if (byteOrder == 1) {
+                if (isGetBigEndian && byteOrder == 1) {
                     // Big-endian -> little-endian
                     uint16_t *dstData = (uint16_t *)buf;
                     uint16_t *srcData = (uint16_t *)buf;

@@ -14,7 +14,6 @@ cc_library_shared {
         "libbase",
         "libcodec2_hidl@1.0",
         "libcodec2_vndk",
-        "libhidlbase",
         "libutils",
     ],
 
