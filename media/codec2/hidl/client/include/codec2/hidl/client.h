@@ -172,8 +172,15 @@ struct Codec2Client : public Codec2ConfigurableClient {
     // Note: A software service will have "_software" as a suffix.
     static std::vector<std::string> const& GetServiceNames();
 
-    // Create a service with a given service name.
-    static std::shared_ptr<Codec2Client> CreateFromService(char const* name);
+    // Create a client to a service with a given name.
+    //
+    // After a client to the service is successfully created, if
+    // setAsPreferredCodec2ComponentStore is true, the component store that the
+    // service hosts will be set as the preferred C2ComponentStore for this
+    // process. (See SetPreferredCodec2ComponentStore() for more information.)
+    static std::shared_ptr<Codec2Client> CreateFromService(
+            char const* name,
+            bool setAsPreferredCodec2ComponentStore = false);
 
     // Get clients to all services.
     static std::vector<std::shared_ptr<Codec2Client>> CreateFromAllServices();
