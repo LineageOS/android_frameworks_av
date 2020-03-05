@@ -593,12 +593,10 @@ void C2SoftVpxDec::process(
         }
     }
 
-    int64_t frameIndex = work->input.ordinal.frameIndex.peekll();
-
     if (inSize) {
         uint8_t *bitstream = const_cast<uint8_t *>(rView.data() + inOffset);
         vpx_codec_err_t err = vpx_codec_decode(
-                mCodecCtx, bitstream, inSize, &frameIndex, 0);
+                mCodecCtx, bitstream, inSize, &work->input.ordinal.frameIndex, 0);
         if (err != VPX_CODEC_OK) {
             ALOGE("on2 decoder failed to decode frame. err: %d", err);
             mSignalledError = true;
@@ -608,7 +606,20 @@ void C2SoftVpxDec::process(
         }
     }
 
-    (void)outputBuffer(pool, work);
+    status_t err = outputBuffer(pool, work);
+    if (err == NOT_ENOUGH_DATA) {
+        if (inSize > 0) {
+            ALOGV("Maybe non-display frame at %lld.",
+                  work->input.ordinal.frameIndex.peekll());
+            // send the work back with empty buffer.
+            inSize = 0;
+        }
+    } else if (err != OK) {
+        ALOGD("Error while getting the output frame out");
+        // work->result would be already filled; do fillEmptyWork() below to
+        // send the work back.
+        inSize = 0;
+    }
 
     if (eos) {
         drainInternal(DRAIN_COMPONENT_WITH_EOS, pool, work);
@@ -742,16 +753,16 @@ static void convertYUV420Planar16ToYUV420Planar(uint8_t *dst,
     }
     return;
 }
-bool C2SoftVpxDec::outputBuffer(
+status_t C2SoftVpxDec::outputBuffer(
         const std::shared_ptr<C2BlockPool> &pool,
         const std::unique_ptr<C2Work> &work)
 {
-    if (!(work && pool)) return false;
+    if (!(work && pool)) return BAD_VALUE;
 
     vpx_codec_iter_t iter = nullptr;
     vpx_image_t *img = vpx_codec_get_frame(mCodecCtx, &iter);
 
-    if (!img) return false;
+    if (!img) return NOT_ENOUGH_DATA;
 
     if (img->d_w != mWidth || img->d_h != mHeight) {
         mWidth = img->d_w;
@@ -768,7 +779,7 @@ bool C2SoftVpxDec::outputBuffer(
             mSignalledError = true;
             work->workletsProcessed = 1u;
             work->result = C2_CORRUPTED;
-            return false;
+            return UNKNOWN_ERROR;
         }
 
     }
@@ -791,18 +802,19 @@ bool C2SoftVpxDec::outputBuffer(
     if (err != C2_OK) {
         ALOGE("fetchGraphicBlock for Output failed with status %d", err);
         work->result = err;
-        return false;
+        return UNKNOWN_ERROR;
     }
 
     C2GraphicView wView = block->map().get();
     if (wView.error()) {
         ALOGE("graphic view map failed %d", wView.error());
         work->result = C2_CORRUPTED;
-        return false;
+        return UNKNOWN_ERROR;
     }
 
-    ALOGV("provided (%dx%d) required (%dx%d), out frameindex %d",
-           block->width(), block->height(), mWidth, mHeight, (int)*(int64_t *)img->user_priv);
+    ALOGV("provided (%dx%d) required (%dx%d), out frameindex %lld",
+           block->width(), block->height(), mWidth, mHeight,
+           ((c2_cntr64_t *)img->user_priv)->peekll());
 
     uint8_t *dst = const_cast<uint8_t *>(wView.data()[C2PlanarLayout::PLANE_Y]);
     size_t srcYStride = img->stride[VPX_PLANE_Y];
@@ -858,8 +870,8 @@ bool C2SoftVpxDec::outputBuffer(
                 dstYStride, dstUVStride,
                 mWidth, mHeight);
     }
-    finishWork(*(int64_t *)img->user_priv, work, std::move(block));
-    return true;
+    finishWork(((c2_cntr64_t *)img->user_priv)->peekull(), work, std::move(block));
+    return OK;
 }
 
 c2_status_t C2SoftVpxDec::drainInternal(
@@ -875,7 +887,7 @@ c2_status_t C2SoftVpxDec::drainInternal(
         return C2_OMITTED;
     }
 
-    while ((outputBuffer(pool, work))) {
+    while (outputBuffer(pool, work) == OK) {
     }
 
     if (drainMode == DRAIN_COMPONENT_WITH_EOS &&

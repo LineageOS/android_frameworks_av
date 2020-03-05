@@ -33,7 +33,9 @@ ACameraCaptureSession::~ACameraCaptureSession() {
         dev->unlockDevice();
     }
     // Fire onClosed callback
-    (*mUserSessionCallback.onClosed)(mUserSessionCallback.context, this);
+    if (mUserSessionCallback.onClosed != nullptr) {
+        (*mUserSessionCallback.onClosed)(mUserSessionCallback.context, this);
+    }
     ALOGV("~ACameraCaptureSession: %p is deleted", this);
 }
 

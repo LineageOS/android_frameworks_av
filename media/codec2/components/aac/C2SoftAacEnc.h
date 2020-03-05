@@ -18,6 +18,7 @@
 #define ANDROID_C2_SOFT_AAC_ENC_H_
 
 #include <atomic>
+#include <optional>
 
 #include <SimpleC2Component.h>
 
@@ -54,12 +55,16 @@ private:
     UINT mOutBufferSize;
 
     bool mSentCodecSpecificData;
-    bool mInputTimeSet;
     size_t mInputSize;
-    c2_cntr64_t mNextFrameTimestampUs;
+    std::optional<c2_cntr64_t> mNextFrameTimestampUs;
+    std::optional<c2_cntr64_t> mLastFrameEndTimestampUs;
 
     bool mSignalledError;
     std::atomic_uint64_t mOutIndex;
+
+    // We support max 6 channels
+    uint8_t mRemainder[6 * sizeof(int16_t)];
+    size_t mRemainderLen;
 
     status_t initEncoder();
 
