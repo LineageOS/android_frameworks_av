@@ -39,4 +39,5 @@ cc_test {
     srcs: [
         "av_services_minijail_unittest.cpp",
     ],
+    test_suites: ["device-tests"],
 }
