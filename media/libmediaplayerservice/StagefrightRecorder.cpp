@@ -2009,6 +2009,9 @@ void StagefrightRecorder::setupMPEG4orWEBMMetaData(sp<MetaData> *meta) {
             (*meta)->setInt32(kKeyRotation, mRotationDegrees);
         }
     }
+    if (mOutputFormat == OUTPUT_FORMAT_MPEG_4 || mOutputFormat == OUTPUT_FORMAT_THREE_GPP) {
+        (*meta)->setInt32(kKeyEmptyTrackMalFormed, true);
+    }
 }
 
 status_t StagefrightRecorder::pause() {
