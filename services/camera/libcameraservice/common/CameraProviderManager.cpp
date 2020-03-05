@@ -326,8 +326,11 @@ status_t CameraProviderManager::setTorchMode(const std::string &id, bool enabled
 
     // Pass the camera ID to start interface so that it will save it to the map of ICameraProviders
     // that are currently in use.
-    const sp<provider::V2_4::ICameraProvider> interface =
-            deviceInfo->mParentProvider->startProviderInterface();
+    sp<ProviderInfo> parentProvider = deviceInfo->mParentProvider.promote();
+    if (parentProvider == nullptr) {
+        return DEAD_OBJECT;
+    }
+    const sp<provider::V2_4::ICameraProvider> interface = parentProvider->startProviderInterface();
     if (interface == nullptr) {
         return DEAD_OBJECT;
     }
@@ -380,8 +383,11 @@ status_t CameraProviderManager::openSession(const std::string &id,
     if (deviceInfo == nullptr) return NAME_NOT_FOUND;
 
     auto *deviceInfo3 = static_cast<ProviderInfo::DeviceInfo3*>(deviceInfo);
-    const sp<provider::V2_4::ICameraProvider> provider =
-            deviceInfo->mParentProvider->startProviderInterface();
+    sp<ProviderInfo> parentProvider = deviceInfo->mParentProvider.promote();
+    if (parentProvider == nullptr) {
+        return DEAD_OBJECT;
+    }
+    const sp<provider::V2_4::ICameraProvider> provider = parentProvider->startProviderInterface();
     if (provider == nullptr) {
         return DEAD_OBJECT;
     }
@@ -423,8 +429,11 @@ status_t CameraProviderManager::openSession(const std::string &id,
     if (deviceInfo == nullptr) return NAME_NOT_FOUND;
 
     auto *deviceInfo1 = static_cast<ProviderInfo::DeviceInfo1*>(deviceInfo);
-    const sp<provider::V2_4::ICameraProvider> provider =
-            deviceInfo->mParentProvider->startProviderInterface();
+    sp<ProviderInfo> parentProvider = deviceInfo->mParentProvider.promote();
+    if (parentProvider == nullptr) {
+        return DEAD_OBJECT;
+    }
+    const sp<provider::V2_4::ICameraProvider> provider = parentProvider->startProviderInterface();
     if (provider == nullptr) {
         return DEAD_OBJECT;
     }
@@ -2044,7 +2053,10 @@ sp<InterfaceT> CameraProviderManager::ProviderInfo::DeviceInfo::startDeviceInter
     sp<InterfaceT> device;
     ATRACE_CALL();
     if (mSavedInterface == nullptr) {
-        device = mParentProvider->startDeviceInterface<InterfaceT>(mName);
+        sp<ProviderInfo> parentProvider = mParentProvider.promote();
+        if (parentProvider != nullptr) {
+            device = parentProvider->startDeviceInterface<InterfaceT>(mName);
+        }
     } else {
         device = (InterfaceT *) mSavedInterface.get();
     }
