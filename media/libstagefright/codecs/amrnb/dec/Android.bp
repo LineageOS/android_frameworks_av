@@ -1,6 +1,7 @@
 cc_library_static {
     name: "libstagefright_amrnbdec",
     vendor_available: true,
+    host_supported: true,
 
     srcs: [
         "src/a_refl.cpp",
@@ -61,6 +62,12 @@ cc_library_static {
         "libstagefright_amrnb_common",
         "liblog",
     ],
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
 
 //###############################################################################
@@ -100,6 +107,7 @@ cc_library_shared {
 cc_test {
     name: "libstagefright_amrnbdec_test",
     gtest: false,
+    host_supported: true,
 
     srcs: ["test/amrnbdec_test.cpp"],
 
@@ -117,6 +125,12 @@ cc_test {
         "libaudioutils",
         "liblog",
     ],
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 
     //sanitize: {
     //    misc_undefined: [
