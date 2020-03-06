@@ -299,10 +299,17 @@ StreamOutHalHidl::~StreamOutHalHidl() {
         if (mCallback.unsafe_get()) {
             processReturn("clearCallback", mStream->clearCallback());
         }
+#if MAJOR_VERSION >= 6
+        if (mEventCallback.unsafe_get() != nullptr) {
+            processReturn("setEventCallback",
+                    mStream->setEventCallback(nullptr));
+        }
+#endif
         processReturn("close", mStream->close());
         mStream.clear();
     }
     mCallback.clear();
+    mEventCallback.clear();
     hardware::IPCThreadState::self()->flushCommands();
     if (mEfGroup) {
         EventFlag::deleteEventFlag(&mEfGroup);
@@ -614,6 +621,50 @@ status_t StreamOutHalHidl::updateSourceMetadata(
 }
 #endif
 
+#if MAJOR_VERSION < 6
+status_t StreamOutHalHidl::setEventCallback(
+        const sp<StreamOutHalInterfaceEventCallback>& callback __unused) {
+    // Codec format callback is supported starting from audio HAL V6.0
+    return INVALID_OPERATION;
+}
+#else
+
+#include PATH(android/hardware/audio/FILE_VERSION/IStreamOutEventCallback.h)
+
+namespace {
+
+struct StreamOutEventCallback : public IStreamOutEventCallback {
+    StreamOutEventCallback(const wp<StreamOutHalHidl>& stream) : mStream(stream) {}
+
+    // IStreamOutEventCallback implementation
+    Return<void> onCodecFormatChanged(
+            const android::hardware::hidl_vec<uint8_t>& audioMetadata)  override {
+        sp<StreamOutHalHidl> stream = mStream.promote();
+        if (stream != nullptr) {
+            std::basic_string<uint8_t> metadataBs(audioMetadata.begin(), audioMetadata.end());
+            stream->onCodecFormatChanged(metadataBs);
+        }
+        return Void();
+    }
+
+  private:
+    wp<StreamOutHalHidl> mStream;
+};
+
+}  // namespace
+
+status_t StreamOutHalHidl::setEventCallback(
+        const sp<StreamOutHalInterfaceEventCallback>& callback) {
+    if (mStream == nullptr) return NO_INIT;
+    mEventCallback = callback;
+    status_t status = processReturn(
+            "setEventCallback",
+            mStream->setEventCallback(
+                    callback.get() == nullptr ? nullptr : new StreamOutEventCallback(this)));
+    return status;
+}
+#endif
+
 void StreamOutHalHidl::onWriteReady() {
     sp<StreamOutHalInterfaceCallback> callback = mCallback.promote();
     if (callback == 0) return;
@@ -633,6 +684,13 @@ void StreamOutHalHidl::onError() {
     if (callback == 0) return;
     ALOGV("asyncCallback onError");
     callback->onError();
+}
+
+void StreamOutHalHidl::onCodecFormatChanged(const std::basic_string<uint8_t>& metadataBs) {
+    sp<StreamOutHalInterfaceEventCallback> callback = mEventCallback.promote();
+    if (callback == nullptr) return;
+    ALOGV("asyncCodecFormatCallback %s", __func__);
+    callback->onCodecFormatChanged(metadataBs);
 }
 
 
