@@ -1008,7 +1008,8 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::fillHeicStreamCombina
         if (sizeAvail) continue;
 
         int64_t stall = 0;
-        bool useHeic, useGrid;
+        bool useHeic = false;
+        bool useGrid = false;
         if (camera3::HeicCompositeStream::isSizeSupportedByHeifEncoder(
                 halStreamConfigs.data.i32[i+1], halStreamConfigs.data.i32[i+2],
                 &useHeic, &useGrid, &stall)) {
