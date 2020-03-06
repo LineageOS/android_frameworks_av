@@ -652,7 +652,7 @@ Return<ModuleTraits::Element> ModuleTraits::deserialize(const xmlNode *cur, PtrS
                         sp<DeviceDescriptor> device = module->getDeclaredDevices().
                                 getDeviceFromTagName(std::string(reinterpret_cast<const char*>(
                                                         attachedDevice.get())));
-                        ctx->addAvailableDevice(device);
+                        ctx->addDevice(device);
                     }
                 }
             }

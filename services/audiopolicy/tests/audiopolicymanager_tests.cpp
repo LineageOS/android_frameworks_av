@@ -292,9 +292,9 @@ TEST_F(AudioPolicyManagerTest, CreateAudioPatchFromMix) {
     audio_patch_handle_t handle = AUDIO_PATCH_HANDLE_NONE;
     uid_t uid = 42;
     const PatchCountCheck patchCount = snapshotPatchCount();
-    ASSERT_FALSE(mManager->getConfig().getAvailableInputDevices().isEmpty());
+    ASSERT_FALSE(mManager->getAvailableInputDevices().isEmpty());
     PatchBuilder patchBuilder;
-    patchBuilder.addSource(mManager->getConfig().getAvailableInputDevices()[0]).
+    patchBuilder.addSource(mManager->getAvailableInputDevices()[0]).
             addSink(mManager->getConfig().getDefaultOutputDevice());
     ASSERT_EQ(NO_ERROR, mManager->createAudioPatch(patchBuilder.patch(), &handle, uid));
     ASSERT_NE(AUDIO_PATCH_HANDLE_NONE, handle);
@@ -328,15 +328,13 @@ void AudioPolicyManagerTestMsd::SetUpManagerConfig() {
     sp<AudioProfile> pcmInputProfile = new AudioProfile(
             AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_STEREO, 44100);
     mMsdInputDevice->addAudioProfile(pcmInputProfile);
-    config.addAvailableDevice(mMsdOutputDevice);
-    config.addAvailableDevice(mMsdInputDevice);
+    config.addDevice(mMsdOutputDevice);
+    config.addDevice(mMsdInputDevice);
 
     sp<HwModule> msdModule = new HwModule(AUDIO_HARDWARE_MODULE_ID_MSD, 2 /*halVersionMajor*/);
     HwModuleCollection modules = config.getHwModules();
     modules.add(msdModule);
     config.setHwModules(modules);
-    mMsdOutputDevice->attach(msdModule);
-    mMsdInputDevice->attach(msdModule);
 
     sp<OutputProfile> msdOutputProfile = new OutputProfile("msd input");
     msdOutputProfile->addAudioProfile(pcmOutputProfile);
@@ -1058,3 +1056,40 @@ INSTANTIATE_TEST_CASE_P(
                                             "hfp_client_out"})
                 )
         );
+
+class AudioPolicyManagerDynamicHwModulesTest : public AudioPolicyManagerTestWithConfigurationFile {
+protected:
+    void SetUpManagerConfig() override;
+};
+
+void AudioPolicyManagerDynamicHwModulesTest::SetUpManagerConfig() {
+    AudioPolicyManagerTestWithConfigurationFile::SetUpManagerConfig();
+    // Only allow successful opening of "primary" hw module during APM initialization.
+    mClient->swapAllowedModuleNames({"primary"});
+}
+
+TEST_F(AudioPolicyManagerDynamicHwModulesTest, InitSuccess) {
+    // SetUp must finish with no assertions.
+}
+
+TEST_F(AudioPolicyManagerDynamicHwModulesTest, DynamicAddition) {
+    const auto handleBefore = mClient->peekNextModuleHandle();
+    mManager->onNewAudioModulesAvailable();
+    ASSERT_EQ(handleBefore, mClient->peekNextModuleHandle());
+    // Reset module loading restrictions.
+    mClient->swapAllowedModuleNames();
+    mManager->onNewAudioModulesAvailable();
+    const auto handleAfter = mClient->peekNextModuleHandle();
+    ASSERT_GT(handleAfter, handleBefore);
+    mManager->onNewAudioModulesAvailable();
+    ASSERT_EQ(handleAfter, mClient->peekNextModuleHandle());
+}
+
+TEST_F(AudioPolicyManagerDynamicHwModulesTest, AddedDeviceAvailable) {
+    ASSERT_EQ(AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE, mManager->getDeviceConnectionState(
+                    AUDIO_DEVICE_IN_REMOTE_SUBMIX, "0"));
+    mClient->swapAllowedModuleNames({"primary", "r_submix"});
+    mManager->onNewAudioModulesAvailable();
+    ASSERT_EQ(AUDIO_POLICY_DEVICE_STATE_AVAILABLE, mManager->getDeviceConnectionState(
+                    AUDIO_DEVICE_IN_REMOTE_SUBMIX, "0"));
+}

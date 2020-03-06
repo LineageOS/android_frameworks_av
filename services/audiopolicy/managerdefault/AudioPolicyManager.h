@@ -315,6 +315,8 @@ public:
             return volumeGroup != VOLUME_GROUP_NONE ? NO_ERROR : BAD_VALUE;
         }
 
+        void onNewAudioModulesAvailable() override;
+
         status_t initialize();
 
 protected:
@@ -717,6 +719,8 @@ protected:
         SwAudioOutputCollection mPreviousOutputs;
         AudioInputCollection mInputs;     // list of input descriptors
 
+        DeviceVector  mOutputDevicesAll; // all output devices from the config
+        DeviceVector  mInputDevicesAll;  // all input devices from the config
         DeviceVector  mAvailableOutputDevices; // all available output devices
         DeviceVector  mAvailableInputDevices;  // all available input devices
 
@@ -727,9 +731,8 @@ protected:
 
         EffectDescriptorCollection mEffects;  // list of registered audio effects
         sp<DeviceDescriptor> mDefaultOutputDevice; // output device selected by default at boot time
-        HwModuleCollection mHwModules; // contains only modules that have been loaded successfully
-        HwModuleCollection mHwModulesAll; // normally not needed, used during construction and for
-                                          // dumps
+        HwModuleCollection mHwModules; // contains modules that have been loaded successfully
+        HwModuleCollection mHwModulesAll; // contains all modules declared in the config
 
         AudioPolicyConfig mConfig;
 
