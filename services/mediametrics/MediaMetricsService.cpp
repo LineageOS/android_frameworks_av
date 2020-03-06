@@ -113,6 +113,7 @@ status_t MediaMetricsService::submitInternal(mediametrics::Item *item, bool rele
     case AID_MEDIA_CODEC:
     case AID_MEDIA_EX:
     case AID_MEDIA_DRM:
+    // case AID_SHELL: // DEBUG ONLY - used for mediametrics_tests to add new keys
     case AID_SYSTEM:
         // trusted source, only override default values
         isTrusted = true;
@@ -145,9 +146,10 @@ status_t MediaMetricsService::submitInternal(mediametrics::Item *item, bool rele
         }
     }
 
-    ALOGV("%s: given uid %d; sanitized uid: %d sanitized pkg: %s "
+    ALOGV("%s: isTrusted:%d given uid %d; sanitized uid: %d sanitized pkg: %s "
           "sanitized pkg version: %lld",
           __func__,
+          (int)isTrusted,
           uid_given, item->getUid(),
           item->getPkgName().c_str(),
           (long long)item->getPkgVersionCode());
