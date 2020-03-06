@@ -720,7 +720,7 @@ class VolumeInterface {
 
 // --- PlaybackThread ---
 class PlaybackThread : public ThreadBase, public StreamOutHalInterfaceCallback,
-    public VolumeInterface {
+                       public VolumeInterface, public StreamOutHalInterfaceEventCallback {
 public:
 
 #include "PlaybackTracks.h"
@@ -796,6 +796,10 @@ protected:
     virtual     void        onAddNewTrack_l();
                 void        onAsyncError(); // error reported by AsyncCallbackThread
 
+    // StreamHalInterfaceCodecFormatCallback implementation
+                void        onCodecFormatChanged(
+                                const std::basic_string<uint8_t>& metadataBs) override;
+
     // ThreadBase virtuals
     virtual     void        preExit();
 
@@ -845,7 +849,8 @@ public:
                                 pid_t tid,
                                 uid_t uid,
                                 status_t *status /*non-NULL*/,
-                                audio_port_handle_t portId);
+                                audio_port_handle_t portId,
+                                const sp<media::IAudioTrackCallback>& callback);
 
                 AudioStreamOut* getOutput() const;
                 AudioStreamOut* clearOutput();
@@ -1167,6 +1172,10 @@ private:
     // callbacks are ignored.
     uint32_t                        mDrainSequence;
     sp<AsyncCallbackThread>         mCallbackThread;
+
+    Mutex                                    mAudioTrackCbLock;
+    // Record of IAudioTrackCallback
+    std::set<sp<media::IAudioTrackCallback>> mAudioTrackCallbacks;
 
 private:
     // The HAL output sink is treated as non-blocking, but current implementation is blocking
