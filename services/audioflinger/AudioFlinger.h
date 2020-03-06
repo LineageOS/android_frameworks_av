@@ -33,6 +33,7 @@
 #include <sys/types.h>
 #include <limits.h>
 
+#include <android/media/IAudioTrackCallback.h>
 #include <android/os/BnExternalVibrationController.h>
 #include <android-base/macros.h>
 
