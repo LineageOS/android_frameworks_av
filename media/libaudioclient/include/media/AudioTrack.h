@@ -26,6 +26,9 @@
 #include <media/Modulo.h>
 #include <utils/threads.h>
 
+#include "android/media/BnAudioTrackCallback.h"
+#include "android/media/IAudioTrackCallback.h"
+
 namespace android {
 
 // ----------------------------------------------------------------------------
@@ -885,8 +888,6 @@ public:
             virtual void onAudioDeviceUpdate(audio_io_handle_t audioIo,
                                              audio_port_handle_t deviceId);
 
-
-
     /* Obtain the pending duration in milliseconds for playback of pure PCM
      * (mixable without embedded timing) data remaining in AudioTrack.
      *
@@ -932,6 +933,10 @@ public:
      * of a given AudioTrack instance if the connection to audioserver is restored.
      */
             audio_port_handle_t getPortId() const { return mPortId; };
+
+            void setAudioTrackCallback(const sp<media::IAudioTrackCallback>& callback) {
+                mAudioTrackCallback->setAudioTrackCallback(callback);
+            }
 
  protected:
     /* copying audio tracks is not allowed */
@@ -1254,6 +1259,18 @@ private:
     };
     MediaMetrics mMediaMetrics;
     std::string mMetricsId;  // GUARDED_BY(mLock), could change in createTrack_l().
+
+private:
+    class AudioTrackCallback : public media::BnAudioTrackCallback {
+    public:
+        binder::Status onCodecFormatChanged(const std::vector<uint8_t>& audioMetadata) override;
+
+        void setAudioTrackCallback(const sp<media::IAudioTrackCallback>& callback);
+    private:
+        Mutex mAudioTrackCbLock;
+        wp<media::IAudioTrackCallback> mCallback;
+    };
+    sp<AudioTrackCallback> mAudioTrackCallback;
 };
 
 }; // namespace android
