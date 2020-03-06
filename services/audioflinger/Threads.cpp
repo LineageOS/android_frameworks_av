@@ -42,6 +42,7 @@
 #include <private/media/AudioTrackShared.h>
 #include <private/android_filesystem_config.h>
 #include <audio_utils/Balance.h>
+#include <audio_utils/Metadata.h>
 #include <audio_utils/channels.h>
 #include <audio_utils/mono_blend.h>
 #include <audio_utils/primitives.h>
@@ -1921,6 +1922,16 @@ AudioFlinger::PlaybackThread::~PlaybackThread()
 
 void AudioFlinger::PlaybackThread::onFirstRef()
 {
+    if (mOutput == nullptr || mOutput->stream == nullptr) {
+        ALOGE("The stream is not open yet"); // This should not happen.
+    } else {
+        // setEventCallback will need a strong pointer as a parameter. Calling it
+        // here instead of constructor of PlaybackThread so that the onFirstRef
+        // callback would not be made on an incompletely constructed object.
+        if (mOutput->stream->setEventCallback(this) != OK) {
+            ALOGE("Failed to add event callback");
+        }
+    }
     run(mThreadName, ANDROID_PRIORITY_URGENT_AUDIO);
 }
 
@@ -2050,7 +2061,8 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         pid_t tid,
         uid_t uid,
         status_t *status,
-        audio_port_handle_t portId)
+        audio_port_handle_t portId,
+        const sp<media::IAudioTrackCallback>& callback)
 {
     size_t frameCount = *pFrameCount;
     size_t notificationFrameCount = *pNotificationFrameCount;
@@ -2340,6 +2352,12 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
             goto Exit;
         }
         mTracks.add(track);
+        {
+            Mutex::Autolock _atCbL(mAudioTrackCbLock);
+            if (callback.get() != nullptr) {
+                mAudioTrackCallbacks.emplace(callback);
+            }
+        }
 
         sp<EffectChain> chain = getEffectChain_l(sessionId);
         if (chain != 0) {
@@ -2640,6 +2658,29 @@ void AudioFlinger::PlaybackThread::onDrainReady()
 void AudioFlinger::PlaybackThread::onError()
 {
     mCallbackThread->setAsyncError();
+}
+
+void AudioFlinger::PlaybackThread::onCodecFormatChanged(
+        const std::basic_string<uint8_t>& metadataBs)
+{
+    std::thread([this, metadataBs]() {
+            audio_utils::metadata::Data metadata =
+                    audio_utils::metadata::dataFromByteString(metadataBs);
+            if (metadata.empty()) {
+                ALOGW("Can not transform the buffer to audio metadata, %s, %d",
+                      reinterpret_cast<char*>(const_cast<uint8_t*>(metadataBs.data())),
+                      (int)metadataBs.size());
+                return;
+            }
+
+            audio_utils::metadata::ByteString metaDataStr =
+                    audio_utils::metadata::byteStringFromData(metadata);
+            std::vector metadataVec(metaDataStr.begin(), metaDataStr.end());
+            Mutex::Autolock _l(mAudioTrackCbLock);
+            for (const auto& callback : mAudioTrackCallbacks) {
+                callback->onCodecFormatChanged(metadataVec);
+            }
+    }).detach();
 }
 
 void AudioFlinger::PlaybackThread::resetWriteBlocked(uint32_t sequence)
