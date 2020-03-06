@@ -4340,7 +4340,7 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
     mpClientInterface(clientInterface),
     mLimitRingtoneVolume(false), mLastVoiceVolume(-1.0f),
     mA2dpSuspended(false),
-    mConfig(mHwModulesAll, mAvailableOutputDevices, mAvailableInputDevices, mDefaultOutputDevice),
+    mConfig(mHwModulesAll, mOutputDevicesAll, mInputDevicesAll, mDefaultOutputDevice),
     mAudioPortGeneration(1),
     mBeaconMuteRefCount(0),
     mBeaconPlayingRefCount(0),
@@ -4385,141 +4385,9 @@ status_t AudioPolicyManager::initialize() {
         return status;
     }
 
-    // mAvailableOutputDevices and mAvailableInputDevices now contain all attached devices
+    // after parsing the config, mOutputDevicesAll and mInputDevicesAll contain all known devices;
     // open all output streams needed to access attached devices
-    for (const auto& hwModule : mHwModulesAll) {
-        hwModule->setHandle(mpClientInterface->loadHwModule(hwModule->getName()));
-        if (hwModule->getHandle() == AUDIO_MODULE_HANDLE_NONE) {
-            ALOGW("could not open HW module %s", hwModule->getName());
-            continue;
-        }
-        mHwModules.push_back(hwModule);
-        // open all output streams needed to access attached devices
-        // except for direct output streams that are only opened when they are actually
-        // required by an app.
-        // This also validates mAvailableOutputDevices list
-        for (const auto& outProfile : hwModule->getOutputProfiles()) {
-            if (!outProfile->canOpenNewIo()) {
-                ALOGE("Invalid Output profile max open count %u for profile %s",
-                      outProfile->maxOpenCount, outProfile->getTagName().c_str());
-                continue;
-            }
-            if (!outProfile->hasSupportedDevices()) {
-                ALOGW("Output profile contains no device on module %s", hwModule->getName());
-                continue;
-            }
-            if ((outProfile->getFlags() & AUDIO_OUTPUT_FLAG_TTS) != 0) {
-                mTtsOutputAvailable = true;
-            }
-
-            if ((outProfile->getFlags() & AUDIO_OUTPUT_FLAG_DIRECT) != 0) {
-                continue;
-            }
-            const DeviceVector &supportedDevices = outProfile->getSupportedDevices();
-            DeviceVector availProfileDevices = supportedDevices.filter(mAvailableOutputDevices);
-            sp<DeviceDescriptor> supportedDevice = 0;
-            if (supportedDevices.contains(mDefaultOutputDevice)) {
-                supportedDevice = mDefaultOutputDevice;
-            } else {
-                // choose first device present in profile's SupportedDevices also part of
-                // mAvailableOutputDevices.
-                if (availProfileDevices.isEmpty()) {
-                    continue;
-                }
-                supportedDevice = availProfileDevices.itemAt(0);
-            }
-            if (!mAvailableOutputDevices.contains(supportedDevice)) {
-                continue;
-            }
-            sp<SwAudioOutputDescriptor> outputDesc = new SwAudioOutputDescriptor(outProfile,
-                                                                                 mpClientInterface);
-            audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-            status_t status = outputDesc->open(nullptr, DeviceVector(supportedDevice),
-                                               AUDIO_STREAM_DEFAULT,
-                                               AUDIO_OUTPUT_FLAG_NONE, &output);
-            if (status != NO_ERROR) {
-                ALOGW("Cannot open output stream for devices %s on hw module %s",
-                      supportedDevice->toString().c_str(), hwModule->getName());
-                continue;
-            }
-            for (const auto &device : availProfileDevices) {
-                // give a valid ID to an attached device once confirmed it is reachable
-                if (!device->isAttached()) {
-                    device->attach(hwModule);
-                }
-            }
-            if (mPrimaryOutput == 0 &&
-                    outProfile->getFlags() & AUDIO_OUTPUT_FLAG_PRIMARY) {
-                mPrimaryOutput = outputDesc;
-            }
-            addOutput(output, outputDesc);
-            setOutputDevices(outputDesc,
-                             DeviceVector(supportedDevice),
-                             true,
-                             0,
-                             NULL);
-        }
-        // open input streams needed to access attached devices to validate
-        // mAvailableInputDevices list
-        for (const auto& inProfile : hwModule->getInputProfiles()) {
-            if (!inProfile->canOpenNewIo()) {
-                ALOGE("Invalid Input profile max open count %u for profile %s",
-                      inProfile->maxOpenCount, inProfile->getTagName().c_str());
-                continue;
-            }
-            if (!inProfile->hasSupportedDevices()) {
-                ALOGW("Input profile contains no device on module %s", hwModule->getName());
-                continue;
-            }
-            // chose first device present in profile's SupportedDevices also part of
-            // available input devices
-            const DeviceVector &supportedDevices = inProfile->getSupportedDevices();
-            DeviceVector availProfileDevices = supportedDevices.filter(mAvailableInputDevices);
-            if (availProfileDevices.isEmpty()) {
-                ALOGE("%s: Input device list is empty!", __FUNCTION__);
-                continue;
-            }
-            sp<AudioInputDescriptor> inputDesc =
-                    new AudioInputDescriptor(inProfile, mpClientInterface);
-
-            audio_io_handle_t input = AUDIO_IO_HANDLE_NONE;
-            status_t status = inputDesc->open(nullptr,
-                                              availProfileDevices.itemAt(0),
-                                              AUDIO_SOURCE_MIC,
-                                              AUDIO_INPUT_FLAG_NONE,
-                                              &input);
-            if (status != NO_ERROR) {
-                ALOGW("Cannot open input stream for device %s on hw module %s",
-                      availProfileDevices.toString().c_str(),
-                      hwModule->getName());
-                continue;
-            }
-            for (const auto &device : availProfileDevices) {
-                // give a valid ID to an attached device once confirmed it is reachable
-                if (!device->isAttached()) {
-                    device->attach(hwModule);
-                    device->importAudioPortAndPickAudioProfile(inProfile, true);
-                }
-            }
-            inputDesc->close();
-        }
-    }
-    // make sure all attached devices have been allocated a unique ID
-    auto checkAndSetAvailable = [this](auto& devices) {
-        for (size_t i = 0; i < devices.size();) {
-            const auto &device = devices[i];
-            if (!device->isAttached()) {
-                ALOGW("device %s is unreachable", device->toString().c_str());
-                devices.remove(device);
-                continue;
-            }
-            // Device is now validated and can be appended to the available devices of the engine
-            setEngineDeviceConnectionState(device, AUDIO_POLICY_DEVICE_STATE_AVAILABLE);
-            i++;
-        }
-    };
-    checkAndSetAvailable(mAvailableOutputDevices);
-    checkAndSetAvailable(mAvailableInputDevices);
+    onNewAudioModulesAvailable();
 
     // make sure default device is reachable
     if (mDefaultOutputDevice == 0 || !mAvailableOutputDevices.contains(mDefaultOutputDevice)) {
@@ -4573,6 +4441,134 @@ status_t AudioPolicyManager::initCheck()
 }
 
 // ---
+
+void AudioPolicyManager::onNewAudioModulesAvailable()
+{
+    for (const auto& hwModule : mHwModulesAll) {
+        if (std::find(mHwModules.begin(), mHwModules.end(), hwModule) != mHwModules.end()) {
+            continue;
+        }
+        hwModule->setHandle(mpClientInterface->loadHwModule(hwModule->getName()));
+        if (hwModule->getHandle() == AUDIO_MODULE_HANDLE_NONE) {
+            ALOGW("could not open HW module %s", hwModule->getName());
+            continue;
+        }
+        mHwModules.push_back(hwModule);
+        // open all output streams needed to access attached devices
+        // except for direct output streams that are only opened when they are actually
+        // required by an app.
+        // This also validates mAvailableOutputDevices list
+        for (const auto& outProfile : hwModule->getOutputProfiles()) {
+            if (!outProfile->canOpenNewIo()) {
+                ALOGE("Invalid Output profile max open count %u for profile %s",
+                      outProfile->maxOpenCount, outProfile->getTagName().c_str());
+                continue;
+            }
+            if (!outProfile->hasSupportedDevices()) {
+                ALOGW("Output profile contains no device on module %s", hwModule->getName());
+                continue;
+            }
+            if ((outProfile->getFlags() & AUDIO_OUTPUT_FLAG_TTS) != 0) {
+                mTtsOutputAvailable = true;
+            }
+
+            if ((outProfile->getFlags() & AUDIO_OUTPUT_FLAG_DIRECT) != 0) {
+                continue;
+            }
+            const DeviceVector &supportedDevices = outProfile->getSupportedDevices();
+            DeviceVector availProfileDevices = supportedDevices.filter(mOutputDevicesAll);
+            sp<DeviceDescriptor> supportedDevice = 0;
+            if (supportedDevices.contains(mDefaultOutputDevice)) {
+                supportedDevice = mDefaultOutputDevice;
+            } else {
+                // choose first device present in profile's SupportedDevices also part of
+                // mAvailableOutputDevices.
+                if (availProfileDevices.isEmpty()) {
+                    continue;
+                }
+                supportedDevice = availProfileDevices.itemAt(0);
+            }
+            if (!mOutputDevicesAll.contains(supportedDevice)) {
+                continue;
+            }
+            sp<SwAudioOutputDescriptor> outputDesc = new SwAudioOutputDescriptor(outProfile,
+                                                                                 mpClientInterface);
+            audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
+            status_t status = outputDesc->open(nullptr, DeviceVector(supportedDevice),
+                                               AUDIO_STREAM_DEFAULT,
+                                               AUDIO_OUTPUT_FLAG_NONE, &output);
+            if (status != NO_ERROR) {
+                ALOGW("Cannot open output stream for devices %s on hw module %s",
+                      supportedDevice->toString().c_str(), hwModule->getName());
+                continue;
+            }
+            for (const auto &device : availProfileDevices) {
+                // give a valid ID to an attached device once confirmed it is reachable
+                if (!device->isAttached()) {
+                    device->attach(hwModule);
+                    mAvailableOutputDevices.add(device);
+                    setEngineDeviceConnectionState(device, AUDIO_POLICY_DEVICE_STATE_AVAILABLE);
+                }
+            }
+            if (mPrimaryOutput == 0 &&
+                    outProfile->getFlags() & AUDIO_OUTPUT_FLAG_PRIMARY) {
+                mPrimaryOutput = outputDesc;
+            }
+            addOutput(output, outputDesc);
+            setOutputDevices(outputDesc,
+                             DeviceVector(supportedDevice),
+                             true,
+                             0,
+                             NULL);
+        }
+        // open input streams needed to access attached devices to validate
+        // mAvailableInputDevices list
+        for (const auto& inProfile : hwModule->getInputProfiles()) {
+            if (!inProfile->canOpenNewIo()) {
+                ALOGE("Invalid Input profile max open count %u for profile %s",
+                      inProfile->maxOpenCount, inProfile->getTagName().c_str());
+                continue;
+            }
+            if (!inProfile->hasSupportedDevices()) {
+                ALOGW("Input profile contains no device on module %s", hwModule->getName());
+                continue;
+            }
+            // chose first device present in profile's SupportedDevices also part of
+            // available input devices
+            const DeviceVector &supportedDevices = inProfile->getSupportedDevices();
+            DeviceVector availProfileDevices = supportedDevices.filter(mInputDevicesAll);
+            if (availProfileDevices.isEmpty()) {
+                ALOGE("%s: Input device list is empty!", __FUNCTION__);
+                continue;
+            }
+            sp<AudioInputDescriptor> inputDesc =
+                    new AudioInputDescriptor(inProfile, mpClientInterface);
+
+            audio_io_handle_t input = AUDIO_IO_HANDLE_NONE;
+            status_t status = inputDesc->open(nullptr,
+                                              availProfileDevices.itemAt(0),
+                                              AUDIO_SOURCE_MIC,
+                                              AUDIO_INPUT_FLAG_NONE,
+                                              &input);
+            if (status != NO_ERROR) {
+                ALOGW("Cannot open input stream for device %s on hw module %s",
+                      availProfileDevices.toString().c_str(),
+                      hwModule->getName());
+                continue;
+            }
+            for (const auto &device : availProfileDevices) {
+                // give a valid ID to an attached device once confirmed it is reachable
+                if (!device->isAttached()) {
+                    device->attach(hwModule);
+                    device->importAudioPortAndPickAudioProfile(inProfile, true);
+                    mAvailableInputDevices.add(device);
+                    setEngineDeviceConnectionState(device, AUDIO_POLICY_DEVICE_STATE_AVAILABLE);
+                }
+            }
+            inputDesc->close();
+        }
+    }
+}
 
 void AudioPolicyManager::addOutput(audio_io_handle_t output,
                                    const sp<SwAudioOutputDescriptor>& outputDesc)
