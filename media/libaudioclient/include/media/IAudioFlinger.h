@@ -40,6 +40,7 @@
 #include <vector>
 
 #include "android/media/IAudioRecord.h"
+#include "android/media/IAudioTrackCallback.h"
 
 namespace android {
 
@@ -83,6 +84,8 @@ public:
             }
             notificationsPerBuffer = parcel->readInt32();
             speed = parcel->readFloat();
+            audioTrackCallback = interface_cast<media::IAudioTrackCallback>(
+                    parcel->readStrongBinder());
 
             /* input/output arguments*/
             (void)parcel->read(&flags, sizeof(audio_output_flags_t));
@@ -107,6 +110,7 @@ public:
             }
             (void)parcel->writeInt32(notificationsPerBuffer);
             (void)parcel->writeFloat(speed);
+            (void)parcel->writeStrongBinder(IInterface::asBinder(audioTrackCallback));
 
             /* input/output arguments*/
             (void)parcel->write(&flags, sizeof(audio_output_flags_t));
@@ -125,6 +129,7 @@ public:
         sp<IMemory> sharedBuffer;
         uint32_t notificationsPerBuffer;
         float speed;
+        sp<media::IAudioTrackCallback> audioTrackCallback;
 
         /* input/output */
         audio_output_flags_t flags;
