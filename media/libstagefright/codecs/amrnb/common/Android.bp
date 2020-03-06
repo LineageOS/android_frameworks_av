@@ -1,6 +1,7 @@
 cc_library {
     name: "libstagefright_amrnb_common",
     vendor_available: true,
+    host_supported: true,
 
     srcs: [
         "src/add.cpp",
@@ -72,6 +73,12 @@ cc_library {
 
         "-Werror",
     ],
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 
     //addressing b/25409744
     //sanitize: {
