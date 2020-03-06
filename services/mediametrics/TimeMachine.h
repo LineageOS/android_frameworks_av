@@ -124,12 +124,23 @@ private:
                 T&& e, int64_t time = 0) {
             if (time == 0) time = systemTime(SYSTEM_TIME_BOOTTIME);
             mLastModificationTime = time;
+            if (mPropertyMap.size() >= kKeyMaxProperties &&
+                    !mPropertyMap.count(property)) {
+                ALOGV("%s: too many properties, rejecting %s", __func__, property.c_str());
+                return;
+            }
             auto& timeSequence = mPropertyMap[property];
             Elem el{std::forward<T>(e)};
             if (timeSequence.empty()           // no elements
                     || property.back() == AMEDIAMETRICS_PROP_SUFFIX_CHAR_DUPLICATES_ALLOWED
                     || timeSequence.rbegin()->second != el) { // value changed
                 timeSequence.emplace(time, std::move(el));
+
+                if (timeSequence.size() > kTimeSequenceMaxElements) {
+                    ALOGV("%s: restricting maximum elements (discarding oldest) for %s",
+                            __func__, property.c_str());
+                    timeSequence.erase(timeSequence.begin());
+                }
             }
         }
 
@@ -188,6 +199,8 @@ private:
 
     using History = std::map<std::string /* key */, std::shared_ptr<KeyHistory>>;
 
+    static inline constexpr size_t kTimeSequenceMaxElements = 100;
+    static inline constexpr size_t kKeyMaxProperties = 100;
     static inline constexpr size_t kKeyLowWaterMark = 500;
     static inline constexpr size_t kKeyHighWaterMark = 1000;
 
@@ -239,6 +252,9 @@ public:
         const int64_t time = item->getTimestamp();
         const std::string &key = item->getKey();
 
+        ALOGV("%s(%zu, %zu): key: %s  isTrusted:%d  size:%zu",
+                __func__, mKeyLowWaterMark, mKeyHighWaterMark,
+                key.c_str(), (int)isTrusted, item->count());
         std::shared_ptr<KeyHistory> keyHistory;
         {
             std::vector<std::any> garbage;
@@ -445,6 +461,9 @@ private:
     // GUARDED_BY mLock
     /**
      * Garbage collects if the TimeMachine size exceeds the high water mark.
+     *
+     * This GC operation limits the number of keys stored (not the size of properties
+     * stored in each key).
      *
      * \param garbage a type-erased vector of elements to be destroyed
      *        outside of lock.  Move large items to be destroyed here.

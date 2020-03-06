@@ -846,3 +846,21 @@ TEST(mediametrics_tests, audio_analytics_dump) {
       ASSERT_EQ(ll, (int32_t) countNewlines(s.c_str()));
   }
 }
+
+#if 0
+// Stress test code for garbage collection, you need to enable AID_SHELL as trusted to run
+// in MediaMetricsService.cpp.
+//
+// TODO: Make a dedicated stress test.
+//
+TEST(mediametrics_tests, gc_same_key) {
+  // random keys ignored when empty
+  for (int i = 0; i < 10000000; ++i) {
+      std::unique_ptr<mediametrics::Item> test_key(mediametrics::Item::create("audio.zzz.123"));
+      test_key->set("event#", "hello");
+      test_key->set("value",  (int)10);
+      test_key->selfrecord();
+  }
+  //mediaMetrics->dump(fileno(stdout), {} /* args */);
+}
+#endif
