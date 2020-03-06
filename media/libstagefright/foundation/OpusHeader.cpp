@@ -126,12 +126,20 @@ bool ParseOpusHeader(const uint8_t* data, size_t data_size, OpusHeader* header) 
     }
     header->num_streams = data[kOpusHeaderNumStreamsOffset];
     header->num_coupled = data[kOpusHeaderNumCoupledStreamsOffset];
-    if (header->num_streams + header->num_coupled != header->channels) {
-        ALOGV("Inconsistent channel mapping.");
+    if (header->num_coupled > header->num_streams ||
+        header->num_streams + header->num_coupled != header->channels) {
+        ALOGV("Inconsistent channel mapping, streams: %d coupled: %d channels: %d",
+        header->num_streams, header->num_coupled, header->channels);
         return false;
     }
-    for (int i = 0; i < header->channels; ++i)
-        header->stream_map[i] = data[kOpusHeaderStreamMapOffset + i];
+    for (int i = 0; i < header->channels; ++i) {
+        uint8_t value = data[kOpusHeaderStreamMapOffset + i];
+        if (value != 255 && value >= header->channels) {
+            ALOGV("Invalid channel mapping for index %i : %d", i, value);
+            return false;
+        }
+        header->stream_map[i] = value;
+    }
     return true;
 }
 
