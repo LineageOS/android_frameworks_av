@@ -51,6 +51,7 @@ cc_library_shared {
         // AIDL files for audioclient interfaces
         // The headers for these interfaces will be available to any modules that
         // include libaudioclient, at the path "aidl/package/path/BnFoo.h"
+        ":libaudioclient_aidl_callback",
         ":libaudioclient_aidl_private",
         ":libaudioclient_aidl",
 
@@ -135,6 +136,15 @@ filegroup {
     name: "libaudioclient_aidl_private",
     srcs: [
         "aidl/android/media/IAudioRecord.aidl",
+    ],
+    path: "aidl",
+}
+
+// AIDL interface for audio track callback
+filegroup {
+    name: "libaudioclient_aidl_callback",
+    srcs: [
+        "aidl/android/media/IAudioTrackCallback.aidl",
     ],
     path: "aidl",
 }
