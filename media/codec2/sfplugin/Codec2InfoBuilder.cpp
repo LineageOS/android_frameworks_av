@@ -319,10 +319,11 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
     // Obtain Codec2Client
     std::vector<Traits> traits = Codec2Client::ListComponents();
 
-    // parse APEX XML first, followed by vendor XML
+    // parse APEX XML first, followed by vendor XML.
+    // Note: APEX XML names do not depend on ro.media.xml_variant.* properties.
     MediaCodecsXmlParser parser;
     parser.parseXmlFilesInSearchDirs(
-            parser.getDefaultXmlNames(),
+            { "media_codecs.xml", "media_codecs_performance.xml" },
             { "/apex/com.android.media.swcodec/etc" });
 
     // TODO: remove these c2-specific files once product moved to default file names
