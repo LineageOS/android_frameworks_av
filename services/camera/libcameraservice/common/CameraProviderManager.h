@@ -447,7 +447,7 @@ private:
             std::map<std::string, hardware::camera::common::V1_0::CameraDeviceStatus>
                     mPhysicalStatus;
 
-            sp<ProviderInfo> mParentProvider;
+            wp<ProviderInfo> mParentProvider;
 
             bool hasFlashUnit() const { return mHasFlashUnit; }
             bool supportNativeZoomRatio() const { return mSupportNativeZoomRatio; }

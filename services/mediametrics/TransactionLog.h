@@ -264,7 +264,7 @@ private:
         return ret;
     }
 
-    const size_t mLowWaterMark = kLogItemsHighWater;
+    const size_t mLowWaterMark = kLogItemsLowWater;
     const size_t mHighWaterMark = kLogItemsHighWater;
 
     mutable std::mutex mLock;
