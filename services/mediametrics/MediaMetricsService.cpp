@@ -386,7 +386,7 @@ bool MediaMetricsService::expirations_l(const std::shared_ptr<const mediametrics
                 break;
             }
             if (now > when && (now - when) <= mMaxRecordAgeNs) {
-                break;  // TODO: if we use BOOTTIME, should be monotonic.
+                break; // Note SYSTEM_TIME_REALTIME may not be monotonic.
             }
             if (i >= mMaxRecordsExpiredAtOnce) {
                 // this represents "one too many"; tell caller there are
