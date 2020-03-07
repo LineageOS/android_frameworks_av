@@ -783,6 +783,13 @@ const sp<IAudioPolicyService> AudioSystem::get_audio_policy_service()
 
 // ---------------------------------------------------------------------------
 
+void AudioSystem::onNewAudioModulesAvailable()
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return;
+    aps->onNewAudioModulesAvailable();
+}
+
 status_t AudioSystem::setDeviceConnectionState(audio_devices_t device,
                                                audio_policy_dev_state_t state,
                                                const char *device_address,

@@ -29,6 +29,7 @@
 #include <string>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <thread>
 
 #include <android/os/IExternalVibratorService.h>
 #include <binder/IPCThreadState.h>
@@ -143,6 +144,19 @@ static sp<os::IExternalVibratorService> getExternalVibratorService() {
     return sExternalVibratorService;
 }
 
+class DevicesFactoryHalCallbackImpl : public DevicesFactoryHalCallback {
+  public:
+    void onNewDevicesAvailable() override {
+        // Start a detached thread to execute notification in parallel.
+        // This is done to prevent mutual blocking of audio_flinger and
+        // audio_policy services during system initialization.
+        std::thread notifier([]() {
+            AudioSystem::onNewAudioModulesAvailable();
+        });
+        notifier.detach();
+    }
+};
+
 // ----------------------------------------------------------------------------
 
 std::string formatToString(audio_format_t format) {
@@ -221,6 +235,9 @@ void AudioFlinger::onFirstRef()
     mMode = AUDIO_MODE_NORMAL;
 
     gAudioFlinger = this;
+
+    mDevicesFactoryHalCallback = new DevicesFactoryHalCallbackImpl;
+    mDevicesFactoryHal->setCallbackOnce(mDevicesFactoryHalCallback);
 }
 
 status_t AudioFlinger::setAudioHalPids(const std::vector<pid_t>& pids) {

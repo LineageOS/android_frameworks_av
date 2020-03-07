@@ -60,6 +60,7 @@ public:
     // BnAudioPolicyService (see AudioPolicyInterface for method descriptions)
     //
 
+    void onNewAudioModulesAvailable() override;
     virtual status_t setDeviceConnectionState(audio_devices_t device,
                                               audio_policy_dev_state_t state,
                                               const char *device_address,
@@ -268,6 +269,7 @@ public:
 
     virtual status_t setRttEnabled(bool enabled);
 
+            void doOnNewAudioModulesAvailable();
             status_t doStopOutput(audio_port_handle_t portId);
             void doReleaseOutput(audio_port_handle_t portId);
 
@@ -450,6 +452,7 @@ private:
             DYN_POLICY_MIX_STATE_UPDATE,
             RECORDING_CONFIGURATION_UPDATE,
             SET_EFFECT_SUSPENDED,
+            AUDIO_MODULES_UPDATE,
         };
 
         AudioCommandThread (String8 name, const wp<AudioPolicyService>& service);
@@ -495,6 +498,7 @@ private:
                     void        setEffectSuspendedCommand(int effectId,
                                                           audio_session_t sessionId,
                                                           bool suspended);
+                    void        audioModulesUpdateCommand();
                     void        insertCommand_l(AudioCommand *command, int delayMs = 0);
     private:
         class AudioCommandData;

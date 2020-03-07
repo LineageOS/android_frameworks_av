@@ -1278,6 +1278,16 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
                         mLock.lock();
                     }
                     } break;
+                case AUDIO_MODULES_UPDATE: {
+                    ALOGV("AudioCommandThread() processing audio modules update");
+                    svc = mService.promote();
+                    if (svc == 0) {
+                        break;
+                    }
+                    mLock.unlock();
+                    svc->doOnNewAudioModulesAvailable();
+                    mLock.lock();
+                    } break;
 
                 default:
                     ALOGW("AudioCommandThread() unknown command %d", command->mCommand);
@@ -1567,6 +1577,13 @@ void AudioPolicyService::AudioCommandThread::recordingConfigurationUpdateCommand
     sendCommand(command);
 }
 
+void AudioPolicyService::AudioCommandThread::audioModulesUpdateCommand()
+{
+    sp<AudioCommand> command = new AudioCommand();
+    command->mCommand = AUDIO_MODULES_UPDATE;
+    sendCommand(command);
+}
+
 status_t AudioPolicyService::AudioCommandThread::sendCommand(sp<AudioCommand>& command, int delayMs)
 {
     {
@@ -1812,6 +1829,11 @@ void AudioPolicyService::setEffectSuspended(int effectId,
                                             bool suspended)
 {
     mAudioCommandThread->setEffectSuspendedCommand(effectId, sessionId, suspended);
+}
+
+void AudioPolicyService::onNewAudioModulesAvailable()
+{
+    mAudioCommandThread->audioModulesUpdateCommand();
 }
 
 
