@@ -25,6 +25,7 @@
 #include <media/hardware/VideoAPI.h>
 #include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ALooper.h>
+#include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaMuxer.h>
 
@@ -157,6 +158,7 @@ private:
         bool                      errorNotified;
         int64_t                   frameNumber;
 
+        sp<AMessage>              format;
         sp<MediaMuxer>            muxer;
         int                       fenceFd;
         int                       fileFd;
@@ -187,7 +189,7 @@ private:
     status_t processCompletedInputFrame(nsecs_t timestamp, InputFrame &inputFrame);
 
     void releaseInputFrameLocked(InputFrame *inputFrame /*out*/);
-    void releaseInputFramesLocked(int64_t currentTs);
+    void releaseInputFramesLocked();
 
     size_t findAppSegmentsSize(const uint8_t* appSegmentBuffer, size_t maxSize,
             size_t* app1SegmentSize);
@@ -205,11 +207,13 @@ private:
             static_cast<android_dataspace>(HAL_DATASPACE_JPEG_APP_SEGMENTS);
     static const android_dataspace kHeifDataSpace =
             static_cast<android_dataspace>(HAL_DATASPACE_HEIF);
+    // Use the limit of pipeline depth in the API sepc as maximum number of acquired
+    // app segment buffers.
+    static const uint32_t kMaxAcquiredAppSegment = 8;
 
     int               mAppSegmentStreamId, mAppSegmentSurfaceId;
     sp<CpuConsumer>   mAppSegmentConsumer;
     sp<Surface>       mAppSegmentSurface;
-    bool              mAppSegmentBufferAcquired;
     size_t            mAppSegmentMaxSize;
     CameraMetadata    mStaticInfo;
 
@@ -218,9 +222,10 @@ private:
     sp<CpuConsumer>   mMainImageConsumer; // Only applicable for HEVC codec.
     bool              mYuvBufferAcquired; // Only applicable to HEVC codec
 
+    static const int32_t kMaxOutputSurfaceProducerCount = 1;
     sp<Surface>       mOutputSurface;
     sp<ProducerListener> mProducerListener;
-
+    int32_t           mDequeuedOutputBufferCnt;
 
     // Map from frame number to JPEG setting of orientation+quality
     std::map<int64_t, std::pair<int32_t, int32_t>> mSettingsByFrameNumber;
@@ -229,11 +234,12 @@ private:
 
     // Keep all incoming APP segment Blob buffer pending further processing.
     std::vector<int64_t> mInputAppSegmentBuffers;
+    int32_t           mLockedAppSegmentBufferCnt;
 
     // Keep all incoming HEIC blob buffer pending further processing.
     std::vector<CodecOutputBufferInfo> mCodecOutputBuffers;
     std::queue<int64_t> mCodecOutputBufferTimestamps;
-    size_t mOutputBufferCounter;
+    size_t mCodecOutputCounter;
 
     // Keep all incoming Yuv buffer pending tiling and encoding (for HEVC YUV tiling only)
     std::vector<int64_t> mInputYuvBuffers;

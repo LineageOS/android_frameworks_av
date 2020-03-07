@@ -473,7 +473,7 @@ AudioStream::MyPlayerBase::~MyPlayerBase() {
 
 void AudioStream::MyPlayerBase::registerWithAudioManager() {
     if (!mRegistered) {
-        init(android::PLAYER_TYPE_AAUDIO, AUDIO_USAGE_MEDIA);
+        init(android::PLAYER_TYPE_AAUDIO, AAudioConvert_usageToInternal(mParent->getUsage()));
         mRegistered = true;
     }
 }

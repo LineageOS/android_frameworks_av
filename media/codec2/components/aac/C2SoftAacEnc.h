@@ -61,6 +61,10 @@ private:
     bool mSignalledError;
     std::atomic_uint64_t mOutIndex;
 
+    // We support max 6 channels
+    uint8_t mRemainder[6 * sizeof(int16_t)];
+    size_t mRemainderLen;
+
     status_t initEncoder();
 
     status_t setAudioParams();
