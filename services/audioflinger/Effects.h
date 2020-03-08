@@ -596,6 +596,9 @@ private:
 
     void setThread(const sp<ThreadBase>& thread);
 
+    // true if any effect module within the chain has volume control
+    bool hasVolumeControlEnabled_l() const;
+
     void setVolumeForOutput_l(uint32_t left, uint32_t right);
 
     mutable  Mutex mLock;        // mutex protecting effect list

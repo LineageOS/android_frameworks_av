@@ -93,7 +93,7 @@ private:
 
         template <typename T>
         status_t getValue(const std::string &property, T* value, int64_t time = 0) const {
-            if (time == 0) time = systemTime(SYSTEM_TIME_BOOTTIME);
+            if (time == 0) time = systemTime(SYSTEM_TIME_REALTIME);
             const auto tsptr = mPropertyMap.find(property);
             if (tsptr == mPropertyMap.end()) return BAD_VALUE;
             const auto& timeSequence = tsptr->second;
@@ -122,7 +122,7 @@ private:
         template <typename T>
         void putValue(const std::string &property,
                 T&& e, int64_t time = 0) {
-            if (time == 0) time = systemTime(SYSTEM_TIME_BOOTTIME);
+            if (time == 0) time = systemTime(SYSTEM_TIME_REALTIME);
             mLastModificationTime = time;
             if (mPropertyMap.size() >= kKeyMaxProperties &&
                     !mPropertyMap.count(property)) {
@@ -340,7 +340,7 @@ public:
     /**
      * Individual property put.
      *
-     * Put takes in a time (if none is provided then BOOTTIME is used).
+     * Put takes in a time (if none is provided then SYSTEM_TIME_REALTIME is used).
      */
     template <typename T>
     status_t put(const std::string &url, T &&e, int64_t time = 0) {
@@ -349,7 +349,7 @@ public:
         std::shared_ptr<KeyHistory> keyHistory =
             getKeyHistoryFromUrl(url, &key, &prop);
         if (keyHistory == nullptr) return BAD_VALUE;
-        if (time == 0) time = systemTime(SYSTEM_TIME_BOOTTIME);
+        if (time == 0) time = systemTime(SYSTEM_TIME_REALTIME);
         std::lock_guard lock(getLockForKey(key));
         keyHistory->putValue(prop, std::forward<T>(e), time);
         return NO_ERROR;
