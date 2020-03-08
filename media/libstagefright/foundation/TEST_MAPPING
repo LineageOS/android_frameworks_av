@@ -1,0 +1,5 @@
+{
+  "presubmit": [
+    { "name": "sf_foundation_test" }
+  ]
+}
