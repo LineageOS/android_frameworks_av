@@ -7,5 +7,5 @@ cc_library_shared {
 
     srcs: ["C2SoftVorbisDec.cpp"],
 
-    shared_libs: ["libvorbisidec"],
+    static_libs: ["libvorbisidec"],
 }
