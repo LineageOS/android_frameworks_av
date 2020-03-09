@@ -1,6 +1,7 @@
 cc_library_static {
     name: "libstagefright_amrwbdec",
     vendor_available: true,
+    host_supported: true,
 
     srcs: [
         "src/agc2_amr_wb.cpp",
@@ -61,12 +62,19 @@ cc_library_static {
             "signed-integer-overflow",
         ],
     },
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
 
 //###############################################################################
 cc_test {
     name: "libstagefright_amrwbdec_test",
     gtest: false,
+    host_supported: true,
 
     srcs: ["test/amrwbdec_test.cpp"],
 
@@ -85,5 +93,11 @@ cc_test {
         misc_undefined: [
             "signed-integer-overflow",
         ],
+    },
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
     },
 }
