@@ -44,8 +44,6 @@ cc_library_static {
         "src/weight_amrwb_lpc.cpp",
     ],
 
-    header_libs: ["libstagefright_headers"],
-
     export_include_dirs: [
         "src",
         "include",
