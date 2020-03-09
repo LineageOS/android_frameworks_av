@@ -246,6 +246,8 @@ void sendCaptureResult(
                 frameNumber);
         return;
     }
+    nsecs_t sensorTimestamp = timestamp.data.i64[0];
+
     for (auto& physicalMetadata : captureResult.mPhysicalMetadatas) {
         camera_metadata_entry timestamp =
                 physicalMetadata.mPhysicalCameraMetadata.find(ANDROID_SENSOR_TIMESTAMP);
@@ -337,7 +339,7 @@ void sendCaptureResult(
                 CameraMetadata(m.mPhysicalCameraMetadata));
     }
     states.tagMonitor.monitorMetadata(TagMonitor::RESULT,
-            frameNumber, timestamp.data.i64[0], captureResult.mMetadata,
+            frameNumber, sensorTimestamp, captureResult.mMetadata,
             monitoredPhysicalMetadata);
 
     insertResultLocked(states, &captureResult, frameNumber);
