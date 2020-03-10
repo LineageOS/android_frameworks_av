@@ -58,6 +58,15 @@ struct H2BCameraServiceListener :
         // TODO: no implementation yet.
         return binder::Status::ok();
     }
+    virtual binder::Status onCameraOpened(const ::android::String16& /*cameraId*/,
+            const ::android::String16& /*clientPackageId*/) {
+        // empty implementation
+        return binder::Status::ok();
+    }
+    virtual binder::Status onCameraClosed(const ::android::String16& /*cameraId*/) {
+        // empty implementation
+        return binder::Status::ok();
+    }
 };
 
 } // implementation

@@ -913,9 +913,10 @@ private:
     class ServiceListener : public virtual IBinder::DeathRecipient {
         public:
             ServiceListener(sp<CameraService> parent, sp<hardware::ICameraServiceListener> listener,
-                    int uid, int pid, bool isVendorClient)
+                    int uid, int pid, bool isVendorClient, bool openCloseCallbackAllowed)
                     : mParent(parent), mListener(listener), mListenerUid(uid), mListenerPid(pid),
-                      mIsVendorListener(isVendorClient) { }
+                      mIsVendorListener(isVendorClient),
+                      mOpenCloseCallbackAllowed(openCloseCallbackAllowed) { }
 
             status_t initialize() {
                 return IInterface::asBinder(mListener)->linkToDeath(this);
@@ -932,6 +933,7 @@ private:
             int getListenerPid() { return mListenerPid; }
             sp<hardware::ICameraServiceListener> getListener() { return mListener; }
             bool isVendorListener() { return mIsVendorListener; }
+            bool isOpenCloseCallbackAllowed() { return mOpenCloseCallbackAllowed; }
 
         private:
             wp<CameraService> mParent;
@@ -939,6 +941,7 @@ private:
             int mListenerUid = -1;
             int mListenerPid = -1;
             bool mIsVendorListener = false;
+            bool mOpenCloseCallbackAllowed = false;
     };
 
     // Guarded by mStatusListenerMutex
@@ -960,6 +963,13 @@ private:
                 rejectedSourceStates);
     void updateStatus(StatusInternal status,
             const String8& cameraId);
+
+    /**
+     * Update the opened/closed status of the given camera id.
+     *
+     * This method acqiures mStatusListenerLock.
+     */
+    void updateOpenCloseStatus(const String8& cameraId, bool open, const String16& packageName);
 
     // flashlight control
     sp<CameraFlashlight> mFlashlight;
