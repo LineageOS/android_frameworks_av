@@ -221,7 +221,7 @@ public:
                     &cameraIdsAndSessionConfigs,
             bool *isSupported);
 
-    std::vector<std::unordered_set<std::string>> getConcurrentStreamingCameraIds() const;
+    std::vector<std::unordered_set<std::string>> getConcurrentCameraIds() const;
     /**
      * Check for device support of specific stream combination.
      */
@@ -630,7 +630,7 @@ private:
         // Expects to have mLock locked
         status_t reCacheConcurrentStreamingCameraIdsLocked();
         // Expects to have mLock locked
-        status_t getConcurrentStreamingCameraIdsInternalLocked(
+        status_t getConcurrentCameraIdsInternalLocked(
                 sp<hardware::camera::provider::V2_6::ICameraProvider> &interface2_6);
     };
 
