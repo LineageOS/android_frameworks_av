@@ -38,6 +38,8 @@ class DevicesFactoryHalHybrid : public DevicesFactoryHalInterface
 
             status_t getHalPids(std::vector<pid_t> *pids) override;
 
+            status_t setCallbackOnce(sp<DevicesFactoryHalCallback> callback) override;
+
   private:
     sp<DevicesFactoryHalInterface> mLocalFactory;
     sp<DevicesFactoryHalInterface> mHidlFactory;
