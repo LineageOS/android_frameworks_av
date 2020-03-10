@@ -27,6 +27,8 @@ class AudioPolicyTestManager : public AudioPolicyManager {
     using AudioPolicyManager::loadConfig;
     using AudioPolicyManager::initialize;
     using AudioPolicyManager::getOutputs;
+    using AudioPolicyManager::getAvailableOutputDevices;
+    using AudioPolicyManager::getAvailableInputDevices;
 };
 
 }  // namespace android
