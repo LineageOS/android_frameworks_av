@@ -18,8 +18,6 @@
 #ifndef ANDROID_MEDIA_RESOURCEMANAGERSERVICE_H
 #define ANDROID_MEDIA_RESOURCEMANAGERSERVICE_H
 
-#include <map>
-
 #include <aidl/android/media/BnResourceManagerService.h>
 #include <arpa/inet.h>
 #include <media/MediaResource.h>
@@ -52,7 +50,6 @@ struct ResourceInfo {
     std::shared_ptr<IResourceManagerClient> client;
     sp<DeathNotifier> deathNotifier;
     ResourceList resources;
-    bool pendingRemoval{false};
 };
 
 // TODO: convert these to std::map
@@ -125,8 +122,6 @@ public:
             int originalPid,
             int newPid) override;
 
-    Status markClientForPendingRemoval(int32_t pid, int64_t clientId) override;
-
     Status removeResource(int pid, int64_t clientId, bool checkValid);
 
 private:
@@ -151,8 +146,7 @@ private:
     // Gets the client who owns biggest piece of specified resource type from pid.
     // Returns false if failed. The client will remain unchanged if failed.
     bool getBiggestClient_l(int pid, MediaResource::Type type,
-            std::shared_ptr<IResourceManagerClient> *client,
-            bool pendingRemovalOnly = false);
+            std::shared_ptr<IResourceManagerClient> *client);
 
     bool isCallingPriorityHigher_l(int callingPid, int pid);
 
