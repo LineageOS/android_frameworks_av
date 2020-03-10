@@ -37,6 +37,10 @@ class DevicesFactoryHalLocal : public DevicesFactoryHalInterface
                 return INVALID_OPERATION;
             }
 
+            status_t setCallbackOnce(sp<DevicesFactoryHalCallback> callback __unused) override {
+                return INVALID_OPERATION;
+            }
+
   private:
     friend class DevicesFactoryHalHybrid;
 
