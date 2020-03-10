@@ -42,6 +42,7 @@ public:
     //
     // IAudioPolicyService interface (see AudioPolicyInterface for method descriptions)
     //
+    virtual void onNewAudioModulesAvailable() = 0;
     virtual status_t setDeviceConnectionState(audio_devices_t device,
                                               audio_policy_dev_state_t state,
                                               const char *device_address,
