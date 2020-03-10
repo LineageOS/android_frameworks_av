@@ -67,10 +67,10 @@ TEST(AudioHealthTest, AttachedDeviceFound) {
     manager.loadConfig();
     ASSERT_NE("AudioPolicyConfig::setDefault", manager.getConfig().getSource());
 
-    for (auto desc : manager.getConfig().getAvailableInputDevices()) {
+    for (auto desc : manager.getConfig().getInputDevices()) {
         ASSERT_NE(attachedDevices.end(), attachedDevices.find(desc->type()));
     }
-    for (auto desc : manager.getConfig().getAvailableOutputDevices()) {
+    for (auto desc : manager.getConfig().getOutputDevices()) {
         ASSERT_NE(attachedDevices.end(), attachedDevices.find(desc->type()));
     }
 }

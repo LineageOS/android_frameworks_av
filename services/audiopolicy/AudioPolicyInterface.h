@@ -83,6 +83,10 @@ public:
     // configuration functions
     //
 
+    // Informs APM that new HAL modules are available. This typically happens
+    // due to registration of an audio HAL service.
+    virtual void onNewAudioModulesAvailable() = 0;
+
     // indicate a change in device connection status
     virtual status_t setDeviceConnectionState(audio_devices_t device,
                                               audio_policy_dev_state_t state,
