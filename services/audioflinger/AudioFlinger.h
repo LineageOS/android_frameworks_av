@@ -105,6 +105,7 @@ class AudioMixer;
 class AudioBuffer;
 class AudioResampler;
 class DeviceHalInterface;
+class DevicesFactoryHalCallback;
 class DevicesFactoryHalInterface;
 class EffectsFactoryHalInterface;
 class FastMixer;
@@ -837,6 +838,7 @@ using effect_buffer_t = int16_t;
                 DefaultKeyedVector<audio_module_handle_t, AudioHwDevice*>  mAudioHwDevs;
 
                 sp<DevicesFactoryHalInterface> mDevicesFactoryHal;
+                sp<DevicesFactoryHalCallback> mDevicesFactoryHalCallback;
 
     // for dump, indicates which hardware operation is currently in progress (but not stream ops)
     enum hardware_call_state {
