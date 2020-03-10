@@ -15,12 +15,13 @@
  */
 
 #include <string.h>
-#include <vector>
+#include <set>
 
 #define LOG_TAG "DevicesFactoryHalHidl"
 //#define LOG_NDEBUG 0
 
 #include <android/hidl/manager/1.0/IServiceManager.h>
+#include <android/hidl/manager/1.0/IServiceNotification.h>
 #include PATH(android/hardware/audio/FILE_VERSION/IDevice.h)
 #include <media/audiohal/hidl/HalDeathHandler.h>
 #include <utils/Log.h>
@@ -29,33 +30,57 @@
 #include "DeviceHalHidl.h"
 #include "DevicesFactoryHalHidl.h"
 
-#include <set>
-
 using ::android::hardware::audio::CPP_VERSION::IDevice;
 using ::android::hardware::audio::CPP_VERSION::Result;
 using ::android::hardware::Return;
+using ::android::hardware::Void;
+using ::android::hidl::manager::V1_0::IServiceManager;
+using ::android::hidl::manager::V1_0::IServiceNotification;
 
 namespace android {
 namespace CPP_VERSION {
 
-DevicesFactoryHalHidl::DevicesFactoryHalHidl(sp<IDevicesFactory> devicesFactory) {
-    ALOG_ASSERT(devicesFactory != nullptr, "Provided IDevicesFactory service is NULL");
+class ServiceNotificationListener : public IServiceNotification {
+  public:
+    explicit ServiceNotificationListener(sp<DevicesFactoryHalHidl> factory)
+            : mFactory(factory) {}
 
-    mDeviceFactories.push_back(devicesFactory);
-    if (MAJOR_VERSION >= 4) {
-        // The MSD factory is optional and only available starting at HAL 4.0
-        sp<IDevicesFactory> msdFactory{IDevicesFactory::getService(AUDIO_HAL_SERVICE_NAME_MSD)};
-        if (msdFactory) {
-            mDeviceFactories.push_back(msdFactory);
+    Return<void> onRegistration(const hidl_string& /*fully_qualified_name*/,
+            const hidl_string& instance_name,
+            bool /*pre_existing*/) override {
+        if (static_cast<std::string>(instance_name) == "default") return Void();
+        sp<DevicesFactoryHalHidl> factory = mFactory.promote();
+        if (!factory) return Void();
+        sp<IDevicesFactory> halFactory = IDevicesFactory::getService(instance_name);
+        if (halFactory) {
+            factory->addDeviceFactory(halFactory, true /*needToNotify*/);
         }
+        return Void();
     }
-    for (const auto& factory : mDeviceFactories) {
-        // It is assumed that the DevicesFactoryHalInterface instance is owned
-        // by AudioFlinger and thus have the same lifespan.
-        factory->linkToDeath(HalDeathHandler::getInstance(), 0 /*cookie*/);
-    }
+
+  private:
+    wp<DevicesFactoryHalHidl> mFactory;
+};
+
+DevicesFactoryHalHidl::DevicesFactoryHalHidl(sp<IDevicesFactory> devicesFactory) {
+    ALOG_ASSERT(devicesFactory != nullptr, "Provided default IDevicesFactory service is NULL");
+    addDeviceFactory(devicesFactory, false /*needToNotify*/);
 }
 
+void DevicesFactoryHalHidl::onFirstRef() {
+    sp<IServiceManager> sm = IServiceManager::getService();
+    ALOG_ASSERT(sm != nullptr, "Hardware service manager is not running");
+    sp<ServiceNotificationListener> listener = new ServiceNotificationListener(this);
+    Return<bool> result = sm->registerForNotifications(
+            IDevicesFactory::descriptor, "", listener);
+    if (result.isOk()) {
+        ALOGE_IF(!static_cast<bool>(result),
+                "Hardware service manager refused to register listener");
+    } else {
+        ALOGE("Failed to register for hardware service manager notifications: %s",
+                result.description().c_str());
+    }
+}
 
 #if MAJOR_VERSION == 2
 static IDevicesFactory::Device idFromHal(const char *name, status_t* status) {
@@ -83,12 +108,13 @@ static const char* idFromHal(const char *name, status_t* status) {
 #endif
 
 status_t DevicesFactoryHalHidl::openDevice(const char *name, sp<DeviceHalInterface> *device) {
-    if (mDeviceFactories.empty()) return NO_INIT;
+    auto factories = copyDeviceFactories();
+    if (factories.empty()) return NO_INIT;
     status_t status;
     auto hidlId = idFromHal(name, &status);
     if (status != OK) return status;
     Result retval = Result::NOT_INITIALIZED;
-    for (const auto& factory : mDeviceFactories) {
+    for (const auto& factory : factories) {
         Return<void> ret = factory->openDevice(
                 hidlId,
                 [&](Result r, const sp<IDevice>& result) {
@@ -113,10 +139,9 @@ status_t DevicesFactoryHalHidl::openDevice(const char *name, sp<DeviceHalInterfa
 
 status_t DevicesFactoryHalHidl::getHalPids(std::vector<pid_t> *pids) {
     std::set<pid_t> pidsSet;
-
-    for (const auto& factory : mDeviceFactories) {
+    auto factories = copyDeviceFactories();
+    for (const auto& factory : factories) {
         using ::android::hidl::base::V1_0::DebugInfo;
-        using android::hidl::manager::V1_0::IServiceManager;
 
         DebugInfo debugInfo;
         auto ret = factory->getDebugInfo([&] (const auto &info) {
@@ -133,6 +158,49 @@ status_t DevicesFactoryHalHidl::getHalPids(std::vector<pid_t> *pids) {
 
     *pids = {pidsSet.begin(), pidsSet.end()};
     return NO_ERROR;
+}
+
+status_t DevicesFactoryHalHidl::setCallbackOnce(sp<DevicesFactoryHalCallback> callback) {
+    ALOG_ASSERT(callback != nullptr);
+    bool needToCallCallback = false;
+    {
+        std::lock_guard<std::mutex> lock(mLock);
+        if (mCallback.unsafe_get()) return INVALID_OPERATION;
+        mCallback = callback;
+        if (mHaveUndeliveredNotifications) {
+            needToCallCallback = true;
+            mHaveUndeliveredNotifications = false;
+        }
+    }
+    if (needToCallCallback) {
+        callback->onNewDevicesAvailable();
+    }
+    return NO_ERROR;
+}
+
+void DevicesFactoryHalHidl::addDeviceFactory(sp<IDevicesFactory> factory, bool needToNotify) {
+    // It is assumed that the DevicesFactoryHalInterface instance is owned
+    // by AudioFlinger and thus have the same lifespan.
+    factory->linkToDeath(HalDeathHandler::getInstance(), 0 /*cookie*/);
+    sp<DevicesFactoryHalCallback> callback;
+    {
+        std::lock_guard<std::mutex> lock(mLock);
+        mDeviceFactories.push_back(factory);
+        if (needToNotify) {
+            callback = mCallback.promote();
+            if (!callback) {
+                mHaveUndeliveredNotifications = true;
+            }
+        }
+    }
+    if (callback) {
+        callback->onNewDevicesAvailable();
+    }
+}
+
+std::vector<sp<IDevicesFactory>> DevicesFactoryHalHidl::copyDeviceFactories() {
+    std::lock_guard<std::mutex> lock(mLock);
+    return mDeviceFactories;
 }
 
 } // namespace CPP_VERSION
