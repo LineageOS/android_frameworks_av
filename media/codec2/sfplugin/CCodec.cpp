@@ -1320,7 +1320,8 @@ void CCodec::start() {
         Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
         const std::unique_ptr<Config> &config = *configLocked;
         inputFormat = config->mInputFormat;
-        outputFormat = config->mOutputFormat;
+        // start triggers format dup
+        outputFormat = config->mOutputFormat = config->mOutputFormat->dup();
         if (config->mInputSurface) {
             err2 = config->mInputSurface->start();
         }
