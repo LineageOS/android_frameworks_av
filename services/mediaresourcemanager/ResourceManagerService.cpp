@@ -114,6 +114,7 @@ static ResourceInfo& getResourceInfoForEdit(
         info.uid = uid;
         info.clientId = clientId;
         info.client = client;
+        info.pendingRemoval = false;
 
         index = infos.add(clientId, info);
     }
@@ -648,6 +649,36 @@ Status ResourceManagerService::overridePid(
     return Status::ok();
 }
 
+Status ResourceManagerService::markClientForPendingRemoval(int32_t pid, int64_t clientId) {
+    String8 log = String8::format(
+            "markClientForPendingRemoval(pid %d, clientId %lld)",
+            pid, (long long) clientId);
+    mServiceLog->add(log);
+
+    Mutex::Autolock lock(mLock);
+    if (!mProcessInfo->isValidPid(pid)) {
+        ALOGE("Rejected markClientForPendingRemoval call with invalid pid.");
+        return Status::fromServiceSpecificError(BAD_VALUE);
+    }
+    ssize_t index = mMap.indexOfKey(pid);
+    if (index < 0) {
+        ALOGV("markClientForPendingRemoval: didn't find pid %d for clientId %lld",
+              pid, (long long)clientId);
+        return Status::ok();
+    }
+    ResourceInfos &infos = mMap.editValueAt(index);
+
+    index = infos.indexOfKey(clientId);
+    if (index < 0) {
+        ALOGV("markClientForPendingRemoval: didn't find clientId %lld", (long long) clientId);
+        return Status::ok();
+    }
+
+    ResourceInfo &info = infos.editValueAt(index);
+    info.pendingRemoval = true;
+    return Status::ok();
+}
+
 bool ResourceManagerService::getPriority_l(int pid, int* priority) {
     int newPid = pid;
 
@@ -693,6 +724,12 @@ bool ResourceManagerService::getLowestPriorityBiggestClient_l(
     int lowestPriorityPid;
     int lowestPriority;
     int callingPriority;
+
+    // Before looking into other processes, check if we have clients marked for
+    // pending removal in the same process.
+    if (getBiggestClient_l(callingPid, type, client, true /* pendingRemovalOnly */)) {
+        return true;
+    }
     if (!getPriority_l(callingPid, &callingPriority)) {
         ALOGE("getLowestPriorityBiggestClient_l: can't get process priority for pid %d",
                 callingPid);
@@ -761,7 +798,8 @@ bool ResourceManagerService::isCallingPriorityHigher_l(int callingPid, int pid) 
 }
 
 bool ResourceManagerService::getBiggestClient_l(
-        int pid, MediaResource::Type type, std::shared_ptr<IResourceManagerClient> *client) {
+        int pid, MediaResource::Type type, std::shared_ptr<IResourceManagerClient> *client,
+        bool pendingRemovalOnly) {
     ssize_t index = mMap.indexOfKey(pid);
     if (index < 0) {
         ALOGE("getBiggestClient_l: can't find resource info for pid %d", pid);
@@ -773,6 +811,9 @@ bool ResourceManagerService::getBiggestClient_l(
     const ResourceInfos &infos = mMap.valueAt(index);
     for (size_t i = 0; i < infos.size(); ++i) {
         const ResourceList &resources = infos[i].resources;
+        if (pendingRemovalOnly && !infos[i].pendingRemoval) {
+            continue;
+        }
         for (auto it = resources.begin(); it != resources.end(); it++) {
             const MediaResourceParcel &resource = it->second;
             if (resource.type == type) {
