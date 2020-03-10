@@ -67,7 +67,8 @@ ui::Dataspace translateDataspace(ui::Dataspace dataspace) {
 bool isHdrY410(const BufferItem &bi) {
     ui::Dataspace dataspace = translateDataspace(static_cast<ui::Dataspace>(bi.mDataSpace));
     // pixel format is HDR Y410 masquerading as RGBA_1010102
-    return (dataspace == ui::Dataspace::BT2020_ITU_PQ &&
+    return ((dataspace == ui::Dataspace::BT2020_ITU_PQ ||
+            dataspace == ui::Dataspace::BT2020_ITU_HLG) &&
             bi.mGraphicBuffer->getPixelFormat() == HAL_PIXEL_FORMAT_RGBA_1010102);
 }
 
