@@ -59,7 +59,6 @@ struct C2Config {
     enum drc_compression_mode_t : int32_t;  ///< DRC compression mode
     enum drc_effect_type_t : int32_t;       ///< DRC effect type
     enum drc_album_mode_t : int32_t;        ///< DRC album mode
-    enum drc_output_loudness : int32_t;     ///< DRC output loudness
     enum intra_refresh_mode_t : uint32_t;   ///< intra refresh modes
     enum level_t : uint32_t;                ///< coding level
     enum ordinal_key_t : uint32_t;          ///< work ordering keys
