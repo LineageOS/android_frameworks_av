@@ -44,6 +44,13 @@ status_t DevicesFactoryHalHybrid::getHalPids(std::vector<pid_t> *pids) {
     return INVALID_OPERATION;
 }
 
+status_t DevicesFactoryHalHybrid::setCallbackOnce(sp<DevicesFactoryHalCallback> callback) {
+    if (mHidlFactory) {
+        return mHidlFactory->setCallbackOnce(callback);
+    }
+    return INVALID_OPERATION;
+}
+
 } // namespace CPP_VERSION
 
 extern "C" __attribute__((visibility("default"))) void* createIDevicesFactory() {

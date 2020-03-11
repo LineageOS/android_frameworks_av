@@ -66,6 +66,14 @@ status_t AudioPolicyService::validateUsage(audio_usage_t usage, pid_t pid, uid_t
 
 // ----------------------------------------------------------------------------
 
+void AudioPolicyService::doOnNewAudioModulesAvailable()
+{
+    if (mAudioPolicyManager == NULL) return;
+    Mutex::Autolock _l(mLock);
+    AutoCallerClear acc;
+    mAudioPolicyManager->onNewAudioModulesAvailable();
+}
+
 status_t AudioPolicyService::setDeviceConnectionState(audio_devices_t device,
                                                   audio_policy_dev_state_t state,
                                                   const char *device_address,

@@ -47,6 +47,11 @@ cc_binary {
         "libbinder",
     ],
     required: ["android.hardware.media.c2@1.1-default-seccomp_policy"],
+
+    // The content in manifest_media_c2_V1_1_default.xml can be included
+    // directly in the main device manifest.xml file or via vintf_fragments.
+    // (Remove the line below if the entry is already in the main manifest.)
+    vintf_fragments: ["manifest_media_c2_V1_1_default.xml"],
 }
 
 // seccomp policy file.
