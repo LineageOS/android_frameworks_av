@@ -248,7 +248,8 @@ bool isHDR(const sp<AMessage> &format) {
         transfer = 0;
     }
     return standard == ColorUtils::kColorStandardBT2020 &&
-            transfer == ColorUtils::kColorTransferST2084;
+            (transfer == ColorUtils::kColorTransferST2084 ||
+            transfer == ColorUtils::kColorTransferHLG);
 }
 
 status_t FrameDecoder::init(
