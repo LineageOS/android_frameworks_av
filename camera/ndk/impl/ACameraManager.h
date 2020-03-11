@@ -92,6 +92,12 @@ class CameraManagerGlobal final : public RefBase {
         }
 
         virtual binder::Status onCameraAccessPrioritiesChanged();
+        virtual binder::Status onCameraOpened(const String16&, const String16&) {
+            return binder::Status::ok();
+        }
+        virtual binder::Status onCameraClosed(const String16&) {
+            return binder::Status::ok();
+        }
 
       private:
         const wp<CameraManagerGlobal> mCameraManager;
