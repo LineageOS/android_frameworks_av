@@ -837,6 +837,8 @@ class Camera3Device :
                 /*out*/sp<hardware::camera::device::V3_6::ICameraOfflineSession>* offlineSession,
                 /*out*/camera3::BufferRecords* bufferRecords);
 
+        void clearPreviousRequest();
+
         status_t setRotateAndCropAutoBehavior(
                 camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue);
 
