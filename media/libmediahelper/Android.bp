@@ -2,6 +2,12 @@ cc_library_headers {
     name: "libmedia_helper_headers",
     vendor_available: true,
     export_include_dirs: ["include"],
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
 
 cc_library {
@@ -26,4 +32,10 @@ cc_library {
         "libmedia_helper_headers",
     ],
     clang: true,
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
