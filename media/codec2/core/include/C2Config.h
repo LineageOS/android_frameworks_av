@@ -248,7 +248,7 @@ enum C2ParamIndexKind : C2Param::type_index_t {
 
     kParamIndexSurfaceAllocator, // u32
 
-    // low latency mode for decoders
+    // low latency mode
     kParamIndexLowLatencyMode, // bool
 };
 
@@ -812,9 +812,10 @@ typedef C2PipelineDelayTuning C2ActualPipelineDelayTuning; // deprecated
 constexpr char C2_PARAMKEY_PIPELINE_DELAY[] = "algo.delay";
 
 /**
- * Enable/disable low latency decoding mode.
- * If true, low latency decoding mode is enabled, and the decoder doesn't hold input and output
- * data more than required by the codec standards.
+ * Enable/disable low latency mode.
+ * If true, low latency is preferred over low power. Disable power optimizations that
+ * may result in increased latency. For decoders, this means that the decoder does not
+ * hold input and output data more than required by the codec standards.
  */
 typedef C2GlobalParam<C2Tuning, C2EasyBoolValue, kParamIndexLowLatencyMode>
         C2GlobalLowLatencyModeTuning;
