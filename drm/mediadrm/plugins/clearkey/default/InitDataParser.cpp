@@ -76,10 +76,21 @@ android::status_t InitDataParser::parse(const Vector<uint8_t>& initData,
 
 android::status_t InitDataParser::parsePssh(const Vector<uint8_t>& initData,
         Vector<const uint8_t*>* keyIds) {
+    // Description of PSSH format:
+    // https://w3c.github.io/encrypted-media/format-registry/initdata/cenc.html
     size_t readPosition = 0;
 
-    // Validate size field
     uint32_t expectedSize = initData.size();
+    const char psshIdentifier[4] = {'p', 's', 's', 'h'};
+    const uint8_t psshVersion1[4] = {1, 0, 0, 0};
+    uint32_t keyIdCount = 0;
+    size_t headerSize = sizeof(expectedSize) + sizeof(psshIdentifier) +
+                        sizeof(psshVersion1) + kSystemIdSize + sizeof(keyIdCount);
+    if (initData.size() < headerSize) {
+        return android::ERROR_DRM_CANNOT_HANDLE;
+    }
+
+    // Validate size field
     expectedSize = htonl(expectedSize);
     if (memcmp(&initData[readPosition], &expectedSize,
                sizeof(expectedSize)) != 0) {
@@ -88,7 +99,6 @@ android::status_t InitDataParser::parsePssh(const Vector<uint8_t>& initData,
     readPosition += sizeof(expectedSize);
 
     // Validate PSSH box identifier
-    const char psshIdentifier[4] = {'p', 's', 's', 'h'};
     if (memcmp(&initData[readPosition], psshIdentifier,
                sizeof(psshIdentifier)) != 0) {
         return android::ERROR_DRM_CANNOT_HANDLE;
@@ -96,7 +106,6 @@ android::status_t InitDataParser::parsePssh(const Vector<uint8_t>& initData,
     readPosition += sizeof(psshIdentifier);
 
     // Validate EME version number
-    const uint8_t psshVersion1[4] = {1, 0, 0, 0};
     if (memcmp(&initData[readPosition], psshVersion1,
                sizeof(psshVersion1)) != 0) {
         return android::ERROR_DRM_CANNOT_HANDLE;
@@ -110,12 +119,14 @@ android::status_t InitDataParser::parsePssh(const Vector<uint8_t>& initData,
     readPosition += kSystemIdSize;
 
     // Read key ID count
-    uint32_t keyIdCount;
     memcpy(&keyIdCount, &initData[readPosition], sizeof(keyIdCount));
     keyIdCount = ntohl(keyIdCount);
     readPosition += sizeof(keyIdCount);
-    if (readPosition + ((uint64_t)keyIdCount * kKeyIdSize) !=
-            initData.size() - sizeof(uint32_t)) {
+
+    uint64_t psshSize = 0;
+    if (__builtin_mul_overflow(keyIdCount, kKeyIdSize, &psshSize) ||
+        __builtin_add_overflow(readPosition, psshSize, &psshSize) ||
+        psshSize != initData.size() - sizeof(uint32_t) /* DataSize(0) */) {
         return android::ERROR_DRM_CANNOT_HANDLE;
     }
 
