@@ -15,6 +15,7 @@
  */
 
 #include <map>
+#include <set>
 
 #include <system/audio.h>
 #include <utils/Log.h>
@@ -27,7 +28,10 @@ namespace android {
 class AudioPolicyManagerTestClient : public AudioPolicyTestClient {
 public:
     // AudioPolicyClientInterface implementation
-    audio_module_handle_t loadHwModule(const char * /*name*/) override {
+    audio_module_handle_t loadHwModule(const char* name) override {
+        if (!mAllowedModuleNames.empty() && !mAllowedModuleNames.count(name)) {
+            return AUDIO_MODULE_HANDLE_NONE;
+        }
         return mNextModuleHandle++;
     }
 
@@ -101,11 +105,18 @@ public:
         return &it->second;
     };
 
+    audio_module_handle_t peekNextModuleHandle() const { return mNextModuleHandle; }
+
+    void swapAllowedModuleNames(std::set<std::string>&& names = {}) {
+        mAllowedModuleNames.swap(names);
+    }
+
 private:
     audio_module_handle_t mNextModuleHandle = AUDIO_MODULE_HANDLE_NONE + 1;
     audio_io_handle_t mNextIoHandle = AUDIO_IO_HANDLE_NONE + 1;
     audio_patch_handle_t mNextPatchHandle = AUDIO_PATCH_HANDLE_NONE + 1;
     std::map<audio_patch_handle_t, struct audio_patch> mActivePatches;
+    std::set<std::string> mAllowedModuleNames;
 };
 
 } // namespace android

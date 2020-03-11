@@ -139,8 +139,6 @@ struct MediaCodec : public AHandler {
     // object.
     status_t release();
 
-    status_t releaseAsync();
-
     status_t flush();
 
     status_t queueInputBuffer(
