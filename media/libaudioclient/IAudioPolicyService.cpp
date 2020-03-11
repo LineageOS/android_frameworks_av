@@ -108,7 +108,6 @@ enum {
     SET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
     REMOVE_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
     GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
-    AUDIO_MODULES_UPDATED,  // oneway
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -1337,13 +1336,6 @@ public:
         }
         return static_cast<status_t>(reply.readInt32());
     }
-
-    virtual void onNewAudioModulesAvailable()
-    {
-        Parcel data, reply;
-        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
-        remote()->transact(AUDIO_MODULES_UPDATED, data, &reply, IBinder::FLAG_ONEWAY);
-    }
 };
 
 IMPLEMENT_META_INTERFACE(AudioPolicyService, "android.media.IAudioPolicyService");
@@ -1410,8 +1402,7 @@ status_t BnAudioPolicyService::onTransact(
         case SET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
         case REMOVE_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
         case GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
-        case SET_ALLOWED_CAPTURE_POLICY:
-        case AUDIO_MODULES_UPDATED: {
+        case SET_ALLOWED_CAPTURE_POLICY: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
@@ -2467,12 +2458,6 @@ status_t BnAudioPolicyService::onTransact(
             reply->writeInt32(status);
             return NO_ERROR;
         }
-
-        case AUDIO_MODULES_UPDATED: {
-            CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            onNewAudioModulesAvailable();
-            return NO_ERROR;
-        } break;
 
         default:
             return BBinder::onTransact(code, data, reply, flags);
