@@ -83,4 +83,12 @@ interface ICameraServiceListener
      * can retry after receiving this callback.
      */
     oneway void onCameraAccessPrioritiesChanged();
+
+    /**
+     * Notify registered clients about cameras being opened/closed.
+     * Only clients with android.permission.CAMERA_OPEN_CLOSE_LISTENER permission
+     * will receive such callbacks.
+     */
+    oneway void onCameraOpened(String cameraId, String clientPackageId);
+    oneway void onCameraClosed(String cameraId);
 }
