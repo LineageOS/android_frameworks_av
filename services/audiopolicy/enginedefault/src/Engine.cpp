@@ -41,20 +41,23 @@ namespace audio_policy
 {
 
 struct legacy_strategy_map { const char *name; legacy_strategy id; };
-static const std::vector<legacy_strategy_map> gLegacyStrategy = {
-    { "STRATEGY_NONE", STRATEGY_NONE },
-    { "STRATEGY_MEDIA", STRATEGY_MEDIA },
-    { "STRATEGY_PHONE", STRATEGY_PHONE },
-    { "STRATEGY_SONIFICATION", STRATEGY_SONIFICATION },
-    { "STRATEGY_SONIFICATION_RESPECTFUL", STRATEGY_SONIFICATION_RESPECTFUL },
-    { "STRATEGY_DTMF", STRATEGY_DTMF },
-    { "STRATEGY_ENFORCED_AUDIBLE", STRATEGY_ENFORCED_AUDIBLE },
-    { "STRATEGY_TRANSMITTED_THROUGH_SPEAKER", STRATEGY_TRANSMITTED_THROUGH_SPEAKER },
-    { "STRATEGY_ACCESSIBILITY", STRATEGY_ACCESSIBILITY },
-    { "STRATEGY_REROUTING", STRATEGY_REROUTING },
-    { "STRATEGY_PATCH", STRATEGY_REROUTING }, // boiler to manage stream patch volume
-    { "STRATEGY_CALL_ASSISTANT", STRATEGY_CALL_ASSISTANT },
-};
+static const std::vector<legacy_strategy_map>& getLegacyStrategy() {
+    static const std::vector<legacy_strategy_map> legacyStrategy = {
+        { "STRATEGY_NONE", STRATEGY_NONE },
+        { "STRATEGY_MEDIA", STRATEGY_MEDIA },
+        { "STRATEGY_PHONE", STRATEGY_PHONE },
+        { "STRATEGY_SONIFICATION", STRATEGY_SONIFICATION },
+        { "STRATEGY_SONIFICATION_RESPECTFUL", STRATEGY_SONIFICATION_RESPECTFUL },
+        { "STRATEGY_DTMF", STRATEGY_DTMF },
+        { "STRATEGY_ENFORCED_AUDIBLE", STRATEGY_ENFORCED_AUDIBLE },
+        { "STRATEGY_TRANSMITTED_THROUGH_SPEAKER", STRATEGY_TRANSMITTED_THROUGH_SPEAKER },
+        { "STRATEGY_ACCESSIBILITY", STRATEGY_ACCESSIBILITY },
+        { "STRATEGY_REROUTING", STRATEGY_REROUTING },
+        { "STRATEGY_PATCH", STRATEGY_REROUTING }, // boiler to manage stream patch volume
+        { "STRATEGY_CALL_ASSISTANT", STRATEGY_CALL_ASSISTANT },
+    };
+    return legacyStrategy;
+}
 
 Engine::Engine()
 {
@@ -63,7 +66,8 @@ Engine::Engine()
              "Policy Engine configuration is partially invalid, skipped %zu elements",
              result.nbSkippedElement);
 
-    for (const auto &strategy : gLegacyStrategy) {
+    auto legacyStrategy = getLegacyStrategy();
+    for (const auto &strategy : legacyStrategy) {
         mLegacyStrategyMap[getProductStrategyByName(strategy.name)] = strategy.id;
     }
 }
