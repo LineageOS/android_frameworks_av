@@ -3148,11 +3148,17 @@ status_t MPEG4Writer::Track::threadEntry() {
             if (buffer->meta_data().findInt32(kKeyIsEndOfStream, &isEOS) && isEOS) {
                 int64_t eosSampleTimestampUs = -1;
                 CHECK(buffer->meta_data().findInt64(kKeyTime, &eosSampleTimestampUs));
-                ALOGV("eosSampleTimestampUs:%" PRId64, eosSampleTimestampUs);
-                lastSampleDurationUs = eosSampleTimestampUs - previousSampleTimestampWithoutFudgeUs
-                                       - previousPausedDurationUs;
-                CHECK(lastSampleDurationUs >= 0);
-                lastSampleDurationTicks = (lastSampleDurationUs * mTimeScale + 500000LL)/1000000LL;
+                if (eosSampleTimestampUs > 0) {
+                    lastSampleDurationUs = eosSampleTimestampUs -
+                                           previousSampleTimestampWithoutFudgeUs -
+                                           previousPausedDurationUs;
+                    if (lastSampleDurationUs >= 0) {
+                        lastSampleDurationTicks = (lastSampleDurationUs * mTimeScale + 500000LL) /
+                                                  1000000LL;
+                    } else {
+                        ALOGW("lastSampleDurationUs %" PRId64 " is negative", lastSampleDurationUs);
+                    }
+                }
                 buffer->release();
                 buffer = nullptr;
                 mSource->stop();
