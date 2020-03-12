@@ -70,7 +70,8 @@ ARTPWriter::ARTPWriter(int fd)
     : mFlags(0),
       mFd(dup(fd)),
       mLooper(new ALooper),
-      mReflector(new AHandlerReflector<ARTPWriter>(this)) {
+      mReflector(new AHandlerReflector<ARTPWriter>(this)),
+      mTrafficRec(new TrafficRecorder<uint32_t, size_t>(128)) {
     CHECK_GE(fd, 0);
     mIsIPv6 = false;
 
@@ -120,7 +121,8 @@ ARTPWriter::ARTPWriter(int fd, String8& localIp, int localPort, String8& remoteI
     : mFlags(0),
       mFd(dup(fd)),
       mLooper(new ALooper),
-      mReflector(new AHandlerReflector<ARTPWriter>(this)) {
+      mReflector(new AHandlerReflector<ARTPWriter>(this)),
+      mTrafficRec(new TrafficRecorder<uint32_t, size_t>(128)) {
     CHECK_GE(fd, 0);
     mIsIPv6 = false;
 
@@ -573,6 +575,10 @@ void ARTPWriter::send(const sp<ABuffer> &buffer, bool isRTCP) {
 
     if (n != (ssize_t)buffer->size()) {
         ALOGW("packets can not be sent. ret=%d, buf=%d", (int)n, (int)buffer->size());
+    } else {
+        // Record current traffic & Print bits while last 1sec (1000ms)
+        mTrafficRec->writeBytes(buffer->size());
+        mTrafficRec->printAccuBitsForLastPeriod(1000, 1000);
     }
 
 #if LOG_TO_FILES
@@ -1073,6 +1079,7 @@ void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
         isSpsPps = true;
     }
 
+    mTrafficRec->updateClock(ALooper::GetNowUs() / 1000);
     sp<ABuffer> buffer = new ABuffer(kMaxPacketSize);
     if (mediaBuf->range_length() + TCPIP_HEADER_SIZE + RTP_HEADER_SIZE + RTP_HEADER_EXT_SIZE
             + RTP_PAYLOAD_ROOM_SIZE <= buffer->capacity()) {
