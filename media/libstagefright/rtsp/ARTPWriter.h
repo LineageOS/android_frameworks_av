@@ -28,6 +28,7 @@
 #include <sys/socket.h>
 
 #include <android/multinetwork.h>
+#include "TrafficRecorder.h"
 
 #define LOG_TO_FILES    0
 
@@ -117,6 +118,7 @@ private:
 
     uint32_t mOpponentID;
     uint32_t mBitrate;
+    sp<TrafficRecorder<uint32_t, size_t> > mTrafficRec;
 
     int32_t mNumSRsSent;
     int32_t mRTPCVOExtMap;
