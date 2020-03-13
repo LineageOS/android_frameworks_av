@@ -33,7 +33,10 @@
 
 namespace android {
 
-DeviceTypeSet APM_AUDIO_OUT_DEVICE_REMOTE_ALL = {AUDIO_DEVICE_OUT_REMOTE_SUBMIX};
+static const DeviceTypeSet& getAllOutRemoteDevices() {
+    static const DeviceTypeSet allOutRemoteDevices = {AUDIO_DEVICE_OUT_REMOTE_SUBMIX};
+    return allOutRemoteDevices;
+}
 
 AudioOutputDescriptor::AudioOutputDescriptor(const sp<PolicyAudioPort>& policyAudioPort,
                                              AudioPolicyClientInterface *clientInterface)
@@ -681,7 +684,7 @@ bool SwAudioOutputCollection::isActiveLocally(VolumeSource volumeSource, uint32_
         const sp<SwAudioOutputDescriptor> outputDesc = this->valueAt(i);
         if (outputDesc->isActive(volumeSource, inPastMs, sysTime)
                 && (!(outputDesc->devices()
-                        .containsDeviceAmongTypes(APM_AUDIO_OUT_DEVICE_REMOTE_ALL)))) {
+                        .containsDeviceAmongTypes(getAllOutRemoteDevices())))) {
             return true;
         }
     }
@@ -693,7 +696,7 @@ bool SwAudioOutputCollection::isActiveRemotely(VolumeSource volumeSource, uint32
     nsecs_t sysTime = systemTime();
     for (size_t i = 0; i < size(); i++) {
         const sp<SwAudioOutputDescriptor> outputDesc = valueAt(i);
-        if (outputDesc->devices().containsDeviceAmongTypes(APM_AUDIO_OUT_DEVICE_REMOTE_ALL) &&
+        if (outputDesc->devices().containsDeviceAmongTypes(getAllOutRemoteDevices()) &&
                 outputDesc->isActive(volumeSource, inPastMs, sysTime)) {
             // do not consider re routing (when the output is going to a dynamic policy)
             // as "remote playback"
