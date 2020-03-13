@@ -13,6 +13,9 @@ cc_library {
         "libsonivox",
         "libstagefright_foundation",
         "libwatchdog",
+    ],
+
+    shared_libs: [
         "libbase",
-    ]
+    ],
 }
