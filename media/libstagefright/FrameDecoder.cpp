@@ -19,6 +19,7 @@
 
 #include "include/FrameDecoder.h"
 #include "include/FrameCaptureLayer.h"
+#include "include/HevcUtils.h"
 #include <binder/MemoryBase.h>
 #include <binder/MemoryHeapBase.h>
 #include <gui/Surface.h>
@@ -456,7 +457,8 @@ VideoFrameDecoder::VideoFrameDecoder(
         const sp<IMediaSource> &source)
     : FrameDecoder(componentName, trackMeta, source),
       mFrame(NULL),
-      mIsAvcOrHevc(false),
+      mIsAvc(false),
+      mIsHevc(false),
       mSeekMode(MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC),
       mTargetTimeUs(-1LL),
       mDefaultSampleDurationUs(0) {
@@ -479,8 +481,8 @@ sp<AMessage> VideoFrameDecoder::onGetFormatAndSeekOptions(
         return NULL;
     }
 
-    mIsAvcOrHevc = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)
-            || !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC);
+    mIsAvc = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC);
+    mIsHevc = !strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC);
 
     if (frameTimeUs < 0) {
         int64_t thumbNailTime = -1ll;
@@ -543,8 +545,10 @@ status_t VideoFrameDecoder::onInputReceived(
         ALOGV("Seeking closest: targetTimeUs=%lld", (long long)mTargetTimeUs);
     }
 
-    if (mIsAvcOrHevc && !isSeekingClosest
-            && IsIDR(codecBuffer->data(), codecBuffer->size())) {
+    if (!isSeekingClosest
+            && ((mIsAvc && IsIDR(codecBuffer->data(), codecBuffer->size()))
+            || (mIsHevc && IsIDR(
+            codecBuffer->data(), codecBuffer->size())))) {
         // Only need to decode one IDR frame, unless we're seeking with CLOSEST
         // option, in which case we need to actually decode to targetTimeUs.
         *flags |= MediaCodec::BUFFER_FLAG_EOS;

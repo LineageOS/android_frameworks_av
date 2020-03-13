@@ -135,7 +135,8 @@ protected:
 private:
     sp<FrameCaptureLayer> mCaptureLayer;
     VideoFrame *mFrame;
-    bool mIsAvcOrHevc;
+    bool mIsAvc;
+    bool mIsHevc;
     MediaSource::ReadOptions::SeekMode mSeekMode;
     int64_t mTargetTimeUs;
     List<int64_t> mSampleDurations;
