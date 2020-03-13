@@ -735,9 +735,8 @@ ACameraManager::openCamera(
 
     if (!serviceRet.isOk() || status != Status::NO_ERROR) {
         ALOGE("%s: connect camera device failed", __FUNCTION__);
-        // TODO: Convert serviceRet to camera_status_t
         delete device;
-        return ACAMERA_ERROR_UNKNOWN;
+        return utils::convertFromHidl(status);
     }
     if (deviceRemote == nullptr) {
         ALOGE("%s: connect camera device failed! remote device is null", __FUNCTION__);
