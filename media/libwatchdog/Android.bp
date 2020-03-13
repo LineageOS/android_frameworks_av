@@ -19,10 +19,8 @@ cc_library {
     ],
     export_include_dirs: ["include"],
     shared_libs: [
-        "liblog",
-    ],
-    static_libs: [
         "libbase",
+        "liblog",
     ],
     target: {
         windows: {
