@@ -95,6 +95,10 @@ cc_defaults {
     name: "libcodec2-internal-defaults",
     defaults: ["libcodec2-impl-defaults"],
 
+    header_libs: [
+        "libcodec2_internal",
+    ],
+
     shared_libs: [
         "libcutils", // for properties
     ],
