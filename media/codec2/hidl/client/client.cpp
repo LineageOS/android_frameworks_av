@@ -678,8 +678,13 @@ c2_status_t Codec2Client::createComponent(
                    << ") -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     } else if (status != C2_OK) {
-        LOG(ERROR) << "createComponent(" << name.c_str()
-                   << ") -- call failed: " << status << ".";
+        if (status == C2_NOT_FOUND) {
+            LOG(VERBOSE) << "createComponent(" << name.c_str()
+                         << ") -- component not found.";
+        } else {
+            LOG(ERROR) << "createComponent(" << name.c_str()
+                       << ") -- call failed: " << status << ".";
+        }
         return status;
     } else if (!*component) {
         LOG(ERROR) << "createComponent(" << name.c_str()
@@ -718,8 +723,13 @@ c2_status_t Codec2Client::createInterface(
                    << ") -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     } else if (status != C2_OK) {
-        LOG(ERROR) << "createComponent(" << name.c_str()
-                   << ") -- call failed: " << status << ".";
+        if (status == C2_NOT_FOUND) {
+            LOG(VERBOSE) << "createInterface(" << name.c_str()
+                         << ") -- component not found.";
+        } else {
+            LOG(ERROR) << "createInterface(" << name.c_str()
+                       << ") -- call failed: " << status << ".";
+        }
         return status;
     }
 
@@ -946,11 +956,11 @@ std::vector<std::shared_ptr<Codec2Client>> Codec2Client::
 
 std::shared_ptr<Codec2Client> Codec2Client::_CreateFromIndex(size_t index) {
     std::string const& name = GetServiceNames()[index];
-    LOG(INFO) << "Creating a Codec2 client to service \"" << name << "\"";
+    LOG(VERBOSE) << "Creating a Codec2 client to service \"" << name << "\"";
     sp<Base> baseStore = Base::getService(name);
     CHECK(baseStore) << "Codec2 service \"" << name << "\""
                         " inaccessible for unknown reasons.";
-    LOG(INFO) << "Client to Codec2 service \"" << name << "\" created";
+    LOG(VERBOSE) << "Client to Codec2 service \"" << name << "\" created";
     return std::make_shared<Codec2Client>(baseStore, index);
 }
 
