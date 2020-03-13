@@ -2,6 +2,12 @@ cc_library_headers {
     name: "libstagefright_headers",
     export_include_dirs: ["include"],
     vendor_available: true,
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
 
 cc_library_static {
