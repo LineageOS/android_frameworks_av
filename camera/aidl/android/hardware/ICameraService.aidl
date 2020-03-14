@@ -119,7 +119,7 @@ interface ICameraService
      * Get a list of combinations of camera ids which support concurrent streaming.
      *
      */
-    ConcurrentCameraIdCombination[] getConcurrentStreamingCameraIds();
+    ConcurrentCameraIdCombination[] getConcurrentCameraIds();
 
     /**
       * Check whether a particular set of session configurations are concurrently supported by the
@@ -129,7 +129,7 @@ interface ICameraService
       * @return true  - the set of concurrent camera id and stream combinations is supported.
       *         false - the set of concurrent camera id and stream combinations is not supported
       *                 OR the method was called with a set of camera ids not returned by
-      *                 getConcurrentMultiStreamingCameraIds().
+      *                 getConcurrentCameraIds().
       */
     boolean isConcurrentSessionConfigurationSupported(
             in CameraIdAndSessionConfiguration[] sessions);
