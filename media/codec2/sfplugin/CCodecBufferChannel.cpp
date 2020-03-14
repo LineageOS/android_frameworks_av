@@ -604,7 +604,12 @@ status_t CCodecBufferChannel::queueSecureInputBuffer(
 
     ssize_t result = -1;
     ssize_t codecDataOffset = 0;
-    if (mCrypto != nullptr) {
+    if (numSubSamples == 1
+            && subSamples[0].mNumBytesOfClearData == 0
+            && subSamples[0].mNumBytesOfEncryptedData == 0) {
+        // We don't need to go through crypto or descrambler if the input is empty.
+        result = 0;
+    } else if (mCrypto != nullptr) {
         hardware::drm::V1_0::DestinationBuffer destination;
         if (secure) {
             destination.type = DrmBufferType::NATIVE_HANDLE;
@@ -620,6 +625,7 @@ status_t CCodecBufferChannel::queueSecureInputBuffer(
                 key, iv, mode, pattern, source, buffer->offset(),
                 subSamples, numSubSamples, destination, errorDetailMsg);
         if (result < 0) {
+            ALOGI("[%s] decrypt failed: result=%zd", mName, result);
             return result;
         }
         if (destination.type == DrmBufferType::SHARED_MEMORY) {
