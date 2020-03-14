@@ -19,6 +19,7 @@
 
 #include <ctype.h>
 #include <inttypes.h>
+#include <algorithm>
 #include <memory>
 #include <stdint.h>
 #include <stdlib.h>
@@ -149,9 +150,13 @@ private:
     bool mIsAudio;
     sp<ItemTable> mItemTable;
 
-    // Start offset from composition time to presentation time.
-    // Support shift only for video tracks through mElstShiftStartTicks for now.
+    /* Shift start offset (move to earlier time) when media_time > 0,
+     * in media time scale.
+     */
     uint64_t mElstShiftStartTicks;
+    /* Initial start offset (move to later time), empty edit list entry
+     * in media time scale.
+     */
     uint64_t mElstInitialEmptyEditTicks;
 
     size_t parseNALSize(const uint8_t *data) const;
@@ -1215,7 +1220,6 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 off64_t entriesoffset = data_offset + 8;
                 uint64_t segment_duration;
                 int64_t media_time;
-                uint64_t empty_edit_ticks = 0;
                 bool empty_edit_present = false;
                 for (int i = 0; i < entry_count; ++i) {
                     switch (version) {
@@ -1247,45 +1251,37 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     }
                     // Empty edit entry would have to be first entry.
                     if (media_time == -1 && i == 0) {
-                        int64_t durationUs;
-                        if (AMediaFormat_getInt64(mFileMetaData, AMEDIAFORMAT_KEY_DURATION,
-                                                  &durationUs)) {
-                            empty_edit_ticks = segment_duration;
-                            ALOGV("initial empty edit ticks: %" PRIu64, empty_edit_ticks);
-                            empty_edit_present = true;
-                        }
-                    }
-                    // Process second entry only when the first entry was an empty edit entry.
-                    if (empty_edit_present && i == 1) {
-                        int64_t durationUs;
-                        if (AMediaFormat_getInt64(mLastTrack->meta, AMEDIAFORMAT_KEY_DURATION,
-                                                  &durationUs) &&
-                            mHeaderTimescale != 0) {
-                            // Support only segment_duration<=track_duration and media_time==0 case.
-                            uint64_t segmentDurationUs =
-                                    segment_duration * 1000000 / mHeaderTimescale;
-                            if (segmentDurationUs == 0 || segmentDurationUs > durationUs ||
-                                media_time != 0) {
-                                ALOGW("for now, unsupported second entry in empty edit list");
-                            }
-                        }
+                        empty_edit_present = true;
+                        ALOGV("initial empty edit ticks: %" PRIu64, segment_duration);
+                        /* In movie header timescale, and needs to be converted to media timescale
+                         * after we get that from a track's 'mdhd' atom,
+                         * which at times come after 'elst'.
+                         */
+                        mLastTrack->elst_initial_empty_edit_ticks = segment_duration;
+                    } else if (media_time >= 0 && i == 0) {
+                        ALOGV("first edit list entry");
+                        mLastTrack->elst_media_time = media_time;
+                        mLastTrack->elst_segment_duration = segment_duration;
+                        ALOGV("segment_duration: %" PRIu64 " media_time: %" PRId64,
+                              segment_duration, media_time);
+                        // media_time is in media timescale as are STTS/CTTS entries.
+                        mLastTrack->elst_shift_start_ticks = media_time;
+                    } else if (empty_edit_present && i == 1) {
+                        // Process second entry only when the first entry was an empty edit entry.
+                        ALOGV("second edit list entry");
+                        mLastTrack->elst_media_time = media_time;
+                        mLastTrack->elst_segment_duration = segment_duration;
+                        ALOGV("segment_duration: %" PRIu64 " media_time: %" PRId64,
+                              segment_duration, media_time);
+                        mLastTrack->elst_shift_start_ticks = media_time;
+                    } else {
+                        ALOGW("for now, unsupported entry in edit list %" PRIu32, entry_count);
                     }
                 }
                 // save these for later, because the elst atom might precede
                 // the atoms that actually gives us the duration and sample rate
                 // needed to calculate the padding and delay values
                 mLastTrack->elst_needs_processing = true;
-                if (empty_edit_present) {
-                    /* In movie header timescale, and needs to be converted to media timescale once
-                     * we get that from a track's 'mdhd' atom, which at times come after 'elst'.
-                     */
-                    mLastTrack->elst_initial_empty_edit_ticks = empty_edit_ticks;
-                } else {
-                    mLastTrack->elst_media_time = media_time;
-                    mLastTrack->elst_segment_duration = segment_duration;
-                    ALOGV("segment_duration: %" PRIu64 " media_time: %" PRId64, segment_duration,
-                          media_time);
-                }
             }
             break;
         }
@@ -4324,9 +4320,9 @@ MediaTrackHelper *MPEG4Extractor::getTrack(size_t index) {
         }
     }
 
-    // media_time is in media timescale as are STTS/CTTS entries.
-    track->elst_shift_start_ticks = track->elst_media_time;
     ALOGV("track->elst_shift_start_ticks :%" PRIu64, track->elst_shift_start_ticks);
+
+    uint64_t elst_initial_empty_edit_ticks = 0;
     if (mHeaderTimescale != 0) {
         // Convert empty_edit_ticks from movie timescale to media timescale.
         uint64_t elst_initial_empty_edit_ticks_mul = 0, elst_initial_empty_edit_ticks_add = 0;
@@ -4337,15 +4333,15 @@ MediaTrackHelper *MPEG4Extractor::getTrack(size_t index) {
             ALOGE("track->elst_initial_empty_edit_ticks overflow");
             return nullptr;
         }
-        track->elst_initial_empty_edit_ticks = elst_initial_empty_edit_ticks_add / mHeaderTimescale;
-        ALOGV("track->elst_initial_empty_edit_ticks :%" PRIu64,
-              track->elst_initial_empty_edit_ticks);
+        elst_initial_empty_edit_ticks = elst_initial_empty_edit_ticks_add / mHeaderTimescale;
     }
+    ALOGV("elst_initial_empty_edit_ticks in MediaTimeScale :%" PRIu64,
+          elst_initial_empty_edit_ticks);
 
     MPEG4Source* source =
             new MPEG4Source(track->meta, mDataSource, track->timescale, track->sampleTable,
                             mSidxEntries, trex, mMoofOffset, itemTable,
-                            track->elst_shift_start_ticks, track->elst_initial_empty_edit_ticks);
+                            track->elst_shift_start_ticks, elst_initial_empty_edit_ticks);
     if (source->init() != OK) {
         delete source;
         return NULL;
@@ -5885,9 +5881,22 @@ media_status_t MPEG4Source::read(
                     break;
             }
             if( mode != ReadOptions::SEEK_FRAME_INDEX) {
-                seekTimeUs += ((long double)mElstShiftStartTicks * 1000000) / mTimescale;
-                ALOGV("shifted seekTimeUs :%" PRId64 ", mElstShiftStartTicks:%" PRIu64, seekTimeUs,
-                      mElstShiftStartTicks);
+                int64_t elstInitialEmptyEditUs = 0, elstShiftStartUs = 0;
+                if (mElstInitialEmptyEditTicks > 0) {
+                    elstInitialEmptyEditUs = ((long double)mElstInitialEmptyEditTicks * 1000000) /
+                                             mTimescale;
+                    /* Sample's composition time from ctts/stts entries are non-negative(>=0).
+                     * Hence, lower bound on seekTimeUs is 0.
+                     */
+                    seekTimeUs = std::max(seekTimeUs - elstInitialEmptyEditUs, (int64_t)0);
+                }
+                if (mElstShiftStartTicks > 0) {
+                    elstShiftStartUs = ((long double)mElstShiftStartTicks * 1000000) / mTimescale;
+                    seekTimeUs += elstShiftStartUs;
+                }
+                ALOGV("shifted seekTimeUs:%" PRId64 ", elstInitialEmptyEditUs:%" PRIu64
+                      ", elstShiftStartUs:%" PRIu64, seekTimeUs, elstInitialEmptyEditUs,
+                      elstShiftStartUs);
             }
 
             uint32_t sampleIndex;
@@ -5933,7 +5942,12 @@ media_status_t MPEG4Source::read(
 
             if (mode == ReadOptions::SEEK_CLOSEST
                 || mode == ReadOptions::SEEK_FRAME_INDEX) {
-                sampleTime -= mElstShiftStartTicks;
+                if (mElstInitialEmptyEditTicks > 0) {
+                    sampleTime += mElstInitialEmptyEditTicks;
+                }
+                if (mElstShiftStartTicks > 0){
+                    sampleTime -= mElstShiftStartTicks;
+                }
                 targetSampleTimeUs = (sampleTime * 1000000ll) / mTimescale;
             }
 
@@ -5976,12 +5990,12 @@ media_status_t MPEG4Source::read(
             if(err == OK) {
                 if (mElstInitialEmptyEditTicks > 0) {
                     cts += mElstInitialEmptyEditTicks;
-                } else {
+                }
+                if (mElstShiftStartTicks > 0) {
                     // cts can be negative. for example, initial audio samples for gapless playback.
                     cts -= (int64_t)mElstShiftStartTicks;
                 }
             }
-
         } else {
             err = mItemTable->getImageOffsetAndSize(
                     options && options->getSeekTo(&seekTimeUs, &mode) ?
@@ -6261,10 +6275,22 @@ media_status_t MPEG4Source::fragmentedRead(
     int64_t seekTimeUs;
     ReadOptions::SeekMode mode;
     if (options && options->getSeekTo(&seekTimeUs, &mode)) {
-
-        seekTimeUs += ((long double)mElstShiftStartTicks * 1000000) / mTimescale;
-        ALOGV("shifted seekTimeUs :%" PRId64 ", mElstShiftStartTicks:%" PRIu64, seekTimeUs,
-              mElstShiftStartTicks);
+        int64_t elstInitialEmptyEditUs = 0, elstShiftStartUs = 0;
+        if (mElstInitialEmptyEditTicks > 0) {
+            elstInitialEmptyEditUs = ((long double)mElstInitialEmptyEditTicks * 1000000) /
+                                     mTimescale;
+            /* Sample's composition time from ctts/stts entries are non-negative(>=0).
+             * Hence, lower bound on seekTimeUs is 0.
+             */
+            seekTimeUs = std::max(seekTimeUs - elstInitialEmptyEditUs, (int64_t)0);
+        }
+        if (mElstShiftStartTicks > 0){
+            elstShiftStartUs = ((long double)mElstShiftStartTicks * 1000000) / mTimescale;
+            seekTimeUs += elstShiftStartUs;
+        }
+        ALOGV("shifted seekTimeUs:%" PRId64 ", elstInitialEmptyEditUs:%" PRIu64
+              ", elstShiftStartUs:%" PRIu64, seekTimeUs, elstInitialEmptyEditUs,
+              elstShiftStartUs);
 
         int numSidxEntries = mSegments.size();
         if (numSidxEntries != 0) {
@@ -6355,7 +6381,8 @@ media_status_t MPEG4Source::fragmentedRead(
 
         if (mElstInitialEmptyEditTicks > 0) {
             cts += mElstInitialEmptyEditTicks;
-        } else {
+        }
+        if (mElstShiftStartTicks > 0) {
             // cts can be negative. for example, initial audio samples for gapless playback.
             cts -= (int64_t)mElstShiftStartTicks;
         }
