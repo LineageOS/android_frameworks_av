@@ -30,6 +30,10 @@
 namespace android {
 
 enum {
+    kHevcNalUnitTypeCodedSliceIdr = 19,
+    kHevcNalUnitTypeCodedSliceIdrNoLP = 20,
+    kHevcNalUnitTypeCodedSliceCra = 21,
+
     kHevcNalUnitTypeVps = 32,
     kHevcNalUnitTypeSps = 33,
     kHevcNalUnitTypePps = 34,
@@ -92,6 +96,7 @@ public:
     status_t makeHvcc(uint8_t *hvcc, size_t *hvccSize, size_t nalSizeLength);
 
     Info getInfo() const { return mInfo; }
+    static bool IsHevcIDR(const uint8_t *data, size_t size);
 
 private:
     status_t parseVps(const uint8_t* data, size_t size);
