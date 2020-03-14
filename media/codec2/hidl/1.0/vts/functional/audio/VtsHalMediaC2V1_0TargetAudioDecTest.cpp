@@ -71,7 +71,8 @@ class Codec2AudioDecHidlTest : public ::testing::VtsHalHidlTargetTestBase {
         mDisableTest = false;
         ALOGV("Codec2AudioDecHidlTest SetUp");
         mClient = android::Codec2Client::CreateFromService(
-            gEnv->getInstance().c_str());
+            gEnv->getInstance().c_str(),
+            !bool(android::Codec2Client::CreateFromService("default", true)));
         ASSERT_NE(mClient, nullptr);
         mListener.reset(new CodecListener(
             [this](std::list<std::unique_ptr<C2Work>>& workItems) {
