@@ -2049,7 +2049,7 @@ Status CameraService::notifyDeviceStateChange(int64_t newState) {
     return Status::ok();
 }
 
- Status CameraService::getConcurrentStreamingCameraIds(
+ Status CameraService::getConcurrentCameraIds(
         std::vector<ConcurrentCameraIdCombination>* concurrentCameraIds) {
     ATRACE_CALL();
     if (!concurrentCameraIds) {
@@ -2065,7 +2065,7 @@ Status CameraService::notifyDeviceStateChange(int64_t newState) {
     // First call into the provider and get the set of concurrent camera
     // combinations
     std::vector<std::unordered_set<std::string>> concurrentCameraCombinations =
-            mCameraProviderManager->getConcurrentStreamingCameraIds();
+            mCameraProviderManager->getConcurrentCameraIds();
     for (auto &combination : concurrentCameraCombinations) {
         std::vector<std::string> validCombination;
         for (auto &cameraId : combination) {
