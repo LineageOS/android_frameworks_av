@@ -1,0 +1,32 @@
+cc_library_shared {
+    name: "libaudiopolicymanager",
+
+    srcs: [
+        "AudioPolicyFactory.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/services/audioflinger"
+    ],
+
+    shared_libs: [
+        "libaudiopolicymanagerdefault",
+    ],
+
+    static_libs: [
+        "libaudiopolicycomponents",
+    ],
+
+    header_libs: [
+        "libaudiopolicycommon",
+        "libaudiopolicyengine_interface_headers",
+        "libaudiopolicymanager_interface_headers",
+        "libaudioutils_headers",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+}
