@@ -152,7 +152,7 @@ public:
     virtual binder::Status    removeListener(
             const sp<hardware::ICameraServiceListener>& listener);
 
-    virtual binder::Status getConcurrentStreamingCameraIds(
+    virtual binder::Status getConcurrentCameraIds(
         /*out*/
         std::vector<hardware::camera2::utils::ConcurrentCameraIdCombination>* concurrentCameraIds);
 
