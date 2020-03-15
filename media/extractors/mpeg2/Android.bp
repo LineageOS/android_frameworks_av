@@ -10,6 +10,7 @@ cc_library {
     ],
 
     shared_libs: [
+        "libbase",
         "libcgrouprc#29",
         "libvndksupport#29",
     ],
@@ -28,7 +29,6 @@ cc_library {
         "android.hidl.memory@1.0",
         "android.hidl.token@1.0",
         "android.hidl.token@1.0-utils",
-        "libbase",
         "libcutils",
         "libhidlbase",
         "libhidlmemory",
