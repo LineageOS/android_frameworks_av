@@ -3000,6 +3000,9 @@ void Camera3Device::sendCaptureResult(CameraMetadata &pendingMetadata,
                 frameNumber);
         return;
     }
+
+    nsecs_t sensorTimestamp = timestamp.data.i64[0];
+
     for (auto& physicalMetadata : captureResult.mPhysicalMetadatas) {
         camera_metadata_entry timestamp =
                 physicalMetadata.mPhysicalCameraMetadata.find(ANDROID_SENSOR_TIMESTAMP);
@@ -3019,7 +3022,7 @@ void Camera3Device::sendCaptureResult(CameraMetadata &pendingMetadata,
     }
 
     mTagMonitor.monitorMetadata(TagMonitor::RESULT,
-            frameNumber, timestamp.data.i64[0], captureResult.mMetadata);
+            frameNumber, sensorTimestamp, captureResult.mMetadata);
 
     insertResultLocked(&captureResult, frameNumber);
 }
