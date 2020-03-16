@@ -17,6 +17,7 @@
 #ifndef AAUDIO_FIXED_BLOCK_ADAPTER_H
 #define AAUDIO_FIXED_BLOCK_ADAPTER_H
 
+#include <memory>
 #include <stdio.h>
 
 /**
@@ -37,7 +38,7 @@ public:
     FixedBlockAdapter(FixedBlockProcessor &fixedBlockProcessor)
     : mFixedBlockProcessor(fixedBlockProcessor) {}
 
-    virtual ~FixedBlockAdapter();
+    virtual ~FixedBlockAdapter() = default;
 
     /**
      * Allocate internal resources needed for buffering data.
@@ -63,7 +64,7 @@ public:
 
 protected:
     FixedBlockProcessor  &mFixedBlockProcessor;
-    uint8_t              *mStorage = nullptr;    // Store data here while assembling buffers.
+    std::unique_ptr<uint8_t[]> mStorage;         // Store data here while assembling buffers.
     int32_t               mSize = 0;             // Size in bytes of the fixed size buffer.
     int32_t               mPosition = 0;         // Offset of the last byte read or written.
 };
