@@ -139,12 +139,20 @@ ACameraMetadata::filterDurations(uint32_t tag) {
     const int STREAM_WIDTH_OFFSET = 1;
     const int STREAM_HEIGHT_OFFSET = 2;
     const int STREAM_DURATION_OFFSET = 3;
+
     camera_metadata_entry entry = mData->find(tag);
-    if (entry.count == 0 || entry.count % 4 || entry.type != TYPE_INT64) {
+
+    if (entry.count == 0) {
+        // Duration keys can be missing when corresponding capture feature is not supported
+        return;
+    }
+
+    if (entry.count % 4 || entry.type != TYPE_INT64) {
         ALOGE("%s: malformed duration key %d! count %zu, type %d",
                 __FUNCTION__, tag, entry.count, entry.type);
         return;
     }
+
     Vector<int64_t> filteredDurations;
     filteredDurations.setCapacity(entry.count * 2);
 
