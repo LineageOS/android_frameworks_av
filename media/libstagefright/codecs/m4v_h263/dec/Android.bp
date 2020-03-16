@@ -38,11 +38,6 @@ cc_library_static {
         "src/zigzag_tab.cpp",
     ],
 
-    header_libs: [
-        "media_plugin_headers",
-        "libstagefright_headers"
-    ],
-
     local_include_dirs: ["src"],
     export_include_dirs: ["include"],
 
