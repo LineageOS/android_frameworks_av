@@ -22,12 +22,16 @@
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
 
+#include <android-base/properties.h>
+
 #include <stdint.h>
 
 namespace android {
 
 ARTPAssembler::ARTPAssembler()
-    : mShowQueueCnt(0), mFirstFailureTimeUs(-1) {
+    : mShowQueueCnt(0),
+      mFirstFailureTimeUs(-1) {
+    mShowQueue = android::base::GetBoolProperty("debug.stagefright.rtp", false);
 }
 
 void ARTPAssembler::onPacketReceived(const sp<ARTPSource> &source) {

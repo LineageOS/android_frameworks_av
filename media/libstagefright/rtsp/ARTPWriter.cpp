@@ -147,6 +147,16 @@ ARTPWriter::ARTPWriter(int fd, String8& localIp, int localPort, String8& remoteI
 }
 
 ARTPWriter::~ARTPWriter() {
+    if (mSPSBuf != NULL) {
+        mSPSBuf->release();
+        mSPSBuf = NULL;
+    }
+
+    if (mPPSBuf != NULL) {
+        mPPSBuf->release();
+        mPPSBuf = NULL;
+    }
+
 #if LOG_TO_FILES
     close(mRTCPFd);
     mRTCPFd = -1;
@@ -163,16 +173,6 @@ ARTPWriter::~ARTPWriter() {
 
     close(mFd);
     mFd = -1;
-
-    if(mSPSBuf != NULL) {
-        mSPSBuf->release();
-        mSPSBuf = NULL;
-    }
-
-    if(mPPSBuf != NULL) {
-        mPPSBuf->release();
-        mPPSBuf = NULL;
-    }
 }
 
 status_t ARTPWriter::addSource(const sp<MediaSource> &source) {
@@ -212,27 +212,27 @@ status_t ARTPWriter::start(MetaData * params) {
     CHECK(mSource->getFormat()->findCString(kKeyMIMEType, &mime));
 
     int32_t selfID = 0;
-    if(params->findInt32(kKeySelfID, &selfID))
+    if (params->findInt32(kKeySelfID, &selfID))
         mSourceID = selfID;
 
     int32_t payloadType = 0;
-    if(params->findInt32(kKeyPayloadType, &payloadType))
+    if (params->findInt32(kKeyPayloadType, &payloadType))
         mPayloadType = payloadType;
 
     int32_t rtpExtMap = 0;
-    if(params->findInt32(kKeyRtpExtMap, &rtpExtMap))
+    if (params->findInt32(kKeyRtpExtMap, &rtpExtMap))
         mRTPCVOExtMap = rtpExtMap;
 
     int32_t rtpCVODegrees = 0;
-    if(params->findInt32(kKeyRtpCvoDegrees, &rtpCVODegrees))
+    if (params->findInt32(kKeyRtpCvoDegrees, &rtpCVODegrees))
         mRTPCVODegrees = rtpCVODegrees;
 
     int32_t dscp = 0;
-    if(params->findInt32(kKeyRtpDscp, &dscp))
+    if (params->findInt32(kKeyRtpDscp, &dscp))
         updateSocketDscp(dscp);
 
     int64_t sockNetwork = 0;
-    if(params->findInt64(kKeySocketNetwork, &sockNetwork))
+    if (params->findInt64(kKeySocketNetwork, &sockNetwork))
         updateSocketNetwork(sockNetwork);
 
     mMode = INVALID;
@@ -295,8 +295,8 @@ static uint32_t StripStartcode(MediaBufferBase *buffer) {
 
     ptr = (const uint8_t *)buffer->data() + buffer->range_offset();
 
-    if ((*ptr & H264_NALU_MASK) == H264_NALU_SPS) {
-        for (uint32_t i = 0; i < buffer->range_length(); i++) {
+    if (buffer->range_length() > 0 && (*ptr & H264_NALU_MASK) == H264_NALU_SPS) {
+        for (uint32_t i = 1; i + 4 <= buffer->range_length(); i++) {
 
             if (!memcmp(ptr + i, "\x00\x00\x00\x01", 4)) {
                 // Now, we found one more NAL unit in the media buffer.
@@ -316,28 +316,28 @@ static void SpsPpsParser(MediaBufferBase *mediaBuffer,
     if (mediaBuffer == NULL || mediaBuffer->range_length() < 4)
         return;
 
-    if((*spsBuffer) != NULL) {
+    if ((*spsBuffer) != NULL) {
         (*spsBuffer)->release();
         (*spsBuffer) = NULL;
     }
 
-    if((*ppsBuffer) != NULL) {
+    if ((*ppsBuffer) != NULL) {
         (*ppsBuffer)->release();
         (*ppsBuffer) = NULL;
     }
 
     // we got sps/pps but startcode of sps is striped.
     (*spsBuffer) = MediaBufferBase::Create(spsSize);
-    int32_t ppsSize = mediaBuffer->range_length() - spsSize - 4/*startcode*/;
-    (*ppsBuffer) = MediaBufferBase::Create(ppsSize);
     memcpy((*spsBuffer)->data(),
             (const uint8_t *)mediaBuffer->data() + mediaBuffer->range_offset(),
             spsSize);
 
+    int32_t ppsSize = mediaBuffer->range_length() - spsSize - 4 /*startcode*/;
     if (ppsSize > 0) {
+        (*ppsBuffer) = MediaBufferBase::Create(ppsSize);
         ALOGV("PPS found. size=%d", (int)ppsSize);
-        mediaBuffer->set_range(mediaBuffer->range_offset() + spsSize + 4/*startcode*/,
-                mediaBuffer->range_length() - spsSize - 4/*startcode*/);
+        mediaBuffer->set_range(mediaBuffer->range_offset() + spsSize + 4 /*startcode*/,
+                mediaBuffer->range_length() - spsSize - 4 /*startcode*/);
         memcpy((*ppsBuffer)->data(),
                 (const uint8_t *)mediaBuffer->data() + mediaBuffer->range_offset(),
                 ppsSize);
@@ -612,7 +612,7 @@ void ARTPWriter::addSDES(const sp<ABuffer> &buffer) {
 
 void ARTPWriter::addTMMBN(const sp<ABuffer> &buffer) {
     if (buffer->size() + 20 > buffer->capacity()) {
-        ALOGW("RTCP buffer too small to accomodate SR.");
+        ALOGW("RTCP buffer too small to accommodate SR.");
         return;
     }
     if (mOpponentID == 0)
@@ -810,7 +810,8 @@ void ARTPWriter::sendSPSPPSIfIFrame(MediaBufferBase *mediaBuf, int64_t timeUs) {
     const uint8_t *mediaData =
         (const uint8_t *)mediaBuf->data() + mediaBuf->range_offset();
 
-    if ((mediaData[0] & H264_NALU_MASK) != H264_NALU_IFRAME)
+    if (mediaBuf->range_length() == 0
+            || (mediaData[0] & H264_NALU_MASK) != H264_NALU_IFRAME)
         return;
 
     if (mSPSBuf != NULL) {
@@ -1194,10 +1195,10 @@ void ARTPWriter::updateSocketDscp(int32_t dscp) {
                 (int *)&mRtpLayer3Dscp, sizeof(mRtpLayer3Dscp)) < 0) {
         ALOGE("failed to set dscp on rtpsock. err=%s", strerror(errno));
     } else {
-        ALOGD("succees to set dscp on rtpsock. opt=%d", mRtpLayer3Dscp);
+        ALOGD("successfully set dscp on rtpsock. opt=%d", mRtpLayer3Dscp);
         setsockopt(mRTCPSocket, IPPROTO_IP, IP_TOS,
                 (int *)&mRtpLayer3Dscp, sizeof(mRtpLayer3Dscp));
-        ALOGD("succees to set dscp on rtcpsock. opt=%d", mRtpLayer3Dscp);
+        ALOGD("successfully set dscp on rtcpsock. opt=%d", mRtpLayer3Dscp);
     }
 }
 
@@ -1408,4 +1409,3 @@ void ARTPWriter::makeSocketPairAndBind(String8& localIp, int localPort,
 }
 
 }  // namespace android
-

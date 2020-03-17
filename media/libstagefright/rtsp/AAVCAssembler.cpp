@@ -65,7 +65,7 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
     bool isTooLate200 = expiredTimeInJb < (playedTimeRtp - jitterTime);
     bool isTooLate300 = expiredTimeInJb < (playedTimeRtp - (jitterTime * 3 / 2));
 
-    if (mShowQueueCnt < 20) {
+    if (mShowQueue && mShowQueueCnt < 20) {
         showCurrentQueue(queue);
         ALOGD("start=%lld, now=%lld, played=%lld", (long long)startTime,
                 (long long)nowTime, (long long)playedTime);
@@ -129,6 +129,8 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
             return NOT_ENOUGH_DATA;
         }
     }
+
+    buffer = *queue->begin();
 
     if (!mNextExpectedSeqNoValid) {
         mNextExpectedSeqNoValid = true;

@@ -22,9 +22,9 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/Utils.h>
 #include <media/BufferingSettings.h>
-#include <media/MediaSource.h>
 
 #include <utils/KeyedVector.h>
 #include <utils/Vector.h>
@@ -45,8 +45,6 @@ namespace android {
 
 struct ALooper;
 struct AnotherPacketSource;
-
-const int32_t videoMinBitrate = 192000;
 
 struct NuPlayer::RTPSource : public NuPlayer::Source {
     RTPSource(
@@ -95,6 +93,9 @@ private:
         kWhatPollBuffering = 'poll',
         kWhatSetBufferingSettings = 'sBuS',
     };
+
+    const int64_t kBufferingPollIntervalUs = 1000000ll;
+    const int32_t kMinVideoBitrate = 192000; /* bps */
 
     enum State {
         DISCONNECTED,

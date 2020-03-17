@@ -608,7 +608,7 @@ status_t ARTPConnection::parseRTP(StreamInfo *s, const sp<ABuffer> &buffer) {
         return -1;
     }
 
-    if ((data[1] & 0x7f) == 20) {
+    if ((data[1] & 0x7f) == 20 /* decimal */) {
         // Unassigned payload type
         return -1;
     }
@@ -701,6 +701,7 @@ status_t ARTPConnection::parseRTPExt(StreamInfo *s,
     }
 
     const uint8_t *extPayload = extHeader + 4;
+    extLen -= 4;
     size_t offset = 0; //start from first payload of rtp extension.
     // one-byte header parser
     while (isOnebyteHeader && offset < extLen) {
@@ -709,12 +710,13 @@ status_t ARTPConnection::parseRTPExt(StreamInfo *s,
         offset++;
 
         // padding case
-        if(extmapId == 0)
+        if (extmapId == 0)
             continue;
 
-        uint8_t data[length];
-        for (uint8_t j = 0; j < length; j++)
+        uint8_t data[16]; // maximum length value
+        for (uint8_t j = 0; offset + j <= extLen && j < length; j++) {
             data[j] = extPayload[offset + j];
+        }
 
         offset += length;
 
@@ -865,13 +867,13 @@ status_t ARTPConnection::parseSR(
 
 status_t ARTPConnection::parseTSFB(
         StreamInfo *s, const uint8_t *data, size_t size) {
-    uint8_t msgType = data[0] & 0x1f;
-    uint32_t id = u32at(&data[4]);
-
     if (size < 12) {
         // broken packet
         return -1;
     }
+
+    uint8_t msgType = data[0] & 0x1f;
+    uint32_t id = u32at(&data[4]);
 
     const uint8_t *ptr = &data[12];
     size -= 12;
@@ -947,21 +949,25 @@ status_t ARTPConnection::parseTSFB(
 
 status_t ARTPConnection::parsePSFB(
         StreamInfo *s, const uint8_t *data, size_t size) {
-    uint8_t msgType = data[0] & 0x1f;
-    uint32_t id = u32at(&data[4]);
-
     if (size < 12) {
         // broken packet
         return -1;
     }
 
+    uint8_t msgType = data[0] & 0x1f;
+    uint32_t id = u32at(&data[4]);
+
+    const uint8_t *ptr = &data[12];
     size -= 12;
 
     using namespace std;
     switch(msgType) {
         case 1:     // Picture Loss Indication (PLI)
         {
-            CHECK(size == 0);   // PLI does not need parameters
+            if (size > 0) {
+                // PLI does not need parameters
+                break;
+            };
             sp<AMessage> notify = s->mNotifyMsg->dup();
             notify->setInt32("rtcp-event", 1);
             notify->setInt32("payload-type", 206);
@@ -973,7 +979,10 @@ status_t ARTPConnection::parsePSFB(
         }
         case 4:     // Full Intra Request (FIR)
         {
-            uint32_t requestedId = u32at(&data[12]);
+            if (size < 4) {
+                break;
+            }
+            uint32_t requestedId = u32at(&ptr[0]);
             if (requestedId == (uint32_t)mSelfID) {
                 sp<AMessage> notify = s->mNotifyMsg->dup();
                 notify->setInt32("rtcp-event", 1);
@@ -1119,4 +1128,3 @@ void ARTPConnection::onInjectPacket(const sp<AMessage> &msg) {
 }
 
 }  // namespace android
-

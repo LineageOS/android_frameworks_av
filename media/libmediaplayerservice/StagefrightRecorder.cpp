@@ -44,6 +44,7 @@
 #include <media/stagefright/CameraSourceTimeLapse.h>
 #include <media/stagefright/MPEG2TSWriter.h>
 #include <media/stagefright/MPEG4Writer.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MediaCodecSource.h>
@@ -574,10 +575,10 @@ status_t StagefrightRecorder::setParamVideoEncodingBitRate(int32_t bitRate) {
     mVideoBitRate = bitRate;
 
     // A new bitrate(TMMBR) should be applied on runtime as well if OutputFormat is RTP_AVP
-    if (mOutputFormat == OUTPUT_FORMAT_RTP_AVP &&  mStarted && mPauseStartTimeUs == 0) {
-        /* Regular I frames overloads on the network so we should consider about it.
-         * Discounted encoding bitrate will be margins for the overloads.
-         * But applied bitrate reply(TMMBN) must be sent as same as TMMBR */
+    if (mOutputFormat == OUTPUT_FORMAT_RTP_AVP && mStarted && mPauseStartTimeUs == 0) {
+        // Regular I frames may overload the network so we reduce the bitrate to allow
+        // margins for the I frame overruns.
+        // Still send requested bitrate (TMMBR) in the reply (TMMBN).
         const float coefficient = 0.8f;
         mVideoBitRate = (bitRate * coefficient) / 1000 * 1000;
         mVideoEncoderSource->setEncodingBitrate(mVideoBitRate);
@@ -590,6 +591,7 @@ status_t StagefrightRecorder::setParamVideoEncodingBitRate(int32_t bitRate) {
 
 status_t StagefrightRecorder::setParamVideoBitRateMode(int32_t bitRateMode) {
     ALOGV("setParamVideoBitRateMode: %d", bitRateMode);
+    // TODO: clarify what bitrate mode of -1 is as these start from 0
     if (bitRateMode < -1) {
         ALOGE("Unsupported video bitrate mode: %d", bitRateMode);
         return BAD_VALUE;
@@ -1987,7 +1989,6 @@ status_t StagefrightRecorder::setupVideoEncoder(
     }
 
     format->setInt32("bitrate", mVideoBitRate);
-    // OMX encoder option how to control bitrate
     format->setInt32("bitrate-mode", mVideoBitRateMode);
     format->setInt32("frame-rate", mFrameRate);
     format->setInt32("i-frame-interval", mIFramesIntervalSec);
@@ -2410,8 +2411,8 @@ status_t StagefrightRecorder::reset() {
     mVideoHeight   = 144;
     mFrameRate     = -1;
     mVideoBitRate  = 192000;
-    // Following ACodec's default
-    mVideoBitRateMode = OMX_Video_ControlRateVariable;
+    // Following MediaCodec's default
+    mVideoBitRateMode = BITRATE_MODE_VBR;
     mSampleRate    = 8000;
     mAudioChannels = 1;
     mAudioBitRate  = 12200;

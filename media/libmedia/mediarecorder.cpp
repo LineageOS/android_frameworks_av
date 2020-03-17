@@ -244,7 +244,7 @@ status_t MediaRecorder::setOutputFormat(int of)
         mCurrentState = MEDIA_RECORDER_ERROR;
         return ret;
     }
-    mOutputFormat = of;
+    mOutputFormat = (output_format)of;
     mCurrentState = MEDIA_RECORDER_DATASOURCE_CONFIGURED;
     return ret;
 }
@@ -745,7 +745,7 @@ void MediaRecorder::doCleanUp()
     mIsAudioEncoderSet = false;
     mIsVideoEncoderSet = false;
     mIsOutputFileSet   = false;
-    mOutputFormat      = 0;
+    mOutputFormat      = OUTPUT_FORMAT_DEFAULT;
 }
 
 // Release should be OK in any state

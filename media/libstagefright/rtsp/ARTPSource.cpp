@@ -316,8 +316,8 @@ void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
 }
 
 void ARTPSource::addTMMBR(const sp<ABuffer> &buffer) {
-    if (buffer->size() + 32 > buffer->capacity()) {
-        ALOGW("RTCP buffer too small to accomodate RR.");
+    if (buffer->size() + 20 > buffer->capacity()) {
+        ALOGW("RTCP buffer too small to accommodate RR.");
         return;
     }
 
@@ -409,5 +409,3 @@ void ARTPSource::noticeAbandonBuffer(int cnt) {
     mNumBuffersReceived -= cnt;
 }
 }  // namespace android
-
-

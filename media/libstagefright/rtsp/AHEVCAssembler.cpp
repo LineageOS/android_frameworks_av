@@ -97,6 +97,8 @@ ARTPAssembler::AssemblyStatus AHEVCAssembler::addNALUnit(
         }
     }
 
+    buffer = *queue->begin();
+
     if (!mNextExpectedSeqNoValid) {
         mNextExpectedSeqNoValid = true;
         mNextExpectedSeqNo = (uint32_t)buffer->int32Data();
@@ -225,7 +227,7 @@ ARTPAssembler::AssemblyStatus AHEVCAssembler::addFragmentedNALUnit(
 
     CHECK((indicator & H265_NALU_MASK) == H265_NALU_FU);
 
-    if (size < 2) {
+    if (size < 3) {
         ALOGV("Ignoring malformed FU buffer (size = %zu)", size);
 
         queue->erase(queue->begin());
