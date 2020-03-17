@@ -1,6 +1,7 @@
 cc_library_static {
     name: "libstagefright_m4vh263dec",
     vendor_available: true,
+    host_supported: true,
     shared_libs: ["liblog"],
 
     srcs: [
@@ -38,11 +39,6 @@ cc_library_static {
         "src/zigzag_tab.cpp",
     ],
 
-    header_libs: [
-        "media_plugin_headers",
-        "libstagefright_headers"
-    ],
-
     local_include_dirs: ["src"],
     export_include_dirs: ["include"],
 
@@ -57,6 +53,12 @@ cc_library_static {
             "signed-integer-overflow",
         ],
         cfi: true,
+    },
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
     },
 }
 
