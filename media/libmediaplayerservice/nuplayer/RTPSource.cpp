@@ -80,6 +80,9 @@ void NuPlayer::RTPSource::prepareAsync() {
         mLooper->registerHandler(mRTPConn);
     }
 
+    CHECK_EQ(mState, (int)DISCONNECTED);
+    mState = CONNECTING;
+
     setParameters(mRTPParams);
 
     TrackInfo *info = NULL;
@@ -111,7 +114,7 @@ void NuPlayer::RTPSource::prepareAsync() {
         // index(i) should be started from 1. 0 is reserved for [root]
         mRTPConn->addStream(sockRtp, sockRtcp, desc, i + 1, notify, false);
         mRTPConn->setSelfID(info->mSelfID);
-        mRTPConn->setMinMaxBitrate(videoMinBitrate, info->mAS * 1000);
+        mRTPConn->setMinMaxBitrate(kMinVideoBitrate, info->mAS * 1000 /* kbps */);
 
         info->mRTPSocket = sockRtp;
         info->mRTCPSocket = sockRtcp;
@@ -138,9 +141,6 @@ void NuPlayer::RTPSource::prepareAsync() {
 
         info->mSource = source;
     }
-
-    CHECK_EQ(mState, (int)DISCONNECTED);
-    mState = CONNECTING;
 
     if (mInPreparationPhase) {
         mInPreparationPhase = false;
@@ -340,7 +340,7 @@ status_t NuPlayer::RTPSource::seekTo(int64_t seekTimeUs, MediaPlayerSeekMode mod
 
 void NuPlayer::RTPSource::schedulePollBuffering() {
     sp<AMessage> msg = new AMessage(kWhatPollBuffering, this);
-    msg->post(1000000ll); // 1 second intervals
+    msg->post(kBufferingPollIntervalUs); // 1 second intervals
 }
 
 void NuPlayer::RTPSource::onPollBuffering() {
@@ -412,6 +412,8 @@ void NuPlayer::RTPSource::onMessageReceived(const sp<AMessage> &msg) {
                 break;
             }
 
+            // Implicitly assert on valid trackIndex here, which we ensure by
+            // never removing tracks.
             TrackInfo *info = &mTracks.editItemAt(trackIndex);
 
             sp<AnotherPacketSource> source = info->mSource;
@@ -492,6 +494,8 @@ void NuPlayer::RTPSource::onTimeUpdate(int32_t trackIndex, uint32_t rtpTime, uin
     ALOGV("onTimeUpdate track %d, rtpTime = 0x%08x, ntpTime = %#016llx",
          trackIndex, rtpTime, (long long)ntpTime);
 
+    // convert ntpTime in Q32 seconds to microseconds. Note: this will not lose precision
+    // because ntpTimeUs is at most 52 bits (double holds 53 bits)
     int64_t ntpTimeUs = (int64_t)(ntpTime * 1E6 / (1ll << 32));
 
     TrackInfo *track = &mTracks.editItemAt(trackIndex);
@@ -659,10 +663,10 @@ status_t NuPlayer::RTPSource::setParameter(const String8 &key, const String8 &va
 
         const char *mime = value.string();
         const char *delimiter = strchr(mime, '/');
-        info->mCodecName = (delimiter + 1);
+        info->mCodecName = delimiter ? (delimiter + 1) : "<none>";
 
         ALOGV("rtp-param-mime-type: mMimeType (%s) => mCodecName (%s)",
-            info->mMimeType.string(), info->mCodecName.string());
+                info->mMimeType.string(), info->mCodecName.string());
     } else if (key == "video-param-decoder-profile") {
         info->mCodecProfile = atoi(value);
     } else if (key == "video-param-decoder-level") {

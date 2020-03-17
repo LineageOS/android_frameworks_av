@@ -46,8 +46,6 @@ namespace android {
 struct ALooper;
 struct AnotherPacketSource;
 
-const int32_t videoMinBitrate = 192000;
-
 struct NuPlayer::RTPSource : public NuPlayer::Source {
     RTPSource(
             const sp<AMessage> &notify,
@@ -95,6 +93,9 @@ private:
         kWhatPollBuffering = 'poll',
         kWhatSetBufferingSettings = 'sBuS',
     };
+
+    const int64_t kBufferingPollIntervalUs = 1000000ll;
+    const int32_t kMinVideoBitrate = 192000; /* bps */
 
     enum State {
         DISCONNECTED,

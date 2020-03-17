@@ -1928,8 +1928,6 @@ status_t NuPlayer::instantiateDecoder(
 
     format->setInt32("priority", 0 /* realtime */);
 
-    AString mime;
-    format->findString("mime", &mime);
     if (mDataSourceType == DATA_SOURCE_TYPE_RTP) {
         ALOGV("instantiateDecoder: set decoder error free on stream corrupt.");
         format->setInt32("corrupt-free", true);
