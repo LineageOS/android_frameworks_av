@@ -1423,7 +1423,7 @@ status_t GraphicBufferSource::signalEndOfInputStream() {
     // stall since no future events are expected.
     mEndOfStream = true;
 
-    if (mExecuting && !haveAvailableBuffers_l()) {
+    if (mStopTimeUs == -1 && mExecuting && !haveAvailableBuffers_l()) {
         submitEndOfInputStream_l();
     }
 
