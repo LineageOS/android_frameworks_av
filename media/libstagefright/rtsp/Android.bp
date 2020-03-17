@@ -22,7 +22,6 @@ cc_defaults {
     ],
 
     shared_libs: [
-        "libandroid",
         "libandroid_net",
         "libcrypto",
         "libdatasource",

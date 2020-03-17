@@ -48,8 +48,6 @@ cc_library_static {
     },
 
     shared_libs: [
-        "libandroid",
-        "libandroid_net",
         "libbinder",
         "libdatasource",
         "libui",
