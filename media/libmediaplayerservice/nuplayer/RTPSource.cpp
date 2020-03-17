@@ -299,7 +299,7 @@ status_t NuPlayer::RTPSource::dequeueAccessUnit(
     if ((*accessUnit) != NULL && (*accessUnit)->meta()->findInt32("cvo", &cvo) &&
             cvo != mLastCVOUpdated) {
         sp<AMessage> msg = new AMessage();
-        msg->setInt32("payload-type", NuPlayer::RTPSource::RTP_CVO);
+        msg->setInt32("payload-type", ARTPSource::RTP_CVO);
         msg->setInt32("cvo", cvo);
 
         sp<AMessage> notify = dupNotify();

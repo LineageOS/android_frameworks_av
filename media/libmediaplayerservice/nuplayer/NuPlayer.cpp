@@ -2858,23 +2858,24 @@ void NuPlayer::sendIMSRxNotice(const sp<AMessage> &msg) {
     in.writeInt32(payloadType);
 
     switch (payloadType) {
-        case NuPlayer::RTPSource::RTCP_TSFB:   // RTCP TSFB
-        case NuPlayer::RTPSource::RTCP_PSFB:   // RTCP PSFB
-        case NuPlayer::RTPSource::RTP_AUTODOWN:
+        case ARTPSource::RTCP_TSFB:   // RTCP TSFB
+        case ARTPSource::RTCP_PSFB:   // RTCP PSFB
+        case ARTPSource::RTP_AUTODOWN:
         {
             int32_t feedbackType, id;
             CHECK(msg->findInt32("feedback-type", &feedbackType));
             CHECK(msg->findInt32("sender", &id));
             in.writeInt32(feedbackType);
             in.writeInt32(id);
-            if (payloadType == NuPlayer::RTPSource::RTCP_TSFB) {
+            if (payloadType == ARTPSource::RTCP_TSFB) {
                 int32_t bitrate;
                 CHECK(msg->findInt32("bit-rate", &bitrate));
                 in.writeInt32(bitrate);
             }
             break;
         }
-        case NuPlayer::RTPSource::RTP_QUALITY:
+        case ARTPSource::RTP_QUALITY:
+        case ARTPSource::RTP_QUALITY_EMC:
         {
             int32_t feedbackType, bitrate;
             int32_t highestSeqNum, baseSeqNum, prevExpected;
@@ -2895,7 +2896,7 @@ void NuPlayer::sendIMSRxNotice(const sp<AMessage> &msg) {
             in.writeInt32(prevNumBufRecv);
             break;
         }
-        case NuPlayer::RTPSource::RTP_CVO:
+        case ARTPSource::RTP_CVO:
         {
             int32_t cvo;
             CHECK(msg->findInt32("cvo", &cvo));
