@@ -31,6 +31,7 @@
 #define MAX_RETRY 20
 #define TIME_OUT 400ms
 #define MAX_INPUT_BUFFERS 8
+#define FLUSH_INTERVAL 30
 
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
@@ -134,4 +135,7 @@ int64_t getNowUs();
 int32_t populateInfoVector(std::string info, android::Vector<FrameInfo>* frameInfo,
                            bool timestampDevTest, std::list<uint64_t>* timestampUslist);
 
+void verifyFlushOutput(std::list<std::unique_ptr<C2Work>>& flushedWork,
+                       std::list<std::unique_ptr<C2Work>>& workQueue,
+                       std::list<uint64_t>& flushedIndices, std::mutex& queueLock);
 #endif  // MEDIA_C2_HIDL_TEST_COMMON_H

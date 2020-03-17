@@ -563,7 +563,7 @@ TEST_P(Codec2AudioDecDecodeTest, DecodeTest) {
     }
     // blocking call to ensures application to Wait till all the inputs are
     // consumed
-    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
+    waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
     eleStream.close();
     if (mFramesReceived != infoSize) {
         ALOGE("Input buffer count and Output buffer count mismatch");
@@ -624,7 +624,7 @@ TEST_P(Codec2AudioDecHidlTest, ThumbnailTest) {
     ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
                                           mFlushedIndices, mLinearPool, eleStream, &Info, 0,
                                           i + 1));
-    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
+    waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
     eleStream.close();
     EXPECT_GE(mFramesReceived, 1U);
     ASSERT_EQ(mEos, true);
@@ -676,7 +676,6 @@ TEST_P(Codec2AudioDecHidlTest, EOSTest) {
 TEST_P(Codec2AudioDecHidlTest, FlushTest) {
     description("Tests Flush calls");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
-    typedef std::unique_lock<std::mutex> ULock;
     char mURL[512], info[512];
     android::Vector<FrameInfo> Info;
 
@@ -699,40 +698,32 @@ TEST_P(Codec2AudioDecHidlTest, FlushTest) {
         return;
     }
     ASSERT_EQ(mComponent->start(), C2_OK);
-    ALOGV("mURL : %s", mURL);
-    std::ifstream eleStream;
-    eleStream.open(mURL, std::ifstream::binary);
-    ASSERT_EQ(eleStream.is_open(), true);
-    // Decode 128 frames and flush. here 128 is chosen to ensure there is a key
-    // frame after this so that the below section can be covered for all
-    // components
-    uint32_t numFramesFlushed = 128;
-    ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
-                                          mFlushedIndices, mLinearPool, eleStream, &Info, 0,
-                                          numFramesFlushed, false));
     // flush
     std::list<std::unique_ptr<C2Work>> flushedWork;
     c2_status_t err = mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
     ASSERT_EQ(err, C2_OK);
-    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
-                                                   (size_t)MAX_INPUT_BUFFERS - flushedWork.size()));
-    uint64_t frameIndex;
-    {
-        // Update mFlushedIndices based on the index received from flush()
-        ULock l(mQueueLock);
-        for (std::unique_ptr<C2Work>& work : flushedWork) {
-            ASSERT_NE(work, nullptr);
-            frameIndex = work->input.ordinal.frameIndex.peeku();
-            std::list<uint64_t>::iterator frameIndexIt =
-                    std::find(mFlushedIndices.begin(), mFlushedIndices.end(), frameIndex);
-            if (!mFlushedIndices.empty() && (frameIndexIt != mFlushedIndices.end())) {
-                mFlushedIndices.erase(frameIndexIt);
-                work->input.buffers.clear();
-                work->worklets.clear();
-                mWorkQueue.push_back(std::move(work));
-            }
-        }
-    }
+    ASSERT_NO_FATAL_FAILURE(
+            verifyFlushOutput(flushedWork, mWorkQueue, mFlushedIndices, mQueueLock));
+    ASSERT_EQ(mWorkQueue.size(), MAX_INPUT_BUFFERS);
+
+    ALOGV("mURL : %s", mURL);
+    std::ifstream eleStream;
+    eleStream.open(mURL, std::ifstream::binary);
+    ASSERT_EQ(eleStream.is_open(), true);
+    // Decode 30 frames and flush.
+    uint32_t numFramesFlushed = FLUSH_INTERVAL;
+    ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                          mFlushedIndices, mLinearPool, eleStream, &Info, 0,
+                                          numFramesFlushed, false));
+    // flush
+    err = mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
+    ASSERT_EQ(err, C2_OK);
+    waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
+                           (size_t)MAX_INPUT_BUFFERS - flushedWork.size());
+    ASSERT_NO_FATAL_FAILURE(
+            verifyFlushOutput(flushedWork, mWorkQueue, mFlushedIndices, mQueueLock));
+    ASSERT_EQ(mWorkQueue.size(), MAX_INPUT_BUFFERS);
+
     // Seek to next key frame and start decoding till the end
     mFlushedIndices.clear();
     int index = numFramesFlushed;
@@ -756,27 +747,13 @@ TEST_P(Codec2AudioDecHidlTest, FlushTest) {
     eleStream.close();
     err = mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
     ASSERT_EQ(err, C2_OK);
-    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
-                                                   (size_t)MAX_INPUT_BUFFERS - flushedWork.size()));
-    {
-        // Update mFlushedIndices based on the index received from flush()
-        ULock l(mQueueLock);
-        for (std::unique_ptr<C2Work>& work : flushedWork) {
-            ASSERT_NE(work, nullptr);
-            frameIndex = work->input.ordinal.frameIndex.peeku();
-            std::list<uint64_t>::iterator frameIndexIt =
-                    std::find(mFlushedIndices.begin(), mFlushedIndices.end(), frameIndex);
-            if (!mFlushedIndices.empty() && (frameIndexIt != mFlushedIndices.end())) {
-                mFlushedIndices.erase(frameIndexIt);
-                work->input.buffers.clear();
-                work->worklets.clear();
-                mWorkQueue.push_back(std::move(work));
-            }
-        }
-    }
+    waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
+                           (size_t)MAX_INPUT_BUFFERS - flushedWork.size());
+    ASSERT_NO_FATAL_FAILURE(
+            verifyFlushOutput(flushedWork, mWorkQueue, mFlushedIndices, mQueueLock));
+    ASSERT_EQ(mWorkQueue.size(), MAX_INPUT_BUFFERS);
     // TODO: (b/154671521)
     // Add assert for mWorkResult
-    ASSERT_EQ(mFlushedIndices.empty(), true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
@@ -841,7 +818,7 @@ TEST_P(Codec2AudioDecHidlTest, DecodeTestEmptyBuffersInserted) {
     // consumed
     if (!mEos) {
         ALOGV("Waiting for input consumption");
-        ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
+        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
     }
 
     eleStream.close();

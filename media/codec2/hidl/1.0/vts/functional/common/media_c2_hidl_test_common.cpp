@@ -191,3 +191,26 @@ int32_t populateInfoVector(std::string info, android::Vector<FrameInfo>* frameIn
     eleInfo.close();
     return numCsds;
 }
+
+void verifyFlushOutput(std::list<std::unique_ptr<C2Work>>& flushedWork,
+                       std::list<std::unique_ptr<C2Work>>& workQueue,
+                       std::list<uint64_t>& flushedIndices, std::mutex& queueLock) {
+    // Update mFlushedIndices based on the index received from flush()
+    typedef std::unique_lock<std::mutex> ULock;
+    uint64_t frameIndex;
+    ULock l(queueLock);
+    for (std::unique_ptr<C2Work>& work : flushedWork) {
+        ASSERT_NE(work, nullptr);
+        frameIndex = work->input.ordinal.frameIndex.peeku();
+        std::list<uint64_t>::iterator frameIndexIt =
+                std::find(flushedIndices.begin(), flushedIndices.end(), frameIndex);
+        if (!flushedIndices.empty() && (frameIndexIt != flushedIndices.end())) {
+            flushedIndices.erase(frameIndexIt);
+            work->input.buffers.clear();
+            work->worklets.clear();
+            workQueue.push_back(std::move(work));
+        }
+    }
+    ASSERT_EQ(flushedIndices.empty(), true);
+    flushedWork.clear();
+}
