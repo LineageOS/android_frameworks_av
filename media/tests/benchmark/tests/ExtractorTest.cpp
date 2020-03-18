@@ -48,8 +48,7 @@ TEST_P(ExtractorTest, Extract) {
     ASSERT_EQ(status, AMEDIA_OK) << "Extraction failed \n";
 
     extractObj->deInitExtractor();
-
-    extractObj->dumpStatistics(GetParam().first);
+    extractObj->dumpStatistics(GetParam().first, "", gEnv->getStatsFile());
 
     fclose(inputFp);
     delete extractObj;
@@ -79,8 +78,11 @@ int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     int status = gEnv->initFromOptions(argc, argv);
     if (status == 0) {
+        gEnv->setStatsFile("Extractor.csv");
+        status = gEnv->writeStatsHeader();
+        ALOGV("Stats file = %d\n", status);
         status = RUN_ALL_TESTS();
-        ALOGD(" Extractor Test result = %d\n", status);
+        ALOGV("Extractor Test result = %d\n", status);
     }
     return status;
 }
