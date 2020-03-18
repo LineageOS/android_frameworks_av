@@ -251,9 +251,11 @@ void C2Encoder::deInitCodec() {
     mStats->setDeInitTime(timeTaken);
 }
 
-void C2Encoder::dumpStatistics(string inputReference, int64_t durationUs) {
+void C2Encoder::dumpStatistics(string inputReference, int64_t durationUs, string componentName,
+                               string statsFile) {
     string operation = "c2encode";
-    mStats->dumpStatistics(operation, inputReference, durationUs);
+    string mode = "async";
+    mStats->dumpStatistics(operation, inputReference, durationUs, componentName, mode, statsFile);
 }
 
 void C2Encoder::resetEncoder() {
