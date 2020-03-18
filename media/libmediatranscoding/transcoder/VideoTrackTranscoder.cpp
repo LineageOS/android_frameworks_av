@@ -71,7 +71,7 @@ struct AsyncCodecCallbackDispatch {
         transcoder->mCodecMessageQueue.push([transcoder, index, codec, bufferInfo] {
             if (codec == transcoder->mDecoder) {
                 transcoder->transferBuffer(index, bufferInfo);
-            } else if (codec == transcoder->mEncoder) {
+            } else if (codec == transcoder->mEncoder.get()) {
                 transcoder->dequeueOutputSample(index, bufferInfo);
             }
         });
@@ -102,10 +102,6 @@ VideoTrackTranscoder::~VideoTrackTranscoder() {
         AMediaCodec_delete(mDecoder);
     }
 
-    if (mEncoder != nullptr) {
-        AMediaCodec_delete(mEncoder);
-    }
-
     if (mSurface != nullptr) {
         ANativeWindow_release(mSurface);
     }
@@ -132,20 +128,22 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
-    mEncoder = AMediaCodec_createEncoderByType(destinationMime);
-    if (mEncoder == nullptr) {
+    AMediaCodec* encoder = AMediaCodec_createEncoderByType(destinationMime);
+    if (encoder == nullptr) {
         LOG(ERROR) << "Unable to create encoder for type " << destinationMime;
         return AMEDIA_ERROR_UNSUPPORTED;
     }
+    mEncoder = std::shared_ptr<AMediaCodec>(encoder,
+                                            std::bind(AMediaCodec_delete, std::placeholders::_1));
 
-    status = AMediaCodec_configure(mEncoder, mDestinationFormat.get(), NULL /* surface */,
+    status = AMediaCodec_configure(mEncoder.get(), mDestinationFormat.get(), NULL /* surface */,
                                    NULL /* crypto */, AMEDIACODEC_CONFIGURE_FLAG_ENCODE);
     if (status != AMEDIA_OK) {
         LOG(ERROR) << "Unable to configure video encoder: " << status;
         return status;
     }
 
-    status = AMediaCodec_createInputSurface(mEncoder, &mSurface);
+    status = AMediaCodec_createInputSurface(mEncoder.get(), &mSurface);
     if (status != AMEDIA_OK) {
         LOG(ERROR) << "Unable to create an encoder input surface: %d" << status;
         return status;
@@ -185,7 +183,7 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
         return status;
     }
 
-    status = AMediaCodec_setAsyncNotifyCallback(mEncoder, asyncCodecCallbacks, this);
+    status = AMediaCodec_setAsyncNotifyCallback(mEncoder.get(), asyncCodecCallbacks, this);
     if (status != AMEDIA_OK) {
         LOG(ERROR) << "Unable to set encoder to async mode: " << status;
         return status;
@@ -197,7 +195,7 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
 void VideoTrackTranscoder::enqueueInputSample(int32_t bufferIndex) {
     media_status_t status = AMEDIA_OK;
 
-    if (mEOSFromSource) {
+    if (mEosFromSource) {
         return;
     }
 
@@ -233,7 +231,7 @@ void VideoTrackTranscoder::enqueueInputSample(int32_t bufferIndex) {
         mMediaSampleReader->advanceTrack(mTrackIndex);
     } else {
         LOG(DEBUG) << "EOS from source.";
-        mEOSFromSource = true;
+        mEosFromSource = true;
     }
 
     status = AMediaCodec_queueInputBuffer(mDecoder, bufferIndex, 0, mSampleInfo.size,
@@ -253,7 +251,7 @@ void VideoTrackTranscoder::transferBuffer(int32_t bufferIndex, AMediaCodecBuffer
 
     if (bufferInfo.flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) {
         LOG(DEBUG) << "EOS from decoder.";
-        media_status_t status = AMediaCodec_signalEndOfInputStream(mEncoder);
+        media_status_t status = AMediaCodec_signalEndOfInputStream(mEncoder.get());
         if (status != AMEDIA_OK) {
             LOG(ERROR) << "SignalEOS on encoder returned error: " << status;
             mStatus = status;
@@ -265,11 +263,15 @@ void VideoTrackTranscoder::dequeueOutputSample(int32_t bufferIndex,
                                                AMediaCodecBufferInfo bufferInfo) {
     if (bufferIndex >= 0) {
         size_t sampleSize = 0;
-        uint8_t* buffer = AMediaCodec_getOutputBuffer(mEncoder, bufferIndex, &sampleSize);
+        uint8_t* buffer = AMediaCodec_getOutputBuffer(mEncoder.get(), bufferIndex, &sampleSize);
+
+        MediaSample::OnSampleReleasedCallback bufferReleaseCallback = [encoder = mEncoder](
+                                                                              MediaSample* sample) {
+            AMediaCodec_releaseOutputBuffer(encoder.get(), sample->bufferId, false /* render */);
+        };
 
         std::shared_ptr<MediaSample> sample = MediaSample::createWithReleaseCallback(
-                buffer, bufferInfo.offset, bufferIndex,
-                std::bind(&VideoTrackTranscoder::releaseOutputSample, this, std::placeholders::_1));
+                buffer, bufferInfo.offset, bufferIndex, bufferReleaseCallback);
         sample->info.size = bufferInfo.size;
         sample->info.flags = bufferInfo.flags;
         sample->info.presentationTimeUs = bufferInfo.presentationTimeUs;
@@ -281,18 +283,14 @@ void VideoTrackTranscoder::dequeueOutputSample(int32_t bufferIndex,
             return;
         }
     } else if (bufferIndex == AMEDIACODEC_INFO_OUTPUT_FORMAT_CHANGED) {
-        AMediaFormat* newFormat = AMediaCodec_getOutputFormat(mEncoder);
+        AMediaFormat* newFormat = AMediaCodec_getOutputFormat(mEncoder.get());
         LOG(DEBUG) << "Encoder output format changed: " << AMediaFormat_toString(newFormat);
     }
 
     if (bufferInfo.flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) {
         LOG(DEBUG) << "EOS from encoder.";
-        mEOSFromEncoder = true;
+        mEosFromEncoder = true;
     }
-}
-
-void VideoTrackTranscoder::releaseOutputSample(MediaSample* sample) {
-    AMediaCodec_releaseOutputBuffer(mEncoder, sample->bufferId, false /* render */);
 }
 
 media_status_t VideoTrackTranscoder::runTranscodeLoop() {
@@ -304,7 +302,7 @@ media_status_t VideoTrackTranscoder::runTranscodeLoop() {
         return status;
     }
 
-    status = AMediaCodec_start(mEncoder);
+    status = AMediaCodec_start(mEncoder.get());
     if (status != AMEDIA_OK) {
         LOG(ERROR) << "Unable to start video encoder: " << status;
         AMediaCodec_stop(mDecoder);
@@ -312,18 +310,18 @@ media_status_t VideoTrackTranscoder::runTranscodeLoop() {
     }
 
     // Process codec events until EOS is reached, transcoding is stopped or an error occurs.
-    while (!mStopRequested && !mEOSFromEncoder && mStatus == AMEDIA_OK) {
+    while (!mStopRequested && !mEosFromEncoder && mStatus == AMEDIA_OK) {
         std::function<void()> message = mCodecMessageQueue.pop();
         message();
     }
 
     // Return error if transcoding was stopped before it finished.
-    if (mStopRequested && !mEOSFromEncoder && mStatus == AMEDIA_OK) {
+    if (mStopRequested && !mEosFromEncoder && mStatus == AMEDIA_OK) {
         mStatus = AMEDIA_ERROR_UNKNOWN;  // TODO: Define custom error codes?
     }
 
     AMediaCodec_stop(mDecoder);
-    AMediaCodec_stop(mEncoder);
+    AMediaCodec_stop(mEncoder.get());
     return mStatus;
 }
 
