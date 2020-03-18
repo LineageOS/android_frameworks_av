@@ -1829,7 +1829,7 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                 // copy standard infos to graphic buffers if not already present (otherwise, we
                 // may overwrite the actual intermediate value with a final value)
                 stream = 0;
-                const static std::vector<C2Param::Index> stdGfxInfos = {
+                const static C2Param::Index stdGfxInfos[] = {
                     C2StreamRotationInfo::output::PARAM_TYPE,
                     C2StreamColorAspectsInfo::output::PARAM_TYPE,
                     C2StreamDataSpaceInfo::output::PARAM_TYPE,
