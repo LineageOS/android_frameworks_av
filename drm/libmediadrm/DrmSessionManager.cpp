@@ -89,7 +89,7 @@ bool isEqualSessionId(const Vector<uint8_t> &sessionId1, const Vector<uint8_t> &
 }
 
 sp<DrmSessionManager> DrmSessionManager::Instance() {
-    auto drmSessionManager = new DrmSessionManager();
+    static sp<DrmSessionManager> drmSessionManager = new DrmSessionManager();
     drmSessionManager->init();
     return drmSessionManager;
 }
@@ -163,7 +163,8 @@ void DrmSessionManager::removeSession(const Vector<uint8_t> &sessionId) {
     }
 
     auto info = it->second;
-    mService->removeResource(info.pid, info.clientId, toResourceVec(sessionId, INT64_MAX));
+    // removeClient instead of removeSession because each client has only one session
+    mService->removeClient(info.pid, info.clientId);
     mSessionMap.erase(it);
 }
 
