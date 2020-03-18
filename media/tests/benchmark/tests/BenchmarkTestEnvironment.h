@@ -25,7 +25,9 @@ using namespace std;
 
 class BenchmarkTestEnvironment : public ::testing::Environment {
   public:
-    BenchmarkTestEnvironment() : res("/sdcard/media/") {}
+    BenchmarkTestEnvironment()
+        : res("/data/local/tmp/MediaBenchmark/res/"),
+          statsFile("/data/local/tmp/MediaBenchmark/res/stats.csv") {}
 
     // Parses the command line argument
     int initFromOptions(int argc, char **argv);
@@ -34,8 +36,15 @@ class BenchmarkTestEnvironment : public ::testing::Environment {
 
     const string getRes() const { return res; }
 
+    void setStatsFile(const string module) { statsFile = getRes() + module; }
+
+    const string getStatsFile() const { return statsFile; }
+
+    bool writeStatsHeader();
+
   private:
     string res;
+    string statsFile;
 };
 
 int BenchmarkTestEnvironment::initFromOptions(int argc, char **argv) {
@@ -68,6 +77,28 @@ int BenchmarkTestEnvironment::initFromOptions(int argc, char **argv) {
         return 2;
     }
     return 0;
+}
+
+/**
+ * Writes the stats header to a file
+ * <p>
+ * \param statsFile    file where the stats data is to be written
+ **/
+bool BenchmarkTestEnvironment::writeStatsHeader() {
+    char statsHeader[] =
+        "currentTime, fileName, operation, componentName, NDK/SDK, sync/async, setupTime, "
+        "destroyTime, minimumTime, maximumTime, averageTime, timeToProcess1SecContent, "
+        "totalBytesProcessedPerSec, timeToFirstFrame, totalSizeInBytes, totalTime\n";
+    FILE *fpStats = fopen(statsFile.c_str(), "w");
+    if(!fpStats) {
+        return false;
+    }
+    int32_t numBytes = fwrite(statsHeader, sizeof(char), sizeof(statsHeader), fpStats);
+    if(numBytes != sizeof(statsHeader)) {
+        return false;
+    }
+    fclose(fpStats);
+    return true;
 }
 
 #endif  // __BENCHMARK_TEST_ENVIRONMENT_H__
