@@ -156,9 +156,11 @@ void C2Decoder::deInitCodec() {
     mStats->setDeInitTime(timeTaken);
 }
 
-void C2Decoder::dumpStatistics(string inputReference, int64_t durationUs) {
+void C2Decoder::dumpStatistics(string inputReference, int64_t durationUs, string componentName,
+                               string statsFile) {
     string operation = "c2decode";
-    mStats->dumpStatistics(operation, inputReference, durationUs);
+    string mode = "async";
+    mStats->dumpStatistics(operation, inputReference, durationUs, componentName, mode, statsFile);
 }
 
 void C2Decoder::resetDecoder() {
