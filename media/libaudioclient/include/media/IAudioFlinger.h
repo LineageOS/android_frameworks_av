@@ -476,6 +476,7 @@ public:
                                     const AudioDeviceTypeAddr& device,
                                     const String16& callingPackage,
                                     pid_t pid,
+                                    bool probe,
                                     status_t *status,
                                     int *id,
                                     int *enabled) = 0;

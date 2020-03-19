@@ -238,6 +238,7 @@ public:
                         const AudioDeviceTypeAddr& device,
                         const String16& opPackageName,
                         pid_t pid,
+                        bool probe,
                         status_t *status /*non-NULL*/,
                         int *id,
                         int *enabled);
