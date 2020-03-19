@@ -33,13 +33,17 @@ namespace android {
 class MediaCodecsXmlParser {
 public:
 
-    // Treblized media codec list will be located in /odm/etc or /vendor/etc.
+    // Treblized media codec list will be located in /product/etc, /odm/etc or
+    // /vendor/etc.
     static std::vector<std::string> getDefaultSearchDirs() {
-            return { "/odm/etc", "/vendor/etc", "/etc" };
+        return { "/product/etc",
+                 "/odm/etc",
+                 "/vendor/etc",
+                 "/system/etc" };
     }
-    static std::vector<std::string> getDefaultXmlNames() {
-            return { "media_codecs.xml", "media_codecs_performance.xml" };
-    }
+
+    static std::vector<std::string> getDefaultXmlNames();
+
     static constexpr char const* defaultProfilingResultsXmlPath =
             "/data/misc/media/media_codecs_profiling_results.xml";
 
