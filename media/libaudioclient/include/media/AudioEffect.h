@@ -365,6 +365,10 @@ public:
      * device: An audio device descriptor. Only used when "sessionID" is AUDIO_SESSION_DEVICE.
      *         Specifies the audio device type and address the effect must be attached to.
      *         If "sessionID" is AUDIO_SESSION_DEVICE then "io" must be AUDIO_IO_HANDLE_NONE.
+     * probe: true if created in a degraded mode to only verify if effect creation is possible.
+     *        In this mode, no IEffect interface to AudioFlinger is created and all actions
+     *        besides getters implemented in client AudioEffect object are no ops
+     *        after effect creation.
      */
 
     AudioEffect(const effect_uuid_t *type,
@@ -375,8 +379,8 @@ public:
                 void* user = NULL,
                 audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
                 audio_io_handle_t io = AUDIO_IO_HANDLE_NONE,
-                const AudioDeviceTypeAddr& device = {}
-                );
+                const AudioDeviceTypeAddr& device = {},
+                bool probe = false);
 
     /* Constructor.
      *      Same as above but with type and uuid specified by character strings
@@ -389,8 +393,8 @@ public:
                     void* user = NULL,
                     audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
                     audio_io_handle_t io = AUDIO_IO_HANDLE_NONE,
-                    const AudioDeviceTypeAddr& device = {}
-                    );
+                    const AudioDeviceTypeAddr& device = {},
+                    bool probe = false);
 
     /* Terminates the AudioEffect and unregisters it from AudioFlinger.
      * The effect engine is also destroyed if this AudioEffect was the last controlling
@@ -412,8 +416,8 @@ public:
                             void* user = NULL,
                             audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
                             audio_io_handle_t io = AUDIO_IO_HANDLE_NONE,
-                            const AudioDeviceTypeAddr& device = {}
-                            );
+                            const AudioDeviceTypeAddr& device = {},
+                            bool probe = false);
 
     /* Result of constructing the AudioEffect. This must be checked
      * before using any AudioEffect API.
@@ -547,6 +551,8 @@ protected:
      audio_session_t         mSessionId;         // audio session ID
      int32_t                 mPriority;          // priority for effect control
      status_t                mStatus;            // effect status
+     bool                    mProbe;             // effect created in probe mode: all commands
+                                                 // are no ops because mIEffect is NULL
      effect_callback_t       mCbf;               // callback function for status, control and
                                                  // parameter changes notifications
      void*                   mUserData;          // client context for callback function
