@@ -3047,7 +3047,7 @@ status_t AudioFlinger::DeviceEffectProxy::checkPort(const PatchPanel::Patch& pat
         int enabled;
         *handle = thread->createEffect_l(nullptr, nullptr, 0, AUDIO_SESSION_DEVICE,
                                          const_cast<effect_descriptor_t *>(&mDescriptor),
-                                         &enabled, &status, false);
+                                         &enabled, &status, false, false /*probe*/);
         ALOGV("%s thread->createEffect_l status %d", __func__, status);
     } else {
         status = BAD_VALUE;
