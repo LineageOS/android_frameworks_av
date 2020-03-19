@@ -50,4 +50,3 @@ readlinkat: 1
 _llseek: 1
 
 @include /system/etc/seccomp_policy/crash_dump.arm.policy
-@include /system/etc/seccomp_policy/code_coverage.arm.policy

@@ -57,4 +57,3 @@ getpid: 1
 gettid: 1
 
 @include /system/etc/seccomp_policy/crash_dump.x86.policy
-@include /system/etc/seccomp_policy/code_coverage.x86.policy

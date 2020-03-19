@@ -44,4 +44,3 @@ mremap: 1
 sched_yield: 1
 
 @include /system/etc/seccomp_policy/crash_dump.arm64.policy
-@include /system/etc/seccomp_policy/code_coverage.arm64.policy

@@ -68,7 +68,6 @@ prebuilt_etc {
     },
     required: [
         "crash_dump.policy",
-        "code_coverage.policy",
     ],
 }
 
