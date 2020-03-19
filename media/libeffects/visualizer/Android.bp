@@ -1,0 +1,32 @@
+// Visualizer library
+cc_library_shared {
+    name: "libvisualizer",
+
+    vendor: true,
+
+    srcs: [
+        "EffectVisualizer.cpp",
+    ],
+
+    cflags: [
+        "-O2",
+        "-fvisibility=hidden",
+
+        "-DBUILD_FLOAT",
+        "-DSUPPORT_MC",
+
+        "-Wall",
+        "-Werror",
+    ],
+
+    shared_libs: [
+        "liblog",
+    ],
+
+    relative_install_path: "soundfx",
+
+    header_libs: [
+        "libaudioeffects",
+        "libaudioutils_headers",
+    ],
+}
