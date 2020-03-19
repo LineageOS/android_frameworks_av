@@ -118,6 +118,8 @@ static void setLogLevel(int level) {
 // ----------------------------------------------------------------------------
 
 static const String16 sManageCameraPermission("android.permission.MANAGE_CAMERA");
+static const String16 sCameraOpenCloseListenerPermission(
+        "android.permission.CAMERA_OPEN_CLOSE_LISTENER");
 
 // Matches with PERCEPTIBLE_APP_ADJ in ProcessList.java
 static constexpr int32_t kVendorClientScore = 200;
@@ -1812,7 +1814,11 @@ Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listen
         }
 
         auto clientUid = CameraThreadState::getCallingUid();
-        sp<ServiceListener> serviceListener = new ServiceListener(this, listener, clientUid);
+        auto clientPid = CameraThreadState::getCallingPid();
+        bool openCloseCallbackAllowed = checkPermission(sCameraOpenCloseListenerPermission,
+                clientPid, clientUid);
+        sp<ServiceListener> serviceListener = new ServiceListener(this, listener,
+                clientUid, clientPid, openCloseCallbackAllowed);
         auto ret = serviceListener->initialize();
         if (ret != NO_ERROR) {
             String8 msg = String8::format("Failed to initialize service listener: %s (%d)",
@@ -2516,6 +2522,9 @@ status_t CameraService::BasicClient::startCameraOps() {
 
     sCameraService->mUidPolicy->registerMonitorUid(mClientUid);
 
+    // Notify listeners of camera open/close status
+    sCameraService->updateOpenCloseStatus(mCameraIdStr, true/*open*/, mClientPackageName);
+
     return OK;
 }
 
@@ -2555,6 +2564,9 @@ status_t CameraService::BasicClient::finishCameraOps() {
     mOpsCallback.clear();
 
     sCameraService->mUidPolicy->unregisterMonitorUid(mClientUid);
+
+    // Notify listeners of camera open/close status
+    sCameraService->updateOpenCloseStatus(mCameraIdStr, false/*open*/, mClientPackageName);
 
     return OK;
 }
@@ -3325,6 +3337,29 @@ void CameraService::updateStatus(StatusInternal status, const String8& cameraId,
                         String16(cameraId));
             }
         });
+}
+
+void CameraService::updateOpenCloseStatus(const String8& cameraId, bool open,
+        const String16& clientPackageName) {
+    Mutex::Autolock lock(mStatusListenerLock);
+
+    for (const auto& it : mListenerList) {
+        if (!it.second->isOpenCloseCallbackAllowed()) {
+            continue;
+        }
+
+        binder::Status ret;
+        String16 cameraId64(cameraId);
+        if (open) {
+            ret = it.second->getListener()->onCameraOpened(cameraId64, clientPackageName);
+        } else {
+            ret = it.second->getListener()->onCameraClosed(cameraId64);
+        }
+        if (!ret.isOk()) {
+            ALOGE("%s: Failed to trigger onCameraOpened/onCameraClosed callback: %d", __FUNCTION__,
+                    ret.exceptionCode());
+        }
+    }
 }
 
 template<class Func>

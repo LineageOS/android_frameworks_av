@@ -1410,6 +1410,7 @@ status_t BnAudioPolicyService::onTransact(
         case SET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
         case REMOVE_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
         case GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
+        case SET_ALLOWED_CAPTURE_POLICY:
         case AUDIO_MODULES_UPDATED: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",

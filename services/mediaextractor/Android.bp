@@ -67,6 +67,9 @@ prebuilt_etc {
             src: "seccomp_policy/mediaextractor-x86_64.policy",
         },
     },
-    required: ["crash_dump.policy"],
+    required: [
+        "crash_dump.policy",
+        "code_coverage.policy",
+    ],
 }
 
