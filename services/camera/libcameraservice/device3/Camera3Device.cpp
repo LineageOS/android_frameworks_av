@@ -4758,6 +4758,11 @@ void Camera3Device::RequestThread::signalPipelineDrain(const std::vector<int>& s
     mStreamIdsToBeDrained = streamIds;
 }
 
+void Camera3Device::RequestThread::clearPreviousRequest() {
+    Mutex::Autolock l(mRequestLock);
+    mPrevRequest.clear();
+}
+
 status_t Camera3Device::RequestThread::switchToOffline(
         const std::vector<int32_t>& streamsToKeep,
         /*out*/hardware::camera::device::V3_6::CameraOfflineSessionInfo* offlineSessionInfo,
@@ -5917,6 +5922,7 @@ status_t Camera3Device::switchToOffline(
     internalUpdateStatusLocked(STATUS_UNCONFIGURED);
     mOperatingMode = NO_MODE;
     mIsConstrainedHighSpeedConfiguration = false;
+    mRequestThread->clearPreviousRequest();
 
     return OK;
     // TO be done by CameraDeviceClient/Camera3OfflineSession
