@@ -200,5 +200,10 @@ void CompositeStream::notifyError(int64_t frameNumber) {
     }
 }
 
+void CompositeStream::switchToOffline() {
+    Mutex::Autolock l(mMutex);
+    mDevice.clear();
+}
+
 }; // namespace camera3
 }; // namespace android
