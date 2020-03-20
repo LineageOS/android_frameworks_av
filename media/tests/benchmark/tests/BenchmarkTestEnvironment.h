@@ -94,10 +94,10 @@ bool BenchmarkTestEnvironment::writeStatsHeader() {
         return false;
     }
     int32_t numBytes = fwrite(statsHeader, sizeof(char), sizeof(statsHeader), fpStats);
+    fclose(fpStats);
     if(numBytes != sizeof(statsHeader)) {
         return false;
     }
-    fclose(fpStats);
     return true;
 }
 
