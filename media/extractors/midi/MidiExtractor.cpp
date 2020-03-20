@@ -26,6 +26,7 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <libsonivox/eas_reverb.h>
+#include <watchdog/Watchdog.h>
 
 namespace android {
 
@@ -116,6 +117,7 @@ media_status_t MidiSource::read(
         MediaBufferHelper **outBuffer, const ReadOptions *options)
 {
     ALOGV("MidiSource::read");
+
     MediaBufferHelper *buffer;
     // process an optional seek request
     int64_t seekTimeUs;
@@ -139,6 +141,8 @@ status_t MidiSource::init()
 }
 
 // MidiEngine
+using namespace std::chrono_literals;
+static constexpr auto kTimeout = 10s;
 
 MidiEngine::MidiEngine(CDataSource *dataSource,
         AMediaFormat *fileMetadata,
@@ -147,6 +151,8 @@ MidiEngine::MidiEngine(CDataSource *dataSource,
             mEasHandle(NULL),
             mEasConfig(NULL),
             mIsInitialized(false) {
+    Watchdog watchdog(kTimeout);
+
     mIoWrapper = new MidiIoWrapper(dataSource);
     // spin up a new EAS engine
     EAS_I32 temp;
@@ -186,6 +192,8 @@ MidiEngine::MidiEngine(CDataSource *dataSource,
 }
 
 MidiEngine::~MidiEngine() {
+    Watchdog watchdog(kTimeout);
+
     if (mEasHandle) {
         EAS_CloseFile(mEasData, mEasHandle);
     }
@@ -217,12 +225,16 @@ status_t MidiEngine::releaseBuffers() {
 }
 
 status_t MidiEngine::seekTo(int64_t positionUs) {
+    Watchdog watchdog(kTimeout);
+
     ALOGV("seekTo %lld", (long long)positionUs);
     EAS_RESULT result = EAS_Locate(mEasData, mEasHandle, positionUs / 1000, false);
     return result == EAS_SUCCESS ? OK : UNKNOWN_ERROR;
 }
 
 MediaBufferHelper* MidiEngine::readBuffer() {
+    Watchdog watchdog(kTimeout);
+
     EAS_STATE state;
     EAS_State(mEasData, mEasHandle, &state);
     if ((state == EAS_STATE_STOPPED) || (state == EAS_STATE_ERROR)) {
