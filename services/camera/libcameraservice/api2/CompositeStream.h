@@ -48,6 +48,9 @@ public:
 
     status_t deleteStream();
 
+    // Switch to offline mode and release any online resources.
+    void switchToOffline();
+
     // Create and register all internal camera streams.
     virtual status_t createInternalStreams(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
