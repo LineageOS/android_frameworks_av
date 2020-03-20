@@ -619,14 +619,15 @@ status_t DepthCompositeStream::deleteInternalStreams() {
                 strerror(-ret), ret);
     }
 
-    sp<CameraDeviceBase> device = mDevice.promote();
-    if (!device.get()) {
-        ALOGE("%s: Invalid camera device!", __FUNCTION__);
-        return NO_INIT;
-    }
-
     if (mDepthStreamId >= 0) {
-        ret = device->deleteStream(mDepthStreamId);
+        // Camera devices may not be valid after switching to offline mode.
+        // In this case, all offline streams including internal composite streams
+        // are managed and released by the offline session.
+        sp<CameraDeviceBase> device = mDevice.promote();
+        if (device.get() != nullptr) {
+            ret = device->deleteStream(mDepthStreamId);
+        }
+
         mDepthStreamId = -1;
     }
 

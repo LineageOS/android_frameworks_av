@@ -59,6 +59,10 @@ status_t CameraOfflineSessionClient::initialize(sp<CameraProviderManager>, const
         return res;
     }
 
+    for (size_t i = 0; i < mCompositeStreamMap.size(); i++) {
+        mCompositeStreamMap.valueAt(i)->switchToOffline();
+    }
+
     return OK;
 }
 
