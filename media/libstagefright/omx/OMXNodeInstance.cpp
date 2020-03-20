@@ -47,6 +47,8 @@
 
 #include <hidlmemory/mapping.h>
 
+#include <vector>
+
 static const OMX_U32 kPortIndexInput = 0;
 static const OMX_U32 kPortIndexOutput = 1;
 
@@ -493,9 +495,7 @@ status_t OMXNodeInstance::freeNode() {
 
         case OMX_StateLoaded:
         {
-            if (mActiveBuffers.size() > 0) {
-                freeActiveBuffers();
-            }
+            freeActiveBuffers();
             FALLTHROUGH_INTENDED;
         }
         case OMX_StateInvalid:
@@ -2430,11 +2430,19 @@ void OMXNodeInstance::removeActiveBuffer(
 }
 
 void OMXNodeInstance::freeActiveBuffers() {
-    // Make sure to count down here, as freeBuffer will in turn remove
-    // the active buffer from the vector...
-    for (size_t i = mActiveBuffers.size(); i > 0;) {
-        i--;
-        freeBuffer(mActiveBuffers[i].mPortIndex, mActiveBuffers[i].mID);
+    std::vector<OMX_U32> portIndices;
+    std::vector<IOMX::buffer_id> bufferIds;
+    {
+        // Access to mActiveBuffers must be protected by mLock.
+        Mutex::Autolock _l(mLock);
+        for (const ActiveBuffer& activeBuffer : mActiveBuffers) {
+            portIndices.emplace_back(activeBuffer.mPortIndex);
+            bufferIds.emplace_back(activeBuffer.mID);
+        }
+    }
+    for (size_t i = bufferIds.size(); i > 0; ) {
+        --i;
+        freeBuffer(portIndices[i], bufferIds[i]);
     }
 }
 
