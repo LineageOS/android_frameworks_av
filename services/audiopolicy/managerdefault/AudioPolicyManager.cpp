@@ -2441,6 +2441,10 @@ status_t AudioPolicyManager::setStreamVolumeIndex(audio_stream_type_t stream,
                                                   audio_devices_t device)
 {
     auto attributes = mEngine->getAttributesForStreamType(stream);
+    if (attributes == AUDIO_ATTRIBUTES_INITIALIZER) {
+        ALOGW("%s: no group for stream %s, bailing out", __func__, toString(stream).c_str());
+        return NO_ERROR;
+    }
     ALOGV("%s: stream %s attributes=%s", __func__,
           toString(stream).c_str(), toString(attributes).c_str());
     return setVolumeIndexForAttributes(attributes, index, device);
@@ -5937,7 +5941,7 @@ void AudioPolicyManager::applyStreamVolumes(const sp<AudioOutputDescriptor>& out
                                             int delayMs,
                                             bool force)
 {
-    ALOGVV("applyStreamVolumes() for device %08x", device);
+    ALOGVV("applyStreamVolumes() for device %s", dumpDeviceTypes(deviceTypes).c_str());
     for (const auto &volumeGroup : mEngine->getVolumeGroups()) {
         auto &curves = getVolumeCurves(toVolumeSource(volumeGroup));
         checkAndSetVolume(curves, toVolumeSource(volumeGroup),
