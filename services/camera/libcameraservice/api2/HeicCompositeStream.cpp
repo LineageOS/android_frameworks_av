@@ -209,13 +209,14 @@ status_t HeicCompositeStream::deleteInternalStreams() {
     deinitCodec();
 
     if (mAppSegmentStreamId >= 0) {
+        // Camera devices may not be valid after switching to offline mode.
+        // In this case, all offline streams including internal composite streams
+        // are managed and released by the offline session.
         sp<CameraDeviceBase> device = mDevice.promote();
-        if (!device.get()) {
-            ALOGE("%s: Invalid camera device!", __FUNCTION__);
-            return NO_INIT;
+        if (device.get() != nullptr) {
+            res = device->deleteStream(mAppSegmentStreamId);
         }
 
-        res = device->deleteStream(mAppSegmentStreamId);
         mAppSegmentStreamId = -1;
     }
 
