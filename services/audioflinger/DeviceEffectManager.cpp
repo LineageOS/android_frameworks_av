@@ -74,13 +74,14 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::DeviceEffectManager::createEffect_l
         const sp<IEffectClient>& effectClient,
         const std::map<audio_patch_handle_t, PatchPanel::Patch>& patches,
         int *enabled,
-        status_t *status) {
+        status_t *status,
+        bool probe) {
     sp<DeviceEffectProxy> effect;
     sp<EffectHandle> handle;
     status_t lStatus;
 
     lStatus = checkEffectCompatibility(descriptor);
-    if (lStatus != NO_ERROR) {
+    if (probe || lStatus != NO_ERROR) {
        *status = lStatus;
        return handle;
     }

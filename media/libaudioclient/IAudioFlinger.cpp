@@ -662,6 +662,7 @@ public:
                                     const AudioDeviceTypeAddr& device,
                                     const String16& opPackageName,
                                     pid_t pid,
+                                    bool probe,
                                     status_t *status,
                                     int *id,
                                     int *enabled)
@@ -689,6 +690,7 @@ public:
         }
         data.writeString16(opPackageName);
         data.writeInt32((int32_t) pid);
+        data.writeInt32(probe ? 1 : 0);
 
         status_t lStatus = remote()->transact(CREATE_EFFECT, data, &reply);
         if (lStatus != NO_ERROR) {
@@ -1395,12 +1397,13 @@ status_t BnAudioFlinger::onTransact(
             }
             const String16 opPackageName = data.readString16();
             pid_t pid = (pid_t)data.readInt32();
+            bool probe = data.readInt32() == 1;
 
             int id = 0;
             int enabled = 0;
 
             sp<IEffect> effect = createEffect(&desc, client, priority, output, sessionId, device,
-                    opPackageName, pid, &status, &id, &enabled);
+                    opPackageName, pid, probe, &status, &id, &enabled);
             reply->writeInt32(status);
             reply->writeInt32(id);
             reply->writeInt32(enabled);
