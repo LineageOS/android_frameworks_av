@@ -342,7 +342,8 @@ public:
                                     effect_descriptor_t *desc,
                                     int *enabled,
                                     status_t *status /*non-NULL*/,
-                                    bool pinned);
+                                    bool pinned,
+                                    bool probe);
 
                 // return values for hasAudioSession (bit field)
                 enum effect_state {
