@@ -2457,6 +2457,10 @@ status_t AudioPolicyManager::setStreamVolumeIndex(audio_stream_type_t stream,
                                                   audio_devices_t device)
 {
     auto attributes = mEngine->getAttributesForStreamType(stream);
+    if (attributes == AUDIO_ATTRIBUTES_INITIALIZER) {
+        ALOGW("%s: no group for stream %s, bailing out", __func__, toString(stream).c_str());
+        return NO_ERROR;
+    }
     ALOGV("%s: stream %s attributes=%s", __func__,
           toString(stream).c_str(), toString(attributes).c_str());
     return setVolumeIndexForAttributes(attributes, index, device);
