@@ -23,11 +23,16 @@
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
-
+#include <media/MediaUtils.h>
 
 int main(int argc __unused, char **argv __unused)
 {
     using namespace android;
+
+    limitProcessMemory(
+        "media.metrics.maxmem", /* property that defines limit */
+        (size_t)128 * (1 << 20), /* SIZE_MAX, upper limit in bytes */
+        10 /* upper limit as percentage of physical RAM */);
 
     signal(SIGPIPE, SIG_IGN);
 
