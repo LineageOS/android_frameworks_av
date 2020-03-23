@@ -23,8 +23,7 @@
 #include <unistd.h>
 
 #include <bionic/malloc.h>
-
-#include "MediaUtils.h"
+#include <media/MediaUtils.h>
 
 extern "C" void __scudo_set_rss_limit(size_t, int) __attribute__((weak));
 

@@ -39,7 +39,7 @@ LOCAL_C_INCLUDES := \
 	frameworks/av/media/libaaudio/include \
 	frameworks/av/media/libaaudio/src \
 	frameworks/av/media/libaaudio/src/binding \
-	frameworks/av/media/libmedia \
+	frameworks/av/media/libmedia/include \
 	external/sonic \
 
 LOCAL_MODULE := audioserver
