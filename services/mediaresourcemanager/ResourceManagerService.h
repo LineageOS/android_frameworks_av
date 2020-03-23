@@ -41,7 +41,7 @@ using ::aidl::android::media::MediaResourceParcel;
 using ::aidl::android::media::MediaResourcePolicyParcel;
 
 typedef std::map<std::tuple<
-        MediaResource::Type, MediaResource::SubType, std::vector<int8_t>>,
+        MediaResource::Type, MediaResource::SubType, std::vector<uint8_t>>,
         MediaResourceParcel> ResourceList;
 
 struct ResourceInfo {

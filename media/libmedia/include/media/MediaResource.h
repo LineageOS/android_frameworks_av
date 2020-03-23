@@ -35,13 +35,13 @@ public:
     MediaResource() = delete;
     MediaResource(Type type, int64_t value);
     MediaResource(Type type, SubType subType, int64_t value);
-    MediaResource(Type type, const std::vector<int8_t> &id, int64_t value);
+    MediaResource(Type type, const std::vector<uint8_t> &id, int64_t value);
 
     static MediaResource CodecResource(bool secure, bool video);
     static MediaResource GraphicMemoryResource(int64_t value);
     static MediaResource CpuBoostResource();
     static MediaResource VideoBatteryResource();
-    static MediaResource DrmSessionResource(const std::vector<int8_t> &id, int64_t value);
+    static MediaResource DrmSessionResource(const std::vector<uint8_t> &id, int64_t value);
 };
 
 inline static const char *asString(MediaResource::Type i, const char *def = "??") {
