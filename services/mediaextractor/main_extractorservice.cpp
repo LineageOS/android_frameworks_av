@@ -21,7 +21,7 @@
 #include <binder/IPCThreadState.h>
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
-
+#include <media/MediaUtils.h>
 #include <string>
 
 #include <android-base/logging.h>
@@ -32,7 +32,6 @@
 
 // from LOCAL_C_INCLUDES
 #include "MediaExtractorService.h"
-#include "MediaUtils.h"
 #include "minijail.h"
 
 using namespace android;

@@ -50,8 +50,6 @@ cc_binary {
     },
     init_rc: ["mediaextractor.rc"],
 
-    include_dirs: ["frameworks/av/media/libmedia"],
-
     cflags: [
         "-Wall",
         "-Werror",

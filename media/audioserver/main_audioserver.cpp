@@ -26,6 +26,7 @@
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
 #include <hidl/HidlTransportSupport.h>
+#include <media/MediaUtils.h>
 #include <utils/Log.h>
 
 // from LOCAL_C_INCLUDES
@@ -35,7 +36,6 @@
 #include "AAudioService.h"
 #include "utility/AAudioUtilities.h"
 #include "MediaLogService.h"
-#include "MediaUtils.h"
 
 using namespace android;
 
