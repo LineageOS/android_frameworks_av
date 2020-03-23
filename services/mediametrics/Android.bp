@@ -11,6 +11,7 @@ cc_binary {
     shared_libs: [
         "libbinder",
         "liblog",
+        "libmedia", // limitProcessMemory
         "libmediametricsservice",
         "libmediautils",
         "libutils",
