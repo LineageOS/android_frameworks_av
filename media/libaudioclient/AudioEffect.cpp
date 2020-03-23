@@ -151,11 +151,13 @@ status_t AudioEffect::set(const effect_uuid_t *type,
     // audio flinger will not be retained. initCheck() will return the creation status
     // but all other APIs will return invalid operation.
     if (probe || iEffect == 0 || (mStatus != NO_ERROR && mStatus != ALREADY_EXISTS)) {
-        char typeBuffer[64], uuidBuffer[64];
+        char typeBuffer[64] = {}, uuidBuffer[64] = {};
         guidToString(type, typeBuffer, sizeof(typeBuffer));
         guidToString(uuid, uuidBuffer, sizeof(uuidBuffer));
         ALOGE_IF(!probe, "set(): AudioFlinger could not create effect %s / %s, status: %d",
-                typeBuffer, uuidBuffer, mStatus);
+                type != nullptr ? typeBuffer : "NULL",
+                uuid != nullptr ? uuidBuffer : "NULL",
+                mStatus);
         if (!probe && iEffect == 0) {
             mStatus = NO_INIT;
         }
