@@ -35,7 +35,7 @@ MediaResource::MediaResource(Type type, SubType subType, int64_t value) {
     this->value = value;
 }
 
-MediaResource::MediaResource(Type type, const std::vector<int8_t> &id, int64_t value) {
+MediaResource::MediaResource(Type type, const std::vector<uint8_t> &id, int64_t value) {
     this->type = type;
     this->subType = SubType::kUnspecifiedSubType;
     this->id = id;
@@ -66,11 +66,11 @@ MediaResource MediaResource::VideoBatteryResource() {
 }
 
 //static
-MediaResource MediaResource::DrmSessionResource(const std::vector<int8_t> &id, int64_t value) {
+MediaResource MediaResource::DrmSessionResource(const std::vector<uint8_t> &id, int64_t value) {
     return MediaResource(Type::kDrmSession, id, value);
 }
 
-static String8 bytesToHexString(const std::vector<int8_t> &bytes) {
+static String8 bytesToHexString(const std::vector<uint8_t> &bytes) {
     String8 str;
     for (auto &b : bytes) {
         str.appendFormat("%02x", b);
