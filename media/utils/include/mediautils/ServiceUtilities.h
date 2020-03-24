@@ -93,7 +93,6 @@ bool modifyDefaultAudioEffectsAllowed(pid_t pid, uid_t uid);
 bool dumpAllowed();
 bool modifyPhoneStateAllowed(pid_t pid, uid_t uid);
 bool bypassInterruptionPolicyAllowed(pid_t pid, uid_t uid);
-bool accessCallAudioAllowed(const String16& opPackageName, pid_t pid, uid_t uid);
 
 status_t checkIMemory(const sp<IMemory>& iMemory);
 
@@ -111,7 +110,7 @@ public:
 private:
     static constexpr const char* nativePackageManagerName = "package_native";
     std::optional<bool> doIsAllowed(uid_t uid);
-    void loadPackageManager();
+    sp<content::pm::IPackageManagerNative> retreivePackageManager();
     sp<content::pm::IPackageManagerNative> mPackageManager; // To check apps manifest
     uint_t mPackageManagerErrors = 0;
     struct Package {
