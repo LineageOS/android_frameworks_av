@@ -543,7 +543,7 @@ void AudioPolicyService::updateUidStates_l()
     //  else
     //    favor the privacy sensitive case
     if (topActive != nullptr && topSensitiveActive != nullptr
-            && !topActive->canCaptureCallOrOutput) {
+            && !topActive->canCaptureOutput) {
         topActive = nullptr;
     }
 
@@ -559,8 +559,8 @@ void AudioPolicyService::updateUidStates_l()
                                  false : current->uid == topSensitiveActive->uid;
 
         auto canCaptureIfInCallOrCommunication = [&](const auto &recordClient) {
-            bool canCaptureCall = recordClient->canCaptureCallOrOutput;
-            bool canCaptureCommunication = recordClient->canCaptureCallOrOutput
+            bool canCaptureCall = recordClient->canCaptureOutput;
+            bool canCaptureCommunication = recordClient->canCaptureOutput
                 || recordClient->uid == mPhoneStateOwnerUid
                 || isServiceUid(mPhoneStateOwnerUid);
             return !(isInCall && !canCaptureCall)
@@ -575,7 +575,7 @@ void AudioPolicyService::updateUidStates_l()
         bool allowCapture = !isAssistantOnTop
                 && (isTopOrLatestActive || isTopOrLatestSensitive)
                 && !(isSensitiveActive
-                    && !(isTopOrLatestSensitive || current->canCaptureCallOrOutput))
+                    && !(isTopOrLatestSensitive || current->canCaptureOutput))
                 && canCaptureIfInCallOrCommunication(current);
 
         if (isVirtualSource(source)) {
@@ -596,7 +596,7 @@ void AudioPolicyService::updateUidStates_l()
             } else {
                 if (((isAssistantOnTop && source == AUDIO_SOURCE_VOICE_RECOGNITION) ||
                         source == AUDIO_SOURCE_HOTWORD)
-                        && !(isSensitiveActive && !current->canCaptureCallOrOutput)
+                        && !(isSensitiveActive && !current->canCaptureOutput)
                         && canCaptureIfInCallOrCommunication(current)) {
                     allowCapture = true;
                 }
@@ -609,7 +609,7 @@ void AudioPolicyService::updateUidStates_l()
             //     OR
             //         Is on TOP AND the source is VOICE_RECOGNITION or HOTWORD
             if (!isAssistantOnTop
-                    && !(isSensitiveActive && !current->canCaptureCallOrOutput)
+                    && !(isSensitiveActive && !current->canCaptureOutput)
                     && canCaptureIfInCallOrCommunication(current)) {
                 allowCapture = true;
             }
