@@ -1,0 +1,53 @@
+cc_library_shared {
+    name: "libaudiopolicyservice",
+
+    srcs: [
+        "AudioPolicyClientImpl.cpp",
+        "AudioPolicyEffects.cpp",
+        "AudioPolicyInterfaceImpl.cpp",
+        "AudioPolicyService.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/services/audioflinger"
+    ],
+
+    shared_libs: [
+        "libaudioclient",
+        "libaudiofoundation",
+        "libaudiopolicymanager",
+        "libaudioutils",
+        "libbinder",
+        "libcutils",
+        "libeffectsconfig",
+        "libhardware_legacy",
+        "liblog",
+        "libmedia_helper",
+        "libmediametrics",
+        "libmediautils",
+        "libsensorprivacy",
+        "libutils",
+        "soundtrigger_middleware-aidl-cpp",
+    ],
+
+    static_libs: [
+        "libaudiopolicycomponents",
+    ],
+
+    header_libs: [
+        "libaudiopolicycommon",
+        "libaudiopolicyengine_interface_headers",
+        "libaudiopolicymanager_interface_headers",
+        "libaudioutils_headers",
+    ],
+
+    cflags: [
+        "-fvisibility=hidden",
+        "-Werror",
+        "-Wall",
+    ],
+
+    export_shared_lib_headers: [
+        "libsensorprivacy",
+    ],
+}
