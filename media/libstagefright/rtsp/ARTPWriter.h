@@ -156,6 +156,7 @@ private:
     void send(const sp<ABuffer> &buffer, bool isRTCP);
     void makeSocketPairAndBind(String8& localIp, int localPort, String8& remoteIp, int remotePort);
 
+    void ModerateInstantTraffic(uint32_t samplePeriod, uint32_t limitBytes);
     DISALLOW_EVIL_CONSTRUCTORS(ARTPWriter);
 };
 

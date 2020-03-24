@@ -570,6 +570,11 @@ void ARTPWriter::send(const sp<ABuffer> &buffer, bool isRTCP) {
             remAddr = (struct sockaddr *)&mRTPAddr;
     }
 
+    // Unseal code if moderator is needed (prevent overflow of instant bandwidth)
+    // Set limit bits per period through the moderator.
+    // ex) 6KByte/10ms = 48KBit/10ms = 4.8MBit/s instant limit
+    // ModerateInstantTraffic(10, 6 * 1024);
+
     ssize_t n = sendto(isRTCP ? mRTCPSocket : mRTPSocket,
             buffer->data(), buffer->size(), 0, remAddr, sizeSockSt);
 
@@ -1512,6 +1517,17 @@ void ARTPWriter::makeSocketPairAndBind(String8& localIp, int localPort,
         ALOGE("failed to bind rtcp %s:%d err=%s", localIp.string(), localPort + 1, strerror(errno));
     } else {
         ALOGD("succeed to bind rtcp %s:%d", localIp.string(), localPort + 1);
+    }
+}
+
+// TODO : Develop more advanced moderator based on AS & TMMBR value
+void ARTPWriter::ModerateInstantTraffic(uint32_t samplePeriod, uint32_t limitBytes) {
+    unsigned int bytes =  mTrafficRec->readBytesForLastPeriod(samplePeriod);
+    if(bytes > limitBytes) {
+        ALOGI("Nuclear moderator. #seq = %d \t\t %d bits / 10ms",
+              mSeqNo, bytes * 8);
+        usleep(4000);
+        mTrafficRec->updateClock(ALooper::GetNowUs() / 1000);
     }
 }
 
