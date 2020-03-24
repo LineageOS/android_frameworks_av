@@ -223,25 +223,6 @@ bool modifyPhoneStateAllowed(pid_t pid, uid_t uid) {
     return ok;
 }
 
-bool accessCallAudioAllowed(const String16& opPackageName, pid_t pid, uid_t uid) {
-    static const String16 sAccessCallAudio("android.permission.ACCESS_CALL_AUDIO");
-    PermissionController permissionController;
-    const String16 resolvedOpPackageName = resolveCallingPackage(
-         permissionController, opPackageName, uid);
-    if (resolvedOpPackageName.size() == 0) {
-        ALOGE("accessCallAudioAllowed - FAIL - package not found.");
-        return false;
-    }
-    AppOpsManager appOps;
-    const int32_t op = appOps.permissionToOpCode(sAccessCallAudio);
-    const int32_t opResult = appOps.noteOp(op, uid, resolvedOpPackageName);
-    if (opResult == PermissionController::MODE_DEFAULT) {
-        // Only allow in case this is a system app with the proper privilege permission
-        return PermissionCache::checkPermission(sAccessCallAudio, pid, uid);
-    }
-    return opResult == PermissionController::MODE_ALLOWED;
-}
-
 // privileged behavior needed by Dialer, Settings, SetupWizard and CellBroadcastReceiver
 bool bypassInterruptionPolicyAllowed(pid_t pid, uid_t uid) {
     static const String16 sWriteSecureSettings("android.permission.WRITE_SECURE_SETTINGS");
@@ -278,29 +259,28 @@ status_t checkIMemory(const sp<IMemory>& iMemory)
     return NO_ERROR;
 }
 
-void MediaPackageManager::loadPackageManager() {
-    if (mPackageManager != nullptr) {
-        return;
-    }
+sp<content::pm::IPackageManagerNative> MediaPackageManager::retreivePackageManager() {
     const sp<IServiceManager> sm = defaultServiceManager();
     if (sm == nullptr) {
         ALOGW("%s: failed to retrieve defaultServiceManager", __func__);
-        return;
+        return nullptr;
     }
     sp<IBinder> packageManager = sm->checkService(String16(nativePackageManagerName));
     if (packageManager == nullptr) {
         ALOGW("%s: failed to retrieve native package manager", __func__);
-        return;
+        return nullptr;
     }
-    mPackageManager = interface_cast<content::pm::IPackageManagerNative>(packageManager);
+    return interface_cast<content::pm::IPackageManagerNative>(packageManager);
 }
 
 std::optional<bool> MediaPackageManager::doIsAllowed(uid_t uid) {
-    /** Can not fetch package manager at construction it may not yet be registered. */
-    loadPackageManager();
     if (mPackageManager == nullptr) {
-        ALOGW("%s: Playback capture is denied as package manager is not reachable", __func__);
-        return std::nullopt;
+        /** Can not fetch package manager at construction it may not yet be registered. */
+        mPackageManager = retreivePackageManager();
+        if (mPackageManager == nullptr) {
+            ALOGW("%s: Playback capture is denied as package manager is not reachable", __func__);
+            return std::nullopt;
+        }
     }
 
     std::vector<std::string> packageNames;
