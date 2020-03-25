@@ -437,6 +437,8 @@ void AudioPolicyService::updateUidStates_l()
 //            OR all active clients are using HOTWORD source
 //        AND no call is active
 //            OR client has CAPTURE_AUDIO_OUTPUT privileged permission
+//    OR the client is the current InputMethodService
+//        AND a RTT call is active AND the source is VOICE_RECOGNITION
 //    OR Any client
 //        AND The assistant is not on TOP
 //        AND is on TOP or latest started
@@ -625,6 +627,12 @@ void AudioPolicyService::updateUidStates_l()
             //         OR client has CAPTURE_AUDIO_OUTPUT privileged permission
             if (onlyHotwordActive
                     && canCaptureIfInCallOrCommunication(current)) {
+                allowCapture = true;
+            }
+        } else if (mUidPolicy->isCurrentImeUid(current->uid)) {
+            // For current InputMethodService allow capture if:
+            //     A RTT call is active AND the source is VOICE_RECOGNITION
+            if (rttCallActive && source == AUDIO_SOURCE_VOICE_RECOGNITION) {
                 allowCapture = true;
             }
         }
