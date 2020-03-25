@@ -784,7 +784,13 @@ status_t C2SoftVpxDec::outputBuffer(
         }
 
     }
-    CHECK(img->fmt == VPX_IMG_FMT_I420 || img->fmt == VPX_IMG_FMT_I42016);
+    if(img->fmt != VPX_IMG_FMT_I420 && img->fmt != VPX_IMG_FMT_I42016) {
+        ALOGE("img->fmt %d not supported", img->fmt);
+        mSignalledError = true;
+        work->workletsProcessed = 1u;
+        work->result = C2_CORRUPTED;
+        return false;
+    }
 
     std::shared_ptr<C2GraphicBlock> block;
     uint32_t format = HAL_PIXEL_FORMAT_YV12;
