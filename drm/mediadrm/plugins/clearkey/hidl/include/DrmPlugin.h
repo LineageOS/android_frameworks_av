@@ -416,6 +416,7 @@ private:
     }
 
     DeviceFiles mFileHandle;
+    Mutex mSecureStopLock;
 
     CLEARKEY_DISALLOW_COPY_AND_ASSIGN_AND_NEW(DrmPlugin);
 };
