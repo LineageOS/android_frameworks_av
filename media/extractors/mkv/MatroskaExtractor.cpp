@@ -1879,13 +1879,12 @@ status_t MatroskaExtractor::initTrackInfo(
 
     for(size_t i = 0; i < track->GetContentEncodingCount(); i++) {
         const mkvparser::ContentEncoding *encoding = track->GetContentEncodingByIndex(i);
-        for(size_t j = 0; j < encoding->GetEncryptionCount(); j++) {
+        if (encoding->GetEncryptionCount() > 0) {
             const mkvparser::ContentEncoding::ContentEncryption *encryption;
-            encryption = encoding->GetEncryptionByIndex(j);
+            encryption = encoding->GetEncryptionByIndex(0);
             AMediaFormat_setBuffer(trackInfo->mMeta,
                     AMEDIAFORMAT_KEY_CRYPTO_KEY, encryption->key_id, encryption->key_id_len);
             trackInfo->mEncrypted = true;
-            break;
         }
 
         for(size_t j = 0; j < encoding->GetCompressionCount(); j++) {
