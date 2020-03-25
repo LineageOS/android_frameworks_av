@@ -127,11 +127,15 @@ void OutputBuffers::initSkipCutBuffer(
     mDelay = delay;
     mPadding = padding;
     mSampleRate = sampleRate;
-    setSkipCutBuffer(delay, padding, channelCount);
+    mChannelCount = channelCount;
+    setSkipCutBuffer(delay, padding);
 }
 
 void OutputBuffers::updateSkipCutBuffer(int32_t sampleRate, int32_t channelCount) {
     if (mSkipCutBuffer == nullptr) {
+        return;
+    }
+    if (mSampleRate == sampleRate && mChannelCount == channelCount) {
         return;
     }
     int32_t delay = mDelay;
@@ -140,7 +144,9 @@ void OutputBuffers::updateSkipCutBuffer(int32_t sampleRate, int32_t channelCount
         delay = ((int64_t)delay * sampleRate) / mSampleRate;
         padding = ((int64_t)padding * sampleRate) / mSampleRate;
     }
-    setSkipCutBuffer(delay, padding, channelCount);
+    mSampleRate = sampleRate;
+    mChannelCount = channelCount;
+    setSkipCutBuffer(delay, padding);
 }
 
 void OutputBuffers::submit(const sp<MediaCodecBuffer> &buffer) {
@@ -153,14 +159,14 @@ void OutputBuffers::transferSkipCutBuffer(const sp<SkipCutBuffer> &scb) {
     mSkipCutBuffer = scb;
 }
 
-void OutputBuffers::setSkipCutBuffer(int32_t skip, int32_t cut, int32_t channelCount) {
+void OutputBuffers::setSkipCutBuffer(int32_t skip, int32_t cut) {
     if (mSkipCutBuffer != nullptr) {
         size_t prevSize = mSkipCutBuffer->size();
         if (prevSize != 0u) {
             ALOGD("[%s] Replacing SkipCutBuffer holding %zu bytes", mName, prevSize);
         }
     }
-    mSkipCutBuffer = new SkipCutBuffer(skip, cut, channelCount);
+    mSkipCutBuffer = new SkipCutBuffer(skip, cut, mChannelCount);
 }
 
 // LocalBufferPool
