@@ -88,9 +88,9 @@ private:
          */
         int64_t elst_media_time;
         uint64_t elst_segment_duration;
-        // Shift start offset only when media_time > 0.
+        // Shift start offset (move to earlier time) when media_time > 0.
         uint64_t elst_shift_start_ticks;
-        // Initial start offset, empty edit list entry.
+        // Initial start offset (move to later time), from empty edit list entry.
         uint64_t elst_initial_empty_edit_ticks;
         bool subsample_encryption;
 
