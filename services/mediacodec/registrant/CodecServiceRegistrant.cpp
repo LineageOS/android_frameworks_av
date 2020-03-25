@@ -17,11 +17,13 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "CodecServiceRegistrant"
 
+#include <android-base/properties.h>
 #include <android-base/logging.h>
 #include <android-base/properties.h>
 
 #include <C2Component.h>
 #include <C2PlatformSupport.h>
+#include <codec2/hidl/1.0/ComponentStore.h>
 #include <codec2/hidl/1.1/ComponentStore.h>
 #include <codec2/hidl/1.1/Configurable.h>
 #include <codec2/hidl/1.1/types.h>
@@ -43,6 +45,10 @@ constexpr c2_status_t C2_TRANSACTION_FAILED = C2_CORRUPTED;
 // Converter from IComponentStore to C2ComponentStore.
 class H2C2ComponentStore : public C2ComponentStore {
 protected:
+    using IComponentStore =
+        ::android::hardware::media::c2::V1_0::IComponentStore;
+    using IConfigurable =
+        ::android::hardware::media::c2::V1_0::IConfigurable;
     sp<IComponentStore> mStore;
     sp<IConfigurable> mConfigurable;
 public:
@@ -399,36 +405,67 @@ bool ionPropertiesDefined() {
 } // unnamed namespace
 
 extern "C" void RegisterCodecServices() {
-    using namespace ::android::hardware::media::c2::V1_1;
     LOG(INFO) << "Creating software Codec2 service...";
-    sp<ComponentStore> store =
-        new ComponentStore(::android::GetCodec2PlatformComponentStore());
-    if (store == nullptr) {
-        LOG(ERROR) <<
-                "Cannot create software Codec2 service.";
-    } else {
-        if (!ionPropertiesDefined()) {
-            std::string preferredStoreName = "default";
-            sp<IComponentStore> preferredStore =
-                IComponentStore::getService(preferredStoreName.c_str());
-            if (preferredStore) {
-                ::android::SetPreferredCodec2ComponentStore(
-                        std::make_shared<H2C2ComponentStore>(preferredStore));
-                LOG(INFO) <<
-                        "Preferred Codec2 store is set to \"" <<
-                        preferredStoreName << "\".";
-            } else {
-                LOG(INFO) <<
-                        "Preferred Codec2 store is defaulted to \"software\".";
+    std::shared_ptr<C2ComponentStore> store =
+        android::GetCodec2PlatformComponentStore();
+    if (!store) {
+        LOG(ERROR) << "Failed to create Codec2 service.";
+        return;
+    }
+
+    using namespace ::android::hardware::media::c2;
+
+    int platformVersion =
+        android::base::GetIntProperty("ro.build.version.sdk", int32_t(29));
+    // STOPSHIP: Remove code name checking once platform version bumps up to 30.
+    std::string codeName =
+        android::base::GetProperty("ro.build.version.codename", "");
+    if (codeName == "R") {
+        platformVersion = 30;
+    }
+
+    switch (platformVersion) {
+        case 30: {
+            android::sp<V1_1::IComponentStore> storeV1_1 =
+                new V1_1::utils::ComponentStore(store);
+            if (storeV1_1->registerAsService("software") != android::OK) {
+                LOG(ERROR) << "Cannot register software Codec2 v1.1 service.";
+                return;
             }
+            break;
         }
-        if (store->registerAsService("software") != android::OK) {
-            LOG(ERROR) <<
-                    "Cannot register software Codec2 service.";
-        } else {
-            LOG(INFO) <<
-                    "Software Codec2 service created.";
+        case 29: {
+            android::sp<V1_0::IComponentStore> storeV1_0 =
+                new V1_0::utils::ComponentStore(store);
+            if (storeV1_0->registerAsService("software") != android::OK) {
+                LOG(ERROR) << "Cannot register software Codec2 v1.0 service.";
+                return;
+            }
+            break;
+        }
+        default: {
+            LOG(ERROR) << "The platform version " << platformVersion <<
+                          " is not supported.";
+            return;
         }
     }
+    if (!ionPropertiesDefined()) {
+        using IComponentStore =
+            ::android::hardware::media::c2::V1_0::IComponentStore;
+        std::string const preferredStoreName = "default";
+        sp<IComponentStore> preferredStore =
+            IComponentStore::getService(preferredStoreName.c_str());
+        if (preferredStore) {
+            ::android::SetPreferredCodec2ComponentStore(
+                    std::make_shared<H2C2ComponentStore>(preferredStore));
+            LOG(INFO) <<
+                    "Preferred Codec2 store is set to \"" <<
+                    preferredStoreName << "\".";
+        } else {
+            LOG(INFO) <<
+                    "Preferred Codec2 store is defaulted to \"software\".";
+        }
+    }
+    LOG(INFO) << "Software Codec2 service created and registered.";
 }
 
