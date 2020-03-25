@@ -134,7 +134,12 @@ status_t ACodecBufferChannel::queueSecureInputBuffer(
     }
     ssize_t result = -1;
     ssize_t codecDataOffset = 0;
-    if (mCrypto != NULL) {
+    if (numSubSamples == 1
+            && subSamples[0].mNumBytesOfClearData == 0
+            && subSamples[0].mNumBytesOfEncryptedData == 0) {
+        // We don't need to go through crypto or descrambler if the input is empty.
+        result = 0;
+    } else if (mCrypto != NULL) {
         hardware::drm::V1_0::DestinationBuffer destination;
         if (secure) {
             destination.type = DrmBufferType::NATIVE_HANDLE;
