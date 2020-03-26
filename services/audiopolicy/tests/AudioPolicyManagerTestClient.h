@@ -94,6 +94,10 @@ public:
         return NO_ERROR;
     }
 
+    void onAudioPortListUpdate() override {
+        ++mAudioPortListUpdateCount;
+    }
+
     // Helper methods for tests
     size_t getActivePatchesCount() const { return mActivePatches.size(); }
 
@@ -111,12 +115,15 @@ public:
         mAllowedModuleNames.swap(names);
     }
 
+    size_t getAudioPortListUpdateCount() const { return mAudioPortListUpdateCount; }
+
 private:
     audio_module_handle_t mNextModuleHandle = AUDIO_MODULE_HANDLE_NONE + 1;
     audio_io_handle_t mNextIoHandle = AUDIO_IO_HANDLE_NONE + 1;
     audio_patch_handle_t mNextPatchHandle = AUDIO_PATCH_HANDLE_NONE + 1;
     std::map<audio_patch_handle_t, struct audio_patch> mActivePatches;
     std::set<std::string> mAllowedModuleNames;
+    size_t mAudioPortListUpdateCount = 0;
 };
 
 } // namespace android

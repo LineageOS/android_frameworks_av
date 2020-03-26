@@ -29,6 +29,7 @@ class AudioPolicyTestManager : public AudioPolicyManager {
     using AudioPolicyManager::getOutputs;
     using AudioPolicyManager::getAvailableOutputDevices;
     using AudioPolicyManager::getAvailableInputDevices;
+    uint32_t getAudioPortGeneration() const { return mAudioPortGeneration; }
 };
 
 }  // namespace android
