@@ -1833,7 +1833,7 @@ void AudioPolicyService::setEffectSuspended(int effectId,
 
 void AudioPolicyService::onNewAudioModulesAvailable()
 {
-    mAudioCommandThread->audioModulesUpdateCommand();
+    mOutputCommandThread->audioModulesUpdateCommand();
 }
 
 
