@@ -3182,7 +3182,9 @@ bool CameraService::UidPolicy::isUidActiveLocked(uid_t uid, String16 callingPack
             // some polling which should happen pretty rarely anyway as the race is hard
             // to hit.
             active = mActiveUids.find(uid) != mActiveUids.end();
-            if (!active) active = am.isUidActive(uid, callingPackage);
+            if (!active) {
+                active = am.isUidActiveOrForeground(uid, callingPackage);
+            }
             if (active) {
                 break;
             }
