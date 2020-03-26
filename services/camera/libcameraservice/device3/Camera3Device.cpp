@@ -1722,6 +1722,13 @@ status_t Camera3Device::createDefaultRequest(int templateId,
             return res;
         }
 
+        // Fill in JPEG_QUALITY if not available
+        if (!mRequestTemplateCache[templateId].exists(ANDROID_JPEG_QUALITY)) {
+            static const uint8_t kDefaultJpegQuality = 95;
+            mRequestTemplateCache[templateId].update(ANDROID_JPEG_QUALITY,
+                    &kDefaultJpegQuality, 1);
+        }
+
         *request = mRequestTemplateCache[templateId];
         mLastTemplateId = templateId;
     }
