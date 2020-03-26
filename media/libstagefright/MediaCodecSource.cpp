@@ -221,6 +221,7 @@ void MediaCodecSource::Puller::pause() {
 
 void MediaCodecSource::Puller::resume() {
     Mutexed<Queue>::Locked queue(mQueue);
+    queue->flush();
     queue->mPaused = false;
 }
 
