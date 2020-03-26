@@ -63,7 +63,6 @@ void TimeCheck::TimeCheckThread::stopMonitoring(nsecs_t endTimeNs) {
 bool TimeCheck::TimeCheckThread::threadLoop()
 {
     status_t status = TIMED_OUT;
-    const char *tag;
     {
         AutoMutex _l(mMutex);
 
@@ -72,6 +71,7 @@ bool TimeCheck::TimeCheckThread::threadLoop()
         }
 
         nsecs_t endTimeNs = INT64_MAX;
+        const char *tag = "<unspecified>";
         // KeyedVector mMonitorRequests is ordered so take first entry as next timeout
         if (mMonitorRequests.size() != 0) {
             endTimeNs = mMonitorRequests.keyAt(0);
