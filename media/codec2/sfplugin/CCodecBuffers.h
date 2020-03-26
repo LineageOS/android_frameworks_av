@@ -228,8 +228,9 @@ private:
     int32_t mDelay;
     int32_t mPadding;
     int32_t mSampleRate;
+    int32_t mChannelCount;
 
-    void setSkipCutBuffer(int32_t skip, int32_t cut, int32_t channelCount);
+    void setSkipCutBuffer(int32_t skip, int32_t cut);
 
     DISALLOW_EVIL_CONSTRUCTORS(OutputBuffers);
 };
