@@ -28,7 +28,7 @@ cc_library_shared {
         "libmediautils",
         "libsensorprivacy",
         "libutils",
-        "soundtrigger_middleware-aidl-cpp",
+        "capture_state_listener-aidl-cpp",
     ],
 
     static_libs: [

@@ -31,6 +31,11 @@
 #include <vector>
 
 namespace android {
+namespace media {
+// Must be pre-declared, or else there isn't a good way to generate a header
+// library.
+class ICaptureStateListener;
+}
 
 // ----------------------------------------------------------------------------
 
@@ -243,6 +248,12 @@ public:
 
     virtual status_t getPreferredDeviceForStrategy(product_strategy_t strategy,
                                                    AudioDeviceTypeAddr &device) = 0;
+
+    // The return code here is only intended to represent transport errors. The
+    // actual server implementation should always return NO_ERROR.
+    virtual status_t registerSoundTriggerCaptureStateListener(
+        const sp<media::ICaptureStateListener>& listener,
+        bool* result) = 0;
 };
 
 
