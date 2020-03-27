@@ -212,7 +212,7 @@ status_t AudioFlinger::EffectBase::updatePolicyState()
     bool registered = false;
     bool doEnable = false;
     bool enabled = false;
-    audio_io_handle_t io;
+    audio_io_handle_t io = AUDIO_IO_HANDLE_NONE;
     uint32_t strategy;
 
     {
