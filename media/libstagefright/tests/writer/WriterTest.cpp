@@ -87,36 +87,37 @@ static const struct InputData {
          "bbb_mpeg4_352x288_512kbps_30fps.info", 352, 288, false},
 };
 
-class WriterTest : public ::testing::TestWithParam<pair<string, int32_t>> {
+class WriterTest {
   public:
     WriterTest() : mWriter(nullptr), mFileMeta(nullptr), mCurrentTrack(nullptr) {}
 
     ~WriterTest() {
-        if (mWriter) {
-            mWriter.clear();
-            mWriter = nullptr;
-        }
         if (mFileMeta) {
             mFileMeta.clear();
             mFileMeta = nullptr;
         }
         if (mCurrentTrack) {
+            mCurrentTrack->stop();
             mCurrentTrack.clear();
             mCurrentTrack = nullptr;
         }
+        if (mWriter) {
+            mWriter.clear();
+            mWriter = nullptr;
+        }
+        mBufferInfo.clear();
+        if (mInputStream.is_open()) mInputStream.close();
     }
 
-    virtual void SetUp() override {
+    void setupWriterType(string writerFormat) {
         mNumCsds = 0;
         mInputFrameId = 0;
         mWriterName = unknown_comp;
         mDisableTest = false;
-
         static const std::map<std::string, standardWriters> mapWriter = {
                 {"ogg", OGG},     {"aac", AAC},      {"aac_adts", AAC_ADTS}, {"webm", WEBM},
                 {"mpeg4", MPEG4}, {"amrnb", AMR_NB}, {"amrwb", AMR_WB},      {"mpeg2Ts", MPEG2TS}};
         // Find the component type
-        string writerFormat = GetParam().first;
         if (mapWriter.find(writerFormat) != mapWriter.end()) {
             mWriterName = mapWriter.at(writerFormat);
         }
@@ -124,11 +125,6 @@ class WriterTest : public ::testing::TestWithParam<pair<string, int32_t>> {
             cout << "[   WARN   ] Test Skipped. No specific writer mentioned\n";
             mDisableTest = true;
         }
-    }
-
-    virtual void TearDown() override {
-        mBufferInfo.clear();
-        if (mInputStream.is_open()) mInputStream.close();
     }
 
     void getInputBufferInfo(string inputFileName, string inputInfo);
@@ -159,6 +155,12 @@ class WriterTest : public ::testing::TestWithParam<pair<string, int32_t>> {
     int32_t mInputFrameId;
     ifstream mInputStream;
     vector<BufferInfo> mBufferInfo;
+};
+
+class WriteFunctionalityTest : public WriterTest,
+                               public ::testing::TestWithParam<pair<string, int32_t>> {
+  public:
+    virtual void SetUp() override { setupWriterType(GetParam().first); }
 };
 
 void WriterTest::getInputBufferInfo(string inputFileName, string inputInfo) {
@@ -270,7 +272,7 @@ void getFileDetails(string &inputFilePath, string &info, configFormat &params, b
     return;
 }
 
-TEST_P(WriterTest, CreateWriterTest) {
+TEST_P(WriteFunctionalityTest, CreateWriterTest) {
     if (mDisableTest) return;
     ALOGV("Tests the creation of writers");
 
@@ -284,7 +286,7 @@ TEST_P(WriterTest, CreateWriterTest) {
             << "Failed to create writer for output format:" << GetParam().first;
 }
 
-TEST_P(WriterTest, WriterTest) {
+TEST_P(WriteFunctionalityTest, WriterTest) {
     if (mDisableTest) return;
     ALOGV("Checks if for a given input, a valid muxed file has been created or not");
 
@@ -321,7 +323,7 @@ TEST_P(WriterTest, WriterTest) {
     close(fd);
 }
 
-TEST_P(WriterTest, PauseWriterTest) {
+TEST_P(WriteFunctionalityTest, PauseWriterTest) {
     if (mDisableTest) return;
     ALOGV("Validates the pause() api of writers");
 
@@ -378,7 +380,7 @@ TEST_P(WriterTest, PauseWriterTest) {
     close(fd);
 }
 
-TEST_P(WriterTest, MultiStartStopPauseTest) {
+TEST_P(WriteFunctionalityTest, MultiStartStopPauseTest) {
     // TODO: (b/144821804)
     // Enable the test for MPE2TS writer
     if (mDisableTest || mWriterName == standardWriters::MPEG2TS) return;
@@ -451,9 +453,112 @@ TEST_P(WriterTest, MultiStartStopPauseTest) {
     close(fd);
 }
 
+class ListenerTest : public WriterTest,
+                     public ::testing::TestWithParam<
+                             tuple<string /* writerFormat*/, int32_t /* inputFileIdx*/,
+                                   float /* FileSizeLimit*/, float /* FileDurationLimit*/>> {
+  public:
+    virtual void SetUp() override {
+        tuple<string, int32_t, float, float> params = GetParam();
+        setupWriterType(get<0>(params));
+    }
+};
+
+TEST_P(ListenerTest, SetMaxFileLimitsTest) {
+    if (mDisableTest) return;
+    ALOGV("Validates writer when max file limits are set");
+
+    tuple<string, int32_t, float, float> params = GetParam();
+    string writerFormat = get<0>(params);
+    string outputFile = OUTPUT_FILE_NAME;
+    int32_t fd =
+            open(outputFile.c_str(), O_CREAT | O_LARGEFILE | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
+    ASSERT_GE(fd, 0) << "Failed to open output file to dump writer's data";
+
+    int32_t status = createWriter(fd);
+    ASSERT_EQ((status_t)OK, status) << "Failed to create writer for output format:" << writerFormat;
+
+    string inputFile = gEnv->getRes();
+    string inputInfo = gEnv->getRes();
+    configFormat param;
+    bool isAudio;
+    int32_t inputFileIdx = get<1>(params);
+    getFileDetails(inputFile, inputInfo, param, isAudio, inputFileIdx);
+    ASSERT_NE(inputFile.compare(gEnv->getRes()), 0) << "No input file specified";
+
+    ASSERT_NO_FATAL_FAILURE(getInputBufferInfo(inputFile, inputInfo));
+    status = addWriterSource(isAudio, param);
+    ASSERT_EQ((status_t)OK, status) << "Failed to add source for " << writerFormat << "Writer";
+
+    // Read file properties
+    struct stat buf;
+    status = stat(inputFile.c_str(), &buf);
+    ASSERT_EQ(0, status);
+
+    float fileSizeLimit = get<2>(params);
+    float fileDurationLimit = get<3>(params);
+    int64_t maxFileSize = 0;
+    int64_t maxFileDuration = 0;
+
+    size_t inputFileSize = buf.st_size;
+    int64_t lastFrameTimeStampUs = mBufferInfo[mBufferInfo.size() - 1].timeUs;
+    if (fileSizeLimit > 0) {
+        maxFileSize = (int64_t)(fileSizeLimit * inputFileSize);
+        mWriter->setMaxFileSize(maxFileSize);
+    }
+    if (fileDurationLimit > 0) {
+        maxFileDuration = (int64_t)(fileDurationLimit * lastFrameTimeStampUs);
+        mWriter->setMaxFileDuration(maxFileDuration);
+    }
+
+    sp<WriterListener> listener = new WriterListener();
+    ASSERT_NE(listener, nullptr) << "unable to allocate listener";
+
+    mWriter->setListener(listener);
+    status = mWriter->start(mFileMeta.get());
+
+    ASSERT_EQ((status_t)OK, status);
+    status = sendBuffersToWriter(mInputStream, mBufferInfo, mInputFrameId, mCurrentTrack, 0,
+                                 mBufferInfo.size(), false, listener);
+    ASSERT_EQ((status_t)OK, status) << writerFormat << " writer failed";
+    ASSERT_TRUE(mWriter->reachedEOS()) << "EOS not signalled.";
+
+    mCurrentTrack->stop();
+    status = mWriter->stop();
+    ASSERT_EQ((status_t)OK, status) << "Failed to stop the writer";
+    close(fd);
+
+    if (maxFileSize <= 0) {
+        ASSERT_FALSE(listener->mSignaledSize);
+    } else if (maxFileDuration <= 0) {
+        ASSERT_FALSE(listener->mSignaledDuration);
+    } else if (maxFileSize > 0 && maxFileDuration <= 0) {
+        ASSERT_TRUE(listener->mSignaledSize);
+    } else if (maxFileDuration > 0 && maxFileSize <= 0) {
+        ASSERT_TRUE(listener->mSignaledDuration);
+    } else {
+        ASSERT_TRUE(listener->mSignaledSize || listener->mSignaledDuration);
+    }
+
+    if (maxFileSize > 0) {
+        struct stat buf;
+        status = stat(outputFile.c_str(), &buf);
+        ASSERT_EQ(0, status);
+        ASSERT_LE(buf.st_size, maxFileSize);
+    }
+}
+
+// TODO: (b/150923387)
+// Add WEBM input
+INSTANTIATE_TEST_SUITE_P(
+        ListenerTestAll, ListenerTest,
+        ::testing::Values(make_tuple("ogg", 0, 0.7, 0.3), make_tuple("aac", 1, 0.6, 0.7),
+                          make_tuple("mpeg4", 1, 0.4, 0.3), make_tuple("amrnb", 3, 0.2, 0.6),
+                          make_tuple("amrwb", 4, 0.5, 0.5), make_tuple("mpeg2Ts", 1, 0.2, 1)));
+
 // TODO: (b/144476164)
 // Add AAC_ADTS, FLAC, AV1 input
-INSTANTIATE_TEST_SUITE_P(WriterTestAll, WriterTest,
+INSTANTIATE_TEST_SUITE_P(WriterTestAll, WriteFunctionalityTest,
                          ::testing::Values(make_pair("ogg", 0), make_pair("webm", 0),
                                            make_pair("aac", 1), make_pair("mpeg4", 1),
                                            make_pair("amrnb", 3), make_pair("amrwb", 4),
