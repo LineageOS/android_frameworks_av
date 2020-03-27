@@ -1076,6 +1076,8 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     // drop it now to reduce our footprint
                     free(mLastTrack->mTx3gBuffer);
                     mLastTrack->mTx3gBuffer = NULL;
+                    mLastTrack->mTx3gFilled = 0;
+                    mLastTrack->mTx3gSize = 0;
                 }
 
                 const char *mime;
@@ -2788,6 +2790,10 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             // if those apps are compensating for it, we'd break them with such a change
             //
 
+            if (mLastTrack->mTx3gBuffer == NULL) {
+                mLastTrack->mTx3gSize = 0;
+                mLastTrack->mTx3gFilled = 0;
+            }
             if (mLastTrack->mTx3gSize - mLastTrack->mTx3gFilled < chunk_size) {
                 size_t growth = kTx3gGrowth;
                 if (growth < chunk_size) {
@@ -5967,7 +5973,11 @@ media_status_t MPEG4Source::read(
                     sampleTime += mElstInitialEmptyEditTicks;
                 }
                 if (mElstShiftStartTicks > 0){
-                    sampleTime -= mElstShiftStartTicks;
+                    if (sampleTime > mElstShiftStartTicks) {
+                        sampleTime -= mElstShiftStartTicks;
+                    } else {
+                        sampleTime = 0;
+                    }
                 }
                 targetSampleTimeUs = (sampleTime * 1000000ll) / mTimescale;
             }
