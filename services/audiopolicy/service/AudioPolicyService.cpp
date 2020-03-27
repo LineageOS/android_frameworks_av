@@ -945,7 +945,7 @@ bool AudioPolicyService::UidPolicy::isUidActive(uid_t uid) {
         }
     }
     ActivityManager am;
-    bool active = am.isUidActive(uid, String16("audioserver"));
+    bool active = am.isUidActiveOrForeground(uid, String16("audioserver"));
     {
         Mutex::Autolock _l(mLock);
         mCachedUids.insert(std::pair<uid_t,
@@ -990,7 +990,7 @@ int AudioPolicyService::UidPolicy::getUidState(uid_t uid) {
         }
     }
     ActivityManager am;
-    bool active = am.isUidActive(uid, String16("audioserver"));
+    bool active = am.isUidActiveOrForeground(uid, String16("audioserver"));
     int state = ActivityManager::PROCESS_STATE_UNKNOWN;
     if (active) {
         state = am.getUidProcessState(uid, String16("audioserver"));
@@ -1876,7 +1876,7 @@ void AudioPolicyService::setEffectSuspended(int effectId,
 
 void AudioPolicyService::onNewAudioModulesAvailable()
 {
-    mAudioCommandThread->audioModulesUpdateCommand();
+    mOutputCommandThread->audioModulesUpdateCommand();
 }
 
 
