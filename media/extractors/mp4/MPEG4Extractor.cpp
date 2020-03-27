@@ -5967,7 +5967,11 @@ media_status_t MPEG4Source::read(
                     sampleTime += mElstInitialEmptyEditTicks;
                 }
                 if (mElstShiftStartTicks > 0){
-                    sampleTime -= mElstShiftStartTicks;
+                    if (sampleTime > mElstShiftStartTicks) {
+                        sampleTime -= mElstShiftStartTicks;
+                    } else {
+                        sampleTime = 0;
+                    }
                 }
                 targetSampleTimeUs = (sampleTime * 1000000ll) / mTimescale;
             }
