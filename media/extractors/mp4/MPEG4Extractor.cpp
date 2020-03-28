@@ -1076,6 +1076,8 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     // drop it now to reduce our footprint
                     free(mLastTrack->mTx3gBuffer);
                     mLastTrack->mTx3gBuffer = NULL;
+                    mLastTrack->mTx3gFilled = 0;
+                    mLastTrack->mTx3gSize = 0;
                 }
 
                 const char *mime;
@@ -1260,7 +1262,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                          */
                         mLastTrack->elst_initial_empty_edit_ticks = segment_duration;
                     } else if (media_time >= 0 && i == 0) {
-                        ALOGV("first edit list entry");
+                        ALOGV("first edit list entry - from gapless playback files");
                         mLastTrack->elst_media_time = media_time;
                         mLastTrack->elst_segment_duration = segment_duration;
                         ALOGV("segment_duration: %" PRIu64 " media_time: %" PRId64,
@@ -1270,10 +1272,6 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     } else if (empty_edit_present && i == 1) {
                         // Process second entry only when the first entry was an empty edit entry.
                         ALOGV("second edit list entry");
-                        mLastTrack->elst_media_time = media_time;
-                        mLastTrack->elst_segment_duration = segment_duration;
-                        ALOGV("segment_duration: %" PRIu64 " media_time: %" PRId64,
-                              segment_duration, media_time);
                         mLastTrack->elst_shift_start_ticks = media_time;
                     } else {
                         ALOGW("for now, unsupported entry in edit list %" PRIu32, entry_count);
@@ -2788,6 +2786,10 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             // if those apps are compensating for it, we'd break them with such a change
             //
 
+            if (mLastTrack->mTx3gBuffer == NULL) {
+                mLastTrack->mTx3gSize = 0;
+                mLastTrack->mTx3gFilled = 0;
+            }
             if (mLastTrack->mTx3gSize - mLastTrack->mTx3gFilled < chunk_size) {
                 size_t growth = kTx3gGrowth;
                 if (growth < chunk_size) {
@@ -5863,7 +5865,7 @@ media_status_t MPEG4Source::read(
     ReadOptions::SeekMode mode;
 
     if (options && options->getSeekTo(&seekTimeUs, &mode)) {
-
+        ALOGV("seekTimeUs:%" PRId64, seekTimeUs);
         if (mIsHeif) {
             CHECK(mSampleTable == NULL);
             CHECK(mItemTable != NULL);
@@ -5967,7 +5969,11 @@ media_status_t MPEG4Source::read(
                     sampleTime += mElstInitialEmptyEditTicks;
                 }
                 if (mElstShiftStartTicks > 0){
-                    sampleTime -= mElstShiftStartTicks;
+                    if (sampleTime > mElstShiftStartTicks) {
+                        sampleTime -= mElstShiftStartTicks;
+                    } else {
+                        sampleTime = 0;
+                    }
                 }
                 targetSampleTimeUs = (sampleTime * 1000000ll) / mTimescale;
             }
@@ -6296,6 +6302,7 @@ media_status_t MPEG4Source::fragmentedRead(
     int64_t seekTimeUs;
     ReadOptions::SeekMode mode;
     if (options && options->getSeekTo(&seekTimeUs, &mode)) {
+        ALOGV("seekTimeUs:%" PRId64, seekTimeUs);
         int64_t elstInitialEmptyEditUs = 0, elstShiftStartUs = 0;
         if (mElstInitialEmptyEditTicks > 0) {
             elstInitialEmptyEditUs = ((long double)mElstInitialEmptyEditTicks * 1000000) /
