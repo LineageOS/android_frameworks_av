@@ -338,6 +338,12 @@ ARTPAssembler::AssemblyStatus AMPEG4ElementaryAssembler::addPacket(
             ABitReader bits(buffer->data() + offset, buffer->size() - offset);
 
             unsigned auxSize = bits.getBits(mAuxiliaryDataSizeLength);
+            if (buffer->size() < auxSize) {
+                ALOGE("b/123940919 auxSize %u", auxSize);
+                android_errorWriteLog(0x534e4554, "123940919");
+                queue->erase(queue->begin());
+                return MALFORMED_PACKET;
+            }
 
             offset += (mAuxiliaryDataSizeLength + auxSize + 7) / 8;
         }
@@ -346,6 +352,12 @@ ARTPAssembler::AssemblyStatus AMPEG4ElementaryAssembler::addPacket(
              it != headers.end(); ++it) {
             const AUHeader &header = *it;
 
+            if (buffer->size() < header.mSize) {
+                ALOGE("b/123940919 AU_size %u", header.mSize);
+                android_errorWriteLog(0x534e4554, "123940919");
+                queue->erase(queue->begin());
+                return MALFORMED_PACKET;
+            }
             if (buffer->size() < offset + header.mSize) {
                 return MALFORMED_PACKET;
             }
