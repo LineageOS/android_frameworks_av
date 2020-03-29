@@ -165,9 +165,8 @@ private:
     status_t parseTrackFragmentRun(off64_t offset, off64_t size);
     status_t parseSampleAuxiliaryInformationSizes(off64_t offset, off64_t size);
     status_t parseSampleAuxiliaryInformationOffsets(off64_t offset, off64_t size);
-    status_t parseClearEncryptedSizes(
-        off64_t offset, bool isSubsampleEncryption, uint32_t flags, off64_t size);
-    status_t parseSampleEncryption(off64_t offset, off64_t size);
+    status_t parseClearEncryptedSizes(off64_t offset, bool isSubsampleEncryption, uint32_t flags);
+    status_t parseSampleEncryption(off64_t offset);
     // returns -1 for invalid layer ID
     int32_t parseHEVCLayerId(const uint8_t *data, size_t size);
 
@@ -1262,7 +1261,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                          */
                         mLastTrack->elst_initial_empty_edit_ticks = segment_duration;
                     } else if (media_time >= 0 && i == 0) {
-                        ALOGV("first edit list entry");
+                        ALOGV("first edit list entry - from gapless playback files");
                         mLastTrack->elst_media_time = media_time;
                         mLastTrack->elst_segment_duration = segment_duration;
                         ALOGV("segment_duration: %" PRIu64 " media_time: %" PRId64,
@@ -1272,10 +1271,6 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     } else if (empty_edit_present && i == 1) {
                         // Process second entry only when the first entry was an empty edit entry.
                         ALOGV("second edit list entry");
-                        mLastTrack->elst_media_time = media_time;
-                        mLastTrack->elst_segment_duration = segment_duration;
-                        ALOGV("segment_duration: %" PRIu64 " media_time: %" PRId64,
-                              segment_duration, media_time);
                         mLastTrack->elst_shift_start_ticks = media_time;
                     } else {
                         ALOGW("for now, unsupported entry in edit list %" PRIu32, entry_count);
@@ -5191,7 +5186,7 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
 
         case FOURCC("senc"): {
             status_t err;
-            if ((err = parseSampleEncryption(data_offset, chunk_data_size)) != OK) {
+            if ((err = parseSampleEncryption(data_offset)) != OK) {
                 return err;
             }
             *offset += chunk_size;
@@ -5383,13 +5378,12 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationOffsets(
     off64_t drmoffset = mCurrentSampleInfoOffsets[0]; // from moof
 
     drmoffset += mCurrentMoofOffset;
-    size -= mCurrentMoofOffset;
 
-    return parseClearEncryptedSizes(drmoffset, false, 0, size);
+    return parseClearEncryptedSizes(drmoffset, false, 0);
 }
 
 status_t MPEG4Source::parseClearEncryptedSizes(
-        off64_t offset, bool isSubsampleEncryption, uint32_t flags, off64_t size) {
+        off64_t offset, bool isSubsampleEncryption, uint32_t flags) {
 
     int32_t ivlength;
     if (!AMediaFormat_getInt32(mFormat, AMEDIAFORMAT_KEY_CRYPTO_DEFAULT_IV_SIZE, &ivlength)) {
@@ -5404,14 +5398,10 @@ status_t MPEG4Source::parseClearEncryptedSizes(
 
     uint32_t sampleCount = mCurrentSampleInfoCount;
     if (isSubsampleEncryption) {
-        if(size < 4){
-            return ERROR_MALFORMED;
-        }
         if (!mDataSource->getUInt32(offset, &sampleCount)) {
             return ERROR_IO;
         }
         offset += 4;
-        size -= 4;
     }
 
     // read CencSampleAuxiliaryDataFormats
@@ -5426,15 +5416,11 @@ status_t MPEG4Source::parseClearEncryptedSizes(
         }
 
         memset(smpl->iv, 0, 16);
-        if(size < ivlength){
-            return ERROR_MALFORMED;
-        }
         if (mDataSource->readAt(offset, smpl->iv, ivlength) != ivlength) {
             return ERROR_IO;
         }
 
         offset += ivlength;
-        size -= ivlength;
 
         bool readSubsamples;
         if (isSubsampleEncryption) {
@@ -5449,20 +5435,13 @@ status_t MPEG4Source::parseClearEncryptedSizes(
 
         if (readSubsamples) {
             uint16_t numsubsamples;
-            if(size < 2){
-                return ERROR_MALFORMED;
-            }
             if (!mDataSource->getUInt16(offset, &numsubsamples)) {
                 return ERROR_IO;
             }
             offset += 2;
-            size -= 2;
             for (size_t j = 0; j < numsubsamples; j++) {
                 uint16_t numclear;
                 uint32_t numencrypted;
-                if(size < 6){
-                    return ERROR_MALFORMED;
-                }
                 if (!mDataSource->getUInt16(offset, &numclear)) {
                     return ERROR_IO;
                 }
@@ -5471,7 +5450,6 @@ status_t MPEG4Source::parseClearEncryptedSizes(
                     return ERROR_IO;
                 }
                 offset += 4;
-                size -= 6;
                 smpl->clearsizes.add(numclear);
                 smpl->encryptedsizes.add(numencrypted);
             }
@@ -5484,15 +5462,12 @@ status_t MPEG4Source::parseClearEncryptedSizes(
     return OK;
 }
 
-status_t MPEG4Source::parseSampleEncryption(off64_t offset, off64_t chunk_data_size) {
+status_t MPEG4Source::parseSampleEncryption(off64_t offset) {
     uint32_t flags;
-    if(chunk_data_size < 4) {
-        return ERROR_MALFORMED;
-    }
     if (!mDataSource->getUInt32(offset, &flags)) { // actually version + flags
         return ERROR_MALFORMED;
     }
-    return parseClearEncryptedSizes(offset + 4, true, flags, chunk_data_size - 4);
+    return parseClearEncryptedSizes(offset + 4, true, flags);
 }
 
 status_t MPEG4Source::parseTrackFragmentHeader(off64_t offset, off64_t size) {
@@ -5869,7 +5844,7 @@ media_status_t MPEG4Source::read(
     ReadOptions::SeekMode mode;
 
     if (options && options->getSeekTo(&seekTimeUs, &mode)) {
-
+        ALOGV("seekTimeUs:%" PRId64, seekTimeUs);
         if (mIsHeif) {
             CHECK(mSampleTable == NULL);
             CHECK(mItemTable != NULL);
@@ -6306,6 +6281,7 @@ media_status_t MPEG4Source::fragmentedRead(
     int64_t seekTimeUs;
     ReadOptions::SeekMode mode;
     if (options && options->getSeekTo(&seekTimeUs, &mode)) {
+        ALOGV("seekTimeUs:%" PRId64, seekTimeUs);
         int64_t elstInitialEmptyEditUs = 0, elstShiftStartUs = 0;
         if (mElstInitialEmptyEditTicks > 0) {
             elstInitialEmptyEditUs = ((long double)mElstInitialEmptyEditTicks * 1000000) /
