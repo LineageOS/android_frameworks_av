@@ -47,6 +47,7 @@ cc_library_static {
         "-DOSCL_IMPORT_REF=",
 
         "-Werror",
+        "-DDEC_NOPOSTPROC",
     ],
 
     version_script: "exports.lds",
