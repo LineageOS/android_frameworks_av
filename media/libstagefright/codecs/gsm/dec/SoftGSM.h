@@ -20,9 +20,7 @@
 
 #include <media/stagefright/omx/SimpleSoftOMXComponent.h>
 
-extern "C" {
 #include "gsm.h"
-}
 
 namespace android {
 
