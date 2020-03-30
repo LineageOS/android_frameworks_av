@@ -23,7 +23,7 @@
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
-#include <media/MediaUtils.h>
+#include <mediautils/LimitProcessMemory.h>
 
 int main(int argc __unused, char **argv __unused)
 {

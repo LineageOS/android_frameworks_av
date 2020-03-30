@@ -272,7 +272,6 @@ cc_library {
         "IRemoteDisplay.cpp",
         "IRemoteDisplayClient.cpp",
         "IStreamSource.cpp",
-        "MediaUtils.cpp",
         "Metadata.cpp",
         "mediarecorder.cpp",
         "IMediaMetadataRetriever.cpp",
@@ -295,7 +294,6 @@ cc_library {
     },
 
     header_libs: [
-        "bionic_libc_platform_headers",
         "libstagefright_headers",
         "media_ndk_headers",
     ],
@@ -334,7 +332,6 @@ cc_library {
     ],
 
     static_libs: [
-        "libc_malloc_debug_backtrace", // for memory heap analysis
         "resourcemanager_aidl_interface-ndk_platform",
     ],
 
