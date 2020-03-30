@@ -26,7 +26,7 @@
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
 #include <hidl/HidlTransportSupport.h>
-#include <media/MediaUtils.h>
+#include <mediautils/LimitProcessMemory.h>
 #include <utils/Log.h>
 
 // from LOCAL_C_INCLUDES
