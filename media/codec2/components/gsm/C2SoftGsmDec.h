@@ -19,10 +19,7 @@
 
 #include <SimpleC2Component.h>
 
-
-extern "C" {
-    #include "gsm.h"
-}
+#include "gsm.h"
 
 namespace android {
 
