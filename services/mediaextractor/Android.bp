@@ -29,6 +29,7 @@ cc_binary {
     shared_libs: [
         "libmedia",
         "libmediaextractorservice",
+        "libmediautils",
         "libbinder",
         "libutils",
         "liblog",
