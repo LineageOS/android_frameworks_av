@@ -90,6 +90,7 @@ public:
     int64_t calculateReasonableTimeout();
 
     aaudio_result_t startClient(const android::AudioClient& client,
+                                const audio_attributes_t *attr,
                                 audio_port_handle_t *clientHandle);
 
     aaudio_result_t stopClient(audio_port_handle_t clientHandle);
