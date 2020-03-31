@@ -114,6 +114,7 @@ enum {
     GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
     GET_DEVICES_FOR_ATTRIBUTES,
     AUDIO_MODULES_UPDATED,  // oneway
+    SET_CURRENT_IME_UID,
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -1145,6 +1146,18 @@ public:
         return static_cast <status_t> (reply.readInt32());
     }
 
+    virtual status_t setCurrentImeUid(uid_t uid)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeInt32(uid);
+        status_t status = remote()->transact(SET_CURRENT_IME_UID, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        return static_cast <status_t> (reply.readInt32());
+    }
+
     virtual bool isHapticPlaybackSupported()
     {
         Parcel data, reply;
@@ -1529,7 +1542,8 @@ status_t BnAudioPolicyService::onTransact(
         case GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
         case GET_DEVICES_FOR_ATTRIBUTES:
         case SET_ALLOWED_CAPTURE_POLICY:
-        case AUDIO_MODULES_UPDATED: {
+        case AUDIO_MODULES_UPDATED:
+        case SET_CURRENT_IME_UID: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
@@ -2679,6 +2693,18 @@ status_t BnAudioPolicyService::onTransact(
             onNewAudioModulesAvailable();
             return NO_ERROR;
         } break;
+
+        case SET_CURRENT_IME_UID: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            int32_t uid;
+            status_t status = data.readInt32(&uid);
+            if (status != NO_ERROR) {
+                return status;
+            }
+            status = setCurrentImeUid(uid);
+            reply->writeInt32(static_cast <int32_t>(status));
+            return NO_ERROR;
+        }
 
         default:
             return BBinder::onTransact(code, data, reply, flags);
