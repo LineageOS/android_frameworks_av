@@ -399,6 +399,7 @@ public:
 
     static status_t setAssistantUid(uid_t uid);
     static status_t setA11yServicesUids(const std::vector<uid_t>& uids);
+    static status_t setCurrentImeUid(uid_t uid);
 
     static bool     isHapticPlaybackSupported();
 
