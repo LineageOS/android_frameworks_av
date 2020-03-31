@@ -21,13 +21,13 @@ import android.media.TranscodingJobParcel;
 import android.media.TranscodingResultParcel;
 
 /**
- * ITranscodingClientListener
+ * ITranscodingClientCallback
  *
  * Interface for the MediaTranscodingService to communicate with the client.
  *
  * {@hide}
  */
-interface ITranscodingClientListener {
+interface ITranscodingClientCallback {
 
     /**
     * Called when the transcoding associated with the jobId finished.

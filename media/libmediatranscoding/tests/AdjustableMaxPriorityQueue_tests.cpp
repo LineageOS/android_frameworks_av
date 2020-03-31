@@ -36,7 +36,7 @@
 namespace android {
 
 class IntUniquePtrComp {
-   public:
+public:
     bool operator()(const std::unique_ptr<int>& lhs, const std::unique_ptr<int>& rhs) const {
         return *lhs < *rhs;
     }
@@ -233,7 +233,7 @@ TEST(AdjustableMaxPriorityQueueTest, TranscodingJobTest) {
     // The job is arranging according to priority with highest priority comes first.
     // For the job with the same priority, the job with early createTime will come first.
     class TranscodingJobComp {
-       public:
+    public:
         bool operator()(const std::unique_ptr<TranscodingJob>& lhs,
                         const std::unique_ptr<TranscodingJob>& rhs) const {
             if (lhs->priority != rhs->priority) {

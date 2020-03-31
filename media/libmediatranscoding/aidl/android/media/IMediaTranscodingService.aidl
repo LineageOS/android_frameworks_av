@@ -17,7 +17,7 @@
 package android.media;
 
 import android.media.ITranscodingClient;
-import android.media.ITranscodingClientListener;
+import android.media.ITranscodingClientCallback;
 import android.media.TranscodingJobParcel;
 import android.media.TranscodingRequestParcel;
 
@@ -54,7 +54,7 @@ interface IMediaTranscodingService {
      * ITranscodingClient interface object. The client should save and use it
      * for all future transactions with the service.
      *
-     * @param listener client interface for the MediaTranscodingService to call
+     * @param callback client interface for the MediaTranscodingService to call
      *        the client.
      * @param clientName name of the client.
      * @param opPackageName op package name of the client.
@@ -64,7 +64,7 @@ interface IMediaTranscodingService {
      *         failure to register.
      */
     ITranscodingClient registerClient(
-            in ITranscodingClientListener listener,
+            in ITranscodingClientCallback callback,
             in String clientName,
             in String opPackageName,
             in int clientUid,

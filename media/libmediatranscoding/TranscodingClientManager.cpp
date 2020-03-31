@@ -21,6 +21,7 @@
 #include <android/binder_ibinder.h>
 #include <inttypes.h>
 #include <media/TranscodingClientManager.h>
+#include <media/TranscodingRequest.h>
 #include <utils/Log.h>
 
 namespace android {
@@ -37,71 +38,101 @@ using ::ndk::SpAIBinder;
  * ClientImpl implements a single client and contains all its information.
  */
 struct TranscodingClientManager::ClientImpl : public BnTranscodingClient {
-    /* The remote client listener that this ClientInfo is associated with.
+    /* The remote client callback that this ClientInfo is associated with.
      * Once the ClientInfo is created, we hold an SpAIBinder so that the binder
      * object doesn't get created again, otherwise the binder object pointer
      * may not be unique.
      */
-    SpAIBinder mClientListener;
+    SpAIBinder mClientCallback;
     /* A unique id assigned to the client by the service. This number is used
      * by the service for indexing. Here we use the binder object's pointer
      * (casted to int64t_t) as the client id.
      */
     ClientIdType mClientId;
-    int32_t mClientPid;
-    int32_t mClientUid;
+    pid_t mClientPid;
+    uid_t mClientUid;
     std::string mClientName;
     std::string mClientOpPackageName;
+
+    // Next jobId to assign
+    std::atomic<std::int32_t> mNextJobId;
+    // Pointer to the client manager for this client
     TranscodingClientManager* mOwner;
 
-    ClientImpl(const std::shared_ptr<ITranscodingClientListener>& listener,
-               int32_t pid, int32_t uid,
-               const std::string& clientName,
-               const std::string& opPackageName,
+    ClientImpl(const std::shared_ptr<ITranscodingClientCallback>& callback, pid_t pid,
+            uid_t uid, const std::string& clientName, const std::string& opPackageName,
                TranscodingClientManager* owner);
 
     Status submitRequest(const TranscodingRequestParcel& /*in_request*/,
-            TranscodingJobParcel* /*out_job*/, int32_t* /*_aidl_return*/) override;
+                         TranscodingJobParcel* /*out_job*/, bool* /*_aidl_return*/) override;
 
     Status cancelJob(int32_t /*in_jobId*/, bool* /*_aidl_return*/) override;
 
-    Status getJobWithId(int32_t /*in_jobId*/,
-            TranscodingJobParcel* /*out_job*/, bool* /*_aidl_return*/) override;
+    Status getJobWithId(int32_t /*in_jobId*/, TranscodingJobParcel* /*out_job*/,
+                        bool* /*_aidl_return*/) override;
 
     Status unregister() override;
 };
 
 TranscodingClientManager::ClientImpl::ClientImpl(
-        const std::shared_ptr<ITranscodingClientListener>& listener,
-        int32_t pid, int32_t uid,
-        const std::string& clientName,
-        const std::string& opPackageName,
+        const std::shared_ptr<ITranscodingClientCallback>& callback, pid_t pid, uid_t uid,
+        const std::string& clientName, const std::string& opPackageName,
         TranscodingClientManager* owner)
-: mClientListener((listener != nullptr) ? listener->asBinder() : nullptr),
-  mClientId((int64_t)mClientListener.get()),
-  mClientPid(pid),
-  mClientUid(uid),
-  mClientName(clientName),
-  mClientOpPackageName(opPackageName),
-  mOwner(owner) {}
+      : mClientCallback((callback != nullptr) ? callback->asBinder() : nullptr),
+        mClientId((int64_t)mClientCallback.get()),
+        mClientPid(pid),
+        mClientUid(uid),
+        mClientName(clientName),
+        mClientOpPackageName(opPackageName),
+        mNextJobId(0),
+        mOwner(owner) {}
 
 Status TranscodingClientManager::ClientImpl::submitRequest(
-        const TranscodingRequestParcel& /*in_request*/,
-        TranscodingJobParcel* /*out_job*/, int32_t* /*_aidl_return*/) {
+        const TranscodingRequestParcel& in_request, TranscodingJobParcel* out_job,
+        bool* _aidl_return) {
+    if (in_request.fileName.empty()) {
+        // This is the only error we check for now.
+        *_aidl_return = false;
+        return Status::ok();
+    }
+
+    int32_t jobId = mNextJobId.fetch_add(1);
+
+    *_aidl_return =
+            mOwner->mJobScheduler->submit(mClientId, jobId, mClientPid, in_request,
+                                          ITranscodingClientCallback::fromBinder(mClientCallback));
+
+    if (*_aidl_return) {
+        out_job->jobId = jobId;
+
+        // TODO(chz): is some of this coming from JobScheduler?
+        *(TranscodingRequest*)&out_job->request = in_request;
+        out_job->awaitNumberOfJobs = 0;
+    }
     return Status::ok();
 }
 
-Status TranscodingClientManager::ClientImpl::cancelJob(
-        int32_t /*in_jobId*/, bool* /*_aidl_return*/) {
+Status TranscodingClientManager::ClientImpl::cancelJob(int32_t in_jobId, bool* _aidl_return) {
+    *_aidl_return = mOwner->mJobScheduler->cancel(mClientId, in_jobId);
     return Status::ok();
 }
 
-Status TranscodingClientManager::ClientImpl::getJobWithId(int32_t /*in_jobId*/,
-        TranscodingJobParcel* /*out_job*/, bool* /*_aidl_return*/) {
+Status TranscodingClientManager::ClientImpl::getJobWithId(int32_t in_jobId,
+                                                          TranscodingJobParcel* out_job,
+                                                          bool* _aidl_return) {
+    *_aidl_return = mOwner->mJobScheduler->getJob(mClientId, in_jobId, &out_job->request);
+
+    if (*_aidl_return) {
+        out_job->jobId = in_jobId;
+        out_job->awaitNumberOfJobs = 0;
+    }
     return Status::ok();
 }
 
 Status TranscodingClientManager::ClientImpl::unregister() {
+    // TODO(chz): Decide what to do about this client's jobs.
+    // If app crashed, it could be relaunched later. Do we want to keep the
+    // jobs around for that?
     mOwner->removeClient(mClientId);
     return Status::ok();
 }
@@ -109,22 +140,15 @@ Status TranscodingClientManager::ClientImpl::unregister() {
 ///////////////////////////////////////////////////////////////////////////////
 
 // static
-TranscodingClientManager& TranscodingClientManager::getInstance() {
-    static TranscodingClientManager gInstance{};
-    return gInstance;
-}
-
-// static
 void TranscodingClientManager::BinderDiedCallback(void* cookie) {
-    ClientIdType clientId = static_cast<ClientIdType>(reinterpret_cast<intptr_t>(cookie));
-    ALOGD("Client %lld is dead", (long long) clientId);
-    // Don't check for pid validity since we know it's already dead.
-    TranscodingClientManager& manager = TranscodingClientManager::getInstance();
-    manager.removeClient(clientId);
+    ClientImpl* client = static_cast<ClientImpl*>(cookie);
+    ALOGD("Client %lld is dead", (long long)client->mClientId);
+    client->unregister();
 }
 
-TranscodingClientManager::TranscodingClientManager()
-    : mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)) {
+TranscodingClientManager::TranscodingClientManager(
+        const std::shared_ptr<SchedulerClientInterface>& scheduler)
+      : mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)), mJobScheduler(scheduler) {
     ALOGD("TranscodingClientManager started");
 }
 
@@ -151,8 +175,8 @@ void TranscodingClientManager::dumpAllClients(int fd, const Vector<String16>& ar
     }
 
     for (const auto& iter : mClientIdToClientMap) {
-        snprintf(buffer, SIZE, "    -- Client id: %lld  name: %s\n",
-                (long long)iter.first, iter.second->mClientName.c_str());
+        snprintf(buffer, SIZE, "    -- Client id: %lld  name: %s\n", (long long)iter.first,
+                 iter.second->mClientName.c_str());
         result.append(buffer);
     }
 
@@ -160,22 +184,18 @@ void TranscodingClientManager::dumpAllClients(int fd, const Vector<String16>& ar
 }
 
 status_t TranscodingClientManager::addClient(
-        const std::shared_ptr<ITranscodingClientListener>& listener,
-        int32_t pid, int32_t uid,
-        const std::string& clientName,
-        const std::string& opPackageName,
+        const std::shared_ptr<ITranscodingClientCallback>& callback, pid_t pid, uid_t uid,
+        const std::string& clientName, const std::string& opPackageName,
         std::shared_ptr<ITranscodingClient>* outClient) {
     // Validate the client.
-    if (listener == nullptr || pid < 0 || uid < 0 ||
-            clientName.empty() || opPackageName.empty()) {
+    if (callback == nullptr || pid < 0 || clientName.empty() || opPackageName.empty()) {
         ALOGE("Invalid client");
         return BAD_VALUE;
     }
 
     // Creates the client and uses its process id as client id.
-    std::shared_ptr<ClientImpl> client =
-            ::ndk::SharedRefBase::make<ClientImpl>(
-                    listener, pid, uid, clientName, opPackageName, this);
+    std::shared_ptr<ClientImpl> client = ::ndk::SharedRefBase::make<ClientImpl>(
+            callback, pid, uid, clientName, opPackageName, this);
 
     std::scoped_lock lock{mLock};
 
@@ -185,14 +205,11 @@ status_t TranscodingClientManager::addClient(
     }
 
     ALOGD("Adding client id %lld, pid %d, uid %d, name %s, package %s",
-            (long long)client->mClientId,
-            client->mClientPid,
-            client->mClientUid,
-            client->mClientName.c_str(),
-            client->mClientOpPackageName.c_str());
+          (long long)client->mClientId, client->mClientPid, client->mClientUid,
+          client->mClientName.c_str(), client->mClientOpPackageName.c_str());
 
-    AIBinder_linkToDeath(client->mClientListener.get(), mDeathRecipient.get(),
-                         reinterpret_cast<void*>(client->mClientId));
+    AIBinder_linkToDeath(client->mClientCallback.get(), mDeathRecipient.get(),
+                         reinterpret_cast<void*>(client.get()));
 
     // Adds the new client to the map.
     mClientIdToClientMap[client->mClientId] = client;
@@ -201,7 +218,6 @@ status_t TranscodingClientManager::addClient(
 
     return OK;
 }
-
 
 status_t TranscodingClientManager::removeClient(ClientIdType clientId) {
     ALOGD("Removing client id %lld", (long long)clientId);
@@ -214,12 +230,12 @@ status_t TranscodingClientManager::removeClient(ClientIdType clientId) {
         return INVALID_OPERATION;
     }
 
-    SpAIBinder listener = it->second->mClientListener;
+    SpAIBinder callback = it->second->mClientCallback;
 
     // Check if the client still live. If alive, unlink the death.
-    if (listener.get() != nullptr) {
-        AIBinder_unlinkToDeath(listener.get(), mDeathRecipient.get(),
-                               reinterpret_cast<void*>(clientId));
+    if (callback.get() != nullptr) {
+        AIBinder_unlinkToDeath(callback.get(), mDeathRecipient.get(),
+                               reinterpret_cast<void*>(it->second.get()));
     }
 
     // Erase the entry.
