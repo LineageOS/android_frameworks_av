@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef _MEDIA_UTILS_H
-#define _MEDIA_UTILS_H
+#ifndef ANDROID_MEDIAUTILS_LIMIT_PROCESS_MEMORY_H
+#define ANDROID_MEDIAUTILS_LIMIT_PROCESS_MEMORY_H
 
 namespace android {
 
@@ -32,4 +32,4 @@ void limitProcessMemory(
 
 }   // namespace android
 
-#endif  // _MEDIA_UTILS_H
+#endif // ANDROID_MEDIAUTILS_LIMIT_PROCESS_MEMORY_H

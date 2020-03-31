@@ -79,32 +79,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
 
     copyFrom(request.getConstantConfiguration());
 
-    aaudio_direction_t direction = getDirection();
-
-    const audio_content_type_t contentType =
-            AAudioConvert_contentTypeToInternal(getContentType());
-    // Usage only used for OUTPUT
-    const audio_usage_t usage = (direction == AAUDIO_DIRECTION_OUTPUT)
-            ? AAudioConvert_usageToInternal(getUsage())
-            : AUDIO_USAGE_UNKNOWN;
-    const audio_source_t source = (direction == AAUDIO_DIRECTION_INPUT)
-            ? AAudioConvert_inputPresetToAudioSource(getInputPreset())
-            : AUDIO_SOURCE_DEFAULT;
-    audio_flags_mask_t flags;
-    if (direction == AAUDIO_DIRECTION_OUTPUT) {
-        flags = AUDIO_FLAG_LOW_LATENCY
-            | AAudioConvert_allowCapturePolicyToAudioFlagsMask(getAllowedCapturePolicy());
-    } else {
-        flags = AUDIO_FLAG_LOW_LATENCY
-            | AAudioConvert_privacySensitiveToAudioFlagsMask(isPrivacySensitive());
-    }
-    const audio_attributes_t attributes = {
-            .content_type = contentType,
-            .usage = usage,
-            .source = source,
-            .flags = flags,
-            .tags = ""
-    };
+    const audio_attributes_t attributes = getAudioAttributesFrom(this);
 
     mMmapClient.clientUid = request.getUserId();
     mMmapClient.clientPid = request.getProcessId();
@@ -126,6 +101,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
     config.sample_rate = aaudioSampleRate;
 
     int32_t aaudioSamplesPerFrame = getSamplesPerFrame();
+
+    const aaudio_direction_t direction = getDirection();
 
     if (direction == AAUDIO_DIRECTION_OUTPUT) {
         config.channel_mask = (aaudioSamplesPerFrame == AAUDIO_UNSPECIFIED)
@@ -269,7 +246,12 @@ aaudio_result_t AAudioServiceEndpointMMAP::startStream(sp<AAudioServiceStreamBas
     // Start the client on behalf of the AAudio service.
     // Use the port handle that was provided by openMmapStream().
     audio_port_handle_t tempHandle = mPortHandle;
-    aaudio_result_t result = startClient(mMmapClient, &tempHandle);
+    audio_attributes_t attr = {};
+    if (stream != nullptr) {
+        attr = getAudioAttributesFrom(stream.get());
+    }
+    aaudio_result_t result = startClient(
+            mMmapClient, stream == nullptr ? nullptr : &attr, &tempHandle);
     // When AudioFlinger is passed a valid port handle then it should not change it.
     LOG_ALWAYS_FATAL_IF(tempHandle != mPortHandle,
                         "%s() port handle not expected to change from %d to %d",
@@ -294,9 +276,10 @@ aaudio_result_t AAudioServiceEndpointMMAP::stopStream(sp<AAudioServiceStreamBase
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::startClient(const android::AudioClient& client,
+                                                       const audio_attributes_t *attr,
                                                        audio_port_handle_t *clientHandle) {
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
-    status_t status = mMmapStream->start(client, clientHandle);
+    status_t status = mMmapStream->start(client, attr, clientHandle);
     return AAudioConvert_androidToAAudioResult(status);
 }
 
