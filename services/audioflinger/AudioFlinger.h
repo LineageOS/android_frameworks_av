@@ -681,7 +681,8 @@ using effect_buffer_t = int16_t;
                                           struct audio_mmap_buffer_info *info);
         virtual status_t getMmapPosition(struct audio_mmap_position *position);
         virtual status_t start(const AudioClient& client,
-                                         audio_port_handle_t *handle);
+                               const audio_attributes_t *attr,
+                               audio_port_handle_t *handle);
         virtual status_t stop(audio_port_handle_t handle);
         virtual status_t standby();
 
