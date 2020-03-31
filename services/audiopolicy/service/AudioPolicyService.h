@@ -261,6 +261,7 @@ public:
 
     virtual status_t setAssistantUid(uid_t uid);
     virtual status_t setA11yServicesUids(const std::vector<uid_t>& uids);
+    virtual status_t setCurrentImeUid(uid_t uid);
 
     virtual bool     isHapticPlaybackSupported();
 
@@ -371,7 +372,7 @@ private:
     public:
         explicit UidPolicy(wp<AudioPolicyService> service)
                 : mService(service), mObserverRegistered(false),
-                  mAssistantUid(0), mRttEnabled(false) {}
+                  mAssistantUid(0), mCurrentImeUid(0), mRttEnabled(false) {}
 
         void registerSelf();
         void unregisterSelf();
@@ -386,6 +387,8 @@ private:
         void setA11yUids(const std::vector<uid_t>& uids) { mA11yUids.clear(); mA11yUids = uids; }
         bool isA11yUid(uid_t uid);
         bool isA11yOnTop();
+        void setCurrentImeUid(uid_t uid) { mCurrentImeUid = uid; }
+        bool isCurrentImeUid(uid_t uid) { return uid == mCurrentImeUid; }
         void setRttEnabled(bool enabled) { mRttEnabled = enabled; }
         bool isRttEnabled() { return mRttEnabled; }
 
@@ -417,6 +420,7 @@ private:
         std::unordered_map<uid_t, std::pair<bool, int>> mCachedUids;
         uid_t mAssistantUid;
         std::vector<uid_t> mA11yUids;
+        uid_t mCurrentImeUid;
         bool mRttEnabled;
     };
 
