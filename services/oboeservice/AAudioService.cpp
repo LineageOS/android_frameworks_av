@@ -310,14 +310,15 @@ aaudio_result_t AAudioService::unregisterAudioThread(aaudio_handle_t streamHandl
 }
 
 aaudio_result_t AAudioService::startClient(aaudio_handle_t streamHandle,
-                                  const android::AudioClient& client,
-                                  audio_port_handle_t *clientHandle) {
+                                           const android::AudioClient& client,
+                                           const audio_attributes_t *attr,
+                                           audio_port_handle_t *clientHandle) {
     sp<AAudioServiceStreamBase> serviceStream = convertHandleToServiceStream(streamHandle);
     if (serviceStream.get() == nullptr) {
         ALOGE("%s(), illegal stream handle = 0x%0x", __func__, streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
-    aaudio_result_t result = serviceStream->startClient(client, clientHandle);
+    aaudio_result_t result = serviceStream->startClient(client, attr, clientHandle);
     return checkForPendingClose(serviceStream, result);
 }
 

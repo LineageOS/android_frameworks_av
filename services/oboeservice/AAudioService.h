@@ -77,8 +77,9 @@ public:
                                                   pid_t tid) override;
 
     aaudio_result_t startClient(aaudio::aaudio_handle_t streamHandle,
-                                      const android::AudioClient& client,
-                                      audio_port_handle_t *clientHandle) override;
+                                const android::AudioClient& client,
+                                const audio_attributes_t *attr,
+                                audio_port_handle_t *clientHandle) override;
 
     aaudio_result_t stopClient(aaudio::aaudio_handle_t streamHandle,
                                        audio_port_handle_t clientHandle) override;
