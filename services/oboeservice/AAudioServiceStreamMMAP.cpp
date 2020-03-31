@@ -86,7 +86,7 @@ aaudio_result_t AAudioServiceStreamMMAP::startDevice() {
     aaudio_result_t result = AAudioServiceStreamBase::startDevice();
     if (!mInService && result == AAUDIO_OK) {
         // Note that this can sometimes take 200 to 300 msec for a cold start!
-        result = startClient(mMmapClient, &mClientHandle);
+        result = startClient(mMmapClient, nullptr /*const audio_attributes_t* */, &mClientHandle);
     }
     return result;
 }
@@ -117,14 +117,15 @@ aaudio_result_t AAudioServiceStreamMMAP::stop() {
 }
 
 aaudio_result_t AAudioServiceStreamMMAP::startClient(const android::AudioClient& client,
-                                                       audio_port_handle_t *clientHandle) {
+                                                     const audio_attributes_t *attr,
+                                                     audio_port_handle_t *clientHandle) {
     sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
     if (endpoint == nullptr) {
         ALOGE("%s() has no endpoint", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
     // Start the client on behalf of the application. Generate a new porthandle.
-    aaudio_result_t result = endpoint->startClient(client, clientHandle);
+    aaudio_result_t result = endpoint->startClient(client, attr, clientHandle);
     return result;
 }
 

@@ -63,6 +63,7 @@ public:
     aaudio_result_t stop() override;
 
     aaudio_result_t startClient(const android::AudioClient& client,
+                                const audio_attributes_t *attr,
                                 audio_port_handle_t *clientHandle) override;
 
     aaudio_result_t stopClient(audio_port_handle_t clientHandle) override;
