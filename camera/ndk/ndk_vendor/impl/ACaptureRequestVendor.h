@@ -17,7 +17,7 @@
 #include "utils.h"
 
 struct ACameraOutputTarget {
-    explicit ACameraOutputTarget(native_handle_t* window) : mWindow(window) {};
+    explicit ACameraOutputTarget(const native_handle_t* window) : mWindow(window) {};
 
     bool operator == (const ACameraOutputTarget& other) const {
         return mWindow == other.mWindow;
