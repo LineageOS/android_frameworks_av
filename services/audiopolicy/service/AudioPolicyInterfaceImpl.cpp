@@ -1420,6 +1420,13 @@ status_t AudioPolicyService::setA11yServicesUids(const std::vector<uid_t>& uids)
     return NO_ERROR;
 }
 
+status_t AudioPolicyService::setCurrentImeUid(uid_t uid)
+{
+    Mutex::Autolock _l(mLock);
+    mUidPolicy->setCurrentImeUid(uid);
+    return NO_ERROR;
+}
+
 bool AudioPolicyService::isHapticPlaybackSupported()
 {
     if (mAudioPolicyManager == NULL) {
