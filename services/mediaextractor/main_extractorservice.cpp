@@ -21,7 +21,7 @@
 #include <binder/IPCThreadState.h>
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
-#include <media/MediaUtils.h>
+#include <mediautils/LimitProcessMemory.h>
 #include <string>
 
 #include <android-base/logging.h>
