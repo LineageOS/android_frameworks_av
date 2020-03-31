@@ -43,10 +43,24 @@ float VolumeCurve::volIndexToDb(int indexInUi, int volIndexMin, int volIndexMax)
         indexInUi = volIndexMax;
     }
 
+    // Calculate the new volume index
     size_t nbCurvePoints = mCurvePoints.size();
-    // the volume index in the UI is relative to the min and max volume indices for this stream
-    int nbSteps = 1 + mCurvePoints[nbCurvePoints - 1].mIndex - mCurvePoints[0].mIndex;
-    int volIdx = (nbSteps * (indexInUi - volIndexMin)) / (volIndexMax - volIndexMin);
+
+    int volIdx;
+    if (volIndexMin == volIndexMax) {
+        if (indexInUi == volIndexMin) {
+            volIdx = volIndexMin;
+        } else {
+            // This would result in a divide-by-zero below
+            ALOG_ASSERT(volIndexmin != volIndexMax, "Invalid volume index range & value: 0");
+            return NAN;
+        }
+    } else {
+        // interpolaate
+        // the volume index in the UI is relative to the min and max volume indices for this stream
+        int nbSteps = 1 + mCurvePoints[nbCurvePoints - 1].mIndex - mCurvePoints[0].mIndex;
+        volIdx = (nbSteps * (indexInUi - volIndexMin)) / (volIndexMax - volIndexMin);
+    }
 
     // Where would this volume index been inserted in the curve point
     size_t indexInUiPosition = mCurvePoints.orderOf(CurvePoint(volIdx, 0));
