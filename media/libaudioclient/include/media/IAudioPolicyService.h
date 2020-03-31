@@ -221,6 +221,7 @@ public:
 
     virtual status_t setAssistantUid(uid_t uid) = 0;
     virtual status_t setA11yServicesUids(const std::vector<uid_t>& uids) = 0;
+    virtual status_t setCurrentImeUid(uid_t uid) = 0;
 
     virtual bool     isHapticPlaybackSupported() = 0;
     virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies) = 0;
