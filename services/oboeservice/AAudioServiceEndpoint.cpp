@@ -138,3 +138,36 @@ bool AAudioServiceEndpoint::matches(const AAudioStreamConfiguration& configurati
     }
     return true;
 }
+
+// static
+audio_attributes_t AAudioServiceEndpoint::getAudioAttributesFrom(
+        const AAudioStreamParameters *params) {
+    if (params == nullptr) {
+        return {};
+    }
+    const aaudio_direction_t direction = params->getDirection();
+
+    const audio_content_type_t contentType =
+            AAudioConvert_contentTypeToInternal(params->getContentType());
+    // Usage only used for OUTPUT
+    const audio_usage_t usage = (direction == AAUDIO_DIRECTION_OUTPUT)
+            ? AAudioConvert_usageToInternal(params->getUsage())
+            : AUDIO_USAGE_UNKNOWN;
+    const audio_source_t source = (direction == AAUDIO_DIRECTION_INPUT)
+            ? AAudioConvert_inputPresetToAudioSource(params->getInputPreset())
+            : AUDIO_SOURCE_DEFAULT;
+    audio_flags_mask_t flags;
+    if (direction == AAUDIO_DIRECTION_OUTPUT) {
+        flags = AUDIO_FLAG_LOW_LATENCY
+            | AAudioConvert_allowCapturePolicyToAudioFlagsMask(params->getAllowedCapturePolicy());
+    } else {
+        flags = AUDIO_FLAG_LOW_LATENCY
+            | AAudioConvert_privacySensitiveToAudioFlagsMask(params->isPrivacySensitive());
+    }
+    return {
+            .content_type = contentType,
+            .usage = usage,
+            .source = source,
+            .flags = flags,
+            .tags = "" };
+}

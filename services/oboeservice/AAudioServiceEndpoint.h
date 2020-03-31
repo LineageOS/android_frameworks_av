@@ -60,6 +60,7 @@ public:
                                        audio_port_handle_t clientHandle) = 0;
 
     virtual aaudio_result_t startClient(const android::AudioClient& client,
+                                        const audio_attributes_t *attr,
                                         audio_port_handle_t *clientHandle) {
         ALOGD("AAudioServiceEndpoint::startClient(...) AAUDIO_ERROR_UNAVAILABLE");
         return AAUDIO_ERROR_UNAVAILABLE;
@@ -117,6 +118,8 @@ protected:
     bool                     isStreamRegistered(audio_port_handle_t portHandle);
 
     void                     disconnectRegisteredStreams();
+
+    static audio_attributes_t getAudioAttributesFrom(const AAudioStreamParameters *params);
 
     mutable std::mutex       mLockStreams;
     std::vector<android::sp<AAudioServiceStreamBase>> mRegisteredStreams;

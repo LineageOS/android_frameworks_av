@@ -1776,7 +1776,9 @@ class MmapThread : public ThreadBase
     status_t createMmapBuffer(int32_t minSizeFrames,
                                       struct audio_mmap_buffer_info *info);
     status_t getMmapPosition(struct audio_mmap_position *position);
-    status_t start(const AudioClient& client, audio_port_handle_t *handle);
+    status_t start(const AudioClient& client,
+                   const audio_attributes_t *attr,
+                   audio_port_handle_t *handle);
     status_t stop(audio_port_handle_t handle);
     status_t standby();
 
