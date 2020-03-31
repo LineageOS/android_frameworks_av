@@ -80,19 +80,22 @@ void MediaTranscodingService::instantiate() {
 }
 
 Status MediaTranscodingService::registerClient(
-        const std::shared_ptr<ITranscodingServiceClient>& in_client,
-        const std::string& in_opPackageName, int32_t in_clientUid, int32_t in_clientPid,
-        int32_t* _aidl_return) {
-    if (in_client == nullptr) {
-        ALOGE("Client can not be null");
-        *_aidl_return = kInvalidJobId;
+        const std::shared_ptr<ITranscodingClientListener>& in_listener,
+        const std::string& in_clientName,
+        const std::string& in_opPackageName,
+        int32_t in_clientUid, int32_t in_clientPid,
+        std::shared_ptr<ITranscodingClient>* _aidl_return) {
+    if (in_listener == nullptr) {
+        ALOGE("Client listener can not be null");
+        *_aidl_return = nullptr;
         return Status::fromServiceSpecificError(ERROR_ILLEGAL_ARGUMENT);
     }
 
     int32_t callingPid = AIBinder_getCallingPid();
     int32_t callingUid = AIBinder_getCallingUid();
 
-    // Check if we can trust clientUid. Only privilege caller could forward the uid on app client's behalf.
+    // Check if we can trust clientUid. Only privilege caller could forward the
+    // uid on app client's behalf.
     if (in_clientUid == USE_CALLING_UID) {
         in_clientUid = callingUid;
     } else if (!isTrustedCallingUid(callingUid)) {
@@ -106,7 +109,8 @@ Status MediaTranscodingService::registerClient(
                                 in_clientPid, in_clientUid);
     }
 
-    // Check if we can trust clientPid. Only privilege caller could forward the pid on app client's behalf.
+    // Check if we can trust clientPid. Only privilege caller could forward the
+    // pid on app client's behalf.
     if (in_clientPid == USE_CALLING_PID) {
         in_clientPid = callingPid;
     } else if (!isTrustedCallingUid(callingUid)) {
@@ -120,78 +124,23 @@ Status MediaTranscodingService::registerClient(
                                 in_clientPid, in_clientUid);
     }
 
-    // We know the clientId must be equal to its pid as we assigned client's pid as its clientId.
-    int32_t clientId = in_clientPid;
-
-    // Checks if the client already registers.
-    if (mTranscodingClientManager.isClientIdRegistered(clientId)) {
-        return Status::fromServiceSpecificError(ERROR_ALREADY_EXISTS);
-    }
-
     // Creates the client and uses its process id as client id.
-    std::unique_ptr<TranscodingClientManager::ClientInfo> newClient =
-            std::make_unique<TranscodingClientManager::ClientInfo>(
-                    in_client, clientId, in_clientPid, in_clientUid, in_opPackageName);
-    status_t err = mTranscodingClientManager.addClient(std::move(newClient));
+    std::shared_ptr<ITranscodingClient> newClient;
+
+    status_t err = mTranscodingClientManager.addClient(in_listener,
+            in_clientPid, in_clientUid, in_clientName, in_opPackageName, &newClient);
     if (err != OK) {
-        *_aidl_return = kInvalidClientId;
+        *_aidl_return = nullptr;
         return STATUS_ERROR_FMT(err, "Failed to add client to TranscodingClientManager");
     }
 
-    ALOGD("Assign client: %s pid: %d, uid: %d with id: %d", in_opPackageName.c_str(), in_clientPid,
-          in_clientUid, clientId);
-
-    *_aidl_return = clientId;
-    return Status::ok();
-}
-
-Status MediaTranscodingService::unregisterClient(int32_t clientId, bool* _aidl_return) {
-    ALOGD("unregisterClient id: %d", clientId);
-    int32_t callingUid = AIBinder_getCallingUid();
-    int32_t callingPid = AIBinder_getCallingPid();
-
-    // Only the client with clientId or the trusted caller could unregister the client.
-    if (callingPid != clientId) {
-        if (!isTrustedCallingUid(callingUid)) {
-            ALOGE("Untrusted caller (calling PID %d, UID %d) trying to "
-                  "unregister client with id: %d",
-                  callingUid, callingPid, clientId);
-            *_aidl_return = true;
-            return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
-                                    "Untrusted caller (calling PID %d, UID %d) trying to "
-                                    "unregister client with id: %d",
-                                    callingUid, callingPid, clientId);
-        }
-    }
-
-    *_aidl_return = (mTranscodingClientManager.removeClient(clientId) == OK);
+    *_aidl_return = newClient;
     return Status::ok();
 }
 
 Status MediaTranscodingService::getNumOfClients(int32_t* _aidl_return) {
     ALOGD("MediaTranscodingService::getNumOfClients");
     *_aidl_return = mTranscodingClientManager.getNumOfClients();
-    return Status::ok();
-}
-
-Status MediaTranscodingService::submitRequest(int32_t /*clientId*/,
-                                              const TranscodingRequestParcel& /*request*/,
-                                              TranscodingJobParcel* /*job*/,
-                                              int32_t* /*_aidl_return*/) {
-    // TODO(hkuang): Add implementation.
-    return Status::ok();
-}
-
-Status MediaTranscodingService::cancelJob(int32_t /*in_clientId*/, int32_t /*in_jobId*/,
-                                          bool* /*_aidl_return*/) {
-    // TODO(hkuang): Add implementation.
-    return Status::ok();
-}
-
-Status MediaTranscodingService::getJobWithId(int32_t /*in_jobId*/,
-                                             TranscodingJobParcel* /*out_job*/,
-                                             bool* /*_aidl_return*/) {
-    // TODO(hkuang): Add implementation.
     return Status::ok();
 }
 
