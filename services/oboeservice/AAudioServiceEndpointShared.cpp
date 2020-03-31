@@ -152,7 +152,9 @@ aaudio_result_t AAudioServiceEndpointShared::startStream(sp<AAudioServiceStreamB
     }
 
     if (result == AAUDIO_OK) {
-        result = getStreamInternal()->startClient(sharedStream->getAudioClient(), clientHandle);
+        const audio_attributes_t attr = getAudioAttributesFrom(sharedStream.get());
+        result = getStreamInternal()->startClient(
+                sharedStream->getAudioClient(), &attr, clientHandle);
         if (result != AAUDIO_OK) {
             if (--mRunningStreamCount == 0) { // atomic
                 stopSharingThread();
