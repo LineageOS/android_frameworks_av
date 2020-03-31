@@ -8633,10 +8633,10 @@ status_t AudioFlinger::MmapThreadHandle::getMmapPosition(struct audio_mmap_posit
 }
 
 status_t AudioFlinger::MmapThreadHandle::start(const AudioClient& client,
-        audio_port_handle_t *handle)
+        const audio_attributes_t *attr, audio_port_handle_t *handle)
 
 {
-    return mThread->start(client, handle);
+    return mThread->start(client, attr, handle);
 }
 
 status_t AudioFlinger::MmapThreadHandle::stop(audio_port_handle_t handle)
@@ -8741,6 +8741,7 @@ status_t AudioFlinger::MmapThread::exitStandby()
 }
 
 status_t AudioFlinger::MmapThread::start(const AudioClient& client,
+                                         const audio_attributes_t *attr,
                                          audio_port_handle_t *handle)
 {
     ALOGV("%s clientUid %d mStandby %d mPortId %d *handle %d", __FUNCTION__,
@@ -8831,9 +8832,10 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
     }
 
     // Given that MmapThread::mAttr is mutable, should a MmapTrack have attributes ?
-    sp<MmapTrack> track = new MmapTrack(this, mAttr, mSampleRate, mFormat, mChannelMask, mSessionId,
-                                        isOutput(), client.clientUid, client.clientPid,
-                                        IPCThreadState::self()->getCallingPid(), portId);
+    sp<MmapTrack> track = new MmapTrack(this, attr == nullptr ? mAttr : *attr, mSampleRate, mFormat,
+                                        mChannelMask, mSessionId, isOutput(), client.clientUid,
+                                        client.clientPid, IPCThreadState::self()->getCallingPid(),
+                                        portId);
 
     if (isOutput()) {
         // force volume update when a new track is added
