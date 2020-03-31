@@ -429,13 +429,14 @@ aaudio_result_t AudioStreamInternal::unregisterThread() {
 }
 
 aaudio_result_t AudioStreamInternal::startClient(const android::AudioClient& client,
+                                                 const audio_attributes_t *attr,
                                                  audio_port_handle_t *portHandle) {
     ALOGV("%s() called", __func__);
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
         return AAUDIO_ERROR_INVALID_STATE;
     }
     aaudio_result_t result =  mServiceInterface.startClient(mServiceStreamHandle,
-                                                            client, portHandle);
+                                                            client, attr, portHandle);
     ALOGV("%s(%d) returning %d", __func__, *portHandle, result);
     return result;
 }
