@@ -1523,4 +1523,12 @@ status_t AudioPolicyService::getPreferredDeviceForStrategy(product_strategy_t st
     return mAudioPolicyManager->getPreferredDeviceForStrategy(strategy, device);
 }
 
+status_t AudioPolicyService::registerSoundTriggerCaptureStateListener(
+    const sp<media::ICaptureStateListener>& listener,
+    bool* result)
+{
+    *result = mCaptureStateNotifier.RegisterListener(listener);
+    return NO_ERROR;
+}
+
 } // namespace android
