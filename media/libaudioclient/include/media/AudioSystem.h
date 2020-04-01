@@ -436,6 +436,30 @@ public:
     static status_t getDeviceForStrategy(product_strategy_t strategy,
             AudioDeviceTypeAddr &device);
 
+    // A listener for capture state changes.
+    class CaptureStateListener : public RefBase {
+    public:
+        // Called whenever capture state changes.
+        virtual void onStateChanged(bool active) = 0;
+        // Called whenever the service dies (and hence our listener is no longer
+        // registered).
+        virtual void onServiceDied() = 0;
+
+        virtual ~CaptureStateListener() = default;
+    };
+
+    // Regiseters a listener for sound trigger capture state changes.
+    // There may only be one such listener registered at any point.
+    // The listener onStateChanged() method will be invoked sychronously from
+    // this call with the initial value.
+    // The listener onServiceDied() method will be invoked sychronously from
+    // this call if initial attempt to register failed.
+    // If the audio policy service cannot be reached, this method will return
+    // PERMISSION_DENIED and will not invoke the callback, otherwise, it will
+    // return NO_ERROR.
+    static status_t registerSoundTriggerCaptureStateListener(
+            const sp<CaptureStateListener>& listener);
+
     // ----------------------------------------------------------------------------
 
     class AudioVolumeGroupCallback : public RefBase
