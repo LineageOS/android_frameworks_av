@@ -20,7 +20,10 @@ adb root && adb wait-for-device remount && adb sync
 echo "========================================"
 
 echo "testing TranscodingClientManager"
-adb shell /data/nativetest64/TranscodingClientManager_tests/TranscodingClientManager_tests
+#adb shell /data/nativetest64/TranscodingClientManager_tests/TranscodingClientManager_tests
+adb shell /data/nativetest/TranscodingClientManager_tests/TranscodingClientManager_tests
 
 echo "testing AdjustableMaxPriorityQueue"
-adb shell /data/nativetest64/AdjustableMaxPriorityQueue_tests/AdjustableMaxPriorityQueue_tests
+#adb shell /data/nativetest64/AdjustableMaxPriorityQueue_tests/AdjustableMaxPriorityQueue_tests
+adb shell /data/nativetest/AdjustableMaxPriorityQueue_tests/AdjustableMaxPriorityQueue_tests
+

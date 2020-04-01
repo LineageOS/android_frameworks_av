@@ -19,9 +19,10 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MediaTranscodingServiceTest"
 
-#include <aidl/android/media/BnTranscodingServiceClient.h>
+#include <aidl/android/media/BnTranscodingClientListener.h>
 #include <aidl/android/media/IMediaTranscodingService.h>
-#include <aidl/android/media/ITranscodingServiceClient.h>
+#include <aidl/android/media/ITranscodingClient.h>
+#include <aidl/android/media/ITranscodingClientListener.h>
 #include <android-base/logging.h>
 #include <android-base/unique_fd.h>
 #include <android/binder_ibinder_jni.h>
@@ -38,48 +39,30 @@ namespace android {
 namespace media {
 
 using Status = ::ndk::ScopedAStatus;
-using aidl::android::media::BnTranscodingServiceClient;
+using aidl::android::media::BnTranscodingClientListener;
+using aidl::android::media::ITranscodingClient;
+using aidl::android::media::ITranscodingClientListener;
 using aidl::android::media::IMediaTranscodingService;
-using aidl::android::media::ITranscodingServiceClient;
-
-constexpr int32_t kInvalidClientId = -5;
 
 // Note that -1 is valid and means using calling pid/uid for the service. But only privilege caller could
 // use them. This test is not a privilege caller.
 constexpr int32_t kInvalidClientPid = -5;
 constexpr int32_t kInvalidClientUid = -5;
+constexpr const char* kInvalidClientName = "";
 constexpr const char* kInvalidClientOpPackageName = "";
 
 constexpr int32_t kClientUseCallingPid = -1;
 constexpr int32_t kClientUseCallingUid = -1;
-constexpr const char* kClientOpPackageName = "TestClient";
+constexpr const char* kClientName = "TestClient";
+constexpr const char* kClientOpPackageName = "TestClientPackage";
 
-class MediaTranscodingServiceTest : public ::testing::Test {
-public:
-    MediaTranscodingServiceTest() { ALOGD("MediaTranscodingServiceTest created"); }
-
-    void SetUp() override {
-        ::ndk::SpAIBinder binder(AServiceManager_getService("media.transcoding"));
-        mService = IMediaTranscodingService::fromBinder(binder);
-        if (mService == nullptr) {
-            ALOGE("Failed to connect to the media.trascoding service.");
-            return;
-        }
-    }
-
-    ~MediaTranscodingServiceTest() { ALOGD("MediaTranscodingingServiceTest destroyed"); }
-
-    std::shared_ptr<IMediaTranscodingService> mService = nullptr;
-};
-
-struct TestClient : public BnTranscodingServiceClient {
-    TestClient(const std::shared_ptr<IMediaTranscodingService>& service) : mService(service) {
+struct TestClient : public BnTranscodingClientListener {
+    TestClient() {
         ALOGD("TestClient Created");
     }
 
-    Status getName(std::string* _aidl_return) override {
-        *_aidl_return = "test_client";
-        return Status::ok();
+    virtual ~TestClient() {
+        ALOGI("TestClient destroyed");
     }
 
     Status onTranscodingFinished(
@@ -102,71 +85,97 @@ struct TestClient : public BnTranscodingServiceClient {
     Status onProgressUpdate(int32_t /* in_jobId */, int32_t /* in_progress */) override {
         return Status::ok();
     }
-
-    virtual ~TestClient() { ALOGI("TestClient destroyed"); };
-
-private:
-    std::shared_ptr<IMediaTranscodingService> mService;
 };
 
+class MediaTranscodingServiceTest : public ::testing::Test {
+public:
+    MediaTranscodingServiceTest() {
+        ALOGD("MediaTranscodingServiceTest created");
+    }
+
+    ~MediaTranscodingServiceTest() {
+        ALOGD("MediaTranscodingingServiceTest destroyed");
+    }
+
+    void SetUp() override {
+        ::ndk::SpAIBinder binder(AServiceManager_getService("media.transcoding"));
+        mService = IMediaTranscodingService::fromBinder(binder);
+        if (mService == nullptr) {
+            ALOGE("Failed to connect to the media.trascoding service.");
+            return;
+        }
+        mClientListener = ::ndk::SharedRefBase::make<TestClient>();
+        mClientListener2 = ::ndk::SharedRefBase::make<TestClient>();
+        mClientListener3 = ::ndk::SharedRefBase::make<TestClient>();
+    }
+
+    std::shared_ptr<IMediaTranscodingService> mService;
+    std::shared_ptr<ITranscodingClientListener> mClientListener;
+    std::shared_ptr<ITranscodingClientListener> mClientListener2;
+    std::shared_ptr<ITranscodingClientListener> mClientListener3;
+};
+
+
 TEST_F(MediaTranscodingServiceTest, TestRegisterNullClient) {
-    std::shared_ptr<ITranscodingServiceClient> client = nullptr;
-    int32_t clientId = 0;
-    Status status = mService->registerClient(client, kClientOpPackageName, kClientUseCallingUid,
-                                             kClientUseCallingPid, &clientId);
+    std::shared_ptr<ITranscodingClient> client;
+
+    // Register the client with null listener
+    Status status = mService->registerClient(
+            nullptr, kClientName, kClientOpPackageName,
+            kClientUseCallingUid, kClientUseCallingPid, &client);
     EXPECT_FALSE(status.isOk());
 }
 
 TEST_F(MediaTranscodingServiceTest, TestRegisterClientWithInvalidClientPid) {
-    std::shared_ptr<ITranscodingServiceClient> client =
-            ::ndk::SharedRefBase::make<TestClient>(mService);
-    EXPECT_TRUE(client != nullptr);
+    std::shared_ptr<ITranscodingClient> client;
 
     // Register the client with the service.
-    int32_t clientId = 0;
-    Status status = mService->registerClient(client, kClientOpPackageName, kClientUseCallingUid,
-                                             kInvalidClientPid, &clientId);
+    Status status = mService->registerClient(
+            mClientListener, kClientName, kClientOpPackageName,
+            kClientUseCallingUid, kInvalidClientPid, &client);
     EXPECT_FALSE(status.isOk());
 }
 
 TEST_F(MediaTranscodingServiceTest, TestRegisterClientWithInvalidClientUid) {
-    std::shared_ptr<ITranscodingServiceClient> client =
-            ::ndk::SharedRefBase::make<TestClient>(mService);
-    EXPECT_TRUE(client != nullptr);
+    std::shared_ptr<ITranscodingClient> client;
 
     // Register the client with the service.
-    int32_t clientId = 0;
-    Status status = mService->registerClient(client, kClientOpPackageName, kInvalidClientUid,
-                                             kClientUseCallingPid, &clientId);
+    Status status = mService->registerClient(
+            mClientListener, kClientName, kClientOpPackageName,
+            kInvalidClientUid, kClientUseCallingPid, &client);
+    EXPECT_FALSE(status.isOk());
+}
+
+TEST_F(MediaTranscodingServiceTest, TestRegisterClientWithInvalidClientName) {
+    std::shared_ptr<ITranscodingClient> client;
+
+    // Register the client with the service.
+    Status status = mService->registerClient(
+            mClientListener, kInvalidClientName, kInvalidClientOpPackageName,
+            kClientUseCallingUid, kClientUseCallingPid, &client);
     EXPECT_FALSE(status.isOk());
 }
 
 TEST_F(MediaTranscodingServiceTest, TestRegisterClientWithInvalidClientPackageName) {
-    std::shared_ptr<ITranscodingServiceClient> client =
-            ::ndk::SharedRefBase::make<TestClient>(mService);
-    EXPECT_TRUE(client != nullptr);
+    std::shared_ptr<ITranscodingClient> client;
 
     // Register the client with the service.
-    int32_t clientId = 0;
-    Status status = mService->registerClient(client, kInvalidClientOpPackageName,
-                                             kClientUseCallingUid, kClientUseCallingPid, &clientId);
+    Status status = mService->registerClient(
+            mClientListener, kClientName, kInvalidClientOpPackageName,
+            kClientUseCallingUid, kClientUseCallingPid, &client);
     EXPECT_FALSE(status.isOk());
 }
 
 TEST_F(MediaTranscodingServiceTest, TestRegisterOneClient) {
-    std::shared_ptr<ITranscodingServiceClient> client =
-            ::ndk::SharedRefBase::make<TestClient>(mService);
-    EXPECT_TRUE(client != nullptr);
+    std::shared_ptr<ITranscodingClient> client;
 
-    // Register the client with the service.
-    int32_t clientId = 0;
-    Status status = mService->registerClient(client, kClientOpPackageName, kClientUseCallingPid,
-                                             kClientUseCallingUid, &clientId);
-    ALOGD("client id is %d", clientId);
+    Status status = mService->registerClient(
+            mClientListener, kClientName, kClientOpPackageName,
+            kClientUseCallingUid, kClientUseCallingPid, &client);
     EXPECT_TRUE(status.isOk());
 
-    // Validate the clientId.
-    EXPECT_TRUE(clientId > 0);
+    // Validate the client.
+    EXPECT_TRUE(client != nullptr);
 
     // Check the number of Clients.
     int32_t numOfClients;
@@ -175,65 +184,82 @@ TEST_F(MediaTranscodingServiceTest, TestRegisterOneClient) {
     EXPECT_EQ(1, numOfClients);
 
     // Unregister the client.
-    bool res;
-    status = mService->unregisterClient(clientId, &res);
+    status = client->unregister();
     EXPECT_TRUE(status.isOk());
-    EXPECT_TRUE(res);
-}
-
-TEST_F(MediaTranscodingServiceTest, TestUnRegisterClientWithInvalidClientId) {
-    std::shared_ptr<ITranscodingServiceClient> client =
-            ::ndk::SharedRefBase::make<TestClient>(mService);
-    EXPECT_TRUE(client != nullptr);
-
-    // Register the client with the service.
-    int32_t clientId = 0;
-    Status status = mService->registerClient(client, kClientOpPackageName, kClientUseCallingUid,
-                                             kClientUseCallingPid, &clientId);
-    ALOGD("client id is %d", clientId);
-    EXPECT_TRUE(status.isOk());
-
-    // Validate the clientId.
-    EXPECT_TRUE(clientId > 0);
 
     // Check the number of Clients.
-    int32_t numOfClients;
     status = mService->getNumOfClients(&numOfClients);
     EXPECT_TRUE(status.isOk());
-    EXPECT_EQ(1, numOfClients);
-
-    // Unregister the client with invalid ID
-    bool res;
-    mService->unregisterClient(kInvalidClientId, &res);
-    EXPECT_FALSE(res);
-
-    // Unregister the valid client.
-    mService->unregisterClient(clientId, &res);
+    EXPECT_EQ(0, numOfClients);
 }
 
 TEST_F(MediaTranscodingServiceTest, TestRegisterClientTwice) {
-    std::shared_ptr<ITranscodingServiceClient> client =
-            ::ndk::SharedRefBase::make<TestClient>(mService);
-    EXPECT_TRUE(client != nullptr);
+    std::shared_ptr<ITranscodingClient> client;
 
-    // Register the client with the service.
-    int32_t clientId = 0;
-    Status status = mService->registerClient(client, kClientOpPackageName, kClientUseCallingUid,
-                                             kClientUseCallingPid, &clientId);
+    Status status = mService->registerClient(
+            mClientListener, kClientName, kClientOpPackageName,
+            kClientUseCallingUid, kClientUseCallingPid, &client);
     EXPECT_TRUE(status.isOk());
 
-    // Validate the clientId.
-    EXPECT_TRUE(clientId > 0);
+    // Validate the client.
+    EXPECT_TRUE(client != nullptr);
 
     // Register the client again and expects failure.
-    status = mService->registerClient(client, kClientOpPackageName, kClientUseCallingUid,
-                                      kClientUseCallingPid, &clientId);
+    std::shared_ptr<ITranscodingClient> client1;
+    status = mService->registerClient(
+            mClientListener, kClientName, kClientOpPackageName,
+            kClientUseCallingUid, kClientUseCallingPid, &client1);
     EXPECT_FALSE(status.isOk());
 
-    // Unregister the valid client.
-    bool res;
-    mService->unregisterClient(clientId, &res);
+    // Unregister the client.
+    status = client->unregister();
+    EXPECT_TRUE(status.isOk());
 }
 
+TEST_F(MediaTranscodingServiceTest, TestRegisterMultipleClients) {
+    std::shared_ptr<ITranscodingClient> client1;
+    std::shared_ptr<ITranscodingClient> client2;
+    std::shared_ptr<ITranscodingClient> client3;
+
+    // Register 3 clients.
+    Status status = mService->registerClient(
+            mClientListener, kClientName, kClientOpPackageName,
+            kClientUseCallingUid, kClientUseCallingPid, &client1);
+    EXPECT_TRUE(status.isOk());
+    EXPECT_TRUE(client1 != nullptr);
+
+    status = mService->registerClient(
+            mClientListener2, kClientName, kClientOpPackageName,
+            kClientUseCallingUid, kClientUseCallingPid, &client2);
+    EXPECT_TRUE(status.isOk());
+    EXPECT_TRUE(client2 != nullptr);
+
+    status = mService->registerClient(
+            mClientListener3, kClientName, kClientOpPackageName,
+            kClientUseCallingUid, kClientUseCallingPid, &client3);
+    EXPECT_TRUE(status.isOk());
+    EXPECT_TRUE(client3 != nullptr);
+
+    // Check the number of clients.
+    int32_t numOfClients;
+    status = mService->getNumOfClients(&numOfClients);
+    EXPECT_TRUE(status.isOk());
+    EXPECT_EQ(3, numOfClients);
+
+    // Unregister the clients.
+    status = client1->unregister();
+    EXPECT_TRUE(status.isOk());
+
+    status = client2->unregister();
+    EXPECT_TRUE(status.isOk());
+
+    status = client3->unregister();
+    EXPECT_TRUE(status.isOk());
+
+    // Check the number of clients.
+    status = mService->getNumOfClients(&numOfClients);
+    EXPECT_TRUE(status.isOk());
+    EXPECT_EQ(0, numOfClients);
+}
 }  // namespace media
 }  // namespace android
