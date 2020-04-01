@@ -6,7 +6,8 @@ LOCAL_SRC_FILES:= \
     AudioPolicyService.cpp \
     AudioPolicyEffects.cpp \
     AudioPolicyInterfaceImpl.cpp \
-    AudioPolicyClientImpl.cpp
+    AudioPolicyClientImpl.cpp \
+    CaptureStateNotifier.cpp
 
 LOCAL_C_INCLUDES := \
     frameworks/av/services/audioflinger \
