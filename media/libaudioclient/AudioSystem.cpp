@@ -18,6 +18,8 @@
 //#define LOG_NDEBUG 0
 
 #include <utils/Log.h>
+
+#include <android/media/BnCaptureStateListener.h>
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
 #include <binder/IPCThreadState.h>
@@ -43,6 +45,10 @@ sp<AudioSystem::AudioFlingerClient> AudioSystem::gAudioFlingerClient;
 std::set<audio_error_callback> AudioSystem::gAudioErrorCallbacks;
 dynamic_policy_callback AudioSystem::gDynPolicyCallback = NULL;
 record_config_callback AudioSystem::gRecordConfigCallback = NULL;
+
+// Required to be held while calling into gSoundTriggerCaptureStateListener.
+Mutex gSoundTriggerCaptureStateListenerLock;
+sp<AudioSystem::CaptureStateListener> gSoundTriggerCaptureStateListener = nullptr;
 
 // establish binder interface to AudioFlinger service
 const sp<IAudioFlinger> AudioSystem::get_audio_flinger()
@@ -1621,6 +1627,48 @@ status_t AudioSystem::getPreferredDeviceForStrategy(product_strategy_t strategy,
         return PERMISSION_DENIED;
     }
     return aps->getPreferredDeviceForStrategy(strategy, device);
+}
+
+class CaptureStateListenerImpl : public media::BnCaptureStateListener,
+                                 public IBinder::DeathRecipient {
+public:
+    binder::Status setCaptureState(bool active) override {
+        Mutex::Autolock _l(gSoundTriggerCaptureStateListenerLock);
+        gSoundTriggerCaptureStateListener->onStateChanged(active);
+        return binder::Status::ok();
+    }
+
+    void binderDied(const wp<IBinder>&) override {
+        Mutex::Autolock _l(gSoundTriggerCaptureStateListenerLock);
+        gSoundTriggerCaptureStateListener->onServiceDied();
+        gSoundTriggerCaptureStateListener = nullptr;
+    }
+};
+
+status_t AudioSystem::registerSoundTriggerCaptureStateListener(
+    const sp<CaptureStateListener>& listener) {
+    const sp<IAudioPolicyService>& aps =
+            AudioSystem::get_audio_policy_service();
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+
+    sp<CaptureStateListenerImpl> wrapper = new CaptureStateListenerImpl();
+
+    Mutex::Autolock _l(gSoundTriggerCaptureStateListenerLock);
+
+    bool active;
+    status_t status =
+        aps->registerSoundTriggerCaptureStateListener(wrapper, &active);
+    if (status != NO_ERROR) {
+        listener->onServiceDied();
+        return NO_ERROR;
+    }
+    gSoundTriggerCaptureStateListener = listener;
+    listener->onStateChanged(active);
+    sp<IBinder> binder = IInterface::asBinder(aps);
+    binder->linkToDeath(wrapper);
+    return NO_ERROR;
 }
 
 // ---------------------------------------------------------------------------
