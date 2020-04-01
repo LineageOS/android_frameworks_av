@@ -29,6 +29,7 @@
 #include <system/audio_effects/effect_visualizer.h>
 #include <audio_utils/channels.h>
 #include <audio_utils/primitives.h>
+#include <media/AudioCommonTypes.h>
 #include <media/AudioContainers.h>
 #include <media/AudioEffect.h>
 #include <media/AudioDeviceTypeAddr.h>
@@ -213,7 +214,7 @@ status_t AudioFlinger::EffectBase::updatePolicyState()
     bool doEnable = false;
     bool enabled = false;
     audio_io_handle_t io = AUDIO_IO_HANDLE_NONE;
-    uint32_t strategy;
+    uint32_t strategy = PRODUCT_STRATEGY_NONE;
 
     {
         Mutex::Autolock _l(mLock);
