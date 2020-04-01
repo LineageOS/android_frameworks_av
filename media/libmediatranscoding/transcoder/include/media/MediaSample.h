@@ -18,6 +18,8 @@
 #define ANDROID_MEDIA_SAMPLE_H
 
 #include <cstdint>
+#include <functional>
+#include <memory>
 
 namespace android {
 
@@ -71,9 +73,37 @@ struct MediaSampleInfo {
  */
 struct MediaSample {
     /**
-     * Byte buffer containing the sample's compressed data.
-     * The memory backing this buffer is not managed by the MediaSample object so a separate
-     * mechanism to release a buffer is needed between a producer and a consumer.
+     * Callback to notify that a media sample is about to be released, giving the creator a chance
+     * to reclaim the data buffer backing the sample. Once this callback returns, the media sample
+     * instance *will* be released so it cannot be used outside of the callback. To enable the
+     * callback, create the media sample with {@link #createWithReleaseCallback}.
+     * @param sample The sample to be released.
+     */
+    using OnSampleReleasedCallback = std::function<void(MediaSample* sample)>;
+
+    /**
+     * Creates a new media sample instance with a registered release callback. The release callback
+     * will get called right before the media sample is released giving the creator a chance to
+     * reclaim the buffer.
+     * @param buffer Byte buffer containing the sample's compressed data.
+     * @param dataOffset Offset, in bytes, to the sample's compressed data inside the buffer.
+     * @param bufferId Buffer identifier that can be used to identify the buffer on release.
+     * @param releaseCallback The sample release callback.
+     * @return A new media sample instance.
+     */
+    static std::shared_ptr<MediaSample> createWithReleaseCallback(
+            uint8_t* buffer, size_t dataOffset, uint32_t bufferId,
+            OnSampleReleasedCallback releaseCallback) {
+        MediaSample* sample = new MediaSample(buffer, dataOffset, bufferId, releaseCallback);
+        return std::shared_ptr<MediaSample>(
+                sample, std::bind(&MediaSample::releaseSample, std::placeholders::_1));
+    }
+
+    /**
+     * Byte buffer containing the sample's compressed data. The media sample instance does not take
+     * ownership of the buffer and will not automatically release the memory, but the caller can
+     * register a release callback by creating the media sample with
+     * {@link #createWithReleaseCallback}.
      */
     const uint8_t* buffer = nullptr;
 
@@ -88,6 +118,28 @@ struct MediaSample {
 
     /** Media sample information. */
     MediaSampleInfo info;
+
+private:
+    MediaSample(uint8_t* buffer, size_t dataOffset, uint32_t bufferId,
+                OnSampleReleasedCallback releaseCallback)
+          : buffer(buffer),
+            dataOffset(dataOffset),
+            bufferId(bufferId),
+            mReleaseCallback(releaseCallback){};
+
+    static void releaseSample(MediaSample* sample) {
+        if (sample->mReleaseCallback != nullptr) {
+            sample->mReleaseCallback(sample);
+        }
+        delete sample;
+    }
+
+    // Do not allow copying to prevent dangling pointers in the copied object after the original is
+    // released.
+    MediaSample(const MediaSample&) = delete;
+    MediaSample& operator=(const MediaSample&) = delete;
+
+    const OnSampleReleasedCallback mReleaseCallback = nullptr;
 };
 
 }  // namespace android
