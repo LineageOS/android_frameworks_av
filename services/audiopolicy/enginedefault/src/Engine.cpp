@@ -402,6 +402,15 @@ audio_devices_t Engine::getDeviceForStrategyInt(legacy_strategy strategy,
     case STRATEGY_REROUTING:
     case STRATEGY_MEDIA: {
         uint32_t device2 = AUDIO_DEVICE_NONE;
+
+        if (isInCall() && (device == AUDIO_DEVICE_NONE)) {
+            // when in call, get the device for Phone strategy
+            device = getDeviceForStrategyInt(
+                    STRATEGY_PHONE, availableOutputDevices, availableInputDevices, outputs,
+                    outputDeviceTypesToIgnore);
+            break;
+        }
+
         if (strategy != STRATEGY_SONIFICATION) {
             // no sonification on remote submix (e.g. WFD)
             if (availableOutputDevices.getDevice(AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
@@ -461,7 +470,7 @@ audio_devices_t Engine::getDeviceForStrategyInt(legacy_strategy strategy,
             // no sonification on aux digital (e.g. HDMI)
             device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_AUX_DIGITAL;
         }
-        if ((device2 == AUDIO_DEVICE_NONE) && (strategy != STRATEGY_SONIFICATION) &&
+        if ((device2 == AUDIO_DEVICE_NONE) &&
                 (getForceUse(AUDIO_POLICY_FORCE_FOR_DOCK) == AUDIO_POLICY_FORCE_ANALOG_DOCK)) {
             device2 = availableOutputDevicesType & AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET;
         }
