@@ -98,8 +98,9 @@ public:
                                                   pid_t clientThreadId) override;
 
     aaudio_result_t startClient(aaudio_handle_t streamHandle __unused,
-                                      const android::AudioClient& client __unused,
-                                      audio_port_handle_t *clientHandle) override {
+                                const android::AudioClient& client __unused,
+                                const audio_attributes_t *attr __unused,
+                                audio_port_handle_t *clientHandle __unused) override {
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
