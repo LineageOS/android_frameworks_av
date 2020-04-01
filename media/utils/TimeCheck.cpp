@@ -63,7 +63,6 @@ void TimeCheck::TimeCheckThread::stopMonitoring(nsecs_t endTimeNs) {
 bool TimeCheck::TimeCheckThread::threadLoop()
 {
     status_t status = TIMED_OUT;
-    const char *tag;
     {
         AutoMutex _l(mMutex);
 
@@ -72,6 +71,7 @@ bool TimeCheck::TimeCheckThread::threadLoop()
         }
 
         nsecs_t endTimeNs = INT64_MAX;
+        const char *tag = nullptr;
         // KeyedVector mMonitorRequests is ordered so take first entry as next timeout
         if (mMonitorRequests.size() != 0) {
             endTimeNs = mMonitorRequests.keyAt(0);
@@ -82,7 +82,9 @@ bool TimeCheck::TimeCheckThread::threadLoop()
         if (waitTimeNs > 0) {
             status = mCond.waitRelative(mMutex, waitTimeNs);
         }
-        if (status != NO_ERROR) {
+
+        // Only error out if we weren't waiting for an addition
+        if (status != NO_ERROR && tag != nullptr) {
             LOG_EVENT_STRING(LOGTAG_AUDIO_BINDER_TIMEOUT, tag);
             LOG_ALWAYS_FATAL("TimeCheck timeout for %s", tag);
         }
