@@ -21,6 +21,7 @@ cc_library_shared {
         "AudioVolumeGroup.cpp",
     ],
     shared_libs: [
+        "capture_state_listener-aidl-cpp",
         "libaudiofoundation",
         "libaudioutils",
         "libbinder",
@@ -34,6 +35,9 @@ cc_library_shared {
     ],
     include_dirs: ["system/media/audio_utils/include"],
     export_include_dirs: ["include"],
+    export_shared_lib_headers: [
+        "capture_state_listener-aidl-cpp",
+    ],
 }
 
 cc_library_shared {
@@ -147,4 +151,12 @@ filegroup {
         "aidl/android/media/IAudioTrackCallback.aidl",
     ],
     path: "aidl",
+}
+
+aidl_interface {
+    name: "capture_state_listener-aidl",
+    local_include_dir: "aidl",
+    srcs: [
+        "aidl/android/media/ICaptureStateListener.aidl",
+    ],
 }
