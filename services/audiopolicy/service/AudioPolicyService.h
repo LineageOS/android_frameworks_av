@@ -34,6 +34,7 @@
 #include <media/AudioPolicy.h>
 #include <mediautils/ServiceUtilities.h>
 #include "AudioPolicyEffects.h"
+#include "CaptureStateNotifier.h"
 #include <AudioPolicyInterface.h>
 #include <android/hardware/BnSensorPrivacyListener.h>
 
@@ -273,6 +274,10 @@ public:
 
     virtual status_t getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
                                                        volume_group_t &volumeGroup);
+
+    status_t registerSoundTriggerCaptureStateListener(
+        const sp<media::ICaptureStateListener>& listener,
+        bool* result) override;
 
     virtual status_t setRttEnabled(bool enabled);
 
@@ -897,6 +902,8 @@ private:
     DefaultKeyedVector< audio_port_handle_t, sp<AudioPlaybackClient> >   mAudioPlaybackClients;
 
     MediaPackageManager mPackageManager; // To check allowPlaybackCapture
+
+    CaptureStateNotifier mCaptureStateNotifier;
 };
 
 } // namespace android
