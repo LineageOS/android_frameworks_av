@@ -234,7 +234,7 @@ status_t AudioPolicyService::getOutputForAttr(audio_attributes_t *attr,
 
     if (result == NO_ERROR && audioPolicyEffects != 0) {
         audioPolicyEffects->updateOutputAudioSessionInfo(*output, *stream,
-                session, flags, config, uid);
+                session, uid);
     }
 
     return result;

@@ -108,8 +108,7 @@ public:
     status_t updateOutputAudioSessionInfo(audio_io_handle_t output,
                              audio_stream_type_t stream,
                              audio_session_t audioSession,
-                             audio_output_flags_t flags,
-                             const audio_config_t *config, uid_t uid);
+                             uid_t uid);
 
     status_t releaseOutputAudioSessionInfo(audio_io_handle_t output,
                              audio_stream_type_t stream,
