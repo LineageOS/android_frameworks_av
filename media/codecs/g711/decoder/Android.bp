@@ -17,6 +17,7 @@
 cc_library_static {
     name: "codecs_g711dec",
     vendor_available: true,
+    host_supported: true,
 
     srcs: [
         "g711DecAlaw.cpp",
@@ -35,4 +36,10 @@ cc_library_static {
         cfi: true,
     },
     apex_available: ["com.android.media.swcodec"],
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
