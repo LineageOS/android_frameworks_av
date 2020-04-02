@@ -182,7 +182,6 @@ status_t AudioPolicyService::getOutputForAttr(audio_attributes_t *attr,
         return NO_INIT;
     }
     ALOGV("getOutputForAttr()");
-    audio_output_flags_t originalFlags = flags;
     status_t result = NO_ERROR;
     sp<AudioPolicyEffects> audioPolicyEffects;
     {
@@ -201,34 +200,36 @@ status_t AudioPolicyService::getOutputForAttr(audio_attributes_t *attr,
                 && !bypassInterruptionPolicyAllowed(pid, uid)) {
             attr->flags &= ~(AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY|AUDIO_FLAG_BYPASS_MUTE);
         }
+        audio_output_flags_t originalFlags = flags;
         AutoCallerClear acc;
         result = mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid,
                                                        config,
                                                        &flags, selectedDeviceId, portId,
                                                        secondaryOutputs);
+
+        // FIXME: Introduce a way to check for the the telephony device before opening the output
+        if ((result == NO_ERROR) &&
+            (flags & AUDIO_OUTPUT_FLAG_INCALL_MUSIC) &&
+            !modifyPhoneStateAllowed(pid, uid)) {
+            // If the app tries to play music through the telephony device and doesn't have permission
+            // the fallback to the default output device.
+            mAudioPolicyManager->releaseOutput(*portId);
+            flags = originalFlags;
+            *selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+            *portId = AUDIO_PORT_HANDLE_NONE;
+            secondaryOutputs->clear();
+            result = mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid, config,
+                                                           &flags, selectedDeviceId, portId,
+                                                           secondaryOutputs);
+        }
+
+        if (result == NO_ERROR) {
+            sp <AudioPlaybackClient> client =
+                new AudioPlaybackClient(*attr, *output, uid, pid, session, *selectedDeviceId, *stream);
+            mAudioPlaybackClients.add(*portId, client);
+        }
+
         audioPolicyEffects = mAudioPolicyEffects;
-    }
-
-    // FIXME: Introduce a way to check for the the telephony device before opening the output
-    if ((result == NO_ERROR) &&
-        (flags & AUDIO_OUTPUT_FLAG_INCALL_MUSIC) &&
-        !modifyPhoneStateAllowed(pid, uid)) {
-        // If the app tries to play music through the telephony device and doesn't have permission
-        // the fallback to the default output device.
-        mAudioPolicyManager->releaseOutput(*portId);
-        flags = originalFlags;
-        *selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
-        *portId = AUDIO_PORT_HANDLE_NONE;
-        secondaryOutputs->clear();
-        result = mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid, config,
-                                                       &flags, selectedDeviceId, portId,
-                                                       secondaryOutputs);
-    }
-
-    if (result == NO_ERROR) {
-        sp <AudioPlaybackClient> client =
-            new AudioPlaybackClient(*attr, *output, uid, pid, session, *selectedDeviceId, *stream);
-        mAudioPlaybackClients.add(*portId, client);
     }
 
     if (result == NO_ERROR && audioPolicyEffects != 0) {
@@ -339,13 +340,15 @@ void AudioPolicyService::doReleaseOutput(audio_port_handle_t portId)
         audioPolicyEffects->releaseOutputSessionEffects(
             client->io, client->stream, client->session);
     }
-    Mutex::Autolock _l(mLock);
-    mAudioPlaybackClients.removeItem(portId);
+    {
+        Mutex::Autolock _l(mLock);
+        mAudioPlaybackClients.removeItem(portId);
 
-    audioPolicyEffects = mAudioPolicyEffects;
+        audioPolicyEffects = mAudioPolicyEffects;
 
-    // called from internal thread: no need to clear caller identity
-    mAudioPolicyManager->releaseOutput(portId);
+        // called from internal thread: no need to clear caller identity
+        mAudioPolicyManager->releaseOutput(portId);
+    }
 
     if (audioPolicyEffects != 0) {
         audioPolicyEffects->releaseOutputAudioSessionInfo(client->io,
