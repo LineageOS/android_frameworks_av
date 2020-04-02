@@ -334,8 +334,7 @@ status_t AudioPolicyEffects::releaseOutputAudioSessionInfo(audio_io_handle_t /* 
 status_t AudioPolicyEffects::updateOutputAudioSessionInfo(audio_io_handle_t /* output */,
                                            audio_stream_type_t stream,
                                            audio_session_t session,
-                                           audio_output_flags_t flags,
-                                           const audio_config_t *config, uid_t uid)
+                                           uid_t uid)
 {
     if (uint32_t(stream) >= AUDIO_STREAM_CNT) {
         return BAD_VALUE;
@@ -357,17 +356,15 @@ status_t AudioPolicyEffects::updateOutputAudioSessionInfo(audio_io_handle_t /* o
     ssize_t idx = mOutputAudioSessionInfo.indexOfKey(session);
     sp<AudioSessionInfo> info;
     if (idx < 0) {
-        info = new AudioSessionInfo(session, stream, flags, config->channel_mask, uid);
+        info = new AudioSessionInfo(session, stream, uid);
         mOutputAudioSessionInfo.add(session, info);
     } else {
         // the streaminfo may actually change
         info = mOutputAudioSessionInfo.valueAt(idx);
-        info->mFlags = flags;
-        info->mChannelMask = config->channel_mask;
     }
 
-    ALOGV("updateOutputAudioSessionInfo() sessionId=%d, flags=0x%x, channel_mask=0x%x uid=%d refCount=%d",
-            info->mSessionId, info->mFlags, info->mChannelMask, info->mUid, info->mRefCount);
+    ALOGV("updateOutputAudioSessionInfo() sessionId=%d, uid=%d, refCount=%d",
+            info->mSessionId, info->mUid, info->mRefCount);
 
     return NO_ERROR;
 }
