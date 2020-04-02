@@ -22,6 +22,7 @@
 #include <math.h>
 #include <sys/types.h>
 
+#include <android/media/ICaptureStateListener.h>
 #include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
 #include <media/AudioEffect.h>
@@ -31,6 +32,8 @@
 #include <system/audio.h>
 
 namespace android {
+
+using media::ICaptureStateListener;
 
 enum {
     SET_DEVICE_CONNECTION_STATE = IBinder::FIRST_CALL_TRANSACTION,
@@ -115,6 +118,7 @@ enum {
     GET_DEVICES_FOR_ATTRIBUTES,
     AUDIO_MODULES_UPDATED,  // oneway
     SET_CURRENT_IME_UID,
+    REGISTER_SOUNDTRIGGER_CAPTURE_STATE_LISTENER,
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -1470,6 +1474,27 @@ public:
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
         remote()->transact(AUDIO_MODULES_UPDATED, data, &reply, IBinder::FLAG_ONEWAY);
     }
+
+    status_t registerSoundTriggerCaptureStateListener(
+            const sp<media::ICaptureStateListener>& listener,
+            bool* result) override {
+        Parcel data, reply;
+        status_t status;
+        status =
+            data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        if (status != NO_ERROR) return status;
+        status = data.writeStrongBinder(IInterface::asBinder(listener));
+        if (status != NO_ERROR) return status;
+        status =
+            remote()->transact(REGISTER_SOUNDTRIGGER_CAPTURE_STATE_LISTENER,
+                               data,
+                               &reply,
+                               0);
+        if (status != NO_ERROR) return status;
+        status = reply.readBool(result);
+        if (status != NO_ERROR) return status;
+        return NO_ERROR;
+    }
 };
 
 IMPLEMENT_META_INTERFACE(AudioPolicyService, "android.media.IAudioPolicyService");
@@ -1543,7 +1568,8 @@ status_t BnAudioPolicyService::onTransact(
         case GET_DEVICES_FOR_ATTRIBUTES:
         case SET_ALLOWED_CAPTURE_POLICY:
         case AUDIO_MODULES_UPDATED:
-        case SET_CURRENT_IME_UID: {
+        case SET_CURRENT_IME_UID:
+        case REGISTER_SOUNDTRIGGER_CAPTURE_STATE_LISTENER: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
@@ -2705,6 +2731,31 @@ status_t BnAudioPolicyService::onTransact(
             reply->writeInt32(static_cast <int32_t>(status));
             return NO_ERROR;
         }
+
+        case REGISTER_SOUNDTRIGGER_CAPTURE_STATE_LISTENER: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            sp<IBinder> binder = data.readStrongBinder();
+            if (binder == nullptr) {
+                return BAD_VALUE;
+            }
+            sp<ICaptureStateListener>
+                listener = interface_cast<ICaptureStateListener>(
+                binder);
+            if (listener == nullptr) {
+                return BAD_VALUE;
+            }
+            bool ret;
+            status_t status =
+                registerSoundTriggerCaptureStateListener(listener, &ret);
+            LOG_ALWAYS_FATAL_IF(status != NO_ERROR,
+                                "Server returned unexpected status code: %d",
+                                status);
+            status = reply->writeBool(ret);
+            if (status != NO_ERROR) {
+                return status;
+            }
+            return NO_ERROR;
+        } break;
 
         default:
             return BBinder::onTransact(code, data, reply, flags);

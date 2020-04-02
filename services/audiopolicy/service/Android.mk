@@ -6,7 +6,8 @@ LOCAL_SRC_FILES:= \
     AudioPolicyService.cpp \
     AudioPolicyEffects.cpp \
     AudioPolicyInterfaceImpl.cpp \
-    AudioPolicyClientImpl.cpp
+    AudioPolicyClientImpl.cpp \
+    CaptureStateNotifier.cpp
 
 LOCAL_C_INCLUDES := \
     frameworks/av/services/audioflinger \
@@ -32,7 +33,7 @@ LOCAL_SHARED_LIBRARIES := \
     libmediautils \
     libeffectsconfig \
     libsensorprivacy \
-    soundtrigger_middleware-aidl-cpp
+    capture_state_listener-aidl-cpp
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := \
     libsensorprivacy
