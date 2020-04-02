@@ -206,29 +206,30 @@ status_t AudioPolicyService::getOutputForAttr(audio_attributes_t *attr,
                                                        config,
                                                        &flags, selectedDeviceId, portId,
                                                        secondaryOutputs);
+
+        // FIXME: Introduce a way to check for the the telephony device before opening the output
+        if ((result == NO_ERROR) &&
+            (flags & AUDIO_OUTPUT_FLAG_INCALL_MUSIC) &&
+            !modifyPhoneStateAllowed(pid, uid)) {
+            // If the app tries to play music through the telephony device and doesn't have permission
+            // the fallback to the default output device.
+            mAudioPolicyManager->releaseOutput(*portId);
+            flags = originalFlags;
+            *selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
+            *portId = AUDIO_PORT_HANDLE_NONE;
+            secondaryOutputs->clear();
+            result = mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid, config,
+                                                           &flags, selectedDeviceId, portId,
+                                                           secondaryOutputs);
+        }
+
+        if (result == NO_ERROR) {
+            sp <AudioPlaybackClient> client =
+                new AudioPlaybackClient(*attr, *output, uid, pid, session, *selectedDeviceId, *stream);
+            mAudioPlaybackClients.add(*portId, client);
+        }
+
         audioPolicyEffects = mAudioPolicyEffects;
-    }
-
-    // FIXME: Introduce a way to check for the the telephony device before opening the output
-    if ((result == NO_ERROR) &&
-        (flags & AUDIO_OUTPUT_FLAG_INCALL_MUSIC) &&
-        !modifyPhoneStateAllowed(pid, uid)) {
-        // If the app tries to play music through the telephony device and doesn't have permission
-        // the fallback to the default output device.
-        mAudioPolicyManager->releaseOutput(*portId);
-        flags = originalFlags;
-        *selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
-        *portId = AUDIO_PORT_HANDLE_NONE;
-        secondaryOutputs->clear();
-        result = mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid, config,
-                                                       &flags, selectedDeviceId, portId,
-                                                       secondaryOutputs);
-    }
-
-    if (result == NO_ERROR) {
-        sp <AudioPlaybackClient> client =
-            new AudioPlaybackClient(*attr, *output, uid, pid, session, *selectedDeviceId, *stream);
-        mAudioPlaybackClients.add(*portId, client);
     }
 
     if (result == NO_ERROR && audioPolicyEffects != 0) {
