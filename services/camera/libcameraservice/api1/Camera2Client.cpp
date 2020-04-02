@@ -733,6 +733,10 @@ status_t Camera2Client::startPreviewL(Parameters &params, bool restart) {
 
     ALOGV("%s: state == %d, restart = %d", __FUNCTION__, params.state, restart);
 
+    if (params.state == Parameters::DISCONNECTED) {
+        ALOGE("%s: Camera %d has been disconnected.", __FUNCTION__, mCameraId);
+        return INVALID_OPERATION;
+    }
     if ( (params.state == Parameters::PREVIEW ||
                     params.state == Parameters::RECORD ||
                     params.state == Parameters::VIDEO_SNAPSHOT)
