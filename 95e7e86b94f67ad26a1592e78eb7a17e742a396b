@@ -1,0 +1,73 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "d8665b4e_619c4449",
+        "filename": "services/audiopolicy/service/AudioPolicyInterfaceImpl.cpp",
+        "patchSetId": 8
+      },
+      "lineNbr": 213,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2020-04-02T20:40:07Z",
+      "side": 1,
+      "message": "Wrong indentation.",
+      "range": {
+        "startLine": 212,
+        "startChar": 0,
+        "endLine": 213,
+        "endChar": 49
+      },
+      "revId": "95e7e86b94f67ad26a1592e78eb7a17e742a396b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "48d33d0a_fdd7ee1b",
+        "filename": "services/audiopolicy/service/AudioPolicyInterfaceImpl.cpp",
+        "patchSetId": 8
+      },
+      "lineNbr": 221,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2020-04-02T20:40:07Z",
+      "side": 1,
+      "message": "Line too long.",
+      "range": {
+        "startLine": 221,
+        "startChar": 12,
+        "endLine": 221,
+        "endChar": 102
+      },
+      "revId": "95e7e86b94f67ad26a1592e78eb7a17e742a396b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "9c800f22_631bb905",
+        "filename": "services/audiopolicy/service/AudioPolicyInterfaceImpl.cpp",
+        "patchSetId": 8
+      },
+      "lineNbr": 228,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2020-04-02T20:40:07Z",
+      "side": 1,
+      "message": "Line too long.",
+      "range": {
+        "startLine": 228,
+        "startChar": 16,
+        "endLine": 228,
+        "endChar": 103
+      },
+      "revId": "95e7e86b94f67ad26a1592e78eb7a17e742a396b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
