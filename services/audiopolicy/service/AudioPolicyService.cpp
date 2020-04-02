@@ -57,9 +57,13 @@ static const String16 sManageAudioPolicyPermission("android.permission.MANAGE_AU
 // ----------------------------------------------------------------------------
 
 AudioPolicyService::AudioPolicyService()
-    : BnAudioPolicyService(), mpAudioPolicyDev(NULL), mpAudioPolicy(NULL),
-      mAudioPolicyManager(NULL), mAudioPolicyClient(NULL), mPhoneState(AUDIO_MODE_INVALID)
-{
+    : BnAudioPolicyService(),
+      mpAudioPolicyDev(NULL),
+      mpAudioPolicy(NULL),
+      mAudioPolicyManager(NULL),
+      mAudioPolicyClient(NULL),
+      mPhoneState(AUDIO_MODE_INVALID),
+      mCaptureStateNotifier(false) {
 }
 
 void AudioPolicyService::onFirstRef()

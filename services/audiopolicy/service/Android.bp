@@ -6,6 +6,7 @@ cc_library_shared {
         "AudioPolicyEffects.cpp",
         "AudioPolicyInterfaceImpl.cpp",
         "AudioPolicyService.cpp",
+        "CaptureStateNotifier.cpp",
     ],
 
     include_dirs: [
@@ -27,7 +28,7 @@ cc_library_shared {
         "libmediautils",
         "libsensorprivacy",
         "libutils",
-        "soundtrigger_middleware-aidl-cpp",
+        "capture_state_listener-aidl-cpp",
     ],
 
     static_libs: [

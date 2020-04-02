@@ -17,13 +17,96 @@
 // #define LOG_NDEBUG 0
 #define LOG_TAG "TranscodingClientManager"
 
+#include <aidl/android/media/BnTranscodingClient.h>
+#include <android/binder_ibinder.h>
 #include <inttypes.h>
 #include <media/TranscodingClientManager.h>
 #include <utils/Log.h>
 
 namespace android {
 
+using ::aidl::android::media::BnTranscodingClient;
+using ::aidl::android::media::TranscodingJobParcel;
+using ::aidl::android::media::TranscodingRequestParcel;
 using Status = ::ndk::ScopedAStatus;
+using ::ndk::SpAIBinder;
+
+///////////////////////////////////////////////////////////////////////////////
+
+/**
+ * ClientImpl implements a single client and contains all its information.
+ */
+struct TranscodingClientManager::ClientImpl : public BnTranscodingClient {
+    /* The remote client listener that this ClientInfo is associated with.
+     * Once the ClientInfo is created, we hold an SpAIBinder so that the binder
+     * object doesn't get created again, otherwise the binder object pointer
+     * may not be unique.
+     */
+    SpAIBinder mClientListener;
+    /* A unique id assigned to the client by the service. This number is used
+     * by the service for indexing. Here we use the binder object's pointer
+     * (casted to int64t_t) as the client id.
+     */
+    ClientIdType mClientId;
+    int32_t mClientPid;
+    int32_t mClientUid;
+    std::string mClientName;
+    std::string mClientOpPackageName;
+    TranscodingClientManager* mOwner;
+
+    ClientImpl(const std::shared_ptr<ITranscodingClientListener>& listener,
+               int32_t pid, int32_t uid,
+               const std::string& clientName,
+               const std::string& opPackageName,
+               TranscodingClientManager* owner);
+
+    Status submitRequest(const TranscodingRequestParcel& /*in_request*/,
+            TranscodingJobParcel* /*out_job*/, int32_t* /*_aidl_return*/) override;
+
+    Status cancelJob(int32_t /*in_jobId*/, bool* /*_aidl_return*/) override;
+
+    Status getJobWithId(int32_t /*in_jobId*/,
+            TranscodingJobParcel* /*out_job*/, bool* /*_aidl_return*/) override;
+
+    Status unregister() override;
+};
+
+TranscodingClientManager::ClientImpl::ClientImpl(
+        const std::shared_ptr<ITranscodingClientListener>& listener,
+        int32_t pid, int32_t uid,
+        const std::string& clientName,
+        const std::string& opPackageName,
+        TranscodingClientManager* owner)
+: mClientListener((listener != nullptr) ? listener->asBinder() : nullptr),
+  mClientId((int64_t)mClientListener.get()),
+  mClientPid(pid),
+  mClientUid(uid),
+  mClientName(clientName),
+  mClientOpPackageName(opPackageName),
+  mOwner(owner) {}
+
+Status TranscodingClientManager::ClientImpl::submitRequest(
+        const TranscodingRequestParcel& /*in_request*/,
+        TranscodingJobParcel* /*out_job*/, int32_t* /*_aidl_return*/) {
+    return Status::ok();
+}
+
+Status TranscodingClientManager::ClientImpl::cancelJob(
+        int32_t /*in_jobId*/, bool* /*_aidl_return*/) {
+    return Status::ok();
+}
+
+Status TranscodingClientManager::ClientImpl::getJobWithId(int32_t /*in_jobId*/,
+        TranscodingJobParcel* /*out_job*/, bool* /*_aidl_return*/) {
+    return Status::ok();
+}
+
+Status TranscodingClientManager::ClientImpl::unregister() {
+    mOwner->removeClient(mClientId);
+    return Status::ok();
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 // static
 TranscodingClientManager& TranscodingClientManager::getInstance() {
@@ -33,8 +116,8 @@ TranscodingClientManager& TranscodingClientManager::getInstance() {
 
 // static
 void TranscodingClientManager::BinderDiedCallback(void* cookie) {
-    int32_t clientId = static_cast<int32_t>(reinterpret_cast<intptr_t>(cookie));
-    ALOGD("Client %" PRId32 " is dead", clientId);
+    ClientIdType clientId = static_cast<ClientIdType>(reinterpret_cast<intptr_t>(cookie));
+    ALOGD("Client %lld is dead", (long long) clientId);
     // Don't check for pid validity since we know it's already dead.
     TranscodingClientManager& manager = TranscodingClientManager::getInstance();
     manager.removeClient(clientId);
@@ -49,9 +132,8 @@ TranscodingClientManager::~TranscodingClientManager() {
     ALOGD("TranscodingClientManager exited");
 }
 
-bool TranscodingClientManager::isClientIdRegistered(int32_t clientId) const {
-    std::scoped_lock lock{mLock};
-    return mClientIdToClientInfoMap.find(clientId) != mClientIdToClientInfoMap.end();
+bool TranscodingClientManager::isClientIdRegistered(ClientIdType clientId) const {
+    return mClientIdToClientMap.find(clientId) != mClientIdToClientMap.end();
 }
 
 void TranscodingClientManager::dumpAllClients(int fd, const Vector<String16>& args __unused) {
@@ -60,86 +142,95 @@ void TranscodingClientManager::dumpAllClients(int fd, const Vector<String16>& ar
     const size_t SIZE = 256;
     char buffer[SIZE];
 
-    snprintf(buffer, SIZE, "    Total num of Clients: %zu\n", mClientIdToClientInfoMap.size());
+    snprintf(buffer, SIZE, "    Total num of Clients: %zu\n", mClientIdToClientMap.size());
     result.append(buffer);
 
-    if (mClientIdToClientInfoMap.size() > 0) {
+    if (mClientIdToClientMap.size() > 0) {
         snprintf(buffer, SIZE, "========== Dumping all clients =========\n");
         result.append(buffer);
     }
 
-    for (const auto& iter : mClientIdToClientInfoMap) {
-        const std::shared_ptr<ITranscodingServiceClient> client = iter.second->mClient;
-        std::string clientName;
-        Status status = client->getName(&clientName);
-        if (!status.isOk()) {
-            ALOGE("Failed to get client: %d information", iter.first);
-            continue;
-        }
-        snprintf(buffer, SIZE, "    -- Clients: %d  name: %s\n", iter.first, clientName.c_str());
+    for (const auto& iter : mClientIdToClientMap) {
+        snprintf(buffer, SIZE, "    -- Client id: %lld  name: %s\n",
+                (long long)iter.first, iter.second->mClientName.c_str());
         result.append(buffer);
     }
 
     write(fd, result.string(), result.size());
 }
 
-status_t TranscodingClientManager::addClient(std::unique_ptr<ClientInfo> client) {
+status_t TranscodingClientManager::addClient(
+        const std::shared_ptr<ITranscodingClientListener>& listener,
+        int32_t pid, int32_t uid,
+        const std::string& clientName,
+        const std::string& opPackageName,
+        std::shared_ptr<ITranscodingClient>* outClient) {
     // Validate the client.
-    if (client == nullptr || client->mClientId < 0 || client->mClientPid < 0 ||
-        client->mClientUid < 0 || client->mClientOpPackageName.empty() ||
-        client->mClientOpPackageName == "") {
+    if (listener == nullptr || pid < 0 || uid < 0 ||
+            clientName.empty() || opPackageName.empty()) {
         ALOGE("Invalid client");
         return BAD_VALUE;
     }
 
+    // Creates the client and uses its process id as client id.
+    std::shared_ptr<ClientImpl> client =
+            ::ndk::SharedRefBase::make<ClientImpl>(
+                    listener, pid, uid, clientName, opPackageName, this);
+
     std::scoped_lock lock{mLock};
 
-    // Check if the client already exists.
-    if (mClientIdToClientInfoMap.count(client->mClientId) != 0) {
-        ALOGW("Client already exists.");
+    // Checks if the client already registers.
+    if (isClientIdRegistered(client->mClientId)) {
         return ALREADY_EXISTS;
     }
 
-    ALOGD("Adding client id %d pid: %d uid: %d %s", client->mClientId, client->mClientPid,
-          client->mClientUid, client->mClientOpPackageName.c_str());
+    ALOGD("Adding client id %lld, pid %d, uid %d, name %s, package %s",
+            (long long)client->mClientId,
+            client->mClientPid,
+            client->mClientUid,
+            client->mClientName.c_str(),
+            client->mClientOpPackageName.c_str());
 
-    AIBinder_linkToDeath(client->mClient->asBinder().get(), mDeathRecipient.get(),
+    AIBinder_linkToDeath(client->mClientListener.get(), mDeathRecipient.get(),
                          reinterpret_cast<void*>(client->mClientId));
 
     // Adds the new client to the map.
-    mClientIdToClientInfoMap[client->mClientId] = std::move(client);
+    mClientIdToClientMap[client->mClientId] = client;
+
+    *outClient = client;
 
     return OK;
 }
 
-status_t TranscodingClientManager::removeClient(int32_t clientId) {
-    ALOGD("Removing client id %d", clientId);
+
+status_t TranscodingClientManager::removeClient(ClientIdType clientId) {
+    ALOGD("Removing client id %lld", (long long)clientId);
     std::scoped_lock lock{mLock};
 
     // Checks if the client is valid.
-    auto it = mClientIdToClientInfoMap.find(clientId);
-    if (it == mClientIdToClientInfoMap.end()) {
-        ALOGE("Client id %d does not exist", clientId);
+    auto it = mClientIdToClientMap.find(clientId);
+    if (it == mClientIdToClientMap.end()) {
+        ALOGE("Client id %lld does not exist", (long long)clientId);
         return INVALID_OPERATION;
     }
 
-    std::shared_ptr<ITranscodingServiceClient> client = it->second->mClient;
+    SpAIBinder listener = it->second->mClientListener;
 
     // Check if the client still live. If alive, unlink the death.
-    if (client) {
-        AIBinder_unlinkToDeath(client->asBinder().get(), mDeathRecipient.get(),
+    if (listener.get() != nullptr) {
+        AIBinder_unlinkToDeath(listener.get(), mDeathRecipient.get(),
                                reinterpret_cast<void*>(clientId));
     }
 
     // Erase the entry.
-    mClientIdToClientInfoMap.erase(it);
+    mClientIdToClientMap.erase(it);
 
     return OK;
 }
 
 size_t TranscodingClientManager::getNumOfClients() const {
     std::scoped_lock lock{mLock};
-    return mClientIdToClientInfoMap.size();
+    return mClientIdToClientMap.size();
 }
 
 }  // namespace android

@@ -19,9 +19,8 @@
 // #define LOG_NDEBUG 0
 #define LOG_TAG "TranscodingClientManagerTest"
 
-#include <aidl/android/media/BnTranscodingServiceClient.h>
+#include <aidl/android/media/BnTranscodingClientListener.h>
 #include <aidl/android/media/IMediaTranscodingService.h>
-#include <aidl/android/media/ITranscodingServiceClient.h>
 #include <android-base/logging.h>
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
@@ -32,28 +31,22 @@
 namespace android {
 
 using Status = ::ndk::ScopedAStatus;
-using aidl::android::media::BnTranscodingServiceClient;
+using aidl::android::media::BnTranscodingClientListener;
 using aidl::android::media::IMediaTranscodingService;
-using aidl::android::media::ITranscodingServiceClient;
 
-constexpr int32_t kInvalidClientId = -1;
 constexpr int32_t kInvalidClientPid = -1;
 constexpr int32_t kInvalidClientUid = -1;
-constexpr const char* kInvalidClientOpPackageName = "";
+constexpr const char* kInvalidClientName = "";
+constexpr const char* kInvalidClientPackage = "";
 
-constexpr int32_t kClientId = 1;
 constexpr int32_t kClientPid = 2;
 constexpr int32_t kClientUid = 3;
-constexpr const char* kClientOpPackageName = "TestClient";
+constexpr const char* kClientName = "TestClientName";
+constexpr const char* kClientPackage = "TestClientPackage";
 
-struct TestClient : public BnTranscodingServiceClient {
-    TestClient(const std::shared_ptr<IMediaTranscodingService>& service) : mService(service) {
+struct TestClient : public BnTranscodingClientListener {
+    TestClient() {
         ALOGD("TestClient Created");
-    }
-
-    Status getName(std::string* _aidl_return) override {
-        *_aidl_return = "test_client";
-        return Status::ok();
     }
 
     Status onTranscodingFinished(
@@ -79,8 +72,7 @@ struct TestClient : public BnTranscodingServiceClient {
 
     virtual ~TestClient() { ALOGI("TestClient destroyed"); };
 
-   private:
-    std::shared_ptr<IMediaTranscodingService> mService;
+private:
     TestClient(const TestClient&) = delete;
     TestClient& operator=(const TestClient&) = delete;
 };
@@ -92,189 +84,128 @@ class TranscodingClientManagerTest : public ::testing::Test {
     }
 
     void SetUp() override {
-        ::ndk::SpAIBinder binder(AServiceManager_getService("media.transcoding"));
-        mService = IMediaTranscodingService::fromBinder(binder);
-        if (mService == nullptr) {
-            ALOGE("Failed to connect to the media.trascoding service.");
-            return;
-        }
-
-        mTestClient = ::ndk::SharedRefBase::make<TestClient>(mService);
+        mClientListener = ::ndk::SharedRefBase::make<TestClient>();
+        mClientListener2 = ::ndk::SharedRefBase::make<TestClient>();
+        mClientListener3 = ::ndk::SharedRefBase::make<TestClient>();
     }
 
     void TearDown() override {
         ALOGI("TranscodingClientManagerTest tear down");
-        mService = nullptr;
     }
 
     ~TranscodingClientManagerTest() { ALOGD("TranscodingClientManagerTest destroyed"); }
 
     TranscodingClientManager& mClientManager;
-    std::shared_ptr<ITranscodingServiceClient> mTestClient = nullptr;
-    std::shared_ptr<IMediaTranscodingService> mService = nullptr;
+    std::shared_ptr<ITranscodingClientListener> mClientListener;
+    std::shared_ptr<ITranscodingClientListener> mClientListener2;
+    std::shared_ptr<ITranscodingClientListener> mClientListener3;
 };
 
-TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientId) {
-    std::shared_ptr<ITranscodingServiceClient> client =
-            ::ndk::SharedRefBase::make<TestClient>(mService);
-
-    // Create a client with invalid client id.
-    std::unique_ptr<TranscodingClientManager::ClientInfo> clientInfo =
-            std::make_unique<TranscodingClientManager::ClientInfo>(
-                    client, kInvalidClientId, kClientPid, kClientUid, kClientOpPackageName);
-
-    // Add the client to the manager and expect failure.
-    status_t err = mClientManager.addClient(std::move(clientInfo));
-    EXPECT_TRUE(err != OK);
+TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientListener) {
+    // Add a client with null listener and expect failure.
+    std::shared_ptr<ITranscodingClient> client;
+    status_t err = mClientManager.addClient(nullptr,
+            kClientPid, kClientUid, kClientName, kClientPackage, &client);
+    EXPECT_EQ(err, BAD_VALUE);
 }
 
 TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientPid) {
-    std::shared_ptr<ITranscodingServiceClient> client =
-            ::ndk::SharedRefBase::make<TestClient>(mService);
-
-    // Create a client with invalid Pid.
-    std::unique_ptr<TranscodingClientManager::ClientInfo> clientInfo =
-            std::make_unique<TranscodingClientManager::ClientInfo>(
-                    client, kClientId, kInvalidClientPid, kClientUid, kClientOpPackageName);
-
-    // Add the client to the manager and expect failure.
-    status_t err = mClientManager.addClient(std::move(clientInfo));
-    EXPECT_TRUE(err != OK);
+    // Add a client with invalid Pid and expect failure.
+    std::shared_ptr<ITranscodingClient> client;
+    status_t err = mClientManager.addClient(mClientListener,
+            kInvalidClientPid, kClientUid, kClientName, kClientPackage, &client);
+    EXPECT_EQ(err, BAD_VALUE);
 }
 
 TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientUid) {
-    std::shared_ptr<ITranscodingServiceClient> client =
-            ::ndk::SharedRefBase::make<TestClient>(mService);
+    // Add a client with invalid Uid and expect failure.
+    std::shared_ptr<ITranscodingClient> client;
+    status_t err = mClientManager.addClient(mClientListener,
+            kClientPid, kInvalidClientUid, kClientName, kClientPackage, &client);
+    EXPECT_EQ(err, BAD_VALUE);
+}
 
-    // Create a client with invalid Uid.
-    std::unique_ptr<TranscodingClientManager::ClientInfo> clientInfo =
-            std::make_unique<TranscodingClientManager::ClientInfo>(
-                    client, kClientId, kClientPid, kInvalidClientUid, kClientOpPackageName);
-
-    // Add the client to the manager and expect failure.
-    status_t err = mClientManager.addClient(std::move(clientInfo));
-    EXPECT_TRUE(err != OK);
+TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientName) {
+    // Add a client with invalid name and expect failure.
+    std::shared_ptr<ITranscodingClient> client;
+    status_t err = mClientManager.addClient(mClientListener,
+            kClientPid, kClientUid, kInvalidClientName, kClientPackage, &client);
+    EXPECT_EQ(err, BAD_VALUE);
 }
 
 TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientPackageName) {
-    std::shared_ptr<ITranscodingServiceClient> client =
-            ::ndk::SharedRefBase::make<TestClient>(mService);
-
-    // Create a client with invalid packagename.
-    std::unique_ptr<TranscodingClientManager::ClientInfo> clientInfo =
-            std::make_unique<TranscodingClientManager::ClientInfo>(
-                    client, kClientId, kClientPid, kClientUid, kInvalidClientOpPackageName);
-
-    // Add the client to the manager and expect failure.
-    status_t err = mClientManager.addClient(std::move(clientInfo));
-    EXPECT_TRUE(err != OK);
+    // Add a client with invalid packagename and expect failure.
+    std::shared_ptr<ITranscodingClient> client;
+    status_t err = mClientManager.addClient(mClientListener,
+            kClientPid, kClientUid, kClientName, kInvalidClientPackage, &client);
+    EXPECT_EQ(err, BAD_VALUE);
 }
 
 TEST_F(TranscodingClientManagerTest, TestAddingValidClient) {
-    std::shared_ptr<ITranscodingServiceClient> client1 =
-            ::ndk::SharedRefBase::make<TestClient>(mService);
+    // Add a valid client, should succeed
+    std::shared_ptr<ITranscodingClient> client;
+    status_t err = mClientManager.addClient(mClientListener,
+            kClientPid, kClientUid, kClientName, kClientPackage, &client);
+    EXPECT_EQ(err, OK);
+    EXPECT_NE(client.get(), nullptr);
+    EXPECT_EQ(mClientManager.getNumOfClients(), 1);
 
-    std::unique_ptr<TranscodingClientManager::ClientInfo> clientInfo =
-            std::make_unique<TranscodingClientManager::ClientInfo>(
-                    client1, kClientId, kClientPid, kClientUid, kClientOpPackageName);
-
-    status_t err = mClientManager.addClient(std::move(clientInfo));
-    EXPECT_TRUE(err == OK);
-
-    size_t numOfClients = mClientManager.getNumOfClients();
-    EXPECT_EQ(numOfClients, 1);
-
-    err = mClientManager.removeClient(kClientId);
-    EXPECT_TRUE(err == OK);
+    // unregister client, should succeed
+    Status status = client->unregister();
+    EXPECT_TRUE(status.isOk());
+    EXPECT_EQ(mClientManager.getNumOfClients(), 0);
 }
 
 TEST_F(TranscodingClientManagerTest, TestAddingDupliacteClient) {
-    std::shared_ptr<ITranscodingServiceClient> client1 =
-            ::ndk::SharedRefBase::make<TestClient>(mService);
+    std::shared_ptr<ITranscodingClient> client;
+    status_t err = mClientManager.addClient(mClientListener,
+            kClientPid, kClientUid, kClientName, kClientPackage, &client);
+    EXPECT_EQ(err, OK);
+    EXPECT_NE(client.get(), nullptr);
+    EXPECT_EQ(mClientManager.getNumOfClients(), 1);
 
-    std::unique_ptr<TranscodingClientManager::ClientInfo> clientInfo =
-            std::make_unique<TranscodingClientManager::ClientInfo>(
-                    client1, kClientId, kClientPid, kClientUid, kClientOpPackageName);
+    std::shared_ptr<ITranscodingClient> dupClient;
+    err = mClientManager.addClient(mClientListener,
+            kClientPid, kClientUid, "dupClient", "dupPackage", &dupClient);
+    EXPECT_EQ(err, ALREADY_EXISTS);
+    EXPECT_EQ(dupClient.get(), nullptr);
+    EXPECT_EQ(mClientManager.getNumOfClients(), 1);
 
-    status_t err = mClientManager.addClient(std::move(clientInfo));
-    EXPECT_TRUE(err == OK);
+    Status status = client->unregister();
+    EXPECT_TRUE(status.isOk());
+    EXPECT_EQ(mClientManager.getNumOfClients(), 0);
 
-    err = mClientManager.addClient(std::move(clientInfo));
-    EXPECT_TRUE(err != OK);
+    err = mClientManager.addClient(mClientListener,
+            kClientPid, kClientUid, "dupClient", "dupPackage", &dupClient);
+    EXPECT_EQ(err, OK);
+    EXPECT_NE(dupClient.get(), nullptr);
+    EXPECT_EQ(mClientManager.getNumOfClients(), 1);
 
-    err = mClientManager.removeClient(kClientId);
-    EXPECT_TRUE(err == OK);
+    status = dupClient->unregister();
+    EXPECT_TRUE(status.isOk());
+    EXPECT_EQ(mClientManager.getNumOfClients(), 0);
 }
 
 TEST_F(TranscodingClientManagerTest, TestAddingMultipleClient) {
-    std::shared_ptr<ITranscodingServiceClient> client1 =
-            ::ndk::SharedRefBase::make<TestClient>(mService);
+    std::shared_ptr<ITranscodingClient> client1, client2, client3;
 
-    std::unique_ptr<TranscodingClientManager::ClientInfo> clientInfo1 =
-            std::make_unique<TranscodingClientManager::ClientInfo>(
-                    client1, kClientId, kClientPid, kClientUid, kClientOpPackageName);
+    EXPECT_EQ(mClientManager.addClient(mClientListener,
+            kClientPid, kClientUid, kClientName, kClientPackage, &client1), OK);
+    EXPECT_NE(client1, nullptr);
 
-    status_t err = mClientManager.addClient(std::move(clientInfo1));
-    EXPECT_TRUE(err == OK);
+    EXPECT_EQ(mClientManager.addClient(mClientListener2,
+            kClientPid, kClientUid, kClientName, kClientPackage, &client2), OK);
+    EXPECT_NE(client2, nullptr);
 
-    std::shared_ptr<ITranscodingServiceClient> client2 =
-            ::ndk::SharedRefBase::make<TestClient>(mService);
+    EXPECT_EQ(mClientManager.addClient(mClientListener3,
+            kClientPid, kClientUid, kClientName, kClientPackage, &client3), OK);
+    EXPECT_NE(client3, nullptr);
 
-    std::unique_ptr<TranscodingClientManager::ClientInfo> clientInfo2 =
-            std::make_unique<TranscodingClientManager::ClientInfo>(
-                    client2, kClientId + 1, kClientPid, kClientUid, kClientOpPackageName);
-
-    err = mClientManager.addClient(std::move(clientInfo2));
-    EXPECT_TRUE(err == OK);
-
-    std::shared_ptr<ITranscodingServiceClient> client3 =
-            ::ndk::SharedRefBase::make<TestClient>(mService);
-
-    // Create a client with invalid packagename.
-    std::unique_ptr<TranscodingClientManager::ClientInfo> clientInfo3 =
-            std::make_unique<TranscodingClientManager::ClientInfo>(
-                    client3, kClientId + 2, kClientPid, kClientUid, kClientOpPackageName);
-
-    err = mClientManager.addClient(std::move(clientInfo3));
-    EXPECT_TRUE(err == OK);
-
-    size_t numOfClients = mClientManager.getNumOfClients();
-    EXPECT_EQ(numOfClients, 3);
-
-    err = mClientManager.removeClient(kClientId);
-    EXPECT_TRUE(err == OK);
-
-    err = mClientManager.removeClient(kClientId + 1);
-    EXPECT_TRUE(err == OK);
-
-    err = mClientManager.removeClient(kClientId + 2);
-    EXPECT_TRUE(err == OK);
-}
-
-TEST_F(TranscodingClientManagerTest, TestRemovingNonExistClient) {
-    status_t err = mClientManager.removeClient(kInvalidClientId);
-    EXPECT_TRUE(err != OK);
-
-    err = mClientManager.removeClient(1000 /* clientId */);
-    EXPECT_TRUE(err != OK);
-}
-
-TEST_F(TranscodingClientManagerTest, TestCheckClientWithClientId) {
-    std::shared_ptr<ITranscodingServiceClient> client =
-            ::ndk::SharedRefBase::make<TestClient>(mService);
-
-    std::unique_ptr<TranscodingClientManager::ClientInfo> clientInfo =
-            std::make_unique<TranscodingClientManager::ClientInfo>(
-                    client, kClientId, kClientPid, kClientUid, kClientOpPackageName);
-
-    status_t err = mClientManager.addClient(std::move(clientInfo));
-    EXPECT_TRUE(err == OK);
-
-    bool res = mClientManager.isClientIdRegistered(kClientId);
-    EXPECT_TRUE(res);
-
-    res = mClientManager.isClientIdRegistered(kInvalidClientId);
-    EXPECT_FALSE(res);
+    EXPECT_EQ(mClientManager.getNumOfClients(), 3);
+    EXPECT_TRUE(client1->unregister().isOk());
+    EXPECT_TRUE(client2->unregister().isOk());
+    EXPECT_TRUE(client3->unregister().isOk());
+    EXPECT_EQ(mClientManager.getNumOfClients(), 0);
 }
 
 }  // namespace android

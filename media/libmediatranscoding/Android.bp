@@ -20,7 +20,8 @@ aidl_interface {
     local_include_dir: "aidl",
     srcs: [
         "aidl/android/media/IMediaTranscodingService.aidl",
-        "aidl/android/media/ITranscodingServiceClient.aidl",
+        "aidl/android/media/ITranscodingClient.aidl",
+        "aidl/android/media/ITranscodingClientListener.aidl",
         "aidl/android/media/TranscodingErrorCode.aidl",
         "aidl/android/media/TranscodingJobPriority.aidl",
         "aidl/android/media/TranscodingType.aidl",
