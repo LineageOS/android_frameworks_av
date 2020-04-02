@@ -59,6 +59,8 @@ public:
 
     sp<ABuffer> getImageData() const { return mImageData; }
 
+    virtual void clearC2BufferRefs() {}
+
 protected:
     /**
      * canCopy() implementation for linear buffers.
@@ -102,6 +104,7 @@ public:
             const std::shared_ptr<C2Buffer> &buffer = nullptr);
 
     std::shared_ptr<C2Buffer> asC2Buffer() override;
+    void clearC2BufferRefs() override;
     bool canCopy(const std::shared_ptr<C2Buffer> &buffer) const override;
     bool copy(const std::shared_ptr<C2Buffer> &buffer) override;
 
@@ -161,6 +164,7 @@ public:
     virtual ~ConstLinearBlockBuffer() = default;
 
     std::shared_ptr<C2Buffer> asC2Buffer() override;
+    void clearC2BufferRefs() override;
 
 private:
     ConstLinearBlockBuffer(
@@ -280,6 +284,7 @@ public:
     virtual ~ConstGraphicBlockBuffer() = default;
 
     std::shared_ptr<C2Buffer> asC2Buffer() override;
+    void clearC2BufferRefs() override;
     bool canCopy(const std::shared_ptr<C2Buffer> &buffer) const override;
     bool copy(const std::shared_ptr<C2Buffer> &buffer) override;
 
