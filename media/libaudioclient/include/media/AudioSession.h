@@ -31,37 +31,29 @@ namespace android {
 // class to store streaminfo
 class AudioSessionInfo : public RefBase {
 public:
-    AudioSessionInfo(audio_session_t session, audio_stream_type_t stream, audio_output_flags_t flags,
-            audio_channel_mask_t channelMask, uid_t uid) :
-        mSessionId(session), mStream(stream), mFlags(flags), mChannelMask(channelMask),
-        mUid(uid), mRefCount(0) {}
+    AudioSessionInfo(audio_session_t session, audio_stream_type_t stream, uid_t uid) :
+        mSessionId(session), mStream(stream), mUid(uid), mRefCount(0) {}
 
-    AudioSessionInfo() : mSessionId((audio_session_t) 0), mStream(AUDIO_STREAM_DEFAULT), mFlags(AUDIO_OUTPUT_FLAG_NONE), mChannelMask(AUDIO_CHANNEL_NONE), mUid(0) {}
+    AudioSessionInfo() : mSessionId((audio_session_t) 0), mStream(AUDIO_STREAM_DEFAULT), mUid(0) {}
 
     /*virtual*/ ~AudioSessionInfo() {}
 
     audio_session_t mSessionId;
     audio_stream_type_t mStream;
-    audio_output_flags_t mFlags;
-    audio_channel_mask_t mChannelMask;
     uid_t mUid;
 
     // AudioPolicyManager keeps mLock, no need for lock on reference count here
     int mRefCount;
 
     void readFromParcel(const Parcel &parcel)  {
-        mSessionId = (audio_session_t) parcel.readInt32();
+        mSessionId = static_cast<audio_session_t>(parcel.readInt32());
         mStream = static_cast<audio_stream_type_t>(parcel.readInt32());
-        mFlags = static_cast<audio_output_flags_t>(parcel.readInt32());
-        mChannelMask = static_cast<audio_channel_mask_t>(parcel.readInt32());
         mUid = static_cast<uid_t>(parcel.readInt32());
     }
 
     void writeToParcel(Parcel *parcel) const {
         parcel->writeInt32(mSessionId);
         parcel->writeInt32(mStream);
-        parcel->writeInt32(mFlags);
-        parcel->writeInt32(mChannelMask);
         parcel->writeInt32(mUid);
     }
 };
