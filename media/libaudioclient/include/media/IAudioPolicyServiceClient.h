@@ -25,7 +25,6 @@
 #include <system/audio_effect.h>
 #include <media/AudioPolicy.h>
 #include <media/AudioVolumeGroup.h>
-#include <media/AudioSession.h>
 
 namespace android {
 
@@ -66,8 +65,6 @@ public:
             std::vector<effect_descriptor_t> effects,
             audio_patch_handle_t patchHandle,
             audio_source_t source) = 0;
-    // Notifies when a default effect set is attached to a session/stream
-    virtual void onOutputSessionEffectsUpdate(sp<AudioSessionInfo>& info, bool added) = 0;
 };
 
 

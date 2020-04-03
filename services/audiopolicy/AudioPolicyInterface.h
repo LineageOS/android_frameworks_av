@@ -383,8 +383,6 @@ public:
                                                 std::vector<effect_descriptor_t> effects,
                                                 audio_patch_handle_t patchHandle,
                                                 audio_source_t source) = 0;
-    virtual void onOutputSessionEffectsUpdate(sp<AudioSessionInfo>& streamInfo, bool added) = 0;
-
 };
 
 extern "C" AudioPolicyInterface* createAudioPolicyManager(AudioPolicyClientInterface *clientInterface);

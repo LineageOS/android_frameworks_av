@@ -182,32 +182,27 @@ status_t AudioPolicyService::getOutputForAttr(audio_attributes_t *attr,
         return NO_INIT;
     }
     ALOGV("getOutputForAttr()");
-    audio_output_flags_t originalFlags = flags;
-    status_t result = NO_ERROR;
-    sp<AudioPolicyEffects> audioPolicyEffects;
-    {
-        Mutex::Autolock _l(mLock);
+    Mutex::Autolock _l(mLock);
 
-        const uid_t callingUid = IPCThreadState::self()->getCallingUid();
-        if (!isAudioServerOrMediaServerUid(callingUid) || uid == (uid_t)-1) {
-            ALOGW_IF(uid != (uid_t)-1 && uid != callingUid,
-                    "%s uid %d tried to pass itself off as %d", __FUNCTION__, callingUid, uid);
-            uid = callingUid;
-        }
-        if (!mPackageManager.allowPlaybackCapture(uid)) {
-            attr->flags |= AUDIO_FLAG_NO_MEDIA_PROJECTION;
-        }
-        if (((attr->flags & (AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY|AUDIO_FLAG_BYPASS_MUTE)) != 0)
-                && !bypassInterruptionPolicyAllowed(pid, uid)) {
-            attr->flags &= ~(AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY|AUDIO_FLAG_BYPASS_MUTE);
-        }
-        AutoCallerClear acc;
-        result = mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid,
-                                                       config,
-                                                       &flags, selectedDeviceId, portId,
-                                                       secondaryOutputs);
-        audioPolicyEffects = mAudioPolicyEffects;
+    const uid_t callingUid = IPCThreadState::self()->getCallingUid();
+    if (!isAudioServerOrMediaServerUid(callingUid) || uid == (uid_t)-1) {
+        ALOGW_IF(uid != (uid_t)-1 && uid != callingUid,
+                "%s uid %d tried to pass itself off as %d", __FUNCTION__, callingUid, uid);
+        uid = callingUid;
     }
+    if (!mPackageManager.allowPlaybackCapture(uid)) {
+        attr->flags |= AUDIO_FLAG_NO_MEDIA_PROJECTION;
+    }
+    if (((attr->flags & (AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY|AUDIO_FLAG_BYPASS_MUTE)) != 0)
+            && !bypassInterruptionPolicyAllowed(pid, uid)) {
+        attr->flags &= ~(AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY|AUDIO_FLAG_BYPASS_MUTE);
+    }
+    audio_output_flags_t originalFlags = flags;
+    AutoCallerClear acc;
+    status_t result = mAudioPolicyManager->getOutputForAttr(attr, output, session, stream, uid,
+                                                 config,
+                                                 &flags, selectedDeviceId, portId,
+                                                 secondaryOutputs);
 
     // FIXME: Introduce a way to check for the the telephony device before opening the output
     if ((result == NO_ERROR) &&
@@ -230,12 +225,6 @@ status_t AudioPolicyService::getOutputForAttr(audio_attributes_t *attr,
             new AudioPlaybackClient(*attr, *output, uid, pid, session, *selectedDeviceId, *stream);
         mAudioPlaybackClients.add(*portId, client);
     }
-
-    if (result == NO_ERROR && audioPolicyEffects != 0) {
-        audioPolicyEffects->updateOutputAudioSessionInfo(*output, *stream,
-                session, flags, config, uid);
-    }
-
     return result;
 }
 
@@ -342,15 +331,8 @@ void AudioPolicyService::doReleaseOutput(audio_port_handle_t portId)
     Mutex::Autolock _l(mLock);
     mAudioPlaybackClients.removeItem(portId);
 
-    audioPolicyEffects = mAudioPolicyEffects;
-
     // called from internal thread: no need to clear caller identity
     mAudioPolicyManager->releaseOutput(portId);
-
-    if (audioPolicyEffects != 0) {
-        audioPolicyEffects->releaseOutputAudioSessionInfo(client->io,
-                client->stream, client->session);
-    }
 }
 
 status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
@@ -1340,26 +1322,6 @@ status_t AudioPolicyService::setRttEnabled(bool enabled)
 {
     Mutex::Autolock _l(mLock);
     mUidPolicy->setRttEnabled(enabled);
-    return NO_ERROR;
-}
-
-status_t AudioPolicyService::listAudioSessions(audio_stream_type_t streams,
-                                               Vector< sp<AudioSessionInfo>> &sessions)
-{
-    sp<AudioPolicyEffects> audioPolicyEffects;
-    {
-        Mutex::Autolock _l(mLock);
-        if (mAudioPolicyManager == NULL) {
-            return NO_INIT;
-        }
-        audioPolicyEffects = mAudioPolicyEffects;
-    }
-
-    if (audioPolicyEffects != 0) {
-        return audioPolicyEffects->listAudioSessions(streams, sessions);
-    }
-
-    // no errors here if effects are not available
     return NO_ERROR;
 }
 

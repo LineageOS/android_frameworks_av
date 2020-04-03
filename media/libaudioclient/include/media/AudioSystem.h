@@ -45,8 +45,6 @@ typedef void (*record_config_callback)(int event,
                                        std::vector<effect_descriptor_t> effects,
                                        audio_patch_handle_t patchHandle,
                                        audio_source_t source);
-typedef void (*audio_session_callback)(int event,
-        sp<AudioSessionInfo>& session, bool added);
 
 class IAudioFlinger;
 class IAudioPolicyService;
@@ -111,7 +109,6 @@ public:
     static void setErrorCallback(audio_error_callback cb);
     static void setDynPolicyCallback(dynamic_policy_callback cb);
     static void setRecordConfigCallback(record_config_callback);
-    static status_t setAudioSessionCallback(audio_session_callback cb);
 
     // helper function to obtain AudioFlinger service handle
     static const sp<IAudioFlinger> get_audio_flinger();
@@ -399,8 +396,6 @@ public:
 
     static status_t setRttEnabled(bool enabled);
 
-    static status_t listAudioSessions(audio_stream_type_t streams,
-                                      Vector< sp<AudioSessionInfo>> &sessions);
      /**
      * Send audio HAL server process pids to native audioserver process for use
      * when generating audio HAL servers tombstones
@@ -540,7 +535,6 @@ private:
                                                     std::vector<effect_descriptor_t> effects,
                                                     audio_patch_handle_t patchHandle,
                                                     audio_source_t source);
-        virtual void onOutputSessionEffectsUpdate(sp<AudioSessionInfo>& info, bool added);
 
     private:
         Mutex                               mLock;
@@ -563,7 +557,6 @@ private:
     static audio_error_callback gAudioErrorCallback;
     static dynamic_policy_callback gDynPolicyCallback;
     static record_config_callback gRecordConfigCallback;
-    static audio_session_callback gAudioSessionCallback;
 
     static size_t gInBuffSize;
     // previous parameters for recording buffer size queries
