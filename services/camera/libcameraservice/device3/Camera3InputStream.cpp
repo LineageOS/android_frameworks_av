@@ -31,8 +31,8 @@ const String8 Camera3InputStream::FAKE_ID;
 
 Camera3InputStream::Camera3InputStream(int id,
         uint32_t width, uint32_t height, int format) :
-        Camera3IOStreamBase(id, CAMERA3_STREAM_INPUT, width, height, /*maxSize*/0,
-                            format, HAL_DATASPACE_UNKNOWN, CAMERA3_STREAM_ROTATION_0,
+        Camera3IOStreamBase(id, CAMERA_STREAM_INPUT, width, height, /*maxSize*/0,
+                            format, HAL_DATASPACE_UNKNOWN, CAMERA_STREAM_ROTATION_0,
                             FAKE_ID) {
 
     if (format == HAL_PIXEL_FORMAT_BLOB) {
@@ -46,7 +46,7 @@ Camera3InputStream::~Camera3InputStream() {
 }
 
 status_t Camera3InputStream::getInputBufferLocked(
-        camera3_stream_buffer *buffer) {
+        camera_stream_buffer *buffer) {
     ATRACE_CALL();
     status_t res;
 
@@ -86,7 +86,7 @@ status_t Camera3InputStream::getInputBufferLocked(
      * in which case we reassign it to acquire_fence
      */
     handoutBufferLocked(*buffer, &(anb->handle), /*acquireFence*/fenceFd,
-                        /*releaseFence*/-1, CAMERA3_BUFFER_STATUS_OK, /*output*/false);
+                        /*releaseFence*/-1, CAMERA_BUFFER_STATUS_OK, /*output*/false);
     mBuffersInFlight.push_back(bufferItem);
 
     mFrameCount++;
@@ -96,7 +96,7 @@ status_t Camera3InputStream::getInputBufferLocked(
 }
 
 status_t Camera3InputStream::returnBufferCheckedLocked(
-            const camera3_stream_buffer &buffer,
+            const camera_stream_buffer &buffer,
             nsecs_t timestamp,
             bool output,
             const std::vector<size_t>&,
@@ -134,7 +134,7 @@ status_t Camera3InputStream::returnBufferCheckedLocked(
         return INVALID_OPERATION;
     }
 
-    if (buffer.status == CAMERA3_BUFFER_STATUS_ERROR) {
+    if (buffer.status == CAMERA_BUFFER_STATUS_ERROR) {
         if (buffer.release_fence != -1) {
             ALOGE("%s: Stream %d: HAL should not set release_fence(%d) when "
                   "there is an error", __FUNCTION__, mId, buffer.release_fence);
@@ -144,7 +144,7 @@ status_t Camera3InputStream::returnBufferCheckedLocked(
         /**
          * Reassign release fence as the acquire fence incase of error
          */
-        const_cast<camera3_stream_buffer*>(&buffer)->release_fence =
+        const_cast<camera_stream_buffer*>(&buffer)->release_fence =
                 buffer.acquire_fence;
     }
 
@@ -165,7 +165,7 @@ status_t Camera3InputStream::returnBufferCheckedLocked(
 }
 
 status_t Camera3InputStream::returnInputBufferLocked(
-        const camera3_stream_buffer &buffer) {
+        const camera_stream_buffer &buffer) {
     ATRACE_CALL();
 
     return returnAnyBufferLocked(buffer, /*timestamp*/0, /*output*/false);
@@ -224,7 +224,7 @@ status_t Camera3InputStream::configureQueueLocked() {
     }
 
     assert(mMaxSize == 0);
-    assert(camera3_stream::format != HAL_PIXEL_FORMAT_BLOB);
+    assert(camera_stream::format != HAL_PIXEL_FORMAT_BLOB);
 
     mHandoutTotalBufferCount = 0;
     mFrameCount = 0;
@@ -244,14 +244,14 @@ status_t Camera3InputStream::configureQueueLocked() {
         }
         size_t minBufs = static_cast<size_t>(minUndequeuedBuffers);
 
-        if (camera3_stream::max_buffers == 0) {
+        if (camera_stream::max_buffers == 0) {
             ALOGE("%s: %d: HAL sets max_buffer to 0. Must be at least 1.",
                     __FUNCTION__, __LINE__);
             return INVALID_OPERATION;
         }
 
         /*
-         * We promise never to 'acquire' more than camera3_stream::max_buffers
+         * We promise never to 'acquire' more than camera_stream::max_buffers
          * at any one time.
          *
          * Boost the number up to meet the minimum required buffer count.
@@ -259,8 +259,8 @@ status_t Camera3InputStream::configureQueueLocked() {
          * (Note that this sets consumer-side buffer count only,
          * and not the sum of producer+consumer side as in other camera streams).
          */
-        mTotalBufferCount = camera3_stream::max_buffers > minBufs ?
-            camera3_stream::max_buffers : minBufs;
+        mTotalBufferCount = camera_stream::max_buffers > minBufs ?
+            camera_stream::max_buffers : minBufs;
         // TODO: somehow set the total buffer count when producer connects?
 
         mConsumer = new BufferItemConsumer(consumer, mUsage,
@@ -272,17 +272,17 @@ status_t Camera3InputStream::configureQueueLocked() {
         mConsumer->setBufferFreedListener(this);
     }
 
-    res = mConsumer->setDefaultBufferSize(camera3_stream::width,
-                                          camera3_stream::height);
+    res = mConsumer->setDefaultBufferSize(camera_stream::width,
+                                          camera_stream::height);
     if (res != OK) {
         ALOGE("%s: Stream %d: Could not set buffer dimensions %dx%d",
-              __FUNCTION__, mId, camera3_stream::width, camera3_stream::height);
+              __FUNCTION__, mId, camera_stream::width, camera_stream::height);
         return res;
     }
-    res = mConsumer->setDefaultBufferFormat(camera3_stream::format);
+    res = mConsumer->setDefaultBufferFormat(camera_stream::format);
     if (res != OK) {
         ALOGE("%s: Stream %d: Could not set buffer format %d",
-              __FUNCTION__, mId, camera3_stream::format);
+              __FUNCTION__, mId, camera_stream::format);
         return res;
     }
 
@@ -298,8 +298,8 @@ status_t Camera3InputStream::getEndpointUsage(uint64_t *usage) const {
 void Camera3InputStream::onBufferFreed(const wp<GraphicBuffer>& gb) {
     const sp<GraphicBuffer> buffer = gb.promote();
     if (buffer != nullptr) {
-        camera3_stream_buffer streamBuffer =
-                {nullptr, &buffer->handle, 0, -1, -1};
+        camera_stream_buffer streamBuffer =
+                {nullptr, &buffer->handle, CAMERA_BUFFER_STATUS_OK, -1, -1};
         // Check if this buffer is outstanding.
         if (isOutstandingBuffer(streamBuffer)) {
             ALOGV("%s: Stream %d: Trying to free a buffer that is still being "

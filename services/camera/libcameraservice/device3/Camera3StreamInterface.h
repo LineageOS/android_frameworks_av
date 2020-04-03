@@ -23,12 +23,54 @@
 #include "Camera3StreamBufferListener.h"
 #include "Camera3StreamBufferFreedListener.h"
 
-struct camera3_stream;
-struct camera3_stream_buffer;
-
 namespace android {
 
 namespace camera3 {
+
+typedef enum camera_buffer_status {
+    CAMERA_BUFFER_STATUS_OK = 0,
+    CAMERA_BUFFER_STATUS_ERROR = 1
+} camera_buffer_status_t;
+
+typedef enum camera_stream_type {
+    CAMERA_STREAM_OUTPUT = 0,
+    CAMERA_STREAM_INPUT = 1,
+    CAMERA_NUM_STREAM_TYPES
+} camera_stream_type_t;
+
+typedef enum camera_stream_rotation {
+    /* No rotation */
+    CAMERA_STREAM_ROTATION_0 = 0,
+
+    /* Rotate by 90 degree counterclockwise */
+    CAMERA_STREAM_ROTATION_90 = 1,
+
+    /* Rotate by 180 degree counterclockwise */
+    CAMERA_STREAM_ROTATION_180 = 2,
+
+    /* Rotate by 270 degree counterclockwise */
+    CAMERA_STREAM_ROTATION_270 = 3
+} camera_stream_rotation_t;
+
+typedef struct camera_stream {
+    camera_stream_type_t stream_type;
+    uint32_t width;
+    uint32_t height;
+    int format;
+    uint32_t usage;
+    uint32_t max_buffers;
+    android_dataspace_t data_space;
+    camera_stream_rotation_t rotation;
+    const char* physical_camera_id;
+} camera_stream_t;
+
+typedef struct camera_stream_buffer {
+    camera_stream_t *stream;
+    buffer_handle_t *buffer;
+    camera_buffer_status_t status;
+    int acquire_fence;
+    int release_fence;
+} camera_stream_buffer_t;
 
 enum {
     /**
@@ -109,23 +151,23 @@ class Camera3StreamInterface : public virtual RefBase {
     virtual bool getOfflineProcessingSupport() const = 0;
 
     /**
-     * Get a HAL3 handle for the stream, without starting stream configuration.
+     * Get a handle for the stream, without starting stream configuration.
      */
-    virtual camera3_stream* asHalStream() = 0;
+    virtual camera_stream* asHalStream() = 0;
 
     /**
      * Start the stream configuration process. Returns a handle to the stream's
-     * information to be passed into the HAL device's configure_streams call.
+     * information to be passed into the device's configure_streams call.
      *
      * Until finishConfiguration() is called, no other methods on the stream may
-     * be called. The usage and max_buffers fields of camera3_stream may be
+     * be called. The usage and max_buffers fields of camera_stream may be
      * modified between start/finishConfiguration, but may not be changed after
-     * that. The priv field of camera3_stream may be modified at any time after
+     * that. The priv field of camera_stream may be modified at any time after
      * startConfiguration.
      *
      * Returns NULL in case of error starting configuration.
      */
-    virtual camera3_stream* startConfiguration() = 0;
+    virtual camera_stream* startConfiguration() = 0;
 
     /**
      * Check if the stream is mid-configuration (start has been called, but not
@@ -241,7 +283,7 @@ class Camera3StreamInterface : public virtual RefBase {
     virtual status_t tearDown() = 0;
 
     /**
-     * Fill in the camera3_stream_buffer with the next valid buffer for this
+     * Fill in the camera_stream_buffer with the next valid buffer for this
      * stream, to hand over to the HAL.
      *
      * Multiple surfaces could share the same HAL stream, but a request may
@@ -255,7 +297,7 @@ class Camera3StreamInterface : public virtual RefBase {
      * buffers.
      *
      */
-    virtual status_t getBuffer(camera3_stream_buffer *buffer,
+    virtual status_t getBuffer(camera_stream_buffer *buffer,
             nsecs_t waitBufferTimeout,
             const std::vector<size_t>& surface_ids = std::vector<size_t>()) = 0;
 
@@ -271,13 +313,13 @@ class Camera3StreamInterface : public virtual RefBase {
      * This method may only be called for buffers provided by getBuffer().
      * For bidirectional streams, this method applies to the output-side buffers
      */
-    virtual status_t returnBuffer(const camera3_stream_buffer &buffer,
+    virtual status_t returnBuffer(const camera_stream_buffer &buffer,
             nsecs_t timestamp, bool timestampIncreasing = true,
             const std::vector<size_t>& surface_ids = std::vector<size_t>(),
             uint64_t frameNumber = 0) = 0;
 
     /**
-     * Fill in the camera3_stream_buffer with the next valid buffer for this
+     * Fill in the camera_stream_buffer with the next valid buffer for this
      * stream, to hand over to the HAL.
      *
      * This method may only be called once finishConfiguration has been called.
@@ -287,7 +329,7 @@ class Camera3StreamInterface : public virtual RefBase {
      * Normally this call will block until the handed out buffer count is less than the stream
      * max buffer count; if respectHalLimit is set to false, this is ignored.
      */
-    virtual status_t getInputBuffer(camera3_stream_buffer *buffer, bool respectHalLimit = true) = 0;
+    virtual status_t getInputBuffer(camera_stream_buffer *buffer, bool respectHalLimit = true) = 0;
 
     /**
      * Return a buffer to the stream after use by the HAL.
@@ -295,7 +337,7 @@ class Camera3StreamInterface : public virtual RefBase {
      * This method may only be called for buffers provided by getBuffer().
      * For bidirectional streams, this method applies to the input-side buffers
      */
-    virtual status_t returnInputBuffer(const camera3_stream_buffer &buffer) = 0;
+    virtual status_t returnInputBuffer(const camera_stream_buffer &buffer) = 0;
 
     /**
      * Get the buffer producer of the input buffer queue.

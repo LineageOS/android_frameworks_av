@@ -28,14 +28,14 @@
 namespace android {
 namespace camera3 {
 
-camera3_buffer_status_t mapHidlBufferStatus(hardware::camera::device::V3_2::BufferStatus status) {
+camera_buffer_status_t mapHidlBufferStatus(hardware::camera::device::V3_2::BufferStatus status) {
     using hardware::camera::device::V3_2::BufferStatus;
 
     switch (status) {
-        case BufferStatus::OK: return CAMERA3_BUFFER_STATUS_OK;
-        case BufferStatus::ERROR: return CAMERA3_BUFFER_STATUS_ERROR;
+        case BufferStatus::OK: return CAMERA_BUFFER_STATUS_OK;
+        case BufferStatus::ERROR: return CAMERA_BUFFER_STATUS_ERROR;
     }
-    return CAMERA3_BUFFER_STATUS_ERROR;
+    return CAMERA_BUFFER_STATUS_ERROR;
 }
 
 void BufferRecords::takeInflightBufferMap(BufferRecords& other) {

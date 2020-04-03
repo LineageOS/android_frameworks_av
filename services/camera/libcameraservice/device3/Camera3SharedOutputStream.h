@@ -36,7 +36,7 @@ public:
     Camera3SharedOutputStream(int id, const std::vector<sp<Surface>>& surfaces,
             uint32_t width, uint32_t height, int format,
             uint64_t consumerUsage, android_dataspace dataSpace,
-            camera3_stream_rotation_t rotation, nsecs_t timestampOffset,
+            camera_stream_rotation_t rotation, nsecs_t timestampOffset,
             const String8& physicalCameraId,
             int setId = CAMERA3_STREAM_SET_ID_INVALID,
             bool useHalBufManager = false);
@@ -116,7 +116,7 @@ private:
     /**
      * Internal Camera3Stream interface
      */
-    virtual status_t getBufferLocked(camera3_stream_buffer *buffer,
+    virtual status_t getBufferLocked(camera_stream_buffer *buffer,
             const std::vector<size_t>& surface_ids);
 
     virtual status_t queueBufferToConsumer(sp<ANativeWindow>& consumer,

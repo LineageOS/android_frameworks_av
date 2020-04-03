@@ -31,6 +31,8 @@
 namespace android {
 namespace camera2 {
 
+using android::camera3::CAMERA_STREAM_ROTATION_0;
+
 CallbackProcessor::CallbackProcessor(sp<Camera2Client> client):
         Thread(false),
         mClient(client),
@@ -154,7 +156,7 @@ status_t CallbackProcessor::updateStream(const Parameters &params) {
                 callbackFormat, params.previewFormat);
         res = device->createStream(mCallbackWindow,
                 params.previewWidth, params.previewHeight, callbackFormat,
-                HAL_DATASPACE_V0_JFIF, CAMERA3_STREAM_ROTATION_0, &mCallbackStreamId,
+                HAL_DATASPACE_V0_JFIF, CAMERA_STREAM_ROTATION_0, &mCallbackStreamId,
                 String8());
         if (res != OK) {
             ALOGE("%s: Camera %d: Can't create output stream for callbacks: "

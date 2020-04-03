@@ -24,8 +24,6 @@
 #include <utils/String8.h>
 #include <utils/Timers.h>
 
-#include "hardware/camera3.h"
-
 #include "common/CameraDeviceBase.h"
 
 namespace android {
@@ -75,7 +73,7 @@ struct InFlightRequest {
     // return from HAL but framework has not yet received the shutter
     // event. They will be returned to the streams when framework receives
     // the shutter event.
-    Vector<camera3_stream_buffer_t> pendingOutputBuffers;
+    Vector<camera_stream_buffer_t> pendingOutputBuffers;
 
     // Whether this inflight request's shutter and result callback are to be
     // called. The policy is that if the request is the last one in the constrained
