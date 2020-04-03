@@ -17,6 +17,7 @@
 #pragma once
 
 #include <mutex>
+#include <binder/IBinder.h>
 #include <utils/StrongPointer.h>
 
 namespace android {
@@ -63,6 +64,7 @@ public:
 private:
     std::mutex mMutex;
     sp<media::ICaptureStateListener> mListener;
+    sp<IBinder::DeathRecipient> mDeathRecipient;
     bool mActive;
 
     class DeathRecipient;
