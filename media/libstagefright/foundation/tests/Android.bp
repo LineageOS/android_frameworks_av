@@ -25,3 +25,31 @@ cc_test {
         "Utils_test.cpp",
     ],
 }
+
+cc_test {
+    name: "MetaDataBaseUnitTest",
+    gtest: true,
+
+    srcs: [
+        "MetaDataBaseUnitTest.cpp",
+    ],
+
+    shared_libs: [
+        "libutils",
+        "liblog",
+    ],
+
+    static_libs: [
+        "libstagefright",
+        "libstagefright_foundation",
+    ],
+
+    header_libs: [
+        "libmedia_headers",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+}
