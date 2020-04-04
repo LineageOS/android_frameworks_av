@@ -42,7 +42,7 @@ using OutputConfiguration = frameworks::cameraservice::device::V2_0::OutputConfi
 // Utility class so that CaptureRequest can be stored by sp<>
 struct CaptureRequest : public RefBase {
   frameworks::cameraservice::device::V2_0::CaptureRequest mCaptureRequest;
-  std::vector<native_handle_t *> mSurfaceList;
+  std::vector<const native_handle_t *> mSurfaceList;
   //Physical camera settings metadata is stored here, since the capture request
   //might not contain it. That's since, fmq might have consumed it.
   hidl_vec<PhysicalCameraSettings> mPhysicalCameraSettings;
@@ -62,13 +62,13 @@ bool isWindowNativeHandleGreaterThan(const native_handle_t *nh1, const native_ha
 // Utility class so the native_handle_t can be compared with  its contents instead
 // of just raw pointer comparisons.
 struct native_handle_ptr_wrapper {
-    native_handle_t *mWindow = nullptr;
+    const native_handle_t *mWindow = nullptr;
 
-    native_handle_ptr_wrapper(native_handle_t *nh) : mWindow(nh) { }
+    native_handle_ptr_wrapper(const native_handle_t *nh) : mWindow(nh) { }
 
     native_handle_ptr_wrapper() = default;
 
-    operator native_handle_t *() const { return mWindow; }
+    operator const native_handle_t *() const { return mWindow; }
 
     bool operator ==(const native_handle_ptr_wrapper other) const {
         return isWindowNativeHandleEqual(mWindow, other.mWindow);

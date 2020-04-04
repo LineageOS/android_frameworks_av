@@ -355,7 +355,7 @@ CameraDevice::allocateCaptureRequestLocked(
     std::vector<int32_t> requestStreamIdxList;
     std::vector<int32_t> requestSurfaceIdxList;
     for (auto outputTarget : request->targets->mOutputs) {
-        native_handle_t* anw = outputTarget.mWindow;
+        const native_handle_t* anw = outputTarget.mWindow;
         bool found = false;
         req->mSurfaceList.push_back(anw);
         // lookup stream/surface ID
@@ -434,7 +434,7 @@ CameraDevice::allocateACaptureRequest(sp<CaptureRequest>& req, const char* devic
     }
     pRequest->targets = new ACameraOutputTargets();
     for (size_t i = 0; i < req->mSurfaceList.size(); i++) {
-        native_handle_t* anw = req->mSurfaceList[i];
+        const native_handle_t* anw = req->mSurfaceList[i];
         ACameraOutputTarget outputTarget(anw);
         pRequest->targets->mOutputs.insert(outputTarget);
     }
@@ -611,7 +611,7 @@ CameraDevice::configureStreamsLocked(const ACaptureSessionOutputContainer* outpu
 
     std::set<std::pair<native_handle_ptr_wrapper, OutputConfigurationWrapper>> outputSet;
     for (auto outConfig : outputs->mOutputs) {
-        native_handle_t* anw = outConfig.mWindow;
+        const native_handle_t* anw = outConfig.mWindow;
         OutputConfigurationWrapper outConfigInsertW;
         OutputConfiguration &outConfigInsert = outConfigInsertW.mOutputConfiguration;
         outConfigInsert.rotation = utils::convertToHidl(outConfig.mRotation);
@@ -846,8 +846,7 @@ CameraDevice::onCaptureErrorLocked(
             for (auto streamAndWindowId : request->mCaptureRequest.streamAndWindowIds) {
                 int32_t windowId = streamAndWindowId.windowId;
                 if (utils::isWindowNativeHandleEqual(windowHandles[windowId],outHandle)) {
-                    native_handle_t* anw =
-                        const_cast<native_handle_t *>(windowHandles[windowId].getNativeHandle());
+                    const native_handle_t* anw = windowHandles[windowId].getNativeHandle();
                     ALOGV("Camera %s Lost output buffer for ANW %p frame %" PRId64,
                             getId(), anw, frameNumber);
 
@@ -1244,7 +1243,7 @@ void CameraDevice::CallbackHandler::onMessageReceived(
                         return;
                     }
 
-                    native_handle_t* anw;
+                    const native_handle_t* anw;
                     found = msg->findPointer(kAnwKey, (void**) &anw);
                     if (!found) {
                         ALOGE("%s: Cannot find native_handle_t!", __FUNCTION__);
