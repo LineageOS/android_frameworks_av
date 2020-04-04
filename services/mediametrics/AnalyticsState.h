@@ -84,8 +84,11 @@ public:
      * delivered.
      *
      * \param lines the maximum number of lines in the string returned.
+     * \param sinceNs the nanoseconds since Unix epoch to start dump (0 shows all)
+     * \param prefix the desired key prefix to match (nullptr shows all)
      */
-    std::pair<std::string, int32_t> dump(int32_t lines = INT32_MAX) const {
+    std::pair<std::string, int32_t> dump(
+            int32_t lines = INT32_MAX, int64_t sinceNs = 0, const char *prefix = nullptr) const {
         std::stringstream ss;
         int32_t ll = lines;
 
@@ -94,8 +97,8 @@ public:
             --ll;
         }
         if (ll > 0) {
-            auto [s, l] = mTransactionLog.dump(ll);
-            ss << s;
+            auto [s, l] = mTransactionLog.dump(ll, sinceNs, prefix);
+            ss << std::move(s);
             ll -= l;
         }
         if (ll > 0) {
@@ -103,8 +106,8 @@ public:
             --ll;
         }
         if (ll > 0) {
-            auto [s, l] = mTimeMachine.dump(ll);
-            ss << s;
+            auto [s, l] = mTimeMachine.dump(ll, sinceNs, prefix);
+            ss << std::move(s);
             ll -= l;
         }
         return { ss.str(), lines - ll };
