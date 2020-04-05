@@ -20,6 +20,7 @@
 
 #include <datasource/FileSource.h>
 #include <media/stagefright/MediaBufferGroup.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaDataUtils.h>
 #include <media/stagefright/foundation/OpusHeader.h>
@@ -47,10 +48,42 @@ constexpr int32_t kMaxCount = 10;
 constexpr int32_t kAudioDefaultSampleDuration = 20000;                       // 20ms
 constexpr int32_t kRandomSeekToleranceUs = 2 * kAudioDefaultSampleDuration;  // 40 ms;
 constexpr int32_t kRandomSeed = 700;
+constexpr int32_t kUndefined = -1;
+
+// LookUpTable of clips and metadata for component testing
+static const struct InputData {
+    string mime;
+    string inputFile;
+    int32_t firstParam;
+    int32_t secondParam;
+    int32_t profile;
+    int32_t frameRate;
+} kInputData[] = {
+        {MEDIA_MIMETYPE_AUDIO_AAC, "test_mono_44100Hz_aac.aac", 44100, 1, AACObjectLC, kUndefined},
+        {MEDIA_MIMETYPE_AUDIO_AMR_NB, "bbb_mono_8kHz_amrnb.amr", 8000, 1, kUndefined, kUndefined},
+        {MEDIA_MIMETYPE_AUDIO_AMR_WB, "bbb_mono_16kHz_amrwb.amr", 16000, 1, kUndefined, kUndefined},
+        {MEDIA_MIMETYPE_AUDIO_VORBIS, "bbb_stereo_48kHz_vorbis.ogg", 48000, 2, kUndefined,
+         kUndefined},
+        {MEDIA_MIMETYPE_AUDIO_MSGSM, "test_mono_8kHz_gsm.wav", 8000, 1, kUndefined, kUndefined},
+        {MEDIA_MIMETYPE_AUDIO_RAW, "bbb_stereo_48kHz_flac.flac", 48000, 2, kUndefined, kUndefined},
+        {MEDIA_MIMETYPE_AUDIO_OPUS, "test_stereo_48kHz_opus.opus", 48000, 2, kUndefined,
+         kUndefined},
+        {MEDIA_MIMETYPE_AUDIO_MPEG, "bbb_stereo_48kHz_mp3.mp3", 48000, 2, kUndefined, kUndefined},
+        {MEDIA_MIMETYPE_AUDIO_RAW, "midi_a.mid", 22050, 2, kUndefined, kUndefined},
+        {MEDIA_MIMETYPE_VIDEO_MPEG2, "bbb_cif_768kbps_30fps_mpeg2.ts", 352, 288, MPEG2ProfileMain,
+         30},
+        {MEDIA_MIMETYPE_VIDEO_MPEG4, "bbb_cif_768kbps_30fps_mpeg4.mkv", 352, 288,
+         MPEG4ProfileSimple, 30},
+        // Test (b/151677264) for MP4 extractor
+        {MEDIA_MIMETYPE_VIDEO_HEVC, "crowd_508x240_25fps_hevc.mp4", 508, 240, HEVCProfileMain,
+         25},
+        {MEDIA_MIMETYPE_VIDEO_VP9, "bbb_340x280_30fps_vp9.webm", 340, 280, VP9Profile0, 30},
+        {MEDIA_MIMETYPE_VIDEO_MPEG2, "swirl_144x136_mpeg2.mpg", 144, 136, MPEG2ProfileMain, 12},
+};
 
 static ExtractorUnitTestEnvironment *gEnv = nullptr;
 
-class ExtractorUnitTest : public ::testing::TestWithParam<pair<string, string>> {
+class ExtractorUnitTest {
   public:
     ExtractorUnitTest() : mInputFp(nullptr), mDataSource(nullptr), mExtractor(nullptr) {}
 
@@ -69,7 +102,7 @@ class ExtractorUnitTest : public ::testing::TestWithParam<pair<string, string>> 
         }
     }
 
-    virtual void SetUp() override {
+    void setupExtractor(string writerFormat) {
         mExtractorName = unknown_comp;
         mDisableTest = false;
 
@@ -78,7 +111,6 @@ class ExtractorUnitTest : public ::testing::TestWithParam<pair<string, string>> 
                 {"wav", WAV},     {"mkv", MKV},         {"flac", FLAC},      {"midi", MIDI},
                 {"mpeg4", MPEG4}, {"mpeg2ts", MPEG2TS}, {"mpeg2ps", MPEG2PS}};
         // Find the component type
-        string writerFormat = GetParam().first;
         if (mapExtractor.find(writerFormat) != mapExtractor.end()) {
             mExtractorName = mapExtractor.at(writerFormat);
         }
@@ -113,6 +145,30 @@ class ExtractorUnitTest : public ::testing::TestWithParam<pair<string, string>> 
     FILE *mInputFp;
     sp<DataSource> mDataSource;
     MediaExtractorPluginHelper *mExtractor;
+};
+
+class ExtractorFunctionalityTest : public ExtractorUnitTest,
+                                   public ::testing::TestWithParam<pair<string, string>> {
+  public:
+    virtual void SetUp() override { setupExtractor(GetParam().first); }
+};
+
+class ConfigParamTest : public ExtractorUnitTest,
+                        public ::testing::TestWithParam<pair<string, int32_t>> {
+  public:
+    virtual void SetUp() override { setupExtractor(GetParam().first); }
+
+    struct configFormat {
+        string mime;
+        int32_t width;
+        int32_t height;
+        int32_t sampleRate;
+        int32_t channelCount;
+        int32_t profile;
+        int32_t frameRate;
+    };
+
+    void getFileProperties(int32_t inputIdx, string &inputFile, configFormat &configParam);
 };
 
 int32_t ExtractorUnitTest::setDataSource(string inputFileName) {
@@ -169,6 +225,27 @@ int32_t ExtractorUnitTest::createExtractor() {
     }
     if (!mExtractor) return -1;
     return 0;
+}
+
+void ConfigParamTest::getFileProperties(int32_t inputIdx, string &inputFile,
+                                        configFormat &configParam) {
+    if (inputIdx >= sizeof(kInputData) / sizeof(kInputData[0])) {
+        return;
+    }
+    inputFile += kInputData[inputIdx].inputFile;
+    configParam.mime = kInputData[inputIdx].mime;
+    size_t found = configParam.mime.find("audio/");
+    // Check if 'audio/' is present in the begininig of the mime type
+    if (found == 0) {
+        configParam.sampleRate = kInputData[inputIdx].firstParam;
+        configParam.channelCount = kInputData[inputIdx].secondParam;
+    } else {
+        configParam.width = kInputData[inputIdx].firstParam;
+        configParam.height = kInputData[inputIdx].secondParam;
+    }
+    configParam.profile = kInputData[inputIdx].profile;
+    configParam.frameRate = kInputData[inputIdx].frameRate;
+    return;
 }
 
 void randomSeekTest(MediaTrackHelper *track, int64_t clipDuration) {
@@ -234,7 +311,7 @@ void getSeekablePoints(vector<int64_t> &seekablePoints, MediaTrackHelper *track)
     }
 }
 
-TEST_P(ExtractorUnitTest, CreateExtractorTest) {
+TEST_P(ExtractorFunctionalityTest, CreateExtractorTest) {
     if (mDisableTest) return;
 
     ALOGV("Checks if a valid extractor is created for a given input file");
@@ -256,7 +333,7 @@ TEST_P(ExtractorUnitTest, CreateExtractorTest) {
     AMediaFormat_delete(format);
 }
 
-TEST_P(ExtractorUnitTest, ExtractorTest) {
+TEST_P(ExtractorFunctionalityTest, ExtractorTest) {
     if (mDisableTest) return;
 
     ALOGV("Validates %s Extractor for a given input file", GetParam().first.c_str());
@@ -306,7 +383,7 @@ TEST_P(ExtractorUnitTest, ExtractorTest) {
     }
 }
 
-TEST_P(ExtractorUnitTest, MetaDataComparisonTest) {
+TEST_P(ExtractorFunctionalityTest, MetaDataComparisonTest) {
     if (mDisableTest) return;
 
     ALOGV("Validates Extractor's meta data for a given input file");
@@ -381,7 +458,7 @@ TEST_P(ExtractorUnitTest, MetaDataComparisonTest) {
     AMediaFormat_delete(extractorFormat);
 }
 
-TEST_P(ExtractorUnitTest, MultipleStartStopTest) {
+TEST_P(ExtractorFunctionalityTest, MultipleStartStopTest) {
     if (mDisableTest) return;
 
     ALOGV("Test %s extractor for multiple start and stop calls", GetParam().first.c_str());
@@ -423,7 +500,7 @@ TEST_P(ExtractorUnitTest, MultipleStartStopTest) {
     }
 }
 
-TEST_P(ExtractorUnitTest, SeekTest) {
+TEST_P(ExtractorFunctionalityTest, SeekTest) {
     if (mDisableTest) return;
 
     ALOGV("Validates %s Extractor behaviour for different seek modes", GetParam().first.c_str());
@@ -586,7 +663,94 @@ TEST_P(ExtractorUnitTest, SeekTest) {
     seekablePoints.clear();
 }
 
-INSTANTIATE_TEST_SUITE_P(ExtractorUnitTestAll, ExtractorUnitTest,
+// This test validates config params for a given input file.
+// For this test we only take single track files since the focus of this test is
+// to validate the file properties reported by Extractor and not multi-track behavior
+TEST_P(ConfigParamTest, ConfigParamValidation) {
+    if (mDisableTest) return;
+
+    ALOGV("Validates %s Extractor for input's file properties", GetParam().first.c_str());
+    string inputFileName = gEnv->getRes();
+    int32_t inputFileIdx = GetParam().second;
+    configFormat configParam;
+    getFileProperties(inputFileIdx, inputFileName, configParam);
+
+    int32_t status = setDataSource(inputFileName);
+    ASSERT_EQ(status, 0) << "SetDataSource failed for " << GetParam().first << "extractor";
+
+    status = createExtractor();
+    ASSERT_EQ(status, 0) << "Extractor creation failed for " << GetParam().first << "extractor";
+
+    int32_t numTracks = mExtractor->countTracks();
+    ASSERT_GT(numTracks, 0) << "Extractor didn't find any track for the given clip";
+
+    MediaTrackHelper *track = mExtractor->getTrack(0);
+    ASSERT_NE(track, nullptr) << "Failed to get track for index 0";
+
+    AMediaFormat *trackFormat = AMediaFormat_new();
+    ASSERT_NE(trackFormat, nullptr) << "AMediaFormat_new returned null format";
+
+    status = track->getFormat(trackFormat);
+    ASSERT_EQ(OK, (media_status_t)status) << "Failed to get track meta data";
+
+    const char *trackMime;
+    bool valueFound = AMediaFormat_getString(trackFormat, AMEDIAFORMAT_KEY_MIME, &trackMime);
+    ASSERT_TRUE(valueFound) << "Mime type not set by extractor";
+    ASSERT_STREQ(configParam.mime.c_str(), trackMime) << "Invalid track format";
+
+    if (!strncmp(trackMime, "audio/", 6)) {
+        int32_t trackSampleRate, trackChannelCount;
+        ASSERT_TRUE(AMediaFormat_getInt32(trackFormat, AMEDIAFORMAT_KEY_CHANNEL_COUNT,
+                                          &trackChannelCount));
+        ASSERT_TRUE(
+                AMediaFormat_getInt32(trackFormat, AMEDIAFORMAT_KEY_SAMPLE_RATE, &trackSampleRate));
+        ASSERT_EQ(configParam.sampleRate, trackSampleRate) << "SampleRate not as expected";
+        ASSERT_EQ(configParam.channelCount, trackChannelCount) << "ChannelCount not as expected";
+    } else {
+        int32_t trackWidth, trackHeight;
+        ASSERT_TRUE(AMediaFormat_getInt32(trackFormat, AMEDIAFORMAT_KEY_WIDTH, &trackWidth));
+        ASSERT_TRUE(AMediaFormat_getInt32(trackFormat, AMEDIAFORMAT_KEY_HEIGHT, &trackHeight));
+        ASSERT_EQ(configParam.width, trackWidth) << "Width not as expected";
+        ASSERT_EQ(configParam.height, trackHeight) << "Height not as expected";
+
+        if (configParam.frameRate != kUndefined) {
+            int32_t frameRate;
+            ASSERT_TRUE(
+                    AMediaFormat_getInt32(trackFormat, AMEDIAFORMAT_KEY_FRAME_RATE, &frameRate));
+            ASSERT_EQ(configParam.frameRate, frameRate) << "frameRate not as expected";
+        }
+    }
+    // validate the profile for the input clip
+    int32_t profile;
+    if (configParam.profile != kUndefined) {
+        if (AMediaFormat_getInt32(trackFormat, AMEDIAFORMAT_KEY_PROFILE, &profile)) {
+            ASSERT_EQ(configParam.profile, profile) << "profile not as expected";
+        } else {
+            ASSERT_TRUE(false) << "profile not returned in extractor";
+        }
+    }
+
+    delete track;
+    AMediaFormat_delete(trackFormat);
+}
+
+INSTANTIATE_TEST_SUITE_P(ConfigParamTestAll, ConfigParamTest,
+                         ::testing::Values(make_pair("aac", 0),
+                                           make_pair("amr", 1),
+                                           make_pair("amr", 2),
+                                           make_pair("ogg", 3),
+                                           make_pair("wav", 4),
+                                           make_pair("flac", 5),
+                                           make_pair("ogg", 6),
+                                           make_pair("mp3", 7),
+                                           make_pair("midi", 8),
+                                           make_pair("mpeg2ts", 9),
+                                           make_pair("mkv", 10),
+                                           make_pair("mpeg4", 11),
+                                           make_pair("mkv", 12),
+                                           make_pair("mpeg2ps", 13)));
+
+INSTANTIATE_TEST_SUITE_P(ExtractorUnitTestAll, ExtractorFunctionalityTest,
                          ::testing::Values(make_pair("aac", "loudsoftaac.aac"),
                                            make_pair("amr", "testamr.amr"),
                                            make_pair("amr", "amrwb.wav"),
