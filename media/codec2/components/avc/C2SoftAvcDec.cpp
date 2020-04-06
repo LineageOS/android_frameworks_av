@@ -35,6 +35,7 @@ namespace {
 constexpr char COMPONENT_NAME[] = "c2.android.avc.decoder";
 constexpr uint32_t kDefaultOutputDelay = 8;
 constexpr uint32_t kMaxOutputDelay = 16;
+constexpr uint32_t kMinInputBytes = 4;
 }  // namespace
 
 class C2SoftAvcDec::IntfImpl : public SimpleInterface<void>::BaseParams {
@@ -816,7 +817,7 @@ void C2SoftAvcDec::process(
           inSize, (int)work->input.ordinal.timestamp.peeku(),
           (int)work->input.ordinal.frameIndex.peeku(), work->input.flags);
     size_t inPos = 0;
-    while (inPos < inSize) {
+    while (inPos < inSize && inSize - inPos >= kMinInputBytes) {
         if (C2_OK != ensureDecoderState(pool)) {
             mSignalledError = true;
             work->workletsProcessed = 1u;
@@ -903,7 +904,6 @@ void C2SoftAvcDec::process(
                 work->result = C2_CORRUPTED;
                 return;
             }
-            continue;
         }
         if (0 < s_decode_op.u4_pic_wd && 0 < s_decode_op.u4_pic_ht) {
             if (mHeaderDecoded == false) {
@@ -936,16 +936,7 @@ void C2SoftAvcDec::process(
         if (s_decode_op.u4_output_present) {
             finishWork(s_decode_op.u4_ts, work);
         }
-        if (0 == s_decode_op.u4_num_bytes_consumed) {
-            ALOGD("Bytes consumed is zero. Ignoring remaining bytes");
-            break;
-        }
         inPos += s_decode_op.u4_num_bytes_consumed;
-        if (hasPicture && (inSize - inPos)) {
-            ALOGD("decoded frame in current access nal, ignoring further trailing bytes %d",
-                  (int)inSize - (int)inPos);
-            break;
-        }
     }
     if (eos) {
         drainInternal(DRAIN_COMPONENT_WITH_EOS, pool, work);
