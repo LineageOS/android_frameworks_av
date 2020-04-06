@@ -19,7 +19,7 @@
 #include <utils/Log.h>
 
 #include <private/android_filesystem_config.h>
-#include <media/MemoryLeakTrackUtil.h>
+#include <mediautils/MemoryLeakTrackUtil.h>
 
 #include <errno.h>
 #include <utils/threads.h>
