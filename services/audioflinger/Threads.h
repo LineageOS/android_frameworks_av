@@ -562,7 +562,7 @@ protected:
 
                 static const int        kThreadNameLength = 16; // prctl(PR_SET_NAME) limit
                 char                    mThreadName[kThreadNameLength]; // guaranteed NUL-terminated
-                sp<IPowerManager>       mPowerManager;
+                sp<os::IPowerManager>   mPowerManager;
                 sp<IBinder>             mWakeLockToken;
                 const sp<PMDeathRecipient> mDeathRecipient;
                 // list of suspended effects per session and per type. The first (outer) vector is
