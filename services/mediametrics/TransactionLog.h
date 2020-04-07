@@ -127,8 +127,11 @@ public:
      * for subsequent line limiting.
      *
      * \param lines the maximum number of lines in the string returned.
+     * \param sinceNs the nanoseconds since Unix epoch to start dump (0 shows all)
+     * \param prefix the desired key prefix to match (nullptr shows all)
      */
-    std::pair<std::string, int32_t> dump(int32_t lines) const {
+    std::pair<std::string, int32_t> dump(
+            int32_t lines, int64_t sinceNs, const char *prefix = nullptr) const {
         std::stringstream ss;
         int32_t ll = lines;
         std::lock_guard lock(mLock);
@@ -138,26 +141,25 @@ public:
             ss << "Consolidated:\n";
             --ll;
         }
-        for (const auto &log : mLog) {
-            if (ll <= 0) break;
-            ss << "  " << log.second->toString() << "\n";
-            --ll;
-        }
+        auto [s, l] = dumpMapTimeItem(mLog, ll, sinceNs, prefix);
+        ss << std::move(s);
+        ll -= l;
 
         // Grouped by item key (category)
         if (ll > 0) {
             ss << "Categorized:\n";
             --ll;
         }
-        for (const auto &itemMap : mItemMap) {
+
+        for (auto it = prefix != nullptr ? mItemMap.lower_bound(prefix) : mItemMap.begin();
+                it != mItemMap.end();
+                ++it) {
             if (ll <= 0) break;
-            ss << " " << itemMap.first << "\n";
-            --ll;
-            for (const auto &item : itemMap.second) {
-                if (ll <= 0) break;
-                ss << "  " << item.second->toString() << "\n";
-                --ll;
-            }
+            if (prefix != nullptr && !startsWith(it->first, prefix)) break;
+            auto [s, l] = dumpMapTimeItem(it->second, ll - 1, sinceNs, prefix);
+            if (l == 0) continue; // don't show empty groups (due to sinceNs).
+            ss << " " << it->first << "\n" << std::move(s);
+            ll -= l + 1;
         }
         return { ss.str(), lines - ll };
     }
@@ -183,6 +185,24 @@ public:
 private:
     using MapTimeItem =
             std::multimap<int64_t /* time */, std::shared_ptr<const mediametrics::Item>>;
+
+    static std::pair<std::string, int32_t> dumpMapTimeItem(
+            const MapTimeItem& mapTimeItem,
+            int32_t lines, int64_t sinceNs = 0, const char *prefix = nullptr) {
+        std::stringstream ss;
+        int32_t ll = lines;
+        // Note: for our data, mapTimeItem.lower_bound(0) == mapTimeItem.begin().
+        for (auto it = mapTimeItem.lower_bound(sinceNs);
+                it != mapTimeItem.end(); ++it) {
+            if (ll <= 0) break;
+            if (prefix != nullptr && !startsWith(it->second->getKey(), prefix)) {
+                continue;
+            }
+            ss << "  " << it->second->toString() << "\n";
+            --ll;
+        }
+        return { ss.str(), lines - ll };
+    }
 
     // GUARDED_BY mLock
     /**
