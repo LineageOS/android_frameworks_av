@@ -85,11 +85,8 @@ private:
     bool expirations_l(const std::shared_ptr<const mediametrics::Item>& item);
 
     // support for generating output
-    void dumpQueue_l(String8 &result);
-    void dumpQueue_l(String8 &result, nsecs_t, const char *only);
-    void dumpHeaders_l(String8 &result, nsecs_t ts_since);
-    void dumpSummaries_l(String8 &result, nsecs_t ts_since, const char * only);
-    void dumpRecent_l(String8 &result, nsecs_t ts_since, const char * only);
+    void dumpQueue_l(String8 &result, int64_t sinceNs, const char* prefix);
+    void dumpHeaders_l(String8 &result, int64_t sinceNs, const char* prefix);
 
     // The following variables accessed without mLock
 

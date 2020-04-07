@@ -60,8 +60,17 @@ public:
      * delivered.
      *
      * \param lines the maximum number of lines in the string returned.
+     * \param sinceNs the nanoseconds since Unix epoch to start dump (0 shows all)
+     * \param prefix the desired key prefix to match (nullptr shows all)
      */
-    std::pair<std::string, int32_t> dump(int32_t lines = INT32_MAX) const;
+    std::pair<std::string, int32_t> dump(
+            int32_t lines = INT32_MAX, int64_t sinceNs = 0, const char *prefix = nullptr) const;
+
+    void clear() {
+        // underlying state is locked.
+        mPreviousAnalyticsState->clear();
+        mAnalyticsState->clear();
+    }
 
 private:
 
