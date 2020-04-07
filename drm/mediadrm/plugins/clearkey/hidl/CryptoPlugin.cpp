@@ -136,6 +136,8 @@ Return<void> CryptoPlugin::decrypt_1_2(
         return Void();
     }
 
+    base = static_cast<uint8_t *>(static_cast<void *>(destBase->getPointer()));
+
     if (destBuffer.offset + destBuffer.size > destBase->getSize()) {
         _hidl_cb(Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE, 0, "invalid buffer size");
         return Void();

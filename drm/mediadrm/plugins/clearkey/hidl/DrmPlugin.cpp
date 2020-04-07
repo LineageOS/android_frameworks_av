@@ -809,6 +809,11 @@ Return<Status> DrmPlugin::releaseSecureStops(const SecureStopRelease& ssRelease)
     //    count - number of secure stops
     //    list of fixed length secure stops
     size_t countBufferSize = sizeof(uint32_t);
+    if (input.size() < countBufferSize) {
+        // SafetyNet logging
+        android_errorWriteLog(0x534e4554, "144766455");
+        return Status::BAD_VALUE;
+    }
     uint32_t count = 0;
     sscanf(reinterpret_cast<char*>(input.data()), "%04" PRIu32, &count);
 
