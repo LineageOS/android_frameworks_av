@@ -208,11 +208,11 @@ static inline constexpr const char *BUNDLE_PROPERTY_COUNT = "_propertyCount";
 
 template<size_t N>
 static inline bool startsWith(const std::string &s, const char (&comp)[N]) {
-    return !strncmp(s.c_str(), comp, N - 1);
+    return !strncmp(s.c_str(), comp, N - 1); // last char is null termination
 }
 
 static inline bool startsWith(const std::string& s, const std::string& comp) {
-    return !strncmp(s.c_str(), comp.c_str(), comp.size() - 1);
+    return !strncmp(s.c_str(), comp.c_str(), comp.size());
 }
 
 /**
