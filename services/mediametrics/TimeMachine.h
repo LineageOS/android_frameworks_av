@@ -149,8 +149,11 @@ private:
             int32_t ll = lines;
             for (auto& tsPair : mPropertyMap) {
                 if (ll <= 0) break;
-                ss << dump(mKey, tsPair, time);
-                --ll;
+                std::string s = dump(mKey, tsPair, time);
+                if (s.size() > 0) {
+                    --ll;
+                    ss << std::move(s);
+                }
             }
             return { ss.str(), lines - ll };
         }
@@ -165,7 +168,7 @@ private:
             const auto timeSequence = tsPair.second;
             auto eptr = timeSequence.lower_bound(time);
             if (eptr == timeSequence.end()) {
-                return tsPair.first + "={};\n";
+                return {}; // don't dump anything. tsPair.first + "={};\n";
             }
             std::stringstream ss;
             ss << key << "." << tsPair.first << "={";
@@ -407,25 +410,23 @@ public:
      *
      * \param lines the maximum number of lines in the string returned.
      * \param key selects only that key.
-     * \param time to start the dump from.
+     * \param sinceNs the nanoseconds since Unix epoch to start dump (0 shows all)
+     * \param prefix the desired key prefix to match (nullptr shows all)
      */
     std::pair<std::string, int32_t> dump(
-            int32_t lines = INT32_MAX, const std::string &key = {}, int64_t time = 0) const {
+            int32_t lines = INT32_MAX, int64_t sinceNs = 0, const char *prefix = nullptr) const {
         std::lock_guard lock(mLock);
-        if (!key.empty()) {  // use std::regex
-            const auto it = mHistory.find(key);
-            if (it == mHistory.end()) return {};
-            std::lock_guard lock(getLockForKey(it->first));
-            return it->second->dump(lines, time);
-        }
-
         std::stringstream ss;
         int32_t ll = lines;
-        for (const auto &[lkey, lhist] : mHistory) {
-            std::lock_guard lock(getLockForKey(lkey));
-            if (lines <= 0) break;
-            auto [s, l] = lhist->dump(ll, time);
-            ss << s;
+
+        for (auto it = prefix != nullptr ? mHistory.lower_bound(prefix) : mHistory.begin();
+                it != mHistory.end();
+                ++it) {
+            if (ll <= 0) break;
+            if (prefix != nullptr && !startsWith(it->first, prefix)) break;
+            std::lock_guard lock(getLockForKey(it->first));
+            auto [s, l] = it->second->dump(ll, sinceNs);
+            ss << std::move(s);
             ll -= l;
         }
         return { ss.str(), lines - ll };
