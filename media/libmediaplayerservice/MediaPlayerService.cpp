@@ -57,7 +57,6 @@
 #include <media/MediaMetadataRetrieverInterface.h>
 #include <media/Metadata.h>
 #include <media/AudioTrack.h>
-#include <media/MemoryLeakTrackUtil.h>
 #include <media/stagefright/InterfaceUtils.h>
 #include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaCodecList.h>
@@ -68,7 +67,7 @@
 #include <media/stagefright/foundation/ALooperRoster.h>
 #include <media/stagefright/SurfaceUtils.h>
 #include <mediautils/BatteryNotifier.h>
-
+#include <mediautils/MemoryLeakTrackUtil.h>
 #include <memunreachable/memunreachable.h>
 #include <system/audio.h>
 

@@ -89,7 +89,7 @@
 #include "AudioHwDevice.h"
 #include "NBAIO_Tee.h"
 
-#include <powermanager/IPowerManager.h>
+#include <android/os/IPowerManager.h>
 
 #include <media/nblog/NBLog.h>
 #include <private/media/AudioEffectShared.h>
