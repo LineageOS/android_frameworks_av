@@ -45,6 +45,14 @@ getrandom: 1
 # for dynamically loading extractors
 pread64: 1
 
+# mremap: Ensure |flags| are (MREMAP_MAYMOVE | MREMAP_FIXED) TODO: Once minijail
+# parser support for '<' is in this needs to be modified to also prevent
+# |old_address| and |new_address| from touching the exception vector page, which
+# on ARM is statically loaded at 0xffff 0000. See
+# http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0211h/Babfeega.html
+# for more details.
+mremap: arg3 == 3 || arg3 == MREMAP_MAYMOVE
+
 # for FileSource
 readlinkat: 1
 _llseek: 1
