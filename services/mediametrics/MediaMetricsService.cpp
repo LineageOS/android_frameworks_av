@@ -26,6 +26,8 @@
 #include <audio_utils/clock.h>                 // clock conversions
 #include <binder/IPCThreadState.h>             // get calling uid
 #include <cutils/properties.h>                 // for property_get
+#include <mediautils/MemoryLeakTrackUtil.h>
+#include <memunreachable/memunreachable.h>
 #include <private/android_filesystem_config.h> // UID
 
 namespace android {
@@ -205,7 +207,11 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
         return NO_ERROR;
     }
 
-    // crack any parameters
+    static const String16 heapOption("--heap");
+    static const String16 unreachableOption("--unreachable");
+    bool heap = false;
+    bool unreachable = false;
+
     const String16 protoOption("--proto");
     const String16 clearOption("--clear");
     bool clear = false;
@@ -218,6 +224,8 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
     for (int i = 0; i < n; i++) {
         if (args[i] == clearOption) {
             clear = true;
+        } else if (args[i] == heapOption) {
+            heap = true;
         } else if (args[i] == protoOption) {
             i++;
             if (i < n) {
@@ -252,14 +260,18 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
             // or dumpsys media.metrics audiotrack codec
 
             result.append("Recognized parameters:\n");
+            result.append("--heap        heap usage (top 100)\n");
             result.append("--help        this help message\n");
             result.append("--proto #     dump using protocol #");
             result.append("--clear       clears out saved records\n");
             result.append("--only X      process records for component X\n");
             result.append("--since X     include records since X\n");
             result.append("             (X is milliseconds since the UNIX epoch)\n");
+            result.append("--unreachable unreachable memory (leaks)\n");
             write(fd, result.string(), result.size());
             return NO_ERROR;
+        } else if (args[i] == unreachableOption) {
+            unreachable = true;
         }
     }
 
@@ -283,8 +295,20 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
             result.append("-- some lines may be truncated --\n");
         }
     }
-
     write(fd, result.string(), result.size());
+
+    // Check heap and unreachable memory outside of lock.
+    if (heap) {
+        dprintf(fd, "\nDumping heap:\n");
+        std::string s = dumpMemoryAddresses(100 /* limit */);
+        write(fd, s.c_str(), s.size());
+    }
+    if (unreachable) {
+        dprintf(fd, "\nDumping unreachable memory:\n");
+        // TODO - should limit be an argument parameter?
+        std::string s = GetUnreachableMemoryString(true /* contents */, 100 /* limit */);
+        write(fd, s.c_str(), s.size());
+    }
     return NO_ERROR;
 }
 
