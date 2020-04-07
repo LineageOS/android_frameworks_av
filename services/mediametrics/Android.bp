@@ -57,6 +57,7 @@ cc_library_shared {
         "liblog",
         "libmediametrics",
         "libmediautils",
+        "libmemunreachable",
         "libprotobuf-cpp-lite",
         "libstatslog",
         "libutils",
