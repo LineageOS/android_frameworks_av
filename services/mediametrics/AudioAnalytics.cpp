@@ -107,14 +107,15 @@ status_t AudioAnalytics::submit(
     return NO_ERROR;
 }
 
-std::pair<std::string, int32_t> AudioAnalytics::dump(int32_t lines) const
+std::pair<std::string, int32_t> AudioAnalytics::dump(
+        int32_t lines, int64_t sinceNs, const char *prefix) const
 {
     std::stringstream ss;
     int32_t ll = lines;
 
     if (ll > 0) {
-        auto [s, l] = mAnalyticsState->dump(ll);
-        ss << s;
+        auto [s, l] = mAnalyticsState->dump(ll, sinceNs, prefix);
+        ss << std::move(s);
         ll -= l;
     }
     if (ll > 0) {
@@ -122,8 +123,8 @@ std::pair<std::string, int32_t> AudioAnalytics::dump(int32_t lines) const
         --ll;
     }
     if (ll > 0) {
-        auto [s, l] = mPreviousAnalyticsState->dump(ll);
-        ss << s;
+        auto [s, l] = mPreviousAnalyticsState->dump(ll, sinceNs, prefix);
+        ss << std::move(s);
         ll -= l;
     }
     return { ss.str(), lines - ll };
