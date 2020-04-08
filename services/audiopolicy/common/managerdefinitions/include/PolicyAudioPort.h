@@ -107,6 +107,15 @@ public:
                 (mFlags & (AUDIO_OUTPUT_FLAG_DIRECT | AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD));
     }
 
+    inline bool isMmap() const
+    {
+        return (asAudioPort()->getType() == AUDIO_PORT_TYPE_MIX)
+                && (((asAudioPort()->getRole() == AUDIO_PORT_ROLE_SOURCE) &&
+                        ((mFlags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) != 0))
+                    || ((asAudioPort()->getRole() == AUDIO_PORT_ROLE_SINK) &&
+                        ((mFlags & AUDIO_INPUT_FLAG_MMAP_NOIRQ) != 0)));
+    }
+
     void addRoute(const sp<AudioRoute> &route) { mRoutes.add(route); }
     const AudioRouteVector &getRoutes() const { return mRoutes; }
 

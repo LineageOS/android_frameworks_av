@@ -26,6 +26,8 @@
 #include <audio_utils/clock.h>                 // clock conversions
 #include <binder/IPCThreadState.h>             // get calling uid
 #include <cutils/properties.h>                 // for property_get
+#include <mediautils/MemoryLeakTrackUtil.h>
+#include <memunreachable/memunreachable.h>
 #include <private/android_filesystem_config.h> // UID
 
 namespace android {
@@ -205,91 +207,112 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
         return NO_ERROR;
     }
 
-    // crack any parameters
-    const String16 protoOption("--proto");
-    const String16 clearOption("--clear");
+    static const String16 allOption("--all");
+    static const String16 clearOption("--clear");
+    static const String16 heapOption("--heap");
+    static const String16 helpOption("--help");
+    static const String16 prefixOption("--prefix");
+    static const String16 sinceOption("--since");
+    static const String16 unreachableOption("--unreachable");
+
+    bool all = false;
     bool clear = false;
-    const String16 sinceOption("--since");
-    nsecs_t ts_since = 0;
-    const String16 helpOption("--help");
-    const String16 onlyOption("--only");
-    std::string only;
-    const int n = args.size();
-    for (int i = 0; i < n; i++) {
-        if (args[i] == clearOption) {
+    bool heap = false;
+    bool unreachable = false;
+    int64_t sinceNs = 0;
+    std::string prefix;
+
+    const size_t n = args.size();
+    for (size_t i = 0; i < n; i++) {
+        if (args[i] == allOption) {
+            all = true;
+        } else if (args[i] == clearOption) {
             clear = true;
-        } else if (args[i] == protoOption) {
-            i++;
-            if (i < n) {
-                // ignore
-            } else {
-                result.append("missing value for -proto\n\n");
-            }
-        } else if (args[i] == sinceOption) {
-            i++;
-            if (i < n) {
-                String8 value(args[i]);
-                char *endp;
-                const char *p = value.string();
-                ts_since = strtoll(p, &endp, 10);
-                if (endp == p || *endp != '\0') {
-                    ts_since = 0;
-                }
-            } else {
-                ts_since = 0;
-            }
-            // command line is milliseconds; internal units are nano-seconds
-            ts_since *= NANOS_PER_MILLISECOND;
-        } else if (args[i] == onlyOption) {
-            i++;
-            if (i < n) {
-                String8 value(args[i]);
-                only = value.string();
-            }
+        } else if (args[i] == heapOption) {
+            heap = true;
         } else if (args[i] == helpOption) {
             // TODO: consider function area dumping.
             // dumpsys media.metrics audiotrack,codec
             // or dumpsys media.metrics audiotrack codec
 
             result.append("Recognized parameters:\n");
-            result.append("--help        this help message\n");
-            result.append("--proto #     dump using protocol #");
-            result.append("--clear       clears out saved records\n");
-            result.append("--only X      process records for component X\n");
-            result.append("--since X     include records since X\n");
-            result.append("             (X is milliseconds since the UNIX epoch)\n");
+            result.append("--all         show all records\n");
+            result.append("--clear       clear out saved records\n");
+            result.append("--heap        show heap usage (top 100)\n");
+            result.append("--help        display help\n");
+            result.append("--prefix X    process records for component X\n");
+            result.append("--since X     X < 0: records from -X seconds in the past\n");
+            result.append("              X = 0: ignore\n");
+            result.append("              X > 0: records from X seconds since Unix epoch\n");
+            result.append("--unreachable show unreachable memory (leaks)\n");
             write(fd, result.string(), result.size());
             return NO_ERROR;
+        } else if (args[i] == prefixOption) {
+            ++i;
+            if (i < n) {
+                prefix = String8(args[i]).string();
+            }
+        } else if (args[i] == sinceOption) {
+            ++i;
+            if (i < n) {
+                String8 value(args[i]);
+                char *endp;
+                const char *p = value.string();
+                long long sec = strtoll(p, &endp, 10);
+                if (endp == p || *endp != '\0' || sec == 0) {
+                    sinceNs = 0;
+                } else if (sec < 0) {
+                    sinceNs = systemTime(SYSTEM_TIME_REALTIME) + sec * NANOS_PER_SECOND;
+                } else {
+                    sinceNs = sec * NANOS_PER_SECOND;
+                }
+            }
+        } else if (args[i] == unreachableOption) {
+            unreachable = true;
         }
     }
 
     {
         std::lock_guard _l(mLock);
 
-        result.appendFormat("Dump of the %s process:\n", kServiceName);
-        dumpHeaders_l(result, ts_since);
-        dumpRecent_l(result, ts_since, only.c_str());
-
         if (clear) {
             mItemsDiscarded += mItems.size();
             mItems.clear();
-            // shall we clear the summary data too?
-        }
-        // TODO: maybe consider a better way of dumping audio analytics info.
-        constexpr int32_t linesToDump = 1000;
-        auto [ dumpString, lines ] = mAudioAnalytics.dump(linesToDump);
-        result.append(dumpString.c_str());
-        if (lines == linesToDump) {
-            result.append("-- some lines may be truncated --\n");
+            mAudioAnalytics.clear();
+        } else {
+            result.appendFormat("Dump of the %s process:\n", kServiceName);
+            const char *prefixptr = prefix.size() > 0 ? prefix.c_str() : nullptr;
+            dumpHeaders_l(result, sinceNs, prefixptr);
+            dumpQueue_l(result, sinceNs, prefixptr);
+
+            // TODO: maybe consider a better way of dumping audio analytics info.
+            const int32_t linesToDump = all ? INT32_MAX : 1000;
+            auto [ dumpString, lines ] = mAudioAnalytics.dump(linesToDump, sinceNs, prefixptr);
+            result.append(dumpString.c_str());
+            if (lines == linesToDump) {
+                result.append("-- some lines may be truncated --\n");
+            }
         }
     }
-
     write(fd, result.string(), result.size());
+
+    // Check heap and unreachable memory outside of lock.
+    if (heap) {
+        dprintf(fd, "\nDumping heap:\n");
+        std::string s = dumpMemoryAddresses(100 /* limit */);
+        write(fd, s.c_str(), s.size());
+    }
+    if (unreachable) {
+        dprintf(fd, "\nDumping unreachable memory:\n");
+        // TODO - should limit be an argument parameter?
+        std::string s = GetUnreachableMemoryString(true /* contents */, 100 /* limit */);
+        write(fd, s.c_str(), s.size());
+    }
     return NO_ERROR;
 }
 
 // dump headers
-void MediaMetricsService::dumpHeaders_l(String8 &result, nsecs_t ts_since)
+void MediaMetricsService::dumpHeaders_l(String8 &result, int64_t sinceNs, const char* prefix)
 {
     if (mediametrics::Item::isEnabled()) {
         result.append("Metrics gathering: enabled\n");
@@ -303,54 +326,36 @@ void MediaMetricsService::dumpHeaders_l(String8 &result, nsecs_t ts_since)
             "Records Discarded: %lld (by Count: %lld by Expiration: %lld)\n",
             (long long)mItemsDiscarded, (long long)mItemsDiscardedCount,
             (long long)mItemsDiscardedExpire);
-    if (ts_since != 0) {
+    if (prefix != nullptr) {
+        result.appendFormat("Restricting to prefix %s", prefix);
+    }
+    if (sinceNs != 0) {
         result.appendFormat(
             "Emitting Queue entries more recent than: %lld\n",
-            (long long)ts_since);
+            (long long)sinceNs);
     }
 }
 
-void MediaMetricsService::dumpRecent_l(
-        String8 &result, nsecs_t ts_since, const char * only)
+// TODO: should prefix be a set<string>?
+void MediaMetricsService::dumpQueue_l(String8 &result, int64_t sinceNs, const char* prefix)
 {
-    if (only != nullptr && *only == '\0') {
-        only = nullptr;
-    }
-    result.append("\nFinalized Metrics (oldest first):\n");
-    dumpQueue_l(result, ts_since, only);
-
-    // show who is connected and injecting records?
-    // talk about # records fed to the 'readers'
-    // talk about # records we discarded, perhaps "discarded w/o reading" too
-}
-
-void MediaMetricsService::dumpQueue_l(String8 &result) {
-    dumpQueue_l(result, (nsecs_t) 0, nullptr /* only */);
-}
-
-void MediaMetricsService::dumpQueue_l(
-        String8 &result, nsecs_t ts_since, const char * only) {
-    int slot = 0;
-
     if (mItems.empty()) {
         result.append("empty\n");
-    } else {
-        for (const auto &item : mItems) {
-            nsecs_t when = item->getTimestamp();
-            if (when < ts_since) {
-                continue;
-            }
-            // TODO: Only should be a set<string>
-            if (only != nullptr &&
-                    item->getKey() /* std::string */ != only) {
-                ALOGV("%s: omit '%s', it's not '%s'",
-                        __func__, item->getKey().c_str(), only);
-                continue;
-            }
-            result.appendFormat("%5d: %s\n",
-                   slot, item->toString().c_str());
-            slot++;
+        return;
+    }
+
+    int slot = 0;
+    for (const auto &item : mItems) {         // TODO: consider std::lower_bound() on mItems
+        if (item->getTimestamp() < sinceNs) { // sinceNs == 0 means all items shown
+            continue;
         }
+        if (prefix != nullptr && !startsWith(item->getKey(), prefix)) {
+            ALOGV("%s: omit '%s', it's not '%s'",
+                    __func__, item->getKey().c_str(), prefix);
+            continue;
+        }
+        result.appendFormat("%5d: %s\n", slot, item->toString().c_str());
+        slot++;
     }
 }
 

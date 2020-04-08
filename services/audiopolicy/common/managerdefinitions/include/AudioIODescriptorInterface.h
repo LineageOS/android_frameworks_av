@@ -41,11 +41,24 @@ sp<DeviceDescriptor> findPreferredDevice(
         IoDescriptor& desc, Filter filter, bool& active, const DeviceVector& devices)
 {
     auto activeClients = desc->clientsList(true /*activeOnly*/);
-    auto activeClientsWithRoute =
-        desc->clientsList(true /*activeOnly*/, filter, true /*preferredDevice*/);
     active = activeClients.size() > 0;
-    if (active && activeClients.size() == activeClientsWithRoute.size()) {
-        return devices.getDeviceFromId(activeClientsWithRoute[0]->preferredDeviceId());
+
+    if (active) {
+        // On MMAP IOs, the preferred device is selected by the first client (virtual client
+        // created when the mmap stream is opened). This client is never active.
+        // On non MMAP IOs, the preferred device is honored only if all active clients have
+        // a preferred device in which case the first client drives the selection.
+        if (desc->getPolicyAudioPort()->isMmap()) {
+            // The client list is never empty on a MMAP IO
+            return devices.getDeviceFromId(
+                    desc->clientsList(false /*activeOnly*/)[0]->preferredDeviceId());
+        } else {
+            auto activeClientsWithRoute =
+                desc->clientsList(true /*activeOnly*/, filter, true /*preferredDevice*/);
+            if (activeClients.size() == activeClientsWithRoute.size()) {
+                return devices.getDeviceFromId(activeClientsWithRoute[0]->preferredDeviceId());
+            }
+        }
     }
     return nullptr;
 }
