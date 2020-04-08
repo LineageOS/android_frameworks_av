@@ -2896,7 +2896,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 return ERROR_MALFORMED;
             }
 
-            parseID3v2MetaData(data_offset + 6);
+            parseID3v2MetaData(data_offset + 6, chunk_data_size - 6);
 
             break;
         }
@@ -4167,8 +4167,19 @@ status_t MPEG4Extractor::parse3GPPMetaData(off64_t offset, size_t size, int dept
     return OK;
 }
 
-void MPEG4Extractor::parseID3v2MetaData(off64_t offset) {
-    ID3 id3(mDataSource, true /* ignorev1 */, offset);
+void MPEG4Extractor::parseID3v2MetaData(off64_t offset, uint64_t size) {
+    uint8_t *buffer = new (std::nothrow) uint8_t[size];
+    if (buffer == NULL) {
+        return;
+    }
+    if (mDataSource->readAt(offset, buffer, size) != (ssize_t)size) {
+        delete[] buffer;
+        buffer = NULL;
+        return;
+    }
+
+    ID3 id3(buffer, size, true /* ignorev1 */);
+    delete[] buffer;
 
     if (id3.isValid()) {
         struct Map {
