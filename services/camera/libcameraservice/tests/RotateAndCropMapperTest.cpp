@@ -38,10 +38,9 @@ using ::testing::Le;
 
 #define EXPECT_EQUAL_WITHIN_N(vec, array, N, msg)   \
 { \
-    std::vector<int32_t> vec_diff; \
-    std::transform(vec.begin(), vec.end(), array, \
-            std::back_inserter(vec_diff), std::minus()); \
-    EXPECT_THAT(vec_diff, Each(AllOf(Ge(-N), Le(N)))) << msg; \
+    for (size_t i = 0; i < vec.size(); i++) { \
+        EXPECT_THAT(vec[i] - array[i], AllOf(Ge(-N), Le(N))) << msg " failed at index:" << i; \
+    } \
 }
 
 int32_t testActiveArray[] = {100, 100, 4000, 3000};
