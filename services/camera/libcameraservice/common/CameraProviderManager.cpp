@@ -841,13 +841,6 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDynamicDepthTags()
         itDuration++; itSize++;
     }
 
-    c.update(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS,
-            dynamicDepthEntries.data(), dynamicDepthEntries.size());
-    c.update(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_MIN_FRAME_DURATIONS,
-            dynamicDepthMinDurationEntries.data(), dynamicDepthMinDurationEntries.size());
-    c.update(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STALL_DURATIONS,
-            dynamicDepthStallDurationEntries.data(), dynamicDepthStallDurationEntries.size());
-
     std::vector<int32_t> supportedChTags;
     supportedChTags.reserve(chTags.count + 3);
     supportedChTags.insert(supportedChTags.end(), chTags.data.i32,
@@ -855,6 +848,12 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDynamicDepthTags()
     supportedChTags.push_back(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS);
     supportedChTags.push_back(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_MIN_FRAME_DURATIONS);
     supportedChTags.push_back(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STALL_DURATIONS);
+    c.update(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS,
+            dynamicDepthEntries.data(), dynamicDepthEntries.size());
+    c.update(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_MIN_FRAME_DURATIONS,
+            dynamicDepthMinDurationEntries.data(), dynamicDepthMinDurationEntries.size());
+    c.update(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STALL_DURATIONS,
+            dynamicDepthStallDurationEntries.data(), dynamicDepthStallDurationEntries.size());
     c.update(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS, supportedChTags.data(),
             supportedChTags.size());
 

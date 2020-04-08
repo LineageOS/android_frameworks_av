@@ -40,8 +40,15 @@ using android::hardware::camera::provider::V2_5::DeviceState;
  */
 struct TestDeviceInterface : public device::V3_2::ICameraDevice {
     std::vector<hardware::hidl_string> mDeviceNames;
+    android::hardware::hidl_vec<uint8_t> mCharacteristics;
+
+    TestDeviceInterface(std::vector<hardware::hidl_string> deviceNames,
+            android::hardware::hidl_vec<uint8_t> chars) :
+        mDeviceNames(deviceNames), mCharacteristics(chars) {}
+
     TestDeviceInterface(std::vector<hardware::hidl_string> deviceNames) :
         mDeviceNames(deviceNames) {}
+
     using getResourceCost_cb = std::function<void(
             hardware::camera::common::V1_0::Status status,
             const hardware::camera::common::V1_0::CameraResourceCost& resourceCost)>;
@@ -58,8 +65,7 @@ struct TestDeviceInterface : public device::V3_2::ICameraDevice {
             const hardware::hidl_vec<uint8_t>& cameraCharacteristics)>;
     hardware::Return<void> getCameraCharacteristics(
             getCameraCharacteristics_cb _hidl_cb) override {
-        hardware::hidl_vec<uint8_t> cameraCharacteristics;
-        _hidl_cb(Status::OK, cameraCharacteristics);
+        _hidl_cb(Status::OK, mCharacteristics);
         return hardware::Void();
     }
 
@@ -98,6 +104,13 @@ struct TestICameraProvider : virtual public provider::V2_5::ICameraProvider {
             const hardware::hidl_vec<common::V1_0::VendorTagSection> &vendorSection) :
         mDeviceNames(devices),
         mDeviceInterface(new TestDeviceInterface(devices)),
+        mVendorTagSections (vendorSection) {}
+
+    TestICameraProvider(const std::vector<hardware::hidl_string> &devices,
+            const hardware::hidl_vec<common::V1_0::VendorTagSection> &vendorSection,
+            android::hardware::hidl_vec<uint8_t> chars) :
+        mDeviceNames(devices),
+        mDeviceInterface(new TestDeviceInterface(devices, chars)),
         mVendorTagSections (vendorSection) {}
 
     virtual hardware::Return<Status> setCallback(
@@ -242,6 +255,52 @@ struct TestStatusListener : public CameraProviderManager::StatusListener {
             hardware::camera::common::V1_0::TorchModeStatus) override {}
     void onNewProviderRegistered() override {}
 };
+
+TEST(CameraProviderManagerTest, InitializeDynamicDepthTest) {
+    std::vector<hardware::hidl_string> deviceNames;
+    deviceNames.push_back("device@3.2/test/0");
+    hardware::hidl_vec<common::V1_0::VendorTagSection> vendorSection;
+    status_t res;
+    sp<CameraProviderManager> providerManager = new CameraProviderManager();
+    sp<TestStatusListener> statusListener = new TestStatusListener();
+    TestInteractionProxy serviceProxy;
+
+    android::hardware::hidl_vec<uint8_t> chars;
+    CameraMetadata meta;
+    int32_t charKeys[] = { ANDROID_DEPTH_DEPTH_IS_EXCLUSIVE,
+            ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS };
+    meta.update(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS, charKeys,
+            sizeof(charKeys) / sizeof(charKeys[0]));
+    uint8_t depthIsExclusive = ANDROID_DEPTH_DEPTH_IS_EXCLUSIVE_FALSE;
+    meta.update(ANDROID_DEPTH_DEPTH_IS_EXCLUSIVE, &depthIsExclusive, 1);
+    int32_t sizes[] = { HAL_PIXEL_FORMAT_BLOB,
+            640, 480, ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT };
+    meta.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS, sizes,
+            sizeof(sizes) / sizeof(sizes[0]));
+    sizes[0] = HAL_PIXEL_FORMAT_Y16;
+    meta.update(ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS, sizes,
+            sizeof(sizes) / sizeof(sizes[0]));
+    int64_t durations[] = { HAL_PIXEL_FORMAT_BLOB, 640, 480, 0 };
+    meta.update(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS, durations,
+            sizeof(durations) / sizeof(durations[0]));
+    meta.update(ANDROID_SCALER_AVAILABLE_STALL_DURATIONS, durations,
+            sizeof(durations) / sizeof(durations[0]));
+    durations[0]= HAL_PIXEL_FORMAT_Y16;
+    meta.update(ANDROID_DEPTH_AVAILABLE_DEPTH_MIN_FRAME_DURATIONS, durations,
+            sizeof(durations) / sizeof(durations[0]));
+    meta.update(ANDROID_DEPTH_AVAILABLE_DEPTH_STALL_DURATIONS, durations,
+            sizeof(durations) / sizeof(durations[0]));
+    camera_metadata_t* metaBuffer = const_cast<camera_metadata_t*>(meta.getAndLock());
+    chars.setToExternal(reinterpret_cast<uint8_t*>(metaBuffer),
+            get_camera_metadata_size(metaBuffer));
+
+    sp<TestICameraProvider> provider =  new TestICameraProvider(deviceNames,
+            vendorSection, chars);
+    serviceProxy.setProvider(provider);
+
+    res = providerManager->initialize(statusListener, &serviceProxy);
+    ASSERT_EQ(res, OK) << "Unable to initialize provider manager";
+}
 
 TEST(CameraProviderManagerTest, InitializeTest) {
     std::vector<hardware::hidl_string> deviceNames;
