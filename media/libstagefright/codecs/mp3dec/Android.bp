@@ -2,6 +2,7 @@ cc_library_static {
     name: "libstagefright_mp3dec",
     vendor_available: true,
 
+    host_supported:true,
     srcs: [
         "src/pvmp3_normalize.cpp",
         "src/pvmp3_alias_reduction.cpp",
@@ -72,6 +73,12 @@ cc_library_static {
         "-DOSCL_UNUSED_ARG(x)=(void)(x)",
         "-Werror",
     ],
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
 
 //###############################################################################
