@@ -1525,7 +1525,7 @@ void MediaCodecsXmlParser::Impl::generateRoleMap() const {
                 nodeInfo.attributeList.push_back(Attribute{"rank", rank});
             }
             nodeList->insert(std::make_pair(
-                    std::move(order), std::move(nodeInfo)));
+                    order, std::move(nodeInfo)));
         }
     }
 }
