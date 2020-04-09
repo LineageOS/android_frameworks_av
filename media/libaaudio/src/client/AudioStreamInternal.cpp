@@ -714,12 +714,8 @@ void AudioStreamInternal::processTimestamp(uint64_t position, int64_t time) {
 aaudio_result_t AudioStreamInternal::setBufferSize(int32_t requestedFrames) {
     int32_t adjustedFrames = requestedFrames;
     const int32_t maximumSize = getBufferCapacity() - mFramesPerBurst;
-    // The buffer size can be set to zero.
-    // This means that the callback may be called when the internal buffer becomes empty.
-    // This will be fine on some devices in ideal circumstances and will result in the
-    // lowest possible latency.
-    // If there are glitches then they should be detected as XRuns and the size can be increased.
-    static const int32_t minimumSize = 0;
+    // Minimum size should be a multiple number of bursts.
+    const int32_t minimumSize = 1 * mFramesPerBurst;
 
     // Clip to minimum size so that rounding up will work better.
     adjustedFrames = std::max(minimumSize, adjustedFrames);
@@ -731,12 +727,14 @@ aaudio_result_t AudioStreamInternal::setBufferSize(int32_t requestedFrames) {
         // Round to the next highest burst size.
         int32_t numBursts = (adjustedFrames + mFramesPerBurst - 1) / mFramesPerBurst;
         adjustedFrames = numBursts * mFramesPerBurst;
+        // Clip just in case maximumSize is not a multiple of mFramesPerBurst.
+        adjustedFrames = std::min(maximumSize, adjustedFrames);
     }
 
     // Clip against the actual size from the endpoint.
     int32_t actualFrames = 0;
     mAudioEndpoint.setBufferSizeInFrames(maximumSize, &actualFrames);
-    // actualFrames should be <= maximumSize
+    // actualFrames should be <= actual maximum size of endpoint
     adjustedFrames = std::min(actualFrames, adjustedFrames);
 
     mBufferSizeInFrames = adjustedFrames;
