@@ -35,7 +35,7 @@ class IsochronousClockModel {
 
 public:
     IsochronousClockModel();
-    virtual ~IsochronousClockModel();
+    virtual ~IsochronousClockModel() = default;
 
     void start(int64_t nanoTime);
     void stop(int64_t nanoTime);
@@ -130,6 +130,7 @@ public:
 private:
 
     int32_t getLateTimeOffsetNanos() const;
+    void update();
 
     enum clock_model_state_t {
         STATE_STOPPED,
@@ -164,7 +165,6 @@ private:
     // distribution of timestamps relative to earliest
     std::unique_ptr<android::audio_utils::Histogram>   mHistogramMicros;
 
-    void update();
 };
 
 } /* namespace aaudio */
