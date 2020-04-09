@@ -51,3 +51,33 @@ cc_library {
      */
     allow_undefined_symbols: true,
 }
+
+cc_fuzz {
+    name: "mp4_extractor_fuzzer",
+
+    srcs: [
+        "mp4_extractor_fuzzer.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/extractors/mp4",
+    ],
+
+    static_libs: [
+        "liblog",
+        "libstagefright_foundation",
+        "libmedia",
+        "libextractorfuzzerbase",
+        "libstagefright_id3",
+        "libstagefright_esds",
+        "libmp4extractor",
+    ],
+
+    shared_libs: [
+        "libutils",
+        "libmediandk",
+        "libbinder",
+    ],
+
+    dictionary: "mp4_extractor_fuzzer.dict",
+}
