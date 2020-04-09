@@ -1185,15 +1185,21 @@ status_t AudioFlinger::setMicMute(bool state)
     }
 
     AutoMutex lock(mHardwareLock);
+    sp<DeviceHalInterface> primaryDev = mPrimaryHardwareDev->hwDevice();
+    if (primaryDev == nullptr) {
+        ALOGW("%s: no primary HAL device", __func__);
+        return INVALID_OPERATION;
+    }
     mHardwareStatus = AUDIO_HW_SET_MIC_MUTE;
+    ret = primaryDev->setMicMute(state);
     for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
         sp<DeviceHalInterface> dev = mAudioHwDevs.valueAt(i)->hwDevice();
-        status_t result = dev->setMicMute(state);
-        if (result != NO_ERROR) {
-            ret = result;
+        if (dev != primaryDev) {
+            (void)dev->setMicMute(state);
         }
     }
     mHardwareStatus = AUDIO_HW_IDLE;
+    ALOGW_IF(ret != NO_ERROR, "%s: error %d setting state to HAL", __func__, ret);
     return ret;
 }
 
@@ -1203,20 +1209,18 @@ bool AudioFlinger::getMicMute() const
     if (ret != NO_ERROR) {
         return false;
     }
-    bool mute = true;
-    bool state = AUDIO_MODE_INVALID;
     AutoMutex lock(mHardwareLock);
-    mHardwareStatus = AUDIO_HW_GET_MIC_MUTE;
-    for (size_t i = 0; i < mAudioHwDevs.size(); i++) {
-        sp<DeviceHalInterface> dev = mAudioHwDevs.valueAt(i)->hwDevice();
-        status_t result = dev->getMicMute(&state);
-        if (result == NO_ERROR) {
-            mute = mute && state;
-        }
+    sp<DeviceHalInterface> primaryDev = mPrimaryHardwareDev->hwDevice();
+    if (primaryDev == nullptr) {
+        ALOGW("%s: no primary HAL device", __func__);
+        return false;
     }
+    bool state;
+    mHardwareStatus = AUDIO_HW_GET_MIC_MUTE;
+    ret = primaryDev->getMicMute(&state);
     mHardwareStatus = AUDIO_HW_IDLE;
-
-    return mute;
+    ALOGE_IF(ret != NO_ERROR, "%s: error %d getting state from HAL", __func__, ret);
+    return (ret == NO_ERROR) && state;
 }
 
 void AudioFlinger::setRecordSilenced(audio_port_handle_t portId, bool silenced)
