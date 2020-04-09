@@ -64,13 +64,6 @@ void SetUpMinijail(const std::string& base_policy_path,
 void SetUpMinijailList(const std::string& base_policy_path,
                    const std::vector<std::string>& additional_policy_paths)
 {
-    // No seccomp policy defined for this architecture.
-    if (access(base_policy_path.c_str(), R_OK) == -1) {
-        // LOG(WARNING) << "No seccomp policy defined for this architecture.";
-        LOG(WARNING) << "missing base seccomp_policy file '" << base_policy_path << "'";
-        return;
-    }
-
     std::string base_policy_content;
     std::vector<std::string> additional_policy_contents;
     if (!base::ReadFileToString(base_policy_path, &base_policy_content,
@@ -83,6 +76,7 @@ void SetUpMinijailList(const std::string& base_policy_path,
         if (one_policy_path.length() > 0 &&
                 !base::ReadFileToString(one_policy_path, &one_policy_content,
                     false /* follow_symlinks */)) {
+            // TODO: harder failure (fatal unless ENOENT?)
             LOG(WARNING) << "Could not read additional policy file '" << one_policy_path << "'";
         }
         additional_policy_contents.push_back(one_policy_content);
