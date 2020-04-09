@@ -98,7 +98,7 @@ public:
         }
         if (ll > 0) {
             auto [s, l] = mTransactionLog.dump(ll, sinceNs, prefix);
-            ss << std::move(s);
+            ss << s;
             ll -= l;
         }
         if (ll > 0) {
@@ -107,7 +107,7 @@ public:
         }
         if (ll > 0) {
             auto [s, l] = mTimeMachine.dump(ll, sinceNs, prefix);
-            ss << std::move(s);
+            ss << s;
             ll -= l;
         }
         return { ss.str(), lines - ll };
