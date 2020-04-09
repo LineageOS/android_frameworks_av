@@ -47,6 +47,7 @@ IsochronousClockModel::IsochronousClockModel()
         , mMarkerNanoTime(0)
         , mSampleRate(48000)
         , mFramesPerBurst(48)
+        , mBurstPeriodNanos(0) // this will be updated before use
         , mMaxMeasuredLatenessNanos(0)
         , mLatenessForDriftNanos(kInitialLatenessForDriftNanos)
         , mState(STATE_STOPPED)
@@ -55,9 +56,6 @@ IsochronousClockModel::IsochronousClockModel()
         mHistogramMicros = std::make_unique<Histogram>(kHistogramBinCount,
                 kHistogramBinWidthMicros);
     }
-}
-
-IsochronousClockModel::~IsochronousClockModel() {
 }
 
 void IsochronousClockModel::setPositionAndTime(int64_t framePosition, int64_t nanoTime) {
@@ -186,7 +184,7 @@ void IsochronousClockModel::processTimestamp(int64_t framePosition, int64_t nano
             // Calculate upper region that will trigger a drift forwards.
             mLatenessForDriftNanos = mMaxMeasuredLatenessNanos - (mMaxMeasuredLatenessNanos >> 4);
         } else { // decrease
-            // If these is an outlier in lateness then mMaxMeasuredLatenessNanos can go high
+            // If this is an outlier in lateness then mMaxMeasuredLatenessNanos can go high
             // and stay there. So we slowly reduce mMaxMeasuredLatenessNanos for better
             // long term stability. The two opposing forces will keep mMaxMeasuredLatenessNanos
             // within a reasonable range.
