@@ -111,6 +111,7 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
         mEos = false;
         mFramesReceived = 0;
         mTimestampUs = 0u;
+        mWorkResult = C2_OK;
         mTimestampDevTest = false;
         if (mCompName == unknown_comp) mDisableTest = true;
 
@@ -141,6 +142,7 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
                 // For decoder components current timestamp always exceeds
                 // previous timestamp
                 typedef std::unique_lock<std::mutex> ULock;
+                mWorkResult |= work->result;
                 bool codecConfig = ((work->worklets.front()->output.flags &
                                      C2FrameData::FLAG_CODEC_CONFIG) != 0);
                 if (!codecConfig && !work->worklets.front()->output.buffers.empty()) {
@@ -200,6 +202,8 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
     std::list<uint64_t> mTimestampUslist;
     std::list<uint64_t> mFlushedIndices;
     standardComp mCompName;
+
+    int32_t mWorkResult;
     uint32_t mFramesReceived;
     C2BlockPool::local_id_t mBlockPoolId;
     std::shared_ptr<C2BlockPool> mLinearPool;
@@ -525,6 +529,7 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
 
     if (mTimestampDevTest) EXPECT_EQ(mTimestampUslist.empty(), true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
+    ASSERT_EQ(mWorkResult, C2_OK);
 }
 
 // Adaptive Test
@@ -631,6 +636,7 @@ TEST_P(Codec2VideoDecHidlTest, AdaptiveDecodeTest) {
     }
 
     if (mTimestampDevTest) EXPECT_EQ(mTimestampUslist.empty(), true);
+    ASSERT_EQ(mWorkResult, C2_OK);
 }
 
 // thumbnail test
@@ -683,6 +689,7 @@ TEST_P(Codec2VideoDecHidlTest, ThumbnailTest) {
         ASSERT_EQ(mComponent->stop(), C2_OK);
     }
     ASSERT_EQ(mComponent->release(), C2_OK);
+    ASSERT_EQ(mWorkResult, C2_OK);
 }
 
 TEST_P(Codec2VideoDecHidlTest, EOSTest) {
@@ -723,6 +730,7 @@ TEST_P(Codec2VideoDecHidlTest, EOSTest) {
     ASSERT_EQ(mEos, true);
     ASSERT_EQ(mWorkQueue.size(), (size_t)MAX_INPUT_BUFFERS);
     ASSERT_EQ(mComponent->stop(), C2_OK);
+    ASSERT_EQ(mWorkResult, C2_OK);
 }
 
 TEST_P(Codec2VideoDecHidlTest, FlushTest) {
@@ -825,6 +833,8 @@ TEST_P(Codec2VideoDecHidlTest, FlushTest) {
             }
         }
     }
+    // TODO: (b/154671521)
+    // Add assert for mWorkResult
     ASSERT_EQ(mFlushedIndices.empty(), true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }

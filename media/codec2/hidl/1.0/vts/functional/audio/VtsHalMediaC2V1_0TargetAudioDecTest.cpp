@@ -105,6 +105,7 @@ class Codec2AudioDecHidlTestBase : public ::testing::Test {
         mEos = false;
         mFramesReceived = 0;
         mTimestampUs = 0u;
+        mWorkResult = C2_OK;
         mTimestampDevTest = false;
         if (mCompName == unknown_comp) mDisableTest = true;
         if (mDisableTest) std::cout << "[   WARN   ] Test Disabled \n";
@@ -131,6 +132,7 @@ class Codec2AudioDecHidlTestBase : public ::testing::Test {
             if (!work->worklets.empty()) {
                 // For decoder components current timestamp always exceeds
                 // previous timestamp
+                mWorkResult |= work->result;
                 bool codecConfig = ((work->worklets.front()->output.flags &
                                      C2FrameData::FLAG_CODEC_CONFIG) != 0);
                 if (!codecConfig && !work->worklets.front()->output.buffers.empty()) {
@@ -182,6 +184,8 @@ class Codec2AudioDecHidlTestBase : public ::testing::Test {
     bool mDisableTest;
     bool mTimestampDevTest;
     standardComp mCompName;
+
+    int32_t mWorkResult;
     uint64_t mTimestampUs;
     uint32_t mFramesReceived;
     std::list<uint64_t> mFlushedIndices;
@@ -584,6 +588,7 @@ TEST_P(Codec2AudioDecDecodeTest, DecodeTest) {
         mTimestampUslist.clear();
     }
     ASSERT_EQ(mComponent->stop(), C2_OK);
+    ASSERT_EQ(mWorkResult, C2_OK);
 }
 
 // thumbnail test
@@ -644,6 +649,7 @@ TEST_P(Codec2AudioDecHidlTest, ThumbnailTest) {
     EXPECT_GE(mFramesReceived, 1U);
     ASSERT_EQ(mEos, true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
+    ASSERT_EQ(mWorkResult, C2_OK);
 }
 
 TEST_P(Codec2AudioDecHidlTest, EOSTest) {
@@ -684,6 +690,7 @@ TEST_P(Codec2AudioDecHidlTest, EOSTest) {
     ASSERT_EQ(mEos, true);
     ASSERT_EQ(mWorkQueue.size(), (size_t)MAX_INPUT_BUFFERS);
     ASSERT_EQ(mComponent->stop(), C2_OK);
+    ASSERT_EQ(mWorkResult, C2_OK);
 }
 
 TEST_P(Codec2AudioDecHidlTest, FlushTest) {
@@ -797,6 +804,8 @@ TEST_P(Codec2AudioDecHidlTest, FlushTest) {
             }
         }
     }
+    // TODO: (b/154671521)
+    // Add assert for mWorkResult
     ASSERT_EQ(mFlushedIndices.empty(), true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }

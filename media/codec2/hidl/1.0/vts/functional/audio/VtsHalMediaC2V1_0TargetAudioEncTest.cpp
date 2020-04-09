@@ -95,6 +95,7 @@ class Codec2AudioEncHidlTestBase : public ::testing::Test {
         mEos = false;
         mCsd = false;
         mFramesReceived = 0;
+        mWorkResult = C2_OK;
         if (mCompName == unknown_comp) mDisableTest = true;
         if (mDisableTest) std::cout << "[   WARN   ] Test Disabled \n";
         getInputMaxBufSize();
@@ -115,6 +116,7 @@ class Codec2AudioEncHidlTestBase : public ::testing::Test {
     void handleWorkDone(std::list<std::unique_ptr<C2Work>>& workItems) {
         for (std::unique_ptr<C2Work>& work : workItems) {
             if (!work->worklets.empty()) {
+                mWorkResult |= work->result;
                 workDone(mComponent, work, mFlushedIndices, mQueueLock, mQueueCondition, mWorkQueue,
                          mEos, mCsd, mFramesReceived);
             }
@@ -135,6 +137,8 @@ class Codec2AudioEncHidlTestBase : public ::testing::Test {
     bool mCsd;
     bool mDisableTest;
     standardComp mCompName;
+
+    int32_t mWorkResult;
     uint32_t mFramesReceived;
     int32_t mInputMaxBufSize;
     std::list<uint64_t> mFlushedIndices;
@@ -439,6 +443,7 @@ TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
     }
     ASSERT_EQ(mEos, true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
+    ASSERT_EQ(mWorkResult, C2_OK);
 }
 
 TEST_P(Codec2AudioEncHidlTest, EOSTest) {
@@ -479,6 +484,7 @@ TEST_P(Codec2AudioEncHidlTest, EOSTest) {
     }
     ASSERT_EQ(mEos, true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
+    ASSERT_EQ(mWorkResult, C2_OK);
 }
 
 TEST_P(Codec2AudioEncHidlTest, FlushTest) {
@@ -588,6 +594,8 @@ TEST_P(Codec2AudioEncHidlTest, FlushTest) {
             }
         }
     }
+    // TODO: (b/154671521)
+    // Add assert for mWorkResult
     ASSERT_EQ(mFlushedIndices.empty(), true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }

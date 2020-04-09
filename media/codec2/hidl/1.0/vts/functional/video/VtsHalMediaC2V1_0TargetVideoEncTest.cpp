@@ -520,6 +520,9 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
 
     if (mTimestampDevTest) EXPECT_EQ(mTimestampUslist.empty(), true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
+
+    // TODO: (b/155534991)
+    // Add assert for mFailedWorkReceived
 }
 
 TEST_P(Codec2VideoEncHidlTest, EOSTest) {
@@ -560,6 +563,7 @@ TEST_P(Codec2VideoEncHidlTest, EOSTest) {
     }
     ASSERT_EQ(mEos, true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
+    ASSERT_EQ(mFailedWorkReceived, 0);
 }
 
 TEST_P(Codec2VideoEncHidlTest, FlushTest) {
@@ -656,6 +660,8 @@ TEST_P(Codec2VideoEncHidlTest, FlushTest) {
             }
         }
     }
+    // TODO: (b/154671521)
+    // Add assert for mFailedWorkReceived
     ASSERT_EQ(mFlushedIndices.empty(), true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
