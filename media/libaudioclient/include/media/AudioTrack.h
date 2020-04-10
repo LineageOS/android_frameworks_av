@@ -947,7 +947,7 @@ public:
     class AudioTrackThread : public Thread
     {
     public:
-        AudioTrackThread(AudioTrack& receiver);
+        explicit AudioTrackThread(AudioTrack& receiver);
 
         // Do not call Thread::requestExitAndWait() without first calling requestExit().
         // Thread::requestExitAndWait() is not virtual, and the implementation doesn't do enough.
@@ -1226,7 +1226,7 @@ public:
 private:
     class DeathNotifier : public IBinder::DeathRecipient {
     public:
-        DeathNotifier(AudioTrack* audioTrack) : mAudioTrack(audioTrack) { }
+        explicit DeathNotifier(AudioTrack* audioTrack) : mAudioTrack(audioTrack) { }
     protected:
         virtual void        binderDied(const wp<IBinder>& who);
     private:
