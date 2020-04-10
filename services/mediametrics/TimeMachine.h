@@ -152,7 +152,7 @@ private:
                 std::string s = dump(mKey, tsPair, time);
                 if (s.size() > 0) {
                     --ll;
-                    ss << std::move(s);
+                    ss << s;
                 }
             }
             return { ss.str(), lines - ll };
@@ -319,7 +319,7 @@ public:
                 if (it == mHistory.end()) continue;
                 remoteKeyHistory = it->second;
             }
-            std::lock_guard(getLockForKey(remoteKey));
+            std::lock_guard lock(getLockForKey(remoteKey));
             remoteKeyHistory->putProp(remoteName, prop, time);
         }
         return NO_ERROR;
@@ -426,7 +426,7 @@ public:
             if (prefix != nullptr && !startsWith(it->first, prefix)) break;
             std::lock_guard lock(getLockForKey(it->first));
             auto [s, l] = it->second->dump(ll, sinceNs);
-            ss << std::move(s);
+            ss << s;
             ll -= l;
         }
         return { ss.str(), lines - ll };
@@ -441,7 +441,7 @@ private:
 
     // Finds a KeyHistory from a URL.  Returns nullptr if not found.
     std::shared_ptr<KeyHistory> getKeyHistoryFromUrl(
-            std::string url, std::string* key, std::string *prop) const {
+            const std::string& url, std::string* key, std::string *prop) const {
         std::lock_guard lock(mLock);
 
         auto it = mHistory.upper_bound(url);
