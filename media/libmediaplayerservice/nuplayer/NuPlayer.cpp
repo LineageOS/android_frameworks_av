@@ -31,6 +31,7 @@
 #include "NuPlayerDriver.h"
 #include "NuPlayerRenderer.h"
 #include "NuPlayerSource.h"
+#include "RTPSource.h"
 #include "RTSPSource.h"
 #include "StreamingSource.h"
 #include "GenericSource.h"
@@ -366,6 +367,18 @@ status_t NuPlayer::setBufferingSettings(const BufferingSettings& buffering) {
         CHECK(response->findInt32("err", &err));
     }
     return err;
+}
+
+void NuPlayer::setDataSourceAsync(const String8& rtpParams) {
+    ALOGD("setDataSourceAsync for RTP = %s", rtpParams.string());
+    sp<AMessage> msg = new AMessage(kWhatSetDataSource, this);
+
+    sp<AMessage> notify = new AMessage(kWhatSourceNotify, this);
+    sp<Source> source = new RTPSource(notify, rtpParams);
+
+    msg->setObject("source", source);
+    msg->post();
+    mDataSourceType = DATA_SOURCE_TYPE_RTP;
 }
 
 void NuPlayer::prepareAsync() {
@@ -1915,6 +1928,11 @@ status_t NuPlayer::instantiateDecoder(
 
     format->setInt32("priority", 0 /* realtime */);
 
+    if (mDataSourceType == DATA_SOURCE_TYPE_RTP) {
+        ALOGV("instantiateDecoder: set decoder error free on stream corrupt.");
+        format->setInt32("corrupt-free", true);
+    }
+
     if (!audio) {
         AString mime;
         CHECK(format->findString("mime", &mime));
@@ -2715,6 +2733,14 @@ void NuPlayer::onSourceNotify(const sp<AMessage> &msg) {
             break;
         }
 
+        case Source::kWhatIMSRxNotice:
+        {
+            sp<AMessage> IMSRxNotice;
+            CHECK(msg->findMessage("message", &IMSRxNotice));
+            sendIMSRxNotice(IMSRxNotice);
+            break;
+        }
+
         default:
             TRESPASS();
     }
@@ -2817,10 +2843,52 @@ void NuPlayer::sendTimedTextData(const sp<ABuffer> &buffer) {
     }
 }
 
+void NuPlayer::sendIMSRxNotice(const sp<AMessage> &msg) {
+    int32_t payloadType;
+
+    CHECK(msg->findInt32("payload-type", &payloadType));
+
+    Parcel in;
+    in.writeInt32(payloadType);
+
+    switch (payloadType) {
+        case NuPlayer::RTPSource::RTCP_TSFB:   // RTCP TSFB
+        case NuPlayer::RTPSource::RTCP_PSFB:   // RTCP PSFB
+        case NuPlayer::RTPSource::RTP_AUTODOWN:
+        {
+            int32_t feedbackType, id;
+            CHECK(msg->findInt32("feedback-type", &feedbackType));
+            CHECK(msg->findInt32("sender", &id));
+            in.writeInt32(feedbackType);
+            in.writeInt32(id);
+            if (payloadType == NuPlayer::RTPSource::RTCP_TSFB) {
+                int32_t bitrate;
+                CHECK(msg->findInt32("bit-rate", &bitrate));
+                in.writeInt32(bitrate);
+            }
+            break;
+        }
+        case NuPlayer::RTPSource::RTP_CVO:
+        {
+            int32_t cvo;
+            CHECK(msg->findInt32("cvo", &cvo));
+            in.writeInt32(cvo);
+            break;
+        }
+        default:
+        break;
+    }
+
+    notifyListener(MEDIA_IMS_RX_NOTICE, 0, 0, &in);
+}
+
 const char *NuPlayer::getDataSourceType() {
     switch (mDataSourceType) {
         case DATA_SOURCE_TYPE_HTTP_LIVE:
             return "HTTPLive";
+
+        case DATA_SOURCE_TYPE_RTP:
+            return "RTP";
 
         case DATA_SOURCE_TYPE_RTSP:
             return "RTSP";

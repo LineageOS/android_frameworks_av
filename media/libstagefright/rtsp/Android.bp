@@ -4,6 +4,7 @@ cc_defaults {
     srcs: [
         "AAMRAssembler.cpp",
         "AAVCAssembler.cpp",
+        "AHEVCAssembler.cpp",
         "AH263Assembler.cpp",
         "AMPEG2TSAssembler.cpp",
         "AMPEG4AudioAssembler.cpp",
@@ -17,9 +18,12 @@ cc_defaults {
         "ARTSPConnection.cpp",
         "ASessionDescription.cpp",
         "SDPLoader.cpp",
+        "QualManager.cpp",
     ],
 
     shared_libs: [
+        "libandroid",
+        "libandroid_net",
         "libcrypto",
         "libdatasource",
         "libmedia",
@@ -28,6 +32,7 @@ cc_defaults {
     include_dirs: [
         "frameworks/av/media/libstagefright",
         "frameworks/native/include/media/openmax",
+        "frameworks/native/include/android",
     ],
 
     arch: {

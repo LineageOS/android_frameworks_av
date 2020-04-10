@@ -555,6 +555,7 @@ ACodec::ACodec()
       mShutdownInProgress(false),
       mExplicitShutdown(false),
       mIsLegacyVP9Decoder(false),
+      mIsStreamCorruptFree(false),
       mEncoderDelay(0),
       mEncoderPadding(0),
       mRotationDegrees(0),
@@ -2304,6 +2305,12 @@ status_t ACodec::configureCodec(
         mChannelMaskPresent = true;
     } else {
         mChannelMaskPresent = false;
+    }
+
+    int32_t isCorruptFree = 0;
+    if (msg->findInt32("corrupt-free", &isCorruptFree)) {
+        mIsStreamCorruptFree = isCorruptFree == 1 ? true : false;
+        ALOGV("corrupt-free=[%d]", mIsStreamCorruptFree);
     }
 
     int32_t maxInputSize;
@@ -4108,6 +4115,29 @@ status_t ACodec::setupVideoEncoder(
 
     if (err == OK) {
         ALOGI("setupVideoEncoder succeeded");
+    }
+
+    // Video should be encoded as stand straight because RTP protocol
+    // can provide rotation information only if CVO is supported.
+    // This needs to be added to support non-CVO case for video streaming scenario.
+    int32_t rotation = 0;
+    if (msg->findInt32("rotation-degrees", &rotation)) {
+        OMX_CONFIG_ROTATIONTYPE config;
+        InitOMXParams(&config);
+        config.nPortIndex = kPortIndexOutput;
+        status_t err = mOMXNode->getConfig(
+                (OMX_INDEXTYPE)OMX_IndexConfigCommonRotate, &config, sizeof(config));
+        if (err != OK) {
+            ALOGW("Failed to getConfig of OMX_IndexConfigCommonRotate(err %d)", err);
+        }
+        config.nRotation = rotation;
+        err = mOMXNode->setConfig(
+                (OMX_INDEXTYPE)OMX_IndexConfigCommonRotate, &config, sizeof(config));
+
+        ALOGD("Applying encoder-rotation=[%d] to video encoder.", config.nRotation);
+        if (err != OK) {
+            ALOGW("Failed to setConfig of OMX_IndexConfigCommonRotate(err %d)", err);
+        }
     }
 
     return err;
@@ -5957,6 +5987,12 @@ bool ACodec::BaseState::onOMXEvent(
         return false;
     }
 
+    if (mCodec->mIsStreamCorruptFree && data1 == (OMX_U32)OMX_ErrorStreamCorrupt) {
+        ALOGV("[%s] handle OMX_ErrorStreamCorrupt as a normal operation",
+                mCodec->mComponentName.c_str());
+        return true;
+    }
+
     ALOGE("[%s] ERROR(0x%08x)", mCodec->mComponentName.c_str(), data1);
 
     // verify OMX component sends back an error we expect.
@@ -6062,6 +6098,13 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
         mCodec->dumpBuffers(kPortIndexInput);
         mCodec->signalError(OMX_ErrorUndefined, FAILED_TRANSACTION);
         return;
+    }
+
+    int32_t cvo;
+    if (mCodec->mNativeWindow != NULL && buffer != NULL &&
+            buffer->meta()->findInt32("cvo", &cvo)) {
+        ALOGV("cvo(%d) found in buffer #%u", cvo, bufferID);
+        setNativeWindowRotation(mCodec->mNativeWindow.get(), cvo);
     }
 
     info->mStatus = BufferInfo::OWNED_BY_US;

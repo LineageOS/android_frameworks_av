@@ -14,6 +14,7 @@ cc_library_static {
         "NuPlayerRenderer.cpp",
         "NuPlayerStreamListener.cpp",
         "RTSPSource.cpp",
+        "RTPSource.cpp",
         "StreamingSource.cpp",
     ],
 
@@ -30,6 +31,7 @@ cc_library_static {
         "frameworks/av/media/libstagefright/mpeg2ts",
         "frameworks/av/media/libstagefright/rtsp",
         "frameworks/av/media/libstagefright/timedtext",
+        "frameworks/native/include/android",
     ],
 
     cflags: [
@@ -46,6 +48,8 @@ cc_library_static {
     },
 
     shared_libs: [
+        "libandroid",
+        "libandroid_net",
         "libbinder",
         "libdatasource",
         "libui",

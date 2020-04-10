@@ -27,6 +27,8 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
+#include <android/multinetwork.h>
+
 #define LOG_TO_FILES    0
 
 namespace android {
@@ -36,14 +38,23 @@ class MediaBuffer;
 
 struct ARTPWriter : public MediaWriter {
     explicit ARTPWriter(int fd);
+    explicit ARTPWriter(int fd, String8& localIp, int localPort,
+                                String8& remoteIp, int remotePort,
+                                uint32_t seqNo);
 
     virtual status_t addSource(const sp<MediaSource> &source);
     virtual bool reachedEOS();
     virtual status_t start(MetaData *params);
     virtual status_t stop();
     virtual status_t pause();
+    void updateCVODegrees(int32_t cvoDegrees);
+    void updatePayloadType(int32_t payloadType);
+    void updateSocketDscp(int32_t dscp);
+    void updateSocketNetwork(int64_t socketNetwork);
+    uint32_t getSequenceNum();
 
     virtual void onMessageReceived(const sp<AMessage> &msg);
+    virtual void setTMMBNInfo(uint32_t opponentID, uint32_t bitrate);
 
 protected:
     virtual ~ARTPWriter();
@@ -76,15 +87,26 @@ private:
     sp<ALooper> mLooper;
     sp<AHandlerReflector<ARTPWriter> > mReflector;
 
-    int mSocket;
+    bool mIsIPv6;
+    int mRTPSocket, mRTCPSocket;
+    struct sockaddr_in mLocalAddr;
     struct sockaddr_in mRTPAddr;
     struct sockaddr_in mRTCPAddr;
+    struct sockaddr_in6 mLocalAddr6;
+    struct sockaddr_in6 mRTPAddr6;
+    struct sockaddr_in6 mRTCPAddr6;
+    int32_t mRtpLayer3Dscp;
+    net_handle_t mRTPSockNetwork;
 
     AString mProfileLevel;
     AString mSeqParamSet;
     AString mPicParamSet;
 
+    MediaBufferBase *mSPSBuf;
+    MediaBufferBase *mPPSBuf;
+
     uint32_t mSourceID;
+    uint32_t mPayloadType;
     uint32_t mSeqNo;
     uint32_t mRTPTimeBase;
     uint32_t mNumRTPSent;
@@ -92,10 +114,16 @@ private:
     uint32_t mLastRTPTime;
     uint64_t mLastNTPTime;
 
+    uint32_t mOpponentID;
+    uint32_t mBitrate;
+
     int32_t mNumSRsSent;
+    int32_t mRTPCVOExtMap;
+    int32_t mRTPCVODegrees;
 
     enum {
         INVALID,
+        H265,
         H264,
         H263,
         AMR_NB,
@@ -109,16 +137,20 @@ private:
 
     void addSR(const sp<ABuffer> &buffer);
     void addSDES(const sp<ABuffer> &buffer);
+    void addTMMBN(const sp<ABuffer> &buffer);
 
     void makeH264SPropParamSets(MediaBufferBase *buffer);
     void dumpSessionDesc();
 
     void sendBye();
+    void sendSPSPPSIfIFrame(MediaBufferBase *mediaBuf, int64_t timeUs);
+    void sendHEVCData(MediaBufferBase *mediaBuf);
     void sendAVCData(MediaBufferBase *mediaBuf);
     void sendH263Data(MediaBufferBase *mediaBuf);
     void sendAMRData(MediaBufferBase *mediaBuf);
 
     void send(const sp<ABuffer> &buffer, bool isRTCP);
+    void makeSocketPairAndBind(String8& localIp, int localPort, String8& remoteIp, int remotePort);
 
     DISALLOW_EVIL_CONSTRUCTORS(ARTPWriter);
 };
