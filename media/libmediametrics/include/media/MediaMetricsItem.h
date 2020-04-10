@@ -223,7 +223,7 @@ static inline bool startsWith(const std::string& s, const std::string& comp) {
 class Defer {
 public:
     template <typename U>
-    Defer(U &&f) : mThunk(std::forward<U>(f)) {}
+    explicit Defer(U &&f) : mThunk(std::forward<U>(f)) {}
     ~Defer() { mThunk(); }
 
 private:
@@ -522,7 +522,7 @@ public:
     BufferedItem(const BufferedItem&) = delete;
     BufferedItem& operator=(const BufferedItem&) = delete;
 
-    BufferedItem(const std::string key, char *begin, char *end)
+    BufferedItem(const std::string& key, char *begin, char *end)
         : BufferedItem(key.c_str(), begin, end) { }
 
     BufferedItem(const char *key, char *begin, char *end)
@@ -687,7 +687,7 @@ protected:
 template <size_t N = 4096>
 class LogItem : public BufferedItem {
 public:
-    explicit LogItem(const std::string key) : LogItem(key.c_str()) { }
+    explicit LogItem(const std::string& key) : LogItem(key.c_str()) { }
 
     // Since this class will not be defined before the base class, we initialize variables
     // in our own order.
@@ -742,10 +742,10 @@ public:
             mElem = other.mElem;
             return *this;
         }
-        Prop(Prop&& other) {
+        Prop(Prop&& other) noexcept {
             *this = std::move(other);
         }
-        Prop& operator=(Prop&& other) {
+        Prop& operator=(Prop&& other) noexcept {
             mName = std::move(other.mName);
             mElem = std::move(other.mElem);
             return *this;
@@ -856,7 +856,7 @@ public:
     // Iteration of props within item
     class iterator {
     public:
-        iterator(const std::map<std::string, Prop>::const_iterator &_it) : it(_it) { }
+        explicit iterator(const std::map<std::string, Prop>::const_iterator &_it) : it(_it) { }
         iterator &operator++() {
             ++it;
             return *this;

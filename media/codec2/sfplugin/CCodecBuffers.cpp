@@ -261,6 +261,7 @@ bool FlexBuffersImpl::releaseSlot(
     std::shared_ptr<C2Buffer> result = mBuffers[index].compBuffer.lock();
     if (!result) {
         result = clientBuffer->asC2Buffer();
+        clientBuffer->clearC2BufferRefs();
         mBuffers[index].compBuffer = result;
     }
     if (c2buffer) {
@@ -379,6 +380,7 @@ bool BuffersArrayImpl::returnBuffer(
     std::shared_ptr<C2Buffer> result = mBuffers[index].compBuffer.lock();
     if (!result) {
         result = clientBuffer->asC2Buffer();
+        clientBuffer->clearC2BufferRefs();
         mBuffers[index].compBuffer = result;
     }
     if (c2buffer) {
