@@ -73,7 +73,7 @@ static int64_t convertTimespecToUs(const struct timespec &tv)
 static inline struct timespec convertNsToTimespec(int64_t ns) {
     struct timespec tv;
     tv.tv_sec = static_cast<time_t>(ns / NANOS_PER_SECOND);
-    tv.tv_nsec = static_cast<long>(ns % NANOS_PER_SECOND);
+    tv.tv_nsec = static_cast<int64_t>(ns % NANOS_PER_SECOND);
     return tv;
 }
 
@@ -639,7 +639,7 @@ status_t AudioTrack::start()
     AutoMutex lock(mLock);
 
     status_t status = NO_ERROR; // logged: make sure to set this before returning.
-    mediametrics::Defer([&] {
+    mediametrics::Defer defer([&] {
         mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_START)
             .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(systemTime() - beginNs))
@@ -772,7 +772,7 @@ void AudioTrack::stop()
     const int64_t beginNs = systemTime();
 
     AutoMutex lock(mLock);
-    mediametrics::Defer([&]() {
+    mediametrics::Defer defer([&]() {
         mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_STOP)
             .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(systemTime() - beginNs))
@@ -832,7 +832,7 @@ void AudioTrack::flush()
 {
     const int64_t beginNs = systemTime();
     AutoMutex lock(mLock);
-    mediametrics::Defer([&]() {
+    mediametrics::Defer defer([&]() {
         mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_FLUSH)
             .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(systemTime() - beginNs))
@@ -1767,7 +1767,7 @@ status_t AudioTrack::obtainBuffer(Buffer* audioBuffer, int32_t waitCount, size_t
     } else if (waitCount > 0) {
         time_t ms = WAIT_PERIOD_MS * (time_t) waitCount;
         timeout.tv_sec = ms / 1000;
-        timeout.tv_nsec = (long) (ms % 1000) * 1000000;
+        timeout.tv_nsec = (ms % 1000) * 1000000;
         requested = &timeout;
     } else {
         ALOGE("%s(%d): invalid waitCount %d", __func__, mPortId, waitCount);
