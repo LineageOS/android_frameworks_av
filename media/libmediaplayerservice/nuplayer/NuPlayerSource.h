@@ -58,6 +58,7 @@ struct NuPlayer::Source : public AHandler {
         kWhatInstantiateSecureDecoders,
         // Modular DRM
         kWhatDrmInfo,
+        kWhatIMSRxNotice,
     };
 
     // The provides message is used to notify the player about various

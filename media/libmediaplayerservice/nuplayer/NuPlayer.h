@@ -51,6 +51,8 @@ struct NuPlayer : public AHandler {
 
     void setDataSourceAsync(const sp<DataSource> &source);
 
+    void setDataSourceAsync(const String8& rtpParams);
+
     status_t getBufferingSettings(BufferingSettings* buffering /* nonnull */);
     status_t setBufferingSettings(const BufferingSettings& buffering);
 
@@ -117,6 +119,7 @@ private:
     struct GenericSource;
     struct HTTPLiveSource;
     struct Renderer;
+    struct RTPSource;
     struct RTSPSource;
     struct StreamingSource;
     struct Action;
@@ -257,6 +260,7 @@ private:
     typedef enum {
         DATA_SOURCE_TYPE_NONE,
         DATA_SOURCE_TYPE_HTTP_LIVE,
+        DATA_SOURCE_TYPE_RTP,
         DATA_SOURCE_TYPE_RTSP,
         DATA_SOURCE_TYPE_GENERIC_URL,
         DATA_SOURCE_TYPE_GENERIC_FD,
@@ -334,6 +338,7 @@ private:
     void sendSubtitleData(const sp<ABuffer> &buffer, int32_t baseIndex);
     void sendTimedMetaData(const sp<ABuffer> &buffer);
     void sendTimedTextData(const sp<ABuffer> &buffer);
+    void sendIMSRxNotice(const sp<AMessage> &msg);
 
     void writeTrackInfo(Parcel* reply, const sp<AMessage>& format) const;
 

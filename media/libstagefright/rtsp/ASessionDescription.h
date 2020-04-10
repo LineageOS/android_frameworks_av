@@ -40,6 +40,8 @@ struct ASessionDescription : public RefBase {
     size_t countTracks() const;
     void getFormat(size_t index, AString *value) const;
 
+    bool getCvoExtMap(size_t index, int32_t *cvoExtMap) const;
+
     void getFormatType(
             size_t index, unsigned long *PT,
             AString *desc, AString *params) const;
@@ -63,6 +65,9 @@ struct ASessionDescription : public RefBase {
     // i.e. we have a fixed duration, otherwise this is live streaming.
     static bool parseNTPRange(const char *s, float *npt1, float *npt2);
 
+    static void SDPStringFactory(AString &sdp, const char *ip, bool isAudio, unsigned port,
+        unsigned payloadType, unsigned as, const char *codec, const char *fmtp = NULL,
+        int32_t width = 0, int32_t height = 0, int32_t cvoExtMap = 0);
 protected:
     virtual ~ASessionDescription();
 

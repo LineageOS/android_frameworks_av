@@ -368,6 +368,7 @@ private:
 
         virtual status_t        setDataSource(const sp<IStreamSource> &source);
         virtual status_t        setDataSource(const sp<IDataSource> &source);
+        virtual status_t        setDataSource(const String8& rtpParams);
 
 
         sp<MediaPlayerBase>     setDataSource_pre(player_type playerType);
