@@ -142,7 +142,7 @@ public:
             --ll;
         }
         auto [s, l] = dumpMapTimeItem(mLog, ll, sinceNs, prefix);
-        ss << std::move(s);
+        ss << s;
         ll -= l;
 
         // Grouped by item key (category)
@@ -158,7 +158,7 @@ public:
             if (prefix != nullptr && !startsWith(it->first, prefix)) break;
             auto [s, l] = dumpMapTimeItem(it->second, ll - 1, sinceNs, prefix);
             if (l == 0) continue; // don't show empty groups (due to sinceNs).
-            ss << " " << it->first << "\n" << std::move(s);
+            ss << " " << it->first << "\n" << s;
             ll -= l + 1;
         }
         return { ss.str(), lines - ll };
