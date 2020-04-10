@@ -394,7 +394,7 @@ status_t AudioRecord::start(AudioSystem::sync_event_t event, audio_session_t tri
     AutoMutex lock(mLock);
 
     status_t status = NO_ERROR;
-    mediametrics::Defer([&] {
+    mediametrics::Defer defer([&] {
         mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_START)
             .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(systemTime() - beginNs))
@@ -467,7 +467,7 @@ void AudioRecord::stop()
 {
     const int64_t beginNs = systemTime();
     AutoMutex lock(mLock);
-    mediametrics::Defer([&] {
+    mediametrics::Defer defer([&] {
         mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_STOP)
             .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(systemTime() - beginNs))
@@ -1340,7 +1340,7 @@ status_t AudioRecord::restoreRecord_l(const char *from)
 {
     status_t result = NO_ERROR;  // logged: make sure to set this before returning.
     const int64_t beginNs = systemTime();
-    mediametrics::Defer([&] {
+    mediametrics::Defer defer([&] {
         mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_RESTORE)
             .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(systemTime() - beginNs))
