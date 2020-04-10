@@ -111,7 +111,11 @@ DummyContainerBuffer::DummyContainerBuffer(
 }
 
 std::shared_ptr<C2Buffer> DummyContainerBuffer::asC2Buffer() {
-    return std::move(mBufferRef);
+    return mBufferRef;
+}
+
+void DummyContainerBuffer::clearC2BufferRefs() {
+    mBufferRef.reset();
 }
 
 bool DummyContainerBuffer::canCopy(const std::shared_ptr<C2Buffer> &) const {
@@ -187,7 +191,11 @@ ConstLinearBlockBuffer::ConstLinearBlockBuffer(
 }
 
 std::shared_ptr<C2Buffer> ConstLinearBlockBuffer::asC2Buffer() {
-    return std::move(mBufferRef);
+    return mBufferRef;
+}
+
+void ConstLinearBlockBuffer::clearC2BufferRefs() {
+    mBufferRef.reset();
 }
 
 // GraphicView2MediaImageConverter
@@ -689,8 +697,12 @@ ConstGraphicBlockBuffer::ConstGraphicBlockBuffer(
 }
 
 std::shared_ptr<C2Buffer> ConstGraphicBlockBuffer::asC2Buffer() {
+    return mBufferRef;
+}
+
+void ConstGraphicBlockBuffer::clearC2BufferRefs() {
     mView.reset();
-    return std::move(mBufferRef);
+    mBufferRef.reset();
 }
 
 bool ConstGraphicBlockBuffer::canCopy(const std::shared_ptr<C2Buffer> &buffer) const {
