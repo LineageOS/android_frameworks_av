@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Copyright (C) 2020 The Android Open Source Project
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+
+<!-- REFERENCE : frameworks/av/media/libstagefright/xmlparser/media_codecs.xsd -->
+<Included>
+    <Settings>
+        <Domain name="telephony" enabled="false" />
+        <Domain name="tv" enabled="false" />
+        <Variant name="variant1" enabled="false" />
+        <Setting name="setting1" value="settingValue1" update="true" />
+        <Setting name="setting2" enabled="false" />
+    </Settings>
+    <Decoders>
+        <!-- entry for enabled, domain, rank and update properties -->
+        <MediaCodec name="test1.decoder" type="audio/mpeg" update="false" domain="telephony" enabled="false" rank="4">
+            <Alias name="alias1.decoder" />
+            <Quirk name="quirk1" value="quirk1Value"/>
+        </MediaCodec>
+        <!-- entry for testing Quirk -->
+        <MediaCodec name="test2.decoder" type="audio/3gpp" enabled="true" >
+            <Quirk name="quirk1" value="quirk1Value"/>
+        </MediaCodec>
+        <!-- entry for testing Feature -->
+        <!-- feature2 takes value 0 (feature with same name takes lower feature's value) -->
+        <!-- feature3 gives value as 0 since it's optional -->
+        <!-- optional="true" required="true" is not a valid combination. -->
+        <!-- optional="false" required="false" is not a valid combination. -->
+        <MediaCodec name="test3.decoder" type="audio/amr-wb" >
+            <Feature name="feature1" value="feature1Val" />
+            <Feature name="feature2" value="feature2Val"/>
+            <Feature name="feature2" />
+            <Feature name="feature3" optional="true" required="false" />
+        </MediaCodec>
+        <!-- entry for testing Type -->
+        <MediaCodec name="test4.decoder">
+            <Type name="audio/flac">
+                <Feature name="feature1" value="feature1Val" />
+            </Type>
+        </MediaCodec>
+        <!-- entry for testing Attribute -->
+        <MediaCodec name="test5.decoder" type="audio/g711-mlaw" >
+            <Attribute name="attributeQuirk1" />
+        </MediaCodec>
+        <!-- entry for testing Variant -->
+        <MediaCodec name="test6.decoder" type="audio/mp4a-latm" variant="variant1,variant2" >
+            <Variant name="variant1">
+                <Limit name="variant1Limit1" min="variant1Limit1Min" max="variant1Limit1Max" />
+                <Limit name="variant1Limit2" range="variant1Limit2Low-variant1Limit2High" />
+            </Variant>
+            <Variant name="variant2">
+                <Limit name="variant2Limit1" value="variant2Limit1Value" />
+            </Variant>
+        </MediaCodec>
+        <!-- entry for testing Limit -->
+        <!-- 'in' is present in xsd file but not handled in MediaCodecsXmlParser -->
+        <MediaCodec name="test7.decoder" type="audio/vorbis" >
+            <Limit name="limit1" in="limit1In" min="limit1Min"/>
+            <Limit name="limit2" min="limit2Min" max="limit2Max" scale="limit2Scale" />
+            <Limit name="limit3" ranges="limit3Val1,limit3Val2,limit3Val3" default="limit3Val3" />
+        </MediaCodec>
+    </Decoders>
+    <Encoders>
+        <MediaCodec name="test8.encoder" type="audio/opus">
+            <Limit name="limit1" max="limit1Max" />
+        </MediaCodec>
+    </Encoders>
+</Included>
