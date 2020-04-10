@@ -55,6 +55,7 @@ const sp<IAudioFlinger> AudioSystem::get_audio_flinger()
 {
     sp<IAudioFlinger> af;
     sp<AudioFlingerClient> afc;
+    bool reportNoError = false;
     {
         Mutex::Autolock _l(gLock);
         if (gAudioFlinger == 0) {
@@ -70,7 +71,7 @@ const sp<IAudioFlinger> AudioSystem::get_audio_flinger()
             if (gAudioFlingerClient == NULL) {
                 gAudioFlingerClient = new AudioFlingerClient();
             } else {
-                reportError(NO_ERROR);
+                reportNoError = true;
             }
             binder->linkToDeath(gAudioFlingerClient);
             gAudioFlinger = interface_cast<IAudioFlinger>(binder);
@@ -86,6 +87,7 @@ const sp<IAudioFlinger> AudioSystem::get_audio_flinger()
         af->registerClient(afc);
         IPCThreadState::self()->restoreCallingIdentity(token);
     }
+    if (reportNoError) reportError(NO_ERROR);
     return af;
 }
 

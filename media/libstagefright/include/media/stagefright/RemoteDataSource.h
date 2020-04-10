@@ -41,6 +41,11 @@ public:
         close();
     }
     virtual sp<IMemory> getIMemory() {
+        Mutex::Autolock lock(mLock);
+        if (mMemory.get() == nullptr) {
+            ALOGE("getIMemory() failed, mMemory is nullptr");
+            return nullptr;
+        }
         return mMemory;
     }
     virtual ssize_t readAt(off64_t offset, size_t size) {
@@ -48,19 +53,35 @@ public:
         if (size > kBufferSize) {
             size = kBufferSize;
         }
+
+        Mutex::Autolock lock(mLock);
+        if (mSource.get() == nullptr) {
+            ALOGE("readAt() failed, mSource is nullptr");
+            return 0;
+        }
         return mSource->readAt(offset, mMemory->unsecurePointer(), size);
     }
     virtual status_t getSize(off64_t *size) {
+        Mutex::Autolock lock(mLock);
+        if (mSource.get() == nullptr) {
+            ALOGE("getSize() failed, mSource is nullptr");
+            return INVALID_OPERATION;
+        }
         return mSource->getSize(size);
     }
     virtual void close() {
         // Protect strong pointer assignments. This also can be called from the binder
         // clean-up procedure which is running on a separate thread.
-        Mutex::Autolock lock(mCloseLock);
+        Mutex::Autolock lock(mLock);
         mSource = nullptr;
         mMemory = nullptr;
     }
     virtual uint32_t getFlags() {
+        Mutex::Autolock lock(mLock);
+        if (mSource.get() == nullptr) {
+            ALOGE("getSize() failed, mSource is nullptr");
+            return 0;
+        }
         return mSource->flags();
     }
     virtual String8 toString()  {
@@ -75,9 +96,10 @@ private:
     sp<IMemory> mMemory;
     sp<DataSource> mSource;
     String8 mName;
-    Mutex mCloseLock;
+    Mutex mLock;
 
     explicit RemoteDataSource(const sp<DataSource> &source) {
+        Mutex::Autolock lock(mLock);
         mSource = source;
         sp<MemoryDealer> memoryDealer = new MemoryDealer(kBufferSize, "RemoteDataSource");
         mMemory = memoryDealer->allocate(kBufferSize);
