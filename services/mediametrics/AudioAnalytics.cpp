@@ -115,7 +115,7 @@ std::pair<std::string, int32_t> AudioAnalytics::dump(
 
     if (ll > 0) {
         auto [s, l] = mAnalyticsState->dump(ll, sinceNs, prefix);
-        ss << std::move(s);
+        ss << s;
         ll -= l;
     }
     if (ll > 0) {
@@ -124,7 +124,7 @@ std::pair<std::string, int32_t> AudioAnalytics::dump(
     }
     if (ll > 0) {
         auto [s, l] = mPreviousAnalyticsState->dump(ll, sinceNs, prefix);
-        ss << std::move(s);
+        ss << s;
         ll -= l;
     }
     return { ss.str(), lines - ll };
