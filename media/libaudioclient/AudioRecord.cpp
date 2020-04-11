@@ -411,6 +411,9 @@ status_t AudioRecord::start(AudioSystem::sync_event_t event, audio_session_t tri
     mFramesReadServerOffset -= mFramesRead + framesFlushed;
     mFramesRead = 0;
     mProxy->clearTimestamp();  // timestamp is invalid until next server push
+    mPreviousTimestamp.clear();
+    mTimestampRetrogradePositionReported = false;
+    mTimestampRetrogradeTimeReported = false;
 
     // reset current position as seen by client to 0
     mProxy->setEpoch(mProxy->getEpoch() - mProxy->getPosition());
@@ -599,6 +602,39 @@ status_t AudioRecord::getTimestamp(ExtendedTimestamp *timestamp)
             if (timestamp->mTimeNs[i] >= 0) {
                 timestamp->mPosition[i] += mFramesReadServerOffset;
             }
+        }
+
+        bool timestampRetrogradeTimeReported = false;
+        bool timestampRetrogradePositionReported = false;
+        for (int i = 0; i < ExtendedTimestamp::LOCATION_MAX; ++i) {
+            if (timestamp->mTimeNs[i] >= 0 && mPreviousTimestamp.mTimeNs[i] >= 0) {
+                if (timestamp->mTimeNs[i] < mPreviousTimestamp.mTimeNs[i]) {
+                    if (!mTimestampRetrogradeTimeReported) {
+                        ALOGD("%s: retrograde time adjusting [%d] current:%lld to previous:%lld",
+                                __func__, i, (long long)timestamp->mTimeNs[i],
+                                (long long)mPreviousTimestamp.mTimeNs[i]);
+                        timestampRetrogradeTimeReported = true;
+                    }
+                    timestamp->mTimeNs[i] = mPreviousTimestamp.mTimeNs[i];
+                }
+                if (timestamp->mPosition[i] < mPreviousTimestamp.mPosition[i]) {
+                    if (!mTimestampRetrogradePositionReported) {
+                        ALOGD("%s: retrograde position"
+                                " adjusting [%d] current:%lld to previous:%lld",
+                                __func__, i, (long long)timestamp->mPosition[i],
+                                (long long)mPreviousTimestamp.mPosition[i]);
+                        timestampRetrogradePositionReported = true;
+                    }
+                    timestamp->mPosition[i] = mPreviousTimestamp.mPosition[i];
+                }
+            }
+        }
+        mPreviousTimestamp = *timestamp;
+        if (timestampRetrogradeTimeReported) {
+            mTimestampRetrogradeTimeReported = true;
+        }
+        if (timestampRetrogradePositionReported) {
+            mTimestampRetrogradePositionReported = true;
         }
     }
     return status;
