@@ -215,6 +215,26 @@ status_t NuPlayerDriver::setDataSource(const sp<DataSource> &source) {
     return mAsyncResult;
 }
 
+status_t NuPlayerDriver::setDataSource(const String8& rtpParams) {
+    ALOGV("setDataSource(%p) rtp source", this);
+    Mutex::Autolock autoLock(mLock);
+
+    if (mState != STATE_IDLE) {
+        return INVALID_OPERATION;
+    }
+
+    mState = STATE_SET_DATASOURCE_PENDING;
+
+    mPlayer->setDataSourceAsync(rtpParams);
+
+    while (mState == STATE_SET_DATASOURCE_PENDING) {
+        mCondition.wait(mLock);
+    }
+
+    return mAsyncResult;
+}
+
+
 status_t NuPlayerDriver::setVideoSurfaceTexture(
         const sp<IGraphicBufferProducer> &bufferProducer) {
     ALOGV("setVideoSurfaceTexture(%p)", this);

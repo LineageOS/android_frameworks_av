@@ -60,6 +60,7 @@ enum media_event_type {
     MEDIA_META_DATA         = 202,
     MEDIA_DRM_INFO          = 210,
     MEDIA_TIME_DISCONTINUITY = 211,
+    MEDIA_IMS_RX_NOTICE     = 300,
     MEDIA_AUDIO_ROUTING_CHANGED = 10000,
 };
 
@@ -217,6 +218,7 @@ public:
 
             status_t        setDataSource(int fd, int64_t offset, int64_t length);
             status_t        setDataSource(const sp<IDataSource> &source);
+            status_t        setDataSource(const String8& rtpParams);
             status_t        setVideoSurfaceTexture(
                                     const sp<IGraphicBufferProducer>& bufferProducer);
             status_t        setListener(const sp<MediaPlayerListener>& listener);

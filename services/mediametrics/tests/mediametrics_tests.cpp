@@ -79,7 +79,7 @@ TEST(mediametrics_tests, shared_ptr_wrap) {
     const int mFinal;
 
     public:
-      Thunk(decltype(mF) f, int final) : mF(f), mFinal(final) {}
+      explicit Thunk(decltype(mF) f, int final) : mF(std::move(f)), mFinal(final) {}
       ~Thunk() { mF(mFinal); }
       void thunk(int value) { mF(value); }
   };
@@ -139,7 +139,7 @@ TEST(mediametrics_tests, lock_wrap) {
     std::function<void()> mF;
 
     public:
-      Thunk(decltype(mF) f) : mF(f) {}
+      explicit Thunk(decltype(mF) f) : mF(std::move(f)) {}
       void thunk() { mF(); }
   };
 

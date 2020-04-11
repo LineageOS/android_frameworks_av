@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "ARTPAssembler"
 #include "ARTPAssembler.h"
 
 #include <media/stagefright/foundation/ABuffer.h>
@@ -21,12 +22,16 @@
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
 
+#include <android-base/properties.h>
+
 #include <stdint.h>
 
 namespace android {
 
 ARTPAssembler::ARTPAssembler()
-    : mFirstFailureTimeUs(-1) {
+    : mShowQueueCnt(0),
+      mFirstFailureTimeUs(-1) {
+    mShowQueue = android::base::GetBoolProperty("debug.stagefright.rtp", false);
 }
 
 void ARTPAssembler::onPacketReceived(const sp<ARTPSource> &source) {
@@ -140,5 +145,16 @@ sp<ABuffer> ARTPAssembler::MakeCompoundFromPackets(
 
     return accessUnit;
 }
+
+void ARTPAssembler::showCurrentQueue(List<sp<ABuffer> > *queue) {
+    AString temp("Queue elem size : ");
+    List<sp<ABuffer> >::iterator it = queue->begin();
+    while (it != queue->end()) {
+        temp.append((*it)->size());
+        temp.append("  \t");
+        it++;
+    }
+    ALOGD("%s",temp.c_str());
+};
 
 }  // namespace android

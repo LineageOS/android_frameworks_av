@@ -103,7 +103,7 @@ bool ASessionDescription::parse(const void *data, size_t size) {
                     key.setTo(line, 0, colonPos);
 
                     if (key == "a=fmtp" || key == "a=rtpmap"
-                            || key == "a=framesize") {
+                            || key == "a=framesize" || key == "a=extmap") {
                         ssize_t spacePos = line.find(" ", colonPos + 1);
                         if (spacePos < 0) {
                             return false;
@@ -199,6 +199,33 @@ bool ASessionDescription::findAttribute(
     *value = track.valueAt(i);
 
     return true;
+}
+
+bool ASessionDescription::getCvoExtMap(
+        size_t index, int32_t *cvoExtMap) const {
+    CHECK_GE(index, 0u);
+    CHECK_LT(index, mTracks.size());
+
+    AString key, value;
+    *cvoExtMap = 0;
+
+    const Attribs &track = mTracks.itemAt(index);
+    for (size_t i = 0; i < track.size(); i++) {
+        value = track.valueAt(i);
+        if (value.size() > 0 && strcmp(value.c_str(), "urn:3gpp:video-orientation") == 0) {
+            key = track.keyAt(i);
+            break;
+        }
+    }
+
+    if (key.size() > 0) {
+        const char *colonPos = strrchr(key.c_str(), ':');
+        colonPos++;
+        *cvoExtMap = atoi(colonPos);
+        return true;
+    }
+
+    return false;
 }
 
 void ASessionDescription::getFormatType(
@@ -343,6 +370,75 @@ bool ASessionDescription::parseNTPRange(
     }
 
     return *npt2 > *npt1;
+}
+
+// static
+void ASessionDescription::SDPStringFactory(AString &sdp,
+        const char *ip, bool isAudio, unsigned port, unsigned payloadType,
+        unsigned as, const char *codec, const char *fmtp,
+        int32_t width, int32_t height, int32_t cvoExtMap)
+{
+    bool isIPv4 = (AString(ip).find("::") == -1) ? true : false;
+    sdp.clear();
+    sdp.append("v=0\r\n");
+
+    sdp.append("a=range:npt=now-\r\n");
+
+    sdp.append("m=");
+    sdp.append(isAudio ? "audio " : "video ");
+    sdp.append(port);
+    sdp.append(" RTP/AVP ");
+    sdp.append(payloadType);
+    sdp.append("\r\n");
+
+    sdp.append("c= IN IP");
+    if (isIPv4) {
+        sdp.append("4 ");
+    } else {
+        sdp.append("6 ");
+    }
+    sdp.append(ip);
+    sdp.append("\r\n");
+
+    sdp.append("b=AS:");
+    sdp.append(as > 0 ? as : 960);
+    sdp.append("\r\n");
+
+    sdp.append("a=rtpmap:");
+    sdp.append(payloadType);
+    sdp.append(" ");
+    sdp.append(codec);
+    sdp.append("/");
+    sdp.append(isAudio ? "8000" : "90000");
+    sdp.append("\r\n");
+
+    if (fmtp != NULL) {
+        sdp.append("a=fmtp:");
+        sdp.append(payloadType);
+        sdp.append(" ");
+        sdp.append(fmtp);
+        sdp.append("\r\n");
+    }
+
+    if (width > 0 && height > 0) {
+        sdp.append("a=framesize:");
+        sdp.append(payloadType);
+        sdp.append(" ");
+        sdp.append(width);
+        sdp.append("-");
+        sdp.append(height);
+        sdp.append("\r\n");
+    }
+
+    if (cvoExtMap > 0) {
+        sdp.append("a=extmap:");
+        sdp.append(cvoExtMap);
+        sdp.append(" ");
+        sdp.append("urn:3gpp:video-orientation");
+        sdp.append("\r\n");
+    }
+
+    ALOGV("SDPStringFactory => %s", sdp.c_str());
 }
 
 }  // namespace android

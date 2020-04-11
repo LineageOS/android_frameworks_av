@@ -59,6 +59,7 @@ public:
     virtual status_t        setDataSource(int fd, int64_t offset, int64_t length) = 0;
     virtual status_t        setDataSource(const sp<IStreamSource>& source) = 0;
     virtual status_t        setDataSource(const sp<IDataSource>& source) = 0;
+    virtual status_t        setDataSource(const String8& rtpParams) = 0;
     virtual status_t        setVideoSurfaceTexture(
                                     const sp<IGraphicBufferProducer>& bufferProducer) = 0;
     virtual status_t        getBufferingSettings(

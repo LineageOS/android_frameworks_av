@@ -22,6 +22,7 @@
 
 #include "AAMRAssembler.h"
 #include "AAVCAssembler.h"
+#include "AHEVCAssembler.h"
 #include "AH263Assembler.h"
 #include "AMPEG2TSAssembler.h"
 #include "AMPEG4AudioAssembler.h"
@@ -35,13 +36,17 @@
 
 namespace android {
 
-static const uint32_t kSourceID = 0xdeadbeef;
+static uint32_t kSourceID = 0xdeadbeef;
 
 ARTPSource::ARTPSource(
         uint32_t id,
         const sp<ASessionDescription> &sessionDesc, size_t index,
         const sp<AMessage> &notify)
-    : mID(id),
+    : mFirstSeqNumber(0),
+      mFirstRtpTime(0),
+      mFirstSysTime(0),
+      mClockRate(0),
+      mID(id),
       mHighestSeqNumber(0),
       mPrevExpected(0),
       mBaseSeqNumber(0),
@@ -60,6 +65,9 @@ ARTPSource::ARTPSource(
 
     if (!strncmp(desc.c_str(), "H264/", 5)) {
         mAssembler = new AAVCAssembler(notify);
+        mIssueFIRRequests = true;
+    } else if (!strncmp(desc.c_str(), "H265/", 5)) {
+        mAssembler = new AHEVCAssembler(notify);
         mIssueFIRRequests = true;
     } else if (!strncmp(desc.c_str(), "MP4A-LATM/", 10)) {
         mAssembler = new AMPEG4AudioAssembler(notify, params);
@@ -108,9 +116,16 @@ void ARTPSource::timeUpdate(uint32_t rtpTime, uint64_t ntpTime) {
 bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
     uint32_t seqNum = (uint32_t)buffer->int32Data();
 
-    if (mNumBuffersReceived++ == 0) {
+    if (mNumBuffersReceived++ == 0 && mFirstSysTime == 0) {
+        int32_t firstRtpTime;
+        CHECK(buffer->meta()->findInt32("rtp-time", &firstRtpTime));
+        mFirstSysTime = ALooper::GetNowUs();
         mHighestSeqNumber = seqNum;
         mBaseSeqNumber = seqNum;
+        mFirstRtpTime = firstRtpTime;
+        ALOGV("first-rtp arrived: first-rtp-time=%d, sys-time=%lld, seq-num=%u",
+                mFirstRtpTime, (long long)mFirstSysTime, mHighestSeqNumber);
+        mClockRate = 90000;
         mQueue.push_back(buffer);
         return true;
     }
@@ -300,6 +315,97 @@ void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
     buffer->setRange(buffer->offset(), buffer->size() + 32);
 }
 
+void ARTPSource::addTMMBR(const sp<ABuffer> &buffer) {
+    if (buffer->size() + 20 > buffer->capacity()) {
+        ALOGW("RTCP buffer too small to accommodate RR.");
+        return;
+    }
+
+    int32_t targetBitrate = mQualManager.getTargetBitrate();
+    if (targetBitrate <= 0)
+        return;
+
+    uint8_t *data = buffer->data() + buffer->size();
+
+    data[0] = 0x80 | 3; // TMMBR
+    data[1] = 205;      // TSFB
+    data[2] = 0;
+    data[3] = 4;        // total (4+1) * sizeof(int32_t) = 20 bytes
+    data[4] = kSourceID >> 24;
+    data[5] = (kSourceID >> 16) & 0xff;
+    data[6] = (kSourceID >> 8) & 0xff;
+    data[7] = kSourceID & 0xff;
+
+    *(int32_t*)(&data[8]) = 0;  // 4 bytes blank
+
+    data[12] = mID >> 24;
+    data[13] = (mID >> 16) & 0xff;
+    data[14] = (mID >> 8) & 0xff;
+    data[15] = mID & 0xff;
+
+    int32_t exp, mantissa;
+
+    // Round off to the nearest 2^4th
+    ALOGI("UE -> Op Req Rx bitrate : %d ", targetBitrate & 0xfffffff0);
+    for (exp=4 ; exp < 32 ; exp++)
+        if (((targetBitrate >> exp) & 0x01) != 0)
+            break;
+    mantissa = targetBitrate >> exp;
+
+    data[16] = ((exp << 2) & 0xfc) | ((mantissa & 0x18000) >> 15);
+    data[17] =                        (mantissa & 0x07f80) >> 7;
+    data[18] =                        (mantissa & 0x0007f) << 1;
+    data[19] = 40;              // 40 bytes overhead;
+
+    buffer->setRange(buffer->offset(), buffer->size() + 20);
+}
+
+uint32_t ARTPSource::getSelfID() {
+    return kSourceID;
+}
+void ARTPSource::setSelfID(const uint32_t selfID) {
+    kSourceID = selfID;
+}
+
+void ARTPSource::setMinMaxBitrate(int32_t min, int32_t max) {
+    mQualManager.setMinMaxBitrate(min, max);
+}
+
+void ARTPSource::setBitrateData(int32_t bitrate, int64_t time) {
+    mQualManager.setBitrateData(bitrate, time);
+}
+
+void ARTPSource::setTargetBitrate() {
+    uint8_t fraction = 0;
+
+    // According to appendix A.3 in RFC 3550
+    uint32_t expected = mHighestSeqNumber - mBaseSeqNumber + 1;
+    int64_t intervalExpected = expected - mPrevExpected;
+    int64_t intervalReceived = mNumBuffersReceived - mPrevNumBuffersReceived;
+    int64_t intervalPacketLost = intervalExpected - intervalReceived;
+
+    ALOGI("UID %p expectedPkts %lld lostPkts %lld", this, (long long)intervalExpected, (long long)intervalPacketLost);
+
+    if (intervalPacketLost < 0 || intervalExpected == 0)
+        fraction = 0;
+    else if (intervalExpected <= intervalPacketLost)
+        fraction = 255;
+    else
+        fraction = (intervalPacketLost << 8) / intervalExpected;
+
+    mQualManager.setTargetBitrate(fraction, ALooper::GetNowUs(), intervalExpected < 5);
+}
+
+bool ARTPSource::isNeedToReport() {
+    int64_t intervalReceived = mNumBuffersReceived - mPrevNumBuffersReceived;
+    return (intervalReceived > 0) ? true : false;
+}
+
+bool ARTPSource::isNeedToDowngrade() {
+    return mQualManager.isNeedToDowngrade();
+}
+
+void ARTPSource::noticeAbandonBuffer(int cnt) {
+    mNumBuffersReceived -= cnt;
+}
 }  // namespace android
-
-

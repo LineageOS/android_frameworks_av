@@ -195,6 +195,22 @@ status_t MediaPlayer::setDataSource(const sp<IDataSource> &source)
     return err;
 }
 
+status_t MediaPlayer::setDataSource(const String8& rtpParams)
+{
+    ALOGV("setDataSource(rtpParams)");
+    status_t err = UNKNOWN_ERROR;
+    const sp<IMediaPlayerService> service(getMediaPlayerService());
+    if (service != 0) {
+        sp<IMediaPlayer> player(service->create(this, mAudioSessionId));
+        if ((NO_ERROR != doSetRetransmitEndpoint(player)) ||
+            (NO_ERROR != player->setDataSource(rtpParams))) {
+            player.clear();
+        }
+        err = attachNewPlayer(player);
+    }
+    return err;
+}
+
 status_t MediaPlayer::invoke(const Parcel& request, Parcel *reply)
 {
     Mutex::Autolock _l(mLock);
@@ -942,6 +958,9 @@ void MediaPlayer::notify(int msg, int ext1, int ext2, const Parcel *obj)
         break;
     case MEDIA_META_DATA:
         ALOGV("Received timed metadata message");
+        break;
+    case MEDIA_IMS_RX_NOTICE:
+        ALOGV("Received IMS Rx notice message");
         break;
     default:
         ALOGV("unrecognized message: (%d, %d, %d)", msg, ext1, ext2);

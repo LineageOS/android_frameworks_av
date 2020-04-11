@@ -23,6 +23,7 @@
 #include <media/stagefright/foundation/ABase.h>
 #include <utils/List.h>
 #include <utils/RefBase.h>
+#include <QualManager.h>
 
 namespace android {
 
@@ -45,8 +46,25 @@ struct ARTPSource : public RefBase {
 
     void addReceiverReport(const sp<ABuffer> &buffer);
     void addFIR(const sp<ABuffer> &buffer);
+    void addTMMBR(const sp<ABuffer> &buffer);
+    uint32_t getSelfID();
+    void setSelfID(const uint32_t selfID);
+    void setMinMaxBitrate(int32_t min, int32_t max);
+    void setBitrateData(int32_t bitrate, int64_t time);
+    void setTargetBitrate();
+
+    bool isNeedToReport();
+    bool isNeedToDowngrade();
+
+    void noticeAbandonBuffer(int cnt=1);
+
+    int32_t mFirstSeqNumber;
+    int32_t mFirstRtpTime;
+    int64_t mFirstSysTime;
+    int32_t mClockRate;
 
 private:
+
     uint32_t mID;
     uint32_t mHighestSeqNumber;
     uint32_t mPrevExpected;
@@ -65,6 +83,8 @@ private:
     uint8_t mNextFIRSeqNo;
 
     sp<AMessage> mNotify;
+
+    QualManager mQualManager;
 
     bool queuePacket(const sp<ABuffer> &buffer);
 
