@@ -203,6 +203,14 @@ struct AUHeader {
     unsigned mSerial;
 };
 
+bool AMPEG4ElementaryAssembler::initCheck() {
+    if(mSizeLength == 0 || mIndexLength == 0 || mIndexDeltaLength == 0) {
+        android_errorWriteLog(0x534e4554, "124777537");
+        return false;
+    }
+    return true;
+}
+
 ARTPAssembler::AssemblyStatus AMPEG4ElementaryAssembler::addPacket(
         const sp<ARTPSource> &source) {
     List<sp<ABuffer> > *queue = source->queue();
