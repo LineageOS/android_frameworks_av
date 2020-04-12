@@ -300,6 +300,7 @@ MediaProfiles::createAudioEncoderCap(const char **atts)
 
     const size_t nMappings = sizeof(sAudioEncoderNameMap)/sizeof(sAudioEncoderNameMap[0]);
     const int codec = findTagForName(sAudioEncoderNameMap, nMappings, atts[1]);
+    if(codec == -1) return nullptr;
     CHECK(codec != -1);
 
     MediaProfiles::AudioEncoderCap *cap =
@@ -419,7 +420,9 @@ MediaProfiles::startElementHandler(void *userData, const char *name, const char 
         profiles->mVideoEncoders.add(createVideoEncoderCap(atts));
     } else if (strcmp("AudioEncoderCap", name) == 0 &&
                strcmp("true", atts[3]) == 0) {
-        profiles->mAudioEncoders.add(createAudioEncoderCap(atts));
+	    MediaProfiles::AudioEncoderCap* cap = createAudioEncoderCap(atts);
+        if(cap != nullptr)
+            profiles->mAudioEncoders.add(cap);
     } else if (strcmp("VideoDecoderCap", name) == 0 &&
                strcmp("true", atts[3]) == 0) {
         profiles->mVideoDecoders.add(createVideoDecoderCap(atts));
