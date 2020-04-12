@@ -82,6 +82,10 @@ ARTPSource::ARTPSource(
     } else {
         TRESPASS();
     }
+
+    if (mAssembler != NULL && !mAssembler->initCheck()) {
+        mAssembler.clear();
+    }
 }
 
 static uint32_t AbsDiff(uint32_t seq1, uint32_t seq2) {
@@ -89,7 +93,7 @@ static uint32_t AbsDiff(uint32_t seq1, uint32_t seq2) {
 }
 
 void ARTPSource::processRTPPacket(const sp<ABuffer> &buffer) {
-    if (queuePacket(buffer) && mAssembler != NULL) {
+    if (mAssembler != NULL && queuePacket(buffer)) {
         mAssembler->onPacketReceived(this);
     }
 }
@@ -171,7 +175,9 @@ bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
 }
 
 void ARTPSource::byeReceived() {
-    mAssembler->onByeReceived();
+    if (mAssembler != NULL) {
+        mAssembler->onByeReceived();
+    }
 }
 
 void ARTPSource::addFIR(const sp<ABuffer> &buffer) {
