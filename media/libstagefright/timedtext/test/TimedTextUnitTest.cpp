@@ -346,6 +346,8 @@ TEST_P(Text3GPPDescriptionTest, Text3GPPGlobalDescriptionTest) {
         ASSERT_EQ(parcel.readInt32(), fontRecordEntries[i].fontNameLength)
                 << "Parcel has invalid value of font name length";
         uint8_t fontName[fontRecordEntries[i].fontNameLength];
+        // written with writeByteArray() writes count, then the actual data
+        ASSERT_EQ(parcel.readInt32(), fontRecordEntries[i].fontNameLength);
         status = parcel.read((void *)fontName, fontRecordEntries[i].fontNameLength);
         ASSERT_EQ(status, 0) << "Failed to read the font name from parcel";
         ASSERT_EQ(memcmp(fontName, fontRecordEntries[i].font, fontRecordEntries[i].fontNameLength),
