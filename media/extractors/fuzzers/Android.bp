@@ -1,0 +1,83 @@
+/******************************************************************************
+ *
+ * Copyright (C) 2020 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ *****************************************************************************
+ * Originally developed and contributed by Ittiam Systems Pvt. Ltd, Bangalore
+ */
+
+cc_library {
+    name: "libextractorfuzzerbase",
+
+    srcs: [
+        "ExtractorFuzzerBase.cpp",
+    ],
+
+    local_include_dirs: [
+        "include",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    static_libs: [
+        "liblog",
+        "libstagefright_foundation",
+        "libmedia",
+    ],
+
+    shared_libs: [
+        "libutils",
+        "libbinder",
+        "libmediandk",
+    ],
+
+    /* GETEXTRACTORDEF is not defined as extractor library is not linked in the
+     * base class. It will be included when the extractor fuzzer binary is
+     * generated.
+     */
+    allow_undefined_symbols: true,
+}
+
+cc_fuzz {
+    name: "mp4_extractor_fuzzer",
+
+    srcs: [
+        "mp4_extractor_fuzzer.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/extractors/mp4",
+    ],
+
+    static_libs: [
+        "liblog",
+        "libstagefright_foundation",
+        "libmedia",
+        "libextractorfuzzerbase",
+        "libstagefright_id3",
+        "libstagefright_esds",
+        "libmp4extractor",
+    ],
+
+    shared_libs: [
+        "libutils",
+        "libmediandk",
+        "libbinder",
+    ],
+
+    dictionary: "mp4_extractor_fuzzer.dict",
+}
