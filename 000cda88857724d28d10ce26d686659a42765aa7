@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "d486309e_e59638f0",
+        "filename": "media/libmedia/MediaProfiles.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 423,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2020-04-13T10:33:55Z",
+      "side": 1,
+      "message": "Replace tabs with spaces",
+      "range": {
+        "startLine": 423,
+        "startChar": 0,
+        "endLine": 423,
+        "endChar": 1
+      },
+      "revId": "000cda88857724d28d10ce26d686659a42765aa7",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
