@@ -2742,7 +2742,7 @@ CameraService::BasicClient::BasicClient(const sp<CameraService>& cameraService,
         mClientPackageName(clientPackageName),
         mClientPid(clientPid), mClientUid(clientUid),
         mServicePid(servicePid),
-        mDisconnected(false),
+        mDisconnected(false), mUidIsTrusted(false),
         mAudioRestriction(hardware::camera2::ICameraDeviceUser::AUDIO_RESTRICTION_NONE),
         mRemoteBinder(remoteCallback)
 {
@@ -2791,6 +2791,8 @@ CameraService::BasicClient::BasicClient(const sp<CameraService>& cameraService,
     if (getCurrentServingCall() != BinderCallType::HWBINDER) {
         mAppOpsManager = std::make_unique<AppOpsManager>();
     }
+
+    mUidIsTrusted = isTrustedCallingUid(mClientUid);
 }
 
 CameraService::BasicClient::~BasicClient() {
@@ -2905,7 +2907,9 @@ status_t CameraService::BasicClient::startCameraOps() {
             return PERMISSION_DENIED;
         }
 
-        if (res == AppOpsManager::MODE_IGNORED) {
+        // If the calling Uid is trusted (a native service), the AppOpsManager could
+        // return MODE_IGNORED. Do not treat such case as error.
+        if (!mUidIsTrusted && res == AppOpsManager::MODE_IGNORED) {
             ALOGI("Camera %s: Access for \"%s\" has been restricted",
                     mCameraIdStr.string(), String8(mClientPackageName).string());
             // Return the same error as for device policy manager rejection
