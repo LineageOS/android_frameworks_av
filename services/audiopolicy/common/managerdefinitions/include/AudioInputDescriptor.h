@@ -92,6 +92,12 @@ public:
     audio_config_base_t getConfig() const override;
     audio_patch_handle_t getPatchHandle() const override;
     void setPatchHandle(audio_patch_handle_t handle) override;
+    bool isMmap() override {
+        if (getPolicyAudioPort() != nullptr) {
+            return getPolicyAudioPort()->isMmap();
+        }
+        return false;
+    }
 
     status_t open(const audio_config_t *config,
                   const sp<DeviceDescriptor> &device,
