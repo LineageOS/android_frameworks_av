@@ -2053,16 +2053,33 @@ status_t ACodec::configureCodec(
     if (mIsVideo || mIsImage) {
         // determine need for software renderer
         bool usingSwRenderer = false;
-        if (haveNativeWindow && mComponentName.startsWith("OMX.google.")) {
-            usingSwRenderer = true;
-            haveNativeWindow = false;
-            (void)setPortMode(kPortIndexOutput, IOMX::kPortModePresetByteBuffer);
-        } else if (haveNativeWindow && !storingMetadataInDecodedBuffers()) {
-            err = setPortMode(kPortIndexOutput, IOMX::kPortModePresetANWBuffer);
-            if (err != OK) {
-                return err;
+        if (haveNativeWindow) {
+            bool requiresSwRenderer = false;
+            OMX_PARAM_U32TYPE param;
+            InitOMXParams(&param);
+            param.nPortIndex = kPortIndexOutput;
+
+            status_t err = mOMXNode->getParameter(
+                    (OMX_INDEXTYPE)OMX_IndexParamVideoAndroidRequiresSwRenderer,
+                    &param, sizeof(param));
+
+            if (err == OK && param.nU32 == 1) {
+                requiresSwRenderer = true;
             }
+
+            if (mComponentName.startsWith("OMX.google.") || requiresSwRenderer) {
+                usingSwRenderer = true;
+                haveNativeWindow = false;
+                (void)setPortMode(kPortIndexOutput, IOMX::kPortModePresetByteBuffer);
+            } else if (!storingMetadataInDecodedBuffers()) {
+                err = setPortMode(kPortIndexOutput, IOMX::kPortModePresetANWBuffer);
+                if (err != OK) {
+                    return err;
+                }
+            }
+
         }
+
 
         if (encoder) {
             err = setupVideoEncoder(mime, msg, outputFormat, inputFormat);
