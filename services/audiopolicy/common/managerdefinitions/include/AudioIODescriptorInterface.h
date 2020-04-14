@@ -34,6 +34,8 @@ public:
     virtual audio_patch_handle_t getPatchHandle() const = 0;
 
     virtual void setPatchHandle(audio_patch_handle_t handle) = 0;
+
+    virtual bool isMmap() = 0;
 };
 
 template <class IoDescriptor, class Filter>
@@ -48,7 +50,7 @@ sp<DeviceDescriptor> findPreferredDevice(
         // created when the mmap stream is opened). This client is never active.
         // On non MMAP IOs, the preferred device is honored only if all active clients have
         // a preferred device in which case the first client drives the selection.
-        if (desc->getPolicyAudioPort()->isMmap()) {
+        if (desc->isMmap()) {
             // The client list is never empty on a MMAP IO
             return devices.getDeviceFromId(
                     desc->clientsList(false /*activeOnly*/)[0]->preferredDeviceId());
