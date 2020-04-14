@@ -45,12 +45,6 @@ private:
     std::shared_ptr<IntfImpl> mIntf;
     bool mSignalledOutputEos;
 
-#ifdef ALAW
-    void DecodeALaw(int16_t *out, const uint8_t *in, size_t inSize);
-#else
-    void DecodeMLaw(int16_t *out, const uint8_t *in, size_t inSize);
-#endif
-
     C2_DO_NOT_COPY(C2SoftG711Dec);
 };
 

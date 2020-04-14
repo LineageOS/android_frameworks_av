@@ -22,7 +22,7 @@
 
 #include <C2PlatformSupport.h>
 #include <SimpleC2Interface.h>
-
+#include <g711Dec.h>
 #include "C2SoftG711Dec.h"
 
 namespace android {
@@ -223,53 +223,6 @@ c2_status_t C2SoftG711Dec::drain(
 
     return C2_OK;
 }
-
-#ifdef ALAW
-void C2SoftG711Dec::DecodeALaw(
-        int16_t *out, const uint8_t *in, size_t inSize) {
-    while (inSize > 0) {
-        inSize--;
-        int32_t x = *in++;
-
-        int32_t ix = x ^ 0x55;
-        ix &= 0x7f;
-
-        int32_t iexp = ix >> 4;
-        int32_t mant = ix & 0x0f;
-
-        if (iexp > 0) {
-            mant += 16;
-        }
-
-        mant = (mant << 4) + 8;
-
-        if (iexp > 1) {
-            mant = mant << (iexp - 1);
-        }
-
-        *out++ = (x > 127) ? mant : -mant;
-    }
-}
-#else
-void C2SoftG711Dec::DecodeMLaw(
-        int16_t *out, const uint8_t *in, size_t inSize) {
-    while (inSize > 0) {
-        inSize--;
-        int32_t x = *in++;
-
-        int32_t mantissa = ~x;
-        int32_t exponent = (mantissa >> 4) & 7;
-        int32_t segment = exponent + 1;
-        mantissa &= 0x0f;
-
-        int32_t step = 4 << segment;
-
-        int32_t abs = (0x80l << exponent) + step * mantissa + step / 2 - 4 * 33;
-
-        *out++ = (x < 0x80) ? -abs : abs;
-    }
-}
-#endif
 
 class C2SoftG711DecFactory : public C2ComponentFactory {
 public:
