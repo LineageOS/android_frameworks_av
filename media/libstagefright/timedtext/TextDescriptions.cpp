@@ -504,7 +504,7 @@ status_t TextDescriptions::extract3GPPGlobalDescriptions(
                             return OK;
                         }
 
-                        parcel->write(tmpData, len);
+                        parcel->writeByteArray(len, tmpData);
                         tmpData += len;
                         subChunkRemaining -= len;
                     }
