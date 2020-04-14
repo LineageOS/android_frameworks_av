@@ -89,17 +89,19 @@ class OpusHeaderParseTest : public OpusHeaderTest,
 
 class OpusHeaderWriteTest
     : public OpusHeaderTest,
-      public ::testing::TestWithParam<pair<int32_t /* ChannelCount */, int32_t /* skipSamples */>> {
-};
+      public ::testing::TestWithParam<tuple<int32_t /* ChannelCount */, int32_t /* skipSamples */,
+                                            string /* referenceFile */>> {};
 
 TEST_P(OpusHeaderWriteTest, WriteTest) {
+    tuple<int32_t, int32_t, string> params = GetParam();
     OpusHeader writtenHeader;
     memset(&writtenHeader, 0, sizeof(writtenHeader));
-    int32_t channels = GetParam().first;
+    int32_t channels = get<0>(params);
     writtenHeader.channels = channels;
     writtenHeader.num_streams = channels;
     writtenHeader.channel_mapping = ((channels > 8) ? 255 : (channels > 2));
-    int32_t skipSamples = GetParam().second;
+    int32_t skipSamples = get<1>(params);
+    string referenceFileName = gEnv->getRes() + get<2>(params);
     writtenHeader.skip_samples = skipSamples;
     uint64_t codecDelayNs = skipSamples * kNsecPerSec / kOpusSampleRate;
     uint8_t headerData[kMaxOpusHeaderSize];
@@ -112,10 +114,28 @@ TEST_P(OpusHeaderWriteTest, WriteTest) {
     ofstream ostrm;
     ostrm.open(OUTPUT_FILE_NAME, ofstream::binary);
     ASSERT_TRUE(ostrm.is_open()) << "Failed to open output file " << OUTPUT_FILE_NAME;
-
-    // TODO : Validate bitstream (b/150116402)
-    ostrm.write(reinterpret_cast<char *>(headerData), sizeof(headerData));
+    ostrm.write(reinterpret_cast<char *>(headerData), headerSize);
     ostrm.close();
+
+    mEleStream.open(referenceFileName, ifstream::binary);
+    ASSERT_EQ(mEleStream.is_open(), true) << "Failed to open referenceFileName " << get<2>(params);
+
+    struct stat buf;
+    int32_t statStatus = stat(referenceFileName.c_str(), &buf);
+    ASSERT_EQ(statStatus, 0) << "Unable to get file properties";
+
+    size_t fileSize = buf.st_size;
+    mInputBuffer = (uint8_t *)malloc(fileSize);
+    ASSERT_NE(mInputBuffer, nullptr) << "Insufficient memory. Malloc failed for size " << fileSize;
+
+    mEleStream.read(reinterpret_cast<char *>(mInputBuffer), fileSize);
+    ASSERT_EQ(mEleStream.gcount(), fileSize) << "mEleStream.gcount() != bytesCount";
+
+    ASSERT_EQ(fileSize, headerSize)
+            << "Mismatch in size between header generated and reference header";
+    int32_t match = memcmp(reinterpret_cast<char *>(mInputBuffer),
+                           reinterpret_cast<char *>(headerData), fileSize);
+    ASSERT_EQ(match, 0) << "Opus header does not match reference file: " << referenceFileName;
 
     size_t opusHeadSize = 0;
     size_t codecDelayBufSize = 0;
@@ -266,19 +286,20 @@ TEST_P(OpusHeaderParseTest, ParseTest) {
     }
 }
 
-INSTANTIATE_TEST_SUITE_P(OpusHeaderTestAll, OpusHeaderWriteTest,
-                         ::testing::Values(make_pair(1, 312),
-                                           make_pair(2, 312),
-                                           make_pair(5, 312),
-                                           make_pair(6, 312),
-                                           make_pair(1, 0),
-                                           make_pair(2, 0),
-                                           make_pair(5, 0),
-                                           make_pair(6, 0),
-                                           make_pair(1, 624),
-                                           make_pair(2, 624),
-                                           make_pair(5, 624),
-                                           make_pair(6, 624)));
+INSTANTIATE_TEST_SUITE_P(
+        OpusHeaderTestAll, OpusHeaderWriteTest,
+        ::testing::Values(make_tuple(1, 312, "output_channels_1skipSamples_312.opus"),
+                          make_tuple(2, 312, "output_channels_2skipSamples_312.opus"),
+                          make_tuple(5, 312, "output_channels_5skipSamples_312.opus"),
+                          make_tuple(6, 312, "output_channels_6skipSamples_312.opus"),
+                          make_tuple(1, 0, "output_channels_1skipSamples_0.opus"),
+                          make_tuple(2, 0, "output_channels_2skipSamples_0.opus"),
+                          make_tuple(5, 0, "output_channels_5skipSamples_0.opus"),
+                          make_tuple(6, 0, "output_channels_6skipSamples_0.opus"),
+                          make_tuple(1, 624, "output_channels_1skipSamples_624.opus"),
+                          make_tuple(2, 624, "output_channels_2skipSamples_624.opus"),
+                          make_tuple(5, 624, "output_channels_5skipSamples_624.opus"),
+                          make_tuple(6, 624, "output_channels_6skipSamples_624.opus")));
 
 INSTANTIATE_TEST_SUITE_P(
         OpusHeaderTestAll, OpusHeaderParseTest,
