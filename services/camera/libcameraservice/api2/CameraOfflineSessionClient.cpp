@@ -197,7 +197,9 @@ status_t CameraOfflineSessionClient::startCameraOps() {
             return PERMISSION_DENIED;
         }
 
-        if (res == AppOpsManager::MODE_IGNORED) {
+        // If the calling Uid is trusted (a native service), the AppOpsManager could
+        // return MODE_IGNORED. Do not treat such case as error.
+        if (!mUidIsTrusted && res == AppOpsManager::MODE_IGNORED) {
             ALOGI("Offline Camera %s: Access for \"%s\" has been restricted",
                     mCameraIdStr.string(), String8(mClientPackageName).string());
             // Return the same error as for device policy manager rejection
