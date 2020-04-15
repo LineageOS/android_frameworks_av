@@ -156,6 +156,12 @@ class CameraManagerGlobal final : public RefBase {
         ACameraManager_PhysicalCameraAvailabilityCallback mPhysicalCamUnavailable;
         void*                               mContext;
     };
+
+    android::Condition mCallbacksCond;
+    size_t mPendingCallbackCnt = 0;
+    void onCallbackCalled();
+    void drainPendingCallbacksLocked();
+
     std::set<Callback> mCallbacks;
 
     // definition of handler and message
@@ -167,10 +173,15 @@ class CameraManagerGlobal final : public RefBase {
     static const char* kPhysicalCameraIdKey;
     static const char* kCallbackFpKey;
     static const char* kContextKey;
+    static const nsecs_t kCallbackDrainTimeout;
     class CallbackHandler : public AHandler {
       public:
-        CallbackHandler() {}
+        CallbackHandler(wp<CameraManagerGlobal> parent) : mParent(parent) {}
         void onMessageReceived(const sp<AMessage> &msg) override;
+      private:
+        wp<CameraManagerGlobal> mParent;
+        void notifyParent();
+        void onMessageReceivedInternal(const sp<AMessage> &msg);
     };
     sp<CallbackHandler> mHandler;
     sp<ALooper>         mCbLooper; // Looper thread where callbacks actually happen on

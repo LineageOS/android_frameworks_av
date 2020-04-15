@@ -35,6 +35,7 @@ const char* CameraManagerGlobal::kCameraIdKey   = "CameraId";
 const char* CameraManagerGlobal::kPhysicalCameraIdKey   = "PhysicalCameraId";
 const char* CameraManagerGlobal::kCallbackFpKey = "CallbackFp";
 const char* CameraManagerGlobal::kContextKey    = "CallbackContext";
+const nsecs_t CameraManagerGlobal::kCallbackDrainTimeout = 5000000; // 5 ms
 Mutex                CameraManagerGlobal::sLock;
 CameraManagerGlobal* CameraManagerGlobal::sInstance = nullptr;
 
@@ -117,7 +118,7 @@ sp<hardware::ICameraService> CameraManagerGlobal::getCameraServiceLocked() {
                 return nullptr;
             }
             if (mHandler == nullptr) {
-                mHandler = new CallbackHandler();
+                mHandler = new CallbackHandler(this);
             }
             mCbLooper->registerHandler(mHandler);
         }
@@ -211,6 +212,9 @@ void CameraManagerGlobal::registerExtendedAvailabilityCallback(
 void CameraManagerGlobal::unregisterExtendedAvailabilityCallback(
         const ACameraManager_ExtendedAvailabilityCallbacks *callback) {
     Mutex::Autolock _l(mLock);
+
+    drainPendingCallbacksLocked();
+
     Callback cb(callback);
     mCallbacks.erase(cb);
 }
@@ -223,8 +227,30 @@ void CameraManagerGlobal::registerAvailabilityCallback(
 void CameraManagerGlobal::unregisterAvailabilityCallback(
         const ACameraManager_AvailabilityCallbacks *callback) {
     Mutex::Autolock _l(mLock);
+
+    drainPendingCallbacksLocked();
+
     Callback cb(callback);
     mCallbacks.erase(cb);
+}
+
+void CameraManagerGlobal::onCallbackCalled() {
+    Mutex::Autolock _l(mLock);
+    if (mPendingCallbackCnt > 0) {
+        mPendingCallbackCnt--;
+    }
+    mCallbacksCond.signal();
+}
+
+void CameraManagerGlobal::drainPendingCallbacksLocked() {
+    while (mPendingCallbackCnt > 0) {
+        auto res = mCallbacksCond.waitRelative(mLock, kCallbackDrainTimeout);
+        if (res != NO_ERROR) {
+            ALOGE("%s: Error waiting to drain callbacks: %s(%d)",
+                    __FUNCTION__, strerror(-res), res);
+            break;
+        }
+    }
 }
 
 template<class T>
@@ -250,6 +276,7 @@ void CameraManagerGlobal::registerAvailCallback(const T *callback) {
             msg->setPointer(kCallbackFpKey, (void *) cbFunc);
             msg->setPointer(kContextKey, cb.mContext);
             msg->setString(kCameraIdKey, AString(cameraId));
+            mPendingCallbackCnt++;
             msg->post();
 
             // Physical camera unavailable callback
@@ -263,6 +290,7 @@ void CameraManagerGlobal::registerAvailCallback(const T *callback) {
                 msg->setPointer(kContextKey, cb.mContext);
                 msg->setString(kCameraIdKey, AString(cameraId));
                 msg->setString(kPhysicalCameraIdKey, AString(physicalCameraId));
+                mPendingCallbackCnt++;
                 msg->post();
             }
         }
@@ -323,6 +351,16 @@ bool CameraManagerGlobal::isStatusAvailable(int32_t status) {
 }
 
 void CameraManagerGlobal::CallbackHandler::onMessageReceived(
+      const sp<AMessage> &msg) {
+    onMessageReceivedInternal(msg);
+    if (msg->what() == kWhatSendSingleCallback ||
+            msg->what() == kWhatSendSingleAccessCallback ||
+            msg->what() == kWhatSendSinglePhysicalCameraCallback) {
+        notifyParent();
+    }
+}
+
+void CameraManagerGlobal::CallbackHandler::onMessageReceivedInternal(
         const sp<AMessage> &msg) {
     switch (msg->what()) {
         case kWhatSendSingleCallback:
@@ -405,6 +443,13 @@ void CameraManagerGlobal::CallbackHandler::onMessageReceived(
     }
 }
 
+void CameraManagerGlobal::CallbackHandler::notifyParent() {
+    sp<CameraManagerGlobal> parent = mParent.promote();
+    if (parent != nullptr) {
+        parent->onCallbackCalled();
+    }
+}
+
 binder::Status CameraManagerGlobal::CameraServiceListener::onCameraAccessPrioritiesChanged() {
     sp<CameraManagerGlobal> cm = mCameraManager.promote();
     if (cm != nullptr) {
@@ -445,6 +490,7 @@ void CameraManagerGlobal::onCameraAccessPrioritiesChanged() {
         if (cbFp != nullptr) {
             msg->setPointer(kCallbackFpKey, (void *) cbFp);
             msg->setPointer(kContextKey, cb.mContext);
+            mPendingCallbackCnt++;
             msg->post();
         }
     }
@@ -491,6 +537,7 @@ void CameraManagerGlobal::onStatusChangedLocked(
             msg->setPointer(kCallbackFpKey, (void *) cbFp);
             msg->setPointer(kContextKey, cb.mContext);
             msg->setString(kCameraIdKey, AString(cameraId));
+            mPendingCallbackCnt++;
             msg->post();
         }
     }
@@ -545,6 +592,7 @@ void CameraManagerGlobal::onStatusChangedLocked(
             msg->setPointer(kContextKey, cb.mContext);
             msg->setString(kCameraIdKey, AString(cameraId));
             msg->setString(kPhysicalCameraIdKey, AString(physicalCameraId));
+            mPendingCallbackCnt++;
             msg->post();
         }
     }

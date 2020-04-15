@@ -191,6 +191,9 @@ camera_status_t ACameraManager_registerAvailabilityCallback(
  *
  * <p>Removing a callback that isn't registered has no effect.</p>
  *
+ * <p>This function must not be called with a mutex lock also held by
+ * the availability callbacks.</p>
+ *
  * @param manager the {@link ACameraManager} of interest.
  * @param callback the {@link ACameraManager_AvailabilityCallbacks} to be unregistered.
  *
@@ -381,6 +384,9 @@ camera_status_t ACameraManager_registerExtendedAvailabilityCallback(
  * Unregister camera extended availability callbacks.
  *
  * <p>Removing a callback that isn't registered has no effect.</p>
+ *
+ * <p>This function must not be called with a mutex lock also held by
+ * the extended availability callbacks.</p>
  *
  * @param manager the {@link ACameraManager} of interest.
  * @param callback the {@link ACameraManager_ExtendedAvailabilityCallbacks} to be unregistered.
