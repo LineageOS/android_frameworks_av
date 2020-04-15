@@ -323,6 +323,7 @@ public:
         const uid_t                     mClientUid;
         const pid_t                     mServicePid;
         bool                            mDisconnected;
+        bool                            mUidIsTrusted;
 
         mutable Mutex                   mAudioRestrictionLock;
         int32_t                         mAudioRestriction;
