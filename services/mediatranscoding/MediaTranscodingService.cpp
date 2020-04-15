@@ -16,9 +16,12 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MediaTranscodingService"
-#include <MediaTranscodingService.h>
+#include "MediaTranscodingService.h"
+
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
+#include <media/TranscodingClientManager.h>
+#include <media/TranscodingJobScheduler.h>
 #include <private/android_filesystem_config.h>
 #include <utils/Log.h>
 #include <utils/Vector.h>
@@ -45,8 +48,41 @@ static bool isTrustedCallingUid(uid_t uid) {
     }
 }
 
+// DummyTranscoder and DummyProcessInfo are currently used to instantiate
+// MediaTranscodingService on service side for testing, so that we could
+// actually test the IPC calls of MediaTranscodingService to expose some
+// issues that's observable only over IPC.
+class DummyTranscoder : public TranscoderInterface {
+    void start(int64_t clientId, int32_t jobId) override {
+        (void)clientId;
+        (void)jobId;
+    }
+    void pause(int64_t clientId, int32_t jobId) override {
+        (void)clientId;
+        (void)jobId;
+    }
+    void resume(int64_t clientId, int32_t jobId) override {
+        (void)clientId;
+        (void)jobId;
+    }
+};
+
+class DummyProcessInfo : public ProcessInfoInterface {
+    bool isProcessOnTop(int32_t pid) override {
+        (void)pid;
+        return true;
+    }
+};
+
 MediaTranscodingService::MediaTranscodingService()
-      : mTranscodingClientManager(TranscodingClientManager::getInstance()) {
+      : MediaTranscodingService(std::make_shared<DummyTranscoder>(),
+                                std::make_shared<DummyProcessInfo>()) {}
+
+MediaTranscodingService::MediaTranscodingService(
+        const std::shared_ptr<TranscoderInterface>& transcoder,
+        const std::shared_ptr<ProcessInfoInterface>& procInfo)
+      : mJobScheduler(new TranscodingJobScheduler(transcoder, procInfo)),
+        mClientManager(new TranscodingClientManager(mJobScheduler)) {
     ALOGV("MediaTranscodingService is created");
 }
 
@@ -64,7 +100,7 @@ binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uin
     write(fd, result.string(), result.size());
 
     Vector<String16> args;
-    mTranscodingClientManager.dumpAllClients(fd, args);
+    mClientManager->dumpAllClients(fd, args);
     return OK;
 }
 
@@ -80,13 +116,11 @@ void MediaTranscodingService::instantiate() {
 }
 
 Status MediaTranscodingService::registerClient(
-        const std::shared_ptr<ITranscodingClientListener>& in_listener,
-        const std::string& in_clientName,
-        const std::string& in_opPackageName,
-        int32_t in_clientUid, int32_t in_clientPid,
-        std::shared_ptr<ITranscodingClient>* _aidl_return) {
-    if (in_listener == nullptr) {
-        ALOGE("Client listener can not be null");
+        const std::shared_ptr<ITranscodingClientCallback>& in_callback,
+        const std::string& in_clientName, const std::string& in_opPackageName, int32_t in_clientUid,
+        int32_t in_clientPid, std::shared_ptr<ITranscodingClient>* _aidl_return) {
+    if (in_callback == nullptr) {
+        ALOGE("Client callback can not be null");
         *_aidl_return = nullptr;
         return Status::fromServiceSpecificError(ERROR_ILLEGAL_ARGUMENT);
     }
@@ -127,8 +161,8 @@ Status MediaTranscodingService::registerClient(
     // Creates the client and uses its process id as client id.
     std::shared_ptr<ITranscodingClient> newClient;
 
-    status_t err = mTranscodingClientManager.addClient(in_listener,
-            in_clientPid, in_clientUid, in_clientName, in_opPackageName, &newClient);
+    status_t err = mClientManager->addClient(in_callback, in_clientPid, in_clientUid, in_clientName,
+                                             in_opPackageName, &newClient);
     if (err != OK) {
         *_aidl_return = nullptr;
         return STATUS_ERROR_FMT(err, "Failed to add client to TranscodingClientManager");
@@ -140,7 +174,7 @@ Status MediaTranscodingService::registerClient(
 
 Status MediaTranscodingService::getNumOfClients(int32_t* _aidl_return) {
     ALOGD("MediaTranscodingService::getNumOfClients");
-    *_aidl_return = mTranscodingClientManager.getNumOfClients();
+    *_aidl_return = mClientManager->getNumOfClients();
     return Status::ok();
 }
 
