@@ -38,7 +38,7 @@ namespace android {
  */
 template <class T, class Comparator = std::less<T>>
 class AdjustableMaxPriorityQueue {
-   public:
+public:
     typedef typename std::vector<T>::iterator iterator;
     typedef typename std::vector<T>::const_iterator const_iterator;
 
@@ -104,7 +104,7 @@ class AdjustableMaxPriorityQueue {
     /* Return the backbone storage of this PriorityQueue. Mainly used for debugging. */
     const std::vector<T>& getStorage() const { return mHeap; };
 
-   private:
+private:
     std::vector<T> mHeap;
 
     /* Implementation shared by both public push() methods. */
