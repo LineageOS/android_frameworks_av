@@ -215,6 +215,9 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             : (aaudio_session_id_t) mAudioTrack->getSessionId();
     setSessionId(actualSessionId);
 
+    mInitialBufferCapacity = getBufferCapacity();
+    mInitialFramesPerBurst = getFramesPerBurst();
+
     mAudioTrack->addAudioDeviceCallback(mDeviceCallback);
 
     // Update performance mode based on the actual stream flags.
@@ -265,7 +268,16 @@ void AudioStreamTrack::processCallback(int event, void *info) {
 
             // Stream got rerouted so we disconnect.
         case AudioTrack::EVENT_NEW_IAUDIOTRACK:
-            processCallbackCommon(AAUDIO_CALLBACK_OPERATION_DISCONNECTED, info);
+            // request stream disconnect if the restored AudioTrack has properties not matching
+            // what was requested initially
+            if (mAudioTrack->channelCount() != getSamplesPerFrame()
+                    || mAudioTrack->format() != getFormat()
+                    || mAudioTrack->getSampleRate() != getSampleRate()
+                    || mAudioTrack->getRoutedDeviceId() != getDeviceId()
+                    || getBufferCapacity() != mInitialBufferCapacity
+                    || getFramesPerBurst() != mInitialFramesPerBurst) {
+                processCallbackCommon(AAUDIO_CALLBACK_OPERATION_DISCONNECTED, info);
+            }
             break;
 
         default:
