@@ -296,11 +296,13 @@ cc_library {
     header_libs: [
         "libstagefright_headers",
         "media_ndk_headers",
+        "jni_headers",
     ],
 
     export_header_lib_headers: [
         "libstagefright_headers",
         "media_ndk_headers",
+        "jni_headers",
     ],
 
     shared_libs: [
