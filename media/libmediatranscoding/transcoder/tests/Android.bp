@@ -1,0 +1,39 @@
+// Unit tests for libmediatranscoder.
+
+filegroup {
+    name: "test_assets",
+    srcs: ["assets/*"],
+}
+
+cc_defaults {
+    name: "testdefaults",
+
+    header_libs: [
+        "libbase_headers",
+        "libmedia_headers",
+    ],
+
+    shared_libs: [
+        "libbase",
+        "libcutils",
+        "libmediandk",
+        "libmediatranscoder",
+        "libutils",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+    data: [":test_assets"],
+    test_config_template: "AndroidTestTemplate.xml",
+    test_suites: ["device-tests", "TranscoderTests"],
+}
+
+// MediaSampleReaderNDK unit test
+cc_test {
+    name: "MediaSampleReaderNDKTests",
+    defaults: ["testdefaults"],
+    srcs: ["MediaSampleReaderNDKTests.cpp"],
+}
