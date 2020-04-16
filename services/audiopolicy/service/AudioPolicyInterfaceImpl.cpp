@@ -592,7 +592,7 @@ Status AudioPolicyService::getInputForAttr(const media::AudioAttributesInternal&
     // Capturing from FM_TUNER source is controlled by captureTunerAudioInputAllowed() and
     // captureAudioOutputAllowed() (deprecated) as this does not affect users privacy
     // as does capturing from an actual microphone.
-    if (!(recordingAllowed(adjAttributionSource, attr.source)
+    if (!isAudioServerOrMediaServerUid(callingUid) && !(recordingAllowed(adjAttributionSource, attr.source)
             || attr.source == AUDIO_SOURCE_FM_TUNER)) {
         ALOGE("%s permission denied: recording not allowed for %s",
                 __func__, adjAttributionSource.toString().c_str());
@@ -654,7 +654,7 @@ Status AudioPolicyService::getInputForAttr(const media::AudioAttributesInternal&
             case AudioPolicyInterface::API_INPUT_TELEPHONY_RX:
                 // FIXME: use the same permission as for remote submix for now.
             case AudioPolicyInterface::API_INPUT_MIX_CAPTURE:
-                if (!canCaptureOutput) {
+                if (!isAudioServerOrMediaServerUid(callingUid) && !canCaptureOutput) {
                     ALOGE("getInputForAttr() permission denied: capture not allowed");
                     status = PERMISSION_DENIED;
                 }
@@ -737,7 +737,7 @@ Status AudioPolicyService::startInput(int32_t portIdAidl)
     msg << "Audio recording on session " << client->session;
 
     // check calling permissions
-    if (!(startRecording(client->attributionSource, String16(msg.str().c_str()),
+    if (!isAudioServerOrMediaServerUid(IPCThreadState::self()->getCallingUid()) && !(startRecording(client->attributionSource, String16(msg.str().c_str()),
         client->attributes.source)
             || client->attributes.source == AUDIO_SOURCE_FM_TUNER)) {
         ALOGE("%s permission denied: recording not allowed for attribution source %s",
