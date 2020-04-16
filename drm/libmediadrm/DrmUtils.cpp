@@ -27,7 +27,7 @@
 #include <android/hardware/drm/1.2/IDrmFactory.h>
 #include <android/hardware/drm/1.3/ICryptoFactory.h>
 #include <android/hardware/drm/1.3/IDrmFactory.h>
-#include <android/hidl/manager/1.0/IServiceManager.h>
+#include <android/hidl/manager/1.2/IServiceManager.h>
 #include <hidl/HidlSupport.h>
 
 #include <utils/Errors.h>
@@ -41,7 +41,7 @@
 #include <mediadrm/ICrypto.h>
 #include <mediadrm/IDrm.h>
 
-using HServiceManager = ::android::hidl::manager::V1_0::IServiceManager;
+using HServiceManager = ::android::hidl::manager::V1_2::IServiceManager;
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
@@ -72,7 +72,7 @@ void MakeHidlFactories(const uint8_t uuid[16], V &factories) {
         exit(-1);
     }
 
-    serviceManager->listByInterface(Hal::descriptor, [&](const hidl_vec<hidl_string> &registered) {
+    serviceManager->listManifestByInterface(Hal::descriptor, [&](const hidl_vec<hidl_string> &registered) {
         for (const auto &instance : registered) {
             auto factory = Hal::getService(instance);
             if (factory != nullptr) {
