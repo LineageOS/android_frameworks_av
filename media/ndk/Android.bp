@@ -71,6 +71,7 @@ cc_library_shared {
     ],
 
     header_libs: [
+        "jni_headers",
         "libmediadrm_headers",
         "libmediametrics_headers",
     ],
@@ -97,6 +98,8 @@ cc_library_shared {
         "libmediandk_utils",
         "libnativehelper",
     ],
+
+    export_header_lib_headers: ["jni_headers"],
 
     export_include_dirs: ["include"],
 
