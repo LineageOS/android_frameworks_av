@@ -103,7 +103,7 @@ public:
 
         addParameter(
                 DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
-                .withDefault(new C2StreamPictureSizeInfo::input(0u, 320, 240))
+                .withDefault(new C2StreamPictureSizeInfo::input(0u, 16, 16))
                 .withFields({
                     C2F(mSize, width).inRange(2, 2560, 2),
                     C2F(mSize, height).inRange(2, 2560, 2),
@@ -129,7 +129,7 @@ public:
 
         addParameter(
                 DefineParam(mFrameRate, C2_PARAMKEY_FRAME_RATE)
-                .withDefault(new C2StreamFrameRateInfo::output(0u, 30.))
+                .withDefault(new C2StreamFrameRateInfo::output(0u, 1.))
                 // TODO: More restriction?
                 .withFields({C2F(mFrameRate, value).greaterThan(0.)})
                 .withSetter(Setter<decltype(*mFrameRate)>::StrictValueWithNoDeps)
