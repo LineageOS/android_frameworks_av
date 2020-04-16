@@ -15,6 +15,7 @@ cc_library {
         "libtinyxml2",
         "libutils",
         "libmedia_helper",
+        "libcutils",
     ],
 
     header_libs: ["libaudio_system_headers"],

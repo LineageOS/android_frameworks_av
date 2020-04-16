@@ -47,6 +47,7 @@
 #include <media/AudioParameter.h>
 #include <private/android_filesystem_config.h>
 #include <system/audio.h>
+#include <system/audio_config.h>
 #include "AudioPolicyManager.h"
 #include <Serializer.h>
 #include "TypeConverter.h"
@@ -4367,12 +4368,6 @@ uint32_t AudioPolicyManager::nextAudioPortGeneration()
     return mAudioPortGeneration++;
 }
 
-// Treblized audio policy xml config will be located in /odm/etc or /vendor/etc.
-static const char *kConfigLocationList[] =
-        {"/odm/etc", "/vendor/etc", "/system/etc"};
-static const int kConfigLocationListSize =
-        (sizeof(kConfigLocationList) / sizeof(kConfigLocationList[0]));
-
 static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
     char audioPolicyXmlConfigFile[AUDIO_POLICY_XML_CONFIG_FILE_PATH_MAX_LENGTH];
     std::vector<const char*> fileNames;
@@ -4394,9 +4389,9 @@ static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
     fileNames.push_back(AUDIO_POLICY_XML_CONFIG_FILE_NAME);
 
     for (const char* fileName : fileNames) {
-        for (int i = 0; i < kConfigLocationListSize; i++) {
+        for (const auto& path : audio_get_configuration_paths()) {
             snprintf(audioPolicyXmlConfigFile, sizeof(audioPolicyXmlConfigFile),
-                     "%s/%s", kConfigLocationList[i], fileName);
+                     "%s/%s", path.c_str(), fileName);
             ret = deserializeAudioPolicyFile(audioPolicyXmlConfigFile, &config);
             if (ret == NO_ERROR) {
                 config.setSource(audioPolicyXmlConfigFile);
