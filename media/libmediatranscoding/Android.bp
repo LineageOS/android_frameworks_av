@@ -21,7 +21,7 @@ aidl_interface {
     srcs: [
         "aidl/android/media/IMediaTranscodingService.aidl",
         "aidl/android/media/ITranscodingClient.aidl",
-        "aidl/android/media/ITranscodingClientListener.aidl",
+        "aidl/android/media/ITranscodingClientCallback.aidl",
         "aidl/android/media/TranscodingErrorCode.aidl",
         "aidl/android/media/TranscodingJobPriority.aidl",
         "aidl/android/media/TranscodingType.aidl",
@@ -36,7 +36,8 @@ cc_library_shared {
     name: "libmediatranscoding",
 
     srcs: [
-        "TranscodingClientManager.cpp"
+        "TranscodingClientManager.cpp",
+        "TranscodingJobScheduler.cpp",
     ],
 
     shared_libs: [

@@ -20,4 +20,5 @@ adb root && adb wait-for-device remount && adb sync
 echo "========================================"
 
 echo "testing mediatranscodingservice"
-adb shell /data/nativetest64/mediatranscodingservice_tests/mediatranscodingservice_tests
+#adb shell /data/nativetest64/mediatranscodingservice_tests/mediatranscodingservice_tests
+adb shell /data/nativetest/mediatranscodingservice_tests/mediatranscodingservice_tests

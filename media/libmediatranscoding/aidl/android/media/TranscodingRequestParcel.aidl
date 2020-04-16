@@ -39,12 +39,12 @@ parcelable TranscodingRequestParcel {
     /**
      * Input source file descriptor.
      */
-    ParcelFileDescriptor inFd;
+    @nullable ParcelFileDescriptor inFd;
 
     /**
      * Output transcoded file descriptor.
      */
-    ParcelFileDescriptor outFd;
+    @nullable ParcelFileDescriptor outFd;
 
     /**
      * Priority of this transcoding. Service will schedule the transcoding based on the priority.

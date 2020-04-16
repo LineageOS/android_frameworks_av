@@ -18,7 +18,7 @@
 #define ANDROID_MEDIA_TRANSCODING_CLIENT_MANAGER_H
 
 #include <aidl/android/media/ITranscodingClient.h>
-#include <aidl/android/media/ITranscodingClientListener.h>
+#include <aidl/android/media/ITranscodingClientCallback.h>
 #include <sys/types.h>
 #include <utils/Condition.h>
 #include <utils/String8.h>
@@ -27,11 +27,12 @@
 #include <mutex>
 #include <unordered_map>
 
+#include "SchedulerClientInterface.h"
+
 namespace android {
 
 using ::aidl::android::media::ITranscodingClient;
-using ::aidl::android::media::ITranscodingClientListener;
-class MediaTranscodingService;
+using ::aidl::android::media::ITranscodingClientCallback;
 
 /*
  * TranscodingClientManager manages all the transcoding clients across different processes.
@@ -46,15 +47,16 @@ class MediaTranscodingService;
  */
 class TranscodingClientManager {
 public:
+    virtual ~TranscodingClientManager();
 
     /**
      * Adds a new client to the manager.
      *
-     * The client must have valid listener, pid, uid, clientName and opPackageName.
-     * Otherwise, this will return a non-zero errorcode. If the client listener has
+     * The client must have valid callback, pid, uid, clientName and opPackageName.
+     * Otherwise, this will return a non-zero errorcode. If the client callback has
      * already been added, it will also return non-zero errorcode.
      *
-     * @param listener client listener for the service to call this client.
+     * @param callback client callback for the service to call this client.
      * @param pid client's process id.
      * @param uid client's user id.
      * @param clientName client's name.
@@ -63,12 +65,9 @@ public:
      *        to use for subsequent communications with the service.
      * @return 0 if client is added successfully, non-zero errorcode otherwise.
      */
-    status_t addClient(
-            const std::shared_ptr<ITranscodingClientListener>& listener,
-            int32_t pid, int32_t uid,
-            const std::string& clientName,
-            const std::string& opPackageName,
-            std::shared_ptr<ITranscodingClient>* client);
+    status_t addClient(const std::shared_ptr<ITranscodingClientCallback>& callback, pid_t pid,
+                       uid_t uid, const std::string& clientName, const std::string& opPackageName,
+                       std::shared_ptr<ITranscodingClient>* client);
 
     /**
      * Gets the number of clients.
@@ -83,12 +82,10 @@ public:
 private:
     friend class MediaTranscodingService;
     friend class TranscodingClientManagerTest;
-
-    typedef int64_t ClientIdType;
     struct ClientImpl;
 
-    TranscodingClientManager();
-    virtual ~TranscodingClientManager();
+    // Only allow MediaTranscodingService and unit tests to instantiate.
+    TranscodingClientManager(const std::shared_ptr<SchedulerClientInterface>& scheduler);
 
     /**
      * Checks if a client with clientId is already registered.
@@ -105,9 +102,6 @@ private:
      */
     status_t removeClient(ClientIdType clientId);
 
-    /** Get the singleton instance of the TranscodingClientManager. */
-    static TranscodingClientManager& getInstance();
-
     static void BinderDiedCallback(void* cookie);
 
     mutable std::mutex mLock;
@@ -115,6 +109,8 @@ private:
             GUARDED_BY(mLock);
 
     ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
+
+    std::shared_ptr<SchedulerClientInterface> mJobScheduler;
 };
 
 }  // namespace android
