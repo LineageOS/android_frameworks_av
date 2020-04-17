@@ -27,6 +27,7 @@
 
 #include <media/EffectsConfig.h>
 #include <media/TypeConverter.h>
+#include <system/audio_config.h>
 
 using namespace tinyxml2;
 
@@ -338,7 +339,7 @@ ParsingResult parse(const char* path) {
         return parseWithPath(path);
     }
 
-    for (const std::string& location : DEFAULT_LOCATIONS) {
+    for (const std::string& location : audio_get_configuration_paths()) {
         std::string defaultPath = location + '/' + DEFAULT_NAME;
         if (access(defaultPath.c_str(), R_OK) != 0) {
             continue;
