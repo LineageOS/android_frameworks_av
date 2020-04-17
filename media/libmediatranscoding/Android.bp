@@ -45,6 +45,7 @@ cc_library_shared {
         "libcutils",
         "liblog",
         "libutils",
+        "libmediatranscoder",
     ],
 
     export_include_dirs: ["include"],
