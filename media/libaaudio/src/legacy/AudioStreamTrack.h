@@ -104,6 +104,10 @@ private:
 
     // TODO add 64-bit position reporting to AudioTrack and use it.
     aaudio_wrapping_frames_t         mPositionWhenPausing = 0;
+
+    // initial AudioTrack frame count and notification period
+    int32_t mInitialBufferCapacity = 0;
+    int32_t mInitialFramesPerBurst = 0;
 };
 
 } /* namespace aaudio */
