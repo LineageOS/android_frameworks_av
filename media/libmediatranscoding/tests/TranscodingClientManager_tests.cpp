@@ -184,8 +184,8 @@ struct TestScheduler : public SchedulerClientInterface {
         {
             auto clientCallback = it->second.callback.lock();
             if (clientCallback != nullptr) {
-                clientCallback->onTranscodingFailed(
-                        mLastJob.second, TranscodingErrorCode::kUnknown);
+                clientCallback->onTranscodingFailed(mLastJob.second,
+                                                    TranscodingErrorCode::kUnknown);
             }
         }
         mJobs.erase(it);
