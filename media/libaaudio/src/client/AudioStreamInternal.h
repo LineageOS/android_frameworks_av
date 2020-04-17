@@ -164,7 +164,7 @@ protected:
     // Offset from underlying frame position.
     int64_t                  mFramesOffsetFromService = 0; // offset for timestamps
 
-    uint8_t                 *mCallbackBuffer = nullptr;
+    std::unique_ptr<uint8_t[]> mCallbackBuffer;
     int32_t                  mCallbackFrames = 0;
 
     // The service uses this for SHARED mode.
