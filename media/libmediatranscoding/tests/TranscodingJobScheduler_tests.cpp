@@ -40,16 +40,16 @@ using aidl::android::media::ITranscodingClient;
 
 constexpr int64_t kClientId = 1000;
 constexpr int32_t kClientJobId = 0;
-constexpr pid_t kClientPid = 5000;
-constexpr pid_t kInvalidPid = -1;
+constexpr uid_t kClientUid = 5000;
+constexpr uid_t kInvalidUid = (uid_t)-1;
 
 #define CLIENT(n) (kClientId + (n))
 #define JOB(n) (kClientJobId + (n))
-#define PID(n) (kClientPid + (n))
+#define UID(n) (kClientUid + (n))
 
-class TestCallback : public TranscoderInterface, public ProcessInfoInterface {
+class TestCallback : public TranscoderInterface, public UidPolicyInterface {
 public:
-    TestCallback() : mTopPid(-1), mLastError(TranscodingErrorCode::kUnknown) {}
+    TestCallback() : mTopUid(kInvalidUid), mLastError(TranscodingErrorCode::kUnknown) {}
     virtual ~TestCallback() {}
 
     // TranscoderInterface
@@ -63,8 +63,8 @@ public:
         mEventQueue.push_back(Resume(clientId, jobId));
     }
 
-    // ProcessInfoInterface
-    bool isProcessOnTop(pid_t pid) override { return pid == mTopPid; }
+    // UidPolicyInterface
+    bool isUidOnTop(uid_t uid) override { return uid == mTopUid; }
 
     void onFinished(int64_t clientId, int32_t jobId) {
         mEventQueue.push_back(Finished(clientId, jobId));
@@ -75,7 +75,7 @@ public:
         mEventQueue.push_back(Failed(clientId, jobId));
     }
 
-    void setTop(pid_t pid) { mTopPid = pid; }
+    void setTop(uid_t uid) { mTopUid = uid; }
 
     TranscodingErrorCode getLastError() {
         TranscodingErrorCode result = mLastError;
@@ -115,7 +115,7 @@ public:
 private:
     Event mPoppedEvent;
     std::list<Event> mEventQueue;
-    pid_t mTopPid;
+    uid_t mTopUid;
     TranscodingErrorCode mLastError;
 };
 
@@ -197,43 +197,43 @@ public:
 TEST_F(TranscodingJobSchedulerTest, TestSubmitJob) {
     ALOGD("TestSubmitJob");
 
-    // Start with PID(1) on top.
-    mCallback->setTop(PID(1));
+    // Start with UID(1) on top.
+    mCallback->setTop(UID(1));
 
-    // Submit offline job to CLIENT(0) in PID(0).
+    // Submit offline job to CLIENT(0) in UID(0).
     // Should start immediately (because this is the only job).
-    mScheduler->submit(CLIENT(0), JOB(0), PID(0), mOfflineRequest, mClientCallback0);
+    mScheduler->submit(CLIENT(0), JOB(0), UID(0), mOfflineRequest, mClientCallback0);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Start(CLIENT(0), 0));
 
     // Submit real-time job to CLIENT(0).
-    // Should pause offline job and start new job,  even if PID(0) is not on top.
-    mScheduler->submit(CLIENT(0), JOB(1), PID(0), mRealtimeRequest, mClientCallback0);
+    // Should pause offline job and start new job,  even if UID(0) is not on top.
+    mScheduler->submit(CLIENT(0), JOB(1), UID(0), mRealtimeRequest, mClientCallback0);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Pause(CLIENT(0), JOB(0)));
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Start(CLIENT(0), JOB(1)));
 
     // Submit real-time job to CLIENT(0), should be queued after the previous job.
-    mScheduler->submit(CLIENT(0), JOB(2), PID(0), mRealtimeRequest, mClientCallback0);
+    mScheduler->submit(CLIENT(0), JOB(2), UID(0), mRealtimeRequest, mClientCallback0);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
-    // Submit real-time job to CLIENT(1) in same pid, should be queued after the previous job.
-    mScheduler->submit(CLIENT(1), JOB(0), PID(0), mRealtimeRequest, mClientCallback1);
+    // Submit real-time job to CLIENT(1) in same uid, should be queued after the previous job.
+    mScheduler->submit(CLIENT(1), JOB(0), UID(0), mRealtimeRequest, mClientCallback1);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
-    // Submit real-time job to CLIENT(2) in PID(1).
-    // Should pause previous job and start new job, because PID(1) is top.
-    mCallback->setTop(PID(1));
-    mScheduler->submit(CLIENT(2), JOB(0), PID(1), mRealtimeRequest, mClientCallback2);
+    // Submit real-time job to CLIENT(2) in UID(1).
+    // Should pause previous job and start new job, because UID(1) is top.
+    mCallback->setTop(UID(1));
+    mScheduler->submit(CLIENT(2), JOB(0), UID(1), mRealtimeRequest, mClientCallback2);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Pause(CLIENT(0), JOB(1)));
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Start(CLIENT(2), JOB(0)));
 
     // Submit offline job, shouldn't generate any event.
-    mScheduler->submit(CLIENT(2), JOB(1), PID(1), mOfflineRequest, mClientCallback2);
+    mScheduler->submit(CLIENT(2), JOB(1), UID(1), mOfflineRequest, mClientCallback2);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
-    mCallback->setTop(PID(0));
-    // Submit real-time job to CLIENT(1) in PID(0).
-    // Should pause current job, and resume last job in PID(0).
-    mScheduler->submit(CLIENT(1), JOB(1), PID(0), mRealtimeRequest, mClientCallback1);
+    mCallback->setTop(UID(0));
+    // Submit real-time job to CLIENT(1) in UID(0).
+    // Should pause current job, and resume last job in UID(0).
+    mScheduler->submit(CLIENT(1), JOB(1), UID(0), mRealtimeRequest, mClientCallback1);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Pause(CLIENT(2), JOB(0)));
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Resume(CLIENT(0), JOB(1)));
 }
@@ -242,15 +242,15 @@ TEST_F(TranscodingJobSchedulerTest, TestCancelJob) {
     ALOGD("TestCancelJob");
 
     // Submit real-time job JOB(0), should start immediately.
-    mScheduler->submit(CLIENT(0), JOB(0), PID(0), mRealtimeRequest, mClientCallback0);
+    mScheduler->submit(CLIENT(0), JOB(0), UID(0), mRealtimeRequest, mClientCallback0);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Start(CLIENT(0), JOB(0)));
 
     // Submit real-time job JOB(1), should not start.
-    mScheduler->submit(CLIENT(0), JOB(1), PID(0), mRealtimeRequest, mClientCallback0);
+    mScheduler->submit(CLIENT(0), JOB(1), UID(0), mRealtimeRequest, mClientCallback0);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
     // Submit offline job JOB(2), should not start.
-    mScheduler->submit(CLIENT(0), JOB(2), PID(0), mOfflineRequest, mClientCallback0);
+    mScheduler->submit(CLIENT(0), JOB(2), UID(0), mOfflineRequest, mClientCallback0);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
     // Cancel queued real-time job.
@@ -262,7 +262,7 @@ TEST_F(TranscodingJobSchedulerTest, TestCancelJob) {
     EXPECT_TRUE(mScheduler->cancel(CLIENT(0), JOB(2)));
 
     // Submit offline job JOB(3), shouldn't cause any event.
-    mScheduler->submit(CLIENT(0), JOB(3), PID(0), mOfflineRequest, mClientCallback0);
+    mScheduler->submit(CLIENT(0), JOB(3), UID(0), mOfflineRequest, mClientCallback0);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
     // Cancel running real-time job JOB(0).
@@ -281,26 +281,26 @@ TEST_F(TranscodingJobSchedulerTest, TestFinishJob) {
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
     // Submit offline job JOB(0), should start immediately.
-    mScheduler->submit(CLIENT(0), JOB(0), PID(0), mOfflineRequest, mClientCallback0);
+    mScheduler->submit(CLIENT(0), JOB(0), UID(0), mOfflineRequest, mClientCallback0);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Start(CLIENT(0), JOB(0)));
 
     // Submit real-time job JOB(1), should pause offline job and start immediately.
-    mScheduler->submit(CLIENT(0), JOB(1), PID(0), mRealtimeRequest, mClientCallback0);
+    mScheduler->submit(CLIENT(0), JOB(1), UID(0), mRealtimeRequest, mClientCallback0);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Pause(CLIENT(0), JOB(0)));
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Start(CLIENT(0), JOB(1)));
 
     // Submit real-time job JOB(2), should not start.
-    mScheduler->submit(CLIENT(0), JOB(2), PID(0), mRealtimeRequest, mClientCallback0);
+    mScheduler->submit(CLIENT(0), JOB(2), UID(0), mRealtimeRequest, mClientCallback0);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
     // Fail when the job never started, should be ignored.
     mScheduler->onFinish(CLIENT(0), JOB(2));
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
-    // PID(1) moves to top.
-    mCallback->setTop(PID(1));
-    // Submit real-time job to CLIENT(1) in PID(1), should pause previous job and start new job.
-    mScheduler->submit(CLIENT(1), JOB(0), PID(1), mRealtimeRequest, mClientCallback1);
+    // UID(1) moves to top.
+    mCallback->setTop(UID(1));
+    // Submit real-time job to CLIENT(1) in UID(1), should pause previous job and start new job.
+    mScheduler->submit(CLIENT(1), JOB(0), UID(1), mRealtimeRequest, mClientCallback1);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Pause(CLIENT(0), JOB(1)));
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Start(CLIENT(1), JOB(0)));
 
@@ -336,26 +336,26 @@ TEST_F(TranscodingJobSchedulerTest, TestFailJob) {
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
     // Submit offline job JOB(0), should start immediately.
-    mScheduler->submit(CLIENT(0), JOB(0), PID(0), mOfflineRequest, mClientCallback0);
+    mScheduler->submit(CLIENT(0), JOB(0), UID(0), mOfflineRequest, mClientCallback0);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Start(CLIENT(0), JOB(0)));
 
     // Submit real-time job JOB(1), should pause offline job and start immediately.
-    mScheduler->submit(CLIENT(0), JOB(1), PID(0), mRealtimeRequest, mClientCallback0);
+    mScheduler->submit(CLIENT(0), JOB(1), UID(0), mRealtimeRequest, mClientCallback0);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Pause(CLIENT(0), JOB(0)));
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Start(CLIENT(0), JOB(1)));
 
     // Submit real-time job JOB(2), should not start.
-    mScheduler->submit(CLIENT(0), JOB(2), PID(0), mRealtimeRequest, mClientCallback0);
+    mScheduler->submit(CLIENT(0), JOB(2), UID(0), mRealtimeRequest, mClientCallback0);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
     // Fail when the job never started, should be ignored.
     mScheduler->onError(CLIENT(0), JOB(2), TranscodingErrorCode::kUnknown);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
-    // PID(1) moves to top.
-    mCallback->setTop(PID(1));
-    // Submit real-time job to CLIENT(1) in PID(1), should pause previous job and start new job.
-    mScheduler->submit(CLIENT(1), JOB(0), PID(1), mRealtimeRequest, mClientCallback1);
+    // UID(1) moves to top.
+    mCallback->setTop(UID(1));
+    // Submit real-time job to CLIENT(1) in UID(1), should pause previous job and start new job.
+    mScheduler->submit(CLIENT(1), JOB(0), UID(1), mRealtimeRequest, mClientCallback1);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Pause(CLIENT(0), JOB(1)));
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Start(CLIENT(1), JOB(0)));
 
@@ -384,33 +384,33 @@ TEST_F(TranscodingJobSchedulerTest, TestFailJob) {
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 }
 
-TEST_F(TranscodingJobSchedulerTest, TestTopProcessChanged) {
-    ALOGD("TestTopProcessChanged");
+TEST_F(TranscodingJobSchedulerTest, TestTopUidChanged) {
+    ALOGD("TestTopUidChanged");
 
     // Submit real-time job to CLIENT(0), job should start immediately.
-    mScheduler->submit(CLIENT(0), JOB(0), PID(0), mRealtimeRequest, mClientCallback0);
+    mScheduler->submit(CLIENT(0), JOB(0), UID(0), mRealtimeRequest, mClientCallback0);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Start(CLIENT(0), JOB(0)));
 
     // Submit offline job to CLIENT(0), should not start.
-    mScheduler->submit(CLIENT(1), JOB(0), PID(0), mOfflineRequest, mClientCallback1);
+    mScheduler->submit(CLIENT(1), JOB(0), UID(0), mOfflineRequest, mClientCallback1);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
-    // Move PID(1) to top.
-    mCallback->setTop(PID(1));
-    // Submit real-time job to CLIENT(2) in different pid PID(1).
+    // Move UID(1) to top.
+    mCallback->setTop(UID(1));
+    // Submit real-time job to CLIENT(2) in different uid UID(1).
     // Should pause previous job and start new job.
-    mScheduler->submit(CLIENT(2), JOB(0), PID(1), mRealtimeRequest, mClientCallback2);
+    mScheduler->submit(CLIENT(2), JOB(0), UID(1), mRealtimeRequest, mClientCallback2);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Pause(CLIENT(0), JOB(0)));
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Start(CLIENT(2), JOB(0)));
 
-    // Bring PID(0) back to top.
-    mCallback->setTop(PID(0));
-    mScheduler->onTopProcessChanged(PID(0));
+    // Bring UID(0) back to top.
+    mCallback->setTop(UID(0));
+    mScheduler->onTopUidChanged(UID(0));
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Pause(CLIENT(2), JOB(0)));
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Resume(CLIENT(0), JOB(0)));
 
-    // Bring invalid process to top.
-    mScheduler->onTopProcessChanged(kInvalidPid);
+    // Bring invalid uid to top.
+    mScheduler->onTopUidChanged(kInvalidUid);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
     // Finish job, next real-time job should resume.
@@ -428,19 +428,19 @@ TEST_F(TranscodingJobSchedulerTest, TestResourceLost) {
     ALOGD("TestResourceLost");
 
     // Submit real-time job to CLIENT(0), job should start immediately.
-    mScheduler->submit(CLIENT(0), JOB(0), PID(0), mRealtimeRequest, mClientCallback0);
+    mScheduler->submit(CLIENT(0), JOB(0), UID(0), mRealtimeRequest, mClientCallback0);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Start(CLIENT(0), JOB(0)));
 
     // Submit offline job to CLIENT(0), should not start.
-    mScheduler->submit(CLIENT(1), JOB(0), PID(0), mOfflineRequest, mClientCallback1);
+    mScheduler->submit(CLIENT(1), JOB(0), UID(0), mOfflineRequest, mClientCallback1);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
-    // Move PID(1) to top.
-    mCallback->setTop(PID(1));
+    // Move UID(1) to top.
+    mCallback->setTop(UID(1));
 
-    // Submit real-time job to CLIENT(2) in different pid PID(1).
+    // Submit real-time job to CLIENT(2) in different uid UID(1).
     // Should pause previous job and start new job.
-    mScheduler->submit(CLIENT(2), JOB(0), PID(1), mRealtimeRequest, mClientCallback2);
+    mScheduler->submit(CLIENT(2), JOB(0), UID(1), mRealtimeRequest, mClientCallback2);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Pause(CLIENT(0), JOB(0)));
     EXPECT_EQ(mCallback->popEvent(), TestCallback::Start(CLIENT(2), JOB(0)));
 
@@ -458,8 +458,8 @@ TEST_F(TranscodingJobSchedulerTest, TestResourceLost) {
     mScheduler->onResourceLost();
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
-    // Move PID(0) back to top, should have no resume due to no resource.
-    mScheduler->onTopProcessChanged(PID(0));
+    // Move UID(0) back to top, should have no resume due to no resource.
+    mScheduler->onTopUidChanged(UID(0));
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
     // Signal resource available, CLIENT(0) should resume.
@@ -471,11 +471,11 @@ TEST_F(TranscodingJobSchedulerTest, TestResourceLost) {
     mScheduler->onResourceLost();
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
-    // Move PID(2) to top.
-    mCallback->setTop(PID(2));
+    // Move UID(2) to top.
+    mCallback->setTop(UID(2));
 
-    // Submit real-time job to CLIENT(3) in PID(2), job shouldn't start due to no resource.
-    mScheduler->submit(CLIENT(3), JOB(0), PID(2), mRealtimeRequest, mClientCallback3);
+    // Submit real-time job to CLIENT(3) in UID(2), job shouldn't start due to no resource.
+    mScheduler->submit(CLIENT(3), JOB(0), UID(2), mRealtimeRequest, mClientCallback3);
     EXPECT_EQ(mCallback->popEvent(), TestCallback::NoEvent);
 
     // Signal resource available, CLIENT(3)'s job should start.

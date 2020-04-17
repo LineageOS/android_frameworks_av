@@ -59,8 +59,8 @@ struct TranscodingClientManager::ClientImpl : public BnTranscodingClient {
     // Pointer to the client manager for this client
     TranscodingClientManager* mOwner;
 
-    ClientImpl(const std::shared_ptr<ITranscodingClientCallback>& callback, pid_t pid,
-            uid_t uid, const std::string& clientName, const std::string& opPackageName,
+    ClientImpl(const std::shared_ptr<ITranscodingClientCallback>& callback, pid_t pid, uid_t uid,
+               const std::string& clientName, const std::string& opPackageName,
                TranscodingClientManager* owner);
 
     Status submitRequest(const TranscodingRequestParcel& /*in_request*/,
@@ -99,7 +99,7 @@ Status TranscodingClientManager::ClientImpl::submitRequest(
     int32_t jobId = mNextJobId.fetch_add(1);
 
     *_aidl_return =
-            mOwner->mJobScheduler->submit(mClientId, jobId, mClientPid, in_request,
+            mOwner->mJobScheduler->submit(mClientId, jobId, mClientUid, in_request,
                                           ITranscodingClientCallback::fromBinder(mClientCallback));
 
     if (*_aidl_return) {

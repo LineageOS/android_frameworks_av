@@ -18,10 +18,10 @@
 #define ANDROID_MEDIA_TRANSCODING_JOB_SCHEDULER_H
 
 #include <aidl/android/media/TranscodingJobPriority.h>
-#include <media/ProcessInfoInterface.h>
 #include <media/SchedulerClientInterface.h>
 #include <media/TranscoderInterface.h>
 #include <media/TranscodingRequest.h>
+#include <media/UidPolicyInterface.h>
 #include <utils/String8.h>
 
 #include <list>
@@ -32,14 +32,14 @@ namespace android {
 using ::aidl::android::media::TranscodingJobPriority;
 using ::aidl::android::media::TranscodingResultParcel;
 
-class TranscodingJobScheduler : public ProcessInfoCallbackInterface,
+class TranscodingJobScheduler : public UidPolicyCallbackInterface,
                                 public SchedulerClientInterface,
                                 public TranscoderCallbackInterface {
 public:
     virtual ~TranscodingJobScheduler();
 
     // SchedulerClientInterface
-    bool submit(ClientIdType clientId, int32_t jobId, pid_t pid,
+    bool submit(ClientIdType clientId, int32_t jobId, uid_t uid,
                 const TranscodingRequestParcel& request,
                 const std::weak_ptr<ITranscodingClientCallback>& clientCallback) override;
     bool cancel(ClientIdType clientId, int32_t jobId) override;
@@ -52,10 +52,10 @@ public:
     void onResourceLost() override;
     // ~TranscoderCallbackInterface
 
-    // ProcessInfoCallbackInterface
-    void onTopProcessChanged(int32_t pid) override;
+    // UidPolicyCallbackInterface
+    void onTopUidChanged(uid_t uid) override;
     void onResourceAvailable() override;
-    // ~ProcessInfoCallbackInterface
+    // ~UidPolicyCallbackInterface
 
 private:
     friend class MediaTranscodingService;
@@ -66,7 +66,7 @@ private:
 
     struct Job {
         JobKeyType key;
-        pid_t pid;
+        uid_t uid;
         enum JobState {
             NOT_STARTED,
             RUNNING,
@@ -82,23 +82,23 @@ private:
 
     std::map<JobKeyType, Job> mJobMap;
 
-    // Pid->JobQueue map (pid == -1: offline queue)
-    std::map<pid_t, JobQueueType> mJobQueues;
+    // uid->JobQueue map (uid == -1: offline queue)
+    std::map<uid_t, JobQueueType> mJobQueues;
 
-    // Pids, with the head being the most-recently-top app, 2nd item is the
+    // uids, with the head being the most-recently-top app, 2nd item is the
     // previous top app, etc.
-    std::list<pid_t> mPidSortedList;
-    std::list<pid_t>::iterator mOfflinePidIterator;
+    std::list<uid_t> mUidSortedList;
+    std::list<uid_t>::iterator mOfflineUidIterator;
 
     std::shared_ptr<TranscoderInterface> mTranscoder;
-    std::shared_ptr<ProcessInfoInterface> mProcInfo;
+    std::shared_ptr<UidPolicyInterface> mUidPolicy;
 
     Job* mCurrentJob;
     bool mResourceLost;
 
     // Only allow MediaTranscodingService and unit tests to instantiate.
     TranscodingJobScheduler(const std::shared_ptr<TranscoderInterface>& transcoder,
-                            const std::shared_ptr<ProcessInfoInterface>& procInfo);
+                            const std::shared_ptr<UidPolicyInterface>& uidPolicy);
 
     Job* getTopJob_l();
     void updateCurrentJob_l();
