@@ -230,7 +230,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         }
 
         const int32_t callbackBufferSize = mCallbackFrames * getBytesPerFrame();
-        mCallbackBuffer = new uint8_t[callbackBufferSize];
+        mCallbackBuffer = std::make_unique<uint8_t[]>(callbackBufferSize);
     }
 
     // For debugging and analyzing the distribution of MMAP timestamps.
@@ -279,8 +279,7 @@ aaudio_result_t AudioStreamInternal::release_l() {
         mServiceStreamHandle = AAUDIO_HANDLE_INVALID;
 
         mServiceInterface.closeStream(serviceStreamHandle);
-        delete[] mCallbackBuffer;
-        mCallbackBuffer = nullptr;
+        mCallbackBuffer.reset();
         result = mEndPointParcelable.close();
         aaudio_result_t result2 = AudioStream::release_l();
         return (result != AAUDIO_OK) ? result : result2;
