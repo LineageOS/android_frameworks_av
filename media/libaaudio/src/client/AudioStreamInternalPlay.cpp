@@ -268,11 +268,11 @@ void *AudioStreamInternalPlay::callbackLoop() {
     // result might be a frame count
     while (mCallbackEnabled.load() && isActive() && (result >= 0)) {
         // Call application using the AAudio callback interface.
-        callbackResult = maybeCallDataCallback(mCallbackBuffer, mCallbackFrames);
+        callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), mCallbackFrames);
 
         if (callbackResult == AAUDIO_CALLBACK_RESULT_CONTINUE) {
             // Write audio data to stream. This is a BLOCKING WRITE!
-            result = write(mCallbackBuffer, mCallbackFrames, timeoutNanos);
+            result = write(mCallbackBuffer.get(), mCallbackFrames, timeoutNanos);
             if ((result != mCallbackFrames)) {
                 if (result >= 0) {
                     // Only wrote some of the frames requested. Must have timed out.

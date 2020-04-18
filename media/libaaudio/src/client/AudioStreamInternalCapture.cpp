@@ -243,7 +243,7 @@ void *AudioStreamInternalCapture::callbackLoop() {
         int64_t timeoutNanos = calculateReasonableTimeout(mCallbackFrames);
 
         // This is a BLOCKING READ!
-        result = read(mCallbackBuffer, mCallbackFrames, timeoutNanos);
+        result = read(mCallbackBuffer.get(), mCallbackFrames, timeoutNanos);
         if ((result != mCallbackFrames)) {
             ALOGE("callbackLoop: read() returned %d", result);
             if (result >= 0) {
@@ -255,7 +255,7 @@ void *AudioStreamInternalCapture::callbackLoop() {
         }
 
         // Call application using the AAudio callback interface.
-        callbackResult = maybeCallDataCallback(mCallbackBuffer, mCallbackFrames);
+        callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), mCallbackFrames);
 
         if (callbackResult == AAUDIO_CALLBACK_RESULT_STOP) {
             ALOGD("%s(): callback returned AAUDIO_CALLBACK_RESULT_STOP", __func__);
