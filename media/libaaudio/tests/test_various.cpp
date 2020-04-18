@@ -28,15 +28,20 @@
 
 // Callback function that does nothing.
 aaudio_data_callback_result_t NoopDataCallbackProc(
-        AAudioStream *stream,
-        void *userData,
+        AAudioStream * stream,
+        void * /* userData */,
         void *audioData,
         int32_t numFrames
 ) {
-    (void) stream;
-    (void) userData;
-    (void) audioData;
-    (void) numFrames;
+    int channels = AAudioStream_getChannelCount(stream);
+    int numSamples = channels * numFrames;
+    bool allZeros = true;
+    float * const floatData = reinterpret_cast<float *>(audioData);
+    for (int i = 0; i < numSamples; i++) {
+        allZeros &= (floatData[i] == 0.0f);
+        floatData[i] = 0.0f;
+    }
+    EXPECT_TRUE(allZeros);
     return AAUDIO_CALLBACK_RESULT_CONTINUE;
 }
 
@@ -56,6 +61,7 @@ void checkReleaseThenClose(aaudio_performance_mode_t perfMode,
                                         nullptr);
     AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, perfMode);
     AAudioStreamBuilder_setSharingMode(aaudioBuilder, sharingMode);
+    AAudioStreamBuilder_setFormat(aaudioBuilder, AAUDIO_FORMAT_PCM_FLOAT);
 
     // Create an AAudioStream using the Builder.
     ASSERT_EQ(AAUDIO_OK,
@@ -114,6 +120,7 @@ void checkStateTransition(aaudio_performance_mode_t perfMode,
     // Request stream properties.
     AAudioStreamBuilder_setDataCallback(aaudioBuilder, NoopDataCallbackProc, nullptr);
     AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, perfMode);
+    AAudioStreamBuilder_setFormat(aaudioBuilder, AAUDIO_FORMAT_PCM_FLOAT);
 
     // Create an AAudioStream using the Builder.
     ASSERT_EQ(AAUDIO_OK, AAudioStreamBuilder_openStream(aaudioBuilder, &aaudioStream));
