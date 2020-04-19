@@ -21,6 +21,7 @@
 #include <cutils/properties.h>
 #include <media/TypeConverter.h>
 #include <media/convert.h>
+#include <system/audio_config.h>
 #include <utils/Log.h>
 #include <libxml/parser.h>
 #include <libxml/xinclude.h>
@@ -693,9 +694,6 @@ android::status_t parseLegacyVolumeFile(const char* path, VolumeGroups &volumeGr
     return deserializeLegacyVolumeCollection(doc, cur, volumeGroups, nbSkippedElements);
 }
 
-static const char *kConfigLocationList[] = {"/odm/etc", "/vendor/etc", "/system/etc"};
-static const int kConfigLocationListSize =
-        (sizeof(kConfigLocationList) / sizeof(kConfigLocationList[0]));
 static const int gApmXmlConfigFilePathMaxLength = 128;
 
 static constexpr const char *apmXmlConfigFileName = "audio_policy_configuration.xml";
@@ -715,9 +713,9 @@ android::status_t parseLegacyVolumes(VolumeGroups &volumeGroups) {
     fileNames.push_back(apmXmlConfigFileName);
 
     for (const char* fileName : fileNames) {
-        for (int i = 0; i < kConfigLocationListSize; i++) {
+        for (const auto& path : audio_get_configuration_paths()) {
             snprintf(audioPolicyXmlConfigFile, sizeof(audioPolicyXmlConfigFile),
-                     "%s/%s", kConfigLocationList[i], fileName);
+                     "%s/%s", path.c_str(), fileName);
             ret = parseLegacyVolumeFile(audioPolicyXmlConfigFile, volumeGroups);
             if (ret == NO_ERROR) {
                 return ret;
