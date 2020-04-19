@@ -35,11 +35,6 @@ namespace effectsConfig {
 /** Default path of effect configuration file. Relative to DEFAULT_LOCATIONS. */
 constexpr const char* DEFAULT_NAME = "audio_effects.xml";
 
-/** Default path of effect configuration file.
- * The /vendor partition is the recommended one, the others are deprecated.
- */
-constexpr const char* DEFAULT_LOCATIONS[] = {"/odm/etc", "/vendor/etc", "/system/etc"};
-
 /** Directories where the effect libraries will be search for. */
 constexpr const char* LD_EFFECT_LIBRARY_PATH[] =
 #ifdef __LP64__
