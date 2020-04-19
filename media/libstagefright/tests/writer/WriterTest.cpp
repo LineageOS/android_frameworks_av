@@ -107,6 +107,7 @@ class WriterTest {
         }
         mBufferInfo.clear();
         if (mInputStream.is_open()) mInputStream.close();
+        if (gEnv->cleanUp()) remove(OUTPUT_FILE_NAME);
     }
 
     void setupWriterType(string writerFormat) {
