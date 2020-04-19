@@ -19,12 +19,13 @@
         <option name="cleanup" value="true" />
         <option name="push" value="writerTest->/data/local/tmp/writerTest" />
         <option name="push-file"
-            key="https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/tests/writer/Writer.zip?unzip=true"
-            value="/data/local/tmp/writerTestRes/" />
+            key="https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/tests/writer/WriterTestRes.zip?unzip=true"
+            value="/data/local/tmp/WriterTestRes/" />
     </target_preparer>
     <test class="com.android.tradefed.testtype.GTest" >
         <option name="native-test-device-path" value="/data/local/tmp" />
         <option name="module-name" value="writerTest" />
-        <option name="native-test-flag" value="-P /data/local/tmp/writerTestRes/" />
+        <option name="native-test-flag" value="-P /data/local/tmp/WriterTestRes/" />
+        <option name="native-test-flag" value="-C true" />
     </test>
 </configuration>
