@@ -25,7 +25,7 @@ using namespace std;
 
 class WriterTestEnvironment : public ::testing::Environment {
   public:
-    WriterTestEnvironment() : res("/data/local/tmp/") {}
+    WriterTestEnvironment() : res("/data/local/tmp/"), deleteOutput(true) {}
 
     // Parses the command line arguments
     int initFromOptions(int argc, char **argv);
@@ -34,16 +34,21 @@ class WriterTestEnvironment : public ::testing::Environment {
 
     const string getRes() const { return res; }
 
+    bool cleanUp() const { return deleteOutput; }
+
   private:
     string res;
+    bool deleteOutput;
 };
 
 int WriterTestEnvironment::initFromOptions(int argc, char **argv) {
-    static struct option options[] = {{"res", required_argument, 0, 'P'}, {0, 0, 0, 0}};
+    static struct option options[] = {{"res", required_argument, 0, 'P'},
+                                      {"cleanUp", optional_argument, 0, 'C'},
+                                      {0, 0, 0, 0}};
 
     while (true) {
         int index = 0;
-        int c = getopt_long(argc, argv, "P:", options, &index);
+        int c = getopt_long(argc, argv, "P:C:", options, &index);
         if (c == -1) {
             break;
         }
@@ -51,6 +56,11 @@ int WriterTestEnvironment::initFromOptions(int argc, char **argv) {
         switch (c) {
             case 'P':
                 setRes(optarg);
+                break;
+            case 'C':
+                if (!strcmp(optarg, "false")) {
+                    deleteOutput = false;
+                }
                 break;
             default:
                 break;
@@ -62,7 +72,8 @@ int WriterTestEnvironment::initFromOptions(int argc, char **argv) {
                 "unrecognized option: %s\n\n"
                 "usage: %s <gtest options> <test options>\n\n"
                 "test options are:\n\n"
-                "-P, --path: Resource files directory location\n",
+                "-P, --path: Resource files directory location\n"
+                "-C, default:true. Delete output file after test completes\n",
                 argv[optind ?: 1], argv[0]);
         return 2;
     }
