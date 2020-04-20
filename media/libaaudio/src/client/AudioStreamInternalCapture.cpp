@@ -42,8 +42,8 @@ AudioStreamInternalCapture::AudioStreamInternalCapture(AAudioServiceInterface  &
 AudioStreamInternalCapture::~AudioStreamInternalCapture() {}
 
 void AudioStreamInternalCapture::advanceClientToMatchServerPosition() {
-    int64_t readCounter = mAudioEndpoint.getDataReadCounter();
-    int64_t writeCounter = mAudioEndpoint.getDataWriteCounter();
+    int64_t readCounter = mAudioEndpoint->getDataReadCounter();
+    int64_t writeCounter = mAudioEndpoint->getDataWriteCounter();
 
     // Bump offset so caller does not see the retrograde motion in getFramesRead().
     int64_t offset = readCounter - writeCounter;
@@ -53,7 +53,7 @@ void AudioStreamInternalCapture::advanceClientToMatchServerPosition() {
 
     // Force readCounter to match writeCounter.
     // This is because we cannot change the write counter in the hardware.
-    mAudioEndpoint.setDataReadCounter(writeCounter);
+    mAudioEndpoint->setDataReadCounter(writeCounter);
 }
 
 // Write the data, block if needed and timeoutMillis > 0
@@ -86,7 +86,7 @@ aaudio_result_t AudioStreamInternalCapture::processDataNow(void *buffer, int32_t
     }
     // If we have gotten this far then we have at least one timestamp from server.
 
-    if (mAudioEndpoint.isFreeRunning()) {
+    if (mAudioEndpoint->isFreeRunning()) {
         //ALOGD("AudioStreamInternalCapture::processDataNow() - update remote counter");
         // Update data queue based on the timing model.
         // Jitter in the DSP can cause late writes to the FIFO.
@@ -95,7 +95,7 @@ aaudio_result_t AudioStreamInternalCapture::processDataNow(void *buffer, int32_t
         // that the DSP could have written the data.
         int64_t estimatedRemoteCounter = mClockModel.convertLatestTimeToPosition(currentNanoTime);
         // TODO refactor, maybe use setRemoteCounter()
-        mAudioEndpoint.setDataWriteCounter(estimatedRemoteCounter);
+        mAudioEndpoint->setDataWriteCounter(estimatedRemoteCounter);
     }
 
     // This code assumes that we have already received valid timestamps.
@@ -108,8 +108,8 @@ aaudio_result_t AudioStreamInternalCapture::processDataNow(void *buffer, int32_t
 
     // If the capture buffer is full beyond capacity then consider it an overrun.
     // For shared streams, the xRunCount is passed up from the service.
-    if (mAudioEndpoint.isFreeRunning()
-        && mAudioEndpoint.getFullFramesAvailable() > mAudioEndpoint.getBufferCapacityInFrames()) {
+    if (mAudioEndpoint->isFreeRunning()
+        && mAudioEndpoint->getFullFramesAvailable() > mAudioEndpoint->getBufferCapacityInFrames()) {
         mXRunCount++;
         if (ATRACE_ENABLED()) {
             ATRACE_INT("aaOverRuns", mXRunCount);
@@ -143,7 +143,7 @@ aaudio_result_t AudioStreamInternalCapture::processDataNow(void *buffer, int32_t
                 // Calculate frame position based off of the readCounter because
                 // the writeCounter might have just advanced in the background,
                 // causing us to sleep until a later burst.
-                int64_t nextPosition = mAudioEndpoint.getDataReadCounter() + mFramesPerBurst;
+                int64_t nextPosition = mAudioEndpoint->getDataReadCounter() + mFramesPerBurst;
                 wakeTime = mClockModel.convertPositionToLatestTime(nextPosition);
             }
                 break;
@@ -166,7 +166,7 @@ aaudio_result_t AudioStreamInternalCapture::readNowWithConversion(void *buffer,
     uint8_t *destination = (uint8_t *) buffer;
     int32_t framesLeft = numFrames;
 
-    mAudioEndpoint.getFullFramesAvailable(&wrappingBuffer);
+    mAudioEndpoint->getFullFramesAvailable(&wrappingBuffer);
 
     // Read data in one or two parts.
     for (int partIndex = 0; framesLeft > 0 && partIndex < WrappingBuffer::SIZE; partIndex++) {
@@ -208,26 +208,29 @@ aaudio_result_t AudioStreamInternalCapture::readNowWithConversion(void *buffer,
     }
 
     int32_t framesProcessed = numFrames - framesLeft;
-    mAudioEndpoint.advanceReadIndex(framesProcessed);
+    mAudioEndpoint->advanceReadIndex(framesProcessed);
 
     //ALOGD("readNowWithConversion() returns %d", framesProcessed);
     return framesProcessed;
 }
 
 int64_t AudioStreamInternalCapture::getFramesWritten() {
-    const int64_t framesWrittenHardware = isClockModelInControl()
-            ? mClockModel.convertTimeToPosition(AudioClock::getNanoseconds())
-            : mAudioEndpoint.getDataWriteCounter();
-    // Add service offset and prevent retrograde motion.
-    mLastFramesWritten = std::max(mLastFramesWritten,
-                                  framesWrittenHardware + mFramesOffsetFromService);
+    if (mAudioEndpoint) {
+        const int64_t framesWrittenHardware = isClockModelInControl()
+                ? mClockModel.convertTimeToPosition(AudioClock::getNanoseconds())
+                : mAudioEndpoint->getDataWriteCounter();
+        // Add service offset and prevent retrograde motion.
+        mLastFramesWritten = std::max(mLastFramesWritten,
+                                      framesWrittenHardware + mFramesOffsetFromService);
+    }
     return mLastFramesWritten;
 }
 
 int64_t AudioStreamInternalCapture::getFramesRead() {
-    int64_t frames = mAudioEndpoint.getDataReadCounter() + mFramesOffsetFromService;
-    //ALOGD("getFramesRead() returns %lld", (long long)frames);
-    return frames;
+    if (mAudioEndpoint) {
+        mLastFramesRead = mAudioEndpoint->getDataReadCounter() + mFramesOffsetFromService;
+    }
+    return mLastFramesRead;
 }
 
 // Read data from the stream and pass it to the callback for processing.
