@@ -138,3 +138,30 @@ cc_fuzz {
         "libbinder",
     ],
 }
+
+cc_fuzz {
+    name: "aac_extractor_fuzzer",
+
+    srcs: [
+        "aac_extractor_fuzzer.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/extractors/aac",
+    ],
+
+    static_libs: [
+        "liblog",
+        "libstagefright_foundation",
+        "libmedia",
+        "libextractorfuzzerbase",
+        "libaacextractor",
+        "libstagefright_metadatautils",
+    ],
+
+    shared_libs: [
+        "libutils",
+        "libmediandk",
+        "libbinder",
+    ],
+}
