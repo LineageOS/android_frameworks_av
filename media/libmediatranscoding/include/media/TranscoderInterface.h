@@ -43,6 +43,7 @@ public:
     // TODO(chz): determine what parameters are needed here.
     virtual void onFinish(int64_t clientId, int32_t jobId) = 0;
     virtual void onError(int64_t clientId, int32_t jobId, TranscodingErrorCode err) = 0;
+    virtual void onProgressUpdate(int64_t clientId, int32_t jobId, int32_t progress) = 0;
 
     // Called when transcoding becomes temporarily inaccessible due to loss of resource.
     // If there is any job currently running, it will be paused. When resource contention

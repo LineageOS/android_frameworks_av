@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// #define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #define LOG_TAG "TranscodingJobScheduler"
 
 #define VALIDATE_STATE 1
@@ -106,6 +106,10 @@ void TranscodingJobScheduler::removeJob_l(const JobKeyType& jobKey) {
     if (uid != OFFLINE_UID && jobQueue.empty()) {
         mUidSortedList.remove(uid);
         mJobQueues.erase(uid);
+        mUidPolicy->unregisterMonitorUid(uid);
+
+        std::unordered_set<uid_t> topUids = mUidPolicy->getTopUids();
+        moveUidsToTop_l(topUids, false /*preserveTopUid*/);
     }
 
     // Clear current job.
@@ -115,6 +119,59 @@ void TranscodingJobScheduler::removeJob_l(const JobKeyType& jobKey) {
 
     // Remove job from job map.
     mJobMap.erase(jobKey);
+}
+
+/**
+ * Moves the set of uids to the front of mUidSortedList (which is used to pick
+ * the next job to run).
+ *
+ * This is called when 1) we received a onTopUidsChanged() callbcak from UidPolicy,
+ * or 2) we removed the job queue for a uid because it becomes empty.
+ *
+ * In case of 1), if there are multiple uids in the set, and the current front
+ * uid in mUidSortedList is still in the set, we try to keep that uid at front
+ * so that current job run is not interrupted. (This is not a concern for case 2)
+ * because the queue for a uid was just removed entirely.)
+ */
+void TranscodingJobScheduler::moveUidsToTop_l(const std::unordered_set<uid_t>& uids,
+                                              bool preserveTopUid) {
+    // If uid set is empty, nothing to do. Do not change the queue status.
+    if (uids.empty()) {
+        return;
+    }
+
+    // Save the current top uid.
+    uid_t curTopUid = *mUidSortedList.begin();
+    bool pushCurTopToFront = false;
+    int32_t numUidsMoved = 0;
+
+    // Go through the sorted uid list once, and move the ones in top set to front.
+    for (auto it = mUidSortedList.begin(); it != mUidSortedList.end();) {
+        uid_t uid = *it;
+
+        if (uid != OFFLINE_UID && uids.count(uid) > 0) {
+            it = mUidSortedList.erase(it);
+
+            // If this is the top we're preserving, don't push it here, push
+            // it after the for-loop.
+            if (uid == curTopUid && preserveTopUid) {
+                pushCurTopToFront = true;
+            } else {
+                mUidSortedList.push_front(uid);
+            }
+
+            // If we found all uids in the set, break out.
+            if (++numUidsMoved == uids.size()) {
+                break;
+            }
+        } else {
+            ++it;
+        }
+    }
+
+    if (pushCurTopToFront) {
+        mUidSortedList.push_front(curTopUid);
+    }
 }
 
 bool TranscodingJobScheduler::submit(ClientIdType clientId, int32_t jobId, uid_t uid,
@@ -150,6 +207,7 @@ bool TranscodingJobScheduler::submit(ClientIdType clientId, int32_t jobId, uid_t
     // and add a new queue if needed.
     if (uid != OFFLINE_UID) {
         if (mJobQueues.count(uid) == 0) {
+            mUidPolicy->registerMonitorUid(uid);
             if (mUidPolicy->isUidOnTop(uid)) {
                 mUidSortedList.push_front(uid);
             } else {
@@ -222,7 +280,7 @@ void TranscodingJobScheduler::onFinish(ClientIdType clientId, int32_t jobId) {
     std::scoped_lock lock{mLock};
 
     if (mJobMap.count(jobKey) == 0) {
-        ALOGW("ignoring abort for non-existent job");
+        ALOGW("ignoring finish for non-existent job");
         return;
     }
 
@@ -230,7 +288,7 @@ void TranscodingJobScheduler::onFinish(ClientIdType clientId, int32_t jobId) {
     // to client if the job is paused. Transcoder could have posted finish when
     // we're pausing it, and the finish arrived after we changed current job.
     if (mJobMap[jobKey].state == Job::NOT_STARTED) {
-        ALOGW("ignoring abort for job that was never started");
+        ALOGW("ignoring finish for job that was never started");
         return;
     }
 
@@ -258,7 +316,7 @@ void TranscodingJobScheduler::onError(int64_t clientId, int32_t jobId, Transcodi
     std::scoped_lock lock{mLock};
 
     if (mJobMap.count(jobKey) == 0) {
-        ALOGW("ignoring abort for non-existent job");
+        ALOGW("ignoring error for non-existent job");
         return;
     }
 
@@ -266,7 +324,7 @@ void TranscodingJobScheduler::onError(int64_t clientId, int32_t jobId, Transcodi
     // to client if the job is paused. Transcoder could have posted finish when
     // we're pausing it, and the finish arrived after we changed current job.
     if (mJobMap[jobKey].state == Job::NOT_STARTED) {
-        ALOGW("ignoring abort for job that was never started");
+        ALOGW("ignoring error for job that was never started");
         return;
     }
 
@@ -286,6 +344,34 @@ void TranscodingJobScheduler::onError(int64_t clientId, int32_t jobId, Transcodi
     validateState_l();
 }
 
+void TranscodingJobScheduler::onProgressUpdate(int64_t clientId, int32_t jobId, int32_t progress) {
+    JobKeyType jobKey = std::make_pair(clientId, jobId);
+
+    ALOGV("%s: job %s, progress %d", __FUNCTION__, jobToString(jobKey).c_str(), progress);
+
+    std::scoped_lock lock{mLock};
+
+    if (mJobMap.count(jobKey) == 0) {
+        ALOGW("ignoring progress for non-existent job");
+        return;
+    }
+
+    // Only ignore if job was never started. In particular, propagate the status
+    // to client if the job is paused. Transcoder could have posted finish when
+    // we're pausing it, and the finish arrived after we changed current job.
+    if (mJobMap[jobKey].state == Job::NOT_STARTED) {
+        ALOGW("ignoring progress for job that was never started");
+        return;
+    }
+
+    {
+        auto clientCallback = mJobMap[jobKey].callback.lock();
+        if (clientCallback != nullptr) {
+            clientCallback->onProgressUpdate(jobId, progress);
+        }
+    }
+}
+
 void TranscodingJobScheduler::onResourceLost() {
     ALOGV("%s", __FUNCTION__);
 
@@ -302,28 +388,25 @@ void TranscodingJobScheduler::onResourceLost() {
     validateState_l();
 }
 
-void TranscodingJobScheduler::onTopUidChanged(uid_t uid) {
-    ALOGV("%s: uid %d", __FUNCTION__, uid);
+void TranscodingJobScheduler::onTopUidsChanged(const std::unordered_set<uid_t>& uids) {
+    if (uids.empty()) {
+        ALOGW("%s: ignoring empty uids", __FUNCTION__);
+        return;
+    }
+
+    std::string uidStr;
+    for (auto it = uids.begin(); it != uids.end(); it++) {
+        if (!uidStr.empty()) {
+            uidStr += ", ";
+        }
+        uidStr += std::to_string(*it);
+    }
+
+    ALOGD("%s: topUids: size %zu, uids: %s", __FUNCTION__, uids.size(), uidStr.c_str());
 
     std::scoped_lock lock{mLock};
 
-    if (uid == OFFLINE_UID) {
-        ALOGW("%s: ignoring invalid uid %d", __FUNCTION__, uid);
-        return;
-    }
-    // If this uid doesn't have any jobs, we don't care about it.
-    if (mJobQueues.count(uid) == 0) {
-        ALOGW("%s: ignoring uid %d without any jobs", __FUNCTION__, uid);
-        return;
-    }
-    // If this uid is already top, don't do anything.
-    if (uid == *mUidSortedList.begin()) {
-        ALOGW("%s: uid %d is already top", __FUNCTION__, uid);
-        return;
-    }
-
-    mUidSortedList.remove(uid);
-    mUidSortedList.push_front(uid);
+    moveUidsToTop_l(uids, true /*preserveTopUid*/);
 
     updateCurrentJob_l();
 

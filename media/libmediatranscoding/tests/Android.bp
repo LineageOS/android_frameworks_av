@@ -37,6 +37,9 @@ cc_test {
     srcs: ["TranscodingClientManager_tests.cpp"],
 }
 
+//
+// TranscodingJobScheduler unit test
+//
 cc_test {
     name: "TranscodingJobScheduler_tests",
     defaults: ["libmediatranscoding_test_defaults"],

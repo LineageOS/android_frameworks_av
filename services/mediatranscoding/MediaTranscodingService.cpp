@@ -22,6 +22,7 @@
 #include <android/binder_process.h>
 #include <media/TranscodingClientManager.h>
 #include <media/TranscodingJobScheduler.h>
+#include <media/TranscodingUidPolicy.h>
 #include <private/android_filesystem_config.h>
 #include <utils/Log.h>
 #include <utils/Vector.h>
@@ -48,10 +49,9 @@ static bool isTrustedCallingUid(uid_t uid) {
     }
 }
 
-// DummyTranscoder and DummyUidPolicy are currently used to instantiate
-// MediaTranscodingService on service side for testing, so that we could
-// actually test the IPC calls of MediaTranscodingService to expose some
-// issues that's observable only over IPC.
+// DummyTranscoder is currently used to instantiate MediaTranscodingService on
+// service side for testing, so that we could actually test the IPC calls of
+// MediaTranscodingService to expose some issues that's observable only over IPC.
 class DummyTranscoder : public TranscoderInterface {
     void start(int64_t clientId, int32_t jobId) override {
         (void)clientId;
@@ -67,16 +67,9 @@ class DummyTranscoder : public TranscoderInterface {
     }
 };
 
-class DummyUidPolicy : public UidPolicyInterface {
-    bool isUidOnTop(uid_t uid) override {
-        (void)uid;
-        return true;
-    }
-};
-
 MediaTranscodingService::MediaTranscodingService()
       : MediaTranscodingService(std::make_shared<DummyTranscoder>(),
-                                std::make_shared<DummyUidPolicy>()) {}
+                                std::make_shared<TranscodingUidPolicy>()) {}
 
 MediaTranscodingService::MediaTranscodingService(
         const std::shared_ptr<TranscoderInterface>& transcoder,
@@ -84,6 +77,7 @@ MediaTranscodingService::MediaTranscodingService(
       : mJobScheduler(new TranscodingJobScheduler(transcoder, uidPolicy)),
         mClientManager(new TranscodingClientManager(mJobScheduler)) {
     ALOGV("MediaTranscodingService is created");
+    uidPolicy->setCallback(mJobScheduler);
 }
 
 MediaTranscodingService::~MediaTranscodingService() {
