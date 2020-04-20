@@ -35,7 +35,13 @@ ndk_headers {
 cc_library_headers {
     name: "media_ndk_headers",
     vendor_available: true,
-    export_include_dirs: ["include"]
+    export_include_dirs: ["include"],
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
 
 cc_library_shared {
