@@ -152,10 +152,16 @@ bool AudioOutputDescriptor::isFixedVolume(const DeviceTypeSet& deviceTypes __unu
 bool AudioOutputDescriptor::setVolume(float volumeDb,
                                       VolumeSource volumeSource,
                                       const StreamTypeVector &/*streams*/,
-                                      const DeviceTypeSet& /*deviceTypes*/,
+                                      const DeviceTypeSet& deviceTypes,
                                       uint32_t delayMs,
                                       bool force)
 {
+
+    if (!supportedDevices().containsDeviceAmongTypes(deviceTypes)) {
+        ALOGV("%s output ID %d unsupported device %s",
+                __func__, getId(), toString(deviceTypes).c_str());
+        return false;
+    }
     // We actually change the volume if:
     // - the float value returned by computeVolume() changed
     // - the force flag is set
