@@ -111,6 +111,33 @@ aaudio_result_t AudioStream::systemStart() {
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
+    switch (getState()) {
+        // Is this a good time to start?
+        case AAUDIO_STREAM_STATE_OPEN:
+        case AAUDIO_STREAM_STATE_PAUSING:
+        case AAUDIO_STREAM_STATE_PAUSED:
+        case AAUDIO_STREAM_STATE_STOPPING:
+        case AAUDIO_STREAM_STATE_STOPPED:
+        case AAUDIO_STREAM_STATE_FLUSHED:
+            break; // Proceed with starting.
+
+        // Already started?
+        case AAUDIO_STREAM_STATE_STARTING:
+        case AAUDIO_STREAM_STATE_STARTED:
+            ALOGW("%s() stream was already started, state = %s", __func__,
+                  AudioGlobal_convertStreamStateToText(getState()));
+            return AAUDIO_ERROR_INVALID_STATE;
+
+        // Don't start when the stream is dead!
+        case AAUDIO_STREAM_STATE_DISCONNECTED:
+        case AAUDIO_STREAM_STATE_CLOSING:
+        case AAUDIO_STREAM_STATE_CLOSED:
+        default:
+            ALOGW("%s() stream is dead, state = %s", __func__,
+                  AudioGlobal_convertStreamStateToText(getState()));
+            return AAUDIO_ERROR_INVALID_STATE;
+    }
+
     aaudio_result_t result = requestStart();
     if (result == AAUDIO_OK) {
         // We only call this for logging in "dumpsys audio". So ignore return code.
@@ -156,8 +183,8 @@ aaudio_result_t AudioStream::systemPause() {
         case AAUDIO_STREAM_STATE_CLOSING:
         case AAUDIO_STREAM_STATE_CLOSED:
         default:
-            ALOGW("safePause() stream not running, state = %s",
-                  AudioGlobal_convertStreamStateToText(getState()));
+            ALOGW("%s() stream not running, state = %s",
+                  __func__, AudioGlobal_convertStreamStateToText(getState()));
             return AAUDIO_ERROR_INVALID_STATE;
     }
 
@@ -267,6 +294,11 @@ void AudioStream::setState(aaudio_stream_state_t state) {
     // CLOSED is a final state
     if (mState == AAUDIO_STREAM_STATE_CLOSED) {
         ALOGE("%s(%d) tried to set to %d but already CLOSED", __func__, getId(), state);
+
+    // Once CLOSING, we can only move to CLOSED state.
+    } else if (mState == AAUDIO_STREAM_STATE_CLOSING
+               && state != AAUDIO_STREAM_STATE_CLOSED) {
+        ALOGE("%s(%d) tried to set to %d but already CLOSING", __func__, getId(), state);
 
     // Once DISCONNECTED, we can only move to CLOSING or CLOSED state.
     } else if (mState == AAUDIO_STREAM_STATE_DISCONNECTED
