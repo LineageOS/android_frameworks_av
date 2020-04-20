@@ -25,9 +25,9 @@ Download and extract the folder. Push all the files in this folder to /data/loca
 adb push WriterTestRes /data/local/tmp/
 ```
 
-usage: writerTest -P \<path_to_res_folder\>
+usage: writerTest -P \<path_to_res_folder\> -C <remove_output_file>
 ```
-adb shell /data/local/tmp/writerTest -P /data/local/tmp/WriterTestRes/
+adb shell /data/local/tmp/writerTest -P /data/local/tmp/WriterTestRes/ -C true
 ```
 Alternatively, the test can also be run using atest command.
 

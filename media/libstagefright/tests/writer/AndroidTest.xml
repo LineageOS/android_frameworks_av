@@ -26,5 +26,6 @@
         <option name="native-test-device-path" value="/data/local/tmp" />
         <option name="module-name" value="writerTest" />
         <option name="native-test-flag" value="-P /data/local/tmp/WriterTestRes/" />
+        <option name="native-test-flag" value="-C true" />
     </test>
 </configuration>
