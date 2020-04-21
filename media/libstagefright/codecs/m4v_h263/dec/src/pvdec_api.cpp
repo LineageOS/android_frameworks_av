@@ -830,7 +830,14 @@ uint32 PVGetVideoTimeStamp(VideoDecControls *decCtrl)
 OSCL_EXPORT_REF void PVSetPostProcType(VideoDecControls *decCtrl, int mode)
 {
     VideoDecData *video = (VideoDecData *)decCtrl->videoDecoderData;
+#ifdef PV_POSTPROC_ON
     video->postFilterType = mode;
+#else
+    if (mode != 0) {
+        ALOGE("Post processing filters are not supported");
+    }
+    video->postFilterType = 0;
+#endif
 }
 
 
