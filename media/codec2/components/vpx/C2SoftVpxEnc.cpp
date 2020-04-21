@@ -67,8 +67,9 @@ C2SoftVpxEnc::C2SoftVpxEnc(const char* name, c2_node_id_t id,
       mLastTimestamp(0x7FFFFFFFFFFFFFFFull),
       mSignalledOutputEos(false),
       mSignalledError(false) {
-    memset(mTemporalLayerBitrateRatio, 0, sizeof(mTemporalLayerBitrateRatio));
-    mTemporalLayerBitrateRatio[0] = 100;
+    for (int i = 0; i < MAXTEMPORALLAYERS; i++) {
+        mTemporalLayerBitrateRatio[i] = 1.0f;
+    }
 }
 
 C2SoftVpxEnc::~C2SoftVpxEnc() {
@@ -123,7 +124,8 @@ status_t C2SoftVpxEnc::initEncoder() {
         mFrameRate = mIntf->getFrameRate_l();
         mIntraRefresh = mIntf->getIntraRefresh_l();
         mRequestSync = mIntf->getRequestSync_l();
-        mTemporalLayers = mIntf->getTemporalLayers_l()->m.layerCount;
+        mLayering = mIntf->getTemporalLayers_l();
+        mTemporalLayers = mLayering->m.layerCount;
     }
 
     switch (mBitrateMode->value) {
@@ -225,6 +227,7 @@ status_t C2SoftVpxEnc::initEncoder() {
             mTemporalPattern[5] = kTemporalUpdateGoldenRefAltRef;
             mTemporalPattern[6] = kTemporalUpdateLastRefAltRef;
             mTemporalPattern[7] = kTemporalUpdateNone;
+            mTemporalLayerBitrateRatio[0] = mLayering->m.bitrateRatios[0];
             mTemporalPatternLength = 8;
             break;
         case 3:
@@ -245,6 +248,8 @@ status_t C2SoftVpxEnc::initEncoder() {
             mTemporalPattern[5] = kTemporalUpdateNone;
             mTemporalPattern[6] = kTemporalUpdateGoldenRefAltRef;
             mTemporalPattern[7] = kTemporalUpdateNone;
+            mTemporalLayerBitrateRatio[0] = mLayering->m.bitrateRatios[0];
+            mTemporalLayerBitrateRatio[1] = mLayering->m.bitrateRatios[1];
             mTemporalPatternLength = 8;
             break;
         default:
@@ -255,7 +260,7 @@ status_t C2SoftVpxEnc::initEncoder() {
     for (size_t i = 0; i < mCodecConfiguration->ts_number_layers; i++) {
         mCodecConfiguration->ts_target_bitrate[i] =
             mCodecConfiguration->rc_target_bitrate *
-            mTemporalLayerBitrateRatio[i] / 100;
+            mTemporalLayerBitrateRatio[i];
     }
     if (mIntf->getSyncFramePeriod() >= 0) {
         mCodecConfiguration->kf_max_dist = mIntf->getSyncFramePeriod();
