@@ -1,0 +1,58 @@
+cc_binary {
+    name: "audioserver",
+
+    srcs: [
+        "main_audioserver.cpp",
+    ],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+
+    header_libs: [
+        "libaudiohal_headers",
+        "libmediametrics_headers",
+    ],
+
+    shared_libs: [
+        "libaaudioservice",
+        "libaudioflinger",
+        "libaudiopolicyservice",
+        "libaudioprocessing",
+        "libbinder",
+        "libcutils",
+        "libhidlbase",
+        "liblog",
+        "libmedia",
+        "libmedialogservice",
+        "libmediautils",
+        "libnbaio",
+        "libnblog",
+        "libpowermanager",
+        "libutils",
+        "libvibrator",
+
+    ],
+
+    // TODO check if we still need all of these include directories
+    include_dirs: [
+        "external/sonic",
+        "frameworks/av/media/libaaudio/include",
+        "frameworks/av/media/libaaudio/src",
+        "frameworks/av/media/libaaudio/src/binding",
+        "frameworks/av/media/libmedia/include",
+        "frameworks/av/services/audioflinger",
+        "frameworks/av/services/audiopolicy",
+        "frameworks/av/services/audiopolicy/common/include",
+        "frameworks/av/services/audiopolicy/common/managerdefinitions/include",
+        "frameworks/av/services/audiopolicy/engine/interface",
+        "frameworks/av/services/audiopolicy/service",
+        "frameworks/av/services/medialog",
+
+        // TODO oboeservice is the old folder name for aaudioservice. It will be changed.
+        "frameworks/av/services/oboeservice",
+    ],
+
+    init_rc: ["audioserver.rc"],
+}
