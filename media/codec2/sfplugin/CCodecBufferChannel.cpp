@@ -867,14 +867,19 @@ status_t CCodecBufferChannel::renderOutputBuffer(
                 .minLuminance = hdrStaticInfo->mastering.minLuminance,
             };
 
-            struct android_cta861_3_metadata cta861_meta = {
-                .maxContentLightLevel = hdrStaticInfo->maxCll,
-                .maxFrameAverageLightLevel = hdrStaticInfo->maxFall,
-            };
-
-            hdr.validTypes = HdrMetadata::SMPTE2086 | HdrMetadata::CTA861_3;
+            hdr.validTypes = HdrMetadata::SMPTE2086;
             hdr.smpte2086 = smpte2086_meta;
-            hdr.cta8613 = cta861_meta;
+
+            // If the content light level fields are 0, do not use them, it
+            // indicates the value may not be present in the stream.
+            if (hdrStaticInfo->maxCll > 0.0f && hdrStaticInfo->maxFall > 0.0f) {
+                struct android_cta861_3_metadata cta861_meta = {
+                    .maxContentLightLevel = hdrStaticInfo->maxCll,
+                    .maxFrameAverageLightLevel = hdrStaticInfo->maxFall,
+                };
+                hdr.validTypes |= HdrMetadata::CTA861_3;
+                hdr.cta8613 = cta861_meta;
+            }
         }
         if (hdr10PlusInfo) {
             hdr.validTypes |= HdrMetadata::HDR10PLUS;
