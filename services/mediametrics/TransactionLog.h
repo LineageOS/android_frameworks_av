@@ -21,6 +21,7 @@
 #include <sstream>
 #include <string>
 
+#include <android-base/thread_annotations.h>
 #include <media/MediaMetricsItem.h>
 
 namespace android::mediametrics {
@@ -92,7 +93,7 @@ public:
         std::vector<std::any> garbage;  // objects destroyed after lock.
         std::lock_guard lock(mLock);
 
-        (void)gc_l(garbage);
+        (void)gc(garbage);
         mLog.emplace(time, item);
         mItemMap[key].emplace(time, item);
         return NO_ERROR;  // no errors for now.
@@ -104,7 +105,7 @@ public:
     std::vector<std::shared_ptr<const mediametrics::Item>> get(
             int64_t startTime = 0, int64_t endTime = INT64_MAX) const {
         std::lock_guard lock(mLock);
-        return getItemsInRange_l(mLog, startTime, endTime);
+        return getItemsInRange(mLog, startTime, endTime);
     }
 
     /**
@@ -116,7 +117,7 @@ public:
         std::lock_guard lock(mLock);
         auto mapIt = mItemMap.find(key);
         if (mapIt == mItemMap.end()) return {};
-        return getItemsInRange_l(mapIt->second, startTime, endTime);
+        return getItemsInRange(mapIt->second, startTime, endTime);
     }
 
     /**
@@ -204,7 +205,6 @@ private:
         return { ss.str(), lines - ll };
     }
 
-    // GUARDED_BY mLock
     /**
      * Garbage collects if the TimeMachine size exceeds the high water mark.
      *
@@ -213,7 +213,7 @@ private:
      *
      * \return true if garbage collection was done.
      */
-    bool gc_l(std::vector<std::any>& garbage) {
+    bool gc(std::vector<std::any>& garbage) REQUIRES(mLock) {
         if (mLog.size() < mHighWaterMark) return false;
 
         ALOGD("%s: garbage collection", __func__);
@@ -268,7 +268,7 @@ private:
         return true;
     }
 
-    static std::vector<std::shared_ptr<const mediametrics::Item>> getItemsInRange_l(
+    static std::vector<std::shared_ptr<const mediametrics::Item>> getItemsInRange(
             const MapTimeItem& map,
             int64_t startTime = 0, int64_t endTime = INT64_MAX) {
         auto it = map.lower_bound(startTime);
@@ -289,11 +289,8 @@ private:
 
     mutable std::mutex mLock;
 
-    // GUARDED_BY mLock
-    MapTimeItem mLog;
-
-    // GUARDED_BY mLock
-    std::map<std::string /* item_key */, MapTimeItem> mItemMap;
+    MapTimeItem mLog GUARDED_BY(mLock);
+    std::map<std::string /* item_key */, MapTimeItem> mItemMap GUARDED_BY(mLock);
 };
 
 } // namespace android::mediametrics

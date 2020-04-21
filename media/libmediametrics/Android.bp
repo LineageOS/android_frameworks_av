@@ -22,9 +22,11 @@ cc_library_shared {
     export_include_dirs: ["include"],
 
     cflags: [
-        "-Werror",
-        "-Wno-error=deprecated-declarations",
         "-Wall",
+        "-Werror",
+        "-Wextra",
+        "-Wthread-safety",
+        "-Wunreachable-code",
     ],
 
     sanitize: {
