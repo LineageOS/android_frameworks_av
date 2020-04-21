@@ -44,6 +44,7 @@ cc_library_static {
 
     cflags: [
         "-Werror",
+        "-DDEC_NOPOSTPROC",
     ],
 
     version_script: "exports.lds",
