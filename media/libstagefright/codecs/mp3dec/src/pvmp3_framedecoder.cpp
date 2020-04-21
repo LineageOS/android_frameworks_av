@@ -659,19 +659,11 @@ void pvmp3_InitDecoder(tPVMP3DecoderExternal *pExt,
     huffcodetab       *pHuff;
 
     pVars = (tmp3dec_file *)pMem;
-
-    pVars->num_channels = 0;
+    memset(pVars, 0, sizeof(*pVars));
 
     pExt->totalNumberOfBitsUsed = 0;
     pExt->inputBufferCurrentLength = 0;
     pExt->inputBufferUsedLength    = 0;
-
-    pVars->mainDataStream.offset = 0;
-
-    pv_memset((void*)pVars->mainDataBuffer,
-              0,
-              BUFSIZE*sizeof(*pVars->mainDataBuffer));
-
 
     pVars->inputStream.pBuffer = pExt->pInputBuffer;
 
