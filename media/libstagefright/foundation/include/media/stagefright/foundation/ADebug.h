@@ -148,7 +148,8 @@ struct ADebug {
     static char *GetDebugName(const char *name);
 
     inline static bool isExperimentEnabled(
-            const char *name __unused /* nonnull */, bool allow __unused = true) {
+            const char *name __attribute__((unused)) /* nonnull */,
+            bool allow __attribute__((unused)) = true) {
 #ifdef ENABLE_STAGEFRIGHT_EXPERIMENTS
         if (!strcmp(name, "legacy-adaptive")) {
             return getExperimentFlag(allow, name, 2, 1); // every other day
